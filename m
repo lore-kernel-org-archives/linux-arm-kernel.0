@@ -1,101 +1,108 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Aug 2010 16:20:26 -0500
-Subject: RFC: A better clock rounding API?
-In-Reply-To: <4C6B7213.3030808@codeaurora.org>
-References: <4C6B7213.3030808@codeaurora.org>
-Message-ID: <AANLkTik1cES4GP4hRf=B5BLrEN35B3p7rFz+tcsHDtHf@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 20 Aug 2010 23:42:36 +0200
+Subject: [PATCH 1/5] mfd: add codec resource into 88pm860x driver
+In-Reply-To: <20100813135858.GA6449@rakim.wolfsonmicro.main>
+References: <AANLkTi=NVRGys_Mv8u-2Ca6w2r1F2DCvKdquqsquwbpH@mail.gmail.com>
+	<20100813135858.GA6449@rakim.wolfsonmicro.main>
+Message-ID: <20100820214235.GG3650@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saravana,
+On Fri, Aug 13, 2010 at 02:58:58PM +0100, Mark Brown wrote:
+> On Fri, Aug 13, 2010 at 09:55:19PM +0800, Haojian Zhuang wrote:
+> > From 7f48ab298f0017ff8b86dbc11f8de21505965ce7 Mon Sep 17 00:00:00 2001
+> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> > Date: Thu, 12 Aug 2010 11:59:33 +0800
+> > Subject: [PATCH 1/5] mfd: add codec resource into 88pm860x driver
+> > 
+> > Add codec IRQ resources that are used in 88pm860x codec driver.
+> 
+> CCing in Samuel since this ought to have his ack.  
+The patch looks good. I'll ack it once Mark's comment gets integrated.
+As for how it should hit upstream, I'm fine taking it unless Haojian prefers
+to see the whole patchset going through Liam's tree.
 
-On Wed, Aug 18, 2010 at 12:39 AM, Saravana Kannan
-<skannan@codeaurora.org> wrote:
-> I'm mostly familiar with ARM. ?So I will limit the discussion to ARM
-> boards/machines. ?But I think the points raised in this email would apply
-> for most architectures.
->
-> I'm sending this to the ARM mailing list first to see if I can get a
-> consensus within the ARM community before I propose this to the wider
-> audience in LKML.
->
-> The meaning of clk_round_rate() is very ambiguous since the nature of the
-> rounding is architecture and platform specific. ?In the case of ARM, it's up
-> to each ARM mach's clock driver to determine how it wants to round the rate.
->
-> To quote Russel King from an email about a month ago:
-> "clk_round_rate() returns the clock rate which will be set if you ask
-> clk_set_rate() to set that rate. ?It provides a way to query from the
-> implementation exactly what rate you'll get if you use clk_set_rate() with
-> that same argument."
->
-> So when someone writes a device driver for a device that's external to the
-> SoC or is integrated into more than one SoC, they currently have the
-> following options to deal with clock rates differences:
->
-> 1. Use clk_round_rate() to get clock rates and test their driver on the
-> one/few board(s) they have at hand and hope it works on boards using
-> different SoCs.
->
-> 2. Add each and every needed clock rate (low power rate, high performance
-> rate, handshake rate, etc) as fields to their platform data and have it
-> populated in every board file that uses the device.
->
-> 3. Do a search of the frequency space of the clock by making several
-> clk_round_rate() calls at various intervals between their minimum and
-> maximum acceptable rates and hope to find one of the supported rates. If
-> clk_round_rate() does a +/- N percentage rounding and the interval is
-> larger, even this searching might not find an existing rate that's supported
-> between the driver's min and max acceptable rates.
->
-> IMHO, each of these options have short comings that could be alleviated by
-> adding a more definitive "rounding" API. ?Also, considering that it's the
-> consumer of each clock that knows best what amount of rounding and in which
-> direction is acceptable, IMHO the current approach of hiding the rounding
-> inside the clock drivers seems counter intuitive.
->
-> I would like to propose the addition of either:
->
-> long clk_find_rate(struct clk *clk,
-> ? ? ? ? ? ? ? ? ? ? ? ?unsigned long min_rate,
-> ? ? ? ? ? ? ? ? ? ? ? ?long max_rate);
->
-> or
->
-> long clk_find_rate(struct clk *clk,
-> ? ? ? ? ? ? ? ? ? ? ? ?unsigned long start_rate,
-> ? ? ? ? ? ? ? ? ? ? ? ?long end_rate);
->
-> The advantage of the 2nd suggestion is that it allows a driver to specify
-> which end of a frequency range it prefers. ?But I'm not sure how important
-> of an advantage that is. ?So, proposing both and having the community decide
-> which one, if any, is acceptable.
->
-> If the clk_find_rate() API is available, the driver developer wouldn't have
-> to worry about figuring out a way for the clk_set_rate() to work on
-> different platforms/machs/SoCs. If a platform/mach/SoC can provide a clock
-> rate that's acceptable to their hardware and software requirements, then
-> they can be assured to find it without having to jump through hoops or
-> having a driver not work when it could have.
->
-> Does the addition of one of the suggested APIs sound reasonable? If not, can
-> someone explain what the right/better solution is? If the addition of a new
-> API is reasonable, what's the community preference between the two
-> suggestion? If I submit a patch that will add one of the APIs is it likely
-> to be accepted?
->
-> Thanks for your time.
->
+Cheers,
+Samuel.
 
-This is still ambiguous. If there are multiple valid frequencies in
-the range, is the preferred rate returned the lowest rate or highest
-rate in the range? For something like an SD bus clock you would want
-the maximum rate within the range. For something like a LCD pixel
-clock or CMOS sensor input clock, you typically only need to be
-greater than a certain minimum freq and for power reasons you want it
-to be closest to the minimum.
+> It may as well be
+> merged via the MFD tree since there's no build time dependency, I guess.
+> I do have one comment...
+> 
+> > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> > ---
+> >  drivers/mfd/88pm860x-core.c |   44 +++++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 44 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+> > index 1580f1f..fba00b4 100644
+> > --- a/drivers/mfd/88pm860x-core.c
+> > +++ b/drivers/mfd/88pm860x-core.c
+> > @@ -158,6 +158,43 @@ static struct mfd_cell onkey_devs[] = {
+> >  	},
+> >  };
+> > 
+> > +static struct resource codec_resources[] = {
+> > +	{
+> > +		/* Headset microphone insertion or removal */
+> > +		.name		= "micin",
+> > +		.start		= PM8607_IRQ_MICIN,
+> > +		.end		= PM8607_IRQ_MICIN,
+> > +		.flags		= IORESOURCE_IRQ,
+> > +	}, {
+> > +		/* Hook-switch press or release */
+> > +		.name		= "hook",
+> > +		.start		= PM8607_IRQ_HOOK,
+> > +		.end		= PM8607_IRQ_HOOK,
+> > +		.flags		= IORESOURCE_IRQ,
+> > +	}, {
+> > +		/* Headset insertion or removal */
+> > +		.name		= "headset",
+> > +		.start		= PM8607_IRQ_HEADSET,
+> > +		.end		= PM8607_IRQ_HEADSET,
+> > +		.flags		= IORESOURCE_IRQ,
+> > +	}, {
+> > +		/* Audio short */
+> > +		.name		= "audio-short",
+> > +		.start		= PM8607_IRQ_AUDIO_SHORT,
+> > +		.end		= PM8607_IRQ_AUDIO_SHORT,
+> > +		.flags		= IORESOURCE_IRQ,
+> > +	},
+> > +};
+> > +
+> > +static struct mfd_cell codec_devs[] = {
+> > +	{
+> > +		.name		= "88pm860x-codec",
+> > +		.num_resources	= 4,
+> 
+> It'd be better to use ARRAY_SIZE() here.
+> 
+> > +		.resources	= &codec_resources[0],
+> > +		.id		= -1,
+> > +	},
+> > +};
+> > +
+> >  static struct resource regulator_resources[] = {
+> >  	PM8607_REG_RESOURCE(BUCK1, BUCK1),
+> >  	PM8607_REG_RESOURCE(BUCK2, BUCK2),
+> > @@ -695,6 +732,13 @@ static void __devinit device_8607_init(struct
+> > pm860x_chip *chip,
+> >  		goto out_dev;
+> >  	}
+> > 
+> > +	ret = mfd_add_devices(chip->dev, 0, &codec_devs[0],
+> > +			      ARRAY_SIZE(codec_devs),
+> > +			      &codec_resources[0], 0);
+> > +	if (ret < 0) {
+> > +		dev_err(chip->dev, "Failed to add codec subdev\n");
+> > +		goto out_dev;
+> > +	}
+> >  	return;
+> >  out_dev:
+> >  	mfd_remove_devices(chip->dev);
+> > -- 
+> > 1.5.6.5
 
-Perhaps adding a flag to clk_round_rate to indicate to round up, down,
-or smallest delta would be sufficient.
-
-Rob
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
