@@ -1,34 +1,60 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 20 Aug 2010 08:31:11 +0200
-Subject: [PATCH] lpc32xx/clock: Use && instead of &
-In-Reply-To: <083DF309106F364B939360100EC290F80ACF95B12A@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1281451732-19294-1-git-send-email-w.sang@pengutronix.de>
-	<083DF309106F364B939360100EC290F80ACF95B12A@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20100820063111.GA7313@pengutronix.de>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Fri, 20 Aug 2010 08:38:10 +0200
+Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <20100820121124Z.fujita.tomonori@lab.ntt.co.jp>
+References: <AANLkTikp49oOny-vrtRTsJvA3Sps08=w7__JjdA3FE8t@mail.gmail.com>
+	<20100820001339N.fujita.tomonori@lab.ntt.co.jp>
+	<op.vhppgaxq7p4s8u@localhost>
+	<20100820121124Z.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <op.vhp4pws27p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 20, 2010 at 12:50:17AM +0200, Kevin Wells wrote:
-> > Subject: [PATCH] lpc32xx/clock: Use && instead of &
-> > 
-> > Because we are connecting two expressions here, not binary values.
-> > 
-> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Kevin Wells <wellsk40@gmail.com>
-> 
-> Acked-by: Kevin Wells <wellsk40@gmail.com>
-> 
-> Do you want me to pull this patch into my next series?
+On Fri, 20 Aug 2010 05:12:50 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+>> 1. Integration on API level meaning that some kind of existing API is used
+>>     instead of new cma_*() calls.  CMA adds notion of devices and memory
+>>     types which is new to all the other APIs (coherent has notion of devices
+>>     but that's not enough).  This basically means that no existing API can be
+>>     used for CMA.  On the other hand, removing notion of devices and memory
+>>     types would defeat the whole purpose of CMA thus destroying the solution
+>>     that CMA provides.
+>
+> You can create something similar to the existing API for memory
+> allocator.
 
-Yes, I think this would be easiest.
+That may be tricky.  cma_alloc() takes four parameters each of which is
+required for CMA.  No other existing set of API uses all those arguments.
+This means, CMA needs it's own, somehow unique API.  I don't quite see
+how the APIs may be unified or "made similar".  Of course, I'm gladly
+accepting suggestions.
+
+>> 2. Reuse of memory pools meaning that memory reserved by CMA can then be
+>>     used by other allocation mechanisms.  This is of course possible.  For
+>>     instance coherent could easily be implemented as a wrapper to CMA.
+>>     This is doable and can be done in the future after CMA gets more
+>>     recognition.
+>>
+>> 3. Reuse of algorithms meaning that allocation algorithms used by other
+>>     allocators will be used with CMA regions.  This is doable as well and
+>>     can be done in the future.
+>
+> Well, why can't we do the above before the inclusion?
+
+Because it's quite a bit of work and instead of diverting my attention I'd
+prefer to make CMA as good as possible and then integrate it with other
+subsystems.  Also, adding the integration would change the patch from being
+4k lines to being like 40k lines.
+
+What I'm trying to say is that I don't consider that a work for now but
+rather a further enchantments.
+
+> Anyway, I think that comments from mm people would be helpful to merge
+> this.
+
+Yes, I agree.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100820/f5192be9/attachment-0001.sig>
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
