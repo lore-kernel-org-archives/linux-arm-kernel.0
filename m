@@ -1,53 +1,67 @@
-From: Simon.Richter@hogyros.de (Simon Richter)
-Date: Fri, 20 Aug 2010 14:41:28 +0200
-Subject: ptrace(PTRACE_PEEKUSER, ..., PT_TEXT_ADDR, ...)
-Message-ID: <20100820124118.GC6950@richter>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 20 Aug 2010 17:18:04 +0200
+Subject: [PATCH] AT91: Correct configuration define value
+In-Reply-To: <1277974545-30331-1-git-send-email-nicolas.ferre@atmel.com>
+References: <4c6fe9a4c298214223ff89d06401ac7b66f81c98.1277911346.git.siccegge@cs.fau.de>
+	<1277974545-30331-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4C6E9CAC.4000404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le 01/07/2010 10:55, Nicolas Ferre :
+> The MTD nand driver for Atmel chips is atmel_nand and not at91_nand anymore.
+> Change wrong configuration variables that were remaining.
+> 
+> Reported-by: Christoph Egger <siccegge@cs.fau.de>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-when patching gdbserver to work on MMUless ARM systems I found that
-there are two definitions for the magic values for PT_TEXT_ADDR (and the
-related fields) in different Linux versions. uClinux 2.4 kernels use
-values starting from 0xc4 (the same as the Coldfire port), while 2.6
-based kernels use magic numbers starting from 0x10000, which were
-introduced in 68b7f7153fa58df710924fbb79722717d2d16094 .
+We can add:
+Acked-by: Kirill A. Shutemov <kirill@shutemov.name>
 
-As has been pointed out by Andreas Schwab from SuSE, the code
-responsible for returning the text segment address is never reached
-because the lines immediately before the code added in the commit
-already filter these out and return -EIO.
+> ---
+> Christoph,
 
-So apparently the new values have never really been in use (so I
-wouldn't consider them part of the kernel interface), and the old values
-now point to something else (because VFP registers were added to struct
-user).
+Christoph,
 
-The "new" values are published in <asm/ptrace.h>, and according to a
-quick search on koders.com, no one but gdb even mentions that name; gdb
-only does so in gdbserver/linux-low.c, where the entire block that
-retrieves the offsets is conditional, and as <sys/ptrace.h> does not
-pull in <asm/ptrace.h> and gdbserver only includes the former, hence the
-current mechanism is unused on ARM, and debugging on MMUless systems is
-broken.
+Is this patch handled by you as part of your patch series or should I
+include it in "Trivial" or "AT91" patch series?
 
-How should this be resolved?
+Bye,
 
-Option 1 would be to exempt the magic values from the size check in
-arch/arm/kernel/ptrace.c. That would probably introduce the least
-breakage, should libc ever decide to include <asm/ptrace.h> from
-<sys/ptrace.h> and someone else use the new libc headers with old kernel
-headers.
+> Thank you for highlighting this. But please consider this
+> patch instead of yours.
+> 
+>  arch/arm/mach-at91/board-at572d940hf_ek.c |    2 +-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c   |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
+> index 5daff27..4665162 100644
+> --- a/arch/arm/mach-at91/board-at572d940hf_ek.c
+> +++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
+> @@ -216,7 +216,7 @@ static struct atmel_nand_data __initdata eb_nand_data = {
+>  /*	.rdy_pin	= AT91_PIN_PC16, */
+>  	.enable_pin	= AT91_PIN_PA15,
+>  	.partition_info	= nand_partitions,
+> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
+> +#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+>  	.bus_width_16	= 1,
+>  #else
+>  	.bus_width_16	= 0,
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index ee80059..37af9b1 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -135,7 +135,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
+>  	.rdy_pin	= AT91_PIN_PC8,
+>  	.enable_pin	= AT91_PIN_PC14,
+>  	.partition_info	= nand_partitions,
+> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
+> +#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
+>  	.bus_width_16	= 1,
+>  #else
+>  	.bus_width_16	= 0,
 
-Option 2 is to move the values to the user page. This way, the special
-case in ptrace.c could go away, however it would make the values
-writeable via ptrace(), which would probably be undesirable.
 
-Additionally, we could introduce a warning if anyone uses 0xc4, 0xc8 or
-0xcc as offsets without also reading at 0xc0 before; this way, people
-using the "old" interface can be told to upgrade.
-
-Opinions?
-
-   Simon
+-- 
+Nicolas Ferre
