@@ -1,53 +1,58 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 20 Aug 2010 19:31:29 +0900
-Subject: [PATCH] ARM: S5PV210: Update I2C-1 Clock Register Property.
-In-Reply-To: <1282199919-32523-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1282199919-32523-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <00da01cb4052$dcb20020$96160060$%kim@samsung.com>
+Date: Fri, 20 Aug 2010 19:21:26 +0900
+Subject: [PATCH] ARM: S5PV310: Fix on typo irqs.h of S5PV310
+Message-ID: <1282299686-5143-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> CLK_GATE_IP3[8] is RESERVED. The port "I2C_HDMI_DDY" of
-> CLK_GATE_IP3[10] is used as another I2C port (but not dedicated to HDMI
-> as if it is a general I2C port)
-> 
-> Therefore, we define the unused I2C-1 (IP3[8] is not used) as another
-> I2C there was left undefined but used.
-> 
+This patch fixes typo 'IRQ_WTD'(?) in the irqs.h of S5PV310.
+And minor update comments.
 
-Your patch file is right, but your comment is not.
-Because actually, I2C1 is dedicated to I2C_HDMI_DDC...
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv310/include/mach/irqs.h |   11 +++++++----
+ 1 files changed, 7 insertions(+), 4 deletions(-)
 
-Anyway, will apply.
-
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/clock.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index af91fef..825b868 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -357,7 +357,7 @@ static struct clk init_clocks_disable[] = {
->  		.id		= 1,
->  		.parent		= &clk_pclk_psys.clk,
->  		.enable		= s5pv210_clk_ip3_ctrl,
-> -		.ctrlbit	= (1<<8),
-> +		.ctrlbit	= (1 << 10),
->  	}, {
->  		.name		= "i2c",
->  		.id		= 2,
-> --
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-s5pv310/include/mach/irqs.h
+index 56885ca..4cdedda 100644
+--- a/arch/arm/mach-s5pv310/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+@@ -15,12 +15,14 @@
+ 
+ #include <plat/irqs.h>
+ 
+-/* Private Peripheral Interrupt */
++/* PPI: Private Peripheral Interrupt */
++
+ #define IRQ_PPI(x)		S5P_IRQ(x+16)
+ 
+ #define IRQ_LOCALTIMER		IRQ_PPI(13)
+ 
+-/* Shared Peripheral Interrupt */
++/* SPI: Shared Peripheral Interrupt */
++
+ #define IRQ_SPI(x)		S5P_IRQ(x+32)
+ 
+ #define IRQ_EINT0		IRQ_SPI(40)
+@@ -36,7 +38,7 @@
+ #define IRQ_PCIE		IRQ_SPI(50)
+ #define IRQ_SYSTEM_TIMER	IRQ_SPI(51)
+ #define IRQ_MFC			IRQ_SPI(52)
+-#define IRQ_WTD			IRQ_SPI(53)
++#define IRQ_WDT			IRQ_SPI(53)
+ #define IRQ_AUDIO_SS		IRQ_SPI(54)
+ #define IRQ_AC97		IRQ_SPI(55)
+ #define IRQ_SPDIF		IRQ_SPI(56)
+@@ -67,8 +69,9 @@
+ #define IRQ_IIC			COMBINER_IRQ(27, 0)
+ 
+ /* Set the default NR_IRQS */
++
+ #define NR_IRQS			COMBINER_IRQ(MAX_COMBINER_NR, 0)
+ 
+ #define MAX_COMBINER_NR		39
+ 
+-#endif /* ASM_ARCH_IRQS_H */
++#endif /* __ASM_ARCH_IRQS_H */
+-- 
+1.6.2.5
