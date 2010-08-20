@@ -1,58 +1,114 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Fri, 20 Aug 2010 15:57:51 +0900
-Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <op.vhp4pws27p4s8u@localhost>
-References: <op.vhppgaxq7p4s8u@localhost>
-	<20100820121124Z.fujita.tomonori@lab.ntt.co.jp>
-	<op.vhp4pws27p4s8u@localhost>
-Message-ID: <20100820155617S.fujita.tomonori@lab.ntt.co.jp>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 20 Aug 2010 15:58:47 +0900
+Subject: [PATCH 10/14] ARM: S5PV310: Adds uart clocks
+In-Reply-To: <AANLkTi=LexGc0WfjLUOdV9PFJciTckus81=j62zmDzEE@mail.gmail.com>
+References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
+	<1282140084-10265-11-git-send-email-kgene.kim@samsung.com>
+	<AANLkTi=LexGc0WfjLUOdV9PFJciTckus81=j62zmDzEE@mail.gmail.com>
+Message-ID: <00aa01cb4035$385833e0$a9089ba0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Aug 2010 08:38:10 +0200
-**UNKNOWN CHARSET** <m.nazarewicz@samsung.com> wrote:
-
-> On Fri, 20 Aug 2010 05:12:50 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
-> >> 1. Integration on API level meaning that some kind of existing API is used
-> >>     instead of new cma_*() calls.  CMA adds notion of devices and memory
-> >>     types which is new to all the other APIs (coherent has notion of devices
-> >>     but that's not enough).  This basically means that no existing API can be
-> >>     used for CMA.  On the other hand, removing notion of devices and memory
-> >>     types would defeat the whole purpose of CMA thus destroying the solution
-> >>     that CMA provides.
-> >
-> > You can create something similar to the existing API for memory
-> > allocator.
+MyungJoo Ham wrote:
 > 
-> That may be tricky.  cma_alloc() takes four parameters each of which is
-> required for CMA.  No other existing set of API uses all those arguments.
-> This means, CMA needs it's own, somehow unique API.  I don't quite see
-> how the APIs may be unified or "made similar".  Of course, I'm gladly
-> accepting suggestions.
-
-Have you even tried to search 'blk_kmalloc' on google? I wrote
-"similar to the existing API', not "reuse the existing API".
-
-
-> >> 2. Reuse of memory pools meaning that memory reserved by CMA can then be
-> >>     used by other allocation mechanisms.  This is of course possible.  For
-> >>     instance coherent could easily be implemented as a wrapper to CMA.
-> >>     This is doable and can be done in the future after CMA gets more
-> >>     recognition.
-> >>
-> >> 3. Reuse of algorithms meaning that allocation algorithms used by other
-> >>     allocators will be used with CMA regions.  This is doable as well and
-> >>     can be done in the future.
-> >
-> > Well, why can't we do the above before the inclusion?
+> Hello,
 > 
-> Because it's quite a bit of work and instead of diverting my attention I'd
-> prefer to make CMA as good as possible and then integrate it with other
-> subsystems.  Also, adding the integration would change the patch from being
-> 4k lines to being like 40k lines.
+Hi,
 
-4k to 40k? I'm not sure. But If I see something like the following, I
-suspect that there is a better way to integrate this into the existing
-infrastructure.
+> Did you intentionally omit uart:0? Then, why uart:0 clock is not being
+> registered while other uart clocks are?
+> 
+Just missed...thanks for finding it.
 
-mm/cma-best-fit.c                   |  407 +++++++++++++++
+Will fix it.
+
+> On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> > From: Jongpill Lee <boyko.lee@samsung.com>
+> >
+> > This patch adds uart clocks for S5PV310/S5PC210.
+> >
+> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?arch/arm/mach-s5pv310/clock.c | ? 37
+> +++++++++++++++++++++++++++++++------
+> > ?1 files changed, 31 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s5pv310/clock.c
+b/arch/arm/mach-s5pv310/clock.c
+> > index 8728504..843f4d0 100644
+> > --- a/arch/arm/mach-s5pv310/clock.c
+> > +++ b/arch/arm/mach-s5pv310/clock.c
+> > @@ -61,6 +61,11 @@ static int s5pv310_clk_ip_fsys_ctrl(struct clk *clk,
+int
+> enable)
+> > ? ? ? ?return s5p_gatectrl(S5P_CLKGATE_IP_FSYS, clk, enable);
+> > ?}
+> >
+> > +static int s5pv310_clk_ip_peril_ctrl(struct clk *clk, int enable)
+> > +{
+> > + ? ? ? return s5p_gatectrl(S5P_CLKGATE_IP_PERIL, clk, enable);
+> > +}
+> > +
+> > ?/* Core list of CMU_CPU side */
+> >
+> > ?static struct clksrc_clk clk_mout_apll = {
+> > @@ -257,11 +262,6 @@ static struct clksrc_clk clk_sclk_vpll = {
+> > ? ? ? ?.reg_src ? ? ? ?= { .reg = S5P_CLKSRC_TOP0, .shift = 8, .size = 1
+},
+> > ?};
+> >
+> > -static int s5pv310_clk_ip_peril_ctrl(struct clk *clk, int enable)
+> > -{
+> > - ? ? ? return s5p_gatectrl(S5P_CLKGATE_IP_PERIL, clk, enable);
+> > -}
+> > -
+> > ?static struct clk init_clocks_disable[] = {
+> > ? ? ? ?{
+> > ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "timers",
+> > @@ -303,7 +303,32 @@ static struct clk init_clocks_disable[] = {
+> > ?};
+> >
+> > ?static struct clk init_clocks[] = {
+> > - ? ? ? /* Nothing here yet */
+> > + ? ? ? {
+> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "uart",
+> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
+> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 1),
+> > + ? ? ? }, {
+> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "uart",
+> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 2,
+> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 2),
+> > + ? ? ? }, {
+> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "uart",
+> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 3,
+> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 3),
+> > + ? ? ? }, {
+> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "uart",
+> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 4,
+> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 4),
+> > + ? ? ? }, {
+> > + ? ? ? ? ? ? ? .name ? ? ? ? ? = "uart",
+> > + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 5,
+> > + ? ? ? ? ? ? ? .enable ? ? ? ? = s5pv310_clk_ip_peril_ctrl,
+> > + ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 5),
+> > + ? ? ? }
+> > ?};
+> >
+> > ?static struct clk *clkset_group_list[] = {
+> > --
+> > 1.6.2.5
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
