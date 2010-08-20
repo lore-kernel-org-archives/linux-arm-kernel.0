@@ -1,67 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Aug 2010 09:56:50 +0300
-Subject: [PATCH 3/6] OMAP3: PM: ensure IO wakeups are properly disabled
-In-Reply-To: <4C6D7936.3090201@ru.mvista.com>
-References: <20100813080034.18750.15410.stgit@baageli.muru.com>
-	<20100813080200.18750.37791.stgit@baageli.muru.com>
-	<4C651635.8000201@ru.mvista.com>
-	<20100813102933.GN12706@atomide.com>
-	<4C65238D.9080105@ru.mvista.com>
-	<87sk2ao4fr.fsf@deeprootsystems.com>
-	<4C6D7936.3090201@ru.mvista.com>
-Message-ID: <20100820065649.GH25742@atomide.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Fri, 20 Aug 2010 15:57:51 +0900
+Subject: [PATCH/RFCv3 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <op.vhp4pws27p4s8u@localhost>
+References: <op.vhppgaxq7p4s8u@localhost>
+	<20100820121124Z.fujita.tomonori@lab.ntt.co.jp>
+	<op.vhp4pws27p4s8u@localhost>
+Message-ID: <20100820155617S.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sergei Shtylyov <sshtylyov@mvista.com> [100819 21:27]:
-> Hello.
-> 
-> Kevin Hilman wrote:
-> 
-> >>>>>From: Kevin Hilman <khilman@ti.com>
-> >>>>>Commit 5a5f561 (convert OMAP3 PRCM macros to the _SHIFT/_MASK suffixes)
-> >>>>>mistakenly removed the check for PER when disabling the IO chain.
-> >>>>>During idle, if the PER powerdomain transitions and CORE does not (as
-> 
-> >>>>  Does not what?
-> 
-> >>>How about ".. and CORE does not transition"?
-> 
-> >>   Transition to what then? Sentense till won't parse right...
-> 
-> >>>Kevin, care to clarify that?
-> >>   Yeah, looks like a considerable partt of that sentense got omitted...
-> 
-> >No.  Nothing was omitted.
-> 
-> >It's like saying "Tony drinks Fernet and Kevin does not."  Adding an
-> >additional "drinks Fernet" at the end is redundant.
-> 
->    Sorry, the sentence still doesn't parse for me. You don't say
-> "Fernet" there BTW, so it's not clear where the PER powerdomain
-> transitions to. What goes after the closing parenthesis doesn't
-> clear things up either, it just describes what happens if...
+On Fri, 20 Aug 2010 08:38:10 +0200
+**UNKNOWN CHARSET** <m.nazarewicz@samsung.com> wrote:
 
-I'll update it with the following to preserve the Fernet style,
-and to describe the transition:
+> On Fri, 20 Aug 2010 05:12:50 +0200, FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+> >> 1. Integration on API level meaning that some kind of existing API is used
+> >>     instead of new cma_*() calls.  CMA adds notion of devices and memory
+> >>     types which is new to all the other APIs (coherent has notion of devices
+> >>     but that's not enough).  This basically means that no existing API can be
+> >>     used for CMA.  On the other hand, removing notion of devices and memory
+> >>     types would defeat the whole purpose of CMA thus destroying the solution
+> >>     that CMA provides.
+> >
+> > You can create something similar to the existing API for memory
+> > allocator.
+> 
+> That may be tricky.  cma_alloc() takes four parameters each of which is
+> required for CMA.  No other existing set of API uses all those arguments.
+> This means, CMA needs it's own, somehow unique API.  I don't quite see
+> how the APIs may be unified or "made similar".  Of course, I'm gladly
+> accepting suggestions.
 
-During idle, if the PER powerdomain transitions into a lower state
-and CORE does not, the IO pad wakeups are not being disabled in
-the idle path after they are enabled. This can happen with the
-lower C-states when using CPUidle for example.
+Have you even tried to search 'blk_kmalloc' on google? I wrote
+"similar to the existing API', not "reuse the existing API".
 
-Updated patch attached.
 
-Please reply ASAP if this is not OK, I'd like to get a pull
-request for these fixes sent to Linus over the weekend.
+> >> 2. Reuse of memory pools meaning that memory reserved by CMA can then be
+> >>     used by other allocation mechanisms.  This is of course possible.  For
+> >>     instance coherent could easily be implemented as a wrapper to CMA.
+> >>     This is doable and can be done in the future after CMA gets more
+> >>     recognition.
+> >>
+> >> 3. Reuse of algorithms meaning that allocation algorithms used by other
+> >>     allocators will be used with CMA regions.  This is doable as well and
+> >>     can be done in the future.
+> >
+> > Well, why can't we do the above before the inclusion?
+> 
+> Because it's quite a bit of work and instead of diverting my attention I'd
+> prefer to make CMA as good as possible and then integrate it with other
+> subsystems.  Also, adding the integration would change the patch from being
+> 4k lines to being like 40k lines.
 
-Regards,
+4k to 40k? I'm not sure. But If I see something like the following, I
+suspect that there is a better way to integrate this into the existing
+infrastructure.
 
-Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: omap3-pm-ensure-io-wakeups-are-properly-disabled.patch
-Type: text/x-diff
-Size: 1872 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100820/16fe0adb/attachment.bin>
+mm/cma-best-fit.c                   |  407 +++++++++++++++
