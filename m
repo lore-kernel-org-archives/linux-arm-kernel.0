@@ -1,126 +1,28 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Fri, 20 Aug 2010 11:18:46 +0200
-Subject: [PATCH 1/1] [ARM] pxa: encode IRQ number into .nr_irqs
-In-Reply-To: <AANLkTim52Zz=DP5Q7278bximQXuRaiPHJp81FyTt5f0u@mail.gmail.com>
-References: <AANLkTim52Zz=DP5Q7278bximQXuRaiPHJp81FyTt5f0u@mail.gmail.com>
-Message-ID: <20100820111846.8d569f90.ospite@studenti.unina.it>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 20 Aug 2010 11:26:53 +0200
+Subject: [PATCH v2] atmel_macb Kconfig: remove long dependency line
+In-Reply-To: <AANLkTikhx4pVJwKukCfiVWAKyL_BQcdGhhmQvfa+d_xX@mail.gmail.com>
+References: <1281167511-3038-1-git-send-email-plagnioj@jcrosoft.com>
+	<1281241293-19571-1-git-send-email-plagnioj@jcrosoft.com>
+	<AANLkTikhx4pVJwKukCfiVWAKyL_BQcdGhhmQvfa+d_xX@mail.gmail.com>
+Message-ID: <20100820092653.GJ8693@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Aug 2010 16:42:20 +0800
-Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+Hi,
 
-> From 7f69e6e31d2bf34bbf156e9385daba08079aa38c Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Fri, 20 Aug 2010 15:23:59 +0800
-> Subject: [PATCH 1/1] [ARM] pxa: encode IRQ number into .nr_irqs
+	David is ok with you?
+
+Best Regards,
+J.
+On 21:42 Tue 10 Aug     , avictor.za at gmail.com wrote:
+> hi Jean-Christophe,
 > 
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-
-Hi Haojian, the EZX changes look incomplete, see below.
-
->  arch/arm/Kconfig                             |    1 +
->  arch/arm/mach-pxa/Kconfig                    |   17 ----------
->  arch/arm/mach-pxa/balloon3.c                 |    1 +
->  arch/arm/mach-pxa/cm-x2xx.c                  |    4 ++
->  arch/arm/mach-pxa/eseries.c                  |    7 ++++
->  arch/arm/mach-pxa/ezx.c                      |    5 +++
->  arch/arm/mach-pxa/hx4700.c                   |    1 +
->  arch/arm/mach-pxa/include/mach/balloon3.h    |    2 +
->  arch/arm/mach-pxa/include/mach/eseries-irq.h |    1 +
->  arch/arm/mach-pxa/include/mach/hx4700.h      |    1 +
->  arch/arm/mach-pxa/include/mach/irqs.h        |   42 ++------------------------
->  arch/arm/mach-pxa/include/mach/littleton.h   |    2 +
->  arch/arm/mach-pxa/include/mach/lpd270.h      |    1 +
->  arch/arm/mach-pxa/include/mach/lubbock.h     |    3 ++
->  arch/arm/mach-pxa/include/mach/magician.h    |    2 +
->  arch/arm/mach-pxa/include/mach/mainstone.h   |    2 +
->  arch/arm/mach-pxa/include/mach/pcm027.h      |    2 +
->  arch/arm/mach-pxa/include/mach/poodle.h      |    2 +
->  arch/arm/mach-pxa/include/mach/tosa.h        |    1 +
->  arch/arm/mach-pxa/include/mach/zeus.h        |    2 +
->  arch/arm/mach-pxa/include/mach/zylonite.h    |    2 +
->  arch/arm/mach-pxa/littleton.c                |    1 +
->  arch/arm/mach-pxa/lpd270.c                   |    1 +
->  arch/arm/mach-pxa/lubbock.c                  |    3 +-
->  arch/arm/mach-pxa/magician.c                 |    1 +
->  arch/arm/mach-pxa/mainstone.c                |    1 +
->  arch/arm/mach-pxa/pcm027.c                   |    1 +
->  arch/arm/mach-pxa/poodle.c                   |    1 +
->  arch/arm/mach-pxa/stargate2.c                |    3 ++
->  arch/arm/mach-pxa/tosa.c                     |    1 +
->  arch/arm/mach-pxa/zeus.c                     |    1 +
->  arch/arm/mach-pxa/zylonite.c                 |    1 +
->  32 files changed, 59 insertions(+), 57 deletions(-)
+> > Many Atmel SOC are embedding a MACB controller. This patch removes the long
+> > dependency line for this Atmel MACB ethernet driver configuration entry.
+> > The HAVE_NET_MACB configuration option is located in the net Kconfig file
+> > as it may be setup by ARM/AT91 and AVR32 chips.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 9295110..45f93e1 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-
-Look for config PXA_EZX, this one also has PXA_HAVE_BOARD_IRQS selected.
-
-[...]
-
-> diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-> index 626c82b..67dd3b7 100644
-> --- a/arch/arm/mach-pxa/ezx.c
-> +++ b/arch/arm/mach-pxa/ezx.c
-> @@ -38,6 +38,8 @@
->  #include "devices.h"
->  #include "generic.h"
+> Looks ok from the AT91 point-of-view.
 > 
-> +#define EZX_NR_IRQS			(IRQ_BOARD_START + 24)
-> +
->  #define GPIO12_A780_FLIP_LID 		12
->  #define GPIO15_A1200_FLIP_LID 		15
->  #define GPIO15_A910_FLIP_LID 		15
-> @@ -1124,6 +1126,7 @@ MACHINE_START(EZX_A910, "Motorola EZX A910")
->  	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
->  	.boot_params    = 0xa0000100,
->  	.map_io         = pxa_map_io,
-> +	.nr_irqs	= EZX_NR_IRQS,
->  	.init_irq       = pxa27x_init_irq,
->  	.timer          = &pxa_timer,
->  	.init_machine   = a910_init,
-> @@ -1190,6 +1193,7 @@ MACHINE_START(EZX_E6, "Motorola EZX E6")
->  	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
->  	.boot_params    = 0xa0000100,
->  	.map_io         = pxa_map_io,
-> +	.nr_irqs	= EZX_NR_IRQS,
->  	.init_irq       = pxa27x_init_irq,
->  	.timer          = &pxa_timer,
->  	.init_machine   = e6_init,
-> @@ -1230,6 +1234,7 @@ MACHINE_START(EZX_E2, "Motorola EZX E2")
->  	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
->  	.boot_params    = 0xa0000100,
->  	.map_io         = pxa_map_io,
-> +	.nr_irqs	= EZX_NR_IRQS,
->  	.init_irq       = pxa27x_init_irq,
->  	.timer          = &pxa_timer,
->  	.init_machine   = e2_init,
-
-ezx.c has 6 (six) machines defined in it, you seem to be changing only
-three of them.
-
-Thanks,
-   Antonio
-
--- 
-Antonio Ospite
-http://ao2.it
-
-PGP public key ID: 0x4553B001
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100820/69b6f1be/attachment.sig>
+> Acked-by: Andrew Victor <linux@maxim.org.za>
