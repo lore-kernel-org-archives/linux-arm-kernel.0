@@ -1,67 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Aug 2010 17:18:04 +0200
-Subject: [PATCH] AT91: Correct configuration define value
-In-Reply-To: <1277974545-30331-1-git-send-email-nicolas.ferre@atmel.com>
-References: <4c6fe9a4c298214223ff89d06401ac7b66f81c98.1277911346.git.siccegge@cs.fau.de>
-	<1277974545-30331-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4C6E9CAC.4000404@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 20 Aug 2010 16:27:09 +0100
+Subject: [PATCH 2.6.36] ARM: S3C64XX: Fix dev-spi build
+Message-ID: <1282318029-19076-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/07/2010 10:55, Nicolas Ferre :
-> The MTD nand driver for Atmel chips is atmel_nand and not at91_nand anymore.
-> Change wrong configuration variables that were remaining.
-> 
-> Reported-by: Christoph Egger <siccegge@cs.fau.de>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The irqs.h usage here got missed in the Samsung platform reorganisation.
 
-We can add:
-Acked-by: Kirill A. Shutemov <kirill@shutemov.name>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/dev-spi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> ---
-> Christoph,
-
-Christoph,
-
-Is this patch handled by you as part of your patch series or should I
-include it in "Trivial" or "AT91" patch series?
-
-Bye,
-
-> Thank you for highlighting this. But please consider this
-> patch instead of yours.
-> 
->  arch/arm/mach-at91/board-at572d940hf_ek.c |    2 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c   |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-> index 5daff27..4665162 100644
-> --- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-> +++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-> @@ -216,7 +216,7 @@ static struct atmel_nand_data __initdata eb_nand_data = {
->  /*	.rdy_pin	= AT91_PIN_PC16, */
->  	.enable_pin	= AT91_PIN_PA15,
->  	.partition_info	= nand_partitions,
-> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
-> +#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
->  	.bus_width_16	= 1,
->  #else
->  	.bus_width_16	= 0,
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index ee80059..37af9b1 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -135,7 +135,7 @@ static struct atmel_nand_data __initdata ek_nand_data = {
->  	.rdy_pin	= AT91_PIN_PC8,
->  	.enable_pin	= AT91_PIN_PC14,
->  	.partition_info	= nand_partitions,
-> -#if defined(CONFIG_MTD_NAND_AT91_BUSWIDTH_16)
-> +#if defined(CONFIG_MTD_NAND_ATMEL_BUSWIDTH_16)
->  	.bus_width_16	= 1,
->  #else
->  	.bus_width_16	= 0,
-
-
+diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
+index a492b98..4bcc87d 100644
+--- a/arch/arm/mach-s3c64xx/dev-spi.c
++++ b/arch/arm/mach-s3c64xx/dev-spi.c
+@@ -21,7 +21,7 @@
+ 
+ #include <plat/s3c64xx-spi.h>
+ #include <plat/gpio-cfg.h>
+-#include <plat/irqs.h>
++#include <mach/irqs.h>
+ 
+ static char *spi_src_clks[] = {
+ 	[S3C64XX_SPI_SRCCLK_PCLK] = "pclk",
 -- 
-Nicolas Ferre
+1.7.1
