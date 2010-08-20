@@ -1,30 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 20 Aug 2010 16:39:00 +0100
-Subject: [PATCH 2/2] ARM: S3C64XX: Prototype SPI devices
-In-Reply-To: <1282318740-23117-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1282318740-23117-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1282318740-23117-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 20 Aug 2010 09:43:29 -0700
+Subject: [PATCH 3/6] OMAP3: PM: ensure IO wakeups are properly disabled
+In-Reply-To: <20100820065649.GH25742@atomide.com> (Tony Lindgren's message of
+	"Fri, 20 Aug 2010 09:56:50 +0300")
+References: <20100813080034.18750.15410.stgit@baageli.muru.com>
+	<20100813080200.18750.37791.stgit@baageli.muru.com>
+	<4C651635.8000201@ru.mvista.com> <20100813102933.GN12706@atomide.com>
+	<4C65238D.9080105@ru.mvista.com> <87sk2ao4fr.fsf@deeprootsystems.com>
+	<4C6D7936.3090201@ru.mvista.com> <20100820065649.GH25742@atomide.com>
+Message-ID: <87bp8xck0e.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoids build warnings due to the undeclared non-statics.
+Tony Lindgren <tony@atomide.com> writes:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/dev-spi.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+[...]
 
-diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
-index bfa3ef7..405e621 100644
---- a/arch/arm/mach-s3c64xx/dev-spi.c
-+++ b/arch/arm/mach-s3c64xx/dev-spi.c
-@@ -22,6 +22,7 @@
- 
- #include <plat/s3c64xx-spi.h>
- #include <plat/gpio-cfg.h>
-+#include <plat/devs.h>
- 
- static char *spi_src_clks[] = {
- 	[S3C64XX_SPI_SRCCLK_PCLK] = "pclk",
--- 
-1.7.1
+> I'll update it with the following to preserve the Fernet style,
+> and to describe the transition:
+
+ok with me, thanks tony.
+
+Kevin
