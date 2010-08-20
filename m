@@ -1,147 +1,101 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 20 Aug 2010 22:05:30 +0200 (CEST)
-Subject: [RFC][PATCH] add
-	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
-In-Reply-To: <201008191818.36068.mitov@issp.bas.bg>
-References: <201008191818.36068.mitov@issp.bas.bg>
-Message-ID: <Pine.LNX.4.64.1008202148110.6103@axis700.grange>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 Aug 2010 16:20:26 -0500
+Subject: RFC: A better clock rounding API?
+In-Reply-To: <4C6B7213.3030808@codeaurora.org>
+References: <4C6B7213.3030808@codeaurora.org>
+Message-ID: <AANLkTik1cES4GP4hRf=B5BLrEN35B3p7rFz+tcsHDtHf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Aug 2010, Marin Mitov wrote:
+Saravana,
 
-> Hi all,
-> 
-> struct device contains a member: struct dma_coherent_mem *dma_mem;
-> to hold information for a piece of memory declared dma-coherent.
-> Alternatively the same member could also be used to hold preallocated
-> dma-coherent memory for latter per-device use.
-> 
-> This tric is already used in drivers/staging/dt3155v4l.c
-> dt3155_alloc_coherent()/dt3155_free_coherent()
-> 
-> Here proposed for general use by popular demand from video4linux folks.
-> Helps for videobuf-dma-contig framework.
+On Wed, Aug 18, 2010 at 12:39 AM, Saravana Kannan
+<skannan@codeaurora.org> wrote:
+> I'm mostly familiar with ARM. ?So I will limit the discussion to ARM
+> boards/machines. ?But I think the points raised in this email would apply
+> for most architectures.
+>
+> I'm sending this to the ARM mailing list first to see if I can get a
+> consensus within the ARM community before I propose this to the wider
+> audience in LKML.
+>
+> The meaning of clk_round_rate() is very ambiguous since the nature of the
+> rounding is architecture and platform specific. ?In the case of ARM, it's up
+> to each ARM mach's clock driver to determine how it wants to round the rate.
+>
+> To quote Russel King from an email about a month ago:
+> "clk_round_rate() returns the clock rate which will be set if you ask
+> clk_set_rate() to set that rate. ?It provides a way to query from the
+> implementation exactly what rate you'll get if you use clk_set_rate() with
+> that same argument."
+>
+> So when someone writes a device driver for a device that's external to the
+> SoC or is integrated into more than one SoC, they currently have the
+> following options to deal with clock rates differences:
+>
+> 1. Use clk_round_rate() to get clock rates and test their driver on the
+> one/few board(s) they have at hand and hope it works on boards using
+> different SoCs.
+>
+> 2. Add each and every needed clock rate (low power rate, high performance
+> rate, handshake rate, etc) as fields to their platform data and have it
+> populated in every board file that uses the device.
+>
+> 3. Do a search of the frequency space of the clock by making several
+> clk_round_rate() calls at various intervals between their minimum and
+> maximum acceptable rates and hope to find one of the supported rates. If
+> clk_round_rate() does a +/- N percentage rounding and the interval is
+> larger, even this searching might not find an existing rate that's supported
+> between the driver's min and max acceptable rates.
+>
+> IMHO, each of these options have short comings that could be alleviated by
+> adding a more definitive "rounding" API. ?Also, considering that it's the
+> consumer of each clock that knows best what amount of rounding and in which
+> direction is acceptable, IMHO the current approach of hiding the rounding
+> inside the clock drivers seems counter intuitive.
+>
+> I would like to propose the addition of either:
+>
+> long clk_find_rate(struct clk *clk,
+> ? ? ? ? ? ? ? ? ? ? ? ?unsigned long min_rate,
+> ? ? ? ? ? ? ? ? ? ? ? ?long max_rate);
+>
+> or
+>
+> long clk_find_rate(struct clk *clk,
+> ? ? ? ? ? ? ? ? ? ? ? ?unsigned long start_rate,
+> ? ? ? ? ? ? ? ? ? ? ? ?long end_rate);
+>
+> The advantage of the 2nd suggestion is that it allows a driver to specify
+> which end of a frequency range it prefers. ?But I'm not sure how important
+> of an advantage that is. ?So, proposing both and having the community decide
+> which one, if any, is acceptable.
+>
+> If the clk_find_rate() API is available, the driver developer wouldn't have
+> to worry about figuring out a way for the clk_set_rate() to work on
+> different platforms/machs/SoCs. If a platform/mach/SoC can provide a clock
+> rate that's acceptable to their hardware and software requirements, then
+> they can be assured to find it without having to jump through hoops or
+> having a driver not work when it could have.
+>
+> Does the addition of one of the suggested APIs sound reasonable? If not, can
+> someone explain what the right/better solution is? If the addition of a new
+> API is reasonable, what's the community preference between the two
+> suggestion? If I submit a patch that will add one of the APIs is it likely
+> to be accepted?
+>
+> Thanks for your time.
+>
 
-Ok, so, we've got two solutions to this problem submitted on the same 
-day;) Following this thread:
+This is still ambiguous. If there are multiple valid frequencies in
+the range, is the preferred rate returned the lowest rate or highest
+rate in the range? For something like an SD bus clock you would want
+the maximum rate within the range. For something like a LCD pixel
+clock or CMOS sensor input clock, you typically only need to be
+greater than a certain minimum freq and for power reasons you want it
+to be closest to the minimum.
 
-http://marc.info/?t=128128236400002&r=1&w=2
+Perhaps adding a flag to clk_round_rate to indicate to round up, down,
+or smallest delta would be sufficient.
 
-on the ARM Linux kernel ML, I submitted a patch series
-
-http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
-
-with a couple of fixes and improvements, the actual new API and a use 
-example. My approach is slightly different, in that instead of requiring 
-drivers to issue two calls - one to reserve RAM (usually 
-dma_alloc_coherent()) and one to assign it to a device, my patch follows 
-the suggestion from Russell King from the first thread and unites these 
-two operations. So, now we have a choice;) Unfortunately, these two patch 
-series went to orthogonal sets of recepients, I'm trying to fix this by 
-adding a couple of CC entries.
-
-Thanks
-Guennadi
-
-> 
-> Signed-off-by: Marin Mitov <mitov@issp.bas.bg>
-> 
-> ======================================================================
-> --- a/drivers/base/dma-coherent.c	2010-08-19 15:50:42.000000000 +0300
-> +++ b/drivers/base/dma-coherent.c	2010-08-19 17:27:56.000000000 +0300
-> @@ -93,6 +93,83 @@ void *dma_mark_declared_memory_occupied(
->  EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
->  
->  /**
-> + * dma_reserve_coherent_memory() - reserve coherent memory for per-device use
-> + *
-> + * @dev:	device from which we allocate memory
-> + * @size:	size of requested memory area in bytes
-> + * @flags:	same as in dma_declare_coherent_memory()
-> + *
-> + * This function reserves coherent memory allocating it early (during probe())
-> + * to support latter allocations from per-device coherent memory pools.
-> + * For a given device one could use either dma_declare_coherent_memory() or
-> + * dma_reserve_coherent_memory(), but not both, becase the result of these
-> + * functions is stored in a single struct device member - dma_mem
-> + *
-> + * Returns DMA_MEMORY_MAP on success, or 0 if failed.
-> + * (same as dma_declare_coherent_memory()
-> + */
-> +int dma_reserve_coherent_memory(struct device *dev, size_t size, int flags)
-> +{
-> +	struct dma_coherent_mem *mem;
-> +	dma_addr_t dev_base;
-> +	int pages = size >> PAGE_SHIFT;
-> +	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
-> +
-> +	if ((flags & DMA_MEMORY_MAP) == 0)
-> +		goto out;
-> +	if (!size)
-> +		goto out;
-> +	if (dev->dma_mem)
-> +		goto out;
-> +
-> +	mem = kzalloc(sizeof(*mem), GFP_KERNEL);
-> +	if (!mem)
-> +		goto out;
-> +	mem->virt_base = dma_alloc_coherent(dev, size, &dev_base,
-> +							DT3155_COH_FLAGS);
-> +	if (!mem->virt_base)
-> +		goto err_alloc_coherent;
-> +	mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-> +	if (!mem->bitmap)
-> +		goto err_bitmap;
-> +
-> +	mem->device_base = dev_base;
-> +	mem->size = pages;
-> +	mem->flags = flags;
-> +	dev->dma_mem = mem;
-> +	return DMA_MEMORY_MAP;
-> +
-> +err_bitmap:
-> +	dma_free_coherent(dev, size, mem->virt_base, dev_base);
-> +err_alloc_coherent:
-> +	kfree(mem);
-> +out:
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(dma_reserve_coherent_memory);
-> +
-> +/**
-> + * dma_free_reserved_memory() - free the reserved dma-coherent memoty
-> + *
-> + * @dev:	device for which we free the dma-coherent memory
-> + *
-> + * same as dma_release_declared_memory()
-> + */
-> +void dma_free_reserved_memory(struct device *dev)
-> +{
-> +	struct dma_coherent_mem *mem = dev->dma_mem;
-> +
-> +	if (!mem)
-> +		return;
-> +	dev->dma_mem = NULL;
-> +	dma_free_coherent(dev, mem->size << PAGE_SHIFT,
-> +					mem->virt_base, mem->device_base);
-> +	kfree(mem->bitmap);
-> +	kfree(mem);
-> +}
-> +EXPORT_SYMBOL(dma_free_reserved_memory);
-> +
-> +/**
->   * dma_alloc_from_coherent() - try to allocate memory from the per-device coherent area
->   *
->   * @dev:	device from which we allocate memory
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Rob
