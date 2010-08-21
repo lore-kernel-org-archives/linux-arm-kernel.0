@@ -1,58 +1,73 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 21 Aug 2010 09:07:45 +0900
-Subject: [PATCH] ARM: S5PC210/S5PC110: VMALLOC_END should be unsigned long
-In-Reply-To: <20100819011951.GA29229@july>
-References: <20100819011951.GA29229@july>
-Message-ID: <001401cb40c4$e4643050$ad2c90f0$%kim@samsung.com>
+Date: Sat, 21 Aug 2010 09:07:07 +0900
+Subject: [PATCH] ARM: SAMSUNG: Fix on build warning regarding VMALLOC_END type
+Message-ID: <1282349227-2581-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Silences following build warning:
-> 
-> arch/arm/mm/init.c: In function 'mem_init':
-> arch/arm/mm/init.c:644: warning: format '%08lx' expects type 'long
-> unsigned int', but argument 12 has type 'unsigned int'
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> 
-> diff --git a/arch/arm/mach-s5pv210/include/mach/vmalloc.h b/arch/arm/mach-
-> s5pv210/include/mach/vmalloc.h
-> index 58f515e..5b4c69b 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/vmalloc.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/vmalloc.h
-> @@ -17,6 +17,6 @@
->  #ifndef __ASM_ARCH_VMALLOC_H
->  #define __ASM_ARCH_VMALLOC_H __FILE__
-> 
-> -#define VMALLOC_END	  (0xE0000000)
-> +#define VMALLOC_END	  (0xE0000000UL)
-> 
->  #endif /* __ASM_ARCH_VMALLOC_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/vmalloc.h b/arch/arm/mach-
-> s5pv310/include/mach/vmalloc.h
-> index 3f565eb..5bf4345 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/vmalloc.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/vmalloc.h
-> @@ -17,6 +17,6 @@
->  #ifndef __ASM_ARCH_VMALLOC_H
->  #define __ASM_ARCH_VMALLOC_H __FILE__
-> 
-> -#define VMALLOC_END	  (0xF0000000)
-> +#define VMALLOC_END	  (0xF0000000UL)
-> 
->  #endif /* __ASM_ARCH_VMALLOC_H */
---
-Ok..will apply.
+Fix this warning:
 
-Thanks.
+arch/arm/mm/init.c: In function 'mem_init':
+arch/arm/mm/init.c:644: warning: format '%08lx' expects type
+'long unsigned int', but argument 12 has type 'unsigned int'
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Reported-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/mach-s3c2410/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s3c64xx/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5p6440/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5p6442/include/mach/vmalloc.h |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2410/include/mach/vmalloc.h b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+index 315b007..dc3b34c 100644
+--- a/arch/arm/mach-s3c2410/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+@@ -15,6 +15,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	(0xE0000000UL)
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+index 7411ef3..f0a0fa2 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+@@ -15,6 +15,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	(0xE0000000UL)
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s5p6440/include/mach/vmalloc.h b/arch/arm/mach-s5p6440/include/mach/vmalloc.h
+index 16df257..8217b99 100644
+--- a/arch/arm/mach-s5p6440/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5p6440/include/mach/vmalloc.h
+@@ -12,6 +12,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	(0xE0000000UL)
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/vmalloc.h b/arch/arm/mach-s5p6442/include/mach/vmalloc.h
+index be33336..b9fd9aa 100644
+--- a/arch/arm/mach-s5p6442/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5p6442/include/mach/vmalloc.h
+@@ -12,6 +12,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	(0xE0000000UL)
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+-- 
+1.6.2.5
