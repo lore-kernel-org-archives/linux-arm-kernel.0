@@ -1,102 +1,17 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 21 Aug 2010 19:32:05 +0200
-Subject: 2.6.36-rc1 on zaurus: bluetooth regression
-In-Reply-To: <20100821152445.GA1536@ucw.cz>
-References: <20100821152445.GA1536@ucw.cz>
-Message-ID: <201008211932.05481.marek.vasut@gmail.com>
+From: adobriyan@gmail.com (Alexey Dobriyan)
+Date: Sat, 21 Aug 2010 21:26:23 +0300
+Subject: [PATCH for -tip 1/2] kernel.h: add
+	MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2
+In-Reply-To: <20100821142215.023431313@efficios.com>
+References: <20100821141750.770348530@efficios.com>
+	<20100821142215.023431313@efficios.com>
+Message-ID: <20100821182623.GA9621@core2.telecom.by>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 21. srpna 2010 17:24:45 Pavel Machek napsal(a):
-> Hi!
-> 
-> Good news is that it boots, suspends and resumes.
-> 
-> Bad news is that bluetooth broke for me. I'm using CF bluetooth
-> card.
-> 
-> Socket 0 Bridge:   	[pxa2xx-pcmcia] 	(bus ID: pxa2xx-pcmcia)
-> 	Configuration:	state: on	ready: yes
-> 			Voltage: 3.3V Vcc: 3.3V Vpp: 0.0V
-> Socket 0 Device 0:	[serial_cs]		(bus ID: 0.0)
-> 	Configuration:	state: on
-> 	Product Name:   Compact Flash Bluetooth Card
-> 	Identification:	manf_id: 0x0279	card_id: 0x950b
-> 			function: 2 (serial)
-> 			prod_id(1): "Compact Flash" (0x95521410)
-> 			prod_id(2): "Bluetooth Card" (0x7664fb1d)
-> 			prod_id(3): --- (---)
-> 			prod_id(4): --- (---)
-> Socket 1 Bridge:   	[pxa2xx-pcmcia] 	(bus ID: pxa2xx-pcmcia)
-> 	Configuration:	state: on	ready: yes
-> 			Voltage: 3.3V Vcc: 3.3V Vpp: 0.0V
-> Socket 1 Device 0:	[ide-cs]		(bus ID: 1.0)
-> 	Configuration:	state: on
-> 	Product Name:   HITACHI microdrive
-> 	Identification:	manf_id: 0x0319	card_id: 0x0000
-> 			function: 4 (fixed disk)
-> 			prod_id(1): "HITACHI" (0xf4f43949)
-> 			prod_id(2): "microdrive" (0xa6d76178)
-> 			prod_id(3): --- (---)
-> 			prod_id(4): --- (---)
-> 
-> 
-> In 2.6.35, I have lots of messages in the syslog, and speed is slow,
-> but it works.
-> 
-> Aug 19 08:01:06 toy kernel: bcsp_recv: Out-of-order packet arrived, got 3
-> expected 2 Aug 19 08:01:06 toy kernel: bcsp_recv: Out-of-order packet
-> arrived, got 4 expected 2 Aug 19 08:01:11 toy kernel: bcsp_recv: Short
-> BCSP packet
-> Aug 19 08:01:11 toy kernel: bcsp_recv: Out-of-order packet arrived, got 3
-> expected 2 Aug 19 08:01:11 toy kernel: bcsp_recv: Out-of-order packet
-> arrived, got 4 expected 2 Aug 19 08:01:12 toy kernel: bcsp_recv:
-> Out-of-order packet arrived, got 5 expected 2 Aug 19 08:01:16 toy kernel:
-> bcsp_recv: Short BCSP packet
-> Aug 19 08:01:16 toy kernel: bcsp_recv: Out-of-order packet arrived, got 2
-> expected 1 Aug 19 08:01:16 toy kernel: bcsp_recv: Out-of-order packet
-> arrived, got 3 expected 1 Aug 19 08:01:16 toy kernel: bcsp_recv:
-> Out-of-order packet arrived, got 4 expected 1
-> 
-> In 2.6.36-rc1, I get:
-> 
-> Aug 20 08:38:27 toy bluetoothd[1318]: HCI dev 0 down
-> Aug 20 08:38:27 toy bluetoothd[1318]: Adapter /org/bluez/1318/hci0 has been
-> disabled Aug 20 08:38:27 toy bluetoothd[1318]: Stopping security manager 0
-> Aug 20 08:38:27 toy kernel: pcmcia_socket pcmcia_socket0: pccard: card
-> ejected from slot 0 Aug 20 08:38:27 toy kernel: PM: Removing info for
-> pcmcia:0.0
-> Aug 20 08:38:27 toy kernel: PM: Removing info for No Bus:ttyS0
-> Aug 20 08:38:27 toy bluetoothd[1318]: HCI dev 0 unregistered
-> Aug 20 08:38:27 toy bluetoothd[1318]: Unregister path: /org/bluez/1318/hci0
-> Aug 20 08:38:27 toy kernel: PM: Removing info for No Bus:hci0
-> Aug 20 08:38:27 toy kernel: PM: Adding info for No Bus:ttyS0
-> Aug 20 08:38:31 toy kernel: pcmcia_socket pcmcia_socket0: pccard: PCMCIA
-> card inserted into slot 0 Aug 20 08:38:31 toy kernel: pcmcia 0.0: pcmcia:
-> registering new device pcmcia0.0 (IRQ: 201) Aug 20 08:38:31 toy kernel:
-> PM: Adding info for pcmcia:0.0
-> Aug 20 08:38:31 toy kernel: PM: Removing info for No Bus:ttyS0
-> Aug 20 08:38:31 toy kernel: 0.0: ttyS0 at I/O 0xc48402f8 (irq = 201) is a
-> 16C950/954 Aug 20 08:38:31 toy kernel: PM: Adding info for No Bus:ttyS0
-> Aug 20 08:38:36 toy bluetoothd[1318]: HCI dev 0 registered
-> Aug 20 08:38:36 toy kernel: PM: Adding info for No Bus:hci0
-> Aug 20 08:38:36 toy kernel: bcsp_recv: Out-of-order packet arrived, got 1
-> expected 0 Aug 20 08:38:37 toy bluetoothd[1318]: accept: Socket operation
-> on non-socket (88) Aug 20 08:38:37 toy bluetoothd[1318]: HCI dev 0 up
-> Aug 20 08:38:37 toy bluetoothd[1318]: Starting security manager 0
-> Aug 20 08:38:37 toy kernel: bcsp_recv: Short BCSP packet
-> Aug 20 08:38:39 toy kernel: PM: Removing info for No Bus:rfcomm1
-> Aug 20 08:38:39 toy kernel: PM: Adding info for No Bus:rfcomm1
-> Aug 20 08:38:40 toy pand[1546]: Bluetooth PAN daemon version 4.66
-> Aug 20 08:38:40 toy pand[1546]: Connecting to 00:21:BA:FF:2D:37
-> Aug 20 08:38:40 toy kernel: hci_cmd_task: hci0 command tx timeout
-> Aug 20 08:38:42 toy bluetoothd[1318]: Can't read version info for
-> /org/bluez/1318/hci0: Connection timed out (110) Aug 20 08:38:44 toy
-> modprobe: FATAL: Could not load /lib/modules/2.6.36-rc1/modules.dep: No
-> such file or directory
-> 
-> Any ideas?
-> 							Pavel
+On Sat, Aug 21, 2010 at 10:17:51AM -0400, Mathieu Desnoyers wrote:
+> +/* Force a compilation error if condition is constant and not a power of 2 */
+> +#define MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2(n)		\
+> +	MAYBE_BUILD_BUG_ON((n) == 0 || (((n) & ((n) - 1)) != 0))
 
-Could it be due to the PCMCIA timings changes on pxa I did? Try reverting that 
-change and retry.
+Sorry, this is tasteless macro.
