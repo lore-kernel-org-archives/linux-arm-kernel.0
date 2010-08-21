@@ -1,35 +1,87 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Sat, 21 Aug 2010 16:24:05 +0800
-Subject: [PATCH 3/3] ARM: imx: set cache line size to 64 bytes for i.MX5
-In-Reply-To: <1282379045-32363-3-git-send-email-jason77.wang@gmail.com>
-References: <1282379045-32363-1-git-send-email-jason77.wang@gmail.com>
-	<1282379045-32363-2-git-send-email-jason77.wang@gmail.com>
-	<1282379045-32363-3-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1282379045-32363-4-git-send-email-jason77.wang@gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sat, 21 Aug 2010 11:07:36 +0200
+Subject: [PATCH] SPI: fix APB pclk power regression on U300
+Message-ID: <1282381656-8644-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core of i.MX5 series is cortex-A8, its cache line size is 64 bytes
-instead of 32 bytes. Refer to the OMAP3's selection, we choose 64
-bytes for i.MX5, this can increase a little bit performance when
-perform cache operations.
+With the introduction of an AMBA PrimeCell per-cell block clock,
+the pclk was left on after probe() unless explicitly disabled.
+This clock is wired to the same clock on PL022 causing it to stay
+always on since.
 
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+Fix this up properly by clocking the pclk whenever we want to
+write into any PL022 registers and clocking the external clock
+whenever we want to transmit messages on the bus.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/plat-mxc/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Tested on U300 and U8500, even though the pclk stuff came in from
+the ARM tree it is probably better to carry this through Grants
+tree so as not to disturb other patches going in for PL022.
+---
+ drivers/spi/amba-pl022.c |   14 ++++++++------
+ 1 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 0527e65..6785db4 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -43,6 +43,7 @@ config ARCH_MXC91231
- config ARCH_MX5
- 	bool "MX5-based"
- 	select CPU_V7
-+	select ARM_L1_CACHE_SHIFT_6
- 	help
- 	  This enables support for systems based on the Freescale i.MX51 family
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index 5b3f575..59f8cfb 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -503,8 +503,9 @@ static void giveback(struct pl022 *pl022)
+ 	msg->state = NULL;
+ 	if (msg->complete)
+ 		msg->complete(msg->context);
+-	/* This message is completed, so let's turn off the clock! */
++	/* This message is completed, so let's turn off the clocks! */
+ 	clk_disable(pl022->clk);
++	amba_pclk_disable(pl022->adev);
+ }
  
+ /**
+@@ -1139,9 +1140,10 @@ static void pump_messages(struct work_struct *work)
+ 	/* Setup the SPI using the per chip configuration */
+ 	pl022->cur_chip = spi_get_ctldata(pl022->cur_msg->spi);
+ 	/*
+-	 * We enable the clock here, then the clock will be disabled when
++	 * We enable the clocks here, then the clocks will be disabled when
+ 	 * giveback() is called in each method (poll/interrupt/DMA)
+ 	 */
++	amba_pclk_enable(pl022->adev);
+ 	clk_enable(pl022->clk);
+ 	restore_state(pl022);
+ 	flush(pl022);
+@@ -1787,11 +1789,9 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
+ 	}
+ 
+ 	/* Disable SSP */
+-	clk_enable(pl022->clk);
+ 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
+ 	       SSP_CR1(pl022->virtbase));
+ 	load_ssp_default_config(pl022);
+-	clk_disable(pl022->clk);
+ 
+ 	status = request_irq(adev->irq[0], pl022_interrupt_handler, 0, "pl022",
+ 			     pl022);
+@@ -1819,6 +1819,8 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
+ 		goto err_spi_register;
+ 	}
+ 	dev_dbg(dev, "probe succeded\n");
++	/* Disable the silicon block pclk and clock it when needed */
++	amba_pclk_disable(adev);
+ 	return 0;
+ 
+  err_spi_register:
+@@ -1880,9 +1882,9 @@ static int pl022_suspend(struct amba_device *adev, pm_message_t state)
+ 		return status;
+ 	}
+ 
+-	clk_enable(pl022->clk);
++	amba_pclk_enable(adev);
+ 	load_ssp_default_config(pl022);
+-	clk_disable(pl022->clk);
++	amba_pclk_disable(adev);
+ 	dev_dbg(&adev->dev, "suspended\n");
+ 	return 0;
+ }
 -- 
-1.5.6.5
+1.6.3.3
