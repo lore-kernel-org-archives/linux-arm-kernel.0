@@ -1,22 +1,20 @@
-From: gregkh@suse.de (Greg KH)
-Date: Sun, 22 Aug 2010 10:10:28 -0700
-Subject: [PATCH v2] ARM: imx: fix build failure concerning otg/ulpi
-In-Reply-To: <4C70D0CB.6040903@compulab.co.il>
-References: <4C65246E.1000906@ru.mvista.com>
-	<1281701210-27776-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4C6783C7.1030604@compulab.co.il>
-	<20100816045340.GA17038@pengutronix.de>
-	<4C68D607.3090202@compulab.co.il> <4C70D0CB.6040903@compulab.co.il>
-Message-ID: <20100822171028.GB8658@suse.de>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Sun, 22 Aug 2010 21:27:05 +0200
+Subject: [PATCH for -tip 1/2] kernel.h: add
+	MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2
+In-Reply-To: <20100821142215.023431313@efficios.com>
+References: <20100821141750.770348530@efficios.com>
+	<20100821142215.023431313@efficios.com>
+Message-ID: <20100822192705.GE1771@one.firstfloor.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 22, 2010 at 10:24:59AM +0300, Igor Grinberg wrote:
->  Greg,
-> 
-> ping...
+> +/* Force a compilation error if condition is constant and not a power of 2 */
+> +#define MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2(n)		\
+> +	MAYBE_BUILD_BUG_ON((n) == 0 || (((n) & ((n) - 1)) != 0))
 
-Sorry, it's in my queue, swamped with -stable work at the moment.  Will
-get to Linus soon...
+Looks super-ugly. IMHO just writing MAYBE_BUILD_BUG_ON(!n || n & (n - 1)) directly
+would be clear enough. If you really think that's unclear define a generic
+is_power_of_two() macro.
 
-greg k-h
+-Andi
