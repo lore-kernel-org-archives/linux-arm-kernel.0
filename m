@@ -1,68 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Aug 2010 16:54:54 +0100
-Subject: [PATCH 1/4] ARM: hw-breakpoint: add mechanism for hooking into
-	prefetch aborts
-In-Reply-To: <1282578897-23247-1-git-send-email-will.deacon@arm.com>
-References: <1282578897-23247-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1282578897-23247-2-git-send-email-will.deacon@arm.com>
+Date: Mon, 23 Aug 2010 16:54:53 +0100
+Subject: [PATCH 0/4] ARM: add support for hw-breakpoints [v6]
+Message-ID: <1282578897-23247-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM processors with hardware breakpoint and watchpoint support,
-triggering these events results in a debug exception. These manifest
-as prefetch and data aborts respectively.
+This is version 6 of the patches originally posted at:
 
-arch/arm/mm/fault.c already provides hook_fault_code for hooking
-into data aborts dependent on the DFSR. This patch adds a new function,
-hook_ifault_code for hooking into prefetch aborts in the same manner.
+v1.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-February/009084.html
+v2.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011170.html
+v3.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017680.html
+v4.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/019882.html
+v5.) http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/022882.html
+
+Changes from v5 include:
+	- Based on v2.6.36-rc2
+	- ptrace breakpoints are now flushed before the thread state is zeroed
+	- ptrace breakpoint pointers are zeroed in copy_thread
+	- Debug registers are now zeroed on all cores during boot
+	- Userspace breakpoint and watchpoint single-stepping is supported on
+	  v7 processors. This means the perf tool can be used to monitor
+	  function calls and variable accesses.
+
+As with v5, these patches have been shown to work with GDB using the patches
+posted here:
+
+http://sourceware.org/ml/gdb-patches/2010-07/msg00110.html
 
 Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
 Cc: Frederic Weisbecker <fweisbec@gmail.com>
 Cc: S. Karthikeyan <informkarthik@gmail.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/system.h |    4 ++++
- arch/arm/mm/fault.c           |   13 +++++++++++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 8ba1ccf..b516cde 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -85,6 +85,10 @@ void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
- 				       struct pt_regs *),
- 		     int sig, int code, const char *name);
- 
-+void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
-+				       struct pt_regs *),
-+		     int sig, int code, const char *name);
-+
- #define xchg(ptr,x) \
- 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
- 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 23b0b03..1e21e12 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -581,6 +581,19 @@ static struct fsr_info ifsr_info[] = {
- 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
- };
- 
-+void __init
-+hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-+		 int sig, int code, const char *name)
-+{
-+	if (nr < 0 || nr >= ARRAY_SIZE(ifsr_info))
-+		BUG();
-+
-+	ifsr_info[nr].fn   = fn;
-+	ifsr_info[nr].sig  = sig;
-+	ifsr_info[nr].code = code;
-+	ifsr_info[nr].name = name;
-+}
-+
- asmlinkage void __exception
- do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
- {
--- 
-1.6.3.3
+Will Deacon (4):
+  ARM: hw-breakpoint: add mechanism for hooking into prefetch aborts
+  ARM: hw-breakpoint: add ARM backend for the hw-breakpoint framework
+  ARM: hw-breakpoint: add new ptrace requests for hw-breakpoint
+    interaction
+  ARM: hw-breakpoint: add HAVE_HW_BREAKPOINT to Kconfig
+
+ arch/arm/Kconfig                     |    1 +
+ arch/arm/include/asm/hw_breakpoint.h |  132 ++++++
+ arch/arm/include/asm/processor.h     |    4 +
+ arch/arm/include/asm/ptrace.h        |    2 +
+ arch/arm/include/asm/system.h        |    4 +
+ arch/arm/kernel/Makefile             |    1 +
+ arch/arm/kernel/hw_breakpoint.c      |  849 ++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/process.c            |    5 +
+ arch/arm/kernel/ptrace.c             |  239 ++++++++++
+ arch/arm/mm/fault.c                  |   13 +
+ 10 files changed, 1250 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/hw_breakpoint.h
+ create mode 100644 arch/arm/kernel/hw_breakpoint.c
