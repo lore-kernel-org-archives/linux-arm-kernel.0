@@ -1,36 +1,42 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Mon, 23 Aug 2010 22:36:45 +0800
-Subject: [PATCH 2/3] arm: return both physical and virtual addresses
-	from addruart
-In-Reply-To: <20100823100519.GA8018@pengutronix.de>
-References: <1282553423.737985.983362819420.0.gpush@pororo>
-	<1282553423.739278.339711204256.2.gpush@pororo>
-	<20100823100519.GA8018@pengutronix.de>
-Message-ID: <1282574205.2845.47.camel@pororo>
+From: jason.mcmullan@netronome.com (Jason McMullan)
+Date: Mon, 23 Aug 2010 11:20:43 -0400
+Subject: Policy question: criteria for submission to mainline for a new SoC?
+Message-ID: <AANLkTimpz2YVTqd1EVqoX3yKKQ-peAy=OgwEDmz-iVi-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi there! So, I have the responsibility of handling our Linux Kernel
+GPL requirements at Netronome for our NFP3200 series of processors
+(ARM MPCore based SoCs with 40 IXP style microengines), and I have
+some policy questions.
 
-> > +		.macro	addruart_current, rx, tmp1, tmp2
-> > +		addruart	\tmp1, \tmp2
-> > +		mrc		p15, 0, \rx, c1, c0
-> > +		tst		\rx, #1
-> > +		moveq		\rx, \tmp1
-> > +		movne		\rx, \tmp2
-> > +		.endm
-> Don't you need to depend on MMU somehow to do this in generic code?
-> 
+We (currently) have two products that the NFP3200 is mounted on,
+both of which are evaluation devices for our customers. We provide
+our customers *complete* source code for *all* GPL components
+(Linux, Busybox, root fs, etc. etc. etc).
 
-Yeah, it would make sense to have a separate paths for CONFIG_MMU/!
-CONFIG_MMU (the latter just using \tmp1).
+We also provide our customers non-GPL components (custom bootloader,
+board initialization routines, etc), if they wish to go the uCOS
+or VxWorks path.
 
-Although, What will the mrc instruction do if there is no MMU? if it
-doesn't cause an exception, we can assume that the platform's addruart
-macro will return the same address in both registers and the existing
-code will just work.
+So our customers (and anyone who asks us for a copy of the GPL
+component sources) are covered, and, as far as I can tell, we are
+GPL compliant. (If not, let me know, and we'll fix it!)
 
-Cheers,
+However, I am not sure if it is worth cluttering up the Linux ARM
+arch mainline with yet another rare SoC. If the Linux ARM community
+would like the sources, I am more than willing to post them on
+the list, but there's not much new or interesting to see - just
+a lot of trivial SoC hardware details.
 
+So, the questions are:
 
-Jeremy
+A) Is anyone interested in the NFP3200 SoC patches?
+
+B) What is the general policy for '# of units sold' for whether
+   a SoC should be added to the Linux ARM mainline?
+
+-- 
+Jason S. McMullan
+Netronome Systems, Inc.
+http://www.netronome.com
