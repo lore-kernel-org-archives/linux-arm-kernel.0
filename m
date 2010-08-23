@@ -1,55 +1,45 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 23 Aug 2010 17:26:41 +0200
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Mon, 23 Aug 2010 18:50:43 +0300
 Subject: Policy question: criteria for submission to mainline for a new
 	SoC?
 In-Reply-To: <AANLkTimpz2YVTqd1EVqoX3yKKQ-peAy=OgwEDmz-iVi-@mail.gmail.com>
 References: <AANLkTimpz2YVTqd1EVqoX3yKKQ-peAy=OgwEDmz-iVi-@mail.gmail.com>
-Message-ID: <201008231726.41399.marek.vasut@gmail.com>
+Message-ID: <AANLkTimpZg_CE9FmNs+H7+dEZdPhMg63=VOgPzWFfn1a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 23. srpna 2010 17:20:43 Jason McMullan napsal(a):
-> Hi there! So, I have the responsibility of handling our Linux Kernel
-> GPL requirements at Netronome for our NFP3200 series of processors
-> (ARM MPCore based SoCs with 40 IXP style microengines), and I have
-> some policy questions.
-> 
-> We (currently) have two products that the NFP3200 is mounted on,
-> both of which are evaluation devices for our customers. We provide
-> our customers *complete* source code for *all* GPL components
-> (Linux, Busybox, root fs, etc. etc. etc).
-> 
-> We also provide our customers non-GPL components (custom bootloader,
-> board initialization routines, etc), if they wish to go the uCOS
-> or VxWorks path.
-
-Most of the board init routines should be in Linux actually. It shouldn't depend 
-on bootloader. Also, you might want to use uboot for linux instead of custom 
-bootloader.
-> 
-> So our customers (and anyone who asks us for a copy of the GPL
-> component sources) are covered, and, as far as I can tell, we are
-> GPL compliant. (If not, let me know, and we'll fix it!)
-
-Why not just sticking the sources on the website somewhere ?
-> 
+On Mon, Aug 23, 2010 at 6:20 PM, Jason McMullan
+<jason.mcmullan@netronome.com> wrote:
+>
 > However, I am not sure if it is worth cluttering up the Linux ARM
 > arch mainline with yet another rare SoC. If the Linux ARM community
 > would like the sources, I am more than willing to post them on
 > the list, but there's not much new or interesting to see - just
 > a lot of trivial SoC hardware details.
 
-Please do.
-> 
+Don't think of it as cluttering up. The Linux kernel changes so fast
+that by pushing code into mainline, you'll offload some of the more
+mundane maintenance tasks over to the kernel developers. So you won't
+have to track internal API changes when you rebase your internal git
+tree to the latest version of the Linux kernel.
+
+This is not to say that you can simply email those patches to LAKML
+and assume your job is done. It might have to be refactored to suit
+the style of code in the kernel. But in the end you'll benefit from
+better quality code and probably even code reduction.
+
 > So, the questions are:
-> 
+>
 > A) Is anyone interested in the NFP3200 SoC patches?
 
-Yes.
-> 
+Yes, it also makes the Linux kernel better by allowing subsystems to
+be designed/refactored to take into account various needs.
+
 > B) What is the general policy for '# of units sold' for whether
->    a SoC should be added to the Linux ARM mainline?
+> ? a SoC should be added to the Linux ARM mainline?
 
-No, >= 1 should do.
+Even a single board shipped is enough :) See this informative talk by
+Greg KH (http://www.kroah.com/log/linux/ols_2006_keynote.html)
 
-Cheers
+Cheers,
+Amit
