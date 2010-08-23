@@ -1,134 +1,286 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 23 Aug 2010 11:05:58 +0900
-Subject: [PATCH 00/14] ARM: S5PV310: Updates clock
-In-Reply-To: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-References: <1282140084-10265-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTinjfjiHQ7W5FpwKHKbdAhDxVKwET+9F5082nxhg@mail.gmail.com>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Mon, 23 Aug 2010 11:11:35 +0900
+Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
+	plat-s5p
+In-Reply-To: <1282522043-2420-1-git-send-email-kgene.kim@samsung.com>
+References: <1282522043-2420-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well,
+" Note: S5PC110 and S5PC210 have same OneNAND driver."
 
-The current V310 clock codes don't work. I wonder these codes are
-should be tested by your team. but it's just hang at clock init.
+Yes I also think it's same device. At least Spec is same. But I heard it has
+some different feature related with DMA operation.
+I'm not yet receive the official release from LSI. So I can't tell the exact
+one.
 
-With this patch, it's also don't boot. We also fixed the wrong uart
-clock bit. but same. don't works.
-
-Question? Do you can boot with this codes at your board?
+If it's true. we need to separate it if required.
 
 Thank you,
 Kyungmin Park
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Linux version 2.6.36-rc1-ga400ca7-dirty
-(dofmind at dofmind-linux) (gcc version 4.4.1 (GCC) ) #334 PREEMPT Mon
-Aug 23 10:45:59 KST 2010
-[    0.000000] CPU: ARMv7 Processor [412fc091] revision 1 (ARMv7), cr=10c53c7f
-[    0.000000] CPU: VIPT nonaliasing data cache, VIPT nonaliasing
-instruction cache
-[    0.000000] Machine: UNIVERSAL_C210
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] CPU S5PV310 (id 0x43200200)
-[    0.000000] S3C24XX Clocks, Copyright 2004 Simtec Electronics
-[    0.000000] s3c_register_clksrc: clock armclk has no registers set
-[    0.000000] S5PV310: PLL settings, A=800000000, M=660000000,
-E=96000000 V=108000000
-[    0.000000] S5PV310: ARMCLK=800000000, DMC=330000000, ACLK200=165000000
-[    0.000000] ACLK100=82500000, ACLK160=132000000, ACLK133=110000000
-[    0.000000] uclk1: source is mout_mpll (6), rate is 82500000
-[    0.000000] uclk1: source is mout_mpll (6), rate is 82500000
-[    0.000000] uclk1: source is mout_mpll (6), rate is 82500000
-[    0.000000] uclk1: source is mout_mpll (6), rate is 82500000
-[    0.000000] sclk_pwm: source is mout_mpll (6), rate is 73333333
-[    0.000000] sclk_csis: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_csis: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_cam: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_cam: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimc: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimc: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimc: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimc: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimd: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimd: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_sata: source is mout_mpll (0), rate is 110000000
-[    0.000000] sclk_spi: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_spi: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_spi: source is ext_xtal (0), rate is 24000000
-[    0.000000] sclk_fimg2d: source is mout_g2d0 (0), rate is 0
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.
-Total pages: 130048
-[    0.000000] Kernel command line: root=ubi0!rootfs rootfstype=ubifs
-rootflags=bulk_read,no_chk_data_crc ubi.mtd=8 ubi.mtd=3 ubi.mtd=6
-earlyprintk console=ttySAC2,115200n8 mem=512M mtdparts=samsung-onenan)
-[    0.000000] PID hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.000000] Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
-[    0.000000] Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
-[    0.000000] Memory: 512MB = 512MB total
-[    0.000000] Memory: 517040k/517040k available, 7248k reserved, 0K highmem
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-[    0.000000]     DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-[    0.000000]     vmalloc : 0xe0800000 - 0xf0000000   ( 248 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
-[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-[    0.000000]       .init : 0xc0008000 - 0xc001f000   (  92 kB)
-[    0.000000]       .text : 0xc001f000 - 0xc023b000   (2160 kB)
-[    0.000000]       .data : 0xc0250000 - 0xc0271340   ( 133 kB)
-[    0.000000] SLUB: Genslabs=11, HWalign=32, Order=0-3, MinObjects=0,
-CPUs=1, Nodes=1
-[    0.000000] Hierarchical RCU implementation.
-[    0.000000]  RCU-based detection of stalled CPUs is disabled.
-[    0.000000]  Verbose stalled-CPUs detection is disabled.
-[    0.000000] NR_IRQS:440
-[    0.000000] Console: colour dummy device 80x30
-s3c24xx_serial_initconsole
-s3c24xx_serial_init_ports: initialising ports...
-s3c24xx_serial_init_port: port=c026caa0, platdev=c0271b20
-s3c24xx_serial_init_port: c026caa0 (hw 0)...
-resource c02564b8 (13800000..13800100)
-port: map=13800000, mem=f5000000, irq=16 (16,18), clock=1
-s3c24xx_serial_init_port: port=c026cb68, platdev=c0256f08
-s3c24xx_serial_init_port: c026cb68 (hw 1)...
-resource c0256528 (13810000..13810100)
-port: map=13810000, mem=f5010000, irq=20 (20,22), clock=1
-s3c24xx_serial_init_port: port=c026cc30, platdev=c0256fe8
-s3c24xx_serial_init_port: c026cc30 (hw 2)...
-resource c0256598 (13820000..13820100)
-port: map=13820000, mem=f5020000, irq=24 (24,26), clock=1
-s3c24xx_serial_init_port: port=c026ccf8, platdev=c02570c8
-s3c24xx_serial_init_port: c026ccf8 (hw 3)...
-resource c0256608 (13830000..13830100)
-port: map=13830000, mem=f5030000, irq=28 (28,30), clock=1
-s3c24xx_serial_console_setup: co=c026cd9c (2), 115200n8
-s3c24xx_serial_console_setup: port=c026cc30 (2)
-s3c24xx_serial_console_setup: baud 115200
-selecting clock fffffffe
-fracval = 0000
-config: 8bits/char
+-----Original Message-----
+From: Kukjin Kim [mailto:kgene.kim at samsung.com] 
+Sent: Monday, August 23, 2010 9:07 AM
+To: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org
+Cc: ben-linux at fluff.org; Kukjin Kim; Kyungmin Park
+Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
+plat-s5p
 
+This patch moves OneNAND device definitions from mach-s5pv210 to plat-s5p
+so that can support it commonly.
 
-On Wed, Aug 18, 2010 at 11:01 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> This patch updates clock for S5PV310/S5PC210.
->
-> [PATCH 01/14] ARM: S5PV310: Adds clock addresses for S5PV310
-> [PATCH 02/14] ARM: S5PV310: Removed unused clock
-> [PATCH 03/14] ARM: S5PV310: Adds clkset_aclk for removing clkset_aclk_xxx
-> [PATCH 04/14] ARM: S5PV310: Fix on PLL setting for S5PV310
-> [PATCH 05/14] ARM: S5PV310: Adds clk_sclk_usbphy0, _usbphy1, and _hdmiphy
-> [PATCH 06/14] ARM: S5PV310: Should be clk_sclk_apll not clk_mout_apll
-> [PATCH 07/14] ARM: S5PV310: Adds printing ACLK200, ACLK100, ACLK160 and ACLK133
-> [PATCH 08/14] ARM: S5PV310: Adds enable and ctrlbit for clk_vpllsrc
-> [PATCH 09/14] ARM: S5PV310: Adds SDMMC clock for S5PV310
-> [PATCH 10/14] ARM: S5PV310: Adds uart clocks
-> [PATCH 11/14] ARM: S5PV310: Bug fix on uclk1 and sclk_pwm
-> [PATCH 12/14] ARM: S5PV310: Add various clocks
-> [PATCH 13/14] ARM: S5PV310: Add video clocks
-> [PATCH 14/14] ARM: S5PV310: Adds various special clocks
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Note: S5PC110 and S5PC210 have same OneNAND driver.
+
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Kyungmin Park <Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/Kconfig                     |    9 +-----
+ arch/arm/mach-s5pv210/Makefile                    |    1 -
+ arch/arm/mach-s5pv210/include/mach/map.h          |    3 ++
+ arch/arm/mach-s5pv210/mach-aquila.c               |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                 |    2 +-
+ arch/arm/mach-s5pv310/include/mach/irqs.h         |    2 +
+ arch/arm/mach-s5pv310/include/mach/map.h          |    6 ++++
+ arch/arm/plat-s5p/Kconfig                         |    5 +++
+ arch/arm/plat-s5p/Makefile                        |    1 +
+ arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c |   28
++++++++++++---------
+ arch/arm/plat-samsung/include/plat/devs.h         |    2 +-
+ 11 files changed, 37 insertions(+), 24 deletions(-)
+ rename arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c (59%)
+
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index d3a3895..5315fec 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -53,11 +53,6 @@ config S5PV210_SETUP_SDHCI_GPIO
+ 	help
+ 	  Common setup code for SDHCI gpio.
+ 
+-config S5PC110_DEV_ONENAND
+-	bool
+-	help
+-	  Compile in platform device definition for OneNAND1 controller
+-
+ menu "S5PC110 Machines"
+ 
+ config MACH_AQUILA
+@@ -71,7 +66,7 @@ config MACH_AQUILA
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_HSMMC2
+-	select S5PC110_DEV_ONENAND
++	select S5P_DEV_ONENAND
+ 	select S5PV210_SETUP_FB_24BPP
+ 	select S5PV210_SETUP_SDHCI
+ 	help
+@@ -88,7 +83,7 @@ config MACH_GONI
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_HSMMC2
+-	select S5PC110_DEV_ONENAND
++	select S5P_DEV_ONENAND
+ 	select S5PV210_SETUP_FB_24BPP
+ 	select S5PV210_SETUP_SDHCI
+ 	help
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 05048c5..7045489 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -26,7 +26,6 @@ obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
+ 
+ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+-obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
+ 
+ obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+ obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h
+b/arch/arm/mach-s5pv210/include/mach/map.h
+index dd4fb6b..aa19d2f 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -17,7 +17,10 @@
+ #include <plat/map-s5p.h>
+ 
+ #define S5PC110_PA_ONENAND	(0xB0000000)
++#define S5P_PA_ONENAND		S5PC110_PA_ONENAND
++
+ #define S5PC110_PA_ONENAND_DMA	(0xB0600000)
++#define S5P_PA_ONENAND_DMA	S5PC110_PA_ONENAND_DMA
+ 
+ #define S5PV210_PA_CHIPID	(0xE0000000)
+ #define S5P_PA_CHIPID		S5PV210_PA_CHIPID
+diff --git a/arch/arm/mach-s5pv210/mach-aquila.c
+b/arch/arm/mach-s5pv210/mach-aquila.c
+index 0dda801..bf772de 100644
+--- a/arch/arm/mach-s5pv210/mach-aquila.c
++++ b/arch/arm/mach-s5pv210/mach-aquila.c
+@@ -477,7 +477,7 @@ static struct platform_device *aquila_devices[]
+__initdata = {
+ 	&aquila_i2c_gpio_pmic,
+ 	&aquila_device_gpiokeys,
+ 	&s3c_device_fb,
+-	&s5pc110_device_onenand,
++	&s5p_device_onenand,
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_hsmmc2,
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-goni.c
+index 53754d7..fdc5cca 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -456,7 +456,7 @@ static void goni_setup_sdhci(void)
+ 
+ static struct platform_device *goni_devices[] __initdata = {
+ 	&s3c_device_fb,
+-	&s5pc110_device_onenand,
++	&s5p_device_onenand,
+ 	&goni_i2c_gpio_pmic,
+ 	&goni_device_gpiokeys,
+ 	&s5p_device_fimc0,
+diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h
+b/arch/arm/mach-s5pv310/include/mach/irqs.h
+index 522352f..7b4b09f 100644
+--- a/arch/arm/mach-s5pv310/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+@@ -73,6 +73,8 @@
+ #define IRQ_HSMMC2		COMBINER_IRQ(29, 2)
+ #define IRQ_HSMMC3		COMBINER_IRQ(29, 3)
+ 
++#define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
++
+ /* Set the default NR_IRQS */
+ 
+ #define NR_IRQS			COMBINER_IRQ(MAX_COMBINER_NR, 0)
+diff --git a/arch/arm/mach-s5pv310/include/mach/map.h
+b/arch/arm/mach-s5pv310/include/mach/map.h
+index 6c7b1fc..5288f5a 100644
+--- a/arch/arm/mach-s5pv310/include/mach/map.h
++++ b/arch/arm/mach-s5pv310/include/mach/map.h
+@@ -23,6 +23,12 @@
+ 
+ #include <plat/map-s5p.h>
+ 
++#define S5PC210_PA_ONENAND		(0x0C000000)
++#define S5P_PA_ONENAND			S5PC210_PA_ONENAND
++
++#define S5PC210_PA_ONENAND_DMA		(0x0C600000)
++#define S5P_PA_ONENAND_DMA		S5PC210_PA_ONENAND_DMA
++
+ #define S5PV310_PA_CHIPID		(0x10000000)
+ #define S5P_PA_CHIPID			S5PV310_PA_CHIPID
+ 
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index c6a855d..407e323 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -46,3 +46,8 @@ config S5P_DEV_FIMC2
+ 	bool
+ 	help
+ 	  Compile in platform device definitions for FIMC controller 2
++
++config S5P_DEV_ONENAND
++	bool
++	help
++	  Compile in platform device definition for OneNAND controller
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index b2e0296..f3e917e 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -24,3 +24,4 @@ obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
+ obj-$(CONFIG_S5P_DEV_FIMC0)	+= dev-fimc0.o
+ obj-$(CONFIG_S5P_DEV_FIMC1)	+= dev-fimc1.o
+ obj-$(CONFIG_S5P_DEV_FIMC2)	+= dev-fimc2.o
++obj-$(CONFIG_S5P_DEV_ONENAND)	+= dev-onenand.o
+diff --git a/arch/arm/mach-s5pv210/dev-onenand.c
+b/arch/arm/plat-s5p/dev-onenand.c
+similarity index 59%
+rename from arch/arm/mach-s5pv210/dev-onenand.c
+rename to arch/arm/plat-s5p/dev-onenand.c
+index f8ede33..6db9262 100644
+--- a/arch/arm/mach-s5pv210/dev-onenand.c
++++ b/arch/arm/plat-s5p/dev-onenand.c
+@@ -1,10 +1,12 @@
+-/*
+- * linux/arch/arm/mach-s5pv210/dev-onenand.c
++/* linux/arch/arm/plat-s5p/dev-onenand.c
++ *
++ * Copyright 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
+  *
+  *  Copyright (c) 2008-2010 Samsung Electronics
+  *  Kyungmin Park <kyungmin.park@samsung.com>
+  *
+- * S5PC110 series device definition for OneNAND devices
++ * S5P series device definition for OneNAND devices
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -19,15 +21,15 @@
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+-static struct resource s5pc110_onenand_resources[] = {
++static struct resource s5p_onenand_resources[] = {
+ 	[0] = {
+-		.start	= S5PC110_PA_ONENAND,
+-		.end	= S5PC110_PA_ONENAND + SZ_128K - 1,
++		.start	= S5P_PA_ONENAND,
++		.end	= S5P_PA_ONENAND + SZ_128K - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= S5PC110_PA_ONENAND_DMA,
+-		.end	= S5PC110_PA_ONENAND_DMA + SZ_8K - 1,
++		.start	= S5P_PA_ONENAND_DMA,
++		.end	= S5P_PA_ONENAND_DMA + SZ_8K - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[2] = {
+@@ -37,19 +39,19 @@ static struct resource s5pc110_onenand_resources[] = {
+ 	},
+ };
+ 
+-struct platform_device s5pc110_device_onenand = {
++struct platform_device s5p_device_onenand = {
+ 	.name		= "s5pc110-onenand",
+ 	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(s5pc110_onenand_resources),
+-	.resource	= s5pc110_onenand_resources,
++	.num_resources	= ARRAY_SIZE(s5p_onenand_resources),
++	.resource	= s5p_onenand_resources,
+ };
+ 
+-void s5pc110_onenand_set_platdata(struct onenand_platform_data *pdata)
++void s5p_onenand_set_platdata(struct onenand_platform_data *pdata)
+ {
+ 	struct onenand_platform_data *pd;
+ 
+ 	pd = kmemdup(pdata, sizeof(struct onenand_platform_data),
+GFP_KERNEL);
+ 	if (!pd)
+ 		printk(KERN_ERR "%s: no memory for platform data\n",
+__func__);
+-	s5pc110_device_onenand.dev.platform_data = pd;
++	s5p_device_onenand.dev.platform_data = pd;
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h
+b/arch/arm/plat-samsung/include/plat/devs.h
+index 85f6f23..cb12102 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -73,7 +73,7 @@ extern struct platform_device s3c_device_hwmon;
+ extern struct platform_device s3c_device_nand;
+ extern struct platform_device s3c_device_onenand;
+ extern struct platform_device s3c64xx_device_onenand1;
+-extern struct platform_device s5pc110_device_onenand;
++extern struct platform_device s5p_device_onenand;
+ 
+ extern struct platform_device s3c_device_usbgadget;
+ extern struct platform_device s3c_device_usb_hsotg;
+-- 
+1.6.2.5
