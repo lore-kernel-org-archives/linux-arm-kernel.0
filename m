@@ -1,28 +1,26 @@
 From: jason.mcmullan@netronome.com (Jason McMullan)
-Date: Mon, 23 Aug 2010 15:51:25 -0400
+Date: Mon, 23 Aug 2010 15:54:14 -0400
 Subject: Policy question: criteria for submission to mainline for a new
 	SoC?
-In-Reply-To: <20100823165317.GC20369@sirena.org.uk>
+In-Reply-To: <201008231912.04970.marek.vasut@gmail.com>
 References: <AANLkTimpz2YVTqd1EVqoX3yKKQ-peAy=OgwEDmz-iVi-@mail.gmail.com>
-	<201008231726.41399.marek.vasut@gmail.com>
 	<AANLkTimzBeN2OzHkay5uNK1pK_w575NgAxJbcDmwYMby@mail.gmail.com>
 	<20100823165317.GC20369@sirena.org.uk>
-Message-ID: <AANLkTiknyv-sZeCDqaUq0LPx2ngRkba6jXggjduhg+_v@mail.gmail.com>
+	<201008231912.04970.marek.vasut@gmail.com>
+Message-ID: <AANLkTi=cMrLvhj__6suoW5nEzQQs7nXqFzmPtzxP0Dwv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 23, 2010 at 12:53 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
+On Mon, Aug 23, 2010 at 1:12 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
 >
-> If you're doing this please make sure you provide a method for customers
-> to customise the machine type (and get the rest of the boot protocol
-> right).
+> You can still release the code, can't you ? Or the NDA is so restrictive it
+> covers even the code?
+>
 
-Machine type (atag id) is one of the many customizable parameters.
-I was itching to use Flattened Device Tree to hold these parameters,
-but as far as I can tell that 'isn't ready for prime time' on ARM at
-the moment.
+I am not in a position to be able to definitively say (as I am
+not involved in the negotiation of those agreements). For now,
+I have to take a very conservative approach to those NDAs.
 
---
+-- 
 Jason S. McMullan
 Netronome Systems, Inc.
