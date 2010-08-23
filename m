@@ -1,47 +1,84 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 24 Aug 2010 00:05:26 +0200 (CEST)
-Subject: [PATCH 0/4] mx2_camera: mx25 fixes and enhancements
-In-Reply-To: <20100823041117.GA20026@jasper.tkos.co.il>
-References: <cover.1280229966.git.baruch@tkos.co.il>
-	<20100823041117.GA20026@jasper.tkos.co.il>
-Message-ID: <Pine.LNX.4.64.1008240002130.13536@axis700.grange>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 23 Aug 2010 15:57:54 -0700
+Subject: RFC: A better clock rounding API?
+In-Reply-To: <AANLkTinxjg3x3oosMJLXg470gkNFo8nZqDBSrKOz6YUm@mail.gmail.com>
+References: <4C6B7213.3030808@codeaurora.org>	<AANLkTik1cES4GP4hRf=B5BLrEN35B3p7rFz+tcsHDtHf@mail.gmail.com>	<4C6EFB47.70607@codeaurora.org>
+	<AANLkTinxjg3x3oosMJLXg470gkNFo8nZqDBSrKOz6YUm@mail.gmail.com>
+Message-ID: <4C72FCF2.5010503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch
+Rob,
 
-On Mon, 23 Aug 2010, Baruch Siach wrote:
-
-> Hi Guennadi,
+Rob Herring wrote:
+> Saravana,
 > 
-> On Tue, Jul 27, 2010 at 03:06:06PM +0300, Baruch Siach wrote:
-> > The first 3 pathces in this series are fixes for the mx2_camera driver which is 
-> > going upstream via the imx git tree. The last patch implements forced active 
-> > buffer termination on mx25.
+> On Fri, Aug 20, 2010 at 5:01 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> Rob,
+>>
+>>> This is still ambiguous. If there are multiple valid frequencies in
+>>> the range, is the preferred rate returned the lowest rate or highest
+>>> rate in the range? For something like an SD bus clock you would want
+>>> the maximum rate within the range. For something like a LCD pixel
+>>> clock or CMOS sensor input clock, you typically only need to be
+>>> greater than a certain minimum freq and for power reasons you want it
+>>> to be closest to the minimum.
+>> Thanks for the feed back. This ambiguity is what my alternate proposal
+>> handles. To repeat the 2nd option:
+>>
+>> long clk_find_rate(struct clk *clk,
+>>                        unsigned long start_rate,
+>>                        long end_rate);
+>>
+>> With the above API, the clock driver tries to find a freq between start_rate
+>> and end_rate, but starts the search from "start_rate".
+>>
+>> So, if you prefer lower freqs, you call it as:
+>> clk_find_rate(clk, 100000, 150000);
+>>
+>> and if you prefer higher freqs, you call it as:
+>> clk_find_rate(clk, 150000, 100000);
+>>
+>> That should take care of your concerns, right?
+>>
+>> -Saravana
 > 
-> Ping?
+> Okay, that does address my concern, but I think that the use of the
+> function is not completely obvious without explanation
+We can resolve this by making sure the inline documentation in clk.h is 
+good.
 
-Sorry for taking a bit long to push your patches, but, I think, we still 
-have a bit of time. Fixes are ok to go in after -rc2 (or even -rc3, or 
--rc4...), with features we're anyway late for 2.6.36, so, they will have 
-to wait until 2.6.37, for which we have some time too. So, I think we're 
-doing fine so far. Of the four patches below patch two was unclear, 
-whether we want it or not, patches one and three were ok, AFAIR, will have 
-to double-check, patch 4 I'll have to decide whether that's a fix or a 
-feature;)
+> and subject to
+> coding mistakes.
+I think this is true for any API. If an API is called with wrong 
+parameters without understanding it, then it's not going to work.
 
-> > Baruch Siach (4):
-> >   mx2_camera: fix a race causing NULL dereference
-> >   mx2_camera: return IRQ_NONE when doing nothing
-> >   mx2_camera: fix comment typo
-> >   mx2_camera: implement forced termination of active buffer for mx25
-> > 
-> >  drivers/media/video/mx2_camera.c |   34 ++++++++++++++++++++++++++--------
-> >  1 files changed, 26 insertions(+), 8 deletions(-)
+> Also, considering clk_round_rate would still be
+> ambiguous and with efforts to unify struct clk, perhaps it makes more
+> sense to fix all users and implementations of clk_round_rate rather
+> than add a new function which will duplicate some portion of
+> clk_round_rate implementations.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+clk_round_rate() in inherently broken because it doesn't provide the 
+clock driver with enough information (consumer's freq tolerance) to make 
+the right decision. I don't think there is a right way to fix it with 
+the existing parameters.
+
+To address your concern, we could mark clk_round_rate() as deprecated 
+and remove it when everyone has converted their device drivers to use 
+clk_find_freq().
+
+Anyway, I think we are putting the cart before the horse here. I'm 
+waiting for Russell King and possibly others to first agree to the 
+proposed API before deciding what we are going to do with the users of 
+the old API.
+
+Russell and other active clock developers,
+
+Any comments?
+
+Thanks,
+Saravana
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
