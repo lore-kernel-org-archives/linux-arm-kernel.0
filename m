@@ -1,53 +1,79 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 22 Aug 2010 20:14:54 -0500
-Subject: RFC: A better clock rounding API?
-In-Reply-To: <4C6EFB47.70607@codeaurora.org>
-References: <4C6B7213.3030808@codeaurora.org>
-	<AANLkTik1cES4GP4hRf=B5BLrEN35B3p7rFz+tcsHDtHf@mail.gmail.com>
-	<4C6EFB47.70607@codeaurora.org>
-Message-ID: <AANLkTinxjg3x3oosMJLXg470gkNFo8nZqDBSrKOz6YUm@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 23 Aug 2010 10:11:07 +0900
+Subject: [PATCH v2] ARM: SAMSUNG: Fix on build warning regarding VMALLOC_END
+	type
+Message-ID: <1282525867-29968-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saravana,
+Fix this warning:
 
-On Fri, Aug 20, 2010 at 5:01 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Rob,
->
->> This is still ambiguous. If there are multiple valid frequencies in
->> the range, is the preferred rate returned the lowest rate or highest
->> rate in the range? For something like an SD bus clock you would want
->> the maximum rate within the range. For something like a LCD pixel
->> clock or CMOS sensor input clock, you typically only need to be
->> greater than a certain minimum freq and for power reasons you want it
->> to be closest to the minimum.
->
-> Thanks for the feed back. This ambiguity is what my alternate proposal
-> handles. To repeat the 2nd option:
->
-> long clk_find_rate(struct clk *clk,
-> ? ? ? ? ? ? ? ? ? ? ? ?unsigned long start_rate,
-> ? ? ? ? ? ? ? ? ? ? ? ?long end_rate);
->
-> With the above API, the clock driver tries to find a freq between start_rate
-> and end_rate, but starts the search from "start_rate".
->
-> So, if you prefer lower freqs, you call it as:
-> clk_find_rate(clk, 100000, 150000);
->
-> and if you prefer higher freqs, you call it as:
-> clk_find_rate(clk, 150000, 100000);
->
-> That should take care of your concerns, right?
->
-> -Saravana
+arch/arm/mm/init.c: In function 'mem_init':
+arch/arm/mm/init.c:644: warning: format '%08lx' expects type
+'long unsigned int', but argument 12 has type 'unsigned int'
 
-Okay, that does address my concern, but I think that the use of the
-function is not completely obvious without explanation and subject to
-coding mistakes. Also, considering clk_round_rate would still be
-ambiguous and with efforts to unify struct clk, perhaps it makes more
-sense to fix all users and implementations of clk_round_rate rather
-than add a new function which will duplicate some portion of
-clk_round_rate implementations.
+And removes the useless parens and white space.
 
-Rob
+Reported-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+Change since v1:
+- Removing the useless parens as per Sergei Shtylyov suggestion.
+
+ arch/arm/mach-s3c2410/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s3c64xx/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5p6440/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5p6442/include/mach/vmalloc.h |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2410/include/mach/vmalloc.h b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+index 315b007..dc3b34c 100644
+--- a/arch/arm/mach-s3c2410/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+@@ -15,6 +15,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	0xE0000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+index 7411ef3..f0a0fa2 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+@@ -15,6 +15,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	0xE0000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s5p6440/include/mach/vmalloc.h b/arch/arm/mach-s5p6440/include/mach/vmalloc.h
+index 16df257..8217b99 100644
+--- a/arch/arm/mach-s5p6440/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5p6440/include/mach/vmalloc.h
+@@ -12,6 +12,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	0xE0000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s5p6442/include/mach/vmalloc.h b/arch/arm/mach-s5p6442/include/mach/vmalloc.h
+index be33336..b9fd9aa 100644
+--- a/arch/arm/mach-s5p6442/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5p6442/include/mach/vmalloc.h
+@@ -12,6 +12,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xE0000000)
++#define VMALLOC_END	0xE0000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+-- 
+1.6.2.5
