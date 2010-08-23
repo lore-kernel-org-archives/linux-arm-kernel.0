@@ -1,37 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Aug 2010 17:59:17 +0100
-Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <20100817104414.19061.38999.stgit@baageli.muru.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-Message-ID: <000601cb42e4$85c7ed80$9157c880$@deacon@arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 23 Aug 2010 19:12:04 +0200
+Subject: Policy question: criteria for submission to mainline for a new
+	SoC?
+In-Reply-To: <20100823165317.GC20369@sirena.org.uk>
+References: <AANLkTimpz2YVTqd1EVqoX3yKKQ-peAy=OgwEDmz-iVi-@mail.gmail.com>
+	<AANLkTimzBeN2OzHkay5uNK1pK_w575NgAxJbcDmwYMby@mail.gmail.com>
+	<20100823165317.GC20369@sirena.org.uk>
+Message-ID: <201008231912.04970.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-> Hi all,
+Dne Po 23. srpna 2010 18:53:17 Mark Brown napsal(a):
+> On Mon, Aug 23, 2010 at 12:39:03PM -0400, Jason McMullan wrote:
+> > On Mon, Aug 23, 2010 at 11:26 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > > Most of the board init routines should be in Linux actually. It
+> > > shouldn't depend on bootloader. Also, you might want to use uboot for
+> > > linux instead of custom bootloader.
+> > 
+> > As much as I would like to, several of our board initialization
+> > routines (specifically DDR3, TCAM, and RXAUI) are under NDA
+> > by our suppliers, and can't be included in U-Boot.
 > 
-> Here are some experimental patches to allow booting ARMv7 SMP
-> kernel on UP to some extent. Posting these early in case it is
-> of any help as I know at least Bryan Wu is working on similar
-> issues.
-> 
-> The patches are very much work in progress, and does not quite
-> boot to init yet so there's all kinds of things to fix. But at
-> least these patches allow booting to the point where the fixing
-> issues might be a bit easier.. Currently it boots to the point
-> where there are tons of "WARNING: at mm/percpu-vm.c:320 pcpu_alloc"
-> prints.
+> If you're doing this please make sure you provide a method for customers
+> to customise the machine type (and get the rest of the boot protocol
+> right).
 
-I've got some similar hacks for the RealView boards which I've used
-to build a Kernel that can boot on the PB-A8 and PBX-A9. Whilst this
-is the wrong way of going about solving the problem [Russell's code
-patching is a lot neater and more scaleable] you might be interested
-in looking at the code anyway:
+You can still release the code, can't you ? Or the NDA is so restrictive it 
+covers even the code?
 
-http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/smp-up-hacks
-
-Only v7 cores are supported and TEX remapping is used to avoid having
-to worry about setting the shared attribute at runtime. Yuck!
-
-Will
+Cheers
