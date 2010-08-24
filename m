@@ -1,45 +1,58 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 24 Aug 2010 17:47:41 +0200
-Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <201008241726.08797.arnd@arndb.de>
-References: <4C61EE55.5030506@codeaurora.org>
-	<201008191309.15425.arnd@arndb.de>
-	<20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
-	<201008241726.08797.arnd@arndb.de>
-Message-ID: <20100824154740.GD2160@osiris.boeblingen.de.ibm.com>
+From: dhylands@gmail.com (Dave Hylands)
+Date: Tue, 24 Aug 2010 09:50:15 -0700
+Subject: Problems with dma_alloc_writecombine
+In-Reply-To: <AANLkTi=kbch5XF99nmjRsy_f2akwQwCR7co7eN=SDd0w@mail.gmail.com>
+References: <AANLkTi=kbch5XF99nmjRsy_f2akwQwCR7co7eN=SDd0w@mail.gmail.com>
+Message-ID: <AANLkTi=-choRCYyU2KA7D2asOqLGwe5BJddt9mgV81KP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 24, 2010 at 05:26:08PM +0200, Arnd Bergmann wrote:
-> On Tuesday 24 August 2010, Heiko Carstens wrote:
-> > > (Taking Martin and Heiko on Cc for s390)
-> > > 
-> > > I'd strongly suggest making the behavior the same for everyone. It should
-> > > be fairly easy to make sure none of these warnings ever triggers
-> > > on s390, because most of the Linux device driver code does not get build
-> > > there anyway.
-> > 
-> > Please don't do that. An s390 allyesconfig still triggers 45 warnings and
-> > I'm currently not willing to "patch" working code just to get rid of these
-> > warnings which are most likely all false positives.
-> > That's the reason why we currently don't error out and only generate
-> > warnings.
-> 
-> Can't you just turn that option off then? Or are you worried about
-> allyesconfig builds?
+Replying to my own post....
 
-I'd like to keep an allyesconfig compiling and booting.
-With the proposed change we would never see a green entry at
-http://kisskb.ellerman.id.au/kisskb/branch/9/ for s390's allyesconfig
-build ;)
-And it would make it a bit harder to find the usual !HAS_DMA and
-!HAS_IOMEM build breakages we see quite frequently. No reason to make
-it even more difficult to keep s390 compiling.
+On Fri, Aug 20, 2010 at 8:14 PM, Dave Hylands wrote:
+> Hi,
+>
+> We've observed a problem with dma_alloc_writecombine when the system
+> is under heavy load (heavy bus traffic).
 
-> The current state is confusing because on s390
-> CONFIG_DEBUG_STRICT_USER_COPY_CHECKS means that gcc will warn rather
-> than ignore the finding, while on all others, the same option turns
-> a warning into an error.
+I found the problem (well I think I found the problem)
 
-Then maybe add a "choice" Kconfig option in a way that both allyesconfig
-as well as allnoconfig will build?
+The armv6_set_pte_ext function (from arch/arm/mm/proc-macros.S) does
+this at the end:
+
+	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+
+which doesn't wait for the write to hit the memory. I added
+
+	mcr	p15, 0, r0, c7, c10, 4		@ dsb
+
+which ensures that the write buffer has been drained before
+continuing, and my problem goes away.
+
+I wasn't sure if the dsb is a complete superset of flush_pte. If it
+is, then the flush_pte can be replaced with a dsb (for my test, I
+added the dsb).
+
+I found some references in the ARM literature:
+<http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf>
+
+In "9.2.1 Ensuring the visibility of updates to instructions for a
+uniprocessor" (page 24) they use the dsb instruction, where the
+armv6_set_pte_ext function doesn't. Their example also covers the more
+general case where the page could refer to instructions or data,
+whereas the dma stuff is data only.
+
+I've checked the sources, and the problem still seems to exist in the
+latest kernel (2.6.35).
+
+I've never submitted a patch to the kernel before. Is there a web page
+which describes the process?
+
+I gather from other posts that using gmail is unacceptable - which is
+fine, I have other email accounts I can use to actually submit the
+patch.
+
+-- 
+Dave Hylands
+Shuswap, BC, Canada
+http://www.DaveHylands.com/
