@@ -1,32 +1,41 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 24 Aug 2010 17:04:14 +0200
-Subject: [PATCH 1/3] h1940: use gpiolib for latch access
-In-Reply-To: <201008241750.43535.anarsoul@gmail.com>
-References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
-	<201008241640.21488.marek.vasut@gmail.com>
-	<201008241750.43535.anarsoul@gmail.com>
-Message-ID: <201008241704.14566.marek.vasut@gmail.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Tue, 24 Aug 2010 17:06:55 +0200
+Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <201008191309.15425.arnd@arndb.de>
+References: <4C61EE55.5030506@codeaurora.org>
+	<201008181428.45029.arnd@arndb.de> <4C6C3910.80800@codeaurora.org>
+	<201008191309.15425.arnd@arndb.de>
+Message-ID: <20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 24. srpna 2010 16:50:36 Vasily Khoruzhick napsal(a):
-> ? ????????? ?? 24 ??????? 2010 17:40:21 ????? Marek Vasut ???????:
-> > Defining S3C2410_GPH_GPIONAME for each bit might be better then.
+On Thu, Aug 19, 2010 at 01:09:15PM +0200, Arnd Bergmann wrote:
+> On Wednesday 18 August 2010, Stephen Boyd wrote:
+> > So the only sticking point now is that x86, parisc, and arm use warnings 
+> > and errors but s390 only uses warnings. I guess I'll reword it to be:
+> > 
+> >         Enabling this option turns a certain set of sanity checks for
+> >         user copy operations into compile time warnings/errors.
+> > 
+> >         The copy_from_user() etc checks are there to help test if there
+> >         are sufficient security checks on the length argument of the
+> >         copy operation, by having gcc prove that the argument is
+> >         within bounds.
+> > 
+> >         If unsure, or if you run an older (pre 4.4) gcc where this
+> >         option is a no-op, say N.
+> > 
+> > or I'll add a patch to make s390 trigger an error when this is enabled?
 > 
-> Well, that requires massive refactoring of h1940 (and rx1950) support. And
-> btw, that's common for s3c24xx-based machines to use generic s3c24xx gpio
-> names, not machine specific.
-
-I assume I see how it works now. Ok, please put a comment around it then so 
-others will understand what it does.
-
-Using machine-specific GPIO names might help readability btw. -- the approach 
-"everyone does it this way so I'll do it this way without thinking" is bad :)
-
-Well, it's just my suggestion for improvement of the overall code quality. Ben, 
-what's your opinion?
-
-Cheers
+> (Taking Martin and Heiko on Cc for s390)
 > 
-> Regards
-> Vasily
+> I'd strongly suggest making the behavior the same for everyone. It should
+> be fairly easy to make sure none of these warnings ever triggers
+> on s390, because most of the Linux device driver code does not get build
+> there anyway.
+
+Please don't do that. An s390 allyesconfig still triggers 45 warnings and
+I'm currently not willing to "patch" working code just to get rid of these
+warnings which are most likely all false positives.
+That's the reason why we currently don't error out and only generate
+warnings.
