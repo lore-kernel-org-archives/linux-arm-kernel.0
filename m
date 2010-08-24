@@ -1,139 +1,111 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Tue, 24 Aug 2010 17:27:02 +0200
-Subject: [PATCH 1/2] Separate display's pixel configuration from video mode
-In-Reply-To: <1282643200-13332-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1282643200-13332-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1282663623-8404-2-git-send-email-m.grzeschik@pengutronix.de>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Tue, 24 Aug 2010 21:13:48 +0530
+Subject: [PATCH 1/2] nomadik-gpio: add SLPM register handing for DB8500v2
+Message-ID: <1282664629-22975-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Juergen Beisert <jbe@pengutronix.de>
+The SLPM register enables/disables wakeup detection on DB8500v2.
 
-Currently the pixel mapping to the display depends on the video mode. This
-seems not true as the IPU transfers the data read from the video memory in an
-internal 32 bit bus to the DI unit. The DI mapping only depends on the settings
-the IPU should read the data from video memory. If all these settings do it in
-the same byte order, only one DI mapping per display is required.
-
-There are three locations where we can mix the colour components:
- - in the video mode description, colour offsets
- - in the IPU while reading pixel data from memory
- - in the DI unit while mapping it to the connected display
-
-If one of these settings are incorrect, the displayed colours are broken.
-
-With this patch the platform describes the display connection and the driver
-uses this information independently from the selected video mode.
-
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- arch/arm/plat-mxc/include/mach/mx3fb.h |    5 +++
- drivers/video/mx3fb.c                  |   62 +++++++++++++-------------------
- 2 files changed, 30 insertions(+), 37 deletions(-)
+ arch/arm/plat-nomadik/gpio.c                |   30 ++++++++++++++++++++++++--
+ arch/arm/plat-nomadik/include/plat/gpio.h   |    2 +
+ arch/arm/plat-nomadik/include/plat/pincfg.h |    5 +++-
+ 3 files changed, 33 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx3fb.h b/arch/arm/plat-mxc/include/mach/mx3fb.h
-index ac24c5c..93bd032 100644
---- a/arch/arm/plat-mxc/include/mach/mx3fb.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3fb.h
-@@ -33,6 +33,11 @@ struct mx3fb_platform_data {
- 	const char			*name;
- 	const struct fb_videomode	*mode;
- 	int				num_modes;
-+
-+	/* display's mapping description */
-+	struct fb_bitfield red;
-+	struct fb_bitfield green;
-+	struct fb_bitfield blue;
- };
+diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+index 977c8f9..014da39 100644
+--- a/arch/arm/plat-nomadik/gpio.c
++++ b/arch/arm/plat-nomadik/gpio.c
+@@ -118,8 +118,8 @@ static void __nmk_config_pin(struct nmk_gpio_chip *nmk_chip, unsigned offset,
+ 		[3] /* illegal */	= "??"
+ 	};
+ 	static const char *slpmnames[] = {
+-		[NMK_GPIO_SLPM_INPUT]		= "input",
+-		[NMK_GPIO_SLPM_NOCHANGE]	= "no-change",
++		[NMK_GPIO_SLPM_INPUT]		= "input/wakeup",
++		[NMK_GPIO_SLPM_NOCHANGE]	= "no-change/no-wakeup",
+ 	};
  
- #endif
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index 658f10a..c335a72 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -286,13 +286,6 @@ static void mx3fb_write_reg(struct mx3fb_data *mx3fb, u32 value, unsigned long r
- 	__raw_writel(value, mx3fb->reg_base + reg);
+ 	int pin = PIN_NUM(cfg);
+@@ -200,6 +200,10 @@ EXPORT_SYMBOL(nmk_config_pins);
+  * changed to an input (with pullup/down enabled) in sleep and deep sleep.  If
+  * @mode is NMK_GPIO_SLPM_NOCHANGE, the pin remains in the state it was
+  * configured even when in sleep and deep sleep.
++ *
++ * On DB8500v2 onwards, this setting loses the previous meaning and instead
++ * indicates if wakeup detection is enabled on the pin.  Note that
++ * enable_irq_wake() will automatically enable wakeup detection.
+  */
+ int nmk_gpio_set_slpm(int gpio, enum nmk_gpio_slpm mode)
+ {
+@@ -367,7 +371,27 @@ static void nmk_gpio_irq_unmask(unsigned int irq)
+ 
+ static int nmk_gpio_irq_set_wake(unsigned int irq, unsigned int on)
+ {
+-	return nmk_gpio_irq_modify(irq, WAKE, on);
++	struct nmk_gpio_chip *nmk_chip;
++	unsigned long flags;
++	int gpio;
++
++	gpio = NOMADIK_IRQ_TO_GPIO(irq);
++	nmk_chip = get_irq_chip_data(irq);
++	if (!nmk_chip)
++		return -EINVAL;
++
++	spin_lock_irqsave(&nmk_chip->lock, flags);
++#ifdef CONFIG_ARCH_U8500
++	if (cpu_is_u8500v2()) {
++		__nmk_gpio_set_slpm(nmk_chip, gpio,
++				    on ? NMK_GPIO_SLPM_WAKEUP_ENABLE
++				       : NMK_GPIO_SLPM_WAKEUP_DISABLE);
++	}
++#endif
++	__nmk_gpio_irq_modify(nmk_chip, gpio, WAKE, on);
++	spin_unlock_irqrestore(&nmk_chip->lock, flags);
++
++	return 0;
  }
  
--static const uint32_t di_mappings[] = {
--	0x1600AAAA, 0x00E05555, 0x00070000, 3,	/* RGB888 */
--	0x0005000F, 0x000B000F, 0x0011000F, 1,	/* RGB666 */
--	0x0011000F, 0x000B000F, 0x0005000F, 1,	/* BGR666 */
--	0x0004003F, 0x000A000F, 0x000F003F, 1	/* RGB565 */
--};
--
- static void sdc_fb_init(struct mx3fb_info *fbi)
- {
- 	struct mx3fb_data *mx3fb = fbi->mx3fb;
-@@ -450,6 +443,9 @@ static int sdc_init_panel(struct mx3fb_data *mx3fb, enum ipu_panel panel,
- 	uint32_t div;
- 	struct clk *ipu_clk;
+ static int nmk_gpio_irq_set_type(unsigned int irq, unsigned int type)
+diff --git a/arch/arm/plat-nomadik/include/plat/gpio.h b/arch/arm/plat-nomadik/include/plat/gpio.h
+index aba3551..67b113d 100644
+--- a/arch/arm/plat-nomadik/include/plat/gpio.h
++++ b/arch/arm/plat-nomadik/include/plat/gpio.h
+@@ -65,7 +65,9 @@ enum nmk_gpio_pull {
+ /* Sleep mode */
+ enum nmk_gpio_slpm {
+ 	NMK_GPIO_SLPM_INPUT,
++	NMK_GPIO_SLPM_WAKEUP_ENABLE = NMK_GPIO_SLPM_INPUT,
+ 	NMK_GPIO_SLPM_NOCHANGE,
++	NMK_GPIO_SLPM_WAKEUP_DISABLE = NMK_GPIO_SLPM_NOCHANGE,
+ };
  
-+	struct device *dev = mx3fb->dev;
-+	struct mx3fb_platform_data *mx3fb_pdata = dev->platform_data;
-+
- 	dev_dbg(mx3fb->dev, "panel size = %d x %d", width, height);
+ extern int nmk_gpio_set_slpm(int gpio, enum nmk_gpio_slpm mode);
+diff --git a/arch/arm/plat-nomadik/include/plat/pincfg.h b/arch/arm/plat-nomadik/include/plat/pincfg.h
+index 7eed11c..432a201 100644
+--- a/arch/arm/plat-nomadik/include/plat/pincfg.h
++++ b/arch/arm/plat-nomadik/include/plat/pincfg.h
+@@ -24,7 +24,7 @@
+  *
+  * PIN_CFG_DEFAULT - default config (0):
+  *		     pull up/down = disabled
+- *		     sleep mode = input
++ *		     sleep mode = input/wakeup
+  *
+  * PIN_CFG	   - default config with alternate function
+  * PIN_CFG_PULL	   - default config with alternate function and pull up/down
+@@ -55,6 +55,9 @@ typedef unsigned long pin_cfg_t;
+ #define PIN_SLPM(x)		(((x) & PIN_SLPM_MASK) >> PIN_SLPM_SHIFT)
+ #define PIN_SLPM_INPUT		(NMK_GPIO_SLPM_INPUT << PIN_SLPM_SHIFT)
+ #define PIN_SLPM_NOCHANGE	(NMK_GPIO_SLPM_NOCHANGE << PIN_SLPM_SHIFT)
++/* These two replace the above in DB8500v2+ */
++#define PIN_SLPM_WAKEUP_ENABLE	(NMK_GPIO_SLPM_WAKEUP_ENABLE << PIN_SLPM_SHIFT)
++#define PIN_SLPM_WAKEUP_DISABLE	(NMK_GPIO_SLPM_WAKEUP_DISABLE << PIN_SLPM_SHIFT)
  
- 	if (v_sync_width == 0 || h_sync_width == 0)
-@@ -536,36 +532,28 @@ static int sdc_init_panel(struct mx3fb_data *mx3fb, enum ipu_panel panel,
- 		sig.Vsync_pol << DI_D3_VSYNC_POL_SHIFT;
- 	mx3fb_write_reg(mx3fb, old_conf, DI_DISP_SIG_POL);
- 
--	switch (pixel_fmt) {
--	case IPU_PIX_FMT_RGB24:
--		mx3fb_write_reg(mx3fb, di_mappings[0], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[1], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[2], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[3] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	case IPU_PIX_FMT_RGB666:
--		mx3fb_write_reg(mx3fb, di_mappings[4], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[5], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[6], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[7] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	case IPU_PIX_FMT_BGR666:
--		mx3fb_write_reg(mx3fb, di_mappings[8], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[9], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[10], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[11] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	default:
--		mx3fb_write_reg(mx3fb, di_mappings[12], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[13], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[14], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[15] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	}
-+	/* setup the pixel mapping to the display. This seems independent
-+	 * from the internal video mode in use
-+	 */
-+	reg = 0xffff & ~(((1 << (mx3fb_pdata->blue.length * 2)) - 1) << (16 - (mx3fb_pdata->blue.length * 2)));
-+	reg |= ((mx3fb_pdata->blue.offset + mx3fb_pdata->blue.length - 1)) << 16;
-+	pr_debug("b: %d %d 0x%08x\n", mx3fb_pdata->blue.offset, mx3fb_pdata->blue.length, reg);
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP3_B0_MAP); /* blue */
-+
-+	reg = 0xffff & ~(((1 << (mx3fb_pdata->green.length * 2)) - 1) << (16 - (mx3fb_pdata->green.length * 2)));
-+	reg |= ((mx3fb_pdata->green.offset + mx3fb_pdata->green.length - 1)) << 16;
-+	pr_debug("g: %d %d 0x%08x\n", mx3fb_pdata->green.offset, mx3fb_pdata->green.length, reg);
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP3_B1_MAP); /* green */
-+
-+	reg = 0xffff & ~(((1 << (mx3fb_pdata->red.length * 2)) - 1) << (16 - (mx3fb_pdata->red.length * 2)));
-+	reg |= ((mx3fb_pdata->red.offset + mx3fb_pdata->red.length - 1)) << 16;
-+	pr_debug("r: %d %d 0x%08x\n", mx3fb_pdata->red.offset, mx3fb_pdata->red.length, reg);
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP3_B2_MAP); /* red */
-+
-+	/* the TFT displays expecting one pixel per clock */
-+	reg = mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) & ~(3 << 12);
-+	reg |= 0 << 12;	/* 0 means one clock */
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP_ACC_CC);
- 
- 	spin_unlock_irqrestore(&mx3fb->lock, lock_flags);
+ #define PIN_CFG_DEFAULT		(PIN_PULL_NONE | PIN_SLPM_INPUT)
  
 -- 
-1.7.1
+1.7.2.dirty
