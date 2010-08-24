@@ -1,39 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 24 Aug 2010 10:19:11 +0200
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <30193.50267.qm@web180305.mail.gq1.yahoo.com>
-References: <30193.50267.qm@web180305.mail.gq1.yahoo.com>
-Message-ID: <4C73807F.4090007@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 24 Aug 2010 10:39:44 +0200
+Subject: [PATCH] MX3x: clean kpp resource structure definitions
+In-Reply-To: <1282636659-2868-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1282636659-2868-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20100824083944.GD1536@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/08/2010 18:36, David Brownell :
+Hallo Michael,
+
+On Tue, Aug 24, 2010 at 09:57:39AM +0200, Michael Grzeschik wrote:
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+>  arch/arm/mach-mx3/devices.c |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
 > 
-> 
-> --- On Mon, 8/23/10, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> 
->> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-> 
-> What's the rationale?  It's valid or not.  And there's already a
-> function whose job it is to report that status ... which is set up
-> for arch customization.
+> diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
+> index a4fd1a2..a3e0fe2 100644
+> --- a/arch/arm/mach-mx3/devices.c
+> +++ b/arch/arm/mach-mx3/devices.c
+> @@ -374,12 +374,12 @@ struct platform_device imx_rtc_device0 = {
+>  
+>  static struct resource imx_kpp_resources[] = {
+>  	{
+> -		.start	= MX3x_KPP_BASE_ADDR,
+> -		.end	= MX3x_KPP_BASE_ADDR + 0xf,
+> -		.flags	= IORESOURCE_MEM
+> +		.start	= KPP_BASE_ADDR,
+> +		.end	= KPP_BASE_ADDR + SZ_4K - 1,
+> +		.flags	= IORESOURCE_MEM,
+>  	}, {
+> -		.start	= MX3x_INT_KPP,
+> -		.end	= MX3x_INT_KPP,
+> +		.start	= MXC_INT_KPP,
+> +		.end	= MXC_INT_KPP,
+>  		.flags	= IORESOURCE_IRQ,
+>  	},
+>  };
+what ist the exact problem you want to fix?  I'm OK with adding that
+comma and using SZ_4K (assuming you checked it in the reference
+manuals).  But why s/MX3x_KPP_BASE_ADDR/KPP_BASE_ADDR/ ?
 
-How do you customize it? I would like to keep the benefit of gpiolib
-implementation.
-In arch/arm/mach-at91/include/mach/gpio.h we include the
-asm-generic/gpio.h. That is why I protect the generic code with
-__HAVE_ARCH_GPIO_IS_VALID.
+Best regards
+Uwe
 
-With this, we can keep the benefit of having an inline function.
-
->  Which ISTR worked fine for AT91 (among other
-> platforms) ...
-
-Well the standard function:
-return ((unsigned)number) < ARCH_NR_GPIOS;
-is not suitable for AT91 as said in the thread.
-
-Best regards,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
