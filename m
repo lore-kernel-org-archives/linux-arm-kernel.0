@@ -1,31 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Aug 2010 15:21:23 +0200
-Subject: How to define CLOCK_TICK_RATE in linux kernel 2.6.xx?
-In-Reply-To: <AANLkTinbttBSuTHqFN5X75kqCkDGXvGXb-c-Yv9xdWXw@mail.gmail.com>
-References: <AANLkTi=T5QP_MbUgh4EfLjtW_be49vw2eLgXNNUCiTb7@mail.gmail.com>
-	<AANLkTinbttBSuTHqFN5X75kqCkDGXvGXb-c-Yv9xdWXw@mail.gmail.com>
-Message-ID: <201008241521.23459.arnd@arndb.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 24 Aug 2010 16:23:48 +0300
+Subject: [PATCH 0/2] s3c24xx: fix DMA support for MCI
+In-Reply-To: <1282143866-8068-1-git-send-email-anarsoul@gmail.com>
+References: <1282143866-8068-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201008241623.56550.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 August 2010, Eric Miao wrote:
-> On Tue, Aug 24, 2010 at 5:20 PM, David Yang <david.yangshuai@gmail.com> wrote:
-> > Hello all,
-> >
-> > We have recently started to port linux 2.6.33 to a arm machine which be
-> > cortex-a9 mpcore, and we found that need define CLOCK_TICK_RATE
-> > (arch/arm/mach_xxx/include/mach/timex.h) to a value.
-> >
-> 
-> It's obsoleted. Give it a fake value and go.
+? ????????? ?? 18 ??????? 2010 18:04:24 ????? Vasily Khoruzhick ???????:
+> This series fixes DMA support for s3c24xx SoCs, now it's
+> possible to use DMA with s3cmci driver.
 
-I would call it *almost* obsolete. Platforms that don't have their
-own clocksource implementation still use it for calculating the
-exact value of their time slices, and the console beep in the TTY layer
-defines its pitch through this frequency.
-
-The latter is of course a bug, it should use 1193182 Hz, independent
-of CLOCK_TICK_RATE, since the frequency is now unfortunately part
-of the ABI.
-
-	Arnd
+Ping :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100824/658cc709/attachment.sig>
