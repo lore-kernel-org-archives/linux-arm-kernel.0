@@ -1,32 +1,38 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 24 Aug 2010 18:19:37 +0300
-Subject: [PATCH 3/3] h1940: implement mmc_power function
-In-Reply-To: <201008241707.31629.marek.vasut@gmail.com>
-References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
-	<201008241756.11529.anarsoul@gmail.com>
-	<201008241707.31629.marek.vasut@gmail.com>
-Message-ID: <201008241819.43833.anarsoul@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Aug 2010 17:26:08 +0200
+Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
+References: <4C61EE55.5030506@codeaurora.org>
+	<201008191309.15425.arnd@arndb.de>
+	<20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
+Message-ID: <201008241726.08797.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 24 ??????? 2010 18:07:31 ????? Marek Vasut ???????:
-> See my previous response. It'd increase code size, but if you mark that
-> code __init, it'll be freed after that function finishes so it doesn't
-> matter.
+On Tuesday 24 August 2010, Heiko Carstens wrote:
+> > (Taking Martin and Heiko on Cc for s390)
+> > 
+> > I'd strongly suggest making the behavior the same for everyone. It should
+> > be fairly easy to make sure none of these warnings ever triggers
+> > on s390, because most of the Linux device driver code does not get build
+> > there anyway.
 > 
-> If something wrong goes on, you can still debug it without for example MMC
-> card (though if you continued probing the MMC driver, it might cause
-> additional unwanted noise and make the debugging harder). That's the whole
-> point.
+> Please don't do that. An s390 allyesconfig still triggers 45 warnings and
+> I'm currently not willing to "patch" working code just to get rid of these
+> warnings which are most likely all false positives.
+> That's the reason why we currently don't error out and only generate
+> warnings.
 
-Ok, but I also want to hear Ben's opinion on this point.
+Can't you just turn that option off then? Or are you worried about
+allyesconfig builds?
 
-Regards
-Vasily
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100824/247d8297/attachment.sig>
+The current state is confusing because on s390
+CONFIG_DEBUG_STRICT_USER_COPY_CHECKS means that gcc will warn rather
+than ignore the finding, while on all others, the same option turns
+a warning into an error.
+
+Test-building an allmodconfig on s390 showed these warnings only in
+architecture independent code, and I agree that they are all false
+positives.
+
+	Arnd
