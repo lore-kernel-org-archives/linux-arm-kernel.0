@@ -1,73 +1,86 @@
 From: gbean@codeaurora.org (Gregory Bean)
-Date: Tue, 24 Aug 2010 09:58:57 -0700
-Subject: [PATCH 3/5 v2] msm: convert 8x50 to gpiomux.
+Date: Tue, 24 Aug 2010 09:58:58 -0700
+Subject: [PATCH 4/5 v2] msm: convert 7x30 to gpiomux.
 In-Reply-To: <1282669139-17640-1-git-send-email-gbean@codeaurora.org>
 References: <1282669139-17640-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1282669139-17640-3-git-send-email-gbean@codeaurora.org>
+Message-ID: <1282669139-17640-4-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the gpio-init code from deprecated gpio_tlmm_config
-to the new gpiomux api.
+Change deprecated gpio_tlmm_config calls to gpiomux calls.
 
 Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 ---
- arch/arm/mach-msm/board-qsd8x50.c |   12 ------------
- arch/arm/mach-msm/gpiomux-8x50.c  |   11 ++++++++++-
- 2 files changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/mach-msm/board-msm7x30.c |   20 --------------------
+ arch/arm/mach-msm/gpiomux-7x30.c  |   21 ++++++++++++++++++++-
+ 2 files changed, 20 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-index e3cc807..fb0fe67 100644
---- a/arch/arm/mach-msm/board-qsd8x50.c
-+++ b/arch/arm/mach-msm/board-qsd8x50.c
-@@ -35,21 +35,10 @@
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index e329819..74abb74 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -39,22 +39,6 @@
  
  extern struct sys_timer msm_timer;
  
--static struct msm_gpio uart3_config_data[] = {
--	{ GPIO_CFG(86, 1, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_Rx"},
--	{ GPIO_CFG(87, 1, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_Tx"},
+-#ifdef CONFIG_SERIAL_MSM_CONSOLE
+-static struct msm_gpio uart2_config_data[] = {
+-	{ GPIO_CFG(49, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_RFR"},
+-	{ GPIO_CFG(50, 2, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_CTS"},
+-	{ GPIO_CFG(51, 2, GPIO_INPUT,   GPIO_PULL_DOWN, GPIO_2MA), "UART2_Rx"},
+-	{ GPIO_CFG(52, 2, GPIO_OUTPUT,  GPIO_PULL_DOWN, GPIO_2MA), "UART2_Tx"},
 -};
 -
- static struct platform_device *devices[] __initdata = {
- 	&msm_device_uart3,
- };
- 
--static void msm8x50_init_uart3(void)
+-static void msm7x30_init_uart2(void)
 -{
--	msm_gpios_request_enable(uart3_config_data,
--				ARRAY_SIZE(uart3_config_data));
--}
+-	msm_gpios_request_enable(uart2_config_data,
+-			ARRAY_SIZE(uart2_config_data));
 -
- static void __init qsd8x50_map_io(void)
+-}
+-#endif
+-
+ static struct platform_device *devices[] __initdata = {
+ #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
+         &msm_device_uart2,
+@@ -70,10 +54,6 @@ static void __init msm7x30_init_irq(void)
+ static void __init msm7x30_init(void)
  {
- 	msm_map_qsd8x50_io();
-@@ -64,7 +53,6 @@ static void __init qsd8x50_init_irq(void)
- 
- static void __init qsd8x50_init(void)
- {
--	msm8x50_init_uart3();
  	platform_add_devices(devices, ARRAY_SIZE(devices));
+-#ifdef CONFIG_SERIAL_MSM_CONSOLE
+-	msm7x30_init_uart2();
+-#endif
+-
  }
  
-diff --git a/arch/arm/mach-msm/gpiomux-8x50.c b/arch/arm/mach-msm/gpiomux-8x50.c
-index 7b380b3..4406e0f 100644
---- a/arch/arm/mach-msm/gpiomux-8x50.c
-+++ b/arch/arm/mach-msm/gpiomux-8x50.c
-@@ -16,4 +16,13 @@
+ static void __init msm7x30_map_io(void)
+diff --git a/arch/arm/mach-msm/gpiomux-7x30.c b/arch/arm/mach-msm/gpiomux-7x30.c
+index 7b380b3..6ce41c5 100644
+--- a/arch/arm/mach-msm/gpiomux-7x30.c
++++ b/arch/arm/mach-msm/gpiomux-7x30.c
+@@ -16,4 +16,23 @@
   */
  #include "gpiomux.h"
  
 -struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {};
 +struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
-+	[86] = { /* UART3 RX */
++#ifdef CONFIG_SERIAL_MSM_CONSOLE
++	[49] = { /* UART2 RFR */
 +		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-+			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
++			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
 +	},
-+	[87] = { /* UART3 TX */
++	[50] = { /* UART2 CTS */
 +		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
-+			     GPIOMUX_FUNC_1 | GPIOMUX_VALID,
++			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
 +	},
++	[51] = { /* UART2 RX */
++		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
++			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
++	},
++	[52] = { /* UART2 TX */
++		.suspended = GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |
++			     GPIOMUX_FUNC_2 | GPIOMUX_VALID,
++	},
++#endif
 +};
 -- 
 1.7.0.4
