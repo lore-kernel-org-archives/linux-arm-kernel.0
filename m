@@ -1,41 +1,42 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 24 Aug 2010 17:06:55 +0200
-Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <201008191309.15425.arnd@arndb.de>
-References: <4C61EE55.5030506@codeaurora.org>
-	<201008181428.45029.arnd@arndb.de> <4C6C3910.80800@codeaurora.org>
-	<201008191309.15425.arnd@arndb.de>
-Message-ID: <20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 24 Aug 2010 17:07:31 +0200
+Subject: [PATCH 3/3] h1940: implement mmc_power function
+In-Reply-To: <201008241756.11529.anarsoul@gmail.com>
+References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
+	<201008241641.57621.marek.vasut@gmail.com>
+	<201008241756.11529.anarsoul@gmail.com>
+Message-ID: <201008241707.31629.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 19, 2010 at 01:09:15PM +0200, Arnd Bergmann wrote:
-> On Wednesday 18 August 2010, Stephen Boyd wrote:
-> > So the only sticking point now is that x86, parisc, and arm use warnings 
-> > and errors but s390 only uses warnings. I guess I'll reword it to be:
+Dne ?t 24. srpna 2010 16:56:06 Vasily Khoruzhick napsal(a):
+> ? ????????? ?? 24 ??????? 2010 17:41:57 ????? Marek Vasut ???????:
+> > Dne ?t 24. srpna 2010 16:21:01 Vasily Khoruzhick napsal(a):
+> > > ? ????????? ?? 24 ??????? 2010 17:01:12 ????? Marek Vasut ???????:
+> > > > pr_err() and don't probe the device for which you couldn't request
+> > > > GPIO.
+> > > 
+> > > Well, handling those errors in machine init functions doesn't make
+> > > sense. PDA is not usable without basic hardware.
 > > 
-> >         Enabling this option turns a certain set of sanity checks for
-> >         user copy operations into compile time warnings/errors.
-> > 
-> >         The copy_from_user() etc checks are there to help test if there
-> >         are sufficient security checks on the length argument of the
-> >         copy operation, by having gcc prove that the argument is
-> >         within bounds.
-> > 
-> >         If unsure, or if you run an older (pre 4.4) gcc where this
-> >         option is a no-op, say N.
-> > 
-> > or I'll add a patch to make s390 trigger an error when this is enabled?
+> > You can use PDA without LCD for example (there are such people, trust
+> > me). So, this comment really isn't too valid. You can also use PDA
+> > without MMC support, you still have onboard flash, etc. etc.
 > 
-> (Taking Martin and Heiko on Cc for s390)
-> 
-> I'd strongly suggest making the behavior the same for everyone. It should
-> be fairly easy to make sure none of these warnings ever triggers
-> on s390, because most of the Linux device driver code does not get build
-> there anyway.
+> But error handling here just increases code size, and gpio_request in init
+> function should always succeed. It means something's going really wrong
+> (kernel bug or misconfiguration) if gpio_request fails. Btw, Ben suggested
+> to use WARN_ON in machine init, look through init functions of qt2410,
+> n30, rx1950, vr1000, etc.
 
-Please don't do that. An s390 allyesconfig still triggers 45 warnings and
-I'm currently not willing to "patch" working code just to get rid of these
-warnings which are most likely all false positives.
-That's the reason why we currently don't error out and only generate
-warnings.
+See my previous response. It'd increase code size, but if you mark that code 
+__init, it'll be freed after that function finishes so it doesn't matter.
+
+If something wrong goes on, you can still debug it without for example MMC card 
+(though if you continued probing the MMC driver, it might cause additional 
+unwanted noise and make the debugging harder). That's the whole point.
+
+Cheers
+> 
+> Regards
+> Vasily
