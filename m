@@ -1,60 +1,52 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Tue, 24 Aug 2010 10:54:08 +0200
-Subject: [PATCH] MX3x: clean kpp resource structure definitions
-In-Reply-To: <20100824083944.GD1536@pengutronix.de>
-References: <1282636659-2868-1-git-send-email-m.grzeschik@pengutronix.de>
-	<20100824083944.GD1536@pengutronix.de>
-Message-ID: <20100824085408.GB3571@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 Aug 2010 11:05:22 +0200
+Subject: i.MX353: mxc-ehci.0
+In-Reply-To: <0D753D10438DA54287A00B0270842697643E840B23@AUSP01VMBX24.collaborationhost.net>
+References: <0D753D10438DA54287A00B0270842697643E840AE6@AUSP01VMBX24.collaborationhost.net>
+	<0D753D10438DA54287A00B0270842697643E840B23@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20100824090522.GB32104@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Uwe,
-
-On Tue, Aug 24, 2010 at 10:39:44AM +0200, Uwe Kleine-K?nig wrote:
-> Hallo Michael,
-> 
-> On Tue, Aug 24, 2010 at 09:57:39AM +0200, Michael Grzeschik wrote:
-> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > ---
-> >  arch/arm/mach-mx3/devices.c |   10 +++++-----
-> >  1 files changed, 5 insertions(+), 5 deletions(-)
+On Mon, Aug 23, 2010 at 07:28:09PM -0500, H Hartley Sweeten wrote:
+> On Monday, August 23, 2010 4:45 PM, H Hartley Sweeten wrote:
+> > Hello all,
 > > 
-> > diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
-> > index a4fd1a2..a3e0fe2 100644
-> > --- a/arch/arm/mach-mx3/devices.c
-> > +++ b/arch/arm/mach-mx3/devices.c
-> > @@ -374,12 +374,12 @@ struct platform_device imx_rtc_device0 = {
-> >  
-> >  static struct resource imx_kpp_resources[] = {
-> >  	{
-> > -		.start	= MX3x_KPP_BASE_ADDR,
-> > -		.end	= MX3x_KPP_BASE_ADDR + 0xf,
-> > -		.flags	= IORESOURCE_MEM
-> > +		.start	= KPP_BASE_ADDR,
-> > +		.end	= KPP_BASE_ADDR + SZ_4K - 1,
-> > +		.flags	= IORESOURCE_MEM,
-> >  	}, {
-> > -		.start	= MX3x_INT_KPP,
-> > -		.end	= MX3x_INT_KPP,
-> > +		.start	= MXC_INT_KPP,
-> > +		.end	= MXC_INT_KPP,
-> >  		.flags	= IORESOURCE_IRQ,
-> >  	},
-> >  };
-> what ist the exact problem you want to fix?
-> I'm OK with adding that
-> comma and using SZ_4K (assuming you checked it in the reference
-> manuals).
-Yes i looked for it in the reference manuals. So it should be ok.
+> > What "magic" setup do I need to enable mxc-ehci.0 as a host controller?
+> > 
+> > I pulled git://git.pengutronix.de/git/imx/linux-2.6.git and have the
+> > imx-for-2.6.37 branch compiled and booting, but I get this:
+> > 
+> > ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> > mxc-ehci mxc-ehci.1: initializing i.MX USB Controller
+> > mxc-ehci mxc-ehci.1: Freescale On-Chip EHCI Host Controller
+> > mxc-ehci mxc-ehci.1: new USB bus registered, assigned bus number 1
+> > mxc-ehci mxc-ehci.1: irq 35, io mem 0x53ff4400
+> > mxc-ehci mxc-ehci.1: USB 2.0 started, EHCI 1.00
+> > hub 1-0:1.0: USB hub found
+> > hub 1-0:1.0: 1 port detected
+> > 
+> > It appears mxc-ehci.1 is working but I don't have that port on my board.
+> > 
+> > This is using the mach-mx35_3ds.c board configuration.
+> 
+> Well, I think I'm closer...
+> 
+> I removed the OTG platform data and the register of the mxc_otg_udc_device
+> from mach-mx35_3ds.c.  I replaced them with the following:
+> 
+> static struct mxc_usbh_platform_data usb_otg_host_pdata = {
+> 	.portsc		= MXC_EHCI_MODE_SERIAL,
+> 	.flags		= MXC_EHCI_INTERFACE_SINGLE_UNI |
+> 			  MXC_EHCI_INTERNAL_PHY,
+> };
 
-> But why s/MX3x_KPP_BASE_ADDR/KPP_BASE_ADDR/ ?
-I didn't see that in mx3x.h these Symbols are defined as deprecated.
-So you are right and we better stay with the MX3x_* Prefix.
+This must match your hardware. The i.MX35 has a UTMI phy connected to
+the otg core, INTERFACE_SINGLE_UNI seems wrong here. I don't know your
+hardware, it may also be that you have an external ULPI phy connected.
 
-I think you could take the SZ_4K into one of your patches when you are going
-to touch the devices.c again. Or do you prefer a oneline patch?
+Sascha
 
-Michael
 
 -- 
 Pengutronix e.K.                           |                             |
