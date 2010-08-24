@@ -1,90 +1,70 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 24 Aug 2010 15:52:42 +0200
-Subject: [PATCH 3/3] h1940: implement mmc_power function
-In-Reply-To: <1282230003-2020-4-git-send-email-anarsoul@gmail.com>
-References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
-	<1282230003-2020-4-git-send-email-anarsoul@gmail.com>
-Message-ID: <201008241552.42856.marek.vasut@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Aug 2010 15:53:11 +0200
+Subject: [PATCH v2] input: use PIT_TICK_RATE in vt beep ioctl
+In-Reply-To: <201008241521.23459.arnd@arndb.de>
+References: <AANLkTi=T5QP_MbUgh4EfLjtW_be49vw2eLgXNNUCiTb7@mail.gmail.com>
+	<AANLkTinbttBSuTHqFN5X75kqCkDGXvGXb-c-Yv9xdWXw@mail.gmail.com>
+	<201008241521.23459.arnd@arndb.de>
+Message-ID: <201008241553.11219.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 19. srpna 2010 17:00:03 Vasily Khoruzhick napsal(a):
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  arch/arm/mach-s3c2410/include/mach/h1940-latch.h |    2 +-
->  arch/arm/mach-s3c2410/mach-h1940.c               |   23
-> +++++++++++++++++++-- 2 files changed, 21 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
-> b/arch/arm/mach-s3c2410/include/mach/h1940-latch.h index 73586f2..ef7d8cf
-> 100644
-> --- a/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
-> +++ b/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
-> @@ -35,7 +35,7 @@
->  #define H1940_LATCH_AUDIO_POWER		H1940_LATCH_GPIO(9)
->  #define H1940_LATCH_SM803_ENABLE	H1940_LATCH_GPIO(10)
->  #define H1940_LATCH_LCD_P4		H1940_LATCH_GPIO(11)
-> -#define H1940_LATCH_CPUQ5		H1940_LATCH_GPIO(12)
-> +#define H1940_LATCH_SD_POWER		H1940_LATCH_GPIO(12)
->  #define H1940_LATCH_BLUETOOTH_POWER	H1940_LATCH_GPIO(13)
->  #define H1940_LATCH_LED_GREEN		H1940_LATCH_GPIO(14)
->  #define H1940_LATCH_LED_FLASH		H1940_LATCH_GPIO(15)
-> diff --git a/arch/arm/mach-s3c2410/mach-h1940.c
-> b/arch/arm/mach-s3c2410/mach-h1940.c index 9717790..c1ccc8e 100644
-> --- a/arch/arm/mach-s3c2410/mach-h1940.c
-> +++ b/arch/arm/mach-s3c2410/mach-h1940.c
-> @@ -116,8 +116,7 @@ static unsigned int latch_state =
-> H1940_LATCH_BIT(H1940_LATCH_LCD_P4) |
-> H1940_LATCH_BIT(H1940_LATCH_LCD_P1)			|
->  	H1940_LATCH_BIT(H1940_LATCH_LCD_P2)			|
->  	H1940_LATCH_BIT(H1940_LATCH_LCD_P3)			|
-> -	H1940_LATCH_BIT(H1940_LATCH_MAX1698_nSHUTDOWN)   |
-> -	H1940_LATCH_BIT(H1940_LATCH_CPUQ5);
-> +	H1940_LATCH_BIT(H1940_LATCH_MAX1698_nSHUTDOWN);
-> 
->  static void h1940_latch_control(unsigned int clear, unsigned int set)
->  {
-> @@ -259,10 +258,25 @@ static struct platform_device h1940_device_bluetooth
-> = { .id               = -1,
->  };
-> 
-> +static void h1940_set_mmc_power(unsigned char power_mode, unsigned short
-> vdd) +{
-> +	switch (power_mode) {
-> +	case MMC_POWER_OFF:
-> +		gpio_set_value(H1940_LATCH_SD_POWER, 0);
-> +		break;
-> +	case MMC_POWER_UP:
-> +	case MMC_POWER_ON:
-> +		gpio_set_value(H1940_LATCH_SD_POWER, 1);
-> +		break;
-> +	default:
-> +		break;
-> +	};
-> +}
-> +
->  static struct s3c24xx_mci_pdata h1940_mmc_cfg __initdata = {
->  	.gpio_detect   = S3C2410_GPF(5),
->  	.gpio_wprotect = S3C2410_GPH(8),
-> -	.set_power     = NULL,
-> +	.set_power     = h1940_set_mmc_power,
->  	.ocr_avail     = MMC_VDD_32_33,
->  };
-> 
+The KIOCSOUND and KDMKTONE ioctls are based on the
+CLOCK_TICK_RATE, which is architecture and sometimes
+configuration specific.
+ 
+In practice, most user applications assume that it
+is actually defined as the i8253 PIT base clock of
+1193182 Hz, which is true on some architectures
+but not on others.
+ 
+This patch makes the vt code use the PIT frequency
+on all architectures, which is much more well-defined.
+It will change the behavior of user applications
+sending the beep ioctl on all architectures that
+define CLOCK_TICK_RATE different from PIT_TICK_RATE.
 
-Can't you implement gpio_power into the s3c24xx mmc driver ? Then you can fix 
-mach-n30 too.
+The original breakage was introduced in commit bcc8ca099
+"Adapt drivers/char/vt_ioctl.c to non-x86".
+Hopefully, reverting this change will make the frequency
+correct in more cases than it will make it incorrect.
 
-> @@ -402,6 +416,9 @@ static void __init h1940_init(void)
->  	gpio_request(H1940_LATCH_USB_DP, "USB pullup");
->  	gpio_direction_output(H1940_LATCH_USB_DP, 0);
-> 
-> +	gpio_request(H1940_LATCH_SD_POWER, "SD power");
-> +	gpio_direction_output(H1940_LATCH_SD_POWER, 0);
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Alan Cox <alan@lxorguk.ukuu.org.uk>
 
-Please handle possible return values here !
-> +
->  	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
->  }
-
-Cheers
+diff --git a/drivers/char/vt_ioctl.c b/drivers/char/vt_ioctl.c
+index cb19dbc..592d8d1 100644
+--- a/drivers/char/vt_ioctl.c
++++ b/drivers/char/vt_ioctl.c
+@@ -533,11 +533,14 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
+ 	case KIOCSOUND:
+ 		if (!perm)
+ 			goto eperm;
+-		/* FIXME: This is an old broken API but we need to keep it
+-		   supported and somehow separate the historic advertised
+-		   tick rate from any real one */
++		/*
++		 * The use of PIT_TICK_RATE is historic, it used to be
++		 * the platform-dependent CLOCK_TICK_RATE between 2.6.12
++		 * and 2.6.36, which was a minor but unfortunate ABI
++		 * change.
++		 */
+ 		if (arg)
+-			arg = CLOCK_TICK_RATE / arg;
++			arg = PIT_TICK_RATE / arg;
+ 		kd_mksound(arg, 0);
+ 		break;
+ 
+@@ -553,11 +556,8 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
+ 		 */
+ 		ticks = HZ * ((arg >> 16) & 0xffff) / 1000;
+ 		count = ticks ? (arg & 0xffff) : 0;
+-		/* FIXME: This is an old broken API but we need to keep it
+-		   supported and somehow separate the historic advertised
+-		   tick rate from any real one */
+ 		if (count)
+-			count = CLOCK_TICK_RATE / count;
++			count = PIT_TICK_RATE / count;
+ 		kd_mksound(count, ticks);
+ 		break;
+ 	}
