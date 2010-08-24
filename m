@@ -1,28 +1,32 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 24 Aug 2010 17:01:43 +0200
-Subject: [PATCH 3/3 v2] dmaengine: Add Freescale i.MX SDMA support
-In-Reply-To: <19571.31677.407213.580581@ipc1.ka-ro>
-References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
-	<1281956870-12463-4-git-send-email-s.hauer@pengutronix.de>
-	<20100823125704.GU27749@pengutronix.de>
-	<19571.31677.407213.580581@ipc1.ka-ro>
-Message-ID: <AANLkTik9sYW9My1SDUV0zvNZaR+UME9z5Z1EMep98Dy-@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 24 Aug 2010 17:04:14 +0200
+Subject: [PATCH 1/3] h1940: use gpiolib for latch access
+In-Reply-To: <201008241750.43535.anarsoul@gmail.com>
+References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
+	<201008241640.21488.marek.vasut@gmail.com>
+	<201008241750.43535.anarsoul@gmail.com>
+Message-ID: <201008241704.14566.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/24 Lothar Wa?mann <LW@karo-electronics.de>:
-> [Sacha]
-> [...]
->> +static int __devinit sdma_probe(struct platform_device *pdev)
->>
-> __devinit/__devexit is for hot-pluggable devices. I don't think the
-> SDMA controller is hot-pluggable, so __init/__exit could be used here.
+Dne ?t 24. srpna 2010 16:50:36 Vasily Khoruzhick napsal(a):
+> ? ????????? ?? 24 ??????? 2010 17:40:21 ????? Marek Vasut ???????:
+> > Defining S3C2410_GPH_GPIONAME for each bit might be better then.
+> 
+> Well, that requires massive refactoring of h1940 (and rx1950) support. And
+> btw, that's common for s3c24xx-based machines to use generic s3c24xx gpio
+> names, not machine specific.
 
-Then the .probe member has to be removed from the
-struct platform_driver and platform_driver_probe() used instead
-of platform_driver_register().
+I assume I see how it works now. Ok, please put a comment around it then so 
+others will understand what it does.
 
-But it'd work fine I think.
+Using machine-specific GPIO names might help readability btw. -- the approach 
+"everyone does it this way so I'll do it this way without thinking" is bad :)
 
-Yours,
-Linus Walleij
+Well, it's just my suggestion for improvement of the overall code quality. Ben, 
+what's your opinion?
+
+Cheers
+> 
+> Regards
+> Vasily
