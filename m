@@ -1,204 +1,311 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Tue, 24 Aug 2010 09:45:47 -0400
-Subject: [PATCH for -tip] Create generic alignment API (v10)
-Message-ID: <20100824134546.GA24465@Krystal>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 24 Aug 2010 15:49:51 +0200
+Subject: [PATCH 1/3] h1940: use gpiolib for latch access
+In-Reply-To: <1282230003-2020-2-git-send-email-anarsoul@gmail.com>
+References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
+	<1282230003-2020-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <201008241549.51513.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than re-doing the "alignment on a type size" trick all over again at
-different levels, import the "ltt_align" from LTTng into kernel.h and make this
-available to everyone. Renaming to:
+Dne ?t 19. srpna 2010 17:00:01 Vasily Khoruzhick napsal(a):
+> This patch adds gpiolib support for h1940 latch.
+> With this patch it's possible to use leds-gpio and uda1380
+> drivers (they require gpiolib support for appropriate pins).
+> And now it's possible to drop leds-h1940 driver.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  arch/arm/mach-s3c2410/h1940-bluetooth.c          |   13 +++-
+>  arch/arm/mach-s3c2410/include/mach/h1940-latch.h |   57 +++++-----------
+>  arch/arm/mach-s3c2410/mach-h1940.c               |   77
+> ++++++++++++++++++++-- arch/arm/plat-s3c24xx/Kconfig                    | 
+>   1 +
+>  4 files changed, 100 insertions(+), 48 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2410/h1940-bluetooth.c
+> b/arch/arm/mach-s3c2410/h1940-bluetooth.c index 8cdeb14..8aa2f19 100644
+> --- a/arch/arm/mach-s3c2410/h1940-bluetooth.c
+> +++ b/arch/arm/mach-s3c2410/h1940-bluetooth.c
+> @@ -30,7 +30,7 @@ static void h1940bt_enable(int on)
+>  {
+>  	if (on) {
+>  		/* Power on the chip */
+> -		h1940_latch_control(0, H1940_LATCH_BLUETOOTH_POWER);
+> +		gpio_set_value(H1940_LATCH_BLUETOOTH_POWER, 1);
+>  		/* Reset the chip */
+>  		mdelay(10);
+> 
+> @@ -43,7 +43,7 @@ static void h1940bt_enable(int on)
+>  		mdelay(10);
+>  		gpio_set_value(S3C2410_GPH(1), 0);
+>  		mdelay(10);
+> -		h1940_latch_control(H1940_LATCH_BLUETOOTH_POWER, 0);
+> +		gpio_set_value(H1940_LATCH_BLUETOOTH_POWER, 0);
+>  	}
+>  }
+> 
+> @@ -64,7 +64,14 @@ static int __devinit h1940bt_probe(struct
+> platform_device *pdev)
+> 
+>  	ret = gpio_request(S3C2410_GPH(1), dev_name(&pdev->dev));
+>  	if (ret) {
+> -		dev_err(&pdev->dev, "could not get GPH1\n");\
+> +		dev_err(&pdev->dev, "could not get GPH1\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = gpio_request(H1940_LATCH_BLUETOOTH_POWER, dev_name(&pdev->dev));
 
-- object_align()
-- object_align_floor()
-- offset_align()
-- offset_align_floor()
+This should contain the name of the GPIO, not dev_name I assume.
 
-Changelog since v9:
-- Hardcode MAYBE_BUILD_BUG_ON((n) == 0 || (((n) & ((n) - 1)) != 0)) rather than
-  creating a helper macro in kernel.h, by popular request.
-- Remove unneeded log2.h include.
-- Now that offset_align_floor and offset_align are macros (needed for
-  MAYBE_BUILD_BUG_ON()), add the appropriate braces around parameters used.
+> +	if (ret) {
+> +		gpio_free(S3C2410_GPH(1));
 
-Changelog since v8:
-- Remove unnecessary braces.
-- Update object_align/object_align_floor comments.
+What's this constant (the 1) here ? Maybe some sane #define wont hurt or comment 
+around it.
+> +		dev_err(&pdev->dev, "could not get BT_POWER\n");
+>  		return ret;
+>  	}
+> 
+> diff --git a/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
+> b/arch/arm/mach-s3c2410/include/mach/h1940-latch.h index d8a8327..73586f2
+> 100644
+> --- a/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
+> +++ b/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
+> @@ -14,51 +14,30 @@
+>  #ifndef __ASM_ARCH_H1940_LATCH_H
+>  #define __ASM_ARCH_H1940_LATCH_H
+> 
+> +#include <mach/gpio.h>
+> 
+> -#ifndef __ASSEMBLY__
+> -#define H1940_LATCH		((void __force __iomem *)0xF8000000)
+> -#else
+> -#define H1940_LATCH		0xF8000000
+> -#endif
+> -
+> -#define H1940_PA_LATCH		(S3C2410_CS2)
+> +#define H1940_LATCH_GPIO(x)		(S3C_GPIO_END + (x))
+> 
+>  /* SD layer latch */
+> 
+> -#define H1940_LATCH_SDQ1		(1<<16)
+> -#define H1940_LATCH_LCD_P1		(1<<17)
+> -#define H1940_LATCH_LCD_P2		(1<<18)
+> -#define H1940_LATCH_LCD_P3		(1<<19)
+> -#define H1940_LATCH_MAX1698_nSHUTDOWN	(1<<20)		/* LCD backlight 
+*/
+> -#define H1940_LATCH_LED_RED		(1<<21)
+> -#define H1940_LATCH_SDQ7		(1<<22)
+> -#define H1940_LATCH_USB_DP		(1<<23)
+> +#define H1940_LATCH_SDQ1		H1940_LATCH_GPIO(0)
+> +#define H1940_LATCH_LCD_P1		H1940_LATCH_GPIO(1)
+> +#define H1940_LATCH_LCD_P2		H1940_LATCH_GPIO(2)
+> +#define H1940_LATCH_LCD_P3		H1940_LATCH_GPIO(3)
+> +#define H1940_LATCH_MAX1698_nSHUTDOWN	H1940_LATCH_GPIO(4)
+> +#define H1940_LATCH_LED_RED		H1940_LATCH_GPIO(5)
+> +#define H1940_LATCH_SDQ7		H1940_LATCH_GPIO(6)
+> +#define H1940_LATCH_USB_DP		H1940_LATCH_GPIO(7)
+> 
+>  /* CPU layer latch */
+> 
+> -#define H1940_LATCH_UDA_POWER		(1<<24)
+> -#define H1940_LATCH_AUDIO_POWER		(1<<25)
+> -#define H1940_LATCH_SM803_ENABLE	(1<<26)
+> -#define H1940_LATCH_LCD_P4		(1<<27)
+> -#define H1940_LATCH_CPUQ5		(1<<28)		/* untraced */
+> -#define H1940_LATCH_BLUETOOTH_POWER	(1<<29)		/* active high */
+> -#define H1940_LATCH_LED_GREEN		(1<<30)
+> -#define H1940_LATCH_LED_FLASH		(1<<31)
+> -
+> -/* default settings */
+> -
+> -#define H1940_LATCH_DEFAULT		\
+> -	H1940_LATCH_LCD_P4		| \
+> -	H1940_LATCH_SM803_ENABLE	| \
+> -	H1940_LATCH_SDQ1		| \
+> -	H1940_LATCH_LCD_P1		| \
+> -	H1940_LATCH_LCD_P2		| \
+> -	H1940_LATCH_LCD_P3		| \
+> -	H1940_LATCH_MAX1698_nSHUTDOWN   | \
+> -	H1940_LATCH_CPUQ5
+> -
+> -/* control functions */
+> -
+> -extern void h1940_latch_control(unsigned int clear, unsigned int set);
+> +#define H1940_LATCH_UDA_POWER		H1940_LATCH_GPIO(8)
+> +#define H1940_LATCH_AUDIO_POWER		H1940_LATCH_GPIO(9)
+> +#define H1940_LATCH_SM803_ENABLE	H1940_LATCH_GPIO(10)
+> +#define H1940_LATCH_LCD_P4		H1940_LATCH_GPIO(11)
+> +#define H1940_LATCH_CPUQ5		H1940_LATCH_GPIO(12)
+> +#define H1940_LATCH_BLUETOOTH_POWER	H1940_LATCH_GPIO(13)
+> +#define H1940_LATCH_LED_GREEN		H1940_LATCH_GPIO(14)
+> +#define H1940_LATCH_LED_FLASH		H1940_LATCH_GPIO(15)
+> 
+>  #endif /* __ASM_ARCH_H1940_LATCH_H */
+> diff --git a/arch/arm/mach-s3c2410/mach-h1940.c
+> b/arch/arm/mach-s3c2410/mach-h1940.c index 779b45b..9717790 100644
+> --- a/arch/arm/mach-s3c2410/mach-h1940.c
+> +++ b/arch/arm/mach-s3c2410/mach-h1940.c
+> @@ -42,6 +42,7 @@
+>  #include <mach/regs-gpio.h>
+>  #include <mach/gpio-fns.h>
+>  #include <mach/gpio-nrs.h>
+> +#include <mach/gpio.h>
+> 
+>  #include <mach/h1940.h>
+>  #include <mach/h1940-latch.h>
+> @@ -58,6 +59,16 @@
+>  #include <plat/mci.h>
+>  #include <plat/ts.h>
+> 
+> +#ifndef __ASSEMBLY__
+> +#define H1940_LATCH		((void __force __iomem *)0xF8000000)
+> +#else
+> +#define H1940_LATCH		0xF8000000
+> +#endif
 
-Changelog since v7:
-- Add missing include/linux/Kconfig header-y.
+Is the __ASSEMBLY__ really needed ? You can establish mapping when the kernel 
+boots (looks like you're doing that already) but then use __raw_readX 
+__raw_writeX to access that space instead of this stuff above.
 
-Changelog since v6:
-- Adapt to changes introduced by
-  commit a79ff731a1b277d0e92d9453bdf374e04cec717a
-- Use __alignof__() instead of sizeof() to support compound types.
+Possibly like this:
 
-Changelog since v5:
-- moved alignment apis to a separate header file so that it is possible
-  to use them from other header files which are, for example, included
-  from kernel.h.
+#define	H1940_VA_LATCH 0xf8000000
 
-Changelog since v4:
-- add missing ( ) around parameters within object_align() and
-  object_align_floor().
-- More coding style cleanups to ALIGN() (checkpatch.pl is happy now).
+some_fn()
+{
+...
+	val = __raw_readl(H1940_VA_LATCH + offset);
+...
+}
 
-Changelog since v3:
-- optimize object_align*() so fewer instructions are needed for alignment of
-  addresses known dynamically. Use the (already existing) "ALIGN()", and create
-  the "ALIGN_FLOOR()" macro.
-- While we are there, let's clean up the ALIGN() macros wrt coding style. e.g.
-  missing parenthesis around the first use of the "x" parameter in ALIGN().
-
-Changelog since v2:
-- Fix object_align*(): should use object size alignment, not pointer alignment.
-
-Changelog since v1:
-- Align on the object natural alignment
-    (rather than min(arch word alignment, natural alignment))
-
-The advantage of separating the API in "object alignment" and "offset alignment"
-is that it gives more freedom to play with offset alignment. Very useful to
-implement a tracer ring-buffer alignment. (hint hint)
-
-Typical users will use "object alignment", but infrastructures like tracers
-which need to perform alignment of statically known base+offsets will typically
-use "offset alignment", because it allows to align with respect to a base rather
-than to pass an absolute address.
-
-Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
-Reviewed-by: Steven Rostedt <rostedt@goodmis.org>
-Reviewed-by: "Kirill A. Shutemov" <kirill@shutemov.name>
-CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-CC: Imre Deak <imre.deak@nokia.com>
-CC: Jamie Lokier <jamie@shareable.org>
-CC: mingo at elte.hu
-CC: Alexey Dobriyan <adobriyan@gmail.com>
----
- include/linux/Kbuild   |    1 
- include/linux/align.h  |   60 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/kernel.h |   10 ++------
- 3 files changed, 64 insertions(+), 7 deletions(-)
- create mode 100644 include/linux/align.h
-
-Index: linux.trees.git/include/linux/align.h
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ linux.trees.git/include/linux/align.h	2010-08-24 09:14:23.000000000 -0400
-@@ -0,0 +1,60 @@
-+#ifndef _LINUX_ALIGN_H
-+#define _LINUX_ALIGN_H
-+
-+#define __ALIGN_KERNEL(x, a)	__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
-+#define __ALIGN_KERNEL_MASK(x, mask) \
-+				(((x) + (mask)) & ~(mask))
-+
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+
-+#define ALIGN(x, a)		__ALIGN_KERNEL(x, a)
-+#define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK(x, mask)
-+#define PTR_ALIGN(p, a)		((typeof(p)) ALIGN((unsigned long) (p), a))
-+#define ALIGN_FLOOR(x, a)	__ALIGN_FLOOR_MASK(x, (typeof(x)) (a) - 1)
-+#define __ALIGN_FLOOR_MASK(x, mask)	((x) & ~(mask))
-+#define PTR_ALIGN_FLOOR(p, a) \
-+			((typeof(p)) ALIGN_FLOOR((unsigned long) (p), a))
-+#define IS_ALIGNED(x, a)	(((x) & ((typeof(x)) (a) - 1)) == 0)
-+
-+/*
-+ * Align pointer on natural object alignment.
-+ */
-+#define object_align(obj)	PTR_ALIGN(obj, __alignof__(*(obj)))
-+#define object_align_floor(obj)	PTR_ALIGN_FLOOR(obj, __alignof__(*(obj)))
-+
-+/**
-+ * offset_align - Calculate the offset needed to align an object on its natural
-+ *                alignment towards higher addresses.
-+ * @align_drift:  object offset from an "alignment"-aligned address.
-+ * @alignment:    natural object alignment. Must be non-zero, power of 2.
-+ *
-+ * Returns the offset that must be added to align towards higher
-+ * addresses.
-+ */
-+#define offset_align(align_drift, alignment)				       \
-+	({								       \
-+		MAYBE_BUILD_BUG_ON((alignment) == 0			       \
-+				   || ((alignment) & ((alignment) - 1) != 0)); \
-+		(((alignment) - (align_drift)) & ((alignment) - 1));	       \
-+	})
-+
-+/**
-+ * offset_align_floor - Calculate the offset needed to align an object
-+ *                      on its natural alignment towards lower addresses.
-+ * @align_drift:  object offset from an "alignment"-aligned address.
-+ * @alignment:    natural object alignment. Must be non-zero, power of 2.
-+ *
-+ * Returns the offset that must be substracted to align towards lower addresses.
-+ */
-+#define offset_align_floor(align_drift, alignment)			       \
-+	({								       \
-+		MAYBE_BUILD_BUG_ON((alignment) == 0			       \
-+				   || ((alignment) & ((alignment) - 1) != 0)); \
-+		(((align_drift) - (alignment)) & ((alignment) - 1);	       \
-+	})
-+
-+#endif /* __KERNEL__ */
-+
-+#endif
-Index: linux.trees.git/include/linux/kernel.h
-===================================================================
---- linux.trees.git.orig/include/linux/kernel.h	2010-08-24 09:07:35.000000000 -0400
-+++ linux.trees.git/include/linux/kernel.h	2010-08-24 09:07:49.000000000 -0400
-@@ -4,8 +4,6 @@
- /*
-  * 'kernel.h' contains some often-used function prototypes etc
-  */
--#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
--#define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
- 
- #ifdef __KERNEL__
- 
-@@ -39,11 +37,6 @@ extern const char linux_proc_banner[];
- 
- #define STACK_MAGIC	0xdeadbeef
- 
--#define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
--#define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
--#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
--#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
--
- #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
- 
- /*
-@@ -767,6 +760,9 @@ struct sysinfo {
- #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:-!!(e); }))
- #define BUILD_BUG_ON_NULL(e) ((void *)sizeof(struct { int:-!!(e); }))
- 
-+/* The header align.h depends on MAYBE_BUILD_BUG_ON_NOT_POWER_OF_2() */
-+#include <linux/align.h>
-+
- /* Trap pasters of __FUNCTION__ at compile-time */
- #define __FUNCTION__ (__func__)
- 
-Index: linux.trees.git/include/linux/Kbuild
-===================================================================
---- linux.trees.git.orig/include/linux/Kbuild	2010-08-24 09:07:35.000000000 -0400
-+++ linux.trees.git/include/linux/Kbuild	2010-08-24 09:07:49.000000000 -0400
-@@ -38,6 +38,7 @@ header-y += adfs_fs.h
- header-y += affs_hardblocks.h
- header-y += agpgart.h
- header-y += aio_abi.h
-+header-y += align.h
- header-y += apm_bios.h
- header-y += arcfb.h
- header-y += atalk.h
- 
-
--- 
-Mathieu Desnoyers
-Operating System Efficiency R&D Consultant
-EfficiOS Inc.
-http://www.efficios.com
+Cheers
+> +
+> +#define H1940_PA_LATCH		(S3C2410_CS2)
+> +
+> +#define H1940_LATCH_BIT(x)		(1 << ((x) + 16 - S3C_GPIO_END))
+> +
+>  static struct map_desc h1940_iodesc[] __initdata = {
+>  	[0] = {
+>  		.virtual	= (unsigned long)H1940_LATCH,
+> @@ -99,9 +110,16 @@ static struct s3c2410_uartcfg h1940_uartcfgs[]
+> __initdata = {
+> 
+>  /* Board control latch control */
+> 
+> -static unsigned int latch_state = H1940_LATCH_DEFAULT;
+> +static unsigned int latch_state = H1940_LATCH_BIT(H1940_LATCH_LCD_P4) |
+> +	H1940_LATCH_BIT(H1940_LATCH_SM803_ENABLE)	|
+> +	H1940_LATCH_BIT(H1940_LATCH_SDQ1)			|
+> +	H1940_LATCH_BIT(H1940_LATCH_LCD_P1)			|
+> +	H1940_LATCH_BIT(H1940_LATCH_LCD_P2)			|
+> +	H1940_LATCH_BIT(H1940_LATCH_LCD_P3)			|
+> +	H1940_LATCH_BIT(H1940_LATCH_MAX1698_nSHUTDOWN)   |
+> +	H1940_LATCH_BIT(H1940_LATCH_CPUQ5);
+> 
+> -void h1940_latch_control(unsigned int clear, unsigned int set)
+> +static void h1940_latch_control(unsigned int clear, unsigned int set)
+>  {
+>  	unsigned long flags;
+> 
+> @@ -115,7 +133,50 @@ void h1940_latch_control(unsigned int clear, unsigned
+> int set) local_irq_restore(flags);
+>  }
+> 
+> -EXPORT_SYMBOL_GPL(h1940_latch_control);
+> +static int h1940_gpiolib_latch_input(struct gpio_chip *chip, unsigned
+> offset) +{
+> +	return -EINVAL;
+> +}
+> +
+> +
+> +static inline int h1940_gpiolib_to_latch(int offset)
+> +{
+> +	return 1 << (offset + 16);
+> +}
+> +
+> +static void h1940_gpiolib_latch_set(struct gpio_chip *chip,
+> +					unsigned offset, int value)
+> +{
+> +	int latch_bit = h1940_gpiolib_to_latch(offset);
+> +
+> +	h1940_latch_control(value ? 0 : latch_bit,
+> +		value ? latch_bit : 0);
+> +}
+> +
+> +static int h1940_gpiolib_latch_output(struct gpio_chip *chip,
+> +					unsigned offset, int value)
+> +{
+> +	h1940_gpiolib_latch_set(chip, offset, value);
+> +
+> +	return 0;
+> +}
+> +
+> +static int h1940_gpiolib_latch_get(struct gpio_chip *chip,
+> +					unsigned offset)
+> +{
+> +	return (latch_state >> (offset + 16)) & 1;
+> +}
+> +
+> +struct gpio_chip h1940_latch_gpiochip = {
+> +	.base				= H1940_LATCH_GPIO(0),
+> +	.owner				= THIS_MODULE,
+> +	.label				= "H1940_LATCH",
+> +	.ngpio				= 16,
+> +	.direction_input	= h1940_gpiolib_latch_input,
+> +	.direction_output	= h1940_gpiolib_latch_output,
+> +	.set				= h1940_gpiolib_latch_set,
+> +	.get				= h1940_gpiolib_latch_get,
+> +};
+> 
+>  static void h1940_udc_pullup(enum s3c2410_udc_cmd_e cmd)
+>  {
+> @@ -124,10 +185,10 @@ static void h1940_udc_pullup(enum s3c2410_udc_cmd_e
+> cmd) switch (cmd)
+>  	{
+>  		case S3C2410_UDC_P_ENABLE :
+> -			h1940_latch_control(0, H1940_LATCH_USB_DP);
+> +			gpio_set_value(H1940_LATCH_USB_DP, 1);
+>  			break;
+>  		case S3C2410_UDC_P_DISABLE :
+> -			h1940_latch_control(H1940_LATCH_USB_DP, 0);
+> +			gpio_set_value(H1940_LATCH_USB_DP, 0);
+>  			break;
+>  		case S3C2410_UDC_P_RESET :
+>  			break;
+> @@ -302,6 +363,8 @@ static void __init h1940_map_io(void)
+>  	memcpy(phys_to_virt(H1940_SUSPEND_RESUMEAT), h1940_pm_return, 1024);
+>  #endif
+>  	s3c_pm_init();
+> +
+> +	WARN_ON(gpiochip_add(&h1940_latch_gpiochip));
+>  }
+> 
+>  static void __init h1940_init_irq(void)
+> @@ -334,9 +397,11 @@ static void __init h1940_init(void)
+>  	gpio_request(S3C2410_GPC(0), "LCD power");
+>  	gpio_request(S3C2410_GPC(5), "LCD power");
+>  	gpio_request(S3C2410_GPC(6), "LCD power");
+> -
+>  	gpio_direction_input(S3C2410_GPC(6));
+> 
+> +	gpio_request(H1940_LATCH_USB_DP, "USB pullup");
+> +	gpio_direction_output(H1940_LATCH_USB_DP, 0);
+> +
+>  	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
+>  }
+> 
+> diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
+> index 984bf66..5a27b1b 100644
+> --- a/arch/arm/plat-s3c24xx/Kconfig
+> +++ b/arch/arm/plat-s3c24xx/Kconfig
+> @@ -69,6 +69,7 @@ config S3C24XX_GPIO_EXTRA
+>  	int
+>  	default 128 if S3C24XX_GPIO_EXTRA128
+>  	default 64 if S3C24XX_GPIO_EXTRA64
+> +	default 16 if ARCH_H1940
+>  	default 0
+> 
+>  config S3C24XX_GPIO_EXTRA64
