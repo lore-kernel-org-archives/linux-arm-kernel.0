@@ -1,55 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 Aug 2010 11:05:22 +0200
-Subject: i.MX353: mxc-ehci.0
-In-Reply-To: <0D753D10438DA54287A00B0270842697643E840B23@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B0270842697643E840AE6@AUSP01VMBX24.collaborationhost.net>
-	<0D753D10438DA54287A00B0270842697643E840B23@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20100824090522.GB32104@pengutronix.de>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Tue, 24 Aug 2010 17:20:42 +0800
+Subject: How to define CLOCK_TICK_RATE in linux kernel 2.6.xx?
+Message-ID: <AANLkTi=T5QP_MbUgh4EfLjtW_be49vw2eLgXNNUCiTb7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 23, 2010 at 07:28:09PM -0500, H Hartley Sweeten wrote:
-> On Monday, August 23, 2010 4:45 PM, H Hartley Sweeten wrote:
-> > Hello all,
-> > 
-> > What "magic" setup do I need to enable mxc-ehci.0 as a host controller?
-> > 
-> > I pulled git://git.pengutronix.de/git/imx/linux-2.6.git and have the
-> > imx-for-2.6.37 branch compiled and booting, but I get this:
-> > 
-> > ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> > mxc-ehci mxc-ehci.1: initializing i.MX USB Controller
-> > mxc-ehci mxc-ehci.1: Freescale On-Chip EHCI Host Controller
-> > mxc-ehci mxc-ehci.1: new USB bus registered, assigned bus number 1
-> > mxc-ehci mxc-ehci.1: irq 35, io mem 0x53ff4400
-> > mxc-ehci mxc-ehci.1: USB 2.0 started, EHCI 1.00
-> > hub 1-0:1.0: USB hub found
-> > hub 1-0:1.0: 1 port detected
-> > 
-> > It appears mxc-ehci.1 is working but I don't have that port on my board.
-> > 
-> > This is using the mach-mx35_3ds.c board configuration.
-> 
-> Well, I think I'm closer...
-> 
-> I removed the OTG platform data and the register of the mxc_otg_udc_device
-> from mach-mx35_3ds.c.  I replaced them with the following:
-> 
-> static struct mxc_usbh_platform_data usb_otg_host_pdata = {
-> 	.portsc		= MXC_EHCI_MODE_SERIAL,
-> 	.flags		= MXC_EHCI_INTERFACE_SINGLE_UNI |
-> 			  MXC_EHCI_INTERNAL_PHY,
-> };
+Hello all,
 
-This must match your hardware. The i.MX35 has a UTMI phy connected to
-the otg core, INTERFACE_SINGLE_UNI seems wrong here. I don't know your
-hardware, it may also be that you have an external ULPI phy connected.
+We have recently started to port linux 2.6.33 to a arm machine which be
+cortex-a9 mpcore, and we found that need define CLOCK_TICK_RATE
+(arch/arm/mach_xxx/include/mach/timex.h) to a value.
 
-Sascha
+Now our arm machine have two timer, first is external general timer
+which clock is 66.666666MHz, second is cortex-a9's private timer which
+clock is 400MHz or 800Hz.
 
+If our linux system support smp, we should how define CLOCK_TICK_RATE?
+If our linux system don't support smp, we should how define
+CLOCK_TICK_RATE?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+BTW, In kernel 2.6.x, CLOCK_TICK_RATE means ?
+Thank for any help
+
+David
