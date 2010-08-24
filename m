@@ -1,36 +1,47 @@
-From: stephan@gatzka.org (Stephan Gatzka)
-Date: Tue, 24 Aug 2010 20:30:31 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <1282594125.3111.344.camel@localhost.localdomain>
-References: <cover.1281956490.git.richard.cochran@omicron.at>	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>	<20100817085324.GB3330@riccoc20.at.omicron.at>	<1282090963.1734.97.camel@localhost>	<20100818071942.GA4096@riccoc20.at.omicron.at>	<1282176776.2865.100.camel@localhost.localdomain>	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<1282594125.3111.344.camel@localhost.localdomain>
-Message-ID: <4C740FC7.90106@gatzka.org>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Tue, 24 Aug 2010 23:07:47 +0300
+Subject: s3c ohci problem
+Message-ID: <i518qk$j8u$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Hi all,
 
-> I'm curious if its possible to do the PTP hardware offset/adjustment
-> calculation in a module internally to the kernel? That would allow the
-> PPS interface to still be used to sync the system time, and not expose
-> additional interfaces.
-Just my 2 cents on this issue. PTP is very often used in embedded 
-systems, where the PTP timestamps will go into some dedicated hardware, 
-for instance an FPGA.
+below is boot log of s3c2410-ohci driver.
 
-I'm currently working on a project where it is not necessary to adjust 
-the Linux system time via PTP (although it would be a nice to have), but 
-we only need the timestamps from the PHY to put them into our FPGA 
-device. So we need some kind of API to access the PTP timestamp registers.
+ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+ohci_hcd: block sizes: ed 64 td 64
+s3c2410-ohci s3c2410-ohci: s3c2410_start_hc:
+s3c2410-ohci s3c2410-ohci: S3C24XX OHCI
+drivers/usb/core/inode.c: creating file 'devices'
+drivers/usb/core/inode.c: creating file '001'
+s3c2410-ohci s3c2410-ohci: new USB bus registered, assigned bus number 1
+s3c2410-ohci s3c2410-ohci: irq 79, io mem 0x74300000
+s3c2410-ohci s3c2410-ohci: created debug files
+s3c2410-ohci s3c2410-ohci: fminterval delta -11999
+s3c2410-ohci s3c2410-ohci: enabling initreset quirk
+s3c2410-ohci s3c2410-ohci: init err (00000000 0000)
+ohci_hcd: can't start s3c24xx
+s3c2410-ohci s3c2410-ohci: OHCI controller state
+s3c2410-ohci s3c2410-ohci: OHCI 0.0, NO legacy support registers
+s3c2410-ohci s3c2410-ohci: control 0x000 HCFS=reset CBSR=0
+s3c2410-ohci s3c2410-ohci: cmdstatus 0x00000 SOC=0
+s3c2410-ohci s3c2410-ohci: intrstatus 0x00000000
+s3c2410-ohci s3c2410-ohci: intrenable 0x00000000
+s3c2410-ohci s3c2410-ohci: hcca frame #0000
+s3c2410-ohci s3c2410-ohci: roothub.a 00000000 POTPGT=0 NDP=0(0)
+s3c2410-ohci s3c2410-ohci: roothub.b 00000000 PPCM=0000 DR=0000
+s3c2410-ohci s3c2410-ohci: roothub.status 00000000
+s3c2410-ohci s3c2410-ohci: startup error -75
+s3c2410-ohci s3c2410-ohci: USB bus 1 deregistered
+s3c2410-ohci s3c2410-ohci: s3c2410_stop_hc:
+s3c2410-ohci: probe of s3c2410-ohci failed with error -75
 
-Kind regards,
+Kernel is v2.6.36-rc2 with few minor patches adding new devices to 
+mach-real6410. Board is Real6410. It seems there isn't any USB 
+enable/disable bit s3c6410 registers, also no gpio multiplexing. There 
+is no power control for usb on this board, it's always powered on.
+Could it be driver problem? Did anybody get USB working on smdk6410 or 
+other s3c64xx boards with latest kernel?
 
-Stephan
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 5136 bytes
-Desc: S/MIME Cryptographic Signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100824/e8de921c/attachment.p7s>
+Darius.
