@@ -1,38 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Aug 2010 17:26:08 +0200
-Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
-References: <4C61EE55.5030506@codeaurora.org>
-	<201008191309.15425.arnd@arndb.de>
-	<20100824150655.GB2160@osiris.boeblingen.de.ibm.com>
-Message-ID: <201008241726.08797.arnd@arndb.de>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Tue, 24 Aug 2010 17:27:01 +0200
+Subject: [PATCH 0/2] fix mx35fb display mappings
+In-Reply-To: <1282643200-13332-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1282643200-13332-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1282663623-8404-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 August 2010, Heiko Carstens wrote:
-> > (Taking Martin and Heiko on Cc for s390)
-> > 
-> > I'd strongly suggest making the behavior the same for everyone. It should
-> > be fairly easy to make sure none of these warnings ever triggers
-> > on s390, because most of the Linux device driver code does not get build
-> > there anyway.
-> 
-> Please don't do that. An s390 allyesconfig still triggers 45 warnings and
-> I'm currently not willing to "patch" working code just to get rid of these
-> warnings which are most likely all false positives.
-> That's the reason why we currently don't error out and only generate
-> warnings.
+This patches introduce a fix for the display mappings
+in the mx35 framebuffer. It also sets the platformspecific
+display mapping for the mx35_3ds development board's tft panel
+added with this patch:
 
-Can't you just turn that option off then? Or are you worried about
-allyesconfig builds?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/023914.html
 
-The current state is confusing because on s390
-CONFIG_DEBUG_STRICT_USER_COPY_CHECKS means that gcc will warn rather
-than ignore the finding, while on all others, the same option turns
-a warning into an error.
+Juergen Beisert (2):
+  Separate display's pixel configuration from video mode
+  mx35_3ds: Make usage of the display connection feature
 
-Test-building an allmodconfig on s390 showed these warnings only in
-architecture independent code, and I agree that they are all false
-positives.
-
-	Arnd
+ arch/arm/mach-mx3/mach-mx35_3ds.c      |   15 ++++++++
+ arch/arm/plat-mxc/include/mach/mx3fb.h |    5 +++
+ drivers/video/mx3fb.c                  |   62 +++++++++++++-------------------
+ 3 files changed, 45 insertions(+), 37 deletions(-)
