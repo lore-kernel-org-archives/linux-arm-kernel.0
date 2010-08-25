@@ -1,65 +1,108 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Aug 2010 19:24:16 +0100
-Subject: Problems with dma_alloc_writecombine
-In-Reply-To: <AANLkTi=-choRCYyU2KA7D2asOqLGwe5BJddt9mgV81KP@mail.gmail.com>
-References: <AANLkTi=kbch5XF99nmjRsy_f2akwQwCR7co7eN=SDd0w@mail.gmail.com>
-	<AANLkTi=-choRCYyU2KA7D2asOqLGwe5BJddt9mgV81KP@mail.gmail.com>
-Message-ID: <20100825182416.GA30772@n2100.arm.linux.org.uk>
+From: maciej.rutecki@gmail.com (Maciej Rutecki)
+Date: Wed, 25 Aug 2010 20:55:56 +0200
+Subject: 2.6.36-rc1 on zaurus: bluetooth regression
+In-Reply-To: <20100821152445.GA1536@ucw.cz>
+References: <20100821152445.GA1536@ucw.cz>
+Message-ID: <201008252055.56916.maciej.rutecki@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 24, 2010 at 09:50:15AM -0700, Dave Hylands wrote:
-> Replying to my own post....
+On sobota, 21 sierpnia 2010 o 17:24:45 Pavel Machek wrote:
+> Hi!
 > 
-> On Fri, Aug 20, 2010 at 8:14 PM, Dave Hylands wrote:
-> > Hi,
-> >
-> > We've observed a problem with dma_alloc_writecombine when the system
-> > is under heavy load (heavy bus traffic).
+> Good news is that it boots, suspends and resumes.
 > 
-> I found the problem (well I think I found the problem)
+> Bad news is that bluetooth broke for me. I'm using CF bluetooth
+> card.
 > 
-> The armv6_set_pte_ext function (from arch/arm/mm/proc-macros.S) does
-> this at the end:
+> Socket 0 Bridge:   	[pxa2xx-pcmcia] 	(bus ID: pxa2xx-pcmcia)
+> 	Configuration:	state: on	ready: yes
+> 			Voltage: 3.3V Vcc: 3.3V Vpp: 0.0V
+> Socket 0 Device 0:	[serial_cs]		(bus ID: 0.0)
+> 	Configuration:	state: on
+> 	Product Name:   Compact Flash Bluetooth Card
+> 	Identification:	manf_id: 0x0279	card_id: 0x950b
+> 			function: 2 (serial)
+> 			prod_id(1): "Compact Flash" (0x95521410)
+> 			prod_id(2): "Bluetooth Card" (0x7664fb1d)
+> 			prod_id(3): --- (---)
+> 			prod_id(4): --- (---)
+> Socket 1 Bridge:   	[pxa2xx-pcmcia] 	(bus ID: pxa2xx-pcmcia)
+> 	Configuration:	state: on	ready: yes
+> 			Voltage: 3.3V Vcc: 3.3V Vpp: 0.0V
+> Socket 1 Device 0:	[ide-cs]		(bus ID: 1.0)
+> 	Configuration:	state: on
+> 	Product Name:   HITACHI microdrive
+> 	Identification:	manf_id: 0x0319	card_id: 0x0000
+> 			function: 4 (fixed disk)
+> 			prod_id(1): "HITACHI" (0xf4f43949)
+> 			prod_id(2): "microdrive" (0xa6d76178)
+> 			prod_id(3): --- (---)
+> 			prod_id(4): --- (---)
 > 
-> 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
 > 
-> which doesn't wait for the write to hit the memory. I added
+> In 2.6.35, I have lots of messages in the syslog, and speed is slow,
+> but it works.
 > 
-> 	mcr	p15, 0, r0, c7, c10, 4		@ dsb
+> Aug 19 08:01:06 toy kernel: bcsp_recv: Out-of-order packet arrived, got 3
+> expected 2 Aug 19 08:01:06 toy kernel: bcsp_recv: Out-of-order packet
+> arrived, got 4 expected 2 Aug 19 08:01:11 toy kernel: bcsp_recv: Short
+> BCSP packet
+> Aug 19 08:01:11 toy kernel: bcsp_recv: Out-of-order packet arrived, got 3
+> expected 2 Aug 19 08:01:11 toy kernel: bcsp_recv: Out-of-order packet
+> arrived, got 4 expected 2 Aug 19 08:01:12 toy kernel: bcsp_recv:
+> Out-of-order packet arrived, got 5 expected 2 Aug 19 08:01:16 toy kernel:
+> bcsp_recv: Short BCSP packet
+> Aug 19 08:01:16 toy kernel: bcsp_recv: Out-of-order packet arrived, got 2
+> expected 1 Aug 19 08:01:16 toy kernel: bcsp_recv: Out-of-order packet
+> arrived, got 3 expected 1 Aug 19 08:01:16 toy kernel: bcsp_recv:
+> Out-of-order packet arrived, got 4 expected 1
 > 
-> which ensures that the write buffer has been drained before
-> continuing, and my problem goes away.
+> In 2.6.36-rc1, I get:
 > 
-> I wasn't sure if the dsb is a complete superset of flush_pte. If it
-> is, then the flush_pte can be replaced with a dsb (for my test, I
-> added the dsb).
+> Aug 20 08:38:27 toy bluetoothd[1318]: HCI dev 0 down
+> Aug 20 08:38:27 toy bluetoothd[1318]: Adapter /org/bluez/1318/hci0 has been
+> disabled Aug 20 08:38:27 toy bluetoothd[1318]: Stopping security manager 0
+> Aug 20 08:38:27 toy kernel: pcmcia_socket pcmcia_socket0: pccard: card
+> ejected from slot 0 Aug 20 08:38:27 toy kernel: PM: Removing info for
+> pcmcia:0.0
+> Aug 20 08:38:27 toy kernel: PM: Removing info for No Bus:ttyS0
+> Aug 20 08:38:27 toy bluetoothd[1318]: HCI dev 0 unregistered
+> Aug 20 08:38:27 toy bluetoothd[1318]: Unregister path: /org/bluez/1318/hci0
+> Aug 20 08:38:27 toy kernel: PM: Removing info for No Bus:hci0
+> Aug 20 08:38:27 toy kernel: PM: Adding info for No Bus:ttyS0
+> Aug 20 08:38:31 toy kernel: pcmcia_socket pcmcia_socket0: pccard: PCMCIA
+> card inserted into slot 0 Aug 20 08:38:31 toy kernel: pcmcia 0.0: pcmcia:
+> registering new device pcmcia0.0 (IRQ: 201) Aug 20 08:38:31 toy kernel:
+> PM: Adding info for pcmcia:0.0
+> Aug 20 08:38:31 toy kernel: PM: Removing info for No Bus:ttyS0
+> Aug 20 08:38:31 toy kernel: 0.0: ttyS0 at I/O 0xc48402f8 (irq = 201) is a
+> 16C950/954 Aug 20 08:38:31 toy kernel: PM: Adding info for No Bus:ttyS0
+> Aug 20 08:38:36 toy bluetoothd[1318]: HCI dev 0 registered
+> Aug 20 08:38:36 toy kernel: PM: Adding info for No Bus:hci0
+> Aug 20 08:38:36 toy kernel: bcsp_recv: Out-of-order packet arrived, got 1
+> expected 0 Aug 20 08:38:37 toy bluetoothd[1318]: accept: Socket operation
+> on non-socket (88) Aug 20 08:38:37 toy bluetoothd[1318]: HCI dev 0 up
+> Aug 20 08:38:37 toy bluetoothd[1318]: Starting security manager 0
+> Aug 20 08:38:37 toy kernel: bcsp_recv: Short BCSP packet
+> Aug 20 08:38:39 toy kernel: PM: Removing info for No Bus:rfcomm1
+> Aug 20 08:38:39 toy kernel: PM: Adding info for No Bus:rfcomm1
+> Aug 20 08:38:40 toy pand[1546]: Bluetooth PAN daemon version 4.66
+> Aug 20 08:38:40 toy pand[1546]: Connecting to 00:21:BA:FF:2D:37
+> Aug 20 08:38:40 toy kernel: hci_cmd_task: hci0 command tx timeout
+> Aug 20 08:38:42 toy bluetoothd[1318]: Can't read version info for
+> /org/bluez/1318/hci0: Connection timed out (110) Aug 20 08:38:44 toy
+> modprobe: FATAL: Could not load /lib/modules/2.6.36-rc1/modules.dep: No
+> such file or directory
 > 
-> I found some references in the ARM literature:
-> <http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf>
-> 
-> In "9.2.1 Ensuring the visibility of updates to instructions for a
-> uniprocessor" (page 24) they use the dsb instruction, where the
-> armv6_set_pte_ext function doesn't. Their example also covers the more
-> general case where the page could refer to instructions or data,
-> whereas the dma stuff is data only.
+> Any ideas?
+> 							Pavel
 
-Partly that's because it's overhead which we don't need there.  Probably
-a better solution is to add the dsb() to __dma_alloc_remap() like this:
 
- arch/arm/mm/dma-mapping.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I created a Bugzilla entry at 
+https://bugzilla.kernel.org/show_bug.cgi?id=17061
+for your bug report, please add your address to the CC list in there, thanks!
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index c704eed..4bc43e5 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -229,6 +229,8 @@ __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot)
- 			}
- 		} while (size -= PAGE_SIZE);
- 
-+		dsb();
-+
- 		return (void *)c->vm_start;
- 	}
- 	return NULL;
+-- 
+Maciej Rutecki
+http://www.maciek.unixy.pl
