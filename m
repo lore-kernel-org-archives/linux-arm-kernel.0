@@ -1,88 +1,121 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 25 Aug 2010 15:11:02 +0200
-Subject: [PATCH 2/3] [ARM] pxa: MFU pin configuration to support Fast
-	ethernet.
-In-Reply-To: <1282727921.6968.99.camel@pe-lt522.marvell.com>
-References: <1282727921.6968.99.camel@pe-lt522.marvell.com>
-Message-ID: <201008251511.02665.marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 25 Aug 2010 21:14:35 +0800
+Subject: [PATCH 1/3] pxa: Hookup MAX7312 thats connected to I2C.
+In-Reply-To: <201008251459.28970.marek.vasut@gmail.com>
+References: <1282727896.6968.96.camel@pe-lt522.marvell.com>
+	<201008251459.28970.marek.vasut@gmail.com>
+Message-ID: <AANLkTikqJ0KWMErk44Z=yj48dEALyz+dC9tEnLL53-V0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 25. srpna 2010 11:18:41 Sachin Sanap napsal(a):
-> Signed-off-by: Sachin Sanap <ssanap@marvell.com>
-> ---
->  arch/arm/mach-mmp/aspenite.c                |   18 ++++++++++++++++++
->  arch/arm/mach-mmp/include/mach/mfp-pxa168.h |   19 +++++++++++++++++++
->  2 files changed, 37 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-> index d19c26c..a235551 100644
-> --- a/arch/arm/mach-mmp/aspenite.c
-> +++ b/arch/arm/mach-mmp/aspenite.c
-> @@ -74,6 +74,24 @@ static unsigned long common_pin_config[] __initdata = {
->  	GPIO105_CI2C_SDA,
->  	GPIO106_CI2C_SCL,
-> 
-> +	/* MFU */
-> +	GPIO86_TX_CLK,
-> +	GPIO87_TX_EN,
-> +	GPIO88_TX_DQ3,
-> +	GPIO89_TX_DQ2,
-> +	GPIO90_TX_DQ1,
-> +	GPIO91_TX_DQ0,
-> +	GPIO92_MII_CRS,
-> +	GPIO93_MII_COL,
-> +	GPIO94_RX_CLK,
-> +	GPIO95_RX_ER,
-> +	GPIO96_RX_DQ3,
-> +	GPIO97_RX_DQ2,
-> +	GPIO98_RX_DQ1,
-> +	GPIO99_RX_DQ0,
-> +	GPIO100_MII_MDC,
-> +	GPIO101_MII_MDIO,
-> +	GPIO103_RX_DV,
->  };
-> 
+On Wed, Aug 25, 2010 at 8:59 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne St 25. srpna 2010 11:18:16 Sachin Sanap napsal(a):
+>> Signed-off-by: Sachin Sanap <ssanap@marvell.com>
+>> ---
+>> ?arch/arm/mach-mmp/aspenite.c | ? 31 +++++++++++++++++++++++++++++--
+>> ?1 files changed, 29 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+>> index 244655d..d19c26c 100644
+>> --- a/arch/arm/mach-mmp/aspenite.c
+>> +++ b/arch/arm/mach-mmp/aspenite.c
+>> @@ -23,9 +23,12 @@
+>> ?#include <mach/mfp-pxa168.h>
+>> ?#include <mach/pxa168.h>
+>> ?#include <mach/gpio.h>
+>> +#include <linux/i2c/pca953x.h>
+>>
+>> ?#include "common.h"
+>>
+>> +#define GPIO_EXT1(x) (128 + 16 + (x))
+>> +
+>> ?static unsigned long common_pin_config[] __initdata = {
+>> ? ? ? /* Data Flash Interface */
+>> ? ? ? GPIO0_DFI_D15,
+>> @@ -66,6 +69,11 @@ static unsigned long common_pin_config[] __initdata = {
+>> ? ? ? GPIO115_I2S_BCLK,
+>> ? ? ? GPIO116_I2S_RXD,
+>> ? ? ? GPIO117_I2S_TXD,
+>> +
+>> + ? ? /* i2c bus */
+>> + ? ? GPIO105_CI2C_SDA,
+>> + ? ? GPIO106_CI2C_SCL,
+>> +
+>> ?};
+>>
+>> ?static struct smc91x_platdata smc91x_info = {
+>> @@ -130,17 +138,36 @@ static struct pxa3xx_nand_platform_data
+>> aspenite_nand_info = { .nr_parts ? ? ?= ARRAY_SIZE(aspenite_nand_partitions),
+>> ?};
+>>
+>> -static struct i2c_board_info aspenite_i2c_info[] __initdata = {
+>> +#if defined(CONFIG_GPIO_PCA953X)
+>> +static struct pca953x_platform_data max7312_data[] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .gpio_base ? ? ?= GPIO_EXT1(0),
+>> + ? ? },
+>> +};
+>> +#endif
+>> +
+>> +static struct i2c_board_info aspenite_pwri2c_info[] __initdata = {
+>> ? ? ? { I2C_BOARD_INFO("wm8753", 0x1b), },
+>> ?};
+>>
+>> +static struct i2c_board_info aspenite_i2c_info[] __initdata = {
+>> +#if defined(CONFIG_GPIO_PCA953X)
+>> + ? ? {
+>> + ? ? ? ? ? ? I2C_BOARD_INFO("max7312", 0x20),
+>> + ? ? ? ? ? ? .irq = IRQ_GPIO(120),
+>> + ? ? ? ? ? ? .platform_data ?= &max7312_data[0],
+>> + ? ? },
+>> +#endif
+>> +};
+>> +
+> I see what you're trying to achieve here, but this seems quite clumsy actually.
+> Try this approach (see mach-pxa/colibri_pxa320.c for example):
+>
+> #if defined(...aspenite_pi2c_chip is selected) || defined(...dtto..._MODULE)
+> static <pi2c chips pdata> aspenite_pwri2c_info = {
+>
+> };
+>
+> statid void __init aspenite_pi2c_init(void)
+> {
+> ? ? ? ?pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(aspenite_pwri2c_info));
+> }
+> #else
+> static inline void aspenite_pi2c_init(void) {}
+> #endif
+>
 
-That's for ethernet, right ? Can you take aspenite apart (aka. remove the 
-ethernet chip or whatnot) ?
+Or to leave those #ifdef .. #endif out completely. I don't actually care
+that much about the benefit of saving some additional bytes compared
+with the mess sometimes with all those #ifdef .. floating around.
 
-Maybe if you'd go the way I outlined in the previous mail commenting on your 1/3 
-patch and apply that approach on the whole aspenite, then there's a space for 
-further improvement. That is, split the MFP config structure into smaller chunks 
-and configure the pins only in case that particular device is enabled in kernel. 
-See colibri_pxa320 for reference again.
-
-Cheers
->  static struct smc91x_platdata smc91x_info = {
-> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h index ded43c4..afea9dc
-> 100644
-> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa168.h
-> @@ -266,6 +266,25 @@
->  #define GPIO116_I2S_RXD		MFP_CFG(GPIO116,AF2)
->  #define GPIO117_I2S_TXD		MFP_CFG(GPIO117,AF2)
-> 
-> +/* MFU */
-> +#define GPIO86_TX_CLK		MFP_CFG(GPIO86, AF5)
-> +#define GPIO87_TX_EN		MFP_CFG(GPIO87, AF5)
-> +#define GPIO88_TX_DQ3		MFP_CFG(GPIO88, AF5)
-> +#define GPIO89_TX_DQ2		MFP_CFG(GPIO89, AF5)
-> +#define GPIO90_TX_DQ1		MFP_CFG(GPIO90, AF5)
-> +#define GPIO91_TX_DQ0		MFP_CFG(GPIO91, AF5)
-> +#define GPIO92_MII_CRS		MFP_CFG(GPIO92, AF5)
-> +#define GPIO93_MII_COL		MFP_CFG(GPIO93, AF5)
-> +#define GPIO94_RX_CLK		MFP_CFG(GPIO94, AF5)
-> +#define GPIO95_RX_ER		MFP_CFG(GPIO95, AF5)
-> +#define GPIO96_RX_DQ3		MFP_CFG(GPIO96, AF5)
-> +#define GPIO97_RX_DQ2		MFP_CFG(GPIO97, AF5)
-> +#define GPIO98_RX_DQ1		MFP_CFG(GPIO98, AF5)
-> +#define GPIO99_RX_DQ0		MFP_CFG(GPIO99, AF5)
-> +#define GPIO100_MII_MDC		MFP_CFG(GPIO100, AF5)
-> +#define GPIO101_MII_MDIO	MFP_CFG(GPIO101, AF5)
-> +#define GPIO103_RX_DV		MFP_CFG(GPIO103, AF5)
-> +
->  /* PWM */
->  #define GPIO96_PWM3_OUT		MFP_CFG(GPIO96, AF1)
->  #define GPIO97_PWM2_OUT		MFP_CFG(GPIO97, AF1)
+> static void __init common_init()
+> {
+> ...
+> ? ? ? ?pxa168_add_uart(1);
+> ? ? ? ?aspenite_pi2c_init();
+> ? ? ? ?aspenite_i2c_init();
+> ...
+> }
+>
+>> ?static void __init common_init(void)
+>> ?{
+>> ? ? ? mfp_config(ARRAY_AND_SIZE(common_pin_config));
+>>
+>> ? ? ? /* on-chip devices */
+>> ? ? ? pxa168_add_uart(1);
+>> - ? ? pxa168_add_twsi(1, NULL, ARRAY_AND_SIZE(aspenite_i2c_info));
+>> + ? ? pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(aspenite_i2c_info));
+>> + ? ? pxa168_add_twsi(1, NULL, ARRAY_AND_SIZE(aspenite_pwri2c_info));
+>
+> Why not just add:
+> pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(aspenite_pwri2c_info));
+>
+> But anyway, this can be dumped with the code I outlined above. Cheers
+> ?
+>> ? ? ? pxa168_add_ssp(1);
+>> ? ? ? pxa168_add_nand(&aspenite_nand_info);
+>
