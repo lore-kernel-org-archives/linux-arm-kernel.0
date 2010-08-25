@@ -1,47 +1,30 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Tue, 24 Aug 2010 23:07:47 +0300
-Subject: s3c ohci problem
-Message-ID: <i518qk$j8u$1@dough.gmane.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 25 Aug 2010 11:41:56 +1000
+Subject: [PATCH 0/3] Generalise ARM perf-events backend for oprofile
+In-Reply-To: <20100823105759.GA18638@infradead.org>
+References: <1282560381-7700-1-git-send-email-matt@console-pimps.org>
+	<20100823105759.GA18638@infradead.org>
+Message-ID: <1282700516.22370.567.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, 2010-08-23 at 06:57 -0400, Christoph Hellwig wrote:
+> On Mon, Aug 23, 2010 at 11:46:18AM +0100, Matt Fleming wrote:
+> > The perf-events backend for OProfile that Will Deacon wrote in
+> > 8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
+> > perf-events framework as backend") is of use to more architectures
+> > than just ARM. Move the code into drivers/oprofile/ so that SH can use
+> > it instead of the nearly identical copy of its OProfile code.
+> 
+> Nice, I didn't know such a backend already existed.  Now that you
+> have made it generic we should aim towards making it the only oprofile
+> backend and getting rid of all the duplication.
 
-below is boot log of s3c2410-ohci driver.
+Even better would be to do the surgery at a higher level and provide the
+oprofile API without the oprofile buffer management. My experience is
+that it doesn't scale, and on heavily threaded large SMP setup, there is
+an enormous amount of time wasted contending on the global oprofile
+buffer mutex.
 
-ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-ohci_hcd: block sizes: ed 64 td 64
-s3c2410-ohci s3c2410-ohci: s3c2410_start_hc:
-s3c2410-ohci s3c2410-ohci: S3C24XX OHCI
-drivers/usb/core/inode.c: creating file 'devices'
-drivers/usb/core/inode.c: creating file '001'
-s3c2410-ohci s3c2410-ohci: new USB bus registered, assigned bus number 1
-s3c2410-ohci s3c2410-ohci: irq 79, io mem 0x74300000
-s3c2410-ohci s3c2410-ohci: created debug files
-s3c2410-ohci s3c2410-ohci: fminterval delta -11999
-s3c2410-ohci s3c2410-ohci: enabling initreset quirk
-s3c2410-ohci s3c2410-ohci: init err (00000000 0000)
-ohci_hcd: can't start s3c24xx
-s3c2410-ohci s3c2410-ohci: OHCI controller state
-s3c2410-ohci s3c2410-ohci: OHCI 0.0, NO legacy support registers
-s3c2410-ohci s3c2410-ohci: control 0x000 HCFS=reset CBSR=0
-s3c2410-ohci s3c2410-ohci: cmdstatus 0x00000 SOC=0
-s3c2410-ohci s3c2410-ohci: intrstatus 0x00000000
-s3c2410-ohci s3c2410-ohci: intrenable 0x00000000
-s3c2410-ohci s3c2410-ohci: hcca frame #0000
-s3c2410-ohci s3c2410-ohci: roothub.a 00000000 POTPGT=0 NDP=0(0)
-s3c2410-ohci s3c2410-ohci: roothub.b 00000000 PPCM=0000 DR=0000
-s3c2410-ohci s3c2410-ohci: roothub.status 00000000
-s3c2410-ohci s3c2410-ohci: startup error -75
-s3c2410-ohci s3c2410-ohci: USB bus 1 deregistered
-s3c2410-ohci s3c2410-ohci: s3c2410_stop_hc:
-s3c2410-ohci: probe of s3c2410-ohci failed with error -75
-
-Kernel is v2.6.36-rc2 with few minor patches adding new devices to 
-mach-real6410. Board is Real6410. It seems there isn't any USB 
-enable/disable bit s3c6410 registers, also no gpio multiplexing. There 
-is no power control for usb on this board, it's always powered on.
-Could it be driver problem? Did anybody get USB working on smdk6410 or 
-other s3c64xx boards with latest kernel?
-
-Darius.
+Cheers,
+Ben.
