@@ -1,42 +1,27 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Wed, 25 Aug 2010 14:51:56 +0200
-Subject: [PATCH 0/2] fix mx35fb display mappings
-In-Reply-To: <4C73FDCE.9080808@eukrea.com>
-References: <1282643200-13332-1-git-send-email-m.grzeschik@pengutronix.de>
-	<1282663623-8404-1-git-send-email-m.grzeschik@pengutronix.de>
-	<4C73FDCE.9080808@eukrea.com>
-Message-ID: <20100825125156.GA4311@pengutronix.de>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Wed, 25 Aug 2010 14:54:52 +0200
+Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <201008251414.16411.arnd@arndb.de>
+References: <4C61EE55.5030506@codeaurora.org>
+	<201008241726.08797.arnd@arndb.de>
+	<20100824154740.GD2160@osiris.boeblingen.de.ibm.com>
+	<201008251414.16411.arnd@arndb.de>
+Message-ID: <20100825125451.GH2153@osiris.boeblingen.de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Wed, Aug 25, 2010 at 02:14:16PM +0200, Arnd Bergmann wrote:
+> > Then maybe add a "choice" Kconfig option in a way that both allyesconfig
+> > as well as allnoconfig will build?
+> 
+> I think it would be easier to remove the config option entirely on s390
+> and just always warn. As I said earlier in this thread, I generally
+> don't think this particular warning is more important than a lot of
+> the other ones that we don't turn into errors.
 
-On Tue, Aug 24, 2010 at 07:13:50PM +0200, Eric B?nard wrote:
-> Hi Michael,
->
-> Le 24/08/2010 17:27, Michael Grzeschik a ?crit :
->> This patches introduce a fix for the display mappings
->> in the mx35 framebuffer. It also sets the platformspecific
->> display mapping for the mx35_3ds development board's tft panel
->> added with this patch:
->>
-> won't this patch break other platforms which are using mx3fb ?
-Yes i suppose it will. But i am currently looking for a proper solution
-to strange coloring issues on different pannels.
+I disagree: a default kernel build should compile without the noise of
+tens of false positive warnings.
+Nobody would look at new warnings and fix possible bugs.
+That's why I want to have an option to turn the warnings off (default).
 
-I figured out a different but related issue in the mx3fb code:
-The sdc_init_panel function, which does the display mapping, is only
-called with the IPU_PIX_FMT_BGR666 or IPU_PIX_FMT_RGB666 pixfmt.
-So this pixfmt should better be set over the function property
-with proper di_mappings.
-
-So i think this patches can be seen as an RFC.
-
-Thanks,
-Michael
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Or are you volunteering to "fix" all the false positives? :)
