@@ -1,64 +1,91 @@
-From: corbet@lwn.net (Jonathan Corbet)
-Date: Wed, 25 Aug 2010 17:31:25 -0600
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100825155814.25c783c7.akpm@linux-foundation.org>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-	<20100825155814.25c783c7.akpm@linux-foundation.org>
-Message-ID: <20100825173125.0855a6b0@bike.lwn.net>
+From: konkers@android.com (Erik Gilling)
+Date: Wed, 25 Aug 2010 16:56:33 -0700
+Subject: [PATCH] video: tegra: add tegra display controller and fb driver
+In-Reply-To: <4C75A039.8060701@bluewatersys.com>
+References: <1281568272-25871-1-git-send-email-konkers@android.com>
+	<4C6379E1.4010500@bluewatersys.com>
+	<AANLkTini+n1osaQHkomguzZi-DaHLX3i1G4gA82bK0=S@mail.gmail.com>
+	<4C75A039.8060701@bluewatersys.com>
+Message-ID: <AANLkTimTJKOgDKqpOR7LR-2gS1qQamke12m73hDru_=t@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Aug 2010 15:58:14 -0700
-Andrew Morton <akpm@linux-foundation.org> wrote:
+On Wed, Aug 25, 2010 at 3:59 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> On 08/26/2010 10:03 AM, Erik Gilling wrote:
+>
+> You sent this just to me, did you mean to post to the list also?
 
-> > If you want guarantees you can free stuff, why not add constraints to
-> > the page allocation type and only allow MIGRATE_MOVABLE pages inside a
-> > certain region, those pages are easily freed/moved aside to satisfy
-> > large contiguous allocations.  
-> 
-> That would be good.  Although I expect that the allocation would need
-> to be 100% rock-solid reliable, otherwise the end user has a
-> non-functioning device.  Could generic core VM provide the required level
-> of service?
+oops
 
-The original OLPC has a camera controller which requires three contiguous,
-image-sized buffers in memory.  That system is a little memory constrained
-(OK, it's desperately short of memory), so, in the past, the chances of
-being able to allocate those buffers anytime some kid decides to start
-taking pictures was poor.  Thus, cafe_ccic.c has an option to snag the
-memory at initialization time and never let go even if you threaten its
-family.  Hell hath no fury like a little kid whose new toy^W educational
-tool stops taking pictures.
+>>>> +config FB_TEGRA
+>>>> + ? ? tristate "Tegra Framebuffer driver"
+>>>> + ? ? depends on TEGRA_DC && FB = y
+>>>
+>
+>>>
+>>> The dump_regs code is very long for a debugging feature. Can it just be
+>>> replaced by a for loop which prints the offsets and values of each register?
+>>
+>> Printing the names of the registers has been invaluable so far. ?I
+>> could move this to a separate file.
+>
+> Its useful for debugging while developing the driver, but it adds a lot
+> of code. Do you expect the register dumping features to be required once
+> the driver hits mainline?
 
-That, of course, is not a hugely efficient use of memory on a
-memory-constrained system.  If the VM could reliably satisfy those
-allocation requestss, life would be wonderful.  Seems difficult.  But it
-would be a nicer solution than CMA, which, to a great extent, is really
-just a standardized mechanism for grabbing memory and never letting go.
+I expect the driver will hit mainline is several phases.  This first
+one.  One where HDMI works.  One where DSI works.  One which has
+rotation.  This code is useful for all those phases.
 
-> It would help (a lot) if we could get more attention and buyin and
-> fedback from the potential clients of this code.  rmk's feedback is
-> valuable.  Have we heard from the linux-media people?  What other
-> subsystems might use it?  ieee1394 perhaps?  Please help identify
-> specific subsystems and I can perhaps help to wake people up.
+>>>> +#undef DUMP_REG
+>>>> +
+>>>> +static int dbg_dc_show(struct seq_file *s, void *unused)
+>>>> +{
+>>>> + ? ? struct tegra_dc *dc = s->private;
+>>>> +
+>>>> + ? ? _dump_regs(dc, s, dbg_regs_print);
+>>>> +
+>>>> + ? ? return 0;
+>>>> +}
+>>>
+>>> This all looks a bit confusing (especially the undef stuff). Why do you
+>>> have both a debugfs interface to the registers and one which prints them
+>>> using dev_dbg?
+>>
+>> The extra #undef was a type-o. ?The debugfs file is useful when
+>> someone brings me a misbehaving unit and I need to dump the register
+>> set. ?The dump_regs funciton is usefull when I want to look at the
+>> state at different points in a code-path.
+>
+> If you really want to keep the debug feature then I would at least pick
+> one interface or the other. The debugfs one feels a bit more standard,
+> and is probably more useful to end users once the driver is in mainline.
 
-If this code had been present when I did the Cafe driver, I would have used
-it.  I think it could be made useful to a number of low-end camera drivers
-if the videobuf layer were made to talk to it in a way which Just Works.
+They still fill different uses.  You can't cat a debugfs file from an
+interrupt handler.  You can't call dump_regs() from userspace.  I'm
+still actively using both.  I could see taking one out once
+development on the driver calms down.
 
-With a bit of tweaking, I think it could be made useful in other
-situations: the viafb driver, for example, really needs an allocator for
-framebuffer memory and it seems silly to create one from scratch.  Of
-course, there might be other possible solutions, like adding a "zones"
-concept to LMB^W memblock.
+>>>> + ? ? tegra_dc_init(dc);
+>>>> +
+>>>> + ? ? tegra_dc_set_blending(dc, tegra_dc_blend_modes[0]);
+>>>> +
+>>>> + ? ? platform_set_drvdata(pdev, dc);
+>>>> +
+>>>> + ? ? tegra_dc_dbg_add(dc);
+>>>> +
+>>>> + ? ? dev_info(&pdev->dev, "probed\n");
+>>>
+>>> dev_dbg?
+>>
+>> I find it very useful when drivers announce when new devices are added.
+>>
+>
+> It adds more noise to the bootlog. There are other ways to determine
+> that a driver has successfully probed. If you do want to keep the
+> message at least make it a bit more informative so that it prints the
+> configuration out or something.
 
-The problem which is being addressed here is real.
+I'll add some more info to the line.
 
-That said, the complexity of the solution still bugs me a bit, and the core
-idea is still to take big chunks of memory out of service for specific
-needs.  It would be far better if the VM could just provide big chunks on
-demand.  Perhaps compaction and the pressures of making transparent huge
-pages work will get us there, but I'm not sure we're there yet.
-
-jon
+-Erik
