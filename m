@@ -1,42 +1,53 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 25 Aug 2010 16:26:34 -0700
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100825155814.25c783c7.akpm@linux-foundation.org>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-	<20100825155814.25c783c7.akpm@linux-foundation.org>
-Message-ID: <1282778794.13797.15.camel@c-dwalke-linux.qualcomm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 26 Aug 2010 08:27:45 +0900
+Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
+	plat-s5p
+In-Reply-To: <01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
+References: <1282522043-2420-1-git-send-email-kgene.kim@samsung.com>
+	<01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
+Message-ID: <001401cb44ad$22fc4460$68f4cd20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-08-25 at 15:58 -0700, Andrew Morton wrote:
-> That would be good.  Although I expect that the allocation would need
-> to be 100% rock-solid reliable, otherwise the end user has a
-> non-functioning device.  Could generic core VM provide the required
-> level
-> of service?
+Kukjin Kim wrote:
 > 
-> Anyway, these patches are going to be hard to merge but not
-> impossible.
-> Keep going.  Part of the problem is cultural, really: the consumers of
-> this interface are weird dinky little devices which the core MM guys
-> tend not to work with a lot, and it adds code which they wouldn't use.
+> This patch moves OneNAND device definitions from mach-s5pv210 to plat-s5p
+> so that can support it commonly.
 > 
-> I agree that having two "contiguous memory allocators" floating about
-> on the list is distressing.  Are we really all 100% diligently certain
-> that there is no commonality here with Zach's work?
+> Note: S5PC110 and S5PC210 have same OneNAND driver.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Kyungmin Park <Kyungmin Park <kyungmin.park@samsung.com>
 
-There is some commonality with Zach's work, but Zach should be following
-all of this development .. So presumably he has no issues with Michal's
-changes. I think Zach's solution has a similar direction to this.
+Hmm...typo...will fix like following.
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
 
-If Michal is active (he seems more so than Zach), and follows community
-comments (including Zach's , but I haven't seen any) then we can defer
-to that solution ..
+> ---
+>  arch/arm/mach-s5pv210/Kconfig                     |    9 +-----
+>  arch/arm/mach-s5pv210/Makefile                    |    1 -
+>  arch/arm/mach-s5pv210/include/mach/map.h          |    3 ++
+>  arch/arm/mach-s5pv210/mach-aquila.c               |    2 +-
+>  arch/arm/mach-s5pv210/mach-goni.c                 |    2 +-
+>  arch/arm/mach-s5pv310/include/mach/irqs.h         |    2 +
+>  arch/arm/mach-s5pv310/include/mach/map.h          |    6 ++++
+>  arch/arm/plat-s5p/Kconfig                         |    5 +++
+>  arch/arm/plat-s5p/Makefile                        |    1 +
+>  arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c |   28
+> +++++++++++---------
+>  arch/arm/plat-samsung/include/plat/devs.h         |    2 +-
+>  11 files changed, 37 insertions(+), 24 deletions(-)
+>  rename arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c (59%)
+> 
 
-Daniel
+(snip)
 
--- 
+> --
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
