@@ -1,88 +1,91 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 24 Aug 2010 21:57:30 -0700
-Subject: [PATCH 01/24] msm: create config option for proc-comm
-In-Reply-To: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1282712273-344-2-git-send-email-johlstei@codeaurora.org>
+Date: Tue, 24 Aug 2010 21:57:29 -0700
+Subject: [PATCH 00/24] Support for Qualcomm msm8660 target
+Message-ID: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Muckle <smuckle@codeaurora.org>
+These patches add support to the Qualcomm msm8660 target. It currently
+provides uniprocessor support only, though SMP support is forthcoming.
+Note that this code is based on top of Gregory Bean's gpiomux code, and
+won't build until the mach-types are updated.
 
-Some builds may not support the proc-comm interface with
-the baseband processor.
+Abhijeet Dharmapurikar (3):
+  GIC: Dont disable INT in ack callback
+  msm: irqs-8x60: interrupt map
+  msm: 8x60: setup correct handlers for private interrupts
 
-Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig  |    7 +++++++
- arch/arm/mach-msm/Makefile |    6 ++----
- 2 files changed, 9 insertions(+), 4 deletions(-)
+Daniel Walker (3):
+  arm: mm: add proc info for ScorpionMP
+  msm: add hotplug stub functions
+  msm: allow uart to be conditionally disabled
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 4e79580..08ed76c 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -10,6 +10,7 @@ config ARCH_MSM7X00A
- 	select MSM_SMD
- 	select MSM_SMD_PKG3
- 	select CPU_V6
-+	select MSM_PROC_COMM
- 
- config ARCH_MSM7X30
- 	bool "MSM7x30"
-@@ -18,6 +19,7 @@ config ARCH_MSM7X30
- 	select MSM_VIC
- 	select CPU_V7
- 	select MSM_REMOTE_SPINLOCK_DEKKERS
-+	select MSM_PROC_COMM
- 
- config ARCH_QSD8X50
- 	bool "QSD8X50"
-@@ -26,6 +28,8 @@ config ARCH_QSD8X50
- 	select MSM_VIC
- 	select CPU_V7
- 	select MSM_REMOTE_SPINLOCK_LDREX
-+	select MSM_PROC_COMM
-+
- endchoice
- 
- config MSM_SOC_REV_A
-@@ -103,6 +107,9 @@ endchoice
- config MSM_SMD_PKG3
- 	bool
- 
-+config MSM_PROC_COMM
-+	bool
-+
- config MSM_SMD
- 	bool
- 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index faeb1f9..78fb536 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -1,8 +1,5 @@
--obj-y += proc_comm.o
- obj-y += io.o idle.o timer.o dma.o
--obj-y += vreg.o
- obj-y += acpuclock-arm11.o
--obj-y += clock.o clock-pcom.o
- 
- ifdef CONFIG_MSM_VIC
- obj-y += irq-vic.o
-@@ -10,10 +7,11 @@ else
- obj-y += irq.o
- endif
- 
-+obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
-+obj-$(CONFIG_MSM_PROC_COMM) += clock.o gpio.o
- obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
- obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
- obj-$(CONFIG_MSM_SMD) += last_radio_log.o
--
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
- obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+Gregory Bean (1):
+  msm: add MSM8x60 FFA support
+
+Jeff Ohlstein (5):
+  msm: timer: support 8x60 timers
+  msm: clock: add dummy clock driver
+  dma: add stub functions for dma features not yet present on 8x60
+  msm: add build support for msm8x60 target
+  msm: physical offset for MSM8X60
+
+Stepan Moskovchenko (3):
+  msm: Add MSM IOMMU support
+  msm: Platform initialization for the IOMMU driver
+  msm: Platform data for msm8x60 IOMMUs
+
+Steve Muckle (9):
+  msm: create config option for proc-comm
+  arm: Kconfig option for ARCH_MSM_SCORPIONMP
+  msm: io: MSM8X60 io support
+  msm: initial irq definitions for MSM8X60
+  msm: MSM8X60 RUMI3 board support
+  msm: irq: rename existing entry-macro to entry-macro-vic
+  msm: 8x60: gic initialization fixup for RUMI
+  msm: add msm8x60_surf machine
+  msm: MSM8X60 simulator board support
+
+ arch/arm/Kconfig                                  |    3 +-
+ arch/arm/common/gic.c                             |   14 -
+ arch/arm/mach-msm/Kconfig                         |   52 +-
+ arch/arm/mach-msm/Makefile                        |   20 +-
+ arch/arm/mach-msm/board-msm8x60.c                 |  102 ++
+ arch/arm/mach-msm/clock-dummy.c                   |   54 +
+ arch/arm/mach-msm/devices-msm8x60-iommu.c         |  883 ++++++++++
+ arch/arm/mach-msm/hotplug.c                       |   22 +
+ arch/arm/mach-msm/include/mach/debug-macro.S      |    2 +-
+ arch/arm/mach-msm/include/mach/dma.h              |   10 +-
+ arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   96 ++
+ arch/arm/mach-msm/include/mach/entry-macro-vic.S  |   37 +
+ arch/arm/mach-msm/include/mach/entry-macro.S      |   43 +-
+ arch/arm/mach-msm/include/mach/io.h               |    1 +
+ arch/arm/mach-msm/include/mach/iommu.h            |  103 ++
+ arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h    | 1871 +++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/irqs-8x60.h        |  267 +++
+ arch/arm/mach-msm/include/mach/irqs.h             |    2 +
+ arch/arm/mach-msm/include/mach/memory.h           |    2 +
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h   |   59 +
+ arch/arm/mach-msm/include/mach/smp.h              |   39 +
+ arch/arm/mach-msm/io.c                            |   15 +
+ arch/arm/mach-msm/iommu.c                         |  597 +++++++
+ arch/arm/mach-msm/iommu_dev.c                     |  364 ++++
+ arch/arm/mach-msm/timer.c                         |  226 ++-
+ arch/arm/mm/proc-v7.S                             |   24 +
+ 26 files changed, 4798 insertions(+), 110 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-msm8x60.c
+ create mode 100644 arch/arm/mach-msm/clock-dummy.c
+ create mode 100644 arch/arm/mach-msm/devices-msm8x60-iommu.c
+ create mode 100644 arch/arm/mach-msm/hotplug.c
+ create mode 100644 arch/arm/mach-msm/include/mach/entry-macro-qgic.S
+ create mode 100644 arch/arm/mach-msm/include/mach/entry-macro-vic.S
+ create mode 100644 arch/arm/mach-msm/include/mach/iommu.h
+ create mode 100644 arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
+ create mode 100644 arch/arm/mach-msm/include/mach/irqs-8x60.h
+ create mode 100644 arch/arm/mach-msm/include/mach/smp.h
+ create mode 100644 arch/arm/mach-msm/iommu.c
+ create mode 100644 arch/arm/mach-msm/iommu_dev.c
+
 -- 
 1.7.2.1
 
