@@ -1,76 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 26 Aug 2010 08:23:57 +0900
-Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
-	plat-s5p
-In-Reply-To: <AANLkTi=V52VyR7ydy6CPChsn0Qp0jW0G0x=ozroDBZYo@mail.gmail.com>
-References: <1282522043-2420-1-git-send-email-kgene.kim@samsung.com>
-	<01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
-	<006001cb426b$e84dd560$b8e98020$%kim@samsung.com>
-	<AANLkTi=V52VyR7ydy6CPChsn0Qp0jW0G0x=ozroDBZYo@mail.gmail.com>
-Message-ID: <001301cb44ac$9a4c0c90$cee425b0$%kim@samsung.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 25 Aug 2010 16:26:34 -0700
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <20100825155814.25c783c7.akpm@linux-foundation.org>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+Message-ID: <1282778794.13797.15.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+On Wed, 2010-08-25 at 15:58 -0700, Andrew Morton wrote:
+> That would be good.  Although I expect that the allocation would need
+> to be 100% rock-solid reliable, otherwise the end user has a
+> non-functioning device.  Could generic core VM provide the required
+> level
+> of service?
 > 
-> On Mon, Aug 23, 2010 at 11:35 AM, Kukjin Kim <kgene.kim@samsung.com>
-wrote:
-> > Kyungmin Park wrote:
-> >>
-> >> " Note: S5PC110 and S5PC210 have same OneNAND driver."
-> >>
-> >> Yes I also think it's same device. At least Spec is same. But I heard
-it
-> > has
-> >> some different feature related with DMA operation.
-> >> I'm not yet receive the official release from LSI. So I can't tell the
-> > exact
-> >> one.
-> >>
-> >> If it's true. we need to separate it if required.
-> >>
-> > No need to separate this stuff.
-> > It means that no problem to use this commonly for S5PC110 and S5PC210.
-> As DMA operation is changed, we need to register onenand device
-> separately like s5pc210-onenand.
-> to use the different read operations.
+> Anyway, these patches are going to be hard to merge but not
+> impossible.
+> Keep going.  Part of the problem is cultural, really: the consumers of
+> this interface are weird dinky little devices which the core MM guys
+> tend not to work with a lot, and it adds code which they wouldn't use.
 > 
-I'm not sure why we need separate platform data even though changed DMA
-operation.
-Anyway, maybe you received information that we can use this on S5PC110 and
-S5PC210.
+> I agree that having two "contiguous memory allocators" floating about
+> on the list is distressing.  Are we really all 100% diligently certain
+> that there is no commonality here with Zach's work?
 
-> >
-> > But...I will check it again before applying.
-> >
-> >> Thank you,
-> >> Kyungmin Park
-> >>
-> >> -----Original Message-----
-> >> From: Kukjin Kim [mailto:kgene.kim at samsung.com]
-> >> Sent: Monday, August 23, 2010 9:07 AM
-> >> To: linux-arm-kernel at lists.infradead.org;
-> > linux-samsung-soc at vger.kernel.org
-> >> Cc: ben-linux at fluff.org; Kukjin Kim; Kyungmin Park
-> >> Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
-> >> plat-s5p
-> >>
-> >> This patch moves OneNAND device definitions from mach-s5pv210 to
-plat-s5p
-> >> so that can support it commonly.
-> >>
-> >> Note: S5PC110 and S5PC210 have same OneNAND driver.
-> >>
-> >> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >> Cc: Kyungmin Park <Kyungmin Park <kyungmin.park@samsung.com>
-> >> ---
-(snip)
+There is some commonality with Zach's work, but Zach should be following
+all of this development .. So presumably he has no issues with Michal's
+changes. I think Zach's solution has a similar direction to this.
 
+If Michal is active (he seems more so than Zach), and follows community
+comments (including Zach's , but I haven't seen any) then we can defer
+to that solution ..
 
-Thanks.
+Daniel
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
