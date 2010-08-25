@@ -1,65 +1,53 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 24 Aug 2010 21:57:32 -0700
-Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
+Date: Tue, 24 Aug 2010 21:57:33 -0700
+Subject: [PATCH 04/24] GIC: Dont disable INT in ack callback
 In-Reply-To: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
 References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1282712273-344-4-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1282712273-344-5-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Walker <dwalker@codeaurora.org>
+From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-ScorpionMP does not have the SMP/nAMP and TLB ops broadcasting bits in
-ACTLR.
+Unless gic_ack_irq is called from __do_IRQ, interrupt should not
+be disabled in the ack function.
 
-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 ---
- arch/arm/mm/proc-v7.S |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+ arch/arm/common/gic.c |   14 --------------
+ 1 files changed, 0 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 7aaf88a..98fd7e5 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -196,6 +196,7 @@ __v7_setup:
- 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
- 	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
- #endif
-+__v7_msm_setup:
- 	adr	r12, __v7_setup_stack		@ the local stack
- 	stmia	r12, {r0-r5, r7, r9, r11, lr}
- 	bl	v7_flush_dcache_all
-@@ -326,6 +327,29 @@ cpu_elf_name:
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 337741f..7d8ca5a 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -67,25 +67,11 @@ static inline unsigned int gic_irq(unsigned int irq)
  
- 	.section ".proc.info.init", #alloc, #execinstr
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+- *
+- * Linux assumes that when we're done with an interrupt we need to
+- * unmask it, in the same way we need to unmask an interrupt when
+- * we first enable it.
+- *
+- * The GIC has a separate notion of "end of interrupt" to re-enable
+- * an interrupt after handling, in order to support hardware
+- * prioritisation.
+- *
+- * We can make the GIC behave in the way that Linux expects by making
+- * our "acknowledge" routine disable the interrupt, then mark it as
+- * complete.
+  */
+ static void gic_ack_irq(unsigned int irq)
+ {
+-	u32 mask = 1 << (irq % 32);
  
-+	.type   __v7_msm_proc_info, #object
-+__v7_msm_proc_info:
-+	.long	0x510f0000		@ Required ID value
-+	.long	0xff0f0000		@ Mask for ID
-+	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \
-+		PMD_FLAGS
-+	.long   PMD_TYPE_SECT | \
-+		PMD_SECT_XN | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ
-+	b	__v7_msm_setup
-+	.long	cpu_arch_name
-+	.long	cpu_elf_name
-+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-+	.long	cpu_v7_name
-+	.long	v7_processor_functions
-+	.long	v7wbi_tlb_fns
-+	.long	v6_user_fns
-+	.long	v7_cache_fns
-+	.size	__v7_msm_proc_info, . - __v7_msm_proc_info
-+
- 	/*
- 	 * Match any ARMv7 processor core.
- 	 */
+ 	spin_lock(&irq_controller_lock);
+-	writel(mask, gic_dist_base(irq) + GIC_DIST_ENABLE_CLEAR + (gic_irq(irq) / 32) * 4);
+ 	writel(gic_irq(irq), gic_cpu_base(irq) + GIC_CPU_EOI);
+ 	spin_unlock(&irq_controller_lock);
+ }
 -- 
 1.7.2.1
 
