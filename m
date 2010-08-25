@@ -1,30 +1,21 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 25 Aug 2010 11:41:56 +1000
-Subject: [PATCH 0/3] Generalise ARM perf-events backend for oprofile
-In-Reply-To: <20100823105759.GA18638@infradead.org>
-References: <1282560381-7700-1-git-send-email-matt@console-pimps.org>
-	<20100823105759.GA18638@infradead.org>
-Message-ID: <1282700516.22370.567.camel@pasglop>
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Tue, 24 Aug 2010 22:02:29 -0400
+Subject: [PATCH 0/1] added initial support for TPO TD043MTEA1 LCD display on
+	Aspenite
+Message-ID: <1282701750-4949-1-git-send-email-mark.brown314@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-08-23 at 06:57 -0400, Christoph Hellwig wrote:
-> On Mon, Aug 23, 2010 at 11:46:18AM +0100, Matt Fleming wrote:
-> > The perf-events backend for OProfile that Will Deacon wrote in
-> > 8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
-> > perf-events framework as backend") is of use to more architectures
-> > than just ARM. Move the code into drivers/oprofile/ so that SH can use
-> > it instead of the nearly identical copy of its OProfile code.
-> 
-> Nice, I didn't know such a backend already existed.  Now that you
-> have made it generic we should aim towards making it the only oprofile
-> backend and getting rid of all the duplication.
+This patch adds basic support for TD043MTEA1 LCD display for Aspenite board.
+This patch is generated against Eric Miao's pxa-linux-2.6 tree devel branch.
 
-Even better would be to do the surgery at a higher level and provide the
-oprofile API without the oprofile buffer management. My experience is
-that it doesn't scale, and on heavily threaded large SMP setup, there is
-an enormous amount of time wasted contending on the global oprofile
-buffer mutex.
+Mark F. Brown (1):
+  pxa168: added initial support for TPO TD043MTEA1 LCD display on
+    Aspenite
 
-Cheers,
-Ben.
+ arch/arm/configs/pxa168_defconfig       |   10 +++++
+ arch/arm/mach-mmp/aspenite.c            |   59 +++++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/include/mach/pxa168.h |    8 ++++
+ arch/arm/mach-mmp/pxa168.c              |    4 ++
+ drivers/video/pxa168fb.c                |    4 +-
+ 5 files changed, 83 insertions(+), 2 deletions(-)
