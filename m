@@ -1,67 +1,90 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Wed, 25 Aug 2010 10:40:45 +0800
-Subject: [PATCH v2 6/8] arm: allow passing an ELF64 header to
-	elf_check_arch()
-In-Reply-To: <20100716081405.GR4247@esdhcp04058.research.nokia.com>
-References: <cover.1273041357.git.ext-mika.1.westerberg@nokia.com>
-	<3c8da055f0a84cfd1c6659d9fda24e4eb97ab9fb.1273041358.git.ext-mika.1.westerberg@nokia.com>
-	<20100510112036.GC14337@n2100.arm.linux.org.uk>
-	<20100510120920.GD11783@esdhcp04058.research.nokia.com>
-	<20100510122156.GA7796@n2100.arm.linux.org.uk>
-	<20100716081405.GR4247@esdhcp04058.research.nokia.com>
-Message-ID: <AANLkTim761FFWZoyL1hJmAA6ArROB4KukXTEX+yh4VNY@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Tue, 24 Aug 2010 21:57:30 -0700
+Subject: [PATCH 01/24] msm: create config option for proc-comm
+In-Reply-To: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
+References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1282712273-344-2-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika,
+From: Steve Muckle <smuckle@codeaurora.org>
 
-I have tried your patch, and it works perfect.
-But there is something  inconvenient  that I have to modify the
-PHYS_OFFSET and mach/Makefile.boot
-manually if I want to get a kdump capable kernel.
+Some builds may not support the proc-comm interface with
+the baseband processor.
 
-How about add additional configuration like CONFIG_RELOCATABLE
-CONFIG_PHYSICAL_STARTas x86?
-This would do great help for formal usage.
+Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
+---
+ arch/arm/mach-msm/Kconfig  |    7 +++++++
+ arch/arm/mach-msm/Makefile |    6 ++----
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-Thanks,
-Lei
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 4e79580..08ed76c 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -10,6 +10,7 @@ config ARCH_MSM7X00A
+ 	select MSM_SMD
+ 	select MSM_SMD_PKG3
+ 	select CPU_V6
++	select MSM_PROC_COMM
+ 
+ config ARCH_MSM7X30
+ 	bool "MSM7x30"
+@@ -18,6 +19,7 @@ config ARCH_MSM7X30
+ 	select MSM_VIC
+ 	select CPU_V7
+ 	select MSM_REMOTE_SPINLOCK_DEKKERS
++	select MSM_PROC_COMM
+ 
+ config ARCH_QSD8X50
+ 	bool "QSD8X50"
+@@ -26,6 +28,8 @@ config ARCH_QSD8X50
+ 	select MSM_VIC
+ 	select CPU_V7
+ 	select MSM_REMOTE_SPINLOCK_LDREX
++	select MSM_PROC_COMM
++
+ endchoice
+ 
+ config MSM_SOC_REV_A
+@@ -103,6 +107,9 @@ endchoice
+ config MSM_SMD_PKG3
+ 	bool
+ 
++config MSM_PROC_COMM
++	bool
++
+ config MSM_SMD
+ 	bool
+ 
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index faeb1f9..78fb536 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -1,8 +1,5 @@
+-obj-y += proc_comm.o
+ obj-y += io.o idle.o timer.o dma.o
+-obj-y += vreg.o
+ obj-y += acpuclock-arm11.o
+-obj-y += clock.o clock-pcom.o
+ 
+ ifdef CONFIG_MSM_VIC
+ obj-y += irq-vic.o
+@@ -10,10 +7,11 @@ else
+ obj-y += irq.o
+ endif
+ 
++obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
++obj-$(CONFIG_MSM_PROC_COMM) += clock.o gpio.o
+ obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
+ obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
+ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+-
+ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
+ obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
+ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+-- 
+1.7.2.1
 
-
-On Fri, Jul 16, 2010 at 4:14 PM, Mika Westerberg
-<ext-mika.1.westerberg@nokia.com> wrote:
-> On Mon, May 10, 2010 at 02:21:56PM +0200, ext Russell King - ARM Linux wrote:
->> On Mon, May 10, 2010 at 03:09:20PM +0300, Mika Westerberg wrote:
-> [...]
->> > I really don't know but fs/proc/vmcore.c is coded in such way that it supports
->> > both types of ELF headers. It however, passes the header to elf_check_arch()
->> > which in our case should fail if it is something else than ELF32 header.
->>
->> There's other arches which want elf_check_arch to be a function call, so
->> I think my question needs to be looked at more closely - and possibly
->> the code changed such that we don't end up with this situation.
->>
->> Maybe a cleaner solution would be for vmcore.c to split its calls to
->> elf_check_arch() - to be elf32_check_arch() and elf64_check_arch() ?
->> Platforms where it's just a macro can define both to be elf_check_arch()
->> but those where only one flavour is supported should define the unsupported
->> flavour to zero - which incidentally would allow the compiler to optimize
->> away the unnecessary parts of parse_crash_elf*_headers().
->
-> Russell,
->
-> I noticed that you applied all the kdump patches except this and the
-> CONFIG_CRASH_DUMP patch. Thanks.
->
-> Should I update this patch as you describe above? So that we don't need to
-> perform any casting but just have elf_check_arch() separated into 32- and 64-bit
-> versions. Or is there something else preventing these 2 patches to be merged?
->
-> Thanks,
-> MW
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
