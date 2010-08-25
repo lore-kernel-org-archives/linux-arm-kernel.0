@@ -1,53 +1,64 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 26 Aug 2010 08:27:45 +0900
-Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
-	plat-s5p
-In-Reply-To: <01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
-References: <1282522043-2420-1-git-send-email-kgene.kim@samsung.com>
-	<01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
-Message-ID: <001401cb44ad$22fc4460$68f4cd20$%kim@samsung.com>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Wed, 25 Aug 2010 17:31:25 -0600
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <20100825155814.25c783c7.akpm@linux-foundation.org>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+Message-ID: <20100825173125.0855a6b0@bike.lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+On Wed, 25 Aug 2010 15:58:14 -0700
+Andrew Morton <akpm@linux-foundation.org> wrote:
+
+> > If you want guarantees you can free stuff, why not add constraints to
+> > the page allocation type and only allow MIGRATE_MOVABLE pages inside a
+> > certain region, those pages are easily freed/moved aside to satisfy
+> > large contiguous allocations.  
 > 
-> This patch moves OneNAND device definitions from mach-s5pv210 to plat-s5p
-> so that can support it commonly.
-> 
-> Note: S5PC110 and S5PC210 have same OneNAND driver.
-> 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Kyungmin Park <Kyungmin Park <kyungmin.park@samsung.com>
+> That would be good.  Although I expect that the allocation would need
+> to be 100% rock-solid reliable, otherwise the end user has a
+> non-functioning device.  Could generic core VM provide the required level
+> of service?
 
-Hmm...typo...will fix like following.
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
+The original OLPC has a camera controller which requires three contiguous,
+image-sized buffers in memory.  That system is a little memory constrained
+(OK, it's desperately short of memory), so, in the past, the chances of
+being able to allocate those buffers anytime some kid decides to start
+taking pictures was poor.  Thus, cafe_ccic.c has an option to snag the
+memory at initialization time and never let go even if you threaten its
+family.  Hell hath no fury like a little kid whose new toy^W educational
+tool stops taking pictures.
 
-> ---
->  arch/arm/mach-s5pv210/Kconfig                     |    9 +-----
->  arch/arm/mach-s5pv210/Makefile                    |    1 -
->  arch/arm/mach-s5pv210/include/mach/map.h          |    3 ++
->  arch/arm/mach-s5pv210/mach-aquila.c               |    2 +-
->  arch/arm/mach-s5pv210/mach-goni.c                 |    2 +-
->  arch/arm/mach-s5pv310/include/mach/irqs.h         |    2 +
->  arch/arm/mach-s5pv310/include/mach/map.h          |    6 ++++
->  arch/arm/plat-s5p/Kconfig                         |    5 +++
->  arch/arm/plat-s5p/Makefile                        |    1 +
->  arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c |   28
-> +++++++++++---------
->  arch/arm/plat-samsung/include/plat/devs.h         |    2 +-
->  11 files changed, 37 insertions(+), 24 deletions(-)
->  rename arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c (59%)
-> 
+That, of course, is not a hugely efficient use of memory on a
+memory-constrained system.  If the VM could reliably satisfy those
+allocation requestss, life would be wonderful.  Seems difficult.  But it
+would be a nicer solution than CMA, which, to a great extent, is really
+just a standardized mechanism for grabbing memory and never letting go.
 
-(snip)
+> It would help (a lot) if we could get more attention and buyin and
+> fedback from the potential clients of this code.  rmk's feedback is
+> valuable.  Have we heard from the linux-media people?  What other
+> subsystems might use it?  ieee1394 perhaps?  Please help identify
+> specific subsystems and I can perhaps help to wake people up.
 
-> --
+If this code had been present when I did the Cafe driver, I would have used
+it.  I think it could be made useful to a number of low-end camera drivers
+if the videobuf layer were made to talk to it in a way which Just Works.
 
+With a bit of tweaking, I think it could be made useful in other
+situations: the viafb driver, for example, really needs an allocator for
+framebuffer memory and it seems silly to create one from scratch.  Of
+course, there might be other possible solutions, like adding a "zones"
+concept to LMB^W memblock.
 
-Thanks.
+The problem which is being addressed here is real.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+That said, the complexity of the solution still bugs me a bit, and the core
+idea is still to take big chunks of memory out of service for specific
+needs.  It would be far better if the VM could just provide big chunks on
+demand.  Perhaps compaction and the pressures of making transparent huge
+pages work will get us there, but I'm not sure we're there yet.
+
+jon
