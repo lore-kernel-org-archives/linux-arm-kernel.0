@@ -1,74 +1,76 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 25 Aug 2010 15:58:14 -0700
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <1282310110.2605.976.camel@laptop>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-Message-ID: <20100825155814.25c783c7.akpm@linux-foundation.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 26 Aug 2010 08:23:57 +0900
+Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
+	plat-s5p
+In-Reply-To: <AANLkTi=V52VyR7ydy6CPChsn0Qp0jW0G0x=ozroDBZYo@mail.gmail.com>
+References: <1282522043-2420-1-git-send-email-kgene.kim@samsung.com>
+	<01ba01cb4268$8346fa50$89d4eef0$%park@samsung.com>
+	<006001cb426b$e84dd560$b8e98020$%kim@samsung.com>
+	<AANLkTi=V52VyR7ydy6CPChsn0Qp0jW0G0x=ozroDBZYo@mail.gmail.com>
+Message-ID: <001301cb44ac$9a4c0c90$cee425b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Aug 2010 15:15:10 +0200
-Peter Zijlstra <peterz@infradead.org> wrote:
-
-> On Fri, 2010-08-20 at 11:50 +0200, Michal Nazarewicz wrote:
-> > Hello everyone,
-> > 
-> > The following patchset implements a Contiguous Memory Allocator.  For
-> > those who have not yet stumbled across CMA an excerpt from
-> > documentation:
-> > 
-> >    The Contiguous Memory Allocator (CMA) is a framework, which allows
-> >    setting up a machine-specific configuration for physically-contiguous
-> >    memory management. Memory for devices is then allocated according
-> >    to that configuration.
-> > 
-> >    The main role of the framework is not to allocate memory, but to
-> >    parse and manage memory configurations, as well as to act as an
-> >    in-between between device drivers and pluggable allocators. It is
-> >    thus not tied to any memory allocation method or strategy.
-> > 
-> > For more information please refer to the second patch from the
-> > patchset which contains the documentation.
+Kyungmin Park wrote:
 > 
-> So the idea is to grab a large chunk of memory at boot time and then
-> later allow some device to use it?
+> On Mon, Aug 23, 2010 at 11:35 AM, Kukjin Kim <kgene.kim@samsung.com>
+wrote:
+> > Kyungmin Park wrote:
+> >>
+> >> " Note: S5PC110 and S5PC210 have same OneNAND driver."
+> >>
+> >> Yes I also think it's same device. At least Spec is same. But I heard
+it
+> > has
+> >> some different feature related with DMA operation.
+> >> I'm not yet receive the official release from LSI. So I can't tell the
+> > exact
+> >> one.
+> >>
+> >> If it's true. we need to separate it if required.
+> >>
+> > No need to separate this stuff.
+> > It means that no problem to use this commonly for S5PC110 and S5PC210.
+> As DMA operation is changed, we need to register onenand device
+> separately like s5pc210-onenand.
+> to use the different read operations.
 > 
-> I'd much rather we'd improve the regular page allocator to be smarter
-> about this. We recently added a lot of smarts to it like memory
-> compaction, which allows large gobs of contiguous memory to be freed for
-> things like huge pages.
-> 
-> If you want guarantees you can free stuff, why not add constraints to
-> the page allocation type and only allow MIGRATE_MOVABLE pages inside a
-> certain region, those pages are easily freed/moved aside to satisfy
-> large contiguous allocations.
+I'm not sure why we need separate platform data even though changed DMA
+operation.
+Anyway, maybe you received information that we can use this on S5PC110 and
+S5PC210.
 
-That would be good.  Although I expect that the allocation would need
-to be 100% rock-solid reliable, otherwise the end user has a
-non-functioning device.  Could generic core VM provide the required level
-of service?
+> >
+> > But...I will check it again before applying.
+> >
+> >> Thank you,
+> >> Kyungmin Park
+> >>
+> >> -----Original Message-----
+> >> From: Kukjin Kim [mailto:kgene.kim at samsung.com]
+> >> Sent: Monday, August 23, 2010 9:07 AM
+> >> To: linux-arm-kernel at lists.infradead.org;
+> > linux-samsung-soc at vger.kernel.org
+> >> Cc: ben-linux at fluff.org; Kukjin Kim; Kyungmin Park
+> >> Subject: [PATCH RE-SEND] ARM: S5P: Move OneNAND device definitions in
+> >> plat-s5p
+> >>
+> >> This patch moves OneNAND device definitions from mach-s5pv210 to
+plat-s5p
+> >> so that can support it commonly.
+> >>
+> >> Note: S5PC110 and S5PC210 have same OneNAND driver.
+> >>
+> >> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> >> Cc: Kyungmin Park <Kyungmin Park <kyungmin.park@samsung.com>
+> >> ---
+(snip)
 
-Anyway, these patches are going to be hard to merge but not impossible.
-Keep going.  Part of the problem is cultural, really: the consumers of
-this interface are weird dinky little devices which the core MM guys
-tend not to work with a lot, and it adds code which they wouldn't use.
 
-I agree that having two "contiguous memory allocators" floating about
-on the list is distressing.  Are we really all 100% diligently certain
-that there is no commonality here with Zach's work?
+Thanks.
 
-I agree that Peter's above suggestion would be the best thing to do. 
-Please let's take a look at that without getting into sunk cost
-fallacies with existing code!
-
-It would help (a lot) if we could get more attention and buyin and
-fedback from the potential clients of this code.  rmk's feedback is
-valuable.  Have we heard from the linux-media people?  What other
-subsystems might use it?  ieee1394 perhaps?  Please help identify
-specific subsystems and I can perhaps help to wake people up.
-
-And I agree that this code (or one of its alternatives!) would benefit
-from having a core MM person take a close interest.  Any volunteers?
-
-Please cc me on future emails on this topic?
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
