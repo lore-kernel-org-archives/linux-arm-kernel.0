@@ -1,325 +1,121 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 24 Aug 2010 21:57:37 -0700
-Subject: [PATCH 08/24] msm: timer: support 8x60 timers
+Date: Tue, 24 Aug 2010 21:57:38 -0700
+Subject: [PATCH 09/24] msm: MSM8X60 RUMI3 board support
 In-Reply-To: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
 References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1282712273-344-9-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1282712273-344-10-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
----
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |   10 +-
- arch/arm/mach-msm/timer.c                       |  226 +++++++++++++++++------
- 2 files changed, 177 insertions(+), 59 deletions(-)
+From: Steve Muckle <smuckle@codeaurora.org>
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-index ee58da5..1f15bbb 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-@@ -35,7 +35,6 @@
-  *
-  */
+Board configuration for MSM8X60 emulation on RUMI3.
+
+Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
+---
+ arch/arm/mach-msm/Kconfig         |    7 ++++
+ arch/arm/mach-msm/Makefile        |    2 +-
+ arch/arm/mach-msm/board-msm8x60.c |   59 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 67 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-msm8x60.c
+
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 3b9bece..60ad211 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -80,6 +80,13 @@ config MACH_QSD8X50A_ST1_5
+ 	help
+ 	  Support for the Qualcomm ST1.5.
  
++config MACH_MSM8X60_RUMI3
++	depends on ARCH_MSM8X60
++	default n
++	bool "MSM8x60 RUMI3"
++	help
++	  Support for the Qualcomm MSM8x60 RUMI3 emulator.
++
+ endmenu
+ 
+ config MSM_DEBUG_UART
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 78fb536..64a95ae 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -16,8 +16,8 @@ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o d
+ obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
+ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+ obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
 -
- #define MSM_QGIC_DIST_BASE	IOMEM(0xF0000000)
- #define MSM_QGIC_DIST_PHYS	0x02080000
- #define MSM_QGIC_DIST_SIZE	SZ_4K
-@@ -56,7 +55,14 @@
- #define MSM_TLMM_PHYS		0x00800000
- #define MSM_TLMM_SIZE		SZ_16K
- 
--#define MSM_SHARED_RAM_BASE	IOMEM(0xF0100000)
-+#define MSM_TMR_BASE		IOMEM(0xF0100000)
-+#define MSM_TMR_PHYS		0x02000000
-+#define MSM_TMR_SIZE		(SZ_1M)
+ obj-y += gpiomux.o
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-7x00.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-7x00.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o
++obj-$(CONFIG_MACH_MSM8X60_RUMI3) += board-msm8x60.o
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+new file mode 100644
+index 0000000..3ab4bd9
+--- /dev/null
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -0,0 +1,59 @@
++/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
 +
-+#define MSM_GPT_BASE		(MSM_TMR_BASE + 0x4)
-+#define MSM_DGT_BASE		(MSM_TMR_BASE + 0x24)
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
 +
-+#define MSM_SHARED_RAM_BASE	IOMEM(0xF0200000)
- #define MSM_SHARED_RAM_SIZE	SZ_1M
- 
- 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index dec5ca6..e76d869 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -1,6 +1,6 @@
--/* linux/arch/arm/mach-msm/timer.c
-- *
-+/*
-  * Copyright (C) 2007 Google, Inc.
-+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -21,6 +21,7 @@
- #include <linux/clockchips.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-+#include <linux/percpu.h>
- 
- #include <asm/mach/time.h>
- #include <mach/msm_iomap.h>
-@@ -28,7 +29,20 @@
- #ifndef MSM_DGT_BASE
- #define MSM_DGT_BASE (MSM_GPT_BASE + 0x10)
- #endif
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/hardware/gic.h>
 +
-+#ifdef CONFIG_MSM7X00A_USE_GP_TIMER
-+	#define DG_TIMER_RATING 100
-+	#define MSM_GLOBAL_TIMER MSM_CLOCK_GPT
-+#else
-+	#define DG_TIMER_RATING 300
-+	#define MSM_GLOBAL_TIMER MSM_CLOCK_DGT
-+#endif
++#include <mach/board.h>
++#include <mach/msm_iomap.h>
++#include <mach/io.h>
 +
-+#if defined(CONFIG_ARCH_MSM_ARM11)
- #define MSM_DGT_SHIFT (5)
-+#else
-+#define MSM_DGT_SHIFT (0)
-+#endif
- 
- #define TIMER_MATCH_VAL         0x0000
- #define TIMER_COUNT_VAL         0x0004
-@@ -40,8 +54,32 @@
- #define CSR_PROTECTION          0x0020
- #define CSR_PROTECTION_EN               1
- 
-+#define LOCAL_TIMER 0
-+#define GLOBAL_TIMER 1
++extern struct sys_timer msm_timer;
++void __iomem *gic_cpu_base_addr;
 +
-+#ifdef CONFIG_ARCH_MSM8X60
-+#define MSM_TMR_BASE_CPU0      0x40000
-+#else
-+#define MSM_TMR_BASE_CPU0      0
-+#endif
-+
-+#define NR_TIMERS ARRAY_SIZE(msm_clocks)
-+
- #define GPT_HZ 32768
--#define DGT_HZ 19200000 /* 19.2 MHz or 600 KHz after shift */
-+
-+#if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM8X60)
-+#define DGT_HZ 4800000	/* Uses TCXO/4 (19.2 MHz / 4) */
-+#else
-+#define DGT_HZ 19200000	/* Uses TCXO (19.2 MHz) */
-+#endif
-+
-+static irqreturn_t msm_timer_interrupt(int irq, void *dev_id);
-+static cycle_t msm_gpt_read(struct clocksource *cs);
-+static cycle_t msm_dgt_read(struct clocksource *cs);
-+static void msm_timer_set_mode(enum clock_event_mode mode,
-+			       struct clock_event_device *evt);
-+static int msm_timer_set_next_event(unsigned long cycles,
-+				    struct clock_event_device *evt);
- 
- struct msm_clock {
- 	struct clock_event_device   clockevent;
-@@ -52,60 +90,10 @@ struct msm_clock {
- 	uint32_t                    shift;
- };
- 
--static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = dev_id;
--	evt->event_handler(evt);
--	return IRQ_HANDLED;
--}
--
--static cycle_t msm_gpt_read(struct clocksource *cs)
--{
--	return readl(MSM_GPT_BASE + TIMER_COUNT_VAL);
--}
--
--static cycle_t msm_dgt_read(struct clocksource *cs)
--{
--	return readl(MSM_DGT_BASE + TIMER_COUNT_VAL) >> MSM_DGT_SHIFT;
--}
--
--static int msm_timer_set_next_event(unsigned long cycles,
--				    struct clock_event_device *evt)
--{
--	struct msm_clock *clock = container_of(evt, struct msm_clock, clockevent);
--	uint32_t now = readl(clock->regbase + TIMER_COUNT_VAL);
--	uint32_t alarm = now + (cycles << clock->shift);
--	int late;
--
--	writel(alarm, clock->regbase + TIMER_MATCH_VAL);
--	now = readl(clock->regbase + TIMER_COUNT_VAL);
--	late = now - alarm;
--	if (late >= (-2 << clock->shift) && late < DGT_HZ*5) {
--		printk(KERN_NOTICE "msm_timer_set_next_event(%lu) clock %s, "
--		       "alarm already expired, now %x, alarm %x, late %d\n",
--		       cycles, clock->clockevent.name, now, alarm, late);
--		return -ETIME;
--	}
--	return 0;
--}
--
--static void msm_timer_set_mode(enum clock_event_mode mode,
--			      struct clock_event_device *evt)
--{
--	struct msm_clock *clock = container_of(evt, struct msm_clock, clockevent);
--	switch (mode) {
--	case CLOCK_EVT_MODE_RESUME:
--	case CLOCK_EVT_MODE_PERIODIC:
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		writel(0, clock->regbase + TIMER_ENABLE);
--		break;
--	}
--}
-+enum {
-+	MSM_CLOCK_GPT,
-+	MSM_CLOCK_DGT,
-+};
- 
- static struct msm_clock msm_clocks[] = {
- 	{
-@@ -165,6 +153,89 @@ static struct msm_clock msm_clocks[] = {
- 	}
- };
- 
-+static struct clock_event_device *local_clock_event;
-+
-+static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
++unsigned long clk_get_max_axi_khz(void)
 +{
-+	struct clock_event_device *evt = dev_id;
-+	if (smp_processor_id() != 0)
-+		evt = local_clock_event;
-+	if (evt->event_handler == NULL)
-+		return IRQ_HANDLED;
-+	evt->event_handler(evt);
-+	return IRQ_HANDLED;
-+}
-+
-+static cycle_t msm_gpt_read(struct clocksource *cs)
-+{
-+	struct msm_clock *clock =
-+		container_of(cs, struct msm_clock, clocksource);
-+	return readl(clock->regbase + TIMER_COUNT_VAL + MSM_TMR_BASE_CPU0);
-+}
-+
-+static cycle_t msm_dgt_read(struct clocksource *cs)
-+{
-+	struct msm_clock *clock =
-+		container_of(cs, struct msm_clock, clocksource);
-+	return readl(clock->regbase + TIMER_COUNT_VAL + MSM_TMR_BASE_CPU0)
-+		>> MSM_DGT_SHIFT;
-+}
-+
-+static int msm_timer_set_next_event(unsigned long cycles,
-+				    struct clock_event_device *evt)
-+{
-+	struct msm_clock *clock;
-+	uint32_t now;
-+	uint32_t alarm;
-+	int late;
-+
-+#ifdef CONFIG_SMP
-+	clock = &msm_clocks[MSM_GLOBAL_TIMER];
-+#else
-+	clock = container_of(evt, struct msm_clock, clockevent);
-+#endif
-+	now = readl(clock->regbase + TIMER_COUNT_VAL);
-+	alarm = now + (cycles << clock->shift);
-+	writel(alarm, clock->regbase + TIMER_MATCH_VAL);
-+	late = now - alarm;
-+	if (late >= (-2 << clock->shift) && late < DGT_HZ*5) {
-+		printk(KERN_NOTICE "msm_timer_set_next_event(%lu) clock %s, "
-+		       "alarm already expired, now %x, alarm %x, late %d\n",
-+		       cycles, clock->clockevent.name, now, alarm, late);
-+		return -ETIME;
-+	}
 +	return 0;
 +}
 +
-+static void msm_timer_set_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *evt)
++static void __init msm8x60_map_io(void)
 +{
-+	struct msm_clock *clock;
-+	unsigned long irq_flags;
-+
-+#ifdef CONFIG_SMP
-+	clock = &msm_clocks[MSM_GLOBAL_TIMER];
-+#else
-+	clock = container_of(evt, struct msm_clock, clockevent);
-+#endif
-+	local_irq_save(irq_flags);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_RESUME:
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+		writel(0, clock->regbase + TIMER_ENABLE);
-+		break;
-+	}
-+
-+	local_irq_restore(irq_flags);
++	msm_map_msm8x60_io();
 +}
 +
- static void __init msm_timer_init(void)
- {
- 	int i;
-@@ -201,6 +272,47 @@ static void __init msm_timer_init(void)
- 	}
- }
- 
-+#ifdef CONFIG_SMP
-+void local_timer_setup(struct clock_event_device *evt)
++static void __init msm8x60_init_irq(void)
 +{
-+	unsigned long flags;
-+	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
-+
-+	if (!local_clock_event) {
-+		writel(0, clock->regbase  + TIMER_ENABLE);
-+		writel(1, clock->regbase + TIMER_CLEAR);
-+		writel(0, clock->regbase + TIMER_COUNT_VAL);
-+		writel(~0, clock->regbase + TIMER_MATCH_VAL);
-+	}
-+	evt->irq = clock->irq.irq;
-+	evt->name = "local_timer";
-+	evt->features = CLOCK_EVT_FEAT_ONESHOT;
-+	evt->rating = clock->clockevent.rating;
-+	evt->set_mode = msm_timer_set_mode;
-+	evt->set_next_event = msm_timer_set_next_event;
-+	evt->shift = clock->clockevent.shift;
-+	evt->mult = div_sc(clock->freq, NSEC_PER_SEC, evt->shift);
-+	evt->max_delta_ns =
-+		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
-+	evt->min_delta_ns = clockevent_delta2ns(4, evt);
-+	evt->cpumask = cpumask_of(smp_processor_id());
-+
-+	local_clock_event = evt;
-+
-+	local_irq_save(flags);
-+	get_irq_chip(clock->irq.irq)->unmask(clock->irq.irq);
-+	local_irq_restore(flags);
-+
-+	clockevents_register_device(evt);
++	gic_dist_init(0, MSM_QGIC_DIST_BASE, 1);
++	gic_cpu_base_addr = (void *)MSM_QGIC_CPU_BASE;
++	gic_cpu_init(0, MSM_QGIC_CPU_BASE);
 +}
 +
-+int local_timer_ack(void)
++static void __init msm8x60_init(void)
 +{
-+	return 1;
 +}
 +
-+#endif
-+
- struct sys_timer msm_timer = {
- 	.init = msm_timer_init
- };
++MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
++	.map_io = msm8x60_map_io,
++	.init_irq = msm8x60_init_irq,
++	.init_machine = msm8x60_init,
++	.timer = &msm_timer,
++MACHINE_END
 -- 
 1.7.2.1
 
