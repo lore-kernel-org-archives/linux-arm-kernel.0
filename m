@@ -1,62 +1,65 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Wed, 25 Aug 2010 20:38:06 +0530
-Subject: [PATCH] wire up fanotify and prlimit64 syscalls on ARM
-In-Reply-To: <19573.12044.918202.642643@pilspetsen.it.uu.se>
-References: <19573.12044.918202.642643@pilspetsen.it.uu.se>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB03243069FE@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Aug 2010 19:24:16 +0100
+Subject: Problems with dma_alloc_writecombine
+In-Reply-To: <AANLkTi=-choRCYyU2KA7D2asOqLGwe5BJddt9mgV81KP@mail.gmail.com>
+References: <AANLkTi=kbch5XF99nmjRsy_f2akwQwCR7co7eN=SDd0w@mail.gmail.com>
+	<AANLkTi=-choRCYyU2KA7D2asOqLGwe5BJddt9mgV81KP@mail.gmail.com>
+Message-ID: <20100825182416.GA30772@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mikael Pettersson wrote:
+On Tue, Aug 24, 2010 at 09:50:15AM -0700, Dave Hylands wrote:
+> Replying to my own post....
 > 
-> The 2.6.36-rc kernel added three new system calls:
-> fanotify_init, fanotify_mark, and prlimit64.  This patch
-> wires them up on ARM.
+> On Fri, Aug 20, 2010 at 8:14 PM, Dave Hylands wrote:
+> > Hi,
+> >
+> > We've observed a problem with dma_alloc_writecombine when the system
+> > is under heavy load (heavy bus traffic).
 > 
-> The only non-trivial issue here is the u64 argument to
-> sys_fanotify_mark(), but it is the 3rd argument and thus
-> passed in r2/r3 in both kernel and user space, so it causes
-> no problems.
+> I found the problem (well I think I found the problem)
 > 
-> Tested with a 2.6.36-rc2 EABI kernel on an ixp4xx machine.
+> The armv6_set_pte_ext function (from arch/arm/mm/proc-macros.S) does
+> this at the end:
 > 
-> Signed-off-by: Mikael Pettersson <mikpe@it.uu.se>
+> 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> 
+> which doesn't wait for the write to hit the memory. I added
+> 
+> 	mcr	p15, 0, r0, c7, c10, 4		@ dsb
+> 
+> which ensures that the write buffer has been drained before
+> continuing, and my problem goes away.
+> 
+> I wasn't sure if the dsb is a complete superset of flush_pte. If it
+> is, then the flush_pte can be replaced with a dsb (for my test, I
+> added the dsb).
+> 
+> I found some references in the ARM literature:
+> <http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf>
+> 
+> In "9.2.1 Ensuring the visibility of updates to instructions for a
+> uniprocessor" (page 24) they use the dsb instruction, where the
+> armv6_set_pte_ext function doesn't. Their example also covers the more
+> general case where the page could refer to instructions or data,
+> whereas the dma stuff is data only.
 
-For what it's worth,
+Partly that's because it's overhead which we don't need there.  Probably
+a better solution is to add the dsb() to __dma_alloc_remap() like this:
 
-Tested-by: Anand Gadiyar <gadiyar@ti.com>
+ arch/arm/mm/dma-mapping.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-on an OMAP4
-
-> ---
->  arch/arm/include/asm/unistd.h |    3 +++
->  arch/arm/kernel/calls.S       |    3 +++
->  2 files changed, 6 insertions(+)
-> 
-> diff -rupN linux-2.6.36-rc2/arch/arm/include/asm/unistd.h 
-> linux-2.6.36-rc2.arm-fanotify+prlimit64-syscalls/arch/arm/include/asm/unistd.h
-> --- linux-2.6.36-rc2/arch/arm/include/asm/unistd.h	2010-08-24 12:03:48.000000000 +0200
-> +++ linux-2.6.36-rc2.arm-fanotify+prlimit64-syscalls/arch/arm/include/asm/unistd.h	2010-08-25 16:27:22.000000000 +0200
-> @@ -393,6 +393,9 @@
->  #define __NR_perf_event_open		(__NR_SYSCALL_BASE+364)
->  #define __NR_recvmmsg			(__NR_SYSCALL_BASE+365)
->  #define __NR_accept4			(__NR_SYSCALL_BASE+366)
-> +#define __NR_fanotify_init		(__NR_SYSCALL_BASE+367)
-> +#define __NR_fanotify_mark		(__NR_SYSCALL_BASE+368)
-> +#define __NR_prlimit64			(__NR_SYSCALL_BASE+369)
->  
->  /*
->   * The following SWIs are ARM private.
-> diff -rupN linux-2.6.36-rc2/arch/arm/kernel/calls.S linux-2.6.36-rc2.arm-fanotify+prlimit64-syscalls/arch/arm/kernel/calls.S
-> --- linux-2.6.36-rc2/arch/arm/kernel/calls.S	2010-08-24 12:03:48.000000000 +0200
-> +++ linux-2.6.36-rc2.arm-fanotify+prlimit64-syscalls/arch/arm/kernel/calls.S	2010-08-25 16:27:22.000000000 +0200
-> @@ -376,6 +376,9 @@
->  		CALL(sys_perf_event_open)
->  /* 365 */	CALL(sys_recvmmsg)
->  		CALL(sys_accept4)
-> +		CALL(sys_fanotify_init)
-> +		CALL(sys_fanotify_mark)
-> +		CALL(sys_prlimit64)
->  #ifndef syscalls_counted
->  .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
->  #define syscalls_counted
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c704eed..4bc43e5 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -229,6 +229,8 @@ __dma_alloc_remap(struct page *page, size_t size, gfp_t gfp, pgprot_t prot)
+ 			}
+ 		} while (size -= PAGE_SIZE);
+ 
++		dsb();
++
+ 		return (void *)c->vm_start;
+ 	}
+ 	return NULL;
