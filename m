@@ -1,43 +1,63 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 24 Aug 2010 21:57:42 -0700
-Subject: [PATCH 13/24] dma: add stub functions for dma features not yet
-	present on 8x60
+Date: Tue, 24 Aug 2010 21:57:43 -0700
+Subject: [PATCH 14/24] msm: add hotplug stub functions
 In-Reply-To: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
 References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1282712273-344-14-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1282712273-344-15-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Daniel Walker <dwalker@codeaurora.org>
+
+We don't actually do anything for hotplug yet. This just lets
+everything compile, even when hotplug is enabled.
 
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 ---
- arch/arm/mach-msm/include/mach/dma.h |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/mach-msm/Makefile  |    1 +
+ arch/arm/mach-msm/hotplug.c |   22 ++++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/hotplug.c
 
-diff --git a/arch/arm/mach-msm/include/mach/dma.h b/arch/arm/mach-msm/include/mach/dma.h
-index 00f9bbf..05583f5 100644
---- a/arch/arm/mach-msm/include/mach/dma.h
-+++ b/arch/arm/mach-msm/include/mach/dma.h
-@@ -32,10 +32,18 @@ struct msm_dmov_cmd {
- 	void *data;
- };
- 
-+#ifndef CONFIG_ARCH_MSM8X60
- void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd);
- void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful);
- int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr);
--
-+#else
-+static inline
-+void msm_dmov_enqueue_cmd(unsigned id, struct msm_dmov_cmd *cmd) { }
-+static inline
-+void msm_dmov_stop_cmd(unsigned id, struct msm_dmov_cmd *cmd, int graceful) { }
-+static inline
-+int msm_dmov_exec_cmd(unsigned id, unsigned int cmdptr) { return -EIO; }
-+#endif
- 
- 
- #define DMOV_SD0(off, ch) (MSM_DMOV_BASE + 0x0000 + (off) + ((ch) << 2))
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index ff19e01..8a01f8a 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -21,4 +21,5 @@ obj-y += gpiomux.o
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-7x00.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-7x00.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o
++obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+ obj-$(CONFIG_MACH_MSM8X60_RUMI3) += board-msm8x60.o
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+new file mode 100644
+index 0000000..ba0803a
+--- /dev/null
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -0,0 +1,22 @@
++/*
++ * Do nothing for now.
++ */
++
++int platform_cpu_kill(unsigned int cpu)
++{
++        return 0;
++}
++
++void platform_cpu_die(unsigned int cpu)
++{
++}
++
++int platform_cpu_disable(unsigned int cpu)
++{
++        return 0;
++}
++
++void local_timer_stop(void)
++{
++}
++
 -- 
 1.7.2.1
 
