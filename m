@@ -1,91 +1,51 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Tue, 24 Aug 2010 21:57:29 -0700
-Subject: [PATCH 00/24] Support for Qualcomm msm8660 target
-Message-ID: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
+Date: Tue, 24 Aug 2010 21:57:31 -0700
+Subject: [PATCH 02/24] arm: Kconfig option for ARCH_MSM_SCORPIONMP
+In-Reply-To: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
+References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1282712273-344-3-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support to the Qualcomm msm8660 target. It currently
-provides uniprocessor support only, though SMP support is forthcoming.
-Note that this code is based on top of Gregory Bean's gpiomux code, and
-won't build until the mach-types are updated.
+From: Steve Muckle <smuckle@codeaurora.org>
 
-Abhijeet Dharmapurikar (3):
-  GIC: Dont disable INT in ack callback
-  msm: irqs-8x60: interrupt map
-  msm: 8x60: setup correct handlers for private interrupts
+ScorpionMP is a configuration of Scorpion processors. It supports local
+timers.
 
-Daniel Walker (3):
-  arm: mm: add proc info for ScorpionMP
-  msm: add hotplug stub functions
-  msm: allow uart to be conditionally disabled
+Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+---
+ arch/arm/Kconfig          |    3 ++-
+ arch/arm/mach-msm/Kconfig |    2 ++
+ 2 files changed, 4 insertions(+), 1 deletions(-)
 
-Gregory Bean (1):
-  msm: add MSM8x60 FFA support
-
-Jeff Ohlstein (5):
-  msm: timer: support 8x60 timers
-  msm: clock: add dummy clock driver
-  dma: add stub functions for dma features not yet present on 8x60
-  msm: add build support for msm8x60 target
-  msm: physical offset for MSM8X60
-
-Stepan Moskovchenko (3):
-  msm: Add MSM IOMMU support
-  msm: Platform initialization for the IOMMU driver
-  msm: Platform data for msm8x60 IOMMUs
-
-Steve Muckle (9):
-  msm: create config option for proc-comm
-  arm: Kconfig option for ARCH_MSM_SCORPIONMP
-  msm: io: MSM8X60 io support
-  msm: initial irq definitions for MSM8X60
-  msm: MSM8X60 RUMI3 board support
-  msm: irq: rename existing entry-macro to entry-macro-vic
-  msm: 8x60: gic initialization fixup for RUMI
-  msm: add msm8x60_surf machine
-  msm: MSM8X60 simulator board support
-
- arch/arm/Kconfig                                  |    3 +-
- arch/arm/common/gic.c                             |   14 -
- arch/arm/mach-msm/Kconfig                         |   52 +-
- arch/arm/mach-msm/Makefile                        |   20 +-
- arch/arm/mach-msm/board-msm8x60.c                 |  102 ++
- arch/arm/mach-msm/clock-dummy.c                   |   54 +
- arch/arm/mach-msm/devices-msm8x60-iommu.c         |  883 ++++++++++
- arch/arm/mach-msm/hotplug.c                       |   22 +
- arch/arm/mach-msm/include/mach/debug-macro.S      |    2 +-
- arch/arm/mach-msm/include/mach/dma.h              |   10 +-
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   96 ++
- arch/arm/mach-msm/include/mach/entry-macro-vic.S  |   37 +
- arch/arm/mach-msm/include/mach/entry-macro.S      |   43 +-
- arch/arm/mach-msm/include/mach/io.h               |    1 +
- arch/arm/mach-msm/include/mach/iommu.h            |  103 ++
- arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h    | 1871 +++++++++++++++++++++
- arch/arm/mach-msm/include/mach/irqs-8x60.h        |  267 +++
- arch/arm/mach-msm/include/mach/irqs.h             |    2 +
- arch/arm/mach-msm/include/mach/memory.h           |    2 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h   |   59 +
- arch/arm/mach-msm/include/mach/smp.h              |   39 +
- arch/arm/mach-msm/io.c                            |   15 +
- arch/arm/mach-msm/iommu.c                         |  597 +++++++
- arch/arm/mach-msm/iommu_dev.c                     |  364 ++++
- arch/arm/mach-msm/timer.c                         |  226 ++-
- arch/arm/mm/proc-v7.S                             |   24 +
- 26 files changed, 4798 insertions(+), 110 deletions(-)
- create mode 100644 arch/arm/mach-msm/board-msm8x60.c
- create mode 100644 arch/arm/mach-msm/clock-dummy.c
- create mode 100644 arch/arm/mach-msm/devices-msm8x60-iommu.c
- create mode 100644 arch/arm/mach-msm/hotplug.c
- create mode 100644 arch/arm/mach-msm/include/mach/entry-macro-qgic.S
- create mode 100644 arch/arm/mach-msm/include/mach/entry-macro-vic.S
- create mode 100644 arch/arm/mach-msm/include/mach/iommu.h
- create mode 100644 arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
- create mode 100644 arch/arm/mach-msm/include/mach/irqs-8x60.h
- create mode 100644 arch/arm/mach-msm/include/mach/smp.h
- create mode 100644 arch/arm/mach-msm/iommu.c
- create mode 100644 arch/arm/mach-msm/iommu_dev.c
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8036e46..d4d9f55 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1173,7 +1173,8 @@ config HOTPLUG_CPU
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+-		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500)
++		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || ARCH_U8500 || \
++		ARCH_MSM_SCORPIONMP)
+ 	default y
+ 	select HAVE_ARM_TWD if (ARCH_REALVIEW || ARCH_OMAP4 || ARCH_U8500)
+ 	help
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 08ed76c..3b9bece 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -39,6 +39,8 @@ config  ARCH_MSM_ARM11
+ 	bool
+ config  ARCH_MSM_SCORPION
+ 	bool
++config  ARCH_MSM_SCORPIONMP
++	bool
+ 
+ config  MSM_VIC
+ 	bool
 -- 
 1.7.2.1
 
