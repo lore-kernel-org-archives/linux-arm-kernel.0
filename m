@@ -1,40 +1,32 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 26 Aug 2010 10:17:07 +0200
+Date: Thu, 26 Aug 2010 10:18:57 +0200
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <op.vh0ud3rg7p4s8u@localhost>
+In-Reply-To: <op.vh0xp8ix7p4s8u@localhost>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>  <op.vh0ud3rg7p4s8u@localhost>
-Message-ID: <1282810627.1975.237.camel@laptop>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+	<op.vh0xp8ix7p4s8u@localhost>
+Message-ID: <1282810737.1975.240.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-08-26 at 03:28 +0200, Micha? Nazarewicz wrote:
-> On Fri, 20 Aug 2010 15:15:10 +0200, Peter Zijlstra <peterz@infradead.org> wrote:
-> > So the idea is to grab a large chunk of memory at boot time and then
-> > later allow some device to use it?
-> >
-> > I'd much rather we'd improve the regular page allocator to be smarter
-> > about this. We recently added a lot of smarts to it like memory
-> > compaction, which allows large gobs of contiguous memory to be freed for
-> > things like huge pages.
-> >
-> > If you want guarantees you can free stuff, why not add constraints to
-> > the page allocation type and only allow MIGRATE_MOVABLE pages inside a
-> > certain region, those pages are easily freed/moved aside to satisfy
-> > large contiguous allocations.
+On Thu, 2010-08-26 at 04:40 +0200, Micha? Nazarewicz wrote:
+> I think that the biggest problem is fragmentation here.  For instance,
+> I think that a situation where there is enough free space but it's
+> fragmented so no single contiguous chunk can be allocated is a serious
+> problem.  However, I would argue that if there's simply no space left,
+> a multimedia device could fail and even though it's not desirable, it
+> would not be such a big issue in my eyes.
 > 
-> I'm aware that grabbing a large chunk at boot time is a bit of waste of
-> space and because of it I'm hoping to came up with a way of reusing the
-> space when it's not used by CMA-aware devices.  My current idea was to
-> use it for easily discardable data (page cache?). 
+> So, if only movable or discardable pages are allocated in CMA managed
+> regions all should work well.  When a device needs memory discardable
+> pages would get freed and movable moved unless there is no space left
+> on the device in which case allocation would fail. 
 
-Right, so to me that looks like going at the problem backwards. That
-will complicate the page-cache instead of your bad hardware drivers
-(really, hardware should use IOMMUs already).
+If you'd actually looked at the page allocator you'd see its capable of
+doing exactly that!
 
-So why not work on the page allocator to improve its contiguous
-allocation behaviour. If you look at the thing you'll find pageblocks
-and migration types. If you change it so that you pin the migration type
-of one or a number of contiguous pageblocks to say MIGRATE_MOVABLE, so
-that they cannot be used for anything but movable pages you're pretty
-much there.
+I has the notion of movable pages, it can defragment free space (called
+compaction).
+
+Use it!
