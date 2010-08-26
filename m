@@ -1,81 +1,71 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Thu, 26 Aug 2010 11:49:26 +0900
+From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
+Date: Thu, 26 Aug 2010 11:50:17 +0900
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100825173125.0855a6b0@bike.lwn.net>
+In-Reply-To: <op.vh0wektv7p4s8u@localhost>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<1282310110.2605.976.camel@laptop>
 	<20100825155814.25c783c7.akpm@linux-foundation.org>
-	<20100825173125.0855a6b0@bike.lwn.net>
-Message-ID: <AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
+	<20100826095857.5b821d7f.kamezawa.hiroyu@jp.fujitsu.com>
+	<op.vh0wektv7p4s8u@localhost>
+Message-ID: <20100826115017.04f6f707.kamezawa.hiroyu@jp.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 26, 2010 at 8:31 AM, Jonathan Corbet <corbet@lwn.net> wrote:
-> On Wed, 25 Aug 2010 15:58:14 -0700
-> Andrew Morton <akpm@linux-foundation.org> wrote:
->
->> > If you want guarantees you can free stuff, why not add constraints to
->> > the page allocation type and only allow MIGRATE_MOVABLE pages inside a
->> > certain region, those pages are easily freed/moved aside to satisfy
->> > large contiguous allocations.
->>
->> That would be good. ?Although I expect that the allocation would need
->> to be 100% rock-solid reliable, otherwise the end user has a
->> non-functioning device. ?Could generic core VM provide the required level
->> of service?
->
-> The original OLPC has a camera controller which requires three contiguous,
-> image-sized buffers in memory. ?That system is a little memory constrained
-> (OK, it's desperately short of memory), so, in the past, the chances of
-> being able to allocate those buffers anytime some kid decides to start
-> taking pictures was poor. ?Thus, cafe_ccic.c has an option to snag the
-> memory at initialization time and never let go even if you threaten its
-> family. ?Hell hath no fury like a little kid whose new toy^W educational
-> tool stops taking pictures.
->
-> That, of course, is not a hugely efficient use of memory on a
-> memory-constrained system. ?If the VM could reliably satisfy those
-> allocation requestss, life would be wonderful. ?Seems difficult. ?But it
-> would be a nicer solution than CMA, which, to a great extent, is really
-> just a standardized mechanism for grabbing memory and never letting go.
->
->> It would help (a lot) if we could get more attention and buyin and
->> fedback from the potential clients of this code. ?rmk's feedback is
->> valuable. ?Have we heard from the linux-media people? ?What other
->> subsystems might use it? ?ieee1394 perhaps? ?Please help identify
->> specific subsystems and I can perhaps help to wake people up.
->
-> If this code had been present when I did the Cafe driver, I would have used
-> it. ?I think it could be made useful to a number of low-end camera drivers
-> if the videobuf layer were made to talk to it in a way which Just Works.
->
-> With a bit of tweaking, I think it could be made useful in other
-> situations: the viafb driver, for example, really needs an allocator for
-> framebuffer memory and it seems silly to create one from scratch. ?Of
-> course, there might be other possible solutions, like adding a "zones"
-> concept to LMB^W memblock.
->
-> The problem which is being addressed here is real.
->
-> That said, the complexity of the solution still bugs me a bit, and the core
-> idea is still to take big chunks of memory out of service for specific
-> needs. ?It would be far better if the VM could just provide big chunks on
-> demand. ?Perhaps compaction and the pressures of making transparent huge
-> pages work will get us there, but I'm not sure we're there yet.
->
-> jon
+On Thu, 26 Aug 2010 04:12:10 +0200
+Micha? Nazarewicz <m.nazarewicz@samsung.com> wrote:
 
-I agree. compaction and movable zone will be one of good solutions.
+> On Thu, 26 Aug 2010 02:58:57 +0200, KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+> > Hmm, you may not like this..but how about following kind of interface ?
+> >
+> > Now, memoyr hotplug supports following operation to free and _isolate_
+> > memory region.
+> > 	# echo offline > /sys/devices/system/memory/memoryX/state
+> >
+> > Then, a region of memory will be isolated. (This succeeds if there are free
+> > memory.)
+> >
+> > Add a new interface.
+> >
+> > 	% echo offline > /sys/devices/system/memory/memoryX/state
+> > 	# extract memory from System RAM and make them invisible from buddy allocator.
+> >
+> > 	% echo cma > /sys/devices/system/memory/memoryX/state
+> > 	# move invisible memory to cma.
+> 
+> At this point I need to say that I have no experience with hotplug memory but
+> I think that for this to make sense the regions of memory would have to be
+> smaller.  Unless I'm misunderstanding something, the above would convert
+> a region of sizes in order of GiBs to use for CMA.
+> 
 
-If some driver needs big contiguous chunk to work, it should make sure
-to be allowable to have memory size for it before going. To make sure
-it, we have to consider compaction of ZONE_MOVABLE zone. But one of
-problems is anonymous page which can be has a role of pinned page in
-non-swapsystem. Even most of embedded system has no swap.
-But it's not hard to solve it.
+Now, x86's section size is 
+==
+#ifdef CONFIG_X86_32
+# ifdef CONFIG_X86_PAE
+#  define SECTION_SIZE_BITS     29
+#  define MAX_PHYSADDR_BITS     36
+#  define MAX_PHYSMEM_BITS      36
+# else
+#  define SECTION_SIZE_BITS     26
+#  define MAX_PHYSADDR_BITS     32
+#  define MAX_PHYSMEM_BITS      32
+# endif
+#else /* CONFIG_X86_32 */
+# define SECTION_SIZE_BITS      27 /* matt - 128 is convenient right now */
+# define MAX_PHYSADDR_BITS      44
+# define MAX_PHYSMEM_BITS       46
+#endif
+==
 
-We needs Mel's opinion, too.
+128MB...too big ? But it's depend on config.
 
--- 
-Kind regards,
-Minchan Kim
+IBM's ppc guys used 16MB section, and recently, a new interface to shrink
+the number of /sys files are added, maybe usable.
+
+Something good with this approach will be you can create "cma" memory
+before installing driver.
+
+But yes, complicated and need some works.
+
+Bye,
+-Kame
