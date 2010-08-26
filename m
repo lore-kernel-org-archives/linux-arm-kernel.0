@@ -1,59 +1,37 @@
-From: yunpeng.gao@intel.com (Gao, Yunpeng)
-Date: Thu, 26 Aug 2010 17:42:00 +0800
-Subject: [RFC/PATCH 3/6] mmc: add general runtime PM support
-In-Reply-To: <1281532770-27545-4-git-send-email-ohad@wizery.com>
-References: <1281532770-27545-1-git-send-email-ohad@wizery.com>
-	<1281532770-27545-4-git-send-email-ohad@wizery.com>
-Message-ID: <CE761E84DADF2947A4AF22FB8D97A4732A516CE8@shsmsx501.ccr.corp.intel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 26 Aug 2010 11:45:58 +0200 (CEST)
+Subject: [RFC][PATCH] add
+	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
+In-Reply-To: <20100826182915S.fujita.tomonori@lab.ntt.co.jp>
+References: <201008260904.19973.mitov@issp.bas.bg>
+	<20100826152333K.fujita.tomonori@lab.ntt.co.jp>
+	<Pine.LNX.4.64.1008261100150.14167@axis700.grange>
+	<20100826182915S.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <Pine.LNX.4.64.1008261140390.14167@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>+static int mmc_runtime_suspend(struct device *dev)
->+{
->+	int status = 0;
->+	struct mmc_card *card = dev_to_mmc_card(dev);
->+
->+	mmc_power_save_host(card->host);
->+
->+	return status;
->+}
+On Thu, 26 Aug 2010, FUJITA Tomonori wrote:
 
-It seems the power_save callback is not implemented (Null pointer) yet for both mmc and sdio. Does it mean that the power_save callback will be implemented in future or just don't need at all? Thanks.
+> Why can't you revert a commit that causes the regression?
 
->+static int mmc_runtime_resume(struct device *dev)
->+{
->+	int status = 0;
->+	struct mmc_card *card = dev_to_mmc_card(dev);
->+
->+	mmc_power_restore_host(card->host);
->+
->+	return status;
->+}
->+
->+static int mmc_runtime_idle(struct device *dev)
->+{
->+	struct mmc_card *card = dev_to_mmc_card(dev);
->+
->+	return pm_runtime_suspend(dev);
->+}
->+
->+static const struct dev_pm_ops mmc_bus_pm_ops = {
->+	.runtime_suspend	= mmc_runtime_suspend,
->+	.runtime_resume		= mmc_runtime_resume,
->+	.runtime_idle		= mmc_runtime_idle,
->+};
->+
-> static struct bus_type mmc_bus_type = {
-> 	.name		= "mmc",
-> 	.dev_attrs	= mmc_dev_attrs,
->@@ -146,6 +180,7 @@ static struct bus_type mmc_bus_type = {
-> 	.remove		= mmc_bus_remove,
-> 	.suspend	= mmc_bus_suspend,
-> 	.resume		= mmc_bus_resume,
->+	.pm		= &mmc_bus_pm_ops,
-> };
->
-I think this is a good example to implement runtime PM support for mmc driver. But seems it doesn't provide a runtime PM example on host controller driver side. To my understanding, once the functions (mmc card or sdio devices) and mmc/sdio bus enter into rumtime suspend, it should then make the host controller enter into runtime suspend, too. Any ideas on how to achieve this? Thanks.
+See this reply, and the complete thread too.
 
-Best Regards,
-Yunpeng Gao
+http://marc.info/?l=linux-sh&m=128130485208262&w=2
+
+> The related DMA API wasn't changed in 2.6.36-rc1. The DMA API is not
+> responsible for the regression. And the patchset even exnteds the
+> definition of the DMA API (dma_declare_coherent_memory). Such change
+> shouldn't applied after rc1. I think that DMA-API.txt says that
+> dma_declare_coherent_memory() handles coherent memory for a particular
+> device. It's not for the API that reserves coherent memory that can be
+> used for any device for a single device.
+
+Anyway, we need a way to fix the regression.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
