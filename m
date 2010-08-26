@@ -1,67 +1,59 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Thu, 26 Aug 2010 18:36:24 +0900
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100826133028.39d731da.kamezawa.hiroyu@jp.fujitsu.com>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-	<20100825155814.25c783c7.akpm@linux-foundation.org>
-	<20100826095857.5b821d7f.kamezawa.hiroyu@jp.fujitsu.com>
-	<op.vh0wektv7p4s8u@localhost>
-	<20100826115017.04f6f707.kamezawa.hiroyu@jp.fujitsu.com>
-	<20100826124434.6089630d.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTi=T1y+sQuqVTYgOkYvqrxdYB1bZmCpKafN5jPqi@mail.gmail.com>
-	<20100826133028.39d731da.kamezawa.hiroyu@jp.fujitsu.com>
-Message-ID: <AANLkTimB+s0tO=wrODAU4qCaZnCBoLZ2A9pGjR_jheOj@mail.gmail.com>
+From: yunpeng.gao@intel.com (Gao, Yunpeng)
+Date: Thu, 26 Aug 2010 17:42:00 +0800
+Subject: [RFC/PATCH 3/6] mmc: add general runtime PM support
+In-Reply-To: <1281532770-27545-4-git-send-email-ohad@wizery.com>
+References: <1281532770-27545-1-git-send-email-ohad@wizery.com>
+	<1281532770-27545-4-git-send-email-ohad@wizery.com>
+Message-ID: <CE761E84DADF2947A4AF22FB8D97A4732A516CE8@shsmsx501.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 26, 2010 at 1:30 PM, KAMEZAWA Hiroyuki
-<kamezawa.hiroyu@jp.fujitsu.com> wrote:
-> On Thu, 26 Aug 2010 13:06:28 +0900
-> Minchan Kim <minchan.kim@gmail.com> wrote:
+>>+static int mmc_runtime_suspend(struct device *dev)
+>+{
+>+	int status = 0;
+>+	struct mmc_card *card = dev_to_mmc_card(dev);
+>+
+>+	mmc_power_save_host(card->host);
+>+
+>+	return status;
+>+}
+
+It seems the power_save callback is not implemented (Null pointer) yet for both mmc and sdio. Does it mean that the power_save callback will be implemented in future or just don't need at all? Thanks.
+
+>+static int mmc_runtime_resume(struct device *dev)
+>+{
+>+	int status = 0;
+>+	struct mmc_card *card = dev_to_mmc_card(dev);
+>+
+>+	mmc_power_restore_host(card->host);
+>+
+>+	return status;
+>+}
+>+
+>+static int mmc_runtime_idle(struct device *dev)
+>+{
+>+	struct mmc_card *card = dev_to_mmc_card(dev);
+>+
+>+	return pm_runtime_suspend(dev);
+>+}
+>+
+>+static const struct dev_pm_ops mmc_bus_pm_ops = {
+>+	.runtime_suspend	= mmc_runtime_suspend,
+>+	.runtime_resume		= mmc_runtime_resume,
+>+	.runtime_idle		= mmc_runtime_idle,
+>+};
+>+
+> static struct bus_type mmc_bus_type = {
+> 	.name		= "mmc",
+> 	.dev_attrs	= mmc_dev_attrs,
+>@@ -146,6 +180,7 @@ static struct bus_type mmc_bus_type = {
+> 	.remove		= mmc_bus_remove,
+> 	.suspend	= mmc_bus_suspend,
+> 	.resume		= mmc_bus_resume,
+>+	.pm		= &mmc_bus_pm_ops,
+> };
 >
->> On Thu, Aug 26, 2010 at 12:44 PM, KAMEZAWA Hiroyuki
->> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
->> > On Thu, 26 Aug 2010 11:50:17 +0900
->> > KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com> wrote:
->> >
->> >> 128MB...too big ? But it's depend on config.
->> >>
->> >> IBM's ppc guys used 16MB section, and recently, a new interface to shrink
->> >> the number of /sys files are added, maybe usable.
->> >>
->> >> Something good with this approach will be you can create "cma" memory
->> >> before installing driver.
->> >>
->> >> But yes, complicated and need some works.
->> >>
->> > Ah, I need to clarify what I want to say.
->> >
->> > With compaction, it's helpful, but you can't get contiguous memory larger
->> > than MAX_ORDER, I think. To get memory larger than MAX_ORDER on demand,
->> > memory hot-plug code has almost all necessary things.
->>
->> True. Doesn't patch's idea of Christoph helps this ?
->> http://lwn.net/Articles/200699/
->>
->
-> yes, I think so. But, IIRC, ?it's own purpose of Chirstoph's work is
-> for removing zones. please be careful what's really necessary.
+I think this is a good example to implement runtime PM support for mmc driver. But seems it doesn't provide a runtime PM example on host controller driver side. To my understanding, once the functions (mmc card or sdio devices) and mmc/sdio bus enter into rumtime suspend, it should then make the host controller enter into runtime suspend, too. Any ideas on how to achieve this? Thanks.
 
-Ahh. Sorry for missing point.
-You're right. The patch can't help our problem.
-
-How about changing following this?
-The thing is MAX_ORDER is static. But we want to avoid too big
-MAX_ORDER of whole zones to support devices which requires big
-allocation chunk.
-So let's add MAX_ORDER into each zone and then, each zone can have
-different max order.
-For example, while DMA[32], NORMAL, HIGHMEM can have normal size 11,
-MOVABLE zone could have a 15.
-
-This approach has a big side effect?
-
--- 
-Kind regards,
-Minchan Kim
+Best Regards,
+Yunpeng Gao
