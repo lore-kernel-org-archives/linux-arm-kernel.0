@@ -1,2754 +1,2641 @@
-From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Thu, 26 Aug 2010 15:02:32 +0300
-Subject: [PATCH v2 6/6] crash: add ARM crashdump support
-In-Reply-To: <cover.1282822832.git.ext-mika.1.westerberg@nokia.com>
-References: <cover.1282822832.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <dbfe3d91ac964790fccf20f6d803741d526b4a4b.1282822832.git.ext-mika.1.westerberg@nokia.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Thu, 26 Aug 2010 14:47:36 +0100
+Subject: [PATCH/RFCv4 2/6] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <343f4b0edf9b5eef598831700cb459cd428d3f2e.1282286941.git.m.nazarewicz@samsung.com>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<0b02e05fc21e70a3af39e65e628d117cd89d70a1.1282286941.git.m.nazarewicz@samsung.com>
+	<343f4b0edf9b5eef598831700cb459cd428d3f2e.1282286941.git.m.nazarewicz@samsung.com>
+Message-ID: <20100826134736.GG20944@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds minimal support for reading ARM crashdumps. Currently supported
-dumpfiles are /dev/mem, diskdump and vmcore. Stack unwinding can be done using
-framepointers or unwinding tables depending on kernel configuration.
+On Fri, Aug 20, 2010 at 11:50:42AM +0200, Michal Nazarewicz wrote:
+> The Contiguous Memory Allocator framework is a set of APIs for
+> allocating physically contiguous chunks of memory.
+> 
+> Various chips require contiguous blocks of memory to operate.  Those
+> chips include devices such as cameras, hardware video decoders and
+> encoders, etc.
+> 
+> The code is highly modular and customisable to suit the needs of
+> various users.  Set of regions reserved for CMA can be configured
+> per-platform and it is easy to add custom allocator algorithms if one
+> has such need.
+> 
+> Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Reviewed-by: Pawel Osciak <p.osciak@samsung.com>
+> ---
 
-Signed-off-by: Jan Karlsson <jan.karlsson@sonyericsson.com>
-Signed-off-by: Thomas F?nge <thomas.fange@sonyericsson.com>
-Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
----
- Makefile     |   12 +-
- arm.c        | 1741 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- defs.h       |  137 +++++
- diskdump.c   |    8 +
- unwind_arm.c |  697 +++++++++++++++++++++++
- 5 files changed, 2593 insertions(+), 2 deletions(-)
- create mode 100644 arm.c
- create mode 100644 unwind_arm.c
+Please do not consider this a proper review. I'm only glancing through
+it.
 
-diff --git a/Makefile b/Makefile
-index 038c887..f79f6a9 100644
---- a/Makefile
-+++ b/Makefile
-@@ -80,11 +80,12 @@ UNWIND_HFILES=unwind.h unwind_i.h rse.h unwind_x86.h unwind_x86_64.h
- CFILES=main.c tools.c global_data.c memory.c filesys.c help.c task.c \
- 	kernel.c test.c gdb_interface.c configure.c net.c dev.c \
- 	alpha.c x86.c ppc.c ia64.c s390.c s390x.c s390dbf.c ppc64.c x86_64.c \
-+	arm.c \
- 	extensions.c remote.c va_server.c va_server_v1.c symbols.c cmdline.c \
- 	lkcd_common.c lkcd_v1.c lkcd_v2_v3.c lkcd_v5.c lkcd_v7.c lkcd_v8.c\
- 	lkcd_fix_mem.c s390_dump.c lkcd_x86_trace.c \
- 	netdump.c diskdump.c xendump.c unwind.c unwind_decoder.c \
--	unwind_x86_32_64.c \
-+	unwind_x86_32_64.c unwind_arm.c \
-  	xen_hyper.c xen_hyper_command.c xen_hyper_global_data.c \
- 	xen_hyper_dump_tables.c kvmdump.c qemu.c qemu-load.c
+>  Documentation/00-INDEX              |    2 +
+>  Documentation/contiguous-memory.txt |  541 +++++++++++++++++++++
+>  include/linux/cma.h                 |  431 +++++++++++++++++
+>  mm/Kconfig                          |   34 ++
+>  mm/Makefile                         |    2 +
+>  mm/cma-best-fit.c                   |  407 ++++++++++++++++
+>  mm/cma.c                            |  910 +++++++++++++++++++++++++++++++++++
+>  7 files changed, 2327 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/contiguous-memory.txt
+>  create mode 100644 include/linux/cma.h
+>  create mode 100644 mm/cma-best-fit.c
+>  create mode 100644 mm/cma.c
+> 
+> diff --git a/Documentation/00-INDEX b/Documentation/00-INDEX
+> index 8dfc670..f93e787 100644
+> --- a/Documentation/00-INDEX
+> +++ b/Documentation/00-INDEX
+> @@ -94,6 +94,8 @@ connector/
+>  	- docs on the netlink based userspace<->kernel space communication mod.
+>  console/
+>  	- documentation on Linux console drivers.
+> +contiguous-memory.txt
+> +	- documentation on physically-contiguous memory allocation framework.
+>  cpu-freq/
+>  	- info on CPU frequency and voltage scaling.
+>  cpu-hotplug.txt
+> diff --git a/Documentation/contiguous-memory.txt b/Documentation/contiguous-memory.txt
+> new file mode 100644
+> index 0000000..8fc2400
+> --- /dev/null
+> +++ b/Documentation/contiguous-memory.txt
+> @@ -0,0 +1,541 @@
+> +                                                             -*- org -*-
+> +
+> +* Contiguous Memory Allocator
+> +
+> +   The Contiguous Memory Allocator (CMA) is a framework, which allows
+> +   setting up a machine-specific configuration for physically-contiguous
+> +   memory management. Memory for devices is then allocated according
+> +   to that configuration.
+> +
+> +   The main role of the framework is not to allocate memory, but to
+> +   parse and manage memory configurations, as well as to act as an
+> +   in-between between device drivers and pluggable allocators. It is
+> +   thus not tied to any memory allocation method or strategy.
+> +
+> +** Why is it needed?
+> +
+> +    Various devices on embedded systems have no scatter-getter and/or
+> +    IO map support and as such require contiguous blocks of memory to
+> +    operate.  They include devices such as cameras, hardware video
+> +    decoders and encoders, etc.
+> +
+> +    Such devices often require big memory buffers (a full HD frame is,
+> +    for instance, more then 2 mega pixels large, i.e. more than 6 MB
+> +    of memory), which makes mechanisms such as kmalloc() ineffective.
+> +
+
+So more than 6MB of memory means the page allocator cannot automatically
+grant the requests. That's fine but I'd still like to be as close to the
+page allocator if possible.
+
+> +    Some embedded devices impose additional requirements on the
+> +    buffers, e.g. they can operate only on buffers allocated in
+> +    particular location/memory bank (if system has more than one
+> +    memory bank) or buffers aligned to a particular memory boundary.
+> +
+
+An important consideration is if the alignment is always a natural
+alignment? i.e. a 64K buffer must be 64K aligned, 128K must be 128K aligned
+etc. I ask because the buddy allocator is great at granting natural alignments
+but is difficult to work with for other alignments.
+
+> +    Development of embedded devices have seen a big rise recently
+> +    (especially in the V4L area) and many such drivers include their
+> +    own memory allocation code. Most of them use bootmem-based methods.
+> +    CMA framework is an attempt to unify contiguous memory allocation
+> +    mechanisms and provide a simple API for device drivers, while
+> +    staying as customisable and modular as possible.
+> +
+
+If drivers are using bootmem and custom allocators, I agree that some common
+framework is needed. If every device depended on bootmem, there would be huge
+chunks of unusable memory. i.e. At first glance, I think this is important
+in concept.
+
+> +** Design
+> +
+> +    The main design goal for the CMA was to provide a customisable and
+> +    modular framework, which could be configured to suit the needs of
+> +    individual systems.  Configuration specifies a list of memory
+> +    regions, which then are assigned to devices.  Memory regions can
+> +    be shared among many device drivers or assigned exclusively to
+> +    one.  This has been achieved in the following ways:
+> +
+
+It'd be very nice if the shared regions could also be used by normal movable
+memory allocations to minimise the amount of wastage. I imagine this would
+be particularly important on memory-constrained devices. So right now,
+we have
  
-@@ -96,11 +97,12 @@ SOURCE_FILES=${CFILES} ${GENERIC_HFILES} ${MCORE_HFILES} \
- OBJECT_FILES=main.o tools.o global_data.o memory.o filesys.o help.o task.o \
- 	build_data.o kernel.o test.o gdb_interface.o net.o dev.o \
- 	alpha.o x86.o ppc.o ia64.o s390.o s390x.o s390dbf.o ppc64.o x86_64.o \
-+	arm.o \
- 	extensions.o remote.o va_server.o va_server_v1.o symbols.o cmdline.o \
- 	lkcd_common.o lkcd_v1.o lkcd_v2_v3.o lkcd_v5.o lkcd_v7.o lkcd_v8.o \
- 	lkcd_fix_mem.o s390_dump.o netdump.o diskdump.o xendump.o \
- 	lkcd_x86_trace.o unwind_v1.o unwind_v2.o unwind_v3.o \
--	unwind_x86_32_64.o \
-+	unwind_x86_32_64.o unwind_arm.o \
-  	xen_hyper.o xen_hyper_command.o xen_hyper_global_data.o \
- 	xen_hyper_dump_tables.o kvmdump.o qemu.o qemu-load.o
- 
-@@ -419,6 +421,9 @@ ppc64.o: ${GENERIC_HFILES} ppc64.c
- x86_64.o: ${GENERIC_HFILES} ${REDHAT_HFILES} x86_64.c
- 	cc -c ${CRASH_CFLAGS} x86_64.c ${WARNING_OPTIONS} ${WARNING_ERROR}
- 
-+arm.o: ${GENERIC_HFILES} ${REDHAT_HFILES} arm.c
-+	cc -c ${CRASH_CFLAGS} arm.c ${WARNING_OPTIONS} ${WARNING_ERROR}
-+
- s390.o: ${GENERIC_HFILES} ${IBM_HFILES} s390.c
- 	cc -c ${CRASH_CFLAGS} s390.c ${WARNING_OPTIONS} ${WARNING_ERROR}
- 
-@@ -460,6 +465,9 @@ lkcd_x86_trace.o: ${GENERIC_HFILES} ${LKCD_TRACE_HFILES} lkcd_x86_trace.c
- unwind_x86_32_64.o: ${GENERIC_HFILES} ${UNWIND_HFILES} unwind_x86_32_64.c
- 	cc -c ${CRASH_CFLAGS} unwind_x86_32_64.c -o unwind_x86_32_64.o ${WARNING_OPTIONS} ${WARNING_ERROR}
- 
-+unwind_arm.o: ${GENERIC_HFILES} ${UNWIND_HFILES} unwind_arm.c
-+	cc -c ${CRASH_CFLAGS} unwind_arm.c -o unwind_arm.o ${WARNING_OPTIONS} ${WARNING_ERROR}
-+
- unwind_v1.o: ${GENERIC_HFILES} ${UNWIND_HFILES} unwind.c unwind_decoder.c
- 	cc -c ${CRASH_CFLAGS} unwind.c -DREDHAT -DUNWIND_V1 -o unwind_v1.o ${WARNING_OPTIONS} ${WARNING_ERROR}
- 
-diff --git a/arm.c b/arm.c
-new file mode 100644
-index 0000000..f6d1b27
---- /dev/null
-+++ b/arm.c
-@@ -0,0 +1,1741 @@
-+/*
-+ * arm.c - core analysis suite
-+ *
-+ * Authors:
-+ *   Thomas F?nge <thomas.fange@sonyericsson.com>
-+ *   Jan Karlsson <jan.karlsson@sonyericsson.com>
-+ *   Mika Westerberg <ext-mika.1.westerberg@nokia.com>
-+ *
-+ * Copyright (C) 2010 Nokia Corporation
-+ * Copyright (C) 2010 Sony Ericsson. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifdef ARM
-+#include <elf.h>
-+
-+#include "defs.h"
-+
-+static void arm_parse_cmdline_args(void);
-+static int arm_get_crash_notes(void);
-+static int arm_verify_symbol(const char *, ulong, char);
-+static int arm_is_module_addr(ulong);
-+static int arm_is_kvaddr(ulong);
-+static int arm_in_exception_text(ulong);
-+static void arm_back_trace(struct bt_info *);
-+static void arm_back_trace_cmd(struct bt_info *);
-+static ulong arm_processor_speed(void);
-+static int arm_translate_pte(ulong, void *, ulonglong);
-+static int arm_vtop(ulong, ulong *, physaddr_t *, int);
-+static int arm_kvtop(struct task_context *, ulong, physaddr_t *, int);
-+static int arm_uvtop(struct task_context *, ulong, physaddr_t *, int);
-+static int arm_get_frame(struct bt_info *, ulong *, ulong *);
-+static int arm_get_dumpfile_stack_frame(struct bt_info *, ulong *, ulong *);
-+static void arm_get_stack_frame(struct bt_info *, ulong *, ulong *);
-+static void arm_dump_exception_stack(ulong, ulong);
-+static void arm_display_full_frame(struct bt_info *, ulong);
-+static ulong arm_vmalloc_start(void);
-+static int arm_is_task_addr(ulong);
-+static int arm_dis_filter(ulong, char *);
-+static int arm_eframe_search(struct bt_info *);
-+static ulong arm_get_task_pgd(ulong);
-+static void arm_cmd_mach(void);
-+static void arm_display_machine_stats(void);
-+static int arm_get_smp_cpus(void);
-+static void print_irq_member(char *, ulong, char *);
-+static void arm_dump_irq(int);
-+static void arm_init_machspec(void);
-+
-+static struct line_number_hook arm_line_number_hooks[];
-+static struct machine_specific arm_machine_specific;
-+
-+/**
-+ * struct arm_cpu_context_save - idle task registers
-+ *
-+ * This structure holds idle task registers. Only FP, SP, and PC are needed for
-+ * unwinding the stack.
-+ */
-+struct arm_cpu_context_save {
-+	ulong	fp;
-+	ulong	sp;
-+	ulong	pc;
-+};
-+
-+/*
-+ * Holds registers during the crash.
-+ */
-+static struct arm_pt_regs panic_task_regs;
-+
-+#define PGDIR_SIZE() (4 * PAGESIZE())
-+#define PGDIR_OFFSET(X) (((ulong)(X)) & (PGDIR_SIZE() - 1))
-+
-+#define _SECTION_PAGE_MASK	(~((MEGABYTES(1))-1))
-+
-+#define PMD_TYPE_MASK   3
-+#define PMD_TYPE_SECT   2
-+#define PMD_TYPE_TABLE  1
-+
-+static inline ulong *
-+pmd_page_addr(ulong pmd)
-+{
-+	ulong ptr;
-+
-+	ptr = pmd & ~(PTRS_PER_PTE * sizeof(void *) - 1);
-+	ptr += PTRS_PER_PTE * sizeof(void *);
-+
-+	return (ulong *)ptr;
-+}
-+
-+/*
-+ * "Linux" PTE definitions.
-+ */
-+#define L_PTE_PRESENT		(1 << 0)
-+#define L_PTE_YOUNG		(1 << 1)
-+#define L_PTE_FILE		(1 << 2)
-+#define L_PTE_DIRTY		(1 << 6)
-+#define L_PTE_WRITE		(1 << 7)
-+#define L_PTE_USER		(1 << 8)
-+#define L_PTE_EXEC		(1 << 9)
-+#define L_PTE_SHARED		(1 << 10)
-+
-+#define pte_val(pte)		(pte)
-+
-+#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
-+#define pte_write(pte)		(pte_val(pte) & L_PTE_WRITE)
-+#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
-+#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
-+
-+/*
-+ * Following stuff is taken directly from the kernel sources. These are used in
-+ * dump_exception_stack() to format an exception stack entry.
-+ */
-+#define USR26_MODE	0x00000000
-+#define FIQ26_MODE	0x00000001
-+#define IRQ26_MODE	0x00000002
-+#define SVC26_MODE	0x00000003
-+#define USR_MODE	0x00000010
-+#define FIQ_MODE	0x00000011
-+#define IRQ_MODE	0x00000012
-+#define SVC_MODE	0x00000013
-+#define ABT_MODE	0x00000017
-+#define UND_MODE	0x0000001b
-+#define SYSTEM_MODE	0x0000001f
-+#define MODE32_BIT	0x00000010
-+#define MODE_MASK	0x0000001f
-+#define PSR_T_BIT	0x00000020
-+#define PSR_F_BIT	0x00000040
-+#define PSR_I_BIT	0x00000080
-+#define PSR_A_BIT	0x00000100
-+#define PSR_E_BIT	0x00000200
-+#define PSR_J_BIT	0x01000000
-+#define PSR_Q_BIT	0x08000000
-+#define PSR_V_BIT	0x10000000
-+#define PSR_C_BIT	0x20000000
-+#define PSR_Z_BIT	0x40000000
-+#define PSR_N_BIT	0x80000000
-+
-+#define isa_mode(regs) \
-+	((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \
-+	 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
-+
-+#define processor_mode(regs) \
-+	((regs)->ARM_cpsr & MODE_MASK)
-+
-+#define interrupts_enabled(regs) \
-+	(!((regs)->ARM_cpsr & PSR_I_BIT))
-+
-+#define fast_interrupts_enabled(regs) \
-+	(!((regs)->ARM_cpsr & PSR_F_BIT))
-+
-+static const char *processor_modes[] = {
-+	"USER_26", "FIQ_26", "IRQ_26", "SVC_26", "UK4_26", "UK5_26",
-+	"UK6_26", "UK7_26" , "UK8_26", "UK9_26", "UK10_26", "UK11_26",
-+	"UK12_26", "UK13_26", "UK14_26", "UK15_26", "USER_32", "FIQ_32",
-+	"IRQ_32", "SVC_32", "UK4_32", "UK5_32", "UK6_32", "ABT_32",
-+	"UK8_32", "UK9_32", "UK10_32", "UND_32", "UK12_32", "UK13_32",
-+	"UK14_32", "SYS_32",
-+};
-+
-+static const char *isa_modes[] = {
-+	"ARM" , "Thumb" , "Jazelle", "ThumbEE",
-+};
-+
-+#define NOT_IMPLEMENTED() \
-+	error(FATAL, "%s: N/A\n", __func__)
-+
-+/*
-+ * Do all necessary machine-specific setup here. This is called several times
-+ * during initialization.
-+ */
-+void
-+arm_init(int when)
-+{
-+	switch (when) {
-+	case PRE_SYMTAB:
-+		machdep->verify_symbol = arm_verify_symbol;
-+		machdep->machspec = &arm_machine_specific;
-+		if (pc->flags & KERNEL_DEBUG_QUERY)
-+			return;
-+		machdep->pagesize = memory_page_size();
-+		machdep->pageshift = ffs(machdep->pagesize) - 1;
-+		machdep->pageoffset = machdep->pagesize - 1;
-+		machdep->pagemask = ~((ulonglong)machdep->pageoffset);
-+		machdep->stacksize = machdep->pagesize * 2;
-+		machdep->last_pgd_read = 0;
-+		machdep->last_pmd_read = 0;
-+		machdep->last_ptbl_read = 0;
-+		machdep->verify_paddr = generic_verify_paddr;
-+		machdep->ptrs_per_pgd = PTRS_PER_PGD;
-+
-+		if (machdep->cmdline_args[0])
-+			arm_parse_cmdline_args();
-+		break;
-+
-+	case PRE_GDB:
-+		if ((machdep->pgd = (char *)malloc(PGDIR_SIZE())) == NULL)
-+			error(FATAL, "cannot malloc pgd space.");
-+		if ((machdep->ptbl = (char *)malloc(PAGESIZE())) == NULL)
-+			error(FATAL, "cannot malloc ptbl space.");
-+
-+		/*
-+		 * Kernel text starts 16k after PAGE_OFFSET.
-+		 */
-+	        machdep->kvbase = symbol_value("_stext") & 0xffff0000UL;
-+		machdep->identity_map_base = machdep->kvbase;
-+		machdep->is_kvaddr = arm_is_kvaddr;
-+		machdep->is_uvaddr = generic_is_uvaddr;
-+		machdep->eframe_search = arm_eframe_search;
-+		machdep->back_trace = arm_back_trace_cmd;
-+		machdep->processor_speed = arm_processor_speed;
-+		machdep->uvtop = arm_uvtop;
-+		machdep->kvtop = arm_kvtop;
-+		machdep->get_task_pgd = arm_get_task_pgd;
-+		machdep->get_stack_frame = arm_get_stack_frame;
-+		machdep->get_stackbase = generic_get_stackbase;
-+		machdep->get_stacktop = generic_get_stacktop;
-+		machdep->translate_pte = arm_translate_pte;
-+		machdep->memory_size = generic_memory_size;
-+		machdep->vmalloc_start = arm_vmalloc_start;
-+		machdep->is_task_addr = arm_is_task_addr;
-+		machdep->dis_filter = arm_dis_filter;
-+		machdep->cmd_mach = arm_cmd_mach;
-+		machdep->get_smp_cpus = arm_get_smp_cpus;
-+		machdep->line_number_hooks = arm_line_number_hooks;
-+		machdep->value_to_symbol = generic_machdep_value_to_symbol;
-+		machdep->init_kernel_pgd = NULL;
-+
-+		if (symbol_exists("irq_desc"))
-+			machdep->dump_irq = arm_dump_irq;
-+
-+		arm_init_machspec();
-+		break;
-+
-+	case POST_GDB:
-+		if (symbol_exists("irq_desc")) {
-+			ARRAY_LENGTH_INIT(machdep->nr_irqs, irq_desc,
-+					  "irq_desc", NULL, 0);
-+			if (MEMBER_EXISTS("irq_desc", "name"))
-+				MEMBER_OFFSET_INIT(irq_desc_t_name, "irq_desc",
-+						   "name");
-+		}
-+
-+		/*
-+		 * Registers for idle threads are saved in
-+		 * thread_info.cpu_context.
-+		 */
-+		STRUCT_SIZE_INIT(cpu_context_save, "cpu_context_save");
-+		MEMBER_OFFSET_INIT(cpu_context_save_fp,
-+			"cpu_context_save", "fp");
-+		MEMBER_OFFSET_INIT(cpu_context_save_sp,
-+			"cpu_context_save", "sp");
-+		MEMBER_OFFSET_INIT(cpu_context_save_pc,
-+			"cpu_context_save", "pc");
-+		MEMBER_OFFSET_INIT(thread_info_cpu_context,
-+			"thread_info", "cpu_context");
-+
-+		/*
-+		 * We need to have information about note_buf_t which is used to
-+		 * hold ELF note containing registers and status of the thread
-+		 * that panic'd.
-+		 */
-+		STRUCT_SIZE_INIT(note_buf, "note_buf_t");
-+
-+		STRUCT_SIZE_INIT(elf_prstatus, "elf_prstatus");
-+		MEMBER_OFFSET_INIT(elf_prstatus_pr_pid, "elf_prstatus",
-+				   "pr_pid");
-+		MEMBER_OFFSET_INIT(elf_prstatus_pr_reg, "elf_prstatus",
-+				   "pr_reg");
-+
-+		/*
-+		 * crash_notes contains machine specific information about the
-+		 * crash. In particular, it contains CPU registers at the time
-+		 * of the crash. We need this information to extract correct
-+		 * backtraces from the panic task.
-+		 */
-+		if (!ACTIVE() && !arm_get_crash_notes())
-+			error(WARNING, "Couldn't retrieve crash_notes\n");
-+		break;
-+
-+	case POST_VM:
-+		machdep->machspec->vmalloc_start_addr = vt->high_memory;
-+		/*
-+		 * Modules are placed in first vmalloc'd area. This is 16MB
-+		 * below PAGE_OFFSET.
-+		 */
-+		machdep->machspec->modules_vaddr = first_vmalloc_address();
-+		machdep->machspec->modules_end = machdep->kvbase - 1;
-+
-+		if (init_unwind_tables()) {
-+			if (CRASHDEBUG(1))
-+				fprintf(fp, "using unwind tables\n");
-+		} else {
-+			if (CRASHDEBUG(1))
-+				fprintf(fp, "using framepointers\n");
-+		}
-+		break;
-+	}
-+}
-+
-+void
-+arm_dump_machdep_table(ulong arg)
-+{
-+	const struct machine_specific *ms;
-+	int others, i;
-+
-+        others = 0;
-+        fprintf(fp, "              flags: %lx (", machdep->flags);
-+	if (machdep->flags & KSYMS_START)
-+		fprintf(fp, "%sKSYMS_START", others++ ? "|" : "");
-+	if (machdep->flags & PHYS_BASE)
-+		fprintf(fp, "%sPHYS_BASE", others++ ? "|" : "");
-+        fprintf(fp, ")\n");
-+
-+	fprintf(fp, "             kvbase: %lx\n", machdep->kvbase);
-+	fprintf(fp, "  identity_map_base: %lx\n", machdep->kvbase);
-+	fprintf(fp, "           pagesize: %d\n", machdep->pagesize);
-+	fprintf(fp, "          pageshift: %d\n", machdep->pageshift);
-+	fprintf(fp, "           pagemask: %lx\n", (ulong)machdep->pagemask);
-+	fprintf(fp, "         pageoffset: %lx\n", machdep->pageoffset);
-+	fprintf(fp, "          stacksize: %ld\n", machdep->stacksize);
-+	fprintf(fp, "                 hz: %d\n", machdep->hz);
-+	fprintf(fp, "                mhz: %ld\n", machdep->mhz);
-+	fprintf(fp, "            memsize: %lld (0x%llx)\n",
-+		machdep->memsize, machdep->memsize);
-+	fprintf(fp, "               bits: %d\n", machdep->bits);
-+	fprintf(fp, "            nr_irqs: %d\n", machdep->nr_irqs);
-+	fprintf(fp, "      eframe_search: arm_eframe_search()\n");
-+	fprintf(fp, "         back_trace: arm_back_trace_cmd()\n");
-+	fprintf(fp, "    processor_speed: arm_processor_speed()\n");
-+	fprintf(fp, "              uvtop: arm_uvtop()\n");
-+	fprintf(fp, "              kvtop: arm_kvtop()\n");
-+	fprintf(fp, "       get_task_pgd: arm_get_task_pgd()\n");
-+	if (symbol_exists("irq_desc"))
-+		fprintf(fp, "           dump_irq: arm_dump_irq()\n");
-+	else
-+		fprintf(fp, "           dump_irq: NULL\n");
-+	fprintf(fp, "    get_stack_frame: arm_get_stack_frame()\n");
-+	fprintf(fp, "      get_stackbase: generic_get_stackbase()\n");
-+	fprintf(fp, "       get_stacktop: generic_get_stacktop()\n");
-+	fprintf(fp, "      translate_pte: arm_translate_pte()\n");
-+	fprintf(fp, "        memory_size: generic_memory_size()\n");
-+	fprintf(fp, "      vmalloc_start: arm_vmalloc_start()\n");
-+	fprintf(fp, "       is_task_addr: arm_is_task_addr()\n");
-+	fprintf(fp, "      verify_symbol: arm_verify_symbol()\n");
-+	fprintf(fp, "         dis_filter: arm_dis_filter()\n");
-+	fprintf(fp, "           cmd_mach: arm_cmd_mach()\n");
-+	fprintf(fp, "       get_smp_cpus: arm_get_smp_cpus()\n");
-+	fprintf(fp, "          is_kvaddr: generic_is_kvaddr()\n");
-+	fprintf(fp, "          is_uvaddr: generic_is_uvaddr()\n");
-+	fprintf(fp, "       verify_paddr: generic_verify_paddr()\n");
-+	fprintf(fp, " xendump_p2m_create: NULL\n");
-+	fprintf(fp, "xen_kdump_p2m_create: NULL\n");
-+	fprintf(fp, "  line_number_hooks: arm_line_number_hooks\n");
-+	fprintf(fp, "      last_pgd_read: %lx\n", machdep->last_pgd_read);
-+	fprintf(fp, "      last_pmd_read: %lx\n", machdep->last_pmd_read);
-+	fprintf(fp, "     last_ptbl_read: %lx\n", machdep->last_ptbl_read);
-+	fprintf(fp, "clear_machdep_cache: NULL\n");
-+	fprintf(fp, "                pgd: %lx\n", (ulong)machdep->pgd);
-+	fprintf(fp, "                pmd: %lx\n", (ulong)machdep->pmd);
-+	fprintf(fp, "               ptbl: %lx\n", (ulong)machdep->ptbl);
-+	fprintf(fp, "       ptrs_per_pgd: %d\n", machdep->ptrs_per_pgd);
-+	fprintf(fp, "  section_size_bits: %ld\n", machdep->section_size_bits);
-+	fprintf(fp, "   max_physmem_bits: %ld\n", machdep->max_physmem_bits);
-+	fprintf(fp, "  sections_per_root: %ld\n", machdep->sections_per_root);
-+
-+	for (i = 0; i < MAX_MACHDEP_ARGS; i++) {
-+		fprintf(fp, "    cmdline_args[%d]: %s\n",
-+			i, machdep->cmdline_args[i] ?
-+			machdep->cmdline_args[i] : "(unused)");
-+	}
-+
-+	ms = machdep->machspec;
-+
-+	fprintf(fp, "           machspec: %lx\n", (ulong)ms);
-+	fprintf(fp, "          phys_base: %lx\n", ms->phys_base);
-+	fprintf(fp, " vmalloc_start_addr: %lx\n", ms->vmalloc_start_addr);
-+	fprintf(fp, "      modules_vaddr: %lx\n", ms->modules_vaddr);
-+	fprintf(fp, "        modules_end: %lx\n", ms->modules_end);
-+	fprintf(fp, "  kernel_text_start: %lx\n", ms->kernel_text_start);
-+	fprintf(fp, "    kernel_text_end: %lx\n", ms->kernel_text_end);
-+	fprintf(fp, "exception_text_start: %lx\n", ms->exception_text_start);
-+	fprintf(fp, " exception_text_end: %lx\n", ms->exception_text_end);
-+	fprintf(fp, "     crash_task_pid: %ld\n", ms->crash_task_pid);
-+	fprintf(fp, "    crash_task_regs: %lx\n", (ulong)ms->crash_task_regs);
-+}
-+
-+/*
-+ * Parse machine dependent command line arguments.
-+ *
-+ * Force the phys_base address via:
-+ *
-+ *  --machdep phys_base=<address>
-+ */
-+static void
-+arm_parse_cmdline_args(void)
-+{
-+	int index, i, c, err;
-+	char *arglist[MAXARGS];
-+	char buf[BUFSIZE];
-+	char *p;
-+	ulong value;
-+
-+	for (index = 0; index < MAX_MACHDEP_ARGS; index++) {
-+		if (!machdep->cmdline_args[index])
-+			break;
-+
-+		if (!strstr(machdep->cmdline_args[index], "=")) {
-+			error(WARNING, "ignoring --machdep option: %x\n",
-+				machdep->cmdline_args[index]);
-+			continue;
-+		}
-+
-+		strcpy(buf, machdep->cmdline_args[index]);
-+
-+		for (p = buf; *p; p++) {
-+			if (*p == ',')
-+				*p = ' ';
-+		}
-+
-+		c = parse_line(buf, arglist);
-+
-+		for (i = 0; i < c; i++) {
-+			err = 0;
-+
-+			if (STRNEQ(arglist[i], "phys_base=")) {
-+				int megabytes = FALSE;
-+				int flags = RETURN_ON_ERROR | QUIET;
-+
-+				if ((LASTCHAR(arglist[i]) == 'm') ||
-+				    (LASTCHAR(arglist[i]) == 'M')) {
-+					LASTCHAR(arglist[i]) = NULLCHAR;
-+					megabytes = TRUE;
-+				}
-+
-+				p = arglist[i] + strlen("phys_base=");
-+				if (strlen(p)) {
-+					if (megabytes)
-+						value = dtol(p, flags, &err);
-+					else
-+						value = htol(p, flags, &err);
-+				}
-+
-+				if (!err) {
-+					if (megabytes)
-+						value = MEGABYTES(value);
-+
-+					machdep->machspec->phys_base = value;
-+
-+					error(NOTE,
-+						"setting phys_base to: 0x%lx\n",
-+						machdep->machspec->phys_base);
-+
-+					machdep->flags |= PHYS_BASE;
-+					continue;
-+				}
-+			}
-+
-+			error(WARNING, "ignoring --machdep option: %s\n",
-+				arglist[i]);
-+		}
-+	}
-+}
-+
-+/*
-+ * Retrieve task registers for the time of the crash.
-+ */
-+static int
-+arm_get_crash_notes(void)
-+{
-+	struct machine_specific *ms = machdep->machspec;
-+	ulong crash_notes;
-+	Elf32_Nhdr *note;
-+	ulong ptr, offset;
-+	char *buf, *p;
-+
-+	if (!symbol_exists("crash_notes"))
-+		return FALSE;
-+
-+	crash_notes = symbol_value("crash_notes");
-+
-+	if (kt->cpus > 1)
-+		error(WARNING, "only one CPU is currently supported\n");
-+
-+	/*
-+	 * Read crash_notes for the first CPU. crash_notes are in standard ELF
-+	 * note format.
-+	 */
-+	if (!readmem(crash_notes, KVADDR, &ptr, sizeof(ptr), "crash_notes",
-+		     RETURN_ON_ERROR)) {
-+		error(WARNING, "cannot read crash_notes\n");
-+		return FALSE;
-+	}
-+
-+	buf = GETBUF(SIZE(note_buf));
-+
-+	if (!readmem(ptr, KVADDR, buf, SIZE(note_buf), "note_buf_t",
-+		     RETURN_ON_ERROR)) {
-+		error(WARNING, "failed to read note_buf_t\n");
-+		goto fail;
-+	}
-+
-+	/*
-+	 * Do some sanity checks for this note before reading registers from it.
-+	 */
-+	note = (Elf32_Nhdr *)buf;
-+	p = buf + sizeof(Elf32_Nhdr);
-+
-+	if (note->n_type != NT_PRSTATUS) {
-+		error(WARNING, "invalid note (n_type != NT_PRSTATUS)\n");
-+		goto fail;
-+	}
-+	if (p[0] != 'C' || p[1] != 'O' || p[2] != 'R' || p[3] != 'E') {
-+		error(WARNING, "invalid note (name != \"CORE\"\n");
-+		goto fail;
-+	}
-+
-+	/*
-+	 * Find correct location of note data. This contains elf_prstatus
-+	 * structure which has registers etc. for the crashed task.
-+	 */
-+	offset = sizeof(Elf32_Nhdr);
-+	offset = roundup(offset + note->n_namesz, 4);
-+	p = buf + offset; /* start of elf_prstatus */
-+
-+	BCOPY(p + OFFSET(elf_prstatus_pr_reg), &panic_task_regs,
-+	      sizeof(panic_task_regs));
-+
-+	/*
-+	 * And finally we have pid and registers for the crashed task. This is
-+	 * used later on when dumping backtrace.
-+	 */
-+	ms->crash_task_pid = *(ulong *)(p + OFFSET(elf_prstatus_pr_pid));
-+	ms->crash_task_regs = &panic_task_regs;
-+
-+	FREEBUF(buf);
-+	return TRUE;
-+
-+fail:
-+	FREEBUF(buf);
-+	return FALSE;
-+}
-+
-+/*
-+ * Accept or reject a symbol from the kernel namelist.
-+ */
-+static int
-+arm_verify_symbol(const char *name, ulong value, char type)
-+{
-+	if (STREQ(name, "swapper_pg_dir"))
-+		machdep->flags |= KSYMS_START;
-+
-+	if (!name || !strlen(name) || !(machdep->flags & KSYMS_START))
-+		return FALSE;
-+
-+	if (STREQ(name, "$a") || STREQ(name, "$n") || STREQ(name, "$d"))
-+		return FALSE;
-+
-+	if (CRASHDEBUG(8) && name && strlen(name))
-+		fprintf(fp, "%08lx %s\n", value, name);
-+
-+	return TRUE;
-+}
-+
-+static int
-+arm_is_module_addr(ulong vaddr)
-+{
-+	ulong modules_start;
-+	ulong modules_end = machdep->kvbase - 1;
-+
-+	if (!MODULES_VADDR) {
-+		/*
-+		 * In case we are still initializing, and vm_init() has not been
-+		 * called, we use defaults here which is 16MB below kernel start
-+		 * address.
-+		 */
-+		modules_start = machdep->kvbase - 16 * 1024 * 1024;
-+	} else {
-+		modules_start = MODULES_VADDR;
-+	}
-+
-+	return (vaddr >= modules_start && vaddr <= modules_end);
-+}
-+
-+int
-+arm_is_vmalloc_addr(ulong vaddr)
-+{
-+	if (arm_is_module_addr(vaddr))
-+		return TRUE;
-+
-+	if (!VMALLOC_START)
-+		return FALSE;
-+
-+	return (vaddr >= VMALLOC_START);
-+}
-+
-+/*
-+ * Check whether given address falls inside kernel address space (including
-+ * modules).
-+ */
-+static int
-+arm_is_kvaddr(ulong vaddr)
-+{
-+	if (arm_is_module_addr(vaddr))
-+		return TRUE;
-+
-+	return (vaddr >= machdep->kvbase);
-+}
-+
-+/*
-+ * Returns TRUE if given pc is in exception area.
-+ */
-+static int
-+arm_in_exception_text(ulong pc)
-+{
-+	ulong exception_start = machdep->machspec->exception_text_start;
-+	ulong exception_end = machdep->machspec->exception_text_end;
-+
-+	if (exception_start && exception_end)
-+		return (pc >= exception_start && pc < exception_end);
-+
-+	return FALSE;
-+}
-+
-+/*
-+ *  Unroll the kernel stack using a minimal amount of gdb services.
-+ */
-+static void
-+arm_back_trace(struct bt_info *bt)
-+{
-+	int n = 0;
-+
-+	/*
-+	 * In case bt->machdep contains pointer to a full register set, we take
-+	 * FP from there.
-+	 */
-+	if (bt->machdep) {
-+		const struct arm_pt_regs *regs = bt->machdep;
-+		bt->frameptr = regs->ARM_fp;
-+	}
-+
-+	/*
-+	 * Stack frame layout:
-+	 *             optionally saved caller registers (r4 - r10)
-+	 *             saved fp
-+	 *             saved sp
-+	 *             saved lr
-+	 *    frame => saved pc
-+	 *             optionally saved arguments (r0 - r3)
-+	 * saved sp => <next word>
-+	 *
-+	 * Functions start with the following code sequence:
-+	 *                  mov   ip, sp
-+	 *                  stmfd sp!, {r0 - r3} (optional)
-+	 * corrected pc =>  stmfd sp!, {..., fp, ip, lr, pc}
-+	 */
-+	while (bt->frameptr && INSTACK(bt->frameptr, bt)) {
-+		ulong from;
-+		ulong sp;
-+
-+		/*
-+		 * We correct the PC to point to the actual instruction (current
-+		 * value is PC + 8).
-+		 */
-+		bt->instptr = GET_STACK_ULONG(bt->frameptr - 0);
-+		bt->instptr -= 8;
-+
-+		/*
-+		 * Now get LR, saved SP and FP from the frame as well.
-+		 */
-+		from = GET_STACK_ULONG(bt->frameptr - 4);
-+		sp = GET_STACK_ULONG(bt->frameptr - 8);
-+		bt->frameptr = GET_STACK_ULONG(bt->frameptr - 12);
-+
-+		arm_dump_backtrace_entry(bt, n++, from, sp);
-+
-+		bt->stkptr = sp;
-+	}
-+}
-+
-+/*
-+ * Unroll a kernel stack.
-+ */
-+static void
-+arm_back_trace_cmd(struct bt_info *bt)
-+{
-+	if (kt->flags & DWARF_UNWIND)
-+		unwind_backtrace(bt);
-+	else
-+		arm_back_trace(bt);
-+}
-+
-+/*
-+ * Calculate and return the speed of the processor.
-+ */
-+static ulong
-+arm_processor_speed(void)
-+{
-+	/*
-+	 * For now, we don't support reading CPU speed.
-+	 */
-+	return 0;
-+}
-+
-+/*
-+ * Translate a PTE, returning TRUE if the page is present. If a physaddr pointer
-+ * is passed in, don't print anything.
-+ */
-+static int
-+arm_translate_pte(ulong pte, void *physaddr, ulonglong pae_pte)
-+{
-+	char ptebuf[BUFSIZE];
-+	char physbuf[BUFSIZE];
-+	char buf[BUFSIZE];
-+	int page_present;
-+	ulong paddr;
-+	int len1, len2, others;
-+
-+	page_present = pte_present(pte);
-+	paddr = PAGEBASE(pte);
-+
-+	if (physaddr) {
-+		*((ulong *)physaddr) = paddr;
-+		return page_present;
-+	}
-+
-+	sprintf(ptebuf, "%lx", pte);
-+	len1 = MAX(strlen(ptebuf), strlen("PTE"));
-+	fprintf(fp, "%s  ", mkstring(buf, len1, CENTER | LJUST, "PTE"));
-+
-+	if (!page_present && pte) {
-+		/* swap page, not handled yet */
-+		return page_present;
-+	}
-+
-+	sprintf(physbuf, "%lx", paddr);
-+	len2 = MAX(strlen(physbuf), strlen("PHYSICAL"));
-+	fprintf(fp, "%s  ", mkstring(buf, len2, CENTER | LJUST, "PHYSICAL"));
-+
-+	fprintf(fp, "FLAGS\n");
-+	fprintf(fp, "%s  %s  ",
-+		mkstring(ptebuf, len1, CENTER | RJUST, NULL),
-+		mkstring(physbuf, len2, CENTER | RJUST, NULL));
-+
-+	fprintf(fp, "(");
-+	others = 0;
-+
-+	if (pte) {
-+		if (pte_present(pte))
-+			fprintf(fp, "%sPRESENT", others++ ? "|" : "");
-+		if (pte_write(pte))
-+			fprintf(fp, "%sWRITE", others++ ? "|" : "");
-+		if (pte_dirty(pte))
-+			fprintf(fp, "%sDIRTY", others++ ? "|" : "");
-+		if (pte_young(pte))
-+			fprintf(fp, "%sYOUNG", others++ ? "|" : "");
-+	} else {
-+		fprintf(fp, "no mapping");
-+	}
-+
-+	fprintf(fp, ")\n");
-+
-+	return 0;
-+}
-+
-+/*
-+ * Virtual to physical memory translation. This function will be called by both
-+ * arm_kvtop() and arm_uvtop().
-+ */
-+static int
-+arm_vtop(ulong vaddr, ulong *pgd, physaddr_t *paddr, int verbose)
-+{
-+	char buf[BUFSIZE];
-+	ulong *page_dir;
-+	ulong *page_middle;
-+	ulong *page_table;
-+	ulong pgd_pte;
-+	ulong pmd_pte;
-+	ulong pte;
-+
-+	/*
-+	 * Page tables in ARM Linux
-+	 *
-+	 * In hardware PGD is 16k (having 4096 pointers to PTE) and PTE is 1k
-+	 * (containing 256 translations).
-+	 *
-+	 * Linux, however, wants to have PTEs as page sized entities. This means
-+	 * that in ARM Linux we have following setup (see also
-+	 * arch/arm/include/asm/pgtable.h)
-+	 *
-+	 *     PGD                   PTE
-+	 * +---------+
-+	 * |         | 0  ---->  +------------+
-+	 * +- - - - -+           | h/w pt 0   |
-+	 * |         | 4  ---->  +------------+ +1024
-+	 * +- - - - -+           | h/w pt 1   |
-+	 * .         .           +------------+ +2048
-+	 * .         .           | Linux pt 0 |
-+	 * .         .           +------------+ +3072
-+	 * |         | 4095      | Linux pt 1 |
-+	 * +---------+           +------------+ +4096
-+	 *
-+	 * So in Linux implementation we have two hardware pointers to second
-+	 * level page tables. After these come "Linux" versions of the page
-+	 * tables.
-+	 *
-+	 * Linux PT entries contain bits that are not supported on hardware, for
-+	 * example "young" and "dirty" flags.
-+	 *
-+	 * Our translation scheme only uses Linux PTEs here. Hardware entries
-+	 * are 1024 bytes below Linux versions.
-+	 */
-+
-+	if (verbose)
-+		fprintf(fp, "PAGE DIRECTORY: %lx\n", (ulong)pgd);
-+
-+	/*
-+	 * pgd_offset(pgd, vaddr)
-+	 */
-+	page_dir = pgd + PGD_OFFSET(vaddr) * 2;
-+
-+	FILL_PGD(PAGEBASE(pgd), KVADDR, PGDIR_SIZE());
-+	pgd_pte = ULONG(machdep->pgd + PGDIR_OFFSET(page_dir));
-+
-+	if (verbose)
-+		fprintf(fp, "  PGD: %s => %lx\n",
-+			mkstring(buf, VADDR_PRLEN, RJUST | LONG_HEX,
-+			MKSTR((ulong)page_dir)), pgd_pte);
-+
-+	if (!pgd_pte)
-+		return FALSE;
-+
-+	/*
-+	 * pmd_offset(pgd, vaddr)
-+	 *
-+	 * Here PMD is folded into a PGD.
-+	 */
-+	pmd_pte = pgd_pte;
-+	page_middle = page_dir;
-+
-+	if (verbose)
-+		fprintf(fp, "  PMD: %s => %lx\n",
-+			mkstring(buf, VADDR_PRLEN, RJUST | LONG_HEX,
-+			MKSTR((ulong)page_middle)), pmd_pte);
-+
-+	if ((pmd_pte & PMD_TYPE_MASK) == PMD_TYPE_SECT) {
-+		if (verbose) {
-+			fprintf(fp, " PAGE: %s  (1MB)\n\n",
-+				mkstring(buf, VADDR_PRLEN, RJUST | LONG_HEX,
-+				MKSTR(PAGEBASE(pmd_pte))));
-+		}
-+		*paddr = PAGEBASE(pmd_pte) + (vaddr & ~_SECTION_PAGE_MASK);
-+		return TRUE;
-+	}
-+
-+	/*
-+	 * pte_offset_map(pmd, vaddr)
-+	 */
-+	page_table = (ulong *)PTOV(pmd_page_addr(pmd_pte)) + PTE_OFFSET(vaddr);
-+
-+	FILL_PTBL(PAGEBASE(page_table), KVADDR, PAGESIZE());
-+	pte = ULONG(machdep->ptbl + PAGEOFFSET(page_table));
-+
-+	if (verbose) {
-+		fprintf(fp, "  PTE: %s => %lx\n\n",
-+			mkstring(buf, VADDR_PRLEN, RJUST | LONG_HEX,
-+			MKSTR((ulong)page_table)), pte);
-+	}
-+
-+	if (!pte_present(pte)) {
-+		if (pte && verbose) {
-+			fprintf(fp, "\n");
-+			arm_translate_pte(pte, 0, 0);
-+		}
-+		return FALSE;
-+	}
-+
-+	*paddr = PAGEBASE(pte) + PAGEOFFSET(vaddr);
-+
-+	if (verbose) {
-+		fprintf(fp, " PAGE: %s\n\n",
-+			mkstring(buf, VADDR_PRLEN, RJUST | LONG_HEX,
-+			MKSTR(PAGEBASE(pte))));
-+		arm_translate_pte(pte, 0, 0);
-+	}
-+
-+	return TRUE;
-+}
-+
-+/*
-+ * Translates a user virtual address to its physical address. cmd_vtop() sets
-+ * the verbose flag so that the pte translation gets displayed; all other
-+ * callers quietly accept the translation.
-+ */
-+static int
-+arm_uvtop(struct task_context *tc, ulong uvaddr, physaddr_t *paddr, int verbose)
-+{
-+	ulong *pgd;
-+	ulong mm;
-+
-+	if (!tc)
-+		error(FATAL, "current context invalid\n");
-+
-+	*paddr = 0;
-+
-+	if (IS_KVADDR(uvaddr))
-+		return arm_kvtop(tc, uvaddr, paddr, verbose);
-+
-+	mm = task_mm(tc->task, TRUE);
-+	if (mm)
-+		pgd = ULONG_PTR(tt->mm_struct + OFFSET(mm_struct_pgd));
-+	else
-+		readmem(tc->mm_struct + OFFSET(mm_struct_pgd), KVADDR, &pgd,
-+			sizeof(long), "mm_struct pgd", FAULT_ON_ERROR);
-+
-+	return arm_vtop(uvaddr, pgd, paddr, verbose);
-+}
-+
-+/*
-+ * Translates a kernel virtual address to its physical address. cmd_vtop() sets
-+ * the verbose flag so that the pte translation gets displayed; all other
-+ * callers quietly accept the translation.
-+ */
-+static int
-+arm_kvtop(struct task_context *tc, ulong kvaddr, physaddr_t *paddr, int verbose)
-+{
-+	if (!IS_KVADDR(kvaddr))
-+		return FALSE;
-+
-+	if (!vt->vmalloc_start) {
-+		*paddr = VTOP(kvaddr);
-+		return TRUE;
-+	}
-+
-+	if (!IS_VMALLOC_ADDR(kvaddr)) {
-+		*paddr = VTOP(kvaddr);
-+		if (!verbose)
-+			return TRUE;
-+	}
-+
-+	return arm_vtop(kvaddr, (ulong *)vt->kernel_pgd[0], paddr, verbose);
-+}
-+
-+/*
-+ * Get SP and PC values for idle tasks.
-+ */
-+static int
-+arm_get_frame(struct bt_info *bt, ulong *pcp, ulong *spp)
-+{
-+	const char *cpu_context;
-+
-+	if (!bt->tc || !(tt->flags & THREAD_INFO))
-+		return FALSE;
-+
-+	/*
-+	 * Update thread_info in tt.
-+	 */
-+	if (!fill_thread_info(bt->tc->thread_info))
-+		return FALSE;
-+
-+	cpu_context = tt->thread_info + OFFSET(thread_info_cpu_context);
-+
-+#define GET_REG(ptr, cp, off) ((*ptr) = (*((ulong *)((cp) + OFFSET(off)))))
-+	/*
-+	 * Unwinding code needs FP value also so we pass it with bt.
-+	 */
-+	GET_REG(&bt->frameptr, cpu_context, cpu_context_save_fp);
-+	GET_REG(spp, cpu_context, cpu_context_save_sp);
-+	GET_REG(pcp, cpu_context, cpu_context_save_pc);
-+
-+	return TRUE;
-+}
-+
-+/*
-+ * Get the starting point for the active cpu in a diskdump.
-+ *
-+ * Note that we currently support only UP machines. In future we might want to
-+ * support SMP machines as well.
-+ */
-+static int
-+arm_get_dumpfile_stack_frame(struct bt_info *bt, ulong *nip, ulong *ksp)
-+{
-+	const struct machine_specific *ms = machdep->machspec;
-+
-+	if (!ms->crash_task_regs)
-+		return FALSE;
-+
-+	if (tt->panic_task != bt->task || bt->tc->pid != ms->crash_task_pid)
-+		return FALSE;
-+
-+	/*
-+	 * We got registers for panic task from crash_notes. Just return them.
-+	 */
-+	*nip = ms->crash_task_regs->ARM_pc;
-+	*ksp = ms->crash_task_regs->ARM_sp;
-+
-+	/*
-+	 * Also store pointer to all registers in case unwinding code needs
-+	 * to access LR.
-+	 */
-+	bt->machdep = ms->crash_task_regs;
-+
-+	return TRUE;
-+}
-+
-+/*
-+ * Get a stack frame combination of PC and SP from the most relevant spot.
-+ */
-+static void
-+arm_get_stack_frame(struct bt_info *bt, ulong *pcp, ulong *spp)
-+{
-+	ulong ip, sp;
-+	int ret;
-+
-+	ip = sp = 0;
-+	bt->machdep = NULL;
-+
-+	if (DUMPFILE() && is_task_active(bt->task))
-+		ret = arm_get_dumpfile_stack_frame(bt, &ip, &sp);
-+	else
-+		ret = arm_get_frame(bt, &ip, &sp);
-+
-+	if (!ret) {
-+		error(WARNING, "cannot get stackframe for task\n");
-+		return;
-+	}
-+
-+	if (pcp)
-+		*pcp = ip;
-+	if (spp)
-+		*spp = sp;
-+}
-+
-+/*
-+ * Prints out exception stack starting from start.
-+ */
-+void
-+arm_dump_exception_stack(ulong start, ulong end)
-+{
-+	struct arm_pt_regs regs;
-+	ulong flags;
-+	char buf[64];
-+
-+	if (!readmem(start, KVADDR, &regs, sizeof(regs),
-+		     "exception regs", RETURN_ON_ERROR)) {
-+		error(WARNING, "failed to read exception registers\n");
-+		return;
-+	}
-+
-+	fprintf(fp, "    pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
-+		"    sp : %08lx  ip : %08lx  fp : %08lx\n",
-+		regs.ARM_pc, regs.ARM_lr, regs.ARM_cpsr,
-+		regs.ARM_sp, regs.ARM_ip, regs.ARM_fp);
-+	fprintf(fp, "    r10: %08lx  r9 : %08lx  r8 : %08lx\n",
-+		regs.ARM_r10, regs.ARM_r9, regs.ARM_r8);
-+	fprintf(fp, "    r7 : %08lx  r6 : %08lx  r5 : %08lx  r4 : %08lx\n",
-+		regs.ARM_r7, regs.ARM_r6,
-+		regs.ARM_r5, regs.ARM_r4);
-+	fprintf(fp, "    r3 : %08lx  r2 : %08lx  r1 : %08lx  r0 : %08lx\n",
-+		regs.ARM_r3, regs.ARM_r2,
-+		regs.ARM_r1, regs.ARM_r0);
-+
-+	flags = regs.ARM_cpsr;
-+	buf[0] = flags & PSR_N_BIT ? 'N' : 'n';
-+	buf[1] = flags & PSR_Z_BIT ? 'Z' : 'z';
-+	buf[2] = flags & PSR_C_BIT ? 'C' : 'c';
-+	buf[3] = flags & PSR_V_BIT ? 'V' : 'v';
-+	buf[4] = '\0';
-+
-+	fprintf(fp, "    Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s\n",
-+		buf, interrupts_enabled(&regs) ? "n" : "ff",
-+		fast_interrupts_enabled(&regs) ? "n" : "ff",
-+		processor_modes[processor_mode(&regs)],
-+		isa_modes[isa_mode(&regs)]);
-+}
-+
-+static void
-+arm_display_full_frame(struct bt_info *bt, ulong sp)
-+{
-+	ulong words, addr;
-+	ulong *up;
-+	char buf[BUFSIZE];
-+	int i, u_idx;
-+
-+	if (!INSTACK(sp, bt) || !INSTACK(bt->stkptr, bt))
-+		return;
-+
-+	words = (sp - bt->stkptr) / sizeof(ulong);
-+
-+	if (words == 0) {
-+		fprintf(fp, "    (no frame)\n");
-+		return;
-+	}
-+
-+	addr = bt->stkptr;
-+	u_idx = (bt->stkptr - bt->stackbase) / sizeof(ulong);
-+	for (i = 0; i < words; i++, u_idx++) {
-+		if ((i % 4) == 0)
-+			fprintf(fp, "%s    %lx: ", i ? "\n" : "", addr);
-+
-+		up = (ulong *)(&bt->stackbuf[u_idx * sizeof(ulong)]);
-+		fprintf(fp, "%s ", format_stack_entry(bt, buf, *up, 0));
-+		addr += sizeof(ulong);
-+	}
-+	fprintf(fp, "\n");
-+}
-+
-+/*
-+ * Prints out a single stack frame. What is printed depends on flags passed in
-+ * with bt.
-+ *
-+ * What is expected when calling this function:
-+ *	bt->frameptr = current FP (or 0 if there is no such)
-+ *	bt->stkptr = current SP
-+ *	bt->instptr = current PC
-+ *
-+ *	from = LR
-+ *	sp = previous/saved SP
-+ */
-+void
-+arm_dump_backtrace_entry(struct bt_info *bt, int level, ulong from, ulong sp)
-+{
-+	struct load_module *lm;
-+	const char *name;
-+
-+	name = closest_symbol(bt->instptr);
-+
-+	if (module_symbol(bt->instptr, NULL, &lm, NULL, 0)) {
-+		fprintf(fp, "%s#%d [<%08lx>] (%s [%s]) from [<%08lx>]\n",
-+			level < 10 ? " " : "",
-+			level, bt->instptr, name, lm->mod_name, from);
-+	} else {
-+		fprintf(fp, "%s#%d [<%08lx>] (%s) from [<%08lx>]\n",
-+			level < 10 ? " " : "",
-+			level, bt->instptr, name, from);
-+	}
-+
-+	if (bt->flags & BT_LINE_NUMBERS) {
-+		char buf[BUFSIZE];
-+
-+		get_line_number(bt->instptr, buf, FALSE);
-+		if (strlen(buf))
-+			fprintf(fp, "    %s\n", buf);
-+	}
-+
-+	if (arm_in_exception_text(bt->instptr))
-+		arm_dump_exception_stack(sp, sp + sizeof(struct arm_pt_regs));
-+
-+	if (bt->flags & BT_FULL) {
-+		if (kt->flags & DWARF_UNWIND) {
-+			fprintf(fp, "    "
-+				"[PC: %08lx  LR: %08lx  SP: %08lx  SIZE: %d]\n",
-+				bt->instptr, from, bt->stkptr, sp - bt->stkptr);
-+		} else {
-+			fprintf(fp, "    "
-+				"[PC: %08lx  LR: %08lx  SP: %08lx  FP: %08lx  "
-+				"SIZE: %d]\n",
-+				bt->instptr, from, bt->stkptr, bt->frameptr,
-+				sp - bt->stkptr);
-+		}
-+		arm_display_full_frame(bt, sp);
-+	}
-+}
-+
-+/*
-+ * Determine where vmalloc'd memory starts.
-+ */
-+static ulong
-+arm_vmalloc_start(void)
-+{
-+	return vt->high_memory;
-+}
-+
-+/*
-+ * Checks whether given task is valid task address.
-+ */
-+static int
-+arm_is_task_addr(ulong task)
-+{
-+	if (tt->flags & THREAD_INFO)
-+		return IS_KVADDR(task);
-+
-+	return (IS_KVADDR(task) && ALIGNED_STACK_OFFSET(task) == 0);
-+}
-+
-+/*
-+ * Filter dissassembly output if the output radix is not gdb's default 10
-+ */
-+static int
-+arm_dis_filter(ulong vaddr, char *inbuf)
-+{
-+	char buf1[BUFSIZE];
-+	char buf2[BUFSIZE];
-+	char *colon, *p1;
-+	int argc;
-+	char *argv[MAXARGS];
-+	ulong value;
-+
-+	if (!inbuf)
-+		return TRUE;
-+/*
-+ *  For some reason gdb can go off into the weeds translating text addresses,
-+ *  (on alpha -- not necessarily seen on arm) so this routine both fixes the
-+ *  references as well as imposing the current output radix on the translations.
-+ */
-+	console("IN: %s", inbuf);
-+
-+	colon = strstr(inbuf, ":");
-+
-+	if (colon) {
-+		sprintf(buf1, "0x%lx <%s>", vaddr,
-+			value_to_symstr(vaddr, buf2, pc->output_radix));
-+		sprintf(buf2, "%s%s", buf1, colon);
-+		strcpy(inbuf, buf2);
-+	}
-+
-+	strcpy(buf1, inbuf);
-+	argc = parse_line(buf1, argv);
-+
-+	if ((FIRSTCHAR(argv[argc-1]) == '<') &&
-+	    (LASTCHAR(argv[argc-1]) == '>')) {
-+		p1 = rindex(inbuf, '<');
-+		while ((p1 > inbuf) && !STRNEQ(p1, " 0x"))
-+			p1--;
-+
-+		if (!STRNEQ(p1, " 0x"))
-+			return FALSE;
-+		p1++;
-+
-+		if (!extract_hex(p1, &value, NULLCHAR, TRUE))
-+			return FALSE;
-+
-+		sprintf(buf1, "0x%lx <%s>\n", value,
-+			value_to_symstr(value, buf2, pc->output_radix));
-+
-+		sprintf(p1, buf1);
-+	}
-+
-+	console("    %s", inbuf);
-+
-+	return TRUE;
-+}
-+
-+/*
-+ * Look for likely exception frames in a stack.
-+ */
-+static int
-+arm_eframe_search(struct bt_info *bt)
-+{
-+	return (NOT_IMPLEMENTED());
-+}
-+
-+/*
-+ * Get the relevant page directory pointer from a task structure.
-+ */
-+static ulong
-+arm_get_task_pgd(ulong task)
-+{
-+	return (NOT_IMPLEMENTED());
-+}
-+
-+/*
-+ * Machine dependent command.
-+ */
-+static void
-+arm_cmd_mach(void)
-+{
-+	int c;
-+
-+	while ((c = getopt(argcnt, args, "cm")) != -1) {
-+		switch (c) {
-+		case 'c':
-+		case 'm':
-+			fprintf(fp, "ARM: '-%c' option is not supported\n", c);
-+			break;
-+
-+		default:
-+			argerrs++;
-+			break;
-+		}
-+	}
-+
-+	if (argerrs)
-+		cmd_usage(pc->curcmd, SYNOPSIS);
-+
-+	arm_display_machine_stats();
-+}
-+
-+static void
-+arm_display_machine_stats(void)
-+{
-+	struct new_utsname *uts;
-+	char buf[BUFSIZE];
-+	ulong mhz;
-+
-+	uts = &kt->utsname;
-+
-+	fprintf(fp, "       MACHINE TYPE: %s\n", uts->machine);
-+	fprintf(fp, "        MEMORY SIZE: %s\n", get_memory_size(buf));
-+	fprintf(fp, "               CPUS: %d\n", get_cpus_to_display());
-+	fprintf(fp, "    PROCESSOR SPEED: ");
-+	if ((mhz = machdep->processor_speed()))
-+		fprintf(fp, "%ld Mhz\n", mhz);
-+	else
-+		fprintf(fp, "(unknown)\n");
-+	fprintf(fp, "                 HZ: %d\n", machdep->hz);
-+	fprintf(fp, "          PAGE SIZE: %d\n", PAGESIZE());
-+	fprintf(fp, "KERNEL VIRTUAL BASE: %lx\n", machdep->kvbase);
-+	fprintf(fp, "KERNEL VMALLOC BASE: %lx\n", vt->vmalloc_start);
-+	fprintf(fp, "  KERNEL STACK SIZE: %ld\n", STACKSIZE());
-+}
-+
-+static int
-+arm_get_smp_cpus(void)
-+{
-+	return get_cpus_online();
-+}
-+
-+static void
-+print_irq_member(char *irq, ulong val, char *ind)
-+{
-+	char buf[BUFSIZE];
-+	ulong val2;
-+
-+	fprintf(fp, "%17s: %8lx  ", irq, val);
-+	if (val) {
-+		if (is_kernel_text(val))
-+			fprintf(fp, "<%s>", value_to_symstr(val, buf, 0));
-+		else if (readmem(val, KVADDR, &val2,
-+			sizeof(ulong), ind, RETURN_ON_ERROR|QUIET) &&
-+			is_kernel_text(val2))
-+			fprintf(fp, "<%s>", value_to_symstr(val2, buf, 0));
-+	}
-+	fprintf(fp, "\n");
-+}
-+
-+/*
-+ *  Do the work for cmd_irq().
-+ */
-+static void
-+arm_dump_irq(int irq)
-+{
-+	struct datatype_member datatype_member, *dm;
-+	ulong irq_desc_addr;
-+	ulong irq_desc_ptr;
-+	long len;
-+	char buf[BUFSIZE];
-+	int type, status, depth, others;
-+	ulong handler, action, value;
-+	ulong tmp1, tmp2;
-+
-+	dm = &datatype_member;
-+
-+	if (!VALID_STRUCT(irq_desc_t))
-+		error(FATAL, "cannot determine size of irq_desc\n");
-+	len = SIZE(irq_desc_t);
-+
-+        if (symbol_exists("irq_desc"))
-+		irq_desc_addr = symbol_value("irq_desc") + (len * irq);
-+        else if (symbol_exists("_irq_desc"))
-+		irq_desc_addr = symbol_value("_irq_desc") + (len * irq);
-+	else if (symbol_exists("irq_desc_ptrs")) {
-+		get_symbol_data("irq_desc_ptrs", sizeof(void *), &irq_desc_ptr);
-+		irq_desc_ptr += (irq * sizeof(void *));
-+		readmem(irq_desc_ptr, KVADDR, &irq_desc_addr,
-+                        sizeof(void *), "irq_desc_ptrs entry",
-+                        FAULT_ON_ERROR);
-+		if (!irq_desc_addr) {
-+			fprintf(fp, "    IRQ: %d (unused)\n\n", irq);
-+			return;
-+		}
-+	} else {
-+		irq_desc_addr = 0;
-+		error(FATAL,
-+		    "neither irq_desc, _irq_desc, nor irq_desc_ptrs "
-+		    "symbols exist\n");
-+	}
-+
-+        readmem(irq_desc_addr + OFFSET(irq_desc_t_status), KVADDR, &status,
-+                sizeof(int), "irq_desc entry", FAULT_ON_ERROR);
-+	if (VALID_MEMBER(irq_desc_t_handler))
-+	        readmem(irq_desc_addr + OFFSET(irq_desc_t_handler), KVADDR,
-+			&handler, sizeof(long), "irq_desc entry",
-+			FAULT_ON_ERROR);
-+	else if (VALID_MEMBER(irq_desc_t_chip))
-+	        readmem(irq_desc_addr + OFFSET(irq_desc_t_chip), KVADDR,
-+			&handler, sizeof(long), "irq_desc entry",
-+			FAULT_ON_ERROR);
-+        readmem(irq_desc_addr + OFFSET(irq_desc_t_action), KVADDR, &action,
-+                sizeof(long), "irq_desc entry", FAULT_ON_ERROR);
-+        readmem(irq_desc_addr + OFFSET(irq_desc_t_depth), KVADDR, &depth,
-+                sizeof(int), "irq_desc entry", FAULT_ON_ERROR);
-+
-+	if (!action && (handler == (ulong)pc->curcmd_private))
-+		return;
-+
-+	fprintf(fp, "    IRQ: %d\n", irq);
-+	fprintf(fp, "ADDRESS: %08lx\n", irq_desc_addr);
-+
-+	if (VALID_MEMBER(irq_desc_t_name)) {
-+		readmem(irq_desc_addr+OFFSET(irq_desc_t_name),
-+			KVADDR,	&tmp1, sizeof(void *),
-+			"irq_desc name", FAULT_ON_ERROR);
-+		if (tmp1) {
-+			fprintf(fp, "   NAME: %lx", tmp1);
-+			BZERO(buf, BUFSIZE);
-+			if (read_string(tmp1, buf, BUFSIZE-1))
-+				fprintf(fp, " \"%s\"", buf);
-+			fprintf(fp, "\n");
-+		}
-+	}
-+
-+	type = status & IRQ_TYPE_SENSE_MASK;
-+	fprintf(fp, "   TYPE: %x %s", type, type ? "(" : "");
-+	others = 0;
-+
-+	if (type & IRQ_TYPE_EDGE_BOTH == IRQ_TYPE_EDGE_BOTH)
-+		fprintf(fp, "%sEDGE_BOTH", others++ ? "|" : "");
-+	else {
-+		if (type & IRQ_TYPE_EDGE_RISING)
-+			fprintf(fp, "%sEDGE_RISING", others++ ? "|" : "");
-+		if (type & IRQ_TYPE_EDGE_FALLING)
-+			fprintf(fp, "%sEDGE_FALLING", others++ ? "|" : "");
-+	}
-+	if (type & IRQ_TYPE_LEVEL_HIGH)
-+		fprintf(fp, "%sLEVEL_HIGH", others++ ? "|" : "");
-+	if (type & IRQ_TYPE_LEVEL_LOW)
-+		fprintf(fp, "%sLEVEL_LOW", others++ ? "|" : "");
-+	fprintf(fp, "%s\n", type ? ")" : "");
-+
-+	fprintf(fp, "  PROBE: %s\n", status & IRQ_TYPE_PROBE ? "true" : "false");
-+
-+	fprintf(fp, " STATUS: %x %s", status, status ? "(" : "");
-+	others = 0;
-+	if (status & IRQ_INPROGRESS) {
-+		fprintf(fp, "IRQ_INPROGRESS");
-+		others++;
-+	}
-+	if (status & IRQ_DISABLED)
-+		fprintf(fp, "%sIRQ_DISABLED", others++ ? "|" : "");
-+        if (status & IRQ_PENDING)
-+                fprintf(fp, "%sIRQ_PENDING", others++ ? "|" : "");
-+        if (status & IRQ_REPLAY)
-+                fprintf(fp, "%sIRQ_REPLAY", others++ ? "|" : "");
-+        if (status & IRQ_AUTODETECT)
-+                fprintf(fp, "%sIRQ_AUTODETECT", others++ ? "|" : "");
-+        if (status & IRQ_WAITING)
-+                fprintf(fp, "%sIRQ_WAITING", others++ ? "|" : "");
-+        if (status & IRQ_LEVEL)
-+                fprintf(fp, "%sIRQ_LEVEL", others++ ? "|" : "");
-+        if (status & IRQ_MASKED)
-+                fprintf(fp, "%sIRQ_MASKED", others++ ? "|" : "");
-+
-+        if (status & IRQ_PER_CPU)
-+                fprintf(fp, "%sIRQ_PER_CPU", others++ ? "|" : "");
-+        if (status & IRQ_NOPROBE)
-+                fprintf(fp, "%sIRQ_NOPROBE", others++ ? "|" : "");
-+        if (status & IRQ_NOREQUEST)
-+                fprintf(fp, "%sIRQ_NOREQUEST", others++ ? "|" : "");
-+        if (status & IRQ_NOAUTOEN)
-+                fprintf(fp, "%sIRQ_NOAUTOEN", others++ ? "|" : "");
-+        if (status & IRQ_WAKEUP)
-+                fprintf(fp, "%sIRQ_WAKEUP", others++ ? "|" : "");
-+        if (status & IRQ_MOVE_PENDING)
-+                fprintf(fp, "%sIRQ_MOVE_PENDING", others++ ? "|" : "");
-+        if (status & IRQ_NO_BALANCING)
-+                fprintf(fp, "%sIRQ_NO_BALANCING", others++ ? "|" : "");
-+        if (status & IRQ_SPURIOUS_DISABLED)
-+                fprintf(fp, "%sIRQ_SPURIOUS_DISABLED", others++ ? "|" : "");
-+        if (status & IRQ_MOVE_PCNTXT)
-+                fprintf(fp, "%sIRQ_MOVE_PCNTXT", others++ ? "|" : "");
-+        if (status & IRQ_AFFINITY_SET)
-+                fprintf(fp, "%sIRQ_AFFINITY_SET", others++ ? "|" : "");
-+
-+
-+	fprintf(fp, "%s\n", status ? ")" : "");
-+
-+	fprintf(fp, "HANDLER: %8lx  ", handler);
-+	if (value_symbol(handler)) {
-+		pad_line(fp, VADDR_PRLEN == 8 ? VADDR_PRLEN+2 : VADDR_PRLEN-6, ' ');
-+		fprintf(fp, "<%s>", value_symbol(handler));
-+	}
-+	fprintf(fp, "\n", handler);
-+
-+#define CHECK_HANDLER_OPT_MEMBER_PRT(x)					 \
-+	if (VALID_MEMBER(hw_interrupt_type_ ## x)) {			 \
-+		readmem(handler+OFFSET(hw_interrupt_type_ ## x), KVADDR, \
-+			&tmp1, sizeof(void *),	"hw_interrupt_type " #x, \
-+			FAULT_ON_ERROR);				 \
-+		print_irq_member(#x, tmp1, #x " indirection");		 \
-+	} else if (VALID_MEMBER(irq_chip_ ## x)) {			 \
-+		readmem(handler+OFFSET(irq_chip_ ## x),KVADDR, &tmp1,	 \
-+			sizeof(void *), "irq_chip " #x, FAULT_ON_ERROR); \
-+		print_irq_member(#x, tmp1, #x " indirection");		 \
-+	}
-+
-+#define CHECK_HANDLER_OPT_MEMBER(x)					 \
-+	if (VALID_MEMBER(hw_interrupt_type_ ## x))			 \
-+		readmem(handler+OFFSET(hw_interrupt_type_ ## x), KVADDR, \
-+			&tmp1, sizeof(void *), "hw_interrupt_type " #x,	 \
-+			FAULT_ON_ERROR);				 \
-+	else if (VALID_MEMBER(irq_chip_ ## x))				 \
-+		readmem(handler+OFFSET(irq_chip_ ## x),KVADDR, &tmp1,	 \
-+			sizeof(void *), "irq_chip " #x, FAULT_ON_ERROR); \
-+
-+#define CHECK_HANDLER_MEMBER_PRT(x,s1,s2)				 \
-+	if (VALID_MEMBER(x)) {						 \
-+		readmem(handler+OFFSET(x), KVADDR, &tmp1, sizeof(void *),\
-+			s1, FAULT_ON_ERROR);				 \
-+			print_irq_member(s2, tmp1, s2 " indirection");	 \
-+	}
-+
-+	if (handler) {
-+		CHECK_HANDLER_OPT_MEMBER(typename);
-+
-+		fprintf(fp, "         typename: %lx  ", tmp1);
-+		BZERO(buf, BUFSIZE);
-+		if (read_string(tmp1, buf, BUFSIZE-1))
-+			fprintf(fp, "\"%s\"", buf);
-+		fprintf(fp, "\n");
-+
-+		CHECK_HANDLER_OPT_MEMBER(startup);
-+
-+		print_irq_member("startup", tmp1, "startup indirection");
-+
-+		CHECK_HANDLER_OPT_MEMBER(shutdown);
-+
-+		print_irq_member("shutdown", tmp1, "shutdown indirection");
-+
-+		CHECK_HANDLER_MEMBER_PRT(hw_interrupt_type_handle,
-+					 "hw_interrupt_type handle",
-+					 "handle");
-+
-+		CHECK_HANDLER_OPT_MEMBER(enable);
-+
-+		print_irq_member("enable", tmp1, "enable indirection");
-+
-+		CHECK_HANDLER_OPT_MEMBER(disable);
-+
-+		print_irq_member("disable", tmp1, "disable indirection");
-+
-+		CHECK_HANDLER_OPT_MEMBER(ack);
-+
-+		print_irq_member("ack", tmp1, "ack indirection");
-+
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_mask, "irq_chip mask","mask");
-+
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_mask_ack, "irq_chip mask_ack",
-+					 "mask_ack");
-+
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_unmask, "irq_chip unmask",
-+					 "unmask");
-+
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_eoi,"irq_chip eoi","eoi");
-+
-+		CHECK_HANDLER_OPT_MEMBER_PRT(startup);
-+
-+		CHECK_HANDLER_OPT_MEMBER_PRT(set_affinity);
-+
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_retrigger,
-+					 "irq_chip retrigger", "retrigger");
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_set_type,
-+					 "irq_chip set_type", "set_type");
-+		CHECK_HANDLER_MEMBER_PRT(irq_chip_set_wake,
-+					 "irq_chip set_wake", "set_wake");
-+	}
-+
-+do_linked_action:
-+
-+	fprintf(fp, " ACTION: ");
-+        if (value_symbol(action)) {
-+                fprintf(fp, "%lx  ", action);
-+                pad_line(fp, VADDR_PRLEN == 8 ?
-+			VADDR_PRLEN+2 : VADDR_PRLEN - 6, ' ');
-+                fprintf(fp, "<%s>\n", value_symbol(action));
-+        } else if (action) {
-+                fprintf(fp, "%8lx\n", action);
-+	} else {
-+		fprintf(fp, "(none)\n");
-+	}
-+
-+	if (action) {
-+                readmem(action+OFFSET(irqaction_handler), KVADDR,
-+                        &tmp1, sizeof(void *),
-+                        "irqaction handler", FAULT_ON_ERROR);
-+
-+		print_irq_member("handler", tmp1, "handler indirection");
-+
-+                readmem(action+OFFSET(irqaction_flags), KVADDR,
-+                        &value, sizeof(void *),
-+                        "irqaction flags", FAULT_ON_ERROR);
-+                fprintf(fp, "            flags: %8lx\n", value);
-+
-+		if (VALID_MEMBER(irqaction_mask)) {
-+			readmem(action+OFFSET(irqaction_mask), KVADDR,
-+				&tmp1, sizeof(void *),
-+				"irqaction mask", FAULT_ON_ERROR);
-+			fprintf(fp, "             mask: %8lx\n", tmp1);
-+		}
-+
-+                readmem(action+OFFSET(irqaction_name), KVADDR,
-+                        &tmp1, sizeof(void *),
-+                        "irqaction name", FAULT_ON_ERROR);
-+                fprintf(fp, "             name: %8lx  ", tmp1);
-+                BZERO(buf, BUFSIZE);
-+                if (read_string(tmp1, buf, BUFSIZE-1))
-+                        fprintf(fp, "\"%s\"", buf);
-+                fprintf(fp, "\n");
-+
-+                readmem(action+OFFSET(irqaction_dev_id), KVADDR,
-+                        &tmp1, sizeof(void *),
-+                        "irqaction dev_id", FAULT_ON_ERROR);
-+                fprintf(fp, "           dev_id: %8lx\n", tmp1);
-+
-+                readmem(action+OFFSET(irqaction_next), KVADDR,
-+                        &action, sizeof(void *),
-+                        "irqaction dev_id", FAULT_ON_ERROR);
-+                fprintf(fp, "             next: %8lx\n", action);
-+	}
-+
-+	if (action)
-+		goto do_linked_action;
-+
-+	fprintf(fp, "  DEPTH: %d\n\n", depth);
-+}
-+
-+/*
-+ * Initialize ARM specific stuff.
-+ */
-+static void
-+arm_init_machspec(void)
-+{
-+	struct machine_specific *ms = machdep->machspec;
-+	ulong phys_base;
-+
-+	if (symbol_exists("__exception_text_start") &&
-+	    symbol_exists("__exception_text_end")) {
-+		ms->exception_text_start = symbol_value("__exception_text_start");
-+		ms->exception_text_end = symbol_value("__exception_text_end");
-+	}
-+
-+	if (symbol_exists("_stext") && symbol_exists("_etext")) {
-+		ms->kernel_text_start = symbol_value("_stext");
-+		ms->kernel_text_end = symbol_value("_etext");
-+	}
-+
-+	if (CRASHDEBUG(1)) {
-+		fprintf(fp, "kernel text:    [%lx - %lx]\n",
-+			ms->kernel_text_start, ms->kernel_text_end);
-+		fprintf(fp, "exception text: [%lx - %lx]\n",
-+			ms->exception_text_start, ms->exception_text_end);
-+	}
-+
-+	if (machdep->flags & PHYS_BASE) /* --machdep override */
-+		return;
-+
-+	/*
-+	 * Next determine suitable value for phys_base. User can override this
-+	 * by passing valid '--machdep phys_base=<addr>' option.
-+	 */
-+	ms->phys_base = 0;
-+
-+	if (ACTIVE()) {
-+		char buf[BUFSIZE];
-+		char *p1;
-+		int errflag;
-+		FILE *fp;
-+
-+		if ((fp = fopen("/proc/iomem", "r")) == NULL)
-+			return;
-+
-+		/*
-+		 * Memory regions are sorted in ascending order. We take the
-+		 * first region which should be correct for most uses.
-+		 */
-+		errflag = 1;
-+		while (fgets(buf, BUFSIZE, fp)) {
-+			if (strstr(buf, ": System RAM")) {
-+				clean_line(buf);
-+				errflag = 0;
-+				break;
-+			}
-+		}
-+		fclose(fp);
-+
-+		if (errflag)
-+			return;
-+
-+		if (!(p1 = strstr(buf, "-")))
-+			return;
-+
-+		*p1 = NULLCHAR;
-+
-+		phys_base = htol(buf, RETURN_ON_ERROR | QUIET, &errflag);
-+		if (errflag)
-+			return;
-+
-+		ms->phys_base = phys_base;
-+	} else if (DISKDUMP_DUMPFILE() && diskdump_phys_base(&phys_base)) {
-+		ms->phys_base = phys_base;
-+	} else if (KDUMP_DUMPFILE() && kdump_phys_base(&phys_base)) {
-+		ms->phys_base = phys_base;
-+	} else {
-+		error(WARNING,
-+			"phys_base cannot be determined from the dumpfile.\n"
-+			"Using default value of 0. If this is not correct,\n"
-+			"consider using '--machdep phys_base=<addr>'\n");
-+	}
-+
-+	if (CRASHDEBUG(1))
-+		fprintf(fp, "using %lx as phys_base\n", ms->phys_base);
-+}
-+
-+static const char *hook_files[] = {
-+	"arch/arm/kernel/entry-armv.S",
-+	"arch/arm/kernel/entry-common.S",
-+};
-+
-+#define ENTRY_ARMV_S	((char **)&hook_files[0])
-+#define ENTRY_COMMON_S	((char **)&hook_files[1])
-+
-+static struct line_number_hook arm_line_number_hooks[] = {
-+	{ "__dabt_svc", ENTRY_ARMV_S },
-+	{ "__irq_svc", ENTRY_ARMV_S },
-+	{ "__und_svc", ENTRY_ARMV_S },
-+	{ "__pabt_svc", ENTRY_ARMV_S },
-+	{ "__switch_to", ENTRY_ARMV_S },
-+
-+	{ "ret_fast_syscall", ENTRY_COMMON_S },
-+	{ "ret_slow_syscall", ENTRY_COMMON_S },
-+	{ "ret_from_fork", ENTRY_COMMON_S },
-+	{ NULL, NULL },
-+};
-+#endif /* ARM */
-diff --git a/defs.h b/defs.h
-index c8bae00..f9118f0 100755
---- a/defs.h
-+++ b/defs.h
-@@ -84,6 +84,9 @@
- #ifdef S390X
- #define NR_CPUS  (64)
- #endif
-+#ifdef ARM
-+#define NR_CPUS  (1)
-+#endif
- 
- #define BUFSIZE  (1500)
- #define NULLCHAR ('\0')
-@@ -1513,6 +1516,22 @@ struct offset_table {                    /* stash of commonly-used offsets */
- 	long mm_rss_stat_count;
- 	long module_module_init;
- 	long module_init_text_size;
-+#ifdef ARM
-+	long cpu_context_save_fp;
-+	long cpu_context_save_sp;
-+	long cpu_context_save_pc;
-+	long elf_prstatus_pr_pid;
-+	long elf_prstatus_pr_reg;
-+	long irq_desc_t_name;
-+	long thread_info_cpu_context;
-+	long unwind_table_list;
-+	long unwind_table_start;
-+	long unwind_table_stop;
-+	long unwind_table_begin_addr;
-+	long unwind_table_end_addr;
-+	long unwind_idx_addr;
-+	long unwind_idx_insn;
-+#endif /* ARM */
- };
- 
- struct size_table {         /* stash of commonly-used sizes */
-@@ -1625,6 +1644,12 @@ struct size_table {         /* stash of commonly-used sizes */
- 	long module_sect_attr;
- 	long task_struct_utime;
- 	long task_struct_stime;
-+#ifdef ARM
-+	long cpu_context_save;
-+	long elf_prstatus;
-+	long note_buf;
-+	long unwind_idx;
-+#endif /* ARM */
- };
- 
- struct array_table {
-@@ -2099,6 +2124,49 @@ struct load_module {
-  *  Machine specific stuff
-  */
- 
-+#ifdef ARM
-+#define _32BIT_
-+#define MACHINE_TYPE		"ARM"
-+
-+#define PAGEBASE(X)		(((ulong)(X)) & (ulong)machdep->pagemask)
-+
-+#define PTOV(X) \
-+	((unsigned long)(X)-(machdep->machspec->phys_base)+(machdep->kvbase))
-+#define VTOP(X) \
-+	((unsigned long)(X)-(machdep->kvbase)+(machdep->machspec->phys_base))
-+
-+#define IS_VMALLOC_ADDR(X) 	arm_is_vmalloc_addr((ulong)(X))
-+
-+#define MODULES_VADDR   	(machdep->machspec->modules_vaddr)
-+#define MODULES_END     	(machdep->machspec->modules_end)
-+#define VMALLOC_START   	(machdep->machspec->vmalloc_start_addr)
-+#define VMALLOC_END     	(machdep->machspec->vmalloc_end)
-+
-+#define PGDIR_SHIFT   		(21)
-+#define PTRS_PER_PTE		(512)
-+#define PTRS_PER_PGD		(2048)
-+
-+#define PGD_OFFSET(vaddr)       ((vaddr) >> PGDIR_SHIFT)
-+#define PTE_OFFSET(vaddr)       (((vaddr) >> PAGESHIFT()) & (PTRS_PER_PTE - 1))
-+
-+#define __SWP_TYPE_SHIFT	3
-+#define __SWP_TYPE_BITS		6
-+#define __SWP_TYPE_MASK		((1 << __SWP_TYPE_BITS) - 1)
-+#define __SWP_OFFSET_SHIFT	(__SWP_TYPE_BITS + __SWP_TYPE_SHIFT)
-+
-+#define SWP_TYPE(entry)		(((entry) >> __SWP_TYPE_SHIFT) & __SWP_TYPE_MASK)
-+#define SWP_OFFSET(entry)	((entry) >> __SWP_OFFSET_SHIFT)
-+
-+#define __swp_type(entry)	SWP_TYPE(entry)
-+#define __swp_offset(entry)	SWP_OFFSET(entry)
-+
-+#define TIF_SIGPENDING		(2)
-+
-+#define _SECTION_SIZE_BITS	28
-+#define _MAX_PHYSMEM_BITS	32
-+
-+#endif  /* ARM */
-+
- #ifdef X86
- #define _32BIT_
- #define MACHINE_TYPE       "X86"
-@@ -2795,6 +2863,10 @@ struct efi_memory_desc_t {
- #define SIZEOF_16BIT  (2)
- #define SIZEOF_8BIT   (1)
- 
-+#ifdef ARM
-+#define MAX_HEXADDR_STRLEN (8)
-+#define UVADDR_PRLEN       (8)
-+#endif
- #ifdef X86
- #define MAX_HEXADDR_STRLEN (8)             
- #define UVADDR_PRLEN       (8)
-@@ -2971,6 +3043,13 @@ struct efi_memory_desc_t {
- #define IRQ_AFFINITY_SET	\
- 	(THIS_KERNEL_VERSION >= LINUX(2,6,21) ? IRQ_AFFINITY_SET_2_6_21 : 0)
- 
-+#ifdef ARM
-+#define SA_PROBE                SA_ONESHOT
-+#define SA_SAMPLE_RANDOM        SA_RESTART
-+#define SA_SHIRQ                0x04000000
-+#define SA_RESTORER             0x04000000
-+#endif
-+
- #ifdef X86
- #define SA_PROBE                SA_ONESHOT
- #define SA_SAMPLE_RANDOM        SA_RESTART
-@@ -3301,6 +3380,9 @@ void program_usage(int);
- #define SHORT_FORM (0)
- void dump_program_context(void);
- void dump_build_data(void);
-+#ifdef ARM
-+#define machdep_init(X) arm_init(X)
-+#endif
- #ifdef X86
- #define machdep_init(X) x86_init(X)
- #endif
-@@ -3659,6 +3741,9 @@ void help_init(void);
- void cmd_usage(char *, int);
- void display_version(void);
- void display_help_screen(char *);
-+#ifdef ARM
-+#define dump_machdep_table(X) arm_dump_machdep_table(X)
-+#endif
- #ifdef X86
- #define dump_machdep_table(X) x86_dump_machdep_table(X)
- #endif
-@@ -3937,6 +4022,58 @@ void read_in_kernel_config(int);
- void dev_init(void);
- void dump_dev_table(void);
- 
-+#ifdef ARM
-+void arm_init(int);
-+void arm_dump_machdep_table(ulong);
-+int arm_is_vmalloc_addr(ulong);
-+void arm_dump_backtrace_entry(struct bt_info *, int, ulong, ulong);
-+
-+#define display_idt_table() \
-+        error(FATAL, "-d option is not applicable to ARM architecture\n")
-+
-+struct arm_pt_regs {
-+	ulong uregs[18];
-+};
-+
-+#define ARM_cpsr	uregs[16]
-+#define ARM_pc		uregs[15]
-+#define ARM_lr		uregs[14]
-+#define ARM_sp		uregs[13]
-+#define ARM_ip		uregs[12]
-+#define ARM_fp		uregs[11]
-+#define ARM_r10		uregs[10]
-+#define ARM_r9		uregs[9]
-+#define ARM_r8		uregs[8]
-+#define ARM_r7		uregs[7]
-+#define ARM_r6		uregs[6]
-+#define ARM_r5		uregs[5]
-+#define ARM_r4		uregs[4]
-+#define ARM_r3		uregs[3]
-+#define ARM_r2		uregs[2]
-+#define ARM_r1		uregs[1]
-+#define ARM_r0		uregs[0]
-+#define ARM_ORIG_r0	uregs[17]
-+
-+#define KSYMS_START	(0x1)
-+#define PHYS_BASE	(0x2)
-+
-+struct machine_specific {
-+	ulong phys_base;
-+	ulong vmalloc_start_addr;
-+	ulong modules_vaddr;
-+	ulong modules_end;
-+	ulong kernel_text_start;
-+	ulong kernel_text_end;
-+	ulong exception_text_start;
-+	ulong exception_text_end;
-+	ulong crash_task_pid;
-+	struct arm_pt_regs *crash_task_regs;
-+};
-+
-+int init_unwind_tables(void);
-+void unwind_backtrace(struct bt_info *);
-+#endif /* ARM */
-+
- /*
-  *  alpha.c
-  */
-diff --git a/diskdump.c b/diskdump.c
-index 3aab338..e52e603 100644
---- a/diskdump.c
-+++ b/diskdump.c
-@@ -528,7 +528,15 @@ page_is_cached(physaddr_t paddr)
- static ulong
- paddr_to_pfn(physaddr_t paddr)
- {
-+#ifdef ARM
-+	/*
-+	 * In ARM, PFN 0 means first page in kernel direct-mapped view.
-+	 * This is also first page in mem_map as well.
-+	 */
-+	return (paddr - machdep->machspec->phys_base) >> dd->block_shift;
-+#else
- 	return paddr >> dd->block_shift;
-+#endif
- }
- 
- /*
-diff --git a/unwind_arm.c b/unwind_arm.c
-new file mode 100644
-index 0000000..8352e2d
---- /dev/null
-+++ b/unwind_arm.c
-@@ -0,0 +1,697 @@
-+/*
-+ * Stack unwinding support for ARM
-+ *
-+ * This code is derived from the kernel source:
-+ * arch/arm/kernel/unwind.c
-+ * Copyright (C) 2008 ARM Limited
-+ *
-+ * Created by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
-+ * Copyright (C) 2010 Nokia Corporation
-+ *
-+ * For more information about ARM unwind tables see "Exception handling ABI for
-+ * the ARM architecture" document at:
-+ *
-+ * http://infocenter.arm.com/help/topic/com.arm.doc.subset.swdev.abi/index.html
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifdef ARM
-+
-+#include "defs.h"
-+
-+/**
-+ * struct unwind_idx - index table entry
-+ * @addr: prel31 offset to the start of the function
-+ * @insn: index table entry.
-+ *
-+ * @insn can be encoded as follows:
-+ *     1. if bit31 is clear this points to the start of the EHT entry
-+ *        (prel31 offset)
-+ *     2. if bit31 is set, this contains the EHT entry itself
-+ *     3. if 0x1, cannot unwind.
-+ *
-+ * In case 1. @insn points to the EH table that comes directly after index
-+ * table. This offset is relative to address of @insn which implies that we must
-+ * allocate both index table and EH table in single chunk.
-+ */
-+struct unwind_idx {
-+	ulong	addr;
-+	ulong	insn;
-+};
-+
-+/**
-+ * struct unwind_table - per-module unwind table
-+ * @idx: pointer to the star of the unwind table
-+ * @start: pointer to the start of the index table
-+ * @end: pointer to the last element +1 of the index table
-+ * @begin_addr: start address which this table covers
-+ * @end_addr: end address which this table covers
-+ *
-+ * Kernel stores per-module unwind tables in this format. There can be more than
-+ * one table per module as we have different ELF sections in the module.
-+ */
-+struct unwind_table {
-+	struct unwind_idx	*idx;
-+	struct unwind_idx	*start;
-+	struct unwind_idx	*end;
-+	ulong			begin_addr;
-+	ulong			end_addr;
-+};
-+
-+/*
-+ * Unwind table pointers to master kernel table and for modules.
-+ */
-+static struct unwind_table	*kernel_unwind_table;
-+static struct unwind_table	*module_unwind_tables;
-+
-+struct unwind_ctrl_block {
-+	ulong	vrs[16];
-+	ulong	*insn;
-+	int	entries;
-+	int	byte;
-+};
-+
-+struct stackframe {
-+	ulong	fp;
-+	ulong	sp;
-+	ulong	lr;
-+	ulong	pc;
-+};
-+
-+enum regs {
-+	FP = 11,
-+	SP = 13,
-+	LR = 14,
-+	PC = 15,
-+};
-+
-+static int init_kernel_unwind_table(void);
-+static void free_kernel_unwind_table(void);
-+static int read_module_unwind_table(struct unwind_table *, ulong);
-+static int init_module_unwind_tables(void);
-+static ulong unwind_get_byte(struct unwind_ctrl_block *);
-+static ulong get_value_from_stack(ulong *);
-+static int unwind_exec_insn(struct unwind_ctrl_block *);
-+static int is_core_kernel_text(ulong);
-+static struct unwind_idx *search_index(ulong);
-+static ulong *prel31_to_addr(ulong *);
-+static int unwind_frame(struct stackframe *, ulong);
-+
-+/*
-+ * Function reads in-memory kernel and module unwind tables and makes
-+ * local copy of them for unwinding. If unwinding tables cannot be found, this
-+ * function returns FALSE, otherwise TRUE.
-+ */
-+int
-+init_unwind_tables(void)
-+{
-+	if (!symbol_exists("__start_unwind_idx") ||
-+	    !symbol_exists("__stop_unwind_idx") ||
-+	    !symbol_exists("__start_unwind_tab") ||
-+	    !symbol_exists("__stop_unwind_tab") ||
-+	    !symbol_exists("unwind_tables")) {
-+		return FALSE;
-+	}
-+
-+	if (!init_kernel_unwind_table()) {
-+		error(WARNING,
-+		      "UNWIND: failed to initialize kernel unwind table\n");
-+		return FALSE;
-+	}
-+
-+	/*
-+	 * Initialize symbols for per-module unwind tables. Actually there are
-+	 * several tables per module (one per code section).
-+	 */
-+	STRUCT_SIZE_INIT(unwind_table, "unwind_table");
-+	MEMBER_OFFSET_INIT(unwind_table_list, "unwind_table", "list");
-+	MEMBER_OFFSET_INIT(unwind_table_start, "unwind_table", "start");
-+	MEMBER_OFFSET_INIT(unwind_table_stop, "unwind_table", "stop");
-+	MEMBER_OFFSET_INIT(unwind_table_begin_addr, "unwind_table",
-+			   "begin_addr");
-+	MEMBER_OFFSET_INIT(unwind_table_end_addr, "unwind_table", "end_addr");
-+
-+	STRUCT_SIZE_INIT(unwind_idx, "unwind_idx");
-+	MEMBER_OFFSET_INIT(unwind_idx_addr, "unwind_idx", "addr");
-+	MEMBER_OFFSET_INIT(unwind_idx_insn, "unwind_idx", "insn");
-+
-+	if (!init_module_unwind_tables()) {
-+		error(WARNING,
-+		      "UNWIND: failed to initialize module unwind tables\n");
-+		free_kernel_unwind_table();
-+		return FALSE;
-+	}
-+
-+	/*
-+	 * We abuse DWARF_UNWIND flag a little here as ARM unwinding tables are
-+	 * not in DWARF format but we can use the flags to indicate that we have
-+	 * unwind tables support ready.
-+	 */
-+	kt->flags |= DWARF_UNWIND_CAPABLE;
-+	kt->flags |= DWARF_UNWIND;
-+
-+	return TRUE;
-+}
-+
-+/*
-+ * Allocate and fill master kernel unwind table.
-+ */
-+static int
-+init_kernel_unwind_table(void)
-+{
-+	ulong idx_start, idx_end, idx_size;
-+	ulong tab_end, tab_size;
-+
-+	kernel_unwind_table = calloc(sizeof(*kernel_unwind_table), 1);
-+	if (!kernel_unwind_table)
-+		return FALSE;
-+
-+	idx_start = symbol_value("__start_unwind_idx");
-+	idx_end = symbol_value("__stop_unwind_idx");
-+	tab_end = symbol_value("__stop_unwind_tab");
-+
-+	/*
-+	 * Calculate sizes of the idx table and the EH table.
-+	 */
-+	idx_size = idx_end - idx_start;
-+	tab_size = tab_end - idx_start;
-+
-+	kernel_unwind_table->idx = calloc(tab_size, 1);
-+	if (!kernel_unwind_table->idx)
-+		goto fail;
-+
-+	/*
-+	 * Now read in both the index table and the EH table. We need to read in
-+	 * both because prel31 offsets in the index table are relative to the
-+	 * index address.
-+	 */
-+	if (!readmem(idx_start, KVADDR, kernel_unwind_table->idx, tab_size,
-+		     "master kernel unwind table", RETURN_ON_ERROR))
-+		goto fail;
-+
-+	kernel_unwind_table->start = kernel_unwind_table->idx;
-+	kernel_unwind_table->end = (struct unwind_idx *)
-+		((char *)kernel_unwind_table->idx + idx_size);
-+	kernel_unwind_table->begin_addr = kernel_unwind_table->start->addr;
-+	kernel_unwind_table->end_addr = (kernel_unwind_table->end - 1)->addr;
-+
-+	if (CRASHDEBUG(1)) {
-+		fprintf(fp, "UNWIND: master kernel table start\n");
-+		fprintf(fp, "UNWIND: size      : %ld\n", tab_size);
-+		fprintf(fp, "UNWIND: start     : %p\n", kernel_unwind_table->start);
-+		fprintf(fp, "UNWIND: end       : %p\n", kernel_unwind_table->end);
-+		fprintf(fp, "UNWIND: begin_addr: 0x%lx\n",
-+			kernel_unwind_table->begin_addr);
-+		fprintf(fp, "UNWIND: begin_addr: 0x%lx\n",
-+			kernel_unwind_table->end_addr);
-+		fprintf(fp, "UNWIND: master kernel table end\n");
-+	}
-+
-+	return TRUE;
-+
-+fail:
-+	free(kernel_unwind_table->idx);
-+	free(kernel_unwind_table);
-+	return FALSE;
-+}
-+
-+static void
-+free_kernel_unwind_table(void)
-+{
-+	free(kernel_unwind_table->idx);
-+	free(kernel_unwind_table);
-+}
-+
-+/*
-+ * Read single module unwind table from addr.
-+ */
-+static int
-+read_module_unwind_table(struct unwind_table *tbl, ulong addr)
-+{
-+	ulong idx_start, idx_stop, idx_size;
-+	char *buf;
-+
-+	buf = GETBUF(SIZE(unwind_table));
-+
-+	/*
-+	 * First read in the unwind table for this module. It then contains
-+	 * pointers to the index table which we will read later.
-+	 */
-+	if (!readmem(addr, KVADDR, buf, SIZE(unwind_table),
-+		     "module unwind table", RETURN_ON_ERROR)) {
-+		error(WARNING, "UNWIND: cannot read unwind table\n");
-+		goto fail;
-+	}
-+
-+#define TABLE_VALUE(b, offs) (*((ulong *)((b) + OFFSET(offs))))
-+
-+	idx_start = TABLE_VALUE(buf, unwind_table_start);
-+	idx_stop = TABLE_VALUE(buf, unwind_table_stop);
-+	idx_size = idx_stop - idx_start;
-+
-+	/*
-+	 * We know the size of the index table. Allocate memory for the table
-+	 * (including the EH table) and read the contents from the kernel
-+	 * memory.
-+	 */
-+	tbl->idx = calloc(idx_size, 1);
-+	if (!tbl->idx)
-+		goto fail;
-+
-+	if (!readmem(idx_start, KVADDR, tbl->idx, idx_size,
-+		     "module unwind index table", RETURN_ON_ERROR)) {
-+		free(tbl->idx);
-+		goto fail;
-+	}
-+
-+	tbl->start = &tbl->idx[0];
-+	tbl->end = (struct unwind_idx *)((char *)tbl->start + idx_size);
-+	tbl->begin_addr = TABLE_VALUE(buf, unwind_table_begin_addr);
-+	tbl->end_addr = TABLE_VALUE(buf, unwind_table_end_addr);
-+
-+	if (CRASHDEBUG(1)) {
-+		fprintf(fp, "UNWIND: module table start\n");
-+		fprintf(fp, "UNWIND: start     : %p\n", tbl->start);
-+		fprintf(fp, "UNWIND: end       : %p\n", tbl->end);
-+		fprintf(fp, "UNWIND: begin_addr: 0x%lx\n", tbl->begin_addr);
-+		fprintf(fp, "UNWIND: begin_addr: 0x%lx\n", tbl->end_addr);
-+		fprintf(fp, "UNWIND: module table end\n");
-+	}
-+
-+	FREEBUF(buf);
-+	return TRUE;
-+
-+fail:
-+	FREEBUF(buf);
-+	free(tbl->idx);
-+	return FALSE;
-+}
-+
-+/*
-+ * Allocate and fill per-module unwind tables.
-+ */
-+static int
-+init_module_unwind_tables(void)
-+{
-+	ulong head = symbol_value("unwind_tables");
-+	struct unwind_table *tbl;
-+	struct list_data ld;
-+	ulong *table_list;
-+	int cnt, i, n;
-+
-+	BZERO(&ld, sizeof(ld));
-+	ld.start = head;
-+	ld.member_offset = OFFSET(unwind_table_list);
-+
-+	if (CRASHDEBUG(1))
-+		ld.flags |= VERBOSE;
-+
-+	/*
-+	 * Iterate through unwind table list and store start address of each
-+	 * table in table_list.
-+	 */
-+	hq_open();
-+	cnt = do_list(&ld);
-+	table_list = (ulong *)GETBUF(cnt * sizeof(ulong));
-+	cnt = retrieve_list(table_list, cnt);
-+	hq_close();
-+
-+	module_unwind_tables = calloc(sizeof(struct unwind_table), cnt);
-+	if (!module_unwind_tables) {
-+		error(WARNING,
-+		      "UNWIND: failed to allocate memory for (%d tables)\n",
-+		      cnt);
-+		FREEBUF(table_list);
-+		return FALSE;
-+	}
-+
-+	/* we skip the first address as it is just head pointer */
-+	for (i = 1, n = 0; i < cnt; i++, n++) {
-+		tbl = &module_unwind_tables[n];
-+		if (!read_module_unwind_table(tbl, table_list[i]))
-+			goto fail;
-+	}
-+
-+	/* just in case, zero the last entry (again) */
-+	BZERO(&module_unwind_tables[n], sizeof(module_unwind_tables[n]));
-+
-+	FREEBUF(table_list);
-+	return TRUE;
-+
-+fail:
-+	FREEBUF(table_list);
-+
-+	while (--n >= 0) {
-+		tbl = &module_unwind_tables[n];
-+		free(tbl->idx);
-+	}
-+
-+	free(module_unwind_tables);
-+	return FALSE;
-+}
-+
-+/*
-+ * Return next insn byte from ctl or 0 in case of failure. As a side-effect,
-+ * changes ctrl according the next byte.
-+ */
-+static ulong
-+unwind_get_byte(struct unwind_ctrl_block *ctrl)
-+{
-+	ulong ret;
-+
-+	if (ctrl->entries <= 0) {
-+		error(WARNING, "UNWIND: corrupt unwind entry\n");
-+		return 0;
-+	}
-+
-+	ret = (*ctrl->insn >> (ctrl->byte * 8)) & 0xff;
-+
-+	if (!ctrl->byte) {
-+		ctrl->insn++;
-+		ctrl->entries--;
-+		ctrl->byte = 3;
-+	} else {
-+		ctrl->byte--;
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ * Gets one value from stack pointed by vsp.
-+ */
-+static ulong
-+get_value_from_stack(ulong *vsp)
-+{
-+	ulong val;
-+
-+	/*
-+	 * We just read the value from kernel memory instead of peeking it from
-+	 * the bt->stack.
-+	 */
-+	if (!readmem((ulong)vsp, KVADDR, &val, sizeof(val),
-+		"unwind stack value", RETURN_ON_ERROR)) {
-+		error(FATAL, "unwind: failed to read value from stack\n");
-+	}
-+
-+	return val;
-+}
-+
-+/*
-+ * Execute the next unwind instruction.
-+ */
-+static int
-+unwind_exec_insn(struct unwind_ctrl_block *ctrl)
-+{
-+	ulong insn = unwind_get_byte(ctrl);
-+
-+	if ((insn & 0xc0) == 0) {
-+		/*
-+		 * 00xx xxxx: vsp = vsp + (xx xxx << 2) + 4
-+		 *
-+		 * Note that it seems that there is a typo in the spec and this
-+		 * is corrected in kernel.
-+		 */
-+		ctrl->vrs[SP] += ((insn & 0x3f) << 2) + 4;
-+	} else if ((insn & 0xc0) == 0x40) {
-+		/* 00xx xxxx: vsp = vsp + (xx xxx << 2) + 4 */
-+		ctrl->vrs[SP] -= ((insn & 0x3f) << 2) + 4;
-+	} else if ((insn & 0xf0) == 0x80) {
-+		/*
-+		 * Pop up to 12 integer registers under masks
-+		 * {r15-r12}, {r11-r4}.
-+		 */
-+		ulong mask;
-+		ulong *vsp = (ulong *)ctrl->vrs[SP];
-+		int load_sp, reg = 4;
-+
-+		insn = (insn << 8) | unwind_get_byte(ctrl);
-+		mask = insn & 0x0fff;
-+		if (mask == 0) {
-+			error(WARNING, "UNWIND: refuse to unwind\n");
-+			return FALSE;
-+		}
-+
-+		/* pop {r4-r15} according to mask */
-+		load_sp = mask & (1 << (13 - 4));
-+		while (mask) {
-+			if (mask & 1)
-+				ctrl->vrs[reg] = get_value_from_stack(vsp++);
-+			mask >>= 1;
-+			reg++;
-+		}
-+		if (!load_sp)
-+			ctrl->vrs[SP] = (ulong)vsp;
-+	} else if ((insn & 0xf0) == 0x90 &&
-+		   (insn & 0x0d) != 0x0d) {
-+		/* 1001 nnnn: set vsp = r[nnnn] */
-+		ctrl->vrs[SP] = ctrl->vrs[insn & 0x0f];
-+	} else if ((insn & 0xf0) == 0xa0) {
-+		/*
-+		 * 1010 0nnn: pop r4-r[4+nnn]
-+		 * 1010 1nnn: pop r4-r[4+nnn], r14
-+		 */
-+		ulong *vsp = (ulong *)ctrl->vrs[SP];
-+		int reg;
-+
-+		for (reg = 4; reg <= 4 + (insn & 7); reg++)
-+			ctrl->vrs[reg] = get_value_from_stack(vsp++);
-+
-+		if (insn & 0x80)
-+			ctrl->vrs[14] = get_value_from_stack(vsp++);
-+
-+		ctrl->vrs[SP] = (ulong)vsp;
-+	} else if (insn == 0xb0) {
-+		/* 1011 0000: finish */
-+		if (ctrl->vrs[PC] == 0)
-+			ctrl->vrs[PC] = ctrl->vrs[LR];
-+		/* no further processing */
-+		ctrl->entries = 0;
-+	} else if (insn == 0xb1) {
-+		/* 1011 0001 xxxx yyyy: spare */
-+		ulong mask = unwind_get_byte(ctrl);
-+		ulong *vsp = (ulong *)ctrl->vrs[SP];
-+		int reg = 0;
-+
-+		if (mask == 0 || mask & 0xf0) {
-+			error(WARNING, "UNWIND: spare error\n");
-+			return FALSE;
-+		}
-+
-+		/* pop r0-r3 according to mask */
-+		while (mask) {
-+			if (mask & 1)
-+				ctrl->vrs[reg] = get_value_from_stack(vsp++);
-+			mask >>= 1;
-+			reg++;
-+		}
-+		ctrl->vrs[SP] = (ulong)vsp;
-+	} else if (insn == 0xb2) {
-+		/* 1011 0010 uleb128: vsp = vsp + 0x204 (uleb128 << 2) */
-+		ulong uleb128 = unwind_get_byte(ctrl);
-+
-+		ctrl->vrs[SP] += 0x204 + (uleb128 << 2);
-+	} else {
-+		error(WARNING, "UNWIND: unhandled instruction: %02lx\n", insn);
-+		return FALSE;
-+	}
-+
-+	return TRUE;
-+}
-+
-+static int
-+is_core_kernel_text(ulong pc)
-+{
-+	ulong text_start = machdep->machspec->kernel_text_start;
-+	ulong text_end = machdep->machspec->kernel_text_end;
-+
-+	if (text_start && text_end)
-+		return (pc >= text_start && pc <= text_end);
-+
-+	return FALSE;
-+}
-+
-+static struct unwind_idx *
-+search_index(ulong ip)
-+{
-+	struct unwind_idx *start = NULL;
-+	struct unwind_idx *end = NULL;
-+
-+	/*
-+	 * First check if this address is in the master kernel unwind table or
-+	 * some of the module unwind tables.
-+	 */
-+	if (is_core_kernel_text(ip)) {
-+		start = kernel_unwind_table->start;
-+		end = kernel_unwind_table->end;
-+	} else {
-+		struct unwind_table *tbl;
-+
-+		for (tbl = &module_unwind_tables[0]; tbl->idx; tbl++) {
-+			if (ip >= tbl->begin_addr && ip < tbl->end_addr) {
-+				start = tbl->start;
-+				end = tbl->end;
-+				break;
-+			}
-+		}
-+	}
-+
-+	if (start && end) {
-+		/*
-+		 * Do a binary search for the addresses in the index table.
-+		 * Addresses are guaranteed to be sorted in ascending order.
-+		 */
-+		while (start < end - 1) {
-+			struct unwind_idx *mid = start + ((end - start + 1) >> 1);
-+
-+			if (ip < mid->addr)
-+				end = mid;
-+			else
-+				start = mid;
-+		}
-+
-+		return start;
-+	}
-+
-+	return NULL;
-+}
-+
-+/*
-+ * Convert a prel31 symbol to an absolute address.
-+ */
-+static ulong *
-+prel31_to_addr(ulong *ptr)
-+{
-+	/* sign extend to 32 bits */
-+	long offset = (((long)*ptr) << 1) >> 1;
-+	return (ulong *)((ulong)ptr + offset);
-+}
-+
-+static int
-+unwind_frame(struct stackframe *frame, ulong stacktop)
-+{
-+	struct unwind_ctrl_block ctrl;
-+	struct unwind_idx *idx;
-+	ulong low, high;
-+
-+	low = frame->sp;
-+	high = stacktop;
-+
-+	idx = search_index(frame->pc);
-+	if (!idx) {
-+		error(WARNING, "UNWIND: cannot find index for %lx\n",
-+		      frame->pc);
-+		return FALSE;
-+	}
-+
-+	ctrl.vrs[FP] = frame->fp;
-+	ctrl.vrs[SP] = frame->sp;
-+	ctrl.vrs[LR] = frame->lr;
-+	ctrl.vrs[PC] = 0;
-+
-+	if (CRASHDEBUG(5)) {
-+		fprintf(fp, "UNWIND: >frame: FP=%lx\n", ctrl.vrs[FP]);
-+		fprintf(fp, "UNWIND: >frame: SP=%lx\n", ctrl.vrs[SP]);
-+		fprintf(fp, "UNWIND: >frame: LR=%lx\n", ctrl.vrs[LR]);
-+		fprintf(fp, "UNWIND: >frame: PC=%lx\n", ctrl.vrs[PC]);
-+	}
-+
-+	if (idx->insn == 1) {
-+		/* can't unwind */
-+		return FALSE;
-+	} else if ((idx->insn & 0x80000000) == 0) {
-+		/* insn contains offset to eht entry */
-+		ctrl.insn = prel31_to_addr(&idx->insn);
-+	} else if ((idx->insn & 0xff000000) == 0x80000000) {
-+		/* eht entry is in insn itself */
-+		ctrl.insn = &idx->insn;
-+	} else {
-+		error(WARNING, "UNWIND: unsupported instruction %lx\n",
-+		      idx->insn);
-+		return FALSE;
-+	}
-+
-+	/* check the personality routine */
-+	if ((*ctrl.insn & 0xff000000) == 0x80000000) {
-+		ctrl.byte = 2;
-+		ctrl.entries = 1;
-+	} else if ((*ctrl.insn & 0xff000000) == 0x81000000) {
-+		ctrl.byte = 1;
-+		ctrl.entries = 1 + ((*ctrl.insn & 0x00ff0000) >> 16);
-+	} else {
-+		error(WARNING, "UNWIND: unsupported personality routine\n");
-+		return FALSE;
-+	}
-+
-+	/* now, execute the instructions */
-+	while (ctrl.entries > 0) {
-+		if (!unwind_exec_insn(&ctrl)) {
-+			error(WARNING, "UNWIND: failed to exec instruction\n");
-+			return FALSE;
-+		}
-+
-+		if (ctrl.vrs[SP] < low || ctrl.vrs[SP] >= high)
-+			return FALSE;
-+	}
-+
-+	if (ctrl.vrs[PC] == 0)
-+		ctrl.vrs[PC] = ctrl.vrs[LR];
-+
-+	if (frame->pc == ctrl.vrs[PC])
-+		return FALSE;
-+
-+	frame->fp = ctrl.vrs[FP];
-+	frame->sp = ctrl.vrs[SP];
-+	frame->lr = ctrl.vrs[LR];
-+	frame->pc = ctrl.vrs[PC];
-+
-+	if (CRASHDEBUG(5)) {
-+		fprintf(fp, "UNWIND: <frame: FP=%lx\n", ctrl.vrs[FP]);
-+		fprintf(fp, "UNWIND: <frame: SP=%lx\n", ctrl.vrs[SP]);
-+		fprintf(fp, "UNWIND: <frame: LR=%lx\n", ctrl.vrs[LR]);
-+		fprintf(fp, "UNWIND: <frame: PC=%lx\n", ctrl.vrs[PC]);
-+	}
-+
-+	return TRUE;
-+}
-+
-+void
-+unwind_backtrace(struct bt_info *bt)
-+{
-+	struct stackframe frame;
-+	int n = 0;
-+
-+	BZERO(&frame, sizeof(frame));
-+	frame.fp = bt->frameptr;
-+	frame.sp = bt->stkptr;
-+	frame.pc = bt->instptr;
-+
-+	/*
-+	 * In case bt->machdep contains pointer to a full register set, we take
-+	 * LR from there.
-+	 */
-+	if (bt->machdep) {
-+		const struct arm_pt_regs *regs = bt->machdep;
-+		frame.lr = regs->ARM_lr;
-+	}
-+
-+	while (IS_KVADDR(bt->instptr)) {
-+		if (!unwind_frame(&frame, bt->stacktop))
-+			break;
-+
-+		arm_dump_backtrace_entry(bt, n++, frame.lr, frame.sp);
-+
-+		bt->instptr = frame.pc;
-+		bt->stkptr = frame.sp;
-+	}
-+}
-+#endif /* ARM */
+#define MIGRATE_UNMOVABLE     0
+#define MIGRATE_RECLAIMABLE   1
+#define MIGRATE_MOVABLE       2
+#define MIGRATE_PCPTYPES      3 /* the number of types on the pcp lists */
+#define MIGRATE_RESERVE       3
+#define MIGRATE_ISOLATE       4 /* can't allocate from here */
+#define MIGRATE_TYPES         5
+
+Conceptually speaking we also want
+
+MIGRATE_MOVABLE_STICKY	  /* Set by CMA, used by CMA and GFP_MOVABLE */
+MIGRATE_MOVABLE_EXCLUSIVE /* Set by CMA, exclusive use of a device */
+
+Sticky would be usable by the page allocator and other than forcing
+the migrate_type to be MIGRATE_MOVABLE, it would otherwise be normal
+memory. Exclusive would be isolated from normal usage by taking the pages from
+the normal free lists and putting them on a free list managed by CMA. Normally
+the page allocator uses zone->free_area[] for its free lists.  The allocator
+would need to handle either free_area from a zone or one provided by a device
+using CMA. Would be tricky to pass through admittedly.
+
+I recognise this is not straight-forward so consider these to be suggestions,
+not requirements. Glancing through, I don't see why these patches could not
+evolve to be closer to the page allocator for example rather than happening
+at the very start.
+
+> +    1. The core of the CMA does not handle allocation of memory and
+> +       management of free space.  Dedicated allocators are used for
+> +       that purpose.
+> +
+
+My ideal would be the default allocator was the buddy allocator
+beginning at __rmqueue_smallest() with a custom allocator provided only
+if absolutly required.
+
+Custom allocators are not easy to get right :/
+
+> +       This way, if the provided solution does not match demands
+> +       imposed on a given system, one can develop a new algorithm and
+> +       easily plug it into the CMA framework.
+> +
+> +       The presented solution includes an implementation of a best-fit
+> +       algorithm.
+> +
+> +    2. When requesting memory, devices have to introduce themselves.
+> +       This way CMA knows who the memory is allocated for.  This
+> +       allows for the system architect to specify which memory regions
+> +       each device should use.
+> +
+> +    3. Memory regions are grouped in various "types".  When device
+> +       requests a chunk of memory, it can specify what type of memory
+> +       it needs.  If no type is specified, "common" is assumed.
+> +
+> +       This makes it possible to configure the system in such a way,
+> +       that a single device may get memory from different memory
+> +       regions, depending on the "type" of memory it requested.  For
+> +       example, a video codec driver might want to allocate some
+> +       shared buffers from the first memory bank and the other from
+> +       the second to get the highest possible memory throughput.
+> +
+> +    4. For greater flexibility and extensibility, the framework allows
+> +       device drivers to register private regions of reserved memory
+> +       which then may be used only by them.
+> +
+> +       As an effect, if a driver would not use the rest of the CMA
+> +       interface, it can still use CMA allocators and other
+> +       mechanisms.
+> +
+> +       4a. Early in boot process, device drivers can also request the
+> +           CMA framework to a reserve a region of memory for them
+> +           which then will be used as a private region.
+> +
+> +           This way, drivers do not need to directly call bootmem,
+> +           memblock or similar early allocator but merely register an
+> +           early region and the framework will handle the rest
+> +           including choosing the right early allocator.
+> +
+> +** Use cases
+> +
+> +    Let's analyse some imaginary system that uses the CMA to see how
+> +    the framework can be used and configured.
+> +
+> +
+> +    We have a platform with a hardware video decoder and a camera each
+> +    needing 20 MiB of memory in the worst case.  Our system is written
+> +    in such a way though that the two devices are never used at the
+> +    same time and memory for them may be shared.  In such a system the
+> +    following configuration would be used in the platform
+> +    initialisation code:
+> +
+> +        static struct cma_region regions[] = {
+> +                { .name = "region", .size = 20 << 20 },
+> +                { }
+> +        }
+> +        static const char map[] __initconst = "video,camera=region";
+> +
+> +        cma_set_defaults(regions, map);
+> +
+> +    The regions array defines a single 20-MiB region named "region".
+> +    The map says that drivers named "video" and "camera" are to be
+> +    granted memory from the previously defined region.
+> +
+> +    A shorter map can be used as well:
+> +
+> +        static const char map[] __initconst = "*=region";
+> +
+> +    The asterisk ("*") matches all devices thus all devices will use
+> +    the region named "region".
+> +
+> +    We can see, that because the devices share the same memory region,
+> +    we save 20 MiB, compared to the situation when each of the devices
+> +    would reserve 20 MiB of memory for itself.
+> +
+> +
+> +    Now, let's say that we have also many other smaller devices and we
+> +    want them to share some smaller pool of memory.  For instance 5
+> +    MiB.  This can be achieved in the following way:
+> +
+> +        static struct cma_region regions[] = {
+> +                { .name = "region", .size = 20 << 20 },
+> +                { .name = "common", .size =  5 << 20 },
+> +                { }
+> +        }
+> +        static const char map[] __initconst =
+> +                "video,camera=region;*=common";
+> +
+> +        cma_set_defaults(regions, map);
+> +
+> +    This instructs CMA to reserve two regions and let video and camera
+> +    use region "region" whereas all other devices should use region
+> +    "common".
+> +
+
+Based on these requirements I guess it would go something like
+
+For camera=region
+	1. Allocate free_area for free lists and associate with cma_region
+	2. Find contiguous range of MIGRATE_MOVABLE blocks
+	3. Mark MIGRATE_MOVABLE_STICKY
+	4. Remove pages from zone free lists and add to cma_region freelist
+
+	On allocation, cma_alloc passes a cma_control structure
+	including the cma_region. Bypass the per-cpu allocator and all
+	that. Use the normal allocator but use the cma_region free
+	lists.
+
+	All allocations for CMA must be compound so that the page has a
+	destructor. Store what cma_region the compound page belongs on the
+	struct page. This is tricky for single pages so it would be
+	ideal if the page could always be compound.
+
+	On free, the destructor adds the page back onto the cma_region
+	free list. Hugetlbfs does something like this
+
+	So, other than where the free list is, allocation is using the
+	core page allocator
+
+	That all said, you could just always go with your BEST_FIT
+	allocator when the use is exclusive.
+
+For *=common
+	1. Find contiguous range of MIGRATE_MOVABLE blocks
+	2. Mark MIGRATE_MOVABLE_STICKY
+
+	On allocation for < MAX_ORDER_NR_PAGES, just specify __GFP_CMA. This
+	will allow allocation from regions marked MIGRATE_MOVABLE_STICKY.
+	If a suitable page is not found, compaction is used to vacate all
+	MOVABLE pages from all MIGRATE_MOVABLE_STICKY regions (you could be
+	smarter about it but as a start, move everything)
+
+	If the allocation is > MAX_ORDER_NR_PAGES, start by migrating all
+	movable pages out of the MIGRATE_MOVABLE_STICKY region and then fall
+	back to a linear scan. You could fall back to BEST_FIT if and only
+	if all the other MOVABLE pages that the best fit algorithm is not
+	aware of got moved out of the way or that the best fit algorithm
+	was informed where the unmovable pages happen to be.
+
+Again, I recognise this is not easy and there will be some weird interaction
+with page reclaim which will need to take the number of CMA regions into
+account. It's just a suggestion on what direction you could take it to avoid
+a mess of custom allocators. The current design looks like it could migrate
+towards the core page allocator and share pages to minimise wastage so it's
+not a blocker to merging.
+
+> +
+> +    Later on, after some development of the system, it can now run
+> +    video decoder and camera at the same time.  The 20 MiB region is
+> +    no longer enough for the two to share.  A quick fix can be made to
+> +    grant each of those devices separate regions:
+> +
+> +        static struct cma_region regions[] = {
+> +                { .name = "v", .size = 20 << 20 },
+> +                { .name = "c", .size = 20 << 20 },
+> +                { .name = "common", .size =  5 << 20 },
+> +                { }
+> +        }
+> +        static const char map[] __initconst = "video=v;camera=c;*=common";
+> +
+> +        cma_set_defaults(regions, map);
+> +
+> +    This solution also shows how with CMA you can assign private pools
+> +    of memory to each device if that is required.
+> +
+> +
+> +    Allocation mechanisms can be replaced dynamically in a similar
+> +    manner as well. Let's say that during testing, it has been
+> +    discovered that, for a given shared region of 40 MiB,
+> +    fragmentation has become a problem.  It has been observed that,
+> +    after some time, it becomes impossible to allocate buffers of the
+> +    required sizes. So to satisfy our requirements, we would have to
+> +    reserve a larger shared region beforehand.
+> +
+> +    But fortunately, you have also managed to develop a new allocation
+> +    algorithm -- Neat Allocation Algorithm or "na" for short -- which
+> +    satisfies the needs for both devices even on a 30 MiB region.  The
+> +    configuration can be then quickly changed to:
+> +
+> +        static struct cma_region regions[] = {
+> +                { .name = "region", .size = 30 << 20, .alloc_name = "na" },
+> +                { .name = "common", .size =  5 << 20 },
+> +                { }
+> +        }
+> +        static const char map[] __initconst = "video,camera=region;*=common";
+> +
+> +        cma_set_defaults(regions, map);
+> +
+> +    This shows how you can develop your own allocation algorithms if
+> +    the ones provided with CMA do not suit your needs and easily
+> +    replace them, without the need to modify CMA core or even
+> +    recompiling the kernel.
+> +
+> +** Technical Details
+> +
+> +*** The attributes
+> +
+> +    As shown above, CMA is configured by a two attributes: list
+> +    regions and map.  The first one specifies regions that are to be
+> +    reserved for CMA.  The second one specifies what regions each
+> +    device is assigned to.
+> +
+> +**** Regions
+> +
+> +     Regions is a list of regions terminated by a region with size
+> +     equal zero.  The following fields may be set:
+> +
+> +     - size       -- size of the region (required, must not be zero)
+> +     - alignment  -- alignment of the region; must be power of two or
+> +                     zero (optional)
+> +     - start      -- where the region has to start (optional)
+> +     - alloc_name -- the name of allocator to use (optional)
+> +     - alloc      -- allocator to use (optional; and besides
+> +                     alloc_name is probably is what you want)
+> +
+> +     size, alignment and start is specified in bytes.  Size will be
+> +     aligned up to a PAGE_SIZE.  If alignment is less then a PAGE_SIZE
+> +     it will be set to a PAGE_SIZE.  start will be aligned to
+> +     alignment.
+> +
+> +**** Map
+> +
+> +     The format of the "map" attribute is as follows:
+> +
+> +         map-attr      ::= [ rules [ ';' ] ]
+> +         rules         ::= rule [ ';' rules ]
+> +         rule          ::= patterns '=' regions
+> +
+> +         patterns      ::= pattern [ ',' patterns ]
+> +
+> +         regions       ::= REG-NAME [ ',' regions ]
+> +                       // list of regions to try to allocate memory
+> +                       // from
+> +
+> +         pattern       ::= dev-pattern [ '/' TYPE-NAME ] | '/' TYPE-NAME
+> +                       // pattern request must match for the rule to
+> +                       // apply; the first rule that matches is
+> +                       // applied; if dev-pattern part is omitted
+> +                       // value identical to the one used in previous
+> +                       // pattern is assumed.
+> +
+> +         dev-pattern   ::= PATTERN
+> +                       // pattern that device name must match for the
+> +                       // rule to apply; may contain question marks
+> +                       // which mach any characters and end with an
+> +                       // asterisk which match the rest of the string
+> +                       // (including nothing).
+> +
+> +     It is a sequence of rules which specify what regions should given
+> +     (device, type) pair use.  The first rule that matches is applied.
+> +
+> +     For rule to match, the pattern must match (dev, type) pair.
+> +     Pattern consist of the part before and after slash.  The first
+> +     part must match device name and the second part must match kind.
+> +
+> +     If the first part is empty, the device name is assumed to match
+> +     iff it matched in previous pattern.  If the second part is
+> +     omitted it will mach any type of memory requested by device.
+> +
+> +     Some examples (whitespace added for better readability):
+> +
+> +         cma_map = foo/quaz = r1;
+> +                       // device foo with type == "quaz" uses region r1
+> +
+> +                   foo/* = r2;     // OR:
+> +                   /* = r2;
+> +                       // device foo with any other kind uses region r2
+> +
+> +                   bar = r1,r2;
+> +                       // device bar uses region r1 or r2
+> +
+> +                   baz?/a , baz?/b = r3;
+> +                       // devices named baz? where ? is any character
+> +                       // with type being "a" or "b" use r3
+> +
+> +*** The device and types of memory
+> +
+> +    The name of the device is taken from the device structure.  It is
+> +    not possible to use CMA if driver does not register a device
+> +    (actually this can be overcome if a fake device structure is
+> +    provided with at least the name set).
+> +
+> +    The type of memory is an optional argument provided by the device
+> +    whenever it requests memory chunk.  In many cases this can be
+> +    ignored but sometimes it may be required for some devices.
+> +
+> +    For instance, let's say that there are two memory banks and for
+> +    performance reasons a device uses buffers in both of them.
+> +    Platform defines a memory types "a" and "b" for regions in both
+> +    banks.  The device driver would use those two types then to
+> +    request memory chunks from different banks.  CMA attributes could
+> +    look as follows:
+> +
+> +         static struct cma_region regions[] = {
+> +                 { .name = "a", .size = 32 << 20 },
+> +                 { .name = "b", .size = 32 << 20, .start = 512 << 20 },
+> +                 { }
+> +         }
+> +         static const char map[] __initconst = "foo/a=a;foo/b=b;*=a,b";
+> +
+> +    And whenever the driver allocated the memory it would specify the
+> +    kind of memory:
+> +
+> +        buffer1 = cma_alloc(dev, "a", 1 << 20, 0);
+> +        buffer2 = cma_alloc(dev, "b", 1 << 20, 0);
+> +
+> +    If it was needed to try to allocate from the other bank as well if
+> +    the dedicated one is full, the map attributes could be changed to:
+> +
+> +         static const char map[] __initconst = "foo/a=a,b;foo/b=b,a;*=a,b";
+> +
+> +    On the other hand, if the same driver was used on a system with
+> +    only one bank, the configuration could be changed just to:
+> +
+> +         static struct cma_region regions[] = {
+> +                 { .name = "r", .size = 64 << 20 },
+> +                 { }
+> +         }
+> +         static const char map[] __initconst = "*=r";
+> +
+> +    without the need to change the driver at all.
+> +
+> +*** Device API
+> +
+> +    There are three basic calls provided by the CMA framework to
+> +    devices.  To allocate a chunk of memory cma_alloc() function needs
+> +    to be used:
+> +
+> +        dma_addr_t cma_alloc(const struct device *dev, const char *type,
+> +                             size_t size, dma_addr_t alignment);
+> +
+> +    If required, device may specify alignment in bytes that the chunk
+> +    need to satisfy.  It have to be a power of two or zero.  The
+> +    chunks are always aligned at least to a page.
+> +
+> +    The type specifies the type of memory as described to in the
+> +    previous subsection.  If device driver does not care about memory
+> +    type it can safely pass NULL as the type which is the same as
+> +    possing "common".
+> +
+> +    The basic usage of the function is just a:
+> +
+> +        addr = cma_alloc(dev, NULL, size, 0);
+> +
+> +    The function returns physical address of allocated chunk or
+> +    a value that evaluates to true if checked with IS_ERR_VALUE(), so
+> +    the correct way for checking for errors is:
+> +
+> +        unsigned long addr = cma_alloc(dev, size);
+> +        if (IS_ERR_VALUE(addr))
+> +                /* Error */
+> +                return (int)addr;
+> +        /* Allocated */
+> +
+> +    (Make sure to include <linux/err.h> which contains the definition
+> +    of the IS_ERR_VALUE() macro.)
+> +
+> +
+> +    Allocated chunk is freed via a cma_free() function:
+> +
+> +        int cma_free(dma_addr_t addr);
+> +
+> +    It takes physical address of the chunk as an argument frees it.
+> +
+> +
+> +    The last function is the cma_info() which returns information
+> +    about regions assigned to given (dev, type) pair.  Its syntax is:
+> +
+> +        int cma_info(struct cma_info *info,
+> +                     const struct device *dev,
+> +                     const char *type);
+> +
+> +    On successful exit it fills the info structure with lower and
+> +    upper bound of regions, total size and number of regions assigned
+> +    to given (dev, type) pair.
+> +
+> +**** Dynamic and private regions
+> +
+> +     In the basic setup, regions are provided and initialised by
+> +     platform initialisation code (which usually use
+> +     cma_set_defaults() for that purpose).
+> +
+> +     It is, however, possible to create and add regions dynamically
+> +     using cma_region_register() function.
+> +
+> +         int cma_region_register(struct cma_region *reg);
+> +
+> +     The region does not have to have name.  If it does not, it won't
+> +     be accessed via standard mapping (the one provided with map
+> +     attribute).  Such regions are private and to allocate chunk from
+> +     them, one needs to call:
+> +
+> +         dma_addr_t cma_alloc_from_region(struct cma_region *reg,
+> +                                          size_t size, dma_addr_t alignment);
+> +
+> +     It is just like cma_alloc() expect one specifies what region to
+> +     allocate memory from.  The region must have been registered.
+> +
+> +**** Allocating from region specified by name
+> +
+> +     If a driver preferred allocating from a region or list of regions
+> +     it knows name of it can use a different call simmilar to the
+> +     previous:
+> +
+> +         dma_addr_t cma_alloc_from(const char *regions,
+> +                                   size_t size, dma_addr_t alignment);
+> +
+> +     The first argument is a comma-separated list of regions the
+> +     driver desires CMA to try and allocate from.  The list is
+> +     terminated by a NUL byte or a semicolon.
+> +
+> +     Similarly, there is a call for requesting information about named
+> +     regions:
+> +
+> +        int cma_info_about(struct cma_info *info, const char *regions);
+> +
+> +     Generally, it should not be needed to use those interfaces but
+> +     they are provided nevertheless.
+> +
+> +**** Registering early regions
+> +
+> +     An early region is a region that is managed by CMA early during
+> +     boot process.  It's platforms responsibility to reserve memory
+> +     for early regions.  Later on, when CMA initialises, early regions
+> +     with reserved memory are registered as normal regions.
+> +     Registering an early region may be a way for a device to request
+> +     a private pool of memory without worrying about actually
+> +     reserving the memory:
+> +
+> +         int cma_early_region_register(struct cma_region *reg);
+> +
+> +     This needs to be done quite early on in boot process, before
+> +     platform traverses the cma_early_regions list to reserve memory.
+> +
+> +     When boot process ends, device driver may see whether the region
+> +     was reserved (by checking reg->reserved flag) and if so, whether
+> +     it was successfully registered as a normal region (by checking
+> +     the reg->registered flag).  If that is the case, device driver
+> +     can use normal API calls to use the region.
+> +
+> +*** Allocator operations
+> +
+> +    Creating an allocator for CMA needs four functions to be
+> +    implemented.
+> +
+> +
+> +    The first two are used to initialise an allocator far given driver
+> +    and clean up afterwards:
+> +
+> +        int  cma_foo_init(struct cma_region *reg);
+> +        void cma_foo_cleanup(struct cma_region *reg);
+> +
+> +    The first is called when allocater is attached to region.  The
+> +    cma_region structure has saved starting address of the region as
+> +    well as its size.  Any data that allocate associated with the
+> +    region can be saved in private_data field.
+> +
+> +    The second call cleans up and frees all resources the allocator
+> +    has allocated for the region.  The function can assume that all
+> +    chunks allocated form this region have been freed thus the whole
+> +    region is free.
+> +
+> +
+> +    The two other calls are used for allocating and freeing chunks.
+> +    They are:
+> +
+> +        struct cma_chunk *cma_foo_alloc(struct cma_region *reg,
+> +                                        size_t size, dma_addr_t alignment);
+> +        void cma_foo_free(struct cma_chunk *chunk);
+> +
+> +    As names imply the first allocates a chunk and the other frees
+> +    a chunk of memory.  It also manages a cma_chunk object
+> +    representing the chunk in physical memory.
+> +
+> +    Either of those function can assume that they are the only thread
+> +    accessing the region.  Therefore, allocator does not need to worry
+> +    about concurrency.  Moreover, all arguments are guaranteed to be
+> +    valid (i.e. page aligned size, a power of two alignment no lower
+> +    the a page size).
+> +
+> +
+> +    When allocator is ready, all that is left is to register it by
+> +    calling cma_allocator_register() function:
+> +
+> +            int cma_allocator_register(struct cma_allocator *alloc);
+> +
+> +    The argument is an structure with pointers to the above functions
+> +    and allocator's name.  The whole call may look something like
+> +    this:
+> +
+> +        static struct cma_allocator alloc = {
+> +                .name    = "foo",
+> +                .init    = cma_foo_init,
+> +                .cleanup = cma_foo_cleanup,
+> +                .alloc   = cma_foo_alloc,
+> +                .free    = cma_foo_free,
+> +        };
+> +        return cma_allocator_register(&alloc);
+> +
+> +    The name ("foo") will be available to use with command line
+> +    argument.
+> +
+> +*** Integration with platform
+> +
+> +    There is one function that needs to be called form platform
+> +    initialisation code.  That is the cma_early_regions_reserve()
+> +    function:
+> +
+> +        void cma_early_regions_reserve(int (*reserve)(struct cma_region *reg));
+> +
+> +    It traverses list of all of the regions given on command line and
+> +    reserves memory for them.  The only argument is a callback
+> +    function used to reserve the region.  Passing NULL as the argument
+> +    makes the function use cma_early_region_reserve() function which
+> +    uses bootmem and memblock for allocating.
+> +
+> +    Alternatively, platform code could traverse the cma_early_regions
+> +    list by itself but this should not be necessary.
+> +
+> +
+> +    Platform has also a way of providing default attributes for CMA,
+> +    cma_set_defaults() function is used for that purpose:
+> +
+> +        int cma_set_defaults(struct cma_region *regions, const char *map)
+> +
+> +    It needs to be called prior to reserving regions.  It let one
+> +    specify the list of regions defined by platform and the map
+> +    attribute.  The map may point to a string in __initdata.  See
+> +    above in this document for example usage of this function.
+> +
+> +** Future work
+> +
+> +    In the future, implementation of mechanisms that would allow the
+> +    free space inside the regions to be used as page cache, filesystem
+> +    buffers or swap devices is planned.  With such mechanisms, the
+> +    memory would not be wasted when not used.
+> +
+> +    Because all allocations and freeing of chunks pass the CMA
+> +    framework it can follow what parts of the reserved memory are
+> +    freed and what parts are allocated.  Tracking the unused memory
+> +    would let CMA use it for other purposes such as page cache, I/O
+> +    buffers, swap, etc.
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> new file mode 100644
+> index 0000000..cd63f52
+> --- /dev/null
+> +++ b/include/linux/cma.h
+> @@ -0,0 +1,431 @@
+> +#ifndef __LINUX_CMA_H
+> +#define __LINUX_CMA_H
+> +
+> +/*
+> + * Contiguous Memory Allocator framework
+> + * Copyright (c) 2010 by Samsung Electronics.
+> + * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
+> + */
+> +
+> +/*
+> + * See Documentation/contiguous-memory.txt for details.
+> + */
+> +
+> +/***************************** Kernel lever API *****************************/
+> +
+
+s/lever/level/ ?
+
+> +#ifdef __KERNEL__
+> +
+> +#include <linux/rbtree.h>
+> +#include <linux/list.h>
+> +
+> +
+
+Unnecessary whitespace. I'll keep these comments to a minimum. They are
+distracting at best but I suggest you take a pass at cleaning up stuff
+like this. It'll avoid your feedback being a mess of trivial cleanups
+and no "proper" feedback :)
+
+> +struct device;
+> +struct cma_info;
+> +
+> +/*
+> + * Don't call it directly, use cma_alloc(), cma_alloc_from() or
+> + * cma_alloc_from_region().
+> + */
+> +dma_addr_t __must_check
+> +__cma_alloc(const struct device *dev, const char *type,
+> +	    size_t size, dma_addr_t alignment);
+> +
+
+So, lets say hypothetically speaking you used the core page allocator
+where possible, you would be tranlating a size to an order. This is not
+a problem but you'd have to watch the alignment because the page
+allocator is only suitable for natural alignments.
+
+> +/* Don't call it directly, use cma_info() or cma_info_about(). */
+> +int
+> +__cma_info(struct cma_info *info, const struct device *dev, const char *type);
+> +
+
+Don't put it in the header then :/
+
+> +
+> +/**
+> + * cma_alloc - allocates contiguous chunk of memory.
+> + * @dev:	The device to perform allocation for.
+> + * @type:	A type of memory to allocate.  Platform may define
+> + *		several different types of memory and device drivers
+> + *		can then request chunks of different types.  Usually it's
+> + *		safe to pass NULL here which is the same as passing
+> + *		"common".
+> + * @size:	Size of the memory to allocate in bytes.
+> + * @alignment:	Desired alignment in bytes.  Must be a power of two or
+
+Nice one, must be a power of two implies natural alignment to the page
+allocator!
+
+> + *		zero.  If alignment is less then a page size it will be
+> + *		set to page size. If unsure, pass zero here.
+> + *
+> + * On error returns a negative error cast to dma_addr_t.  Use
+> + * IS_ERR_VALUE() to check if returned value is indeed an error.
+> + * Otherwise physical address of the chunk is returned.
+> + */
+> +static inline dma_addr_t __must_check
+> +cma_alloc(const struct device *dev, const char *type,
+> +	  size_t size, dma_addr_t alignment)
+> +{
+> +	return dev ? __cma_alloc(dev, type, size, alignment) : -EINVAL;
+> +}
+> +
+> +
+> +/**
+> + * struct cma_info - information about regions returned by cma_info().
+> + * @lower_bound:	The smallest address that is possible to be
+> + *			allocated for given (dev, type) pair.
+> + * @upper_bound:	The one byte after the biggest address that is
+> + *			possible to be allocated for given (dev, type)
+> + *			pair.
+> + * @total_size:	Total size of regions mapped to (dev, type) pair.
+> + * @free_size:	Total free size in all of the regions mapped to (dev, type)
+> + *		pair.  Because of possible race conditions, it is not
+> + *		guaranteed that the value will be correct -- it gives only
+> + *		an approximation.
+> + * @count:	Number of regions mapped to (dev, type) pair.
+> + */
+> +struct cma_info {
+> +	dma_addr_t lower_bound, upper_bound;
+> +	size_t total_size, free_size;
+> +	unsigned count;
+> +};
+> +
+> +/**
+> + * cma_info - queries information about regions.
+> + * @info:	Pointer to a structure where to save the information.
+> + * @dev:	The device to query information for.
+> + * @type:	A type of memory to query information for.
+> + *		If unsure, pass NULL here which is equal to passing
+> + *		"common".
+> + *
+> + * On error returns a negative error, zero otherwise.
+> + */
+> +static inline int
+> +cma_info(struct cma_info *info, const struct device *dev, const char *type)
+> +{
+> +	return dev ? __cma_info(info, dev, type) : -EINVAL;
+> +}
+> +
+> +
+> +/**
+> + * cma_free - frees a chunk of memory.
+> + * @addr:	Beginning of the chunk.
+> + *
+> + * Returns -ENOENT if there is no chunk at given location; otherwise
+> + * zero.  In the former case issues a warning.
+> + */
+> +int cma_free(dma_addr_t addr);
+> +
+
+Is it not an error to free a non-existant chunk? Hope it WARN()s at
+least.
+
+> +
+> +
+> +/****************************** Lower lever API *****************************/
+> +
+
+How lower? If it can be hidden, put it in a private header.
+
+> +/**
+> + * cma_alloc_from - allocates contiguous chunk of memory from named regions.
+
+Ideally named regions would be managed by default by free_area and the core
+page allocator.
+
+> + * @regions:	Comma separated list of region names.  Terminated by NUL
+> + *		byte or a semicolon.
+> + * @size:	Size of the memory to allocate in bytes.
+> + * @alignment:	Desired alignment in bytes.  Must be a power of two or
+> + *		zero.  If alignment is less then a page size it will be
+> + *		set to page size. If unsure, pass zero here.
+> + *
+> + * On error returns a negative error cast to dma_addr_t.  Use
+> + * IS_ERR_VALUE() to check if returned value is indeed an error.
+> + * Otherwise physical address of the chunk is returned.
+> + */
+> +static inline dma_addr_t __must_check
+> +cma_alloc_from(const char *regions, size_t size, dma_addr_t alignment)
+> +{
+> +	return __cma_alloc(NULL, regions, size, alignment);
+> +}
+> +
+> +/**
+> + * cma_info_about - queries information about named regions.
+> + * @info:	Pointer to a structure where to save the information.
+> + * @regions:	Comma separated list of region names.  Terminated by NUL
+> + *		byte or a semicolon.
+> + *
+> + * On error returns a negative error, zero otherwise.
+> + */
+> +static inline int
+> +cma_info_about(struct cma_info *info, const const char *regions)
+> +{
+> +	return __cma_info(info, NULL, regions);
+> +}
+> +
+> +
+> +
+> +struct cma_allocator;
+> +
+
+So, I would hope that a default allocator would be something that sits above
+__rmqueue_smallest with some juggling to allow __rmqueue_smallest to take
+an arbitrary free_area. The CMA wrapper around it would need to know things
+like how to call compaction to move pages out of MIGRATE_MOVABLE_STICKY
+if necessary.
+
+> +/**
+> + * struct cma_region - a region reserved for CMA allocations.
+> + * @name:	Unique name of the region.  Read only.
+> + * @start:	Physical starting address of the region in bytes.  Always
+> + *		aligned at least to a full page.  Read only.
+> + * @size:	Size of the region in bytes.  Multiply of a page size.
+> + *		Read only.
+> + * @free_space:	Free space in the region.  Read only.
+> + * @alignment:	Desired alignment of the region in bytes.  A power of two,
+> + *		always at least page size.  Early.
+> + * @alloc:	Allocator used with this region.  NULL means allocator is
+> + *		not attached.  Private.
+> + * @alloc_name:	Allocator name read from cmdline.  Private.  This may be
+> + *		different from @alloc->name.
+> + * @private_data:	Allocator's private data.
+> + * @users:	Number of chunks allocated in this region.
+> + * @list:	Entry in list of regions.  Private.
+> + * @used:	Whether region was already used, ie. there was at least
+> + *		one allocation request for.  Private.
+> + * @registered:	Whether this region has been registered.  Read only.
+> + * @reserved:	Whether this region has been reserved.  Early.  Read only.
+> + * @copy_name:	Whether @name and @alloc_name needs to be copied when
+> + *		this region is converted from early to normal.  Early.
+> + *		Private.
+> + * @free_alloc_name:	Whether @alloc_name was kmalloced().  Private.
+> + *
+> + * Regions come in two types: an early region and normal region.  The
+> + * former can be reserved or not-reserved.  Fields marked as "early"
+> + * are only meaningful in early regions.
+> + *
+> + * Early regions are important only during initialisation.  The list
+> + * of early regions is built from the "cma" command line argument or
+> + * platform defaults.  Platform initialisation code is responsible for
+> + * reserving space for unreserved regions that are placed on
+> + * cma_early_regions list.
+> + *
+> + * Later, during CMA initialisation all reserved regions from the
+> + * cma_early_regions list are registered as normal regions and can be
+> + * used using standard mechanisms.
+> + */
+> +struct cma_region {
+> +	const char *name;
+> +	dma_addr_t start;
+> +	size_t size;
+> +	union {
+> +		size_t free_space;	/* Normal region */
+> +		dma_addr_t alignment;	/* Early region */
+> +	};
+> +
+> +	struct cma_allocator *alloc;
+> +	const char *alloc_name;
+> +	void *private_data;
+> +
+> +	unsigned users;
+> +	struct list_head list;
+> +
+> +	unsigned used:1;
+> +	unsigned registered:1;
+> +	unsigned reserved:1;
+> +	unsigned copy_name:1;
+> +	unsigned free_alloc_name:1;
+> +};
+> +
+> +
+> +/**
+> + * cma_region_register() - registers a region.
+> + * @reg:	Region to region.
+> + *
+> + * Region's start and size must be set.
+> + *
+> + * If name is set the region will be accessible using normal mechanism
+> + * like mapping or cma_alloc_from() function otherwise it will be
+> + * a private region and accessible only using the
+> + * cma_alloc_from_region() function.
+> + *
+> + * If alloc is set function will try to initialise given allocator
+> + * (and will return error if it failes).  Otherwise alloc_name may
+> + * point to a name of an allocator to use (if not set, the default
+> + * will be used).
+> + *
+> + * All other fields are ignored and/or overwritten.
+> + *
+> + * Returns zero or negative error.  In particular, -EADDRINUSE if
+> + * region overlap with already existing region.
+> + */
+> +int __must_check cma_region_register(struct cma_region *reg);
+> +
+> +/**
+> + * cma_region_unregister() - unregisters a region.
+> + * @reg:	Region to unregister.
+> + *
+> + * Region is unregistered only if there are no chunks allocated for
+> + * it.  Otherwise, function returns -EBUSY.
+> + *
+> + * On success returs zero.
+> + */
+> +int __must_check cma_region_unregister(struct cma_region *reg);
+> +
+> +
+> +/**
+> + * cma_alloc_from_region() - allocates contiguous chunk of memory from region.
+> + * @reg:	Region to allocate chunk from.
+> + * @size:	Size of the memory to allocate in bytes.
+> + * @alignment:	Desired alignment in bytes.  Must be a power of two or
+> + *		zero.  If alignment is less then a page size it will be
+> + *		set to page size. If unsure, pass zero here.
+> + *
+> + * On error returns a negative error cast to dma_addr_t.  Use
+> + * IS_ERR_VALUE() to check if returned value is indeed an error.
+> + * Otherwise physical address of the chunk is returned.
+> + */
+> +dma_addr_t __must_check
+> +cma_alloc_from_region(struct cma_region *reg,
+> +		      size_t size, dma_addr_t alignment);
+> +
+> +
+> +
+> +/****************************** Allocators API ******************************/
+> +
+> +/**
+> + * struct cma_chunk - an allocated contiguous chunk of memory.
+> + * @start:	Physical address in bytes.
+> + * @size:	Size in bytes.
+> + * @free_space:	Free space in region in bytes.  Read only.
+> + * @reg:	Region this chunk belongs to.
+> + * @by_start:	A node in an red-black tree with all chunks sorted by
+> + *		start address.
+> + *
+> + * The cma_allocator::alloc() operation need to set only the @start
+> + * and @size fields.  The rest is handled by the caller (ie. CMA
+> + * glue).
+> + */
+> +struct cma_chunk {
+> +	dma_addr_t start;
+> +	size_t size;
+> +
+> +	struct cma_region *reg;
+> +	struct rb_node by_start;
+> +};
+> +
+
+Is there any scope for reusing parts of kernel/resource.c? Frankly, I
+didn't look at your requirements closely enough or at kernel/resource.c
+capabilities but at a glance, there appears to be some commonality.
+
+Minimally, if there is a good reason to *not* use resource.c, it should
+be in the changelog or I guarantee that in 3 months time, someone else
+will ask you exactly the same question :)
+
+> +
+> +/**
+> + * struct cma_allocator - a CMA allocator.
+> + * @name:	Allocator's unique name
+> + * @init:	Initialises an allocator on given region.
+> + * @cleanup:	Cleans up after init.  May assume that there are no chunks
+> + *		allocated in given region.
+> + * @alloc:	Allocates a chunk of memory of given size in bytes and
+> + *		with given alignment.  Alignment is a power of
+> + *		two (thus non-zero) and callback does not need to check it.
+> + *		May also assume that it is the only call that uses given
+> + *		region (ie. access to the region is synchronised with
+> + *		a mutex).  This has to allocate the chunk object (it may be
+> + *		contained in a bigger structure with allocator-specific data.
+> + *		Required.
+> + * @free:	Frees allocated chunk.  May also assume that it is the only
+> + *		call that uses given region.  This has to free() the chunk
+> + *		object as well.  Required.
+> + * @list:	Entry in list of allocators.  Private.
+> + */
+> + /* * @users:	How many regions use this allocator.  Private. */
+> +struct cma_allocator {
+> +	const char *name;
+> +
+> +	int (*init)(struct cma_region *reg);
+> +	void (*cleanup)(struct cma_region *reg);
+> +	struct cma_chunk *(*alloc)(struct cma_region *reg, size_t size,
+> +				   dma_addr_t alignment);
+> +	void (*free)(struct cma_chunk *chunk);
+> +
+> +	/* unsigned users; */
+> +	struct list_head list;
+> +};
+> +
+
+Again, with some jiggery pokery I think you could make the guts of the page
+allocator the default cma_allocator.
+
+> +
+> +/**
+> + * cma_allocator_register() - Registers an allocator.
+> + * @alloc:	Allocator to register.
+> + *
+> + * Adds allocator to the list of allocators managed by CMA.
+> + *
+> + * All of the fields of cma_allocator structure must be set except for
+> + * optional name and users and list which will be overriden.
+> + *
+> + * Returns zero or negative error code.
+> + */
+> +int cma_allocator_register(struct cma_allocator *alloc);
+> +
+> +
+> +/**************************** Initialisation API ****************************/
+> +
+
+As an aside, it does not seem necessary to have everything CMA related
+in the same header. Maybe split it out to minimise the risk of drivers
+abusing the layers. Up to you really, I don't feel very strongly on
+header layout.
+
+> +/**
+> + * cma_set_defaults() - specifies default command line parameters.
+> + * @regions:	A zero-sized entry terminated list of early regions.
+> + *		This array must not be placed in __initdata section.
+> + * @map:	Map attribute.
+> + *
+> + * This function should be called prior to cma_early_regions_reserve()
+> + * and after early parameters have been parsed.
+> + *
+> + * Returns zero or negative error.
+> + */
+> +int __init cma_set_defaults(struct cma_region *regions, const char *map);
+> +
+> +
+> +/**
+> + * cma_early_regions - a list of early regions.
+> + *
+> + * Platform needs to allocate space for each of the region before
+> + * initcalls are executed.  If space is reserved, the reserved flag
+> + * must be set.  Platform initialisation code may choose to use
+> + * cma_early_regions_allocate().
+> + *
+> + * Later, during CMA initialisation all reserved regions from the
+> + * cma_early_regions list are registered as normal regions and can be
+> + * used using standard mechanisms.
+> + */
+> +extern struct list_head cma_early_regions __initdata;
+> +
+> +
+> +/**
+> + * cma_early_region_register() - registers an early region.
+> + * @reg:	Region to add.
+> + *
+> + * Region's start, size and alignment must be set.
+> + *
+> + * If name is set the region will be accessible using normal mechanism
+> + * like mapping or cma_alloc_from() function otherwise it will be
+> + * a private region accessible only using the cma_alloc_from_region().
+> + *
+> + * If alloc is set function will try to initialise given allocator
+> + * when the early region is "converted" to normal region and
+> + * registered during CMA initialisation.  If this failes, the space
+> + * will still be reserved but the region won't be registered.
+> + *
+> + * As usually, alloc_name may point to a name of an allocator to use
+> + * (if both alloc and alloc_name aret set, the default will be used).
+> + *
+> + * All other fields are ignored and/or overwritten.
+> + *
+> + * Returns zero or negative error.  No checking if regions overlap is
+> + * performed.
+> + */
+> +int __init __must_check cma_early_region_register(struct cma_region *reg);
+> +
+> +
+> +/**
+> + * cma_early_region_reserve() - reserves a physically contiguous memory region.
+> + * @reg:	Early region to reserve memory for.
+> + *
+> + * If platform supports bootmem this is the first allocator this
+> + * function tries to use.  If that failes (or bootmem is not
+> + * supported) function tries to use memblec if it is available.
+> + *
+> + * On success sets reg->reserved flag.
+> + *
+> + * Returns zero or negative error.
+> + */
+> +int __init cma_early_region_reserve(struct cma_region *reg);
+> +
+> +/**
+> + * cma_early_regions_reserver() - helper function for reserving early regions.
+> + * @reserve:	Callbac function used to reserve space for region.  Needs
+> + *		to return non-negative if allocation succeeded, negative
+> + *		error otherwise.  NULL means cma_early_region_alloc() will
+> + *		be used.
+> + *
+> + * This function traverses the %cma_early_regions list and tries to
+> + * reserve memory for each early region.  It uses the @reserve
+> + * callback function for that purpose.  The reserved flag of each
+> + * region is updated accordingly.
+> + */
+> +void __init cma_early_regions_reserve(int (*reserve)(struct cma_region *reg));
+> +
+> +#else
+> +
+> +#define cma_defaults(regions, map)         ((int)0)
+> +#define cma_early_regions_reserve(reserve) do { } while (0)
+> +
+> +#endif
+> +
+> +#endif
+> diff --git a/mm/Kconfig b/mm/Kconfig
+> index f4e516e..3e9317c 100644
+> --- a/mm/Kconfig
+> +++ b/mm/Kconfig
+> @@ -301,3 +301,37 @@ config NOMMU_INITIAL_TRIM_EXCESS
+>  	  of 1 says that all excess pages should be trimmed.
+>  
+>  	  See Documentation/nommu-mmap.txt for more information.
+> +
+> +
+> +config CMA
+> +	bool "Contiguous Memory Allocator framework"
+> +	# Currently there is only one allocator so force it on
+> +	select CMA_BEST_FIT
+
+and hopefully there will be a CMA_CORE_PGALLOC in the future. The
+principal advantage again of such a move is that the pages would be
+usable for normal allocations while the device is inactive.
+
+> +	help
+> +	  This enables the Contiguous Memory Allocator framework which
+> +	  allows drivers to allocate big physically-contiguous blocks of
+> +	  memory for use with hardware components that do not support I/O
+> +	  map nor scatter-gather.
+> +
+> +	  If you select this option you will also have to select at least
+> +	  one allocator algorithm below.
+> +
+> +	  To make use of CMA you need to specify the regions and
+> +	  driver->region mapping on command line when booting the kernel.
+> +
+> +config CMA_DEBUG
+> +	bool "CMA debug messages (DEVELOPEMENT)"
+> +	depends on CMA
+> +	help
+> +	  Enable debug messages in CMA code.
+> +
+> +config CMA_BEST_FIT
+> +	bool "CMA best-fit allocator"
+> +	depends on CMA
+> +	default y
+
+You don't need to default y this if CMA is selecting it, right?
+
+also CMA should default n.
+
+> +	help
+> +	  This is a best-fit algorithm running in O(n log n) time where
+> +	  n is the number of existing holes (which is never greater then
+> +	  the number of allocated regions and usually much smaller).  It
+> +	  allocates area from the smallest hole that is big enough for
+> +	  allocation in question.
+> diff --git a/mm/Makefile b/mm/Makefile
+> index 34b2546..d8c717f 100644
+> --- a/mm/Makefile
+> +++ b/mm/Makefile
+> @@ -47,3 +47,5 @@ obj-$(CONFIG_MEMORY_FAILURE) += memory-failure.o
+>  obj-$(CONFIG_HWPOISON_INJECT) += hwpoison-inject.o
+>  obj-$(CONFIG_DEBUG_KMEMLEAK) += kmemleak.o
+>  obj-$(CONFIG_DEBUG_KMEMLEAK_TEST) += kmemleak-test.o
+> +obj-$(CONFIG_CMA) += cma.o
+> +obj-$(CONFIG_CMA_BEST_FIT) += cma-best-fit.o
+> diff --git a/mm/cma-best-fit.c b/mm/cma-best-fit.c
+> new file mode 100644
+> index 0000000..97f8d61
+> --- /dev/null
+> +++ b/mm/cma-best-fit.c
+> @@ -0,0 +1,407 @@
+> +/*
+> + * Contiguous Memory Allocator framework: Best Fit allocator
+> + * Copyright (c) 2010 by Samsung Electronics.
+> + * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License or (at your optional) any later version of the license.
+> + */
+> +
+> +#define pr_fmt(fmt) "cma: bf: " fmt
+> +
+> +#ifdef CONFIG_CMA_DEBUG
+> +#  define DEBUG
+> +#endif
+> +
+> +#include <linux/errno.h>       /* Error numbers */
+> +#include <linux/slab.h>        /* kmalloc() */
+> +
+> +#include <linux/cma.h>         /* CMA structures */
+> +
+> +
+> +/************************* Data Types *************************/
+> +
+> +struct cma_bf_item {
+> +	struct cma_chunk ch;
+> +	struct rb_node by_size;
+> +};
+> +
+> +struct cma_bf_private {
+> +	struct rb_root by_start_root;
+> +	struct rb_root by_size_root;
+> +};
+> +
+> +
+> +/************************* Prototypes *************************/
+> +
+> +/*
+> + * Those are only for holes.  They must be called whenever hole's
+> + * properties change but also whenever chunk becomes a hole or hole
+> + * becames a chunk.
+> + */
+> +static void __cma_bf_hole_insert_by_size(struct cma_bf_item *item);
+> +static void __cma_bf_hole_erase_by_size(struct cma_bf_item *item);
+> +static int  __must_check
+> +__cma_bf_hole_insert_by_start(struct cma_bf_item *item);
+> +static void __cma_bf_hole_erase_by_start(struct cma_bf_item *item);
+> +
+> +/**
+> + * __cma_bf_hole_take - takes a chunk of memory out of a hole.
+> + * @hole:	hole to take chunk from
+> + * @size:	chunk's size
+> + * @alignment:	chunk's starting address alignment (must be power of two)
+> + *
+> + * Takes a @size bytes large chunk from hole @hole which must be able
+> + * to hold the chunk.  The "must be able" includes also alignment
+> + * constraint.
+> + *
+> + * Returns allocated item or NULL on error (if kmalloc() failed).
+> + */
+> +static struct cma_bf_item *__must_check
+> +__cma_bf_hole_take(struct cma_bf_item *hole, size_t size, dma_addr_t alignment);
+> +
+> +/**
+> + * __cma_bf_hole_merge_maybe - tries to merge hole with neighbours.
+> + * @item: hole to try and merge
+> + *
+> + * Which items are preserved is undefined so you may not rely on it.
+> + */
+> +static void __cma_bf_hole_merge_maybe(struct cma_bf_item *item);
+> +
+> +
+> +/************************* Device API *************************/
+> +
+> +int cma_bf_init(struct cma_region *reg)
+> +{
+> +	struct cma_bf_private *prv;
+> +	struct cma_bf_item *item;
+> +
+> +	prv = kzalloc(sizeof *prv, GFP_KERNEL);
+> +	if (unlikely(!prv))
+> +		return -ENOMEM;
+> +
+> +	item = kzalloc(sizeof *item, GFP_KERNEL);
+> +	if (unlikely(!item)) {
+> +		kfree(prv);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	item->ch.start = reg->start;
+> +	item->ch.size  = reg->size;
+> +	item->ch.reg   = reg;
+> +
+> +	rb_root_init(&prv->by_start_root, &item->ch.by_start);
+> +	rb_root_init(&prv->by_size_root, &item->by_size);
+> +
+> +	reg->private_data = prv;
+> +	return 0;
+> +}
+> +
+> +void cma_bf_cleanup(struct cma_region *reg)
+> +{
+> +	struct cma_bf_private *prv = reg->private_data;
+> +	struct cma_bf_item *item =
+> +		rb_entry(prv->by_size_root.rb_node,
+> +			 struct cma_bf_item, by_size);
+> +
+> +	/* We can assume there is only a single hole in the tree. */
+> +	WARN_ON(item->by_size.rb_left || item->by_size.rb_right ||
+> +		item->ch.by_start.rb_left || item->ch.by_start.rb_right);
+> +
+> +	kfree(item);
+> +	kfree(prv);
+> +}
+> +
+> +struct cma_chunk *cma_bf_alloc(struct cma_region *reg,
+> +			       size_t size, dma_addr_t alignment)
+> +{
+> +	struct cma_bf_private *prv = reg->private_data;
+> +	struct rb_node *node = prv->by_size_root.rb_node;
+> +	struct cma_bf_item *item = NULL;
+> +
+> +	/* First find hole that is large enough */
+> +	while (node) {
+> +		struct cma_bf_item *i =
+> +			rb_entry(node, struct cma_bf_item, by_size);
+> +
+> +		if (i->ch.size < size) {
+> +			node = node->rb_right;
+> +		} else if (i->ch.size >= size) {
+> +			node = node->rb_left;
+> +			item = i;
+> +		}
+> +	}
+> +	if (!item)
+> +		return NULL;
+> +
+> +	/* Now look for items which can satisfy alignment requirements */
+> +	for (;;) {
+> +		dma_addr_t start = ALIGN(item->ch.start, alignment);
+> +		dma_addr_t end   = item->ch.start + item->ch.size;
+> +		if (start < end && end - start >= size) {
+> +			item = __cma_bf_hole_take(item, size, alignment);
+> +			return likely(item) ? &item->ch : NULL;
+> +		}
+> +
+> +		node = rb_next(node);
+> +		if (!node)
+> +			return NULL;
+> +
+> +		item  = rb_entry(node, struct cma_bf_item, by_size);
+> +	}
+> +}
+> +
+> +void cma_bf_free(struct cma_chunk *chunk)
+> +{
+> +	struct cma_bf_item *item = container_of(chunk, struct cma_bf_item, ch);
+> +
+> +	/* Add new hole */
+> +	if (unlikely(__cma_bf_hole_insert_by_start(item))) {
+> +		/*
+> +		 * We're screwed...  Just free the item and forget
+> +		 * about it.  Things are broken beyond repair so no
+> +		 * sense in trying to recover.
+> +		 */
+> +		kfree(item);
+> +	} else {
+> +		__cma_bf_hole_insert_by_size(item);
+> +
+> +		/* Merge with prev and next sibling */
+> +		__cma_bf_hole_merge_maybe(item);
+> +	}
+> +}
+> +
+> +
+> +/************************* Basic Tree Manipulation *************************/
+> +
+> +static void __cma_bf_hole_insert_by_size(struct cma_bf_item *item)
+> +{
+> +	struct cma_bf_private *prv = item->ch.reg->private_data;
+> +	struct rb_node **link = &prv->by_size_root.rb_node, *parent = NULL;
+> +	const typeof(item->ch.size) value = item->ch.size;
+> +
+> +	while (*link) {
+> +		struct cma_bf_item *i;
+> +		parent = *link;
+> +		i = rb_entry(parent, struct cma_bf_item, by_size);
+> +		link = value <= i->ch.size
+> +			? &parent->rb_left
+> +			: &parent->rb_right;
+> +	}
+> +
+> +	rb_link_node(&item->by_size, parent, link);
+> +	rb_insert_color(&item->by_size, &prv->by_size_root);
+> +}
+> +
+> +static void __cma_bf_hole_erase_by_size(struct cma_bf_item *item)
+> +{
+> +	struct cma_bf_private *prv = item->ch.reg->private_data;
+> +	rb_erase(&item->by_size, &prv->by_size_root);
+> +}
+> +
+> +static int  __must_check
+> +__cma_bf_hole_insert_by_start(struct cma_bf_item *item)
+> +{
+> +	struct cma_bf_private *prv = item->ch.reg->private_data;
+> +	struct rb_node **link = &prv->by_start_root.rb_node, *parent = NULL;
+> +	const typeof(item->ch.start) value = item->ch.start;
+> +
+> +	while (*link) {
+> +		struct cma_bf_item *i;
+> +		parent = *link;
+> +		i = rb_entry(parent, struct cma_bf_item, ch.by_start);
+> +
+> +		if (WARN_ON(value == i->ch.start))
+> +			/*
+> +			 * This should *never* happen.  And I mean
+> +			 * *never*.  We could even BUG on it but
+> +			 * hopefully things are only a bit broken,
+> +			 * ie. system can still run.  We produce
+> +			 * a warning and return an error.
+> +			 */
+> +			return -EBUSY;
+> +
+> +		link = value <= i->ch.start
+> +			? &parent->rb_left
+> +			: &parent->rb_right;
+> +	}
+> +
+> +	rb_link_node(&item->ch.by_start, parent, link);
+> +	rb_insert_color(&item->ch.by_start, &prv->by_start_root);
+> +	return 0;
+> +}
+> +
+> +static void __cma_bf_hole_erase_by_start(struct cma_bf_item *item)
+> +{
+> +	struct cma_bf_private *prv = item->ch.reg->private_data;
+> +	rb_erase(&item->ch.by_start, &prv->by_start_root);
+> +}
+> +
+> +
+> +/************************* More Tree Manipulation *************************/
+> +
+> +static struct cma_bf_item *__must_check
+> +__cma_bf_hole_take(struct cma_bf_item *hole, size_t size, size_t alignment)
+> +{
+> +	struct cma_bf_item *item;
+> +
+> +	/*
+> +	 * There are three cases:
+> +	 * 1. the chunk takes the whole hole,
+> +	 * 2. the chunk is at the beginning or at the end of the hole, or
+> +	 * 3. the chunk is in the middle of the hole.
+> +	 */
+> +
+> +
+> +	/* Case 1, the whole hole */
+> +	if (size == hole->ch.size) {
+> +		__cma_bf_hole_erase_by_size(hole);
+> +		__cma_bf_hole_erase_by_start(hole);
+> +		return hole;
+> +	}
+> +
+> +
+> +	/* Allocate */
+> +	item = kmalloc(sizeof *item, GFP_KERNEL);
+> +	if (unlikely(!item))
+> +		return NULL;
+> +
+> +	item->ch.start = ALIGN(hole->ch.start, alignment);
+> +	item->ch.size  = size;
+> +
+> +	/* Case 3, in the middle */
+> +	if (item->ch.start != hole->ch.start
+> +	 && item->ch.start + item->ch.size !=
+> +	    hole->ch.start + hole->ch.size) {
+> +		struct cma_bf_item *tail;
+> +
+> +		/*
+> +		 * Space between the end of the chunk and the end of
+> +		 * the region, ie. space left after the end of the
+> +		 * chunk.  If this is dividable by alignment we can
+> +		 * move the chunk to the end of the hole.
+> +		 */
+> +		size_t left =
+> +			hole->ch.start + hole->ch.size -
+> +			(item->ch.start + item->ch.size);
+> +		if (left % alignment == 0) {
+> +			item->ch.start += left;
+> +			goto case_2;
+> +		}
+> +
+> +		/*
+> +		 * We are going to add a hole at the end.  This way,
+> +		 * we will reduce the problem to case 2 -- the chunk
+> +		 * will be at the end of the hole.
+> +		 */
+> +		tail = kmalloc(sizeof *tail, GFP_KERNEL);
+> +		if (unlikely(!tail)) {
+> +			kfree(item);
+> +			return NULL;
+> +		}
+> +
+> +		tail->ch.start = item->ch.start + item->ch.size;
+> +		tail->ch.size  =
+> +			hole->ch.start + hole->ch.size - tail->ch.start;
+> +		tail->ch.reg   = hole->ch.reg;
+> +
+> +		if (unlikely(__cma_bf_hole_insert_by_start(tail))) {
+> +			/*
+> +			 * Things are broken beyond repair...  Abort
+> +			 * inserting the hole but still continue with
+> +			 * allocation (seems like the best we can do).
+> +			 */
+> +
+> +			hole->ch.size = tail->ch.start - hole->ch.start;
+> +			kfree(tail);
+> +		} else {
+> +			__cma_bf_hole_insert_by_size(tail);
+> +			/*
+> +			 * It's important that we first insert the new
+> +			 * hole in the tree sorted by size and later
+> +			 * reduce the size of the old hole.  We will
+> +			 * update the position of the old hole in the
+> +			 * rb tree in code that handles case 2.
+> +			 */
+> +			hole->ch.size = tail->ch.start - hole->ch.start;
+> +		}
+> +
+> +		/* Go to case 2 */
+> +	}
+> +
+> +
+> +	/* Case 2, at the beginning or at the end */
+> +case_2:
+> +	/* No need to update the tree; order preserved. */
+> +	if (item->ch.start == hole->ch.start)
+> +		hole->ch.start += item->ch.size;
+> +
+> +	/* Alter hole's size */
+> +	hole->ch.size -= size;
+> +	__cma_bf_hole_erase_by_size(hole);
+> +	__cma_bf_hole_insert_by_size(hole);
+> +
+> +	return item;
+> +}
+> +
+> +
+> +static void __cma_bf_hole_merge_maybe(struct cma_bf_item *item)
+> +{
+> +	struct cma_bf_item *prev;
+> +	struct rb_node *node;
+> +	int twice = 2;
+> +
+> +	node = rb_prev(&item->ch.by_start);
+> +	if (unlikely(!node))
+> +		goto next;
+> +	prev = rb_entry(node, struct cma_bf_item, ch.by_start);
+> +
+> +	for (;;) {
+> +		if (prev->ch.start + prev->ch.size == item->ch.start) {
+> +			/* Remove previous hole from trees */
+> +			__cma_bf_hole_erase_by_size(prev);
+> +			__cma_bf_hole_erase_by_start(prev);
+> +
+> +			/* Alter this hole */
+> +			item->ch.size += prev->ch.size;
+> +			item->ch.start = prev->ch.start;
+> +			__cma_bf_hole_erase_by_size(item);
+> +			__cma_bf_hole_insert_by_size(item);
+> +			/*
+> +			 * No need to update by start trees as we do
+> +			 * not break sequence order
+> +			 */
+> +
+> +			/* Free prev hole */
+> +			kfree(prev);
+> +		}
+> +
+> +next:
+> +		if (!--twice)
+> +			break;
+> +
+> +		node = rb_next(&item->ch.by_start);
+> +		if (unlikely(!node))
+> +			break;
+> +		prev = item;
+> +		item = rb_entry(node, struct cma_bf_item, ch.by_start);
+> +	}
+> +}
+> +
+
+I confess I didn't review this part at all. I'm only commenting on how
+you might better integrate with the core allocator in the future.
+
+> +
+> +
+> +/************************* Register *************************/
+> +static int cma_bf_module_init(void)
+> +{
+> +	static struct cma_allocator alloc = {
+> +		.name    = "bf",
+> +		.init    = cma_bf_init,
+> +		.cleanup = cma_bf_cleanup,
+> +		.alloc   = cma_bf_alloc,
+> +		.free    = cma_bf_free,
+> +	};
+> +	return cma_allocator_register(&alloc);
+> +}
+> +module_init(cma_bf_module_init);
+> diff --git a/mm/cma.c b/mm/cma.c
+> new file mode 100644
+> index 0000000..401399c
+> --- /dev/null
+> +++ b/mm/cma.c
+> @@ -0,0 +1,910 @@
+> +/*
+> + * Contiguous Memory Allocator framework
+> + * Copyright (c) 2010 by Samsung Electronics.
+> + * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License or (at your optional) any later version of the license.
+
+I'm not certain about the "any later version" part of this license and
+how it applies to kernel code but I'm no licensing guru. I know we have
+duel licensing elsewhere for BSD but someone should double check this
+license is ok.
+
+> + */
+> +
+> +/*
+> + * See Documentation/contiguous-memory.txt for details.
+> + */
+> +
+> +#define pr_fmt(fmt) "cma: " fmt
+> +
+> +#ifdef CONFIG_CMA_DEBUG
+> +#  define DEBUG
+> +#endif
+> +
+> +#ifndef CONFIG_NO_BOOTMEM
+> +#  include <linux/bootmem.h>   /* alloc_bootmem_pages_nopanic() */
+> +#endif
+> +#ifdef CONFIG_HAVE_MEMBLOCK
+> +#  include <linux/memblock.h>  /* memblock*() */
+> +#endif
+> +#include <linux/device.h>      /* struct device, dev_name() */
+> +#include <linux/errno.h>       /* Error numbers */
+> +#include <linux/err.h>         /* IS_ERR, PTR_ERR, etc. */
+> +#include <linux/mm.h>          /* PAGE_ALIGN() */
+> +#include <linux/module.h>      /* EXPORT_SYMBOL_GPL() */
+> +#include <linux/mutex.h>       /* mutex */
+> +#include <linux/slab.h>        /* kmalloc() */
+> +#include <linux/string.h>      /* str*() */
+> +
+> +#include <linux/cma.h>
+> +
+> +
+> +/*
+> + * Protects cma_regions, cma_allocators, cma_map, cma_map_length, and
+> + * cma_chunks_by_start.
+> + */
+> +static DEFINE_MUTEX(cma_mutex);
+> +
+> +
+> +
+> +/************************* Map attribute *************************/
+> +
+> +static const char *cma_map;
+> +static size_t cma_map_length;
+> +
+> +/*
+> + * map-attr      ::= [ rules [ ';' ] ]
+> + * rules         ::= rule [ ';' rules ]
+> + * rule          ::= patterns '=' regions
+> + * patterns      ::= pattern [ ',' patterns ]
+> + * regions       ::= REG-NAME [ ',' regions ]
+> + * pattern       ::= dev-pattern [ '/' TYPE-NAME ] | '/' TYPE-NAME
+> + *
+> + * See Documentation/contiguous-memory.txt for details.
+> + */
+> +static ssize_t cma_map_validate(const char *param)
+> +{
+> +	const char *ch = param;
+> +
+> +	if (*ch == '\0' || *ch == '\n')
+> +		return 0;
+> +
+> +	for (;;) {
+> +		const char *start = ch;
+> +
+> +		while (*ch && *ch != '\n' && *ch != ';' && *ch != '=')
+> +			++ch;
+> +
+> +		if (*ch != '=' || start == ch) {
+> +			pr_err("map: expecting \"<patterns>=<regions>\" near %s\n",
+> +			       start);
+> +			return -EINVAL;
+> +		}
+> +
+> +		while (*++ch != ';')
+> +			if (*ch == '\0' || *ch == '\n')
+> +				return ch - param;
+> +		if (ch[1] == '\0' || ch[1] == '\n')
+> +			return ch - param;
+> +		++ch;
+> +	}
+> +}
+> +
+> +static int __init cma_map_param(char *param)
+> +{
+> +	ssize_t len;
+> +
+> +	pr_debug("param: map: %s\n", param);
+> +
+> +	len = cma_map_validate(param);
+> +	if (len < 0)
+> +		return len;
+> +
+> +	cma_map = param;
+> +	cma_map_length = len;
+> +	return 0;
+> +}
+> +
+> +
+> +
+> +/************************* Early regions *************************/
+> +
+> +struct list_head cma_early_regions __initdata =
+> +	LIST_HEAD_INIT(cma_early_regions);
+> +
+> +
+> +int __init __must_check cma_early_region_register(struct cma_region *reg)
+> +{
+> +	dma_addr_t start, alignment;
+> +	size_t size;
+> +
+> +	if (reg->alignment & (reg->alignment - 1))
+> +		return -EINVAL;
+> +
+> +	alignment = max(reg->alignment, (dma_addr_t)PAGE_SIZE);
+> +	start     = ALIGN(reg->start, alignment);
+> +	size      = PAGE_ALIGN(reg->size);
+> +
+> +	if (start + size < start)
+> +		return -EINVAL;
+> +
+> +	reg->size      = size;
+> +	reg->start     = start;
+> +	reg->alignment = alignment;
+> +
+> +	list_add_tail(&reg->list, &cma_early_regions);
+> +
+> +	pr_debug("param: registering early region %s (%p@%p/%p)\n",
+> +		 reg->name, (void *)reg->size, (void *)reg->start,
+> +		 (void *)reg->alignment);
+> +
+> +	return 0;
+> +}
+> +
+> +
+> +
+> +/************************* Regions & Allocators *************************/
+> +
+> +static int __cma_region_attach_alloc(struct cma_region *reg);
+> +
+> +/* List of all regions.  Named regions are kept before unnamed. */
+> +static LIST_HEAD(cma_regions);
+> +
+> +#define cma_foreach_region(reg) \
+> +	list_for_each_entry(reg, &cma_regions, list)
+> +
+> +int __must_check cma_region_register(struct cma_region *reg)
+> +{
+> +	const char *name, *alloc_name;
+> +	struct cma_region *r;
+> +	char *ch = NULL;
+> +	int ret = 0;
+> +
+> +	if (!reg->size || reg->start + reg->size < reg->start)
+> +		return -EINVAL;
+> +
+> +	reg->users = 0;
+> +	reg->used = 0;
+> +	reg->private_data = NULL;
+> +	reg->registered = 0;
+> +	reg->free_space = reg->size;
+> +
+> +	/* Copy name and alloc_name */
+> +	name = reg->name;
+> +	alloc_name = reg->alloc_name;
+> +	if (reg->copy_name && (reg->name || reg->alloc_name)) {
+> +		size_t name_size, alloc_size;
+> +
+> +		name_size  = reg->name       ? strlen(reg->name) + 1       : 0;
+> +		alloc_size = reg->alloc_name ? strlen(reg->alloc_name) + 1 : 0;
+> +
+> +		ch = kmalloc(name_size + alloc_size, GFP_KERNEL);
+> +		if (!ch) {
+> +			pr_err("%s: not enough memory to allocate name\n",
+> +			       reg->name ?: "(private)");
+> +			return -ENOMEM;
+> +		}
+> +
+> +		if (name_size) {
+> +			memcpy(ch, reg->name, name_size);
+> +			name = ch;
+> +			ch += name_size;
+> +		}
+> +
+> +		if (alloc_size) {
+> +			memcpy(ch, reg->alloc_name, alloc_size);
+> +			alloc_name = ch;
+> +		}
+> +	}
+> +
+> +	mutex_lock(&cma_mutex);
+> +
+> +	/* Don't let regions overlap */
+> +	cma_foreach_region(r)
+> +		if (r->start + r->size > reg->start &&
+> +		    r->start < reg->start + reg->size) {
+> +			ret = -EADDRINUSE;
+> +			goto done;
+> +		}
+> +
+> +	if (reg->alloc) {
+> +		ret = __cma_region_attach_alloc(reg);
+> +		if (unlikely(ret < 0))
+> +			goto done;
+> +	}
+> +
+> +	reg->name = name;
+> +	reg->alloc_name = alloc_name;
+> +	reg->registered = 1;
+> +	ch = NULL;
+> +
+> +	/*
+> +	 * Keep named at the beginning and unnamed (private) at the
+> +	 * end.  This helps in traversal when named region is looked
+> +	 * for.
+> +	 */
+> +	if (name)
+> +		list_add(&reg->list, &cma_regions);
+> +	else
+> +		list_add_tail(&reg->list, &cma_regions);
+> +
+> +done:
+> +	mutex_unlock(&cma_mutex);
+> +
+> +	pr_debug("%s: region %sregistered\n",
+> +		 reg->name ?: "(private)", ret ? "not " : "");
+> +	kfree(ch);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(cma_region_register);
+> +
+> +static struct cma_region *__must_check
+> +__cma_region_find(const char **namep)
+> +{
+> +	struct cma_region *reg;
+> +	const char *ch, *name;
+> +	size_t n;
+> +
+> +	for (ch = *namep; *ch && *ch != ',' && *ch != ';'; ++ch)
+> +		/* nop */;
+> +	name = *namep;
+> +	*namep = *ch == ',' ? ch : (ch + 1);
+> +	n = ch - name;
+> +
+> +	/*
+> +	 * Named regions are kept in front of unnamed so if we
+> +	 * encounter unnamed region we can stop.
+> +	 */
+> +	cma_foreach_region(reg)
+> +		if (!reg->name)
+> +			break;
+> +		else if (!strncmp(name, reg->name, n) && !reg->name[n])
+> +			return reg;
+> +
+> +	return NULL;
+> +}
+> +
+> +
+> +/* List of all allocators. */
+> +static LIST_HEAD(cma_allocators);
+> +
+> +#define cma_foreach_allocator(alloc) \
+> +	list_for_each_entry(alloc, &cma_allocators, list)
+> +
+> +int cma_allocator_register(struct cma_allocator *alloc)
+> +{
+> +	struct cma_region *reg;
+> +	int first;
+> +
+> +	if (!alloc->alloc || !alloc->free)
+> +		return -EINVAL;
+> +
+> +	/* alloc->users = 0; */
+> +
+
+Odd comment.
+
+> +	mutex_lock(&cma_mutex);
+> +
+> +	first = list_empty(&cma_allocators);
+> +
+> +	list_add_tail(&alloc->list, &cma_allocators);
+> +
+> +	/*
+> +	 * Attach this allocator to all allocator-less regions that
+> +	 * request this particular allocator (reg->alloc_name equals
+> +	 * alloc->name) or if region wants the first available
+> +	 * allocator and we are the first.
+> +	 */
+> +	cma_foreach_region(reg) {
+> +		if (reg->alloc)
+> +			continue;
+> +		if (reg->alloc_name
+> +		  ? alloc->name && !strcmp(alloc->name, reg->alloc_name)
+> +		  : (!reg->used && first))
+> +			continue;
+> +
+> +		reg->alloc = alloc;
+> +		__cma_region_attach_alloc(reg);
+> +	}
+> +
+> +	mutex_unlock(&cma_mutex);
+> +
+> +	pr_debug("%s: allocator registered\n", alloc->name ?: "(unnamed)");
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(cma_allocator_register);
+> +
+> +static struct cma_allocator *__must_check
+> +__cma_allocator_find(const char *name)
+> +{
+> +	struct cma_allocator *alloc;
+> +
+> +	if (!name)
+> +		return list_empty(&cma_allocators)
+> +			? NULL
+> +			: list_entry(cma_allocators.next,
+> +				     struct cma_allocator, list);
+> +
+> +	cma_foreach_allocator(alloc)
+> +		if (alloc->name && !strcmp(name, alloc->name))
+> +			return alloc;
+> +
+> +	return NULL;
+> +}
+> +
+> +
+> +
+> +/************************* Initialise CMA *************************/
+> +
+> +int __init cma_set_defaults(struct cma_region *regions, const char *map)
+> +{
+> +	if (map) {
+> +		int ret = cma_map_param((char *)map);
+> +		if (unlikely(ret < 0))
+> +			return ret;
+> +	}
+> +
+> +	if (!regions)
+> +		return 0;
+> +
+> +	for (; regions->size; ++regions) {
+> +		int ret = cma_early_region_register(regions);
+> +		if (unlikely(ret < 0))
+> +			return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +
+> +int __init cma_early_region_reserve(struct cma_region *reg)
+> +{
+> +	int tried = 0;
+> +
+> +	if (!reg->size || (reg->alignment & (reg->alignment - 1)) ||
+> +	    reg->reserved)
+> +		return -EINVAL;
+> +
+> +#ifndef CONFIG_NO_BOOTMEM
+> +
+> +	tried = 1;
+> +
+> +	{
+> +		void *ptr = __alloc_bootmem_nopanic(reg->size, reg->alignment,
+> +						    reg->start);
+> +		if (ptr) {
+> +			reg->start = virt_to_phys(ptr);
+> +			reg->reserved = 1;
+> +			return 0;
+> +		}
+> +	}
+> +
+> +#endif
+> +
+> +#ifdef CONFIG_HAVE_MEMBLOCK
+> +
+> +	tried = 1;
+> +
+> +	if (reg->start) {
+> +		if (memblock_is_region_reserved(reg->start, reg->size) < 0 &&
+> +		    memblock_reserve(reg->start, reg->size) >= 0) {
+> +			reg->reserved = 1;
+> +			return 0;
+> +		}
+> +	} else {
+> +		/*
+> +		 * Use __memblock_alloc_base() since
+> +		 * memblock_alloc_base() panic()s.
+> +		 */
+> +		u64 ret = __memblock_alloc_base(reg->size, reg->alignment, 0);
+> +		if (ret &&
+> +		    ret < ~(dma_addr_t)0 &&
+> +		    ret + reg->size < ~(dma_addr_t)0 &&
+> +		    ret + reg->size > ret) {
+> +			reg->start = ret;
+> +			reg->reserved = 1;
+> +			return 0;
+> +		}
+> +
+> +		if (ret)
+> +			memblock_free(ret, reg->size);
+> +	}
+> +
+> +#endif
+> +
+> +	return tried ? -ENOMEM : -EOPNOTSUPP;
+> +}
+> +
+> +void __init cma_early_regions_reserve(int (*reserve)(struct cma_region *reg))
+> +{
+> +	struct cma_region *reg;
+> +
+> +	pr_debug("init: reserving early regions\n");
+> +
+> +	if (!reserve)
+> +		reserve = cma_early_region_reserve;
+> +
+> +	list_for_each_entry(reg, &cma_early_regions, list) {
+> +		if (reg->reserved) {
+> +			/* nothing */
+> +		} else if (reserve(reg) >= 0) {
+> +			pr_debug("init: %s: reserved %p@%p\n",
+> +				 reg->name ?: "(private)",
+> +				 (void *)reg->size, (void *)reg->start);
+> +			reg->reserved = 1;
+> +		} else {
+> +			pr_warn("init: %s: unable to reserve %p@%p/%p\n",
+> +				reg->name ?: "(private)",
+> +				(void *)reg->size, (void *)reg->start,
+> +				(void *)reg->alignment);
+> +		}
+> +	}
+> +}
+> +
+> +
+> +static int __init cma_init(void)
+> +{
+> +	struct cma_region *reg, *n;
+> +
+> +	pr_debug("init: initialising\n");
+> +
+> +	if (cma_map) {
+> +		char *val = kmemdup(cma_map, cma_map_length + 1, GFP_KERNEL);
+> +		cma_map = val;
+> +		if (!val)
+> +			return -ENOMEM;
+> +		val[cma_map_length] = '\0';
+> +	}
+> +
+> +	list_for_each_entry_safe(reg, n, &cma_early_regions, list) {
+> +		INIT_LIST_HEAD(&reg->list);
+> +		/*
+> +		 * We don't care if there was an error.  It's a pity
+> +		 * but there's not much we can do about it any way.
+> +		 * If the error is on a region that was parsed from
+> +		 * command line then it will stay and waste a bit of
+> +		 * space; if it was registered using
+> +		 * cma_early_region_register() it's caller's
+> +		 * responsibility to do something about it.
+> +		 */
+> +		if (reg->reserved && cma_region_register(reg) < 0)
+> +			/* ignore error */;
+> +	}
+> +
+> +	INIT_LIST_HEAD(&cma_early_regions);
+> +
+> +	return 0;
+> +}
+> +/*
+> + * We want to be initialised earlier than module_init/__initcall so
+> + * that drivers that want to grab memory at boot time will get CMA
+> + * ready.  subsys_initcall() seems early enough and not too early at
+> + * the same time.
+> + */
+> +subsys_initcall(cma_init);
+> +
+> +
+> +
+> +/************************* Chunks *************************/
+> +
+> +/* All chunks sorted by start address. */
+> +static struct rb_root cma_chunks_by_start;
+> +
+> +static struct cma_chunk *__must_check __cma_chunk_find(dma_addr_t addr)
+> +{
+> +	struct cma_chunk *chunk;
+> +	struct rb_node *n;
+> +
+> +	for (n = cma_chunks_by_start.rb_node; n; ) {
+> +		chunk = rb_entry(n, struct cma_chunk, by_start);
+> +		if (addr < chunk->start)
+> +			n = n->rb_left;
+> +		else if (addr > chunk->start)
+> +			n = n->rb_right;
+> +		else
+> +			return chunk;
+> +	}
+> +	WARN(1, KERN_WARNING "no chunk starting at %p\n", (void *)addr);
+> +	return NULL;
+> +}
+> +
+> +static int __must_check __cma_chunk_insert(struct cma_chunk *chunk)
+> +{
+> +	struct rb_node **new, *parent = NULL;
+> +	typeof(chunk->start) addr = chunk->start;
+> +
+> +	for (new = &cma_chunks_by_start.rb_node; *new; ) {
+> +		struct cma_chunk *c =
+> +			container_of(*new, struct cma_chunk, by_start);
+> +
+> +		parent = *new;
+> +		if (addr < c->start) {
+> +			new = &(*new)->rb_left;
+> +		} else if (addr > c->start) {
+> +			new = &(*new)->rb_right;
+> +		} else {
+> +			/*
+> +			 * We should never be here.  If we are it
+> +			 * means allocator gave us an invalid chunk
+> +			 * (one that has already been allocated) so we
+> +			 * refuse to accept it.  Our caller will
+> +			 * recover by freeing the chunk.
+> +			 */
+> +			WARN_ON(1);
+> +			return -EADDRINUSE;
+> +		}
+> +	}
+> +
+> +	rb_link_node(&chunk->by_start, parent, new);
+> +	rb_insert_color(&chunk->by_start, &cma_chunks_by_start);
+> +
+> +	return 0;
+> +}
+> +
+> +static void __cma_chunk_free(struct cma_chunk *chunk)
+> +{
+> +	rb_erase(&chunk->by_start, &cma_chunks_by_start);
+> +
+> +	chunk->reg->alloc->free(chunk);
+> +	--chunk->reg->users;
+> +	chunk->reg->free_space += chunk->size;
+> +}
+> +
+
+For the most part other than style issues, nothing horrible jumped out.
+There is nothing "surprising" about the allocator or how it is
+structured as such. At least, not at first glance :)
+
+There are concepts it shares with a standard arena allocator and the managing
+of buffer information is similar to how slab manages objects.  There might
+be some scope with getting closer to slab in the future but it would be
+premature as a starting point.
+
+I am curious about one thing though. Have you considered reusing the bootmem
+allocator code to manage the regions instead of your custom stuff here? Instead
+of the cma_regions core structures, you would associate cma_region with
+a new bootmem_data_t, keep the bootmem code around and allocate using its
+allocator. It's a bitmap allocator too and would be less code in the kernel?
+
+> +
+> +/************************* The Device API *************************/
+> +
+> +static const char *__must_check
+> +__cma_where_from(const struct device *dev, const char *type);
+> +
+> +
+> +/* Allocate. */
+> +
+> +static dma_addr_t __must_check
+> +__cma_alloc_from_region(struct cma_region *reg,
+> +			size_t size, dma_addr_t alignment)
+> +{
+> +	struct cma_chunk *chunk;
+> +
+> +	pr_debug("allocate %p/%p from %s\n",
+> +		 (void *)size, (void *)alignment,
+> +		 reg ? reg->name ?: "(private)" : "(null)");
+> +
+> +	if (!reg || reg->free_space < size)
+> +		return -ENOMEM;
+> +
+> +	if (!reg->alloc) {
+> +		if (!reg->used)
+> +			__cma_region_attach_alloc(reg);
+> +		if (!reg->alloc)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	chunk = reg->alloc->alloc(reg, size, alignment);
+> +	if (!chunk)
+> +		return -ENOMEM;
+> +
+> +	if (unlikely(__cma_chunk_insert(chunk) < 0)) {
+> +		/* We should *never* be here. */
+> +		chunk->reg->alloc->free(chunk);
+> +		kfree(chunk);
+> +		return -EADDRINUSE;
+> +	}
+> +
+> +	chunk->reg = reg;
+> +	++reg->users;
+> +	reg->free_space -= chunk->size;
+> +	pr_debug("allocated at %p\n", (void *)chunk->start);
+> +	return chunk->start;
+> +}
+> +
+> +dma_addr_t __must_check
+> +cma_alloc_from_region(struct cma_region *reg,
+> +		      size_t size, dma_addr_t alignment)
+> +{
+> +	dma_addr_t addr;
+> +
+> +	pr_debug("allocate %p/%p from %s\n",
+> +		 (void *)size, (void *)alignment,
+> +		 reg ? reg->name ?: "(private)" : "(null)");
+> +
+> +	if (!size || alignment & (alignment - 1) || !reg)
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&cma_mutex);
+> +
+> +	addr = reg->registered ?
+> +		__cma_alloc_from_region(reg, PAGE_ALIGN(size),
+> +					max(alignment, (dma_addr_t)PAGE_SIZE)) :
+> +		-EINVAL;
+> +
+> +	mutex_unlock(&cma_mutex);
+> +
+> +	return addr;
+> +}
+> +EXPORT_SYMBOL_GPL(cma_alloc_from_region);
+> +
+> +dma_addr_t __must_check
+> +__cma_alloc(const struct device *dev, const char *type,
+> +	    dma_addr_t size, dma_addr_t alignment)
+> +{
+> +	struct cma_region *reg;
+> +	const char *from;
+> +	dma_addr_t addr;
+> +
+> +	if (dev)
+> +		pr_debug("allocate %p/%p for %s/%s\n",
+> +			 (void *)size, (void *)alignment,
+> +			 dev_name(dev), type ?: "");
+> +
+> +	if (!size || alignment & (alignment - 1))
+> +		return -EINVAL;
+> +
+> +	size = PAGE_ALIGN(size);
+> +	if (alignment < PAGE_SIZE)
+> +		alignment = PAGE_SIZE;
+> +
+> +	mutex_lock(&cma_mutex);
+> +
+> +	from = __cma_where_from(dev, type);
+> +	if (unlikely(IS_ERR(from))) {
+> +		addr = PTR_ERR(from);
+> +		goto done;
+> +	}
+> +
+> +	pr_debug("allocate %p/%p from one of %s\n",
+> +		 (void *)size, (void *)alignment, from);
+> +
+> +	while (*from && *from != ';') {
+> +		reg = __cma_region_find(&from);
+> +		addr = __cma_alloc_from_region(reg, size, alignment);
+> +		if (!IS_ERR_VALUE(addr))
+> +			goto done;
+> +	}
+> +
+> +	pr_debug("not enough memory\n");
+> +	addr = -ENOMEM;
+> +
+> +done:
+> +	mutex_unlock(&cma_mutex);
+> +
+> +	return addr;
+> +}
+> +EXPORT_SYMBOL_GPL(__cma_alloc);
+> +
+> +
+> +/* Query information about regions. */
+> +static void __cma_info_add(struct cma_info *infop, struct cma_region *reg)
+> +{
+> +	infop->total_size += reg->size;
+> +	infop->free_size += reg->free_space;
+> +	if (infop->lower_bound > reg->start)
+> +		infop->lower_bound = reg->start;
+> +	if (infop->upper_bound < reg->start + reg->size)
+> +		infop->upper_bound = reg->start + reg->size;
+> +	++infop->count;
+> +}
+> +
+> +int
+> +__cma_info(struct cma_info *infop, const struct device *dev, const char *type)
+> +{
+> +	struct cma_info info = { ~(dma_addr_t)0, 0, 0, 0, 0 };
+> +	struct cma_region *reg;
+> +	const char *from;
+> +	int ret;
+> +
+> +	if (unlikely(!infop))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&cma_mutex);
+> +
+> +	from = __cma_where_from(dev, type);
+> +	if (IS_ERR(from)) {
+> +		ret = PTR_ERR(from);
+> +		info.lower_bound = 0;
+> +		goto done;
+> +	}
+> +
+> +	while (*from && *from != ';') {
+> +		reg = __cma_region_find(&from);
+> +		if (reg)
+> +			__cma_info_add(&info, reg);
+> +	}
+> +
+> +	ret = 0;
+> +done:
+> +	mutex_unlock(&cma_mutex);
+> +
+> +	memcpy(infop, &info, sizeof info);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(__cma_info);
+> +
+> +
+> +/* Freeing. */
+> +int cma_free(dma_addr_t addr)
+> +{
+> +	struct cma_chunk *c;
+> +	int ret;
+> +
+> +	mutex_lock(&cma_mutex);
+> +
+> +	c = __cma_chunk_find(addr);
+> +
+> +	if (c) {
+> +		__cma_chunk_free(c);
+> +		ret = 0;
+> +	} else {
+> +		ret = -ENOENT;
+> +	}
+> +
+> +	mutex_unlock(&cma_mutex);
+> +
+> +	pr_debug("free(%p): %s\n", (void *)addr, c ? "freed" : "not found");
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(cma_free);
+> +
+> +
+> +/************************* Miscellaneous *************************/
+> +
+> +static int __cma_region_attach_alloc(struct cma_region *reg)
+> +{
+> +	struct cma_allocator *alloc;
+> +	int ret;
+> +
+> +	/*
+> +	 * If reg->alloc is set then caller wants us to use this
+> +	 * allocator.  Otherwise we need to find one by name.
+> +	 */
+> +	if (reg->alloc) {
+> +		alloc = reg->alloc;
+> +	} else {
+> +		alloc = __cma_allocator_find(reg->alloc_name);
+> +		if (!alloc) {
+> +			pr_warn("init: %s: %s: no such allocator\n",
+> +				reg->name ?: "(private)",
+> +				reg->alloc_name ?: "(default)");
+> +			reg->used = 1;
+> +			return -ENOENT;
+> +		}
+> +	}
+> +
+> +	/* Try to initialise the allocator. */
+> +	reg->private_data = NULL;
+> +	ret = alloc->init ? alloc->init(reg) : 0;
+> +	if (unlikely(ret < 0)) {
+> +		pr_err("init: %s: %s: unable to initialise allocator\n",
+> +		       reg->name ?: "(private)", alloc->name ?: "(unnamed)");
+> +		reg->alloc = NULL;
+> +		reg->used = 1;
+> +	} else {
+> +		reg->alloc = alloc;
+> +		/* ++alloc->users; */
+> +		pr_debug("init: %s: %s: initialised allocator\n",
+> +			 reg->name ?: "(private)", alloc->name ?: "(unnamed)");
+> +	}
+> +	return ret;
+> +}
+> +
+> +
+> +/*
+> + * s            ::= rules
+> + * rules        ::= rule [ ';' rules ]
+> + * rule         ::= patterns '=' regions
+> + * patterns     ::= pattern [ ',' patterns ]
+> + * regions      ::= REG-NAME [ ',' regions ]
+> + * pattern      ::= dev-pattern [ '/' TYPE-NAME ] | '/' TYPE-NAME
+> + */
+> +static const char *__must_check
+> +__cma_where_from(const struct device *dev, const char *type)
+> +{
+> +	/*
+> +	 * This function matches the pattern from the map attribute
+> +	 * agains given device name and type.  Type may be of course
+> +	 * NULL or an emtpy string.
+> +	 */
+> +
+> +	const char *s, *name;
+> +	int name_matched = 0;
+> +
+> +	/*
+> +	 * If dev is NULL we were called in alternative form where
+> +	 * type is the from string.  All we have to do is return it.
+> +	 */
+> +	if (!dev)
+> +		return type ?: ERR_PTR(-EINVAL);
+> +
+> +	if (!cma_map)
+> +		return ERR_PTR(-ENOENT);
+> +
+> +	name = dev_name(dev);
+> +	if (WARN_ON(!name || !*name))
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	if (!type)
+> +		type = "common";
+> +
+> +	/*
+> +	 * Now we go throught the cma_map attribute.
+> +	 */
+> +	for (s = cma_map; *s; ++s) {
+> +		const char *c;
+> +
+> +		/*
+> +		 * If the pattern starts with a slash, the device part of the
+> +		 * pattern matches if it matched previously.
+> +		 */
+> +		if (*s == '/') {
+> +			if (!name_matched)
+> +				goto look_for_next;
+> +			goto match_type;
+> +		}
+> +
+> +		/*
+> +		 * We are now trying to match the device name.  This also
+> +		 * updates the name_matched variable.  If, while reading the
+> +		 * spec, we ecnounter comma it means that the pattern does not
+> +		 * match and we need to start over with another pattern (the
+> +		 * one afther the comma).  If we encounter equal sign we need
+> +		 * to start over with another rule.  If there is a character
+> +		 * that does not match, we neet to look for a comma (to get
+> +		 * another pattern) or semicolon (to get another rule) and try
+> +		 * again if there is one somewhere.
+> +		 */
+> +
+> +		name_matched = 0;
+> +
+> +		for (c = name; *s != '*' && *c; ++c, ++s)
+> +			if (*s == '=')
+> +				goto next_rule;
+> +			else if (*s == ',')
+> +				goto next_pattern;
+> +			else if (*s != '?' && *c != *s)
+> +				goto look_for_next;
+> +		if (*s == '*')
+> +			++s;
+> +
+> +		name_matched = 1;
+> +
+> +		/*
+> +		 * Now we need to match the type part of the pattern.  If the
+> +		 * pattern is missing it we match only if type points to an
+> +		 * empty string.  Otherwise wy try to match it just like name.
+> +		 */
+> +		if (*s == '/') {
+> +match_type:		/* s points to '/' */
+> +			++s;
+> +
+> +			for (c = type; *s && *c; ++c, ++s)
+> +				if (*s == '=')
+> +					goto next_rule;
+> +				else if (*s == ',')
+> +					goto next_pattern;
+> +				else if (*c != *s)
+> +					goto look_for_next;
+> +		}
+> +
+> +		/* Return the string behind the '=' sign of the rule. */
+> +		if (*s == '=')
+> +			return s + 1;
+> +		else if (*s == ',')
+> +			return strchr(s, '=') + 1;
+> +
+> +		/* Pattern did not match */
+> +
+> +look_for_next:
+> +		do {
+> +			++s;
+> +		} while (*s != ',' && *s != '=');
+> +		if (*s == ',')
+> +			continue;
+> +
+> +next_rule:	/* s points to '=' */
+> +		s = strchr(s, ';');
+> +		if (!s)
+> +			break;
+> +
+> +next_pattern:
+> +		continue;
+> +	}
+> +
+> +	return ERR_PTR(-ENOENT);
+> +}
+
+I'm afraid I ran out of beans reading the patch so it isn't a detailed
+review. Nothing horrible jumps out but I'd be interested in hearing your
+thoughts on suggestions for bringing it closer to the page allocator and
+reusing the bootmem allocator instead of introducing new code for CMA.
+
+Thanks
+
 -- 
-1.5.6.5
+Mel Gorman
+Part-time Phd Student                          Linux Technology Center
+University of Limerick                         IBM Dublin Software Lab
