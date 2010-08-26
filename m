@@ -1,32 +1,21 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 26 Aug 2010 10:18:57 +0200
+Date: Thu, 26 Aug 2010 10:20:11 +0200
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <op.vh0xp8ix7p4s8u@localhost>
+In-Reply-To: <AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<1282310110.2605.976.camel@laptop>
 	<20100825155814.25c783c7.akpm@linux-foundation.org>
-	<op.vh0xp8ix7p4s8u@localhost>
-Message-ID: <1282810737.1975.240.camel@laptop>
+	<20100825173125.0855a6b0@bike.lwn.net>
+	<AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
+Message-ID: <1282810811.1975.246.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-08-26 at 04:40 +0200, Micha? Nazarewicz wrote:
-> I think that the biggest problem is fragmentation here.  For instance,
-> I think that a situation where there is enough free space but it's
-> fragmented so no single contiguous chunk can be allocated is a serious
-> problem.  However, I would argue that if there's simply no space left,
-> a multimedia device could fail and even though it's not desirable, it
-> would not be such a big issue in my eyes.
-> 
-> So, if only movable or discardable pages are allocated in CMA managed
-> regions all should work well.  When a device needs memory discardable
-> pages would get freed and movable moved unless there is no space left
-> on the device in which case allocation would fail. 
+On Thu, 2010-08-26 at 11:49 +0900, Minchan Kim wrote:
+> But one of
+> problems is anonymous page which can be has a role of pinned page in
+> non-swapsystem. 
 
-If you'd actually looked at the page allocator you'd see its capable of
-doing exactly that!
-
-I has the notion of movable pages, it can defragment free space (called
-compaction).
-
-Use it!
+Well, compaction can move those around, but if you've got too many of
+them its a simple matter of over-commit and for that we've got the
+OOM-killer ;-)
