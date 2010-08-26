@@ -1,60 +1,56 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 26 Aug 2010 18:21:15 +0800
-Subject: [PATCH 3/3] [ARM] mmp: support sparse irq
-In-Reply-To: <AANLkTinBzb1gnC38asFsURMg73TXOWP0Cef8LJXF9AHy@mail.gmail.com>
-References: <AANLkTinBzb1gnC38asFsURMg73TXOWP0Cef8LJXF9AHy@mail.gmail.com>
-Message-ID: <AANLkTikEu0VXP-y5yOP68_=rChEKoSiFeoCG3+pMBSbw@mail.gmail.com>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Thu, 26 Aug 2010 19:21:55 +0900
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <1282817160.1975.476.camel@laptop>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+	<20100825173125.0855a6b0@bike.lwn.net>
+	<AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
+	<1282810811.1975.246.camel@laptop>
+	<AANLkTin7EBZw0-WY=NGOmYzZT5Cfy7oWVFBaT2cjK+vZ@mail.gmail.com>
+	<1282817160.1975.476.camel@laptop>
+Message-ID: <AANLkTikS9Bc1NmCCO5w=pT+LBLaeSyk2PBnAry+oDxM8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 25, 2010 at 6:45 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From cdf2a6749f5c01ffe285b0b10427557b3c2f73cd Mon Sep 17 00:00:00 2001
-> From: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date: Wed, 25 Aug 2010 14:52:53 +0800
-> Subject: [PATCH 3/3] [ARM] mmp: support sparse irq
+On Thu, Aug 26, 2010 at 7:06 PM, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, 2010-08-26 at 18:29 +0900, Minchan Kim wrote:
+>> As I said following mail, I said about free space problem.
+>> Of course, compaction could move anon pages into somewhere.
+>> What's is somewhere? At last, it's same zone.
+>> It can prevent fragment problem but not size of free space.
+>> So I mean it would be better to move it into another zone(ex, HIGHMEM)
+>> rather than OOM kill.
 >
-> Add sparse IRQ support in ARCH_MMP.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-mmp/include/mach/irqs.h | ? ?4 +---
-> ?2 files changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 45f93e1..eb1d43d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -511,6 +511,7 @@ config ARCH_MMP
-> ? ? ? ?select GENERIC_CLOCKEVENTS
-> ? ? ? ?select TICK_ONESHOT
-> ? ? ? ?select PLAT_PXA
-> + ? ? ? select SPARSE_IRQ
+> Real machines don't have highmem, highmem sucks!! /me runs
 
-Hrm... I don't see any machine files being amended for the .nr_irqs
-field?
+It's another topic.
+I agree highmem isn't a gorgeous. But my desktop isn't real machine?
+Important thing is that we already have a highmem and many guys
+include you(kmap stacking patch :))try to improve highmem problems. :)
 
-> ? ? ? ?help
-> ? ? ? ? ?Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
 >
-> diff --git a/arch/arm/mach-mmp/include/mach/irqs.h
-> b/arch/arm/mach-mmp/include/mach/irqs.h
-> index b379cde..a09d328 100644
-> --- a/arch/arm/mach-mmp/include/mach/irqs.h
-> +++ b/arch/arm/mach-mmp/include/mach/irqs.h
-> @@ -222,10 +222,8 @@
-> ?#define IRQ_GPIO_NUM ? ? ? ? ? ? ? ? ? 192
-> ?#define IRQ_GPIO(x) ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_START + (x))
+> Does cross zone movement really matter, I though these crappy devices
+> were mostly used on crappy hardware with very limited memory, so pretty
+> much everything would be in zone_normal.. no?
+
+No. Until now, many embedded devices have used to small memory. In
+that case, only there is a DMA zone in system. But as I know, mobile
+phone starts to use big(?) memory like 1G or above sooner or later. So
+they starts to use HIGHMEM. Otherwise, 2G/2G space configuration.
+Some embedded device uses many thread model to port easily from RTOS.
+In that case, they don't have enough address space for application if
+it uses 2G/2G model.
+
+So we should care of HIGHMEM in embedded system from now on.
+
 >
-> -/* Board IRQ - 64 by default, increase if not enough */
-> ?#define IRQ_BOARD_START ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_START + IRQ_GPIO_NUM)
-> -#define IRQ_BOARD_END ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START + 64)
+> But sure, if there's really a need we can look at maybe doing cross zone
+> movement.
 >
-> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_END)
-> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START)
->
-> ?#endif /* __ASM_MACH_IRQS_H */
-> --
-> 1.5.6.5
->
+
+
+-- 
+Kind regards,
+Minchan Kim
