@@ -1,21 +1,217 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 26 Aug 2010 15:28:35 +0900
-Subject: [PATCH V2] ARM: S5PV310: Update clocks
-Message-ID: <1282804120-17241-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 26 Aug 2010 15:28:40 +0900
+Subject: [PATCH V2 14/14] ARM: S5PV310: Adds various special clocks
+In-Reply-To: <1282804120-17241-1-git-send-email-kgene.kim@samsung.com>
+References: <1282804120-17241-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1282804120-17241-6-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is second version for updating clocks for S5PV310/S5PC210.
-Thanks for MyungJoo Ham's pointing out.
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-Following is changes since v1:
-- Restored some clocks which can be used for CPU_FREQ 
-- Added 'uart0'
-- Fix on Watchdog timer clock
-- Restored(removed) regarding MIPI clocks
+This patch adds various special clocks for S5PV310/S5PC210.
 
-[PATCH V2 02/14] ARM: S5PV310: Removed unused clock
-[PATCH V2 10/14] ARM: S5PV310: Adds uart clocks
-[PATCH V2 12/14] ARM: S5PV310: Add various clocks
-[PATCH V2 13/14] ARM: S5PV310: Add video clocks
-[PATCH V2 14/14] ARM: S5PV310: Adds various special clocks
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v1:
+- Restored regarding mipi clocks
+
+ arch/arm/mach-s5pv310/clock.c |  168 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 168 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
+index b6ad76f..262a46f 100644
+--- a/arch/arm/mach-s5pv310/clock.c
++++ b/arch/arm/mach-s5pv310/clock.c
+@@ -51,6 +51,21 @@ static int s5pv310_clksrc_mask_top_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
+ }
+ 
++static int s5pv310_clksrc_mask_cam_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_CAM, clk, enable);
++}
++
++static int s5pv310_clksrc_mask_lcd0_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_LCD0, clk, enable);
++}
++
++static int s5pv310_clksrc_mask_lcd1_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_LCD1, clk, enable);
++}
++
+ static int s5pv310_clksrc_mask_fsys_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_FSYS, clk, enable);
+@@ -61,6 +76,11 @@ static int s5pv310_clksrc_mask_peril0_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(S5P_CLKSRC_MASK_PERIL0, clk, enable);
+ }
+ 
++static int s5pv310_clksrc_mask_peril1_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKSRC_MASK_PERIL1, clk, enable);
++}
++
+ static int s5pv310_clk_ip_cam_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(S5P_CLKGATE_IP_CAM, clk, enable);
+@@ -739,6 +759,154 @@ static struct clksrc_clk clksrcs[] = {
+ 		.reg_div = { .reg = S5P_CLKDIV_PERIL3, .shift = 0, .size = 4 },
+ 	}, {
+ 		.clk		= {
++			.name		= "sclk_csis",
++			.id		= 0,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 24),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 24, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 24, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_csis",
++			.id		= 1,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 28),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 28, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 28, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_cam",
++			.id		= 0,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 16),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 16, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 16, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_cam",
++			.id		= 1,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 20),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 20, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 20, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimc",
++			.id		= 0,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 0),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 0, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 0, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimc",
++			.id		= 1,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 4),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 4, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 4, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimc",
++			.id		= 2,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 8),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 8, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 8, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimc",
++			.id		= 3,
++			.enable		= s5pv310_clksrc_mask_cam_ctrl,
++			.ctrlbit	= (1 << 12),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_CAM, .shift = 12, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_CAM, .shift = 12, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimd",
++			.id		= 0,
++			.enable		= s5pv310_clksrc_mask_lcd0_ctrl,
++			.ctrlbit	= (1 << 0),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_LCD0, .shift = 0, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_LCD0, .shift = 0, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimd",
++			.id		= 1,
++			.enable		= s5pv310_clksrc_mask_lcd1_ctrl,
++			.ctrlbit	= (1 << 0),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_LCD1, .shift = 0, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_LCD1, .shift = 0, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_sata",
++			.id		= -1,
++			.enable		= s5pv310_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 24),
++		},
++		.sources = &clkset_mout_corebus,
++		.reg_src = { .reg = S5P_CLKSRC_FSYS, .shift = 24, .size = 1 },
++		.reg_div = { .reg = S5P_CLKDIV_FSYS0, .shift = 20, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_spi",
++			.id		= 0,
++			.enable		= s5pv310_clksrc_mask_peril1_ctrl,
++			.ctrlbit	= (1 << 16),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 16, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_PERIL1, .shift = 0, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_spi",
++			.id		= 1,
++			.enable		= s5pv310_clksrc_mask_peril1_ctrl,
++			.ctrlbit	= (1 << 20),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 20, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_PERIL1, .shift = 16, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_spi",
++			.id		= 2,
++			.enable		= s5pv310_clksrc_mask_peril1_ctrl,
++			.ctrlbit	= (1 << 24),
++		},
++		.sources = &clkset_group,
++		.reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 24, .size = 4 },
++		.reg_div = { .reg = S5P_CLKDIV_PERIL2, .shift = 0, .size = 4 },
++	}, {
++		.clk		= {
++			.name		= "sclk_fimg2d",
++			.id		= -1,
++		},
++		.sources = &clkset_mout_g2d,
++		.reg_src = { .reg = S5P_CLKSRC_IMAGE, .shift = 8, .size = 1 },
++		.reg_div = { .reg = S5P_CLKDIV_IMAGE, .shift = 0, .size = 4 },
++	}, {
++		.clk		= {
+ 			.name		= "sclk_mmc",
+ 			.id		= 0,
+ 			.parent		= &clk_dout_mmc0.clk,
+-- 
+1.6.2.5
