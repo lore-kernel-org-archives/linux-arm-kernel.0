@@ -1,30 +1,16 @@
-From: p.osciak@samsung.com (Pawel Osciak)
-Date: Thu, 26 Aug 2010 10:38:16 +0900
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Thu, 26 Aug 2010 03:49:00 +0200
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
 In-Reply-To: <20100825173125.0855a6b0@bike.lwn.net>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<1282310110.2605.976.camel@laptop>
 	<20100825155814.25c783c7.akpm@linux-foundation.org>
 	<20100825173125.0855a6b0@bike.lwn.net>
-Message-ID: <4C75C588.7010707@samsung.com>
+Message-ID: <op.vh0vbys97p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2010 08:31 AM, Jonathan Corbet wrote:
-> On Wed, 25 Aug 2010 15:58:14 -0700
-> Andrew Morton<akpm@linux-foundation.org>  wrote:
->
->    
->>> If you want guarantees you can free stuff, why not add constraints to
->>> the page allocation type and only allow MIGRATE_MOVABLE pages inside a
->>> certain region, those pages are easily freed/moved aside to satisfy
->>> large contiguous allocations.
->>>        
->> That would be good.  Although I expect that the allocation would need
->> to be 100% rock-solid reliable, otherwise the end user has a
->> non-functioning device.  Could generic core VM provide the required level
->> of service?
->>      
+On Thu, 26 Aug 2010 01:31:25 +0200, Jonathan Corbet <corbet@lwn.net> wrote:
 > The original OLPC has a camera controller which requires three contiguous,
 > image-sized buffers in memory.  That system is a little memory constrained
 > (OK, it's desperately short of memory), so, in the past, the chances of
@@ -39,35 +25,24 @@ On 08/26/2010 08:31 AM, Jonathan Corbet wrote:
 > allocation requestss, life would be wonderful.  Seems difficult.  But it
 > would be a nicer solution than CMA, which, to a great extent, is really
 > just a standardized mechanism for grabbing memory and never letting go.
->    
 
-The main problem is of course fragmentation, for this there is no 
-solution in CMA. It has a feature intended to at least reduce memory 
-usage though, if only a little bit. It is region sharing. It allows 
-platform architects to define regions shared by more than one driver, as 
-explained by Michal in the RFC. So we can at least try to reuse each 
-chunk of memory as much as possible and not hold separate regions for 
-each driver when they are not intended to work simultaneously. Not a 
-silver bullet, but is there any though?
+At this moment it seems nothing more then that but they way I see it
+is that with a common, standardised, centrally-managed mechanism for
+grabbing memory we can start thinking about the ways to reuse the memory.
 
->> It would help (a lot) if we could get more attention and buyin and
->> fedback from the potential clients of this code.  rmk's feedback is
->> valuable.  Have we heard from the linux-media people?  What other
->> subsystems might use it?  ieee1394 perhaps?  Please help identify
->> specific subsystems and I can perhaps help to wake people up.
->>      
-> If this code had been present when I did the Cafe driver, I would have used
-> it.  I think it could be made useful to a number of low-end camera drivers
-> if the videobuf layer were made to talk to it in a way which Just Works.
->    
+If each driver were to grab it's own memory in a way know to itself only
+the memory is truly lost but with CMA not only regions can be reused among
+devices but also the framework can manage the unallocated memory and try to
+utilize it in other ways (movable pages? cache? buffers? some kind of
+compressed memory swap?).
 
-I am working on new videobuf which will (hopefully) Just Work. CMA is 
-intended to be pluggable into it, as should be any other allocator for 
-that matter.
+What I'm trying to say is that I totally agree with your and other's comments
+about CMA essentially grabbing memory and never releasing it but I believe
+this can be combat with time when overall idea of haw the CMA API should look
+like is agreed upon.
 
 -- 
-
-Best regards,
-Pawel Osciak
-Linux Platform Group
-Samsung Poland R&D Center
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
