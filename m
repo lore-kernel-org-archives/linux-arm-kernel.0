@@ -1,49 +1,15 @@
 From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Thu, 26 Aug 2010 04:56:51 -0400
-Subject: [PATCH] ARM: pxa3xx: fix build error when CONFIG_MTD_PARTITIONS is
-	not defined
-In-Reply-To: <1282813011-6187-1-git-send-email-mark.brown314@gmail.com>
-References: <1282813011-6187-1-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1282813011-6187-2-git-send-email-mark.brown314@gmail.com>
+Date: Thu, 26 Aug 2010 05:07:28 -0400
+Subject: [PATCH 0/1] ARM: pxa168: fix corrected reset vector
+Message-ID: <1282813649-8332-1-git-send-email-mark.brown314@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
----
- drivers/mtd/nand/pxa3xx_nand.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Reset vector for pxa168 is 0xffff_0000 not 0x0
+This fix allows reboot to work
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 4d89f37..4d01cda 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -1320,6 +1320,7 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
- 		goto fail_free_irq;
- 	}
- 
-+#ifdef CONFIG_MTD_PARTITIONS
- 	if (mtd_has_cmdlinepart()) {
- 		static const char *probes[] = { "cmdlinepart", NULL };
- 		struct mtd_partition *parts;
-@@ -1332,6 +1333,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
- 	}
- 
- 	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
-+#else
-+	return 0;
-+#endif
- 
- fail_free_irq:
- 	free_irq(irq, info);
-@@ -1364,7 +1368,9 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, NULL);
- 
- 	del_mtd_device(mtd);
-+#ifdef CONFIG_MTD_PARTITIONS
- 	del_mtd_partitions(mtd);
-+#endif
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq >= 0)
- 		free_irq(irq, info);
--- 
-1.7.0.4
+Mark F. Brown (1):
+  ARM: pxa168: fix corrected reset vector
+
+ arch/arm/mach-mmp/include/mach/system.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
