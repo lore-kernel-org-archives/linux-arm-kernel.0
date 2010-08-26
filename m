@@ -1,70 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Aug 2010 13:33:23 +0300
-Subject: [PATCH] omap: Fix SMP on UP initialization for multi-omap
-Message-ID: <mailman.227.1283455814.27306.linux-arm-kernel@lists.infradead.org>
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Thu, 26 Aug 2010 11:27:31 -0400
+Subject: [PATCH v2 0/6] ARM: pxa168: add keypad support
+Message-ID: <1282836457-5651-1-git-send-email-mark.brown314@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix SMP on UP initialization for multi-omap.
+Version 1
+1) Make pxa27x_keypad.h accessible to mach-mmp
+2) Add a wakeup handler for pxa27x_keypad interrupts
+The wakeup callback fixes an issue on the pxa168 that prevents the keypad
+driver from being able to clear the keypad interrupt after reading KPC_PC
+3) Add initial board level support
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Version 2
+1) Clean up for wakeup handler moved from pxa168-irq to pxa27x_keypad
+2) Reduced the number of rows to 5 for Aspenite
 
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 9e9f70e..3695232 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -22,6 +22,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/localtimer.h>
-+#include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
-@@ -114,11 +115,15 @@ void __init smp_init_cpus(void)
- {
- 	unsigned int i, ncores;
- 
--	/* Never released */
--	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
--	BUG_ON(!scu_base);
-+	if (!smp_cpu()) {
-+		ncores = 1;
-+	} else {
-+		/* Never released */
-+		scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
-+		BUG_ON(!scu_base);
- 
--	ncores = get_core_count();
-+		ncores = get_core_count();
-+	}
- 
- 	for (i = 0; i < ncores; i++)
- 		set_cpu_possible(i, true);
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index 74fbed8..a21b4a4 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -37,6 +37,7 @@
- #include <linux/clockchips.h>
- 
- #include <asm/mach/time.h>
-+#include <asm/smp_plat.h>
- #include <plat/dmtimer.h>
- #include <asm/localtimer.h>
- 
-@@ -228,8 +229,10 @@ static void __init omap2_gp_clocksource_init(void)
- static void __init omap2_gp_timer_init(void)
- {
- #ifdef CONFIG_LOCAL_TIMERS
--	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
--	BUG_ON(!twd_base);
-+	if (!smp_cpu()) {
-+		twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
-+		BUG_ON(!twd_base);
-+	}
- #endif
- 	omap_dm_timer_init();
- 
+Mark F. Brown (6):
+  ARM: pxa27x/pxa3xx: moved pxa27x_keypad.h to platform pxa directory
+  ARM: pxa168: added keypad support
+  ARM: pxa168: added wake clear register support for APMU
+  ARM: pxa27x_keypad: added wakeup event handler for keypad interrupts
+  ARM: pxa168: added keypad wake clear event support for platform
+  ARM: pxa168: aspenite: add board support for keypad
 
---SWTRyWv/ijrBap1m--
+ arch/arm/mach-mmp/aspenite.c                       |   27 ++++++++++++++++++++
+ arch/arm/mach-mmp/include/mach/mfp-pxa168.h        |    7 +++++
+ arch/arm/mach-mmp/include/mach/pxa168.h            |   12 +++++++++
+ arch/arm/mach-mmp/include/mach/regs-apmu.h         |   12 +++++++++
+ arch/arm/mach-mmp/pxa168.c                         |   13 +++++++++
+ arch/arm/mach-pxa/devices.c                        |    2 +-
+ arch/arm/mach-pxa/em-x270.c                        |    2 +-
+ arch/arm/mach-pxa/ezx.c                            |    2 +-
+ arch/arm/mach-pxa/littleton.c                      |    2 +-
+ arch/arm/mach-pxa/mainstone.c                      |    4 +-
+ arch/arm/mach-pxa/mioa701.c                        |    2 +-
+ arch/arm/mach-pxa/palmld.c                         |    2 +-
+ arch/arm/mach-pxa/palmt5.c                         |    2 +-
+ arch/arm/mach-pxa/palmtreo.c                       |    2 +-
+ arch/arm/mach-pxa/palmtx.c                         |    2 +-
+ arch/arm/mach-pxa/palmz72.c                        |    2 +-
+ arch/arm/mach-pxa/tavorevb.c                       |    2 +-
+ arch/arm/mach-pxa/z2.c                             |    2 +-
+ arch/arm/mach-pxa/zylonite.c                       |    2 +-
+ .../mach => plat-pxa/include/plat}/pxa27x_keypad.h |    1 +
+ drivers/input/keyboard/Kconfig                     |    2 +-
+ drivers/input/keyboard/pxa27x_keypad.c             |   12 ++++++++-
+ 22 files changed, 99 insertions(+), 17 deletions(-)
+ rename arch/arm/{mach-pxa/include/mach => plat-pxa/include/plat}/pxa27x_keypad.h (97%)
