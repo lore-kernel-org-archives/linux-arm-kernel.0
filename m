@@ -1,46 +1,45 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Thu, 26 Aug 2010 12:44:34 +0900
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <20100826115017.04f6f707.kamezawa.hiroyu@jp.fujitsu.com>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-	<20100825155814.25c783c7.akpm@linux-foundation.org>
-	<20100826095857.5b821d7f.kamezawa.hiroyu@jp.fujitsu.com>
-	<op.vh0wektv7p4s8u@localhost>
-	<20100826115017.04f6f707.kamezawa.hiroyu@jp.fujitsu.com>
-Message-ID: <20100826124434.6089630d.kamezawa.hiroyu@jp.fujitsu.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 26 Aug 2010 05:51:57 +0200
+Subject: [PATCH] pxa168fb: Fix section mismatch
+Message-ID: <1282794717-27728-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Aug 2010 11:50:17 +0900
-KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/video/pxa168fb.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+index c91a7f7..5d786bd 100644
+--- a/drivers/video/pxa168fb.c
++++ b/drivers/video/pxa168fb.c
+@@ -559,7 +559,7 @@ static struct fb_ops pxa168fb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
  
-> 128MB...too big ? But it's depend on config.
-> 
-> IBM's ppc guys used 16MB section, and recently, a new interface to shrink
-> the number of /sys files are added, maybe usable.
-> 
-> Something good with this approach will be you can create "cma" memory
-> before installing driver.
-> 
-> But yes, complicated and need some works.
-> 
-Ah, I need to clarify what I want to say.
-
-With compaction, it's helpful, but you can't get contiguous memory larger
-than MAX_ORDER, I think. To get memory larger than MAX_ORDER on demand,
-memory hot-plug code has almost all necessary things.
-
-you may able to add
-# echo 0xa0000000-0xa80000000 > /sys/devices/system/memory/cma
-
-to get contiguous isolated memory.
-
-BTW, just curious...the memory for cma need not to be saved at
-hibernation ? Or drivers has to write its own hibernation ops by driver suspend
-udev or some ?
-
-
-
-Thanks,
--Kame
+-static int __init pxa168fb_init_mode(struct fb_info *info,
++static int __devinit pxa168fb_init_mode(struct fb_info *info,
+ 			      struct pxa168fb_mach_info *mi)
+ {
+ 	struct pxa168fb_info *fbi = info->par;
+@@ -599,7 +599,7 @@ static int __init pxa168fb_init_mode(struct fb_info *info,
+ 	return ret;
+ }
+ 
+-static int __init pxa168fb_probe(struct platform_device *pdev)
++static int __devinit pxa168fb_probe(struct platform_device *pdev)
+ {
+ 	struct pxa168fb_mach_info *mi;
+ 	struct fb_info *info = 0;
+@@ -792,7 +792,7 @@ static struct platform_driver pxa168fb_driver = {
+ 	.probe		= pxa168fb_probe,
+ };
+ 
+-static int __devinit pxa168fb_init(void)
++static int __init pxa168fb_init(void)
+ {
+ 	return platform_driver_register(&pxa168fb_driver);
+ }
+-- 
+1.7.1
