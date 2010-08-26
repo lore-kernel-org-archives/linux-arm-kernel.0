@@ -1,83 +1,81 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 26 Aug 2010 17:23:41 +0900
-Subject: [PATCH] ARM: S5PV310: Fix on Secondary CPU startup
-Message-ID: <1282811021-21612-1-git-send-email-kgene.kim@samsung.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 26 Aug 2010 11:06:20 +0200 (CEST)
+Subject: [RFC][PATCH] add
+	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
+In-Reply-To: <20100826152333K.fujita.tomonori@lab.ntt.co.jp>
+References: <201008201450.12585.mitov@issp.bas.bg>
+	<20100826144000C.fujita.tomonori@lab.ntt.co.jp>
+	<201008260904.19973.mitov@issp.bas.bg>
+	<20100826152333K.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <Pine.LNX.4.64.1008261100150.14167@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changhwan Youn <chaos.youn@samsung.com>
+On Thu, 26 Aug 2010, FUJITA Tomonori wrote:
 
-Following occurs on boot message without this patch.
-    CPU1: processor failed to boot
-    Brought up 1 CPUs
-    SMP: Total of 1 processors activated
+> On Thu, 26 Aug 2010 09:04:14 +0300
+> Marin Mitov <mitov@issp.bas.bg> wrote:
+> 
+> > On Thursday, August 26, 2010 08:40:47 am FUJITA Tomonori wrote:
+> > > On Fri, 20 Aug 2010 14:50:12 +0300
+> > > Marin Mitov <mitov@issp.bas.bg> wrote:
+> > > 
+> > > > On Friday, August 20, 2010 11:35:06 am FUJITA Tomonori wrote:
+> > > > > On Fri, 20 Aug 2010 11:13:45 +0300
+> > > > > Marin Mitov <mitov@issp.bas.bg> wrote:
+> > > > > 
+> > > > > > > > This tric is already used in drivers/staging/dt3155v4l.c
+> > > > > > > > dt3155_alloc_coherent()/dt3155_free_coherent()
+> > > > > > > > 
+> > > > > > > > Here proposed for general use by popular demand from video4linux folks.
+> > > > > > > > Helps for videobuf-dma-contig framework.
+> > > > > > > 
+> > > > > > > What you guys exactly want to do? If you just want to pre-allocate
+> > > > > > > coherent memory for latter usage,
+> > > > > > 
+> > > > > > Yes, just to preallocate not coherent, but rather contiguous memory for latter usage.
+> > > > > > We use coherent memory because it turns out to be contiguous.
+> > > > > 
+> > > > > Hmm, you don't care about coherency? You just need contiguous memory?
+> > > > 
+> > > > Yes. We just need contiguous memory. Coherency is important as far as when dma
+> > > > transfer finishes user land is able to see the new data. Could be done by something like
+> > > > dma_{,un}map_single()
+> > > 
+> > > Then, we should avoid using coherent memory as I exaplained before. In
+> > > addition, dma_alloc_coherent can't provide large enough contigous
+> > > memory for some drivers so this patch doesn't help much.
+> > 
+> > Please, look at drivers/media/video/videobuf-dma-contig.c. Using coherent memory
+> > is inavoidable for now, there is no alternative for it for now. The two new functions,
+> > which I propose are just helpers for those of us who already use coherent memory
+> > (via videobuf-dma-contig API). May be adding these two functions to 
+> > drivers/media/video/videobuf-dma-contig.c will be better solution?
+> 
+> If you add something to the videobuf-dma-contig API, that's fine by me
+> because drivers/media/video/videobuf-dma-contig.c uses the own
+> structure and plays with dma_alloc_coherent. As long as a driver
+> doesn't touch device->dma_mem directly, it's fine, I think (that is,
+> dt3155v4l driver is broken). There are already some workarounds for
+> contigous memory in several drivers anyway.
 
-This patch adds SYSRAM mapping for fixing Secondary CPU startup.
-    CPU1: Booted secondary processor
-    Brought up 2 CPUs
-    SMP: Total of 2 processors activated
+No, this will not work - this API has to be used from board code and 
+videobuf can be built modular.
 
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> We will have the proper API for contiguous memory. I don't think that
+> adding such workaround to the DMA API is a good idea.
+
+We have currently a number of boards broken in the mainline. They must be 
+fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
+as I suggested earlier, we need either this or my patch series
+
+http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
+
+for 2.6.36.
+
+Thanks
+Guennadi
 ---
- arch/arm/mach-s5pv310/cpu.c              |    5 +++++
- arch/arm/mach-s5pv310/include/mach/map.h |    2 ++
- arch/arm/mach-s5pv310/platsmp.c          |    2 +-
- arch/arm/plat-s5p/include/plat/map-s5p.h |    1 +
- 4 files changed, 9 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-index 2b74295..32b6972 100644
---- a/arch/arm/mach-s5pv310/cpu.c
-+++ b/arch/arm/mach-s5pv310/cpu.c
-@@ -50,6 +50,11 @@ static struct map_desc s5pv310_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(S5PV310_PA_CMU),
- 		.length		= SZ_128K,
- 		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM,
-+		.pfn		= __phys_to_pfn(S5PV310_PA_SYSRAM),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
- 	}
- };
- 
-diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
-index 3c00495..213e110 100644
---- a/arch/arm/mach-s5pv310/include/mach/map.h
-+++ b/arch/arm/mach-s5pv310/include/mach/map.h
-@@ -23,6 +23,8 @@
- 
- #include <plat/map-s5p.h>
- 
-+#define S5PV310_PA_SYSRAM		(0x02025000)
-+
- #define S5PV310_PA_CHIPID		(0x10000000)
- #define S5P_PA_CHIPID			S5PV310_PA_CHIPID
- 
-diff --git a/arch/arm/mach-s5pv310/platsmp.c b/arch/arm/mach-s5pv310/platsmp.c
-index fe9469a..d357c19 100644
---- a/arch/arm/mach-s5pv310/platsmp.c
-+++ b/arch/arm/mach-s5pv310/platsmp.c
-@@ -187,6 +187,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 		 * until it receives a soft interrupt, and then the
- 		 * secondary CPU branches to this address.
- 		 */
--	__raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)), S5P_INFORM0);
-+	__raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)), S5P_VA_SYSRAM);
- 	}
- }
-diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-index 5897792..c4ff88b 100644
---- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-+++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-@@ -17,6 +17,7 @@
- #define S5P_VA_GPIO		S3C_ADDR(0x00500000)
- #define S5P_VA_SYSTIMER		S3C_ADDR(0x01200000)
- #define S5P_VA_SROMC		S3C_ADDR(0x01100000)
-+#define S5P_VA_SYSRAM		S3C_ADDR(0x01180000)
- 
- #define S5P_VA_COMBINER_BASE	S3C_ADDR(0x00600000)
- #define S5P_VA_COMBINER(x)	(S5P_VA_COMBINER_BASE + ((x) >> 2) * 0x10)
--- 
-1.6.2.5
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
