@@ -1,56 +1,60 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Thu, 26 Aug 2010 19:21:55 +0900
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <1282817160.1975.476.camel@laptop>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-	<20100825155814.25c783c7.akpm@linux-foundation.org>
-	<20100825173125.0855a6b0@bike.lwn.net>
-	<AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
-	<1282810811.1975.246.camel@laptop>
-	<AANLkTin7EBZw0-WY=NGOmYzZT5Cfy7oWVFBaT2cjK+vZ@mail.gmail.com>
-	<1282817160.1975.476.camel@laptop>
-Message-ID: <AANLkTikS9Bc1NmCCO5w=pT+LBLaeSyk2PBnAry+oDxM8@mail.gmail.com>
+From: matthias.fuchs@esd.eu (Matthias Fuchs)
+Date: Thu, 26 Aug 2010 12:58:39 +0200
+Subject: Request for holding Ryan's patch set for SPEAr
+In-Reply-To: <4C64BFF7.9020500@st.com>
+References: <4C639611.8060107@st.com> <4C645C98.1020401@bluewatersys.com>
+	<4C64BFF7.9020500@st.com>
+Message-ID: <201008261258.40193.matthias.fuchs@esd.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 26, 2010 at 7:06 PM, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Thu, 2010-08-26 at 18:29 +0900, Minchan Kim wrote:
->> As I said following mail, I said about free space problem.
->> Of course, compaction could move anon pages into somewhere.
->> What's is somewhere? At last, it's same zone.
->> It can prevent fragment problem but not size of free space.
->> So I mean it would be better to move it into another zone(ex, HIGHMEM)
->> rather than OOM kill.
->
-> Real machines don't have highmem, highmem sucks!! /me runs
+Hi,
 
-It's another topic.
-I agree highmem isn't a gorgeous. But my desktop isn't real machine?
-Important thing is that we already have a highmem and many guys
-include you(kmap stacking patch :))try to improve highmem problems. :)
+did anything happen to this over the last two weeks?
 
->
-> Does cross zone movement really matter, I though these crappy devices
-> were mostly used on crappy hardware with very limited memory, so pretty
-> much everything would be in zone_normal.. no?
+@ST: in the meantime, where can I can your 2.6.32 kernel incl. those 150 patches ?
 
-No. Until now, many embedded devices have used to small memory. In
-that case, only there is a DMA zone in system. But as I know, mobile
-phone starts to use big(?) memory like 1G or above sooner or later. So
-they starts to use HIGHMEM. Otherwise, 2G/2G space configuration.
-Some embedded device uses many thread model to port easily from RTOS.
-In that case, they don't have enough address space for application if
-it uses 2G/2G model.
+Matthias
 
-So we should care of HIGHMEM in embedded system from now on.
-
->
-> But sure, if there's really a need we can look at maybe doing cross zone
-> movement.
->
-
-
--- 
-Kind regards,
-Minchan Kim
+On Friday 13 August 2010 05:45, viresh kumar wrote:
+> On 8/13/2010 2:12 AM, Ryan Mallon wrote:
+> > On 08/12/2010 06:34 PM, viresh kumar wrote:
+> >> Russell,
+> >>
+> >> We are facing some problem in organizing patches for spear and need some
+> >> help from you. Actually there are 5 patches for spear sent by Ryan some
+> >> time back, they were related to removing multiple defconfigs and merging
+> >> them for a family of machines. (Ryan did it for spear3xx).
+> >>
+> >> Following is Ryan's patchset:
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017254.html
+> >>
+> >> We have been working on linux-2.6.32 until now and so didn't sent any further
+> >> patches to mailing list because of other commitments. Now we have over 150 
+> >> patches which we need to add to mainline. 
+> >>
+> >> Since all our patches are based on multiple defconfig approach, a lot of work
+> >> is required to rebase our patches over ryan's patchset.
+> >>
+> >> We request if you can hold ryan's patches. I would provide those patches over
+> >> and above my patchset. This will make rebasing easier.
+> > 
+> > Probably the easiest way is if I hold off my patches and rebase them
+> > after you have posted your patches. The other approach would be for you
+> > to apply them on top of your tree, make any necessary changes, and just
+> > keep my From/Signed-off-by tag when you post to the list.
+> > 
+> 
+> Ryan, I will go with the second approach.
+> 
+> Russell, Is this approach fine for you??
+> 
+> Thanks,
+> viresh.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
