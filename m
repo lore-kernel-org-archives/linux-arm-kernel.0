@@ -1,52 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 26 Aug 2010 18:01:22 +0800
-Subject: [PATCH 1/1] [ARM] pxa: encode IRQ number into .nr_irqs
-In-Reply-To: <20100820125432.5cd60d55.ospite@studenti.unina.it>
-References: <AANLkTimAgV9USBf4ojoNSuNXL5jogTr0vRy3NfLUyR0_@mail.gmail.com>
-	<AANLkTinSumMxHLWt_xp6Kb3ymMkU2d28bZZZFdFM60vd@mail.gmail.com>
-	<20100820125432.5cd60d55.ospite@studenti.unina.it>
-Message-ID: <AANLkTinf01x1ihsP9d5s6yzq038=Kf2JvOr+02Kig8cG@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 26 Aug 2010 12:06:00 +0200
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <AANLkTin7EBZw0-WY=NGOmYzZT5Cfy7oWVFBaT2cjK+vZ@mail.gmail.com>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+	<20100825173125.0855a6b0@bike.lwn.net>
+	<AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
+	<1282810811.1975.246.camel@laptop>
+	<AANLkTin7EBZw0-WY=NGOmYzZT5Cfy7oWVFBaT2cjK+vZ@mail.gmail.com>
+Message-ID: <1282817160.1975.476.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 20, 2010 at 6:54 PM, Antonio Ospite
-<ospite@studenti.unina.it> wrote:
-> On Fri, 20 Aug 2010 18:42:26 +0800
-> Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->
->> On Fri, Aug 20, 2010 at 6:40 PM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->> > From fabb050a825825b55099766167fa9bb47d4b6941 Mon Sep 17 00:00:00 2001
->> > From: Haojian Zhuang <haojian.zhuang@marvell.com>
->> > Date: Fri, 20 Aug 2010 15:23:59 +0800
->> > Subject: [PATCH 1/1] [ARM] pxa: encode IRQ number into .nr_irqs
->> >
->> > Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->> > Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> > ---
->>
->> Changelog:
->>
->> 1. Append .nr_irqs for all 6 EZX platform
->>
->> 2. clean unnecessary PXA_HAVE_BOARD_IRQ in arch/arm/mach-pxa/Kconfig.
->>
->
-> The EZX changes look OK now.
+On Thu, 2010-08-26 at 18:29 +0900, Minchan Kim wrote:
+> As I said following mail, I said about free space problem.
+> Of course, compaction could move anon pages into somewhere.
+> What's is somewhere? At last, it's same zone.
+> It can prevent fragment problem but not size of free space.
+> So I mean it would be better to move it into another zone(ex, HIGHMEM)
+> rather than OOM kill. 
 
-Applied to 'devel'.
+Real machines don't have highmem, highmem sucks!! /me runs
 
->
-> Thanks,
-> ? Antonio
->
-> --
-> Antonio Ospite
-> http://ao2.it
->
-> PGP public key ID: 0x4553B001
->
-> A: Because it messes up the order in which people normally read text.
-> ? See http://en.wikipedia.org/wiki/Posting_style
-> Q: Why is top-posting such a bad thing?
->
+Does cross zone movement really matter, I though these crappy devices
+were mostly used on crappy hardware with very limited memory, so pretty
+much everything would be in zone_normal.. no?
+
+But sure, if there's really a need we can look at maybe doing cross zone
+movement.
