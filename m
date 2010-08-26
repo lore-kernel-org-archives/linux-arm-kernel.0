@@ -1,25 +1,22 @@
-From: meenayakri@gmail.com (Meenakshi Yakri)
-Date: Thu, 26 Aug 2010 11:20:14 +0530
-Subject: need to profile the qt/cpp code with arm-linux-gprof
-Message-ID: <AANLkTikZCK0nx29ctDX_vZmQe-jKciMi_wjNLsCO+RYu@mail.gmail.com>
+From: nickpelling@nanodome.com (Nick Pelling)
+Date: Thu, 26 Aug 2010 09:42:45 +0100
+Subject: Samsung Linux project management status page...?
+In-Reply-To: <20100826082528.GM9915@chipmunk>
+References: <1282801318-2291-1-git-send-email-tanmay.upadhyay@einfochips.com>
+	<20100826082528.GM9915@chipmunk>
+Message-ID: <87175j$9ulihk@out1.ip02ir2.opaltelecom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-I need to profile my qt project/cpp code how to do this.
-I am working on ARM-Linux I have GCC
-tried profiling with arm-linux-gprof but not working.. the steps i followed
-to do this are
-1. added the following lines in .pro file of my qt project
-CONFIG += DEBUG
-QMAKE_CXXFLAGS_DEBUG += -pg
-QMAKE_LFLAGS_DEBUG += -pg
-did qmake,, make
-& after running it din't generate gmon.out
-so i am not able to profile..
+Hi everyone,
 
-any other steps to do this profiling using arm-linux-gprof please tell
-or any other profiling tools, how to get them & how to use please help
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100826/dfce5e6c/attachment-0001.html>
+Do any of the Samsung Linux maintainers or Linux managers have a 
+Linux project management status page online? By which I mean a page 
+for each SoC showing which components/devices are in Linus' tree, in 
+Russell's tree, in Ben's tree, in Kyungmin Park's tree, in 
+development, expected, planned, not planned, rejected, etc?
+
+(I'm trying to develop a FIMC- & OpenGL ES-based app around the 
+S5PC100 and can't see any obvious way of telling what is checked in and where).
+
+Thanks!, ....Nick Pelling....
