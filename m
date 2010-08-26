@@ -1,62 +1,41 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 26 Aug 2010 17:58:59 +0800
-Subject: [PATCH] pxa168fb: Fix section mismatch
-In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C0598176EBB@SC-VEXCH1.marvell.com>
-References: <1282794717-27728-1-git-send-email-marek.vasut@gmail.com>
-	<25B60CDC2F704E4E9D88FFD52780CB4C0598176EBB@SC-VEXCH1.marvell.com>
-Message-ID: <AANLkTik555t5dV8HOqQORm=wKurbQL7SnjjsypDAH1R9@mail.gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 26 Aug 2010 19:00:24 +0900
+Subject: [RFC][PATCH] add
+	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
+In-Reply-To: <20100826095311.GA13051@pengutronix.de>
+References: <Pine.LNX.4.64.1008261100150.14167@axis700.grange>
+	<20100826182915S.fujita.tomonori@lab.ntt.co.jp>
+	<20100826095311.GA13051@pengutronix.de>
+Message-ID: <20100826185938A.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/26 Haojian Zhuang <hzhuang1@marvell.com>:
->
-> -----Original Message-----
-> From: Marek Vasut [mailto:marek.vasut at gmail.com]
-> Sent: 2010?8?26? 11:52 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Haojian Zhuang; mark.brown314 at gmail.com; eric.y.miao at gmail.com; Marek Vasut
-> Subject: [PATCH] pxa168fb: Fix section mismatch
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> ?drivers/video/pxa168fb.c | ? ?6 +++---
-> ?1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index c91a7f7..5d786bd 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -559,7 +559,7 @@ static struct fb_ops pxa168fb_ops = {
-> ? ? ? ?.fb_imageblit ? = cfb_imageblit,
-> ?};
->
-> -static int __init pxa168fb_init_mode(struct fb_info *info,
-> +static int __devinit pxa168fb_init_mode(struct fb_info *info,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pxa168fb_mach_info *mi)
-> ?{
-> ? ? ? ?struct pxa168fb_info *fbi = info->par;
-> @@ -599,7 +599,7 @@ static int __init pxa168fb_init_mode(struct fb_info *info,
-> ? ? ? ?return ret;
-> ?}
->
-> -static int __init pxa168fb_probe(struct platform_device *pdev)
-> +static int __devinit pxa168fb_probe(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct pxa168fb_mach_info *mi;
-> ? ? ? ?struct fb_info *info = 0;
-> @@ -792,7 +792,7 @@ static struct platform_driver pxa168fb_driver = {
-> ? ? ? ?.probe ? ? ? ? ?= pxa168fb_probe,
-> ?};
->
-> -static int __devinit pxa168fb_init(void)
-> +static int __init pxa168fb_init(void)
-> ?{
-> ? ? ? ?return platform_driver_register(&pxa168fb_driver);
-> ?}
-> --
-> 1.7.1
->
-> I'm fine on this patch. Acked.
->
+On Thu, 26 Aug 2010 11:53:11 +0200
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-Applied to 'fix'.
+> > > We have currently a number of boards broken in the mainline. They must be 
+> > > fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
+> > > as I suggested earlier, we need either this or my patch series
+> > > 
+> > > http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
+> > > 
+> > > for 2.6.36.
+> > 
+> > Why can't you revert a commit that causes the regression?
+> > 
+> > The related DMA API wasn't changed in 2.6.36-rc1. The DMA API is not
+> > responsible for the regression. And the patchset even exnteds the
+> > definition of the DMA API (dma_declare_coherent_memory). Such change
+> > shouldn't applied after rc1. I think that DMA-API.txt says that
+> > dma_declare_coherent_memory() handles coherent memory for a particular
+> > device. It's not for the API that reserves coherent memory that can be
+> > used for any device for a single device.
+> The patch that made the problem obvious for ARM is
+> 309caa9cc6ff39d261264ec4ff10e29489afc8f8 aka v2.6.36-rc1~591^2~2^4~12.
+> So this went in before v2.6.36-rc1.  One of the "architectures which
+> similar restrictions" is x86 BTW.
+> 
+> And no, we won't revert 309caa9cc6ff39d261264ec4ff10e29489afc8f8 as it
+> addresses a hardware restriction.
+
+How these drivers were able to work without hitting the hardware restriction?
