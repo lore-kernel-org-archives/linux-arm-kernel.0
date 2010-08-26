@@ -1,16 +1,25 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 16 Aug 2010 22:39:59 -0000
-Subject: [PATCH] MAINTAINERS: Update ARM/S3C patterns
-In-Reply-To: <28b93faea32a3f5a3f79a68b92c60ba7dad99425.1281422516.git.joe@perches.com>
-References: <28b93faea32a3f5a3f79a68b92c60ba7dad99425.1281422516.git.joe@perches.com>
-Message-ID: <4C66B63A.1020509@fluff.org>
+From: meenayakri@gmail.com (Meenakshi Yakri)
+Date: Thu, 26 Aug 2010 11:20:14 +0530
+Subject: need to profile the qt/cpp code with arm-linux-gprof
+Message-ID: <AANLkTikZCK0nx29ctDX_vZmQe-jKciMi_wjNLsCO+RYu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/10 07:46, Joe Perches wrote:
-> for merged SOCs
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
+Hi
+I need to profile my qt project/cpp code how to do this.
+I am working on ARM-Linux I have GCC
+tried profiling with arm-linux-gprof but not working.. the steps i followed
+to do this are
+1. added the following lines in .pro file of my qt project
+CONFIG += DEBUG
+QMAKE_CXXFLAGS_DEBUG += -pg
+QMAKE_LFLAGS_DEBUG += -pg
+did qmake,, make
+& after running it din't generate gmon.out
+so i am not able to profile..
 
-Acked-by: Ben Dooks <ben-linux@fluff.org>
+any other steps to do this profiling using arm-linux-gprof please tell
+or any other profiling tools, how to get them & how to use please help
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100826/dfce5e6c/attachment-0001.html>
