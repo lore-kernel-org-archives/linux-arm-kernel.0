@@ -1,9 +1,19 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 26 Aug 2010 05:51:57 +0200
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Wed, 25 Aug 2010 20:53:56 -0700
 Subject: [PATCH] pxa168fb: Fix section mismatch
-Message-ID: <1282794717-27728-1-git-send-email-marek.vasut@gmail.com>
+In-Reply-To: <1282794717-27728-1-git-send-email-marek.vasut@gmail.com>
+References: <1282794717-27728-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C0598176EBB@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+
+-----Original Message-----
+From: Marek Vasut [mailto:marek.vasut at gmail.com] 
+Sent: 2010?8?26? 11:52 AM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Haojian Zhuang; mark.brown314 at gmail.com; eric.y.miao at gmail.com; Marek Vasut
+Subject: [PATCH] pxa168fb: Fix section mismatch
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
@@ -43,3 +53,5 @@ index c91a7f7..5d786bd 100644
  }
 -- 
 1.7.1
+
+I'm fine on this patch. Acked.
