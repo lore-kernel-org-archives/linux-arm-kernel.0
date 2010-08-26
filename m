@@ -1,24 +1,21 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 26 Aug 2010 11:25:06 -0700
-Subject: [PATCH 1/5] arm: mach-davinci: check irq2ctlr() result
-In-Reply-To: <1279379947-15152-1-git-send-email-segooon@gmail.com> (Kulikov
-	Vasiliy's message of "Sat, 17 Jul 2010 19:19:07 +0400")
-References: <1279379947-15152-1-git-send-email-segooon@gmail.com>
-Message-ID: <87wrrd2pvh.fsf@deeprootsystems.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Thu, 26 Aug 2010 11:30:03 -0700 (PDT)
+Subject: gs_start_io() and gs_close()
+In-Reply-To: <4C761243.6000606@compulab.co.il>
+Message-ID: <215822.81660.qm@web180307.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kulikov Vasiliy <segooon@gmail.com> writes:
+> >???seems wrong.
 
-> If irq2ctlr() fails return IRQ_NONE.
-> Also as it can fail make 'ctlr' signed.
 
-[...]
+Does it cause an actual problem though?  Back when
+that code was written and submitted, ISTR doing a
+leak analysis and finding none on start_io() paths
+or their cleanup siblings.  Did something change
+since then?
 
-> Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
+I don't recall problems being reported in this area
+over the past several years, either...
 
-Sorry for the lag on this one.
-
-Queueing for 2.6.37 in linux-davinci.git
-
-Kevin
+- Dave
