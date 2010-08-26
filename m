@@ -1,37 +1,65 @@
 From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Thu, 26 Aug 2010 05:18:57 -0400
-Subject: [PATCH 3/5] ARM: pxa168: added wake clear register support for APMU
+Date: Thu, 26 Aug 2010 05:18:58 -0400
+Subject: [PATCH 4/5] ARM: pxa168: added special case handler for keypad
+	interrupts
 In-Reply-To: <1282814339-10934-1-git-send-email-mark.brown314@gmail.com>
 References: <1282814339-10934-1-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1282814339-10934-4-git-send-email-mark.brown314@gmail.com>
+Message-ID: <1282814339-10934-5-git-send-email-mark.brown314@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
 ---
- arch/arm/mach-mmp/include/mach/regs-apmu.h |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/irq-pxa168.c |   23 ++++++++++++++++++++++-
+ 1 files changed, 22 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-index 9190305..ac47023 100644
---- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-@@ -33,4 +33,16 @@
- #define APMU_FNRST_DIS	(1 << 1)
- #define APMU_AXIRST_DIS	(1 << 0)
+diff --git a/arch/arm/mach-mmp/irq-pxa168.c b/arch/arm/mach-mmp/irq-pxa168.c
+index 52ff2f0..bfb0984 100644
+--- a/arch/arm/mach-mmp/irq-pxa168.c
++++ b/arch/arm/mach-mmp/irq-pxa168.c
+@@ -17,6 +17,8 @@
+ #include <linux/io.h>
  
-+/* Wake Clear Register */
-+#define APMU_WAKE_CLR	APMU_REG(0x07c)
+ #include <mach/regs-icu.h>
++#include <mach/regs-apmu.h>
++#include <mach/cputype.h>
+ 
+ #include "common.h"
+ 
+@@ -42,6 +44,19 @@ static struct irq_chip icu_irq_chip = {
+ 	.unmask	= icu_unmask_irq,
+ };
+ 
++void handle_pxa168_keypad_irq(unsigned int irq, struct irq_desc *desc)
++{
++	uint32_t val;
++	uint32_t mask = APMU_PXA168_KP_WAKE_CLR;
 +
-+#define APMU_PXA168_KP_WAKE_CLR		(1 << 7)
-+#define APMU_PXA168_CFI_WAKE_CLR	(1 << 6)
-+#define APMU_PXA168_XD_WAKE_CLR		(1 << 5)
-+#define APMU_PXA168_MSP_WAKE_CLR	(1 << 4)
-+#define APMU_PXA168_SD4_WAKE_CLR	(1 << 3)
-+#define APMU_PXA168_SD3_WAKE_CLR	(1 << 2)
-+#define APMU_PXA168_SD2_WAKE_CLR	(1 << 1)
-+#define APMU_PXA168_SD1_WAKE_CLR	(1 << 0)
++	/* clear keypad wake event */
++	val = __raw_readl(APMU_WAKE_CLR);
++	__raw_writel(val |  mask, APMU_WAKE_CLR);
 +
- #endif /* __ASM_MACH_REGS_APMU_H */
++	/* handle irq */
++	handle_level_irq(irq, desc);
++}
++
+ void __init icu_init_irq(void)
+ {
+ 	int irq;
+@@ -49,7 +64,13 @@ void __init icu_init_irq(void)
+ 	for (irq = 0; irq < 64; irq++) {
+ 		icu_mask_irq(irq);
+ 		set_irq_chip(irq, &icu_irq_chip);
+-		set_irq_handler(irq, handle_level_irq);
++
++		/* special handler for keypad */
++		if (cpu_is_pxa168() && irq == IRQ_PXA168_KEYPAD)
++			set_irq_handler(irq, handle_pxa168_keypad_irq);
++		else
++			set_irq_handler(irq, handle_level_irq);
++
+ 		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ }
 -- 
 1.7.0.4
