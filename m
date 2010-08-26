@@ -1,45 +1,23 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 26 Aug 2010 10:05:39 +0300
-Subject: gs_start_io() and gs_close()
-In-Reply-To: <loom.20100826T032027-25@post.gmane.org>
-References: <loom.20100826T032027-25@post.gmane.org>
-Message-ID: <4C761243.6000606@compulab.co.il>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Thu, 26 Aug 2010 15:43:29 +0800
+Subject: Driver supported smp linux kernel need use smp_wmb/smp_rmb,
+	nor wmb/rmb?
+Message-ID: <AANLkTimOaRrEGCYH6k_3wfDixnk1RkJ5JCSi_hv8PQsC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 08/26/10 04:21, Jim Sung wrote:
-> I'm debugging a problem with the USB gadget serial on the Marvell PXA168
+Hello all,
 
-CC'ed LAKML
+Start with linux 2.6.33,  the DMA coherent buffers are mapped as Normal
+Non-cacheable, so our drivers using dma_alloc_coherent() add the
+barriers (e.g. wmb/rmb) to ensure that read/wirte coherence with
+devices.
 
-> platform, which led to the following observations:
->
-> - The way gs_start_io() is implemented, each time it is invoked,
->   port->read_pool and port->write_pool will grow by QUEUE_SIZE, which
->   seems wrong.
->
->   For now, I just added a list_empty() check in gs_start_io() on the two
->   lists.
->
-> - "struct gs_port" does not appear to have provision to notify the USB
->   device controller to release any resource (particularly for rx) in
->   gs_close().
->
->   To fix the problem, I have a hard coded call into the USB device
->   controller right now, but that is ugly.
->
-> The particular kernel I'm working with is 2.6.28, but I took a look at
-> 2.6.35-rc6, and I don't see any change in these areas.
->
-> Jim
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Now our drivers are stable at the non-smp linux 2.6.33,  if our driver
+need support the smp linux 2.6.33, we need replace wmb()/rmb() to
+smp_wmb()/smp_rmb()?
 
--- 
-Regards,
-Igor.
+
+Thank for any help
+
+David
