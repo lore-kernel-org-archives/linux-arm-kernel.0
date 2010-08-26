@@ -1,28 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Aug 2010 18:49:09 +0100
+Date: Thu, 26 Aug 2010 18:54:40 +0100
 Subject: [RFC][PATCH] add
 	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
-In-Reply-To: <20100826185102I.fujita.tomonori@lab.ntt.co.jp>
+In-Reply-To: <20100826185938A.fujita.tomonori@lab.ntt.co.jp>
 References: <Pine.LNX.4.64.1008261100150.14167@axis700.grange>
 	<20100826182915S.fujita.tomonori@lab.ntt.co.jp>
-	<Pine.LNX.4.64.1008261140390.14167@axis700.grange>
-	<20100826185102I.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100826174909.GA13224@n2100.arm.linux.org.uk>
+	<20100826095311.GA13051@pengutronix.de>
+	<20100826185938A.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100826175440.GB13224@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 26, 2010 at 06:51:48PM +0900, FUJITA Tomonori wrote:
-> On Thu, 26 Aug 2010 11:45:58 +0200 (CEST)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+On Thu, Aug 26, 2010 at 07:00:24PM +0900, FUJITA Tomonori wrote:
+> On Thu, 26 Aug 2010 11:53:11 +0200
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> > On Thu, 26 Aug 2010, FUJITA Tomonori wrote:
-> > 
+> > > > We have currently a number of boards broken in the mainline. They must be 
+> > > > fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
+> > > > as I suggested earlier, we need either this or my patch series
+> > > > 
+> > > > http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
+> > > > 
+> > > > for 2.6.36.
+> > > 
 > > > Why can't you revert a commit that causes the regression?
-> > 
-> > See this reply, and the complete thread too.
-> > 
-> > http://marc.info/?l=linux-sh&m=128130485208262&w=2
-> > 
+> > > 
 > > > The related DMA API wasn't changed in 2.6.36-rc1. The DMA API is not
 > > > responsible for the regression. And the patchset even exnteds the
 > > > definition of the DMA API (dma_declare_coherent_memory). Such change
@@ -30,26 +32,30 @@ On Thu, Aug 26, 2010 at 06:51:48PM +0900, FUJITA Tomonori wrote:
 > > > dma_declare_coherent_memory() handles coherent memory for a particular
 > > > device. It's not for the API that reserves coherent memory that can be
 > > > used for any device for a single device.
+> > The patch that made the problem obvious for ARM is
+> > 309caa9cc6ff39d261264ec4ff10e29489afc8f8 aka v2.6.36-rc1~591^2~2^4~12.
+> > So this went in before v2.6.36-rc1.  One of the "architectures which
+> > similar restrictions" is x86 BTW.
 > > 
-> > Anyway, we need a way to fix the regression.
+> > And no, we won't revert 309caa9cc6ff39d261264ec4ff10e29489afc8f8 as it
+> > addresses a hardware restriction.
 > 
-> Needs to find a different way.
+> How these drivers were able to work without hitting the hardware restriction?
 
-No.  ioremap on memory mapped by the kernel is just plain not permitted
-with ARMv6 and ARMv7 architectures.
+Well, OMAP processors have experienced lock-ups due to multiple mappings of
+memory, so the restriction in the architecture manual is for real.
 
-It's not something you can say "oh, need to find another way" because there
-is _no_ software solution to having physical regions mapped multiple times
-with different attributes.  It's an architectural restriction.
+But more the issue is that the behaviour you get from a region is _totally_
+unpredictable (as the arch manual says).  With the VIPT caches, they can
+be searched irrespective of whether the page tabkes indicate that it's
+supposed to be cached or not - which means you can still hit cache lines
+for an ioremap'd region.
 
-We can't unmap the kernel's memory mapping either, as I've already explained
-several times this month - and I'm getting frustrated at having to keep
-on explaining that point.
+And if you do, how do you know that the cached data is still valid - what
+if it's some critical data that results in corruption - how do you know
+whether that's happened or not?  It might not even cause a kernel
+exception.
 
-Just accept the plain fact that multiple mappings of the same physical
-regions have become illegal.
-
-What we need is another alternative other than using ioremap on memory
-already mapped by the kernel - eg, by reserving a certain chunk of
-memory for this purpose at boot time which his _never_ mapped by the
-kernel, except via ioremap.
+We have to adhere to the restrictions placed upon us by the architecture
+at hand, and if that means device drivers break, so be it - at least we
+get to know what needs to be fixed for these restrictions.
