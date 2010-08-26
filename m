@@ -1,36 +1,20 @@
 From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Thu, 26 Aug 2010 03:28:41 +0200
+Date: Thu, 26 Aug 2010 03:38:11 +0200
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <1282310110.2605.976.camel@laptop>
+In-Reply-To: <1282778794.13797.15.camel@c-dwalke-linux.qualcomm.com>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<1282310110.2605.976.camel@laptop>
-Message-ID: <op.vh0ud3rg7p4s8u@localhost>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+	<1282778794.13797.15.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <op.vh0utxl87p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Aug 2010 15:15:10 +0200, Peter Zijlstra <peterz@infradead.org> wrote:
-> So the idea is to grab a large chunk of memory at boot time and then
-> later allow some device to use it?
->
-> I'd much rather we'd improve the regular page allocator to be smarter
-> about this. We recently added a lot of smarts to it like memory
-> compaction, which allows large gobs of contiguous memory to be freed for
-> things like huge pages.
->
-> If you want guarantees you can free stuff, why not add constraints to
-> the page allocation type and only allow MIGRATE_MOVABLE pages inside a
-> certain region, those pages are easily freed/moved aside to satisfy
-> large contiguous allocations.
+On Thu, 26 Aug 2010 01:26:34 +0200, Daniel Walker <dwalker@codeaurora.org> wrote:
+> If Michal is active, and follows community comments (including Zach's,
+> but I haven't seen any) then we can defer to that solution ..
 
-I'm aware that grabbing a large chunk at boot time is a bit of waste of
-space and because of it I'm hoping to came up with a way of reusing the
-space when it's not used by CMA-aware devices.  My current idea was to
-use it for easily discardable data (page cache?).
-
-> Also, please remove --chain-reply-to from your git config. You're using
-> 1.7 which should do the right thing (--no-chain-reply-to) by default.
-
-OK.
+Comments are always welcome. :)
 
 -- 
 Best regards,                                        _     _
