@@ -1,91 +1,60 @@
-From: mitov@issp.bas.bg (Marin Mitov)
-Date: Thu, 26 Aug 2010 13:18:22 +0300
-Subject: [RFC][PATCH] add
-	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
-In-Reply-To: <20100826091725.GC5355@pengutronix.de>
-References: <201008201450.12585.mitov@issp.bas.bg>
-	<Pine.LNX.4.64.1008261100150.14167@axis700.grange>
-	<20100826091725.GC5355@pengutronix.de>
-Message-ID: <201008261318.31784.mitov@issp.bas.bg>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 26 Aug 2010 18:21:15 +0800
+Subject: [PATCH 3/3] [ARM] mmp: support sparse irq
+In-Reply-To: <AANLkTinBzb1gnC38asFsURMg73TXOWP0Cef8LJXF9AHy@mail.gmail.com>
+References: <AANLkTinBzb1gnC38asFsURMg73TXOWP0Cef8LJXF9AHy@mail.gmail.com>
+Message-ID: <AANLkTikEu0VXP-y5yOP68_=rChEKoSiFeoCG3+pMBSbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 26, 2010 12:17:25 pm Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Thu, Aug 26, 2010 at 11:06:20AM +0200, Guennadi Liakhovetski wrote:
-> > On Thu, 26 Aug 2010, FUJITA Tomonori wrote:
-> > 
-> > > On Thu, 26 Aug 2010 09:04:14 +0300
-> > > Marin Mitov <mitov@issp.bas.bg> wrote:
-> > > 
-> > > > On Thursday, August 26, 2010 08:40:47 am FUJITA Tomonori wrote:
-> > > > > On Fri, 20 Aug 2010 14:50:12 +0300
-> > > > > Marin Mitov <mitov@issp.bas.bg> wrote:
-> > > > > 
-> > > > > > On Friday, August 20, 2010 11:35:06 am FUJITA Tomonori wrote:
-> > > > > > > On Fri, 20 Aug 2010 11:13:45 +0300
-> > > > > > > Marin Mitov <mitov@issp.bas.bg> wrote:
-> > > > > > > 
-> > > > > > > > > > This tric is already used in drivers/staging/dt3155v4l.c
-> > > > > > > > > > dt3155_alloc_coherent()/dt3155_free_coherent()
-> > > > > > > > > > 
-> > > > > > > > > > Here proposed for general use by popular demand from video4linux folks.
-> > > > > > > > > > Helps for videobuf-dma-contig framework.
-> > > > > > > > > 
-> > > > > > > > > What you guys exactly want to do? If you just want to pre-allocate
-> > > > > > > > > coherent memory for latter usage,
-> > > > > > > > 
-> > > > > > > > Yes, just to preallocate not coherent, but rather contiguous memory for latter usage.
-> > > > > > > > We use coherent memory because it turns out to be contiguous.
-> > > > > > > 
-> > > > > > > Hmm, you don't care about coherency? You just need contiguous memory?
-> > > > > > 
-> > > > > > Yes. We just need contiguous memory. Coherency is important as far as when dma
-> > > > > > transfer finishes user land is able to see the new data. Could be done by something like
-> > > > > > dma_{,un}map_single()
-> > > > > 
-> > > > > Then, we should avoid using coherent memory as I exaplained before. In
-> > > > > addition, dma_alloc_coherent can't provide large enough contigous
-> > > > > memory for some drivers so this patch doesn't help much.
-> > > > 
-> > > > Please, look at drivers/media/video/videobuf-dma-contig.c. Using coherent memory
-> > > > is inavoidable for now, there is no alternative for it for now. The two new functions,
-> > > > which I propose are just helpers for those of us who already use coherent memory
-> > > > (via videobuf-dma-contig API). May be adding these two functions to 
-> > > > drivers/media/video/videobuf-dma-contig.c will be better solution?
-> > > 
-> > > If you add something to the videobuf-dma-contig API, that's fine by me
-> > > because drivers/media/video/videobuf-dma-contig.c uses the own
-> > > structure and plays with dma_alloc_coherent. As long as a driver
-> > > doesn't touch device->dma_mem directly, it's fine, I think (that is,
-> > > dt3155v4l driver is broken). There are already some workarounds for
-> > > contigous memory in several drivers anyway.
-> > 
-> > No, this will not work - this API has to be used from board code and 
-> > videobuf can be built modular.
-> > 
-> > > We will have the proper API for contiguous memory. I don't think that
-> > > adding such workaround to the DMA API is a good idea.
-> > 
-> > We have currently a number of boards broken in the mainline. They must be 
-> > fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
-> > as I suggested earlier, we need either this or my patch series
-> > 
-> > http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
-> this seems to be more mature to me.  The original patch in this thread
-> uses a symbol DT3155_COH_FLAGS which seems misplaced in generic code and
-> doesn't put the new functions in a header.
+On Wed, Aug 25, 2010 at 6:45 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From cdf2a6749f5c01ffe285b0b10427557b3c2f73cd Mon Sep 17 00:00:00 2001
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date: Wed, 25 Aug 2010 14:52:53 +0800
+> Subject: [PATCH 3/3] [ARM] mmp: support sparse irq
+>
+> Add sparse IRQ support in ARCH_MMP.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-mmp/include/mach/irqs.h | ? ?4 +---
+> ?2 files changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 45f93e1..eb1d43d 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -511,6 +511,7 @@ config ARCH_MMP
+> ? ? ? ?select GENERIC_CLOCKEVENTS
+> ? ? ? ?select TICK_ONESHOT
+> ? ? ? ?select PLAT_PXA
+> + ? ? ? select SPARSE_IRQ
 
-You are right. DT3155_COH_FLAGS should be defined, and a declaration should be 
-put in the headers.
+Hrm... I don't see any machine files being amended for the .nr_irqs
+field?
 
-But it is just RFC :-)
-
-Marin Mitov
-
-> 
-> Best regards
-> Uwe
-> 
-> 
+> ? ? ? ?help
+> ? ? ? ? ?Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
+>
+> diff --git a/arch/arm/mach-mmp/include/mach/irqs.h
+> b/arch/arm/mach-mmp/include/mach/irqs.h
+> index b379cde..a09d328 100644
+> --- a/arch/arm/mach-mmp/include/mach/irqs.h
+> +++ b/arch/arm/mach-mmp/include/mach/irqs.h
+> @@ -222,10 +222,8 @@
+> ?#define IRQ_GPIO_NUM ? ? ? ? ? ? ? ? ? 192
+> ?#define IRQ_GPIO(x) ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_START + (x))
+>
+> -/* Board IRQ - 64 by default, increase if not enough */
+> ?#define IRQ_BOARD_START ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_START + IRQ_GPIO_NUM)
+> -#define IRQ_BOARD_END ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START + 64)
+>
+> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_END)
+> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(IRQ_BOARD_START)
+>
+> ?#endif /* __ASM_MACH_IRQS_H */
+> --
+> 1.5.6.5
+>
