@@ -1,182 +1,202 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Thu, 26 Aug 2010 15:02:28 +0300
-Subject: [PATCH v2 2/6] configure/Makefile: add support for ARM targets
+Date: Thu, 26 Aug 2010 15:02:31 +0300
+Subject: [PATCH v2 5/6] crash/kdump: add ARM support
 In-Reply-To: <cover.1282822832.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1282822832.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <a3ea7a89f09cc3d5e5677338cc7cb5d1e29f7922.1282822832.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <57cbc6faa8e5e4922267bf716a734ed510988986.1282822832.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to build for ARM targets. This includes native ARM build, and also
-ARM on x86 (which works because of the same word size and endianness).
+This patch adds ARM support for kdump files (ELF files readable from
+/proc/vmcore). It also provides a function which tries to determine correct
+phys_base based on the program headers in the ELF file.
 
 Signed-off-by: Jan Karlsson <jan.karlsson@sonyericsson.com>
 Signed-off-by: Thomas F?nge <thomas.fange@sonyericsson.com>
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- Makefile    |   18 +++++++++++++++---
- configure.c |   32 +++++++++++++++++++++++++++++++-
- 2 files changed, 46 insertions(+), 4 deletions(-)
+ defs.h    |    3 ++
+ netdump.c |  115 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 118 insertions(+), 0 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index c2a2ac0..038c887 100644
---- a/Makefile
-+++ b/Makefile
-@@ -32,6 +32,12 @@ ifeq ($(ARCH), ppc64)
- CONF_FLAGS = -m64
- endif
- 
-+ifeq ($(TARGET), ARM)
-+ifeq ($(ARCH), i386)
-+GDB_CONF_FLAGS = --target=arm-elf-linux
-+endif
-+endif
-+
- #
- # GDB, GDB_FILES, GDB_OFILES and GDB_PATCH_FILES will be configured automatically by configure 
- #
-@@ -240,11 +246,17 @@ GDB_INCLUDE_DIRECTORY=./${GDB}/include
- 
- REDHATFLAGS=-DREDHAT
- 
-+# target could be set on command line when invoking make. Like: make target=ARM
-+# otherwise target will be the same as the host
-+ifneq ($(target),)
-+CONF_TARGET_FLAG="-t$(target)"
-+endif
-+
- # To build the extensions library by default, uncomment the third command
- # line below.  Otherwise they can be built by entering "make extensions".
- 
- all: make_configure
--	@./configure -p "RPMPKG=${RPMPKG}" -b
-+	@./configure ${CONF_TARGET_FLAG} -p "RPMPKG=${RPMPKG}" -b
- 	@make --no-print-directory gdb_merge
- #	@make --no-print-directory extensions
- 
-@@ -254,7 +266,7 @@ gdb_merge: force
- 	@echo "${LDFLAGS} -lz -ldl -rdynamic" > ${GDB}/gdb/mergelibs
- 	@echo "../../${PROGRAM} ../../${PROGRAM}lib.a" > ${GDB}/gdb/mergeobj
- 	@if [ ! -f ${GDB}/config.status ]; then \
--	  (cd ${GDB}; ./configure --with-separate-debug-dir=/usr/lib/debug \
-+	  (cd ${GDB}; ./configure ${GDB_CONF_FLAGS} --with-separate-debug-dir=/usr/lib/debug \
- 	    --with-bugurl="" --with-expat=no --with-python=no; \
- 	  make --no-print-directory;) \
- 	else (cd ${GDB}/gdb; make --no-print-directory;); fi
-@@ -591,7 +603,7 @@ dis:
- 	objdump --disassemble --line-numbers ${PROGRAM} > ${PROGRAM}.dis
- 
- extensions: make_configure
--	@./configure -q -b
-+	@./configure ${CONF_TARGET_FLAG} -q -b
- 	@make --no-print-directory do_extensions
- 
- do_extensions:
-diff --git a/configure.c b/configure.c
-index 627bb83..a4b3a0e 100755
---- a/configure.c
-+++ b/configure.c
-@@ -90,6 +90,7 @@ void make_spec_file(struct supported_gdb_version *);
- #undef S390X
- #undef PPC64
- #undef X86_64
-+#undef ARM
- 
- #define X86     1
- #define ALPHA   2
-@@ -99,6 +100,7 @@ void make_spec_file(struct supported_gdb_version *);
- #define S390X   6
- #define PPC64   7
- #define X86_64  8
-+#define ARM	9
- 
- #define TARGET_X86    "TARGET=X86"
- #define TARGET_ALPHA  "TARGET=ALPHA"
-@@ -108,6 +110,7 @@ void make_spec_file(struct supported_gdb_version *);
- #define TARGET_S390X  "TARGET=S390X"
- #define TARGET_PPC64  "TARGET=PPC64"
- #define TARGET_X86_64 "TARGET=X86_64"
-+#define TARGET_ARM    "TARGET=ARM"
- 
- #define TARGET_CFLAGS_X86    "TARGET_CFLAGS=-D_FILE_OFFSET_BITS=64"
- #define TARGET_CFLAGS_ALPHA  "TARGET_CFLAGS="
-@@ -117,6 +120,7 @@ void make_spec_file(struct supported_gdb_version *);
- #define TARGET_CFLAGS_S390X  "TARGET_CFLAGS="
- #define TARGET_CFLAGS_PPC64  "TARGET_CFLAGS=-m64"
- #define TARGET_CFLAGS_X86_64 "TARGET_CFLAGS="
-+#define TARGET_CFLAGS_ARM    "TARGET_CFLAGS=-D_FILE_OFFSET_BITS=64"
+diff --git a/defs.h b/defs.h
+index 3d34b8e..c8bae00 100755
+--- a/defs.h
++++ b/defs.h
+@@ -4353,6 +4353,9 @@ int xen_minor_version(void);
+ int get_netdump_arch(void);
+ void *get_regs_from_elf_notes(struct task_context *);
+ void map_cpus_to_prstatus(void);
++#ifdef ARM
++int kdump_phys_base(ulong *);
++#endif
  
  /*
-  *  The original plan was to allow the use of a particular version
-@@ -193,6 +197,7 @@ struct target_data {
- 	char gdb_version[MAXSTRLEN];
- 	char release[MAXSTRLEN];
- 	struct stat statbuf;
-+	const char *target_as_param;
- } target_data = { 0 }; 
+  *  diskdump.c
+diff --git a/netdump.c b/netdump.c
+index 3a5db13..3bf6e3b 100644
+--- a/netdump.c
++++ b/netdump.c
+@@ -32,6 +32,7 @@ static void dump_Elf64_Ehdr(Elf64_Ehdr *);
+ static void dump_Elf64_Phdr(Elf64_Phdr *, int);
+ static size_t dump_Elf64_Nhdr(Elf64_Off offset, int);
+ static void get_netdump_regs_ppc64(struct bt_info *, ulong *, ulong *);
++static void get_netdump_regs_arm(struct bt_info *, ulong *, ulong *);
+ static physaddr_t xen_kdump_p2m(physaddr_t);
+ static void check_dumpfile_size(char *);
  
- int
-@@ -203,7 +208,7 @@ main(int argc, char **argv)
- 
- 	sp = setup_gdb_defaults();
- 
--	while ((c = getopt(argc, argv, "gsqnWwubdr:p:P:")) > 0) {
-+	while ((c = getopt(argc, argv, "gsqnWwubdr:p:P:t:")) > 0) {
- 		switch (c) {
- 		case 'q':
- 			target_data.flags |= QUIET;
-@@ -236,6 +241,9 @@ main(int argc, char **argv)
- 		case 'g':
- 			gdb_configure(sp);
+@@ -170,6 +171,12 @@ is_netdump(char *file, ulong source_query)
+ 				goto bailout;
  			break;
-+		case 't':
-+			target_data.target_as_param = optarg;
+ 
++		case EM_ARM:
++			if (machine_type_mismatch(file, "ARM", NULL,
++			    source_query))
++				goto bailout;
 +			break;
- 		}
- 	}
- 
-@@ -274,6 +282,21 @@ get_current_configuration(void)
- #ifdef __x86_64__
-         target_data.target = X86_64;
- #endif
-+#ifdef __arm__
-+        target_data.target = ARM;
-+#endif
-+        /* override target if specified on command line */
-+	if (target_data.target_as_param != 0) {
-+		if (target_data.target == X86 &&
-+		    strcmp(target_data.target_as_param, "ARM") == 0) {
-+			/* debugging of ARM core files only supported on X86 */
-+			target_data.target = ARM;
-+		} else {
-+			fprintf(stderr,
-+				"target \"%s\" is not supported on this architecture\n",
-+				target_data.target_as_param);
-+		}
-+        }
- 
-         if ((fp = fopen("Makefile", "r")) == NULL) {
- 		perror("Makefile");
-@@ -374,6 +397,9 @@ show_configuration(void)
- 	case X86_64:
- 		printf("TARGET: X86_64\n");
++
+ 		default:
+ 			if (machine_type_mismatch(file, "(unknown)", NULL,
+ 			    source_query))
+@@ -2094,6 +2101,10 @@ get_netdump_regs(struct bt_info *bt, ulong *eip, ulong *esp)
+ 	case EM_S390:
+ 		machdep->get_stack_frame(bt, eip, esp);
  		break;
-+	case ARM:
-+		printf("TARGET: ARM\n");
++
++	case EM_ARM:
++		return get_netdump_regs_arm(bt, eip, esp);
 +		break;
- 	}
+ 	default:
+ 		error(FATAL, 
+ 		   "support for ELF machine type %d not available\n",
+@@ -2393,6 +2404,40 @@ get_netdump_regs_ppc64(struct bt_info *bt, ulong *eip, ulong *esp)
+ 	machdep->get_stack_frame(bt, eip, esp);
+ }
  
- 	if (strlen(target_data.program)) {
-@@ -437,6 +463,10 @@ build_configure(struct supported_gdb_version *sp)
-                 target = TARGET_X86_64;
-                 target_CFLAGS = TARGET_CFLAGS_X86_64;
-                 break;
-+	case ARM:
-+                target = TARGET_ARM;
-+                target_CFLAGS = TARGET_CFLAGS_ARM;
-+                break;
- 	}
++static void
++get_netdump_regs_arm(struct bt_info *bt, ulong *eip, ulong *esp)
++{
++	Elf64_Nhdr *note;
++	size_t len;
++
++	if ((bt->task == tt->panic_task) ||
++		(is_task_active(bt->task) && nd->num_prstatus_notes > 1)) {
++		/*
++		 * Registers are saved during the dump process for the
++		 * panic task. Whereas in kdump, regs are captured for all
++		 * CPUs if they responded to an IPI.
++		 */
++                if (nd->num_prstatus_notes > 1) {
++			if (!nd->nt_prstatus_percpu[bt->tc->processor])
++				error(FATAL,
++				      "cannot determine NT_PRSTATUS ELF note "
++				      "for %s task: %lx\n",
++				       (bt->task == tt->panic_task) ?
++				       "panic" : "active", bt->task);
++                        note = (Elf64_Nhdr *)
++                                nd->nt_prstatus_percpu[bt->tc->processor];
++		} else
++			note = (Elf64_Nhdr *)nd->nt_prstatus;
++
++		len = sizeof(Elf64_Nhdr);
++		len = roundup(len + note->n_namesz, 4);
++		bt->machdep = (void *)((char *)note + len +
++			MEMBER_OFFSET("elf_prstatus", "pr_reg"));
++	}
++
++	machdep->get_stack_frame(bt, eip, esp);
++}
++
+ int 
+ is_partial_netdump(void)
+ {
+@@ -2644,6 +2689,7 @@ xen_minor_version(void)
+ static void *get_ppc64_regs_from_elf_notes(struct task_context *);
+ static void *get_x86_regs_from_elf_notes(struct task_context *);
+ static void *get_x86_64_regs_from_elf_notes(struct task_context *);
++static void *get_arm_regs_from_elf_notes(struct task_context *);
  
- 	makefile_setup(&fp1, &fp2);
+ int get_netdump_arch(void)
+ {
+@@ -2670,6 +2716,8 @@ get_regs_from_elf_notes(struct task_context *tc)
+ 		return get_ppc64_regs_from_elf_notes(tc);
+ 	case EM_X86_64:
+ 		return get_x86_64_regs_from_elf_notes(tc);
++	case EM_ARM:
++		return get_arm_regs_from_elf_notes(tc);
+ 	default:
+ 		error(FATAL,
+ 		    "support for ELF machine type %d not available\n",
+@@ -2786,3 +2834,70 @@ get_ppc64_regs_from_elf_notes(struct task_context *tc)
+ 	
+ 	return pt_regs;
+ }
++
++#ifdef ARM
++/*
++ * In case of ARM we need to determine correct PHYS_OFFSET from the kdump file.
++ * This is done by taking lowest physical address (LMA) from given load
++ * segments. Normally this is the right one.
++ *
++ * Alternative would be to store phys_base in VMCOREINFO but current kernel
++ * kdump doesn't do that yet.
++ */
++int kdump_phys_base(ulong *phys_base)
++{
++	struct pt_load_segment *pls;
++	ulong paddr = ULONG_MAX;
++	int i;
++
++	for (i = 0; i < nd->num_pt_load_segments; i++) {
++		pls = &nd->pt_load_segments[i];
++		if (pls->phys_start < paddr)
++			paddr = pls->phys_start;
++	}
++
++	if (paddr != ULONG_MAX) {
++		*phys_base = paddr;
++		return TRUE;
++	}
++	return FALSE;
++}
++#endif /* ARM */
++
++static void *
++get_arm_regs_from_elf_notes(struct task_context *tc)
++{
++	Elf32_Nhdr *note_32;
++	Elf64_Nhdr *note_64;
++	void *note;
++	size_t len;
++	void *pt_regs;
++
++	len = 0;
++	pt_regs = NULL;
++
++	if ((tc->task == tt->panic_task) ||
++	    (is_task_active(tc->task) && (nd->num_prstatus_notes > 1))) {
++		if (nd->num_prstatus_notes > 1)
++			note = (void *)
++				nd->nt_prstatus_percpu[tc->processor];
++		else
++			note = (void *)nd->nt_prstatus;
++		if (nd->elf32) {
++			note_32 = (Elf32_Nhdr *)note;
++			len = sizeof(Elf32_Nhdr);
++			len = roundup(len + note_32->n_namesz, 4);
++		} else if (nd->elf64) {
++			note_64 = (Elf64_Nhdr *)note;
++			len = sizeof(Elf64_Nhdr);
++			len = roundup(len + note_64->n_namesz, 4);
++		}
++
++		pt_regs = (void *)((char *)note + len +
++			MEMBER_OFFSET("elf_prstatus", "pr_reg"));
++	} else
++		error(FATAL,
++		    "cannot determine arm register set for task \"%s\"\n",
++			tc->comm);
++	return pt_regs;
++}
 -- 
 1.5.6.5
