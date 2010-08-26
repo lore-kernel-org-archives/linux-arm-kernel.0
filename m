@@ -1,75 +1,50 @@
-From: mitov@issp.bas.bg (Marin Mitov)
-Date: Thu, 26 Aug 2010 21:32:26 +0300
-Subject: [RFC][PATCH] add
-	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
-In-Reply-To: <20100826174909.GA13224@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.64.1008261100150.14167@axis700.grange>
-	<20100826185102I.fujita.tomonori@lab.ntt.co.jp>
-	<20100826174909.GA13224@n2100.arm.linux.org.uk>
-Message-ID: <201008262132.35523.mitov@issp.bas.bg>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Thu, 26 Aug 2010 20:09:15 +0100
+Subject: [PATCH V2 0/4] Generalise ARM perf-events backend for oprofile
+Message-ID: <cover.1282848651.git.matt@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 26, 2010 08:49:09 pm Russell King - ARM Linux wrote:
-> On Thu, Aug 26, 2010 at 06:51:48PM +0900, FUJITA Tomonori wrote:
-> > On Thu, 26 Aug 2010 11:45:58 +0200 (CEST)
-> > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > 
-> > > On Thu, 26 Aug 2010, FUJITA Tomonori wrote:
-> > > 
-> > > > Why can't you revert a commit that causes the regression?
-> > > 
-> > > See this reply, and the complete thread too.
-> > > 
-> > > http://marc.info/?l=linux-sh&m=128130485208262&w=2
-> > > 
-> > > > The related DMA API wasn't changed in 2.6.36-rc1. The DMA API is not
-> > > > responsible for the regression. And the patchset even exnteds the
-> > > > definition of the DMA API (dma_declare_coherent_memory). Such change
-> > > > shouldn't applied after rc1. I think that DMA-API.txt says that
-> > > > dma_declare_coherent_memory() handles coherent memory for a particular
-> > > > device. It's not for the API that reserves coherent memory that can be
-> > > > used for any device for a single device.
-> > > 
-> > > Anyway, we need a way to fix the regression.
-> > 
-> > Needs to find a different way.
-> 
-> No.  ioremap on memory mapped by the kernel is just plain not permitted
-> with ARMv6 and ARMv7 architectures.
+The perf-events backend for OProfile that Will Deacon wrote in
+8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
+perf-events framework as backend") is of use to more architectures
+than just ARM. Move the code into drivers/oprofile/ so that SH can use
+it instead of the nearly identical copy of its OProfile code.
 
-Hi Russell,
+The benefit of the backend is that it becomes necessary to only
+maintain one copy of the PMU accessor functions for each architecture,
+with bug fixes and new features benefiting both OProfile and perf.
 
-Just because ioremap on memory mapped by the kernel is just plain not permitted
-I have proposed a new pair of functions: dma_reserve_coherent_memory()/dma_free_reserved_memory()
+Note that I haven't been able to test these patches on an ARM board to
+see if I've caused any regressions. If anyone else could do that I'd
+appreciate it. Though, I have been able to compile this version of the
+series.
 
-http://lkml.org/lkml/2010/8/19/200
+This patch series is based on tip/master.
 
-but it is not quite well accepted from the community.
-What is your opinion?
+Changes from v1:
+ - Prefix the new functons with "oprofile_" instead of "op_".
+ - Fix ARM compilation errors
+ - Move all the oprofile-perf logic into oprofile_perf.c
+ - Include cleanup patch from Will
 
-Thanks,
+Matt Fleming (3):
+  sh: Accessor functions for the sh_pmu state
+  oprofile: Abstract the perf-events backend
+  sh: Use the perf-events backend for oprofile
 
-Marin Mitov
+Will Deacon (1):
+  oprofile: Handle initialisation failure more gracefully
 
-> 
-> It's not something you can say "oh, need to find another way" because there
-> is _no_ software solution to having physical regions mapped multiple times
-> with different attributes.  It's an architectural restriction.
-> 
-> We can't unmap the kernel's memory mapping either, as I've already explained
-> several times this month - and I'm getting frustrated at having to keep
-> on explaining that point.
-> 
-> Just accept the plain fact that multiple mappings of the same physical
-> regions have become illegal.
-> 
-> What we need is another alternative other than using ioremap on memory
-> already mapped by the kernel - eg, by reserving a certain chunk of
-> memory for this purpose at boot time which his _never_ mapped by the
-> kernel, except via ioremap.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ arch/arm/oprofile/Makefile       |    4 +
+ arch/arm/oprofile/common.c       |  228 ++++----------------------------------
+ arch/sh/include/asm/perf_event.h |    2 +
+ arch/sh/kernel/perf_event.c      |   13 ++
+ arch/sh/oprofile/Makefile        |    2 +-
+ arch/sh/oprofile/common.c        |   96 +++-------------
+ arch/sh/oprofile/op_impl.h       |   33 ------
+ drivers/oprofile/oprofile_perf.c |  209 ++++++++++++++++++++++++++++++++++
+ include/linux/oprofile.h         |   12 ++
+ 9 files changed, 283 insertions(+), 316 deletions(-)
+ delete mode 100644 arch/sh/oprofile/op_impl.h
+ create mode 100644 drivers/oprofile/oprofile_perf.c
