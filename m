@@ -1,80 +1,67 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 26 Aug 2010 17:34:12 +0800
-Subject: [PATCH v3 1/2] pxa168: added framebuffer support code.
-In-Reply-To: <1282794715-28640-2-git-send-email-mark.brown314@gmail.com>
-References: <1282794715-28640-1-git-send-email-mark.brown314@gmail.com>
-	<1282794715-28640-2-git-send-email-mark.brown314@gmail.com>
-Message-ID: <AANLkTim-CSzGgYfr4QJaA1-h4+cOb05jh6ifd2jJsfs6@mail.gmail.com>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Thu, 26 Aug 2010 18:36:24 +0900
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <20100826133028.39d731da.kamezawa.hiroyu@jp.fujitsu.com>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+	<20100826095857.5b821d7f.kamezawa.hiroyu@jp.fujitsu.com>
+	<op.vh0wektv7p4s8u@localhost>
+	<20100826115017.04f6f707.kamezawa.hiroyu@jp.fujitsu.com>
+	<20100826124434.6089630d.kamezawa.hiroyu@jp.fujitsu.com>
+	<AANLkTi=T1y+sQuqVTYgOkYvqrxdYB1bZmCpKafN5jPqi@mail.gmail.com>
+	<20100826133028.39d731da.kamezawa.hiroyu@jp.fujitsu.com>
+Message-ID: <AANLkTimB+s0tO=wrODAU4qCaZnCBoLZ2A9pGjR_jheOj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 26, 2010 at 11:51 AM, Mark F. Brown <mark.brown314@gmail.com> wrote:
-> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+On Thu, Aug 26, 2010 at 1:30 PM, KAMEZAWA Hiroyuki
+<kamezawa.hiroyu@jp.fujitsu.com> wrote:
+> On Thu, 26 Aug 2010 13:06:28 +0900
+> Minchan Kim <minchan.kim@gmail.com> wrote:
+>
+>> On Thu, Aug 26, 2010 at 12:44 PM, KAMEZAWA Hiroyuki
+>> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+>> > On Thu, 26 Aug 2010 11:50:17 +0900
+>> > KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+>> >
+>> >> 128MB...too big ? But it's depend on config.
+>> >>
+>> >> IBM's ppc guys used 16MB section, and recently, a new interface to shrink
+>> >> the number of /sys files are added, maybe usable.
+>> >>
+>> >> Something good with this approach will be you can create "cma" memory
+>> >> before installing driver.
+>> >>
+>> >> But yes, complicated and need some works.
+>> >>
+>> > Ah, I need to clarify what I want to say.
+>> >
+>> > With compaction, it's helpful, but you can't get contiguous memory larger
+>> > than MAX_ORDER, I think. To get memory larger than MAX_ORDER on demand,
+>> > memory hot-plug code has almost all necessary things.
+>>
+>> True. Doesn't patch's idea of Christoph helps this ?
+>> http://lwn.net/Articles/200699/
+>>
+>
+> yes, I think so. But, IIRC, ?it's own purpose of Chirstoph's work is
+> for removing zones. please be careful what's really necessary.
 
-Applied to 'devel'.
+Ahh. Sorry for missing point.
+You're right. The patch can't help our problem.
 
-> ---
-> ?arch/arm/mach-mmp/include/mach/pxa168.h | ? ?8 ++++++++
-> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ?| ? ?3 +++
-> ?2 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-> index 27e1bc7..220738f 100644
-> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
-> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-> @@ -10,6 +10,7 @@ extern void __init pxa168_init_irq(void);
-> ?#include <mach/devices.h>
-> ?#include <plat/i2c.h>
-> ?#include <plat/pxa3xx_nand.h>
-> +#include <video/pxa168fb.h>
->
-> ?extern struct pxa_device_desc pxa168_device_uart1;
-> ?extern struct pxa_device_desc pxa168_device_uart2;
-> @@ -25,6 +26,7 @@ extern struct pxa_device_desc pxa168_device_ssp3;
-> ?extern struct pxa_device_desc pxa168_device_ssp4;
-> ?extern struct pxa_device_desc pxa168_device_ssp5;
-> ?extern struct pxa_device_desc pxa168_device_nand;
-> +extern struct pxa_device_desc pxa168_device_fb;
->
-> ?static inline int pxa168_add_uart(int id)
-> ?{
-> @@ -97,4 +99,10 @@ static inline int pxa168_add_nand(struct pxa3xx_nand_platform_data *info)
-> ?{
-> ? ? ? ?return pxa_register_device(&pxa168_device_nand, info, sizeof(*info));
-> ?}
-> +
-> +static inline int pxa168_add_fb(struct pxa168fb_mach_info *mi)
-> +{
-> + ? ? ? return pxa_register_device(&pxa168_device_fb, mi, sizeof(*mi));
-> +}
-> +
-> ?#endif /* __ASM_MACH_PXA168_H */
-> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-> index 652ae66..eaebf66 100644
-> --- a/arch/arm/mach-mmp/pxa168.c
-> +++ b/arch/arm/mach-mmp/pxa168.c
-> @@ -79,6 +79,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
-> ?static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
->
-> ?static APMU_CLK(nand, NAND, 0x01db, 208000000);
-> +static APMU_CLK(lcd, LCD, 0x7f, 312000000);
->
-> ?/* device and clock bindings */
-> ?static struct clk_lookup pxa168_clkregs[] = {
-> @@ -96,6 +97,7 @@ static struct clk_lookup pxa168_clkregs[] = {
-> ? ? ? ?INIT_CLKREG(&clk_ssp4, "pxa168-ssp.3", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_ssp5, "pxa168-ssp.4", NULL),
-> ? ? ? ?INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
-> + ? ? ? INIT_CLKREG(&clk_lcd, "pxa168-fb", NULL),
-> ?};
->
-> ?static int __init pxa168_init(void)
-> @@ -147,3 +149,4 @@ PXA168_DEVICE(ssp2, "pxa168-ssp", 1, SSP2, 0xd401c000, 0x40, 54, 55);
-> ?PXA168_DEVICE(ssp3, "pxa168-ssp", 2, SSP3, 0xd401f000, 0x40, 56, 57);
-> ?PXA168_DEVICE(ssp4, "pxa168-ssp", 3, SSP4, 0xd4020000, 0x40, 58, 59);
-> ?PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000, 0x40, 60, 61);
-> +PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000, 0x1c8);
-> --
-> 1.7.0.4
->
->
+How about changing following this?
+The thing is MAX_ORDER is static. But we want to avoid too big
+MAX_ORDER of whole zones to support devices which requires big
+allocation chunk.
+So let's add MAX_ORDER into each zone and then, each zone can have
+different max order.
+For example, while DMA[32], NORMAL, HIGHMEM can have normal size 11,
+MOVABLE zone could have a 15.
+
+This approach has a big side effect?
+
+-- 
+Kind regards,
+Minchan Kim
