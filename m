@@ -1,112 +1,182 @@
 From: ext-mika.1.westerberg@nokia.com (Mika Westerberg)
-Date: Thu, 26 Aug 2010 15:02:30 +0300
-Subject: [PATCH v2 4/6] crash/diskdump: add ARM support
+Date: Thu, 26 Aug 2010 15:02:28 +0300
+Subject: [PATCH v2 2/6] configure/Makefile: add support for ARM targets
 In-Reply-To: <cover.1282822832.git.ext-mika.1.westerberg@nokia.com>
 References: <cover.1282822832.git.ext-mika.1.westerberg@nokia.com>
-Message-ID: <4077ca13865cabc9dafb64b4d533388897a4aa81.1282822832.git.ext-mika.1.westerberg@nokia.com>
+Message-ID: <a3ea7a89f09cc3d5e5677338cc7cb5d1e29f7922.1282822832.git.ext-mika.1.westerberg@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ARM support for makedumpfile generated diskdump files.
+Add support to build for ARM targets. This includes native ARM build, and also
+ARM on x86 (which works because of the same word size and endianness).
 
+Signed-off-by: Jan Karlsson <jan.karlsson@sonyericsson.com>
+Signed-off-by: Thomas F?nge <thomas.fange@sonyericsson.com>
 Signed-off-by: Mika Westerberg <ext-mika.1.westerberg@nokia.com>
 ---
- diskdump.c |   34 +++++++++++++++++++++++++++++++---
- 1 files changed, 31 insertions(+), 3 deletions(-)
+ Makefile    |   18 +++++++++++++++---
+ configure.c |   32 +++++++++++++++++++++++++++++++-
+ 2 files changed, 46 insertions(+), 4 deletions(-)
 
-diff --git a/diskdump.c b/diskdump.c
-index 79e72ad..3aab338 100644
---- a/diskdump.c
-+++ b/diskdump.c
-@@ -249,6 +249,9 @@ restart:
- 	else if (STRNEQ(header->utsname.machine, "ppc64") &&
- 	    machine_type_mismatch(file, "PPC64", NULL, 0))
- 		goto err;
-+	else if (STRNEQ(header->utsname.machine, "arm") &&
-+	    machine_type_mismatch(file, "ARM", NULL, 0))
-+		goto err;
+diff --git a/Makefile b/Makefile
+index c2a2ac0..038c887 100644
+--- a/Makefile
++++ b/Makefile
+@@ -32,6 +32,12 @@ ifeq ($(ARCH), ppc64)
+ CONF_FLAGS = -m64
+ endif
  
- 	if (header->block_size != block_size) {
- 		block_size = header->block_size;
-@@ -335,7 +338,9 @@ restart:
++ifeq ($(TARGET), ARM)
++ifeq ($(ARCH), i386)
++GDB_CONF_FLAGS = --target=arm-elf-linux
++endif
++endif
++
+ #
+ # GDB, GDB_FILES, GDB_OFILES and GDB_PATCH_FILES will be configured automatically by configure 
+ #
+@@ -240,11 +246,17 @@ GDB_INCLUDE_DIRECTORY=./${GDB}/include
  
- 	dd->header = header;
+ REDHATFLAGS=-DREDHAT
  
--	if (machine_type("X86"))
-+	if (machine_type("ARM"))
-+		dd->machine_type = EM_ARM;
-+	else if (machine_type("X86"))
- 		dd->machine_type = EM_386;
- 	else if (machine_type("X86_64"))
- 		dd->machine_type = EM_X86_64;
-@@ -516,6 +521,17 @@ page_is_cached(physaddr_t paddr)
- }
++# target could be set on command line when invoking make. Like: make target=ARM
++# otherwise target will be the same as the host
++ifneq ($(target),)
++CONF_TARGET_FLAG="-t$(target)"
++endif
++
+ # To build the extensions library by default, uncomment the third command
+ # line below.  Otherwise they can be built by entering "make extensions".
+ 
+ all: make_configure
+-	@./configure -p "RPMPKG=${RPMPKG}" -b
++	@./configure ${CONF_TARGET_FLAG} -p "RPMPKG=${RPMPKG}" -b
+ 	@make --no-print-directory gdb_merge
+ #	@make --no-print-directory extensions
+ 
+@@ -254,7 +266,7 @@ gdb_merge: force
+ 	@echo "${LDFLAGS} -lz -ldl -rdynamic" > ${GDB}/gdb/mergelibs
+ 	@echo "../../${PROGRAM} ../../${PROGRAM}lib.a" > ${GDB}/gdb/mergeobj
+ 	@if [ ! -f ${GDB}/config.status ]; then \
+-	  (cd ${GDB}; ./configure --with-separate-debug-dir=/usr/lib/debug \
++	  (cd ${GDB}; ./configure ${GDB_CONF_FLAGS} --with-separate-debug-dir=/usr/lib/debug \
+ 	    --with-bugurl="" --with-expat=no --with-python=no; \
+ 	  make --no-print-directory;) \
+ 	else (cd ${GDB}/gdb; make --no-print-directory;); fi
+@@ -591,7 +603,7 @@ dis:
+ 	objdump --disassemble --line-numbers ${PROGRAM} > ${PROGRAM}.dis
+ 
+ extensions: make_configure
+-	@./configure -q -b
++	@./configure ${CONF_TARGET_FLAG} -q -b
+ 	@make --no-print-directory do_extensions
+ 
+ do_extensions:
+diff --git a/configure.c b/configure.c
+index 627bb83..a4b3a0e 100755
+--- a/configure.c
++++ b/configure.c
+@@ -90,6 +90,7 @@ void make_spec_file(struct supported_gdb_version *);
+ #undef S390X
+ #undef PPC64
+ #undef X86_64
++#undef ARM
+ 
+ #define X86     1
+ #define ALPHA   2
+@@ -99,6 +100,7 @@ void make_spec_file(struct supported_gdb_version *);
+ #define S390X   6
+ #define PPC64   7
+ #define X86_64  8
++#define ARM	9
+ 
+ #define TARGET_X86    "TARGET=X86"
+ #define TARGET_ALPHA  "TARGET=ALPHA"
+@@ -108,6 +110,7 @@ void make_spec_file(struct supported_gdb_version *);
+ #define TARGET_S390X  "TARGET=S390X"
+ #define TARGET_PPC64  "TARGET=PPC64"
+ #define TARGET_X86_64 "TARGET=X86_64"
++#define TARGET_ARM    "TARGET=ARM"
+ 
+ #define TARGET_CFLAGS_X86    "TARGET_CFLAGS=-D_FILE_OFFSET_BITS=64"
+ #define TARGET_CFLAGS_ALPHA  "TARGET_CFLAGS="
+@@ -117,6 +120,7 @@ void make_spec_file(struct supported_gdb_version *);
+ #define TARGET_CFLAGS_S390X  "TARGET_CFLAGS="
+ #define TARGET_CFLAGS_PPC64  "TARGET_CFLAGS=-m64"
+ #define TARGET_CFLAGS_X86_64 "TARGET_CFLAGS="
++#define TARGET_CFLAGS_ARM    "TARGET_CFLAGS=-D_FILE_OFFSET_BITS=64"
  
  /*
-+ * Translate physical address in paddr to PFN number. This means normally that
-+ * we just shift paddr by some constant. Some architectures need special
-+ * handling for this, however.
-+ */
-+static ulong
-+paddr_to_pfn(physaddr_t paddr)
-+{
-+	return paddr >> dd->block_shift;
-+}
-+
-+/*
-  *  Cache the page's data.
-  *
-  *  If an empty page cache location is available, take it.  Otherwise, evict
-@@ -560,7 +576,7 @@ cache_page(physaddr_t paddr)
- 	dd->page_cache_hdr[i].pg_hit_count++;
+  *  The original plan was to allow the use of a particular version
+@@ -193,6 +197,7 @@ struct target_data {
+ 	char gdb_version[MAXSTRLEN];
+ 	char release[MAXSTRLEN];
+ 	struct stat statbuf;
++	const char *target_as_param;
+ } target_data = { 0 }; 
  
- 	/* find page descriptor */
--	pfn = paddr >> dd->block_shift;
-+	pfn = paddr_to_pfn(paddr);
- 	desc_pos = pfn_to_pos(pfn);
- 	seek_offset = dd->data_offset
- 			+ (off_t)(desc_pos - 1)*sizeof(page_desc_t);
-@@ -613,7 +629,7 @@ read_diskdump(int fd, void *bufptr, int cnt, ulong addr, physaddr_t paddr)
- 	physaddr_t curpaddr;
- 	ulong pfn, page_offset;
+ int
+@@ -203,7 +208,7 @@ main(int argc, char **argv)
  
--	pfn = paddr >> dd->block_shift;
-+	pfn = paddr_to_pfn(paddr);
+ 	sp = setup_gdb_defaults();
  
- 	if (KDUMP_SPLIT()) {
- 		/* Find proper dd */
-@@ -687,6 +703,12 @@ get_diskdump_regs_ppc64(struct bt_info *bt, ulong *eip, ulong *esp)
- 	machdep->get_stack_frame(bt, eip, esp);
- }
+-	while ((c = getopt(argc, argv, "gsqnWwubdr:p:P:")) > 0) {
++	while ((c = getopt(argc, argv, "gsqnWwubdr:p:P:t:")) > 0) {
+ 		switch (c) {
+ 		case 'q':
+ 			target_data.flags |= QUIET;
+@@ -236,6 +241,9 @@ main(int argc, char **argv)
+ 		case 'g':
+ 			gdb_configure(sp);
+ 			break;
++		case 't':
++			target_data.target_as_param = optarg;
++			break;
+ 		}
+ 	}
  
-+static void
-+get_diskdump_regs_arm(struct bt_info *bt, ulong *eip, ulong *esp)
-+{
-+	machdep->get_stack_frame(bt, eip, esp);
-+}
-+
- /*
-  *  Send the request to the proper architecture hander.
-  */
-@@ -696,6 +718,10 @@ get_diskdump_regs(struct bt_info *bt, ulong *eip, ulong *esp)
- {
- 	switch (dd->machine_type) 
- 	{
-+	case EM_ARM:
-+		get_diskdump_regs_arm(bt, eip, esp);
-+		break;
-+
- 	case EM_386:
- 		return get_netdump_regs_x86(bt, eip, esp);
+@@ -274,6 +282,21 @@ get_current_configuration(void)
+ #ifdef __x86_64__
+         target_data.target = X86_64;
+ #endif
++#ifdef __arm__
++        target_data.target = ARM;
++#endif
++        /* override target if specified on command line */
++	if (target_data.target_as_param != 0) {
++		if (target_data.target == X86 &&
++		    strcmp(target_data.target_as_param, "ARM") == 0) {
++			/* debugging of ARM core files only supported on X86 */
++			target_data.target = ARM;
++		} else {
++			fprintf(stderr,
++				"target \"%s\" is not supported on this architecture\n",
++				target_data.target_as_param);
++		}
++        }
+ 
+         if ((fp = fopen("Makefile", "r")) == NULL) {
+ 		perror("Makefile");
+@@ -374,6 +397,9 @@ show_configuration(void)
+ 	case X86_64:
+ 		printf("TARGET: X86_64\n");
  		break;
-@@ -784,6 +810,8 @@ __diskdump_memory_dump(FILE *fp)
-         fprintf(fp, "      machine_type: %d ", dd->machine_type);
- 	switch (dd->machine_type)
- 	{
-+	case EM_ARM:
-+		fprintf(fp, "(EM_ARM)\n"); break;
- 	case EM_386:
- 		fprintf(fp, "(EM_386)\n"); break;
- 	case EM_X86_64:
++	case ARM:
++		printf("TARGET: ARM\n");
++		break;
+ 	}
+ 
+ 	if (strlen(target_data.program)) {
+@@ -437,6 +463,10 @@ build_configure(struct supported_gdb_version *sp)
+                 target = TARGET_X86_64;
+                 target_CFLAGS = TARGET_CFLAGS_X86_64;
+                 break;
++	case ARM:
++                target = TARGET_ARM;
++                target_CFLAGS = TARGET_CFLAGS_ARM;
++                break;
+ 	}
+ 
+ 	makefile_setup(&fp1, &fp2);
 -- 
 1.5.6.5
