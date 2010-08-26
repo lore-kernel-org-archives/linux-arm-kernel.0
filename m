@@ -1,48 +1,34 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 26 Aug 2010 22:54:39 +0900
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 26 Aug 2010 18:02:46 +0200
 Subject: ARM: 2.6.3[45] PCI regression (IXP4xx and PXA?)
-In-Reply-To: <20100826205344E.fujita.tomonori@lab.ntt.co.jp>
-References: <20100819234835Y.fujita.tomonori@lab.ntt.co.jp>
+In-Reply-To: <20100826205344E.fujita.tomonori@lab.ntt.co.jp> (FUJITA
+	Tomonori's message of "Thu, 26 Aug 2010 20:55:09 +0900")
+References: <1282213882.22370.360.camel@pasglop>
+	<20100819234835Y.fujita.tomonori@lab.ntt.co.jp>
 	<1282254713.22370.368.camel@pasglop>
 	<20100826205344E.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100826225352S.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <m3iq2x2wgp.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Aug 2010 20:55:09 +0900
-FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> wrote:
+FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
 
-> On Fri, 20 Aug 2010 07:51:52 +1000
-> Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
-> 
-> > On Thu, 2010-08-19 at 23:50 +0900, FUJITA Tomonori wrote:
-> > > 
-> > > You mean that you like to permit architectures to modify
-> > > dev->coherent_dma_mask behind a device? If so, I'm against it because
-> > > it means dev->coherent_dma_mask has two meanings. That's confusing.
-> > 
-> > No it's not. It has one and only one meaning which is the mask defining
-> > where the coherent memory can come from for that device. Nobody cares if
-> > the device can do more and has been "clipped" at set_coherent_dma_mask()
-> > time by the bus. This is not useful information.
-> 
-> Ok.
+> Lots of drivers call dma_set_coherent_mask with 64bit mask and then
+> call it with 32bit mask if 64bit mask fails.
 
-btw, I'm still not sure, letting architectures to clip the dma mask
-(and coherent mask) behind a driver is correct by defintion of the DMA
-API (it's not a real problem).
+Which seems strange to me. If the driver asks for 64-bit mask and the
+system can only give it 32-bits, why return an error? Every 32-bit
+address is also 64-bit, with the most significant bits simply cleared.
 
-DMA-API.txt defines dma_set_mask is "checks to see if the mask is
-possible and update the device parameters if it is". It means that
-architectures can't clip the mask behind a driver, I think.
+It makes sense the other way around, if the device wants e.g. 24-bit
+mask (ISA or something) but the OS doesn't have a memory pool smaller
+than e.g. 4 GB then returning with error is ok.
 
-Lots of drivers do something like:
+Same with IXP4xx (and perhaps PXA) - the device wants 32 bits and it's
+fine, even if the mask is set to 28 bits since the CPU can't let PCI
+access more.
 
-if (dma_set_mask(dev, DMA_BIT_MASK(64)))
-        if (dma_set_mask(dev, DMA_BIT_MASK(32)))
-
-What arm does is accepting whatever dma mask and setting the clipped
-mask behind a driver. If we use this sementics (archs are free to clip
-the mask), drivers don't need the second dma_set_mask call. And the
-driver wrongly assumes that it successfully set 64bit dma mask (and
-possibly set the hardware to 64bit dma mode needlessly).
+If the device wants to know if it should issue DACs or something like
+that, sure - just check the current masks (effective).
+-- 
+Krzysztof Halasa
