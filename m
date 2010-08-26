@@ -1,96 +1,245 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Thu, 26 Aug 2010 12:04:42 +0900
-Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<1282310110.2605.976.camel@laptop>
-	<20100825155814.25c783c7.akpm@linux-foundation.org>
-	<20100825173125.0855a6b0@bike.lwn.net>
-	<AANLkTinPaq+0MbdW81uoc5_OZ=1Gy_mVYEBnwv8zgOBd@mail.gmail.com>
-Message-ID: <AANLkTimofo3WyaWyTCBegVqpzoDLq0NXxC7+JuVPMQGr@mail.gmail.com>
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Wed, 25 Aug 2010 23:44:48 -0400
+Subject: [PATCH v2 1/1] pxa168: added initial support for TPO TD043MTEA1
+	LCD display on Aspenite
+In-Reply-To: <201008260426.39963.marek.vasut@gmail.com>
+References: <1282788292-5484-1-git-send-email-mark.brown314@gmail.com>
+	<201008260426.39963.marek.vasut@gmail.com>
+Message-ID: <AANLkTin9Yq3v1HO0PH9t2XjqLtxn8_+0keG=1JLQ0=OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 26, 2010 at 11:49 AM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> On Thu, Aug 26, 2010 at 8:31 AM, Jonathan Corbet <corbet@lwn.net> wrote:
->> On Wed, 25 Aug 2010 15:58:14 -0700
->> Andrew Morton <akpm@linux-foundation.org> wrote:
+On Wed, Aug 25, 2010 at 10:26 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne ?t 26. srpna 2010 04:04:52 Mark F. Brown napsal(a):
+>> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+>> ---
+>> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ?| ? 60
+>> +++++++++++++++++++++++++++++++ arch/arm/mach-mmp/include/mach/pxa168.h |
+>> ? 8 ++++
+>> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ?| ? ?4 ++
+>> ?drivers/video/pxa168fb.c ? ? ? ? ? ? ? ?| ? ?4 +-
+>> ?4 files changed, 74 insertions(+), 2 deletions(-)
 >>
->>> > If you want guarantees you can free stuff, why not add constraints to
->>> > the page allocation type and only allow MIGRATE_MOVABLE pages inside a
->>> > certain region, those pages are easily freed/moved aside to satisfy
->>> > large contiguous allocations.
->>>
->>> That would be good. ?Although I expect that the allocation would need
->>> to be 100% rock-solid reliable, otherwise the end user has a
->>> non-functioning device. ?Could generic core VM provide the required level
->>> of service?
+>> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+>> index 0629394..9e1bd6b 100644
+>> --- a/arch/arm/mach-mmp/aspenite.c
+>> +++ b/arch/arm/mach-mmp/aspenite.c
+>> @@ -23,6 +23,7 @@
+>> ?#include <mach/mfp-pxa168.h>
+>> ?#include <mach/pxa168.h>
+>> ?#include <mach/gpio.h>
+>> +#include <video/pxa168fb.h>
 >>
->> The original OLPC has a camera controller which requires three contiguous,
->> image-sized buffers in memory. ?That system is a little memory constrained
->> (OK, it's desperately short of memory), so, in the past, the chances of
->> being able to allocate those buffers anytime some kid decides to start
->> taking pictures was poor. ?Thus, cafe_ccic.c has an option to snag the
->> memory at initialization time and never let go even if you threaten its
->> family. ?Hell hath no fury like a little kid whose new toy^W educational
->> tool stops taking pictures.
+>> ?#include "common.h"
 >>
->> That, of course, is not a hugely efficient use of memory on a
->> memory-constrained system. ?If the VM could reliably satisfy those
->> allocation requestss, life would be wonderful. ?Seems difficult. ?But it
->> would be a nicer solution than CMA, which, to a great extent, is really
->> just a standardized mechanism for grabbing memory and never letting go.
+>> @@ -66,6 +67,36 @@ static unsigned long common_pin_config[] __initdata = {
+>> ? ? ? GPIO115_I2S_BCLK,
+>> ? ? ? GPIO116_I2S_RXD,
+>> ? ? ? GPIO117_I2S_TXD,
+>> +
+>> + ? ? /* LCD */
+>> + ? ? GPIO56_LCD_FCLK_RD,
+>> + ? ? GPIO57_LCD_LCLK_A0,
+>> + ? ? GPIO58_LCD_PCLK_WR,
+>> + ? ? GPIO59_LCD_DENA_BIAS,
+>> + ? ? GPIO60_LCD_DD0,
+>> + ? ? GPIO61_LCD_DD1,
+>> + ? ? GPIO62_LCD_DD2,
+>> + ? ? GPIO63_LCD_DD3,
+>> + ? ? GPIO64_LCD_DD4,
+>> + ? ? GPIO65_LCD_DD5,
+>> + ? ? GPIO66_LCD_DD6,
+>> + ? ? GPIO67_LCD_DD7,
+>> + ? ? GPIO68_LCD_DD8,
+>> + ? ? GPIO69_LCD_DD9,
+>> + ? ? GPIO70_LCD_DD10,
+>> + ? ? GPIO71_LCD_DD11,
+>> + ? ? GPIO72_LCD_DD12,
+>> + ? ? GPIO73_LCD_DD13,
+>> + ? ? GPIO74_LCD_DD14,
+>> + ? ? GPIO75_LCD_DD15,
+>> + ? ? GPIO76_LCD_DD16,
+>> + ? ? GPIO77_LCD_DD17,
+>> + ? ? GPIO78_LCD_DD18,
+>> + ? ? GPIO79_LCD_DD19,
+>> + ? ? GPIO80_LCD_DD20,
+>> + ? ? GPIO81_LCD_DD21,
+>> + ? ? GPIO82_LCD_DD22,
+>> + ? ? GPIO83_LCD_DD23,
+>> ?};
 >>
->>> It would help (a lot) if we could get more attention and buyin and
->>> fedback from the potential clients of this code. ?rmk's feedback is
->>> valuable. ?Have we heard from the linux-media people? ?What other
->>> subsystems might use it? ?ieee1394 perhaps? ?Please help identify
->>> specific subsystems and I can perhaps help to wake people up.
+>> ?static struct smc91x_platdata smc91x_info = {
+>> @@ -134,6 +165,34 @@ static struct i2c_board_info aspenite_i2c_info[]
+>> __initdata = { { I2C_BOARD_INFO("wm8753", 0x1b), },
+>> ?};
 >>
->> If this code had been present when I did the Cafe driver, I would have used
->> it. ?I think it could be made useful to a number of low-end camera drivers
->> if the videobuf layer were made to talk to it in a way which Just Works.
+>> +static struct fb_videomode video_modes[] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .pixclock ? ? ? = 30120,
+>> + ? ? ? ? ? ? .refresh ? ? ? ?= 60,
+>> + ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
+>> + ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
+>> + ? ? ? ? ? ? .hsync_len ? ? ?= 1,
+>> + ? ? ? ? ? ? .left_margin ? ?= 215,
+>> + ? ? ? ? ? ? .right_margin ? = 40,
+>> + ? ? ? ? ? ? .vsync_len ? ? ?= 1,
+>> + ? ? ? ? ? ? .upper_margin ? = 34,
+>> + ? ? ? ? ? ? .lower_margin ? = 10,
+>> + ? ? ? ? ? ? .sync ? ? ? ? ? = FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT,
+>> + ? ? },
+>> +};
+>> +
+>> +struct pxa168fb_mach_info aspenite_lcd_info = {
+>> + ? ? .id ? ? ? ? ? ? ? ? ? ? = "Graphic Frame",
+>> + ? ? .modes ? ? ? ? ? ? ? ? ?= video_modes,
+>> + ? ? .num_modes ? ? ? ? ? ? ?= ARRAY_SIZE(video_modes),
+>> + ? ? .pix_fmt ? ? ? ? ? ? ? ?= PIX_FMT_RGB565,
+>> + ? ? .io_pin_allocation_mode = PIN_MODE_DUMB_24,
+>> + ? ? .dumb_mode ? ? ? ? ? ? ?= DUMB_MODE_RGB888,
+>> + ? ? .active ? ? ? ? ? ? ? ? = 1,
+>> + ? ? .panel_rbswap ? ? ? ? ? = 0,
+>> + ? ? .invert_pixclock ? ? ? ?= 0,
+>> +};
+>> +
+>> ?static void __init common_init(void)
+>> ?{
+>> ? ? ? mfp_config(ARRAY_AND_SIZE(common_pin_config));
+>> @@ -143,6 +202,7 @@ static void __init common_init(void)
+>> ? ? ? pxa168_add_twsi(1, NULL, ARRAY_AND_SIZE(aspenite_i2c_info));
+>> ? ? ? pxa168_add_ssp(1);
+>> ? ? ? pxa168_add_nand(&aspenite_nand_info);
+>> + ? ? pxa168_add_fb(&aspenite_lcd_info);
 >>
->> With a bit of tweaking, I think it could be made useful in other
->> situations: the viafb driver, for example, really needs an allocator for
->> framebuffer memory and it seems silly to create one from scratch. ?Of
->> course, there might be other possible solutions, like adding a "zones"
->> concept to LMB^W memblock.
->>
->> The problem which is being addressed here is real.
->>
->> That said, the complexity of the solution still bugs me a bit, and the core
->> idea is still to take big chunks of memory out of service for specific
->> needs. ?It would be far better if the VM could just provide big chunks on
->> demand. ?Perhaps compaction and the pressures of making transparent huge
->> pages work will get us there, but I'm not sure we're there yet.
->>
->> jon
+>> ? ? ? /* off-chip devices */
+>> ? ? ? platform_device_register(&smc91x_device);
 >
-> I agree. compaction and movable zone will be one of good solutions.
 >
-> If some driver needs big contiguous chunk to work, it should make sure
-> to be allowable to have memory size for it before going. To make sure
-> it, we have to consider compaction of ZONE_MOVABLE zone. But one of
-> problems is anonymous page which can be has a role of pinned page in
-> non-swapsystem. Even most of embedded system has no swap.
-> But it's not hard to solve it.
 >
-> We needs Mel's opinion, too.
-
-I elaborates my statement for preventing confusing due to using _pinned page_.
-I means that anon pages isn't not a fragment problem but space problem
-for the devices.
-It would be better to move the pages into !ZONE_MOVABLE zone.
-
+> ----------------------------------------------
+> ^--- one patch above
+> SNIP, please split into two patches
+> v--- another patch below
+> ----------------------------------------------
 >
-> --
-> Kind regards,
-> Minchan Kim
+>
+>
+>
+>> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h
+>> b/arch/arm/mach-mmp/include/mach/pxa168.h index 27e1bc7..220738f 100644
+>> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
+>> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
+>> @@ -10,6 +10,7 @@ extern void __init pxa168_init_irq(void);
+>> ?#include <mach/devices.h>
+>> ?#include <plat/i2c.h>
+>> ?#include <plat/pxa3xx_nand.h>
+>> +#include <video/pxa168fb.h>
+>>
+>> ?extern struct pxa_device_desc pxa168_device_uart1;
+>> ?extern struct pxa_device_desc pxa168_device_uart2;
+>> @@ -25,6 +26,7 @@ extern struct pxa_device_desc pxa168_device_ssp3;
+>> ?extern struct pxa_device_desc pxa168_device_ssp4;
+>> ?extern struct pxa_device_desc pxa168_device_ssp5;
+>> ?extern struct pxa_device_desc pxa168_device_nand;
+>> +extern struct pxa_device_desc pxa168_device_fb;
+>>
+>> ?static inline int pxa168_add_uart(int id)
+>> ?{
+>> @@ -97,4 +99,10 @@ static inline int pxa168_add_nand(struct
+>> pxa3xx_nand_platform_data *info) {
+>> ? ? ? return pxa_register_device(&pxa168_device_nand, info, sizeof(*info));
+>> ?}
+>> +
+>> +static inline int pxa168_add_fb(struct pxa168fb_mach_info *mi)
+>> +{
+>> + ? ? return pxa_register_device(&pxa168_device_fb, mi, sizeof(*mi));
+>> +}
+>> +
+>> ?#endif /* __ASM_MACH_PXA168_H */
+>> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+>> index 652ae66..886eadb 100644
+>> --- a/arch/arm/mach-mmp/pxa168.c
+>> +++ b/arch/arm/mach-mmp/pxa168.c
+>> @@ -25,6 +25,7 @@
+>> ?#include <mach/dma.h>
+>> ?#include <mach/devices.h>
+>> ?#include <mach/mfp.h>
+>> +#include <video/pxa168fb.h>
+>>
+>> ?#include "common.h"
+>> ?#include "clock.h"
+>> @@ -79,6 +80,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
+>> ?static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
+>>
+>> ?static APMU_CLK(nand, NAND, 0x01db, 208000000);
+>> +static APMU_CLK(lcd, LCD, 0x7f, 312000000);
+>>
+>> ?/* device and clock bindings */
+>> ?static struct clk_lookup pxa168_clkregs[] = {
+>> @@ -96,6 +98,7 @@ static struct clk_lookup pxa168_clkregs[] = {
+>> ? ? ? INIT_CLKREG(&clk_ssp4, "pxa168-ssp.3", NULL),
+>> ? ? ? INIT_CLKREG(&clk_ssp5, "pxa168-ssp.4", NULL),
+>> ? ? ? INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
+>> + ? ? INIT_CLKREG(&clk_lcd, "pxa168-fb", NULL),
+>> ?};
+>>
+>> ?static int __init pxa168_init(void)
+>> @@ -147,3 +150,4 @@ PXA168_DEVICE(ssp2, "pxa168-ssp", 1, SSP2, 0xd401c000,
+>> 0x40, 54, 55); PXA168_DEVICE(ssp3, "pxa168-ssp", 2, SSP3, 0xd401f000,
+>> 0x40, 56, 57); PXA168_DEVICE(ssp4, "pxa168-ssp", 3, SSP4, 0xd4020000,
+>> 0x40, 58, 59); PXA168_DEVICE(ssp5, "pxa168-ssp", 4, SSP5, 0xd4021000,
+>> 0x40, 60, 61); +PXA168_DEVICE(fb, "pxa168-fb", -1, LCD, 0xd420b000,
+>> 0x1c8);
+>> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+>> index c91a7f7..d3e597e 100644
+>> --- a/drivers/video/pxa168fb.c
+>> +++ b/drivers/video/pxa168fb.c
+>> @@ -559,7 +559,7 @@ static struct fb_ops pxa168fb_ops = {
+>> ? ? ? .fb_imageblit ? = cfb_imageblit,
+>> ?};
+>>
+>> -static int __init pxa168fb_init_mode(struct fb_info *info,
+>> +static int pxa168fb_init_mode(struct fb_info *info,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pxa168fb_mach_info *mi)
+>
+> Why do you remove __init from it ?
+>> ?{
+>> ? ? ? struct pxa168fb_info *fbi = info->par;
+>> @@ -599,7 +599,7 @@ static int __init pxa168fb_init_mode(struct fb_info
+>> *info, return ret;
+>> ?}
+>>
+>> -static int __init pxa168fb_probe(struct platform_device *pdev)
+>> +static int pxa168fb_probe(struct platform_device *pdev)
+>
+> Why do you remove __init from it ? (DTTO)
+>> ?{
+>> ? ? ? struct pxa168fb_mach_info *mi;
+>> ? ? ? struct fb_info *info = 0;
+>
+> Cheers
 >
 
+Hi Marek,
+
+1) I removed the __init because it was causing a section mismatch
+warning wth this kernel. Since pxa168fb_probe() is calling
+pxa168fb_init_mode(), I cannot declare pxa168fb_init_mode() as an
+__init function. If pxa168fb_probe gets called after the __init
+section is wiped then it will attempt to run the deleted
+pxa168fb_init_mode() code.
+
+WARNING: vmlinux.o(.data+0x17984): Section mismatch in reference from
+the variable pxa168fb_driver to the function
+.init.text:pxa168fb_probe()
+The variable pxa168fb_driver references
+the function __init pxa168fb_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 
 
--- 
-Kind regards,
-Minchan Kim
+2) What is the logic behind the delineation between patch files? I
+cannot build patch #1 without patch #2 based on how you defined the
+split. I need all of it in order to function.
+
+-- Mark
