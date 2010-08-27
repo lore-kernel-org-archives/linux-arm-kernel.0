@@ -1,45 +1,46 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 16 Aug 2010 06:48:51 -0000
-Subject: [PATCH] Add support for Vista Silicon Visstrim_m10 board [v6].
-In-Reply-To: <606214.36639.qm@web51004.mail.re2.yahoo.com>
-References: <1280477161-16350-1-git-send-email-javier.martin@vista-silicon.com>
-	<606214.36639.qm@web51004.mail.re2.yahoo.com>
-Message-ID: <AANLkTineSkM=eVYcrH5qM6UvWWrL=BZxH+OzXp9Hdw==@mail.gmail.com>
+From: jacob.keller@gmail.com (Jacob Keller)
+Date: Fri, 27 Aug 2010 09:17:10 -0700
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <4C77D804.9060500@gmx.net>
+References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+	<20100817085324.GB3330@riccoc20.at.omicron.at>
+	<1282090963.1734.97.camel@localhost>
+	<20100818071942.GA4096@riccoc20.at.omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<1282594125.3111.344.camel@localhost.localdomain>
+	<20100827123849.GC11657@riccoc20.at.omicron.at>
+	<20100827143844.646eccf6@lxorguk.ukuu.org.uk>
+	<20100827143437.GB3293@riccoc20.at.omicron.at>
+	<20100827160624.433b3374@lxorguk.ukuu.org.uk>
+	<4C77D804.9060500@gmx.net>
+Message-ID: <AANLkTimG+cMnGL=K9Cf1Xjhnh3HKyH3k-scXRHLQdh7Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 July 2010 18:49, Fabio Estevam <fabioestevam@yahoo.com> wrote:
+On Fri, Aug 27, 2010 at 8:06 AM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote
 
-> Javier,
+> > > system time bimble track a source makes sense just as with NTP but
+> making
+> > > it a new clock seems the wrong model extending a non-too-bright API
+> when
+> > > you can just put the time sources in a file tree.
+> >
+> > Don't get your meaning here, what did you mean by "file tree?"
 >
-> --- On Fri, 7/30/10, Javier Martin <javier.martin@vista-silicon.com>
-> wrote:
-> ...
+> Something like
 >
-> > +/* Visstrim_SM10 has a microSD slot connected to sdhc2 */
+>        /sys/class/timesource/<name>/...
 >
-> Isn't it connected to SDHC1?
+> at which point we don't have to enumerate them all, add special system
+> calls and then fret about the fact you can't access them from things like
+> shell scripts.
 >
-> Regards,
->
-> Fabio Estevam
->
->
->
-> Yes, which is SDHC2 according to Freescale's Reference Manual.
 
-Any reason for not applying this patch yet?
-
-Thank you.
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+I agree that this interface is the best way to be future proof. This appears
+to allow for multiple "clocks" or nodes, and doesn't get messed up when we
+add more than one NIC with separate clocks to a machine.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100816/7e2102f9/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100827/958e52ae/attachment-0001.html>
