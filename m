@@ -1,41 +1,53 @@
-From: konkers@android.com (Erik Gilling)
-Date: Fri, 27 Aug 2010 12:26:03 -0700
-Subject: [PATCH v2] spi: add spi_tegra driver
-In-Reply-To: <AANLkTincgapUK5ncs_t3ax=1Kt_56GdR_RVwRqdCm5ge@mail.gmail.com>
-References: <1280450224-25118-1-git-send-email-ccross@google.com>
-	<1281574023-25160-1-git-send-email-konkers@android.com>
-	<AANLkTim4nL+Re=qc55CGS+ksq+ACtGe=vqOeGQ3HbQWM@mail.gmail.com>
-	<AANLkTincgapUK5ncs_t3ax=1Kt_56GdR_RVwRqdCm5ge@mail.gmail.com>
-Message-ID: <AANLkTin4HxVLt=4VH-NQWhB-p_2EpX_yoTcwEOTJP3m_@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 27 Aug 2010 20:33:03 +0100
+Subject: [PATCH 1/7] mmc: at91_mci: fix pointer errors
+In-Reply-To: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
+References: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
+Message-ID: <20100827193303.GB23079@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 25, 2010 at 2:22 PM, Erik Gilling <konkers@android.com> wrote:
->> As an aside, and commenting on the tegra DMA api... Is the IS_ERR()
->> pattern in the tegra_dma_allocate_channel() return really a good idea
->> here? ?Personally I find that pattern isn't very useful, especially
->> when the results is either "yes, allocated" or "no, not-alocated", and
->> it is very easy to write code that tests the wrong thing on the return
->> value because the compiler cannot catch it. ?In other words, if it
->> isn't vital to return a specific error code, the using the PTR_ERR()
->> pattern adds unnecessary risk to the code because developers are used
->> to seeing and writing this pattern:
->>
->> tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
->> if (!tspi->rx_dma)
->> ? ? ? ?return -ENOMEM;
->>
->> The compiler won't catch it if the return value is an PTR_ERR.
->>
->> (I know that some subsystems make heavy use of it, particularly
->> filesystems and the block layer which do need to return specific error
->> codes to userspace. ?My argument is that the specific error code is
->> probably irrelevant when allocating DMA channels)
->
-> I don't have a strong opinion either way but that's the way Colin's
-> code is written. ?I'll let him speak to that.
+Hi Andrew, Nicolas,
 
-I spoke with colin about this.  He's fine getting rid of the PTR_ERR.
-I'll post a DMA and SPI patch when that's done.
+On Fri, Feb 26, 2010 at 07:39:29PM +0100, Nicolas Ferre wrote:
+> From: Wolfgang Muees <wolfgang.mues@auerswald.de>
+> 
+> Fixes two pointer errors, one which leads to memory overwrites if used with
+> large chunks of data.
+> 
+> Signed-off-by: Wolfgang Muees <wolfgang.mues@auerswald.de>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/mmc/host/at91_mci.c |    8 +++++---
+>  1 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+> index 63924e0..6835104 100644
+> --- a/drivers/mmc/host/at91_mci.c
+> +++ b/drivers/mmc/host/at91_mci.c
+> @@ -227,11 +227,13 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
+>  			for (index = 0; index < (amount / 4); index++)
+>  				*dmabuf++ = swab32(sgbuffer[index]);
+>  		} else {
+> -			memcpy(dmabuf, sgbuffer, amount);
+> -			dmabuf += amount;
+> +			char *tmpv = (char *)dmabuf;
+> +			memcpy(tmpv, sgbuffer, amount);
+> +			tmpv += amount;
+> +			dmabuf = (unsigned *)tmpv;
+>  		}
+>  
+> -		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
+> +		kunmap_atomic(((void *)sgbuffer)-sg->offset, KM_BIO_SRC_IRQ);
+>  
+>  		if (size == 0)
+>  			break;
+> -- 
+> 1.5.6.5
 
--Erik
+Looks like only the first half of this patch was applied?  The
+kunmap_atomic() line is still present as before in Linus' tree. 
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
