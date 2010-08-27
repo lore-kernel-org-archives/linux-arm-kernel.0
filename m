@@ -1,66 +1,73 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Fri, 27 Aug 2010 14:38:44 +0100
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <20100827123849.GC11657@riccoc20.at.omicron.at>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
-	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
-	<20100817085324.GB3330@riccoc20.at.omicron.at>
-	<1282090963.1734.97.camel@localhost>
-	<20100818071942.GA4096@riccoc20.at.omicron.at>
-	<1282176776.2865.100.camel@localhost.localdomain>
-	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<1282594125.3111.344.camel@localhost.localdomain>
-	<20100827123849.GC11657@riccoc20.at.omicron.at>
-Message-ID: <20100827143844.646eccf6@lxorguk.ukuu.org.uk>
+From: robert.richter@amd.com (Robert Richter)
+Date: Fri, 27 Aug 2010 15:43:01 +0200
+Subject: [PATCH 2/4] sh: Accessor functions for the sh_pmu state
+In-Reply-To: <f259830dbccb084d27d127676b979d9cb502e36f.1282848651.git.matt@console-pimps.org>
+References: <cover.1282848651.git.matt@console-pimps.org>
+	<f259830dbccb084d27d127676b979d9cb502e36f.1282848651.git.matt@console-pimps.org>
+Message-ID: <20100827134301.GL22783@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 2007. If we can justify adding a clock id in this case, surely we can
-> add one for PTP as well!
-
-But PTP isn't really a clock - its a time sync protocol. You can (and may
-need to) have multiple clocks of this form on the same host because it's
-master based and you may have to deal with multiple masters who disagree.
-
-> > Further, if we're using PTP to synchoronize the system time, then there
-> > shouldn't be any measurable difference between CLOCK_PTP and
-> > CLOCK_REALTIME, no?
+On 26.08.10 15:09:17, Matt Fleming wrote:
+> Introduce some accessor functions for getting at the name and number of
+> counters of the current sh_pmu instance.
 > 
-> When using software timestamping, then the clocks are one in the same.
+> Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> ---
+>  arch/sh/include/asm/perf_event.h |    2 ++
+>  arch/sh/kernel/perf_event.c      |   13 +++++++++++++
+>  2 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/sh/include/asm/perf_event.h b/arch/sh/include/asm/perf_event.h
+> index 3d0c9f3..5b7fa84 100644
+> --- a/arch/sh/include/asm/perf_event.h
+> +++ b/arch/sh/include/asm/perf_event.h
+> @@ -25,6 +25,8 @@ struct sh_pmu {
+>  extern int register_sh_pmu(struct sh_pmu *);
+>  extern int reserve_pmc_hardware(void);
+>  extern void release_pmc_hardware(void);
+> +extern int sh_pmu_num_events(void);
+> +extern const char *sh_pmu_name(void);
+>  
+>  static inline void set_perf_event_pending(void)
+>  {
+> diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
+> index 7a3dc35..086f788 100644
+> --- a/arch/sh/kernel/perf_event.c
+> +++ b/arch/sh/kernel/perf_event.c
+> @@ -60,6 +60,19 @@ static inline int sh_pmu_initialized(void)
+>  }
+>  
+>  /*
+> + * Return the number of events for the current sh_pmu.
+> + */
+> +int sh_pmu_num_events(void)
+> +{
+> +	return sh_pmu->num_events;
+> +}
+> +
+> +const char *sh_pmu_name(void)
+> +{
+> +	return sh_pmu->name;
+> +}
+> +
+> +/*
 
-Technically the POSIX clock is UTC, IEEE1588v2 is TAI.
+This probably needs EXPORT_SYMBOLS*(), but not really sure. Have you
+compiled oprofile as module?
 
-> It would be possible, but not too nice, IMHO. In contrast to NTP,
-> there is no real need to place the servo in the kernel. Having the
-> protocol code and servo in user space makes life much easier.
+This accessor functions should be generic for all architectures.
 
-We can't currently put it in the kernel anyway for other good reasons.
+-Robert
 
-> viable approach. After the lkml discussion, I think it is even cleaner
-> and nicer to just offer a new clock id.
+>   * Release the PMU if this is the last perf_event.
+>   */
+>  static void hw_perf_event_destroy(struct perf_event *event)
+> -- 
+> 1.7.1
+> 
+> 
 
-PTP is not a clock, it's many clocks so a clock id doesn't really work.
-You could assume a single time domain and add a CLOCK_TAI plus then use
-PTP to track it I guess ?
-
-The question then is who would consume it and how ?
-
-Generic applications want POSIX time, which is managed by NTP but could
-in userspace also be slewed via the existing API to track a PTP source if
-someone wanted and if there is a GPS source around they can compute UTC
-from it.
-
-Specialist applications will presumably need to know which time source or
-sources they are tracking and synchronizing too out of multiple potential
-PTP sources
-
-Kernel stuff is more of a problem.
-
-I'm not sure shoehorning a source of many clocks and time sync bases into
-a jump up and down and make it fit single time assumption is wise. Making
-system time bimble track a source makes sense just as with NTP but making
-it a new clock seems the wrong model extending a non-too-bright API when
-you can just put the time sources in a file tree.
-
-Alan
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
