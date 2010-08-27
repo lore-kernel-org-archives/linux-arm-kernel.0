@@ -1,89 +1,61 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Fri, 27 Aug 2010 16:31:21 +0200
-Subject: [PATCH V2 3/4] oprofile: Abstract the perf-events backend
-In-Reply-To: <fe3e173aaa85f4cd73ea4b5abca50976fc40a01f.1282848651.git.matt@console-pimps.org>
-References: <cover.1282848651.git.matt@console-pimps.org>
-	<fe3e173aaa85f4cd73ea4b5abca50976fc40a01f.1282848651.git.matt@console-pimps.org>
-Message-ID: <20100827143121.GN22783@erda.amd.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 27 Aug 2010 16:06:24 +0100
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100827143437.GB3293@riccoc20.at.omicron.at>
+References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+	<20100817085324.GB3330@riccoc20.at.omicron.at>
+	<1282090963.1734.97.camel@localhost>
+	<20100818071942.GA4096@riccoc20.at.omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<1282594125.3111.344.camel@localhost.localdomain>
+	<20100827123849.GC11657@riccoc20.at.omicron.at>
+	<20100827143844.646eccf6@lxorguk.ukuu.org.uk>
+	<20100827143437.GB3293@riccoc20.at.omicron.at>
+Message-ID: <20100827160624.433b3374@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.08.10 15:09:18, Matt Fleming wrote:
-> Move the perf-events backend from arch/arm/oprofile into
-> drivers/oprofile so that the code can be shared between architectures.
+> Sorry for causing confusion, but please understand "a hardware clock
+> with timestamping capabilities than can be used for PTP support"
+> whenever I wrote "PTP" or "PTP clock."
+
+Ok that makes sense.
 > 
-> This allows each architecture to maintain only a single copy of the
-> PMU accessor functions instead of one for both perf and OProfile. It
-> also becomes possible for other architectures to delete much of their
-> OProfile code in favour of the common code now available in
-> drivers/oprofile/oprofile_perf.c.
+> Well, what I just said is not entirely true.
+> most are bound to the PTP protocol. That may change in the future...
+
+Which seems fine to me too - its an implementation detail of that time
+source.
+
+> > Specialist applications will presumably need to know which time source or
+> > sources they are tracking and synchronizing too out of multiple potential
+> > PTP sources
 > 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> ---
->  arch/arm/oprofile/Makefile       |    4 +
->  arch/arm/oprofile/common.c       |  215 +++-----------------------------------
->  drivers/oprofile/oprofile_perf.c |  209 ++++++++++++++++++++++++++++++++++++
->  include/linux/oprofile.h         |   12 ++
->  4 files changed, 242 insertions(+), 198 deletions(-)
->  create mode 100644 drivers/oprofile/oprofile_perf.c
+> Yes, the PTPd will have some special knowledge.
+
+Not only that but consumers of different time synchronizations will need
+to be able to describe which time source they want to talk about from a
+selection of PTP or similar things.
+
+> > system time bimble track a source makes sense just as with NTP but making
+> > it a new clock seems the wrong model extending a non-too-bright API when
+> > you can just put the time sources in a file tree.
 > 
-> diff --git a/arch/arm/oprofile/Makefile b/arch/arm/oprofile/Makefile
-> index e666eaf..038d7af 100644
-> --- a/arch/arm/oprofile/Makefile
-> +++ b/arch/arm/oprofile/Makefile
-> @@ -6,4 +6,8 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
->                 oprofilefs.o oprofile_stats.o \
->                 timer_int.o )
-> 
-> +ifeq ($(CONFIG_HW_PERF_EVENTS), y)
-> +DRIVER_OBJS += $(addprefix ../../../drivers/oprofile/, oprofile_perf.o)
-> +endif
+> Don't get your meaning here, what did you mean by "file tree?"
 
-You use CONFIG_HW_PERF_EVENTS while CONFIG_PERF_EVENTS in oprofile.h.
+Something like
 
-> +
->  oprofile-y                             := $(DRIVER_OBJS) common.o
+	/sys/class/timesource/<name>/...
 
-> diff --git a/include/linux/oprofile.h b/include/linux/oprofile.h
-> index 5171639..99e0323 100644
-> --- a/include/linux/oprofile.h
-> +++ b/include/linux/oprofile.h
-> @@ -185,4 +185,16 @@ int oprofile_add_data(struct op_entry *entry, unsigned long val);
->  int oprofile_add_data64(struct op_entry *entry, u64 val);
->  int oprofile_write_commit(struct op_entry *entry);
-> 
-> +/* Oprofile perf wrapper functions. */
-> +
-> +#ifdef CONFIG_PERF_EVENTS
-> +int oprofile_perf_init(void);
-> +void oprofile_perf_exit(void);
-> +int oprofile_perf_setup(void);
-> +int oprofile_perf_start(void);
-> +void oprofile_perf_stop(void);
-> +int oprofile_perf_create_files(struct super_block *sb, struct dentry *root);
-> +void oprofile_perf_set_num_counters(int num_counters);
-> +#endif /* CONFIG_PERF_EVENTS */
+at which point we don't have to enumerate them all, add special system
+calls and then fret about the fact you can't access them from things like
+shell scripts.
 
-We need empty function stubs for all this functions for the
-!CONFIG_PERF_EVENTS case returning -ENODEV or so. Otherwise
-compliation will fail for it.
+The fact SYS5.4 Unix and SuS got obsessed with numbering things
+rather than using names unlike Unix doesn't mean it's the right model to
+number them - usually the reverse is true, a heirarchy of file names is
+rather more future proof.
 
-For arm this does not happen because of #ifdefs, but for sh.
-
-Again, please first change the code and then move it without
-functional changes, one patch each.
-
-Thanks,
-
--Robert
-
-> +
->  #endif /* OPROFILE_H */
-> --
-> 1.7.1
-> 
-> 
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Alan
