@@ -1,100 +1,156 @@
-From: mitov@issp.bas.bg (Marin Mitov)
-Date: Fri, 27 Aug 2010 10:02:20 +0300
-Subject: [RFC][PATCH] add
-	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
-In-Reply-To: <20100827153204A.fujita.tomonori@lab.ntt.co.jp>
-References: <20100827051907.GA17521@pengutronix.de>
-	<201008270923.30297.mitov@issp.bas.bg>
-	<20100827153204A.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <201008271002.29297.mitov@issp.bas.bg>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 27 Aug 2010 09:57:27 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <1282874269.4371.74.camel@localhost.localdomain>
+References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+	<20100817085324.GB3330@riccoc20.at.omicron.at>
+	<1282090963.1734.97.camel@localhost>
+	<20100818071942.GA4096@riccoc20.at.omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<1282594125.3111.344.camel@localhost.localdomain>
+	<AANLkTi=nKrRHH6+9mvny718gov8Q+u7DHFikdgNY8YdX@mail.gmail.com>
+	<1282874269.4371.74.camel@localhost.localdomain>
+Message-ID: <20100827075727.GA3818@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 27, 2010 09:32:14 am FUJITA Tomonori wrote:
-> On Fri, 27 Aug 2010 09:23:21 +0300
-> Marin Mitov <mitov@issp.bas.bg> wrote:
-> 
-> > On Friday, August 27, 2010 08:57:59 am FUJITA Tomonori wrote:
-> > > On Fri, 27 Aug 2010 07:19:07 +0200
-> > > Uwe Kleine-König <u.kleine-koenig@pengutronix.de> wrote:
-> > > 
-> > > > Hey,
-> > > > 
-> > > > On Fri, Aug 27, 2010 at 02:00:17PM +0900, FUJITA Tomonori wrote:
-> > > > > On Fri, 27 Aug 2010 06:41:42 +0200
-> > > > > Uwe Kleine-König <u.kleine-koenig@pengutronix.de> wrote:
-> > > > > > On Thu, Aug 26, 2010 at 07:00:24PM +0900, FUJITA Tomonori wrote:
-> > > > > > > On Thu, 26 Aug 2010 11:53:11 +0200
-> > > > > > > Uwe Kleine-König <u.kleine-koenig@pengutronix.de> wrote:
-> > > > > > > 
-> > > > > > > > > > We have currently a number of boards broken in the mainline. They must be 
-> > > > > > > > > > fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
-> > > > > > > > > > as I suggested earlier, we need either this or my patch series
-> > > > > > > > > > 
-> > > > > > > > > > http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
-> > > > > > > > > > 
-> > > > > > > > > > for 2.6.36.
-> > > > > > > > > 
-> > > > > > > > > Why can't you revert a commit that causes the regression?
-> > > > > > > > > 
-> > > > > > > > > The related DMA API wasn't changed in 2.6.36-rc1. The DMA API is not
-> > > > > > > > > responsible for the regression. And the patchset even exnteds the
-> > > > > > > > > definition of the DMA API (dma_declare_coherent_memory). Such change
-> > > > > > > > > shouldn't applied after rc1. I think that DMA-API.txt says that
-> > > > > > > > > dma_declare_coherent_memory() handles coherent memory for a particular
-> > > > > > > > > device. It's not for the API that reserves coherent memory that can be
-> > > > > > > > > used for any device for a single device.
-> > > > > > > > The patch that made the problem obvious for ARM is
-> > > > > > > > 309caa9cc6ff39d261264ec4ff10e29489afc8f8 aka v2.6.36-rc1~591^2~2^4~12.
-> > > > > > > > So this went in before v2.6.36-rc1.  One of the "architectures which
-> > > > > > > > similar restrictions" is x86 BTW.
-> > > > > > > > 
-> > > > > > > > And no, we won't revert 309caa9cc6ff39d261264ec4ff10e29489afc8f8 as it
-> > > > > > > > addresses a hardware restriction.
-> > > > > > > 
-> > > > > > > How these drivers were able to work without hitting the hardware restriction?
-> > > > > > In my case the machine in question is an ARMv5, the hardware restriction
-> > > > > > is on ARMv6+ only.  You could argue that so the breaking patch for arm
-> > > > > > should only break ARMv6, but I don't think this is sensible from a
-> > > > > > maintainers POV.  We need an API that works independant of the machine
-> > > > > > that runs the code.
-> > > > > 
-> > > > > Agreed. But insisting that the DMA API needs to be extended wrongly
-> > > > > after rc2 to fix the regression is not sensible too. The related DMA
-> > > > > API wasn't changed in 2.6.36-rc1. The API isn't responsible for the
-> > > > > regression at all.
-> > > > I think this isn't about "responsiblity".  Someone in arm-land found
-> > > > that the way dma memory allocation worked for some time doesn't work
-> > > > anymore on new generation chips.  As pointing out this problem was
-> > > > expected to find some matches it was merged in the merge window.  One
-> > > > such match is the current usage of the DMA API that doesn't currently
-> > > > offer a way to do it right, so it needs a patch, no?
-> > > 
-> > > No, I don't think so. We are talking about a regression, right?
-> > > 
-> > > On new generation chips, something often doesn't work (which have
-> > > worked on old chips for some time). It's not a regresiion. I don't
-> > > think that it's sensible to make large change (especially after rc1)
-> > > to fix such issue. If you say that the DMA API doesn't work on new
-> > > chips and proposes a patch for the next merge window, it's sensible, I
-> > > suppose.
-> > > 
-> > > Btw, the patch isn't a fix for the DMA API. It tries to extend the DMA
-> > > API (and IMO in the wrong way). 
-> > > In addition, the patch might break the
-> > > current code. 
-> > 
-> > To "break the current code" is simply not possible. Sorry to oppose. As you have written it 
-> > "extend the DMA API", so if you do not use the new API (and no current code is using it)
-> > you cannot "break the current code". 
-> 
-> Looks like that the patch adds the new API that touches the exisitng
-> code. It means the existing code could break. So the exsising API
-> could break too.
-> 
-> http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+On Thu, Aug 26, 2010 at 06:57:49PM -0700, john stultz wrote:
+> On Wed, 2010-08-25 at 11:40 +0200, Christian Riesch wrote:
+> > 2) Master clock:
+> > We have one or more network ports. Our system has a really good clock
+> > (ovenized quartz crystal, an atomic clock, a GPS timing receiver...)
+> > and it distributes this time on the network. In such a case we do not
+> > steer our clock based on the (packet) timestamps we get from our
+> > timestamping unit. Instead, we directly drive our clock hardware with
+> > a very stable frequency that we get from the OCXO or the atomic
+> > clock...
+>
+> Ok. Following you here...
+>
+> > or we use one of the ancillary features of the PTP clock that
+> > Richard mentioned to timestamp not network packets but a 1pps signal
+> > and use these timestamps to steer the clock.
+>
+> Wait.. I thought we weren't using PTP to steer the clock? But now we're
+> using the pps signal from it to do so? Do I misunderstand you? Or did
+> you just not mean this?
+
+The master node in a PTP network probably takes its time from a
+precise external time source, like GPS. The GPS provides a 1 PPS
+directly to the PTP clock hardware, which latches the PTP hardware
+clock time on the PPS edge. This provides one sample as input to a
+clock servo (in the PTPd) that, in turn, regulates the PTP clock
+hardware.
+
+> > Packet time stamping is
+> > used to distribute the time to the slaves, but it is not part of the
+> > control loop in this case.
+>
+> I assume here you mean PTPd is steering the PTP clock according to the
+> system time (which is NTP/GPS/whatever sourced)? And then the PTP clock
+> distributes that time through the network?
+
+Yes, but in this case, "system time" has nothing to do with the Linux
+system time. For a PTP master clock, it really doesn't matter whether
+the Linux time is correct, or not. It doesn't hurt either (but see
+below about chaining servos).
+
+> So first of all, thanks for the extra explanation and context here! I
+> really appreciate it, as I'm not familiar with all the hardware details
+> and possible use cases, but I'm trying to learn.
+>
+> So in the two cases you mention, the time "flow" is something like:
+>
+> #1) [Master Clock on Network1] => [PTP Clock] => [PTPd] =>
+> 	[PTP Clock] => [PTP Clients on Network2]
+
+I would only draw the PTP clock once, perhaps like this:
+
+                                +------------------------------+
+                                |                              ^
+                                V                              |
+[Master Clock on NW 1]--->[HW timestamp]--->[PTPd]--adj-->[PTP Clock]
+[Slaves on NW 2,3,...]<---[HW timestamp]<---[    ]
+
+>
+> #2) [GPS] => [NTPd] => [System Time] => [PTPd] => [PTP clock] =>
+> 	[PTP clients on Network]
+
+Nope. More like this:
+
+                                      +------------------------------+
+                                      |                              ^
+                                      V                              |
+[GPS]----------PPS--------->[Latch  timestamp]--->[PTPd]--adj-->[PTP Clock]
+[Slaves on NW 1,2,3,...]<---[HW pkt timestamp]<---[    ]
+
+> And the original case:
+> #3) [Master Clock on Network] => [PTP clock] => [PTPd] => [PTP clock]
+
+More like:
+
+[Master Clock on NW 1]--->[HW timestamp]--->[PTPd]--adj-->[PTP Clock]
+
+> With a secondary control flow:
+> 	[PPS signal from PTP clock] => [NTPd] => [System Time]
+
+Yes.
+
+
+> So, just brainstorming here, I guess the question I'm trying to figure
+> out here, is can the "System Time" and "PTP clock" be merged/globbed
+> into a single "Time" interface from the userspace point of view?
+
+This is the core issue and source of misunderstanding, in my view. The
+fact of the matter is, the current generation of computers has
+multiple clocks, and these are usually unsynchronized. I think we
+should not try too hard to cover up or work around this. It is a fact
+of life.
+
+It would be nice if there were only one clock, and that clock could do
+everything that we need. Indeed, the next generation of SoC computers may
+all have PTP build in to the main CPU. Well, one can always wish.
+
+If we can make it appear that multiple clocks are just one clock, then
+I agree that we should do it. But I would not want to sacrifice
+synchronization accuracy or application features just to keep that
+illusion.
+
+> In other words, if internal to the kernel, the PTP clock was always
+> synced to the system time, couldn't the flow look something like:
+>
+> #3') [Master clock on network] => [PTP clock] => [PTPd] =>
+> 	 [System Time] => [in-kernel sync thread] => [PTP clock]
+>
+> So PTPd sees the offset adjustment from the PTP clock, and then feeds
+> that offset correction right into (a possibly enhanced) adjtimex. The
+> kernel would then immediately steer the PTP clock by the same amount to
+> keep it in sync with system time (along with a periodic offset/freq
+> correction step to deal with crystal drift).
+>
+> Similarly:
+>
+> #2') [GPS] => [NTPd] => [System Time] => [in-kernel sync thread] =>
+> 		[PTP clock] => [PTP clients on Network]
+>
+> and
+>
+> #1') [Master Clock on Network1] => [PTP Clock] => [PTPd] =>
+> 	[System Time] => [in-kernel sync thread] => [PTP Clock] =>
+> 	[PTP Clients on Network2]
+>
+> Now, I realize PTP purists probably won't like this, because it
+> effectively makes the in-kernel sync thread similar to a PTP boundary
+> clock (or worse, since the control loop isn't exactly direct).
+
+I don't like it. The experience with PTP boundary clocks already shows
+that the errors in servo loops cascade. It worsens the PTP performance.
+
+However, I think it would fine just to synch the Linux system time to
+the PTP clock using the PPS interface, which is what my patch set
+implements. Linux user applications would not be able to detect the
+difference.
+
+Richard
