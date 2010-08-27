@@ -1,70 +1,33 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 27 Aug 2010 07:19:07 +0200
-Subject: [RFC][PATCH] add
-	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
-In-Reply-To: <20100827140005Y.fujita.tomonori@lab.ntt.co.jp>
-References: <20100826095311.GA13051@pengutronix.de>
-	<20100826185938A.fujita.tomonori@lab.ntt.co.jp>
-	<20100827044142.GB31863@pengutronix.de>
-	<20100827140005Y.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100827051907.GA17521@pengutronix.de>
+Date: Fri, 27 Aug 2010 07:35:47 +0200
+Subject: [PATCH] i2c-pxa: Squash warning about discarding qualifier
+In-Reply-To: <1282795885-4445-1-git-send-email-marek.vasut@gmail.com>
+References: <1282795885-4445-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <20100827053547.GB17521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
-
-On Fri, Aug 27, 2010 at 02:00:17PM +0900, FUJITA Tomonori wrote:
-> On Fri, 27 Aug 2010 06:41:42 +0200
-> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > On Thu, Aug 26, 2010 at 07:00:24PM +0900, FUJITA Tomonori wrote:
-> > > On Thu, 26 Aug 2010 11:53:11 +0200
-> > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > > 
-> > > > > > We have currently a number of boards broken in the mainline. They must be 
-> > > > > > fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
-> > > > > > as I suggested earlier, we need either this or my patch series
-> > > > > > 
-> > > > > > http://thread.gmane.org/gmane.linux.ports.sh.devel/8595
-> > > > > > 
-> > > > > > for 2.6.36.
-> > > > > 
-> > > > > Why can't you revert a commit that causes the regression?
-> > > > > 
-> > > > > The related DMA API wasn't changed in 2.6.36-rc1. The DMA API is not
-> > > > > responsible for the regression. And the patchset even exnteds the
-> > > > > definition of the DMA API (dma_declare_coherent_memory). Such change
-> > > > > shouldn't applied after rc1. I think that DMA-API.txt says that
-> > > > > dma_declare_coherent_memory() handles coherent memory for a particular
-> > > > > device. It's not for the API that reserves coherent memory that can be
-> > > > > used for any device for a single device.
-> > > > The patch that made the problem obvious for ARM is
-> > > > 309caa9cc6ff39d261264ec4ff10e29489afc8f8 aka v2.6.36-rc1~591^2~2^4~12.
-> > > > So this went in before v2.6.36-rc1.  One of the "architectures which
-> > > > similar restrictions" is x86 BTW.
-> > > > 
-> > > > And no, we won't revert 309caa9cc6ff39d261264ec4ff10e29489afc8f8 as it
-> > > > addresses a hardware restriction.
-> > > 
-> > > How these drivers were able to work without hitting the hardware restriction?
-> > In my case the machine in question is an ARMv5, the hardware restriction
-> > is on ARMv6+ only.  You could argue that so the breaking patch for arm
-> > should only break ARMv6, but I don't think this is sensible from a
-> > maintainers POV.  We need an API that works independant of the machine
-> > that runs the code.
+On Thu, Aug 26, 2010 at 06:11:25AM +0200, Marek Vasut wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+>  drivers/i2c/busses/i2c-pxa.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Agreed. But insisting that the DMA API needs to be extended wrongly
-> after rc2 to fix the regression is not sensible too. The related DMA
-> API wasn't changed in 2.6.36-rc1. The API isn't responsible for the
-> regression at all.
-I think this isn't about "responsiblity".  Someone in arm-land found
-that the way dma memory allocation worked for some time doesn't work
-anymore on new generation chips.  As pointing out this problem was
-expected to find some matches it was merged in the merge window.  One
-such match is the current usage of the DMA API that doesn't currently
-offer a way to do it right, so it needs a patch, no?
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index 020ff23..c94e51b 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -1001,7 +1001,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>  	struct pxa_i2c *i2c;
+>  	struct resource *res;
+>  	struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
+> -	struct platform_device_id *id = platform_get_device_id(dev);
+> +	const struct platform_device_id *id = platform_get_device_id(dev);
+>  	int ret;
+>  	int irq;
+This is already in mainline:
 
-Best regards
-Uwe
+http://git.kernel.org/linus/21e2ecfe19df8f28408b5a607fef8704f51fa7f8
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
