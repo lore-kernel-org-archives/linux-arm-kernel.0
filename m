@@ -1,7 +1,7 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Fri, 27 Aug 2010 17:16:39 +0900
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 27 Aug 2010 10:37:40 +0200
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <AANLkTimB+s0tO=wrODAU4qCaZnCBoLZ2A9pGjR_jheOj@mail.gmail.com>
+In-Reply-To: <20100827171639.83c8642c.kamezawa.hiroyu@jp.fujitsu.com>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<1282310110.2605.976.camel@laptop>
 	<20100825155814.25c783c7.akpm@linux-foundation.org>
@@ -12,89 +12,32 @@ References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<AANLkTi=T1y+sQuqVTYgOkYvqrxdYB1bZmCpKafN5jPqi@mail.gmail.com>
 	<20100826133028.39d731da.kamezawa.hiroyu@jp.fujitsu.com>
 	<AANLkTimB+s0tO=wrODAU4qCaZnCBoLZ2A9pGjR_jheOj@mail.gmail.com>
-Message-ID: <20100827171639.83c8642c.kamezawa.hiroyu@jp.fujitsu.com>
+	<20100827171639.83c8642c.kamezawa.hiroyu@jp.fujitsu.com>
+Message-ID: <1282898260.1975.1844.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Aug 2010 18:36:24 +0900
-Minchan Kim <minchan.kim@gmail.com> wrote:
+On Fri, 2010-08-27 at 17:16 +0900, KAMEZAWA Hiroyuki wrote:
+> > How about changing following this?
+> > The thing is MAX_ORDER is static. But we want to avoid too big
+> > MAX_ORDER of whole zones to support devices which requires big
+> > allocation chunk.
+> > So let's add MAX_ORDER into each zone and then, each zone can have
+> > different max order.
+> > For example, while DMA[32], NORMAL, HIGHMEM can have normal size 11,
+> > MOVABLE zone could have a 15.
+> > 
+> > This approach has a big side effect?
 
-> On Thu, Aug 26, 2010 at 1:30 PM, KAMEZAWA Hiroyuki
-> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
-> > On Thu, 26 Aug 2010 13:06:28 +0900
-> > Minchan Kim <minchan.kim@gmail.com> wrote:
-> >
-> >> On Thu, Aug 26, 2010 at 12:44 PM, KAMEZAWA Hiroyuki
-> >> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
-> >> > On Thu, 26 Aug 2010 11:50:17 +0900
-> >> > KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com> wrote:
-> >> >
-> >> >> 128MB...too big ? But it's depend on config.
-> >> >>
-> >> >> IBM's ppc guys used 16MB section, and recently, a new interface to shrink
-> >> >> the number of /sys files are added, maybe usable.
-> >> >>
-> >> >> Something good with this approach will be you can create "cma" memory
-> >> >> before installing driver.
-> >> >>
-> >> >> But yes, complicated and need some works.
-> >> >>
-> >> > Ah, I need to clarify what I want to say.
-> >> >
-> >> > With compaction, it's helpful, but you can't get contiguous memory larger
-> >> > than MAX_ORDER, I think. To get memory larger than MAX_ORDER on demand,
-> >> > memory hot-plug code has almost all necessary things.
-> >>
-> >> True. Doesn't patch's idea of Christoph helps this ?
-> >> http://lwn.net/Articles/200699/
-> >>
-> >
-> > yes, I think so. But, IIRC, ?it's own purpose of Chirstoph's work is
-> > for removing zones. please be careful what's really necessary.
-> 
-> Ahh. Sorry for missing point.
-> You're right. The patch can't help our problem.
-> 
-> How about changing following this?
-> The thing is MAX_ORDER is static. But we want to avoid too big
-> MAX_ORDER of whole zones to support devices which requires big
-> allocation chunk.
-> So let's add MAX_ORDER into each zone and then, each zone can have
-> different max order.
-> For example, while DMA[32], NORMAL, HIGHMEM can have normal size 11,
-> MOVABLE zone could have a 15.
-> 
-> This approach has a big side effect?
-> 
+The side effect of increasing MAX_ORDER is that page allocations get
+more expensive since the buddy tree gets larger, yielding more
+splits/merges.
 
-Hm...need to check hard coded MAX_ORDER usages...I don't think
-side-effect is big. Hmm. But I think enlarging MAX_ORDER isn't an
-important thing. A code which strips contiguous chunks of pages from
-buddy allocator is a necessaty thing, as..
+> Hm...need to check hard coded MAX_ORDER usages...I don't think
+> side-effect is big. Hmm. But I think enlarging MAX_ORDER isn't an
+> important thing. A code which strips contiguous chunks of pages from
+> buddy allocator is a necessaty thing, as..
 
-What I can think of at 1st is...
-==
-	int steal_pages(unsigned long start_pfn, unsigned long end_pfn)
-	{
-		/* Be careful mutal execution with memory hotplug, because reusing code */
-
-		split [start_pfn, end_pfn) to pageblock_order
-		
-		for each pageblock in the range {
-			Mark this block as MIGRATE_ISOLATE
-			try-to-free pages in the range or
-			migrate pages in the range to somewhere.
-			/* Here all pages in the range are on buddy allocator
-			and free and never be allocated by anyone else. */
-		}
-
-		please see __rmqueue_fallback(). it selects migration-type at 1st.
-		Then, if you can pass start_migratetype of MIGLATE_ISOLATE,
-		you can automatically strip all MIGRATE_ISOLATE pages from free_area[].
-
-		return chunk of pages.
-	}
-==
-
-Thanks,
--Kame
+Right, once we can explicitly free the pages we want, crossing MAX_ORDER
+isn't too hard like you say, we can simply continue with freeing the
+next in order page.
