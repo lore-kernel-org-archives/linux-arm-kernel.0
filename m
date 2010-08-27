@@ -1,49 +1,48 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Fri, 27 Aug 2010 07:12:57 -0400
-Subject: [PATCH v4] davinci: Add MityDSP-L138/MityARM-1808 SOM support
-In-Reply-To: <4C7702EB.8040905@criticallink.com>
-References: <4C516634.5040804@criticallink.com>
-	<877hjd106u.fsf@deeprootsystems.com>
-	<4C7702EB.8040905@criticallink.com>
-Message-ID: <4C779DB9.20107@criticallink.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Aug 2010 14:03:41 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100827110855.GA11657@riccoc20.at.omicron.at>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<1282594899.3111.358.camel@localhost.localdomain>
+	<20100827110855.GA11657@riccoc20.at.omicron.at>
+Message-ID: <201008271403.41949.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2010 08:12 PM, Michael Williamson wrote:
-> Hi Kevin,
+On Friday 27 August 2010, Richard Cochran wrote:
+> On Mon, Aug 23, 2010 at 01:21:39PM -0700, john stultz wrote:
+> > On Thu, 2010-08-19 at 17:38 +0200, Richard Cochran wrote:
+> > > On Thu, Aug 19, 2010 at 02:28:04PM +0200, Arnd Bergmann wrote:
+> > > > Have you considered passing a struct timex instead of ppb and ts?
+> > > 
+> > > Yes, but the timex is not suitable, IMHO.
+> > 
+> > Could you expand on this?
+> 
+> We need to able to specify that the call is for a PTP clock. We could
+> add that to the modes flag, like this:
+> 
+> /*timex.h*/
+> #define ADJ_PTP_0 0x10000
+> #define ADJ_PTP_1 0x20000
+> #define ADJ_PTP_2 0x30000
+> #define ADJ_PTP_3 0x40000
 >
-> On 08/26/2010 06:25 PM, Kevin Hilman wrote:
->> Michael Williamson<michael.williamson@criticallink.com>  writes:
->>
->>>   This patch adds support for the MityDSP-L138 and MityARM-1808 
->>> system on
->>> module (SOM) under the registered machine "mityomapl138".  These SOMs
->>> are based on the da850 davinci CPU architecture.  Information on these
->>> SOMs may be found at http://www.mitydsp.com.
->>>
->>> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
->>> ---
->>> This patch is against Kevin's tree, but is dependent on the 
->>> following patch,
->>> which is queued for 2.6.36:
->>>
->>> [1] 
->>> http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=commit;h=48519f0ae03bc7e86b3dc93e56f1334d53803770 
->>>
->> Running this patch through scripts/checkpatch.pl, I get:
->>
->>     total: 268 errors, 586 warnings, 1632 lines checked
->>
->> Please fix all errors and warnings.
->>
->> For future reference, normally, I don't even read the rest of a patch if
->> there are any checkpatch errors.
->>
->
-> As expected. At the time I submitted this (before your comments came in
-> on V3, actually), I had run a checkpatch.pl and it had passed.  That was
-> prior to the 2.6.35 merge when you got back from vacation.
-That should have read 2.6.36.  I also must have blown the checkpatch as 
-well.
+> I can live with this, if everyone else can, too.
 
--Mike
+My suggestion was actually to have a new syscall with the existing
+structure, and pass a clockid_t value to it, similar to your
+sys_clock_adjtime(), not change the actual sys_adjtime syscall.
+  
+> > Could we not add a adjustment mode ADJ_SETOFFSET or something that would
+> > provide the instantaneous offset correction?
+> 
+> Yes, but we would also need to add a struct timespec to the struct
+> timex, in order to get nanosecond resolution. I think it would be
+> possible to do in the padding at the end?
+
+Yes, that's exactly what the padding is for. Instead of timespec, you can
+probably have a extra values for replacing the existing ppm values with
+ppb values.
+
+	Arnd
