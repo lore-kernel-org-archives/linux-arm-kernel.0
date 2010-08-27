@@ -1,79 +1,28 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 27 Aug 2010 11:21:05 -0700
-Subject: [PATCH 0/3] Allow late mdesc detection, v4
-In-Reply-To: <1282553423.737985.983362819420.0.gpush@pororo> (Jeremy Kerr's
-	message of "Mon, 23 Aug 2010 16:50:23 +0800")
-References: <1282553423.737985.983362819420.0.gpush@pororo>
-Message-ID: <87bp8nq5m6.fsf@deeprootsystems.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 27 Aug 2010 20:00:34 +0100
+Subject: [PATCH] MMC: pxamci: call pdata->setpower even when regulator
+	is used
+In-Reply-To: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
+References: <1259233813-2724-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20100827190034.GA20407@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy Kerr <jeremy.kerr@canonical.com> writes:
+Hi,
 
-> Currently, we probe for a mdesc early in boot. At this early stage, the
-> only thing we use the mdesc for is to determine the debug page mapping.
->
-> However, the debug addresses (phys and virt) need to be coded into the
-> addruart macro anyway; the dynamic probing is only going to tell us what
-> we already know.
->
-> These changes allow us to use the addruart macros to find the debug
-> mapping addresses, rather than pulling them out of the mdesc. This means
-> that the addresses are only kept in the one place, and that we don't
-> need the mdesc nearly as early.
->
-> The first change updates all of the addruart macros to return both
-> physical and virtual addresses. I've used 'rp' and 'rv' as the macro
-> arguments to indicate which address goes where
->
-> The second change updates the debug setup routine to use the addruart
-> macro to establish the debug mapping, now that we can invoke the macro
-> to find the phyical and virtual addresses.
->
-> This allows us to delay the requirement to have a mdesc available until
-> much later. For example, we can parse one from the device tree once
-> we've reached C code.
->
-> As they have more complex and/or new debug macros, the following platforms
-> could do with extra testing:
->  * omap (mach-omap1 and mach-omap2)
->  * davinci
+On Thu, Nov 26, 2009 at 12:10:13PM +0100, Daniel Mack wrote:
+> On platforms where the vmmc regulator is used, it might still be
+> necessary to call the platform data's setpower() callback in order to
+> drive GPIOs to power up hardware.
+> 
+> I can't see any pxamci user with power regulators enabled, hence this
+> shouldn't break anything.
+> 
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
 
-Tested on a couple flavors of DaVinci SoCs, so for davinci
+Am chasing up old patches, looks like this didn't get merged.  Eric,
+any interest in taking something like this, or was your reply a NACK?
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-
->  * tegra
->
-> Cheers,
->
->
-> Jeremy
->
-> v4:
->  * updates for 2.6.36
->  * add changes for tegra
->  * update davinci
->  * include fixes for omap[12]
->  * drop mdesc changes
->
-> v3:
->  * only establish page mapping if !DEBUG_ICEDCC
->
-> v2:
->  * return both phys and virt addresses from addruart
->  * mask unneeded bits from uart physical address in mapping setup
->  * remove io_pg_offst and phys_io, in a separate patch
->
-> ---
-> Jeremy Kerr (3):
->       arm/debug: consolidate addruart macros for CONFIG_DEBUG_ICEDCC
->       arm: return both physical and virtual addresses from addruart
->       arm: use addruart macro to establish debug mappings
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
