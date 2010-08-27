@@ -1,189 +1,102 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Fri, 27 Aug 2010 12:44:28 +0200
-Subject: [PATCH v2] Separate display's pixel configuration from video mode
-In-Reply-To: <1282663623-8404-2-git-send-email-m.grzeschik@pengutronix.de>
-References: <1282663623-8404-2-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1282905868-16018-1-git-send-email-m.grzeschik@pengutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 27 Aug 2010 13:08:55 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <1282594899.3111.358.camel@localhost.localdomain>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<201008191428.04546.arnd@arndb.de>
+	<20100819153847.GA10695@riccoc20.at.omicron.at>
+	<1282594899.3111.358.camel@localhost.localdomain>
+Message-ID: <20100827110855.GA11657@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Juergen Beisert <jbe@pengutronix.de>
+On Mon, Aug 23, 2010 at 01:21:39PM -0700, john stultz wrote:
+> On Thu, 2010-08-19 at 17:38 +0200, Richard Cochran wrote:
+> > On Thu, Aug 19, 2010 at 02:28:04PM +0200, Arnd Bergmann wrote:
+> > > My point was that a syscall is better than an ioctl based interface here,
+> > > which I definitely still think. Given that John knows much more about
+> > > clocks than I do, we still need to get agreement on the question that
+> > > he raised, which is whether we actually need to expose this clock to the
+> > > user or not.
+> > > 
+> > > If we can find a way to sync system time accurate enough with PTP and
+> > > PPS, user applications may not need to see two separate clocks at all.
+> > 
+> > At the very least, one user application (the PTPd) needs to see the
+> > PTP clock.
+> > 
+> > > > SYSCALL_DEFINE3(clock_adjtime, const clockid_t, clkid,
+> > > > 		int, ppb, struct timespec __user *, ts)
+> > > > 
+> > > > ppb - desired frequency adjustment in parts per billion
+> > > > ts  - desired time step (or jump) in <sec,nsec> to correct
+> > > >       a measured offset
+> > > > 
+> > > > Arguably, this syscall might be useful for other clocks, too.
+> > > 
+> > > This is a mix of adjtime and adjtimex with the addition of
+> > > the clkid parameter, right?
+> > 
+> > Sort of, but not really. ADJTIME(3) takes an offset and slowly
+> > corrects the clock using a servo in the kernel, over hours.
+> > 
+> > For this function, the offset passed in the 'ts' parameter will be
+> > immediately corrected, by jumping to the new time. This reflects the
+> > way that PTP works. After the first few samples, the PTPd has an
+> > estimate of the offset to the master and the rate difference. The PTPd
+> > can proceed in one of two ways.
+> > 
+> > 1. If resetting the clock is not desired, then the clock is set to the
+> >    maximum adjustment (in the right direction) until the clock time is
+> >    close to the master's time.
+> > 
+> > 2. The estimated offset is added to the current time, resulting in a
+> >    jump in time.
+> > 
+> > We need clock_adjtime(id, 0, ts) for the second case.
+> >
+> > > Have you considered passing a struct timex instead of ppb and ts?
+> > 
+> > Yes, but the timex is not suitable, IMHO.
+> 
+> Could you expand on this?
 
-Currently the pixel mapping to the display depends on the video mode. This
-seems not true as the IPU transfers the data read from the video memory in an
-internal 32 bit bus to the DI unit. The DI mapping only depends on the settings
-the IPU should read the data from video memory. If all these settings do it in
-the same byte order, only one DI mapping per display is required.
+We need to able to specify that the call is for a PTP clock. We could
+add that to the modes flag, like this:
 
-There are three locations where we can mix the colour components:
- - in the video mode description, colour offsets
- - in the IPU while reading pixel data from memory
- - in the DI unit while mapping it to the connected display
+/*timex.h*/
+#define ADJ_PTP_0 0x10000
+#define ADJ_PTP_1 0x20000
+#define ADJ_PTP_2 0x30000
+#define ADJ_PTP_3 0x40000
 
-If one of these settings are incorrect, the displayed colours are broken.
+I can live with this, if everyone else can, too.
+ 
+> Could we not add a adjustment mode ADJ_SETOFFSET or something that would
+> provide the instantaneous offset correction?
 
-With this patch the platform describes the display connection and the driver
-uses this information independently from the selected video mode.
+Yes, but we would also need to add a struct timespec to the struct
+timex, in order to get nanosecond resolution. I think it would be
+possible to do in the padding at the end?
 
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
-v1 - v2:
-	added default fallback ipu fb_bitfield values
-	for the case the platform doesn't define these.
+> You're right that the timex is a little crufty. But its legacy that we
+> will support indefinitely. So following the established interface helps
+> maintainability.
 
- arch/arm/plat-mxc/include/mach/mx3fb.h |    5 ++
- drivers/video/mx3fb.c                  |   80 +++++++++++++++----------------
- 2 files changed, 44 insertions(+), 41 deletions(-)
+We can use it for PTP, with the modifications suggested above. Or we
+can just introduce the clock_adjtime method, instead.
+ 
+> So if the clock_adjtime interface is needed, it would seem best for it
+> to be generic enough to support not only PTP, but also the NTP kernel
+> PLL.
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx3fb.h b/arch/arm/plat-mxc/include/mach/mx3fb.h
-index ac24c5c..93bd032 100644
---- a/arch/arm/plat-mxc/include/mach/mx3fb.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3fb.h
-@@ -33,6 +33,11 @@ struct mx3fb_platform_data {
- 	const char			*name;
- 	const struct fb_videomode	*mode;
- 	int				num_modes;
-+
-+	/* display's mapping description */
-+	struct fb_bitfield red;
-+	struct fb_bitfield green;
-+	struct fb_bitfield blue;
- };
- 
- #endif
-diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-index 658f10a..5e552a7 100644
---- a/drivers/video/mx3fb.c
-+++ b/drivers/video/mx3fb.c
-@@ -286,13 +286,6 @@ static void mx3fb_write_reg(struct mx3fb_data *mx3fb, u32 value, unsigned long r
- 	__raw_writel(value, mx3fb->reg_base + reg);
- }
- 
--static const uint32_t di_mappings[] = {
--	0x1600AAAA, 0x00E05555, 0x00070000, 3,	/* RGB888 */
--	0x0005000F, 0x000B000F, 0x0011000F, 1,	/* RGB666 */
--	0x0011000F, 0x000B000F, 0x0005000F, 1,	/* BGR666 */
--	0x0004003F, 0x000A000F, 0x000F003F, 1	/* RGB565 */
--};
--
- static void sdc_fb_init(struct mx3fb_info *fbi)
- {
- 	struct mx3fb_data *mx3fb = fbi->mx3fb;
-@@ -421,7 +414,6 @@ static int sdc_set_window_pos(struct mx3fb_data *mx3fb, enum ipu_channel channel
-  * @pixel_clk:		desired pixel clock frequency in Hz.
-  * @width:		width of panel in pixels.
-  * @height:		height of panel in pixels.
-- * @pixel_fmt:		pixel format of buffer as FOURCC ASCII code.
-  * @h_start_width:	number of pixel clocks between the HSYNC signal pulse
-  *			and the start of valid data.
-  * @h_sync_width:	width of the HSYNC signal in units of pixel clocks.
-@@ -438,7 +430,6 @@ static int sdc_set_window_pos(struct mx3fb_data *mx3fb, enum ipu_channel channel
- static int sdc_init_panel(struct mx3fb_data *mx3fb, enum ipu_panel panel,
- 			  uint32_t pixel_clk,
- 			  uint16_t width, uint16_t height,
--			  enum pixel_fmt pixel_fmt,
- 			  uint16_t h_start_width, uint16_t h_sync_width,
- 			  uint16_t h_end_width, uint16_t v_start_width,
- 			  uint16_t v_sync_width, uint16_t v_end_width,
-@@ -450,6 +441,9 @@ static int sdc_init_panel(struct mx3fb_data *mx3fb, enum ipu_panel panel,
- 	uint32_t div;
- 	struct clk *ipu_clk;
- 
-+	struct device *dev = mx3fb->dev;
-+	struct mx3fb_platform_data *mx3fb_pdata = dev->platform_data;
-+
- 	dev_dbg(mx3fb->dev, "panel size = %d x %d", width, height);
- 
- 	if (v_sync_width == 0 || h_sync_width == 0)
-@@ -536,36 +530,28 @@ static int sdc_init_panel(struct mx3fb_data *mx3fb, enum ipu_panel panel,
- 		sig.Vsync_pol << DI_D3_VSYNC_POL_SHIFT;
- 	mx3fb_write_reg(mx3fb, old_conf, DI_DISP_SIG_POL);
- 
--	switch (pixel_fmt) {
--	case IPU_PIX_FMT_RGB24:
--		mx3fb_write_reg(mx3fb, di_mappings[0], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[1], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[2], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[3] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	case IPU_PIX_FMT_RGB666:
--		mx3fb_write_reg(mx3fb, di_mappings[4], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[5], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[6], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[7] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	case IPU_PIX_FMT_BGR666:
--		mx3fb_write_reg(mx3fb, di_mappings[8], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[9], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[10], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[11] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	default:
--		mx3fb_write_reg(mx3fb, di_mappings[12], DI_DISP3_B0_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[13], DI_DISP3_B1_MAP);
--		mx3fb_write_reg(mx3fb, di_mappings[14], DI_DISP3_B2_MAP);
--		mx3fb_write_reg(mx3fb, mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) |
--			     ((di_mappings[15] - 1) << 12), DI_DISP_ACC_CC);
--		break;
--	}
-+	/* setup the pixel mapping to the display. This seems independent
-+	 * from the internal video mode in use
-+	 */
-+	reg = 0xffff & ~(((1 << (mx3fb_pdata->blue.length * 2)) - 1) << (16 - (mx3fb_pdata->blue.length * 2)));
-+	reg |= ((mx3fb_pdata->blue.offset + mx3fb_pdata->blue.length - 1)) << 16;
-+	pr_debug("b: %d %d 0x%08x\n", mx3fb_pdata->blue.offset, mx3fb_pdata->blue.length, reg);
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP3_B0_MAP); /* blue */
-+
-+	reg = 0xffff & ~(((1 << (mx3fb_pdata->green.length * 2)) - 1) << (16 - (mx3fb_pdata->green.length * 2)));
-+	reg |= ((mx3fb_pdata->green.offset + mx3fb_pdata->green.length - 1)) << 16;
-+	pr_debug("g: %d %d 0x%08x\n", mx3fb_pdata->green.offset, mx3fb_pdata->green.length, reg);
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP3_B1_MAP); /* green */
-+
-+	reg = 0xffff & ~(((1 << (mx3fb_pdata->red.length * 2)) - 1) << (16 - (mx3fb_pdata->red.length * 2)));
-+	reg |= ((mx3fb_pdata->red.offset + mx3fb_pdata->red.length - 1)) << 16;
-+	pr_debug("r: %d %d 0x%08x\n", mx3fb_pdata->red.offset, mx3fb_pdata->red.length, reg);
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP3_B2_MAP); /* red */
-+
-+	/* the TFT displays expecting one pixel per clock */
-+	reg = mx3fb_read_reg(mx3fb, DI_DISP_ACC_CC) & ~(3 << 12);
-+	reg |= 0 << 12;	/* 0 means one clock */
-+	mx3fb_write_reg(mx3fb, reg, DI_DISP_ACC_CC);
- 
- 	spin_unlock_irqrestore(&mx3fb->lock, lock_flags);
- 
-@@ -776,8 +762,6 @@ static int __set_par(struct fb_info *fbi, bool lock)
- 		if (sdc_init_panel(mx3fb, mode,
- 				   (PICOS2KHZ(fbi->var.pixclock)) * 1000UL,
- 				   fbi->var.xres, fbi->var.yres,
--				   (fbi->var.sync & FB_SYNC_SWAP_RGB) ?
--				   IPU_PIX_FMT_BGR666 : IPU_PIX_FMT_RGB666,
- 				   fbi->var.left_margin,
- 				   fbi->var.hsync_len,
- 				   fbi->var.right_margin +
-@@ -1367,6 +1351,20 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
- 		goto emode;
- 	}
- 
-+	if (mx3fb_pdata->red.length == 0 &&
-+	    mx3fb_pdata->green.length == 0 &&
-+	    mx3fb_pdata->blue.length == 0) {
-+
-+		mx3fb_pdata->red.length = 6;
-+		mx3fb_pdata->red.offset = 12;
-+
-+		mx3fb_pdata->green.length = 6;
-+		mx3fb_pdata->green.offset = 6;
-+
-+		mx3fb_pdata->blue.length = 6;
-+		mx3fb_pdata->blue.offset = 0;
-+	}
-+
- 	fb_videomode_to_modelist(mode, num_modes, &fbi->modelist);
- 
- 	/* Default Y virtual size is 2x panel size */
--- 
-1.7.1
+For the proposed clock_adjime, what else is needed to support clock
+adjustment in general?
+
+I don't mind making the interface generic enough to support any
+(realistic) conceivable clock adjustment scheme, but beyond the
+present PTP hardware clocks, I don't know what else might be needed.
+
+Richard
