@@ -1,155 +1,162 @@
-From: johnstul@us.ibm.com (john stultz)
-Date: Thu, 26 Aug 2010 18:57:49 -0700
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <AANLkTi=nKrRHH6+9mvny718gov8Q+u7DHFikdgNY8YdX@mail.gmail.com>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
-	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
-	<20100817085324.GB3330@riccoc20.at.omicron.at>
-	<1282090963.1734.97.camel@localhost>
-	<20100818071942.GA4096@riccoc20.at.omicron.at>
-	<1282176776.2865.100.camel@localhost.localdomain>
-	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<1282594125.3111.344.camel@localhost.localdomain>
-	<AANLkTi=nKrRHH6+9mvny718gov8Q+u7DHFikdgNY8YdX@mail.gmail.com>
-Message-ID: <1282874269.4371.74.camel@localhost.localdomain>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Fri, 27 Aug 2010 04:09:51 +0200
+Subject: [PATCH/RFCv4 2/6] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <20100826134736.GG20944@csn.ul.ie>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<0b02e05fc21e70a3af39e65e628d117cd89d70a1.1282286941.git.m.nazarewicz@samsung.com>
+	<343f4b0edf9b5eef598831700cb459cd428d3f2e.1282286941.git.m.nazarewicz@samsung.com>
+	<20100826134736.GG20944@csn.ul.ie>
+Message-ID: <op.vh2qypgm7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-08-25 at 11:40 +0200, Christian Riesch wrote:
-> What you describe here is only one of the use cases. If the hardware
-> has a single network port and operates as a PTP slave, it timestamps
-> the PTP packets that are sent and received and subsequently uses these
-> timestamps and the information it received from the master in the
-> packets to steer its clock to align it with the master clock. In such
-> a case the timestamping hardware and the clock hardware work together
-> closely and it seems to be okay to use the same interface to control
-> both the timestamping and the PTP clock.
-> 
-> But we have to consider other use cases, e.g.,
-> 
-> 1) Boundary clocks:
-> We have more than one network port. One port operates as a slave
-> clock, our system gets time information via this port and steers its
-> PTP clock to align with the master clock. The other network ports of
-> our system operate as master clocks and redistribute the time
-> information we got from the master to other clocks on these networks.
-> In such a case we do timestamping on each of the network ports, but we
-> only have a single PTP clock. Each network port's timestamping
-> hardware uses the same hardware clock to generate time stamps.
-> 
-> 2) Master clock:
-> We have one or more network ports. Our system has a really good clock
-> (ovenized quartz crystal, an atomic clock, a GPS timing receiver...)
-> and it distributes this time on the network. In such a case we do not
-> steer our clock based on the (packet) timestamps we get from our
-> timestamping unit. Instead, we directly drive our clock hardware with
-> a very stable frequency that we get from the OCXO or the atomic
-> clock... 
+> An important consideration is if the alignment is always a natural
+> alignment? i.e. a 64K buffer must be 64K aligned, 128K must be 128K aligned
+> etc. I ask because the buddy allocator is great at granting natural alignments
+> but is difficult to work with for other alignments.
 
-Ok. Following you here...
+I'm not sure what you mean by "natural alignment".  If 1M alignment of a 64K buffer
+is natural then yes, presented API requires alignment to be natural.  In short,
+alignment must be a power of two and is never less then a PAGE_SIZE but can be more
+then the size of the requested chunk.
 
-> or we use one of the ancillary features of the PTP clock that
-> Richard mentioned to timestamp not network packets but a 1pps signal
-> and use these timestamps to steer the clock. 
+>> +    The main design goal for the CMA was to provide a customisable and
+>> +    modular framework, which could be configured to suit the needs of
+>> +    individual systems.  Configuration specifies a list of memory
+>> +    regions, which then are assigned to devices.  Memory regions can
+>> +    be shared among many device drivers or assigned exclusively to
+>> +    one.  This has been achieved in the following ways:
 
-Wait.. I thought we weren't using PTP to steer the clock? But now we're
-using the pps signal from it to do so? Do I misunderstand you? Or did
-you just not mean this?
+> It'd be very nice if the shared regions could also be used by normal movable
+> memory allocations to minimise the amount of wastage.
 
-> Packet time stamping is
-> used to distribute the time to the slaves, but it is not part of the
-> control loop in this case.
+Yes.  I hope to came up with a CMA version that will allow reserved spec to be
+reused by the rest of memory management code.  For now, I won't respond to your
+suggestions regarding the use of page allocator but I hope to write something
+later today in response to Peter's and Minchan's mails.  I'll make sure to cc you
+as well.
 
-I assume here you mean PTPd is steering the PTP clock according to the
-system time (which is NTP/GPS/whatever sourced)? And then the PTP clock
-distributes that time through the network?
+>> +/* Don't call it directly, use cma_info() or cma_info_about(). */
+>> +int
+>> +__cma_info(struct cma_info *info, const struct device *dev, const char *type);
+>> +
 
-> So in the first case we have one PTP clock but several network packet
-> timestamping units, whereas in the second case the packet timestamping
-> is done but it is not part of the control loop that steers the clock.
-> Of course in most hardware implementations both the PTP clock and the
-> timestamping unit sit on the same chip and often use the same means of
-> communication to the cpu, e.g., the MDIO bus, but I think we need some
-> logical separation here.
+> Don't put it in the header then :/
 
+It's in the header to allow cma_info() and cma_info_about() to be static inlines.
+The idea is not to generate too many exported symbols.  Also, it's not like usage
+of __cma_info() is in any way more dangerous then cma_info() or cma_info_about().
 
-So first of all, thanks for the extra explanation and context here! I
-really appreciate it, as I'm not familiar with all the hardware details
-and possible use cases, but I'm trying to learn.
+>> +/**
+>> + * cma_free - frees a chunk of memory.
+>> + * @addr:	Beginning of the chunk.
+>> + *
+>> + * Returns -ENOENT if there is no chunk at given location; otherwise
+>> + * zero.  In the former case issues a warning.
+>> + */
+>> +int cma_free(dma_addr_t addr);
+>> +
 
-So in the two cases you mention, the time "flow" is something like:
+> Is it not an error to free a non-existant chunk? Hope it WARN()s at
+> least.
 
-#1) [Master Clock on Network1] => [PTP Clock] => [PTPd] =>
-	[PTP Clock] => [PTP Clients on Network2]
+No WARN() is generated but -ENOENT is returned so it is considered an error.
+I've also changed the code to use pr_err() when chunk is not found (it used
+pr_debug() previously).
 
-#2) [GPS] => [NTPd] => [System Time] => [PTPd] => [PTP clock] =>
-	[PTP clients on Network]
+I'm still wondering whether the use of address is the best idea or whether
+passing a cma_chunk structure would be a better option.  In this way, cma_alloc()
+would return cma_chunk structure rather then dma_addr_t.
 
-And the original case:
-#3) [Master Clock on Network] => [PTP clock] => [PTPd] => [PTP clock]
+>> +/****************************** Lower lever API *****************************/
 
-With a secondary control flow:
-	[PPS signal from PTP clock] => [NTPd] => [System Time]
+> How lower? If it can be hidden, put it in a private header.
 
+It's meant to be used by drivers even though the idea is that most drivers will
+stick to the API above.
 
-Right?
+>> + * cma_alloc_from - allocates contiguous chunk of memory from named regions.
 
+> Ideally named regions would be managed by default by free_area and the core
+> page allocator.
 
-So, just brainstorming here, I guess the question I'm trying to figure
-out here, is can the "System Time" and "PTP clock" be merged/globbed
-into a single "Time" interface from the userspace point of view?
+Not sure what you mean.
 
-In other words, if internal to the kernel, the PTP clock was always
-synced to the system time, couldn't the flow look something like:
+>> +struct cma_chunk {
+>> +	dma_addr_t start;
+>> +	size_t size;
+>> +
+>> +	struct cma_region *reg;
+>> +	struct rb_node by_start;
+>> +};
+>> +
+>
+> Is there any scope for reusing parts of kernel/resource.c? Frankly, I
+> didn't look at your requirements closely enough or at kernel/resource.c
+> capabilities but at a glance, there appears to be some commonality.
 
-#3') [Master clock on network] => [PTP clock] => [PTPd] =>
-	 [System Time] => [in-kernel sync thread] => [PTP clock]
+I'm not sure how resources.c could be reused.  It puts resources in hierarchy
+whereas CMA does not care about hierarchy that much plus has only two levels
+(regions on top and then chunks allocated inside).
 
-So PTPd sees the offset adjustment from the PTP clock, and then feeds
-that offset correction right into (a possibly enhanced) adjtimex. The
-kernel would then immediately steer the PTP clock by the same amount to
-keep it in sync with system time (along with a periodic offset/freq
-correction step to deal with crystal drift).
+> As an aside, it does not seem necessary to have everything CMA related
+> in the same header. Maybe split it out to minimise the risk of drivers
+> abusing the layers. Up to you really, I don't feel very strongly on
+> header layout.
 
-Similarly:
+I dunno, I first created two header files but then decided to put everything
+in one file.  I dunno if anything is gained by exporting a few functions to
+a separate header.  I think it only complicates things.
 
-#2') [GPS] => [NTPd] => [System Time] => [in-kernel sync thread] => 
-		[PTP clock] => [PTP clients on Network]
+>> +config CMA
+>> +	bool "Contiguous Memory Allocator framework"
+>> +	# Currently there is only one allocator so force it on
+>> +	select CMA_BEST_FIT
 
-and 
+>> +config CMA_BEST_FIT
+>> +	bool "CMA best-fit allocator"
+>> +	depends on CMA
+>> +	default y
 
-#1') [Master Clock on Network1] => [PTP Clock] => [PTPd] =>
-	[System Time] => [in-kernel sync thread] => [PTP Clock] => 
-	[PTP Clients on Network2]
+> You don't need to default y this if CMA is selecting it, right?
 
-Now, I realize PTP purists probably won't like this, because it
-effectively makes the in-kernel sync thread similar to a PTP boundary
-clock (or worse, since the control loop isn't exactly direct).
+True.
 
-But considering that the kernel (internally) allows for *very*
-fine-grained adjustments (we keep our long-term offset error in
-(nanoseconds << 32)  ie: ~quarter-*billion*ths of a nanosecond - I think
-that's sub-attosecond, if I recall the unit). And even the existing
-external adjtimex interface allows for adjustments of 1ppm<<16 which is
-a granularity of ~15 parts-per-trillion (assuming i'm doing the math
-right).
+> also CMA should default n.
 
-These are all much greater then the parts-per-billion adjustment
-granularity proposed for the direct PTP clock steering, so I suspect any
-error caused by the indirection in the control flow could be minimized
-significantly.
+CMA defaults to n.
 
-Additionally my suggestion here has the benefit of:
-A: Avoiding the fragmented time domains (ie CLOCK_REALTIME vs CLOCK_PTP)
-caused by adding a new clock_id.
+>> +/*
+>> + * Contiguous Memory Allocator framework
+>> + * Copyright (c) 2010 by Samsung Electronics.
+>> + * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation; either version 2 of the
+>> + * License or (at your optional) any later version of the license.
+>
+> I'm not certain about the "any later version" part of this license and
+> how it applies to kernel code but I'm no licensing guru. I know we have
+> duel licensing elsewhere for BSD but someone should double check this
+> license is ok.
 
-B: Avoiding the indirect system time sync through the PPS interface,
-which isn't completely terrible, but just feels a little ugly
-configuration wise from a users-perspective.
+Why wouldn't it?  All it says is that this particular file can be distributed
+under GPLv2 or GPLv3 (or any later if FSF decides to publish updated version).
+There is no difference between licensing GPLv2/BSD and GPLv2/GPLv3+.
 
-I'm sure I still have lots to learn about PTP, so please let me know
-where I'm off-base.
+> I am curious about one thing though. Have you considered reusing the bootmem
+> allocator code to manage the regions instead of your custom stuff here? Instead
+> of the cma_regions core structures, you would associate cma_region with
+> a new bootmem_data_t, keep the bootmem code around and allocate using its
+> allocator. It's a bitmap allocator too and would be less code in the kernel?
 
-thanks
--john
+I haven't looked at bootmem in such perspective.  I'll add that to my TODO list.
+On the other hand, however, it seems bootmem is pass?e so I'm not sure if it's a
+good idea to integrate with it that much.
+
+-- 
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
