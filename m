@@ -1,199 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Aug 2010 16:15:25 +0100
-Subject: [PATCH 1/4] oprofile: Handle initialisation failure more
-	gracefully
-In-Reply-To: <20100827124344.GJ22783@erda.amd.com>
-References: <cover.1282848651.git.matt@console-pimps.org>
-	<442a16796990290ca3ebaaa3d0ab317e7b0a30a5.1282848651.git.matt@console-pimps.org>
-	<20100827124344.GJ22783@erda.amd.com>
-Message-ID: <1282922125.22128.5.camel@e102144-lin.cambridge.arm.com>
+From: Patrick.Loschmidt@gmx.net (Patrick Loschmidt)
+Date: Fri, 27 Aug 2010 17:21:40 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100827160624.433b3374@lxorguk.ukuu.org.uk>
+References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>	<20100817085324.GB3330@riccoc20.at.omicron.at>	<1282090963.1734.97.camel@localhost>	<20100818071942.GA4096@riccoc20.at.omicron.at>	<1282176776.2865.100.camel@localhost.localdomain>	<20100819055518.GA4084@riccoc20.at.omicron.at>	<1282594125.3111.344.camel@localhost.localdomain>	<20100827123849.GC11657@riccoc20.at.omicron.at>	<20100827143844.646eccf6@lxorguk.ukuu.org.uk>	<20100827143437.GB3293@riccoc20.at.omicron.at>
+	<20100827160624.433b3374@lxorguk.ukuu.org.uk>
+Message-ID: <4C77D804.9060500@gmx.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi!
 
-On Fri, 2010-08-27 at 13:43 +0100, Robert Richter wrote:
-> On 26.08.10 15:09:16, Matt Fleming wrote:
-> > From: Will Deacon <will.deacon@arm.com>
-> >
-> > The current implementation is not entirely safe in the case that
-> > oprofile_arch_init() fails. We need to make sure that we always call
-> > exit_driverfs() if we've called init_driverfs(). Also, avoid a potential
-> > double free when freeing 'counter_config', e.g. don't free
-> > 'counter_config' in both oprofile_arch_init() and oprofile_arch_exit().
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/oprofile/common.c |   15 ++++++++-------
-> >  1 files changed, 8 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index 0691176..482779c 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -275,10 +275,12 @@ out:
-> >       return ret;
-> >  }
-> > 
-> > -static void  exit_driverfs(void)
-> > +static void exit_driverfs(void)
-> >  {
-> > -     platform_device_unregister(oprofile_pdev);
-> > -     platform_driver_unregister(&oprofile_driver);
-> > +     if (!IS_ERR_OR_NULL(oprofile_pdev)) {
-> > +             platform_device_unregister(oprofile_pdev);
-> > +             platform_driver_unregister(&oprofile_driver);
-> > +     }
-> 
-> The root cause that makes this check necessary is that
-> oprofile_arch_exit() is called though oprofile_arch_init() failed. We
-> should better fix this instead. I have to admit we will then have to
-> check all architectural implementations.
-> 
+I'd like to add my two cents about the discussion. Just to shortly
+introduce myself: I'm working with PTP since version 2002 (now 2008 or
+PTPv2) and I'm developing matching network cards, drivers, and also
+sometimes a bit of the stack.
 
-I took a look through all of the oprofile_arch_{init,exit} functions
-and it looks like only ARM needs fixing. Nobody else does any allocation
-here [well, until Matt's unified version comes into play].
+I always had the problem of different HW implementations (even my own)
+and how to access the clocks there. So reading this thread, I strongly
+support the idea to provide a driver class, which allows the userspace
+to run certain standard operations (settime, gettime, adjtime, ...) as
+proposed and leave the detailed implementation to a specific PTP clock
+driver. I always made my own char device, but I don't want to open this
+discussion again as for me it doesn't matter.
 
-> >  }
-> >  #else
-> >  static int __init init_driverfs(void) { return 0; }
-> > @@ -363,10 +365,8 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-> >       }
-> > 
-> >       ret = init_driverfs();
-> > -     if (ret) {
-> > -             kfree(counter_config);
-> 
-> We should not return from oprofile_arch_init() with allocated
-> resources if the function fails. To fix duplicate kfrees, we should
-> free it here and then set counter_config to NULL. It should also be
-> freed if for_each_possible_cpu() or op_name_from_perf_id() fails.
-> 
-> Also, the pointer should be NULLed after freeing in
-> oprofile_arch_exit(). There, we also don't need the NULL pointer check
-> as it is save to call kfree(NULL).
+Concerning the long discussion about PTP clock, system time, etc. I'd
+like to say, that from a point of view of PTP every node/host has only
+one clock. That means, that if you have a NIC with integrated clock
+(required for HW timestamping) it is counted as a node. As soon as you
+want to use multiple NICs this is actually outside the PTP protocol
+definition, unless you have only one clock available to both network
+interfaces (which is hard to achieve).
 
+So the solution to treat a PTP enabled NIC as a time source for the
+system time is in general sufficient, unless for applications that
+require precise timestamps in applications. I know of use cases where
+code gets instrumented to measure time delays, processing time, and
+sequence in SW, e.g. distributed databases for trading systems at the
+stock exchange.
 
-How about something like this? This removes the exit call
-from the init code and sets pointers to NULL after they have been
-freed. We still have to do some checking so that we don't try to
-release a NULL perf event:
-
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 0691176..12253eb 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -275,10 +275,12 @@ out:
- 	return ret;
- }
- 
--static void  exit_driverfs(void)
-+static void __exit exit_driverfs(void)
- {
--	platform_device_unregister(oprofile_pdev);
--	platform_driver_unregister(&oprofile_driver);
-+	if (!IS_ERR_OR_NULL(oprofile_pdev)) {
-+		platform_device_unregister(oprofile_pdev);
-+		platform_driver_unregister(&oprofile_driver);
-+	}
- }
- #else
- static int __init init_driverfs(void) { return 0; }
-@@ -365,6 +367,7 @@ int __init oprofile_arch_init(struct
-oprofile_operations *ops)
- 	ret = init_driverfs();
- 	if (ret) {
- 		kfree(counter_config);
-+		counter_config = NULL;
- 		return ret;
- 	}
- 
-@@ -374,8 +377,10 @@ int __init oprofile_arch_init(struct
-oprofile_operations *ops)
- 		if (!perf_events[cpu]) {
- 			pr_info("oprofile: failed to allocate %d perf events "
- 					"for cpu %d\n", perf_num_counters, cpu);
--			while (--cpu >= 0)
-+			while (--cpu >= 0) {
- 				kfree(perf_events[cpu]);
-+				perf_events[cpu] = NULL;
-+			}
- 			return -ENOMEM;
- 		}
- 	}
-@@ -396,25 +401,27 @@ int __init oprofile_arch_init(struct
-oprofile_operations *ops)
- 	return ret;
- }
- 
--void oprofile_arch_exit(void)
-+void __exit oprofile_arch_exit(void)
- {
- 	int cpu, id;
- 	struct perf_event *event;
- 
--	if (*perf_events) {
--		exit_driverfs();
--		for_each_possible_cpu(cpu) {
--			for (id = 0; id < perf_num_counters; ++id) {
--				event = perf_events[cpu][id];
--				if (event != NULL)
--					perf_event_release_kernel(event);
--			}
--			kfree(perf_events[cpu]);
-+	exit_driverfs();
-+
-+	for_each_possible_cpu(cpu) {
-+		if (!perf_events[cpu])
-+			continue;
-+
-+		for (id = 0; id < perf_num_counters; ++id) {
-+			event = perf_events[cpu][id];
-+			if (event != NULL)
-+				perf_event_release_kernel(event);
- 		}
-+
-+		kfree(perf_events[cpu]);
- 	}
- 
--	if (counter_config)
--		kfree(counter_config);
-+	kfree(counter_config);
- }
- #else
- int __init oprofile_arch_init(struct oprofile_operations *ops)
-@@ -422,5 +429,5 @@ int __init oprofile_arch_init(struct
-oprofile_operations *ops)
- 	pr_info("oprofile: hardware counters not available\n");
- 	return -ENODEV;
- }
--void oprofile_arch_exit(void) {}
-+void __exit oprofile_arch_exit(void) {}
- #endif /* CONFIG_HW_PERF_EVENTS */
-diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
-index b336cd9..3094af0 100644
---- a/drivers/oprofile/oprof.c
-+++ b/drivers/oprofile/oprof.c
-@@ -257,15 +257,11 @@ static int __init oprofile_init(void)
- 		printk(KERN_INFO "oprofile: using timer interrupt.\n");
- 		err = oprofile_timer_init(&oprofile_ops);
- 		if (err)
--			goto out_arch;
-+			goto out;
- 	}
- 	err = oprofilefs_register();
--	if (err)
--		goto out_arch;
--	return 0;
- 
--out_arch:
--	oprofile_arch_exit();
-+out:
- 	return err;
- }
- 
+Summarizing I think it would be a huge step forward, if all the
+different HW implementations could be controlled via a standardised
+interface through the kernel. I need timestamps from my network card
+with ps resolution and to steer the onboard clock from user space. Then
+I would be happy already. :-)
 
 Thanks,
-
-Will
+Patrick
