@@ -1,63 +1,37 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 27 Aug 2010 16:02:05 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <20100827134154.50eef56c@lxorguk.ukuu.org.uk>
-References: <20100817085324.GB3330@riccoc20.at.omicron.at>
-	<1282090963.1734.97.camel@localhost>
-	<20100818071942.GA4096@riccoc20.at.omicron.at>
-	<1282176776.2865.100.camel@localhost.localdomain>
-	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<1282594125.3111.344.camel@localhost.localdomain>
-	<AANLkTi=nKrRHH6+9mvny718gov8Q+u7DHFikdgNY8YdX@mail.gmail.com>
-	<1282874269.4371.74.camel@localhost.localdomain>
-	<20100827075727.GA3818@riccoc20.at.omicron.at>
-	<20100827134154.50eef56c@lxorguk.ukuu.org.uk>
-Message-ID: <20100827140205.GA3293@riccoc20.at.omicron.at>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 27 Aug 2010 07:11:58 -0700
+Subject: [PATCH v4] davinci: Add MityDSP-L138/MityARM-1808 SOM support
+In-Reply-To: <4C7702EB.8040905@criticallink.com> (Michael Williamson's message
+	of "Thu, 26 Aug 2010 20:12:27 -0400")
+References: <4C516634.5040804@criticallink.com>
+	<877hjd106u.fsf@deeprootsystems.com>
+	<4C7702EB.8040905@criticallink.com>
+Message-ID: <8762ywrvpt.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 27, 2010 at 01:41:54PM +0100, Alan Cox wrote:
-> > The master node in a PTP network probably takes its time from a
-> > precise external time source, like GPS. The GPS provides a 1 PPS
-> > directly to the PTP clock hardware, which latches the PTP hardware
-> > clock time on the PPS edge. This provides one sample as input to a
-> > clock servo (in the PTPd) that, in turn, regulates the PTP clock
-> > hardware.
-> 
-> A PTP clock is TAI, Unix time is UTC.
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-But TAI and UTC progress at the same rate, and UTC differs from TAI by
-a constant offset. In fact, the needed conversion is provided by the
-protocol, so it is not hard to take a 1 PPS from GPS and set the PTP
-clock to TAI.
+>> Normally, I like to see new board support broken down more.  It's rather
+>> difficult to do a good review of new board file when everything is added
+>> in a single patch.
+>>
+>> Typically, a basic patch that just supports basic boot (typically to
+>> UART console) is the first patch.  Then additional patches are added to
+>> add peripheral support (display, MMC, SPI, flash, regulators, ...)
+>>
+>> Breaking things up this way helps reviewers and maintainers greatly.
+>>
+>> [...]
+>>    
+> OK.  Most of the board file is a large cut-and-paste of the da850
+> EVM.  It seems unlikely that I'll have any measure of success here, but if
+> I get time I might try again.
 
-> > This is the core issue and source of misunderstanding, in my view. The
-> > fact of the matter is, the current generation of computers has
-> > multiple clocks, and these are usually unsynchronized. I think we
-> > should not try too hard to cover up or work around this. It is a fact
-> > of life.
-> 
-> In this case I don't think you can. Their divergence is rather difficult
-> to handle unless you have a GPS to hand.
-> 
-> But all this talk of "PTP this" and "PTP that" is not helpful. Any
-> interface for additional time sources should be generic with PTP being
-> one use case.
-
-To tell the truth, my original motivation for the patch set was to
-support PTP clocks and applications. I don't think that is such a bad
-idea. After all, the adjtimex interface was added just to support NTP.
-
-At the same time, I can understand the desire to have a generic
-hardware clock adjustment API. Let me see if I can understand and
-summarize what people are asking for:
-
-	  clock_adjtime(clockid_t id, struct timex *t);
-
-and struct timex gets some new fields at the end.
-
-Using the call, NTPd can call clock_adjtime(CLOCK_REALTIME) and PTPd
-can call clock_realtime(CLOCK_PTP) and everyone is happy, no?
+OK, if it's mostly a cut-and-paste of da850, then maybe just break it up
+into two patches, 1) the cut, paste & rename patch and 2) a separate
+patch for things that are different on your board.
 
 Thanks,
-Richard
+
+Kevin
