@@ -1,174 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Aug 2010 19:06:45 +0100
-Subject: [PATCH 1/4] oprofile: Handle initialisation failure more
-	gracefully
-In-Reply-To: <20100827163839.GR22783@erda.amd.com>
-References: <cover.1282848651.git.matt@console-pimps.org>
-	<442a16796990290ca3ebaaa3d0ab317e7b0a30a5.1282848651.git.matt@console-pimps.org>
-	<20100827124344.GJ22783@erda.amd.com>
-	<1282922125.22128.5.camel@e102144-lin.cambridge.arm.com>
-	<20100827163839.GR22783@erda.amd.com>
-Message-ID: <1282932405.2899.22.camel@e102144-lin.cambridge.arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 27 Aug 2010 11:21:05 -0700
+Subject: [PATCH 0/3] Allow late mdesc detection, v4
+In-Reply-To: <1282553423.737985.983362819420.0.gpush@pororo> (Jeremy Kerr's
+	message of "Mon, 23 Aug 2010 16:50:23 +0800")
+References: <1282553423.737985.983362819420.0.gpush@pororo>
+Message-ID: <87bp8nq5m6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Jeremy Kerr <jeremy.kerr@canonical.com> writes:
 
-Thanks for taking the time to look at this.
+> Currently, we probe for a mdesc early in boot. At this early stage, the
+> only thing we use the mdesc for is to determine the debug page mapping.
+>
+> However, the debug addresses (phys and virt) need to be coded into the
+> addruart macro anyway; the dynamic probing is only going to tell us what
+> we already know.
+>
+> These changes allow us to use the addruart macros to find the debug
+> mapping addresses, rather than pulling them out of the mdesc. This means
+> that the addresses are only kept in the one place, and that we don't
+> need the mdesc nearly as early.
+>
+> The first change updates all of the addruart macros to return both
+> physical and virtual addresses. I've used 'rp' and 'rv' as the macro
+> arguments to indicate which address goes where
+>
+> The second change updates the debug setup routine to use the addruart
+> macro to establish the debug mapping, now that we can invoke the macro
+> to find the phyical and virtual addresses.
+>
+> This allows us to delay the requirement to have a mdesc available until
+> much later. For example, we can parse one from the device tree once
+> we've reached C code.
+>
+> As they have more complex and/or new debug macros, the following platforms
+> could do with extra testing:
+>  * omap (mach-omap1 and mach-omap2)
+>  * davinci
 
-On Fri, 2010-08-27 at 17:38 +0100, Robert Richter wrote:
-> On 27.08.10 11:15:25, Will Deacon wrote:
+Tested on a couple flavors of DaVinci SoCs, so for davinci
 
-> > How about something like this? This removes the exit call
-> > from the init code and sets pointers to NULL after they have been
-> > freed. We still have to do some checking so that we don't try to
-> > release a NULL perf event:
-> >
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index 0691176..12253eb 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -275,10 +275,12 @@ out:
-> >       return ret;
-> >  }
-> > 
-> > -static void  exit_driverfs(void)
-> > +static void __exit exit_driverfs(void)
-> >  {
-> > -     platform_device_unregister(oprofile_pdev);
-> > -     platform_driver_unregister(&oprofile_driver);
-> > +     if (!IS_ERR_OR_NULL(oprofile_pdev)) {
-> 
-> This check is obsolete here as we do not call oprofile_arch_exit() on
-> failure.
-> 
-Sorry, I was being braindead and thought oprofile_arch_exit might be
-called via oprofile_exit. As it happens, this is only called because of
-module_exit so we know that initialisation will have completed.
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-In light of this and your comments, I've simplified the code. Once
-people are happy with it, I'll post it as a couple of patches:
 
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 0691176..c2c4a2e 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -275,7 +275,7 @@ out:
-        return ret;
- }
- 
--static void  exit_driverfs(void)
-+static void __exit exit_driverfs(void)
- {
-        platform_device_unregister(oprofile_pdev);
-        platform_driver_unregister(&oprofile_driver);
-@@ -359,14 +359,13 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-        if (!counter_config) {
-                pr_info("oprofile: failed to allocate %d "
-                                "counters\n", perf_num_counters);
--               return -ENOMEM;
-+               ret = -ENOMEM;
-+               goto out;
-        }
- 
-        ret = init_driverfs();
--       if (ret) {
--               kfree(counter_config);
--               return ret;
--       }
-+       if (ret)
-+               goto out;
- 
-        for_each_possible_cpu(cpu) {
-                perf_events[cpu] = kcalloc(perf_num_counters,
-@@ -374,9 +373,8 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-                if (!perf_events[cpu]) {
-                        pr_info("oprofile: failed to allocate %d perf events "
-                                        "for cpu %d\n", perf_num_counters, cpu);
--                       while (--cpu >= 0)
--                               kfree(perf_events[cpu]);
--                       return -ENOMEM;
-+                       ret = -ENOMEM;
-+                       goto out;
-                }
-        }
- 
-@@ -393,28 +391,33 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-        else
-                pr_info("oprofile: using %s\n", ops->cpu_type);
- 
-+out:
-+       if (ret) {
-+               kfree(counter_config);
-+               for_each_possible_cpu(cpu)
-+                       kfree(perf_events[cpu]);
-+       }
-+
-        return ret;
- }
- 
--void oprofile_arch_exit(void)
-+void __exit oprofile_arch_exit(void)
- {
-        int cpu, id;
-        struct perf_event *event;
- 
--       if (*perf_events) {
--               exit_driverfs();
--               for_each_possible_cpu(cpu) {
--                       for (id = 0; id < perf_num_counters; ++id) {
--                               event = perf_events[cpu][id];
--                               if (event != NULL)
--                                       perf_event_release_kernel(event);
--                       }
--                       kfree(perf_events[cpu]);
-+       for_each_possible_cpu(cpu) {
-+               for (id = 0; id < perf_num_counters; ++id) {
-+                       event = perf_events[cpu][id];
-+                       if (event)
-+                               perf_event_release_kernel(event);
-                }
-+
-+               kfree(perf_events[cpu]);
-        }
- 
--       if (counter_config)
--               kfree(counter_config);
-+       kfree(counter_config);
-+       exit_driverfs();
- }
- #else
- int __init oprofile_arch_init(struct oprofile_operations *ops)
-@@ -422,5 +425,5 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-        pr_info("oprofile: hardware counters not available\n");
-        return -ENODEV;
- }
--void oprofile_arch_exit(void) {}
-+void __exit oprofile_arch_exit(void) {}
- #endif /* CONFIG_HW_PERF_EVENTS */
-diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
-index b336cd9..b4a6857 100644
---- a/drivers/oprofile/oprof.c
-+++ b/drivers/oprofile/oprof.c
-@@ -257,16 +257,9 @@ static int __init oprofile_init(void)
-                printk(KERN_INFO "oprofile: using timer interrupt.\n");
-                err = oprofile_timer_init(&oprofile_ops);
-                if (err)
--                       goto out_arch;
-+                       return err;
-        }
--       err = oprofilefs_register();
--       if (err)
--               goto out_arch;
--       return 0;
--
--out_arch:
--       oprofile_arch_exit();
--       return err;
-+       return oprofilefs_register();
- }
-
- 
-Once again, thanks for looking@this and have a good weekend,
-
-Will
+>  * tegra
+>
+> Cheers,
+>
+>
+> Jeremy
+>
+> v4:
+>  * updates for 2.6.36
+>  * add changes for tegra
+>  * update davinci
+>  * include fixes for omap[12]
+>  * drop mdesc changes
+>
+> v3:
+>  * only establish page mapping if !DEBUG_ICEDCC
+>
+> v2:
+>  * return both phys and virt addresses from addruart
+>  * mask unneeded bits from uart physical address in mapping setup
+>  * remove io_pg_offst and phys_io, in a separate patch
+>
+> ---
+> Jeremy Kerr (3):
+>       arm/debug: consolidate addruart macros for CONFIG_DEBUG_ICEDCC
+>       arm: return both physical and virtual addresses from addruart
+>       arm: use addruart macro to establish debug mappings
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
