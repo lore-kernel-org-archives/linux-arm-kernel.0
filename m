@@ -1,80 +1,100 @@
-From: darian59@rocketmail.com (Mars Steeve)
-Date: Fri, 27 Aug 2010 08:02:44 +0000 (GMT)
-Subject: AT91 UDC softirq problem
-Message-ID: <384846.65848.qm@web24820.mail.ird.yahoo.com>
+From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
+Date: Fri, 27 Aug 2010 17:16:39 +0900
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <AANLkTimB+s0tO=wrODAU4qCaZnCBoLZ2A9pGjR_jheOj@mail.gmail.com>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+	<20100826095857.5b821d7f.kamezawa.hiroyu@jp.fujitsu.com>
+	<op.vh0wektv7p4s8u@localhost>
+	<20100826115017.04f6f707.kamezawa.hiroyu@jp.fujitsu.com>
+	<20100826124434.6089630d.kamezawa.hiroyu@jp.fujitsu.com>
+	<AANLkTi=T1y+sQuqVTYgOkYvqrxdYB1bZmCpKafN5jPqi@mail.gmail.com>
+	<20100826133028.39d731da.kamezawa.hiroyu@jp.fujitsu.com>
+	<AANLkTimB+s0tO=wrODAU4qCaZnCBoLZ2A9pGjR_jheOj@mail.gmail.com>
+Message-ID: <20100827171639.83c8642c.kamezawa.hiroyu@jp.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 26 Aug 2010 18:36:24 +0900
+Minchan Kim <minchan.kim@gmail.com> wrote:
 
+> On Thu, Aug 26, 2010 at 1:30 PM, KAMEZAWA Hiroyuki
+> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+> > On Thu, 26 Aug 2010 13:06:28 +0900
+> > Minchan Kim <minchan.kim@gmail.com> wrote:
+> >
+> >> On Thu, Aug 26, 2010 at 12:44 PM, KAMEZAWA Hiroyuki
+> >> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+> >> > On Thu, 26 Aug 2010 11:50:17 +0900
+> >> > KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+> >> >
+> >> >> 128MB...too big ? But it's depend on config.
+> >> >>
+> >> >> IBM's ppc guys used 16MB section, and recently, a new interface to shrink
+> >> >> the number of /sys files are added, maybe usable.
+> >> >>
+> >> >> Something good with this approach will be you can create "cma" memory
+> >> >> before installing driver.
+> >> >>
+> >> >> But yes, complicated and need some works.
+> >> >>
+> >> > Ah, I need to clarify what I want to say.
+> >> >
+> >> > With compaction, it's helpful, but you can't get contiguous memory larger
+> >> > than MAX_ORDER, I think. To get memory larger than MAX_ORDER on demand,
+> >> > memory hot-plug code has almost all necessary things.
+> >>
+> >> True. Doesn't patch's idea of Christoph helps this ?
+> >> http://lwn.net/Articles/200699/
+> >>
+> >
+> > yes, I think so. But, IIRC, ?it's own purpose of Chirstoph's work is
+> > for removing zones. please be careful what's really necessary.
+> 
+> Ahh. Sorry for missing point.
+> You're right. The patch can't help our problem.
+> 
+> How about changing following this?
+> The thing is MAX_ORDER is static. But we want to avoid too big
+> MAX_ORDER of whole zones to support devices which requires big
+> allocation chunk.
+> So let's add MAX_ORDER into each zone and then, each zone can have
+> different max order.
+> For example, while DMA[32], NORMAL, HIGHMEM can have normal size 11,
+> MOVABLE zone could have a 15.
+> 
+> This approach has a big side effect?
+> 
 
-I'm currently working on an AT91SAM9G20 based board, and I encounter a problem 
-with the USB Gadget driver (at91_udc) and the Ethernet gadget with RNDIS 
-support.
-The board shall be connected with USB on a Windows platform (Vista or Seven) and 
-communicate with an embedded http server (lighttpd), that's why I need the RNDIS 
-support (I read on the Internet that vista supports CDC ECM but I don't know how 
-to use it).
+Hm...need to check hard coded MAX_ORDER usages...I don't think
+side-effect is big. Hmm. But I think enlarging MAX_ORDER isn't an
+important thing. A code which strips contiguous chunks of pages from
+buddy allocator is a necessaty thing, as..
 
-I first tried a 2.6.34 kernel version but unfortunately the link was very 
-unstable, I lost 10% of my ICMP ping packet  and the HTTP browsing is unusable.
-Note: I have no problem with CDC ECM and a Linux host.
+What I can think of at 1st is...
+==
+	int steal_pages(unsigned long start_pfn, unsigned long end_pfn)
+	{
+		/* Be careful mutal execution with memory hotplug, because reusing code */
 
-Then I compiled a 2.6.36-rc2 kernel (with the at91_udc softirq patch) and now my 
-link is stable but I always have a warning message when I plug my device on the 
-host:
+		split [start_pfn, end_pfn) to pageblock_order
+		
+		for each pageblock in the range {
+			Mark this block as MIGRATE_ISOLATE
+			try-to-free pages in the range or
+			migrate pages in the range to somewhere.
+			/* Here all pages in the range are on buddy allocator
+			and free and never be allocated by anyone else. */
+		}
 
-[    2.170000] ------------[ cut here ]------------
-[    2.170000] WARNING: at kernel/softirq.c:143 local_bh_enable+0x80/0xac()
-[    2.170000] Modules linked in:
-[    2.170000] [<c0025cb0>] (unwind_backtrace+0x0/0xf4) from [<c0032574>] 
-(warn_slowpath_common+0x4c/0x64)
-[    2.170000] [<c0032574>] (warn_slowpath_common+0x4c/0x64) from [<c00325a8>] 
-(warn_slowpath_null+0x1c/0x24)
-[    2.170000] [<c00325a8>] (warn_slowpath_null+0x1c/0x24) from [<c00389f4>] 
-(local_bh_enable+0x80/0xac)
-[    2.170000] [<c00389f4>] (local_bh_enable+0x80/0xac) from [<c01e012c>] 
-(dev_txq_stats_fold+0xa0/0xec)
-[    2.170000] [<c01e012c>] (dev_txq_stats_fold+0xa0/0xec) from [<c01e0268>] 
-(dev_get_stats+0xf0/0xf8)
-[    2.170000]  [<c01e0268>] (dev_get_stats+0xf0/0xf8) from [<c01c45c8>] 
-(gen_ndis_query_resp+0x58/0x4a0)
-[    2.170000] [<c01c45c8>] (gen_ndis_query_resp+0x58/0x4a0) from [<c01c4c7c>] 
-(rndis_msg_parser+0x26c/0x458)
-[    2.170000] [<c01c4c7c>] (rndis_msg_parser+0x26c/0x458) from [<c01c4e8c>] 
-(rndis_command_complete+0x24/0x58)
-[    2.170000] [<c01c4e8c>] (rndis_command_complete+0x24/0x58) from [<c01c01c4>] 
-(done+0x84/0xcc)
-[    2.170000] [<c01c01c4>] (done+0x84/0xcc) from [<c01c11e4>] 
-(read_fifo+0xf8/0x10c)
-[    2.170000] [<c01c11e4>] (read_fifo+0xf8/0x10c) from [<c01c1830>] 
-(at91_udc_irq+0x3a8/0x97c)
-[    2.170000] [<c01c1830>] (at91_udc_irq+0x3a8/0x97c) from [<c0063a18>] 
-(handle_IRQ_event+0x40/0x118)
-[    2.170000] [<c0063a18>]  (handle_IRQ_event+0x40/0x118) from [<c0065c58>] 
-(handle_level_irq+0xa8/0x17c)
-[    2.170000] [<c0065c58>] (handle_level_irq+0xa8/0x17c) from [<c0020044>] 
-(asm_do_IRQ+0x44/0xa4)
-[    2.170000] [<c0020044>] (asm_do_IRQ+0x44/0xa4) from [<c0020b28>] 
-(__irq_svc+0x48/0x8c)
-[    2.170000] Exception stack(0xc0319f80 to 0xc0319fc8)
-[    2.170000] 9f80: c0318000 60000013 00000001 60000013 c0318000 c03397a8 
-c031bc90 c031bc88
-[    2.170000] 9fa0: 2001c838 41069265 2001c804 00000000 00000000 c0319fc8 
-c0022180 c0022120
-[    2.170000] 9fc0: 60000013 ffffffff
-[    2.170000] [<c0020b28>] (__irq_svc+0x48/0x8c) from [<c0022120>] 
-(cpu_idle+0x28/0xc0)
-[    2.170000] [<c0022120>] (cpu_idle+0x28/0xc0) from [<c0008924>] 
-(start_kernel+0x230/0x274)
-[    2.170000]  [<c0008924>] (start_kernel+0x230/0x274) from [<20008034>] 
-(0x20008034)
-[    2.170000] ---[ end trace d1eb86bf710a14c5 ]---
+		please see __rmqueue_fallback(). it selects migration-type at 1st.
+		Then, if you can pass start_migratetype of MIGLATE_ISOLATE,
+		you can automatically strip all MIGRATE_ISOLATE pages from free_area[].
 
-Is this message important or can I still use this version without problem in the 
-future ?
+		return chunk of pages.
+	}
+==
 
-Thanks
-
-
-      
+Thanks,
+-Kame
