@@ -1,61 +1,209 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Fri, 27 Aug 2010 16:06:24 +0100
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <20100827143437.GB3293@riccoc20.at.omicron.at>
-References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
-	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
-	<20100817085324.GB3330@riccoc20.at.omicron.at>
-	<1282090963.1734.97.camel@localhost>
-	<20100818071942.GA4096@riccoc20.at.omicron.at>
-	<1282176776.2865.100.camel@localhost.localdomain>
-	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<1282594125.3111.344.camel@localhost.localdomain>
-	<20100827123849.GC11657@riccoc20.at.omicron.at>
-	<20100827143844.646eccf6@lxorguk.ukuu.org.uk>
-	<20100827143437.GB3293@riccoc20.at.omicron.at>
-Message-ID: <20100827160624.433b3374@lxorguk.ukuu.org.uk>
+From: robert.richter@amd.com (Robert Richter)
+Date: Fri, 27 Aug 2010 16:59:01 +0200
+Subject: [PATCH V2 4/4] sh: Use the perf-events backend for oprofile
+In-Reply-To: <c741813aa911f0048cfab1a1a30534e8d7bb6765.1282848651.git.matt@console-pimps.org>
+References: <cover.1282848651.git.matt@console-pimps.org>
+	<c741813aa911f0048cfab1a1a30534e8d7bb6765.1282848651.git.matt@console-pimps.org>
+Message-ID: <20100827145901.GO22783@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sorry for causing confusion, but please understand "a hardware clock
-> with timestamping capabilities than can be used for PTP support"
-> whenever I wrote "PTP" or "PTP clock."
-
-Ok that makes sense.
+On 26.08.10 15:09:19, Matt Fleming wrote:
+> Use the perf-events based wrapper for oprofile available in
+> drivers/oprofile. This allows us to centralise the code to control
+> performance counters.
 > 
-> Well, what I just said is not entirely true.
-> most are bound to the PTP protocol. That may change in the future...
-
-Which seems fine to me too - its an implementation detail of that time
-source.
-
-> > Specialist applications will presumably need to know which time source or
-> > sources they are tracking and synchronizing too out of multiple potential
-> > PTP sources
+> Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> ---
 > 
-> Yes, the PTPd will have some special knowledge.
-
-Not only that but consumers of different time synchronizations will need
-to be able to describe which time source they want to talk about from a
-selection of PTP or similar things.
-
-> > system time bimble track a source makes sense just as with NTP but making
-> > it a new clock seems the wrong model extending a non-too-bright API when
-> > you can just put the time sources in a file tree.
+> Paul,
 > 
-> Don't get your meaning here, what did you mean by "file tree?"
+> I dropped the CONFIG_PERF_EVENTS dependency from the Makefile in this
+> version because to do anything useful we need perf events anyway.
 
-Something like
+Initialization should simply fail with a printk message for this case,
+implement function stubs for the !CONFIG_PERF_EVENTS case instead in
+the oprofile.h header file.
 
-	/sys/class/timesource/<name>/...
+> 
+>  arch/sh/oprofile/Makefile  |    2 +-
+>  arch/sh/oprofile/common.c  |   96 ++++++++-----------------------------------
+>  arch/sh/oprofile/op_impl.h |   33 ---------------
+>  3 files changed, 19 insertions(+), 112 deletions(-)
+>  delete mode 100644 arch/sh/oprofile/op_impl.h
+> 
+> diff --git a/arch/sh/oprofile/Makefile b/arch/sh/oprofile/Makefile
+> index 4886c5c..e1015ae 100644
+> --- a/arch/sh/oprofile/Makefile
+> +++ b/arch/sh/oprofile/Makefile
+> @@ -4,6 +4,6 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
+>  		oprof.o cpu_buffer.o buffer_sync.o \
+>  		event_buffer.o oprofile_files.o \
+>  		oprofilefs.o oprofile_stats.o \
+> -		timer_int.o )
+> +		timer_int.o oprofile_perf.o )
+>  
+>  oprofile-y	:= $(DRIVER_OBJS) common.o backtrace.o
+> diff --git a/arch/sh/oprofile/common.c b/arch/sh/oprofile/common.c
+> index ac60493..f8d4a84 100644
+> --- a/arch/sh/oprofile/common.c
+> +++ b/arch/sh/oprofile/common.c
+> @@ -17,71 +17,23 @@
+>  #include <linux/init.h>
+>  #include <linux/errno.h>
+>  #include <linux/smp.h>
+> +#include <linux/perf_event.h>
 
-at which point we don't have to enumerate them all, add special system
-calls and then fret about the fact you can't access them from things like
-shell scripts.
+I don't see a reason why this must be included here.
 
-The fact SYS5.4 Unix and SuS got obsessed with numbering things
-rather than using names unlike Unix doesn't mean it's the right model to
-number them - usually the reverse is true, a heirarchy of file names is
-rather more future proof.
+It's only for sh_pmu_name() and sh_pmu_num_events(), so the interface
+looks wrong here. It should be in oprofile_perf.c. The functions
+should be generic non-arch perf code. See below.
 
-Alan
+>  #include <asm/processor.h>
+> -#include "op_impl.h"
+> -
+> -static struct op_sh_model *model;
+> -
+> -static struct op_counter_config ctr[20];
+>  
+>  extern void sh_backtrace(struct pt_regs * const regs, unsigned int depth);
+>  
+> -static int op_sh_setup(void)
+> -{
+> -	/* Pre-compute the values to stuff in the hardware registers.  */
+> -	model->reg_setup(ctr);
+> -
+> -	/* Configure the registers on all cpus.  */
+> -	on_each_cpu(model->cpu_setup, NULL, 1);
+> -
+> -        return 0;
+> -}
+> -
+> -static int op_sh_create_files(struct super_block *sb, struct dentry *root)
+> -{
+> -	int i, ret = 0;
+> -
+> -	for (i = 0; i < model->num_counters; i++) {
+> -		struct dentry *dir;
+> -		char buf[4];
+> -
+> -		snprintf(buf, sizeof(buf), "%d", i);
+> -		dir = oprofilefs_mkdir(sb, root, buf);
+> -
+> -		ret |= oprofilefs_create_ulong(sb, dir, "enabled", &ctr[i].enabled);
+> -		ret |= oprofilefs_create_ulong(sb, dir, "event", &ctr[i].event);
+> -		ret |= oprofilefs_create_ulong(sb, dir, "kernel", &ctr[i].kernel);
+> -		ret |= oprofilefs_create_ulong(sb, dir, "user", &ctr[i].user);
+> -
+> -		if (model->create_files)
+> -			ret |= model->create_files(sb, dir);
+> -		else
+> -			ret |= oprofilefs_create_ulong(sb, dir, "count", &ctr[i].count);
+> -
+> -		/* Dummy entries */
+> -		ret |= oprofilefs_create_ulong(sb, dir, "unit_mask", &ctr[i].unit_mask);
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+> -static int op_sh_start(void)
+> +static char *op_name_from_perf_name(const char *name)
+>  {
+> -	/* Enable performance monitoring for all counters.  */
+> -	on_each_cpu(model->cpu_start, NULL, 1);
+> +	if (!strcmp(name, "SH-4A"))
+> +		return "sh/sh4a";
+> +	if (!strcmp(name, "SH7750"))
+> +		return "sh/sh7750";
+
+With that implementation we always have to touch the code for new
+cpus. Maybe we derive it from the perf name, e.g. making all lowercase
+and removing dashes?
+
+>  
+> -	return 0;
+> -}
+> -
+> -static void op_sh_stop(void)
+> -{
+> -	/* Disable performance monitoring for all counters.  */
+> -	on_each_cpu(model->cpu_stop, NULL, 1);
+> +	return NULL;
+>  }
+>  
+>  int __init oprofile_arch_init(struct oprofile_operations *ops)
+>  {
+> -	struct op_sh_model *lmodel = NULL;
+>  	int ret;
+>  
+>  	/*
+> @@ -91,40 +43,28 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+>  	 */
+>  	ops->backtrace = sh_backtrace;
+>  
+> -	/*
+> -	 * XXX
+> -	 *
+> -	 * All of the SH7750/SH-4A counters have been converted to perf,
+> -	 * this infrastructure hook is left for other users until they've
+> -	 * had a chance to convert over, at which point all of this
+> -	 * will be deleted.
+> -	 */
+> -
+> -	if (!lmodel)
+> -		return -ENODEV;
+>  	if (!(current_cpu_data.flags & CPU_HAS_PERF_COUNTER))
+>  		return -ENODEV;
+>  
+> -	ret = lmodel->init();
+> -	if (unlikely(ret != 0))
+> -		return ret;
+> +	ops->setup		= oprofile_perf_setup;
+> +	ops->create_files	= oprofile_perf_create_files;
+> +	ops->start		= oprofile_perf_start;
+> +	ops->stop		= oprofile_perf_stop;
+> +	ops->cpu_type		= op_name_from_perf_name(sh_pmu_name());
+>  
+> -	model = lmodel;
+> +	oprofile_perf_set_num_counters(sh_pmu_num_events());
+>  
+> -	ops->setup		= op_sh_setup;
+> -	ops->create_files	= op_sh_create_files;
+> -	ops->start		= op_sh_start;
+> -	ops->stop		= op_sh_stop;
+> -	ops->cpu_type		= lmodel->cpu_type;
+> +	ret = oprofile_perf_init();
+
+Instead of exporting all the functions above implement something like:
+
+	name = op_name_from_perf_name(sh_pmu_name());
+	num_events = sh_pmu_num_events();
+	ret = oprofile_perf_init(ops, name, num_events);
+
+We will then have only oprofile_perf_init() and oprofile_perf_exit()
+as interface which is much cleaner.
+
+-Robert
+
+> +	if (ret != 0)
+> +		return ret;
+>  
+>  	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
+> -	       lmodel->cpu_type);
+> +	       ops->cpu_type);
+>  
+>  	return 0;
+>  }
+>  
+>  void oprofile_arch_exit(void)
+>  {
+> -	if (model && model->exit)
+> -		model->exit();
+> +	oprofile_perf_exit();
+>  }
+
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
