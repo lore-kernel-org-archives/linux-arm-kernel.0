@@ -1,259 +1,59 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Fri, 27 Aug 2010 09:19:35 -0700
-Subject: [PATCH 5/5 v3] msm: gpio: Remove tlmm routines obsoleted by gpiomux.
-In-Reply-To: <1282925975-26367-1-git-send-email-gbean@codeaurora.org>
-References: <1282925975-26367-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1282925975-26367-5-git-send-email-gbean@codeaurora.org>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Fri, 27 Aug 2010 12:24:29 -0400
+Subject: [PATCH v4] davinci: Add MityDSP-L138/MityARM-1808 SOM support
+In-Reply-To: <8762ywrvpt.fsf@deeprootsystems.com>
+References: <4C516634.5040804@criticallink.com>	<877hjd106u.fsf@deeprootsystems.com>	<4C7702EB.8040905@criticallink.com>
+	<8762ywrvpt.fsf@deeprootsystems.com>
+Message-ID: <4C77E6BD.4000303@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all supported gpio_tlmm_config-using boards
-are using gpiomux, remove the deprecated code.
+On 08/27/2010 10:11 AM, Kevin Hilman wrote:
+> Michael Williamson<michael.williamson@criticallink.com>  writes:
+>
+>    
+>>> Normally, I like to see new board support broken down more.  It's rather
+>>> difficult to do a good review of new board file when everything is added
+>>> in a single patch.
+>>>
+>>> Typically, a basic patch that just supports basic boot (typically to
+>>> UART console) is the first patch.  Then additional patches are added to
+>>> add peripheral support (display, MMC, SPI, flash, regulators, ...)
+>>>
+>>> Breaking things up this way helps reviewers and maintainers greatly.
+>>>
+>>> [...]
+>>>
+>>>        
+>> OK.  Most of the board file is a large cut-and-paste of the da850
+>> EVM.  It seems unlikely that I'll have any measure of success here, but if
+>> I get time I might try again.
+>>      
+> OK, if it's mostly a cut-and-paste of da850, then maybe just break it up
+> into two patches, 1) the cut, paste&  rename patch and 2) a separate
+> patch for things that are different on your board.
+>
+> Thanks,
+>
+> Kevin
+>    
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- arch/arm/mach-msm/Makefile            |    1 -
- arch/arm/mach-msm/gpio.c              |   85 -----------------------
- arch/arm/mach-msm/include/mach/gpio.h |  123 ---------------------------------
- 3 files changed, 0 insertions(+), 209 deletions(-)
- delete mode 100644 arch/arm/mach-msm/gpio.c
+I think I am going to try again.  I intend to basically start over, leaving
+the console UART, NAND, and EMAC (hardcoded to MII interface for now).
+This is the minimum set of devices I need to get one of our base boards to
+boot and mount a root filesystem and run some tests here.
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 1850942..faeb1f9 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -3,7 +3,6 @@ obj-y += io.o idle.o timer.o dma.o
- obj-y += vreg.o
- obj-y += acpuclock-arm11.o
- obj-y += clock.o clock-pcom.o
--obj-y += gpio.o
- 
- ifdef CONFIG_MSM_VIC
- obj-y += irq-vic.o
-diff --git a/arch/arm/mach-msm/gpio.c b/arch/arm/mach-msm/gpio.c
-deleted file mode 100644
-index bc32c84..0000000
---- a/arch/arm/mach-msm/gpio.c
-+++ /dev/null
-@@ -1,85 +0,0 @@
--/* linux/arch/arm/mach-msm/gpio.c
-- *
-- * Copyright (C) 2007 Google, Inc.
-- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#include <linux/module.h>
--#include <mach/gpio.h>
--#include "proc_comm.h"
--
--int gpio_tlmm_config(unsigned config, unsigned disable)
--{
--	return msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, &disable);
--}
--EXPORT_SYMBOL(gpio_tlmm_config);
--
--int msm_gpios_enable(const struct msm_gpio *table, int size)
--{
--	int rc;
--	int i;
--	const struct msm_gpio *g;
--	for (i = 0; i < size; i++) {
--		g = table + i;
--		rc = gpio_tlmm_config(g->gpio_cfg, GPIO_ENABLE);
--		if (rc) {
--			pr_err("gpio_tlmm_config(0x%08x, GPIO_ENABLE)"
--			       " <%s> failed: %d\n",
--			       g->gpio_cfg, g->label ?: "?", rc);
--			pr_err("pin %d func %d dir %d pull %d drvstr %d\n",
--			       GPIO_PIN(g->gpio_cfg), GPIO_FUNC(g->gpio_cfg),
--			       GPIO_DIR(g->gpio_cfg), GPIO_PULL(g->gpio_cfg),
--			       GPIO_DRVSTR(g->gpio_cfg));
--			goto err;
--		}
--	}
--	return 0;
--err:
--	msm_gpios_disable(table, i);
--	return rc;
--}
--EXPORT_SYMBOL(msm_gpios_enable);
--
--void msm_gpios_disable(const struct msm_gpio *table, int size)
--{
--	int rc;
--	int i;
--	const struct msm_gpio *g;
--	for (i = size-1; i >= 0; i--) {
--		g = table + i;
--		rc = gpio_tlmm_config(g->gpio_cfg, GPIO_DISABLE);
--		if (rc) {
--			pr_err("gpio_tlmm_config(0x%08x, GPIO_DISABLE)"
--			       " <%s> failed: %d\n",
--			       g->gpio_cfg, g->label ?: "?", rc);
--			pr_err("pin %d func %d dir %d pull %d drvstr %d\n",
--			       GPIO_PIN(g->gpio_cfg), GPIO_FUNC(g->gpio_cfg),
--			       GPIO_DIR(g->gpio_cfg), GPIO_PULL(g->gpio_cfg),
--			       GPIO_DRVSTR(g->gpio_cfg));
--		}
--	}
--}
--EXPORT_SYMBOL(msm_gpios_disable);
--
--int msm_gpios_request_enable(const struct msm_gpio *table, int size)
--{
--	int rc = msm_gpios_enable(table, size);
--	return rc;
--}
--EXPORT_SYMBOL(msm_gpios_request_enable);
--
--void msm_gpios_disable_free(const struct msm_gpio *table, int size)
--{
--	msm_gpios_disable(table, size);
--}
--EXPORT_SYMBOL(msm_gpios_disable_free);
-diff --git a/arch/arm/mach-msm/include/mach/gpio.h b/arch/arm/mach-msm/include/mach/gpio.h
-index 83e47c0..36ad50d 100644
---- a/arch/arm/mach-msm/include/mach/gpio.h
-+++ b/arch/arm/mach-msm/include/mach/gpio.h
-@@ -23,127 +23,4 @@
- #define gpio_cansleep   __gpio_cansleep
- #define gpio_to_irq     __gpio_to_irq
- 
--/**
-- * struct msm_gpio - GPIO pin description
-- * @gpio_cfg - configuration bitmap, as per gpio_tlmm_config()
-- * @label - textual label
-- *
-- * Usually, GPIO's are operated by sets.
-- * This struct accumulate all GPIO information in single source
-- * and facilitete group operations provided by msm_gpios_xxx()
-- */
--struct msm_gpio {
--	u32 gpio_cfg;
--	const char *label;
--};
--
--/**
-- * msm_gpios_request_enable() - request and enable set of GPIOs
-- *
-- * Request and configure set of GPIO's
-- * In case of error, all operations rolled back.
-- * Return error code.
-- *
-- * @table: GPIO table
-- * @size:  number of entries in @table
-- */
--int msm_gpios_request_enable(const struct msm_gpio *table, int size);
--
--/**
-- * msm_gpios_disable_free() - disable and free set of GPIOs
-- *
-- * @table: GPIO table
-- * @size:  number of entries in @table
-- */
--void msm_gpios_disable_free(const struct msm_gpio *table, int size);
--
--/**
-- * msm_gpios_request() - request set of GPIOs
-- * In case of error, all operations rolled back.
-- * Return error code.
-- *
-- * @table: GPIO table
-- * @size:  number of entries in @table
-- */
--int msm_gpios_request(const struct msm_gpio *table, int size);
--
--/**
-- * msm_gpios_free() - free set of GPIOs
-- *
-- * @table: GPIO table
-- * @size:  number of entries in @table
-- */
--void msm_gpios_free(const struct msm_gpio *table, int size);
--
--/**
-- * msm_gpios_enable() - enable set of GPIOs
-- * In case of error, all operations rolled back.
-- * Return error code.
-- *
-- * @table: GPIO table
-- * @size:  number of entries in @table
-- */
--int msm_gpios_enable(const struct msm_gpio *table, int size);
--
--/**
-- * msm_gpios_disable() - disable set of GPIOs
-- *
-- * @table: GPIO table
-- * @size:  number of entries in @table
-- */
--void msm_gpios_disable(const struct msm_gpio *table, int size);
--
--/* GPIO TLMM (Top Level Multiplexing) Definitions */
--
--/* GPIO TLMM: Function -- GPIO specific */
--
--/* GPIO TLMM: Direction */
--enum {
--	GPIO_INPUT,
--	GPIO_OUTPUT,
--};
--
--/* GPIO TLMM: Pullup/Pulldown */
--enum {
--	GPIO_NO_PULL,
--	GPIO_PULL_DOWN,
--	GPIO_KEEPER,
--	GPIO_PULL_UP,
--};
--
--/* GPIO TLMM: Drive Strength */
--enum {
--	GPIO_2MA,
--	GPIO_4MA,
--	GPIO_6MA,
--	GPIO_8MA,
--	GPIO_10MA,
--	GPIO_12MA,
--	GPIO_14MA,
--	GPIO_16MA,
--};
--
--enum {
--	GPIO_ENABLE,
--	GPIO_DISABLE,
--};
--
--#define GPIO_CFG(gpio, func, dir, pull, drvstr) \
--	((((gpio) & 0x3FF) << 4)        |	  \
--	 ((func) & 0xf)                  |	  \
--	 (((dir) & 0x1) << 14)           |	  \
--	 (((pull) & 0x3) << 15)          |	  \
--	 (((drvstr) & 0xF) << 17))
--
--/**
-- * extract GPIO pin from bit-field used for gpio_tlmm_config
-- */
--#define GPIO_PIN(gpio_cfg)    (((gpio_cfg) >>  4) & 0x3ff)
--#define GPIO_FUNC(gpio_cfg)   (((gpio_cfg) >>  0) & 0xf)
--#define GPIO_DIR(gpio_cfg)    (((gpio_cfg) >> 14) & 0x1)
--#define GPIO_PULL(gpio_cfg)   (((gpio_cfg) >> 15) & 0x3)
--#define GPIO_DRVSTR(gpio_cfg) (((gpio_cfg) >> 17) & 0xf)
--
--int gpio_tlmm_config(unsigned config, unsigned disable);
--
- #endif /* __ASM_ARCH_MSM_GPIO_H */
--- 
-1.7.0.4
+I will remove all the ATAG garbage and anything that is runtime configurable
+as well as the LCD, McASP, SPI, SPI-NOR, and I2C based peripherals.  If the
+patch is OK, then I'll add them back one by one for review.
 
-/usr2/gbean/.signature.codeaurora.org
+Would this be a reasonable approach?  And should I post it as a v5 to this
+series or create a different series (given the large change of code)?
+
+Should I pull the general ARM mailing list off the distribution as this 
+should
+now be specific only to mach-davinci?
+
+Thanks again for any insight.
+
+-Mike
