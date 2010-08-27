@@ -1,64 +1,196 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 27 Aug 2010 09:33:46 -0700
-Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
-In-Reply-To: <1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
-References: <1282922978.5075.13.camel@m0nster>
-	<1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1282926826.5075.21.camel@m0nster>
+From: robert.richter@amd.com (Robert Richter)
+Date: Fri, 27 Aug 2010 18:38:39 +0200
+Subject: [PATCH 1/4] oprofile: Handle initialisation failure more
+	gracefully
+In-Reply-To: <1282922125.22128.5.camel@e102144-lin.cambridge.arm.com>
+References: <cover.1282848651.git.matt@console-pimps.org>
+	<442a16796990290ca3ebaaa3d0ab317e7b0a30a5.1282848651.git.matt@console-pimps.org>
+	<20100827124344.GJ22783@erda.amd.com>
+	<1282922125.22128.5.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <20100827163839.GR22783@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-08-27 at 17:04 +0100, Catalin Marinas wrote:
-> On Fri, 2010-08-27 at 16:29 +0100, Daniel Walker wrote:
-> > On Fri, 2010-08-27 at 14:54 +0100, Catalin Marinas wrote:
-> > > On Wed, 2010-08-25 at 05:57 +0100, Jeff Ohlstein wrote:
-> > > > From: Daniel Walker <dwalker@codeaurora.org>
-> > > >
-> > > > ScorpionMP does not have the SMP/nAMP and TLB ops broadcasting bits in
-> > > > ACTLR.
-> > > >
-> > > > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> > > > Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
-> > > > ---
-> > > >  arch/arm/mm/proc-v7.S |   24 ++++++++++++++++++++++++
-> > > >  1 files changed, 24 insertions(+), 0 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > > > index 7aaf88a..98fd7e5 100644
-> > > > --- a/arch/arm/mm/proc-v7.S
-> > > > +++ b/arch/arm/mm/proc-v7.S
-> > > > @@ -196,6 +196,7 @@ __v7_setup:
-> > > >         orreq   r0, r0, #(1 << 6) | (1 << 0)    @ Enable SMP/nAMP mode and
-> > > >         mcreq   p15, 0, r0, c1, c0, 1           @ TLB ops broadcasting
-> > > >  #endif
-> > > > +__v7_msm_setup:
-> > > >         adr     r12, __v7_setup_stack           @ the local stack
-> > > >         stmia   r12, {r0-r5, r7, r9, r11, lr}
-> > > >         bl      v7_flush_dcache_all
-> > >
-> > > It may be better to move the generic __v7_setup here and have a specific
-> > > entry for ARM Ltd cores (mask 0xff0f0000 and value 0x410f0000).
+On 27.08.10 11:15:25, Will Deacon wrote:
+
+> > > The current implementation is not entirely safe in the case that
+> > > oprofile_arch_init() fails. We need to make sure that we always call
+> > > exit_driverfs() if we've called init_driverfs(). Also, avoid a potential
+> > > double free when freeing 'counter_config', e.g. don't free
+> > > 'counter_config' in both oprofile_arch_init() and oprofile_arch_exit().
+
+I am not sure if it is worth the memory handling code, we could
+alternativly implement fixed size arrays with MAX_COUNTERS. This would
+eas it a lot. But, this code will become generic, so we can stick with
+this implementation.
+
+But, cpu varables should be used, maybe with a later patch.
+
+> > The root cause that makes this check necessary is that
+> > oprofile_arch_exit() is called though oprofile_arch_init() failed. We
+> > should better fix this instead. I have to admit we will then have to
+> > check all architectural implementations.
 > > 
-> > I'm not sure I follow you.. Are you saying there are other cpu's that
-> > don't need the SMP stuff at the top of __v7_setup ?
 > 
-> The SMP/nAMP bit is something specific to the ARM11MPCore and Cortex-A9
-> processors produced by ARM. If you core doesn't need this, it should use
-> a default __v7_setup without any additional bits being set.
+> I took a look through all of the oprofile_arch_{init,exit} functions
+> and it looks like only ARM needs fixing. Nobody else does any allocation
+> here [well, until Matt's unified version comes into play].
+
+Great, many thanks.
+
+> How about something like this? This removes the exit call
+> from the init code and sets pointers to NULL after they have been
+> freed. We still have to do some checking so that we don't try to
+> release a NULL perf event:
 > 
-> I'm not aware of other MP ARM processors produced by other companies
-> that would require exactly the same bit being set.
+> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> index 0691176..12253eb 100644
+> --- a/arch/arm/oprofile/common.c
+> +++ b/arch/arm/oprofile/common.c
+> @@ -275,10 +275,12 @@ out:
+>  	return ret;
+>  }
+>  
+> -static void  exit_driverfs(void)
+> +static void __exit exit_driverfs(void)
+>  {
+> -	platform_device_unregister(oprofile_pdev);
+> -	platform_driver_unregister(&oprofile_driver);
+> +	if (!IS_ERR_OR_NULL(oprofile_pdev)) {
 
-So your saying it makes more sense to change the msm entry into the
-default entry, and make the current default into the
-ARM11MPCore/Cortex-A9 entry?
+This check is obsolete here as we do not call oprofile_arch_exit() on
+failure.
 
-There's 4 or 5 other cpu's that have SMP but none have had to jump over
-those bits AFAIK ..
+> +		platform_device_unregister(oprofile_pdev);
+> +		platform_driver_unregister(&oprofile_driver);
+> +	}
+>  }
+>  #else
+>  static int __init init_driverfs(void) { return 0; }
+> @@ -365,6 +367,7 @@ int __init oprofile_arch_init(struct
+> oprofile_operations *ops)
+>  	ret = init_driverfs();
+>  	if (ret) {
+>  		kfree(counter_config);
+> +		counter_config = NULL;
 
-Daniel
+Dito, obsolete now.
+
+>  		return ret;
+>  	}
+>  
+> @@ -374,8 +377,10 @@ int __init oprofile_arch_init(struct
+> oprofile_operations *ops)
+>  		if (!perf_events[cpu]) {
+>  			pr_info("oprofile: failed to allocate %d perf events "
+>  					"for cpu %d\n", perf_num_counters, cpu);
+> -			while (--cpu >= 0)
+> +			while (--cpu >= 0) {
+>  				kfree(perf_events[cpu]);
+> +				perf_events[cpu] = NULL;
+> +			}
+
+counter_config must be freed here.
+
+>  			return -ENOMEM;
+>  		}
+>  	}
+> @@ -396,25 +401,27 @@ int __init oprofile_arch_init(struct
+> oprofile_operations *ops)
+>  	return ret;
+>  }
+>  
+> -void oprofile_arch_exit(void)
+> +void __exit oprofile_arch_exit(void)
+>  {
+>  	int cpu, id;
+>  	struct perf_event *event;
+>  
+> -	if (*perf_events) {
+> -		exit_driverfs();
+> -		for_each_possible_cpu(cpu) {
+> -			for (id = 0; id < perf_num_counters; ++id) {
+> -				event = perf_events[cpu][id];
+> -				if (event != NULL)
+> -					perf_event_release_kernel(event);
+> -			}
+> -			kfree(perf_events[cpu]);
+> +	exit_driverfs();
+
+If we shutdown all this in reverse order, this should be after the
+loop.
+
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		if (!perf_events[cpu])
+> +			continue;
+
+Should be never NULL, the check can be removed.
+
+> +
+> +		for (id = 0; id < perf_num_counters; ++id) {
+> +			event = perf_events[cpu][id];
+> +			if (event != NULL)
+
+	if (event)
+		...
+
+> +				perf_event_release_kernel(event);
+>  		}
+> +
+> +		kfree(perf_events[cpu]);
+>  	}
+>  
+> -	if (counter_config)
+> -		kfree(counter_config);
+> +	kfree(counter_config);
+>  }
+>  #else
+>  int __init oprofile_arch_init(struct oprofile_operations *ops)
+> @@ -422,5 +429,5 @@ int __init oprofile_arch_init(struct
+> oprofile_operations *ops)
+>  	pr_info("oprofile: hardware counters not available\n");
+>  	return -ENODEV;
+>  }
+> -void oprofile_arch_exit(void) {}
+> +void __exit oprofile_arch_exit(void) {}
+>  #endif /* CONFIG_HW_PERF_EVENTS */
+> diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
+> index b336cd9..3094af0 100644
+> --- a/drivers/oprofile/oprof.c
+> +++ b/drivers/oprofile/oprof.c
+> @@ -257,15 +257,11 @@ static int __init oprofile_init(void)
+>  		printk(KERN_INFO "oprofile: using timer interrupt.\n");
+>  		err = oprofile_timer_init(&oprofile_ops);
+>  		if (err)
+> -			goto out_arch;
+> +			goto out;
+
+A 'return err;' here would remove the goto. I would preffer this.
+
+Thanks,
+
+-Robert
+
+>  	}
+>  	err = oprofilefs_register();
+> -	if (err)
+> -		goto out_arch;
+> -	return 0;
+>  
+> -out_arch:
+> -	oprofile_arch_exit();
+> +out:
+>  	return err;
+>  }
+>  
+> 
+> Thanks,
+> 
+> Will
+> 
+> 
 
 -- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Advanced Micro Devices, Inc.
+Operating System Research Center
