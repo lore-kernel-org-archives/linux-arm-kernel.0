@@ -1,48 +1,42 @@
-From: Patrick.Loschmidt@gmx.net (Patrick Loschmidt)
-Date: Fri, 27 Aug 2010 17:21:40 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <20100827160624.433b3374@lxorguk.ukuu.org.uk>
-References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>	<20100817085324.GB3330@riccoc20.at.omicron.at>	<1282090963.1734.97.camel@localhost>	<20100818071942.GA4096@riccoc20.at.omicron.at>	<1282176776.2865.100.camel@localhost.localdomain>	<20100819055518.GA4084@riccoc20.at.omicron.at>	<1282594125.3111.344.camel@localhost.localdomain>	<20100827123849.GC11657@riccoc20.at.omicron.at>	<20100827143844.646eccf6@lxorguk.ukuu.org.uk>	<20100827143437.GB3293@riccoc20.at.omicron.at>
-	<20100827160624.433b3374@lxorguk.ukuu.org.uk>
-Message-ID: <4C77D804.9060500@gmx.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Aug 2010 16:22:33 +0100
+Subject: [PATCH] ARM: perf: fix event validation
+Message-ID: <1282922553-22500-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The validate_event function in the ARM perf events backend has the
+following problems:
 
-I'd like to add my two cents about the discussion. Just to shortly
-introduce myself: I'm working with PTP since version 2002 (now 2008 or
-PTPv2) and I'm developing matching network cards, drivers, and also
-sometimes a bit of the stack.
+1.) Events that are disabled count towards the cost.
+2.) Events associated with other PMUs [for example, software events or
+    breakpoints] do not count towards the cost, but do fail validation,
+    causing the group to fail.
 
-I always had the problem of different HW implementations (even my own)
-and how to access the clocks there. So reading this thread, I strongly
-support the idea to provide a driver class, which allows the userspace
-to run certain standard operations (settime, gettime, adjtime, ...) as
-proposed and leave the detailed implementation to a specific PTP clock
-driver. I always made my own char device, but I don't want to open this
-discussion again as for me it doesn't matter.
+This patch changes validate_event so that it ignores events in the
+PERF_EVENT_STATE_OFF state or that are scheduled for other PMUs.
 
-Concerning the long discussion about PTP clock, system time, etc. I'd
-like to say, that from a point of view of PTP every node/host has only
-one clock. That means, that if you have a NIC with integrated clock
-(required for HW timestamping) it is counted as a node. As soon as you
-want to use multiple NICs this is actually outside the PTP protocol
-definition, unless you have only one clock available to both network
-interfaces (which is hard to achieve).
+Cc: Jamie Iles <jamie.iles@picochip.com>
+Reported-by: Pawe?? Moll <pawel.moll@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-So the solution to treat a PTP enabled NIC as a time source for the
-system time is in general sufficient, unless for applications that
-require precise timestamps in applications. I know of use cases where
-code gets instrumented to measure time delays, processing time, and
-sequence in SW, e.g. distributed databases for trading systems at the
-stock exchange.
-
-Summarizing I think it would be a huge step forward, if all the
-different HW implementations could be controlled via a standardised
-interface through the kernel. I need timestamps from my network card
-with ps resolution and to steer the onboard clock from user space. Then
-I would be happy already. :-)
-
-Thanks,
-Patrick
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index e213925..ecbb028 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -319,8 +319,8 @@ validate_event(struct cpu_hw_events *cpuc,
+ {
+ 	struct hw_perf_event fake_event = event->hw;
+ 
+-	if (event->pmu && event->pmu != &pmu)
+-		return 0;
++	if (event->pmu != &pmu || event->state <= PERF_EVENT_STATE_OFF)
++		return 1;
+ 
+ 	return armpmu->get_event_idx(cpuc, &fake_event) >= 0;
+ }
+-- 
+1.6.3.3
