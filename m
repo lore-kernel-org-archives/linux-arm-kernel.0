@@ -1,30 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 27 Aug 2010 08:13:55 +0200
+From: mitov@issp.bas.bg (Marin Mitov)
+Date: Fri, 27 Aug 2010 09:23:21 +0300
 Subject: [RFC][PATCH] add
 	dma_reserve_coherent_memory()/dma_free_reserved_memory() API
 In-Reply-To: <20100827145712Z.fujita.tomonori@lab.ntt.co.jp>
 References: <20100827044142.GB31863@pengutronix.de>
-	<20100827140005Y.fujita.tomonori@lab.ntt.co.jp>
 	<20100827051907.GA17521@pengutronix.de>
 	<20100827145712Z.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100827061355.GA938@pengutronix.de>
+Message-ID: <201008270923.30297.mitov@issp.bas.bg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Aug 27, 2010 at 02:57:59PM +0900, FUJITA Tomonori wrote:
+On Friday, August 27, 2010 08:57:59 am FUJITA Tomonori wrote:
 > On Fri, 27 Aug 2010 07:19:07 +0200
-> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> Uwe Kleine-König <u.kleine-koenig@pengutronix.de> wrote:
 > 
 > > Hey,
 > > 
 > > On Fri, Aug 27, 2010 at 02:00:17PM +0900, FUJITA Tomonori wrote:
 > > > On Fri, 27 Aug 2010 06:41:42 +0200
-> > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> > > Uwe Kleine-König <u.kleine-koenig@pengutronix.de> wrote:
 > > > > On Thu, Aug 26, 2010 at 07:00:24PM +0900, FUJITA Tomonori wrote:
 > > > > > On Thu, 26 Aug 2010 11:53:11 +0200
-> > > > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> > > > > Uwe Kleine-König <u.kleine-koenig@pengutronix.de> wrote:
 > > > > > 
 > > > > > > > > We have currently a number of boards broken in the mainline. They must be 
 > > > > > > > > fixed for 2.6.36. I don't think the mentioned API will do this for us. So, 
@@ -79,16 +76,18 @@ On Fri, Aug 27, 2010 at 02:57:59PM +0900, FUJITA Tomonori wrote:
 > suppose.
 > 
 > Btw, the patch isn't a fix for the DMA API. It tries to extend the DMA
-> API (and IMO in the wrong way). In addition, the patch might break the
-> current code. I really don't think that applying such patch after rc1
+> API (and IMO in the wrong way). 
+> In addition, the patch might break the
+> current code. 
+
+To "break the current code" is simply not possible. Sorry to oppose. As you have written it 
+"extend the DMA API", so if you do not use the new API (and no current code is using it)
+you cannot "break the current code". 
+
+Thanks,
+
+Marin Mitov
+
+> I really don't think that applying such patch after rc1
 > is senseble.
-So you suggest to revert 309caa9cc6ff39d261264ec4ff10e29489afc8f8 or at
-least restrict it to ARMv6+ and fix the problem during the next merge
-window?  Russell?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
