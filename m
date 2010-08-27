@@ -1,59 +1,64 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Fri, 27 Aug 2010 12:24:29 -0400
-Subject: [PATCH v4] davinci: Add MityDSP-L138/MityARM-1808 SOM support
-In-Reply-To: <8762ywrvpt.fsf@deeprootsystems.com>
-References: <4C516634.5040804@criticallink.com>	<877hjd106u.fsf@deeprootsystems.com>	<4C7702EB.8040905@criticallink.com>
-	<8762ywrvpt.fsf@deeprootsystems.com>
-Message-ID: <4C77E6BD.4000303@criticallink.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 27 Aug 2010 09:33:46 -0700
+Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
+In-Reply-To: <1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
+References: <1282922978.5075.13.camel@m0nster>
+	<1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <1282926826.5075.21.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2010 10:11 AM, Kevin Hilman wrote:
-> Michael Williamson<michael.williamson@criticallink.com>  writes:
->
->    
->>> Normally, I like to see new board support broken down more.  It's rather
->>> difficult to do a good review of new board file when everything is added
->>> in a single patch.
->>>
->>> Typically, a basic patch that just supports basic boot (typically to
->>> UART console) is the first patch.  Then additional patches are added to
->>> add peripheral support (display, MMC, SPI, flash, regulators, ...)
->>>
->>> Breaking things up this way helps reviewers and maintainers greatly.
->>>
->>> [...]
->>>
->>>        
->> OK.  Most of the board file is a large cut-and-paste of the da850
->> EVM.  It seems unlikely that I'll have any measure of success here, but if
->> I get time I might try again.
->>      
-> OK, if it's mostly a cut-and-paste of da850, then maybe just break it up
-> into two patches, 1) the cut, paste&  rename patch and 2) a separate
-> patch for things that are different on your board.
->
-> Thanks,
->
-> Kevin
->    
+On Fri, 2010-08-27 at 17:04 +0100, Catalin Marinas wrote:
+> On Fri, 2010-08-27 at 16:29 +0100, Daniel Walker wrote:
+> > On Fri, 2010-08-27 at 14:54 +0100, Catalin Marinas wrote:
+> > > On Wed, 2010-08-25 at 05:57 +0100, Jeff Ohlstein wrote:
+> > > > From: Daniel Walker <dwalker@codeaurora.org>
+> > > >
+> > > > ScorpionMP does not have the SMP/nAMP and TLB ops broadcasting bits in
+> > > > ACTLR.
+> > > >
+> > > > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> > > > Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+> > > > ---
+> > > >  arch/arm/mm/proc-v7.S |   24 ++++++++++++++++++++++++
+> > > >  1 files changed, 24 insertions(+), 0 deletions(-)
+> > > >
+> > > > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > > > index 7aaf88a..98fd7e5 100644
+> > > > --- a/arch/arm/mm/proc-v7.S
+> > > > +++ b/arch/arm/mm/proc-v7.S
+> > > > @@ -196,6 +196,7 @@ __v7_setup:
+> > > >         orreq   r0, r0, #(1 << 6) | (1 << 0)    @ Enable SMP/nAMP mode and
+> > > >         mcreq   p15, 0, r0, c1, c0, 1           @ TLB ops broadcasting
+> > > >  #endif
+> > > > +__v7_msm_setup:
+> > > >         adr     r12, __v7_setup_stack           @ the local stack
+> > > >         stmia   r12, {r0-r5, r7, r9, r11, lr}
+> > > >         bl      v7_flush_dcache_all
+> > >
+> > > It may be better to move the generic __v7_setup here and have a specific
+> > > entry for ARM Ltd cores (mask 0xff0f0000 and value 0x410f0000).
+> > 
+> > I'm not sure I follow you.. Are you saying there are other cpu's that
+> > don't need the SMP stuff at the top of __v7_setup ?
+> 
+> The SMP/nAMP bit is something specific to the ARM11MPCore and Cortex-A9
+> processors produced by ARM. If you core doesn't need this, it should use
+> a default __v7_setup without any additional bits being set.
+> 
+> I'm not aware of other MP ARM processors produced by other companies
+> that would require exactly the same bit being set.
 
-I think I am going to try again.  I intend to basically start over, leaving
-the console UART, NAND, and EMAC (hardcoded to MII interface for now).
-This is the minimum set of devices I need to get one of our base boards to
-boot and mount a root filesystem and run some tests here.
+So your saying it makes more sense to change the msm entry into the
+default entry, and make the current default into the
+ARM11MPCore/Cortex-A9 entry?
 
-I will remove all the ATAG garbage and anything that is runtime configurable
-as well as the LCD, McASP, SPI, SPI-NOR, and I2C based peripherals.  If the
-patch is OK, then I'll add them back one by one for review.
+There's 4 or 5 other cpu's that have SMP but none have had to jump over
+those bits AFAIK ..
 
-Would this be a reasonable approach?  And should I post it as a v5 to this
-series or create a different series (given the large change of code)?
+Daniel
 
-Should I pull the general ARM mailing list off the distribution as this 
-should
-now be specific only to mach-davinci?
-
-Thanks again for any insight.
-
--Mike
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
