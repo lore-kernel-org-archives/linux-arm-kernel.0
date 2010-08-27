@@ -1,21 +1,71 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Fri, 27 Aug 2010 20:34:57 +0100
-Subject: [PATCH 1/7] mmc: at91_mci: fix pointer errors
-In-Reply-To: <20100827193303.GB23079@void.printf.net>
-References: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
-	<20100827193303.GB23079@void.printf.net>
-Message-ID: <20100827193457.GC23079@void.printf.net>
+Date: Fri, 27 Aug 2010 20:37:27 +0100
+Subject: [PATCH 01/03] omap hsmmc: prevent race between dma and hsmmc
+	callback
+In-Reply-To: <618f0c911003100611q42e7f23cuc3c8d3f116ca7eb3@mail.gmail.com>
+References: <618f0c911003100611q42e7f23cuc3c8d3f116ca7eb3@mail.gmail.com>
+Message-ID: <20100827193727.GF23079@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 27, 2010 at 08:33:03PM +0100, Chris Ball wrote:
-> Looks like only the first half of this patch was applied?  The
-> kunmap_atomic() line is still present as before in Linus' tree. 
+Hi,
 
-Might be related to Dan Carpenter's suggestion that the spacing for that
-line should change to:
+Looks like the discussion on this patch stopped: do we think there's a
+race worth fixing here?
 
-	kunmap_atomic(((void *)sgbuffer) - sg->offset, KM_BIO_SRC_IRQ);
+On Wed, Mar 10, 2010 at 07:41:38PM +0530, Venkatraman S wrote:
+> See previous post http://patchwork.kernel.org/patch/82907/
+> Rebased to 2.6.34-rc1 and fixed comment alignment.
+> 
+> CC: Adrian Hunter <adrian.hunter@nokia.com>
+> CC: Madhusudhan C <madhu.cr@ti.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Venkatraman S <svenkatr@ti.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++--------
+>  1 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 83f0aff..ea2a082 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1046,8 +1046,18 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
+> 
+>  	if (end_cmd || ((status & CC) && host->cmd))
+>  		omap_hsmmc_cmd_done(host, host->cmd);
+> -	if ((end_trans || (status & TC)) && host->mrq)
+> +	if ((end_trans || (status & TC)) && host->mrq) {
+>  		omap_hsmmc_xfer_done(host, data);
+> +		if (host->dma_ch != -1) {
+> +			omap_free_dma(host->dma_ch);
+> +			host->dma_ch = -1;
+> +			/*
+> +			 * Callback: run in interrupt context.
+> +			 * mutex_unlock will throw a kernel warning if used.
+> +			 */
+> +			up(&host->sem);
+> +		}
+> +	}
+> 
+>  	spin_unlock(&host->irq_lock);
+> 
+> @@ -1267,13 +1277,6 @@ static void omap_hsmmc_dma_cb(int lch, u16
+> ch_status, void *data)
+>  		return;
+>  	}
+> 
+> -	omap_free_dma(host->dma_ch);
+> -	host->dma_ch = -1;
+> -	/*
+> -	 * DMA Callback: run in interrupt context.
+> -	 * mutex_unlock will throw a kernel warning if used.
+> -	 */
+> -	up(&host->sem);
+>  }
+> 
+>  /*
+> -- 
+> 1.6.3.3
 
 -- 
 Chris Ball   <cjb@laptop.org>   <http://printf.net/>
