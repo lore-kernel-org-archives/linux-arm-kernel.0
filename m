@@ -1,69 +1,110 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 Aug 2010 18:48:48 +0900
-Subject: [GIT PULL] Samsung fixes for 2.6.36-rc3
-Message-ID: <006d01cb45cd$0e4e3610$2aeaa230$%kim@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Aug 2010 11:41:31 +0100
+Subject: [PATCH V2 3/4] oprofile: Abstract the perf-events backend
+In-Reply-To: <fe3e173aaa85f4cd73ea4b5abca50976fc40a01f.1282848651.git.matt@console-pimps.org>
+References: <cover.1282848651.git.matt@console-pimps.org>
+	<fe3e173aaa85f4cd73ea4b5abca50976fc40a01f.1282848651.git.matt@console-pimps.org>
+Message-ID: <1282905691.16770.20.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Matt,
 
-Please pull Samsung fixes from:
+I'm still not happy with the init/exit alloc/free code:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
+On Thu, 2010-08-26 at 20:09 +0100, Matt Fleming wrote:
 
-These things are for bug fix on 2.6.36-rc3.
-If any problems, please let me know.
+[...]
 
-Thanks.
+> +int oprofile_perf_init(void)
+> +{
+> +       u32 counter_size = sizeof(struct op_counter_config);
+> +       int cpu;
+> +
+> +       counter_config = kcalloc(perf_num_counters, counter_size, GFP_KERNEL);
+> +
+> +       if (!counter_config) {
+> +               pr_info("oprofile: failed to allocate %d "
+> +                               "counters\n", perf_num_counters);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       for_each_possible_cpu(cpu) {
+> +               perf_events[cpu] = kcalloc(perf_num_counters,
+> +                               sizeof(struct perf_event *), GFP_KERNEL);
+> +               if (!perf_events[cpu]) {
+> +                       pr_info("oprofile: failed to allocate %d perf events "
+> +                                       "for cpu %d\n", perf_num_counters, cpu);
+> +                       while (--cpu >= 0)
+> +                               kfree(perf_events[cpu]);
+> +                       kfree(counter_config);
+> +                       return -ENOMEM;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+So here, if the perf_events allocation fails for a cpu, we free the
+stuff we've already allocated [including counter_config] and return
+-ENOMEM. Looking at drivers/oprofile/oprof.c:
 
+static int __init oprofile_init(void)
+{
+	int err;
 
-The following changes since commit 76be97c1fc945db08aae1f1b746012662d643e97:
+	err = oprofile_arch_init(&oprofile_ops);
+	if (err < 0 || timer) {
+		printk(KERN_INFO "oprofile: using timer interrupt.\n");
+		err = oprofile_timer_init(&oprofile_ops);
+		if (err)
+			goto out_arch;
+	}
+	err = oprofilefs_register();
+	if (err)
+		goto out_arch;
+	return 0;
 
-  Linux 2.6.36-rc2 (2010-08-22 17:43:29 -0700)
+out_arch:
+	oprofile_arch_exit();
+	return err;
+}
 
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
+So now, if timer_init fails or oprofilefs_register fails, we will
+call oprofile_arch_exit, which calls oprofile_perf_exit:
 
-Changhwan Youn (1):
-      ARM: S5PV310: Fix on Secondary CPU startup
+> +void oprofile_perf_exit(void)
+> +{
+> +       int id, cpu;
+> +
+> +       for_each_possible_cpu(cpu) {
+> +               for (id = 0; id < perf_num_counters; ++id)
+> +                       oprofile_destroy_counter(cpu, id);
+> +
+> +               kfree(perf_events[cpu]);
+> +       }
+> +
+> +       kfree(counter_config);
+> +}
 
-Jongpill Lee (4):
-      ARM: S5PV310: Fix on PLL setting for S5PV310
-      ARM: S5PV310: Should be clk_sclk_apll not clk_mout_apll
-      ARM: S5PV310: Fix missed uart clocks
-      ARM: S5PV310: Bug fix on uclk1 and sclk_pwm
+meaning that we will free everything again! This is what I
+was trying to avoid in patch 1/4, by moving the counter_config
+freeing into the *_exit function. Looking at it again, I think
+all the freeing should be moved to the *_exit function and the init
+function should just return error when allocation fails. What do you
+think?
 
-Kukjin Kim (4):
-      ARM: SAMSUNG: Fix on build warning regarding VMALLOC_END type
-      ARM: S5PV310: Fix on default ZRELADDR of ARCH_S5PV310
-      ARM: S5PV310: Fix on typo irqs.h of S5PV310
-      ARM: S5PV310: Add CMU block for S5PV310 Clock
+> +/*
+> + * Create active perf events based on the perviously configured
+> + * attributes.
+> + */
 
-Kyungmin Park (2):
-      ARM: S5P: VMALLOC_END should be unsigned long
-      ARM: S5PV310: Fix on GPIO base addresses
+typo :)
 
- arch/arm/Kconfig                                |    3 +-
- arch/arm/mach-s3c2410/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-s3c64xx/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-s5p6440/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-s5p6442/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-s5pv210/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-s5pv310/clock.c                   |   82
-+++++++++++++++++-----
- arch/arm/mach-s5pv310/cpu.c                     |   10 +++
- arch/arm/mach-s5pv310/include/mach/irqs.h       |   11 ++-
- arch/arm/mach-s5pv310/include/mach/map.h        |   16 ++++-
- arch/arm/mach-s5pv310/include/mach/regs-clock.h |   59 ++++++++--------
- arch/arm/mach-s5pv310/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-s5pv310/platsmp.c                 |    2 +-
- arch/arm/plat-s5p/include/plat/map-s5p.h        |    2 +
- 14 files changed, 135 insertions(+), 62 deletions(-)
+For what it's worth, I tested the series on my Cortex-A9 board and
+everything seemed to work fine. I'll give the patches another spin when
+we've sorted out these memory issues.
+
+Cheers,
+
+Will
