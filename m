@@ -1,45 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 Aug 2010 14:13:28 -0600
-Subject: [PATCH v2] spi: add spi_tegra driver
-In-Reply-To: <AANLkTin4HxVLt=4VH-NQWhB-p_2EpX_yoTcwEOTJP3m_@mail.gmail.com>
-References: <1280450224-25118-1-git-send-email-ccross@google.com>
-	<1281574023-25160-1-git-send-email-konkers@android.com>
-	<AANLkTim4nL+Re=qc55CGS+ksq+ACtGe=vqOeGQ3HbQWM@mail.gmail.com>
-	<AANLkTincgapUK5ncs_t3ax=1Kt_56GdR_RVwRqdCm5ge@mail.gmail.com>
-	<AANLkTin4HxVLt=4VH-NQWhB-p_2EpX_yoTcwEOTJP3m_@mail.gmail.com>
-Message-ID: <AANLkTinGiRP=6wkHSQ94D__07T3vok79mRrQhG+Nv+5a@mail.gmail.com>
+From: konkers@android.com (Erik Gilling)
+Date: Fri, 27 Aug 2010 13:13:52 -0700
+Subject: [PATCH] [ARM] tegra: Add ZRELADDR default for ARCH_TEGRA
+In-Reply-To: <1282939982-11295-1-git-send-email-konkers@android.com>
+References: <1282939982-11295-1-git-send-email-konkers@android.com>
+Message-ID: <AANLkTikHFgT5YeTEEYT1--0wvn-7TzSV03EQAN7ZG3Qe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 27, 2010 at 1:26 PM, Erik Gilling <konkers@android.com> wrote:
-> On Wed, Aug 25, 2010 at 2:22 PM, Erik Gilling <konkers@android.com> wrote:
->>> As an aside, and commenting on the tegra DMA api... Is the IS_ERR()
->>> pattern in the tegra_dma_allocate_channel() return really a good idea
->>> here? ?Personally I find that pattern isn't very useful, especially
->>> when the results is either "yes, allocated" or "no, not-alocated", and
->>> it is very easy to write code that tests the wrong thing on the return
->>> value because the compiler cannot catch it. ?In other words, if it
->>> isn't vital to return a specific error code, the using the PTR_ERR()
->>> pattern adds unnecessary risk to the code because developers are used
->>> to seeing and writing this pattern:
->>>
->>> tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
->>> if (!tspi->rx_dma)
->>> ? ? ? ?return -ENOMEM;
->>>
->>> The compiler won't catch it if the return value is an PTR_ERR.
->>>
->>> (I know that some subsystems make heavy use of it, particularly
->>> filesystems and the block layer which do need to return specific error
->>> codes to userspace. ?My argument is that the specific error code is
->>> probably irrelevant when allocating DMA channels)
->>
->> I don't have a strong opinion either way but that's the way Colin's
->> code is written. ?I'll let him speak to that.
+Sorry for the Change-Id.. forgot to strip that
+
+-Erik
+
+On Fri, Aug 27, 2010 at 1:13 PM, Erik Gilling <konkers@android.com> wrote:
+> Change-Id: Ic28177a645e2d5bc53099c15dcd5b1ae7f3d5208
+> Signed-off-by: Erik Gilling <konkers@android.com>
+> ---
+> ?arch/arm/Kconfig | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
 >
-> I spoke with colin about this. ?He's fine getting rid of the PTR_ERR.
-> I'll post a DMA and SPI patch when that's done.
-
-Okay, thanks.
-
-g.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 771503d..8b0d769 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1602,6 +1602,7 @@ config ZRELADDR
+> ? ? ? ? ? ? ? ?ARCH_ORION5X ||\
+> ? ? ? ? ? ? ? ?ARCH_SPEAR3XX ||\
+> ? ? ? ? ? ? ? ?ARCH_SPEAR6XX ||\
+> + ? ? ? ? ? ? ? ARCH_TEGRA ||\
+> ? ? ? ? ? ? ? ?ARCH_U8500 ||\
+> ? ? ? ? ? ? ? ?ARCH_VERSATILE ||\
+> ? ? ? ? ? ? ? ?ARCH_W90X900
+> --
+> 1.6.5.6
+>
+>
