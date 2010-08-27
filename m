@@ -1,68 +1,75 @@
 From: matt@console-pimps.org (Matt Fleming)
-Date: Fri, 27 Aug 2010 20:17:45 +0100
-Subject: [PATCH 2/4] sh: Accessor functions for the sh_pmu state
-In-Reply-To: <20100827134301.GL22783@erda.amd.com>
-References: <cover.1282848651.git.matt@console-pimps.org>
-	<f259830dbccb084d27d127676b979d9cb502e36f.1282848651.git.matt@console-pimps.org>
-	<20100827134301.GL22783@erda.amd.com>
-Message-ID: <20100827191745.GA7258@console-pimps.org>
+Date: Fri, 27 Aug 2010 20:24:17 +0100
+Subject: [PATCH RESEND] at91_mci.c: use resource_size()
+In-Reply-To: <20100827190812.GD20407@void.printf.net>
+References: <BD79186B4FD85F4B8E60E381CAEE19090200E9E8@mi8nycmail19.Mi8.com>
+	<20100827190812.GD20407@void.printf.net>
+Message-ID: <20100827192417.GB7258@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 27, 2010 at 03:43:01PM +0200, Robert Richter wrote:
-> On 26.08.10 15:09:17, Matt Fleming wrote:
-> > Introduce some accessor functions for getting at the name and number of
-> > counters of the current sh_pmu instance.
-> > 
-> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> > ---
-> >  arch/sh/include/asm/perf_event.h |    2 ++
-> >  arch/sh/kernel/perf_event.c      |   13 +++++++++++++
-> >  2 files changed, 15 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/sh/include/asm/perf_event.h b/arch/sh/include/asm/perf_event.h
-> > index 3d0c9f3..5b7fa84 100644
-> > --- a/arch/sh/include/asm/perf_event.h
-> > +++ b/arch/sh/include/asm/perf_event.h
-> > @@ -25,6 +25,8 @@ struct sh_pmu {
-> >  extern int register_sh_pmu(struct sh_pmu *);
-> >  extern int reserve_pmc_hardware(void);
-> >  extern void release_pmc_hardware(void);
-> > +extern int sh_pmu_num_events(void);
-> > +extern const char *sh_pmu_name(void);
-> >  
-> >  static inline void set_perf_event_pending(void)
-> >  {
-> > diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
-> > index 7a3dc35..086f788 100644
-> > --- a/arch/sh/kernel/perf_event.c
-> > +++ b/arch/sh/kernel/perf_event.c
-> > @@ -60,6 +60,19 @@ static inline int sh_pmu_initialized(void)
-> >  }
-> >  
-> >  /*
-> > + * Return the number of events for the current sh_pmu.
-> > + */
-> > +int sh_pmu_num_events(void)
-> > +{
-> > +	return sh_pmu->num_events;
-> > +}
-> > +
-> > +const char *sh_pmu_name(void)
-> > +{
-> > +	return sh_pmu->name;
-> > +}
-> > +
-> > +/*
+[Adding maintainer to CC]
+
+On Fri, Aug 27, 2010 at 08:08:13PM +0100, Chris Ball wrote:
+> From: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Date: Mon, 14 Dec 2009 14:10:26 -0500
 > 
-> This probably needs EXPORT_SYMBOLS*(), but not really sure. Have you
-> compiled oprofile as module?
-
-Ah, no, I haven't compiled this as a module. I'll add some
-EXPORT_SYMBOL()'s in the next version.
-
-> This accessor functions should be generic for all architectures.
-
-This isn't going to work. ARM uses an integer ID whereas SH uses a
-string name. This is specific to an architecture and making it generic
-would probably involve some abstraction layer.
+> Use resource_size().
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> [cjb: rebased patch against Linus]
+> Signed-off-by: Chris Ball <cjb@laptop.org>
+> ---
+>  drivers/mmc/host/at91_mci.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
+> index 5f3a599..3995db3 100644
+> --- a/drivers/mmc/host/at91_mci.c
+> +++ b/drivers/mmc/host/at91_mci.c
+> @@ -927,7 +927,7 @@ static int __init at91_mci_probe(struct platform_device *pdev)
+>  	if (!res)
+>  		return -ENXIO;
+>  
+> -	if (!request_mem_region(res->start, res->end - res->start + 1, DRIVER_NAME))
+> +	if (!request_mem_region(res->start, resource_size(res), DRIVER_NAME))
+>  		return -EBUSY;
+>  
+>  	mmc = mmc_alloc_host(sizeof(struct at91mci_host), &pdev->dev);
+> @@ -1016,7 +1016,7 @@ static int __init at91_mci_probe(struct platform_device *pdev)
+>  	/*
+>  	 * Map I/O region
+>  	 */
+> -	host->baseaddr = ioremap(res->start, res->end - res->start + 1);
+> +	host->baseaddr = ioremap(res->start, resource_size(res));
+>  	if (!host->baseaddr) {
+>  		ret = -ENOMEM;
+>  		goto fail1;
+> @@ -1092,7 +1092,7 @@ fail4b:
+>  fail5:
+>  	mmc_free_host(mmc);
+>  fail6:
+> -	release_mem_region(res->start, res->end - res->start + 1);
+> +	release_mem_region(res->start, resource_size(res));
+>  	dev_err(&pdev->dev, "probe failed, err %d\n", ret);
+>  	return ret;
+>  }
+> @@ -1137,7 +1137,7 @@ static int __exit at91_mci_remove(struct platform_device *pdev)
+>  
+>  	iounmap(host->baseaddr);
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	release_mem_region(res->start, res->end - res->start + 1);
+> +	release_mem_region(res->start, resource_size(res));
+>  
+>  	mmc_free_host(mmc);
+>  	platform_set_drvdata(pdev, NULL);
+> -- 
+> 1.7.0.1
+> 
+> -- 
+> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> One Laptop Per Child
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
