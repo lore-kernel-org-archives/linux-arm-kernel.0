@@ -1,55 +1,36 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 27 Aug 2010 08:29:38 -0700
-Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
-In-Reply-To: <1282917280.26355.33.camel@e102109-lin.cambridge.arm.com>
-References: <1282712273-344-4-git-send-email-johlstei@codeaurora.org>
-	<1282917280.26355.33.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1282922978.5075.13.camel@m0nster>
+From: imp@bsdimp.com (M. Warner Losh)
+Date: Fri, 27 Aug 2010 09:35:21 -0600 (MDT)
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100827140205.GA3293@riccoc20.at.omicron.at>
+References: <20100827075727.GA3818@riccoc20.at.omicron.at>
+	<20100827134154.50eef56c@lxorguk.ukuu.org.uk>
+	<20100827140205.GA3293@riccoc20.at.omicron.at>
+Message-ID: <20100827.093521.467748298504420477.imp@bsdimp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-08-27 at 14:54 +0100, Catalin Marinas wrote:
-> On Wed, 2010-08-25 at 05:57 +0100, Jeff Ohlstein wrote:
-> > From: Daniel Walker <dwalker@codeaurora.org>
-> > 
-> > ScorpionMP does not have the SMP/nAMP and TLB ops broadcasting bits in
-> > ACTLR.
-> > 
-> > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> > Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
-> > ---
-> >  arch/arm/mm/proc-v7.S |   24 ++++++++++++++++++++++++
-> >  1 files changed, 24 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index 7aaf88a..98fd7e5 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -196,6 +196,7 @@ __v7_setup:
-> >         orreq   r0, r0, #(1 << 6) | (1 << 0)    @ Enable SMP/nAMP mode and
-> >         mcreq   p15, 0, r0, c1, c0, 1           @ TLB ops broadcasting
-> >  #endif
-> > +__v7_msm_setup:
-> >         adr     r12, __v7_setup_stack           @ the local stack
-> >         stmia   r12, {r0-r5, r7, r9, r11, lr}
-> >         bl      v7_flush_dcache_all
-> 
-> It may be better to move the generic __v7_setup here and have a specific
-> entry for ARM Ltd cores (mask 0xff0f0000 and value 0x410f0000).
+In message: <20100827140205.GA3293@riccoc20.at.omicron.at>
+            Richard Cochran <richardcochran@gmail.com> writes:
+: On Fri, Aug 27, 2010 at 01:41:54PM +0100, Alan Cox wrote:
+: > > The master node in a PTP network probably takes its time from a
+: > > precise external time source, like GPS. The GPS provides a 1 PPS
+: > > directly to the PTP clock hardware, which latches the PTP hardware
+: > > clock time on the PPS edge. This provides one sample as input to a
+: > > clock servo (in the PTPd) that, in turn, regulates the PTP clock
+: > > hardware.
+: > 
+: > A PTP clock is TAI, Unix time is UTC.
+: 
+: But TAI and UTC progress at the same rate, and UTC differs from TAI by
+: a constant offset. In fact, the needed conversion is provided by the
+: protocol, so it is not hard to take a 1 PPS from GPS and set the PTP
+: clock to TAI.
 
-I'm not sure I follow you.. Are you saying there are other cpu's that
-don't need the SMP stuff at the top of __v7_setup ?
+Except for leap seconds, this is true.   However, Unix time isn't UTC
+either.  Unix time is UTC that pretends leap seconds just don't
+exist.  POSIX enshrined this long ago, and nobody is going to change
+that any time soon.
 
-> In general, I would have liked a different way (still ID-based) of
-> handling such issues without duplicating the whole structure. But I see
-> this becoming the standard as proc-v6.S follows it as well.
+I don't believe IEEEv2 propagates leap seconds, does it?
 
-This whole thing was something Russell specifically asked for (and
-practically wrote for me).
-
-Daniel
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Warner
