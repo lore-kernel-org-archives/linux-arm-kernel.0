@@ -1,75 +1,41 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Fri, 27 Aug 2010 20:24:17 +0100
-Subject: [PATCH RESEND] at91_mci.c: use resource_size()
-In-Reply-To: <20100827190812.GD20407@void.printf.net>
-References: <BD79186B4FD85F4B8E60E381CAEE19090200E9E8@mi8nycmail19.Mi8.com>
-	<20100827190812.GD20407@void.printf.net>
-Message-ID: <20100827192417.GB7258@console-pimps.org>
+From: konkers@android.com (Erik Gilling)
+Date: Fri, 27 Aug 2010 12:26:03 -0700
+Subject: [PATCH v2] spi: add spi_tegra driver
+In-Reply-To: <AANLkTincgapUK5ncs_t3ax=1Kt_56GdR_RVwRqdCm5ge@mail.gmail.com>
+References: <1280450224-25118-1-git-send-email-ccross@google.com>
+	<1281574023-25160-1-git-send-email-konkers@android.com>
+	<AANLkTim4nL+Re=qc55CGS+ksq+ACtGe=vqOeGQ3HbQWM@mail.gmail.com>
+	<AANLkTincgapUK5ncs_t3ax=1Kt_56GdR_RVwRqdCm5ge@mail.gmail.com>
+Message-ID: <AANLkTin4HxVLt=4VH-NQWhB-p_2EpX_yoTcwEOTJP3m_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding maintainer to CC]
+On Wed, Aug 25, 2010 at 2:22 PM, Erik Gilling <konkers@android.com> wrote:
+>> As an aside, and commenting on the tegra DMA api... Is the IS_ERR()
+>> pattern in the tegra_dma_allocate_channel() return really a good idea
+>> here? ?Personally I find that pattern isn't very useful, especially
+>> when the results is either "yes, allocated" or "no, not-alocated", and
+>> it is very easy to write code that tests the wrong thing on the return
+>> value because the compiler cannot catch it. ?In other words, if it
+>> isn't vital to return a specific error code, the using the PTR_ERR()
+>> pattern adds unnecessary risk to the code because developers are used
+>> to seeing and writing this pattern:
+>>
+>> tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+>> if (!tspi->rx_dma)
+>> ? ? ? ?return -ENOMEM;
+>>
+>> The compiler won't catch it if the return value is an PTR_ERR.
+>>
+>> (I know that some subsystems make heavy use of it, particularly
+>> filesystems and the block layer which do need to return specific error
+>> codes to userspace. ?My argument is that the specific error code is
+>> probably irrelevant when allocating DMA channels)
+>
+> I don't have a strong opinion either way but that's the way Colin's
+> code is written. ?I'll let him speak to that.
 
-On Fri, Aug 27, 2010 at 08:08:13PM +0100, Chris Ball wrote:
-> From: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Date: Mon, 14 Dec 2009 14:10:26 -0500
-> 
-> Use resource_size().
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> [cjb: rebased patch against Linus]
-> Signed-off-by: Chris Ball <cjb@laptop.org>
-> ---
->  drivers/mmc/host/at91_mci.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
-> index 5f3a599..3995db3 100644
-> --- a/drivers/mmc/host/at91_mci.c
-> +++ b/drivers/mmc/host/at91_mci.c
-> @@ -927,7 +927,7 @@ static int __init at91_mci_probe(struct platform_device *pdev)
->  	if (!res)
->  		return -ENXIO;
->  
-> -	if (!request_mem_region(res->start, res->end - res->start + 1, DRIVER_NAME))
-> +	if (!request_mem_region(res->start, resource_size(res), DRIVER_NAME))
->  		return -EBUSY;
->  
->  	mmc = mmc_alloc_host(sizeof(struct at91mci_host), &pdev->dev);
-> @@ -1016,7 +1016,7 @@ static int __init at91_mci_probe(struct platform_device *pdev)
->  	/*
->  	 * Map I/O region
->  	 */
-> -	host->baseaddr = ioremap(res->start, res->end - res->start + 1);
-> +	host->baseaddr = ioremap(res->start, resource_size(res));
->  	if (!host->baseaddr) {
->  		ret = -ENOMEM;
->  		goto fail1;
-> @@ -1092,7 +1092,7 @@ fail4b:
->  fail5:
->  	mmc_free_host(mmc);
->  fail6:
-> -	release_mem_region(res->start, res->end - res->start + 1);
-> +	release_mem_region(res->start, resource_size(res));
->  	dev_err(&pdev->dev, "probe failed, err %d\n", ret);
->  	return ret;
->  }
-> @@ -1137,7 +1137,7 @@ static int __exit at91_mci_remove(struct platform_device *pdev)
->  
->  	iounmap(host->baseaddr);
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	release_mem_region(res->start, res->end - res->start + 1);
-> +	release_mem_region(res->start, resource_size(res));
->  
->  	mmc_free_host(mmc);
->  	platform_set_drvdata(pdev, NULL);
-> -- 
-> 1.7.0.1
-> 
-> -- 
-> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> One Laptop Per Child
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I spoke with colin about this.  He's fine getting rid of the PTR_ERR.
+I'll post a DMA and SPI patch when that's done.
+
+-Erik
