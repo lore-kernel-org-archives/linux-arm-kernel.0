@@ -1,124 +1,207 @@
-From: johnstul@us.ibm.com (John Stultz)
-Date: Fri, 27 Aug 2010 13:14:11 -0700
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <20100827110855.GA11657@riccoc20.at.omicron.at>
-References: <cover.1281956490.git.richard.cochran@omicron.at>
-	<1282176776.2865.100.camel@localhost.localdomain>
-	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<201008191428.04546.arnd@arndb.de>
-	<20100819153847.GA10695@riccoc20.at.omicron.at>
-	<1282594899.3111.358.camel@localhost.localdomain>
-	<20100827110855.GA11657@riccoc20.at.omicron.at>
-Message-ID: <1282940051.2268.18.camel@jstultz-laptop>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Fri, 27 Aug 2010 21:19:46 +0100
+Subject: [PATCH V2 4/4] sh: Use the perf-events backend for oprofile
+In-Reply-To: <20100827145901.GO22783@erda.amd.com>
+References: <cover.1282848651.git.matt@console-pimps.org>
+	<c741813aa911f0048cfab1a1a30534e8d7bb6765.1282848651.git.matt@console-pimps.org>
+	<20100827145901.GO22783@erda.amd.com>
+Message-ID: <20100827201946.GB18829@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-08-27 at 13:08 +0200, Richard Cochran wrote:
-> On Mon, Aug 23, 2010 at 01:21:39PM -0700, john stultz wrote:
-> > On Thu, 2010-08-19 at 17:38 +0200, Richard Cochran wrote:
-> > > On Thu, Aug 19, 2010 at 02:28:04PM +0200, Arnd Bergmann wrote:
-> > > > My point was that a syscall is better than an ioctl based interface here,
-> > > > which I definitely still think. Given that John knows much more about
-> > > > clocks than I do, we still need to get agreement on the question that
-> > > > he raised, which is whether we actually need to expose this clock to the
-> > > > user or not.
-> > > > 
-> > > > If we can find a way to sync system time accurate enough with PTP and
-> > > > PPS, user applications may not need to see two separate clocks at all.
-> > > 
-> > > At the very least, one user application (the PTPd) needs to see the
-> > > PTP clock.
-> > > 
-> > > > > SYSCALL_DEFINE3(clock_adjtime, const clockid_t, clkid,
-> > > > > 		int, ppb, struct timespec __user *, ts)
-> > > > > 
-> > > > > ppb - desired frequency adjustment in parts per billion
-> > > > > ts  - desired time step (or jump) in <sec,nsec> to correct
-> > > > >       a measured offset
-> > > > > 
-> > > > > Arguably, this syscall might be useful for other clocks, too.
-> > > > 
-> > > > This is a mix of adjtime and adjtimex with the addition of
-> > > > the clkid parameter, right?
-> > > 
-> > > Sort of, but not really. ADJTIME(3) takes an offset and slowly
-> > > corrects the clock using a servo in the kernel, over hours.
-> > > 
-> > > For this function, the offset passed in the 'ts' parameter will be
-> > > immediately corrected, by jumping to the new time. This reflects the
-> > > way that PTP works. After the first few samples, the PTPd has an
-> > > estimate of the offset to the master and the rate difference. The PTPd
-> > > can proceed in one of two ways.
-> > > 
-> > > 1. If resetting the clock is not desired, then the clock is set to the
-> > >    maximum adjustment (in the right direction) until the clock time is
-> > >    close to the master's time.
-> > > 
-> > > 2. The estimated offset is added to the current time, resulting in a
-> > >    jump in time.
-> > > 
-> > > We need clock_adjtime(id, 0, ts) for the second case.
-> > >
-> > > > Have you considered passing a struct timex instead of ppb and ts?
-> > > 
-> > > Yes, but the timex is not suitable, IMHO.
+On Fri, Aug 27, 2010 at 04:59:01PM +0200, Robert Richter wrote:
+> On 26.08.10 15:09:19, Matt Fleming wrote:
+> > Use the perf-events based wrapper for oprofile available in
+> > drivers/oprofile. This allows us to centralise the code to control
+> > performance counters.
 > > 
-> > Could you expand on this?
+> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> > ---
+> > 
+> > Paul,
+> > 
+> > I dropped the CONFIG_PERF_EVENTS dependency from the Makefile in this
+> > version because to do anything useful we need perf events anyway.
 > 
-> We need to able to specify that the call is for a PTP clock. We could
-> add that to the modes flag, like this:
+> Initialization should simply fail with a printk message for this case,
+> implement function stubs for the !CONFIG_PERF_EVENTS case instead in
+> the oprofile.h header file.
+
+I didn't do this because I was hoping that eventually we'd make
+CONFIG_OPROFILE select PERF_EVENTS. Would you be OK making that change
+instead? Runtime failure is best avoided where possible, especially when
+we can sort this out at compile time.
+
+> > 
+> >  arch/sh/oprofile/Makefile  |    2 +-
+> >  arch/sh/oprofile/common.c  |   96 ++++++++-----------------------------------
+> >  arch/sh/oprofile/op_impl.h |   33 ---------------
+> >  3 files changed, 19 insertions(+), 112 deletions(-)
+> >  delete mode 100644 arch/sh/oprofile/op_impl.h
+> > 
+> > diff --git a/arch/sh/oprofile/Makefile b/arch/sh/oprofile/Makefile
+> > index 4886c5c..e1015ae 100644
+> > --- a/arch/sh/oprofile/Makefile
+> > +++ b/arch/sh/oprofile/Makefile
+> > @@ -4,6 +4,6 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
+> >  		oprof.o cpu_buffer.o buffer_sync.o \
+> >  		event_buffer.o oprofile_files.o \
+> >  		oprofilefs.o oprofile_stats.o \
+> > -		timer_int.o )
+> > +		timer_int.o oprofile_perf.o )
+> >  
+> >  oprofile-y	:= $(DRIVER_OBJS) common.o backtrace.o
+> > diff --git a/arch/sh/oprofile/common.c b/arch/sh/oprofile/common.c
+> > index ac60493..f8d4a84 100644
+> > --- a/arch/sh/oprofile/common.c
+> > +++ b/arch/sh/oprofile/common.c
+> > @@ -17,71 +17,23 @@
+> >  #include <linux/init.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/smp.h>
+> > +#include <linux/perf_event.h>
 > 
-> /*timex.h*/
-> #define ADJ_PTP_0 0x10000
-> #define ADJ_PTP_1 0x20000
-> #define ADJ_PTP_2 0x30000
-> #define ADJ_PTP_3 0x40000
+> I don't see a reason why this must be included here.
 > 
-> I can live with this, if everyone else can, too.
+> It's only for sh_pmu_name() and sh_pmu_num_events(), so the interface
+> looks wrong here. It should be in oprofile_perf.c. The functions
+> should be generic non-arch perf code. See below.
 
-I wasn't suggesting adding the clock multiplexing to the timex, just
-using the timex to specify the adjustments in the clock_adjtime call. 
+These functions are inherently architecture-specific. See my reply to
+your response to patch 2/4.
 
-So I was asking why a timex was not suitable instead of using just the
-ppb and timespec.
-
-
-> > Could we not add a adjustment mode ADJ_SETOFFSET or something that would
-> > provide the instantaneous offset correction?
+> >  #include <asm/processor.h>
+> > -#include "op_impl.h"
+> > -
+> > -static struct op_sh_model *model;
+> > -
+> > -static struct op_counter_config ctr[20];
+> >  
+> >  extern void sh_backtrace(struct pt_regs * const regs, unsigned int depth);
+> >  
+> > -static int op_sh_setup(void)
+> > -{
+> > -	/* Pre-compute the values to stuff in the hardware registers.  */
+> > -	model->reg_setup(ctr);
+> > -
+> > -	/* Configure the registers on all cpus.  */
+> > -	on_each_cpu(model->cpu_setup, NULL, 1);
+> > -
+> > -        return 0;
+> > -}
+> > -
+> > -static int op_sh_create_files(struct super_block *sb, struct dentry *root)
+> > -{
+> > -	int i, ret = 0;
+> > -
+> > -	for (i = 0; i < model->num_counters; i++) {
+> > -		struct dentry *dir;
+> > -		char buf[4];
+> > -
+> > -		snprintf(buf, sizeof(buf), "%d", i);
+> > -		dir = oprofilefs_mkdir(sb, root, buf);
+> > -
+> > -		ret |= oprofilefs_create_ulong(sb, dir, "enabled", &ctr[i].enabled);
+> > -		ret |= oprofilefs_create_ulong(sb, dir, "event", &ctr[i].event);
+> > -		ret |= oprofilefs_create_ulong(sb, dir, "kernel", &ctr[i].kernel);
+> > -		ret |= oprofilefs_create_ulong(sb, dir, "user", &ctr[i].user);
+> > -
+> > -		if (model->create_files)
+> > -			ret |= model->create_files(sb, dir);
+> > -		else
+> > -			ret |= oprofilefs_create_ulong(sb, dir, "count", &ctr[i].count);
+> > -
+> > -		/* Dummy entries */
+> > -		ret |= oprofilefs_create_ulong(sb, dir, "unit_mask", &ctr[i].unit_mask);
+> > -	}
+> > -
+> > -	return ret;
+> > -}
+> > -
+> > -static int op_sh_start(void)
+> > +static char *op_name_from_perf_name(const char *name)
+> >  {
+> > -	/* Enable performance monitoring for all counters.  */
+> > -	on_each_cpu(model->cpu_start, NULL, 1);
+> > +	if (!strcmp(name, "SH-4A"))
+> > +		return "sh/sh4a";
+> > +	if (!strcmp(name, "SH7750"))
+> > +		return "sh/sh7750";
 > 
-> Yes, but we would also need to add a struct timespec to the struct
-> timex, in order to get nanosecond resolution. I think it would be
-> possible to do in the padding at the end?
+> With that implementation we always have to touch the code for new
+> cpus. Maybe we derive it from the perf name, e.g. making all lowercase
+> and removing dashes?
 
+Is this code really that bad that we need to start playing string
+manipulation games?
 
-The existing struct timeval in the timex can be also used as a timespec.
-NTPv4 uses it that way specifying the ADJ_NANO flag.
-
-
-> > You're right that the timex is a little crufty. But its legacy that we
-> > will support indefinitely. So following the established interface helps
-> > maintainability.
+> >  
+> > -	return 0;
+> > -}
+> > -
+> > -static void op_sh_stop(void)
+> > -{
+> > -	/* Disable performance monitoring for all counters.  */
+> > -	on_each_cpu(model->cpu_stop, NULL, 1);
+> > +	return NULL;
+> >  }
+> >  
+> >  int __init oprofile_arch_init(struct oprofile_operations *ops)
+> >  {
+> > -	struct op_sh_model *lmodel = NULL;
+> >  	int ret;
+> >  
+> >  	/*
+> > @@ -91,40 +43,28 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+> >  	 */
+> >  	ops->backtrace = sh_backtrace;
+> >  
+> > -	/*
+> > -	 * XXX
+> > -	 *
+> > -	 * All of the SH7750/SH-4A counters have been converted to perf,
+> > -	 * this infrastructure hook is left for other users until they've
+> > -	 * had a chance to convert over, at which point all of this
+> > -	 * will be deleted.
+> > -	 */
+> > -
+> > -	if (!lmodel)
+> > -		return -ENODEV;
+> >  	if (!(current_cpu_data.flags & CPU_HAS_PERF_COUNTER))
+> >  		return -ENODEV;
+> >  
+> > -	ret = lmodel->init();
+> > -	if (unlikely(ret != 0))
+> > -		return ret;
+> > +	ops->setup		= oprofile_perf_setup;
+> > +	ops->create_files	= oprofile_perf_create_files;
+> > +	ops->start		= oprofile_perf_start;
+> > +	ops->stop		= oprofile_perf_stop;
+> > +	ops->cpu_type		= op_name_from_perf_name(sh_pmu_name());
+> >  
+> > -	model = lmodel;
+> > +	oprofile_perf_set_num_counters(sh_pmu_num_events());
+> >  
+> > -	ops->setup		= op_sh_setup;
+> > -	ops->create_files	= op_sh_create_files;
+> > -	ops->start		= op_sh_start;
+> > -	ops->stop		= op_sh_stop;
+> > -	ops->cpu_type		= lmodel->cpu_type;
+> > +	ret = oprofile_perf_init();
 > 
-> We can use it for PTP, with the modifications suggested above. Or we
-> can just introduce the clock_adjtime method, instead.
-
-Again, I think you misunderstood my suggestion. I was suggesting
-something like clock_adjtime(clock_id, struct timex*).
-
-
-> > So if the clock_adjtime interface is needed, it would seem best for it
-> > to be generic enough to support not only PTP, but also the NTP kernel
-> > PLL.
+> Instead of exporting all the functions above implement something like:
 > 
-> For the proposed clock_adjime, what else is needed to support clock
-> adjustment in general?
+> 	name = op_name_from_perf_name(sh_pmu_name());
+> 	num_events = sh_pmu_num_events();
+> 	ret = oprofile_perf_init(ops, name, num_events);
 > 
-> I don't mind making the interface generic enough to support any
-> (realistic) conceivable clock adjustment scheme, but beyond the
-> present PTP hardware clocks, I don't know what else might be needed.
+> We will then have only oprofile_perf_init() and oprofile_perf_exit()
+> as interface which is much cleaner.
 
-I think using the timex struct covers most of the existing knowledge of
-what is needed. 
-
-thanks
--john
+Well, the reason that I left it this way is so that architectures can
+choose to implement wrappers around the oprofile_perf_* functions. I
+don't think ARM or SH actually need wrappers (the only extra thing that
+ARM does is locking which SH should probably do too) but I assumed there
+was a reason that these functions pointers were exposed originally. I
+haven't look at what other architectures would do. I'll take a look at
+that.
