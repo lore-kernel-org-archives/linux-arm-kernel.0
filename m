@@ -1,43 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Aug 2010 14:54:40 +0100
-Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
-In-Reply-To: <1282712273-344-4-git-send-email-johlstei@codeaurora.org>
-References: <1282712273-344-4-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1282917280.26355.33.camel@e102109-lin.cambridge.arm.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 27 Aug 2010 16:02:05 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <20100827134154.50eef56c@lxorguk.ukuu.org.uk>
+References: <20100817085324.GB3330@riccoc20.at.omicron.at>
+	<1282090963.1734.97.camel@localhost>
+	<20100818071942.GA4096@riccoc20.at.omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<1282594125.3111.344.camel@localhost.localdomain>
+	<AANLkTi=nKrRHH6+9mvny718gov8Q+u7DHFikdgNY8YdX@mail.gmail.com>
+	<1282874269.4371.74.camel@localhost.localdomain>
+	<20100827075727.GA3818@riccoc20.at.omicron.at>
+	<20100827134154.50eef56c@lxorguk.ukuu.org.uk>
+Message-ID: <20100827140205.GA3293@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-08-25 at 05:57 +0100, Jeff Ohlstein wrote:
-> From: Daniel Walker <dwalker@codeaurora.org>
+On Fri, Aug 27, 2010 at 01:41:54PM +0100, Alan Cox wrote:
+> > The master node in a PTP network probably takes its time from a
+> > precise external time source, like GPS. The GPS provides a 1 PPS
+> > directly to the PTP clock hardware, which latches the PTP hardware
+> > clock time on the PPS edge. This provides one sample as input to a
+> > clock servo (in the PTPd) that, in turn, regulates the PTP clock
+> > hardware.
 > 
-> ScorpionMP does not have the SMP/nAMP and TLB ops broadcasting bits in
-> ACTLR.
+> A PTP clock is TAI, Unix time is UTC.
+
+But TAI and UTC progress at the same rate, and UTC differs from TAI by
+a constant offset. In fact, the needed conversion is provided by the
+protocol, so it is not hard to take a 1 PPS from GPS and set the PTP
+clock to TAI.
+
+> > This is the core issue and source of misunderstanding, in my view. The
+> > fact of the matter is, the current generation of computers has
+> > multiple clocks, and these are usually unsynchronized. I think we
+> > should not try too hard to cover up or work around this. It is a fact
+> > of life.
 > 
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
-> ---
->  arch/arm/mm/proc-v7.S |   24 ++++++++++++++++++++++++
->  1 files changed, 24 insertions(+), 0 deletions(-)
+> In this case I don't think you can. Their divergence is rather difficult
+> to handle unless you have a GPS to hand.
 > 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 7aaf88a..98fd7e5 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -196,6 +196,7 @@ __v7_setup:
->         orreq   r0, r0, #(1 << 6) | (1 << 0)    @ Enable SMP/nAMP mode and
->         mcreq   p15, 0, r0, c1, c0, 1           @ TLB ops broadcasting
->  #endif
-> +__v7_msm_setup:
->         adr     r12, __v7_setup_stack           @ the local stack
->         stmia   r12, {r0-r5, r7, r9, r11, lr}
->         bl      v7_flush_dcache_all
+> But all this talk of "PTP this" and "PTP that" is not helpful. Any
+> interface for additional time sources should be generic with PTP being
+> one use case.
 
-It may be better to move the generic __v7_setup here and have a specific
-entry for ARM Ltd cores (mask 0xff0f0000 and value 0x410f0000).
+To tell the truth, my original motivation for the patch set was to
+support PTP clocks and applications. I don't think that is such a bad
+idea. After all, the adjtimex interface was added just to support NTP.
 
-In general, I would have liked a different way (still ID-based) of
-handling such issues without duplicating the whole structure. But I see
-this becoming the standard as proc-v6.S follows it as well.
+At the same time, I can understand the desire to have a generic
+hardware clock adjustment API. Let me see if I can understand and
+summarize what people are asking for:
 
--- 
-Catalin
+	  clock_adjtime(clockid_t id, struct timex *t);
+
+and struct timex gets some new fields at the end.
+
+Using the call, NTPd can call clock_adjtime(CLOCK_REALTIME) and PTPd
+can call clock_realtime(CLOCK_PTP) and everyone is happy, no?
+
+Thanks,
+Richard
