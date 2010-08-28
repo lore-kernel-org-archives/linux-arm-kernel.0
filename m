@@ -1,61 +1,145 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 28 Aug 2010 19:58:11 +0200
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100819174426O.fujita.tomonori@lab.ntt.co.jp> (FUJITA
-	Tomonori's message of "Thu, 19 Aug 2010 17:51:48 +0900")
-References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <m3sk1yzkjw.fsf@intrepid.localdomain>
+From: vm.rod25@gmail.com (Victor Rodriguez)
+Date: Sat, 28 Aug 2010 13:18:23 -0500
+Subject: [PATCH] hawkboard
+Message-ID: <1283019503-3070-1-git-send-email-vm.rod25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What's the outcome of the following?
+Basic support for Hawkboard OMAPL138 just UART cominication is included
 
-Russell, are you going to apply it as is, or is a better (short-term)
-fix being made?
+Signed-off-by: Victor Rodriguez <vm.rod25@gmail.com>
 
-FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
+Notes: This patch is checked with 0a50e05b20f3c6af67656303bdb3661a2541ce03 from
+	Kernel development tree for TI DaVinci family of processors
 
-> This fixes the regression of the
-> 6fee48cd330c68332f9712bc968d934a1a84a32a commit.
->
-> After the above commit, pci_set_consistent_dma_mask doesn't work for
-> dmabounce devices. It converts ARM to use the generic implementation
-> of pci_set_consistent_dma_mask.
->
-> The root cause that ARM's CONFIG_DMABOUNCE uses dev->coherent_dma_mask
-> for the dma mask of a device _AND_ a bus. dev->coherent_dma_mask is
-> supposed to represent the dma mask of a device.
->
-> The proper solution is that device and bus has the own dma mask
-> respectively (POWERPC does the similar). But the fix must go to stable
-> trees so this simple (and hacky a bit) patch works better for now.
->
-> For further information: http://lkml.org/lkml/2010/8/10/272
->
-> Reported-by: Krzysztof Halasa <khc@pm.waw.pl>
-> Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-> Tested-by: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: stable at kernel.org
-> ---
->  arch/arm/mm/dma-mapping.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index c704eed..2a3fc2e 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -77,6 +77,11 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
->  	if (mask < 0xffffffffULL)
->  		gfp |= GFP_DMA;
->  
-> +#ifdef CONFIG_DMABOUNCE
-> +	if (dev->archdata.dmabounce)
-> +		gfp |= GFP_DMA;
-> +#endif
-> +
->  	page = alloc_pages(gfp, order);
->  	if (!page)
->  		return NULL;
+	This patch works with basic da8xx_omapl_defconfig, it just have basic support
+	for UART console
+---
+ arch/arm/mach-davinci/Kconfig                   |    9 +++
+ arch/arm/mach-davinci/Makefile                  |    1 +
+ arch/arm/mach-davinci/board-da850-hawk.c        |   69 +++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
+ 4 files changed, 80 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-davinci/board-da850-hawk.c
 
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 2bf03e9..fd8a11c 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -185,6 +185,15 @@ config MACH_TNETV107X
+ 	help
+ 	  Say Y here to select the TI TNETV107X Evaluation Module.
+ 
++config MACH_OMAPL138_HAWKBOARD
++	bool "TI DA850/OMAP-L138/AM18xx Hawkboard(.org) Platform"
++	default ARCH_DAVINCI_DA850
++	depends on ARCH_DAVINCI_DA850
++	help
++	  Say Y here to select the TI DA850/OMAP-L138/AM18xx Hawkboard.
++	  Information of this board may be found at
++	  http://www.hawkboard.org/
++
+ config DAVINCI_MUX
+ 	bool "DAVINCI multiplexing support"
+ 	depends on ARCH_DAVINCI
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index eab4c0f..fd271cd 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_MACH_DAVINCI_DM365_EVM)	+= board-dm365-evm.o
+ obj-$(CONFIG_MACH_DAVINCI_DA830_EVM)	+= board-da830-evm.o
+ obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
+ obj-$(CONFIG_MACH_TNETV107X)		+= board-tnetv107x-evm.o
++obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-da850-hawk.o
+ 
+ # Power Management
+ obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
+diff --git a/arch/arm/mach-davinci/board-da850-hawk.c b/arch/arm/mach-davinci/board-da850-hawk.c
+new file mode 100644
+index 0000000..e34bcbb
+--- /dev/null
++++ b/arch/arm/mach-davinci/board-da850-hawk.c
+@@ -0,0 +1,69 @@
++/*
++ * Hawkboar.org based on TI's OMAP-L138 Platform
++ *
++ * Initial code: Syed Mohammed Khasim
++ *
++ * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com
++ *
++ * Derived from: arch/arm/mach-davinci/board-da850-evm.c
++ * Original Copyrights follow:
++ *
++ * 2007, 2009 (c) MontaVista Software, Inc. This file is licensed under
++ * the terms of the GNU General Public License version 2. This program
++ * is licensed "as is" without any warranty of any kind, whether express
++ * or implied.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/console.h>
++#include <linux/gpio.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++#include <mach/cp_intc.h>
++#include <mach/da8xx.h>
++
++
++
++static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
++	.enabled_uarts = 0x7,
++};
++
++static __init void omapl138_hawk_init(void)
++{
++
++	davinci_serial_init(&omapl138_hawk_uart_config);
++
++	/*
++	 * shut down uart 0 and 1; they are not used on the board and
++	 * accessing them causes endless "too much work in irq53" messages
++	 * with arago fs
++	 */
++	__raw_writel(0, IO_ADDRESS(DA8XX_UART1_BASE) + 0x30);
++	__raw_writel(0, IO_ADDRESS(DA8XX_UART0_BASE) + 0x30);
++
++}
++
++#ifdef CONFIG_SERIAL_8250_CONSOLE
++static int __init omapl138_hawk_console_init(void)
++{
++	return add_preferred_console("ttyS", 2, "115200");
++}
++console_initcall(omapl138_hawk_console_init);
++#endif
++
++static void __init omapl138_hawk_map_io(void)
++{
++	da850_init();
++}
++
++MACHINE_START(OMAPL138_HAWKBOARD, "OMAPL 138 Hawkboard.org")
++	.phys_io	= IO_PHYS,
++	.io_pg_offst	= (__IO_ADDRESS(IO_PHYS) >> 18) & 0xfffc,
++	.boot_params	= (DA8XX_DDR_BASE + 0x100),
++	.map_io		= omapl138_hawk_map_io,
++	.init_irq	= cp_intc_init,
++	.timer		= &davinci_timer,
++	.init_machine	= omapl138_hawk_init,
++MACHINE_END
+diff --git a/arch/arm/mach-davinci/include/mach/uncompress.h b/arch/arm/mach-davinci/include/mach/uncompress.h
+index 15a6192..640f834 100644
+--- a/arch/arm/mach-davinci/include/mach/uncompress.h
++++ b/arch/arm/mach-davinci/include/mach/uncompress.h
+@@ -88,6 +88,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		/* DA8xx boards */
+ 		DEBUG_LL_DA8XX(davinci_da830_evm,	2);
+ 		DEBUG_LL_DA8XX(davinci_da850_evm,	2);
++		DEBUG_LL_DA8XX(omapl138_hawkboard,	2);
+ 
+ 		/* TNETV107x boards */
+ 		DEBUG_LL_TNETV107X(tnetv107x,		1);
 -- 
-Krzysztof Halasa
+1.6.0.5
