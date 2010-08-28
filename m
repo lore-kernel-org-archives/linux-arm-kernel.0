@@ -1,61 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 28 Aug 2010 19:20:10 +0200
-Subject: [PATCH 3/3 v2] dmaengine: Add Freescale i.MX SDMA support
-In-Reply-To: <201008281830.05208.marek.vasut@gmail.com>
-References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
-	<201008281727.10913.marek.vasut@gmail.com>
-	<20100828161858.GI1473@pengutronix.de>
-	<201008281830.05208.marek.vasut@gmail.com>
-Message-ID: <20100828172010.GJ1473@pengutronix.de>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sat, 28 Aug 2010 19:58:11 +0200
+Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
+In-Reply-To: <20100819174426O.fujita.tomonori@lab.ntt.co.jp> (FUJITA
+	Tomonori's message of "Thu, 19 Aug 2010 17:51:48 +0900")
+References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <m3sk1yzkjw.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 28, 2010 at 06:30:05PM +0200, Marek Vasut wrote:
-> Dne So 28. srpna 2010 18:18:58 Sascha Hauer napsal(a):
-> > On Sat, Aug 28, 2010 at 05:27:10PM +0200, Marek Vasut wrote:
-> > > Dne So 28. srpna 2010 17:18:17 Linus Walleij napsal(a):
-> > > > 2010/8/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > > > >> +     evt = readl(SDMA_H_EVTOVR);
-> > > > >> +     mcu = readl(SDMA_H_HOSTOVR);
-> > > > >> +     dsp = readl(SDMA_H_DSPOVR);
-> > > > > 
-> > > > > __raw_readl?
-> > > > 
-> > > > Sorry I never understood this __raw_[read|write][b|w|l] vs.
-> > > > plain read[b|w|l] proliferation in some drivers and code.
-> > > > 
-> > > > What's the reason for?
-> > > 
-> > > Hey,
-> > > 
-> > > this trick is, if you create the VA<->PA mapping at the kernel start (eg.
-> > > see how pxa_map_io() is replacedon some devices for instance), you then
-> > > use the VA address you specified and use __raw_{read,write}[b,w,l](). So
-> > > use __raw_{read,write}[b,w,l]() on drivers specific for certain device
-> > > and use {read,write}[b,w,l]() on ioremap()ed memory areas, aka. in
-> > > common drivers.
-> > 
-> > Nope, this has nothing to do with static mappings vs. ioremap. The
-> > difference is that read[b,w,l] do little endian accesses suitable for
-> > PCI whereas the __raw_* functions do accesses in CPU endianess.
-> > Peripherals integrated into a SoC like the SDMA engine here are
-> > normally accessible in native endianess and thus need the __raw_*
-> > functions. An external network controller (for example a LAN9117) will
-> > probably need the non raw functions. Note that 99% of the arm users use
-> > little endian only and thus cpu_to_le* is a noop, so both types will work
-> > for most people.
-> 
-> Sorry, you got me here. Why do we have io{read,write} then btw. ? That's for 
-> x86's io space, right ?
+What's the outcome of the following?
 
-Looking at the implementation in lib/iomap.c it seems that
-io{read,write} can do both PIO and MMIO accesses depending on the
-address given to them.
+Russell, are you going to apply it as is, or is a better (short-term)
+fix being made?
 
-Sascha
+FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
+
+> This fixes the regression of the
+> 6fee48cd330c68332f9712bc968d934a1a84a32a commit.
+>
+> After the above commit, pci_set_consistent_dma_mask doesn't work for
+> dmabounce devices. It converts ARM to use the generic implementation
+> of pci_set_consistent_dma_mask.
+>
+> The root cause that ARM's CONFIG_DMABOUNCE uses dev->coherent_dma_mask
+> for the dma mask of a device _AND_ a bus. dev->coherent_dma_mask is
+> supposed to represent the dma mask of a device.
+>
+> The proper solution is that device and bus has the own dma mask
+> respectively (POWERPC does the similar). But the fix must go to stable
+> trees so this simple (and hacky a bit) patch works better for now.
+>
+> For further information: http://lkml.org/lkml/2010/8/10/272
+>
+> Reported-by: Krzysztof Halasa <khc@pm.waw.pl>
+> Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+> Tested-by: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: stable at kernel.org
+> ---
+>  arch/arm/mm/dma-mapping.c |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c704eed..2a3fc2e 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -77,6 +77,11 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
+>  	if (mask < 0xffffffffULL)
+>  		gfp |= GFP_DMA;
+>  
+> +#ifdef CONFIG_DMABOUNCE
+> +	if (dev->archdata.dmabounce)
+> +		gfp |= GFP_DMA;
+> +#endif
+> +
+>  	page = alloc_pages(gfp, order);
+>  	if (!page)
+>  		return NULL;
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Krzysztof Halasa
