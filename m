@@ -1,101 +1,61 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Sat, 28 Aug 2010 10:15:52 -0700
-Subject: [PATCH] gpio: sx150x: correct and refine reset-on-probe behavior.
-Message-ID: <1283015752-11141-1-git-send-email-gbean@codeaurora.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 28 Aug 2010 19:20:10 +0200
+Subject: [PATCH 3/3 v2] dmaengine: Add Freescale i.MX SDMA support
+In-Reply-To: <201008281830.05208.marek.vasut@gmail.com>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<201008281727.10913.marek.vasut@gmail.com>
+	<20100828161858.GI1473@pengutronix.de>
+	<201008281830.05208.marek.vasut@gmail.com>
+Message-ID: <20100828172010.GJ1473@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the arbitrary software-reset call from the device-probe
-method, because:
-- It is defective.  To work correctly, it should be two byte writes,
-  not a single word write.  As it stands, it does nothing.
-- Some devices with sx150x expanders installed have their NRESET pins
-  ganged on the same line, so resetting one causes the others to reset -
-  not a nice thing to do arbitrarily!
-- The probe, usually taking place at boot, implies a recent hard-reset,
-  so a software reset at this point is just a waste of energy anyway.
+On Sat, Aug 28, 2010 at 06:30:05PM +0200, Marek Vasut wrote:
+> Dne So 28. srpna 2010 18:18:58 Sascha Hauer napsal(a):
+> > On Sat, Aug 28, 2010 at 05:27:10PM +0200, Marek Vasut wrote:
+> > > Dne So 28. srpna 2010 17:18:17 Linus Walleij napsal(a):
+> > > > 2010/8/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > > > >> +     evt = readl(SDMA_H_EVTOVR);
+> > > > >> +     mcu = readl(SDMA_H_HOSTOVR);
+> > > > >> +     dsp = readl(SDMA_H_DSPOVR);
+> > > > > 
+> > > > > __raw_readl?
+> > > > 
+> > > > Sorry I never understood this __raw_[read|write][b|w|l] vs.
+> > > > plain read[b|w|l] proliferation in some drivers and code.
+> > > > 
+> > > > What's the reason for?
+> > > 
+> > > Hey,
+> > > 
+> > > this trick is, if you create the VA<->PA mapping at the kernel start (eg.
+> > > see how pxa_map_io() is replacedon some devices for instance), you then
+> > > use the VA address you specified and use __raw_{read,write}[b,w,l](). So
+> > > use __raw_{read,write}[b,w,l]() on drivers specific for certain device
+> > > and use {read,write}[b,w,l]() on ioremap()ed memory areas, aka. in
+> > > common drivers.
+> > 
+> > Nope, this has nothing to do with static mappings vs. ioremap. The
+> > difference is that read[b,w,l] do little endian accesses suitable for
+> > PCI whereas the __raw_* functions do accesses in CPU endianess.
+> > Peripherals integrated into a SoC like the SDMA engine here are
+> > normally accessible in native endianess and thus need the __raw_*
+> > functions. An external network controller (for example a LAN9117) will
+> > probably need the non raw functions. Note that 99% of the arm users use
+> > little endian only and thus cpu_to_le* is a noop, so both types will work
+> > for most people.
+> 
+> Sorry, you got me here. Why do we have io{read,write} then btw. ? That's for 
+> x86's io space, right ?
 
-Therefore, make it optional, defaulting to off, as this will match the
-common case of probing at powerup and also matches the current
-broken no-op behavior.
+Looking at the implementation in lib/iomap.c it seems that
+io{read,write} can do both PIO and MMIO accesses depending on the
+address given to them.
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- drivers/gpio/sx150x.c      |   29 ++++++++++++++++++++++++-----
- include/linux/i2c/sx150x.h |    4 ++++
- 2 files changed, 28 insertions(+), 5 deletions(-)
+Sascha
 
-diff --git a/drivers/gpio/sx150x.c b/drivers/gpio/sx150x.c
-index b42f42c..6d68018 100644
---- a/drivers/gpio/sx150x.c
-+++ b/drivers/gpio/sx150x.c
-@@ -459,17 +459,36 @@ static int sx150x_init_io(struct sx150x_chip *chip, u8 base, u16 cfg)
- 	return err;
- }
- 
--static int sx150x_init_hw(struct sx150x_chip *chip,
--			struct sx150x_platform_data *pdata)
-+static int sx150x_reset(struct sx150x_chip *chip)
- {
--	int err = 0;
-+	int err;
-+
-+	err = i2c_smbus_write_byte_data(chip->client,
-+					chip->dev_cfg->reg_reset,
-+					0x12);
-+	if (err < 0)
-+		return err;
- 
--	err = i2c_smbus_write_word_data(chip->client,
-+	err = i2c_smbus_write_byte_data(chip->client,
- 					chip->dev_cfg->reg_reset,
--					0x3412);
-+					0x34);
- 	if (err < 0)
- 		return err;
- 
-+	return 0;
-+}
-+
-+static int sx150x_init_hw(struct sx150x_chip *chip,
-+			struct sx150x_platform_data *pdata)
-+{
-+	int err = 0;
-+
-+	if (pdata->reset_during_probe) {
-+		err = sx150x_reset(chip);
-+		if (err < 0)
-+			return err;
-+	}
-+
- 	err = sx150x_i2c_write(chip->client,
- 			chip->dev_cfg->reg_misc,
- 			0x01);
-diff --git a/include/linux/i2c/sx150x.h b/include/linux/i2c/sx150x.h
-index ee3049c..52baa79 100644
---- a/include/linux/i2c/sx150x.h
-+++ b/include/linux/i2c/sx150x.h
-@@ -63,6 +63,9 @@
-  *            IRQ lines will appear.  Similarly to gpio_base, the expander
-  *            will create a block of irqs beginning at this number.
-  *            This value is ignored if irq_summary is < 0.
-+ * @reset_during_probe: If set to true, the driver will trigger a full
-+ *                      reset of the chip@the beginning of the probe
-+ *                      in order to place it in a known state.
-  */
- struct sx150x_platform_data {
- 	unsigned gpio_base;
-@@ -73,6 +76,7 @@ struct sx150x_platform_data {
- 	u16      io_polarity;
- 	int      irq_summary;
- 	unsigned irq_base;
-+	bool     reset_during_probe;
- };
- 
- #endif /* __LINUX_I2C_SX150X_H */
 -- 
-1.7.0.4
-
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
