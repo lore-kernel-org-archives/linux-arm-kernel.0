@@ -1,88 +1,40 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 28 Aug 2010 15:58:23 +0200
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Sat, 28 Aug 2010 16:16:09 +0200
 Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
-In-Reply-To: <1283002486.1975.3479.camel@laptop>
+In-Reply-To: <201008281558.23501.hverkuil@xs4all.nl>
 References: <cover.1282286941.git.m.nazarewicz@samsung.com>
 	<201008281508.19756.hverkuil@xs4all.nl>
 	<1283002486.1975.3479.camel@laptop>
-Message-ID: <201008281558.23501.hverkuil@xs4all.nl>
+	<201008281558.23501.hverkuil@xs4all.nl>
+Message-ID: <1283004969.1975.3530.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, August 28, 2010 15:34:46 Peter Zijlstra wrote:
-> On Sat, 2010-08-28 at 15:08 +0200, Hans Verkuil wrote:
+On Sat, 2010-08-28 at 15:58 +0200, Hans Verkuil wrote:
+> > Isn't the proposed CMA thing vulnerable to the exact same problem? If
+> > you allow sharing of regions and plug some allocator in there you get
+> > the same problem. If you can solve it there, you can solve it for any
+> > kind of reservation scheme.
 > 
-> > > That would be good.  Although I expect that the allocation would need
-> > > to be 100% rock-solid reliable, otherwise the end user has a
-> > > non-functioning device.
-> > 
-> > Yes, indeed. And you have to be careful as well how you move pages around.
-> > Say that you have a capture and an output v4l device: the first one needs
-> > 64 MB contiguous memory and so it allocates that amount, moving pages around
-> > as needed. Once allocated that memory is pinned in place since it is needed
-> > for DMA. So if the output device also needs 64 MB, then you must have a
-> > guarantee that the first allocation didn't fragment the available contiguous
-> > memory.
-> 
-> Isn't the proposed CMA thing vulnerable to the exact same problem? If
-> you allow sharing of regions and plug some allocator in there you get
-> the same problem. If you can solve it there, you can solve it for any
-> kind of reservation scheme.
+> Since with cma you can assign a region exclusively to a driver you can ensure
+> that this problem does not occur. Of course, if you allow sharing then you will
+> end up with the same type of problem unless you know that there is only one
+> driver at a time that will use that memory.
 
-Since with cma you can assign a region exclusively to a driver you can ensure
-that this problem does not occur. Of course, if you allow sharing then you will
-end up with the same type of problem unless you know that there is only one
-driver at a time that will use that memory.
+I think you could do the same thing, the proposed page allocator
+solutions still needs to manage pageblock state, you can manage those
+the same as you would your cma regions -- the difference is that you get
+the option of letting the rest of the system use the memory in a
+transparent manner if you don't need it.
 
-> > I also wonder how expensive it is to move all the pages around. E.g. if you
-> > have a digital camera and want to make a hires picture, then it wouldn't
-> > do if it takes a second to move all the pages around making room for the
-> > captured picture. The CPUs in many SoCs are not very powerful compared to
-> > your average desktop.
-> 
-> Well, that's a trade-off, if you want to have the memory be usable for
-> anything else (which I understood people did want) then you have to pay
-> for cleaning it up when you need to use it.
-> 
-> As for the cost of compaction vs regular page-out of random page-cache
-> memory, compaction is actually cheaper, since it doesn't need to write
-> out dirty data, and page-out driven writeback sucks due to the
-> non-linear nature of it.
 
-There is obviously a trade-off. I was just wondering how costly it is.
-E.g. would it be a noticeable delay making 64 MB memory available in this
-way on a, say, 600 MHz ARM.
- 
-> > And how would memory allocations in specific memory ranges (e.g. memory
-> > banks) work?
-> 
-> Make sure you reserve pageblocks in the desired range.
-> 
-> > Note also that these issues are not limited to embedded systems, also PCI(e)
-> > boards can sometimes require massive amounts of DMA-able memory. I have had
-> > this happen in the past with the ivtv driver with customers that had 15 or so
-> > capture cards in one box. And I'm sure it will happen in the future as well,
-> > esp. with upcoming 4k video formats.
-> 
-> I would sincerely hope PCI(e) devices come with an IOMMU (and all memory
-> lines wired up), really, any hardware that doesn't isn't worth the
-> silicon its engraved in. Just don't buy it.
+> There is obviously a trade-off. I was just wondering how costly it is.
+> E.g. would it be a noticeable delay making 64 MB memory available in this
+> way on a, say, 600 MHz ARM. 
 
-In the case of the ivtv driver the PCI device had a broken scatter-gather DMA
-engine, which is the underlying reason for these issues. Since I was maintainer
-of this driver for a few years I would love to have a reliable solution for the
-memory issues. It's not a big deal, 99.99% of all users will never notice
-anything, but still... And I don't think there are any affordable or easily
-obtainable alternatives to this hardware with similar feature sets, even after
-all these years.
+Right, dunno really, rather depends on the memory bandwidth of your arm
+device I suspect. It is something you'd have to test. 
 
-Anyway, I agree with your sentiment, but reality can be disappointingly
-different :-( And especially with regards to video hardware the creativity of
-the hardware designers is boundless -- to the dismay of us linux-media developers.
-
-Regards,
-
-	Hans
-
--- 
-Hans Verkuil - video4linux developer - sponsored by TANDBERG, part of Cisco
+In case the machine isn't fast enough, there really isn't anything you
+can do but keep the memory empty at all times; unless of course the
+device in question needs it.
