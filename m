@@ -1,56 +1,27 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 29 Aug 2010 11:05:26 +0800
-Subject: [PATCH 0/5] pxa3xx_nand updates
-In-Reply-To: <1282840236.15156.41.camel@localhost>
-References: <AANLkTinU2nF2q9+eSX9XkA3U=Kj3M+BELrDBN1S2AaZp@mail.gmail.com>
-	<AANLkTikMedFwPzoodZx+EJTUkkB2hdsso3Yc7o1q9jBr@mail.gmail.com>
-	<AANLkTim+zxHQHwpM0KJ5vrNNfKAb-ro+2aJiG7CtEvqF@mail.gmail.com>
-	<1282840236.15156.41.camel@localhost>
-Message-ID: <AANLkTikU1oa-WqkraOTGz9re_=rreuikA1uoJk-SeEOR@mail.gmail.com>
+From: jayakumar.lkml@gmail.com (Jaya Kumar)
+Date: Sun, 29 Aug 2010 13:08:23 +0800
+Subject: pxa168 and LINUX_REBOOT_CMD_POWER_OFF
+In-Reply-To: <AANLkTikn_0=w07d=zkPk0nn4r7m6jzBKGaMKkc4dKdmQ@mail.gmail.com>
+References: <AANLkTikdGoVwo6igAzf2xtPDvM3adwkfG_X-3AtKN=fU@mail.gmail.com>
+	<AANLkTikdxhpwF637joeyRcbNd1CuU4-pKh6EPETDw1_v@mail.gmail.com>
+	<AANLkTikn_0=w07d=zkPk0nn4r7m6jzBKGaMKkc4dKdmQ@mail.gmail.com>
+Message-ID: <AANLkTinu8pN4oc324t2ND1RTwfF3p1brWiM8QjgDqos6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 27, 2010 at 12:30 AM, David Woodhouse <dwmw2@infradead.org> wrote:
-> On Fri, 2010-08-27 at 00:22 +0800, Haojian Zhuang wrote:
->> On Mon, Aug 23, 2010 at 4:22 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> > On Wed, Aug 18, 2010 at 10:34 PM, Haojian Zhuang
->> > <haojian.zhuang@gmail.com> wrote:
->> >> Changelog from v1:
->> >>
->> >> 1. Add default timing in order to read id successfully.
->> >> 2. Clean code
->> >>
->> >
->> > This series looks good to me. David, would you please help
->> > merge this? Thanks.
->> >
->>
->> Hi David,
->>
->> How about this series of patches? If they can be merged, we can
->> produce new patches from mtd tree.
+On Sun, Aug 22, 2010 at 11:01 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
 >
-> Please could you resend them -- with Eric's Acked-By, and *without* the
-> line wrap that prevents them from applying.
+> There's all eight power domains can be controlled by max8660. V1~V5 is
+> controlled by SYS_EN signal. V6 & V7 is controlled by I2C bus. V8 is
+> VCC_BBATT domain that should be always ON. So we can't shutdown all
+> power on Aspenite since V8 shoudl be always ON.
 >
-> --
-> dwmw2
->
->
+> So the key is SYS_EN. In Aspenite board, one signal of GPIO expander
+> is named EXP2_SYS_DIS_N. If we put this signal to low, the SYS_EN
+> signal will do a negative transition.
 
-Hi David,
+Thanks Haojian, Eric, Marek. That was useful info.
 
-Eric's Acked-by is added into these patches already. Please help to
-review and merge.
-
-Since the first patch is already merged, only submit the other 4 patches.
-
-Thanks
-Haojian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 20100829_nand_series1.tgz
-Type: application/x-gzip
-Size: 6802 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100829/4bb1c61c/attachment-0001.tgz>
+Regards,
+jaya
