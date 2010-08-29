@@ -1,45 +1,89 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 29 Aug 2010 10:25:58 +0300
-Subject: usb host port3 on pxa310?
-In-Reply-To: <4C76C07B.1040809@gmail.com>
-References: <loom.20100806T201947-76@post.gmane.org>,
-	<201008080921466561614@gmail.com> <201008221620318595557@gmail.com>
-	<4C721532.50905@compulab.co.il> <4C76C07B.1040809@gmail.com>
-Message-ID: <4C7A0B86.2020900@compulab.co.il>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 29 Aug 2010 10:56:27 +0300
+Subject: [PATCH 4/4] mx2_camera: implement forced termination of active
+	buffer for mx25
+In-Reply-To: <Pine.LNX.4.64.1008271054060.28043@axis700.grange>
+References: <cover.1280229966.git.baruch@tkos.co.il>
+	<967af81dac1c4c7627b18b5eec23a258ac7d9cd2.1280229966.git.baruch@tkos.co.il>
+	<Pine.LNX.4.64.1008271054060.28043@axis700.grange>
+Message-ID: <20100829075627.GB8285@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 08/26/10 22:28, David Hunter wrote:
-> On 8/22/2010 11:29 PM, Igor Grinberg wrote:
-> >   On 08/22/10 11:20, Chen Wenjie wrote:
-> >> and I found the VCC voltage is only 3.0v, it is lower than 3.3v
-> >> (in the spec). Is this a fatal issue?
-> >
-> > May be not fatal, but could bring issues...
-> > I'd check the VBUS on that usb port and also the pull ups on DP/DM.
-> > If those are not by the spec. then the chances of getting it work are poor.
->
-> The host USB transceiver (ISP1105) should have external 15K pull-downs on both DP and DM. The device will have a pull-up on one signal to distinguish low speed vs. full speed.
->
-> You didn't mention what USB device you're test with. Is it actually full speed as the kernel logs indicate?
->
-> Do you mean VCC on ISP1105 is only 3.0V? That's the minimum, so it may still be functional. Hopefully the supply is adjustable.
->
-> ISP1105 supports both single-ended and differential input modes, as selected by the ISP1105's MODE pin. Can you confirm the PXA310 is set for the right mode? That'll be (digging thru the Dev Man) the P3SS bits in the U2DP3CR register in the U2D (Yes, the USB 2.0 Device Controller must be configured to use the USB Host Port 3. Thanks, Intel.) There's other important settings there, can't think of them off the top of my head. If that doesn't help, I'll share some code when my PXA310 box comes back online.
+Hi Guennadi,
 
-cm-x300 uses PXA310 usb port 3 in host mode (the code is in mainline).
-I've already mentioned the U2DP3CR register in one of my previous replies.
-On cm-x300 we use 6-wire single ended transceiver (TUSB1105) and
-the port works just fine without any special setup (the default values of
-U2DP3CR are fine).
-So there indeed could be a mismatch between the port configuration (U2DP3CR)
-and the ISP1105's MODE pin wiring (although I think "grounded" is 6-wire s/e),
-or the pull ups on DP/DM or VBUS or the VCC to the transceiver.
+On Fri, Aug 27, 2010 at 11:07:31AM +0200, Guennadi Liakhovetski wrote:
+> On Tue, 27 Jul 2010, Baruch Siach wrote:
+> > This allows userspace to terminate a capture without waiting for the 
+> > current
+> > frame to complete.
+> 
+> This is an improvement, not a fix, right? Without this patch the 
+> termination just have to wait a couple of ms longer? so, it is ok to 
+> schedule it for 2.6.37?
 
->
-> -Dave
->
+In my situation the image data source may stop sending data in the middle of a 
+frame.  In this case userspace is stuck forever. So, this is a real fix for 
+me. This is not the usual use case, I guess, so I leave it for you to decide.
+
+baruch
+
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  drivers/media/video/mx2_camera.c |   20 ++++++++++++++++----
+> >  1 files changed, 16 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
+> > index d327d11..396542b 100644
+> > --- a/drivers/media/video/mx2_camera.c
+> > +++ b/drivers/media/video/mx2_camera.c
+> > @@ -648,15 +648,27 @@ static void mx2_videobuf_release(struct videobuf_queue *vq,
+> >  	 * Terminate only queued but inactive buffers. Active buffers are
+> >  	 * released when they become inactive after videobuf_waiton().
+> >  	 *
+> > -	 * FIXME: implement forced termination of active buffers, so that the
+> > -	 * user won't get stuck in an uninterruptible state. This requires a
+> > -	 * specific handling for each of the three DMA types that this driver
+> > -	 * supports.
+> > +	 * FIXME: implement forced termination of active buffers for mx27 and 
+> > +	 * mx27 eMMA, so that the user won't get stuck in an uninterruptible
+> > +	 * state. This requires a specific handling for each of the these DMA
+> > +	 * types.
+> >  	 */
+> >  	spin_lock_irqsave(&pcdev->lock, flags);
+> >  	if (vb->state == VIDEOBUF_QUEUED) {
+> >  		list_del(&vb->queue);
+> >  		vb->state = VIDEOBUF_ERROR;
+> > +	} else if (cpu_is_mx25() && vb->state == VIDEOBUF_ACTIVE) {
+> > +		if (pcdev->fb1_active == buf) {
+> > +			pcdev->csicr1 &= ~CSICR1_FB1_DMA_INTEN;
+> > +			writel(0, pcdev->base_csi + CSIDMASA_FB1);
+> > +			pcdev->fb1_active = NULL;
+> > +		} else if (pcdev->fb2_active == buf) {
+> > +			pcdev->csicr1 &= ~CSICR1_FB2_DMA_INTEN;
+> > +			writel(0, pcdev->base_csi + CSIDMASA_FB2);
+> > +			pcdev->fb2_active = NULL;
+> > +		}
+> > +		writel(pcdev->csicr1, pcdev->base_csi + CSICR1);
+> > +		vb->state = VIDEOBUF_ERROR;
+> >  	}
+> >  	spin_unlock_irqrestore(&pcdev->lock, flags);
+> >  
+> > -- 
+> > 1.7.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> 
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
 
 -- 
-Regards,
-Igor.
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
