@@ -1,75 +1,99 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Mon, 30 Aug 2010 07:46:08 +1000
-Subject: [PATCH 3/3 v3] dmaengine: Add Freescale i.MX SDMA support
-In-Reply-To: <20100827122230.GF1473@pengutronix.de>
-References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
-	<1281956870-12463-4-git-send-email-s.hauer@pengutronix.de>
-	<20100827122230.GF1473@pengutronix.de>
-Message-ID: <201008300746.08153.marc@cpdesign.com.au>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Sun, 29 Aug 2010 15:18:22 -0700
+Subject: [PATCH v2] gpio: sx150x: correct and refine reset-on-probe behavior.
+Message-ID: <1283120302-6259-1-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Replace the arbitrary software-reset call from the device-probe
+method, because:
+- It is defective.  To work correctly, it should be two byte writes,
+  not a single word write.  As it stands, it does nothing.
+- Some devices with sx150x expanders installed have their NRESET pins
+  ganged on the same line, so resetting one causes the others to reset -
+  not a nice thing to do arbitrarily!
+- The probe, usually taking place at boot, implies a recent hard-reset,
+  so a software reset at this point is just a waste of energy anyway.
 
-Just a typo and a minor niggle..
+Therefore, make it optional, defaulting to off, as this will match the
+common case of probing at powerup and also matches the current
+broken no-op behavior.
 
-On Friday, August 27, 2010 10:22:31 pm Sascha Hauer wrote:
-> This patch adds support for the Freescale i.MX SDMA engine.
+Cc: Jean Delvare <khali@linux-fr.org>
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+---
+ drivers/gpio/sx150x.c      |   26 +++++++++++++++++++++-----
+ include/linux/i2c/sx150x.h |    4 ++++
+ 2 files changed, 25 insertions(+), 5 deletions(-)
 
-> +static int sdma_config_ownership(struct sdma_channel *sdmac,
-> +		bool event_override, bool mcu_verride, bool dsp_override)
-> +{
-> +	struct sdma_engine *sdma = sdmac->sdma;
-> +	int channel = sdmac->channel;
-> +	u32 evt, mcu, dsp;
-> +
-> +	if (event_override && mcu_verride && dsp_override)
-> +		return -EINVAL;
-> +
-> +	evt = __raw_readl(sdma->regs + SDMA_H_EVTOVR);
-> +	mcu = __raw_readl(sdma->regs + SDMA_H_HOSTOVR);
-> +	dsp = __raw_readl(sdma->regs + SDMA_H_DSPOVR);
-> +
-> +	if (dsp_override)
-> +		dsp &= ~(1 << channel);
-> +	else
-> +		dsp |= (1 << channel);
-> +
-> +	if (event_override)
-> +		evt &= ~(1 << channel);
-> +	else
-> +		evt |= (1 << channel);
-> +
-> +	if (mcu_verride)
-> +		mcu &= ~(1 << channel);
-> +	else
-> +		mcu |= (1 << channel);
-> +
-> +	__raw_writel(evt, sdma->regs + SDMA_H_EVTOVR);
-> +	__raw_writel(mcu, sdma->regs + SDMA_H_HOSTOVR);
-> +	__raw_writel(dsp, sdma->regs + SDMA_H_DSPOVR);
-> +
-> +	return 0;
-> +}
-s/mcu_verride/mcu_override
+diff --git a/drivers/gpio/sx150x.c b/drivers/gpio/sx150x.c
+index b42f42c..823559a 100644
+--- a/drivers/gpio/sx150x.c
++++ b/drivers/gpio/sx150x.c
+@@ -459,17 +459,33 @@ static int sx150x_init_io(struct sx150x_chip *chip, u8 base, u16 cfg)
+ 	return err;
+ }
+ 
+-static int sx150x_init_hw(struct sx150x_chip *chip,
+-			struct sx150x_platform_data *pdata)
++static int sx150x_reset(struct sx150x_chip *chip)
+ {
+-	int err = 0;
++	int err;
+ 
+-	err = i2c_smbus_write_word_data(chip->client,
++	err = i2c_smbus_write_byte_data(chip->client,
+ 					chip->dev_cfg->reg_reset,
+-					0x3412);
++					0x12);
+ 	if (err < 0)
+ 		return err;
+ 
++	err = i2c_smbus_write_byte_data(chip->client,
++					chip->dev_cfg->reg_reset,
++					0x34);
++	return err;
++}
++
++static int sx150x_init_hw(struct sx150x_chip *chip,
++			struct sx150x_platform_data *pdata)
++{
++	int err = 0;
++
++	if (pdata->reset_during_probe) {
++		err = sx150x_reset(chip);
++		if (err < 0)
++			return err;
++	}
++
+ 	err = sx150x_i2c_write(chip->client,
+ 			chip->dev_cfg->reg_misc,
+ 			0x01);
+diff --git a/include/linux/i2c/sx150x.h b/include/linux/i2c/sx150x.h
+index ee3049c..52baa79 100644
+--- a/include/linux/i2c/sx150x.h
++++ b/include/linux/i2c/sx150x.h
+@@ -63,6 +63,9 @@
+  *            IRQ lines will appear.  Similarly to gpio_base, the expander
+  *            will create a block of irqs beginning at this number.
+  *            This value is ignored if irq_summary is < 0.
++ * @reset_during_probe: If set to true, the driver will trigger a full
++ *                      reset of the chip@the beginning of the probe
++ *                      in order to place it in a known state.
+  */
+ struct sx150x_platform_data {
+ 	unsigned gpio_base;
+@@ -73,6 +76,7 @@ struct sx150x_platform_data {
+ 	u16      io_polarity;
+ 	int      irq_summary;
+ 	unsigned irq_base;
++	bool     reset_during_probe;
+ };
+ 
+ #endif /* __LINUX_I2C_SX150X_H */
+-- 
+1.7.0.4
 
-
-> +static void sdma_event_enable(struct sdma_channel *sdmac, unsigned int
-> event) +{
-> +	struct sdma_engine *sdma = sdmac->sdma;
-> +	int channel = sdmac->channel;
-> +	u32 val;
-> +	u32 chnenbl = chnenbl_ofs(sdma, event);
-> +
-> +	val = __raw_readl(sdma->regs + chnenbl);
-> +	val |= (1 << channel);
-> +	__raw_writel(val, sdma->regs + chnenbl);
-> +}
-s/chnenbl/chanenbl ?
- (or chanenable, etc.) 
-Everything else was easily readable, but I did a double take when I read 
-through this.
-
-
-Cheers,
-Marc
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
