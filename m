@@ -1,89 +1,71 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 29 Aug 2010 10:56:27 +0300
-Subject: [PATCH 4/4] mx2_camera: implement forced termination of active
-	buffer for mx25
-In-Reply-To: <Pine.LNX.4.64.1008271054060.28043@axis700.grange>
-References: <cover.1280229966.git.baruch@tkos.co.il>
-	<967af81dac1c4c7627b18b5eec23a258ac7d9cd2.1280229966.git.baruch@tkos.co.il>
-	<Pine.LNX.4.64.1008271054060.28043@axis700.grange>
-Message-ID: <20100829075627.GB8285@jasper.tkos.co.il>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 29 Aug 2010 18:43:25 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.36-rc3
+In-Reply-To: <AANLkTi=+XnCQu6Cz0P+A=qhaeN2HKJ9gYdTx2jWe7sfH@mail.gmail.com>
+References: <006d01cb45cd$0e4e3610$2aeaa230$%kim@samsung.com>
+	<AANLkTi=+XnCQu6Cz0P+A=qhaeN2HKJ9gYdTx2jWe7sfH@mail.gmail.com>
+Message-ID: <000101cb475e$a364eef0$ea2eccd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-On Fri, Aug 27, 2010 at 11:07:31AM +0200, Guennadi Liakhovetski wrote:
-> On Tue, 27 Jul 2010, Baruch Siach wrote:
-> > This allows userspace to terminate a capture without waiting for the 
-> > current
-> > frame to complete.
+Kyungmin Park wrote:
 > 
-> This is an improvement, not a fix, right? Without this patch the 
-> termination just have to wait a couple of ms longer? so, it is ok to 
-> schedule it for 2.6.37?
-
-In my situation the image data source may stop sending data in the middle of a 
-frame.  In this case userspace is stuck forever. So, this is a real fix for 
-me. This is not the usual use case, I guess, so I leave it for you to decide.
-
-baruch
-
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  drivers/media/video/mx2_camera.c |   20 ++++++++++++++++----
-> >  1 files changed, 16 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> > index d327d11..396542b 100644
-> > --- a/drivers/media/video/mx2_camera.c
-> > +++ b/drivers/media/video/mx2_camera.c
-> > @@ -648,15 +648,27 @@ static void mx2_videobuf_release(struct videobuf_queue *vq,
-> >  	 * Terminate only queued but inactive buffers. Active buffers are
-> >  	 * released when they become inactive after videobuf_waiton().
-> >  	 *
-> > -	 * FIXME: implement forced termination of active buffers, so that the
-> > -	 * user won't get stuck in an uninterruptible state. This requires a
-> > -	 * specific handling for each of the three DMA types that this driver
-> > -	 * supports.
-> > +	 * FIXME: implement forced termination of active buffers for mx27 and 
-> > +	 * mx27 eMMA, so that the user won't get stuck in an uninterruptible
-> > +	 * state. This requires a specific handling for each of the these DMA
-> > +	 * types.
-> >  	 */
-> >  	spin_lock_irqsave(&pcdev->lock, flags);
-> >  	if (vb->state == VIDEOBUF_QUEUED) {
-> >  		list_del(&vb->queue);
-> >  		vb->state = VIDEOBUF_ERROR;
-> > +	} else if (cpu_is_mx25() && vb->state == VIDEOBUF_ACTIVE) {
-> > +		if (pcdev->fb1_active == buf) {
-> > +			pcdev->csicr1 &= ~CSICR1_FB1_DMA_INTEN;
-> > +			writel(0, pcdev->base_csi + CSIDMASA_FB1);
-> > +			pcdev->fb1_active = NULL;
-> > +		} else if (pcdev->fb2_active == buf) {
-> > +			pcdev->csicr1 &= ~CSICR1_FB2_DMA_INTEN;
-> > +			writel(0, pcdev->base_csi + CSIDMASA_FB2);
-> > +			pcdev->fb2_active = NULL;
-> > +		}
-> > +		writel(pcdev->csicr1, pcdev->base_csi + CSICR1);
-> > +		vb->state = VIDEOBUF_ERROR;
-> >  	}
-> >  	spin_unlock_irqrestore(&pcdev->lock, flags);
-> >  
-> > -- 
-> > 1.7.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+> On Fri, Aug 27, 2010 at 6:48 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Hi Linus,
+> >
+> > Please pull Samsung fixes from:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > s5p-fixes-for-linus
+> >
+> > These things are for bug fix on 2.6.36-rc3.
+> > If any problems, please let me know.
 > 
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
+> Well nothing changed. only LSI codes and required things from LSI side
+> are merged.
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+At this point, focus on getting the critical portions of S5PV310/S5PC210
+into
+the mainline. Once that is done, other features can be merged as required.
+
+> And still need more patches for booting at s5pc210 (aka s5pv310).
+> 
+Thanks for your concern.
+But I think it's enough just only one patch about following...
+I know the problem that we cannot get the proper clock 'id' from clk_get()
+in
+the console_initcall(). This problem occurs when only defined 'uclk1' as
+uart
+clock. And to solve that will be submitted soon.
+
+> Several thins are missed.
+> 1. gpio_to_irq patch not included. it's basic gpiolib feature. Without
+> this patch, it can't use the generic gpiolib based drivers. e.g.,
+> gpio-keys.
+> http://marc.info/?l=linux-arm-kernel&m=128202435823832&w=2
+> 
+I don't think so, 'gpio_to_irq' is a new feature not a bug fix.
+So if required, will be merged at the merge window after review.
+
+> 2. Wrong UART level triggers.
+> At least s5pc110/s5pc210 has wrong UART trigger values compare to macro
+name.
+> http://marc.info/?l=linux-arm-kernel&m=128218476209330&w=2
+> 
+I couldn't find anywhere used it in the mainline. So I'm not sure we really
+need it.
+
+> 3. set correct gpio config at GPIO I at s5pc110
+> http://marc.info/?l=linux-arm-kernel&m=128202423923745&w=2
+> 
+mm...I will sort this out.
+
+(snip)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
