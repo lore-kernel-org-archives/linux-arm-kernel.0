@@ -1,64 +1,75 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Mon, 30 Aug 2010 09:39:44 +1200
-Subject: [PATCH 1/7] mmc: at91_mci: fix pointer errors
-In-Reply-To: <20100827193303.GB23079@void.printf.net>
-References: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
-	<20100827193303.GB23079@void.printf.net>
-Message-ID: <4C7AD3A0.40607@bluewatersys.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Mon, 30 Aug 2010 07:46:08 +1000
+Subject: [PATCH 3/3 v3] dmaengine: Add Freescale i.MX SDMA support
+In-Reply-To: <20100827122230.GF1473@pengutronix.de>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-4-git-send-email-s.hauer@pengutronix.de>
+	<20100827122230.GF1473@pengutronix.de>
+Message-ID: <201008300746.08153.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2010 07:33 AM, Chris Ball wrote:
-> Hi Andrew, Nicolas,
-> 
-> On Fri, Feb 26, 2010 at 07:39:29PM +0100, Nicolas Ferre wrote:
->> From: Wolfgang Muees <wolfgang.mues@auerswald.de>
->>
->> Fixes two pointer errors, one which leads to memory overwrites if used with
->> large chunks of data.
->>
->> Signed-off-by: Wolfgang Muees <wolfgang.mues@auerswald.de>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  drivers/mmc/host/at91_mci.c |    8 +++++---
->>  1 files changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mmc/host/at91_mci.c b/drivers/mmc/host/at91_mci.c
->> index 63924e0..6835104 100644
->> --- a/drivers/mmc/host/at91_mci.c
->> +++ b/drivers/mmc/host/at91_mci.c
->> @@ -227,11 +227,13 @@ static inline void at91_mci_sg_to_dma(struct at91mci_host *host, struct mmc_data
->>  			for (index = 0; index < (amount / 4); index++)
->>  				*dmabuf++ = swab32(sgbuffer[index]);
->>  		} else {
->> -			memcpy(dmabuf, sgbuffer, amount);
->> -			dmabuf += amount;
->> +			char *tmpv = (char *)dmabuf;
->> +			memcpy(tmpv, sgbuffer, amount);
->> +			tmpv += amount;
->> +			dmabuf = (unsigned *)tmpv;
+Hi,
 
-I see this is already applied, but why all the type trickery here? Why
-not just:
+Just a typo and a minor niggle..
 
-	memcpy(dmabuf, sgbuffer, amount);
-	dmabuf += amount / sizeof(dmabuf);
+On Friday, August 27, 2010 10:22:31 pm Sascha Hauer wrote:
+> This patch adds support for the Freescale i.MX SDMA engine.
 
->>  		}
->>  
->> -		kunmap_atomic(sgbuffer, KM_BIO_SRC_IRQ);
->> +		kunmap_atomic(((void *)sgbuffer)-sg->offset, KM_BIO_SRC_IRQ);
+> +static int sdma_config_ownership(struct sdma_channel *sdmac,
+> +		bool event_override, bool mcu_verride, bool dsp_override)
+> +{
+> +	struct sdma_engine *sdma = sdmac->sdma;
+> +	int channel = sdmac->channel;
+> +	u32 evt, mcu, dsp;
+> +
+> +	if (event_override && mcu_verride && dsp_override)
+> +		return -EINVAL;
+> +
+> +	evt = __raw_readl(sdma->regs + SDMA_H_EVTOVR);
+> +	mcu = __raw_readl(sdma->regs + SDMA_H_HOSTOVR);
+> +	dsp = __raw_readl(sdma->regs + SDMA_H_DSPOVR);
+> +
+> +	if (dsp_override)
+> +		dsp &= ~(1 << channel);
+> +	else
+> +		dsp |= (1 << channel);
+> +
+> +	if (event_override)
+> +		evt &= ~(1 << channel);
+> +	else
+> +		evt |= (1 << channel);
+> +
+> +	if (mcu_verride)
+> +		mcu &= ~(1 << channel);
+> +	else
+> +		mcu |= (1 << channel);
+> +
+> +	__raw_writel(evt, sdma->regs + SDMA_H_EVTOVR);
+> +	__raw_writel(mcu, sdma->regs + SDMA_H_HOSTOVR);
+> +	__raw_writel(dsp, sdma->regs + SDMA_H_DSPOVR);
+> +
+> +	return 0;
+> +}
+s/mcu_verride/mcu_override
 
-void * arithmetic is a gcc-ism. Isn't it better to cast to char *, since
-the meaning will be a bit more clear.
 
-~Ryan
+> +static void sdma_event_enable(struct sdma_channel *sdmac, unsigned int
+> event) +{
+> +	struct sdma_engine *sdma = sdmac->sdma;
+> +	int channel = sdmac->channel;
+> +	u32 val;
+> +	u32 chnenbl = chnenbl_ofs(sdma, event);
+> +
+> +	val = __raw_readl(sdma->regs + chnenbl);
+> +	val |= (1 << channel);
+> +	__raw_writel(val, sdma->regs + chnenbl);
+> +}
+s/chnenbl/chanenbl ?
+ (or chanenable, etc.) 
+Everything else was easily readable, but I did a double take when I read 
+through this.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Cheers,
+Marc
