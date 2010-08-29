@@ -1,145 +1,128 @@
-From: vm.rod25@gmail.com (Victor Rodriguez)
-Date: Sat, 28 Aug 2010 13:18:23 -0500
-Subject: [PATCH] hawkboard
-Message-ID: <1283019503-3070-1-git-send-email-vm.rod25@gmail.com>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Sun, 29 Aug 2010 03:48:16 +0200
+Subject: [PATCH/RFCv4 2/6] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <201008281437.11830.hverkuil@xs4all.nl>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>
+	<0b02e05fc21e70a3af39e65e628d117cd89d70a1.1282286941.git.m.nazarewicz@samsung.com>
+	<343f4b0edf9b5eef598831700cb459cd428d3f2e.1282286941.git.m.nazarewicz@samsung.com>
+	<201008281437.11830.hverkuil@xs4all.nl>
+Message-ID: <op.vh6faqnl7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic support for Hawkboard OMAPL138 just UART cominication is included
+> On Friday, August 20, 2010 11:50:42 Michal Nazarewicz wrote:
+>> +**** Regions
+>> +
+>> +     Regions is a list of regions terminated by a region with size
+>> +     equal zero.  The following fields may be set:
+>> +
+>> +     - size       -- size of the region (required, must not be zero)
+>> +     - alignment  -- alignment of the region; must be power of two or
+>> +                     zero (optional)
 
-Signed-off-by: Victor Rodriguez <vm.rod25@gmail.com>
+On Sat, 28 Aug 2010 14:37:11 +0200, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> Just wondering: is alignment really needed since we already align to the
+> PAGE_SIZE? Do you know of hardware with alignment requirements > PAGE_SIZE?
 
-Notes: This patch is checked with 0a50e05b20f3c6af67656303bdb3661a2541ce03 from
-	Kernel development tree for TI DaVinci family of processors
+Our video coder needs its firmware aligned to 128K plus it has to be located
+before any other buffers allocated for the chip.  Because of those, we have
+defined a separate region just for the coder's firmware which is small (256K
+IIRC) and aligned to 128K.
 
-	This patch works with basic da8xx_omapl_defconfig, it just have basic support
-	for UART console
----
- arch/arm/mach-davinci/Kconfig                   |    9 +++
- arch/arm/mach-davinci/Makefile                  |    1 +
- arch/arm/mach-davinci/board-da850-hawk.c        |   69 +++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
- 4 files changed, 80 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-davinci/board-da850-hawk.c
+>> +     - start      -- where the region has to start (optional)
+>> +     - alloc_name -- the name of allocator to use (optional)
+>> +     - alloc      -- allocator to use (optional; and besides
+>> +                     alloc_name is probably is what you want)
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 2bf03e9..fd8a11c 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -185,6 +185,15 @@ config MACH_TNETV107X
- 	help
- 	  Say Y here to select the TI TNETV107X Evaluation Module.
- 
-+config MACH_OMAPL138_HAWKBOARD
-+	bool "TI DA850/OMAP-L138/AM18xx Hawkboard(.org) Platform"
-+	default ARCH_DAVINCI_DA850
-+	depends on ARCH_DAVINCI_DA850
-+	help
-+	  Say Y here to select the TI DA850/OMAP-L138/AM18xx Hawkboard.
-+	  Information of this board may be found at
-+	  http://www.hawkboard.org/
-+
- config DAVINCI_MUX
- 	bool "DAVINCI multiplexing support"
- 	depends on ARCH_DAVINCI
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index eab4c0f..fd271cd 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -33,6 +33,7 @@ obj-$(CONFIG_MACH_DAVINCI_DM365_EVM)	+= board-dm365-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DA830_EVM)	+= board-da830-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
- obj-$(CONFIG_MACH_TNETV107X)		+= board-tnetv107x-evm.o
-+obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-da850-hawk.o
- 
- # Power Management
- obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
-diff --git a/arch/arm/mach-davinci/board-da850-hawk.c b/arch/arm/mach-davinci/board-da850-hawk.c
-new file mode 100644
-index 0000000..e34bcbb
---- /dev/null
-+++ b/arch/arm/mach-davinci/board-da850-hawk.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Hawkboar.org based on TI's OMAP-L138 Platform
-+ *
-+ * Initial code: Syed Mohammed Khasim
-+ *
-+ * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * Derived from: arch/arm/mach-davinci/board-da850-evm.c
-+ * Original Copyrights follow:
-+ *
-+ * 2007, 2009 (c) MontaVista Software, Inc. This file is licensed under
-+ * the terms of the GNU General Public License version 2. This program
-+ * is licensed "as is" without any warranty of any kind, whether express
-+ * or implied.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/console.h>
-+#include <linux/gpio.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+#include <mach/cp_intc.h>
-+#include <mach/da8xx.h>
-+
-+
-+
-+static struct davinci_uart_config omapl138_hawk_uart_config __initdata = {
-+	.enabled_uarts = 0x7,
-+};
-+
-+static __init void omapl138_hawk_init(void)
-+{
-+
-+	davinci_serial_init(&omapl138_hawk_uart_config);
-+
-+	/*
-+	 * shut down uart 0 and 1; they are not used on the board and
-+	 * accessing them causes endless "too much work in irq53" messages
-+	 * with arago fs
-+	 */
-+	__raw_writel(0, IO_ADDRESS(DA8XX_UART1_BASE) + 0x30);
-+	__raw_writel(0, IO_ADDRESS(DA8XX_UART0_BASE) + 0x30);
-+
-+}
-+
-+#ifdef CONFIG_SERIAL_8250_CONSOLE
-+static int __init omapl138_hawk_console_init(void)
-+{
-+	return add_preferred_console("ttyS", 2, "115200");
-+}
-+console_initcall(omapl138_hawk_console_init);
-+#endif
-+
-+static void __init omapl138_hawk_map_io(void)
-+{
-+	da850_init();
-+}
-+
-+MACHINE_START(OMAPL138_HAWKBOARD, "OMAPL 138 Hawkboard.org")
-+	.phys_io	= IO_PHYS,
-+	.io_pg_offst	= (__IO_ADDRESS(IO_PHYS) >> 18) & 0xfffc,
-+	.boot_params	= (DA8XX_DDR_BASE + 0x100),
-+	.map_io		= omapl138_hawk_map_io,
-+	.init_irq	= cp_intc_init,
-+	.timer		= &davinci_timer,
-+	.init_machine	= omapl138_hawk_init,
-+MACHINE_END
-diff --git a/arch/arm/mach-davinci/include/mach/uncompress.h b/arch/arm/mach-davinci/include/mach/uncompress.h
-index 15a6192..640f834 100644
---- a/arch/arm/mach-davinci/include/mach/uncompress.h
-+++ b/arch/arm/mach-davinci/include/mach/uncompress.h
-@@ -88,6 +88,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* DA8xx boards */
- 		DEBUG_LL_DA8XX(davinci_da830_evm,	2);
- 		DEBUG_LL_DA8XX(davinci_da850_evm,	2);
-+		DEBUG_LL_DA8XX(omapl138_hawkboard,	2);
- 
- 		/* TNETV107x boards */
- 		DEBUG_LL_TNETV107X(tnetv107x,		1);
+> I would make this field internal only. At least for now.
+
+OK.
+
+>> +*** The device and types of memory
+>> +
+>> +    The name of the device is taken from the device structure.  It is
+>> +    not possible to use CMA if driver does not register a device
+>> +    (actually this can be overcome if a fake device structure is
+>> +    provided with at least the name set).
+>> +
+>> +    The type of memory is an optional argument provided by the device
+>> +    whenever it requests memory chunk.  In many cases this can be
+>> +    ignored but sometimes it may be required for some devices.
+>
+> This really should not be optional but compulsory. 'type' has the same function
+> as the GFP flags with kmalloc. They tell the kernel where the memory should be
+> allocated. Only if you do not care at all can you pass in NULL. But in almost
+> all cases the memory should be at least DMA-able (and yes, for a lot of SoCs that
+> is the same as any memory -- for now).
+
+At this moment, if type is NULL "common" is assumed.
+
+> Memory types should be defined in the platform code. Some can be generic
+> like 'dma' (i.e. any DMAable memory), 'dma32' (32-bit DMA) and 'common' (any
+> memory). Others are platform specific like 'banka' and 'bankb'.
+
+Yes, that's the idea.
+
+> A memory type definition can either be a start address/size pair but it can
+> perhaps also be a GFP type (e.g. .name = "dma32", .gfp = GFP_DMA32).
+>
+> Regions should be of a single memory type. So when you define the region it
+> should have a memory type field.
+>
+> Drivers request memory of whatever type they require. The mapping just maps
+> one or more regions to the driver and the cma allocator will pick only those
+> regions with the required type and ignore those that do not match.
+>
+>> +    For instance, let's say that there are two memory banks and for
+>> +    performance reasons a device uses buffers in both of them.
+>> +    Platform defines a memory types "a" and "b" for regions in both
+>> +    banks.  The device driver would use those two types then to
+>> +    request memory chunks from different banks.  CMA attributes could
+>> +    look as follows:
+>> +
+>> +         static struct cma_region regions[] = {
+>> +                 { .name = "a", .size = 32 << 20 },
+>> +                 { .name = "b", .size = 32 << 20, .start = 512 << 20 },
+>> +                 { }
+>> +         }
+>> +         static const char map[] __initconst = "foo/a=a;foo/b=b;*=a,b";
+>
+> So this would become something like this:
+>
+>          static struct cma_memtype types[] = {
+>                  { .name = "a", .size = 32 << 20 },
+>                  { .name = "b", .size = 32 << 20, .start = 512 << 20 },
+>                  // For example:
+>                  { .name = "dma", .gfp = GFP_DMA },
+>                  { }
+>          }
+>          static struct cma_region regions[] = {
+>                  // size may of course be smaller than the memtype size.
+>                  { .name = "a", type = "a", .size = 32 << 20 },
+>                  { .name = "b", type = "b", .size = 32 << 20 },
+>                  { }
+>          }
+>          static const char map[] __initconst = "*=a,b";
+>
+> No need to do anything special for driver foo here: cma_alloc will pick the
+> correct region based on the memory type requested by the driver.
+>
+> It is probably no longer needed to specify the memory type in the mapping when
+> this is in place.
+
+I'm not entirely happy with such scheme.
+
+For one, types may overlap: ie. the whole "banka" may be "dma" as well.
+This means that a single region could be of several different types.
+
+Moreover, as I've mentioned the video coder needs to allocate buffers from
+different banks.  However, on never platform there's only one bank (actually
+two but they are interlaced) so allocations from different banks no longer
+make sense.  Instead of changing the driver though I'd prefer to only change
+the mapping in the platform.
+
 -- 
-1.6.0.5
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
