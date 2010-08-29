@@ -1,128 +1,56 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Sun, 29 Aug 2010 03:48:16 +0200
-Subject: [PATCH/RFCv4 2/6] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <201008281437.11830.hverkuil@xs4all.nl>
-References: <cover.1282286941.git.m.nazarewicz@samsung.com>
-	<0b02e05fc21e70a3af39e65e628d117cd89d70a1.1282286941.git.m.nazarewicz@samsung.com>
-	<343f4b0edf9b5eef598831700cb459cd428d3f2e.1282286941.git.m.nazarewicz@samsung.com>
-	<201008281437.11830.hverkuil@xs4all.nl>
-Message-ID: <op.vh6faqnl7p4s8u@localhost>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 29 Aug 2010 11:05:26 +0800
+Subject: [PATCH 0/5] pxa3xx_nand updates
+In-Reply-To: <1282840236.15156.41.camel@localhost>
+References: <AANLkTinU2nF2q9+eSX9XkA3U=Kj3M+BELrDBN1S2AaZp@mail.gmail.com>
+	<AANLkTikMedFwPzoodZx+EJTUkkB2hdsso3Yc7o1q9jBr@mail.gmail.com>
+	<AANLkTim+zxHQHwpM0KJ5vrNNfKAb-ro+2aJiG7CtEvqF@mail.gmail.com>
+	<1282840236.15156.41.camel@localhost>
+Message-ID: <AANLkTikU1oa-WqkraOTGz9re_=rreuikA1uoJk-SeEOR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Friday, August 20, 2010 11:50:42 Michal Nazarewicz wrote:
->> +**** Regions
->> +
->> +     Regions is a list of regions terminated by a region with size
->> +     equal zero.  The following fields may be set:
->> +
->> +     - size       -- size of the region (required, must not be zero)
->> +     - alignment  -- alignment of the region; must be power of two or
->> +                     zero (optional)
-
-On Sat, 28 Aug 2010 14:37:11 +0200, Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> Just wondering: is alignment really needed since we already align to the
-> PAGE_SIZE? Do you know of hardware with alignment requirements > PAGE_SIZE?
-
-Our video coder needs its firmware aligned to 128K plus it has to be located
-before any other buffers allocated for the chip.  Because of those, we have
-defined a separate region just for the coder's firmware which is small (256K
-IIRC) and aligned to 128K.
-
->> +     - start      -- where the region has to start (optional)
->> +     - alloc_name -- the name of allocator to use (optional)
->> +     - alloc      -- allocator to use (optional; and besides
->> +                     alloc_name is probably is what you want)
-
-> I would make this field internal only. At least for now.
-
-OK.
-
->> +*** The device and types of memory
->> +
->> +    The name of the device is taken from the device structure.  It is
->> +    not possible to use CMA if driver does not register a device
->> +    (actually this can be overcome if a fake device structure is
->> +    provided with at least the name set).
->> +
->> +    The type of memory is an optional argument provided by the device
->> +    whenever it requests memory chunk.  In many cases this can be
->> +    ignored but sometimes it may be required for some devices.
+On Fri, Aug 27, 2010 at 12:30 AM, David Woodhouse <dwmw2@infradead.org> wrote:
+> On Fri, 2010-08-27 at 00:22 +0800, Haojian Zhuang wrote:
+>> On Mon, Aug 23, 2010 at 4:22 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> > On Wed, Aug 18, 2010 at 10:34 PM, Haojian Zhuang
+>> > <haojian.zhuang@gmail.com> wrote:
+>> >> Changelog from v1:
+>> >>
+>> >> 1. Add default timing in order to read id successfully.
+>> >> 2. Clean code
+>> >>
+>> >
+>> > This series looks good to me. David, would you please help
+>> > merge this? Thanks.
+>> >
+>>
+>> Hi David,
+>>
+>> How about this series of patches? If they can be merged, we can
+>> produce new patches from mtd tree.
 >
-> This really should not be optional but compulsory. 'type' has the same function
-> as the GFP flags with kmalloc. They tell the kernel where the memory should be
-> allocated. Only if you do not care at all can you pass in NULL. But in almost
-> all cases the memory should be at least DMA-able (and yes, for a lot of SoCs that
-> is the same as any memory -- for now).
-
-At this moment, if type is NULL "common" is assumed.
-
-> Memory types should be defined in the platform code. Some can be generic
-> like 'dma' (i.e. any DMAable memory), 'dma32' (32-bit DMA) and 'common' (any
-> memory). Others are platform specific like 'banka' and 'bankb'.
-
-Yes, that's the idea.
-
-> A memory type definition can either be a start address/size pair but it can
-> perhaps also be a GFP type (e.g. .name = "dma32", .gfp = GFP_DMA32).
+> Please could you resend them -- with Eric's Acked-By, and *without* the
+> line wrap that prevents them from applying.
 >
-> Regions should be of a single memory type. So when you define the region it
-> should have a memory type field.
+> --
+> dwmw2
 >
-> Drivers request memory of whatever type they require. The mapping just maps
-> one or more regions to the driver and the cma allocator will pick only those
-> regions with the required type and ignore those that do not match.
 >
->> +    For instance, let's say that there are two memory banks and for
->> +    performance reasons a device uses buffers in both of them.
->> +    Platform defines a memory types "a" and "b" for regions in both
->> +    banks.  The device driver would use those two types then to
->> +    request memory chunks from different banks.  CMA attributes could
->> +    look as follows:
->> +
->> +         static struct cma_region regions[] = {
->> +                 { .name = "a", .size = 32 << 20 },
->> +                 { .name = "b", .size = 32 << 20, .start = 512 << 20 },
->> +                 { }
->> +         }
->> +         static const char map[] __initconst = "foo/a=a;foo/b=b;*=a,b";
->
-> So this would become something like this:
->
->          static struct cma_memtype types[] = {
->                  { .name = "a", .size = 32 << 20 },
->                  { .name = "b", .size = 32 << 20, .start = 512 << 20 },
->                  // For example:
->                  { .name = "dma", .gfp = GFP_DMA },
->                  { }
->          }
->          static struct cma_region regions[] = {
->                  // size may of course be smaller than the memtype size.
->                  { .name = "a", type = "a", .size = 32 << 20 },
->                  { .name = "b", type = "b", .size = 32 << 20 },
->                  { }
->          }
->          static const char map[] __initconst = "*=a,b";
->
-> No need to do anything special for driver foo here: cma_alloc will pick the
-> correct region based on the memory type requested by the driver.
->
-> It is probably no longer needed to specify the memory type in the mapping when
-> this is in place.
 
-I'm not entirely happy with such scheme.
+Hi David,
 
-For one, types may overlap: ie. the whole "banka" may be "dma" as well.
-This means that a single region could be of several different types.
+Eric's Acked-by is added into these patches already. Please help to
+review and merge.
 
-Moreover, as I've mentioned the video coder needs to allocate buffers from
-different banks.  However, on never platform there's only one bank (actually
-two but they are interlaced) so allocations from different banks no longer
-make sense.  Instead of changing the driver though I'd prefer to only change
-the mapping in the platform.
+Since the first patch is already merged, only submit the other 4 patches.
 
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+Thanks
+Haojian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 20100829_nand_series1.tgz
+Type: application/x-gzip
+Size: 6802 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100829/4bb1c61c/attachment-0001.tgz>
