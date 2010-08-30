@@ -1,36 +1,52 @@
-From: andy@warmcat.com (Andy Green)
-Date: Mon, 30 Aug 2010 14:56:28 +0100
-Subject: iMX31 power management
-In-Reply-To: <201008301444.21510.thomas.nemeth@betatech.fr>
-References: <201008301444.21510.thomas.nemeth@betatech.fr>
-Message-ID: <4C7BB88C.1010202@warmcat.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 30 Aug 2010 10:10:00 -0400 (EDT)
+Subject: [PATCH 17/74] ST SPEAr: Adding USB Host support
+In-Reply-To: <16ef7fe197c3333deccdc6ff41d34ffeb0a8b71e.1283161023.git.viresh.kumar@st.com>
+Message-ID: <Pine.LNX.4.44L0.1008301007010.1571-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/10 13:44, Somebody in the thread at some point said:
+On Mon, 30 Aug 2010, Viresh KUMAR wrote:
 
-Hi -
+> From: Deepak Sikri <deepak.sikri@st.com>
+> 
 
->      I'm currently struggling trying to make suspend to RAM work for the
->      iMX31 processor. As the pm functions were not implemented, I added
->      a pretty straightforward pm "driver".
->
->      It works to a point. The processor seems really sleeping. But where
->      the heck is Prince Charming ? It does not want to wakeup else :( I
->      can't make the DOZE mode, State Retention mode and Deep Sleep mode
->      to work. Does anybody know how ?
->
->      I added in attachment the code I adapted from 2.6.22 so that it
->      integrates better with current kernels.
+Missing patch description.
 
-I ported this similar stuff from the Freescale tree to 2.6.32 last 
-December, it sleeps and wakes fine (using stop clock) on that txtr board 
-since then.
+> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
 
-http://git.warmcat.com/cgi-bin/cgit/txtr-kernel/commit/?h=txtr-tracking&id=34685e9c378c865885ad6a8f2fc06fc36ad48482
 
-There was no enable_irq_wake(); platform support at that time so I guess 
-maybe there is now and you need to make sure your wake interrupts are 
-marked as wake sources?
+> --- /dev/null
+> +++ b/drivers/usb/host/ehci-spear.c
+> @@ -0,0 +1,210 @@
 
--Andy
+...
+
+> +static const struct hc_driver ehci_spear_hc_driver = {
+> +	.description		= hcd_name,
+> +	.product_desc		= "SPEAr EHCI",
+> +	.hcd_priv_size		= sizeof(struct spear_ehci),
+> +
+> +	/* generic hardware linkage */
+> +	.irq			= ehci_irq,
+> +	.flags			= HCD_MEMORY | HCD_USB2,
+> +
+> +	/* basic lifecycle operations */
+> +	.reset			= ehci_spear_setup,
+> +	.start			= ehci_run,
+> +	.stop			= ehci_stop,
+> +	.shutdown		= ehci_shutdown,
+> +
+> +	/* managing i/o requests and associated device resources */
+> +	.urb_enqueue		= ehci_urb_enqueue,
+> +	.urb_dequeue		= ehci_urb_dequeue,
+> +	.endpoint_disable	= ehci_endpoint_disable,
+> +
+
+Missing .endpoint_reset.
+
+Alan Stern
