@@ -1,52 +1,74 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 30 Aug 2010 10:10:00 -0400 (EDT)
-Subject: [PATCH 17/74] ST SPEAr: Adding USB Host support
-In-Reply-To: <16ef7fe197c3333deccdc6ff41d34ffeb0a8b71e.1283161023.git.viresh.kumar@st.com>
-Message-ID: <Pine.LNX.4.44L0.1008301007010.1571-100000@iolanthe.rowland.org>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 30 Aug 2010 17:34:22 +0300
+Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
+Message-ID: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Aug 2010, Viresh KUMAR wrote:
+From: Fabian Godehardt <fg@emlix.com>
 
-> From: Deepak Sikri <deepak.sikri@st.com>
-> 
+This is a patch that seems to make the USB hangs on the S3C244X go away.
+At least a good amount of ping torture didn't make them come back so far.
 
-Missing patch description.
+The issue is that, if there are several back-to-back packets, sometimes no
+interrupt is generated for one of them. This seems to be caused by the
+mysterious dual packet mode, which the USB hardware enters automatically
+if the endpoint size is half that of the FIFO. (On the 244X, this is the
+normal situation for bulk data endpoints.)
 
-> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
+There is also a timing factor in this. It seems that what happens is that
+the USB hardware automatically sends an acknowledgement if there is only one 
+packet in the FIFO (the FIFO has space for two). If another packet arrives
+before the host has retrieved and acknowledged the previous one, no interrupt
+is generated for that second one.
 
+However, there may be an indication. There is one undocumented bit (none
+of the 244x manuals document it), OUT_CRS1_REG[1], that seems to be set
+suspiciously often when this condition occurs. There is also
+CLR_DATA_TOGGLE, OUT_CRS1_REG[7], which may have a function related to
+this. (The Samsung manual is rather terse on that, as usual.)
 
-> --- /dev/null
-> +++ b/drivers/usb/host/ehci-spear.c
-> @@ -0,0 +1,210 @@
+This needs to be examined further. For now, the patch seems to do the
+trick.
 
-...
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ drivers/usb/gadget/s3c2410_udc.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
 
-> +static const struct hc_driver ehci_spear_hc_driver = {
-> +	.description		= hcd_name,
-> +	.product_desc		= "SPEAr EHCI",
-> +	.hcd_priv_size		= sizeof(struct spear_ehci),
-> +
-> +	/* generic hardware linkage */
-> +	.irq			= ehci_irq,
-> +	.flags			= HCD_MEMORY | HCD_USB2,
-> +
-> +	/* basic lifecycle operations */
-> +	.reset			= ehci_spear_setup,
-> +	.start			= ehci_run,
-> +	.stop			= ehci_stop,
-> +	.shutdown		= ehci_shutdown,
-> +
-> +	/* managing i/o requests and associated device resources */
-> +	.urb_enqueue		= ehci_urb_enqueue,
-> +	.urb_dequeue		= ehci_urb_dequeue,
-> +	.endpoint_disable	= ehci_endpoint_disable,
-> +
-
-Missing .endpoint_reset.
-
-Alan Stern
+diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
+index ea2b3c7..fed323c 100644
+--- a/drivers/usb/gadget/s3c2410_udc.c
++++ b/drivers/usb/gadget/s3c2410_udc.c
+@@ -902,7 +902,7 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void *_dev)
+ 	int pwr_reg;
+ 	int ep0csr;
+ 	int i;
+-	u32 idx;
++	u32 idx, idx2;
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&dev->lock, flags);
+@@ -1017,6 +1017,20 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void *_dev)
+ 		}
+ 	}
+ 
++	/* what else causes this interrupt? a receive! who is it? */
++	if (!usb_status && !usbd_status && !pwr_reg && !ep0csr) {
++		for (i = 1; i < S3C2410_ENDPOINTS; i++) {
++			idx2 = udc_read(S3C2410_UDC_INDEX_REG);
++			udc_write(i, S3C2410_UDC_INDEX_REG);
++
++			if (udc_read(S3C2410_UDC_OUT_CSR1_REG) & 0x1)
++				s3c2410_udc_handle_ep(&dev->ep[i]);
++
++			/* restore index */
++			udc_write(idx2, S3C2410_UDC_INDEX_REG);
++		}
++	}
++
+ 	dprintk(DEBUG_VERBOSE, "irq: %d s3c2410_udc_done.\n", IRQ_USBD);
+ 
+ 	/* Restore old index */
+-- 
+1.7.2
