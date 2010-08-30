@@ -1,1176 +1,883 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:26 +0530
-Subject: [PATCH 63/74] SPEAr3xx: Rework pmx_dev code to remove conflicts
+Date: Mon, 30 Aug 2010 16:08:55 +0530
+Subject: [PATCH 31/74] ST SPEAr: Adding support for SSP PL022
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <68d31bf04a4d4ae6e969a15d446d100ccb6f3902.1283161024.git.viresh.kumar@st.com>
+Message-ID: <447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryan Mallon <ryan@bluewatersys.com>
-
-Prefix the pmx_devs to remove naming conflicts between the three
-SPEAr3xx platforms. Also make pmx_driver static to each platform and
-rework the init code to pass the devices rather than export the
-pmx_driver structure.
-
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |  129 +++++++++++++------------
- arch/arm/mach-spear3xx/spear300.c             |   40 ++++----
- arch/arm/mach-spear3xx/spear300_evb.c         |   25 ++---
- arch/arm/mach-spear3xx/spear310.c             |   28 +++---
- arch/arm/mach-spear3xx/spear310_evb.c         |   41 ++++-----
- arch/arm/mach-spear3xx/spear320.c             |   56 ++++++-----
- arch/arm/mach-spear3xx/spear320_evb.c         |   35 +++----
- arch/arm/mach-spear3xx/spear3xx.c             |   60 ++++++------
- 8 files changed, 206 insertions(+), 208 deletions(-)
+ arch/arm/mach-spear13xx/clock.c                |    2 +-
+ arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |   47 ++++++++++++++
+ arch/arm/mach-spear13xx/spear13xx.c            |   31 ++++++++++
+ arch/arm/mach-spear3xx/clock.c                 |    4 +-
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    2 +
+ arch/arm/mach-spear3xx/spear300_evb.c          |   50 +++++++++++++++
+ arch/arm/mach-spear3xx/spear310_evb.c          |   42 +++++++++++++
+ arch/arm/mach-spear3xx/spear320.c              |   42 +++++++++++++
+ arch/arm/mach-spear3xx/spear320_evb.c          |   46 ++++++++++++++
+ arch/arm/mach-spear3xx/spear3xx.c              |   31 ++++++++++
+ arch/arm/mach-spear6xx/clock.c                 |    6 +-
+ arch/arm/mach-spear6xx/include/mach/generic.h  |    1 +
+ arch/arm/mach-spear6xx/include/mach/spear.h    |    4 +-
+ arch/arm/mach-spear6xx/spear600_evb.c          |   51 ++++++++++++++++
+ arch/arm/mach-spear6xx/spear6xx.c              |   68 +++++++++++++++++++++
+ arch/arm/plat-spear/include/plat/spi.h         |   77 ++++++++++++++++++++++++
+ 17 files changed, 497 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/plat-spear/include/plat/spi.h
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 896c1b0..6f4b90d 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -71,21 +71,21 @@ void spear3xx_pmx_init_addr(struct pmx_driver *driver, unsigned int addr);
- #define PMX_TIMER_1_2_MASK	(1 << 0)
+diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+index 8658d48..8399c15 100644
+--- a/arch/arm/mach-spear13xx/clock.c
++++ b/arch/arm/mach-spear13xx/clock.c
+@@ -799,7 +799,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.dev_id = "i2s0",		.clk = &i2s0_clk},
+ 	{.dev_id = "i2s1",		.clk = &i2s1_clk},
+ 	{.dev_id = "adc",		.clk = &adc_clk},
+-	{.dev_id = "ssp",		.clk = &ssp_clk},
++	{.dev_id = "ssp-pl022",		.clk = &ssp_clk},
+ 	{.dev_id = "gpio0",		.clk = &gpio0_clk},
+ 	{.dev_id = "gpio1",		.clk = &gpio1_clk},
+ 	{.dev_id = "keyboard",		.clk = &kbd_clk},
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index b884359..967e96e 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -30,6 +30,7 @@
  
- /* pad mux devices */
--extern struct pmx_dev pmx_firda;
--extern struct pmx_dev pmx_i2c;
--extern struct pmx_dev pmx_ssp_cs;
--extern struct pmx_dev pmx_ssp;
--extern struct pmx_dev pmx_mii;
--extern struct pmx_dev pmx_gpio_pin0;
--extern struct pmx_dev pmx_gpio_pin1;
--extern struct pmx_dev pmx_gpio_pin2;
--extern struct pmx_dev pmx_gpio_pin3;
--extern struct pmx_dev pmx_gpio_pin4;
--extern struct pmx_dev pmx_gpio_pin5;
--extern struct pmx_dev pmx_uart0_modem;
--extern struct pmx_dev pmx_uart0;
--extern struct pmx_dev pmx_timer_3_4;
--extern struct pmx_dev pmx_timer_1_2;
-+extern struct pmx_dev spear3xx_pmx_firda;
-+extern struct pmx_dev spear3xx_pmx_i2c;
-+extern struct pmx_dev spear3xx_pmx_ssp_cs;
-+extern struct pmx_dev spear3xx_pmx_ssp;
-+extern struct pmx_dev spear3xx_pmx_mii;
-+extern struct pmx_dev spear3xx_pmx_gpio_pin0;
-+extern struct pmx_dev spear3xx_pmx_gpio_pin1;
-+extern struct pmx_dev spear3xx_pmx_gpio_pin2;
-+extern struct pmx_dev spear3xx_pmx_gpio_pin3;
-+extern struct pmx_dev spear3xx_pmx_gpio_pin4;
-+extern struct pmx_dev spear3xx_pmx_gpio_pin5;
-+extern struct pmx_dev spear3xx_pmx_uart0_modem;
-+extern struct pmx_dev spear3xx_pmx_uart0;
-+extern struct pmx_dev spear3xx_pmx_timer_3_4;
-+extern struct pmx_dev spear3xx_pmx_timer_1_2;
+ /* Add spear13xx family device structure declarations here */
+ extern struct amba_device gpio_device[];
++extern struct amba_device ssp_device;
+ extern struct amba_device uart_device;
+ extern struct platform_device ehci0_device;
+ extern struct platform_device ehci1_device;
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index c5ac2fb..6aaae5a 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -12,7 +12,10 @@
+  */
  
- #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
- /* padmux plgpio devices */
-@@ -106,8 +106,6 @@ extern struct pmx_dev pmx_plgpio_43_44_47_48;
- extern struct pmx_dev pmx_plgpio_45_46_49_50;
- #endif
+ #include <linux/types.h>
++#include <linux/gpio.h>
+ #include <linux/mtd/nand.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+@@ -21,10 +24,12 @@
+ #include <plat/keyboard.h>
+ #include <plat/nand.h>
+ #include <plat/smi.h>
++#include <plat/spi.h>
  
--extern struct pmx_driver pmx_driver;
--
- /* spear300 declarations */
- #ifdef CONFIG_MACH_SPEAR300
- /* Add spear300 machine device structure declarations here */
-@@ -136,27 +134,28 @@ extern struct pmx_mode camu_wlcd_mode;
- extern struct pmx_mode caml_lcd_mode;
- 
- /* pad mux devices */
--extern struct pmx_dev pmx_fsmc_2_chips;
--extern struct pmx_dev pmx_fsmc_4_chips;
--extern struct pmx_dev pmx_keyboard;
--extern struct pmx_dev pmx_clcd;
--extern struct pmx_dev pmx_telecom_gpio;
--extern struct pmx_dev pmx_telecom_tdm;
--extern struct pmx_dev pmx_telecom_spi_cs_i2c_clk;
--extern struct pmx_dev pmx_telecom_camera;
--extern struct pmx_dev pmx_telecom_dac;
--extern struct pmx_dev pmx_telecom_i2s;
--extern struct pmx_dev pmx_telecom_boot_pins;
--extern struct pmx_dev pmx_telecom_sdhci_4bit;
--extern struct pmx_dev pmx_telecom_sdhci_8bit;
--extern struct pmx_dev pmx_gpio1;
-+extern struct pmx_dev spear300_pmx_fsmc_2_chips;
-+extern struct pmx_dev spear300_pmx_fsmc_4_chips;
-+extern struct pmx_dev spear300_pmx_keyboard;
-+extern struct pmx_dev spear300_pmx_clcd;
-+extern struct pmx_dev spear300_pmx_telecom_gpio;
-+extern struct pmx_dev spear300_pmx_telecom_tdm;
-+extern struct pmx_dev spear300_pmx_telecom_spi_cs_i2c_clk;
-+extern struct pmx_dev spear300_pmx_telecom_camera;
-+extern struct pmx_dev spear300_pmx_telecom_dac;
-+extern struct pmx_dev spear300_pmx_telecom_i2s;
-+extern struct pmx_dev spear300_pmx_telecom_boot_pins;
-+extern struct pmx_dev spear300_pmx_telecom_sdhci_4bit;
-+extern struct pmx_dev spear300_pmx_telecom_sdhci_8bit;
-+extern struct pmx_dev spear300_pmx_gpio1;
- 
- /* pad multiplexing support */
- #define SPEAR300_PAD_MUX_CONFIG_REG	0x99000000
- #define SPEAR300_MODE_CONFIG_REG	0x99000004
- 
- /* Add spear300 machine function declarations here */
--void __init spear300_init(void);
-+void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count);
- #define SDHCI_MEM_ENB	0x1
- #define I2S_MEM_ENB	0x2
- void sdhci_i2s_mem_enable(u8 mask);
-@@ -177,18 +176,19 @@ extern struct platform_device plgpio_device;
- extern struct platform_device nand_device;
- 
- /* pad mux devices */
--extern struct pmx_dev pmx_emi_cs_0_1_4_5;
--extern struct pmx_dev pmx_emi_cs_2_3;
--extern struct pmx_dev pmx_uart1;
--extern struct pmx_dev pmx_uart2;
--extern struct pmx_dev pmx_uart3_4_5;
--extern struct pmx_dev pmx_fsmc;
--extern struct pmx_dev pmx_rs485_0_1;
--extern struct pmx_dev pmx_tdm0;
-+extern struct pmx_dev spear310_pmx_emi_cs_0_1_4_5;
-+extern struct pmx_dev spear310_pmx_emi_cs_2_3;
-+extern struct pmx_dev spear310_pmx_uart1;
-+extern struct pmx_dev spear310_pmx_uart2;
-+extern struct pmx_dev spear310_pmx_uart3_4_5;
-+extern struct pmx_dev spear310_pmx_fsmc;
-+extern struct pmx_dev spear310_pmx_rs485_0_1;
-+extern struct pmx_dev spear310_pmx_tdm0;
- #define SPEAR310_PAD_MUX_CONFIG_REG	0xB4000008
- 
- /* Add spear310 machine function declarations here */
--void __init spear310_init(void);
-+void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count);
- 
- /* spear320 declarations */
- #elif defined(CONFIG_MACH_SPEAR320)
-@@ -213,35 +213,36 @@ extern struct pmx_mode auto_exp_mode;
- extern struct pmx_mode small_printers_mode;
- 
- /* pad mux devices */
--extern struct pmx_dev pmx_clcd;
--extern struct pmx_dev pmx_emi;
--extern struct pmx_dev pmx_fsmc;
--extern struct pmx_dev pmx_spp;
--extern struct pmx_dev pmx_sdhci;
--extern struct pmx_dev pmx_i2s;
--extern struct pmx_dev pmx_uart1;
--extern struct pmx_dev pmx_uart1_modem;
--extern struct pmx_dev pmx_uart2;
--extern struct pmx_dev pmx_touchscreen;
--extern struct pmx_dev pmx_can;
--extern struct pmx_dev pmx_sdhci_led;
--extern struct pmx_dev pmx_pwm0;
--extern struct pmx_dev pmx_pwm1;
--extern struct pmx_dev pmx_pwm2;
--extern struct pmx_dev pmx_pwm3;
--extern struct pmx_dev pmx_ssp1;
--extern struct pmx_dev pmx_ssp2;
--extern struct pmx_dev pmx_mii1;
--extern struct pmx_dev pmx_smii0;
--extern struct pmx_dev pmx_smii1;
--extern struct pmx_dev pmx_i2c1;
-+extern struct pmx_dev spear320_pmx_clcd;
-+extern struct pmx_dev spear320_pmx_emi;
-+extern struct pmx_dev spear320_pmx_fsmc;
-+extern struct pmx_dev spear320_pmx_spp;
-+extern struct pmx_dev spear320_pmx_sdhci;
-+extern struct pmx_dev spear320_pmx_i2s;
-+extern struct pmx_dev spear320_pmx_uart1;
-+extern struct pmx_dev spear320_pmx_uart1_modem;
-+extern struct pmx_dev spear320_pmx_uart2;
-+extern struct pmx_dev spear320_pmx_touchscreen;
-+extern struct pmx_dev spear320_pmx_can;
-+extern struct pmx_dev spear320_pmx_sdhci_led;
-+extern struct pmx_dev spear320_pmx_pwm0;
-+extern struct pmx_dev spear320_pmx_pwm1;
-+extern struct pmx_dev spear320_pmx_pwm2;
-+extern struct pmx_dev spear320_pmx_pwm3;
-+extern struct pmx_dev spear320_pmx_ssp1;
-+extern struct pmx_dev spear320_pmx_ssp2;
-+extern struct pmx_dev spear320_pmx_mii1;
-+extern struct pmx_dev spear320_pmx_smii0;
-+extern struct pmx_dev spear320_pmx_smii1;
-+extern struct pmx_dev spear320_pmx_i2c1;
- 
- /* pad multiplexing support */
- #define SPEAR320_PAD_MUX_CONFIG_REG	0xB300000C
- #define SPEAR320_MODE_CONFIG_REG	0xB3000010
- 
- /* Add spear320 machine function declarations here */
--void __init spear320_init(void);
-+void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count);
- 
- /* Add misc structure declarations here */
- extern struct clcd_board clcd_plat_data;
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index c2d4a91..272cd80 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -131,7 +131,7 @@ static struct pmx_dev_mode pmx_fsmc_2_chips_modes[] = {
- 	},
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&gpio_device[0],
+ 	&gpio_device[1],
++	&ssp_device,
+ 	&uart_device,
  };
  
--struct pmx_dev pmx_fsmc_2_chips = {
-+struct pmx_dev spear300_pmx_fsmc_2_chips = {
- 	.name = "fsmc_2_chips",
- 	.modes = pmx_fsmc_2_chips_modes,
- 	.mode_count = ARRAY_SIZE(pmx_fsmc_2_chips_modes),
-@@ -154,7 +154,7 @@ static struct pmx_dev_mode pmx_fsmc_4_chips_modes[] = {
- 	},
+@@ -49,6 +54,46 @@ static struct kbd_platform_data kbd_data = {
+ 	.rep = 1,
  };
  
--struct pmx_dev pmx_fsmc_4_chips = {
-+struct pmx_dev spear300_pmx_fsmc_4_chips = {
- 	.name = "fsmc_4_chips",
- 	.modes = pmx_fsmc_4_chips_modes,
- 	.mode_count = ARRAY_SIZE(pmx_fsmc_4_chips_modes),
-@@ -179,7 +179,7 @@ static struct pmx_dev_mode pmx_keyboard_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_keyboard = {
-+struct pmx_dev spear300_pmx_keyboard = {
- 	.name = "keyboard",
- 	.modes = pmx_keyboard_modes,
- 	.mode_count = ARRAY_SIZE(pmx_keyboard_modes),
-@@ -213,7 +213,7 @@ static struct pmx_dev_mode pmx_clcd_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_clcd = {
-+struct pmx_dev spear300_pmx_clcd = {
- 	.name = "clcd",
- 	.modes = pmx_clcd_modes,
- 	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
-@@ -280,7 +280,7 @@ static struct pmx_dev_mode pmx_telecom_gpio_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_gpio = {
-+struct pmx_dev spear300_pmx_telecom_gpio = {
- 	.name = "telecom_gpio",
- 	.modes = pmx_telecom_gpio_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_gpio_modes),
-@@ -306,7 +306,7 @@ static struct pmx_dev_mode pmx_telecom_tdm_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_tdm = {
-+struct pmx_dev spear300_pmx_telecom_tdm = {
- 	.name = "telecom_tdm",
- 	.modes = pmx_telecom_tdm_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_tdm_modes),
-@@ -331,7 +331,7 @@ static struct pmx_dev_mode pmx_telecom_spi_cs_i2c_clk_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_spi_cs_i2c_clk = {
-+struct pmx_dev spear300_pmx_telecom_spi_cs_i2c_clk = {
- 	.name = "telecom_spi_cs_i2c_clk",
- 	.modes = pmx_telecom_spi_cs_i2c_clk_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_spi_cs_i2c_clk_modes),
-@@ -363,7 +363,7 @@ static struct pmx_dev_mode pmx_telecom_camera_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_camera = {
-+struct pmx_dev spear300_pmx_telecom_camera = {
- 	.name = "telecom_camera",
- 	.modes = pmx_telecom_camera_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_camera_modes),
-@@ -386,7 +386,7 @@ static struct pmx_dev_mode pmx_telecom_dac_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_dac = {
-+struct pmx_dev spear300_pmx_telecom_dac = {
- 	.name = "telecom_dac",
- 	.modes = pmx_telecom_dac_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_dac_modes),
-@@ -411,7 +411,7 @@ static struct pmx_dev_mode pmx_telecom_i2s_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_i2s = {
-+struct pmx_dev spear300_pmx_telecom_i2s = {
- 	.name = "telecom_i2s",
- 	.modes = pmx_telecom_i2s_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_i2s_modes),
-@@ -434,7 +434,7 @@ static struct pmx_dev_mode pmx_telecom_boot_pins_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_boot_pins = {
-+struct pmx_dev spear300_pmx_telecom_boot_pins = {
- 	.name = "telecom_boot_pins",
- 	.modes = pmx_telecom_boot_pins_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_boot_pins_modes),
-@@ -462,7 +462,7 @@ static struct pmx_dev_mode pmx_telecom_sdhci_4bit_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_sdhci_4bit = {
-+struct pmx_dev spear300_pmx_telecom_sdhci_4bit = {
- 	.name = "telecom_sdhci_4bit",
- 	.modes = pmx_telecom_sdhci_4bit_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_4bit_modes),
-@@ -489,7 +489,7 @@ static struct pmx_dev_mode pmx_telecom_sdhci_8bit_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_sdhci_8bit = {
-+struct pmx_dev spear300_pmx_telecom_sdhci_8bit = {
- 	.name = "telecom_sdhci_8bit",
- 	.modes = pmx_telecom_sdhci_8bit_modes,
- 	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_8bit_modes),
-@@ -512,14 +512,14 @@ static struct pmx_dev_mode pmx_gpio1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio1 = {
-+struct pmx_dev spear300_pmx_gpio1 = {
- 	.name = "arm gpio1",
- 	.modes = pmx_gpio1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio1_modes),
- };
- 
- /* pmx driver structure */
--struct pmx_driver pmx_driver = {
-+static struct pmx_driver pmx_driver = {
- 	.mode_reg = {.address = SPEAR300_MODE_CONFIG_REG, .mask = 0x0000000f},
- };
- 
-@@ -773,7 +773,8 @@ void sdhci_i2s_mem_enable(u8 mask)
++/* Currently no gpios are free on eval board so it is kept commented */
++#if 0
++/* spi board information */
++/* spi0 flash Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, flash, /* mention gpio number here */);
++/* spi0 flash Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, flash, spi0_flash_cs_control);
++
++/* spi0 spidev Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, dev, /* mention gpio number here */);
++/* spi0 spidev Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, dev, spi0_dev_cs_control);
++#endif
++
++static struct spi_board_info __initdata spi_board_info[] = {
++#if 0
++	/* spi0 board info */
++	{
++		.modalias = "spidev",
++		.controller_data = &spi0_dev_chip_info,
++		.max_speed_hz = 10000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.mode = 0,
++	}, {
++		.modalias = "m25p80",
++		.controller_data = &spi0_flash_chip_info,
++		.max_speed_hz = 1000000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = 0,
++	}
++#endif
++};
++
++static void __init spi_init(void)
++{
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++}
++
+ #ifdef CONFIG_PCIEPORTBUS
+ /* this function is needed for PCIE host and device driver. Same
+  * controller can not be programmed as host as well as device. So host
+@@ -106,6 +151,8 @@ static void __init spear1300_evb_init(void)
+ 	/* Add Amba Devices */
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
++
++	spi_init();
  }
  
- /* spear300 routines */
--void __init spear300_init(void)
-+void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count)
- {
- 	int ret = 0;
+ MACHINE_START(SPEAR1300, "ST-SPEAR1300-EVB")
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index c5a0a0c..9e4a673 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -12,6 +12,7 @@
+  */
  
-@@ -788,10 +789,13 @@ void __init spear300_init(void)
- 			printk(KERN_ERR "Error registering Shared IRQ\n");
+ #include <linux/types.h>
++#include <linux/amba/pl022.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/ptrace.h>
+ #include <linux/io.h>
+@@ -64,6 +65,36 @@ struct amba_device gpio_device[] = {
  	}
+ };
  
-+	/* pmx initialization */
-+	pmx_driver.mode = pmx_mode;
-+	pmx_driver.devs = pmx_devs;
-+	pmx_driver.devs_count = pmx_dev_count;
++/* ssp device registeration */
++static struct pl022_ssp_controller ssp_platform_data = {
++	.bus_id = 0,
++	.enable_dma = 0,
++	/*
++	 * This is number of spi devices that can be connected to spi. There are
++	 * two type of chipselects on which slave devices can work. One is chip
++	 * select provided by spi masters other is controlled through external
++	 * gpio's. We can't use chipselect provided from spi master (because as
++	 * soon as FIFO becomes empty, CS is disabled and transfer ends). So
++	 * this number now depends on number of gpios available for spi. each
++	 * slave on each master requires a separate gpio pin.
++	 */
++	.num_chipselect = 2,
++};
 +
- 	/* This fixes addresses of all pmx devices for spear300 */
- 	spear3xx_pmx_init_addr(&pmx_driver, SPEAR300_PAD_MUX_CONFIG_REG);
--
--	/* pmx initialization */
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
- 		pr_err("padmux: registeration failed. err no: %d\n", ret);
++struct amba_device ssp_device = {
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.init_name = "ssp-pl022",
++		.platform_data = &ssp_platform_data,
++	},
++	.res = {
++		.start = SPEAR13XX_SSP_BASE,
++		.end = SPEAR13XX_SSP_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {IRQ_SSP, NO_IRQ},
++};
++
+ /* uart device registeration */
+ struct amba_device uart_device = {
+ 	.dev = {
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 93c5fd9..f7dedc6 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -444,7 +444,7 @@ static struct clk adc_clk = {
+ };
+ 
+ /* ssp clock */
+-static struct clk ssp_clk = {
++static struct clk ssp0_clk = {
+ 	.pclk = &apb_clk,
+ 	.en_reg = PERIP1_CLK_ENB,
+ 	.en_reg_bit = SSP_CLK_ENB,
+@@ -543,7 +543,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "c3",		.clk = &c3_clk},
+ 	/* clock derived from apb clk */
+ 	{ .dev_id = "adc",		.clk = &adc_clk},
+-	{ .dev_id = "ssp",		.clk = &ssp_clk},
++	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
+ 	{ .dev_id = "gpio",		.clk = &gpio_clk},
+ #if defined(CONFIG_MACH_SPEAR300) || defined(CONFIG_MACH_SPEAR310) || \
+ 	defined(CONFIG_MACH_SPEAR320)
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 6aac229..04ce870 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -32,6 +32,7 @@
+ 
+ /* Add spear3xx family device structure declarations here */
+ extern struct amba_device gpio_device;
++extern struct amba_device ssp0_device;
+ extern struct amba_device uart_device;
+ extern struct amba_device wdt_device;
+ extern struct platform_device ehci_device;
+@@ -176,6 +177,7 @@ void __init spear310_init(void);
+ #elif defined(CONFIG_MACH_SPEAR320)
+ /* Add spear320 machine device structure declarations here */
+ extern struct amba_device clcd_device;
++extern struct amba_device ssp_device[];
+ extern struct platform_device i2c1_device;
+ extern struct platform_device nand_device;
+ extern struct platform_device plgpio_device;
 diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index 1bcbd95..d8a22fd 100644
+index 895f7b7..653adec 100644
 --- a/arch/arm/mach-spear3xx/spear300_evb.c
 +++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -28,17 +28,17 @@
+@@ -14,11 +14,15 @@
+ #include <linux/mtd/nand.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
+ #include <mach/generic.h>
++#include <mach/gpio.h>
+ #include <mach/spear.h>
+ #include <plat/keyboard.h>
+ #include <plat/nand.h>
+ #include <plat/smi.h>
++#include <plat/spi.h>
+ 
  /* padmux devices to enable */
  static struct pmx_dev *pmx_devs[] = {
+@@ -39,6 +43,7 @@ static struct pmx_dev *pmx_devs[] = {
+ static struct amba_device *amba_devs[] __initdata = {
  	/* spear3xx specific devices */
--	&pmx_i2c,
--	&pmx_ssp_cs,
--	&pmx_ssp,
--	&pmx_mii,
--	&pmx_uart0,
-+	&spear3xx_pmx_i2c,
-+	&spear3xx_pmx_ssp_cs,
-+	&spear3xx_pmx_ssp,
-+	&spear3xx_pmx_mii,
-+	&spear3xx_pmx_uart0,
+ 	&gpio_device,
++	&ssp0_device,
+ 	&uart_device,
+ 	&wdt_device,
  
- 	/* spear300 specific devices */
--	&pmx_fsmc_2_chips,
--	&pmx_clcd,
--	&pmx_telecom_sdhci_4bit,
--	&pmx_gpio1,
-+	&spear300_pmx_fsmc_2_chips,
-+	&spear300_pmx_clcd,
-+	&spear300_pmx_telecom_sdhci_4bit,
-+	&spear300_pmx_gpio1,
+@@ -70,6 +75,49 @@ static struct kbd_platform_data kbd_data = {
+ 	.rep = 1,
  };
  
- static struct amba_device *amba_devs[] __initdata = {
-@@ -130,11 +130,6 @@ static void __init spi_init(void)
- 
++/* spi board information */
++/* spi0 flash Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, flash, RAS_GPIO_3);
++/* spi0 flash Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, flash, spi0_flash_cs_control);
++
++/*
++ * Chip select of spidev, currently no gpio is free on eval board so it is kept
++ * commented
++ */
++#if 0
++/* spi0 spidev Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, dev, /* mention gpio number here */);
++/* spi0 spidev Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, dev, spi0_dev_cs_control);
++#endif
++
++static struct spi_board_info __initdata spi_board_info[] = {
++	/* spi0 board info */
++	{
++#if 0
++		.modalias = "spidev",
++		.controller_data = &spi0_dev_chip_info,
++		.max_speed_hz = 10000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.mode = 0,
++	}, {
++#endif
++		.modalias = "m25p80",
++		.controller_data = &spi0_flash_chip_info,
++		.max_speed_hz = 400000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = 0,
++	}
++};
++
++static void __init spi_init(void)
++{
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++}
++
  static void __init spear300_evb_init(void)
  {
--	/* padmux initialization, must be done before spear300_init */
--	pmx_driver.mode = &photo_frame_mode;
--	pmx_driver.devs = pmx_devs;
--	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--
- 	/* set keyboard plat data */
- 	kbd_set_plat_data(&kbd_device, &kbd_data);
- 
-@@ -149,7 +144,7 @@ static void __init spear300_evb_init(void)
- 	sdhci_i2s_mem_enable(SDHCI_MEM_ENB);
- 
- 	/* call spear300 machine init function */
--	spear300_init();
-+	spear300_init(&photo_frame_mode, pmx_devs, ARRAY_SIZE(pmx_devs));
- 
- 	/* Register slave devices on the I2C buses */
- 	i2c_register_board_devices();
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 7a3903a..71f1148 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -38,7 +38,7 @@ static struct pmx_dev_mode pmx_emi_cs_0_1_4_5_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_emi_cs_0_1_4_5 = {
-+struct pmx_dev spear310_pmx_emi_cs_0_1_4_5 = {
- 	.name = "emi_cs_0_1_4_5",
- 	.modes = pmx_emi_cs_0_1_4_5_modes,
- 	.mode_count = ARRAY_SIZE(pmx_emi_cs_0_1_4_5_modes),
-@@ -59,7 +59,7 @@ static struct pmx_dev_mode pmx_emi_cs_2_3_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_emi_cs_2_3 = {
-+struct pmx_dev spear310_pmx_emi_cs_2_3 = {
- 	.name = "emi_cs_2_3",
- 	.modes = pmx_emi_cs_2_3_modes,
- 	.mode_count = ARRAY_SIZE(pmx_emi_cs_2_3_modes),
-@@ -80,7 +80,7 @@ static struct pmx_dev_mode pmx_uart1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart1 = {
-+struct pmx_dev spear310_pmx_uart1 = {
- 	.name = "uart1",
- 	.modes = pmx_uart1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
-@@ -101,7 +101,7 @@ static struct pmx_dev_mode pmx_uart2_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart2 = {
-+struct pmx_dev spear310_pmx_uart2 = {
- 	.name = "uart2",
- 	.modes = pmx_uart2_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
-@@ -122,7 +122,7 @@ static struct pmx_dev_mode pmx_uart3_4_5_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart3_4_5 = {
-+struct pmx_dev spear310_pmx_uart3_4_5 = {
- 	.name = "uart3_4_5",
- 	.modes = pmx_uart3_4_5_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart3_4_5_modes),
-@@ -143,7 +143,7 @@ static struct pmx_dev_mode pmx_fsmc_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_fsmc = {
-+struct pmx_dev spear310_pmx_fsmc = {
- 	.name = "fsmc",
- 	.modes = pmx_fsmc_modes,
- 	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
-@@ -164,7 +164,7 @@ static struct pmx_dev_mode pmx_rs485_0_1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_rs485_0_1 = {
-+struct pmx_dev spear310_pmx_rs485_0_1 = {
- 	.name = "rs485_0_1",
- 	.modes = pmx_rs485_0_1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_rs485_0_1_modes),
-@@ -185,14 +185,14 @@ static struct pmx_dev_mode pmx_tdm0_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_tdm0 = {
-+struct pmx_dev spear310_pmx_tdm0 = {
- 	.name = "tdm0",
- 	.modes = pmx_tdm0_modes,
- 	.mode_count = ARRAY_SIZE(pmx_tdm0_modes),
- };
- 
- /* pmx driver structure */
--struct pmx_driver pmx_driver;
-+static struct pmx_driver pmx_driver;
- 
- /* Add spear310 specific devices here */
- /* uart1 device registeration */
-@@ -490,7 +490,8 @@ static struct spear_shirq shirq_intrcomm_ras = {
- };
- 
- /* spear310 routines */
--void __init spear310_init(void)
-+void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count)
- {
- 	void __iomem *base;
- 	int ret = 0;
-@@ -526,10 +527,13 @@ void __init spear310_init(void)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
- 
-+	/* pmx initialization */
-+	pmx_driver.mode = pmx_mode;
-+	pmx_driver.devs = pmx_devs;
-+	pmx_driver.devs_count = pmx_dev_count;
+ 	unsigned int i;
+@@ -101,6 +149,8 @@ static void __init spear300_evb_init(void)
+ 	/* Add Amba Devices */
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
 +
- 	/* This fixes addresses of all pmx devices for spear310 */
- 	spear3xx_pmx_init_addr(&pmx_driver, SPEAR310_PAD_MUX_CONFIG_REG);
--
--	/* pmx initialization */
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
- 		pr_err("padmux: registeration failed. err no: %d\n", ret);
++	spi_init();
+ }
+ 
+ MACHINE_START(SPEAR300, "ST-SPEAR300-EVB")
 diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 64d06f1..a306647 100644
+index 8f17362..663e78e 100644
 --- a/arch/arm/mach-spear3xx/spear310_evb.c
 +++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -36,25 +36,25 @@ static struct mtd_partition partition_info[] = {
+@@ -14,10 +14,14 @@
+ #include <linux/mtd/nand.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
+ #include <mach/generic.h>
++#include <mach/gpio.h>
+ #include <mach/spear.h>
+ #include <plat/nand.h>
+ #include <plat/smi.h>
++#include <plat/spi.h>
+ 
  /* padmux devices to enable */
  static struct pmx_dev *pmx_devs[] = {
+@@ -46,6 +50,7 @@ static struct pmx_dev *pmx_devs[] = {
+ static struct amba_device *amba_devs[] __initdata = {
  	/* spear3xx specific devices */
--	&pmx_i2c,
--	&pmx_ssp,
--	&pmx_gpio_pin0,
--	&pmx_gpio_pin1,
--	&pmx_gpio_pin2,
--	&pmx_gpio_pin3,
--	&pmx_gpio_pin4,
--	&pmx_gpio_pin5,
--	&pmx_uart0,
-+	&spear3xx_pmx_i2c,
-+	&spear3xx_pmx_ssp,
-+	&spear3xx_pmx_gpio_pin0,
-+	&spear3xx_pmx_gpio_pin1,
-+	&spear3xx_pmx_gpio_pin2,
-+	&spear3xx_pmx_gpio_pin3,
-+	&spear3xx_pmx_gpio_pin4,
-+	&spear3xx_pmx_gpio_pin5,
-+	&spear3xx_pmx_uart0,
+ 	&gpio_device,
++	&ssp0_device,
+ 	&uart_device,
+ 	&wdt_device,
  
- 	/* spear310 specific devices */
--	&pmx_emi_cs_0_1_4_5,
--	&pmx_emi_cs_2_3,
--	&pmx_uart1,
--	&pmx_uart2,
--	&pmx_uart3_4_5,
--	&pmx_fsmc,
--	&pmx_rs485_0_1,
--	&pmx_tdm0,
-+	&spear310_pmx_emi_cs_0_1_4_5,
-+	&spear310_pmx_emi_cs_2_3,
-+	&spear310_pmx_uart1,
-+	&spear310_pmx_uart2,
-+	&spear310_pmx_uart3_4_5,
-+	&spear310_pmx_fsmc,
-+	&spear310_pmx_rs485_0_1,
-+	&spear310_pmx_tdm0,
+@@ -66,6 +71,41 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&plgpio_device,
  };
  
- static struct amba_device *amba_devs[] __initdata = {
-@@ -119,17 +119,12 @@ static void __init spi_init(void)
- 
++/* spi board information */
++/* spi0 flash Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, flash, BASIC_GPIO_3);
++/* spi0 flash Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, flash, spi0_flash_cs_control);
++
++/* spi0 spidev Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, dev, BASIC_GPIO_4);
++/* spi0 spidev Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, dev, spi0_dev_cs_control);
++
++static struct spi_board_info __initdata spi_board_info[] = {
++	/* spi0 board info */
++	{
++		.modalias = "spidev",
++		.controller_data = &spi0_dev_chip_info,
++		.max_speed_hz = 10000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.mode = 0,
++	}, {
++		.modalias = "m25p80",
++		.controller_data = &spi0_flash_chip_info,
++		.max_speed_hz = 400000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = 0,
++	}
++};
++
++static void __init spi_init(void)
++{
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++}
++
  static void __init spear310_evb_init(void)
  {
--	/* padmux initialization, must be done before spear310_init */
--	pmx_driver.mode = NULL;
--	pmx_driver.devs = pmx_devs;
--	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--
- 	/* set nand device's plat data */
- 	nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
- 			SPEAR_NAND_BW8);
+ 	unsigned int i;
+@@ -94,6 +134,8 @@ static void __init spear310_evb_init(void)
+ 	/* Add Amba Devices */
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
++
++	spi_init();
+ }
  
- 	/* call spear310 machine init function */
--	spear310_init();
-+	spear310_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
- 
- 	/* Register slave devices on the I2C buses */
- 	i2c_register_board_devices();
+ MACHINE_START(SPEAR310, "ST-SPEAR310-EVB")
 diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 7470870..bd1d12a 100644
+index 2ac838b..9c3d75f 100644
 --- a/arch/arm/mach-spear3xx/spear320.c
 +++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -71,7 +71,7 @@ static struct pmx_dev_mode pmx_clcd_modes[] = {
- 	},
+@@ -11,6 +11,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#include <linux/amba/pl022.h>
+ #include <linux/ptrace.h>
+ #include <asm/irq.h>
+ #include <mach/generic.h>
+@@ -403,6 +404,47 @@ struct amba_device clcd_device = {
+ 	.irq = {VIRQ_CLCD, NO_IRQ},
  };
  
--struct pmx_dev pmx_clcd = {
-+struct pmx_dev spear320_pmx_clcd = {
- 	.name = "clcd",
- 	.modes = pmx_clcd_modes,
- 	.mode_count = ARRAY_SIZE(pmx_clcd_modes),
-@@ -93,7 +93,7 @@ static struct pmx_dev_mode pmx_emi_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_emi = {
-+struct pmx_dev spear320_pmx_emi = {
- 	.name = "emi",
- 	.modes = pmx_emi_modes,
- 	.mode_count = ARRAY_SIZE(pmx_emi_modes),
-@@ -115,7 +115,7 @@ static struct pmx_dev_mode pmx_fsmc_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_fsmc = {
-+struct pmx_dev spear320_pmx_fsmc = {
- 	.name = "fsmc",
- 	.modes = pmx_fsmc_modes,
- 	.mode_count = ARRAY_SIZE(pmx_fsmc_modes),
-@@ -137,7 +137,7 @@ static struct pmx_dev_mode pmx_spp_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_spp = {
-+struct pmx_dev spear320_pmx_spp = {
- 	.name = "spp",
- 	.modes = pmx_spp_modes,
- 	.mode_count = ARRAY_SIZE(pmx_spp_modes),
-@@ -160,7 +160,7 @@ static struct pmx_dev_mode pmx_sdhci_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_sdhci = {
-+struct pmx_dev spear320_pmx_sdhci = {
- 	.name = "sdhci",
- 	.modes = pmx_sdhci_modes,
- 	.mode_count = ARRAY_SIZE(pmx_sdhci_modes),
-@@ -182,7 +182,7 @@ static struct pmx_dev_mode pmx_i2s_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_i2s = {
-+struct pmx_dev spear320_pmx_i2s = {
- 	.name = "i2s",
- 	.modes = pmx_i2s_modes,
- 	.mode_count = ARRAY_SIZE(pmx_i2s_modes),
-@@ -204,7 +204,7 @@ static struct pmx_dev_mode pmx_uart1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart1 = {
-+struct pmx_dev spear320_pmx_uart1 = {
- 	.name = "uart1",
- 	.modes = pmx_uart1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart1_modes),
-@@ -239,7 +239,7 @@ static struct pmx_dev_mode pmx_uart1_modem_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart1_modem = {
-+struct pmx_dev spear320_pmx_uart1_modem = {
- 	.name = "uart1_modem",
- 	.modes = pmx_uart1_modem_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart1_modem_modes),
-@@ -261,7 +261,7 @@ static struct pmx_dev_mode pmx_uart2_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart2 = {
-+struct pmx_dev spear320_pmx_uart2 = {
- 	.name = "uart2",
- 	.modes = pmx_uart2_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart2_modes),
-@@ -283,7 +283,7 @@ static struct pmx_dev_mode pmx_touchscreen_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_touchscreen = {
-+struct pmx_dev spear320_pmx_touchscreen = {
- 	.name = "touchscreen",
- 	.modes = pmx_touchscreen_modes,
- 	.mode_count = ARRAY_SIZE(pmx_touchscreen_modes),
-@@ -306,7 +306,7 @@ static struct pmx_dev_mode pmx_can_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_can = {
-+struct pmx_dev spear320_pmx_can = {
- 	.name = "can",
- 	.modes = pmx_can_modes,
- 	.mode_count = ARRAY_SIZE(pmx_can_modes),
-@@ -328,7 +328,7 @@ static struct pmx_dev_mode pmx_sdhci_led_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_sdhci_led = {
-+struct pmx_dev spear320_pmx_sdhci_led = {
- 	.name = "sdhci_led",
- 	.modes = pmx_sdhci_led_modes,
- 	.mode_count = ARRAY_SIZE(pmx_sdhci_led_modes),
-@@ -361,7 +361,7 @@ static struct pmx_dev_mode pmx_pwm0_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_pwm0 = {
-+struct pmx_dev spear320_pmx_pwm0 = {
- 	.name = "pwm0",
- 	.modes = pmx_pwm0_modes,
- 	.mode_count = ARRAY_SIZE(pmx_pwm0_modes),
-@@ -394,7 +394,7 @@ static struct pmx_dev_mode pmx_pwm1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_pwm1 = {
-+struct pmx_dev spear320_pmx_pwm1 = {
- 	.name = "pwm1",
- 	.modes = pmx_pwm1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_pwm1_modes),
-@@ -427,7 +427,7 @@ static struct pmx_dev_mode pmx_pwm2_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_pwm2 = {
-+struct pmx_dev spear320_pmx_pwm2 = {
- 	.name = "pwm2",
- 	.modes = pmx_pwm2_modes,
- 	.mode_count = ARRAY_SIZE(pmx_pwm2_modes),
-@@ -449,7 +449,7 @@ static struct pmx_dev_mode pmx_pwm3_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_pwm3 = {
-+struct pmx_dev spear320_pmx_pwm3 = {
- 	.name = "pwm3",
- 	.modes = pmx_pwm3_modes,
- 	.mode_count = ARRAY_SIZE(pmx_pwm3_modes),
-@@ -471,7 +471,7 @@ static struct pmx_dev_mode pmx_ssp1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_ssp1 = {
-+struct pmx_dev spear320_pmx_ssp1 = {
- 	.name = "ssp1",
- 	.modes = pmx_ssp1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_ssp1_modes),
-@@ -493,7 +493,7 @@ static struct pmx_dev_mode pmx_ssp2_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_ssp2 = {
-+struct pmx_dev spear320_pmx_ssp2 = {
- 	.name = "ssp2",
- 	.modes = pmx_ssp2_modes,
- 	.mode_count = ARRAY_SIZE(pmx_ssp2_modes),
-@@ -515,7 +515,7 @@ static struct pmx_dev_mode pmx_mii1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_mii1 = {
-+struct pmx_dev spear320_pmx_mii1 = {
- 	.name = "mii1",
- 	.modes = pmx_mii1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_mii1_modes),
-@@ -537,7 +537,7 @@ static struct pmx_dev_mode pmx_smii0_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_smii0 = {
-+struct pmx_dev spear320_pmx_smii0 = {
- 	.name = "smii0",
- 	.modes = pmx_smii0_modes,
- 	.mode_count = ARRAY_SIZE(pmx_smii0_modes),
-@@ -559,7 +559,7 @@ static struct pmx_dev_mode pmx_smii1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_smii1 = {
-+struct pmx_dev spear320_pmx_smii1 = {
- 	.name = "smii1",
- 	.modes = pmx_smii1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_smii1_modes),
-@@ -581,14 +581,14 @@ static struct pmx_dev_mode pmx_i2c1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_i2c1 = {
-+struct pmx_dev spear320_pmx_i2c1 = {
- 	.name = "i2c1",
- 	.modes = pmx_i2c1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_i2c1_modes),
- };
- 
- /* pmx driver structure */
--struct pmx_driver pmx_driver = {
-+static struct pmx_driver pmx_driver = {
- 	.mode_reg = {.address = SPEAR320_MODE_CONFIG_REG, .mask = 0x00000007},
- };
- 
-@@ -970,7 +970,8 @@ static struct spear_shirq shirq_intrcomm_ras = {
- };
- 
- /* spear320 routines */
--void __init spear320_init(void)
-+void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-+		u8 pmx_dev_count)
- {
- 	void __iomem *base;
- 	int ret = 0;
-@@ -1000,10 +1001,13 @@ void __init spear320_init(void)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
- 
-+	/* pmx initialization */
-+	pmx_driver.mode = pmx_mode;
-+	pmx_driver.devs = pmx_devs;
-+	pmx_driver.devs_count = pmx_dev_count;
++/* ssp device registeration */
++static struct pl022_ssp_controller ssp_platform_data[] = {
++	{
++		.bus_id = 1,
++		.enable_dma = 0,
++		.num_chipselect = 2,
++	}, {
++		.bus_id = 2,
++		.enable_dma = 0,
++		.num_chipselect = 2,
++	}
++};
 +
- 	/* This fixes addresses of all pmx devices for spear320 */
- 	spear3xx_pmx_init_addr(&pmx_driver, SPEAR320_PAD_MUX_CONFIG_REG);
--
--	/* pmx initialization */
- 	ret = pmx_register(&pmx_driver);
- 	if (ret)
- 		pr_err("padmux: registeration failed. err no: %d\n", ret);
++struct amba_device ssp_device[] = {
++	{
++		.dev = {
++			.coherent_dma_mask = ~0,
++			.init_name = "ssp-pl022.1",
++			.platform_data = &ssp_platform_data[0],
++		},
++		.res = {
++			.start = SPEAR320_SSP0_BASE,
++			.end = SPEAR320_SSP0_BASE + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {VIRQ_SSP1, NO_IRQ},
++	}, {
++		.dev = {
++			.coherent_dma_mask = ~0,
++			.init_name = "ssp-pl022.2",
++			.platform_data = &ssp_platform_data[1],
++		},
++		.res = {
++			.start = SPEAR320_SSP1_BASE,
++			.end = SPEAR320_SSP1_BASE + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {VIRQ_SSP2, NO_IRQ},
++	}
++};
++
+ /* plgpio device registeration */
+ static struct plgpio_platform_data plgpio_plat_data = {
+ 	.gpio_base = 8,
 diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index da57e97..7c94abf 100644
+index d693877..99ae3ba 100644
 --- a/arch/arm/mach-spear3xx/spear320_evb.c
 +++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -37,22 +37,22 @@ static struct mtd_partition partition_info[] = {
+@@ -14,10 +14,14 @@
+ #include <linux/mtd/nand.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
+ #include <mach/generic.h>
++#include <mach/gpio.h>
+ #include <mach/spear.h>
+ #include <plat/nand.h>
+ #include <plat/smi.h>
++#include <plat/spi.h>
+ 
  /* padmux devices to enable */
  static struct pmx_dev *pmx_devs[] = {
- 	/* spear3xx specific devices */
--	&pmx_i2c,
--	&pmx_ssp,
--	&pmx_mii,
--	&pmx_uart0,
-+	&spear3xx_pmx_i2c,
-+	&spear3xx_pmx_ssp,
-+	&spear3xx_pmx_mii,
-+	&spear3xx_pmx_uart0,
- 
- 	/* spear320 specific devices */
--	&pmx_fsmc,
--	&pmx_sdhci,
--	&pmx_i2s,
--	&pmx_uart1,
--	&pmx_uart2,
--	&pmx_can,
--	&pmx_pwm0,
--	&pmx_pwm1,
--	&pmx_pwm2,
--	&pmx_mii1,
-+	&spear320_pmx_fsmc,
-+	&spear320_pmx_sdhci,
-+	&spear320_pmx_i2s,
-+	&spear320_pmx_uart1,
-+	&spear320_pmx_uart2,
-+	&spear320_pmx_can,
-+	&spear320_pmx_pwm0,
-+	&spear320_pmx_pwm1,
-+	&spear320_pmx_pwm2,
-+	&spear320_pmx_mii1,
+@@ -66,6 +70,46 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&pwm_device,
  };
  
- static struct amba_device *amba_devs[] __initdata = {
-@@ -137,17 +137,12 @@ static void __init spear320_evb_init(void)
- 	/* set sdhci device platform data */
- 	sdhci_set_plat_data(&sdhci_device, &sdhci_plat_data);
++/* Currently no gpios are free on eval board so it is kept commented */
++#if 0
++/* spi board information */
++/* spi0 flash Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, flash, /* mention gpio number here */);
++/* spi0 flash Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, flash, spi0_flash_cs_control);
++
++/* spi0 spidev Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, dev, /* mention gpio number here */);
++/* spi0 spidev Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, dev, spi0_dev_cs_control);
++#endif
++
++static struct spi_board_info __initdata spi_board_info[] = {
++#if 0
++	/* spi0 board info */
++	{
++		.modalias = "spidev",
++		.controller_data = &spi0_dev_chip_info,
++		.max_speed_hz = 10000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.mode = 0,
++	}, {
++		.modalias = "m25p80",
++		.controller_data = &spi0_flash_chip_info,
++		.max_speed_hz = 400000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = 0,
++	}
++#endif
++};
++
++static void __init spi_init(void)
++{
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++}
++
+ static void __init spear320_evb_init(void)
+ {
+ 	unsigned int i;
+@@ -94,6 +138,8 @@ static void __init spear320_evb_init(void)
+ 	/* Add Amba Devices */
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
++
++	spi_init();
+ }
  
--	/* padmux initialization, must be done before spear320_init */
--	pmx_driver.mode = &auto_net_mii_mode;
--	pmx_driver.devs = pmx_devs;
--	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--
- 	/* set nand device's plat data */
- 	nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
- 			SPEAR_NAND_BW8);
- 
- 	/* call spear320 machine init function */
--	spear320_init();
-+	spear320_init(&auto_net_mii_mode, pmx_devs, ARRAY_SIZE(pmx_devs));
- 
- 	/* initialize serial nor related data in smi plat data */
- 	smi_init_board_info(&smi_device);
+ MACHINE_START(SPEAR320, "ST-SPEAR320-EVB")
 diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 46093e2..184c9de 100644
+index b15fd27..fdb4fa8 100644
 --- a/arch/arm/mach-spear3xx/spear3xx.c
 +++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -310,7 +310,7 @@ static struct pmx_dev_mode pmx_firda_modes[] = {
- 	},
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include <linux/types.h>
++#include <linux/amba/pl022.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/ptrace.h>
+ #include <linux/io.h>
+@@ -41,6 +42,36 @@ struct amba_device gpio_device = {
+ 	.irq = {IRQ_BASIC_GPIO, NO_IRQ},
  };
  
--struct pmx_dev pmx_firda = {
-+struct pmx_dev spear3xx_pmx_firda = {
- 	.name = "firda",
- 	.modes = pmx_firda_modes,
- 	.mode_count = ARRAY_SIZE(pmx_firda_modes),
-@@ -332,7 +332,7 @@ static struct pmx_dev_mode pmx_i2c_modes[] = {
- 	},
++/* ssp device registeration */
++static struct pl022_ssp_controller ssp_platform_data = {
++	.bus_id = 0,
++	.enable_dma = 0,
++	/*
++	 * This is number of spi devices that can be connected to spi. There are
++	 * two type of chipselects on which slave devices can work. One is chip
++	 * select provided by spi masters other is controlled through external
++	 * gpio's. We can't use chipselect provided from spi master (because as
++	 * soon as FIFO becomes empty, CS is disabled and transfer ends). So
++	 * this number now depends on number of gpios available for spi. each
++	 * slave on each master requires a separate gpio pin.
++	 */
++	.num_chipselect = 2,
++};
++
++struct amba_device ssp0_device = {
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.init_name = "ssp-pl022.0",
++		.platform_data = &ssp_platform_data,
++	},
++	.res = {
++		.start = SPEAR3XX_ICM1_SSP_BASE,
++		.end = SPEAR3XX_ICM1_SSP_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {IRQ_SSP, NO_IRQ},
++};
++
+ /* uart device registeration */
+ struct amba_device uart_device = {
+ 	.dev = {
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 91f1f3f..52d5bff 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -605,9 +605,9 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .con_id = "fsmc",		.clk = &fsmc_clk},
+ 	/* clock derived from apb clk */
+ 	{ .dev_id = "adc",		.clk = &adc_clk},
+-	{ .dev_id = "ssp0",		.clk = &ssp0_clk},
+-	{ .dev_id = "ssp1",		.clk = &ssp1_clk},
+-	{ .dev_id = "ssp2",		.clk = &ssp2_clk},
++	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
++	{ .dev_id = "ssp-pl022.1",	.clk = &ssp1_clk},
++	{ .dev_id = "ssp-pl022.2",	.clk = &ssp2_clk},
+ 	{ .dev_id = "gpio0",		.clk = &gpio0_clk},
+ 	{ .dev_id = "gpio1",		.clk = &gpio1_clk},
+ 	{ .dev_id = "gpio2",		.clk = &gpio2_clk},
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index ff90419..dd29298 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -31,6 +31,7 @@
+ /* Add spear6xx family device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device gpio_device[];
++extern struct amba_device ssp_device[];
+ extern struct amba_device uart_device[];
+ extern struct amba_device wdt_device;
+ extern struct platform_device ehci0_device;
+diff --git a/arch/arm/mach-spear6xx/include/mach/spear.h b/arch/arm/mach-spear6xx/include/mach/spear.h
+index a835f5b..31486e5 100644
+--- a/arch/arm/mach-spear6xx/include/mach/spear.h
++++ b/arch/arm/mach-spear6xx/include/mach/spear.h
+@@ -68,8 +68,8 @@
+ #define SPEAR6XX_ICM2_GPIO_BASE		0xD8100000
+ #define SPEAR6XX_ICM2_GPIO_SIZE		0x00080000
+ 
+-#define SPEAR6XX_ICM2_SPI2_BASE		0xD8180000
+-#define SPEAR6XX_ICM2_SPI2_SIZE		0x00080000
++#define SPEAR6XX_ICM2_SSP2_BASE		0xD8180000
++#define SPEAR6XX_ICM2_SSP2_SIZE		0x00080000
+ 
+ #define SPEAR6XX_ICM2_ADC_BASE		0xD8200000
+ #define SPEAR6XX_ICM2_ADC_SIZE		0x00080000
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+index cf86efc..ae1055a 100644
+--- a/arch/arm/mach-spear6xx/spear600_evb.c
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -14,16 +14,24 @@
+ #include <linux/mtd/nand.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
++#include <linux/gpio.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
+ #include <mach/generic.h>
++#include <mach/gpio.h>
+ #include <mach/spear.h>
+ #include <plat/nand.h>
+ #include <plat/smi.h>
++#include <plat/spi.h>
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&clcd_device,
+ 	&gpio_device[0],
+ 	&gpio_device[1],
+ 	&gpio_device[2],
++	&ssp_device[0],
++	&ssp_device[1],
++	&ssp_device[2],
+ 	&uart_device[0],
+ 	&uart_device[1],
+ 	&wdt_device,
+@@ -40,6 +48,47 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&smi_device,
  };
  
--struct pmx_dev pmx_i2c = {
-+struct pmx_dev spear3xx_pmx_i2c = {
- 	.name = "i2c",
- 	.modes = pmx_i2c_modes,
- 	.mode_count = ARRAY_SIZE(pmx_i2c_modes),
-@@ -354,7 +354,7 @@ static struct pmx_dev_mode pmx_ssp_cs_modes[] = {
- 	},
++/* Currently no gpios are free on eval board so it is kept commented */
++#if 0
++/* spi board information */
++/* spi0 flash Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, flash, /* mention gpio number here */);
++/* spi0 flash Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, flash, spi0_flash_cs_control);
++
++/* spi0 spidev Chip Select Control function, controlled by gpio pin mentioned */
++DECLARE_SPI_CS_CONTROL(0, dev, /* mention gpio number here */);
++/* spi0 spidev Chip Info structure */
++DECLARE_SPI_CHIP_INFO(0, dev, spi0_dev_cs_control);
++#endif
++
++static struct spi_board_info __initdata spi_board_info[] = {
++#if 0
++	/* spi0 board info */
++	{
++		.modalias = "spidev",
++		.controller_data = &spi0_dev_chip_info,
++		.max_speed_hz = 10000000,
++		.bus_num = 0,
++		.chip_select = 0,
++		.mode = 0,
++	}, {
++		.modalias = "m25p80",
++		.controller_data = &spi0_flash_chip_info,
++		.max_speed_hz = 400000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = 0,
++	}
++#endif
++	/* Similarly can be done for other spi masters */
++};
++
++static void __init spi_init(void)
++{
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++}
++
+ static void __init spear600_evb_init(void)
+ {
+ 	unsigned int i;
+@@ -63,6 +112,8 @@ static void __init spear600_evb_init(void)
+ 	/* Add Amba Devices */
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
++
++	spi_init();
+ }
+ 
+ 
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index 2296d0f..876692e 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include <linux/types.h>
++#include <linux/amba/pl022.h>
+ #include <linux/amba/pl061.h>
+ #include <linux/ptrace.h>
+ #include <linux/io.h>
+@@ -41,6 +42,73 @@ struct amba_device clcd_device = {
+ 	.irq = {IRQ_BASIC_CLCD, NO_IRQ},
  };
  
--struct pmx_dev pmx_ssp_cs = {
-+struct pmx_dev spear3xx_pmx_ssp_cs = {
- 	.name = "ssp_chip_selects",
- 	.modes = pmx_ssp_cs_modes,
- 	.mode_count = ARRAY_SIZE(pmx_ssp_cs_modes),
-@@ -376,7 +376,7 @@ static struct pmx_dev_mode pmx_ssp_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_ssp = {
-+struct pmx_dev spear3xx_pmx_ssp = {
- 	.name = "ssp",
- 	.modes = pmx_ssp_modes,
- 	.mode_count = ARRAY_SIZE(pmx_ssp_modes),
-@@ -398,7 +398,7 @@ static struct pmx_dev_mode pmx_mii_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_mii = {
-+struct pmx_dev spear3xx_pmx_mii = {
- 	.name = "mii",
- 	.modes = pmx_mii_modes,
- 	.mode_count = ARRAY_SIZE(pmx_mii_modes),
-@@ -420,7 +420,7 @@ static struct pmx_dev_mode pmx_gpio_pin0_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio_pin0 = {
-+struct pmx_dev spear3xx_pmx_gpio_pin0 = {
- 	.name = "gpio_pin0",
- 	.modes = pmx_gpio_pin0_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio_pin0_modes),
-@@ -442,7 +442,7 @@ static struct pmx_dev_mode pmx_gpio_pin1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio_pin1 = {
-+struct pmx_dev spear3xx_pmx_gpio_pin1 = {
- 	.name = "gpio_pin1",
- 	.modes = pmx_gpio_pin1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio_pin1_modes),
-@@ -464,7 +464,7 @@ static struct pmx_dev_mode pmx_gpio_pin2_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio_pin2 = {
-+struct pmx_dev spear3xx_pmx_gpio_pin2 = {
- 	.name = "gpio_pin2",
- 	.modes = pmx_gpio_pin2_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio_pin2_modes),
-@@ -486,7 +486,7 @@ static struct pmx_dev_mode pmx_gpio_pin3_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio_pin3 = {
-+struct pmx_dev spear3xx_pmx_gpio_pin3 = {
- 	.name = "gpio_pin3",
- 	.modes = pmx_gpio_pin3_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio_pin3_modes),
-@@ -508,7 +508,7 @@ static struct pmx_dev_mode pmx_gpio_pin4_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio_pin4 = {
-+struct pmx_dev spear3xx_pmx_gpio_pin4 = {
- 	.name = "gpio_pin4",
- 	.modes = pmx_gpio_pin4_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio_pin4_modes),
-@@ -530,7 +530,7 @@ static struct pmx_dev_mode pmx_gpio_pin5_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_gpio_pin5 = {
-+struct pmx_dev spear3xx_pmx_gpio_pin5 = {
- 	.name = "gpio_pin5",
- 	.modes = pmx_gpio_pin5_modes,
- 	.mode_count = ARRAY_SIZE(pmx_gpio_pin5_modes),
-@@ -552,7 +552,7 @@ static struct pmx_dev_mode pmx_uart0_modem_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart0_modem = {
-+struct pmx_dev spear3xx_pmx_uart0_modem = {
- 	.name = "uart0_modem",
- 	.modes = pmx_uart0_modem_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart0_modem_modes),
-@@ -574,7 +574,7 @@ static struct pmx_dev_mode pmx_uart0_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_uart0 = {
-+struct pmx_dev spear3xx_pmx_uart0 = {
- 	.name = "uart0",
- 	.modes = pmx_uart0_modes,
- 	.mode_count = ARRAY_SIZE(pmx_uart0_modes),
-@@ -596,7 +596,7 @@ static struct pmx_dev_mode pmx_timer_3_4_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_timer_3_4 = {
-+struct pmx_dev spear3xx_pmx_timer_3_4 = {
- 	.name = "timer_3_4",
- 	.modes = pmx_timer_3_4_modes,
- 	.mode_count = ARRAY_SIZE(pmx_timer_3_4_modes),
-@@ -618,7 +618,7 @@ static struct pmx_dev_mode pmx_timer_1_2_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_timer_1_2 = {
-+struct pmx_dev spear3xx_pmx_timer_1_2 = {
- 	.name = "timer_1_2",
- 	.modes = pmx_timer_1_2_modes,
- 	.mode_count = ARRAY_SIZE(pmx_timer_1_2_modes),
-@@ -641,7 +641,7 @@ static struct pmx_dev_mode pmx_plgpio_0_1_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_0_1 = {
-+struct pmx_dev spear3xx_pmx_plgpio_0_1 = {
- 	.name = "plgpio 0 and 1",
- 	.modes = pmx_plgpio_0_1_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_0_1_modes),
-@@ -663,7 +663,7 @@ static struct pmx_dev_mode pmx_plgpio_2_3_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_2_3 = {
-+struct pmx_dev spear3xx_pmx_plgpio_2_3 = {
- 	.name = "plgpio 2 and 3",
- 	.modes = pmx_plgpio_2_3_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_2_3_modes),
-@@ -685,7 +685,7 @@ static struct pmx_dev_mode pmx_plgpio_4_5_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_4_5 = {
-+struct pmx_dev spear3xx_pmx_plgpio_4_5 = {
- 	.name = "plgpio 4 and 5",
- 	.modes = pmx_plgpio_4_5_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_4_5_modes),
-@@ -707,7 +707,7 @@ static struct pmx_dev_mode pmx_plgpio_6_9_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_6_9 = {
-+struct pmx_dev spear3xx_pmx_plgpio_6_9 = {
- 	.name = "plgpio 6 to 9",
- 	.modes = pmx_plgpio_6_9_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_6_9_modes),
-@@ -729,7 +729,7 @@ static struct pmx_dev_mode pmx_plgpio_10_27_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_10_27 = {
-+struct pmx_dev spear3xx_pmx_plgpio_10_27 = {
- 	.name = "plgpio 10 to 27",
- 	.modes = pmx_plgpio_10_27_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_10_27_modes),
-@@ -751,7 +751,7 @@ static struct pmx_dev_mode pmx_plgpio_28_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_28 = {
-+struct pmx_dev spear3xx_pmx_plgpio_28 = {
- 	.name = "plgpio 28",
- 	.modes = pmx_plgpio_28_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_28_modes),
-@@ -773,7 +773,7 @@ static struct pmx_dev_mode pmx_plgpio_29_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_29 = {
-+struct pmx_dev spear3xx_pmx_plgpio_29 = {
- 	.name = "plgpio 29",
- 	.modes = pmx_plgpio_29_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_29_modes),
-@@ -795,7 +795,7 @@ static struct pmx_dev_mode pmx_plgpio_30_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_30 = {
-+struct pmx_dev spear3xx_pmx_plgpio_30 = {
- 	.name = "plgpio 30",
- 	.modes = pmx_plgpio_30_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_30_modes),
-@@ -817,7 +817,7 @@ static struct pmx_dev_mode pmx_plgpio_31_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_31 = {
-+struct pmx_dev spear3xx_pmx_plgpio_31 = {
- 	.name = "plgpio 31",
- 	.modes = pmx_plgpio_31_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_31_modes),
-@@ -839,7 +839,7 @@ static struct pmx_dev_mode pmx_plgpio_32_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_32 = {
-+struct pmx_dev spear3xx_pmx_plgpio_32 = {
- 	.name = "plgpio 32",
- 	.modes = pmx_plgpio_32_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_32_modes),
-@@ -861,7 +861,7 @@ static struct pmx_dev_mode pmx_plgpio_33_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_33 = {
-+struct pmx_dev spear3xx_pmx_plgpio_33 = {
- 	.name = "plgpio 33",
- 	.modes = pmx_plgpio_33_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_33_modes),
-@@ -883,7 +883,7 @@ static struct pmx_dev_mode pmx_plgpio_34_36_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_34_36 = {
-+struct pmx_dev spear3xx_pmx_plgpio_34_36 = {
- 	.name = "plgpio 34 to 36",
- 	.modes = pmx_plgpio_34_36_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_34_36_modes),
-@@ -905,7 +905,7 @@ static struct pmx_dev_mode pmx_plgpio_37_42_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_37_42 = {
-+struct pmx_dev spear3xx_pmx_plgpio_37_42 = {
- 	.name = "plgpio 37 to 42",
- 	.modes = pmx_plgpio_37_42_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_37_42_modes),
-@@ -927,7 +927,7 @@ static struct pmx_dev_mode pmx_plgpio_43_44_47_48_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_43_44_47_48 = {
-+struct pmx_dev spear3xx_pmx_plgpio_43_44_47_48 = {
- 	.name = "plgpio 43, 44, 47 and 48",
- 	.modes = pmx_plgpio_43_44_47_48_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_43_44_47_48_modes),
-@@ -949,7 +949,7 @@ static struct pmx_dev_mode pmx_plgpio_45_46_49_50_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_plgpio_45_46_49_50 = {
-+struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50 = {
- 	.name = "plgpio 45, 46, 49 and 50",
- 	.modes = pmx_plgpio_45_46_49_50_modes,
- 	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
++/* ssp device registeration */
++static struct pl022_ssp_controller ssp_platform_data[] = {
++	{
++		.bus_id = 0,
++		.enable_dma = 0,
++		/*
++		 * This is number of spi devices that can be connected to spi.
++		 * There are two type of chipselects on which slave devices can
++		 * work. One is chip select provided by spi masters other is
++		 * controlled through external gpio's. We can't use chipselect
++		 * provided from spi master (because as soon as FIFO becomes
++		 * empty, CS is disabled and transfer ends). So this number now
++		 * depends on number of gpios available for spi. each slave on
++		 * each master requires a separate gpio pin.
++		 */
++		.num_chipselect = 2,
++	}, {
++		.bus_id = 1,
++		.enable_dma = 0,
++		.num_chipselect = 2,
++	}, {
++		.bus_id = 2,
++		.enable_dma = 0,
++		.num_chipselect = 2,
++	}
++};
++
++struct amba_device ssp_device[] = {
++	{
++		.dev = {
++			.coherent_dma_mask = ~0,
++			.init_name = "ssp-pl022.0",
++			.platform_data = &ssp_platform_data[0],
++		},
++		.res = {
++			.start = SPEAR6XX_ICM1_SSP0_BASE,
++			.end = SPEAR6XX_ICM1_SSP0_BASE + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_SSP_1, NO_IRQ},
++	}, {
++		.dev = {
++			.coherent_dma_mask = ~0,
++			.init_name = "ssp-pl022.1",
++			.platform_data = &ssp_platform_data[1],
++		},
++		.res = {
++			.start = SPEAR6XX_ICM1_SSP1_BASE,
++			.end = SPEAR6XX_ICM1_SSP1_BASE + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_SSP_2, NO_IRQ},
++	}, {
++		.dev = {
++			.coherent_dma_mask = ~0,
++			.init_name = "ssp-pl022.2",
++			.platform_data = &ssp_platform_data[2],
++		},
++		.res = {
++			.start = SPEAR6XX_ICM2_SSP2_BASE,
++			.end = SPEAR6XX_ICM2_SSP2_BASE + SZ_4K - 1,
++			.flags = IORESOURCE_MEM,
++		},
++		.irq = {IRQ_APPL_SSP, NO_IRQ},
++	}
++};
++
+ /* uart device registeration */
+ struct amba_device uart_device[] = {
+ 	{
+diff --git a/arch/arm/plat-spear/include/plat/spi.h b/arch/arm/plat-spear/include/plat/spi.h
+new file mode 100644
+index 0000000..a2c53f3
+--- /dev/null
++++ b/arch/arm/plat-spear/include/plat/spi.h
+@@ -0,0 +1,77 @@
++/*
++ * arch/arm/plat-spear/include/plat/spi.h
++ *
++ * SPI board specific definitions common to multiple boards on multiple
++ * machines.
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Viresh Kumar<viresh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __PLAT_SPI_H
++#define __PLAT_SPI_H
++
++#include <linux/amba/pl022.h>
++#include <linux/gpio.h>
++
++/* spi board information */
++static inline int spi_cs_gpio_request(u32 gpio_pin)
++{
++	int ret;
++
++	ret = gpio_request(gpio_pin, "SPI_CS");
++	if (ret < 0) {
++		printk(KERN_ERR "SPI: gpio:%d request fail\n", gpio_pin);
++		return ret;
++	} else {
++		ret = gpio_direction_output(gpio_pin, 1);
++		if (ret) {
++			printk(KERN_ERR "SPI: gpio:%d direction set fail\n",
++					gpio_pin);
++			return ret;
++		}
++	}
++	return 0;
++}
++
++/* This will define cs_control function for a specific spi slave */
++#define DECLARE_SPI_CS_CONTROL(id, type, gpio)		\
++static void spi##id##_##type##_cs_control(u32 control)	\
++{							\
++	static int count, ret;				\
++							\
++	if (unlikely(!count)) {				\
++		count++;				\
++		ret = spi_cs_gpio_request(gpio);	\
++	}						\
++							\
++	if (!ret)					\
++		gpio_set_value(gpio, control);		\
++}
++
++/* This will define CHIP_INFO structure for a specific spi slave */
++#define DECLARE_SPI_CHIP_INFO(id, type, chip_select_control)	\
++struct pl022_config_chip spi##id##_##type##_chip_info = {	\
++	.lbm = LOOPBACK_DISABLED,			\
++	.iface = SSP_INTERFACE_MOTOROLA_SPI,		\
++	.hierarchy = SSP_MASTER,			\
++	.slave_tx_disable = 0,				\
++	.endian_tx = SSP_TX_LSB,			\
++	.endian_rx = SSP_RX_LSB,			\
++	.data_size = SSP_DATA_BITS_8,			\
++	.com_mode = INTERRUPT_TRANSFER,			\
++	.rx_lev_trig = SSP_RX_1_OR_MORE_ELEM,		\
++	.tx_lev_trig = SSP_TX_1_OR_MORE_EMPTY_LOC,	\
++	.clk_phase = SSP_CLK_SECOND_EDGE,		\
++	.clk_pol = SSP_CLK_POL_IDLE_LOW,		\
++	.cs_control = chip_select_control,		\
++};
++
++#define DECLARE_SPI_CHIP_INFO_NULL_ID(chip_select_control)	\
++DECLARE_SPI_CHIP_INFO(, chip_select_control)
++
++#endif /* __PLAT_SPI_H */
 -- 
 1.7.2.2
