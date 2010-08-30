@@ -1,55 +1,38 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 30 Aug 2010 14:41:58 +0200
-Subject: [PATCH 2/4] sh: Accessor functions for the sh_pmu state
-In-Reply-To: <20100827191745.GA7258@console-pimps.org>
-References: <cover.1282848651.git.matt@console-pimps.org>
-	<f259830dbccb084d27d127676b979d9cb502e36f.1282848651.git.matt@console-pimps.org>
-	<20100827134301.GL22783@erda.amd.com>
-	<20100827191745.GA7258@console-pimps.org>
-Message-ID: <20100830124158.GY22783@erda.amd.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Aug 2010 14:55:56 +0200
+Subject: [PATCH 3/3 v2] dmaengine: Add Freescale i.MX SDMA support
+In-Reply-To: <AANLkTimhFAhR3sSJWo3b8_rMk5GCQfOwG0T36uEs=DjA@mail.gmail.com>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<20100823174852.GB26928@pengutronix.de>
+	<AANLkTimmEKfErV17RWNBO-pVCfFtFw=yJL2v92UBN0=2@mail.gmail.com>
+	<201008281727.10913.marek.vasut@gmail.com>
+	<20100828161858.GI1473@pengutronix.de>
+	<AANLkTimhFAhR3sSJWo3b8_rMk5GCQfOwG0T36uEs=DjA@mail.gmail.com>
+Message-ID: <20100830125556.GL1473@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.08.10 15:17:45, Matt Fleming wrote:
-
-> > > --- a/arch/sh/kernel/perf_event.c
-> > > +++ b/arch/sh/kernel/perf_event.c
-> > > @@ -60,6 +60,19 @@ static inline int sh_pmu_initialized(void)
-> > >  }
-> > >  
-> > >  /*
-> > > + * Return the number of events for the current sh_pmu.
-> > > + */
-> > > +int sh_pmu_num_events(void)
-> > > +{
-> > > +	return sh_pmu->num_events;
-> > > +}
-> > > +
-> > > +const char *sh_pmu_name(void)
-> > > +{
-> > > +	return sh_pmu->name;
-> > > +}
-
-> > This accessor functions should be generic for all architectures.
+On Sun, Aug 29, 2010 at 02:35:01PM +0200, Linus Walleij wrote:
+> 2010/8/28 Sascha Hauer <s.hauer@pengutronix.de>:
 > 
-> This isn't going to work. ARM uses an integer ID whereas SH uses a
-> string name. This is specific to an architecture and making it generic
-> would probably involve some abstraction layer.
+> > Peripherals integrated into a SoC like the SDMA engine here are
+> > normally accessible in native endianess and thus need the __raw_*
+> > functions.
+> 
+> So the SDMA actually switch and twist around the endianness of
+> its registers if it's synthesized into a bigendian version of the system?
+> 
+> Or hardware-dynamically even depending on the setting of the
+> endianness bit in the ARM core?
 
-Perf should provide the interface to detect the number of counters
-(btw. *num_events is wrong) and the name of the pmu. The information
-is part of perf and thus the functions accessing it should be part of
-perf too, not oprofile.
+I think it's the bus between the ARM core and the periherals which
+changes the endianess. I have never tried running an i.MX in big endian
+mode, so I can only guess how the system really behaves in BE mode.
 
-We also need generic functions, because we want to have a generic
-oprofile-perf driver.
-
-I don't see that this is hard to implement. We could add function
-stubs returning an error or invalid value using the __weak attribute
-and implement it for those architectures where we need it.
-
--Robert
+Sascha
 
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
