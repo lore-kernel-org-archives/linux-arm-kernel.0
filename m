@@ -1,41 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Aug 2010 15:53:13 -0700
+Date: Mon, 30 Aug 2010 15:55:27 -0700
 Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <000601cb42e4$85c7ed80$9157c880$@deacon@arm.com>
+In-Reply-To: <20100820120622.GL25742@atomide.com>
 References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<000601cb42e4$85c7ed80$9157c880$@deacon@arm.com>
-Message-ID: <20100830225313.GB11597@atomide.com>
+	<20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+	<4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+Message-ID: <20100830225527.GC11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Will Deacon <will.deacon@arm.com> [100823 09:51]:
-> Hi Tony,
-> 
-> > Hi all,
+* Tony Lindgren <tony@atomide.com> [100820 04:59]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
+> > On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
+> > > Looks like something is not quite right with smp_on_up part of __fixup_smp,
+> > > returning early before smp_on_up does not produce that.
 > > 
-> > Here are some experimental patches to allow booting ARMv7 SMP
-> > kernel on UP to some extent. Posting these early in case it is
-> > of any help as I know at least Bryan Wu is working on similar
-> > issues.
-> > 
-> > The patches are very much work in progress, and does not quite
-> > boot to init yet so there's all kinds of things to fix. But at
-> > least these patches allow booting to the point where the fixing
-> > issues might be a bit easier.. Currently it boots to the point
-> > where there are tons of "WARNING: at mm/percpu-vm.c:320 pcpu_alloc"
-> > prints.
-> 
-> I've got some similar hacks for the RealView boards which I've used
-> to build a Kernel that can boot on the PB-A8 and PBX-A9. Whilst this
-> is the wrong way of going about solving the problem [Russell's code
-> patching is a lot neater and more scaleable] you might be interested
-> in looking at the code anyway:
-> 
-> http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/smp-up-hacks
-> 
-> Only v7 cores are supported and TEX remapping is used to avoid having
-> to worry about setting the shared attribute at runtime. Yuck!
+> > It's probably overwriting some register it shouldn't be.  I might be
+> > able to look at this sometime during the coming week... assuming that
+> > the weather is as bad as they forecast and I have 'net connectivity.
 
-Heh cool, I'll take a look at those :)
+This seems to fix it.
 
 Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: fix-smp-on-up.patch
+Type: text/x-diff
+Size: 788 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/c3899324/attachment.bin>
