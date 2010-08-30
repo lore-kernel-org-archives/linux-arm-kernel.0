@@ -1,171 +1,37 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 30 Aug 2010 20:47:29 +0900
-Subject: [PATCH 3/3] ARM: Samsung S3C: Move/use the S3C common GPIO IRQ type
-Message-ID: <20100830114729.GA13150@july>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 30 Aug 2010 17:28:12 +0530
+Subject: [PATCH] davinci: Initial support for MityDSP-L138/MityARM-1808
+In-Reply-To: <4C78FA26.4040801@criticallink.com>
+References: <4C78FA26.4040801@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301F6615555@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+Hi Michael,
 
-Samsung S3C series have the common GPIO IRQ type for all S3C series.
+On Sat, Aug 28, 2010 at 17:29:34, Michael Williamson wrote:
+> This patch adds initial support for the MityDSP-L138 and MityDSP-1808 system
+> on Module (SOM) under the machine name "mityomapl138".  These SOMs are based
+> on the da850 davinci CPU architecture.  Information on these SOMs may be
+> found at http://www.mitydsp.com.
+>
+> Basic support for the console UART, NAND, and EMAC (MII interface) is
+> included in this patch.
+>
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+> ---
+> Notes:
+>   1) Patch is against 0a50e05b20f3c6af67656303bdb3661a2541ce03 of Kevin's
+>      tree (2.6.36-rc2).
+>   2) I did not include a defconfig update in this patch.  Until the regulator
+>      support is added back in (planned subsequent patch), it cannot be added
+>      to da8xx_omapl_defconfig as the CONFIG_REGULATOR option doesn't play
+>      nice with platforms not defining a regulator.  If a defconfig support
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s3c64xx/irq-eint.c                  |   12 ++++++------
- arch/arm/plat-s3c24xx/irq.c                       |   14 +++++++-------
- arch/arm/plat-s5p/irq-eint.c                      |    2 --
- arch/arm/plat-samsung/include/plat/gpio-core.h    |    6 ++++++
- arch/arm/plat-samsung/include/plat/regs-irqtype.h |   21 ---------------------
- 5 files changed, 19 insertions(+), 36 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-irqtype.h
+What is the issue you are facing? I have seen in the past that enabling
+CONFIG_REGULATOR_DUMMY helped overcome an aic3x codec initialization issue
+when the aic3x probe expects a few regulators to be present in the system
+if CONFIG_REGULATOR is on.
 
-diff --git a/arch/arm/mach-s3c64xx/irq-eint.c b/arch/arm/mach-s3c64xx/irq-eint.c
-index 5682d6a..c079147 100644
---- a/arch/arm/mach-s3c64xx/irq-eint.c
-+++ b/arch/arm/mach-s3c64xx/irq-eint.c
-@@ -21,8 +21,8 @@
- 
- #include <asm/hardware/vic.h>
- 
--#include <plat/regs-irqtype.h>
- #include <mach/regs-gpio.h>
-+#include <plat/gpio-core.h>
- #include <plat/gpio-cfg.h>
- 
- #include <mach/map.h>
-@@ -85,23 +85,23 @@ static int s3c_irq_eint_set_type(unsigned int irq, unsigned int type)
- 		break;
- 
- 	case IRQ_TYPE_EDGE_RISING:
--		newvalue = S3C2410_EXTINT_RISEEDGE;
-+		newvalue = S3C_GPIO_EDGE_RISING;
- 		break;
- 
- 	case IRQ_TYPE_EDGE_FALLING:
--		newvalue = S3C2410_EXTINT_FALLEDGE;
-+		newvalue = S3C_GPIO_EDGE_FALLING;
- 		break;
- 
- 	case IRQ_TYPE_EDGE_BOTH:
--		newvalue = S3C2410_EXTINT_BOTHEDGE;
-+		newvalue = S3C_GPIO_EDGE_BOTH;
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_LOW:
--		newvalue = S3C2410_EXTINT_LOWLEV;
-+		newvalue = S3C_GPIO_LEVEL_LOW;
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_HIGH:
--		newvalue = S3C2410_EXTINT_HILEV;
-+		newvalue = S3C_GPIO_LEVEL_HIGH;
- 		break;
- 
- 	default:
-diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index ad0d44e..e1a6fe5 100644
---- a/arch/arm/plat-s3c24xx/irq.c
-+++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -23,12 +23,12 @@
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
- #include <linux/sysdev.h>
-+#include <linux/gpio.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/irq.h>
- 
--#include <plat/regs-irqtype.h>
--
-+#include <plat/gpio-core.h>
- #include <plat/cpu.h>
- #include <plat/pm.h>
- #include <plat/irq.h>
-@@ -201,23 +201,23 @@ s3c_irqext_type(unsigned int irq, unsigned int type)
- 			break;
- 
- 		case IRQ_TYPE_EDGE_RISING:
--			newvalue = S3C2410_EXTINT_RISEEDGE;
-+			newvalue = S3C_GPIO_EDGE_RISING;
- 			break;
- 
- 		case IRQ_TYPE_EDGE_FALLING:
--			newvalue = S3C2410_EXTINT_FALLEDGE;
-+			newvalue = S3C_GPIO_EDGE_FALLING;
- 			break;
- 
- 		case IRQ_TYPE_EDGE_BOTH:
--			newvalue = S3C2410_EXTINT_BOTHEDGE;
-+			newvalue = S3C_GPIO_EDGE_BOTH;
- 			break;
- 
- 		case IRQ_TYPE_LEVEL_LOW:
--			newvalue = S3C2410_EXTINT_LOWLEV;
-+			newvalue = S3C_GPIO_LEVEL_LOW;
- 			break;
- 
- 		case IRQ_TYPE_LEVEL_HIGH:
--			newvalue = S3C2410_EXTINT_HILEV;
-+			newvalue = S3C_GPIO_LEVEL_HIGH;
- 			break;
- 
- 		default:
-diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
-index 4e0d94b..02d6ea2 100644
---- a/arch/arm/plat-s5p/irq-eint.c
-+++ b/arch/arm/plat-s5p/irq-eint.c
-@@ -19,8 +19,6 @@
- 
- #include <asm/hardware/vic.h>
- 
--#include <plat/regs-irqtype.h>
--
- #include <mach/map.h>
- #include <plat/cpu.h>
- #include <plat/pm.h>
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
-index c8681e0..2aef589 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-core.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
-@@ -14,6 +14,12 @@
- #define GPIOCON_OFF	(0x00)
- #define GPIODAT_OFF	(0x04)
- 
-+#define S3C_GPIO_LEVEL_LOW		(0x00)
-+#define S3C_GPIO_LEVEL_HIGH		(0x01)
-+#define S3C_GPIO_EDGE_FALLING		(0x02)
-+#define S3C_GPIO_EDGE_RISING		(0x04)
-+#define S3C_GPIO_EDGE_BOTH		(0x06)
-+
- #define S5P_GPIO_LEVEL_LOW		(0x00)
- #define S5P_GPIO_LEVEL_HIGH		(0x01)
- #define S5P_GPIO_EDGE_FALLING		(0x02)
-diff --git a/arch/arm/plat-samsung/include/plat/regs-irqtype.h b/arch/arm/plat-samsung/include/plat/regs-irqtype.h
-deleted file mode 100644
-index c63cd3f..0000000
---- a/arch/arm/plat-samsung/include/plat/regs-irqtype.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/* arch/arm/plat-s3c/include/plat/regs-irqtype.h
-- *
-- * Copyright 2008 Simtec Electronics
-- *      Ben Dooks <ben@simtec.co.uk>
-- *      http://armlinux.simtec.co.uk/
-- *
-- * S3C - IRQ detection types.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--/* values for S3C2410_EXTINT0/1/2 and other cpus in the series, including
-- * the S3C64XX
--*/
--#define S3C2410_EXTINT_LOWLEV	 (0x00)
--#define S3C2410_EXTINT_HILEV	 (0x01)
--#define S3C2410_EXTINT_FALLEDGE	 (0x02)
--#define S3C2410_EXTINT_RISEEDGE	 (0x04)
--#define S3C2410_EXTINT_BOTHEDGE	 (0x06)
--- 
-1.5.3.3
+Thanks,
+Sekhar
