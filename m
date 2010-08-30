@@ -1,491 +1,102 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:08:46 +0530
-Subject: [PATCH 16/74] ST SPEAr: adding support for synopsis i2c designware
+Date: Mon, 30 Aug 2010 16:08:49 +0530
+Subject: [PATCH 20/74] Clock Framework: Adding ENABLED_ON_INIT feature in clk
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <72ad657ab3eb9d61f11741145494eadb061926b9.1283161023.git.viresh.kumar@st.com>
+Message-ID: <510ca14c78955ed8f6bed507a320ee7852b5cafa.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/clock.c                |    2 +-
- arch/arm/mach-spear13xx/include/mach/generic.h |    2 +
- arch/arm/mach-spear13xx/spear1300_evb.c        |    4 +++
- arch/arm/mach-spear13xx/spear13xx.c            |   23 +++++++++++++++++++
- arch/arm/mach-spear3xx/clock.c                 |   14 ++++++++++-
- arch/arm/mach-spear3xx/include/mach/generic.h  |    3 ++
- arch/arm/mach-spear3xx/include/mach/irqs.h     |    2 +-
- arch/arm/mach-spear3xx/spear300_evb.c          |    4 +++
- arch/arm/mach-spear3xx/spear310_evb.c          |    4 +++
- arch/arm/mach-spear3xx/spear320.c              |   24 +++++++++++++++++++-
- arch/arm/mach-spear3xx/spear320_evb.c          |    5 ++++
- arch/arm/mach-spear3xx/spear3xx.c              |   22 ++++++++++++++++++
- arch/arm/mach-spear6xx/clock.c                 |    2 +-
- arch/arm/mach-spear6xx/include/mach/generic.h  |    2 +
- arch/arm/mach-spear6xx/spear600_evb.c          |    4 +++
- arch/arm/mach-spear6xx/spear6xx.c              |   22 ++++++++++++++++++
- arch/arm/plat-spear/Makefile                   |    6 +++++
- arch/arm/plat-spear/i2c_eval_board.c           |   29 ++++++++++++++++++++++++
- 18 files changed, 169 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/plat-spear/i2c_eval_board.c
+ arch/arm/mach-spear13xx/clock.c          |    2 ++
+ arch/arm/mach-spear3xx/clock.c           |    1 +
+ arch/arm/mach-spear6xx/clock.c           |    1 +
+ arch/arm/plat-spear/clock.c              |    6 ++++++
+ arch/arm/plat-spear/include/plat/clock.h |    1 +
+ 5 files changed, 11 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index cc692cc..7f7330c 100644
+index 9d97c69..9252940 100644
 --- a/arch/arm/mach-spear13xx/clock.c
 +++ b/arch/arm/mach-spear13xx/clock.c
-@@ -777,7 +777,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.dev_id = "uhci0",		.clk = &uhci0_clk},
- 	{.dev_id = "uhci1",		.clk = &uhci1_clk},
- 	{.dev_id = "usbd",		.clk = &usbd_clk},
--	{.dev_id = "i2c",		.clk = &i2c_clk},
-+	{.dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{.dev_id = "dma0",		.clk = &dma0_clk},
- 	{.dev_id = "dma1",		.clk = &dma1_clk},
- 	{.dev_id = "jpeg",		.clk = &jpeg_clk},
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index dc80421..0ba99de 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -30,6 +30,7 @@
+@@ -89,6 +89,7 @@ static struct pll_clk_config pll1_config = {
  
- /* Add spear13xx family device structure declarations here */
- extern struct amba_device uart_device;
-+extern struct platform_device i2c_device;
- extern struct platform_device rtc_device;
- extern struct sys_timer spear13xx_timer;
+ /* pll1 clock */
+ static struct clk pll1_clk = {
++	.flags = ENABLED_ON_INIT,
+ 	.pclk_sel = &pll_pclk_sel,
+ 	.pclk_sel_shift = PLL1_CLK_SHIFT,
+ 	.en_reg = PLL1_CTR,
+@@ -156,6 +157,7 @@ static struct pll_clk_config pll4_config = {
  
-@@ -37,6 +38,7 @@ extern struct sys_timer spear13xx_timer;
- 
- /* Add spear13xx family function declarations here */
- void __init clk_init(void);
-+void __init i2c_register_board_devices(void);
- void __init spear_setup_timer(void);
- void __init spear1300_init(void);
- void __init spear13xx_map_io(void);
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 60c5fee..4bf908f 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -22,6 +22,7 @@ static struct amba_device *amba_devs[] __initdata = {
- };
- 
- static struct platform_device *plat_devs[] __initdata = {
-+	&i2c_device,
- 	&rtc_device,
- };
- 
-@@ -32,6 +33,9 @@ static void __init spear1300_evb_init(void)
- 	/* call spear1300 machine init function */
- 	spear1300_init();
- 
-+	/* Register slave devices on the I2C buses */
-+	i2c_register_board_devices();
-+
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index bdca713..5abdae8 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -24,6 +24,7 @@
- #include <mach/hardware.h>
- 
- /* Add spear13xx machines common devices here */
-+
- /* uart device registeration */
- struct amba_device uart_device = {
- 	.dev = {
-@@ -37,6 +38,28 @@ struct amba_device uart_device = {
- 	.irq = {IRQ_UART, NO_IRQ},
- };
- 
-+/* i2c device registeration */
-+static struct resource i2c_resources[] = {
-+	{
-+		.start = SPEAR13XX_I2C_BASE,
-+		.end = SPEAR13XX_I2C_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_I2C,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device i2c_device = {
-+	.name = "i2c_designware",
-+	.id = 0,
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+	},
-+	.num_resources = ARRAY_SIZE(i2c_resources),
-+	.resource = i2c_resources,
-+};
-+
- /* rtc device registration */
- static struct resource rtc_resources[] = {
- 	{
+ /* pll4 (DDR) clock */
+ static struct clk pll4_clk = {
++	.flags = ENABLED_ON_INIT,
+ 	.pclk = &osc1_24m_clk,
+ 	.en_reg = PLL4_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
 diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 147d0a3..ae6c244 100644
+index 5eb6ff6..79f0159 100644
 --- a/arch/arm/mach-spear3xx/clock.c
 +++ b/arch/arm/mach-spear3xx/clock.c
-@@ -460,6 +460,15 @@ static struct clk gpio_clk = {
+@@ -62,6 +62,7 @@ static struct pll_clk_config pll1_config = {
  
- static struct clk dummy_apb_pclk;
- 
-+#ifdef CONFIG_MACH_SPEAR320
-+/* i2c1 clock */
-+static struct clk i2c1_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ahb_clk,
-+	.recalc = &follow_parent,
-+};
-+#endif
-+
- /* array of all spear 3xx clock lookups */
- static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "apb_pclk",	.clk = &dummy_apb_pclk},
-@@ -491,7 +500,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "clcd",		.clk = &clcd_clk},
- 	/* clock derived from ahb clk */
- 	{ .con_id = "apb_clk",		.clk = &apb_clk},
--	{ .dev_id = "i2c",		.clk = &i2c_clk},
-+	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{ .dev_id = "dma",		.clk = &dma_clk},
- 	{ .dev_id = "jpeg",		.clk = &jpeg_clk},
- 	{ .dev_id = "gmac",		.clk = &gmac_clk},
-@@ -501,6 +510,9 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "adc",		.clk = &adc_clk},
- 	{ .dev_id = "ssp",		.clk = &ssp_clk},
- 	{ .dev_id = "gpio",		.clk = &gpio_clk},
-+#ifdef CONFIG_MACH_SPEAR320
-+	{ .dev_id = "i2c_designware.1",	.clk = &i2c1_clk},
-+#endif
- };
- 
- void __init clk_init(void)
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 408bb8d..162f33b 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -33,11 +33,13 @@
- /* Add spear3xx family device structure declarations here */
- extern struct amba_device gpio_device;
- extern struct amba_device uart_device;
-+extern struct platform_device i2c_device;
- extern struct platform_device rtc_device;
- extern struct sys_timer spear3xx_timer;
- 
- /* Add spear3xx family function declarations here */
- void __init clk_init(void);
-+void __init i2c_register_board_devices(void);
- void __init spear_setup_timer(void);
- void __init spear3xx_map_io(void);
- void __init spear3xx_init_irq(void);
-@@ -166,6 +168,7 @@ void __init spear310_init(void);
- #ifdef CONFIG_MACH_SPEAR320
- /* Add spear320 machine device structure declarations here */
- extern struct amba_device clcd_device;
-+extern struct platform_device i2c1_device;
- extern struct platform_device plgpio_device;
- 
- /* pad mux modes */
-diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
-index f1175b9..5ad7574 100644
---- a/arch/arm/mach-spear3xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
-@@ -133,7 +133,7 @@
- #define VIRQ_MII1_SMII1				(VIRQ_START + 13)
- #define VIRQ_WAKEUP_SMII0			(VIRQ_START + 14)
- #define VIRQ_WAKEUP_MII1_SMII1			(VIRQ_START + 15)
--#define VIRQ_I2C				(VIRQ_START + 16)
-+#define VIRQ_I2C1				(VIRQ_START + 16)
- 
- /* GPIO pins virtual irqs */
- #define SPEAR_GPIO_INT_BASE			(VIRQ_START + 17)
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index 392ee4a..083f65c 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -44,6 +44,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 
- static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
-+	&i2c_device,
- 	&rtc_device,
- 
- 	/* spear300 specific devices */
-@@ -61,6 +62,9 @@ static void __init spear300_evb_init(void)
- 	/* call spear300 machine init function */
- 	spear300_init();
- 
-+	/* Register slave devices on the I2C buses */
-+	i2c_register_board_devices();
-+
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
- 
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 15ca8fc..208a68ce1 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -50,6 +50,7 @@ static struct amba_device *amba_devs[] __initdata = {
- 
- static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
-+	&i2c_device,
- 	&rtc_device,
- 
- 	/* spear310 specific devices */
-@@ -68,6 +69,9 @@ static void __init spear310_evb_init(void)
- 	/* call spear310 machine init function */
- 	spear310_init();
- 
-+	/* Register slave devices on the I2C buses */
-+	i2c_register_board_devices();
-+
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
- 
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 2e388dd..bfb21ae 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -409,6 +409,28 @@ static struct plgpio_platform_data plgpio_plat_data = {
- 	.gpio_count = SPEAR_PLGPIO_COUNT,
- };
- 
-+/* i2c1 device registeration */
-+static struct resource i2c1_resources[] = {
-+	{
-+		.start = SPEAR320_I2C_BASE,
-+		.end = SPEAR320_I2C_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = VIRQ_I2C1 ,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device i2c1_device = {
-+	.name = "i2c_designware",
-+	.id = 1,
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+	},
-+	.num_resources = ARRAY_SIZE(i2c1_resources),
-+	.resource = i2c1_resources,
-+};
-+
- static struct resource plgpio_resources[] = {
- 	{
- 		.start = SPEAR320_SOC_CONFIG_BASE,
-@@ -535,7 +557,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
- 		.status_mask = WAKEUP_MII1_SMII1_IRQ_MASK,
- 		.clear_mask = WAKEUP_MII1_SMII1_IRQ_MASK,
- 	}, {
--		.virq = VIRQ_I2C,
-+		.virq = VIRQ_I2C1,
- 		.status_mask = I2C1_IRQ_MASK,
- 		.clear_mask = I2C1_IRQ_MASK,
- 	},
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 48155cc..90d685e 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -48,9 +48,11 @@ static struct amba_device *amba_devs[] __initdata = {
- 
- static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
-+	&i2c_device,
- 	&rtc_device,
- 
- 	/* spear320 specific devices */
-+	&i2c1_device,
- 	&plgpio_device,
- };
- 
-@@ -66,6 +68,9 @@ static void __init spear320_evb_init(void)
- 	/* call spear320 machine init function */
- 	spear320_init();
- 
-+	/* Register slave devices on the I2C buses */
-+	i2c_register_board_devices();
-+
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
- 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 6d8791e..34d22a5 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -54,6 +54,28 @@ struct amba_device uart_device = {
- 	.irq = {IRQ_UART, NO_IRQ},
- };
- 
-+/* i2c device registeration */
-+static struct resource i2c_resources[] = {
-+	{
-+		.start = SPEAR3XX_ICM1_I2C_BASE,
-+		.end = SPEAR3XX_ICM1_I2C_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_I2C,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device i2c_device = {
-+	.name = "i2c_designware",
-+	.id = 0,
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+	},
-+	.num_resources = ARRAY_SIZE(i2c_resources),
-+	.resource = i2c_resources,
-+};
-+
- /* rtc device registration */
- static struct resource rtc_resources[] = {
- 	{
+ /* PLL1 clock */
+ static struct clk pll1_clk = {
++	.flags = ENABLED_ON_INIT,
+ 	.pclk = &osc_24m_clk,
+ 	.en_reg = PLL1_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
 diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 66fc622..0972b8f 100644
+index 3caf91a..fb05ec8 100644
 --- a/arch/arm/mach-spear6xx/clock.c
 +++ b/arch/arm/mach-spear6xx/clock.c
-@@ -596,7 +596,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
- 	{ .con_id = "apb_clk",		.clk = &apb_clk},
--	{ .dev_id = "i2c",		.clk = &i2c_clk},
-+	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{ .dev_id = "dma",		.clk = &dma_clk},
- 	{ .dev_id = "jpeg",		.clk = &jpeg_clk},
- 	{ .dev_id = "gmac",		.clk = &gmac_clk},
-diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index 674b16c..44a2f99 100644
---- a/arch/arm/mach-spear6xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -32,10 +32,12 @@
- extern struct amba_device clcd_device;
- extern struct amba_device gpio_device[];
- extern struct amba_device uart_device[];
-+extern struct platform_device i2c_device;
- extern struct platform_device rtc_device;
- extern struct sys_timer spear6xx_timer;
+@@ -62,6 +62,7 @@ static struct pll_clk_config pll1_config = {
  
- /* Add spear6xx family function declarations here */
-+void __init i2c_register_board_devices(void);
- void __init spear_setup_timer(void);
- void __init spear6xx_map_io(void);
- void __init spear6xx_init_irq(void);
-diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
-index 861e83d..6b0cf23 100644
---- a/arch/arm/mach-spear6xx/spear600_evb.c
-+++ b/arch/arm/mach-spear6xx/spear600_evb.c
-@@ -26,6 +26,7 @@ static struct amba_device *amba_devs[] __initdata = {
- };
- 
- static struct platform_device *plat_devs[] __initdata = {
-+	&i2c_device,
- 	&rtc_device,
- };
- 
-@@ -36,6 +37,9 @@ static void __init spear600_evb_init(void)
- 	/* call spear600 machine init function */
- 	spear600_init();
- 
-+	/* Register slave devices on the I2C buses */
-+	i2c_register_board_devices();
-+
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
- 
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 1e403cb..787de46 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -121,6 +121,28 @@ struct amba_device gpio_device[] = {
+ /* PLL1 clock */
+ static struct clk pll1_clk = {
++	.flags = ENABLED_ON_INIT,
+ 	.pclk = &osc_30m_clk,
+ 	.en_reg = PLL1_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index 75c42a3..e871016 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -372,6 +372,9 @@ void propagate_rate(struct clk *pclk)
+ 				clk->recalc(clk);
+ 			propagate_rate(clk);
+ 		}
++		/* Enable clks enabled on init, in software view */
++		if (clk->flags & ENABLED_ON_INIT)
++			do_clk_enable(clk);
  	}
- };
+ }
  
-+/* i2c device registeration */
-+static struct resource i2c_resources[] = {
-+	{
-+		.start = SPEAR6XX_ICM1_I2C_BASE,
-+		.end = SPEAR6XX_ICM1_I2C_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_I2C,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device i2c_device = {
-+	.name = "i2c_designware",
-+	.id = 0,
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+	},
-+	.num_resources = ARRAY_SIZE(i2c_resources),
-+	.resource = i2c_resources,
-+};
-+
- /* rtc device registration */
- static struct resource rtc_resources[] = {
- 	{
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index e66bc5f..c31892a 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -8,3 +8,9 @@ obj-y	:= clcd.o clock.o time.o
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
-+
-+obj-$(CONFIG_BOARD_SPEAR1300_EVB)	+= i2c_eval_board.o
-+obj-$(CONFIG_BOARD_SPEAR300_EVB)	+= i2c_eval_board.o
-+obj-$(CONFIG_BOARD_SPEAR310_EVB)	+= i2c_eval_board.o
-+obj-$(CONFIG_BOARD_SPEAR320_EVB)	+= i2c_eval_board.o
-+obj-$(CONFIG_BOARD_SPEAR600_EVB)	+= i2c_eval_board.o
-diff --git a/arch/arm/plat-spear/i2c_eval_board.c b/arch/arm/plat-spear/i2c_eval_board.c
-new file mode 100644
-index 0000000..a2473a8
---- /dev/null
-+++ b/arch/arm/plat-spear/i2c_eval_board.c
-@@ -0,0 +1,29 @@
-+/*
-+ * arch/arm/plat-spear/i2c_eval_board.c
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/i2c.h>
-+#include <linux/kernel.h>
-+
-+static struct i2c_board_info __initdata i2c_board_info[] = {
-+	{
-+		.type = "eeprom",
-+		.addr = 0x50,
-+	}, {
-+		.type = "eeprom",
-+		.addr = 0x51,
-+	},
-+};
-+
-+void __init i2c_register_board_devices(void)
-+{
-+	i2c_register_board_info(0, i2c_board_info,
-+				ARRAY_SIZE(i2c_board_info));
-+}
+@@ -550,6 +553,9 @@ void recalc_root_clocks(void)
+ 				pclk->recalc(pclk);
+ 			propagate_rate(pclk);
+ 		}
++		/* Enable clks enabled on init, in software view */
++		if (pclk->flags & ENABLED_ON_INIT)
++			do_clk_enable(pclk);
+ 	}
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index 2e55855..91f8e3f 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -21,6 +21,7 @@
+ /* clk structure flags */
+ #define	ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
+ #define	RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
++#define	ENABLED_ON_INIT		(1 << 2) /* clocks enabled@init */
+ 
+ /**
+  * struct clkops - clock operations
 -- 
 1.7.2.2
