@@ -1,38 +1,55 @@
-From: thomas.nemeth@betatech.fr (Thomas Nemeth)
-Date: Mon, 30 Aug 2010 14:44:21 +0200
-Subject: iMX31 power management
-Message-ID: <201008301444.21510.thomas.nemeth@betatech.fr>
+From: robert.richter@amd.com (Robert Richter)
+Date: Mon, 30 Aug 2010 14:41:58 +0200
+Subject: [PATCH 2/4] sh: Accessor functions for the sh_pmu state
+In-Reply-To: <20100827191745.GA7258@console-pimps.org>
+References: <cover.1282848651.git.matt@console-pimps.org>
+	<f259830dbccb084d27d127676b979d9cb502e36f.1282848651.git.matt@console-pimps.org>
+	<20100827134301.GL22783@erda.amd.com>
+	<20100827191745.GA7258@console-pimps.org>
+Message-ID: <20100830124158.GY22783@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 27.08.10 15:17:45, Matt Fleming wrote:
 
-    Hi.
+> > > --- a/arch/sh/kernel/perf_event.c
+> > > +++ b/arch/sh/kernel/perf_event.c
+> > > @@ -60,6 +60,19 @@ static inline int sh_pmu_initialized(void)
+> > >  }
+> > >  
+> > >  /*
+> > > + * Return the number of events for the current sh_pmu.
+> > > + */
+> > > +int sh_pmu_num_events(void)
+> > > +{
+> > > +	return sh_pmu->num_events;
+> > > +}
+> > > +
+> > > +const char *sh_pmu_name(void)
+> > > +{
+> > > +	return sh_pmu->name;
+> > > +}
 
-    I'm currently struggling trying to make suspend to RAM work for the
-    iMX31 processor. As the pm functions were not implemented, I added
-    a pretty straightforward pm "driver".
+> > This accessor functions should be generic for all architectures.
+> 
+> This isn't going to work. ARM uses an integer ID whereas SH uses a
+> string name. This is specific to an architecture and making it generic
+> would probably involve some abstraction layer.
 
-    It works to a point. The processor seems really sleeping. But where
-    the heck is Prince Charming ? It does not want to wakeup else :( I
-    can't make the DOZE mode, State Retention mode and Deep Sleep mode
-    to work. Does anybody know how ?
+Perf should provide the interface to detect the number of counters
+(btw. *num_events is wrong) and the name of the pmu. The information
+is part of perf and thus the functions accessing it should be part of
+perf too, not oprofile.
 
-    I added in attachment the code I adapted from 2.6.22 so that it
-    integrates better with current kernels.
+We also need generic functions, because we want to have a generic
+oprofile-perf driver.
 
+I don't see that this is hard to implement. We could add function
+stubs returning an error or invalid value using the __weak attribute
+and implement it for those architectures where we need it.
 
-Thomas.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: pm.c
-Type: text/x-csrc
-Size: 4152 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/d8328997/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 189 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/d8328997/attachment.sig>
+-Robert
+
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
