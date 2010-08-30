@@ -1,255 +1,323 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:13 +0530
-Subject: [PATCH 49/74] SPEAr CPU freq: Adding support for CPU Freq framework
+Date: Mon, 30 Aug 2010 16:09:08 +0530
+Subject: [PATCH 44/74] ST SPEAr : FSMC (Flexible Static Memory Controller) NOR
+	interface driver
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <95e9f2e2d8e2a23629760a7dcb7cbab098ff7412.1283161023.git.viresh.kumar@st.com>
+Message-ID: <3083e6913169ae3d3761be1667708c01ea2e344c.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Vipin Kumar <vipin.kumar@st.com>
 
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+SPEAr1300 SoC supports FSMC to interface with various memories (NOR/NAND/SRAM).
+This patch adds the support for FSMC over NOR interface.
+
+The driver being used is driver/mtd/maps/physmap.c
+
+Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/Kconfig                |    2 +
- arch/arm/mach-spear13xx/clock.c |    1 +
- arch/arm/mach-spear3xx/clock.c  |    1 +
- arch/arm/mach-spear6xx/clock.c  |    1 +
- arch/arm/plat-spear/Makefile    |    2 +-
- arch/arm/plat-spear/cpufreq.c   |  160 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 166 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/plat-spear/cpufreq.c
+ arch/arm/mach-spear13xx/Makefile               |    2 +-
+ arch/arm/mach-spear13xx/clock.c                |    2 +-
+ arch/arm/mach-spear13xx/fsmc-nor.c             |   81 ++++++++++++++++++++++++
+ arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |   17 +++++
+ arch/arm/mach-spear13xx/spear13xx.c            |   20 ++++++
+ arch/arm/plat-spear/include/plat/fsmc.h        |   51 +++++++++++++++-
+ 7 files changed, 171 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-spear13xx/fsmc-nor.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c4d1df3..ef92faa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -822,6 +822,8 @@ config PLAT_SPEAR
- 	select COMMON_CLKDEV
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
-+	select ARCH_HAS_CPUFREQ
-+
- 	help
- 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
+diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
+index 168886e..8644c76 100644
+--- a/arch/arm/mach-spear13xx/Makefile
++++ b/arch/arm/mach-spear13xx/Makefile
+@@ -3,7 +3,7 @@
+ #
+ 
+ # common files
+-obj-y					+= spear13xx.o clock.o
++obj-y					+= spear13xx.o clock.o fsmc-nor.o
+ obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+ obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
  
 diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index c593608..7f07911 100644
+index 30eba05..c593608 100644
 --- a/arch/arm/mach-spear13xx/clock.c
 +++ b/arch/arm/mach-spear13xx/clock.c
-@@ -90,6 +90,7 @@ static struct pll_clk_config pll1_config = {
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	/* PCLK 24MHz */
-+	{.mode = 0, .m = 0x64, .n = 0x03, .p = 0x2}, /* 400 MHz */
- 	{.mode = 0, .m = 0x7D, .n = 0x03, .p = 0x2}, /* 500 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x03, .p = 0x2}, /* 664 MHz */
- 	{.mode = 0, .m = 0xC8, .n = 0x03, .p = 0x2}, /* 800 MHz */
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 4f049fe..64d9cdc 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
+@@ -920,7 +920,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.dev_id = "pcie2",		.clk = &pcie2_clk},
+ 	{.dev_id = "cfxd",		.clk = &cfxd_clk},
+ 	{.dev_id = "sdhci",		.clk = &sdhci_clk},
+-	{.con_id = "fsmc",		.clk = &fsmc_clk},
++	{.dev_id = "fsmc",		.clk = &fsmc_clk},
+ 	{.dev_id = "sysram0",		.clk = &sysram0_clk},
+ 	{.dev_id = "sysram1",		.clk = &sysram1_clk},
  
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
-+	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 99cc21d..f1429f5 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
- 
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
-+	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 1c8ee4a..c25e5b8 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -6,7 +6,7 @@
- obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
- 
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
--
-+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
- obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
-diff --git a/arch/arm/plat-spear/cpufreq.c b/arch/arm/plat-spear/cpufreq.c
+diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
 new file mode 100644
-index 0000000..3b1cac9
+index 0000000..68f0ca0
 --- /dev/null
-+++ b/arch/arm/plat-spear/cpufreq.c
-@@ -0,0 +1,160 @@
++++ b/arch/arm/mach-spear13xx/fsmc-nor.c
+@@ -0,0 +1,81 @@
 +/*
-+ * arch/arm/plat-spear/cpufreq.c
++ * arch/arm/mach-spear13xx/fsmc-nor.c
 + *
-+ * CPU Frequency Scaling for SPEAr platform
++ * FSMC (Flexible Static Memory Controller) interface for NOR
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri<deepak.sikri@st.com>
-+ *
++ * Vipin Kumar<vipin.kumar@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/cpufreq.h>
-+#include <linux/delay.h>
++#include <linux/clk.h>
++#include <linux/err.h>
 +#include <linux/init.h>
 +#include <linux/err.h>
-+#include <linux/clk.h>
 +#include <linux/io.h>
++#include <plat/fsmc.h>
 +
-+#include <mach/hardware.h>
-+#include <asm/system.h>
-+
-+#define CPU_CLK		"cpu_clk"
-+
-+#ifdef CONFIG_ARCH_SPEAR13XX
-+#define MIN_CPU_FREQ	200000
-+#define MAX_CPU_FREQ	500000
-+
-+static u32 spear_cpu_freq[] = {
-+	200000,	/* 200 MHZ */
-+	250000,	/* 250 MHZ */
-+	332000,	/* 332 MHZ */
-+	400000,	/* 400 MHZ */
-+	500000,	/* 500 MHZ */
-+};
-+#elif defined(CONFIG_ARCH_SPEAR6XX) || defined(CONFIG_ARCH_SPEAR3XX)
-+#define MIN_CPU_FREQ	166000
-+#define MAX_CPU_FREQ	332000
-+
-+static u32 spear_cpu_freq[] = {
-+	166000,	/* 166 MHZ */
-+	266000,	/* 266 MHZ */
-+	332000,	/* 333 MHZ */
-+};
-+#endif
-+
-+static struct
-+	cpufreq_frequency_table spear_freq_tbl[ARRAY_SIZE(spear_cpu_freq) + 1];
-+static struct clk *cpu_clk;
-+
-+int spear_cpufreq_verify(struct cpufreq_policy *policy)
++int __init fsmc_nor_init(struct platform_device *pdev, unsigned long base,
++		u32 bank, u32 width)
 +{
-+	return cpufreq_frequency_table_verify(policy, spear_freq_tbl);
-+}
++	void __iomem *fsmc_nor_base;
++	struct fsmc_regs *regs;
++	struct clk *clk;
++	int ret;
++	u32 ctrl;
 +
-+unsigned int spear_cpufreq_get(unsigned int cpu)
-+{
-+	unsigned long rate;
-+
-+	if (cpu)
-+		return 0;
-+
-+	rate = clk_get_rate(cpu_clk) / 1000;
-+	return rate;
-+}
-+
-+static int spear_cpufreq_target(struct cpufreq_policy *policy,
-+		unsigned int target_freq, unsigned int relation)
-+{
-+	struct cpufreq_freqs freqs;
-+	int ret = 0;
-+	int index;
-+
-+	if (policy->cpu != 0)
++	if (bank > (FSMC_MAX_NOR_BANKS - 1))
 +		return -EINVAL;
 +
-+	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
-+				target_freq, relation, &index))
-+		return -EINVAL;
++	fsmc_nor_base = ioremap(base, FSMC_NOR_REG_SIZE);
++	if (!fsmc_nor_base)
++		return -ENOMEM;
 +
-+	freqs.old = spear_cpufreq_get(0);
-+	freqs.new = spear_cpu_freq[index];
-+	freqs.cpu = policy->cpu;
-+
-+	if (freqs.old == target_freq)
-+		return 0;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
-+	return ret;
-+}
-+
-+static int spear_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int result;
-+	int i = 0;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	cpu_clk = clk_get(NULL, CPU_CLK);
-+	if (IS_ERR(cpu_clk))
-+		return PTR_ERR(cpu_clk);
-+
-+	policy->cpuinfo.min_freq = MIN_CPU_FREQ;
-+	policy->cpuinfo.max_freq = MAX_CPU_FREQ;
-+	policy->cur = policy->min = policy->max = spear_cpufreq_get(0);
-+
-+	for (i = 0; i < ARRAY_SIZE(spear_cpu_freq); i++) {
-+		spear_freq_tbl[i].index = i;
-+		spear_freq_tbl[i].frequency = spear_cpu_freq[i];
++	clk = clk_get(NULL, "fsmc");
++	if (IS_ERR(clk)) {
++		iounmap(fsmc_nor_base);
++		return PTR_ERR(clk);
 +	}
 +
-+	spear_freq_tbl[i].index = i;
-+	spear_freq_tbl[i].frequency = CPUFREQ_TABLE_END;
-+	result = cpufreq_frequency_table_cpuinfo(policy, spear_freq_tbl);
-+	if (!result)
-+		cpufreq_frequency_table_get_attr(spear_freq_tbl,
-+				policy->cpu);
++	ret = clk_enable(clk);
++	if (ret) {
++		iounmap(fsmc_nor_base);
++		return ret;
++	}
 +
-+	policy->cpuinfo.transition_latency = 300*1000; /*250 uS*/
++	regs = (struct fsmc_regs *)fsmc_nor_base;
++
++	ctrl = WAIT_ENB | WRT_ENABLE | WPROT | NOR_DEV | BANK_ENABLE;
++
++	switch (width) {
++	case FSMC_FLASH_WIDTH8:
++		ctrl |= WIDTH_8;
++		break;
++
++	case FSMC_FLASH_WIDTH16:
++		ctrl |= WIDTH_16;
++		break;
++
++	default:
++		ctrl |= WIDTH_8;
++		break;
++	}
++
++	writel(ctrl, &regs->nor_bank_regs[bank].ctrl);
++	writel(0x0FFFFFFF, &regs->nor_bank_regs[bank].ctrl_tim);
++	writel(ctrl | RSTPWRDWN, &regs->nor_bank_regs[bank].ctrl);
++
++	iounmap(fsmc_nor_base);
 +
 +	return 0;
 +}
 +
-+static int spear_cpufreq_exit(struct cpufreq_policy *policy)
++void __init fsmc_init_board_info(struct platform_device *pdev,
++		struct mtd_partition *partitions, unsigned int nr_partitions,
++		unsigned int width)
 +{
-+	clk_put(cpu_clk);
-+	return 0;
++	fsmc_init_plat_data(pdev, partitions, nr_partitions, width);
 +}
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 6f4e6b5..dfee834 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -38,6 +38,7 @@ extern struct platform_device ehci1_device;
+ extern struct platform_device i2c_device;
+ extern struct platform_device kbd_device;
+ extern struct platform_device nand_device;
++extern struct platform_device fsmc_nor_device;
+ extern struct platform_device ohci0_device;
+ extern struct platform_device ohci1_device;
+ extern struct platform_device rtc_device;
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index db05747..d030a85 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -21,11 +21,21 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
+ #include <mach/pcie.h>
++#include <plat/fsmc.h>
+ #include <plat/keyboard.h>
+ #include <plat/nand.h>
+ #include <plat/smi.h>
+ #include <plat/spi.h>
+ 
++#define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
 +
-+static struct freq_attr *spear_cpufreq_attr[] = {
-+	 &cpufreq_freq_attr_scaling_available_freqs,
-+	 NULL,
++static struct mtd_partition partition_info[] = {
++	PARTITION("X-loader", 0, 1 * 0x20000),
++	PARTITION("U-Boot", 0x20000, 3 * 0x20000),
++	PARTITION("Kernel", 0x80000, 24 * 0x20000),
++	PARTITION("Root File System", 0x380000, 84 * 0x20000),
 +};
 +
-+static struct cpufreq_driver spear_driver = {
-+	.flags		= CPUFREQ_STICKY,
-+	.verify		= spear_cpufreq_verify,
-+	.target		= spear_cpufreq_target,
-+	.get		= spear_cpufreq_get,
-+	.init		= spear_cpufreq_init,
-+	.exit		= spear_cpufreq_exit,
-+	.name		= "spear_cpufreq",
-+	.attr		= spear_cpufreq_attr,
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&gpio_device[0],
+ 	&gpio_device[1],
+@@ -143,6 +153,9 @@ static void __init spear1300_evb_init(void)
+ 	enable_pcie0_clk();
+ 	pcie_init(&spear1300_pcie_port_is_host);
+ #endif
++	/* initialize fsmc related data in fsmc plat data */
++	fsmc_init_board_info(&fsmc_nor_device, partition_info,
++			ARRAY_SIZE(partition_info), FSMC_FLASH_WIDTH8);
+ 
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+@@ -150,6 +163,10 @@ static void __init spear1300_evb_init(void)
+ 	/* Add Amba Devices */
+ 	spear_amba_device_register(amba_devs, ARRAY_SIZE(amba_devs));
+ 
++	/* Initialize fsmc regiters */
++	fsmc_nor_init(&fsmc_nor_device, SPEAR13XX_FSMC_BASE, 0,
++			FSMC_FLASH_WIDTH8);
++
+ 	spi_init();
+ }
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index 4563551..6d71aac 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -14,6 +14,7 @@
+ #include <linux/types.h>
+ #include <linux/amba/pl022.h>
+ #include <linux/amba/pl061.h>
++#include <linux/mtd/physmap.h>
+ #include <linux/ptrace.h>
+ #include <linux/io.h>
+ #include <asm/hardware/gic.h>
+@@ -130,6 +131,25 @@ struct platform_device i2c_device = {
+ 	.resource = i2c_resources,
+ };
+ 
++/* fsmc nor flash device registeration */
++static struct physmap_flash_data fsmc_norflash_data;
++
++static struct resource fsmc_nor_resources[] = {
++	{
++		.start	= SPEAR13XX_FSMC_MEM_BASE,
++		.end	= SPEAR13XX_FSMC_MEM_BASE + SZ_16M - 1,
++		.flags	= IORESOURCE_MEM,
++	},
 +};
 +
-+static int __init spear_cpufreq_register(void)
++struct platform_device fsmc_nor_device = {
++	.name	= "physmap-flash",
++	.id	= -1,
++	.resource = fsmc_nor_resources,
++	.num_resources = ARRAY_SIZE(fsmc_nor_resources),
++	.dev.platform_data = &fsmc_norflash_data,
++};
++
+ /* nand device registeration */
+ void __init nand_mach_init(u32 busw)
+ {
+diff --git a/arch/arm/plat-spear/include/plat/fsmc.h b/arch/arm/plat-spear/include/plat/fsmc.h
+index c0fdcd3..5909afd 100644
+--- a/arch/arm/plat-spear/include/plat/fsmc.h
++++ b/arch/arm/plat-spear/include/plat/fsmc.h
+@@ -15,11 +15,36 @@
+ #define __PLAT_FSMC_H
+ 
+ #include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
+ #include <linux/types.h>
+ #include <asm/param.h>
+ 
++#define FSMC_MAX_NOR_BANKS	4
+ #define FSMC_MAX_NAND_BANKS	4
+ 
++#define FSMC_FLASH_WIDTH8	1
++#define FSMC_FLASH_WIDTH16	2
++
++struct nor_bank_regs {
++	u32 ctrl;
++	u32 ctrl_tim;
++};
++
++/* ctrl register definitions */
++#define BANK_ENABLE		(1 << 0)
++#define MUXED			(1 << 1)
++#define NOR_DEV			(2 << 2)
++#define WIDTH_8			(0 << 4)
++#define WIDTH_16		(1 << 4)
++#define RSTPWRDWN		(1 << 6)
++#define WPROT			(1 << 7)
++#define WRT_ENABLE		(1 << 12)
++#define WAIT_ENB		(1 << 13)
++
++/* ctrl_tim register definitions */
++
+ struct nand_bank_regs {
+ 	u32 pc;
+ 	u32 sts;
+@@ -31,8 +56,11 @@ struct nand_bank_regs {
+ 	u32 ecc3;
+ };
+ 
++#define FSMC_NOR_REG_SIZE	0x40
++
+ struct fsmc_regs {
+-	u8 reserved_1[0x40];
++	struct nor_bank_regs nor_bank_regs[FSMC_MAX_NOR_BANKS];
++	u8 reserved_1[0x40 - 0x20];
+ 	struct nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
+ 	u8 reserved_2[0xfe0 - 0xc0];
+ 	u32 peripid0;			/* 0xfe0 */
+@@ -106,4 +134,25 @@ struct fsmc_eccplace {
+ 	struct fsmc_nand_eccplace eccplace[MAX_ECCPLACE_ENTRIES];
+ };
+ 
++static inline void fsmc_init_plat_data(struct platform_device *pdev,
++		struct mtd_partition *partitions, unsigned int nr_partitions,
++		unsigned int width)
 +{
-+	return cpufreq_register_driver(&spear_driver);
++	struct physmap_flash_data *fsmc_plat_data;
++	fsmc_plat_data = dev_get_platdata(&pdev->dev);
++
++	if (partitions) {
++		fsmc_plat_data->parts = partitions;
++		fsmc_plat_data->nr_parts = nr_partitions;
++	}
++
++	fsmc_plat_data->width = width;
 +}
 +
-+arch_initcall(spear_cpufreq_register);
++extern int __init fsmc_nor_init(struct platform_device *pdev,
++		unsigned long base, u32 bank, u32 width);
++extern void __init fsmc_init_board_info(struct platform_device *pdev,
++		struct mtd_partition *partitions, unsigned int nr_partitions,
++		unsigned int width);
++
+ #endif /* __PLAT_FSMC_H */
 -- 
 1.7.2.2
