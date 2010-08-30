@@ -1,44 +1,33 @@
-From: wolfgang.mues@auerswald.de (=?ISO-8859-1?Q?Wolfgang_M=FCes?=)
-Date: Mon, 30 Aug 2010 08:56:01 +0200
-Subject: [PATCH 1/7] mmc: at91_mci: fix pointer errors
-In-Reply-To: <4C7AD3A0.40607@bluewatersys.com>
-References: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
-	<20100827193303.GB23079@void.printf.net>
-	<4C7AD3A0.40607@bluewatersys.com>
-Message-ID: <4C7B5601.5060505@auerswald.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 30 Aug 2010 16:05:42 +0800
+Subject: [GIT PULL] pxa fixes for 2.6.36-rc3
+Message-ID: <AANLkTinObjyGTgMudJzWwZFKDeij_Y-8nJ2qA-NN-zvb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 2bfc96a127bc1cc94d26bfaa40159966064f9c8c:
+  Linus Torvalds (1):
+        Linux 2.6.36-rc3
 
-Am 29.08.2010 23:39, schrieb Ryan Mallon:
-> I see this is already applied, but why all the type trickery here? Why
-> not just:
->
-> 	memcpy(dmabuf, sgbuffer, amount);
-> 	dmabuf += amount / sizeof(dmabuf);
+are available in the git repository at:
 
-Because this is wrong?
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
 
-Maybe you mean sizeof(*dmabuf)?
+Axel Lin (1):
+      ARM: pxa: fix CI_HSYNC and CI_VSYNC MFP defines for pxa300
 
-The exact style of the bug fix is not important, it's important that 
-it's fixed.
+Eric Miao (1):
+      ARM: pxa: remove __init from cpufreq_driver->init()
 
-best regards
+Marek Vasut (1):
+      ARM: pxa168fb: fix section mismatch
 
-i. A. Wolfgang Muees
+Uwe Kleine-K?nig (1):
+      ARM: pxa: Make id const in pwm_probe()
 
-Hardware-Entwicklung
-Leiter Pruefen & Layout
--- 
-Auerswald Gesellschaft fuer Datensysteme mbH
-
-Phone: +49 5306-9219-562
-Fax:   +49 5306-9200-94
---------------------------------------------------------------
-Auerswald Gesellschaft fuer Datensysteme mbH,
-Vor den Grashoefen 1, 38162 Cremlingen
-
-Registriert beim AG Braunschweig HRB 7499
-Gesch?ftsf?hrer: Dipl-Ing. Gerhard Auerswald
+ arch/arm/mach-pxa/cpufreq-pxa2xx.c          |    2 +-
+ arch/arm/mach-pxa/cpufreq-pxa3xx.c          |    2 +-
+ arch/arm/mach-pxa/include/mach/mfp-pxa300.h |    4 ++--
+ arch/arm/plat-pxa/pwm.c                     |    2 +-
+ drivers/video/pxa168fb.c                    |    6 +++---
+ 5 files changed, 8 insertions(+), 8 deletions(-)
