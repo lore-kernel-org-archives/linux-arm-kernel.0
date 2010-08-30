@@ -1,65 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 30 Aug 2010 15:23:42 -0700
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <20100716.121034.193687021.Hiroshi.DOYU@nokia.com>
-References: <20100715084118.GB26212@n2100.arm.linux.org.uk>
-	<20100715.120807.39160135.Hiroshi.DOYU@nokia.com>
-	<20100716075243.GB16124@n2100.arm.linux.org.uk>
-	<20100716.121034.193687021.Hiroshi.DOYU@nokia.com>
-Message-ID: <1283207022.11841.110.camel@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Aug 2010 15:53:13 -0700
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <000601cb42e4$85c7ed80$9157c880$@deacon@arm.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<000601cb42e4$85c7ed80$9157c880$@deacon@arm.com>
+Message-ID: <20100830225313.GB11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-07-16 at 12:10 +0300, Hiroshi DOYU wrote:
-> From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-> Date: Fri, 16 Jul 2010 09:52:44 +0200
+* Will Deacon <will.deacon@arm.com> [100823 09:51]:
+> Hi Tony,
 > 
-> > On Thu, Jul 15, 2010 at 12:08:07PM +0300, Hiroshi DOYU wrote:
-> >> From: ext Russell King - ARM Linux <linux@arm.linux.org.uk>
-> >> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-> >> Date: Thu, 15 Jul 2010 10:41:18 +0200
-> >> 
-> >> > On Thu, Jul 15, 2010 at 08:34:50AM +0300, Hiroshi DOYU wrote:
-> >> >> Russell, would it be possible to put this into your next merge queue?
-> >> > 
-> >> > I think it needs quite a bit of rework - I certainly don't like all
-> >> > those CP15 register accesses there - that's asking for lots of ifdefs
-> >> > to spring up as more CPUs are supported.
-> >> >
-> >> > Eg, what about ensuring that state such as iWMMXt on PXA CPUs is
-> >> > properly restored?
-> >> 
-> >> Right. This arch specific part can be something like
-> >> "suspend-v[3-7].S" to accomodate those differences
+> > Hi all,
 > > 
-> > It's not quite that simple - things like iWMMXt aren't part of the ARM
-> > arch specs.
-> >
-> >> > We already have code which knows what needs to be saved across a
-> >> > power-off transition - its what we use for our normal suspend/resume
-> >> > functionality, so we should look at re-using that code for hibernate
-> >> > as well.  We really don't want to be maintaining two sets of code
-> >> > doing the same thing.
-> >> 
-> >> Could you explain which code you're refering for the existing one?
+> > Here are some experimental patches to allow booting ARMv7 SMP
+> > kernel on UP to some extent. Posting these early in case it is
+> > of any help as I know at least Bryan Wu is working on similar
+> > issues.
 > > 
-> > The code which handles saving state for the existing suspend/resume
-> > support.  This code already saves the necessary state from CP15 and
-> > any other state which needs to be saved prior to putting the system
-> > into low power mode.
-> > 
-> > Every machine class which supports suspend today has their own chunk
-> > of code which does this, normally called something like sleep.S
+> > The patches are very much work in progress, and does not quite
+> > boot to init yet so there's all kinds of things to fix. But at
+> > least these patches allow booting to the point where the fixing
+> > issues might be a bit easier.. Currently it boots to the point
+> > where there are tons of "WARNING: at mm/percpu-vm.c:320 pcpu_alloc"
+> > prints.
 > 
-> Ok, it seems to be the way to try to make use of the existing one for
-> suspend-to-ram with some modifications.
+> I've got some similar hacks for the RealView boards which I've used
+> to build a Kernel that can boot on the PB-A8 and PBX-A9. Whilst this
+> is the wrong way of going about solving the problem [Russell's code
+> patching is a lot neater and more scaleable] you might be interested
+> in looking at the code anyway:
+> 
+> http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/smp-up-hacks
+> 
+> Only v7 cores are supported and TEX remapping is used to avoid having
+> to worry about setting the shared attribute at runtime. Yuck!
 
-[sorry to be late to the party here]
+Heh cool, I'll take a look at those :)
 
-At least on OMAP, we already have everything needed to save/restore
-context for off-mode transitions handled in the suspend (and idle)
-paths.  So, at least in terms of context save/restore, there should be
-minimal changes needed there.
-
-Kevin
+Tony
