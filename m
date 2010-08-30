@@ -1,65 +1,220 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 30 Aug 2010 11:09:29 +0200
-Subject: [PATCH 3/3] x86: oprofile: fix oprofile_arch_init behaviour on
-	failure
-In-Reply-To: <1283107921-21464-4-git-send-email-will.deacon@arm.com>
-References: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-2-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-3-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-4-git-send-email-will.deacon@arm.com>
-Message-ID: <20100830090929.GU22783@erda.amd.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Mon, 30 Aug 2010 16:08:34 +0530
+Subject: [PATCH 03/74] ST SPEAr: Formalized timer support
+In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+Message-ID: <eed779f7085ed5686aceb61b48a2c2a7d6af5953.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.08.10 14:52:01, Will Deacon wrote:
-> The OProfile driver no longer calls oprofile_arch_exit when
-> oprofile_arch_init return failure.
-> 
-> This patch fixes the x86 implementation of oprofile_arch_init
-> to ensure that op_nmi_exit is called if necessary.
-> 
-> Cc: Robert Richter <robert.richter@amd.com>
-> Cc: Matt Fleming <matt@console-pimps.org>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Ingo Molnar <mingo@elte.hu>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/x86/oprofile/init.c |   26 +++++++++++++++-----------
->  1 files changed, 15 insertions(+), 11 deletions(-)
-> 
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
->  int __init oprofile_arch_init(struct oprofile_operations *ops)
->  {
->  	int ret;
->  
-> -	ret = -ENODEV;
-> -
-> -#ifdef CONFIG_X86_LOCAL_APIC
->  	ret = op_nmi_init(ops);
-> -#endif
-> -#ifdef CONFIG_X86_IO_APIC
->  	if (ret < 0)
-> +#ifdef CONFIG_X86_IO_APIC
->  		ret = op_nmi_timer_init(ops);
-> +#else
-> +		return ret;
->  #endif
-> +
->  	ops->backtrace = x86_backtrace;
->  
-> +	if (ret < 0)
-> +		op_nmi_exit();
-> +
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/mach-spear3xx/include/mach/generic.h |    3 +-
+ arch/arm/mach-spear3xx/spear300_evb.c         |    2 +-
+ arch/arm/mach-spear3xx/spear310_evb.c         |    2 +-
+ arch/arm/mach-spear3xx/spear320_evb.c         |    2 +-
+ arch/arm/mach-spear3xx/spear3xx.c             |   10 ++++++-
+ arch/arm/mach-spear6xx/include/mach/generic.h |    3 +-
+ arch/arm/mach-spear6xx/spear600_evb.c         |    3 +-
+ arch/arm/mach-spear6xx/spear6xx.c             |    9 ++++++
+ arch/arm/plat-spear/time.c                    |   34 +++++++++++++++++-------
+ 9 files changed, 51 insertions(+), 17 deletions(-)
 
-I don't see why we have to do this. All init functions above clean up
-properly on failure. If op_nmi_init() succeeds we don't call
-op_nmi_timer_init(), so we don't need to free it it either.
-
--Robert
-
->  	return ret;
->  }
-
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index c16d2f8..e7d2de8 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -33,10 +33,11 @@
+ /* Add spear3xx family device structure declarations here */
+ extern struct amba_device gpio_device;
+ extern struct amba_device uart_device;
+-extern struct sys_timer spear_sys_timer;
++extern struct sys_timer spear3xx_timer;
+ 
+ /* Add spear3xx family function declarations here */
+ void __init clk_init(void);
++void __init spear_setup_timer(void);
+ void __init spear3xx_map_io(void);
+ void __init spear3xx_init_irq(void);
+ void __init spear3xx_init(void);
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 2c90663..cd23c98 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -71,6 +71,6 @@ MACHINE_START(SPEAR300, "ST-SPEAR300-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear3xx_map_io,
+ 	.init_irq	=	spear3xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear300_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index 4e55e55..3855431 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -78,6 +78,6 @@ MACHINE_START(SPEAR310, "ST-SPEAR310-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear3xx_map_io,
+ 	.init_irq	=	spear3xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear310_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 7083a06..4a7ce35 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -75,6 +75,6 @@ MACHINE_START(SPEAR320, "ST-SPEAR320-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear3xx_map_io,
+ 	.init_irq	=	spear3xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear3xx_timer,
+ 	.init_machine	=	spear320_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index efd2e17..89cf8ea 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -523,5 +523,13 @@ struct pmx_dev pmx_plgpio_45_46_49_50 = {
+ 	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
+ 	.enb_on_reset = 1,
+ };
++#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
+ 
+-#endif
++static void __init spear3xx_timer_init(void)
++{
++	spear_setup_timer();
++}
++
++struct sys_timer spear3xx_timer = {
++	.init = spear3xx_timer_init,
++};
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index 16205a5..e5967ed 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -31,9 +31,10 @@
+ /* Add spear6xx family device structure declarations here */
+ extern struct amba_device gpio_device[];
+ extern struct amba_device uart_device[];
+-extern struct sys_timer spear_sys_timer;
++extern struct sys_timer spear6xx_timer;
+ 
+ /* Add spear6xx family function declarations here */
++void __init spear_setup_timer(void);
+ void __init spear6xx_map_io(void);
+ void __init spear6xx_init_irq(void);
+ void __init spear6xx_init(void);
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+index daff8d0..bdd5b76 100644
+--- a/arch/arm/mach-spear6xx/spear600_evb.c
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -42,10 +42,11 @@ static void __init spear600_evb_init(void)
+ 		amba_device_register(amba_devs[i], &iomem_resource);
+ }
+ 
++
+ MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
+ 	.boot_params	=	0x00000100,
+ 	.map_io		=	spear6xx_map_io,
+ 	.init_irq	=	spear6xx_init_irq,
+-	.timer		=	&spear_sys_timer,
++	.timer		=	&spear6xx_timer,
+ 	.init_machine	=	spear600_evb_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index baf6bcc..88a82ca 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -155,3 +155,12 @@ void __init spear6xx_map_io(void)
+ 	/* This will initialize clock framework */
+ 	clk_init();
+ }
++
++static void __init spear6xx_timer_init(void)
++{
++	spear_setup_timer();
++}
++
++struct sys_timer spear6xx_timer = {
++	.init = spear6xx_timer_init,
++};
+diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
+index ab21165..850d0cf 100644
+--- a/arch/arm/plat-spear/time.c
++++ b/arch/arm/plat-spear/time.c
+@@ -66,6 +66,13 @@
+ static __iomem void *gpt_base;
+ static struct clk *gpt_clk;
+ 
++/* following defines the parent clock to be used */
++#ifdef CONFIG_ARCH_SPEAR13XX
++static char pclk_name[] = "osc1_24m_clk";
++#else
++static char pclk_name[] = "pll3_48m_clk";
++#endif
++
+ static void clockevent_set_mode(enum clock_event_mode mode,
+ 				struct clock_event_device *clk_event_dev);
+ static int clockevent_next_event(unsigned long evt,
+@@ -215,7 +222,8 @@ static void __init spear_clockevent_init(void)
+ 
+ void __init spear_setup_timer(void)
+ {
+-	struct clk *pll3_clk;
++	struct clk *clk;
++	int ret;
+ 
+ 	if (!request_mem_region(SPEAR_GPT0_BASE, SZ_1K, "gpt0")) {
+ 		pr_err("%s:cannot get IO addr\n", __func__);
+@@ -234,26 +242,32 @@ void __init spear_setup_timer(void)
+ 		goto err_iomap;
+ 	}
+ 
+-	pll3_clk = clk_get(NULL, "pll3_48m_clk");
+-	if (!pll3_clk) {
+-		pr_err("%s:couldn't get PLL3 as parent for gpt\n", __func__);
++	/* get the parent clock */
++	clk = clk_get(NULL, pclk_name);
++
++	if (!clk) {
++		pr_err("%s:couldn't get %s as parent for gpt\n",
++				__func__, pclk_name);
+ 		goto err_iomap;
+ 	}
+ 
+-	clk_set_parent(gpt_clk, pll3_clk);
++	clk_set_parent(gpt_clk, clk);
++
++	ret = clk_enable(gpt_clk);
++	if (ret < 0) {
++		pr_err("%s:couldn't enable gpt clock\n", __func__);
++		goto err_clk;
++	}
+ 
+ 	spear_clockevent_init();
+ 	spear_clocksource_init();
+ 
+ 	return;
+ 
++err_clk:
++	clk_put(gpt_clk);
+ err_iomap:
+ 	iounmap(gpt_base);
+-
+ err_mem:
+ 	release_mem_region(SPEAR_GPT0_BASE, SZ_1K);
+ }
+-
+-struct sys_timer spear_sys_timer = {
+-	.init = spear_setup_timer,
+-};
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+1.7.2.2
