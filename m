@@ -1,73 +1,38 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Mon, 30 Aug 2010 10:05:28 +0300
-Subject: [PATCH] serial: samsung: fix device name
-In-Reply-To: <008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
-References: <20100805201000.14030.34703.stgit@darius-desktop>
-	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
-	<4C5BAFF6.10606@gmail.com> <4C5BB462.6010409@samsung.com>
-	<008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
-Message-ID: <4C7B5838.7060605@gmail.com>
+From: wolfgang.mues@auerswald.de (=?ISO-8859-1?Q?Wolfgang_M=FCes?=)
+Date: Mon, 30 Aug 2010 08:51:37 +0200
+Subject: [PATCH 1/7] mmc: at91_mci: fix pointer errors
+In-Reply-To: <20100827193457.GC23079@void.printf.net>
+References: <9535dc8dfe4476a0314b9513fb9d37862faa731d.1267209149.git.nicolas.ferre@atmel.com>
+	<20100827193303.GB23079@void.printf.net>
+	<20100827193457.GC23079@void.printf.net>
+Message-ID: <4C7B54F9.6090200@auerswald.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi,
 
-please pick up this one to your tree too.
+Am 27.08.2010 21:34, schrieb Chris Ball:
+> On Fri, Aug 27, 2010 at 08:33:03PM +0100, Chris Ball wrote:
+>> Looks like only the first half of this patch was applied?  The
+>> kunmap_atomic() line is still present as before in Linus' tree.
 
-Thanks,
+It was argued that the kunmap_atomic() will truncate the pointer to the 
+start of the page anyway, so the subtraction is not needed.
 
-Darius.
+best regards
 
-On 08/06/2010 10:23 AM, Kukjin Kim wrote:
-> Joonyoung Shim wrote:
->>
->> On 8/6/2010 3:47 PM, Paulius Zaleckas wrote:
->>> On 08/06/2010 03:04 AM, Kyungmin Park wrote:
->>>> Hi,
->>>>
->>>> It's already posted by Mr. Shim
->>>> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
->>>
->>> Darius patch is a little bit cleaner.
->>>
->>
->> OK, it's better.
->>
->> Acked-by: Joonyoung Shim<jy0922.shim@samsung.com>
->>
->
-> Hi all,
->
-> I think, this should be handled by Ben Dooks....
-> As Kyungmin Park said, there was his comment about this.
->
-> This is just for your information....
->
-> ===
->
-> On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
->> On 5/18/2010 11:48 AM, Ben Dooks wrote:
->>> On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
->>>> Thd dev_name and driver_name should be switched each other.
->>>
->>> Hmm, this doesn't seem to have appeard on the linux-arm-kernel list yet.
->>>
->>> Please provide some information about what problem that this is fixing
->>> and the impact on any existing systems.
->>>
->>
->> The serial device nodes are created to s3c2410_serial* on android
->> platform instead of ttySAC*.
->
-> This has been how they've been for ages, surely the android device node
-> creation sytstem supports symlinking /dev/SACx ->  /dev/s3c2410_serialx,
-> like many other operating sysyerms that can already do this.
->
-> Changing this just because android (something as-yet unmerged into mainline)
-> does not like it. I'm not even happy with an #ifdef around this.
->
-> If you really feel this is a problem that you absolutely must fix in kernel
-> then please provide a kernel commandline option to change the serial driver
-> name and use that on any platform that needs it. Another way would be to
-> update the serial platform data to have a field for which name to choose.
->
+i. A. Wolfgang Muees
+
+Hardware-Entwicklung
+Leiter Pruefen & Layout
+-- 
+Auerswald Gesellschaft fuer Datensysteme mbH
+
+Phone: +49 5306-9219-562
+Fax:   +49 5306-9200-94
+--------------------------------------------------------------
+Auerswald Gesellschaft fuer Datensysteme mbH,
+Vor den Grashoefen 1, 38162 Cremlingen
+
+Registriert beim AG Braunschweig HRB 7499
+Gesch?ftsf?hrer: Dipl-Ing. Gerhard Auerswald
