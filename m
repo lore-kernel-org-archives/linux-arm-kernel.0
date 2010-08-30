@@ -1,938 +1,1041 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:08:45 +0530
-Subject: [PATCH 14/74] ST SPEAr: Adding PLGPIO driver for spear platform
+Date: Mon, 30 Aug 2010 16:08:35 +0530
+Subject: [PATCH 04/74] ST SPEAr13XX: Adding machine specific header files
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <ee98dfb49c1634d60fe2fe4f8aabca183be08d24.1283161023.git.viresh.kumar@st.com>
+Message-ID: <216f9534163c6b7ccf403df870601bf254a3964f.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Plgpio pads on few spear machines can be configured as gpios. This patch add
-support for configuring these PLGPIOs.
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |    2 +
- arch/arm/mach-spear3xx/include/mach/gpio.h    |  141 ++++++++
- arch/arm/mach-spear3xx/include/mach/irqs.h    |    9 +-
- arch/arm/mach-spear3xx/spear310.c             |   69 ++++
- arch/arm/mach-spear3xx/spear310_evb.c         |    1 +
- arch/arm/mach-spear3xx/spear320.c             |   30 ++-
- arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
- arch/arm/mach-spear6xx/include/mach/gpio.h    |   27 ++
- arch/arm/plat-spear/Makefile                  |    2 +
- arch/arm/plat-spear/include/plat/gpio.h       |   35 ++
- arch/arm/plat-spear/plgpio.c                  |  453 +++++++++++++++++++++++++
- 11 files changed, 765 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/plat-spear/plgpio.c
+ arch/arm/mach-spear13xx/include/mach/clkdev.h      |   19 ++
+ arch/arm/mach-spear13xx/include/mach/debug-macro.S |   14 +
+ arch/arm/mach-spear13xx/include/mach/entry-macro.S |   88 ++++++
+ arch/arm/mach-spear13xx/include/mach/generic.h     |   46 +++
+ arch/arm/mach-spear13xx/include/mach/gpio.h        |   19 ++
+ arch/arm/mach-spear13xx/include/mach/hardware.h    |   25 ++
+ arch/arm/mach-spear13xx/include/mach/io.h          |   19 ++
+ arch/arm/mach-spear13xx/include/mach/irqs.h        |   91 ++++++
+ arch/arm/mach-spear13xx/include/mach/memory.h      |   19 ++
+ arch/arm/mach-spear13xx/include/mach/misc_regs.h   |  301 ++++++++++++++++++++
+ arch/arm/mach-spear13xx/include/mach/smp.h         |   33 +++
+ arch/arm/mach-spear13xx/include/mach/spear.h       |   93 ++++++
+ arch/arm/mach-spear13xx/include/mach/spear1300.h   |   21 ++
+ arch/arm/mach-spear13xx/include/mach/system.h      |   43 +++
+ arch/arm/mach-spear13xx/include/mach/timex.h       |   19 ++
+ arch/arm/mach-spear13xx/include/mach/uncompress.h  |   19 ++
+ arch/arm/mach-spear13xx/include/mach/vmalloc.h     |   18 ++
+ 17 files changed, 887 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/io.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/memory.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/misc_regs.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/smp.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1300.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/system.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/vmalloc.h
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 1c8f9f1..d76ee98 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -144,6 +144,7 @@ extern struct clcd_board clcd_plat_data;
- /* spear310 declarations */
- #ifdef CONFIG_MACH_SPEAR310
- /* Add spear310 machine device structure declarations here */
-+extern struct platform_device plgpio_device;
- 
- /* pad mux devices */
- extern struct pmx_dev pmx_emi_cs_0_1_4_5;
-@@ -164,6 +165,7 @@ void __init spear310_init(void);
- #ifdef CONFIG_MACH_SPEAR320
- /* Add spear320 machine device structure declarations here */
- extern struct amba_device clcd_device;
-+extern struct platform_device plgpio_device;
- 
- /* pad mux modes */
- extern struct pmx_mode auto_net_smii_mode;
-diff --git a/arch/arm/mach-spear3xx/include/mach/gpio.h b/arch/arm/mach-spear3xx/include/mach/gpio.h
-index 451b208..e531f6d 100644
---- a/arch/arm/mach-spear3xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear3xx/include/mach/gpio.h
-@@ -16,4 +16,145 @@
- 
- #include <plat/gpio.h>
- 
-+#ifdef CONFIG_MACH_SPEAR310
-+#define PLGPIO_ENB		0x0010
-+#define PLGPIO_WDATA		0x0020
-+#define PLGPIO_DIR		0x0030
-+#define PLGPIO_IE		0x0040
-+#define PLGPIO_RDATA		0x0050
-+#define PLGPIO_MIS		0x0060
-+
-+#elif defined(CONFIG_MACH_SPEAR320)
-+#define PLGPIO_ENB		0x0024
-+#define PLGPIO_WDATA		0x0034
-+#define PLGPIO_DIR		0x0044
-+#define PLGPIO_RDATA		0x0054
-+#define PLGPIO_IE		0x0064
-+#define PLGPIO_MIS		0x0074
-+#endif
-+
-+#define BASIC_GPIO_0		0
-+#define BASIC_GPIO_1		1
-+#define BASIC_GPIO_2		2
-+#define BASIC_GPIO_3		3
-+#define BASIC_GPIO_4		4
-+#define BASIC_GPIO_5		5
-+#define BASIC_GPIO_6		6
-+#define BASIC_GPIO_7		7
-+
-+#ifdef CONFIG_MACH_SPEAR300
-+#define RAS_GPIO_0		8
-+#define RAS_GPIO_1		9
-+#define RAS_GPIO_2		10
-+#define RAS_GPIO_3		11
-+#define RAS_GPIO_4		12
-+#define RAS_GPIO_5		13
-+#define RAS_GPIO_6		14
-+#define RAS_GPIO_7		15
-+
-+#elif defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
-+#define PLGPIO_0		8
-+#define PLGPIO_1		9
-+#define PLGPIO_2		10
-+#define PLGPIO_3		11
-+#define PLGPIO_4		12
-+#define PLGPIO_5		13
-+#define PLGPIO_6		14
-+#define PLGPIO_7		15
-+#define PLGPIO_8		16
-+#define PLGPIO_9		17
-+#define PLGPIO_10		18
-+#define PLGPIO_11		19
-+#define PLGPIO_12		20
-+#define PLGPIO_13		21
-+#define PLGPIO_14		22
-+#define PLGPIO_15		23
-+#define PLGPIO_16		24
-+#define PLGPIO_17		25
-+#define PLGPIO_18		26
-+#define PLGPIO_19		27
-+#define PLGPIO_20		28
-+#define PLGPIO_21		29
-+#define PLGPIO_22		30
-+#define PLGPIO_23		31
-+#define PLGPIO_24		32
-+#define PLGPIO_25		33
-+#define PLGPIO_26		34
-+#define PLGPIO_27		35
-+#define PLGPIO_28		36
-+#define PLGPIO_29		37
-+#define PLGPIO_30		38
-+#define PLGPIO_31		39
-+#define PLGPIO_32		40
-+#define PLGPIO_33		41
-+#define PLGPIO_34		42
-+#define PLGPIO_35		43
-+#define PLGPIO_36		44
-+#define PLGPIO_37		45
-+#define PLGPIO_38		46
-+#define PLGPIO_39		47
-+#define PLGPIO_40		48
-+#define PLGPIO_41		49
-+#define PLGPIO_42		50
-+#define PLGPIO_43		51
-+#define PLGPIO_44		52
-+#define PLGPIO_45		53
-+#define PLGPIO_46		54
-+#define PLGPIO_47		55
-+#define PLGPIO_48		56
-+#define PLGPIO_49		57
-+#define PLGPIO_50		58
-+#define PLGPIO_51		59
-+#define PLGPIO_52		60
-+#define PLGPIO_53		61
-+#define PLGPIO_54		62
-+#define PLGPIO_55		63
-+#define PLGPIO_56		64
-+#define PLGPIO_57		65
-+#define PLGPIO_58		66
-+#define PLGPIO_59		67
-+#define PLGPIO_60		68
-+#define PLGPIO_61		69
-+#define PLGPIO_62		70
-+#define PLGPIO_63		71
-+#define PLGPIO_64		72
-+#define PLGPIO_65		73
-+#define PLGPIO_66		74
-+#define PLGPIO_67		75
-+#define PLGPIO_68		76
-+#define PLGPIO_69		77
-+#define PLGPIO_70		78
-+#define PLGPIO_71		79
-+#define PLGPIO_72		80
-+#define PLGPIO_73		81
-+#define PLGPIO_74		82
-+#define PLGPIO_75		83
-+#define PLGPIO_76		84
-+#define PLGPIO_77		85
-+#define PLGPIO_78		86
-+#define PLGPIO_79		87
-+#define PLGPIO_80		88
-+#define PLGPIO_81		89
-+#define PLGPIO_82		90
-+#define PLGPIO_83		91
-+#define PLGPIO_84		92
-+#define PLGPIO_85		93
-+#define PLGPIO_86		94
-+#define PLGPIO_87		95
-+#define PLGPIO_88		96
-+#define PLGPIO_89		97
-+#define PLGPIO_90		98
-+#define PLGPIO_91		99
-+#define PLGPIO_92		100
-+#define PLGPIO_93		101
-+#define PLGPIO_94		102
-+#define PLGPIO_95		103
-+#define PLGPIO_96		104
-+#define PLGPIO_97		105
-+#define PLGPIO_98		106
-+#define PLGPIO_99		107
-+#define PLGPIO_100		108
-+#define PLGPIO_101		109
-+#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
-+
- #endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
-index 7f940b8..f1175b9 100644
---- a/arch/arm/mach-spear3xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
-@@ -141,12 +141,13 @@
- #endif
- 
- /* PLGPIO Virtual IRQs */
-+#define SPEAR_PLGPIO_COUNT	102
- #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--#define SPEAR_PLGPIO_INT_BASE			(SPEAR_GPIO_INT_BASE + 8)
--#define SPEAR_GPIO_INT_END			(SPEAR_PLGPIO_INT_BASE + 102)
-+#define SPEAR_PLGPIO_INT_BASE	(SPEAR_GPIO_INT_BASE + 8)
-+#define SPEAR_GPIO_INT_END	(SPEAR_PLGPIO_INT_BASE + SPEAR_PLGPIO_COUNT)
- #endif
- 
--#define VIRQ_END				SPEAR_GPIO_INT_END
--#define NR_IRQS					VIRQ_END
-+#define VIRQ_END		SPEAR_GPIO_INT_END
-+#define NR_IRQS			VIRQ_END
- 
- #endif /* __MACH_IRQS_H */
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 576bc57..88b55b5 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -15,6 +15,7 @@
- #include <asm/irq.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/gpio.h>
- #include <plat/shirq.h>
- 
- /* pad multiplexing support */
-@@ -140,6 +141,74 @@ struct pmx_driver pmx_driver = {
- };
- 
- /* Add spear310 specific devices here */
-+/* plgpio device registeration */
-+/*
-+ * pin to offset and offset to pin converter functions
-+ *
-+ * In spear310 there is inconsistency among bit positions in plgpio regiseters,
-+ * for different plgpio pins. For example: for pin 27, bit offset is 23, pin
-+ * 28-33 are not supported, pin 95 has offset bit 95, bit 100 has offset bit 1
-+ */
-+static int spear300_p2o(int pin)
-+{
-+	int offset = pin;
-+
-+	if (pin <= 27)
-+		offset += 4;
-+	else if (pin <= 33)
-+		offset = -1;
-+	else if (pin <= 97)
-+		offset -= 2;
-+	else if (pin <= 101)
-+		offset = 101 - pin;
-+	else
-+		offset = -1;
-+
-+	return offset;
-+}
-+
-+int spear300_o2p(int offset)
-+{
-+	if (offset <= 3)
-+		return 101 - offset;
-+	else if (offset <= 31)
-+		return offset - 4;
-+	else
-+		return offset + 2;
-+}
-+
-+static struct plgpio_platform_data plgpio_plat_data = {
-+	.gpio_base = 8,
-+	.irq_base = SPEAR_PLGPIO_INT_BASE,
-+	.gpio_count = SPEAR_PLGPIO_COUNT,
-+	.p2o = spear300_p2o,
-+	.o2p = spear300_o2p,
-+	/* list of registers with inconsistency */
-+	.p2o_regs = PTO_RDATA_REG | PTO_WDATA_REG | PTO_DIR_REG |
-+		PTO_IE_REG | PTO_RDATA_REG | PTO_MIS_REG,
-+};
-+
-+static struct resource plgpio_resources[] = {
-+	{
-+		.start = SPEAR310_SOC_CONFIG_BASE,
-+		.end = SPEAR310_SOC_CONFIG_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = VIRQ_PLGPIO,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device plgpio_device = {
-+	.name = "plgpio",
-+	.id = -1,
-+	.dev = {
-+		.platform_data = &plgpio_plat_data,
-+	},
-+	.num_resources = ARRAY_SIZE(plgpio_resources),
-+	.resource = plgpio_resources,
-+};
-+
- 
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 3855431..7dd93bd 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -52,6 +52,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 
- 	/* spear310 specific devices */
-+	&plgpio_device,
- };
- 
- static void __init spear310_evb_init(void)
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index e5baa00..2e388dd 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -15,6 +15,7 @@
- #include <asm/irq.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/gpio.h>
- #include <plat/shirq.h>
- 
- /* pad multiplexing support */
-@@ -385,7 +386,6 @@ struct pmx_driver pmx_driver = {
- };
- 
- /* Add spear320 specific devices here */
--
- /* CLCD device registration */
- struct amba_device clcd_device = {
- 	.dev = {
-@@ -402,6 +402,34 @@ struct amba_device clcd_device = {
- 	.irq = {VIRQ_CLCD, NO_IRQ},
- };
- 
-+/* plgpio device registeration */
-+static struct plgpio_platform_data plgpio_plat_data = {
-+	.gpio_base = 8,
-+	.irq_base = SPEAR_PLGPIO_INT_BASE,
-+	.gpio_count = SPEAR_PLGPIO_COUNT,
-+};
-+
-+static struct resource plgpio_resources[] = {
-+	{
-+		.start = SPEAR320_SOC_CONFIG_BASE,
-+		.end = SPEAR320_SOC_CONFIG_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = VIRQ_PLGPIO,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device plgpio_device = {
-+	.name = "plgpio",
-+	.id = -1,
-+	.dev = {
-+		.platform_data = &plgpio_plat_data,
-+	},
-+	.num_resources = ARRAY_SIZE(plgpio_resources),
-+	.resource = plgpio_resources,
-+};
-+
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 821e806..82f4e76 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -50,6 +50,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 
- 	/* spear320 specific devices */
-+	&plgpio_device,
- };
- 
- static void __init spear320_evb_init(void)
-diff --git a/arch/arm/mach-spear6xx/include/mach/gpio.h b/arch/arm/mach-spear6xx/include/mach/gpio.h
-index 3a789db..465b2e7 100644
---- a/arch/arm/mach-spear6xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear6xx/include/mach/gpio.h
-@@ -16,4 +16,31 @@
- 
- #include <plat/gpio.h>
- 
-+#define CPU_GPIO_0		0
-+#define CPU_GPIO_1		1
-+#define CPU_GPIO_2		2
-+#define CPU_GPIO_3		3
-+#define CPU_GPIO_4		4
-+#define CPU_GPIO_5		5
-+#define CPU_GPIO_6		6
-+#define CPU_GPIO_7		7
-+
-+#define BASIC_GPIO_0		8
-+#define BASIC_GPIO_1		9
-+#define BASIC_GPIO_2		10
-+#define BASIC_GPIO_3		11
-+#define BASIC_GPIO_4		12
-+#define BASIC_GPIO_5		13
-+#define BASIC_GPIO_6		14
-+#define BASIC_GPIO_7		15
-+
-+#define APPL_GPIO_0		16
-+#define APPL_GPIO_1		17
-+#define APPL_GPIO_2		18
-+#define APPL_GPIO_3		19
-+#define APPL_GPIO_4		20
-+#define APPL_GPIO_5		21
-+#define APPL_GPIO_6		22
-+#define APPL_GPIO_7		23
-+
- #endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 01a4a91..e66bc5f 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -6,3 +6,5 @@
- obj-y	:= clcd.o clock.o time.o
- 
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
-+obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
-+obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
-diff --git a/arch/arm/plat-spear/include/plat/gpio.h b/arch/arm/plat-spear/include/plat/gpio.h
-index b857c91..450671e 100644
---- a/arch/arm/plat-spear/include/plat/gpio.h
-+++ b/arch/arm/plat-spear/include/plat/gpio.h
-@@ -21,4 +21,39 @@
- #define gpio_cansleep	__gpio_cansleep
- #define gpio_to_irq	__gpio_to_irq
- 
-+/* plgpio driver declarations */
-+/*
-+ * plgpio pins in all machines are not one to one mapped, bitwise with
-+ * registers bits. These set of macros define register masks for which below
-+ * functions (pin_to_offset and offset_to_pin) are required to be called.
-+ */
-+#define PTO_ENB_REG		0x001
-+#define PTO_WDATA_REG		0x002
-+#define PTO_DIR_REG		0x004
-+#define PTO_IE_REG		0x008
-+#define PTO_RDATA_REG		0x010
-+#define PTO_MIS_REG		0x020
-+
-+/* functions for converting pin to correct offset in register and vice versa */
-+/**
-+ * struct plgpio_platform_data: plgpio driver platform data
-+ *
-+ * gpio_base: gpio start number of plgpios
-+ * irq_base: irq number of plgpio0
-+ * gpio_count: total count of plgpios
-+ * p2o: function ptr for pin to offset conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * o2p: function ptr for offset to pin conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * p2o_regs: mask of registers for which p2o and o2p are applicable
-+ */
-+struct plgpio_platform_data {
-+	u32 gpio_base;
-+	u32 irq_base;
-+	u32 gpio_count;
-+	int (*p2o)(int pin);		/* pin_to_offset */
-+	int (*o2p)(int offset);		/* offset_to_pin */
-+	u32 p2o_regs;
-+};
-+
- #endif /* __PLAT_GPIO_H */
-diff --git a/arch/arm/plat-spear/plgpio.c b/arch/arm/plat-spear/plgpio.c
+diff --git a/arch/arm/mach-spear13xx/include/mach/clkdev.h b/arch/arm/mach-spear13xx/include/mach/clkdev.h
 new file mode 100644
-index 0000000..847ff9c
+index 0000000..effdb81
 --- /dev/null
-+++ b/arch/arm/plat-spear/plgpio.c
-@@ -0,0 +1,453 @@
++++ b/arch/arm/mach-spear13xx/include/mach/clkdev.h
+@@ -0,0 +1,19 @@
 +/*
-+ * arch/arm/plat-spear/plgpio.c
++ * arch/arm/mach-spear13xx/include/mach/clkdev.h
 + *
-+ * SPEAr platform PLGPIO driver source file
++ * Clock Dev framework definitions for spear13xx machine family
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
++ * Shiraz Hashim <shiraz.hashim@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/bitops.h>
-+#include <linux/kernel.h>
-+#include <linux/spinlock.h>
-+#include <linux/errno.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/irq.h>
-+#include <linux/gpio.h>
-+#include <linux/slab.h>
-+#include <linux/platform_device.h>
-+#include <mach/gpio.h>
++#ifndef __MACH_CLKDEV_H
++#define __MACH_CLKDEV_H
 +
-+#define MAX_GPIO_PER_REG		32
-+#define PIN_OFFSET(pin)			(pin % MAX_GPIO_PER_REG)
-+#define REG_OFFSET(base, reg, pin)	(base + reg + (pin / MAX_GPIO_PER_REG)\
-+		* sizeof(int *))
++#include <plat/clkdev.h>
 +
++#endif /* __MACH_CLKDEV_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/debug-macro.S b/arch/arm/mach-spear13xx/include/mach/debug-macro.S
+new file mode 100644
+index 0000000..3933edc
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/debug-macro.S
+@@ -0,0 +1,14 @@
 +/*
-+ * struct plgpio: plgpio driver specific structure
++ * arch/arm/mach-spear13xx/include/mach/debug-macro.S
 + *
-+ * lock: lock for guarding gpio registers
-+ * base: base address of plgpio block
-+ * irq_base: irq number of plgpio0
-+ * chip: gpio framework specific chip information structure
-+ * p2o: function ptr for pin to offset conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * o2p: function ptr for offset to pin conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * p2o_regs: mask of registers for which p2o and o2p are applicable
++ * Debugging macro include header spear13xx machine family
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+struct plgpio {
-+	spinlock_t		lock;
-+	void __iomem		*base;
-+	unsigned		irq_base;
-+	struct gpio_chip	chip;
-+	int (*p2o)(int pin);		/* pin_to_offset */
-+	int (*o2p)(int offset);		/* offset_to_pin */
-+	u32			p2o_regs;
-+};
 +
-+/* register manipulation inline functions */
-+static inline u32 is_plgpio_set(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl(reg_off);
++#include <plat/debug-macro.S>
+diff --git a/arch/arm/mach-spear13xx/include/mach/entry-macro.S b/arch/arm/mach-spear13xx/include/mach/entry-macro.S
+new file mode 100644
+index 0000000..62e1785
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/entry-macro.S
+@@ -0,0 +1,88 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/entry-macro.S
++ *
++ * Copyright (C) 2009 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * Copy of RealView platform implementation
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+	return val & (1 << offset);
-+}
++#include <mach/hardware.h>
++#include <asm/hardware/gic.h>
 +
-+static inline void plgpio_reg_set(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl(reg_off);
++		.macro	disable_fiq
++		.endm
 +
-+	writel(val | (1 << offset), reg_off);
-+}
++		.macro	get_irqnr_preamble, base, tmp
++		ldr	\base, =IO_ADDRESS(SPEAR13XX_GIC_CPU_BASE)
++		.endm
 +
-+static inline void plgpio_reg_reset(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl(reg_off);
-+
-+	writel(val & ~(1 << offset), reg_off);
-+}
-+
-+/* gpio framework specific routines */
-+static int plgpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_DIR_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, PLGPIO_DIR);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int plgpio_direction_output(struct gpio_chip *chip, unsigned offset,
-+		int value)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+	unsigned dir_offset = offset, wdata_offset = offset, tmp;
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & (PTO_DIR_REG | PTO_WDATA_REG))) {
-+		tmp = plgpio->p2o(offset);
-+		if (tmp == -1)
-+			return -EINVAL;
-+
-+		if (plgpio->p2o_regs & PTO_DIR_REG)
-+			dir_offset = tmp;
-+		if (plgpio->p2o_regs & PTO_WDATA_REG)
-+			wdata_offset = tmp;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, dir_offset, PLGPIO_DIR);
-+	if (value)
-+		plgpio_reg_set(plgpio->base, wdata_offset, PLGPIO_WDATA);
-+	else
-+		plgpio_reg_reset(plgpio->base, wdata_offset, PLGPIO_WDATA);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int plgpio_get_value(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_RDATA_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	return is_plgpio_set(plgpio->base, offset, PLGPIO_RDATA);
-+}
-+
-+static void plgpio_set_value(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (offset >= chip->ngpio)
-+		return;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_WDATA_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	if (value)
-+		plgpio_reg_set(plgpio->base, offset, PLGPIO_WDATA);
-+	else
-+		plgpio_reg_reset(plgpio->base, offset, PLGPIO_WDATA);
-+}
-+
-+static int plgpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/*
-+	 * put gpio in IN mode before enabling it. This make enabling gpio safe
-+	 */
-+	ret = plgpio_direction_input(chip, offset);
-+	if (ret)
-+		return ret;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_ENB_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, PLGPIO_ENB);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static void plgpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+
-+	if (offset >= chip->ngpio)
-+		return;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_ENB_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, offset, PLGPIO_ENB);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+}
-+
-+static int plgpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (plgpio->irq_base == (unsigned) -1)
-+		return -EINVAL;
-+
-+	return plgpio->irq_base + offset;
-+}
-+
-+/* PLGPIO IRQ */
-+static void plgpio_irq_mask(unsigned irq)
-+{
-+	struct plgpio *plgpio = get_irq_chip_data(irq);
-+	int offset = irq - plgpio->irq_base;
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_IE_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, PLGPIO_IE);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+}
-+
-+static void plgpio_irq_unmask(unsigned irq)
-+{
-+	struct plgpio *plgpio = get_irq_chip_data(irq);
-+	int offset = irq - plgpio->irq_base;
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_IE_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, offset, PLGPIO_IE);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+}
-+
-+static int plgpio_irq_type(unsigned irq, unsigned trigger)
-+{
-+	struct plgpio *plgpio = get_irq_chip_data(irq);
-+	int offset = irq - plgpio->irq_base;
-+
-+	if (offset >= plgpio->chip.ngpio)
-+		return -EINVAL;
-+
-+	if (trigger != IRQ_TYPE_LEVEL_HIGH)
-+		return -EINVAL;
-+	return 0;
-+}
-+
-+static struct irq_chip plgpio_irqchip = {
-+	.name		= "PLGPIO",
-+	.mask		= plgpio_irq_mask,
-+	.unmask		= plgpio_irq_unmask,
-+	.set_type	= plgpio_irq_type,
-+};
-+
-+static void plgpio_irq_handler(unsigned irq, struct irq_desc *desc)
-+{
-+	struct plgpio *plgpio = get_irq_data(irq);
-+	unsigned long pending;
-+	int regs_count = DIV_ROUND_UP(plgpio->chip.ngpio, MAX_GPIO_PER_REG),
-+	    count, pin, offset, i = 0;
-+
-+	/* check all plgpio MIS registers for a possible interrupt */
-+	for (; i < regs_count; i++) {
-+		pending = readl(plgpio->base + PLGPIO_MIS + i * sizeof(int *));
-+		if (!pending)
-+			continue;
++		.macro	arch_ret_to_user, tmp1, tmp2
++		.endm
 +
 +		/*
-+		 * clear extra bits in last register having gpios < MAX/REG
-+		 * ex: Suppose there are max 102 plgpios. then last register
-+		 * must have only (102 - MAX_GPIO_PER_REG * 3) = 6 relevant bits
-+		 * so, we must not take other 28 bits into consideration for
-+		 * checking interrupt. so clear those bits.
++		 * The interrupt numbering scheme is defined in the
++		 * interrupt controller spec. To wit:
++		 *
++		 * Interrupts 0-15 are IPI
++		 * 16-28 are reserved
++		 * 29-31 are local. We allow 30 to be used for the watchdog.
++		 * 32-1020 are global
++		 * 1021-1022 are reserved
++		 * 1023 is "spurious" (no interrupt)
++		 *
++		 * For now, we ignore all local interrupts so only return an
++		 * interrupt if it's between 30 and 1020. The test_for_ipi
++		 * routine below will pick up on IPIs.
++		 *
++		 * A simple read from the controller will tell us the number
++		 * of the highest priority enabled interrupt. We then just
++		 * need to check whether it is in the valid range for an
++		 * IRQ (30-1020 inclusive).
 +		 */
-+		count = plgpio->chip.ngpio - i * MAX_GPIO_PER_REG;
-+		if (count < MAX_GPIO_PER_REG)
-+			pending &= (1 << count) - 1;
 +
-+		for_each_set_bit(offset, &pending, MAX_GPIO_PER_REG) {
-+			/* get correct pin for "offset" */
-+			if (plgpio->o2p && (plgpio->p2o_regs & PTO_MIS_REG)) {
-+				pin = plgpio->o2p(offset);
-+				if (pin == -1)
-+					continue;
-+			} else
-+				pin = offset;
++		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 +
-+			generic_handle_irq(plgpio_to_irq(&plgpio->chip,
-+						i * MAX_GPIO_PER_REG + pin));
-+		}
-+	}
-+}
++		/* bits 12-10 = src CPU, 9-0 = int # */
++		ldr	\irqstat, [\base, #GIC_CPU_INTACK]
 +
-+static int __devinit plgpio_probe(struct platform_device *pdev)
++		ldr	\tmp, =1021
++
++		bic	\irqnr, \irqstat, #0x1c00
++
++		cmp	\irqnr, #29
++		cmpcc	\irqnr, \irqnr
++		cmpne	\irqnr, \tmp
++		cmpcs	\irqnr, \irqnr
++
++		.endm
++
++		/*
++		 * We assume that irqstat (the raw value of the IRQ acknowledge
++		 * register) is preserved from the macro above.
++		 * If there is an IPI, we immediately signal end of interrupt
++		 * on the controller, since this requires the original irqstat
++		 * value which we won't easily be able to recreate later.
++		 */
++
++		.macro test_for_ipi, irqnr, irqstat, base, tmp
++		bic	\irqnr, \irqstat, #0x1c00
++		cmp	\irqnr, #16
++		strcc	\irqstat, [\base, #GIC_CPU_EOI]
++		cmpcs	\irqnr, \irqnr
++		.endm
++
++		/* this assumes that irqstat and base are preserved.. */
++
++		.macro test_for_ltirq, irqnr, irqstat, base, tmp
++		bic	\irqnr, \irqstat, #0x1c00
++		mov 	\tmp, #0
++		cmp	\irqnr, #29
++		moveq	\tmp, #1
++		streq	\irqstat, [\base, #GIC_CPU_EOI]
++		cmp	\tmp, #0
++		.endm
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+new file mode 100644
+index 0000000..41c1a53
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -0,0 +1,46 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/generic.h
++ *
++ * spear13xx machine family generic header file
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_GENERIC_H
++#define __MACH_GENERIC_H
++
++#include <asm/mach/time.h>
++#include <asm/mach/map.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/amba/bus.h>
++
++/*
++ * Each GPT has 2 timer channels
++ * Following GPT channels will be used as clock source and clockevent
++ */
++#define SPEAR_GPT0_BASE		SPEAR13XX_GPT0_BASE
++#define SPEAR_GPT0_CHAN0_IRQ	IRQ_GPT0_TMR0
++#define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
++
++/* Add spear13xx family device structure declarations here */
++extern struct amba_device uart_device;
++extern struct sys_timer spear13xx_timer;
++
++/* Add spear1300 machine device structure declarations here */
++
++/* Add spear13xx family function declarations here */
++void __init clk_init(void);
++void __init spear_setup_timer(void);
++void __init spear1300_init(void);
++void __init spear13xx_map_io(void);
++void __init spear13xx_init_irq(void);
++void __init spear13xx_init(void);
++void spear13xx_secondary_startup(void);
++
++#endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/gpio.h b/arch/arm/mach-spear13xx/include/mach/gpio.h
+new file mode 100644
+index 0000000..43fa541
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/gpio.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/gpio.h
++ *
++ * GPIO macros for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_GPIO_H
++#define __MACH_GPIO_H
++
++#include <plat/gpio.h>
++
++#endif /* __MACH_GPIO_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+new file mode 100644
+index 0000000..0047d75
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+@@ -0,0 +1,25 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/hardware.h
++ *
++ * Hardware definitions for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_HARDWARE_H
++#define __MACH_HARDWARE_H
++
++#include <mach/spear.h>
++
++/* Vitual to physical translation of statically mapped space */
++#define IO_ADDRESS(x)		(x | 0xF0000000)
++
++/* typesafe io address */
++#define __io_address(n)		__io(IO_ADDRESS(n))
++
++#endif /* __MACH_HARDWARE_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/io.h b/arch/arm/mach-spear13xx/include/mach/io.h
+new file mode 100644
+index 0000000..2fe3503
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/io.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/io.h
++ *
++ * IO definitions for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_IO_H
++#define __MACH_IO_H
++
++#include <plat/io.h>
++
++#endif /* __MACH_IO_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
+new file mode 100644
+index 0000000..fd90236
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
+@@ -0,0 +1,91 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/irqs.h
++ *
++ * IRQ helper macros for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_IRQS_H
++#define __MACH_IRQS_H
++
++/* IRQ definitions */
++/*
++ * SGI : ID0 - ID15
++ * PPI : ID16 - ID31
++ * SHPI : ID32 - ID224
++ */
++
++#define IRQ_LOCALTIMER		29
++#define IRQ_LOCALWDOG		30
++
++/* Shared Peripheral Interrupt (SHPI) */
++#define IRQ_SHPI_START		32
++
++#define IRQ_PLAY_I2S2		(IRQ_SHPI_START + 10)
++#define IRQ_REC_I2S2		(IRQ_SHPI_START + 11)
++#define IRQ_ADC			(IRQ_SHPI_START + 12)
++#define IRQ_CLCD		(IRQ_SHPI_START + 13)
++#define IRQ_DMAC0_FLAG_0	(IRQ_SHPI_START + 14)
++#define IRQ_DMAC0_FLAG_1	(IRQ_SHPI_START + 15)
++#define IRQ_DMAC0_FLAG_2	(IRQ_SHPI_START + 16)
++#define IRQ_DMAC0_FLAG_3	(IRQ_SHPI_START + 17)
++#define IRQ_DMAC0_FLAG_4	(IRQ_SHPI_START + 18)
++#define IRQ_DMAC0_COMBINED	(IRQ_SHPI_START + 19)
++#define IRQ_FSMC0		(IRQ_SHPI_START + 20)
++#define IRQ_FSMC1		(IRQ_SHPI_START + 21)
++#define IRQ_FSMC2		(IRQ_SHPI_START + 22)
++#define IRQ_FSMC3		(IRQ_SHPI_START + 23)
++#define IRQ_GPIO0		(IRQ_SHPI_START + 24)
++#define IRQ_GPIO1		(IRQ_SHPI_START + 25)
++#define IRQ_PLAY_I2S1		(IRQ_SHPI_START + 26)
++#define IRQ_JPEG		(IRQ_SHPI_START + 27)
++#define IRQ_MMC			(IRQ_SHPI_START + 28)
++#define IRQ_CF			(IRQ_SHPI_START + 29)
++#define IRQ_SMI			(IRQ_SHPI_START + 30)
++#define IRQ_SSP			(IRQ_SHPI_START + 31)
++#define IRQ_C3			(IRQ_SHPI_START + 32)
++#define IRQ_GMAC_1		(IRQ_SHPI_START + 33)
++#define IRQ_GMAC_2		(IRQ_SHPI_START + 34)
++#define IRQ_UART		(IRQ_SHPI_START + 35)
++#define IRQ_RTC			(IRQ_SHPI_START + 36)
++#define IRQ_GPT0_TMR0		(IRQ_SHPI_START + 37)
++#define IRQ_GPT0_TMR1		(IRQ_SHPI_START + 38)
++#define IRQ_GPT1_TMR0		(IRQ_SHPI_START + 39)
++#define IRQ_GPT1_TMR1		(IRQ_SHPI_START + 40)
++#define IRQ_I2C			(IRQ_SHPI_START + 41)
++#define IRQ_GPT2_TMR0		(IRQ_SHPI_START + 42)
++#define IRQ_GPT2_TMR1		(IRQ_SHPI_START + 43)
++#define IRQ_GPT3_TMR0		(IRQ_SHPI_START + 44)
++#define IRQ_GPT3_TMR1		(IRQ_SHPI_START + 45)
++
++#define IRQ_JPEG_RME		(IRQ_SHPI_START + 52)
++#define IRQ_KBD			(IRQ_SHPI_START + 52)
++#define IRQ_REC_I2S1		(IRQ_SHPI_START + 53)
++#define IRQ_DMAC1_FLAG_0	(IRQ_SHPI_START + 54)
++#define IRQ_DMAC1_FLAG_1	(IRQ_SHPI_START + 55)
++#define IRQ_DMAC1_FLAG_2	(IRQ_SHPI_START + 56)
++#define IRQ_DMAC1_FLAG_3	(IRQ_SHPI_START + 57)
++#define IRQ_DMAC1_FLAG_4	(IRQ_SHPI_START + 58)
++#define IRQ_DMAC1_COMBINED	(IRQ_SHPI_START + 59)
++
++#define IRQ_UDC			(IRQ_SHPI_START + 62)
++#define IRQ_UPD			(IRQ_SHPI_START + 63)
++#define IRQ_USBH_EHCI0		(IRQ_SHPI_START + 64)
++#define IRQ_USBH_OHCI0		(IRQ_SHPI_START + 65)
++#define IRQ_USBH_EHCI1		(IRQ_SHPI_START + 66)
++#define IRQ_USBH_OHCI1		(IRQ_SHPI_START + 67)
++#define IRQ_PCIE1		(IRQ_SHPI_START + 68)
++#define IRQ_PCIE2		(IRQ_SHPI_START + 69)
++#define IRQ_PCIE3		(IRQ_SHPI_START + 70)
++
++#define IRQ_GIC_END		(IRQ_SHPI_START + 128)
++
++#define NR_IRQS			IRQ_GIC_END
++
++#endif /* __MACH_IRQS_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/memory.h b/arch/arm/mach-spear13xx/include/mach/memory.h
+new file mode 100644
+index 0000000..200257c
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/memory.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/memory.h
++ *
++ * Memory map for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_MEMORY_H
++#define __MACH_MEMORY_H
++
++#include <plat/memory.h>
++
++#endif /* __MACH_MEMORY_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+new file mode 100644
+index 0000000..2e87a07
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+@@ -0,0 +1,301 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/misc_regs.h
++ *
++ * Miscellaneous registers definitions for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_MISC_REGS_H
++#define __MACH_MISC_REGS_H
++
++#include <mach/hardware.h>
++
++#define MISC_BASE		VA_SPEAR13XX_MISC_BASE
++
++/* General Configuration */
++#define SOC_CFG			((unsigned int *)(MISC_BASE + 0x000))
++#define BOOTSTRAP_CFG		((unsigned int *)(MISC_BASE + 0x004))
++
++/* Power Management Registers */
++#define PCM_CFG			((unsigned int *)(MISC_BASE + 0x100))
++#define PCM_WKUP_CFG		((unsigned int *)(MISC_BASE + 0x104))
++#define SWITCH_CTR		((unsigned int *)(MISC_BASE + 0x108))
++#define SYS_CLK_CTRL		((unsigned int *)(MISC_BASE + 0x200))
++#define SYS_SW_RES		((unsigned int *)(MISC_BASE + 0x204))
++
++/* Clock Configuration Registers */
++#define SYS_CLK_PLLTIMER	((unsigned int *)(MISC_BASE + 0x208))
++#define SYS_CLK_OSCITIMER	((unsigned int *)(MISC_BASE + 0x20c))
++
++/* PLL related registers and bit values */
++#define PLL_CFG			((unsigned int *)(MISC_BASE + 0x210))
++	/* PLL_CFG bit values */
++	#define OSC_24M_MASK	0
++	#define OSC_25M_MASK	1
++	#define PLL_CLK_MASK	3
++	#define PLL1_CLK_SHIFT	20
++	#define PLL2_CLK_SHIFT	22
++	#define PLL3_CLK_SHIFT	24
++
++#define PLL1_CTR		((unsigned int *)(MISC_BASE + 0x214))
++#define PLL1_FRQ		((unsigned int *)(MISC_BASE + 0x218))
++#define PLL1_MOD		((unsigned int *)(MISC_BASE + 0x21c))
++#define PLL2_CTR		((unsigned int *)(MISC_BASE + 0x220))
++#define PLL2_FRQ		((unsigned int *)(MISC_BASE + 0x224))
++#define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x228))
++#define PLL3_CTR		((unsigned int *)(MISC_BASE + 0x22c))
++#define PLL3_FRQ		((unsigned int *)(MISC_BASE + 0x230))
++#define PLL3_MOD		((unsigned int *)(MISC_BASE + 0x234))
++#define PLL4_CTR		((unsigned int *)(MISC_BASE + 0x238))
++	/* PLL_CTR register masks */
++	#define PLL_ENABLE		2
++	#define PLL_MODE_SHIFT		4
++	#define PLL_MODE_MASK		3
++	#define PLL_MODE_NORMAL		0
++	#define PLL_MODE_FRACTION	1
++	#define PLL_MODE_DITH_DSB	2
++	#define PLL_MODE_DITH_SSB	3
++
++#define PLL4_FRQ		((unsigned int *)(MISC_BASE + 0x23c))
++	/* PLL FRQ register masks */
++	#define PLL_DIV_N_SHIFT		0
++	#define PLL_DIV_N_MASK		0xFF
++	#define PLL_DIV_P_SHIFT		8
++	#define PLL_DIV_P_MASK		0x7
++	#define PLL_NORM_FDBK_M_SHIFT	24
++	#define PLL_NORM_FDBK_M_MASK	0xFF
++	#define PLL_DITH_FDBK_M_SHIFT	16
++	#define PLL_DITH_FDBK_M_MASK	0xFFFF
++
++#define PLL4_MOD		((unsigned int *)(MISC_BASE + 0x240))
++
++#define PERIP_CLK_CFG		((unsigned int *)(MISC_BASE + 0x244))
++	/* PERIP_CLK_CFG bit values */
++	#define GPT_OSC24_MASK	0
++	#define GPT_APB_MASK	1
++	#define GPT_CLK_MASK	1
++	#define GPT0_CLK_SHIFT	8
++	#define GPT1_CLK_SHIFT	9
++	#define GPT2_CLK_SHIFT	12
++	#define GPT3_CLK_SHIFT	13
++	#define AUX_CLK_PLL1_MASK	1
++	#define AUX_CLK_PLL5_MASK	0
++	#define UART_CLK_MASK		1
++	#define UART_CLK_SHIFT		4
++
++#define GMAC_CLK_CFG		((unsigned int *)(MISC_BASE + 0x248))
++#define C3_CLK_SYNTH		((unsigned int *)(MISC_BASE + 0x24c))
++#define CLCD_CLK_SYNT		((unsigned int *)(MISC_BASE + 0x250))
++#define UART_CLK_SYNT		((unsigned int *)(MISC_BASE + 0x254))
++#define GMAC_CLK_SYNT		((unsigned int *)(MISC_BASE + 0x258))
++#define MCIF_SD_CLK_SYNT	((unsigned int *)(MISC_BASE + 0x25c))
++#define MCIF_CFXD_CLK_SYNT	((unsigned int *)(MISC_BASE + 0x260))
++#define RAS_CLK_SYNT0		((unsigned int *)(MISC_BASE + 0x264))
++#define RAS_CLK_SYNT1		((unsigned int *)(MISC_BASE + 0x268))
++#define RAS_CLK_SYNT2		((unsigned int *)(MISC_BASE + 0x26c))
++#define RAS_CLK_SYNT3		((unsigned int *)(MISC_BASE + 0x270))
++	/* aux clk synthesizer register masks */
++	#define AUX_EQ_SEL_SHIFT	30
++	#define AUX_EQ_SEL_MASK		1
++	#define AUX_EQ1_SEL		0
++	#define AUX_EQ2_SEL		1
++	#define AUX_XSCALE_SHIFT	16
++	#define AUX_XSCALE_MASK		0xFFF
++	#define AUX_YSCALE_SHIFT	0
++	#define AUX_YSCALE_MASK		0xFFF
++
++#define PERIP1_CLK_ENB		((unsigned int *)(MISC_BASE + 0x274))
++	/* PERIP1_CLK_ENB register masks */
++	#define BUS_CLK_ENB		0
++	#define SYSROM_CLK_ENB		1
++	#define AORAM_CLK_ENB		2
++	#define SYSRAM_CLK_ENB		3
++	#define FSMC_CLK_ENB		4
++	#define SMI_CLK_ENB		5
++	#define SD_CLK_ENB		6
++	#define CF_XD_CLK_ENB		7
++	#define GETH_CLK_ENB		8
++	#define UHC0_CLK_ENB		9
++	#define UHC1_CLK_ENB		10
++	#define UDC_UPD_CLK_ENB		11
++	#define PCI0_CLK_ENB		12
++	#define PCI1_CLK_ENB		13
++	#define PCI2_CLK_ENB		14
++	#define UART_CLK_ENB		15
++	#define SSP_CLK_ENB		17
++	#define I2C_CLK_ENB		18
++	#define I2S_SLV_CLK_ENB		19
++	#define I2S_MST_CLK_ENB		20
++	#define GPT0_CLK_ENB		21
++	#define GPT1_CLK_ENB		22
++	#define GPIOA_CLK_ENB		23
++	#define GPIOB_CLK_ENB		24
++	#define DMA0_CLK_ENB		25
++	#define DMA1_CLK_ENB		26
++	#define CLCD_CLK_ENB		27
++	#define JPEGC_CLK_ENB		28
++	#define C3_CLK_ENB		29
++	#define ADC_CLK_ENB		30
++	#define RTC_CLK_ENB		31
++
++#define PERIP2_CLK_ENB		((unsigned int *)(MISC_BASE + 0x278))
++	/* PERIP2_CLK_ENB register masks */
++	#define DDR_CTRL_CLK_ENB	0
++	#define DDR_CORE_CLK_ENB	1
++	#define CPU_DBG_CLK_ENB		2
++	#define KBD_CLK_ENB		3
++	#define GPT2_CLK_ENB		4
++	#define GPT3_CLK_ENB		5
++	#define ACP_CLK_ENB		6
++	#define I2S_REFOUT_CLK_ENB	7
++	#define THSENS_CLK_ENB		8
++
++#define PERIP1_SW_RST		((unsigned int *)(MISC_BASE + 0x27c))
++	#define JPEG_SOF_RST		28
++#define PERIP2_SW_RST		((unsigned int *)(MISC_BASE + 0x280))
++#define RAS_CLK_ENB		((unsigned int *)(MISC_BASE + 0x284))
++#define RAS_SW_RST		((unsigned int *)(MISC_BASE + 0x288))
++#define PLL1_SYNT		((unsigned int *)(MISC_BASE + 0x28c))
++#define I2S_CLK_CFG		((unsigned int *)(MISC_BASE + 0x290))
++
++/* Peripheral Configuration Registers */
++#define DMAC_HS_SEL		((unsigned int *)(MISC_BASE + 0x300))
++#define DMAC_SEL		((unsigned int *)(MISC_BASE + 0x304))
++#define DMAC_FLOW_SEL		((unsigned int *)(MISC_BASE + 0x308))
++#define DMAC_DIR_SEL		((unsigned int *)(MISC_BASE + 0x30c))
++#define DMAC_CFG		((unsigned int *)(MISC_BASE + 0x310))
++#define USBPHY_GEN_CFG		((unsigned int *)(MISC_BASE + 0x314))
++#define USBPHY_P1_CFG		((unsigned int *)(MISC_BASE + 0x318))
++#define USBPHY_P2_CFG		((unsigned int *)(MISC_BASE + 0x31c))
++#define USBPHY_P3_CFG		((unsigned int *)(MISC_BASE + 0x320))
++#define PCIE_CFG		((unsigned int *)(MISC_BASE + 0x324))
++#define PCIE_MIPHY_CFG		((unsigned int *)(MISC_BASE + 0x328))
++#define PERIP_CFG		((unsigned int *)(MISC_BASE + 0x32c))
++#define FSMC_CFG		((unsigned int *)(MISC_BASE + 0x330))
++#define MPMC_CTR_STS		((unsigned int *)(MISC_BASE + 0x334))
++
++/* Inter-Processor Communication Registers */
++#define PRC1_LOCK_CTR		((unsigned int *)(MISC_BASE + 0x500))
++#define PRC2_LOCK_CTR		((unsigned int *)(MISC_BASE + 0x504))
++#define PRC1_IRQ_CTR		((unsigned int *)(MISC_BASE + 0x508))
++#define PRC2_IRQ_CTR		((unsigned int *)(MISC_BASE + 0x51C))
++
++/* Pad Configuration Registers */
++#define PAD_PU_CFG_1		((unsigned int *)(MISC_BASE + 0x600))
++#define PAD_PU_CFG_2		((unsigned int *)(MISC_BASE + 0x604))
++#define PAD_PU_CFG_3		((unsigned int *)(MISC_BASE + 0x608))
++#define PAD_PU_CFG_4		((unsigned int *)(MISC_BASE + 0x60c))
++#define PAD_PU_CFG_5		((unsigned int *)(MISC_BASE + 0x610))
++#define PAD_PU_CFG_6		((unsigned int *)(MISC_BASE + 0x614))
++#define PAD_PU_CFG_7		((unsigned int *)(MISC_BASE + 0x618))
++#define PAD_PU_CFG_8		((unsigned int *)(MISC_BASE + 0x61c))
++#define PAD_PD_CFG_1		((unsigned int *)(MISC_BASE + 0x620))
++#define PAD_PD_CFG_2		((unsigned int *)(MISC_BASE + 0x624))
++#define PAD_PD_CFG_3		((unsigned int *)(MISC_BASE + 0x628))
++#define PAD_PD_CFG_4		((unsigned int *)(MISC_BASE + 0x62c))
++#define PAD_PD_CFG_5		((unsigned int *)(MISC_BASE + 0x630))
++#define PAD_PD_CFG_6		((unsigned int *)(MISC_BASE + 0x634))
++#define PAD_PD_CFG_7		((unsigned int *)(MISC_BASE + 0x638))
++#define PAD_PD_CFG_8		((unsigned int *)(MISC_BASE + 0x63c))
++#define PAD_SLEEP_CFG		((unsigned int *)(MISC_BASE + 0x640))
++#define PAD_HYST_CFG		((unsigned int *)(MISC_BASE + 0x644))
++#define PAD_DRV_CFG		((unsigned int *)(MISC_BASE + 0x648))
++#define PAD_SLEW_CFG		((unsigned int *)(MISC_BASE + 0x64c))
++#define PAD_FUNCTION_EN_1	((unsigned int *)(MISC_BASE + 0x650))
++#define PAD_FUNCTION_EN_2	((unsigned int *)(MISC_BASE + 0x654))
++#define PAD_FUNCTION_EN_3	((unsigned int *)(MISC_BASE + 0x658))
++#define DDR_PAD_CFG		((unsigned int *)(MISC_BASE + 0x65c))
++#define THSENS_CFG		((unsigned int *)(MISC_BASE + 0x6c4))
++
++/* Compensation Configuration Registers */
++#define COMP_1V8_2V5_3V3__1_CFG		((unsigned int *)(MISC_BASE + 0x700))
++#define COMP_1V8_2V5_3V3__2_CFG		((unsigned int *)(MISC_BASE + 0x704))
++#define COMP_3V3_1_CFG			((unsigned int *)(MISC_BASE + 0x708))
++#define COMP_3V3_2_CFG			((unsigned int *)(MISC_BASE + 0x70c))
++#define COMP_DDR_CFG			((unsigned int *)(MISC_BASE + 0x710))
++
++/* OTP Programming Registers */
++#define OTP_PROG_CTR		((unsigned int *)(MISC_BASE + 0x800))
++#define OTP_WDATA1_1		((unsigned int *)(MISC_BASE + 0x804))
++#define OTP_WDATA1_2		((unsigned int *)(MISC_BASE + 0x808))
++#define OTP_WDATA1_3		((unsigned int *)(MISC_BASE + 0x80c))
++#define OTP_WDATA1_4		((unsigned int *)(MISC_BASE + 0x810))
++#define OTP_WDATA1_5		((unsigned int *)(MISC_BASE + 0x814))
++#define OTP_WDATA1_6		((unsigned int *)(MISC_BASE + 0x818))
++#define OTP_WDATA1_7		((unsigned int *)(MISC_BASE + 0x81c))
++#define OTP_WDATA1_8		((unsigned int *)(MISC_BASE + 0x820))
++#define OTP_WDATA2_1		((unsigned int *)(MISC_BASE + 0x824))
++#define OTP_WDATA2_2		((unsigned int *)(MISC_BASE + 0x828))
++#define OTP_WDATA2_3		((unsigned int *)(MISC_BASE + 0x82c))
++#define OTP_WDATA2_4		((unsigned int *)(MISC_BASE + 0x830))
++#define OTP_WDATA2_5		((unsigned int *)(MISC_BASE + 0x834))
++#define OTP_WDATA2_6		((unsigned int *)(MISC_BASE + 0x838))
++#define OTP_WDATA2_7		((unsigned int *)(MISC_BASE + 0x83c))
++#define OTP_WDATA2_8		((unsigned int *)(MISC_BASE + 0x840))
++#define OTP_MASK_1		((unsigned int *)(MISC_BASE + 0x844))
++#define OTP_MASK_2		((unsigned int *)(MISC_BASE + 0x848))
++#define OTP_MASK_3		((unsigned int *)(MISC_BASE + 0x84c))
++#define OTP_MASK_4		((unsigned int *)(MISC_BASE + 0x850))
++#define OTP_MASK_5		((unsigned int *)(MISC_BASE + 0x854))
++#define OTP_MASK_6		((unsigned int *)(MISC_BASE + 0x858))
++#define OTP_MASK_7		((unsigned int *)(MISC_BASE + 0x85c))
++#define OTP_MASK_8		((unsigned int *)(MISC_BASE + 0x860))
++#define OTP_RDATA1_1		((unsigned int *)(MISC_BASE + 0x864))
++#define OTP_RDATA1_2		((unsigned int *)(MISC_BASE + 0x868))
++#define OTP_RDATA1_3		((unsigned int *)(MISC_BASE + 0x86c))
++#define OTP_RDATA1_4		((unsigned int *)(MISC_BASE + 0x870))
++#define OTP_RDATA1_5		((unsigned int *)(MISC_BASE + 0x874))
++#define OTP_RDATA1_6		((unsigned int *)(MISC_BASE + 0x878))
++#define OTP_RDATA1_7		((unsigned int *)(MISC_BASE + 0x87c))
++#define OTP_RDATA1_8		((unsigned int *)(MISC_BASE + 0x880))
++#define OTP_RDATA2_1		((unsigned int *)(MISC_BASE + 0x884))
++#define OTP_RDATA2_2		((unsigned int *)(MISC_BASE + 0x888))
++#define OTP_RDATA2_3		((unsigned int *)(MISC_BASE + 0x88c))
++#define OTP_RDATA2_4		((unsigned int *)(MISC_BASE + 0x890))
++#define OTP_RDATA2_5		((unsigned int *)(MISC_BASE + 0x894))
++#define OTP_RDATA2_6		((unsigned int *)(MISC_BASE + 0x898))
++#define OTP_RDATA2_7		((unsigned int *)(MISC_BASE + 0x89c))
++#define OTP_RDATA2_8		((unsigned int *)(MISC_BASE + 0x8a0))
++#define OTP_RDATAM_1		((unsigned int *)(MISC_BASE + 0x8a4))
++#define OTP_RDATAM_2		((unsigned int *)(MISC_BASE + 0x8a8))
++#define OTP_RDATAM_3		((unsigned int *)(MISC_BASE + 0x8ac))
++#define OTP_RDATAM_4		((unsigned int *)(MISC_BASE + 0x8b0))
++#define OTP_RDATAM_5		((unsigned int *)(MISC_BASE + 0x8b4))
++#define OTP_RDATAM_6		((unsigned int *)(MISC_BASE + 0x8b8))
++#define OTP_RDATAM_7		((unsigned int *)(MISC_BASE + 0x8bc))
++#define OTP_RDATAM_8		((unsigned int *)(MISC_BASE + 0x8c0))
++
++/* A9SM Registers */
++#define A9SM_CLUSTERID		((unsigned int *)(MISC_BASE + 0x900))
++#define A9SM_STATUS		((unsigned int *)(MISC_BASE + 0x904))
++#define A9SM_DEBUG		((unsigned int *)(MISC_BASE + 0x908))
++#define A9SM_FILTER		((unsigned int *)(MISC_BASE + 0x90c))
++#define A9SM_PARITY_CFG		((unsigned int *)(MISC_BASE + 0x910))
++#define A9SM_PARITY_ERR		((unsigned int *)(MISC_BASE + 0x914))
++
++/* SOC ID Registers */
++#define DIE_ID_1		((unsigned int *)(MISC_BASE + 0xa00))
++#define DIE_ID_2		((unsigned int *)(MISC_BASE + 0xa04))
++#define DIE_ID_3		((unsigned int *)(MISC_BASE + 0xa08))
++#define DIE_ID_4		((unsigned int *)(MISC_BASE + 0xa0c))
++#define DIE_ID_VALID		((unsigned int *)(MISC_BASE + 0xa10))
++
++/* SOC TEST & DEBUG Registers */
++#define MIPHY_TEST		((unsigned int *)(MISC_BASE + 0x1000))
++#define PCIE_MSTR_P0		((unsigned int *)(MISC_BASE + 0x1004))
++#define PCIE_AWMISC_P0		((unsigned int *)(MISC_BASE + 0x1008))
++#define PCIE_ARMISC_P0		((unsigned int *)(MISC_BASE + 0x100c))
++#define PCIE_MSTR_P1		((unsigned int *)(MISC_BASE + 0x1010))
++#define PCIE_AWMISC_P1		((unsigned int *)(MISC_BASE + 0x1014))
++#define PCIE_ARMISC_P1		((unsigned int *)(MISC_BASE + 0x1018))
++#define PCIE_MSTR_P2		((unsigned int *)(MISC_BASE + 0x101c))
++#define PCIE_AWMISC_P2		((unsigned int *)(MISC_BASE + 0x1020))
++#define PCIE_ARMISC_P2		((unsigned int *)(MISC_BASE + 0x1024))
++
++#endif /* __MACH_MISC_REGS_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/smp.h b/arch/arm/mach-spear13xx/include/mach/smp.h
+new file mode 100644
+index 0000000..6e028a1
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/smp.h
+@@ -0,0 +1,33 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/smp.h
++ *
++ * Few SMP related definitions for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_SMP_H
++#define __MACH_SMP_H
++
++#include <asm/hardware/gic.h>
++
++#define hard_smp_processor_id()			\
++	({						\
++		unsigned int cpunum;			\
++		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
++			: "=r" (cpunum));		\
++		cpunum &= 0x0F;				\
++	})
++
++/* We use IRQ1 as the IPI */
++static inline void smp_cross_call(const struct cpumask *mask)
 +{
-+	struct plgpio_platform_data *pdata;
-+	struct plgpio *plgpio;
-+	int ret, irq, i;
-+	struct resource *res;
-+
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "invalid platform data\n");
-+		goto fail;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		ret = -EBUSY;
-+		dev_dbg(&pdev->dev, "invalid IORESOURCE_MEM\n");
-+		goto fail;
-+	}
-+
-+	if (!request_mem_region(res->start, resource_size(res), "plgpio")) {
-+		ret = -EBUSY;
-+		dev_dbg(&pdev->dev, "request mem region fail\n");
-+		goto fail;
-+	}
-+
-+	plgpio = kzalloc(sizeof(*plgpio), GFP_KERNEL);
-+	if (!plgpio) {
-+		ret = -ENOMEM;
-+		dev_dbg(&pdev->dev, "memory allocation fail\n");
-+		goto release_region;
-+	}
-+
-+	plgpio->base = ioremap(res->start, resource_size(res));
-+	if (!plgpio->base) {
-+		ret = -ENOMEM;
-+		dev_dbg(&pdev->dev, "ioremap fail\n");
-+		goto kfree;
-+	}
-+
-+	spin_lock_init(&plgpio->lock);
-+
-+	plgpio->chip.request = plgpio_request;
-+	plgpio->chip.free = plgpio_free;
-+	plgpio->chip.direction_input = plgpio_direction_input;
-+	plgpio->chip.direction_output = plgpio_direction_output;
-+	plgpio->chip.get = plgpio_get_value;
-+	plgpio->chip.set = plgpio_set_value;
-+	plgpio->chip.to_irq = plgpio_to_irq;
-+	plgpio->chip.base = pdata->gpio_base;
-+	plgpio->chip.ngpio = pdata->gpio_count;
-+	plgpio->chip.label = dev_name(&pdev->dev);
-+	plgpio->chip.dev = &pdev->dev;
-+	plgpio->chip.owner = THIS_MODULE;
-+	plgpio->irq_base = pdata->irq_base;
-+	plgpio->p2o = pdata->p2o;
-+	plgpio->o2p = pdata->o2p;
-+	plgpio->p2o_regs = pdata->p2o_regs;
-+
-+	ret = gpiochip_add(&plgpio->chip);
-+	if (ret) {
-+		dev_dbg(&pdev->dev, "unable to add gpio chip\n");
-+		goto iounmap;
-+	}
-+
-+	/* irq_chip support */
-+	if (pdata->irq_base == (unsigned) -1) {
-+		dev_info(&pdev->dev, "Initialization successful\n");
-+		return 0;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "invalid irq number\n");
-+		goto remove_gpiochip;
-+	}
-+
-+	set_irq_chained_handler(irq, plgpio_irq_handler);
-+	for (i = 0; i < pdata->gpio_count; i++) {
-+		set_irq_chip(i+plgpio->irq_base, &plgpio_irqchip);
-+		set_irq_handler(i+plgpio->irq_base, handle_simple_irq);
-+		set_irq_flags(i+plgpio->irq_base, IRQF_VALID);
-+		set_irq_chip_data(i+plgpio->irq_base, plgpio);
-+	}
-+	set_irq_data(irq, plgpio);
-+	dev_info(&pdev->dev, "Initialization successful\n");
-+
-+	return 0;
-+
-+remove_gpiochip:
-+	if (gpiochip_remove(&plgpio->chip))
-+		dev_dbg(&pdev->dev, "unable to remove gpiochip\n");
-+iounmap:
-+	iounmap(plgpio->base);
-+kfree:
-+	kfree(plgpio);
-+release_region:
-+	release_mem_region(res->start, resource_size(res));
-+fail:
-+	dev_err(&pdev->dev, "probe fail: %d\n", ret);
-+	return ret;
++	gic_raise_softirq(mask, 1);
 +}
 +
-+static struct platform_driver plgpio_driver = {
-+	.probe		= plgpio_probe,
-+	.driver		= {
-+		.name	= "plgpio",
-+		.owner	= THIS_MODULE,
-+	},
-+};
++#endif
+diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
+new file mode 100644
+index 0000000..0dcd131
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/spear.h
+@@ -0,0 +1,93 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/spear.h
++ *
++ * spear13xx Machine family specific definition
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+static int __init plgpio_init(void)
++#ifndef __MACH_SPEAR13XX_H
++#define __MACH_SPEAR13XX_H
++
++#include <mach/spear1300.h>
++
++#define SPEAR13XX_L2CC_BASE		0xED000000
++
++/* ARM9SMP peripheral base address */
++#define SPEAR13XX_A9SM_PERIP_BASE	0xEC800000
++#define VA_SPEAR13XX_A9SM_PERIP_BASE	IO_ADDRESS(SPEAR13XX_A9SM_PERIP_BASE)
++/* A9SM peripheral offsets */
++#define SPEAR13XX_SCU_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x00)
++#define SPEAR13XX_GIC_CPU_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x100)
++#define SPEAR13XX_GLOBAL_TMR_BASE	(SPEAR13XX_A9SM_PERIP_BASE + 0x200)
++#define SPEAR13XX_LOCAL_TMR_BASE	(SPEAR13XX_A9SM_PERIP_BASE + 0x600)
++#define SPEAR13XX_WDT_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x620)
++#define SPEAR13XX_GIC_DIST_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x1000)
++
++#define SPEAR13XX_UART_BASE		0xE0000000
++#define VA_SPEAR13XX_UART_BASE		IO_ADDRESS(SPEAR13XX_UART_BASE)
++
++#define SPEAR13XX_ADC_BASE		0xE0080000
++#define SPEAR13XX_SSP_BASE		0xE0100000
++#define SPEAR13XX_I2S0_BASE		0xE0180000
++#define SPEAR13XX_I2S1_BASE		0xE0200000
++#define SPEAR13XX_I2C_BASE		0xE0280000
++#define SPEAR13XX_KBD_BASE		0xE0300000
++#define SPEAR13XX_GPT0_BASE		0xE0380000
++#define SPEAR13XX_GPT1_BASE		0xE0400000
++#define SPEAR13XX_GPT2_BASE		0xE0480000
++#define SPEAR13XX_GPT3_BASE		0xE0500000
++#define SPEAR13XX_RTC_BASE		0xE0580000
++#define SPEAR13XX_GPIOA_BASE		0xE0600000
++#define SPEAR13XX_GPIOB_BASE		0xE0680000
++#define SPEAR13XX_MISC_BASE		0xE0700000
++#define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
++
++#define SPEAR13XX_SYSRAM0_BASE		0xB3800000
++#define SPEAR13XX_SYSRAM0_SIZE		0x00800000
++
++/*
++ * The system location which is polled by secondary cpus to find the
++ * jump address
++ */
++#define SPEAR13XX_SYS_LOCATION		(SPEAR13XX_SYSRAM0_BASE + 0x600)
++
++#define SPEAR13XX_SYSRAM1_BASE		0xE0800000
++#define SPEAR13XX_SYSRAM1_SIZE		0x00800000
++#define SPEAR13XX_CLCD_BASE		0xE1000000
++#define SPEAR13XX_C3_BASE		0xE1800000
++#define SPEAR13XX_GETH_BASE		0xE2000000
++#define SPEAR13XX_UPD_BASE		0xE2800000
++#define SPEAR13XX_UDC_BASE		0xE3800000
++#define SPEAR13XX_UHC0_OHCI_BASE	0xE4000000
++#define SPEAR13XX_UHC0_EHCI_BASE	0xE4800000
++#define SPEAR13XX_UHC1_OHCI_BASE	0xE5000000
++#define SPEAR13XX_UHC1_EHCI_BASE	0xE5800000
++#define SPEAR13XX_SMI_MEM_BASE		0xE6000000
++#define SPEAR13XX_SMI_CTRL_BASE		0xEA000000
++#define SPEAR13XX_DMAC0_BASE		0xEA800000
++#define SPEAR13XX_DMAC1_BASE		0xEB000000
++#define SPEAR13XX_MII_PHY_BASE		0xEB800000
++#define SPEAR13XX_MPMC_BASE		0xEC000000
++#define SPEAR13XX_PCIE0_BASE		0x80000000
++#define SPEAR13XX_PCIE1_BASE		0x90000000
++#define SPEAR13XX_PCIE2_BASE		0xC0000000
++#define SPEAR13XX_PCIE0_APP_BASE	0xB1000000
++#define SPEAR13XX_PCIE1_APP_BASE	0xB1800000
++#define SPEAR13XX_PCIE2_APP_BASE	0xB4000000
++#define SPEAR13XX_FSMC_MEM_BASE		0xA0000000
++#define SPEAR13XX_FSMC_BASE		0xB0000000
++#define SPEAR13XX_JPEG_BASE		0xB2000000
++#define SPEAR13XX_MCIF_CF_BASE		0xB2800000
++#define SPEAR13XX_MCIF_MMC_BASE		0xB3000000
++
++/* Debug uart for linux, will be used for debug and uncompress messages */
++#define SPEAR_DBG_UART_BASE		SPEAR13XX_UART_BASE
++#define VA_SPEAR_DBG_UART_BASE		VA_SPEAR13XX_UART_BASE
++
++#endif /* __MACH_SPEAR13XX_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/spear1300.h b/arch/arm/mach-spear13xx/include/mach/spear1300.h
+new file mode 100644
+index 0000000..b3ba267
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/spear1300.h
+@@ -0,0 +1,21 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/spear1300.h
++ *
++ * SPEAr1300 Machine specific definition
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifdef	CONFIG_MACH_SPEAR1300
++
++#ifndef __MACH_SPEAR1300_H
++#define __MACH_SPEAR1300_H
++
++#endif /* __MACH_SPEAR1300_H */
++
++#endif /* CONFIG_MACH_SPEAR1300 */
+diff --git a/arch/arm/mach-spear13xx/include/mach/system.h b/arch/arm/mach-spear13xx/include/mach/system.h
+new file mode 100644
+index 0000000..6ce0819
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/system.h
+@@ -0,0 +1,43 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/system.h
++ *
++ * spear13xx Machine family specific architecture functions
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_SYSTEM_H
++#define __MACH_SYSTEM_H
++
++#include <linux/io.h>
++#include <mach/hardware.h>
++#include <mach/misc_regs.h>
++
++static inline void arch_idle(void)
 +{
-+	return platform_driver_register(&plgpio_driver);
++	/*
++	 * This should do all the clock switching
++	 * and wait for interrupt tricks
++	 */
++	cpu_do_idle();
 +}
-+subsys_initcall(plgpio_init);
 +
-+MODULE_AUTHOR("Viresh Kumar <viresh.kumar@st.com>");
-+MODULE_DESCRIPTION("SPEAr PLGPIO driver");
-+MODULE_LICENSE("GPL");
++static inline void arch_reset(char mode, const char *cmd)
++{
++	pr_info("Going to reboot...\n");
++
++	/* let above information be printed */
++	msleep(1000);
++
++	writel(0x01, SYS_SW_RES);
++	/* wait for system to rest */
++	while (1)
++		;
++}
++
++#endif /* __MACH_SYSTEM_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/timex.h b/arch/arm/mach-spear13xx/include/mach/timex.h
+new file mode 100644
+index 0000000..0a81490
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/timex.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/timex.h
++ *
++ * spear13xx machine family specific timex definitions
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_TIMEX_H
++#define __MACH_TIMEX_H
++
++#define CLOCK_TICK_RATE			24000000
++
++#endif /* __MACH_TIMEX_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/uncompress.h b/arch/arm/mach-spear13xx/include/mach/uncompress.h
+new file mode 100644
+index 0000000..3c27f25
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/uncompress.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/uncompress.h
++ *
++ * Serial port stubs for kernel decompress status messages
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_UNCOMPRESS_H
++#define __MACH_UNCOMPRESS_H
++
++#include <plat/uncompress.h>
++
++#endif /* __MACH_UNCOMPRESS_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/vmalloc.h b/arch/arm/mach-spear13xx/include/mach/vmalloc.h
+new file mode 100644
+index 0000000..85ad57e
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/include/mach/vmalloc.h
+@@ -0,0 +1,18 @@
++/*
++ * arch/arm/mach-spear13xx/include/mach/vmalloc.h
++ *
++ * Defining Vmalloc area for spear13xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_VMALLOC_H
++#define __MACH_VMALLOC_H
++
++#include <plat/vmalloc.h>
++
++#endif /* __MACH_VMALLOC_H */
 -- 
 1.7.2.2
