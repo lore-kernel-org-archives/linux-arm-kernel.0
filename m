@@ -1,29 +1,38 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 30 Aug 2010 15:14:29 +0300
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
-Message-ID: <1283170469.12995.53.camel@brekeke>
+From: thomas.nemeth@betatech.fr (Thomas Nemeth)
+Date: Mon, 30 Aug 2010 14:44:21 +0200
+Subject: iMX31 power management
+Message-ID: <201008301444.21510.thomas.nemeth@betatech.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-08-30 at 16:13 +0530, Viresh KUMAR wrote:
-> From: Vipin Kumar <vipin.kumar@st.com>
-> 
-> For a page size of 4096, the number of oob bytes are 128 per page. This demands
-> for an increased ecc_pos array as well as ecc can be placed at more than 64
-> locations.
-> 
-> This patch is added because SPEAr platforms NAND controller has 13 bytes of ecc
-> for each 512 bytes of data. This results in 104 bytes of ecc in case of 4096
-> byte page.
-> 
-> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-Nack, breaking ABI Is not allowed in Linux.
+    Hi.
 
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+    I'm currently struggling trying to make suspend to RAM work for the
+    iMX31 processor. As the pm functions were not implemented, I added
+    a pretty straightforward pm "driver".
+
+    It works to a point. The processor seems really sleeping. But where
+    the heck is Prince Charming ? It does not want to wakeup else :( I
+    can't make the DOZE mode, State Retention mode and Deep Sleep mode
+    to work. Does anybody know how ?
+
+    I added in attachment the code I adapted from 2.6.22 so that it
+    integrates better with current kernels.
+
+
+Thomas.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pm.c
+Type: text/x-csrc
+Size: 4152 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/d8328997/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/d8328997/attachment.sig>
