@@ -1,1255 +1,896 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:11 +0530
-Subject: [PATCH 47/74] SPEAr Power Management: Added the support for Standby
-	mode.
+Date: Mon, 30 Aug 2010 16:11:00 +0530
+Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <c3398c49d087eda78211a99ae879deb11f75286a.1283161023.git.viresh.kumar@st.com>
+Message-ID: <d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 
-OPEN POINTS: 	1. Suspend to RAM support needs to be added.
-		2. The basic framework added for S2R.
-		3. SPEAr13xx: The power domains need to be added.
-		4. Extensive testing needs to be done.
-		5. For SPEAr13xx: PLL-4 has not been switch off while moving
-		into sleep. There is some problem in getting the pll back to on.
-		6. Not functional on SPEAr6XX
-
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/Makefile               |    1 +
- arch/arm/mach-spear13xx/include/mach/suspend.h |   47 +++
- arch/arm/mach-spear13xx/pm.c                   |  107 ++++++
- arch/arm/mach-spear13xx/sleep.S                |  435 ++++++++++++++++++++++++
- arch/arm/mach-spear13xx/spear13xx.c            |    5 +
- arch/arm/mach-spear3xx/include/mach/suspend.h  |   44 +++
- arch/arm/mach-spear3xx/spear3xx.c              |    5 +-
- arch/arm/mach-spear6xx/include/mach/suspend.h  |   44 +++
- arch/arm/mach-spear6xx/spear6xx.c              |    9 +-
- arch/arm/plat-spear/Makefile                   |    6 +
- arch/arm/plat-spear/pm.c                       |  104 ++++++
- arch/arm/plat-spear/sleep.S                    |  288 ++++++++++++++++
- 12 files changed, 1093 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/include/mach/suspend.h
- create mode 100644 arch/arm/mach-spear13xx/pm.c
- create mode 100644 arch/arm/mach-spear13xx/sleep.S
- create mode 100644 arch/arm/mach-spear3xx/include/mach/suspend.h
- create mode 100644 arch/arm/mach-spear6xx/include/mach/suspend.h
- create mode 100644 arch/arm/plat-spear/pm.c
- create mode 100644 arch/arm/plat-spear/sleep.S
+ arch/arm/mach-spear13xx/clock.c                |    2 +-
+ arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |    1 +
+ arch/arm/mach-spear13xx/spear13xx.c            |   19 +
+ arch/arm/mach-spear3xx/clock.c                 |    2 +-
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    1 +
+ arch/arm/mach-spear3xx/spear300_evb.c          |    1 +
+ arch/arm/mach-spear3xx/spear310_evb.c          |    1 +
+ arch/arm/mach-spear3xx/spear320_evb.c          |    1 +
+ arch/arm/mach-spear3xx/spear3xx.c              |   19 +
+ arch/arm/mach-spear6xx/clock.c                 |    2 +-
+ arch/arm/mach-spear6xx/include/mach/generic.h  |    1 +
+ arch/arm/mach-spear6xx/spear600_evb.c          |    1 +
+ arch/arm/mach-spear6xx/spear6xx.c              |   19 +
+ drivers/rtc/Kconfig                            |    7 +
+ drivers/rtc/Makefile                           |    1 +
+ drivers/rtc/rtc-spear.c                        |  598 ++++++++++++++++++++++++
+ 17 files changed, 674 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/rtc/rtc-spear.c
 
-diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index 8644c76..b786edc 100644
---- a/arch/arm/mach-spear13xx/Makefile
-+++ b/arch/arm/mach-spear13xx/Makefile
-@@ -17,3 +17,4 @@ obj-$(CONFIG_BOARD_SPEAR1300_EVB)	+= spear1300_evb.o
- obj-$(CONFIG_MACH_SPEAR1310)		+= spear1310.o
- # spear1310 boards files
- obj-$(CONFIG_BOARD_SPEAR1310_EVB)	+= spear1310_evb.o
-+obj-$(CONFIG_PM)	+= pm.o sleep.o
-diff --git a/arch/arm/mach-spear13xx/include/mach/suspend.h b/arch/arm/mach-spear13xx/include/mach/suspend.h
-new file mode 100644
-index 0000000..c8d13e6
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/include/mach/suspend.h
-@@ -0,0 +1,47 @@
-+/*
-+ * arch/arm/mach-spear13xx/include/mach/suspend.h
-+ *
-+ * Sleep mode defines for SPEAr13xx machine family
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_SUSPEND_H
-+#define __MACH_SUSPEND_H
-+
-+#include <mach/spear.h>
-+
-+#ifndef __ASSEMBLER__
-+extern void spear_sleep_mode(suspend_state_t state);
-+extern unsigned int spear_sleep_mode_sz;
-+extern void spear_wakeup(void);
-+extern unsigned int spear_wakeup_sz;
-+#endif
-+
-+/* SRAM related defines*/
-+#define SRAM_STACK_STRT_OFF	0x500
-+#define SRAM_STACK_SCR_OFFS	0xF00
-+#define SPEAR_START_SRAM	SPEAR13XX_SYSRAM1_BASE
-+#define SPEAR_LIMIT_SRAM	(SPEAR_START_SRAM + SZ_4K - 1)
-+#define SPEAR_SRAM_STACK_PA	(SPEAR_START_SRAM + SRAM_STACK_STRT_OFF)
-+#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
-+/* SPEAr subsystem physical addresses */
-+#define MPMC_BASE_PA		SPEAR13XX_MPMC_BASE
-+#define MISC_BASE_PA		SPEAR13XX_MISC_BASE
-+
-+/* ARM Modes of Operation */
-+#define MODE_USR_32		0x10
-+#define MODE_FIQ_32		0x11
-+#define MODE_IRQ_32		0x12
-+#define MODE_SVC_32		0x13
-+#define MODE_ABT_32		0x17
-+#define MODE_UND_32		0x1B
-+#define MODE_SYS_32		0x1F
-+#define MODE_BITS		0x1F
-+
-+#endif /* __MACH_SUSPEND_H */
-diff --git a/arch/arm/mach-spear13xx/pm.c b/arch/arm/mach-spear13xx/pm.c
-new file mode 100644
-index 0000000..6152043
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/pm.c
-@@ -0,0 +1,107 @@
-+/*
-+ * arch/arm/mach-spear13xx/pm.c
-+ *
-+ * SPEAr13xx Power Management source file
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/suspend.h>
-+#include <linux/sysfs.h>
-+#include <linux/module.h>
-+#include <asm/cacheflush.h>
-+#include <mach/irqs.h>
-+#include <mach/suspend.h>
-+#include <mach/hardware.h>
-+
-+static int spear_pm_sleep(suspend_state_t state)
-+{
-+	void (*spear_sram_sleep)(suspend_state_t state) = NULL;
-+	void (*spear_sram_wake)(void) = NULL;
-+	void *sram_dest = (void *)IO_ADDRESS(SPEAR_START_SRAM);
-+
-+	if (state == PM_SUSPEND_MEM) {
-+		spear_sram_wake = memcpy(sram_dest, (void *)spear_wakeup,
-+				spear_wakeup_sz);
-+		/* Increment destination pointer by the size copied*/
-+		sram_dest += roundup(spear_wakeup_sz, 4);
-+	}
-+
-+	/* Copy the Sleep code on to the SRAM*/
-+	spear_sram_sleep = memcpy(sram_dest, (void *)spear_sleep_mode,
-+			spear_sleep_mode_sz);
-+	flush_cache_all();
-+	/* Jump to the suspend routines in sram */
-+	spear_sram_sleep(state);
-+	return 0;
-+}
-+
-+/*
-+ *	spear_pm_prepare - Do preliminary suspend work.
-+ *
-+ */
-+static int spear_pm_prepare(void)
-+{
-+	/* We cannot sleep in idle until we have resumed */
-+	disable_hlt();
-+	return 0;
-+}
-+
-+/*
-+ *	spear_pm_enter - Actually enter a sleep state.
-+ *	@state:		State we're entering.
-+ *
-+ */
-+static int spear_pm_enter(suspend_state_t state)
-+{
-+	int ret;
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+	case PM_SUSPEND_MEM:
-+		ret = spear_pm_sleep(state);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ *	spear_pm_finish - Finish up suspend sequence.
-+ *
-+ *	This is called after we wake back up (or if entering the sleep state
-+ *	failed).
-+ */
-+static void spear_pm_finish(void)
-+{
-+	enable_hlt();
-+}
-+
-+static struct platform_suspend_ops spear_pm_ops = {
-+	.prepare	= spear_pm_prepare,
-+	.enter		= spear_pm_enter,
-+	.finish		= spear_pm_finish,
-+	.valid		= suspend_valid_only_mem,
-+};
-+
-+static int __init spear_pm_init(void)
-+{
-+	void * sram_limit_va = (void *)IO_ADDRESS(SPEAR_LIMIT_SRAM);
-+	void * sram_st_va = (void *)IO_ADDRESS(SPEAR_START_SRAM);
-+
-+	/* In case the suspend code size is more than sram size return */
-+	if (spear_sleep_mode_sz > (sram_limit_va - sram_st_va))
-+		return	-ENOMEM;
-+
-+	suspend_set_ops(&spear_pm_ops);
-+
-+	return 0;
-+}
-+arch_initcall(spear_pm_init);
-diff --git a/arch/arm/mach-spear13xx/sleep.S b/arch/arm/mach-spear13xx/sleep.S
-new file mode 100644
-index 0000000..9c7f12b
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/sleep.S
-@@ -0,0 +1,435 @@
-+/*
-+ * linux/arch/arm/mach-spear13xx/sleep.S
-+ *
-+ * SPEAR13xx specific functions that will run in internal SRAM.
-+ * The functions are used in power management.
-+ *
-+ * Copyright (C) 2010 ST MicroElectronics
-+ * Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/hardware.h>
-+#include <mach/suspend.h>
-+
-+/* #define DDR_PLL_SREFRESH */
-+/* #define TEST_PWRDOMAINS */
-+.text
-+ENTRY(spear_wakeup)
-+
-+spear_wakeup:
-+	b	spear_wakeup
-+	adr	r0, spear_sleep_restore
-+	bx	r0
-+
-+ENTRY(spear_wakeup_sz)
-+	.word	. - spear_wakeup
-+/*
-+ * spear_sleep_mode()
-+ * Forces SPEAr into sleep
-+ */
-+ENTRY(spear_sleep_mode)
-+	stmfd	sp!, {r0-r12, lr}		@ save registers on stack
-+	/* Store Stack address in r8 */
-+	ldr	r8, SRAM_STACK_VA
-+
-+	/* Store sp and spsr to SDRAM */
-+	mov	r4, sp
-+	mrs	r5, spsr
-+	mov	r6, lr
-+	stmia	r8!, {r4-r6}
-+
-+	/* Save all ARM registers */
-+	/* Coprocessor access control register */
-+	mrc	p15, 0, r6, c1, c0, 2
-+	stmia	r8!, {r6}
-+	/* TTBR0, TTBR1 and Translation table base control */
-+	mrc	p15, 0, r4, c2, c0, 0
-+	mrc	p15, 0, r5, c2, c0, 1
-+	mrc	p15, 0, r6, c2, c0, 2
-+	stmia	r8!, {r4-r6}
-+	/*
-+	 * Domain access control register, data fault status register,
-+	 * and instruction fault status register
-+	 */
-+	mrc	p15, 0, r4, c3, c0, 0
-+	mrc	p15, 0, r5, c5, c0, 0
-+	mrc	p15, 0, r6, c5, c0, 1
-+	stmia	r8!, {r4-r6}
-+	/*
-+	 * Data aux fault status register, instruction aux fault status,
-+	 * data fault address register and instruction fault address register
-+	 */
-+	mrc	p15, 0, r4, c5, c1, 0
-+	mrc	p15, 0, r5, c5, c1, 1
-+	mrc	p15, 0, r6, c6, c0, 0
-+	mrc	p15, 0, r7, c6, c0, 2
-+	stmia	r8!, {r4-r7}
-+	/*
-+	 * user r/w thread and process ID, user r/o thread and process ID,
-+	 * priv only thread and process ID, cache size selection
-+	 */
-+	mrc	p15, 0, r4, c13, c0, 2
-+	mrc	p15, 0, r5, c13, c0, 3
-+	mrc	p15, 0, r6, c13, c0, 4
-+	mrc	p15, 2, r7, c0, c0, 0
-+	stmia	r8!, {r4-r7}
-+	/* Data TLB lockdown, instruction TLB lockdown registers */
-+	mrc	p15, 0, r5, c10, c0, 0
-+	mrc	p15, 0, r6, c10, c0, 1
-+	stmia	r8!, {r5-r6}
-+	/* Secure or non secure vector base address, FCSE PID, Context PID*/
-+	mrc	p15, 0, r4, c12, c0, 0
-+	mrc	p15, 0, r5, c13, c0, 0
-+	mrc	p15, 0, r6, c13, c0, 1
-+	stmia	r8!, {r4-r6}
-+	/* Primary remap, normal remap registers */
-+	mrc	p15, 0, r4, c10, c2, 0
-+	mrc	p15, 0, r5, c10, c2, 1
-+	stmia	r8!, {r4-r5}
-+	/* Store current cpsr*/
-+	mrs	r2, cpsr
-+	stmia	r8!, {r2}
-+	mrc	p15, 0, r4, c1, c0, 0
-+	/* save control register */
-+	stmia	r8!, {r4}
-+	/* Data memory barrier and Data sync barrier */
-+	mov	r1, #0
-+	mcr	p15, 0, r1, c7, c10, 4
-+	mcr	p15, 0, r1, c7, c10, 5
-+	dsb
-+	isb
-+	/* Extract the physical address to jump to */
-+	adr	r0, mmu_off
-+	mov	r1, #0xcfffffff
-+	and	r0, r0, r1
-+	ldr	r1, =0x20000000
-+	orr	r0, r0, r1
-+	mov	r2, r0
-+
-+	/* Disable MMU */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	ldr	r1, DISABLE_I_C_M_V
-+	bic	r0, r0, r1
-+	mcr	p15, 0, r0, c1, c0, 0
-+	/* Move the Physical address into PC */
-+	bx	r2
-+	nop
-+mmu_off:
-+	/* Put the DDR in self refresh mode */
-+	ldr	r6, MISC_BASE_P
-+	/* Program MPMC Control Status register in Misc Space */
-+	ldr	r0, [r6, #0x334]
-+	/* Set srefresh_enter bit(2) */
-+	orr	r0, r0, #0x4
-+	str	r0, [r6, #0x334]
-+wait_till_srefresh_on:
-+	ldr	r0, [r6, #0x334]
-+	/* check for cke_status bit(13) */
-+	tst	r0, #0x2000
-+	beq	wait_till_srefresh_on
-+
-+	/* Put the system in slow mode */
-+	ldr	r0, [r6, #0x200]
-+	bic	r0, r0, #0x4
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r0, r0, #0x2
-+	str	r0, [r6, #0x200]	/* System is now in slow mode */
-+wait_till_slow_mode:
-+	ldr	r0, [r6, #0x200]
-+	/* Wait for the mode to be updated */
-+	and	r0, r0, #0xF0000
-+	/* Poll the SCCTRL register status bits (6:3) */
-+	cmp	r0, #0xA0000
-+	bne wait_till_slow_mode
-+
-+	/*
-+	 * Put the all the system pll's to off state
-+	 * The loop of count 3 is provided below to
-+	 * switch off the pll-1/2/3.
-+	 * r1 contains the offset for the pll control
-+	 * registers in the misc space.
-+	 * DDR pll-4 requires different processing.
-+	 */
-+	ldr	r1, MISC_PLL_OFFS
-+	ldr	r2, =0x0	/* PLL Counter 1, 2, 3, 4 */
-+swoff_pll:
-+	ldr	r0, [r6, r1]
-+	/* Clear pll_enable bit(1) of PLL1_CTR register in Misc registers */
-+	bic	r0, r0, #0x02
-+	str	r0, [r6, r1]
-+	add	r1, #0xc
-+	add	r2, #0x1
-+	cmp	r2, #0x3	/* Switch off pll-1/2/3 */
-+	bne	swoff_pll
-+
-+#ifdef DDR_PLL_SREFRESH
-+	/* Switch off pll-4 */
-+	ldr	r0, [r6, r1]
-+	/* Clear pll_enable bit(2) of PLL1_CTR register in Misc registers */
-+	bic	r0, r0, #0x04
-+	str	r0, [r6, r1]
-+#endif
-+
-+#ifdef TEST_PWRDOMAINS
-+	/* Switch off the undesired PLL's */
-+	nop
-+	ldr	r6, MISC_BASE_P
-+	ldr	r0, [r6, #0x200]
-+	bic	r0, r0, #0x7
-+	orr	r0, r0, #0x2
-+	str	r0, [r6, #0x200	]
-+wait_ack0:
-+	ldr	r0, [r6, #0x200]
-+	and	r0, r0, #0xF0000
-+	cmp	r0, #0xA0000
-+	bne	wait_ack0
-+	ldr	r6, MISC_BASE_P
-+	ldr	r0, [r6, #0x100]
-+
-+	/*
-+	 * Switch off the power domains.
-+	 * Clear the ack bit
-+	 */
-+	bic	r0, r0, #0xc000
-+	str	r0, [r6, #0x100]
-+
-+	bic	r0, r0, #0x1000
-+	str	r0, [r6, #0x100]
-+
-+wait_ack1:
-+	ldr	r0, [r6, #0x100]
-+	tst	r0, #0x4000
-+	beq	wait_ack1
-+
-+	/* Clear the ack bit */
-+	bic	r0, r0, #0xc000
-+	str	r0, [r6, #0x100]
-+
-+	bic	r0, r0, #0x0800
-+	str	r0, [r6, #0x100]
-+wait_ack2:
-+	ldr	r0, [r6, #0x100]
-+	tst	r0, #0x4000
-+	beq	wait_ack2
-+
-+	/* Clear the ack bit */
-+	bic	r0, r0, #0xc000
-+	str	r0, [r6, #0x100]
-+
-+	bic	r0, r0, #0x2400
-+	str	r0, [r6, #0x100]
-+wait_ack3:
-+	ldr	r0, [r6, #0x100]
-+	tst	r0, #0x4000
-+	beq	wait_ack3
-+#endif
-+	wfi				@ wait for interrupt
-+	nop
-+spear_sleep_restore:
-+	/*
-+	 * Reenable the switched off pll's. The Pll's are
-+	 * enabled using loop count of 4 to activalte all the
-+	 * pll-1/2/3/4.
-+	 * The strobing is done for pll-4 only.
-+	 */
-+
-+	ldr	r6, MISC_BASE_P
-+	ldr	r1, MISC_PLL_OFFS
-+	ldr	r2, =0x0	/* PLL Counter 1, 2, 3, 4 */
-+swon_pll_1_3:
-+	/* Switch on Pll-1/2/3 */
-+	ldr	r0, [r6, r1]
-+	orr	r0, r0, #0x2
-+	str	r0, [r6, r1]
-+pll_lock_1_3:
-+	/* Set the pll_lock bit(0) in PLLX_CTR register in misc space*/
-+	ldr	r5, [r6, r1]
-+	and	r5, r5, #0x1
-+	/* Wait for pll lock status */
-+	cmp	r5, #0x1
-+	bne	pll_lock_1_3
-+
-+	/* Loop for all the pll's */
-+	add	r1, #0xc
-+	add	r2, #0x1
-+	cmp	r2, #0x3	/* Switch on till pll-3 */
-+	bne	swon_pll_1_3
-+
-+#ifdef DDR_PLL_SREFRESH
-+	/* Switch on PLL-4, strobe the pll also */
-+	ldr	r0, [r6, r1]
-+	ldr	r0, PLL_VAL1
-+	str	r0, [r6, r1]
-+	ldr	r0, PLL_VAL2
-+	str	r0, [r6, r1]
-+	ldr	r0, PLL_VAL3
-+	str	r0, [r6, r1]
-+	ldr	r0, PLL_VAL2
-+	str	r0, [r6, r1]
-+pll_lock_4:
-+	/* Set the pll_lock bit(0) in PLLX_CTR register in misc space*/
-+	ldr	r5, [r6, r1]
-+	and	r5, r5, #0x1
-+	/* Wait for pll lock status */
-+	cmp	r5, #0x1
-+	bne	pll_lock_4
-+#endif
-+
-+	/* Put the system in normal mode */
-+	ldr	r0, [r6, #0x200]
-+	bic	r0, r0, #0x7
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r0, r0, #0x4
-+	str	r0, [r6, #0x200]	/* System is now in slow mode */
-+wait_till_normal_mode:
-+	ldr	r0, [r6, #0x200]
-+	/* Wait for the mode to be updated */
-+	and	r0, r0, #0xF0000
-+	/* Poll the SCCTRL register status bits (6:3) */
-+	cmp	r0, #0xf0000
-+	bne wait_till_normal_mode
-+
-+	/*
-+	 * Invalidate all instruction caches to PoU
-+	 * and flush branch target cache
-+	 */
-+	mov	r1, #0
-+	mcr	p15, 0, r1, c7, c5, 0
-+
-+	ldr	r3, SRAM_STACK_PA
-+	ldmia	r3!, {r4-r6}
-+	mov	sp, r4
-+	msr	spsr_cxsf, r5
-+	mov	lr, r6
-+
-+	ldmia	r3!, {r4-r9}
-+	/* Coprocessor access Control Register */
-+	mcr	p15, 0, r4, c1, c0, 2
-+
-+	/* TTBR0 */
-+	mcr	p15, 0, r5, c2, c0, 0
-+	/* TTBR1 */
-+	mcr	p15, 0, r6, c2, c0, 1
-+	/* Translation table base control register */
-+	mcr	p15, 0, r7, c2, c0, 2
-+	/*domain access Control Register */
-+	mcr	p15, 0, r8, c3, c0, 0
-+	/* data fault status Register */
-+	mcr	p15, 0, r9, c5, c0, 0
-+
-+	ldmia	r3!, {r4-r8}
-+	/* instruction fault status Register */
-+	mcr	p15, 0, r4, c5, c0, 1
-+	/*Data Auxiliary Fault Status Register */
-+	mcr	p15, 0, r5, c5, c1, 0
-+	/*Instruction Auxiliary Fault Status Register*/
-+	mcr	p15, 0, r6, c5, c1, 1
-+	/*Data Fault Address Register */
-+	mcr	p15, 0, r7, c6, c0, 0
-+	/*Instruction Fault Address Register*/
-+	mcr	p15, 0, r8, c6, c0, 2
-+	ldmia	r3!, {r4-r7}
-+
-+	/* user r/w thread and process ID */
-+	mcr	p15, 0, r4, c13, c0, 2
-+	/* user ro thread and process ID */
-+	mcr	p15, 0, r5, c13, c0, 3
-+	/*Privileged only thread and process ID */
-+	mcr	p15, 0, r6, c13, c0, 4
-+	/* cache size selection */
-+	mcr	p15, 2, r7, c0, c0, 0
-+	ldmia	r3!, {r4-r8}
-+	/* Data TLB lockdown registers */
-+	mcr	p15, 0, r4, c10, c0, 0
-+	/* Instruction TLB lockdown registers */
-+	mcr	p15, 0, r5, c10, c0, 1
-+	/* Secure or Nonsecure Vector Base Address */
-+	mcr	p15, 0, r6, c12, c0, 0
-+	/* FCSE PID */
-+	mcr	p15, 0, r7, c13, c0, 0
-+	/* Context PID */
-+	mcr	p15, 0, r8, c13, c0, 1
-+
-+	ldmia	r3!, {r4-r5}
-+	/* primary memory remap register */
-+	mcr	p15, 0, r4, c10, c2, 0
-+	/*normal memory remap register */
-+	mcr	p15, 0, r5, c10, c2, 1
-+
-+	/* Restore cpsr */
-+	ldmfd	r3!, {r4}	/*load CPSR from SDRAM*/
-+	msr	cpsr, r4	/*store cpsr */
-+	dsb
-+	isb
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c5, 4	@ Flush prefetch buffer
-+	mcr	p15, 0, r0, c7, c5, 6	@ Invalidate branch predictor array
-+	mcr	p15, 0, r0, c8, c5, 0	@ Invalidate instruction TLB
-+	mcr	p15, 0, r0, c8, c6, 0	@ Invalidate data TLB
-+
-+	adr	r5, mmu_on
-+	mov	r1, #0xcfffffff
-+	and	r5, r5, r1
-+	ldr	r1, =0x30000000
-+	orr	r5, r5, r1
-+	mov	r4, r5
-+
-+	/* Move the DDR out of self refresh mode */
-+	ldr	r6, MISC_BASE_P
-+	ldr	r7, MPMC_BASE_P
-+	/* Program MPMC Control Status register in Misc Space */
-+	ldr	r0, [r6, #0x334]
-+	/* Clear srefresh_enter bit(2) */
-+	bic	r0, r0, #0x4
-+	str	r0, [r6, #0x334]
-+	/* Additional clearance is required in the mpmc space */
-+	ldr	r0, [r7, #0x2c]
-+	/*
-+	 * Clear bit srefresh bit (2) of MPMC_11 register
-+	 * The misc wrapper does not works fine by itself till
-+	 * this bit is also cleared.
-+	 */
-+	bic	r0, r0, #0x10000
-+	str	r0, [r7, #0x2c]
-+wait_for_refresh_exit:
-+	ldr	r0, [r6, #0x334]
-+	tst	r0, #0x2000
-+	bne	wait_for_refresh_exit
-+
-+	ldmfd	r3!, {r2}
-+	/* restore the MMU control register from stack to enable mmu */
-+	mcr	p15, 0, r2, c1, c0, 0
-+	bx	r4
-+
-+mmu_on:
-+	ldmfd	sp!, {r0-r12, pc}		@ restore regs and return
-+	nop
-+
-+MPMC_BASE_P :
-+	.word MPMC_BASE_PA
-+MISC_BASE_P :
-+	.word MISC_BASE_PA
-+SRAM_STACK_VA :
-+	.word IO_ADDRESS(SPEAR_SRAM_STACK_PA)
-+SRAM_STACK_PA :
-+	.word SPEAR_SRAM_STACK_PA
-+DISABLE_I_C_M_V:
-+	.word 0x1805
-+MISC_PLL_OFFS:
-+	.word 0x214
-+#ifdef DDR_PLL_SREFRESH
-+PLL_VAL1:
-+	.word 0x060a
-+PLL_VAL2:
-+	.word 0x060e
-+PLL_VAL3:
-+	.word 0x0606
-+#endif
-+ENTRY(spear_sleep_mode_sz)
-+	.word	. - spear_sleep_mode
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 6d71aac..59eaf98 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -454,6 +454,11 @@ struct map_desc spear13xx_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM0_BASE),
- 		.length		= SZ_32K,
- 		.type		= MT_DEVICE
-+	}, {
-+		.virtual	= IO_ADDRESS(SPEAR13XX_SYSRAM1_BASE),
-+		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM1_BASE),
-+		.length		= SZ_1M,
-+		.type		= MT_MEMORY_NONCACHED
- 	},
+diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+index cef3b13..cc692cc 100644
+--- a/arch/arm/mach-spear13xx/clock.c
++++ b/arch/arm/mach-spear13xx/clock.c
+@@ -736,7 +736,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.con_id = "osc3_25m_clk",	.clk = &osc3_25m_clk},
+ 
+ 	/* clock derived from 32 KHz osc clk */
+-	{.dev_id = "rtc",		.clk = &rtc_clk},
++	{.dev_id = "rtc-spear",		.clk = &rtc_clk},
+ 
+ 	/* clock derived from 24/25 MHz osc1/osc3 clk */
+ 	{.con_id = "pll1_clk",		.clk = &pll1_clk},
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 41c1a53..dc80421 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -30,6 +30,7 @@
+ 
+ /* Add spear13xx family device structure declarations here */
+ extern struct amba_device uart_device;
++extern struct platform_device rtc_device;
+ extern struct sys_timer spear13xx_timer;
+ 
+ /* Add spear1300 machine device structure declarations here */
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index d72c8a8..60c5fee 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -22,6 +22,7 @@ static struct amba_device *amba_devs[] __initdata = {
  };
  
-diff --git a/arch/arm/mach-spear3xx/include/mach/suspend.h b/arch/arm/mach-spear3xx/include/mach/suspend.h
-new file mode 100644
-index 0000000..a525173
---- /dev/null
-+++ b/arch/arm/mach-spear3xx/include/mach/suspend.h
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/mach-spear3xx/include/mach/suspend.h
-+ *
-+ * Sleep mode defines for SPEAr3xx machine family
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+ static struct platform_device *plat_devs[] __initdata = {
++	&rtc_device,
+ };
+ 
+ static void __init spear1300_evb_init(void)
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index d11e300..bdca713 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -37,6 +37,25 @@ struct amba_device uart_device = {
+ 	.irq = {IRQ_UART, NO_IRQ},
+ };
+ 
++/* rtc device registration */
++static struct resource rtc_resources[] = {
++	{
++		.start = SPEAR13XX_RTC_BASE,
++		.end = SPEAR13XX_RTC_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_RTC,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+#ifndef __MACH_SUSPEND_H
-+#define __MACH_SUSPEND_H
++struct platform_device rtc_device = {
++	.name = "rtc-spear",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(rtc_resources),
++	.resource = rtc_resources,
++};
 +
-+#include <mach/spear.h>
-+
-+#ifndef __ASSEMBLER__
-+extern void spear_sleep_mode(suspend_state_t state);
-+extern unsigned int spear_sleep_mode_sz;
-+#endif
-+
-+/* SRAM related defines*/
-+#define SRAM_STACK_SCR_OFFS	0xF00
-+#define SPEAR_START_SRAM	SPEAR3XX_ICM1_SRAM_BASE
-+#define SPEAR_SRAM_SIZE		SZ_4K
-+#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
-+/* SPEAr subsystem physical addresses */
-+#define SYS_CTRL_BASE_PA	SPEAR3XX_ICM3_SYS_CTRL_BASE
-+#define MPMC_BASE_PA		SPEAR3XX_ICM3_SDRAM_CTRL_BASE
-+#define MISC_BASE_PA		SPEAR3XX_ICM3_MISC_REG_BASE
-+
-+/* ARM Modes of Operation */
-+#define MODE_USR_32		0x10
-+#define MODE_FIQ_32		0x11
-+#define MODE_IRQ_32		0x12
-+#define MODE_SVC_32		0x13
-+#define MODE_ABT_32		0x17
-+#define MODE_UND_32		0x1B
-+#define MODE_SYS_32		0x1F
-+#define MODE_BITS		0x1F
-+
-+#endif /* __MACH_SUSPEND_H */
+ /* Do spear13xx familiy common initialization part here */
+ void __init spear13xx_init(void)
+ {
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index dc19666..147d0a3 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -467,7 +467,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
+ 	{ .con_id = "osc_24m_clk",	.clk = &osc_24m_clk},
+ 	/* clock derived from 32 KHz osc clk */
+-	{ .dev_id = "rtc",		.clk = &rtc_clk},
++	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
+ 	/* clock derived from 24 MHz osc clk */
+ 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
+ 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index d76ee98..408bb8d 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -33,6 +33,7 @@
+ /* Add spear3xx family device structure declarations here */
+ extern struct amba_device gpio_device;
+ extern struct amba_device uart_device;
++extern struct platform_device rtc_device;
+ extern struct sys_timer spear3xx_timer;
+ 
+ /* Add spear3xx family function declarations here */
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 3bb7fbc..392ee4a 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -44,6 +44,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
++	&rtc_device,
+ 
+ 	/* spear300 specific devices */
+ };
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index 7dd93bd..15ca8fc 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -50,6 +50,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
++	&rtc_device,
+ 
+ 	/* spear310 specific devices */
+ 	&plgpio_device,
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 82f4e76..48155cc 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -48,6 +48,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
++	&rtc_device,
+ 
+ 	/* spear320 specific devices */
+ 	&plgpio_device,
 diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 23f92af..1f374b4 100644
+index 89cf8ea..6d8791e 100644
 --- a/arch/arm/mach-spear3xx/spear3xx.c
 +++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -22,6 +22,8 @@
- #include <mach/generic.h>
- #include <mach/spear.h>
+@@ -54,6 +54,25 @@ struct amba_device uart_device = {
+ 	.irq = {IRQ_UART, NO_IRQ},
+ };
  
-+#define SPEAR3XX_WKUP_SRCS	(1 << IRQ_MAC_1 | 1 << IRQ_USB_DEV | \
-+				1 << IRQ_BASIC_RTC | 1 << IRQ_BASIC_GPIO)
- /* Add spear3xx machines common devices here */
- /* gpio device registeration */
- static struct pl061_platform_data gpio_plat_data = {
-@@ -246,7 +248,8 @@ void __init spear3xx_init(void)
- /* This will initialize vic */
- void __init spear3xx_init_irq(void)
++/* rtc device registration */
++static struct resource rtc_resources[] = {
++	{
++		.start = SPEAR3XX_ICM3_RTC_BASE,
++		.end = SPEAR3XX_ICM3_RTC_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_BASIC_RTC,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device rtc_device = {
++	.name = "rtc-spear",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(rtc_resources),
++	.resource = rtc_resources,
++};
++
+ /* Do spear3xx familiy common initialization part here */
+ void __init spear3xx_init(void)
  {
--	vic_init((void __iomem *)VA_SPEAR3XX_ML1_VIC_BASE, 0, ~0, 0);
-+	vic_init((void __iomem *)VA_SPEAR3XX_ML1_VIC_BASE, 0, ~0,
-+			SPEAR3XX_WKUP_SRCS);
- }
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 4a91991..66fc622 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -569,7 +569,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
+ 	{ .con_id = "osc_30m_clk",	.clk = &osc_30m_clk},
+ 	/* clock derived from 32 KHz os		 clk */
+-	{ .dev_id = "rtc",		.clk = &rtc_clk},
++	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
+ 	/* clock derived from 30 MHz os		 clk */
+ 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
+ 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index d6a04f2..674b16c 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -32,6 +32,7 @@
+ extern struct amba_device clcd_device;
+ extern struct amba_device gpio_device[];
+ extern struct amba_device uart_device[];
++extern struct platform_device rtc_device;
+ extern struct sys_timer spear6xx_timer;
  
- /* Following will create static virtual/physical mappings */
-diff --git a/arch/arm/mach-spear6xx/include/mach/suspend.h b/arch/arm/mach-spear6xx/include/mach/suspend.h
-new file mode 100644
-index 0000000..e98e831
---- /dev/null
-+++ b/arch/arm/mach-spear6xx/include/mach/suspend.h
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/mach-spear6xx/include/mach/suspend.h
-+ *
-+ * Sleep mode defines for SPEAr6xx machine family
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_SUSPEND_H
-+#define __MACH_SUSPEND_H
-+
-+#include <mach/spear.h>
-+
-+#ifndef __ASSEMBLER__
-+extern void spear_sleep_mode(suspend_state_t state);
-+extern unsigned int spear_sleep_mode_sz;
-+#endif
-+
-+/* SRAM related defines*/
-+#define SRAM_STACK_SCR_OFFS	0xF00
-+#define SPEAR_START_SRAM	SPEAR6XX_ICM1_SRAM_BASE
-+#define SPEAR_SRAM_SIZE		SZ_4K
-+#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
-+/* SPEAr subsystem physical addresses */
-+#define SYS_CTRL_BASE_PA	SPEAR6XX_ICM3_SYS_CTRL_BASE
-+#define MPMC_BASE_PA		SPEAR6XX_ICM3_SDRAM_CTRL_BASE
-+#define MISC_BASE_PA		SPEAR6XX_ICM3_MISC_REG_BASE
-+
-+/* ARM Modes of Operation */
-+#define MODE_USR_32		0x10
-+#define MODE_FIQ_32		0x11
-+#define MODE_IRQ_32		0x12
-+#define MODE_SVC_32		0x13
-+#define MODE_ABT_32		0x17
-+#define MODE_UND_32		0x1B
-+#define MODE_SYS_32		0x1F
-+#define MODE_BITS		0x1F
-+
-+#endif /* __MACH_SUSPEND_H */
+ /* Add spear6xx family function declarations here */
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+index 88e69f4..861e83d 100644
+--- a/arch/arm/mach-spear6xx/spear600_evb.c
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -26,6 +26,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
++	&rtc_device,
+ };
+ 
+ static void __init spear600_evb_init(void)
 diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index f729e92..725dbc4 100644
+index d0f6b9d..1e403cb 100644
 --- a/arch/arm/mach-spear6xx/spear6xx.c
 +++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -24,6 +24,12 @@
- #include <mach/spear.h>
- #include <plat/nand.h>
+@@ -121,6 +121,25 @@ struct amba_device gpio_device[] = {
+ 	}
+ };
  
-+/* The wake sources are routed through vic-2 */
-+#define SPEAR6XX_WKUP_SRCS_VIC2		(1 << (IRQ_GMAC_1 - 32) | \
-+					1 << (IRQ_USB_DEV - 32) | \
-+					1 << (IRQ_BASIC_RTC - 32) |\
-+					1 << (IRQ_BASIC_GPIO - 32))
++/* rtc device registration */
++static struct resource rtc_resources[] = {
++	{
++		.start = SPEAR6XX_ICM3_RTC_BASE,
++		.end = SPEAR6XX_ICM3_RTC_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_BASIC_RTC,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
- /* Add spear6xx machines common devices here */
- 
- /* CLCD device registration */
-@@ -400,7 +406,8 @@ void __init spear6xx_init(void)
- void __init spear6xx_init_irq(void)
++struct platform_device rtc_device = {
++	.name = "rtc-spear",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(rtc_resources),
++	.resource = rtc_resources,
++};
++
+ /* This will add devices, and do machine specific tasks */
+ void __init spear6xx_init(void)
  {
- 	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_PRI_BASE, 0, ~0, 0);
--	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0, 0);
-+	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0,
-+			SPEAR6XX_WKUP_SRCS_VIC2);
- }
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 48ca713..f099473 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -625,6 +625,13 @@ config RTC_DRV_WM8350
+ 	  This driver can also be built as a module. If so, the module
+ 	  will be called "rtc-wm8350".
  
- /* Following will create static virtual/physical mappings */
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 0e2cf75..1c8ee4a 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -6,6 +6,7 @@
- obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
- 
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
++config RTC_DRV_SPEAR
++	tristate "SPEAR ST RTC"
++	default y
++	help
++	 If you say Y here you will get support for the RTC found on
++	 spear
 +
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
- obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
-@@ -16,3 +17,8 @@ obj-$(CONFIG_BOARD_SPEAR300_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR310_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR320_EVB)	+= i2c_eval_board.o
- obj-$(CONFIG_BOARD_SPEAR600_EVB)	+= i2c_eval_board.o
-+
-+ifeq ($(CONFIG_PM),y)
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= pm.o sleep.o
-+obj-$(CONFIG_ARCH_SPEAR6XX)	+= pm.o sleep.o
-+endif
-diff --git a/arch/arm/plat-spear/pm.c b/arch/arm/plat-spear/pm.c
+ config RTC_DRV_PCF50633
+ 	depends on MFD_PCF50633
+ 	tristate "NXP PCF50633 RTC"
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index 0f207b3..44df01a 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -86,6 +86,7 @@ obj-$(CONFIG_RTC_DRV_S35390A)	+= rtc-s35390a.o
+ obj-$(CONFIG_RTC_DRV_S3C)	+= rtc-s3c.o
+ obj-$(CONFIG_RTC_DRV_SA1100)	+= rtc-sa1100.o
+ obj-$(CONFIG_RTC_DRV_SH)	+= rtc-sh.o
++obj-$(CONFIG_RTC_DRV_SPEAR)	+= rtc-spear.o
+ obj-$(CONFIG_RTC_DRV_STARFIRE)	+= rtc-starfire.o
+ obj-$(CONFIG_RTC_DRV_STK17TA8)	+= rtc-stk17ta8.o
+ obj-$(CONFIG_RTC_DRV_STMP)	+= rtc-stmp3xxx.o
+diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
 new file mode 100644
-index 0000000..0cb2d0c
+index 0000000..5b49124
 --- /dev/null
-+++ b/arch/arm/plat-spear/pm.c
-@@ -0,0 +1,104 @@
++++ b/drivers/rtc/rtc-spear.c
+@@ -0,0 +1,598 @@
 +/*
-+ * arch/arm/plat-spear/pm.c
-+ *
-+ * SPEAr3xx & SPEAr6xx Power Management source file
++ * drivers/rtc/rtc-spear.c
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri <deepak.sikri@st.com>
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/suspend.h>
-+#include <linux/sysfs.h>
-+#include <linux/module.h>
++#include <linux/bcd.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/ioport.h>
 +#include <linux/io.h>
-+#include <asm/cacheflush.h>
-+#include <mach/irqs.h>
-+#include <mach/suspend.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
++#include <linux/wait.h>
++#include <asm/mach/time.h>
 +
-+static void (*saved_idle)(void);
-+static void __iomem *spear_sram_base;
++/* RTC registers */
++#define TIME_REG		0x00
++#define DATE_REG		0x04
++#define ALARM_TIME_REG		0x08
++#define ALARM_DATE_REG		0x0C
++#define CTRL_REG		0x10
++#define STATUS_REG		0x14
 +
-+static int spear_pm_sleep(suspend_state_t state)
++/* TIME_REG & ALARM_TIME_REG */
++#define SECONDS_UNITS		(0xf<<0)	/* seconds units position */
++#define SECONDS_TENS		(0x7<<4)	/* seconds tens position */
++#define MINUTES_UNITS		(0xf<<8)	/* minutes units position */
++#define MINUTES_TENS		(0x7<<12)	/* minutes tens position */
++#define HOURS_UNITS		(0xf<<16)	/* hours units position */
++#define HOURS_TENS		(0x3<<20)	/* hours tens position */
++
++/* DATE_REG & ALARM_DATE_REG */
++#define DAYS_UNITS		(0xf<<0)	/* days units position */
++#define DAYS_TENS		(0x3<<4)	/* days tens position */
++#define MONTHS_UNITS		(0xf<<8)	/* months units position */
++#define MONTHS_TENS		(0x1<<12)	/* months tens position */
++#define YEARS_UNITS		(0xf<<16)	/* years units position */
++#define YEARS_TENS		(0xf<<20)	/* years tens position */
++#define YEARS_HUNDREDS		(0xf<<24)	/* years hundereds position */
++#define YEARS_MILLENIUMS	(0xf<<28)	/* years millenium position */
++
++/* MASK SHIFT TIME_REG & ALARM_TIME_REG*/
++#define SECOND_SHIFT		0x00		/* seconds units */
++#define MINUTE_SHIFT		0x08		/* minutes units position */
++#define HOUR_SHIFT		0x10		/* hours units position */
++#define MDAY_SHIFT		0x00		/* Month day shift */
++#define MONTH_SHIFT		0x08		/* Month shift */
++#define YEAR_SHIFT		0x10		/* Year shift */
++
++#define SECOND_MASK		0x7F
++#define MIN_MASK		0x7F
++#define HOUR_MASK		0x3F
++#define DAY_MASK		0x3F
++#define MONTH_MASK		0x7F
++#define YEAR_MASK		0xFFFF
++
++/* date reg equal to time reg, for debug only */
++#define TIME_BYP		(1<<9)
++#define INT_ENABLE		(1<<31)		/* interrupt enable */
++
++/* STATUS_REG */
++#define CLK_UNCONNECTED		(1<<0)
++#define PEND_WR_TIME		(1<<2)
++#define PEND_WR_DATE		(1<<3)
++#define LOST_WR_TIME		(1<<4)
++#define LOST_WR_DATE		(1<<5)
++#define RTC_INT_MASK		(1<<31)
++#define STATUS_BUSY		(PEND_WR_TIME | PEND_WR_DATE)
++#define STATUS_FAIL		(LOST_WR_TIME | LOST_WR_DATE)
++
++struct spear_rtc_config {
++	struct clk *clk;
++	spinlock_t lock;
++	void __iomem *ioaddr;
++};
++
++static inline void spear_rtc_clear_interrupt(struct spear_rtc_config *config)
 +{
-+	void (*spear_sram_sleep)(suspend_state_t state) = NULL;
++	unsigned int val;
++	unsigned long flags;
 +
-+	/* Copy the Sleep code on to the SRAM*/
-+	spear_sram_sleep = memcpy((void *)spear_sram_base,
-+			(void *)spear_sleep_mode, spear_sleep_mode_sz);
-+	flush_cache_all();
-+	/* Jump to the suspend routines in sram */
-+	spear_sram_sleep(state);
-+	return 0;
++	spin_lock_irqsave(&config->lock, flags);
++	val = readl(config->ioaddr + STATUS_REG);
++	val |= RTC_INT_MASK;
++	writel(val, config->ioaddr + STATUS_REG);
++	spin_unlock_irqrestore(&config->lock, flags);
 +}
 +
-+/*
-+ *	spear_pm_prepare - Do preliminary suspend work.
-+ *
-+ */
-+static int spear_pm_prepare(void)
++static inline void spear_rtc_enable_interrupt(struct spear_rtc_config *config)
 +{
-+	/* We cannot sleep in idle until we have resumed */
-+	saved_idle = pm_idle;
-+	pm_idle = NULL;
-+	return 0;
-+}
++	unsigned int val;
 +
-+/*
-+ *	spear_pm_enter - Actually enter a sleep state.
-+ *	@state:		State we're entering.
-+ *
-+ */
-+static int spear_pm_enter(suspend_state_t state)
-+{
-+	int ret;
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+	case PM_SUSPEND_MEM:
-+		ret = spear_pm_sleep(state);
-+		break;
-+	default:
-+		return -EINVAL;
++	val = readl(config->ioaddr + CTRL_REG);
++	if (!(val & INT_ENABLE)) {
++		spear_rtc_clear_interrupt(config);
++		val |= INT_ENABLE;
++		writel(val, config->ioaddr + CTRL_REG);
 +	}
++}
++
++static inline void spear_rtc_disable_interrupt(struct spear_rtc_config *config)
++{
++	unsigned int val;
++
++	val = readl(config->ioaddr + CTRL_REG);
++	if (val & INT_ENABLE) {
++		val &= ~INT_ENABLE;
++		writel(val, config->ioaddr + CTRL_REG);
++	}
++}
++
++static inline int is_write_complete(struct spear_rtc_config *config)
++{
++	int ret = 0;
++	unsigned long flags;
++
++	spin_lock_irqsave(&config->lock, flags);
++	if ((readl(config->ioaddr + STATUS_REG)) & STATUS_FAIL)
++		ret = -EIO;
++	spin_unlock_irqrestore(&config->lock, flags);
 +
 +	return ret;
 +}
 +
-+/*
-+ *	spear_pm_finish - Finish up suspend sequence.
-+ *
-+ *	This is called after we wake back up (or if entering the sleep state
-+ *	failed).
-+ */
-+static void spear_pm_finish(void)
++static void rtc_wait_not_busy(struct spear_rtc_config *config)
 +{
-+	pm_idle = saved_idle;
++	int status, count = 0;
++	unsigned long flags;
++
++	/* Assuming BUSY may stay active for 80 msec) */
++	for (count = 0; count < 80; count++) {
++		spin_lock_irqsave(&config->lock, flags);
++		status = readl(config->ioaddr + STATUS_REG);
++		spin_unlock_irqrestore(&config->lock, flags);
++		if ((status & STATUS_BUSY) == 0)
++			break;
++		/* check status busy, after each msec */
++		msleep(1);
++	}
 +}
 +
-+static struct platform_suspend_ops spear_pm_ops = {
-+	.prepare	= spear_pm_prepare,
-+	.enter		= spear_pm_enter,
-+	.finish		= spear_pm_finish,
-+	.valid		= suspend_valid_only_mem,
-+};
-+
-+static int __init spear_pm_init(void)
++static irqreturn_t spear_rtc_irq(int irq, void *dev_id)
 +{
++	struct rtc_device *rtc = (struct rtc_device *)dev_id;
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	unsigned long flags, events = 0;
++	unsigned int irq_data;
 +
-+	spear_sram_base = ioremap(SPEAR_START_SRAM, SPEAR_SRAM_SIZE);
++	spin_lock_irqsave(&config->lock, flags);
++	irq_data = readl(config->ioaddr + STATUS_REG);
++	spin_unlock_irqrestore(&config->lock, flags);
 +
-+	if (!spear_sram_base)
-+		return -ENOMEM;
++	if ((irq_data & RTC_INT_MASK)) {
++		spear_rtc_clear_interrupt(config);
++		events = RTC_IRQF | RTC_AF;
++		rtc_update_irq(rtc, 1, events);
++		return IRQ_HANDLED;
++	} else
++		return IRQ_NONE;
 +
-+	/* In case the suspend code size is more than sram size return */
-+	if (spear_sleep_mode_sz > (SPEAR_SRAM_SIZE))
-+		return	-ENOMEM;
++}
 +
-+	suspend_set_ops(&spear_pm_ops);
++static int tm2bcd(struct rtc_time *tm)
++{
++	if (rtc_valid_tm(tm) != 0)
++		return -EINVAL;
++	tm->tm_sec = bin2bcd(tm->tm_sec);
++	tm->tm_min = bin2bcd(tm->tm_min);
++	tm->tm_hour = bin2bcd(tm->tm_hour);
++	tm->tm_mday = bin2bcd(tm->tm_mday);
++	tm->tm_mon = bin2bcd(tm->tm_mon + 1);
++	tm->tm_year = bin2bcd(tm->tm_year);
++
 +	return 0;
 +}
-+arch_initcall(spear_pm_init);
-diff --git a/arch/arm/plat-spear/sleep.S b/arch/arm/plat-spear/sleep.S
-new file mode 100644
-index 0000000..5347789
---- /dev/null
-+++ b/arch/arm/plat-spear/sleep.S
-@@ -0,0 +1,288 @@
++
++static void bcd2tm(struct rtc_time *tm)
++{
++	tm->tm_sec = bcd2bin(tm->tm_sec);
++	tm->tm_min = bcd2bin(tm->tm_min);
++	tm->tm_hour = bcd2bin(tm->tm_hour);
++	tm->tm_mday = bcd2bin(tm->tm_mday);
++	tm->tm_mon = bcd2bin(tm->tm_mon) - 1;
++	/* epoch == 1900 */
++	tm->tm_year = bcd2bin(tm->tm_year);
++}
++
 +/*
-+ * arch/arm/plat-spear/sleep.S
++ * spear_rtc_read_time - set the time
++ * @dev: rtc device in use
++ * @tm: holds date and time
 + *
-+ * SPEAR3xx and SPEAR6xx specific functions that will run in
-+ * internal SRAM. The functions are used in power management.
-+ *
-+ * Copyright (ST) 2010 Deepak Sikri <deepak.sikri@.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * This function read time and date. On success it will return 0
++ * otherwise -ve error is returned.
 + */
++static int spear_rtc_read_time(struct device *dev, struct rtc_time *tm)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	unsigned int time, date;
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/hardware.h>
-+#include <mach/suspend.h>
++	/* we don't report wday/yday/isdst ... */
++	rtc_wait_not_busy(config);
 +
-+.text
-+ENTRY(spear_sleep_mode)
-+	stmfd	sp!, {r0-r12, lr}
++	time = readl(config->ioaddr + TIME_REG);
++	date = readl(config->ioaddr + DATE_REG);
++	tm->tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
++	tm->tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
++	tm->tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
++	tm->tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
++	tm->tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
++	tm->tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
 +
-+	/* Latch some of MMU registers on to stack */
-+	mrc	p15, 0, r0, c5, c0, 0 /* FSR--Domain Fault */
-+	mrc	p15, 0, r1, c5, c0, 1 /* FSR--Instruction Fault */
-+	mrc	p15, 0, r2, c6, c0, 0 /* FAR */
-+	mrc	p15, 0, r3, c9, c0, 0 /* Read Dcache Lockdown */
-+	mrc	p15, 0, r4, c9, c0, 1 /* Read ICache Lockdown */
-+	mrc	p15, 0, r5, c9, c1, 0 /* Read Data TLB */
-+	mrc	p15, 0, r6, c9, c1, 1 /* Read Instr TCM region register */
++	bcd2tm(tm);
++	return 0;
++}
 +
-+	mrc	p15, 0, r7, c10, c0, 0 /* Data TLBLock Down operation */
-+	mrc	p15, 0, r8, c13, c0, 0 /* FCSE--PID */
-+	mrc	p15, 0, r9, c13, c0, 1 /* Context-ID */
++/*
++ * spear_rtc_set_time - set the time
++ * @dev: rtc device in use
++ * @tm: holds date and time
++ *
++ * This function set time and date. On success it will return 0
++ * otherwise -ve error is returned.
++ */
++static int spear_rtc_set_time(struct device *dev, struct rtc_time *tm)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	unsigned int time, date, err = 0;
 +
-+	/* Save all these registers onto the stack */
-+	stmfd	sp!, {r0-r9}
-+	/* Save the stack pointer */
-+	mov	r3, sp
-+	/* Store the two mode registers */
-+	stmfd	r3!, {sp, lr}
-+	/* Save the current mode with irq disabled */
-+	mrs	r0, cpsr
-+	stmfd	r3!, {r0}
-+	/*
-+	 * Save the MMU registers on the SRAM Stack
-+	 * Domain Register on Back-up RAM structure
-+	 */
-+	mrc	p15, 0, r2, c3, c0, 0
-+	/* TTB Register */
-+	mrc	p15, 0, r1, c2, c0, 0
-+	/* MMU Enable Register */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	stmfd	r3!, {r0, r1, r2}
-+	/*
-+	 * Capture the Physical Address.
-+	 * This will be used once MMU is Off
-+	 */
-+	adr	r0, mmu_off
-+	adr	r1, spear_sleep_mode
-+	/* Store the virtual address on to DDR */
-+	stmfd	r3!, {r1}
-+	sub	r1, r0, r1
-+	ldr	r0, SRAM_START_P
-+	add	r2, r1, r0
++	if (tm2bcd(tm) < 0)
++		return -EINVAL;
 +
-+	/* Disable MMU */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	ldr	r1, DISABLE_I_C_M_V
-+	bic	r0, r0, r1
-+	mcr	p15, 0, r0, c1, c0, 0
-+	/* Move the Physical address into PC */
-+	bx	r2
++	rtc_wait_not_busy(config);
++	time = (tm->tm_sec << SECOND_SHIFT) | (tm->tm_min << MINUTE_SHIFT) |
++		(tm->tm_hour << HOUR_SHIFT);
++	date = (tm->tm_mday << MDAY_SHIFT) | (tm->tm_mon << MONTH_SHIFT) |
++		(tm->tm_year << YEAR_SHIFT);
++	writel(time, config->ioaddr + TIME_REG);
++	writel(date, config->ioaddr + DATE_REG);
++	err = is_write_complete(config);
++	if (err < 0)
++		return err;
 +
-+	/*
-+	 * This portion of code is executed from SRAM
-+	 * post MMU has been turned off
-+	 */
-+mmu_off:
-+	/* Store the DDR stack address onto scratch pad location */
-+	ldr	r0, SCRATCH_PAD
-+	str	r3, [r0]
++	return 0;
++}
 +
-+	ldr	r6, MISC_BASE_P
-+	ldr	r7, MPMC_BASE_P
-+	ldr	r8, SYS_CTRL_BASE_P
++/*
++ * spear_rtc_read_alarm - read the alarm time
++ * @dev: rtc device in use
++ * @alm: holds alarm date and time
++ *
++ * This function read alarm time and date. On success it will return 0
++ * otherwise -ve error is returned.
++ */
++static int spear_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	unsigned int time, date;
 +
-+	/*
-+	 * Put SDRAM in self-refresh mode
-+	 * Clear START bit(24) of MEMCTL_GP_03 register in MPMC
-+	 */
-+	ldr	r0, [r7, #0x1c]
-+	ldr	r4, =0x1000000
-+	/* Begin the command processing in controller */
-+	bic	r0, r0, r4
-+	str	r0, [r7, #0x1c]
-+	ldr	r0, [r7, #0x1c]
-+	/* set the SREFRESH bit(16) */
-+	ldr	r4, =0x10000
-+	orr	r0, r0, r4
-+	str	r0, [r7, #0x1c]
++	rtc_wait_not_busy(config);
 +
-+	/* Put the DDR into low power mode */
-+	ldr	r0, [r6, #0xf0]
-+	ldr	r4, =0x00000001
-+	/* Clear DDR_LOW_POWER_DDR2_MODE bit(1) of DDR_PAD register */
-+	bic	r0, r0, r4
-+	str	r0, [r6, #0xf0]
++	time = readl(config->ioaddr + ALARM_TIME_REG);
++	date = readl(config->ioaddr + ALARM_DATE_REG);
++	alm->time.tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
++	alm->time.tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
++	alm->time.tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
++	alm->time.tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
++	alm->time.tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
++	alm->time.tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
 +
-+	/* Put the system in slow mode, use system controller */
-+	ldr	r0, [r8]
-+	bic	r0, r0, #0x4
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r0, r0, #0x2
-+	str	r0, [r8]	/* System is now in slow mode */
++	bcd2tm(&alm->time);
++	alm->enabled = readl(config->ioaddr + CTRL_REG) & INT_ENABLE;
 +
-+wait_till_slow_mode:
-+	ldr	r0, [r8]
-+	and	r0, r0, #0x78	/* Wait for the mode to be updated */
-+	cmp	r0, #0x10	/* Poll the SCCTRL register status bits (6:3) */
-+	bne wait_till_slow_mode
++	return 0;
++}
 +
-+	/* Put the Pll-1 to off. */
-+	ldr	r0, [r6, #0x08]
-+	/* Clear pll_enable bit(2) of PLL1_CTR register in Misc registers */
-+	bic	r0, r0, #0x04
-+	str	r0, [r6, #0x08]
++/*
++ * spear_rtc_set_alarm - set the alarm time
++ * @dev: rtc device in use
++ * @alm: holds alarm date and time
++ *
++ * This function set alarm time and date. On success it will return 0
++ * otherwise -ve error is returned.
++ */
++static int spear_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	unsigned int time, date, err = 0;
 +
-+	/* Put the Pll-2 to off */
-+	ldr	r0, [r6, #0x14]
-+	/* Clear pll_enable bit(2) of PLL2_CTR register in Misc registers */
-+	bic	r0, r0, #0x04
-+	str	r0, [r6, #0x14]
-+	mov	r2, #0
-+	/* Put the system in sleep */
-+	ldr	r0, [r8]
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	bic	r0, r0, #0x7
-+#ifdef TEST_SLOW
-+	orr	r0, r0, #0x2 /* Slow Mode */
++	if (tm2bcd(&alm->time) < 0)
++		return -EINVAL;
++
++	rtc_wait_not_busy(config);
++
++	time = (alm->time.tm_sec << SECOND_SHIFT) | (alm->time.tm_min <<
++			MINUTE_SHIFT) |	(alm->time.tm_hour << HOUR_SHIFT);
++	date = (alm->time.tm_mday << MDAY_SHIFT) | (alm->time.tm_mon <<
++			MONTH_SHIFT) | (alm->time.tm_year << YEAR_SHIFT);
++
++	writel(time, config->ioaddr + ALARM_TIME_REG);
++	writel(date, config->ioaddr + ALARM_DATE_REG);
++	err = is_write_complete(config);
++	if (err < 0)
++		return err;
++
++	if (alm->enabled)
++		spear_rtc_enable_interrupt(config);
++	else
++		spear_rtc_disable_interrupt(config);
++
++	return 0;
++}
++
++#ifdef CONFIG_RTC_INTF_DEV
++static int
++spear_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	struct rtc_time tm;
++	struct rtc_wkalrm alm;
++	void __user *uarg = (void __user *)arg;
++	int err = 0;
++
++	switch (cmd) {
++		/* AIE = Alarm Interrupt Enable */
++	case RTC_AIE_OFF:
++		spear_rtc_disable_interrupt(config);
++		break;
++	case RTC_AIE_ON:
++		spear_rtc_enable_interrupt(config);
++		break;
++	case RTC_SET_TIME:
++		if (copy_from_user(&tm, uarg, sizeof(tm)))
++			return -EFAULT;
++		return spear_rtc_set_time(dev, &tm);
++	case RTC_RD_TIME:
++		err = spear_rtc_read_time(dev, &tm);
++		if (err < 0)
++			return err;
++
++		if (copy_to_user(uarg, &tm, sizeof(tm)))
++			return -EFAULT;
++		break;
++	case RTC_ALM_SET:
++		if (copy_from_user(&alm.time, uarg, sizeof(tm)))
++			return -EFAULT;
++		alm.enabled = 0;
++		alm.pending = 0;
++		spear_rtc_set_alarm(dev, &alm);
++		break;
++	case RTC_ALM_READ:
++		err = spear_rtc_read_alarm(dev, &alm);
++		if (err < 0)
++			return err;
++
++		if (copy_to_user(uarg, &alm.time, sizeof(tm)))
++			return -EFAULT;
++		break;
++	default:
++		return -ENOIOCTLCMD;
++	}
++
++	return 0;
++}
++
++#else
++#define spear_rtc_ioctl	NULL
 +#endif
-+	str	r0, [r8]
-+	/* Put system in WFI */
-+	mcr	p15, 0, r2, c7, c0, 4
-+wakeup_addr:
-+	ldr	r6, MISC_BASE_P
-+	ldr	r7, MPMC_BASE_P
-+	ldr	r8, SYS_CTRL_BASE_P
-+	/* Reenable pll1 and pll2 */
-+	ldr	r0, PLL_VAL1
-+	str	r0, [r6, #0x08]
-+	str	r0, [r6, #0x14]
-+	ldr	r0, PLL_VAL2
-+	str	r0, [r6, #0x08]
-+	str	r0, [r6, #0x14]
-+	/* Strobe */
-+	ldr	r2, PLL_VAL3
-+	str	r2, [r6, #0x08]
-+	str	r2, [r6, #0x14]
-+	ldr	r2, PLL_VAL2
-+	str	r2, [r6, #0x08]
-+	str	r2, [r6, #0x14]
-+pll1_lock_1:
-+	/* Set the pll_lock bit(0) in PLL1_CTR register in misc space*/
-+	ldr	r2, [r6, #0x08]
-+	and	r2, r2, #0x1
-+	/* Wait for pll-1 lock status */
-+	cmp	r2, #0x1
-+	bne	pll1_lock_1
 +
-+pll2_lock_2:
-+	/* Set the pll_lock bit(0) in PLL2_CTR register in misc space*/
-+	ldr	r2, [r6, #0x14]
-+	and	r2, r2, #0x1
-+	/* Wait for pll-2 lock status */
-+	cmp	r2, #0x1
-+	bne	pll2_lock_2
++static struct rtc_class_ops spear_rtc_ops = {
++	.ioctl = spear_rtc_ioctl,
++	.read_time = spear_rtc_read_time,
++	.set_time = spear_rtc_set_time,
++	.read_alarm = spear_rtc_read_alarm,
++	.set_alarm = spear_rtc_set_alarm,
++};
 +
-+	/* Move the system in Normal mode, use system controller */
-+	ldr	r3, [r8]
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	bic	r3, r3, #0x7
-+	orr	r3, r3, #0x4
-+	str	r3, [r8]
++static int __devinit spear_rtc_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct rtc_device *rtc;
++	struct spear_rtc_config *config;
++	unsigned int status = 0;
++	int irq;
 +
-+wait_till_norm_mode:
-+	ldr	r3, [r8]
-+	and	r3, r3, #0x78
-+	cmp	r3, #0x20	/* Poll the SCCTRL register status bits (6:3) */
-+	bne	wait_till_norm_mode
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no resource defined\n");
++		return -EBUSY;
++	}
++	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
++		dev_err(&pdev->dev, "rtc region already claimed\n");
++		return -EBUSY;
++	}
 +
-+	/* Resume the DDR from Low power mode. */
-+	ldr	r0, [r6, #0xf0]
-+	/* Set DDR_LOW_POWER_DDR2_MODE bit(1) of DDR_PAD register */
-+	orr	r0, r0, #0x01
-+	str	r0, [r6, #0xf0]
++	config = kzalloc(sizeof(*config), GFP_KERNEL);
++	if (!config) {
++		dev_err(&pdev->dev, "out of memory\n");
++		status = -ENOMEM;
++		goto err_release_region;
++	}
 +
-+	/* Exit DDR-SDRAM from self-refresh mode */
-+	ldr	r1, [r7, #0x1c]
-+	/* clear the SREFRESH bit(16) */
-+	ldr	r4, =0x10000
-+	bic	r1, r1, r4
-+	str	r1, [r7, #0x1c]
++	config->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(config->clk)) {
++		status = PTR_ERR(config->clk);
++		goto err_kfree;
++	}
 +
-+	/* Begin the command processing in controller */
-+	ldr	r4, =0x1000000
-+	/* Set START bit(24) of MEMCTL_GP_03 register in MPMC*/
-+	orr	r1, r1, r4
-+	str	r1, [r7, #0x1c]
++	status = clk_enable(config->clk);
++	if (status < 0)
++		goto err_clk_put;
 +
-+	mov	r0, r0
-+	/* Start the Restore Processing */
-+	ldr	r0, SCRATCH_PAD
-+	ldr	r6, [r0]
++	config->ioaddr = ioremap(res->start, resource_size(res));
++	if (!config->ioaddr) {
++		dev_err(&pdev->dev, "ioremap fail\n");
++		status = -ENOMEM;
++		goto err_disable_clock;
++	}
 +
-+	/* Restore the Virtual Address to be used */
-+	/* Once MMU is made on */
-+	ldr	r0, SRAM_START_P
-+	adr	r1, mmu_on
-+	sub	r0, r1, r0
-+	/* Get the physical Address */
-+	mov	r3, #0xc0000000
-+	sub	r6, r6, r3
-+	/* Fetch the sram virtual address */
-+	ldmfd	r6!, {r1}
-+	add	r4, r1, r0
++	rtc = rtc_device_register(pdev->name, &pdev->dev, &spear_rtc_ops,
++			THIS_MODULE);
++	if (IS_ERR(rtc)) {
++		dev_err(&pdev->dev, "can't register RTC device, err %ld\n",
++				PTR_ERR(rtc));
++		status = PTR_ERR(rtc);
++		goto err_iounmap;
++	}
++	platform_set_drvdata(pdev, rtc);
++	dev_set_drvdata(&rtc->dev, config);
 +
-+	/* Fetch the MMU Related information latched on SDRAM */
-+	ldmfd	r6!, {r0, r1, r2}
-+	/* Enable the MMU */
-+	mcr	p15, 0, r2, c3, c0, 0
-+	mcr	p15, 0, r1, c2, c0, 0
-+	mcr	p15, 0, r0, c1, c0, 0
-+	bx	r4
-+mmu_on:
-+	add	r6, r6, r3
-+	/* Store the value of cpsr in R0 */
-+	mrs	r0, cpsr
-+	bic	r0, r0, #MODE_BITS
++	spin_lock_init(&config->lock);
 +
-+	/* Here we will restore our cpsr IRQ/FIQ Disabled */
-+	ldr	r0, [r6]
-+	msr	cpsr_cxsf, r0
-+	add	r6, r6, #4
++	/* alarm irqs */
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "no update irq?\n");
++		status = irq;
++		goto err_clear_platdata;
++	}
 +
-+	/* Now only two user-mode registers are left */
-+	ldmfd	r6!, {sp, lr}
-+	mov	r0, r0
++	status = request_irq(irq, spear_rtc_irq, 0, pdev->name, rtc);
++	if (status) {
++		dev_err(&pdev->dev, "Alarm interrupt IRQ%d already \
++				claimed\n", irq);
++		goto err_clear_platdata;
++	}
 +
-+	/* Restore stack pointer for the current mode */
-+	mov	sp, r6
++	if (!device_can_wakeup(&pdev->dev))
++		device_init_wakeup(&pdev->dev, 1);
 +
-+	ldmfd	sp!, {r0-r9}
-+	mcr	p15, 0, r0, c5, c0, 0 /* FSR--Domain Fault */
-+	mcr	p15, 0, r1, c5, c0, 1 /* FSR--Instruction Fault */
-+	mcr	p15, 0, r2, c6, c0, 0 /* FAR */
-+	mcr	p15, 0, r3, c9, c0, 0 /* Read Dcache Lockdown */
-+	mcr	p15, 0, r4, c9, c0, 1 /* Read ICache Lockdown */
-+	mcr 	p15, 0, r5, c9, c1, 0 /* Read Data TLB */
-+	mcr	p15, 0, r6, c9, c1, 1 /* Read Instruction Lockdown */
++	return 0;
 +
-+	mcr	p15, 0, r7, c10, c0, 0 /* Data TLB LockDown operation */
-+	mcr	p15, 0, r8, c13, c0, 0 /* FCSE--PID */
-+	mcr	p15, 0, r9, c13, c0, 1 /* Context-ID */
++err_clear_platdata:
++	platform_set_drvdata(pdev, NULL);
++	dev_set_drvdata(&rtc->dev, NULL);
++	rtc_device_unregister(rtc);
++err_iounmap:
++	iounmap(config->ioaddr);
++err_disable_clock:
++	clk_disable(config->clk);
++err_clk_put:
++	clk_put(config->clk);
++err_kfree:
++	kfree(config);
++err_release_region:
++	release_mem_region(res->start, resource_size(res));
 +
-+	mov	r0, #0
-+	ldmfd	sp!, {r0-r12, pc}
++	return status;
++}
 +
-+SYS_CTRL_BASE_P :
-+	.word SYS_CTRL_BASE_PA
-+MPMC_BASE_P :
-+	.word MPMC_BASE_PA
-+MISC_BASE_P :
-+	.word MISC_BASE_PA
-+SRAM_START_P:
-+	.word SPEAR_START_SRAM
-+SCRATCH_PAD:
-+	.word SPEAR_SRAM_SCR_REG
-+DISABLE_I_C_M_V:
-+	.word 0x1005
-+PLL_VAL1:
-+	.word 0x1c0a
-+PLL_VAL2:
-+	.word 0x1c0e
-+PLL_VAL3:
-+	.word 0x1c06
-+ENTRY(spear_sleep_mode_sz)
-+	.word . - spear_sleep_mode
++static int __devexit spear_rtc_remove(struct platform_device *pdev)
++{
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	int irq;
++	struct resource *res;
++
++	/* leave rtc running, but disable irqs */
++	spear_rtc_disable_interrupt(config);
++	device_init_wakeup(&pdev->dev, 0);
++	irq = platform_get_irq(pdev, 0);
++	if (irq)
++		free_irq(irq, pdev);
++	clk_disable(config->clk);
++	clk_put(config->clk);
++	iounmap(config->ioaddr);
++	kfree(config);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res)
++		release_mem_region(res->start, resource_size(res));
++	platform_set_drvdata(pdev, NULL);
++	dev_set_drvdata(&rtc->dev, NULL);
++	rtc_device_unregister(rtc);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++
++static int spear_rtc_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	int irq;
++
++	irq = platform_get_irq(pdev, 0);
++	if (device_may_wakeup(&pdev->dev))
++		enable_irq_wake(irq);
++	else {
++		spear_rtc_disable_interrupt(config);
++		clk_disable(config->clk);
++	}
++
++	return 0;
++}
++
++static int spear_rtc_resume(struct platform_device *pdev)
++{
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++	int irq;
++
++	irq = platform_get_irq(pdev, 0);
++
++	if (device_may_wakeup(&pdev->dev))
++		disable_irq_wake(irq);
++	else {
++		clk_enable(config->clk);
++		spear_rtc_enable_interrupt(config);
++	}
++
++	return 0;
++}
++
++#else
++#define spear_rtc_suspend	NULL
++#define spear_rtc_resume	NULL
++#endif
++
++static void spear_rtc_shutdown(struct platform_device *pdev)
++{
++	struct rtc_device *rtc = platform_get_drvdata(pdev);
++	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
++
++	spear_rtc_disable_interrupt(config);
++	clk_disable(config->clk);
++}
++
++static struct platform_driver spear_rtc_driver = {
++	.probe = spear_rtc_probe,
++	.remove = __devexit_p(spear_rtc_remove),
++	.suspend = spear_rtc_suspend,
++	.resume = spear_rtc_resume,
++	.shutdown = spear_rtc_shutdown,
++	.driver = {
++		.name = "rtc-spear",
++		.owner = THIS_MODULE,
++	},
++};
++
++static int __init rtc_init(void)
++{
++	return platform_driver_register(&spear_rtc_driver);
++}
++module_init(rtc_init);
++
++static void __exit rtc_exit(void)
++{
++	platform_driver_unregister(&spear_rtc_driver);
++}
++module_exit(rtc_exit);
++
++MODULE_ALIAS("rtc-spear");
++MODULE_AUTHOR("Rajeev Kumar");
++MODULE_LICENSE("GPL");
 -- 
 1.7.2.2
