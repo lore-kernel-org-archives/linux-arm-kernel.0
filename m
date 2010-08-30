@@ -1,243 +1,105 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:08:32 +0530
-Subject: [PATCH 01/74] ST SPEAr: Padmux code Updated
+Date: Mon, 30 Aug 2010 16:08:40 +0530
+Subject: [PATCH 09/74] ST SPEAr: Adding information in Documentation/ and
+	MAINTAINERS
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <90f361f70296c1762fae29a8d00d37c51b53cee2.1283161023.git.viresh.kumar@st.com>
+Message-ID: <09499075f7a7177877c7038937079c48dbd4fe95.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- compiling padmux only for spear3xx
-- padmux initialization code rearranged in evaluation board and machine files.
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |    7 -------
- arch/arm/mach-spear3xx/spear300.c             |   13 +++++++++----
- arch/arm/mach-spear3xx/spear300_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear310.c             |   11 ++++++-----
- arch/arm/mach-spear3xx/spear310_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear320.c             |   11 ++++++-----
- arch/arm/mach-spear3xx/spear320_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear3xx.c             |   21 ---------------------
- arch/arm/plat-spear/Makefile                  |    4 ++--
- 9 files changed, 35 insertions(+), 59 deletions(-)
+ Documentation/arm/SPEAr/overview.txt |   33 +++++++++++++++++++++++----------
+ MAINTAINERS                          |    6 ++++++
+ 2 files changed, 29 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index af7e02c..c16d2f8 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -40,7 +40,6 @@ void __init clk_init(void);
- void __init spear3xx_map_io(void);
- void __init spear3xx_init_irq(void);
- void __init spear3xx_init(void);
--void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size);
+diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
+index 253a35c..0e91cbf 100644
+--- a/Documentation/arm/SPEAr/overview.txt
++++ b/Documentation/arm/SPEAr/overview.txt
+@@ -9,8 +9,9 @@ Introduction
  
- /* pad mux declarations */
- #define PMX_FIRDA_MASK		(1 << 14)
-@@ -133,8 +132,6 @@ extern struct pmx_dev pmx_telecom_sdio_4bit;
- extern struct pmx_dev pmx_telecom_sdio_8bit;
- extern struct pmx_dev pmx_gpio1;
+   The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
+   supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
+-  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
+-  series is in progress.
++  SPEAr310, SPEAr320, SPEAr600 and SPEAr1300 SOCs are supported.
++  SPEAr3XX and SPEAr6XX are based on ARM9 whereas SPEAr13XX is based on latest
++  ARM Cortex A9 CPUs.
  
--void spear300_pmx_init(void);
--
- /* Add spear300 machine function declarations here */
- void __init spear300_init(void);
+   Hierarchy in SPEAr is as follows:
  
-@@ -154,8 +151,6 @@ extern struct pmx_dev pmx_fsmc;
- extern struct pmx_dev pmx_rs485_0_1;
- extern struct pmx_dev pmx_tdm0;
+@@ -27,16 +28,26 @@ Introduction
+ 			- SPEAr600_EVB (Evaluation Board)
+ 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+ 		- SPEAr1300 (SOC)
++			- SPEAr1300_EVB (Evaluation Board)
  
--void spear310_pmx_init(void);
--
- /* Add spear310 machine function declarations here */
- void __init spear310_init(void);
+   Configuration
+   -------------
  
-@@ -195,8 +190,6 @@ extern struct pmx_dev pmx_smii0;
- extern struct pmx_dev pmx_smii1;
- extern struct pmx_dev pmx_i2c1;
- 
--void spear320_pmx_init(void);
--
- /* Add spear320 machine function declarations here */
- void __init spear320_init(void);
- 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 3560f8c..7e0ca5d 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -459,10 +459,15 @@ void __init spear300_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ\n");
- 	}
--}
- 
--void spear300_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR300_SOC_CONFIG_BASE,
-+	/* pmx initialization */
-+	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
- 			SPEAR300_SOC_CONFIG_SIZE);
-+	if (pmx_driver.base) {
-+		ret = pmx_register(&pmx_driver);
-+		if (ret)
-+			printk(KERN_ERR "padmux: registeration failed. err no"
-+					": %d\n", ret);
-+		iounmap(pmx_driver.base);
-+	}
- }
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index bb21db1..2c90663 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -51,14 +51,13 @@ static void __init spear300_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear300 machine init function */
--	spear300_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear300_init */
- 	pmx_driver.mode = &photo_frame_mode;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear300_pmx_init();
+   A generic configuration is provided for each machine, and can be used as the
+   default by
+-	make spear600_defconfig
+-	make spear300_defconfig
+-	make spear310_defconfig
+-	make spear320_defconfig
++	#make ARCH=arm spear600_defconfig
++	#make ARCH=arm spear300_defconfig
++	#make ARCH=arm spear310_defconfig
++	#make ARCH=arm spear320_defconfig
++	#make ARCH=arm spear1300_defconfig
++	#make ARCH=arm spear1300-smp_defconfig (for SMP based configuration)
 +
-+	/* call spear300 machine init function */
-+	spear300_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 96a1ab8..576bc57 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -293,10 +293,11 @@ void __init spear310_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
--}
- 
--void spear310_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR310_SOC_CONFIG_BASE,
--			SPEAR310_SOC_CONFIG_SIZE);
-+	/* pmx initialization */
-+	pmx_driver.base = base;
-+	ret = pmx_register(&pmx_driver);
-+	if (ret)
-+		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
-+				ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 7facf66..4e55e55 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -58,14 +58,13 @@ static void __init spear310_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear310 machine init function */
--	spear310_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear310_init */
- 	pmx_driver.mode = NULL;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear310_pmx_init();
++  Compilation
++  -----------
 +
-+	/* call spear310 machine init function */
-+	spear310_init();
++  After applying default configuration, Linux kernel for SPEAr architecture
++  can be compiled as
++	#make ARCH=arm CROSS_COMPILE=arm-linux- uImage
  
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 6a12195..2886bb2 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -540,10 +540,11 @@ void __init spear320_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
--}
+   Layout
+   ------
+@@ -48,13 +59,15 @@ Introduction
+   Each machine series have a directory with name arch/arm/mach-spear followed by
+   series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
  
--void spear320_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR320_SOC_CONFIG_BASE,
--			SPEAR320_SOC_CONFIG_SIZE);
-+	/* pmx initialization */
-+	pmx_driver.base = base;
-+	ret = pmx_register(&pmx_driver);
-+	if (ret)
-+		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
-+				ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 62ac685..7083a06 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -55,14 +55,13 @@ static void __init spear320_evb_init(void)
- {
- 	unsigned int i;
+-  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
+-  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
++  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c, for
++  spear6xx is mach-spear6xx/spear6xx.c and similarly for spear13xx is
++  mach-spear13xx/spear13xx.c. mach-spear* also contain soc/machine
+   specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
+-  mach-spear* also contains board specific files for each machine type.
++  Board specific files for each machine type is also contained in mach-spear*
++  folder.
  
--	/* call spear320 machine init function */
--	spear320_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear320_init */
- 	pmx_driver.mode = &auto_net_mii_mode;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear320_pmx_init();
+ 
+   Document Author
+   ---------------
+ 
+-  Viresh Kumar, (c) 2010 ST Microelectronics
++  Viresh Kumar, Shiraz Hashim (c) 2010 ST Microelectronics
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a1df54b..257e396 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5434,6 +5434,12 @@ W:	http://www.st.com/spear
+ S:	Maintained
+ F:	arch/arm/plat-spear/
+ 
++SPEAR13XX MACHINE SUPPORT
++M:	Shiraz Hashim <shiraz.hashim@st.com>
++W:	http://www.st.com/spear
++S:	Maintained
++F:	arch/arm/mach-spear13xx/
 +
-+	/* call spear320 machine init function */
-+	spear320_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index e87313a..efd2e17 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -525,24 +525,3 @@ struct pmx_dev pmx_plgpio_45_46_49_50 = {
- };
- 
- #endif
--
--/* spear padmux initialization function */
--void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size)
--{
--	int ret = 0;
--
--	/* pad mux initialization */
--	pmx_driver->base = ioremap(base, size);
--	if (!pmx_driver->base) {
--		ret = -ENOMEM;
--		goto pmx_fail;
--	}
--
--	ret = pmx_register(pmx_driver);
--	iounmap(pmx_driver->base);
--
--pmx_fail:
--	if (ret)
--		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
--				ret);
--}
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index eb89540..b4f340b 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -3,6 +3,6 @@
- #
- 
- # Common support
--obj-y	:= clock.o padmux.o time.o
-+obj-y	:= clock.o time.o
- 
--obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+ SPEAR3XX MACHINE SUPPORT
+ M:	Viresh Kumar <viresh.kumar@st.com>
+ W:	http://www.st.com/spear
 -- 
 1.7.2.2
