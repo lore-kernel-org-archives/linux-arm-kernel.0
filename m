@@ -1,89 +1,440 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:18 +0530
-Subject: [PATCH 55/74] ST SPEAr13xx: Modified static mappings
+Date: Mon, 30 Aug 2010 16:09:32 +0530
+Subject: [PATCH 69/74] ST SPEAR6xx: renaming spear600_defconfig as
+	spear6xx_defconfig
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <ba740ee450513a415e666299a0dbaee871014cb4.1283161023.git.viresh.kumar@st.com>
+Message-ID: <208186b20d19b7353f5f85f2db048dc2f564862a.1283161024.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
-
-The new static io mappings map regions in 0xE...,.... space to
-0xF...,.... and those in space 0x6...,.... to 0xE...,.... range.
-This is done to accomodate regions of RAS configuration registers to be
-used by clock frameowrk and possibly others.
-
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/hardware.h  |    7 ++++++-
- arch/arm/mach-spear13xx/include/mach/spear1310.h |    1 +
- arch/arm/mach-spear13xx/include/mach/vmalloc.h   |    2 +-
- arch/arm/mach-spear13xx/spear13xx.c              |    8 ++++++++
- 4 files changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/configs/spear600_defconfig |   49 -----
+ arch/arm/configs/spear6xx_defconfig |  358 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 358 insertions(+), 49 deletions(-)
+ delete mode 100644 arch/arm/configs/spear600_defconfig
+ create mode 100644 arch/arm/configs/spear6xx_defconfig
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
-index 4abc2c0..44cd0c2 100644
---- a/arch/arm/mach-spear13xx/include/mach/hardware.h
-+++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
-@@ -17,7 +17,12 @@
- #include <mach/spear.h>
- 
- /* Vitual to physical translation of statically mapped space */
--#define IO_ADDRESS(x)		(x | 0xF0000000)
-+/*
-+ * if phy_addr is 0x8...,.... and above then map it to  0xF...,....
-+ * else map it to 0xE...,....
-+ */
+diff --git a/arch/arm/configs/spear600_defconfig b/arch/arm/configs/spear600_defconfig
+deleted file mode 100644
+index 6777c11..0000000
+--- a/arch/arm/configs/spear600_defconfig
++++ /dev/null
+@@ -1,49 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_EXTRA_PASS=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
+-CONFIG_PLAT_SPEAR=y
+-CONFIG_ARCH_SPEAR6XX=y
+-CONFIG_BINFMT_MISC=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=16384
+-CONFIG_INPUT_FF_MEMLESS=y
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_SERIAL_AMBA_PL011=y
+-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_RAW_DRIVER=y
+-CONFIG_MAX_RAW_DEVS=8192
+-CONFIG_GPIO_SYSFS=y
+-CONFIG_GPIO_PL061=y
+-# CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT2_FS_XATTR=y
+-CONFIG_EXT2_FS_SECURITY=y
+-CONFIG_EXT3_FS=y
+-CONFIG_EXT3_FS_SECURITY=y
+-CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
+-CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+-CONFIG_TMPFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+-CONFIG_NLS_DEFAULT="utf8"
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_SPINLOCK=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
+diff --git a/arch/arm/configs/spear6xx_defconfig b/arch/arm/configs/spear6xx_defconfig
+new file mode 100644
+index 0000000..3dfc6bb
+--- /dev/null
++++ b/arch/arm/configs/spear6xx_defconfig
+@@ -0,0 +1,358 @@
++#
++# Automatically generated make config: don't edit
++# Linux kernel version: 2.6.32
++# Thu Aug 19 15:23:42 2010
++#
++CONFIG_ARM=y
++CONFIG_SYS_SUPPORTS_APM_EMULATION=y
++CONFIG_GENERIC_GPIO=y
++CONFIG_GENERIC_TIME=y
++CONFIG_GENERIC_CLOCKEVENTS=y
++CONFIG_GENERIC_HARDIRQS=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_LATENCYTOP_SUPPORT=y
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_RWSEM_GENERIC_SPINLOCK=y
++CONFIG_ARCH_HAS_CPUFREQ=y
++CONFIG_GENERIC_HWEIGHT=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_GENERIC_HARDIRQS_NO__DO_IRQ=y
++CONFIG_VECTORS_BASE=0xffff0000
++CONFIG_DEFCONFIG_LIST="/lib/modules/$UNAME_RELEASE/.config"
++CONFIG_CONSTRUCTORS=y
 +
-+#define IO_ADDRESS(x)   ((x) | ((((x) >> 31) << 28) | 0xE0000000))
- 
- /* typesafe io address */
- #define __io_address(n)		__io(IO_ADDRESS(n))
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear1310.h b/arch/arm/mach-spear13xx/include/mach/spear1310.h
-index d1735e8..e3d347c 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear1310.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear1310.h
-@@ -18,6 +18,7 @@
- 
- #define SPEAR1310_CAN0_BASE		UL(0x6DA00000)
- #define SPEAR1310_CAN1_BASE		UL(0x6DB00000)
-+#define SPEAR1310_RAS_BASE		UL(0x6C800000)
- 
- #endif /* __MACH_SPEAR1310_H */
- 
-diff --git a/arch/arm/mach-spear13xx/include/mach/vmalloc.h b/arch/arm/mach-spear13xx/include/mach/vmalloc.h
-index 85ad57e..9f329d1 100644
---- a/arch/arm/mach-spear13xx/include/mach/vmalloc.h
-+++ b/arch/arm/mach-spear13xx/include/mach/vmalloc.h
-@@ -13,6 +13,6 @@
- #ifndef __MACH_VMALLOC_H
- #define __MACH_VMALLOC_H
- 
--#include <plat/vmalloc.h>
-+#define VMALLOC_END		0xEC800000
- 
- #endif /* __MACH_VMALLOC_H */
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 48cdff2..05ae8f5 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -570,6 +570,14 @@ struct map_desc spear13xx_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM1_BASE),
- 		.length		= SZ_1M,
- 		.type		= MT_MEMORY_NONCACHED
-+#ifdef CONFIG_MACH_SPEAR1310
-+	}, {
-+		.virtual	= IO_ADDRESS(SPEAR1310_RAS_BASE),
-+		.pfn		= __phys_to_pfn(SPEAR1310_RAS_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE
++#
++# General setup
++#
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_EXTRA_PASS=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_PLAT_SPEAR=y
++# CONFIG_ARCH_SPEAR13XX is not set
++# CONFIG_ARCH_SPEAR3XX is not set
++CONFIG_ARCH_SPEAR6XX=y
 +
-+#endif
- 	},
- };
- 
++#
++# SPEAr6xx Implementations
++#
++CONFIG_BOARD_SPEAR600_EVB=y
++CONFIG_MACH_SPEAR600=y
++
++#
++# Processor Type
++#
++CONFIG_CPU_32=y
++CONFIG_CPU_ARM926T=y
++CONFIG_CPU_32v5=y
++CONFIG_CPU_ABRT_EV5TJ=y
++CONFIG_CPU_PABRT_LEGACY=y
++CONFIG_CPU_CACHE_VIVT=y
++CONFIG_CPU_COPY_V4WB=y
++CONFIG_CPU_TLB_V4WBI=y
++CONFIG_CPU_CP15=y
++CONFIG_CPU_CP15_MMU=y
++
++#
++# Processor Features
++#
++CONFIG_ARM_THUMB=y
++# CONFIG_CPU_ICACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_DISABLE is not set
++# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
++# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
++CONFIG_ARM_L1_CACHE_SHIFT=5
++CONFIG_ARM_VIC=y
++CONFIG_ARM_VIC_NR=2
++CONFIG_COMMON_CLKDEV=y
++
++#
++# Bus support
++#
++CONFIG_ARM_AMBA=y
++# CONFIG_PCI_SYSCALL is not set
++# CONFIG_ARCH_SUPPORTS_MSI is not set
++# CONFIG_PCCARD is not set
++
++#
++# Kernel Features
++#
++# CONFIG_NO_HZ is not set
++# CONFIG_HIGH_RES_TIMERS is not set
++CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
++CONFIG_VMSPLIT_3G=y
++# CONFIG_VMSPLIT_2G is not set
++# CONFIG_VMSPLIT_1G is not set
++CONFIG_PAGE_OFFSET=0xC0000000
++CONFIG_PREEMPT_NONE=y
++# CONFIG_PREEMPT_VOLUNTARY is not set
++# CONFIG_PREEMPT is not set
++CONFIG_HZ=100
++# CONFIG_AEABI is not set
++# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
++# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
++# CONFIG_HIGHMEM is not set
++CONFIG_SELECT_MEMORY_MODEL=y
++CONFIG_FLATMEM_MANUAL=y
++# CONFIG_DISCONTIGMEM_MANUAL is not set
++# CONFIG_SPARSEMEM_MANUAL is not set
++CONFIG_FLATMEM=y
++CONFIG_FLAT_NODE_MEM_MAP=y
++CONFIG_PAGEFLAGS_EXTENDED=y
++CONFIG_SPLIT_PTLOCK_CPUS=4096
++# CONFIG_PHYS_ADDR_T_64BIT is not set
++CONFIG_ZONE_DMA_FLAG=0
++CONFIG_VIRT_TO_BUS=y
++CONFIG_HAVE_MLOCK=y
++CONFIG_HAVE_MLOCKED_PAGE_BIT=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_ALIGNMENT_TRAP=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
++
++#
++# Boot options
++#
++CONFIG_ZBOOT_ROM_TEXT=0
++CONFIG_ZBOOT_ROM_BSS=0
++CONFIG_CMDLINE=""
++# CONFIG_XIP_KERNEL is not set
++# CONFIG_KEXEC is not set
++
++#
++# CPU Power Management
++#
++# CONFIG_CPU_FREQ is not set
++# CONFIG_CPU_IDLE is not set
++
++#
++# Floating point emulation
++#
++
++#
++# At least one emulation must be selected
++#
++# CONFIG_FPE_NWFPE is not set
++# CONFIG_FPE_FASTFPE is not set
++# CONFIG_VFP is not set
++
++#
++# Userspace binary formats
++#
++CONFIG_BINFMT_ELF=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HAVE_AOUT=y
++# CONFIG_BINFMT_AOUT is not set
++CONFIG_BINFMT_MISC=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=16384
++# CONFIG_BLK_DEV_XIP is not set
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_MG_DISK is not set
++CONFIG_MISC_DEVICES=y
++# CONFIG_ENCLOSURE_SERVICES is not set
++# CONFIG_C2PORT is not set
++
++#
++# EEPROM support
++#
++# CONFIG_EEPROM_93CX6 is not set
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
++
++#
++# SCSI device support
++#
++# CONFIG_RAID_ATTRS is not set
++# CONFIG_SCSI is not set
++# CONFIG_SCSI_DMA is not set
++# CONFIG_SCSI_NETLINK is not set
++# CONFIG_ATA is not set
++# CONFIG_MD is not set
++# CONFIG_PHONE is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++CONFIG_INPUT_FF_MEMLESS=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
++CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
++# CONFIG_INPUT_JOYDEV is not set
++# CONFIG_INPUT_EVDEV is not set
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++CONFIG_INPUT_KEYBOARD=y
++CONFIG_KEYBOARD_ATKBD=y
++# CONFIG_KEYBOARD_LKKBD is not set
++# CONFIG_KEYBOARD_GPIO is not set
++# CONFIG_KEYBOARD_MATRIX is not set
++# CONFIG_KEYBOARD_NEWTON is not set
++# CONFIG_KEYBOARD_OPENCORES is not set
++# CONFIG_KEYBOARD_STOWAWAY is not set
++# CONFIG_KEYBOARD_SUNKBD is not set
++# CONFIG_KEYBOARD_SPEAR is not set
++# CONFIG_KEYBOARD_XTKBD is not set
++CONFIG_INPUT_MOUSE=y
++CONFIG_MOUSE_PS2=y
++CONFIG_MOUSE_PS2_ALPS=y
++CONFIG_MOUSE_PS2_LOGIPS2PP=y
++CONFIG_MOUSE_PS2_SYNAPTICS=y
++CONFIG_MOUSE_PS2_TRACKPOINT=y
++# CONFIG_MOUSE_PS2_ELANTECH is not set
++# CONFIG_MOUSE_PS2_SENTELIC is not set
++# CONFIG_MOUSE_PS2_TOUCHKIT is not set
++# CONFIG_MOUSE_SERIAL is not set
++# CONFIG_MOUSE_VSXXXAA is not set
++# CONFIG_MOUSE_GPIO is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++# CONFIG_INPUT_TOUCHSCREEN is not set
++# CONFIG_INPUT_MISC is not set
++
++#
++# Hardware I/O ports
++#
++CONFIG_SERIO=y
++CONFIG_SERIO_SERPORT=y
++# CONFIG_SERIO_AMBAKMI is not set
++CONFIG_SERIO_LIBPS2=y
++# CONFIG_SERIO_RAW is not set
++# CONFIG_GAMEPORT is not set
++
++#
++# Character devices
++#
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++# CONFIG_VT_HW_CONSOLE_BINDING is not set
++CONFIG_DEVKMEM=y
++# CONFIG_SERIAL_NONSTANDARD is not set
++
++#
++# Serial drivers
++#
++# CONFIG_SERIAL_8250 is not set
++
++#
++# Non-8250 serial port support
++#
++# CONFIG_SERIAL_AMBA_PL010 is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_IPMI_HANDLER is not set
++CONFIG_HW_RANDOM=m
++# CONFIG_HW_RANDOM_TIMERIOMEM is not set
++# CONFIG_R3964 is not set
++CONFIG_RAW_DRIVER=y
++CONFIG_MAX_RAW_DEVS=8192
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_PL061=y
++# CONFIG_HWMON is not set
++# CONFIG_THERMAL is not set
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++
++#
++# Sonics Silicon Backplane
++#
++# CONFIG_SSB is not set
++
++#
++# Multifunction device drivers
++#
++# CONFIG_MFD_CORE is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_MFD_ASIC3 is not set
++# CONFIG_HTC_EGPIO is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_TMIO is not set
++# CONFIG_MFD_T7L66XB is not set
++# CONFIG_MFD_TC6387XB is not set
++# CONFIG_MFD_TC6393XB is not set
++# CONFIG_REGULATOR is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_VGASTATE is not set
++# CONFIG_VIDEO_OUTPUT_CONTROL is not set
++# CONFIG_FB is not set
++# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
++
++#
++# Display device support
++#
++# CONFIG_DISPLAY_SUPPORT is not set
++
++#
++# Console display driver support
++#
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_DUMMY_CONSOLE=y
++# CONFIG_SOUND is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT3_FS_SECURITY=y
++CONFIG_AUTOFS4_FS=m
++CONFIG_MSDOS_FS=m
++CONFIG_VFAT_FS=m
++CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
++CONFIG_TMPFS=y
++# CONFIG_TMPFS_POSIX_ACL is not set
++# CONFIG_HUGETLB_PAGE is not set
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_MISC_FILESYSTEMS=y
++# CONFIG_ADFS_FS is not set
++# CONFIG_AFFS_FS is not set
++# CONFIG_HFS_FS is not set
++# CONFIG_HFSPLUS_FS is not set
++# CONFIG_BEFS_FS is not set
++# CONFIG_BFS_FS is not set
++# CONFIG_EFS_FS is not set
++# CONFIG_CRAMFS is not set
++# CONFIG_SQUASHFS is not set
++# CONFIG_VXFS_FS is not set
++# CONFIG_MINIX_FS is not set
++# CONFIG_OMFS_FS is not set
++# CONFIG_HPFS_FS is not set
++# CONFIG_QNX4FS_FS is not set
++# CONFIG_ROMFS_FS is not set
++# CONFIG_SYSV_FS is not set
++# CONFIG_UFS_FS is not set
++
++#
++# Partition Types
++#
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="utf8"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=m
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_CRC32 is not set
 -- 
 1.7.2.2
