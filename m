@@ -1,1331 +1,1255 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:08:54 +0530
-Subject: [PATCH 30/74] ST SPEAr: Added PCIE host controller base driver
-	support.
+Date: Mon, 30 Aug 2010 16:09:11 +0530
+Subject: [PATCH 47/74] SPEAr Power Management: Added the support for Standby
+	mode.
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <9073f2d0548a2e17ce93d8a87d34207697fe145d.1283161023.git.viresh.kumar@st.com>
+Message-ID: <c3398c49d087eda78211a99ae879deb11f75286a.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
-This driver is based on synopsys DWC version 3.30a.
+OPEN POINTS: 	1. Suspend to RAM support needs to be added.
+		2. The basic framework added for S2R.
+		3. SPEAr13xx: The power domains need to be added.
+		4. Extensive testing needs to be done.
+		5. For SPEAr13xx: PLL-4 has not been switch off while moving
+		into sleep. There is some problem in getting the pll back to on.
+		6. Not functional on SPEAr6XX
 
-Intr, MSI, & Hotplug and other interfaces have still
-to be implemented.
-
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/Kconfig                                 |    5 +-
- arch/arm/mach-spear13xx/Makefile                 |    1 +
- arch/arm/mach-spear13xx/include/mach/hardware.h  |    7 +
- arch/arm/mach-spear13xx/include/mach/irqs.h      |   25 +-
- arch/arm/mach-spear13xx/include/mach/misc_regs.h |   20 +
- arch/arm/mach-spear13xx/include/mach/pcie.h      |  169 +++++
- arch/arm/mach-spear13xx/pcie.c                   |  881 ++++++++++++++++++++++
- arch/arm/mach-spear13xx/spear1300_evb.c          |   31 +
- arch/arm/mach-spear13xx/spear13xx.c              |   28 +
- arch/arm/plat-spear/Kconfig                      |    1 +
- 10 files changed, 1163 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/include/mach/pcie.h
- create mode 100644 arch/arm/mach-spear13xx/pcie.c
+ arch/arm/mach-spear13xx/Makefile               |    1 +
+ arch/arm/mach-spear13xx/include/mach/suspend.h |   47 +++
+ arch/arm/mach-spear13xx/pm.c                   |  107 ++++++
+ arch/arm/mach-spear13xx/sleep.S                |  435 ++++++++++++++++++++++++
+ arch/arm/mach-spear13xx/spear13xx.c            |    5 +
+ arch/arm/mach-spear3xx/include/mach/suspend.h  |   44 +++
+ arch/arm/mach-spear3xx/spear3xx.c              |    5 +-
+ arch/arm/mach-spear6xx/include/mach/suspend.h  |   44 +++
+ arch/arm/mach-spear6xx/spear6xx.c              |    9 +-
+ arch/arm/plat-spear/Makefile                   |    6 +
+ arch/arm/plat-spear/pm.c                       |  104 ++++++
+ arch/arm/plat-spear/sleep.S                    |  288 ++++++++++++++++
+ 12 files changed, 1093 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/suspend.h
+ create mode 100644 arch/arm/mach-spear13xx/pm.c
+ create mode 100644 arch/arm/mach-spear13xx/sleep.S
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/suspend.h
+ create mode 100644 arch/arm/mach-spear6xx/include/mach/suspend.h
+ create mode 100644 arch/arm/plat-spear/pm.c
+ create mode 100644 arch/arm/plat-spear/sleep.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 950c045..c4d1df3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1104,7 +1104,9 @@ config ISA_DMA_API
- 	bool
- 
- config PCI
--	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
-+	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB ||\
-+	ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX ||\
-+	ARCH_SPEAR13XX
- 	help
- 	  Find out whether you have a PCI motherboard. PCI is the name of a
- 	  bus system, i.e. the way the CPU talks to the other stuff inside
-@@ -1131,6 +1133,7 @@ config PCI_HOST_ITE8152
- 	select DMABOUNCE
- 
- source "drivers/pci/Kconfig"
-+source "drivers/pci/pcie/Kconfig"
- 
- source "drivers/pcmcia/Kconfig"
- 
 diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index cb5ae9e..b55f92e 100644
+index 8644c76..b786edc 100644
 --- a/arch/arm/mach-spear13xx/Makefile
 +++ b/arch/arm/mach-spear13xx/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
- 
- # spear1300 specific files
- obj-$(CONFIG_MACH_SPEAR1300)		+= spear1300.o
-+obj-$(CONFIG_PCIEPORTBUS)		+= pcie.o
- 
- # spear1300 boards files
- obj-$(CONFIG_BOARD_SPEAR1300_EVB)	+= spear1300_evb.o
-diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
-index 0047d75..4abc2c0 100644
---- a/arch/arm/mach-spear13xx/include/mach/hardware.h
-+++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
-@@ -22,4 +22,11 @@
- /* typesafe io address */
- #define __io_address(n)		__io(IO_ADDRESS(n))
- 
-+#if defined(CONFIG_PCI)
-+#define PCIBIOS_MIN_IO		0
-+#define PCIBIOS_MIN_MEM		0
-+#define pcibios_assign_all_busses()	0
-+#endif
-+
-+
- #endif /* __MACH_HARDWARE_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
-index 562d20f..97d0d80 100644
---- a/arch/arm/mach-spear13xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
-@@ -80,9 +80,9 @@
- #define IRQ_USBH_OHCI0		(IRQ_SHPI_START + 65)
- #define IRQ_USBH_EHCI1		(IRQ_SHPI_START + 66)
- #define IRQ_USBH_OHCI1		(IRQ_SHPI_START + 67)
--#define IRQ_PCIE1		(IRQ_SHPI_START + 68)
--#define IRQ_PCIE2		(IRQ_SHPI_START + 69)
--#define IRQ_PCIE3		(IRQ_SHPI_START + 70)
-+#define IRQ_PCIE0		(IRQ_SHPI_START + 68)
-+#define IRQ_PCIE1		(IRQ_SHPI_START + 69)
-+#define IRQ_PCIE2		(IRQ_SHPI_START + 70)
- 
- #define IRQ_GIC_END		(IRQ_SHPI_START + 128)
- 
-@@ -93,7 +93,24 @@
- #define SPEAR_GPIO1_INT_BASE	(SPEAR_GPIO0_INT_BASE + 8)
- #define SPEAR_GPIO_INT_END	(SPEAR_GPIO1_INT_BASE + 8)
- 
--#define VIRQ_END		SPEAR_GPIO_INT_END
-+/* PCIE MSI virtual irqs */
-+#define SPEAR_NUM_MSI_IRQS	64
-+#define SPEAR_MSI0_INT_BASE	(SPEAR_GPIO_INT_END + 0)
-+#define SPEAR_MSI0_INT_END	(SPEAR_MSI0_INT_BASE + SPEAR_NUM_MSI_IRQS)
-+#define SPEAR_MSI1_INT_BASE	(SPEAR_MSI0_INT_END + 0)
-+#define SPEAR_MSI1_INT_END	(SPEAR_MSI1_INT_BASE + SPEAR_NUM_MSI_IRQS)
-+#define SPEAR_MSI2_INT_BASE	(SPEAR_MSI1_INT_END + 0)
-+#define SPEAR_MSI2_INT_END	(SPEAR_MSI2_INT_BASE + SPEAR_NUM_MSI_IRQS)
-+
-+#define SPEAR_NUM_INTX_IRQS	4
-+#define SPEAR_INTX0_BASE	(SPEAR_MSI2_INT_END + 0)
-+#define SPEAR_INTX0_END		(SPEAR_INTX0_BASE + SPEAR_NUM_INTX_IRQS)
-+#define SPEAR_INTX1_BASE	(SPEAR_INTX0_END + 0)
-+#define SPEAR_INTX1_END		(SPEAR_INTX1_BASE + SPEAR_NUM_INTX_IRQS)
-+#define SPEAR_INTX2_BASE	(SPEAR_INTX1_END + 0)
-+#define SPEAR_INTX2_END		(SPEAR_INTX2_BASE + SPEAR_NUM_INTX_IRQS)
-+
-+#define VIRQ_END		SPEAR_INTX2_END
- #define NR_IRQS			VIRQ_END
- 
- #endif /* __MACH_IRQS_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-index 05815fa..bc785f9 100644
---- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-@@ -202,6 +202,26 @@
- #define USBPHY_P2_CFG		((unsigned int *)(MISC_BASE + 0x31c))
- #define USBPHY_P3_CFG		((unsigned int *)(MISC_BASE + 0x320))
- #define PCIE_CFG		((unsigned int *)(MISC_BASE + 0x324))
-+	/* PCIE CFG MASks */
-+	#define PCIE2_CFG_AUX_CLK	(1 << 0)
-+	#define PCIE1_CFG_AUX_CLK	(1 << 1)
-+	#define PCIE0_CFG_AUX_CLK	(1 << 2)
-+	#define PCIE2_CFG_CORE_CLK	(1 << 3)
-+	#define PCIE1_CFG_CORE_CLK	(1 << 4)
-+	#define PCIE0_CFG_CORE_CLK	(1 << 5)
-+	#define PCIE2_CFG_POWERUP_RESET	(1 << 6)
-+	#define PCIE1_CFG_POWERUP_RESET	(1 << 7)
-+	#define PCIE0_CFG_POWERUP_RESET	(1 << 8)
-+	#define PCIE2_CFG_DEVICE_PRESENT	(1 << 9)
-+	#define PCIE1_CFG_DEVICE_PRESENT	(1 << 10)
-+	#define PCIE0_CFG_DEVICE_PRESENT	(1 << 11)
-+	#define PCIE0_CFG_VAL	(PCIE0_CFG_AUX_CLK | PCIE0_CFG_CORE_CLK \
-+			| PCIE0_CFG_POWERUP_RESET | PCIE0_CFG_DEVICE_PRESENT)
-+	#define PCIE1_CFG_VAL	(PCIE1_CFG_AUX_CLK | PCIE1_CFG_CORE_CLK \
-+			| PCIE1_CFG_POWERUP_RESET | PCIE1_CFG_DEVICE_PRESENT)
-+	#define PCIE2_CFG_VAL	(PCIE2_CFG_AUX_CLK | PCIE2_CFG_CORE_CLK \
-+			| PCIE2_CFG_POWERUP_RESET | PCIE2_CFG_DEVICE_PRESENT)
-+
- #define PCIE_MIPHY_CFG		((unsigned int *)(MISC_BASE + 0x328))
- #define PERIP_CFG		((unsigned int *)(MISC_BASE + 0x32c))
- #define FSMC_CFG		((unsigned int *)(MISC_BASE + 0x330))
-diff --git a/arch/arm/mach-spear13xx/include/mach/pcie.h b/arch/arm/mach-spear13xx/include/mach/pcie.h
+@@ -17,3 +17,4 @@ obj-$(CONFIG_BOARD_SPEAR1300_EVB)	+= spear1300_evb.o
+ obj-$(CONFIG_MACH_SPEAR1310)		+= spear1310.o
+ # spear1310 boards files
+ obj-$(CONFIG_BOARD_SPEAR1310_EVB)	+= spear1310_evb.o
++obj-$(CONFIG_PM)	+= pm.o sleep.o
+diff --git a/arch/arm/mach-spear13xx/include/mach/suspend.h b/arch/arm/mach-spear13xx/include/mach/suspend.h
 new file mode 100644
-index 0000000..3ec1e94
+index 0000000..c8d13e6
 --- /dev/null
-+++ b/arch/arm/mach-spear13xx/include/mach/pcie.h
-@@ -0,0 +1,169 @@
++++ b/arch/arm/mach-spear13xx/include/mach/suspend.h
+@@ -0,0 +1,47 @@
 +/*
-+ * arch/arm/mach-spear13xx/include/mach/pcie.h
++ * arch/arm/mach-spear13xx/include/mach/suspend.h
 + *
-+ * Spear SoC PCIe handling.
++ * Sleep mode defines for SPEAr13xx machine family
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Pratyush Anand <pratyush.anand@st.com>
++ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef __MACH_PCIE_H
-+#define __MACH_PCIE_H
++#ifndef __MACH_SUSPEND_H
++#define __MACH_SUSPEND_H
 +
-+extern int (*pcie_port_is_host)(int port);
-+extern int enable_pcie0_clk(void);
++#include <mach/spear.h>
 +
-+
-+struct pcie_port {
-+	u8			port;
-+	u8			root_bus_nr;
-+	void __iomem		*base;
-+	void __iomem		*app_base;
-+	void __iomem		*va_app_base;
-+	void __iomem		*va_dbi_base;
-+	spinlock_t		conf_lock;
-+	char			mem_space_name[16];
-+	char			io_space_name[16];
-+	struct resource		res[2];
-+};
-+
-+struct pcie_app_reg {
-+	u32	app_ctrl_0;		/*cr0*/
-+	u32	app_ctrl_1;		/*cr1*/
-+	u32	app_status_0;		/*cr2*/
-+	u32	app_status_1;		/*cr3*/
-+	u32	msg_status;		/*cr4*/
-+	u32	msg_payload;		/*cr5*/
-+	u32	int_sts;		/*cr6*/
-+	u32	int_clr;		/*cr7*/
-+	u32	int_mask;		/*cr8*/
-+	u32	mst_bmisc;		/*cr9*/
-+	u32	phy_ctrl;		/*cr10*/
-+	u32	phy_status;		/*cr11*/
-+	u32	cxpl_debug_info_0;	/*cr12*/
-+	u32	cxpl_debug_info_1;	/*cr13*/
-+	u32	ven_msg_ctrl_0;		/*cr14*/
-+	u32	ven_msg_ctrl_1;		/*cr15*/
-+	u32	ven_msg_data_0;		/*cr16*/
-+	u32	ven_msg_data_1;		/*cr17*/
-+	u32	ven_msi_0;		/*cr18*/
-+	u32	ven_msi_1;		/*cr19*/
-+	u32	mst_rmisc;		/*cr 20*/
-+	u32	slv_awmisc;		/*cr 21*/
-+	u32	slv_armisc;		/*cr 22*/
-+	u32	pom0_mem_addr_start;	/*cr23*/
-+	u32	pom1_mem_addr_start;	/*cr24*/
-+	u32	pom_io_addr_start;	/*cr25*/
-+	u32	pom_cfg0_addr_start;	/*cr26*/
-+	u32	pom_cfg1_addr_start;	/*cr27*/
-+	u32	in0_mem_addr_start;	/*cr28*/
-+	u32	in1_mem_addr_start;	/*cr29*/
-+	u32	in_io_addr_start;	/*cr30*/
-+	u32	in_cfg0_addr_start;	/*cr31*/
-+	u32	in_cfg1_addr_start;	/*cr32*/
-+	u32	in_msg_addr_start;	/*cr33*/
-+	u32	in0_mem_addr_limit;	/*cr34*/
-+	u32	in1_mem_addr_limit;	/*cr35*/
-+	u32	in_io_addr_limit;	/*cr36*/
-+	u32	in_cfg0_addr_limit;	/*cr37*/
-+	u32	in_cfg1_addr_limit;	/*cr38*/
-+	u32	in_msg_addr_limit;	/*cr39*/
-+	u32	mem0_addr_offset_limit;	/*cr40*/
-+	u32	pim0_mem_addr_start;	/*cr41*/
-+	u32	pim1_mem_addr_start;	/*cr42*/
-+	u32	pim_io_addr_start;	/*cr43*/
-+	u32	pim_rom_addr_start;	/*cr44*/
-+};
-+
-+/*CR0 ID*/
-+#define RX_LANE_FLIP_EN_ID	0
-+#define TX_LANE_FLIP_EN_ID	1
-+#define SYS_AUX_PWR_DET_ID	2
-+#define APP_LTSSM_ENABLE_ID	3
-+#define SYS_ATTEN_BUTTON_PRESSED_ID	4
-+#define SYS_MRL_SENSOR_STATE_ID 5
-+#define SYS_PWR_FAULT_DET_ID	6
-+#define SYS_MRL_SENSOR_CHGED_ID 7
-+#define SYS_PRE_DET_CHGED_ID	8
-+#define SYS_CMD_CPLED_INT_ID	9
-+#define APP_INIT_RST_0_ID	11
-+#define APP_REQ_ENTR_L1_ID	12
-+#define APP_READY_ENTR_L23_ID	13
-+#define APP_REQ_EXIT_L1_ID	14
-+#define DEVICE_TYPE_EP		(0 << 25)
-+#define DEVICE_TYPE_LEP		(1 << 25)
-+#define DEVICE_TYPE_RC		(4 << 25)
-+#define SYS_INT_ID		29
-+#define MISCTRL_EN_ID		30
-+#define REG_TRANSLATION_ENABLE	31
-+
-+/*CR1 ID*/
-+#define APPS_PM_XMT_TURNOFF_ID	2
-+#define APPS_PM_XMT_PME_ID	5
-+
-+/*CR3 ID*/
-+#define XMLH_LTSSM_STATE_ID	0
-+#define XMLH_LTSSM_STATE_L0	((u32)0x11 << XMLH_LTSSM_STATE_ID)
-+#define XMLH_LTSSM_STATE_MASK	((u32)0x1F << XMLH_LTSSM_STATE_ID)
-+#define XMLH_LINK_UP_ID	5
-+
-+/*CR4 ID*/
-+#define CFG_MSI_EN_ID	18
-+
-+/*CR6*/
-+#define INTA_CTRL_INT	(1 << 7)
-+#define INTB_CTRL_INT	(1 << 8)
-+#define INTC_CTRL_INT	(1 << 9)
-+#define INTD_CTRL_INT	(1 << 10)
-+#define MSI_CTRL_INT	(1 << 26)
-+
-+/*CR19 ID*/
-+#define VEN_MSI_REQ_ID	11
-+#define VEN_MSI_FUN_NUM_ID	8
-+#define VEN_MSI_TC_ID	5
-+#define VEN_MSI_VECTOR_ID	0
-+#define VEN_MSI_REQ_EN	((u32)0x1 << VEN_MSI_REQ_ID)
-+#define VEN_MSI_FUN_NUM_MASK	((u32)0x7 << VEN_MSI_FUN_NUM_ID)
-+#define VEN_MSI_TC_MASK	((u32)0x7 << VEN_MSI_TC_ID)
-+#define VEN_MSI_VECTOR_MASK	((u32)0x1F << VEN_MSI_VECTOR_ID)
++#ifndef __ASSEMBLER__
++extern void spear_sleep_mode(suspend_state_t state);
++extern unsigned int spear_sleep_mode_sz;
++extern void spear_wakeup(void);
++extern unsigned int spear_wakeup_sz;
 +#endif
 +
-+/*CE21-22 ID*/
-+/*ID definitio of ARMISC*/
-+#define AXI_OP_TYPE_ID	0
-+#define AXI_OP_BCM_ID	5
-+#define AXI_OP_EP_ID	6
-+#define AXI_OP_TD_ID	7
-+#define AXI_OP_ATTRIBUTE_ID	8
-+#define AXI_OP_TC_ID	10
-+#define AXI_OP_MSG_CODE_ID	13
-+#define AXI_OP_DBI_ACCESS_ID	21
-+#define AXI_OP_TYPE_MASK	0x1F
-+#define AXI_OP_TYPE_MEM_RDRW	0
-+#define AXI_OP_TYPE_MEM_RDRW_LOCKED	1
-+#define AXI_OP_TYPE_IO_RDRW	2
-+#define AXI_OP_TYPE_CONFIG_RDRW_TYPE0	4
-+#define AXI_OP_TYPE_CONFIG_RDRW_TYPE1	5
-+#define AXI_OP_TYPE_MSG_REQ	16
-+#define AXI_OP_TYPE_COMPLETION	10
-+#define AXI_OP_TYPE_COMPLETION_LOCKED	11
-+#define AXI_OP_TYPE_DBI_ELBI_ENABLE	1
++/* SRAM related defines*/
++#define SRAM_STACK_STRT_OFF	0x500
++#define SRAM_STACK_SCR_OFFS	0xF00
++#define SPEAR_START_SRAM	SPEAR13XX_SYSRAM1_BASE
++#define SPEAR_LIMIT_SRAM	(SPEAR_START_SRAM + SZ_4K - 1)
++#define SPEAR_SRAM_STACK_PA	(SPEAR_START_SRAM + SRAM_STACK_STRT_OFF)
++#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
++/* SPEAr subsystem physical addresses */
++#define MPMC_BASE_PA		SPEAR13XX_MPMC_BASE
++#define MISC_BASE_PA		SPEAR13XX_MISC_BASE
 +
-+/* synopsis specific PCIE configuration registers*/
-+#define PCIE_MSI_ADDR_LO	0x820	/* 32 bits */
-+#define PCIE_MSI_ADDR_HI	0x824	/* 32 bits */
-+#define PCIE_MSI_INTR0_ENABLE	0x828	/* 32 bits */
-+#define PCIE_MSI_INTR0_MASK	0x82C	/* 32 bits */
-+#define PCIE_MSI_INTR0_STATUS	0x830	/* 32 bits */
++/* ARM Modes of Operation */
++#define MODE_USR_32		0x10
++#define MODE_FIQ_32		0x11
++#define MODE_IRQ_32		0x12
++#define MODE_SVC_32		0x13
++#define MODE_ABT_32		0x17
++#define MODE_UND_32		0x1B
++#define MODE_SYS_32		0x1F
++#define MODE_BITS		0x1F
 +
-+/*BAR MASK registers*/
-+#define PCIE_BAR0_MASK_REG	0x1010
-+
-+static inline void pcie_init(int (*fptr)(int port))
-+{
-+	pcie_port_is_host = fptr;
-+}
-diff --git a/arch/arm/mach-spear13xx/pcie.c b/arch/arm/mach-spear13xx/pcie.c
++#endif /* __MACH_SUSPEND_H */
+diff --git a/arch/arm/mach-spear13xx/pm.c b/arch/arm/mach-spear13xx/pm.c
 new file mode 100644
-index 0000000..4128897
+index 0000000..6152043
 --- /dev/null
-+++ b/arch/arm/mach-spear13xx/pcie.c
-@@ -0,0 +1,881 @@
++++ b/arch/arm/mach-spear13xx/pm.c
+@@ -0,0 +1,107 @@
 +/*
-+ * arch/arm/mach-spear13xx/pcie.c
++ * arch/arm/mach-spear13xx/pm.c
 + *
-+ * PCIe functions for SPEAr 13xx SoCs
++ * SPEAr13xx Power Management source file
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Pratyush Anand <pratyush.anand@st.com>
++ * Deepak Sikri <deepak.sikri@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/kernel.h>
-+#include <linux/pci.h>
-+#include <linux/msi.h>
-+#include <linux/mbus.h>
-+#include <linux/sched.h>
-+#include <asm/irq.h>
-+#include <asm/mach/pci.h>
-+#include <asm/mach/irq.h>
-+#include <mach/pcie.h>
++#include <linux/suspend.h>
++#include <linux/sysfs.h>
++#include <linux/module.h>
++#include <asm/cacheflush.h>
 +#include <mach/irqs.h>
-+#include <mach/misc_regs.h>
++#include <mach/suspend.h>
++#include <mach/hardware.h>
 +
-+#define NUM_PCIE_PORTS	3
-+
-+#define IN0_MEM_SIZE	(200 * 1024 * 1024 - 1)
-+/* In current implementation address translation is done using IN0 only.
-+ * So IN1 start address and IN0 end address has been kept same
-+*/
-+#define IN1_MEM_SIZE	(0 * 1024 * 1024 - 1)
-+#define IN_IO_SIZE	(20 * 1024 * 1024 - 1)
-+#define IN_CFG0_SIZE	(12 * 1024 * 1024 - 1)
-+#define IN_CFG1_SIZE	(12 * 1024 * 1024 - 1)
-+#define IN_MSG_SIZE	(12 * 1024 * 1024 - 1)
-+
-+#define MAX_LINK_UP_WAIT_JIFFIES	10
-+
-+int (*pcie_port_is_host)(int port);
-+static struct pcie_port pcie_port[NUM_PCIE_PORTS];
-+static u32 spr_pcie_base[NUM_PCIE_PORTS] = {
-+	SPEAR13XX_PCIE0_BASE,
-+	SPEAR13XX_PCIE1_BASE,
-+	SPEAR13XX_PCIE2_BASE,
-+};
-+static u32 spr_pcie_app_base[NUM_PCIE_PORTS] = {
-+	SPEAR13XX_PCIE0_APP_BASE,
-+	SPEAR13XX_PCIE1_APP_BASE,
-+	SPEAR13XX_PCIE2_APP_BASE,
-+};
-+
-+/* Keeping all DDR area of 256MB accesible for inbound transaction */
-+#define INBOUND_ADDR_MASK	0xFFFFFFF
-+
-+#ifdef CONFIG_PCI_MSI
-+static DECLARE_BITMAP(msi_irq_in_use[NUM_PCIE_PORTS], SPEAR_NUM_MSI_IRQS);
-+static unsigned int spear_msi_data[NUM_PCIE_PORTS];
-+
-+static void spear13xx_msi_init(struct pcie_port *pp);
-+#endif
-+
-+static void spear_pcie_int_handler(unsigned int irq, struct irq_desc *desc);
-+
-+static void enable_dbi_access(struct pcie_app_reg *app_reg)
++static int spear_pm_sleep(suspend_state_t state)
 +{
-+	/* Enable DBI access */
-+	writel(readl(&app_reg->slv_armisc) | (1 << AXI_OP_DBI_ACCESS_ID),
-+			&app_reg->slv_armisc);
-+	writel(readl(&app_reg->slv_awmisc) | (1 << AXI_OP_DBI_ACCESS_ID),
-+			&app_reg->slv_awmisc);
++	void (*spear_sram_sleep)(suspend_state_t state) = NULL;
++	void (*spear_sram_wake)(void) = NULL;
++	void *sram_dest = (void *)IO_ADDRESS(SPEAR_START_SRAM);
 +
-+}
++	if (state == PM_SUSPEND_MEM) {
++		spear_sram_wake = memcpy(sram_dest, (void *)spear_wakeup,
++				spear_wakeup_sz);
++		/* Increment destination pointer by the size copied*/
++		sram_dest += roundup(spear_wakeup_sz, 4);
++	}
 +
-+static void disable_dbi_access(struct pcie_app_reg *app_reg)
-+{
-+	/* disable DBI access */
-+	writel(readl(&app_reg->slv_armisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
-+			&app_reg->slv_armisc);
-+	writel(readl(&app_reg->slv_awmisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
-+			&app_reg->slv_awmisc);
-+
-+}
-+
-+static void spear_dbi_read_reg(struct pcie_port *pp, int where, int size,
-+		u32 *val)
-+{
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
-+	u32 va_address;
-+
-+	/* Enable DBI access */
-+	enable_dbi_access(app_reg);
-+
-+	va_address = (u32)pp->va_dbi_base + (where & ~0x3);
-+
-+	*val = readl(va_address);
-+
-+	if (size == 1)
-+		*val = (*val >> (8 * (where & 3))) & 0xff;
-+	else if (size == 2)
-+		*val = (*val >> (8 * (where & 3))) & 0xffff;
-+
-+	/* Disable DBI access */
-+	disable_dbi_access(app_reg);
-+}
-+
-+static void spear_dbi_write_reg(struct pcie_port *pp, int where, int size,
-+		u32 val)
-+{
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
-+	u32 va_address;
-+
-+	/* Enable DBI access */
-+	enable_dbi_access(app_reg);
-+
-+	va_address = (u32)pp->va_dbi_base + (where & ~0x3);
-+
-+	if (size == 4)
-+		writel(val, va_address);
-+	else if (size == 2)
-+		writew(val, va_address + (where & 2));
-+	else if (size == 1)
-+		writeb(val, va_address + (where & 3));
-+
-+	/* Disable DBI access */
-+	disable_dbi_access(app_reg);
-+}
-+
-+static int spear13xx_pcie_link_up(void __iomem *va_app_base)
-+{
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) va_app_base;
-+	unsigned long deadline = jiffies + MAX_LINK_UP_WAIT_JIFFIES;
-+
-+	do {
-+		if (readl(&app_reg->app_status_1) &
-+				((u32)1 << XMLH_LINK_UP_ID))
-+			return 1;
-+
-+		cond_resched();
-+	} while (!time_after_eq(jiffies, deadline));
-+
++	/* Copy the Sleep code on to the SRAM*/
++	spear_sram_sleep = memcpy(sram_dest, (void *)spear_sleep_mode,
++			spear_sleep_mode_sz);
++	flush_cache_all();
++	/* Jump to the suspend routines in sram */
++	spear_sram_sleep(state);
 +	return 0;
 +}
-+
-+static void spear13xx_pcie_host_init(struct pcie_port *pp)
-+{
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
-+
-+	/*setup registers for outbound translation */
-+
-+	writel(pp->base, &app_reg->in0_mem_addr_start);
-+	writel(app_reg->in0_mem_addr_start + IN0_MEM_SIZE,
-+			&app_reg->in0_mem_addr_limit);
-+	writel(app_reg->in0_mem_addr_limit + 1, &app_reg->in1_mem_addr_start);
-+	writel(app_reg->in1_mem_addr_start + IN1_MEM_SIZE,
-+			&app_reg->in1_mem_addr_limit);
-+	writel(app_reg->in1_mem_addr_limit + 1, &app_reg->in_io_addr_start);
-+	writel(app_reg->in_io_addr_start + IN_IO_SIZE,
-+			&app_reg->in_io_addr_limit);
-+	writel(app_reg->in_io_addr_limit + 1, &app_reg->in_cfg0_addr_start);
-+	writel(app_reg->in_cfg0_addr_start + IN_CFG0_SIZE,
-+			&app_reg->in_cfg0_addr_limit);
-+	writel(app_reg->in_cfg0_addr_limit + 1, &app_reg->in_cfg1_addr_start);
-+	writel(app_reg->in_cfg1_addr_start + IN_CFG1_SIZE,
-+			&app_reg->in_cfg1_addr_limit);
-+	writel(app_reg->in_cfg1_addr_limit + 1, &app_reg->in_msg_addr_start);
-+	writel(app_reg->in_msg_addr_start + IN_MSG_SIZE,
-+			&app_reg->in_msg_addr_limit);
-+
-+	writel(app_reg->in0_mem_addr_start, &app_reg->pom0_mem_addr_start);
-+	writel(app_reg->in1_mem_addr_start, &app_reg->pom1_mem_addr_start);
-+	writel(app_reg->in_io_addr_start, &app_reg->pom_io_addr_start);
-+
-+	/*setup registers for inbound translation */
-+
-+	writel(INBOUND_ADDR_MASK + 1, &app_reg->mem0_addr_offset_limit);
-+	writel(0, &app_reg->pim0_mem_addr_start);
-+	writel(0, &app_reg->pim1_mem_addr_start);
-+	spear_dbi_write_reg(pp, PCIE_BAR0_MASK_REG, 4, INBOUND_ADDR_MASK);
-+	spear_dbi_write_reg(pp, PCI_BASE_ADDRESS_0, 4, 0);
-+
-+	writel(0x0, &app_reg->pim_io_addr_start);
-+	writel(0x0, &app_reg->pim_io_addr_start);
-+	writel(0x0, &app_reg->pim_rom_addr_start);
-+
-+	writel(DEVICE_TYPE_RC | (1 << MISCTRL_EN_ID)
-+			| (1 << APP_LTSSM_ENABLE_ID)
-+			| ((u32)1 << REG_TRANSLATION_ENABLE),
-+			&app_reg->app_ctrl_0);
-+}
-+
-+static void __init spear13xx_pcie_preinit(void)
-+{
-+	int i;
-+	struct pcie_port *pp;
-+	struct pcie_app_reg *app_reg;
-+
-+	for (i = 0; i < NUM_PCIE_PORTS; i++) {
-+		pp = pcie_port + i;
-+		app_reg = (struct pcie_app_reg *) (pp->va_app_base);
-+
-+		if (!(*pcie_port_is_host)(i))
-+			continue;
-+		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
-+			"PCIe %d MEM", pp->port);
-+		pp->mem_space_name[sizeof(pp->mem_space_name) - 1] = 0;
-+		pp->res[0].name = pp->mem_space_name;
-+		pp->res[0].start = app_reg->in0_mem_addr_start;
-+		pp->res[0].end = app_reg->in0_mem_addr_limit;
-+		pp->res[0].flags = IORESOURCE_MEM;
-+
-+		snprintf(pp->io_space_name, sizeof(pp->io_space_name),
-+			"PCIe %d I/O", pp->port);
-+		pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
-+		pp->res[1].name = pp->io_space_name;
-+		pp->res[1].start = app_reg->in_io_addr_start;
-+		pp->res[1].end = app_reg->in_io_addr_limit;
-+		pp->res[1].flags = IORESOURCE_IO;
-+
-+		if (request_resource(&iomem_resource, &pp->res[0]))
-+			panic("can't allocate PCIe I/O space");
-+		if (request_resource(&iomem_resource, &pp->res[1]))
-+			panic("can't allocate PCIe MEM space");
-+	}
-+}
-+
-+static int __init spear13xx_pcie_setup(int nr, struct pci_sys_data *sys)
-+{
-+	struct pcie_port *pp;
-+	u32 val = 0;
-+
-+	if (nr >= NUM_PCIE_PORTS)
-+		return 0;
-+
-+	if (!(*pcie_port_is_host)(nr))
-+		return 0;
-+
-+	pp = &pcie_port[nr];
-+	if (!spear13xx_pcie_link_up((void __iomem *)pp->va_app_base))
-+		return 0;
-+	pp->root_bus_nr = sys->busnr;
-+
-+	/* Generic PCIe unit setup.*/
-+
-+	/* Enable own BME. It is necessary to enable own BME to do a
-+	 * memory transaction on a downstream device
-+	 */
-+	spear_dbi_read_reg(pp, PCI_COMMAND, 2, &val);
-+	val |= (PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER);
-+	spear_dbi_write_reg(pp, PCI_COMMAND, 2, val);
-+
-+	/* Need to come back here*/
-+
-+	sys->resource[0] = &pp->res[0];
-+	sys->resource[1] = &pp->res[1];
-+	sys->resource[2] = NULL;
-+
-+	return 1;
-+}
-+
-+static struct pcie_port *bus_to_port(int bus)
-+{
-+	int i;
-+
-+	for (i = NUM_PCIE_PORTS - 1; i >= 0; i--) {
-+		int rbus = pcie_port[i].root_bus_nr;
-+		if (!(*pcie_port_is_host)(i))
-+			continue;
-+		if (rbus != -1 && rbus <= bus)
-+			break;
-+	}
-+
-+	return i >= 0 ? pcie_port + i : NULL;
-+}
-+
-+static int pcie_valid_config(struct pcie_port *pp, int bus, int dev)
-+{
-+	/*If there is no link, then there is no device*/
-+	if (!spear13xx_pcie_link_up((void __iomem *)pp->va_app_base))
-+		return 0;
-+	/*
-+	 * Don't go out when trying to access nonexisting devices
-+	 * on the local bus.
-+	 * we have only one slot on each root port.
-+	 */
-+	if (bus == pp->root_bus_nr && dev > 0)
-+		return 0;
-+	return 1;
-+}
-+
-+static int spear13xx_pcie_rd_conf(struct pcie_port *pp, struct pci_bus *bus,
-+		u32 devfn, int where, int size, u32 *val)
-+{
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
-+	u32 va_address;
-+	u32 address = readl(&app_reg->in_cfg0_addr_start)
-+			| (PCI_FUNC(devfn) << 16)
-+			| (where & 0xFFFC);
-+
-+	writel((bus->number << 24) | (PCI_SLOT(devfn) << 19),
-+			&app_reg->pom_cfg0_addr_start);
-+	writel(readl(&app_reg->slv_armisc) & ~(AXI_OP_TYPE_MASK),
-+			&app_reg->slv_armisc);
-+	writel(readl(&app_reg->slv_armisc) | AXI_OP_TYPE_CONFIG_RDRW_TYPE0,
-+			&app_reg->slv_armisc);
-+	va_address = (u32)ioremap(address, 4);
-+	if (!va_address) {
-+		pr_err("error with ioremap in function %s\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	*val = readl(va_address);
-+	if (size == 1)
-+		*val = (*val >> (8 * (where & 3))) & 0xff;
-+	else if (size == 2)
-+		*val = (*val >> (8 * (where & 3))) & 0xffff;
-+
-+	iounmap((void *)va_address);
-+	writel(readl(&app_reg->slv_armisc) & ~(AXI_OP_TYPE_MASK),
-+			&app_reg->slv_armisc);
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static int pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
-+			int size, u32 *val)
-+{
-+	struct pcie_port *pp = bus_to_port(bus->number);
-+	unsigned long flags;
-+	int ret;
-+
-+	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0) {
-+		*val = 0xffffffff;
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+	}
-+
-+	spin_lock_irqsave(&pp->conf_lock, flags);
-+	ret = spear13xx_pcie_rd_conf(pp, bus, devfn, where, size, val);
-+	spin_unlock_irqrestore(&pp->conf_lock, flags);
-+
-+	return ret;
-+}
-+
-+static int spear13xx_pcie_wr_conf(struct pcie_port *pp, struct pci_bus *bus,
-+		u32 devfn, int where, int size, u32 val)
-+{
-+	int ret = PCIBIOS_SUCCESSFUL;
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
-+	u32 va_address;
-+	u32 address = readl(&app_reg->in_cfg0_addr_start)
-+			| (PCI_FUNC(devfn) << 16)
-+			| (where & 0xFFFC);
-+
-+	writel((bus->number << 24) | (PCI_SLOT(devfn) << 19),
-+			&app_reg->pom_cfg0_addr_start);
-+	writel(readl(&app_reg->slv_awmisc) & ~(AXI_OP_TYPE_MASK),
-+			&app_reg->slv_awmisc);
-+	writel(readl(&app_reg->slv_awmisc) | AXI_OP_TYPE_CONFIG_RDRW_TYPE0,
-+			&app_reg->slv_awmisc);
-+	va_address = (u32)ioremap(address, 4);
-+	if (!va_address) {
-+		pr_err("error with ioremap in function %s\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	if (size == 4)
-+		writel(val, va_address);
-+	else if (size == 2)
-+		writew(val, va_address + (where & 2));
-+	else if (size == 1)
-+		writeb(val, va_address + (where & 3));
-+	else
-+		ret = PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	iounmap((void *)va_address);
-+	writel(readl(&app_reg->slv_awmisc) & ~(AXI_OP_TYPE_MASK),
-+			&app_reg->slv_awmisc);
-+	return ret;
-+}
-+
-+static int pcie_wr_conf(struct pci_bus *bus, u32 devfn,
-+			int where, int size, u32 val)
-+{
-+	struct pcie_port *pp = bus_to_port(bus->number);
-+	unsigned long flags;
-+	int ret;
-+
-+	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0)
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+
-+	spin_lock_irqsave(&pp->conf_lock, flags);
-+	ret = spear13xx_pcie_wr_conf(pp, bus, devfn, where, size, val);
-+	spin_unlock_irqrestore(&pp->conf_lock, flags);
-+
-+	return ret;
-+}
-+
-+static struct pci_ops pcie_ops = {
-+	.read = pcie_rd_conf,
-+	.write = pcie_wr_conf,
-+};
-+
-+static struct pci_bus __init *
-+spear13xx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+{
-+	struct pci_bus *bus;
-+
-+	if ((nr < NUM_PCIE_PORTS) && (*pcie_port_is_host)(nr)) {
-+		bus = pci_scan_bus(sys->busnr, &pcie_ops, sys);
-+	} else {
-+		bus = NULL;
-+		BUG();
-+	}
-+
-+	return bus;
-+}
-+
-+static int __init spear13xx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-+{
-+	struct pcie_port *pp = bus_to_port(dev->bus->number);
-+	int irq = (SPEAR_INTX0_BASE + pp->port * SPEAR_NUM_INTX_IRQS + pin - 1);
-+
-+	return irq;
-+}
-+
-+static struct hw_pci spear13xx_pci __initdata = {
-+	.nr_controllers	= NUM_PCIE_PORTS,
-+	.preinit	= spear13xx_pcie_preinit,
-+	.swizzle	= pci_std_swizzle,
-+	.setup		= spear13xx_pcie_setup,
-+	.scan		= spear13xx_pcie_scan_bus,
-+	.map_irq	= spear13xx_pcie_map_irq,
-+};
-+
-+void mask_intx_irq(unsigned int irq)
-+{
-+	int irq_offset = (irq - SPEAR_INTX0_BASE) % SPEAR_NUM_INTX_IRQS;
-+	int port = (irq - SPEAR_INTX0_BASE) / SPEAR_NUM_INTX_IRQS;
-+	struct pcie_port *pp = &pcie_port[port];
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
-+
-+	switch (irq_offset) {
-+	case 0:
-+		writel(readl(&app_reg->int_mask) & ~INTA_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	case 1:
-+		writel(readl(&app_reg->int_mask) & ~INTB_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	case 2:
-+		writel(readl(&app_reg->int_mask) & ~INTC_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	case 3:
-+		writel(readl(&app_reg->int_mask) & ~INTD_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	}
-+}
-+
-+void unmask_intx_irq(unsigned int irq)
-+{
-+	int irq_offset = (irq - SPEAR_INTX0_BASE) % SPEAR_NUM_INTX_IRQS;
-+	int port = (irq - SPEAR_INTX0_BASE) / SPEAR_NUM_INTX_IRQS;
-+	struct pcie_port *pp = &pcie_port[port];
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
-+
-+	switch (irq_offset) {
-+	case 0:
-+		writel(readl(&app_reg->int_mask) | INTA_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	case 1:
-+		writel(readl(&app_reg->int_mask) | INTB_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	case 2:
-+		writel(readl(&app_reg->int_mask) | INTC_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	case 3:
-+		writel(readl(&app_reg->int_mask) | INTD_CTRL_INT,
-+				&app_reg->int_mask);
-+		break;
-+	}
-+}
-+
-+static struct irq_chip spear13xx_intx_chip = {
-+	.name = "PCI-INTX",
-+	.mask = mask_intx_irq,
-+	.unmask = unmask_intx_irq,
-+};
-+
-+static void spear13xx_int_init(struct pcie_port *pp)
-+{
-+	int i, irq;
-+	struct pcie_app_reg *app_reg;
-+
-+	set_irq_chained_handler(IRQ_PCIE0 + pp->port, spear_pcie_int_handler);
-+
-+#ifdef CONFIG_PCI_MSI
-+	spear13xx_msi_init(pp);
-+#endif
-+	/* Enbale INTX interrupt*/
-+	app_reg = (struct pcie_app_reg *)pp->va_app_base;
-+	writel(readl(&app_reg->int_mask) | INTA_CTRL_INT
-+			| INTB_CTRL_INT	| INTC_CTRL_INT
-+			| INTD_CTRL_INT, &app_reg->int_mask);
-+
-+	/* initilize INTX chip here only. MSI chip will be
-+	 * initilized dynamically.*/
-+	irq = (SPEAR_INTX0_BASE + pp->port * SPEAR_NUM_INTX_IRQS);
-+	for (i = 0; i < SPEAR_NUM_INTX_IRQS; i++) {
-+		set_irq_chip_and_handler(irq + i, &spear13xx_intx_chip,
-+				handle_simple_irq);
-+		set_irq_flags(irq + i, IRQF_VALID);
-+	}
-+}
-+
-+static void __init add_pcie_port(int port, u32 base, u32 app_base)
-+{
-+	struct pcie_port *pp = &pcie_port[port];
-+
-+	pp->port = port;
-+	pp->root_bus_nr = -1;
-+	pp->base = (void __iomem *)base;
-+	pp->app_base = (void __iomem *)app_base;
-+	pp->va_app_base = (void __iomem *) ioremap(app_base, 0x200);
-+	if (!pp->va_app_base) {
-+		pr_err("error with ioremap in function %s\n", __func__);
-+		return;
-+	}
-+	pp->va_dbi_base = (void __iomem *) ioremap(base, 0x2000);
-+	if (!pp->va_dbi_base) {
-+		pr_err("error with ioremap in function %s\n", __func__);
-+		return;
-+	}
-+	spin_lock_init(&pp->conf_lock);
-+	memset(pp->res, 0, sizeof(pp->res));
-+	pr_info("spear13xx PCIe port %d\n", port);
-+	if (spear13xx_pcie_link_up((void __iomem *)pp->va_app_base)) {
-+		pr_info("link up in bios\n");
-+	} else {
-+		pr_info("link down in bios\n");
-+		spear13xx_pcie_host_init(pp);
-+		spear13xx_int_init(pp);
-+
-+	}
-+}
-+
-+static int __init spear13xx_pcie_init(void)
-+{
-+	int port;
-+	struct clk *clk;
-+
-+	for (port = 0; port < NUM_PCIE_PORTS; port++) {
-+		/* do not enable clock if it is PCIE0. Ideally , all controller
-+		 * should have been independent from others with respect to
-+		 * clock. But PCIE1 and 2 depends on PCIE0.So PCIE0 clk
-+		 * is provided during board init.*/
-+		if (port == 1) {
-+			/* Ideally CFG Clock should have been also enabled
-+			 * here. But it is done currently during board
-+			 * init routne*/
-+			clk = clk_get_sys("pcie1", NULL);
-+			if (!clk) {
-+				pr_err("%s:couldn't get clk for pcie1\n",
-+						__func__);
-+				continue;
-+			}
-+			if (clk_enable(clk)) {
-+				pr_err("%s:couldn't enable clk for pcie1\n",
-+						__func__);
-+				continue;
-+			}
-+		} else if (port == 2) {
-+			/* Ideally CFG Clock should have been also enabled
-+			 * here. But it is done currently during board
-+			 * init routne*/
-+			clk = clk_get_sys("pcie2", NULL);
-+			if (!clk) {
-+				pr_err("%s:couldn't get clk for pcie2\n",
-+						__func__);
-+				continue;
-+			}
-+			if (clk_enable(clk)) {
-+				pr_err("%s:couldn't enable clk for pcie2\n",
-+						__func__);
-+				continue;
-+			}
-+		}
-+
-+		if ((*pcie_port_is_host)(port))
-+			add_pcie_port(port, spr_pcie_base[port],
-+					spr_pcie_app_base[port]);
-+	}
-+
-+	pci_common_init(&spear13xx_pci);
-+
-+	return 0;
-+}
-+subsys_initcall(spear13xx_pcie_init);
-+
-+#ifdef CONFIG_PCI_MSI
-+/* MSI int handler
-+ */
-+static void handle_msi(struct pcie_port *pp)
-+{
-+	unsigned long val;
-+	int i, pos;
-+
-+	for (i = 0; i < 8; i++) {
-+		spear_dbi_read_reg(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
-+				(u32 *)&val);
-+		if (val) {
-+			pos = 0;
-+			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
-+				generic_handle_irq(SPEAR_MSI0_INT_BASE
-+					+ pp->port * SPEAR_NUM_MSI_IRQS
-+					+ (i * 32) + pos);
-+				pos++;
-+			}
-+		}
-+		spear_dbi_write_reg(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4, val);
-+	}
-+}
-+#else
-+static void handle_msi(struct pcie_port *pp)
-+{
-+}
-+#endif
-+
-+static void spear_pcie_int_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct pcie_port *pp = &pcie_port[irq - IRQ_PCIE0];
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
-+	unsigned int status, type;
-+	int i;
-+
-+	status = readl(&app_reg->int_sts);
-+
-+	desc->chip->ack(irq);
-+
-+	for (i = 0; i < 26; i++) {
-+		type = status & (1 << i);
-+		switch (type) {
-+		case MSI_CTRL_INT:
-+			handle_msi(pp);
-+			writel(type, &app_reg->int_clr);
-+			break;
-+		case INTA_CTRL_INT:
-+			generic_handle_irq(SPEAR_INTX0_BASE
-+					+ pp->port * SPEAR_NUM_INTX_IRQS);
-+			break;
-+		case INTB_CTRL_INT:
-+			generic_handle_irq(SPEAR_INTX0_BASE
-+					+ pp->port * SPEAR_NUM_INTX_IRQS + 1);
-+			break;
-+		case INTC_CTRL_INT:
-+			generic_handle_irq(SPEAR_INTX0_BASE
-+					+ pp->port * SPEAR_NUM_INTX_IRQS + 2);
-+			break;
-+		case INTD_CTRL_INT:
-+			generic_handle_irq(SPEAR_INTX0_BASE
-+					+ pp->port * SPEAR_NUM_INTX_IRQS + 3);
-+			break;
-+		default:
-+			writel(type, &app_reg->int_clr);
-+			break;
-+		}
-+	}
-+
-+	desc->chip->unmask(irq);
-+}
-+
-+#ifdef CONFIG_PCI_MSI
-+static int find_valid_pos0(int port, int nvec, int pos, int *pos0)
-+{
-+	int flag = 1;
-+	do {
-+		pos = find_next_zero_bit(msi_irq_in_use[port],
-+				SPEAR_NUM_MSI_IRQS, pos);
-+		/*if you have reached to the end then get out from here.*/
-+		if (pos == SPEAR_NUM_MSI_IRQS)
-+			return -ENOSPC;
-+		/* Check if this position is at correct offset.nvec is always a
-+		 * power of two. pos0 must be nvec bit alligned.
-+		 */
-+		if (pos % nvec)
-+			pos += nvec - (pos % nvec);
-+		else
-+			flag = 0;
-+	} while (flag);
-+
-+	*pos0 = pos;
-+	return 0;
-+}
-+
-+static void spear13xx_msi_nop(unsigned int irq)
-+{
-+	return;
-+}
-+
-+static struct irq_chip spear13xx_msi_chip = {
-+	.name = "PCI-MSI",
-+	.ack = spear13xx_msi_nop,
-+	.enable = unmask_msi_irq,
-+	.disable = mask_msi_irq,
-+	.mask = mask_msi_irq,
-+	.unmask = unmask_msi_irq,
-+};
 +
 +/*
-+ * Dynamic irq allocate and deallocation
++ *	spear_pm_prepare - Do preliminary suspend work.
++ *
 + */
-+static int get_irq(int nvec, struct msi_desc *desc, int *pos)
++static int spear_pm_prepare(void)
 +{
-+	int res, bit, irq, pos0, pos1, i;
-+	u32 val;
-+	struct pcie_port *pp = bus_to_port(desc->dev->bus->number);
-+
-+	pos0 = find_first_zero_bit(msi_irq_in_use[pp->port],
-+			SPEAR_NUM_MSI_IRQS);
-+	if (pos0 % nvec) {
-+		if (find_valid_pos0(pp->port, nvec, pos0, &pos0))
-+			goto no_valid_irq;
-+	}
-+	if (nvec > 1) {
-+		pos1 = find_next_bit(msi_irq_in_use[pp->port],
-+				SPEAR_NUM_MSI_IRQS, pos0);
-+		/* there must be nvec number of consecutive free bits */
-+		while ((pos1 - pos0) < nvec) {
-+			if (find_valid_pos0(pp->port, nvec, pos1, &pos0))
-+				goto no_valid_irq;
-+			pos1 = find_next_bit(msi_irq_in_use[pp->port],
-+					SPEAR_NUM_MSI_IRQS, pos0);
-+		}
-+	}
-+
-+	irq = (SPEAR_MSI0_INT_BASE + (pp->port * SPEAR_NUM_MSI_IRQS)) + pos0;;
-+
-+	if ((irq + nvec) > (SPEAR_MSI0_INT_END
-+				+ (pp->port * SPEAR_NUM_MSI_IRQS)))
-+		goto no_valid_irq;
-+
-+	i = 0;
-+	while (i < nvec) {
-+		set_bit(pos0 + i, msi_irq_in_use[pp->port]);
-+		dynamic_irq_init(irq + i);
-+		set_irq_msi(irq + i, desc);
-+		set_irq_chip_and_handler(irq + i, &spear13xx_msi_chip,
-+				handle_simple_irq);
-+
-+		/* Enable corresponding interrupt on MSI interrupt
-+		 * controller.
-+		 */
-+		res = ((pos0 + i) / 32) * 12;
-+		bit = (pos0 + i) % 32;
-+		spear_dbi_read_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
-+		val |= 1 << bit;
-+		spear_dbi_write_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
-+
-+		i++;
-+	}
-+
-+	*pos = pos0;
-+	return irq;
-+no_valid_irq:
-+	*pos = pos0;
-+	return -ENOSPC;
-+}
-+
-+static void clean_irq(unsigned int irq)
-+{
-+	int res, bit, val, pos;
-+	struct irq_desc *desc = irq_to_desc(irq);
-+	struct pcie_port *pp = bus_to_port(desc->msi_desc->dev->bus->number);
-+
-+	pos = irq - (SPEAR_MSI0_INT_BASE + (pp->port * SPEAR_NUM_MSI_IRQS));
-+
-+	dynamic_irq_cleanup(irq);
-+
-+	clear_bit(pos, msi_irq_in_use[pp->port]);
-+
-+	/* Disable corresponding interrupt on MSI interrupt
-+	 * controller.
-+	 */
-+	res = (pos / 32) * 12;
-+	bit = pos % 32;
-+	spear_dbi_read_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
-+	val &= ~(1 << bit);
-+	spear_dbi_write_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
-+
-+}
-+
-+int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+{
-+	int cvec, rvec, irq, pos;
-+	struct msi_msg msg;
-+	uint16_t control;
-+	struct pcie_port *pp = bus_to_port(pdev->bus->number);
-+
-+	/*
-+	 * Read the MSI config to figure out how many IRQs this device
-+	 * wants.Most devices only want 1, which will give
-+	 * configured_private_bits and request_private_bits equal 0.
-+	 */
-+	pci_read_config_word(pdev, desc->msi_attrib.pos + PCI_MSI_FLAGS,
-+			&control);
-+
-+	/*
-+	 * If the number of private bits has been configured then use
-+	 * that value instead of the requested number. This gives the
-+	 * driver the chance to override the number of interrupts
-+	 * before calling pci_enable_msi().
-+	 */
-+
-+	cvec = (control & PCI_MSI_FLAGS_QSIZE) >> 4;
-+
-+	if (cvec == 0) {
-+		/* Nothing is configured, so use the hardware requested size */
-+		rvec = (control & PCI_MSI_FLAGS_QMASK) >> 1;
-+	} else {
-+		/*
-+		 * Use the number of configured bits, assuming the
-+		 * driver wanted to override the hardware request
-+		 * value.
-+		 */
-+		rvec = cvec;
-+	}
-+
-+	/*
-+	 * The PCI 2.3 spec mandates that there are at most 32
-+	 * interrupts. If this device asks for more, only give it one.
-+	 */
-+	if (rvec > 5)
-+		rvec = 0;
-+
-+	irq = get_irq((1 << rvec), desc, &pos);
-+
-+	 if (irq < 0)
-+		return irq;
-+
-+	 /* Update the number of IRQs the device has available to it */
-+	 control &= ~PCI_MSI_FLAGS_QSIZE;
-+	 control |= rvec << 4;
-+	 pci_write_config_word(pdev, desc->msi_attrib.pos + PCI_MSI_FLAGS,
-+			 control);
-+	 desc->msi_attrib.multiple = rvec;
-+
-+	/* An EP will modify lower 8 bits(max) of msi data while
-+	 * sending any msi interrupt
-+	 */
-+	msg.address_hi = 0x0;
-+	msg.address_lo = __virt_to_phys((u32)(&spear_msi_data[pp->port]));
-+	msg.data = pos;
-+	write_msi_msg(irq, &msg);
-+
++	/* We cannot sleep in idle until we have resumed */
++	disable_hlt();
 +	return 0;
 +}
 +
-+void arch_teardown_msi_irq(unsigned int irq)
-+{
-+	clean_irq(irq);
-+}
-+
-+static void spear13xx_msi_init(struct pcie_port *pp)
-+{
-+	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
-+
-+	spear_dbi_write_reg(pp, PCIE_MSI_ADDR_LO, 4,
-+			__virt_to_phys((u32)(&spear_msi_data[pp->port])));
-+	spear_dbi_write_reg(pp, PCIE_MSI_ADDR_HI, 4, 0);
-+	/* Enbale MSI interrupt*/
-+	writel(readl(&app_reg->int_mask) | MSI_CTRL_INT,
-+			&app_reg->int_mask);
-+}
-+#endif
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 4267b46..c5ac2fb 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -17,6 +17,7 @@
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <mach/pcie.h>
- #include <plat/keyboard.h>
- #include <plat/nand.h>
- #include <plat/smi.h>
-@@ -48,6 +49,30 @@ static struct kbd_platform_data kbd_data = {
- 	.rep = 1,
- };
- 
-+#ifdef CONFIG_PCIEPORTBUS
-+/* this function is needed for PCIE host and device driver. Same
-+ * controller can not be programmed as host as well as device. So host
-+ * driver must call this function and if this function returns 1 then
-+ * only host should add that particular port as RC.
-+ * A port to be added as device, one must also add device's information
-+ * in plat_devs array defined in this file.
-+ * it is the responsibility of calling function to not send port number
-+ * greter than max no of controller(3)
++/*
++ *	spear_pm_enter - Actually enter a sleep state.
++ *	@state:		State we're entering.
++ *
 + */
-+static int spear1300_pcie_port_is_host(int port)
++static int spear_pm_enter(suspend_state_t state)
 +{
-+	switch (port) {
-+	case 0:
-+		return 0;
-+	case 1:
-+		return 1;
-+	case 2:
-+		return 1;
++	int ret;
++
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++	case PM_SUSPEND_MEM:
++		ret = spear_pm_sleep(state);
++		break;
++	default:
++		return -EINVAL;
 +	}
-+	return -EINVAL;
++
++	return ret;
 +}
++
++/*
++ *	spear_pm_finish - Finish up suspend sequence.
++ *
++ *	This is called after we wake back up (or if entering the sleep state
++ *	failed).
++ */
++static void spear_pm_finish(void)
++{
++	enable_hlt();
++}
++
++static struct platform_suspend_ops spear_pm_ops = {
++	.prepare	= spear_pm_prepare,
++	.enter		= spear_pm_enter,
++	.finish		= spear_pm_finish,
++	.valid		= suspend_valid_only_mem,
++};
++
++static int __init spear_pm_init(void)
++{
++	void * sram_limit_va = (void *)IO_ADDRESS(SPEAR_LIMIT_SRAM);
++	void * sram_st_va = (void *)IO_ADDRESS(SPEAR_START_SRAM);
++
++	/* In case the suspend code size is more than sram size return */
++	if (spear_sleep_mode_sz > (sram_limit_va - sram_st_va))
++		return	-ENOMEM;
++
++	suspend_set_ops(&spear_pm_ops);
++
++	return 0;
++}
++arch_initcall(spear_pm_init);
+diff --git a/arch/arm/mach-spear13xx/sleep.S b/arch/arm/mach-spear13xx/sleep.S
+new file mode 100644
+index 0000000..9c7f12b
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/sleep.S
+@@ -0,0 +1,435 @@
++/*
++ * linux/arch/arm/mach-spear13xx/sleep.S
++ *
++ * SPEAR13xx specific functions that will run in internal SRAM.
++ * The functions are used in power management.
++ *
++ * Copyright (C) 2010 ST MicroElectronics
++ * Deepak Sikri <deepak.sikri@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <mach/hardware.h>
++#include <mach/suspend.h>
++
++/* #define DDR_PLL_SREFRESH */
++/* #define TEST_PWRDOMAINS */
++.text
++ENTRY(spear_wakeup)
++
++spear_wakeup:
++	b	spear_wakeup
++	adr	r0, spear_sleep_restore
++	bx	r0
++
++ENTRY(spear_wakeup_sz)
++	.word	. - spear_wakeup
++/*
++ * spear_sleep_mode()
++ * Forces SPEAr into sleep
++ */
++ENTRY(spear_sleep_mode)
++	stmfd	sp!, {r0-r12, lr}		@ save registers on stack
++	/* Store Stack address in r8 */
++	ldr	r8, SRAM_STACK_VA
++
++	/* Store sp and spsr to SDRAM */
++	mov	r4, sp
++	mrs	r5, spsr
++	mov	r6, lr
++	stmia	r8!, {r4-r6}
++
++	/* Save all ARM registers */
++	/* Coprocessor access control register */
++	mrc	p15, 0, r6, c1, c0, 2
++	stmia	r8!, {r6}
++	/* TTBR0, TTBR1 and Translation table base control */
++	mrc	p15, 0, r4, c2, c0, 0
++	mrc	p15, 0, r5, c2, c0, 1
++	mrc	p15, 0, r6, c2, c0, 2
++	stmia	r8!, {r4-r6}
++	/*
++	 * Domain access control register, data fault status register,
++	 * and instruction fault status register
++	 */
++	mrc	p15, 0, r4, c3, c0, 0
++	mrc	p15, 0, r5, c5, c0, 0
++	mrc	p15, 0, r6, c5, c0, 1
++	stmia	r8!, {r4-r6}
++	/*
++	 * Data aux fault status register, instruction aux fault status,
++	 * data fault address register and instruction fault address register
++	 */
++	mrc	p15, 0, r4, c5, c1, 0
++	mrc	p15, 0, r5, c5, c1, 1
++	mrc	p15, 0, r6, c6, c0, 0
++	mrc	p15, 0, r7, c6, c0, 2
++	stmia	r8!, {r4-r7}
++	/*
++	 * user r/w thread and process ID, user r/o thread and process ID,
++	 * priv only thread and process ID, cache size selection
++	 */
++	mrc	p15, 0, r4, c13, c0, 2
++	mrc	p15, 0, r5, c13, c0, 3
++	mrc	p15, 0, r6, c13, c0, 4
++	mrc	p15, 2, r7, c0, c0, 0
++	stmia	r8!, {r4-r7}
++	/* Data TLB lockdown, instruction TLB lockdown registers */
++	mrc	p15, 0, r5, c10, c0, 0
++	mrc	p15, 0, r6, c10, c0, 1
++	stmia	r8!, {r5-r6}
++	/* Secure or non secure vector base address, FCSE PID, Context PID*/
++	mrc	p15, 0, r4, c12, c0, 0
++	mrc	p15, 0, r5, c13, c0, 0
++	mrc	p15, 0, r6, c13, c0, 1
++	stmia	r8!, {r4-r6}
++	/* Primary remap, normal remap registers */
++	mrc	p15, 0, r4, c10, c2, 0
++	mrc	p15, 0, r5, c10, c2, 1
++	stmia	r8!, {r4-r5}
++	/* Store current cpsr*/
++	mrs	r2, cpsr
++	stmia	r8!, {r2}
++	mrc	p15, 0, r4, c1, c0, 0
++	/* save control register */
++	stmia	r8!, {r4}
++	/* Data memory barrier and Data sync barrier */
++	mov	r1, #0
++	mcr	p15, 0, r1, c7, c10, 4
++	mcr	p15, 0, r1, c7, c10, 5
++	dsb
++	isb
++	/* Extract the physical address to jump to */
++	adr	r0, mmu_off
++	mov	r1, #0xcfffffff
++	and	r0, r0, r1
++	ldr	r1, =0x20000000
++	orr	r0, r0, r1
++	mov	r2, r0
++
++	/* Disable MMU */
++	mrc	p15, 0, r0, c1, c0, 0
++	ldr	r1, DISABLE_I_C_M_V
++	bic	r0, r0, r1
++	mcr	p15, 0, r0, c1, c0, 0
++	/* Move the Physical address into PC */
++	bx	r2
++	nop
++mmu_off:
++	/* Put the DDR in self refresh mode */
++	ldr	r6, MISC_BASE_P
++	/* Program MPMC Control Status register in Misc Space */
++	ldr	r0, [r6, #0x334]
++	/* Set srefresh_enter bit(2) */
++	orr	r0, r0, #0x4
++	str	r0, [r6, #0x334]
++wait_till_srefresh_on:
++	ldr	r0, [r6, #0x334]
++	/* check for cke_status bit(13) */
++	tst	r0, #0x2000
++	beq	wait_till_srefresh_on
++
++	/* Put the system in slow mode */
++	ldr	r0, [r6, #0x200]
++	bic	r0, r0, #0x4
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	orr	r0, r0, #0x2
++	str	r0, [r6, #0x200]	/* System is now in slow mode */
++wait_till_slow_mode:
++	ldr	r0, [r6, #0x200]
++	/* Wait for the mode to be updated */
++	and	r0, r0, #0xF0000
++	/* Poll the SCCTRL register status bits (6:3) */
++	cmp	r0, #0xA0000
++	bne wait_till_slow_mode
++
++	/*
++	 * Put the all the system pll's to off state
++	 * The loop of count 3 is provided below to
++	 * switch off the pll-1/2/3.
++	 * r1 contains the offset for the pll control
++	 * registers in the misc space.
++	 * DDR pll-4 requires different processing.
++	 */
++	ldr	r1, MISC_PLL_OFFS
++	ldr	r2, =0x0	/* PLL Counter 1, 2, 3, 4 */
++swoff_pll:
++	ldr	r0, [r6, r1]
++	/* Clear pll_enable bit(1) of PLL1_CTR register in Misc registers */
++	bic	r0, r0, #0x02
++	str	r0, [r6, r1]
++	add	r1, #0xc
++	add	r2, #0x1
++	cmp	r2, #0x3	/* Switch off pll-1/2/3 */
++	bne	swoff_pll
++
++#ifdef DDR_PLL_SREFRESH
++	/* Switch off pll-4 */
++	ldr	r0, [r6, r1]
++	/* Clear pll_enable bit(2) of PLL1_CTR register in Misc registers */
++	bic	r0, r0, #0x04
++	str	r0, [r6, r1]
 +#endif
 +
- static void __init spear1300_evb_init(void)
- {
- 	unsigned int i;
-@@ -69,6 +94,12 @@ static void __init spear1300_evb_init(void)
- 	/* initialize serial nor related data in smi plat data */
- 	smi_init_board_info(&smi_device);
- 
-+#ifdef CONFIG_PCIEPORTBUS
-+	/* Enable PCIE0 clk */
-+	enable_pcie0_clk();
-+	pcie_init(&spear1300_pcie_port_is_host);
++#ifdef TEST_PWRDOMAINS
++	/* Switch off the undesired PLL's */
++	nop
++	ldr	r6, MISC_BASE_P
++	ldr	r0, [r6, #0x200]
++	bic	r0, r0, #0x7
++	orr	r0, r0, #0x2
++	str	r0, [r6, #0x200	]
++wait_ack0:
++	ldr	r0, [r6, #0x200]
++	and	r0, r0, #0xF0000
++	cmp	r0, #0xA0000
++	bne	wait_ack0
++	ldr	r6, MISC_BASE_P
++	ldr	r0, [r6, #0x100]
++
++	/*
++	 * Switch off the power domains.
++	 * Clear the ack bit
++	 */
++	bic	r0, r0, #0xc000
++	str	r0, [r6, #0x100]
++
++	bic	r0, r0, #0x1000
++	str	r0, [r6, #0x100]
++
++wait_ack1:
++	ldr	r0, [r6, #0x100]
++	tst	r0, #0x4000
++	beq	wait_ack1
++
++	/* Clear the ack bit */
++	bic	r0, r0, #0xc000
++	str	r0, [r6, #0x100]
++
++	bic	r0, r0, #0x0800
++	str	r0, [r6, #0x100]
++wait_ack2:
++	ldr	r0, [r6, #0x100]
++	tst	r0, #0x4000
++	beq	wait_ack2
++
++	/* Clear the ack bit */
++	bic	r0, r0, #0xc000
++	str	r0, [r6, #0x100]
++
++	bic	r0, r0, #0x2400
++	str	r0, [r6, #0x100]
++wait_ack3:
++	ldr	r0, [r6, #0x100]
++	tst	r0, #0x4000
++	beq	wait_ack3
++#endif
++	wfi				@ wait for interrupt
++	nop
++spear_sleep_restore:
++	/*
++	 * Reenable the switched off pll's. The Pll's are
++	 * enabled using loop count of 4 to activalte all the
++	 * pll-1/2/3/4.
++	 * The strobing is done for pll-4 only.
++	 */
++
++	ldr	r6, MISC_BASE_P
++	ldr	r1, MISC_PLL_OFFS
++	ldr	r2, =0x0	/* PLL Counter 1, 2, 3, 4 */
++swon_pll_1_3:
++	/* Switch on Pll-1/2/3 */
++	ldr	r0, [r6, r1]
++	orr	r0, r0, #0x2
++	str	r0, [r6, r1]
++pll_lock_1_3:
++	/* Set the pll_lock bit(0) in PLLX_CTR register in misc space*/
++	ldr	r5, [r6, r1]
++	and	r5, r5, #0x1
++	/* Wait for pll lock status */
++	cmp	r5, #0x1
++	bne	pll_lock_1_3
++
++	/* Loop for all the pll's */
++	add	r1, #0xc
++	add	r2, #0x1
++	cmp	r2, #0x3	/* Switch on till pll-3 */
++	bne	swon_pll_1_3
++
++#ifdef DDR_PLL_SREFRESH
++	/* Switch on PLL-4, strobe the pll also */
++	ldr	r0, [r6, r1]
++	ldr	r0, PLL_VAL1
++	str	r0, [r6, r1]
++	ldr	r0, PLL_VAL2
++	str	r0, [r6, r1]
++	ldr	r0, PLL_VAL3
++	str	r0, [r6, r1]
++	ldr	r0, PLL_VAL2
++	str	r0, [r6, r1]
++pll_lock_4:
++	/* Set the pll_lock bit(0) in PLLX_CTR register in misc space*/
++	ldr	r5, [r6, r1]
++	and	r5, r5, #0x1
++	/* Wait for pll lock status */
++	cmp	r5, #0x1
++	bne	pll_lock_4
 +#endif
 +
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
- 
++	/* Put the system in normal mode */
++	ldr	r0, [r6, #0x200]
++	bic	r0, r0, #0x7
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	orr	r0, r0, #0x4
++	str	r0, [r6, #0x200]	/* System is now in slow mode */
++wait_till_normal_mode:
++	ldr	r0, [r6, #0x200]
++	/* Wait for the mode to be updated */
++	and	r0, r0, #0xF0000
++	/* Poll the SCCTRL register status bits (6:3) */
++	cmp	r0, #0xf0000
++	bne wait_till_normal_mode
++
++	/*
++	 * Invalidate all instruction caches to PoU
++	 * and flush branch target cache
++	 */
++	mov	r1, #0
++	mcr	p15, 0, r1, c7, c5, 0
++
++	ldr	r3, SRAM_STACK_PA
++	ldmia	r3!, {r4-r6}
++	mov	sp, r4
++	msr	spsr_cxsf, r5
++	mov	lr, r6
++
++	ldmia	r3!, {r4-r9}
++	/* Coprocessor access Control Register */
++	mcr	p15, 0, r4, c1, c0, 2
++
++	/* TTBR0 */
++	mcr	p15, 0, r5, c2, c0, 0
++	/* TTBR1 */
++	mcr	p15, 0, r6, c2, c0, 1
++	/* Translation table base control register */
++	mcr	p15, 0, r7, c2, c0, 2
++	/*domain access Control Register */
++	mcr	p15, 0, r8, c3, c0, 0
++	/* data fault status Register */
++	mcr	p15, 0, r9, c5, c0, 0
++
++	ldmia	r3!, {r4-r8}
++	/* instruction fault status Register */
++	mcr	p15, 0, r4, c5, c0, 1
++	/*Data Auxiliary Fault Status Register */
++	mcr	p15, 0, r5, c5, c1, 0
++	/*Instruction Auxiliary Fault Status Register*/
++	mcr	p15, 0, r6, c5, c1, 1
++	/*Data Fault Address Register */
++	mcr	p15, 0, r7, c6, c0, 0
++	/*Instruction Fault Address Register*/
++	mcr	p15, 0, r8, c6, c0, 2
++	ldmia	r3!, {r4-r7}
++
++	/* user r/w thread and process ID */
++	mcr	p15, 0, r4, c13, c0, 2
++	/* user ro thread and process ID */
++	mcr	p15, 0, r5, c13, c0, 3
++	/*Privileged only thread and process ID */
++	mcr	p15, 0, r6, c13, c0, 4
++	/* cache size selection */
++	mcr	p15, 2, r7, c0, c0, 0
++	ldmia	r3!, {r4-r8}
++	/* Data TLB lockdown registers */
++	mcr	p15, 0, r4, c10, c0, 0
++	/* Instruction TLB lockdown registers */
++	mcr	p15, 0, r5, c10, c0, 1
++	/* Secure or Nonsecure Vector Base Address */
++	mcr	p15, 0, r6, c12, c0, 0
++	/* FCSE PID */
++	mcr	p15, 0, r7, c13, c0, 0
++	/* Context PID */
++	mcr	p15, 0, r8, c13, c0, 1
++
++	ldmia	r3!, {r4-r5}
++	/* primary memory remap register */
++	mcr	p15, 0, r4, c10, c2, 0
++	/*normal memory remap register */
++	mcr	p15, 0, r5, c10, c2, 1
++
++	/* Restore cpsr */
++	ldmfd	r3!, {r4}	/*load CPSR from SDRAM*/
++	msr	cpsr, r4	/*store cpsr */
++	dsb
++	isb
++	mov	r0, #0
++	mcr	p15, 0, r0, c7, c5, 4	@ Flush prefetch buffer
++	mcr	p15, 0, r0, c7, c5, 6	@ Invalidate branch predictor array
++	mcr	p15, 0, r0, c8, c5, 0	@ Invalidate instruction TLB
++	mcr	p15, 0, r0, c8, c6, 0	@ Invalidate data TLB
++
++	adr	r5, mmu_on
++	mov	r1, #0xcfffffff
++	and	r5, r5, r1
++	ldr	r1, =0x30000000
++	orr	r5, r5, r1
++	mov	r4, r5
++
++	/* Move the DDR out of self refresh mode */
++	ldr	r6, MISC_BASE_P
++	ldr	r7, MPMC_BASE_P
++	/* Program MPMC Control Status register in Misc Space */
++	ldr	r0, [r6, #0x334]
++	/* Clear srefresh_enter bit(2) */
++	bic	r0, r0, #0x4
++	str	r0, [r6, #0x334]
++	/* Additional clearance is required in the mpmc space */
++	ldr	r0, [r7, #0x2c]
++	/*
++	 * Clear bit srefresh bit (2) of MPMC_11 register
++	 * The misc wrapper does not works fine by itself till
++	 * this bit is also cleared.
++	 */
++	bic	r0, r0, #0x10000
++	str	r0, [r7, #0x2c]
++wait_for_refresh_exit:
++	ldr	r0, [r6, #0x334]
++	tst	r0, #0x2000
++	bne	wait_for_refresh_exit
++
++	ldmfd	r3!, {r2}
++	/* restore the MMU control register from stack to enable mmu */
++	mcr	p15, 0, r2, c1, c0, 0
++	bx	r4
++
++mmu_on:
++	ldmfd	sp!, {r0-r12, pc}		@ restore regs and return
++	nop
++
++MPMC_BASE_P :
++	.word MPMC_BASE_PA
++MISC_BASE_P :
++	.word MISC_BASE_PA
++SRAM_STACK_VA :
++	.word IO_ADDRESS(SPEAR_SRAM_STACK_PA)
++SRAM_STACK_PA :
++	.word SPEAR_SRAM_STACK_PA
++DISABLE_I_C_M_V:
++	.word 0x1805
++MISC_PLL_OFFS:
++	.word 0x214
++#ifdef DDR_PLL_SREFRESH
++PLL_VAL1:
++	.word 0x060a
++PLL_VAL2:
++	.word 0x060e
++PLL_VAL3:
++	.word 0x0606
++#endif
++ENTRY(spear_sleep_mode_sz)
++	.word	. - spear_sleep_mode
 diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 4810652..c5a0a0c 100644
+index 6d71aac..59eaf98 100644
 --- a/arch/arm/mach-spear13xx/spear13xx.c
 +++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -318,6 +318,34 @@ struct platform_device smi_device = {
- 	.resource = smi_resources,
+@@ -454,6 +454,11 @@ struct map_desc spear13xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM0_BASE),
+ 		.length		= SZ_32K,
+ 		.type		= MT_DEVICE
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR13XX_SYSRAM1_BASE),
++		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM1_BASE),
++		.length		= SZ_1M,
++		.type		= MT_MEMORY_NONCACHED
+ 	},
  };
  
-+#ifdef CONFIG_PCIEPORTBUS
-+/* PCIE0 clock always needs to be enabled if any of the three PCIE port
-+ * have to be used. So call this function from the board initilization
-+ * file. Ideally , all controller should have been independent from
-+ * others with respect to clock.
+diff --git a/arch/arm/mach-spear3xx/include/mach/suspend.h b/arch/arm/mach-spear3xx/include/mach/suspend.h
+new file mode 100644
+index 0000000..a525173
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/suspend.h
+@@ -0,0 +1,44 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/suspend.h
++ *
++ * Sleep mode defines for SPEAr3xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+int enable_pcie0_clk(void)
-+{
-+	struct clk *clk;
-+	/*Enable all CLK in CFG registers here only. Idealy only PCIE0
-+	 * should have been enabled. But Controler does not work
-+	 * properly if PCIE1 and PCIE2's CFG CLK is enabled in stages.
-+	 */
-+	writel(PCIE0_CFG_VAL | PCIE1_CFG_VAL | PCIE2_CFG_VAL, PCIE_CFG);
-+	clk = clk_get_sys("pcie0", NULL);
-+	if (!clk) {
-+		pr_err("%s:couldn't get clk for pcie0\n", __func__);
-+		return -ENODEV;
-+	}
-+	if (clk_enable(clk)) {
-+		pr_err("%s:couldn't enable clk for pcie0\n", __func__);
-+		return -ENODEV;
-+	}
 +
-+	return 0;
-+}
++#ifndef __MACH_SUSPEND_H
++#define __MACH_SUSPEND_H
++
++#include <mach/spear.h>
++
++#ifndef __ASSEMBLER__
++extern void spear_sleep_mode(suspend_state_t state);
++extern unsigned int spear_sleep_mode_sz;
 +#endif
 +
- /* Do spear13xx familiy common initialization part here */
- void __init spear13xx_init(void)
- {
-diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
-index 80f402b..b8e4988 100644
---- a/arch/arm/plat-spear/Kconfig
-+++ b/arch/arm/plat-spear/Kconfig
-@@ -12,6 +12,7 @@ config ARCH_SPEAR13XX
- 	bool "SPEAr13XX"
- 	select ARM_GIC
- 	select CPU_V7
-+	select ARCH_SUPPORTS_MSI
- 	help
- 	  Supports for ARM's SPEAR13XX family
++/* SRAM related defines*/
++#define SRAM_STACK_SCR_OFFS	0xF00
++#define SPEAR_START_SRAM	SPEAR3XX_ICM1_SRAM_BASE
++#define SPEAR_SRAM_SIZE		SZ_4K
++#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
++/* SPEAr subsystem physical addresses */
++#define SYS_CTRL_BASE_PA	SPEAR3XX_ICM3_SYS_CTRL_BASE
++#define MPMC_BASE_PA		SPEAR3XX_ICM3_SDRAM_CTRL_BASE
++#define MISC_BASE_PA		SPEAR3XX_ICM3_MISC_REG_BASE
++
++/* ARM Modes of Operation */
++#define MODE_USR_32		0x10
++#define MODE_FIQ_32		0x11
++#define MODE_IRQ_32		0x12
++#define MODE_SVC_32		0x13
++#define MODE_ABT_32		0x17
++#define MODE_UND_32		0x1B
++#define MODE_SYS_32		0x1F
++#define MODE_BITS		0x1F
++
++#endif /* __MACH_SUSPEND_H */
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 23f92af..1f374b4 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -22,6 +22,8 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
  
++#define SPEAR3XX_WKUP_SRCS	(1 << IRQ_MAC_1 | 1 << IRQ_USB_DEV | \
++				1 << IRQ_BASIC_RTC | 1 << IRQ_BASIC_GPIO)
+ /* Add spear3xx machines common devices here */
+ /* gpio device registeration */
+ static struct pl061_platform_data gpio_plat_data = {
+@@ -246,7 +248,8 @@ void __init spear3xx_init(void)
+ /* This will initialize vic */
+ void __init spear3xx_init_irq(void)
+ {
+-	vic_init((void __iomem *)VA_SPEAR3XX_ML1_VIC_BASE, 0, ~0, 0);
++	vic_init((void __iomem *)VA_SPEAR3XX_ML1_VIC_BASE, 0, ~0,
++			SPEAR3XX_WKUP_SRCS);
+ }
+ 
+ /* Following will create static virtual/physical mappings */
+diff --git a/arch/arm/mach-spear6xx/include/mach/suspend.h b/arch/arm/mach-spear6xx/include/mach/suspend.h
+new file mode 100644
+index 0000000..e98e831
+--- /dev/null
++++ b/arch/arm/mach-spear6xx/include/mach/suspend.h
+@@ -0,0 +1,44 @@
++/*
++ * arch/arm/mach-spear6xx/include/mach/suspend.h
++ *
++ * Sleep mode defines for SPEAr6xx machine family
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * AUTHOR : Deepak Sikri <deepak.sikri@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_SUSPEND_H
++#define __MACH_SUSPEND_H
++
++#include <mach/spear.h>
++
++#ifndef __ASSEMBLER__
++extern void spear_sleep_mode(suspend_state_t state);
++extern unsigned int spear_sleep_mode_sz;
++#endif
++
++/* SRAM related defines*/
++#define SRAM_STACK_SCR_OFFS	0xF00
++#define SPEAR_START_SRAM	SPEAR6XX_ICM1_SRAM_BASE
++#define SPEAR_SRAM_SIZE		SZ_4K
++#define SPEAR_SRAM_SCR_REG	(SPEAR_START_SRAM + SRAM_STACK_SCR_OFFS)
++/* SPEAr subsystem physical addresses */
++#define SYS_CTRL_BASE_PA	SPEAR6XX_ICM3_SYS_CTRL_BASE
++#define MPMC_BASE_PA		SPEAR6XX_ICM3_SDRAM_CTRL_BASE
++#define MISC_BASE_PA		SPEAR6XX_ICM3_MISC_REG_BASE
++
++/* ARM Modes of Operation */
++#define MODE_USR_32		0x10
++#define MODE_FIQ_32		0x11
++#define MODE_IRQ_32		0x12
++#define MODE_SVC_32		0x13
++#define MODE_ABT_32		0x17
++#define MODE_UND_32		0x1B
++#define MODE_SYS_32		0x1F
++#define MODE_BITS		0x1F
++
++#endif /* __MACH_SUSPEND_H */
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index f729e92..725dbc4 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -24,6 +24,12 @@
+ #include <mach/spear.h>
+ #include <plat/nand.h>
+ 
++/* The wake sources are routed through vic-2 */
++#define SPEAR6XX_WKUP_SRCS_VIC2		(1 << (IRQ_GMAC_1 - 32) | \
++					1 << (IRQ_USB_DEV - 32) | \
++					1 << (IRQ_BASIC_RTC - 32) |\
++					1 << (IRQ_BASIC_GPIO - 32))
++
+ /* Add spear6xx machines common devices here */
+ 
+ /* CLCD device registration */
+@@ -400,7 +406,8 @@ void __init spear6xx_init(void)
+ void __init spear6xx_init_irq(void)
+ {
+ 	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_PRI_BASE, 0, ~0, 0);
+-	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0, 0);
++	vic_init((void __iomem *)VA_SPEAR6XX_CPU_VIC_SEC_BASE, 32, ~0,
++			SPEAR6XX_WKUP_SRCS_VIC2);
+ }
+ 
+ /* Following will create static virtual/physical mappings */
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index 0e2cf75..1c8ee4a 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -6,6 +6,7 @@
+ obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
+ 
+ obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
++
+ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
+ obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
+ obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
+@@ -16,3 +17,8 @@ obj-$(CONFIG_BOARD_SPEAR300_EVB)	+= i2c_eval_board.o
+ obj-$(CONFIG_BOARD_SPEAR310_EVB)	+= i2c_eval_board.o
+ obj-$(CONFIG_BOARD_SPEAR320_EVB)	+= i2c_eval_board.o
+ obj-$(CONFIG_BOARD_SPEAR600_EVB)	+= i2c_eval_board.o
++
++ifeq ($(CONFIG_PM),y)
++obj-$(CONFIG_ARCH_SPEAR3XX)	+= pm.o sleep.o
++obj-$(CONFIG_ARCH_SPEAR6XX)	+= pm.o sleep.o
++endif
+diff --git a/arch/arm/plat-spear/pm.c b/arch/arm/plat-spear/pm.c
+new file mode 100644
+index 0000000..0cb2d0c
+--- /dev/null
++++ b/arch/arm/plat-spear/pm.c
+@@ -0,0 +1,104 @@
++/*
++ * arch/arm/plat-spear/pm.c
++ *
++ * SPEAr3xx & SPEAr6xx Power Management source file
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Deepak Sikri <deepak.sikri@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/suspend.h>
++#include <linux/sysfs.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <asm/cacheflush.h>
++#include <mach/irqs.h>
++#include <mach/suspend.h>
++
++static void (*saved_idle)(void);
++static void __iomem *spear_sram_base;
++
++static int spear_pm_sleep(suspend_state_t state)
++{
++	void (*spear_sram_sleep)(suspend_state_t state) = NULL;
++
++	/* Copy the Sleep code on to the SRAM*/
++	spear_sram_sleep = memcpy((void *)spear_sram_base,
++			(void *)spear_sleep_mode, spear_sleep_mode_sz);
++	flush_cache_all();
++	/* Jump to the suspend routines in sram */
++	spear_sram_sleep(state);
++	return 0;
++}
++
++/*
++ *	spear_pm_prepare - Do preliminary suspend work.
++ *
++ */
++static int spear_pm_prepare(void)
++{
++	/* We cannot sleep in idle until we have resumed */
++	saved_idle = pm_idle;
++	pm_idle = NULL;
++	return 0;
++}
++
++/*
++ *	spear_pm_enter - Actually enter a sleep state.
++ *	@state:		State we're entering.
++ *
++ */
++static int spear_pm_enter(suspend_state_t state)
++{
++	int ret;
++
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++	case PM_SUSPEND_MEM:
++		ret = spear_pm_sleep(state);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return ret;
++}
++
++/*
++ *	spear_pm_finish - Finish up suspend sequence.
++ *
++ *	This is called after we wake back up (or if entering the sleep state
++ *	failed).
++ */
++static void spear_pm_finish(void)
++{
++	pm_idle = saved_idle;
++}
++
++static struct platform_suspend_ops spear_pm_ops = {
++	.prepare	= spear_pm_prepare,
++	.enter		= spear_pm_enter,
++	.finish		= spear_pm_finish,
++	.valid		= suspend_valid_only_mem,
++};
++
++static int __init spear_pm_init(void)
++{
++
++	spear_sram_base = ioremap(SPEAR_START_SRAM, SPEAR_SRAM_SIZE);
++
++	if (!spear_sram_base)
++		return -ENOMEM;
++
++	/* In case the suspend code size is more than sram size return */
++	if (spear_sleep_mode_sz > (SPEAR_SRAM_SIZE))
++		return	-ENOMEM;
++
++	suspend_set_ops(&spear_pm_ops);
++	return 0;
++}
++arch_initcall(spear_pm_init);
+diff --git a/arch/arm/plat-spear/sleep.S b/arch/arm/plat-spear/sleep.S
+new file mode 100644
+index 0000000..5347789
+--- /dev/null
++++ b/arch/arm/plat-spear/sleep.S
+@@ -0,0 +1,288 @@
++/*
++ * arch/arm/plat-spear/sleep.S
++ *
++ * SPEAR3xx and SPEAR6xx specific functions that will run in
++ * internal SRAM. The functions are used in power management.
++ *
++ * Copyright (ST) 2010 Deepak Sikri <deepak.sikri@.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <mach/hardware.h>
++#include <mach/suspend.h>
++
++.text
++ENTRY(spear_sleep_mode)
++	stmfd	sp!, {r0-r12, lr}
++
++	/* Latch some of MMU registers on to stack */
++	mrc	p15, 0, r0, c5, c0, 0 /* FSR--Domain Fault */
++	mrc	p15, 0, r1, c5, c0, 1 /* FSR--Instruction Fault */
++	mrc	p15, 0, r2, c6, c0, 0 /* FAR */
++	mrc	p15, 0, r3, c9, c0, 0 /* Read Dcache Lockdown */
++	mrc	p15, 0, r4, c9, c0, 1 /* Read ICache Lockdown */
++	mrc	p15, 0, r5, c9, c1, 0 /* Read Data TLB */
++	mrc	p15, 0, r6, c9, c1, 1 /* Read Instr TCM region register */
++
++	mrc	p15, 0, r7, c10, c0, 0 /* Data TLBLock Down operation */
++	mrc	p15, 0, r8, c13, c0, 0 /* FCSE--PID */
++	mrc	p15, 0, r9, c13, c0, 1 /* Context-ID */
++
++	/* Save all these registers onto the stack */
++	stmfd	sp!, {r0-r9}
++	/* Save the stack pointer */
++	mov	r3, sp
++	/* Store the two mode registers */
++	stmfd	r3!, {sp, lr}
++	/* Save the current mode with irq disabled */
++	mrs	r0, cpsr
++	stmfd	r3!, {r0}
++	/*
++	 * Save the MMU registers on the SRAM Stack
++	 * Domain Register on Back-up RAM structure
++	 */
++	mrc	p15, 0, r2, c3, c0, 0
++	/* TTB Register */
++	mrc	p15, 0, r1, c2, c0, 0
++	/* MMU Enable Register */
++	mrc	p15, 0, r0, c1, c0, 0
++	stmfd	r3!, {r0, r1, r2}
++	/*
++	 * Capture the Physical Address.
++	 * This will be used once MMU is Off
++	 */
++	adr	r0, mmu_off
++	adr	r1, spear_sleep_mode
++	/* Store the virtual address on to DDR */
++	stmfd	r3!, {r1}
++	sub	r1, r0, r1
++	ldr	r0, SRAM_START_P
++	add	r2, r1, r0
++
++	/* Disable MMU */
++	mrc	p15, 0, r0, c1, c0, 0
++	ldr	r1, DISABLE_I_C_M_V
++	bic	r0, r0, r1
++	mcr	p15, 0, r0, c1, c0, 0
++	/* Move the Physical address into PC */
++	bx	r2
++
++	/*
++	 * This portion of code is executed from SRAM
++	 * post MMU has been turned off
++	 */
++mmu_off:
++	/* Store the DDR stack address onto scratch pad location */
++	ldr	r0, SCRATCH_PAD
++	str	r3, [r0]
++
++	ldr	r6, MISC_BASE_P
++	ldr	r7, MPMC_BASE_P
++	ldr	r8, SYS_CTRL_BASE_P
++
++	/*
++	 * Put SDRAM in self-refresh mode
++	 * Clear START bit(24) of MEMCTL_GP_03 register in MPMC
++	 */
++	ldr	r0, [r7, #0x1c]
++	ldr	r4, =0x1000000
++	/* Begin the command processing in controller */
++	bic	r0, r0, r4
++	str	r0, [r7, #0x1c]
++	ldr	r0, [r7, #0x1c]
++	/* set the SREFRESH bit(16) */
++	ldr	r4, =0x10000
++	orr	r0, r0, r4
++	str	r0, [r7, #0x1c]
++
++	/* Put the DDR into low power mode */
++	ldr	r0, [r6, #0xf0]
++	ldr	r4, =0x00000001
++	/* Clear DDR_LOW_POWER_DDR2_MODE bit(1) of DDR_PAD register */
++	bic	r0, r0, r4
++	str	r0, [r6, #0xf0]
++
++	/* Put the system in slow mode, use system controller */
++	ldr	r0, [r8]
++	bic	r0, r0, #0x4
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	orr	r0, r0, #0x2
++	str	r0, [r8]	/* System is now in slow mode */
++
++wait_till_slow_mode:
++	ldr	r0, [r8]
++	and	r0, r0, #0x78	/* Wait for the mode to be updated */
++	cmp	r0, #0x10	/* Poll the SCCTRL register status bits (6:3) */
++	bne wait_till_slow_mode
++
++	/* Put the Pll-1 to off. */
++	ldr	r0, [r6, #0x08]
++	/* Clear pll_enable bit(2) of PLL1_CTR register in Misc registers */
++	bic	r0, r0, #0x04
++	str	r0, [r6, #0x08]
++
++	/* Put the Pll-2 to off */
++	ldr	r0, [r6, #0x14]
++	/* Clear pll_enable bit(2) of PLL2_CTR register in Misc registers */
++	bic	r0, r0, #0x04
++	str	r0, [r6, #0x14]
++	mov	r2, #0
++	/* Put the system in sleep */
++	ldr	r0, [r8]
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	bic	r0, r0, #0x7
++#ifdef TEST_SLOW
++	orr	r0, r0, #0x2 /* Slow Mode */
++#endif
++	str	r0, [r8]
++	/* Put system in WFI */
++	mcr	p15, 0, r2, c7, c0, 4
++wakeup_addr:
++	ldr	r6, MISC_BASE_P
++	ldr	r7, MPMC_BASE_P
++	ldr	r8, SYS_CTRL_BASE_P
++	/* Reenable pll1 and pll2 */
++	ldr	r0, PLL_VAL1
++	str	r0, [r6, #0x08]
++	str	r0, [r6, #0x14]
++	ldr	r0, PLL_VAL2
++	str	r0, [r6, #0x08]
++	str	r0, [r6, #0x14]
++	/* Strobe */
++	ldr	r2, PLL_VAL3
++	str	r2, [r6, #0x08]
++	str	r2, [r6, #0x14]
++	ldr	r2, PLL_VAL2
++	str	r2, [r6, #0x08]
++	str	r2, [r6, #0x14]
++pll1_lock_1:
++	/* Set the pll_lock bit(0) in PLL1_CTR register in misc space*/
++	ldr	r2, [r6, #0x08]
++	and	r2, r2, #0x1
++	/* Wait for pll-1 lock status */
++	cmp	r2, #0x1
++	bne	pll1_lock_1
++
++pll2_lock_2:
++	/* Set the pll_lock bit(0) in PLL2_CTR register in misc space*/
++	ldr	r2, [r6, #0x14]
++	and	r2, r2, #0x1
++	/* Wait for pll-2 lock status */
++	cmp	r2, #0x1
++	bne	pll2_lock_2
++
++	/* Move the system in Normal mode, use system controller */
++	ldr	r3, [r8]
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	bic	r3, r3, #0x7
++	orr	r3, r3, #0x4
++	str	r3, [r8]
++
++wait_till_norm_mode:
++	ldr	r3, [r8]
++	and	r3, r3, #0x78
++	cmp	r3, #0x20	/* Poll the SCCTRL register status bits (6:3) */
++	bne	wait_till_norm_mode
++
++	/* Resume the DDR from Low power mode. */
++	ldr	r0, [r6, #0xf0]
++	/* Set DDR_LOW_POWER_DDR2_MODE bit(1) of DDR_PAD register */
++	orr	r0, r0, #0x01
++	str	r0, [r6, #0xf0]
++
++	/* Exit DDR-SDRAM from self-refresh mode */
++	ldr	r1, [r7, #0x1c]
++	/* clear the SREFRESH bit(16) */
++	ldr	r4, =0x10000
++	bic	r1, r1, r4
++	str	r1, [r7, #0x1c]
++
++	/* Begin the command processing in controller */
++	ldr	r4, =0x1000000
++	/* Set START bit(24) of MEMCTL_GP_03 register in MPMC*/
++	orr	r1, r1, r4
++	str	r1, [r7, #0x1c]
++
++	mov	r0, r0
++	/* Start the Restore Processing */
++	ldr	r0, SCRATCH_PAD
++	ldr	r6, [r0]
++
++	/* Restore the Virtual Address to be used */
++	/* Once MMU is made on */
++	ldr	r0, SRAM_START_P
++	adr	r1, mmu_on
++	sub	r0, r1, r0
++	/* Get the physical Address */
++	mov	r3, #0xc0000000
++	sub	r6, r6, r3
++	/* Fetch the sram virtual address */
++	ldmfd	r6!, {r1}
++	add	r4, r1, r0
++
++	/* Fetch the MMU Related information latched on SDRAM */
++	ldmfd	r6!, {r0, r1, r2}
++	/* Enable the MMU */
++	mcr	p15, 0, r2, c3, c0, 0
++	mcr	p15, 0, r1, c2, c0, 0
++	mcr	p15, 0, r0, c1, c0, 0
++	bx	r4
++mmu_on:
++	add	r6, r6, r3
++	/* Store the value of cpsr in R0 */
++	mrs	r0, cpsr
++	bic	r0, r0, #MODE_BITS
++
++	/* Here we will restore our cpsr IRQ/FIQ Disabled */
++	ldr	r0, [r6]
++	msr	cpsr_cxsf, r0
++	add	r6, r6, #4
++
++	/* Now only two user-mode registers are left */
++	ldmfd	r6!, {sp, lr}
++	mov	r0, r0
++
++	/* Restore stack pointer for the current mode */
++	mov	sp, r6
++
++	ldmfd	sp!, {r0-r9}
++	mcr	p15, 0, r0, c5, c0, 0 /* FSR--Domain Fault */
++	mcr	p15, 0, r1, c5, c0, 1 /* FSR--Instruction Fault */
++	mcr	p15, 0, r2, c6, c0, 0 /* FAR */
++	mcr	p15, 0, r3, c9, c0, 0 /* Read Dcache Lockdown */
++	mcr	p15, 0, r4, c9, c0, 1 /* Read ICache Lockdown */
++	mcr 	p15, 0, r5, c9, c1, 0 /* Read Data TLB */
++	mcr	p15, 0, r6, c9, c1, 1 /* Read Instruction Lockdown */
++
++	mcr	p15, 0, r7, c10, c0, 0 /* Data TLB LockDown operation */
++	mcr	p15, 0, r8, c13, c0, 0 /* FCSE--PID */
++	mcr	p15, 0, r9, c13, c0, 1 /* Context-ID */
++
++	mov	r0, #0
++	ldmfd	sp!, {r0-r12, pc}
++
++SYS_CTRL_BASE_P :
++	.word SYS_CTRL_BASE_PA
++MPMC_BASE_P :
++	.word MPMC_BASE_PA
++MISC_BASE_P :
++	.word MISC_BASE_PA
++SRAM_START_P:
++	.word SPEAR_START_SRAM
++SCRATCH_PAD:
++	.word SPEAR_SRAM_SCR_REG
++DISABLE_I_C_M_V:
++	.word 0x1005
++PLL_VAL1:
++	.word 0x1c0a
++PLL_VAL2:
++	.word 0x1c0e
++PLL_VAL3:
++	.word 0x1c06
++ENTRY(spear_sleep_mode_sz)
++	.word . - spear_sleep_mode
 -- 
 1.7.2.2
