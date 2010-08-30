@@ -1,323 +1,302 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:08 +0530
-Subject: [PATCH 44/74] ST SPEAr : FSMC (Flexible Static Memory Controller) NOR
-	interface driver
+Date: Mon, 30 Aug 2010 16:09:10 +0530
+Subject: [PATCH 46/74] SPEAr Clock Framework: Adding support for PLL frequency
+	change
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <3083e6913169ae3d3761be1667708c01ea2e344c.1283161023.git.viresh.kumar@st.com>
+Message-ID: <7ba5db686f554abfd298d7b21c882f0cdeb49049.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vipin Kumar <vipin.kumar@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
-SPEAr1300 SoC supports FSMC to interface with various memories (NOR/NAND/SRAM).
-This patch adds the support for FSMC over NOR interface.
-
-The driver being used is driver/mtd/maps/physmap.c
-
-Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/Makefile               |    2 +-
- arch/arm/mach-spear13xx/clock.c                |    2 +-
- arch/arm/mach-spear13xx/fsmc-nor.c             |   81 ++++++++++++++++++++++++
- arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/spear1300_evb.c        |   17 +++++
- arch/arm/mach-spear13xx/spear13xx.c            |   20 ++++++
- arch/arm/plat-spear/include/plat/fsmc.h        |   51 +++++++++++++++-
- 7 files changed, 171 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/fsmc-nor.c
+ arch/arm/mach-spear3xx/spear3xx.c        |    5 +
+ arch/arm/mach-spear6xx/spear6xx.c        |    5 +
+ arch/arm/plat-spear/Makefile             |    2 +-
+ arch/arm/plat-spear/clock.c              |    6 +-
+ arch/arm/plat-spear/include/plat/clock.h |    1 +
+ arch/arm/plat-spear/pll_clk.S            |  187 ++++++++++++++++++++++++++++++
+ 6 files changed, 201 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/plat-spear/pll_clk.S
 
-diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index 168886e..8644c76 100644
---- a/arch/arm/mach-spear13xx/Makefile
-+++ b/arch/arm/mach-spear13xx/Makefile
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index a905b5d..23f92af 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -271,6 +271,11 @@ struct map_desc spear3xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_MISC_REG_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR3XX_ICM3_SDRAM_CTRL_BASE),
++		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SDRAM_CTRL_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index 4490731..f729e92 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -430,6 +430,11 @@ static struct map_desc spear6xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR6XX_ICM3_SDRAM_CTRL_BASE),
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SDRAM_CTRL_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
+ 	},
+ };
+ 
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index 50c680c..0e2cf75 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
 @@ -3,7 +3,7 @@
  #
  
- # common files
--obj-y					+= spear13xx.o clock.o
-+obj-y					+= spear13xx.o clock.o fsmc-nor.o
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+ # Common support
+-obj-y	:= clcd.o clock.o time.o smi.o
++obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
  
-diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index 30eba05..c593608 100644
---- a/arch/arm/mach-spear13xx/clock.c
-+++ b/arch/arm/mach-spear13xx/clock.c
-@@ -920,7 +920,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.dev_id = "pcie2",		.clk = &pcie2_clk},
- 	{.dev_id = "cfxd",		.clk = &cfxd_clk},
- 	{.dev_id = "sdhci",		.clk = &sdhci_clk},
--	{.con_id = "fsmc",		.clk = &fsmc_clk},
-+	{.dev_id = "fsmc",		.clk = &fsmc_clk},
- 	{.dev_id = "sysram0",		.clk = &sysram0_clk},
- 	{.dev_id = "sysram1",		.clk = &sysram1_clk},
+ obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index fb1c87b..ee8f82b 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -586,11 +586,10 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+ 			 * call routine to put ddr in refresh mode, and
+ 			 * configure pll.
+ 			 */
+-			/* TBD */
++			pll_set_rate(tbls[i].m, tbls[i].p, tbls[i].n);
+ 			clk->rate = rate;
+ 		}
+-
+-		return ret;
++		return 0;
+ 	}
  
-diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
+ 	val = readl(config->mode_reg) &
+@@ -616,7 +615,6 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+ 			config->masks->norm_fdbk_m_shift;
+ 
+ 	writel(val, config->cfg_reg);
+-
+ 	clk->rate = rate;
+ 
+ 	return 0;
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index 6d53fc8..09d61a4 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -264,5 +264,6 @@ int aux_clk_set_rate(struct clk *clk, unsigned long desired_rate);
+ unsigned long clcd_calc_rate(struct clk *clk, int index);
+ int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate);
++void pll_set_rate(u16 pdiv, u8 nmul, u8 hclkdiv);
+ 
+ #endif /* __PLAT_CLOCK_H */
+diff --git a/arch/arm/plat-spear/pll_clk.S b/arch/arm/plat-spear/pll_clk.S
 new file mode 100644
-index 0000000..68f0ca0
+index 0000000..d0687b4
 --- /dev/null
-+++ b/arch/arm/mach-spear13xx/fsmc-nor.c
-@@ -0,0 +1,81 @@
++++ b/arch/arm/plat-spear/pll_clk.S
+@@ -0,0 +1,187 @@
 +/*
-+ * arch/arm/mach-spear13xx/fsmc-nor.c
++ * arch/arm/plat-spear/pll_clk.S
 + *
-+ * FSMC (Flexible Static Memory Controller) interface for NOR
++ * SPEAR3xx and SPEAR6xx specific functions that will run in
++ * cache. These funstions intend to configure the PLL.
 + *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Vipin Kumar<vipin.kumar@st.com>
++ * Copyright (ST) 2010 Deepak Sikri <deepak.sikri@.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <plat/fsmc.h>
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <mach/hardware.h>
++#include <mach/suspend.h>
 +
-+int __init fsmc_nor_init(struct platform_device *pdev, unsigned long base,
-+		u32 bank, u32 width)
-+{
-+	void __iomem *fsmc_nor_base;
-+	struct fsmc_regs *regs;
-+	struct clk *clk;
-+	int ret;
-+	u32 ctrl;
++#if defined(CONFIG_ARCH_SPEAR3XX) || defined(CONFIG_ARCH_SPEAR6XX)
++.text
++ENTRY(pll_set_rate)
++	stmfd	sp!, {r0-r12, lr}
 +
-+	if (bank > (FSMC_MAX_NOR_BANKS - 1))
-+		return -EINVAL;
++	/* Lock down the TLB entry to the current victim */
++	mrc	p15, 0, r3, c10, c0, 0	/* read the lockdown register */
++	orr	r3, r3, #1		/* set the preserved bit */
++	mcr	p15, 0, r3, c10, c0, 0	/* write to the lockdown register */
 +
-+	fsmc_nor_base = ioremap(base, FSMC_NOR_REG_SIZE);
-+	if (!fsmc_nor_base)
-+		return -ENOMEM;
++	/*
++	 * set r4 to the value of the address to be locked down.
++	 * Invalidate the TLB single entry in TLB to ensure that
++	 * the locked address is not already in TLB.
++	 * MPMC, System Controller & Miscellaneous register address
++	 * are locked down below.
++	 */
 +
-+	clk = clk_get(NULL, "fsmc");
-+	if (IS_ERR(clk)) {
-+		iounmap(fsmc_nor_base);
-+		return PTR_ERR(clk);
-+	}
++	ldr	r4, MPMC_BASE_VA
++	/* Invalidate the MPMC virtual address in TLB. */
++	mcr	p15, 0, r4, c8, c7, 1
++	/* TLB will miss and entry will be reloaded */
++	ldr	r4, [r4]
++	/* read the lockdown register (victim will have rloaded) */
++	mrc	p15, 0, r3, c10, c0, 0
 +
-+	ret = clk_enable(clk);
-+	if (ret) {
-+		iounmap(fsmc_nor_base);
-+		return ret;
-+	}
++	ldr	r4, SYS_CTRL_BASE_VA
++	/* Invalidate the System controller virtual address in TLB */
++	mcr	p15, 0, r4, c8, c7, 1
++	/* TLB will miss and entry will be reloaded */
++	ldr	r4, [r4]
++	/* read the lockdown register (victim will have rloaded) */
++	mrc	p15, 0, r3, c10, c0, 0
 +
-+	regs = (struct fsmc_regs *)fsmc_nor_base;
++	ldr	r4, MISC_BASE_VA
++	/* Invalidate the Miscellaneous registers virtual address in TLB */
++	mcr	p15, 0, r4, c8, c7, 1
++	/* TLB will miss and entry will be reloaded */
++	ldr	r4, [r4]
++	/* read the lockdown register (victim will have rloaded) */
++	mrc	p15, 0, r3, c10, c0, 0
 +
-+	ctrl = WAIT_ENB | WRT_ENABLE | WPROT | NOR_DEV | BANK_ENABLE;
++	/* clear preserve bit */
++	bic	r3, r3, #1
++	/* write to the lockdown register */
++	mcr	p15, 0, r3, c10, c0, 0
 +
-+	switch (width) {
-+	case FSMC_FLASH_WIDTH8:
-+		ctrl |= WIDTH_8;
-+		break;
++	ldr	r7, MPMC_BASE_VA
++	ldr	r8, SYS_CTRL_BASE_VA
++	ldr	r6, MISC_BASE_VA
++	/* Prefetch certain instructions in the cache. */
++	adr	r4, cache_prefetch_start1
++	adr	r5, cache_prefetch_end1
++	mvn	r3, #0x1F
++	ands	r4, r3, r4
++	/* Lock Instructions in i-cache */
++fetch_loop:
++	/*
++	 * copy a cache-line-sized block of main memory to a cache
++	 * line in the I-cache.
++	 */
++	mcr	p15, 0, r4, c7, c13, 1
++	cmp	r4, r5
++	addls	r4, r4, #0x20
++	bls	fetch_loop
++cache_prefetch_start1:
++	/* Put SDRAM in self-refresh mode */
++	ldr	r3, [r7, #0x1c]
++	/* Clear START bit(24) of MEMCTL_GP_03 register in MPMC */
++	ldr	r4, =0x1000000
++	bic	r3, r3, r4
++	str	r3, [r7, #0x1c]
 +
-+	case FSMC_FLASH_WIDTH16:
-+		ctrl |= WIDTH_16;
-+		break;
++	ldr	r3, [r7, #0xe4]
++	ldr	r4, =0xffff0000
++	/* Latch the current self refresh time */
++	mov	r9, r3
++	/* Increase the self refresh exit time */
++	bic	r3, r3, r4
++	ldr	r4, =0xffff
++	/* Program the SDRAM self refresh exit time on read command */
++	orr	r3, r3, r4, LSL #16
++	str	r3, [r7, #0xe4]
 +
-+	default:
-+		ctrl |= WIDTH_8;
-+		break;
-+	}
++	ldr	r3, [r7, #0x1c]
++	/* Set the SREFRESH bit(16) */
++	ldr	r4, =0x10000
++	orr	r3, r3, r4
++	str	r3, [r7, #0x1c]
 +
-+	writel(ctrl, &regs->nor_bank_regs[bank].ctrl);
-+	writel(0x0FFFFFFF, &regs->nor_bank_regs[bank].ctrl_tim);
-+	writel(ctrl | RSTPWRDWN, &regs->nor_bank_regs[bank].ctrl);
++	/* Put the system in slow mode, use system controller */
++	ldr	r3, [r8]
++	bic	r3, r3, #0x7
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	orr	r3, r3, #0x2
++	str	r3, [r8]
 +
-+	iounmap(fsmc_nor_base);
++wait_till_slow_mode:
++	ldr	r3, [r8]
++	and	r3, r3, #0x78	/* Wait for the mode to be updated */
++	cmp	r3, #0x10	/* Poll the SCCTRL register status bits (6:3) */
++	bne wait_till_slow_mode
 +
-+	return 0;
-+}
++	/*
++	 * reprogram the m(r0), p(r2), n(r1) values in the PLL
++	 * control registers (PLL_FRQ register in misc space).
++	 */
++	ldr	r3, [r6, #0x0c]
++	bic	r3, r3, #0x00ff
++	/* Program the PLL post divisor: p */
++	orr	r3, r3, r2
++	str	r3, [r6, #0x0c]
 +
-+void __init fsmc_init_board_info(struct platform_device *pdev,
-+		struct mtd_partition *partitions, unsigned int nr_partitions,
-+		unsigned int width)
-+{
-+	fsmc_init_plat_data(pdev, partitions, nr_partitions, width);
-+}
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 6f4e6b5..dfee834 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -38,6 +38,7 @@ extern struct platform_device ehci1_device;
- extern struct platform_device i2c_device;
- extern struct platform_device kbd_device;
- extern struct platform_device nand_device;
-+extern struct platform_device fsmc_nor_device;
- extern struct platform_device ohci0_device;
- extern struct platform_device ohci1_device;
- extern struct platform_device rtc_device;
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index db05747..d030a85 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -21,11 +21,21 @@
- #include <mach/generic.h>
- #include <mach/spear.h>
- #include <mach/pcie.h>
-+#include <plat/fsmc.h>
- #include <plat/keyboard.h>
- #include <plat/nand.h>
- #include <plat/smi.h>
- #include <plat/spi.h>
- 
-+#define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
++	ldr	r3, [r6, #0x0c]
++	ldr	r4, =0xffff0000
++	bic	r3, r3, r4
++	bic	r3, r3, #0x0700
++	/* Program the PLL pre divisor: n */
++	orr	r3, r3, r1, LSL #8
++	/* Program the PLL feedback divisor: m */
++	orr	r3, r3, r0, LSL #24
++	str	r3, [r6, #0x0c]
 +
-+static struct mtd_partition partition_info[] = {
-+	PARTITION("X-loader", 0, 1 * 0x20000),
-+	PARTITION("U-Boot", 0x20000, 3 * 0x20000),
-+	PARTITION("Kernel", 0x80000, 24 * 0x20000),
-+	PARTITION("Root File System", 0x380000, 84 * 0x20000),
-+};
++	/* Move the system in Normal mode, use system controller */
++	ldr	r3, [r8, #0x0]
++	ldr	r4, =0xfffffff8
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	and	r3, r3, r4
++	orr	r3, r3, #0x4
++	str	r3, [r8, #0x0]
 +
- static struct amba_device *amba_devs[] __initdata = {
- 	&gpio_device[0],
- 	&gpio_device[1],
-@@ -143,6 +153,9 @@ static void __init spear1300_evb_init(void)
- 	enable_pcie0_clk();
- 	pcie_init(&spear1300_pcie_port_is_host);
- #endif
-+	/* initialize fsmc related data in fsmc plat data */
-+	fsmc_init_board_info(&fsmc_nor_device, partition_info,
-+			ARRAY_SIZE(partition_info), FSMC_FLASH_WIDTH8);
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-@@ -150,6 +163,10 @@ static void __init spear1300_evb_init(void)
- 	/* Add Amba Devices */
- 	spear_amba_device_register(amba_devs, ARRAY_SIZE(amba_devs));
- 
-+	/* Initialize fsmc regiters */
-+	fsmc_nor_init(&fsmc_nor_device, SPEAR13XX_FSMC_BASE, 0,
-+			FSMC_FLASH_WIDTH8);
++wait_till_normal_mode:
++	ldr	r3, [r8, #0x0]
++	and	r3, r3, #0x78
++	cmp	r3, #0x20	/* Poll the SCCTRL register status bits (6:3) */
++	bne wait_till_normal_mode
 +
- 	spi_init();
- }
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 4563551..6d71aac 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -14,6 +14,7 @@
- #include <linux/types.h>
- #include <linux/amba/pl022.h>
- #include <linux/amba/pl061.h>
-+#include <linux/mtd/physmap.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
- #include <asm/hardware/gic.h>
-@@ -130,6 +131,25 @@ struct platform_device i2c_device = {
- 	.resource = i2c_resources,
- };
- 
-+/* fsmc nor flash device registeration */
-+static struct physmap_flash_data fsmc_norflash_data;
++	/* Exit DDR-SDRAM from self-refresh mode */
++	ldr	r10, MPMC_BASE_VA
++	/* Clear the SREFRESH bit(16) */
++	ldr	r3, [r10, #0x1c]
++	ldr	r4, =0x10000
++	bic	r3, r3, r4
++	str	r3, [r10, #0x1c]
++	/* Restore the SDRAM self refresh exit time on read command */
++	mov	r3, r9
++	str	r3, [r7, #0xe4]
++	/* Begin the command processing in controller */
++	ldr	r4, =0x1000000
++	orr	r3, r3, r4
++	/* Set START bit(24) of MEMCTL_GP_03 register in MPMC*/
++	str	r3, [r10, #0x1c]
 +
-+static struct resource fsmc_nor_resources[] = {
-+	{
-+		.start	= SPEAR13XX_FSMC_MEM_BASE,
-+		.end	= SPEAR13XX_FSMC_MEM_BASE + SZ_16M - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
++	ldmfd	sp!, {r0-r12, pc}
 +
-+struct platform_device fsmc_nor_device = {
-+	.name	= "physmap-flash",
-+	.id	= -1,
-+	.resource = fsmc_nor_resources,
-+	.num_resources = ARRAY_SIZE(fsmc_nor_resources),
-+	.dev.platform_data = &fsmc_norflash_data,
-+};
++/* This is the end of the code to be copied */
 +
- /* nand device registeration */
- void __init nand_mach_init(u32 busw)
- {
-diff --git a/arch/arm/plat-spear/include/plat/fsmc.h b/arch/arm/plat-spear/include/plat/fsmc.h
-index c0fdcd3..5909afd 100644
---- a/arch/arm/plat-spear/include/plat/fsmc.h
-+++ b/arch/arm/plat-spear/include/plat/fsmc.h
-@@ -15,11 +15,36 @@
- #define __PLAT_FSMC_H
- 
- #include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/mtd/physmap.h>
- #include <linux/types.h>
- #include <asm/param.h>
- 
-+#define FSMC_MAX_NOR_BANKS	4
- #define FSMC_MAX_NAND_BANKS	4
- 
-+#define FSMC_FLASH_WIDTH8	1
-+#define FSMC_FLASH_WIDTH16	2
++SYS_CTRL_BASE_VA :
++	.word IO_ADDRESS(SYS_CTRL_BASE_PA)
++MPMC_BASE_VA :
++	.word IO_ADDRESS(MPMC_BASE_PA)
++MISC_BASE_VA :
++	.word IO_ADDRESS(MISC_BASE_PA)
++cache_prefetch_end1 :
 +
-+struct nor_bank_regs {
-+	u32 ctrl;
-+	u32 ctrl_tim;
-+};
-+
-+/* ctrl register definitions */
-+#define BANK_ENABLE		(1 << 0)
-+#define MUXED			(1 << 1)
-+#define NOR_DEV			(2 << 2)
-+#define WIDTH_8			(0 << 4)
-+#define WIDTH_16		(1 << 4)
-+#define RSTPWRDWN		(1 << 6)
-+#define WPROT			(1 << 7)
-+#define WRT_ENABLE		(1 << 12)
-+#define WAIT_ENB		(1 << 13)
-+
-+/* ctrl_tim register definitions */
-+
- struct nand_bank_regs {
- 	u32 pc;
- 	u32 sts;
-@@ -31,8 +56,11 @@ struct nand_bank_regs {
- 	u32 ecc3;
- };
- 
-+#define FSMC_NOR_REG_SIZE	0x40
-+
- struct fsmc_regs {
--	u8 reserved_1[0x40];
-+	struct nor_bank_regs nor_bank_regs[FSMC_MAX_NOR_BANKS];
-+	u8 reserved_1[0x40 - 0x20];
- 	struct nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
- 	u8 reserved_2[0xfe0 - 0xc0];
- 	u32 peripid0;			/* 0xfe0 */
-@@ -106,4 +134,25 @@ struct fsmc_eccplace {
- 	struct fsmc_nand_eccplace eccplace[MAX_ECCPLACE_ENTRIES];
- };
- 
-+static inline void fsmc_init_plat_data(struct platform_device *pdev,
-+		struct mtd_partition *partitions, unsigned int nr_partitions,
-+		unsigned int width)
-+{
-+	struct physmap_flash_data *fsmc_plat_data;
-+	fsmc_plat_data = dev_get_platdata(&pdev->dev);
-+
-+	if (partitions) {
-+		fsmc_plat_data->parts = partitions;
-+		fsmc_plat_data->nr_parts = nr_partitions;
-+	}
-+
-+	fsmc_plat_data->width = width;
-+}
-+
-+extern int __init fsmc_nor_init(struct platform_device *pdev,
-+		unsigned long base, u32 bank, u32 width);
-+extern void __init fsmc_init_board_info(struct platform_device *pdev,
-+		struct mtd_partition *partitions, unsigned int nr_partitions,
-+		unsigned int width);
-+
- #endif /* __PLAT_FSMC_H */
++#elif defined(CONFIG_ARCH_SPEAR13XX)
++.text
++ENTRY(pll_set_rate)
++#endif
 -- 
 1.7.2.2
