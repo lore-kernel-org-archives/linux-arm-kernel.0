@@ -1,74 +1,62 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 30 Aug 2010 17:34:22 +0300
-Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
-Message-ID: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+From: thomas.nemeth@betatech.fr (Thomas Nemeth)
+Date: Mon, 30 Aug 2010 16:41:39 +0200
+Subject: iMX31 power management
+In-Reply-To: <4C7BB88C.1010202@warmcat.com>
+References: <201008301444.21510.thomas.nemeth@betatech.fr>
+	<4C7BB88C.1010202@warmcat.com>
+Message-ID: <201008301641.41957.thomas.nemeth@betatech.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabian Godehardt <fg@emlix.com>
+Le lundi 30 ao?t 2010, Andy Green a ?crit?:
+> On 08/30/10 13:44, Somebody in the thread at some point said:
+>
+> Hi -
 
-This is a patch that seems to make the USB hangs on the S3C244X go away.
-At least a good amount of ping torture didn't make them come back so far.
+    Hi Andy.
 
-The issue is that, if there are several back-to-back packets, sometimes no
-interrupt is generated for one of them. This seems to be caused by the
-mysterious dual packet mode, which the USB hardware enters automatically
-if the endpoint size is half that of the FIFO. (On the 244X, this is the
-normal situation for bulk data endpoints.)
 
-There is also a timing factor in this. It seems that what happens is that
-the USB hardware automatically sends an acknowledgement if there is only one 
-packet in the FIFO (the FIFO has space for two). If another packet arrives
-before the host has retrieved and acknowledged the previous one, no interrupt
-is generated for that second one.
+> >      I added in attachment the code I adapted from 2.6.22 so that
+> > it integrates better with current kernels.
+>
+> I ported this similar stuff from the Freescale tree to 2.6.32 last
+> December, it sleeps and wakes fine (using stop clock) on that txtr
+> board since then.
 
-However, there may be an indication. There is one undocumented bit (none
-of the 244x manuals document it), OUT_CRS1_REG[1], that seems to be set
-suspiciously often when this condition occurs. There is also
-CLR_DATA_TOGGLE, OUT_CRS1_REG[7], which may have a function related to
-this. (The Samsung manual is rather terse on that, as usual.)
+    I did this piece of code because it wasn't in 2.6.34 mainline :)
+    Should we make something to have it marged ?
 
-This needs to be examined further. For now, the patch seems to do the
-trick.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/usb/gadget/s3c2410_udc.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
+> http://git.warmcat.com/cgi-bin/cgit/txtr-kernel/commit/?h=txtr-tracki
+>ng&id=34685e9c378c865885ad6a8f2fc06fc36ad48482
+>
+> There was no enable_irq_wake(); platform support at that time so I
 
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index ea2b3c7..fed323c 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -902,7 +902,7 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void *_dev)
- 	int pwr_reg;
- 	int ep0csr;
- 	int i;
--	u32 idx;
-+	u32 idx, idx2;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&dev->lock, flags);
-@@ -1017,6 +1017,20 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void *_dev)
- 		}
- 	}
- 
-+	/* what else causes this interrupt? a receive! who is it? */
-+	if (!usb_status && !usbd_status && !pwr_reg && !ep0csr) {
-+		for (i = 1; i < S3C2410_ENDPOINTS; i++) {
-+			idx2 = udc_read(S3C2410_UDC_INDEX_REG);
-+			udc_write(i, S3C2410_UDC_INDEX_REG);
-+
-+			if (udc_read(S3C2410_UDC_OUT_CSR1_REG) & 0x1)
-+				s3c2410_udc_handle_ep(&dev->ep[i]);
-+
-+			/* restore index */
-+			udc_write(idx2, S3C2410_UDC_INDEX_REG);
-+		}
-+	}
-+
- 	dprintk(DEBUG_VERBOSE, "irq: %d s3c2410_udc_done.\n", IRQ_USBD);
- 
- 	/* Restore old index */
--- 
-1.7.2
+    I wasn't aware of that function. It indeed may be of a great help.
+    I've seen that a lot of drivers use directly set_irq_wake(). Is
+    there a "prefered" way of using this facility ?
+
+    I think the set_wake() field in the irq_chip structure from
+    arch/arm/plat-mxc/irq.c should be created, didn't it ?
+
+
+> guess maybe there is now and you need to make sure your wake
+> interrupts are marked as wake sources?
+
+    In a more recent version of my pm.c source file, I have :
+       __raw_writel(0, MXC_CCM_WIMR);
+    in mx31_pm_prepare(), in order to enable all interrupts to wake the
+    processor up. But to no use :(
+
+
+    Thanks a lot.
+
+
+Thomas.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/9e6cd356/attachment.sig>
