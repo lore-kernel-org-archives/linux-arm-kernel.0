@@ -1,23 +1,27 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 30 Aug 2010 11:11:13 +0300
-Subject: [PATCH] ARM: S5PC210: OneNAND device support
-In-Reply-To: <20100817083049.GA20042@july>
-References: <20100817083049.GA20042@july>
-Message-ID: <1283155873.12995.16.camel@brekeke>
+From: clemens@ladisch.de (Clemens Ladisch)
+Date: Mon, 30 Aug 2010 10:27:50 +0200
+Subject: [PATCH/RFCv4 0/6] The Contiguous Memory Allocator framework
+In-Reply-To: <20100825155814.25c783c7.akpm@linux-foundation.org>
+References: <cover.1282286941.git.m.nazarewicz@samsung.com>	<1282310110.2605.976.camel@laptop>
+	<20100825155814.25c783c7.akpm@linux-foundation.org>
+Message-ID: <4C7B6B86.3080502@ladisch.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-08-17 at 17:30 +0900, Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> OneNAND device support on s5pc210 SoC.
-> It's same as s5pc110 controller
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
+Andrew Morton wrote:
+> It would help (a lot) if we could get more attention and buyin and
+> fedback from the potential clients of this code.  rmk's feedback is
+> valuable.  Have we heard from the linux-media people?  What other
+> subsystems might use it?  ieee1394 perhaps?
 
-Looks like material for an arm tree/subtree, not for the MTD tree.
+All FireWire controllers are OHCI and use scatter-gather lists.
 
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+Most USB controllers require continuous memory for USB packets; the USB
+framework has its own DMA buffer cache.
+
+Some sound cards have no IOMMU; the ALSA framework preallocates buffers
+for those.
+
+
+Regards,
+Clemens
