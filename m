@@ -1,730 +1,1110 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:01 +0530
-Subject: [PATCH 37/74] SPEAr: removing size based macros except those necessary
+Date: Mon, 30 Aug 2010 16:09:06 +0530
+Subject: [PATCH 42/74] ST SPEAr: Adding support for DDR in clock framework
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <085b21964175f9c508a3c6cb4eb0f01099ca5d9d.1283161023.git.viresh.kumar@st.com>
+Message-ID: <8afc7eff2c9b2c2a9dd401ee31d9a3ef4c248883.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+Changing rate of clk, which is ancestor of DDR requires to put DDR in refresh
+mode before changing parents rate. For this DDR support is added in clock
+framework. Now at boot time all ancestors of DDR is marked specially and
+changing their rate must be first acked by ddr (i.e. ddr will run on that
+clock). This patch adds support for this.
 
-Size macros are defined in machine specific files which are really not
-required. These size defines were coming straight from h/w user manual
-which were much greater than required size. Hence these are removed for
-any use.
-Also the base addresses are defined as ulong.
-
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/spear.h   |   91 ++++++------
- arch/arm/mach-spear3xx/include/mach/spear.h    |  134 +++++-------------
- arch/arm/mach-spear3xx/include/mach/spear300.h |   59 ++------
- arch/arm/mach-spear3xx/include/mach/spear310.h |   34 ++---
- arch/arm/mach-spear3xx/include/mach/spear320.h |   68 +++-------
- arch/arm/mach-spear6xx/include/mach/spear.h    |  174 ++++++-----------------
- 6 files changed, 172 insertions(+), 388 deletions(-)
+ arch/arm/mach-spear13xx/clock.c                  |   69 ++++++++---
+ arch/arm/mach-spear13xx/include/mach/generic.h   |    2 +-
+ arch/arm/mach-spear13xx/include/mach/misc_regs.h |    4 +
+ arch/arm/mach-spear13xx/spear13xx.c              |    2 +-
+ arch/arm/mach-spear3xx/clock.c                   |  105 ++++++++++++++----
+ arch/arm/mach-spear3xx/include/mach/generic.h    |    2 +-
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h  |    7 +
+ arch/arm/mach-spear3xx/spear3xx.c                |    2 +-
+ arch/arm/mach-spear6xx/clock.c                   |  105 ++++++++++++++----
+ arch/arm/mach-spear6xx/include/mach/generic.h    |    2 +-
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h  |    7 +
+ arch/arm/mach-spear6xx/spear6xx.c                |    2 +-
+ arch/arm/plat-spear/clock.c                      |  133 ++++++++++++++++++---
+ arch/arm/plat-spear/include/plat/clock.h         |   42 +++++--
+ 14 files changed, 385 insertions(+), 99 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-index 282ef2f..1a1af72 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-@@ -14,12 +14,13 @@
- #ifndef __MACH_SPEAR13XX_H
- #define __MACH_SPEAR13XX_H
+diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+index 1ee820a..30eba05 100644
+--- a/arch/arm/mach-spear13xx/clock.c
++++ b/arch/arm/mach-spear13xx/clock.c
+@@ -22,19 +22,19 @@
+ /* root clks */
+ /* 24 MHz oscillator clock */
+ static struct clk osc1_24m_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 24000000,
+ };
  
-+#include <asm/memory.h>
- #include <mach/spear1300.h>
+ /* 32 KHz oscillator clock */
+ static struct clk osc2_32k_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 32000,
+ };
  
--#define SPEAR13XX_L2CC_BASE		0xED000000
-+#define SPEAR13XX_L2CC_BASE		UL(0xED000000)
+ /* 25 MHz MIPHY oscillator clock */
+ static struct clk osc3_25m_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 25000000,
+ };
  
- /* ARM9SMP peripheral base address */
--#define SPEAR13XX_A9SM_PERIP_BASE	0xEC800000
-+#define SPEAR13XX_A9SM_PERIP_BASE	UL(0xEC800000)
- #define VA_SPEAR13XX_A9SM_PERIP_BASE	IO_ADDRESS(SPEAR13XX_A9SM_PERIP_BASE)
- /* A9SM peripheral offsets */
- #define SPEAR13XX_SCU_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x00)
-@@ -29,26 +30,26 @@
- #define SPEAR13XX_WDT_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x620)
- #define SPEAR13XX_GIC_DIST_BASE		(SPEAR13XX_A9SM_PERIP_BASE + 0x1000)
+@@ -98,7 +98,7 @@ struct pll_rate_tbl pll_rtbl[] = {
  
--#define SPEAR13XX_UART_BASE		0xE0000000
-+#define SPEAR13XX_UART_BASE		UL(0xE0000000)
- #define VA_SPEAR13XX_UART_BASE		IO_ADDRESS(SPEAR13XX_UART_BASE)
+ /* pll1 clock */
+ static struct clk pll1_clk = {
+-	.flags = ENABLED_ON_INIT,
++	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
+ 	.pclk_sel = &pll_pclk_sel,
+ 	.pclk_sel_shift = PLL1_CLK_SHIFT,
+ 	.en_reg = PLL1_CTR,
+@@ -112,7 +112,7 @@ static struct clk pll1_clk = {
  
--#define SPEAR13XX_ADC_BASE		0xE0080000
--#define SPEAR13XX_SSP_BASE		0xE0100000
--#define SPEAR13XX_I2S0_BASE		0xE0180000
--#define SPEAR13XX_I2S1_BASE		0xE0200000
--#define SPEAR13XX_I2C_BASE		0xE0280000
--#define SPEAR13XX_KBD_BASE		0xE0300000
--#define SPEAR13XX_GPT0_BASE		0xE0380000
--#define SPEAR13XX_GPT1_BASE		0xE0400000
--#define SPEAR13XX_GPT2_BASE		0xE0480000
--#define SPEAR13XX_GPT3_BASE		0xE0500000
--#define SPEAR13XX_RTC_BASE		0xE0580000
--#define SPEAR13XX_GPIO0_BASE		0xE0600000
--#define SPEAR13XX_GPIO1_BASE		0xE0680000
--#define SPEAR13XX_MISC_BASE		0xE0700000
-+#define SPEAR13XX_ADC_BASE		UL(0xE0080000)
-+#define SPEAR13XX_SSP_BASE		UL(0xE0100000)
-+#define SPEAR13XX_I2S0_BASE		UL(0xE0180000)
-+#define SPEAR13XX_I2S1_BASE		UL(0xE0200000)
-+#define SPEAR13XX_I2C_BASE		UL(0xE0280000)
-+#define SPEAR13XX_KBD_BASE		UL(0xE0300000)
-+#define SPEAR13XX_GPT0_BASE		UL(0xE0380000)
-+#define SPEAR13XX_GPT1_BASE		UL(0xE0400000)
-+#define SPEAR13XX_GPT2_BASE		UL(0xE0480000)
-+#define SPEAR13XX_GPT3_BASE		UL(0xE0500000)
-+#define SPEAR13XX_RTC_BASE		UL(0xE0580000)
-+#define SPEAR13XX_GPIO0_BASE		UL(0xE0600000)
-+#define SPEAR13XX_GPIO1_BASE		UL(0xE0680000)
-+#define SPEAR13XX_MISC_BASE		UL(0xE0700000)
- #define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
+ /* pll1div2 clock */
+ static struct clk pll1div2_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.div_factor = 2,
+ 	.recalc = &follow_parent,
+@@ -120,7 +120,7 @@ static struct clk pll1div2_clk = {
  
--#define SPEAR13XX_SYSRAM0_BASE		0xB3800000
-+#define SPEAR13XX_SYSRAM0_BASE		UL(0xB3800000)
- #define SPEAR13XX_SYSRAM0_SIZE		0x00800000
+ /* pll1div4 clock */
+ static struct clk pll1div4_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.div_factor = 4,
+ 	.recalc = &follow_parent,
+@@ -135,6 +135,7 @@ static struct pll_clk_config pll2_config = {
  
- /*
-@@ -57,34 +58,34 @@
+ /* pll2 clock */
+ static struct clk pll2_clk = {
++	.flags = SYSTEM_CLK,
+ 	.pclk_sel = &pll_pclk_sel,
+ 	.pclk_sel_shift = PLL2_CLK_SHIFT,
+ 	.en_reg = PLL2_CTR,
+@@ -155,6 +156,7 @@ static struct pll_clk_config pll3_config = {
+ 
+ /* pll3 clock */
+ static struct clk pll3_clk = {
++	.flags = SYSTEM_CLK,
+ 	.pclk_sel = &pll_pclk_sel,
+ 	.pclk_sel_shift = PLL3_CLK_SHIFT,
+ 	.en_reg = PLL3_CTR,
+@@ -183,7 +185,7 @@ struct pll_rate_tbl pll4_rtbl[] = {
+ 
+ /* pll4 (DDR) clock */
+ static struct clk pll4_clk = {
+-	.flags = ENABLED_ON_INIT,
++	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
+ 	.pclk = &osc1_24m_clk,
+ 	.en_reg = PLL4_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
+@@ -196,22 +198,54 @@ static struct clk pll4_clk = {
+ 
+ /* pll5 USB 48 MHz clock */
+ static struct clk pll5_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &osc1_24m_clk,
+ 	.rate = 48000000,
+ };
+ 
+ /* pll6 (MIPHY) clock */
+ static struct clk pll6_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &osc3_25m_clk,
+ 	.rate = 25000000,
+ };
+ 
+ /* clocks derived from pll1 clk */
++/* ddr clock */
++struct ddr_rate_tbl ddr_rate_tbl = {
++	.minrate = 332000000,
++	.maxrate = 500000000,
++};
++
++static struct pclk_info ddr_pclk_info[] = {
++	{
++		.pclk = &pll1_clk,
++		.pclk_val = MCTR_CLK_PLL1_VAL,
++	}, {
++		.pclk = &pll4_clk,
++		.pclk_val = MCTR_CLK_PLL4_VAL,
++	},
++};
++
++/* ddr parent select structure */
++static struct pclk_sel ddr_pclk_sel = {
++	.pclk_info = ddr_pclk_info,
++	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
++	.pclk_sel_reg = PERIP_CLK_CFG,
++	.pclk_sel_mask = MCTR_CLK_MASK,
++};
++
++static struct clk ddr_clk = {
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
++	.recalc = &follow_parent,
++	.pclk_sel = &ddr_pclk_sel,
++	.pclk_sel_shift = MCTR_CLK_SHIFT,
++	.private_data = &ddr_rate_tbl,
++};
++
+ /* cpu clock */
+ static struct clk cpu_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.div_factor = 2,
+ 	.recalc = &follow_parent,
+@@ -219,7 +253,7 @@ static struct clk cpu_clk = {
+ 
+ /* ahb clock */
+ static struct clk ahb_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.div_factor = 6,
+ 	.recalc = &follow_parent,
+@@ -227,7 +261,7 @@ static struct clk ahb_clk = {
+ 
+ /* apb clock */
+ static struct clk apb_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.div_factor = 12,
+ 	.recalc = &follow_parent,
+@@ -844,6 +878,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.con_id = "pll6_clk",		.clk = &pll6_clk},
+ 
+ 	/* clock derived from pll1 clk */
++	{.con_id = "ddr_clk",		.clk = &ddr_clk},
+ 	{.con_id = "cpu_clk",		.clk = &cpu_clk},
+ 	{.con_id = "ahb_clk",		.clk = &ahb_clk},
+ 	{.con_id = "apb_clk",		.clk = &apb_clk},
+@@ -910,12 +945,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ #endif
+ };
+ 
+-void __init clk_init(void)
++/* machine clk init */
++void __init spear13xx_clk_init(void)
+ {
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
+-		clk_register(&spear_clk_lookups[i]);
+-
+-	recalc_root_clocks();
++	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
+ }
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 62d3d9b..6f4e6b5 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -46,7 +46,7 @@ extern struct platform_device smi_device;
+ extern struct sys_timer spear13xx_timer;
+ 
+ /* Add spear13xx family function declarations here */
+-void __init clk_init(void);
++void __init spear13xx_clk_init(void);
+ void __init i2c_register_board_devices(void);
+ void __init spear_setup_timer(void);
+ void __init spear13xx_map_io(void);
+diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+index 2529a48..2db1ffe 100644
+--- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
++++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+@@ -98,6 +98,10 @@
+ 	#define CLCD_CLK_SHIFT		2
+ 	#define C3_CLK_MASK		1
+ 	#define C3_CLK_SHIFT		1
++	#define MCTR_CLK_SHIFT		10
++	#define MCTR_CLK_MASK		0x1
++	#define MCTR_CLK_PLL1_VAL	0x0
++	#define MCTR_CLK_PLL4_VAL	0x1
+ 
+ #define GMAC_CLK_CFG		((unsigned int *)(MISC_BASE + 0x248))
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index b06f59e..4563551 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -443,7 +443,7 @@ void __init spear13xx_map_io(void)
+ 	iotable_init(spear13xx_io_desc, ARRAY_SIZE(spear13xx_io_desc));
+ 
+ 	/* This will initialize clock framework */
+-	clk_init();
++	spear13xx_clk_init();
+ }
+ 
+ static void __init spear13xx_timer_init(void)
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 96a51cc..41a2b5e 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -19,13 +19,13 @@
+ /* root clks */
+ /* 32 KHz oscillator clock */
+ static struct clk osc_32k_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 32000,
+ };
+ 
+ /* 24 MHz oscillator clock */
+ static struct clk osc_24m_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 24000000,
+ };
+ 
+@@ -40,7 +40,7 @@ static struct clk rtc_clk = {
+ 
+ /* clock derived from 24 MHz osc clk */
+ /* pll masks structure */
+-static struct pll_clk_masks pll1_masks = {
++static struct pll_clk_masks pll_masks = {
+ 	.mode_mask = PLL_MODE_MASK,
+ 	.mode_shift = PLL_MODE_SHIFT,
+ 	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
+@@ -53,22 +53,22 @@ static struct pll_clk_masks pll1_masks = {
+ 	.div_n_shift = PLL_DIV_N_SHIFT,
+ };
+ 
+-/* pll1 configuration structure */
+-static struct pll_clk_config pll1_config = {
+-	.mode_reg = PLL1_CTR,
+-	.cfg_reg = PLL1_FRQ,
+-	.masks = &pll1_masks,
+-};
+-
+ /* pll rate configuration table, in ascending order of rates */
+ struct pll_rate_tbl pll_rtbl[] = {
+ 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
+ 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
+ };
+ 
++/* pll1 configuration structure */
++static struct pll_clk_config pll1_config = {
++	.mode_reg = PLL1_CTR,
++	.cfg_reg = PLL1_FRQ,
++	.masks = &pll_masks,
++};
++
+ /* PLL1 clock */
+ static struct clk pll1_clk = {
+-	.flags = ENABLED_ON_INIT,
++	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
+ 	.pclk = &osc_24m_clk,
+ 	.en_reg = PLL1_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
+@@ -79,9 +79,29 @@ static struct clk pll1_clk = {
+ 	.private_data = &pll1_config,
+ };
+ 
++/* pll2 configuration structure */
++static struct pll_clk_config pll2_config = {
++	.mode_reg = PLL2_CTR,
++	.cfg_reg = PLL2_FRQ,
++	.masks = &pll_masks,
++};
++
++/* PLL2 clock */
++static struct clk pll2_clk = {
++	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
++	.pclk = &osc_24m_clk,
++	.en_reg = PLL2_CTR,
++	.en_reg_bit = PLL_ENABLE,
++	.calc_rate = &pll_calc_rate,
++	.recalc = &pll_clk_recalc,
++	.set_rate = &pll_clk_set_rate,
++	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
++	.private_data = &pll2_config,
++};
++
+ /* PLL3 48 MHz clock */
+ static struct clk pll3_48m_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &osc_24m_clk,
+ 	.rate = 48000000,
+ };
+@@ -96,7 +116,7 @@ static struct clk wdt_clk = {
+ /* clock derived from pll1 clk */
+ /* cpu clock */
+ static struct clk cpu_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.recalc = &follow_parent,
+ };
+@@ -123,7 +143,7 @@ struct bus_rate_tbl bus_rtbl[] = {
+ 
+ /* ahb clock */
+ static struct clk ahb_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.calc_rate = &bus_calc_rate,
+ 	.recalc = &bus_clk_recalc,
+@@ -410,6 +430,48 @@ static struct clk usbd_clk = {
+ };
+ 
+ /* clock derived from ahb clk */
++/* ahb multiplied by 2 clock */
++static struct clk ahbmult2_clk = {
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
++	.pclk = &ahb_clk,
++	.recalc = &ahbmult2_clk_recalc,
++};
++
++/* ddr clock */
++struct ddr_rate_tbl ddr_rate_tbl = {
++	.minrate = 166000000,
++	.maxrate = 332000000,
++};
++
++static struct pclk_info ddr_pclk_info[] = {
++	{
++		.pclk = &ahb_clk,
++		.pclk_val = MCTR_CLK_HCLK_VAL,
++	}, {
++		.pclk = &ahbmult2_clk,
++		.pclk_val = MCTR_CLK_2HCLK_VAL,
++	}, {
++		.pclk = &pll2_clk,
++		.pclk_val = MCTR_CLK_PLL2_VAL,
++	},
++};
++
++/* ddr parent select structure */
++static struct pclk_sel ddr_pclk_sel = {
++	.pclk_info = ddr_pclk_info,
++	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
++	.pclk_sel_reg = PLL_CLK_CFG,
++	.pclk_sel_mask = MCTR_CLK_MASK,
++};
++
++static struct clk ddr_clk = {
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
++	.recalc = &follow_parent,
++	.pclk_sel = &ddr_pclk_sel,
++	.pclk_sel_shift = MCTR_CLK_SHIFT,
++	.private_data = &ddr_rate_tbl,
++};
++
+ /* apb masks structure */
+ static struct bus_clk_masks apb_masks = {
+ 	.mask = HCLK_PCLK_RATIO_MASK,
+@@ -424,7 +486,7 @@ static struct bus_clk_config apb_config = {
+ 
+ /* apb clock */
+ static struct clk apb_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &ahb_clk,
+ 	.calc_rate = &bus_calc_rate,
+ 	.recalc = &bus_clk_recalc,
+@@ -649,6 +711,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
+ 	/* clock derived from 24 MHz osc clk */
+ 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
++	{ .con_id = "pll2_clk",		.clk = &pll2_clk},
+ 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
+ 	{ .dev_id = "wdt",		.clk = &wdt_clk},
+ 	/* clock derived from pll1 clk */
+@@ -668,6 +731,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .con_id = "usbh_clk",		.clk = &usbh_clk},
+ 	{ .dev_id = "usbd",		.clk = &usbd_clk},
+ 	/* clock derived from ahb clk */
++	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
++	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
+ 	{ .con_id = "apb_clk",		.clk = &apb_clk},
+ 	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
+ 	{ .dev_id = "dma",		.clk = &dma_clk},
+@@ -720,12 +785,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ #endif
+ };
+ 
+-void __init clk_init(void)
++/* machine clk init */
++void __init spear3xx_clk_init(void)
+ {
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
+-		clk_register(&spear_clk_lookups[i]);
+-
+-	recalc_root_clocks();
++	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
+ }
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 75c1eef..4d04dbe 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -45,7 +45,7 @@ extern struct platform_device smi_device;
+ extern struct sys_timer spear3xx_timer;
+ 
+ /* Add spear3xx family function declarations here */
+-void __init clk_init(void);
++void __init spear3xx_clk_init(void);
+ void __init i2c_register_board_devices(void);
+ void __init spear_setup_timer(void);
+ void __init spear3xx_map_io(void);
+diff --git a/arch/arm/mach-spear3xx/include/mach/misc_regs.h b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
+index 6cb4f3c..6316900 100644
+--- a/arch/arm/mach-spear3xx/include/mach/misc_regs.h
++++ b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
+@@ -46,6 +46,13 @@
+ 
+ #define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x01C))
+ #define PLL_CLK_CFG		((unsigned int *)(MISC_BASE + 0x020))
++/* PLL_CLK_CFG register masks */
++#define MCTR_CLK_SHIFT		28
++#define MCTR_CLK_MASK		0x7
++#define MCTR_CLK_HCLK_VAL	0x0
++#define MCTR_CLK_2HCLK_VAL	0x1
++#define MCTR_CLK_PLL2_VAL	0x3
++
+ #define CORE_CLK_CFG		((unsigned int *)(MISC_BASE + 0x024))
+ /* CORE CLK CFG register masks */
+ #define PLL_HCLK_RATIO_SHIFT	10
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 18072ee..a905b5d 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -280,7 +280,7 @@ void __init spear3xx_map_io(void)
+ 	iotable_init(spear3xx_io_desc, ARRAY_SIZE(spear3xx_io_desc));
+ 
+ 	/* This will initialize clock framework */
+-	clk_init();
++	spear3xx_clk_init();
+ }
+ 
+ /* pad multiplexing support */
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 9171952..99cc21d 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -19,13 +19,13 @@
+ /* root clks */
+ /* 32 KHz oscillator clock */
+ static struct clk osc_32k_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 32000,
+ };
+ 
+ /* 30 MHz oscillator clock */
+ static struct clk osc_30m_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.rate = 30000000,
+ };
+ 
+@@ -40,7 +40,7 @@ static struct clk rtc_clk = {
+ 
+ /* clock derived from 30 MHz osc clk */
+ /* pll masks structure */
+-static struct pll_clk_masks pll1_masks = {
++static struct pll_clk_masks pll_masks = {
+ 	.mode_mask = PLL_MODE_MASK,
+ 	.mode_shift = PLL_MODE_SHIFT,
+ 	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
+@@ -53,22 +53,22 @@ static struct pll_clk_masks pll1_masks = {
+ 	.div_n_shift = PLL_DIV_N_SHIFT,
+ };
+ 
+-/* pll1 configuration structure */
+-static struct pll_clk_config pll1_config = {
+-	.mode_reg = PLL1_CTR,
+-	.cfg_reg = PLL1_FRQ,
+-	.masks = &pll1_masks,
+-};
+-
+ /* pll rate configuration table, in ascending order of rates */
+ struct pll_rate_tbl pll_rtbl[] = {
+ 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
+ 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
+ };
+ 
++/* pll1 configuration structure */
++static struct pll_clk_config pll1_config = {
++	.mode_reg = PLL1_CTR,
++	.cfg_reg = PLL1_FRQ,
++	.masks = &pll_masks,
++};
++
+ /* PLL1 clock */
+ static struct clk pll1_clk = {
+-	.flags = ENABLED_ON_INIT,
++	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
+ 	.pclk = &osc_30m_clk,
+ 	.en_reg = PLL1_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
+@@ -79,9 +79,29 @@ static struct clk pll1_clk = {
+ 	.private_data = &pll1_config,
+ };
+ 
++/* pll2 configuration structure */
++static struct pll_clk_config pll2_config = {
++	.mode_reg = PLL2_CTR,
++	.cfg_reg = PLL2_FRQ,
++	.masks = &pll_masks,
++};
++
++/* PLL2 clock */
++static struct clk pll2_clk = {
++	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
++	.pclk = &osc_30m_clk,
++	.en_reg = PLL2_CTR,
++	.en_reg_bit = PLL_ENABLE,
++	.calc_rate = &pll_calc_rate,
++	.recalc = &pll_clk_recalc,
++	.set_rate = &pll_clk_set_rate,
++	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
++	.private_data = &pll2_config,
++};
++
+ /* PLL3 48 MHz clock */
+ static struct clk pll3_48m_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &osc_30m_clk,
+ 	.rate = 48000000,
+ };
+@@ -96,7 +116,7 @@ static struct clk wdt_clk = {
+ /* clock derived from pll1 clk */
+ /* cpu clock */
+ static struct clk cpu_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.recalc = &follow_parent,
+ };
+@@ -123,7 +143,7 @@ struct bus_rate_tbl bus_rtbl[] = {
+ 
+ /* ahb clock */
+ static struct clk ahb_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &pll1_clk,
+ 	.calc_rate = &bus_calc_rate,
+ 	.recalc = &bus_clk_recalc,
+@@ -491,6 +511,48 @@ static struct clk usbd_clk = {
+ };
+ 
+ /* clock derived from ahb clk */
++/* ahb multiplied by 2 clock */
++static struct clk ahbmult2_clk = {
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
++	.pclk = &ahb_clk,
++	.recalc = &ahbmult2_clk_recalc,
++};
++
++/* ddr clock */
++struct ddr_rate_tbl ddr_rate_tbl = {
++	.minrate = 166000000,
++	.maxrate = 332000000,
++};
++
++static struct pclk_info ddr_pclk_info[] = {
++	{
++		.pclk = &ahb_clk,
++		.pclk_val = MCTR_CLK_HCLK_VAL,
++	}, {
++		.pclk = &ahbmult2_clk,
++		.pclk_val = MCTR_CLK_2HCLK_VAL,
++	}, {
++		.pclk = &pll2_clk,
++		.pclk_val = MCTR_CLK_PLL2_VAL,
++	},
++};
++
++/* ddr parent select structure */
++static struct pclk_sel ddr_pclk_sel = {
++	.pclk_info = ddr_pclk_info,
++	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
++	.pclk_sel_reg = PLL_CLK_CFG,
++	.pclk_sel_mask = MCTR_CLK_MASK,
++};
++
++static struct clk ddr_clk = {
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
++	.recalc = &follow_parent,
++	.pclk_sel = &ddr_pclk_sel,
++	.pclk_sel_shift = MCTR_CLK_SHIFT,
++	.private_data = &ddr_rate_tbl,
++};
++
+ /* apb masks structure */
+ static struct bus_clk_masks apb_masks = {
+ 	.mask = HCLK_PCLK_RATIO_MASK,
+@@ -505,7 +567,7 @@ static struct bus_clk_config apb_config = {
+ 
+ /* apb clock */
+ static struct clk apb_clk = {
+-	.flags = ALWAYS_ENABLED,
++	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
+ 	.pclk = &ahb_clk,
+ 	.calc_rate = &bus_calc_rate,
+ 	.recalc = &bus_clk_recalc,
+@@ -630,6 +692,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
+ 	/* clock derived from 30 MHz os		 clk */
+ 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
++	{ .con_id = "pll2_clk",		.clk = &pll2_clk},
+ 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
+ 	{ .dev_id = "wdt",		.clk = &wdt_clk},
+ 	/* clock derived from pll1 clk */
+@@ -654,6 +717,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .con_id = "usbh.1_clk",	.clk = &usbh1_clk},
+ 	{ .dev_id = "usbd",		.clk = &usbd_clk},
+ 	/* clock derived from ahb clk */
++	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
++	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
+ 	{ .con_id = "apb_clk",		.clk = &apb_clk},
+ 	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
+ 	{ .dev_id = "dma",		.clk = &dma_clk},
+@@ -671,12 +736,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "gpio2",		.clk = &gpio2_clk},
+ };
+ 
+-void __init clk_init(void)
++/* machine clk init */
++void __init spear6xx_clk_init(void)
+ {
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
+-		clk_register(&spear_clk_lookups[i]);
+-
+-	recalc_root_clocks();
++	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
+ }
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index b33e436..4cccf99 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -52,7 +52,7 @@ void __init spear6xx_map_io(void);
+ void __init spear6xx_init_irq(void);
+ void __init spear6xx_init(void);
+ void __init spear600_init(void);
+-void __init clk_init(void);
++void __init spear6xx_clk_init(void);
+ 
+ /* Add spear600 machine device structure declarations here */
+ 
+diff --git a/arch/arm/mach-spear6xx/include/mach/misc_regs.h b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
+index bd71e72..0f4562b 100644
+--- a/arch/arm/mach-spear6xx/include/mach/misc_regs.h
++++ b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
+@@ -47,6 +47,13 @@
+ #define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x01C))
+ #define PLL_CLK_CFG		((unsigned int *)(MISC_BASE + 0x020))
+ #define CORE_CLK_CFG		((unsigned int *)(MISC_BASE + 0x024))
++/* PLL_CLK_CFG register masks */
++#define MCTR_CLK_SHIFT		28
++#define MCTR_CLK_MASK		0x7
++#define MCTR_CLK_HCLK_VAL	0x0
++#define MCTR_CLK_2HCLK_VAL	0x1
++#define MCTR_CLK_PLL2_VAL	0x3
++
+ /* CORE CLK CFG register masks */
+ #define PLL_HCLK_RATIO_SHIFT	10
+ #define PLL_HCLK_RATIO_MASK	0x3
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index eb72c4c..4490731 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -439,7 +439,7 @@ void __init spear6xx_map_io(void)
+ 	iotable_init(spear6xx_io_desc, ARRAY_SIZE(spear6xx_io_desc));
+ 
+ 	/* This will initialize clock framework */
+-	clk_init();
++	spear6xx_clk_init();
+ }
+ 
+ static void __init spear6xx_timer_init(void)
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index 7d3338f..fb1c87b 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -21,6 +21,8 @@
+ #include <linux/spinlock.h>
+ #include <plat/clock.h>
+ 
++/* pointer to ddr clock structure */
++static struct clk *ddr_clk;
+ static DEFINE_SPINLOCK(clocks_lock);
+ static LIST_HEAD(root_clks);
+ #ifdef CONFIG_DEBUG_FS
+@@ -160,7 +162,7 @@ static int do_clk_enable(struct clk *clk)
+ 		 * time please reclac
+ 		 */
+ 		if (clk->recalc) {
+-			ret = clk->recalc(clk);
++			ret = clk->recalc(clk, &clk->rate, clk->pclk->rate);
+ 			if (ret)
+ 				goto err;
+ 		}
+@@ -298,7 +300,16 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 			propagate_rate(clk, 0);
+ 		spin_unlock_irqrestore(&clocks_lock, flags);
+ 	} else if (clk->pclk) {
+-		u32 mult = clk->div_factor ? clk->div_factor : 1;
++		u32 mult;
++		/*
++		 * if pclk is SYSTEM_CLK and clk is not SYSTEM_CLK then return
++		 * error
++		 */
++		if (clk->pclk->flags & SYSTEM_CLK)
++			if (!(clk->flags & SYSTEM_CLK))
++				return -EPERM;
++
++		mult = clk->div_factor ? clk->div_factor : 1;
+ 		ret = clk_set_rate(clk->pclk, mult * rate);
+ 	}
+ 
+@@ -371,7 +382,7 @@ void propagate_rate(struct clk *pclk, int on_init)
+ 
+ 	list_for_each_entry_safe(clk, _temp, &pclk->children, sibling) {
+ 		if (clk->recalc) {
+-			ret = clk->recalc(clk);
++			ret = clk->recalc(clk, &clk->rate, clk->pclk->rate);
+ 			/*
+ 			 * recalc will return error if clk out is not programmed
+ 			 * In this case configure default rate.
+@@ -390,6 +401,47 @@ void propagate_rate(struct clk *pclk, int on_init)
+ 	}
+ }
+ 
++/* updates "rate" pointer with current_clk's output for input "rate" */
++static void rate_calc(struct clk *current_clk, struct clk *ancestor_clk,
++		unsigned long *rate)
++{
++	if (current_clk->pclk != ancestor_clk)
++		rate_calc(current_clk->pclk, ancestor_clk, rate);
++
++	if (current_clk->recalc)
++		current_clk->recalc(current_clk, rate, *rate);
++}
++
++/*
++ * Check if ancestor clk rate is acceptable to ddr or not.
++ * This will call recursive rate_calc function, starting from ddr upto ancestor
++ * clk mentioned. This will calculate divisions / multiplications by all
++ * intermediate ancestor clocks and return the final rate of ddr if ancestor clk
++ * sets its rate to "rate", value passed in function.
++ */
++static int ddr_rate_acceptable(struct clk *aclk, unsigned long rate)
++{
++	struct ddr_rate_tbl *tbl = ddr_clk->private_data;
++
++	rate_calc(ddr_clk, aclk, &rate);
++	if ((rate >= tbl->minrate) && (rate <= tbl->maxrate))
++		return true;
++
++	return false;
++}
++
++/* mark all ddr ancestors with DDR_ANCESTOR flag */
++static void mark_ddr_ancestors(struct clk *dclk)
++{
++	struct clk *clk = dclk->pclk;
++
++	/* mark all ancestors of DDR */
++	while (clk != NULL) {
++		clk->flags |= DDR_ANCESTOR;
++		clk = clk->pclk;
++	}
++}
++
+ /**
+  * round_rate - Returns index of closest programmable rate in rate_config tbl
+  * @clk: ptr to clock structure
+@@ -475,7 +527,7 @@ unsigned long pll_calc_rate(struct clk *clk, int index)
+  * In Dithered mode
+  * rate = (2 * M[15:0] * Fin)/(256 * N * 2^P)
   */
- #define SPEAR13XX_SYS_LOCATION		(SPEAR13XX_SYSRAM0_BASE + 0x600)
+-int pll_clk_recalc(struct clk *clk)
++int pll_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
+ {
+ 	struct pll_clk_config *config = clk->private_data;
+ 	unsigned int num = 2, den = 0, val, mode = 0;
+@@ -504,7 +556,7 @@ int pll_clk_recalc(struct clk *clk)
+ 	if (!den)
+ 		return -EINVAL;
  
--#define SPEAR13XX_SYSRAM1_BASE		0xE0800000
-+#define SPEAR13XX_SYSRAM1_BASE		UL(0xE0800000)
- #define SPEAR13XX_SYSRAM1_SIZE		0x00800000
--#define SPEAR13XX_CLCD_BASE		0xE1000000
--#define SPEAR13XX_C3_BASE		0xE1800000
--#define SPEAR13XX_GETH_BASE		0xE2000000
--#define SPEAR13XX_UPD_BASE		0xE2800000
--#define SPEAR13XX_UDC_BASE		0xE3800000
--#define SPEAR13XX_UHC0_OHCI_BASE	0xE4000000
--#define SPEAR13XX_UHC0_EHCI_BASE	0xE4800000
--#define SPEAR13XX_UHC1_OHCI_BASE	0xE5000000
--#define SPEAR13XX_UHC1_EHCI_BASE	0xE5800000
--#define SPEAR13XX_SMI_MEM_BASE		0xE6000000
--#define SPEAR13XX_SMI_CTRL_BASE		0xEA000000
--#define SPEAR13XX_DMAC0_BASE		0xEA800000
--#define SPEAR13XX_DMAC1_BASE		0xEB000000
--#define SPEAR13XX_MII_PHY_BASE		0xEB800000
--#define SPEAR13XX_MPMC_BASE		0xEC000000
--#define SPEAR13XX_PCIE0_BASE		0x80000000
--#define SPEAR13XX_PCIE1_BASE		0x90000000
--#define SPEAR13XX_PCIE2_BASE		0xC0000000
--#define SPEAR13XX_PCIE0_APP_BASE	0xB1000000
--#define SPEAR13XX_PCIE1_APP_BASE	0xB1800000
--#define SPEAR13XX_PCIE2_APP_BASE	0xB4000000
--#define SPEAR13XX_FSMC_MEM_BASE		0xA0000000
--#define SPEAR13XX_FSMC_BASE		0xB0000000
--#define SPEAR13XX_JPEG_BASE		0xB2000000
--#define SPEAR13XX_MCIF_CF_BASE		0xB2800000
--#define SPEAR13XX_MCIF_SDHCI_BASE	0xB3000000
-+#define SPEAR13XX_CLCD_BASE		UL(0xE1000000)
-+#define SPEAR13XX_C3_BASE		UL(0xE1800000)
-+#define SPEAR13XX_GETH_BASE		UL(0xE2000000)
-+#define SPEAR13XX_UPD_BASE		UL(0xE2800000)
-+#define SPEAR13XX_UDC_BASE		UL(0xE3800000)
-+#define SPEAR13XX_UHC0_OHCI_BASE	UL(0xE4000000)
-+#define SPEAR13XX_UHC0_EHCI_BASE	UL(0xE4800000)
-+#define SPEAR13XX_UHC1_OHCI_BASE	UL(0xE5000000)
-+#define SPEAR13XX_UHC1_EHCI_BASE	UL(0xE5800000)
-+#define SPEAR13XX_SMI_MEM_BASE		UL(0xE6000000)
-+#define SPEAR13XX_SMI_CTRL_BASE		UL(0xEA000000)
-+#define SPEAR13XX_DMAC0_BASE		UL(0xEA800000)
-+#define SPEAR13XX_DMAC1_BASE		UL(0xEB000000)
-+#define SPEAR13XX_MII_PHY_BASE		UL(0xEB800000)
-+#define SPEAR13XX_MPMC_BASE		UL(0xEC000000)
-+#define SPEAR13XX_PCIE0_BASE		UL(0x80000000)
-+#define SPEAR13XX_PCIE1_BASE		UL(0x90000000)
-+#define SPEAR13XX_PCIE2_BASE		UL(0xC0000000)
-+#define SPEAR13XX_PCIE0_APP_BASE	UL(0xB1000000)
-+#define SPEAR13XX_PCIE1_APP_BASE	UL(0xB1800000)
-+#define SPEAR13XX_PCIE2_APP_BASE	UL(0xB4000000)
-+#define SPEAR13XX_FSMC_MEM_BASE		UL(0xA0000000)
-+#define SPEAR13XX_FSMC_BASE		UL(0xB0000000)
-+#define SPEAR13XX_JPEG_BASE		UL(0xB2000000)
-+#define SPEAR13XX_MCIF_CF_BASE		UL(0xB2800000)
-+#define SPEAR13XX_MCIF_SDHCI_BASE	UL(0xB3000000)
+-	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
++	*rate = (((prate/10000) * num) / den) * 10000;
+ 	return 0;
+ }
  
- /* Debug uart for linux, will be used for debug and uncompress messages */
- #define SPEAR_DBG_UART_BASE		SPEAR13XX_UART_BASE
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear.h b/arch/arm/mach-spear3xx/include/mach/spear.h
-index dcca856..00828bb 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear.h
-@@ -14,124 +14,62 @@
- #ifndef __MACH_SPEAR3XX_H
- #define __MACH_SPEAR3XX_H
+@@ -522,6 +574,25 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+ 	if (i < 0)
+ 		return i;
  
-+#include <asm/memory.h>
- #include <mach/hardware.h>
- #include <mach/spear300.h>
- #include <mach/spear310.h>
- #include <mach/spear320.h>
++	/* if clk is ddrs ancestor, check if rate is acceptable to ddr */
++	if (ddr_clk && (clk->flags & DDR_ANCESTOR)) {
++		int ret;
++
++		ret = ddr_rate_acceptable(clk, rate);
++		if (ret == false)
++			return -EPERM;
++		else {
++			/*
++			 * call routine to put ddr in refresh mode, and
++			 * configure pll.
++			 */
++			/* TBD */
++			clk->rate = rate;
++		}
++
++		return ret;
++	}
++
+ 	val = readl(config->mode_reg) &
+ 		~(config->masks->mode_mask << config->masks->mode_shift);
+ 	val |= (tbls[i].mode & config->masks->mode_mask) <<
+@@ -563,7 +634,7 @@ unsigned long bus_calc_rate(struct clk *clk, int index)
+ }
  
--#define SPEAR3XX_ML_SDRAM_BASE		0x00000000
--#define SPEAR3XX_ML_SDRAM_SIZE		0x40000000
-+#define SPEAR3XX_ML_SDRAM_BASE		UL(0x00000000)
+ /* calculates current programmed rate of ahb or apb bus */
+-int bus_clk_recalc(struct clk *clk)
++int bus_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
+ {
+ 	struct bus_clk_config *config = clk->private_data;
+ 	unsigned int div;
+@@ -574,7 +645,7 @@ int bus_clk_recalc(struct clk *clk)
+ 	if (!div)
+ 		return -EINVAL;
  
--#define SPEAR3XX_ICM9_BASE		0xC0000000
--#define SPEAR3XX_ICM9_SIZE		0x10000000
-+#define SPEAR3XX_ICM9_BASE		UL(0xC0000000)
+-	clk->rate = (unsigned long)clk->pclk->rate / div;
++	*rate = prate / div;
+ 	return 0;
+ }
  
- /* ICM1 - Low speed connection */
--#define SPEAR3XX_ICM1_2_BASE		0xD0000000
--#define SPEAR3XX_ICM1_2_SIZE		0x10000000
--
--#define SPEAR3XX_ICM1_UART_BASE		0xD0000000
-+#define SPEAR3XX_ICM1_2_BASE		UL(0xD0000000)
-+#define SPEAR3XX_ICM1_UART_BASE		UL(0xD0000000)
- #define VA_SPEAR3XX_ICM1_UART_BASE	IO_ADDRESS(SPEAR3XX_ICM1_UART_BASE)
--#define SPEAR3XX_ICM1_UART_SIZE		0x00080000
--
--#define SPEAR3XX_ICM1_ADC_BASE		0xD0080000
--#define SPEAR3XX_ICM1_ADC_SIZE		0x00080000
--
--#define SPEAR3XX_ICM1_SSP_BASE		0xD0100000
--#define SPEAR3XX_ICM1_SSP_SIZE		0x00080000
--
--#define SPEAR3XX_ICM1_I2C_BASE		0xD0180000
--#define SPEAR3XX_ICM1_I2C_SIZE		0x00080000
--
--#define SPEAR3XX_ICM1_JPEG_BASE		0xD0800000
--#define SPEAR3XX_ICM1_JPEG_SIZE		0x00800000
--
--#define SPEAR3XX_ICM1_IRDA_BASE		0xD1000000
--#define SPEAR3XX_ICM1_IRDA_SIZE		0x00080000
--
--#define SPEAR3XX_ICM1_SRAM_BASE		0xD2800000
--#define SPEAR3XX_ICM1_SRAM_SIZE		0x05800000
-+#define SPEAR3XX_ICM1_ADC_BASE		UL(0xD0080000)
-+#define SPEAR3XX_ICM1_SSP_BASE		UL(0xD0100000)
-+#define SPEAR3XX_ICM1_I2C_BASE		UL(0xD0180000)
-+#define SPEAR3XX_ICM1_JPEG_BASE		UL(0xD0800000)
-+#define SPEAR3XX_ICM1_IRDA_BASE		UL(0xD1000000)
-+#define SPEAR3XX_ICM1_SRAM_BASE		UL(0xD2800000)
+@@ -600,6 +671,14 @@ int bus_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+ 	return 0;
+ }
  
- /* ICM2 - Application Subsystem */
--#define SPEAR3XX_ICM2_HWACCEL0_BASE	0xD8800000
--#define SPEAR3XX_ICM2_HWACCEL0_SIZE	0x00800000
--
--#define SPEAR3XX_ICM2_HWACCEL1_BASE	0xD9000000
--#define SPEAR3XX_ICM2_HWACCEL1_SIZE	0x00800000
-+#define SPEAR3XX_ICM2_HWACCEL0_BASE	UL(0xD8800000)
-+#define SPEAR3XX_ICM2_HWACCEL1_BASE	UL(0xD9000000)
++/* calculates current programmed rate of ahbmult2 */
++int
++ahbmult2_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
++{
++	*rate = prate * 2;
++	return 0;
++}
++
+ /*
+  * gives rate for different values of eq, x and y
+  *
+@@ -627,7 +706,7 @@ unsigned long aux_calc_rate(struct clk *clk, int index)
+  *
+  * Selection of eqn 1 or 2 is programmed in register
+  */
+-int aux_clk_recalc(struct clk *clk)
++int aux_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
+ {
+ 	struct aux_clk_config *config = clk->private_data;
+ 	unsigned int num = 1, den = 1, val, eqn;
+@@ -650,7 +729,7 @@ int aux_clk_recalc(struct clk *clk)
+ 	if (!den)
+ 		return -EINVAL;
  
- /* ICM4 - High Speed Connection */
--#define SPEAR3XX_ICM4_BASE		0xE0000000
--#define SPEAR3XX_ICM4_SIZE		0x08000000
--
--#define SPEAR3XX_ICM4_MII_BASE		0xE0800000
--#define SPEAR3XX_ICM4_MII_SIZE		0x00800000
--
--#define SPEAR3XX_ICM4_USBD_FIFO_BASE	0xE1000000
--#define SPEAR3XX_ICM4_USBD_FIFO_SIZE	0x00100000
--
--#define SPEAR3XX_ICM4_USBD_CSR_BASE	0xE1100000
--#define SPEAR3XX_ICM4_USBD_CSR_SIZE	0x00100000
--
--#define SPEAR3XX_ICM4_USBD_PLDT_BASE	0xE1200000
--#define SPEAR3XX_ICM4_USBD_PLDT_SIZE	0x00100000
--
--#define SPEAR3XX_ICM4_USB_EHCI0_1_BASE	0xE1800000
--#define SPEAR3XX_ICM4_USB_EHCI0_1_SIZE	0x00100000
--
--#define SPEAR3XX_ICM4_USB_OHCI0_BASE	0xE1900000
--#define SPEAR3XX_ICM4_USB_OHCI0_SIZE	0x00100000
--
--#define SPEAR3XX_ICM4_USB_OHCI1_BASE	0xE2100000
--#define SPEAR3XX_ICM4_USB_OHCI1_SIZE	0x00100000
--
--#define SPEAR3XX_ICM4_USB_ARB_BASE	0xE2800000
--#define SPEAR3XX_ICM4_USB_ARB_SIZE	0x00010000
-+#define SPEAR3XX_ICM4_BASE		UL(0xE0000000)
-+#define SPEAR3XX_ICM4_MII_BASE		UL(0xE0800000)
-+#define SPEAR3XX_ICM4_USBD_FIFO_BASE	UL(0xE1000000)
-+#define SPEAR3XX_ICM4_USBD_CSR_BASE	UL(0xE1100000)
-+#define SPEAR3XX_ICM4_USBD_PLDT_BASE	UL(0xE1200000)
-+#define SPEAR3XX_ICM4_USB_EHCI0_1_BASE	UL(0xE1800000)
-+#define SPEAR3XX_ICM4_USB_OHCI0_BASE	UL(0xE1900000)
-+#define SPEAR3XX_ICM4_USB_OHCI1_BASE	UL(0xE2100000)
-+#define SPEAR3XX_ICM4_USB_ARB_BASE	UL(0xE2800000)
+-	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
++	*rate = (((prate / 10000) * num) / den) * 10000;
+ 	return 0;
+ }
  
- /* ML1 - Multi Layer CPU Subsystem */
--#define SPEAR3XX_ICM3_ML1_2_BASE	0xF0000000
--#define SPEAR3XX_ICM3_ML1_2_SIZE	0x0F000000
--
--#define SPEAR3XX_ML1_TMR_BASE		0xF0000000
--#define SPEAR3XX_ML1_TMR_SIZE		0x00100000
--
--#define SPEAR3XX_ML1_VIC_BASE		0xF1100000
-+#define SPEAR3XX_ICM3_ML1_2_BASE	UL(0xF0000000)
-+#define SPEAR3XX_ML1_TMR_BASE		UL(0xF0000000)
-+#define SPEAR3XX_ML1_VIC_BASE		UL(0xF1100000)
- #define VA_SPEAR3XX_ML1_VIC_BASE	IO_ADDRESS(SPEAR3XX_ML1_VIC_BASE)
--#define SPEAR3XX_ML1_VIC_SIZE		0x00100000
+@@ -704,7 +783,7 @@ unsigned long gpt_calc_rate(struct clk *clk, int index)
+  * Fout from synthesizer can be given from below equations:
+  * Fout= Fin/((2 ^ (N+1)) * (M+1))
+  */
+-int gpt_clk_recalc(struct clk *clk)
++int gpt_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
+ {
+ 	struct gpt_clk_config *config = clk->private_data;
+ 	unsigned int div = 1, val;
+@@ -718,7 +797,7 @@ int gpt_clk_recalc(struct clk *clk)
+ 	if (!div)
+ 		return -EINVAL;
  
- /* ICM3 - Basic Subsystem */
--#define SPEAR3XX_ICM3_SMEM_BASE		0xF8000000
--#define SPEAR3XX_ICM3_SMEM_SIZE		0x04000000
--
--#define SPEAR3XX_ICM3_SMI_CTRL_BASE	0xFC000000
--#define SPEAR3XX_ICM3_SMI_CTRL_SIZE	0x00200000
--
--#define SPEAR3XX_ICM3_DMA_BASE		0xFC400000
--#define SPEAR3XX_ICM3_DMA_SIZE		0x00200000
--
--#define SPEAR3XX_ICM3_SDRAM_CTRL_BASE	0xFC600000
--#define SPEAR3XX_ICM3_SDRAM_CTRL_SIZE	0x00200000
--
--#define SPEAR3XX_ICM3_TMR0_BASE		0xFC800000
--#define SPEAR3XX_ICM3_TMR0_SIZE		0x00080000
--
--#define SPEAR3XX_ICM3_WDT_BASE		0xFC880000
--#define SPEAR3XX_ICM3_WDT_SIZE		0x00080000
--
--#define SPEAR3XX_ICM3_RTC_BASE		0xFC900000
--#define SPEAR3XX_ICM3_RTC_SIZE		0x00080000
--
--#define SPEAR3XX_ICM3_GPIO_BASE		0xFC980000
--#define SPEAR3XX_ICM3_GPIO_SIZE		0x00080000
--
--#define SPEAR3XX_ICM3_SYS_CTRL_BASE	0xFCA00000
-+#define SPEAR3XX_ICM3_SMEM_BASE		UL(0xF8000000)
-+#define SPEAR3XX_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
-+#define SPEAR3XX_ICM3_DMA_BASE		UL(0xFC400000)
-+#define SPEAR3XX_ICM3_SDRAM_CTRL_BASE	UL(0xFC600000)
-+#define SPEAR3XX_ICM3_TMR0_BASE		UL(0xFC800000)
-+#define SPEAR3XX_ICM3_WDT_BASE		UL(0xFC880000)
-+#define SPEAR3XX_ICM3_RTC_BASE		UL(0xFC900000)
-+#define SPEAR3XX_ICM3_GPIO_BASE		UL(0xFC980000)
-+#define SPEAR3XX_ICM3_SYS_CTRL_BASE	UL(0xFCA00000)
- #define VA_SPEAR3XX_ICM3_SYS_CTRL_BASE	IO_ADDRESS(SPEAR3XX_ICM3_SYS_CTRL_BASE)
--#define SPEAR3XX_ICM3_SYS_CTRL_SIZE	0x00080000
--
--#define SPEAR3XX_ICM3_MISC_REG_BASE	0xFCA80000
-+#define SPEAR3XX_ICM3_MISC_REG_BASE	UL(0xFCA80000)
- #define VA_SPEAR3XX_ICM3_MISC_REG_BASE	IO_ADDRESS(SPEAR3XX_ICM3_MISC_REG_BASE)
--#define SPEAR3XX_ICM3_MISC_REG_SIZE	0x00080000
--
--#define SPEAR3XX_ICM3_TMR1_BASE		0xFCB00000
--#define SPEAR3XX_ICM3_TMR1_SIZE		0x00080000
-+#define SPEAR3XX_ICM3_TMR1_BASE		UL(0xFCB00000)
+-	clk->rate = (unsigned long)clk->pclk->rate / div;
++	*rate = prate / div;
+ 	return 0;
+ }
  
- /* Debug uart for linux, will be used for debug and uncompress messages */
- #define SPEAR_DBG_UART_BASE		SPEAR3XX_ICM1_UART_BASE
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear300.h b/arch/arm/mach-spear3xx/include/mach/spear300.h
-index 1059d5a..c723515 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear300.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear300.h
-@@ -17,11 +17,9 @@
- #define __MACH_SPEAR300_H
+@@ -786,11 +865,10 @@ unsigned long clcd_calc_rate(struct clk *clk, int index)
+  * complete div (including fractional part) and then right shift the
+  * result by 14 places.
+  */
+-int clcd_clk_recalc(struct clk *clk)
++int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
+ {
+ 	struct clcd_clk_config *config = clk->private_data;
+ 	unsigned int div = 1;
+-	unsigned long prate;
+ 	unsigned int val;
  
- /* Base address of various IPs */
--#define SPEAR300_TELECOM_BASE		0x50000000
--#define SPEAR300_TELECOM_SIZE		0x10000000
-+#define SPEAR300_TELECOM_BASE		UL(0x50000000)
+ 	val = readl(config->synth_reg);
+@@ -800,10 +878,10 @@ int clcd_clk_recalc(struct clk *clk)
+ 	if (!div)
+ 		return -EINVAL;
  
- /* Interrupt registers offsets and masks */
--#define SPEAR300_TELECOM_REG_SIZE	0x00010000
- #define INT_ENB_MASK_REG		0x54
- #define INT_STS_MASK_REG		0x58
- #define IT_PERS_S_IRQ_MASK		(1 << 0)
-@@ -36,47 +34,20 @@
+-	prate = clk->pclk->rate / 1000; /* first level division, make it KHz */
++	prate = prate / 1000; /* first level division, make it KHz */
  
- #define SHIRQ_RAS1_MASK			0x1FF
+-	clk->rate = (((unsigned long)prate << 12) / (2 * div)) >> 12;
+-	clk->rate *= 1000;
++	*rate = (((unsigned long)prate << 12) / (2 * div)) >> 12;
++	*rate *= 1000;
+ 	return 0;
+ }
  
--#define SPEAR300_CLCD_BASE		0x60000000
--#define SPEAR300_CLCD_SIZE		0x10000000
--
--#define SPEAR300_SDHCI_BASE		0x70000000
--#define SPEAR300_SDHCI_SIZE		0x10000000
--
--#define SPEAR300_NAND_0_BASE		0x80000000
--#define SPEAR300_NAND_0_SIZE		0x04000000
--
--#define SPEAR300_NAND_1_BASE		0x84000000
--#define SPEAR300_NAND_1_SIZE		0x04000000
--
--#define SPEAR300_NAND_2_BASE		0x88000000
--#define SPEAR300_NAND_2_SIZE		0x04000000
--
--#define SPEAR300_NAND_3_BASE		0x8c000000
--#define SPEAR300_NAND_3_SIZE		0x04000000
--
--#define SPEAR300_NOR_0_BASE		0x90000000
--#define SPEAR300_NOR_0_SIZE		0x01000000
--
--#define SPEAR300_NOR_1_BASE		0x91000000
--#define SPEAR300_NOR_1_SIZE		0x01000000
--
--#define SPEAR300_NOR_2_BASE		0x92000000
--#define SPEAR300_NOR_2_SIZE		0x01000000
--
--#define SPEAR300_NOR_3_BASE		0x93000000
--#define SPEAR300_NOR_3_SIZE		0x01000000
--
--#define SPEAR300_FSMC_BASE		0x94000000
--#define SPEAR300_FSMC_SIZE		0x05000000
--
--#define SPEAR300_SOC_CONFIG_BASE	0x99000000
--#define SPEAR300_SOC_CONFIG_SIZE	0x00000008
--
--#define SPEAR300_KEYBOARD_BASE		0xA0000000
--#define SPEAR300_KEYBOARD_SIZE		0x09000000
--
--#define SPEAR300_GPIO_BASE		0xA9000000
--#define SPEAR300_GPIO_SIZE		0x07000000
-+#define SPEAR300_CLCD_BASE		UL(0x60000000)
-+#define SPEAR300_SDHCI_BASE		UL(0x70000000)
-+#define SPEAR300_NAND_0_BASE		UL(0x80000000)
-+#define SPEAR300_NAND_1_BASE		UL(0x84000000)
-+#define SPEAR300_NAND_2_BASE		UL(0x88000000)
-+#define SPEAR300_NAND_3_BASE		UL(0x8c000000)
-+#define SPEAR300_NOR_0_BASE		UL(0x90000000)
-+#define SPEAR300_NOR_1_BASE		UL(0x91000000)
-+#define SPEAR300_NOR_2_BASE		UL(0x92000000)
-+#define SPEAR300_NOR_3_BASE		UL(0x93000000)
-+#define SPEAR300_FSMC_BASE		UL(0x94000000)
-+#define SPEAR300_SOC_CONFIG_BASE	UL(0x99000000)
-+#define SPEAR300_KEYBOARD_BASE		UL(0xA0000000)
-+#define SPEAR300_GPIO_BASE		UL(0xA9000000)
+@@ -834,11 +912,11 @@ int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+  * Used for clocks that always have value as the parent clock divided by a
+  * fixed divisor
+  */
+-int follow_parent(struct clk *clk)
++int follow_parent(struct clk *clk, unsigned long *rate, unsigned long prate)
+ {
+ 	unsigned int div_factor = (clk->div_factor < 1) ? 1 : clk->div_factor;
  
- #endif /* __MACH_SPEAR300_H */
+-	clk->rate = clk->pclk->rate/div_factor;
++	*rate = prate / div_factor;
+ 	return 0;
+ }
  
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear310.h b/arch/arm/mach-spear3xx/include/mach/spear310.h
-index b27bb8a..1e85347 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear310.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear310.h
-@@ -16,30 +16,18 @@
- #ifndef __MACH_SPEAR310_H
- #define __MACH_SPEAR310_H
+@@ -857,7 +935,7 @@ void recalc_root_clocks(void)
+ 	spin_lock_irqsave(&clocks_lock, flags);
+ 	list_for_each_entry(pclk, &root_clks, sibling) {
+ 		if (pclk->recalc) {
+-			ret = pclk->recalc(pclk);
++			ret = pclk->recalc(pclk, &pclk->rate, pclk->pclk->rate);
+ 			/*
+ 			 * recalc will return error if clk out is not programmed
+ 			 * In this case configure default clock.
+@@ -873,6 +951,23 @@ void recalc_root_clocks(void)
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
  
--#define SPEAR310_NAND_BASE		0x40000000
--#define SPEAR310_NAND_SIZE		0x04000000
-+#define SPEAR310_NAND_BASE		UL(0x40000000)
-+#define SPEAR310_FSMC_BASE		UL(0x44000000)
-+#define SPEAR310_UART1_BASE		UL(0xB2000000)
-+#define SPEAR310_UART2_BASE		UL(0xB2080000)
-+#define SPEAR310_UART3_BASE		UL(0xB2100000)
-+#define SPEAR310_UART4_BASE		UL(0xB2180000)
-+#define SPEAR310_UART5_BASE		UL(0xB2200000)
-+#define SPEAR310_HDLC_BASE		UL(0xB2800000)
-+#define SPEAR310_RS485_0_BASE		UL(0xB3000000)
-+#define SPEAR310_RS485_1_BASE		UL(0xB3800000)
-+#define SPEAR310_SOC_CONFIG_BASE	UL(0xB4000000)
++void __init
++clk_init(struct clk_lookup *clk_lookups, u32 count, struct clk *dclk)
++{
++	int i;
++
++	for (i = 0; i < count; i++)
++		clk_register(&clk_lookups[i]);
++
++	recalc_root_clocks();
++
++	/* Mark all ancestors of DDR with special flag */
++	if (dclk) {
++		ddr_clk = dclk;
++		mark_ddr_ancestors(dclk);
++	}
++}
++
+ #ifdef CONFIG_DEBUG_FS
+ /*
+  *	debugfs support to trace clock tree hierarchy and attributes
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index 30938ea..6d53fc8 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -19,9 +19,12 @@
+ #include <linux/types.h>
  
--#define SPEAR310_FSMC_BASE		0x44000000
--#define SPEAR310_FSMC_SIZE		0x01000000
--
--#define SPEAR310_UART1_BASE		0xB2000000
--#define SPEAR310_UART2_BASE		0xB2080000
--#define SPEAR310_UART3_BASE		0xB2100000
--#define SPEAR310_UART4_BASE		0xB2180000
--#define SPEAR310_UART5_BASE		0xB2200000
--#define SPEAR310_UART_SIZE		0x00080000
--
--#define SPEAR310_HDLC_BASE		0xB2800000
--#define SPEAR310_HDLC_SIZE		0x00800000
--
--#define SPEAR310_RS485_0_BASE		0xB3000000
--#define SPEAR310_RS485_0_SIZE		0x00800000
--
--#define SPEAR310_RS485_1_BASE		0xB3800000
--#define SPEAR310_RS485_1_SIZE		0x00800000
--
--#define SPEAR310_SOC_CONFIG_BASE	0xB4000000
--#define SPEAR310_SOC_CONFIG_SIZE	0x00000070
- /* Interrupt registers offsets and masks */
- #define INT_STS_MASK_REG		0x04
- #define SMII0_IRQ_MASK			(1 << 0)
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
-index 89f5bfb..940f0d8 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear320.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
-@@ -16,57 +16,25 @@
- #ifndef __MACH_SPEAR320_H
- #define __MACH_SPEAR320_H
+ /* clk structure flags */
+-#define	ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
+-#define	RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
+-#define	ENABLED_ON_INIT		(1 << 2) /* clocks enabled at init */
++#define ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
++#define RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
++#define ENABLED_ON_INIT		(1 << 2) /* clocks enabled@init */
++/* Only System clocks can call other sytem clocks set rate function */
++#define SYSTEM_CLK		(1 << 3)
++#define DDR_ANCESTOR		(1 << 4) /* ancestor clks of DDR */
  
--#define SPEAR320_EMI_CTRL_BASE		0x40000000
--#define SPEAR320_EMI_CTRL_SIZE		0x08000000
-+#define SPEAR320_EMI_CTRL_BASE		UL(0x40000000)
-+#define SPEAR320_FSMC_BASE		UL(0x4C000000)
-+#define SPEAR320_NAND_BASE		UL(0x50000000)
-+#define SPEAR320_I2S_BASE		UL(0x60000000)
-+#define SPEAR320_SDHCI_BASE		UL(0x70000000)
-+#define SPEAR320_CLCD_BASE		UL(0x90000000)
-+#define SPEAR320_PAR_PORT_BASE		UL(0xA0000000)
-+#define SPEAR320_CAN0_BASE		UL(0xA1000000)
-+#define SPEAR320_CAN1_BASE		UL(0xA2000000)
-+#define SPEAR320_UART1_BASE		UL(0xA3000000)
-+#define SPEAR320_UART2_BASE		UL(0xA4000000)
-+#define SPEAR320_SSP0_BASE		UL(0xA5000000)
-+#define SPEAR320_SSP1_BASE		UL(0xA6000000)
-+#define SPEAR320_I2C_BASE		UL(0xA7000000)
-+#define SPEAR320_PWM_BASE		UL(0xA8000000)
-+#define SPEAR320_SMII0_BASE		UL(0xAA000000)
-+#define SPEAR320_SMII1_BASE		UL(0xAB000000)
-+#define SPEAR320_SOC_CONFIG_BASE	UL(0xB3000000)
+ /**
+  * struct clkops - clock operations
+@@ -99,8 +102,9 @@ struct clk {
+ 	unsigned int *en_reg;
+ 	u8 en_reg_bit;
+ 	const struct clkops *ops;
+-	int (*recalc) (struct clk *);
+-	int (*set_rate) (struct clk *, unsigned long rate);
++	int (*recalc) (struct clk *clk, unsigned long *rate,
++			unsigned long prate);
++	int (*set_rate) (struct clk *clk, unsigned long rate);
+ 	unsigned long (*calc_rate)(struct clk *, int index);
+ 	struct rate_config rate_config;
+ 	unsigned int div_factor;
+@@ -223,26 +227,42 @@ struct clcd_rate_tbl {
+ 	u16 div;
+ };
  
--#define SPEAR320_FSMC_BASE		0x4C000000
--#define SPEAR320_FSMC_SIZE		0x01000000
--
--#define SPEAR320_NAND_BASE		0x50000000
--#define SPEAR320_NAND_SIZE		0x04000000
--
--#define SPEAR320_I2S_BASE		0x60000000
--#define SPEAR320_I2S_SIZE		0x10000000
--
--#define SPEAR320_SDHCI_BASE		0x70000000
--#define SPEAR320_SDHCI_SIZE		0x10000000
--
--#define SPEAR320_CLCD_BASE		0x90000000
--#define SPEAR320_CLCD_SIZE		0x10000000
--
--#define SPEAR320_PAR_PORT_BASE		0xA0000000
--#define SPEAR320_PAR_PORT_SIZE		0x01000000
--
--#define SPEAR320_CAN0_BASE		0xA1000000
--#define SPEAR320_CAN0_SIZE		0x01000000
--
--#define SPEAR320_CAN1_BASE		0xA2000000
--#define SPEAR320_CAN1_SIZE		0x01000000
--
--#define SPEAR320_UART1_BASE		0xA3000000
--#define SPEAR320_UART2_BASE		0xA4000000
--#define SPEAR320_UART_SIZE		0x01000000
--
--#define SPEAR320_SSP0_BASE		0xA5000000
--#define SPEAR320_SSP0_SIZE		0x01000000
--
--#define SPEAR320_SSP1_BASE		0xA6000000
--#define SPEAR320_SSP1_SIZE		0x01000000
--
--#define SPEAR320_I2C_BASE		0xA7000000
--#define SPEAR320_I2C_SIZE		0x01000000
--
--#define SPEAR320_PWM_BASE		0xA8000000
--#define SPEAR320_PWM_SIZE		0x01000000
--
--#define SPEAR320_SMII0_BASE		0xAA000000
--#define SPEAR320_SMII0_SIZE		0x01000000
--
--#define SPEAR320_SMII1_BASE		0xAB000000
--#define SPEAR320_SMII1_SIZE		0x01000000
--
--#define SPEAR320_SOC_CONFIG_BASE	0xB3000000
--#define SPEAR320_SOC_CONFIG_SIZE	0x00000070
- /* Interrupt registers offsets and masks */
- #define INT_STS_MASK_REG		0x04
- #define INT_CLR_MASK_REG		0x04
-diff --git a/arch/arm/mach-spear6xx/include/mach/spear.h b/arch/arm/mach-spear6xx/include/mach/spear.h
-index 31486e5..4a2ecc7 100644
---- a/arch/arm/mach-spear6xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear6xx/include/mach/spear.h
-@@ -14,153 +14,71 @@
- #ifndef __MACH_SPEAR6XX_H
- #define __MACH_SPEAR6XX_H
++/* ddr min, max clk rate table */
++struct ddr_rate_tbl {
++	unsigned long minrate;
++	unsigned long maxrate;
++};
++
+ /* platform specific clock functions */
++/*
++ * must be called from machine clock.c file, dclk is pointer to ddr_clk
++ * strucutre. Which is required by clock framework.
++ *
++ * Actually before changing rate of DDRs ancestor, we must put ddr in refresh
++ * state and then change parent.
++ */
++void clk_init(struct clk_lookup *clk_lookups, u32 count, struct clk *dclk);
+ void clk_register(struct clk_lookup *cl);
+ void recalc_root_clocks(void);
  
-+#include <asm/memory.h>
- #include <mach/hardware.h>
- #include <mach/spear600.h>
+ /* clock recalc & set rate functions */
+-int follow_parent(struct clk *clk);
++int follow_parent(struct clk *clk, unsigned long *rate, unsigned long prate);
+ unsigned long pll_calc_rate(struct clk *clk, int index);
+-int pll_clk_recalc(struct clk *clk);
++int pll_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate);
+ unsigned long bus_calc_rate(struct clk *clk, int index);
+-int bus_clk_recalc(struct clk *clk);
++int bus_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int bus_clk_set_rate(struct clk *clk, unsigned long desired_rate);
++int ahbmult2_clk_recalc(struct clk *clk, unsigned long *rate,
++		unsigned long prate);
+ unsigned long gpt_calc_rate(struct clk *clk, int index);
+-int gpt_clk_recalc(struct clk *clk);
++int gpt_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int gpt_clk_set_rate(struct clk *clk, unsigned long desired_rate);
+ unsigned long aux_calc_rate(struct clk *clk, int index);
+-int aux_clk_recalc(struct clk *clk);
++int aux_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int aux_clk_set_rate(struct clk *clk, unsigned long desired_rate);
+ unsigned long clcd_calc_rate(struct clk *clk, int index);
+-int clcd_clk_recalc(struct clk *clk);
++int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate);
  
--#define SPEAR6XX_ML_SDRAM_BASE		0x00000000
--#define SPEAR6XX_ML_SDRAM_SIZE		0x40000000
--
-+#define SPEAR6XX_ML_SDRAM_BASE		UL(0x00000000)
- /* ICM1 - Low speed connection */
--#define SPEAR6XX_ICM1_BASE		0xD0000000
--#define SPEAR6XX_ICM1_SIZE		0x08000000
-+#define SPEAR6XX_ICM1_BASE		UL(0xD0000000)
- 
--#define SPEAR6XX_ICM1_UART0_BASE	0xD0000000
-+#define SPEAR6XX_ICM1_UART0_BASE	UL(0xD0000000)
- #define VA_SPEAR6XX_ICM1_UART0_BASE	IO_ADDRESS(SPEAR6XX_ICM1_UART0_BASE)
--#define SPEAR6XX_ICM1_UART0_SIZE	0x00080000
--
--#define SPEAR6XX_ICM1_UART1_BASE	0xD0080000
--#define SPEAR6XX_ICM1_UART1_SIZE	0x00080000
--
--#define SPEAR6XX_ICM1_SSP0_BASE		0xD0100000
--#define SPEAR6XX_ICM1_SSP0_SIZE		0x00080000
--
--#define SPEAR6XX_ICM1_SSP1_BASE		0xD0180000
--#define SPEAR6XX_ICM1_SSP1_SIZE		0x00080000
--
--#define SPEAR6XX_ICM1_I2C_BASE		0xD0200000
--#define SPEAR6XX_ICM1_I2C_SIZE		0x00080000
- 
--#define SPEAR6XX_ICM1_JPEG_BASE		0xD0800000
--#define SPEAR6XX_ICM1_JPEG_SIZE		0x00800000
--
--#define SPEAR6XX_ICM1_IRDA_BASE		0xD1000000
--#define SPEAR6XX_ICM1_IRDA_SIZE		0x00800000
--
--#define SPEAR6XX_ICM1_FSMC_BASE		0xD1800000
--#define SPEAR6XX_ICM1_FSMC_SIZE		0x00800000
--
--#define SPEAR6XX_ICM1_NAND_BASE		0xD2000000
--#define SPEAR6XX_ICM1_NAND_SIZE		0x00800000
--
--#define SPEAR6XX_ICM1_SRAM_BASE		0xD2800000
--#define SPEAR6XX_ICM1_SRAM_SIZE		0x00800000
-+#define SPEAR6XX_ICM1_UART1_BASE	UL(0xD0080000)
-+#define SPEAR6XX_ICM1_SSP0_BASE		UL(0xD0100000)
-+#define SPEAR6XX_ICM1_SSP1_BASE		UL(0xD0180000)
-+#define SPEAR6XX_ICM1_I2C_BASE		UL(0xD0200000)
-+#define SPEAR6XX_ICM1_JPEG_BASE		UL(0xD0800000)
-+#define SPEAR6XX_ICM1_IRDA_BASE		UL(0xD1000000)
-+#define SPEAR6XX_ICM1_FSMC_BASE		UL(0xD1800000)
-+#define SPEAR6XX_ICM1_NAND_BASE		UL(0xD2000000)
-+#define SPEAR6XX_ICM1_SRAM_BASE		UL(0xD2800000)
- 
- /* ICM2 - Application Subsystem */
--#define SPEAR6XX_ICM2_BASE		0xD8000000
--#define SPEAR6XX_ICM2_SIZE		0x08000000
--
--#define SPEAR6XX_ICM2_TMR0_BASE		0xD8000000
--#define SPEAR6XX_ICM2_TMR0_SIZE		0x00080000
--
--#define SPEAR6XX_ICM2_TMR1_BASE		0xD8080000
--#define SPEAR6XX_ICM2_TMR1_SIZE		0x00080000
--
--#define SPEAR6XX_ICM2_GPIO_BASE		0xD8100000
--#define SPEAR6XX_ICM2_GPIO_SIZE		0x00080000
--
--#define SPEAR6XX_ICM2_SSP2_BASE		0xD8180000
--#define SPEAR6XX_ICM2_SSP2_SIZE		0x00080000
--
--#define SPEAR6XX_ICM2_ADC_BASE		0xD8200000
--#define SPEAR6XX_ICM2_ADC_SIZE		0x00080000
-+#define SPEAR6XX_ICM2_BASE		UL(0xD8000000)
-+#define SPEAR6XX_ICM2_TMR0_BASE		UL(0xD8000000)
-+#define SPEAR6XX_ICM2_TMR1_BASE		UL(0xD8080000)
-+#define SPEAR6XX_ICM2_GPIO_BASE		UL(0xD8100000)
-+#define SPEAR6XX_ICM2_SSP2_BASE		UL(0xD8180000)
-+#define SPEAR6XX_ICM2_ADC_BASE		UL(0xD8200000)
- 
- /* ML-1, 2 - Multi Layer CPU Subsystem */
--#define SPEAR6XX_ML_CPU_BASE		0xF0000000
--#define SPEAR6XX_ML_CPU_SIZE		0x08000000
--
--#define SPEAR6XX_CPU_TMR_BASE		0xF0000000
--#define SPEAR6XX_CPU_TMR_SIZE		0x00100000
--
--#define SPEAR6XX_CPU_GPIO_BASE		0xF0100000
--#define SPEAR6XX_CPU_GPIO_SIZE		0x00100000
--
--#define SPEAR6XX_CPU_VIC_SEC_BASE	0xF1000000
-+#define SPEAR6XX_ML_CPU_BASE		UL(0xF0000000)
-+#define SPEAR6XX_CPU_TMR_BASE		UL(0xF0000000)
-+#define SPEAR6XX_CPU_GPIO_BASE		UL(0xF0100000)
-+#define SPEAR6XX_CPU_VIC_SEC_BASE	UL(0xF1000000)
- #define VA_SPEAR6XX_CPU_VIC_SEC_BASE	IO_ADDRESS(SPEAR6XX_CPU_VIC_SEC_BASE)
--#define SPEAR6XX_CPU_VIC_SEC_SIZE	0x00100000
--
--#define SPEAR6XX_CPU_VIC_PRI_BASE	0xF1100000
-+#define SPEAR6XX_CPU_VIC_PRI_BASE	UL(0xF1100000)
- #define VA_SPEAR6XX_CPU_VIC_PRI_BASE	IO_ADDRESS(SPEAR6XX_CPU_VIC_PRI_BASE)
--#define SPEAR6XX_CPU_VIC_PRI_SIZE	0x00100000
- 
- /* ICM3 - Basic Subsystem */
--#define SPEAR6XX_ICM3_BASE		0xF8000000
--#define SPEAR6XX_ICM3_SIZE		0x08000000
--
--#define SPEAR6XX_ICM3_SMEM_BASE		0xF8000000
--#define SPEAR6XX_ICM3_SMEM_SIZE		0x04000000
--
--#define SPEAR6XX_ICM3_SMI_CTRL_BASE	0xFC000000
--#define SPEAR6XX_ICM3_SMI_CTRL_SIZE	0x00200000
--
--#define SPEAR6XX_ICM3_CLCD_BASE		0xFC200000
--#define SPEAR6XX_ICM3_CLCD_SIZE		0x00200000
--
--#define SPEAR6XX_ICM3_DMA_BASE		0xFC400000
--#define SPEAR6XX_ICM3_DMA_SIZE		0x00200000
--
--#define SPEAR6XX_ICM3_SDRAM_CTRL_BASE	0xFC600000
--#define SPEAR6XX_ICM3_SDRAM_CTRL_SIZE	0x00200000
--
--#define SPEAR6XX_ICM3_TMR_BASE		0xFC800000
--#define SPEAR6XX_ICM3_TMR_SIZE		0x00080000
--
--#define SPEAR6XX_ICM3_WDT_BASE		0xFC880000
--#define SPEAR6XX_ICM3_WDT_SIZE		0x00080000
--
--#define SPEAR6XX_ICM3_RTC_BASE		0xFC900000
--#define SPEAR6XX_ICM3_RTC_SIZE		0x00080000
--
--#define SPEAR6XX_ICM3_GPIO_BASE		0xFC980000
--#define SPEAR6XX_ICM3_GPIO_SIZE		0x00080000
--
--#define SPEAR6XX_ICM3_SYS_CTRL_BASE	0xFCA00000
-+#define SPEAR6XX_ICM3_BASE		UL(0xF8000000)
-+#define SPEAR6XX_ICM3_SMEM_BASE		UL(0xF8000000)
-+#define SPEAR6XX_ICM3_SMI_CTRL_BASE	UL(0xFC000000)
-+#define SPEAR6XX_ICM3_CLCD_BASE		UL(0xFC200000)
-+#define SPEAR6XX_ICM3_DMA_BASE		UL(0xFC400000)
-+#define SPEAR6XX_ICM3_SDRAM_CTRL_BASE	UL(0xFC600000)
-+#define SPEAR6XX_ICM3_TMR_BASE		UL(0xFC800000)
-+#define SPEAR6XX_ICM3_WDT_BASE		UL(0xFC880000)
-+#define SPEAR6XX_ICM3_RTC_BASE		UL(0xFC900000)
-+#define SPEAR6XX_ICM3_GPIO_BASE		UL(0xFC980000)
-+#define SPEAR6XX_ICM3_SYS_CTRL_BASE	UL(0xFCA00000)
- #define VA_SPEAR6XX_ICM3_SYS_CTRL_BASE	IO_ADDRESS(SPEAR6XX_ICM3_SYS_CTRL_BASE)
--#define SPEAR6XX_ICM3_SYS_CTRL_SIZE	0x00080000
--
--#define SPEAR6XX_ICM3_MISC_REG_BASE	0xFCA80000
-+#define SPEAR6XX_ICM3_MISC_REG_BASE	UL(0xFCA80000)
- #define VA_SPEAR6XX_ICM3_MISC_REG_BASE	IO_ADDRESS(SPEAR6XX_ICM3_MISC_REG_BASE)
--#define SPEAR6XX_ICM3_MISC_REG_SIZE	0x00080000
- 
- /* ICM4 - High Speed Connection */
--#define SPEAR6XX_ICM4_BASE		0xE0000000
--#define SPEAR6XX_ICM4_SIZE		0x08000000
--
--#define SPEAR6XX_ICM4_GMAC_BASE		0xE0800000
--#define SPEAR6XX_ICM4_GMAC_SIZE		0x00800000
--
--#define SPEAR6XX_ICM4_USBD_FIFO_BASE	0xE1000000
--#define SPEAR6XX_ICM4_USBD_FIFO_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USBD_CSR_BASE	0xE1100000
--#define SPEAR6XX_ICM4_USBD_CSR_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USBD_PLDT_BASE	0xE1200000
--#define SPEAR6XX_ICM4_USBD_PLDT_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USB_EHCI0_BASE	0xE1800000
--#define SPEAR6XX_ICM4_USB_EHCI0_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USB_OHCI0_BASE	0xE1900000
--#define SPEAR6XX_ICM4_USB_OHCI0_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USB_EHCI1_BASE	0xE2000000
--#define SPEAR6XX_ICM4_USB_EHCI1_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USB_OHCI1_BASE	0xE2100000
--#define SPEAR6XX_ICM4_USB_OHCI1_SIZE	0x00100000
--
--#define SPEAR6XX_ICM4_USB_ARB_BASE	0xE2800000
--#define SPEAR6XX_ICM4_USB_ARB_SIZE	0x00010000
-+#define SPEAR6XX_ICM4_BASE		UL(0xE0000000)
-+#define SPEAR6XX_ICM4_GMAC_BASE		UL(0xE0800000)
-+#define SPEAR6XX_ICM4_USBD_FIFO_BASE	UL(0xE1000000)
-+#define SPEAR6XX_ICM4_USBD_CSR_BASE	UL(0xE1100000)
-+#define SPEAR6XX_ICM4_USBD_PLDT_BASE	UL(0xE1200000)
-+#define SPEAR6XX_ICM4_USB_EHCI0_BASE	UL(0xE1800000)
-+#define SPEAR6XX_ICM4_USB_OHCI0_BASE	UL(0xE1900000)
-+#define SPEAR6XX_ICM4_USB_EHCI1_BASE	UL(0xE2000000)
-+#define SPEAR6XX_ICM4_USB_OHCI1_BASE	UL(0xE2100000)
-+#define SPEAR6XX_ICM4_USB_ARB_BASE	UL(0xE2800000)
- 
- /* Debug uart for linux, will be used for debug and uncompress messages */
- #define SPEAR_DBG_UART_BASE		SPEAR6XX_ICM1_UART0_BASE
+ #endif /* __PLAT_CLOCK_H */
 -- 
 1.7.2.2
