@@ -1,896 +1,1049 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:11:00 +0530
-Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
+Date: Mon, 30 Aug 2010 16:12:18 +0530
+Subject: [PATCH 17/74] ST SPEAr: Adding USB Host support
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+Message-ID: <16ef7fe197c3333deccdc6ff41d34ffeb0a8b71e.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/clock.c                |    2 +-
- arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/spear1300_evb.c        |    1 +
- arch/arm/mach-spear13xx/spear13xx.c            |   19 +
+ arch/arm/mach-spear13xx/clock.c                |    4 +-
+ arch/arm/mach-spear13xx/include/mach/generic.h |    4 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |    4 +
+ arch/arm/mach-spear13xx/spear13xx.c            |  106 +++++++++++
  arch/arm/mach-spear3xx/clock.c                 |    2 +-
- arch/arm/mach-spear3xx/include/mach/generic.h  |    1 +
- arch/arm/mach-spear3xx/spear300_evb.c          |    1 +
- arch/arm/mach-spear3xx/spear310_evb.c          |    1 +
- arch/arm/mach-spear3xx/spear320_evb.c          |    1 +
- arch/arm/mach-spear3xx/spear3xx.c              |   19 +
- arch/arm/mach-spear6xx/clock.c                 |    2 +-
- arch/arm/mach-spear6xx/include/mach/generic.h  |    1 +
- arch/arm/mach-spear6xx/spear600_evb.c          |    1 +
- arch/arm/mach-spear6xx/spear6xx.c              |   19 +
- drivers/rtc/Kconfig                            |    7 +
- drivers/rtc/Makefile                           |    1 +
- drivers/rtc/rtc-spear.c                        |  598 ++++++++++++++++++++++++
- 17 files changed, 674 insertions(+), 3 deletions(-)
- create mode 100644 drivers/rtc/rtc-spear.c
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    3 +
+ arch/arm/mach-spear3xx/spear300_evb.c          |    3 +
+ arch/arm/mach-spear3xx/spear310_evb.c          |    3 +
+ arch/arm/mach-spear3xx/spear320_evb.c          |    3 +
+ arch/arm/mach-spear3xx/spear3xx.c              |   80 ++++++++
+ arch/arm/mach-spear6xx/clock.c                 |    4 +-
+ arch/arm/mach-spear6xx/include/mach/generic.h  |    4 +
+ arch/arm/mach-spear6xx/spear600_evb.c          |    4 +
+ arch/arm/mach-spear6xx/spear6xx.c              |  108 +++++++++++
+ drivers/usb/Kconfig                            |    2 +
+ drivers/usb/host/ehci-hcd.c                    |    5 +
+ drivers/usb/host/ehci-spear.c                  |  210 +++++++++++++++++++++
+ drivers/usb/host/ohci-hcd.c                    |    5 +
+ drivers/usb/host/ohci-spear.c                  |  240 ++++++++++++++++++++++++
+ 19 files changed, 789 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/usb/host/ehci-spear.c
+ create mode 100644 drivers/usb/host/ohci-spear.c
 
 diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index cef3b13..cc692cc 100644
+index 7f7330c..9d97c69 100644
 --- a/arch/arm/mach-spear13xx/clock.c
 +++ b/arch/arm/mach-spear13xx/clock.c
-@@ -736,7 +736,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.con_id = "osc3_25m_clk",	.clk = &osc3_25m_clk},
+@@ -774,8 +774,8 @@ static struct clk_lookup spear_clk_lookups[] = {
  
- 	/* clock derived from 32 KHz osc clk */
--	{.dev_id = "rtc",		.clk = &rtc_clk},
-+	{.dev_id = "rtc-spear",		.clk = &rtc_clk},
- 
- 	/* clock derived from 24/25 MHz osc1/osc3 clk */
- 	{.con_id = "pll1_clk",		.clk = &pll1_clk},
+ 	/* clock derived from ahb clk */
+ 	{.dev_id = "smi",		.clk = &smi_clk},
+-	{.dev_id = "uhci0",		.clk = &uhci0_clk},
+-	{.dev_id = "uhci1",		.clk = &uhci1_clk},
++	{.con_id = "usbh.0_clk",	.clk = &uhci0_clk},
++	{.con_id = "usbh.1_clk",	.clk = &uhci1_clk},
+ 	{.dev_id = "usbd",		.clk = &usbd_clk},
+ 	{.dev_id = "i2c_designware.0",	.clk = &i2c_clk},
+ 	{.dev_id = "dma0",		.clk = &dma0_clk},
 diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 41c1a53..dc80421 100644
+index 0ba99de..7e5d7e1 100644
 --- a/arch/arm/mach-spear13xx/include/mach/generic.h
 +++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -30,6 +30,7 @@
+@@ -30,7 +30,11 @@
  
  /* Add spear13xx family device structure declarations here */
  extern struct amba_device uart_device;
-+extern struct platform_device rtc_device;
++extern struct platform_device ehci0_device;
++extern struct platform_device ehci1_device;
+ extern struct platform_device i2c_device;
++extern struct platform_device ohci0_device;
++extern struct platform_device ohci1_device;
+ extern struct platform_device rtc_device;
  extern struct sys_timer spear13xx_timer;
  
- /* Add spear1300 machine device structure declarations here */
 diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index d72c8a8..60c5fee 100644
+index 4bf908f..0a6d26f 100644
 --- a/arch/arm/mach-spear13xx/spear1300_evb.c
 +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -22,6 +22,7 @@ static struct amba_device *amba_devs[] __initdata = {
+@@ -22,7 +22,11 @@ static struct amba_device *amba_devs[] __initdata = {
  };
  
  static struct platform_device *plat_devs[] __initdata = {
-+	&rtc_device,
++	&ehci0_device,
++	&ehci1_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
  };
  
- static void __init spear1300_evb_init(void)
 diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index d11e300..bdca713 100644
+index 5abdae8..c8f1aff 100644
 --- a/arch/arm/mach-spear13xx/spear13xx.c
 +++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -37,6 +37,25 @@ struct amba_device uart_device = {
- 	.irq = {IRQ_UART, NO_IRQ},
+@@ -60,6 +60,112 @@ struct platform_device i2c_device = {
+ 	.resource = i2c_resources,
  };
  
-+/* rtc device registration */
-+static struct resource rtc_resources[] = {
-+	{
-+		.start = SPEAR13XX_RTC_BASE,
-+		.end = SPEAR13XX_RTC_BASE + SZ_4K - 1,
++/* usb host device registeration */
++static struct resource ehci0_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC0_EHCI_BASE,
++		.end = SPEAR13XX_UHC0_EHCI_BASE + SZ_4K - 1,
 +		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_RTC,
++	},
++	[1] = {
++		.start = IRQ_USBH_EHCI0,
 +		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+struct platform_device rtc_device = {
-+	.name = "rtc-spear",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(rtc_resources),
-+	.resource = rtc_resources,
++static struct resource ehci1_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC1_EHCI_BASE,
++		.end = SPEAR13XX_UHC1_EHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_EHCI1,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
 +
- /* Do spear13xx familiy common initialization part here */
- void __init spear13xx_init(void)
- {
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC0_OHCI_BASE,
++		.end = SPEAR13XX_UHC0_OHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_OHCI0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC1_OHCI_BASE,
++		.end = SPEAR13XX_UHC1_OHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_OHCI1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++/* usbh0_id defaults to 0, being static variable */
++static int usbh0_id;
++static int usbh1_id = 1;
++static u64 ehci0_dmamask = ~0;
++
++struct platform_device ehci0_device = {
++	.name = "spear-ehci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci0_resources),
++	.resource = ehci0_resources,
++};
++
++static u64 ehci1_dmamask = ~0;
++
++struct platform_device ehci1_device = {
++	.name = "spear-ehci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci1_resources),
++	.resource = ehci1_resources,
++};
++
++static u64 ohci0_dmamask = ~0;
++
++struct platform_device ohci0_device = {
++	.name = "spear-ohci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci0_resources),
++	.resource = ohci0_resources,
++};
++
++static u64 ohci1_dmamask = ~0;
++struct platform_device ohci1_device = {
++	.name = "spear-ohci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci1_resources),
++	.resource = ohci1_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
 diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index dc19666..147d0a3 100644
+index ae6c244..5eb6ff6 100644
 --- a/arch/arm/mach-spear3xx/clock.c
 +++ b/arch/arm/mach-spear3xx/clock.c
-@@ -467,7 +467,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
- 	{ .con_id = "osc_24m_clk",	.clk = &osc_24m_clk},
- 	/* clock derived from 32 KHz osc clk */
--	{ .dev_id = "rtc",		.clk = &rtc_clk},
-+	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
- 	/* clock derived from 24 MHz osc clk */
- 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
- 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
+@@ -495,7 +495,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "gpt1",		.clk = &gpt1_clk},
+ 	{ .dev_id = "gpt2",		.clk = &gpt2_clk},
+ 	/* clock derived from pll3 clk */
+-	{ .dev_id = "usbh",		.clk = &usbh_clk},
++	{ .con_id = "usbh_clk",		.clk = &usbh_clk},
+ 	{ .dev_id = "usbd",		.clk = &usbd_clk},
+ 	{ .dev_id = "clcd",		.clk = &clcd_clk},
+ 	/* clock derived from ahb clk */
 diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index d76ee98..408bb8d 100644
+index 162f33b..3eb2737 100644
 --- a/arch/arm/mach-spear3xx/include/mach/generic.h
 +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -33,6 +33,7 @@
+@@ -33,7 +33,10 @@
  /* Add spear3xx family device structure declarations here */
  extern struct amba_device gpio_device;
  extern struct amba_device uart_device;
-+extern struct platform_device rtc_device;
++extern struct platform_device ehci_device;
+ extern struct platform_device i2c_device;
++extern struct platform_device ohci0_device;
++extern struct platform_device ohci1_device;
+ extern struct platform_device rtc_device;
  extern struct sys_timer spear3xx_timer;
  
- /* Add spear3xx family function declarations here */
 diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index 3bb7fbc..392ee4a 100644
+index 083f65c..3b3c6ce 100644
 --- a/arch/arm/mach-spear3xx/spear300_evb.c
 +++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -44,6 +44,7 @@ static struct amba_device *amba_devs[] __initdata = {
+@@ -44,7 +44,10 @@ static struct amba_device *amba_devs[] __initdata = {
  
  static struct platform_device *plat_devs[] __initdata = {
  	/* spear3xx specific devices */
-+	&rtc_device,
++	&ehci_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
  
  	/* spear300 specific devices */
- };
 diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 7dd93bd..15ca8fc 100644
+index 208a68ce1..d523040 100644
 --- a/arch/arm/mach-spear3xx/spear310_evb.c
 +++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -50,6 +50,7 @@ static struct amba_device *amba_devs[] __initdata = {
+@@ -50,7 +50,10 @@ static struct amba_device *amba_devs[] __initdata = {
  
  static struct platform_device *plat_devs[] __initdata = {
  	/* spear3xx specific devices */
-+	&rtc_device,
++	&ehci_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
  
  	/* spear310 specific devices */
- 	&plgpio_device,
 diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 82f4e76..48155cc 100644
+index 90d685e..f90a9b8 100644
 --- a/arch/arm/mach-spear3xx/spear320_evb.c
 +++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -48,6 +48,7 @@ static struct amba_device *amba_devs[] __initdata = {
+@@ -48,7 +48,10 @@ static struct amba_device *amba_devs[] __initdata = {
  
  static struct platform_device *plat_devs[] __initdata = {
  	/* spear3xx specific devices */
-+	&rtc_device,
++	&ehci_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
  
  	/* spear320 specific devices */
- 	&plgpio_device,
 diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 89cf8ea..6d8791e 100644
+index 34d22a5..780d83e 100644
 --- a/arch/arm/mach-spear3xx/spear3xx.c
 +++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -54,6 +54,25 @@ struct amba_device uart_device = {
- 	.irq = {IRQ_UART, NO_IRQ},
+@@ -76,6 +76,86 @@ struct platform_device i2c_device = {
+ 	.resource = i2c_resources,
  };
  
-+/* rtc device registration */
-+static struct resource rtc_resources[] = {
-+	{
-+		.start = SPEAR3XX_ICM3_RTC_BASE,
-+		.end = SPEAR3XX_ICM3_RTC_BASE + SZ_4K - 1,
++/* usb host device registeration */
++static struct resource ehci_resources[] = {
++	[0] = {
++		.start = SPEAR3XX_ICM4_USB_EHCI0_1_BASE,
++		.end = SPEAR3XX_ICM4_USB_EHCI0_1_BASE + SZ_4K - 1,
 +		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_BASIC_RTC,
++	},
++	[1] = {
++		.start = IRQ_USB_H_EHCI_0,
 +		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+struct platform_device rtc_device = {
-+	.name = "rtc-spear",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(rtc_resources),
-+	.resource = rtc_resources,
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start = SPEAR3XX_ICM4_USB_OHCI0_BASE,
++		.end = SPEAR3XX_ICM4_USB_OHCI0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_0,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
 +
- /* Do spear3xx familiy common initialization part here */
- void __init spear3xx_init(void)
- {
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start = SPEAR3XX_ICM4_USB_OHCI1_BASE,
++		.end = SPEAR3XX_ICM4_USB_OHCI1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static u64 ehci_dmamask = ~0;
++static int usbh_id = -1;
++
++struct platform_device ehci_device = {
++	.name = "spear-ehci",
++	.id = -1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci_dmamask,
++		.platform_data = &usbh_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci_resources),
++	.resource = ehci_resources,
++};
++
++static u64 ohci0_dmamask = ~0;
++
++struct platform_device ohci0_device = {
++	.name = "spear-ohci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci0_dmamask,
++		.platform_data = &usbh_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci0_resources),
++	.resource = ohci0_resources,
++};
++
++static u64 ohci1_dmamask = ~0;
++
++struct platform_device ohci1_device = {
++	.name = "spear-ohci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci1_dmamask,
++		.platform_data = &usbh_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci1_resources),
++	.resource = ohci1_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
 diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 4a91991..66fc622 100644
+index 0972b8f..3caf91a 100644
 --- a/arch/arm/mach-spear6xx/clock.c
 +++ b/arch/arm/mach-spear6xx/clock.c
-@@ -569,7 +569,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
- 	{ .con_id = "osc_30m_clk",	.clk = &osc_30m_clk},
- 	/* clock derived from 32 KHz os		 clk */
--	{ .dev_id = "rtc",		.clk = &rtc_clk},
-+	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
- 	/* clock derived from 30 MHz os		 clk */
- 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
- 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
+@@ -591,8 +591,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{ .dev_id = "gpt2",		.clk = &gpt2_clk},
+ 	{ .dev_id = "gpt3",		.clk = &gpt3_clk},
+ 	/* clock derived from pll3 clk */
+-	{ .dev_id = "usbh0",		.clk = &usbh0_clk},
+-	{ .dev_id = "usbh1",		.clk = &usbh1_clk},
++	{ .con_id = "usbh.0_clk",	.clk = &usbh0_clk},
++	{ .con_id = "usbh.1_clk",	.clk = &usbh1_clk},
+ 	{ .dev_id = "usbd",		.clk = &usbd_clk},
+ 	/* clock derived from ahb clk */
+ 	{ .con_id = "apb_clk",		.clk = &apb_clk},
 diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index d6a04f2..674b16c 100644
+index 44a2f99..3b15289 100644
 --- a/arch/arm/mach-spear6xx/include/mach/generic.h
 +++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -32,6 +32,7 @@
+@@ -32,7 +32,11 @@
  extern struct amba_device clcd_device;
  extern struct amba_device gpio_device[];
  extern struct amba_device uart_device[];
-+extern struct platform_device rtc_device;
++extern struct platform_device ehci0_device;
++extern struct platform_device ehci1_device;
+ extern struct platform_device i2c_device;
++extern struct platform_device ohci0_device;
++extern struct platform_device ohci1_device;
+ extern struct platform_device rtc_device;
  extern struct sys_timer spear6xx_timer;
  
- /* Add spear6xx family function declarations here */
 diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
-index 88e69f4..861e83d 100644
+index 6b0cf23..b4dfd25 100644
 --- a/arch/arm/mach-spear6xx/spear600_evb.c
 +++ b/arch/arm/mach-spear6xx/spear600_evb.c
-@@ -26,6 +26,7 @@ static struct amba_device *amba_devs[] __initdata = {
+@@ -26,7 +26,11 @@ static struct amba_device *amba_devs[] __initdata = {
  };
  
  static struct platform_device *plat_devs[] __initdata = {
-+	&rtc_device,
++	&ehci0_device,
++	&ehci1_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
  };
  
- static void __init spear600_evb_init(void)
 diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index d0f6b9d..1e403cb 100644
+index 787de46..5a5195b 100644
 --- a/arch/arm/mach-spear6xx/spear6xx.c
 +++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -121,6 +121,25 @@ struct amba_device gpio_device[] = {
- 	}
+@@ -143,6 +143,114 @@ struct platform_device i2c_device = {
+ 	.resource = i2c_resources,
  };
  
-+/* rtc device registration */
-+static struct resource rtc_resources[] = {
-+	{
-+		.start = SPEAR6XX_ICM3_RTC_BASE,
-+		.end = SPEAR6XX_ICM3_RTC_BASE + SZ_4K - 1,
++/* usb host device registeration */
++static struct resource ehci0_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_EHCI0_BASE,
++		.end = SPEAR6XX_ICM4_USB_EHCI0_BASE + SZ_4K - 1,
 +		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_BASIC_RTC,
++	},
++	[1] = {
++		.start = IRQ_USB_H_EHCI_0,
 +		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+struct platform_device rtc_device = {
-+	.name = "rtc-spear",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(rtc_resources),
-+	.resource = rtc_resources,
-+};
-+
- /* This will add devices, and do machine specific tasks */
- void __init spear6xx_init(void)
- {
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 48ca713..f099473 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -625,6 +625,13 @@ config RTC_DRV_WM8350
- 	  This driver can also be built as a module. If so, the module
- 	  will be called "rtc-wm8350".
- 
-+config RTC_DRV_SPEAR
-+	tristate "SPEAR ST RTC"
-+	default y
-+	help
-+	 If you say Y here you will get support for the RTC found on
-+	 spear
-+
- config RTC_DRV_PCF50633
- 	depends on MFD_PCF50633
- 	tristate "NXP PCF50633 RTC"
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 0f207b3..44df01a 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -86,6 +86,7 @@ obj-$(CONFIG_RTC_DRV_S35390A)	+= rtc-s35390a.o
- obj-$(CONFIG_RTC_DRV_S3C)	+= rtc-s3c.o
- obj-$(CONFIG_RTC_DRV_SA1100)	+= rtc-sa1100.o
- obj-$(CONFIG_RTC_DRV_SH)	+= rtc-sh.o
-+obj-$(CONFIG_RTC_DRV_SPEAR)	+= rtc-spear.o
- obj-$(CONFIG_RTC_DRV_STARFIRE)	+= rtc-starfire.o
- obj-$(CONFIG_RTC_DRV_STK17TA8)	+= rtc-stk17ta8.o
- obj-$(CONFIG_RTC_DRV_STMP)	+= rtc-stmp3xxx.o
-diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
-new file mode 100644
-index 0000000..5b49124
---- /dev/null
-+++ b/drivers/rtc/rtc-spear.c
-@@ -0,0 +1,598 @@
-+/*
-+ * drivers/rtc/rtc-spear.c
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/bcd.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/ioport.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/types.h>
-+#include <linux/wait.h>
-+#include <asm/mach/time.h>
-+
-+/* RTC registers */
-+#define TIME_REG		0x00
-+#define DATE_REG		0x04
-+#define ALARM_TIME_REG		0x08
-+#define ALARM_DATE_REG		0x0C
-+#define CTRL_REG		0x10
-+#define STATUS_REG		0x14
-+
-+/* TIME_REG & ALARM_TIME_REG */
-+#define SECONDS_UNITS		(0xf<<0)	/* seconds units position */
-+#define SECONDS_TENS		(0x7<<4)	/* seconds tens position */
-+#define MINUTES_UNITS		(0xf<<8)	/* minutes units position */
-+#define MINUTES_TENS		(0x7<<12)	/* minutes tens position */
-+#define HOURS_UNITS		(0xf<<16)	/* hours units position */
-+#define HOURS_TENS		(0x3<<20)	/* hours tens position */
-+
-+/* DATE_REG & ALARM_DATE_REG */
-+#define DAYS_UNITS		(0xf<<0)	/* days units position */
-+#define DAYS_TENS		(0x3<<4)	/* days tens position */
-+#define MONTHS_UNITS		(0xf<<8)	/* months units position */
-+#define MONTHS_TENS		(0x1<<12)	/* months tens position */
-+#define YEARS_UNITS		(0xf<<16)	/* years units position */
-+#define YEARS_TENS		(0xf<<20)	/* years tens position */
-+#define YEARS_HUNDREDS		(0xf<<24)	/* years hundereds position */
-+#define YEARS_MILLENIUMS	(0xf<<28)	/* years millenium position */
-+
-+/* MASK SHIFT TIME_REG & ALARM_TIME_REG*/
-+#define SECOND_SHIFT		0x00		/* seconds units */
-+#define MINUTE_SHIFT		0x08		/* minutes units position */
-+#define HOUR_SHIFT		0x10		/* hours units position */
-+#define MDAY_SHIFT		0x00		/* Month day shift */
-+#define MONTH_SHIFT		0x08		/* Month shift */
-+#define YEAR_SHIFT		0x10		/* Year shift */
-+
-+#define SECOND_MASK		0x7F
-+#define MIN_MASK		0x7F
-+#define HOUR_MASK		0x3F
-+#define DAY_MASK		0x3F
-+#define MONTH_MASK		0x7F
-+#define YEAR_MASK		0xFFFF
-+
-+/* date reg equal to time reg, for debug only */
-+#define TIME_BYP		(1<<9)
-+#define INT_ENABLE		(1<<31)		/* interrupt enable */
-+
-+/* STATUS_REG */
-+#define CLK_UNCONNECTED		(1<<0)
-+#define PEND_WR_TIME		(1<<2)
-+#define PEND_WR_DATE		(1<<3)
-+#define LOST_WR_TIME		(1<<4)
-+#define LOST_WR_DATE		(1<<5)
-+#define RTC_INT_MASK		(1<<31)
-+#define STATUS_BUSY		(PEND_WR_TIME | PEND_WR_DATE)
-+#define STATUS_FAIL		(LOST_WR_TIME | LOST_WR_DATE)
-+
-+struct spear_rtc_config {
-+	struct clk *clk;
-+	spinlock_t lock;
-+	void __iomem *ioaddr;
-+};
-+
-+static inline void spear_rtc_clear_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	val = readl(config->ioaddr + STATUS_REG);
-+	val |= RTC_INT_MASK;
-+	writel(val, config->ioaddr + STATUS_REG);
-+	spin_unlock_irqrestore(&config->lock, flags);
-+}
-+
-+static inline void spear_rtc_enable_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+
-+	val = readl(config->ioaddr + CTRL_REG);
-+	if (!(val & INT_ENABLE)) {
-+		spear_rtc_clear_interrupt(config);
-+		val |= INT_ENABLE;
-+		writel(val, config->ioaddr + CTRL_REG);
-+	}
-+}
-+
-+static inline void spear_rtc_disable_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+
-+	val = readl(config->ioaddr + CTRL_REG);
-+	if (val & INT_ENABLE) {
-+		val &= ~INT_ENABLE;
-+		writel(val, config->ioaddr + CTRL_REG);
-+	}
-+}
-+
-+static inline int is_write_complete(struct spear_rtc_config *config)
-+{
-+	int ret = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	if ((readl(config->ioaddr + STATUS_REG)) & STATUS_FAIL)
-+		ret = -EIO;
-+	spin_unlock_irqrestore(&config->lock, flags);
-+
-+	return ret;
-+}
-+
-+static void rtc_wait_not_busy(struct spear_rtc_config *config)
-+{
-+	int status, count = 0;
-+	unsigned long flags;
-+
-+	/* Assuming BUSY may stay active for 80 msec) */
-+	for (count = 0; count < 80; count++) {
-+		spin_lock_irqsave(&config->lock, flags);
-+		status = readl(config->ioaddr + STATUS_REG);
-+		spin_unlock_irqrestore(&config->lock, flags);
-+		if ((status & STATUS_BUSY) == 0)
-+			break;
-+		/* check status busy, after each msec */
-+		msleep(1);
-+	}
-+}
-+
-+static irqreturn_t spear_rtc_irq(int irq, void *dev_id)
-+{
-+	struct rtc_device *rtc = (struct rtc_device *)dev_id;
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned long flags, events = 0;
-+	unsigned int irq_data;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	irq_data = readl(config->ioaddr + STATUS_REG);
-+	spin_unlock_irqrestore(&config->lock, flags);
-+
-+	if ((irq_data & RTC_INT_MASK)) {
-+		spear_rtc_clear_interrupt(config);
-+		events = RTC_IRQF | RTC_AF;
-+		rtc_update_irq(rtc, 1, events);
-+		return IRQ_HANDLED;
-+	} else
-+		return IRQ_NONE;
-+
-+}
-+
-+static int tm2bcd(struct rtc_time *tm)
-+{
-+	if (rtc_valid_tm(tm) != 0)
-+		return -EINVAL;
-+	tm->tm_sec = bin2bcd(tm->tm_sec);
-+	tm->tm_min = bin2bcd(tm->tm_min);
-+	tm->tm_hour = bin2bcd(tm->tm_hour);
-+	tm->tm_mday = bin2bcd(tm->tm_mday);
-+	tm->tm_mon = bin2bcd(tm->tm_mon + 1);
-+	tm->tm_year = bin2bcd(tm->tm_year);
-+
-+	return 0;
-+}
-+
-+static void bcd2tm(struct rtc_time *tm)
-+{
-+	tm->tm_sec = bcd2bin(tm->tm_sec);
-+	tm->tm_min = bcd2bin(tm->tm_min);
-+	tm->tm_hour = bcd2bin(tm->tm_hour);
-+	tm->tm_mday = bcd2bin(tm->tm_mday);
-+	tm->tm_mon = bcd2bin(tm->tm_mon) - 1;
-+	/* epoch == 1900 */
-+	tm->tm_year = bcd2bin(tm->tm_year);
-+}
-+
-+/*
-+ * spear_rtc_read_time - set the time
-+ * @dev: rtc device in use
-+ * @tm: holds date and time
-+ *
-+ * This function read time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date;
-+
-+	/* we don't report wday/yday/isdst ... */
-+	rtc_wait_not_busy(config);
-+
-+	time = readl(config->ioaddr + TIME_REG);
-+	date = readl(config->ioaddr + DATE_REG);
-+	tm->tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-+	tm->tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-+	tm->tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-+	tm->tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-+	tm->tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-+	tm->tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-+
-+	bcd2tm(tm);
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_set_time - set the time
-+ * @dev: rtc device in use
-+ * @tm: holds date and time
-+ *
-+ * This function set time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date, err = 0;
-+
-+	if (tm2bcd(tm) < 0)
-+		return -EINVAL;
-+
-+	rtc_wait_not_busy(config);
-+	time = (tm->tm_sec << SECOND_SHIFT) | (tm->tm_min << MINUTE_SHIFT) |
-+		(tm->tm_hour << HOUR_SHIFT);
-+	date = (tm->tm_mday << MDAY_SHIFT) | (tm->tm_mon << MONTH_SHIFT) |
-+		(tm->tm_year << YEAR_SHIFT);
-+	writel(time, config->ioaddr + TIME_REG);
-+	writel(date, config->ioaddr + DATE_REG);
-+	err = is_write_complete(config);
-+	if (err < 0)
-+		return err;
-+
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_read_alarm - read the alarm time
-+ * @dev: rtc device in use
-+ * @alm: holds alarm date and time
-+ *
-+ * This function read alarm time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date;
-+
-+	rtc_wait_not_busy(config);
-+
-+	time = readl(config->ioaddr + ALARM_TIME_REG);
-+	date = readl(config->ioaddr + ALARM_DATE_REG);
-+	alm->time.tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-+	alm->time.tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-+	alm->time.tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-+	alm->time.tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-+	alm->time.tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-+	alm->time.tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-+
-+	bcd2tm(&alm->time);
-+	alm->enabled = readl(config->ioaddr + CTRL_REG) & INT_ENABLE;
-+
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_set_alarm - set the alarm time
-+ * @dev: rtc device in use
-+ * @alm: holds alarm date and time
-+ *
-+ * This function set alarm time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date, err = 0;
-+
-+	if (tm2bcd(&alm->time) < 0)
-+		return -EINVAL;
-+
-+	rtc_wait_not_busy(config);
-+
-+	time = (alm->time.tm_sec << SECOND_SHIFT) | (alm->time.tm_min <<
-+			MINUTE_SHIFT) |	(alm->time.tm_hour << HOUR_SHIFT);
-+	date = (alm->time.tm_mday << MDAY_SHIFT) | (alm->time.tm_mon <<
-+			MONTH_SHIFT) | (alm->time.tm_year << YEAR_SHIFT);
-+
-+	writel(time, config->ioaddr + ALARM_TIME_REG);
-+	writel(date, config->ioaddr + ALARM_DATE_REG);
-+	err = is_write_complete(config);
-+	if (err < 0)
-+		return err;
-+
-+	if (alm->enabled)
-+		spear_rtc_enable_interrupt(config);
-+	else
-+		spear_rtc_disable_interrupt(config);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_RTC_INTF_DEV
-+static int
-+spear_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	struct rtc_time tm;
-+	struct rtc_wkalrm alm;
-+	void __user *uarg = (void __user *)arg;
-+	int err = 0;
-+
-+	switch (cmd) {
-+		/* AIE = Alarm Interrupt Enable */
-+	case RTC_AIE_OFF:
-+		spear_rtc_disable_interrupt(config);
-+		break;
-+	case RTC_AIE_ON:
-+		spear_rtc_enable_interrupt(config);
-+		break;
-+	case RTC_SET_TIME:
-+		if (copy_from_user(&tm, uarg, sizeof(tm)))
-+			return -EFAULT;
-+		return spear_rtc_set_time(dev, &tm);
-+	case RTC_RD_TIME:
-+		err = spear_rtc_read_time(dev, &tm);
-+		if (err < 0)
-+			return err;
-+
-+		if (copy_to_user(uarg, &tm, sizeof(tm)))
-+			return -EFAULT;
-+		break;
-+	case RTC_ALM_SET:
-+		if (copy_from_user(&alm.time, uarg, sizeof(tm)))
-+			return -EFAULT;
-+		alm.enabled = 0;
-+		alm.pending = 0;
-+		spear_rtc_set_alarm(dev, &alm);
-+		break;
-+	case RTC_ALM_READ:
-+		err = spear_rtc_read_alarm(dev, &alm);
-+		if (err < 0)
-+			return err;
-+
-+		if (copy_to_user(uarg, &alm.time, sizeof(tm)))
-+			return -EFAULT;
-+		break;
-+	default:
-+		return -ENOIOCTLCMD;
-+	}
-+
-+	return 0;
-+}
-+
-+#else
-+#define spear_rtc_ioctl	NULL
-+#endif
-+
-+static struct rtc_class_ops spear_rtc_ops = {
-+	.ioctl = spear_rtc_ioctl,
-+	.read_time = spear_rtc_read_time,
-+	.set_time = spear_rtc_set_time,
-+	.read_alarm = spear_rtc_read_alarm,
-+	.set_alarm = spear_rtc_set_alarm,
-+};
-+
-+static int __devinit spear_rtc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct rtc_device *rtc;
-+	struct spear_rtc_config *config;
-+	unsigned int status = 0;
-+	int irq;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "no resource defined\n");
-+		return -EBUSY;
-+	}
-+	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
-+		dev_err(&pdev->dev, "rtc region already claimed\n");
-+		return -EBUSY;
-+	}
-+
-+	config = kzalloc(sizeof(*config), GFP_KERNEL);
-+	if (!config) {
-+		dev_err(&pdev->dev, "out of memory\n");
-+		status = -ENOMEM;
-+		goto err_release_region;
-+	}
-+
-+	config->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(config->clk)) {
-+		status = PTR_ERR(config->clk);
-+		goto err_kfree;
-+	}
-+
-+	status = clk_enable(config->clk);
-+	if (status < 0)
-+		goto err_clk_put;
-+
-+	config->ioaddr = ioremap(res->start, resource_size(res));
-+	if (!config->ioaddr) {
-+		dev_err(&pdev->dev, "ioremap fail\n");
-+		status = -ENOMEM;
-+		goto err_disable_clock;
-+	}
-+
-+	rtc = rtc_device_register(pdev->name, &pdev->dev, &spear_rtc_ops,
-+			THIS_MODULE);
-+	if (IS_ERR(rtc)) {
-+		dev_err(&pdev->dev, "can't register RTC device, err %ld\n",
-+				PTR_ERR(rtc));
-+		status = PTR_ERR(rtc);
-+		goto err_iounmap;
-+	}
-+	platform_set_drvdata(pdev, rtc);
-+	dev_set_drvdata(&rtc->dev, config);
-+
-+	spin_lock_init(&config->lock);
-+
-+	/* alarm irqs */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "no update irq?\n");
-+		status = irq;
-+		goto err_clear_platdata;
-+	}
-+
-+	status = request_irq(irq, spear_rtc_irq, 0, pdev->name, rtc);
-+	if (status) {
-+		dev_err(&pdev->dev, "Alarm interrupt IRQ%d already \
-+				claimed\n", irq);
-+		goto err_clear_platdata;
-+	}
-+
-+	if (!device_can_wakeup(&pdev->dev))
-+		device_init_wakeup(&pdev->dev, 1);
-+
-+	return 0;
-+
-+err_clear_platdata:
-+	platform_set_drvdata(pdev, NULL);
-+	dev_set_drvdata(&rtc->dev, NULL);
-+	rtc_device_unregister(rtc);
-+err_iounmap:
-+	iounmap(config->ioaddr);
-+err_disable_clock:
-+	clk_disable(config->clk);
-+err_clk_put:
-+	clk_put(config->clk);
-+err_kfree:
-+	kfree(config);
-+err_release_region:
-+	release_mem_region(res->start, resource_size(res));
-+
-+	return status;
-+}
-+
-+static int __devexit spear_rtc_remove(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+	struct resource *res;
-+
-+	/* leave rtc running, but disable irqs */
-+	spear_rtc_disable_interrupt(config);
-+	device_init_wakeup(&pdev->dev, 0);
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq)
-+		free_irq(irq, pdev);
-+	clk_disable(config->clk);
-+	clk_put(config->clk);
-+	iounmap(config->ioaddr);
-+	kfree(config);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res)
-+		release_mem_region(res->start, resource_size(res));
-+	platform_set_drvdata(pdev, NULL);
-+	dev_set_drvdata(&rtc->dev, NULL);
-+	rtc_device_unregister(rtc);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+
-+static int spear_rtc_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (device_may_wakeup(&pdev->dev))
-+		enable_irq_wake(irq);
-+	else {
-+		spear_rtc_disable_interrupt(config);
-+		clk_disable(config->clk);
-+	}
-+
-+	return 0;
-+}
-+
-+static int spear_rtc_resume(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+
-+	if (device_may_wakeup(&pdev->dev))
-+		disable_irq_wake(irq);
-+	else {
-+		clk_enable(config->clk);
-+		spear_rtc_enable_interrupt(config);
-+	}
-+
-+	return 0;
-+}
-+
-+#else
-+#define spear_rtc_suspend	NULL
-+#define spear_rtc_resume	NULL
-+#endif
-+
-+static void spear_rtc_shutdown(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+
-+	spear_rtc_disable_interrupt(config);
-+	clk_disable(config->clk);
-+}
-+
-+static struct platform_driver spear_rtc_driver = {
-+	.probe = spear_rtc_probe,
-+	.remove = __devexit_p(spear_rtc_remove),
-+	.suspend = spear_rtc_suspend,
-+	.resume = spear_rtc_resume,
-+	.shutdown = spear_rtc_shutdown,
-+	.driver = {
-+		.name = "rtc-spear",
-+		.owner = THIS_MODULE,
++static struct resource ehci1_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_EHCI1_BASE,
++		.end = SPEAR6XX_ICM4_USB_EHCI1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_EHCI_1,
++		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+static int __init rtc_init(void)
-+{
-+	return platform_driver_register(&spear_rtc_driver);
-+}
-+module_init(rtc_init);
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_OHCI0_BASE,
++		.end = SPEAR6XX_ICM4_USB_OHCI0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+static void __exit rtc_exit(void)
-+{
-+	platform_driver_unregister(&spear_rtc_driver);
-+}
-+module_exit(rtc_exit);
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_OHCI1_BASE,
++		.end = SPEAR6XX_ICM4_USB_OHCI1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
 +
-+MODULE_ALIAS("rtc-spear");
-+MODULE_AUTHOR("Rajeev Kumar");
-+MODULE_LICENSE("GPL");
++/* usbh0_id defaults to 0, being static variable */
++static int usbh0_id;
++static int usbh1_id = 1;
++static u64 ehci0_dmamask = ~0;
++
++struct platform_device ehci0_device = {
++	.name = "spear-ehci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci0_resources),
++	.resource = ehci0_resources,
++};
++
++static u64 ehci1_dmamask = ~0;
++
++struct platform_device ehci1_device = {
++	.name = "spear-ehci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci1_resources),
++	.resource = ehci1_resources,
++};
++
++static u64 ohci0_dmamask = ~0;
++
++struct platform_device ohci0_device = {
++	.name = "spear-ohci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci0_resources),
++	.resource = ohci0_resources,
++};
++
++static u64 ohci1_dmamask = ~0;
++
++struct platform_device ohci1_device = {
++	.name = "spear-ohci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci1_resources),
++	.resource = ohci1_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
+diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
+index 4aa00e6..108f69d 100644
+--- a/drivers/usb/Kconfig
++++ b/drivers/usb/Kconfig
+@@ -41,6 +41,7 @@ config USB_ARCH_HAS_OHCI
+ 	default y if MFD_TC6393XB
+ 	default y if ARCH_W90X900
+ 	default y if ARCH_DAVINCI_DA8XX
++	default y if PLAT_SPEAR
+ 	# PPC:
+ 	default y if STB03xxx
+ 	default y if PPC_MPC52xx
+@@ -65,6 +66,7 @@ config USB_ARCH_HAS_EHCI
+ 	default y if ARCH_AT91SAM9G45
+ 	default y if ARCH_MXC
+ 	default y if ARCH_OMAP3
++	default y if PLAT_SPEAR
+ 	default PCI
+ 
+ # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 34a928d..2101725 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1197,6 +1197,11 @@ MODULE_LICENSE ("GPL");
+ #define	PLATFORM_DRIVER		ehci_atmel_driver
+ #endif
+ 
++#ifdef CONFIG_PLAT_SPEAR
++#include "ehci-spear.c"
++#define PLATFORM_DRIVER		spear_ehci_hcd_driver
++#endif
++
+ #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
+     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
+     !defined(XILINX_OF_PLATFORM_DRIVER)
+diff --git a/drivers/usb/host/ehci-spear.c b/drivers/usb/host/ehci-spear.c
+new file mode 100644
+index 0000000..caac843
+--- /dev/null
++++ b/drivers/usb/host/ehci-spear.c
+@@ -0,0 +1,210 @@
++/*
++* Driver for EHCI HCD on SPEAR SOC
++*
++* Copyright (C) 2010 ST Micro Electronics,
++* Deepak Sikri <deepak.sikri@st.com>
++*
++* Based on various ehci-*.c drivers
++*
++* This file is subject to the terms and conditions of the GNU General Public
++* License. See the file COPYING in the main directory of this archive for
++* more details.
++*/
++
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++
++struct spear_ehci {
++	struct ehci_hcd ehci;
++	struct clk *clk;
++};
++
++#define to_spear_ehci(hcd)	(struct spear_ehci *)hcd_to_ehci(hcd)
++
++static void spear_start_ehci(struct spear_ehci *ehci)
++{
++	clk_enable(ehci->clk);
++}
++
++static void spear_stop_ehci(struct spear_ehci *ehci)
++{
++	clk_disable(ehci->clk);
++}
++
++static int ehci_spear_setup(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int retval = 0;
++
++	/* registers start at offset 0x0 */
++	ehci->caps = hcd->regs;
++	ehci->regs = hcd->regs + HC_LENGTH(ehci_readl(ehci,
++				&ehci->caps->hc_capbase));
++	/* cache this readonly data; minimize chip reads */
++	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
++	retval = ehci_halt(ehci);
++	if (retval)
++		return retval;
++
++	retval = ehci_init(hcd);
++	if (retval)
++		return retval;
++
++	ehci_reset(ehci);
++	ehci_port_power(ehci, 0);
++
++	return retval;
++}
++
++static const struct hc_driver ehci_spear_hc_driver = {
++	.description		= hcd_name,
++	.product_desc		= "SPEAr EHCI",
++	.hcd_priv_size		= sizeof(struct spear_ehci),
++
++	/* generic hardware linkage */
++	.irq			= ehci_irq,
++	.flags			= HCD_MEMORY | HCD_USB2,
++
++	/* basic lifecycle operations */
++	.reset			= ehci_spear_setup,
++	.start			= ehci_run,
++	.stop			= ehci_stop,
++	.shutdown		= ehci_shutdown,
++
++	/* managing i/o requests and associated device resources */
++	.urb_enqueue		= ehci_urb_enqueue,
++	.urb_dequeue		= ehci_urb_dequeue,
++	.endpoint_disable	= ehci_endpoint_disable,
++
++	/* scheduling support */
++	.get_frame_number	= ehci_get_frame,
++
++	/* root hub support */
++	.hub_status_data	= ehci_hub_status_data,
++	.hub_control		= ehci_hub_control,
++	.bus_suspend		= ehci_bus_suspend,
++	.bus_resume		= ehci_bus_resume,
++	.relinquish_port	= ehci_relinquish_port,
++	.port_handed_over	= ehci_port_handed_over,
++};
++
++static int spear_ehci_hcd_drv_probe(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd ;
++	struct spear_ehci *ehci;
++	struct resource *res;
++	struct clk *usbh_clk;
++	const struct hc_driver *driver = &ehci_spear_hc_driver;
++	int *pdata = pdev->dev.platform_data;
++	int irq, retval;
++	char clk_name[20] = "usbh_clk";
++
++	if (pdata == NULL)
++		return -EFAULT;
++
++	if (usb_disabled())
++		return -ENODEV;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		retval = irq;
++		goto fail_irq_get;
++	}
++
++	if (*pdata >= 0)
++		sprintf(clk_name, "usbh.%01d_clk", *pdata);
++
++	usbh_clk = clk_get(NULL, clk_name);
++	if (IS_ERR(usbh_clk)) {
++		dev_err(&pdev->dev, "Error getting interface clock\n");
++		retval = PTR_ERR(usbh_clk);
++		goto fail_get_usbh_clk;
++	}
++
++	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
++	if (!hcd) {
++		retval = -ENOMEM;
++		goto fail_create_hcd;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		retval = -ENODEV;
++		goto fail_request_resource;
++	}
++
++	hcd->rsrc_start = res->start;
++	hcd->rsrc_len = resource_size(res);
++	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len,
++				driver->description)) {
++		retval = -EBUSY;
++		goto fail_request_resource;
++	}
++
++	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
++	if (hcd->regs == NULL) {
++		dev_dbg(&pdev->dev, "error mapping memory\n");
++		retval = -ENOMEM;
++		goto fail_ioremap;
++	}
++
++	ehci = (struct spear_ehci *)hcd_to_ehci(hcd);
++	ehci->clk = usbh_clk;
++
++	spear_start_ehci(ehci);
++	retval = usb_add_hcd(hcd, irq, IRQF_SHARED | IRQF_DISABLED);
++	if (retval)
++		goto fail_add_hcd;
++
++	return retval;
++
++fail_add_hcd:
++	spear_stop_ehci(ehci);
++	iounmap(hcd->regs);
++fail_ioremap:
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++fail_request_resource:
++	usb_put_hcd(hcd);
++fail_create_hcd:
++	clk_put(usbh_clk);
++fail_get_usbh_clk:
++fail_irq_get:
++	dev_err(&pdev->dev, "init fail, %d\n", retval);
++
++	return retval ;
++}
++
++static int spear_ehci_hcd_drv_remove(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct spear_ehci *ehci_p = to_spear_ehci(hcd);
++
++	if (!hcd)
++		return 0;
++	if (in_interrupt())
++		BUG();
++	usb_remove_hcd(hcd);
++
++	if (ehci_p->clk)
++		spear_stop_ehci(ehci_p);
++	iounmap(hcd->regs);
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++	usb_put_hcd(hcd);
++
++	if (ehci_p->clk)
++		clk_put(ehci_p->clk);
++
++	return 0;
++}
++
++static struct platform_driver spear_ehci_hcd_driver = {
++	.probe		= spear_ehci_hcd_drv_probe,
++	.remove		= spear_ehci_hcd_drv_remove,
++	.shutdown	= usb_hcd_platform_shutdown,
++	.driver		= {
++		.name = "spear-ehci",
++		.bus = &platform_bus_type
++	}
++};
++
++MODULE_ALIAS("platform:spear-ehci");
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index c3b4ccc..8104fd3 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1075,6 +1075,11 @@ MODULE_LICENSE ("GPL");
+ #define OF_PLATFORM_DRIVER	ohci_hcd_ppc_of_driver
+ #endif
+ 
++#ifdef CONFIG_PLAT_SPEAR
++#include "ohci-spear.c"
++#define PLATFORM_DRIVER		spear_ohci_hcd_driver
++#endif
++
+ #ifdef CONFIG_PPC_PS3
+ #include "ohci-ps3.c"
+ #define PS3_SYSTEM_BUS_DRIVER	ps3_ohci_driver
+diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
+new file mode 100644
+index 0000000..4fd4bea
+--- /dev/null
++++ b/drivers/usb/host/ohci-spear.c
+@@ -0,0 +1,240 @@
++/*
++* OHCI HCD (Host Controller Driver) for USB.
++*
++* Copyright (C) 2010 ST Microelectronics.
++* Deepak Sikri<deepak.sikri@st.com>
++*
++* Based on various ohci-*.c drivers
++*
++* This file is licensed under the terms of the GNU General Public
++* License version 2. This program is licensed "as is" without any
++* warranty of any kind, whether express or implied.
++*/
++
++#include <linux/signal.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++
++struct spear_ohci {
++	struct ohci_hcd ohci;
++	struct clk *clk;
++};
++
++#define to_spear_ohci(hcd)	(struct spear_ohci *)hcd_to_ohci(hcd)
++
++static void spear_start_ohci(struct spear_ohci *ohci)
++{
++	clk_enable(ohci->clk);
++}
++
++static void spear_stop_ohci(struct spear_ohci *ohci)
++{
++	clk_disable(ohci->clk);
++}
++
++static int __devinit ohci_spear_start(struct usb_hcd *hcd)
++{
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
++	int ret;
++
++	ret = ohci_init(ohci);
++	if (ret < 0)
++		return ret;
++	ohci->regs = hcd->regs;
++
++	ret = ohci_run(ohci);
++	if (ret < 0) {
++		dev_err(hcd->self.controller, "can't start\n");
++		ohci_stop(hcd);
++		return ret;
++	}
++
++	create_debug_files(ohci);
++
++#ifdef DEBUG
++	ohci_dump(ohci, 1);
++#endif
++	return 0;
++}
++
++static const struct hc_driver ohci_spear_hc_driver = {
++	.description		= hcd_name,
++	.product_desc		= "SPEAr OHCI",
++	.hcd_priv_size		= sizeof(struct spear_ohci),
++
++	/* generic hardware linkage */
++	.irq			= ohci_irq,
++	.flags			= HCD_USB11 | HCD_MEMORY,
++
++	/* basic lifecycle operations */
++	.start			= ohci_spear_start,
++	.stop			= ohci_stop,
++	.shutdown		= ohci_shutdown,
++#ifdef	CONFIG_PM
++	.bus_suspend		= ohci_bus_suspend,
++	.bus_resume		= ohci_bus_resume,
++#endif
++
++	/* managing i/o requests and associated device resources */
++	.urb_enqueue		= ohci_urb_enqueue,
++	.urb_dequeue		= ohci_urb_dequeue,
++	.endpoint_disable	= ohci_endpoint_disable,
++
++	/* scheduling support */
++	.get_frame_number	= ohci_get_frame,
++
++	/* root hub support */
++	.hub_status_data	= ohci_hub_status_data,
++	.hub_control		= ohci_hub_control,
++
++	.start_port_reset	= ohci_start_port_reset,
++};
++
++static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
++{
++	const struct hc_driver *driver = &ohci_spear_hc_driver;
++	struct usb_hcd *hcd = NULL;
++	struct clk *usbh_clk;
++	struct spear_ohci *ohci_p;
++	struct resource *res;
++	int retval, irq;
++	int *pdata = pdev->dev.platform_data;
++	char clk_name[20] = "usbh_clk";
++
++	if (pdata == NULL)
++		return -EFAULT;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		retval = irq;
++		goto fail_irq_get;
++	}
++
++	if (*pdata >= 0)
++		sprintf(clk_name, "usbh.%01d_clk", *pdata);
++
++	usbh_clk = clk_get(NULL, clk_name);
++	if (IS_ERR(usbh_clk)) {
++		dev_err(&pdev->dev, "Error getting interface clock\n");
++		retval = PTR_ERR(usbh_clk);
++		goto fail_get_usbh_clk;
++	}
++
++	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
++	if (!hcd) {
++		retval = -ENOMEM;
++		goto fail_create_hcd;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		retval = -ENODEV;
++		goto fail_request_resource;
++	}
++
++	hcd->rsrc_start = pdev->resource[0].start;
++	hcd->rsrc_len = resource_size(res);
++	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
++		dev_dbg(&pdev->dev, "request_mem_region failed\n");
++		retval = -EBUSY;
++		goto fail_request_resource;
++	}
++
++	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
++	if (!hcd->regs) {
++		dev_dbg(&pdev->dev, "ioremap failed\n");
++		retval = -ENOMEM;
++		goto fail_ioremap;
++	}
++
++	ohci_p = (struct spear_ohci *)hcd_to_ohci(hcd);
++	ohci_p->clk = usbh_clk;
++	spear_start_ohci(ohci_p);
++	ohci_hcd_init(hcd_to_ohci(hcd));
++
++	retval = usb_add_hcd(hcd, platform_get_irq(pdev, 0), IRQF_DISABLED);
++	if (retval == 0)
++		return retval;
++
++	spear_stop_ohci(ohci_p);
++	iounmap(hcd->regs);
++fail_ioremap:
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++fail_request_resource:
++	usb_put_hcd(hcd);
++fail_create_hcd:
++	clk_put(usbh_clk);
++fail_get_usbh_clk:
++fail_irq_get:
++	dev_err(&pdev->dev, "init fail, %d\n", retval);
++
++	return retval;
++}
++
++static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
++
++	usb_remove_hcd(hcd);
++	if (ohci_p->clk)
++		spear_stop_ohci(ohci_p);
++
++	iounmap(hcd->regs);
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++	usb_put_hcd(hcd);
++
++	if (ohci_p->clk)
++		clk_put(ohci_p->clk);
++	platform_set_drvdata(pdev, NULL);
++	return 0;
++}
++
++#if defined(CONFIG_PM)
++static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
++		pm_message_t message)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(dev);
++	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
++
++	if (time_before(jiffies, ohci->next_statechange))
++		msleep(5);
++	ohci->next_statechange = jiffies;
++
++	spear_stop_ohci(ohci_p);
++	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
++	return 0;
++}
++
++static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(dev);
++	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
++
++	if (time_before(jiffies, ohci->next_statechange))
++		msleep(5);
++	ohci->next_statechange = jiffies;
++
++	spear_start_ohci(ohci_p);
++	ohci_finish_controller_resume(hcd);
++	return 0;
++}
++#endif
++
++/* Driver definition to register with the platform bus */
++static struct platform_driver spear_ohci_hcd_driver = {
++	.probe =	spear_ohci_hcd_drv_probe,
++	.remove =	spear_ohci_hcd_drv_remove,
++#ifdef CONFIG_PM
++	.suspend =	spear_ohci_hcd_drv_suspend,
++	.resume =	spear_ohci_hcd_drv_resume,
++#endif
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "spear-ohci",
++	},
++};
++
++MODULE_ALIAS("platform:spear-ohci");
 -- 
 1.7.2.2
