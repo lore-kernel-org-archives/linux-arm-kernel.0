@@ -1,74 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Aug 2010 14:00:54 -0700
-Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early init testing
-Message-ID: <mailman.220.1283444342.27306.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 30 Aug 2010 14:03:28 -0700
+Subject: [PATCH 5/6] ARM: Don't set TLB ops broadcasting on UP ARMv7
+Message-ID: <mailman.224.1283444542.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add inline function smp_on_up() for early init checks, and
-change build_mem_type_table to use it.
+Don't set TLB ops broadcasting on UP ARMv7. Looks like these bits
+are also different on A8 and A9.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/smp_plat.h |   16 ++++++++++++++++
- arch/arm/mm/mmu.c               |   20 +++++++++++---------
- 2 files changed, 27 insertions(+), 9 deletions(-)
+ arch/arm/mm/proc-v7.S |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 8db3512..5ef4114 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -39,4 +39,20 @@ static inline int cache_ops_need_broadcast(void)
- #define UP(instr...)	_str(instr)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 07fc660..51a063d 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -191,7 +191,8 @@ __v7_setup:
+ 	UP(mov	r0, #(1 << 6))			@ fake it for UP
+ 	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
+ 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
+-	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
++	SMP(mcreq	p15, 0, r0, c1, c0, 1)	@ TLB ops broadcasting
++	UP(nop)					@ Don't enable on UP 
  #endif
- 
-+static inline int smp_on_up(void)
-+{
-+#ifdef CONFIG_SMP_ON_UP
-+	int smp_on_up;
-+
-+	asm(							\
-+		SMP(mov	%0, #0)					\
-+		UP(mov	%0, #1)					\
-+		: "=r" (smp_on_up));
-+
-+	return smp_on_up;
-+#else
-+	return 0;
-+#endif
-+}
-+
- #endif
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 6e1c4f6..f320901 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -430,15 +430,17 @@ static void __init build_mem_type_table(void)
- 		/*
- 		 * Mark memory with the "shared" attribute for SMP systems
- 		 */
--		user_pgprot |= L_PTE_SHARED;
--		kern_pgprot |= L_PTE_SHARED;
--		vecs_pgprot |= L_PTE_SHARED;
--		mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
--		mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
--		mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
--		mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
--		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
--		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
-+		if (!smp_on_up()) {
-+			user_pgprot |= L_PTE_SHARED;
-+			kern_pgprot |= L_PTE_SHARED;
-+			vecs_pgprot |= L_PTE_SHARED;
-+			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_S;
-+			mem_types[MT_DEVICE_WC].prot_pte |= L_PTE_SHARED;
-+			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_S;
-+			mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
-+			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
-+			mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
-+		}
- #endif
- 	}
- 
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
 -- 
 1.7.1
