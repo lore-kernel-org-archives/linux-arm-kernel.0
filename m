@@ -1,158 +1,305 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:00 +0530
-Subject: [PATCH 36/74] ST SPEAr: Replacing SIZE macro's with actual required
-	size
+Date: Mon, 30 Aug 2010 16:09:05 +0530
+Subject: [PATCH 41/74] ST SPEAr : Adding CAN platform support for SPEAr320 and
+	SPEAr1310
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <8a29e9869372faa26d7aed7a624c0723ebcfa270.1283161023.git.viresh.kumar@st.com>
+Message-ID: <6e2d66a6206d4f6ec61da685daa359720060d55e.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+From: Bhupesh Sharma <bhupesh.sharma@st.com>
 
-In arch specific files SIZE macro's were defined which were used for
-creating memory/io mappings for sepecific devices. These macro's are
-coming straight from h/w user manual and are much greated than required
-sizes. Replacing these macros by actual required size.
-
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: Bhupesh Sharma <bhupesh.sharma@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/spear300.c |    9 +++------
- arch/arm/mach-spear3xx/spear310.c |    2 +-
- arch/arm/mach-spear3xx/spear320.c |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c |    8 ++++----
- arch/arm/mach-spear6xx/spear6xx.c |   10 +++++-----
- 5 files changed, 14 insertions(+), 17 deletions(-)
+ arch/arm/mach-spear13xx/clock.c                |   32 ++++++++++++++++++++
+ arch/arm/mach-spear13xx/include/mach/generic.h |   21 +++++++++++--
+ arch/arm/mach-spear13xx/spear1310.c            |   37 ++++++++++++++++++++++++
+ arch/arm/mach-spear13xx/spear1310_evb.c        |    6 ++++
+ arch/arm/mach-spear3xx/clock.c                 |   16 ++++++++++
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    2 +
+ arch/arm/mach-spear3xx/spear320.c              |   37 ++++++++++++++++++++++++
+ arch/arm/mach-spear3xx/spear320_evb.c          |    2 +
+ 8 files changed, 150 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 9c6b2ff..c99db91 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -604,8 +604,7 @@ struct spear_shirq shirq_ras1 = {
- void sdhci_i2s_mem_enable(u8 mask)
+diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+index 98ba04e..1ee820a 100644
+--- a/arch/arm/mach-spear13xx/clock.c
++++ b/arch/arm/mach-spear13xx/clock.c
+@@ -803,6 +803,28 @@ static struct clk kbd_clk = {
+ 	.recalc = &follow_parent,
+ };
+ 
++/* spear1300 machine specific clock structures */
++#ifdef CONFIG_MACH_SPEAR1300
++
++#endif
++
++/* spear1310 machine specific clock structures */
++#ifdef CONFIG_MACH_SPEAR1310
++/* can0 clock */
++static struct clk can0_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &apb_clk,
++	.recalc = &follow_parent,
++};
++
++/* can1 clock */
++static struct clk can1_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &apb_clk,
++	.recalc = &follow_parent,
++};
++#endif
++
+ /* array of all spear 13xx clock lookups */
+ static struct clk_lookup spear_clk_lookups[] = {
+ 	/* root clks */
+@@ -876,6 +898,16 @@ static struct clk_lookup spear_clk_lookups[] = {
+ 	{.dev_id = "gpio1",		.clk = &gpio1_clk},
+ 	{.dev_id = "keyboard",		.clk = &kbd_clk},
+ 	{.dev_id = "wdt",		.clk = &wdt_clk},
++
++	/* spear1300 machine specific clock structures */
++#ifdef CONFIG_MACH_SPEAR1300
++#endif
++
++	/* spear1310 machine specific clock structures */
++#ifdef CONFIG_MACH_SPEAR1310
++	{.dev_id = "spear_can.0",	.clk = &can0_clk},
++	{.dev_id = "spear_can.1",	.clk = &can1_clk},
++#endif
+ };
+ 
+ void __init clk_init(void)
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 18800b0..62d3d9b 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -45,17 +45,32 @@ extern struct platform_device sdhci_device;
+ extern struct platform_device smi_device;
+ extern struct sys_timer spear13xx_timer;
+ 
+-/* Add spear1300 machine device structure declarations here */
+-
+ /* Add spear13xx family function declarations here */
+ void __init clk_init(void);
+ void __init i2c_register_board_devices(void);
+ void __init spear_setup_timer(void);
+-void __init spear1300_init(void);
+ void __init spear13xx_map_io(void);
+ void __init spear13xx_init_irq(void);
+ void __init spear13xx_init(void);
+ void __init nand_mach_init(u32 busw);
+ void spear13xx_secondary_startup(void);
+ 
++/* spear1300 declarations */
++#ifdef CONFIG_MACH_SPEAR1300
++/* Add spear1300 machine function declarations here */
++void __init spear1300_init(void);
++
++#endif /* CONFIG_MACH_SPEAR1300 */
++
++/* spear1310 declarations */
++#ifdef CONFIG_MACH_SPEAR1310
++/* Add spear1310 machine device structure declarations here */
++extern struct platform_device can0_device;
++extern struct platform_device can1_device;
++
++/* Add spear1310 machine function declarations here */
++void __init spear1310_init(void);
++
++#endif /* CONFIG_MACH_SPEAR1310 */
++
+ #endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
+index c3953a9..906ede9 100644
+--- a/arch/arm/mach-spear13xx/spear1310.c
++++ b/arch/arm/mach-spear13xx/spear1310.c
+@@ -18,6 +18,43 @@
+ 
+ /* Add spear1310 specific devices here */
+ 
++/* CAN device registeration */
++static struct resource can0_resources[] = {
++	{
++		.start = SPEAR1310_CAN0_BASE,
++		.end = SPEAR1310_CAN0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_CCAN0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device can0_device = {
++	.name = "spear_can",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(can0_resources),
++	.resource = can0_resources,
++};
++
++static struct resource can1_resources[] = {
++	{
++		.start = SPEAR1310_CAN1_BASE,
++		.end = SPEAR1310_CAN1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_CCAN1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device can1_device = {
++	.name = "spear_can",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(can1_resources),
++	.resource = can1_resources,
++};
++
+ void __init spear1310_init(void)
  {
- 	u32 val;
--	void __iomem *base = ioremap(SPEAR300_SOC_CONFIG_BASE,
--			SPEAR300_SOC_CONFIG_SIZE);
-+	void __iomem *base = ioremap(SPEAR300_SOC_CONFIG_BASE, SZ_4K);
- 	if (!base) {
- 		pr_debug("sdhci_i2s_enb: ioremap fail\n");
- 		return;
-@@ -628,8 +627,7 @@ void __init spear300_init(void)
- 	spear3xx_init();
+ 	/* call spear13xx family common init function */
+diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
+index 7591d89..8b02104 100644
+--- a/arch/arm/mach-spear13xx/spear1310_evb.c
++++ b/arch/arm/mach-spear13xx/spear1310_evb.c
+@@ -27,6 +27,7 @@
+ #include <plat/spi.h>
  
- 	/* shared irq registeration */
--	shirq_ras1.regs.base =
--		ioremap(SPEAR300_TELECOM_BASE, SPEAR300_TELECOM_REG_SIZE);
-+	shirq_ras1.regs.base = ioremap(SPEAR300_TELECOM_BASE, SZ_4K);
- 	if (shirq_ras1.regs.base) {
- 		ret = spear_shirq_register(&shirq_ras1);
- 		if (ret)
-@@ -637,8 +635,7 @@ void __init spear300_init(void)
- 	}
+ static struct amba_device *amba_devs[] __initdata = {
++	/* spear13xx specific devices */
+ 	&gpio_device[0],
+ 	&gpio_device[1],
+ 	&ssp_device,
+@@ -34,6 +35,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ };
  
- 	/* pmx initialization */
--	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
--			SPEAR300_SOC_CONFIG_SIZE);
-+	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE, SZ_4K);
- 	if (pmx_driver.base) {
- 		ret = pmx_register(&pmx_driver);
- 		if (ret)
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 69350b7..b73e2df 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -362,7 +362,7 @@ void __init spear310_init(void)
- 	spear3xx_init();
+ static struct platform_device *plat_devs[] __initdata = {
++	/* spear13xx specific devices */
+ 	&ehci0_device,
+ 	&ehci1_device,
+ 	&i2c_device,
+@@ -45,6 +47,10 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&sdhci_device,
+ 	&smi_device,
+ 	&pcie_gadget0_device,
++
++	/* spear1310 specific devices */
++	&can0_device,
++	&can1_device,
+ };
  
- 	/* shared irq registeration */
--	base = ioremap(SPEAR310_SOC_CONFIG_BASE, SPEAR310_SOC_CONFIG_SIZE);
-+	base = ioremap(SPEAR310_SOC_CONFIG_BASE, SZ_4K);
- 	if (base) {
- 		/* shirq 1 */
- 		shirq_ras1.regs.base = base;
+ /* keyboard specific platform data */
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 2b5d7e1..96a51cc 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -596,6 +596,20 @@ static struct clk uart5_clk = {
+ 
+ /* spear320 machine specific clock structures */
+ #ifdef CONFIG_MACH_SPEAR320
++/* can0 clock */
++static struct clk can0_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &apb_clk,
++	.recalc = &follow_parent,
++};
++
++/* can1 clock */
++static struct clk can1_clk = {
++	.flags = ALWAYS_ENABLED,
++	.pclk = &apb_clk,
++	.recalc = &follow_parent,
++};
++
+ /* i2c1 clock */
+ static struct clk i2c1_clk = {
+ 	.flags = ALWAYS_ENABLED,
+@@ -697,6 +711,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+ #endif
+ 	/* spear320 machine specific clock structures */
+ #ifdef CONFIG_MACH_SPEAR320
++	{ .dev_id = "spear_can.0",	.clk = &can0_clk},
++	{ .dev_id = "spear_can.1",	.clk = &can1_clk},
+ 	{ .dev_id = "i2c_designware.1",	.clk = &i2c1_clk},
+ 	{ .dev_id = "ssp-pl022.1",	.clk = &ssp1_clk},
+ 	{ .dev_id = "ssp-pl022.2",	.clk = &ssp2_clk},
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 2fc36a8..75c1eef 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -190,6 +190,8 @@ extern struct amba_device clcd_device;
+ extern struct amba_device ssp_device[];
+ extern struct amba_device uart1_device;
+ extern struct amba_device uart2_device;
++extern struct platform_device can0_device;
++extern struct platform_device can1_device;
+ extern struct platform_device i2c1_device;
+ extern struct platform_device nand_device;
+ extern struct platform_device plgpio_device;
 diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 14aa9a3..7a2e07c 100644
+index 3fbb1f6..0c2f4a5 100644
 --- a/arch/arm/mach-spear3xx/spear320.c
 +++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -694,7 +694,7 @@ void __init spear320_init(void)
- 	spear3xx_init();
+@@ -480,6 +480,43 @@ static struct plgpio_platform_data plgpio_plat_data = {
+ 	.gpio_count = SPEAR_PLGPIO_COUNT,
+ };
  
- 	/* shared irq registeration */
--	base = ioremap(SPEAR320_SOC_CONFIG_BASE, SPEAR320_SOC_CONFIG_SIZE);
-+	base = ioremap(SPEAR320_SOC_CONFIG_BASE, SZ_4K);
- 	if (base) {
- 		/* shirq 1 */
- 		shirq_ras1.regs.base = base;
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index b7f7ea7..18072ee 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -254,22 +254,22 @@ struct map_desc spear3xx_io_desc[] __initdata = {
++/* CAN device registeration */
++static struct resource can0_resources[] = {
++	{
++		.start = SPEAR320_CAN0_BASE,
++		.end = SPEAR320_CAN0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = VIRQ_CANU,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device can0_device = {
++	.name = "spear_can",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(can0_resources),
++	.resource = can0_resources,
++};
++
++static struct resource can1_resources[] = {
++	{
++		.start = SPEAR320_CAN1_BASE,
++		.end = SPEAR320_CAN1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = VIRQ_CANL,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device can1_device = {
++	.name = "spear_can",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(can1_resources),
++	.resource = can1_resources,
++};
++
+ /* i2c1 device registeration */
+ static struct resource i2c1_resources[] = {
  	{
- 		.virtual	= VA_SPEAR3XX_ICM1_UART_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR3XX_ICM1_UART_BASE),
--		.length		= SPEAR3XX_ICM1_UART_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR3XX_ML1_VIC_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR3XX_ML1_VIC_BASE),
--		.length		= SPEAR3XX_ML1_VIC_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR3XX_ICM3_SYS_CTRL_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SYS_CTRL_BASE),
--		.length		= SPEAR3XX_ICM3_SYS_CTRL_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR3XX_ICM3_MISC_REG_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_MISC_REG_BASE),
--		.length		= SPEAR3XX_ICM3_MISC_REG_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	},
- };
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 489a36e..eb72c4c 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -408,27 +408,27 @@ static struct map_desc spear6xx_io_desc[] __initdata = {
- 	{
- 		.virtual	= VA_SPEAR6XX_ICM1_UART0_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR6XX_ICM1_UART0_BASE),
--		.length		= SPEAR6XX_ICM1_UART0_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR6XX_CPU_VIC_PRI_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_PRI_BASE),
--		.length		= SPEAR6XX_CPU_VIC_PRI_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR6XX_CPU_VIC_SEC_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_SEC_BASE),
--		.length		= SPEAR6XX_CPU_VIC_SEC_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR6XX_ICM3_SYS_CTRL_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SYS_CTRL_BASE),
--		.length		= SPEAR6XX_ICM3_MISC_REG_BASE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
- 		.virtual	= VA_SPEAR6XX_ICM3_MISC_REG_BASE,
- 		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
--		.length		= SPEAR6XX_ICM3_MISC_REG_SIZE,
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	},
- };
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 261c0b0..d55e1b2 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -66,6 +66,8 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&smi_device,
+ 
+ 	/* spear320 specific devices */
++	&can0_device,
++	&can1_device,
+ 	&i2c1_device,
+ 	&plgpio_device,
+ 	&pwm_device,
 -- 
 1.7.2.2
