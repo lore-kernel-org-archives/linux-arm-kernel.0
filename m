@@ -1,372 +1,255 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:28 +0530
-Subject: [PATCH 65/74] SPEAr3xx: Replace defconfigs with single unfied
-	defconfig
+Date: Mon, 30 Aug 2010 16:09:13 +0530
+Subject: [PATCH 49/74] SPEAr CPU freq: Adding support for CPU Freq framework
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <9b1698806ed8f1634b64351aba0c9f414c51faeb.1283161024.git.viresh.kumar@st.com>
+Message-ID: <95e9f2e2d8e2a23629760a7dcb7cbab098ff7412.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryan Mallon <ryan@bluewatersys.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
-We only need one defconfig for SPEAr3xx now since we can build all
-three boards into one kernel.
-
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear300_defconfig |   51 -----------
- arch/arm/configs/spear310_defconfig |   52 -----------
- arch/arm/configs/spear320_defconfig |   52 -----------
- arch/arm/configs/spear3xx_defconfig |  163 +++++++++++++++++++++++++++++++++++
- 4 files changed, 163 insertions(+), 155 deletions(-)
- delete mode 100644 arch/arm/configs/spear300_defconfig
- delete mode 100644 arch/arm/configs/spear310_defconfig
- delete mode 100644 arch/arm/configs/spear320_defconfig
- create mode 100644 arch/arm/configs/spear3xx_defconfig
+ arch/arm/Kconfig                |    2 +
+ arch/arm/mach-spear13xx/clock.c |    1 +
+ arch/arm/mach-spear3xx/clock.c  |    1 +
+ arch/arm/mach-spear6xx/clock.c  |    1 +
+ arch/arm/plat-spear/Makefile    |    2 +-
+ arch/arm/plat-spear/cpufreq.c   |  160 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 166 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/plat-spear/cpufreq.c
 
-diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear300_defconfig
-deleted file mode 100644
-index cf29f3e..0000000
---- a/arch/arm/configs/spear300_defconfig
-+++ /dev/null
-@@ -1,51 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
-deleted file mode 100644
-index 824e444..0000000
---- a/arch/arm/configs/spear310_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR310=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
-deleted file mode 100644
-index 842f7f3..0000000
---- a/arch/arm/configs/spear320_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR320=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear3xx_defconfig b/arch/arm/configs/spear3xx_defconfig
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c4d1df3..ef92faa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -822,6 +822,8 @@ config PLAT_SPEAR
+ 	select COMMON_CLKDEV
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
++	select ARCH_HAS_CPUFREQ
++
+ 	help
+ 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
+ 
+diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+index c593608..7f07911 100644
+--- a/arch/arm/mach-spear13xx/clock.c
++++ b/arch/arm/mach-spear13xx/clock.c
+@@ -90,6 +90,7 @@ static struct pll_clk_config pll1_config = {
+ /* pll rate configuration table, in ascending order of rates */
+ struct pll_rate_tbl pll_rtbl[] = {
+ 	/* PCLK 24MHz */
++	{.mode = 0, .m = 0x64, .n = 0x03, .p = 0x2}, /* 400 MHz */
+ 	{.mode = 0, .m = 0x7D, .n = 0x03, .p = 0x2}, /* 500 MHz */
+ 	{.mode = 0, .m = 0xA6, .n = 0x03, .p = 0x2}, /* 664 MHz */
+ 	{.mode = 0, .m = 0xC8, .n = 0x03, .p = 0x2}, /* 800 MHz */
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 4f049fe..64d9cdc 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
+ 
+ /* pll rate configuration table, in ascending order of rates */
+ struct pll_rate_tbl pll_rtbl[] = {
++	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
+ 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
+ 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
+ };
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 99cc21d..f1429f5 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
+ 
+ /* pll rate configuration table, in ascending order of rates */
+ struct pll_rate_tbl pll_rtbl[] = {
++	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
+ 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
+ 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
+ };
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index 1c8ee4a..c25e5b8 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -6,7 +6,7 @@
+ obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
+ 
+ obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+-
++obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
+ obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
+ obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
+diff --git a/arch/arm/plat-spear/cpufreq.c b/arch/arm/plat-spear/cpufreq.c
 new file mode 100644
-index 0000000..3b0e955
+index 0000000..3b1cac9
 --- /dev/null
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -0,0 +1,163 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR3XX=y
-+# CONFIG_ARCH_SPEAR6XX is not set
-+CONFIG_MACH_SPEAR300=y
-+CONFIG_MACH_SPEAR310=y
-+CONFIG_MACH_SPEAR320=y
-+CONFIG_BOARD_SPEAR300_EVB=y
-+CONFIG_BOARD_SPEAR310_EVB=y
-+CONFIG_BOARD_SPEAR320_EVB=y
++++ b/arch/arm/plat-spear/cpufreq.c
+@@ -0,0 +1,160 @@
++/*
++ * arch/arm/plat-spear/cpufreq.c
++ *
++ * CPU Frequency Scaling for SPEAr platform
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Deepak Sikri<deepak.sikri@st.com>
++ *
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+#
-+# Processor Type
-+#
-+CONFIG_CPU_32=y
-+CONFIG_CPU_ARM926T=y
-+CONFIG_CPU_32v5=y
-+CONFIG_CPU_ABRT_EV5TJ=y
-+CONFIG_CPU_PABRT_LEGACY=y
-+CONFIG_CPU_CACHE_VIVT=y
-+CONFIG_CPU_COPY_V4WB=y
-+CONFIG_CPU_TLB_V4WBI=y
-+CONFIG_CPU_CP15=y
-+CONFIG_CPU_CP15_MMU=y
++#include <linux/types.h>
++#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/cpufreq.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/io.h>
 +
-+#
-+# Processor Features
-+#
-+CONFIG_ARM_THUMB=y
-+# CONFIG_CPU_ICACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_DISABLE is not set
-+# CONFIG_CPU_DCACHE_WRITETHROUGH is not set
-+# CONFIG_CPU_CACHE_ROUND_ROBIN is not set
-+CONFIG_ARM_L1_CACHE_SHIFT=5
-+CONFIG_ARM_VIC=y
-+CONFIG_ARM_VIC_NR=2
-+CONFIG_COMMON_CLKDEV=y
++#include <mach/hardware.h>
++#include <asm/system.h>
 +
-+#
-+# Bus support
-+#
-+CONFIG_ARM_AMBA=y
-+# CONFIG_PCI_SYSCALL is not set
-+# CONFIG_ARCH_SUPPORTS_MSI is not set
-+# CONFIG_PCCARD is not set
++#define CPU_CLK		"cpu_clk"
 +
-+#
-+# Kernel Features
-+#
-+# CONFIG_NO_HZ is not set
-+# CONFIG_HIGH_RES_TIMERS is not set
-+CONFIG_GENERIC_CLOCKEVENTS_BUILD=y
-+CONFIG_VMSPLIT_3G=y
-+# CONFIG_VMSPLIT_2G is not set
-+# CONFIG_VMSPLIT_1G is not set
-+CONFIG_PAGE_OFFSET=0xC0000000
-+CONFIG_PREEMPT_NONE=y
-+# CONFIG_PREEMPT_VOLUNTARY is not set
-+# CONFIG_PREEMPT is not set
-+CONFIG_HZ=100
-+# CONFIG_AEABI is not set
-+# CONFIG_ARCH_SPARSEMEM_DEFAULT is not set
-+# CONFIG_ARCH_SELECT_MEMORY_MODEL is not set
-+# CONFIG_HIGHMEM is not set
-+CONFIG_SELECT_MEMORY_MODEL=y
-+CONFIG_FLATMEM_MANUAL=y
-+# CONFIG_DISCONTIGMEM_MANUAL is not set
-+# CONFIG_SPARSEMEM_MANUAL is not set
-+CONFIG_FLATMEM=y
-+CONFIG_FLAT_NODE_MEM_MAP=y
-+CONFIG_PAGEFLAGS_EXTENDED=y
-+CONFIG_SPLIT_PTLOCK_CPUS=4096
-+# CONFIG_PHYS_ADDR_T_64BIT is not set
-+CONFIG_ZONE_DMA_FLAG=0
-+CONFIG_VIRT_TO_BUS=y
-+CONFIG_HAVE_MLOCK=y
-+CONFIG_HAVE_MLOCKED_PAGE_BIT=y
-+# CONFIG_KSM is not set
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
-+CONFIG_ALIGNMENT_TRAP=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
++#ifdef CONFIG_ARCH_SPEAR13XX
++#define MIN_CPU_FREQ	200000
++#define MAX_CPU_FREQ	500000
 +
-+#
-+# Boot options
-+#
-+CONFIG_ZBOOT_ROM_TEXT=0
-+CONFIG_ZBOOT_ROM_BSS=0
-+CONFIG_CMDLINE=""
-+# CONFIG_XIP_KERNEL is not set
-+# CONFIG_KEXEC is not set
++static u32 spear_cpu_freq[] = {
++	200000,	/* 200 MHZ */
++	250000,	/* 250 MHZ */
++	332000,	/* 332 MHZ */
++	400000,	/* 400 MHZ */
++	500000,	/* 500 MHZ */
++};
++#elif defined(CONFIG_ARCH_SPEAR6XX) || defined(CONFIG_ARCH_SPEAR3XX)
++#define MIN_CPU_FREQ	166000
++#define MAX_CPU_FREQ	332000
 +
-+#
-+# CPU Power Management
-+#
-+# CONFIG_CPU_IDLE is not set
++static u32 spear_cpu_freq[] = {
++	166000,	/* 166 MHZ */
++	266000,	/* 266 MHZ */
++	332000,	/* 333 MHZ */
++};
++#endif
 +
-+#
-+# Floating point emulation
-+#
++static struct
++	cpufreq_frequency_table spear_freq_tbl[ARRAY_SIZE(spear_cpu_freq) + 1];
++static struct clk *cpu_clk;
 +
-+#
-+# At least one emulation must be selected
-+#
-+# CONFIG_FPE_NWFPE is not set
-+# CONFIG_FPE_FASTFPE is not set
-+# CONFIG_VFP is not set
++int spear_cpufreq_verify(struct cpufreq_policy *policy)
++{
++	return cpufreq_frequency_table_verify(policy, spear_freq_tbl);
++}
 +
-+#
-+# Userspace binary formats
-+#
-+CONFIG_BINFMT_ELF=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HAVE_AOUT=y
-+# CONFIG_BINFMT_AOUT is not set
-+CONFIG_BINFMT_MISC=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_PL061=y
-+# CONFIG_HWMON is not set
-+# CONFIG_VGA_CONSOLE is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT2_FS_SECURITY=y
-+CONFIG_EXT3_FS=y
-+CONFIG_EXT3_FS_SECURITY=y
-+CONFIG_AUTOFS4_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+CONFIG_TMPFS=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=m
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DEBUG_SPINLOCK=y
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_CRC32 is not set
++unsigned int spear_cpufreq_get(unsigned int cpu)
++{
++	unsigned long rate;
++
++	if (cpu)
++		return 0;
++
++	rate = clk_get_rate(cpu_clk) / 1000;
++	return rate;
++}
++
++static int spear_cpufreq_target(struct cpufreq_policy *policy,
++		unsigned int target_freq, unsigned int relation)
++{
++	struct cpufreq_freqs freqs;
++	int ret = 0;
++	int index;
++
++	if (policy->cpu != 0)
++		return -EINVAL;
++
++	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
++				target_freq, relation, &index))
++		return -EINVAL;
++
++	freqs.old = spear_cpufreq_get(0);
++	freqs.new = spear_cpu_freq[index];
++	freqs.cpu = policy->cpu;
++
++	if (freqs.old == target_freq)
++		return 0;
++
++	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
++	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++
++	return ret;
++}
++
++static int spear_cpufreq_init(struct cpufreq_policy *policy)
++{
++	int result;
++	int i = 0;
++
++	if (policy->cpu != 0)
++		return -EINVAL;
++
++	cpu_clk = clk_get(NULL, CPU_CLK);
++	if (IS_ERR(cpu_clk))
++		return PTR_ERR(cpu_clk);
++
++	policy->cpuinfo.min_freq = MIN_CPU_FREQ;
++	policy->cpuinfo.max_freq = MAX_CPU_FREQ;
++	policy->cur = policy->min = policy->max = spear_cpufreq_get(0);
++
++	for (i = 0; i < ARRAY_SIZE(spear_cpu_freq); i++) {
++		spear_freq_tbl[i].index = i;
++		spear_freq_tbl[i].frequency = spear_cpu_freq[i];
++	}
++
++	spear_freq_tbl[i].index = i;
++	spear_freq_tbl[i].frequency = CPUFREQ_TABLE_END;
++	result = cpufreq_frequency_table_cpuinfo(policy, spear_freq_tbl);
++	if (!result)
++		cpufreq_frequency_table_get_attr(spear_freq_tbl,
++				policy->cpu);
++
++	policy->cpuinfo.transition_latency = 300*1000; /*250 uS*/
++
++	return 0;
++}
++
++static int spear_cpufreq_exit(struct cpufreq_policy *policy)
++{
++	clk_put(cpu_clk);
++	return 0;
++}
++
++static struct freq_attr *spear_cpufreq_attr[] = {
++	 &cpufreq_freq_attr_scaling_available_freqs,
++	 NULL,
++};
++
++static struct cpufreq_driver spear_driver = {
++	.flags		= CPUFREQ_STICKY,
++	.verify		= spear_cpufreq_verify,
++	.target		= spear_cpufreq_target,
++	.get		= spear_cpufreq_get,
++	.init		= spear_cpufreq_init,
++	.exit		= spear_cpufreq_exit,
++	.name		= "spear_cpufreq",
++	.attr		= spear_cpufreq_attr,
++};
++
++static int __init spear_cpufreq_register(void)
++{
++	return cpufreq_register_driver(&spear_driver);
++}
++
++arch_initcall(spear_cpufreq_register);
 -- 
 1.7.2.2
