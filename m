@@ -1,46 +1,174 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:08:37 +0530
-Subject: [PATCH 06/74] ST SPEAr: Adding support for SPEAr13xx SoC in spear
-	generic plat/
+Date: Mon, 30 Aug 2010 16:09:27 +0530
+Subject: [PATCH 64/74] SPEAr3xx: Rework KConfig to allow all boards to be
+	compiled in
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <50a2ff7be88e0c73be9bfb0bd293b80b971e9f22.1283161023.git.viresh.kumar@st.com>
+Message-ID: <a410f9a54d0a26acb4b090d66a8712a3c4c3c3b8.1283161024.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+From: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Now that all three SPEAr3xx platforms can be built into one kernel,
+rework KConfig to allow this. Move everything into one KConfig file
+while we are here.
+
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/plat-spear/Kconfig |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-spear3xx/Kconfig                |   30 ++++++++++++++++--------
+ arch/arm/mach-spear3xx/Kconfig300             |   17 --------------
+ arch/arm/mach-spear3xx/Kconfig310             |   17 --------------
+ arch/arm/mach-spear3xx/Kconfig320             |   17 --------------
+ arch/arm/mach-spear3xx/include/mach/generic.h |    6 +++-
+ 5 files changed, 24 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig300
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig310
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig320
 
-diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
-index 1bb3dbc..29a25d2 100644
---- a/arch/arm/plat-spear/Kconfig
-+++ b/arch/arm/plat-spear/Kconfig
-@@ -8,6 +8,13 @@ choice
- 	prompt "ST SPEAr Family"
- 	default ARCH_SPEAR3XX
+diff --git a/arch/arm/mach-spear3xx/Kconfig b/arch/arm/mach-spear3xx/Kconfig
+index 20d1317..2cee6b0 100644
+--- a/arch/arm/mach-spear3xx/Kconfig
++++ b/arch/arm/mach-spear3xx/Kconfig
+@@ -4,9 +4,26 @@
  
-+config ARCH_SPEAR13XX
-+	bool "SPEAr13XX"
-+	select ARM_GIC
-+	select CPU_V7
+ if ARCH_SPEAR3XX
+ 
+-choice
+-	prompt "SPEAr3XX Family"
+-	default MACH_SPEAR300
++menu "SPEAr3xx Implementations"
++config BOARD_SPEAR300_EVB
++	bool "SPEAr300 Evaluation Board"
++	select MACH_SPEAR300
 +	help
-+	  Supports for ARM's SPEAR13XX family
++	  Supports ST SPEAr300 Evaluation Board
 +
- config ARCH_SPEAR3XX
- 	bool "SPEAr3XX"
- 	select ARM_VIC
-@@ -25,6 +32,7 @@ config ARCH_SPEAR6XX
- endchoice
++config BOARD_SPEAR310_EVB
++	bool "SPEAr310 Evaluation Board"
++	select MACH_SPEAR310
++	help
++	  Supports ST SPEAr310 Evaluation Board
++
++config BOARD_SPEAR320_EVB
++	bool "SPEAr320 Evaluation Board"
++	select MACH_SPEAR320
++	help
++	  Supports ST SPEAr320 Evaluation Board
++
++endmenu
  
- # Adding SPEAr machine specific configuration files
-+source "arch/arm/mach-spear13xx/Kconfig"
- source "arch/arm/mach-spear3xx/Kconfig"
- source "arch/arm/mach-spear6xx/Kconfig"
+ config MACH_SPEAR300
+ 	bool "SPEAr300"
+@@ -23,11 +40,4 @@ config MACH_SPEAR320
+ 	help
+ 	  Supports ST SPEAr320 Machine
  
+-endchoice
+-
+-# Adding SPEAr3XX machine specific configuration files
+-source "arch/arm/mach-spear3xx/Kconfig300"
+-source "arch/arm/mach-spear3xx/Kconfig310"
+-source "arch/arm/mach-spear3xx/Kconfig320"
+-
+ endif #ARCH_SPEAR3XX
+diff --git a/arch/arm/mach-spear3xx/Kconfig300 b/arch/arm/mach-spear3xx/Kconfig300
+deleted file mode 100644
+index c519a05..0000000
+--- a/arch/arm/mach-spear3xx/Kconfig300
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr300 machine configuration file
+-#
+-
+-if MACH_SPEAR300
+-
+-choice
+-	prompt "SPEAr300 Boards"
+-	default BOARD_SPEAR300_EVB
+-
+-config BOARD_SPEAR300_EVB
+-	bool "SPEAr300 Evaluation Board"
+-	help
+-	  Supports ST SPEAr300 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR300
+diff --git a/arch/arm/mach-spear3xx/Kconfig310 b/arch/arm/mach-spear3xx/Kconfig310
+deleted file mode 100644
+index 60e7442..0000000
+--- a/arch/arm/mach-spear3xx/Kconfig310
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr310 machine configuration file
+-#
+-
+-if MACH_SPEAR310
+-
+-choice
+-	prompt "SPEAr310 Boards"
+-	default BOARD_SPEAR310_EVB
+-
+-config BOARD_SPEAR310_EVB
+-	bool "SPEAr310 Evaluation Board"
+-	help
+-	  Supports ST SPEAr310 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR310
+diff --git a/arch/arm/mach-spear3xx/Kconfig320 b/arch/arm/mach-spear3xx/Kconfig320
+deleted file mode 100644
+index 1c1d438..0000000
+--- a/arch/arm/mach-spear3xx/Kconfig320
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr320 machine configuration file
+-#
+-
+-if MACH_SPEAR320
+-
+-choice
+-	prompt "SPEAr320 Boards"
+-	default BOARD_SPEAR320_EVB
+-
+-config BOARD_SPEAR320_EVB
+-	bool "SPEAr320 Evaluation Board"
+-	help
+-	  Supports ST SPEAr320 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR320
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 6f4b90d..d70f515 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -162,9 +162,10 @@ void sdhci_i2s_mem_enable(u8 mask);
+ 
+ /* Add misc structure declarations here */
+ extern struct clcd_board clcd_plat_data;
++#endif
+ 
+ /* spear310 declarations */
+-#elif defined(CONFIG_MACH_SPEAR310)
++#if defined(CONFIG_MACH_SPEAR310)
+ /* Add spear310 machine device structure declarations here */
+ extern struct amba_device uart1_device;
+ extern struct amba_device uart2_device;
+@@ -189,9 +190,10 @@ extern struct pmx_dev spear310_pmx_tdm0;
+ /* Add spear310 machine function declarations here */
+ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 		u8 pmx_dev_count);
++#endif
+ 
+ /* spear320 declarations */
+-#elif defined(CONFIG_MACH_SPEAR320)
++#if defined(CONFIG_MACH_SPEAR320)
+ /* Add spear320 machine device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device ssp_device[];
 -- 
 1.7.2.2
