@@ -1,55 +1,66 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Mon, 30 Aug 2010 09:29:22 -0400
-Subject: [PATCH] davinci: Initial support for MityDSP-L138/MityARM-1808
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301F6615555@dbde02.ent.ti.com>
-References: <4C78FA26.4040801@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F6615555@dbde02.ent.ti.com>
-Message-ID: <4C7BB232.80502@criticallink.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 30 Aug 2010 22:35:29 +0900
+Subject: [PATCH 1/3] ARM: Samsung S5P: Move the common Samsung S5P series
+	GPIO level type
+In-Reply-To: <006201cb483b$0e1727e0$2a4577a0$%kim@samsung.com>
+References: <20100830114708.GA13140@july>
+	<006201cb483b$0e1727e0$2a4577a0$%kim@samsung.com>
+Message-ID: <AANLkTinYiG2y=x48kkV=XMzpsc_a677Xsox6dNkuHMF3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Sekhar,
-
-On 8/30/2010 7:58 AM, Nori, Sekhar wrote:
-> Hi Michael,
->
-> On Sat, Aug 28, 2010 at 17:29:34, Michael Williamson wrote:
->> This patch adds initial support for the MityDSP-L138 and MityDSP-1808 system
->> on Module (SOM) under the machine name "mityomapl138".  These SOMs are based
->> on the da850 davinci CPU architecture.  Information on these SOMs may be
->> found at http://www.mitydsp.com.
+On Mon, Aug 30, 2010 at 9:01 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kyungmin Park wrote:
 >>
->> Basic support for the console UART, NAND, and EMAC (MII interface) is
->> included in this patch.
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
 >>
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>> Samsung S5P series has common level type. It's different from S3C series.
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >> ---
->> Notes:
->>   1) Patch is against 0a50e05b20f3c6af67656303bdb3661a2541ce03 of Kevin's
->>      tree (2.6.36-rc2).
->>   2) I did not include a defconfig update in this patch.  Until the regulator
->>      support is added back in (planned subsequent patch), it cannot be added
->>      to da8xx_omapl_defconfig as the CONFIG_REGULATOR option doesn't play
->>      nice with platforms not defining a regulator.  If a defconfig support
-> What is the issue you are facing? I have seen in the past that enabling
-> CONFIG_REGULATOR_DUMMY helped overcome an aic3x codec initialization issue
-> when the aic3x probe expects a few regulators to be present in the system
-> if CONFIG_REGULATOR is on.
+>> ?arch/arm/plat-samsung/include/plat/gpio-core.h | ? ?6 ++++++
+>> ?1 files changed, 6 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
+> b/arch/arm/plat-
+>> samsung/include/plat/gpio-core.h
+>> index e358c7d..c8681e0 100644
+>> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
+>> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+>> @@ -14,6 +14,12 @@
+>> ?#define GPIOCON_OFF ?(0x00)
+>> ?#define GPIODAT_OFF ?(0x04)
+>>
+>> +#define S5P_GPIO_LEVEL_LOW ? ? ? ? ? (0x00)
+>> +#define S5P_GPIO_LEVEL_HIGH ? ? ? ? ?(0x01)
+>> +#define S5P_GPIO_EDGE_FALLING ? ? ? ? ? ? ? ?(0x02)
+>> +#define S5P_GPIO_EDGE_RISING ? ? ? ? (0x03)
+>> +#define S5P_GPIO_EDGE_BOTH ? ? ? ? ? (0x04)
 >
-Enabling CONFIG_REGULATOR_DUMMY will remove the error message for this SOM. 
-This brings up a couple of questions I've wanted to ask:  Are there ground
-rules are for adding options to defconfig files that cover more than one
-architecture/board?  Is a defconfig required for new boards?
+> Why should we change the name of definition from S5P_EXTINT_XXX?
+> If we use that, we don't need to change other files.
 
-Is it OK that I add CONFIG_REGULATOR_DUMMY to the da8xx_omapl_defconfig file? 
-Or should there be a critical warning as currently defined if there
-is no regulator found for the other da8xx platforms? 
+External interrupt is one of GPIOs. and it's used for GPIO interrupt.
+Do you want to use the EXTINT at generic gpio function?
 
-Can I add the other options to support booting from NAND in this as well?
-If the answer is "sure", then I can update the da8xx_omapl_defconfig and submit
-that as a separate patch or resubmit this one.
+Also change the name format as IRQ_TYPE_* style.
 
-Thank you for any insight.
+Thank you,
+Kyungmin Park
 
--Mike
-  
+>
+>> +
+>> ?#define con_4bit_shift(__off) ((__off) * 4)
+>>
+>> ?/* Define the core gpiolib support functions that the s3c platforms may
+>> --
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
