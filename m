@@ -1,83 +1,208 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Mon, 30 Aug 2010 16:09:16 +0530
-Subject: [PATCH 53/74] ST SPEAr13xx: add l2 cache support
+Date: Mon, 30 Aug 2010 16:09:15 +0530
+Subject: [PATCH 52/74] ST SPEAr13xx: Adding CPU hotplug support added for SMP
+	platforms
 In-Reply-To: <cover.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-Message-ID: <6cba9ad18feace456f25c764f4a60051ddb14991.1283161023.git.viresh.kumar@st.com>
+Message-ID: <1980a48cb88189ce617fbfa2742d3259dd400b7b.1283161023.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/spear1300_evb.c |   13 +++++++++++++
- arch/arm/mach-spear13xx/spear13xx.c     |    7 +++++++
- arch/arm/mm/Kconfig                     |    2 +-
- 3 files changed, 21 insertions(+), 1 deletions(-)
+ arch/arm/mach-spear13xx/Makefile  |    1 +
+ arch/arm/mach-spear13xx/hotplug.c |  146 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-spear13xx/platsmp.c |   12 +++
+ 3 files changed, 159 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-spear13xx/hotplug.c
 
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 5756a8c..95e25b7 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -26,6 +26,8 @@
- #include <plat/nand.h>
- #include <plat/smi.h>
- #include <plat/spi.h>
-+#include <mach/hardware.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
- 
-@@ -132,6 +134,17 @@ static int spear1300_pcie_port_is_host(int port)
- 
- static void __init spear1300_evb_init(void)
- {
-+#ifdef CONFIG_CACHE_L2X0
+diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
+index b786edc..b092231 100644
+--- a/arch/arm/mach-spear13xx/Makefile
++++ b/arch/arm/mach-spear13xx/Makefile
+@@ -18,3 +18,4 @@ obj-$(CONFIG_MACH_SPEAR1310)		+= spear1310.o
+ # spear1310 boards files
+ obj-$(CONFIG_BOARD_SPEAR1310_EVB)	+= spear1310_evb.o
+ obj-$(CONFIG_PM)	+= pm.o sleep.o
++obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
+new file mode 100644
+index 0000000..6405e49
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/hotplug.c
+@@ -0,0 +1,146 @@
++/*
++ * linux/arch/arm/mach-spear13xx/hotplug.c
++ *
++ * Copyright (C) 2010 ST Microelectronics Ltd.
++ * Deepak Sikri <deepak.sikri@st.com>
++ *
++ * based upon linux/arch/arm/mach-realview/hotplug.c
++ *
++ * Copyright (C) 2002 ARM Ltd.
++ * All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/smp.h>
++#include <linux/completion.h>
++
++#include <asm/cacheflush.h>
++
++extern volatile int pen_release;
++
++static DECLARE_COMPLETION(cpu_killed);
++
++static inline void cpu_enter_lowpower(void)
++{
++	unsigned int v;
++
++	flush_cache_all();
++	asm volatile(
++	"	mcr	p15, 0, %1, c7, c5, 0\n"
++	"	mcr	p15, 0, %1, c7, c10, 4\n"
 +	/*
-+	 * 256KB (16KB/way), 16-way associativity, parity not
-+	 * supported
-+	 * TODO: 0x249, picked from nomadik, to be analyzed
-+	 * Comment from nomadik:
-+	 * At full speed latency must be >=2, so 0x249 in low bits
++	 * Turn off coherency
 +	 */
-+	l2x0_init(__io_address(SPEAR13XX_L2CC_BASE), 0x00260249, 0xfe00ffff);
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, #0x20\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, #0x04\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "r" (0)
++	  : "cc");
++}
++
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile("mrc	p15, 0, %0, c1, c0, 0\n"
++	"	orr	%0, %0, #0x04\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	orr	%0, %0, #0x20\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	  : "=&r" (v)
++	  :
++	  : "cc");
++}
++
++static inline void platform_do_lowpower(unsigned int cpu)
++{
++	/*
++	 * there is no power-control hardware on this platform, so all
++	 * we can do is put the core into WFI; this is safe as the calling
++	 * code will have already disabled interrupts
++	 */
++	for (;;) {
++		/*
++		 * here's the WFI
++		 */
++		asm(".word	0xe320f003\n"
++		    :
++		    :
++		    : "memory", "cc");
++
++		if (pen_release == cpu) {
++			/*
++			 * OK, proper wakeup, we're done
++			 */
++			break;
++		}
++
++		/*
++		 * getting here, means that we have come out of WFI without
++		 * having been woken up - this shouldn't happen
++		 *
++		 * The trouble is, letting people know about this is not really
++		 * possible, since we are currently running incoherently, and
++		 * therefore cannot safely call printk() or anything else
++		 */
++#ifdef DEBUG
++		pr_crit("CPU%u: spurious wakeup call\n", cpu);
++#endif
++	}
++}
++
++int platform_cpu_kill(unsigned int cpu)
++{
++	return wait_for_completion_timeout(&cpu_killed, 5000);
++}
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void __cpuinit platform_cpu_die(unsigned int cpu)
++{
++#ifdef DEBUG
++	unsigned int this_cpu = hard_smp_processor_id();
++
++	if (cpu != this_cpu) {
++		pr_crit("Eek! platform_cpu_die running on %u, should\
++				be %u\n", this_cpu, cpu);
++		BUG();
++	}
 +#endif
 +
- 	/* set keyboard plat data */
- 	kbd_set_plat_data(&kbd_device, &kbd_data);
++	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
++	complete(&cpu_killed);
++
++	/*
++	 * we're ready for shutdown now, so do it
++	 */
++	cpu_enter_lowpower();
++	platform_do_lowpower(cpu);
++
++	/*
++	 * bring this CPU back into the world of cache
++	 * coherency, and then restore interrupts
++	 */
++	cpu_leave_lowpower();
++}
++
++int platform_cpu_disable(unsigned int cpu)
++{
++	/*
++	 * we don't allow CPU 0 to be shutdown (it is still too special
++	 * e.g. clock tick interrupts)
++	 */
++	return cpu == 0 ? -EPERM : 0;
++}
+diff --git a/arch/arm/mach-spear13xx/platsmp.c b/arch/arm/mach-spear13xx/platsmp.c
+index 73fbcdb..2864a5c 100644
+--- a/arch/arm/mach-spear13xx/platsmp.c
++++ b/arch/arm/mach-spear13xx/platsmp.c
+@@ -101,6 +101,18 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	pen_release = cpu;
+ 	flush_cache_all();
  
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 01cb76c..0f42522 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -538,6 +538,13 @@ struct map_desc spear13xx_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SPEAR13XX_A9SM_PERIP_BASE),
- 		.length		= SZ_8K,
- 		.type		= MT_DEVICE
-+#ifdef CONFIG_CACHE_L2X0
-+	}, {
-+		.virtual	= IO_ADDRESS(SPEAR13XX_L2CC_BASE),
-+		.pfn		= __phys_to_pfn(SPEAR13XX_L2CC_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE
-+#endif
- 	}, {
- 		.virtual	= IO_ADDRESS(SPEAR13XX_MISC_BASE),
- 		.pfn		= __phys_to_pfn(SPEAR13XX_MISC_BASE),
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 33c3f57..cb0a30e 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -772,7 +772,7 @@ config CACHE_L2X0
- 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
- 		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || \
- 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_S5PV310 || ARCH_TEGRA || \
--		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4
-+		   ARCH_SPEAR13XX || ARCH_U8500 || ARCH_VEXPRESS_CA9X4
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
++	/*
++	 * XXX
++	 *
++	 * This is a later addition to the booting protocol: the
++	 * bootMonitor now puts secondary cores into WFI, so
++	 * poke_milo() no longer gets the cores moving; we need
++	 * to send a soft interrupt to wake the secondary core.
++	 * Use smp_cross_call() for this, since there's little
++	 * point duplicating the code here
++	 */
++	smp_cross_call(cpumask_of(cpu));
++
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+ 		smp_rmb();
 -- 
 1.7.2.2
