@@ -1,53 +1,210 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 30 Aug 2010 21:01:15 +0900
-Subject: [PATCH 1/3] ARM: Samsung S5P: Move the common Samsung S5P series
-	GPIO level type
-In-Reply-To: <20100830114708.GA13140@july>
-References: <20100830114708.GA13140@july>
-Message-ID: <006201cb483b$0e1727e0$2a4577a0$%kim@samsung.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Mon, 30 Aug 2010 08:03:48 -0400
+Subject: [GIT PULL for -tip] Create generic alignment API (v11)
+Message-ID: <20100830120348.GA1687@Krystal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Samsung S5P series has common level type. It's different from S3C series.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/plat-samsung/include/plat/gpio-core.h |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
-b/arch/arm/plat-
-> samsung/include/plat/gpio-core.h
-> index e358c7d..c8681e0 100644
-> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
-> @@ -14,6 +14,12 @@
->  #define GPIOCON_OFF	(0x00)
->  #define GPIODAT_OFF	(0x04)
-> 
-> +#define S5P_GPIO_LEVEL_LOW		(0x00)
-> +#define S5P_GPIO_LEVEL_HIGH		(0x01)
-> +#define S5P_GPIO_EDGE_FALLING		(0x02)
-> +#define S5P_GPIO_EDGE_RISING		(0x03)
-> +#define S5P_GPIO_EDGE_BOTH		(0x04)
+Hi Ingo,
 
-Why should we change the name of definition from S5P_EXTINT_XXX?
-If we use that, we don't need to change other files.
+I'm resubmitting this for inclusion in -tip. You can pull it from
 
-> +
->  #define con_4bit_shift(__off) ((__off) * 4)
-> 
->  /* Define the core gpiolib support functions that the s3c platforms may
-> --
+git://git.kernel.org/pub/scm/linux/kernel/git/compudj/linux-2.6-ringbuffer.git
+branch: tip-pull-queue
 
-Thanks.
+Thanks,
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Mathieu
+
+
+Rather than re-doing the "alignment on a type size" trick all over again at
+different levels, import the "ltt_align" from LTTng into kernel.h and make this
+available to everyone. Renaming to:
+
+- object_align()
+- object_align_floor()
+- offset_align()
+- offset_align_floor()
+
+Changelog since v10:
+- Remove stale comment.
+- Fix parenthesis in the MAYBE_BUILD_BUG_ON test.
+
+Changelog since v9:
+- Hardcode MAYBE_BUILD_BUG_ON((n) == 0 || (((n) & ((n) - 1)) != 0)) rather than
+  creating a helper macro in kernel.h, by popular request.
+- Remove unneeded log2.h include.
+- Now that offset_align_floor and offset_align are macros (needed for
+  MAYBE_BUILD_BUG_ON()), add the appropriate braces around parameters used.
+
+Changelog since v8:
+- Remove unnecessary braces.
+- Update object_align/object_align_floor comments.
+
+Changelog since v7:
+- Add missing include/linux/Kconfig header-y.
+
+Changelog since v6:
+- Adapt to changes introduced by
+  commit a79ff731a1b277d0e92d9453bdf374e04cec717a
+- Use __alignof__() instead of sizeof() to support compound types.
+
+Changelog since v5:
+- moved alignment apis to a separate header file so that it is possible
+  to use them from other header files which are, for example, included
+  from kernel.h.
+
+Changelog since v4:
+- add missing ( ) around parameters within object_align() and
+  object_align_floor().
+- More coding style cleanups to ALIGN() (checkpatch.pl is happy now).
+
+Changelog since v3:
+- optimize object_align*() so fewer instructions are needed for alignment of
+  addresses known dynamically. Use the (already existing) "ALIGN()", and create
+  the "ALIGN_FLOOR()" macro.
+- While we are there, let's clean up the ALIGN() macros wrt coding style. e.g.
+  missing parenthesis around the first use of the "x" parameter in ALIGN().
+
+Changelog since v2:
+- Fix object_align*(): should use object size alignment, not pointer alignment.
+
+Changelog since v1:
+- Align on the object natural alignment
+    (rather than min(arch word alignment, natural alignment))
+
+The advantage of separating the API in "object alignment" and "offset alignment"
+is that it gives more freedom to play with offset alignment. Very useful to
+implement a tracer ring-buffer alignment. (hint hint)
+
+Typical users will use "object alignment", but infrastructures like tracers
+which need to perform alignment of statically known base+offsets will typically
+use "offset alignment", because it allows to align with respect to a base rather
+than to pass an absolute address.
+
+Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Signed-off-by: Alexander Shishkin <virtuoso@slind.org>
+Reviewed-by: Steven Rostedt <rostedt@goodmis.org>
+Reviewed-by: "Kirill A. Shutemov" <kirill@shutemov.name>
+CC: Russell King - ARM Linux <linux@arm.linux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
+CC: Imre Deak <imre.deak@nokia.com>
+CC: Jamie Lokier <jamie@shareable.org>
+CC: mingo at elte.hu
+CC: Alexey Dobriyan <adobriyan@gmail.com>
+---
+ include/linux/Kbuild   |    1 
+ include/linux/align.h  |   60 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/kernel.h |    9 +------
+ 3 files changed, 63 insertions(+), 7 deletions(-)
+ create mode 100644 include/linux/align.h
+
+Index: linux.trees.git/include/linux/align.h
+===================================================================
+--- /dev/null
++++ linux.trees.git/include/linux/align.h
+@@ -0,0 +1,60 @@
++#ifndef _LINUX_ALIGN_H
++#define _LINUX_ALIGN_H
++
++#define __ALIGN_KERNEL(x, a)	__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
++#define __ALIGN_KERNEL_MASK(x, mask) \
++				(((x) + (mask)) & ~(mask))
++
++#ifdef __KERNEL__
++
++#include <linux/types.h>
++
++#define ALIGN(x, a)		__ALIGN_KERNEL(x, a)
++#define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK(x, mask)
++#define PTR_ALIGN(p, a)		((typeof(p)) ALIGN((unsigned long) (p), a))
++#define ALIGN_FLOOR(x, a)	__ALIGN_FLOOR_MASK(x, (typeof(x)) (a) - 1)
++#define __ALIGN_FLOOR_MASK(x, mask)	((x) & ~(mask))
++#define PTR_ALIGN_FLOOR(p, a) \
++			((typeof(p)) ALIGN_FLOOR((unsigned long) (p), a))
++#define IS_ALIGNED(x, a)	(((x) & ((typeof(x)) (a) - 1)) == 0)
++
++/*
++ * Align pointer on natural object alignment.
++ */
++#define object_align(obj)	PTR_ALIGN(obj, __alignof__(*(obj)))
++#define object_align_floor(obj)	PTR_ALIGN_FLOOR(obj, __alignof__(*(obj)))
++
++/**
++ * offset_align - Calculate the offset needed to align an object on its natural
++ *                alignment towards higher addresses.
++ * @align_drift:  object offset from an "alignment"-aligned address.
++ * @alignment:    natural object alignment. Must be non-zero, power of 2.
++ *
++ * Returns the offset that must be added to align towards higher
++ * addresses.
++ */
++#define offset_align(align_drift, alignment)				       \
++	({								       \
++		MAYBE_BUILD_BUG_ON((alignment) == 0			       \
++				   || ((alignment) & ((alignment) - 1)));      \
++		(((alignment) - (align_drift)) & ((alignment) - 1));	       \
++	})
++
++/**
++ * offset_align_floor - Calculate the offset needed to align an object
++ *                      on its natural alignment towards lower addresses.
++ * @align_drift:  object offset from an "alignment"-aligned address.
++ * @alignment:    natural object alignment. Must be non-zero, power of 2.
++ *
++ * Returns the offset that must be substracted to align towards lower addresses.
++ */
++#define offset_align_floor(align_drift, alignment)			       \
++	({								       \
++		MAYBE_BUILD_BUG_ON((alignment) == 0			       \
++				   || ((alignment) & ((alignment) - 1)));      \
++		(((align_drift) - (alignment)) & ((alignment) - 1);	       \
++	})
++
++#endif /* __KERNEL__ */
++
++#endif
+Index: linux.trees.git/include/linux/kernel.h
+===================================================================
+--- linux.trees.git.orig/include/linux/kernel.h
++++ linux.trees.git/include/linux/kernel.h
+@@ -4,8 +4,8 @@
+ /*
+  * 'kernel.h' contains some often-used function prototypes etc
+  */
+-#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
+-#define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
++
++#include <linux/align.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -39,11 +39,6 @@ extern const char linux_proc_banner[];
+ 
+ #define STACK_MAGIC	0xdeadbeef
+ 
+-#define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
+-#define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
+-#define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
+-#define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
+-
+ #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+ 
+ /*
+Index: linux.trees.git/include/linux/Kbuild
+===================================================================
+--- linux.trees.git.orig/include/linux/Kbuild
++++ linux.trees.git/include/linux/Kbuild
+@@ -38,6 +38,7 @@ header-y += adfs_fs.h
+ header-y += affs_hardblocks.h
+ header-y += agpgart.h
+ header-y += aio_abi.h
++header-y += align.h
+ header-y += apm_bios.h
+ header-y += arcfb.h
+ header-y += atalk.h
+-- 
+Mathieu Desnoyers
+Operating System Efficiency R&D Consultant
+EfficiOS Inc.
+http://www.efficios.com
