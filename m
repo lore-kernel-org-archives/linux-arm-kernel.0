@@ -1,58 +1,211 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 30 Aug 2010 22:35:29 +0900
-Subject: [PATCH 1/3] ARM: Samsung S5P: Move the common Samsung S5P series
-	GPIO level type
-In-Reply-To: <006201cb483b$0e1727e0$2a4577a0$%kim@samsung.com>
-References: <20100830114708.GA13140@july>
-	<006201cb483b$0e1727e0$2a4577a0$%kim@samsung.com>
-Message-ID: <AANLkTinYiG2y=x48kkV=XMzpsc_a677Xsox6dNkuHMF3@mail.gmail.com>
+Date: Mon, 30 Aug 2010 22:40:33 +0900
+Subject: [PATCH 3/3] ARM: Samsung S3C: Move/use the S3C common GPIO IRQ
+	type
+In-Reply-To: <006301cb483c$434f76f0$c9ee64d0$%kim@samsung.com>
+References: <20100830114729.GA13150@july>
+	<006301cb483c$434f76f0$c9ee64d0$%kim@samsung.com>
+Message-ID: <AANLkTimxhFtfB8G-z=04zj7ZRq+f7GDaVX5mzgCENuvx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 9:01 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Mon, Aug 30, 2010 at 9:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 > Kyungmin Park wrote:
 >>
 >> From: Kyungmin Park <kyungmin.park@samsung.com>
 >>
->> Samsung S5P series has common level type. It's different from S3C series.
+>> Samsung S3C series have the common GPIO IRQ type for all S3C series.
 >>
+> I can't agree with your changing name. Why do you want to change the name?
+> If you want to move S3C2410_EXTINT_XXX from regs-irqtype.h, just move
+> without any changes.
+As S5P series change the name conversion. I will also modify the s3c series.
+
+>
+> But I'm still thinking why should we move the external interrupt definitions
+> to plat/gpio-core.h...
+
+To use the GPIO interrupt. these definitions are used both external
+interrupt and GPIO interrupt.
+>
 >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >> ---
->> ?arch/arm/plat-samsung/include/plat/gpio-core.h | ? ?6 ++++++
->> ?1 files changed, 6 insertions(+), 0 deletions(-)
+>> ?arch/arm/mach-s3c64xx/irq-eint.c ? ? ? ? ? ? ? ? ?| ? 12 ++++++------
+>> ?arch/arm/plat-s3c24xx/irq.c ? ? ? ? ? ? ? ? ? ? ? | ? 14 +++++++-------
+>> ?arch/arm/plat-s5p/irq-eint.c ? ? ? ? ? ? ? ? ? ? ?| ? ?2 --
+>> ?arch/arm/plat-samsung/include/plat/gpio-core.h ? ?| ? ?6 ++++++
+>> ?arch/arm/plat-samsung/include/plat/regs-irqtype.h | ? 21
+> ---------------------
+>> ?5 files changed, 19 insertions(+), 36 deletions(-)
+>> ?delete mode 100644 arch/arm/plat-samsung/include/plat/regs-irqtype.h
 >>
+>> diff --git a/arch/arm/mach-s3c64xx/irq-eint.c
+> b/arch/arm/mach-s3c64xx/irq-eint.c
+>> index 5682d6a..c079147 100644
+>> --- a/arch/arm/mach-s3c64xx/irq-eint.c
+>> +++ b/arch/arm/mach-s3c64xx/irq-eint.c
+>> @@ -21,8 +21,8 @@
+>>
+>> ?#include <asm/hardware/vic.h>
+>>
+>> -#include <plat/regs-irqtype.h>
+>> ?#include <mach/regs-gpio.h>
+>> +#include <plat/gpio-core.h>
+>> ?#include <plat/gpio-cfg.h>
+>>
+>> ?#include <mach/map.h>
+>> @@ -85,23 +85,23 @@ static int s3c_irq_eint_set_type(unsigned int irq,
+> unsigned
+>> int type)
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? case IRQ_TYPE_EDGE_RISING:
+>> - ? ? ? ? ? ? newvalue = S3C2410_EXTINT_RISEEDGE;
+>> + ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_RISING;
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? case IRQ_TYPE_EDGE_FALLING:
+>> - ? ? ? ? ? ? newvalue = S3C2410_EXTINT_FALLEDGE;
+>> + ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_FALLING;
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? case IRQ_TYPE_EDGE_BOTH:
+>> - ? ? ? ? ? ? newvalue = S3C2410_EXTINT_BOTHEDGE;
+>> + ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_BOTH;
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? case IRQ_TYPE_LEVEL_LOW:
+>> - ? ? ? ? ? ? newvalue = S3C2410_EXTINT_LOWLEV;
+>> + ? ? ? ? ? ? newvalue = S3C_GPIO_LEVEL_LOW;
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? case IRQ_TYPE_LEVEL_HIGH:
+>> - ? ? ? ? ? ? newvalue = S3C2410_EXTINT_HILEV;
+>> + ? ? ? ? ? ? newvalue = S3C_GPIO_LEVEL_HIGH;
+>> ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? default:
+>> diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
+>> index ad0d44e..e1a6fe5 100644
+>> --- a/arch/arm/plat-s3c24xx/irq.c
+>> +++ b/arch/arm/plat-s3c24xx/irq.c
+>> @@ -23,12 +23,12 @@
+>> ?#include <linux/interrupt.h>
+>> ?#include <linux/ioport.h>
+>> ?#include <linux/sysdev.h>
+>> +#include <linux/gpio.h>
+>>
+> Why need this inclusion?
+>
+>> ?#include <asm/irq.h>
+>> ?#include <asm/mach/irq.h>
+>>
+>> -#include <plat/regs-irqtype.h>
+>> -
+>> +#include <plat/gpio-core.h>
+>> ?#include <plat/cpu.h>
+>> ?#include <plat/pm.h>
+>> ?#include <plat/irq.h>
+>> @@ -201,23 +201,23 @@ s3c_irqext_type(unsigned int irq, unsigned int type)
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? ? ? ? ? case IRQ_TYPE_EDGE_RISING:
+>> - ? ? ? ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_RISEEDGE;
+>> + ? ? ? ? ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_RISING;
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? ? ? ? ? case IRQ_TYPE_EDGE_FALLING:
+>> - ? ? ? ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_FALLEDGE;
+>> + ? ? ? ? ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_FALLING;
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? ? ? ? ? case IRQ_TYPE_EDGE_BOTH:
+>> - ? ? ? ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_BOTHEDGE;
+>> + ? ? ? ? ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_BOTH;
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? ? ? ? ? case IRQ_TYPE_LEVEL_LOW:
+>> - ? ? ? ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_LOWLEV;
+>> + ? ? ? ? ? ? ? ? ? ? newvalue = S3C_GPIO_LEVEL_LOW;
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? ? ? ? ? case IRQ_TYPE_LEVEL_HIGH:
+>> - ? ? ? ? ? ? ? ? ? ? newvalue = S3C2410_EXTINT_HILEV;
+>> + ? ? ? ? ? ? ? ? ? ? newvalue = S3C_GPIO_LEVEL_HIGH;
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> ? ? ? ? ? ? ? default:
+>> diff --git a/arch/arm/plat-s5p/irq-eint.c b/arch/arm/plat-s5p/irq-eint.c
+>> index 4e0d94b..02d6ea2 100644
+>> --- a/arch/arm/plat-s5p/irq-eint.c
+>> +++ b/arch/arm/plat-s5p/irq-eint.c
+>> @@ -19,8 +19,6 @@
+>>
+>> ?#include <asm/hardware/vic.h>
+>>
+>> -#include <plat/regs-irqtype.h>
+>> -
+>> ?#include <mach/map.h>
+>> ?#include <plat/cpu.h>
+>> ?#include <plat/pm.h>
 >> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
 > b/arch/arm/plat-
 >> samsung/include/plat/gpio-core.h
->> index e358c7d..c8681e0 100644
+>> index c8681e0..2aef589 100644
 >> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
 >> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
 >> @@ -14,6 +14,12 @@
 >> ?#define GPIOCON_OFF ?(0x00)
 >> ?#define GPIODAT_OFF ?(0x04)
 >>
->> +#define S5P_GPIO_LEVEL_LOW ? ? ? ? ? (0x00)
->> +#define S5P_GPIO_LEVEL_HIGH ? ? ? ? ?(0x01)
->> +#define S5P_GPIO_EDGE_FALLING ? ? ? ? ? ? ? ?(0x02)
->> +#define S5P_GPIO_EDGE_RISING ? ? ? ? (0x03)
->> +#define S5P_GPIO_EDGE_BOTH ? ? ? ? ? (0x04)
->
-> Why should we change the name of definition from S5P_EXTINT_XXX?
-> If we use that, we don't need to change other files.
-
-External interrupt is one of GPIOs. and it's used for GPIO interrupt.
-Do you want to use the EXTINT at generic gpio function?
-
-Also change the name format as IRQ_TYPE_* style.
-
-Thank you,
-Kyungmin Park
-
->
+>> +#define S3C_GPIO_LEVEL_LOW ? ? ? ? ? (0x00)
+>> +#define S3C_GPIO_LEVEL_HIGH ? ? ? ? ?(0x01)
+>> +#define S3C_GPIO_EDGE_FALLING ? ? ? ? ? ? ? ?(0x02)
+>> +#define S3C_GPIO_EDGE_RISING ? ? ? ? (0x04)
+>> +#define S3C_GPIO_EDGE_BOTH ? ? ? ? ? (0x06)
 >> +
->> ?#define con_4bit_shift(__off) ((__off) * 4)
->>
->> ?/* Define the core gpiolib support functions that the s3c platforms may
+> GPIO_LELVEL? GPIO_EDGE?...
+>
+> I think EXTINT_LEVEL_XXX and EXTINT_EDGE_XXX are more clear.
+
+ ? ? ? case IRQ_TYPE_EDGE_BOTH:
+ ? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_BOTH;
+
+Don't you it's more clear?
+
+>
+>> ?#define S5P_GPIO_LEVEL_LOW ? ? ? ? ? (0x00)
+>> ?#define S5P_GPIO_LEVEL_HIGH ? ? ? ? ?(0x01)
+>> ?#define S5P_GPIO_EDGE_FALLING ? ? ? ? ? ? ? ?(0x02)
+>> diff --git a/arch/arm/plat-samsung/include/plat/regs-irqtype.h
+> b/arch/arm/plat-
+>> samsung/include/plat/regs-irqtype.h
+>> deleted file mode 100644
+>> index c63cd3f..0000000
+>> --- a/arch/arm/plat-samsung/include/plat/regs-irqtype.h
+>> +++ /dev/null
+>> @@ -1,21 +0,0 @@
+>> -/* arch/arm/plat-s3c/include/plat/regs-irqtype.h
+>> - *
+>> - * Copyright 2008 Simtec Electronics
+>> - * ? ? ?Ben Dooks <ben@simtec.co.uk>
+>> - * ? ? ?http://armlinux.simtec.co.uk/
+>> - *
+>> - * S3C - IRQ detection types.
+>> - *
+>> - * This program is free software; you can redistribute it and/or modify
+>> - * it under the terms of the GNU General Public License version 2 as
+>> - * published by the Free Software Foundation.
+>> - */
+>> -
+>> -/* values for S3C2410_EXTINT0/1/2 and other cpus in the series, including
+>> - * the S3C64XX
+>> -*/
+>> -#define S3C2410_EXTINT_LOWLEV ? ? ? ? (0x00)
+>> -#define S3C2410_EXTINT_HILEV ?(0x01)
+>> -#define S3C2410_EXTINT_FALLEDGE ? ? ? (0x02)
+>> -#define S3C2410_EXTINT_RISEEDGE ? ? ? (0x04)
+>> -#define S3C2410_EXTINT_BOTHEDGE ? ? ? (0x06)
 >> --
 >
 > Thanks.
@@ -63,4 +216,9 @@ Kyungmin Park
 > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 > SW Solution Development Team, Samsung Electronics Co., Ltd.
 >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
 >
