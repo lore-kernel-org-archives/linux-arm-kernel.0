@@ -1,428 +1,208 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 31 Aug 2010 18:05:05 +0300
-Subject: [PATCH 9/9] ARM: Add SWP/SWPB emulation for ARMv7 processors (v5)
-In-Reply-To: <20100831135855.21304.5457.stgit@e102109-lin.cambridge.arm.com>
-References: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
-	<20100831135855.21304.5457.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100831150505.GC13866@shutemov.name>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 31 Aug 2010 21:09:20 +0530
+Subject: [PATCH v1] davinci: Initial support for MityDSP-L138/MityARM-1808
+In-Reply-To: <4C7C52FD.6010608@criticallink.com>
+References: <4C7C52FD.6010608@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301F6AC5679@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 31, 2010 at 02:58:56PM +0100, Catalin Marinas wrote:
-> From: Leif Lindholm <leif.lindholm@arm.com>
-> 
-> The SWP instruction was deprecated in the ARMv6 architecture, superseded
-> by the LDREX/STREX family of instructions for
-> load-linked/store-conditional operations. The ARMv7 multiprocessing
-> extensions mandate that SWP/SWPB instructions are treated as undefined
-> from reset, with the ability to enable them through the System Control
-> Register SW bit.
-> 
-> This patch adds the alternative solution to emulate the SWP and SWPB
-> instructions using LDREX/STREX sequences, and log statistics to
-> /proc/cpu/swp_emulation. To correctly deal with copy-on-write, it also
-> modifies cpu_v7_set_pte_ext to change the mappings to priviliged RO when
-> user RO.
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Hi Michael,
 
-Acked-by: Kirill A. Shutemov <kirill@shutemov.name>
+On Tue, Aug 31, 2010 at 06:25:25, Michael Williamson wrote:
+> This patch adds initial support for the MityDSP-L138 and MityDSP-1808 system
+> on Module (SOM) under the machine name "mityomapl138".  These SOMs are based
+> on the da850 davinci CPU architecture.  Information on these SOMs may be
+> found at http://www.mitydsp.com.
+>
+> Basic support for the console UART, NAND, and EMAC (MII interface) is
+> included in this patch.
+>
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 
-BTW, there is PERF_COUNT_SW_EMULATION_FAULT event in perf. It's good idea
-to trigger it from here.
+[...]
 
-> ---
->  Documentation/arm/00-INDEX      |    2 
->  Documentation/arm/swp_emulation |   27 ++++
->  arch/arm/kernel/Makefile        |    1 
->  arch/arm/kernel/swp_emulate.c   |  260 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mm/Kconfig             |   27 ++++
->  arch/arm/mm/proc-v7.S           |    4 +
->  6 files changed, 321 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/arm/swp_emulation
->  create mode 100644 arch/arm/kernel/swp_emulate.c
-> 
-> diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
-> index 7f5fc3b..2d02564 100644
-> --- a/Documentation/arm/00-INDEX
-> +++ b/Documentation/arm/00-INDEX
-> @@ -32,3 +32,5 @@ memory.txt
->  	- description of the virtual memory layout
->  nwfpe/
->  	- NWFPE floating point emulator documentation
-> +swp_emulation
-> +	- SWP/SWPB emulation handler/logging description
-> diff --git a/Documentation/arm/swp_emulation b/Documentation/arm/swp_emulation
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 292e8b7..e51a80f 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -586,6 +586,9 @@ static __init void da830_evm_init(void)
+>  #ifdef CONFIG_SERIAL_8250_CONSOLE
+>  static int __init da830_evm_console_init(void)
+>  {
+> +     if (!machine_is_davinci_da830_evm())
+> +             return 0;
+> +
+>       return add_preferred_console("ttyS", 2, "115200");
+>  }
+>  console_initcall(da830_evm_console_init);
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 190ebd3..d491b5f 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -847,6 +847,9 @@ static __init void da850_evm_init(void)
+>  #ifdef CONFIG_SERIAL_8250_CONSOLE
+>  static int __init da850_evm_console_init(void)
+>  {
+> +     if (!machine_is_davinci_da850_evm())
+> +             return 0;
+> +
+>       return add_preferred_console("ttyS", 2, "115200");
+>  }
+>  console_initcall(da850_evm_console_init);
+
+I think this should be carved into a separate patch as
+this is a bug fix of existing code rather than addition
+of new board as subject and description of this patch
+indicate.
+
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
 > new file mode 100644
-> index 0000000..af903d2
+> index 0000000..7338adb
 > --- /dev/null
-> +++ b/Documentation/arm/swp_emulation
-> @@ -0,0 +1,27 @@
-> +Software emulation of deprecated SWP instruction (CONFIG_SWP_EMULATE)
-> +---------------------------------------------------------------------
-> +
-> +ARMv6 architecture deprecates use of the SWP/SWPB instructions, and recommeds
-> +moving to the load-locked/store-conditional instructions LDREX and STREX.
-> +
-> +ARMv7 multiprocessing extensions introduce the ability to disable these
-> +instructions, triggering an undefined instruction exception when executed.
-> +Trapped instructions are emulated using an LDREX/STREX or LDREXB/STREXB
-> +sequence. If a memory access fault (an abort) occurs, a segmentation fault is
-> +signalled to the triggering process.
-> +
-> +/proc/cpu/swp_emulation holds some statistics/information, including the PID of
-> +the last process to trigger the emulation to be invocated. For example:
-> +---
-> +Emulated SWP:		12
-> +Emulated SWPB:		0
-> +Aborted SWP{B}:		1
-> +Last process:		314
-> +---
-> +
-> +NOTE: when accessing uncached shared regions, LDREX/STREX rely on an external
-> +transaction monitoring block called a global monitor to maintain update
-> +atomicity. If your system does not implement a global monitor, this option can
-> +cause programs that perform SWP operations to uncached memory to deadlock, as
-> +the STREX operation will always fail.
-> +
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 980b78e..d3430ee 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -42,6 +42,7 @@ obj-$(CONFIG_KGDB)		+= kgdb.o
->  obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
->  obj-$(CONFIG_HAVE_TCM)		+= tcm.o
->  obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
-> +obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
->  
->  obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
->  AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
-> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-> new file mode 100644
-> index 0000000..c254d1d
-> --- /dev/null
-> +++ b/arch/arm/kernel/swp_emulate.c
-> @@ -0,0 +1,260 @@
+> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> @@ -0,0 +1,220 @@
 > +/*
-> + *  linux/arch/arm/kernel/swp_emulate.c
+> + * Critical Link MityOMAP-L138 SoM
 > + *
-> + *  Copyright (C) 2009 ARM Limited
-> + *  __user_* functions adapted from include/asm/uaccess.h
+> + * Copyright (C) 2010 Critical Link LLC - http://www.criticallink.com
 > + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + *  Implements emulation of the SWP/SWPB instructions using load-exclusive and
-> + *  store-exclusive for processors that have them disabled (or future ones that
-> + *  might not implement them).
-> + *
-> + *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
-> + *  Where: Rt  = destination
-> + *	   Rt2 = source
-> + *	   Rn  = address
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2. This program is licensed "as is" without any warranty of
+> + * any kind, whether express or implied.
 > + */
 > +
-> +#include <linux/init.h>
 > +#include <linux/kernel.h>
-> +#include <linux/proc_fs.h>
-> +#include <linux/sched.h>
-> +#include <linux/syscalls.h>
+> +#include <linux/init.h>
+> +#include <linux/console.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/partitions.h>
 > +
-> +#include <asm/traps.h>
-> +#include <asm/uaccess.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/common.h>
+> +#include <mach/cp_intc.h>
+> +#include <mach/da8xx.h>
+> +#include <mach/nand.h>
+> +#include <mach/mux.h>
 > +
-> +/*
-> + * Error-checking SWP macros implemented using ldrex{b}/strex{b}
-> + */
-> +#define __user_swpX_asm(data, addr, res, B)			\
-> +	__asm__ __volatile__(					\
-> +	"	mov		r3, %1\n"			\
-> +	"0:	ldrex"B"	%1, [%2]\n"			\
-> +	"1:	strex"B"	%0, r3, [%2]\n"			\
-> +	"	cmp		%0, #0\n"			\
-> +	"	movne		%0, %3\n"			\
-> +	"2:\n"							\
-> +	"	.section	 .fixup,\"ax\"\n"		\
-> +	"	.align		2\n"				\
-> +	"3:	mov		%0, %4\n"			\
-> +	"	b		2b\n"				\
-> +	"	.previous\n"					\
-> +	"	.section	 __ex_table,\"a\"\n"		\
-> +	"	.align		3\n"				\
-> +	"	.long		0b, 3b\n"			\
-> +	"	.long		1b, 3b\n"			\
-> +	"	.previous"					\
-> +	: "=&r" (res), "+r" (data)				\
-> +	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
-> +	: "cc", "r3")
-> +
-> +#define __user_swp_asm(data, addr, res) __user_swpX_asm(data, addr, res, "")
-> +#define __user_swpb_asm(data, addr, res) __user_swpX_asm(data, addr, res, "b")
+> +#define MITYOMAPL138_PHY_MASK                0x08 /* hardcoded for now */
+> +#define MITYOMAPL138_MDIO_FREQUENCY  (2200000) /* PHY bus frequency */
 > +
 > +/*
-> + * Macros/defines for extracting register numbers from instruction.
+> + * MityDSP-L138 includes a 256 MByte large-page NAND flash
+> + * (128K blocks).
 > + */
-> +#define EXTRACT_REG_NUM(instruction, offset) \
-> +  (((instruction) & (0xf << (offset))) >> (offset))
-> +#define RN_OFFSET  16
-> +#define RT_OFFSET  12
-> +#define RT2_OFFSET  0
-> +/*
-> + * Bit 22 of the instruction encoding distinguishes between
-> + * the SWP and SWPB variants (bit set means SWPB).
-> + */
-> +#define TYPE_SWPB (1 << 22)
-> +
-> +static unsigned long long swpcounter;
-> +static unsigned long long swpbcounter;
-> +static unsigned long long abtcounter;
-> +static long		  previous_pid;
-> +
-> +#ifdef CONFIG_PROC_FS
-> +static int proc_read_status(char *page, char **start, off_t off, int count,
-> +			    int *eof, void *data)
-> +{
-> +	char *p = page;
-> +	int len;
-> +
-> +	p += sprintf(p, "Emulated SWP:\t\t%llu\n", swpcounter);
-> +	p += sprintf(p, "Emulated SWPB:\t\t%llu\n", swpbcounter);
-> +	p += sprintf(p, "Aborted SWP{B}:\t\t%llu\n", abtcounter);
-> +	if (previous_pid != 0)
-> +		p += sprintf(p, "Last process:\t\t%ld\n", previous_pid);
-> +
-> +	len = (p - page) - off;
-> +	if (len < 0)
-> +		len = 0;
-> +
-> +	*eof = (len <= count) ? 1 : 0;
-> +	*start = page + off;
-> +
-> +	return len;
-> +}
-> +#endif
-> +
-> +/*
-> + * Set up process info to signal segmentation fault - called on access error.
-> + */
-> +static void set_segfault(struct pt_regs *regs, unsigned long addr)
-> +{
-> +	siginfo_t info;
-> +
-> +	if (find_vma(current->mm, addr) == NULL)
-> +		info.si_code = SEGV_MAPERR;
-> +	else
-> +		info.si_code = SEGV_ACCERR;
-> +
-> +	info.si_signo = SIGSEGV;
-> +	info.si_errno = 0;
-> +	info.si_addr  = (void *) instruction_pointer(regs);
-> +
-> +	pr_debug("SWP{B} emulation: access caused memory abort!\n");
-> +	arm_notify_die("Illegal memory access", regs, &info, 0, 0);
-> +
-> +	abtcounter++;
-> +}
-> +
-> +static int emulate_swpX(unsigned int address, unsigned int *data,
-> +			unsigned int type)
-> +{
-> +	unsigned int res = 0;
-> +
-> +	if ((type != TYPE_SWPB) && (address & 0x3)) {
-> +		/* SWP to unaligned address not permitted */
-> +		pr_debug("SWP instruction on unaligned pointer!\n");
-> +		return -EFAULT;
-> +	}
-> +
-> +	while (1) {
-> +		/*
-> +		 * Barrier required between accessing protected resource and
-> +		 * releasing a lock for it. Legacy code might not have done
-> +		 * this, and we cannot determine that this is not the case
-> +		 * being emulated, so insert always.
-> +		 */
-> +		smp_mb();
-> +
-> +		if (type == TYPE_SWPB)
-> +			__user_swpb_asm(*data, address, res);
-> +		else
-> +			__user_swp_asm(*data, address, res);
-> +
-> +		if (likely(res != -EAGAIN) || signal_pending(current))
-> +			break;
-> +
-> +		cond_resched();
-> +	}
-> +
-> +	if (res == 0) {
-> +		/*
-> +		 * Barrier also required between aquiring a lock for a
-> +		 * protected resource and accessing the resource. Inserted for
-> +		 * same reason as above.
-> +		 */
-> +		smp_mb();
-> +
-> +		if (type == TYPE_SWPB)
-> +			swpbcounter++;
-> +		else
-> +			swpcounter++;
-> +	}
-> +
-> +	return res;
-> +}
-> +
-> +/*
-> + * swp_handler logs the id of calling process, dissects the instruction, sanity
-> + * checks the memory location, calls emulate_swpX for the actual operation and
-> + * deals with fixup/error handling before returning
-> + */
-> +static int swp_handler(struct pt_regs *regs, unsigned int instr)
-> +{
-> +	unsigned int address, destreg, data, type;
-> +	unsigned int res = 0;
-> +
-> +	if (current->pid != previous_pid) {
-> +		pr_debug("\"%s\" (%ld) uses deprecated SWP{B} instruction\n",
-> +			 current->comm, (unsigned long)current->pid);
-> +		previous_pid = current->pid;
-> +	}
-> +
-> +	address = regs->uregs[EXTRACT_REG_NUM(instr, RN_OFFSET)];
-> +	data	= regs->uregs[EXTRACT_REG_NUM(instr, RT2_OFFSET)];
-> +	destreg = EXTRACT_REG_NUM(instr, RT_OFFSET);
-> +
-> +	type = instr & TYPE_SWPB;
-> +
-> +	pr_debug("addr in r%d->0x%08x, dest is r%d, source in r%d->0x%08x)\n",
-> +		 EXTRACT_REG_NUM(instr, RN_OFFSET), address,
-> +		 destreg, EXTRACT_REG_NUM(instr, RT2_OFFSET), data);
-> +
-> +	/* Check access in reasonable access range for both SWP and SWPB */
-> +	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
-> +		pr_debug("SWP{B} emulation: access to %p not allowed!\n",
-> +			 (void *)address);
-> +		res = -EFAULT;
-> +	} else {
-> +		res = emulate_swpX(address, &data, type);
-> +	}
-> +
-> +	if (res == 0) {
-> +		/*
-> +		 * On successful emulation, revert the adjustment to the PC
-> +		 * made in kernel/traps.c in order to resume execution at the
-> +		 * instruction following the SWP{B}.
-> +		 */
-> +		regs->ARM_pc += 4;
-> +		regs->uregs[destreg] = data;
-> +	} else if (res == -EFAULT) {
-> +		/*
-> +		 * Memory errors do not mean emulation failed.
-> +		 * Set up signal info to return SEGV, then return OK
-> +		 */
-> +		set_segfault(regs, address);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Only emulate SWP/SWPB executed in ARM state/User mode.
-> + * The kernel must be SWP free and SWP{B} does not exist in Thumb/ThumbEE.
-> + */
-> +static struct undef_hook swp_hook = {
-> +	.instr_mask = 0x0fb00ff0,
-> +	.instr_val  = 0x01000090,
-> +	.cpsr_mask  = MODE_MASK | PSR_T_BIT | PSR_J_BIT,
-> +	.cpsr_val   = USR_MODE,
-> +	.fn	    = swp_handler
+> +struct mtd_partition mityomapl138_nandflash_partition[] = {
+> +     {
+> +             .name           = "rootfs",
+> +             .offset         = 0,
+> +             .size           = SZ_128M,
+> +             .mask_flags     = 0, /* MTD_WRITEABLE, */
+> +     },
+> +     {
+> +             .name           = "homefs",
+> +             .offset         = MTDPART_OFS_APPEND,
+> +             .size           = MTDPART_SIZ_FULL,
+> +             .mask_flags     = 0,
+> +     },
 > +};
 > +
-> +/*
-> + * Register handler and create status file in /proc/cpu
-> + * Invoked as late_initcall, since not needed before init spawned.
-> + */
-> +static int __init swp_emulation_init(void)
+> +static struct davinci_nand_pdata mityomapl138_nandflash_data = {
+> +     .parts          = mityomapl138_nandflash_partition,
+> +     .nr_parts       = ARRAY_SIZE(mityomapl138_nandflash_partition),
+> +     .ecc_mode       = NAND_ECC_HW,
+> +     .options        = NAND_USE_FLASH_BBT | NAND_BUSWIDTH_16,
+> +     .ecc_bits   = 1, /* 4 bit mode is not supported with 16 bit NAND */
+> +};
+> +
+> +static struct resource mityomapl138_nandflash_resource[] = {
+> +     {
+> +             .start  = DA8XX_AEMIF_CS3_BASE,
+> +             .end    = DA8XX_AEMIF_CS3_BASE + SZ_512K + 2 * SZ_1K - 1,
+> +             .flags  = IORESOURCE_MEM,
+> +     },
+> +     {
+> +             .start  = DA8XX_AEMIF_CTL_BASE,
+> +             .end    = DA8XX_AEMIF_CTL_BASE + SZ_32K - 1,
+> +             .flags  = IORESOURCE_MEM,
+> +     },
+> +};
+> +
+> +static struct platform_device mityomapl138_nandflash_device = {
+> +     .name           = "davinci_nand",
+> +     .id             = 0,
+> +     .dev            = {
+> +             .platform_data  = &mityomapl138_nandflash_data,
+> +     },
+> +     .num_resources  = ARRAY_SIZE(mityomapl138_nandflash_resource),
+> +     .resource       = mityomapl138_nandflash_resource,
+> +};
+> +
+> +static struct platform_device *mityomapl138_devices[] __initdata = {
+> +     &mityomapl138_nandflash_device,
+> +};
+> +
+> +static void __init mityomapl138_setup_nand(void)
 > +{
-> +#ifdef CONFIG_PROC_FS
-> +	struct proc_dir_entry *res;
-> +
-> +	res = create_proc_entry("cpu/swp_emulation", S_IRUGO, NULL);
-> +
-> +	if (!res)
-> +		return -ENOMEM;
-> +
-> +	res->read_proc = proc_read_status;
-> +#endif /* CONFIG_PROC_FS */
-> +
-> +	printk(KERN_NOTICE "Registering SWP/SWPB emulation handler\n");
-> +	register_undef_hook(&swp_hook);
-> +
-> +	return 0;
+> +     platform_add_devices(mityomapl138_devices,
+> +                              ARRAY_SIZE(mityomapl138_devices));
 > +}
 > +
-> +late_initcall(swp_emulation_init);
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 6d05f79..8493ed0 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -636,6 +636,33 @@ config ARM_THUMBEE
->  	  Say Y here if you have a CPU with the ThumbEE extension and code to
->  	  make use of it. Say N for code that can run on CPUs without ThumbEE.
->  
-> +config SWP_EMULATE
-> +	bool "Emulate SWP/SWPB instructions"
-> +	depends on CPU_V7
-> +	select HAVE_PROC_CPU if PROC_FS
-> +	default y if SMP
-> +	help
-> +	  ARMv6 architecture deprecates use of the SWP/SWPB instructions.
-> +	  ARMv7 multiprocessing extensions introduce the ability to disable
-> +	  these instructions, triggering an undefined instruction exception
-> +	  when executed. Say Y here to enable software emulation of these
-> +	  instructions for userspace (not kernel) using LDREX/STREX.
-> +	  Also creates /proc/cpu/swp_emulation for statistics.
+> +static struct davinci_uart_config mityomapl138_uart_config __initdata = {
+> +     .enabled_uarts = 0x7,
+> +};
 > +
-> +	  In some older versions of glibc [<=2.8] SWP is used during futex
-> +	  trylock() operations with the assumption that the code will not
-> +	  be preempted. This invalid assumption may be more likely to fail
-> +	  with SWP emulation enabled, leading to deadlock of the user
-> +	  application.
+> +static const short mityomap_mii_pins[] = {
+> +     DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
+> +     DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
+> +     DA850_MII_CRS, DA850_MII_RXCLK, DA850_MII_RXDV, DA850_MII_RXD_3,
+> +     DA850_MII_RXD_2, DA850_MII_RXD_1, DA850_MII_RXD_0, DA850_MDIO_CLK,
+> +     DA850_MDIO_D,
+> +     -1
+> +};
 > +
-> +	  NOTE: when accessing uncached shared regions, LDREX/STREX rely
-> +	  on an external transaction monitoring block called a global
-> +	  monitor to maintain update atomicity. If your system does not
-> +	  implement a global monitor, this option can cause programs that
-> +	  perform SWP operations to uncached memory to deadlock.
+> +static const short mityomap_rmii_pins[] = {
+> +     DA850_RMII_TXD_0, DA850_RMII_TXD_1, DA850_RMII_TXEN,
+> +     DA850_RMII_CRS_DV, DA850_RMII_RXD_0, DA850_RMII_RXD_1,
+> +     DA850_RMII_RXER, DA850_RMII_MHZ_50_CLK, DA850_MDIO_CLK,
+> +     DA850_MDIO_D,
+> +     -1
+> +};
 > +
-> +	  If unsure, say Y.
+> +static void __init mityomapl138_config_emac(void)
+> +{
+> +     void __iomem *cfg_chip3_base;
+> +     int ret;
+> +     u32 val;
+> +     struct davinci_soc_info *soc_info = &davinci_soc_info;
+> +     soc_info->emac_pdata->rmii_en = 0; /* hardcoded for now */
 > +
->  config CPU_BIG_ENDIAN
->  	bool "Build big-endian kernel"
->  	depends on ARCH_SUPPORTS_BIG_ENDIAN
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 19638c6..d5d9b58 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -278,6 +278,10 @@ __v7_setup:
->  #ifdef CONFIG_CPU_ENDIAN_BE8
->  	orr	r6, r6, #1 << 25		@ big-endian page tables
->  #endif
-> +#ifdef CONFIG_SWP_EMULATE
-> +	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
-> +	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
-> +#endif
->     	mrc	p15, 0, r0, c1, c0, 0		@ read control register
->  	bic	r0, r0, r5			@ clear bits them
->  	orr	r0, r0, r6			@ set them
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +     cfg_chip3_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
+> +     val = __raw_readl(cfg_chip3_base);
+> +
+> +     if (soc_info->emac_pdata->rmii_en) {
+> +             val |= BIT(8);
+> +             ret = davinci_cfg_reg_list(mityomap_rmii_pins);
+> +             pr_info("RMII PHY configured\n");
+> +     } else {
+> +             val &= ~BIT(8);
+> +             ret = davinci_cfg_reg_list(mityomap_mii_pins);
+> +             pr_info("MII PHY configured\n");
+> +     }
+> +
+> +     if (ret) {
+> +             pr_warning("mii/rmii mux setup failed: %d\n", ret);
+> +             return;
+> +     }
+> +
+> +     /* configure the CFGCHIP3 register for RMII or MII */
+> +     __raw_writel(val, cfg_chip3_base);
+> +
+> +     soc_info->emac_pdata->phy_mask = MITYOMAPL138_PHY_MASK;
+> +     pr_info("setting phy_mask to %x\n", soc_info->emac_pdata->phy_mask);
 
--- 
- Kirill A. Shutemov
+This should be pr_debug()?
+
+Thanks,
+Sekhar
