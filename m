@@ -1,29 +1,32 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Tue, 31 Aug 2010 18:10:25 +0900
-Subject: smsc911x.c driver and SMP
-In-Reply-To: <87k4n7ti6n.fsf@doris.research.nokia.com>
-References: <4A7AEEB6.5060903@googlemail.com>	<1249981883.27150.14.camel@pc1117.cambridge.arm.com>	<4A818CBC.8040000@googlemail.com>	<1250006770.30628.1.camel@pc1117.cambridge.arm.com>	<4A819C54.3080606@googlemail.com>	<1250009043.30628.9.camel@pc1117.cambridge.arm.com>	<87ab25vazg.fsf@brigitte.kvy.fi>	<1250080338.20332.32.camel@pc1117.cambridge.arm.com>	<87k518yc8a.fsf@brigitte.kvy.fi>	<1252660898.3354.16.camel@pc1117.cambridge.arm.com>	<4AAA48CA.9040405@billgatliff.com>	<1252674034.29620.30.camel@pc1117.cambridge.arm.com>	<4AAA6AB7.60808@billgatliff.com>	<1252685189.29620.33.camel@pc1117.cambridge.arm.com>	<87my459hjs.fsf@brigitte.kvy.fi>
-	<4C7C47DF.3030307@renesas.com>
-	<87k4n7ti6n.fsf@doris.research.nokia.com>
-Message-ID: <4C7CC701.3030704@renesas.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Tue, 31 Aug 2010 11:05:18 +0200
+Subject: [PATCH 3/3] x86: oprofile: fix oprofile_arch_init behaviour on
+	failure
+In-Reply-To: <1283244880.645.17.camel@e102144-lin.cambridge.arm.com>
+References: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
+	<1283107921-21464-2-git-send-email-will.deacon@arm.com>
+	<1283107921-21464-3-git-send-email-will.deacon@arm.com>
+	<1283107921-21464-4-git-send-email-will.deacon@arm.com>
+	<20100830090929.GU22783@erda.amd.com>
+	<1283244880.645.17.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <20100831090518.GZ22783@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 31.08.10 04:54:40, Will Deacon wrote:
+> Do you think it would be better to rework this patch so that the static
+> using_nmi variable is set explicitly by init.c, or shall I just drop
+> this patch altogether (and resubmit the first two)?
 
-On 8/31/2010 3:22 PM, Antti P Miettinen wrote:
-> Hmm.. hard to remember what the patch actually contained - could it be
-> the one below?
+For x86 wont change the code (actually I found a bug in the init_sysfs
+error handler for which I will send a fix). Just wanted to get your
+confirmation in case I was missing something that x86 is not affected.
+I will apply the first 2 patches, no need to resubmit.
 
-That's the one (also identified by Catalin), thanks both.
+Thanks Will.
 
-> By the way - I have a KZM board so I'd be happy to test your kernels.
+-Robert
 
-Great, thanks for kind offer.  I'm planning to upgrade its kernel
-from .28/.29 to .31/.32, which doubles as ARM training for me (as
-I'm new to ARM).  When I have a problem, I'd like to ask for help.
-
-Thanks,
 -- 
-Shinya Kuribayashi
-Renesas Electronics
+Advanced Micro Devices, Inc.
+Operating System Research Center
