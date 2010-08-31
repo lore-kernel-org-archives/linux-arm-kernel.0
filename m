@@ -1,44 +1,77 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 31 Aug 2010 14:12:06 +0200
-Subject: [PATCH 04/12] DMAENGINE: use GFP_NOWAIT for PL08X allocations
-In-Reply-To: <1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 31 Aug 2010 14:12:03 +0200
+Subject: [PATCH 01/12] DMAENGINE: remove clock code from PL08X driver
+In-Reply-To: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
 References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since DMA jobs can be prepared and fired in IRQ context, request
-GFP_NOWAIT memory for the structs.
+With the introduction of the pclk infrastructure the block clock
+is handled by the AMBA PrimeCell bus core, and we can remove the
+local references to any clocks.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/dma/amba-pl08x.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/amba-pl08x.c |   18 ------------------
+ 1 files changed, 0 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 506749b..d1a4813 100644
+index fc5aaeb..2afb4f6 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -628,7 +628,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		return 0;
- 	}
+@@ -68,7 +68,6 @@
+ #include <linux/amba/bus.h>
+ #include <linux/dmaengine.h>
+ #include <linux/amba/pl08x.h>
+-#include <linux/clk.h>
  
--	txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_KERNEL,
-+	txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT,
- 				      &txd->llis_bus);
- 	if (!txd->llis_va) {
- 		dev_err(&pl08x->adev->dev, "%s no memory for llis\n", __func__);
-@@ -1564,7 +1564,7 @@ struct dma_async_tx_descriptor *pl08x_prep_slave_sg(
- 	dev_dbg(&pl08x->adev->dev, "%s prepare transaction of %d bytes from %s\n",
- 		__func__, sgl->length, plchan->name);
+ #include <asm/hardware/pl080.h>
+ #include <asm/dma.h>
+@@ -113,7 +112,6 @@ struct lli {
+  * @adev: the corresponding AMBA (PrimeCell) bus entry
+  * @vd: vendor data for this PL08x variant
+  * @pd: platform data passed in from the platform/machine
+- * @clk: a clock to be enabled for this device to run
+  * @phy_chans: array of data for the physical channels
+  * @pool: a pool for the LLI descriptors
+  * @pool_ctr: counter of LLIs in the pool
+@@ -124,7 +122,6 @@ struct pl08x_driver_data {
+ 	struct amba_device *adev;
+ 	struct vendor_data *vd;
+ 	struct pl08x_platform_data *pd;
+-	struct clk *clk;
+ 	struct pl08x_phy_chan *phy_chans;
+ 	struct dma_pool *pool;
+ 	int pool_ctr;
+@@ -1826,19 +1823,6 @@ static int pl08x_probe(struct amba_device *adev, struct amba_id *id)
+ 	pl08x->adev = adev;
+ 	pl08x->vd = vd;
  
--	txd = kzalloc(sizeof(struct pl08x_txd), GFP_KERNEL);
-+	txd = kzalloc(sizeof(struct pl08x_txd), GFP_NOWAIT);
- 	if (!txd) {
- 		dev_err(&pl08x->adev->dev, "%s no txd\n", __func__);
- 		return NULL;
+-	pl08x->clk = clk_get(&adev->dev, NULL);
+-	if (IS_ERR(pl08x->clk)) {
+-		ret = PTR_ERR(pl08x->clk);
+-		if (ret == -ENOENT) {
+-			dev_info(&adev->dev, "no clock supplied, assume always on\n");
+-			pl08x->clk = NULL;
+-		} else
+-			goto out_no_clk;
+-	}
+-	/* Constantly enabled for now, we can control this dynamically */
+-	if (pl08x->clk)
+-		clk_enable(pl08x->clk);
+-
+ 	/* A DMA memory pool for LLIs, align on 1-byte boundary */
+ 	pl08x->pool = dma_pool_create(DRIVER_NAME, &pl08x->adev->dev,
+ 			PL08X_LLI_TSFR_SIZE, PL08X_ALIGN, 0);
+@@ -1963,8 +1947,6 @@ out_no_irq:
+ out_no_ioremap:
+ 	dma_pool_destroy(pl08x->pool);
+ out_no_lli_pool:
+-	clk_put(pl08x->clk);
+-out_no_clk:
+ 	kfree(pl08x);
+ out_no_pl08x:
+ 	amba_release_regions(adev);
 -- 
 1.6.3.3
