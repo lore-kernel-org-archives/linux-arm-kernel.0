@@ -1,35 +1,133 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Tue, 31 Aug 2010 12:04:32 +0530
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <1283170469.12995.53.camel@brekeke>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	
-	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
-	<1283170469.12995.53.camel@brekeke>
-Message-ID: <4C7CA278.9040902@st.com>
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Tue, 31 Aug 2010 02:48:23 -0400
+Subject: [PATCH 1/1] ARM: pxa168: fix corrected reset vector
+In-Reply-To: <AANLkTinjyJvMRt8OovZBJD+-xU6KXH5WAfqz9Epok+=g@mail.gmail.com>
+References: <1282813649-8332-1-git-send-email-mark.brown314@gmail.com>
+	<1282813649-8332-2-git-send-email-mark.brown314@gmail.com>
+	<AANLkTi=GZ1p3MzibOEzhyD=Mv6d2x2nRh93D4bmtgcYE@mail.gmail.com>
+	<AANLkTimwU17YS5Yk7y+13Dj9Ww4oPG0g4v5ZbvOVuQV6@mail.gmail.com>
+	<AANLkTikxOQnj=vKD8b0aZqZHNe4m-Y+o+620TBzMJCAW@mail.gmail.com>
+	<AANLkTik3cnE4HQ3hq3wfuxcept4BeTh+zZvNDbZ_b3O7@mail.gmail.com>
+	<AANLkTinjyJvMRt8OovZBJD+-xU6KXH5WAfqz9Epok+=g@mail.gmail.com>
+Message-ID: <AANLkTikrp0i_U_eKaAbUOop6U4Un6-ASTKuXU1HOzoc7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/30/2010 5:44 PM, Artem Bityutskiy wrote:
-> On Mon, 2010-08-30 at 16:13 +0530, Viresh KUMAR wrote:
->> From: Vipin Kumar <vipin.kumar@st.com>
+On Tue, Aug 31, 2010 at 2:26 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Tue, Aug 31, 2010 at 2:08 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> On Tue, Aug 31, 2010 at 2:04 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>> On Tue, Aug 31, 2010 at 2:02 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
+>>>> On Tue, Aug 31, 2010 at 1:48 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>>>> On Thu, Aug 26, 2010 at 5:07 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
+>>>>>> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+>>>>>> ---
+>>>>>> ?arch/arm/mach-mmp/include/mach/system.h | ? ?2 +-
+>>>>>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-mmp/include/mach/system.h b/arch/arm/mach-mmp/include/mach/system.h
+>>>>>> index 4f5b0e0..926e9c0 100644
+>>>>>> --- a/arch/arm/mach-mmp/include/mach/system.h
+>>>>>> +++ b/arch/arm/mach-mmp/include/mach/system.h
+>>>>>> @@ -16,6 +16,6 @@ static inline void arch_idle(void)
+>>>>>>
+>>>>>> ?static inline void arch_reset(char mode, const char *cmd)
+>>>>>> ?{
+>>>>>> - ? ? ? cpu_reset(0);
+>>>>>> + ? ? ? cpu_reset(0xffff0000);
+>>>>>
+>>>>> Not sure if this correct. But normally reset jump happens after we turn
+>>>>> off the MMU and so on. Ain't the BootROM starts from 0 ?
+>>>>>
+>>>>>> ?}
+>>>>>> ?#endif /* __ASM_MACH_SYSTEM_H */
+>>>>>> --
+>>>>>> 1.7.0.4
+>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>> Eric, the boot-rom for pxa168 starts at 0xffff_0000. I am pretty sure
+>>>> about that! If you set the reset vector to 0x0 it will crash during
+>>>> reboot. I will send you xdb snapshots if you need me to.
+>>>>
+>>>
+>>> OK, you are expert on this :-)
+>>>
+>>> Applied to 'fix'.
+>>>
 >>
->> For a page size of 4096, the number of oob bytes are 128 per page. This demands
->> for an increased ecc_pos array as well as ecc can be placed at more than 64
->> locations.
+>> One moment. Since this is really global to pxa910 and mmp2, so I
+>> suggest this being fixed for pxa168 only first. How about this:
 >>
->> This patch is added because SPEAr platforms NAND controller has 13 bytes of ecc
->> for each 512 bytes of data. This results in 104 bytes of ecc in case of 4096
->> byte page.
+>> ? ?ARM: pxa168: fix corrected reset vector
 >>
->> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> 
-> Nack, breaking ABI Is not allowed in Linux.
-> 
-Hello Artem,
+>> ? ?Reset vector for pxa168 is 0xffff_0000 not 0x0. This fix allows
+>> ? ?reboot to work
+>>
+>> ? ?Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+>>
+>> diff --git a/arch/arm/mach-mmp/include/mach/system.h
+>> b/arch/arm/mach-mmp/include/mach/system.h
+>> index 4f5b0e0..1a8a25e 100644
+>> --- a/arch/arm/mach-mmp/include/mach/system.h
+>> +++ b/arch/arm/mach-mmp/include/mach/system.h
+>> @@ -9,6 +9,8 @@
+>> ?#ifndef __ASM_MACH_SYSTEM_H
+>> ?#define __ASM_MACH_SYSTEM_H
+>>
+>> +#include <mach/cputype.h>
+>> +
+>> ?static inline void arch_idle(void)
+>> ?{
+>> ? ? ? ?cpu_do_idle();
+>> @@ -16,6 +18,9 @@ static inline void arch_idle(void)
+>>
+>> ?static inline void arch_reset(char mode, const char *cmd)
+>> ?{
+>> - ? ? ? cpu_reset(0);
+>> + ? ? ? if (cpu_is_pxa168())
+>> + ? ? ? ? ? ? ? cpu_reset(0xffff0000);
+>> + ? ? ? else
+>> + ? ? ? ? ? ? ? cpu_reset(0);
+>> ?}
+>> ?#endif /* __ASM_MACH_SYSTEM_H */
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at ?http://www.tux.org/lkml/
+>>
+> The reset code is in below.
+>
+> ? ? ? ?.align ?5
+> ENTRY(cpu_mohawk_reset)
+> ? ? ? ?mov ? ? ip, #0
+> ? ? ? ?mcr ? ? p15, 0, ip, c7, c7, 0 ? ? ? ? ? @ invalidate I,D caches
+> ? ? ? ?mcr ? ? p15, 0, ip, c7, c10, 4 ? ? ? ? ?@ drain WB
+> ? ? ? ?mcr ? ? p15, 0, ip, c8, c7, 0 ? ? ? ? ? @ invalidate I & D TLBs
+> ? ? ? ?mrc ? ? p15, 0, ip, c1, c0, 0 ? ? ? ? ? @ ctrl register
+> ? ? ? ?bic ? ? ip, ip, #0x0007 ? ? ? ? ? ? ? ? @ .............cam
+> ? ? ? ?bic ? ? ip, ip, #0x1100 ? ? ? ? ? ? ? ? @ ...i...s........
+> ? ? ? ?mcr ? ? p15, 0, ip, c1, c0, 0 ? ? ? ? ? @ ctrl register
+> ? ? ? ?mov ? ? pc, r0
+>
+> MMU is disabled at here and replace PC with r0 value. I doubt code
+> executed correctly at here. While MMU is disabled, the PC should be
+> continue in the range of 0xCxxx_xxxx (kernel space). "mov pc, r0"
+> shouldn't be executed. Instruction fetch failure should occurs since
+> there's no physical address in 0xCxxx_xxxx.
+>
+> Correct me if I'm wrong.
+>
+> Thanks
+> Haojian
+>
 
-I could not understand your point. Can you please elaborate. How does this patch 
-break ABI
+Haojian,
 
-Regards
-Vipin
+I think there is a pipeline execution of the mov pc, r0 instruction.
+If I remember correctly you need to do a similar jump when you turn
+the MMU on in early boot code. If it makes any difference I did test
+this code on pxa168 before submitting it. I will double check the mmp2
+and the pxa910 reset vectors with the Boot ROM developers.
