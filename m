@@ -1,77 +1,246 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 31 Aug 2010 14:12:03 +0200
-Subject: [PATCH 01/12] DMAENGINE: remove clock code from PL08X driver
-In-Reply-To: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 31 Aug 2010 14:12:14 +0200
+Subject: [PATCH 12/12] DMAENGINE: define channel states for the PL08X
+In-Reply-To: <1283256734-3408-12-git-send-email-linus.walleij@stericsson.com>
 References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-6-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-7-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-8-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-9-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-10-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-11-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-12-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1283256734-3408-13-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of the pclk infrastructure the block clock
-is handled by the AMBA PrimeCell bus core, and we can remove the
-local references to any clocks.
+Instead of strange things like a bool indicating paused state for
+channels, let's define a proper channel state and use that. Also
+print it out in the debugfs so we get a nice overview of the
+channels and states.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/dma/amba-pl08x.c |   18 ------------------
- 1 files changed, 0 insertions(+), 18 deletions(-)
+ drivers/dma/amba-pl08x.c   |   70 ++++++++++++++++++++++++++++++++++----------
+ include/linux/amba/pl08x.h |   22 ++++++++++++-
+ 2 files changed, 74 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index fc5aaeb..2afb4f6 100644
+index 49fb19d..1718b2e 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -68,7 +68,6 @@
- #include <linux/amba/bus.h>
- #include <linux/dmaengine.h>
- #include <linux/amba/pl08x.h>
--#include <linux/clk.h>
- 
- #include <asm/hardware/pl080.h>
- #include <asm/dma.h>
-@@ -113,7 +112,6 @@ struct lli {
-  * @adev: the corresponding AMBA (PrimeCell) bus entry
-  * @vd: vendor data for this PL08x variant
-  * @pd: platform data passed in from the platform/machine
-- * @clk: a clock to be enabled for this device to run
-  * @phy_chans: array of data for the physical channels
-  * @pool: a pool for the LLI descriptors
-  * @pool_ctr: counter of LLIs in the pool
-@@ -124,7 +122,6 @@ struct pl08x_driver_data {
- 	struct amba_device *adev;
- 	struct vendor_data *vd;
- 	struct pl08x_platform_data *pd;
--	struct clk *clk;
- 	struct pl08x_phy_chan *phy_chans;
- 	struct dma_pool *pool;
- 	int pool_ctr;
-@@ -1826,19 +1823,6 @@ static int pl08x_probe(struct amba_device *adev, struct amba_id *id)
- 	pl08x->adev = adev;
- 	pl08x->vd = vd;
- 
--	pl08x->clk = clk_get(&adev->dev, NULL);
--	if (IS_ERR(pl08x->clk)) {
--		ret = PTR_ERR(pl08x->clk);
--		if (ret == -ENOENT) {
--			dev_info(&adev->dev, "no clock supplied, assume always on\n");
--			pl08x->clk = NULL;
+@@ -1148,9 +1148,20 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
+ 			pl08x_free_txd_list(pl08x, plchan);
+ 			spin_unlock_irqrestore(&plchan->lock, flags);
+ 			return -EBUSY;
 -		} else
--			goto out_no_clk;
++		} else {
++			plchan->state = PL08X_CHAN_WAITING;
+ 			plchan->waiting = txd;
 -	}
--	/* Constantly enabled for now, we can control this dynamically */
--	if (pl08x->clk)
--		clk_enable(pl08x->clk);
--
- 	/* A DMA memory pool for LLIs, align on 1-byte boundary */
- 	pl08x->pool = dma_pool_create(DRIVER_NAME, &pl08x->adev->dev,
- 			PL08X_LLI_TSFR_SIZE, PL08X_ALIGN, 0);
-@@ -1963,8 +1947,6 @@ out_no_irq:
- out_no_ioremap:
- 	dma_pool_destroy(pl08x->pool);
- out_no_lli_pool:
--	clk_put(pl08x->clk);
--out_no_clk:
- 	kfree(pl08x);
- out_no_pl08x:
- 	amba_release_regions(adev);
++		}
++	} else
++		/*
++		 * Else we're all set, paused and ready to roll,
++		 * status will switch to PL08X_CHAN_RUNNING when
++		 * we call issue_pending(). If there is something
++		 * running on the channel already we don't change
++		 * its state.
++		 */
++		if (plchan->state == PL08X_CHAN_IDLE)
++			plchan->state = PL08X_CHAN_PAUSED;
+ 	spin_unlock_irqrestore(&plchan->lock, flags);
+ 
+ 	return tx->cookie;
+@@ -1206,9 +1217,10 @@ pl08x_dma_tx_status(struct dma_chan *chan,
+ 	dma_set_tx_state(txstate, last_complete, last_used,
+ 			 bytesleft);
+ 
+-	if (plchan->paused)
++	if (plchan->state == PL08X_CHAN_PAUSED)
+ 		return DMA_PAUSED;
+ 
++	/* Whether waiting or running, we're in progress */
+ 	return DMA_IN_PROGRESS;
+ }
+ 
+@@ -1366,7 +1378,7 @@ static void pl08x_issue_pending(struct dma_chan *chan)
+ 	}
+ 
+ 	/* Didn't get a physical channel so waiting for it ... */
+-	if (plchan->waiting)
++	if (plchan->state == PL08X_CHAN_WAITING)
+ 		return;
+ 
+ 	/* Take the first element in the queue and execute it */
+@@ -1378,6 +1390,7 @@ static void pl08x_issue_pending(struct dma_chan *chan)
+ 					node);
+ 		list_del(&next->node);
+ 		plchan->at = next;
++		plchan->state = PL08X_CHAN_RUNNING;
+ 
+ 		/* Configure the physical channel for the active txd */
+ 		pl08x_config_phychan_for_txd(plchan);
+@@ -1520,7 +1533,7 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 
+ 	switch (cmd) {
+ 	case DMA_TERMINATE_ALL:
+-		plchan->paused = false;
++		plchan->state = PL08X_CHAN_IDLE;
+ 
+ 		if (plchan->phychan) {
+ 			pl08x_stop_phy_chan(plchan->phychan);
+@@ -1549,11 +1562,11 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		break;
+ 	case DMA_PAUSE:
+ 		pl08x_pause_phy_chan(plchan->phychan);
+-		plchan->paused = true;
++		plchan->state = PL08X_CHAN_PAUSED;
+ 		break;
+ 	case DMA_RESUME:
+ 		pl08x_resume_phy_chan(plchan->phychan);
+-		plchan->paused = false;
++		plchan->state = PL08X_CHAN_RUNNING;
+ 		break;
+ 	default:
+ 		/* Unknown command */
+@@ -1676,6 +1689,7 @@ static void pl08x_tasklet(unsigned long data)
+ 		}
+ 		pl08x_put_phy_channel(pl08x, phychan);
+ 		plchan->phychan = NULL;
++		plchan->state = PL08X_CHAN_IDLE;
+ 
+ 		/*
+ 		 * And NOW before anyone else can grab that free:d
+@@ -1684,13 +1698,17 @@ static void pl08x_tasklet(unsigned long data)
+ 		 * being stacked up while we were choking the
+ 		 * physical channels with data.
+ 		 */
+-		list_for_each_entry(waiting, &pl08x->memcpy.channels, chan.device_node) {
+-			if (waiting->waiting) {
++		list_for_each_entry(waiting, &pl08x->memcpy.channels,
++				    chan.device_node) {
++		  if (waiting->state == PL08X_CHAN_WAITING &&
++			    waiting->waiting != NULL) {
+ 				int ret;
+ 
+ 				/* This should REALLY not fail now */
+-				ret = prep_phy_channel(waiting, waiting->waiting);
++				ret = prep_phy_channel(waiting,
++						       waiting->waiting);
+ 				BUG_ON(ret);
++				waiting->state = PL08X_CHAN_RUNNING;
+ 				waiting->waiting = NULL;
+ 				pl08x_issue_pending(&waiting->chan);
+ 				break;
+@@ -1771,6 +1789,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
+ 		}
+ 
+ 		chan->host = pl08x;
++		chan->state = PL08X_CHAN_IDLE;
+ 
+ 		if (slave) {
+ 			chan->slave = true;
+@@ -1817,6 +1836,23 @@ static void pl08x_free_virtual_channels(struct dma_device *dmadev)
+ }
+ 
+ #ifdef CONFIG_DEBUG_FS
++static const char *pl08x_state_str(enum pl08x_dma_chan_state state)
++{
++	switch(state) {
++	case PL08X_CHAN_IDLE:
++		return "idle";
++	case PL08X_CHAN_RUNNING:
++		return "running";
++	case PL08X_CHAN_PAUSED:
++		return "paused";
++	case PL08X_CHAN_WAITING:
++		return "waiting";
++	default:
++		break;
++	}
++	return "UNKNOWN STATE";
++}
++
+ static int pl08x_debugfs_show(struct seq_file *s, void *data)
+ {
+ 	struct pl08x_driver_data *pl08x = s->private;
+@@ -1843,17 +1879,19 @@ static int pl08x_debugfs_show(struct seq_file *s, void *data)
+ 	}
+ 
+ 	seq_printf(s, "\nPL08x virtual memcpy channels:\n");
+-	seq_printf(s, "CHANNEL:\n");
+-	seq_printf(s, "--------\n");
++	seq_printf(s, "CHANNEL:\tSTATE:\n");
++	seq_printf(s, "--------\t------\n");
+ 	list_for_each_entry(chan, &pl08x->memcpy.channels, chan.device_node) {
+-		seq_printf(s, "%s\n", chan->name);
++		seq_printf(s, "%s\t\t\%s\n", chan->name,
++			   pl08x_state_str(chan->state));
+ 	}
+ 
+ 	seq_printf(s, "\nPL08x virtual slave channels:\n");
+-	seq_printf(s, "CHANNEL:\n");
+-	seq_printf(s, "--------\n");
++	seq_printf(s, "CHANNEL:\tSTATE:\n");
++	seq_printf(s, "--------\t------\n");
+ 	list_for_each_entry(chan, &pl08x->slave.channels, chan.device_node) {
+-		seq_printf(s, "%s\n", chan->name);
++		seq_printf(s, "%s\t\t\%s\n", chan->name,
++			   pl08x_state_str(chan->state));
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index f461648..d54fbff 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -123,6 +123,24 @@ struct pl08x_txd {
+ };
+ 
+ /**
++ * struct pl08x_dma_chan_state - holds the PL08x specific virtual
++ * channel states
++ * @PL08X_CHAN_IDLE: the channel is idle
++ * @PL08X_CHAN_RUNNING: the channel has allocated a physical transport
++ * channel and is running a transfer on it
++ * @PL08X_CHAN_PAUSED: the channel has allocated a physical transport
++ * channel, but the transfer is currently paused
++ * @PL08X_CHAN_WAITING: the channel is waiting for a physical transport
++ * channel to become available (only pertains to memcpy channels)
++ */
++enum pl08x_dma_chan_state {
++	PL08X_CHAN_IDLE,
++	PL08X_CHAN_RUNNING,
++	PL08X_CHAN_PAUSED,
++	PL08X_CHAN_WAITING,
++};
++
++/**
+  * struct pl08x_dma_chan - this structure wraps a DMA ENGINE channel
+  * @chan: wrappped abstract channel
+  * @phychan: the physical channel utilized by this channel, if there is one
+@@ -137,7 +155,7 @@ struct pl08x_txd {
+  * @at: active transaction on this channel
+  * @lock: a lock for this channel data
+  * @host: a pointer to the host (internal use)
+- * @paused: whether the channel is paused
++ * @state: whether the channel is idle, paused, running etc
+  * @slave: whether this channel is a device (slave) or for memcpy
+  * @waiting: a TX descriptor on this channel which is waiting for
+  * a physical channel to become available
+@@ -156,7 +174,7 @@ struct pl08x_dma_chan {
+ 	struct pl08x_txd *at;
+ 	spinlock_t lock;
+ 	void *host;
+-	bool paused;
++	enum pl08x_dma_chan_state state;
+ 	bool slave;
+ 	struct pl08x_txd *waiting;
+ };
 -- 
 1.6.3.3
