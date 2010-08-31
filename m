@@ -1,78 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Aug 2010 09:54:40 +0100
-Subject: [PATCH 3/3] x86: oprofile: fix oprofile_arch_init behaviour on
-	failure
-In-Reply-To: <20100830090929.GU22783@erda.amd.com>
-References: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-2-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-3-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-4-git-send-email-will.deacon@arm.com>
-	<20100830090929.GU22783@erda.amd.com>
-Message-ID: <1283244880.645.17.camel@e102144-lin.cambridge.arm.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Tue, 31 Aug 2010 18:10:25 +0900
+Subject: smsc911x.c driver and SMP
+In-Reply-To: <87k4n7ti6n.fsf@doris.research.nokia.com>
+References: <4A7AEEB6.5060903@googlemail.com>	<1249981883.27150.14.camel@pc1117.cambridge.arm.com>	<4A818CBC.8040000@googlemail.com>	<1250006770.30628.1.camel@pc1117.cambridge.arm.com>	<4A819C54.3080606@googlemail.com>	<1250009043.30628.9.camel@pc1117.cambridge.arm.com>	<87ab25vazg.fsf@brigitte.kvy.fi>	<1250080338.20332.32.camel@pc1117.cambridge.arm.com>	<87k518yc8a.fsf@brigitte.kvy.fi>	<1252660898.3354.16.camel@pc1117.cambridge.arm.com>	<4AAA48CA.9040405@billgatliff.com>	<1252674034.29620.30.camel@pc1117.cambridge.arm.com>	<4AAA6AB7.60808@billgatliff.com>	<1252685189.29620.33.camel@pc1117.cambridge.arm.com>	<87my459hjs.fsf@brigitte.kvy.fi>
+	<4C7C47DF.3030307@renesas.com>
+	<87k4n7ti6n.fsf@doris.research.nokia.com>
+Message-ID: <4C7CC701.3030704@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert,
+Hi,
 
-On Mon, 2010-08-30 at 10:09 +0100, Robert Richter wrote:
-> On 29.08.10 14:52:01, Will Deacon wrote:
-> > The OProfile driver no longer calls oprofile_arch_exit when
-> > oprofile_arch_init return failure.
-> >
-> > This patch fixes the x86 implementation of oprofile_arch_init
-> > to ensure that op_nmi_exit is called if necessary.
-> >
-> > Cc: Robert Richter <robert.richter@amd.com>
-> > Cc: Matt Fleming <matt@console-pimps.org>
-> > Cc: Peter Zijlstra <peterz@infradead.org>
-> > Cc: Ingo Molnar <mingo@elte.hu>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/x86/oprofile/init.c |   26 +++++++++++++++-----------
-> >  1 files changed, 15 insertions(+), 11 deletions(-)
-> >
-> 
-> >  int __init oprofile_arch_init(struct oprofile_operations *ops)
-> >  {
-> >       int ret;
-> > 
-> > -     ret = -ENODEV;
-> > -
-> > -#ifdef CONFIG_X86_LOCAL_APIC
-> >       ret = op_nmi_init(ops);
-> > -#endif
-> > -#ifdef CONFIG_X86_IO_APIC
-> >       if (ret < 0)
-> > +#ifdef CONFIG_X86_IO_APIC
-> >               ret = op_nmi_timer_init(ops);
-> > +#else
-> > +             return ret;
-> >  #endif
-> > +
-> >       ops->backtrace = x86_backtrace;
-> > 
-> > +     if (ret < 0)
-> > +             op_nmi_exit();
-> > +
-> 
-> I don't see why we have to do this. All init functions above clean up
-> properly on failure. If op_nmi_init() succeeds we don't call
-> op_nmi_timer_init(), so we don't need to free it it either.
-> 
+On 8/31/2010 3:22 PM, Antti P Miettinen wrote:
+> Hmm.. hard to remember what the patch actually contained - could it be
+> the one below?
 
-The original code called op_nmi_exit() from oprofile_arch_exit()
-regardless of whether or not op_nmi_init() had succeeded. Actually, it
-turns out that this is ok because of this guy:
+That's the one (also identified by Catalin), thanks both.
 
-/* in order to get sysfs right */
-static int using_nmi;
+> By the way - I have a KZM board so I'd be happy to test your kernels.
 
-which is set by the nmi_init function and checked by nmi_exit.
-
-Do you think it would be better to rework this patch so that the static
-using_nmi variable is set explicitly by init.c, or shall I just drop
-this patch altogether (and resubmit the first two)?
+Great, thanks for kind offer.  I'm planning to upgrade its kernel
+from .28/.29 to .31/.32, which doubles as ARM training for me (as
+I'm new to ARM).  When I have a problem, I'd like to ask for help.
 
 Thanks,
-
-Will
+-- 
+Shinya Kuribayashi
+Renesas Electronics
