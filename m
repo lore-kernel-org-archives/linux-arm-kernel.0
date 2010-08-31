@@ -1,5 +1,5 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 31 Aug 2010 14:54:33 +0800
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 31 Aug 2010 15:02:07 +0800
 Subject: [PATCH 1/1] ARM: pxa168: fix corrected reset vector
 In-Reply-To: <AANLkTikrp0i_U_eKaAbUOop6U4Un6-ASTKuXU1HOzoc7@mail.gmail.com>
 References: <1282813649-8332-1-git-send-email-mark.brown314@gmail.com>
@@ -10,7 +10,7 @@ References: <1282813649-8332-1-git-send-email-mark.brown314@gmail.com>
 	<AANLkTik3cnE4HQ3hq3wfuxcept4BeTh+zZvNDbZ_b3O7@mail.gmail.com>
 	<AANLkTinjyJvMRt8OovZBJD+-xU6KXH5WAfqz9Epok+=g@mail.gmail.com>
 	<AANLkTikrp0i_U_eKaAbUOop6U4Un6-ASTKuXU1HOzoc7@mail.gmail.com>
-Message-ID: <AANLkTikfTYnJ=RsMzuukWeVm0Gvzaq4vMLnW3p3yb2Hy@mail.gmail.com>
+Message-ID: <AANLkTinq8wFGmYKzBrEY1d3FadN+55urxLxQCFTcpcrM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -129,12 +129,16 @@ On Tue, Aug 31, 2010 at 2:48 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
 > Haojian,
 >
 > I think there is a pipeline execution of the mov pc, r0 instruction.
-
-It does depend on the prefetch unit for that. So the branch instruction
-should follow right after the mcr one.
-
 > If I remember correctly you need to do a similar jump when you turn
 > the MMU on in early boot code. If it makes any difference I did test
 > this code on pxa168 before submitting it. I will double check the mmp2
 > and the pxa910 reset vectors with the Boot ROM developers.
 >
+
+In early boot code, 1:1 (physical:virtual) mapping is used. It means
+that physical address is same as virtual address. So you can operature
+mmu as you wish.
+
+By the way, I don't suggest to reset CPU by this way. Reset is not
+only make code running from the head, it should also clear registers
+and RTL logic in CPU.
