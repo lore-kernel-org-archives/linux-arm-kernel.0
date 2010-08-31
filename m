@@ -1,837 +1,411 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 Aug 2010 14:58:50 +0100
-Subject: [PATCH 8/9] ARM: Remove the domain switching on ARMv6k/v7 CPUs
+Date: Tue, 31 Aug 2010 14:58:56 +0100
+Subject: [PATCH 9/9] ARM: Add SWP/SWPB emulation for ARMv7 processors (v5)
 In-Reply-To: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
 References: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100831135846.21304.33450.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100831135855.21304.5457.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the domain switching functionality via the set_fs and
-__switch_to functions on cores that have a TLS register.
+From: Leif Lindholm <leif.lindholm@arm.com>
 
-Currently, the ioremap and vmalloc areas share the same level 1 page
-tables and therefore have the same domain (DOMAIN_KERNEL). When the
-kernel domain is modified from Client to Manager (via the __set_fs or in
-the __switch_to function), the XN (eXecute Never) bit is overridden and
-newer CPUs can speculatively prefetch the ioremap'ed memory.
+The SWP instruction was deprecated in the ARMv6 architecture, superseded
+by the LDREX/STREX family of instructions for
+load-linked/store-conditional operations. The ARMv7 multiprocessing
+extensions mandate that SWP/SWPB instructions are treated as undefined
+from reset, with the ability to enable them through the System Control
+Register SW bit.
 
-Linux performs the kernel domain switching to allow user-specific
-functions (copy_to/from_user, get/put_user etc.) to access kernel
-memory. In order for these functions to work with the kernel domain set
-to Client, the patch modifies the LDRT/STRT and related instructions to
-the LDR/STR ones.
+This patch adds the alternative solution to emulate the SWP and SWPB
+instructions using LDREX/STREX sequences, and log statistics to
+/proc/cpu/swp_emulation. To correctly deal with copy-on-write, it also
+modifies cpu_v7_set_pte_ext to change the mappings to priviliged RO when
+user RO.
 
-The user pages access rights are also modified for kernel read-only
-access rather than read/write so that the copy-on-write mechanism still
-works. CPU_USE_DOMAINS gets disabled only if the hardware has a TLS register
-(CPU_32v6K is defined) since writing the TLS value to the high vectors page
-isn't possible.
-
-The user addresses passed to the kernel are checked by the access_ok()
-function so that they do not point to the kernel space.
-
+Signed-off-by: Leif Lindholm <leif.lindholm@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Anton Vorontsov <cbouatmailru@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/include/asm/assembler.h |   13 +++---
- arch/arm/include/asm/domain.h    |   31 +++++++++++++-
- arch/arm/include/asm/futex.h     |    9 ++--
- arch/arm/include/asm/traps.h     |    2 +
- arch/arm/include/asm/uaccess.h   |   16 ++++---
- arch/arm/kernel/entry-armv.S     |    4 +-
- arch/arm/kernel/fiq.c            |    5 ++
- arch/arm/kernel/traps.c          |   14 +++++-
- arch/arm/lib/getuser.S           |   13 +++---
- arch/arm/lib/putuser.S           |   29 +++++++------
- arch/arm/lib/uaccess.S           |   83 +++++++++++++++++++-------------------
- arch/arm/mm/Kconfig              |    8 ++++
- arch/arm/mm/mmu.c                |    6 +--
- arch/arm/mm/proc-macros.S        |    7 +++
- arch/arm/mm/proc-v7.S            |    5 +-
- 15 files changed, 153 insertions(+), 92 deletions(-)
+ Documentation/arm/00-INDEX      |    2 
+ Documentation/arm/swp_emulation |   27 ++++
+ arch/arm/kernel/Makefile        |    1 
+ arch/arm/kernel/swp_emulate.c   |  260 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig             |   27 ++++
+ arch/arm/mm/proc-v7.S           |    4 +
+ 6 files changed, 321 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/arm/swp_emulation
+ create mode 100644 arch/arm/kernel/swp_emulate.c
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 6e8f05c..66db132 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -18,6 +18,7 @@
- #endif
+diff --git a/Documentation/arm/00-INDEX b/Documentation/arm/00-INDEX
+index 7f5fc3b..2d02564 100644
+--- a/Documentation/arm/00-INDEX
++++ b/Documentation/arm/00-INDEX
+@@ -32,3 +32,5 @@ memory.txt
+ 	- description of the virtual memory layout
+ nwfpe/
+ 	- NWFPE floating point emulator documentation
++swp_emulation
++	- SWP/SWPB emulation handler/logging description
+diff --git a/Documentation/arm/swp_emulation b/Documentation/arm/swp_emulation
+new file mode 100644
+index 0000000..af903d2
+--- /dev/null
++++ b/Documentation/arm/swp_emulation
+@@ -0,0 +1,27 @@
++Software emulation of deprecated SWP instruction (CONFIG_SWP_EMULATE)
++---------------------------------------------------------------------
++
++ARMv6 architecture deprecates use of the SWP/SWPB instructions, and recommeds
++moving to the load-locked/store-conditional instructions LDREX and STREX.
++
++ARMv7 multiprocessing extensions introduce the ability to disable these
++instructions, triggering an undefined instruction exception when executed.
++Trapped instructions are emulated using an LDREX/STREX or LDREXB/STREXB
++sequence. If a memory access fault (an abort) occurs, a segmentation fault is
++signalled to the triggering process.
++
++/proc/cpu/swp_emulation holds some statistics/information, including the PID of
++the last process to trigger the emulation to be invocated. For example:
++---
++Emulated SWP:		12
++Emulated SWPB:		0
++Aborted SWP{B}:		1
++Last process:		314
++---
++
++NOTE: when accessing uncached shared regions, LDREX/STREX rely on an external
++transaction monitoring block called a global monitor to maintain update
++atomicity. If your system does not implement a global monitor, this option can
++cause programs that perform SWP operations to uncached memory to deadlock, as
++the STREX operation will always fail.
++
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 980b78e..d3430ee 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -42,6 +42,7 @@ obj-$(CONFIG_KGDB)		+= kgdb.o
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
+ obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
++obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
  
- #include <asm/ptrace.h>
-+#include <asm/domain.h>
- 
- /*
-  * Endian independent macros for shifting bytes within registers.
-@@ -183,12 +184,12 @@
-  */
- #ifdef CONFIG_THUMB2_KERNEL
- 
--	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort
-+	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort, t=T()
- 9999:
- 	.if	\inc == 1
--	\instr\cond\()bt \reg, [\ptr, #\off]
-+	\instr\cond\()b\()\t\().w \reg, [\ptr, #\off]
- 	.elseif	\inc == 4
--	\instr\cond\()t \reg, [\ptr, #\off]
-+	\instr\cond\()\t\().w \reg, [\ptr, #\off]
- 	.else
- 	.error	"Unsupported inc macro argument"
- 	.endif
-@@ -223,13 +224,13 @@
- 
- #else	/* !CONFIG_THUMB2_KERNEL */
- 
--	.macro	usracc, instr, reg, ptr, inc, cond, rept, abort
-+	.macro	usracc, instr, reg, ptr, inc, cond, rept, abort, t=T()
- 	.rept	\rept
- 9999:
- 	.if	\inc == 1
--	\instr\cond\()bt \reg, [\ptr], #\inc
-+	\instr\cond\()b\()\t \reg, [\ptr], #\inc
- 	.elseif	\inc == 4
--	\instr\cond\()t \reg, [\ptr], #\inc
-+	\instr\cond\()\t \reg, [\ptr], #\inc
- 	.else
- 	.error	"Unsupported inc macro argument"
- 	.endif
-diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
-index cc7ef40..af18cea 100644
---- a/arch/arm/include/asm/domain.h
-+++ b/arch/arm/include/asm/domain.h
-@@ -45,13 +45,17 @@
-  */
- #define DOMAIN_NOACCESS	0
- #define DOMAIN_CLIENT	1
-+#ifdef CONFIG_CPU_USE_DOMAINS
- #define DOMAIN_MANAGER	3
-+#else
-+#define DOMAIN_MANAGER	1
-+#endif
- 
- #define domain_val(dom,type)	((type) << (2*(dom)))
- 
- #ifndef __ASSEMBLY__
- 
--#ifdef CONFIG_MMU
-+#ifdef CONFIG_CPU_USE_DOMAINS
- #define set_domain(x)					\
- 	do {						\
- 	__asm__ __volatile__(				\
-@@ -74,5 +78,28 @@
- #define modify_domain(dom,type)	do { } while (0)
- #endif
- 
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+new file mode 100644
+index 0000000..c254d1d
+--- /dev/null
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -0,0 +1,260 @@
 +/*
-+ * Generate the T (user) versions of the LDR/STR and related
-+ * instructions (inline assembly)
++ *  linux/arch/arm/kernel/swp_emulate.c
++ *
++ *  Copyright (C) 2009 ARM Limited
++ *  __user_* functions adapted from include/asm/uaccess.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ *  Implements emulation of the SWP/SWPB instructions using load-exclusive and
++ *  store-exclusive for processors that have them disabled (or future ones that
++ *  might not implement them).
++ *
++ *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
++ *  Where: Rt  = destination
++ *	   Rt2 = source
++ *	   Rn  = address
 + */
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+#define T(instr)	#instr "t"
-+#else
-+#define T(instr)	#instr
- #endif
--#endif /* !__ASSEMBLY__ */
 +
-+#else /* __ASSEMBLY__ */
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/proc_fs.h>
++#include <linux/sched.h>
++#include <linux/syscalls.h>
 +
-+/*
-+ * Generate the T (user) versions of the LDR/STR and related
-+ * instructions
-+ */
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+#define T(instr)	instr ## t
-+#else
-+#define T(instr)	instr
-+#endif
-+
-+#endif /* __ASSEMBLY__ */
-+
-+#endif /* !__ASM_PROC_DOMAIN_H */
-diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
-index 540a044..b33fe70 100644
---- a/arch/arm/include/asm/futex.h
-+++ b/arch/arm/include/asm/futex.h
-@@ -13,12 +13,13 @@
- #include <linux/preempt.h>
- #include <linux/uaccess.h>
- #include <asm/errno.h>
-+#include <asm/domain.h>
- 
- #define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
- 	__asm__ __volatile__(					\
--	"1:	ldrt	%1, [%2]\n"				\
-+	"1:	" T(ldr) "	%1, [%2]\n"			\
- 	"	" insn "\n"					\
--	"2:	strt	%0, [%2]\n"				\
-+	"2:	" T(str) "	%0, [%2]\n"			\
- 	"	mov	%0, #0\n"				\
- 	"3:\n"							\
- 	"	.pushsection __ex_table,\"a\"\n"		\
-@@ -97,10 +98,10 @@ futex_atomic_cmpxchg_inatomic(int __user *uaddr, int oldval, int newval)
- 	pagefault_disable();	/* implies preempt_disable() */
- 
- 	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
--	"1:	ldrt	%0, [%3]\n"
-+	"1:	" T(ldr) "	%0, [%3]\n"
- 	"	teq	%0, %1\n"
- 	"	it	eq	@ explicit IT needed for the 2b label\n"
--	"2:	streqt	%2, [%3]\n"
-+	"2:	" T(streq) "	%2, [%3]\n"
- 	"3:\n"
- 	"	.pushsection __ex_table,\"a\"\n"
- 	"	.align	3\n"
-diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
-index 491960b..af5d5d1 100644
---- a/arch/arm/include/asm/traps.h
-+++ b/arch/arm/include/asm/traps.h
-@@ -27,4 +27,6 @@ static inline int in_exception_text(unsigned long ptr)
- extern void __init early_trap_init(void);
- extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
- 
-+extern void *vectors_page;
-+
- #endif
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 33e4a48..b293616 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -227,7 +227,7 @@ do {									\
- 
- #define __get_user_asm_byte(x,addr,err)				\
- 	__asm__ __volatile__(					\
--	"1:	ldrbt	%1,[%2]\n"				\
-+	"1:	" T(ldrb) "	%1,[%2],#0\n"			\
- 	"2:\n"							\
- 	"	.pushsection .fixup,\"ax\"\n"			\
- 	"	.align	2\n"					\
-@@ -263,7 +263,7 @@ do {									\
- 
- #define __get_user_asm_word(x,addr,err)				\
- 	__asm__ __volatile__(					\
--	"1:	ldrt	%1,[%2]\n"				\
-+	"1:	" T(ldr) "	%1,[%2],#0\n"			\
- 	"2:\n"							\
- 	"	.pushsection .fixup,\"ax\"\n"			\
- 	"	.align	2\n"					\
-@@ -308,7 +308,7 @@ do {									\
- 
- #define __put_user_asm_byte(x,__pu_addr,err)			\
- 	__asm__ __volatile__(					\
--	"1:	strbt	%1,[%2]\n"				\
-+	"1:	" T(strb) "	%1,[%2],#0\n"			\
- 	"2:\n"							\
- 	"	.pushsection .fixup,\"ax\"\n"			\
- 	"	.align	2\n"					\
-@@ -341,7 +341,7 @@ do {									\
- 
- #define __put_user_asm_word(x,__pu_addr,err)			\
- 	__asm__ __volatile__(					\
--	"1:	strt	%1,[%2]\n"				\
-+	"1:	" T(str) "	%1,[%2],#0\n"			\
- 	"2:\n"							\
- 	"	.pushsection .fixup,\"ax\"\n"			\
- 	"	.align	2\n"					\
-@@ -366,10 +366,10 @@ do {									\
- 
- #define __put_user_asm_dword(x,__pu_addr,err)			\
- 	__asm__ __volatile__(					\
-- ARM(	"1:	strt	" __reg_oper1 ", [%1], #4\n"	)	\
-- ARM(	"2:	strt	" __reg_oper0 ", [%1]\n"	)	\
-- THUMB(	"1:	strt	" __reg_oper1 ", [%1]\n"	)	\
-- THUMB(	"2:	strt	" __reg_oper0 ", [%1, #4]\n"	)	\
-+ ARM(	"1:	" T(str) "	" __reg_oper1 ", [%1], #4\n"	)	\
-+ ARM(	"2:	" T(str) "	" __reg_oper0 ", [%1]\n"	)	\
-+ THUMB(	"1:	" T(str) "	" __reg_oper1 ", [%1]\n"	)	\
-+ THUMB(	"2:	" T(str) "	" __reg_oper0 ", [%1, #4]\n"	)	\
- 	"3:\n"							\
- 	"	.pushsection .fixup,\"ax\"\n"			\
- 	"	.align	2\n"					\
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index bb8e93a..4a8559f 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -733,7 +733,7 @@ ENTRY(__switch_to)
-  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
-  THUMB(	str	sp, [ip], #4		   )
-  THUMB(	str	lr, [ip], #4		   )
--#ifdef CONFIG_MMU
-+#ifdef CONFIG_CPU_USE_DOMAINS
- 	ldr	r6, [r2, #TI_CPU_DOMAIN]
- #endif
- 	set_tls	r3, r4, r5
-@@ -742,7 +742,7 @@ ENTRY(__switch_to)
- 	ldr	r8, =__stack_chk_guard
- 	ldr	r7, [r7, #TSK_STACK_CANARY]
- #endif
--#ifdef CONFIG_MMU
-+#ifdef CONFIG_CPU_USE_DOMAINS
- 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
- #endif
- 	mov	r5, r0
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 6ff7919..d601ef2 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -45,6 +45,7 @@
- #include <asm/fiq.h>
- #include <asm/irq.h>
- #include <asm/system.h>
 +#include <asm/traps.h>
- 
- static unsigned long no_fiq_insn;
- 
-@@ -77,7 +78,11 @@ int show_fiq_list(struct seq_file *p, void *v)
- 
- void set_fiq_handler(void *start, unsigned int length)
- {
-+#if defined(CONFIG_CPU_USE_DOMAINS)
- 	memcpy((void *)0xffff001c, start, length);
-+#else
-+	memcpy(vectors_page + 0x1c, start, length);
-+#endif
- 	flush_icache_range(0xffff001c, 0xffff001c + length);
- 	if (!vectors_high())
- 		flush_icache_range(0x1c, 0x1c + length);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index cda78d5..87abca0 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -37,6 +37,8 @@
- 
- static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
- 
-+void *vectors_page;
++#include <asm/uaccess.h>
 +
- #ifdef CONFIG_DEBUG_USER
- unsigned int user_debug;
- 
-@@ -759,7 +761,11 @@ static void __init kuser_get_tls_init(unsigned long vectors)
- 
- void __init early_trap_init(void)
- {
-+#if defined(CONFIG_CPU_USE_DOMAINS)
- 	unsigned long vectors = CONFIG_VECTORS_BASE;
-+#else
-+	unsigned long vectors = (unsigned long)vectors_page;
++/*
++ * Error-checking SWP macros implemented using ldrex{b}/strex{b}
++ */
++#define __user_swpX_asm(data, addr, res, B)			\
++	__asm__ __volatile__(					\
++	"	mov		r3, %1\n"			\
++	"0:	ldrex"B"	%1, [%2]\n"			\
++	"1:	strex"B"	%0, r3, [%2]\n"			\
++	"	cmp		%0, #0\n"			\
++	"	movne		%0, %3\n"			\
++	"2:\n"							\
++	"	.section	 .fixup,\"ax\"\n"		\
++	"	.align		2\n"				\
++	"3:	mov		%0, %4\n"			\
++	"	b		2b\n"				\
++	"	.previous\n"					\
++	"	.section	 __ex_table,\"a\"\n"		\
++	"	.align		3\n"				\
++	"	.long		0b, 3b\n"			\
++	"	.long		1b, 3b\n"			\
++	"	.previous"					\
++	: "=&r" (res), "+r" (data)				\
++	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "cc", "r3")
++
++#define __user_swp_asm(data, addr, res) __user_swpX_asm(data, addr, res, "")
++#define __user_swpb_asm(data, addr, res) __user_swpX_asm(data, addr, res, "b")
++
++/*
++ * Macros/defines for extracting register numbers from instruction.
++ */
++#define EXTRACT_REG_NUM(instruction, offset) \
++  (((instruction) & (0xf << (offset))) >> (offset))
++#define RN_OFFSET  16
++#define RT_OFFSET  12
++#define RT2_OFFSET  0
++/*
++ * Bit 22 of the instruction encoding distinguishes between
++ * the SWP and SWPB variants (bit set means SWPB).
++ */
++#define TYPE_SWPB (1 << 22)
++
++static unsigned long long swpcounter;
++static unsigned long long swpbcounter;
++static unsigned long long abtcounter;
++static long		  previous_pid;
++
++#ifdef CONFIG_PROC_FS
++static int proc_read_status(char *page, char **start, off_t off, int count,
++			    int *eof, void *data)
++{
++	char *p = page;
++	int len;
++
++	p += sprintf(p, "Emulated SWP:\t\t%llu\n", swpcounter);
++	p += sprintf(p, "Emulated SWPB:\t\t%llu\n", swpbcounter);
++	p += sprintf(p, "Aborted SWP{B}:\t\t%llu\n", abtcounter);
++	if (previous_pid != 0)
++		p += sprintf(p, "Last process:\t\t%ld\n", previous_pid);
++
++	len = (p - page) - off;
++	if (len < 0)
++		len = 0;
++
++	*eof = (len <= count) ? 1 : 0;
++	*start = page + off;
++
++	return len;
++}
 +#endif
- 	extern char __stubs_start[], __stubs_end[];
- 	extern char __vectors_start[], __vectors_end[];
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
-@@ -783,10 +789,10 @@ void __init early_trap_init(void)
- 	 * Copy signal return handlers into the vector page, and
- 	 * set sigreturn to be a pointer to these.
- 	 */
--	memcpy((void *)KERN_SIGRETURN_CODE, sigreturn_codes,
--	       sizeof(sigreturn_codes));
--	memcpy((void *)KERN_RESTART_CODE, syscall_restart_code,
--	       sizeof(syscall_restart_code));
-+	memcpy((void *)(vectors + KERN_SIGRETURN_CODE - CONFIG_VECTORS_BASE),
-+	       sigreturn_codes, sizeof(sigreturn_codes));
-+	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
-+	       syscall_restart_code, sizeof(syscall_restart_code));
- 
- 	flush_icache_range(vectors, vectors + PAGE_SIZE);
- 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index b1631a7..1b049cd 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -28,20 +28,21 @@
-  */
- #include <linux/linkage.h>
- #include <asm/errno.h>
-+#include <asm/domain.h>
- 
- ENTRY(__get_user_1)
--1:	ldrbt	r2, [r0]
-+1:	T(ldrb)	r2, [r0]
- 	mov	r0, #0
- 	mov	pc, lr
- ENDPROC(__get_user_1)
- 
- ENTRY(__get_user_2)
- #ifdef CONFIG_THUMB2_KERNEL
--2:	ldrbt	r2, [r0]
--3:	ldrbt	r3, [r0, #1]
-+2:	T(ldrb)	r2, [r0]
-+3:	T(ldrb)	r3, [r0, #1]
- #else
--2:	ldrbt	r2, [r0], #1
--3:	ldrbt	r3, [r0]
-+2:	T(ldrb)	r2, [r0], #1
-+3:	T(ldrb)	r3, [r0]
- #endif
- #ifndef __ARMEB__
- 	orr	r2, r2, r3, lsl #8
-@@ -53,7 +54,7 @@ ENTRY(__get_user_2)
- ENDPROC(__get_user_2)
- 
- ENTRY(__get_user_4)
--4:	ldrt	r2, [r0]
-+4:	T(ldr)	r2, [r0]
- 	mov	r0, #0
- 	mov	pc, lr
- ENDPROC(__get_user_4)
-diff --git a/arch/arm/lib/putuser.S b/arch/arm/lib/putuser.S
-index 5a01a23..c023fc1 100644
---- a/arch/arm/lib/putuser.S
-+++ b/arch/arm/lib/putuser.S
-@@ -28,9 +28,10 @@
-  */
- #include <linux/linkage.h>
- #include <asm/errno.h>
-+#include <asm/domain.h>
- 
- ENTRY(__put_user_1)
--1:	strbt	r2, [r0]
-+1:	T(strb)	r2, [r0]
- 	mov	r0, #0
- 	mov	pc, lr
- ENDPROC(__put_user_1)
-@@ -39,19 +40,19 @@ ENTRY(__put_user_2)
- 	mov	ip, r2, lsr #8
- #ifdef CONFIG_THUMB2_KERNEL
- #ifndef __ARMEB__
--2:	strbt	r2, [r0]
--3:	strbt	ip, [r0, #1]
-+2:	T(strb)	r2, [r0]
-+3:	T(strb)	ip, [r0, #1]
- #else
--2:	strbt	ip, [r0]
--3:	strbt	r2, [r0, #1]
-+2:	T(strb)	ip, [r0]
-+3:	T(strb)	r2, [r0, #1]
- #endif
- #else	/* !CONFIG_THUMB2_KERNEL */
- #ifndef __ARMEB__
--2:	strbt	r2, [r0], #1
--3:	strbt	ip, [r0]
-+2:	T(strb)	r2, [r0], #1
-+3:	T(strb)	ip, [r0]
- #else
--2:	strbt	ip, [r0], #1
--3:	strbt	r2, [r0]
-+2:	T(strb)	ip, [r0], #1
-+3:	T(strb)	r2, [r0]
- #endif
- #endif	/* CONFIG_THUMB2_KERNEL */
- 	mov	r0, #0
-@@ -59,18 +60,18 @@ ENTRY(__put_user_2)
- ENDPROC(__put_user_2)
- 
- ENTRY(__put_user_4)
--4:	strt	r2, [r0]
-+4:	T(str)	r2, [r0]
- 	mov	r0, #0
- 	mov	pc, lr
- ENDPROC(__put_user_4)
- 
- ENTRY(__put_user_8)
- #ifdef CONFIG_THUMB2_KERNEL
--5:	strt	r2, [r0]
--6:	strt	r3, [r0, #4]
-+5:	T(str)	r2, [r0]
-+6:	T(str)	r3, [r0, #4]
- #else
--5:	strt	r2, [r0], #4
--6:	strt	r3, [r0]
-+5:	T(str)	r2, [r0], #4
-+6:	T(str)	r3, [r0]
- #endif
- 	mov	r0, #0
- 	mov	pc, lr
-diff --git a/arch/arm/lib/uaccess.S b/arch/arm/lib/uaccess.S
-index fee9f6f..d0ece2a 100644
---- a/arch/arm/lib/uaccess.S
-+++ b/arch/arm/lib/uaccess.S
-@@ -14,6 +14,7 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- #include <asm/errno.h>
-+#include <asm/domain.h>
- 
- 		.text
- 
-@@ -31,11 +32,11 @@
- 		rsb	ip, ip, #4
- 		cmp	ip, #2
- 		ldrb	r3, [r1], #1
--USER(		strbt	r3, [r0], #1)			@ May fault
-+USER(		T(strb)	r3, [r0], #1)			@ May fault
- 		ldrgeb	r3, [r1], #1
--USER(		strgebt	r3, [r0], #1)			@ May fault
-+USER(		T(strgeb) r3, [r0], #1)			@ May fault
- 		ldrgtb	r3, [r1], #1
--USER(		strgtbt	r3, [r0], #1)			@ May fault
-+USER(		T(strgtb) r3, [r0], #1)			@ May fault
- 		sub	r2, r2, ip
- 		b	.Lc2u_dest_aligned
- 
-@@ -58,7 +59,7 @@ ENTRY(__copy_to_user)
- 		addmi	ip, r2, #4
- 		bmi	.Lc2u_0nowords
- 		ldr	r3, [r1], #4
--USER(		strt	r3, [r0], #4)			@ May fault
-+USER(		T(str)	r3, [r0], #4)			@ May fault
- 		mov	ip, r0, lsl #32 - PAGE_SHIFT	@ On each page, use a ld/st??t instruction
- 		rsb	ip, ip, #0
- 		movs	ip, ip, lsr #32 - PAGE_SHIFT
-@@ -87,18 +88,18 @@ USER(		strt	r3, [r0], #4)			@ May fault
- 		stmneia	r0!, {r3 - r4}			@ Shouldnt fault
- 		tst	ip, #4
- 		ldrne	r3, [r1], #4
--		strnet	r3, [r0], #4			@ Shouldnt fault
-+		T(strne) r3, [r0], #4			@ Shouldnt fault
- 		ands	ip, ip, #3
- 		beq	.Lc2u_0fupi
- .Lc2u_0nowords:	teq	ip, #0
- 		beq	.Lc2u_finished
- .Lc2u_nowords:	cmp	ip, #2
- 		ldrb	r3, [r1], #1
--USER(		strbt	r3, [r0], #1)			@ May fault
-+USER(		T(strb)	r3, [r0], #1)			@ May fault
- 		ldrgeb	r3, [r1], #1
--USER(		strgebt	r3, [r0], #1)			@ May fault
-+USER(		T(strgeb) r3, [r0], #1)			@ May fault
- 		ldrgtb	r3, [r1], #1
--USER(		strgtbt	r3, [r0], #1)			@ May fault
-+USER(		T(strgtb) r3, [r0], #1)			@ May fault
- 		b	.Lc2u_finished
- 
- .Lc2u_not_enough:
-@@ -119,7 +120,7 @@ USER(		strgtbt	r3, [r0], #1)			@ May fault
- 		mov	r3, r7, pull #8
- 		ldr	r7, [r1], #4
- 		orr	r3, r3, r7, push #24
--USER(		strt	r3, [r0], #4)			@ May fault
-+USER(		T(str)	r3, [r0], #4)			@ May fault
- 		mov	ip, r0, lsl #32 - PAGE_SHIFT
- 		rsb	ip, ip, #0
- 		movs	ip, ip, lsr #32 - PAGE_SHIFT
-@@ -154,18 +155,18 @@ USER(		strt	r3, [r0], #4)			@ May fault
- 		movne	r3, r7, pull #8
- 		ldrne	r7, [r1], #4
- 		orrne	r3, r3, r7, push #24
--		strnet	r3, [r0], #4			@ Shouldnt fault
-+		T(strne) r3, [r0], #4			@ Shouldnt fault
- 		ands	ip, ip, #3
- 		beq	.Lc2u_1fupi
- .Lc2u_1nowords:	mov	r3, r7, get_byte_1
- 		teq	ip, #0
- 		beq	.Lc2u_finished
- 		cmp	ip, #2
--USER(		strbt	r3, [r0], #1)			@ May fault
-+USER(		T(strb)	r3, [r0], #1)			@ May fault
- 		movge	r3, r7, get_byte_2
--USER(		strgebt	r3, [r0], #1)			@ May fault
-+USER(		T(strgeb) r3, [r0], #1)			@ May fault
- 		movgt	r3, r7, get_byte_3
--USER(		strgtbt	r3, [r0], #1)			@ May fault
-+USER(		T(strgtb) r3, [r0], #1)			@ May fault
- 		b	.Lc2u_finished
- 
- .Lc2u_2fupi:	subs	r2, r2, #4
-@@ -174,7 +175,7 @@ USER(		strgtbt	r3, [r0], #1)			@ May fault
- 		mov	r3, r7, pull #16
- 		ldr	r7, [r1], #4
- 		orr	r3, r3, r7, push #16
--USER(		strt	r3, [r0], #4)			@ May fault
-+USER(		T(str)	r3, [r0], #4)			@ May fault
- 		mov	ip, r0, lsl #32 - PAGE_SHIFT
- 		rsb	ip, ip, #0
- 		movs	ip, ip, lsr #32 - PAGE_SHIFT
-@@ -209,18 +210,18 @@ USER(		strt	r3, [r0], #4)			@ May fault
- 		movne	r3, r7, pull #16
- 		ldrne	r7, [r1], #4
- 		orrne	r3, r3, r7, push #16
--		strnet	r3, [r0], #4			@ Shouldnt fault
-+		T(strne) r3, [r0], #4			@ Shouldnt fault
- 		ands	ip, ip, #3
- 		beq	.Lc2u_2fupi
- .Lc2u_2nowords:	mov	r3, r7, get_byte_2
- 		teq	ip, #0
- 		beq	.Lc2u_finished
- 		cmp	ip, #2
--USER(		strbt	r3, [r0], #1)			@ May fault
-+USER(		T(strb)	r3, [r0], #1)			@ May fault
- 		movge	r3, r7, get_byte_3
--USER(		strgebt	r3, [r0], #1)			@ May fault
-+USER(		T(strgeb) r3, [r0], #1)			@ May fault
- 		ldrgtb	r3, [r1], #0
--USER(		strgtbt	r3, [r0], #1)			@ May fault
-+USER(		T(strgtb) r3, [r0], #1)			@ May fault
- 		b	.Lc2u_finished
- 
- .Lc2u_3fupi:	subs	r2, r2, #4
-@@ -229,7 +230,7 @@ USER(		strgtbt	r3, [r0], #1)			@ May fault
- 		mov	r3, r7, pull #24
- 		ldr	r7, [r1], #4
- 		orr	r3, r3, r7, push #8
--USER(		strt	r3, [r0], #4)			@ May fault
-+USER(		T(str)	r3, [r0], #4)			@ May fault
- 		mov	ip, r0, lsl #32 - PAGE_SHIFT
- 		rsb	ip, ip, #0
- 		movs	ip, ip, lsr #32 - PAGE_SHIFT
-@@ -264,18 +265,18 @@ USER(		strt	r3, [r0], #4)			@ May fault
- 		movne	r3, r7, pull #24
- 		ldrne	r7, [r1], #4
- 		orrne	r3, r3, r7, push #8
--		strnet	r3, [r0], #4			@ Shouldnt fault
-+		T(strne) r3, [r0], #4			@ Shouldnt fault
- 		ands	ip, ip, #3
- 		beq	.Lc2u_3fupi
- .Lc2u_3nowords:	mov	r3, r7, get_byte_3
- 		teq	ip, #0
- 		beq	.Lc2u_finished
- 		cmp	ip, #2
--USER(		strbt	r3, [r0], #1)			@ May fault
-+USER(		T(strb)	r3, [r0], #1)			@ May fault
- 		ldrgeb	r3, [r1], #1
--USER(		strgebt	r3, [r0], #1)			@ May fault
-+USER(		T(strgeb) r3, [r0], #1)			@ May fault
- 		ldrgtb	r3, [r1], #0
--USER(		strgtbt	r3, [r0], #1)			@ May fault
-+USER(		T(strgtb) r3, [r0], #1)			@ May fault
- 		b	.Lc2u_finished
- ENDPROC(__copy_to_user)
- 
-@@ -294,11 +295,11 @@ ENDPROC(__copy_to_user)
- .Lcfu_dest_not_aligned:
- 		rsb	ip, ip, #4
- 		cmp	ip, #2
--USER(		ldrbt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrb)	r3, [r1], #1)			@ May fault
- 		strb	r3, [r0], #1
--USER(		ldrgebt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrgeb) r3, [r1], #1)			@ May fault
- 		strgeb	r3, [r0], #1
--USER(		ldrgtbt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrgtb) r3, [r1], #1)			@ May fault
- 		strgtb	r3, [r0], #1
- 		sub	r2, r2, ip
- 		b	.Lcfu_dest_aligned
-@@ -321,7 +322,7 @@ ENTRY(__copy_from_user)
- .Lcfu_0fupi:	subs	r2, r2, #4
- 		addmi	ip, r2, #4
- 		bmi	.Lcfu_0nowords
--USER(		ldrt	r3, [r1], #4)
-+USER(		T(ldr)	r3, [r1], #4)
- 		str	r3, [r0], #4
- 		mov	ip, r1, lsl #32 - PAGE_SHIFT	@ On each page, use a ld/st??t instruction
- 		rsb	ip, ip, #0
-@@ -350,18 +351,18 @@ USER(		ldrt	r3, [r1], #4)
- 		ldmneia	r1!, {r3 - r4}			@ Shouldnt fault
- 		stmneia	r0!, {r3 - r4}
- 		tst	ip, #4
--		ldrnet	r3, [r1], #4			@ Shouldnt fault
-+		T(ldrne) r3, [r1], #4			@ Shouldnt fault
- 		strne	r3, [r0], #4
- 		ands	ip, ip, #3
- 		beq	.Lcfu_0fupi
- .Lcfu_0nowords:	teq	ip, #0
- 		beq	.Lcfu_finished
- .Lcfu_nowords:	cmp	ip, #2
--USER(		ldrbt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrb)	r3, [r1], #1)			@ May fault
- 		strb	r3, [r0], #1
--USER(		ldrgebt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrgeb) r3, [r1], #1)			@ May fault
- 		strgeb	r3, [r0], #1
--USER(		ldrgtbt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrgtb) r3, [r1], #1)			@ May fault
- 		strgtb	r3, [r0], #1
- 		b	.Lcfu_finished
- 
-@@ -374,7 +375,7 @@ USER(		ldrgtbt	r3, [r1], #1)			@ May fault
- 
- .Lcfu_src_not_aligned:
- 		bic	r1, r1, #3
--USER(		ldrt	r7, [r1], #4)			@ May fault
-+USER(		T(ldr)	r7, [r1], #4)			@ May fault
- 		cmp	ip, #2
- 		bgt	.Lcfu_3fupi
- 		beq	.Lcfu_2fupi
-@@ -382,7 +383,7 @@ USER(		ldrt	r7, [r1], #4)			@ May fault
- 		addmi	ip, r2, #4
- 		bmi	.Lcfu_1nowords
- 		mov	r3, r7, pull #8
--USER(		ldrt	r7, [r1], #4)			@ May fault
-+USER(		T(ldr)	r7, [r1], #4)			@ May fault
- 		orr	r3, r3, r7, push #24
- 		str	r3, [r0], #4
- 		mov	ip, r1, lsl #32 - PAGE_SHIFT
-@@ -417,7 +418,7 @@ USER(		ldrt	r7, [r1], #4)			@ May fault
- 		stmneia	r0!, {r3 - r4}
- 		tst	ip, #4
- 		movne	r3, r7, pull #8
--USER(		ldrnet	r7, [r1], #4)			@ May fault
-+USER(		T(ldrne) r7, [r1], #4)			@ May fault
- 		orrne	r3, r3, r7, push #24
- 		strne	r3, [r0], #4
- 		ands	ip, ip, #3
-@@ -437,7 +438,7 @@ USER(		ldrnet	r7, [r1], #4)			@ May fault
- 		addmi	ip, r2, #4
- 		bmi	.Lcfu_2nowords
- 		mov	r3, r7, pull #16
--USER(		ldrt	r7, [r1], #4)			@ May fault
-+USER(		T(ldr)	r7, [r1], #4)			@ May fault
- 		orr	r3, r3, r7, push #16
- 		str	r3, [r0], #4
- 		mov	ip, r1, lsl #32 - PAGE_SHIFT
-@@ -473,7 +474,7 @@ USER(		ldrt	r7, [r1], #4)			@ May fault
- 		stmneia	r0!, {r3 - r4}
- 		tst	ip, #4
- 		movne	r3, r7, pull #16
--USER(		ldrnet	r7, [r1], #4)			@ May fault
-+USER(		T(ldrne) r7, [r1], #4)			@ May fault
- 		orrne	r3, r3, r7, push #16
- 		strne	r3, [r0], #4
- 		ands	ip, ip, #3
-@@ -485,7 +486,7 @@ USER(		ldrnet	r7, [r1], #4)			@ May fault
- 		strb	r3, [r0], #1
- 		movge	r3, r7, get_byte_3
- 		strgeb	r3, [r0], #1
--USER(		ldrgtbt	r3, [r1], #0)			@ May fault
-+USER(		T(ldrgtb) r3, [r1], #0)			@ May fault
- 		strgtb	r3, [r0], #1
- 		b	.Lcfu_finished
- 
-@@ -493,7 +494,7 @@ USER(		ldrgtbt	r3, [r1], #0)			@ May fault
- 		addmi	ip, r2, #4
- 		bmi	.Lcfu_3nowords
- 		mov	r3, r7, pull #24
--USER(		ldrt	r7, [r1], #4)			@ May fault
-+USER(		T(ldr)	r7, [r1], #4)			@ May fault
- 		orr	r3, r3, r7, push #8
- 		str	r3, [r0], #4
- 		mov	ip, r1, lsl #32 - PAGE_SHIFT
-@@ -528,7 +529,7 @@ USER(		ldrt	r7, [r1], #4)			@ May fault
- 		stmneia	r0!, {r3 - r4}
- 		tst	ip, #4
- 		movne	r3, r7, pull #24
--USER(		ldrnet	r7, [r1], #4)			@ May fault
-+USER(		T(ldrne) r7, [r1], #4)			@ May fault
- 		orrne	r3, r3, r7, push #8
- 		strne	r3, [r0], #4
- 		ands	ip, ip, #3
-@@ -538,9 +539,9 @@ USER(		ldrnet	r7, [r1], #4)			@ May fault
- 		beq	.Lcfu_finished
- 		cmp	ip, #2
- 		strb	r3, [r0], #1
--USER(		ldrgebt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrgeb) r3, [r1], #1)			@ May fault
- 		strgeb	r3, [r0], #1
--USER(		ldrgtbt	r3, [r1], #1)			@ May fault
-+USER(		T(ldrgtb) r3, [r1], #1)			@ May fault
- 		strgtb	r3, [r0], #1
- 		b	.Lcfu_finished
- ENDPROC(__copy_from_user)
++
++/*
++ * Set up process info to signal segmentation fault - called on access error.
++ */
++static void set_segfault(struct pt_regs *regs, unsigned long addr)
++{
++	siginfo_t info;
++
++	if (find_vma(current->mm, addr) == NULL)
++		info.si_code = SEGV_MAPERR;
++	else
++		info.si_code = SEGV_ACCERR;
++
++	info.si_signo = SIGSEGV;
++	info.si_errno = 0;
++	info.si_addr  = (void *) instruction_pointer(regs);
++
++	pr_debug("SWP{B} emulation: access caused memory abort!\n");
++	arm_notify_die("Illegal memory access", regs, &info, 0, 0);
++
++	abtcounter++;
++}
++
++static int emulate_swpX(unsigned int address, unsigned int *data,
++			unsigned int type)
++{
++	unsigned int res = 0;
++
++	if ((type != TYPE_SWPB) && (address & 0x3)) {
++		/* SWP to unaligned address not permitted */
++		pr_debug("SWP instruction on unaligned pointer!\n");
++		return -EFAULT;
++	}
++
++	while (1) {
++		/*
++		 * Barrier required between accessing protected resource and
++		 * releasing a lock for it. Legacy code might not have done
++		 * this, and we cannot determine that this is not the case
++		 * being emulated, so insert always.
++		 */
++		smp_mb();
++
++		if (type == TYPE_SWPB)
++			__user_swpb_asm(*data, address, res);
++		else
++			__user_swp_asm(*data, address, res);
++
++		if (likely(res != -EAGAIN) || signal_pending(current))
++			break;
++
++		cond_resched();
++	}
++
++	if (res == 0) {
++		/*
++		 * Barrier also required between aquiring a lock for a
++		 * protected resource and accessing the resource. Inserted for
++		 * same reason as above.
++		 */
++		smp_mb();
++
++		if (type == TYPE_SWPB)
++			swpbcounter++;
++		else
++			swpcounter++;
++	}
++
++	return res;
++}
++
++/*
++ * swp_handler logs the id of calling process, dissects the instruction, sanity
++ * checks the memory location, calls emulate_swpX for the actual operation and
++ * deals with fixup/error handling before returning
++ */
++static int swp_handler(struct pt_regs *regs, unsigned int instr)
++{
++	unsigned int address, destreg, data, type;
++	unsigned int res = 0;
++
++	if (current->pid != previous_pid) {
++		pr_debug("\"%s\" (%ld) uses deprecated SWP{B} instruction\n",
++			 current->comm, (unsigned long)current->pid);
++		previous_pid = current->pid;
++	}
++
++	address = regs->uregs[EXTRACT_REG_NUM(instr, RN_OFFSET)];
++	data	= regs->uregs[EXTRACT_REG_NUM(instr, RT2_OFFSET)];
++	destreg = EXTRACT_REG_NUM(instr, RT_OFFSET);
++
++	type = instr & TYPE_SWPB;
++
++	pr_debug("addr in r%d->0x%08x, dest is r%d, source in r%d->0x%08x)\n",
++		 EXTRACT_REG_NUM(instr, RN_OFFSET), address,
++		 destreg, EXTRACT_REG_NUM(instr, RT2_OFFSET), data);
++
++	/* Check access in reasonable access range for both SWP and SWPB */
++	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
++		pr_debug("SWP{B} emulation: access to %p not allowed!\n",
++			 (void *)address);
++		res = -EFAULT;
++	} else {
++		res = emulate_swpX(address, &data, type);
++	}
++
++	if (res == 0) {
++		/*
++		 * On successful emulation, revert the adjustment to the PC
++		 * made in kernel/traps.c in order to resume execution at the
++		 * instruction following the SWP{B}.
++		 */
++		regs->ARM_pc += 4;
++		regs->uregs[destreg] = data;
++	} else if (res == -EFAULT) {
++		/*
++		 * Memory errors do not mean emulation failed.
++		 * Set up signal info to return SEGV, then return OK
++		 */
++		set_segfault(regs, address);
++	}
++
++	return 0;
++}
++
++/*
++ * Only emulate SWP/SWPB executed in ARM state/User mode.
++ * The kernel must be SWP free and SWP{B} does not exist in Thumb/ThumbEE.
++ */
++static struct undef_hook swp_hook = {
++	.instr_mask = 0x0fb00ff0,
++	.instr_val  = 0x01000090,
++	.cpsr_mask  = MODE_MASK | PSR_T_BIT | PSR_J_BIT,
++	.cpsr_val   = USR_MODE,
++	.fn	    = swp_handler
++};
++
++/*
++ * Register handler and create status file in /proc/cpu
++ * Invoked as late_initcall, since not needed before init spawned.
++ */
++static int __init swp_emulation_init(void)
++{
++#ifdef CONFIG_PROC_FS
++	struct proc_dir_entry *res;
++
++	res = create_proc_entry("cpu/swp_emulation", S_IRUGO, NULL);
++
++	if (!res)
++		return -ENOMEM;
++
++	res->read_proc = proc_read_status;
++#endif /* CONFIG_PROC_FS */
++
++	printk(KERN_NOTICE "Registering SWP/SWPB emulation handler\n");
++	register_undef_hook(&swp_hook);
++
++	return 0;
++}
++
++late_initcall(swp_emulation_init);
 diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 4414a01..6d05f79 100644
+index 6d05f79..8493ed0 100644
 --- a/arch/arm/mm/Kconfig
 +++ b/arch/arm/mm/Kconfig
-@@ -599,6 +599,14 @@ config CPU_CP15_MPU
- 	help
- 	  Processor has the CP15 register, which has MPU related registers.
+@@ -636,6 +636,33 @@ config ARM_THUMBEE
+ 	  Say Y here if you have a CPU with the ThumbEE extension and code to
+ 	  make use of it. Say N for code that can run on CPUs without ThumbEE.
  
-+config CPU_USE_DOMAINS
-+	bool
-+	depends on MMU
-+	default y if !CPU_32v6K
++config SWP_EMULATE
++	bool "Emulate SWP/SWPB instructions"
++	depends on CPU_V7
++	select HAVE_PROC_CPU if PROC_FS
++	default y if SMP
 +	help
-+	  This option enables or disables the use of domain switching
-+	  via the set_fs() function.
++	  ARMv6 architecture deprecates use of the SWP/SWPB instructions.
++	  ARMv7 multiprocessing extensions introduce the ability to disable
++	  these instructions, triggering an undefined instruction exception
++	  when executed. Say Y here to enable software emulation of these
++	  instructions for userspace (not kernel) using LDREX/STREX.
++	  Also creates /proc/cpu/swp_emulation for statistics.
 +
- #
- # CPU supports 36-bit I/O
- #
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index a486bd0..920fb3b 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -25,6 +25,7 @@
- #include <asm/smp_plat.h>
- #include <asm/tlb.h>
- #include <asm/highmem.h>
-+#include <asm/traps.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -897,12 +898,11 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
- {
- 	struct map_desc map;
- 	unsigned long addr;
--	void *vectors;
- 
- 	/*
- 	 * Allocate the vector page early.
- 	 */
--	vectors = early_alloc(PAGE_SIZE);
-+	vectors_page = early_alloc(PAGE_SIZE);
- 
- 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
- 		pmd_clear(pmd_off_k(addr));
-@@ -942,7 +942,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
- 	 * location (0xffff0000).  If we aren't using high-vectors, also
- 	 * create a mapping at the low-vectors virtual address.
- 	 */
--	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
-+	map.pfn = __phys_to_pfn(virt_to_phys(vectors_page));
- 	map.virtual = 0xffff0000;
- 	map.length = PAGE_SIZE;
- 	map.type = MT_HIGH_VECTORS;
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index 7d63bea..337f102 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -99,6 +99,10 @@
-  *  110x   0   1   0	r/w	r/o
-  *  11x0   0   1   0	r/w	r/o
-  *  1111   0   1   1	r/w	r/w
-+ *
-+ * If !CONFIG_CPU_USE_DOMAINS, the following permissions are changed:
-+ *  110x   1   1   1	r/o	r/o
-+ *  11x0   1   1   1	r/o	r/o
-  */
- 	.macro	armv6_mt_table pfx
- \pfx\()_mt_table:
-@@ -138,8 +142,11 @@
- 
- 	tst	r1, #L_PTE_USER
- 	orrne	r3, r3, #PTE_EXT_AP1
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+	@ allow kernel read/write access to read-only user pages
- 	tstne	r3, #PTE_EXT_APX
- 	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
-+#endif
- 
- 	tst	r1, #L_PTE_EXEC
- 	orreq	r3, r3, #PTE_EXT_XN
++	  In some older versions of glibc [<=2.8] SWP is used during futex
++	  trylock() operations with the assumption that the code will not
++	  be preempted. This invalid assumption may be more likely to fail
++	  with SWP emulation enabled, leading to deadlock of the user
++	  application.
++
++	  NOTE: when accessing uncached shared regions, LDREX/STREX rely
++	  on an external transaction monitoring block called a global
++	  monitor to maintain update atomicity. If your system does not
++	  implement a global monitor, this option can cause programs that
++	  perform SWP operations to uncached memory to deadlock.
++
++	  If unsure, say Y.
++
+ config CPU_BIG_ENDIAN
+ 	bool "Build big-endian kernel"
+ 	depends on ARCH_SUPPORTS_BIG_ENDIAN
 diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 6a8506d..19638c6 100644
+index 19638c6..d5d9b58 100644
 --- a/arch/arm/mm/proc-v7.S
 +++ b/arch/arm/mm/proc-v7.S
-@@ -149,8 +149,11 @@ ENTRY(cpu_v7_set_pte_ext)
- 
- 	tst	r1, #L_PTE_USER
- 	orrne	r3, r3, #PTE_EXT_AP1
-+#ifdef CONFIG_CPU_USE_DOMAINS
-+	@ allow kernel read/write access to read-only user pages
- 	tstne	r3, #PTE_EXT_APX
- 	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
+@@ -278,6 +278,10 @@ __v7_setup:
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	orr	r6, r6, #1 << 25		@ big-endian page tables
+ #endif
++#ifdef CONFIG_SWP_EMULATE
++	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
++	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
 +#endif
- 
- 	tst	r1, #L_PTE_EXEC
- 	orreq	r3, r3, #PTE_EXT_XN
-@@ -237,8 +240,6 @@ __v7_setup:
- 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
- 	orr	r4, r4, #TTB_FLAGS
- 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
--	mov	r10, #0x1f			@ domains 0, 1 = manager
--	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
- 	/*
- 	 * Memory region attributes with SCTLR.TRE=1
- 	 *
+    	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
