@@ -1,5 +1,5 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 31 Aug 2010 15:27:48 +0800
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Tue, 31 Aug 2010 03:28:13 -0400
 Subject: [PATCH 1/1] ARM: pxa168: fix corrected reset vector
 In-Reply-To: <AANLkTi=NGyKtVPH2UgbR_Y2rBcFX7hzDAFkZw5KKetKT@mail.gmail.com>
 References: <1282813649-8332-1-git-send-email-mark.brown314@gmail.com>
@@ -13,11 +13,11 @@ References: <1282813649-8332-1-git-send-email-mark.brown314@gmail.com>
 	<AANLkTinq8wFGmYKzBrEY1d3FadN+55urxLxQCFTcpcrM@mail.gmail.com>
 	<AANLkTimAkhcSuBotE2eN=ETkFBmgMS6L=97wo+-woLHN@mail.gmail.com>
 	<AANLkTi=NGyKtVPH2UgbR_Y2rBcFX7hzDAFkZw5KKetKT@mail.gmail.com>
-Message-ID: <AANLkTikUEav5Jo9rCFw7hTs8U3anpDZhSF_jtGKKMma7@mail.gmail.com>
+Message-ID: <AANLkTinN4w=P7oferD35bBMkPE+9z+2OyYsBcy3ptBzL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 31, 2010 at 3:21 PM, Haojian Zhuang
+On Tue, Aug 31, 2010 at 3:21 AM, Haojian Zhuang
 <haojian.zhuang@gmail.com> wrote:
 > On Tue, Aug 31, 2010 at 3:08 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
 >> On Tue, Aug 31, 2010 at 3:02 PM, Haojian Zhuang
@@ -161,5 +161,9 @@ On Tue, Aug 31, 2010 at 3:21 PM, Haojian Zhuang
 > I think that watchdog reset could be better.
 >
 
-Haojian, note we have a reboot mode, so possibly will have to implement
-all of them if capable.
+Haojian,
+
+That is true, I am planning to send an update to support watchdog
+timer reset soon. The problem is I need to test pxa910 and mmp2 as
+well and determine if the watchdog reset code is consistent. It was
+simpler for me to just fix this at the moment.
