@@ -1,43 +1,43 @@
-From: daniel.hobi@schmid-telecom.ch (Daniel Hobi)
-Date: Tue, 31 Aug 2010 14:52:17 +0200
-Subject: [PATCH] [ARM] .gitignore: Ignore piggy.gzip, lib1funcs.S and vmlinux
-References: <1272015498-10749-1-git-send-email-mroth@nessie.de>
-Message-ID: <1283259137-28480-1-git-send-email-daniel.hobi@schmid-telecom.ch>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 31 Aug 2010 16:13:55 +0300
+Subject: [PATCH 2/2] set packet size limit for the mv643xx csum offloading
+In-Reply-To: <1281738480.12446.533.camel@sakura.staff.proxad.net>
+References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+	<1275827336-31111-2-git-send-email-saeed@marvell.com>
+	<1281738480.12446.533.camel@sakura.staff.proxad.net>
+Message-ID: <AANLkTikXbHTXNW2FAoP+Z0LWPNT1J3GhHEYouqjiGdFY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e7db7b42 (arm: add support for LZO-compressed kernels) added
-intermediate files piggy.gzip and lib1funcs.S without adding them to
-.gitignore.
-
-Commit 6db823c (Fix up .gitignore for top-level file patterns) changed
-vmlinux to /vmlinux in the top-level .gitignore, thus making
-arch/arm/boot/compressed/vmlinux visible.
-
-Signed-off-by: Daniel Hobi <daniel.hobi@schmid-telecom.ch>
----
-This patch revives https://patchwork.kernel.org/patch/94654/
-([ARM] .gitignore: Ignore piggy.lzo, lib1funcs.S and vmlinux)
-by Michael Roth with the following changes:
- - do not add piggy.lzo because it is now covered by *.lzo rule
-   from top-level .gitignore
- - Ignore piggy.gzip (instead of piggy.gz)
-
-Please keep me on CC since I am not a subscriber.
-
- arch/arm/boot/compressed/.gitignore |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-index ab204db..e02c52e 100644
---- a/arch/arm/boot/compressed/.gitignore
-+++ b/arch/arm/boot/compressed/.gitignore
-@@ -1,3 +1,5 @@
- font.c
--piggy.gz
-+lib1funcs.S
-+piggy.gzip
-+vmlinux
- vmlinux.lds
--- 
-1.7.2.1
+On Sat, Aug 14, 2010 at 1:28 AM, Maxime Bizon <mbizon@freebox.fr> wrote:
+>
+> On Sun, 2010-06-06 at 15:28 +0300, Saeed Bishara wrote:
+>
+>> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+>> index 4ccfdf9..c4bd8cb 100644
+>> --- a/arch/arm/mach-kirkwood/common.c
+>> +++ b/arch/arm/mach-kirkwood/common.c
+>> @@ -114,6 +114,7 @@ void __init kirkwood_ehci_init(void)
+>> ? ****************************************************************************/
+>> ?struct mv643xx_eth_shared_platform_data kirkwood_ge00_shared_data = {
+>> ? ? ? .dram ? ? ? ? ? = &kirkwood_mbus_dram_info,
+>> + ? ? .tx_csum_limit ?= 1600,
+>> ?};
+>>
+>> ?static struct resource kirkwood_ge00_shared_resources[] = {
+>
+> Kirkwood (at least) has a second ethernet mac, please add the definition
+> for it too.
+ok, I'll
+>
+> Thanks,
+>
+> --
+> Maxime
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-net" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
