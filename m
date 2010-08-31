@@ -1,55 +1,56 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 31 Aug 2010 14:12:07 +0200
-Subject: [PATCH 05/12] DMAENGINE: terminate transfers on PL08X mere throughly
-In-Reply-To: <1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 31 Aug 2010 14:12:04 +0200
+Subject: [PATCH 02/12] DMAENGINE: safeguard PL08X from missing platform data
+In-Reply-To: <1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
 References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
 	<1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1283256734-3408-6-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to terminate pending tasklets and be sure to disable not
-only the channel but it's IRQ:s when we terminate all work on
-a PL08X channel.
+The PL08X needs some platform data with channel assignments etc to
+work properly, bail out of this is not supplied.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/dma/amba-pl08x.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/dma/amba-pl08x.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index d1a4813..65f595c 100644
+index 2afb4f6..506749b 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -312,6 +312,8 @@ static void pl08x_stop_phy_chan(struct pl08x_phy_chan *ch)
- 	/* Disable channel */
- 	val = readl(ch->base + PL080_CH_CONFIG);
- 	val &= ~PL080_CONFIG_ENABLE;
-+	val &= ~PL080_CONFIG_ERR_IRQ_MASK;
-+	val &= ~PL080_CONFIG_TC_IRQ_MASK;
- 	writel(val, ch->base + PL080_CH_CONFIG);
- }
+@@ -1819,6 +1819,13 @@ static int pl08x_probe(struct amba_device *adev, struct amba_id *id)
+ 		goto out_no_pl08x;
+ 	}
  
-@@ -1653,13 +1655,15 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 			pl08x_put_phy_channel(pl08x, plchan->phychan);
- 			plchan->phychan = NULL;
- 		}
++	/* Get the platform data */
++	pl08x->pd = dev_get_platdata(&adev->dev);
++	if (!pl08x->pd) {
++		dev_err(&adev->dev, "no platform data supplied\n");
++		goto out_no_platdata;
++	}
++
+ 	/* Assign useful pointers to the driver state */
+ 	pl08x->adev = adev;
+ 	pl08x->vd = vd;
+@@ -1879,9 +1886,6 @@ static int pl08x_probe(struct amba_device *adev, struct amba_id *id)
+ 			 pl08x_phy_channel_busy(ch) ? "BUSY" : "FREE");
+ 	}
+ 
+-	/* Get the platform data */
+-	pl08x->pd = dev_get_platdata(&adev->dev);
 -
-+		/* Stop any pending tasklet */
-+		tasklet_disable(&plchan->tasklet);
- 		/* Dequeue jobs and free LLIs */
- 		if (plchan->at) {
- 			pl08x_free_txd(pl08x, plchan->at);
--			pl08x_free_txd_list(pl08x, plchan);
- 			plchan->at = NULL;
- 		}
-+		/* Dequeue jobs not yet fired as well */
-+		pl08x_free_txd_list(pl08x, plchan);
- 		break;
- 	case DMA_PAUSE:
- 		pl08x_pause_phy_chan(plchan->phychan);
+ 	/* Set caps */
+ 	dma_cap_set(DMA_MEMCPY, dmac_memcpy.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, dmac_slave.cap_mask);
+@@ -1947,6 +1951,7 @@ out_no_irq:
+ out_no_ioremap:
+ 	dma_pool_destroy(pl08x->pool);
+ out_no_lli_pool:
++out_no_platdata:
+ 	kfree(pl08x);
+ out_no_pl08x:
+ 	amba_release_regions(adev);
 -- 
 1.6.3.3
