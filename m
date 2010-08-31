@@ -1,37 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Aug 2010 15:55:27 -0700
-Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <20100820120622.GL25742@atomide.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100817135205.GC20325@n2100.arm.linux.org.uk>
-	<20100817141210.GJ12184@atomide.com>
-	<20100817154035.GD20325@n2100.arm.linux.org.uk>
-	<20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-Message-ID: <20100830225527.GC11597@atomide.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Tue, 31 Aug 2010 09:07:59 +0900
+Subject: smsc911x.c driver and SMP
+In-Reply-To: <87my459hjs.fsf@brigitte.kvy.fi>
+References: <4A7AEEB6.5060903@googlemail.com>	<1249981883.27150.14.camel@pc1117.cambridge.arm.com>	<4A818CBC.8040000@googlemail.com>	<1250006770.30628.1.camel@pc1117.cambridge.arm.com>	<4A819C54.3080606@googlemail.com>	<1250009043.30628.9.camel@pc1117.cambridge.arm.com>	<87ab25vazg.fsf@brigitte.kvy.fi>	<1250080338.20332.32.camel@pc1117.cambridge.arm.com>	<87k518yc8a.fsf@brigitte.kvy.fi>	<1252660898.3354.16.camel@pc1117.cambridge.arm.com>	<4AAA48CA.9040405@billgatliff.com>	<1252674034.29620.30.camel@pc1117.cambridge.arm.com>	<4AAA6AB7.60808@billgatliff.com>	<1252685189.29620.33.camel@pc1117.cambridge.arm.com>
+	<87my459hjs.fsf@brigitte.kvy.fi>
+Message-ID: <4C7C47DF.3030307@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100820 04:59]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
-> > On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
-> > > Looks like something is not quite right with smp_on_up part of __fixup_smp,
-> > > returning early before smp_on_up does not produce that.
-> > 
-> > It's probably overwriting some register it shouldn't be.  I might be
-> > able to look at this sometime during the coming week... assuming that
-> > the weather is as bad as they forecast and I have 'net connectivity.
+Hi Catalin and Antti,
 
-This seems to fix it.
+On 10/6/2009 3:12 PM, Antti P Miettinen wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
+>> Fixed it with this new commit (I'm not posting the patch here as it's
+>> not meant for review on this list):
+>>
+>> http://www.linux-arm.org/git?p=linux-2.6.git;a=commitdiff;h=3cc8ee538f6727d1f6773fff6d8e31bc5522bfee
+> 
+> Just a piece of information: with vanilla 2.6.31 boot from NFS root on
+> my PB11MPCore hangs, with this patch applied, boot succeeds.
 
-Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: fix-smp-on-up.patch
-Type: text/x-diff
-Size: 788 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100830/c3899324/attachment.bin>
+Now I'm setting up similar dev environment by chance; Cortex-A9 MPcore,
+slightly old kernel (say .31 or .32), and with smsc911x.c Ethernet
+driver required [1].
+
+I'm auditing the required patches right now, and very interested in
+above patch, but it seems that blob got lost these days :-(
+
+Do you still have the patch, and would you mind sharing it with me?
+
+[1] http://www.kmckk.co.jp/eng/kzmca9/index.html
+-- 
+Shinya Kuribayashi
+Renesas Electronics
