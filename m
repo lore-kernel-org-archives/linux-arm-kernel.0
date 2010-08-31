@@ -1,35 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 Aug 2010 09:33:02 +0100
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Tue, 31 Aug 2010 17:42:46 +0900
 Subject: smsc911x.c driver and SMP
-In-Reply-To: <4C7C47DF.3030307@renesas.com>
+In-Reply-To: <1283243582.28248.0.camel@e102109-lin.cambridge.arm.com>
 References: <4C7C47DF.3030307@renesas.com>
-Message-ID: <1283243582.28248.0.camel@e102109-lin.cambridge.arm.com>
+	<1283243582.28248.0.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <4C7CC086.2040407@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-08-31 at 01:07 +0100, Shinya Kuribayashi wrote:
-> On 10/6/2009 3:12 PM, Antti P Miettinen wrote:
-> > Catalin Marinas <catalin.marinas@arm.com> writes:
-> >> Fixed it with this new commit (I'm not posting the patch here as it's
-> >> not meant for review on this list):
-> >>
-> >> http://www.linux-arm.org/git?p=linux-2.6.git;a=commitdiff;h=3cc8ee538f6727d1f6773fff6d8e31bc5522bfee
-> >
-> > Just a piece of information: with vanilla 2.6.31 boot from NFS root on
-> > my PB11MPCore hangs, with this patch applied, boot succeeds.
+On 8/31/2010 5:33 PM, Catalin Marinas wrote:
+> It is in mainline already:
 > 
-> Now I'm setting up similar dev environment by chance; Cortex-A9 MPcore,
-> slightly old kernel (say .31 or .32), and with smsc911x.c Ethernet
-> driver required [1].
-> 
-> I'm auditing the required patches right now, and very interested in
-> above patch, but it seems that blob got lost these days :-(
-> 
-> Do you still have the patch, and would you mind sharing it with me?
+> http://git.kernel.org/linus/492c5d943d6a04b124ba3a719dc746dc36b14cfb
 
-It is in mainline already:
+Thanks!  Just slightly out of my search range ;-)
 
-http://git.kernel.org/linus/492c5d943d6a04b124ba3a719dc746dc36b14cfb
+$ git describe 492c5d943d6a04b124ba3a719dc746dc36b14cfb
+v2.6.35-rc1-1255-g492c5d9
 
 -- 
-Catalin
+Shinya Kuribayashi
+Renesas Electronics
