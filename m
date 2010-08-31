@@ -1,22 +1,51 @@
-From: nickpelling@nanodome.com (Nick Pelling)
-Date: Thu, 26 Aug 2010 09:42:45 +0100
-Subject: Samsung Linux project management status page...?
-In-Reply-To: <20100826082528.GM9915@chipmunk>
-References: <1282801318-2291-1-git-send-email-tanmay.upadhyay@einfochips.com>
-	<20100826082528.GM9915@chipmunk>
-Message-ID: <87175j$9ulihk@out1.ip02ir2.opaltelecom.net>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 31 Aug 2010 14:17:55 +0300
+Subject: [PATCH 2/2] set packet size limit for the mv643xx csum offloading
+In-Reply-To: <1281738480.12446.533.camel@sakura.staff.proxad.net>
+References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+	<1275827336-31111-2-git-send-email-saeed@marvell.com>
+	<1281738480.12446.533.camel@sakura.staff.proxad.net>
+Message-ID: <AANLkTinN294J2M3FPLCed_rwHuOhxU7H2AVcBxEV77g0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Sat, Aug 14, 2010 at 1:28 AM, Maxime Bizon <mbizon@freebox.fr> wrote:
 
-Do any of the Samsung Linux maintainers or Linux managers have a 
-Linux project management status page online? By which I mean a page 
-for each SoC showing which components/devices are in Linus' tree, in 
-Russell's tree, in Ben's tree, in Kyungmin Park's tree, in 
-development, expected, planned, not planned, rejected, etc?
+>
+> On Sun, 2010-06-06 at 15:28 +0300, Saeed Bishara wrote:
+>
+> > diff --git a/arch/arm/mach-kirkwood/common.c
+> b/arch/arm/mach-kirkwood/common.c
+> > index 4ccfdf9..c4bd8cb 100644
+> > --- a/arch/arm/mach-kirkwood/common.c
+> > +++ b/arch/arm/mach-kirkwood/common.c
+> > @@ -114,6 +114,7 @@ void __init kirkwood_ehci_init(void)
+> >
+> ****************************************************************************/
+> >  struct mv643xx_eth_shared_platform_data kirkwood_ge00_shared_data = {
+> >       .dram           = &kirkwood_mbus_dram_info,
+> > +     .tx_csum_limit  = 1600,
+> >  };
+> >
+> >  static struct resource kirkwood_ge00_shared_resources[] = {
+>
+> Kirkwood (at least) has a second ethernet mac, please add the definition
+> for it too.
+>
+ok
 
-(I'm trying to develop a FIMC- & OpenGL ES-based app around the 
-S5PC100 and can't see any obvious way of telling what is checked in and where).
-
-Thanks!, ....Nick Pelling....
+>
+> Thanks,
+>
+> --
+> Maxime
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-net" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100831/793b6520/attachment-0001.html>
