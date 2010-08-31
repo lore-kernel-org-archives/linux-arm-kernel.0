@@ -1,207 +1,301 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 30 Aug 2010 10:41:25 -0400
-Subject: [PATCH 6/6] pxa3xx_nand: clean the keep configure code
-In-Reply-To: <1283179285-6539-5-git-send-email-haojian.zhuang@marvell.com>
-References: <1283179285-6539-1-git-send-email-haojian.zhuang@marvell.com>
-	<1283179285-6539-2-git-send-email-haojian.zhuang@marvell.com>
-	<1283179285-6539-3-git-send-email-haojian.zhuang@marvell.com>
-	<1283179285-6539-4-git-send-email-haojian.zhuang@marvell.com>
-	<1283179285-6539-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1283179285-6539-6-git-send-email-haojian.zhuang@marvell.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue, 31 Aug 2010 14:56:55 -0400
+Subject: [PATCH v2] davinci: Initial support for MityDSP-L138/MityARM-1808
+Message-ID: <1283281015-28360-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lei Wen <leiwen@marvell.com>
+This patch adds initial support for the MityDSP-L138 and MityDSP-1808 system
+on Module (SOM) under the machine name "mityomapl138".  These SOMs are based
+on the da850 davinci CPU architecture.  Information on these SOMs may be
+found at http://www.mitydsp.com.
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
+Basic support for the console UART, NAND, and EMAC (MII interface) is
+included in this patch.
+
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
- arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |    1 +
- drivers/mtd/nand/pxa3xx_nand.c               |  107 +++++++++-----------------
- 2 files changed, 38 insertions(+), 70 deletions(-)
+Changes since v1:
+   1) Split out defconfig changes to separate patch.
+   2) Split out console init changes to DA8XX EVMS to separate patch.
+   3) Change a pr_info() to a pr_debug().
 
-diff --git a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-index 01a8448..0bd4e88 100644
---- a/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-+++ b/arch/arm/plat-pxa/include/plat/pxa3xx_nand.h
-@@ -30,6 +30,7 @@ struct pxa3xx_nand_cmdset {
- };
+ arch/arm/mach-davinci/Kconfig                   |    9 +
+ arch/arm/mach-davinci/Makefile                  |    1 +
+ arch/arm/mach-davinci/board-mityomapl138.c      |  220 +++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
+ 4 files changed, 231 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-davinci/board-mityomapl138.c
+
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 2bf03e9..633eccb 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -185,6 +185,15 @@ config MACH_TNETV107X
+ 	help
+ 	  Say Y here to select the TI TNETV107X Evaluation Module.
  
- struct pxa3xx_nand_flash {
-+	char		*name;
- 	uint32_t	chip_id;
- 	unsigned int	page_per_block; /* Pages per block (PG_PER_BLK) */
- 	unsigned int	page_size;	/* Page size in bytes (PAGE_SZ) */
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 79ca1cf..2c63cde 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -209,15 +209,15 @@ static struct pxa3xx_nand_timing timing[] = {
- };
++config MACH_MITYOMAPL138
++	bool "Critical Link MityDSP-L138/MityARM-1808 SoM"
++	default ARCH_DAVINCI_DA850
++	depends on ARCH_DAVINCI_DA850
++	help
++	  Say Y here to select the Critical Link MityDSP-L138/MityARM-1808
++	  System on Module.  Information on this SoM may be found at
++	  http://www.mitydsp.com
++
+ config DAVINCI_MUX
+ 	bool "DAVINCI multiplexing support"
+ 	depends on ARCH_DAVINCI
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index eab4c0f..3e966e8 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_MACH_DAVINCI_DM365_EVM)	+= board-dm365-evm.o
+ obj-$(CONFIG_MACH_DAVINCI_DA830_EVM)	+= board-da830-evm.o
+ obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
+ obj-$(CONFIG_MACH_TNETV107X)		+= board-tnetv107x-evm.o
++obj-$(CONFIG_MACH_MITYOMAPL138)		+= board-mityomapl138.o
  
- static struct pxa3xx_nand_flash builtin_flash_types[] = {
--	{      0,   0, 2048,  8,  8,    0, &default_cmdset, &timing[0] },
--	{ 0x46ec,  32,  512, 16, 16, 4096, &default_cmdset, &timing[1] },
--	{ 0xdaec,  64, 2048,  8,  8, 2048, &default_cmdset, &timing[1] },
--	{ 0xd7ec, 128, 4096,  8,  8, 8192, &default_cmdset, &timing[1] },
--	{ 0xa12c,  64, 2048,  8,  8, 1024, &default_cmdset, &timing[2] },
--	{ 0xb12c,  64, 2048, 16, 16, 1024, &default_cmdset, &timing[2] },
--	{ 0xdc2c,  64, 2048,  8,  8, 4096, &default_cmdset, &timing[2] },
--	{ 0xcc2c,  64, 2048, 16, 16, 4096, &default_cmdset, &timing[2] },
--	{ 0xba20,  64, 2048, 16, 16, 2048, &default_cmdset, &timing[3] },
-+{ "DEFAULT FLASH",      0,   0, 2048,  8,  8,    0, &default_cmdset, &timing[0] },
-+{ "64MiB 16-bit",  0x46ec,  32,  512, 16, 16, 4096, &default_cmdset, &timing[1] },
-+{ "256MiB 8-bit",  0xdaec,  64, 2048,  8,  8, 2048, &default_cmdset, &timing[1] },
-+{ "4GiB 8-bit",    0xd7ec, 128, 4096,  8,  8, 8192, &default_cmdset, &timing[1] },
-+{ "128MiB 8-bit",  0xa12c,  64, 2048,  8,  8, 1024, &default_cmdset, &timing[2] },
-+{ "128MiB 16-bit", 0xb12c,  64, 2048, 16, 16, 1024, &default_cmdset, &timing[2] },
-+{ "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096, &default_cmdset, &timing[2] },
-+{ "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &default_cmdset, &timing[2] },
-+{ "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &default_cmdset, &timing[3] },
- };
- 
- /* Define a default flash type setting serve as flash detecting only */
-@@ -755,7 +755,6 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
- 	/* calculate flash information */
- 	info->cmdset = f->cmdset;
- 	info->page_size = f->page_size;
--	info->oob_buff = info->data_buff + f->page_size;
- 	info->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
- 
- 	/* calculate addressing information */
-@@ -785,44 +784,12 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
- static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
- {
- 	uint32_t ndcr = nand_readl(info, NDCR);
--	struct nand_flash_dev *type = NULL;
--	uint32_t id = -1, page_per_block, num_blocks;
--	int i;
- 
--	page_per_block = ndcr & NDCR_PG_PER_BLK ? 64 : 32;
- 	info->page_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
- 	/* set info fields needed to read id */
- 	info->read_id_bytes = (info->page_size == 2048) ? 4 : 2;
- 	info->reg_ndcr = ndcr;
- 
--	pxa3xx_nand_cmdfunc(info->mtd, NAND_CMD_READID, 0, 0);
--	id = *((uint16_t *)(info->data_buff));
--	if (id == 0)
--		return -ENODEV;
--
--	/* Lookup the flash id */
--	for (i = 0; nand_flash_ids[i].name != NULL; i++) {
--		if (id == nand_flash_ids[i].id) {
--			type =  &nand_flash_ids[i];
--			break;
--		}
--	}
--
--	if (!type)
--		return -ENODEV;
--
--	/* fill the missing flash information */
--	i = __ffs(page_per_block * info->page_size);
--	num_blocks = type->chipsize << (20 - i);
--
--	/* calculate addressing information */
--	info->col_addr_cycles = (info->page_size == 2048) ? 2 : 1;
--
--	if (num_blocks * page_per_block > 65536)
--		info->row_addr_cycles = 3;
--	else
--		info->row_addr_cycles = 2;
--
- 	info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
- 	info->ndtr1cs0 = nand_readl(info, NDTR1CS0);
- 	info->cmdset = &default_cmdset;
-@@ -934,14 +901,17 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	struct pxa3xx_nand_info *info = mtd->priv;
- 	struct platform_device *pdev = info->pdev;
- 	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
-+	struct nand_flash_dev pxa3xx_flash_ids[2] = {{NULL,}, {NULL,}};
- 	const struct pxa3xx_nand_flash *f = NULL;
- 	struct nand_chip *chip = mtd->priv;
- 	uint32_t id = -1;
-+	uint64_t chipsize;
- 	int i, ret;
- 
--	if (pdata->keep_config)
-+	if (pdata->keep_config) {
- 		if (pxa3xx_nand_detect_config(info) == 0)
--			return 0;
-+			goto KEEP_CONFIG;
+ # Power Management
+ obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+new file mode 100644
+index 0000000..f95cd9c
+--- /dev/null
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -0,0 +1,220 @@
++/*
++ * Critical Link MityOMAP-L138 SoM
++ *
++ * Copyright (C) 2010 Critical Link LLC - http://www.criticallink.com
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of
++ * any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/console.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/partitions.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/common.h>
++#include <mach/cp_intc.h>
++#include <mach/da8xx.h>
++#include <mach/nand.h>
++#include <mach/mux.h>
++
++#define MITYOMAPL138_PHY_MASK		0x08 /* hardcoded for now */
++#define MITYOMAPL138_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
++
++/*
++ * MityDSP-L138 includes a 256 MByte large-page NAND flash
++ * (128K blocks).
++ */
++struct mtd_partition mityomapl138_nandflash_partition[] = {
++	{
++		.name		= "rootfs",
++		.offset		= 0,
++		.size		= SZ_128M,
++		.mask_flags	= 0, /* MTD_WRITEABLE, */
++	},
++	{
++		.name		= "homefs",
++		.offset		= MTDPART_OFS_APPEND,
++		.size		= MTDPART_SIZ_FULL,
++		.mask_flags	= 0,
++	},
++};
++
++static struct davinci_nand_pdata mityomapl138_nandflash_data = {
++	.parts		= mityomapl138_nandflash_partition,
++	.nr_parts	= ARRAY_SIZE(mityomapl138_nandflash_partition),
++	.ecc_mode	= NAND_ECC_HW,
++	.options	= NAND_USE_FLASH_BBT | NAND_BUSWIDTH_16,
++	.ecc_bits   = 1, /* 4 bit mode is not supported with 16 bit NAND */
++};
++
++static struct resource mityomapl138_nandflash_resource[] = {
++	{
++		.start	= DA8XX_AEMIF_CS3_BASE,
++		.end	= DA8XX_AEMIF_CS3_BASE + SZ_512K + 2 * SZ_1K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= DA8XX_AEMIF_CTL_BASE,
++		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device mityomapl138_nandflash_device = {
++	.name		= "davinci_nand",
++	.id		= 0,
++	.dev		= {
++		.platform_data	= &mityomapl138_nandflash_data,
++	},
++	.num_resources	= ARRAY_SIZE(mityomapl138_nandflash_resource),
++	.resource	= mityomapl138_nandflash_resource,
++};
++
++static struct platform_device *mityomapl138_devices[] __initdata = {
++	&mityomapl138_nandflash_device,
++};
++
++static void __init mityomapl138_setup_nand(void)
++{
++	platform_add_devices(mityomapl138_devices,
++				 ARRAY_SIZE(mityomapl138_devices));
++}
++
++static struct davinci_uart_config mityomapl138_uart_config __initdata = {
++	.enabled_uarts = 0x7,
++};
++
++static const short mityomap_mii_pins[] = {
++	DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
++	DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
++	DA850_MII_CRS, DA850_MII_RXCLK, DA850_MII_RXDV, DA850_MII_RXD_3,
++	DA850_MII_RXD_2, DA850_MII_RXD_1, DA850_MII_RXD_0, DA850_MDIO_CLK,
++	DA850_MDIO_D,
++	-1
++};
++
++static const short mityomap_rmii_pins[] = {
++	DA850_RMII_TXD_0, DA850_RMII_TXD_1, DA850_RMII_TXEN,
++	DA850_RMII_CRS_DV, DA850_RMII_RXD_0, DA850_RMII_RXD_1,
++	DA850_RMII_RXER, DA850_RMII_MHZ_50_CLK, DA850_MDIO_CLK,
++	DA850_MDIO_D,
++	-1
++};
++
++static void __init mityomapl138_config_emac(void)
++{
++	void __iomem *cfg_chip3_base;
++	int ret;
++	u32 val;
++	struct davinci_soc_info *soc_info = &davinci_soc_info;
++	soc_info->emac_pdata->rmii_en = 0; /* hardcoded for now */
++
++	cfg_chip3_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
++	val = __raw_readl(cfg_chip3_base);
++
++	if (soc_info->emac_pdata->rmii_en) {
++		val |= BIT(8);
++		ret = davinci_cfg_reg_list(mityomap_rmii_pins);
++		pr_info("RMII PHY configured\n");
++	} else {
++		val &= ~BIT(8);
++		ret = davinci_cfg_reg_list(mityomap_mii_pins);
++		pr_info("MII PHY configured\n");
 +	}
++
++	if (ret) {
++		pr_warning("mii/rmii mux setup failed: %d\n", ret);
++		return;
++	}
++
++	/* configure the CFGCHIP3 register for RMII or MII */
++	__raw_writel(val, cfg_chip3_base);
++
++	soc_info->emac_pdata->phy_mask = MITYOMAPL138_PHY_MASK;
++	pr_debug("setting phy_mask to %x\n", soc_info->emac_pdata->phy_mask);
++	soc_info->emac_pdata->mdio_max_freq = MITYOMAPL138_MDIO_FREQUENCY;
++
++	ret = da8xx_register_emac();
++	if (ret)
++		pr_warning("emac registration failed: %d\n", ret);
++}
++
++static struct davinci_pm_config da850_pm_pdata = {
++	.sleepcount = 128,
++};
++
++static struct platform_device da850_pm_device = {
++	.name	= "pm-davinci",
++	.dev = {
++		.platform_data  = &da850_pm_pdata,
++	},
++	.id	= -1,
++};
++
++static void __init mityomapl138_init(void)
++{
++	int ret;
++
++	/* for now, no special EDMA channels are reserved */
++	ret = da850_register_edma(NULL);
++	if (ret)
++		pr_warning("edma registration failed: %d\n", ret);
++
++	ret = da8xx_register_watchdog();
++	if (ret)
++		pr_warning("watchdog registration failed: %d\n", ret);
++
++	davinci_serial_init(&mityomapl138_uart_config);
++
++	mityomapl138_setup_nand();
++
++	mityomapl138_config_emac();
++
++	ret = da8xx_register_rtc();
++	if (ret)
++		pr_warning("rtc setup failed: %d\n", ret);
++
++	ret = da850_register_cpufreq("pll0_sysclk3");
++	if (ret)
++		pr_warning("cpufreq registration failed: %d\n", ret);
++
++	ret = da8xx_register_cpuidle();
++	if (ret)
++		pr_warning("cpuidle registration failed: %d\n", ret);
++
++	ret = da850_register_pm(&da850_pm_device);
++	if (ret)
++		pr_warning("da850_evm_init: suspend registration failed: %d\n",
++				ret);
++}
++
++#ifdef CONFIG_SERIAL_8250_CONSOLE
++static int __init mityomapl138_console_init(void)
++{
++	if (!machine_is_mityomapl138())
++		return 0;
++
++	return add_preferred_console("ttyS", 1, "115200");
++}
++console_initcall(mityomapl138_console_init);
++#endif
++
++static void __init mityomapl138_map_io(void)
++{
++	da850_init();
++}
++
++MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
++	.phys_io	= IO_PHYS,
++	.io_pg_offst	= (__IO_ADDRESS(IO_PHYS) >> 18) & 0xfffc,
++	.boot_params	= (DA8XX_DDR_BASE + 0x100),
++	.map_io		= mityomapl138_map_io,
++	.init_irq	= cp_intc_init,
++	.timer		= &davinci_timer,
++	.init_machine	= mityomapl138_init,
++MACHINE_END
+diff --git a/arch/arm/mach-davinci/include/mach/uncompress.h b/arch/arm/mach-davinci/include/mach/uncompress.h
+index 15a6192..d370391 100644
+--- a/arch/arm/mach-davinci/include/mach/uncompress.h
++++ b/arch/arm/mach-davinci/include/mach/uncompress.h
+@@ -88,6 +88,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		/* DA8xx boards */
+ 		DEBUG_LL_DA8XX(davinci_da830_evm,	2);
+ 		DEBUG_LL_DA8XX(davinci_da850_evm,	2);
++		DEBUG_LL_DA8XX(mityomapl138,		1);
  
- 	ret = pxa3xx_nand_sensing(info);
- 	if (!ret) {
-@@ -971,22 +941,11 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 			f = &builtin_flash_types[i - pdata->num_flash + 1];
- 
- 		/* find the chip in default list */
--		if (f->chip_id == id) {
--			pxa3xx_nand_config_flash(info, f);
--			mtd->writesize = f->page_size;
--			mtd->writesize_shift = ffs(mtd->writesize) - 1;
--			mtd->writesize_mask = (1 << mtd->writesize_shift) - 1;
--			mtd->oobsize = mtd->writesize / 32;
--			mtd->erasesize = f->page_size * f->page_per_block;
--			mtd->erasesize_shift = ffs(mtd->erasesize) - 1;
--			mtd->erasesize_mask = (1 << mtd->erasesize_shift) - 1;
--
--			mtd->name = mtd_names[0];
-+		if (f->chip_id == id)
- 			break;
--		}
- 	}
- 
--	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash)) {
-+	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1)) {
- 		kfree(mtd);
- 		info->mtd = NULL;
- 		printk(KERN_ERR "ERROR!! flash not defined!!!\n");
-@@ -994,20 +953,28 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 		return -EINVAL;
- 	}
- 
-+	pxa3xx_nand_config_flash(info, f);
-+	pxa3xx_flash_ids[0].name = f->name;
-+	pxa3xx_flash_ids[0].id = (f->chip_id >> 8) & 0xffff;
-+	pxa3xx_flash_ids[0].pagesize = f->page_size;
-+	chipsize = (uint64_t)f->num_blocks * f->page_per_block * f->page_size;
-+	pxa3xx_flash_ids[0].chipsize = chipsize >> 20;
-+	pxa3xx_flash_ids[0].erasesize = f->page_size * f->page_per_block;
-+	pxa3xx_flash_ids[0].options = (f->flash_width == 16) ? NAND_BUSWIDTH_16 : 0;
-+KEEP_CONFIG:
-+	if (nand_scan_ident(mtd, 1, pxa3xx_flash_ids))
-+		return -ENODEV;
-+	/* calculate addressing information */
-+	info->col_addr_cycles = (mtd->writesize >= 2048) ? 2 : 1;
-+	info->oob_buff = info->data_buff + mtd->writesize;
-+	if ((mtd->size >> chip->page_shift) > 65536)
-+		info->row_addr_cycles = 3;
-+	else
-+		info->row_addr_cycles = 2;
-+	mtd->name = mtd_names[0];
- 	chip->ecc.mode = NAND_ECC_HW;
--	chip->ecc.size = f->page_size;
--	chip->chipsize 	= (uint64_t)f->num_blocks * f->page_per_block
--				* f->page_size;
--	mtd->size = chip->chipsize;
--
--	/* Calculate the address shift from the page size */
--	chip->page_shift = ffs(mtd->writesize) - 1;
--	chip->pagemask = mtd_div_by_ws(chip->chipsize, mtd) - 1;
--	chip->numchips = 1;
--	chip->bbt_erase_shift = chip->phys_erase_shift = ffs(mtd->erasesize) - 1;
--
--	chip->options = (f->flash_width == 16) ? NAND_BUSWIDTH_16: 0;
--	chip->options |= NAND_NO_AUTOINCR;
-+	chip->ecc.size = mtd->writesize;
-+	chip->options = (info->reg_ndcr & NDCR_DWIDTH_M) ? NAND_BUSWIDTH_16: 0;
- 	chip->options |= NAND_NO_READRDY;
- 	chip->options |= NAND_USE_FLASH_BBT;
- 
+ 		/* TNETV107x boards */
+ 		DEBUG_LL_TNETV107X(tnetv107x,		1);
 -- 
 1.7.0.4
