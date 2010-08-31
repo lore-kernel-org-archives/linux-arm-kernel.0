@@ -1,35 +1,30 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 30 Aug 2010 18:21:55 +0200
-Subject: [PATCH] oprofile, arm: initialize perf_event pointers with NULL
-Message-ID: <mailman.215.1283252618.27306.linux-arm-kernel@lists.infradead.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 31 Aug 2010 12:07:58 +0100
+Subject: [PATCH] mmc: move regulator handling to core
+In-Reply-To: <AANLkTim+cOSt=kjXXh_w+b4mzCiZN76HQ3az7SJKmOxR@mail.gmail.com>
+References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
+	<20100827190306.GB20407@void.printf.net>
+	<AANLkTi=20KrUy334JRmMYwK7rbaVYrYCqW-BHZYGPrwT@mail.gmail.com>
+	<20100829132711.GB10233@opensource.wolfsonmicro.com>
+	<AANLkTim+cOSt=kjXXh_w+b4mzCiZN76HQ3az7SJKmOxR@mail.gmail.com>
+Message-ID: <20100831110758.GD20849@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pointers must be NULL'ed to avoid double-freeing the pointers in
-rare cases during reinitialization.
+On Sun, Aug 29, 2010 at 05:30:48PM +0200, Linus Walleij wrote:
+> 2010/8/29 Mark Brown <broonie@opensource.wolfsonmicro.com>:
 
-Signed-off-by: Robert Richter <robert.richter@amd.com>
----
- arch/arm/oprofile/common.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+> > This seems like the wrong approach; if there's a problem it'd seem much
+> > better to fix the core code that everything is sharing rather than
+> > factor it out - the location of the code is orthogonal to its
+> > helpfulness.
 
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index c3652f7..d660cb8 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -351,6 +351,8 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
- {
- 	int cpu, ret = 0;
- 
-+	memset(&perf_events, 0, sizeof(perf_events));
-+
- 	perf_num_counters = armpmu_get_max_events();
- 
- 	counter_config = kcalloc(perf_num_counters,
--- 
-1.7.1.1
+> I actually did not move the essential regulator bits out just enable/disable,
+> so that these were in the sites where the regulators were actually
+> enabled/disabled in respective driver. That makes the internal
+> regulator reference count do the trick.
 
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+I'm not sure what "the sites where the regulators were actually
+enabled/disabled in respective driver" are but my understanding was that
+there's a bit of an issue here in that the MMC core does not guarantee
+balanced enable/disable calls.
