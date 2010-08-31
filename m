@@ -1,42 +1,22 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Wed, 1 Sep 2010 00:46:35 +0200
-Subject: [PATCH] input/touch: Introduce the LPC32xx touchscreen
-	controller driver (v2)
-In-Reply-To: <20100829054838.GC15369@core.coreip.homeip.net>
-References: <1281993661-21097-1-git-send-email-wellsk40@gmail.com>
-	<1281993661-21097-2-git-send-email-wellsk40@gmail.com>
-	<20100829054838.GC15369@core.coreip.homeip.net>
-Message-ID: <083DF309106F364B939360100EC290F80AD44F8E1B@eu1rdcrdc1wx030.exi.nxp.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 01 Sep 2010 02:31:32 +0300
+Subject: [PATCH] ARM: pxa3xx: fix build error when
+	CONFIG_MTD_PARTITIONS is not defined
+In-Reply-To: <AANLkTinn_Yb+jGOcpc139X2cW0ax5Ev23ovjpp9NrPJC@mail.gmail.com>
+References: <1282813011-6187-1-git-send-email-mark.brown314@gmail.com>
+	<1282813011-6187-2-git-send-email-mark.brown314@gmail.com>
+	<AANLkTinn_Yb+jGOcpc139X2cW0ax5Ev23ovjpp9NrPJC@mail.gmail.com>
+Message-ID: <1283297492.2018.62.camel@brekeke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> Subject: Re: [PATCH] input/touch: Introduce the LPC32xx touchscreen
-> controller driver (v2)
+On Tue, 2010-08-31 at 13:51 +0800, Haojian Zhuang wrote:
+> Hi Mark,
 > 
-> On Mon, Aug 16, 2010 at 02:21:01PM -0700, wellsk40 at gmail.com wrote:
-> > From: Kevin Wells <wellsk40@gmail.com>
-> >
-> > This patch set introduces support for the LPC32xx touchscreen
-> > controller driver. The LPC32xx touchscreen controller supports
-> > automated event detection and X/Y data conversion for resistive
-> > touchscreens.
-> >
-> > Signed-off-by: Kevin Wells <wellsk40@gmail.com>
-> > Signed-off-by: Durgesh Pattamatta <durgesh.pattamatta@nxp.com>
-> 
-> Applied to my .37 queue, thanks Kevin.
-> 
+> Don't forget to cc maintainer of mtd tree. I loop them now.
 
-Thanks for applying this Dmitry.
-Ryan M also had some good comments about the v2 driver that I'll
-resolve once some other associated fixes get pulled in.
+FYI, the MTD maintainer id dwmw2, I'm just helping him sometimes.
 
-> --
-> Dmitry
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
