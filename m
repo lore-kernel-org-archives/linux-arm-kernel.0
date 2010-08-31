@@ -1,38 +1,73 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 Aug 2010 14:58:29 +0100
-Subject: [PATCH 5/9] ARM: Remove superfluous flush_kernel_dcache_page()
+Date: Tue, 31 Aug 2010 14:58:35 +0100
+Subject: [PATCH 6/9] ARM: Implement phys_mem_access_prot() to avoid
+	attributes aliasing
 In-Reply-To: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
 References: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20100831135829.21304.99094.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100831135835.21304.33824.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since page cache pages are now considered 'dirty' by default, the cache
-flushing is handled via __flush_dcache_page() when a page gets mapped to
-user space. Highmem pages on VIVT systems are flushed during kunmap()
-and flush_kernel_dcache_page() was already a no-op in this case.
+ARMv7 onwards requires that there are no aliases to the same physical
+location using different memory types (i.e. Normal vs Strongly Ordered).
+Access to SO mappings when the unaligned accesses are handled in
+hardware is also Unpredictable (pgprot_noncached() mappings in user
+space).
 
-ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE is still defined since ARM needs
-specific implementations for flush_kernel_vmap_range() and
-invalidate_kernel_vmap_range().
+The /dev/mem driver requires uncached mappings with O_SYNC. The patch
+implements the phys_mem_access_prot() function which generates Strongly
+Ordered memory attributes if !pfn_valid() (independent of O_SYNC) and
+Normal Noncacheable (writecombine) if O_SYNC.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/include/asm/cacheflush.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/pgtable.h |    3 +++
+ arch/arm/mm/mmu.c              |   14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index d3730f0..042e139 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -405,9 +405,6 @@ static inline void flush_anon_page(struct vm_area_struct *vma,
- #define ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
- static inline void flush_kernel_dcache_page(struct page *page)
- {
--	/* highmem pages are always flushed upon kunmap already */
--	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
--		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 42e694f..ea19775 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -337,6 +337,9 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
+ #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_BUFFERABLE)
++#define __HAVE_PHYS_MEM_ACCESS_PROT
++extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++				     unsigned long size, pgprot_t vma_prot);
+ #else
+ #define pgprot_dmacoherent(prot) \
+ 	__pgprot_modify(prot, L_PTE_MT_MASK|L_PTE_EXEC, L_PTE_MT_UNCACHED)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6e1c4f6..a486bd0 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -15,6 +15,7 @@
+ #include <linux/nodemask.h>
+ #include <linux/memblock.h>
+ #include <linux/sort.h>
++#include <linux/fs.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+@@ -498,6 +499,19 @@ static void __init build_mem_type_table(void)
+ 	}
  }
  
- #define flush_dcache_mmap_lock(mapping) \
++#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
++pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++			      unsigned long size, pgprot_t vma_prot)
++{
++	if (!pfn_valid(pfn))
++		return pgprot_noncached(vma_prot);
++	else if (file->f_flags & O_SYNC)
++		return pgprot_writecombine(vma_prot);
++	return vma_prot;
++}
++EXPORT_SYMBOL(phys_mem_access_prot);
++#endif
++
+ #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
+ 
+ static void __init *early_alloc(unsigned long sz)
