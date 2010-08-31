@@ -1,66 +1,60 @@
 From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 30 Aug 2010 10:56:18 +0200
-Subject: [PATCH] oprofile, x86: fix init_sysfs error handling
-Message-ID: <mailman.214.1283250914.27306.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 31 Aug 2010 13:01:52 +0200
+Subject: [PATCH 0/3] stop OProfile calling arch_exit when arch_init fails
+In-Reply-To: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
+References: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20100831110152.GD22783@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On failure init_sysfs() might not properly free resources. The error
-code of the function is not checked. And, when reinitializing the exit
-function might be called twice. This patch fixes all this.
+On 29.08.10 14:51:58, Will Deacon wrote:
+> These patches remove the oprofile_arch_exit call from oprofile_init,
+> allowing architectures that perform memory allocation in their init
+> functions to be simplified. This requires some changes to the ARM and
+> x86 OProfile backends to ensure that their init functions clean up
+> after themselves if they fail.
+> 
+> This is required for Matt's combined OProfile/Perf driver which will
+> be shared between all architectures.
+> 
+> Patches taken against tip/master.
+> 
+> Cc: Robert Richter <robert.richter@amd.com>
+> Cc: Matt Fleming <matt@console-pimps.org>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Ingo Molnar <mingo@elte.hu>
+> 
+> Will Deacon (3):
+>   oprofile: don't call arch exit code from init code on failure
+>   ARM: oprofile: fix and simplify init/exit functions
+>   x86: oprofile: fix oprofile_arch_init behaviour on failure
+> 
+>  arch/arm/oprofile/common.c |   47 +++++++++++++++++++++++--------------------
+>  arch/x86/oprofile/init.c   |   26 ++++++++++++++----------
+>  drivers/oprofile/oprof.c   |   11 +--------
+>  3 files changed, 42 insertions(+), 42 deletions(-)
 
-Cc: stable at kernel.org
-Signed-off-by: Robert Richter <robert.richter@amd.com>
----
- arch/x86/oprofile/nmi_int.c |   16 +++++++++++++---
- 1 files changed, 13 insertions(+), 3 deletions(-)
+I have applied patch #1 and #2 to
 
-diff --git a/arch/x86/oprofile/nmi_int.c b/arch/x86/oprofile/nmi_int.c
-index f6b48f6..73a41d3 100644
---- a/arch/x86/oprofile/nmi_int.c
-+++ b/arch/x86/oprofile/nmi_int.c
-@@ -568,8 +568,13 @@ static int __init init_sysfs(void)
- 	int error;
- 
- 	error = sysdev_class_register(&oprofile_sysclass);
--	if (!error)
--		error = sysdev_register(&device_oprofile);
-+	if (error)
-+		return error;
+ git://git.kernel.org/pub/scm/linux/kernel/git/rric/oprofile.git core
+
+with some small modifications:
+
+Patch #1: Commit message, x86 removed.
+Patch #2: Order of freeing memory:
+
++out:
++       if (ret) {
++               for_each_possible_cpu(cpu)
++                       kfree(perf_events[cpu]);
++               kfree(counter_config);
++       }
 +
-+	error = sysdev_register(&device_oprofile);
-+	if (error)
-+		sysdev_class_unregister(&oprofile_sysclass);
-+
- 	return error;
- }
- 
-@@ -695,6 +700,8 @@ int __init op_nmi_init(struct oprofile_operations *ops)
- 	char *cpu_type = NULL;
- 	int ret = 0;
- 
-+	using_nmi = 0;
-+
- 	if (!cpu_has_apic)
- 		return -ENODEV;
- 
-@@ -774,7 +781,10 @@ int __init op_nmi_init(struct oprofile_operations *ops)
- 
- 	mux_init(ops);
- 
--	init_sysfs();
-+	ret = init_sysfs();
-+	if (ret)
-+		return ret;
-+
- 	using_nmi = 1;
- 	printk(KERN_INFO "oprofile: using NMI interrupt.\n");
- 	return 0;
--- 
-1.7.1.1
 
+There is also the patch below on top of it.
 
+Thanks Will,
 
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+-Robert
+
+--
