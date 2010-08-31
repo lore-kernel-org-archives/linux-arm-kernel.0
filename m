@@ -1,39 +1,66 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 31 Aug 2010 14:15:07 +0200
-Subject: [PATCH] mmc: move regulator handling to core
-In-Reply-To: <20100831110758.GD20849@rakim.wolfsonmicro.main>
-References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
-	<20100827190306.GB20407@void.printf.net>
-	<AANLkTi=20KrUy334JRmMYwK7rbaVYrYCqW-BHZYGPrwT@mail.gmail.com>
-	<20100829132711.GB10233@opensource.wolfsonmicro.com>
-	<AANLkTim+cOSt=kjXXh_w+b4mzCiZN76HQ3az7SJKmOxR@mail.gmail.com>
-	<20100831110758.GD20849@rakim.wolfsonmicro.main>
-Message-ID: <AANLkTimN0cSzp8756frWvQQpaUCy+3ydVg+JYD9LxHLc@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Aug 2010 13:18:36 +0100
+Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
+In-Reply-To: <1282938790.5075.25.camel@m0nster>
+References: <1282926826.5075.21.camel@m0nster>
+	<1282927746.26355.74.camel@e102109-lin.cambridge.arm.com>
+	<1282938790.5075.25.camel@m0nster>
+Message-ID: <1283257116.28248.20.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/31 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> On Sun, Aug 29, 2010 at 05:30:48PM +0200, Linus Walleij wrote:
->> 2010/8/29 Mark Brown <broonie@opensource.wolfsonmicro.com>:
->
->> > This seems like the wrong approach; if there's a problem it'd seem much
->> > better to fix the core code that everything is sharing rather than
->> > factor it out - the location of the code is orthogonal to its
->> > helpfulness.
->
->> I actually did not move the essential regulator bits out just enable/disable,
->> so that these were in the sites where the regulators were actually
->> enabled/disabled in respective driver. That makes the internal
->> regulator reference count do the trick.
->
-> I'm not sure what "the sites where the regulators were actually
-> enabled/disabled in respective driver" are but my understanding was that
-> there's a bit of an issue here in that the MMC core does not guarantee
-> balanced enable/disable calls.
+On Fri, 2010-08-27 at 20:53 +0100, Daniel Walker wrote:
+> On Fri, 2010-08-27 at 17:49 +0100, Catalin Marinas wrote:
+> 
+> > > So your saying it makes more sense to change the msm entry into the
+> > > default entry, and make the current default into the
+> > > ARM11MPCore/Cortex-A9 entry?
+> >
+> > So my opinion is to not add any specific msm code but make the
+> > __v7_setup skip the ACTLR bit setting. Then add an entry for Cortex-A9
+> > to set those bits.
+> >
+> 
+> how about this? Naming is of course flexible ..
 
-Yeah I figured out what you wanted and sent an updated patch, check
-it out. I'll just weave in some comments from Adrian and it'll do things
-the way you want it I believe.
+I cc'ed Santosh as well. I'm not sure whether TI are using a Cortex-A9
+but with different manufacturer field (I suspect it's still 0x41).
 
-Yours,
-Linus Walleij
+> ScorpionMP does not have the SMP/nAMP and TLB ops broadcasting bits in
+> ACTLR. These bits are only used on ARM11MPCore and Cortex-A9 from arm.
+> This patch just makes it so no other arm core ends up getting these
+> bits set.
+> 
+> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> 
+> ---
+>  arch/arm/mm/proc-v7.S |   26 +++++++++++++++++++++++++-
+>  1 files changed, 25 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 7aaf88a..e1b5492 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -189,13 +189,14 @@ cpu_v7_name:
+>   *     It is assumed that:
+>   *     - cache type register is implemented
+>   */
+> -__v7_setup:
+> +__v7_armmp_setup:
+
+Maybe __v7_ca9mp_setup. Future MP processors from ARM may not need this
+bit set.
+
+> +__v7_armmp_proc_info:
+> +       .long   0x410f0000              @ Required ID value
+> +       .long   0xff0f0000              @ Mask for ID
+
+We could restrict it to:
+
+	.long	0x410fc090
+	.long	0xff0ffff0
+
+Otherwise the patch looks fine. Thanks.
+
+-- 
+Catalin
