@@ -1,94 +1,35 @@
-From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Tue, 31 Aug 2010 02:28:59 -0400
-Subject: [PATCH 4/5] ARM: pxa168: added special case handler for keypad
-	interrupts
-In-Reply-To: <AANLkTimvudYv4fwyGWjL5c10QrM9GtC2SXjPZzcV20_s@mail.gmail.com>
-References: <1282814339-10934-1-git-send-email-mark.brown314@gmail.com>
-	<1282814339-10934-5-git-send-email-mark.brown314@gmail.com>
-	<AANLkTimvudYv4fwyGWjL5c10QrM9GtC2SXjPZzcV20_s@mail.gmail.com>
-Message-ID: <AANLkTinEtFhC6kB3asuBXLxCgYf9yOTLTTwRQJXKcu2n@mail.gmail.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Tue, 31 Aug 2010 12:04:32 +0530
+Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
+In-Reply-To: <1283170469.12995.53.camel@brekeke>
+References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	
+	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
+	<1283170469.12995.53.camel@brekeke>
+Message-ID: <4C7CA278.9040902@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 31, 2010 at 12:53 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Thu, Aug 26, 2010 at 5:18 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
->> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
->> ---
->> ?arch/arm/mach-mmp/irq-pxa168.c | ? 23 ++++++++++++++++++++++-
->> ?1 files changed, 22 insertions(+), 1 deletions(-)
+On 8/30/2010 5:44 PM, Artem Bityutskiy wrote:
+> On Mon, 2010-08-30 at 16:13 +0530, Viresh KUMAR wrote:
+>> From: Vipin Kumar <vipin.kumar@st.com>
 >>
->> diff --git a/arch/arm/mach-mmp/irq-pxa168.c b/arch/arm/mach-mmp/irq-pxa168.c
->> index 52ff2f0..bfb0984 100644
->> --- a/arch/arm/mach-mmp/irq-pxa168.c
->> +++ b/arch/arm/mach-mmp/irq-pxa168.c
->> @@ -17,6 +17,8 @@
->> ?#include <linux/io.h>
+>> For a page size of 4096, the number of oob bytes are 128 per page. This demands
+>> for an increased ecc_pos array as well as ecc can be placed at more than 64
+>> locations.
 >>
->> ?#include <mach/regs-icu.h>
->> +#include <mach/regs-apmu.h>
->> +#include <mach/cputype.h>
+>> This patch is added because SPEAr platforms NAND controller has 13 bytes of ecc
+>> for each 512 bytes of data. This results in 104 bytes of ecc in case of 4096
+>> byte page.
 >>
->> ?#include "common.h"
->>
->> @@ -42,6 +44,19 @@ static struct irq_chip icu_irq_chip = {
->> ? ? ? ?.unmask = icu_unmask_irq,
->> ?};
->>
->> +void handle_pxa168_keypad_irq(unsigned int irq, struct irq_desc *desc)
->> +{
->> + ? ? ? uint32_t val;
->> + ? ? ? uint32_t mask = APMU_PXA168_KP_WAKE_CLR;
->> +
->> + ? ? ? /* clear keypad wake event */
->> + ? ? ? val = __raw_readl(APMU_WAKE_CLR);
->> + ? ? ? __raw_writel(val | ?mask, APMU_WAKE_CLR);
->> +
->> + ? ? ? /* handle irq */
->> + ? ? ? handle_level_irq(irq, desc);
->> +}
->> +
->
-> Why should you clear wakeup event status in IRQ handler? If system is
-> resumed by keypad event, you should clear this wakeup source in resume
-> code. I think that IRQ code should not be binded with wakeup event at
-> here.
->
->> ?void __init icu_init_irq(void)
->> ?{
->> ? ? ? ?int irq;
->> @@ -49,7 +64,13 @@ void __init icu_init_irq(void)
->> ? ? ? ?for (irq = 0; irq < 64; irq++) {
->> ? ? ? ? ? ? ? ?icu_mask_irq(irq);
->> ? ? ? ? ? ? ? ?set_irq_chip(irq, &icu_irq_chip);
->> - ? ? ? ? ? ? ? set_irq_handler(irq, handle_level_irq);
->> +
->> + ? ? ? ? ? ? ? /* special handler for keypad */
->> + ? ? ? ? ? ? ? if (cpu_is_pxa168() && irq == IRQ_PXA168_KEYPAD)
->> + ? ? ? ? ? ? ? ? ? ? ? set_irq_handler(irq, handle_pxa168_keypad_irq);
->> + ? ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? ? set_irq_handler(irq, handle_level_irq);
->> +
->> ? ? ? ? ? ? ? ?set_irq_flags(irq, IRQF_VALID);
->> ? ? ? ?}
->> ?}
->> --
->> 1.7.0.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at ?http://www.tux.org/lkml/
->>
->
+>> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> 
+> Nack, breaking ABI Is not allowed in Linux.
+> 
+Hello Artem,
 
-Haojian, this is an usual case, but without that clear wake event you
-will not be able to clear the keypad interrupt. For my push to open
-source I re-wrote the workaround code and added it as a special case
-IRQ handler. In the Marvell pxa168 code base it is actually located in
-the keypad interrupt handler as the function clear_wakeup(). I felt it
-was better to isolate this code in the mmp common code base instead.
+I could not understand your point. Can you please elaborate. How does this patch 
+break ABI
 
-Regards,
--- Mark
+Regards
+Vipin
