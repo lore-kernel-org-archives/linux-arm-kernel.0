@@ -1,208 +1,275 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 31 Aug 2010 21:09:20 +0530
-Subject: [PATCH v1] davinci: Initial support for MityDSP-L138/MityARM-1808
-In-Reply-To: <4C7C52FD.6010608@criticallink.com>
-References: <4C7C52FD.6010608@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301F6AC5679@dbde02.ent.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 31 Aug 2010 17:26:06 +0200
+Subject: [PATCH] MMC: move regulator handling closer to core v2
+Message-ID: <1283268367-3525-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+After discovering a problem in regulator reference counting I
+took Mark Brown's advice to move the reference count into the
+MMC core by making the regulator status a member of
+struct mmc_host.
 
-On Tue, Aug 31, 2010 at 06:25:25, Michael Williamson wrote:
-> This patch adds initial support for the MityDSP-L138 and MityDSP-1808 system
-> on Module (SOM) under the machine name "mityomapl138".  These SOMs are based
-> on the da850 davinci CPU architecture.  Information on these SOMs may be
-> found at http://www.mitydsp.com.
->
-> Basic support for the console UART, NAND, and EMAC (MII interface) is
-> included in this patch.
->
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+I took this opportunity to also implement NULL versions of
+the regulator functions so as to rid the driver code from
+some ugly #ifdef CONFIG_REGULATOR clauses.
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Adrian Hunter <adrian.hunter@nokia.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: Sundar Iyer <sundar.iyer@stericsson.com>
+Cc: Daniel Mack <daniel@caiaq.de>
+Cc: Pierre Ossman <pierre@ossman.eu>
+Cc: Matt Fleming <matt@console-pimps.org>
+Cc: David Brownell <dbrownell@users.sourceforge.net>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Cliff Brake <cbrake@bec-systems.com>
+Cc: Jarkko Lavinen <jarkko.lavinen@nokia.com>
+Cc: linux-mmc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+Changes V1->V2:
+- Moved #ifdef:ed out regulator code to core.h header
+- Moved error print into the core regulator code
+---
+ drivers/mmc/core/core.c       |   26 ++++++++++++++++----------
+ drivers/mmc/host/mmci.c       |   11 ++++-------
+ drivers/mmc/host/omap_hsmmc.c |   21 +++++++++++++--------
+ drivers/mmc/host/pxamci.c     |   18 ++++++++++++------
+ include/linux/mmc/host.h      |   22 +++++++++++++++++++++-
+ 5 files changed, 66 insertions(+), 32 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-> index 292e8b7..e51a80f 100644
-> --- a/arch/arm/mach-davinci/board-da830-evm.c
-> +++ b/arch/arm/mach-davinci/board-da830-evm.c
-> @@ -586,6 +586,9 @@ static __init void da830_evm_init(void)
->  #ifdef CONFIG_SERIAL_8250_CONSOLE
->  static int __init da830_evm_console_init(void)
->  {
-> +     if (!machine_is_davinci_da830_evm())
-> +             return 0;
-> +
->       return add_preferred_console("ttyS", 2, "115200");
->  }
->  console_initcall(da830_evm_console_init);
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 190ebd3..d491b5f 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -847,6 +847,9 @@ static __init void da850_evm_init(void)
->  #ifdef CONFIG_SERIAL_8250_CONSOLE
->  static int __init da850_evm_console_init(void)
->  {
-> +     if (!machine_is_davinci_da850_evm())
-> +             return 0;
-> +
->       return add_preferred_console("ttyS", 2, "115200");
->  }
->  console_initcall(da850_evm_console_init);
-
-I think this should be carved into a separate patch as
-this is a bug fix of existing code rather than addition
-of new board as subject and description of this patch
-indicate.
-
-> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-> new file mode 100644
-> index 0000000..7338adb
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
-> @@ -0,0 +1,220 @@
-> +/*
-> + * Critical Link MityOMAP-L138 SoM
-> + *
-> + * Copyright (C) 2010 Critical Link LLC - http://www.criticallink.com
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2. This program is licensed "as is" without any warranty of
-> + * any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/console.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/partitions.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <mach/common.h>
-> +#include <mach/cp_intc.h>
-> +#include <mach/da8xx.h>
-> +#include <mach/nand.h>
-> +#include <mach/mux.h>
-> +
-> +#define MITYOMAPL138_PHY_MASK                0x08 /* hardcoded for now */
-> +#define MITYOMAPL138_MDIO_FREQUENCY  (2200000) /* PHY bus frequency */
-> +
-> +/*
-> + * MityDSP-L138 includes a 256 MByte large-page NAND flash
-> + * (128K blocks).
-> + */
-> +struct mtd_partition mityomapl138_nandflash_partition[] = {
-> +     {
-> +             .name           = "rootfs",
-> +             .offset         = 0,
-> +             .size           = SZ_128M,
-> +             .mask_flags     = 0, /* MTD_WRITEABLE, */
-> +     },
-> +     {
-> +             .name           = "homefs",
-> +             .offset         = MTDPART_OFS_APPEND,
-> +             .size           = MTDPART_SIZ_FULL,
-> +             .mask_flags     = 0,
-> +     },
-> +};
-> +
-> +static struct davinci_nand_pdata mityomapl138_nandflash_data = {
-> +     .parts          = mityomapl138_nandflash_partition,
-> +     .nr_parts       = ARRAY_SIZE(mityomapl138_nandflash_partition),
-> +     .ecc_mode       = NAND_ECC_HW,
-> +     .options        = NAND_USE_FLASH_BBT | NAND_BUSWIDTH_16,
-> +     .ecc_bits   = 1, /* 4 bit mode is not supported with 16 bit NAND */
-> +};
-> +
-> +static struct resource mityomapl138_nandflash_resource[] = {
-> +     {
-> +             .start  = DA8XX_AEMIF_CS3_BASE,
-> +             .end    = DA8XX_AEMIF_CS3_BASE + SZ_512K + 2 * SZ_1K - 1,
-> +             .flags  = IORESOURCE_MEM,
-> +     },
-> +     {
-> +             .start  = DA8XX_AEMIF_CTL_BASE,
-> +             .end    = DA8XX_AEMIF_CTL_BASE + SZ_32K - 1,
-> +             .flags  = IORESOURCE_MEM,
-> +     },
-> +};
-> +
-> +static struct platform_device mityomapl138_nandflash_device = {
-> +     .name           = "davinci_nand",
-> +     .id             = 0,
-> +     .dev            = {
-> +             .platform_data  = &mityomapl138_nandflash_data,
-> +     },
-> +     .num_resources  = ARRAY_SIZE(mityomapl138_nandflash_resource),
-> +     .resource       = mityomapl138_nandflash_resource,
-> +};
-> +
-> +static struct platform_device *mityomapl138_devices[] __initdata = {
-> +     &mityomapl138_nandflash_device,
-> +};
-> +
-> +static void __init mityomapl138_setup_nand(void)
-> +{
-> +     platform_add_devices(mityomapl138_devices,
-> +                              ARRAY_SIZE(mityomapl138_devices));
-> +}
-> +
-> +static struct davinci_uart_config mityomapl138_uart_config __initdata = {
-> +     .enabled_uarts = 0x7,
-> +};
-> +
-> +static const short mityomap_mii_pins[] = {
-> +     DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
-> +     DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
-> +     DA850_MII_CRS, DA850_MII_RXCLK, DA850_MII_RXDV, DA850_MII_RXD_3,
-> +     DA850_MII_RXD_2, DA850_MII_RXD_1, DA850_MII_RXD_0, DA850_MDIO_CLK,
-> +     DA850_MDIO_D,
-> +     -1
-> +};
-> +
-> +static const short mityomap_rmii_pins[] = {
-> +     DA850_RMII_TXD_0, DA850_RMII_TXD_1, DA850_RMII_TXEN,
-> +     DA850_RMII_CRS_DV, DA850_RMII_RXD_0, DA850_RMII_RXD_1,
-> +     DA850_RMII_RXER, DA850_RMII_MHZ_50_CLK, DA850_MDIO_CLK,
-> +     DA850_MDIO_D,
-> +     -1
-> +};
-> +
-> +static void __init mityomapl138_config_emac(void)
-> +{
-> +     void __iomem *cfg_chip3_base;
-> +     int ret;
-> +     u32 val;
-> +     struct davinci_soc_info *soc_info = &davinci_soc_info;
-> +     soc_info->emac_pdata->rmii_en = 0; /* hardcoded for now */
-> +
-> +     cfg_chip3_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
-> +     val = __raw_readl(cfg_chip3_base);
-> +
-> +     if (soc_info->emac_pdata->rmii_en) {
-> +             val |= BIT(8);
-> +             ret = davinci_cfg_reg_list(mityomap_rmii_pins);
-> +             pr_info("RMII PHY configured\n");
-> +     } else {
-> +             val &= ~BIT(8);
-> +             ret = davinci_cfg_reg_list(mityomap_mii_pins);
-> +             pr_info("MII PHY configured\n");
-> +     }
-> +
-> +     if (ret) {
-> +             pr_warning("mii/rmii mux setup failed: %d\n", ret);
-> +             return;
-> +     }
-> +
-> +     /* configure the CFGCHIP3 register for RMII or MII */
-> +     __raw_writel(val, cfg_chip3_base);
-> +
-> +     soc_info->emac_pdata->phy_mask = MITYOMAPL138_PHY_MASK;
-> +     pr_info("setting phy_mask to %x\n", soc_info->emac_pdata->phy_mask);
-
-This should be pr_debug()?
-
-Thanks,
-Sekhar
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 5db49b1..2d47467 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -771,8 +771,9 @@ EXPORT_SYMBOL(mmc_regulator_get_ocrmask);
+ 
+ /**
+  * mmc_regulator_set_ocr - set regulator to match host->ios voltage
+- * @vdd_bit: zero for power off, else a bit number (host->ios.vdd)
++ * @mmc: the host to regulate
+  * @supply: regulator to use
++ * @vdd_bit: zero for power off, else a bit number (host->ios.vdd)
+  *
+  * Returns zero on success, else negative errno.
+  *
+@@ -780,15 +781,12 @@ EXPORT_SYMBOL(mmc_regulator_get_ocrmask);
+  * a particular supply voltage.  This would normally be called from the
+  * set_ios() method.
+  */
+-int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit)
++int mmc_regulator_set_ocr(struct mmc_host *mmc,
++			struct regulator *supply,
++			unsigned short vdd_bit)
+ {
+ 	int			result = 0;
+ 	int			min_uV, max_uV;
+-	int			enabled;
+-
+-	enabled = regulator_is_enabled(supply);
+-	if (enabled < 0)
+-		return enabled;
+ 
+ 	if (vdd_bit) {
+ 		int		tmp;
+@@ -819,17 +817,25 @@ int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit)
+ 		else
+ 			result = 0;
+ 
+-		if (result == 0 && !enabled)
++		if (result == 0 && !mmc->regulator_enabled) {
+ 			result = regulator_enable(supply);
+-	} else if (enabled) {
++			if (!result)
++				mmc->regulator_enabled = true;
++		}
++	} else if (mmc->regulator_enabled) {
+ 		result = regulator_disable(supply);
++		if (result == 0)
++			mmc->regulator_enabled = false;
+ 	}
+ 
++	if (result)
++		dev_err(mmc_dev(mmc),
++			"could not set regulator OCR (%d)\n", result);
+ 	return result;
+ }
+ EXPORT_SYMBOL(mmc_regulator_set_ocr);
+ 
+-#endif
++#endif /* CONFIG_REGULATOR */
+ 
+ /*
+  * Mask off any voltages we don't support and select
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 840b301..7f5ec67 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -507,19 +507,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	struct mmci_host *host = mmc_priv(mmc);
+ 	u32 pwr = 0;
+ 	unsigned long flags;
++	int ret;
+ 
+ 	switch (ios->power_mode) {
+ 	case MMC_POWER_OFF:
+-		if(host->vcc &&
+-		   regulator_is_enabled(host->vcc))
+-			regulator_disable(host->vcc);
++		if (host->vcc)
++			ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
+ 		break;
+ 	case MMC_POWER_UP:
+-#ifdef CONFIG_REGULATOR
+ 		if (host->vcc)
+-			/* This implicitly enables the regulator */
+-			mmc_regulator_set_ocr(host->vcc, ios->vdd);
+-#endif
++			ret = mmc_regulator_set_ocr(mmc, host->vcc, ios->vdd);
+ 		if (host->plat->vdd_handler)
+ 			pwr |= host->plat->vdd_handler(mmc_dev(mmc), ios->vdd,
+ 						       ios->power_mode);
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 4a8776f..14598ca 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -250,9 +250,9 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
+ 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
+ 
+ 	if (power_on)
+-		ret = mmc_regulator_set_ocr(host->vcc, vdd);
++		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+ 	else
+-		ret = mmc_regulator_set_ocr(host->vcc, 0);
++		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
+ 
+ 	if (mmc_slot(host).after_set_reg)
+ 		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
+@@ -291,18 +291,23 @@ static int omap_hsmmc_23_set_power(struct device *dev, int slot, int power_on,
+ 	 * chips/cards need an interface voltage rail too.
+ 	 */
+ 	if (power_on) {
+-		ret = mmc_regulator_set_ocr(host->vcc, vdd);
++		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+ 		/* Enable interface voltage rail, if needed */
+ 		if (ret == 0 && host->vcc_aux) {
+ 			ret = regulator_enable(host->vcc_aux);
+ 			if (ret < 0)
+-				ret = mmc_regulator_set_ocr(host->vcc, 0);
++				ret = mmc_regulator_set_ocr(host->mmc,
++							host->vcc, 0);
+ 		}
+ 	} else {
++		/* Shut down the rail */
+ 		if (host->vcc_aux)
+ 			ret = regulator_disable(host->vcc_aux);
+-		if (ret == 0)
+-			ret = mmc_regulator_set_ocr(host->vcc, 0);
++		if (!ret) {
++			/* Then proceed to shut down the local regulator */
++			ret = mmc_regulator_set_ocr(host->mmc,
++						host->vcc, 0);
++		}
+ 	}
+ 
+ 	if (mmc_slot(host).after_set_reg)
+@@ -343,9 +348,9 @@ static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
+ 	if (cardsleep) {
+ 		/* VCC can be turned off if card is asleep */
+ 		if (sleep)
+-			err = mmc_regulator_set_ocr(host->vcc, 0);
++			err = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
+ 		else
+-			err = mmc_regulator_set_ocr(host->vcc, vdd);
++			err = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+ 	} else
+ 		err = regulator_set_mode(host->vcc, mode);
+ 	if (err)
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 0a4e43f..a219f1f 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -99,14 +99,20 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
+ 	}
+ }
+ 
+-static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
++static inline void pxamci_set_power(struct pxamci_host *host,
++				    unsigned char power_mode,
++				    unsigned int vdd)
+ {
+ 	int on;
+ 
+-#ifdef CONFIG_REGULATOR
+-	if (host->vcc)
+-		mmc_regulator_set_ocr(host->vcc, vdd);
+-#endif
++	if (host->vcc) {
++		int ret;
++
++		if (power_mode == MMC_POWER_UP)
++			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
++		else if (power_mode == MMC_POWER_OFF)
++			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
++	}
+ 	if (!host->vcc && host->pdata &&
+ 	    gpio_is_valid(host->pdata->gpio_power)) {
+ 		on = ((1 << vdd) & host->pdata->ocr_mask);
+@@ -492,7 +498,7 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	if (host->power_mode != ios->power_mode) {
+ 		host->power_mode = ios->power_mode;
+ 
+-		pxamci_set_power(host, ios->vdd);
++		pxamci_set_power(host, ios->power_mode, ios->vdd);
+ 
+ 		if (ios->power_mode == MMC_POWER_ON)
+ 			host->cmdat |= CMDAT_INIT;
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 1575b52..d009d73 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -212,6 +212,10 @@ struct mmc_host {
+ 	struct led_trigger	*led;		/* activity led */
+ #endif
+ 
++#ifdef CONFIG_REGULATOR
++	bool			regulator_enabled; /* regulator state */
++#endif
++
+ 	struct dentry		*debugfs_root;
+ 
+ 	unsigned long		private[0] ____cacheline_aligned;
+@@ -250,8 +254,24 @@ static inline void mmc_signal_sdio_irq(struct mmc_host *host)
+ 
+ struct regulator;
+ 
++#ifdef CONFIG_REGULATOR
+ int mmc_regulator_get_ocrmask(struct regulator *supply);
+-int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit);
++int mmc_regulator_set_ocr(struct mmc_host *mmc,
++			struct regulator *supply,
++			unsigned short vdd_bit);
++#else
++int inline mmc_regulator_get_ocrmask(struct regulator *supply)
++{
++	return 0;
++}
++
++int inline mmc_regulator_set_ocr(struct mmc_host *mmc,
++				 struct regulator *supply,
++				 unsigned short vdd_bit)
++{
++	return 0;
++}
++#endif
+ 
+ int mmc_card_awake(struct mmc_host *host);
+ int mmc_card_sleep(struct mmc_host *host);
+-- 
+1.7.2.2
