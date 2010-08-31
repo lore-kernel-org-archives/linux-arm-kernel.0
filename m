@@ -1,37 +1,39 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 31 Aug 2010 14:12:08 +0200
-Subject: [PATCH 06/12] DMAENGINE: free txd list if submission fails on PL08X
-In-Reply-To: <1283256734-3408-6-git-send-email-linus.walleij@stericsson.com>
-References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-6-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1283256734-3408-7-git-send-email-linus.walleij@stericsson.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 31 Aug 2010 14:15:07 +0200
+Subject: [PATCH] mmc: move regulator handling to core
+In-Reply-To: <20100831110758.GD20849@rakim.wolfsonmicro.main>
+References: <1259844390-10541-1-git-send-email-daniel@caiaq.de>
+	<20100827190306.GB20407@void.printf.net>
+	<AANLkTi=20KrUy334JRmMYwK7rbaVYrYCqW-BHZYGPrwT@mail.gmail.com>
+	<20100829132711.GB10233@opensource.wolfsonmicro.com>
+	<AANLkTim+cOSt=kjXXh_w+b4mzCiZN76HQ3az7SJKmOxR@mail.gmail.com>
+	<20100831110758.GD20849@rakim.wolfsonmicro.main>
+Message-ID: <AANLkTimN0cSzp8756frWvQQpaUCy+3ydVg+JYD9LxHLc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes oversubscribed channels fail to mux in a signal line for
-the transmission, and we bail out. Make sure we also clean out any
-pending txd lists when this happens.
+2010/8/31 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Sun, Aug 29, 2010 at 05:30:48PM +0200, Linus Walleij wrote:
+>> 2010/8/29 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+>
+>> > This seems like the wrong approach; if there's a problem it'd seem much
+>> > better to fix the core code that everything is sharing rather than
+>> > factor it out - the location of the code is orthogonal to its
+>> > helpfulness.
+>
+>> I actually did not move the essential regulator bits out just enable/disable,
+>> so that these were in the sites where the regulators were actually
+>> enabled/disabled in respective driver. That makes the internal
+>> regulator reference count do the trick.
+>
+> I'm not sure what "the sites where the regulators were actually
+> enabled/disabled in respective driver" are but my understanding was that
+> there's a bit of an issue here in that the MMC core does not guarantee
+> balanced enable/disable calls.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/dma/amba-pl08x.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Yeah I figured out what you wanted and sent an updated patch, check
+it out. I'll just weave in some comments from Adrian and it'll do things
+the way you want it I believe.
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 65f595c..65892d5 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1270,6 +1270,7 @@ static dma_cookie_t pl08x_tx_submit(struct dma_async_tx_descriptor *tx)
- 	ret = prep_phy_channel(plchan, txd);
- 	if (ret) {
- 		/* No physical channel available, cope with it */
-+		pl08x_free_txd_list(pl08x, plchan);
- 		spin_unlock_irqrestore(&plchan->lock, flags);
- 		return -EBUSY;
- 	}
--- 
-1.6.3.3
+Yours,
+Linus Walleij
