@@ -1,27 +1,21 @@
 From: david-b@pacbell.net (David Brownell)
-Date: Mon, 30 Aug 2010 20:42:49 -0700 (PDT)
+Date: Mon, 30 Aug 2010 20:45:01 -0700 (PDT)
 Subject: gs_start_io() and gs_close()
 In-Reply-To: <4C7C5B39.80307@syncadence.com>
-Message-ID: <286573.7601.qm@web180311.mail.gq1.yahoo.com>
+Message-ID: <154082.61516.qm@web180301.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, the patch looks plausible and you say you've
-tested it ...
+As I mentioned, I'd like to see a few
+Tested-By: reports confirming this
+patch works, before this gets into
+Greg's merge queue ...
 
-Greg, can you add this to your queue?
+So -- can folk using the serial gadget code
+please give this a whirl and see if the patch
+behaves (or instead makes trouble).
 
-I figure that we should try to collect a
-few "Tested-By" attributions before including
-this in the next merge window.
 
-But, at worst, I'd expect bugs that can
-be fixed by one of the submitters...
-
-I can imagine how having stress tested this on
-systems with relatively much memory (not really
-tiny embedded hardware, except physically) could
-have hidden such problems.
 
 
 --- On Mon, 8/30/10, Jim Sung <jsung@syncadence.com> wrote:
@@ -29,11 +23,6 @@ have hidden such problems.
 > From: Jim Sung <jsung@syncadence.com>
 > Subject: Re: gs_start_io() and gs_close()
 > To: "David Brownell" <david-b@pacbell.net>
-
-Acked-by: David Brownell <dbrownell@users.sourceforge.net>
-
-
-
 > Cc: "Igor Grinberg" <grinberg@compulab.co.il>, linux-usb at vger.kernel.org, "linux-arm-kernel" <linux-arm-kernel@lists.infradead.org>
 > Date: Monday, August 30, 2010, 6:30 PM
 > Hi Dave:
