@@ -1,25 +1,62 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 1 Sep 2010 12:45:18 +0100
-Subject: [PATCH 00/13] ARM: S5P64X0: Add new S5P6450 Support
-In-Reply-To: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100901114518.GA20737@trinity.fluff.org>
+From: martinwguy@gmail.com (Martin Guy)
+Date: Wed, 1 Sep 2010 13:41:12 +0200
+Subject: mmc over SPI on DM6467 based board. card not detected.
+In-Reply-To: <AANLkTinZEWUqhV_yVh78hYNA82JbJ8OKYP_UJ2fRD6BA@mail.gmail.com>
+References: <4C516634.5040804@criticallink.com>
+	<877hjd106u.fsf@deeprootsystems.com>
+	<4C7702EB.8040905@criticallink.com>
+	<8762ywrvpt.fsf@deeprootsystems.com>
+	<4C77E6BD.4000303@criticallink.com>
+	<87fwy0orsg.fsf@deeprootsystems.com>
+	<BLU124-W40A2B008B886302781867B4870@phx.gbl>
+	<AANLkTinZEWUqhV_yVh78hYNA82JbJ8OKYP_UJ2fRD6BA@mail.gmail.com>
+Message-ID: <AANLkTimM=OC1d8ttngXC2Mbpr8006sGsNv1e6hxK+m3Z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 01, 2010 at 04:09:07PM +0900, Kukjin Kim wrote:
-> This patches add basic support for Samsung S5P6450 SoC.
-> 
-> Basically this patch moves mach-s5p6440 (ARCH_S5P6440) to mach-s5p64x0
-> (ARCH_S5P64X0) to support Samsung's new S5P6450 SoC. The ARCH_S5P64X0
-> can support S5P6440 and S5P6450 with one kernel image. It is tested on
-> SMDK6440(S5P6440) and SMDK6450(S5P6450) with s5p64x0_defconfig. And
-> this patch changes s5p6440_defconfig to s5p64x0_defconfig for S5P64X0.
+On 8/30/10, Steve Chen <schen@mvista.com> wrote:
+> On Sat, Aug 28, 2010 at 8:26 AM, Sumesh Kaana <sumeshkkn@hotmail.com> wrote:
+>  > I am trying to mount SD-Card over SPI on our custom DM6467 board. davinci
+>  > spi controller driver and mmc over spi drver are selected in the menuconfig.
+>  > i am using davinci-PSP.03-XX-00-37 kernel.
+>  >
+>  > I have also edited board initialization file to probe the MMC card under SPI
+>  > as below:
+>  >
+>  >
+>  >
+>  > static struct spi_board_info dm646x_spi_info[] __initconst = {
+>  >
+>  > #ifdef CONFIG_MMC_SPI
+>  >
+>  >         {
+>  >
+>  >                 .modalias = "mmc_spi",
+>  >
+>  >                 .max_speed_hz = (750 * 1000 ),     /* max spi clock (SCK)
+>  > speed in HZ */
+>  >
+>  >                 .bus_num = 0,
+>  >
+>  >                 .chip_select = 0,                       /* CS0 */
+>  >
+>  >                 .mode           = SPI_MODE_0,
+>  >
+>  >         },
+>  >
+>  > #endif
+>  >
+>  >
+>  >
+>  > The kernel boots with following log
+>  >
+>  ...
+>  > mmc0: Minimum clock frequency too high for identification mode
+>  ...
+>
+>  Have you tried lower the clock frequency?
 
-What about the s5p6442?
+The initial card identification should be done at 400kHz. If that is
+successful, the following commands can be sent at your maximum rate.
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+   M
