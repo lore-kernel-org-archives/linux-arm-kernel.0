@@ -1,310 +1,37 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 1 Sep 2010 18:47:37 +0900
-Subject: [PATCH 02/13] ARM: S5P64X0: Update Kconfig and Makefile
-In-Reply-To: <1283324960-21629-3-git-send-email-kgene.kim@samsung.com>
-References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-	<1283324960-21629-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTin_aQvv_U9z7VxGM-3VWMj-iWdS928aB30sETWp@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 1 Sep 2010 10:48:26 +0100
+Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
+In-Reply-To: <000801cb49ba$3e1e50f0$ba5af2d0$%kim@samsung.com>
+References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
+	<20100820095351.GD13668@rakim.wolfsonmicro.main>
+	<1282301229.3084.152.camel@odin>
+	<011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
+	<20100901091519.GA17032@opensource.wolfsonmicro.com>
+	<000801cb49ba$3e1e50f0$ba5af2d0$%kim@samsung.com>
+Message-ID: <20100901094826.GA28490@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> This patch updates the Kconfig and Makefile for the S5P6440 and S5P6450
-> machines. It also updates arch/arm/ Kconfig and Makefile to include for
-> support ARCH_S5P64X0 with one kernel image.
->
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 16 +++---
-> ?arch/arm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-s5p6440/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 33 ------------
-> ?arch/arm/mach-s5p6440/Makefile ? ? ? ? ? ? ? ? ? ? | ? 25 ---------
-> ?arch/arm/mach-s5p64x0/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 55 ++++++++++++++++++++
-> ?arch/arm/mach-s5p64x0/Makefile ? ? ? ? ? ? ? ? ? ? | ? 30 +++++++++++
-> ?.../{mach-s5p6440 => mach-s5p64x0}/Makefile.boot ? | ? ?0
-> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?4 +-
-> ?8 files changed, 95 insertions(+), 70 deletions(-)
-> ?delete mode 100644 arch/arm/mach-s5p6440/Kconfig
-> ?delete mode 100644 arch/arm/mach-s5p6440/Makefile
-> ?create mode 100644 arch/arm/mach-s5p64x0/Kconfig
-> ?create mode 100644 arch/arm/mach-s5p64x0/Makefile
-> ?rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/Makefile.boot (100%)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a7ed21f..40e75b3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -679,17 +679,15 @@ config ARCH_S3C64XX
-> ? ? ? ?help
-> ? ? ? ? ?Samsung S3C64XX series based systems
->
-> -config ARCH_S5P6440
-> - ? ? ? bool "Samsung S5P6440"
-> +config ARCH_S5P64X0
-> + ? ? ? bool "Samsung S5P6440 S5P6450"
-> ? ? ? ?select CPU_V6
-> ? ? ? ?select GENERIC_GPIO
-> ? ? ? ?select HAVE_CLK
-> - ? ? ? select HAVE_S3C2410_WATCHDOG
-> ? ? ? ?select ARCH_USES_GETTIMEOFFSET
-> - ? ? ? select HAVE_S3C2410_I2C
-> - ? ? ? select HAVE_S3C_RTC
+On Wed, Sep 01, 2010 at 06:44:11PM +0900, Kukjin Kim wrote:
 
-Why HAVE_* is deleted?
+> MM...but I'm not sure if I can submit other patch for max8952...
+> Actually, Mr. Ham's max8952 code has been applied by Liam.
 
-> ? ? ? ?help
-> - ? ? ? ? Samsung S5P6440 CPU based systems
-> + ? ? ? ? Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
-> + ? ? ? ? SMDK6450.
->
-> ?config ARCH_S5P6442
-> ? ? ? ?bool "Samsung S5P6442"
-> @@ -929,7 +927,7 @@ if ARCH_S3C64XX
-> ?source "arch/arm/mach-s3c64xx/Kconfig"
-> ?endif
->
-> -source "arch/arm/mach-s5p6440/Kconfig"
-> +source "arch/arm/mach-s5p64x0/Kconfig"
->
-> ?source "arch/arm/mach-s5p6442/Kconfig"
->
-> @@ -1232,7 +1230,7 @@ source kernel/Kconfig.preempt
->
-> ?config HZ
-> ? ? ? ?int
-> - ? ? ? default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || \
-> + ? ? ? default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
-> ? ? ? ? ? ? ? ?ARCH_S5P6442 || ARCH_S5PV210 || ARCH_S5PV310
-> ? ? ? ?default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
-> ? ? ? ?default AT91_TIMER_HZ if ARCH_AT91
-> @@ -1609,7 +1607,7 @@ config ZRELADDR
-> ? ? ? ?default 0x10008000 if ARCH_MSM ||\
-> ? ? ? ? ? ? ? ?ARCH_OMAP1 ||\
-> ? ? ? ? ? ? ? ?ARCH_RPC
-> - ? ? ? default 0x20008000 if ARCH_S5P6440 ||\
-> + ? ? ? default 0x20008000 if ARCH_S5P64X0 ||\
-> ? ? ? ? ? ? ? ?ARCH_S5P6442 ||\
-> ? ? ? ? ? ? ? ?ARCH_S5PC100 ||\
-> ? ? ? ? ? ? ? ?ARCH_S5PV210
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 59c1ce8..8420f21 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -173,7 +173,7 @@ machine-$(CONFIG_ARCH_RPC) ? ? ? ? ?:= rpc
-> ?machine-$(CONFIG_ARCH_S3C2410) ? ? ? ? := s3c2410 s3c2400 s3c2412 s3c2416 s3c2440 s3c2443
-> ?machine-$(CONFIG_ARCH_S3C24A0) ? ? ? ? := s3c24a0
-> ?machine-$(CONFIG_ARCH_S3C64XX) ? ? ? ? := s3c64xx
-> -machine-$(CONFIG_ARCH_S5P6440) ? ? ? ? := s5p6440
-> +machine-$(CONFIG_ARCH_S5P64X0) ? ? ? ? := s5p64x0
-> ?machine-$(CONFIG_ARCH_S5P6442) ? ? ? ? := s5p6442
-> ?machine-$(CONFIG_ARCH_S5PC100) ? ? ? ? := s5pc100
-> ?machine-$(CONFIG_ARCH_S5PV210) ? ? ? ? := s5pv210
-> diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
-> deleted file mode 100644
-> index 6a4af7f..0000000
-> --- a/arch/arm/mach-s5p6440/Kconfig
-> +++ /dev/null
-> @@ -1,33 +0,0 @@
-> -# arch/arm/mach-s5p6440/Kconfig
-> -#
-> -# Copyright (c) 2009 Samsung Electronics Co., Ltd.
-> -# ? ? ? ? ? ? ?http://www.samsung.com/
-> -#
-> -# Licensed under GPLv2
-> -
-> -if ARCH_S5P6440
-> -
-> -config CPU_S5P6440
-> - ? ? ? bool
-> - ? ? ? select S3C_PL330_DMA
-> - ? ? ? help
-> - ? ? ? ? Enable S5P6440 CPU support
-> -
-> -config S5P6440_SETUP_I2C1
-> - ? ? ? bool
-> - ? ? ? help
-> - ? ? ? ? Common setup code for i2c bus 1.
-> -
-> -config MACH_SMDK6440
-> - ? ? ? bool "SMDK6440"
-> - ? ? ? select CPU_S5P6440
-> - ? ? ? select S3C_DEV_I2C1
-> - ? ? ? select S3C_DEV_RTC
-> - ? ? ? select S3C_DEV_WDT
-> - ? ? ? select SAMSUNG_DEV_ADC
-> - ? ? ? select SAMSUNG_DEV_TS
-> - ? ? ? select S5P6440_SETUP_I2C1
-> - ? ? ? help
-> - ? ? ? ? Machine support for the Samsung SMDK6440
-> -
-> -endif
-> diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
-> deleted file mode 100644
-> index c3fe4d3..0000000
-> --- a/arch/arm/mach-s5p6440/Makefile
-> +++ /dev/null
-> @@ -1,25 +0,0 @@
-> -# arch/arm/mach-s5p6440/Makefile
-> -#
-> -# Copyright (c) 2009 Samsung Electronics Co., Ltd.
-> -# ? ? ? ? ? ? ?http://www.samsung.com/
-> -#
-> -# Licensed under GPLv2
-> -
-> -obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> -obj-m ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> -obj-n ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> -obj- ? ? ? ? ? ? ? ? ? ? ? ? ? :=
-> -
-> -# Core support for S5P6440 system
-> -
-> -obj-$(CONFIG_CPU_S5P6440) ? ? ?+= cpu.o init.o clock.o gpio.o dma.o
-> -obj-$(CONFIG_CPU_S5P6440) ? ? ?+= setup-i2c0.o
-> -
-> -# machine support
-> -
-> -obj-$(CONFIG_MACH_SMDK6440) ? ?+= mach-smdk6440.o
-> -
-> -# device support
-> -obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?+= dev-audio.o
-> -obj-$(CONFIG_S3C64XX_DEV_SPI) ?+= dev-spi.o
-> -obj-$(CONFIG_S5P6440_SETUP_I2C1) ? ? ? += setup-i2c1.o
-> diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-> new file mode 100644
-> index 0000000..488375c
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p64x0/Kconfig
-> @@ -0,0 +1,55 @@
-> +# arch/arm/mach-s5p64x0/Kconfig
-> +#
-> +# Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-> +# ? ? ? ? ? ? ?http://www.samsung.com/
-> +#
-> +# Licensed under GPLv2
-> +
-> +if ARCH_S5P64X0
-> +
-> +config CPU_S5P6440
-> + ? ? ? bool
-> + ? ? ? select PLAT_S5P
-> + ? ? ? select S3C_PL330_DMA
-> + ? ? ? help
-> + ? ? ? ? Enable S5P6440 CPU support
-> +
-> +config CPU_S5P6450
-> + ? ? ? bool
-> + ? ? ? select PLAT_S5P
-> + ? ? ? select S3C_PL330_DMA
-> + ? ? ? help
-> + ? ? ? ? Enable S5P6450 CPU support
-> +
-> +config S5P64X0_SETUP_I2C1
-> + ? ? ? bool
-> + ? ? ? help
-> + ? ? ? ? Common setup code for i2c bus 1.
-> +
-> +# machine support
-> +
-> +config MACH_SMDK6440
-> + ? ? ? bool "SMDK6440"
-> + ? ? ? select CPU_S5P6440
-> + ? ? ? select S3C_DEV_I2C1
-> + ? ? ? select S3C_DEV_RTC
-> + ? ? ? select S3C_DEV_WDT
-> + ? ? ? select SAMSUNG_DEV_ADC
-> + ? ? ? select SAMSUNG_DEV_TS
-> + ? ? ? select S5P64X0_SETUP_I2C1
-> + ? ? ? help
-> + ? ? ? ? Machine support for the Samsung SMDK6440
-> +
-> +config MACH_SMDK6450
-> + ? ? ? bool "SMDK6450"
-> + ? ? ? select CPU_S5P6450
-> + ? ? ? select S3C_DEV_I2C1
-> + ? ? ? select S3C_DEV_RTC
-> + ? ? ? select S3C_DEV_WDT
-> + ? ? ? select SAMSUNG_DEV_ADC
-> + ? ? ? select SAMSUNG_DEV_TS
-> + ? ? ? select S5P64X0_SETUP_I2C1
-> + ? ? ? help
-> + ? ? ? ? Machine support for the Samsung SMDK6450
+We can always remove that if it makes more sense to combine the code.
 
-In most case SMDK has almost same functionality. make a common select
-e.g., SMDK_COMMON and each board just select it.
+> -	return (MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP);
+> +	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
+> +	int ret = MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP;
 > +
-> +endif
-> diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
-> new file mode 100644
-> index 0000000..2655829
-> --- /dev/null
-> +++ b/arch/arm/mach-s5p64x0/Makefile
-> @@ -0,0 +1,30 @@
-> +# arch/arm/mach-s5p64x0/Makefile
-> +#
-> +# Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-> +# ? ? ? ? ? ? ?http://www.samsung.com
-> +#
-> +# Licensed under GPLv2
-> +
-> +obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> +obj-m ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> +obj-n ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> +obj- ? ? ? ? ? ? ? ? ? ? ? ? ? :=
-> +
-> +# Core support for S5P64X0 system
-> +
-> +obj-$(CONFIG_ARCH_S5P64X0) ? ? += cpu.o init.o clock.o dma.o
-> +obj-$(CONFIG_ARCH_S5P64X0) ? ? += setup-i2c0.o
-> +obj-$(CONFIG_CPU_S5P6440) ? ? ?+= clock-s5p6440.o gpio.o
-> +obj-$(CONFIG_CPU_S5P6450) ? ? ?+= clock-s5p6450.o
-> +
-> +# machine support
-> +
-> +obj-$(CONFIG_MACH_SMDK6440) ? ?+= mach-smdk6440.o
-> +obj-$(CONFIG_MACH_SMDK6450) ? ?+= mach-smdk6450.o
-Are there difference between smdk6440 and smdk6450 except the SOC?
-If no, how about to make a single file as pxa or omap does?
+> +	if (!strcmp(info->i2c->name, "max8952"))
 
-Thank you,
-Kyungmin Park
-> +
-> +# device support
-> +
-> +obj-y ? ? ? ? ? ? ? ? ? ? ? ? ?+= dev-audio.o
-> +obj-$(CONFIG_S3C64XX_DEV_SPI) ?+= dev-spi.o
-> +
-> +obj-$(CONFIG_S5P64X0_SETUP_I2C1) ? ? ? += setup-i2c1.o
-> diff --git a/arch/arm/mach-s5p6440/Makefile.boot b/arch/arm/mach-s5p64x0/Makefile.boot
-> similarity index 100%
-> rename from arch/arm/mach-s5p6440/Makefile.boot
-> rename to arch/arm/mach-s5p64x0/Makefile.boot
-> diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-> index c6a855d..90f97d6 100644
-> --- a/arch/arm/plat-s5p/Kconfig
-> +++ b/arch/arm/plat-s5p/Kconfig
-> @@ -7,7 +7,7 @@
->
-> ?config PLAT_S5P
-> ? ? ? ?bool
-> - ? ? ? depends on (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310)
-> + ? ? ? depends on (ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310)
-> ? ? ? ?default y
-> ? ? ? ?select ARM_VIC if !ARCH_S5PV310
-> ? ? ? ?select ARM_GIC if ARCH_S5PV310
-> @@ -30,7 +30,7 @@ config S5P_EXT_INT
-> ? ? ? ?bool
-> ? ? ? ?help
-> ? ? ? ? ?Use the external interrupts (other than GPIO interrupts.)
-> - ? ? ? ? Note: Do not choose this for S5P6440.
-> + ? ? ? ? Note: Do not choose this for S5P6440 and S5P6450.
->
-> ?config S5P_DEV_FIMC0
-> ? ? ? ?bool
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Rather than doing a strcmp on the name you should use the id field here:
+
+>  static const struct i2c_device_id max8649_id[] = {
+>  	{ "max8649", 0 },
+> +	{ "max8952", 0 },
+>  	{ }
+>  };
+
+to pass in a value which you compare against.  While it's probably not a
+performance issue on this chip this is much clearer and more idiomatic.
