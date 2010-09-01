@@ -1,39 +1,35 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Sep 2010 08:23:05 +0100
-Subject: [PATCH 08/13] PXA: Colibri: Toradex Colibri PXA270 CF support
-In-Reply-To: <1281673964-2119-8-git-send-email-marek.vasut@gmail.com>
-References: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
-	<1281673964-2119-8-git-send-email-marek.vasut@gmail.com>
-Message-ID: <20100901072304.GE8142@n2100.arm.linux.org.uk>
+Date: Wed, 1 Sep 2010 08:39:13 +0100
+Subject: [PATCH 0/3] Allow late mdesc detection, v4
+In-Reply-To: <1282553423.737985.983362819420.0.gpush@pororo>
+References: <1282553423.737985.983362819420.0.gpush@pororo>
+Message-ID: <20100901073913.GF8142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 13, 2010 at 06:32:39AM +0200, Marek Vasut wrote:
-> diff --git a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
-> new file mode 100644
-> index 0000000..8373816
-> --- /dev/null
-> +++ b/drivers/pcmcia/pxa2xx_colibri.c
-> @@ -0,0 +1,215 @@
-> +/*
-> + * linux/drivers/pcmcia/pxa2xx_colibri.c
-> + *
-> + * Driver for Toradex Colibri PXA270 CF socket
-> + *
-> + * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/delay.h>
-> +
-> +#include <asm/mach-types.h>
-> +
-> +#include <mach/gpio.h>
+On Mon, Aug 23, 2010 at 04:50:23PM +0800, Jeremy Kerr wrote:
+> Currently, we probe for a mdesc early in boot. At this early stage, the
+> only thing we use the mdesc for is to determine the debug page mapping.
+> 
+> However, the debug addresses (phys and virt) need to be coded into the
+> addruart macro anyway; the dynamic probing is only going to tell us what
+> we already know.
+> 
+> These changes allow us to use the addruart macros to find the debug
+> mapping addresses, rather than pulling them out of the mdesc. This means
+> that the addresses are only kept in the one place, and that we don't
+> need the mdesc nearly as early.
 
-linux/gpio.h please.
+I fear that to merge them into my tree now will invite merge conflicts
+and/or code breakage when something gets merged without regard to these
+changes.  As I said last time around, the point to merge these (as newly
+updated patches) is once we freeze new platform support just before the
+next merge window.
+
+So I'm not merging them until the potential last week prior to the merge
+window opening - please keep an eye on Linus' -rc announcements and
+send updated patches (against my -devel tree - this is one case where
+we're going to have to do it this way) to the patch system at when Linus
+indicates that he's released the final -rc.
+
+Thanks.
