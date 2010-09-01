@@ -1,38 +1,39 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 1 Sep 2010 13:12:20 +0200
+Date: Wed, 1 Sep 2010 13:13:02 +0200
 Subject: [RFC] [PATCH] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <20100901100155.GN8142@n2100.arm.linux.org.uk>
+In-Reply-To: <20100901091233.GK8142@n2100.arm.linux.org.uk>
 References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
-	<20100901100155.GN8142@n2100.arm.linux.org.uk>
-Message-ID: <20100901111220.GD22790@game.jcrosoft.org>
+	<20100901091233.GK8142@n2100.arm.linux.org.uk>
+Message-ID: <20100901111302.GE22790@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +
-> > +static __inline__ struct clk_lookup_alloc *arch_kzalloc(size_t size)
-> 
-> No need to use __inline__ here - use inline instead.
-> 
-> > +static __inline__ struct clk_lookup_alloc *arch_kzalloc(size_t size)
-> 
-> Ditto.
-> 
-> > @@ -120,12 +124,12 @@ struct clk_lookup_alloc {
-> >  	char	con_id[MAX_CON_ID];
-> >  };
+On 10:12 Wed 01 Sep     , Russell King - ARM Linux wrote:
+> On Tue, Aug 31, 2010 at 01:16:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > factorise some generic infrastructure to assist looking up struct clks
+> > for the ARM & SH architecture.
+> > +/*
+> > + * Returns a clock. Note that we first try to use device id on the bus
+> > + * and clock name. If this fails, we try to use clock name only.
+> > + */
+> >  struct clk *clk_get(struct device *dev, const char *con_id)
+> >  {
+> >  	const char *dev_id = dev ? dev_name(dev) : NULL;
 > >  
-> > -struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
-> > -	const char *dev_fmt, ...)
-> > +struct clk_lookup * __init_refok
-> > +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+> >  	return clk_get_sys(dev_id, con_id);
+> >  }
+> > -EXPORT_SYMBOL(clk_get);
+> > +EXPORT_SYMBOL_GPL(clk_get);
+> >  
+> >  void clk_put(struct clk *clk)
+> >  {
+> >  	__clk_put(clk);
+> >  }
+> > -EXPORT_SYMBOL(clk_put);
+> > +EXPORT_SYMBOL_GPL(clk_put);
 > 
-> This looks like a nasty hack to get around the problem of calling a
-> boot-time only allocator - but I guess given what sh is doing we don't
-> have much choice here.
-> 
-> The choice of 'arch_kzalloc' is imho very poor - it potentially could
-> clash with some other use.  Maybe __clkdev_alloc() instead?
-ok I'll update
+> Please leave these as-is.
+ok but on SH it's GPL so it is ok with you Paul too?
 
 Best Regards,
 J.
