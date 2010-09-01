@@ -1,207 +1,63 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 2 Sep 2010 00:43:44 +0200
-Subject: [PATCH 44/74] ST SPEAr : FSMC (Flexible Static Memory Controller)
-	NOR interface driver
-In-Reply-To: <3083e6913169ae3d3761be1667708c01ea2e344c.1283161023.git.viresh.kumar@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<3083e6913169ae3d3761be1667708c01ea2e344c.1283161023.git.viresh.kumar@st.com>
-Message-ID: <AANLkTinEkovA7PLcSLso22Ok+GO-Nra4e27OwyeqC4dz@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 02 Sep 2010 01:53:22 +0300
+Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
+In-Reply-To: <4C7ED1E9.4050208@bluewatersys.com>
+References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
+	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
+	<1283170469.12995.53.camel@brekeke>	<4C7CA278.9040902@st.com>
+	<1283297810.2018.67.camel@brekeke>	<4C7DD2FD.1080501@st.com>
+	<1283337939.1958.20.camel@brekeke>	<4C7E3344.2020202@st.com>
+	<4C7EC43B.2050903@bluewatersys.com>
+	<AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>
+	<4C7ED1E9.4050208@bluewatersys.com>
+Message-ID: <1283381602.2209.49.camel@brekeke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/30 Viresh KUMAR <viresh.kumar@st.com>:
+On Thu, 2010-09-02 at 10:21 +1200, Ryan Mallon wrote:
+> On 09/02/2010 09:54 AM, Kevin Cernekee wrote:
+> > On Wed, Sep 1, 2010 at 2:23 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> >> However, we are interested in having a proper solution to this problem.
+> > 
+> > I would suggest using this patch as a starting point - could you
+> > please review the changes and try it out?
+> > 
+> > http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/b6d6ae730be2750fac166ed9df11ee6ea54d9160
+> 
+> That patch still breaks the ABI by renaming struct nand_ecclayout to
+> nand_ecclayout_user.
 
-> (...)
-> ?arch/arm/mach-spear13xx/fsmc-nor.c ? ? ? ? ? ? | ? 81 ++++++++++++++++++++++++
-> (...)
->  arch/arm/plat-spear/include/plat/fsmc.h        |   51 +++++++++++++++-
+Hmm, would you please show why my binary file 'nandwrite' would have to
+be re-built?
 
-Hmmm... again we have this block also in U300 and NHK8815.
+>  Any application using the old names will have to be
+> rewritten to compile against a new kernel.
 
-> (...)
-> +++ b/arch/arm/mach-spear13xx/fsmc-nor.c
-> @@ -0,0 +1,81 @@
-> +/*
-> + * arch/arm/mach-spear13xx/fsmc-nor.c
-> + *
-> + * FSMC (Flexible Static Memory Controller) interface for NOR
+Not necessary. mtd-utils, for example, maintain their own copy of the
+mtd-abi.h file, which I personally think is a good idea.
 
-It even says its generic and should live in
-drivers/mtd/maps I think for NOR controllers.
+But if your apps depend on the kernel headers, then yes, you will need
+to amend it or copy the old header into your project.
 
-> + *
-> + * Copyright (C) 2010 ST Microelectronics
-> + * Vipin Kumar<vipin.kumar@st.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <plat/fsmc.h>
-> +
-> +int __init fsmc_nor_init(struct platform_device *pdev, unsigned long base,
-> + ? ? ? ? ? ? ? u32 bank, u32 width)
-> +{
-> + ? ? ? void __iomem *fsmc_nor_base;
-> + ? ? ? struct fsmc_regs *regs;
-> + ? ? ? struct clk *clk;
-> + ? ? ? int ret;
-> + ? ? ? u32 ctrl;
-> +
-> + ? ? ? if (bank > (FSMC_MAX_NOR_BANKS - 1))
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? fsmc_nor_base = ioremap(base, FSMC_NOR_REG_SIZE);
-> + ? ? ? if (!fsmc_nor_base)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? clk = clk_get(NULL, "fsmc");
-> + ? ? ? if (IS_ERR(clk)) {
-> + ? ? ? ? ? ? ? iounmap(fsmc_nor_base);
-> + ? ? ? ? ? ? ? return PTR_ERR(clk);
-> + ? ? ? }
-> +
-> + ? ? ? ret = clk_enable(clk);
-> + ? ? ? if (ret) {
-> + ? ? ? ? ? ? ? iounmap(fsmc_nor_base);
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> +
-> + ? ? ? regs = (struct fsmc_regs *)fsmc_nor_base;
-> +
-> + ? ? ? ctrl = WAIT_ENB | WRT_ENABLE | WPROT | NOR_DEV | BANK_ENABLE;
-> +
-> + ? ? ? switch (width) {
-> + ? ? ? case FSMC_FLASH_WIDTH8:
-> + ? ? ? ? ? ? ? ctrl |= WIDTH_8;
-> + ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? case FSMC_FLASH_WIDTH16:
-> + ? ? ? ? ? ? ? ctrl |= WIDTH_16;
-> + ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? ctrl |= WIDTH_8;
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? }
-> +
-> + ? ? ? writel(ctrl, &regs->nor_bank_regs[bank].ctrl);
-> + ? ? ? writel(0x0FFFFFFF, &regs->nor_bank_regs[bank].ctrl_tim);
-> + ? ? ? writel(ctrl | RSTPWRDWN, &regs->nor_bank_regs[bank].ctrl);
-> +
-> + ? ? ? iounmap(fsmc_nor_base);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +void __init fsmc_init_board_info(struct platform_device *pdev,
-> + ? ? ? ? ? ? ? struct mtd_partition *partitions, unsigned int nr_partitions,
-> + ? ? ? ? ? ? ? unsigned int width)
-> +{
-> + ? ? ? fsmc_init_plat_data(pdev, partitions, nr_partitions, width);
-> +}
+IOW, the patch breaks API by renaming, but not ABI, I think. I do not
+see this as a major problem - just a small inconvenience.
 
-All this should be in drivers/mtd/maps/fsmc-nor.c or so am I right?
+> The old interface should remain unchanged in that include/mtd/mtd-abi.h.
+> If an application using the old interface calls any of the ecc ioctls
+> for a nand chip with > 64 bytes ecc it should return an error.
 
-> diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-> diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+It will, because size of the structure is part of the ioctl number,
+even. See the corresponding ioctl macro definition.
 
-That kind of stuff you can keep :-)
+> I still think the eccpos field should be a pointer, so that it can
+> allocate as much space as is needed for the ecc. This also means that
+> the kernel doesn't need to be changed every time a new NAND chips
+> appears with a bigger ecc size.
 
-> diff --git a/arch/arm/plat-spear/include/plat/fsmc.h b/arch/arm/plat-spear/include/plat/fsmc.h
+Sure, this is the whole point: go ahead and design the new ioctl, and
+then deprecate the old one. Just invest men/hours into that and we are
+all right :-)
 
-Noooo combine this with the NAND stuff into include/linux/mtd/fsmc.h!
-
-> index c0fdcd3..5909afd 100644
-> --- a/arch/arm/plat-spear/include/plat/fsmc.h
-> +++ b/arch/arm/plat-spear/include/plat/fsmc.h
-> @@ -15,11 +15,36 @@
-> ?#define __PLAT_FSMC_H
-
-Change #define to reflect new suggested placement.
-
->
-> ?#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/physmap.h>
-> ?#include <linux/types.h>
-> ?#include <asm/param.h>
->
-> +#define FSMC_MAX_NOR_BANKS ? ? 4
-> ?#define FSMC_MAX_NAND_BANKS ? ?4
->
-> +#define FSMC_FLASH_WIDTH8 ? ? ?1
-> +#define FSMC_FLASH_WIDTH16 ? ? 2
-> +
-> +struct nor_bank_regs {
-> + ? ? ? u32 ctrl;
-> + ? ? ? u32 ctrl_tim;
-> +};
-> +
-> +/* ctrl register definitions */
-> +#define BANK_ENABLE ? ? ? ? ? ?(1 << 0)
-> +#define MUXED ? ? ? ? ? ? ? ? ?(1 << 1)
-> +#define NOR_DEV ? ? ? ? ? ? ? ? ? ? ? ?(2 << 2)
-> +#define WIDTH_8 ? ? ? ? ? ? ? ? ? ? ? ?(0 << 4)
-> +#define WIDTH_16 ? ? ? ? ? ? ? (1 << 4)
-> +#define RSTPWRDWN ? ? ? ? ? ? ?(1 << 6)
-> +#define WPROT ? ? ? ? ? ? ? ? ?(1 << 7)
-> +#define WRT_ENABLE ? ? ? ? ? ? (1 << 12)
-> +#define WAIT_ENB ? ? ? ? ? ? ? (1 << 13)
-> +
-> +/* ctrl_tim register definitions */
-> +
-> ?struct nand_bank_regs {
-> ? ? ? ?u32 pc;
-> ? ? ? ?u32 sts;
-> @@ -31,8 +56,11 @@ struct nand_bank_regs {
-> ? ? ? ?u32 ecc3;
-> ?};
->
-> +#define FSMC_NOR_REG_SIZE ? ? ?0x40
-> +
-> ?struct fsmc_regs {
-> - ? ? ? u8 reserved_1[0x40];
-> + ? ? ? struct nor_bank_regs nor_bank_regs[FSMC_MAX_NOR_BANKS];
-> + ? ? ? u8 reserved_1[0x40 - 0x20];
-> ? ? ? ?struct nand_bank_regs bank_regs[FSMC_MAX_NAND_BANKS];
-> ? ? ? ?u8 reserved_2[0xfe0 - 0xc0];
-> ? ? ? ?u32 peripid0; ? ? ? ? ? ? ? ? ? /* 0xfe0 */
-> @@ -106,4 +134,25 @@ struct fsmc_eccplace {
-> ? ? ? ?struct fsmc_nand_eccplace eccplace[MAX_ECCPLACE_ENTRIES];
-> ?};
->
-> +static inline void fsmc_init_plat_data(struct platform_device *pdev,
-> + ? ? ? ? ? ? ? struct mtd_partition *partitions, unsigned int nr_partitions,
-> + ? ? ? ? ? ? ? unsigned int width)
-> +{
-> + ? ? ? struct physmap_flash_data *fsmc_plat_data;
-> + ? ? ? fsmc_plat_data = dev_get_platdata(&pdev->dev);
-> +
-> + ? ? ? if (partitions) {
-> + ? ? ? ? ? ? ? fsmc_plat_data->parts = partitions;
-> + ? ? ? ? ? ? ? fsmc_plat_data->nr_parts = nr_partitions;
-> + ? ? ? }
-> +
-> + ? ? ? fsmc_plat_data->width = width;
-> +}
-> +
-> +extern int __init fsmc_nor_init(struct platform_device *pdev,
-> + ? ? ? ? ? ? ? unsigned long base, u32 bank, u32 width);
-> +extern void __init fsmc_init_board_info(struct platform_device *pdev,
-> + ? ? ? ? ? ? ? struct mtd_partition *partitions, unsigned int nr_partitions,
-> + ? ? ? ? ? ? ? unsigned int width);
-> +
-> ?#endif /* __PLAT_FSMC_H */
-
-Thanks!
-
-Yours,
-Linus Walleij
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
