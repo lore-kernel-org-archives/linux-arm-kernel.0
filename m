@@ -1,27 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 1 Sep 2010 12:02:03 +0200
-Subject: [PATCH 02/19] ARM: sa1111: move __sa1111_probe() to .devinit.text
-In-Reply-To: <1281017333-5563-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100805140813.GA13859@pengutronix.de>
-	<1281017333-5563-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100901100203.GB11107@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Sep 2010 11:01:55 +0100
+Subject: [RFC] [PATCH] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20100901100155.GN8142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tue, Aug 31, 2010 at 01:16:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> diff --git a/arch/arm/include/asm/lookup_clkdev.h b/arch/arm/include/asm/lookup_clkdev.h
+> new file mode 100644
+> index 0000000..d57f7a6
+> --- /dev/null
+> +++ b/arch/arm/include/asm/lookup_clkdev.h
+> @@ -0,0 +1,23 @@
+> +/*
+> + *  arch/arm/common/clkdev.c
+> + *
+> + *  Copyright (C) 2008 Russell King.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Helper for the clk API to assist looking up a struct clk.
+> + */
+> +
+> +#ifndef __LOOKUP_CLK_DEV__
+> +#define __LOOKUP_CLK_DEV__
+> +
+> +#include <mach/clkdev.h>
+> +
+> +static __inline__ struct clk_lookup_alloc *arch_kzalloc(size_t size)
 
-On Thu, Aug 05, 2010 at 04:08:36PM +0200, Uwe Kleine-K?nig wrote:
-> __sa1111_probe is only called by sa1111_probe that lives in .devinit.text.
-> So it's save to move the former to .devinit.text, too.
-> 
-> Acked-by: Kristoffer Ericson <kristoffer.ericson@gmail.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Should/can I send the fixes in this series that are not yet in mainline to
-your patch system?
+No need to use __inline__ here - use inline instead.
 
-Best regards
-Uwe
+> +static __inline__ struct clk_lookup_alloc *arch_kzalloc(size_t size)
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Ditto.
+
+> @@ -120,12 +124,12 @@ struct clk_lookup_alloc {
+>  	char	con_id[MAX_CON_ID];
+>  };
+>  
+> -struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+> -	const char *dev_fmt, ...)
+> +struct clk_lookup * __init_refok
+> +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+
+This looks like a nasty hack to get around the problem of calling a
+boot-time only allocator - but I guess given what sh is doing we don't
+have much choice here.
+
+The choice of 'arch_kzalloc' is imho very poor - it potentially could
+clash with some other use.  Maybe __clkdev_alloc() instead?
