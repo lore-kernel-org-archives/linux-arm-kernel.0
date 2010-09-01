@@ -1,33 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Sep 2010 10:12:33 +0100
-Subject: [RFC] [PATCH] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20100901091233.GK8142@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 1 Sep 2010 10:15:19 +0100
+Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
+In-Reply-To: <011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
+References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
+	<20100820095351.GD13668@rakim.wolfsonmicro.main>
+	<1282301229.3084.152.camel@odin>
+	<011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
+Message-ID: <20100901091519.GA17032@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 31, 2010 at 01:16:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> factorise some generic infrastructure to assist looking up struct clks
-> for the ARM & SH architecture.
-> +/*
-> + * Returns a clock. Note that we first try to use device id on the bus
-> + * and clock name. If this fails, we try to use clock name only.
-> + */
->  struct clk *clk_get(struct device *dev, const char *con_id)
->  {
->  	const char *dev_id = dev ? dev_name(dev) : NULL;
->  
->  	return clk_get_sys(dev_id, con_id);
->  }
-> -EXPORT_SYMBOL(clk_get);
-> +EXPORT_SYMBOL_GPL(clk_get);
->  
->  void clk_put(struct clk *clk)
->  {
->  	__clk_put(clk);
->  }
-> -EXPORT_SYMBOL(clk_put);
-> +EXPORT_SYMBOL_GPL(clk_put);
+On Wed, Sep 01, 2010 at 09:15:36AM +0900, Kukjin Kim wrote:
 
-Please leave these as-is.
+> Seems almost same between the operation of max8649 and max8952 except output
+> voltage range.
+
+> How do you think that can support max8952 with small modifying max8649?
+
+Take a look at something like the WM831x drivers for how you can handle
+multiple devices with one driver - you can register I2C IDs for multiple
+devices and then select behaviour based on the name that was quoted.
