@@ -1,44 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Sep 2010 16:09:20 +0900
-Subject: [PATCH 13/13] ARM: s5p64x0_defconfig: Update for support S5P6440 and
-	S5P6450
-In-Reply-To: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1283324960-21629-14-git-send-email-kgene.kim@samsung.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Wed, 1 Sep 2010 10:42:15 +0300
+Subject: [PATCH 2/2] set packet size limit for the mv643xx csum offloading
+In-Reply-To: <20100831164816.GU1586@mail.wantstofly.org>
+References: <1275827336-31111-1-git-send-email-saeed@marvell.com>
+	<1275827336-31111-2-git-send-email-saeed@marvell.com>
+	<20100715202621.GA772@jirafa.cyrius.com>
+	<20100716060856.GP14513@mail.wantstofly.org>
+	<AANLkTiknBccMbH0ZB_bbe6xC4W1EgtFn=sxVUHCDi8cJ@mail.gmail.com>
+	<20100831164816.GU1586@mail.wantstofly.org>
+Message-ID: <AANLkTinvM2DK9c2oxsVMVpF1gzf5VEHiHukqOc59mT79@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates s5p64x0_defconfig and changes the name from
-s5p6440_defconfig so that can support S5P6440 and S5P6450 with
-one kernel.
-
-Tested on SMDK6440(S5P6440) and SMDK6450(S5P6450).
-
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- .../{s5p6440_defconfig => s5p64x0_defconfig}       |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
- rename arch/arm/configs/{s5p6440_defconfig => s5p64x0_defconfig} (97%)
-
-diff --git a/arch/arm/configs/s5p6440_defconfig b/arch/arm/configs/s5p64x0_defconfig
-similarity index 97%
-rename from arch/arm/configs/s5p6440_defconfig
-rename to arch/arm/configs/s5p64x0_defconfig
-index 0b0266c..2993ecd 100644
---- a/arch/arm/configs/s5p6440_defconfig
-+++ b/arch/arm/configs/s5p64x0_defconfig
-@@ -5,10 +5,11 @@ CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_S5P6440=y
-+CONFIG_ARCH_S5P64X0=y
- CONFIG_S3C_BOOT_ERROR_RESET=y
- CONFIG_S3C_LOWLEVEL_UART_PORT=1
- CONFIG_MACH_SMDK6440=y
-+CONFIG_MACH_SMDK6450=y
- CONFIG_CPU_32v6K=y
- CONFIG_AEABI=y
- CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
--- 
-1.6.2.5
+On Tue, Aug 31, 2010 at 7:48 PM, Lennert Buytenhek
+<buytenh@wantstofly.org> wrote:
+> On Tue, Aug 31, 2010 at 04:13:28PM +0300, saeed bishara wrote:
+>
+>> > > I noticed that patch 1/2 has gone into mainline but I cannot find 2/2
+>> > > in any tree. ?Saeed, can you add the definition for Loki that someone
+>> > > pointed out (9*1024) and resubmit?
+>> >
+>> > If you're going to supply the value explicitly for all platforms, you
+>> > might as well supply it explicitly for mv78xx0 (9*1024) and orion5x
+>> > (9*1024) as well.
+>>
+>> The default value is 9*1024, so I see there is need to supply it for
+>> mv78xx0 and Loki. agree?
+>
+> I would supply it in any case, for clarity -- and if there are two
+> (or more) different values out there, then neither value really has
+> more right to be the default than the other.
+ok, attached the updated version of this patch.
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-set-packet-size-limit-for-the-mv643xx-csum-offloadin.patch
+Type: application/octet-stream
+Size: 4511 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100901/c629e319/attachment-0001.obj>
