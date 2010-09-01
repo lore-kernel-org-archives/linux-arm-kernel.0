@@ -1,25 +1,96 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 02 Sep 2010 02:23:25 +0300
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <4C7E3344.2020202@st.com>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
-	<1283170469.12995.53.camel@brekeke>  <4C7CA278.9040902@st.com>
-	<1283297810.2018.67.camel@brekeke>  <4C7DD2FD.1080501@st.com>
-	<1283337939.1958.20.camel@brekeke>  <4C7E3344.2020202@st.com>
-Message-ID: <1283383405.2209.66.camel@brekeke>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Wed,  1 Sep 2010 16:26:12 -0700
+Subject: [PATCH] msm: Featurize gpiomux.
+Message-ID: <1283383572-15635-1-git-send-email-gbean@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Featurize gpiomux so that systems like 7x00 which do not wish to use it
+do not have to be saddled with the configuration tables.
 
-On Wed, 2010-09-01 at 16:34 +0530, Vipin Kumar wrote:
-> I got the point, but this change is essential (at least for me). It may be 
-> essential to others as well in near future. Please let me know how to handle more 
-> than 64 bytes of ecc
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+---
+ arch/arm/mach-msm/Kconfig   |    5 +++++
+ arch/arm/mach-msm/gpiomux.h |   20 ++++++++++++++++++++
+ 2 files changed, 25 insertions(+), 0 deletions(-)
 
-Invent new ioctl, and declare the old one deprecated.
-
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 4e79580..f09ffef 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -18,6 +18,7 @@ config ARCH_MSM7X30
+ 	select MSM_VIC
+ 	select CPU_V7
+ 	select MSM_REMOTE_SPINLOCK_DEKKERS
++	select MSM_GPIOMUX
+ 
+ config ARCH_QSD8X50
+ 	bool "QSD8X50"
+@@ -26,6 +27,7 @@ config ARCH_QSD8X50
+ 	select MSM_VIC
+ 	select CPU_V7
+ 	select MSM_REMOTE_SPINLOCK_LDREX
++	select MSM_GPIOMUX
+ endchoice
+ 
+ config MSM_SOC_REV_A
+@@ -106,6 +108,9 @@ config MSM_SMD_PKG3
+ config MSM_SMD
+ 	bool
+ 
++config MSM_GPIOMUX
++	bool
++
+ config MSM_V2_TLMM
+ 	bool
+ endif
+diff --git a/arch/arm/mach-msm/gpiomux.h b/arch/arm/mach-msm/gpiomux.h
+index bb0acf0..b178d9c 100644
+--- a/arch/arm/mach-msm/gpiomux.h
++++ b/arch/arm/mach-msm/gpiomux.h
+@@ -18,6 +18,7 @@
+ #define __ARCH_ARM_MACH_MSM_GPIOMUX_H
+ 
+ #include <linux/bitops.h>
++#include <linux/errno.h>
+ 
+ #if defined(CONFIG_MSM_V2_TLMM)
+ #include "gpiomux-v2.h"
+@@ -60,6 +61,8 @@ enum {
+ 	GPIOMUX_CTL_MASK = GPIOMUX_VALID,
+ };
+ 
++#ifdef CONFIG_MSM_GPIOMUX
++
+ /* Each architecture must provide its own instance of this table.
+  * To avoid having gpiomux manage any given gpio, one or both of
+  * the entries can avoid setting GPIOMUX_VALID - the absence
+@@ -90,5 +93,22 @@ int msm_gpiomux_write(unsigned gpio,
+  * should use msm_gpiomux_write.
+  */
+ void __msm_gpiomux_write(unsigned gpio, gpiomux_config_t val);
++#else
++static inline int __must_check msm_gpiomux_get(unsigned gpio)
++{
++	return -ENOSYS;
++}
+ 
++static inline int msm_gpiomux_put(unsigned gpio)
++{
++	return -ENOSYS;
++}
++
++static inline int msm_gpiomux_write(unsigned gpio,
++				    gpiomux_config_t active,
++				    gpiomux_config_t suspended)
++{
++	return -ENOSYS;
++}
++#endif
+ #endif
 -- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+1.7.0.4
+
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
