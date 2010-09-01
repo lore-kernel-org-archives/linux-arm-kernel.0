@@ -1,488 +1,558 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 1 Sep 2010 17:24:25 +0200
-Subject: [PATCH 6/6] ARM: config RealViews PL011 PL022 for DMA v10
-In-Reply-To: <1283354665-8673-7-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 1 Sep 2010 17:24:21 +0200
+Subject: [PATCH 3/6] ARM: add PrimeCell generic DMA to MMCI/PL180 v10
+In-Reply-To: <1283354665-8673-3-git-send-email-linus.walleij@stericsson.com>
 References: <1283354665-8673-1-git-send-email-linus.walleij@stericsson.com>
 	<1283354665-8673-2-git-send-email-linus.walleij@stericsson.com>
 	<1283354665-8673-3-git-send-email-linus.walleij@stericsson.com>
-	<1283354665-8673-4-git-send-email-linus.walleij@stericsson.com>
-	<1283354665-8673-5-git-send-email-linus.walleij@stericsson.com>
-	<1283354665-8673-6-git-send-email-linus.walleij@stericsson.com>
-	<1283354665-8673-7-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1283354665-8673-8-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1283354665-8673-4-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the platform necessary to make the PL08x driver from the
-async_tx tree probe successfully with the RealView boards (except
-for the PB1176 which lacks a working DMAC) and thus makes the
-memcpy channels available on all of them.
-
-Further it implements the logic for muxing the two sets of device
-(slave) DMA channels, so that devices can request their DMA
-channels and have them muxed in on request.
-
-Platform data for the PL022 and PL011 is supplied for the
-PB11MPCore.
-
-This was tested successfully on an PB11MPCore using DMA for the
-PL022 SPI and PL011 UART simultaneously with the DMA engine test
-client running memcpy on two of the channels. The slave transfers
-bail out and switch to PIO mode on oversubscribed channels and
-memcpy transfers queue if no physical channel is available.
+This extends the MMCI/PL180 driver with generic DMA engine support
+using the PrimeCell DMA engine interface.
 
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/mach-realview/core.c                  |  239 ++++++++++++++++++++++++
- arch/arm/mach-realview/core.h                  |    2 +
- arch/arm/mach-realview/include/mach/platform.h |    2 +
- arch/arm/mach-realview/realview_eb.c           |    3 +-
- arch/arm/mach-realview/realview_pb11mp.c       |   43 ++++-
- arch/arm/mach-realview/realview_pba8.c         |    3 +-
- arch/arm/mach-realview/realview_pbx.c          |    3 +-
- 7 files changed, 287 insertions(+), 8 deletions(-)
+ drivers/mmc/host/mmci.c   |  329 ++++++++++++++++++++++++++++++++++++++++-----
+ drivers/mmc/host/mmci.h   |   16 +++
+ include/linux/amba/mmci.h |   16 +++
+ 3 files changed, 330 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 07c0815..937300f 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -25,6 +25,8 @@
- #include <linux/interrupt.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
-+#include <linux/amba/pl08x.h>
-+#include <linux/amba/serial.h>
- #include <linux/io.h>
- #include <linux/smsc911x.h>
- #include <linux/ata_platform.h>
-@@ -46,6 +48,7 @@
- #include <asm/mach/map.h>
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index f0c7313..876a293 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -2,7 +2,7 @@
+  *  linux/drivers/mmc/host/mmci.c - ARM PrimeCell MMCI PL180/1 driver
+  *
+  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
+- *  Copyright (C) 2010 ST-Ericsson AB.
++ *  Copyright (C) 2010 ST-Ericsson SA
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -23,8 +23,10 @@
+ #include <linux/clk.h>
+ #include <linux/scatterlist.h>
+ #include <linux/gpio.h>
+-#include <linux/amba/mmci.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/dmaengine.h>
++#include <linux/dma-mapping.h>
++#include <linux/amba/mmci.h>
  
- #include <asm/hardware/gic.h>
-+#include <asm/hardware/pl080.h>
- 
- #include <mach/clkdev.h>
- #include <mach/platform.h>
-@@ -619,6 +622,242 @@ struct clcd_board clcd_plat_data = {
- 	.remove		= realview_clcd_remove,
+ #include <asm/div64.h>
+ #include <asm/io.h>
+@@ -40,6 +42,7 @@ static unsigned int fmax = 515633;
+  * struct variant_data - MMCI variant-specific quirks
+  * @clkreg: default value for MCICLOCK register
+  * @clkreg_enable: enable value for MMCICLOCK register
++ * @dmareg_enable: enable value for MMCIDATACTRL register
+  * @datalength_bits: number of bits in the MMCIDATALENGTH register
+  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
+  *	      is asserted (likewise for RX)
+@@ -50,6 +53,7 @@ static unsigned int fmax = 515633;
+ struct variant_data {
+ 	unsigned int		clkreg;
+ 	unsigned int		clkreg_enable;
++	unsigned int		dmareg_enable;
+ 	unsigned int		datalength_bits;
+ 	unsigned int		fifosize;
+ 	unsigned int		fifohalfsize;
+@@ -74,6 +78,7 @@ static struct variant_data variant_ux500 = {
+ 	.fifohalfsize		= 8 * 4,
+ 	.clkreg			= MCI_CLK_ENABLE,
+ 	.clkreg_enable		= 1 << 14, /* HWFCEN */
++	.dmareg_enable		= 1 << 12, /* DMAREQCTRL */
+ 	.datalength_bits	= 24,
+ 	.singleirq		= true,
  };
+@@ -169,6 +174,203 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+ 	sg_miter_start(&host->sg_miter, data->sg, data->sg_len, flags);
+ }
  
++/*
++ * All the DMA operation mode stuff goes inside this ifdef.
++ * This assumes that you have a generic DMA device interface,
++ * no custom DMA interfaces are supported.
++ */
++#ifdef CONFIG_DMADEVICES
++static void __devinit mmci_setup_dma(struct mmci_host *host)
++{
++	struct mmci_platform_data *plat = host->plat;
++	dma_cap_mask_t mask;
++
++	if (!plat || !plat->dma_filter) {
++		dev_err(mmc_dev(host->mmc), "no DMA platform data!\n");
++		return;
++	}
++
++	/* Try to acquire a generic DMA engine slave channel */
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++	/*
++	 * If only an RX channel is specified, the driver will
++	 * attempt to use it bidirectionally, however if it is
++	 * is specified but cannot be located, DMA will be disabled.
++	 */
++	host->dma_rx_channel = dma_request_channel(mask,
++						plat->dma_filter,
++						plat->dma_rx_param);
++	/* E.g if no DMA hardware is present */
++	if (!host->dma_rx_channel) {
++		dev_err(mmc_dev(host->mmc), "no RX DMA channel!\n");
++		return;
++	}
++	if (plat->dma_tx_param) {
++		host->dma_tx_channel = dma_request_channel(mask,
++							   plat->dma_filter,
++							   plat->dma_tx_param);
++		if (!host->dma_tx_channel) {
++			dma_release_channel(host->dma_rx_channel);
++			host->dma_rx_channel = NULL;
++			return;
++		}
++	} else {
++		host->dma_tx_channel = host->dma_rx_channel;
++	}
++	host->dma_enable = true;
++	dev_info(mmc_dev(host->mmc), "use DMA channels DMA RX %s, DMA TX %s\n",
++		 dma_chan_name(host->dma_rx_channel),
++		 dma_chan_name(host->dma_tx_channel));
++}
 +
 +/*
-+ * DMA config
++ * This is used in __devinit or __devexit so inline it
++ * so it can be discarded.
 + */
-+#ifdef CONFIG_AMBA_PL08X
-+
-+/* State of the big DMA mux */
-+static u32 current_mux = 0x00;
-+static u32 mux_users = 0x00;
-+static spinlock_t current_mux_lock = SPIN_LOCK_UNLOCKED;
-+
-+static int pl081_get_signal(struct pl08x_dma_chan *ch)
++static inline void mmci_disable_dma(struct mmci_host *host)
 +{
-+	struct pl08x_channel_data *cd = ch->cd;
-+	unsigned long flags;
-+	u32 val;
-+
-+	spin_lock_irqsave(&current_mux_lock, flags);
-+	/*
-+	 * We're on the same mux so fine, go ahead!
-+	 */
-+	if (cd->muxval == current_mux) {
-+		mux_users ++;
-+		spin_unlock_irqrestore(&current_mux_lock, flags);
-+		/* We still have to write it since it may be OFF by default */
-+		val = readl(__io_address(REALVIEW_SYS_DMAPSR));
-+		val &= 0xFFFFFFFCU;
-+		val |= current_mux;
-+		writel(val, __io_address(REALVIEW_SYS_DMAPSR));
-+		return cd->min_signal;
-+	}
-+	/*
-+	 * If we're not on the same mux and there are already
-+	 * users on the other mux setting, tough luck, the client
-+	 * can come back and retry or give up and fall back to
-+	 * PIO mode.
-+	 */
-+	if (mux_users) {
-+		spin_unlock_irqrestore(&current_mux_lock, flags);
-+		return -EBUSY;
-+	}
-+
-+	/* Switch mux setting */
-+	current_mux = cd->muxval;
-+
-+	val = readl(__io_address(REALVIEW_SYS_DMAPSR));
-+	val &= 0xFFFFFFFCU;
-+	val |= cd->muxval;
-+	writel(val, __io_address(REALVIEW_SYS_DMAPSR));
-+
-+	pr_info("%s: muxing in %s in bank %d writing value "
-+		"%08x to register %08x\n",
-+		__func__, ch->name, cd->muxval,
-+		val, REALVIEW_SYS_DMAPSR);
-+
-+	spin_unlock_irqrestore(&current_mux_lock, flags);
-+
-+	return cd->min_signal;
++	if (host->dma_rx_channel)
++		dma_release_channel(host->dma_rx_channel);
++	if (host->dma_tx_channel)
++		dma_release_channel(host->dma_tx_channel);
++	host->dma_enable = false;
 +}
 +
-+static void pl081_put_signal(struct pl08x_dma_chan *ch)
++static void mmci_dma_data_end(struct mmci_host *host)
 +{
-+	unsigned long flags;
++	struct mmc_data *data = host->data;
 +
-+	spin_lock_irqsave(&current_mux_lock, flags);
-+	mux_users--;
-+	spin_unlock_irqrestore(&current_mux_lock, flags);
++	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
++		     (data->flags & MMC_DATA_WRITE)
++		     ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
 +}
 +
-+#define PRIMECELL_DEFAULT_CCTL (PL080_BSIZE_8 << PL080_CONTROL_SB_SIZE_SHIFT | \
-+				PL080_BSIZE_8 << PL080_CONTROL_DB_SIZE_SHIFT | \
-+				PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT | \
-+				PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT | \
-+				PL080_CONTROL_PROT_SYS)
++static void mmci_dma_data_error(struct mmci_host *host)
++{
++	struct mmc_data *data = host->data;
++	struct dma_chan *chan;
 +
-+/* Muxed channels as found in most RealViews */
-+struct pl08x_channel_data realview_chan_data[] = {
-+	/* Muxed on signal bank 0 */
-+	[0] = {
-+		.bus_id = "usb0",
-+		.min_signal = 0,
-+		.max_signal = 0,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[1] = {
-+		.bus_id = "usb1",
-+		.min_signal = 1,
-+		.max_signal = 1,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[2] = {
-+		.bus_id = "t1dmac0",
-+		.min_signal = 2,
-+		.max_signal = 2,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[3] = {
-+		.bus_id = "mci0",
-+		.min_signal = 3,
-+		.max_signal = 3,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[4] = {
-+		.bus_id = "aacitx",
-+		.min_signal = 4,
-+		.max_signal = 4,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[5] = {
-+		.bus_id = "aacirx",
-+		.min_signal = 5,
-+		.max_signal = 5,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[6] = {
-+		.bus_id = "scirx",
-+		.min_signal = 6,
-+		.max_signal = 6,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[7] = {
-+		.bus_id = "scitx",
-+		.min_signal = 7,
-+		.max_signal = 7,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	/* Muxed on signal bank 1 */
-+	[8] = {
-+		.bus_id = "ssprx",
-+		.min_signal = 0,
-+		.max_signal = 0,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[9] = {
-+		.bus_id = "ssptx",
-+		.min_signal = 1,
-+		.max_signal = 1,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[10] = {
-+		.bus_id = "uart2rx",
-+		.min_signal = 2,
-+		.max_signal = 2,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[11] = {
-+		.bus_id = "uart2tx",
-+		.min_signal = 3,
-+		.max_signal = 3,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[12] = {
-+		.bus_id = "uart1rx",
-+		.min_signal = 4,
-+		.max_signal = 4,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[13] = {
-+		.bus_id = "uart1tx",
-+		.min_signal = 5,
-+		.max_signal = 5,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[14] = {
-+		.bus_id = "uart0rx",
-+		.min_signal = 6,
-+		.max_signal = 6,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[15] = {
-+		.bus_id = "uart0tx",
-+		.min_signal = 7,
-+		.max_signal = 7,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+};
++	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
++	if (data->flags & MMC_DATA_READ)
++		chan = host->dma_rx_channel;
++	else
++		chan = host->dma_tx_channel;
++	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
++		     (data->flags & MMC_DATA_WRITE)
++		     ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
++	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++}
 +
-+struct pl08x_platform_data pl081_plat_data = {
-+	.memcpy_channel = {
-+		.bus_id = "memcpy",
++static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
++{
++	struct variant_data *variant = host->variant;
++	struct dma_slave_config rx_conf = {
++		.src_addr = host->phybase + MMCIFIFO,
++		.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
++		.direction = DMA_FROM_DEVICE,
++		.src_maxburst = variant->fifohalfsize >> 2, /* # of words */
++	};
++	struct dma_slave_config tx_conf = {
++		.dst_addr = host->phybase + MMCIFIFO,
++		.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
++		.direction = DMA_TO_DEVICE,
++		.dst_maxburst = variant->fifohalfsize >> 2, /* # of words */
++	};
++	struct mmc_data *data = host->data;
++	enum dma_data_direction direction;
++	struct dma_chan *chan;
++	struct dma_async_tx_descriptor *desc;
++	struct scatterlist *sg;
++	dma_cookie_t cookie;
++	int i;
++
++	datactrl |= MCI_DPSM_DMAENABLE;
++	datactrl |= variant->dmareg_enable;
++
++	if (data->flags & MMC_DATA_READ) {
++		direction = DMA_FROM_DEVICE;
++		chan = host->dma_rx_channel;
++		chan->device->device_control(chan, DMA_SLAVE_CONFIG,
++					     (unsigned long) &rx_conf);
++	} else {
++		direction = DMA_TO_DEVICE;
++		chan = host->dma_tx_channel;
++		chan->device->device_control(chan, DMA_SLAVE_CONFIG,
++					     (unsigned long) &tx_conf);
++	}
++
++	/* Check for weird stuff in the sg list */
++	for_each_sg(data->sg, sg, data->sg_len, i) {
++		dev_vdbg(mmc_dev(host->mmc), "MMCI SGlist %d dir %d: length: %08x\n",
++			 i, direction, sg->length);
++		if (sg->offset & 3 || sg->length & 3)
++			return -EINVAL;
++	}
++
++	dma_map_sg(mmc_dev(host->mmc), data->sg,
++		   data->sg_len, direction);
++
++	desc = chan->device->device_prep_slave_sg(chan,
++					data->sg, data->sg_len, direction,
++					DMA_CTRL_ACK);
++	if (!desc)
++		goto unmap_exit;
++
++	host->dma_desc = desc;
++	dev_vdbg(mmc_dev(host->mmc), "Submit MMCI DMA job, sglen %d "
++		 "blksz %04x blks %04x flags %08x\n",
++		 data->sg_len, data->blksz, data->blocks, data->flags);
++	cookie = desc->tx_submit(desc);
++
++	/* Here overloaded DMA controllers may fail */
++	if (dma_submit_error(cookie))
++		goto unmap_exit;
++
++	host->dma_on_current_xfer = true;
++	chan->device->device_issue_pending(chan);
++
++	/* Trigger the DMA transfer */
++	writel(datactrl, host->base + MMCIDATACTRL);
++	/*
++	 * Let the MMCI say when the data is ended and it's time
++	 * to fire next DMA request. When that happens, MMCI will
++	 * call mmci_data_end()
++	 */
++	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
++	       host->base + MMCIMASK0);
++	return 0;
++
++unmap_exit:
++	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len, direction);
++	host->dma_on_current_xfer = false;
++	return -ENOMEM;
++}
++#else
++/* Blank functions if the DMA engine is not available */
++static inline void mmci_setup_dma(struct mmci_host *host)
++{
++}
++
++static inline void mmci_disable_dma(struct mmci_host *host)
++{
++}
++
++static inline void mmci_dma_data_end(struct mmci_host *host)
++{
++}
++
++static inline void mmci_dma_data_error(struct mmci_host *host)
++{
++}
++
++static inline int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
++{
++	return -ENOSYS;
++}
++#endif
++
+ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	struct variant_data *variant = host->variant;
+@@ -183,8 +385,8 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	host->data = data;
+ 	host->size = data->blksz * data->blocks;
+ 	host->data_xfered = 0;
+-
+-	mmci_init_sg(host, data);
++	host->blockend = false;
++	host->dataend = false;
+ 
+ 	clks = (unsigned long long)data->timeout_ns * host->cclk;
+ 	do_div(clks, 1000000000UL);
+@@ -199,13 +401,32 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	BUG_ON(1 << blksz_bits != data->blksz);
+ 
+ 	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
+-	if (data->flags & MMC_DATA_READ) {
++
++	if (data->flags & MMC_DATA_READ)
+ 		datactrl |= MCI_DPSM_DIRECTION;
++
++	if (host->dma_enable) {
++		int ret;
++
 +		/*
-+		 * We pass in some optimal memcpy config, the
-+		 * driver will augment it if need be. 256 byte
-+		 * bursts and 32bit bus width.
++		 * Attempt to use DMA operation mode, if this
++		 * should fail, fall back to PIO mode
 +		 */
-+		.cctl =
-+		(PL080_BSIZE_256 << PL080_CONTROL_SB_SIZE_SHIFT |	\
-+		 PL080_BSIZE_256 << PL080_CONTROL_DB_SIZE_SHIFT |	\
-+		 PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT |	\
-+		 PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT |	\
-+		 PL080_CONTROL_PROT_BUFF |				\
-+		 PL080_CONTROL_PROT_CACHE |				\
-+		 PL080_CONTROL_PROT_SYS),
-+		/* Flow control: DMAC controls this */
-+		.ccfg = PL080_FLOW_MEM2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	.slave_channels = realview_chan_data,
-+	.num_slave_channels = ARRAY_SIZE(realview_chan_data),
-+	.get_signal = pl081_get_signal,
-+	.put_signal = pl081_put_signal,
-+};
++		ret = mmci_dma_start_data(host, datactrl);
++		if (!ret)
++			return;
++	}
 +
-+#else
-+struct pl08x_platform_data pl081_plat_data = {
-+};
-+#endif
++	/* IRQ mode, map the SG list for CPU reading/writing */
++	mmci_init_sg(host, data);
 +
-+
- #ifdef CONFIG_LEDS
- #define VA_LEDS_BASE (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_LED_OFFSET)
++	if (data->flags & MMC_DATA_READ) {
+ 		irqmask = MCI_RXFIFOHALFFULLMASK;
  
-diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
-index 781bca6..af8427f 100644
---- a/arch/arm/mach-realview/core.h
-+++ b/arch/arm/mach-realview/core.h
-@@ -53,12 +53,14 @@ extern struct platform_device realview_i2c_device;
- extern struct mmci_platform_data realview_mmc0_plat_data;
- extern struct mmci_platform_data realview_mmc1_plat_data;
- extern struct clcd_board clcd_plat_data;
-+extern struct pl08x_platform_data pl081_plat_data;
- extern void __iomem *gic_cpu_base_addr;
- extern void __iomem *timer0_va_base;
- extern void __iomem *timer1_va_base;
- extern void __iomem *timer2_va_base;
- extern void __iomem *timer3_va_base;
- 
-+extern void pl081_fixup(void);
- extern void realview_leds_event(led_event_t ledevt);
- extern void realview_timer_init(unsigned int timer_irq);
- extern int realview_flash_register(struct resource *res, u32 num);
-diff --git a/arch/arm/mach-realview/include/mach/platform.h b/arch/arm/mach-realview/include/mach/platform.h
-index 1b77a27..934c5c2 100644
---- a/arch/arm/mach-realview/include/mach/platform.h
-+++ b/arch/arm/mach-realview/include/mach/platform.h
-@@ -77,6 +77,7 @@
- #define REALVIEW_SYS_BOOTCS_OFFSET           0x58
- #define REALVIEW_SYS_24MHz_OFFSET            0x5C
- #define REALVIEW_SYS_MISC_OFFSET             0x60
-+#define REALVIEW_SYS_DMAPSR_OFFSET           0x64
- #define REALVIEW_SYS_IOSEL_OFFSET            0x70
- #define REALVIEW_SYS_PROCID_OFFSET           0x84
- #define REALVIEW_SYS_TEST_OSC0_OFFSET        0xC0
-@@ -111,6 +112,7 @@
- #define REALVIEW_SYS_BOOTCS                  (REALVIEW_SYS_BASE + REALVIEW_SYS_BOOTCS_OFFSET)
- #define REALVIEW_SYS_24MHz                   (REALVIEW_SYS_BASE + REALVIEW_SYS_24MHz_OFFSET)
- #define REALVIEW_SYS_MISC                    (REALVIEW_SYS_BASE + REALVIEW_SYS_MISC_OFFSET)
-+#define REALVIEW_SYS_DMAPSR                  (REALVIEW_SYS_BASE + REALVIEW_SYS_DMAPSR_OFFSET)
- #define REALVIEW_SYS_IOSEL                   (REALVIEW_SYS_BASE + REALVIEW_SYS_IOSEL_OFFSET)
- #define REALVIEW_SYS_PROCID                  (REALVIEW_SYS_BASE + REALVIEW_SYS_PROCID_OFFSET)
- #define REALVIEW_SYS_TEST_OSC0               (REALVIEW_SYS_BASE + REALVIEW_SYS_TEST_OSC0_OFFSET)
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 991c1f8..3117510 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/pl08x.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
- #include <linux/amba/pl022.h>
-@@ -209,7 +210,7 @@ AMBA_DEVICE(uart3, "fpga:uart3", EB_UART3, NULL);
- /* DevChip Primecells */
- AMBA_DEVICE(smc,   "dev:smc",   EB_SMC,   NULL);
- AMBA_DEVICE(clcd,  "dev:clcd",  EB_CLCD,  &clcd_plat_data);
--AMBA_DEVICE(dmac,  "dev:dmac",  DMAC,     NULL);
-+AMBA_DEVICE(dmac,  "dev:dmac",  DMAC,     &pl081_plat_data);
- AMBA_DEVICE(sctl,  "dev:sctl",  SCTL,     NULL);
- AMBA_DEVICE(wdog,  "dev:wdog",  EB_WATCHDOG, NULL);
- AMBA_DEVICE(gpio0, "dev:gpio0", EB_GPIO0, &gpio0_plat_data);
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index d591bc0..50e921b 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -23,9 +23,11 @@
- #include <linux/platform_device.h>
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/pl08x.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
- #include <linux/amba/pl022.h>
-+#include <linux/amba/serial.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -127,8 +129,39 @@ static struct pl061_platform_data gpio2_plat_data = {
- 
- static struct pl022_ssp_controller ssp0_plat_data = {
- 	.bus_id = 0,
--	.enable_dma = 0,
- 	.num_chipselect = 1,
-+#ifdef CONFIG_AMBA_PL08X
-+	.enable_dma = 1,
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "ssprx",
-+	.dma_tx_param = (void *) "ssptx",
-+#else
-+	.enable_dma = 0,
-+#endif
-+};
+ 		/*
+-		 * If we have less than a FIFOSIZE of bytes to transfer,
+-		 * trigger a PIO interrupt as soon as any data is available.
++		 * If we have less than a FIFOSIZE of bytes to
++		 * transfer, trigger a PIO interrupt as soon as any
++		 * data is available.
+ 		 */
+ 		if (host->size < variant->fifosize)
+ 			irqmask |= MCI_RXDATAAVLBLMASK;
+@@ -254,20 +475,7 @@ static void
+ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 	      unsigned int status)
+ {
+-	if (status & MCI_DATABLOCKEND) {
+-		host->data_xfered += data->blksz;
+-#ifdef CONFIG_ARCH_U300
+-		/*
+-		 * On the U300 some signal or other is
+-		 * badly routed so that a data write does
+-		 * not properly terminate with a MCI_DATAEND
+-		 * status flag. This quirk will make writes
+-		 * work again.
+-		 */
+-		if (data->flags & MMC_DATA_WRITE)
+-			status |= MCI_DATAEND;
+-#endif
+-	}
++	/* First check for errors */
+ 	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
+ 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ (status %08x)\n", status);
+ 		if (status & MCI_DATACRCFAIL)
+@@ -276,13 +484,19 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 			data->error = -ETIMEDOUT;
+ 		else if (status & (MCI_TXUNDERRUN|MCI_RXOVERRUN))
+ 			data->error = -EIO;
+-		status |= MCI_DATAEND;
 +
-+static struct amba_pl011_data uart0_plat_data = {
-+#ifdef CONFIG_AMBA_PL08X
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart0rx",
-+	.dma_tx_param = (void *) "uart0tx",
-+#endif
-+};
++		/* Force-complete the transaction */
++		host->blockend = true;
++		host->dataend = true;
+ 
+ 		/*
+ 		 * We hit an error condition.  Ensure that any data
+-		 * partially written to a page is properly coherent.
++		 * partially written to a page is properly coherent,
++		 * unless we're using DMA.
+ 		 */
+-		if (data->flags & MMC_DATA_READ) {
++		if (host->dma_on_current_xfer)
++			mmci_dma_data_error(host);
++		else if (data->flags & MMC_DATA_READ) {
+ 			struct sg_mapping_iter *sg_miter = &host->sg_miter;
+ 			unsigned long flags;
+ 
+@@ -294,12 +508,59 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 			local_irq_restore(flags);
+ 		}
+ 	}
+-	if (status & MCI_DATAEND) {
 +
-+static struct amba_pl011_data uart1_plat_data = {
-+#ifdef CONFIG_AMBA_PL08X
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart1rx",
-+	.dma_tx_param = (void *) "uart1tx",
-+#endif
-+};
++	/*
++	 * On ARM variants in PIO mode, MCI_DATABLOCKEND
++	 * is always sent first, and we increase the
++	 * transfered number of bytes for that IRQ. Then
++	 * MCI_DATEND follows and we conclude the transaction.
++	 * This is also the case in the U300 PIO mode.
++	 *
++	 * The Ux500 single-IRQ variant only fires the
++	 * MCI_DATAEND IRQ at the end of the entire transfer.
++	 *
++	 * In DMA mode, the IRQs can arrive out-of-order,
++	 * e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
++	 * so in this case we use the flags "blockend" and
++	 * "dataend" to make sure both IRQs have arrived before
++	 * concluding the transaction. (This does not apply
++	 * to the Ux500 which doesn't fire MCI_DATABLOCKEND
++	 * at all.)
++	 */
++	if (status & MCI_DATABLOCKEND) {
++		/*
++		 * Just being a little over-cautious, we do not
++		 * use this progressive update in DMA or single-IRQ
++		 * mode.
++		 */
++		if (!host->variant->singleirq && !host->dma_on_current_xfer)
++			host->data_xfered += data->blksz;
++		host->blockend = true;
++	}
 +
-+static struct amba_pl011_data uart2_plat_data = {
-+#ifdef CONFIG_AMBA_PL08X
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart2rx",
-+	.dma_tx_param = (void *) "uart2tx",
++	if (status & MCI_DATAEND)
++		host->dataend = true;
++
++	/*
++	 * On Ux500 we shall only wait for dataend, on others we must sync
++	 * with the blockend signal since they can appear out-of-order
++	 * when using DMA.
++	 */
++	if (host->dataend && (host->blockend || host->variant->singleirq)) {
++		mmci_dma_data_end(host);
+ 		mmci_stop_data(host);
+ 
+-		/* MCI_DATABLOCKEND not used with single irq */
+-		if (host->variant->singleirq && !data->error)
+-			host->data_xfered = data->blksz * data->blocks;
++		/* Reset these flags */
++		host->blockend = false;
++		host->dataend = false;
++
++		/*
++		 * Single IRQ variants do not transmit MCI_DATABLOCKEND
++		 * and in DMA mode this signal need to be synchronized
++		 * with MCI_DATEND
++		 */
++		if ((host->variant->singleirq || host->dma_on_current_xfer) && !data->error)
++			host->data_xfered += data->blksz * data->blocks;
+ 
+ 		if (!data->stop) {
+ 			mmci_request_end(host, data->mrq);
+@@ -718,6 +979,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 		dev_dbg(mmc_dev(mmc), "eventual mclk rate: %u Hz\n",
+ 			host->mclk);
+ 	}
++	host->phybase = dev->res.start;
+ 	host->base = ioremap(dev->res.start, resource_size(&dev->res));
+ 	if (!host->base) {
+ 		ret = -ENOMEM;
+@@ -829,6 +1091,8 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 	    && host->gpio_cd_irq < 0)
+ 		mmc->caps |= MMC_CAP_NEEDS_POLL;
+ 
++	mmci_setup_dma(host);
++
+ 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
+ 	if (ret)
+ 		goto unmap;
+@@ -855,15 +1119,17 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 
+ 	mmc_add_host(mmc);
+ 
+-	dev_info(&dev->dev, "%s: MMCI rev %x cfg %02x at 0x%016llx irq %d,%d\n",
+-		mmc_hostname(mmc), amba_rev(dev), amba_config(dev),
+-		(unsigned long long)dev->res.start, dev->irq[0], dev->irq[1]);
++	dev_info(&dev->dev, "%s: MMCI/PL180 manf %x rev %x cfg %02x at 0x%016llx\n",
++		 mmc_hostname(mmc), amba_manf(dev), amba_rev(dev), amba_config(dev),
++		 (unsigned long long)dev->res.start);
++	dev_info(&dev->dev, "IRQ %d, %d (pio)\n", dev->irq[0], dev->irq[1]);
+ 
+ 	return 0;
+ 
+  irq0_free:
+ 	free_irq(dev->irq[0], host);
+  unmap:
++	mmci_disable_dma(host);
+ 	if (host->gpio_wp != -ENOSYS)
+ 		gpio_free(host->gpio_wp);
+  err_gpio_wp:
+@@ -903,6 +1169,7 @@ static int __devexit mmci_remove(struct amba_device *dev)
+ 		writel(0, host->base + MMCICOMMAND);
+ 		writel(0, host->base + MMCIDATACTRL);
+ 
++		mmci_disable_dma(host);
+ 		free_irq(dev->irq[0], host);
+ 		if (!variant->singleirq)
+ 			free_irq(dev->irq[1], host);
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index ba203b8..3736d93 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -142,8 +142,11 @@
+ 
+ struct clk;
+ struct variant_data;
++struct dma_chan;
++struct dma_async_tx_descriptor;
+ 
+ struct mmci_host {
++	phys_addr_t		phybase;
+ 	void __iomem		*base;
+ 	struct mmc_request	*mrq;
+ 	struct mmc_command	*cmd;
+@@ -170,9 +173,22 @@ struct mmci_host {
+ 	struct timer_list	timer;
+ 	unsigned int		oldstat;
+ 
++	bool			blockend;
++	bool			dataend;
++
+ 	/* pio stuff */
+ 	struct sg_mapping_iter	sg_miter;
+ 	unsigned int		size;
++
+ 	struct regulator	*vcc;
++
++	/* DMA stuff */
++	bool			dma_enable;
++	bool			dma_on_current_xfer;
++#ifdef CONFIG_DMADEVICES
++	struct dma_chan		*dma_rx_channel;
++	struct dma_chan		*dma_tx_channel;
++	struct dma_async_tx_descriptor *dma_desc;
 +#endif
  };
  
- /*
-@@ -194,14 +227,14 @@ AMBA_DEVICE(gpio1,	"dev:gpio1",	GPIO1,		&gpio1_plat_data);
- AMBA_DEVICE(gpio2,	"dev:gpio2",	GPIO2,		&gpio2_plat_data);
- AMBA_DEVICE(rtc,	"dev:rtc",	PB11MP_RTC,	NULL);
- AMBA_DEVICE(sci0,	"dev:sci0",	SCI,		NULL);
--AMBA_DEVICE(uart0,	"dev:uart0",	PB11MP_UART0,	NULL);
--AMBA_DEVICE(uart1,	"dev:uart1",	PB11MP_UART1,	NULL);
--AMBA_DEVICE(uart2,	"dev:uart2",	PB11MP_UART2,	NULL);
-+AMBA_DEVICE(uart0,	"dev:uart0",	PB11MP_UART0,	&uart0_plat_data);
-+AMBA_DEVICE(uart1,	"dev:uart1",	PB11MP_UART1,	&uart1_plat_data);
-+AMBA_DEVICE(uart2,	"dev:uart2",	PB11MP_UART2,	&uart2_plat_data);
- AMBA_DEVICE(ssp0,	"dev:ssp0",	PB11MP_SSP,	&ssp0_plat_data);
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index f4ee9ac..dbeba68 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -6,6 +6,8 @@
  
- /* Primecells on the NEC ISSP chip */
- AMBA_DEVICE(clcd,	"issp:clcd",	PB11MP_CLCD,	&clcd_plat_data);
--AMBA_DEVICE(dmac,	"issp:dmac",	DMAC,		NULL);
-+AMBA_DEVICE(dmac,	"issp:dmac",	DMAC,		&pl081_plat_data);
+ #include <linux/mmc/host.h>
  
- static struct amba_device *amba_devs[] __initdata = {
- 	&dmac_device,
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index 6c37621..bafd457 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/pl08x.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
- #include <linux/amba/pl022.h>
-@@ -191,7 +192,7 @@ AMBA_DEVICE(ssp0,	"dev:ssp0",	PBA8_SSP,	&ssp0_plat_data);
++/* Just some dummy forwarding */
++struct dma_chan;
+ /**
+  * struct mmci_platform_data - platform configuration for the MMCI
+  * (also known as PL180) block.
+@@ -27,6 +29,17 @@
+  * @cd_invert: true if the gpio_cd pin value is active low
+  * @capabilities: the capabilities of the block as implemented in
+  * this platform, signify anything MMC_CAP_* from mmc/host.h
++ * @dma_filter: function used to select an apropriate RX and TX
++ * DMA channel to be used for DMA, if and only if you're deploying the
++ * generic DMA engine
++ * @dma_rx_param: parameter passed to the DMA allocation
++ * filter in order to select an apropriate RX channel. If
++ * there is a bidirectional RX+TX channel, then just specify
++ * this and leave dma_tx_param set to NULL
++ * @dma_tx_param: parameter passed to the DMA allocation
++ * filter in order to select an apropriate TX channel. If this
++ * is NULL the driver will attempt to use the RX channel as a
++ * bidirectional channel
+  */
+ struct mmci_platform_data {
+ 	unsigned int f_max;
+@@ -38,6 +51,9 @@ struct mmci_platform_data {
+ 	int	gpio_cd;
+ 	bool	cd_invert;
+ 	unsigned long capabilities;
++	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
++	void *dma_rx_param;
++	void *dma_tx_param;
+ };
  
- /* Primecells on the NEC ISSP chip */
- AMBA_DEVICE(clcd,	"issp:clcd",	PBA8_CLCD,	&clcd_plat_data);
--AMBA_DEVICE(dmac,	"issp:dmac",	DMAC,		NULL);
-+AMBA_DEVICE(dmac,	"issp:dmac",	DMAC,		&pl081_plat_data);
- 
- static struct amba_device *amba_devs[] __initdata = {
- 	&dmac_device,
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 9428eff..20c7eae 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -22,6 +22,7 @@
- #include <linux/platform_device.h>
- #include <linux/sysdev.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/pl08x.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
- #include <linux/amba/pl022.h>
-@@ -213,7 +214,7 @@ AMBA_DEVICE(ssp0,	"dev:ssp0",	PBX_SSP,	&ssp0_plat_data);
- 
- /* Primecells on the NEC ISSP chip */
- AMBA_DEVICE(clcd,	"issp:clcd",	PBX_CLCD,	&clcd_plat_data);
--AMBA_DEVICE(dmac,	"issp:dmac",	DMAC,		NULL);
-+AMBA_DEVICE(dmac,	"issp:dmac",	DMAC,		&pl081_plat_data);
- 
- static struct amba_device *amba_devs[] __initdata = {
- 	&dmac_device,
+ #endif
 -- 
 1.6.3.3
