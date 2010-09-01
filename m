@@ -1,34 +1,86 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 01 Sep 2010 16:48:06 -0700
-Subject: [PATCH 1/2 v2] msm: Install the Google-Android gpio driver.
-In-Reply-To: <1283384380-24997-1-git-send-email-gbean@codeaurora.org>
-References: <1283384380-24997-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1283384886.21049.28.camel@c-dwalke-linux.qualcomm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 02 Sep 2010 08:49:08 +0900
+Subject: [PATCH 0/2] s3c: mach-real6410 missing fixes
+In-Reply-To: <AANLkTinJVKmAV_ZXDXTqOwbu4iTmrf9fRVpZ3uCdDr1w@mail.gmail.com>
+References: <20100816173905.14924.62664.stgit@darius-desktop>
+	<4C721CF0.3070004@gmail.com>
+	<005b01cb45b2$7c4f5420$74edfc60$%kim@samsung.com>
+	<4C7B57F4.8010502@gmail.com>
+	<012c01cb4978$193f67c0$4bbe3740$%kim@samsung.com>
+	<AANLkTinJVKmAV_ZXDXTqOwbu4iTmrf9fRVpZ3uCdDr1w@mail.gmail.com>
+Message-ID: <002a01cb4a30$47d5f140$d781d3c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-09-01 at 16:39 -0700, Gregory Bean wrote:
-> +void msm_gpio_enter_sleep(int from_idle)
-> +{
-> +       int i;
-> +       struct tramp_gpio_smem *smem_gpio;
-> +
-> +       smem_gpio = smem_alloc(SMEM_GPIO_INT, sizeof(*smem_gpio));
-> +
-> +       if (smem_gpio) {
-> +               for (i = 0; i < ARRAY_SIZE(smem_gpio->enabled); i++) {
-> +                       smem_gpio->enabled[i] = 0;
-> +                       smem_gpio->detection[i] = 0;
-> +                       smem_gpio->polarity[i] = 0;
-> +               }
-> +       }
-> + 
+Darius Augulis wrote:
+> 
+> On Wed, Sep 1, 2010 at 4:50 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Darius Augulis wrote:
+> >>
+> >> Hi,
+> >>
+> > Hi ;-)
+> >
+> >> On 08/27/2010 09:38 AM, Kukjin Kim wrote:
+> >> > Darius Augulis wrote:
+> >> >>
+> >> >> Hi Ben, Kukjin,
+> >> >>
+> >> > Hi Darius,
+> >> >
+> >> >> please add these patches to your tree, they contain necessary fixes
+for
+> >> >> mach-real6410.
+> >> >>
+> >> > Looks good your patches.
+> >> >
+> >> > But I think, this should be sent to upstream through Ben's tree.
+> >> >
+> >> > If Ben has no time to handle this, I will do it through my tree.
+> >>
+> >> it seems he hasn't. please pick up these two patches and older one,
+with
+> >> fixup of device name of samsung serial. it hangs already for a long
+time
+> >> without any comment.
+> >
+> > I have a question about dm9000 on your real6410.
+> >
+> > The smdkv210 use it also, but need to some modify dm9000 driver for use
+it.
+> > Is there no problem on your board?
+> 
+> this patch is not driver fix. dm9000 on real6410 is working well and
+> tested several times.
+> so, please add this patch to your tree too. if you found some bug in
+> dm9000 driver or if you need new features please provide new patch.
+> 
+Yeah I know, yours is not driver fix.
+I did just wonder working of dm9000.
 
-Can you not drop these for some reason ?
+Because there was some problem on my board as following.
+The dm9000 Phy enable was required at that time.
+Ethernet did not work without dm9000 Phy enable.
 
-Daniel
+But couldn't find the root cause and because that is not general in my
+thinking, not submitted.
 
--- 
+> >
+> > And please refer to my other comment about device name of Samsung
+serial.
+> >
+> > Ben,
+> > I will apply Darius' fixing CodingStyle patch.
+> > If any problems, please let me know.
+> >
+> >>
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+(snip)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
