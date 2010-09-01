@@ -1,70 +1,34 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 02 Sep 2010 11:43:34 +1200
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <4C7EE3A7.4050108@bluewatersys.com>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>		<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>		<1283170469.12995.53.camel@brekeke>	<4C7CA278.9040902@st.com>		<1283297810.2018.67.camel@brekeke>	<4C7DD2FD.1080501@st.com>		<1283337939.1958.20.camel@brekeke>	<4C7E3344.2020202@st.com>		<4C7EC43B.2050903@bluewatersys.com>		<AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>		<4C7ED1E9.4050208@bluewatersys.com>	<1283381602.2209.49.camel@brekeke>
-	<4C7EE3A7.4050108@bluewatersys.com>
-Message-ID: <4C7EE526.2080703@bluewatersys.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 01 Sep 2010 16:48:06 -0700
+Subject: [PATCH 1/2 v2] msm: Install the Google-Android gpio driver.
+In-Reply-To: <1283384380-24997-1-git-send-email-gbean@codeaurora.org>
+References: <1283384380-24997-1-git-send-email-gbean@codeaurora.org>
+Message-ID: <1283384886.21049.28.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2010 11:37 AM, Ryan Mallon wrote:
-> On 09/02/2010 10:53 AM, Artem Bityutskiy wrote:
->> On Thu, 2010-09-02 at 10:21 +1200, Ryan Mallon wrote:
->>> On 09/02/2010 09:54 AM, Kevin Cernekee wrote:
->>>> On Wed, Sep 1, 2010 at 2:23 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
->>>>> However, we are interested in having a proper solution to this problem.
->>>>
->>>> I would suggest using this patch as a starting point - could you
->>>> please review the changes and try it out?
->>>>
->>>> http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/b6d6ae730be2750fac166ed9df11ee6ea54d9160
->>>
->>> That patch still breaks the ABI by renaming struct nand_ecclayout to
->>> nand_ecclayout_user.
->>
->> Hmm, would you please show why my binary file 'nandwrite' would have to
->> be re-built?
->>
->>>  Any application using the old names will have to be
->>> rewritten to compile against a new kernel.
->>
->> Not necessary. mtd-utils, for example, maintain their own copy of the
->> mtd-abi.h file, which I personally think is a good idea.
->>
->> But if your apps depend on the kernel headers, then yes, you will need
->> to amend it or copy the old header into your project.
->>
->> IOW, the patch breaks API by renaming, but not ABI, I think. I do not
->> see this as a major problem - just a small inconvenience.
-> 
-> Sorry, you are correct, it breaks the API not the ABI. I understood that
-> such changes were still to be avoided.
-> 
->>> The old interface should remain unchanged in that include/mtd/mtd-abi.h.
->>> If an application using the old interface calls any of the ecc ioctls
->>> for a nand chip with > 64 bytes ecc it should return an error.
->>
->> It will, because size of the structure is part of the ioctl number,
->> even. See the corresponding ioctl macro definition.
-> 
-> Right, but I don't think it needs the complexity of the shrink_ecc
-> function from Kevin's patch. The old ioctl should return an error
-> (possibly with a kernel message) if the requested nand chip has > 64
-> bytes ecc. Otherwise it should just copy upto 64 bytes into the old
-> nand_ecclayout structure and return.
+On Wed, 2010-09-01 at 16:39 -0700, Gregory Bean wrote:
+> +void msm_gpio_enter_sleep(int from_idle)
+> +{
+> +       int i;
+> +       struct tramp_gpio_smem *smem_gpio;
+> +
+> +       smem_gpio = smem_alloc(SMEM_GPIO_INT, sizeof(*smem_gpio));
+> +
+> +       if (smem_gpio) {
+> +               for (i = 0; i < ARRAY_SIZE(smem_gpio->enabled); i++) {
+> +                       smem_gpio->enabled[i] = 0;
+> +                       smem_gpio->detection[i] = 0;
+> +                       smem_gpio->polarity[i] = 0;
+> +               }
+> +       }
+> + 
 
-Oops, I misread the patch. The shrink_ecclayout function is actually
-fine. The only change I would make is to possible add a warning/error if
-the data is being truncated.
+Can you not drop these for some reason ?
 
-~Ryan
+Daniel
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
