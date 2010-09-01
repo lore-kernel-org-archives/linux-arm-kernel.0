@@ -1,20 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 00:23:07 +0100
-Subject: [PATCH] ARM: Implement cpu_v7_reset.
-In-Reply-To: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
-References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100901232307.GC25860@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 02 Sep 2010 02:23:25 +0300
+Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
+In-Reply-To: <4C7E3344.2020202@st.com>
+References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
+	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
+	<1283170469.12995.53.camel@brekeke>  <4C7CA278.9040902@st.com>
+	<1283297810.2018.67.camel@brekeke>  <4C7DD2FD.1080501@st.com>
+	<1283337939.1958.20.camel@brekeke>  <4C7E3344.2020202@st.com>
+Message-ID: <1283383405.2209.66.camel@brekeke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 01, 2010 at 04:01:59PM +0200, Linus Walleij wrote:
-> From: Per Fransson <per.xx.fransson@stericsson.com>
-> 
-> This implementation of cpu_v7_reset flushes the L1 cache
-> and turns off the MMU.
+Hi,
 
-NAK - this is wrong.  Please check the updates I made to the shutdown code
-(which already deal with the cache flushing and turning off cacheability.)
+On Wed, 2010-09-01 at 16:34 +0530, Vipin Kumar wrote:
+> I got the point, but this change is essential (at least for me). It may be 
+> essential to others as well in near future. Please let me know how to handle more 
+> than 64 bytes of ecc
 
-The only thing this should be doing is turning off the MMU and jumping to
-the provided pointer.
+Invent new ioctl, and declare the old one deprecated.
+
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
