@@ -1,50 +1,35 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Sep 2010 08:06:46 +0100
-Subject: ARM: LPC32XX: Various minor fixes and updates
-In-Reply-To: <AANLkTi=soChFReosv8ipAzRdJFjH+mC+TebyhMd1mjMt@mail.gmail.com>
-References: <1282174859-8780-1-git-send-email-wellsk40@gmail.com>
-	<AANLkTi=soChFReosv8ipAzRdJFjH+mC+TebyhMd1mjMt@mail.gmail.com>
-Message-ID: <20100901070646.GB8142@n2100.arm.linux.org.uk>
+Date: Wed, 1 Sep 2010 08:17:01 +0100
+Subject: ptrace(PTRACE_PEEKUSER, ..., PT_TEXT_ADDR, ...)
+In-Reply-To: <20100820124118.GC6950@richter>
+References: <20100820124118.GC6950@richter>
+Message-ID: <20100901071701.GC8142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 20, 2010 at 03:16:17PM -0700, Kevin Wells wrote:
-> >
-> > [PATCH 1/6] ARM: LPC32XX: Fix several clock device ID strings
-> > [PATCH 2/6] ARM: LPC32XX: Fix naming convention issues with some defines
-> > [PATCH 3/6] ARM: LPC32xx: Fix gpiolib bit mask macro
-> > [PATCH 4/6] ARM: LPC32xx: Remove MMC peripheral clock enable/disable code
-> > [PATCH 5/6] ARM: LPC32XX: Remove clock enable code for AMBA driver
-> > [PATCH 6/6] ARM: LPC32XX: Add board.h for platform_data structures
-> >
+On Fri, Aug 20, 2010 at 02:41:28PM +0200, Simon Richter wrote:
+> when patching gdbserver to work on MMUless ARM systems I found that
+> there are two definitions for the magic values for PT_TEXT_ADDR (and the
+> related fields) in different Linux versions. uClinux 2.4 kernels use
+> values starting from 0xc4 (the same as the Coldfire port), while 2.6
+> based kernels use magic numbers starting from 0x10000, which were
+> introduced in 68b7f7153fa58df710924fbb79722717d2d16094 .
 > 
-> Sorry about the lack of info on changed with this patchset.
-> This is a v2 update to the v1 patchset. The title should of indicated that :(
-> v1 was originally posted July 29 (ARM: LPC32xx: Misc arch updates and fixes)
-> 
-> Unchanged from v1:
->        LPC definition fixes
->        Fix GPIO 3 IN bit mask
->        Remove un-needed local MMC clock enable code
->        Fix up I2S device ID name for clock registration
-> 
-> Changed from v1:
->        Remove un-needed code from IRQ ack handler
->          The problem this patch fixed needs more investigation, so
-> there's no point
->           in putting in a partial fix
->        Change AMBA pre and post clock init for AMBA registration
->           No longer needed with amba clocking fix
->        Add a workaround for LCD register access prior to clock enable
->           No longer needed with amba clocking fix
-> 
-> Additions in v2:
->        Changed the touch screen clock device ID name to match &pdev->dev per
->           the driver currently under review
->        Added board.h file and platform data for touch screen controller and
->           key scanner interface
-> 
-> I sneaked the additions in this series so I can move forward with the
-> tsc changes.
+> As has been pointed out by Andreas Schwab from SuSE, the code
+> responsible for returning the text segment address is never reached
+> because the lines immediately before the code added in the commit
+> already filter these out and return -EIO.
 
-This patch set looks fine to me.
+I've always regarded this PT_* stuff as a hack around the problem at
+hand - and as you point out below...
+
+> So apparently the new values have never really been in use (so I
+> wouldn't consider them part of the kernel interface), and the old values
+> now point to something else (because VFP registers were added to struct
+> user).
+
+... it has the potential to break horribly when the original API is
+extended through additional hardware features.
+
+Maybe this is something which should be fixed properly by introducing
+a proper cross-arch API for getting this information.
