@@ -1,52 +1,44 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 1 Sep 2010 14:50:50 +0200
-Subject: [PATCH] oprofile, x86: fix init_sysfs() function stub
-Message-ID: <mailman.217.1283348321.27306.linux-arm-kernel@lists.infradead.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 1 Sep 2010 16:01:59 +0200
+Subject: [PATCH] ARM: Implement cpu_v7_reset.
+Message-ID: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of the return value of init_sysfs() with commit
+From: Per Fransson <per.xx.fransson@stericsson.com>
 
- 10f0412 oprofile, x86: fix init_sysfs error handling
+This implementation of cpu_v7_reset flushes the L1 cache
+and turns off the MMU.
 
-discovered the following build error for !CONFIG_PM:
-
- .../linux/arch/x86/oprofile/nmi_int.c: In function =E2=80=98op_nmi_init=E2=
-=80=99:
- .../linux/arch/x86/oprofile/nmi_int.c:784: error: expected expression be=
-fore =E2=80=98do=E2=80=99
- make[2]: *** [arch/x86/oprofile/nmi_int.o] Error 1
- make[1]: *** [arch/x86/oprofile] Error 2
-
-This patch fixes this.
-
-Reported-by: Ingo Molnar <mingo@elte.hu>
-Signed-off-by: Robert Richter <robert.richter@amd.com>
+Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/x86/oprofile/nmi_int.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mm/proc-v7.S |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/arch/x86/oprofile/nmi_int.c b/arch/x86/oprofile/nmi_int.c
-index 73a41d3..cfe4faa 100644
---- a/arch/x86/oprofile/nmi_int.c
-+++ b/arch/x86/oprofile/nmi_int.c
-@@ -585,8 +585,10 @@ static void exit_sysfs(void)
- }
-=20
- #else
--#define init_sysfs() do { } while (0)
--#define exit_sysfs() do { } while (0)
-+
-+static inline int  init_sysfs(void) { return 0; }
-+static inline void exit_sysfs(void) { }
-+
- #endif /* CONFIG_PM */
-=20
- static int __init p4_init(char **cpu_type)
---=20
-1.7.1.1
-
-
---=20
-Advanced Micro Devices, Inc.
-Operating System Research Center
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index d5d9b58..f2e2c92 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -63,7 +63,18 @@ ENDPROC(cpu_v7_proc_fin)
+  */
+ 	.align	5
+ ENTRY(cpu_v7_reset)
+-	mov	pc, r0
++	mov     r4, r0
++	mov     ip, #0
++	bl      v7_flush_kern_cache_all         @ invalidate I,D caches
++	dsb                                     @ drain WB
++#ifdef CONFIG_MMU
++	mcr     p15, 0, ip, c8, c7, 0           @ invalidate I & D TLBs
++#endif
++	mrc     p15, 0, ip, c1, c0, 0           @ ctrl register
++	bic     ip, ip, #0x000f                 @ ............wcam
++	bic     ip, ip, #0x1100                 @ ...i...s........
++	mcr     p15, 0, ip, c1, c0, 0           @ ctrl register
++	mov     pc, r4
+ ENDPROC(cpu_v7_reset)
+ 
+ /*
+-- 
+1.6.3.3
