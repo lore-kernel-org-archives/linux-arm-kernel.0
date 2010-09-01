@@ -1,95 +1,122 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 02 Sep 2010 08:55:01 +1200
-Subject: [PATCH] ep93xx: move clock initialization earlier
-In-Reply-To: <1283363460-25825-1-git-send-email-mika.westerberg@iki.fi>
-References: <1283363460-25825-1-git-send-email-mika.westerberg@iki.fi>
-Message-ID: <4C7EBDA5.1080601@bluewatersys.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 01 Sep 2010 14:13:26 -0700
+Subject: [PATCH 1/2] msm: Install the Google-Android gpio driver.
+In-Reply-To: <0D753D10438DA54287A00B027084269764447830F3@AUSP01VMBX24.collaborationhost.net>
+References: <1283213906-17671-1-git-send-email-gbean@codeaurora.org>
+	<0D753D10438DA54287A00B027084269764447830F3@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <1283375606.21049.20.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2010 05:51 AM, Mika Westerberg wrote:
-> Commit 7cfe24947 ("ARM: AMBA: Add pclk support to AMBA bus infrastructure")
-> changed AMBA bus to handle the PCLK automatically. However, in EP93xx clock
-> initialization is arch_initcall() which is done later than AMBA device
-> identification. This causes amba_get_enable_pclk() to fail resulting device
-> where UARTs are not functional.
+On Wed, 2010-09-01 at 13:59 -0500, H Hartley Sweeten wrote:
+> On Monday, August 30, 2010 5:18 PM, Gregory Bean wrote:
+> > Subject: [PATCH 1/2] msm: Install the Google-Android gpio driver.
+> > 
+> > From: Arve Hj?nnev?g <arve@android.com>
+> > 
+> > As part of the ongoing effort to converge on a common code base,
+> > adopt the Google-Android msmgpio driver, as it has a stronger pedigree
+> > than the previous submission from codeaurora.
+> > 
+> > Cc: Arve Hj?nnev?g <arve@android.com>
+> > Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 > 
-> So move clock initialization code before any AMBA device registration.
+> Hello Greg,
 > 
-> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
-> ---
-> Note that I'm not sure whether ep93xx_map_io() is the best place for calling
-> clock init code. Alternative would be to put it in ep93xx_init_devices() just
-> before calls to amba_device_register().
-
-Thanks Mika,
-
-I'm guessing none of the initcalls are early enough to solve this
-problem? I think that calling from either ep93xx_map_io or
-ep93xx_init_devices is fine, especially since this is a regression fix.
-
-If nobody has a better solution:
-
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
-
-> Tested on ep9302 (ts-7260) and on ep9307 (Sim.One).
+> A couple comments on this.
 > 
->  arch/arm/mach-ep93xx/clock.c                 |    4 +---
->  arch/arm/mach-ep93xx/core.c                  |    1 +
->  arch/arm/mach-ep93xx/include/mach/platform.h |    1 +
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> > +struct msm_gpio_chip msm_gpio_chips[] = {
+> > +	{
+> > +		.regs = {
+> > +			.out =         GPIO_OUT_0,
+> > +			.in =          GPIO_IN_0,
+> > +			.int_status =  GPIO_INT_STATUS_0,
+> > +			.int_clear =   GPIO_INT_CLEAR_0,
+> > +			.int_en =      GPIO_INT_EN_0,
+> > +			.int_edge =    GPIO_INT_EDGE_0,
+> > +			.int_pos =     GPIO_INT_POS_0,
+> > +			.oe =          GPIO_OE_0,
+> > +		},
+> > +		.chip = {
+> > +			.base = 0,
+> > +			.ngpio = 16,
+> > +			.get = msm_gpio_get,
+> > +			.set = msm_gpio_set,
+> > +			.direction_input = msm_gpio_direction_input,
+> > +			.direction_output = msm_gpio_direction_output,
+> > +			.to_irq = msm_gpio_to_irq,
+> > +		}
+> > +	},
 > 
-> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-> index 8bf3cec..119e614 100644
-> --- a/arch/arm/mach-ep93xx/clock.c
-> +++ b/arch/arm/mach-ep93xx/clock.c
-> @@ -514,7 +514,7 @@ static void __init ep93xx_dma_clock_init(void)
->  	clk_m2m1.rate = clk_h.rate;
->  }
->  
-> -static int __init ep93xx_clock_init(void)
-> +void __init ep93xx_clock_init(void)
->  {
->  	u32 value;
->  
-> @@ -558,6 +558,4 @@ static int __init ep93xx_clock_init(void)
->  		clk_p.rate / 1000000);
->  
->  	clkdev_add_table(clocks, ARRAY_SIZE(clocks));
-> -	return 0;
->  }
-> -arch_initcall(ep93xx_clock_init);
-> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-> index 4cb55d3..04e1b25 100644
-> --- a/arch/arm/mach-ep93xx/core.c
-> +++ b/arch/arm/mach-ep93xx/core.c
-> @@ -65,6 +65,7 @@ static struct map_desc ep93xx_io_desc[] __initdata = {
->  void __init ep93xx_map_io(void)
->  {
->  	iotable_init(ep93xx_io_desc, ARRAY_SIZE(ep93xx_io_desc));
-> +	ep93xx_clock_init();
->  }
->  
->  
-> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
-> index 3330b36..9b732b1 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
-> @@ -20,6 +20,7 @@ struct ep93xx_eth_data
->  
->  void ep93xx_map_io(void);
->  void ep93xx_init_irq(void);
-> +void ep93xx_clock_init(void);
->  
->  /* EP93xx System Controller software locked register write */
->  void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
+> This is a bit ugly... A 204 line struct definition is a bit hard to follow,
+> especially the way it's broken up with all the #if defined stuff.
+> 
+> Each gpio "bank" is code duplication other than the .base and .ngpio.  The
+> whole thing can be reduced using a helper macro.  Something like this:
+> 
+> #define MSM_GPIO_BANK(bank, base_gpio, num_gpio)			\
+> 	{										\
+> 		.regs = {								\
+> 			.out			= GPIO_OUT_##bank,		\
+> 			.in			= GPIO_IN_##bank,			\
+> 			.int_status		= GPIO_INT_STATUS_##bank,	\
+> 			.int_clear		= GPIO_INT_CLEAR_##bank,	\
+> 			.int_en		= GPIO_INT_EN_##bank,		\
+> 			.int_edge		= GPIO_INT_EDGE_##bank,		\
+> 			.int_pos		= GPIO_INT_POS_##bank,		\
+> 			.oe			= GPIO_OE_##bank,			\
+> 		},									\
+> 		.chip = {								\
+> 			.direction_input	= msm_gpio_direction_input,	\
+> 			.direction_output	= msm_gpio_direction_output,	\
+> 			.get			= msm_gpio_get,			\
+> 			.set			= msm_gpio_set,			\
+> 			.to_irq		= msm_gpio_to_irq,		\
+> 			.base			= base_gpio,			\
+> 			.ngpio		= num_gpio,				\
+> 		},									\
+> 	}
+> 
+> Then the struct definition can be reduced to this:
+> 
+> struct msm_gpio_chip msm_gpio_chips[] = {
+> #if defined(CONFIG_ARCH_MSM7X30)
+> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
+> 	MSM_GPIO_BANK(1, 16, 28),	/* gpio 16-43 */
+> 	MSM_GPIO_BANK(2, 44, 24),	/* gpio 44-67 */
+> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
+> 	MSM_GPIO_BANK(4, 95, 12),	/* gpio 95-106 */
+> 	MSM_GPIO_BANK(5, 107, 27),	/* gpio 107-133 */
+> 	MSM_GPIO_BANK(6, 134, 17),	/* gpio 134-150 */
+> 	MSM_GPIO_BANK(7, 151, 31),	/* gpio 151-181 */
+> #elif defined(CONFIG_ARCH_QSD8X50)
+> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
+> 	MSM_GPIO_BANK(1, 16, 27),	/* gpio 16-42 */
+> 	MSM_GPIO_BANK(2, 43, 25),	/* gpio 43-67 */
+> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
+> 	MSM_GPIO_BANK(4, 95, 9),	/* gpio 95-103 */
+> 	MSM_GPIO_BANK(5, 104, 18),	/* gpio 104-121 */
+> 	MSM_GPIO_BANK(6, 122, 31),	/* gpio 122-152 */
+> 	MSM_GPIO_BANK(7, 153, 12),	/* gpio 153-164 */
+> #else
+> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
+> 	MSM_GPIO_BANK(1, 16, 27),	/* gpio 16-42 */
+> 	MSM_GPIO_BANK(2, 43, 25),	/* gpio 43-67 */
+> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
+> 	MSM_GPIO_BANK(4, 95, 12),	/* gpio 95-106 */
+> 	MSM_GPIO_BANK(5, 107, 15),	/* gpio 107-121 */
+> #endif
+> };
+> 
 
+Yeah, this macro method is much nicer. It drops 204 lines down to less
+than half that.. Less duplication and less lines to maintain.
+
+Thanks for the review Hartley.
+
+Daniel
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
