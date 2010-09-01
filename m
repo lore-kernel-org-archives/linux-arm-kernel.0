@@ -1,148 +1,93 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 02 Sep 2010 09:30:11 +1200
-Subject: [PATCH 1/2] msm: Install the Google-Android gpio driver.
-In-Reply-To: <1283375606.21049.20.camel@c-dwalke-linux.qualcomm.com>
-References: <1283213906-17671-1-git-send-email-gbean@codeaurora.org>	<0D753D10438DA54287A00B027084269764447830F3@AUSP01VMBX24.collaborationhost.net>
-	<1283375606.21049.20.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4C7EC5E3.8030504@bluewatersys.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu,  2 Sep 2010 00:26:49 +0300
+Subject: [PATCH v5 6/7] omap: zoom: add fixed regulator device for wlan
+In-Reply-To: <1283376410-9999-1-git-send-email-ohad@wizery.com>
+References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
+Message-ID: <1283376410-9999-7-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2010 09:13 AM, Daniel Walker wrote:
-> On Wed, 2010-09-01 at 13:59 -0500, H Hartley Sweeten wrote:
->> On Monday, August 30, 2010 5:18 PM, Gregory Bean wrote:
->>> Subject: [PATCH 1/2] msm: Install the Google-Android gpio driver.
->>>
->>> From: Arve Hj?nnev?g <arve@android.com>
->>>
->>> As part of the ongoing effort to converge on a common code base,
->>> adopt the Google-Android msmgpio driver, as it has a stronger pedigree
->>> than the previous submission from codeaurora.
->>>
->>> Cc: Arve Hj?nnev?g <arve@android.com>
->>> Signed-off-by: Gregory Bean <gbean@codeaurora.org>
->>
->> Hello Greg,
->>
->> A couple comments on this.
->>
->>> +struct msm_gpio_chip msm_gpio_chips[] = {
->>> +	{
->>> +		.regs = {
->>> +			.out =         GPIO_OUT_0,
->>> +			.in =          GPIO_IN_0,
->>> +			.int_status =  GPIO_INT_STATUS_0,
->>> +			.int_clear =   GPIO_INT_CLEAR_0,
->>> +			.int_en =      GPIO_INT_EN_0,
->>> +			.int_edge =    GPIO_INT_EDGE_0,
->>> +			.int_pos =     GPIO_INT_POS_0,
->>> +			.oe =          GPIO_OE_0,
->>> +		},
->>> +		.chip = {
->>> +			.base = 0,
->>> +			.ngpio = 16,
->>> +			.get = msm_gpio_get,
->>> +			.set = msm_gpio_set,
->>> +			.direction_input = msm_gpio_direction_input,
->>> +			.direction_output = msm_gpio_direction_output,
->>> +			.to_irq = msm_gpio_to_irq,
->>> +		}
->>> +	},
->>
->> This is a bit ugly... A 204 line struct definition is a bit hard to follow,
->> especially the way it's broken up with all the #if defined stuff.
->>
->> Each gpio "bank" is code duplication other than the .base and .ngpio.  The
->> whole thing can be reduced using a helper macro.  Something like this:
->>
->> #define MSM_GPIO_BANK(bank, base_gpio, num_gpio)			\
->> 	{										\
->> 		.regs = {								\
->> 			.out			= GPIO_OUT_##bank,		\
->> 			.in			= GPIO_IN_##bank,			\
->> 			.int_status		= GPIO_INT_STATUS_##bank,	\
->> 			.int_clear		= GPIO_INT_CLEAR_##bank,	\
->> 			.int_en		= GPIO_INT_EN_##bank,		\
->> 			.int_edge		= GPIO_INT_EDGE_##bank,		\
->> 			.int_pos		= GPIO_INT_POS_##bank,		\
->> 			.oe			= GPIO_OE_##bank,			\
->> 		},									\
->> 		.chip = {								\
->> 			.direction_input	= msm_gpio_direction_input,	\
->> 			.direction_output	= msm_gpio_direction_output,	\
->> 			.get			= msm_gpio_get,			\
->> 			.set			= msm_gpio_set,			\
->> 			.to_irq		= msm_gpio_to_irq,		\
->> 			.base			= base_gpio,			\
->> 			.ngpio		= num_gpio,				\
->> 		},									\
->> 	}
->>
->> Then the struct definition can be reduced to this:
->>
->> struct msm_gpio_chip msm_gpio_chips[] = {
->> #if defined(CONFIG_ARCH_MSM7X30)
->> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
->> 	MSM_GPIO_BANK(1, 16, 28),	/* gpio 16-43 */
->> 	MSM_GPIO_BANK(2, 44, 24),	/* gpio 44-67 */
->> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
->> 	MSM_GPIO_BANK(4, 95, 12),	/* gpio 95-106 */
->> 	MSM_GPIO_BANK(5, 107, 27),	/* gpio 107-133 */
->> 	MSM_GPIO_BANK(6, 134, 17),	/* gpio 134-150 */
->> 	MSM_GPIO_BANK(7, 151, 31),	/* gpio 151-181 */
->> #elif defined(CONFIG_ARCH_QSD8X50)
->> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
->> 	MSM_GPIO_BANK(1, 16, 27),	/* gpio 16-42 */
->> 	MSM_GPIO_BANK(2, 43, 25),	/* gpio 43-67 */
->> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
->> 	MSM_GPIO_BANK(4, 95, 9),	/* gpio 95-103 */
->> 	MSM_GPIO_BANK(5, 104, 18),	/* gpio 104-121 */
->> 	MSM_GPIO_BANK(6, 122, 31),	/* gpio 122-152 */
->> 	MSM_GPIO_BANK(7, 153, 12),	/* gpio 153-164 */
->> #else
->> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
->> 	MSM_GPIO_BANK(1, 16, 27),	/* gpio 16-42 */
->> 	MSM_GPIO_BANK(2, 43, 25),	/* gpio 43-67 */
->> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
->> 	MSM_GPIO_BANK(4, 95, 12),	/* gpio 95-106 */
->> 	MSM_GPIO_BANK(5, 107, 15),	/* gpio 107-121 */
->> #endif
->> };
+Add a fixed regulator vmmc device to enable power control
+of the wl1271 wlan device.
 
-Which could also be further reduced to:
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   35 ++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
 
-struct msm_gpio_chip msm_gpio_chips[] = {
-	MSM_GPIO_BANK(0,   0, 16),	/* gpio 0-15 */
-#if defined(CONFIG_ARCH_MSM7X30)
-	MSM_GPIO_BANK(1,  16, 28),	/* gpio 16-43 */
- 	MSM_GPIO_BANK(2,  44, 24),	/* gpio 44-67 */
- 	MSM_GPIO_BANK(3,  68, 27),	/* gpio 68-94 */
- 	MSM_GPIO_BANK(4,  95, 12),	/* gpio 95-106 */
- 	MSM_GPIO_BANK(5, 107, 27),	/* gpio 107-133 */
- 	MSM_GPIO_BANK(6, 134, 17),	/* gpio 134-150 */
- 	MSM_GPIO_BANK(7, 151, 31),	/* gpio 151-181 */
-#else
-	MSM_GPIO_BANK(1,  16, 27),	/* gpio 16-42 */
-	MSM_GPIO_BANK(2,  43, 25),	/* gpio 43-67 */
- 	MSM_GPIO_BANK(3,  68, 27),	/* gpio 68-94 */
-#if defined(CONFIG_ARCH_QSD8X50)
-	MSM_GPIO_BANK(4,  95,  9),	/* gpio 95-103 */
- 	MSM_GPIO_BANK(5, 104, 18),	/* gpio 104-121 */
- 	MSM_GPIO_BANK(6, 122, 31),	/* gpio 122-152 */
- 	MSM_GPIO_BANK(7, 153, 12),	/* gpio 153-164 */	
-#else
-	MSM_GPIO_BANK(4,  95, 12),	/* gpio 95-106 */
- 	MSM_GPIO_BANK(5, 107, 15),	/* gpio 107-121 */
-#endif
-#endif
-
-~Ryan
-
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index 6b39849..de88635 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -16,6 +16,7 @@
+ #include <linux/gpio.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -27,6 +28,8 @@
+ #include "mux.h"
+ #include "hsmmc.h"
+ 
++#define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
++
+ /* Zoom2 has Qwerty keyboard*/
+ static int board_keymap[] = {
+ 	KEY(0, 0, KEY_E),
+@@ -106,6 +109,11 @@ static struct regulator_consumer_supply zoom_vmmc2_supply = {
+ 	.supply		= "vmmc",
+ };
+ 
++static struct regulator_consumer_supply zoom_vmmc3_supply = {
++	.supply		= "vmmc",
++	.dev_name	= "mmci-omap-hs.2",
++};
++
+ /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
+ static struct regulator_init_data zoom_vmmc1 = {
+ 	.constraints = {
+@@ -151,6 +159,32 @@ static struct regulator_init_data zoom_vsim = {
+ 	.consumer_supplies      = &zoom_vsim_supply,
+ };
+ 
++static struct regulator_init_data zoom_vmmc3 = {
++	.constraints = {
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies = 1,
++	.consumer_supplies = &zoom_vmmc3_supply,
++};
++
++static struct fixed_voltage_config zoom_vwlan = {
++	.supply_name = "vwl1271",
++	.microvolts = 1800000, /* 1.8V */
++	.gpio = OMAP_ZOOM_WLAN_PMENA_GPIO,
++	.startup_delay = 70000, /* 70msec */
++	.enable_high = 1,
++	.enabled_at_boot = 0,
++	.init_data = &zoom_vmmc3,
++};
++
++static struct platform_device omap_vwlan_device = {
++	.name		= "reg-fixed-voltage",
++	.id		= 1,
++	.dev = {
++		.platform_data = &zoom_vwlan,
++	},
++};
++
+ static struct omap2_hsmmc_info mmc[] __initdata = {
+ 	{
+ 		.name		= "external",
+@@ -280,6 +314,7 @@ static void enable_board_wakeup_source(void)
+ void __init zoom_peripherals_init(void)
+ {
+ 	omap_i2c_init();
++	platform_device_register(&omap_vwlan_device);
+ 	usb_musb_init(&musb_board_data);
+ 	enable_board_wakeup_source();
+ }
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+1.7.0.4
