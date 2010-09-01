@@ -1,372 +1,138 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Sep 2010 16:09:18 +0900
-Subject: [PATCH 11/13] ARM: S5P64X0: Move SMDK6440 board file and Add SMDK6450
-	board file
+Date: Wed,  1 Sep 2010 16:09:19 +0900
+Subject: [PATCH 12/13] ARM: S5P64X0: Add UART serial support for S5P6450
 In-Reply-To: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
 References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1283324960-21629-12-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1283324960-21629-13-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves smdk6440 board file from mach-s5p6440 into the new
-mach-s5p64x0 directory and adds smdk6450 board file.
+This patch adds UART serial port support for S5P6450 SoC.
+The S5P6450 has 6 UARTs, so adds resource of UART4 and UART5.
+And to fix membase which is in serial/samsung.c is from Ben Dooks.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- .../{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c |   87 ++++++----
- arch/arm/mach-s5p64x0/mach-smdk6450.c              |  182 ++++++++++++++++++++
- 2 files changed, 234 insertions(+), 35 deletions(-)
- rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c (66%)
- create mode 100644 arch/arm/mach-s5p64x0/mach-smdk6450.c
+ arch/arm/plat-s5p/dev-uart.c |   58 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/serial/Kconfig       |    7 +++--
+ drivers/serial/samsung.c     |    2 +-
+ 3 files changed, 63 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-similarity index 66%
-rename from arch/arm/mach-s5p6440/mach-smdk6440.c
-rename to arch/arm/mach-s5p64x0/mach-smdk6440.c
-index 9202aaa..28de0a5 100644
---- a/arch/arm/mach-s5p6440/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -1,7 +1,7 @@
--/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
-+/* linux/arch/arm/mach-s5p64x0/mach-smdk6440.c
-  *
-- * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-+ * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -21,21 +21,22 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/clk.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/irq.h>
-+#include <asm/mach-types.h>
- 
- #include <mach/hardware.h>
- #include <mach/map.h>
--
--#include <asm/irq.h>
--#include <asm/mach-types.h>
-+#include <mach/regs-clock.h>
-+#include <mach/i2c.h>
- 
- #include <plat/regs-serial.h>
--
-+#include <plat/gpio-cfg.h>
- #include <plat/s5p6440.h>
- #include <plat/clock.h>
--#include <mach/regs-clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/iic.h>
-@@ -58,43 +59,60 @@
- 
- static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
- 	[0] = {
--		.hwport	     = 0,
--		.flags	     = 0,
--		.ucon	     = SMDK6440_UCON_DEFAULT,
--		.ulcon	     = SMDK6440_ULCON_DEFAULT,
--		.ufcon	     = SMDK6440_UFCON_DEFAULT,
-+		.hwport		= 0,
-+		.flags		= 0,
-+		.ucon		= SMDK6440_UCON_DEFAULT,
-+		.ulcon		= SMDK6440_ULCON_DEFAULT,
-+		.ufcon		= SMDK6440_UFCON_DEFAULT,
- 	},
- 	[1] = {
--		.hwport	     = 1,
--		.flags	     = 0,
--		.ucon	     = SMDK6440_UCON_DEFAULT,
--		.ulcon	     = SMDK6440_ULCON_DEFAULT,
--		.ufcon	     = SMDK6440_UFCON_DEFAULT,
-+		.hwport		= 1,
-+		.flags		= 0,
-+		.ucon		= SMDK6440_UCON_DEFAULT,
-+		.ulcon		= SMDK6440_ULCON_DEFAULT,
-+		.ufcon		= SMDK6440_UFCON_DEFAULT,
- 	},
- 	[2] = {
--		.hwport	     = 2,
--		.flags	     = 0,
--		.ucon	     = SMDK6440_UCON_DEFAULT,
--		.ulcon	     = SMDK6440_ULCON_DEFAULT,
--		.ufcon	     = SMDK6440_UFCON_DEFAULT,
-+		.hwport		= 2,
-+		.flags		= 0,
-+		.ucon		= SMDK6440_UCON_DEFAULT,
-+		.ulcon		= SMDK6440_ULCON_DEFAULT,
-+		.ufcon		= SMDK6440_UFCON_DEFAULT,
- 	},
- 	[3] = {
--		.hwport	     = 3,
--		.flags	     = 0,
--		.ucon	     = SMDK6440_UCON_DEFAULT,
--		.ulcon	     = SMDK6440_ULCON_DEFAULT,
--		.ufcon	     = SMDK6440_UFCON_DEFAULT,
-+		.hwport		= 3,
-+		.flags		= 0,
-+		.ucon		= SMDK6440_UCON_DEFAULT,
-+		.ulcon		= SMDK6440_ULCON_DEFAULT,
-+		.ufcon		= SMDK6440_UFCON_DEFAULT,
- 	},
+diff --git a/arch/arm/plat-s5p/dev-uart.c b/arch/arm/plat-s5p/dev-uart.c
+index a89331e..6a73428 100644
+--- a/arch/arm/plat-s5p/dev-uart.c
++++ b/arch/arm/plat-s5p/dev-uart.c
+@@ -119,6 +119,56 @@ static struct resource s5p_uart3_resource[] = {
+ #endif
  };
  
- static struct platform_device *smdk6440_devices[] __initdata = {
--	&s5p6440_device_iis,
- 	&s3c_device_adc,
- 	&s3c_device_rtc,
- 	&s3c_device_i2c0,
- 	&s3c_device_i2c1,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
-+	&s5p6440_device_iis,
-+};
-+
-+static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
-+	.flags		= 0,
-+	.slave_addr	= 0x10,
-+	.frequency	= 100*1000,
-+	.sda_delay	= 100,
-+	.cfg_gpio	= s5p6440_i2c0_cfg_gpio,
-+};
-+
-+static struct s3c2410_platform_i2c s5p6440_i2c1_data __initdata = {
-+	.flags		= 0,
-+	.bus_num	= 1,
-+	.slave_addr	= 0x10,
-+	.frequency	= 100*1000,
-+	.sda_delay	= 100,
-+	.cfg_gpio	= s5p6440_i2c1_cfg_gpio,
- };
- 
- static struct i2c_board_info smdk6440_i2c_devs0[] __initdata = {
-@@ -113,7 +131,7 @@ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
- 
- static void __init smdk6440_map_io(void)
- {
--	s5p_init_io(NULL, 0, S5P_SYS_ID);
-+	s5p_init_io(NULL, 0, S5P64X0_SYS_ID);
- 	s3c24xx_init_clocks(12000000);
- 	s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
- }
-@@ -122,9 +140,8 @@ static void __init smdk6440_machine_init(void)
- {
- 	s3c24xx_ts_set_platdata(&s3c_ts_platform);
- 
--	/* I2C */
--	s3c_i2c0_set_platdata(NULL);
--	s3c_i2c1_set_platdata(NULL);
-+	s3c_i2c0_set_platdata(&s5p6440_i2c0_data);
-+	s3c_i2c1_set_platdata(&s5p6440_i2c1_data);
- 	i2c_register_board_info(0, smdk6440_i2c_devs0,
- 			ARRAY_SIZE(smdk6440_i2c_devs0));
- 	i2c_register_board_info(1, smdk6440_i2c_devs1,
-@@ -135,9 +152,9 @@ static void __init smdk6440_machine_init(void)
- 
- MACHINE_START(SMDK6440, "SMDK6440")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
--	.phys_io	= S3C_PA_UART & 0xfff00000,
-+	.phys_io	= S5P6440_PA_UART(0) & 0xfff00000,
- 	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
--	.boot_params	= S5P_PA_SDRAM + 0x100,
-+	.boot_params	= S5P64X0_PA_SDRAM + 0x100,
- 
- 	.init_irq	= s5p6440_init_irq,
- 	.map_io		= smdk6440_map_io,
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-new file mode 100644
-index 0000000..8e98217
---- /dev/null
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-@@ -0,0 +1,182 @@
-+/* linux/arch/arm/mach-s5p64x0/mach-smdk6450.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/timer.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/i2c.h>
-+#include <linux/serial_core.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/clk.h>
-+#include <linux/gpio.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/irq.h>
-+#include <asm/mach-types.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/map.h>
-+#include <mach/regs-clock.h>
-+#include <mach/i2c.h>
-+
-+#include <plat/regs-serial.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/s5p6450.h>
-+#include <plat/clock.h>
-+#include <plat/devs.h>
-+#include <plat/cpu.h>
-+#include <plat/iic.h>
-+#include <plat/pll.h>
-+#include <plat/adc.h>
-+#include <plat/ts.h>
-+
-+#define SMDK6450_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				S3C2410_UCON_RXILEVEL |		\
-+				S3C2410_UCON_TXIRQMODE |	\
-+				S3C2410_UCON_RXIRQMODE |	\
-+				S3C2410_UCON_RXFIFO_TOI |	\
-+				S3C2443_UCON_RXERR_IRQEN)
-+
-+#define SMDK6450_ULCON_DEFAULT	S3C2410_LCON_CS8
-+
-+#define SMDK6450_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				S3C2440_UFCON_TXTRIG16 |	\
-+				S3C2410_UFCON_RXTRIG8)
-+
-+static struct s3c2410_uartcfg smdk6450_uartcfgs[] __initdata = {
++static struct resource s5p_uart4_resource[] = {
++#if CONFIG_SERIAL_SAMSUNG_UARTS > 4
 +	[0] = {
-+		.hwport		= 0,
-+		.flags		= 0,
-+		.ucon		= SMDK6450_UCON_DEFAULT,
-+		.ulcon		= SMDK6450_ULCON_DEFAULT,
-+		.ufcon		= SMDK6450_UFCON_DEFAULT,
++		.start	= S5P_PA_UART4,
++		.end	= S5P_PA_UART4 + S5P_SZ_UART,
++		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.hwport		= 1,
-+		.flags		= 0,
-+		.ucon		= SMDK6450_UCON_DEFAULT,
-+		.ulcon		= SMDK6450_ULCON_DEFAULT,
-+		.ufcon		= SMDK6450_UFCON_DEFAULT,
++		.start	= IRQ_S5P_UART_RX4,
++		.end	= IRQ_S5P_UART_RX4,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +	[2] = {
-+		.hwport		= 2,
-+		.flags		= 0,
-+		.ucon		= SMDK6450_UCON_DEFAULT,
-+		.ulcon		= SMDK6450_ULCON_DEFAULT,
-+		.ufcon		= SMDK6450_UFCON_DEFAULT,
++		.start	= IRQ_S5P_UART_TX4,
++		.end	= IRQ_S5P_UART_TX4,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +	[3] = {
-+		.hwport		= 3,
-+		.flags		= 0,
-+		.ucon		= SMDK6450_UCON_DEFAULT,
-+		.ulcon		= SMDK6450_ULCON_DEFAULT,
-+		.ufcon		= SMDK6450_UFCON_DEFAULT,
-+	},
-+#if CONFIG_SERIAL_SAMSUNG_UARTS > 4
-+	[4] = {
-+		.hwport		= 4,
-+		.flags		= 0,
-+		.ucon		= SMDK6450_UCON_DEFAULT,
-+		.ulcon		= SMDK6450_ULCON_DEFAULT,
-+		.ufcon		= SMDK6450_UFCON_DEFAULT,
++		.start	= IRQ_S5P_UART_ERR4,
++		.end	= IRQ_S5P_UART_ERR4,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +#endif
++};
++
++static struct resource s5p_uart5_resource[] = {
 +#if CONFIG_SERIAL_SAMSUNG_UARTS > 5
-+	[5] = {
-+		.hwport		= 5,
-+		.flags		= 0,
-+		.ucon		= SMDK6450_UCON_DEFAULT,
-+		.ulcon		= SMDK6450_ULCON_DEFAULT,
-+		.ufcon		= SMDK6450_UFCON_DEFAULT,
++	[0] = {
++		.start	= S5P_PA_UART5,
++		.end	= S5P_PA_UART5 + S5P_SZ_UART,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_S5P_UART_RX5,
++		.end	= IRQ_S5P_UART_RX5,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[2] = {
++		.start	= IRQ_S5P_UART_TX5,
++		.end	= IRQ_S5P_UART_TX5,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[3] = {
++		.start	= IRQ_S5P_UART_ERR5,
++		.end	= IRQ_S5P_UART_ERR5,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +#endif
 +};
 +
-+static struct platform_device *smdk6450_devices[] __initdata = {
-+	&s3c_device_adc,
-+	&s3c_device_rtc,
-+	&s3c_device_i2c0,
-+	&s3c_device_i2c1,
-+	&s3c_device_ts,
-+	&s3c_device_wdt,
-+	&s5p6450_device_iis0,
-+	/* s5p6450_device_spi0 will be added */
-+};
-+
-+static struct s3c2410_platform_i2c s5p6450_i2c0_data __initdata = {
-+	.flags		= 0,
-+	.slave_addr	= 0x10,
-+	.frequency	= 100*1000,
-+	.sda_delay	= 100,
-+	.cfg_gpio	= s5p6450_i2c0_cfg_gpio,
-+};
-+
-+static struct s3c2410_platform_i2c s5p6450_i2c1_data __initdata = {
-+	.flags		= 0,
-+	.bus_num	= 1,
-+	.slave_addr	= 0x10,
-+	.frequency	= 100*1000,
-+	.sda_delay	= 100,
-+	.cfg_gpio	= s5p6450_i2c1_cfg_gpio,
-+};
-+
-+static struct i2c_board_info smdk6450_i2c_devs0[] __initdata = {
-+	{ I2C_BOARD_INFO("24c08", 0x50), },	/* Samsung KS24C080C EEPROM */
-+};
-+
-+static struct i2c_board_info smdk6450_i2c_devs1[] __initdata = {
-+	{ I2C_BOARD_INFO("24c128", 0x57), },/* Samsung S524AD0XD1 EEPROM */
-+};
-+
-+static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
-+	.delay			= 10000,
-+	.presc			= 49,
-+	.oversampling_shift	= 2,
-+};
-+
-+static void __init smdk6450_map_io(void)
-+{
-+	s5p_init_io(NULL, 0, S5P64X0_SYS_ID);
-+	s3c24xx_init_clocks(19200000);
-+	s3c24xx_init_uarts(smdk6450_uartcfgs, ARRAY_SIZE(smdk6450_uartcfgs));
-+}
-+
-+static void __init smdk6450_machine_init(void)
-+{
-+	s3c24xx_ts_set_platdata(&s3c_ts_platform);
-+
-+	s3c_i2c0_set_platdata(&s5p6450_i2c0_data);
-+	s3c_i2c1_set_platdata(&s5p6450_i2c1_data);
-+	i2c_register_board_info(0, smdk6450_i2c_devs0,
-+			ARRAY_SIZE(smdk6450_i2c_devs0));
-+	i2c_register_board_info(1, smdk6450_i2c_devs1,
-+			ARRAY_SIZE(smdk6450_i2c_devs1));
-+
-+	platform_add_devices(smdk6450_devices, ARRAY_SIZE(smdk6450_devices));
-+}
-+
-+MACHINE_START(SMDK6450, "SMDK6450")
-+	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	.phys_io	= S5P6450_PA_UART(0) & 0xfff00000,
-+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S5P64X0_PA_SDRAM + 0x100,
-+
-+	.init_irq	= s5p6450_init_irq,
-+	.map_io		= smdk6450_map_io,
-+	.init_machine	= smdk6450_machine_init,
-+	.timer		= &s3c24xx_timer,
-+MACHINE_END
+ struct s3c24xx_uart_resources s5p_uart_resources[] __initdata = {
+ 	[0] = {
+ 		.resources	= s5p_uart0_resource,
+@@ -136,4 +186,12 @@ struct s3c24xx_uart_resources s5p_uart_resources[] __initdata = {
+ 		.resources	= s5p_uart3_resource,
+ 		.nr_resources	= ARRAY_SIZE(s5p_uart3_resource),
+ 	},
++	[4] = {
++		.resources	= s5p_uart4_resource,
++		.nr_resources	= ARRAY_SIZE(s5p_uart4_resource),
++	},
++	[5] = {
++		.resources	= s5p_uart5_resource,
++		.nr_resources	= ARRAY_SIZE(s5p_uart5_resource),
++	},
+ };
+diff --git a/drivers/serial/Kconfig b/drivers/serial/Kconfig
+index 12900f7..3198c53 100644
+--- a/drivers/serial/Kconfig
++++ b/drivers/serial/Kconfig
+@@ -458,6 +458,7 @@ config SERIAL_SAMSUNG_UARTS
+ 	int
+ 	depends on ARM && PLAT_SAMSUNG
+ 	default 2 if ARCH_S3C2400
++	default 6 if ARCH_S5P6450
+ 	default 4 if SERIAL_SAMSUNG_UARTS_4
+ 	default 3
+ 	help
+@@ -526,12 +527,12 @@ config SERIAL_S3C24A0
+ 	  Serial port support for the Samsung S3C24A0 SoC
+ 
+ config SERIAL_S3C6400
+-	tristate "Samsung S3C6400/S3C6410/S5P6440/S5PC100 Serial port support"
+-	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5PC100)
++	tristate "Samsung S3C6400/S3C6410/S5P6440/S5P6450/S5PC100 Serial port support"
++	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5P6450 || CPU_S5PC100)
+ 	select SERIAL_SAMSUNG_UARTS_4
+ 	default y
+ 	help
+-	  Serial port support for the Samsung S3C6400, S3C6410, S5P6440
++	  Serial port support for the Samsung S3C6400, S3C6410, S5P6440, S5P6450
+ 	  and S5PC100 SoCs
+ 
+ config SERIAL_S5PV210
+diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+index b1156ba..7ac2bf5 100644
+--- a/drivers/serial/samsung.c
++++ b/drivers/serial/samsung.c
+@@ -1101,7 +1101,7 @@ static int s3c24xx_serial_init_port(struct s3c24xx_uart_port *ourport,
+ 	dbg("resource %p (%lx..%lx)\n", res, res->start, res->end);
+ 
+ 	port->mapbase = res->start;
+-	port->membase = S3C_VA_UART + res->start - (S3C_PA_UART & 0xfff00000);
++	port->membase = S3C_VA_UART + (res->start & 0xfffff);
+ 	ret = platform_get_irq(platdev, 0);
+ 	if (ret < 0)
+ 		port->irq = 0;
 -- 
 1.6.2.5
