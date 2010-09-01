@@ -1,93 +1,23 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu,  2 Sep 2010 00:26:49 +0300
-Subject: [PATCH v5 6/7] omap: zoom: add fixed regulator device for wlan
-In-Reply-To: <1283376410-9999-1-git-send-email-ohad@wizery.com>
-References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
-Message-ID: <1283376410-9999-7-git-send-email-ohad@wizery.com>
+From: cernekee@gmail.com (Kevin Cernekee)
+Date: Wed, 1 Sep 2010 14:54:37 -0700
+Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
+In-Reply-To: <4C7EC43B.2050903@bluewatersys.com>
+References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
+	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
+	<1283170469.12995.53.camel@brekeke> <4C7CA278.9040902@st.com>
+	<1283297810.2018.67.camel@brekeke> <4C7DD2FD.1080501@st.com>
+	<1283337939.1958.20.camel@brekeke> <4C7E3344.2020202@st.com>
+	<4C7EC43B.2050903@bluewatersys.com>
+Message-ID: <AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a fixed regulator vmmc device to enable power control
-of the wl1271 wlan device.
+On Wed, Sep 1, 2010 at 2:23 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> However, we are interested in having a proper solution to this problem.
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- arch/arm/mach-omap2/board-zoom-peripherals.c |   35 ++++++++++++++++++++++++++
- 1 files changed, 35 insertions(+), 0 deletions(-)
+I would suggest using this patch as a starting point - could you
+please review the changes and try it out?
 
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index 6b39849..de88635 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -16,6 +16,7 @@
- #include <linux/gpio.h>
- #include <linux/i2c/twl.h>
- #include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -27,6 +28,8 @@
- #include "mux.h"
- #include "hsmmc.h"
- 
-+#define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
-+
- /* Zoom2 has Qwerty keyboard*/
- static int board_keymap[] = {
- 	KEY(0, 0, KEY_E),
-@@ -106,6 +109,11 @@ static struct regulator_consumer_supply zoom_vmmc2_supply = {
- 	.supply		= "vmmc",
- };
- 
-+static struct regulator_consumer_supply zoom_vmmc3_supply = {
-+	.supply		= "vmmc",
-+	.dev_name	= "mmci-omap-hs.2",
-+};
-+
- /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
- static struct regulator_init_data zoom_vmmc1 = {
- 	.constraints = {
-@@ -151,6 +159,32 @@ static struct regulator_init_data zoom_vsim = {
- 	.consumer_supplies      = &zoom_vsim_supply,
- };
- 
-+static struct regulator_init_data zoom_vmmc3 = {
-+	.constraints = {
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies = 1,
-+	.consumer_supplies = &zoom_vmmc3_supply,
-+};
-+
-+static struct fixed_voltage_config zoom_vwlan = {
-+	.supply_name = "vwl1271",
-+	.microvolts = 1800000, /* 1.8V */
-+	.gpio = OMAP_ZOOM_WLAN_PMENA_GPIO,
-+	.startup_delay = 70000, /* 70msec */
-+	.enable_high = 1,
-+	.enabled_at_boot = 0,
-+	.init_data = &zoom_vmmc3,
-+};
-+
-+static struct platform_device omap_vwlan_device = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 1,
-+	.dev = {
-+		.platform_data = &zoom_vwlan,
-+	},
-+};
-+
- static struct omap2_hsmmc_info mmc[] __initdata = {
- 	{
- 		.name		= "external",
-@@ -280,6 +314,7 @@ static void enable_board_wakeup_source(void)
- void __init zoom_peripherals_init(void)
- {
- 	omap_i2c_init();
-+	platform_device_register(&omap_vwlan_device);
- 	usb_musb_init(&musb_board_data);
- 	enable_board_wakeup_source();
- }
--- 
-1.7.0.4
+http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/b6d6ae730be2750fac166ed9df11ee6ea54d9160
+
+Thanks.
