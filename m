@@ -1,122 +1,56 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 01 Sep 2010 14:13:26 -0700
-Subject: [PATCH 1/2] msm: Install the Google-Android gpio driver.
-In-Reply-To: <0D753D10438DA54287A00B027084269764447830F3@AUSP01VMBX24.collaborationhost.net>
-References: <1283213906-17671-1-git-send-email-gbean@codeaurora.org>
-	<0D753D10438DA54287A00B027084269764447830F3@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <1283375606.21049.20.camel@c-dwalke-linux.qualcomm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 01 Sep 2010 14:18:11 -0700
+Subject: [PATCH] ARM: Implement cpu_v7_reset.
+In-Reply-To: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4C7EC313.7050705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-09-01 at 13:59 -0500, H Hartley Sweeten wrote:
-> On Monday, August 30, 2010 5:18 PM, Gregory Bean wrote:
-> > Subject: [PATCH 1/2] msm: Install the Google-Android gpio driver.
-> > 
-> > From: Arve Hj?nnev?g <arve@android.com>
-> > 
-> > As part of the ongoing effort to converge on a common code base,
-> > adopt the Google-Android msmgpio driver, as it has a stronger pedigree
-> > than the previous submission from codeaurora.
-> > 
-> > Cc: Arve Hj?nnev?g <arve@android.com>
-> > Signed-off-by: Gregory Bean <gbean@codeaurora.org>
+On 09/01/2010 07:01 AM, Linus Walleij wrote:
+> From: Per Fransson <per.xx.fransson@stericsson.com>
 > 
-> Hello Greg,
+> This implementation of cpu_v7_reset flushes the L1 cache
+> and turns off the MMU.
 > 
-> A couple comments on this.
-> 
-> > +struct msm_gpio_chip msm_gpio_chips[] = {
-> > +	{
-> > +		.regs = {
-> > +			.out =         GPIO_OUT_0,
-> > +			.in =          GPIO_IN_0,
-> > +			.int_status =  GPIO_INT_STATUS_0,
-> > +			.int_clear =   GPIO_INT_CLEAR_0,
-> > +			.int_en =      GPIO_INT_EN_0,
-> > +			.int_edge =    GPIO_INT_EDGE_0,
-> > +			.int_pos =     GPIO_INT_POS_0,
-> > +			.oe =          GPIO_OE_0,
-> > +		},
-> > +		.chip = {
-> > +			.base = 0,
-> > +			.ngpio = 16,
-> > +			.get = msm_gpio_get,
-> > +			.set = msm_gpio_set,
-> > +			.direction_input = msm_gpio_direction_input,
-> > +			.direction_output = msm_gpio_direction_output,
-> > +			.to_irq = msm_gpio_to_irq,
-> > +		}
-> > +	},
-> 
-> This is a bit ugly... A 204 line struct definition is a bit hard to follow,
-> especially the way it's broken up with all the #if defined stuff.
-> 
-> Each gpio "bank" is code duplication other than the .base and .ngpio.  The
-> whole thing can be reduced using a helper macro.  Something like this:
-> 
-> #define MSM_GPIO_BANK(bank, base_gpio, num_gpio)			\
-> 	{										\
-> 		.regs = {								\
-> 			.out			= GPIO_OUT_##bank,		\
-> 			.in			= GPIO_IN_##bank,			\
-> 			.int_status		= GPIO_INT_STATUS_##bank,	\
-> 			.int_clear		= GPIO_INT_CLEAR_##bank,	\
-> 			.int_en		= GPIO_INT_EN_##bank,		\
-> 			.int_edge		= GPIO_INT_EDGE_##bank,		\
-> 			.int_pos		= GPIO_INT_POS_##bank,		\
-> 			.oe			= GPIO_OE_##bank,			\
-> 		},									\
-> 		.chip = {								\
-> 			.direction_input	= msm_gpio_direction_input,	\
-> 			.direction_output	= msm_gpio_direction_output,	\
-> 			.get			= msm_gpio_get,			\
-> 			.set			= msm_gpio_set,			\
-> 			.to_irq		= msm_gpio_to_irq,		\
-> 			.base			= base_gpio,			\
-> 			.ngpio		= num_gpio,				\
-> 		},									\
-> 	}
-> 
-> Then the struct definition can be reduced to this:
-> 
-> struct msm_gpio_chip msm_gpio_chips[] = {
-> #if defined(CONFIG_ARCH_MSM7X30)
-> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
-> 	MSM_GPIO_BANK(1, 16, 28),	/* gpio 16-43 */
-> 	MSM_GPIO_BANK(2, 44, 24),	/* gpio 44-67 */
-> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
-> 	MSM_GPIO_BANK(4, 95, 12),	/* gpio 95-106 */
-> 	MSM_GPIO_BANK(5, 107, 27),	/* gpio 107-133 */
-> 	MSM_GPIO_BANK(6, 134, 17),	/* gpio 134-150 */
-> 	MSM_GPIO_BANK(7, 151, 31),	/* gpio 151-181 */
-> #elif defined(CONFIG_ARCH_QSD8X50)
-> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
-> 	MSM_GPIO_BANK(1, 16, 27),	/* gpio 16-42 */
-> 	MSM_GPIO_BANK(2, 43, 25),	/* gpio 43-67 */
-> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
-> 	MSM_GPIO_BANK(4, 95, 9),	/* gpio 95-103 */
-> 	MSM_GPIO_BANK(5, 104, 18),	/* gpio 104-121 */
-> 	MSM_GPIO_BANK(6, 122, 31),	/* gpio 122-152 */
-> 	MSM_GPIO_BANK(7, 153, 12),	/* gpio 153-164 */
-> #else
-> 	MSM_GPIO_BANK(0, 0, 16),	/* gpio 0-15 */
-> 	MSM_GPIO_BANK(1, 16, 27),	/* gpio 16-42 */
-> 	MSM_GPIO_BANK(2, 43, 25),	/* gpio 43-67 */
-> 	MSM_GPIO_BANK(3, 68, 27),	/* gpio 68-94 */
-> 	MSM_GPIO_BANK(4, 95, 12),	/* gpio 95-106 */
-> 	MSM_GPIO_BANK(5, 107, 15),	/* gpio 107-121 */
-> #endif
-> };
-> 
+> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
 
-Yeah, this macro method is much nicer. It drops 204 lines down to less
-than half that.. Less duplication and less lines to maintain.
+Is this needed to make kexec work on v7? It would be nice if something
+like that was noted in the commit message besides what the patch is doing.
 
-Thanks for the review Hartley.
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index d5d9b58..f2e2c92 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -63,7 +63,18 @@ ENDPROC(cpu_v7_proc_fin)
+>   */
+>  	.align	5
+>  ENTRY(cpu_v7_reset)
+> -	mov	pc, r0
+> +	mov     r4, r0
+> +	mov     ip, #0
+> +	bl      v7_flush_kern_cache_all         @ invalidate I,D caches
+> +	dsb                                     @ drain WB
 
-Daniel
+Is this necessary considering that machine_kexec.c calls
+flush_cache_all() right before calling cpu_reset()?
+
+> +#ifdef CONFIG_MMU
+> +	mcr     p15, 0, ip, c8, c7, 0           @ invalidate I & D TLBs
+> +#endif
+> +	mrc     p15, 0, ip, c1, c0, 0           @ ctrl register
+> +	bic     ip, ip, #0x000f                 @ ............wcam
+> +	bic     ip, ip, #0x1100                 @ ...i...s........
+> +	mcr     p15, 0, ip, c1, c0, 0           @ ctrl register
+
+On a related note, I was always a bit confused since proc-v6 and proc-v7
+don't turn off the MMU in their cpu_reset functions, which doesn't seem
+correct with respect to Documentation/arm/Booting. Is it necessary to
+turn off the MMU when kexec'ing the kernel? Last time I tried kexec'ing
+on a v6 it worked fine without turning off the MMU.
 
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
