@@ -1,103 +1,385 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Wed, 1 Sep 2010 11:51:17 +0200
-Subject: [PATCH] oprofile, x86: fix init_sysfs error handling
-In-Reply-To: <20100831103001.GC22783@erda.amd.com>
-References: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-2-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-3-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-4-git-send-email-will.deacon@arm.com>
-	<20100830090929.GU22783@erda.amd.com>
-	<1283244880.645.17.camel@e102144-lin.cambridge.arm.com>
-	<20100831090518.GZ22783@erda.amd.com>
-	<1283247089.4063.2.camel@e102144-lin.cambridge.arm.com>
-	<20100831103001.GC22783@erda.amd.com>
-Message-ID: <20100901095117.GA4246@elte.hu>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 1 Sep 2010 19:00:26 +0900
+Subject: [PATCH 11/13] ARM: S5P64X0: Move SMDK6440 board file and Add
+	SMDK6450 board file
+In-Reply-To: <1283324960-21629-12-git-send-email-kgene.kim@samsung.com>
+References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+	<1283324960-21629-12-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTikXD9xz+mGz1QabwB91WdRX1oPeeOwa-juGdt6H@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Robert Richter <robert.richter@amd.com> wrote:
-
-> On 31.08.10 05:31:29, Will Deacon wrote:
-> > > For x86 wont change the code (actually I found a bug in the init_sysfs
-> > > error handler for which I will send a fix). Just wanted to get your
-> > > confirmation in case I was missing something that x86 is not affected.
-> > > I will apply the first 2 patches, no need to resubmit.
-> 
-> This is the patch, applied to:
-> 
->  git://git.kernel.org/pub/scm/linux/kernel/git/rric/oprofile.git urgent
-> 
-> -Robert
-> 
-> --
-> 
-> >From 10f0412f57f2a76a90eff4376f59cbb0a39e4e18 Mon Sep 17 00:00:00 2001
-> From: Robert Richter <robert.richter@amd.com>
-> Date: Mon, 30 Aug 2010 10:56:18 +0200
-> Subject: [PATCH] oprofile, x86: fix init_sysfs error handling
-> 
-> On failure init_sysfs() might not properly free resources. The error
-> code of the function is not checked. And, when reinitializing the exit
-> function might be called twice. This patch fixes all this.
-> 
-> Cc: stable at kernel.org
-> Signed-off-by: Robert Richter <robert.richter@amd.com>
+On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This patch moves smdk6440 board file from mach-s5p6440 into the new
+> mach-s5p64x0 directory and adds smdk6450 board file.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  arch/x86/oprofile/nmi_int.c |   16 +++++++++++++---
->  1 files changed, 13 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/x86/oprofile/nmi_int.c b/arch/x86/oprofile/nmi_int.c
-> index f6b48f6..73a41d3 100644
-> --- a/arch/x86/oprofile/nmi_int.c
-> +++ b/arch/x86/oprofile/nmi_int.c
-> @@ -568,8 +568,13 @@ static int __init init_sysfs(void)
->  	int error;
->  
->  	error = sysdev_class_register(&oprofile_sysclass);
-> -	if (!error)
-> -		error = sysdev_register(&device_oprofile);
-> +	if (error)
-> +		return error;
+> ?.../{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c | ? 87 ++++++----
+> ?arch/arm/mach-s5p64x0/mach-smdk6450.c ? ? ? ? ? ? ?| ?182 ++++++++++++++++++++
+> ?2 files changed, 234 insertions(+), 35 deletions(-)
+> ?rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c (66%)
+> ?create mode 100644 arch/arm/mach-s5p64x0/mach-smdk6450.c
+>
+> diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+> similarity index 66%
+> rename from arch/arm/mach-s5p6440/mach-smdk6440.c
+> rename to arch/arm/mach-s5p64x0/mach-smdk6440.c
+> index 9202aaa..28de0a5 100644
+> --- a/arch/arm/mach-s5p6440/mach-smdk6440.c
+> +++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+> @@ -1,7 +1,7 @@
+> -/* linux/arch/arm/mach-s5p6440/mach-smdk6440.c
+> +/* linux/arch/arm/mach-s5p64x0/mach-smdk6440.c
+> ?*
+> - * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+> - * ? ? ? ? ? ? http://www.samsung.com/
+> + * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
+> + * ? ? ? ? ? ? http://www.samsung.com
+> ?*
+> ?* This program is free software; you can redistribute it and/or modify
+> ?* it under the terms of the GNU General Public License version 2 as
+> @@ -21,21 +21,22 @@
+> ?#include <linux/io.h>
+> ?#include <linux/module.h>
+> ?#include <linux/clk.h>
+> +#include <linux/gpio.h>
+>
+> ?#include <asm/mach/arch.h>
+> ?#include <asm/mach/map.h>
+> +#include <asm/irq.h>
+> +#include <asm/mach-types.h>
+>
+> ?#include <mach/hardware.h>
+> ?#include <mach/map.h>
+> -
+> -#include <asm/irq.h>
+> -#include <asm/mach-types.h>
+> +#include <mach/regs-clock.h>
+> +#include <mach/i2c.h>
+>
+> ?#include <plat/regs-serial.h>
+> -
+> +#include <plat/gpio-cfg.h>
+> ?#include <plat/s5p6440.h>
+> ?#include <plat/clock.h>
+> -#include <mach/regs-clock.h>
+> ?#include <plat/devs.h>
+> ?#include <plat/cpu.h>
+> ?#include <plat/iic.h>
+> @@ -58,43 +59,60 @@
+>
+> ?static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
+> ? ? ? ?[0] = {
+> - ? ? ? ? ? ? ? .hwport ? ? ?= 0,
+> - ? ? ? ? ? ? ? .flags ? ? ? = 0,
+> - ? ? ? ? ? ? ? .ucon ? ? ? ?= SMDK6440_UCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ulcon ? ? ? = SMDK6440_ULCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ufcon ? ? ? = SMDK6440_UFCON_DEFAULT,
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 0,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+There's no place to use this flags, it's posted for long time. but you
+don't listen it.
+I hope delete it if not used.
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6440_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6440_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6440_UFCON_DEFAULT,
+> ? ? ? ?},
+> ? ? ? ?[1] = {
+> - ? ? ? ? ? ? ? .hwport ? ? ?= 1,
+> - ? ? ? ? ? ? ? .flags ? ? ? = 0,
+> - ? ? ? ? ? ? ? .ucon ? ? ? ?= SMDK6440_UCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ulcon ? ? ? = SMDK6440_ULCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ufcon ? ? ? = SMDK6440_UFCON_DEFAULT,
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6440_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6440_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6440_UFCON_DEFAULT,
+> ? ? ? ?},
+> ? ? ? ?[2] = {
+> - ? ? ? ? ? ? ? .hwport ? ? ?= 2,
+> - ? ? ? ? ? ? ? .flags ? ? ? = 0,
+> - ? ? ? ? ? ? ? .ucon ? ? ? ?= SMDK6440_UCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ulcon ? ? ? = SMDK6440_ULCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ufcon ? ? ? = SMDK6440_UFCON_DEFAULT,
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 2,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6440_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6440_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6440_UFCON_DEFAULT,
+> ? ? ? ?},
+> ? ? ? ?[3] = {
+> - ? ? ? ? ? ? ? .hwport ? ? ?= 3,
+> - ? ? ? ? ? ? ? .flags ? ? ? = 0,
+> - ? ? ? ? ? ? ? .ucon ? ? ? ?= SMDK6440_UCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ulcon ? ? ? = SMDK6440_ULCON_DEFAULT,
+> - ? ? ? ? ? ? ? .ufcon ? ? ? = SMDK6440_UFCON_DEFAULT,
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 3,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6440_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6440_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6440_UFCON_DEFAULT,
+> ? ? ? ?},
+> ?};
+>
+> ?static struct platform_device *smdk6440_devices[] __initdata = {
+> - ? ? ? &s5p6440_device_iis,
+> ? ? ? ?&s3c_device_adc,
+> ? ? ? ?&s3c_device_rtc,
+> ? ? ? ?&s3c_device_i2c0,
+> ? ? ? ?&s3c_device_i2c1,
+> ? ? ? ?&s3c_device_ts,
+> ? ? ? ?&s3c_device_wdt,
+> + ? ? ? &s5p6440_device_iis,
+> +};
 > +
-> +	error = sysdev_register(&device_oprofile);
-> +	if (error)
-> +		sysdev_class_unregister(&oprofile_sysclass);
+> +static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
+> + ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? .slave_addr ? ? = 0x10,
+> + ? ? ? .frequency ? ? ?= 100*1000,
+> + ? ? ? .sda_delay ? ? ?= 100,
+> + ? ? ? .cfg_gpio ? ? ? = s5p6440_i2c0_cfg_gpio,
+> +};
 > +
->  	return error;
->  }
->  
-> @@ -695,6 +700,8 @@ int __init op_nmi_init(struct oprofile_operations *ops)
->  	char *cpu_type = NULL;
->  	int ret = 0;
->  
-> +	using_nmi = 0;
+> +static struct s3c2410_platform_i2c s5p6440_i2c1_data __initdata = {
+> + ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? .bus_num ? ? ? ?= 1,
+> + ? ? ? .slave_addr ? ? = 0x10,
+> + ? ? ? .frequency ? ? ?= 100*1000,
+> + ? ? ? .sda_delay ? ? ?= 100,
+> + ? ? ? .cfg_gpio ? ? ? = s5p6440_i2c1_cfg_gpio,
+> ?};
+>
+> ?static struct i2c_board_info smdk6440_i2c_devs0[] __initdata = {
+> @@ -113,7 +131,7 @@ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+>
+> ?static void __init smdk6440_map_io(void)
+> ?{
+> - ? ? ? s5p_init_io(NULL, 0, S5P_SYS_ID);
+> + ? ? ? s5p_init_io(NULL, 0, S5P64X0_SYS_ID);
+> ? ? ? ?s3c24xx_init_clocks(12000000);
+> ? ? ? ?s3c24xx_init_uarts(smdk6440_uartcfgs, ARRAY_SIZE(smdk6440_uartcfgs));
+> ?}
+> @@ -122,9 +140,8 @@ static void __init smdk6440_machine_init(void)
+> ?{
+> ? ? ? ?s3c24xx_ts_set_platdata(&s3c_ts_platform);
+>
+> - ? ? ? /* I2C */
+> - ? ? ? s3c_i2c0_set_platdata(NULL);
+> - ? ? ? s3c_i2c1_set_platdata(NULL);
+> + ? ? ? s3c_i2c0_set_platdata(&s5p6440_i2c0_data);
+> + ? ? ? s3c_i2c1_set_platdata(&s5p6440_i2c1_data);
+> ? ? ? ?i2c_register_board_info(0, smdk6440_i2c_devs0,
+> ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(smdk6440_i2c_devs0));
+> ? ? ? ?i2c_register_board_info(1, smdk6440_i2c_devs1,
+> @@ -135,9 +152,9 @@ static void __init smdk6440_machine_init(void)
+>
+> ?MACHINE_START(SMDK6440, "SMDK6440")
+> ? ? ? ?/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+> - ? ? ? .phys_io ? ? ? ?= S3C_PA_UART & 0xfff00000,
+> + ? ? ? .phys_io ? ? ? ?= S5P6440_PA_UART(0) & 0xfff00000,
+> ? ? ? ?.io_pg_offst ? ?= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+> - ? ? ? .boot_params ? ?= S5P_PA_SDRAM + 0x100,
+> + ? ? ? .boot_params ? ?= S5P64X0_PA_SDRAM + 0x100,
+>
+> ? ? ? ?.init_irq ? ? ? = s5p6440_init_irq,
+> ? ? ? ?.map_io ? ? ? ? = smdk6440_map_io,
+> diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+> new file mode 100644
+> index 0000000..8e98217
+> --- /dev/null
+> +++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+> @@ -0,0 +1,182 @@
+> +/* linux/arch/arm/mach-s5p64x0/mach-smdk6450.c
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + * ? ? ? ? ? ? http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
->  	if (!cpu_has_apic)
->  		return -ENODEV;
->  
-> @@ -774,7 +781,10 @@ int __init op_nmi_init(struct oprofile_operations *ops)
->  
->  	mux_init(ops);
->  
-> -	init_sysfs();
-> +	ret = init_sysfs();
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/list.h>
+> +#include <linux/timer.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/i2c.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +#include <linux/gpio.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/irq.h>
+> +#include <asm/mach-types.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/map.h>
+> +#include <mach/regs-clock.h>
+> +#include <mach/i2c.h>
+> +
+> +#include <plat/regs-serial.h>
+> +#include <plat/gpio-cfg.h>
+> +#include <plat/s5p6450.h>
+> +#include <plat/clock.h>
+> +#include <plat/devs.h>
+> +#include <plat/cpu.h>
+> +#include <plat/iic.h>
+> +#include <plat/pll.h>
+> +#include <plat/adc.h>
+> +#include <plat/ts.h>
+> +
+> +#define SMDK6450_UCON_DEFAULT ?(S3C2410_UCON_TXILEVEL | ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_UCON_RXILEVEL | ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_UCON_TXIRQMODE | ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_UCON_RXIRQMODE | ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_UCON_RXFIFO_TOI | ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2443_UCON_RXERR_IRQEN)
+> +
+> +#define SMDK6450_ULCON_DEFAULT S3C2410_LCON_CS8
+> +
+> +#define SMDK6450_UFCON_DEFAULT (S3C2410_UFCON_FIFOMODE | ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2440_UFCON_TXTRIG16 | ? ? ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C2410_UFCON_RXTRIG8)
+> +
+> +static struct s3c2410_uartcfg smdk6450_uartcfgs[] __initdata = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 0,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6450_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6450_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6450_UFCON_DEFAULT,
+> + ? ? ? },
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 1,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6450_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6450_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6450_UFCON_DEFAULT,
+> + ? ? ? },
+> + ? ? ? [2] = {
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 2,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6450_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6450_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6450_UFCON_DEFAULT,
+> + ? ? ? },
+> + ? ? ? [3] = {
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 3,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6450_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6450_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6450_UFCON_DEFAULT,
+> + ? ? ? },
+> +#if CONFIG_SERIAL_SAMSUNG_UARTS > 4
+> + ? ? ? [4] = {
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 4,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6450_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6450_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6450_UFCON_DEFAULT,
+> + ? ? ? },
+> +#endif
+> +#if CONFIG_SERIAL_SAMSUNG_UARTS > 5
+> + ? ? ? [5] = {
+> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 5,
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6450_UCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6450_ULCON_DEFAULT,
+> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6450_UFCON_DEFAULT,
+> + ? ? ? },
+> +#endif
+> +};
+> +
+> +static struct platform_device *smdk6450_devices[] __initdata = {
+> + ? ? ? &s3c_device_adc,
+> + ? ? ? &s3c_device_rtc,
+> + ? ? ? &s3c_device_i2c0,
+> + ? ? ? &s3c_device_i2c1,
+> + ? ? ? &s3c_device_ts,
+> + ? ? ? &s3c_device_wdt,
+> + ? ? ? &s5p6450_device_iis0,
+> + ? ? ? /* s5p6450_device_spi0 will be added */
+> +};
+> +
+> +static struct s3c2410_platform_i2c s5p6450_i2c0_data __initdata = {
+> + ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? .slave_addr ? ? = 0x10,
+> + ? ? ? .frequency ? ? ?= 100*1000,
+> + ? ? ? .sda_delay ? ? ?= 100,
+> + ? ? ? .cfg_gpio ? ? ? = s5p6450_i2c0_cfg_gpio,
+> +};
+> +
+> +static struct s3c2410_platform_i2c s5p6450_i2c1_data __initdata = {
+> + ? ? ? .flags ? ? ? ? ?= 0,
+> + ? ? ? .bus_num ? ? ? ?= 1,
+> + ? ? ? .slave_addr ? ? = 0x10,
+> + ? ? ? .frequency ? ? ?= 100*1000,
+> + ? ? ? .sda_delay ? ? ?= 100,
+> + ? ? ? .cfg_gpio ? ? ? = s5p6450_i2c1_cfg_gpio,
+> +};
+> +
+> +static struct i2c_board_info smdk6450_i2c_devs0[] __initdata = {
+> + ? ? ? { I2C_BOARD_INFO("24c08", 0x50), }, ? ? /* Samsung KS24C080C EEPROM */
+> +};
+> +
+> +static struct i2c_board_info smdk6450_i2c_devs1[] __initdata = {
+> + ? ? ? { I2C_BOARD_INFO("24c128", 0x57), },/* Samsung S524AD0XD1 EEPROM */
+> +};
+> +
+> +static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+> + ? ? ? .delay ? ? ? ? ? ? ? ? ?= 10000,
+> + ? ? ? .presc ? ? ? ? ? ? ? ? ?= 49,
+> + ? ? ? .oversampling_shift ? ? = 2,
+> +};
+> +
+> +static void __init smdk6450_map_io(void)
+> +{
+> + ? ? ? s5p_init_io(NULL, 0, S5P64X0_SYS_ID);
+> + ? ? ? s3c24xx_init_clocks(19200000);
+> + ? ? ? s3c24xx_init_uarts(smdk6450_uartcfgs, ARRAY_SIZE(smdk6450_uartcfgs));
+> +}
+> +
+> +static void __init smdk6450_machine_init(void)
+> +{
+> + ? ? ? s3c24xx_ts_set_platdata(&s3c_ts_platform);
+> +
+> + ? ? ? s3c_i2c0_set_platdata(&s5p6450_i2c0_data);
+> + ? ? ? s3c_i2c1_set_platdata(&s5p6450_i2c1_data);
+> + ? ? ? i2c_register_board_info(0, smdk6450_i2c_devs0,
+> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdk6450_i2c_devs0));
+> + ? ? ? i2c_register_board_info(1, smdk6450_i2c_devs1,
+> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(smdk6450_i2c_devs1));
+> +
+> + ? ? ? platform_add_devices(smdk6450_devices, ARRAY_SIZE(smdk6450_devices));
+> +}
+> +
+> +MACHINE_START(SMDK6450, "SMDK6450")
 
-FYI, this causes a build error if CONFIG_PM is off:
-
-   arch/x86/oprofile/nmi_int.c:784: error: expected expression before ?do?
-
-Due to this assymetric form of the wrapper:
-
-  #define init_sysfs() do { } while (0)
-
-The wrapper should be changed to return 0 i suspect, via something like 
-this:
-
-  static inline int init_sysfs(void) { return 0; }
-
-(untested)
-
-Thanks,
-
-	Ingo
+I think you can make a single SMDK file.
+> + ? ? ? /* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+> + ? ? ? .phys_io ? ? ? ?= S5P6450_PA_UART(0) & 0xfff00000,
+> + ? ? ? .io_pg_offst ? ?= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+> + ? ? ? .boot_params ? ?= S5P64X0_PA_SDRAM + 0x100,
+> +
+> + ? ? ? .init_irq ? ? ? = s5p6450_init_irq,
+> + ? ? ? .map_io ? ? ? ? = smdk6450_map_io,
+> + ? ? ? .init_machine ? = smdk6450_machine_init,
+> + ? ? ? .timer ? ? ? ? ?= &s3c24xx_timer,
+> +MACHINE_END
+> --
+> 1.6.2.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
