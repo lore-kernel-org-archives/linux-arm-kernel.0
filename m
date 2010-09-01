@@ -1,63 +1,74 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 02 Sep 2010 01:53:22 +0300
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <4C7ED1E9.4050208@bluewatersys.com>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
-	<1283170469.12995.53.camel@brekeke>	<4C7CA278.9040902@st.com>
-	<1283297810.2018.67.camel@brekeke>	<4C7DD2FD.1080501@st.com>
-	<1283337939.1958.20.camel@brekeke>	<4C7E3344.2020202@st.com>
-	<4C7EC43B.2050903@bluewatersys.com>
-	<AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>
-	<4C7ED1E9.4050208@bluewatersys.com>
-Message-ID: <1283381602.2209.49.camel@brekeke>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 00:17:52 +0100
+Subject: [RFC] [PATCH] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <20100901111302.GE22790@game.jcrosoft.org>
+References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
+	<20100901091233.GK8142@n2100.arm.linux.org.uk>
+	<20100901111302.GE22790@game.jcrosoft.org>
+Message-ID: <20100901231752.GA25860@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-02 at 10:21 +1200, Ryan Mallon wrote:
-> On 09/02/2010 09:54 AM, Kevin Cernekee wrote:
-> > On Wed, Sep 1, 2010 at 2:23 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> >> However, we are interested in having a proper solution to this problem.
+On Wed, Sep 01, 2010 at 01:13:02PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:12 Wed 01 Sep     , Russell King - ARM Linux wrote:
+> > On Tue, Aug 31, 2010 at 01:16:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > factorise some generic infrastructure to assist looking up struct clks
+> > > for the ARM & SH architecture.
+> > > +/*
+> > > + * Returns a clock. Note that we first try to use device id on the bus
+> > > + * and clock name. If this fails, we try to use clock name only.
+> > > + */
+> > >  struct clk *clk_get(struct device *dev, const char *con_id)
+> > >  {
+> > >  	const char *dev_id = dev ? dev_name(dev) : NULL;
+> > >  
+> > >  	return clk_get_sys(dev_id, con_id);
+> > >  }
+> > > -EXPORT_SYMBOL(clk_get);
+> > > +EXPORT_SYMBOL_GPL(clk_get);
+> > >  
+> > >  void clk_put(struct clk *clk)
+> > >  {
+> > >  	__clk_put(clk);
+> > >  }
+> > > -EXPORT_SYMBOL(clk_put);
+> > > +EXPORT_SYMBOL_GPL(clk_put);
 > > 
-> > I would suggest using this patch as a starting point - could you
-> > please review the changes and try it out?
-> > 
-> > http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/b6d6ae730be2750fac166ed9df11ee6ea54d9160
-> 
-> That patch still breaks the ABI by renaming struct nand_ecclayout to
-> nand_ecclayout_user.
+> > Please leave these as-is.
+> ok but on SH it's GPL so it is ok with you Paul too?
 
-Hmm, would you please show why my binary file 'nandwrite' would have to
-be re-built?
+If you want to get that pedantic... I created clkdev, and Sascha Hauer
+extended it with some refactoring to create the clk_get_sys() interface.
 
->  Any application using the old names will have to be
-> rewritten to compile against a new kernel.
+If you look at the history, the sh version is a copy of the ARM version:
 
-Not necessary. mtd-utils, for example, maintain their own copy of the
-mtd-abi.h file, which I personally think is a good idea.
+commit 51a5006afcd13176276f0935ee57c4cc6f210e83
+Author: Paul Mundt <lethal@linux-sh.org>
+Date:   Mon Mar 8 21:45:19 2010 +0900
 
-But if your apps depend on the kernel headers, then yes, you will need
-to amend it or copy the old header into your project.
+    sh: Merge clkdev API updates.
 
-IOW, the patch breaks API by renaming, but not ABI, I think. I do not
-see this as a major problem - just a small inconvenience.
+    This rolls in the remainder of the clkdev API bits from the ARM tree.
+    This can more or less be used verbatim, so we just copy it over and nuke
+    our local version.
 
-> The old interface should remain unchanged in that include/mtd/mtd-abi.h.
-> If an application using the old interface calls any of the ecc ioctls
-> for a nand chip with > 64 bytes ecc it should return an error.
+    Signed-off-by: Paul Mundt <lethal@linux-sh.org>
 
-It will, because size of the structure is part of the ioctl number,
-even. See the corresponding ioctl macro definition.
+and
 
-> I still think the eccpos field should be a pointer, so that it can
-> allocate as much space as is needed for the ecc. This also means that
-> the kernel doesn't need to be changed every time a new NAND chips
-> appears with a bigger ecc size.
+commit 441c2440aba2efd8d0f48a5e3357deec92283d62
+Author: Magnus Damm <damm@opensource.se>
+Date:   Tue May 11 09:37:12 2010 +0000
 
-Sure, this is the whole point: go ahead and design the new ioctl, and
-then deprecate the old one. Just invest men/hours into that and we are
-all right :-)
+    sh: remove unused clock lookup
 
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+    Now when all clocks are registered using clkdev,
+    get rid of the special SH-specific clock lookup.
+
+    Also ditch the unused module ref counting code.
+    This patch syncs the SH behaviour with ARM.
+
+    Signed-off-by: Magnus Damm <damm@opensource.se>
+    Signed-off-by: Paul Mundt <lethal@linux-sh.org>
+
+so really it's a question for primerily me, and maybe Sascha.
