@@ -1,43 +1,31 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 1 Sep 2010 14:39:08 +0200
-Subject: [PATCH 08/13] PXA: Colibri: Toradex Colibri PXA270 CF support
-In-Reply-To: <20100901072304.GE8142@n2100.arm.linux.org.uk>
-References: <1281673964-2119-1-git-send-email-marek.vasut@gmail.com>
-	<1281673964-2119-8-git-send-email-marek.vasut@gmail.com>
-	<20100901072304.GE8142@n2100.arm.linux.org.uk>
-Message-ID: <201009011439.09191.marek.vasut@gmail.com>
+From: jamie.iles@picochip.com (Jamie Iles)
+Date: Wed, 1 Sep 2010 13:57:32 +0100
+Subject: [PATCH] ARM: perf: fix event validation
+In-Reply-To: <1283343082-28764-1-git-send-email-will.deacon@arm.com>
+References: <1283343082-28764-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20100901125732.GA28196@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 1. z??? 2010 09:23:05 Russell King - ARM Linux napsal(a):
-> On Fri, Aug 13, 2010 at 06:32:39AM +0200, Marek Vasut wrote:
-> > diff --git a/drivers/pcmcia/pxa2xx_colibri.c
-> > b/drivers/pcmcia/pxa2xx_colibri.c new file mode 100644
-> > index 0000000..8373816
-> > --- /dev/null
-> > +++ b/drivers/pcmcia/pxa2xx_colibri.c
-> > @@ -0,0 +1,215 @@
-> > +/*
-> > + * linux/drivers/pcmcia/pxa2xx_colibri.c
-> > + *
-> > + * Driver for Toradex Colibri PXA270 CF socket
-> > + *
-> > + * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/delay.h>
-> > +
-> > +#include <asm/mach-types.h>
-> > +
-> > +#include <mach/gpio.h>
+On Wed, Sep 01, 2010 at 01:11:22PM +0100, Will Deacon wrote:
+> The validate_event function in the ARM perf events backend has the
+> following problems:
 > 
-> linux/gpio.h please.
+> 1.) Events that are disabled count towards the cost.
+> 2.) Events associated with other PMUs [for example, software events or
+>     breakpoints] do not count towards the cost, but do fail validation,
+>     causing the group to fail.
+> 
+> This patch changes validate_event so that it ignores events in the
+> PERF_EVENT_STATE_OFF state or that are scheduled for other PMUs.
+> 
+> Cc: Jamie Iles <jamie.iles@picochip.com>
+> Reported-by: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Resend with correct spelling of Pawel's email address on CC.
+> Jamie - are you ok with this fix?
+Yes, looks good to me.
 
-Thanks, good catch. I fixed this in my tree.
+Acked-by: Jamie Iles <jamie.iles@picochip.com>
