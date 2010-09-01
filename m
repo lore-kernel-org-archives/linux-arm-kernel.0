@@ -1,7 +1,7 @@
 From: robert.richter@amd.com (Robert Richter)
 Date: Wed, 1 Sep 2010 14:50:50 +0200
 Subject: [PATCH] oprofile, x86: fix init_sysfs() function stub
-Message-ID: <mailman.216.1283347789.27306.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.217.1283348321.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
