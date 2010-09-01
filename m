@@ -1,22 +1,20 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 02 Sep 2010 02:20:14 +0300
-Subject: [PATCH] ARM: pxa3xx: fix build error when
-	CONFIG_MTD_PARTITIONS is not defined
-In-Reply-To: <1282813011-6187-2-git-send-email-mark.brown314@gmail.com>
-References: <1282813011-6187-1-git-send-email-mark.brown314@gmail.com>
-	<1282813011-6187-2-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1283383214.2209.63.camel@brekeke>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 00:23:07 +0100
+Subject: [PATCH] ARM: Implement cpu_v7_reset.
+In-Reply-To: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100901232307.GC25860@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-08-26 at 04:56 -0400, Mark F. Brown wrote:
-> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
-> ---
->  drivers/mtd/nand/pxa3xx_nand.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
+On Wed, Sep 01, 2010 at 04:01:59PM +0200, Linus Walleij wrote:
+> From: Per Fransson <per.xx.fransson@stericsson.com>
+> 
+> This implementation of cpu_v7_reset flushes the L1 cache
+> and turns off the MMU.
 
-Pushed to l2-mtd-2.6 / for-2.6.36, thanks.
+NAK - this is wrong.  Please check the updates I made to the shutdown code
+(which already deal with the cache flushing and turning off cacheability.)
 
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+The only thing this should be doing is turning off the MMU and jumping to
+the provided pointer.
