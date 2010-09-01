@@ -1,1670 +1,923 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 01 Sep 2010 09:07:50 +0800
-Subject: [PATCH 2/3] arm: return both physical and virtual addresses from
-	addruart
-In-Reply-To: <1283303270.565454.673065645961.0.gpush@pororo>
-Message-ID: <1283303270.566757.315468531956.2.gpush@pororo>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Wed, 1 Sep 2010 09:22:34 +0800
+Subject: [rtc-linux] [PATCH 15/74] ST SPEAr: adding support for rtc
+In-Reply-To: <d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+Message-ID: <AANLkTin8+fwS_XZx7Hx2DPj8y=xnFZAd=Wjoi1B4ZHbY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than checking the MMU status in every instance of addruart, do it
-once in kernel/debug.S, and change the existing addruart macros to
-return both physical and virtual addresses. The main debug code can then
-select the appropriate address to use.
+2010/8/30 Viresh KUMAR <viresh.kumar@st.com>:
+> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+>
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+> ?arch/arm/mach-spear13xx/clock.c ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-spear13xx/include/mach/generic.h | ? ?1 +
+> ?arch/arm/mach-spear13xx/spear1300_evb.c ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-spear13xx/spear13xx.c ? ? ? ? ? ?| ? 19 +
+> ?arch/arm/mach-spear3xx/clock.c ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-spear3xx/include/mach/generic.h ?| ? ?1 +
+> ?arch/arm/mach-spear3xx/spear300_evb.c ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-spear3xx/spear310_evb.c ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-spear3xx/spear320_evb.c ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-spear3xx/spear3xx.c ? ? ? ? ? ? ?| ? 19 +
+> ?arch/arm/mach-spear6xx/clock.c ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-spear6xx/include/mach/generic.h ?| ? ?1 +
+> ?arch/arm/mach-spear6xx/spear600_evb.c ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-spear6xx/spear6xx.c ? ? ? ? ? ? ?| ? 19 +
+> ?drivers/rtc/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?7 +
+> ?drivers/rtc/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?drivers/rtc/rtc-spear.c ? ? ? ? ? ? ? ? ? ? ? ?| ?598 ++++++++++++++++++++++++
+> ?17 files changed, 674 insertions(+), 3 deletions(-)
+> ?create mode 100644 drivers/rtc/rtc-spear.c
+>
 
-This will also allow us to retreive the address of a uart for the MMU
-state that we're not current in.
 
-Updated with fixes for OMAP from Jason Wang <jason77.wang@gmail.com>
-and Tony Lindgren <tony@atomide.com>, and fix for versatile express from
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>.
+Please split your this patch into two parts, one submitted to LAKM,
+the other submitted to Linux-rtc list.
 
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-Tested-by: Kevin Hilman <khilman@deeprootsystems.com>
+> diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+> index cef3b13..cc692cc 100644
+> --- a/arch/arm/mach-spear13xx/clock.c
+> +++ b/arch/arm/mach-spear13xx/clock.c
+> @@ -736,7 +736,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+> ? ? ? ?{.con_id = "osc3_25m_clk", ? ? ?.clk = &osc3_25m_clk},
+>
+> ? ? ? ?/* clock derived from 32 KHz osc clk */
+> - ? ? ? {.dev_id = "rtc", ? ? ? ? ? ? ? .clk = &rtc_clk},
+> + ? ? ? {.dev_id = "rtc-spear", ? ? ? ? .clk = &rtc_clk},
+>
+> ? ? ? ?/* clock derived from 24/25 MHz osc1/osc3 clk */
+> ? ? ? ?{.con_id = "pll1_clk", ? ? ? ? ?.clk = &pll1_clk},
+> diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+> index 41c1a53..dc80421 100644
+> --- a/arch/arm/mach-spear13xx/include/mach/generic.h
+> +++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+> @@ -30,6 +30,7 @@
+>
+> ?/* Add spear13xx family device structure declarations here */
+> ?extern struct amba_device uart_device;
+> +extern struct platform_device rtc_device;
+> ?extern struct sys_timer spear13xx_timer;
+>
+> ?/* Add spear1300 machine device structure declarations here */
+> diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+> index d72c8a8..60c5fee 100644
+> --- a/arch/arm/mach-spear13xx/spear1300_evb.c
+> +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+> @@ -22,6 +22,7 @@ static struct amba_device *amba_devs[] __initdata = {
+> ?};
+>
+> ?static struct platform_device *plat_devs[] __initdata = {
+> + ? ? ? &rtc_device,
+> ?};
+>
+> ?static void __init spear1300_evb_init(void)
+> diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+> index d11e300..bdca713 100644
+> --- a/arch/arm/mach-spear13xx/spear13xx.c
+> +++ b/arch/arm/mach-spear13xx/spear13xx.c
+> @@ -37,6 +37,25 @@ struct amba_device uart_device = {
+> ? ? ? ?.irq = {IRQ_UART, NO_IRQ},
+> ?};
+>
+> +/* rtc device registration */
+> +static struct resource rtc_resources[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .start = SPEAR13XX_RTC_BASE,
+> + ? ? ? ? ? ? ? .end = SPEAR13XX_RTC_BASE + SZ_4K - 1,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .start = IRQ_RTC,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
+> + ? ? ? },
+> +};
+> +
+> +struct platform_device rtc_device = {
+> + ? ? ? .name = "rtc-spear",
+> + ? ? ? .id = -1,
+> + ? ? ? .num_resources = ARRAY_SIZE(rtc_resources),
+> + ? ? ? .resource = rtc_resources,
+> +};
+> +
+> ?/* Do spear13xx familiy common initialization part here */
+> ?void __init spear13xx_init(void)
+> ?{
+> diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+> index dc19666..147d0a3 100644
+> --- a/arch/arm/mach-spear3xx/clock.c
+> +++ b/arch/arm/mach-spear3xx/clock.c
+> @@ -467,7 +467,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+> ? ? ? ?{ .con_id = "osc_32k_clk", ? ? ?.clk = &osc_32k_clk},
+> ? ? ? ?{ .con_id = "osc_24m_clk", ? ? ?.clk = &osc_24m_clk},
+> ? ? ? ?/* clock derived from 32 KHz osc clk */
+> - ? ? ? { .dev_id = "rtc", ? ? ? ? ? ? ?.clk = &rtc_clk},
+> + ? ? ? { .dev_id = "rtc-spear", ? ? ? ?.clk = &rtc_clk},
+> ? ? ? ?/* clock derived from 24 MHz osc clk */
+> ? ? ? ?{ .con_id = "pll1_clk", ? ? ? ? .clk = &pll1_clk},
+> ? ? ? ?{ .con_id = "pll3_48m_clk", ? ? .clk = &pll3_48m_clk},
+> diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+> index d76ee98..408bb8d 100644
+> --- a/arch/arm/mach-spear3xx/include/mach/generic.h
+> +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+> @@ -33,6 +33,7 @@
+> ?/* Add spear3xx family device structure declarations here */
+> ?extern struct amba_device gpio_device;
+> ?extern struct amba_device uart_device;
+> +extern struct platform_device rtc_device;
+> ?extern struct sys_timer spear3xx_timer;
+>
+> ?/* Add spear3xx family function declarations here */
+> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+> index 3bb7fbc..392ee4a 100644
+> --- a/arch/arm/mach-spear3xx/spear300_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
+> @@ -44,6 +44,7 @@ static struct amba_device *amba_devs[] __initdata = {
+>
+> ?static struct platform_device *plat_devs[] __initdata = {
+> ? ? ? ?/* spear3xx specific devices */
+> + ? ? ? &rtc_device,
+>
+> ? ? ? ?/* spear300 specific devices */
+> ?};
+> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+> index 7dd93bd..15ca8fc 100644
+> --- a/arch/arm/mach-spear3xx/spear310_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
+> @@ -50,6 +50,7 @@ static struct amba_device *amba_devs[] __initdata = {
+>
+> ?static struct platform_device *plat_devs[] __initdata = {
+> ? ? ? ?/* spear3xx specific devices */
+> + ? ? ? &rtc_device,
+>
+> ? ? ? ?/* spear310 specific devices */
+> ? ? ? ?&plgpio_device,
+> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+> index 82f4e76..48155cc 100644
+> --- a/arch/arm/mach-spear3xx/spear320_evb.c
+> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
+> @@ -48,6 +48,7 @@ static struct amba_device *amba_devs[] __initdata = {
+>
+> ?static struct platform_device *plat_devs[] __initdata = {
+> ? ? ? ?/* spear3xx specific devices */
+> + ? ? ? &rtc_device,
+>
+> ? ? ? ?/* spear320 specific devices */
+> ? ? ? ?&plgpio_device,
+> diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+> index 89cf8ea..6d8791e 100644
+> --- a/arch/arm/mach-spear3xx/spear3xx.c
+> +++ b/arch/arm/mach-spear3xx/spear3xx.c
+> @@ -54,6 +54,25 @@ struct amba_device uart_device = {
+> ? ? ? ?.irq = {IRQ_UART, NO_IRQ},
+> ?};
+>
+> +/* rtc device registration */
+> +static struct resource rtc_resources[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .start = SPEAR3XX_ICM3_RTC_BASE,
+> + ? ? ? ? ? ? ? .end = SPEAR3XX_ICM3_RTC_BASE + SZ_4K - 1,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .start = IRQ_BASIC_RTC,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
+> + ? ? ? },
+> +};
+> +
+> +struct platform_device rtc_device = {
+> + ? ? ? .name = "rtc-spear",
+> + ? ? ? .id = -1,
+> + ? ? ? .num_resources = ARRAY_SIZE(rtc_resources),
+> + ? ? ? .resource = rtc_resources,
+> +};
+> +
+> ?/* Do spear3xx familiy common initialization part here */
+> ?void __init spear3xx_init(void)
+> ?{
+> diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+> index 4a91991..66fc622 100644
+> --- a/arch/arm/mach-spear6xx/clock.c
+> +++ b/arch/arm/mach-spear6xx/clock.c
+> @@ -569,7 +569,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+> ? ? ? ?{ .con_id = "osc_32k_clk", ? ? ?.clk = &osc_32k_clk},
+> ? ? ? ?{ .con_id = "osc_30m_clk", ? ? ?.clk = &osc_30m_clk},
+> ? ? ? ?/* clock derived from 32 KHz os ? ? ? ? ?clk */
+> - ? ? ? { .dev_id = "rtc", ? ? ? ? ? ? ?.clk = &rtc_clk},
+> + ? ? ? { .dev_id = "rtc-spear", ? ? ? ?.clk = &rtc_clk},
+> ? ? ? ?/* clock derived from 30 MHz os ? ? ? ? ?clk */
+> ? ? ? ?{ .con_id = "pll1_clk", ? ? ? ? .clk = &pll1_clk},
+> ? ? ? ?{ .con_id = "pll3_48m_clk", ? ? .clk = &pll3_48m_clk},
+> diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+> index d6a04f2..674b16c 100644
+> --- a/arch/arm/mach-spear6xx/include/mach/generic.h
+> +++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+> @@ -32,6 +32,7 @@
+> ?extern struct amba_device clcd_device;
+> ?extern struct amba_device gpio_device[];
+> ?extern struct amba_device uart_device[];
+> +extern struct platform_device rtc_device;
+> ?extern struct sys_timer spear6xx_timer;
+>
+> ?/* Add spear6xx family function declarations here */
+> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+> index 88e69f4..861e83d 100644
+> --- a/arch/arm/mach-spear6xx/spear600_evb.c
+> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+> @@ -26,6 +26,7 @@ static struct amba_device *amba_devs[] __initdata = {
+> ?};
+>
+> ?static struct platform_device *plat_devs[] __initdata = {
+> + ? ? ? &rtc_device,
+> ?};
+>
+> ?static void __init spear600_evb_init(void)
+> diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+> index d0f6b9d..1e403cb 100644
+> --- a/arch/arm/mach-spear6xx/spear6xx.c
+> +++ b/arch/arm/mach-spear6xx/spear6xx.c
+> @@ -121,6 +121,25 @@ struct amba_device gpio_device[] = {
+> ? ? ? ?}
+> ?};
+>
+> +/* rtc device registration */
+> +static struct resource rtc_resources[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .start = SPEAR6XX_ICM3_RTC_BASE,
+> + ? ? ? ? ? ? ? .end = SPEAR6XX_ICM3_RTC_BASE + SZ_4K - 1,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .start = IRQ_BASIC_RTC,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
+> + ? ? ? },
+> +};
+> +
+> +struct platform_device rtc_device = {
+> + ? ? ? .name = "rtc-spear",
+> + ? ? ? .id = -1,
+> + ? ? ? .num_resources = ARRAY_SIZE(rtc_resources),
+> + ? ? ? .resource = rtc_resources,
+> +};
+> +
+> ?/* This will add devices, and do machine specific tasks */
+> ?void __init spear6xx_init(void)
+> ?{
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index 48ca713..f099473 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -625,6 +625,13 @@ config RTC_DRV_WM8350
+> ? ? ? ? ?This driver can also be built as a module. If so, the module
+> ? ? ? ? ?will be called "rtc-wm8350".
+>
+> +config RTC_DRV_SPEAR
+> + ? ? ? tristate "SPEAR ST RTC"
+> + ? ? ? default y
+> + ? ? ? help
+> + ? ? ? ?If you say Y here you will get support for the RTC found on
+> + ? ? ? ?spear
+> +
+> ?config RTC_DRV_PCF50633
+> ? ? ? ?depends on MFD_PCF50633
+> ? ? ? ?tristate "NXP PCF50633 RTC"
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+> index 0f207b3..44df01a 100644
+> --- a/drivers/rtc/Makefile
+> +++ b/drivers/rtc/Makefile
+> @@ -86,6 +86,7 @@ obj-$(CONFIG_RTC_DRV_S35390A) += rtc-s35390a.o
+> ?obj-$(CONFIG_RTC_DRV_S3C) ? ? ?+= rtc-s3c.o
+> ?obj-$(CONFIG_RTC_DRV_SA1100) ? += rtc-sa1100.o
+> ?obj-$(CONFIG_RTC_DRV_SH) ? ? ? += rtc-sh.o
+> +obj-$(CONFIG_RTC_DRV_SPEAR) ? ?+= rtc-spear.o
+> ?obj-$(CONFIG_RTC_DRV_STARFIRE) += rtc-starfire.o
+> ?obj-$(CONFIG_RTC_DRV_STK17TA8) += rtc-stk17ta8.o
+> ?obj-$(CONFIG_RTC_DRV_STMP) ? ? += rtc-stmp3xxx.o
+> diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
+> new file mode 100644
+> index 0000000..5b49124
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-spear.c
+> @@ -0,0 +1,598 @@
+> +/*
+> + * drivers/rtc/rtc-spear.c
+> + *
+> + * Copyright (C) 2010 ST Microelectronics
+> + * Rajeev Kumar<rajeev-dlh.kumar@st.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/bcd.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/ioport.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtc.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/types.h>
+> +#include <linux/wait.h>
+> +#include <asm/mach/time.h>
+> +
+> +/* RTC registers */
+> +#define TIME_REG ? ? ? ? ? ? ? 0x00
+> +#define DATE_REG ? ? ? ? ? ? ? 0x04
+> +#define ALARM_TIME_REG ? ? ? ? 0x08
+> +#define ALARM_DATE_REG ? ? ? ? 0x0C
+> +#define CTRL_REG ? ? ? ? ? ? ? 0x10
+> +#define STATUS_REG ? ? ? ? ? ? 0x14
+> +
+> +/* TIME_REG & ALARM_TIME_REG */
+> +#define SECONDS_UNITS ? ? ? ? ?(0xf<<0) ? ? ? ?/* seconds units position */
+> +#define SECONDS_TENS ? ? ? ? ? (0x7<<4) ? ? ? ?/* seconds tens position */
+> +#define MINUTES_UNITS ? ? ? ? ?(0xf<<8) ? ? ? ?/* minutes units position */
+> +#define MINUTES_TENS ? ? ? ? ? (0x7<<12) ? ? ? /* minutes tens position */
+> +#define HOURS_UNITS ? ? ? ? ? ?(0xf<<16) ? ? ? /* hours units position */
+> +#define HOURS_TENS ? ? ? ? ? ? (0x3<<20) ? ? ? /* hours tens position */
+> +
+> +/* DATE_REG & ALARM_DATE_REG */
+> +#define DAYS_UNITS ? ? ? ? ? ? (0xf<<0) ? ? ? ?/* days units position */
+> +#define DAYS_TENS ? ? ? ? ? ? ?(0x3<<4) ? ? ? ?/* days tens position */
+> +#define MONTHS_UNITS ? ? ? ? ? (0xf<<8) ? ? ? ?/* months units position */
+> +#define MONTHS_TENS ? ? ? ? ? ?(0x1<<12) ? ? ? /* months tens position */
+> +#define YEARS_UNITS ? ? ? ? ? ?(0xf<<16) ? ? ? /* years units position */
+> +#define YEARS_TENS ? ? ? ? ? ? (0xf<<20) ? ? ? /* years tens position */
+> +#define YEARS_HUNDREDS ? ? ? ? (0xf<<24) ? ? ? /* years hundereds position */
+> +#define YEARS_MILLENIUMS ? ? ? (0xf<<28) ? ? ? /* years millenium position */
+> +
+> +/* MASK SHIFT TIME_REG & ALARM_TIME_REG*/
+> +#define SECOND_SHIFT ? ? ? ? ? 0x00 ? ? ? ? ? ?/* seconds units */
+> +#define MINUTE_SHIFT ? ? ? ? ? 0x08 ? ? ? ? ? ?/* minutes units position */
+> +#define HOUR_SHIFT ? ? ? ? ? ? 0x10 ? ? ? ? ? ?/* hours units position */
+> +#define MDAY_SHIFT ? ? ? ? ? ? 0x00 ? ? ? ? ? ?/* Month day shift */
+> +#define MONTH_SHIFT ? ? ? ? ? ?0x08 ? ? ? ? ? ?/* Month shift */
+> +#define YEAR_SHIFT ? ? ? ? ? ? 0x10 ? ? ? ? ? ?/* Year shift */
+> +
+> +#define SECOND_MASK ? ? ? ? ? ?0x7F
+> +#define MIN_MASK ? ? ? ? ? ? ? 0x7F
+> +#define HOUR_MASK ? ? ? ? ? ? ?0x3F
+> +#define DAY_MASK ? ? ? ? ? ? ? 0x3F
+> +#define MONTH_MASK ? ? ? ? ? ? 0x7F
+> +#define YEAR_MASK ? ? ? ? ? ? ?0xFFFF
+> +
+> +/* date reg equal to time reg, for debug only */
+> +#define TIME_BYP ? ? ? ? ? ? ? (1<<9)
+> +#define INT_ENABLE ? ? ? ? ? ? (1<<31) ? ? ? ? /* interrupt enable */
+> +
+> +/* STATUS_REG */
+> +#define CLK_UNCONNECTED ? ? ? ? ? ? ? ?(1<<0)
+> +#define PEND_WR_TIME ? ? ? ? ? (1<<2)
+> +#define PEND_WR_DATE ? ? ? ? ? (1<<3)
+> +#define LOST_WR_TIME ? ? ? ? ? (1<<4)
+> +#define LOST_WR_DATE ? ? ? ? ? (1<<5)
+> +#define RTC_INT_MASK ? ? ? ? ? (1<<31)
+> +#define STATUS_BUSY ? ? ? ? ? ?(PEND_WR_TIME | PEND_WR_DATE)
+> +#define STATUS_FAIL ? ? ? ? ? ?(LOST_WR_TIME | LOST_WR_DATE)
+> +
+> +struct spear_rtc_config {
+> + ? ? ? struct clk *clk;
+> + ? ? ? spinlock_t lock;
+> + ? ? ? void __iomem *ioaddr;
+> +};
+> +
+> +static inline void spear_rtc_clear_interrupt(struct spear_rtc_config *config)
+> +{
+> + ? ? ? unsigned int val;
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? spin_lock_irqsave(&config->lock, flags);
+> + ? ? ? val = readl(config->ioaddr + STATUS_REG);
+> + ? ? ? val |= RTC_INT_MASK;
+> + ? ? ? writel(val, config->ioaddr + STATUS_REG);
+> + ? ? ? spin_unlock_irqrestore(&config->lock, flags);
+> +}
+> +
+> +static inline void spear_rtc_enable_interrupt(struct spear_rtc_config *config)
+> +{
+> + ? ? ? unsigned int val;
+> +
+> + ? ? ? val = readl(config->ioaddr + CTRL_REG);
+> + ? ? ? if (!(val & INT_ENABLE)) {
+> + ? ? ? ? ? ? ? spear_rtc_clear_interrupt(config);
+> + ? ? ? ? ? ? ? val |= INT_ENABLE;
+> + ? ? ? ? ? ? ? writel(val, config->ioaddr + CTRL_REG);
+> + ? ? ? }
+> +}
+> +
+> +static inline void spear_rtc_disable_interrupt(struct spear_rtc_config *config)
+> +{
+> + ? ? ? unsigned int val;
+> +
+> + ? ? ? val = readl(config->ioaddr + CTRL_REG);
+> + ? ? ? if (val & INT_ENABLE) {
+> + ? ? ? ? ? ? ? val &= ~INT_ENABLE;
+> + ? ? ? ? ? ? ? writel(val, config->ioaddr + CTRL_REG);
+> + ? ? ? }
+> +}
+> +
+> +static inline int is_write_complete(struct spear_rtc_config *config)
+> +{
+> + ? ? ? int ret = 0;
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? spin_lock_irqsave(&config->lock, flags);
+> + ? ? ? if ((readl(config->ioaddr + STATUS_REG)) & STATUS_FAIL)
+> + ? ? ? ? ? ? ? ret = -EIO;
+> + ? ? ? spin_unlock_irqrestore(&config->lock, flags);
+> +
+> + ? ? ? return ret;
+> +}
+> +
+> +static void rtc_wait_not_busy(struct spear_rtc_config *config)
+> +{
+> + ? ? ? int status, count = 0;
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? /* Assuming BUSY may stay active for 80 msec) */
+> + ? ? ? for (count = 0; count < 80; count++) {
+> + ? ? ? ? ? ? ? spin_lock_irqsave(&config->lock, flags);
+> + ? ? ? ? ? ? ? status = readl(config->ioaddr + STATUS_REG);
+> + ? ? ? ? ? ? ? spin_unlock_irqrestore(&config->lock, flags);
+> + ? ? ? ? ? ? ? if ((status & STATUS_BUSY) == 0)
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? /* check status busy, after each msec */
+> + ? ? ? ? ? ? ? msleep(1);
+> + ? ? ? }
+> +}
+> +
+> +static irqreturn_t spear_rtc_irq(int irq, void *dev_id)
+> +{
+> + ? ? ? struct rtc_device *rtc = (struct rtc_device *)dev_id;
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? unsigned long flags, events = 0;
+> + ? ? ? unsigned int irq_data;
+> +
+> + ? ? ? spin_lock_irqsave(&config->lock, flags);
+> + ? ? ? irq_data = readl(config->ioaddr + STATUS_REG);
+> + ? ? ? spin_unlock_irqrestore(&config->lock, flags);
+> +
+> + ? ? ? if ((irq_data & RTC_INT_MASK)) {
+> + ? ? ? ? ? ? ? spear_rtc_clear_interrupt(config);
+> + ? ? ? ? ? ? ? events = RTC_IRQF | RTC_AF;
+> + ? ? ? ? ? ? ? rtc_update_irq(rtc, 1, events);
+> + ? ? ? ? ? ? ? return IRQ_HANDLED;
+> + ? ? ? } else
+> + ? ? ? ? ? ? ? return IRQ_NONE;
+> +
+> +}
+> +
+> +static int tm2bcd(struct rtc_time *tm)
+> +{
+> + ? ? ? if (rtc_valid_tm(tm) != 0)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? tm->tm_sec = bin2bcd(tm->tm_sec);
+> + ? ? ? tm->tm_min = bin2bcd(tm->tm_min);
+> + ? ? ? tm->tm_hour = bin2bcd(tm->tm_hour);
+> + ? ? ? tm->tm_mday = bin2bcd(tm->tm_mday);
+> + ? ? ? tm->tm_mon = bin2bcd(tm->tm_mon + 1);
+> + ? ? ? tm->tm_year = bin2bcd(tm->tm_year);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static void bcd2tm(struct rtc_time *tm)
+> +{
+> + ? ? ? tm->tm_sec = bcd2bin(tm->tm_sec);
+> + ? ? ? tm->tm_min = bcd2bin(tm->tm_min);
+> + ? ? ? tm->tm_hour = bcd2bin(tm->tm_hour);
+> + ? ? ? tm->tm_mday = bcd2bin(tm->tm_mday);
+> + ? ? ? tm->tm_mon = bcd2bin(tm->tm_mon) - 1;
+> + ? ? ? /* epoch == 1900 */
+> + ? ? ? tm->tm_year = bcd2bin(tm->tm_year);
+> +}
+> +
+> +/*
+> + * spear_rtc_read_time - set the time
+> + * @dev: rtc device in use
+> + * @tm: holds date and time
+> + *
+> + * This function read time and date. On success it will return 0
+> + * otherwise -ve error is returned.
+> + */
+> +static int spear_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> +{
+> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? unsigned int time, date;
+> +
+> + ? ? ? /* we don't report wday/yday/isdst ... */
+> + ? ? ? rtc_wait_not_busy(config);
+> +
+> + ? ? ? time = readl(config->ioaddr + TIME_REG);
+> + ? ? ? date = readl(config->ioaddr + DATE_REG);
+> + ? ? ? tm->tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
+> + ? ? ? tm->tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
+> + ? ? ? tm->tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
+> + ? ? ? tm->tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
+> + ? ? ? tm->tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
+> + ? ? ? tm->tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
+> +
+> + ? ? ? bcd2tm(tm);
+> + ? ? ? return 0;
+> +}
+> +
+> +/*
+> + * spear_rtc_set_time - set the time
+> + * @dev: rtc device in use
+> + * @tm: holds date and time
+> + *
+> + * This function set time and date. On success it will return 0
+> + * otherwise -ve error is returned.
+> + */
+> +static int spear_rtc_set_time(struct device *dev, struct rtc_time *tm)
+> +{
+> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? unsigned int time, date, err = 0;
+> +
+> + ? ? ? if (tm2bcd(tm) < 0)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? rtc_wait_not_busy(config);
+> + ? ? ? time = (tm->tm_sec << SECOND_SHIFT) | (tm->tm_min << MINUTE_SHIFT) |
+> + ? ? ? ? ? ? ? (tm->tm_hour << HOUR_SHIFT);
+> + ? ? ? date = (tm->tm_mday << MDAY_SHIFT) | (tm->tm_mon << MONTH_SHIFT) |
+> + ? ? ? ? ? ? ? (tm->tm_year << YEAR_SHIFT);
+> + ? ? ? writel(time, config->ioaddr + TIME_REG);
+> + ? ? ? writel(date, config->ioaddr + DATE_REG);
+> + ? ? ? err = is_write_complete(config);
+> + ? ? ? if (err < 0)
+> + ? ? ? ? ? ? ? return err;
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +/*
+> + * spear_rtc_read_alarm - read the alarm time
+> + * @dev: rtc device in use
+> + * @alm: holds alarm date and time
+> + *
+> + * This function read alarm time and date. On success it will return 0
+> + * otherwise -ve error is returned.
+> + */
+> +static int spear_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
+> +{
+> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? unsigned int time, date;
+> +
+> + ? ? ? rtc_wait_not_busy(config);
+> +
+> + ? ? ? time = readl(config->ioaddr + ALARM_TIME_REG);
+> + ? ? ? date = readl(config->ioaddr + ALARM_DATE_REG);
+> + ? ? ? alm->time.tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
+> + ? ? ? alm->time.tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
+> + ? ? ? alm->time.tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
+> + ? ? ? alm->time.tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
+> + ? ? ? alm->time.tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
+> + ? ? ? alm->time.tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
+> +
+> + ? ? ? bcd2tm(&alm->time);
+> + ? ? ? alm->enabled = readl(config->ioaddr + CTRL_REG) & INT_ENABLE;
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +/*
+> + * spear_rtc_set_alarm - set the alarm time
+> + * @dev: rtc device in use
+> + * @alm: holds alarm date and time
+> + *
+> + * This function set alarm time and date. On success it will return 0
+> + * otherwise -ve error is returned.
+> + */
+> +static int spear_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
+> +{
+> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? unsigned int time, date, err = 0;
+> +
+> + ? ? ? if (tm2bcd(&alm->time) < 0)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? rtc_wait_not_busy(config);
+> +
+> + ? ? ? time = (alm->time.tm_sec << SECOND_SHIFT) | (alm->time.tm_min <<
+> + ? ? ? ? ? ? ? ? ? ? ? MINUTE_SHIFT) | (alm->time.tm_hour << HOUR_SHIFT);
+> + ? ? ? date = (alm->time.tm_mday << MDAY_SHIFT) | (alm->time.tm_mon <<
+> + ? ? ? ? ? ? ? ? ? ? ? MONTH_SHIFT) | (alm->time.tm_year << YEAR_SHIFT);
+> +
+> + ? ? ? writel(time, config->ioaddr + ALARM_TIME_REG);
+> + ? ? ? writel(date, config->ioaddr + ALARM_DATE_REG);
+> + ? ? ? err = is_write_complete(config);
+> + ? ? ? if (err < 0)
+> + ? ? ? ? ? ? ? return err;
+> +
+> + ? ? ? if (alm->enabled)
+> + ? ? ? ? ? ? ? spear_rtc_enable_interrupt(config);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? spear_rtc_disable_interrupt(config);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +#ifdef CONFIG_RTC_INTF_DEV
+> +static int
+> +spear_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
+> +{
+> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? struct rtc_time tm;
+> + ? ? ? struct rtc_wkalrm alm;
+> + ? ? ? void __user *uarg = (void __user *)arg;
+> + ? ? ? int err = 0;
+> +
+> + ? ? ? switch (cmd) {
+> + ? ? ? ? ? ? ? /* AIE = Alarm Interrupt Enable */
+> + ? ? ? case RTC_AIE_OFF:
+> + ? ? ? ? ? ? ? spear_rtc_disable_interrupt(config);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case RTC_AIE_ON:
+> + ? ? ? ? ? ? ? spear_rtc_enable_interrupt(config);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case RTC_SET_TIME:
+> + ? ? ? ? ? ? ? if (copy_from_user(&tm, uarg, sizeof(tm)))
+> + ? ? ? ? ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? ? ? ? ? return spear_rtc_set_time(dev, &tm);
+> + ? ? ? case RTC_RD_TIME:
+> + ? ? ? ? ? ? ? err = spear_rtc_read_time(dev, &tm);
+> + ? ? ? ? ? ? ? if (err < 0)
+> + ? ? ? ? ? ? ? ? ? ? ? return err;
+> +
+> + ? ? ? ? ? ? ? if (copy_to_user(uarg, &tm, sizeof(tm)))
+> + ? ? ? ? ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case RTC_ALM_SET:
+> + ? ? ? ? ? ? ? if (copy_from_user(&alm.time, uarg, sizeof(tm)))
+> + ? ? ? ? ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? ? ? ? ? alm.enabled = 0;
+> + ? ? ? ? ? ? ? alm.pending = 0;
+> + ? ? ? ? ? ? ? spear_rtc_set_alarm(dev, &alm);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case RTC_ALM_READ:
+> + ? ? ? ? ? ? ? err = spear_rtc_read_alarm(dev, &alm);
+> + ? ? ? ? ? ? ? if (err < 0)
+> + ? ? ? ? ? ? ? ? ? ? ? return err;
+> +
+> + ? ? ? ? ? ? ? if (copy_to_user(uarg, &alm.time, sizeof(tm)))
+> + ? ? ? ? ? ? ? ? ? ? ? return -EFAULT;
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? return -ENOIOCTLCMD;
+> + ? ? ? }
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +#else
+> +#define spear_rtc_ioctl ? ? ? ?NULL
+> +#endif
+> +
+> +static struct rtc_class_ops spear_rtc_ops = {
+> + ? ? ? .ioctl = spear_rtc_ioctl,
+> + ? ? ? .read_time = spear_rtc_read_time,
+> + ? ? ? .set_time = spear_rtc_set_time,
+> + ? ? ? .read_alarm = spear_rtc_read_alarm,
+> + ? ? ? .set_alarm = spear_rtc_set_alarm,
+> +};
+> +
+> +static int __devinit spear_rtc_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct resource *res;
+> + ? ? ? struct rtc_device *rtc;
+> + ? ? ? struct spear_rtc_config *config;
+> + ? ? ? unsigned int status = 0;
+> + ? ? ? int irq;
+> +
+> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (!res) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no resource defined\n");
+> + ? ? ? ? ? ? ? return -EBUSY;
+> + ? ? ? }
+> + ? ? ? if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "rtc region already claimed\n");
+> + ? ? ? ? ? ? ? return -EBUSY;
+> + ? ? ? }
+> +
+> + ? ? ? config = kzalloc(sizeof(*config), GFP_KERNEL);
+> + ? ? ? if (!config) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "out of memory\n");
+> + ? ? ? ? ? ? ? status = -ENOMEM;
+> + ? ? ? ? ? ? ? goto err_release_region;
+> + ? ? ? }
+> +
+> + ? ? ? config->clk = clk_get(&pdev->dev, NULL);
+> + ? ? ? if (IS_ERR(config->clk)) {
+> + ? ? ? ? ? ? ? status = PTR_ERR(config->clk);
+> + ? ? ? ? ? ? ? goto err_kfree;
+> + ? ? ? }
+> +
+> + ? ? ? status = clk_enable(config->clk);
+> + ? ? ? if (status < 0)
+> + ? ? ? ? ? ? ? goto err_clk_put;
+> +
+> + ? ? ? config->ioaddr = ioremap(res->start, resource_size(res));
+> + ? ? ? if (!config->ioaddr) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "ioremap fail\n");
+> + ? ? ? ? ? ? ? status = -ENOMEM;
+> + ? ? ? ? ? ? ? goto err_disable_clock;
+> + ? ? ? }
+> +
+> + ? ? ? rtc = rtc_device_register(pdev->name, &pdev->dev, &spear_rtc_ops,
+> + ? ? ? ? ? ? ? ? ? ? ? THIS_MODULE);
+> + ? ? ? if (IS_ERR(rtc)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "can't register RTC device, err %ld\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PTR_ERR(rtc));
+> + ? ? ? ? ? ? ? status = PTR_ERR(rtc);
+> + ? ? ? ? ? ? ? goto err_iounmap;
+> + ? ? ? }
+> + ? ? ? platform_set_drvdata(pdev, rtc);
+> + ? ? ? dev_set_drvdata(&rtc->dev, config);
+> +
+> + ? ? ? spin_lock_init(&config->lock);
+> +
+> + ? ? ? /* alarm irqs */
+> + ? ? ? irq = platform_get_irq(pdev, 0);
+> + ? ? ? if (irq < 0) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no update irq?\n");
+> + ? ? ? ? ? ? ? status = irq;
+> + ? ? ? ? ? ? ? goto err_clear_platdata;
+> + ? ? ? }
+> +
+> + ? ? ? status = request_irq(irq, spear_rtc_irq, 0, pdev->name, rtc);
+> + ? ? ? if (status) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Alarm interrupt IRQ%d already \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? claimed\n", irq);
+> + ? ? ? ? ? ? ? goto err_clear_platdata;
+> + ? ? ? }
+> +
+> + ? ? ? if (!device_can_wakeup(&pdev->dev))
+> + ? ? ? ? ? ? ? device_init_wakeup(&pdev->dev, 1);
+> +
+> + ? ? ? return 0;
+> +
+> +err_clear_platdata:
+> + ? ? ? platform_set_drvdata(pdev, NULL);
+> + ? ? ? dev_set_drvdata(&rtc->dev, NULL);
+> + ? ? ? rtc_device_unregister(rtc);
+> +err_iounmap:
+> + ? ? ? iounmap(config->ioaddr);
+> +err_disable_clock:
+> + ? ? ? clk_disable(config->clk);
+> +err_clk_put:
+> + ? ? ? clk_put(config->clk);
+> +err_kfree:
+> + ? ? ? kfree(config);
+> +err_release_region:
+> + ? ? ? release_mem_region(res->start, resource_size(res));
+> +
+> + ? ? ? return status;
+> +}
+> +
+> +static int __devexit spear_rtc_remove(struct platform_device *pdev)
+> +{
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? int irq;
+> + ? ? ? struct resource *res;
+> +
+> + ? ? ? /* leave rtc running, but disable irqs */
+> + ? ? ? spear_rtc_disable_interrupt(config);
+> + ? ? ? device_init_wakeup(&pdev->dev, 0);
+> + ? ? ? irq = platform_get_irq(pdev, 0);
+> + ? ? ? if (irq)
+> + ? ? ? ? ? ? ? free_irq(irq, pdev);
+> + ? ? ? clk_disable(config->clk);
+> + ? ? ? clk_put(config->clk);
+> + ? ? ? iounmap(config->ioaddr);
+> + ? ? ? kfree(config);
+> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + ? ? ? if (res)
+> + ? ? ? ? ? ? ? release_mem_region(res->start, resource_size(res));
+> + ? ? ? platform_set_drvdata(pdev, NULL);
+> + ? ? ? dev_set_drvdata(&rtc->dev, NULL);
+> + ? ? ? rtc_device_unregister(rtc);
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +
+> +static int spear_rtc_suspend(struct platform_device *pdev, pm_message_t state)
+> +{
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? int irq;
+> +
+> + ? ? ? irq = platform_get_irq(pdev, 0);
+> + ? ? ? if (device_may_wakeup(&pdev->dev))
+> + ? ? ? ? ? ? ? enable_irq_wake(irq);
+> + ? ? ? else {
+> + ? ? ? ? ? ? ? spear_rtc_disable_interrupt(config);
+> + ? ? ? ? ? ? ? clk_disable(config->clk);
+> + ? ? ? }
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static int spear_rtc_resume(struct platform_device *pdev)
+> +{
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> + ? ? ? int irq;
+> +
+> + ? ? ? irq = platform_get_irq(pdev, 0);
+> +
+> + ? ? ? if (device_may_wakeup(&pdev->dev))
+> + ? ? ? ? ? ? ? disable_irq_wake(irq);
+> + ? ? ? else {
+> + ? ? ? ? ? ? ? clk_enable(config->clk);
+> + ? ? ? ? ? ? ? spear_rtc_enable_interrupt(config);
+> + ? ? ? }
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +#else
+> +#define spear_rtc_suspend ? ? ?NULL
+> +#define spear_rtc_resume ? ? ? NULL
+> +#endif
+> +
+> +static void spear_rtc_shutdown(struct platform_device *pdev)
+> +{
+> + ? ? ? struct rtc_device *rtc = platform_get_drvdata(pdev);
+> + ? ? ? struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
+> +
+> + ? ? ? spear_rtc_disable_interrupt(config);
+> + ? ? ? clk_disable(config->clk);
+> +}
+> +
+> +static struct platform_driver spear_rtc_driver = {
+> + ? ? ? .probe = spear_rtc_probe,
+> + ? ? ? .remove = __devexit_p(spear_rtc_remove),
+> + ? ? ? .suspend = spear_rtc_suspend,
+> + ? ? ? .resume = spear_rtc_resume,
+> + ? ? ? .shutdown = spear_rtc_shutdown,
+> + ? ? ? .driver = {
+> + ? ? ? ? ? ? ? .name = "rtc-spear",
+> + ? ? ? ? ? ? ? .owner = THIS_MODULE,
+> + ? ? ? },
+> +};
+> +
+> +static int __init rtc_init(void)
+> +{
+> + ? ? ? return platform_driver_register(&spear_rtc_driver);
+> +}
+> +module_init(rtc_init);
+> +
+> +static void __exit rtc_exit(void)
+> +{
+> + ? ? ? platform_driver_unregister(&spear_rtc_driver);
+> +}
+> +module_exit(rtc_exit);
+> +
+> +MODULE_ALIAS("rtc-spear");
+> +MODULE_AUTHOR("Rajeev Kumar");
+> +MODULE_LICENSE("GPL");
+> --
+> 1.7.2.2
+>
+> --
+> You received this message because you are subscribed to "rtc-linux".
+> Membership options at http://groups.google.com/group/rtc-linux .
+> Please read http://groups.google.com/group/rtc-linux/web/checklist
+> before submitting a driver.
 
----
- arch/arm/kernel/debug.S                             |   22 +-
- arch/arm/mach-aaec2000/include/mach/debug-macro.S   |   10 
- arch/arm/mach-at91/include/mach/debug-macro.S       |    8 
- arch/arm/mach-clps711x/include/mach/debug-macro.S   |   12 -
- arch/arm/mach-cns3xxx/include/mach/debug-macro.S    |   10 
- arch/arm/mach-davinci/include/mach/debug-macro.S    |   46 ++--
- arch/arm/mach-dove/include/mach/debug-macro.S       |   11 -
- arch/arm/mach-ebsa110/include/mach/debug-macro.S    |    7 
- arch/arm/mach-ep93xx/include/mach/debug-macro.S     |   11 -
- arch/arm/mach-footbridge/include/mach/debug-macro.S |   22 --
- arch/arm/mach-gemini/include/mach/debug-macro.S     |    8 
- arch/arm/mach-h720x/include/mach/debug-macro.S      |   10 
- arch/arm/mach-integrator/include/mach/debug-macro.S |   10 
- arch/arm/mach-iop13xx/include/mach/debug-macro.S    |   16 -
- arch/arm/mach-iop32x/include/mach/debug-macro.S     |    7 
- arch/arm/mach-iop33x/include/mach/debug-macro.S     |   12 -
- arch/arm/mach-ixp2000/include/mach/debug-macro.S    |   14 -
- arch/arm/mach-ixp23xx/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-ixp4xx/include/mach/debug-macro.S     |   16 -
- arch/arm/mach-kirkwood/include/mach/debug-macro.S   |   11 -
- arch/arm/mach-ks8695/include/mach/debug-macro.S     |    8 
- arch/arm/mach-l7200/include/mach/debug-macro.S      |   38 +++
- arch/arm/mach-lh7a40x/include/mach/debug-macro.S    |   10 
- arch/arm/mach-loki/include/mach/debug-macro.S       |   11 -
- arch/arm/mach-mmp/include/mach/debug-macro.S        |   11 -
- arch/arm/mach-msm/include/mach/debug-macro.S        |   10 
- arch/arm/mach-mv78xx0/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-netx/include/mach/debug-macro.S       |   10 
- arch/arm/mach-nomadik/include/mach/debug-macro.S    |   12 -
- arch/arm/mach-ns9xxx/include/mach/debug-macro.S     |    8 
- arch/arm/mach-omap1/include/mach/debug-macro.S      |   68 +++---
- arch/arm/mach-omap2/include/mach/debug-macro.S      |  127 +++++-------
- arch/arm/mach-orion5x/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-pnx4008/include/mach/debug-macro.S    |   10 
- arch/arm/mach-pxa/include/mach/debug-macro.S        |   10 
- arch/arm/mach-realview/include/mach/debug-macro.S   |   10 
- arch/arm/mach-rpc/include/mach/debug-macro.S        |   12 -
- arch/arm/mach-s3c2410/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-s3c24a0/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-s3c64xx/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-s5p6440/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-s5p6442/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-s5pc100/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-s5pv210/include/mach/debug-macro.S    |   11 -
- arch/arm/mach-sa1100/include/mach/debug-macro.S     |   36 +--
- arch/arm/mach-shark/include/mach/debug-macro.S      |    7 
- arch/arm/mach-tegra/include/mach/debug-macro.S      |   26 +-
- arch/arm/mach-u300/include/mach/debug-macro.S       |   11 -
- arch/arm/mach-ux500/include/mach/debug-macro.S      |    8 
- arch/arm/mach-versatile/include/mach/debug-macro.S  |   12 -
- arch/arm/mach-vexpress/include/mach/debug-macro.S   |   10 
- arch/arm/plat-mxc/include/mach/debug-macro.S        |    8 
- arch/arm/plat-spear/include/plat/debug-macro.S      |    8 
- arch/arm/plat-stmp3xxx/include/mach/debug-macro.S   |   11 -
- 54 files changed, 432 insertions(+), 433 deletions(-)
 
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index f913952..a0f0752 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -22,7 +22,7 @@
- #if defined(CONFIG_DEBUG_ICEDCC)
- 		@@ debug using ARM EmbeddedICE DCC channel
- 
--		.macro	addruart, rx, tmp
-+		.macro	addruart, rp, rv
- 		.endm
- 
- #if defined(CONFIG_CPU_V6)
-@@ -121,6 +121,22 @@ wait:		mrc	p14, 0, pc, c0, c1, 0
- #include <mach/debug-macro.S>
- #endif	/* CONFIG_DEBUG_ICEDCC */
- 
-+#ifdef CONFIG_MMU
-+		.macro	addruart_current, rx, tmp1, tmp2
-+		addruart	\tmp1, \tmp2
-+		mrc		p15, 0, \rx, c1, c0
-+		tst		\rx, #1
-+		moveq		\rx, \tmp1
-+		movne		\rx, \tmp2
-+		.endm
-+
-+#else /* !CONFIG_MMU */
-+		.macro	addruart_current, rx, tmp1, tmp2
-+		addruart	\rx, \tmp1
-+		.endm
-+
-+#endif /* CONFIG_MMU */
-+
- /*
-  * Useful debugging routines
-  */
-@@ -155,7 +171,7 @@ ENDPROC(printhex2)
- 		.ltorg
- 
- ENTRY(printascii)
--		addruart r3, r1
-+		addruart_current r3, r1, r2
- 		b	2f
- 1:		waituart r2, r3
- 		senduart r1, r3
-@@ -171,7 +187,7 @@ ENTRY(printascii)
- ENDPROC(printascii)
- 
- ENTRY(printch)
--		addruart r3, r1
-+		addruart_current r3, r1, r2
- 		mov	r1, r0
- 		mov	r0, #0
- 		b	1b
-diff --git a/arch/arm/mach-aaec2000/include/mach/debug-macro.S b/arch/arm/mach-aaec2000/include/mach/debug-macro.S
-index a9cac36..bc7ad55 100644
---- a/arch/arm/mach-aaec2000/include/mach/debug-macro.S
-+++ b/arch/arm/mach-aaec2000/include/mach/debug-macro.S
-@@ -10,12 +10,10 @@
-  */
- 
- #include "hardware.h"
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x80000000		@ physical
--		movne	\rx, #io_p2v(0x80000000)	@ virtual
--		orr	\rx, \rx, #0x00000800
-+		.macro	addruart, rp, rv
-+		mov	\rp, 0x00000800
-+		orr	\rv, \rp, #io_p2v(0x80000000)	@ virtual
-+		orr	\rp, \rp, #0x80000000		@ physical
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
-index 9e750a1..0f959fa 100644
---- a/arch/arm/mach-at91/include/mach/debug-macro.S
-+++ b/arch/arm/mach-at91/include/mach/debug-macro.S
-@@ -14,11 +14,9 @@
- #include <mach/hardware.h>
- #include <mach/at91_dbgu.h>
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1						@ MMU enabled?
--	ldreq	\rx, =(AT91_BASE_SYS + AT91_DBGU)		@ System peripherals (phys address)
--	ldrne	\rx, =(AT91_VA_BASE_SYS	+ AT91_DBGU)		@ System peripherals (virt address)
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)		@ System peripherals (phys address)
-+	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)		@ System peripherals (virt address)
- 	.endm
- 
- 	.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-clps711x/include/mach/debug-macro.S b/arch/arm/mach-clps711x/include/mach/debug-macro.S
-index 072cc6b..507c687 100644
---- a/arch/arm/mach-clps711x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-clps711x/include/mach/debug-macro.S
-@@ -14,16 +14,14 @@
- #include <mach/hardware.h>
- #include <asm/hardware/clps7111.h>
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #CLPS7111_PHYS_BASE
--		movne	\rx, #CLPS7111_VIRT_BASE
-+		.macro	addruart, rp, rv
- #ifndef CONFIG_DEBUG_CLPS711X_UART2
--		add	\rx, \rx, #0x0000	@ UART1
-+		mov	\rp, #0x0000	@ UART1
- #else
--		add	\rx, \rx, #0x1000	@ UART2
-+		mov	\rp, #0x1000	@ UART2
- #endif
-+		orr	\rv, \rp, #CLPS7111_VIRT_BASE
-+		orr	\rp, \rp, #CLPS7111_PHYS_BASE
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-index d16ce7e..56d8286 100644
---- a/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-cns3xxx/include/mach/debug-macro.S
-@@ -10,12 +10,10 @@
-  * published by the Free Software Foundation.
-  */
- 
--		.macro	addruart,rx
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx,      #0x10000000
--		movne	\rx,      #0xf0000000	@ virtual base
--		orr	\rx, \rx, #0x00009000
-+		.macro	addruart,rp,rv
-+		mov	\rp, #0x00009000
-+		orr	\rv, \rp, #0xf0000000	@ virtual base
-+		orr	\rp, \rp, #0x10000000
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-davinci/include/mach/debug-macro.S b/arch/arm/mach-davinci/include/mach/debug-macro.S
-index f761dfd..9f1befc 100644
---- a/arch/arm/mach-davinci/include/mach/debug-macro.S
-+++ b/arch/arm/mach-davinci/include/mach/debug-macro.S
-@@ -29,35 +29,39 @@ davinci_uart_phys:	.word	0
- davinci_uart_virt:	.word	0
- 		.popsection
- 
--		.macro addruart, rx, tmp
-+		.macro addruart, rp, rv
- 
- 		/* Use davinci_uart_phys/virt if already configured */
--10:		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		ldreq	\rx, =__virt_to_phys(davinci_uart_phys)
--		ldrne	\rx, =davinci_uart_virt
--		ldr	\rx, [\rx]
--		cmp	\rx, #0			@ is port configured?
-+10:		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
-+		ldreq	\rp, =__virt_to_phys(davinci_uart_phys)
-+		ldrne	\rp, =davinci_uart_phys
-+		add	\rv, \rp, #4		@ davinci_uart_virt
-+		ldr	\rp, [\rp, #0]
-+		ldr	\rv, [\rv, #0]
-+		cmp	\rp, #0			@ is port configured?
-+		cmpne	\rv, #0
- 		bne	99f			@ already configured
- 
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
-+		/* Check the debug UART address set in uncompress.h */
-+		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
- 
- 		/* Copy uart phys address from decompressor uart info */
--		ldreq	\tmp, =__virt_to_phys(davinci_uart_phys)
--		ldrne	\tmp, =davinci_uart_phys
--		ldreq	\rx, =DAVINCI_UART_INFO
--		ldrne	\rx, =__phys_to_virt(DAVINCI_UART_INFO)
--		ldr	\rx, [\rx, #0]
--		str	\rx, [\tmp]
-+		ldreq	\rv, =__virt_to_phys(davinci_uart_phys)
-+		ldrne	\rv, =davinci_uart_phys
-+		ldreq	\rp, =DAVINCI_UART_INFO
-+		ldrne	\rp, =__phys_to_virt(DAVINCI_UART_INFO)
-+		ldr	\rp, [\rp, #0]
-+		str	\rp, [\rv]
- 
- 		/* Copy uart virt address from decompressor uart info */
--		ldreq	\tmp, =__virt_to_phys(davinci_uart_virt)
--		ldrne	\tmp, =davinci_uart_virt
--		ldreq	\rx, =DAVINCI_UART_INFO
--		ldrne	\rx, =__phys_to_virt(DAVINCI_UART_INFO)
--		ldr	\rx, [\rx, #4]
--		str	\rx, [\tmp]
-+		ldreq	\rv, =__virt_to_phys(davinci_uart_virt)
-+		ldrne	\rv, =davinci_uart_virt
-+		ldreq	\rp, =DAVINCI_UART_INFO
-+		ldrne	\rp, =__phys_to_virt(DAVINCI_UART_INFO)
-+		ldr	\rp, [\rp, #4]
-+		str	\rp, [\rv]
- 
- 		b	10b
- 99:
-diff --git a/arch/arm/mach-dove/include/mach/debug-macro.S b/arch/arm/mach-dove/include/mach/debug-macro.S
-index 1521d13..da8bf2b 100644
---- a/arch/arm/mach-dove/include/mach/debug-macro.S
-+++ b/arch/arm/mach-dove/include/mach/debug-macro.S
-@@ -8,12 +8,11 @@
- 
- #include <mach/bridge-regs.h>
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =DOVE_SB_REGS_PHYS_BASE
--	ldrne	\rx, =DOVE_SB_REGS_VIRT_BASE
--	orr	\rx, \rx, #0x00012000
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =DOVE_SB_REGS_PHYS_BASE
-+	ldr	\rv, =DOVE_SB_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-ebsa110/include/mach/debug-macro.S b/arch/arm/mach-ebsa110/include/mach/debug-macro.S
-index ebbd89f..7ef5690 100644
---- a/arch/arm/mach-ebsa110/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ebsa110/include/mach/debug-macro.S
-@@ -11,9 +11,10 @@
-  *
- **/
- 
--		.macro	addruart, rx, tmp
--		mov	\rx, #0xf0000000
--		orr	\rx, \rx, #0x00000be0
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0xf0000000
-+		orr	\rp, \rp, #0x00000be0
-+		mov	\rp, \rv
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-ep93xx/include/mach/debug-macro.S b/arch/arm/mach-ep93xx/include/mach/debug-macro.S
-index 5cd2244..b25bc90 100644
---- a/arch/arm/mach-ep93xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ep93xx/include/mach/debug-macro.S
-@@ -11,12 +11,11 @@
-  */
- #include <mach/ep93xx-regs.h>
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1				@ MMU enabled?
--		ldreq	\rx, =EP93XX_APB_PHYS_BASE	@ Physical base
--		ldrne	\rx, =EP93XX_APB_VIRT_BASE	@ virtual base
--		orr	\rx, \rx, #0x000c0000
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =EP93XX_APB_PHYS_BASE	@ Physical base
-+		ldr	\rv, =EP93XX_APB_VIRT_BASE	@ virtual base
-+		orr	\rp, \rp, #0x000c0000
-+		orr	\rv, \rv, #0x000c0000
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-footbridge/include/mach/debug-macro.S b/arch/arm/mach-footbridge/include/mach/debug-macro.S
-index 60dda13..3c9e0c4 100644
---- a/arch/arm/mach-footbridge/include/mach/debug-macro.S
-+++ b/arch/arm/mach-footbridge/include/mach/debug-macro.S
-@@ -15,12 +15,10 @@
- 
- #ifndef CONFIG_DEBUG_DC21285_PORT
- 	/* For NetWinder debugging */
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x7c000000	@ physical
--		movne	\rx, #0xff000000	@ virtual
--		orr	\rx, \rx, #0x000003f8
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x000003f8
-+		orr	\rv, \rp, #0x7c000000	@ physical
-+		orr	\rp, \rp, #0xff000000	@ virtual
- 		.endm
- 
- #define UART_SHIFT	0
-@@ -32,14 +30,14 @@
- 		.equ	dc21285_high, ARMCSR_BASE & 0xff000000
- 		.equ	dc21285_low,  ARMCSR_BASE & 0x00ffffff
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x42000000
--		movne	\rx, #dc21285_high
-+		.macro	addruart, rp, rv
- 		.if	dc21285_low
--		orrne	\rx, \rx, #dc21285_low
-+		mov	\rp, #dc21285_low
-+		.else
-+		mov	\rp, #0
- 		.endif
-+		orr	\rv, \rp, #0x42000000
-+		orr	\rp, \rp, #dc21285_high
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-gemini/include/mach/debug-macro.S b/arch/arm/mach-gemini/include/mach/debug-macro.S
-index ad47704..f40e006 100644
---- a/arch/arm/mach-gemini/include/mach/debug-macro.S
-+++ b/arch/arm/mach-gemini/include/mach/debug-macro.S
-@@ -11,11 +11,9 @@
-  */
- #include <mach/hardware.h>
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =GEMINI_UART_BASE			@ physical
--	ldrne	\rx, =IO_ADDRESS(GEMINI_UART_BASE)	@ virtual
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =GEMINI_UART_BASE			@ physical
-+	ldr	\rv, =IO_ADDRESS(GEMINI_UART_BASE)	@ virtual
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-h720x/include/mach/debug-macro.S b/arch/arm/mach-h720x/include/mach/debug-macro.S
-index 27cafd1..c2093e8 100644
---- a/arch/arm/mach-h720x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-h720x/include/mach/debug-macro.S
-@@ -16,12 +16,10 @@
- 		.equ    io_virt, IO_VIRT
- 		.equ    io_phys, IO_PHYS
- 
--		.macro  addruart, rx, tmp
--		mrc     p15, 0, \rx, c1, c0
--		tst     \rx, #1  	       @ MMU enabled?
--		moveq   \rx, #io_phys	       @ physical base address
--		movne   \rx, #io_virt	       @ virtual address
--		add     \rx, \rx, #0x00020000   @ UART1
-+		.macro  addruart, rp, rv
-+		mov     \rp, #0x00020000	@ UART1
-+		add     \rv, \rp, #io_virt	@ virtual address
-+		add     \rp, \rp, #io_phys	@ physical base address
- 		.endm
- 
- 		.macro  senduart,rd,rx
-diff --git a/arch/arm/mach-integrator/include/mach/debug-macro.S b/arch/arm/mach-integrator/include/mach/debug-macro.S
-index 87a6888..a1f598f 100644
---- a/arch/arm/mach-integrator/include/mach/debug-macro.S
-+++ b/arch/arm/mach-integrator/include/mach/debug-macro.S
-@@ -11,12 +11,10 @@
-  *
- */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x16000000	@ physical base address
--		movne	\rx, #0xf0000000	@ virtual base
--		addne	\rx, \rx, #0x16000000 >> 4
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x16000000	@ physical base address
-+		mov	\rv, #0xf0000000	@ virtual base
-+		add	\rv, \rv, #0x16000000 >> 4
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-iop13xx/include/mach/debug-macro.S b/arch/arm/mach-iop13xx/include/mach/debug-macro.S
-index c9d6ba4..e664466 100644
---- a/arch/arm/mach-iop13xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-iop13xx/include/mach/debug-macro.S
-@@ -11,15 +11,13 @@
-  * published by the Free Software Foundation.
-  */
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1			@ mmu enabled?
--	moveq	\rx, #0xff000000	@ physical
--	orreq	\rx, \rx, #0x00d80000
--	movne	\rx, #0xfe000000	@ virtual
--	orrne	\rx, \rx, #0x00e80000
--	orr	\rx, \rx, #0x00002300
--	orr	\rx, \rx, #0x00000040
-+	.macro	addruart, rp, rv
-+	mov	\rp, #0x00002300
-+	orr	\rp, \rp, #0x00000040
-+	orr	\rv, \rp, #0xfe000000	@ virtual
-+	orr	\rv, \rv, #0x00e80000
-+	orr	\rp, \rp, #0xff000000	@ physical
-+	orr	\rp, \rp, #0x00d80000
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-iop32x/include/mach/debug-macro.S b/arch/arm/mach-iop32x/include/mach/debug-macro.S
-index 736afe1..ff9e76c 100644
---- a/arch/arm/mach-iop32x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-iop32x/include/mach/debug-macro.S
-@@ -11,9 +11,10 @@
-  * published by the Free Software Foundation.
-  */
- 
--		.macro	addruart, rx, tmp
--		mov	\rx, #0xfe000000	@ physical as well as virtual
--		orr	\rx, \rx, #0x00800000	@ location of the UART
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0xfe000000	@ physical as well as virtual
-+		orr	\rp, \rp, #0x00800000	@ location of the UART
-+		mov	\rv, \rp
- 		.endm
- 
- #define UART_SHIFT	0
-diff --git a/arch/arm/mach-iop33x/include/mach/debug-macro.S b/arch/arm/mach-iop33x/include/mach/debug-macro.S
-index addb2da..40c500d 100644
---- a/arch/arm/mach-iop33x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-iop33x/include/mach/debug-macro.S
-@@ -11,13 +11,11 @@
-  * published by the Free Software Foundation.
-  */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ mmu enabled?
--		moveq	\rx, #0xff000000	@ physical
--		movne	\rx, #0xfe000000	@ virtual
--		orr	\rx, \rx, #0x00ff0000
--		orr	\rx, \rx, #0x0000f700
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00ff0000
-+		orr	\rp, \rp, #0x0000f700
-+		orr	\rv, #0xfe000000	@ virtual
-+		orr	\rp, #0xff000000	@ physical
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-ixp2000/include/mach/debug-macro.S b/arch/arm/mach-ixp2000/include/mach/debug-macro.S
-index 6a82768..0ef533b 100644
---- a/arch/arm/mach-ixp2000/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ixp2000/include/mach/debug-macro.S
-@@ -11,16 +11,14 @@
-  *
- */
- 
--		.macro  addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0xc0000000	@ Physical base
--		movne	\rx, #0xfe000000	@ virtual base
--		orrne	\rx, \rx, #0x00f00000
--		orr	\rx, \rx, #0x00030000
-+		.macro  addruart, rp, rv
-+		mov	\rp, #0x00030000
- #ifdef	__ARMEB__
--		orr	\rx, \rx, #0x00000003
-+		orr	\rp, \rp, #0x00000003
- #endif
-+		orr	\rv, \rp, #0xfe000000	@ virtual base
-+		orr	\rv, \rv, #0x00f00000
-+		orr	\rp, \rp, #0xc0000000	@ Physical base
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-ixp23xx/include/mach/debug-macro.S b/arch/arm/mach-ixp23xx/include/mach/debug-macro.S
-index a82e375..f7c6eef 100644
---- a/arch/arm/mach-ixp23xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ixp23xx/include/mach/debug-macro.S
-@@ -12,13 +12,12 @@
-  */
- #include <mach/ixp23xx.h>
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1				@ mmu enabled?
--		ldreq	\rx, =IXP23XX_PERIPHERAL_PHYS 	@ physical
--		ldrne	\rx, =IXP23XX_PERIPHERAL_VIRT	@ virtual
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =IXP23XX_PERIPHERAL_PHYS 	@ physical
-+		ldr	\rv, =IXP23XX_PERIPHERAL_VIRT	@ virtual
- #ifdef __ARMEB__
--		orr	\rx, \rx, #0x00000003
-+		orr	\rp, \rp, #0x00000003
-+		orr	\rv, \rv, #0x00000003
- #endif
- 		.endm
- 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/debug-macro.S b/arch/arm/mach-ixp4xx/include/mach/debug-macro.S
-index 3fc66d6..b974a49 100644
---- a/arch/arm/mach-ixp4xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ixp4xx/include/mach/debug-macro.S
-@@ -10,16 +10,16 @@
-  * published by the Free Software Foundation.
- */
- 
--                .macro  addruart, rx, tmp
--                mrc     p15, 0, \rx, c1, c0
--                tst     \rx, #1                 @ MMU enabled?
--                moveq   \rx, #0xc8000000
--                movne   \rx, #0xff000000
--		orrne	\rx, \rx, #0x00b00000
-+                .macro  addruart, rp, rv
- #ifdef __ARMEB__
--                add     \rx,\rx,#3              @ Uart regs are at off set of 3 if
--						@ byte writes used - Big Endian.
-+                mov     \rp, #3         @ Uart regs are at off set of 3 if
-+					@ byte writes used - Big Endian.
-+#else
-+		mov	\rp, #0
- #endif
-+                orr     \rv, \rp, #0xff000000	@ virtual
-+		orr	\rv, \rv, #0x00b00000
-+                orr     \rp, \rp, #0xc8000000	@ physical
-                 .endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-kirkwood/include/mach/debug-macro.S b/arch/arm/mach-kirkwood/include/mach/debug-macro.S
-index d060677..db06ae4 100644
---- a/arch/arm/mach-kirkwood/include/mach/debug-macro.S
-+++ b/arch/arm/mach-kirkwood/include/mach/debug-macro.S
-@@ -8,12 +8,11 @@
- 
- #include <mach/bridge-regs.h>
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =KIRKWOOD_REGS_PHYS_BASE
--	ldrne	\rx, =KIRKWOOD_REGS_VIRT_BASE
--	orr	\rx, \rx, #0x00012000
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =KIRKWOOD_REGS_PHYS_BASE
-+	ldr	\rv, =KIRKWOOD_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/mach-ks8695/include/mach/debug-macro.S
-index cf2095d..bf516ad 100644
---- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ks8695/include/mach/debug-macro.S
-@@ -14,11 +14,9 @@
- #include <mach/hardware.h>
- #include <mach/regs-uart.h>
- 
--	.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1				@ MMU enabled?
--		ldreq	\rx, =KS8695_UART_PA		@ physical base address
--		ldrne	\rx, =KS8695_UART_VA		@ virtual base address
-+	.macro	addruart, rp, rv
-+		ldr	\rp, =KS8695_UART_PA		@ physical base address
-+		ldr	\rv, =KS8695_UART_VA		@ virtual base address
- 	.endm
- 
- 	.macro	senduart, rd, rx
-diff --git a/arch/arm/mach-l7200/include/mach/debug-macro.S b/arch/arm/mach-l7200/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..b0a2db7
---- /dev/null
-+++ b/arch/arm/mach-l7200/include/mach/debug-macro.S
-@@ -0,0 +1,38 @@
-+/* arch/arm/mach-l7200/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+*/
-+
-+		.equ	io_virt, IO_BASE
-+		.equ	io_phys, IO_START
-+
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00044000	@ UART1
-+@		mov	\rp, #0x00045000	@ UART2
-+		add	\rv, \rp, #io_virt	@ virtual address
-+		add	\rp, \rp, #io_phys	@ physical base address
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		str	\rd, [\rx, #0x0]	@ UARTDR
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
-+		tst	\rd, #1 << 5		@ UARTFLGUTXFF - 1 when full
-+		bne	1001b
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
-+		tst	\rd, #1 << 3		@ UARTFLGUBUSY - 1 when busy
-+		bne	1001b
-+		.endm
-diff --git a/arch/arm/mach-lh7a40x/include/mach/debug-macro.S b/arch/arm/mach-lh7a40x/include/mach/debug-macro.S
-index c0dcbbb..cff3362 100644
---- a/arch/arm/mach-lh7a40x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-lh7a40x/include/mach/debug-macro.S
-@@ -14,12 +14,10 @@
- 	@ It is not known if this will be appropriate for every 40x
- 	@ board.
- 
--		.macro  addruart, rx, tmp
--		mrc     p15, 0, \rx, c1, c0
--		tst     \rx, #1                 @ MMU enabled?
--		mov     \rx, #0x00000700        @ offset from base
--		orreq   \rx, \rx, #0x80000000   @ physical base
--		orrne   \rx, \rx, #0xf8000000   @ virtual base
-+		.macro  addruart, rp, rv
-+		mov     \rp, #0x00000700        @ offset from base
-+		orr     \rv, \rp, #0xf8000000   @ virtual base
-+		orr     \rp, \rp, #0x80000000   @ physical base
- 		.endm
- 
- 		.macro  senduart,rd,rx
-diff --git a/arch/arm/mach-loki/include/mach/debug-macro.S b/arch/arm/mach-loki/include/mach/debug-macro.S
-index 3136c91..cc90d99 100644
---- a/arch/arm/mach-loki/include/mach/debug-macro.S
-+++ b/arch/arm/mach-loki/include/mach/debug-macro.S
-@@ -8,12 +8,11 @@
- 
- #include <mach/loki.h>
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =LOKI_REGS_PHYS_BASE
--	ldrne	\rx, =LOKI_REGS_VIRT_BASE
--	orr	\rx, \rx, #0x00012000
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =LOKI_REGS_PHYS_BASE
-+	ldr	\rv, =LOKI_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-mmp/include/mach/debug-macro.S b/arch/arm/mach-mmp/include/mach/debug-macro.S
-index 76deff2..7e2ebd3 100644
---- a/arch/arm/mach-mmp/include/mach/debug-macro.S
-+++ b/arch/arm/mach-mmp/include/mach/debug-macro.S
-@@ -11,12 +11,11 @@
- 
- #include <mach/addr-map.h>
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1				@ MMU enabled?
--		ldreq	\rx, =APB_PHYS_BASE		@ physical
--		ldrne	\rx, =APB_VIRT_BASE		@ virtual
--		orr	\rx, \rx, #0x00017000
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =APB_PHYS_BASE		@ physical
-+		ldr	\rv, =APB_VIRT_BASE		@ virtual
-+		orr	\rp, \rp, #0x00017000
-+		orr	\rv, \rv, #0x00017000
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-msm/include/mach/debug-macro.S b/arch/arm/mach-msm/include/mach/debug-macro.S
-index 528750f..3c35b0d 100644
---- a/arch/arm/mach-msm/include/mach/debug-macro.S
-+++ b/arch/arm/mach-msm/include/mach/debug-macro.S
-@@ -20,12 +20,10 @@
- #include <mach/msm_iomap.h>
- 
- #ifdef CONFIG_MSM_DEBUG_UART
--	.macro	addruart, rx, tmp
-+	.macro	addruart, rp, rv
- 	@ see if the MMU is enabled and select appropriate base address
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1
--	ldreq	\rx, =MSM_DEBUG_UART_PHYS
--	ldrne	\rx, =MSM_DEBUG_UART_BASE
-+	ldr	\rp, =MSM_DEBUG_UART_PHYS
-+	ldr	\rv, =MSM_DEBUG_UART_BASE
- 	.endm
- 
- 	.macro	senduart,rd,rx
-@@ -40,7 +38,7 @@
- 	beq	1001b
- 	.endm
- #else
--	.macro	addruart, rx, tmp
-+	.macro	addruart, rp, rv
- 	.endm
- 
- 	.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-mv78xx0/include/mach/debug-macro.S b/arch/arm/mach-mv78xx0/include/mach/debug-macro.S
-index cd81689..0489142 100644
---- a/arch/arm/mach-mv78xx0/include/mach/debug-macro.S
-+++ b/arch/arm/mach-mv78xx0/include/mach/debug-macro.S
-@@ -8,12 +8,11 @@
- 
- #include <mach/mv78xx0.h>
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =MV78XX0_REGS_PHYS_BASE
--	ldrne	\rx, =MV78XX0_REGS_VIRT_BASE
--	orr	\rx, \rx, #0x00012000
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =MV78XX0_REGS_PHYS_BASE
-+	ldr	\rv, =MV78XX0_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-netx/include/mach/debug-macro.S b/arch/arm/mach-netx/include/mach/debug-macro.S
-index e96339e..56a9152 100644
---- a/arch/arm/mach-netx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-netx/include/mach/debug-macro.S
-@@ -13,12 +13,10 @@
- 
- #include "hardware.h"
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x00100000		@ physical
--		movne	\rx, #io_p2v(0x00100000)	@ virtual
--		orr	\rx, \rx, #0x00000a00
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00000a00
-+		orr	\rv, \rp, #io_p2v(0x00100000)	@ virtual
-+		orr	\rp, \rp, #0x00100000		@ physical
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-nomadik/include/mach/debug-macro.S b/arch/arm/mach-nomadik/include/mach/debug-macro.S
-index 4f92acf..e7151b4 100644
---- a/arch/arm/mach-nomadik/include/mach/debug-macro.S
-+++ b/arch/arm/mach-nomadik/include/mach/debug-macro.S
-@@ -10,13 +10,11 @@
-  *
- */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x10000000	@ physical base address
--		movne	\rx, #0xf0000000	@ virtual base
--		add	\rx, \rx, #0x00100000
--		add	\rx, \rx, #0x000fb000
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00100000
-+		add	\rp, \rp, #0x000fb000
-+		add	\rv, \rp, #0xf0000000	@ virtual base
-+		add	\rp, \rp, #0x10000000	@ physical base address
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-ns9xxx/include/mach/debug-macro.S b/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-index 5c934bd..5a2acbd 100644
---- a/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ns9xxx/include/mach/debug-macro.S
-@@ -12,11 +12,9 @@
- 
- #include <mach/regs-board-a9m9750dev.h>
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, =NS9XXX_CSxSTAT_PHYS(0)
--		ldrne	\rx, =io_p2v(NS9XXX_CSxSTAT_PHYS(0))
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =NS9XXX_CSxSTAT_PHYS(0)
-+		ldr	\rv, =io_p2v(NS9XXX_CSxSTAT_PHYS(0))
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
-index 671408e..6a0fa04 100644
---- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-@@ -28,56 +28,58 @@ omap_uart_virt:	.word	0x0
- 		 * the desired UART phys and virt addresses temporarily into
- 		 * the omap_uart_phys and omap_uart_virt above.
- 		 */
--		.macro	addruart, rx, tmp
-+		.macro	addruart, rp, rv
- 
- 		/* Use omap_uart_phys/virt if already configured */
--9:		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		ldreq	\rx, =__virt_to_phys(omap_uart_phys)	@ physical base address
--		ldrne	\rx, =omap_uart_virt	@ virtual base
--		ldr	\rx, [\rx, #0]
--		cmp	\rx, #0			@ is port configured?
-+9:		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
-+		ldreq	\rp, =__virt_to_phys(omap_uart_phys)	@ MMU not enabled
-+		ldrne	\rp, =omap_uart_phys	@ MMU enabled
-+		add	\rv, \rp, #4		@ omap_uart_virt
-+		ldr	\rp, [\rp, #0]
-+		ldr	\rv, [\rv, #0]
-+		cmp	\rp, #0			@ is port configured?
-+		cmpne	\rv, #0
- 		bne	99f			@ already configured
- 
- 		/* Check the debug UART configuration set in uncompress.h */
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		ldreq	\rx, =OMAP_UART_INFO
--		ldrne	\rx, =__phys_to_virt(OMAP_UART_INFO)
--		ldr	\rx, [\rx, #0]
-+		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
-+		ldreq	\rp, =OMAP_UART_INFO	@ MMU not enabled
-+		ldrne	\rp, =__phys_to_virt(OMAP_UART_INFO)	@ MMU enabled
-+		ldr	\rp, [\rp, #0]
- 
- 		/* Select the UART to use based on the UART1 scratchpad value */
--10:		cmp	\rx, #0			@ no port configured?
-+10:		cmp	\rp, #0			@ no port configured?
- 		beq	11f			@ if none, try to use UART1
--		cmp	\rx, #OMAP1UART1
-+		cmp	\rp, #OMAP1UART1
- 		beq	11f			@ configure OMAP1UART1
--		cmp	\rx, #OMAP1UART2
-+		cmp	\rp, #OMAP1UART2
- 		beq	12f			@ configure OMAP1UART2
--		cmp	\rx, #OMAP1UART3
-+		cmp	\rp, #OMAP1UART3
- 		beq	13f			@ configure OMAP2UART3
- 
- 		/* Configure the UART offset from the phys/virt base */
--11:		mov	\rx, #0x00fb0000	@ OMAP1UART1
-+11:		mov	\rp, #0x00fb0000	@ OMAP1UART1
- 		b	98f
--12:		mov	\rx, #0x00fb0000	@ OMAP1UART1
--		orr	\rx, \rx, #0x00000800	@ OMAP1UART2
-+12:		mov	\rp, #0x00fb0000	@ OMAP1UART1
-+		orr	\rp, \rp, #0x00000800	@ OMAP1UART2
- 		b	98f
--13:		mov	\rx, #0x00fb0000	@ OMAP1UART1
--		orr	\rx, \rx, #0x00000800	@ OMAP1UART2
--		orr	\rx, \rx, #0x00009000	@ OMAP1UART3
-+13:		mov	\rp, #0x00fb0000	@ OMAP1UART1
-+		orr	\rp, \rp, #0x00000800	@ OMAP1UART2
-+		orr	\rp, \rp, #0x00009000	@ OMAP1UART3
- 
- 		/* Store both phys and virt address for the uart */
--98:		add	\rx, \rx, #0xff000000	@ phys base
--		mrc	p15, 0, \tmp, c1, c0
--		tst	\tmp, #1		@ MMU enabled?
--		ldreq	\tmp, =__virt_to_phys(omap_uart_phys)
--		ldrne	\tmp, =omap_uart_phys
--		str	\rx, [\tmp, #0]
--		sub	\rx, \rx, #0xff000000	@ phys base
--		add	\rx, \rx, #0xfe000000	@ virt base
--		ldreq	\tmp, =__virt_to_phys(omap_uart_virt)
--		ldrne	\tmp, =omap_uart_virt
--		str	\rx, [\tmp, #0]
-+98:		add	\rp, \rp, #0xff000000	@ phys base
-+		mrc	p15, 0, \rv, c1, c0
-+		tst	\rv, #1			@ MMU enabled?
-+		ldreq	\rv, =__virt_to_phys(omap_uart_phys)	@ MMU not enabled
-+		ldrne	\rv, =omap_uart_phys	@ MMU enabled
-+		str	\rp, [\rv, #0]
-+		sub	\rp, \rp, #0xff000000	@ phys base
-+		add	\rp, \rp, #0xfe000000	@ virt base
-+		add	\rv, \rv, #4		@ omap_uart_lsr
-+		str	\rp, [\rv, #0]
- 		b	9b
- 99:
- 		.endm
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index 09331bb..6a4d413 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -31,95 +31,94 @@ omap_uart_lsr:	.word	0
- 		 * the desired UART phys and virt addresses temporarily into
- 		 * the omap_uart_phys and omap_uart_virt above.
- 		 */
--		.macro	addruart, rx, tmp
-+		.macro	addruart, rp, rv
- 
- 		/* Use omap_uart_phys/virt if already configured */
--10:		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		ldreq	\rx, =__virt_to_phys(omap_uart_phys)	@ physical base address
--		ldrne	\rx, =omap_uart_virt	@ virtual base address
--		ldr	\rx, [\rx, #0]
--		cmp	\rx, #0			@ is port configured?
-+10:		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
-+		ldreq	\rp, =__virt_to_phys(omap_uart_phys)	@ MMU not enabled
-+		ldrne	\rp, =omap_uart_phys	@ MMU enabled
-+		add	\rv, \rp, #4		@ omap_uart_virt
-+		ldr	\rp, [\rp, #0]
-+		ldr	\rv, [\rv, #0]
-+		cmp	\rp, #0			@ is port configured?
-+		cmpne	\rv, #0
- 		bne	99f			@ already configured
- 
- 		/* Check the debug UART configuration set in uncompress.h */
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		ldreq	\rx, =OMAP_UART_INFO
--		ldrne	\rx, =__phys_to_virt(OMAP_UART_INFO)
--		ldr	\rx, [\rx, #0]
-+		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
-+		ldreq	\rp, =OMAP_UART_INFO	@ MMU not enabled
-+		ldrne	\rp, =__phys_to_virt(OMAP_UART_INFO)	@ MMU enabled
-+		ldr	\rp, [\rp, #0]
- 
- 		/* Select the UART to use based on the UART1 scratchpad value */
--		cmp	\rx, #0			@ no port configured?
-+		cmp	\rp, #0			@ no port configured?
- 		beq	21f			@ if none, try to use UART1
--		cmp	\rx, #OMAP2UART1	@ OMAP2/3/4UART1
-+		cmp	\rp, #OMAP2UART1	@ OMAP2/3/4UART1
- 		beq	21f			@ configure OMAP2/3/4UART1
--		cmp	\rx, #OMAP2UART2	@ OMAP2/3/4UART2
-+		cmp	\rp, #OMAP2UART2	@ OMAP2/3/4UART2
- 		beq	22f			@ configure OMAP2/3/4UART2
--		cmp	\rx, #OMAP2UART3	@ only on 24xx
-+		cmp	\rp, #OMAP2UART3	@ only on 24xx
- 		beq	23f			@ configure OMAP2UART3
--		cmp	\rx, #OMAP3UART3	@ only on 34xx
-+		cmp	\rp, #OMAP3UART3	@ only on 34xx
- 		beq	33f			@ configure OMAP3UART3
--		cmp	\rx, #OMAP4UART3	@ only on 44xx
-+		cmp	\rp, #OMAP4UART3	@ only on 44xx
- 		beq	43f			@ configure OMAP4UART3
--		cmp	\rx, #OMAP3UART4	@ only on 36xx
-+		cmp	\rp, #OMAP3UART4	@ only on 36xx
- 		beq	34f			@ configure OMAP3UART4
--		cmp	\rx, #OMAP4UART4	@ only on 44xx
-+		cmp	\rp, #OMAP4UART4	@ only on 44xx
- 		beq	44f			@ configure OMAP4UART4
--		cmp	\rx, #ZOOM_UART		@ only on zoom2/3
-+		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
- 		beq	95f			@ configure ZOOM_UART
- 
- 		/* Configure the UART offset from the phys/virt base */
--21:		mov	\rx, #UART_OFFSET(OMAP2_UART1_BASE)	@ omap2/3/4
-+21:		mov	\rp, #UART_OFFSET(OMAP2_UART1_BASE)	@ omap2/3/4
- 		b	98f
--22:		mov	\rx, #UART_OFFSET(OMAP2_UART2_BASE)	@ omap2/3/4
-+22:		mov	\rp, #UART_OFFSET(OMAP2_UART2_BASE)	@ omap2/3/4
- 		b	98f
--23:		mov	\rx, #UART_OFFSET(OMAP2_UART3_BASE)
-+23:		mov	\rp, #UART_OFFSET(OMAP2_UART3_BASE)
- 		b	98f
--33:		mov	\rx, #UART_OFFSET(OMAP3_UART1_BASE)
--		add	\rx, \rx, #0x00fb0000
--		add	\rx, \rx, #0x00006000		@ OMAP3_UART3_BASE
-+33:		mov	\rp, #UART_OFFSET(OMAP3_UART1_BASE)
-+		add	\rp, \rp, #0x00fb0000
-+		add	\rp, \rp, #0x00006000		@ OMAP3_UART3_BASE
- 		b	98f
--34:		mov	\rx, #UART_OFFSET(OMAP3_UART1_BASE)
--		add	\rx, \rx, #0x00fb0000
--		add	\rx, \rx, #0x00028000		@ OMAP3_UART4_BASE
-+34:		mov	\rp, #UART_OFFSET(OMAP3_UART1_BASE)
-+		add	\rp, \rp, #0x00fb0000
-+		add	\rp, \rp, #0x00028000		@ OMAP3_UART4_BASE
- 		b	98f
--43:		mov	\rx, #UART_OFFSET(OMAP4_UART3_BASE)
-+43:		mov	\rp, #UART_OFFSET(OMAP4_UART3_BASE)
- 		b	98f
--44:		mov	\rx, #UART_OFFSET(OMAP4_UART4_BASE)
-+44:		mov	\rp, #UART_OFFSET(OMAP4_UART4_BASE)
- 		b	98f
--95:		ldr	\rx, =ZOOM_UART_BASE
--		mrc	p15, 0, \tmp, c1, c0
--		tst	\tmp, #1		@ MMU enabled?
--		ldreq	\tmp, =__virt_to_phys(omap_uart_phys)
--		ldrne	\tmp, =omap_uart_phys
--		str	\rx, [\tmp, #0]
--		ldr	\rx, =ZOOM_UART_VIRT
--		ldreq	\tmp, =__virt_to_phys(omap_uart_virt)
--		ldrne	\tmp, =omap_uart_virt
--		str	\rx, [\tmp, #0]
--		mov	\rx, #(UART_LSR << ZOOM_PORT_SHIFT)
--		ldreq	\tmp, =__virt_to_phys(omap_uart_lsr)
--		ldrne	\tmp, =omap_uart_lsr
--		str	\rx, [\tmp, #0]
-+95:		ldr	\rp, =ZOOM_UART_BASE
-+		mrc	p15, 0, \rv, c1, c0
-+		tst	\rv, #1			@ MMU enabled?
-+		ldreq	\rv, =__virt_to_phys(omap_uart_phys)	@ MMU not enabled
-+		ldrne	\rv, =omap_uart_phys	@ MMU enabled
-+		str	\rp, [\rv, #0]
-+		ldr	\rp, =ZOOM_UART_VIRT
-+		add	\rv, \rv, #4		@ omap_uart_virt
-+		str	\rp, [\rv, #0]
-+		mov	\rp, #(UART_LSR << ZOOM_PORT_SHIFT)
-+		add	\rv, \rv, #4		@ omap_uart_lsr
-+		str	\rp, [\rv, #0]
- 		b	10b
- 
- 		/* Store both phys and virt address for the uart */
--98:		add	\rx, \rx, #0x48000000	@ phys base
--		mrc	p15, 0, \tmp, c1, c0
--		tst	\tmp, #1		@ MMU enabled?
--		ldreq	\tmp, =__virt_to_phys(omap_uart_phys)
--		ldrne	\tmp, =omap_uart_phys
--		str	\rx, [\tmp, #0]
--		sub	\rx, \rx, #0x48000000	@ phys base
--		add	\rx, \rx, #0xfa000000	@ virt base
--		ldreq	\tmp, =__virt_to_phys(omap_uart_virt)
--		ldrne	\tmp, =omap_uart_virt
--		str	\rx, [\tmp, #0]
--		mov	\rx, #(UART_LSR << OMAP_PORT_SHIFT)
--		ldreq	\tmp, =__virt_to_phys(omap_uart_lsr)
--		ldrne	\tmp, =omap_uart_lsr
--		str	\rx, [\tmp, #0]
-+98:		add	\rp, \rp, #0x48000000	@ phys base
-+		mrc	p15, 0, \rv, c1, c0
-+		tst	\rv, #1			@ MMU enabled?
-+		ldreq	\rv, =__virt_to_phys(omap_uart_phys)	@ MMU not enabled
-+		ldrne	\rv, =omap_uart_phys	@ MMU enabled
-+		str	\rp, [\rv, #0]
-+		sub	\rp, \rp, #0x48000000	@ phys base
-+		add	\rp, \rp, #0xfa000000	@ virt base
-+		add	\rv, \rv, #4		@ omap_uart_virt
-+		str	\rp, [\rv, #0]
-+		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
-+		add	\rv, \rv, #4		@ omap_uart_lsr
-+		str	\rp, [\rv, #0]
- 
- 		b	10b
- 99:
-@@ -131,9 +130,9 @@ omap_uart_lsr:	.word	0
- 
- 		.macro	busyuart,rd,rx
- 1001:		mrc	p15, 0, \rd, c1, c0
--		tst	\rd, #1		@ MMU enabled?
--		ldreq	\rd, =__virt_to_phys(omap_uart_lsr)
--		ldrne	\rd, =omap_uart_lsr
-+		tst	\rd, #1			@ MMU enabled?
-+		ldreq	\rd, =__virt_to_phys(omap_uart_lsr)	@ MMU not enabled
-+		ldrne	\rd, =omap_uart_lsr	@ MMU enabled
- 		ldr	\rd, [\rd, #0]
- 		ldrb	\rd, [\rx, \rd]
- 		and	\rd, \rd, #(UART_LSR_TEMT | UART_LSR_THRE)
-diff --git a/arch/arm/mach-orion5x/include/mach/debug-macro.S b/arch/arm/mach-orion5x/include/mach/debug-macro.S
-index 91e0e39..5e3bf5b 100644
---- a/arch/arm/mach-orion5x/include/mach/debug-macro.S
-+++ b/arch/arm/mach-orion5x/include/mach/debug-macro.S
-@@ -10,12 +10,11 @@
- 
- #include <mach/orion5x.h>
- 
--	.macro  addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =ORION5X_REGS_PHYS_BASE
--	ldrne	\rx, =ORION5X_REGS_VIRT_BASE
--	orr	\rx, \rx, #0x00012000
-+	.macro  addruart, rp, rv
-+	ldr	\rp, =ORION5X_REGS_PHYS_BASE
-+	ldr	\rv, =ORION5X_REGS_VIRT_BASE
-+	orr	\rp, \rp, #0x00012000
-+	orr	\rv, \rv, #0x00012000
- 	.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-pnx4008/include/mach/debug-macro.S b/arch/arm/mach-pnx4008/include/mach/debug-macro.S
-index 6ca8bd3..931afeb 100644
---- a/arch/arm/mach-pnx4008/include/mach/debug-macro.S
-+++ b/arch/arm/mach-pnx4008/include/mach/debug-macro.S
-@@ -11,12 +11,10 @@
-  *
- */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		mov	\rx, #0x00090000
--		addeq	\rx, \rx, #0x40000000
--		addne	\rx, \rx, #0xf4000000
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00090000
-+		add	\rv, \rp, #0xf4000000	@ virtual
-+		add	\rp, \rp, #0x40000000	@ physical
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-pxa/include/mach/debug-macro.S b/arch/arm/mach-pxa/include/mach/debug-macro.S
-index 01cf813..7d5c751 100644
---- a/arch/arm/mach-pxa/include/mach/debug-macro.S
-+++ b/arch/arm/mach-pxa/include/mach/debug-macro.S
-@@ -13,12 +13,10 @@
- 
- #include "hardware.h"
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x40000000		@ physical
--		movne	\rx, #io_p2v(0x40000000)	@ virtual
--		orr	\rx, \rx, #0x00100000
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00100000
-+		orr	\rv, \rp, #io_p2v(0x40000000)	@ virtual
-+		orr	\rp, \rp, #0x40000000		@ physical
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-realview/include/mach/debug-macro.S b/arch/arm/mach-realview/include/mach/debug-macro.S
-index 8662228..90b687c 100644
---- a/arch/arm/mach-realview/include/mach/debug-macro.S
-+++ b/arch/arm/mach-realview/include/mach/debug-macro.S
-@@ -33,12 +33,10 @@
- #error "Unknown RealView platform"
- #endif
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx,      #0x10000000
--		movne	\rx,      #0xfb000000	@ virtual base
--		orr	\rx, \rx, #DEBUG_LL_UART_OFFSET
-+		.macro	addruart, rp, rv
-+		mov	\rp, #DEBUG_LL_UART_OFFSET
-+		orr	\rv, \rp, #0xfb000000	@ virtual base
-+		orr	\rp, \rp, #0x10000000	@ physical base
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-rpc/include/mach/debug-macro.S b/arch/arm/mach-rpc/include/mach/debug-macro.S
-index 6fc8d66..85effff 100644
---- a/arch/arm/mach-rpc/include/mach/debug-macro.S
-+++ b/arch/arm/mach-rpc/include/mach/debug-macro.S
-@@ -11,13 +11,11 @@
-  *
- */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x03000000
--		movne	\rx, #0xe0000000
--		orr	\rx, \rx, #0x00010000
--		orr	\rx, \rx, #0x00000fe0
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0x00010000
-+		orr	\rp, \rp, #0x00000fe0
-+		orr	\rv, \rp, #0xe0000000	@ virtual
-+		orr	\rp, \rp, #0x03000000	@ physical
- 		.endm
- 
- #define UART_SHIFT	2
-diff --git a/arch/arm/mach-s3c2410/include/mach/debug-macro.S b/arch/arm/mach-s3c2410/include/mach/debug-macro.S
-index 0eef78b..5882dea 100644
---- a/arch/arm/mach-s3c2410/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s3c2410/include/mach/debug-macro.S
-@@ -19,13 +19,12 @@
- #define S3C2410_UART1_OFF (0x4000)
- #define SHIFT_2440TXF (14-9)
- 
--	.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C24XX_PA_UART
--		ldrne	\rx, = S3C24XX_VA_UART
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C24XX_PA_UART
-+		ldr	\rv, = S3C24XX_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-s3c24a0/include/mach/debug-macro.S b/arch/arm/mach-s3c24a0/include/mach/debug-macro.S
-index 239476b..0c5a738 100644
---- a/arch/arm/mach-s3c24a0/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s3c24a0/include/mach/debug-macro.S
-@@ -10,13 +10,12 @@
- #include <mach/map.h>
- #include <plat/regs-serial.h>
- 
--	.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C24XX_PA_UART
--		ldrne	\rx, = S3C24XX_VA_UART
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C24XX_PA_UART
-+		ldr	\rv, = S3C24XX_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S b/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-index f9ab5d2..a29e705 100644
---- a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-@@ -21,13 +21,12 @@
- 	 * aligned and add in the offset when we load the value here.
- 	 */
- 
--	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C_PA_UART
--		ldrne	\rx, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C_PA_UART
-+		ldr	\rv, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-s5p6440/include/mach/debug-macro.S b/arch/arm/mach-s5p6440/include/mach/debug-macro.S
-index 1347d7f..f4c20ee 100644
---- a/arch/arm/mach-s5p6440/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5p6440/include/mach/debug-macro.S
-@@ -19,13 +19,12 @@
- 	 * aligned and add in the offset when we load the value here.
- 	 */
- 
--	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C_PA_UART
--		ldrne	\rx, = S3C_VA_UART
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C_PA_UART
-+		ldr	\rv, = S3C_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-s5p6442/include/mach/debug-macro.S b/arch/arm/mach-s5p6442/include/mach/debug-macro.S
-index bb65361..e221320 100644
---- a/arch/arm/mach-s5p6442/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5p6442/include/mach/debug-macro.S
-@@ -15,13 +15,12 @@
- #include <mach/map.h>
- #include <plat/regs-serial.h>
- 
--	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C_PA_UART
--		ldrne	\rx, = S3C_VA_UART
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C_PA_UART
-+		ldr	\rv, = S3C_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-s5pc100/include/mach/debug-macro.S b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-index 70e02e9..b2ba95d 100644
---- a/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5pc100/include/mach/debug-macro.S
-@@ -22,13 +22,12 @@
- 	 * aligned and add in the offset when we load the value here.
- 	 */
- 
--	.macro addruart, rx, rtmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C_PA_UART
--		ldrne	\rx, = S3C_VA_UART
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C_PA_UART
-+		ldr	\rv, = S3C_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-s5pv210/include/mach/debug-macro.S b/arch/arm/mach-s5pv210/include/mach/debug-macro.S
-index 7872f5c..169fe65 100644
---- a/arch/arm/mach-s5pv210/include/mach/debug-macro.S
-+++ b/arch/arm/mach-s5pv210/include/mach/debug-macro.S
-@@ -21,13 +21,12 @@
- 	 * aligned and add in the offset when we load the value here.
- 	 */
- 
--	.macro addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1
--		ldreq	\rx, = S3C_PA_UART
--		ldrne	\rx, = S3C_VA_UART
-+	.macro addruart, rp, rv
-+		ldr	\rp, = S3C_PA_UART
-+		ldr	\rv, = S3C_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
--		add	\rx, \rx, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
-+		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/mach-sa1100/include/mach/debug-macro.S
-index 336adcc..0cd0fc9 100644
---- a/arch/arm/mach-sa1100/include/mach/debug-macro.S
-+++ b/arch/arm/mach-sa1100/include/mach/debug-macro.S
-@@ -12,33 +12,37 @@
- */
- #include <mach/hardware.h>
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x80000000	@ physical base address
--		movne	\rx, #0xf8000000	@ virtual address
-+		.macro	addruart, rp, rv
-+		mrc	p15, 0, \rp, c1, c0
-+		tst	\rp, #1			@ MMU enabled?
-+		moveq	\rp, #0x80000000	@ physical base address
-+		movne	\rp, #0xf8000000	@ virtual address
- 
- 		@ We probe for the active serial port here, coherently with
- 		@ the comment in arch/arm/mach-sa1100/include/mach/uncompress.h.
- 		@ We assume r1 can be clobbered.
- 
- 		@ see if Ser3 is active
--		add	\rx, \rx, #0x00050000
--		ldr	r1, [\rx, #UTCR3]
--		tst	r1, #UTCR3_TXE
-+		add	\rp, \rp, #0x00050000
-+		ldr	\rv, [\rp, #UTCR3]
-+		tst	\rv, #UTCR3_TXE
- 
- 		@ if Ser3 is inactive, then try Ser1
--		addeq	\rx, \rx, #(0x00010000 - 0x00050000)
--		ldreq	r1, [\rx, #UTCR3]
--		tsteq	r1, #UTCR3_TXE
-+		addeq	\rp, \rp, #(0x00010000 - 0x00050000)
-+		ldreq	\rv, [\rp, #UTCR3]
-+		tsteq	\rv, #UTCR3_TXE
- 
- 		@ if Ser1 is inactive, then try Ser2
--		addeq	\rx, \rx, #(0x00030000 - 0x00010000)
--		ldreq	r1, [\rx, #UTCR3]
--		tsteq	r1, #UTCR3_TXE
-+		addeq	\rp, \rp, #(0x00030000 - 0x00010000)
-+		ldreq	\rv, [\rp, #UTCR3]
-+		tsteq	\rv, #UTCR3_TXE
-+
-+		@ clear top bits, and generate both phys and virt addresses
-+		lsl	\rp, \rp, #8
-+		lsr	\rp, \rp, #8
-+		orr	\rv, \rp, #0xf8000000	@ virtual
-+		orr	\rp, \rp, #0x80000000	@ physical
- 
--		@ if all ports are inactive, then there is nothing we can do
--		moveq	pc, lr
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-shark/include/mach/debug-macro.S b/arch/arm/mach-shark/include/mach/debug-macro.S
-index 5ea24d4..a473f55 100644
---- a/arch/arm/mach-shark/include/mach/debug-macro.S
-+++ b/arch/arm/mach-shark/include/mach/debug-macro.S
-@@ -11,9 +11,10 @@
-  *
- */
- 
--		.macro	addruart, rx, tmp
--		mov	\rx, #0xe0000000
--		orr	\rx, \rx, #0x000003f8
-+		.macro	addruart, rp, rv
-+		mov	\rp, #0xe0000000
-+		orr	\rp, \rp, #0x000003f8
-+		mov	\rv, \rp
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
-index 55a3956..8ea3bff 100644
---- a/arch/arm/mach-tegra/include/mach/debug-macro.S
-+++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
-@@ -20,24 +20,28 @@
- 
- #include <mach/io.h>
- 
--	.macro  addruart,rx, tmp
--        mrc     p15, 0, \rx, c1, c0
--        tst     \rx, #1                 @ MMU enabled?
--        ldreq   \rx, =IO_APB_PHYS       @ physical
--        ldrne   \rx, =IO_APB_VIRT        @ virtual
-+	.macro  addruart, rp, rv
-+        ldreq   \rp, =IO_APB_PHYS       @ physical
-+        ldrne   \rv, =IO_APB_VIRT        @ virtual
- #if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
- #error "A debug UART must be selected in the kernel config to use DEBUG_LL"
- #elif defined(CONFIG_TEGRA_DEBUG_UARTA)
--        orr     \rx, \rx, #0x6000
-+        orr     \rp, \rp, #0x6000
-+        orr     \rv, \rv, #0x6000
- #elif defined(CONFIG_TEGRA_DEBUG_UARTB)
--	ldr	\tmp, =0x6040
--        orr     \rx, \rx, \tmp
-+        orr     \rp, \rp, #0x6000
-+	orr	\rp, \rp, #0x40
-+        orr     \rv, \rv, #0x6000
-+	orr	\rv, \rv, #0x40
- #elif defined(CONFIG_TEGRA_DEBUG_UARTC)
--        orr     \rx, \rx, #0x6200
-+        orr     \rp, \rp, #0x6200
-+        orr     \rv, \rv, #0x6200
- #elif defined(CONFIG_TEGRA_DEBUG_UARTD)
--        orr     \rx, \rx, #0x6300
-+        orr     \rp, \rp, #0x6300
-+        orr     \rv, \rv, #0x6300
- #elif defined(CONFIG_TEGRA_DEBUG_UARTE)
--        orr     \rx, \rx, #0x6400
-+        orr     \rp, \rp, #0x6400
-+        orr     \rv, \rv, #0x6400
- #endif
- 	.endm
- 
-diff --git a/arch/arm/mach-u300/include/mach/debug-macro.S b/arch/arm/mach-u300/include/mach/debug-macro.S
-index 92c1242..df71570 100644
---- a/arch/arm/mach-u300/include/mach/debug-macro.S
-+++ b/arch/arm/mach-u300/include/mach/debug-macro.S
-@@ -10,13 +10,12 @@
-  */
- #include <mach/hardware.h>
- 
--	.macro	addruart, rx, tmp
-+	.macro	addruart, rp, rv
- 	/* If we move the address using MMU, use this. */
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1			@ MMU enabled?
--	ldreq	\rx,	  = U300_SLOW_PER_PHYS_BASE @ MMU off, physical address
--	ldrne	\rx,	  = U300_SLOW_PER_VIRT_BASE @ MMU on, virtual address
--	orr	\rx, \rx, #0x00003000
-+	ldr	\rp,	  = U300_SLOW_PER_PHYS_BASE @ MMU off, physical address
-+	ldr	\rv,	  = U300_SLOW_PER_VIRT_BASE @ MMU on, virtual address
-+	orr	\rp, \rp, #0x00003000
-+	orr	\rv, \rv, #0x00003000
- 	.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-ux500/include/mach/debug-macro.S b/arch/arm/mach-ux500/include/mach/debug-macro.S
-index c5203b7..be7c0f1 100644
---- a/arch/arm/mach-ux500/include/mach/debug-macro.S
-+++ b/arch/arm/mach-ux500/include/mach/debug-macro.S
-@@ -18,11 +18,9 @@
- #define UX500_UART(n)	__UX500_UART(n)
- #define UART_BASE	UX500_UART(CONFIG_UX500_DEBUG_UART)
- 
--	.macro	addruart, rx, tmp
--	mrc	p15, 0, \rx, c1, c0
--	tst	\rx, #1					@ MMU enabled?
--	ldreq	\rx, =UART_BASE				@ no, physical address
--	ldrne	\rx, =IO_ADDRESS(UART_BASE)		@ yes, virtual address
-+	.macro	addruart, rp, rv
-+	ldr	\rp, =UART_BASE				@ no, physical address
-+	ldr	\rv, =IO_ADDRESS(UART_BASE)		@ yes, virtual address
- 	.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-versatile/include/mach/debug-macro.S b/arch/arm/mach-versatile/include/mach/debug-macro.S
-index 6fea719..eb2cf7d 100644
---- a/arch/arm/mach-versatile/include/mach/debug-macro.S
-+++ b/arch/arm/mach-versatile/include/mach/debug-macro.S
-@@ -11,13 +11,11 @@
-  *
- */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx,      #0x10000000
--		movne	\rx,      #0xf1000000	@ virtual base
--		orr	\rx, \rx, #0x001F0000
--		orr	\rx, \rx, #0x00001000
-+		.macro	addruart, rp, rv
-+		mov	\rp,      #0x001F0000
-+		orr	\rp, \rp, #0x00001000
-+		orr	\rv, \rp, #0xf1000000	@ virtual base
-+		orr	\rp, \rp,  #0x10000000	@ physical base
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-vexpress/include/mach/debug-macro.S b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-index 5167e2a..050d65e 100644
---- a/arch/arm/mach-vexpress/include/mach/debug-macro.S
-+++ b/arch/arm/mach-vexpress/include/mach/debug-macro.S
-@@ -12,12 +12,10 @@
- 
- #define DEBUG_LL_UART_OFFSET	0x00009000
- 
--		.macro	addruart,rx,tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx,      #0x10000000
--		movne	\rx,      #0xf8000000	@ virtual base
--		orr	\rx, \rx, #DEBUG_LL_UART_OFFSET
-+		.macro	addruart,rp,rv
-+		mov	\rp, #DEBUG_LL_UART_OFFSET
-+		orr	\rv, \rp, #0xf8000000	@ virtual base
-+		orr	\rp, \rp, #0x10000000	@ physical base
- 		.endm
- 
- #include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-index 2560640..d56213f 100644
---- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-@@ -62,11 +62,9 @@
- #define UART_PADDR	MXC91231_UART2_BASE_ADDR
- #define UART_VADDR	MXC91231_IO_ADDRESS(MXC91231_UART2_BASE_ADDR)
- #endif
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		ldreq	\rx, =UART_PADDR	@ physical
--		ldrne	\rx, =UART_VADDR	@ virtual
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =UART_PADDR	@ physical
-+		ldr	\rv, =UART_VADDR	@ virtual
- 		.endm
- 
- 		.macro	senduart,rd,rx
-diff --git a/arch/arm/plat-spear/include/plat/debug-macro.S b/arch/arm/plat-spear/include/plat/debug-macro.S
-index 37fa593..e91270e 100644
---- a/arch/arm/plat-spear/include/plat/debug-macro.S
-+++ b/arch/arm/plat-spear/include/plat/debug-macro.S
-@@ -14,11 +14,9 @@
- #include <linux/amba/serial.h>
- #include <mach/spear.h>
- 
--		.macro	addruart, rx
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1					@ MMU enabled?
--		moveq	\rx, #SPEAR_DBG_UART_BASE		@ Physical base
--		movne	\rx, #VA_SPEAR_DBG_UART_BASE		@ Virtual base
-+		.macro	addruart, rp, rv
-+		mov	\rp, #SPEAR_DBG_UART_BASE		@ Physical base
-+		mov	\rv, #VA_SPEAR_DBG_UART_BASE		@ Virtual base
- 		.endm
- 
- 		.macro	senduart, rd, rx
-diff --git a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S b/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
-index 1b9348b..d3a0985 100644
---- a/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
-+++ b/arch/arm/plat-stmp3xxx/include/mach/debug-macro.S
-@@ -16,13 +16,10 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
--		.macro	addruart, rx, tmp
--		mrc	p15, 0, \rx, c1, c0
--		tst	\rx, #1			@ MMU enabled?
--		moveq	\rx, #0x80000000	@ physical base address
--		addeq	\rx, \rx, #0x00070000
--		movne	\rx, #0xf0000000	@ virtual base
--		addne	\rx, \rx, #0x00070000
-+		.macro	addruart, rp, rv
-+		mov	\rp,      #0x00070000
-+		add	\rv, \rp, #0xf0000000	@ virtual base
-+		add	\rp, \rp, #0x80000000	@ physical base
- 		.endm
- 
- 		.macro	senduart,rd,rx
+
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
