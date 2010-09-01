@@ -1,25 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Sep 2010 12:16:02 +0100
-Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
-In-Reply-To: <AANLkTi=akjQ2wUp7h4gJfsn52BozMprVn9oKygec-0DU@mail.gmail.com>
-References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
-	<20100820095351.GD13668@rakim.wolfsonmicro.main>
-	<1282301229.3084.152.camel@odin>
-	<011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
-	<20100901091519.GA17032@opensource.wolfsonmicro.com>
-	<000801cb49ba$3e1e50f0$ba5af2d0$%kim@samsung.com>
-	<AANLkTinUNXmDc=H16gS5EXEAdrGAU=zK4cjsHSh7UQ8Q@mail.gmail.com>
-	<001101cb49c0$3fd715c0$bf854140$%kim@samsung.com>
-	<AANLkTi=akjQ2wUp7h4gJfsn52BozMprVn9oKygec-0DU@mail.gmail.com>
-Message-ID: <20100901111602.GF17548@opensource.wolfsonmicro.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 1 Sep 2010 13:18:46 +0200
+Subject: [RFC] [PATCH] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <20100901095121.GA11107@pengutronix.de>
+References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
+	<20100901095121.GA11107@pengutronix.de>
+Message-ID: <20100901111846.GF22790@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 01, 2010 at 07:36:40PM +0900, Kyungmin Park wrote:
+> >  
+> > -struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+> > -	const char *dev_fmt, ...)
+> > +struct clk_lookup * __init_refok
+> Why do you need __init_refok?  __init_refok is defined as follows in
+> include/linux/init.h:
+> 
+> 	/* compatibility defines */
+> 	#define __init_refok     __ref
+> 
+> So if really needed better use __ref.  Couldn't this be __init?  
+ok for __ref but __init_refok is more clear IMHO
+and yes we need it as for early device we may use bootmem as slab allocators
+may no be availlable in some case
 
-> As your word, first check the ID1 to detect the 8649 and 8952 and read
-> ID2 again to distinguish it. But actually we pass the max8952 as
-> platform device, so don't need to read ID2.
-
-If you can read the ID from the chip it's always good to do so in order
-to verify that the user has supplied accurate information.
+Best Regards,
+J.
