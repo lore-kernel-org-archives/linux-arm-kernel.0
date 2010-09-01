@@ -1,46 +1,52 @@
 From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 1 Sep 2010 15:07:48 +0200
-Subject: [PATCH] oprofile, x86: fix init_sysfs error handling
-In-Reply-To: <20100901095117.GA4246@elte.hu>
-References: <1283107921-21464-1-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-2-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-3-git-send-email-will.deacon@arm.com>
-	<1283107921-21464-4-git-send-email-will.deacon@arm.com>
-	<20100830090929.GU22783@erda.amd.com>
-	<1283244880.645.17.camel@e102144-lin.cambridge.arm.com>
-	<20100831090518.GZ22783@erda.amd.com>
-	<1283247089.4063.2.camel@e102144-lin.cambridge.arm.com>
-	<20100831103001.GC22783@erda.amd.com>
-	<20100901095117.GA4246@elte.hu>
-Message-ID: <20100901130748.GK22783@erda.amd.com>
+Date: Wed, 1 Sep 2010 14:50:50 +0200
+Subject: [PATCH] oprofile, x86: fix init_sysfs() function stub
+Message-ID: <mailman.216.1283347789.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.09.10 05:51:17, Ingo Molnar wrote:
-> > @@ -774,7 +781,10 @@ int __init op_nmi_init(struct oprofile_operations *ops)
-> >  
-> >  	mux_init(ops);
-> >  
-> > -	init_sysfs();
-> > +	ret = init_sysfs();
-> 
-> FYI, this causes a build error if CONFIG_PM is off:
-> 
->    arch/x86/oprofile/nmi_int.c:784: error: expected expression before ?do?
-> 
-> Due to this assymetric form of the wrapper:
-> 
->   #define init_sysfs() do { } while (0)
-> 
-> The wrapper should be changed to return 0 i suspect, via something like 
-> this:
-> 
->   static inline int init_sysfs(void) { return 0; }
-> 
-> (untested)
+The use of the return value of init_sysfs() with commit
 
-Ingo, thanks for catching this, fix below.
+ 10f0412 oprofile, x86: fix init_sysfs error handling
 
--Robert
+discovered the following build error for !CONFIG_PM:
 
---
+ .../linux/arch/x86/oprofile/nmi_int.c: In function =E2=80=98op_nmi_init=E2=
+=80=99:
+ .../linux/arch/x86/oprofile/nmi_int.c:784: error: expected expression be=
+fore =E2=80=98do=E2=80=99
+ make[2]: *** [arch/x86/oprofile/nmi_int.o] Error 1
+ make[1]: *** [arch/x86/oprofile] Error 2
+
+This patch fixes this.
+
+Reported-by: Ingo Molnar <mingo@elte.hu>
+Signed-off-by: Robert Richter <robert.richter@amd.com>
+---
+ arch/x86/oprofile/nmi_int.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/x86/oprofile/nmi_int.c b/arch/x86/oprofile/nmi_int.c
+index 73a41d3..cfe4faa 100644
+--- a/arch/x86/oprofile/nmi_int.c
++++ b/arch/x86/oprofile/nmi_int.c
+@@ -585,8 +585,10 @@ static void exit_sysfs(void)
+ }
+=20
+ #else
+-#define init_sysfs() do { } while (0)
+-#define exit_sysfs() do { } while (0)
++
++static inline int  init_sysfs(void) { return 0; }
++static inline void exit_sysfs(void) { }
++
+ #endif /* CONFIG_PM */
+=20
+ static int __init p4_init(char **cpu_type)
+--=20
+1.7.1.1
+
+
+--=20
+Advanced Micro Devices, Inc.
+Operating System Research Center
