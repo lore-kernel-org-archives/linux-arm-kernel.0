@@ -1,35 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Sep 2010 08:17:01 +0100
-Subject: ptrace(PTRACE_PEEKUSER, ..., PT_TEXT_ADDR, ...)
-In-Reply-To: <20100820124118.GC6950@richter>
-References: <20100820124118.GC6950@richter>
-Message-ID: <20100901071701.GC8142@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed,  1 Sep 2010 16:09:13 +0900
+Subject: [PATCH 06/13] ARM: S5P64X0: Update Timer support
+In-Reply-To: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1283324960-21629-7-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 20, 2010 at 02:41:28PM +0200, Simon Richter wrote:
-> when patching gdbserver to work on MMUless ARM systems I found that
-> there are two definitions for the magic values for PT_TEXT_ADDR (and the
-> related fields) in different Linux versions. uClinux 2.4 kernels use
-> values starting from 0xc4 (the same as the Coldfire port), while 2.6
-> based kernels use magic numbers starting from 0x10000, which were
-> introduced in 68b7f7153fa58df710924fbb79722717d2d16094 .
-> 
-> As has been pointed out by Andreas Schwab from SuSE, the code
-> responsible for returning the text segment address is never reached
-> because the lines immediately before the code added in the commit
-> already filter these out and return -EIO.
+This patch updates timer support for S5P6440 and S5P6450 SoCs.
 
-I've always regarded this PT_* stuff as a hack around the problem at
-hand - and as you point out below...
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ .../include/mach/pwm-clock.h                       |   10 ++++------
+ .../include/mach/tick.h                            |   13 +++++++++----
+ 2 files changed, 13 insertions(+), 10 deletions(-)
+ rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/include/mach/pwm-clock.h (86%)
+ rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/include/mach/tick.h (60%)
 
-> So apparently the new values have never really been in use (so I
-> wouldn't consider them part of the kernel interface), and the old values
-> now point to something else (because VFP registers were added to struct
-> user).
-
-... it has the potential to break horribly when the original API is
-extended through additional hardware features.
-
-Maybe this is something which should be fixed properly by introducing
-a proper cross-arch API for getting this information.
+diff --git a/arch/arm/mach-s5p6440/include/mach/pwm-clock.h b/arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
+similarity index 86%
+rename from arch/arm/mach-s5p6440/include/mach/pwm-clock.h
+rename to arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
+index 6a2a02f..19fff8b 100644
+--- a/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
++++ b/arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
+@@ -1,16 +1,14 @@
+-/* linux/arch/arm/mach-s5p6440/include/mach/pwm-clock.h
++/* linux/arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
+  *
+- * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
++ * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
+  *      Ben Dooks <ben@simtec.co.uk>
+  *      http://armlinux.simtec.co.uk/
+  *
+- * Based on arch/arm/mach-s3c64xx/include/mach/pwm-clock.h
+- *
+- * S5P6440 - pwm clock and timer support
++ * S5P64X0 - pwm clock and timer support
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+diff --git a/arch/arm/mach-s5p6440/include/mach/tick.h b/arch/arm/mach-s5p64x0/include/mach/tick.h
+similarity index 60%
+rename from arch/arm/mach-s5p6440/include/mach/tick.h
+rename to arch/arm/mach-s5p64x0/include/mach/tick.h
+index 2f25c7f..00aa7f1 100644
+--- a/arch/arm/mach-s5p6440/include/mach/tick.h
++++ b/arch/arm/mach-s5p64x0/include/mach/tick.h
+@@ -1,9 +1,14 @@
+-/* linux/arch/arm/mach-s5p6440/include/mach/tick.h
++/* linux/arch/arm/mach-s5p64x0/include/mach/tick.h
+  *
+- * Copyright (c) 2009 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
++ * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
+  *
+- * S5P6440 - Timer tick support definitions
++ * Copyright 2008 Openmoko, Inc.
++ * Copyright 2008 Simtec Electronics
++ *	http://armlinux.simtec.co.uk/
++ *	Ben Dooks <ben@simtec.co.uk>
++ *
++ * S5P64X0 - Timer tick support definitions
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+-- 
+1.6.2.5
