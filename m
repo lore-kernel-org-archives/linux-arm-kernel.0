@@ -1,56 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Sep 2010 11:01:55 +0100
-Subject: [RFC] [PATCH] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20100901100155.GN8142@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 01 Sep 2010 19:05:39 +0900
+Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
+In-Reply-To: <20100901094826.GA28490@sirena.org.uk>
+References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
+	<20100820095351.GD13668@rakim.wolfsonmicro.main>
+	<1282301229.3084.152.camel@odin>
+	<011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
+	<20100901091519.GA17032@opensource.wolfsonmicro.com>
+	<000801cb49ba$3e1e50f0$ba5af2d0$%kim@samsung.com>
+	<20100901094826.GA28490@sirena.org.uk>
+Message-ID: <000901cb49bd$3df19440$b9d4bcc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 31, 2010 at 01:16:42PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> diff --git a/arch/arm/include/asm/lookup_clkdev.h b/arch/arm/include/asm/lookup_clkdev.h
-> new file mode 100644
-> index 0000000..d57f7a6
-> --- /dev/null
-> +++ b/arch/arm/include/asm/lookup_clkdev.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + *  arch/arm/common/clkdev.c
-> + *
-> + *  Copyright (C) 2008 Russell King.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Helper for the clk API to assist looking up a struct clk.
-> + */
-> +
-> +#ifndef __LOOKUP_CLK_DEV__
-> +#define __LOOKUP_CLK_DEV__
-> +
-> +#include <mach/clkdev.h>
-> +
-> +static __inline__ struct clk_lookup_alloc *arch_kzalloc(size_t size)
+Mark Brown wrote:
+> 
+> On Wed, Sep 01, 2010 at 06:44:11PM +0900, Kukjin Kim wrote:
+> 
+> > MM...but I'm not sure if I can submit other patch for max8952...
+> > Actually, Mr. Ham's max8952 code has been applied by Liam.
+> 
+> We can always remove that if it makes more sense to combine the code.
+> 
+> > -	return (MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP);
+> > +	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
+> > +	int ret = MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP;
+> > +
+> > +	if (!strcmp(info->i2c->name, "max8952"))
+> 
+> Rather than doing a strcmp on the name you should use the id field here:
+> 
+Ok..will fix it.
 
-No need to use __inline__ here - use inline instead.
+> >  static const struct i2c_device_id max8649_id[] = {
+> >  	{ "max8649", 0 },
+> > +	{ "max8952", 0 },
+> >  	{ }
+> >  };
+> 
+> to pass in a value which you compare against.  While it's probably not a
+> performance issue on this chip this is much clearer and more idiomatic.
 
-> +static __inline__ struct clk_lookup_alloc *arch_kzalloc(size_t size)
+Thanks for your review and suggestion.
+Will submit as per your comments.
 
-Ditto.
+Thanks.
 
-> @@ -120,12 +124,12 @@ struct clk_lookup_alloc {
->  	char	con_id[MAX_CON_ID];
->  };
->  
-> -struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
-> -	const char *dev_fmt, ...)
-> +struct clk_lookup * __init_refok
-> +clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
-
-This looks like a nasty hack to get around the problem of calling a
-boot-time only allocator - but I guess given what sh is doing we don't
-have much choice here.
-
-The choice of 'arch_kzalloc' is imho very poor - it potentially could
-clash with some other use.  Maybe __clkdev_alloc() instead?
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
