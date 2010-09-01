@@ -1,124 +1,79 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu,  2 Sep 2010 00:26:48 +0300
-Subject: [PATCH v5 5/7] wireless: wl1271: make ref_clock configurable by board
+Date: Thu,  2 Sep 2010 00:26:50 +0300
+Subject: [PATCH v5 7/7] omap: zoom: add mmc3/wl1271 device support
 In-Reply-To: <1283376410-9999-1-git-send-email-ohad@wizery.com>
 References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
-Message-ID: <1283376410-9999-6-git-send-email-ohad@wizery.com>
+Message-ID: <1283376410-9999-8-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wl1271 device is using a reference clock that may change
-between board to board.
+Add MMC3 support on ZOOM, which is hardwired to the wl1271 device.
 
-Make the ref_clock parameter configurable by the board
-files that set up the device, instead of having a hard coded
-value in the driver source itself.
+The wl1271 is a 4-wire, 1.8V, embedded SDIO WLAN device with an
+external IRQ line, and power-controlled by a GPIO-based fixed regulator.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/net/wireless/wl12xx/wl1271.h      |    1 +
- drivers/net/wireless/wl12xx/wl1271_boot.c |    9 +++++----
- drivers/net/wireless/wl12xx/wl1271_boot.h |    1 -
- drivers/net/wireless/wl12xx/wl1271_sdio.c |    1 +
- drivers/net/wireless/wl12xx/wl1271_spi.c  |    2 ++
- include/linux/wl12xx.h                    |    1 +
- 6 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/wireless/wl12xx/wl1271.h b/drivers/net/wireless/wl12xx/wl1271.h
-index faa5925..4134f44 100644
---- a/drivers/net/wireless/wl12xx/wl1271.h
-+++ b/drivers/net/wireless/wl12xx/wl1271.h
-@@ -330,6 +330,7 @@ struct wl1271 {
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index de88635..7ee5663 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -17,6 +17,7 @@
+ #include <linux/i2c/twl.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
++#include <linux/wl12xx.h>
  
- 	void (*set_power)(bool enable);
- 	int irq;
-+	int ref_clock;
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -29,6 +30,7 @@
+ #include "hsmmc.h"
  
- 	spinlock_t wl_lock;
+ #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
++#define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
  
-diff --git a/drivers/net/wireless/wl12xx/wl1271_boot.c b/drivers/net/wireless/wl12xx/wl1271_boot.c
-index f36430b..95c636a 100644
---- a/drivers/net/wireless/wl12xx/wl1271_boot.c
-+++ b/drivers/net/wireless/wl12xx/wl1271_boot.c
-@@ -457,17 +457,18 @@ int wl1271_boot(struct wl1271 *wl)
- {
- 	int ret = 0;
- 	u32 tmp, clk, pause;
-+	int ref_clock = wl->ref_clock;
- 
- 	wl1271_boot_hw_version(wl);
- 
--	if (REF_CLOCK == 0 || REF_CLOCK == 2 || REF_CLOCK == 4)
-+	if (ref_clock == 0 || ref_clock == 2 || ref_clock == 4)
- 		/* ref clk: 19.2/38.4/38.4-XTAL */
- 		clk = 0x3;
--	else if (REF_CLOCK == 1 || REF_CLOCK == 3)
-+	else if (ref_clock == 1 || ref_clock == 3)
- 		/* ref clk: 26/52 */
- 		clk = 0x5;
- 
--	if (REF_CLOCK != 0) {
-+	if (ref_clock != 0) {
- 		u16 val;
- 		/* Set clock type (open drain) */
- 		val = wl1271_top_reg_read(wl, OCP_REG_CLK_TYPE);
-@@ -516,7 +517,7 @@ int wl1271_boot(struct wl1271 *wl)
- 	wl1271_debug(DEBUG_BOOT, "clk2 0x%x", clk);
- 
- 	/* 2 */
--	clk |= (REF_CLOCK << 1) << 4;
-+	clk |= (ref_clock << 1) << 4;
- 	wl1271_write32(wl, DRPW_SCRATCH_START, clk);
- 
- 	wl1271_set_partition(wl, &part_table[PART_WORK]);
-diff --git a/drivers/net/wireless/wl12xx/wl1271_boot.h b/drivers/net/wireless/wl12xx/wl1271_boot.h
-index f829699..f73b0b1 100644
---- a/drivers/net/wireless/wl12xx/wl1271_boot.h
-+++ b/drivers/net/wireless/wl12xx/wl1271_boot.h
-@@ -46,7 +46,6 @@ struct wl1271_static_data {
- /* delay between retries */
- #define INIT_LOOP_DELAY 50
- 
--#define REF_CLOCK            2
- #define WU_COUNTER_PAUSE_VAL 0x3FF
- #define WELP_ARM_COMMAND_VAL 0x4
- 
-diff --git a/drivers/net/wireless/wl12xx/wl1271_sdio.c b/drivers/net/wireless/wl12xx/wl1271_sdio.c
-index 7f4461c..824b9e8 100644
---- a/drivers/net/wireless/wl12xx/wl1271_sdio.c
-+++ b/drivers/net/wireless/wl12xx/wl1271_sdio.c
-@@ -211,6 +211,7 @@ static int __devinit wl1271_probe(struct sdio_func *func,
- 	}
- 
- 	wl->irq = wlan_data.irq;
-+	wl->ref_clock = wlan_data.board_ref_clock;
- 
- 	ret = request_irq(wl->irq, wl1271_irq, 0, DRIVER_NAME, wl);
- 	if (ret < 0) {
-diff --git a/drivers/net/wireless/wl12xx/wl1271_spi.c b/drivers/net/wireless/wl12xx/wl1271_spi.c
-index de56d8d..ced0a9e 100644
---- a/drivers/net/wireless/wl12xx/wl1271_spi.c
-+++ b/drivers/net/wireless/wl12xx/wl1271_spi.c
-@@ -372,6 +372,8 @@ static int __devinit wl1271_probe(struct spi_device *spi)
- 		goto out_free;
- 	}
- 
-+	wl->ref_clock = pdata->board_ref_clock;
-+
- 	wl->irq = spi->irq;
- 	if (wl->irq < 0) {
- 		wl1271_error("irq missing in platform data");
-diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
-index 3e33ae1..0116d88 100644
---- a/include/linux/wl12xx.h
-+++ b/include/linux/wl12xx.h
-@@ -29,6 +29,7 @@ struct wl12xx_platform_data {
- 	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
- 	int irq;
- 	bool use_eeprom;
-+	int board_ref_clock;
+ /* Zoom2 has Qwerty keyboard*/
+ static int board_keymap[] = {
+@@ -185,6 +187,12 @@ static struct platform_device omap_vwlan_device = {
+ 	},
  };
  
- int wl12xx_set_platform_data(const struct wl12xx_platform_data *data);
++struct wl12xx_platform_data omap_zoom_wlan_data = {
++	.irq = OMAP_GPIO_IRQ(OMAP_ZOOM_WLAN_IRQ_GPIO),
++	/* ZOOM ref clock is 26 MHz */
++	.board_ref_clock = 1,
++};
++
+ static struct omap2_hsmmc_info mmc[] __initdata = {
+ 	{
+ 		.name		= "external",
+@@ -202,6 +210,14 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
+ 		.nonremovable	= true,
+ 		.power_saving	= true,
+ 	},
++	{
++		.name		= "wl1271",
++		.mmc		= 3,
++		.wires		= 4,
++		.gpio_wp	= -EINVAL,
++		.gpio_cd	= -EINVAL,
++		.nonremovable	= true,
++	},
+ 	{}      /* Terminator */
+ };
+ 
+@@ -313,6 +329,9 @@ static void enable_board_wakeup_source(void)
+ 
+ void __init zoom_peripherals_init(void)
+ {
++	if (wl12xx_set_platform_data(&omap_zoom_wlan_data))
++		pr_err("error setting wl12xx data\n");
++
+ 	omap_i2c_init();
+ 	platform_device_register(&omap_vwlan_device);
+ 	usb_musb_init(&musb_board_data);
 -- 
 1.7.0.4
