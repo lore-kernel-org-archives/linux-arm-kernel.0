@@ -1,84 +1,110 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 1 Sep 2010 11:10:46 +0900
-Subject: [PATCH 3/3] ARM: Samsung S3C: Move/use the S3C common GPIO IRQ
-	type
-In-Reply-To: <011701cb4967$1ee563c0$5cb02b40$%kim@samsung.com>
-References: <20100830114729.GA13150@july>
-	<006301cb483c$434f76f0$c9ee64d0$%kim@samsung.com>
-	<AANLkTimxhFtfB8G-z=04zj7ZRq+f7GDaVX5mzgCENuvx@mail.gmail.com>
-	<011701cb4967$1ee563c0$5cb02b40$%kim@samsung.com>
-Message-ID: <AANLkTinQeBDU=0D1WgBJHHsgtWH3V0w1bdgBWPSVgBb+@mail.gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Wed, 01 Sep 2010 11:46:34 +0900
+Subject: [PATCH] serial: samsung: fix device name
+In-Reply-To: <012b01cb4977$72adf4d0$5809de70$%kim@samsung.com>
+References: <20100805201000.14030.34703.stgit@darius-desktop>
+	<AANLkTikp2ThBqF2jkU4CXS9-iYRoy3AWpeqWXjmLF6Gd@mail.gmail.com>
+	<4C5BAFF6.10606@gmail.com> <4C5BB462.6010409@samsung.com>
+	<008701cb3538$54a12a00$fde37e00$%kim@samsung.com>
+	<4C7B5838.7060605@gmail.com>
+	<012b01cb4977$72adf4d0$5809de70$%kim@samsung.com>
+Message-ID: <4C7DBE8A.5050709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 1, 2010 at 8:49 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kyungmin Park wrote:
+On 2010-09-01 ?? 10:46, Kukjin Kim wrote:
+> Darius Augulis wrote:
 >>
->> On Mon, Aug 30, 2010 at 9:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Kyungmin Park wrote:
->> >>
->> >> From: Kyungmin Park <kyungmin.park@samsung.com>
->> >>
->> >> Samsung S3C series have the common GPIO IRQ type for all S3C series.
->> >>
->> > I can't agree with your changing name. Why do you want to change the
-> name?
->> > If you want to move S3C2410_EXTINT_XXX from regs-irqtype.h, just move
->> > without any changes.
->> As S5P series change the name conversion. I will also modify the s3c
-> series.
+>> Hi Kukjin,
 >>
-> I think that we don?t need to change for it.
-> And as you see, there is no difference between S3C2410_XXX and S3C_XXX.
->> >
->> > But I'm still thinking why should we move the external interrupt
-> definitions
->> > to plat/gpio-core.h...
->>
->> To use the GPIO interrupt. these definitions are used both external
->> interrupt and GPIO interrupt.
+> Hi ;-)
 >
->
->> >
->> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> >> ---
->
-> (snip)
->
->> >>
->> >> +#define S3C_GPIO_LEVEL_LOW ? ? ? ? ? (0x00)
->> >> +#define S3C_GPIO_LEVEL_HIGH ? ? ? ? ?(0x01)
->> >> +#define S3C_GPIO_EDGE_FALLING ? ? ? ? ? ? ? ?(0x02)
->> >> +#define S3C_GPIO_EDGE_RISING ? ? ? ? (0x04)
->> >> +#define S3C_GPIO_EDGE_BOTH ? ? ? ? ? (0x06)
->> >> +
->> > GPIO_LELVEL? GPIO_EDGE?...
->> >
->> > I think EXTINT_LEVEL_XXX and EXTINT_EDGE_XXX are more clear.
+>> please pick up this one to your tree too.
 >>
->> ?? ? ? case IRQ_TYPE_EDGE_BOTH:
->> ?? ? ? ? ? ? newvalue = S3C_GPIO_EDGE_BOTH;
->>
->> Don't you it's more clear?
->>
-> I don't think so, I meant that it is used for external interrupt not gpio.
-> And it used currently for external interrupt.
-I also don't think so. GPIO interrupt has the same function and no
-need to bind these name to external interrupt.
+>
+> As I still thinking, this should be handled by Ben Dooks.
+>
+> And please refer to below Ben's comments about this.
+>
 
-At the spec. no difference between external interrupt and gpios. As
-you don't use the GPIO interrupts. don't say it's for external
-interrupt.
+I am really wondering your opinion about this fix. Why should handle 
+only by Ben? This is obvious bug fix if you think so, you can handle it too.
 
+>> Thanks,
+>>
+>> Darius.
+>>
+>> On 08/06/2010 10:23 AM, Kukjin Kim wrote:
+>>> Joonyoung Shim wrote:
+>>>>
+>>>> On 8/6/2010 3:47 PM, Paulius Zaleckas wrote:
+>>>>> On 08/06/2010 03:04 AM, Kyungmin Park wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> It's already posted by Mr. Shim
+>>>>>> http://marc.info/?l=linux-arm-kernel&m=127410047306149&w=2
+>>>>>
+>>>>> Darius patch is a little bit cleaner.
+>>>>>
+>>>>
+>>>> OK, it's better.
+>>>>
+>>>> Acked-by: Joonyoung Shim<jy0922.shim@samsung.com>
+>>>>
+>>>
+>>> Hi all,
+>>>
+>>> I think, this should be handled by Ben Dooks....
+>>> As Kyungmin Park said, there was his comment about this.
+>>>
+>>> This is just for your information....
+>>>
+>>> ===
+>>>
+>>> On Tue, May 18, 2010 at 12:52:13PM +0900, Joonyoung Shim wrote:
+>>>> On 5/18/2010 11:48 AM, Ben Dooks wrote:
+>>>>> On Mon, May 17, 2010 at 09:46:50PM +0900, Joonyoung Shim wrote:
+>>>>>> Thd dev_name and driver_name should be switched each other.
+>>>>>
+>>>>> Hmm, this doesn't seem to have appeard on the linux-arm-kernel list
+> yet.
+>>>>>
+>>>>> Please provide some information about what problem that this is fixing
+>>>>> and the impact on any existing systems.
+>>>>>
+>>>>
+>>>> The serial device nodes are created to s3c2410_serial* on android
+>>>> platform instead of ttySAC*.
+>>>
+>>> This has been how they've been for ages, surely the android device node
+>>> creation sytstem supports symlinking /dev/SACx ->   /dev/s3c2410_serialx,
+>>> like many other operating sysyerms that can already do this.
+>>>
+>>> Changing this just because android (something as-yet unmerged into
+> mainline)
+>>> does not like it. I'm not even happy with an #ifdef around this.
+>>>
+>>> If you really feel this is a problem that you absolutely must fix in
+> kernel
+>>> then please provide a kernel commandline option to change the serial
+> driver
+>>> name and use that on any platform that needs it. Another way would be to
+>>> update the serial platform data to have a field for which name to
+> choose.
+>>>
 >
-> So, I said that no need to change it now.
 >
 > Thanks.
 >
 > Best regards,
 > Kgene.
 > --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> Kukjin Kim<kgene.kim@samsung.com>, Senior Engineer,
 > SW Solution Development Team, Samsung Electronics Co., Ltd.
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
