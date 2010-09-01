@@ -1,47 +1,95 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 1 Sep 2010 23:08:14 +0300
-Subject: [RFC/PATCH 3/6] mmc: add general runtime PM support
-In-Reply-To: <CE761E84DADF2947A4AF22FB8D97A4732A516CE8@shsmsx501.ccr.corp.intel.com>
-References: <1281532770-27545-1-git-send-email-ohad@wizery.com>
-	<1281532770-27545-4-git-send-email-ohad@wizery.com>
-	<CE761E84DADF2947A4AF22FB8D97A4732A516CE8@shsmsx501.ccr.corp.intel.com>
-Message-ID: <AANLkTi=4U0AwLeXg=fSUViGvaCnJeXGYvJ=7pkGK+fFX@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 02 Sep 2010 08:55:01 +1200
+Subject: [PATCH] ep93xx: move clock initialization earlier
+In-Reply-To: <1283363460-25825-1-git-send-email-mika.westerberg@iki.fi>
+References: <1283363460-25825-1-git-send-email-mika.westerberg@iki.fi>
+Message-ID: <4C7EBDA5.1080601@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yunpeng,
+On 09/02/2010 05:51 AM, Mika Westerberg wrote:
+> Commit 7cfe24947 ("ARM: AMBA: Add pclk support to AMBA bus infrastructure")
+> changed AMBA bus to handle the PCLK automatically. However, in EP93xx clock
+> initialization is arch_initcall() which is done later than AMBA device
+> identification. This causes amba_get_enable_pclk() to fail resulting device
+> where UARTs are not functional.
+> 
+> So move clock initialization code before any AMBA device registration.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> ---
+> Note that I'm not sure whether ep93xx_map_io() is the best place for calling
+> clock init code. Alternative would be to put it in ep93xx_init_devices() just
+> before calls to amba_device_register().
 
-Sorry for the late reply (vacation..).
+Thanks Mika,
 
-On Thu, Aug 26, 2010 at 12:42 PM, Gao, Yunpeng <yunpeng.gao@intel.com> wrote:
-> It seems the power_save callback is not implemented (Null pointer) yet for both mmc and sdio. Does it mean that the power_save callback will be implemented in future or just don't need at all? Thanks.
+I'm guessing none of the initcalls are early enough to solve this
+problem? I think that calling from either ep93xx_map_io or
+ep93xx_init_devices is fine, especially since this is a regression fix.
 
-Yes, currently seems it is not needed.
+If nobody has a better solution:
 
-> But seems it doesn't provide a runtime PM example on host controller driver side. To my understanding, once the functions (mmc card or sdio devices) and mmc/sdio bus enter into rumtime suspend, it should then make the host controller enter into runtime suspend, too. Any ideas on how to achieve this? Thanks.
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
-This should already be taken care of by the PM core:
+> Tested on ep9302 (ts-7260) and on ep9307 (Sim.One).
+> 
+>  arch/arm/mach-ep93xx/clock.c                 |    4 +---
+>  arch/arm/mach-ep93xx/core.c                  |    1 +
+>  arch/arm/mach-ep93xx/include/mach/platform.h |    1 +
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+> index 8bf3cec..119e614 100644
+> --- a/arch/arm/mach-ep93xx/clock.c
+> +++ b/arch/arm/mach-ep93xx/clock.c
+> @@ -514,7 +514,7 @@ static void __init ep93xx_dma_clock_init(void)
+>  	clk_m2m1.rate = clk_h.rate;
+>  }
+>  
+> -static int __init ep93xx_clock_init(void)
+> +void __init ep93xx_clock_init(void)
+>  {
+>  	u32 value;
+>  
+> @@ -558,6 +558,4 @@ static int __init ep93xx_clock_init(void)
+>  		clk_p.rate / 1000000);
+>  
+>  	clkdev_add_table(clocks, ARRAY_SIZE(clocks));
+> -	return 0;
+>  }
+> -arch_initcall(ep93xx_clock_init);
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 4cb55d3..04e1b25 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -65,6 +65,7 @@ static struct map_desc ep93xx_io_desc[] __initdata = {
+>  void __init ep93xx_map_io(void)
+>  {
+>  	iotable_init(ep93xx_io_desc, ARRAY_SIZE(ep93xx_io_desc));
+> +	ep93xx_clock_init();
+>  }
+>  
+>  
+> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+> index 3330b36..9b732b1 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+> @@ -20,6 +20,7 @@ struct ep93xx_eth_data
+>  
+>  void ep93xx_map_io(void);
+>  void ep93xx_init_irq(void);
+> +void ep93xx_clock_init(void);
+>  
+>  /* EP93xx System Controller software locked register write */
+>  void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
 
-When a device is suspended (e.g. our sdio/mmc card), an idle request
-is sent by the PM core to its parent device (in our case, that would
-be the host controller).
-Now, if the host controller driver has enabled runtime PM, its idle
-handler would be called so it could act upon it.
-Similarly, when the card is resumed, the PM core will first invoke its
-host controller parent's resume handler.
 
-For an (initial) reference example of enabling runtime PM in a host
-controller driver (omap_hsmmc), you can take a look at Kevin Hilman's
-pm-wip/mmc branch of:
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Btw I have an updated version of this patchset - I am about to start
-testing it (will make sure your scenario works too) and then soon
-after post it here for review.
-
-Thanks,
-Ohad.
-
->
-> Best Regards,
-> Yunpeng Gao
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
