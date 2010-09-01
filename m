@@ -1,22 +1,17 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Sep 2010 10:15:19 +0100
-Subject: [PATCH v2] MAX8952 PMIC Driver Initial Release
-In-Reply-To: <011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
-References: <1282283036-12641-1-git-send-email-myungjoo.ham@samsung.com>
-	<20100820095351.GD13668@rakim.wolfsonmicro.main>
-	<1282301229.3084.152.camel@odin>
-	<011b01cb496a$cfa773d0$6ef65b70$%kim@samsung.com>
-Message-ID: <20100901091519.GA17032@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Sep 2010 10:14:55 +0100
+Subject: [PATCH 2/7] wire up sys_time_change_notify() on ARM
+In-Reply-To: <1283255151-6364-2-git-send-email-virtuoso@slind.org>
+References: <1283255151-6364-1-git-send-email-virtuoso@slind.org>
+	<1283255151-6364-2-git-send-email-virtuoso@slind.org>
+Message-ID: <20100901091455.GL8142@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 01, 2010 at 09:15:36AM +0900, Kukjin Kim wrote:
+On Tue, Aug 31, 2010 at 02:45:46PM +0300, Alexander Shishkin wrote:
+> sys_time_change_notify() is a new syscall with number and types of
+> parameters such that no ARM-specific processing is needed.
 
-> Seems almost same between the operation of max8649 and max8952 except output
-> voltage range.
-
-> How do you think that can support max8952 with small modifying max8649?
-
-Take a look at something like the WM831x drivers for how you can handle
-multiple devices with one driver - you can register I2C IDs for multiple
-devices and then select behaviour based on the name that was quoted.
+This patch needs to be redone.  Please wait until I've finished catching
+up with the last 10 or so days of email and merged my tree into mainline.
+Alternatively, update your patch to apply on top of my master branch.
