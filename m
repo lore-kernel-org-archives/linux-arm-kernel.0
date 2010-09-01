@@ -1,62 +1,46 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Wed, 1 Sep 2010 13:41:12 +0200
-Subject: mmc over SPI on DM6467 based board. card not detected.
-In-Reply-To: <AANLkTinZEWUqhV_yVh78hYNA82JbJ8OKYP_UJ2fRD6BA@mail.gmail.com>
-References: <4C516634.5040804@criticallink.com>
-	<877hjd106u.fsf@deeprootsystems.com>
-	<4C7702EB.8040905@criticallink.com>
-	<8762ywrvpt.fsf@deeprootsystems.com>
-	<4C77E6BD.4000303@criticallink.com>
-	<87fwy0orsg.fsf@deeprootsystems.com>
-	<BLU124-W40A2B008B886302781867B4870@phx.gbl>
-	<AANLkTinZEWUqhV_yVh78hYNA82JbJ8OKYP_UJ2fRD6BA@mail.gmail.com>
-Message-ID: <AANLkTimM=OC1d8ttngXC2Mbpr8006sGsNv1e6hxK+m3Z@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  1 Sep 2010 13:11:22 +0100
+Subject: [PATCH] ARM: perf: fix event validation
+Message-ID: <1283343082-28764-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/30/10, Steve Chen <schen@mvista.com> wrote:
-> On Sat, Aug 28, 2010 at 8:26 AM, Sumesh Kaana <sumeshkkn@hotmail.com> wrote:
->  > I am trying to mount SD-Card over SPI on our custom DM6467 board. davinci
->  > spi controller driver and mmc over spi drver are selected in the menuconfig.
->  > i am using davinci-PSP.03-XX-00-37 kernel.
->  >
->  > I have also edited board initialization file to probe the MMC card under SPI
->  > as below:
->  >
->  >
->  >
->  > static struct spi_board_info dm646x_spi_info[] __initconst = {
->  >
->  > #ifdef CONFIG_MMC_SPI
->  >
->  >         {
->  >
->  >                 .modalias = "mmc_spi",
->  >
->  >                 .max_speed_hz = (750 * 1000 ),     /* max spi clock (SCK)
->  > speed in HZ */
->  >
->  >                 .bus_num = 0,
->  >
->  >                 .chip_select = 0,                       /* CS0 */
->  >
->  >                 .mode           = SPI_MODE_0,
->  >
->  >         },
->  >
->  > #endif
->  >
->  >
->  >
->  > The kernel boots with following log
->  >
->  ...
->  > mmc0: Minimum clock frequency too high for identification mode
->  ...
->
->  Have you tried lower the clock frequency?
+The validate_event function in the ARM perf events backend has the
+following problems:
 
-The initial card identification should be done at 400kHz. If that is
-successful, the following commands can be sent at your maximum rate.
+1.) Events that are disabled count towards the cost.
+2.) Events associated with other PMUs [for example, software events or
+    breakpoints] do not count towards the cost, but do fail validation,
+    causing the group to fail.
 
-   M
+This patch changes validate_event so that it ignores events in the
+PERF_EVENT_STATE_OFF state or that are scheduled for other PMUs.
+
+Cc: Jamie Iles <jamie.iles@picochip.com>
+Reported-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+Resend with correct spelling of Pawel's email address on CC.
+Jamie - are you ok with this fix?
+
+ arch/arm/kernel/perf_event.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index e213925..ecbb028 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -319,8 +319,8 @@ validate_event(struct cpu_hw_events *cpuc,
+ {
+ 	struct hw_perf_event fake_event = event->hw;
+ 
+-	if (event->pmu && event->pmu != &pmu)
+-		return 0;
++	if (event->pmu != &pmu || event->state <= PERF_EVENT_STATE_OFF)
++		return 1;
+ 
+ 	return armpmu->get_event_idx(cpuc, &fake_event) >= 0;
+ }
+-- 
+1.6.3.3
