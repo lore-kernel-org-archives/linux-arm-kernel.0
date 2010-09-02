@@ -1,42 +1,28 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Thu, 2 Sep 2010 17:11:56 +0200
-Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
-In-Reply-To: <20100902145357.GL14214@pengutronix.de>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<20100902145357.GL14214@pengutronix.de>
-Message-ID: <19583.48828.125104.712979@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 16:59:15 +0100
+Subject: [PATCH 45/74] SPEAr : SEV Send event to secondary CPUs
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CCED14CF@dbde02.ent.ti.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
+	<20100902102256.GO26319@n2100.arm.linux.org.uk>
+	<003f01cb4a8b$372d0d00$a5872700$@deacon@arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCED14CF@dbde02.ent.ti.com>
+Message-ID: <20100902155915.GQ26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 02, 2010 at 04:37:37PM +0530, Shilimkar, Santosh wrote:
+> May be we should have barrier version of these
+> There is one already exist in mainline already in spin lock code
+> "dsb_sev(void)"
 
-> > -	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
-> > +	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
-> > +	 * not compatible with existing SPI controllers on other i.MX platforms,
-> > +	 * while CSPI controller is 100% compatible with the one on the i.MX35.
-> > +	 * We set the platform device id to 2 for this CSPI at i.MX51 board init
-> > +	 * level to distinguish it from two eCSPI controllers.
-> > +	 */
-> This comment is missing in Sascha's driver.  I like it.
-> BTW, I'd like to make use of platform ids in this driver.  This would
-> make this ugly "on imx51 id2 is a cspi" distinction unnecessary.
-> 
-> > +	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
-> > +	    (cpu_is_mx51() && (pdev->id == 2))) {
-I'd prefer a flag in the platform_data that tells the driver to act as
-an eCSPI driver. This way the information about eCSPI or not would be
-where it belongs (in the arch specific code).
+I don't think so - they're not a general purpose event passing mechanism.
+Their use is fairly well limited to two situations:
 
+1. spin locks, where we already have dsb_sev as we care about ordering.
+2. smp secondary cpu bring-up code, where we care a little less about the
+   ordering.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+I think coupling a barrier with these will just make people want to have
+a version without the barrier.  At least if we don't provide the barrier,
+people have the option of using mb() before sev() if they desire ordering.
