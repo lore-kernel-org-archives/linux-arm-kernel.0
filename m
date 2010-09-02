@@ -1,9 +1,9 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 09:16:59 -0700
-Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <20100902133637.GJ26319@n2100.arm.linux.org.uk>
-References: <20100817135205.GC20325@n2100.arm.linux.org.uk>
-	<20100817141210.GJ12184@atomide.com>
+Date: Thu, 2 Sep 2010 09:18:47 -0700
+Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early init
+	testing
+In-Reply-To: <20100902161659.GJ11597@atomide.com>
+References: <20100817141210.GJ12184@atomide.com>
 	<20100817154035.GD20325@n2100.arm.linux.org.uk>
 	<20100819073810.GR12184@atomide.com>
 	<4C6CFBAF.6020407@canonical.com>
@@ -12,38 +12,8 @@ References: <20100817135205.GC20325@n2100.arm.linux.org.uk>
 	<20100820120622.GL25742@atomide.com>
 	<20100830225527.GC11597@atomide.com>
 	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-Message-ID: <20100902161659.GJ11597@atomide.com>
+	<20100902161659.GJ11597@atomide.com>
+Message-ID: <20100902161846.GK11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 06:29]:
-> On Mon, Aug 30, 2010 at 03:55:27PM -0700, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [100820 04:59]:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
-> > > > On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
-> > > > > Looks like something is not quite right with smp_on_up part of __fixup_smp,
-> > > > > returning early before smp_on_up does not produce that.
-> > > > 
-> > > > It's probably overwriting some register it shouldn't be.  I might be
-> > > > able to look at this sometime during the coming week... assuming that
-> > > > the weather is as bad as they forecast and I have 'net connectivity.
-> > 
-> > This seems to fix it.
-> 
-> Thanks, merged that into my original patch - so here it is again with
-> everything updated.
-
-Your patch sure makes things simpler! The problem still is the
-V6 vs V7 SMP code though.
-
-Will post my six patches that apply on top of your patch as a reply to
-this mail. With those, everything seems to work, at least after testing
-on omap3630 (Cortex-A8 UP) and omap4430 (Cortex-A9 SMP).
-
-Will, maybe see if there are some parts in your patchset that should
-be used instead? I noticed pretty much all the earlier hacks are no
-longer needed :)
-
-Regards,
-
-Tony
