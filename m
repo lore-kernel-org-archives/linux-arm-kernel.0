@@ -1,30 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Sep 2010 12:50:18 +0200
-Subject: [PATCH 16/19] ARM: nomadik: register nmk_gpio_driver using
-	platform_driver_probe
-In-Reply-To: <AANLkTin4XQWDdSjFaU-FsvVP43gUKffr-csKTvnxGQc7@mail.gmail.com>
-References: <20100805140813.GA13859@pengutronix.de>
-	<1281017333-5563-16-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTin4XQWDdSjFaU-FsvVP43gUKffr-csKTvnxGQc7@mail.gmail.com>
-Message-ID: <20100902105018.GG14214@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 11:50:55 +0100
+Subject: [PATCH 4/5] DMA: Add functions to preallocate DMA memory dor
+	devices
+In-Reply-To: <Pine.LNX.4.64.1008191636590.26145@axis700.grange>
+References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
+	<Pine.LNX.4.64.1008191636590.26145@axis700.grange>
+Message-ID: <20100902105055.GS26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
-
-On Thu, Sep 02, 2010 at 12:30:22PM +0200, Linus Walleij wrote:
-> 2010/8/5 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+On Thu, Aug 19, 2010 at 04:40:22PM +0200, Guennadi Liakhovetski wrote:
+> Currently dma_declare_coherent_memory() and dma_release_declared_memory() are
+> provided to assign DMA memory to a device and to release it. These functions
+> can be use with device local memory, like on-chip SRAM. However, they are
+> unsuitable for assigning of generic system RAM to devices, because such system
+> memory should not be ioremapped, and ioremap() is used internally in the former
+> of these functions to map the memory.
 > 
-> > This fixes a section mismatch reported by modpost:
-> 
-> Uwe, why have you put this into Russells patch tracker without taking
-> into account the issues raised by Rabin?
-Oh sorry, overlooked that when resorting my patches.  Will send a fix
-after lunch.
+> This patch solves this problem by adding two more functions:
+> dma_preallocate_coherent_memory() and dma_release_preallocated_memory(), which
+> allocate DMA coherent memory and assign it to the device, and release it back
+> respectively.
 
-Best regards and thanks for noticing,
-Uwe
+This looks like a much saner interface for pre-allocating DMA memory from
+system memory, rather than trying to use dma_declare_coherent_memory().
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
