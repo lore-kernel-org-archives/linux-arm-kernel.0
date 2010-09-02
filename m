@@ -1,45 +1,24 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  2 Sep 2010 17:13:35 +0200
-Subject: (Patch #6347) ARM: nomadik: move nmk_gpio_probe to .devinit.text
-In-Reply-To: <AANLkTinU=E0aek4CA73wLTfb1yArpE4u=YpHQTpvS+rg@mail.gmail.com>
-References: <AANLkTinU=E0aek4CA73wLTfb1yArpE4u=YpHQTpvS+rg@mail.gmail.com>
-Message-ID: <1283440415-21990-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Sep 2010 16:27:05 +0100
+Subject: Colibri PXA320 Power management question
+In-Reply-To: <4C7FB7B5.2010301@compulab.co.il>
+References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
+	<20100902142203.GA8381@sirena.org.uk>
+	<4C7FB7B5.2010301@compulab.co.il>
+Message-ID: <20100902152705.GC5809@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a section mismatch reported by modpost:
+On Thu, Sep 02, 2010 at 05:41:57PM +0300, Mike Rapoport wrote:
+> Mark Brown wrote:
 
-	WARNING: arch/arm/plat-nomadik/built-in.o(.data+0x100): Section mismatch in reference from the variable nmk_gpio_driver to the function .init.text:nmk_gpio_probe()
-	The variable nmk_gpio_driver references
-	the function __init nmk_gpio_probe()
-	If the reference is valid then annotate the
-	variable with __init* or __refdata (see linux/init.h) or name the variable:
-	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+> >The expectation in Linux is that voltage scaling will be done in
+> >software using cpufreq rather than autonomously by the CPU.
 
-According to Rabin VINCENT the alternative to use platform_driver_probe
-won't work because the "platform devices are not yet registered when
-nmk_gpio_init() is called."
+> PXA3xx has ability to automatically control certain regulators
+> (almost) without software intervention. Setting the bits Yuri is
+> talking about should enable CPU initiated i2c transactions upon
+> frequency scaling events.
 
-Acked-by: Rabin Vincent <rabin.vincent@stericsson.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-KernelVersion: 2.6.36-rc3
-
- arch/arm/plat-nomadik/gpio.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
-index 977c8f9..7c7c1f1 100644
---- a/arch/arm/plat-nomadik/gpio.c
-+++ b/arch/arm/plat-nomadik/gpio.c
-@@ -534,7 +534,7 @@ static struct gpio_chip nmk_gpio_template = {
- 	.can_sleep		= 0,
- };
- 
--static int __init nmk_gpio_probe(struct platform_device *dev)
-+static int __devinit nmk_gpio_probe(struct platform_device *dev)
- {
- 	struct nmk_gpio_platform_data *pdata = dev->dev.platform_data;
- 	struct nmk_gpio_chip *nmk_chip;
--- 
-1.7.1
+Yes, exactly - what I'm saying is that Linux is set up to use cpufreq
+rather than rely on the built in stuff.
