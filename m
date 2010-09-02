@@ -1,33 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 09:34:54 -0700
-Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
-In-Reply-To: <20100902162537.GU26319@n2100.arm.linux.org.uk>
-References: <20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902162039.GM11597@atomide.com>
-	<20100902162537.GU26319@n2100.arm.linux.org.uk>
-Message-ID: <20100902163453.GR11597@atomide.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 02 Sep 2010 09:49:37 -0700
+Subject: [PATCH 14/24] msm: add hotplug stub functions
+In-Reply-To: <20100902111157.GX26319@n2100.arm.linux.org.uk>
+References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
+	<1282712273-344-15-git-send-email-johlstei@codeaurora.org>
+	<20100902111157.GX26319@n2100.arm.linux.org.uk>
+Message-ID: <1283446177.3674.0.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 09:18]:
-> On Thu, Sep 02, 2010 at 09:20:40AM -0700, Tony Lindgren wrote:
-> > >From 253e91b76e104dbdf05c5c3eaf9cbf426972c938 Mon Sep 17 00:00:00 2001
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Wed, 1 Sep 2010 16:49:13 -0700
-> > Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
+On Thu, 2010-09-02 at 12:11 +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 24, 2010 at 09:57:43PM -0700, Jeff Ohlstein wrote:
+> > From: Daniel Walker <dwalker@codeaurora.org>
 > > 
-> > Fix v7wbi_tlb_flags for SMP on UP. Note that we must enable MULTI_TLB
-> > to avoid undefined reference to cpu_tlb error.
+> > We don't actually do anything for hotplug yet. This just lets
+> > everything compile, even when hotplug is enabled.
 > 
-> This isn't required, as it is already covered by my patch.
+> And the point of that is?  If you're not supporting hotplug CPU yet, then
+> don't allow it to be enabled.
 
-Yup, seems to be working without this patch.
+How do we do that? I didn't see a easy way to prevent it.
 
-Tony
+Daniel
+
+
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
