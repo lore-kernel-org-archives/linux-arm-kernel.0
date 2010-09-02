@@ -1,30 +1,49 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 2 Sep 2010 07:59:07 +0200
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
-	<m3sk1yzkjw.fsf@intrepid.localdomain>
-	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
-	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100902055907.GA3287@riccoc20.at.omicron.at>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  2 Sep 2010 08:17:10 +0200
+Subject: [PATCH] ARM: omap1/nokia770: mark some functions __init
+In-Reply-To: <20100902054630.GB14214@pengutronix.de>
+References: <20100902054630.GB14214@pengutronix.de>
+Message-ID: <1283408230-22652-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 11:50:33AM +0900, FUJITA Tomonori wrote:
-> btw, I can't compile ARCH_IXP4XX without the following patch:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg95933.html
+These are only called from omap_nokia770_init which is in .init.text, too.
 
-I have the same problem. Compilation of IXP4xx was broken by
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-omap1/board-nokia770.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-    commit 4fa5518c65df7a2c4b6c58061ac53d0b01228042
-    Author: Eric Miao <eric.y.miao@gmail.com>
-    Date:   Sat Jun 5 15:16:17 2010 +0800
-
-    [ARM] pxa: remove now unnecessary dma_needs_bounce()
-
-What is the correct way to do fix this? Is the above patch the
-solution, or is dma_needs_bounce() perhaps also unnecessary for ixp?
-
-Thanks,
-Richard
+diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+index 51a4539..09b3f46 100644
+--- a/arch/arm/mach-omap1/board-nokia770.c
++++ b/arch/arm/mach-omap1/board-nokia770.c
+@@ -112,7 +112,7 @@ static struct mipid_platform_data nokia770_mipid_platform_data = {
+ 	.shutdown = mipid_shutdown,
+ };
+ 
+-static void mipid_dev_init(void)
++static void __init mipid_dev_init(void)
+ {
+ 	const struct omap_lcd_config *conf;
+ 
+@@ -123,7 +123,7 @@ static void mipid_dev_init(void)
+ 	}
+ }
+ 
+-static void ads7846_dev_init(void)
++static void __init ads7846_dev_init(void)
+ {
+ 	if (gpio_request(ADS7846_PENDOWN_GPIO, "ADS7846 pendown") < 0)
+ 		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
+@@ -167,7 +167,7 @@ static struct hwa742_platform_data nokia770_hwa742_platform_data = {
+ 	.te_connected		= 1,
+ };
+ 
+-static void hwa742_dev_init(void)
++static void __init hwa742_dev_init(void)
+ {
+ 	clk_add_alias("hwa_sys_ck", NULL, "bclk", NULL);
+ 	omapfb_set_ctrl_platform_data(&nokia770_hwa742_platform_data);
+-- 
+1.7.1
