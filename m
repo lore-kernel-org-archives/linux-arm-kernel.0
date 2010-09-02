@@ -1,16 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 11:04:34 +0100
-Subject: [PATCH 38/74] ST SPEAr3xx: Rearranging declarations in clock.c
-	file
-In-Reply-To: <4d45de5bf73c7c10c68ade48922a9c3ffdcac795.1283161023.git.viresh.kumar@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<4d45de5bf73c7c10c68ade48922a9c3ffdcac795.1283161023.git.viresh.kumar@st.com>
-Message-ID: <20100902100434.GM26319@n2100.arm.linux.org.uk>
+From: jason77.wang@gmail.com (Jason Wang)
+Date: Thu, 02 Sep 2010 18:07:58 +0800
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
+	driver
+In-Reply-To: <20100902082759.GE14214@pengutronix.de>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<20100902082759.GE14214@pengutronix.de>
+Message-ID: <4C7F777E.1090104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 04:09:02PM +0530, Viresh KUMAR wrote:
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Uwe Kleine-K?nig wrote:
+> Hello Jason,
+>
+> On Thu, Sep 02, 2010 at 03:51:58PM +0800, Jason Wang wrote:
+>   
+>> Some explanations:
+>>
+>> This patchset is to add SPI support in the existing spi_imx driver for
+>> i.MX51 and add SPI relating stuffs for mx51_3ds board level.
+>>
+>> i.MX51 has two eCSPI controllers and one CSPI controller, CSPI
+>> controller is 100% compatible with the one of i.MX35, so we don't need
+>> to add new functions for this CSPI, only bind it with i.MX35 together,
+>> while eCSPI isn't compatible with existing controllers of i.MX
+>> platforms, so i add new functions for these two eCSPIs in the existing
+>> spi_imx driver.
+>>
+>> If these patches pass review, the first patch 0001-xxx.patch should be
+>> merged by Grant.likely; other patches(0002-0006) are based off
+>> imx-for-2.6.37 and should be handled by Sascha.
+>>     
+>
+> Unfortunately we (=Pengutronix) have some patches pending to add
+> mx51-spi support, too.  And there are some other patches that will
+> conflict with your series (e.g. I renamed some symbols used by you:
+>
+> -#define MX51_CSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
+> +#define MX51_ECSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
+> -#define MX51_CSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
+> +#define MX51_ECSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
+> -#define MX51_CSPI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
+> +#define MX51_CSPI_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
+> -#define MX51_MXC_INT_CSPI1		36
+> -#define MX51_MXC_INT_CSPI2		37
+> -#define MX51_MXC_INT_CSPI		38
+> +#define MX51_INT_ECSPI1			36
+> +#define MX51_INT_ECSPI2			37
+> +#define MX51_INT_CSPI			38
+> )
+>
+> Actually I would prefer our patches, but of course I'm biased :-)
+>
+> I don't know how we should handle this.  And Sascha is on vacation this
+> and next week.  I will investigate if our patches are already free to be
+> posted.
+>
+>   
+OK, for conflicting parts, i will wait for new patches to be posted out,
+and rebase my conflicting patches off that.
 
-Do this in the patch which adds the sdhci clock instead.  This patch
-on its own is pure noise.
+If it is possible, please review other parts first.
+
+Thanks,
+Jason.
+
+> Best regards
+> Uwe
+>
+>   
