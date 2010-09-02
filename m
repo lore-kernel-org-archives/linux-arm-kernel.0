@@ -1,30 +1,30 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 02 Sep 2010 12:49:37 +0300
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <4C7F4526.105@gmail.com>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
-	<1283170469.12995.53.camel@brekeke>	<4C7CA278.9040902@st.com>
-	<1283297810.2018.67.camel@brekeke>	<4C7DD2FD.1080501@st.com>
-	<1283337939.1958.20.camel@brekeke>	<4C7E3344.2020202@st.com>
-	<4C7EC43B.2050903@bluewatersys.com>
-	<AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>
-	<4C7ED1E9.4050208@bluewatersys.com>  <4C7F4526.105@gmail.com>
-Message-ID: <1283420977.1748.6.camel@brekeke>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 10:57:58 +0100
+Subject: [PATCH 31/74] ST SPEAr: Adding support for SSP PL022
+In-Reply-To: <447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
+Message-ID: <20100902095758.GK26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-09-01 at 23:33 -0700, Brian Norris wrote:
-> 
-> I'm curious how many applications actually need to have the ecclayout.
-> nandwrite doesn't actually use it, just oobinfo. 
+On Mon, Aug 30, 2010 at 04:08:55PM +0530, Viresh KUMAR wrote:
+> diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
+> index 8658d48..8399c15 100644
+> --- a/arch/arm/mach-spear13xx/clock.c
+> +++ b/arch/arm/mach-spear13xx/clock.c
+> @@ -799,7 +799,7 @@ static struct clk_lookup spear_clk_lookups[] = {
+>  	{.dev_id = "i2s0",		.clk = &i2s0_clk},
+>  	{.dev_id = "i2s1",		.clk = &i2s1_clk},
+>  	{.dev_id = "adc",		.clk = &adc_clk},
+> -	{.dev_id = "ssp",		.clk = &ssp_clk},
+> +	{.dev_id = "ssp-pl022",		.clk = &ssp_clk},
 
-That is good point - I think we should not accept new ioctl before the
-submitter shows us how and for what he will use it.
+All these kinds of changes are just noise in these patches, which add
+to the review workload (and review tiredness.)  Your previous patches
+added the original definitions.  Please roll these changes into your
+previous patches so that there's less overall changes to look at in
+your patch series.
 
-My point is simple - OOB layout should be transparent to users-space.
-Messing with this is error-prone.
-
--- 
-Best Regards,
-Artem Bityutskiy (???????? ?????)
+It really is not necessary to show how you got from A to B via every
+minute step.
