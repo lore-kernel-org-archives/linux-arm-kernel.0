@@ -1,30 +1,46 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 02 Sep 2010 09:49:37 -0700
-Subject: [PATCH 14/24] msm: add hotplug stub functions
-In-Reply-To: <20100902111157.GX26319@n2100.arm.linux.org.uk>
-References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-	<1282712273-344-15-git-send-email-johlstei@codeaurora.org>
-	<20100902111157.GX26319@n2100.arm.linux.org.uk>
-Message-ID: <1283446177.3674.0.camel@c-dwalke-linux.qualcomm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 17:57:56 +0100
+Subject: [PATCH 5/6] ARM: Don't set TLB ops broadcasting on UP ARMv7
+In-Reply-To: <20100902162220.GO11597@atomide.com>
+References: <20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+	<4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902162220.GO11597@atomide.com>
+Message-ID: <20100902165756.GV26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-02 at 12:11 +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 24, 2010 at 09:57:43PM -0700, Jeff Ohlstein wrote:
-> > From: Daniel Walker <dwalker@codeaurora.org>
-> > 
-> > We don't actually do anything for hotplug yet. This just lets
-> > everything compile, even when hotplug is enabled.
+On Thu, Sep 02, 2010 at 09:22:20AM -0700, Tony Lindgren wrote:
+> >From 8b22546af2ba9a0d96c2f419bfcec1f3c01a414d Mon Sep 17 00:00:00 2001
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 30 Aug 2010 14:03:28 -0700
+> Subject: [PATCH 5/6] ARM: Don't set TLB ops broadcasting on UP ARMv7
 > 
-> And the point of that is?  If you're not supporting hotplug CPU yet, then
-> don't allow it to be enabled.
+> Don't set TLB ops broadcasting on UP ARMv7. Looks like these bits
+> are also different on A8 and A9.
 
-How do we do that? I didn't see a easy way to prevent it.
+This is already taken care of.
 
-Daniel
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 07fc660..51a063d 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -191,7 +191,8 @@ __v7_setup:
+>  	UP(mov	r0, #(1 << 6))			@ fake it for UP
 
+If it's UP, we set r0 to 1 << 6, which...
 
--- 
+>  	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+means this test produces a non-zero result.
+
+>  	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
+> -	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
+
+And therefore these instructions will not be executed.
