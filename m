@@ -1,35 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 12:13:10 +0100
-Subject: [PATCH 20/24] msm: MSM8X60 simulator board support
-In-Reply-To: <1282712273-344-21-git-send-email-johlstei@codeaurora.org>
-References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-	<1282712273-344-21-git-send-email-johlstei@codeaurora.org>
-Message-ID: <20100902111310.GY26319@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 2 Sep 2010 13:15:13 +0200
+Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
+In-Reply-To: <4C7F5B9E.8090406@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
+	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
+	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
+	<4C7F5B9E.8090406@st.com>
+Message-ID: <AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 24, 2010 at 09:57:49PM -0700, Jeff Ohlstein wrote:
-> From: Steve Muckle <smuckle@codeaurora.org>
-> 
-> Board configuration for MSM8X60 simulation.
-> 
-> Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
-> ---
->  arch/arm/mach-msm/Kconfig         |    7 +++++++
->  arch/arm/mach-msm/Makefile        |    1 +
->  arch/arm/mach-msm/board-msm8x60.c |   10 +++++++++-
->  3 files changed, 17 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> index 3017e12..d2610a3 100644
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ b/arch/arm/mach-msm/Kconfig
-> @@ -105,6 +105,13 @@ config MACH_MSM8X60_SURF
->  	help
->  	  Support for the Qualcomm MSM8x60 SURF eval board.
->  
-> +config MACH_MSM8X60_SIM
-> +	depends on ARCH_MSM8X60
-> +	default n
+2010/9/2 Armando Visconti <armando.visconti@st.com>:
 
-All these 'default n' statements can be removed - n is the default anyway.
+>> I *highly* suspect that this driver duplicates some code found in
+>> drivers/mtd/nand/nomadik_nand.c because it's the same silicon.
+>
+> Why nomadik_nand.c?
+> Shouldn't the fsmc_nand.c rule apply also in this case?
+
+As I said I think nomadik_nand.c shall be deleted and replaced with
+this driver.
+
+Unless Alessandro hits me on the fingers... If it is made generic
+I can provide testing for the U300. (Maybe I can get my NHK8815
+card booting too, I don't know.)
+
+Yours,
+Linus Walleij
