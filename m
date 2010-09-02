@@ -1,39 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 11:02:47 +0100
-Subject: [PATCH 35/74] ST SPEAr: Enabling clocks before amba device
-	registeration
-In-Reply-To: <96b4972a92cab5025a89bd71a4e23fa29aa41cba.1283161023.git.viresh.kumar@st.com>
+Date: Thu, 2 Sep 2010 11:04:34 +0100
+Subject: [PATCH 38/74] ST SPEAr3xx: Rearranging declarations in clock.c
+	file
+In-Reply-To: <4d45de5bf73c7c10c68ade48922a9c3ffdcac795.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<96b4972a92cab5025a89bd71a4e23fa29aa41cba.1283161023.git.viresh.kumar@st.com>
-Message-ID: <20100902100247.GL26319@n2100.arm.linux.org.uk>
+	<4d45de5bf73c7c10c68ade48922a9c3ffdcac795.1283161023.git.viresh.kumar@st.com>
+Message-ID: <20100902100434.GM26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 04:08:59PM +0530, Viresh KUMAR wrote:
+On Mon, Aug 30, 2010 at 04:09:02PM +0530, Viresh KUMAR wrote:
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-No description, so I'm going to have to guess about this.
-
-> +static inline void
-> +spear_amba_device_register(struct amba_device **devices, u32 count)
-> +{
-> +	u32 i;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		struct clk *clk = clk_get_sys(devices[i]->dev.init_name, NULL);
-> +		if (IS_ERR(clk))
-> +			continue;
-> +
-> +		clk_enable(clk);
-> +		amba_device_register(devices[i], &iomem_resource);
-> +		clk_disable(clk);
-
-My guess is that you're doing this to work around the fact that your
-SoC enables/disables both the bus clock and the functional clock to
-each primecell, and so you're finding that you need to enable the
-clock to access the device registers.
-
-We've fixed this in the generic code by introducing an 'apb_pclk' clock
-which the core bus code controls (and eventually drivers.)  See discussion
-earlier this month/last month on this list about this.
-
-That makes this patch redundant.
+Do this in the patch which adds the sdhci clock instead.  This patch
+on its own is pure noise.
