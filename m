@@ -1,5 +1,5 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 02 Sep 2010 15:25:30 -0700
+Date: Thu, 02 Sep 2010 15:36:40 -0700
 Subject: [PATCH 14/24] msm: add hotplug stub functions
 In-Reply-To: <20100902171253.GX26319@n2100.arm.linux.org.uk>
 References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
@@ -7,7 +7,7 @@ References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
 	<20100902111157.GX26319@n2100.arm.linux.org.uk>
 	<1283446177.3674.0.camel@c-dwalke-linux.qualcomm.com>
 	<20100902171253.GX26319@n2100.arm.linux.org.uk>
-Message-ID: <1283466330.3674.368.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <1283467000.3674.381.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,11 +30,67 @@ On Thu, 2010-09-02 at 18:12 +0100, Russell King - ARM Linux wrote:
 >         bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
 >         depends on SMP && HOTPLUG && EXPERIMENTAL
 > +	depends on !ARCH_MSM
+> --
 
-So every other SMP does this? I didn't see any other's besides RealView
-implementing these. I just assumed they all had compile failures.
+If no others use it .. We can do this to fix them all. What do you
+think?
 
-Daniel
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d4d9f55..6d8cf39 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1163,9 +1163,12 @@ config NR_CPUS
+ 	depends on SMP
+ 	default "4"
+ 
++config HAS_HOTPLUG_CPU
++	bool
++
+ config HOTPLUG_CPU
+ 	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+-	depends on SMP && HOTPLUG && EXPERIMENTAL
++	depends on SMP && HOTPLUG && EXPERIMENTAL && HAS_HOTPLUG_CPU
+ 	help
+ 	  Say Y here to experiment with turning CPUs off and on.  CPUs
+ 	  can be controlled through /sys/devices/system/cpu.
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index b4575ae..8b5c339 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -11,6 +11,7 @@ config REALVIEW_EB_A9MP
+ 	bool "Support Multicore Cortex-A9"
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V7
++	select HAS_HOTPLUG_CPU
+ 	help
+ 	  Enable support for the Cortex-A9MPCore tile on the Realview platform.
+ 
+@@ -19,6 +20,7 @@ config REALVIEW_EB_ARM11MP
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V6
+ 	select ARCH_HAS_BARRIERS if SMP
++	select HAS_HOTPLUG_CPU
+ 	help
+ 	  Enable support for the ARM11MPCore tile on the Realview platform.
+ 
+@@ -37,6 +39,7 @@ config MACH_REALVIEW_PB11MP
+ 	select ARM_GIC
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_HAS_BARRIERS if SMP
++	select HAS_HOTPLUG_CPU
+ 	help
+ 	  Include support for the ARM(R) RealView MPCore Platform Baseboard.
+ 	  PB11MPCore is a platform with an on-board ARM11MPCore and has
+@@ -74,6 +77,7 @@ config MACH_REALVIEW_PBX
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ZONE_DMA if SPARSEMEM
++	select HAS_HOTPLUG_CPU
+ 	help
+ 	  Include support for the ARM(R) RealView PBX platform.
+ 
+
+
 
 -- 
 
