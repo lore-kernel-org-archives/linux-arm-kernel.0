@@ -1,50 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  2 Sep 2010 15:50:27 +0200
-Subject: [PATCH] ARM: nomadik: move nmk_gpio_probe to .devinit.text
-In-Reply-To: <20100809065933.GA900@bnru01.bnr.st.com>
-References: <20100809065933.GA900@bnru01.bnr.st.com>
-Message-ID: <1283435427-14115-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 2 Sep 2010 15:55:42 +0200
+Subject: [RFC] [PATCH v2] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <20100902134732.GL26319@n2100.arm.linux.org.uk>
+References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
+	<1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<20100902132641.GI14214@pengutronix.de>
+	<20100902134732.GL26319@n2100.arm.linux.org.uk>
+Message-ID: <20100902135542.GJ14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a section mismatch reported by modpost:
+Hi Russell,
 
-	WARNING: arch/arm/plat-nomadik/built-in.o(.data+0x100): Section mismatch in reference from the variable nmk_gpio_driver to the function .init.text:nmk_gpio_probe()
-	The variable nmk_gpio_driver references
-	the function __init nmk_gpio_probe()
-	If the reference is valid then annotate the
-	variable with __init* or __refdata (see linux/init.h) or name the variable:
-	*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+On Thu, Sep 02, 2010 at 02:47:32PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 02, 2010 at 03:26:41PM +0200, Uwe Kleine-K?nig wrote:
+> > I'm not very satisfied by Russell's answer.  But even if I accept that
+> > it should not move to .init.text, why .ref.text?  If I'm not mistaken
+> > clkdev_alloc references the following non-local symbols:
+> > 
+> > 	__clkdev_alloc
+> > 	strlcpy
+> > 	vscnprintf
+> 
+> __clkdev_alloc() is an inline function, so effectively it's part of this
+> function.  On sh, this calls the boot time allocator which is marked as
+> __init if the normal memory allocators aren't online yet.
+ah, OK, so I suggest to do
 
-According to Rabin VINCENT the alternative to use platform_driver_probe
-won't work because the "platform devices are not yet registered when
-nmk_gpio_init() is called."
+	#ifdef CONFIG_SH
+	__ref
+	#endif
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello Rabin,
+Just kidding :-)
 
-sorry for ignoring your review, it wasn't on purpose.  Here comes a
-fixed up version.  If this is OK for you, I'd post this as 6347/2.
+> > Russell, would at least __module_or_init be OK?
+> 
+> It's a conceptual thing - we want to allow people to create aliases at
+> run time.  Making it an __init thing will only encourage people to do
+> silly things to work around the "it can only be used at init time"
+> problem rather than taking the obvious step of removing the __init tag.
+OK, thanks for your explanation.
 
-Best regards
 Uwe
 
- arch/arm/plat-nomadik/gpio.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
-index 977c8f9..7c7c1f1 100644
---- a/arch/arm/plat-nomadik/gpio.c
-+++ b/arch/arm/plat-nomadik/gpio.c
-@@ -534,7 +534,7 @@ static struct gpio_chip nmk_gpio_template = {
- 	.can_sleep		= 0,
- };
- 
--static int __init nmk_gpio_probe(struct platform_device *dev)
-+static int __devinit nmk_gpio_probe(struct platform_device *dev)
- {
- 	struct nmk_gpio_platform_data *pdata = dev->dev.platform_data;
- 	struct nmk_gpio_chip *nmk_chip;
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
