@@ -1,61 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 10:42:44 -0700
-Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early
-	init testing
-In-Reply-To: <20100902170830.GW26319@n2100.arm.linux.org.uk>
-References: <20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902161846.GK11597@atomide.com>
-	<20100902170830.GW26319@n2100.arm.linux.org.uk>
-Message-ID: <20100902174244.GU11597@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 2 Sep 2010 19:57:21 +0200
+Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
+In-Reply-To: <20100902172908.GD2464@tarshish>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
+	<20100902145357.GL14214@pengutronix.de>
+	<19583.48828.125104.712979@ipc1.ka-ro>
+	<20100902172908.GD2464@tarshish>
+Message-ID: <20100902175720.GU14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 10:00]:
-> On Thu, Sep 02, 2010 at 09:18:47AM -0700, Tony Lindgren wrote:
+Hello,
+
+On Thu, Sep 02, 2010 at 08:29:09PM +0300, Baruch Siach wrote:
+> Hi Lothar,
 > 
-> > --- a/arch/arm/include/asm/smp_plat.h
-> > +++ b/arch/arm/include/asm/smp_plat.h
-> > @@ -39,4 +39,20 @@ static inline int cache_ops_need_broadcast(void)
-> >  #define UP(instr...)	_str(instr)
-> >  #endif
-> >  
-> > +static inline int smp_on_up(void)
-> > +{
-> > +#ifdef CONFIG_SMP_ON_UP
-> > +	int smp_on_up;
-> > +
-> > +	asm(							\
-> > +		SMP(mov	%0, #0)					\
-> > +		UP(mov	%0, #1)					\
-> > +		: "=r" (smp_on_up));
-> > +
-> > +	return smp_on_up;
-> > +#else
-> > +	return 0;
-> > +#endif
+> On Thu, Sep 02, 2010 at 05:11:56PM +0200, Lothar Wa?mann wrote:
+> > > > -	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
+> > > > +	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
+> > > > +	 * not compatible with existing SPI controllers on other i.MX platforms,
+> > > > +	 * while CSPI controller is 100% compatible with the one on the i.MX35.
+> > > > +	 * We set the platform device id to 2 for this CSPI at i.MX51 board init
+> > > > +	 * level to distinguish it from two eCSPI controllers.
+> > > > +	 */
+> > > This comment is missing in Sascha's driver.  I like it.
+> > > BTW, I'd like to make use of platform ids in this driver.  This would
+> > > make this ugly "on imx51 id2 is a cspi" distinction unnecessary.
+> > > 
+> > > > +	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
+> > > > +	    (cpu_is_mx51() && (pdev->id == 2))) {
+> > I'd prefer a flag in the platform_data that tells the driver to act as
+> > an eCSPI driver. This way the information about eCSPI or not would be
+> > where it belongs (in the arch specific code).
 > 
-> I think this is the wrong approach - rather than a function which tells us
-> just if we are a SMP kernel running on UP, why not something which returns
-> whether we're running on SMP and use that to eliminate some of these ifdefs?
+> But this also increases the size of driver code, since the compiler can 
+> resolve cpu_is_* at compile time, and drop the dead code. Maybe an is_ecspi 
+> macro will make the above code clearer.
+If you ask me the cleanest approach is using platform ids.  That is the
+devices on mx51 could be called:
 
-Sure. Will has something like this in his patches:
+	imx51-ecspi.0
+	imx51-ecspi.1
+	imx51-cspi.0
 
-static inline int cpu_is_part_of_mp_system(void)
-{
-	u32 mpidr;
-	asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
-	return (mpidr >> 31) ? !(mpidr >> 30) : 0;
-}
+I don't know what the implications on driver code size is, but I can
+imagine that if done carefully the driver doesn't need to be bigger.
 
-BTW, so far looks like we should only need this during init to set up things.
+Best regards
+Uwe
 
-Regards,
-
-Tony
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
