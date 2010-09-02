@@ -1,37 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 02 Sep 2010 19:21:10 +0900
-Subject: [PATCH 00/13] ARM: S5P64X0: Add new S5P6450 Support
-In-Reply-To: <20100901114518.GA20737@trinity.fluff.org>
-References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-	<20100901114518.GA20737@trinity.fluff.org>
-Message-ID: <005201cb4a88$93214570$b963d050$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 11:22:56 +0100
+Subject: [PATCH 45/74] SPEAr : SEV Send event to secondary CPUs
+In-Reply-To: <861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
+Message-ID: <20100902102256.GO26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> 
-Hi ;-)
+On Mon, Aug 30, 2010 at 04:09:09PM +0530, Viresh KUMAR wrote:
+> diff --git a/arch/arm/mach-spear13xx/include/mach/smp.h b/arch/arm/mach-spear13xx/include/mach/smp.h
+> index 6e028a1..e2e55fc 100644
+> --- a/arch/arm/mach-spear13xx/include/mach/smp.h
+> +++ b/arch/arm/mach-spear13xx/include/mach/smp.h
+> @@ -24,6 +24,12 @@
+>  		cpunum &= 0x0F;				\
+>  	})
+>  
+> +/*
+> + * set_event() is used to wake up secondary core from wfe using sev. Booting
+> + * code puts the second core into wfe(standby).
+> + */
+> +#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
 
-> On Wed, Sep 01, 2010 at 04:09:07PM +0900, Kukjin Kim wrote:
-> > This patches add basic support for Samsung S5P6450 SoC.
-> >
-> > Basically this patch moves mach-s5p6440 (ARCH_S5P6440) to mach-s5p64x0
-> > (ARCH_S5P64X0) to support Samsung's new S5P6450 SoC. The
-> ARCH_S5P64X0
-> > can support S5P6440 and S5P6450 with one kernel image. It is tested on
-> > SMDK6440(S5P6440) and SMDK6450(S5P6450) with s5p64x0_defconfig. And
-> > this patch changes s5p6440_defconfig to s5p64x0_defconfig for S5P64X0.
-> 
-> What about the s5p6442?
-> 
-S5P6440 and S5P6450 are each other similar, but S5P6442 differs much with
-it.
-,,,so remains some issues for it now.
+This shouldn't be something that platforms define on their own.  Please
+add a sev() macro to arch/arm/include/asm/system.h instead.  Also take a
+look at arch/arm/mach-omap2/omap-smp.c for an alternative idea about how
+to handle this.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Lastly, consider rolling the OMAP solution into the patch which adds SMP
+support for spear13xx.
