@@ -1,65 +1,89 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Sep 2010 17:02:58 +0200
-Subject: [PATCH 3/6] mx5: add support to dynamically register spi_imx
-	devices (imx51 3ds)
-In-Reply-To: <1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
+Date: Thu, 2 Sep 2010 17:05:16 +0200
+Subject: [PATCH 5/6] mx51_3ds: add eCSPI2 support on the imx51_3ds board
+In-Reply-To: <1283413924-14210-6-git-send-email-jason77.wang@gmail.com>
 References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100902150258.GN14214@pengutronix.de>
+	<1283413924-14210-5-git-send-email-jason77.wang@gmail.com>
+	<1283413924-14210-6-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100902150516.GO14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jason,
 
-On Thu, Sep 02, 2010 at 03:52:01PM +0800, Jason Wang wrote:
+On Thu, Sep 02, 2010 at 03:52:03PM +0800, Jason Wang wrote:
+> Add platform data for eCSPI2 and register it through spi_imx dynamical
+> register interface.
+> 
 > Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 > ---
->  arch/arm/mach-mx5/Kconfig         |    1 +
->  arch/arm/mach-mx5/devices-imx51.h |   20 ++++++++++++++++++++
->  2 files changed, 21 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/devices-imx51.h
+>  arch/arm/mach-mx5/board-mx51_3ds.c |   20 ++++++++++++++++++++
+>  1 files changed, 20 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index 0848db5..898fb47 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -18,6 +18,7 @@ config MACH_MX51_BABBAGE
->  config MACH_MX51_3DS
->  	bool "Support MX51PDK (3DS)"
->  	select MXC_DEBUG_BOARD
-> +	select IMX_HAVE_PLATFORM_SPI_IMX
->  	help
->  	  Include support for MX51PDK (3DS) platform. This includes specific
->  	  configurations for the board and its peripherals.
-> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-> new file mode 100644
-> index 0000000..d04c7eb
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/devices-imx51.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * Copyright (C) 2010 Jason Wang <jason77.wang@gmail.com>
-> + *
-> + * based on mach-mx3/devices-imx35.h which is
-> + * Copyright (C) 2010 Pengutronix
-> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +#include <mach/mx51.h>
-> +#include <mach/devices-common.h>
+> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+> index f95c2fd..0cf4e14 100644
+> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
+> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+> @@ -24,9 +24,11 @@
+>  #include <mach/imx-uart.h>
+>  #include <mach/3ds_debugboard.h>
+>  
+> +#include "devices-imx51.h"
+>  #include "devices.h"
+>  
+>  #define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
+> +#define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
+>  
+>  static struct pad_desc mx51_3ds_pads[] = {
+>  	/* UART1 */
+> @@ -61,6 +63,12 @@ static struct pad_desc mx51_3ds_pads[] = {
+>  	MX51_PAD_KEY_COL3__KEY_COL3,
+>  	MX51_PAD_KEY_COL4__KEY_COL4,
+>  	MX51_PAD_KEY_COL5__KEY_COL5,
 > +
-> +#define imx51_add_spi_imx0(pdata)	\
-> +	imx_add_spi_imx(0, MX51_CSPI1_BASE_ADDR, SZ_4K, MX51_MXC_INT_CSPI1, pdata)
-> +#define imx51_add_spi_imx1(pdata)	\
-> +	imx_add_spi_imx(1, MX51_CSPI2_BASE_ADDR, SZ_4K, MX51_MXC_INT_CSPI2, pdata)
-> +#define imx51_add_spi_imx2(pdata)	\
-> +	imx_add_spi_imx(1, MX51_CSPI3_BASE_ADDR, SZ_4K, MX51_MXC_INT_CSPI, pdata)
-I like my new approach better.  See my patch 3.
+> +	/* eCSPI2 */
+> +	MX51_PAD_NANDF_RB2__ECSPI2_SCLK,
+> +	MX51_PAD_NANDF_RB3__ECSPI2_MISO,
+> +	MX51_PAD_NANDF_D15__ECSPI2_MOSI,
+> +	MX51_PAD_NANDF_D12__GPIO_3_28,
+>  };
+>  
+>  /* Serial ports */
+> @@ -127,6 +135,16 @@ static inline void mxc_init_keypad(void)
+>  }
+>  #endif
+>  
+> +static int mx51_3ds_spi2_cs[] = {
+> +	MXC_SPI_CS(0),
+> +	MX51_3DS_ECSPI2_CS,
+> +};
+> +
+> +static struct spi_imx_master mx51_3ds_spi2_pdata = {
+> +	.chipselect	= mx51_3ds_spi2_cs,
+> +	.num_chipselect	= ARRAY_SIZE(mx51_3ds_spi2_cs),
+> +};
+maybe better call it mx51_3ds_ecspi2_pdata?  This should be const
+__initconst.
+
+>  /*
+>   * Board specific initialization.
+>   */
+> @@ -136,6 +154,8 @@ static void __init mxc_board_init(void)
+>  					ARRAY_SIZE(mx51_3ds_pads));
+>  	mxc_init_imx_uart();
+>  
+> +	imx51_add_spi_imx1(&mx51_3ds_spi2_pdata);
+> +
+>  	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+>  		printk(KERN_WARNING "Init of the debugboard failed, all "
+>  				    "devices on the board are unusable.\n");
+> -- 
+> 1.5.6.5
+> 
+> 
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
