@@ -1,99 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 02 Sep 2010 16:32:19 +0900
-Subject: [PATCH 08/13] ARM: S5P64X0: Move DMA support for S5P64X0
-In-Reply-To: <AANLkTi=1tJ-EnDmiossRWVPkumubicqXzqvXSrWQMqQ=@mail.gmail.com>
-References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-	<1283324960-21629-9-git-send-email-kgene.kim@samsung.com>
-	<AANLkTi=1tJ-EnDmiossRWVPkumubicqXzqvXSrWQMqQ=@mail.gmail.com>
-Message-ID: <004701cb4a70$fc807260$f5815720$%kim@samsung.com>
+From: jason77.wang@gmail.com (Jason Wang)
+Date: Thu,  2 Sep 2010 15:51:58 +0800
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx driver
+Message-ID: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> 
-> On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > This patch moves DMA support files in the mach-s5p64x0
-> > for S5P6440 and S5P6450 SoCs.
-> >
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: Jassi Brar <jassi.brar@samsung.com>
-> > ---
-> >  arch/arm/{mach-s5p6440 => mach-s5p64x0}/dma.c      |   75
-> ++++++++++++++++---
-> >  .../include/mach/dma.h                             |    0
-> >  arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h |   28 +++++++
-> >  3 files changed, 91 insertions(+), 12 deletions(-)
-> >  rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/dma.c (56%)
-> >  rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/include/mach/dma.h (100%)
-> >
+Some explanations:
 
-(snip)
+This patchset is to add SPI support in the existing spi_imx driver for
+i.MX51 and add SPI relating stuffs for mx51_3ds board level.
 
-> > +
-> >  static struct platform_device s5p6440_device_pdma = {
-> >        .name           = "s3c-pl330",
-> >        .id             = 1,
-> 
-> While at it, please make id 0  as well.
-> 
-Ok..will fix it.
+i.MX51 has two eCSPI controllers and one CSPI controller, CSPI
+controller is 100% compatible with the one of i.MX35, so we don't need
+to add new functions for this CSPI, only bind it with i.MX35 together,
+while eCSPI isn't compatible with existing controllers of i.MX
+platforms, so i add new functions for these two eCSPIs in the existing
+spi_imx driver.
 
-> 
-> > -       .num_resources  = ARRAY_SIZE(s5p6440_pdma_resource),
-> > -       .resource       = s5p6440_pdma_resource,
-> > +       .num_resources  = ARRAY_SIZE(s5p64x0_pdma_resource),
-> > +       .resource       = s5p64x0_pdma_resource,
-> >        .dev            = {
-> >                .dma_mask = &dma_dmamask,
-> >                .coherent_dma_mask = DMA_BIT_MASK(32),
-> > @@ -92,14 +130,27 @@ static struct platform_device s5p6440_device_pdma = {
-> >        },
-> >  };
-> >
-> > -static struct platform_device *s5p6440_dmacs[] __initdata = {
-> > +static struct platform_device s5p6450_device_pdma = {
-> > +       .name           = "s3c-pl330",
-> > +       .id             = 0,
-> > +       .num_resources  = ARRAY_SIZE(s5p64x0_pdma_resource),
-> > +       .resource       = s5p64x0_pdma_resource,
-> > +       .dev            = {
-> > +               .dma_mask = &dma_dmamask,
-> > +               .coherent_dma_mask = DMA_BIT_MASK(32),
-> > +               .platform_data = &s5p6450_pdma_pdata,
-> > +       },
-> > +};
-> > +
-> > +static struct platform_device *s5p64x0_dmacs[] __initdata = {
-> >        &s5p6440_device_pdma,
-> > +       /* &s5p6450_device_pdma will be added */
-> >  };
-> Let us simply call the DMAC as s5p64x0_device_pdma and use some
-> CPU detection method in s5p64x0_dma_init to assign either of
-> s5p6440_pdma_pdata and s5p6450_pdma_pdata to the platform_data
-> 
-Ok.
+If these patches pass review, the first patch 0001-xxx.patch should be
+merged by Grant.likely; other patches(0002-0006) are based off
+imx-for-2.6.37 and should be handled by Sascha.
 
-> ........
-> 
-> > +       DMACH_MTOM_0,
-> > +       DMACH_MTOM_1,
-> > +       DMACH_MTOM_2,
-> > +       DMACH_MTOM_3,
-> > +       DMACH_MTOM_4,
-> > +       DMACH_MTOM_5,
-> > +       DMACH_MTOM_6,
-> > +       DMACH_MTOM_7,
-> 
-> oops ... Mainline s3c dma api doesn't yet support Mem->Mem transfers.
-> You need to drop it.
+On mx51_3ds board, there is a SPI NOR flash connected through eCSPI2,
+i have validated this patchset using this SPI NOR flash, see results:
+(bootlogs)
+<snip>
+m25p80 spi1.1: found sst25vf016b, expected m25p80
+m25p80 spi1.1: sst25vf016b (2048 Kbytes)
+spi_imx spi_imx.1: probed
+<snip>
+(target tty console)
+# cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 00200000 00001000 "spi1.1"
+# mtd_debug read /dev/mtd0 0 0x100 /a.txt
+Copied 256 bytes from address 0x00000000 in flash to /a.txt
+# hexdump a.txt 
+0000000 0000 eb00 0b53 eb00 002c e28f 0c00 e890
+0000010 a000 e08a b000 e08b 7001 e24a 000b e15a
+0000020 0000 1a00 0b4b eb00 000f e8ba e018 e24f
+0000030 0001 e313 f003 1047 ff13 e12f 3720 0000
+0000040 3730 0000 3000 e3b0 4000 e3b0 5000 e3b0
+0000050 6000 e3b0 2010 e252 0078 28a1 fffc 8aff
+0000060 2e82 e1b0 0030 28a1 3000 4581 ff1e e12f
+0000070 e004 e52d 7000 e10f 700f e3c7 6001 e287
+0000080 f006 e12f 0001 e040 d000 e1a0 6002 e287
+0000090 f006 e12f 0001 e040 d000 e1a0 6006 e287
+00000a0 f006 e12f 0001 e040 d000 e1a0 6007 e287
+00000b0 f006 e12f 0001 e040 d000 e1a0 600b e287
+00000c0 f006 e12f 0001 e040 d000 e1a0 600f e287
+00000d0 f006 e12f 0001 e040 d000 e1a0 6003 e287
+00000e0 60c0 e3c6 f006 e12f f004 e49d f003 e320
+00000f0 ff1e e12f 4001 e92d 0f11 ee11 0001 e380
 
-Oh, you're right. it's my mistake.
-Will fix it. :-)
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks,
+Jason.
