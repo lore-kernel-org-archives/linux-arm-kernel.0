@@ -1,33 +1,42 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 02 Sep 2010 18:43:02 +0300
-Subject: Colibri PXA320 Power management question
-In-Reply-To: <20100902152705.GC5809@rakim.wolfsonmicro.main>
-References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
-	<20100902142203.GA8381@sirena.org.uk>
-	<4C7FB7B5.2010301@compulab.co.il>
-	<20100902152705.GC5809@rakim.wolfsonmicro.main>
-Message-ID: <4C7FC606.20904@compulab.co.il>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Thu, 2 Sep 2010 17:11:56 +0200
+Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
+In-Reply-To: <20100902145357.GL14214@pengutronix.de>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
+	<20100902145357.GL14214@pengutronix.de>
+Message-ID: <19583.48828.125104.712979@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> On Thu, Sep 02, 2010 at 05:41:57PM +0300, Mike Rapoport wrote:
->> Mark Brown wrote:
-> 
->>> The expectation in Linux is that voltage scaling will be done in
->>> software using cpufreq rather than autonomously by the CPU.
-> 
->> PXA3xx has ability to automatically control certain regulators
->> (almost) without software intervention. Setting the bits Yuri is
->> talking about should enable CPU initiated i2c transactions upon
->> frequency scaling events.
-> 
-> Yes, exactly - what I'm saying is that Linux is set up to use cpufreq
-> rather than rely on the built in stuff.
+Hi,
 
-There's no contradiction here. The PXA3XX cpufreq implementation could trigger 
-automatic voltage scaling.
+> > -	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
+> > +	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
+> > +	 * not compatible with existing SPI controllers on other i.MX platforms,
+> > +	 * while CSPI controller is 100% compatible with the one on the i.MX35.
+> > +	 * We set the platform device id to 2 for this CSPI at i.MX51 board init
+> > +	 * level to distinguish it from two eCSPI controllers.
+> > +	 */
+> This comment is missing in Sascha's driver.  I like it.
+> BTW, I'd like to make use of platform ids in this driver.  This would
+> make this ugly "on imx51 id2 is a cspi" distinction unnecessary.
+> 
+> > +	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
+> > +	    (cpu_is_mx51() && (pdev->id == 2))) {
+I'd prefer a flag in the platform_data that tells the driver to act as
+an eCSPI driver. This way the information about eCSPI or not would be
+where it belongs (in the arch specific code).
 
+
+Lothar Wa?mann
 -- 
-Sincerely yours,
-Mike.
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
