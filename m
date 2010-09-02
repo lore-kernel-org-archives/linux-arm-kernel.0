@@ -1,24 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Sep 2010 16:27:05 +0100
-Subject: Colibri PXA320 Power management question
-In-Reply-To: <4C7FB7B5.2010301@compulab.co.il>
-References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
-	<20100902142203.GA8381@sirena.org.uk>
-	<4C7FB7B5.2010301@compulab.co.il>
-Message-ID: <20100902152705.GC5809@rakim.wolfsonmicro.main>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 16:40:55 +0100
+Subject: [PATCH 72/74] SPEAr13xx: Replace defconfigs with single unfied
+	defconfig
+In-Reply-To: <24d22c52ef8367bd6167f2a511cd86176ab6948e.1283161024.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<24d22c52ef8367bd6167f2a511cd86176ab6948e.1283161024.git.viresh.kumar@st.com>
+Message-ID: <20100902154055.GP26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 05:41:57PM +0300, Mike Rapoport wrote:
-> Mark Brown wrote:
+On Mon, Aug 30, 2010 at 04:09:35PM +0530, Viresh KUMAR wrote:
+> We only need one defconfig for SPEAr13xx now since we can build all
+> boards into one kernel.
 
-> >The expectation in Linux is that voltage scaling will be done in
-> >software using cpufreq rather than autonomously by the CPU.
+All this kind of thing should be rolled into previous patches.
 
-> PXA3xx has ability to automatically control certain regulators
-> (almost) without software intervention. Setting the bits Yuri is
-> talking about should enable CPU initiated i2c transactions upon
-> frequency scaling events.
-
-Yes, exactly - what I'm saying is that Linux is set up to use cpufreq
-rather than rely on the built in stuff.
+We really don't need to know that you developed SPEAr13xx support
+such that it initially couldn't build all boards into a kernel,
+what the changes were to achieve a kernel for everything, and that
+there were several defconfigs in existence before one grand unified
+one was possible.
