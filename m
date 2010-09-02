@@ -1,28 +1,44 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 11:50:55 +0100
-Subject: [PATCH 4/5] DMA: Add functions to preallocate DMA memory dor
-	devices
-In-Reply-To: <Pine.LNX.4.64.1008191636590.26145@axis700.grange>
-References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
-	<Pine.LNX.4.64.1008191636590.26145@axis700.grange>
-Message-ID: <20100902105055.GS26319@n2100.arm.linux.org.uk>
+Date: Thu, 2 Sep 2010 11:53:49 +0100
+Subject: [PATCH 1/3] h1940: use gpiolib for latch access
+In-Reply-To: <1282230003-2020-2-git-send-email-anarsoul@gmail.com>
+References: <1282230003-2020-1-git-send-email-anarsoul@gmail.com>
+	<1282230003-2020-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <20100902105349.GT26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 19, 2010 at 04:40:22PM +0200, Guennadi Liakhovetski wrote:
-> Currently dma_declare_coherent_memory() and dma_release_declared_memory() are
-> provided to assign DMA memory to a device and to release it. These functions
-> can be use with device local memory, like on-chip SRAM. However, they are
-> unsuitable for assigning of generic system RAM to devices, because such system
-> memory should not be ioremapped, and ioremap() is used internally in the former
-> of these functions to map the memory.
-> 
-> This patch solves this problem by adding two more functions:
-> dma_preallocate_coherent_memory() and dma_release_preallocated_memory(), which
-> allocate DMA coherent memory and assign it to the device, and release it back
-> respectively.
+On Thu, Aug 19, 2010 at 06:00:01PM +0300, Vasily Khoruzhick wrote:
+> diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
+> index 779b45b..9717790 100644
+> --- a/arch/arm/mach-s3c2410/mach-h1940.c
+> +++ b/arch/arm/mach-s3c2410/mach-h1940.c
+> @@ -42,6 +42,7 @@
+>  #include <mach/regs-gpio.h>
+>  #include <mach/gpio-fns.h>
+>  #include <mach/gpio-nrs.h>
+> +#include <mach/gpio.h>
 
-This looks like a much saner interface for pre-allocating DMA memory from
-system memory, rather than trying to use dma_declare_coherent_memory().
+linux/gpio.h ?
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>  
+>  #include <mach/h1940.h>
+>  #include <mach/h1940-latch.h>
+> @@ -58,6 +59,16 @@
+>  #include <plat/mci.h>
+>  #include <plat/ts.h>
+>  
+> +#ifndef __ASSEMBLY__
+> +#define H1940_LATCH		((void __force __iomem *)0xF8000000)
+> +#else
+> +#define H1940_LATCH		0xF8000000
+> +#endif
+
+This file can never be built by the assembler, so the above is pointless.
+
+> +
+> +#define H1940_PA_LATCH		(S3C2410_CS2)
+
+Parents not required.
+
+Rest looks fine to me.
