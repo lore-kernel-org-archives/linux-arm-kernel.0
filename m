@@ -1,180 +1,61 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  2 Sep 2010 16:42:02 +0200
-Subject: [PATCH 5/6] spi-imx: Add i.MX51 support
+Date: Thu,  2 Sep 2010 16:41:59 +0200
+Subject: [PATCH 2/6] ARM: mx51: fix naming of spi related defines
 In-Reply-To: <20100902143908.GK14214@pengutronix.de>
 References: <20100902143908.GK14214@pengutronix.de>
-Message-ID: <1283438523-19697-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1283438523-19697-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+The names used now match the processor's reference manual.  Also remove
+MXC from the interrupt defines to match the other imx platforms.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/spi/spi_imx.c |  123 +++++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 120 insertions(+), 3 deletions(-)
+ arch/arm/plat-mxc/include/mach/mx51.h |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 7972e90..5ee2699 100644
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -155,6 +155,117 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
- 	return 7;
- }
- 
-+/* MX51 */
-+static unsigned int spi_imx_clkdiv_3(unsigned int fin,
-+		unsigned int fspi)
-+{
-+	unsigned int div = 4, post = 0, pre = 0, res;
-+
-+	div = fin / fspi;
-+
-+	res = fin;
-+	while (res > (fspi * 16)) {
-+		post++;
-+		res = fin / (1 << post);
-+	}
-+
-+	pre = fin / (1 << post) / fspi;
-+
-+	return (post & 0xf) | ((pre & 0xf) << 4);
-+}
-+
-+#define MX51_CSPIRXDATA		0x00
-+#define MX51_CSPITXDATA		0x04
-+#define MX51_CSPICTRL		0x08
-+#define MX51_CSPICONFIG		0x0c
-+#define MX51_CSPIINT		0x10
-+#define MX51_CSPIDMA		0x14
-+#define MX51_CSPISTATUS		0x18
-+#define MX51_CSPIPERIOD		0x1c
-+#define MX51_CSPITEST		0x20
-+
-+#define MX51_INTREG_TEEN	(1 << 0)
-+#define MX51_INTREG_RREN	(1 << 3)
-+
-+#define MX51_CSPICTRL_ENABLE	(1 << 0)
-+#define MX51_CSPICTRL_XCH	(1 << 2)
-+#define MX51_CSPICTRL_DIV_SHIFT	8
-+#define MX51_CSPICTRL_MASTER(cs)	((1 << (cs)) << 4)
-+#define MX51_CSPICTRL_BL_SHIFT	20
-+#define MX51_CSPICTRL_CS(cs)	((cs) << 18)
-+
-+#define MX51_CSPICONFIG_PHA(cs)		((1 << (cs)) << 0)
-+#define MX51_CSPICONFIG_POL(cs)		((1 << (cs)) << 4)
-+#define MX51_CSPICONFIG_SSBCTRL(cs)	((1 << (cs)) << 8)
-+#define MX51_CSPICONFIG_SSBPOL(cs)	((1 << (cs)) << 12)
-+#define MX51_CSPICONFIG_DATACTRL(cs)	((1 << (cs)) << 16)
-+#define MX51_CSPICONFIG_SCLKCTRL(cs)	((1 << (cs)) << 20)
-+
-+#define MX51_STATUS_RR		(1 << 3)
-+
-+#define MX51_CSPITEST_LBC	(1 << 31)
-+
-+static void mx51_intctrl(struct spi_imx_data *spi_imx, int enable)
-+{
-+	unsigned int val = 0;
-+
-+	if (enable & MXC_INT_TE)
-+		val |= MX51_INTREG_TEEN;
-+	if (enable & MXC_INT_RR)
-+		val |= MX51_INTREG_RREN;
-+
-+	writel(val, spi_imx->base + MX51_CSPIINT);
-+}
-+
-+static void mx51_trigger(struct spi_imx_data *spi_imx)
-+{
-+	unsigned int reg;
-+
-+	reg = readl(spi_imx->base + MXC_CSPICTRL);
-+	reg |= MX51_CSPICTRL_XCH;
-+	writel(reg, spi_imx->base + MXC_CSPICTRL);
-+}
-+
-+static int mx51_config(struct spi_imx_data *spi_imx,
-+		struct spi_imx_config *config)
-+{
-+	int cs;
-+	u32 ctrl;
-+	u32 cfg = 0;
-+
-+#ifdef INTERNAL_LOOPBACK
-+	writel(MX51_CSPITEST_LBC, spi_imx->base + MX51_CSPITEST);
-+#endif
-+	if (config->cs < 0)
-+		cs = config->cs + 32;
-+	else
-+		cs = 0;
-+
-+	ctrl = MX51_CSPICTRL_MASTER(cs) | MX51_CSPICTRL_ENABLE;
-+	ctrl |= spi_imx_clkdiv_3(spi_imx->spi_clk, config->speed_hz) <<
-+		MX51_CSPICTRL_DIV_SHIFT;
-+
-+	ctrl |= (config->bpw - 1) << MX51_CSPICTRL_BL_SHIFT;
-+	cfg |= MX51_CSPICONFIG_SSBCTRL(cs);
-+	if (config->mode & SPI_CPHA)
-+		cfg |= MX51_CSPICONFIG_PHA(cs);
-+	if (config->mode & SPI_CPOL)
-+		cfg |= MX51_CSPICONFIG_POL(cs) | MX51_CSPICONFIG_SCLKCTRL(cs);
-+	if (config->mode & SPI_CS_HIGH)
-+		cfg |= MX51_CSPICONFIG_SSBPOL(cs);
-+	ctrl |= MX51_CSPICTRL_CS(cs);
-+
-+	writel(ctrl, spi_imx->base + MX51_CSPICTRL);
-+	writel(cfg, spi_imx->base + MX51_CSPICONFIG);
-+
-+	return 0;
-+}
-+
-+static int mx51_rx_available(struct spi_imx_data *spi_imx)
-+{
-+	return readl(spi_imx->base + MX51_CSPISTATUS) & MX51_STATUS_RR;
-+}
-+
- #define MX31_INTREG_TEEN	(1 << 0)
- #define MX31_INTREG_RREN	(1 << 3)
- 
-@@ -209,7 +320,7 @@ static int mx31_config(struct spi_imx_data *spi_imx,
- 
- 	if (cpu_is_mx31())
- 		reg |= (config->bpw - 1) << MX31_CSPICTRL_BC_SHIFT;
--	else if (cpu_is_mx25() || cpu_is_mx35()) {
-+	else if (cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51()) {
- 		reg |= (config->bpw - 1) << MX35_CSPICTRL_BL_SHIFT;
- 		reg |= MX31_CSPICTRL_SSCTL;
- 	}
-@@ -223,7 +334,7 @@ static int mx31_config(struct spi_imx_data *spi_imx,
- 	if (config->cs < 0) {
- 		if (cpu_is_mx31())
- 			reg |= (config->cs + 32) << MX31_CSPICTRL_CS_SHIFT;
--		else if (cpu_is_mx25() || cpu_is_mx35())
-+		else if (cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51())
- 			reg |= (config->cs + 32) << MX35_CSPICTRL_CS_SHIFT;
- 	}
- 
-@@ -567,7 +678,8 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
- 		goto out_iounmap;
- 	}
- 
--	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
-+	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
-+			(cpu_is_mx51() && pdev->id == 2)) {
- 		spi_imx->intctrl = mx31_intctrl;
- 		spi_imx->config = mx31_config;
- 		spi_imx->trigger = mx31_trigger;
-@@ -582,6 +694,11 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
- 		spi_imx->config = mx1_config;
- 		spi_imx->trigger = mx1_trigger;
- 		spi_imx->rx_available = mx1_rx_available;
-+	} else if (cpu_is_mx51()) {
-+		spi_imx->intctrl = mx51_intctrl;
-+		spi_imx->config = mx51_config;
-+		spi_imx->trigger = mx51_trigger;
-+		spi_imx->rx_available = mx51_rx_available;
- 	} else
- 		BUG();
- 
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index 92b39f7..d0fda39 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -67,7 +67,7 @@
+ #define MX51_MMC_SDHC1_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x04000)
+ #define MX51_MMC_SDHC2_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x08000)
+ #define MX51_UART3_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x0c000)
+-#define MX51_CSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
++#define MX51_ECSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
+ #define MX51_SSI2_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x14000)
+ #define MX51_MMC_SDHC3_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x20000)
+ #define MX51_MMC_SDHC4_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x24000)
+@@ -121,12 +121,12 @@
+ #define MX51_ARM_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xa0000)
+ #define MX51_OWIRE_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xa4000)
+ #define MX51_FIRI_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xa8000)
+-#define MX51_CSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
++#define MX51_ECSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
+ #define MX51_SDMA_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xb0000)
+ #define MX51_SCC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xb4000)
+ #define MX51_ROMCP_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xb8000)
+ #define MX51_RTIC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xbc000)
+-#define MX51_CSPI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
++#define MX51_CSPI_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
+ #define MX51_I2C2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc4000)
+ #define MX51_I2C1_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc8000)
+ #define MX51_SSI1_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xcc000)
+@@ -346,9 +346,9 @@
+ #define MX51_MXC_INT_UART3		33
+ #define MX51_MXC_INT_RESV34		34
+ #define MX51_MXC_INT_RESV35		35
+-#define MX51_MXC_INT_CSPI1		36
+-#define MX51_MXC_INT_CSPI2		37
+-#define MX51_MXC_INT_CSPI		38
++#define MX51_INT_ECSPI1			36
++#define MX51_INT_ECSPI2			37
++#define MX51_INT_CSPI			38
+ #define MX51_MXC_INT_GPT		39
+ #define MX51_MXC_INT_EPIT1		40
+ #define MX51_MXC_INT_EPIT2		41
 -- 
 1.7.1
