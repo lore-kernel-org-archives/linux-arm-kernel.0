@@ -1,203 +1,138 @@
 From: jason77.wang@gmail.com (Jason Wang)
-Date: Thu,  2 Sep 2010 15:51:59 +0800
-Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
-In-Reply-To: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+Date: Thu,  2 Sep 2010 15:52:00 +0800
+Subject: [PATCH 2/6] i.MX5/clock: add eCSPI and CSPI clock definitions
+In-Reply-To: <1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
 References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
+	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 3 SPI controllers on i.MX51, one is called CSPI and is
-100% compatible with the one on i.MX35, the other two are called
-eCSPI and are not compatible with existing controllers on other
-i.MX platforms, here we add support of these three controllers in
-the imx spi driver.
+i.MX51 has two eCSPI and one CSPI controllers, now add clock
+definitions and registrations for these controllers.
 
 Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 ---
- drivers/spi/spi_imx.c |  135 +++++++++++++++++++++++++++++++++++++++++++++++--
- 1 files changed, 131 insertions(+), 4 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |   79 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 79 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 7972e90..8d9c9da 100644
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -155,6 +155,120 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
- 	return 7;
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 6af69de..217c3f3 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -38,6 +38,7 @@ static struct clk periph_apm_clk;
+ static struct clk ahb_clk;
+ static struct clk ipg_clk;
+ static struct clk usboh3_clk;
++static struct clk spba_clk;
+ 
+ #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
+ 
+@@ -52,6 +53,18 @@ static int _clk_ccgr_enable(struct clk *clk)
+ 	return 0;
  }
  
-+/* MX51 eCSPI post divider */
-+static unsigned int spi_imx_clkdiv_3(unsigned int fin,
-+		unsigned int fspi)
++static int _clk_ccgr_enable_inrun(struct clk *clk)
 +{
-+	int i, div = 1;
++	u32 reg;
 +
-+	for (i = 0; i < 15; i++) {
-+		if (fspi * div >= fin)
-+			return i;
-+		div <<= 1;
-+	}
-+
-+	return 15;
-+}
-+
-+#define MX51_INTREG_TEEN		(1 << 0)
-+#define MX51_INTREG_RREN		(1 << 3)
-+
-+#define MX51_CSPICTRL_ENABLE		(1 << 0)
-+#define MX51_CSPICTRL_XCH		(1 << 2)
-+
-+#define MX51_CSPICTRL_BL_SHIFT		20
-+#define MX51_CSPICTRL_CS_SHIFT		18
-+#define MX51_CSPICTRL_DR_SHIFT		8
-+#define MX51_CSPICTRL_MODE_SHIFT	4
-+#define MX51_CSPICONF_PHA_SHIFT		0
-+#define MX51_CSPICONF_POL_SHIFT		4
-+#define MX51_CSPICONF_SSPOL_SHIFT	12
-+#define MX51_CSPICONF_SSCTL_SHIFT	8
-+
-+#define MX51_CSPICTRL_CSMASK		0x3
-+#define MX51_CSPIINT			0x10
-+#define MX51_CSPICONF			0xC
-+#define MX51_CSPISTATUS			0x18
-+#define MX51_STATUS_RR			(1 << 3)
-+
-+#define MAX_CHIPSELECT_NUM 4
-+
-+static int get_chipselect(struct spi_imx_data *spi_imx,
-+			  struct spi_imx_config *config)
-+{
-+	int i;
-+
-+	for (i = 0; i < MAX_CHIPSELECT_NUM; i++) {
-+		if (config->cs == spi_imx->chipselect[i])
-+			return i;
-+	}
-+
-+	return -EINVAL;
-+}
-+static void mx51_intctrl(struct spi_imx_data *spi_imx, int enable)
-+{
-+	unsigned int val = 0;
-+
-+	if (enable & MXC_INT_TE)
-+		val |= MX51_INTREG_TEEN;
-+	if (enable & MXC_INT_RR)
-+		val |= MX51_INTREG_RREN;
-+
-+	writel(val, spi_imx->base + MX51_CSPIINT);
-+}
-+
-+static void mx51_trigger(struct spi_imx_data *spi_imx)
-+{
-+	unsigned int reg;
-+
-+	reg = readl(spi_imx->base + MXC_CSPICTRL);
-+	reg |= MX51_CSPICTRL_XCH;
-+	writel(reg, spi_imx->base + MXC_CSPICTRL);
-+}
-+
-+static int mx51_config(struct spi_imx_data *spi_imx,
-+		struct spi_imx_config *config)
-+{
-+	unsigned int config_reg = 0;
-+	unsigned int ctrl_reg = MX51_CSPICTRL_ENABLE;
-+	int chan;
-+
-+	chan = get_chipselect(spi_imx, config);
-+	if (chan < 0)
-+		return chan;
-+	ctrl_reg |= (chan & MX51_CSPICTRL_CSMASK) << MX51_CSPICTRL_CS_SHIFT;
-+	ctrl_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
-+		MX51_CSPICTRL_MODE_SHIFT;
-+	ctrl_reg |= spi_imx_clkdiv_3(spi_imx->spi_clk, config->speed_hz) <<
-+		MX51_CSPICTRL_DR_SHIFT;
-+
-+	ctrl_reg |= (config->bpw - 1) << MX51_CSPICTRL_BL_SHIFT;
-+
-+
-+	if (config->mode & SPI_CPHA)
-+		config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
-+			MX51_CSPICONF_PHA_SHIFT;
-+	if (config->mode & SPI_CPOL)
-+		config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
-+			MX51_CSPICONF_POL_SHIFT;
-+	if (config->mode & SPI_CS_HIGH)
-+		config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
-+			MX51_CSPICONF_SSPOL_SHIFT;
-+
-+	config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
-+		MX51_CSPICONF_SSCTL_SHIFT;
-+
-+	writel(ctrl_reg, spi_imx->base + MXC_CSPICTRL);
-+	writel(config_reg, spi_imx->base + MX51_CSPICONF);
++	reg = __raw_readl(clk->enable_reg);
++	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
++	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
++	__raw_writel(reg, clk->enable_reg);
 +
 +	return 0;
 +}
 +
-+static int mx51_rx_available(struct spi_imx_data *spi_imx)
+ static void _clk_ccgr_disable(struct clk *clk)
+ {
+ 	u32 reg;
+@@ -762,6 +775,61 @@ static struct clk kpp_clk = {
+ 	.id = 0,
+ };
+ 
++/* eCSPI */
++static unsigned long _clk_ecspi_getrate(struct clk *clk)
 +{
-+	return readl(spi_imx->base + MX51_CSPISTATUS) & MX51_STATUS_RR;
++	u32 reg, prediv, podf;
++	unsigned long ret;
++
++	reg = __raw_readl(MXC_CCM_CSCDR2);
++	prediv = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PRED_MASK) >>
++		  MXC_CCM_CSCDR2_CSPI_CLK_PRED_OFFSET) + 1;
++	if (prediv == 1)
++		BUG();
++	podf = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PODF_MASK) >>
++		MXC_CCM_CSCDR2_CSPI_CLK_PODF_OFFSET) + 1;
++
++	ret = clk_get_rate(clk->parent) / (prediv * podf);
++	return ret;
 +}
 +
- #define MX31_INTREG_TEEN	(1 << 0)
- #define MX31_INTREG_RREN	(1 << 3)
++static int _clk_ecspi_set_parent(struct clk *clk, struct clk *parent)
++{
++	u32 reg, mux;
++
++	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk, &pll3_sw_clk,
++		       &lp_apm_clk);
++	reg = __raw_readl(MXC_CCM_CSCMR1) & ~MXC_CCM_CSCMR1_CSPI_CLK_SEL_MASK;
++	reg |= mux << MXC_CCM_CSCMR1_CSPI_CLK_SEL_OFFSET;
++	__raw_writel(reg, MXC_CCM_CSCMR1);
++
++	return 0;
++}
++
++static struct clk ecspi_main_clk = {
++	.parent = &pll3_sw_clk,
++	.get_rate = _clk_ecspi_getrate,
++	.set_parent = _clk_ecspi_set_parent,
++};
++
++static struct clk ecspi1_ipg_clk = {
++	.parent = &ipg_clk,
++	.secondary = &spba_clk,
++	.enable_reg = MXC_CCM_CCGR4,
++	.enable_shift = MXC_CCM_CCGRx_CG9_OFFSET,
++	.enable = _clk_ccgr_enable_inrun,
++	.disable = _clk_ccgr_disable,
++};
++
++static struct clk ecspi2_ipg_clk = {
++	.parent = &ipg_clk,
++	.secondary = &aips_tz2_clk,
++	.enable_reg = MXC_CCM_CCGR4,
++	.enable_shift = MXC_CCM_CCGRx_CG11_OFFSET,
++	.enable = _clk_ccgr_enable_inrun,
++	.disable = _clk_ccgr_disable,
++};
++
+ #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
+ 	static struct clk name = {			\
+ 		.id		= i,			\
+@@ -814,6 +882,14 @@ DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+ DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
  
-@@ -209,7 +323,7 @@ static int mx31_config(struct spi_imx_data *spi_imx,
++/* eCSPI & CSPI */
++DEFINE_CLOCK(cspi1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG10_OFFSET,
++	NULL, NULL, &ecspi_main_clk, &ecspi1_ipg_clk);
++DEFINE_CLOCK(cspi2_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG12_OFFSET,
++	NULL, NULL, &ecspi_main_clk, &ecspi2_ipg_clk);
++DEFINE_CLOCK(cspi3_clk, 2, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG13_OFFSET,
++	NULL, NULL, &ipg_clk, NULL);
++
+ #define _REGISTER_CLOCK(d, n, c) \
+        { \
+ 		.dev_id = d, \
+@@ -837,6 +913,9 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+ 	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
++	_REGISTER_CLOCK("spi_imx.0", NULL, cspi1_clk)
++	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
++	_REGISTER_CLOCK("spi_imx.2", NULL, cspi3_clk)
+ };
  
- 	if (cpu_is_mx31())
- 		reg |= (config->bpw - 1) << MX31_CSPICTRL_BC_SHIFT;
--	else if (cpu_is_mx25() || cpu_is_mx35()) {
-+	else if (cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51()) {
- 		reg |= (config->bpw - 1) << MX35_CSPICTRL_BL_SHIFT;
- 		reg |= MX31_CSPICTRL_SSCTL;
- 	}
-@@ -223,7 +337,7 @@ static int mx31_config(struct spi_imx_data *spi_imx,
- 	if (config->cs < 0) {
- 		if (cpu_is_mx31())
- 			reg |= (config->cs + 32) << MX31_CSPICTRL_CS_SHIFT;
--		else if (cpu_is_mx25() || cpu_is_mx35())
-+		else if (cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51())
- 			reg |= (config->cs + 32) << MX35_CSPICTRL_CS_SHIFT;
- 	}
- 
-@@ -567,7 +681,14 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
- 		goto out_iounmap;
- 	}
- 
--	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
-+	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
-+	 * not compatible with existing SPI controllers on other i.MX platforms,
-+	 * while CSPI controller is 100% compatible with the one on the i.MX35.
-+	 * We set the platform device id to 2 for this CSPI@i.MX51 board init
-+	 * level to distinguish it from two eCSPI controllers.
-+	 */
-+	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
-+	    (cpu_is_mx51() && (pdev->id == 2))) {
- 		spi_imx->intctrl = mx31_intctrl;
- 		spi_imx->config = mx31_config;
- 		spi_imx->trigger = mx31_trigger;
-@@ -582,6 +703,11 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
- 		spi_imx->config = mx1_config;
- 		spi_imx->trigger = mx1_trigger;
- 		spi_imx->rx_available = mx1_rx_available;
-+	} else if (cpu_is_mx51()) {
-+		spi_imx->intctrl = mx51_intctrl;
-+		spi_imx->config = mx51_config;
-+		spi_imx->trigger = mx51_trigger;
-+		spi_imx->rx_available = mx51_rx_available;
- 	} else
- 		BUG();
- 
-@@ -599,7 +725,8 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
- 		writel(1, spi_imx->base + MXC_RESET);
- 
- 	/* drain receive buffer */
--	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35())
-+	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
-+	    (cpu_is_mx51() && (pdev->id == 2)))
- 		while (readl(spi_imx->base + MX3_CSPISTAT) & MX3_CSPISTAT_RR)
- 			readl(spi_imx->base + MXC_CSPIRXDATA);
- 
+ static void clk_tree_init(void)
 -- 
 1.5.6.5
