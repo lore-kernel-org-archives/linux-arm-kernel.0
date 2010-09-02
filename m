@@ -1,27 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 14:41:51 +0100
-Subject: memblock_is_region_reserved() issue
-In-Reply-To: <1280894327.1902.138.camel@pasglop>
-References: <1280882307.1902.124.camel@pasglop>
-	<1280885890.1902.134.camel@pasglop>
-	<1280894327.1902.138.camel@pasglop>
-Message-ID: <20100902134151.GK26319@n2100.arm.linux.org.uk>
+Date: Thu, 2 Sep 2010 14:47:32 +0100
+Subject: [RFC] [PATCH v2] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <20100902132641.GI14214@pengutronix.de>
+References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
+	<1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<20100902132641.GI14214@pengutronix.de>
+Message-ID: <20100902134732.GL26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 04, 2010 at 01:58:47PM +1000, Benjamin Herrenschmidt wrote:
-> Hi folks !
+On Thu, Sep 02, 2010 at 03:26:41PM +0200, Uwe Kleine-K?nig wrote:
+> I'm not very satisfied by Russell's answer.  But even if I accept that
+> it should not move to .init.text, why .ref.text?  If I'm not mistaken
+> clkdev_alloc references the following non-local symbols:
 > 
-> You seem to use memblock_is_region_reserved() in a few places in the new
-> code assuming (as I would) that it returns a boolean (0 reserved, !0 not
-> reserved).
+> 	__clkdev_alloc
+> 	strlcpy
+> 	vscnprintf
 
-That's where having a comment describing such things would be useful,
-so that it's easier to ensure that it's correct at creation/review time.
+__clkdev_alloc() is an inline function, so effectively it's part of this
+function.  On sh, this calls the boot time allocator which is marked as
+__init if the normal memory allocators aren't online yet.
 
-> However, the implementation looks totally wrong. I was wondering if you
-> had noticed :-)
+> Russell, would at least __module_or_init be OK?
 
-I guess not - I relied on others to test that code... no reports were
-forthcoming of breakage.  Maybe the test cases didn't involve paths
-through this code though.
+It's a conceptual thing - we want to allow people to create aliases at
+run time.  Making it an __init thing will only encourage people to do
+silly things to work around the "it can only be used at init time"
+problem rather than taking the obvious step of removing the __init tag.
+
+Make it easy for people to do the right thing.
