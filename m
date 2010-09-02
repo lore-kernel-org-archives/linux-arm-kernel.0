@@ -1,30 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 12:30:01 -0700
-Subject: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-omap
-In-Reply-To: <20100902162337.GP11597@atomide.com>
-References: <20100817154035.GD20325@n2100.arm.linux.org.uk>
-	<20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902162337.GP11597@atomide.com>
-Message-ID: <20100902193000.GX11597@atomide.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 2 Sep 2010 21:30:53 +0200
+Subject: [PATCH 2/3] plat-nomadik: Added suspend/resume support for MTU
+	timer.
+In-Reply-To: <20100902160443.GR26319@n2100.arm.linux.org.uk>
+References: <1283412633-9883-1-git-send-email-jonas.aberg@stericsson.com>
+	<1283412633-9883-2-git-send-email-jonas.aberg@stericsson.com>
+	<20100902160443.GR26319@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikTuuVGnOstk+YGq3R9pwrMT-qwkbo7CXMJ4NB6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100902 09:16]:
-> From c04a57fc3b41d886f56ccdc27cf9758de0c95202 Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 17 Aug 2010 13:33:23 +0300
-> Subject: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-omap
-> 
-> Fix SMP on UP interrupt handling for multi-omap
+2010/9/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Sep 02, 2010 at 09:30:32AM +0200, Jonas Aaberg wrote:
+>> (...)
+>> ? ? ? /*
+>> - ? ? ?* Tick rate is 2.4MHz for Nomadik and 110MHz for ux500:
+>> + ? ? ?* Tick rate is 2.4MHz for Nomadik and 100 or 133MHz for ux500:
+>> ? ? ? ?* use a divide-by-16 counter if it's more than 16MHz
+>> ? ? ? ?*/
+>> - ? ? cr = MTU_CRn_32BITS;;
+>> ? ? ? rate = clk_get_rate(clk0);
+>> - ? ? if (rate > 16 << 20) {
+>> + ? ? if (rate > (16 << 20))
+>
+> n << 20 doesn't give you MHz, so this code doesn't match the comments.
+> Do you mean 16MHz or 16.777216MHz ?
 
-Here's this one updated to use !smp_cpu() instead of smp_on_up().
-Looks like the description and subject needed some refreshing too.
+That comes from Alessandros oneshot mode a while back actually,
+Jonas is only factoring it around.
 
-Tony
+Alessandro why do we kick in a prescaler if rate > (16 << 20)?
+Seems weird to me too when I look@it, more like it'd be
+if rate (1 << 20) which makes sense, if the counter will flip
+around 20 bits in 1 second we prescale it by 16.
+
+Yours,
+Linus Walleij
