@@ -1,28 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 19:52:55 +0100
-Subject: [PATCH 20/24] msm: MSM8X60 simulator board support
-In-Reply-To: <20100902181914.GB2589@huya.qualcomm.com>
-References: <1282712273-344-1-git-send-email-johlstei@codeaurora.org>
-	<1282712273-344-21-git-send-email-johlstei@codeaurora.org>
-	<20100902111310.GY26319@n2100.arm.linux.org.uk>
-	<20100902181914.GB2589@huya.qualcomm.com>
-Message-ID: <20100902185255.GA26319@n2100.arm.linux.org.uk>
+Date: Thu, 2 Sep 2010 19:57:44 +0100
+Subject: invalid address returned by usb_alloc_coherent on dockstar
+In-Reply-To: <65B450424E3DC742AA18F68E1AFB214003A59142@EX06.ad.tulane.edu>
+References: <65B450424E3DC742AA18F68E1AFB214003A58D62@EX06.ad.tulane.edu>
+	<20100902163019.GA9983@n2100.arm.linux.org.uk>
+	<65B450424E3DC742AA18F68E1AFB214003A59142@EX06.ad.tulane.edu>
+Message-ID: <20100902185744.GB26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 11:19:14AM -0700, David Brown wrote:
-> On Thu, Sep 02, 2010 at 12:13:10PM +0100, Russell King - ARM Linux wrote:
+On Thu, Sep 02, 2010 at 01:28:33PM -0500, MacLaren, James M wrote:
+> Thanks for the clarification.  I will contact the author of the driver.
 > 
-> > > +config MACH_MSM8X60_SIM
-> > > +	depends on ARCH_MSM8X60
-> > > +	default n
-> > 
-> > All these 'default n' statements can be removed - n is the default anyway.
-> 
-> Isn't the behavior different, though?  If I do a 'make oldconfig'
-> after a kernel upgrade, new options that don't have defaults will stop
-> and prompt me, whereas ones with a listed default will just select the
-> default without asking.
+> I am sure this is an ignorant question but how does one then use that
+> address if it has been remapped?  
 
-You always get asked about new options which have an option text - but
-'default' sets what you get when you just hit 'enter' on them.
+Memory returned by dma_alloc_coherent() is guaranteed to be directly
+addressible by the CPU.  The DMA address is also provided by
+dma_alloc_coherent() for the device doing DMA (which is the struct
+device passed into dma_alloc_coherent.)
+
+Such a buffer is _guaranteed_ to be cache coherent with the DMA agent -
+the only remaining issue is that caused by weakly ordered memory models
+which is solved via barriers.
+
+> In following through the hdpvr driver the address get stored for that
+> urb by usb_fill_bulk_urb 
+> 
+> The driver fails when it later calls  usb_submit_urb and that address is
+> checked in dma_map_single by virt_addr_valid
+
+That's where it's going wrong.  Buffers allocated by dma_alloc_coherent()
+are already DMA coherent and must not be passed to dma_map_single().  I
+believe USB has some way to be told that the buffer is already suitable
+for DMA without needing additional handling.
