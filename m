@@ -1,6 +1,6 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 09:22:20 -0700
-Subject: [PATCH 5/6] ARM: Don't set TLB ops broadcasting on UP ARMv7
+Date: Thu, 2 Sep 2010 09:23:37 -0700
+Subject: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-omap
 In-Reply-To: <20100902161659.GJ11597@atomide.com>
 References: <20100817141210.GJ12184@atomide.com>
 	<20100817154035.GD20325@n2100.arm.linux.org.uk>
@@ -12,7 +12,7 @@ References: <20100817141210.GJ12184@atomide.com>
 	<20100830225527.GC11597@atomide.com>
 	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
 	<20100902161659.GJ11597@atomide.com>
-Message-ID: <20100902162220.GO11597@atomide.com>
+Message-ID: <20100902162337.GP11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
