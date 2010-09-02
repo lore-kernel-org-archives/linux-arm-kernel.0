@@ -1,21 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 11:07:05 +0100
-Subject: [PATCH 40/74] ST SPEAr 13xx : Adding support for SPEAr1310
-In-Reply-To: <ac3dec2c43f98984b67c85418e1d39cadc82c550.1283161023.git.viresh.kumar@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<ac3dec2c43f98984b67c85418e1d39cadc82c550.1283161023.git.viresh.kumar@st.com>
-Message-ID: <20100902100705.GN26319@n2100.arm.linux.org.uk>
+From: konkers@google.com (Erik Gilling)
+Date: Thu, 2 Sep 2010 03:20:16 -0700
+Subject: [PATCH 0/9] [ARM] tegra: Additional core support for Tegra2 SOCs
+In-Reply-To: <20100902084812.GD26319@n2100.arm.linux.org.uk>
+References: <1280449771-24043-1-git-send-email-ccross@google.com>
+	<AANLkTinhoBrzYmypsKNcLPar-pKWiYm60GL6YBfd1jT9@mail.gmail.com>
+	<20100902084812.GD26319@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikPm2B9GPsUSS=E+7_tgHVrBVeG-5pngejAxiyv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 04:09:04PM +0530, Viresh KUMAR wrote:
-> From: Bhupesh Sharma <bhupesh.sharma@st.com>
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@st.com>
-> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  arch/arm/Makefile                                |    1 +
->  arch/arm/configs/spear1310-smp_defconfig         |  875 ++++++++++++++++++++++
+Sorry for the confusion.  These patches were posted by Colin Cross on
+July 29th (http://www.spinics.net/lists/arm-kernel/msg94637.html) and
+pinged again by me on August 25th
+(http://www.spinics.net/lists/arm-kernel/msg96657.html).
 
-NAK.  No new large defconfigs.
+Cheers,
+    Erik
+
+On Thu, Sep 2, 2010 at 1:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 25, 2010 at 02:24:24PM -0700, Erik Gilling wrote:
+>> Any comments on the below patches? ?If not I'm going to push them to
+>> our for-next tree.
+>
+> Where are the patches? ?I don't see them on the mailing list. ?We don't
+> review code sitting in git trees - only patches on mailing lists.
+>
