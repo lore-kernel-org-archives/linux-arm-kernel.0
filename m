@@ -1,32 +1,62 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 11:22:56 +0100
-Subject: [PATCH 45/74] SPEAr : SEV Send event to secondary CPUs
-In-Reply-To: <861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
+Date: Thu, 2 Sep 2010 11:23:23 +0100
+Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
-Message-ID: <20100902102256.GO26319@n2100.arm.linux.org.uk>
+	<47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
+Message-ID: <20100902102323.GP26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 04:09:09PM +0530, Viresh KUMAR wrote:
-> diff --git a/arch/arm/mach-spear13xx/include/mach/smp.h b/arch/arm/mach-spear13xx/include/mach/smp.h
-> index 6e028a1..e2e55fc 100644
-> --- a/arch/arm/mach-spear13xx/include/mach/smp.h
-> +++ b/arch/arm/mach-spear13xx/include/mach/smp.h
-> @@ -24,6 +24,12 @@
->  		cpunum &= 0x0F;				\
->  	})
+On Mon, Aug 30, 2010 at 04:09:12PM +0530, Viresh KUMAR wrote:
+> From: Deepak Sikri <deepak.sikri@st.com>
+> 
+
+The reason being?
+
+> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  arch/arm/common/gic.c |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 7dfa9a8..e816ef1 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -201,6 +201,18 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>  	chip->unmask(irq);
+>  }
 >  
-> +/*
-> + * set_event() is used to wake up secondary core from wfe using sev. Booting
-> + * code puts the second core into wfe(standby).
-> + */
-> +#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
-
-This shouldn't be something that platforms define on their own.  Please
-add a sev() macro to arch/arm/include/asm/system.h instead.  Also take a
-look at arch/arm/mach-omap2/omap-smp.c for an alternative idea about how
-to handle this.
-
-Lastly, consider rolling the OMAP solution into the patch which adds SMP
-support for spear13xx.
+> +#ifdef CONFIG_PM
+> +
+> +static int gic_set_wake(unsigned int irq, unsigned int on)
+> +{
+> +	return 0;
+> +}
+> +
+> +#else
+> +
+> +#define gic_set_wake NULL
+> +#endif
+> +
+>  static struct irq_chip gic_chip = {
+>  	.name		= "GIC",
+>  	.ack		= gic_ack_irq,
+> @@ -210,6 +222,7 @@ static struct irq_chip gic_chip = {
+>  #ifdef CONFIG_SMP
+>  	.set_affinity	= gic_set_cpu,
+>  #endif
+> +	.set_wake	= gic_set_wake,
+>  };
+>  
+>  void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+> -- 
+> 1.7.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
