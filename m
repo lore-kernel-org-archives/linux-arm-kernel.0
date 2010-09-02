@@ -1,42 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Sep 2010 11:40:08 +0100
-Subject: [PATCH 45/74] SPEAr : SEV Send event to secondary CPUs
-In-Reply-To: <20100902102256.GO26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
-	<20100902102256.GO26319@n2100.arm.linux.org.uk>
-Message-ID: <003f01cb4a8b$372d0d00$a5872700$@deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 11:39:57 +0100
+Subject: [PATCH] ARM: Implement cpu_v7_reset.
+In-Reply-To: <20100902085341.GJ25559@gw.healthdatacare.com>
+References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+	<20100901232307.GC25860@n2100.arm.linux.org.uk>
+	<20100902083423.GI25559@gw.healthdatacare.com>
+	<20100902084101.GA26319@n2100.arm.linux.org.uk>
+	<20100902085341.GJ25559@gw.healthdatacare.com>
+Message-ID: <20100902103957.GR26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-[added Jeff Ohlstein]
-
-> On Mon, Aug 30, 2010 at 04:09:09PM +0530, Viresh KUMAR wrote:
-> > diff --git a/arch/arm/mach-spear13xx/include/mach/smp.h b/arch/arm/mach-spear13xx/include/mach/smp.h
-> > index 6e028a1..e2e55fc 100644
-> > --- a/arch/arm/mach-spear13xx/include/mach/smp.h
-> > +++ b/arch/arm/mach-spear13xx/include/mach/smp.h
-> > @@ -24,6 +24,12 @@
-> >  		cpunum &= 0x0F;				\
-> >  	})
-> >
-> > +/*
-> > + * set_event() is used to wake up secondary core from wfe using sev. Booting
-> > + * code puts the second core into wfe(standby).
-> > + */
-> > +#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
+On Thu, Sep 02, 2010 at 11:53:41AM +0300, Mika Westerberg wrote:
+> On Thu, Sep 02, 2010 at 09:41:01AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Sep 02, 2010 at 11:34:23AM +0300, Mika Westerberg wrote:
+> > > 
+> > > When the MMU is turned off, should we be running on 1:1 mappings?
+> > 
+> > Mappings are setup, but not for this code.  This code relies upon the
+> > instruction which jumps to already be in the pipeline at the point when
+> > the MMU is turned off - and the destination for that jump to be a 1:1
+> > mapping.
 > 
-> This shouldn't be something that platforms define on their own.  Please
-> add a sev() macro to arch/arm/include/asm/system.h instead.  Also take a
-> look at arch/arm/mach-omap2/omap-smp.c for an alternative idea about how
-> to handle this.
+> OK, thanks.
+> 
+> Any Idea what might cause the hang on OMAP3? Only way I was able
+> to get it working when MMU is disabled was to run cpu_v7_reset()
+> also via 1:1 mapping.
 
-There was patch posted last month from Code Aurora:
+Well, as the current v6 and v7 cpu_reset() code is broken, it's hardly
+surprising that it doesn't work.  It needs to be something like this
+(I haven't tested it yet.)
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/021401.html
-
-which proposed adding a sev() macro to processor.h. They also added
-a wfe() macro, so maybe all of this should go in system.h instead.
-
-Will
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 22aac85..6b873f9 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -59,6 +59,16 @@ ENTRY(cpu_v6_proc_fin)
+  */
+ 	.align	5
+ ENTRY(cpu_v6_reset)
++	mov	ip, #0
++	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
++	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
++#ifdef CONFIG_MMU
++	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
++#endif
++	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
++	bic	ip, ip, #0x000f			@ ............wcam
++	bic	ip, ip, #0x1100			@ ...i...s........
++	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
+ 	mov	pc, r0
+ 
+ /*
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 6a8506d..3542ee0 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -63,6 +63,16 @@ ENDPROC(cpu_v7_proc_fin)
+  */
+ 	.align	5
+ ENTRY(cpu_v7_reset)
++	mov	ip, #0
++	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
++	dsb
++#ifdef CONFIG_MMU
++	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
++#endif
++	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
++	bic	ip, ip, #0x000f			@ ............wcam
++	bic	ip, ip, #0x1100			@ ...i...s........
++	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
+ 	mov	pc, r0
+ ENDPROC(cpu_v7_reset)
+ 
