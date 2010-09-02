@@ -1,89 +1,68 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 2 Sep 2010 21:18:53 +0200
-Subject: [PATCH 31/74] ST SPEAr: Adding support for SSP PL022
-In-Reply-To: <447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
-Message-ID: <AANLkTi=Fiv2i4qMcrnOeECkMKtNathO9P906=T1gcFPB@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Sep 2010 12:26:59 -0700
+Subject: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init testing
+In-Reply-To: <20100902174244.GU11597@atomide.com>
+References: <4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+Message-ID: <20100902192659.GW11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/30 Viresh KUMAR <viresh.kumar@st.com>:
+* Tony Lindgren <tony@atomide.com> [100902 10:35]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 10:00]:
+> > On Thu, Sep 02, 2010 at 09:18:47AM -0700, Tony Lindgren wrote:
+> > 
+> > > --- a/arch/arm/include/asm/smp_plat.h
+> > > +++ b/arch/arm/include/asm/smp_plat.h
+> > > @@ -39,4 +39,20 @@ static inline int cache_ops_need_broadcast(void)
+> > >  #define UP(instr...)	_str(instr)
+> > >  #endif
+> > >  
+> > > +static inline int smp_on_up(void)
+> > > +{
+> > > +#ifdef CONFIG_SMP_ON_UP
+> > > +	int smp_on_up;
+> > > +
+> > > +	asm(							\
+> > > +		SMP(mov	%0, #0)					\
+> > > +		UP(mov	%0, #1)					\
+> > > +		: "=r" (smp_on_up));
+> > > +
+> > > +	return smp_on_up;
+> > > +#else
+> > > +	return 0;
+> > > +#endif
+> > 
+> > I think this is the wrong approach - rather than a function which tells us
+> > just if we are a SMP kernel running on UP, why not something which returns
+> > whether we're running on SMP and use that to eliminate some of these ifdefs?
+> 
+> Sure. Will has something like this in his patches:
+> 
+> static inline int cpu_is_part_of_mp_system(void)
+> {
+> 	u32 mpidr;
+> 	asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
+> 	return (mpidr >> 31) ? !(mpidr >> 30) : 0;
+> }
+> 
+> BTW, so far looks like we should only need this during init to set up things.
 
-> (...)
-> diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-> (...)
-> +/* Currently no gpios are free on eval board so it is kept commented */
-> +#if 0
+Here's this one updated to replace smp_cpu() instead of smp_on_up().
 
-Argh!
-
-> +/* spi board information */
-> +/* spi0 flash Chip Select Control function, controlled by gpio pin mentioned */
-> +DECLARE_SPI_CS_CONTROL(0, flash, /* mention gpio number here */);
-> +/* spi0 flash Chip Info structure */
-> +DECLARE_SPI_CHIP_INFO(0, flash, spi0_flash_cs_control);
-> +
-> +/* spi0 spidev Chip Select Control function, controlled by gpio pin mentioned */
-> +DECLARE_SPI_CS_CONTROL(0, dev, /* mention gpio number here */);
-> +/* spi0 spidev Chip Info structure */
-> +DECLARE_SPI_CHIP_INFO(0, dev, spi0_dev_cs_control);
-> +#endif
-> +
-> +static struct spi_board_info __initdata spi_board_info[] = {
-> +#if 0
-
-And again!
-
-> + ? ? ? /* spi0 board info */
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .modalias = "spidev",
-> + ? ? ? ? ? ? ? .controller_data = &spi0_dev_chip_info,
-> + ? ? ? ? ? ? ? .max_speed_hz = 10000000,
-> + ? ? ? ? ? ? ? .bus_num = 0,
-> + ? ? ? ? ? ? ? .chip_select = 0,
-> + ? ? ? ? ? ? ? .mode = 0,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .modalias = "m25p80",
-> + ? ? ? ? ? ? ? .controller_data = &spi0_flash_chip_info,
-> + ? ? ? ? ? ? ? .max_speed_hz = 1000000,
-> + ? ? ? ? ? ? ? .bus_num = 0,
-> + ? ? ? ? ? ? ? .chip_select = 1,
-> + ? ? ? ? ? ? ? .mode = 0,
-> + ? ? ? }
-> +#endif
-
-Don't commit commented-out code.
-
-> (...)
-> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-> (...)
-> +/*
-> + * Chip select of spidev, currently no gpio is free on eval board so it is kept
-> + * commented
-> + */
-> +#if 0
-
-Again!
-
-> (...)
-> +static struct spi_board_info __initdata spi_board_info[] = {
-> + ? ? ? /* spi0 board info */
-> + ? ? ? {
-> +#if 0
-
-And again!
-
-> + ? ? ? ? ? ? ? .modalias = "spidev",
-> + ? ? ? ? ? ? ? .controller_data = &spi0_dev_chip_info,
-> + ? ? ? ? ? ? ? .max_speed_hz = 10000000,
-> + ? ? ? ? ? ? ? .bus_num = 0,
-> + ? ? ? ? ? ? ? .chip_select = 0,
-> + ? ? ? ? ? ? ? .mode = 0,
-> + ? ? ? }, {
-> +#endif
-
-Please grep your code for all #if 0 and remove it.
-
-Yours,
-Linus Walleij
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smp-cpu.patch
+Type: text/x-diff
+Size: 2042 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100902/d339b7c4/attachment.bin>
