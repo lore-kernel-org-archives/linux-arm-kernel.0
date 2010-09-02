@@ -1,119 +1,59 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 02 Sep 2010 17:25:38 +0900
-Subject: [PATCH 02/13] ARM: S5P64X0: Update Kconfig and Makefile
-In-Reply-To: <AANLkTin_aQvv_U9z7VxGM-3VWMj-iWdS928aB30sETWp@mail.gmail.com>
-References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
-	<1283324960-21629-3-git-send-email-kgene.kim@samsung.com>
-	<AANLkTin_aQvv_U9z7VxGM-3VWMj-iWdS928aB30sETWp@mail.gmail.com>
-Message-ID: <004b01cb4a78$74552860$5cff7920$%kim@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 2 Sep 2010 10:27:59 +0200
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
+	driver
+In-Reply-To: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100902082759.GE14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+Hello Jason,
+
+On Thu, Sep 02, 2010 at 03:51:58PM +0800, Jason Wang wrote:
+> Some explanations:
 > 
-> On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > This patch updates the Kconfig and Makefile for the S5P6440 and S5P6450
-> > machines. It also updates arch/arm/ Kconfig and Makefile to include for
-> > support ARCH_S5P64X0 with one kernel image.
-> >
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 16 +++---
-> > ?arch/arm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> > ?arch/arm/mach-s5p6440/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 33 ------------
-> > ?arch/arm/mach-s5p6440/Makefile ? ? ? ? ? ? ? ? ? ? | ? 25 ---------
-> > ?arch/arm/mach-s5p64x0/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 55
-> ++++++++++++++++++++
-> > ?arch/arm/mach-s5p64x0/Makefile ? ? ? ? ? ? ? ? ? ? | ? 30 +++++++++++
-> > ?.../{mach-s5p6440 => mach-s5p64x0}/Makefile.boot ? | ? ?0
-> > ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?4 +-
-> > ?8 files changed, 95 insertions(+), 70 deletions(-)
-> > ?delete mode 100644 arch/arm/mach-s5p6440/Kconfig
-> > ?delete mode 100644 arch/arm/mach-s5p6440/Makefile
-> > ?create mode 100644 arch/arm/mach-s5p64x0/Kconfig
-> > ?create mode 100644 arch/arm/mach-s5p64x0/Makefile
-> > ?rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/Makefile.boot (100%)
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index a7ed21f..40e75b3 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -679,17 +679,15 @@ config ARCH_S3C64XX
-> > ? ? ? ?help
-> > ? ? ? ? ?Samsung S3C64XX series based systems
-> >
-> > -config ARCH_S5P6440
-> > - ? ? ? bool "Samsung S5P6440"
-> > +config ARCH_S5P64X0
-> > + ? ? ? bool "Samsung S5P6440 S5P6450"
-> > ? ? ? ?select CPU_V6
-> > ? ? ? ?select GENERIC_GPIO
-> > ? ? ? ?select HAVE_CLK
-> > - ? ? ? select HAVE_S3C2410_WATCHDOG
-> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
-> > - ? ? ? select HAVE_S3C2410_I2C
-> > - ? ? ? select HAVE_S3C_RTC
+> This patchset is to add SPI support in the existing spi_imx driver for
+> i.MX51 and add SPI relating stuffs for mx51_3ds board level.
 > 
-> Why HAVE_* is deleted?
+> i.MX51 has two eCSPI controllers and one CSPI controller, CSPI
+> controller is 100% compatible with the one of i.MX35, so we don't need
+> to add new functions for this CSPI, only bind it with i.MX35 together,
+> while eCSPI isn't compatible with existing controllers of i.MX
+> platforms, so i add new functions for these two eCSPIs in the existing
+> spi_imx driver.
 > 
-Ok...will add it.
+> If these patches pass review, the first patch 0001-xxx.patch should be
+> merged by Grant.likely; other patches(0002-0006) are based off
+> imx-for-2.6.37 and should be handled by Sascha.
 
-> > ? ? ? ?help
-> > - ? ? ? ? Samsung S5P6440 CPU based systems
-> > + ? ? ? ? Samsung S5P64X0 CPU based systems, such as the Samsung
-> SMDK6440,
-> > + ? ? ? ? SMDK6450.
-> >
+Unfortunately we (=Pengutronix) have some patches pending to add
+mx51-spi support, too.  And there are some other patches that will
+conflict with your series (e.g. I renamed some symbols used by you:
 
-(snip)
+-#define MX51_CSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
++#define MX51_ECSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
+-#define MX51_CSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
++#define MX51_ECSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
+-#define MX51_CSPI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
++#define MX51_CSPI_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
+-#define MX51_MXC_INT_CSPI1		36
+-#define MX51_MXC_INT_CSPI2		37
+-#define MX51_MXC_INT_CSPI		38
++#define MX51_INT_ECSPI1			36
++#define MX51_INT_ECSPI2			37
++#define MX51_INT_CSPI			38
+)
 
-> > +
-> > +config MACH_SMDK6440
-> > + ? ? ? bool "SMDK6440"
-> > + ? ? ? select CPU_S5P6440
-> > + ? ? ? select S3C_DEV_I2C1
-> > + ? ? ? select S3C_DEV_RTC
-> > + ? ? ? select S3C_DEV_WDT
-> > + ? ? ? select SAMSUNG_DEV_ADC
-> > + ? ? ? select SAMSUNG_DEV_TS
-> > + ? ? ? select S5P64X0_SETUP_I2C1
-> > + ? ? ? help
-> > + ? ? ? ? Machine support for the Samsung SMDK6440
-> > +
-> > +config MACH_SMDK6450
-> > + ? ? ? bool "SMDK6450"
-> > + ? ? ? select CPU_S5P6450
-> > + ? ? ? select S3C_DEV_I2C1
-> > + ? ? ? select S3C_DEV_RTC
-> > + ? ? ? select S3C_DEV_WDT
-> > + ? ? ? select SAMSUNG_DEV_ADC
-> > + ? ? ? select SAMSUNG_DEV_TS
-> > + ? ? ? select S5P64X0_SETUP_I2C1
-> > + ? ? ? help
-> > + ? ? ? ? Machine support for the Samsung SMDK6450
-> 
-> In most case SMDK has almost same functionality. make a common select
-> e.g., SMDK_COMMON and each board just select it.
+Actually I would prefer our patches, but of course I'm biased :-)
 
-If required, will sort out next time with other architectures.
+I don't know how we should handle this.  And Sascha is on vacation this
+and next week.  I will investigate if our patches are already free to be
+posted.
 
-(snip)
+Best regards
+Uwe
 
-> > +
-> > +obj-$(CONFIG_MACH_SMDK6440) ? ?+= mach-smdk6440.o
-> > +obj-$(CONFIG_MACH_SMDK6450) ? ?+= mach-smdk6450.o
-> Are there difference between smdk6440 and smdk6450 except the SOC?
-> If no, how about to make a single file as pxa or omap does?
-> 
-Because each components on the board are different,
-SMDK6440 and SMDK6450 need each machine file...
-
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
