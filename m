@@ -1,62 +1,79 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Thu,  2 Sep 2010 15:52:04 +0800
-Subject: [PATCH 6/6] mx51_3ds: add SPI NOR flash in the board init stage
-In-Reply-To: <1283413924-14210-6-git-send-email-jason77.wang@gmail.com>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-5-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-6-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1283413924-14210-7-git-send-email-jason77.wang@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 02 Sep 2010 17:02:30 +0900
+Subject: [PATCH 11/13] ARM: S5P64X0: Move SMDK6440 board file and Add
+	SMDK6450 board file
+In-Reply-To: <AANLkTikXD9xz+mGz1QabwB91WdRX1oPeeOwa-juGdt6H@mail.gmail.com>
+References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+	<1283324960-21629-12-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikXD9xz+mGz1QabwB91WdRX1oPeeOwa-juGdt6H@mail.gmail.com>
+Message-ID: <004901cb4a75$33f2cb90$9bd862b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A 2M bytes SPI NOR flash(sst25vf016b) is soldered on the mx51_3ds
-board, Now add registration for it in the board init stage.
+Kyungmin Park wrote:
+> 
+> On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch moves smdk6440 board file from mach-s5p6440 into the new
+> > mach-s5p64x0 directory and adds smdk6450 board file.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?.../{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c | ? 87 ++++++----
+> > ?arch/arm/mach-s5p64x0/mach-smdk6450.c ? ? ? ? ? ? ?| ?182
+> ++++++++++++++++++++
+> > ?2 files changed, 234 insertions(+), 35 deletions(-)
+> > ?rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c (66%)
+> > ?create mode 100644 arch/arm/mach-s5p64x0/mach-smdk6450.c
+> >
+> > diff --git a/arch/arm/mach-s5p6440/mach-smdk6440.c b/arch/arm/mach-
+> s5p64x0/mach-smdk6440.c
+> > similarity index 66%
+> > rename from arch/arm/mach-s5p6440/mach-smdk6440.c
+> > rename to arch/arm/mach-s5p64x0/mach-smdk6440.c
+> > index 9202aaa..28de0a5 100644
+> > --- a/arch/arm/mach-s5p6440/mach-smdk6440.c
+> > +++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
 
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
----
- arch/arm/mach-mx5/board-mx51_3ds.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+(snip)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index 0cf4e14..8f1631d 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -13,6 +13,7 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/input/matrix_keypad.h>
-+#include <linux/spi/spi.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -145,6 +146,16 @@ static struct spi_imx_master mx51_3ds_spi2_pdata = {
- 	.num_chipselect	= ARRAY_SIZE(mx51_3ds_spi2_cs),
- };
- 
-+static struct spi_board_info mx51_3ds_spi_nor_device[] = {
-+	{
-+	 .modalias = "m25p80",
-+	 .max_speed_hz = 25000000,	/* max spi clock (SCK) speed in HZ */
-+	 .bus_num = 1,
-+	 .chip_select = 1,
-+	 .mode = SPI_MODE_0,
-+	 .platform_data = NULL,},
-+};
-+
- /*
-  * Board specific initialization.
-  */
-@@ -155,6 +166,8 @@ static void __init mxc_board_init(void)
- 	mxc_init_imx_uart();
- 
- 	imx51_add_spi_imx1(&mx51_3ds_spi2_pdata);
-+	spi_register_board_info(mx51_3ds_spi_nor_device,
-+				ARRAY_SIZE(mx51_3ds_spi_nor_device));
- 
- 	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
- 		printk(KERN_WARNING "Init of the debugboard failed, all "
--- 
-1.5.6.5
+> > @@ -58,43 +59,60 @@
+> >
+> > ?static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
+> > ? ? ? ?[0] = {
+> > - ? ? ? ? ? ? ? .hwport ? ? ?= 0,
+> > - ? ? ? ? ? ? ? .flags ? ? ? = 0,
+> > - ? ? ? ? ? ? ? .ucon ? ? ? ?= SMDK6440_UCON_DEFAULT,
+> > - ? ? ? ? ? ? ? .ulcon ? ? ? = SMDK6440_ULCON_DEFAULT,
+> > - ? ? ? ? ? ? ? .ufcon ? ? ? = SMDK6440_UFCON_DEFAULT,
+> > + ? ? ? ? ? ? ? .hwport ? ? ? ? = 0,
+> > + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
+> There's no place to use this flags, it's posted for long time. but you
+> don't listen it.
+> I hope delete it if not used.
+
+Will be removed flags member after merging it in the mainline.
+
+> > + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = SMDK6440_UCON_DEFAULT,
+> > + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= SMDK6440_ULCON_DEFAULT,
+> > + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= SMDK6440_UFCON_DEFAULT,
+> > ? ? ? ?},
+
+(snip)
+
+> > +
+> > +MACHINE_START(SMDK6450, "SMDK6450")
+> 
+> I think you can make a single SMDK file.
+
+Because the components on the board are different,
+SMDK6440 and SMDK6450 need each machine file.
+
+(snip)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
