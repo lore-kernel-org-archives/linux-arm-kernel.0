@@ -1,84 +1,119 @@
-From: armando.visconti@st.com (Armando Visconti)
-Date: Thu, 2 Sep 2010 10:09:02 +0200
-Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
-In-Reply-To: <AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
-	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
-Message-ID: <4C7F5B9E.8090406@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 02 Sep 2010 17:25:38 +0900
+Subject: [PATCH 02/13] ARM: S5P64X0: Update Kconfig and Makefile
+In-Reply-To: <AANLkTin_aQvv_U9z7VxGM-3VWMj-iWdS928aB30sETWp@mail.gmail.com>
+References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+	<1283324960-21629-3-git-send-email-kgene.kim@samsung.com>
+	<AANLkTin_aQvv_U9z7VxGM-3VWMj-iWdS928aB30sETWp@mail.gmail.com>
+Message-ID: <004b01cb4a78$74552860$5cff7920$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ciao Linus,
+Kyungmin Park wrote:
+> 
+> On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch updates the Kconfig and Makefile for the S5P6440 and S5P6450
+> > machines. It also updates arch/arm/ Kconfig and Makefile to include for
+> > support ARCH_S5P64X0 with one kernel image.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 16 +++---
+> > ?arch/arm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> > ?arch/arm/mach-s5p6440/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 33 ------------
+> > ?arch/arm/mach-s5p6440/Makefile ? ? ? ? ? ? ? ? ? ? | ? 25 ---------
+> > ?arch/arm/mach-s5p64x0/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 55
+> ++++++++++++++++++++
+> > ?arch/arm/mach-s5p64x0/Makefile ? ? ? ? ? ? ? ? ? ? | ? 30 +++++++++++
+> > ?.../{mach-s5p6440 => mach-s5p64x0}/Makefile.boot ? | ? ?0
+> > ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?4 +-
+> > ?8 files changed, 95 insertions(+), 70 deletions(-)
+> > ?delete mode 100644 arch/arm/mach-s5p6440/Kconfig
+> > ?delete mode 100644 arch/arm/mach-s5p6440/Makefile
+> > ?create mode 100644 arch/arm/mach-s5p64x0/Kconfig
+> > ?create mode 100644 arch/arm/mach-s5p64x0/Makefile
+> > ?rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/Makefile.boot (100%)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index a7ed21f..40e75b3 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -679,17 +679,15 @@ config ARCH_S3C64XX
+> > ? ? ? ?help
+> > ? ? ? ? ?Samsung S3C64XX series based systems
+> >
+> > -config ARCH_S5P6440
+> > - ? ? ? bool "Samsung S5P6440"
+> > +config ARCH_S5P64X0
+> > + ? ? ? bool "Samsung S5P6440 S5P6450"
+> > ? ? ? ?select CPU_V6
+> > ? ? ? ?select GENERIC_GPIO
+> > ? ? ? ?select HAVE_CLK
+> > - ? ? ? select HAVE_S3C2410_WATCHDOG
+> > ? ? ? ?select ARCH_USES_GETTIMEOFFSET
+> > - ? ? ? select HAVE_S3C2410_I2C
+> > - ? ? ? select HAVE_S3C_RTC
+> 
+> Why HAVE_* is deleted?
+> 
+Ok...will add it.
 
-Linus Walleij wrote:
-> 2010/8/30 Viresh KUMAR <viresh.kumar@st.com>:
->
->   
->> From: Vipin Kumar <vipin.kumar@st.com>
->>
->> SPEAr platforms use Flexible Static Memory Controller(FSMC) provided by ST for
->> interfacing with NAND devices.
->> This patch adds the support for glue logic for NAND flash on SPEAr boards
->>     
->
-> OK...
->
->   
->> (...)
->>  create mode 100644 arch/arm/plat-spear/include/plat/fsmc.h
->>  create mode 100644 arch/arm/plat-spear/include/plat/nand.h
->>  create mode 100644 drivers/mtd/nand/spear_nand.c
->>     
->
-> spear_nand.c?
->
-> Why not fsmc-nand.c or similar if this is the name of the block.
-> We have this in U300, Nomadik NHK8815 and other platforms too,
-> it doesn't have much to do with SPEAr actually...
->
-> Also, what are the include files doing in plat-spear since we have
-> the same hardware in other platforms? Move them to include/linux/mtd/
-> so we can use them please.
->
-> I *highly* suspect that this driver duplicates some code found in
-> drivers/mtd/nand/nomadik_nand.c because it's the same silicon.
->   
-Why nomadik_nand.c?
-Shouldn't the fsmc_nand.c rule apply also in this case?
+> > ? ? ? ?help
+> > - ? ? ? ? Samsung S5P6440 CPU based systems
+> > + ? ? ? ? Samsung S5P64X0 CPU based systems, such as the Samsung
+> SMDK6440,
+> > + ? ? ? ? SMDK6450.
+> >
 
+(snip)
 
-> Alessandro can judge on this, but I have a feeling that driver
-> should be replaced by this, more mature driver.
->   
-Maybe.
-But I suspect that may be few differences in the ECC accelerator inside, 
-in fact.
+> > +
+> > +config MACH_SMDK6440
+> > + ? ? ? bool "SMDK6440"
+> > + ? ? ? select CPU_S5P6440
+> > + ? ? ? select S3C_DEV_I2C1
+> > + ? ? ? select S3C_DEV_RTC
+> > + ? ? ? select S3C_DEV_WDT
+> > + ? ? ? select SAMSUNG_DEV_ADC
+> > + ? ? ? select SAMSUNG_DEV_TS
+> > + ? ? ? select S5P64X0_SETUP_I2C1
+> > + ? ? ? help
+> > + ? ? ? ? Machine support for the Samsung SMDK6440
+> > +
+> > +config MACH_SMDK6450
+> > + ? ? ? bool "SMDK6450"
+> > + ? ? ? select CPU_S5P6450
+> > + ? ? ? select S3C_DEV_I2C1
+> > + ? ? ? select S3C_DEV_RTC
+> > + ? ? ? select S3C_DEV_WDT
+> > + ? ? ? select SAMSUNG_DEV_ADC
+> > + ? ? ? select SAMSUNG_DEV_TS
+> > + ? ? ? select S5P64X0_SETUP_I2C1
+> > + ? ? ? help
+> > + ? ? ? ? Machine support for the Samsung SMDK6450
+> 
+> In most case SMDK has almost same functionality. make a common select
+> e.g., SMDK_COMMON and each board just select it.
 
-In our FSMC previous case it was a Hamming accelerator, and I think this 
-apply
-also for nomadik (maybe). In our sp1300 case it is a BCH with 104 bytes 
-of ECC.
+If required, will sort out next time with other architectures.
 
-This is one of the options when generating the h/w block, so FSMCs may 
-differ.
-If we want to re-use same driver I guess we might change something and 
-accept
-few parameters from the platform.
+(snip)
 
-Vipin can for sure comment more on this.....
+> > +
+> > +obj-$(CONFIG_MACH_SMDK6440) ? ?+= mach-smdk6440.o
+> > +obj-$(CONFIG_MACH_SMDK6450) ? ?+= mach-smdk6450.o
+> Are there difference between smdk6440 and smdk6450 except the SOC?
+> If no, how about to make a single file as pxa or omap does?
+> 
+Because each components on the board are different,
+SMDK6440 and SMDK6450 need each machine file...
 
+(snip)
 
-Rgds,
-Arm
+Thanks.
 
--- 
--- "Every step appears to be the unavoidable consequence of the
--- preceding one." (A. Einstein) 
--- 
-Armando Visconti                  Mobile: (+39) 346 8879146
-Senior SW Engineer                Fax:    (+39) 02 93519290
-CPG                               Work:   (+39) 02 93519683
-Computer System Division          e-mail: armando.visconti at st.com
-ST Microelectronics               TINA:   051  4683
-                                    
- 
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
