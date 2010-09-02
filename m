@@ -1,7 +1,6 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 09:18:47 -0700
-Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early init
-	testing
+Date: Thu, 2 Sep 2010 09:19:40 -0700
+Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
 In-Reply-To: <20100902161659.GJ11597@atomide.com>
 References: <20100817141210.GJ12184@atomide.com>
 	<20100817154035.GD20325@n2100.arm.linux.org.uk>
@@ -13,7 +12,7 @@ References: <20100817141210.GJ12184@atomide.com>
 	<20100830225527.GC11597@atomide.com>
 	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
 	<20100902161659.GJ11597@atomide.com>
-Message-ID: <20100902161846.GK11597@atomide.com>
+Message-ID: <20100902161940.GL11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
