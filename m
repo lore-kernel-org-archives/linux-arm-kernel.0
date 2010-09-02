@@ -1,660 +1,1593 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 14:36:37 +0100
-Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <20100830225527.GC11597@atomide.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100817135205.GC20325@n2100.arm.linux.org.uk>
-	<20100817141210.GJ12184@atomide.com>
-	<20100817154035.GD20325@n2100.arm.linux.org.uk>
-	<20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-Message-ID: <20100902133637.GJ26319@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu,  2 Sep 2010 15:39:46 +0200
+Subject: [PATCH V3] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 03:55:27PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [100820 04:59]:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
-> > > On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
-> > > > Looks like something is not quite right with smp_on_up part of __fixup_smp,
-> > > > returning early before smp_on_up does not produce that.
-> > > 
-> > > It's probably overwriting some register it shouldn't be.  I might be
-> > > able to look at this sometime during the coming week... assuming that
-> > > the weather is as bad as they forecast and I have 'net connectivity.
-> 
-> This seems to fix it.
+factorise some generic infrastructure to assist looking up struct clks
+for the ARM & SH architecture.
 
-Thanks, merged that into my original patch - so here it is again with
-everything updated.
+as the code is identical at 99%
+
+put the arch specific code for allocation as example in asm/clkdev.h
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+v3:
+	wrong comment removed
+	headers fixed
+
+Best Regards,
+J.
+ arch/arm/Kconfig                                |   40 +++---
+ arch/arm/common/Kconfig                         |    4 -
+ arch/arm/common/Makefile                        |    1 -
+ arch/arm/include/asm/clkdev.h                   |   22 +--
+ arch/arm/mach-bcmring/clock.c                   |    3 +-
+ arch/arm/mach-bcmring/core.c                    |    2 +-
+ arch/arm/mach-davinci/clock.h                   |    2 +-
+ arch/arm/mach-ep93xx/clock.c                    |    2 +-
+ arch/arm/mach-imx/clock-imx1.c                  |    3 +-
+ arch/arm/mach-imx/clock-imx21.c                 |    2 +-
+ arch/arm/mach-imx/clock-imx27.c                 |    2 +-
+ arch/arm/mach-integrator/core.c                 |    3 +-
+ arch/arm/mach-integrator/impd1.c                |    3 +-
+ arch/arm/mach-integrator/integrator_cp.c        |    3 +-
+ arch/arm/mach-lpc32xx/clock.c                   |    3 +-
+ arch/arm/mach-mmp/clock.h                       |    2 +-
+ arch/arm/mach-mx25/clock.c                      |    3 +-
+ arch/arm/mach-mx3/clock-imx31.c                 |    2 +-
+ arch/arm/mach-mx3/clock-imx35.c                 |    3 +-
+ arch/arm/mach-mx5/clock-mx51.c                  |    2 +-
+ arch/arm/mach-mxc91231/clock.c                  |    2 +-
+ arch/arm/mach-nomadik/clock.c                   |    2 +-
+ arch/arm/mach-nuc93x/clock.h                    |    2 +-
+ arch/arm/mach-omap1/clock.c                     |    2 +-
+ arch/arm/mach-omap2/dpll3xxx.c                  |    2 +-
+ arch/arm/mach-pnx4008/clock.c                   |    3 +-
+ arch/arm/mach-pxa/clock.c                       |    2 +-
+ arch/arm/mach-pxa/clock.h                       |    2 +-
+ arch/arm/mach-realview/core.c                   |    3 +-
+ arch/arm/mach-shmobile/Kconfig                  |    6 +-
+ arch/arm/mach-shmobile/clock-sh7367.c           |    2 +-
+ arch/arm/mach-shmobile/clock-sh7372.c           |    2 +-
+ arch/arm/mach-shmobile/clock-sh7377.c           |    2 +-
+ arch/arm/mach-tegra/clock.c                     |    2 +-
+ arch/arm/mach-tegra/clock.h                     |    2 +-
+ arch/arm/mach-tegra/tegra2_clocks.c             |    3 +-
+ arch/arm/mach-u300/clock.c                      |    2 +-
+ arch/arm/mach-ux500/clock.c                     |    3 +-
+ arch/arm/mach-versatile/core.c                  |    3 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c               |    3 +-
+ arch/arm/mach-vexpress/v2m.c                    |    3 +-
+ arch/arm/mach-w90x900/clock.h                   |    2 +-
+ arch/arm/plat-omap/Kconfig                      |    4 +-
+ arch/arm/plat-omap/include/plat/clkdev_omap.h   |    2 +-
+ arch/arm/plat-spear/include/plat/clock.h        |    2 +-
+ arch/arm/plat-stmp3xxx/clock.c                  |    2 +-
+ arch/sh/Kconfig                                 |    2 +-
+ arch/sh/boards/mach-highlander/setup.c          |    2 +-
+ arch/sh/include/asm/clkdev.h                    |   66 ++++-----
+ arch/sh/kernel/Makefile                         |    2 +-
+ arch/sh/kernel/clkdev.c                         |  169 -----------------------
+ arch/sh/kernel/cpu/clock-cpg.c                  |    2 +-
+ arch/sh/kernel/cpu/clock.c                      |   16 --
+ arch/sh/kernel/cpu/sh4/clock-sh4-202.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7343.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7366.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7722.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7723.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7724.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7757.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7763.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7780.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7785.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7786.c          |    2 +-
+ arch/sh/kernel/cpu/sh4a/clock-shx3.c            |    2 +-
+ drivers/Kconfig                                 |    2 +
+ drivers/Makefile                                |    2 +
+ drivers/clk/Kconfig                             |    4 +
+ drivers/clk/Makefile                            |    2 +
+ {arch/arm/common => drivers/clk}/clkdev.c       |   13 +-
+ {arch/sh/include/asm => include/linux}/clkdev.h |   11 +-
+ 71 files changed, 139 insertions(+), 350 deletions(-)
+ rewrite arch/sh/include/asm/clkdev.h (69%)
+ delete mode 100644 arch/sh/kernel/clkdev.c
+ create mode 100644 drivers/clk/Kconfig
+ create mode 100644 drivers/clk/Makefile
+ rename {arch/arm/common => drivers/clk}/clkdev.c (93%)
+ rename {arch/sh/include/asm => include/linux}/clkdev.h (85%)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9295110..725a463 100644
+index a7ed21f..1d8a26c 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1166,6 +1166,18 @@ config SMP
+@@ -221,7 +221,7 @@ config ARCH_INTEGRATOR
+ 	bool "ARM Ltd. Integrator family"
+ 	select ARM_AMBA
+ 	select ARCH_HAS_CPUFREQ
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select PLAT_VERSATILE
+@@ -231,7 +231,7 @@ config ARCH_INTEGRATOR
+ config ARCH_REALVIEW
+ 	bool "ARM Ltd. RealView family"
+ 	select ARM_AMBA
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+@@ -245,7 +245,7 @@ config ARCH_VERSATILE
+ 	bool "ARM Ltd. Versatile family"
+ 	select ARM_AMBA
+ 	select ARM_VIC
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ICST
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+@@ -259,7 +259,7 @@ config ARCH_VEXPRESS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
+ 	select ICST
+@@ -281,7 +281,7 @@ config ARCH_BCMRING
+ 	depends on MMU
+ 	select CPU_V6
+ 	select ARM_AMBA
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	help
+@@ -328,7 +328,7 @@ config ARCH_EP93XX
+ 	select CPU_ARM920T
+ 	select ARM_AMBA
+ 	select ARM_VIC
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_USES_GETTIMEOFFSET
+@@ -348,14 +348,14 @@ config ARCH_MXC
+ 	bool "Freescale MXC/iMX-based"
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	help
+ 	  Support for Freescale MXC/iMX-based family of processors
  
- 	  If you don't know what to do here, say N.
+ config ARCH_STMP3XXX
+ 	bool "Freescale STMP3xxx"
+ 	select CPU_ARM926T
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+ 	select USB_ARCH_HAS_EHCI
+@@ -473,7 +473,7 @@ config ARCH_LPC32XX
+ 	select HAVE_IDE
+ 	select ARM_AMBA
+ 	select USB_ARCH_HAS_OHCI
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_TIME
+ 	select GENERIC_CLOCKEVENTS
+ 	help
+@@ -507,7 +507,7 @@ config ARCH_MMP
+ 	bool "Marvell PXA168/910/MMP2"
+ 	depends on MMU
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select TICK_ONESHOT
+ 	select PLAT_PXA
+@@ -539,7 +539,7 @@ config ARCH_W90X900
+ 	bool "Nuvoton W90X900 CPU"
+ 	select CPU_ARM926T
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	help
+ 	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
+@@ -553,7 +553,7 @@ config ARCH_W90X900
+ config ARCH_NUC93X
+ 	bool "Nuvoton NUC93X CPU"
+ 	select CPU_ARM926T
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	help
+ 	  Support for Nuvoton (Winbond logic dept.) NUC93X MCU,The NUC93X is a
+ 	  low-power and high performance MPEG-4/JPEG multimedia controller chip.
+@@ -564,7 +564,7 @@ config ARCH_TEGRA
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ARCH_HAS_BARRIERS if CACHE_L2X0
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+@@ -573,7 +573,7 @@ config ARCH_TEGRA
+ config ARCH_PNX4008
+ 	bool "Philips Nexperia PNX4008 Mobile"
+ 	select CPU_ARM926T
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	help
+ 	  This enables support for Philips PNX4008 mobile platform.
+@@ -583,7 +583,7 @@ config ARCH_PXA
+ 	depends on MMU
+ 	select ARCH_MTD_XIP
+ 	select ARCH_HAS_CPUFREQ
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+ 	select TICK_ONESHOT
+@@ -767,7 +767,7 @@ config ARCH_U300
+ 	select ARM_AMBA
+ 	select ARM_VIC
+ 	select GENERIC_CLOCKEVENTS
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_GPIO
+ 	help
+ 	  Support for ST-Ericsson U300 series mobile platforms.
+@@ -777,7 +777,7 @@ config ARCH_U8500
+ 	select CPU_V7
+ 	select ARM_AMBA
+ 	select GENERIC_CLOCKEVENTS
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	help
+ 	  Support for ST-Ericsson's Ux500 architecture
+@@ -787,7 +787,7 @@ config ARCH_NOMADIK
+ 	select ARM_AMBA
+ 	select ARM_VIC
+ 	select CPU_ARM926T
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	help
+@@ -799,7 +799,7 @@ config ARCH_DAVINCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ZONE_DMA
+ 	select HAVE_IDE
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_ALLOCATOR
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	help
+@@ -819,7 +819,7 @@ config PLAT_SPEAR
+ 	bool "ST SPEAr"
+ 	select ARM_AMBA
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
+ 	help
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 0a34c81..778655f 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -37,7 +37,3 @@ config SHARP_PARAM
  
-+config SMP_ON_UP
-+	bool "Allow booting SMP kernel on uniprocessor systems (EXPERIMENTAL)"
-+	depends on SMP && !XIP
-+	default y
-+	help
-+	  SMP kernels contain instructions which fail on non-SMP processors.
-+	  Enabling this option allows the kernel to modify itself to make
-+	  these instructions safe.  Disabling it allows about 1K of space
-+	  savings.
-+
-+	  If you don' tknow what to do here, say Y.
-+
- config HAVE_ARM_SCU
+ config SHARP_SCOOP
  	bool
- 	depends on SMP
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 6e8f05c..55974d2 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -154,16 +154,32 @@
- 	.long	9999b,9001f;			\
- 	.popsection
+-
+-config COMMON_CLKDEV
+-	bool
+-	select HAVE_CLK
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e6e8664..799e140 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -16,4 +16,3 @@ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+ obj-$(CONFIG_ARCH_IXP2000)	+= uengine.o
+ obj-$(CONFIG_ARCH_IXP23XX)	+= uengine.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+-obj-$(CONFIG_COMMON_CLKDEV)	+= clkdev.o
+diff --git a/arch/arm/include/asm/clkdev.h b/arch/arm/include/asm/clkdev.h
+index b56c138..765d332 100644
+--- a/arch/arm/include/asm/clkdev.h
++++ b/arch/arm/include/asm/clkdev.h
+@@ -12,23 +12,13 @@
+ #ifndef __ASM_CLKDEV_H
+ #define __ASM_CLKDEV_H
  
-+#ifdef CONFIG_SMP
-+#define SMP(instr...)						\
-+9998:	instr
-+#define UP(instr...)						\
-+	.pushsection ".smpalt.init", "a"			;\
-+	.word	9998b						;\
-+	instr							;\
-+	.popsection
-+#else
-+#define SMP(instr...)
-+#define UP(instr...) instr
-+#endif
-+
- /*
-  * SMP data memory barrier
+-struct clk;
+-struct device;
++#include <linux/slab.h>
+ 
+-struct clk_lookup {
+-	struct list_head	node;
+-	const char		*dev_id;
+-	const char		*con_id;
+-	struct clk		*clk;
+-};
++#include <mach/clkdev.h>
+ 
+-struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+-	const char *dev_fmt, ...);
+-
+-void clkdev_add(struct clk_lookup *cl);
+-void clkdev_drop(struct clk_lookup *cl);
+-
+-void clkdev_add_table(struct clk_lookup *, size_t);
+-int clk_add_alias(const char *, const char *, char *, struct device *);
++static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
++{
++	return kzalloc(size, GFP_KERNEL);
++}
+ 
+ #endif
+diff --git a/arch/arm/mach-bcmring/clock.c b/arch/arm/mach-bcmring/clock.c
+index 14bafc3..ad237a4 100644
+--- a/arch/arm/mach-bcmring/clock.c
++++ b/arch/arm/mach-bcmring/clock.c
+@@ -21,13 +21,12 @@
+ #include <linux/string.h>
+ #include <linux/clk.h>
+ #include <linux/spinlock.h>
++#include <linux/clkdev.h>
+ #include <mach/csp/hw_cfg.h>
+ #include <mach/csp/chipcHw_def.h>
+ #include <mach/csp/chipcHw_reg.h>
+ #include <mach/csp/chipcHw_inline.h>
+ 
+-#include <asm/clkdev.h>
+-
+ #include "clock.h"
+ 
+ #define clk_is_primary(x)       ((x)->type & CLK_TYPE_PRIMARY)
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index d3f959e..ed96ef4 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -30,10 +30,10 @@
+ #include <linux/amba/bus.h>
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/csp/mm_addr.h>
+ #include <mach/hardware.h>
+-#include <asm/clkdev.h>
+ #include <linux/io.h>
+ #include <asm/irq.h>
+ #include <asm/hardware/arm_timer.h>
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index 01e3648..64c58ad 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -68,7 +68,7 @@
+ #ifndef __ASSEMBLER__
+ 
+ #include <linux/list.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ struct pll_data {
+ 	u32 phys_base;
+diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+index 8bf3cec..f60d636 100644
+--- a/arch/arm/mach-ep93xx/clock.c
++++ b/arch/arm/mach-ep93xx/clock.c
+@@ -19,10 +19,10 @@
+ #include <linux/string.h>
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/hardware.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/div64.h>
+ 
+ 
+diff --git a/arch/arm/mach-imx/clock-imx1.c b/arch/arm/mach-imx/clock-imx1.c
+index c05096c..9c848d9 100644
+--- a/arch/arm/mach-imx/clock-imx1.c
++++ b/arch/arm/mach-imx/clock-imx1.c
+@@ -22,8 +22,7 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
+-
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/clock.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
+index bb419ef..19e966e 100644
+--- a/arch/arm/mach-imx/clock-imx21.c
++++ b/arch/arm/mach-imx/clock-imx21.c
+@@ -21,11 +21,11 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/clock.h>
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+-#include <asm/clkdev.h>
+ #include <asm/div64.h>
+ 
+ #define IO_ADDR_CCM(off)	(MX21_IO_ADDRESS(MX21_CCM_BASE_ADDR + (off)))
+diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+index 5a1aa15..f121114 100644
+--- a/arch/arm/mach-imx/clock-imx27.c
++++ b/arch/arm/mach-imx/clock-imx27.c
+@@ -21,8 +21,8 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/div64.h>
+ 
+ #include <mach/clock.h>
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 8f4fb6d..b8e884b 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -21,9 +21,8 @@
+ #include <linux/amba/bus.h>
+ #include <linux/amba/serial.h>
+ #include <linux/io.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+-#include <mach/clkdev.h>
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+ #include <asm/irq.h>
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index fd684bf..5db574f 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -22,9 +22,8 @@
+ #include <linux/amba/clcd.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+-#include <mach/clkdev.h>
+ #include <asm/hardware/icst.h>
+ #include <mach/lm.h>
+ #include <mach/impd1.h>
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 05db40e..fce64fc 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -21,9 +21,8 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/io.h>
+ #include <linux/gfp.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+-#include <mach/clkdev.h>
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+ #include <asm/irq.h>
+diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+index 32d6379..da0e649 100644
+--- a/arch/arm/mach-lpc32xx/clock.c
++++ b/arch/arm/mach-lpc32xx/clock.c
+@@ -90,10 +90,9 @@
+ #include <linux/clk.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/clcd.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/hardware.h>
+-#include <asm/clkdev.h>
+-#include <mach/clkdev.h>
+ #include <mach/platform.h>
+ #include "clock.h"
+ #include "common.h"
+diff --git a/arch/arm/mach-mmp/clock.h b/arch/arm/mach-mmp/clock.h
+index 016ae94..9b027d7 100644
+--- a/arch/arm/mach-mmp/clock.h
++++ b/arch/arm/mach-mmp/clock.h
+@@ -6,7 +6,7 @@
+  *  published by the Free Software Foundation.
   */
- 	.macro	smp_dmb
- #ifdef CONFIG_SMP
- #if __LINUX_ARM_ARCH__ >= 7
--	dmb
-+	SMP(dmb)
- #elif __LINUX_ARM_ARCH__ == 6
--	mcr	p15, 0, r0, c7, c10, 5	@ dmb
-+	SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
-+#else
-+#error Incompatible SMP platform
- #endif
-+	UP(nop)
- #endif
- 	.endm
  
-diff --git a/arch/arm/include/asm/smp_midr.h b/arch/arm/include/asm/smp_midr.h
-index e69de29..4538ba4 100644
---- a/arch/arm/include/asm/smp_midr.h
-+++ b/arch/arm/include/asm/smp_midr.h
-@@ -0,0 +1,17 @@
-+#ifndef ASMARM_SMP_MIDR_H
-+#define ASMARM_SMP_MIDR_H
-+
-+#define hard_smp_processor_id()						\
-+	({								\
-+		unsigned int cpunum;					\
-+		__asm__("\n"						\
-+			"1:	mrc p15, 0, %0, c0, c0, 5\n"		\
-+			"	.pushsection \".smpalt.init\", \"a\"\n"	\
-+			"	.word	1b\n"				\
-+			"	mov	%0, #0\n"			\
-+			"	.popsection"				\
-+			: "=r" (cpunum));				\
-+		cpunum &= 0x0F;						\
-+	})
-+
-+#endif
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 33b546a..1fd0db9 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -70,6 +70,10 @@
- #undef _TLB
- #undef MULTI_TLB
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
  
-+#ifdef CONFIG_SMP_ON_UP
-+#define MULTI_TLB 1
-+#endif
-+
- #define v3_tlb_flags	(TLB_V3_FULL | TLB_V3_PAGE)
- 
- #ifdef CONFIG_CPU_TLB_V3
-@@ -185,12 +189,15 @@
- # define v6wbi_always_flags	(-1UL)
- #endif
- 
--#ifdef CONFIG_SMP
--#define v7wbi_tlb_flags (TLB_WB | TLB_DCLEAN | TLB_V7_IS_BTB | \
-+#define v7wbi_tlb_flags_smp (TLB_WB | TLB_DCLEAN | TLB_V7_IS_BTB | \
- 			 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | TLB_V7_UIS_ASID)
--#else
--#define v7wbi_tlb_flags (TLB_WB | TLB_DCLEAN | TLB_BTB | \
-+#define v7wbi_tlb_flags_up (TLB_WB | TLB_DCLEAN | TLB_BTB | \
- 			 TLB_V6_U_FULL | TLB_V6_U_PAGE | TLB_V6_U_ASID)
-+
-+#ifdef CONFIG_SMP
-+#define v7wbi_tlb_flags	v7wbi_tlb_flags_smp
-+#else
-+#define v7wbi_tlb_flags	v7wbi_tlb_flags_up
- #endif
- 
- #ifdef CONFIG_CPU_TLB_V7
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index bb8e93a..bb2ef60 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -965,11 +965,8 @@ kuser_cmpxchg_fixup:
- 	beq	1b
- 	rsbs	r0, r3, #0
- 	/* beware -- each __kuser slot must be 8 instructions max */
--#ifdef CONFIG_SMP
--	b	__kuser_memory_barrier
--#else
--	usr_ret	lr
--#endif
-+	SMP(b	__kuser_memory_barrier)
-+	UP(usr_ret	lr)
- 
- #endif
- 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index eb62bf9..cf76484 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -86,6 +86,9 @@ ENTRY(stext)
- 	movs	r8, r5				@ invalid machine (r5=0)?
- 	beq	__error_a			@ yes, error 'a'
- 	bl	__vet_atags
-+#ifdef CONFIG_SMP_ON_UP
-+	bl	__fixup_smp
-+#endif
- 	bl	__create_page_tables
- 
- 	/*
-@@ -333,4 +336,35 @@ __create_page_tables:
- ENDPROC(__create_page_tables)
- 	.ltorg
- 
-+#ifdef CONFIG_SMP_ON_UP
-+__fixup_smp:
-+	and	r0, r9, #0xff000000
-+	teq	r0, #0x41000000		@ ARM CPU?
-+	bne	smp_on_up		@ no, assume UP
-+	and	r0, r9, #0x00070000
-+	teq	r0, #0x00070000		@ ARMv6/v7?
-+	bne	smp_on_up		@ no, assume UP
-+	mrc	p15, 0, r0, c0, c0, 5	@ read MIDR
-+	movs	r0, r0, lsr #30
-+	teqne	r0, #3			@ check top two bits 00 or 11
-+	movne	pc, lr
-+
-+smp_on_up:
-+	adr	r0, 1f
-+	ldmia	r0, {r3, r6, r7}
-+	sub	r3, r0, r3
-+	add	r6, r6, r3
-+	add	r7, r7, r3
-+2:	cmp	r6, r7
-+	ldmia	r6!, {r0, r4}
-+	movhs	pc, lr
-+	str	r4, [r0, r3]
-+	b	2b
-+ENDPROC(__fixup_smp)
-+
-+1:	.word	.
-+	.word	__smpalt_begin
-+	.word	__smpalt_end
-+#endif
-+
- #include "head-common.S"
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b16c079..53cb57e 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -40,6 +40,11 @@ SECTIONS
- 		__tagtable_begin = .;
- 			*(.taglist.init)
- 		__tagtable_end = .;
-+#ifdef CONFIG_SMP_ON_UP
-+		__smpalt_begin = .;
-+			*(.smpalt.init)
-+		__smpalt_end = .;
-+#endif
- 
- 		INIT_SETUP(16)
- 
-@@ -237,6 +242,12 @@ SECTIONS
- 
- 	/* Default discards */
- 	DISCARDS
-+
-+#ifndef CONFIG_SMP_ON_UP
-+	/DISCARD/ {
-+		*(.smpalt.init)
-+	}
-+#endif
- }
- 
- /*
-diff --git a/arch/arm/mach-realview/include/mach/smp.h b/arch/arm/mach-realview/include/mach/smp.h
-index dd53892..833ee85 100644
---- a/arch/arm/mach-realview/include/mach/smp.h
-+++ b/arch/arm/mach-realview/include/mach/smp.h
-@@ -1,16 +1,8 @@
- #ifndef ASMARM_ARCH_SMP_H
- #define ASMARM_ARCH_SMP_H
- 
+ struct clkops {
+ 	void			(*enable)(struct clk *);
+diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
+index 40c7cc4..b3196bb 100644
+--- a/arch/arm/mach-mx25/clock.c
++++ b/arch/arm/mach-mx25/clock.c
+@@ -21,8 +21,7 @@
+ #include <linux/list.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
 -
- #include <asm/hardware/gic.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/clock.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-mx3/clock-imx31.c b/arch/arm/mach-mx3/clock-imx31.c
+index 9a9eb6d..2ba7094 100644
+--- a/arch/arm/mach-mx3/clock-imx31.c
++++ b/arch/arm/mach-mx3/clock-imx31.c
+@@ -23,8 +23,8 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/div64.h>
+ 
+ #include <mach/clock.h>
+diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
+index d3af0fd..2d17c03 100644
+--- a/arch/arm/mach-mx3/clock-imx35.c
++++ b/arch/arm/mach-mx3/clock-imx35.c
+@@ -21,8 +21,7 @@
+ #include <linux/list.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
 -
--#define hard_smp_processor_id()			\
--	({						\
--		unsigned int cpunum;			\
--		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
--			: "=r" (cpunum));		\
--		cpunum &= 0x0F;				\
--	})
-+#include <asm/smp_midr.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
  
- /*
-  * We use IRQ1 as the IPI
-diff --git a/arch/arm/mach-s5pv310/include/mach/smp.h b/arch/arm/mach-s5pv310/include/mach/smp.h
-index 990f3ba..1b8b637 100644
---- a/arch/arm/mach-s5pv310/include/mach/smp.h
-+++ b/arch/arm/mach-s5pv310/include/mach/smp.h
-@@ -7,17 +7,10 @@
- #define ASM_ARCH_SMP_H __FILE__
+ #include <mach/clock.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 6af69de..e599b6d 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -14,8 +14,8 @@
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/clkdev.h>
  
- #include <asm/hardware/gic.h>
-+#include <asm/smp_midr.h>
+-#include <asm/clkdev.h>
+ #include <asm/div64.h>
  
- extern void __iomem *gic_cpu_base_addr;
- 
--#define hard_smp_processor_id()			\
--	({						\
--		unsigned int cpunum;			\
--		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
--			: "=r" (cpunum));		\
--		cpunum &= 0x03;				\
--	})
--
- /*
-  * We use IRQ1 as the IPI
-  */
-diff --git a/arch/arm/mach-tegra/include/mach/smp.h b/arch/arm/mach-tegra/include/mach/smp.h
-index 8b42dab..d5c4030 100644
---- a/arch/arm/mach-tegra/include/mach/smp.h
-+++ b/arch/arm/mach-tegra/include/mach/smp.h
-@@ -1,16 +1,8 @@
- #ifndef ASMARM_ARCH_SMP_H
- #define ASMARM_ARCH_SMP_H
- 
--
- #include <asm/hardware/gic.h>
--
--#define hard_smp_processor_id()			\
--	({						\
--		unsigned int cpunum;			\
--		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
--			: "=r" (cpunum));		\
--		cpunum &= 0x0F;				\
--	})
-+#include <asm/smp_midr.h>
- 
- /*
-  * We use IRQ1 as the IPI
-diff --git a/arch/arm/mach-ux500/include/mach/smp.h b/arch/arm/mach-ux500/include/mach/smp.h
-index b59f7bc..87a9cf3 100644
---- a/arch/arm/mach-ux500/include/mach/smp.h
-+++ b/arch/arm/mach-ux500/include/mach/smp.h
-@@ -10,18 +10,11 @@
- #define ASMARM_ARCH_SMP_H
- 
- #include <asm/hardware/gic.h>
-+#include <asm/smp_midr.h>
- 
- /* This is required to wakeup the secondary core */
- extern void u8500_secondary_startup(void);
- 
--#define hard_smp_processor_id()				\
--	({						\
--		unsigned int cpunum;			\
--		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
--			: "=r" (cpunum));		\
--		cpunum &= 0x0F;				\
--	})
--
- /*
-  * We use IRQ1 as the IPI
-  */
-diff --git a/arch/arm/mach-vexpress/include/mach/smp.h b/arch/arm/mach-vexpress/include/mach/smp.h
-index 72a9621..e02bc7d 100644
---- a/arch/arm/mach-vexpress/include/mach/smp.h
-+++ b/arch/arm/mach-vexpress/include/mach/smp.h
-@@ -2,14 +2,7 @@
- #define __MACH_SMP_H
- 
- #include <asm/hardware/gic.h>
--
--#define hard_smp_processor_id()				\
--	({						\
--		unsigned int cpunum;			\
--		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
--			: "=r" (cpunum));		\
--		cpunum &= 0x0F;				\
--	})
-+#include <asm/smp_midr.h>
- 
- /*
-  * We use IRQ1 as the IPI
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 37c8157..2aa59d5 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -91,11 +91,8 @@ ENTRY(v7_flush_kern_cache_all)
-  THUMB(	stmfd	sp!, {r4-r7, r9-r11, lr}	)
- 	bl	v7_flush_dcache_all
- 	mov	r0, #0
--#ifdef CONFIG_SMP
--	mcr	p15, 0, r0, c7, c1, 0		@ invalidate I-cache inner shareable
--#else
--	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
--#endif
-+	SMP(mcr	p15, 0, r0, c7, c1, 0)		@ invalidate I-cache inner shareable
-+	UP(mcr	p15, 0, r0, c7, c5, 0)		@ I+BTB cache invalidate
-  ARM(	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
-  THUMB(	ldmfd	sp!, {r4-r7, r9-r11, lr}	)
- 	mov	pc, lr
-@@ -171,11 +168,8 @@ ENTRY(v7_coherent_user_range)
- 	cmp	r0, r1
- 	blo	1b
- 	mov	r0, #0
--#ifdef CONFIG_SMP
--	mcr	p15, 0, r0, c7, c1, 6		@ invalidate BTB Inner Shareable
--#else
--	mcr	p15, 0, r0, c7, c5, 6		@ invalidate BTB
--#endif
-+	SMP(mcr	p15, 0, r0, c7, c1, 6)		@ invalidate BTB Inner Shareable
-+	UP(mcr	p15, 0, r0, c7, c5, 6)		@ invalidate BTB
- 	dsb
- 	isb
- 	mov	pc, lr
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 22aac85..00692b0 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -30,13 +30,10 @@
- #define TTB_RGN_WT	(2 << 3)
- #define TTB_RGN_WB	(3 << 3)
- 
--#ifndef CONFIG_SMP
--#define TTB_FLAGS	TTB_RGN_WBWA
--#define PMD_FLAGS	PMD_SECT_WB
--#else
--#define TTB_FLAGS	TTB_RGN_WBWA|TTB_S
--#define PMD_FLAGS	PMD_SECT_WBWA|PMD_SECT_S
--#endif
-+#define TTB_FLAGS_UP	TTB_RGN_WBWA
-+#define PMD_FLAGS_UP	PMD_SECT_WB
-+#define TTB_FLAGS_SMP	TTB_RGN_WBWA|TTB_S
-+#define PMD_FLAGS_SMP	PMD_SECT_WBWA|PMD_SECT_S
- 
- ENTRY(cpu_v6_proc_init)
- 	mov	pc, lr
-@@ -97,7 +94,8 @@ ENTRY(cpu_v6_switch_mm)
- #ifdef CONFIG_MMU
- 	mov	r2, #0
- 	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
--	orr	r0, r0, #TTB_FLAGS
-+	SMP(orr	r0, r0, #TTB_FLAGS_SMP)
-+	UP(orr	r0, r0, #TTB_FLAGS_UP)
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- 	mcr	p15, 0, r2, c7, c10, 4		@ drain write buffer
- 	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
-@@ -156,9 +154,11 @@ cpu_pj4_name:
-  */
- __v6_setup:
- #ifdef CONFIG_SMP
--	mrc	p15, 0, r0, c1, c0, 1		@ Enable SMP/nAMP mode
-+	SMP(mrc	p15, 0, r0, c1, c0, 1)		@ Enable SMP/nAMP mode
-+	UP(nop)
- 	orr	r0, r0, #0x20
--	mcr	p15, 0, r0, c1, c0, 1
-+	SMP(mcr	p15, 0, r0, c1, c0, 1)
-+	UP(nop)
- #endif
- 
- 	mov	r0, #0
-@@ -169,7 +169,8 @@ __v6_setup:
- #ifdef CONFIG_MMU
- 	mcr	p15, 0, r0, c8, c7, 0		@ invalidate I + D TLBs
- 	mcr	p15, 0, r0, c2, c0, 2		@ TTB control register
--	orr	r4, r4, #TTB_FLAGS
-+	SMP(orr	r4, r4, #TTB_FLAGS_SMP)
-+	UP(orr	r4, r4, #TTB_FLAGS_UP)
- 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
- #endif /* CONFIG_MMU */
- 	adr	r5, v6_crval
-@@ -225,10 +226,16 @@ cpu_elf_name:
- __v6_proc_info:
- 	.long	0x0007b000
- 	.long	0x0007f000
--	.long   PMD_TYPE_SECT | \
-+	SMP(.long \
-+		PMD_TYPE_SECT | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \
-+		PMD_FLAGS_SMP)
-+	UP(.long \
-+		PMD_TYPE_SECT | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ | \
--		PMD_FLAGS
-+		PMD_FLAGS_UP)
- 	.long   PMD_TYPE_SECT | \
- 		PMD_SECT_XN | \
- 		PMD_SECT_AP_WRITE | \
-@@ -249,10 +256,16 @@ __v6_proc_info:
- __pj4_v6_proc_info:
- 	.long	0x560f5810
- 	.long	0xff0ffff0
--	.long   PMD_TYPE_SECT | \
-+	SMP(.long \
-+		PMD_TYPE_SECT | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \
-+		PMD_FLAGS_SMP)
-+	UP(.long \
-+		PMD_TYPE_SECT | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ | \
--		PMD_FLAGS
-+		PMD_FLAGS_UP)
- 	.long   PMD_TYPE_SECT | \
- 		PMD_SECT_XN | \
- 		PMD_SECT_AP_WRITE | \
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 6a8506d..07fc660 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -30,15 +30,13 @@
- #define TTB_IRGN_WT	((1 << 0) | (0 << 6))
- #define TTB_IRGN_WB	((1 << 0) | (1 << 6))
- 
--#ifndef CONFIG_SMP
- /* PTWs cacheable, inner WB not shareable, outer WB not shareable */
--#define TTB_FLAGS	TTB_IRGN_WB|TTB_RGN_OC_WB
--#define PMD_FLAGS	PMD_SECT_WB
--#else
-+#define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
-+#define PMD_FLAGS_UP	PMD_SECT_WB
-+
- /* PTWs cacheable, inner WBWA shareable, outer WBWA not shareable */
--#define TTB_FLAGS	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
--#define PMD_FLAGS	PMD_SECT_WBWA|PMD_SECT_S
--#endif
-+#define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
-+#define PMD_FLAGS_SMP	PMD_SECT_WBWA|PMD_SECT_S
- 
- ENTRY(cpu_v7_proc_init)
- 	mov	pc, lr
-@@ -105,7 +103,8 @@ ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_MMU
- 	mov	r2, #0
- 	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
--	orr	r0, r0, #TTB_FLAGS
-+	SMP(orr	r0, r0, #TTB_FLAGS_SMP)
-+	UP(orr	r0, r0, #TTB_FLAGS_UP)
- #ifdef CONFIG_ARM_ERRATA_430973
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- #endif
-@@ -188,7 +187,8 @@ cpu_v7_name:
-  */
- __v7_setup:
- #ifdef CONFIG_SMP
--	mrc	p15, 0, r0, c1, c0, 1
-+	SMP(mrc	p15, 0, r0, c1, c0, 1)
-+	UP(mov	r0, #(1 << 6))			@ fake it for UP
- 	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
- 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
- 	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
-@@ -235,7 +235,8 @@ __v7_setup:
- #ifdef CONFIG_MMU
- 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
- 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
--	orr	r4, r4, #TTB_FLAGS
-+	SMP(orr	r4, r4, #TTB_FLAGS_SMP)
-+	UP(orr	r4, r4, #TTB_FLAGS_UP)
- 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
- 	mov	r10, #0x1f			@ domains 0, 1 = manager
- 	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
-@@ -330,10 +331,16 @@ cpu_elf_name:
- __v7_proc_info:
- 	.long	0x000f0000		@ Required ID value
- 	.long	0x000f0000		@ Mask for ID
--	.long   PMD_TYPE_SECT | \
-+	SMP(.long \
-+		PMD_TYPE_SECT | \
-+		PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \
-+		PMD_FLAGS_SMP)
-+	UP(.long \
-+		PMD_TYPE_SECT | \
- 		PMD_SECT_AP_WRITE | \
- 		PMD_SECT_AP_READ | \
--		PMD_FLAGS
-+		PMD_FLAGS_UP)
- 	.long   PMD_TYPE_SECT | \
- 		PMD_SECT_XN | \
- 		PMD_SECT_AP_WRITE | \
-diff --git a/arch/arm/mm/tlb-v7.S b/arch/arm/mm/tlb-v7.S
-index f3f288a..26247c9 100644
---- a/arch/arm/mm/tlb-v7.S
-+++ b/arch/arm/mm/tlb-v7.S
-@@ -13,6 +13,7 @@
-  */
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-mxc91231/clock.c b/arch/arm/mach-mxc91231/clock.c
+index 5c85075..9fab505 100644
+--- a/arch/arm/mach-mxc91231/clock.c
++++ b/arch/arm/mach-mxc91231/clock.c
+@@ -2,12 +2,12 @@
+ #include <linux/kernel.h>
  #include <linux/init.h>
- #include <linux/linkage.h>
-+#include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/page.h>
- #include <asm/tlbflush.h>
-@@ -41,20 +42,15 @@ ENTRY(v7wbi_flush_user_tlb_range)
- 	orr	r0, r3, r0, lsl #PAGE_SHIFT	@ Create initial MVA
- 	mov	r1, r1, lsl #PAGE_SHIFT
- 1:
--#ifdef CONFIG_SMP
--	mcr	p15, 0, r0, c8, c3, 1		@ TLB invalidate U MVA (shareable) 
--#else
--	mcr	p15, 0, r0, c8, c7, 1		@ TLB invalidate U MVA
--#endif
-+	SMP(mcr	p15, 0, r0, c8, c3, 1)		@ TLB invalidate U MVA (shareable) 
-+	UP(mcr	p15, 0, r0, c8, c7, 1)		@ TLB invalidate U MVA
-+
- 	add	r0, r0, #PAGE_SZ
- 	cmp	r0, r1
- 	blo	1b
- 	mov	ip, #0
--#ifdef CONFIG_SMP
--	mcr	p15, 0, ip, c7, c1, 6		@ flush BTAC/BTB Inner Shareable
--#else
--	mcr	p15, 0, ip, c7, c5, 6		@ flush BTAC/BTB
--#endif
-+	SMP(mcr	p15, 0, ip, c7, c1, 6)		@ flush BTAC/BTB Inner Shareable
-+	UP(mcr	p15, 0, ip, c7, c5, 6)		@ flush BTAC/BTB
- 	dsb
- 	mov	pc, lr
- ENDPROC(v7wbi_flush_user_tlb_range)
-@@ -74,20 +70,14 @@ ENTRY(v7wbi_flush_kern_tlb_range)
- 	mov	r0, r0, lsl #PAGE_SHIFT
- 	mov	r1, r1, lsl #PAGE_SHIFT
- 1:
--#ifdef CONFIG_SMP
--	mcr	p15, 0, r0, c8, c3, 1		@ TLB invalidate U MVA (shareable)
--#else
--	mcr	p15, 0, r0, c8, c7, 1		@ TLB invalidate U MVA
--#endif
-+	SMP(mcr	p15, 0, r0, c8, c3, 1)		@ TLB invalidate U MVA (shareable)
-+	UP(mcr	p15, 0, r0, c8, c7, 1)		@ TLB invalidate U MVA
- 	add	r0, r0, #PAGE_SZ
- 	cmp	r0, r1
- 	blo	1b
- 	mov	r2, #0
--#ifdef CONFIG_SMP
--	mcr	p15, 0, r2, c7, c1, 6		@ flush BTAC/BTB Inner Shareable
--#else
--	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
--#endif
-+	SMP(mcr	p15, 0, r2, c7, c1, 6)		@ flush BTAC/BTB Inner Shareable
-+	UP(mcr	p15, 0, r2, c7, c5, 6)		@ flush BTAC/BTB
- 	dsb
- 	isb
- 	mov	pc, lr
-@@ -99,5 +89,6 @@ ENDPROC(v7wbi_flush_kern_tlb_range)
- ENTRY(v7wbi_tlb_fns)
- 	.long	v7wbi_flush_user_tlb_range
- 	.long	v7wbi_flush_kern_tlb_range
--	.long	v7wbi_tlb_flags
-+	SMP(.long	v7wbi_tlb_flags_smp)
-+	UP(.long	v7wbi_tlb_flags_up)
- 	.size	v7wbi_tlb_fns, . - v7wbi_tlb_fns
-diff --git a/arch/arm/plat-omap/include/plat/smp.h b/arch/arm/plat-omap/include/plat/smp.h
-index 6a3ff65..ed96907 100644
---- a/arch/arm/plat-omap/include/plat/smp.h
-+++ b/arch/arm/plat-omap/include/plat/smp.h
-@@ -18,6 +18,7 @@
- #define OMAP_ARCH_SMP_H
+ #include <linux/io.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/clock.h>
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/bug.h>
+ #include <asm/div64.h>
+ 
+diff --git a/arch/arm/mach-nomadik/clock.c b/arch/arm/mach-nomadik/clock.c
+index 89f793a..48a59f2 100644
+--- a/arch/arm/mach-nomadik/clock.c
++++ b/arch/arm/mach-nomadik/clock.c
+@@ -7,7 +7,7 @@
+ #include <linux/module.h>
+ #include <linux/errno.h>
+ #include <linux/clk.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include "clock.h"
+ 
+ /*
+diff --git a/arch/arm/mach-nuc93x/clock.h b/arch/arm/mach-nuc93x/clock.h
+index 18e51be..4de1f1d 100644
+--- a/arch/arm/mach-nuc93x/clock.h
++++ b/arch/arm/mach-nuc93x/clock.h
+@@ -10,7 +10,7 @@
+  * the Free Software Foundation; either version 2 of the License.
+  */
+ 
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ void nuc93x_clk_enable(struct clk *clk, int enable);
+ void clks_register(struct clk_lookup *clks, size_t num);
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index b8c7fb9..84ef704 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -17,9 +17,9 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/clkdev.h>
+ 
+ #include <asm/mach-types.h>
+-#include <asm/clkdev.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/usb.h>
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index ed8d330..ebb888f 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -26,10 +26,10 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/bitops.h>
++#include <linux/clkdev.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/clock.h>
+-#include <asm/clkdev.h>
+ 
+ #include "clock.h"
+ #include "prm.h"
+diff --git a/arch/arm/mach-pnx4008/clock.c b/arch/arm/mach-pnx4008/clock.c
+index 9d1975f..a4a3819 100644
+--- a/arch/arm/mach-pnx4008/clock.c
++++ b/arch/arm/mach-pnx4008/clock.c
+@@ -21,8 +21,7 @@
+ #include <linux/err.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+-
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/clock.h>
+diff --git a/arch/arm/mach-pxa/clock.c b/arch/arm/mach-pxa/clock.c
+index abba008..4e4a84b 100644
+--- a/arch/arm/mach-pxa/clock.c
++++ b/arch/arm/mach-pxa/clock.c
+@@ -11,8 +11,8 @@
+ #include <linux/spinlock.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/hardware.h>
+ 
+diff --git a/arch/arm/mach-pxa/clock.h b/arch/arm/mach-pxa/clock.h
+index d848874..12cc0e8 100644
+--- a/arch/arm/mach-pxa/clock.h
++++ b/arch/arm/mach-pxa/clock.h
+@@ -1,4 +1,4 @@
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ struct clkops {
+ 	void			(*enable)(struct clk *);
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 2fa38df..cda8b04 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -30,8 +30,8 @@
+ #include <linux/ata_platform.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/gfp.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+@@ -47,7 +47,6 @@
  
  #include <asm/hardware/gic.h>
-+#include <asm/smp_midr.h>
  
- /* Needed for secondary core boot */
- extern void omap_secondary_startup(void);
-@@ -33,15 +34,4 @@ static inline void smp_cross_call(const struct cpumask *mask)
- 	gic_raise_softirq(mask, 1);
+-#include <mach/clkdev.h>
+ #include <mach/platform.h>
+ #include <mach/irqs.h>
+ #include <plat/timer-sp.h>
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 54b479c..f8f06e9 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -6,7 +6,7 @@ config ARCH_SH7367
+ 	bool "SH-Mobile G3 (SH7367)"
+ 	select CPU_V6
+ 	select HAVE_CLK
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select SH_CLK_CPG
+ 	select GENERIC_CLOCKEVENTS
+ 
+@@ -14,7 +14,7 @@ config ARCH_SH7377
+ 	bool "SH-Mobile G4 (SH7377)"
+ 	select CPU_V7
+ 	select HAVE_CLK
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select SH_CLK_CPG
+ 	select GENERIC_CLOCKEVENTS
+ 
+@@ -22,7 +22,7 @@ config ARCH_SH7372
+ 	bool "SH-Mobile AP4 (SH7372)"
+ 	select CPU_V7
+ 	select HAVE_CLK
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	select SH_CLK_CPG
+ 	select GENERIC_CLOCKEVENTS
+ 
+diff --git a/arch/arm/mach-shmobile/clock-sh7367.c b/arch/arm/mach-shmobile/clock-sh7367.c
+index b6454c9..3030935 100644
+--- a/arch/arm/mach-shmobile/clock-sh7367.c
++++ b/arch/arm/mach-shmobile/clock-sh7367.c
+@@ -20,8 +20,8 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
++#include <linux/clkdev.h>
+ #include <mach/common.h>
+-#include <asm/clkdev.h>
+ 
+ /* SH7367 registers */
+ #define RTFRQCR    0xe6150000
+diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
+index fb4e9b1..907f46d 100644
+--- a/arch/arm/mach-shmobile/clock-sh7372.c
++++ b/arch/arm/mach-shmobile/clock-sh7372.c
+@@ -20,8 +20,8 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
++#include <linux/clkdev.h>
+ #include <mach/common.h>
+-#include <asm/clkdev.h>
+ 
+ /* SH7372 registers */
+ #define FRQCRA		0xe6150000
+diff --git a/arch/arm/mach-shmobile/clock-sh7377.c b/arch/arm/mach-shmobile/clock-sh7377.c
+index e007c28..a322c9b 100644
+--- a/arch/arm/mach-shmobile/clock-sh7377.c
++++ b/arch/arm/mach-shmobile/clock-sh7377.c
+@@ -20,8 +20,8 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
++#include <linux/clkdev.h>
+ #include <mach/common.h>
+-#include <asm/clkdev.h>
+ 
+ /* SH7377 registers */
+ #define RTFRQCR    0xe6150000
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index 03ad578..cad740c 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -24,7 +24,7 @@
+ #include <linux/debugfs.h>
+ #include <linux/slab.h>
+ #include <linux/seq_file.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #include "clock.h"
+ 
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+index af7c70e..39a87e7 100644
+--- a/arch/arm/mach-tegra/clock.h
++++ b/arch/arm/mach-tegra/clock.h
+@@ -21,7 +21,7 @@
+ #define __MACH_TEGRA_CLOCK_H
+ 
+ #include <linux/list.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #define DIV_BUS			(1 << 0)
+ #define DIV_U71			(1 << 1)
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 4261632..d2cecbf 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -24,8 +24,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/hrtimer.h>
+-
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #include <mach/iomap.h>
+ 
+diff --git a/arch/arm/mach-u300/clock.c b/arch/arm/mach-u300/clock.c
+index 60acf9e..cb3ab08 100644
+--- a/arch/arm/mach-u300/clock.c
++++ b/arch/arm/mach-u300/clock.c
+@@ -25,8 +25,8 @@
+ #include <linux/timer.h>
+ #include <linux/io.h>
+ #include <linux/seq_file.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <mach/hardware.h>
+ #include <mach/syscon.h>
+ 
+diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
+index d8ab7f1..df238ab 100644
+--- a/arch/arm/mach-ux500/clock.c
++++ b/arch/arm/mach-ux500/clock.c
+@@ -13,8 +13,7 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
+-
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ #include <plat/mtu.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index e38acb0..8c1ca1d 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -31,8 +31,8 @@
+ #include <linux/amba/pl022.h>
+ #include <linux/io.h>
+ #include <linux/gfp.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/system.h>
+ #include <asm/irq.h>
+ #include <asm/leds.h>
+@@ -46,7 +46,6 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+-#include <mach/clkdev.h>
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+ #include <plat/timer-sp.h>
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index 577df6c..fb94f30 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -8,8 +8,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/clcd.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -18,7 +18,6 @@
+ #include <asm/pmu.h>
+ #include <asm/smp_twd.h>
+ 
+-#include <mach/clkdev.h>
+ #include <mach/ct-ca9x4.h>
+ 
+ #include <plat/timer-sp.h>
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 817f0ad..919103d 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -11,15 +11,14 @@
+ #include <linux/spinlock.h>
+ #include <linux/sysdev.h>
+ #include <linux/usb/isp1760.h>
++#include <linux/clkdev.h>
+ 
+-#include <asm/clkdev.h>
+ #include <asm/sizes.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/hardware/arm_timer.h>
+ 
+-#include <mach/clkdev.h>
+ #include <mach/motherboard.h>
+ 
+ #include <plat/timer-sp.h>
+diff --git a/arch/arm/mach-w90x900/clock.h b/arch/arm/mach-w90x900/clock.h
+index c56ddab..b88a1b1 100644
+--- a/arch/arm/mach-w90x900/clock.h
++++ b/arch/arm/mach-w90x900/clock.h
+@@ -10,7 +10,7 @@
+  * the Free Software Foundation; either version 2 of the License.
+  */
+ 
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ void nuc900_clk_enable(struct clk *clk, int enable);
+ void nuc900_subclk_enable(struct clk *clk, int enable);
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index e39a417..271d7b8 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -11,13 +11,13 @@ choice
+ 
+ config ARCH_OMAP1
+ 	bool "TI OMAP1"
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	help
+ 	  "Systems based on omap7xx, omap15xx or omap16xx"
+ 
+ config ARCH_OMAP2PLUS
+ 	bool "TI OMAP2/3/4"
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	help
+ 	  "Systems based on omap24xx, omap34xx or omap44xx"
+ 
+diff --git a/arch/arm/plat-omap/include/plat/clkdev_omap.h b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+index bb937f3..4b2028a 100644
+--- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
++++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+@@ -8,7 +8,7 @@
+ #ifndef __ARCH_ARM_PLAT_OMAP_INCLUDE_PLAT_CLKDEV_OMAP_H
+ #define __ARCH_ARM_PLAT_OMAP_INCLUDE_PLAT_CLKDEV_OMAP_H
+ 
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ struct omap_clk {
+ 	u16				cpu;
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index 298bafc..2572260 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -15,7 +15,7 @@
+ #define __PLAT_CLOCK_H
+ 
+ #include <linux/list.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <linux/types.h>
+ 
+ /* clk structure flags */
+diff --git a/arch/arm/plat-stmp3xxx/clock.c b/arch/arm/plat-stmp3xxx/clock.c
+index e593a2a..2e712e1 100644
+--- a/arch/arm/plat-stmp3xxx/clock.c
++++ b/arch/arm/plat-stmp3xxx/clock.c
+@@ -25,9 +25,9 @@
+ #include <linux/err.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
++#include <linux/clkdev.h>
+ 
+ #include <asm/mach-types.h>
+-#include <asm/clkdev.h>
+ #include <mach/platform.h>
+ #include <mach/regs-clkctrl.h>
+ 
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index 33990fa..b5f8a0f 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -8,7 +8,7 @@ mainmenu "Linux/SuperH Kernel Configuration"
+ config SUPERH
+ 	def_bool y
+ 	select EMBEDDED
+-	select HAVE_CLK
++	select CLKDEV_LOOKUP
+ 	select HAVE_IDE if HAS_IOPORT
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_OPROFILE
+diff --git a/arch/sh/boards/mach-highlander/setup.c b/arch/sh/boards/mach-highlander/setup.c
+index a5ecfba..87618c9 100644
+--- a/arch/sh/boards/mach-highlander/setup.c
++++ b/arch/sh/boards/mach-highlander/setup.c
+@@ -24,10 +24,10 @@
+ #include <linux/interrupt.h>
+ #include <linux/usb/r8a66597.h>
+ #include <linux/usb/m66592.h>
++#include <linux/clkdev.h>
+ #include <net/ax88796.h>
+ #include <asm/machvec.h>
+ #include <mach/highlander.h>
+-#include <asm/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/heartbeat.h>
+ #include <asm/io.h>
+diff --git a/arch/sh/include/asm/clkdev.h b/arch/sh/include/asm/clkdev.h
+dissimilarity index 69%
+index 5645f35..6ba9186 100644
+--- a/arch/sh/include/asm/clkdev.h
++++ b/arch/sh/include/asm/clkdev.h
+@@ -1,35 +1,31 @@
+-/*
+- *  arch/sh/include/asm/clkdev.h
+- *
+- * Cloned from arch/arm/include/asm/clkdev.h:
+- *
+- *  Copyright (C) 2008 Russell King.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * Helper for the clk API to assist looking up a struct clk.
+- */
+-#ifndef __ASM_CLKDEV_H
+-#define __ASM_CLKDEV_H
+-
+-struct clk;
+-
+-struct clk_lookup {
+-	struct list_head	node;
+-	const char		*dev_id;
+-	const char		*con_id;
+-	struct clk		*clk;
+-};
+-
+-struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+-	const char *dev_fmt, ...);
+-
+-void clkdev_add(struct clk_lookup *cl);
+-void clkdev_drop(struct clk_lookup *cl);
+-
+-void clkdev_add_table(struct clk_lookup *, size_t);
+-int clk_add_alias(const char *, const char *, char *, struct device *);
+-
+-#endif
++/*
++ *  Copyright (C) 2010 Paul Mundt <lethal@linux-sh.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Helper for the clk API to assist looking up a struct clk.
++ */
++
++#ifndef __CLKDEV__H_
++#define __CLKDEV__H_
++
++#include <linux/bootmem.h>
++#include <linux/mm.h>
++#include <linux/slab.h>
++
++#include <asm/clock.h>
++
++static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
++{
++	if (!slab_is_available())
++		return alloc_bootmem_low_pages(size);
++	else
++		return kzalloc(size, GFP_KERNEL);
++}
++
++#define __clk_put(clk)
++#define __clk_get(clk) ({ 1; })
++
++#endif /* __CLKDEV_H__ */
+diff --git a/arch/sh/kernel/Makefile b/arch/sh/kernel/Makefile
+index e25f3c6..e4fe614 100644
+--- a/arch/sh/kernel/Makefile
++++ b/arch/sh/kernel/Makefile
+@@ -11,7 +11,7 @@ endif
+ 
+ CFLAGS_REMOVE_return_address.o = -pg
+ 
+-obj-y	:= clkdev.o debugtraps.o dma-nommu.o dumpstack.o 		\
++obj-y	:= debugtraps.o dma-nommu.o dumpstack.o 			\
+ 	   idle.o io.o irq.o						\
+ 	   irq_$(BITS).o machvec.o nmi_debug.o process.o		\
+ 	   process_$(BITS).o ptrace_$(BITS).o				\
+diff --git a/arch/sh/kernel/clkdev.c b/arch/sh/kernel/clkdev.c
+deleted file mode 100644
+index befc255..0000000
+--- a/arch/sh/kernel/clkdev.c
++++ /dev/null
+@@ -1,169 +0,0 @@
+-/*
+- * arch/sh/kernel/clkdev.c
+- *
+- * Cloned from arch/arm/common/clkdev.c:
+- *
+- *  Copyright (C) 2008 Russell King.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * Helper for the clk API to assist looking up a struct clk.
+- */
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/device.h>
+-#include <linux/list.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/string.h>
+-#include <linux/mutex.h>
+-#include <linux/clk.h>
+-#include <linux/slab.h>
+-#include <linux/bootmem.h>
+-#include <linux/mm.h>
+-#include <asm/clock.h>
+-#include <asm/clkdev.h>
+-
+-static LIST_HEAD(clocks);
+-static DEFINE_MUTEX(clocks_mutex);
+-
+-/*
+- * Find the correct struct clk for the device and connection ID.
+- * We do slightly fuzzy matching here:
+- *  An entry with a NULL ID is assumed to be a wildcard.
+- *  If an entry has a device ID, it must match
+- *  If an entry has a connection ID, it must match
+- * Then we take the most specific entry - with the following
+- * order of precedence: dev+con > dev only > con only.
+- */
+-static struct clk *clk_find(const char *dev_id, const char *con_id)
+-{
+-	struct clk_lookup *p;
+-	struct clk *clk = NULL;
+-	int match, best = 0;
+-
+-	list_for_each_entry(p, &clocks, node) {
+-		match = 0;
+-		if (p->dev_id) {
+-			if (!dev_id || strcmp(p->dev_id, dev_id))
+-				continue;
+-			match += 2;
+-		}
+-		if (p->con_id) {
+-			if (!con_id || strcmp(p->con_id, con_id))
+-				continue;
+-			match += 1;
+-		}
+-		if (match == 0)
+-			continue;
+-
+-		if (match > best) {
+-			clk = p->clk;
+-			best = match;
+-		}
+-	}
+-	return clk;
+-}
+-
+-struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+-{
+-	struct clk *clk;
+-
+-	mutex_lock(&clocks_mutex);
+-	clk = clk_find(dev_id, con_id);
+-	mutex_unlock(&clocks_mutex);
+-
+-	return clk ? clk : ERR_PTR(-ENOENT);
+-}
+-EXPORT_SYMBOL(clk_get_sys);
+-
+-void clkdev_add(struct clk_lookup *cl)
+-{
+-	mutex_lock(&clocks_mutex);
+-	list_add_tail(&cl->node, &clocks);
+-	mutex_unlock(&clocks_mutex);
+-}
+-EXPORT_SYMBOL(clkdev_add);
+-
+-void __init clkdev_add_table(struct clk_lookup *cl, size_t num)
+-{
+-	mutex_lock(&clocks_mutex);
+-	while (num--) {
+-		list_add_tail(&cl->node, &clocks);
+-		cl++;
+-	}
+-	mutex_unlock(&clocks_mutex);
+-}
+-
+-#define MAX_DEV_ID	20
+-#define MAX_CON_ID	16
+-
+-struct clk_lookup_alloc {
+-	struct clk_lookup cl;
+-	char	dev_id[MAX_DEV_ID];
+-	char	con_id[MAX_CON_ID];
+-};
+-
+-struct clk_lookup * __init_refok
+-clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+-{
+-	struct clk_lookup_alloc *cla;
+-
+-	if (!slab_is_available())
+-		cla = alloc_bootmem_low_pages(sizeof(*cla));
+-	else
+-		cla = kzalloc(sizeof(*cla), GFP_KERNEL);
+-
+-	if (!cla)
+-		return NULL;
+-
+-	cla->cl.clk = clk;
+-	if (con_id) {
+-		strlcpy(cla->con_id, con_id, sizeof(cla->con_id));
+-		cla->cl.con_id = cla->con_id;
+-	}
+-
+-	if (dev_fmt) {
+-		va_list ap;
+-
+-		va_start(ap, dev_fmt);
+-		vscnprintf(cla->dev_id, sizeof(cla->dev_id), dev_fmt, ap);
+-		cla->cl.dev_id = cla->dev_id;
+-		va_end(ap);
+-	}
+-
+-	return &cla->cl;
+-}
+-EXPORT_SYMBOL(clkdev_alloc);
+-
+-int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
+-	struct device *dev)
+-{
+-	struct clk *r = clk_get(dev, id);
+-	struct clk_lookup *l;
+-
+-	if (IS_ERR(r))
+-		return PTR_ERR(r);
+-
+-	l = clkdev_alloc(r, alias, alias_dev_name);
+-	clk_put(r);
+-	if (!l)
+-		return -ENODEV;
+-	clkdev_add(l);
+-	return 0;
+-}
+-EXPORT_SYMBOL(clk_add_alias);
+-
+-/*
+- * clkdev_drop - remove a clock dynamically allocated
+- */
+-void clkdev_drop(struct clk_lookup *cl)
+-{
+-	mutex_lock(&clocks_mutex);
+-	list_del(&cl->node);
+-	mutex_unlock(&clocks_mutex);
+-	kfree(cl);
+-}
+-EXPORT_SYMBOL(clkdev_drop);
+diff --git a/arch/sh/kernel/cpu/clock-cpg.c b/arch/sh/kernel/cpu/clock-cpg.c
+index e2f63d6..dd0e0f2 100644
+--- a/arch/sh/kernel/cpu/clock-cpg.c
++++ b/arch/sh/kernel/cpu/clock-cpg.c
+@@ -2,7 +2,7 @@
+ #include <linux/compiler.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ 
+ static struct clk master_clk = {
+diff --git a/arch/sh/kernel/cpu/clock.c b/arch/sh/kernel/cpu/clock.c
+index 50f887d..4187cf4 100644
+--- a/arch/sh/kernel/cpu/clock.c
++++ b/arch/sh/kernel/cpu/clock.c
+@@ -48,20 +48,4 @@ int __init clk_init(void)
+ 	return ret;
  }
  
 -/*
-- * Read MPIDR: Multiprocessor affinity register
+- * Returns a clock. Note that we first try to use device id on the bus
+- * and clock name. If this fails, we try to use clock name only.
 - */
--#define hard_smp_processor_id()			\
--	({						\
--		unsigned int cpunum;			\
--		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
--			: "=r" (cpunum));		\
--		cpunum &= 0x0F;				\
--	})
+-struct clk *clk_get(struct device *dev, const char *con_id)
+-{
+-	const char *dev_id = dev ? dev_name(dev) : NULL;
 -
- #endif
+-	return clk_get_sys(dev_id, con_id);
+-}
+-EXPORT_SYMBOL_GPL(clk_get);
+-
+-void clk_put(struct clk *clk)
+-{
+-}
+-EXPORT_SYMBOL_GPL(clk_put);
+ 
+diff --git a/arch/sh/kernel/cpu/sh4/clock-sh4-202.c b/arch/sh/kernel/cpu/sh4/clock-sh4-202.c
+index 4eabc68..6c1492b 100644
+--- a/arch/sh/kernel/cpu/sh4/clock-sh4-202.c
++++ b/arch/sh/kernel/cpu/sh4/clock-sh4-202.c
+@@ -13,7 +13,7 @@
+ #include <linux/kernel.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ 
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7343.c b/arch/sh/kernel/cpu/sh4a/clock-sh7343.c
+index 71291ae..93c6460 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7343.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7343.c
+@@ -21,7 +21,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ 
+ /* SH7343 registers */
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7366.c b/arch/sh/kernel/cpu/sh4a/clock-sh7366.c
+index 7ce5bbc..049dc06 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7366.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7366.c
+@@ -21,7 +21,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ 
+ /* SH7366 registers */
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7722.c b/arch/sh/kernel/cpu/sh4a/clock-sh7722.c
+index 2030f3d..9d23a36 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7722.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7722.c
+@@ -21,7 +21,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/hwblk.h>
+ #include <cpu/sh7722.h>
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7723.c b/arch/sh/kernel/cpu/sh4a/clock-sh7723.c
+index d3938f0..55493cd 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7723.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7723.c
+@@ -22,7 +22,7 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/hwblk.h>
+ #include <cpu/sh7723.h>
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7724.c b/arch/sh/kernel/cpu/sh4a/clock-sh7724.c
+index 2d9700c..527936b 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7724.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7724.c
+@@ -22,7 +22,7 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/hwblk.h>
+ #include <cpu/sh7724.h>
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7757.c b/arch/sh/kernel/cpu/sh4a/clock-sh7757.c
+index 0a752bd..589ee0a 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7757.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7757.c
+@@ -12,7 +12,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ 
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7763.c b/arch/sh/kernel/cpu/sh4a/clock-sh7763.c
+index 1f1df48..599630f 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7763.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7763.c
+@@ -13,7 +13,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ #include <asm/io.h>
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7780.c b/arch/sh/kernel/cpu/sh4a/clock-sh7780.c
+index 62d7063..8894926 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7780.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7780.c
+@@ -12,7 +12,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ #include <asm/io.h>
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7785.c b/arch/sh/kernel/cpu/sh4a/clock-sh7785.c
+index c3e458a..2d96024 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7785.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7785.c
+@@ -14,7 +14,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/cpufreq.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ #include <cpu/sh7785.h>
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-sh7786.c b/arch/sh/kernel/cpu/sh4a/clock-sh7786.c
+index 597c9fb..42e403b 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-sh7786.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-sh7786.c
+@@ -13,7 +13,7 @@
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ 
+diff --git a/arch/sh/kernel/cpu/sh4a/clock-shx3.c b/arch/sh/kernel/cpu/sh4a/clock-shx3.c
+index 236a628..228d7e6 100644
+--- a/arch/sh/kernel/cpu/sh4a/clock-shx3.c
++++ b/arch/sh/kernel/cpu/sh4a/clock-shx3.c
+@@ -14,7 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+-#include <asm/clkdev.h>
++#include <linux/clkdev.h>
+ #include <asm/clock.h>
+ #include <asm/freq.h>
+ 
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index a2b902f..3d93b3a 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -111,4 +111,6 @@ source "drivers/xen/Kconfig"
+ source "drivers/staging/Kconfig"
+ 
+ source "drivers/platform/Kconfig"
++
++source "drivers/clk/Kconfig"
+ endmenu
+diff --git a/drivers/Makefile b/drivers/Makefile
+index ae47344..b0e30b2 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -115,3 +115,5 @@ obj-$(CONFIG_VLYNQ)		+= vlynq/
+ obj-$(CONFIG_STAGING)		+= staging/
+ obj-y				+= platform/
+ obj-y				+= ieee802154/
++#common clk code
++obj-y				+= clk/
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+new file mode 100644
+index 0000000..4168c88
+--- /dev/null
++++ b/drivers/clk/Kconfig
+@@ -0,0 +1,4 @@
++
++config CLKDEV_LOOKUP
++	bool
++	select HAVE_CLK
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+new file mode 100644
+index 0000000..07613fa
+--- /dev/null
++++ b/drivers/clk/Makefile
+@@ -0,0 +1,2 @@
++
++obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+diff --git a/arch/arm/common/clkdev.c b/drivers/clk/clkdev.c
+similarity index 93%
+rename from arch/arm/common/clkdev.c
+rename to drivers/clk/clkdev.c
+index e2b2bb6..0fc0a79 100644
+--- a/arch/arm/common/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -1,5 +1,5 @@
+ /*
+- *  arch/arm/common/clkdev.c
++ * drivers/clk/clkdev.c
+  *
+  *  Copyright (C) 2008 Russell King.
+  *
+@@ -18,10 +18,7 @@
+ #include <linux/string.h>
+ #include <linux/mutex.h>
+ #include <linux/clk.h>
+-#include <linux/slab.h>
+-
+-#include <asm/clkdev.h>
+-#include <mach/clkdev.h>
++#include <linux/clkdev.h>
+ 
+ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
+@@ -120,12 +117,12 @@ struct clk_lookup_alloc {
+ 	char	con_id[MAX_CON_ID];
+ };
+ 
+-struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+-	const char *dev_fmt, ...)
++struct clk_lookup * __init_refok
++clkdev_alloc(struct clk *clk, const char *con_id, const char *dev_fmt, ...)
+ {
+ 	struct clk_lookup_alloc *cla;
+ 
+-	cla = kzalloc(sizeof(*cla), GFP_KERNEL);
++	cla = __clkdev_alloc(sizeof(*cla));
+ 	if (!cla)
+ 		return NULL;
+ 
+diff --git a/arch/sh/include/asm/clkdev.h b/include/linux/clkdev.h
+similarity index 85%
+rename from arch/sh/include/asm/clkdev.h
+rename to include/linux/clkdev.h
+index 5645f35..457bcb0 100644
+--- a/arch/sh/include/asm/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -1,7 +1,5 @@
+ /*
+- *  arch/sh/include/asm/clkdev.h
+- *
+- * Cloned from arch/arm/include/asm/clkdev.h:
++ *  include/linux/clkdev.h
+  *
+  *  Copyright (C) 2008 Russell King.
+  *
+@@ -11,10 +9,13 @@
+  *
+  * Helper for the clk API to assist looking up a struct clk.
+  */
+-#ifndef __ASM_CLKDEV_H
+-#define __ASM_CLKDEV_H
++#ifndef __CLKDEV_H
++#define __CLKDEV_H
++
++#include <asm/clkdev.h>
+ 
+ struct clk;
++struct device;
+ 
+ struct clk_lookup {
+ 	struct list_head	node;
+-- 
+1.7.1
