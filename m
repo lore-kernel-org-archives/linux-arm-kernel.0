@@ -1,58 +1,203 @@
 From: jason77.wang@gmail.com (Jason Wang)
-Date: Thu,  2 Sep 2010 15:51:58 +0800
-Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx driver
-Message-ID: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+Date: Thu,  2 Sep 2010 15:51:59 +0800
+Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
+In-Reply-To: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some explanations:
+There are 3 SPI controllers on i.MX51, one is called CSPI and is
+100% compatible with the one on i.MX35, the other two are called
+eCSPI and are not compatible with existing controllers on other
+i.MX platforms, here we add support of these three controllers in
+the imx spi driver.
 
-This patchset is to add SPI support in the existing spi_imx driver for
-i.MX51 and add SPI relating stuffs for mx51_3ds board level.
+Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+---
+ drivers/spi/spi_imx.c |  135 +++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 131 insertions(+), 4 deletions(-)
 
-i.MX51 has two eCSPI controllers and one CSPI controller, CSPI
-controller is 100% compatible with the one of i.MX35, so we don't need
-to add new functions for this CSPI, only bind it with i.MX35 together,
-while eCSPI isn't compatible with existing controllers of i.MX
-platforms, so i add new functions for these two eCSPIs in the existing
-spi_imx driver.
-
-If these patches pass review, the first patch 0001-xxx.patch should be
-merged by Grant.likely; other patches(0002-0006) are based off
-imx-for-2.6.37 and should be handled by Sascha.
-
-On mx51_3ds board, there is a SPI NOR flash connected through eCSPI2,
-i have validated this patchset using this SPI NOR flash, see results:
-(bootlogs)
-<snip>
-m25p80 spi1.1: found sst25vf016b, expected m25p80
-m25p80 spi1.1: sst25vf016b (2048 Kbytes)
-spi_imx spi_imx.1: probed
-<snip>
-(target tty console)
-# cat /proc/mtd
-dev:    size   erasesize  name
-mtd0: 00200000 00001000 "spi1.1"
-# mtd_debug read /dev/mtd0 0 0x100 /a.txt
-Copied 256 bytes from address 0x00000000 in flash to /a.txt
-# hexdump a.txt 
-0000000 0000 eb00 0b53 eb00 002c e28f 0c00 e890
-0000010 a000 e08a b000 e08b 7001 e24a 000b e15a
-0000020 0000 1a00 0b4b eb00 000f e8ba e018 e24f
-0000030 0001 e313 f003 1047 ff13 e12f 3720 0000
-0000040 3730 0000 3000 e3b0 4000 e3b0 5000 e3b0
-0000050 6000 e3b0 2010 e252 0078 28a1 fffc 8aff
-0000060 2e82 e1b0 0030 28a1 3000 4581 ff1e e12f
-0000070 e004 e52d 7000 e10f 700f e3c7 6001 e287
-0000080 f006 e12f 0001 e040 d000 e1a0 6002 e287
-0000090 f006 e12f 0001 e040 d000 e1a0 6006 e287
-00000a0 f006 e12f 0001 e040 d000 e1a0 6007 e287
-00000b0 f006 e12f 0001 e040 d000 e1a0 600b e287
-00000c0 f006 e12f 0001 e040 d000 e1a0 600f e287
-00000d0 f006 e12f 0001 e040 d000 e1a0 6003 e287
-00000e0 60c0 e3c6 f006 e12f f004 e49d f003 e320
-00000f0 ff1e e12f 4001 e92d 0f11 ee11 0001 e380
-
-
-Thanks,
-Jason.
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 7972e90..8d9c9da 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -155,6 +155,120 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+ 	return 7;
+ }
+ 
++/* MX51 eCSPI post divider */
++static unsigned int spi_imx_clkdiv_3(unsigned int fin,
++		unsigned int fspi)
++{
++	int i, div = 1;
++
++	for (i = 0; i < 15; i++) {
++		if (fspi * div >= fin)
++			return i;
++		div <<= 1;
++	}
++
++	return 15;
++}
++
++#define MX51_INTREG_TEEN		(1 << 0)
++#define MX51_INTREG_RREN		(1 << 3)
++
++#define MX51_CSPICTRL_ENABLE		(1 << 0)
++#define MX51_CSPICTRL_XCH		(1 << 2)
++
++#define MX51_CSPICTRL_BL_SHIFT		20
++#define MX51_CSPICTRL_CS_SHIFT		18
++#define MX51_CSPICTRL_DR_SHIFT		8
++#define MX51_CSPICTRL_MODE_SHIFT	4
++#define MX51_CSPICONF_PHA_SHIFT		0
++#define MX51_CSPICONF_POL_SHIFT		4
++#define MX51_CSPICONF_SSPOL_SHIFT	12
++#define MX51_CSPICONF_SSCTL_SHIFT	8
++
++#define MX51_CSPICTRL_CSMASK		0x3
++#define MX51_CSPIINT			0x10
++#define MX51_CSPICONF			0xC
++#define MX51_CSPISTATUS			0x18
++#define MX51_STATUS_RR			(1 << 3)
++
++#define MAX_CHIPSELECT_NUM 4
++
++static int get_chipselect(struct spi_imx_data *spi_imx,
++			  struct spi_imx_config *config)
++{
++	int i;
++
++	for (i = 0; i < MAX_CHIPSELECT_NUM; i++) {
++		if (config->cs == spi_imx->chipselect[i])
++			return i;
++	}
++
++	return -EINVAL;
++}
++static void mx51_intctrl(struct spi_imx_data *spi_imx, int enable)
++{
++	unsigned int val = 0;
++
++	if (enable & MXC_INT_TE)
++		val |= MX51_INTREG_TEEN;
++	if (enable & MXC_INT_RR)
++		val |= MX51_INTREG_RREN;
++
++	writel(val, spi_imx->base + MX51_CSPIINT);
++}
++
++static void mx51_trigger(struct spi_imx_data *spi_imx)
++{
++	unsigned int reg;
++
++	reg = readl(spi_imx->base + MXC_CSPICTRL);
++	reg |= MX51_CSPICTRL_XCH;
++	writel(reg, spi_imx->base + MXC_CSPICTRL);
++}
++
++static int mx51_config(struct spi_imx_data *spi_imx,
++		struct spi_imx_config *config)
++{
++	unsigned int config_reg = 0;
++	unsigned int ctrl_reg = MX51_CSPICTRL_ENABLE;
++	int chan;
++
++	chan = get_chipselect(spi_imx, config);
++	if (chan < 0)
++		return chan;
++	ctrl_reg |= (chan & MX51_CSPICTRL_CSMASK) << MX51_CSPICTRL_CS_SHIFT;
++	ctrl_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
++		MX51_CSPICTRL_MODE_SHIFT;
++	ctrl_reg |= spi_imx_clkdiv_3(spi_imx->spi_clk, config->speed_hz) <<
++		MX51_CSPICTRL_DR_SHIFT;
++
++	ctrl_reg |= (config->bpw - 1) << MX51_CSPICTRL_BL_SHIFT;
++
++
++	if (config->mode & SPI_CPHA)
++		config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
++			MX51_CSPICONF_PHA_SHIFT;
++	if (config->mode & SPI_CPOL)
++		config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
++			MX51_CSPICONF_POL_SHIFT;
++	if (config->mode & SPI_CS_HIGH)
++		config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
++			MX51_CSPICONF_SSPOL_SHIFT;
++
++	config_reg |= (1 << (chan & MX51_CSPICTRL_CSMASK)) <<
++		MX51_CSPICONF_SSCTL_SHIFT;
++
++	writel(ctrl_reg, spi_imx->base + MXC_CSPICTRL);
++	writel(config_reg, spi_imx->base + MX51_CSPICONF);
++
++	return 0;
++}
++
++static int mx51_rx_available(struct spi_imx_data *spi_imx)
++{
++	return readl(spi_imx->base + MX51_CSPISTATUS) & MX51_STATUS_RR;
++}
++
+ #define MX31_INTREG_TEEN	(1 << 0)
+ #define MX31_INTREG_RREN	(1 << 3)
+ 
+@@ -209,7 +323,7 @@ static int mx31_config(struct spi_imx_data *spi_imx,
+ 
+ 	if (cpu_is_mx31())
+ 		reg |= (config->bpw - 1) << MX31_CSPICTRL_BC_SHIFT;
+-	else if (cpu_is_mx25() || cpu_is_mx35()) {
++	else if (cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51()) {
+ 		reg |= (config->bpw - 1) << MX35_CSPICTRL_BL_SHIFT;
+ 		reg |= MX31_CSPICTRL_SSCTL;
+ 	}
+@@ -223,7 +337,7 @@ static int mx31_config(struct spi_imx_data *spi_imx,
+ 	if (config->cs < 0) {
+ 		if (cpu_is_mx31())
+ 			reg |= (config->cs + 32) << MX31_CSPICTRL_CS_SHIFT;
+-		else if (cpu_is_mx25() || cpu_is_mx35())
++		else if (cpu_is_mx25() || cpu_is_mx35() || cpu_is_mx51())
+ 			reg |= (config->cs + 32) << MX35_CSPICTRL_CS_SHIFT;
+ 	}
+ 
+@@ -567,7 +681,14 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+ 		goto out_iounmap;
+ 	}
+ 
+-	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
++	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
++	 * not compatible with existing SPI controllers on other i.MX platforms,
++	 * while CSPI controller is 100% compatible with the one on the i.MX35.
++	 * We set the platform device id to 2 for this CSPI@i.MX51 board init
++	 * level to distinguish it from two eCSPI controllers.
++	 */
++	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
++	    (cpu_is_mx51() && (pdev->id == 2))) {
+ 		spi_imx->intctrl = mx31_intctrl;
+ 		spi_imx->config = mx31_config;
+ 		spi_imx->trigger = mx31_trigger;
+@@ -582,6 +703,11 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+ 		spi_imx->config = mx1_config;
+ 		spi_imx->trigger = mx1_trigger;
+ 		spi_imx->rx_available = mx1_rx_available;
++	} else if (cpu_is_mx51()) {
++		spi_imx->intctrl = mx51_intctrl;
++		spi_imx->config = mx51_config;
++		spi_imx->trigger = mx51_trigger;
++		spi_imx->rx_available = mx51_rx_available;
+ 	} else
+ 		BUG();
+ 
+@@ -599,7 +725,8 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+ 		writel(1, spi_imx->base + MXC_RESET);
+ 
+ 	/* drain receive buffer */
+-	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35())
++	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
++	    (cpu_is_mx51() && (pdev->id == 2)))
+ 		while (readl(spi_imx->base + MX3_CSPISTAT) & MX3_CSPISTAT_RR)
+ 			readl(spi_imx->base + MXC_CSPIRXDATA);
+ 
+-- 
+1.5.6.5
