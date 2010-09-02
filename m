@@ -1,159 +1,65 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Sep 2010 17:01:12 +0200
-Subject: [PATCH 2/6] i.MX5/clock: add eCSPI and CSPI clock definitions
-In-Reply-To: <1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
+Date: Thu, 2 Sep 2010 17:02:58 +0200
+Subject: [PATCH 3/6] mx5: add support to dynamically register spi_imx
+	devices (imx51 3ds)
+In-Reply-To: <1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
 References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20100902150112.GM14214@pengutronix.de>
+	<1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20100902150258.GN14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 03:52:00PM +0800, Jason Wang wrote:
-> i.MX51 has two eCSPI and one CSPI controllers, now add clock
-> definitions and registrations for these controllers.
-> 
+Hi Jason,
+
+On Thu, Sep 02, 2010 at 03:52:01PM +0800, Jason Wang wrote:
 > Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 > ---
->  arch/arm/mach-mx5/clock-mx51.c |   79 ++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 79 insertions(+), 0 deletions(-)
+>  arch/arm/mach-mx5/Kconfig         |    1 +
+>  arch/arm/mach-mx5/devices-imx51.h |   20 ++++++++++++++++++++
+>  2 files changed, 21 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/devices-imx51.h
 > 
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-> index 6af69de..217c3f3 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -38,6 +38,7 @@ static struct clk periph_apm_clk;
->  static struct clk ahb_clk;
->  static struct clk ipg_clk;
->  static struct clk usboh3_clk;
-> +static struct clk spba_clk;
->  
->  #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
->  
-> @@ -52,6 +53,18 @@ static int _clk_ccgr_enable(struct clk *clk)
->  	return 0;
->  }
->  
-> +static int _clk_ccgr_enable_inrun(struct clk *clk)
-> +{
-> +	u32 reg;
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index 0848db5..898fb47 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -18,6 +18,7 @@ config MACH_MX51_BABBAGE
+>  config MACH_MX51_3DS
+>  	bool "Support MX51PDK (3DS)"
+>  	select MXC_DEBUG_BOARD
+> +	select IMX_HAVE_PLATFORM_SPI_IMX
+>  	help
+>  	  Include support for MX51PDK (3DS) platform. This includes specific
+>  	  configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+> new file mode 100644
+> index 0000000..d04c7eb
+> --- /dev/null
+> +++ b/arch/arm/mach-mx5/devices-imx51.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + * Copyright (C) 2010 Jason Wang <jason77.wang@gmail.com>
+> + *
+> + * based on mach-mx3/devices-imx35.h which is
+> + * Copyright (C) 2010 Pengutronix
+> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <mach/mx51.h>
+> +#include <mach/devices-common.h>
 > +
-> +	reg = __raw_readl(clk->enable_reg);
-> +	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
-> +	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
-> +	__raw_writel(reg, clk->enable_reg);
-> +
-> +	return 0;
-> +}
-> +
-imho this should be consolidated in something like:
-
-static int _clk_ccgr_setclk(struct clk *clk, unsigned mode)
-{
-	...
-}
-
-#define _clk_ccgr_enable(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_ON)
-#define _clk_ccgr_disable(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_OFF)
-#define _clk_ccgr_enable_inrun(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE)
-
->  static void _clk_ccgr_disable(struct clk *clk)
->  {
->  	u32 reg;
-> @@ -762,6 +775,61 @@ static struct clk kpp_clk = {
->  	.id = 0,
->  };
->  
-> +/* eCSPI */
-> +static unsigned long _clk_ecspi_getrate(struct clk *clk)
-> +{
-> +	u32 reg, prediv, podf;
-> +	unsigned long ret;
-> +
-> +	reg = __raw_readl(MXC_CCM_CSCDR2);
-> +	prediv = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PRED_MASK) >>
-> +		  MXC_CCM_CSCDR2_CSPI_CLK_PRED_OFFSET) + 1;
-> +	if (prediv == 1)
-> +		BUG();
-> +	podf = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PODF_MASK) >>
-> +		MXC_CCM_CSCDR2_CSPI_CLK_PODF_OFFSET) + 1;
-> +
-> +	ret = clk_get_rate(clk->parent) / (prediv * podf);
-> +	return ret;
-> +}
-> +
-> +static int _clk_ecspi_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	u32 reg, mux;
-> +
-> +	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk, &pll3_sw_clk,
-> +		       &lp_apm_clk);
-> +	reg = __raw_readl(MXC_CCM_CSCMR1) & ~MXC_CCM_CSCMR1_CSPI_CLK_SEL_MASK;
-> +	reg |= mux << MXC_CCM_CSCMR1_CSPI_CLK_SEL_OFFSET;
-> +	__raw_writel(reg, MXC_CCM_CSCMR1);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk ecspi_main_clk = {
-> +	.parent = &pll3_sw_clk,
-> +	.get_rate = _clk_ecspi_getrate,
-> +	.set_parent = _clk_ecspi_set_parent,
-Sascha didn't implement set_parent
-
-> +};
-> +
-> +static struct clk ecspi1_ipg_clk = {
-> +	.parent = &ipg_clk,
-> +	.secondary = &spba_clk,
-> +	.enable_reg = MXC_CCM_CCGR4,
-> +	.enable_shift = MXC_CCM_CCGRx_CG9_OFFSET,
-> +	.enable = _clk_ccgr_enable_inrun,
-> +	.disable = _clk_ccgr_disable,
-> +};
-> +
-> +static struct clk ecspi2_ipg_clk = {
-> +	.parent = &ipg_clk,
-> +	.secondary = &aips_tz2_clk,
-> +	.enable_reg = MXC_CCM_CCGR4,
-> +	.enable_shift = MXC_CCM_CCGRx_CG11_OFFSET,
-> +	.enable = _clk_ccgr_enable_inrun,
-> +	.disable = _clk_ccgr_disable,
-> +};
-> +
->  #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
->  	static struct clk name = {			\
->  		.id		= i,			\
-> @@ -814,6 +882,14 @@ DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
->  DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
->  	NULL,  NULL, &ipg_clk, NULL);
->  
-> +/* eCSPI & CSPI */
-> +DEFINE_CLOCK(cspi1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG10_OFFSET,
-> +	NULL, NULL, &ecspi_main_clk, &ecspi1_ipg_clk);
-> +DEFINE_CLOCK(cspi2_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG12_OFFSET,
-> +	NULL, NULL, &ecspi_main_clk, &ecspi2_ipg_clk);
-> +DEFINE_CLOCK(cspi3_clk, 2, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG13_OFFSET,
-> +	NULL, NULL, &ipg_clk, NULL);
-> +
-Maybe use ecspi1_clk, cspi2_clk, cspi_clk here?  I thought about this,
-too, for our code, couldn't really decide.  What do you think?
-
->  #define _REGISTER_CLOCK(d, n, c) \
->         { \
->  		.dev_id = d, \
-> @@ -837,6 +913,9 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
->  	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
-> +	_REGISTER_CLOCK("spi_imx.0", NULL, cspi1_clk)
-> +	_REGISTER_CLOCK("spi_imx.1", NULL, cspi2_clk)
-> +	_REGISTER_CLOCK("spi_imx.2", NULL, cspi3_clk)
->  };
->  
-
-Best regards
-Uwe
+> +#define imx51_add_spi_imx0(pdata)	\
+> +	imx_add_spi_imx(0, MX51_CSPI1_BASE_ADDR, SZ_4K, MX51_MXC_INT_CSPI1, pdata)
+> +#define imx51_add_spi_imx1(pdata)	\
+> +	imx_add_spi_imx(1, MX51_CSPI2_BASE_ADDR, SZ_4K, MX51_MXC_INT_CSPI2, pdata)
+> +#define imx51_add_spi_imx2(pdata)	\
+> +	imx_add_spi_imx(1, MX51_CSPI3_BASE_ADDR, SZ_4K, MX51_MXC_INT_CSPI, pdata)
+I like my new approach better.  See my patch 3.
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
