@@ -1,46 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 17:57:56 +0100
-Subject: [PATCH 5/6] ARM: Don't set TLB ops broadcasting on UP ARMv7
-In-Reply-To: <20100902162220.GO11597@atomide.com>
-References: <20100817154035.GD20325@n2100.arm.linux.org.uk>
-	<20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902162220.GO11597@atomide.com>
-Message-ID: <20100902165756.GV26319@n2100.arm.linux.org.uk>
+From: leif.lindholm@arm.com (Leif Lindholm)
+Date: Thu, 2 Sep 2010 18:04:24 +0100
+Subject: [PATCH 9/9] ARM: Add SWP/SWPB emulation for ARMv7 processors	(v5)
+In-Reply-To: <20100901040801.GA10431@lixom.net>
+References: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
+	<20100831135855.21304.5457.stgit@e102109-lin.cambridge.arm.com>
+	<20100901040801.GA10431@lixom.net>
+Message-ID: <000001cb4ac0$e5b2fd00$b118f700$@lindholm@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 09:22:20AM -0700, Tony Lindgren wrote:
-> >From 8b22546af2ba9a0d96c2f419bfcec1f3c01a414d Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 30 Aug 2010 14:03:28 -0700
-> Subject: [PATCH 5/6] ARM: Don't set TLB ops broadcasting on UP ARMv7
+> From: Olof Johansson [mailto:olof at lixom.net]
+> >
+> > This patch adds the alternative solution to emulate the SWP and SWPB
+> > instructions using LDREX/STREX sequences, and log statistics to
+> > /proc/cpu/swp_emulation. To correctly deal with copy-on-write, it
+> also
 > 
-> Don't set TLB ops broadcasting on UP ARMv7. Looks like these bits
-> are also different on A8 and A9.
+> Sounds like debugfs would be a better place to export this through?
+> That's what PPC does.
 
-This is already taken care of.
+It made sense to me to place it with /proc/cpu/alignment.
+Moving both of these into debugfs might well make sense in the future,
+but I think that should be a separate patch.
 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 07fc660..51a063d 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -191,7 +191,8 @@ __v7_setup:
->  	UP(mov	r0, #(1 << 6))			@ fake it for UP
-
-If it's UP, we set r0 to 1 << 6, which...
-
->  	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
-
-means this test produces a non-zero result.
-
->  	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
-> -	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
-
-And therefore these instructions will not be executed.
+/
+    Leif
