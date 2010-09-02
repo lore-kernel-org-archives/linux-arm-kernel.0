@@ -1,25 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 15:06:30 +0100
-Subject: [PATCH 3/3] dmaengine: Add Freescale i.MX SDMA support
-In-Reply-To: <AANLkTi=pO-ZJ33FrL=4bVRYa2o9HA0_h5tBYG7wdMuwz@mail.gmail.com>
-References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
-	<1281956870-12463-4-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTi=pO-ZJ33FrL=4bVRYa2o9HA0_h5tBYG7wdMuwz@mail.gmail.com>
-Message-ID: <20100902140630.GM26319@n2100.arm.linux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 2 Sep 2010 23:18:18 +0900
+Subject: mmc over SPI on DM6467 based board. card not detected.
+In-Reply-To: <BLU124-W40A2B008B886302781867B4870@phx.gbl>
+References: <4C516634.5040804@criticallink.com>
+	<877hjd106u.fsf@deeprootsystems.com>
+	<4C7702EB.8040905@criticallink.com>
+	<8762ywrvpt.fsf@deeprootsystems.com>
+	<4C77E6BD.4000303@criticallink.com>
+	<87fwy0orsg.fsf@deeprootsystems.com>
+	<BLU124-W40A2B008B886302781867B4870@phx.gbl>
+Message-ID: <AANLkTikywOgVwse640vAVAuE7wXpvgEXaJkoiinv9sdG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 16, 2010 at 02:21:06PM +0200, Linus Walleij wrote:
-> > +/*
-> > + * Buffer descriptor
-> > + */
-> > +struct sdma_buffer_descriptor {
-> > + ? ? ? struct sdma_mode_count ?mode;
-> > + ? ? ? u32 buffer_addr; ? ?/* address of the buffer described */
-> > + ? ? ? u32 ext_buffer_addr; /* extended buffer address */
-> 
-> Shouldn't these be dma_addr_t? OK that's probably u32
-> anyway but just to make a marker...
+On Sat, Aug 28, 2010 at 10:26 PM, Sumesh Kaana <sumeshkkn@hotmail.com> wrote:
+> Hi all,
+>
+>
+>
+> I am trying to mount SD-Card over SPI on our custom DM6467 board. davinci
+> spi controller driver and mmc over spi drver are selected in the menuconfig.
+> i am using davinci-PSP.03-XX-00-37 kernel.
+>
+> I have also edited board initialization file to probe the MMC card under SPI
+> as below:
 
-If this is describing hardware, then it makes sense to use uNN rather
-than dma_addr_t.  dma_addr_t may be subject to change in the future.
+First, make sure
+a) you provide 3.3v and ground properly.
+b) the slot, card and connections are OK by using spi_gpio driver to
+run the same pins,
+   if the SPI controller pins could be muxed into GPIO mode(usually
+they could be).
+
+Probably the source clock doesn't allow for scaling down to within
+400KHz, give it a closer look.
