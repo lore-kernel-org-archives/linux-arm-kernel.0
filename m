@@ -1,16 +1,15 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 09:48:12 +0100
-Subject: [PATCH 0/9] [ARM] tegra: Additional core support for Tegra2 SOCs
-In-Reply-To: <AANLkTinhoBrzYmypsKNcLPar-pKWiYm60GL6YBfd1jT9@mail.gmail.com>
-References: <1280449771-24043-1-git-send-email-ccross@google.com>
-	<AANLkTinhoBrzYmypsKNcLPar-pKWiYm60GL6YBfd1jT9@mail.gmail.com>
-Message-ID: <20100902084812.GD26319@n2100.arm.linux.org.uk>
+Date: Thu, 2 Sep 2010 09:51:27 +0100
+Subject: [PATCH 08/74] ST SPEAr1300: Adding default config file
+In-Reply-To: <3a583e07221d909bd4afb952bbf2a38a2d25cdf4.1283161023.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<3a583e07221d909bd4afb952bbf2a38a2d25cdf4.1283161023.git.viresh.kumar@st.com>
+Message-ID: <20100902085127.GE26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 25, 2010 at 02:24:24PM -0700, Erik Gilling wrote:
-> Any comments on the below patches?  If not I'm going to push them to
-> our for-next tree.
+On Mon, Aug 30, 2010 at 04:08:39PM +0530, Viresh KUMAR wrote:
+> From: Shiraz Hashim <shiraz.hashim@st.com>
 
-Where are the patches?  I don't see them on the mailing list.  We don't
-review code sitting in git trees - only patches on mailing lists.
+This defconfig is too large and verbose to go anywhere near mainline,
+even temporarily.  You need to talk to Uwe about how to shrink it down.
