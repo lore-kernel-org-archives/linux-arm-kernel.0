@@ -1,169 +1,35 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed,  1 Sep 2010 20:04:34 -0700
-Subject: [PATCH] [ARM] twd: Allow twd rescaling to match cpu frequency
-Message-ID: <1283396674-4865-1-git-send-email-ccross@android.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 2 Sep 2010 07:03:49 +0200
+Subject: [PATCH] ARM: Implement cpu_v7_reset.
+In-Reply-To: <4C7EC313.7050705@codeaurora.org>
+References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+	<4C7EC313.7050705@codeaurora.org>
+Message-ID: <20100902050349.GA14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock to the ARM TWD local timer scales with the cpu
-frequency.  To allow the cpu frequency to change while
-maintaining a constant TWD frequency, pick a lower target
-frequency for the TWD and use the prescaler to divide down
-to the closest lower frequency.
+Hello,
 
-This patch provides a new initialization function that takes
-a target TWD frequency and the relation between the cpu
-clock and the TWD clock, required to be an integer divider
->= 2 by the ARM spec.  It also provides a function to be
-called from cpufreq drivers to set the prescaler whenever
-the cpu frequency changes.
+> > +#ifdef CONFIG_MMU
+> > +	mcr     p15, 0, ip, c8, c7, 0           @ invalidate I & D TLBs
+> > +#endif
+> > +	mrc     p15, 0, ip, c1, c0, 0           @ ctrl register
+> > +	bic     ip, ip, #0x000f                 @ ............wcam
+> > +	bic     ip, ip, #0x1100                 @ ...i...s........
+> > +	mcr     p15, 0, ip, c1, c0, 0           @ ctrl register
+> 
+> On a related note, I was always a bit confused since proc-v6 and proc-v7
+> don't turn off the MMU in their cpu_reset functions, which doesn't seem
+> correct with respect to Documentation/arm/Booting. Is it necessary to
+> turn off the MMU when kexec'ing the kernel? Last time I tried kexec'ing
+> on a v6 it worked fine without turning off the MMU.
+The boot process isn't that strict.  Having the MMU off is the safest,
+but e.g. having an 1:1 mapping worked OK last time I checked.  But this
+has to be considered to be by chance and it might not work with 2.6.37.
 
-Also fixes a typo in the printk of the calibrated frequency.
+Best regards
+Uwe
 
-Change-Id: I45c76ae1ed501c40b94709c15834c8a0b6116c84
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/include/asm/smp_twd.h |   19 +++++++++++++
- arch/arm/kernel/smp_twd.c      |   57 +++++++++++++++++++++++++++++++++++++---
- 2 files changed, 72 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 634f357..79aebe2 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -17,6 +17,7 @@
- #define TWD_TIMER_CONTROL_ONESHOT	(0 << 1)
- #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
-+#define TWD_TIMER_CONTROL_PRESCALE_MASK	(0xFF << 8)
- 
- struct clock_event_device;
- 
-@@ -26,4 +27,22 @@ void twd_timer_stop(void);
- int twd_timer_ack(void);
- void twd_timer_setup(struct clock_event_device *);
- 
-+/*
-+ * Use this setup function on systems where the cpu clock frequency may
-+ * change.  periphclk_prescaler is the fixed divider value between the cpu
-+ * clock and the PERIPHCLK clock that feeds the TWD.  target_rate should be
-+ * low enough that the prescaler can accurately reach the target rate from the
-+ * lowest cpu frequency.
-+ */
-+void twd_timer_setup_scalable(struct clock_event_device *,
-+	unsigned long target_rate, unsigned int periphclk_prescaler);
-+
-+/*
-+ * Recalculate the twd prescaler value when the cpu frequency changes. To
-+ * prevent early timer interrupts, must be called before changing the cpu
-+ * frequency if the frequency is increasing, or after if the frequency is
-+ * decreasing.
-+ */
-+void twd_recalc_prescaler(unsigned long new_rate);
-+
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 35882fb..2b4f927 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -25,6 +25,8 @@
- void __iomem *twd_base;
- 
- static unsigned long twd_timer_rate;
-+static unsigned long twd_periphclk_prescaler;
-+static unsigned long twd_target_rate;
- 
- static void twd_set_mode(enum clock_event_mode mode,
- 			struct clock_event_device *clk)
-@@ -79,10 +81,31 @@ int twd_timer_ack(void)
- 	return 0;
- }
- 
--static void __cpuinit twd_calibrate_rate(void)
-+void twd_recalc_prescaler(unsigned long new_rate)
-+{
-+	u32 ctrl;
-+	int prescaler;
-+	unsigned long periphclk_rate;
-+
-+	BUG_ON(twd_periphclk_prescaler == 0 || twd_timer_rate == 0);
-+
-+	periphclk_rate = new_rate / twd_periphclk_prescaler;
-+
-+	prescaler = DIV_ROUND_UP(periphclk_rate, twd_timer_rate);
-+	prescaler = clamp(prescaler - 1, 0, 0xFF);
-+
-+	ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
-+	ctrl &= ~TWD_TIMER_CONTROL_PRESCALE_MASK;
-+	ctrl |= prescaler << 8;
-+	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
-+}
-+
-+static void __cpuinit twd_calibrate_rate(unsigned long target_rate,
-+	unsigned int periphclk_prescaler)
- {
- 	unsigned long load, count;
- 	u64 waitjiffies;
-+	unsigned long cpu_rate;
- 
- 	/*
- 	 * If this is the first time round, we need to work out how fast
-@@ -113,8 +136,22 @@ static void __cpuinit twd_calibrate_rate(void)
- 
- 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
- 
-+		/*
-+		 * If a target rate has been requested, adjust the TWD prescaler
-+		 * to get the closest lower frequency.
-+		 */
-+		if (target_rate) {
-+			twd_periphclk_prescaler = periphclk_prescaler;
-+			twd_target_rate = target_rate;
-+
-+			cpu_rate = twd_timer_rate * periphclk_prescaler;
-+			twd_recalc_prescaler(cpu_rate);
-+
-+			twd_timer_rate = twd_target_rate;
-+		}
-+
- 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
--			(twd_timer_rate / 100000) % 100);
-+			(twd_timer_rate / 10000) % 100);
- 	}
- 
- 	load = twd_timer_rate / HZ;
-@@ -125,11 +162,12 @@ static void __cpuinit twd_calibrate_rate(void)
- /*
-  * Setup the local clock events for a CPU.
-  */
--void __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+static void __cpuinit __twd_timer_setup(struct clock_event_device *clk,
-+	unsigned long target_rate, unsigned int periphclk_prescaler)
- {
- 	unsigned long flags;
- 
--	twd_calibrate_rate();
-+	twd_calibrate_rate(target_rate, periphclk_prescaler);
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-@@ -151,6 +189,17 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clockevents_register_device(clk);
- }
- 
-+void __cpuinit twd_timer_setup_scalable(struct clock_event_device *clk,
-+	unsigned long target_rate, unsigned int periphclk_prescaler)
-+{
-+	__twd_timer_setup(clk, target_rate, periphclk_prescaler);
-+}
-+
-+void __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+{
-+	__twd_timer_setup(clk, 0, 0);
-+}
-+
- #ifdef CONFIG_HOTPLUG_CPU
- /*
-  * take a local timer down
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
