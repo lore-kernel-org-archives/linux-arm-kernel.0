@@ -1,154 +1,169 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 2 Sep 2010 11:50:33 +0900
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100901085738.GJ8142@n2100.arm.linux.org.uk>
-References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
-	<m3sk1yzkjw.fsf@intrepid.localdomain>
-	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
-Message-ID: <20100902114937X.fujita.tomonori@lab.ntt.co.jp>
+From: ccross@android.com (Colin Cross)
+Date: Wed,  1 Sep 2010 20:04:34 -0700
+Subject: [PATCH] [ARM] twd: Allow twd rescaling to match cpu frequency
+Message-ID: <1283396674-4865-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Sep 2010 09:57:38 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+The clock to the ARM TWD local timer scales with the cpu
+frequency.  To allow the cpu frequency to change while
+maintaining a constant TWD frequency, pick a lower target
+frequency for the TWD and use the prescaler to divide down
+to the closest lower frequency.
 
-> On Sat, Aug 28, 2010 at 07:58:11PM +0200, Krzysztof Halasa wrote:
-> > What's the outcome of the following?
-> > 
-> > Russell, are you going to apply it as is, or is a better (short-term)
-> > fix being made?
-> 
-> I want to see a better solution to this first - without which we'll
-> apply this hack and then quietly forget about the problem.
+This patch provides a new initialization function that takes
+a target TWD frequency and the relation between the cpu
+clock and the TWD clock, required to be an integer divider
+>= 2 by the ARM spec.  It also provides a function to be
+called from cpufreq drivers to set the prescaler whenever
+the cpu frequency changes.
 
-This restores the trick that had worked.
+Also fixes a typo in the printk of the calibrated frequency.
 
-btw, I can't compile ARCH_IXP4XX without the following patch:
-
-http://www.spinics.net/lists/arm-kernel/msg95933.html
-
-=
-From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-Subject: [PATCH] arm: fix arm: fix pci_set_consistent_dma_mask for dmabounce devices
-
-This fixes the regression caused by the commit
-6fee48cd330c68332f9712bc968d934a1a84a32a.
-
-ARM needs to clip the dma coherent mask for dmabounce devices. This
-restores the old trick.
-
-Note that strictly speaking, the DMA API doesn't allow architectures
-to do such but I'm not sure it's worth adding the new API to set the
-dma mask that allows architectures to clip it.
-
-Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+Change-Id: I45c76ae1ed501c40b94709c15834c8a0b6116c84
+Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/common/it8152.c                     |    8 ++++++++
- arch/arm/mach-ixp4xx/common-pci.c            |    8 ++++++++
- arch/arm/mach-ixp4xx/include/mach/hardware.h |    2 ++
- arch/arm/mach-pxa/include/mach/hardware.h    |    2 +-
- arch/arm/mach-pxa/include/mach/io.h          |    2 ++
- include/linux/dma-mapping.h                  |    4 ++++
- 6 files changed, 25 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/smp_twd.h |   19 +++++++++++++
+ arch/arm/kernel/smp_twd.c      |   57 +++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 72 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/common/it8152.c b/arch/arm/common/it8152.c
-index 6c09135..f89dc5d 100644
---- a/arch/arm/common/it8152.c
-+++ b/arch/arm/common/it8152.c
-@@ -263,6 +263,14 @@ static int it8152_pci_platform_notify_remove(struct device *dev)
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
+index 634f357..79aebe2 100644
+--- a/arch/arm/include/asm/smp_twd.h
++++ b/arch/arm/include/asm/smp_twd.h
+@@ -17,6 +17,7 @@
+ #define TWD_TIMER_CONTROL_ONESHOT	(0 << 1)
+ #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
+ #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
++#define TWD_TIMER_CONTROL_PRESCALE_MASK	(0xFF << 8)
+ 
+ struct clock_event_device;
+ 
+@@ -26,4 +27,22 @@ void twd_timer_stop(void);
+ int twd_timer_ack(void);
+ void twd_timer_setup(struct clock_event_device *);
+ 
++/*
++ * Use this setup function on systems where the cpu clock frequency may
++ * change.  periphclk_prescaler is the fixed divider value between the cpu
++ * clock and the PERIPHCLK clock that feeds the TWD.  target_rate should be
++ * low enough that the prescaler can accurately reach the target rate from the
++ * lowest cpu frequency.
++ */
++void twd_timer_setup_scalable(struct clock_event_device *,
++	unsigned long target_rate, unsigned int periphclk_prescaler);
++
++/*
++ * Recalculate the twd prescaler value when the cpu frequency changes. To
++ * prevent early timer interrupts, must be called before changing the cpu
++ * frequency if the frequency is increasing, or after if the frequency is
++ * decreasing.
++ */
++void twd_recalc_prescaler(unsigned long new_rate);
++
+ #endif
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 35882fb..2b4f927 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -25,6 +25,8 @@
+ void __iomem *twd_base;
+ 
+ static unsigned long twd_timer_rate;
++static unsigned long twd_periphclk_prescaler;
++static unsigned long twd_target_rate;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+ 			struct clock_event_device *clk)
+@@ -79,10 +81,31 @@ int twd_timer_ack(void)
  	return 0;
  }
  
-+int dma_set_coherent_mask(struct device *dev, u64 mask)
+-static void __cpuinit twd_calibrate_rate(void)
++void twd_recalc_prescaler(unsigned long new_rate)
 +{
-+	if (mask >= PHYS_OFFSET + SZ_64M - 1)
-+		return 0;
++	u32 ctrl;
++	int prescaler;
++	unsigned long periphclk_rate;
 +
-+	return -EIO;
++	BUG_ON(twd_periphclk_prescaler == 0 || twd_timer_rate == 0);
++
++	periphclk_rate = new_rate / twd_periphclk_prescaler;
++
++	prescaler = DIV_ROUND_UP(periphclk_rate, twd_timer_rate);
++	prescaler = clamp(prescaler - 1, 0, 0xFF);
++
++	ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++	ctrl &= ~TWD_TIMER_CONTROL_PRESCALE_MASK;
++	ctrl |= prescaler << 8;
++	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
 +}
 +
- int __init it8152_pci_setup(int nr, struct pci_sys_data *sys)
++static void __cpuinit twd_calibrate_rate(unsigned long target_rate,
++	unsigned int periphclk_prescaler)
  {
- 	it8152_io.start = IT8152_IO_BASE + 0x12000;
-diff --git a/arch/arm/mach-ixp4xx/common-pci.c b/arch/arm/mach-ixp4xx/common-pci.c
-index 61cd4d6..06941a0 100644
---- a/arch/arm/mach-ixp4xx/common-pci.c
-+++ b/arch/arm/mach-ixp4xx/common-pci.c
-@@ -503,6 +503,14 @@ struct pci_bus * __devinit ixp4xx_scan_bus(int nr, struct pci_sys_data *sys)
- 	return pci_scan_bus(sys->busnr, &ixp4xx_ops, sys);
- }
+ 	unsigned long load, count;
+ 	u64 waitjiffies;
++	unsigned long cpu_rate;
  
-+int dma_set_coherent_mask(struct device *dev, u64 mask)
-+{
-+	if (mask >= SZ_64M - 1 )
-+		return 0;
+ 	/*
+ 	 * If this is the first time round, we need to work out how fast
+@@ -113,8 +136,22 @@ static void __cpuinit twd_calibrate_rate(void)
+ 
+ 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+ 
++		/*
++		 * If a target rate has been requested, adjust the TWD prescaler
++		 * to get the closest lower frequency.
++		 */
++		if (target_rate) {
++			twd_periphclk_prescaler = periphclk_prescaler;
++			twd_target_rate = target_rate;
 +
-+	return -EIO;
-+}
++			cpu_rate = twd_timer_rate * periphclk_prescaler;
++			twd_recalc_prescaler(cpu_rate);
 +
- EXPORT_SYMBOL(ixp4xx_pci_read);
- EXPORT_SYMBOL(ixp4xx_pci_write);
- 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/hardware.h b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-index f91ca6d..8138371 100644
---- a/arch/arm/mach-ixp4xx/include/mach/hardware.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/hardware.h
-@@ -26,6 +26,8 @@
- #define PCIBIOS_MAX_MEM		0x4BFFFFFF
- #endif
- 
-+#define ARCH_HAS_DMA_SET_COHERENT_MASK
++			twd_timer_rate = twd_target_rate;
++		}
 +
- #define pcibios_assign_all_busses()	1
+ 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+-			(twd_timer_rate / 100000) % 100);
++			(twd_timer_rate / 10000) % 100);
+ 	}
  
- /* Register locations and bits */
-diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-index 7f64d24..428cc7b 100644
---- a/arch/arm/mach-pxa/include/mach/hardware.h
-+++ b/arch/arm/mach-pxa/include/mach/hardware.h
-@@ -309,7 +309,7 @@ extern unsigned long get_clock_tick_rate(void);
- #define PCIBIOS_MIN_IO		0
- #define PCIBIOS_MIN_MEM		0
- #define pcibios_assign_all_busses()	1
-+#define ARCH_HAS_DMA_SET_COHERENT_MASK
- #endif
- 
--
- #endif  /* _ASM_ARCH_HARDWARE_H */
-diff --git a/arch/arm/mach-pxa/include/mach/io.h b/arch/arm/mach-pxa/include/mach/io.h
-index 262691f..fdca3be 100644
---- a/arch/arm/mach-pxa/include/mach/io.h
-+++ b/arch/arm/mach-pxa/include/mach/io.h
-@@ -6,6 +6,8 @@
- #ifndef __ASM_ARM_ARCH_IO_H
- #define __ASM_ARM_ARCH_IO_H
- 
-+#include <mach/hardware.h>
-+
- #define IO_SPACE_LIMIT 0xffffffff
- 
+ 	load = twd_timer_rate / HZ;
+@@ -125,11 +162,12 @@ static void __cpuinit twd_calibrate_rate(void)
  /*
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index ce29b81..ba8319a 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -102,6 +102,9 @@ static inline u64 dma_get_mask(struct device *dev)
- 	return DMA_BIT_MASK(32);
- }
- 
-+#ifdef ARCH_HAS_DMA_SET_COHERENT_MASK
-+int dma_set_coherent_mask(struct device *dev, u64 mask);
-+#else
- static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
+  * Setup the local clock events for a CPU.
+  */
+-void __cpuinit twd_timer_setup(struct clock_event_device *clk)
++static void __cpuinit __twd_timer_setup(struct clock_event_device *clk,
++	unsigned long target_rate, unsigned int periphclk_prescaler)
  {
- 	if (!dma_supported(dev, mask))
-@@ -109,6 +112,7 @@ static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
- 	dev->coherent_dma_mask = mask;
- 	return 0;
+ 	unsigned long flags;
+ 
+-	twd_calibrate_rate();
++	twd_calibrate_rate(target_rate, periphclk_prescaler);
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+@@ -151,6 +189,17 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clockevents_register_device(clk);
  }
-+#endif
  
- extern u64 dma_get_required_mask(struct device *dev);
- 
++void __cpuinit twd_timer_setup_scalable(struct clock_event_device *clk,
++	unsigned long target_rate, unsigned int periphclk_prescaler)
++{
++	__twd_timer_setup(clk, target_rate, periphclk_prescaler);
++}
++
++void __cpuinit twd_timer_setup(struct clock_event_device *clk)
++{
++	__twd_timer_setup(clk, 0, 0);
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ /*
+  * take a local timer down
 -- 
 1.7.1
