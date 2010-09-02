@@ -1,86 +1,34 @@
-From: per.xx.fransson@stericsson.com (Per Fransson)
-Date: Thu, 2 Sep 2010 15:30:01 +0200
-Subject: [PATCH] ARM: Implement cpu_v7_reset.
-In-Reply-To: <20100902103957.GR26319@n2100.arm.linux.org.uk>
-References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
-	<20100901232307.GC25860@n2100.arm.linux.org.uk>
-	<20100902083423.GI25559@gw.healthdatacare.com>
-	<20100902084101.GA26319@n2100.arm.linux.org.uk>
-	<20100902085341.GJ25559@gw.healthdatacare.com>
-	<20100902103957.GR26319@n2100.arm.linux.org.uk>
-Message-ID: <4C7FA6D9.6040307@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Sep 2010 14:33:01 +0100
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100819073810.GR12184@atomide.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+Message-ID: <20100902133301.GI26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 19, 2010 at 10:38:11AM +0300, Tony Lindgren wrote:
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -346,8 +346,10 @@ __fixup_smp:
+>  	bne	smp_on_up		@ no, assume UP
+>  	mrc	p15, 0, r0, c0, c0, 5	@ read MIDR
+>  	movs	r0, r0, lsr #30
+> -	teqne	r0, #3			@ check top two bits 00 or 11
+> -	moveq	pc, lr
+> +	teq	r0, #0			@ check two top bits 00
+> +	beq	smp_on_up		@ yes, assume UP
+> +	teq	r0, #3			@ check top two bits 11
+> +	movne	pc, lr			@ no, running on SMP hw
 
-I tested the v7 version below and it works fine.
+This should be:
 
-Regards,
-Per
+	movs	r0, r0, lsr #30
+	teqne	r0, #3
+	movne	pc, lr
 
-On 09/02/2010 12:39 PM, Russell King - ARM Linux wrote:
-> On Thu, Sep 02, 2010 at 11:53:41AM +0300, Mika Westerberg wrote:
->> On Thu, Sep 02, 2010 at 09:41:01AM +0100, Russell King - ARM Linux wrote:
->>> On Thu, Sep 02, 2010 at 11:34:23AM +0300, Mika Westerberg wrote:
->>>>
->>>> When the MMU is turned off, should we be running on 1:1 mappings?
->>>
->>> Mappings are setup, but not for this code.  This code relies upon the
->>> instruction which jumps to already be in the pipeline at the point when
->>> the MMU is turned off - and the destination for that jump to be a 1:1
->>> mapping.
->>
->> OK, thanks.
->>
->> Any Idea what might cause the hang on OMAP3? Only way I was able
->> to get it working when MMU is disabled was to run cpu_v7_reset()
->> also via 1:1 mapping.
->
-> Well, as the current v6 and v7 cpu_reset() code is broken, it's hardly
-> surprising that it doesn't work.  It needs to be something like this
-> (I haven't tested it yet.)
->
-> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-> index 22aac85..6b873f9 100644
-> --- a/arch/arm/mm/proc-v6.S
-> +++ b/arch/arm/mm/proc-v6.S
-> @@ -59,6 +59,16 @@ ENTRY(cpu_v6_proc_fin)
->    */
->   	.align	5
->   ENTRY(cpu_v6_reset)
-> +	mov	ip, #0
-> +	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
-> +	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
-> +#ifdef CONFIG_MMU
-> +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I&  D TLBs
-> +#endif
-> +	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-> +	bic	ip, ip, #0x000f			@ ............wcam
-> +	bic	ip, ip, #0x1100			@ ...i...s........
-> +	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
->   	mov	pc, r0
->
->   /*
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 6a8506d..3542ee0 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -63,6 +63,16 @@ ENDPROC(cpu_v7_proc_fin)
->    */
->   	.align	5
->   ENTRY(cpu_v7_reset)
-> +	mov	ip, #0
-> +	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
-> +	dsb
-> +#ifdef CONFIG_MMU
-> +	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I&  D TLBs
-> +#endif
-> +	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-> +	bic	ip, ip, #0x000f			@ ............wcam
-> +	bic	ip, ip, #0x1100			@ ...i...s........
-> +	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
->   	mov	pc, r0
->   ENDPROC(cpu_v7_reset)
->
->
->
+so that 0 or 3 avoids the return.
