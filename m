@@ -1,28 +1,37 @@
-From: konkers@google.com (Erik Gilling)
-Date: Thu, 2 Sep 2010 03:20:16 -0700
-Subject: [PATCH 0/9] [ARM] tegra: Additional core support for Tegra2 SOCs
-In-Reply-To: <20100902084812.GD26319@n2100.arm.linux.org.uk>
-References: <1280449771-24043-1-git-send-email-ccross@google.com>
-	<AANLkTinhoBrzYmypsKNcLPar-pKWiYm60GL6YBfd1jT9@mail.gmail.com>
-	<20100902084812.GD26319@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikPm2B9GPsUSS=E+7_tgHVrBVeG-5pngejAxiyv@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 02 Sep 2010 19:21:10 +0900
+Subject: [PATCH 00/13] ARM: S5P64X0: Add new S5P6450 Support
+In-Reply-To: <20100901114518.GA20737@trinity.fluff.org>
+References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+	<20100901114518.GA20737@trinity.fluff.org>
+Message-ID: <005201cb4a88$93214570$b963d050$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the confusion.  These patches were posted by Colin Cross on
-July 29th (http://www.spinics.net/lists/arm-kernel/msg94637.html) and
-pinged again by me on August 25th
-(http://www.spinics.net/lists/arm-kernel/msg96657.html).
+Ben Dooks wrote:
+> 
+Hi ;-)
 
-Cheers,
-    Erik
+> On Wed, Sep 01, 2010 at 04:09:07PM +0900, Kukjin Kim wrote:
+> > This patches add basic support for Samsung S5P6450 SoC.
+> >
+> > Basically this patch moves mach-s5p6440 (ARCH_S5P6440) to mach-s5p64x0
+> > (ARCH_S5P64X0) to support Samsung's new S5P6450 SoC. The
+> ARCH_S5P64X0
+> > can support S5P6440 and S5P6450 with one kernel image. It is tested on
+> > SMDK6440(S5P6440) and SMDK6450(S5P6450) with s5p64x0_defconfig. And
+> > this patch changes s5p6440_defconfig to s5p64x0_defconfig for S5P64X0.
+> 
+> What about the s5p6442?
+> 
+S5P6440 and S5P6450 are each other similar, but S5P6442 differs much with
+it.
+,,,so remains some issues for it now.
 
-On Thu, Sep 2, 2010 at 1:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 25, 2010 at 02:24:24PM -0700, Erik Gilling wrote:
->> Any comments on the below patches? ?If not I'm going to push them to
->> our for-next tree.
->
-> Where are the patches? ?I don't see them on the mailing list. ?We don't
-> review code sitting in git trees - only patches on mailing lists.
->
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
