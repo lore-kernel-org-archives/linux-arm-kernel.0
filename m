@@ -1,19 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 10:21:23 +0100
-Subject: [PATCH 32/74] ST SPEAr: Adding clk_set_rate support
-In-Reply-To: <89c9cebf76e54242ec0d2cb0b7e90b2305db1b39.1283161023.git.viresh.kumar@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<89c9cebf76e54242ec0d2cb0b7e90b2305db1b39.1283161023.git.viresh.kumar@st.com>
-Message-ID: <20100902092123.GJ26319@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 02 Sep 2010 12:49:37 +0300
+Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
+In-Reply-To: <4C7F4526.105@gmail.com>
+References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
+	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>
+	<1283170469.12995.53.camel@brekeke>	<4C7CA278.9040902@st.com>
+	<1283297810.2018.67.camel@brekeke>	<4C7DD2FD.1080501@st.com>
+	<1283337939.1958.20.camel@brekeke>	<4C7E3344.2020202@st.com>
+	<4C7EC43B.2050903@bluewatersys.com>
+	<AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>
+	<4C7ED1E9.4050208@bluewatersys.com>  <4C7F4526.105@gmail.com>
+Message-ID: <1283420977.1748.6.camel@brekeke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 04:08:56PM +0530, Viresh KUMAR wrote:
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+On Wed, 2010-09-01 at 23:33 -0700, Brian Norris wrote:
+> 
+> I'm curious how many applications actually need to have the ecclayout.
+> nandwrite doesn't actually use it, just oobinfo. 
 
-Can't this patch be rolled into a previous patch - especially as it deletes
-a load of code added by that previous patch (eg, clk_is_enabled)?  It
-doesn't look like it depends on the other various changes between that
-patch and this one.
+That is good point - I think we should not accept new ioctl before the
+submitter shows us how and for what he will use it.
+
+My point is simple - OOB layout should be transparent to users-space.
+Messing with this is error-prone.
+
+-- 
+Best Regards,
+Artem Bityutskiy (???????? ?????)
