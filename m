@@ -1,32 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 14:47:32 +0100
-Subject: [RFC] [PATCH v2] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <20100902132641.GI14214@pengutronix.de>
-References: <1283253402-3139-1-git-send-email-plagnioj@jcrosoft.com>
-	<1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
-	<20100902132641.GI14214@pengutronix.de>
-Message-ID: <20100902134732.GL26319@n2100.arm.linux.org.uk>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 2 Sep 2010 16:48:34 +0300
+Subject: [PATCH] ARM: Implement cpu_v7_reset.
+In-Reply-To: <20100902121838.GB26319@n2100.arm.linux.org.uk>
+References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
+	<20100901232307.GC25860@n2100.arm.linux.org.uk>
+	<20100902083423.GI25559@gw.healthdatacare.com>
+	<20100902084101.GA26319@n2100.arm.linux.org.uk>
+	<20100902085341.GJ25559@gw.healthdatacare.com>
+	<20100902103957.GR26319@n2100.arm.linux.org.uk>
+	<20100902115206.GK25559@gw.healthdatacare.com>
+	<20100902121838.GB26319@n2100.arm.linux.org.uk>
+Message-ID: <20100902134834.GL25559@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 03:26:41PM +0200, Uwe Kleine-K?nig wrote:
-> I'm not very satisfied by Russell's answer.  But even if I accept that
-> it should not move to .init.text, why .ref.text?  If I'm not mistaken
-> clkdev_alloc references the following non-local symbols:
+On Thu, Sep 02, 2010 at 01:18:38PM +0100, Russell King - ARM Linux wrote:
+> > 
+> > I tested this patch without that cache invalidate instruction + dsb
+> > and it still hangs. Exactly the same code works perfectly when it is run
+> > via 1:1 mapping.
 > 
-> 	__clkdev_alloc
-> 	strlcpy
-> 	vscnprintf
+> Where are you ultimately jumping to?
 
-__clkdev_alloc() is an inline function, so effectively it's part of this
-function.  On sh, this calls the boot time allocator which is marked as
-__init if the normal memory allocators aren't online yet.
+This is the normal kexec to a new kernel case so jump is to
+relocate_new_kernel(), if that was what you meant.
 
-> Russell, would at least __module_or_init be OK?
-
-It's a conceptual thing - we want to allow people to create aliases at
-run time.  Making it an __init thing will only encourage people to do
-silly things to work around the "it can only be used at init time"
-problem rather than taking the obvious step of removing the __init tag.
-
-Make it easy for people to do the right thing.
+MW
