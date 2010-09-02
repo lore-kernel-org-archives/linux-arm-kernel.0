@@ -1,55 +1,78 @@
 From: jason77.wang@gmail.com (Jason Wang)
-Date: Thu,  2 Sep 2010 15:52:02 +0800
-Subject: [PATCH 4/6] mx5/iomux: add iomux definitions for eCSPI2 on the
-	imx51_3ds board
-In-Reply-To: <1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
+Date: Thu,  2 Sep 2010 15:52:03 +0800
+Subject: [PATCH 5/6] mx51_3ds: add eCSPI2 support on the imx51_3ds board
+In-Reply-To: <1283413924-14210-5-git-send-email-jason77.wang@gmail.com>
 References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
 	<1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1283413924-14210-5-git-send-email-jason77.wang@gmail.com>
+	<1283413924-14210-5-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1283413924-14210-6-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the imx51_3ds board, eCSPI2 is connected to a SPI NOR flash,
-now add iomux definitions for those used pins.
+Add platform data for eCSPI2 and register it through spi_imx dynamical
+register interface.
 
 Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/board-mx51_3ds.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index 0d77be3..d0ef881 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -45,6 +45,8 @@ typedef enum iomux_config {
- 				PAD_CTL_PKE | PAD_CTL_HYS)
- #define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
- 				PAD_CTL_SRE_FAST)
-+#define MX51_ECSPI_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
-+				PAD_CTL_SRE_FAST)
+diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+index f95c2fd..0cf4e14 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
++++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+@@ -24,9 +24,11 @@
+ #include <mach/imx-uart.h>
+ #include <mach/3ds_debugboard.h>
  
- #define MX51_PAD_CTRL_1	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
- 					PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_HYS)
-@@ -139,8 +141,10 @@ typedef enum iomux_config {
- #define MX51_PAD_NANDF_RB0__GPIO_3_8            IOMUX_PAD(0x4F8, 0x11C, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB1__GPIO_3_9            IOMUX_PAD(0x4FC, 0x120, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__GPIO_3_10           IOMUX_PAD(0x500, 0x124, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB2__ECSPI2_SCLK         IOMUX_PAD(0x500, 0x124, 2, 0x0,   0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_NANDF_RB2__FEC_COL		IOMUX_PAD(0x500, 0x124, 1, 0x0,   0, MX51_PAD_CTRL_2)
- #define MX51_PAD_NANDF_RB3__GPIO_3_11           IOMUX_PAD(0x504, 0x128, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_RB3__ECSPI2_MISO         IOMUX_PAD(0x504, 0x128, 2, 0x0,   0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_NANDF_RB3__FEC_RXCLK		IOMUX_PAD(0x504, 0x128, 1, 0x0,   0, MX51_PAD_CTRL_2)
- #define MX51_PAD_NANDF_RB6__FEC_RDAT0		IOMUX_PAD(0x5DC, 0x134, 1, 0x0,   0, MX51_PAD_CTRL_4)
- #define MX51_PAD_NANDF_RB7__FEC_TDAT0		IOMUX_PAD(0x5E0, 0x138, 1, 0x0,   0, MX51_PAD_CTRL_5)
-@@ -162,6 +166,7 @@ typedef enum iomux_config {
- #define MX51_PAD_NANDF_RDY_INT__GPIO_3_24       IOMUX_PAD(0x538, 0x150, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	IOMUX_PAD(0x538, 0x150, 1, 0x0,   0, MX51_PAD_CTRL_4)
- #define MX51_PAD_NANDF_D15__GPIO_3_25           IOMUX_PAD(0x53C, 0x154, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_NANDF_D15__ECSPI2_MOSI         IOMUX_PAD(0x53C, 0x154, 2, 0x0,   0, MX51_ECSPI_PAD_CTRL)
- #define MX51_PAD_NANDF_D14__GPIO_3_26           IOMUX_PAD(0x540, 0x158, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_D13__GPIO_3_27           IOMUX_PAD(0x544, 0x15C, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_NANDF_D12__GPIO_3_28           IOMUX_PAD(0x548, 0x160, 3, 0x0,   0, NO_PAD_CTRL)
++#include "devices-imx51.h"
+ #include "devices.h"
+ 
+ #define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
++#define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
+ 
+ static struct pad_desc mx51_3ds_pads[] = {
+ 	/* UART1 */
+@@ -61,6 +63,12 @@ static struct pad_desc mx51_3ds_pads[] = {
+ 	MX51_PAD_KEY_COL3__KEY_COL3,
+ 	MX51_PAD_KEY_COL4__KEY_COL4,
+ 	MX51_PAD_KEY_COL5__KEY_COL5,
++
++	/* eCSPI2 */
++	MX51_PAD_NANDF_RB2__ECSPI2_SCLK,
++	MX51_PAD_NANDF_RB3__ECSPI2_MISO,
++	MX51_PAD_NANDF_D15__ECSPI2_MOSI,
++	MX51_PAD_NANDF_D12__GPIO_3_28,
+ };
+ 
+ /* Serial ports */
+@@ -127,6 +135,16 @@ static inline void mxc_init_keypad(void)
+ }
+ #endif
+ 
++static int mx51_3ds_spi2_cs[] = {
++	MXC_SPI_CS(0),
++	MX51_3DS_ECSPI2_CS,
++};
++
++static struct spi_imx_master mx51_3ds_spi2_pdata = {
++	.chipselect	= mx51_3ds_spi2_cs,
++	.num_chipselect	= ARRAY_SIZE(mx51_3ds_spi2_cs),
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -136,6 +154,8 @@ static void __init mxc_board_init(void)
+ 					ARRAY_SIZE(mx51_3ds_pads));
+ 	mxc_init_imx_uart();
+ 
++	imx51_add_spi_imx1(&mx51_3ds_spi2_pdata);
++
+ 	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+ 		printk(KERN_WARNING "Init of the debugboard failed, all "
+ 				    "devices on the board are unusable.\n");
 -- 
 1.5.6.5
