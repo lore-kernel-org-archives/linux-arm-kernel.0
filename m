@@ -1,57 +1,49 @@
-From: kheitke@codeaurora.org (Kenneth Heitke)
-Date: Thu,  2 Sep 2010 17:29:56 -0600
-Subject: [PATCH v2 1/2] msm: i2c: Add msm_qup_i2c.h
-In-Reply-To: <1283470197-21148-1-git-send-email-kheitke@codeaurora.org>
-References: <1283470197-21148-1-git-send-email-kheitke@codeaurora.org>
-Message-ID: <1283470197-21148-2-git-send-email-kheitke@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 2 Sep 2010 18:32:10 -0500
+Subject: [PATCH v2] ep93xx: move clock initialization earlier
+In-Reply-To: <1283438347-22257-1-git-send-email-mika.westerberg@iki.fi>
+References: <1283438347-22257-1-git-send-email-mika.westerberg@iki.fi>
+Message-ID: <0D753D10438DA54287A00B0270842697644485C436@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defines the platform data used by the MSM QUP I2C driver.
+On Thursday, September 02, 2010 7:39 AM, Mika Westerberg wrote:
+> Commit 7cfe24947 ("ARM: AMBA: Add pclk support to AMBA bus infrastructure")
+> changed AMBA bus to handle the PCLK automatically. However, in EP93xx clock
+> initialization is arch_initcall which is done later than AMBA device
+> identification. This causes amba_get_enable_pclk() to fail resulting device
+> where UARTs are not functional.
+> 
+> So change ep93xx_clock_init() to be postcore_initcall.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 
-Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
----
- arch/arm/mach-msm/include/mach/msm_qup_i2c.h |   28 ++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/include/mach/msm_qup_i2c.h
+It appears the place that the clocks are added varies widely on the various
+arch/arm/mach-* ports:
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_qup_i2c.h b/arch/arm/mach-msm/include/mach/msm_qup_i2c.h
-new file mode 100644
-index 0000000..e26684b
---- /dev/null
-+++ b/arch/arm/mach-msm/include/mach/msm_qup_i2c.h
-@@ -0,0 +1,28 @@
-+/*
-+ * Qualcomm MSM QUP i2c Controller Platform Data
-+ *
-+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-+ * 02110-1301, USA.
-+ */
-+#ifndef __MSM_QUP_I2C_MSM_H
-+#define __MSM_QUP_I2C_MSM_H
-+
-+struct msm_i2c_platform_data {
-+	int bus_freq;		/* I2C bus frequency (Hz) */
-+	int src_clk_rate;	/* I2C controller clock rate (Hz) */
-+};
-+
-+#endif /* __MSM_QUP_I2C_MSM_H */
--- 
-1.7.1.1
+mach-bcmring and mach-versatile do it as part of MACHINE_START.init_machine
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+mach-davinci and mach-w90x900 do it as part of MACHINE_START.map_io
+
+mach-ep93xx, mach-pnx4008, mach-vexpress, and plat-stmp3xxx do it as an arch_initcall
+
+mach-imx, mach-mx25, mach-mx3, mach-mxc91231, and mach-shmobile do it as
+part of MACHINE_START.timer.init
+
+mach-mmp does it as a postcore_initcall
+
+mach-nomadik, mach-u300, and mach-ux500 do it as part of MACHINE_START.init_irq
+
+mach-realview does it as a core_initcall
+
+mach-integrator has both a MACHINE_START.init_machine and an arch_initcall
+
+mach-pxa has a MACHINE_START.init_machine, a postcore_initcall, and a core_initcall
+
+Based on that, I guess changing it on mach-ep93xx to a postcore_initcall is fine.
+Unless Russell has an overall opinion on what the best initialization point would
+be.
+
+So FWIW, on the ep93xx:
+
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
