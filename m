@@ -1,45 +1,242 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 01 Sep 2010 23:33:10 -0700
-Subject: [PATCH 28/74] Incrementing the ecc_pos array to contain 128 char
-In-Reply-To: <4C7ED1E9.4050208@bluewatersys.com>
-References: <07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<a750eadbd743c3a2d5dc8b35c25e0ee82f569e87.1283161023.git.viresh.kumar@st.com>	<1283170469.12995.53.camel@brekeke>	<4C7CA278.9040902@st.com>	<1283297810.2018.67.camel@brekeke>	<4C7DD2FD.1080501@st.com>	<1283337939.1958.20.camel@brekeke>	<4C7E3344.2020202@st.com>	<4C7EC43B.2050903@bluewatersys.com>
-	<AANLkTinmEck5413ZuCDMB1jyBjH63Uh=L+87q8V4Ek1X@mail.gmail.com>
-	<4C7ED1E9.4050208@bluewatersys.com>
-Message-ID: <4C7F4526.105@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 02 Sep 2010 16:30:37 +0900
+Subject: [PATCH 07/13] ARM: S5P64X0: Update Audio support
+In-Reply-To: <AANLkTin=fmeRZt=SSrxk9YzrhZs1nLxc9M30PYO3ONEb@mail.gmail.com>
+References: <1283324960-21629-1-git-send-email-kgene.kim@samsung.com>
+	<1283324960-21629-8-git-send-email-kgene.kim@samsung.com>
+	<AANLkTin=fmeRZt=SSrxk9YzrhZs1nLxc9M30PYO3ONEb@mail.gmail.com>
+Message-ID: <004601cb4a70$c0d72970$42857c50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/1/2010 3:21 PM, Ryan Mallon wrote:
-> On 09/02/2010 09:54 AM, Kevin Cernekee wrote:
->> On Wed, Sep 1, 2010 at 2:23 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
->> http://git.infradead.org/users/dedekind/l2-mtd-2.6.git/commitdiff/b6d6ae730be2750fac166ed9df11ee6ea54d9160
+Jassi Brar wrote:
 > 
-> That patch still breaks the ABI by renaming struct nand_ecclayout to
-> nand_ecclayout_user. Any application using the old names will have to be
-> rewritten to compile against a new kernel.
+Hi Jassi :-)
 
-I don't know how exactly all user-space apps deal with this, but isn't
-that what the following typedef is for? (include/mtd/mtd-user.h)
-	typedef struct nand_ecclayout nand_ecclayout_t;
-changed to:
-	typedef struct nand_ecclayout_user nand_ecclayout_t;
+Thanks for your review.
 
-So any app that properly used nand_ecclayout_t would not need changes
-even when using the new headers. Again, I don't know who has been using
-what in user-space.
+> On Wed, Sep 1, 2010 at 4:09 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch updates Audio and SPI for S5P6440 and S5P6450 SoCs.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Jassi Brar <jassi.brar@samsung.com>
+> > ---
+> >  arch/arm/mach-s5p6440/dev-audio.c               |  127 -----------
+> >  arch/arm/mach-s5p6440/dev-spi.c                 |  176 ---------------
+> >  arch/arm/mach-s5p6440/include/mach/spi-clocks.h |   17 --
+> >  arch/arm/mach-s5p64x0/dev-audio.c               |  164 ++++++++++++++
+> >  arch/arm/mach-s5p64x0/dev-spi.c                 |  275
+> +++++++++++++++++++++++
+> >  arch/arm/mach-s5p64x0/include/mach/spi-clocks.h |   20 ++
+> >  arch/arm/plat-samsung/include/plat/devs.h       |    5 +
+> >  7 files changed, 464 insertions(+), 320 deletions(-)
+> >  delete mode 100644 arch/arm/mach-s5p6440/dev-audio.c
+> >  delete mode 100644 arch/arm/mach-s5p6440/dev-spi.c
+> >  delete mode 100644 arch/arm/mach-s5p6440/include/mach/spi-clocks.h
+> >  create mode 100644 arch/arm/mach-s5p64x0/dev-audio.c
+> >  create mode 100644 arch/arm/mach-s5p64x0/dev-spi.c
+> >  create mode 100644 arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+> >
 
-> The old interface should remain unchanged in that include/mtd/mtd-abi.h.
-> If an application using the old interface calls any of the ecc ioctls
-> for a nand chip with > 64 bytes ecc it should return an error.
+(snip)
+
 > 
-> I still think the eccpos field should be a pointer, so that it can
-> allocate as much space as is needed for the ecc. This also means that
-> the kernel doesn't need to be changed every time a new NAND chips
-> appears with a bigger ecc size.
+> S5P6450 has 2 I2S_v2 and 1 I2S_v4, the first two are missing.
+> Also missing are 3 PCM device definitions.
+> 
+Yeah, I know. But the remaining items will be added later.
+Maybe Mr. Youn will do it ;-)
 
-Yes, dynamic allocation would probably make more sense in the future.
-However, it seems difficult (or impossible?) to create an
-arbitrary-sized ioctl; the size is hard-coded into the ioctl definition.
+(snip)
 
-I'm curious how many applications actually need to have the ecclayout.
-nandwrite doesn't actually use it, just oobinfo.
+> > +struct platform_device s5p6440_device_iis = {
+> > +       .name           = "s3c64x0-iis-v4",
+> 
+> The assigned name is wrong. It should be "s3c64xx-iis-v4"
+> 
+You're right..will fix it.
+
+> 
+> > +       .id             = -1,
+> > +       .num_resources  = ARRAY_SIZE(s5p64x0_iis0_resource),
+> > +       .resource       = s5p64x0_iis0_resource,
+> > +       .dev = {
+> > +               .platform_data = &s5p6440_i2s_pdata,
+> > +       },
+> > +};
+> > +
+> > +struct platform_device s5p6450_device_iis0 = {
+> > +       .name           = "s3c64x0-iis-v4",
+> 
+> The assigned name is wrong. It should be "s3c64xx-iis-v4"
+> 
+ok..
+
+> > +       .id             = -1,
+> > +       .num_resources  = ARRAY_SIZE(s5p64x0_iis0_resource),
+> > +       .resource       = s5p64x0_iis0_resource,
+> > +       .dev = {
+> > +               .platform_data = &s5p6450_i2s_pdata,
+> > +       },
+> > +};
+> > +
+
+(snip)
+
+> > +
+> > +static char *s5p6440_spi_src_clks[] = {
+> > +       [S5P64X0_SPI_SRCCLK_PCLK] = "pclk",
+> > +       [S5P64X0_SPI_SRCCLK_SCLK] = "spi_epll",
+> > +};
+> > +
+> > +static char *s5p6450_spi_src_clks[] = {
+> > +       [S5P64X0_SPI_SRCCLK_PCLK] = "pclk",
+> > +       [S5P64X0_SPI_SRCCLK_SCLK] = "sclk_spi",
+> > +};
+> 
+> Maybe we can drop one and call the other s5p64x0_spi_src_clks
+> The second clock is the same but only named differently.
+> 
+As you know, we use the clock name as there is in data sheet.
+Anyway...will sort out.
+
+(snip)
+
+> > +
+> > +static struct s3c64x0_spi_info s5p6440_spi0_pdata = {
+> > +       .cfg_gpio       = s5p6440_spi_cfg_gpio,
+> > +       .fifo_lvl_mask  = 0x1ff,
+> > +       .rx_lvl_offset  = 15,
+> > +};
+> 
+> I think you forgot to compile check in hurry ?
+
+hahaha, I'm always remembering it :-) about all of s3c and s5p defconfigs.
+Actually, there is no build error...and kernel booting works well on the board.
+
+But I didn't audio test...just moved your original code into the new machine directory.
+...And now, not selected S3C64XX_DEV_SPI...so not compiled dev-spi.c.
+Anyway, I will check all files ;-)
+Thanks.
+
+> There is no s3c64x0_spi_info, but only s3c64xx_spi_info
+> 
+Yeah, you're right...will fix it.
+
+> > +
+> > +static struct s3c64x0_spi_info s5p6450_spi0_pdata = {
+> > +       .cfg_gpio       = s5p6450_spi_cfg_gpio,
+> > +       .fifo_lvl_mask  = 0x1ff,
+> > +       .rx_lvl_offset  = 15,
+> > +};
+> > +
+> > +static u64 spi_dmamask = DMA_BIT_MASK(32);
+> > +
+> > +struct platform_device s5p6440_device_spi0 = {
+> > +       .name           = "s3c64x0-spi",
+> 
+> %s/64xx/64x0 ? :)
+
+Maybe...yes? ;-)
+
+> The device name should be kept same "s3c64xx-spi"
+> 
+It's my mistake...will fix it.
+
+> > +       .id             = 0,
+> > +       .num_resources  = ARRAY_SIZE(s5p64x0_spi0_resource),
+> > +       .resource       = s5p64x0_spi0_resource,
+> > +       .dev = {
+> > +               .dma_mask               = &spi_dmamask,
+> > +               .coherent_dma_mask      = DMA_BIT_MASK(32),
+> > +               .platform_data = &s5p6440_spi0_pdata,
+> > +       },
+> > +};
+> > +
+> > +struct platform_device s5p6450_device_spi0 = {
+> > +       .name           = "s3c64x0-spi",
+> 
+> same here
+> 
+ok...
+
+> > +       .id             = 0,
+> > +       .num_resources  = ARRAY_SIZE(s5p64x0_spi0_resource),
+> > +       .resource       = s5p64x0_spi0_resource,
+> > +       .dev = {
+> > +               .dma_mask               = &spi_dmamask,
+> > +               .coherent_dma_mask      = DMA_BIT_MASK(32),
+> > +               .platform_data = &s5p6450_spi0_pdata,
+> > +       },
+> > +};
+
+(snip)
+
+> > +
+> > +struct platform_device s5p6440_device_spi1 = {
+> > +       .name           = "s3c64x0-spi",
+> 
+> same here...
+> 
+ok...
+
+> > +       .id             = 1,
+> > +       .num_resources  = ARRAY_SIZE(s5p64x0_spi1_resource),
+> > +       .resource       = s5p64x0_spi1_resource,
+> > +       .dev = {
+> > +               .dma_mask               = &spi_dmamask,
+> > +               .coherent_dma_mask      = DMA_BIT_MASK(32),
+> > +               .platform_data = &s5p6440_spi1_pdata,
+> > +       },
+> > +};
+> > +
+> > +struct platform_device s5p6450_device_spi1 = {
+> > +       .name           = "s3c64x0-spi",
+> 
+> same here ....
+> 
+ok...
+
+> > +       .id             = 1,
+> > +       .num_resources  = ARRAY_SIZE(s5p64x0_spi1_resource),
+> > +       .resource       = s5p64x0_spi1_resource,
+> > +       .dev = {
+> > +               .dma_mask               = &spi_dmamask,
+> > +               .coherent_dma_mask      = DMA_BIT_MASK(32),
+> > +               .platform_data = &s5p6450_spi1_pdata,
+> > +       },
+> > +};
+> > +
+> > +void __init s5p6440_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+> 
+> maybe we could call it s5p64x0_spi_set_info, and remove other other one ?
+> 
+mm...will sort out.
+
+> > +{
+> > +       struct s3c64x0_spi_info *pd;
+> > +
+> > +       /* Reject invalid configuration */
+> > +       if (!num_cs || src_clk_nr < 0
+> > +                       || src_clk_nr > S5P6440_SPI_SRCCLK_SCLK) {
+>  you need to change all references to S5P6440_SPI_SRCCLK_..... as well.
+> 
+Yeah, ok.
+
+> > +               printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
+> > +               return;
+> > +       }
+> > +
+
+(snip)
+
+> 
+> just to say the least.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
