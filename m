@@ -1,39 +1,42 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 7 Sep 2010 15:32:27 +0200
-Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
-	controller driver
-In-Reply-To: <4C8627EE.6090606@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
-	<20100906224050.GA8153@game.jcrosoft.org> <4C86192C.801@st.com>
-	<20100907113850.GE30509@game.jcrosoft.org>
-	<4C8627EE.6090606@st.com>
-Message-ID: <20100907133227.GG30509@game.jcrosoft.org>
+From: maclaren@tulane.edu (MacLaren, James M)
+Date: Thu, 2 Sep 2010 18:21:04 -0500
+Subject: invalid address returned by usb_alloc_coherent on dockstar
+References: <65B450424E3DC742AA18F68E1AFB214003A58D62@EX06.ad.tulane.edu><20100902163019.GA9983@n2100.arm.linux.org.uk><65B450424E3DC742AA18F68E1AFB214003A59142@EX06.ad.tulane.edu><20100902185744.GB26319@n2100.arm.linux.org.uk>
+	<AANLkTinz1q77F_V1As2Ob7acY_PS2xpJ1pDRwuvJOk7d@mail.gmail.com>
+Message-ID: <65B450424E3DC742AA18F68E1AFB2140015BDF4C@EX06.ad.tulane.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:24 Tue 07 Sep     , viresh kumar wrote:
-> On 9/7/2010 5:08 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>> +/* emi nor flash device registeration */
-> >>>>> > >> > +static struct physmap_flash_data emi_norflash_data;
-> >>>>> > >> > +
-> >>>>> > >> > +static struct resource emi_nor_resources[] = {
-> >>>>> > >> > +     {
-> >>>>> > >> > +             .start  = SPEAR310_EMI_MEM_0_BASE,
-> >>>>> > >> > +             .end    = SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
-> >>>>> > >> > +             .flags  = IORESOURCE_MEM,
-> >>>>> > >> > +     },
-> >>>>> > >> > +};
-> >>> > > it's board specfic not mach
-> >>> > > 
-> >>> > > NACK
-> >> > 
-> >> > No. This is machine specific. Same for all boards.
-> > NACK as you can have a flash at other place and more than one flash
-> > and the size depend on the flash
-> 
-> Correct!! Size has to be board specific. Will modify it.
-and the start also as you may have 2 nor flash on different bank
 
-Best Regards,
-J.
+>> That's where it's going wrong. ?Buffers allocated by dma_alloc_coherent()
+>> are already DMA coherent and must not be passed to dma_map_single(). ?I
+>> believe USB has some way to be told that the buffer is already suitable
+>> for DMA without needing additional handling.
+
+>Yes,
+>setting
+>urb->transfer_flags  = URB_NO_TRANSFER_DMA_MAP
+>will do this
+
+>Regards,
+
+>Martin
+
+
+Russell and Martin
+
+THANKS!!! That solved it.  I also saw in the linux device drivers 3rd edition that they added 
+
+urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+
+after the call to usb_fill_bulk_urb
+
+I did this and now it captures from /dev/video0 just fine.
+
+If you ever find yourself in New Orleans I'll buy you a beer!
+
+Thanks,
+James
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100902/ddb82bf2/attachment-0001.html>
