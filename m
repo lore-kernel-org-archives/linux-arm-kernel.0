@@ -1,76 +1,149 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Sep 2010 11:39:57 +0100
-Subject: [PATCH] ARM: Implement cpu_v7_reset.
-In-Reply-To: <20100902085341.GJ25559@gw.healthdatacare.com>
-References: <1283349719-21115-1-git-send-email-linus.walleij@stericsson.com>
-	<20100901232307.GC25860@n2100.arm.linux.org.uk>
-	<20100902083423.GI25559@gw.healthdatacare.com>
-	<20100902084101.GA26319@n2100.arm.linux.org.uk>
-	<20100902085341.GJ25559@gw.healthdatacare.com>
-Message-ID: <20100902103957.GR26319@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 02 Sep 2010 19:47:11 +0900
+Subject: [PATCH] sdhci-s3c: support non-standard clock setting for c210
+In-Reply-To: <AANLkTik7RV8nSxPb4NQ+D3n6C_bO6L=WZvfd==7u3fJO@mail.gmail.com>
+References: <4C7CDA39.1020907@samsung.com>
+	<005101cb4a88$7283d080$578b7180$%kim@samsung.com>
+	<AANLkTik7RV8nSxPb4NQ+D3n6C_bO6L=WZvfd==7u3fJO@mail.gmail.com>
+Message-ID: <005301cb4a8c$38844320$a98cc960$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 11:53:41AM +0300, Mika Westerberg wrote:
-> On Thu, Sep 02, 2010 at 09:41:01AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Sep 02, 2010 at 11:34:23AM +0300, Mika Westerberg wrote:
-> > > 
-> > > When the MMU is turned off, should we be running on 1:1 mappings?
-> > 
-> > Mappings are setup, but not for this code.  This code relies upon the
-> > instruction which jumps to already be in the pipeline at the point when
-> > the MMU is turned off - and the destination for that jump to be a 1:1
-> > mapping.
+Kyungmin Park wrote:
 > 
-> OK, thanks.
+> On Thu, Sep 2, 2010 at 7:20 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Jaehoon Chung wrote:
+> >>
+> >> This is sdhci-s3c patch for c210.
+> >> c210 didn't use divider of host controller.
+> >>
+> >> Host Controller need other clock setting methods.
+> >>
+> >> So I add the callback functions for s5pc210.
+> >> also I set 400KHz for initial clock.
+> >>
+> >> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> >> ?Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+   ^^^
+Unnecessary whitespace
+
+If your patch includes arch/arm stuff, please add Linux-arm-kernel
+maillinglist.
+(Cc'ed that)
+
+> >>
+> >> ---
+> >> ?arch/arm/plat-samsung/include/plat/sdhci.h | ? 19 ++++++++
+> >> ?drivers/mmc/host/sdhci-s3c.c ? ? ? ? ? ? ? | ? 68
+> >> ++++++++++++++++++++++++++++
+> >> ?2 files changed, 87 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h
+b/arch/arm/plat-
+> >> samsung/include/plat/sdhci.h
+> >> index 30844c2..7c75ee3 100644
+> >> --- a/arch/arm/plat-samsung/include/plat/sdhci.h
+> >> +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+> >> @@ -15,6 +15,8 @@
+> >> ?#ifndef __PLAT_S3C_SDHCI_H
+> >> ?#define __PLAT_S3C_SDHCI_H __FILE__
+> >>
+> >> +#include <plat/devs.h>
+> >> +
+> >> ?struct platform_device;
+> >> ?struct mmc_host;
+> >> ?struct mmc_card;
+> >> @@ -288,4 +290,21 @@ static inline void s5pv210_default_sdhci3(void) {
+}
+> >>
+> >> ?#endif /* CONFIG_S5PV210_SETUP_SDHCI */
+> >>
+> >> +/* re-define device name depending on support. */
+> >> +static inline void s3c_hsmmc_setname(char *name)
+> >> +{
+> >> +#ifdef CONFIG_S3C_DEV_HSMMC
+> >> + ? ? s3c_device_hsmmc0.name = name;
+> >> +#endif
+> >> +#ifdef CONFIG_S3C_DEV_HSMMC1
+> >> + ? ? s3c_device_hsmmc1.name = name;
+> >> +#endif
+> >> +#ifdef CONFIG_S3C_DEV_HSMMC2
+> >> + ? ? s3c_device_hsmmc2.name = name;
+> >> +#endif
+> >> +#ifdef CONFIG_S3C_DEV_HSMMC3
+> >> + ? ? s3c_device_hsmmc3.name = name;
+> >> +#endif
+> >> +}
+> >> +
+> >> ?#endif /* __PLAT_S3C_SDHCI_H */
+> >
+> > It would be helpful to me if you could separate platform and driver
+patches.
+> > And if you want to add s3c_hsmmc_setname(), please send together code
+that
+> > it is used.
+> >
+> >> diff --git a/drivers/mmc/host/sdhci-s3c.c
+b/drivers/mmc/host/sdhci-s3c.c
+> >> index 71ad416..3927793 100644
+> >> --- a/drivers/mmc/host/sdhci-s3c.c
+> >> +++ b/drivers/mmc/host/sdhci-s3c.c
+
+(snip)
+
+> >
+> > How do you think about using quirk to separate S5PV310 case as
+following?
+> > I think this is more general method in here...And will be submitted soon
+> > after fixing something.
+> What's the meaning of "general method"?
 > 
-> Any Idea what might cause the hang on OMAP3? Only way I was able
-> to get it working when MMU is disabled was to run cpu_v7_reset()
-> also via 1:1 mapping.
+I'd like to ask you why there is quirk in sdmmc driver.
 
-Well, as the current v6 and v7 cpu_reset() code is broken, it's hardly
-surprising that it doesn't work.  It needs to be something like this
-(I haven't tested it yet.)
+> and how/where do you set the host->quirks? when board or platform set
+> the these quirks? who know it uses nonstandard quirk?
 
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 22aac85..6b873f9 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -59,6 +59,16 @@ ENTRY(cpu_v6_proc_fin)
-  */
- 	.align	5
- ENTRY(cpu_v6_reset)
-+	mov	ip, #0
-+	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
-+	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
-+#ifdef CONFIG_MMU
-+	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
-+#endif
-+	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-+	bic	ip, ip, #0x000f			@ ............wcam
-+	bic	ip, ip, #0x1100			@ ...i...s........
-+	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
- 	mov	pc, r0
- 
- /*
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 6a8506d..3542ee0 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -63,6 +63,16 @@ ENDPROC(cpu_v7_proc_fin)
-  */
- 	.align	5
- ENTRY(cpu_v7_reset)
-+	mov	ip, #0
-+	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches
-+	dsb
-+#ifdef CONFIG_MMU
-+	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
-+#endif
-+	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-+	bic	ip, ip, #0x000f			@ ............wcam
-+	bic	ip, ip, #0x1100			@ ...i...s........
-+	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
- 	mov	pc, r0
- ENDPROC(cpu_v7_reset)
- 
+How about following?
+
+static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+...
++	if (pdev->id_entry->driver_data == TYPE_S5PV310)
++		host->quirks |= SDHCI_QUIRK_BROKEN_CLOCK_DIVIDER;
+...
+
+> In case s5pc210 don't have standard host controller. it's more clear
+> to use own functions instead of quirks.
+> 
+Why do we add another callback function?
+
+> >
+> > From: Hyuk Lee <hyuk1.lee@samsung.com>
+> >
+> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> > index 71ad416..1ac2f36 100644
+> > --- a/drivers/mmc/host/sdhci-s3c.c
+> > +++ b/drivers/mmc/host/sdhci-s3c.c
+
+(snip)
+
+> > @@ -221,6 +257,11 @@ static unsigned int sdhci_s3c_get_min_clock(struct
+> > sdhci_host *host)
+> > ? ? ? ?unsigned int delta, min = UINT_MAX;
+> > ? ? ? ?int src;
+> >
+> > + ? ? ? /* There is only one clock source(sclk) if there is no clock
+divider
+> > + ? ? ? ?* in the host controller */
+> > + ? ? ? if(host->quirks & SDHCI_QUIRK_BROKEN_CLOCK_DIVIDER)
+> > + ? ? ? ? ? ? ? return clk_round_rate(ourhost->clk_bus[2], 400000);
+> what's the clk_bus[2]?
+> 
+Should be clk_bus[ourhost->cur_clk]
+
+(snip)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
