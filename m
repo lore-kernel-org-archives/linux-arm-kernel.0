@@ -1,91 +1,71 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 2 Sep 2010 08:22:49 -0600
-Subject: [PATCH v4] spi: add spi_tegra driver
-In-Reply-To: <1283379393-14831-1-git-send-email-konkers@android.com>
-References: <1282771395-21684-1-git-send-email-konkers@android.com>
-	<1283379393-14831-1-git-send-email-konkers@android.com>
-Message-ID: <AANLkTimonLa1mUVSHR=QnR48HPtAZ5BW3BsVsg7MWALy@mail.gmail.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Thu, 2 Sep 2010 16:30:18 +0200
+Subject: ARM926EJ-S TLB lockdown
+In-Reply-To: <AANLkTinPN1gYoq6xLCynFmYG+3Zkje=rzHzXKvvGJGeC@mail.gmail.com>
+References: <20100901151920.GA6019@sig21.net>
+	<AANLkTinPN1gYoq6xLCynFmYG+3Zkje=rzHzXKvvGJGeC@mail.gmail.com>
+Message-ID: <20100902143018.GA9166@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 1, 2010 at 4:16 PM, Erik Gilling <konkers@android.com> wrote:
-> v2 changes:
-> ?from Thierry Reding:
-> ? ?* add "select TEGRA_SYSTEM_DMA" to Kconfig
-> ?from Grant Likely:
-> ? ?* add oneline description to header
-> ? ?* inline references to DRIVER_NAME
-> ? ?* inline references to BUSY_TIMEOUT
-> ? ?* open coded bytes_per_word()
-> ? ?* spi_readl/writel -> spi_tegra_readl/writel
-> ? ?* move transfer validation to spi_tegra_transfer
-> ? ?* don't request_mem_region iomem as platform bus does that for us
-> ? ?* __exit -> __devexit
->
-> v3 changes:
-> ?from Russell King:
-> ? ?* put request_mem_region back int
-> ?from Grant Likely:
-> ? ?* remove #undef DEBUG
-> ? ?* add SLINK_ to register bit defines
-> ? ?* remove unused bytes_per_word
-> ? ?* make spi_tegra_readl/writel static linine
-> ? ?* various refactoring for clarity
-> ? ?* mark err if BSY bit is not cleared after 1000 retries
-> ? ?* move spinlock to protect setting of RDY bit
-> ? ?* subsys_initcall -> module_init
->
-> v3 changes:
-> ?from Grant Likely:
-> ? ?* update spi_tegra to use PTR_ERRless dma API
->
-> Signed-off-by: Erik Gilling <konkers@android.com>
-> Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Russell King <linux@arm.linux.org.uk>
+On Wed, Sep 01, 2010 at 10:01:14PM +0200, Linus Walleij wrote:
+> 2010/9/1 Johannes Stezenbach <js@sig21.net>:
+> 
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xffff0000); ? ? ? // exception vectors
+> 
+> This is probably clever to put in the lockdown TLB
+> 
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0000000); ? ? ? // kernel code / data
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0100000); ? ? ? // kernel code / data
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0200000); ? ? ? // kernel code / data
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0300000); ? ? ? // kernel code / data
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0400000); ? ? ? // kernel code / data
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0500000); ? ? ? // kernel code / data
+> > ? ? ? ? ? ? ? ?tlb_lockdown(0xc0600000); ? ? ? // kernel code / data
+> 
+> But are these really most relevant to lock down?
 
-Hi Erik,
+Well, these were just easy to do.  The kernel uses 1MB sections
+(not 4K pages) for these mappings, thus it is possible to cover
+all kernel code + data + a bit more with just 7 TLB entries.
+Kernel modules and everything else use 4K pages so it
+becomes difficult to decide what to lock down.
 
-Go ahead and add my Acked-by line and merge this via the tegra tree to
-avoid ordering issues.  I also have a few more minor comments below.
+But OTOH the kernel's use of 1MB sections also means there is
+not much TLB pressure which I guess explains the small gain.
 
-g.
+> Since you have a JTAG debugger, can't you profile what
+> memory pages are actually accessed most often and lock down
+> these?
+> 
+> But it can be even more elaborate. Profile out the *functions*
+> most used.
+> 
+> When I've worked with TCM I played with the idea to be able to
+> tag functions like this:
+> 
+> #define __hotfunc __attribute__((long_call)) __section(.hot.text) noinline
+> (...)
+> int __hotfunc foo();
+> 
+> Then have the linker put the hotfuncs into separate pages and
+> link that.
+> 
+> You can use the same scheme for locked-down TLB:s I believe?
+> Up to 8 pages of code tagged "hotfunc" will be diverted to these
+> pages and locked down.
+> 
+> See the stuff in arch/arm/include/asm/tcm.h for the compiler
+> directives and check the link script in
+> arch/arm/kernel/vmlinux.lds.S to see how I'm separating the
+> TCM stuff to separate pages.
 
-> + ? ? ? /* FIXME: should probably control CS manually so that we can be sure
-> + ? ? ? ?* it does not go low between transfer and to support delay_usecs
-> + ? ? ? ?* correctly.
-> + ? ? ? ?*/
+That's much more work than I'm willing to invest right now ;-/
 
-Yes, you'll probably want to revisit this.  A lot of SPI hardware
-doesn't understand that the actual transfer may be longer that the
-data it immediately knows about.  Also, it is common to use GPIOs as
-chip selects.
+I guess the intended use for the lockdown TLB is to minimize
+latency for realtime code, e.g. if I had hooked up a FIQ handler
+I would lock down it's code, stack and data pages.
 
-> +static void spi_tegra_cleanup(struct spi_device *spi)
-> +{
-> + ? ? ? dev_dbg(&spi->dev, "cleanup\n");
-> +}
 
-Remove the empty hook
-
-> +static int __init spi_tegra_probe(struct platform_device *pdev)
-> +{
-> + ? ? ? struct spi_master ? ? ? *master;
-> + ? ? ? struct spi_tegra_data ? *tspi;
-> + ? ? ? struct resource ? ? ? ? *r;
-> + ? ? ? int ret;
-> +
-> + ? ? ? master = spi_alloc_master(&pdev->dev, sizeof *tspi);
-> + ? ? ? if (master == NULL) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "master allocation failed\n");
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> + ? ? ? }
-> +
-> + ? ? ? /* the spi->mode bits understood by this driver: */
-> + ? ? ? master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
-> +
-> + ? ? ? if (pdev->id != -1)
-> + ? ? ? ? ? ? ? master->bus_num = pdev->id;
-
-even if pdev->id is -1, you probably want to set master->bus_num to is
-so that a spi bus number can be dynamically assigned.
+Thanks
+Johannes
