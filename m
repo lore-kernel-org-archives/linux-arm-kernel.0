@@ -1,36 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Sep 2010 20:36:45 +0100
-Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
-In-Reply-To: <20100903170403.GM11597@atomide.com>
-References: <20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902162039.GM11597@atomide.com>
-	<20100902162537.GU26319@n2100.arm.linux.org.uk>
-	<20100902163453.GR11597@atomide.com>
-	<20100902234746.GF11597@atomide.com>
-	<20100903090734.GJ26319@n2100.arm.linux.org.uk>
-	<20100903091029.GK26319@n2100.arm.linux.org.uk>
-	<20100903170403.GM11597@atomide.com>
-Message-ID: <20100903193645.GB2978@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 3 Sep 2010 21:38:45 +0200
+Subject: [PATCH] MMC: move regulator handling closer to core v2
+In-Reply-To: <1283268367-3525-1-git-send-email-linus.walleij@stericsson.com>
+References: <1283268367-3525-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <AANLkTik-uLMUz2g2znaF0K43D8CONsGdjrRqxTCqpS_X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 10:04:03AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100903 02:02]:
-> > On Fri, Sep 03, 2010 at 10:07:34AM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Sep 02, 2010 at 04:47:46PM -0700, Tony Lindgren wrote:
-> > > > Correction, only boots on SMP hardawre. On UP hardware I still
-> > > > need the following patch.
-> > > 
-> > > This should fix that properly.
-> > 
-> > Correction - the order of the config tests was wrong.
-> 
-> OK that works now.
-> 
-> Looks like your new patch is missing smp_midr.h BTW.
+2010/8/31 Linus Walleij <linus.walleij@stericsson.com>:
 
-Damn git.  Hate it when keeping patches external to git, even in git diff
-form.  Luckily the file is just sitting around in my tree rather than
-having been deleted entirely...
+> After discovering a problem in regulator reference counting I
+> took Mark Brown's advice to move the reference count into the
+> MMC core by making the regulator status a member of
+> struct mmc_host.
+
+This has an Reveiwed-by from the regulator maintainer and
+seems to address all comments, noone is objection so Andrew
+can you pick it up?
+
+Yours,
+Linus Walleij
