@@ -1,22 +1,49 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 3 Sep 2010 09:28:15 +0530
-Subject: [PATCH 31/74] ST SPEAr: Adding support for SSP PL022
-In-Reply-To: <AANLkTi=Fiv2i4qMcrnOeECkMKtNathO9P906=T1gcFPB@mail.gmail.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
-	<AANLkTi=Fiv2i4qMcrnOeECkMKtNathO9P906=T1gcFPB@mail.gmail.com>
-Message-ID: <4C807257.4030305@st.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 3 Sep 2010 12:20:26 +0800
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100902161659.GJ11597@atomide.com>
+References: <20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+	<4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+Message-ID: <AANLkTinfACvokr6vGZYdhE_RgNPHSA+k3Q7PHm1QvA+X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/3/2010 12:48 AM, Linus Walleij wrote:
->> > +               .modalias = "spidev",
->> > +               .controller_data = &spi0_dev_chip_info,
->> > +               .max_speed_hz = 10000000,
->> > +               .bus_num = 0,
->> > +               .chip_select = 0,
->> > +               .mode = 0,
->> > +       }, {
->> > +#endif
-> Please grep your code for all #if 0 and remove it.
+On Fri, Sep 3, 2010 at 12:16 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 06:29]:
+>> On Mon, Aug 30, 2010 at 03:55:27PM -0700, Tony Lindgren wrote:
+>> > * Tony Lindgren <tony@atomide.com> [100820 04:59]:
+>> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
+>> > > > On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
+>> > > > > Looks like something is not quite right with smp_on_up part of __fixup_smp,
+>> > > > > returning early before smp_on_up does not produce that.
+>> > > >
+>> > > > It's probably overwriting some register it shouldn't be. ?I might be
+>> > > > able to look at this sometime during the coming week... assuming that
+>> > > > the weather is as bad as they forecast and I have 'net connectivity.
+>> >
+>> > This seems to fix it.
+>>
+>> Thanks, merged that into my original patch - so here it is again with
+>> everything updated.
+>
+> Your patch sure makes things simpler! The problem still is the
+> V6 vs V7 SMP code though.
+>
+> Will post my six patches that apply on top of your patch as a reply to
+> this mail. With those, everything seems to work, at least after testing
+> on omap3630 (Cortex-A8 UP) and omap4430 (Cortex-A9 SMP).
 
-Sorry for the noise!!! Will correct it.
+Awesome, where can get those finalize the patches for testing? After
+that I can test our Ubuntu kernel on both boards.
+
+Thanks,
+-Bryan
