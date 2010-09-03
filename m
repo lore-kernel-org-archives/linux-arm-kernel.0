@@ -1,34 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Sep 2010 08:34:21 +0100
-Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
-	Suspend Resume
-In-Reply-To: <4C809486.2070308@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
-	<20100902102323.GP26319@n2100.arm.linux.org.uk>
-	<4C809486.2070308@st.com>
-Message-ID: <20100903073421.GF26319@n2100.arm.linux.org.uk>
+Date: Fri, 3 Sep 2010 08:42:47 +0100
+Subject: [PATCH] ARM: SAMSUNG: Removed redunt zreladdr in Makefile.boot
+In-Reply-To: <1283470043-16050-1-git-send-email-kgene.kim@samsung.com>
+References: <1283470043-16050-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100903074247.GG26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 11:54:06AM +0530, deepaksi wrote:
-> On 9/2/2010 3:53 PM, Russell King - ARM Linux wrote:
-> > On Mon, Aug 30, 2010 at 04:09:12PM +0530, Viresh KUMAR wrote:
-> >   
-> >> From: Deepak Sikri <deepak.sikri@st.com>
-> >>
-> >>     
-> > The reason being?
-> >
-> >   
-> 
-> For configuring the wake up sources ( normally in the PM framework for
-> suspend resume operations), you need to use the following set of api
-> enable_irq_wake(). This handler has a appropriate callback for the vic,
-> similar to the plugin that we have added in for gic which does enable
-> the wake interrupt sources only. But since gic handler did not had this
-> call back associated was always returning -ENXIO, which was breaking the
-> existing drivers. In case no checks are provided for the return value of 
-> enable_irq_wake(), the things were fine.
+On Fri, Sep 03, 2010 at 08:27:23AM +0900, Kukjin Kim wrote:
+> Because can be calculated ZREADDR now, removed redunt zreladdr
+> definitions in each Makefile.boot of Samsung architectures.
 
-So how are wakeup sources configured if this callback does nothing?
+I'd suggest holding off on this.  CONFIG_ZRELADDR has a few problems
+at the moment that need fixing - and if there's no movement to fix
+them, it'll be reverted.
