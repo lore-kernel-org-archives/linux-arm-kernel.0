@@ -1,51 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 04 Sep 2010 06:47:52 +0900
-Subject: [PATCH] regulators: add support max8952 regulator
-In-Reply-To: <20100903094200.GC8381@sirena.org.uk>
-References: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
-	<20100903094200.GC8381@sirena.org.uk>
-Message-ID: <01e301cb4bb1$ac1fa240$045ee6c0$%kim@samsung.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri,  3 Sep 2010 23:12:11 +0200
+Subject: [PATCH] ARM: Update RealView defconfig
+Message-ID: <1283548331-21264-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-Hi,
+This patches the condensed RealView defconfig activating some
+stuff that has been missing from this config for some time and
+some stuff that was merged in the 2.6.36 merge window:
 
-Thanks for your review.
+- The new character LCD driver is enabled
+- The Versatile I2C is enabled
+- The PL022 SPI driver is enabled
+- gpiolib is enabled (and makes MMC detection work properly)
+- The new LEDs code is enabled with a heartbeat trigger
+- The RTC class is enabled, and the PL031 RTC (onchip) and
+  the offchip DS1307 on I2C is enabled
 
-> On Fri, Sep 03, 2010 at 10:15:24AM +0900, Kukjin Kim wrote:
-> 
-> > +	ret2 = max8649_reg_read(info->i2c, MAX8649_CHIP_ID2);
-> > +	if (ret2 < 0) {
-> > +		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
-> > +			id->name, ret2);
-> >  		goto out;
-> >  	}
-> 
-> If the read fails you'll not set an error code when you jump to out so
-> the probe will report success.  It might be clearer to have separate id
-> variables which you store the read values into if they're OK, just from
-> a legibility point of view.
-> 
-Ok..will fix it.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/configs/realview_defconfig |   15 +++++++++++++--
+ 1 files changed, 13 insertions(+), 2 deletions(-)
 
-> > -	dev_info(info->dev, "Detected MAX8649 (ID:%x)\n", ret);
-> > +	dev_info(info->dev, "Detected %s (ID:%x %x)\n", id->name, ret,
-ret2);
-> > +
-> > +	info->type = id->driver_data;
-> 
-> It'd be nice to check that the type that was supplied matches the ID
-> read from the chip in case the user got things wrong, just for
-> defensiveness.
-
-Ok..will modify as per your suggestion.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
+index fb75192..fcaa603 100644
+--- a/arch/arm/configs/realview_defconfig
++++ b/arch/arm/configs/realview_defconfig
+@@ -38,6 +38,7 @@ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_ARM_CHARLCD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_NET_ETHERNET=y
+@@ -51,10 +52,13 @@ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_VERSATILE=y
++CONFIG_SPI=y
++CONFIG_GPIOLIB=y
+ # CONFIG_HWMON is not set
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ # CONFIG_LOGO_LINUX_MONO is not set
+@@ -69,7 +73,13 @@ CONFIG_SND_ARMAACI=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+-CONFIG_INOTIFY=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_DS1307=y
++CONFIG_RTC_DRV_PL031=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_CRAMFS=y
+@@ -79,6 +89,7 @@ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-- 
+1.7.2.2
