@@ -1,87 +1,80 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  3 Sep 2010 11:56:56 +0200
-Subject: [PATCH 5/7] ARM: don't expose CONFIG_ZRELADDR to the users
-In-Reply-To: <20100903095504.GC13643@pengutronix.de>
-References: <20100903095504.GC13643@pengutronix.de>
-Message-ID: <1283507818-1573-5-git-send-email-u.kleine-koenig@pengutronix.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 3 Sep 2010 19:18:43 +0900
+Subject: [PATCH V3] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This value is essential for booting a zImage and only depends on the
-memory layout of the machine to boot.  This value was specified in
-Makefile.boot before
+On Thu, Sep 2, 2010 at 10:39 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> factorise some generic infrastructure to assist looking up struct clks
+> for the ARM & SH architecture.
+>
+> as the code is identical at 99%
+>
+> put the arch specific code for allocation as example in asm/clkdev.h
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+> v3:
+> ? ? ? ?wrong comment removed
+> ? ? ? ?headers fixed
 
-	e69edc79 (ARM: Auto calculate ZRELADDR and provide option for exceptions)
+[snip]
 
-and so wasn't available to change via .config.
+I can't apply this patch using GNU patch. I've tested 2.5.9 and 2.6.1
+from Gentoo.
 
-The only exception is bcmring that had a extra config for specifing the
-address used, which is removed in this commit, too, as it isn't used
-anymore since e69edc79.  This is the only machine that still gets a
-possibility to change CONFIG_ZRELADDR.
+Using --dry-run is fine, but omitting dry-run gives me:
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Eric Miao <eric.miao@canonical.com>
-Cc: Leo Chen <leochen@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/Kconfig                    |    2 +-
- arch/arm/configs/bcmring_defconfig  |    1 -
- arch/arm/mach-bcmring/Kconfig       |    3 ---
- arch/arm/mach-bcmring/Makefile.boot |    1 -
- 4 files changed, 1 insertions(+), 6 deletions(-)
+...
+patching file arch/arm/common/clkdev.c
+patching file arch/sh/include/asm/clkdev.h
+Hunk #1 FAILED at 1.
+Hunk #2 FAILED at 11.
+2 out of 2 hunks FAILED -- saving rejects to file
+arch/sh/include/asm/clkdev.h.rej
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4a9a55c..0654afe 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1577,7 +1577,7 @@ config AUTO_ZRELADDR
- 	  from start of memory.
- 
- config ZRELADDR
--	hex "Physical address of the decompressed kernel image"
-+	hex "Physical address of the decompressed kernel image" if ARCH_BCMRING
- 	depends on !AUTO_ZRELADDR
- 	default 0x00008000 if ARCH_BCMRING ||\
- 		ARCH_CNS3XXX ||\
-diff --git a/arch/arm/configs/bcmring_defconfig b/arch/arm/configs/bcmring_defconfig
-index 75984cd..9168d05 100644
---- a/arch/arm/configs/bcmring_defconfig
-+++ b/arch/arm/configs/bcmring_defconfig
-@@ -21,7 +21,6 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_BCMRING=y
--CONFIG_BCM_ZRELADDR=0x8000
- CONFIG_CPU_32v6K=y
- CONFIG_NO_HZ=y
- CONFIG_PREEMPT=y
-diff --git a/arch/arm/mach-bcmring/Kconfig b/arch/arm/mach-bcmring/Kconfig
-index 457b438..e076cc8 100644
---- a/arch/arm/mach-bcmring/Kconfig
-+++ b/arch/arm/mach-bcmring/Kconfig
-@@ -13,9 +13,6 @@ endchoice
- menu "BCMRING Options"
- 	depends on ARCH_BCMRING
- 
--config BCM_ZRELADDR
--	hex "Compressed ZREL ADDR"
--
- endmenu
- 
- # source "drivers/char/bcmring/Kconfig"
-diff --git a/arch/arm/mach-bcmring/Makefile.boot b/arch/arm/mach-bcmring/Makefile.boot
-index fb53b28..6894871 100644
---- a/arch/arm/mach-bcmring/Makefile.boot
-+++ b/arch/arm/mach-bcmring/Makefile.boot
-@@ -1,6 +1,5 @@
- # Address where decompressor will be written and eventually executed.
- #
- # default to SDRAM
--zreladdr-y      := $(CONFIG_BCM_ZRELADDR)
- params_phys-y   := 0x00000800
- 
--- 
-1.7.1
+I guess this is caused by the last "renaming" hunk, see below.
+
+I thought these things were supposed to work out of the box...
+
+/ magnus
+
+> diff --git a/arch/sh/include/asm/clkdev.h b/include/linux/clkdev.h
+> similarity index 85%
+> rename from arch/sh/include/asm/clkdev.h
+> rename to include/linux/clkdev.h
+> index 5645f35..457bcb0 100644
+> --- a/arch/sh/include/asm/clkdev.h
+> +++ b/include/linux/clkdev.h
+> @@ -1,7 +1,5 @@
+> ?/*
+> - * ?arch/sh/include/asm/clkdev.h
+> - *
+> - * Cloned from arch/arm/include/asm/clkdev.h:
+> + * ?include/linux/clkdev.h
+> ?*
+> ?* ?Copyright (C) 2008 Russell King.
+> ?*
+> @@ -11,10 +9,13 @@
+> ?*
+> ?* Helper for the clk API to assist looking up a struct clk.
+> ?*/
+> -#ifndef __ASM_CLKDEV_H
+> -#define __ASM_CLKDEV_H
+> +#ifndef __CLKDEV_H
+> +#define __CLKDEV_H
+> +
+> +#include <asm/clkdev.h>
+>
+> ?struct clk;
+> +struct device;
+>
+> ?struct clk_lookup {
+> ? ? ? ?struct list_head ? ? ? ?node;
+> --
+> 1.7.1
