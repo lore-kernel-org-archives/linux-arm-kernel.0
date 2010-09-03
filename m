@@ -1,59 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Sep 2010 20:23:23 +0200
-Subject: [PATCH V3] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Fri, 3 Sep 2010 13:43:51 -0500
+Subject: [BUG?] rename patch accepted with --dry-run, rejected without (Re:
+	[PATCH V3] arm & sh: factorised duplicated clkdev.c)
+In-Reply-To: <20100903182323.GA17152@pengutronix.de>
 References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
 	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
 	<AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
-Message-ID: <20100903182323.GA17152@pengutronix.de>
+	<20100903182323.GA17152@pengutronix.de>
+Message-ID: <20100903184351.GC2341@burratino>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+(+cc: bug-patch)
 
-[added git ML to Cc:]
+Hi,
 
-On Fri, Sep 03, 2010 at 07:18:43PM +0900, Magnus Damm wrote:
-> On Thu, Sep 2, 2010 at 10:39 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > factorise some generic infrastructure to assist looking up struct clks
-> > for the ARM & SH architecture.
-> >
-> > as the code is identical at 99%
-> >
-> > put the arch specific code for allocation as example in asm/clkdev.h
-> >
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > ---
-> > v3:
-> > ? ? ? ?wrong comment removed
-> > ? ? ? ?headers fixed
-> 
-> [snip]
-> 
-> I can't apply this patch using GNU patch. I've tested 2.5.9 and 2.6.1
-> from Gentoo.
-> 
-> Using --dry-run is fine, but omitting dry-run gives me:
-> 
-> ...
-> patching file arch/arm/common/clkdev.c
-> patching file arch/sh/include/asm/clkdev.h
-> Hunk #1 FAILED at 1.
-> Hunk #2 FAILED at 11.
-> 2 out of 2 hunks FAILED -- saving rejects to file
-> arch/sh/include/asm/clkdev.h.rej
-> 
-> I guess this is caused by the last "renaming" hunk, see below.
-> 
-> I thought these things were supposed to work out of the box...
-Yes, they work out of the box, but only for people using git :-)
+Uwe Kleine-K?nig wrote:
+> On Fri, Sep 03, 2010 at 07:18:43PM +0900, Magnus Damm wrote:
 
-Maybe git-apply can be used instead of patch?
+>> Using --dry-run is fine, but omitting dry-run gives me:
+>> 
+>> ...
+>> patching file arch/arm/common/clkdev.c
+>> patching file arch/sh/include/asm/clkdev.h
+>> Hunk #1 FAILED at 1.
+>> Hunk #2 FAILED at 11.
+>> 2 out of 2 hunks FAILED -- saving rejects to file
+>> arch/sh/include/asm/clkdev.h.rej
+>> 
+>> I guess this is caused by the last "renaming" hunk, see below.
 
-Best regards
-Uwe
+Yep, I can reproduce this.  Patch applies with "git apply",
+"patch --dry-run -p1" accepts it, "patch -p1" fails.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ $ patch --version | head -1
+ GNU patch 2.6.1.85-423d
+ $ cd ~/src/linux-2.6
+ $ git checkout 2bfc96a12
+ $ git clean -fd
+ $ wget http://download.gmane.org/gmane.linux.ports.sh.devel/8747/8748
+ $ patch -p1 --quiet --dry-run <8748 
+ $ echo $?
+ 0
+ $ patch -p1 --quiet <8748 
+ 2 out of 2 hunks FAILED -- saving rejects to file include/linux/clkdev.h.rej
+ $ echo $?
+ 1
+
+Andreas: ideas?
