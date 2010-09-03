@@ -1,76 +1,69 @@
-From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Fri,  3 Sep 2010 18:28:11 -0400
-Subject: [PATCH v2 6/6 RESEND] ARM: pxa168: aspenite: add board support for
-	keypad
-In-Reply-To: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
-References: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1283552891-13966-7-git-send-email-mark.brown314@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 04 Sep 2010 07:43:57 +0900
+Subject: [PATCH] ARM: PL330: Accept revisions of the dmac
+In-Reply-To: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <01e401cb4bb9$812723d0$83756b70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
----
- arch/arm/mach-mmp/aspenite.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+Jassi Brar wrote:
+> 
+> From: Jassi Brar <jassi.brar@samsung.com>
+> 
+> The driver can handle different revisions of the core which
+> vary only minorly. So check for only the necessary part of
+> the IDs.
+> 
+> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> ---
+>  arch/arm/common/pl330.c |    7 +++----
+>  1 files changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+> index 5ebbab6..8f0f86d 100644
+> --- a/arch/arm/common/pl330.c
+> +++ b/arch/arm/common/pl330.c
+> @@ -146,8 +146,7 @@
+>  #define DESIGNER	0x41
+>  #define REVISION	0x0
+>  #define INTEG_CFG	0x0
+> -#define PERIPH_ID_VAL	((PART << 0) | (DESIGNER << 12) \
+> -			  | (REVISION << 20) | (INTEG_CFG << 24))
+> +#define PERIPH_ID_VAL	((PART << 0) | (DESIGNER << 12))
+> 
+>  #define PCELL_ID_VAL	0xb105f00d
+> 
+> @@ -1859,10 +1858,10 @@ int pl330_add(struct pl330_info *pi)
+>  	regs = pi->base;
+> 
+>  	/* Check if we can handle this DMAC */
+> -	if (get_id(pi, PERIPH_ID) != PERIPH_ID_VAL
+> +	if ((get_id(pi, PERIPH_ID) & 0xfffff) != PERIPH_ID_VAL
+>  	   || get_id(pi, PCELL_ID) != PCELL_ID_VAL) {
+>  		dev_err(pi->dev, "PERIPH_ID 0x%x, PCELL_ID 0x%x !\n",
+> -			readl(regs + PERIPH_ID), readl(regs + PCELL_ID));
+> +			get_id(pi, PERIPH_ID), get_id(pi, PCELL_ID));
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 9e1bd6b..f04bae6 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -24,6 +24,8 @@
- #include <mach/pxa168.h>
- #include <mach/gpio.h>
- #include <video/pxa168fb.h>
-+#include <linux/input.h>
-+#include <plat/pxa27x_keypad.h>
- 
- #include "common.h"
- 
-@@ -97,6 +99,13 @@ static unsigned long common_pin_config[] __initdata = {
- 	GPIO81_LCD_DD21,
- 	GPIO82_LCD_DD22,
- 	GPIO83_LCD_DD23,
-+
-+	/* Keypad */
-+	GPIO109_KP_MKIN1,
-+	GPIO110_KP_MKIN0,
-+	GPIO111_KP_MKOUT7,
-+	GPIO112_KP_MKOUT6,
-+	GPIO121_KP_MKIN4,
- };
- 
- static struct smc91x_platdata smc91x_info = {
-@@ -193,6 +202,23 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
- 	.invert_pixclock	= 0,
- };
- 
-+static unsigned int aspenite_matrix_key_map[] = {
-+	KEY(0, 6, KEY_UP),	/* SW 4 */
-+	KEY(0, 7, KEY_DOWN),	/* SW 5 */
-+	KEY(1, 6, KEY_LEFT),	/* SW 6 */
-+	KEY(1, 7, KEY_RIGHT),	/* SW 7 */
-+	KEY(4, 6, KEY_ENTER),	/* SW 8 */
-+	KEY(4, 7, KEY_ESC),	/* SW 9 */
-+};
-+
-+static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
-+	.matrix_key_rows	= 5,
-+	.matrix_key_cols	= 8,
-+	.matrix_key_map		= aspenite_matrix_key_map,
-+	.matrix_key_map_size	= ARRAY_SIZE(aspenite_matrix_key_map),
-+	.debounce_interval	= 30,
-+};
-+
- static void __init common_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(common_pin_config));
-@@ -203,6 +229,7 @@ static void __init common_init(void)
- 	pxa168_add_ssp(1);
- 	pxa168_add_nand(&aspenite_nand_info);
- 	pxa168_add_fb(&aspenite_lcd_info);
-+	pxa168_add_keypad(&aspenite_keypad_info);
- 
- 	/* off-chip devices */
- 	platform_device_register(&smc91x_device);
--- 
-1.7.0.4
+mm...really needed to change readl to get_id?
+
+According to PL330 TRM 3-48, seems that PERIPH_ID includes all of other
+PERIPH_ID_X's information.
+And PCELL_ID is same...
+
+But I'm not sure whether there is any update...
+
+>  		return -EINVAL;
+>  	}
+> 
+> --
+> 1.6.2.5
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
