@@ -1,108 +1,105 @@
-From: eric.miao@canonical.com (Eric Miao)
-Date: Fri, 3 Sep 2010 21:39:45 +0800
-Subject: [PATCH 2/7] [RFC] ARM: shmobile: remove unneeded hack to
-	calculate zreladdr
-In-Reply-To: <1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100903095504.GC13643@pengutronix.de>
-	<1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <AANLkTimV5MFqQ+r-uE2M3bVtEqtNfuxq+jkGdW-J8Bis@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 3 Sep 2010 16:11:16 +0200
+Subject: [PATCH 5/5] ARM: pxa168: aspenite: add board support for keypad
+In-Reply-To: <AANLkTi=2ZJTy=RD_L0g-HnLF=r27bZLm5hTHemyNQFEi@mail.gmail.com>
+References: <1282814339-10934-1-git-send-email-mark.brown314@gmail.com>
+	<AANLkTi=OkRUmBgx_ezWtGHywGJkFAJsdGLR07v8dgzD7@mail.gmail.com>
+	<AANLkTi=2ZJTy=RD_L0g-HnLF=r27bZLm5hTHemyNQFEi@mail.gmail.com>
+Message-ID: <201009031611.16464.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/3 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> The calculated value in Makefile.boot isn't used anymore since
->
-> ? ? ? ?e69edc79 (ARM: Auto calculate ZRELADDR and provide option for exceptions)
->
-> and physoffset can better be set in mach/memory.h depending on the
-> actual machine type.
->
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: linux-sh at vger.kernel.org
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> ?arch/arm/mach-shmobile/Kconfig ? ? ? ? ? ? ? | ? 11 -----------
-> ?arch/arm/mach-shmobile/Makefile.boot ? ? ? ? | ? ?9 ---------
-> ?arch/arm/mach-shmobile/include/mach/memory.h | ? 15 ++++++++++++++-
-> ?3 files changed, 14 insertions(+), 21 deletions(-)
-> ?delete mode 100644 arch/arm/mach-shmobile/Makefile.boot
->
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 54b479c..45e134e 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -61,17 +61,6 @@ comment "SH-Mobile System Configuration"
->
-> ?menu "Memory configuration"
->
-> -config MEMORY_START
-> - ? ? ? hex "Physical memory start address"
-> - ? ? ? default "0x50000000" if MACH_G3EVM
-> - ? ? ? default "0x40000000" if MACH_G4EVM
-> - ? ? ? default "0x40000000" if MACH_AP4EVB
-> - ? ? ? default "0x00000000"
-> - ? ? ? ---help---
-> - ? ? ? ? Tweak this only when porting to a new machine which does not
-> - ? ? ? ? already have a defconfig. Changing it from the known correct
-> - ? ? ? ? value on any of the known systems will only lead to disaster.
-> -
-> ?config MEMORY_SIZE
-> ? ? ? ?hex "Physical memory size"
-> ? ? ? ?default "0x08000000" if MACH_G3EVM
-> diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-> deleted file mode 100644
-> index 1c08ee9..0000000
-> --- a/arch/arm/mach-shmobile/Makefile.boot
-> +++ /dev/null
-> @@ -1,9 +0,0 @@
-> -__ZRELADDR ? ? := $(shell /bin/bash -c 'printf "0x%08x" \
-> - ? ? ? ? ? ? ? ? ? ?$$[$(CONFIG_MEMORY_START) + 0x8000]')
-> -
-> - ? zreladdr-y ? := $(__ZRELADDR)
-> -
-> -# Unsupported legacy stuff
-> -#
-> -#params_phys-y (Instead: Pass atags pointer in r2)
-> -#initrd_phys-y (Instead: Use compiled-in initramfs)
-> diff --git a/arch/arm/mach-shmobile/include/mach/memory.h b/arch/arm/mach-shmobile/include/mach/memory.h
-> index 377584e..100f734 100644
-> --- a/arch/arm/mach-shmobile/include/mach/memory.h
-> +++ b/arch/arm/mach-shmobile/include/mach/memory.h
-> @@ -1,7 +1,20 @@
-> ?#ifndef __ASM_MACH_MEMORY_H
-> ?#define __ASM_MACH_MEMORY_H
->
-> -#define PHYS_OFFSET ? ?UL(CONFIG_MEMORY_START)
-> +#define SH7367_PHYS_OFFSET UL(0x50000000)
-> +#define SH7372_PHYS_OFFSET UL(0x40000000)
-> +#define SH7377_PHYS_OFFSET UL(0x40000000)
-> +
-> +#if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
-> +# if defined(CONFIG_ARCH_SH7367)
-> +# ?define PHYS_OFFSET ?SH7367_PHYS_OFFSET
-> +# elif defined(CONFIG_ARCH_SH7372)
-> +# ?define PHYS_OFFSET ?SH7372_PHYS_OFFSET
-> +# elif defined(CONFIG_ARCH_SH7377)
-> +# ?define PHYS_OFFSET ?SH7377_PHYS_OFFSET
-> +# endif
-> +#endif /* if !defined(CONFIG_RUNTIME_PHYS_OFFSET) */
-> +
+Dne P? 3. z??? 2010 06:50:28 Mark F. Brown napsal(a):
+> On Tue, Aug 31, 2010 at 1:00 AM, Haojian Zhuang
+> 
+> <haojian.zhuang@gmail.com> wrote:
+> > On Thu, Aug 26, 2010 at 5:18 PM, Mark F. Brown <mark.brown314@gmail.com> 
+wrote:
+> >> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+> >> ---
+> >>  arch/arm/mach-mmp/aspenite.c |   27 +++++++++++++++++++++++++++
+> >>  1 files changed, 27 insertions(+), 0 deletions(-)
+> >> 
+> >> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+> >> index 9e1bd6b..1b788c5 100644
+> >> --- a/arch/arm/mach-mmp/aspenite.c
+> >> +++ b/arch/arm/mach-mmp/aspenite.c
+> >> @@ -24,6 +24,8 @@
+> >>  #include <mach/pxa168.h>
+> >>  #include <mach/gpio.h>
+> >>  #include <video/pxa168fb.h>
+> >> +#include <linux/input.h>
+> >> +#include <plat/pxa27x_keypad.h>
+> >> 
+> >>  #include "common.h"
+> >> 
+> >> @@ -97,6 +99,13 @@ static unsigned long common_pin_config[] __initdata =
+> >> { GPIO81_LCD_DD21,
+> >>        GPIO82_LCD_DD22,
+> >>        GPIO83_LCD_DD23,
+> >> +
+> >> +       /* Keypad */
+> >> +       GPIO109_KP_MKIN1,
+> >> +       GPIO110_KP_MKIN0,
+> >> +       GPIO111_KP_MKOUT7,
+> >> +       GPIO112_KP_MKOUT6,
+> >> +       GPIO121_KP_MKIN4,
+> >>  };
+> >> 
+> >>  static struct smc91x_platdata smc91x_info = {
+> >> @@ -193,6 +202,23 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
+> >>        .invert_pixclock        = 0,
+> >>  };
+> >> 
+> >> +static unsigned int aspenite_matrix_key_map[] = {
+> >> +       KEY(0, 6, KEY_UP),      /* SW 4 */
+> >> +       KEY(0, 7, KEY_DOWN),    /* SW 5 */
+> >> +       KEY(1, 6, KEY_LEFT),    /* SW 6 */
+> >> +       KEY(1, 7, KEY_RIGHT),   /* SW 7 */
+> >> +       KEY(4, 6, KEY_ENTER),   /* SW 8 */
+> >> +       KEY(4, 7, KEY_ESC),     /* SW 9 */
+> >> +};
+> >> +
+> >> +static struct pxa27x_keypad_platform_data aspenite_keypad_info
+> >> __initdata = { +       .matrix_key_rows        = 8,
+> >> +       .matrix_key_cols        = 8,
+> > 
+> > It seems that maxium columns is 5, not 8.
+> > 
+> >> +       .matrix_key_map         = aspenite_matrix_key_map,
+> >> +       .matrix_key_map_size    = ARRAY_SIZE(aspenite_matrix_key_map),
+> >> +       .debounce_interval      = 30,
+> >> +};
+> >> +
+> >>  static void __init common_init(void)
+> >>  {
+> >>        mfp_config(ARRAY_AND_SIZE(common_pin_config));
+> >> @@ -203,6 +229,7 @@ static void __init common_init(void)
+> >>        pxa168_add_ssp(1);
+> >>        pxa168_add_nand(&aspenite_nand_info);
+> >>        pxa168_add_fb(&aspenite_lcd_info);
+> >> +       pxa168_add_keypad(&aspenite_keypad_info);
+> >> 
+> >>        /* off-chip devices */
+> >>        platform_device_register(&smc91x_device);
+> >> --
+> >> 1.7.0.4
+> >> 
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
+> >> in the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> The maximum keypad columns are 8 and the maximum keypad rows are 5 for
+> Aspenite. I will correct that in my patch resubmission!
 
-Looks like the CONFIG_MEMORY_START was a configurable option, tho
-not sure if it can be configured to other values, but making it fixed here
-doesn't seem to be a consistent change. (meaning there is assumption
-here).
+Eric, did you merge this already ? If so, we'll need a separate patch here?
 
-> ?#define MEM_SIZE ? ? ? UL(CONFIG_MEMORY_SIZE)
->
-> ?/* DMA memory at 0xf6000000 - 0xffdfffff */
+> 
+> Regards,
+> -- Mark
 > --
-> 1.7.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> To unsubscribe from this list: send the line "unsubscribe linux-input" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
