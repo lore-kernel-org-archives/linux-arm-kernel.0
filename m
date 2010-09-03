@@ -1,93 +1,100 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Fri, 3 Sep 2010 12:27:27 +0530
-Subject: [PATCH 04/74] ST SPEAr13XX: Adding machine specific header	files
-In-Reply-To: <20100902085652.GF26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<216f9534163c6b7ccf403df870601bf254a3964f.1283161023.git.viresh.kumar@st.com>
-	<20100902085652.GF26319@n2100.arm.linux.org.uk>
-Message-ID: <4C809C57.7040609@st.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Fri, 3 Sep 2010 12:41:56 +0530
+Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
+In-Reply-To: <4C7F5B9E.8090406@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
+	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
+	<4C7F5B9E.8090406@st.com>
+Message-ID: <4C809FBC.8020003@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russel,
-
-On 9/2/2010 2:26 PM, Russell King - ARM Linux wrote:
-> On Mon, Aug 30, 2010 at 04:08:35PM +0530, Viresh KUMAR wrote:
->> +#ifndef __MACH_GENERIC_H
->> +#define __MACH_GENERIC_H
->> +
->> +#include <asm/mach/time.h>
->> +#include <asm/mach/map.h>
->> +#include <linux/init.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/amba/bus.h>
+On 9/2/2010 1:39 PM, Armando VISCONTI wrote:
+> Ciao Linus,
 > 
-> linux/ before asm/ please.
+> Linus Walleij wrote:
+>> 2010/8/30 Viresh KUMAR <viresh.kumar@st.com>:
+>>
+>>   
+>>> From: Vipin Kumar <vipin.kumar@st.com>
+>>>
+>>> SPEAr platforms use Flexible Static Memory Controller(FSMC) provided by ST for
+>>> interfacing with NAND devices.
+>>> This patch adds the support for glue logic for NAND flash on SPEAr boards
+>>>     
+>>
+>> OK...
+>>
+>>   
+>>> (...)
+>>>  create mode 100644 arch/arm/plat-spear/include/plat/fsmc.h
+>>>  create mode 100644 arch/arm/plat-spear/include/plat/nand.h
+>>>  create mode 100644 drivers/mtd/nand/spear_nand.c
+>>>     
+>>
+>> spear_nand.c?
+>>
+>> Why not fsmc-nand.c or similar if this is the name of the block.
+>> We have this in U300, Nomadik NHK8815 and other platforms too,
+>> it doesn't have much to do with SPEAr actually...
+>>
+>> Also, what are the include files doing in plat-spear since we have
+>> the same hardware in other platforms? Move them to include/linux/mtd/
+>> so we can use them please.
+>>
+>> I *highly* suspect that this driver duplicates some code found in
+>> drivers/mtd/nand/nomadik_nand.c because it's the same silicon.
+>>   
+> Why nomadik_nand.c?
+> Shouldn't the fsmc_nand.c rule apply also in this case?
 > 
-
-OK, would correct it.
-
->> +#ifndef __MACH_HARDWARE_H
->> +#define __MACH_HARDWARE_H
->> +
->> +#include <mach/spear.h>
->> +
->> +/* Vitual to physical translation of statically mapped space */
->> +#define IO_ADDRESS(x)		(x | 0xF0000000)
->> +
->> +/* typesafe io address */
->> +#define __io_address(n)		__io(IO_ADDRESS(n))
 > 
-> Wrong use of __io().  __io() is just a macro for asm/io.h to make use of,
-> and in any case should be defined in your mach/io.h file.
+>> Alessandro can judge on this, but I have a feeling that driver
+>> should be replaced by this, more mature driver.
+>>   
 
-__io is defined in plat/io.h which is included in mach/io.h. I see other machs
-(ux500, realview, versatile) also defining __io_address like this for typesafe
-access. Is it wrong ?
+Hello All,
 
->> diff --git a/arch/arm/mach-spear13xx/include/mach/system.h b/arch/arm/mach-spear13xx/include/mach/system.h
->> new file mode 100644
->> index 0000000..6ce0819
->> --- /dev/null
->> +++ b/arch/arm/mach-spear13xx/include/mach/system.h
->> @@ -0,0 +1,43 @@
->> +/*
->> + * arch/arm/mach-spear13xx/include/mach/system.h
->> + *
->> + * spear13xx Machine family specific architecture functions
->> + *
->> + * Copyright (C) 2010 ST Microelectronics
->> + * Shiraz Hashim <shiraz.hashim@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef __MACH_SYSTEM_H
->> +#define __MACH_SYSTEM_H
->> +
->> +#include <linux/io.h>
->> +#include <mach/hardware.h>
->> +#include <mach/misc_regs.h>
->> +
->> +static inline void arch_idle(void)
->> +{
->> +	/*
->> +	 * This should do all the clock switching
->> +	 * and wait for interrupt tricks
->> +	 */
->> +	cpu_do_idle();
->> +}
->> +
->> +static inline void arch_reset(char mode, const char *cmd)
->> +{
->> +	pr_info("Going to reboot...\n");
+> Maybe.
+> But I suspect that may be few differences in the ECC accelerator inside, 
+> in fact.
 > 
-> The kernel already prints a message for reboot, so this is superfluous.
-> .
+> In our FSMC previous case it was a Hamming accelerator, and I think this 
+> apply
+> also for nomadik (maybe). In our sp1300 case it is a BCH with 104 bytes 
+> of ECC.
 
-OK, would remove this.
+Adding on top of what Armando has already pointed out, FSMC block may 
+have different versions and each of them may support different features 
+based on its configuration eg. spear device's FSMC block is version8 
+and is configured for 13 byte ecc(per 512 bytes data, BCH8 algorithm). 
+There are other possibilities eg. BCH4, BCH2 etc which are not used in 
+spear devices.
 
-regards
-Shiraz
+Making it generic would also entail supporting all possible configurations 
+through single driver (makes more sense)
+
+Customization was the prime reason for keeping the driver spear 
+dependent and naming it as spear_nand.c
+
+Alessandro/Sebastian: Is it OK to add a common driver for all FSMC versions
+and customizations
+
+Comments/Suggestions welcome
+
+Regards
+Vipin
+
+> 
+> This is one of the options when generating the h/w block, so FSMCs may 
+> differ.
+> If we want to re-use same driver I guess we might change something and 
+> accept
+> few parameters from the platform.
+> 
+> Vipin can for sure comment more on this.....
+> 
+> 
+> Rgds,
+> Arm
+> 
