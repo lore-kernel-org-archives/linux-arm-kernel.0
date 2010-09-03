@@ -1,69 +1,76 @@
 From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Fri,  3 Sep 2010 18:28:10 -0400
-Subject: [PATCH v2 5/6 RESEND] ARM: pxa168: added keypad wake clear event
-	support for platform
+Date: Fri,  3 Sep 2010 18:28:11 -0400
+Subject: [PATCH v2 6/6 RESEND] ARM: pxa168: aspenite: add board support for
+	keypad
 In-Reply-To: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
 References: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1283552891-13966-6-git-send-email-mark.brown314@gmail.com>
+Message-ID: <1283552891-13966-7-git-send-email-mark.brown314@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
 ---
- arch/arm/mach-mmp/include/mach/pxa168.h |    5 +++++
- arch/arm/mach-mmp/pxa168.c              |   10 ++++++++++
- 2 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/aspenite.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-index f34e663..1801e42 100644
---- a/arch/arm/mach-mmp/include/mach/pxa168.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-@@ -5,6 +5,7 @@ struct sys_timer;
- 
- extern struct sys_timer pxa168_timer;
- extern void __init pxa168_init_irq(void);
-+extern void pxa168_clear_keypad_wakeup(void);
- 
- #include <linux/i2c.h>
- #include <mach/devices.h>
-@@ -12,6 +13,7 @@ extern void __init pxa168_init_irq(void);
- #include <plat/pxa3xx_nand.h>
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 9e1bd6b..f04bae6 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -24,6 +24,8 @@
+ #include <mach/pxa168.h>
+ #include <mach/gpio.h>
  #include <video/pxa168fb.h>
- #include <plat/pxa27x_keypad.h>
-+#include <mach/cputype.h>
++#include <linux/input.h>
++#include <plat/pxa27x_keypad.h>
  
- extern struct pxa_device_desc pxa168_device_uart1;
- extern struct pxa_device_desc pxa168_device_uart2;
-@@ -109,6 +111,9 @@ static inline int pxa168_add_fb(struct pxa168fb_mach_info *mi)
+ #include "common.h"
  
- static inline int pxa168_add_keypad(struct pxa27x_keypad_platform_data *data)
- {
-+	if (cpu_is_pxa168())
-+		data->clear_wakeup_event = pxa168_clear_keypad_wakeup;
+@@ -97,6 +99,13 @@ static unsigned long common_pin_config[] __initdata = {
+ 	GPIO81_LCD_DD21,
+ 	GPIO82_LCD_DD22,
+ 	GPIO83_LCD_DD23,
 +
- 	return pxa_register_device(&pxa168_device_keypad, data, sizeof(*data));
- }
- 
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 2fa16fb..72b4e76 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -136,6 +136,16 @@ struct sys_timer pxa168_timer = {
- 	.init	= pxa168_timer_init,
++	/* Keypad */
++	GPIO109_KP_MKIN1,
++	GPIO110_KP_MKIN0,
++	GPIO111_KP_MKOUT7,
++	GPIO112_KP_MKOUT6,
++	GPIO121_KP_MKIN4,
  };
  
-+void pxa168_clear_keypad_wakeup(void)
-+{
-+	uint32_t val;
-+	uint32_t mask = APMU_PXA168_KP_WAKE_CLR;
+ static struct smc91x_platdata smc91x_info = {
+@@ -193,6 +202,23 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
+ 	.invert_pixclock	= 0,
+ };
+ 
++static unsigned int aspenite_matrix_key_map[] = {
++	KEY(0, 6, KEY_UP),	/* SW 4 */
++	KEY(0, 7, KEY_DOWN),	/* SW 5 */
++	KEY(1, 6, KEY_LEFT),	/* SW 6 */
++	KEY(1, 7, KEY_RIGHT),	/* SW 7 */
++	KEY(4, 6, KEY_ENTER),	/* SW 8 */
++	KEY(4, 7, KEY_ESC),	/* SW 9 */
++};
 +
-+	/* wake event clear is needed in order to clear keypad interrupt */
-+	val = __raw_readl(APMU_WAKE_CLR);
-+	__raw_writel(val |  mask, APMU_WAKE_CLR);
-+}
++static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
++	.matrix_key_rows	= 5,
++	.matrix_key_cols	= 8,
++	.matrix_key_map		= aspenite_matrix_key_map,
++	.matrix_key_map_size	= ARRAY_SIZE(aspenite_matrix_key_map),
++	.debounce_interval	= 30,
++};
 +
- /* on-chip devices */
- PXA168_DEVICE(uart1, "pxa2xx-uart", 0, UART1, 0xd4017000, 0x30, 21, 22);
- PXA168_DEVICE(uart2, "pxa2xx-uart", 1, UART2, 0xd4018000, 0x30, 23, 24);
+ static void __init common_init(void)
+ {
+ 	mfp_config(ARRAY_AND_SIZE(common_pin_config));
+@@ -203,6 +229,7 @@ static void __init common_init(void)
+ 	pxa168_add_ssp(1);
+ 	pxa168_add_nand(&aspenite_nand_info);
+ 	pxa168_add_fb(&aspenite_lcd_info);
++	pxa168_add_keypad(&aspenite_keypad_info);
+ 
+ 	/* off-chip devices */
+ 	platform_device_register(&smc91x_device);
 -- 
 1.7.0.4
