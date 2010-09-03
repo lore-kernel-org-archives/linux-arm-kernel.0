@@ -1,16 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Sep 2010 08:42:47 +0100
-Subject: [PATCH] ARM: SAMSUNG: Removed redunt zreladdr in Makefile.boot
-In-Reply-To: <1283470043-16050-1-git-send-email-kgene.kim@samsung.com>
-References: <1283470043-16050-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100903074247.GG26319@n2100.arm.linux.org.uk>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 3 Sep 2010 13:14:11 +0530
+Subject: [PATCH 08/74] ST SPEAr1300: Adding default config file
+In-Reply-To: <20100903073246.GE26319@n2100.arm.linux.org.uk>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<3a583e07221d909bd4afb952bbf2a38a2d25cdf4.1283161023.git.viresh.kumar@st.com>
+	<20100902085127.GE26319@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1009022143420.19366@xanadu.home>
+	<20100903073246.GE26319@n2100.arm.linux.org.uk>
+Message-ID: <4C80A74B.2090901@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 08:27:23AM +0900, Kukjin Kim wrote:
-> Because can be calculated ZREADDR now, removed redunt zreladdr
-> definitions in each Makefile.boot of Samsung architectures.
+On 9/3/2010 1:02 PM, Russell King - ARM Linux wrote:
+>> These days, all you need to do is:
+>> > 
+>> > 	  make savedefconfig
+>> > 
+>> > and look for a defconfig file in the current directory.
+> Ah right.  Wonder why no one documented that.
 
-I'd suggest holding off on this.  CONFIG_ZRELADDR has a few problems
-at the moment that need fixing - and if there's no movement to fix
-them, it'll be reverted.
+Thanks for the info. It was really helpful.
+
+viresh.
