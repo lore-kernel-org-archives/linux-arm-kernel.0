@@ -1,36 +1,55 @@
-From: sebastian.rasmussen@stericsson.com (Sebastian RASMUSSEN)
-Date: Fri, 3 Sep 2010 13:22:49 +0200
-Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
-In-Reply-To: <4C809FBC.8020003@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
-	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
-	<4C7F5B9E.8090406@st.com> <4C809FBC.8020003@st.com>
-Message-ID: <ECD438FDEF6BD742895E554C24725A401602C9EF37@EXDCVYMBSTM005.EQ1STM.local>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 3 Sep 2010 13:54:11 +0200 (CEST)
+Subject: lazy disabling and idle states
+In-Reply-To: <4C80720A.40503@codeaurora.org>
+References: <4C80720A.40503@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1009031347490.3301@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> Adding on top of what Armando has already pointed out, FSMC block may 
-> have different versions and each of them may support different features 
-> based on its configuration eg. spear device's FSMC block is version8 
-> and is configured for 13 byte ecc(per 512 bytes data, BCH8 algorithm). 
-> There are other possibilities eg. BCH4, BCH2 etc which are not used in 
-> spear devices.
+On Thu, 2 Sep 2010, Abhijeet Dharmapurikar wrote:
 
-Looking at the future trend of NAND flash memories I believe that BCH8 is
-likely to be of most interest, but of course having backwards compatibility
-with already existing FSMC block usage is interesting enough.
+> I understand that lazy disabling was introduced so that we don't loose wakeup
+> interrupts while going in to suspend. The way lazy disabling is implemented is
 
-> Making it generic would also entail supporting all possible configurations 
-> through single driver (makes more sense)
-[...]
-> Alessandro/Sebastian: Is it OK to add a common driver for all FSMC versions
-> and customizations
+No, that's wrong. lazy irq disabling has nothing to do with suspend at
+all. It's there to avoid expensive access to interrupt controller
+hardware. In most cases when an interrupt is disabled via
+disable_irq(), then the device does not issue an interrupt, so we
+optimize that case and do the lazy disable. The suspend code just
+utilizes this detail.
 
-I believe that a common driver is the best way forward, yes. Let me know if I
-can assist you in any of the development or testing.
+If a driver is shutdown completely and called free_irq() then the irq
+line is disabled at the hardware level in any case.
 
- / Sebastian
+> in disable_irq() the interrupt is marked as IRQ_DISABLED but the irq_chip's
+> mask function is not called. As a result the interrupt remains enabled in the
+> irq controller and is masked in the controller only when it is raised again.
+> 
+> This raises the question of unnecessary wakeups in idle power collapse case.
+> By idle power collapse I mean the low power state where the processor is shut
+> off during long idle periods. While in idle power collapse, the cpu could wake
+> up from a disabled interrupt only to realize that it was marked IRQ_DISABLED
+> (as a part of lazy disabling) and would call the mask function and go to idle
+> power collapse again. This behavior could have negative effect on power
+> consumption.
+> 
+> One solution that comes to mind is that the idle power collapse code, before
+> going to sleep, could iterate over the irq_desc's of all the interrupts and
+> call mask on the ones marked as IRQ_DISABLED to make sure that they are
+> actually masked in the controller. This would fix the unnecessary wakeups from
+> idle power collapse. But this operation is very lengthy and inefficient
+> because it may end up calling mask on interrupts that have been already
+> masked.
+> 
+> Are there other solutions to address this issue? Feel free to correct me if I
+> missed a something and my conclusion is incorrect.
+
+Fix the device drivers which keep a device in a state which will fire
+interrupts after the driver called disable_irq(). 
+ 
+Thanks,
+
+	tglx
