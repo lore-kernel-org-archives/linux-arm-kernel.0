@@ -1,28 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 17:51:42 -0700
-Subject: [PATCH] Fix smp_on_up detection
-Message-ID: <mailman.230.1283477996.27306.linux-arm-kernel@lists.infradead.org>
+Date: Thu, 2 Sep 2010 19:22:01 -0700
+Subject: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init
+	testing
+In-Reply-To: <20100903000817.GG11597@atomide.com>
+References: <20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+	<20100902192659.GW11597@atomide.com>
+	<20100903000817.GG11597@atomide.com>
+Message-ID: <20100903022201.GI11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed to detect UP properly on older ARMv7 like Cortex-A8.
+* Tony Lindgren <tony@atomide.com> [100902 17:00]:
+> * Tony Lindgren <tony@atomide.com> [100902 12:20]:
+> 
+> Heh, turns out there's a bit of a bug in the code snippet above :) It should
+> be !((mpidr >> 30) & 1) instead, otherwise it always returns 0.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+This too can check for value of 2. Also we probably want to do the
+CPU type checks too. Updated patch below.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 0b4a626..86aa36d 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -346,8 +346,8 @@ __fixup_smp:
- 	bne	smp_on_up		@ no, assume UP
- 	mrc	p15, 0, r0, c0, c0, 5	@ read MIDR
- 	movs	r0, r0, lsr #30
--	teqne	r0, #3			@ check top two bits 00 or 11
--	movne	pc, lr
-+	teq	r0, #2			@ check top two bits, 10 for SMP
-+	moveq	pc, lr
- 
- smp_on_up:
- 	adr	r0, 1f
-
---CNK/L7dwKXQ4Ub8J--
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smp-cpu.patch
+Type: text/x-diff
+Size: 2233 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100902/18515d65/attachment.bin>
