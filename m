@@ -1,17 +1,17 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 3 Sep 2010 09:22:10 +0530
-Subject: [PATCH 38/74] ST SPEAr3xx: Rearranging declarations in clock.c
-	file
-In-Reply-To: <20100902100434.GM26319@n2100.arm.linux.org.uk>
+Date: Fri, 3 Sep 2010 09:23:30 +0530
+Subject: [PATCH 40/74] ST SPEAr 13xx : Adding support for SPEAr1310
+In-Reply-To: <20100902100705.GN26319@n2100.arm.linux.org.uk>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<4d45de5bf73c7c10c68ade48922a9c3ffdcac795.1283161023.git.viresh.kumar@st.com>
-	<20100902100434.GM26319@n2100.arm.linux.org.uk>
-Message-ID: <4C8070EA.6040302@st.com>
+	<ac3dec2c43f98984b67c85418e1d39cadc82c550.1283161023.git.viresh.kumar@st.com>
+	<20100902100705.GN26319@n2100.arm.linux.org.uk>
+Message-ID: <4C80713A.70206@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2010 3:34 PM, Russell King - ARM Linux wrote:
-> Do this in the patch which adds the sdhci clock instead.  This patch
-> on its own is pure noise.
+On 9/2/2010 3:37 PM, Russell King - ARM Linux wrote:
+>>  arch/arm/Makefile                                |    1 +
+>> >  arch/arm/configs/spear1310-smp_defconfig         |  875 ++++++++++++++++++++++
+> NAK.  No new large defconfigs.
 
-OK.
+Ok. Will correct all defconfig patches.
