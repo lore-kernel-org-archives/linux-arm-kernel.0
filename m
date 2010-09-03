@@ -1,55 +1,104 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 3 Sep 2010 13:54:11 +0200 (CEST)
-Subject: lazy disabling and idle states
-In-Reply-To: <4C80720A.40503@codeaurora.org>
-References: <4C80720A.40503@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1009031347490.3301@localhost6.localdomain6>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 3 Sep 2010 17:27:25 +0530
+Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
+In-Reply-To: <20100902161940.GL11597@atomide.com>
+References: <20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com> <4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161940.GL11597@atomide.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7588@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, 2 Sep 2010, Abhijeet Dharmapurikar wrote:
-
-> I understand that lazy disabling was introduced so that we don't loose wakeup
-> interrupts while going in to suspend. The way lazy disabling is implemented is
-
-No, that's wrong. lazy irq disabling has nothing to do with suspend at
-all. It's there to avoid expensive access to interrupt controller
-hardware. In most cases when an interrupt is disabled via
-disable_irq(), then the device does not issue an interrupt, so we
-optimize that case and do the lazy disable. The suspend code just
-utilizes this detail.
-
-If a driver is shutdown completely and called free_irq() then the irq
-line is disabled at the hardware level in any case.
-
-> in disable_irq() the interrupt is marked as IRQ_DISABLED but the irq_chip's
-> mask function is not called. As a result the interrupt remains enabled in the
-> irq controller and is masked in the controller only when it is raised again.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> Sent: Thursday, September 02, 2010 9:50 PM
+> To: Russell King - ARM Linux
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Bryan Wu; Will Deacon
+> Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
 > 
-> This raises the question of unnecessary wakeups in idle power collapse case.
-> By idle power collapse I mean the low power state where the processor is shut
-> off during long idle periods. While in idle power collapse, the cpu could wake
-> up from a disabled interrupt only to realize that it was marked IRQ_DISABLED
-> (as a part of lazy disabling) and would call the mask function and go to idle
-> power collapse again. This behavior could have negative effect on power
-> consumption.
+> From 16c866489613ef8ea9d28ecf861f5a7ff4d60377 Mon Sep 17 00:00:00 2001
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Thu, 2 Sep 2010 08:20:02 -0700
+> Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
 > 
-> One solution that comes to mind is that the idle power collapse code, before
-> going to sleep, could iterate over the irq_desc's of all the interrupts and
-> call mask on the ones marked as IRQ_DISABLED to make sure that they are
-> actually masked in the controller. This would fix the unnecessary wakeups from
-> idle power collapse. But this operation is very lengthy and inefficient
-> because it may end up calling mask on interrupts that have been already
-> masked.
+> Use SMP and UP macros for cacheflush. Note that __flush_icache_all
+> currently won't work properly on ARMv7 SMP if support for ARMv6 is
+> compiled in.
 > 
-> Are there other solutions to address this issue? Feel free to correct me if I
-> missed a something and my conclusion is incorrect.
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/include/asm/cacheflush.h |    7 +++++--
+>  1 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/cacheflush.h
+> b/arch/arm/include/asm/cacheflush.h
+> index 4656a24..09a893e 100644
+> --- a/arch/arm/include/asm/cacheflush.h
+> +++ b/arch/arm/include/asm/cacheflush.h
+> @@ -16,6 +16,7 @@
+>  #include <asm/shmparam.h>
+>  #include <asm/cachetype.h>
+>  #include <asm/outercache.h>
+> +#include <asm/smp_plat.h>
+> 
+>  #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
+> 
+> @@ -372,8 +373,10 @@ static inline void __flush_icache_all(void)
+>  	extern void v6_icache_inval_all(void);
+>  	v6_icache_inval_all();
+>  #elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
+> -	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner
+> shareable\n"
+> -	    :
+> +	asm(								\
+> +	SMP(mcr	p15, 0, %0, c7, c1, 0	@ inv I-cache inner shareable)
+> 	\
+> +	UP(mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache)		\
+> +	    :								\
+>  	    : "r" (0));
+>  #else
+>  	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
 
-Fix the device drivers which keep a device in a state which will fire
-interrupts after the driver called disable_irq(). 
+Since UP/SMP both cases are handled, the above patch can be something like this now... 
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 9792a71..ebdff42 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -16,6 +16,7 @@
+ #include <asm/shmparam.h>
+ #include <asm/cachetype.h>
+ #include <asm/outercache.h>
++#include <asm/smp_plat.h>
  
-Thanks,
-
-	tglx
+ #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
+ 
+@@ -394,13 +395,11 @@ static inline void __flush_icache_all(void)
+ #ifdef CONFIG_ARM_ERRATA_411920
+ 	extern void v6_icache_inval_all(void);
+ 	v6_icache_inval_all();
+-#elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
+-	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner shareable\n"
+-	    :
+-	    : "r" (0));
+ #else
+-	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+-	    :
++	asm(								\
++	SMP(mcr	p15, 0, %0, c7, c1, 0	@ inv I-cache inner shareable)	\
++	UP(mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache)		\
++	    :								\
+ 	    : "r" (0));
+ #endif
+ }
+-- 
+1.6.0.4
