@@ -1,45 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Sep 2010 21:23:29 +0200
-Subject: [PATCH 1/7] ARM: specify ZRELADDR for ARCH_TEGRA
-In-Reply-To: <AANLkTin2fEj2kRRoE+RSpBovApMaCKTs+DVz9wvj7M3u@mail.gmail.com>
-References: <20100903095504.GC13643@pengutronix.de>
-	<1283507818-1573-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTi=7+TcOWu_62EWH6pwFUuizMT47tHJraaqzdJgp@mail.gmail.com>
-	<20100903190155.GE17152@pengutronix.de>
-	<AANLkTin2fEj2kRRoE+RSpBovApMaCKTs+DVz9wvj7M3u@mail.gmail.com>
-Message-ID: <20100903192329.GB29821@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Sep 2010 20:29:07 +0100
+Subject: [BUG?] rename patch accepted with --dry-run, rejected without
+	(Re: [PATCH V3] arm & sh: factorised duplicated clkdev.c)
+In-Reply-To: <20100903184351.GC2341@burratino>
+References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
+	<AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
+	<20100903182323.GA17152@pengutronix.de>
+	<20100903184351.GC2341@burratino>
+Message-ID: <20100903192907.GA2978@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Sep 03, 2010 at 12:19:26PM -0700, Erik Gilling wrote:
-> On Fri, Sep 3, 2010 at 12:01 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Fri, Sep 03, 2010 at 10:46:43AM -0700, Erik Gilling wrote:
-> >> Yeah I saw that and posted a patch on the 27th and sent a pull request
-> >> to Linus on Wednesday. ?Hopefully it will make rc4.
-> > OK for me, I'll keep it in my queue and will drop it when Linus got
-> > the change. ?You didn't remove the line from
-> > arch/arm/mach-tegra/Makefile.boot, though.
+On Fri, Sep 03, 2010 at 01:43:51PM -0500, Jonathan Nieder wrote:
+> (+cc: bug-patch)
 > 
-> I'll do that too.
-Note that Linus don't like to pull branches that don't match the pull
-request.  (This makes him feel pulling uncooked changes.)
-If you do, you can add my Ack.
-
-> > (hmm, I thought that patches that touch common files like
-> > arch/arm/Kconfig should go via rmk?!)
+> Hi,
 > 
-> I looked and saw that others (specifically samsung) had submitted this
-> fix directly to Linus.  I'm still learning the ropes here and am happy
-> to hear some clarification either way.
-Note that just me wondering if it's right doesn't necessarily means it's
-not.  Russell, can you comment?  Is it trivial enough and obviously only
-tegra related that it's OK?
- 
-Uwe
+> Uwe Kleine-K?nig wrote:
+> > On Fri, Sep 03, 2010 at 07:18:43PM +0900, Magnus Damm wrote:
+> 
+> >> Using --dry-run is fine, but omitting dry-run gives me:
+> >> 
+> >> ...
+> >> patching file arch/arm/common/clkdev.c
+> >> patching file arch/sh/include/asm/clkdev.h
+> >> Hunk #1 FAILED at 1.
+> >> Hunk #2 FAILED at 11.
+> >> 2 out of 2 hunks FAILED -- saving rejects to file
+> >> arch/sh/include/asm/clkdev.h.rej
+> >> 
+> >> I guess this is caused by the last "renaming" hunk, see below.
+> 
+> Yep, I can reproduce this.  Patch applies with "git apply",
+> "patch --dry-run -p1" accepts it, "patch -p1" fails.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+git patches include additional metadata for renaming files, which gnu patch
+will not understand.
+
+If you want GNU patch compatible diffs, don't use -C or -M when generating
+patches out of git.
