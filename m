@@ -1,25 +1,94 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 3 Sep 2010 15:05:34 +0200
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 03 Sep 2010 15:05:43 +0200
 Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
-	single TC block
+	single	TC block
 In-Reply-To: <1283517093-12628-1-git-send-email-fg@emlix.com>
 References: <1283517093-12628-1-git-send-email-fg@emlix.com>
-Message-ID: <20100903130534.GB17702@game.jcrosoft.org>
+Message-ID: <4C80F2A7.9040007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:31 Fri 03 Sep     , Fabian Godehardt wrote:
+Le 03/09/2010 14:31, Fabian Godehardt :
 > Without this patch you will not be able to register the first block
 > because of the second association call on at91_add_device_tc().
-> 
+
+Yes, I noticed that.
+
 > Signed-off-by: Fabian Godehardt <fg@emlix.com>
-duplicate code is not a good idea
 
-this is one of the reason I'm think to drop the current clock assotion code of
-at91 to use the generic clkdev
+Tell me if my little modification is ok for you. I will then sign it and
+send it to Russell patch tracking system: what do you think about it?
 
-here you can also do not specify the device as the clock is not device
-specific
+> ---
+>  arch/arm/mach-at91/at91sam9g45.c         |   12 +++++++++---
+>  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+>  2 files changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 753c0d3..52ef2d6 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -121,8 +121,13 @@ static struct clk ssc1_clk = {
+>  	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
+>  	.type		= CLK_TYPE_PERIPHERAL,
+>  };
+> -static struct clk tcb_clk = {
+> -	.name		= "tcb_clk",
+> +static struct clk tcb0_clk = {
+> +	.name		= "tcb0_clk",
+> +	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
+> +	.type		= CLK_TYPE_PERIPHERAL,
+> +};
+> +static struct clk tcb1_clk = {
+> +	.name		= "tcb1_clk",
+>  	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
+>  	.type		= CLK_TYPE_PERIPHERAL,
 
-Best Regards,
-J.
+I prefer to add a "fake" clock that depend on the first one instead of
+doubling the definition: like this:
+
+/* One additional fake clock for second TC block */
+static struct clk tcb1_clk = {
+        .name           = "tcb1_clk",
+        .pmc_mask       = 0,
+        .type           = CLK_TYPE_PERIPHERAL,
+        .parent         = &tcb0_clk,
+};
+
+This way we keep the single clock entry but we provide a fake entry for
+registering the second TC block.
+
+
+>  };
+> @@ -208,7 +213,8 @@ static struct clk *periph_clocks[] __initdata = {
+>  	&spi1_clk,
+>  	&ssc0_clk,
+>  	&ssc1_clk,
+> -	&tcb_clk,
+> +	&tcb0_clk,
+> +	&tcb1_clk,
+>  	&pwm_clk,
+>  	&tsc_clk,
+>  	&dma_clk,
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 809114d..4822019 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -835,9 +835,9 @@ static struct platform_device at91sam9g45_tcb1_device = {
+>  static void __init at91_add_device_tc(void)
+>  {
+>  	/* this chip has one clock and irq for all six TC channels */
+> -	at91_clock_associate("tcb_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
+> +	at91_clock_associate("tcb0_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
+>  	platform_device_register(&at91sam9g45_tcb0_device);
+> -	at91_clock_associate("tcb_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
+> +	at91_clock_associate("tcb1_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
+>  	platform_device_register(&at91sam9g45_tcb1_device);
+>  }
+>  #else
+
+Ok for other modifications,
+
+Best regards,
+-- 
+Nicolas Ferre
