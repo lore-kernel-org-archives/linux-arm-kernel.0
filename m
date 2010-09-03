@@ -1,43 +1,51 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 3 Sep 2010 23:38:54 +0200
-Subject: [PATCH] ARM: expose PB1176 ROM in debugfs
-In-Reply-To: <AANLkTilxaHzHC3zFPR6q9v2mGKu7EG_Nv40V0kcZ-gwR@mail.gmail.com>
-References: <1278504339-26992-1-git-send-email-triad@df.lth.se>
-	<20100718194720.GE24707@n2100.arm.linux.org.uk>
-	<AANLkTilxaHzHC3zFPR6q9v2mGKu7EG_Nv40V0kcZ-gwR@mail.gmail.com>
-Message-ID: <AANLkTik4F8VnCota=Jp+pZPg3QHvr-dKzy3cuVXJeMu7@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 04 Sep 2010 06:47:52 +0900
+Subject: [PATCH] regulators: add support max8952 regulator
+In-Reply-To: <20100903094200.GC8381@sirena.org.uk>
+References: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
+	<20100903094200.GC8381@sirena.org.uk>
+Message-ID: <01e301cb4bb1$ac1fa240$045ee6c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping on this David, you have an opinion? debugfs ROM or
-MTD ROM mapping?
+Mark Brown wrote:
+> 
+Hi,
 
-Yours,
-Linus Walleij
+Thanks for your review.
 
-2010/7/18 Linus Walleij <linus.ml.walleij@gmail.com>:
-> 2010/7/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->
->> On Wed, Jul 07, 2010 at 02:05:39PM +0200, Linus Walleij wrote:
->>> This exposes the PB1176 ROM as a simple 16KiB file in debugfs so
->>> that it can be copied out and disassembled with some
->>> objcopy+objdump massage for example. I used this to find out how
->>> the ROM handled the CharLCD.
->>
->> Would it be better to expose this through a mtd ROM mapping (map_rom) ?
->
-> This is more convenient I think.
->
-> I don't know the actual purpose of MTD ROM mappings, so
-> paging David on this.
->
-> It has the small upside of only getting compiled in if you select
-> CONFIG_DEBUG_FS, and getting a distinct name in debugfs
-> rather than /dev/mtdN.
->
-> Also I can now cp /debugfs/pb1176-ROM foo.bin
-> Is this possible with mtdblocks or do you have to dd if=... ?
->
-> Yours,
-> Linus Walleij
->
+> On Fri, Sep 03, 2010 at 10:15:24AM +0900, Kukjin Kim wrote:
+> 
+> > +	ret2 = max8649_reg_read(info->i2c, MAX8649_CHIP_ID2);
+> > +	if (ret2 < 0) {
+> > +		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
+> > +			id->name, ret2);
+> >  		goto out;
+> >  	}
+> 
+> If the read fails you'll not set an error code when you jump to out so
+> the probe will report success.  It might be clearer to have separate id
+> variables which you store the read values into if they're OK, just from
+> a legibility point of view.
+> 
+Ok..will fix it.
+
+> > -	dev_info(info->dev, "Detected MAX8649 (ID:%x)\n", ret);
+> > +	dev_info(info->dev, "Detected %s (ID:%x %x)\n", id->name, ret,
+ret2);
+> > +
+> > +	info->type = id->driver_data;
+> 
+> It'd be nice to check that the type that was supplied matches the ID
+> read from the chip in case the user got things wrong, just for
+> defensiveness.
+
+Ok..will modify as per your suggestion.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
