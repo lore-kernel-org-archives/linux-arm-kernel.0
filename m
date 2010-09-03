@@ -1,69 +1,67 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 04 Sep 2010 07:43:57 +0900
-Subject: [PATCH] ARM: PL330: Accept revisions of the dmac
-In-Reply-To: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <01e401cb4bb9$812723d0$83756b70$%kim@samsung.com>
+From: agruen@suse.de (Andreas Gruenbacher)
+Date: Sat, 4 Sep 2010 00:58:17 +0200
+Subject: [bug-patch] [BUG?] rename patch accepted with --dry-run,
+	rejected without (Re: [PATCH V3] arm & sh: factorised duplicated
+	clkdev.c)
+In-Reply-To: <20100903184351.GC2341@burratino>
+References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<20100903182323.GA17152@pengutronix.de>
+	<20100903184351.GC2341@burratino>
+Message-ID: <201009040058.18028.agruen@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> 
-> From: Jassi Brar <jassi.brar@samsung.com>
-> 
-> The driver can handle different revisions of the core which
-> vary only minorly. So check for only the necessary part of
-> the IDs.
-> 
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
->  arch/arm/common/pl330.c |    7 +++----
->  1 files changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
-> index 5ebbab6..8f0f86d 100644
-> --- a/arch/arm/common/pl330.c
-> +++ b/arch/arm/common/pl330.c
-> @@ -146,8 +146,7 @@
->  #define DESIGNER	0x41
->  #define REVISION	0x0
->  #define INTEG_CFG	0x0
-> -#define PERIPH_ID_VAL	((PART << 0) | (DESIGNER << 12) \
-> -			  | (REVISION << 20) | (INTEG_CFG << 24))
-> +#define PERIPH_ID_VAL	((PART << 0) | (DESIGNER << 12))
-> 
->  #define PCELL_ID_VAL	0xb105f00d
-> 
-> @@ -1859,10 +1858,10 @@ int pl330_add(struct pl330_info *pi)
->  	regs = pi->base;
-> 
->  	/* Check if we can handle this DMAC */
-> -	if (get_id(pi, PERIPH_ID) != PERIPH_ID_VAL
-> +	if ((get_id(pi, PERIPH_ID) & 0xfffff) != PERIPH_ID_VAL
->  	   || get_id(pi, PCELL_ID) != PCELL_ID_VAL) {
->  		dev_err(pi->dev, "PERIPH_ID 0x%x, PCELL_ID 0x%x !\n",
-> -			readl(regs + PERIPH_ID), readl(regs + PCELL_ID));
-> +			get_id(pi, PERIPH_ID), get_id(pi, PCELL_ID));
+Hi,
 
-mm...really needed to change readl to get_id?
-
-According to PL330 TRM 3-48, seems that PERIPH_ID includes all of other
-PERIPH_ID_X's information.
-And PCELL_ID is same...
-
-But I'm not sure whether there is any update...
-
->  		return -EINVAL;
->  	}
+On Friday 03 September 2010 20:43:51 Jonathan Nieder wrote:
+> Uwe Kleine-K?nig wrote:
+> > On Fri, Sep 03, 2010 at 07:18:43PM +0900, Magnus Damm wrote:
 > 
-> --
-> 1.6.2.5
+> >> Using --dry-run is fine, but omitting dry-run gives me:
+> >> 
+> >> ...
+> >> patching file arch/arm/common/clkdev.c
+> >> patching file arch/sh/include/asm/clkdev.h
+> >> Hunk #1 FAILED at 1.
+> >> Hunk #2 FAILED at 11.
+> >> 2 out of 2 hunks FAILED -- saving rejects to file
+> >> arch/sh/include/asm/clkdev.h.rej
+> >> 
+> >> I guess this is caused by the last "renaming" hunk, see below.
+> 
+> Yep, I can reproduce this.  Patch applies with "git apply",
+> "patch --dry-run -p1" accepts it, "patch -p1" fails.
+> 
+>  $ patch --version | head -1
+>  GNU patch 2.6.1.85-423d
+>  $ cd ~/src/linux-2.6
+>  $ git checkout 2bfc96a12
+>  $ git clean -fd
+>  $ wget http://download.gmane.org/gmane.linux.ports.sh.devel/8747/8748
+> [...]
 
+something pretty bizarre is going on here.  The wget output modifies the same 
+file twice, but both patches to this file have the same source sha1 (5645f35):
 
-Thanks.
+> diff --git a/arch/sh/include/asm/clkdev.h b/arch/sh/include/asm/clkdev.h
+> dissimilarity index 69%
+> index 5645f35..6ba9186 100644
+> --- a/arch/sh/include/asm/clkdev.h
+> +++ b/arch/sh/include/asm/clkdev.h
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> diff --git a/arch/sh/include/asm/clkdev.h b/include/linux/clkdev.h
+> similarity index 85%
+> rename from arch/sh/include/asm/clkdev.h
+> rename to include/linux/clkdev.h
+> index 5645f35..457bcb0 100644
+
+So "git apply" and "patch --dry-run" seem to work only by accident.
+
+How was this patch generated: with git itself?
+
+The fact that "patch --dry-run" may not work for patches that modify the same 
+file twice is a known defect.  I don't know how to solve this in a reasonably 
+elegant way.  Luckily the problem only triggers when people are doing 
+something "strange" such as concatenating patches.
+
+Andreas
