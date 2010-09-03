@@ -1,24 +1,24 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 3 Sep 2010 13:14:11 +0530
-Subject: [PATCH 08/74] ST SPEAr1300: Adding default config file
-In-Reply-To: <20100903073246.GE26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<3a583e07221d909bd4afb952bbf2a38a2d25cdf4.1283161023.git.viresh.kumar@st.com>
-	<20100902085127.GE26319@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1009022143420.19366@xanadu.home>
-	<20100903073246.GE26319@n2100.arm.linux.org.uk>
-Message-ID: <4C80A74B.2090901@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Sep 2010 08:46:26 +0100
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <AANLkTinfACvokr6vGZYdhE_RgNPHSA+k3Q7PHm1QvA+X@mail.gmail.com>
+References: <20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+	<4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<AANLkTinfACvokr6vGZYdhE_RgNPHSA+k3Q7PHm1QvA+X@mail.gmail.com>
+Message-ID: <20100903074626.GH26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/3/2010 1:02 PM, Russell King - ARM Linux wrote:
->> These days, all you need to do is:
->> > 
->> > 	  make savedefconfig
->> > 
->> > and look for a defconfig file in the current directory.
-> Ah right.  Wonder why no one documented that.
+On Fri, Sep 03, 2010 at 12:20:26PM +0800, Bryan Wu wrote:
+> Awesome, where can get those finalize the patches for testing? After
+> that I can test our Ubuntu kernel on both boards.
 
-Thanks for the info. It was really helpful.
-
-viresh.
+Not yet - they're work in progress.  Final patches will probably be a
+few days yet.
