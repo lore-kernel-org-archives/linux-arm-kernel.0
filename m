@@ -1,9 +1,8 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Sep 2010 10:07:34 +0100
+Date: Fri, 3 Sep 2010 10:10:29 +0100
 Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
-In-Reply-To: <20100902234746.GF11597@atomide.com>
-References: <20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+In-Reply-To: <20100903090734.GJ26319@n2100.arm.linux.org.uk>
+References: <20100819102025.GA32151@n2100.arm.linux.org.uk>
 	<20100820120622.GL25742@atomide.com>
 	<20100830225527.GC11597@atomide.com>
 	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
@@ -12,15 +11,19 @@ References: <20100819095705.GU12184@atomide.com>
 	<20100902162537.GU26319@n2100.arm.linux.org.uk>
 	<20100902163453.GR11597@atomide.com>
 	<20100902234746.GF11597@atomide.com>
-Message-ID: <20100903090734.GJ26319@n2100.arm.linux.org.uk>
+	<20100903090734.GJ26319@n2100.arm.linux.org.uk>
+Message-ID: <20100903091029.GK26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 04:47:46PM -0700, Tony Lindgren wrote:
-> Correction, only boots on SMP hardawre. On UP hardware I still
-> need the following patch.
+On Fri, Sep 03, 2010 at 10:07:34AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 02, 2010 at 04:47:46PM -0700, Tony Lindgren wrote:
+> > Correction, only boots on SMP hardawre. On UP hardware I still
+> > need the following patch.
+> 
+> This should fix that properly.
 
-This should fix that properly.
+Correction - the order of the config tests was wrong.
 
  arch/arm/Kconfig                          |   12 ++++++++
  arch/arm/include/asm/assembler.h          |   20 ++++++++++++-
@@ -103,7 +106,7 @@ index 6e8f05c..55974d2 100644
  	.endm
  
 diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index 33b546a..c344c34 100644
+index 33b546a..cf2f018 100644
 --- a/arch/arm/include/asm/tlbflush.h
 +++ b/arch/arm/include/asm/tlbflush.h
 @@ -70,6 +70,10 @@
@@ -135,12 +138,12 @@ index 33b546a..c344c34 100644
 -# define v7wbi_possible_flags	v7wbi_tlb_flags
 -# define v7wbi_always_flags	v7wbi_tlb_flags
 +
-+# ifdef CONFIG_SMP
-+#  define v7wbi_possible_flags	v7wbi_tlb_flags_smp
-+#  define v7wbi_always_flags	v7wbi_tlb_flags_smp
-+# elif defined(CONFIG_SMP_ON_UP)
++# ifdef CONFIG_SMP_ON_UP
 +#  define v7wbi_possible_flags	(v7wbi_tlb_flags_smp | v7wbi_tlb_flags_up)
 +#  define v7wbi_always_flags	(v7wbi_tlb_flags_smp & v7wbi_tlb_flags_up)
++# elif defined(CONFIG_SMP)
++#  define v7wbi_possible_flags	v7wbi_tlb_flags_smp
++#  define v7wbi_always_flags	v7wbi_tlb_flags_smp
 +# else
 +#  define v7wbi_possible_flags	v7wbi_tlb_flags_up
 +#  define v7wbi_always_flags	v7wbi_tlb_flags_up
