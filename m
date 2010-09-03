@@ -1,23 +1,33 @@
-From: wellsk40@gmail.com (Kevin Wells)
-Date: Fri, 3 Sep 2010 12:46:39 -0700
-Subject: GIT pull request: arm: lpc32xx_up1
-Message-ID: <AANLkTi=eoOYV8_7wANNucC5+eeTfVNeWKoD5SyBPOX4T@mail.gmail.com>
+From: Matthieu.Moy@grenoble-inp.fr (Matthieu Moy)
+Date: Fri, 03 Sep 2010 21:34:02 +0200
+Subject: [BUG?] rename patch accepted with --dry-run,
+	rejected without (Re: [PATCH V3] arm & sh: factorised duplicated
+	clkdev.c)
+In-Reply-To: <20100903192907.GA2978@n2100.arm.linux.org.uk> (Russell King's
+	message of "Fri\, 3 Sep 2010 20\:29\:07 +0100")
+References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
+	<AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
+	<20100903182323.GA17152@pengutronix.de>
+	<20100903184351.GC2341@burratino>
+	<20100903192907.GA2978@n2100.arm.linux.org.uk>
+Message-ID: <vpqr5habp05.fsf@bauges.imag.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Can you please pull this into your tree?
+> git patches include additional metadata for renaming files, which gnu patch
+> will not understand.
+>
+> If you want GNU patch compatible diffs, don't use -C or -M when generating
+> patches out of git.
 
-        git at lpclinux.com:linux-2.6-lpc for_rmk_0903
+Fyi: actually, GNU patch will support git-style patches in the next
+version according to
 
-These are the last posted and reviewed LPC32xx updates.
-[PATCH 1/6] ARM: LPC32XX: Fix several clock device ID strings
-[PATCH 2/6] ARM: LPC32XX: Fix naming convention issues with some defines
-[PATCH 3/6] ARM: LPC32xx: Fix gpiolib bit mask macro
-[PATCH 4/6] ARM: LPC32xx: Remove MMC peripheral clock enable/disable code
-[PATCH 5/6] ARM: LPC32XX: Remove clock enable code for AMBA driver
-[PATCH 6/6] ARM: LPC32XX: Add board.h for platform_data structures
+http://savannah.gnu.org/forum/forum.php?forum_id=6320
 
-thanks,
-Kevin
+-- 
+Matthieu Moy
+http://www-verimag.imag.fr/~moy/
