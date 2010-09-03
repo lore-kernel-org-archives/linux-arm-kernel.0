@@ -1,42 +1,32 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Sep 2010 22:46:46 +0200
-Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
-	for exceptions
-In-Reply-To: <20100903095504.GC13643@pengutronix.de>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-	<20100902212145.GA15264@n2100.arm.linux.org.uk>
-	<20100902212723.GC26319@n2100.arm.linux.org.uk>
-	<20100903074806.GX14214@pengutronix.de>
-	<20100903095504.GC13643@pengutronix.de>
-Message-ID: <20100903204646.GB3497@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 04 Sep 2010 06:36:40 +0900
+Subject: [PATCH] ARM: SAMSUNG: Removed redunt zreladdr in Makefile.boot
+In-Reply-To: <20100903074247.GG26319@n2100.arm.linux.org.uk>
+References: <1283470043-16050-1-git-send-email-kgene.kim@samsung.com>
+	<20100903074247.GG26319@n2100.arm.linux.org.uk>
+Message-ID: <01dd01cb4bb0$1c124dc0$5436e940$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Russell King wrote:
+> 
+Hi ;-)
 
-[Added Ben to Cc:]
-> On Fri, Sep 03, 2010 at 09:48:06AM +0200, Uwe Kleine-K?nig wrote:
-> > On Thu, Sep 02, 2010 at 10:27:23PM +0100, Russell King - ARM Linux wrote:
-> > > 
-> > > And while we're here, why hasn't anyone removed the zreladdr
-> > > definitions in Makefile.boot yet?  Or do we still need them and
-> > > we now have the same information defined in two different places?
-> > > 
-> > > This all looks like a half-done job at the moment.  Please clean it up.
-> > The original series removed all the 'Makefile.boot's IIRC.  Currently
-> > the params_phys-y value is needed though.  So should I send a patch that
-> > just removes the zreladdr values?
-> I looked into that and found some more issues.  I hope I catched them
-> all now.  While doing that removing the zreladdr lines was nearly for
-> free.  So I did that, too.
-I just found another (probably harmless) issue:  arch/arm/Kconfig has:
+> On Fri, Sep 03, 2010 at 08:27:23AM +0900, Kukjin Kim wrote:
+> > Because can be calculated ZREADDR now, removed redunt zreladdr
+> > definitions in each Makefile.boot of Samsung architectures.
+> 
+> I'd suggest holding off on this.  CONFIG_ZRELADDR has a few problems
+> at the moment that need fixing - and if there's no movement to fix
+> them, it'll be reverted.
 
-	...
-        default 0x30008000 if ARCH_S3C2410 ||\
-                ARCH_S3C2400 ||\
-                ARCH_S3C2412 ||\
-                ARCH_S3C2416 ||\
-                ARCH_S3C2440 ||\
-                ARCH_S3C2443
-	...
+Ok...And I will check its progress in the mailing list.
+
+Have a nice weekend.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
