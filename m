@@ -1,52 +1,53 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 3 Sep 2010 10:49:09 +0200
-Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
-In-Reply-To: <20100902172908.GD2464@tarshish>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<20100902145357.GL14214@pengutronix.de>
-	<19583.48828.125104.712979@ipc1.ka-ro>
-	<20100902172908.GD2464@tarshish>
-Message-ID: <19584.46725.955202.942529@ipc1.ka-ro>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Sep 2010 09:58:23 +0100
+Subject: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init
+	testing
+In-Reply-To: <20100903022201.GI11597@atomide.com>
+References: <20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+	<20100902192659.GW11597@atomide.com>
+	<20100903000817.GG11597@atomide.com>
+	<20100903022201.GI11597@atomide.com>
+Message-ID: <004601cb4b46$2bf3c120$83db4360$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tony,
 
-> On Thu, Sep 02, 2010 at 05:11:56PM +0200, Lothar Wa?mann wrote:
-> > > > -	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
-> > > > +	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
-> > > > +	 * not compatible with existing SPI controllers on other i.MX platforms,
-> > > > +	 * while CSPI controller is 100% compatible with the one on the i.MX35.
-> > > > +	 * We set the platform device id to 2 for this CSPI at i.MX51 board init
-> > > > +	 * level to distinguish it from two eCSPI controllers.
-> > > > +	 */
-> > > This comment is missing in Sascha's driver.  I like it.
-> > > BTW, I'd like to make use of platform ids in this driver.  This would
-> > > make this ugly "on imx51 id2 is a cspi" distinction unnecessary.
-> > > 
-> > > > +	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35() ||
-> > > > +	    (cpu_is_mx51() && (pdev->id == 2))) {
-> > I'd prefer a flag in the platform_data that tells the driver to act as
-> > an eCSPI driver. This way the information about eCSPI or not would be
-> > where it belongs (in the arch specific code).
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: 03 September 2010 03:22
+> To: Russell King - ARM Linux
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Bryan Wu; Will Deacon
+> Subject: Re: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init testing
 > 
-> But this also increases the size of driver code, since the compiler can 
-> resolve cpu_is_* at compile time, and drop the dead code. Maybe an is_ecspi 
-> macro will make the above code clearer.
-> 
-I did not mean to remove the cpu_is_* macros, but use the explicit
-ecspi flag instead of the comparison with pdev->id.
+> * Tony Lindgren <tony@atomide.com> [100902 17:00]:
+> > * Tony Lindgren <tony@atomide.com> [100902 12:20]:
+> >
+> > Heh, turns out there's a bit of a bug in the code snippet above :) It should
+> > be !((mpidr >> 30) & 1) instead, otherwise it always returns 0.
 
+Gah! Well spotted! I think I was getting away with this because the platforms
+I was using for testing didn't need tlb ops to be broadcast.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> This too can check for value of 2. Also we probably want to do the
+> CPU type checks too. Updated patch below.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+Your patches are turning up as attachments here, so I can't comment
+inline. The only problem I can see is for SMP v6 platforms (ARM11MPCore)
+where the MPIDR is actually the `CPU ID register' with bits 31:12 set to
+zero, so we'll say it's a UP core.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Since 11MPCore is the only ARM SMP v6 processor and you're checking
+the implementor ID anyway, it might be easier to check for the 11MPCore
+explicitly, ((read_cpuid_id() & 0xfff0) == 0xB020) rather than check for v6/v7.
+
+Or we could just ignore v6 for now.
+
+Will
