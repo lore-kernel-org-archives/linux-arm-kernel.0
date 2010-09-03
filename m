@@ -1,94 +1,99 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 03 Sep 2010 15:05:43 +0200
-Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
-	single	TC block
-In-Reply-To: <1283517093-12628-1-git-send-email-fg@emlix.com>
-References: <1283517093-12628-1-git-send-email-fg@emlix.com>
-Message-ID: <4C80F2A7.9040007@atmel.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Fri, 3 Sep 2010 21:30:50 +0800
+Subject: [PATCH 5/7] ARM: don't expose CONFIG_ZRELADDR to the users
+In-Reply-To: <1283507818-1573-5-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100903095504.GC13643@pengutronix.de>
+	<1283507818-1573-5-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <AANLkTikg-A7Y19vU+gShPP+zQHpNm-Wzi-m43_dm+OxL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/09/2010 14:31, Fabian Godehardt :
-> Without this patch you will not be able to register the first block
-> because of the second association call on at91_add_device_tc().
+2010/9/3 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> This value is essential for booting a zImage and only depends on the
+> memory layout of the machine to boot. ?This value was specified in
+> Makefile.boot before
+>
+> ? ? ? ?e69edc79 (ARM: Auto calculate ZRELADDR and provide option for exceptions)
+>
+> and so wasn't available to change via .config.
+>
+> The only exception is bcmring that had a extra config for specifing the
+> address used, which is removed in this commit, too, as it isn't used
+> anymore since e69edc79. ?This is the only machine that still gets a
+> possibility to change CONFIG_ZRELADDR.
 
-Yes, I noticed that.
+This looks correct to me.
 
-> Signed-off-by: Fabian Godehardt <fg@emlix.com>
-
-Tell me if my little modification is ok for you. I will then sign it and
-send it to Russell patch tracking system: what do you think about it?
-
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Eric Miao <eric.miao@canonical.com>
+> Cc: Leo Chen <leochen@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
->  arch/arm/mach-at91/at91sam9g45.c         |   12 +++++++++---
->  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
->  2 files changed, 11 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index 753c0d3..52ef2d6 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -121,8 +121,13 @@ static struct clk ssc1_clk = {
->  	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
->  	.type		= CLK_TYPE_PERIPHERAL,
->  };
-> -static struct clk tcb_clk = {
-> -	.name		= "tcb_clk",
-> +static struct clk tcb0_clk = {
-> +	.name		= "tcb0_clk",
-> +	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
-> +	.type		= CLK_TYPE_PERIPHERAL,
-> +};
-> +static struct clk tcb1_clk = {
-> +	.name		= "tcb1_clk",
->  	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
->  	.type		= CLK_TYPE_PERIPHERAL,
-
-I prefer to add a "fake" clock that depend on the first one instead of
-doubling the definition: like this:
-
-/* One additional fake clock for second TC block */
-static struct clk tcb1_clk = {
-        .name           = "tcb1_clk",
-        .pmc_mask       = 0,
-        .type           = CLK_TYPE_PERIPHERAL,
-        .parent         = &tcb0_clk,
-};
-
-This way we keep the single clock entry but we provide a fake entry for
-registering the second TC block.
-
-
->  };
-> @@ -208,7 +213,8 @@ static struct clk *periph_clocks[] __initdata = {
->  	&spi1_clk,
->  	&ssc0_clk,
->  	&ssc1_clk,
-> -	&tcb_clk,
-> +	&tcb0_clk,
-> +	&tcb1_clk,
->  	&pwm_clk,
->  	&tsc_clk,
->  	&dma_clk,
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 809114d..4822019 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -835,9 +835,9 @@ static struct platform_device at91sam9g45_tcb1_device = {
->  static void __init at91_add_device_tc(void)
->  {
->  	/* this chip has one clock and irq for all six TC channels */
-> -	at91_clock_associate("tcb_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
-> +	at91_clock_associate("tcb0_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
->  	platform_device_register(&at91sam9g45_tcb0_device);
-> -	at91_clock_associate("tcb_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
-> +	at91_clock_associate("tcb1_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
->  	platform_device_register(&at91sam9g45_tcb1_device);
->  }
->  #else
-
-Ok for other modifications,
-
-Best regards,
--- 
-Nicolas Ferre
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/configs/bcmring_defconfig ?| ? ?1 -
+> ?arch/arm/mach-bcmring/Kconfig ? ? ? | ? ?3 ---
+> ?arch/arm/mach-bcmring/Makefile.boot | ? ?1 -
+> ?4 files changed, 1 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4a9a55c..0654afe 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1577,7 +1577,7 @@ config AUTO_ZRELADDR
+> ? ? ? ? ?from start of memory.
+>
+> ?config ZRELADDR
+> - ? ? ? hex "Physical address of the decompressed kernel image"
+> + ? ? ? hex "Physical address of the decompressed kernel image" if ARCH_BCMRING
+> ? ? ? ?depends on !AUTO_ZRELADDR
+> ? ? ? ?default 0x00008000 if ARCH_BCMRING ||\
+> ? ? ? ? ? ? ? ?ARCH_CNS3XXX ||\
+> diff --git a/arch/arm/configs/bcmring_defconfig b/arch/arm/configs/bcmring_defconfig
+> index 75984cd..9168d05 100644
+> --- a/arch/arm/configs/bcmring_defconfig
+> +++ b/arch/arm/configs/bcmring_defconfig
+> @@ -21,7 +21,6 @@ CONFIG_MODULE_UNLOAD=y
+> ?# CONFIG_IOSCHED_DEADLINE is not set
+> ?# CONFIG_IOSCHED_CFQ is not set
+> ?CONFIG_ARCH_BCMRING=y
+> -CONFIG_BCM_ZRELADDR=0x8000
+> ?CONFIG_CPU_32v6K=y
+> ?CONFIG_NO_HZ=y
+> ?CONFIG_PREEMPT=y
+> diff --git a/arch/arm/mach-bcmring/Kconfig b/arch/arm/mach-bcmring/Kconfig
+> index 457b438..e076cc8 100644
+> --- a/arch/arm/mach-bcmring/Kconfig
+> +++ b/arch/arm/mach-bcmring/Kconfig
+> @@ -13,9 +13,6 @@ endchoice
+> ?menu "BCMRING Options"
+> ? ? ? ?depends on ARCH_BCMRING
+>
+> -config BCM_ZRELADDR
+> - ? ? ? hex "Compressed ZREL ADDR"
+> -
+> ?endmenu
+>
+> ?# source "drivers/char/bcmring/Kconfig"
+> diff --git a/arch/arm/mach-bcmring/Makefile.boot b/arch/arm/mach-bcmring/Makefile.boot
+> index fb53b28..6894871 100644
+> --- a/arch/arm/mach-bcmring/Makefile.boot
+> +++ b/arch/arm/mach-bcmring/Makefile.boot
+> @@ -1,6 +1,5 @@
+> ?# Address where decompressor will be written and eventually executed.
+> ?#
+> ?# default to SDRAM
+> -zreladdr-y ? ? ?:= $(CONFIG_BCM_ZRELADDR)
+> ?params_phys-y ? := 0x00000800
+>
+> --
+> 1.7.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
