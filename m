@@ -1,50 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Sep 2010 21:33:09 +0200
-Subject: [BUG?] rename patch accepted with --dry-run, rejected without
-	(Re: [PATCH V3] arm & sh: factorised duplicated clkdev.c)
-In-Reply-To: <20100903192907.GA2978@n2100.arm.linux.org.uk>
-References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
-	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
-	<AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
-	<20100903182323.GA17152@pengutronix.de>
-	<20100903184351.GC2341@burratino>
-	<20100903192907.GA2978@n2100.arm.linux.org.uk>
-Message-ID: <20100903193309.GC29821@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Sep 2010 20:36:45 +0100
+Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
+In-Reply-To: <20100903170403.GM11597@atomide.com>
+References: <20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902162039.GM11597@atomide.com>
+	<20100902162537.GU26319@n2100.arm.linux.org.uk>
+	<20100902163453.GR11597@atomide.com>
+	<20100902234746.GF11597@atomide.com>
+	<20100903090734.GJ26319@n2100.arm.linux.org.uk>
+	<20100903091029.GK26319@n2100.arm.linux.org.uk>
+	<20100903170403.GM11597@atomide.com>
+Message-ID: <20100903193645.GB2978@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Russell,
-
-On Fri, Sep 03, 2010 at 08:29:07PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 03, 2010 at 01:43:51PM -0500, Jonathan Nieder wrote:
-> > Uwe Kleine-K?nig wrote:
-> > > On Fri, Sep 03, 2010 at 07:18:43PM +0900, Magnus Damm wrote:
+On Fri, Sep 03, 2010 at 10:04:03AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100903 02:02]:
+> > On Fri, Sep 03, 2010 at 10:07:34AM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Sep 02, 2010 at 04:47:46PM -0700, Tony Lindgren wrote:
+> > > > Correction, only boots on SMP hardawre. On UP hardware I still
+> > > > need the following patch.
+> > > 
+> > > This should fix that properly.
 > > 
-> > >> Using --dry-run is fine, but omitting dry-run gives me:
-> > >> 
-> > >> ...
-> > >> patching file arch/arm/common/clkdev.c
-> > >> patching file arch/sh/include/asm/clkdev.h
-> > >> Hunk #1 FAILED at 1.
-> > >> Hunk #2 FAILED at 11.
-> > >> 2 out of 2 hunks FAILED -- saving rejects to file
-> > >> arch/sh/include/asm/clkdev.h.rej
-> > >> 
-> > >> I guess this is caused by the last "renaming" hunk, see below.
-> > 
-> > Yep, I can reproduce this.  Patch applies with "git apply",
-> > "patch --dry-run -p1" accepts it, "patch -p1" fails.
+> > Correction - the order of the config tests was wrong.
 > 
-> git patches include additional metadata for renaming files, which gnu patch
-> will not understand.
+> OK that works now.
 > 
-> If you want GNU patch compatible diffs, don't use -C or -M when generating
-> patches out of git.
-Still GNU patch should then already fail in --dry-run mode.
- 
-Best regards
-Uwe
+> Looks like your new patch is missing smp_midr.h BTW.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Damn git.  Hate it when keeping patches external to git, even in git diff
+form.  Luckily the file is just sitting around in my tree rather than
+having been deleted entirely...
