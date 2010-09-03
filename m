@@ -1,65 +1,67 @@
-From: fg@emlix.com (Fabian Godehardt)
-Date: Fri,  3 Sep 2010 13:31:33 +0100
-Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every single
-	TC block
-Message-ID: <1283517093-12628-1-git-send-email-fg@emlix.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 3 Sep 2010 18:01:19 +0530
+Subject: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init
+	testing
+In-Reply-To: <004d01cb4b62$d49c91a0$7dd5b4e0$@deacon@arm.com>
+References: <4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+	<20100902192659.GW11597@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A8@dbde02.ent.ti.com>
+	<004d01cb4b62$d49c91a0$7dd5b4e0$@deacon@arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75CA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch you will not be able to register the first block
-because of the second association call on at91_add_device_tc().
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Friday, September 03, 2010 5:54 PM
+> To: Shilimkar, Santosh; Tony Lindgren; Russell King - ARM Linux
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Bryan Wu
+> Subject: RE: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init
+> testing
+> 
+> Santosh,
+> 
+> > diff --git a/arch/arm/include/asm/smp_plat.h
+> b/arch/arm/include/asm/smp_plat.h
+> > index 8db3512..82bc488 100644
+> > --- a/arch/arm/include/asm/smp_plat.h
+> > +++ b/arch/arm/include/asm/smp_plat.h
+> > @@ -39,4 +39,11 @@ static inline int cache_ops_need_broadcast(void)
+> >  #define UP(instr...)	_str(instr)
+> >  #endif
+> >
+> > +static inline int smp_cpu(void)
+> > +{
+> > +        u32 mpidr;
+> > +        asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
+> > +        return (mpidr >> 31) ? !(mpidr >> 30) : 0;
+> > +}
+> > +
+> > Will this be called on UP machines ?? if yes, then mpidr register is not
+> > available on those
+> 
+> The multiprocessor affinity register (MPIDR) is defined as part of ARMv7.
+> ARM recommends that it returns 0 on UP systems. If bit 31 is set, then the
+> multiprocessing extensions are available.
+> 
+I might be wrong but  didn't find this register on Cortex-A8(ARMv7).
 
-Signed-off-by: Fabian Godehardt <fg@emlix.com>
----
- arch/arm/mach-at91/at91sam9g45.c         |   12 +++++++++---
- arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
- 2 files changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 753c0d3..52ef2d6 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -121,8 +121,13 @@ static struct clk ssc1_clk = {
- 	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
--static struct clk tcb_clk = {
--	.name		= "tcb_clk",
-+static struct clk tcb0_clk = {
-+	.name		= "tcb0_clk",
-+	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
-+static struct clk tcb1_clk = {
-+	.name		= "tcb1_clk",
- 	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
-@@ -208,7 +213,8 @@ static struct clk *periph_clocks[] __initdata = {
- 	&spi1_clk,
- 	&ssc0_clk,
- 	&ssc1_clk,
--	&tcb_clk,
-+	&tcb0_clk,
-+	&tcb1_clk,
- 	&pwm_clk,
- 	&tsc_clk,
- 	&dma_clk,
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 809114d..4822019 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -835,9 +835,9 @@ static struct platform_device at91sam9g45_tcb1_device = {
- static void __init at91_add_device_tc(void)
- {
- 	/* this chip has one clock and irq for all six TC channels */
--	at91_clock_associate("tcb_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
-+	at91_clock_associate("tcb0_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
- 	platform_device_register(&at91sam9g45_tcb0_device);
--	at91_clock_associate("tcb_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
-+	at91_clock_associate("tcb1_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
- 	platform_device_register(&at91sam9g45_tcb1_device);
- }
- #else
--- 
-1.6.6.1
+> The quirk (as discussed early) is that that 11MPCore has the CPUID
+> register
+> at this location in the coprocessor space, with bit 31 set to 0. This
+> means
+> that we have to check for it explicitly otherwise we will identify it as a
+> UP machine.
+> 
+> Will
+> 
