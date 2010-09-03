@@ -1,104 +1,32 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 3 Sep 2010 17:27:25 +0530
-Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
-In-Reply-To: <20100902161940.GL11597@atomide.com>
-References: <20100817141210.GJ12184@atomide.com>
-	<20100817154035.GD20325@n2100.arm.linux.org.uk>
-	<20100819073810.GR12184@atomide.com> <4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902161940.GL11597@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7588@dbde02.ent.ti.com>
+From: sundar.iyer@stericsson.com (Sundar Iyer)
+Date: Fri, 3 Sep 2010 17:31:04 +0530
+Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+Message-ID: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> Sent: Thursday, September 02, 2010 9:50 PM
-> To: Russell King - ARM Linux
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Bryan Wu; Will Deacon
-> Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
-> 
-> From 16c866489613ef8ea9d28ecf861f5a7ff4d60377 Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Thu, 2 Sep 2010 08:20:02 -0700
-> Subject: [PATCH 2/6] ARM: Use SMP and UP macros for cacheflush
-> 
-> Use SMP and UP macros for cacheflush. Note that __flush_icache_all
-> currently won't work properly on ARMv7 SMP if support for ARMv6 is
-> compiled in.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/include/asm/cacheflush.h |    7 +++++--
->  1 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cacheflush.h
-> b/arch/arm/include/asm/cacheflush.h
-> index 4656a24..09a893e 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -16,6 +16,7 @@
->  #include <asm/shmparam.h>
->  #include <asm/cachetype.h>
->  #include <asm/outercache.h>
-> +#include <asm/smp_plat.h>
-> 
->  #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
-> 
-> @@ -372,8 +373,10 @@ static inline void __flush_icache_all(void)
->  	extern void v6_icache_inval_all(void);
->  	v6_icache_inval_all();
->  #elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
-> -	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner
-> shareable\n"
-> -	    :
-> +	asm(								\
-> +	SMP(mcr	p15, 0, %0, c7, c1, 0	@ inv I-cache inner shareable)
-> 	\
-> +	UP(mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache)		\
-> +	    :								\
->  	    : "r" (0));
->  #else
->  	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+Inspired by Will Deacon's cleanup for the Realview series, this is an attempt
+to factor even more common code and move hotplug functions to the generic
+arch/arm/common folder
 
-Since UP/SMP both cases are handled, the above patch can be something like this now... 
+Sundar Iyer (2):
+  ARM: Generalize all CPU Hotplug code across platforms
+  ux500: Add CPU hotplug support
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 9792a71..ebdff42 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -16,6 +16,7 @@
- #include <asm/shmparam.h>
- #include <asm/cachetype.h>
- #include <asm/outercache.h>
-+#include <asm/smp_plat.h>
- 
- #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
- 
-@@ -394,13 +395,11 @@ static inline void __flush_icache_all(void)
- #ifdef CONFIG_ARM_ERRATA_411920
- 	extern void v6_icache_inval_all(void);
- 	v6_icache_inval_all();
--#elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
--	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner shareable\n"
--	    :
--	    : "r" (0));
- #else
--	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
--	    :
-+	asm(								\
-+	SMP(mcr	p15, 0, %0, c7, c1, 0	@ inv I-cache inner shareable)	\
-+	UP(mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache)		\
-+	    :								\
- 	    : "r" (0));
- #endif
- }
+ arch/arm/common/Makefile           |    1 +
+ arch/arm/common/hotplug.c          |   57 ++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/hotplug.h     |   18 +++++++++++
+ arch/arm/mach-omap2/omap-hotplug.c |   24 +--------------
+ arch/arm/mach-realview/hotplug.c   |   56 ++++-------------------------------
+ arch/arm/mach-s5pv310/hotplug.c    |   56 ++++-------------------------------
+ arch/arm/mach-tegra/hotplug.c      |   56 +++++------------------------------
+ arch/arm/mach-ux500/Makefile       |    1 +
+ arch/arm/mach-ux500/hotplug.c      |   30 +++++++++++++++++++
+ arch/arm/mach-ux500/platsmp.c      |    4 ++-
+ 10 files changed, 134 insertions(+), 169 deletions(-)
+ create mode 100644 arch/arm/common/hotplug.c
+ create mode 100644 arch/arm/include/asm/hotplug.h
+ create mode 100644 arch/arm/mach-ux500/hotplug.c
+
 -- 
-1.6.0.4
+1.7.2.dirty
