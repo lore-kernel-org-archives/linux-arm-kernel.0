@@ -1,29 +1,31 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Fri, 3 Sep 2010 11:34:34 +0200
-Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
-	driver
-In-Reply-To: <20100903064104.GA2965@matterhorn.lan>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<20100902082759.GE14214@pengutronix.de>
-	<4C7F777E.1090104@gmail.com>
-	<20100902143908.GK14214@pengutronix.de>
-	<4C8068FD.1090705@gmail.com> <20100903064104.GA2965@matterhorn.lan>
-Message-ID: <20100903093434.GT10841@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 3 Sep 2010 10:42:01 +0100
+Subject: [PATCH] regulators: add support max8952 regulator
+In-Reply-To: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
+References: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20100903094200.GC8381@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 09:41:04AM +0300, Amit Kucheria wrote:
-> Can we put up a wiki page of what drivers are being worked on by who so we
-> don't work on the same drivers?
-> 
-> We are planning to look at the power management aspects of the i.MX51 at Linaro.
+On Fri, Sep 03, 2010 at 10:15:24AM +0900, Kukjin Kim wrote:
 
-Something like this: http://www.elinux.org/I.MX
-Feel free to optimize the format, it's just a first raw cut.
+> +	ret2 = max8649_reg_read(info->i2c, MAX8649_CHIP_ID2);
+> +	if (ret2 < 0) {
+> +		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
+> +			id->name, ret2);
+>  		goto out;
+>  	}
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+If the read fails you'll not set an error code when you jump to out so
+the probe will report success.  It might be clearer to have separate id
+variables which you store the read values into if they're OK, just from
+a legibility point of view.
+
+> -	dev_info(info->dev, "Detected MAX8649 (ID:%x)\n", ret);
+> +	dev_info(info->dev, "Detected %s (ID:%x %x)\n", id->name, ret, ret2);
+> +
+> +	info->type = id->driver_data;
+
+It'd be nice to check that the type that was supplied matches the ID
+read from the chip in case the user got things wrong, just for
+defensiveness.
