@@ -1,58 +1,69 @@
 From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Fri,  3 Sep 2010 18:28:09 -0400
-Subject: [PATCH v2 4/6 RESEND] ARM: pxa27x_keypad: added wakeup event handler
-	for keypad interrupts
+Date: Fri,  3 Sep 2010 18:28:10 -0400
+Subject: [PATCH v2 5/6 RESEND] ARM: pxa168: added keypad wake clear event
+	support for platform
 In-Reply-To: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
 References: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1283552891-13966-5-git-send-email-mark.brown314@gmail.com>
+Message-ID: <1283552891-13966-6-git-send-email-mark.brown314@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-mmp needs to clear wake event in order to clear the keypad interrupt
-
 Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
 ---
- arch/arm/plat-pxa/include/plat/pxa27x_keypad.h |    1 +
- drivers/input/keyboard/pxa27x_keypad.c         |   10 ++++++++++
- 2 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/include/mach/pxa168.h |    5 +++++
+ arch/arm/mach-mmp/pxa168.c              |   10 ++++++++++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-index 7b4eadc..73dacda 100644
---- a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-+++ b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
-@@ -52,6 +52,7 @@ struct pxa27x_keypad_platform_data {
+diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
+index f34e663..1801e42 100644
+--- a/arch/arm/mach-mmp/include/mach/pxa168.h
++++ b/arch/arm/mach-mmp/include/mach/pxa168.h
+@@ -5,6 +5,7 @@ struct sys_timer;
  
- 	/* key debounce interval */
- 	unsigned int	debounce_interval;
-+	void		(*clear_wakeup_event)(void);
- };
+ extern struct sys_timer pxa168_timer;
+ extern void __init pxa168_init_irq(void);
++extern void pxa168_clear_keypad_wakeup(void);
  
- extern void pxa_set_keypad_info(struct pxa27x_keypad_platform_data *info);
-diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
-index 0610d10..b36d2be 100644
---- a/drivers/input/keyboard/pxa27x_keypad.c
-+++ b/drivers/input/keyboard/pxa27x_keypad.c
-@@ -330,11 +330,21 @@ static void pxa27x_keypad_scan_direct(struct pxa27x_keypad *keypad)
- 	keypad->direct_key_state = new_state;
+ #include <linux/i2c.h>
+ #include <mach/devices.h>
+@@ -12,6 +13,7 @@ extern void __init pxa168_init_irq(void);
+ #include <plat/pxa3xx_nand.h>
+ #include <video/pxa168fb.h>
+ #include <plat/pxa27x_keypad.h>
++#include <mach/cputype.h>
+ 
+ extern struct pxa_device_desc pxa168_device_uart1;
+ extern struct pxa_device_desc pxa168_device_uart2;
+@@ -109,6 +111,9 @@ static inline int pxa168_add_fb(struct pxa168fb_mach_info *mi)
+ 
+ static inline int pxa168_add_keypad(struct pxa27x_keypad_platform_data *data)
+ {
++	if (cpu_is_pxa168())
++		data->clear_wakeup_event = pxa168_clear_keypad_wakeup;
++
+ 	return pxa_register_device(&pxa168_device_keypad, data, sizeof(*data));
  }
  
-+static void clear_wakeup_event(struct pxa27x_keypad *keypad)
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 2fa16fb..72b4e76 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -136,6 +136,16 @@ struct sys_timer pxa168_timer = {
+ 	.init	= pxa168_timer_init,
+ };
+ 
++void pxa168_clear_keypad_wakeup(void)
 +{
-+	struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
++	uint32_t val;
++	uint32_t mask = APMU_PXA168_KP_WAKE_CLR;
 +
-+	if (pdata->clear_wakeup_event)
-+		(pdata->clear_wakeup_event)();
++	/* wake event clear is needed in order to clear keypad interrupt */
++	val = __raw_readl(APMU_WAKE_CLR);
++	__raw_writel(val |  mask, APMU_WAKE_CLR);
 +}
 +
- static irqreturn_t pxa27x_keypad_irq_handler(int irq, void *dev_id)
- {
- 	struct pxa27x_keypad *keypad = dev_id;
- 	unsigned long kpc = keypad_readl(KPC);
- 
-+	clear_wakeup_event(keypad);
-+
- 	if (kpc & KPC_DI)
- 		pxa27x_keypad_scan_direct(keypad);
- 
+ /* on-chip devices */
+ PXA168_DEVICE(uart1, "pxa2xx-uart", 0, UART1, 0xd4017000, 0x30, 21, 22);
+ PXA168_DEVICE(uart2, "pxa2xx-uart", 1, UART2, 0xd4018000, 0x30, 23, 24);
 -- 
 1.7.0.4
