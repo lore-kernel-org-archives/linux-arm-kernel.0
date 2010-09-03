@@ -1,182 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 03 Sep 2010 10:37:50 +0900
-Subject: [PATCH] regulators: add support max8952 regulator
-In-Reply-To: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
-References: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <014001cb4b08$a48d3410$eda79c30$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Sep 2010 18:39:41 -0700
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100902133301.GI26319@n2100.arm.linux.org.uk>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com>
+	<20100902133301.GI26319@n2100.arm.linux.org.uk>
+Message-ID: <20100903013940.GH11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 06:25]:
+> On Thu, Aug 19, 2010 at 10:38:11AM +0300, Tony Lindgren wrote:
+> > --- a/arch/arm/kernel/head.S
+> > +++ b/arch/arm/kernel/head.S
+> > @@ -346,8 +346,10 @@ __fixup_smp:
+> >  	bne	smp_on_up		@ no, assume UP
+> >  	mrc	p15, 0, r0, c0, c0, 5	@ read MIDR
+> >  	movs	r0, r0, lsr #30
+> > -	teqne	r0, #3			@ check top two bits 00 or 11
+> > -	moveq	pc, lr
+> > +	teq	r0, #0			@ check two top bits 00
+> > +	beq	smp_on_up		@ yes, assume UP
+> > +	teq	r0, #3			@ check top two bits 11
+> > +	movne	pc, lr			@ no, running on SMP hw
 > 
-> From: Changhwan Youn <chaos.youn@samsung.com>
+> This should be:
 > 
-> The operation of max8952 is almost similar to max8649 except
-> the output voltage range. This patch adds support the max8952
-> regulator using current max8649 implementation.
+> 	movs	r0, r0, lsr #30
+> 	teqne	r0, #3
+> 	movne	pc, lr
 > 
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> so that 0 or 3 avoids the return.
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Actually should also handle value of 1:
 
-Thanks.
+31	30
+0	0	Not using new register, assume not SMP
+0	1	Not using new register, assume not SMP
+1	0	Using new register, SMP
+1	1	Using new register, UP
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-> ---
->  drivers/regulator/Kconfig   |    4 ++--
->  drivers/regulator/max8649.c |   43
-> ++++++++++++++++++++++++++++++++++++-------
->  2 files changed, 38 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-> index 172951b..fab9a90 100644
-> --- a/drivers/regulator/Kconfig
-> +++ b/drivers/regulator/Kconfig
-> @@ -81,10 +81,10 @@ config REGULATOR_MAX1586
->  	  for PXA27x chips to control VCC_CORE and VCC_USIM voltages.
-> 
->  config REGULATOR_MAX8649
-> -	tristate "Maxim 8649 voltage regulator"
-> +	tristate "Maxim 8649/8952 voltage regulator"
->  	depends on I2C
->  	help
-> -	  This driver controls a Maxim 8649 voltage output regulator via
-> +	  This driver controls a Maxim 8649/8952 voltage output regulator
-via
->  	  I2C bus.
-> 
->  config REGULATOR_MAX8660
-> diff --git a/drivers/regulator/max8649.c b/drivers/regulator/max8649.c
-> index 4520ace..f5d034c 100644
-> --- a/drivers/regulator/max8649.c
-> +++ b/drivers/regulator/max8649.c
-> @@ -22,6 +22,9 @@
->  #define MAX8649_DCDC_STEP	10000		/* uV */
->  #define MAX8649_VOL_MASK	0x3f
-> 
-> +/* difference between voltages of max8649 and max8952 */
-> +#define DIFF_MAX8952_DCDC_VOL	20000		/* uV */
-> +
->  /* Registers */
->  #define MAX8649_MODE0		0x00
->  #define MAX8649_MODE1		0x01
-> @@ -47,6 +50,11 @@
->  #define MAX8649_RAMP_MASK	(7 << 5)
->  #define MAX8649_RAMP_DOWN	(1 << 1)
-> 
-> +enum chips {
-> +	MAX8649,
-> +	MAX8952
-> +};
-> +
->  struct max8649_regulator_info {
->  	struct regulator_dev	*regulator;
->  	struct i2c_client	*i2c;
-> @@ -54,6 +62,7 @@ struct max8649_regulator_info {
->  	struct mutex		io_lock;
-> 
->  	int		vol_reg;
-> +	int		type;
->  	unsigned	mode:2;	/* bit[1:0] = VID1, VID0 */
->  	unsigned	extclk_freq:2;
->  	unsigned	extclk:1;
-> @@ -138,7 +147,12 @@ static inline int check_range(int min_uV, int max_uV)
-> 
->  static int max8649_list_voltage(struct regulator_dev *rdev, unsigned
-index)
->  {
-> -	return (MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP);
-> +	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
-> +	int ret = MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP;
-> +
-> +	if (info->type == MAX8952)
-> +		ret += DIFF_MAX8952_DCDC_VOL;
-> +	return ret;
->  }
-> 
->  static int max8649_get_voltage(struct regulator_dev *rdev)
-> @@ -160,6 +174,11 @@ static int max8649_set_voltage(struct regulator_dev
-*rdev,
->  	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
->  	unsigned char data, mask;
-> 
-> +	if (info->type == MAX8952) {
-> +		min_uV -= DIFF_MAX8952_DCDC_VOL;
-> +		max_uV -= DIFF_MAX8952_DCDC_VOL;
-> +	}
-> +
->  	if (check_range(min_uV, max_uV)) {
->  		dev_err(info->dev, "invalid voltage range (%d, %d) uV\n",
->  			min_uV, max_uV);
-> @@ -263,7 +282,6 @@ static struct regulator_ops max8649_dcdc_ops = {
->  	.enable_time	= max8649_enable_time,
->  	.set_mode	= max8649_set_mode,
->  	.get_mode	= max8649_get_mode,
-> -
->  };
-> 
->  static struct regulator_desc dcdc_desc = {
-> @@ -281,6 +299,7 @@ static int __devinit max8649_regulator_probe(struct
-> i2c_client *client,
->  	struct max8649_regulator_info *info = NULL;
->  	unsigned char data;
->  	int ret;
-> +	int ret2;
-> 
->  	info = kzalloc(sizeof(struct max8649_regulator_info), GFP_KERNEL);
->  	if (!info) {
-> @@ -313,11 +332,20 @@ static int __devinit max8649_regulator_probe(struct
-> i2c_client *client,
-> 
->  	ret = max8649_reg_read(info->i2c, MAX8649_CHIP_ID1);
->  	if (ret < 0) {
-> -		dev_err(info->dev, "Failed to detect ID of MAX8649:%d\n",
-> -			ret);
-> +		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
-> +			id->name, ret);
-> +		goto out;
-> +	}
-> +
-> +	ret2 = max8649_reg_read(info->i2c, MAX8649_CHIP_ID2);
-> +	if (ret2 < 0) {
-> +		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
-> +			id->name, ret2);
->  		goto out;
->  	}
-> -	dev_info(info->dev, "Detected MAX8649 (ID:%x)\n", ret);
-> +	dev_info(info->dev, "Detected %s (ID:%x %x)\n", id->name, ret,
-ret2);
-> +
-> +	info->type = id->driver_data;
-> 
->  	/* enable VID0 & VID1 */
->  	max8649_set_bits(info->i2c, MAX8649_CONTROL, MAX8649_VID_MASK,
-> 0);
-> @@ -354,7 +382,7 @@ static int __devinit max8649_regulator_probe(struct
-> i2c_client *client,
->  		goto out;
->  	}
-> 
-> -	dev_info(info->dev, "Max8649 regulator device is detected.\n");
-> +	dev_info(info->dev, "%s regulator device is detected.\n", id->name);
->  	return 0;
->  out:
->  	kfree(info);
-> @@ -375,7 +403,8 @@ static int __devexit max8649_regulator_remove(struct
-> i2c_client *client)
->  }
-> 
->  static const struct i2c_device_id max8649_id[] = {
-> -	{ "max8649", 0 },
-> +	{ "max8649", MAX8649 },
-> +	{ "max8952", MAX8952 },
->  	{ }
->  };
->  MODULE_DEVICE_TABLE(i2c, max8649_id);
-> --
->1.6.2.5
+So we should return early only if it's 2.
+
+Regards,
+
+Tony
