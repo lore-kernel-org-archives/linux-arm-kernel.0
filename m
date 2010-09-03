@@ -1,31 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 3 Sep 2010 10:42:01 +0100
-Subject: [PATCH] regulators: add support max8952 regulator
-In-Reply-To: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
-References: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100903094200.GC8381@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 3 Sep 2010 11:55:04 +0200
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
+	for exceptions
+In-Reply-To: <20100903074806.GX14214@pengutronix.de>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+	<20100902212145.GA15264@n2100.arm.linux.org.uk>
+	<20100902212723.GC26319@n2100.arm.linux.org.uk>
+	<20100903074806.GX14214@pengutronix.de>
+Message-ID: <20100903095504.GC13643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 10:15:24AM +0900, Kukjin Kim wrote:
+Hello Russell,
 
-> +	ret2 = max8649_reg_read(info->i2c, MAX8649_CHIP_ID2);
-> +	if (ret2 < 0) {
-> +		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
-> +			id->name, ret2);
->  		goto out;
->  	}
+On Fri, Sep 03, 2010 at 09:48:06AM +0200, Uwe Kleine-K?nig wrote:
+> On Thu, Sep 02, 2010 at 10:27:23PM +0100, Russell King - ARM Linux wrote:
+> > 
+> > And while we're here, why hasn't anyone removed the zreladdr
+> > definitions in Makefile.boot yet?  Or do we still need them and
+> > we now have the same information defined in two different places?
+> > 
+> > This all looks like a half-done job at the moment.  Please clean it up.
+> The original series removed all the 'Makefile.boot's IIRC.  Currently
+> the params_phys-y value is needed though.  So should I send a patch that
+> just removes the zreladdr values?
+I looked into that and found some more issues.  I hope I catched them
+all now.  While doing that removing the zreladdr lines was nearly for
+free.  So I did that, too.
 
-If the read fails you'll not set an error code when you jump to out so
-the probe will report success.  It might be clearer to have separate id
-variables which you store the read values into if they're OK, just from
-a legibility point of view.
+I couldn't determine who to cc: for the ARCH_H720X patch.  Russell, do
+you maintain this platform?
 
-> -	dev_info(info->dev, "Detected MAX8649 (ID:%x)\n", ret);
-> +	dev_info(info->dev, "Detected %s (ID:%x %x)\n", id->name, ret, ret2);
-> +
-> +	info->type = id->driver_data;
+Best regards
+Uwe
 
-It'd be nice to check that the type that was supplied matches the ID
-read from the chip in case the user got things wrong, just for
-defensiveness.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
