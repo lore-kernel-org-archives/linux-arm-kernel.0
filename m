@@ -1,17 +1,25 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 3 Sep 2010 09:23:30 +0530
-Subject: [PATCH 40/74] ST SPEAr 13xx : Adding support for SPEAr1310
-In-Reply-To: <20100902100705.GN26319@n2100.arm.linux.org.uk>
+Date: Fri, 3 Sep 2010 09:26:52 +0530
+Subject: [PATCH 72/74] SPEAr13xx: Replace defconfigs with single unfied
+	defconfig
+In-Reply-To: <20100902154055.GP26319@n2100.arm.linux.org.uk>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<ac3dec2c43f98984b67c85418e1d39cadc82c550.1283161023.git.viresh.kumar@st.com>
-	<20100902100705.GN26319@n2100.arm.linux.org.uk>
-Message-ID: <4C80713A.70206@st.com>
+	<24d22c52ef8367bd6167f2a511cd86176ab6948e.1283161024.git.viresh.kumar@st.com>
+	<20100902154055.GP26319@n2100.arm.linux.org.uk>
+Message-ID: <4C807204.7090100@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2010 3:37 PM, Russell King - ARM Linux wrote:
->>  arch/arm/Makefile                                |    1 +
->> >  arch/arm/configs/spear1310-smp_defconfig         |  875 ++++++++++++++++++++++
-> NAK.  No new large defconfigs.
+On 9/2/2010 9:10 PM, Russell King - ARM Linux wrote:
+> On Mon, Aug 30, 2010 at 04:09:35PM +0530, Viresh KUMAR wrote:
+>> > We only need one defconfig for SPEAr13xx now since we can build all
+>> > boards into one kernel.
+> All this kind of thing should be rolled into previous patches.
+> 
+> We really don't need to know that you developed SPEAr13xx support
+> such that it initially couldn't build all boards into a kernel,
+> what the changes were to achieve a kernel for everything, and that
+> there were several defconfigs in existence before one grand unified
+> one was possible.
 
-Ok. Will correct all defconfig patches.
+Ok.
