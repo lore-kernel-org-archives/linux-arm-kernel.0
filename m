@@ -1,57 +1,75 @@
-From: kheitke@codeaurora.org (Kenneth Heitke)
-Date: Thu,  2 Sep 2010 17:44:19 -0600
-Subject: [PATCH v2 1/2] msm: i2c: Add msm_qup_i2c.h
-In-Reply-To: <1283471059-22262-1-git-send-email-kheitke@codeaurora.org>
-References: <1283471059-22262-1-git-send-email-kheitke@codeaurora.org>
-Message-ID: <1283471059-22262-2-git-send-email-kheitke@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Sep 2010 17:08:18 -0700
+Subject: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init
+	testing
+In-Reply-To: <20100902192659.GW11597@atomide.com>
+References: <20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+	<20100902192659.GW11597@atomide.com>
+Message-ID: <20100903000817.GG11597@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defines the platform data used by the MSM QUP I2C driver.
+* Tony Lindgren <tony@atomide.com> [100902 12:20]:
+> * Tony Lindgren <tony@atomide.com> [100902 10:35]:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 10:00]:
+> > > On Thu, Sep 02, 2010 at 09:18:47AM -0700, Tony Lindgren wrote:
+> > > 
+> > > > --- a/arch/arm/include/asm/smp_plat.h
+> > > > +++ b/arch/arm/include/asm/smp_plat.h
+> > > > @@ -39,4 +39,20 @@ static inline int cache_ops_need_broadcast(void)
+> > > >  #define UP(instr...)	_str(instr)
+> > > >  #endif
+> > > >  
+> > > > +static inline int smp_on_up(void)
+> > > > +{
+> > > > +#ifdef CONFIG_SMP_ON_UP
+> > > > +	int smp_on_up;
+> > > > +
+> > > > +	asm(							\
+> > > > +		SMP(mov	%0, #0)					\
+> > > > +		UP(mov	%0, #1)					\
+> > > > +		: "=r" (smp_on_up));
+> > > > +
+> > > > +	return smp_on_up;
+> > > > +#else
+> > > > +	return 0;
+> > > > +#endif
+> > > 
+> > > I think this is the wrong approach - rather than a function which tells us
+> > > just if we are a SMP kernel running on UP, why not something which returns
+> > > whether we're running on SMP and use that to eliminate some of these ifdefs?
+> > 
+> > Sure. Will has something like this in his patches:
+> > 
+> > static inline int cpu_is_part_of_mp_system(void)
+> > {
+> > 	u32 mpidr;
+> > 	asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
+> > 	return (mpidr >> 31) ? !(mpidr >> 30) : 0;
+> > }
+> > 
+> > BTW, so far looks like we should only need this during init to set up things.
+> 
+> Here's this one updated to replace smp_cpu() instead of smp_on_up().
 
-Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
----
- arch/arm/mach-msm/include/mach/msm_qup_i2c.h |   28 ++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/include/mach/msm_qup_i2c.h
+Heh, turns out there's a bit of a bug in the code snippet above :) It should
+be !((mpidr >> 30) & 1) instead, otherwise it always returns 0.
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_qup_i2c.h b/arch/arm/mach-msm/include/mach/msm_qup_i2c.h
-new file mode 100644
-index 0000000..e26684b
---- /dev/null
-+++ b/arch/arm/mach-msm/include/mach/msm_qup_i2c.h
-@@ -0,0 +1,28 @@
-+/*
-+ * Qualcomm MSM QUP i2c Controller Platform Data
-+ *
-+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-+ * 02110-1301, USA.
-+ */
-+#ifndef __MSM_QUP_I2C_MSM_H
-+#define __MSM_QUP_I2C_MSM_H
-+
-+struct msm_i2c_platform_data {
-+	int bus_freq;		/* I2C bus frequency (Hz) */
-+	int src_clk_rate;	/* I2C controller clock rate (Hz) */
-+};
-+
-+#endif /* __MSM_QUP_I2C_MSM_H */
--- 
-1.7.1.1
+Regards,
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smp-cpu.patch
+Type: text/x-diff
+Size: 2048 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100902/08f99cc9/attachment.bin>
