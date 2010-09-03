@@ -1,28 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Sep 2010 08:32:46 +0100
-Subject: [PATCH 08/74] ST SPEAr1300: Adding default config file
-In-Reply-To: <alpine.LFD.2.00.1009022143420.19366@xanadu.home>
+Date: Fri, 3 Sep 2010 08:34:21 +0100
+Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <4C809486.2070308@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<3a583e07221d909bd4afb952bbf2a38a2d25cdf4.1283161023.git.viresh.kumar@st.com>
-	<20100902085127.GE26319@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1009022143420.19366@xanadu.home>
-Message-ID: <20100903073246.GE26319@n2100.arm.linux.org.uk>
+	<47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
+	<20100902102323.GP26319@n2100.arm.linux.org.uk>
+	<4C809486.2070308@st.com>
+Message-ID: <20100903073421.GF26319@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 09:45:23PM -0400, Nicolas Pitre wrote:
-> On Thu, 2 Sep 2010, Russell King - ARM Linux wrote:
+On Fri, Sep 03, 2010 at 11:54:06AM +0530, deepaksi wrote:
+> On 9/2/2010 3:53 PM, Russell King - ARM Linux wrote:
+> > On Mon, Aug 30, 2010 at 04:09:12PM +0530, Viresh KUMAR wrote:
+> >   
+> >> From: Deepak Sikri <deepak.sikri@st.com>
+> >>
+> >>     
+> > The reason being?
+> >
+> >   
 > 
-> > On Mon, Aug 30, 2010 at 04:08:39PM +0530, Viresh KUMAR wrote:
-> > > From: Shiraz Hashim <shiraz.hashim@st.com>
-> > 
-> > This defconfig is too large and verbose to go anywhere near mainline,
-> > even temporarily.  You need to talk to Uwe about how to shrink it down.
-> 
-> These days, all you need to do is:
-> 
-> 	  make savedefconfig
-> 
-> and look for a defconfig file in the current directory.
+> For configuring the wake up sources ( normally in the PM framework for
+> suspend resume operations), you need to use the following set of api
+> enable_irq_wake(). This handler has a appropriate callback for the vic,
+> similar to the plugin that we have added in for gic which does enable
+> the wake interrupt sources only. But since gic handler did not had this
+> call back associated was always returning -ENXIO, which was breaking the
+> existing drivers. In case no checks are provided for the return value of 
+> enable_irq_wake(), the things were fine.
 
-Ah right.  Wonder why no one documented that.
+So how are wakeup sources configured if this callback does nothing?
