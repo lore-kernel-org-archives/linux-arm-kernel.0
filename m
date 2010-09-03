@@ -1,33 +1,45 @@
-From: Matthieu.Moy@grenoble-inp.fr (Matthieu Moy)
-Date: Fri, 03 Sep 2010 21:34:02 +0200
-Subject: [BUG?] rename patch accepted with --dry-run,
-	rejected without (Re: [PATCH V3] arm & sh: factorised duplicated
-	clkdev.c)
-In-Reply-To: <20100903192907.GA2978@n2100.arm.linux.org.uk> (Russell King's
-	message of "Fri\, 3 Sep 2010 20\:29\:07 +0100")
-References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
-	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
-	<AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
-	<20100903182323.GA17152@pengutronix.de>
-	<20100903184351.GC2341@burratino>
-	<20100903192907.GA2978@n2100.arm.linux.org.uk>
-Message-ID: <vpqr5habp05.fsf@bauges.imag.fr>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri,  3 Sep 2010 22:35:46 +0200
+Subject: [PATCH] ARM: pxa: Fix pxa3xx-u2d crash when ULPI not used
+Message-ID: <1283546146-20000-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+In case the pxa3xx-u2d driver isn't used, probing of ohci-pxa27x will cause an
+ugly kernel crash (NULL pointer dereference in pxa3xx_u2d_start_hc(), because
+struct u2d is NULL and clk_enable() call will crash the kernel, trying to access
+it).
 
-> git patches include additional metadata for renaming files, which gnu patch
-> will not understand.
->
-> If you want GNU patch compatible diffs, don't use -C or -M when generating
-> patches out of git.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/pxa3xx-ulpi.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-Fyi: actually, GNU patch will support git-style patches in the next
-version according to
-
-http://savannah.gnu.org/forum/forum.php?forum_id=6320
-
+diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+index e57439e..ce7168b 100644
+--- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
++++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+@@ -252,6 +252,10 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
+ {
+ 	int err = 0;
+ 
++	/* In case the PXA3xx ULPI isn't used, do nothing. */
++	if (!u2d)
++		return 0;
++
+ 	clk_enable(u2d->clk);
+ 
+ 	if (cpu_is_pxa310()) {
+@@ -264,6 +268,10 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
+ 
+ void pxa3xx_u2d_stop_hc(struct usb_bus *host)
+ {
++	/* In case the PXA3xx ULPI isn't used, do nothing. */
++	if (!u2d)
++		return;
++
+ 	if (cpu_is_pxa310())
+ 		pxa310_stop_otg_hc();
+ 
 -- 
-Matthieu Moy
-http://www-verimag.imag.fr/~moy/
+1.7.1
