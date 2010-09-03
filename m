@@ -1,50 +1,158 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Sep 2010 16:47:46 -0700
-Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
-In-Reply-To: <20100902163453.GR11597@atomide.com>
-References: <4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902162039.GM11597@atomide.com>
-	<20100902162537.GU26319@n2100.arm.linux.org.uk>
-	<20100902163453.GR11597@atomide.com>
-Message-ID: <20100902234746.GF11597@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri,  3 Sep 2010 10:15:24 +0900
+Subject: [PATCH] regulators: add support max8952 regulator
+Message-ID: <1283476524-12820-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100902 09:29]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 09:18]:
-> > On Thu, Sep 02, 2010 at 09:20:40AM -0700, Tony Lindgren wrote:
-> > > >From 253e91b76e104dbdf05c5c3eaf9cbf426972c938 Mon Sep 17 00:00:00 2001
-> > > From: Tony Lindgren <tony@atomide.com>
-> > > Date: Wed, 1 Sep 2010 16:49:13 -0700
-> > > Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
-> > > 
-> > > Fix v7wbi_tlb_flags for SMP on UP. Note that we must enable MULTI_TLB
-> > > to avoid undefined reference to cpu_tlb error.
-> > 
-> > This isn't required, as it is already covered by my patch.
-> 
-> Yup, seems to be working without this patch.
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-Correction, only boots on SMP hardawre. On UP hardware I still
-need the following patch.
+The operation of max8952 is almost similar to max8649 except
+the output voltage range. This patch adds support the max8952
+regulator using current max8649 implementation.
 
-Left out forcing MULTI_TLB as looks like your patch already
-does that.
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/regulator/Kconfig   |    4 ++--
+ drivers/regulator/max8649.c |   43 ++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 38 insertions(+), 9 deletions(-)
 
-Also noticed I'm now getting unhandled fault on SMP system
-which I was not getting earlier. Will try to track it down.
-
-Tony
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: tlbflush-fix-smp-on-up-flags.patch
-Type: text/x-diff
-Size: 1386 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100902/0370d3cb/attachment.bin>
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 172951b..fab9a90 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -81,10 +81,10 @@ config REGULATOR_MAX1586
+ 	  for PXA27x chips to control VCC_CORE and VCC_USIM voltages.
+ 
+ config REGULATOR_MAX8649
+-	tristate "Maxim 8649 voltage regulator"
++	tristate "Maxim 8649/8952 voltage regulator"
+ 	depends on I2C
+ 	help
+-	  This driver controls a Maxim 8649 voltage output regulator via
++	  This driver controls a Maxim 8649/8952 voltage output regulator via
+ 	  I2C bus.
+ 
+ config REGULATOR_MAX8660
+diff --git a/drivers/regulator/max8649.c b/drivers/regulator/max8649.c
+index 4520ace..f5d034c 100644
+--- a/drivers/regulator/max8649.c
++++ b/drivers/regulator/max8649.c
+@@ -22,6 +22,9 @@
+ #define MAX8649_DCDC_STEP	10000		/* uV */
+ #define MAX8649_VOL_MASK	0x3f
+ 
++/* difference between voltages of max8649 and max8952 */
++#define DIFF_MAX8952_DCDC_VOL	20000		/* uV */
++
+ /* Registers */
+ #define MAX8649_MODE0		0x00
+ #define MAX8649_MODE1		0x01
+@@ -47,6 +50,11 @@
+ #define MAX8649_RAMP_MASK	(7 << 5)
+ #define MAX8649_RAMP_DOWN	(1 << 1)
+ 
++enum chips {
++	MAX8649,
++	MAX8952
++};
++
+ struct max8649_regulator_info {
+ 	struct regulator_dev	*regulator;
+ 	struct i2c_client	*i2c;
+@@ -54,6 +62,7 @@ struct max8649_regulator_info {
+ 	struct mutex		io_lock;
+ 
+ 	int		vol_reg;
++	int		type;
+ 	unsigned	mode:2;	/* bit[1:0] = VID1, VID0 */
+ 	unsigned	extclk_freq:2;
+ 	unsigned	extclk:1;
+@@ -138,7 +147,12 @@ static inline int check_range(int min_uV, int max_uV)
+ 
+ static int max8649_list_voltage(struct regulator_dev *rdev, unsigned index)
+ {
+-	return (MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP);
++	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
++	int ret = MAX8649_DCDC_VMIN + index * MAX8649_DCDC_STEP;
++
++	if (info->type == MAX8952)
++		ret += DIFF_MAX8952_DCDC_VOL;
++	return ret;
+ }
+ 
+ static int max8649_get_voltage(struct regulator_dev *rdev)
+@@ -160,6 +174,11 @@ static int max8649_set_voltage(struct regulator_dev *rdev,
+ 	struct max8649_regulator_info *info = rdev_get_drvdata(rdev);
+ 	unsigned char data, mask;
+ 
++	if (info->type == MAX8952) {
++		min_uV -= DIFF_MAX8952_DCDC_VOL;
++		max_uV -= DIFF_MAX8952_DCDC_VOL;
++	}
++
+ 	if (check_range(min_uV, max_uV)) {
+ 		dev_err(info->dev, "invalid voltage range (%d, %d) uV\n",
+ 			min_uV, max_uV);
+@@ -263,7 +282,6 @@ static struct regulator_ops max8649_dcdc_ops = {
+ 	.enable_time	= max8649_enable_time,
+ 	.set_mode	= max8649_set_mode,
+ 	.get_mode	= max8649_get_mode,
+-
+ };
+ 
+ static struct regulator_desc dcdc_desc = {
+@@ -281,6 +299,7 @@ static int __devinit max8649_regulator_probe(struct i2c_client *client,
+ 	struct max8649_regulator_info *info = NULL;
+ 	unsigned char data;
+ 	int ret;
++	int ret2;
+ 
+ 	info = kzalloc(sizeof(struct max8649_regulator_info), GFP_KERNEL);
+ 	if (!info) {
+@@ -313,11 +332,20 @@ static int __devinit max8649_regulator_probe(struct i2c_client *client,
+ 
+ 	ret = max8649_reg_read(info->i2c, MAX8649_CHIP_ID1);
+ 	if (ret < 0) {
+-		dev_err(info->dev, "Failed to detect ID of MAX8649:%d\n",
+-			ret);
++		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
++			id->name, ret);
++		goto out;
++	}
++
++	ret2 = max8649_reg_read(info->i2c, MAX8649_CHIP_ID2);
++	if (ret2 < 0) {
++		dev_err(info->dev, "Failed to detect ID of %s:%d\n",
++			id->name, ret2);
+ 		goto out;
+ 	}
+-	dev_info(info->dev, "Detected MAX8649 (ID:%x)\n", ret);
++	dev_info(info->dev, "Detected %s (ID:%x %x)\n", id->name, ret, ret2);
++
++	info->type = id->driver_data;
+ 
+ 	/* enable VID0 & VID1 */
+ 	max8649_set_bits(info->i2c, MAX8649_CONTROL, MAX8649_VID_MASK, 0);
+@@ -354,7 +382,7 @@ static int __devinit max8649_regulator_probe(struct i2c_client *client,
+ 		goto out;
+ 	}
+ 
+-	dev_info(info->dev, "Max8649 regulator device is detected.\n");
++	dev_info(info->dev, "%s regulator device is detected.\n", id->name);
+ 	return 0;
+ out:
+ 	kfree(info);
+@@ -375,7 +403,8 @@ static int __devexit max8649_regulator_remove(struct i2c_client *client)
+ }
+ 
+ static const struct i2c_device_id max8649_id[] = {
+-	{ "max8649", 0 },
++	{ "max8649", MAX8649 },
++	{ "max8952", MAX8952 },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(i2c, max8649_id);
+-- 
+1.6.2.5
