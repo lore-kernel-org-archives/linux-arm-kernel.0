@@ -1,95 +1,36 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Fri, 03 Sep 2010 14:24:01 +0800
-Subject: [PATCH 5/6] mx51_3ds: add eCSPI2 support on the imx51_3ds board
-In-Reply-To: <20100902150516.GO14214@pengutronix.de>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-4-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-5-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-6-git-send-email-jason77.wang@gmail.com>
-	<20100902150516.GO14214@pengutronix.de>
-Message-ID: <4C809481.9090200@gmail.com>
+From: deepak.sikri@st.com (deepaksi)
+Date: Fri, 3 Sep 2010 11:50:50 +0530
+Subject: [PATCH 49/74] SPEAr CPU freq: Adding support for CPU
+	Freq	framework
+In-Reply-To: <20100902102407.GQ26319@n2100.arm.linux.org.uk>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<95e9f2e2d8e2a23629760a7dcb7cbab098ff7412.1283161023.git.viresh.kumar@st.com>
+	<20100902102407.GQ26319@n2100.arm.linux.org.uk>
+Message-ID: <4C8093C2.2010204@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
-> Hi Jason,
->
-> On Thu, Sep 02, 2010 at 03:52:03PM +0800, Jason Wang wrote:
+On 9/2/2010 3:54 PM, Russell King - ARM Linux wrote:
+> On Mon, Aug 30, 2010 at 04:09:13PM +0530, Viresh KUMAR wrote:
 >   
->> Add platform data for eCSPI2 and register it through spi_imx dynamical
->> register interface.
->>
->> Signed-off-by: Jason Wang <jason77.wang@gmail.com>
->> ---
->>  arch/arm/mach-mx5/board-mx51_3ds.c |   20 ++++++++++++++++++++
->>  1 files changed, 20 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
->> index f95c2fd..0cf4e14 100644
->> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
->> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
->> @@ -24,9 +24,11 @@
->>  #include <mach/imx-uart.h>
->>  #include <mach/3ds_debugboard.h>
->>  
->> +#include "devices-imx51.h"
->>  #include "devices.h"
->>  
->>  #define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
->> +#define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
->>  
->>  static struct pad_desc mx51_3ds_pads[] = {
->>  	/* UART1 */
->> @@ -61,6 +63,12 @@ static struct pad_desc mx51_3ds_pads[] = {
->>  	MX51_PAD_KEY_COL3__KEY_COL3,
->>  	MX51_PAD_KEY_COL4__KEY_COL4,
->>  	MX51_PAD_KEY_COL5__KEY_COL5,
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index c4d1df3..ef92faa 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -822,6 +822,8 @@ config PLAT_SPEAR
+>>  	select COMMON_CLKDEV
+>>  	select GENERIC_CLOCKEVENTS
+>>  	select HAVE_CLK
+>> +	select ARCH_HAS_CPUFREQ
 >> +
->> +	/* eCSPI2 */
->> +	MX51_PAD_NANDF_RB2__ECSPI2_SCLK,
->> +	MX51_PAD_NANDF_RB3__ECSPI2_MISO,
->> +	MX51_PAD_NANDF_D15__ECSPI2_MOSI,
->> +	MX51_PAD_NANDF_D12__GPIO_3_28,
->>  };
->>  
->>  /* Serial ports */
->> @@ -127,6 +135,16 @@ static inline void mxc_init_keypad(void)
->>  }
->>  #endif
->>  
->> +static int mx51_3ds_spi2_cs[] = {
->> +	MXC_SPI_CS(0),
->> +	MX51_3DS_ECSPI2_CS,
->> +};
->> +
->> +static struct spi_imx_master mx51_3ds_spi2_pdata = {
->> +	.chipselect	= mx51_3ds_spi2_cs,
->> +	.num_chipselect	= ARRAY_SIZE(mx51_3ds_spi2_cs),
->> +};
 >>     
-> maybe better call it mx51_3ds_ecspi2_pdata?  This should be const
-> __initconst.
->
+> You should avoid this blank line.
 >   
-OK, i will modify it.
->>  /*
->>   * Board specific initialization.
->>   */
->> @@ -136,6 +154,8 @@ static void __init mxc_board_init(void)
->>  					ARRAY_SIZE(mx51_3ds_pads));
->>  	mxc_init_imx_uart();
->>  
->> +	imx51_add_spi_imx1(&mx51_3ds_spi2_pdata);
->> +
->>  	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
->>  		printk(KERN_WARNING "Init of the debugboard failed, all "
->>  				    "devices on the board are unusable.\n");
->> -- 
->> 1.5.6.5
->>
->>
+
+Ok..
+>>  	help
+>>  	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
 >>     
+> .
 >
 >   
