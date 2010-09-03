@@ -1,66 +1,39 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Sep 2010 09:48:06 +0200
-Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
-	for exceptions
-In-Reply-To: <20100902212723.GC26319@n2100.arm.linux.org.uk>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-	<20100902212145.GA15264@n2100.arm.linux.org.uk>
-	<20100902212723.GC26319@n2100.arm.linux.org.uk>
-Message-ID: <20100903074806.GX14214@pengutronix.de>
+Date: Fri, 3 Sep 2010 09:54:16 +0200
+Subject: [PATCH 1/6] spi-imx: add CSPI and eCSPI support for i.MX51 MCU
+In-Reply-To: <4C8092AB.1050405@gmail.com>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
+	<20100902145357.GL14214@pengutronix.de>
+	<4C8092AB.1050405@gmail.com>
+Message-ID: <20100903075416.GY14214@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, Sep 02, 2010 at 10:27:23PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Sep 02, 2010 at 10:21:45PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jun 03, 2010 at 03:36:52PM +0800, Eric Miao wrote:
-> > > From: Eric Miao <eric.y.miao@gmail.com>
-> > > 
-> > > Original idea and prototype came from Nicolas Pitre.
-> > > 
-> > > As long as the zImage is placed within the 256MB range from the
-> > > start of the memory, ZRELADDR (Address where the decompressed
-> > > kernel will be placed, usually  == PHYS_OFFSET + TEXT_OFFSET)
-> > > can be determined at run-time by masking PC with 0xf000_0000.
-> > > 
-> > > Running through all the Makefile.boot, all those zreladdr-y
-> > > address == 0x[0-f]000_0000 + TEXT_OFFSET can be determined at
-> > > run-time.
-> > > 
-> > > Option CONFIG_AUTO_ZRELADDR and CONFIG_ZRELADDR are introduced,
-> > > CONFIG_ZRELADDR _must_ be explicitly specified if:
-> > > 
-> > >  - ((zreladdr-y - TEXT_OFFSET) & ~0xf0000000) != 0, which means
-> > >    a maksing of PC with 0xf000_0000 will result an incorrect
-> > >    address.
-> > > 
-> > >  - or the assumption of the zImage being loaded by the boot
-> > >    loader within 256MB from the start address is simply
-> > >    incorrect
-> > > 
-> > >  - or when ZBOOT_ROM is used, where the above assumption is
-> > >    normally wrong
-> > > 
-> > > List of all Makefile.boot:
-> > 
-> > Not so.  What happened to H720x platforms, which are now broken?
-> > Any chance of fixing the regression that this introduced?
-> > 
-> > http://armlinux.simtec.co.uk/kautobuild/2.6.36-rc3/h7202_defconfig/zimage.log
-> 
-> And while we're here, why hasn't anyone removed the zreladdr
-> definitions in Makefile.boot yet?  Or do we still need them and
-> we now have the same information defined in two different places?
-> 
-> This all looks like a half-done job at the moment.  Please clean it up.
-The original series removed all the 'Makefile.boot's IIRC.  Currently
-the params_phys-y value is needed though.  So should I send a patch that
-just removes the zreladdr values?
-
-Eric, what are your plans regarding the runtime-physoffset stuff?  (I
-currently have none.)
+On Fri, Sep 03, 2010 at 02:16:11PM +0800, Jason Wang wrote:
+>>>  -	if (cpu_is_mx25() || cpu_is_mx31() || cpu_is_mx35()) {
+>>> +	/* i.MX51 has two eCSPI and one CSPI controllers, eCSPI controllers are
+>>> +	 * not compatible with existing SPI controllers on other i.MX platforms,
+>>> +	 * while CSPI controller is 100% compatible with the one on the i.MX35.
+>>> +	 * We set the platform device id to 2 for this CSPI at i.MX51 board init
+>>> +	 * level to distinguish it from two eCSPI controllers.
+>>> +	 */
+>>>     
+>> This comment is missing in Sascha's driver.  I like it.
+>> BTW, I'd like to make use of platform ids in this driver.  This would
+>> make this ugly "on imx51 id2 is a cspi" distinction unnecessary.
+>>
+>>   
+> agree, i like both your and lothar's solution.
+> Either platform ids or flags in platform_data.
+I suggest to do the cleanup later.  Doing it before adding mx51 support
+would make only more work for little benefit.  And then the cleanup
+bases on a working version.  I'm willing to implement the platform id
+thingy and evaluate it.  But currently I have no time for that.  So I
+suggest we choose a mix between your and Sascha's patch for now and I
+will check where the cleanup fits in my planning.
 
 Best regards
 Uwe
