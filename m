@@ -1,25 +1,22 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 3 Sep 2010 09:26:52 +0530
-Subject: [PATCH 72/74] SPEAr13xx: Replace defconfigs with single unfied
-	defconfig
-In-Reply-To: <20100902154055.GP26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<24d22c52ef8367bd6167f2a511cd86176ab6948e.1283161024.git.viresh.kumar@st.com>
-	<20100902154055.GP26319@n2100.arm.linux.org.uk>
-Message-ID: <4C807204.7090100@st.com>
+Date: Fri, 3 Sep 2010 09:28:15 +0530
+Subject: [PATCH 31/74] ST SPEAr: Adding support for SSP PL022
+In-Reply-To: <AANLkTi=Fiv2i4qMcrnOeECkMKtNathO9P906=T1gcFPB@mail.gmail.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<447e0086df5d9eac78a2fc4ccf7ad51ecbed0232.1283161023.git.viresh.kumar@st.com>
+	<AANLkTi=Fiv2i4qMcrnOeECkMKtNathO9P906=T1gcFPB@mail.gmail.com>
+Message-ID: <4C807257.4030305@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2010 9:10 PM, Russell King - ARM Linux wrote:
-> On Mon, Aug 30, 2010 at 04:09:35PM +0530, Viresh KUMAR wrote:
->> > We only need one defconfig for SPEAr13xx now since we can build all
->> > boards into one kernel.
-> All this kind of thing should be rolled into previous patches.
-> 
-> We really don't need to know that you developed SPEAr13xx support
-> such that it initially couldn't build all boards into a kernel,
-> what the changes were to achieve a kernel for everything, and that
-> there were several defconfigs in existence before one grand unified
-> one was possible.
+On 9/3/2010 12:48 AM, Linus Walleij wrote:
+>> > +               .modalias = "spidev",
+>> > +               .controller_data = &spi0_dev_chip_info,
+>> > +               .max_speed_hz = 10000000,
+>> > +               .bus_num = 0,
+>> > +               .chip_select = 0,
+>> > +               .mode = 0,
+>> > +       }, {
+>> > +#endif
+> Please grep your code for all #if 0 and remove it.
 
-Ok.
+Sorry for the noise!!! Will correct it.
