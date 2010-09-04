@@ -1,33 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 4 Sep 2010 01:03:48 +0100
-Subject: [BUG?] rename patch accepted with --dry-run, rejected without
-	(Re: [PATCH V3] arm & sh: factorised duplicated clkdev.c)
-In-Reply-To: <20100903193309.GC29821@pengutronix.de>
-References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
-	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
-	<AANLkTimRKCYYQmgwY0DHu5+e-ggT8grJbdjWFvUqTzH=@mail.gmail.com>
-	<20100903182323.GA17152@pengutronix.de>
-	<20100903184351.GC2341@burratino>
-	<20100903192907.GA2978@n2100.arm.linux.org.uk>
-	<20100903193309.GC29821@pengutronix.de>
-Message-ID: <20100904000348.GA7498@n2100.arm.linux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 4 Sep 2010 10:32:08 +0900
+Subject: [PATCH] ARM: PL330: Accept revisions of the dmac
+In-Reply-To: <01e401cb4bb9$812723d0$83756b70$%kim@samsung.com>
+References: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
+	<01e401cb4bb9$812723d0$83756b70$%kim@samsung.com>
+Message-ID: <AANLkTin9VDyyV-_TA23-g57jjDuFjA7sCpuDyj+d+7qh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 09:33:09PM +0200, Uwe Kleine-K?nig wrote:
-> > git patches include additional metadata for renaming files, which gnu patch
-> > will not understand.
-> > 
-> > If you want GNU patch compatible diffs, don't use -C or -M when generating
-> > patches out of git.
-> Still GNU patch should then already fail in --dry-run mode.
+On Sat, Sep 4, 2010 at 7:43 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Jassi Brar wrote:
+>>
+>> From: Jassi Brar <jassi.brar@samsung.com>
+>>
+>> The driver can handle different revisions of the core which
+>> vary only minorly. So check for only the necessary part of
+>> the IDs.
+>>
+>> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+>> ---
+>> ?arch/arm/common/pl330.c | ? ?7 +++----
+>> ?1 files changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+>> index 5ebbab6..8f0f86d 100644
+>> --- a/arch/arm/common/pl330.c
+>> +++ b/arch/arm/common/pl330.c
+>> @@ -146,8 +146,7 @@
+>> ?#define DESIGNER ? ? 0x41
+>> ?#define REVISION ? ? 0x0
+>> ?#define INTEG_CFG ? ?0x0
+>> -#define PERIPH_ID_VAL ? ? ? ?((PART << 0) | (DESIGNER << 12) \
+>> - ? ? ? ? ? ? ? ? ? ? ? | (REVISION << 20) | (INTEG_CFG << 24))
+>> +#define PERIPH_ID_VAL ? ? ? ?((PART << 0) | (DESIGNER << 12))
+>>
+>> ?#define PCELL_ID_VAL 0xb105f00d
+>>
+>> @@ -1859,10 +1858,10 @@ int pl330_add(struct pl330_info *pi)
+>> ? ? ? regs = pi->base;
+>>
+>> ? ? ? /* Check if we can handle this DMAC */
+>> - ? ? if (get_id(pi, PERIPH_ID) != PERIPH_ID_VAL
+>> + ? ? if ((get_id(pi, PERIPH_ID) & 0xfffff) != PERIPH_ID_VAL
+>> ? ? ? ? ?|| get_id(pi, PCELL_ID) != PCELL_ID_VAL) {
+>> ? ? ? ? ? ? ? dev_err(pi->dev, "PERIPH_ID 0x%x, PCELL_ID 0x%x !\n",
+>> - ? ? ? ? ? ? ? ? ? ? readl(regs + PERIPH_ID), readl(regs + PCELL_ID));
+>> + ? ? ? ? ? ? ? ? ? ? get_id(pi, PERIPH_ID), get_id(pi, PCELL_ID));
+>
+> mm...really needed to change readl to get_id?
 
-And now look at the patch - it touches arch/sh/include/asm/clkdev.h twice.
-Once to remove it and once as a rename.
+Yes, get_id will read regs and encode the values to provide real IDs.
 
-GNU patch not in --dry-run mode will first remove arch/sh/include/asm/clkdev.h,
-and then not have a file to deal with when it tries to patch the rename
-part.  Whereas with --dry-run, the file stays around.
 
-As I say, it's because GNU patch doesn't (currently) understand GIT
-patches.  I wouldn't call that a bug in GNU patch.
+>
+> According to PL330 TRM 3-48, seems that PERIPH_ID includes all of other
+> PERIPH_ID_X's information.
+> And PCELL_ID is same...
+>
+> But I'm not sure whether there is any update...
+Our newer SoCs, C210 and V310 have revised versions and does not work without
+this patch.
