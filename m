@@ -1,96 +1,53 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 4 Sep 2010 07:23:32 +0200
-Subject: [PATCH v2 6/6] ARM: pxa168: aspenite: add board support for keypad
-In-Reply-To: <AANLkTiniX5w6Uy6xhs3k_FZc4REvpNPaixet3d8TTPVy@mail.gmail.com>
-References: <1282836457-5651-1-git-send-email-mark.brown314@gmail.com>
-	<201009040412.01067.marek.vasut@gmail.com>
-	<AANLkTiniX5w6Uy6xhs3k_FZc4REvpNPaixet3d8TTPVy@mail.gmail.com>
-Message-ID: <201009040723.33131.marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 4 Sep 2010 13:38:24 +0800
+Subject: [PATCH] ARM: pxa: Fix pxa3xx-u2d crash when ULPI not used
+In-Reply-To: <1283546146-20000-1-git-send-email-marek.vasut@gmail.com>
+References: <1283546146-20000-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTim5Gw9P91WWeoebq_qzoy+UUHMLx01nn7b0ybLf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 4. z??? 2010 04:56:27 Mark F. Brown napsal(a):
-> On Fri, Sep 3, 2010 at 10:12 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne ?t 26. srpna 2010 17:27:37 Mark F. Brown napsal(a):
-> >> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
-> > 
-> > Ditto, which is V2 and which are just resubmissions please ?
-> > 
-> >> ---
-> >>  arch/arm/mach-mmp/aspenite.c |   27 +++++++++++++++++++++++++++
-> >>  1 files changed, 27 insertions(+), 0 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-> >> index 9e1bd6b..f04bae6 100644
-> >> --- a/arch/arm/mach-mmp/aspenite.c
-> >> +++ b/arch/arm/mach-mmp/aspenite.c
-> >> @@ -24,6 +24,8 @@
-> >>  #include <mach/pxa168.h>
-> >>  #include <mach/gpio.h>
-> >>  #include <video/pxa168fb.h>
-> >> +#include <linux/input.h>
-> >> +#include <plat/pxa27x_keypad.h>
-> >> 
-> >>  #include "common.h"
-> >> 
-> >> @@ -97,6 +99,13 @@ static unsigned long common_pin_config[] __initdata =
-> >> { GPIO81_LCD_DD21,
-> >>       GPIO82_LCD_DD22,
-> >>       GPIO83_LCD_DD23,
-> >> +
-> >> +     /* Keypad */
-> >> +     GPIO109_KP_MKIN1,
-> >> +     GPIO110_KP_MKIN0,
-> >> +     GPIO111_KP_MKOUT7,
-> >> +     GPIO112_KP_MKOUT6,
-> >> +     GPIO121_KP_MKIN4,
-> >>  };
-> >> 
-> >>  static struct smc91x_platdata smc91x_info = {
-> >> @@ -193,6 +202,23 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
-> >>       .invert_pixclock        = 0,
-> >>  };
-> >> 
-> >> +static unsigned int aspenite_matrix_key_map[] = {
-> >> +     KEY(0, 6, KEY_UP),      /* SW 4 */
-> >> +     KEY(0, 7, KEY_DOWN),    /* SW 5 */
-> >> +     KEY(1, 6, KEY_LEFT),    /* SW 6 */
-> >> +     KEY(1, 7, KEY_RIGHT),   /* SW 7 */
-> >> +     KEY(4, 6, KEY_ENTER),   /* SW 8 */
-> >> +     KEY(4, 7, KEY_ESC),     /* SW 9 */
-> >> +};
-> >> +
-> >> +static struct pxa27x_keypad_platform_data aspenite_keypad_info
-> >> __initdata = { + .matrix_key_rows        = 5,
-> >> +     .matrix_key_cols        = 8,
-> >> +     .matrix_key_map         = aspenite_matrix_key_map,
-> >> +     .matrix_key_map_size    = ARRAY_SIZE(aspenite_matrix_key_map),
-> >> +     .debounce_interval      = 30,
-> >> +};
-> >> +
-> >>  static void __init common_init(void)
-> >>  {
-> >>       mfp_config(ARRAY_AND_SIZE(common_pin_config));
-> >> @@ -203,6 +229,7 @@ static void __init common_init(void)
-> >>       pxa168_add_ssp(1);
-> >>       pxa168_add_nand(&aspenite_nand_info);
-> >>       pxa168_add_fb(&aspenite_lcd_info);
-> >> +     pxa168_add_keypad(&aspenite_keypad_info);
-> >> 
-> >>       /* off-chip devices */
-> >>       platform_device_register(&smc91x_device);
-> 
-> Sorry I am new to this! If I am updating the patchset based on
-> community recommendations should I consider that the next version of
-> the patchset or something else? I think I am confused about the
-> distinction.
+On Sat, Sep 4, 2010 at 4:35 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> In case the pxa3xx-u2d driver isn't used, probing of ohci-pxa27x will cause an
+> ugly kernel crash (NULL pointer dereference in pxa3xx_u2d_start_hc(), because
+> struct u2d is NULL and clk_enable() call will crash the kernel, trying to access
+> it).
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-Stick the description of the changes made from previous version to where 
-diffstat is.
+Applied to 'devel'.
 
-Also, mark "vN+1" only those patches, that are really changed in the patchset. 
-Cheers
-> 
-> Thanks,
-> -- Mark
-> -- Mark
+> ---
+> ?arch/arm/mach-pxa/pxa3xx-ulpi.c | ? ?8 ++++++++
+> ?1 files changed, 8 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> index e57439e..ce7168b 100644
+> --- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> +++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+> @@ -252,6 +252,10 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
+> ?{
+> ? ? ? ?int err = 0;
+>
+> + ? ? ? /* In case the PXA3xx ULPI isn't used, do nothing. */
+> + ? ? ? if (!u2d)
+> + ? ? ? ? ? ? ? return 0;
+> +
+> ? ? ? ?clk_enable(u2d->clk);
+>
+> ? ? ? ?if (cpu_is_pxa310()) {
+> @@ -264,6 +268,10 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
+>
+> ?void pxa3xx_u2d_stop_hc(struct usb_bus *host)
+> ?{
+> + ? ? ? /* In case the PXA3xx ULPI isn't used, do nothing. */
+> + ? ? ? if (!u2d)
+> + ? ? ? ? ? ? ? return;
+> +
+> ? ? ? ?if (cpu_is_pxa310())
+> ? ? ? ? ? ? ? ?pxa310_stop_otg_hc();
+>
+> --
+> 1.7.1
+>
+>
