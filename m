@@ -1,35 +1,18 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Sat, 04 Sep 2010 09:10:23 +0300
-Subject: [PATCH] MMC: move regulator handling closer to core v2
-In-Reply-To: <AANLkTik-uLMUz2g2znaF0K43D8CONsGdjrRqxTCqpS_X@mail.gmail.com>
-References: <1283268367-3525-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTik-uLMUz2g2znaF0K43D8CONsGdjrRqxTCqpS_X@mail.gmail.com>
-Message-ID: <4C81E2CF.8070406@nokia.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 4 Sep 2010 15:40:44 +0800
+Subject: [PATCH v2 1/6 RESEND] ARM: pxa27x/pxa3xx: moved pxa27x_keypad.h
+	to platform pxa directory
+In-Reply-To: <1283552891-13966-2-git-send-email-mark.brown314@gmail.com>
+References: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
+	<1283552891-13966-2-git-send-email-mark.brown314@gmail.com>
+Message-ID: <AANLkTim_Z=ppernEbttKz6hcaT=F+DZDBTkhQMSipACK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> 2010/8/31 Linus Walleij <linus.walleij@stericsson.com>:
-> 
->> After discovering a problem in regulator reference counting I
->> took Mark Brown's advice to move the reference count into the
->> MMC core by making the regulator status a member of
->> struct mmc_host.
-> 
-> This has an Reveiwed-by from the regulator maintainer and
-> seems to address all comments, noone is objection so Andrew
-> can you pick it up?
+On Sat, Sep 4, 2010 at 6:28 AM, Mark F. Brown <mark.brown314@gmail.com> wrote:
+> mach-mmp utilizes pxa27x_keypad code so we need to move header to
+> platform pxa directory.
+>
+> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
 
-One of our contractors had a look at the patch and had this comment:
-
-One comment/question:
-/host/mmci.c in function
-"static int __devexit mmci_remove(struct amba_device *dev)" there is code:
-         if (regulator_is_enabled(host->vcc))
-             regulator_disable(host->vcc);
-should "ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);" be added here?
-
-> 
-> Yours,
-> Linus Walleij
-> 
+Applied to 'devel'.
