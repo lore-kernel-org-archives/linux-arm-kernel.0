@@ -1,77 +1,49 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 4 Sep 2010 04:12:00 +0200
-Subject: [PATCH v2 6/6] ARM: pxa168: aspenite: add board support for keypad
-In-Reply-To: <1282836457-5651-7-git-send-email-mark.brown314@gmail.com>
-References: <1282836457-5651-1-git-send-email-mark.brown314@gmail.com>
-	<1282836457-5651-7-git-send-email-mark.brown314@gmail.com>
-Message-ID: <201009040412.01067.marek.vasut@gmail.com>
+Date: Sat, 4 Sep 2010 04:13:10 +0200
+Subject: [PATCH] ARM: expose PB1176 ROM in debugfs
+In-Reply-To: <AANLkTik4F8VnCota=Jp+pZPg3QHvr-dKzy3cuVXJeMu7@mail.gmail.com>
+References: <1278504339-26992-1-git-send-email-triad@df.lth.se>
+	<AANLkTilxaHzHC3zFPR6q9v2mGKu7EG_Nv40V0kcZ-gwR@mail.gmail.com>
+	<AANLkTik4F8VnCota=Jp+pZPg3QHvr-dKzy3cuVXJeMu7@mail.gmail.com>
+Message-ID: <201009040413.10445.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 26. srpna 2010 17:27:37 Mark F. Brown napsal(a):
-> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+Dne P? 3. z??? 2010 23:38:54 Linus Walleij napsal(a):
+> Ping on this David, you have an opinion? debugfs ROM or
+> MTD ROM mapping?
 
-Ditto, which is V2 and which are just resubmissions please ?
-> ---
->  arch/arm/mach-mmp/aspenite.c |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
+Hey, I'd be for having this exposed through mtd_rom too. Cheers
 > 
-> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-> index 9e1bd6b..f04bae6 100644
-> --- a/arch/arm/mach-mmp/aspenite.c
-> +++ b/arch/arm/mach-mmp/aspenite.c
-> @@ -24,6 +24,8 @@
->  #include <mach/pxa168.h>
->  #include <mach/gpio.h>
->  #include <video/pxa168fb.h>
-> +#include <linux/input.h>
-> +#include <plat/pxa27x_keypad.h>
+> Yours,
+> Linus Walleij
 > 
->  #include "common.h"
+> 2010/7/18 Linus Walleij <linus.ml.walleij@gmail.com>:
+> > 2010/7/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> >> On Wed, Jul 07, 2010 at 02:05:39PM +0200, Linus Walleij wrote:
+> >>> This exposes the PB1176 ROM as a simple 16KiB file in debugfs so
+> >>> that it can be copied out and disassembled with some
+> >>> objcopy+objdump massage for example. I used this to find out how
+> >>> the ROM handled the CharLCD.
+> >> 
+> >> Would it be better to expose this through a mtd ROM mapping (map_rom) ?
+> > 
+> > This is more convenient I think.
+> > 
+> > I don't know the actual purpose of MTD ROM mappings, so
+> > paging David on this.
+> > 
+> > It has the small upside of only getting compiled in if you select
+> > CONFIG_DEBUG_FS, and getting a distinct name in debugfs
+> > rather than /dev/mtdN.
+> > 
+> > Also I can now cp /debugfs/pb1176-ROM foo.bin
+> > Is this possible with mtdblocks or do you have to dd if=... ?
+> > 
+> > Yours,
+> > Linus Walleij
 > 
-> @@ -97,6 +99,13 @@ static unsigned long common_pin_config[] __initdata = {
->  	GPIO81_LCD_DD21,
->  	GPIO82_LCD_DD22,
->  	GPIO83_LCD_DD23,
-> +
-> +	/* Keypad */
-> +	GPIO109_KP_MKIN1,
-> +	GPIO110_KP_MKIN0,
-> +	GPIO111_KP_MKOUT7,
-> +	GPIO112_KP_MKOUT6,
-> +	GPIO121_KP_MKIN4,
->  };
-> 
->  static struct smc91x_platdata smc91x_info = {
-> @@ -193,6 +202,23 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
->  	.invert_pixclock	= 0,
->  };
-> 
-> +static unsigned int aspenite_matrix_key_map[] = {
-> +	KEY(0, 6, KEY_UP),	/* SW 4 */
-> +	KEY(0, 7, KEY_DOWN),	/* SW 5 */
-> +	KEY(1, 6, KEY_LEFT),	/* SW 6 */
-> +	KEY(1, 7, KEY_RIGHT),	/* SW 7 */
-> +	KEY(4, 6, KEY_ENTER),	/* SW 8 */
-> +	KEY(4, 7, KEY_ESC),	/* SW 9 */
-> +};
-> +
-> +static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata
-> = { +	.matrix_key_rows	= 5,
-> +	.matrix_key_cols	= 8,
-> +	.matrix_key_map		= aspenite_matrix_key_map,
-> +	.matrix_key_map_size	= ARRAY_SIZE(aspenite_matrix_key_map),
-> +	.debounce_interval	= 30,
-> +};
-> +
->  static void __init common_init(void)
->  {
->  	mfp_config(ARRAY_AND_SIZE(common_pin_config));
-> @@ -203,6 +229,7 @@ static void __init common_init(void)
->  	pxa168_add_ssp(1);
->  	pxa168_add_nand(&aspenite_nand_info);
->  	pxa168_add_fb(&aspenite_lcd_info);
-> +	pxa168_add_keypad(&aspenite_keypad_info);
-> 
->  	/* off-chip devices */
->  	platform_device_register(&smc91x_device);
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
