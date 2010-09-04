@@ -1,62 +1,96 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 03 Sep 2010 21:49:51 -0700
-Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
-In-Reply-To: <20100828074304.GA2183@osiris.boeblingen.de.ibm.com>
-References: <4C61EE55.5030506@codeaurora.org>	<201008251414.16411.arnd@arndb.de>	<20100825125451.GH2153@osiris.boeblingen.de.ibm.com>	<201008251555.53653.arnd@arndb.de>	<20100825144040.GI2153@osiris.boeblingen.de.ibm.com>	<4C7867D4.10404@codeaurora.org>
-	<20100828074304.GA2183@osiris.boeblingen.de.ibm.com>
-Message-ID: <4C81CFEF.6060701@codeaurora.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 4 Sep 2010 07:23:32 +0200
+Subject: [PATCH v2 6/6] ARM: pxa168: aspenite: add board support for keypad
+In-Reply-To: <AANLkTiniX5w6Uy6xhs3k_FZc4REvpNPaixet3d8TTPVy@mail.gmail.com>
+References: <1282836457-5651-1-git-send-email-mark.brown314@gmail.com>
+	<201009040412.01067.marek.vasut@gmail.com>
+	<AANLkTiniX5w6Uy6xhs3k_FZc4REvpNPaixet3d8TTPVy@mail.gmail.com>
+Message-ID: <201009040723.33131.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2010 12:43 AM, Heiko Carstens wrote:
-> On Fri, Aug 27, 2010 at 06:35:16PM -0700, Stephen Boyd wrote:
->> On 08/25/2010 07:40 AM, Heiko Carstens wrote:
->>> On Wed, Aug 25, 2010 at 03:55:53PM +0200, Arnd Bergmann wrote:
->>>>
->>>> If you don't want to see the warnings, then just remove the strict checks.
->>>> We already concluded that there is little value in them on s390 since it only
->>>> shows false postives.
->>>>
->>>> Maybe the easiest way would be to rename the option on s390 and move all
->>>> the other ones into a common place.
->>>
->>> Yes, feel free to do that.
->>
->> Can you put up the false positives somewhere? I don't have easy access
->> to an s390 toolchain to test build with and I'm interested to see how
->> bad the false positives are.
->>
->> I'm slightly concerned that we'll just have this problem again when
->> another arch comes along with false positives. But ignoring that issue
->> is probably fine. I'll respin with a patch to move s390 to something
->> like DEBUG_WARN_USER_COPY_CHECKS.
+Dne So 4. z??? 2010 04:56:27 Mark F. Brown napsal(a):
+> On Fri, Sep 3, 2010 at 10:12 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne ?t 26. srpna 2010 17:27:37 Mark F. Brown napsal(a):
+> >> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+> > 
+> > Ditto, which is V2 and which are just resubmissions please ?
+> > 
+> >> ---
+> >>  arch/arm/mach-mmp/aspenite.c |   27 +++++++++++++++++++++++++++
+> >>  1 files changed, 27 insertions(+), 0 deletions(-)
+> >> 
+> >> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+> >> index 9e1bd6b..f04bae6 100644
+> >> --- a/arch/arm/mach-mmp/aspenite.c
+> >> +++ b/arch/arm/mach-mmp/aspenite.c
+> >> @@ -24,6 +24,8 @@
+> >>  #include <mach/pxa168.h>
+> >>  #include <mach/gpio.h>
+> >>  #include <video/pxa168fb.h>
+> >> +#include <linux/input.h>
+> >> +#include <plat/pxa27x_keypad.h>
+> >> 
+> >>  #include "common.h"
+> >> 
+> >> @@ -97,6 +99,13 @@ static unsigned long common_pin_config[] __initdata =
+> >> { GPIO81_LCD_DD21,
+> >>       GPIO82_LCD_DD22,
+> >>       GPIO83_LCD_DD23,
+> >> +
+> >> +     /* Keypad */
+> >> +     GPIO109_KP_MKIN1,
+> >> +     GPIO110_KP_MKIN0,
+> >> +     GPIO111_KP_MKOUT7,
+> >> +     GPIO112_KP_MKOUT6,
+> >> +     GPIO121_KP_MKIN4,
+> >>  };
+> >> 
+> >>  static struct smc91x_platdata smc91x_info = {
+> >> @@ -193,6 +202,23 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
+> >>       .invert_pixclock        = 0,
+> >>  };
+> >> 
+> >> +static unsigned int aspenite_matrix_key_map[] = {
+> >> +     KEY(0, 6, KEY_UP),      /* SW 4 */
+> >> +     KEY(0, 7, KEY_DOWN),    /* SW 5 */
+> >> +     KEY(1, 6, KEY_LEFT),    /* SW 6 */
+> >> +     KEY(1, 7, KEY_RIGHT),   /* SW 7 */
+> >> +     KEY(4, 6, KEY_ENTER),   /* SW 8 */
+> >> +     KEY(4, 7, KEY_ESC),     /* SW 9 */
+> >> +};
+> >> +
+> >> +static struct pxa27x_keypad_platform_data aspenite_keypad_info
+> >> __initdata = { + .matrix_key_rows        = 5,
+> >> +     .matrix_key_cols        = 8,
+> >> +     .matrix_key_map         = aspenite_matrix_key_map,
+> >> +     .matrix_key_map_size    = ARRAY_SIZE(aspenite_matrix_key_map),
+> >> +     .debounce_interval      = 30,
+> >> +};
+> >> +
+> >>  static void __init common_init(void)
+> >>  {
+> >>       mfp_config(ARRAY_AND_SIZE(common_pin_config));
+> >> @@ -203,6 +229,7 @@ static void __init common_init(void)
+> >>       pxa168_add_ssp(1);
+> >>       pxa168_add_nand(&aspenite_nand_info);
+> >>       pxa168_add_fb(&aspenite_lcd_info);
+> >> +     pxa168_add_keypad(&aspenite_keypad_info);
+> >> 
+> >>       /* off-chip devices */
+> >>       platform_device_register(&smc91x_device);
 > 
-> Sure:
+> Sorry I am new to this! If I am updating the patchset based on
+> community recommendations should I consider that the next version of
+> the patchset or something else? I think I am confused about the
+> distinction.
+
+Stick the description of the changes made from previous version to where 
+diffstat is.
+
+Also, mark "vN+1" only those patches, that are really changed in the patchset. 
+Cheers
 > 
-> In function 'copy_from_user',
->     inlined from 'write_enabled_file_bool' at kernel/kprobes.c:1973:
-> /linux-2.6/arch/s390/include/asm/uaccess.h:297: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
-> In function 'copy_from_user',
->     inlined from 'perf_copy_attr' at kernel/perf_event.c:4988,
->     inlined from 'SYSC_perf_event_open' at kernel/perf_event.c:5092,
->     inlined from 'SyS_perf_event_open' at kernel/perf_event.c:5077:
-[snip]
->     inlined from 'compat_sys_socketcall' at net/compat.c:783:
-> /linux-2.6/arch/s390/include/asm/uaccess.h:297: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
-> 
-
-Thanks. I'm a bit confused now since these files are compiled on x86 too
-and I don't see any warnings on that architecture. Which compiler is wrong?
-
-Anyway, tile has joined the strict copy from user checks arena and it's
-acting like s390 by only enabling warnings when the option is set. Sigh....
-
-I would really like to just merge all this code. How about a config
-DEBUG_USER_COPY_CHECKS which just does warnings, and then a config
-DEBUG_STRICT_USER_COPY_CHECKS that depends on DEBUG_USER_COPY_CHECKS
-that upgrades the warnings to errors? This would allow us to merge most
-of the code and still be mostly backwards compatible.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Thanks,
+> -- Mark
+> -- Mark
