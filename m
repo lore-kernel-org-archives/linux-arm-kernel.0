@@ -1,108 +1,29 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Sat, 4 Sep 2010 14:23:19 +0200
-Subject: [PATCH v5 3/7] wireless: wl12xx: add platform data passing support
-In-Reply-To: <1283376410-9999-4-git-send-email-ohad@wizery.com>
-References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
-	<1283376410-9999-4-git-send-email-ohad@wizery.com>
-Message-ID: <AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 4 Sep 2010 15:31:09 +0100
+Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
+In-Reply-To: <1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
+References: <1282922978.5075.13.camel@m0nster>
+	<1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100904143109.GA16462@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/1 Ohad Ben-Cohen <ohad@wizery.com>:
-> Add a simple mechanism to pass platform data to the
-> SDIO instances of wl12xx.
->
-> This way there is no confusion over who owns the 'embedded data',
-> typechecking is preserved, and no possibility for the wrong driver to
-> pick up the data.
->
-> Originally proposed by Russell King.
->
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> ---
-> ?drivers/net/wireless/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?drivers/net/wireless/wl12xx/Kconfig ? ? ? ? ? ? ? ?| ? ?5 ++-
-> ?drivers/net/wireless/wl12xx/wl12xx_platform_data.c | ? 31 ++++++++++++++++++++
-> ?include/linux/wl12xx.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?3 ++
-> ?4 files changed, 40 insertions(+), 1 deletions(-)
-> ?create mode 100644 drivers/net/wireless/wl12xx/wl12xx_platform_data.c
->
-> diff --git a/drivers/net/wireless/Makefile b/drivers/net/wireless/Makefile
-> index 5d4ce4d..85af697 100644
-> --- a/drivers/net/wireless/Makefile
-> +++ b/drivers/net/wireless/Makefile
-> @@ -50,5 +50,7 @@ obj-$(CONFIG_ATH_COMMON) ? ? ?+= ath/
-> ?obj-$(CONFIG_MAC80211_HWSIM) ? += mac80211_hwsim.o
->
-> ?obj-$(CONFIG_WL12XX) ? += wl12xx/
-> +# small builtin driver bit
-> +obj-$(CONFIG_WL12XX_PLATFORM_DATA) ? ? += wl12xx/wl12xx_platform_data.o
->
-> ?obj-$(CONFIG_IWM) ? ? ?+= iwmc3200wifi/
-> diff --git a/drivers/net/wireless/wl12xx/Kconfig b/drivers/net/wireless/wl12xx/Kconfig
-> index 2f98058..4a8bb25 100644
-> --- a/drivers/net/wireless/wl12xx/Kconfig
-> +++ b/drivers/net/wireless/wl12xx/Kconfig
-> @@ -74,4 +74,7 @@ config WL1271_SDIO
-> ? ? ? ? ?If you choose to build a module, it'll be called
-> ? ? ? ? ?wl1271_sdio. Say N if unsure.
->
-> -
-> +config WL12XX_PLATFORM_DATA
-> + ? ? ? bool
-> + ? ? ? depends on WL1271_SDIO != n
-> + ? ? ? default y
-> diff --git a/drivers/net/wireless/wl12xx/wl12xx_platform_data.c b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
-> new file mode 100644
-> index 0000000..e00973b
-> --- /dev/null
-> +++ b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
-> @@ -0,0 +1,31 @@
-> +#include <linux/module.h>
-> +#include <linux/wl12xx.h>
-> +
-> +static struct wl12xx_platform_data *platform_data;
-> +
-> +int __init wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
-> +{
-> + ? ? ? if (platform_data)
-> + ? ? ? ? ? ? ? return -EBUSY;
-> + ? ? ? if (!data)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? platform_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
-> + ? ? ? if (!platform_data)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +int wl12xx_get_platform_data(struct wl12xx_platform_data *data)
-> +{
-> + ? ? ? if (!platform_data)
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? if (!data)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? memcpy(data, platform_data, sizeof(*data));
-> +
-> + ? ? ? return 0;
-> +}
-> +EXPORT_SYMBOL(wl12xx_get_platform_data);
-> diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
-> index 137ac89..3e33ae1 100644
-> --- a/include/linux/wl12xx.h
-> +++ b/include/linux/wl12xx.h
-> @@ -31,4 +31,7 @@ struct wl12xx_platform_data {
-> ? ? ? ?bool use_eeprom;
-> ?};
->
-> +int wl12xx_set_platform_data(const struct wl12xx_platform_data *data);
-> +int wl12xx_get_platform_data(struct wl12xx_platform_data *data);
-> +
-> ?#endif
+On Fri, Aug 27, 2010 at 05:04:32PM +0100, Catalin Marinas wrote:
+> On Fri, 2010-08-27 at 16:29 +0100, Daniel Walker wrote:
+> > > In general, I would have liked a different way (still ID-based) of
+> > > handling such issues without duplicating the whole structure. But I see
+> > > this becoming the standard as proc-v6.S follows it as well.
+> > 
+> > This whole thing was something Russell specifically asked for (and
+> > practically wrote for me).
+> 
+> Yes, I know and I'm not saying that you should change it in this patch.
+> It's just that I would have liked to only duplicate the setup function
+> rather than the whole procinfo structure.
 
-Why do you need all that copying? Isn't the data constant?
-
-Best Regards,
-Micha? Miros?aw
+If you think about it, the only way to do that is to make things even
+more complicated than they already are by separating out the rest of
+the structure from the ID, mask, and setup functions.  At that point,
+what if someone has just one change to the other values in the structure?
+They'll have the same complaint as you have, and they'll want it split
+in an entirely different way.
