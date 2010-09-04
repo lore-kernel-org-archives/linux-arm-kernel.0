@@ -1,49 +1,31 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 4 Sep 2010 04:13:10 +0200
-Subject: [PATCH] ARM: expose PB1176 ROM in debugfs
-In-Reply-To: <AANLkTik4F8VnCota=Jp+pZPg3QHvr-dKzy3cuVXJeMu7@mail.gmail.com>
-References: <1278504339-26992-1-git-send-email-triad@df.lth.se>
-	<AANLkTilxaHzHC3zFPR6q9v2mGKu7EG_Nv40V0kcZ-gwR@mail.gmail.com>
-	<AANLkTik4F8VnCota=Jp+pZPg3QHvr-dKzy3cuVXJeMu7@mail.gmail.com>
-Message-ID: <201009040413.10445.marek.vasut@gmail.com>
+Date: Sat, 4 Sep 2010 04:31:49 +0200
+Subject: [Openpxa-users] Colibri PXA320 Power management question
+In-Reply-To: <4C7FC606.20904@compulab.co.il>
+References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
+	<20100902152705.GC5809@rakim.wolfsonmicro.main>
+	<4C7FC606.20904@compulab.co.il>
+Message-ID: <201009040431.49798.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 3. z??? 2010 23:38:54 Linus Walleij napsal(a):
-> Ping on this David, you have an opinion? debugfs ROM or
-> MTD ROM mapping?
-
-Hey, I'd be for having this exposed through mtd_rom too. Cheers
-> 
-> Yours,
-> Linus Walleij
-> 
-> 2010/7/18 Linus Walleij <linus.ml.walleij@gmail.com>:
-> > 2010/7/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> >> On Wed, Jul 07, 2010 at 02:05:39PM +0200, Linus Walleij wrote:
-> >>> This exposes the PB1176 ROM as a simple 16KiB file in debugfs so
-> >>> that it can be copied out and disassembled with some
-> >>> objcopy+objdump massage for example. I used this to find out how
-> >>> the ROM handled the CharLCD.
+Dne ?t 2. z??? 2010 17:43:02 Mike Rapoport napsal(a):
+> Mark Brown wrote:
+> > On Thu, Sep 02, 2010 at 05:41:57PM +0300, Mike Rapoport wrote:
+> >> Mark Brown wrote:
+> >>> The expectation in Linux is that voltage scaling will be done in
+> >>> software using cpufreq rather than autonomously by the CPU.
 > >> 
-> >> Would it be better to expose this through a mtd ROM mapping (map_rom) ?
+> >> PXA3xx has ability to automatically control certain regulators
+> >> (almost) without software intervention. Setting the bits Yuri is
+> >> talking about should enable CPU initiated i2c transactions upon
+> >> frequency scaling events.
 > > 
-> > This is more convenient I think.
-> > 
-> > I don't know the actual purpose of MTD ROM mappings, so
-> > paging David on this.
-> > 
-> > It has the small upside of only getting compiled in if you select
-> > CONFIG_DEBUG_FS, and getting a distinct name in debugfs
-> > rather than /dev/mtdN.
-> > 
-> > Also I can now cp /debugfs/pb1176-ROM foo.bin
-> > Is this possible with mtdblocks or do you have to dd if=... ?
-> > 
-> > Yours,
-> > Linus Walleij
+> > Yes, exactly - what I'm saying is that Linux is set up to use cpufreq
+> > rather than rely on the built in stuff.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> There's no contradiction here. The PXA3XX cpufreq implementation could
+> trigger automatic voltage scaling.
+
+Considering the CPU and the regulator are compatible and you wont fry the CPU. 
+In that case, you use cpufreq indeed.
