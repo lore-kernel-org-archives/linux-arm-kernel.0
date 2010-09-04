@@ -1,53 +1,35 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 4 Sep 2010 13:38:24 +0800
-Subject: [PATCH] ARM: pxa: Fix pxa3xx-u2d crash when ULPI not used
-In-Reply-To: <1283546146-20000-1-git-send-email-marek.vasut@gmail.com>
-References: <1283546146-20000-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTim5Gw9P91WWeoebq_qzoy+UUHMLx01nn7b0ybLf@mail.gmail.com>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Sat, 04 Sep 2010 09:10:23 +0300
+Subject: [PATCH] MMC: move regulator handling closer to core v2
+In-Reply-To: <AANLkTik-uLMUz2g2znaF0K43D8CONsGdjrRqxTCqpS_X@mail.gmail.com>
+References: <1283268367-3525-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTik-uLMUz2g2znaF0K43D8CONsGdjrRqxTCqpS_X@mail.gmail.com>
+Message-ID: <4C81E2CF.8070406@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 4, 2010 at 4:35 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> In case the pxa3xx-u2d driver isn't used, probing of ohci-pxa27x will cause an
-> ugly kernel crash (NULL pointer dereference in pxa3xx_u2d_start_hc(), because
-> struct u2d is NULL and clk_enable() call will crash the kernel, trying to access
-> it).
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Linus Walleij wrote:
+> 2010/8/31 Linus Walleij <linus.walleij@stericsson.com>:
+> 
+>> After discovering a problem in regulator reference counting I
+>> took Mark Brown's advice to move the reference count into the
+>> MMC core by making the regulator status a member of
+>> struct mmc_host.
+> 
+> This has an Reveiwed-by from the regulator maintainer and
+> seems to address all comments, noone is objection so Andrew
+> can you pick it up?
 
-Applied to 'devel'.
+One of our contractors had a look at the patch and had this comment:
 
-> ---
-> ?arch/arm/mach-pxa/pxa3xx-ulpi.c | ? ?8 ++++++++
-> ?1 files changed, 8 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
-> index e57439e..ce7168b 100644
-> --- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
-> +++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
-> @@ -252,6 +252,10 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
-> ?{
-> ? ? ? ?int err = 0;
->
-> + ? ? ? /* In case the PXA3xx ULPI isn't used, do nothing. */
-> + ? ? ? if (!u2d)
-> + ? ? ? ? ? ? ? return 0;
-> +
-> ? ? ? ?clk_enable(u2d->clk);
->
-> ? ? ? ?if (cpu_is_pxa310()) {
-> @@ -264,6 +268,10 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
->
-> ?void pxa3xx_u2d_stop_hc(struct usb_bus *host)
-> ?{
-> + ? ? ? /* In case the PXA3xx ULPI isn't used, do nothing. */
-> + ? ? ? if (!u2d)
-> + ? ? ? ? ? ? ? return;
-> +
-> ? ? ? ?if (cpu_is_pxa310())
-> ? ? ? ? ? ? ? ?pxa310_stop_otg_hc();
->
-> --
-> 1.7.1
->
->
+One comment/question:
+/host/mmci.c in function
+"static int __devexit mmci_remove(struct amba_device *dev)" there is code:
+         if (regulator_is_enabled(host->vcc))
+             regulator_disable(host->vcc);
+should "ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);" be added here?
+
+> 
+> Yours,
+> Linus Walleij
+> 
