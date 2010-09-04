@@ -1,31 +1,24 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 4 Sep 2010 04:31:49 +0200
-Subject: [Openpxa-users] Colibri PXA320 Power management question
-In-Reply-To: <4C7FC606.20904@compulab.co.il>
-References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
-	<20100902152705.GC5809@rakim.wolfsonmicro.main>
-	<4C7FC606.20904@compulab.co.il>
-Message-ID: <201009040431.49798.marek.vasut@gmail.com>
+From: david.yangshuai@gmail.com (David Yang)
+Date: Sat, 4 Sep 2010 10:43:19 +0800
+Subject: Question about lowmemorykiller of kernel_armdroid
+Message-ID: <AANLkTi=vdnkHjd1gPLKPeh5bDnuMPjZeeP5JMfkrv-uY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 2. z??? 2010 17:43:02 Mike Rapoport napsal(a):
-> Mark Brown wrote:
-> > On Thu, Sep 02, 2010 at 05:41:57PM +0300, Mike Rapoport wrote:
-> >> Mark Brown wrote:
-> >>> The expectation in Linux is that voltage scaling will be done in
-> >>> software using cpufreq rather than autonomously by the CPU.
-> >> 
-> >> PXA3xx has ability to automatically control certain regulators
-> >> (almost) without software intervention. Setting the bits Yuri is
-> >> talking about should enable CPU initiated i2c transactions upon
-> >> frequency scaling events.
-> > 
-> > Yes, exactly - what I'm saying is that Linux is set up to use cpufreq
-> > rather than rely on the built in stuff.
-> 
-> There's no contradiction here. The PXA3XX cpufreq implementation could
-> trigger automatic voltage scaling.
+hi,
 
-Considering the CPU and the regulator are compatible and you wont fry the CPU. 
-In that case, you use cpufreq indeed.
+     When I  used the kernel_armdroid, sometimes the kernel crashed
+and printed the error information as:
+
+?a NULL pointer  ,   the file  lowmemorykiller.c?
+
+    I saw from the google,the NULL pointer problem should have be
+solved before the latest kernel_armdroid.But I think there may be a
+little possiblity that the bug is still alive.
+
+
+   Any suggestion will be appreciated.
+
+   Thanks!
+
+   David
