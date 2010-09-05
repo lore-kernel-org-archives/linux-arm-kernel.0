@@ -1,34 +1,58 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 5 Sep 2010 18:50:17 +0800
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100902055907.GA3287@riccoc20.at.omicron.at>
-References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
-	<m3sk1yzkjw.fsf@intrepid.localdomain>
-	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
-	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-	<20100902055907.GA3287@riccoc20.at.omicron.at>
-Message-ID: <AANLkTi=TfmFPSfw3iYUMzxdsCLC7keJxMbb7vZvQHoiO@mail.gmail.com>
+Date: Sun, 5 Sep 2010 19:08:47 +0800
+Subject: [PATCH] pxa168fb: Add .remove function
+In-Reply-To: <201008301943.48077.marek.vasut@gmail.com>
+References: <1283128337-4605-1-git-send-email-haojian.zhuang@marvell.com>
+	<201008301943.48077.marek.vasut@gmail.com>
+Message-ID: <AANLkTim6g-=R1gStpecbGuyLu3d2JkGVkY2Ct7691oJN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 2, 2010 at 1:59 PM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> On Thu, Sep 02, 2010 at 11:50:33AM +0900, FUJITA Tomonori wrote:
->> btw, I can't compile ARCH_IXP4XX without the following patch:
+On Tue, Aug 31, 2010 at 1:43 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne Po 30. srpna 2010 02:32:16 Haojian Zhuang napsal(a):
+>> The pxa168fb driver is missing .remove function so the framebuffer isn't
+>> correctly shut down when the module is removed.
 >>
->> http://www.spinics.net/lists/arm-kernel/msg95933.html
+>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?drivers/video/pxa168fb.c | ? 47
+>> ++++++++++++++++++++++++++++++++++++++++++++++ 1 files changed, 47
+>> insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+>> index c91a7f7..ec2ddb2 100644
+>> --- a/drivers/video/pxa168fb.c
+>> +++ b/drivers/video/pxa168fb.c
+>> @@ -784,12 +784,53 @@ failed:
+>> ? ? ? return ret;
+>> ?}
+>>
+>> +static int __devexit pxa168fb_remove(struct platform_device *pdev)
+>> +{
+>> + ? ? struct pxa168fb_info *fbi = platform_get_drvdata(pdev);
+>> + ? ? struct fb_info *info;
+>> + ? ? int irq;
+>> + ? ? unsigned int data;
+>> +
+>> + ? ? if (!fbi)
+>> + ? ? ? ? ? ? return 0;
+>> +
+>> + ? ? /* disable DMA transfer */
+>> + ? ? data = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+>> + ? ? data &= ~CFG_GRA_ENA_MASK;
+>> + ? ? writel(data, fbi->reg_base + LCD_SPU_DMA_CTRL0);
+>> +
+>> + ? ? info = fbi->info;
+>> +
+>> + ? ? unregister_framebuffer(info);
+>> +
 >
-> I have the same problem. Compilation of IXP4xx was broken by
+> Haojian, is this line below correct?
 >
-> ? ?commit 4fa5518c65df7a2c4b6c58061ac53d0b01228042
-> ? ?Author: Eric Miao <eric.y.miao@gmail.com>
-> ? ?Date: ? Sat Jun 5 15:16:17 2010 +0800
+> If so, for this modified version, find my:
 >
-> ? ?[ARM] pxa: remove now unnecessary dma_needs_bounce()
->
-> What is the correct way to do fix this? Is the above patch the
-> solution, or is dma_needs_bounce() perhaps also unnecessary for ixp?
+> Acked-by: Marek Vasut <marek.vasut@gmail.com>
 >
 
-My bad to break this. If there is no quick proper fix, I'd prefer this
-being reverted first.
+Applied to 'devel'.
