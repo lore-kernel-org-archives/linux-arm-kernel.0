@@ -1,50 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Sep 2010 12:25:13 +0100
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
-	<m3sk1yzkjw.fsf@intrepid.localdomain>
-	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
-	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20100905112513.GB558@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 5 Sep 2010 19:56:15 +0800
+Subject: [PATCH] pxa168fb: fix clear operation
+In-Reply-To: <1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
+References: <1283128337-4605-1-git-send-email-haojian.zhuang@marvell.com>
+	<1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 02, 2010 at 11:50:33AM +0900, FUJITA Tomonori wrote:
-> On Wed, 1 Sep 2010 09:57:38 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Sat, Aug 28, 2010 at 07:58:11PM +0200, Krzysztof Halasa wrote:
-> > > What's the outcome of the following?
-> > > 
-> > > Russell, are you going to apply it as is, or is a better (short-term)
-> > > fix being made?
-> > 
-> > I want to see a better solution to this first - without which we'll
-> > apply this hack and then quietly forget about the problem.
-> 
-> This restores the trick that had worked.
-> 
-> btw, I can't compile ARCH_IXP4XX without the following patch:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg95933.html
-> 
-> =
-> From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-> Subject: [PATCH] arm: fix arm: fix pci_set_consistent_dma_mask for dmabounce devices
-> 
-> This fixes the regression caused by the commit
-> 6fee48cd330c68332f9712bc968d934a1a84a32a.
-> 
-> ARM needs to clip the dma coherent mask for dmabounce devices. This
-> restores the old trick.
-> 
-> Note that strictly speaking, the DMA API doesn't allow architectures
-> to do such but I'm not sure it's worth adding the new API to set the
-> dma mask that allows architectures to clip it.
-> 
-> Signed-off-by: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+On Mon, Aug 30, 2010 at 8:32 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> While fb isn't active, we should clear CFG_GRA_ENA bit. The existing code
+> can't clear this bit.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+> ?drivers/video/pxa168fb.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+> index ec2ddb2..3f112c9 100644
+> --- a/drivers/video/pxa168fb.c
+> +++ b/drivers/video/pxa168fb.c
+> @@ -298,8 +298,8 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
+> ? ? ? ? * Set bit to enable graphics DMA.
+> ? ? ? ? */
+> ? ? ? ?x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+> - ? ? ? x |= fbi->active ? 0x00000100 : 0;
+> - ? ? ? fbi->active = 0;
+> + ? ? ? x &= ~CFG_GRA_ENA_MASK;
+> + ? ? ? x |= CFG_GRA_ENA(!!fbi->active);
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This isn't very readable. And since CFG_GRA_ENA is actually a 1-bit
+field, I'd recommend to change it to something like below:
 
-Thanks.
+diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+index 5d786bd..59fa751 100644
+--- a/drivers/video/pxa168fb.c
++++ b/drivers/video/pxa168fb.c
+@@ -298,8 +298,11 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
+ 	 * Set bit to enable graphics DMA.
+ 	 */
+ 	x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+-	x |= fbi->active ? 0x00000100 : 0;
+-	fbi->active = 0;
++
++	if (fbi->active)
++		x &= ~CFG_GRA_ENA;
++	else
++		x |= CFG_GRA_ENA;
+
+ 	/*
+ 	 * If we are in a pseudo-color mode, we need to enable
+diff --git a/drivers/video/pxa168fb.h b/drivers/video/pxa168fb.h
+index eee0927..e5c34a5 100644
+--- a/drivers/video/pxa168fb.h
++++ b/drivers/video/pxa168fb.h
+@@ -240,8 +240,7 @@
+ #define     CFG_GRA_SWAPYU_MASK			0x00000400
+ #define     CFG_YUV2RGB_GRA(cvrt)		((cvrt) << 9)
+ #define     CFG_YUV2RGB_GRA_MASK		0x00000200
+-#define     CFG_GRA_ENA(gra)			((gra) << 8)
+-#define     CFG_GRA_ENA_MASK			0x00000100
++#define     CFG_GRA_ENA				0x10000100
+ /* for video part */
+ #define     CFG_DMA_FTOGGLE(toggle)		((toggle) << 7)
+ #define     CFG_DMA_FTOGGLE_MASK		0x00000080
+>
+> ? ? ? ?/*
+> ? ? ? ? * If we are in a pseudo-color mode, we need to enable
+> --
+> 1.5.6.5
+>
+>
