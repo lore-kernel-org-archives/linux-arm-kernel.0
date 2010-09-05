@@ -1,80 +1,34 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 5 Sep 2010 18:46:56 +0800
-Subject: [PATCH v2 4/6 RESEND] ARM: pxa27x_keypad: added wakeup event
-	handler for keypad interrupts
-In-Reply-To: <4C834E9B.5080505@compulab.co.il>
-References: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
-	<1283552891-13966-5-git-send-email-mark.brown314@gmail.com>
-	<4C834E9B.5080505@compulab.co.il>
-Message-ID: <AANLkTikOs0a45bfZ4jRd1_ROvcUMPmnwvcicpm1RZFCc@mail.gmail.com>
+Date: Sun, 5 Sep 2010 18:50:17 +0800
+Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
+In-Reply-To: <20100902055907.GA3287@riccoc20.at.omicron.at>
+References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
+	<m3sk1yzkjw.fsf@intrepid.localdomain>
+	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
+	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
+	<20100902055907.GA3287@riccoc20.at.omicron.at>
+Message-ID: <AANLkTi=TfmFPSfw3iYUMzxdsCLC7keJxMbb7vZvQHoiO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 5, 2010 at 4:02 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> ?On 09/04/10 01:28, Mark F. Brown wrote:
->> mach-mmp needs to clear wake event in order to clear the keypad interrupt
+On Thu, Sep 2, 2010 at 1:59 PM, Richard Cochran
+<richardcochran@gmail.com> wrote:
+> On Thu, Sep 02, 2010 at 11:50:33AM +0900, FUJITA Tomonori wrote:
+>> btw, I can't compile ARCH_IXP4XX without the following patch:
 >>
->> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
->> ---
->> ?arch/arm/plat-pxa/include/plat/pxa27x_keypad.h | ? ?1 +
->> ?drivers/input/keyboard/pxa27x_keypad.c ? ? ? ? | ? 10 ++++++++++
->> ?2 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
->> index 7b4eadc..73dacda 100644
->> --- a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
->> +++ b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
->> @@ -52,6 +52,7 @@ struct pxa27x_keypad_platform_data {
->>
->> ? ? ? /* key debounce interval */
->> ? ? ? unsigned int ? ?debounce_interval;
->> + ? ? void ? ? ? ? ? ?(*clear_wakeup_event)(void);
+>> http://www.spinics.net/lists/arm-kernel/msg95933.html
 >
-> I understand, this is a bit late... but still I want to ask a question:
-> As I understand, the clear_wakeup_event() function is called in interrupt context,
-> wouldn't it be wiser to add a comment on this, so platform (current/future) code
-> will be aware and will make no heavy stuff in it (accidentally).
+> I have the same problem. Compilation of IXP4xx was broken by
+>
+> ? ?commit 4fa5518c65df7a2c4b6c58061ac53d0b01228042
+> ? ?Author: Eric Miao <eric.y.miao@gmail.com>
+> ? ?Date: ? Sat Jun 5 15:16:17 2010 +0800
+>
+> ? ?[ARM] pxa: remove now unnecessary dma_needs_bounce()
+>
+> What is the correct way to do fix this? Is the above patch the
+> solution, or is dma_needs_bounce() perhaps also unnecessary for ixp?
 >
 
-A comment will be good to have indeed, not just explaining the context
-this function will be running, but also a bit about why this is introduced.
-
-Mark,
-
-If you come up with an updated patch, I'll help rebase my tree.
-
->> ?};
->>
->> ?extern void pxa_set_keypad_info(struct pxa27x_keypad_platform_data *info);
->> diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
->> index 0610d10..b36d2be 100644
->> --- a/drivers/input/keyboard/pxa27x_keypad.c
->> +++ b/drivers/input/keyboard/pxa27x_keypad.c
->> @@ -330,11 +330,21 @@ static void pxa27x_keypad_scan_direct(struct pxa27x_keypad *keypad)
->> ? ? ? keypad->direct_key_state = new_state;
->> ?}
->>
->> +static void clear_wakeup_event(struct pxa27x_keypad *keypad)
->> +{
->> + ? ? struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
->> +
->> + ? ? if (pdata->clear_wakeup_event)
->> + ? ? ? ? ? ? (pdata->clear_wakeup_event)();
->> +}
->> +
->> ?static irqreturn_t pxa27x_keypad_irq_handler(int irq, void *dev_id)
->> ?{
->> ? ? ? struct pxa27x_keypad *keypad = dev_id;
->> ? ? ? unsigned long kpc = keypad_readl(KPC);
->>
->> + ? ? clear_wakeup_event(keypad);
->> +
->> ? ? ? if (kpc & KPC_DI)
->> ? ? ? ? ? ? ? pxa27x_keypad_scan_direct(keypad);
->>
->
-> --
-> Regards,
-> Igor.
->
->
+My bad to break this. If there is no quick proper fix, I'd prefer this
+being reverted first.
