@@ -1,31 +1,48 @@
-From: agruen@suse.de (Andreas Gruenbacher)
-Date: Sun, 5 Sep 2010 00:26:08 +0200
-Subject: [bug-patch] Re: [BUG?] rename patch accepted with --dry-run,
-	rejected without (Re: [PATCH V3] arm & sh: factorised duplicated
-	clkdev.c)
-In-Reply-To: <20100904220152.GB20444@n2100.arm.linux.org.uk>
-References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
-	<201009042346.11787.agruen@suse.de>
-	<20100904220152.GB20444@n2100.arm.linux.org.uk>
-Message-ID: <201009050026.08235.agruen@suse.de>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Sun, 05 Sep 2010 03:53:55 +0200
+Subject: [PATCH 1/6] ARM: Add inline function smp_cpu() for early init
+	testing
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A8@dbde02.ent.ti.com>
+References: <4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+	<20100902192659.GW11597@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A8@dbde02.ent.ti.com>
+Message-ID: <op.vijd75a97p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 05 September 2010 00:01:52 Russell King - ARM Linux wrote:
-> On Sat, Sep 04, 2010 at 11:46:11PM +0200, Andreas Gruenbacher wrote:
-> > On Saturday 04 September 2010 23:45:27 Russell King - ARM Linux wrote:
-> > > It also makes them incompatible with GNU patch, whether or not GNU patch
-> > > understands the GIT headers.
-> > 
-> > Aha?  Then why do you think GNU patch tries to understand the GIt patch 
-> > headers?  So that it can be incompatible with GIT?
-> 
-> Read what you said last time around.  "In this case, the patch itself is
-> broken."
+On Fri, 03 Sep 2010 14:12:22 +0200, Shilimkar, Santosh <santosh.shilimkar@ti.com> wrote:
+> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+> index 8db3512..82bc488 100644
+> --- a/arch/arm/include/asm/smp_plat.h
+> +++ b/arch/arm/include/asm/smp_plat.h
+> @@ -39,4 +39,11 @@ static inline int cache_ops_need_broadcast(void)
+>  #define UP(instr...)	_str(instr)
+>  #endif
+> +static inline int smp_cpu(void)
+> +{
+> +        u32 mpidr;
+> +        asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
+> +        return (mpidr >> 31) ? !(mpidr >> 30) : 0;
 
-I was corrected on that by Jonathan Nieder's mail which describes a detail of 
-the GIT patch format that I didn't know about.  So it's a bug in the way GNU 
-patch handles the git patch format and not an error in the patch.  Not nice 
-and probably not easy to fix, but not fundamentally unfixable.
+This always returns 0.  If (mpdir >> 31) is true then (mpidr >> 30) is
+either 2 or 3.  Did you mean:
 
-Andreas
++	return (mpidr >> 30) == 2;
+
+> +}
+> +
+
+-- 
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
