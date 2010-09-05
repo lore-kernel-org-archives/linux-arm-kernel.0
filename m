@@ -1,56 +1,87 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 05 Sep 2010 17:31:53 +0300
-Subject: [PATCH] ARM: pxa: Fix pxa3xx-u2d crash when ULPI not used
-In-Reply-To: <AANLkTik7Hzs8OUKSL+6HRgvR1iRWg4LE_v0LMUC2VxVZ@mail.gmail.com>
-References: <1283546146-20000-1-git-send-email-marek.vasut@gmail.com>
-	<201009051001.22816.marek.vasut@gmail.com>
-	<4C8351F0.2040801@compulab.co.il>
-	<201009051025.49256.marek.vasut@gmail.com>
-	<4C835655.1080103@compulab.co.il>
-	<AANLkTikRREGjQfiMc+ttypHmeBE00cXM1Fcmf0GvZXPV@mail.gmail.com>
-	<4C839F26.4050107@compulab.co.il>
-	<AANLkTik7Hzs8OUKSL+6HRgvR1iRWg4LE_v0LMUC2VxVZ@mail.gmail.com>
-Message-ID: <4C83A9D9.9050803@compulab.co.il>
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Sun, 5 Sep 2010 11:28:51 -0400
+Subject: [PATCH v2 4/6 RESEND] ARM: pxa27x_keypad: added wakeup event
+	handler for keypad interrupts
+In-Reply-To: <AANLkTikOs0a45bfZ4jRd1_ROvcUMPmnwvcicpm1RZFCc@mail.gmail.com>
+References: <1283552891-13966-1-git-send-email-mark.brown314@gmail.com>
+	<1283552891-13966-5-git-send-email-mark.brown314@gmail.com>
+	<4C834E9B.5080505@compulab.co.il>
+	<AANLkTikOs0a45bfZ4jRd1_ROvcUMPmnwvcicpm1RZFCc@mail.gmail.com>
+Message-ID: <AANLkTik7H3qdbRa3NHKFyMvaFRJpisqs0=U-h7sxZQy4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 09/05/10 16:58, Eric Miao wrote:
-> On Sun, Sep 5, 2010 at 9:46 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>  On 09/05/10 13:43, Eric Miao wrote:
->>> On Sun, Sep 5, 2010 at 4:35 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>> Igor,
+On Sun, Sep 5, 2010 at 6:46 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Sun, Sep 5, 2010 at 4:02 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>> ?On 09/04/10 01:28, Mark F. Brown wrote:
+>>> mach-mmp needs to clear wake event in order to clear the keypad interrupt
 >>>
->>> So do you this as a proper fix, or there is better way out?
->> If we want to keep it the most straight-forward way so it is fine.
+>>> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+>>> ---
+>>> ?arch/arm/plat-pxa/include/plat/pxa27x_keypad.h | ? ?1 +
+>>> ?drivers/input/keyboard/pxa27x_keypad.c ? ? ? ? | ? 10 ++++++++++
+>>> ?2 files changed, 11 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
+>>> index 7b4eadc..73dacda 100644
+>>> --- a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
+>>> +++ b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
+>>> @@ -52,6 +52,7 @@ struct pxa27x_keypad_platform_data {
+>>>
+>>> ? ? ? /* key debounce interval */
+>>> ? ? ? unsigned int ? ?debounce_interval;
+>>> + ? ? void ? ? ? ? ? ?(*clear_wakeup_event)(void);
 >>
->> Another possible ways would be:
+>> I understand, this is a bit late... but still I want to ask a question:
+>> As I understand, the clear_wakeup_event() function is called in interrupt context,
+>> wouldn't it be wiser to add a comment on this, so platform (current/future) code
+>> will be aware and will make no heavy stuff in it (accidentally).
 >>
->> 1) create a new flag, lets say PORT2_USE_U2DC in pxaohci_platform_data.
->> This is a relatively clean way of making ohci aware of
->> u2d existence at runtime and eliminates the calls to functions
->> of non-existing (not loaded) driver...
+>
+> A comment will be good to have indeed, not just explaining the context
+> this function will be running, but also a bit about why this is introduced.
+>
+> Mark,
+>
+> If you come up with an updated patch, I'll help rebase my tree.
+>
+>>> ?};
+>>>
+>>> ?extern void pxa_set_keypad_info(struct pxa27x_keypad_platform_data *info);
+>>> diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+>>> index 0610d10..b36d2be 100644
+>>> --- a/drivers/input/keyboard/pxa27x_keypad.c
+>>> +++ b/drivers/input/keyboard/pxa27x_keypad.c
+>>> @@ -330,11 +330,21 @@ static void pxa27x_keypad_scan_direct(struct pxa27x_keypad *keypad)
+>>> ? ? ? keypad->direct_key_state = new_state;
+>>> ?}
+>>>
+>>> +static void clear_wakeup_event(struct pxa27x_keypad *keypad)
+>>> +{
+>>> + ? ? struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
+>>> +
+>>> + ? ? if (pdata->clear_wakeup_event)
+>>> + ? ? ? ? ? ? (pdata->clear_wakeup_event)();
+>>> +}
+>>> +
+>>> ?static irqreturn_t pxa27x_keypad_irq_handler(int irq, void *dev_id)
+>>> ?{
+>>> ? ? ? struct pxa27x_keypad *keypad = dev_id;
+>>> ? ? ? unsigned long kpc = keypad_readl(KPC);
+>>>
+>>> + ? ? clear_wakeup_event(keypad);
+>>> +
+>>> ? ? ? if (kpc & KPC_DI)
+>>> ? ? ? ? ? ? ? pxa27x_keypad_scan_direct(keypad);
+>>>
 >>
->> 2) use something like:
->> struct u2d_hc_ops {
->>    int (*start_hc)(...);
->>    void (*stop_hc)(...);
->> }
+>> --
+>> Regards,
+>> Igor.
 >>
->> in board init code register the ops structure via the pxa_ohci platform data.
 >>
->> This way adds some more pollution to the pxa_ohci glue with code
->> relevant only to pxa3xx, achieving the same as the 1st way, but also
->> can be useful for u2dc otg/peripheral driver (if it will come some day...).
->>
->> I'm fine with both (Marek's patch or my proposal), so tell me what
->> looks better to you.
->>
-> That sounds to be a cleaner way, but may require more changes. What
-> if we get this patch into -rc phase as is first, and get a cleaner patch for
-> -next?
+>
 
-Fine with me.
+Ok will do!
 
--- 
-Regards,
-Igor.
+-- Mark
