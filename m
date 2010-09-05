@@ -1,49 +1,47 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 5 Sep 2010 19:58:39 +0800
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100905112152.GA558@n2100.arm.linux.org.uk>
-References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
-	<m3sk1yzkjw.fsf@intrepid.localdomain>
-	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
-	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-	<20100902055907.GA3287@riccoc20.at.omicron.at>
-	<AANLkTi=TfmFPSfw3iYUMzxdsCLC7keJxMbb7vZvQHoiO@mail.gmail.com>
-	<20100905112152.GA558@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=K_nV+xOCD4tGT3Df74EWq2crjpkLyXtOkHsC9@mail.gmail.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Sun, 05 Sep 2010 08:02:52 -0400
+Subject: [PATCH] davinci: Add I2C0 devices to MityDSP-L138/MityARM-1808
+	platform
+In-Reply-To: <4C837195.2040100@mvista.com>
+References: <1283616701-6418-1-git-send-email-michael.williamson@criticallink.com>
+	<4C837195.2040100@mvista.com>
+Message-ID: <4C8386EC.50002@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 5, 2010 at 7:21 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Sep 05, 2010 at 06:50:17PM +0800, Eric Miao wrote:
->> On Thu, Sep 2, 2010 at 1:59 PM, Richard Cochran
->> <richardcochran@gmail.com> wrote:
->> > On Thu, Sep 02, 2010 at 11:50:33AM +0900, FUJITA Tomonori wrote:
->> >> btw, I can't compile ARCH_IXP4XX without the following patch:
->> >>
->> >> http://www.spinics.net/lists/arm-kernel/msg95933.html
->> >
->> > I have the same problem. Compilation of IXP4xx was broken by
->> >
->> > ? ?commit 4fa5518c65df7a2c4b6c58061ac53d0b01228042
->> > ? ?Author: Eric Miao <eric.y.miao@gmail.com>
->> > ? ?Date: ? Sat Jun 5 15:16:17 2010 +0800
->> >
->> > ? ?[ARM] pxa: remove now unnecessary dma_needs_bounce()
->> >
->> > What is the correct way to do fix this? Is the above patch the
->> > solution, or is dma_needs_bounce() perhaps also unnecessary for ixp?
->> >
->>
->> My bad to break this. If there is no quick proper fix, I'd prefer this
->> being reverted first.
->
-> Reverted.
->
-> Can I assume that I can commit this with:
->
-> Reported-by: Richard Cochran <richardcochran@gmail.com>
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
->
+On 09/05/2010 06:31 AM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04-09-2010 20:11, Michael Williamson wrote:
+> 
+>> This patch adds the i2c0 bus and attached devices to the MityDSP-L138
+>> and MityARM-1808 davinci SoM.  Included is a TPS65023 voltage regulator
+>> needed for power management and a small 24c02 EPROM that contains
+>> factory configuration data.
+> 
+>> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
+> [...]
+>> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c
+>> b/arch/arm/mach-davinci/board-mityomapl138.c
+>> index 7146916..03820ce 100644
+>> --- a/arch/arm/mach-davinci/board-mityomapl138.c
+>> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> [...]
+>> @@ -25,6 +27,141 @@
+> [...]
+>> +struct regulator_init_data tps65023_regulator_data[] = {
+>> +    /* dcdc1 */
+>> +    {
+>> +        .constraints = {
+>> +            .min_uV = 1150000,
+>> +            .max_uV = 1350000,
+>> +            .valid_ops_mask = (REGULATOR_CHANGE_VOLTAGE |
+>> +                REGULATOR_CHANGE_STATUS),
+> 
+>    Would look better if you aligned it. And parens are useless here.
+> 
 
-Yes please.
+I'll clean it up, but I pretty much lifted it from board-da850-evm.c. 
+The next time someone's in there, I suppose it should also be addressed.
+
+Thanks for the comments.
