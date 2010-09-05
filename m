@@ -1,75 +1,49 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 5 Sep 2010 19:56:15 +0800
-Subject: [PATCH] pxa168fb: fix clear operation
-In-Reply-To: <1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1283128337-4605-1-git-send-email-haojian.zhuang@marvell.com>
-	<1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
+Date: Sun, 5 Sep 2010 19:58:39 +0800
+Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
+In-Reply-To: <20100905112152.GA558@n2100.arm.linux.org.uk>
+References: <20100819174426O.fujita.tomonori@lab.ntt.co.jp>
+	<m3sk1yzkjw.fsf@intrepid.localdomain>
+	<20100901085738.GJ8142@n2100.arm.linux.org.uk>
+	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
+	<20100902055907.GA3287@riccoc20.at.omicron.at>
+	<AANLkTi=TfmFPSfw3iYUMzxdsCLC7keJxMbb7vZvQHoiO@mail.gmail.com>
+	<20100905112152.GA558@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=K_nV+xOCD4tGT3Df74EWq2crjpkLyXtOkHsC9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 30, 2010 at 8:32 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> While fb isn't active, we should clear CFG_GRA_ENA bit. The existing code
-> can't clear this bit.
+On Sun, Sep 5, 2010 at 7:21 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Sep 05, 2010 at 06:50:17PM +0800, Eric Miao wrote:
+>> On Thu, Sep 2, 2010 at 1:59 PM, Richard Cochran
+>> <richardcochran@gmail.com> wrote:
+>> > On Thu, Sep 02, 2010 at 11:50:33AM +0900, FUJITA Tomonori wrote:
+>> >> btw, I can't compile ARCH_IXP4XX without the following patch:
+>> >>
+>> >> http://www.spinics.net/lists/arm-kernel/msg95933.html
+>> >
+>> > I have the same problem. Compilation of IXP4xx was broken by
+>> >
+>> > ? ?commit 4fa5518c65df7a2c4b6c58061ac53d0b01228042
+>> > ? ?Author: Eric Miao <eric.y.miao@gmail.com>
+>> > ? ?Date: ? Sat Jun 5 15:16:17 2010 +0800
+>> >
+>> > ? ?[ARM] pxa: remove now unnecessary dma_needs_bounce()
+>> >
+>> > What is the correct way to do fix this? Is the above patch the
+>> > solution, or is dma_needs_bounce() perhaps also unnecessary for ixp?
+>> >
+>>
+>> My bad to break this. If there is no quick proper fix, I'd prefer this
+>> being reverted first.
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
-> ?drivers/video/pxa168fb.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
+> Reverted.
 >
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index ec2ddb2..3f112c9 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -298,8 +298,8 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
-> ? ? ? ? * Set bit to enable graphics DMA.
-> ? ? ? ? */
-> ? ? ? ?x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
-> - ? ? ? x |= fbi->active ? 0x00000100 : 0;
-> - ? ? ? fbi->active = 0;
-> + ? ? ? x &= ~CFG_GRA_ENA_MASK;
-> + ? ? ? x |= CFG_GRA_ENA(!!fbi->active);
+> Can I assume that I can commit this with:
+>
+> Reported-by: Richard Cochran <richardcochran@gmail.com>
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>
 
-This isn't very readable. And since CFG_GRA_ENA is actually a 1-bit
-field, I'd recommend to change it to something like below:
-
-diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-index 5d786bd..59fa751 100644
---- a/drivers/video/pxa168fb.c
-+++ b/drivers/video/pxa168fb.c
-@@ -298,8 +298,11 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
- 	 * Set bit to enable graphics DMA.
- 	 */
- 	x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
--	x |= fbi->active ? 0x00000100 : 0;
--	fbi->active = 0;
-+
-+	if (fbi->active)
-+		x &= ~CFG_GRA_ENA;
-+	else
-+		x |= CFG_GRA_ENA;
-
- 	/*
- 	 * If we are in a pseudo-color mode, we need to enable
-diff --git a/drivers/video/pxa168fb.h b/drivers/video/pxa168fb.h
-index eee0927..e5c34a5 100644
---- a/drivers/video/pxa168fb.h
-+++ b/drivers/video/pxa168fb.h
-@@ -240,8 +240,7 @@
- #define     CFG_GRA_SWAPYU_MASK			0x00000400
- #define     CFG_YUV2RGB_GRA(cvrt)		((cvrt) << 9)
- #define     CFG_YUV2RGB_GRA_MASK		0x00000200
--#define     CFG_GRA_ENA(gra)			((gra) << 8)
--#define     CFG_GRA_ENA_MASK			0x00000100
-+#define     CFG_GRA_ENA				0x10000100
- /* for video part */
- #define     CFG_DMA_FTOGGLE(toggle)		((toggle) << 7)
- #define     CFG_DMA_FTOGGLE_MASK		0x00000080
->
-> ? ? ? ?/*
-> ? ? ? ? * If we are in a pseudo-color mode, we need to enable
-> --
-> 1.5.6.5
->
->
+Yes please.
