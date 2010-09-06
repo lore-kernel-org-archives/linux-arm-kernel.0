@@ -1,55 +1,135 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 05:50:42 +0200
-Subject: [PATCH 2/4] ARM: Samsung: s5p-fimc: fix dma coherent mask
+Date: Mon, 06 Sep 2010 05:50:43 +0200
+Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
 In-Reply-To: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
 References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1283745044-15514-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FIMC driver uses DMA_coherent allocator, which requires proper dma mask
-to be set.
+Add common clocks setup code for FIMC devices on S5PV210 SoCs.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-s5p/dev-fimc0.c |    2 ++
- arch/arm/plat-s5p/dev-fimc1.c |    2 ++
- arch/arm/plat-s5p/dev-fimc2.c |    2 ++
- 3 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/Kconfig             |    6 ++++
+ arch/arm/mach-s5pv210/Makefile            |    1 +
+ arch/arm/mach-s5pv210/setup-fimc.c        |   46 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/fimc.h |   24 +++++++++++++++
+ 4 files changed, 77 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv210/setup-fimc.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/fimc.h
 
-diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-fimc0.c
-index d3f1a9b..9f26096 100644
---- a/arch/arm/plat-s5p/dev-fimc0.c
-+++ b/arch/arm/plat-s5p/dev-fimc0.c
-@@ -33,4 +33,6 @@ struct platform_device s5p_device_fimc0 = {
- 	.id		= 0,
- 	.num_resources	= ARRAY_SIZE(s5p_fimc0_resource),
- 	.resource	= s5p_fimc0_resource,
-+	.dev.dma_mask	  = &s5p_device_fimc0.dev.coherent_dma_mask,
-+	.dev.coherent_dma_mask = 0xffffffffUL,
- };
-diff --git a/arch/arm/plat-s5p/dev-fimc1.c b/arch/arm/plat-s5p/dev-fimc1.c
-index 41bd698..4149c49 100644
---- a/arch/arm/plat-s5p/dev-fimc1.c
-+++ b/arch/arm/plat-s5p/dev-fimc1.c
-@@ -33,4 +33,6 @@ struct platform_device s5p_device_fimc1 = {
- 	.id		= 1,
- 	.num_resources	= ARRAY_SIZE(s5p_fimc1_resource),
- 	.resource	= s5p_fimc1_resource,
-+	.dev.dma_mask	  = &s5p_device_fimc1.dev.coherent_dma_mask,
-+	.dev.coherent_dma_mask = 0xffffffffUL,
- };
-diff --git a/arch/arm/plat-s5p/dev-fimc2.c b/arch/arm/plat-s5p/dev-fimc2.c
-index dfddeda..ced9097 100644
---- a/arch/arm/plat-s5p/dev-fimc2.c
-+++ b/arch/arm/plat-s5p/dev-fimc2.c
-@@ -33,4 +33,6 @@ struct platform_device s5p_device_fimc2 = {
- 	.id		= 2,
- 	.num_resources	= ARRAY_SIZE(s5p_fimc2_resource),
- 	.resource	= s5p_fimc2_resource,
-+	.dev.dma_mask	  = &s5p_device_fimc2.dev.coherent_dma_mask,
-+	.dev.coherent_dma_mask = 0xffffffffUL,
- };
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index d3a3895..48489bb 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -37,6 +37,12 @@ config S5PV210_SETUP_FB_24BPP
+ 	help
+           Common setup code for S5PV210 with an 24bpp RGB display helper.
+ 
++config S5PV210_SETUP_FIMC
++	bool
++	help
++	  Compile common code for S5PV210 based machines to setup correct
++	  FIMC clock parameters.
++
+ config S5PV210_SETUP_KEYPAD
+ 	bool
+ 	help
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 05048c5..c13aef1 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -29,6 +29,7 @@ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+ obj-$(CONFIG_S5PC110_DEV_ONENAND) += dev-onenand.o
+ 
+ obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
++obj-$(CONFIG_S5PV210_SETUP_FIMC)	+= setup-fimc.o
+ obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
+ obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
+ obj-$(CONFIG_S5PV210_SETUP_IDE)		+= setup-ide.o
+diff --git a/arch/arm/mach-s5pv210/setup-fimc.c b/arch/arm/mach-s5pv210/setup-fimc.c
+new file mode 100644
+index 0000000..80c1ffe
+--- /dev/null
++++ b/arch/arm/mach-s5pv210/setup-fimc.c
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * S5PV210 clock setup code for FIMC devices
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/device.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <plat/devs.h>
++#include <plat/fimc.h>
++
++int __init s5pv210_fimc_setup_clks(void)
++{
++	int err = 0;
++	int i;
++	struct clk *clk_fimc, *parent;
++
++	struct device *fimc_devs[] = {
++		&s5p_device_fimc0.dev,
++		&s5p_device_fimc1.dev,
++		&s5p_device_fimc2.dev
++	};
++
++	parent = clk_get(NULL, "mout_epll");
++	if (IS_ERR(parent))
++		return PTR_ERR(parent);
++
++	for (i = 0; err == 0 && i < ARRAY_SIZE(fimc_devs); i++) {
++		if (fimc_devs[i]) {
++			clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
++			if (IS_ERR(clk_fimc)) {
++				err = PTR_ERR(clk_fimc);
++				break;
++			}
++			clk_set_parent(clk_fimc, parent);
++			clk_put(clk_fimc);
++		}
++	}
++	clk_put(parent);
++	return err;
++}
+diff --git a/arch/arm/plat-samsung/include/plat/fimc.h b/arch/arm/plat-samsung/include/plat/fimc.h
+new file mode 100644
+index 0000000..2c06f37
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/fimc.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
++ * Common FIMC devices definitions and helper functions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __PLAT_SAMSUNG_FIMC_H
++#define __PLAT_SAMSUNG_FIMC_H __FILE__
++
++/**
++ * s5pv210_fimc_setup_clks() - S5PV210/S5PC110 fimc clocks setup function
++ *
++ * Set correct parent clocks on machines which bootloaded did not configured
++ * fimc clocks correctly. FIMC devices works properly only if sourced from
++ * certain clock sources. "mout_epll" clock is the recommended one.
++ */
++extern int s5pv210_fimc_setup_clks(void);
++
++#endif /* __PLAT_SAMSUNG_FIMC_H */
 -- 
 1.7.2.2
