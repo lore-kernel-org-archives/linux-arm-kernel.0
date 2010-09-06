@@ -1,140 +1,265 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 11:12:27 +0200
-Subject: [PATCH 6/6] ARM: S5PC110: GONI: Add support for QT602240 TS driver
+Date: Mon, 06 Sep 2010 11:12:26 +0200
+Subject: [PATCH 5/6] ARM: Samsung: Add common samsung_gpiolib_to_irq function
 In-Reply-To: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
 References: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1283764347-460-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1283764347-460-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-Add required platform definitions for QT602240 touchscreen on I2C2 bus.
+This patch adds a common callback for gpio_to_irq() for external and
+gpio interrupts for Samsung SoCs.
 
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig     |    3 ++
- arch/arm/mach-s5pv210/mach-goni.c |   56 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/gpiolib.c                |    8 +----
+ arch/arm/mach-s5pc100/gpiolib.c                |   31 ++++++-----------------
+ arch/arm/mach-s5pv210/gpiolib.c                |    8 ++++++
+ arch/arm/plat-s3c24xx/gpiolib.c                |    8 +----
+ arch/arm/plat-s5p/irq-gpioint.c                |    1 +
+ arch/arm/plat-samsung/gpiolib.c                |    8 ++++++
+ arch/arm/plat-samsung/include/plat/gpio-core.h |   11 ++++++++
+ 7 files changed, 40 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 5315fec..2f4025d 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -76,6 +76,7 @@ config MACH_GONI
- 	bool "GONI"
- 	select CPU_S5PV210
- 	select ARCH_SPARSEMEM_ENABLE
-+	select S5P_GPIO_INT
- 	select S3C_DEV_FB
- 	select S5P_DEV_FIMC0
- 	select S5P_DEV_FIMC1
-@@ -83,8 +84,10 @@ config MACH_GONI
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
-+	select S3C_DEV_I2C2
- 	select S5P_DEV_ONENAND
- 	select S5PV210_SETUP_FB_24BPP
-+	select S5PV210_SETUP_I2C2
- 	select S5PV210_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung GONI board
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index fdc5cca..bc9c5af 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -15,6 +15,7 @@
- #include <linux/fb.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
-+#include <linux/i2c/qt602240_ts.h>
- #include <linux/mfd/max8998.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-@@ -35,6 +36,7 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/fb.h>
-+#include <plat/iic.h>
- #include <plat/sdhci.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
-@@ -111,6 +113,52 @@ static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
- 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
+diff --git a/arch/arm/mach-s3c64xx/gpiolib.c b/arch/arm/mach-s3c64xx/gpiolib.c
+index 300dee4..fd99a82 100644
+--- a/arch/arm/mach-s3c64xx/gpiolib.c
++++ b/arch/arm/mach-s3c64xx/gpiolib.c
+@@ -195,11 +195,6 @@ static struct s3c_gpio_cfg gpio_2bit_cfg_eint11 = {
+ 	.get_pull	= s3c_gpio_getpull_updown,
  };
  
-+/* TSP */
-+static struct qt602240_platform_data qt602240_platform_data = {
-+	.x_line		= 17,
-+	.y_line		= 11,
-+	.x_size		= 800,
-+	.y_size		= 480,
-+	.blen		= 0x21,
-+	.threshold	= 0x28,
-+	.voltage	= 2800000,              /* 2.8V */
-+	.orient		= QT602240_DIAGONAL,
-+};
+-int s3c64xx_gpio2int_gpn(struct gpio_chip *chip, unsigned pin)
+-{
+-	return IRQ_EINT(0) + pin;
+-}
+-
+ static struct s3c_gpio_chip gpio_2bit[] = {
+ 	{
+ 		.base	= S3C64XX_GPF_BASE,
+@@ -227,12 +222,13 @@ static struct s3c_gpio_chip gpio_2bit[] = {
+ 		},
+ 	}, {
+ 		.base	= S3C64XX_GPN_BASE,
++		.irq_base = IRQ_EINT(0),
+ 		.config	= &gpio_2bit_cfg_eint10,
+ 		.chip	= {
+ 			.base	= S3C64XX_GPN(0),
+ 			.ngpio	= S3C64XX_GPIO_N_NR,
+ 			.label	= "GPN",
+-			.to_irq = s3c64xx_gpio2int_gpn,
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= S3C64XX_GPO_BASE,
+diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/arch/arm/mach-s5pc100/gpiolib.c
+index 5811578..def4ff8 100644
+--- a/arch/arm/mach-s5pc100/gpiolib.c
++++ b/arch/arm/mach-s5pc100/gpiolib.c
+@@ -61,25 +61,6 @@
+  * L3	8	4Bit	None
+  */
+ 
+-static int s5pc100_gpiolib_to_eint(struct gpio_chip *chip, unsigned int offset)
+-{
+-	int base;
+-
+-	base = chip->base - S5PC100_GPH0(0);
+-	if (base == 0)
+-		return IRQ_EINT(offset);
+-	base = chip->base - S5PC100_GPH1(0);
+-	if (base == 0)
+-		return IRQ_EINT(8 + offset);
+-	base = chip->base - S5PC100_GPH2(0);
+-	if (base == 0)
+-		return IRQ_EINT(16 + offset);
+-	base = chip->base - S5PC100_GPH3(0);
+-	if (base == 0)
+-		return IRQ_EINT(24 + offset);
+-	return -EINVAL;
+-}
+-
+ static struct s3c_gpio_cfg gpio_cfg = {
+ 	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
+ 	.set_pull	= s3c_gpio_setpull_updown,
+@@ -223,38 +204,42 @@ static struct s3c_gpio_chip s5pc100_gpio_chips[] = {
+ 	}, {
+ 		.base	= S5PC100_GPH0_BASE,
+ 		.config	= &gpio_cfg_eint,
++		.irq_base = IRQ_EINT(0),
+ 		.chip	= {
+ 			.base	= S5PC100_GPH0(0),
+ 			.ngpio	= S5PC100_GPIO_H0_NR,
+ 			.label	= "GPH0",
+-			.to_irq = s5pc100_gpiolib_to_eint,
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= S5PC100_GPH1_BASE,
+ 		.config	= &gpio_cfg_eint,
++		.irq_base = IRQ_EINT(8),
+ 		.chip	= {
+ 			.base	= S5PC100_GPH1(0),
+ 			.ngpio	= S5PC100_GPIO_H1_NR,
+ 			.label	= "GPH1",
+-			.to_irq = s5pc100_gpiolib_to_eint,
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= S5PC100_GPH2_BASE,
+ 		.config	= &gpio_cfg_eint,
++		.irq_base = IRQ_EINT(16),
+ 		.chip	= {
+ 			.base	= S5PC100_GPH2(0),
+ 			.ngpio	= S5PC100_GPIO_H2_NR,
+ 			.label	= "GPH2",
+-			.to_irq = s5pc100_gpiolib_to_eint,
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= S5PC100_GPH3_BASE,
+ 		.config	= &gpio_cfg_eint,
++		.irq_base = IRQ_EINT(24),
+ 		.chip	= {
+ 			.base	= S5PC100_GPH3(0),
+ 			.ngpio	= S5PC100_GPIO_H3_NR,
+ 			.label	= "GPH3",
+-			.to_irq = s5pc100_gpiolib_to_eint,
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= S5PC100_GPI_BASE,
+diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
+index 29dfb89..ab673ef 100644
+--- a/arch/arm/mach-s5pv210/gpiolib.c
++++ b/arch/arm/mach-s5pv210/gpiolib.c
+@@ -224,34 +224,42 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
+ 	}, {
+ 		.base	= (S5P_VA_GPIO + 0xC00),
+ 		.config	= &gpio_cfg_noint,
++		.irq_base = IRQ_EINT(0),
+ 		.chip	= {
+ 			.base	= S5PV210_GPH0(0),
+ 			.ngpio	= S5PV210_GPIO_H0_NR,
+ 			.label	= "GPH0",
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= (S5P_VA_GPIO + 0xC20),
+ 		.config	= &gpio_cfg_noint,
++		.irq_base = IRQ_EINT(8),
+ 		.chip	= {
+ 			.base	= S5PV210_GPH1(0),
+ 			.ngpio	= S5PV210_GPIO_H1_NR,
+ 			.label	= "GPH1",
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= (S5P_VA_GPIO + 0xC40),
+ 		.config	= &gpio_cfg_noint,
++		.irq_base = IRQ_EINT(16),
+ 		.chip	= {
+ 			.base	= S5PV210_GPH2(0),
+ 			.ngpio	= S5PV210_GPIO_H2_NR,
+ 			.label	= "GPH2",
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= (S5P_VA_GPIO + 0xC60),
+ 		.config	= &gpio_cfg_noint,
++		.irq_base = IRQ_EINT(24),
+ 		.chip	= {
+ 			.base	= S5PV210_GPH3(0),
+ 			.ngpio	= S5PV210_GPIO_H3_NR,
+ 			.label	= "GPH3",
++			.to_irq = samsung_gpiolib_to_irq,
+ 		},
+ 	},
+ };
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+index 4c0896f..243b641 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -74,11 +74,6 @@ static int s3c24xx_gpiolib_bankf_toirq(struct gpio_chip *chip, unsigned offset)
+ 	return -EINVAL;
+ }
+ 
+-static int s3c24xx_gpiolib_bankg_toirq(struct gpio_chip *chip, unsigned offset)
+-{
+-	return IRQ_EINT8 + offset;
+-}
+-
+ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
+ 	.set_config	= s3c_gpio_setcfg_s3c24xx_a,
+ 	.get_config	= s3c_gpio_getcfg_s3c24xx_a,
+@@ -157,12 +152,13 @@ struct s3c_gpio_chip s3c24xx_gpios[] = {
+ 	[6] = {
+ 		.base	= S3C2410_GPGCON,
+ 		.pm	= __gpio_pm(&s3c_gpio_pm_2bit),
++		.irq_base = IRQ_EINT8,
+ 		.chip	= {
+ 			.base			= S3C2410_GPG(0),
+ 			.owner			= THIS_MODULE,
+ 			.label			= "GPIOG",
+ 			.ngpio			= 16,
+-			.to_irq			= s3c24xx_gpiolib_bankg_toirq,
++			.to_irq			= samsung_gpiolib_to_irq,
+ 		},
+ 	}, {
+ 		.base	= S3C2410_GPHCON,
+diff --git a/arch/arm/plat-s5p/irq-gpioint.c b/arch/arm/plat-s5p/irq-gpioint.c
+index 7409ae0..5b735b1 100644
+--- a/arch/arm/plat-s5p/irq-gpioint.c
++++ b/arch/arm/plat-s5p/irq-gpioint.c
+@@ -235,6 +235,7 @@ int __init s5p_register_gpio_interrupt(int pin)
+ 	/* register gpio group */
+ 	ret = s5p_gpioint_add(my_chip);
+ 	if (ret == 0) {
++		my_chip->chip.to_irq = samsung_gpiolib_to_irq;
+ 		printk(KERN_INFO "Registered interrupt support for gpio group %d.\n",
+ 		       group);
+ 		return my_chip->irq_base + offset;
+diff --git a/arch/arm/plat-samsung/gpiolib.c b/arch/arm/plat-samsung/gpiolib.c
+index c354089..f2dc389 100644
+--- a/arch/arm/plat-samsung/gpiolib.c
++++ b/arch/arm/plat-samsung/gpiolib.c
+@@ -197,3 +197,11 @@ void __init samsung_gpiolib_add_4bit2_chips(struct s3c_gpio_chip *chip,
+ 		s3c_gpiolib_add(chip);
+ 	}
+ }
 +
-+static struct s3c2410_platform_i2c i2c2_data __initdata = {
-+	.flags		= 0,
-+	.bus_num	= 2,
-+	.slave_addr	= 0x10,
-+	.frequency	= 400 * 1000,
-+	.sda_delay	= 100,
-+};
-+
-+static struct i2c_board_info i2c2_devs[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("qt602240_ts", 0x4a),
-+		.platform_data = &qt602240_platform_data,
-+	},
-+};
-+
-+static void __init goni_tsp_init(void)
++int samsung_gpiolib_to_irq(struct gpio_chip *chip, unsigned int offset)
 +{
-+	int gpio, irq;
++	struct s3c_gpio_chip *s3c_chip = container_of(chip,
++			struct s3c_gpio_chip, chip);
 +
-+	gpio = S5PV210_GPJ1(3);                 /* XMSMADDR_11 */
-+	gpio_request(gpio, "TSP_LDO_ON");
-+	gpio_direction_output(gpio, 1);
-+	gpio_export(gpio, 0);
-+
-+	gpio = S5PV210_GPJ0(5);                 /* XMSMADDR_5 */
-+	gpio_request(gpio, "TSP_INT");
-+
-+	s5p_register_gpio_interrupt(gpio);
-+	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+	irq = gpio_to_irq(gpio);
-+	i2c2_devs[0].irq = irq;
++	return s3c_chip->irq_base + offset;
 +}
-+
- /* MAX8998 regulators */
- #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
+index c22c27c..13a22b8 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-core.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+@@ -122,6 +122,17 @@ extern void samsung_gpiolib_add_4bit2_chips(struct s3c_gpio_chip *chip,
+ extern void samsung_gpiolib_add_4bit(struct s3c_gpio_chip *chip);
+ extern void samsung_gpiolib_add_4bit2(struct s3c_gpio_chip *chip);
  
-@@ -465,6 +513,7 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&s3c_device_hsmmc0,
- 	&s3c_device_hsmmc1,
- 	&s3c_device_hsmmc2,
-+	&s3c_device_i2c2,
- };
- 
- static void __init goni_map_io(void)
-@@ -476,6 +525,13 @@ static void __init goni_map_io(void)
- 
- static void __init goni_machine_init(void)
- {
-+	/* TSP: call before I2C 2 registeration */
-+	goni_tsp_init();
 +
-+	/* I2C2 */
-+	s3c_i2c2_set_platdata(&i2c2_data);
-+	i2c_register_board_info(2, i2c2_devs, ARRAY_SIZE(i2c2_devs));
++/**
++ * samsung_gpiolib_to_irq - convert gpio pin to irq number
++ * @chip: The gpio chip that the pin belongs to.
++ * @offset: The offset of the pin in the chip.
++ *
++ * This helper returns the irq number calculated from the chip->irq_base and
++ * the provided offset.
++ */
++extern int samsung_gpiolib_to_irq(struct gpio_chip *chip, unsigned int offset);
 +
- 	/* PMIC */
- 	goni_pmic_init();
- 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
+ /* exported for core SoC support to change */
+ extern struct s3c_gpio_cfg s3c24xx_gpiocfg_default;
+ 
 -- 
 1.7.2.2
