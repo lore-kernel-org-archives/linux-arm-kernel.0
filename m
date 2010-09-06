@@ -1,43 +1,104 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Mon, 6 Sep 2010 13:14:22 +0530
-Subject: [PATCH 45/74] SPEAr : SEV Send event to secondary CPUs
-In-Reply-To: <20100902102256.GO26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
-	<20100902102256.GO26319@n2100.arm.linux.org.uk>
-Message-ID: <4C849BD6.90007@st.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 6 Sep 2010 10:35:03 +0200
+Subject: [PATCH] ARM: PL330: Accept revisions of the dmac
+In-Reply-To: <AANLkTikeTyUtUQEobgi0eQX47jO0CQ2oGusojHv1ymED@mail.gmail.com>
+References: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
+	<AANLkTimC5Ru-cTGVynnCu2NntHrHa9pB1HSGWEEJNZT7@mail.gmail.com>
+	<AANLkTikeTyUtUQEobgi0eQX47jO0CQ2oGusojHv1ymED@mail.gmail.com>
+Message-ID: <AANLkTims+16hJT5m3e+_9vf5wfvtRyArHV2ttzbHxid9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+2010/9/5 Jassi Brar <jassisinghbrar@gmail.com>:
+> [Me]
+>> Jassi, this kind of macros already exist in <linux/amba/bus.h>
+>> can't you just #include that and use these instead?
+> You mean to use amba_config/rev et al ?
+>
+> But they work on struct amba_device *, and I have to form those
+> structs just to make use of the macros.
 
-On 9/2/2010 3:52 PM, Russell King - ARM Linux wrote:
-> On Mon, Aug 30, 2010 at 04:09:09PM +0530, Viresh KUMAR wrote:
->> diff --git a/arch/arm/mach-spear13xx/include/mach/smp.h b/arch/arm/mach-spear13xx/include/mach/smp.h
->> index 6e028a1..e2e55fc 100644
->> --- a/arch/arm/mach-spear13xx/include/mach/smp.h
->> +++ b/arch/arm/mach-spear13xx/include/mach/smp.h
->> @@ -24,6 +24,12 @@
->>  		cpunum &= 0x0F;				\
->>  	})
->>  
->> +/*
->> + * set_event() is used to wake up secondary core from wfe using sev. Booting
->> + * code puts the second core into wfe(standby).
->> + */
->> +#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
-> 
-> This shouldn't be something that platforms define on their own.  Please
-> add a sev() macro to arch/arm/include/asm/system.h instead.  Also take a
-> look at arch/arm/mach-omap2/omap-smp.c for an alternative idea about how
-> to handle this.
+Ah I get it...
 
-OK.
- 
-> Lastly, consider rolling the OMAP solution into the patch which adds SMP
-> support for spear13xx.
+But maybe we should refactor <linux/amba/bus.h> then?
+Something like this:
 
-OK. I would merge it.
+From: Linus Walleij <linus.walleij@stericsson.com>
+Date: Mon, 6 Sep 2010 10:29:26 +0200
+Subject: [PATCH] ARM: move the PrimeCell IDs to use macros
 
-regards
-Shiraz
+This make four macros for the PrimeCell ID register available to
+drivers that use them witout using the PrimeCell/AMBA bus
+abstraction and struct amba_device. It also moves the magic
+PrimeCell CID "B105F00D" to the bus.h header file.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/amba/bus.c       |    2 +-
+ include/linux/amba/bus.h |   15 +++++++++++----
+ 2 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index d31590e..2737b97 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -298,7 +298,7 @@ int amba_device_register(struct amba_device *dev,
+struct resource *parent)
+
+                amba_put_disable_pclk(dev);
+
+-               if (cid == 0xb105f00d)
++               if (cid == AMBA_CID)
+                        dev->periphid = pid;
+
+                if (!dev->periphid)
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index b0c1740..4c0f5a3 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -20,6 +20,7 @@
+ #include <linux/resource.h>
+
+ #define AMBA_NR_IRQS   2
++#define AMBA_CID       0xb105f00d
+
+ struct clk;
+
+@@ -70,9 +71,15 @@ void amba_release_regions(struct amba_device *);
+ #define amba_pclk_disable(d)   \
+        do { if (!IS_ERR((d)->pclk)) clk_disable((d)->pclk); } while (0)
+
+-#define amba_config(d) (((d)->periphid >> 24) & 0xff)
+-#define amba_rev(d)    (((d)->periphid >> 20) & 0x0f)
+-#define amba_manf(d)   (((d)->periphid >> 12) & 0xff)
+-#define amba_part(d)   ((d)->periphid & 0xfff)
++/* Some drivers don't use the struct amba_device */
++#define AMBA_CONFIG_BITS(a) ((a >> 24) & 0xff)
++#define AMBA_REV_BITS(a) ((a >> 20) & 0x0f)
++#define AMBA_MANF_BITS(a) ((a >> 12) & 0xff)
++#define AMBA_PART_BITS(a) (a & 0xfff)
++
++#define amba_config(d) AMBA_CONFIG_BITS((d)->periphid)
++#define amba_rev(d)    AMBA_REV_BITS((d)->periphid)
++#define amba_manf(d)   AMBA_MANF_BITS((d)->periphid)
++#define amba_part(d)   AMBA_PART_BITS((d)->periphid)
+
+ #endif
+-- 
+1.7.2.2
+
+Then you can use AMBA_CONFIG_BITS() etc.
+
+If Russell likes it I'll put it in the patch tracker.
+
+Come to think about it, we have this enum in the bus.h:
+
+enum amba_vendor {
+        AMBA_VENDOR_ARM = 0x41,
+        AMBA_VENDOR_ST = 0x80,
+};
+
+What byte value is Samsung using for vendor?
+
+Yours,
+Linus Walleij
