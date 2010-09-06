@@ -1,71 +1,37 @@
-From: fg@emlix.com (Fabian Godehardt)
-Date: Mon, 6 Sep 2010 05:48:18 +0100
-Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
-	=?iso-8859-1?q?single=09TC?= block
-In-Reply-To: <4C80F2A7.9040007@atmel.com>
-References: <1283517093-12628-1-git-send-email-fg@emlix.com>
-	<4C80F2A7.9040007@atmel.com>
-Message-ID: <201009060548.18521.fg@emlix.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 6 Sep 2010 13:52:24 +0900
+Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
+In-Reply-To: <1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
+References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 6, 2010 at 12:50 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+....
+> + ? ? ? parent = clk_get(NULL, "mout_epll");
+> + ? ? ? if (IS_ERR(parent))
+> + ? ? ? ? ? ? ? return PTR_ERR(parent);
+> +
+> + ? ? ? for (i = 0; err == 0 && i < ARRAY_SIZE(fimc_devs); i++) {
+> + ? ? ? ? ? ? ? if (fimc_devs[i]) {
+> + ? ? ? ? ? ? ? ? ? ? ? clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
+> + ? ? ? ? ? ? ? ? ? ? ? if (IS_ERR(clk_fimc)) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? err = PTR_ERR(clk_fimc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? ? ? ? ? clk_set_parent(clk_fimc, parent);
+> + ? ? ? ? ? ? ? ? ? ? ? clk_put(clk_fimc);
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
 
-Am Freitag 03 September 2010 14:05:43 schrieben Sie:
-> Le 03/09/2010 14:31, Fabian Godehardt :
-> > Without this patch you will not be able to register the first block
-> > because of the second association call on at91_add_device_tc().
-> 
-> Yes, I noticed that.
-> 
-> > Signed-off-by: Fabian Godehardt <fg@emlix.com>
-> 
-> Tell me if my little modification is ok for you. I will then sign it and
-> send it to Russell patch tracking system: what do you think about it?
-> 
-> > ---
-> >  arch/arm/mach-at91/at91sam9g45.c         |   12 +++++++++---
-> >  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
-> >  2 files changed, 11 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-at91/at91sam9g45.c
-> > b/arch/arm/mach-at91/at91sam9g45.c index 753c0d3..52ef2d6 100644
-> > --- a/arch/arm/mach-at91/at91sam9g45.c
-> > +++ b/arch/arm/mach-at91/at91sam9g45.c
-> > @@ -121,8 +121,13 @@ static struct clk ssc1_clk = {
-> >  	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
-> >  	.type		= CLK_TYPE_PERIPHERAL,
-> >  };
-> > -static struct clk tcb_clk = {
-> > -	.name		= "tcb_clk",
-> > +static struct clk tcb0_clk = {
-> > +	.name		= "tcb0_clk",
-> > +	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
-> > +	.type		= CLK_TYPE_PERIPHERAL,
-> > +};
-> > +static struct clk tcb1_clk = {
-> > +	.name		= "tcb1_clk",
-> >  	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
-> >  	.type		= CLK_TYPE_PERIPHERAL,
-> 
-> I prefer to add a "fake" clock that depend on the first one instead of
-> doubling the definition: like this:
-> 
-> /* One additional fake clock for second TC block */
-> static struct clk tcb1_clk = {
->         .name           = "tcb1_clk",
->         .pmc_mask       = 0,
->         .type           = CLK_TYPE_PERIPHERAL,
->         .parent         = &tcb0_clk,
-> };
-> 
-> This way we keep the single clock entry but we provide a fake entry for
-> registering the second TC block.
-
-It's ok and works for me - thanks.
-
-Acked-by: Fabian Godehardt <fg@emlix.com>
-
-
-Best regards,
-Fabian
+The sclk_fimc could source clock from a number of options out of a mux.
+mout_epll is just one of them. Different machines may want to source the
+clock differently.
+So, IMO the parent selection should not be done in platform code, but rather
+in machine init code.
+Not the best, but a better solution can be found in
+arch/arm/mach-s5pc100/dev-spi.c
+Give it a thought.
