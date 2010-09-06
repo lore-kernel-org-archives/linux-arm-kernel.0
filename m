@@ -1,42 +1,41 @@
-From: armando.visconti@st.com (Armando Visconti)
-Date: Mon, 6 Sep 2010 09:25:05 +0200
-Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
-In-Reply-To: <AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>	<4C7F5B9E.8090406@st.com>	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>	<4C7F9993.3040700@st.com>	<20100903112338.GA3132@morgana.i.gnudd.com>
-	<AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
-Message-ID: <4C849751.1090604@st.com>
+From: jonas.aberg@stericsson.com (Jonas Aaberg)
+Date: Mon, 6 Sep 2010 09:27:43 +0200
+Subject: [PATCH 3/3] mach-ux500: Added nomadik mtu timer suspend/resume
+	hooks.
+In-Reply-To: <20100902160708.GS26319@n2100.arm.linux.org.uk>
+References: <1283412633-9883-1-git-send-email-jonas.aberg@stericsson.com>
+	<1283412633-9883-2-git-send-email-jonas.aberg@stericsson.com>
+	<1283412633-9883-3-git-send-email-jonas.aberg@stericsson.com>
+	<20100902160708.GS26319@n2100.arm.linux.org.uk>
+Message-ID: <4C8497EF.50306@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> 2010/9/3 Alessandro Rubini <rubini-list@gnudd.com>:
->
->   
->> Note however that the platform data in
->> arch/arm/mach-nomadik/board-nhk8815.c should be fixed to reference the
->> new driver.  If you remove my version please at least compile-check
->> the nhk with the new patch-set.
->>     
->
-> What about we put this new FSMC generic thing in, and
-> then remove the old one with the same patch that
-> instead activates the new one. No need to rush that.
->
-> Right now I mostly worry about having it in the proper
-> place with the proper name and the headers accessible from
-> all archs...
->
-> Linus Walleij
->   
-Agreed.
+On 09/02/2010 06:07 PM, Russell King - ARM Linux wrote:
+> On Thu, Sep 02, 2010 at 09:30:33AM +0200, Jonas Aaberg wrote:
+>>  struct sys_timer ux500_timer = {
+>> -	.init	= ux500_timer_init,
+>> +	.init	 = ux500_timer_init,
+>> +#ifdef CONFIG_PM
+>> +	.suspend = nmdk_timer_suspend,
+>> +	.resume  = nmdk_timer_resume,
+>> +#endif
+> 
+> It would be better to use the callbacks from the clocksource/clockevent
+> code so that if your timers aren't being used, they can be shutdown for
+> power saving.
 
-THis also because, as I already mentioned, I seem to remember that the
-Nomadik FSMC it is not exactly the standard one, but a modified (not 
-configured)
-version.
+I agree. For clockevents, I suppose you get CLOCK_EVT_MODE_SHUTDOWN/UNUSED
+when the clockevent isn't used, but for clocksource, I don't get how it is supposed
+to work. When a clocksource is registered or changed, clocksource.c:clock_select() 
+is called, but it does not look like the clocksources involved get informed about 
+the change, if there is any change.
 
-So, you may better check with Andrea Gallo whether this is really the case
-or not.
+> 
+> In any case, with clockevents support enabled, these suspend/resume
+> callbacks will not be called.
 
-Rgds,
-Arm
+Ok. Thanks for your comments!
+
+BR,
+ Jonas
