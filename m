@@ -1,22 +1,92 @@
-From: pieterg@gmx.com (pieterg)
-Date: Mon, 6 Sep 2010 15:12:23 +0200
-Subject: colibri-pxa300: LCD_LDD / LCD_CS gpio conflict
-Message-ID: <201009061512.23705.pieterg@gmx.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon,  6 Sep 2010 16:21:04 +0200
+Subject: [PATCH v2] AT91: pio: add gpio_is_valid() function
+In-Reply-To: <4C73807F.4090007@atmel.com>
+References: <4C73807F.4090007@atmel.com>
+Message-ID: <1283782864-10567-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In colibri-pxa300.c, line 132, gpio config GPIO62_LCD_CS_N is overriding the 
-GPIO62_LCD_LDD_8 configuration, earlier in the pin config table.
+Add a simple gpio_is_valid() function to overload
+the standard one. It takes into account the AT91
+pio numbering to check if a proper value is used.
+The upper limit keeps room for IO expanders above
+regular on-chip GPIO numbers.
 
-As a result, one pixel data line is missing, obviously causing wrong pixel 
-data on passive lcd panels.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+Changes since v1:
+	define ARCH_NR_GPIOS for AT91 keeping room for IO expanders
+	now use an upper limit to conform with gpiolib
 
-Not sure what the best workaround should be.
-LDD_CS is not available on the colibri evalboard as far as I can see, so we 
-might just define GPIO127_LCD_CS_N instead? (till the soc/carrier board 
-configs have been split)
+ arch/arm/mach-at91/include/mach/gpio.h |   14 ++++++++++++++
+ include/asm-generic/gpio.h             |    4 ++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-Or for now just put GPIO62_LCD_CS_N between
-#ifdef CONFIG_FB_PXA_SMARTPANEL?
-
-Rgds, Pieter
+diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
+index bfdd8ab..55828ad 100644
+--- a/arch/arm/mach-at91/include/mach/gpio.h
++++ b/arch/arm/mach-at91/include/mach/gpio.h
+@@ -21,6 +21,10 @@
+ #define MAX_GPIO_BANKS		5
+ #define NR_BUILTIN_GPIO		(PIN_BASE + (MAX_GPIO_BANKS * 32))
+ 
++/* keep room for a couple of GPIO expanders */
++#define NR_EXTRA_GPIO		64
++#define ARCH_NR_GPIOS		(NR_BUILTIN_GPIO + NR_EXTRA_GPIO)
++
+ /* these pin numbers double as IRQ numbers, like AT91xxx_ID_* values */
+ 
+ #define	AT91_PIN_PA0	(PIN_BASE + 0x00 + 0)
+@@ -189,6 +193,16 @@
+ #define	AT91_PIN_PE31	(PIN_BASE + 0x80 + 31)
+ 
+ #ifndef __ASSEMBLY__
++static inline int gpio_is_valid(int number)
++{
++	if (number >= PIN_BASE &&
++	    number <= ARCH_NR_GPIOS)
++		return 1;
++	return 0;
++}
++#define __HAVE_ARCH_GPIO_IS_VALID 1
++
++
+ /* setup setup routines, called from board init or driver probe() */
+ extern int __init_or_module at91_set_GPIO_periph(unsigned pin, int use_pullup);
+ extern int __init_or_module at91_set_A_periph(unsigned pin, int use_pullup);
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index c7376bf..264e701 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -22,11 +22,13 @@
+ #define ARCH_NR_GPIOS		256
+ #endif
+ 
++#ifndef __HAVE_ARCH_GPIO_IS_VALID
+ static inline int gpio_is_valid(int number)
+ {
+ 	/* only some non-negative numbers are valid */
+ 	return ((unsigned)number) < ARCH_NR_GPIOS;
+ }
++#endif
+ 
+ struct device;
+ struct seq_file;
+@@ -200,11 +202,13 @@ extern void gpio_unexport(unsigned gpio);
+ 
+ #else	/* !CONFIG_HAVE_GPIO_LIB */
+ 
++#ifndef __HAVE_ARCH_GPIO_IS_VALID
+ static inline int gpio_is_valid(int number)
+ {
+ 	/* only non-negative numbers are valid */
+ 	return number >= 0;
+ }
++#endif
+ 
+ /* platforms that don't directly support access to GPIOs through I2C, SPI,
+  * or other blocking infrastructure can use these wrappers.
+-- 
+1.5.6.5
