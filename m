@@ -1,49 +1,20 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon,  6 Sep 2010 22:53:09 +0200
-Subject: [PATCH] ARM: pxa: Enable U2D only in case PXA3xx is enabled
-Message-ID: <1283806389-18128-1-git-send-email-marek.vasut@gmail.com>
+From: avictor.za@gmail.com (avictor.za at gmail.com)
+Date: Mon, 6 Sep 2010 23:07:30 +0200
+Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
+	single TC block
+In-Reply-To: <1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
+References: <201009060548.18521.fg@emlix.com>
+	<1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <AANLkTiny_0n3YT6+-GbpRzMcxBOF7x1P6b0Ynv_s3fR=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case PXA3xx support isn't enabled in kernel, the pxa3xx_u2d_start_hc()
-and pxa3xx_u2d_stop_hc() functions are undefined. Encapsulate their callings
-with #ifdef CONFIG_PXA3xx macro.
+> Without this patch you will not be able to register the first block
+> because of the second association call on at91_add_device_tc().
+>
+> Signed-off-by: Fabian Godehardt <fg@emlix.com>
+> [nicolas.ferre at atmel.com: change tcb1_clk to fake child clock of tcb0_clk]
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Nicolas Ferre
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
-
-NOTE: I'm adding "Make a proper fix for this thing" into my ToDo. This is just a
-quick patch since I have that exam soon. I'll go for approach 2) from what we
-discussed in the other thread once the exam's past me.
-
- drivers/usb/host/ohci-pxa27x.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index afef7b0..f3c60b9 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -236,8 +236,10 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
- 	if (retval < 0)
- 		return retval;
- 
-+#ifdef CONFIG_PXA3xx
- 	if (cpu_is_pxa3xx())
- 		pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
-+#endif
- 
- 	uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
- 	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
-@@ -255,8 +257,10 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
- 
- 	inf = dev->platform_data;
- 
-+#ifdef CONFIG_PXA3xx
- 	if (cpu_is_pxa3xx())
- 		pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
-+#endif
- 
- 	if (inf->exit)
- 		inf->exit(dev);
--- 
-1.7.1
+Acked-By: Andrew Victor <linux@maxim.org.za>
