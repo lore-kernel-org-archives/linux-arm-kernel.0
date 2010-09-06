@@ -1,215 +1,67 @@
-From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Mon, 06 Sep 2010 08:33:59 +0200
-Subject: [RFCv5 9/9] mm: vcm: vcm-cma: VCM CMA driver added
-In-Reply-To: <cover.1283749231.git.mina86@mina86.com>
-References: <cover.1283749231.git.mina86@mina86.com>
-Message-ID: <01be3a37af9569f711ad18c4b868cd4708da19e4.1283749231.git.mina86@mina86.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon,  6 Sep 2010 12:34:23 +0200
+Subject: [RFC 1/3] sdhci-pltfm: Add structure for host-specific data
+In-Reply-To: <1283769265-14147-1-git-send-email-w.sang@pengutronix.de>
+References: <1283769265-14147-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1283769265-14147-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a VCM driver that instead of using real
-hardware MMU emulates one and uses CMA for allocating
-contiguous memory chunks.
+We need to carry some information per host, e.g. the clock.
 
-Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- Documentation/virtual-contiguous-memory.txt |   12 ++++-
- include/linux/vcm-cma.h                     |   38 ++++++++++++
- mm/Kconfig                                  |   14 +++++
- mm/Makefile                                 |    1 +
- mm/vcm-cma.c                                |   84 +++++++++++++++++++++++++++
- 5 files changed, 148 insertions(+), 1 deletions(-)
- create mode 100644 include/linux/vcm-cma.h
- create mode 100644 mm/vcm-cma.c
+ drivers/mmc/host/sdhci-pltfm.c |    7 +++++--
+ drivers/mmc/host/sdhci-pltfm.h |    5 +++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/virtual-contiguous-memory.txt b/Documentation/virtual-contiguous-memory.txt
-index 6d1014c..01e2e6c 100644
---- a/Documentation/virtual-contiguous-memory.txt
-+++ b/Documentation/virtual-contiguous-memory.txt
-@@ -496,7 +496,17 @@ able to run with One-to-One driver you should limit operations to:
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index e045e3c..bf522a1 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+ 	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
+ 	struct resource *iomem;
+ 	int ret;
  
- under some conditions, vcm_map() may also work.
+@@ -72,15 +73,17 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 			"experience problems.\n");
  
--There are no One-to-One drivers at this time.
-+*** VCM CMA
-+
-+VCM CMA driver is a One-to-One driver which uses CMA (see
-+[[file:contiguous-memory.txt][contiguous-memory.txt]]) to allocate physically contiguous memory.  VCM
-+CMA context is created by calling:
-+
-+	struct vcm *__must_check
-+	vcm_cma_create(const char *regions, dma_addr_t alignment);
-+
-+Its first argument is the list of regions that CMA should try to
-+allocate memory from.  The second argument is required alignment.
+ 	if (pdev->dev.parent)
+-		host = sdhci_alloc_host(pdev->dev.parent, 0);
++		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
+ 	else
+-		host = sdhci_alloc_host(&pdev->dev, 0);
++		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
  
- * Writing a VCM driver
+ 	if (IS_ERR(host)) {
+ 		ret = PTR_ERR(host);
+ 		goto err;
+ 	}
  
-diff --git a/include/linux/vcm-cma.h b/include/linux/vcm-cma.h
-new file mode 100644
-index 0000000..bc06767
---- /dev/null
-+++ b/include/linux/vcm-cma.h
-@@ -0,0 +1,38 @@
-+/*
-+ * Virtual Contiguous Memory driver for CMA header
-+ * Copyright (c) 2010 by Samsung Electronics.
-+ * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License or (at your optional) any later version of the license.
-+ */
++	pltfm_host = sdhci_priv(host);
 +
-+/*
-+ * See Documentation/virtual-contiguous-memory.txt for details.
-+ */
-+
-+#ifndef __LINUX_VCM_CMA_H
-+#define __LINUX_VCM_CMA_H
-+
-+#include <linux/types.h>
-+
-+struct vcm;
-+
-+/**
-+ * vcm_cma_create() - creates a VCM context that fakes a hardware MMU
-+ * @regions:	list of CMA regions physical allocations should be done
-+ *		from.
-+ * @alignment:	required alignment of allocations.
-+ *
-+ * This creates VCM context that can be used on platforms with no
-+ * hardware MMU or for devices that aro conected to the bus directly.
-+ * Because it does not represent real MMU it has some limitations:
-+ * basically, vcm_alloc(), vcm_reserve() and vcm_bind() are likely to
-+ * fail so vcm_make_binding() should be used instead.
-+ */
-+struct vcm *__must_check
-+vcm_cma_create(const char *regions, dma_addr_t alignment);
-+
-+#endif
-diff --git a/mm/Kconfig b/mm/Kconfig
-index be040e7..bf0c7f6 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -410,3 +410,17 @@ config VCM_SAMP
- 	  This enables a sample driver for the VCM framework.  This driver
- 	  does not handle any real harwdare.  It's merely an template of
- 	  how for real drivers.
-+
-+config VCM_CMA
-+	bool "VCM CMA driver"
-+	depends on VCM && CMA
-+	select VCM_O2O
-+	help
-+	  This enables VCM driver that instead of using a real hardware
-+	  MMU fakes one and uses a direct mapping.  It provides a subset
-+	  of functionalities of a real MMU but if drivers limits their
-+	  use of VCM to only supported operations they can work on
-+	  both systems with and without MMU with no changes.
-+
-+	  For more information see
-+	  <Documentation/virtual-contiguous-memory-cma.txt>.
-diff --git a/mm/Makefile b/mm/Makefile
-index c465dfa..e376eef 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -51,3 +51,4 @@ obj-$(CONFIG_CMA) += cma.o
- obj-$(CONFIG_CMA_BEST_FIT) += cma-best-fit.o
- obj-$(CONFIG_VCM) += vcm.o
- obj-$(CONFIG_VCM_SAMPLE) += vcm-sample.o
-+obj-$(CONFIG_VCM_CMA) += vcm-cma.o
-diff --git a/mm/vcm-cma.c b/mm/vcm-cma.c
-new file mode 100644
-index 0000000..177041a
---- /dev/null
-+++ b/mm/vcm-cma.c
-@@ -0,0 +1,84 @@
-+/*
-+ * Virtual Contiguous Memory driver for CMA
-+ * Copyright (c) 2010 by Samsung Electronics.
-+ * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License or (at your optional) any later version of the license.
-+ */
-+
-+/*
-+ * See Documentation/virtual-contiguous-memory.txt for details.
-+ */
-+
-+#include <linux/vcm-cma.h>
-+#include <linux/vcm-drv.h>
-+#include <linux/cma.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
-+
-+struct vcm_cma {
-+	struct vcm_o2o	o2o;
-+	const char	*regions;
-+	dma_addr_t	alignment;
+ 	host->hw_name = "platform";
+ 	if (pdata && pdata->ops)
+ 		host->ops = pdata->ops;
+diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+index 900f329..c393289 100644
+--- a/drivers/mmc/host/sdhci-pltfm.h
++++ b/drivers/mmc/host/sdhci-pltfm.h
+@@ -13,6 +13,11 @@
+ 
+ #include <linux/sdhci-pltfm.h>
+ 
++struct sdhci_pltfm_host {
++	struct clk *clk;
++	u32 scratchpad; /* to handle quirks across io-accessor calls */
 +};
 +
-+static void *
-+vcm_cma_alloc(struct vcm *vcm, struct vcm_phys_part *part, unsigned flags)
-+{
-+	struct vcm_cma *cma = container_of(vcm, struct vcm_cma, o2o.vcm);
-+	dma_addr_t addr;
-+
-+	addr = cma_alloc_from(cma->regions, part->size, cma->alignment);
-+	if (IS_ERR_VALUE(addr))
-+		return ERR_PTR(addr);
-+
-+	part->start = addr;
-+	return NULL;
-+}
-+
-+static void vcm_cma_free(struct vcm_phys_part *part, void *priv)
-+{
-+	cma_free(part->start);
-+}
-+
-+struct vcm *__must_check
-+vcm_cma_create(const char *regions, dma_addr_t alignment)
-+{
-+	static const struct vcm_o2o_driver driver = {
-+		.alloc	= vcm_cma_alloc,
-+		.free	= vcm_cma_free,
-+	};
-+
-+	struct cma_info info;
-+	struct vcm_cma *cma;
-+	struct vcm *vcm;
-+	int ret;
-+
-+	if (alignment & (alignment - 1))
-+		return ERR_PTR(-EINVAL);
-+
-+	ret = cma_info_about(&info, regions);
-+	if (ret < 0)
-+		return ERR_PTR(ret);
-+	if (info.count == 0)
-+		return ERR_PTR(-ENOENT);
-+
-+	cma = kmalloc(sizeof *cma, GFP_KERNEL);
-+	if (!cma)
-+		return ERR_PTR(-ENOMEM);
-+
-+	cma->o2o.driver    = &driver;
-+	cma->o2o.vcm.start = info.lower_bound;
-+	cma->o2o.vcm.size  = info.upper_bound - info.lower_bound;
-+	cma->regions       = regions;
-+	cma->alignment     = alignment;
-+	vcm = vcm_o2o_init(&cma->o2o);
-+	if (IS_ERR(vcm))
-+		kfree(cma);
-+	return vcm;
-+}
-+EXPORT_SYMBOL_GPL(vcm_cma_create);
+ extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+ 
+ #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
 -- 
 1.7.1
