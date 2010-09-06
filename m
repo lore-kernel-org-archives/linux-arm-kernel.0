@@ -1,27 +1,20 @@
 From: greg@kroah.com (Greg KH)
-Date: Mon, 6 Sep 2010 14:09:05 -0700
-Subject: [RFCv5 0/9] CMA + VCMM integration
-In-Reply-To: <cover.1283749231.git.mina86@mina86.com>
+Date: Mon, 6 Sep 2010 14:10:54 -0700
+Subject: [RFCv5 8/9] mm: vcm: Sample driver added
+In-Reply-To: <262a5a5019c1f1a44d5793f7e69776e56f27af06.1283749231.git.mina86@mina86.com>
 References: <cover.1283749231.git.mina86@mina86.com>
-Message-ID: <20100906210905.GB5863@kroah.com>
+	<262a5a5019c1f1a44d5793f7e69776e56f27af06.1283749231.git.mina86@mina86.com>
+Message-ID: <20100906211054.GC5863@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 06, 2010 at 08:33:50AM +0200, Michal Nazarewicz wrote:
-> Hello everyone,
-> 
-> This patchset introduces a draft of a redesign of Zach Pfeffer's
-> VCMM.
+On Mon, Sep 06, 2010 at 08:33:58AM +0200, Michal Nazarewicz wrote:
+> --- /dev/null
+> +++ b/include/linux/vcm-sample.h
 
-What is a VCMM?
-
-What is a CMA?
-
-> Not all of the functionality of the original VCMM has been
-> ported into this patchset.  This is mostly meant as RFC.  Moreover,
-> the code for VCMM implementation in this RFC has not been tested.
-
-If you haven't even tested it, why should we review it?
+Don't put "sample" code in include/linux/ please.  That's just
+cluttering up the place, don't you think?  Especially as no one else
+needs the file there...
 
 thanks,
 
