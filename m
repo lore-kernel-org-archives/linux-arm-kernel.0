@@ -1,41 +1,48 @@
-From: jonas.aberg@stericsson.com (Jonas Aaberg)
-Date: Mon, 6 Sep 2010 09:27:43 +0200
-Subject: [PATCH 3/3] mach-ux500: Added nomadik mtu timer suspend/resume
-	hooks.
-In-Reply-To: <20100902160708.GS26319@n2100.arm.linux.org.uk>
-References: <1283412633-9883-1-git-send-email-jonas.aberg@stericsson.com>
-	<1283412633-9883-2-git-send-email-jonas.aberg@stericsson.com>
-	<1283412633-9883-3-git-send-email-jonas.aberg@stericsson.com>
-	<20100902160708.GS26319@n2100.arm.linux.org.uk>
-Message-ID: <4C8497EF.50306@stericsson.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 6 Sep 2010 13:04:10 +0530
+Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+In-Reply-To: <33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7B29@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2010 06:07 PM, Russell King - ARM Linux wrote:
-> On Thu, Sep 02, 2010 at 09:30:33AM +0200, Jonas Aaberg wrote:
->>  struct sys_timer ux500_timer = {
->> -	.init	= ux500_timer_init,
->> +	.init	 = ux500_timer_init,
->> +#ifdef CONFIG_PM
->> +	.suspend = nmdk_timer_suspend,
->> +	.resume  = nmdk_timer_resume,
->> +#endif
+> -----Original Message-----
+> From: Sundar R IYER [mailto:sundar.iyer at stericsson.com]
+> Sent: Monday, September 06, 2010 12:46 PM
+> To: Shilimkar, Santosh; Will Deacon; Kukjin Kim; Colin Cross
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 0/2] ARM: factorise CPU hotplug code
 > 
-> It would be better to use the callbacks from the clocksource/clockevent
-> code so that if your timers aren't being used, they can be shutdown for
-> power saving.
-
-I agree. For clockevents, I suppose you get CLOCK_EVT_MODE_SHUTDOWN/UNUSED
-when the clockevent isn't used, but for clocksource, I don't get how it is supposed
-to work. When a clocksource is registered or changed, clocksource.c:clock_select() 
-is called, but it does not look like the clocksources involved get informed about 
-the change, if there is any change.
-
+> Hi Santosh,
 > 
-> In any case, with clockevents support enabled, these suspend/resume
-> callbacks will not be called.
+> >-----Original Message-----
+> >From: Shilimkar, Santosh [mailto:santosh.shilimkar at ti.com]
+> 
+> >Generic Approach seems to be good but I think this might complicate few
+> >scenario's regarding how _A_ platform wants to handle the hotplug.
+> >
+> 
+> Yes. But the functions cpu_enter_lowpower and cpu_leave_lowpower()
+> are still preserved in platform specific files. Only the top helpers are
+> moved out.
+I saw that and hence was ok with the change to begin with.
 
-Ok. Thanks for your comments!
+> So, platforms can still work out their custom low power mode
+> implementations;
+> which I believe can vary according to the implementation of (say
+> independent) power
+> domains for each/multiple cores.
+> 
+> Is there anything still you think cannot be generalized?
+> 
+The generic timeout also can be optimized in certain cases or
+may be for all platforms.
 
-BR,
- Jonas
+I am ok with this change as such.
+
+Regards,
+Santosh
