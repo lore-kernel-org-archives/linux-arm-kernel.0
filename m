@@ -1,60 +1,65 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 6 Sep 2010 16:46:24 +0300
-Subject: [PATCH v5 3/7] wireless: wl12xx: add platform data passing support
-In-Reply-To: <20100906120716.GE20903@n2100.arm.linux.org.uk>
-References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
-	<1283376410-9999-4-git-send-email-ohad@wizery.com>
-	<AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
-	<20100906120716.GE20903@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=z-cqdwrbXo9pv9WhZkrnb7X+zpVNbJ_-VTJ16@mail.gmail.com>
+From: ww-ml@gmx.de (Wolfgang Wegner)
+Date: Mon, 6 Sep 2010 15:58:36 +0200
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to,from}_user?
+In-Reply-To: <AANLkTi=kSwGKZ8Hpcvmatj9j2h2JZAWMGR15hMOBOpTx@mail.gmail.com>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<AANLkTi=kSwGKZ8Hpcvmatj9j2h2JZAWMGR15hMOBOpTx@mail.gmail.com>
+Message-ID: <20100906135836.GB6897@debian-wegner1.datadisplay.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> We could instead make wl12xx_get_platform_data() return a const pointer
-> to its own internal storage instead, or ERR pointers for the various
-> failure cases.
+On Mon, Sep 06, 2010 at 04:46:07PM +0300, saeed bishara wrote:
+> On Mon, Sep 6, 2010 at 1:02 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> >
+> > Mapping the PCI memory space via mmap() resulted in some
+> > disappointing ~6.5 MBytes/second. I tried to modify page
+> > protection to pgprot_writecombine or pgprot_cached, but while
+> > this did reproducably change performance, it was only in
+> > some sub-percentage range.
+> weird, marking those pages as bufferable (none-cachable) should boost
+> the throughput.
 
-Sounds good:
+Maybe I have some misunderstanding here. My idea was that
+I have to enable any sort of caching to get the writes combined
+into a burst because else every single write causes a single PCI
+transaction.
+In my naive thought, writecombine was something like a write-only,
+read transparent cache. Is there any thorough explanation of their
+meaning somewhere?
+Anyways, neither of pgprot_nocache, pgprot_cached or
+pgprot_writecombine made a significant difference.
 
-diff --git a/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
-b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
-new file mode 100644
-index 0000000..973b110
---- /dev/null
-+++ b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
-@@ -0,0 +1,28 @@
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/wl12xx.h>
-+
-+static const struct wl12xx_platform_data *platform_data;
-+
-+int __init wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
-+{
-+	if (platform_data)
-+		return -EBUSY;
-+	if (!data)
-+		return -EINVAL;
-+
-+	platform_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
-+	if (!platform_data)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+const struct wl12xx_platform_data *wl12xx_get_platform_data(void)
-+{
-+	if (!platform_data)
-+		return ERR_PTR(-ENODEV);
-+
-+	return platform_data;
-+}
-+EXPORT_SYMBOL(wl12xx_get_platform_data);
+> you may also try to set the u-boot variable pcieTune to yes, make sure
+> to save the env. variables then reboot the system.
 
+I set "setenv pcieTune yes" and saved the environment, but it
+did not change anything. Who would be responsible for caring
+about this variable, U-Boot itself or the kernel? I am asking
+because the variable was not present at all in my environment
+until now.
 
-I'll wait a few days to see if there's any other comment, and then
-post v6 with this change.
+[...]
+> > - Is this feature available as an unofficial patch somewhere?
+> yes, but the kernel has the drivers/dma/mv_xor that implements the DMA
+> Engine interface, you may use that driver for the DMA offloading.
 
->
+Yes, I found this interface, but was hoping there would be some
+more framework that already does the copy_{to,from}_user handling
+for me so I do not have to fiddle around with the user pages and
+stuff. But while implementing I saw it is probably too device-
+dependent to have such a thing around.
+
+> > - Is the idea of directly setting up a transfer from user pages
+> > ?to PCI memory space possible at all?
+> you need to do some hacking for that, but I'm almost sure that it
+> won't help. using the cpu should be enough.
+
+Sounds bad. :-(
+
+I will see if I can get my hacking to work, just to hopefully
+prove you wrong here. ;-) Well, obviously the point is not to
+prove somebody else wrong but to somehow get a reasonable speed...
+
+Regards,
+Wolfgang
