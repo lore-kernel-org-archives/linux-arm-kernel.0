@@ -1,43 +1,42 @@
 From: armando.visconti@st.com (Armando Visconti)
-Date: Mon, 6 Sep 2010 09:20:48 +0200
-Subject: [PATCH 2/3] plat-nomadik: Added suspend/resume support for MTU
-	timer.
-In-Reply-To: <AANLkTin-BqN=VKjO3rLJbh3m5OroSfkAF8urhE9Y=yR4@mail.gmail.com>
-References: <1283412633-9883-1-git-send-email-jonas.aberg@stericsson.com>	<1283412633-9883-2-git-send-email-jonas.aberg@stericsson.com>	<20100902160443.GR26319@n2100.arm.linux.org.uk>	<AANLkTikTuuVGnOstk+YGq3R9pwrMT-qwkbo7CXMJ4NB6@mail.gmail.com>	<20100903114900.GA3495@morgana.i.gnudd.com>
-	<AANLkTin-BqN=VKjO3rLJbh3m5OroSfkAF8urhE9Y=yR4@mail.gmail.com>
-Message-ID: <4C849650.8050005@st.com>
+Date: Mon, 6 Sep 2010 09:25:05 +0200
+Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
+In-Reply-To: <AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>	<4C7F5B9E.8090406@st.com>	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>	<4C7F9993.3040700@st.com>	<20100903112338.GA3132@morgana.i.gnudd.com>
+	<AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
+Message-ID: <4C849751.1090604@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Linus Walleij wrote:
 > 2010/9/3 Alessandro Rubini <rubini-list@gnudd.com>:
+>
 >   
->> [Me]
->>     
->>> Alessandro why do we kick in a prescaler if rate > (16 << 20)?
->>> Seems weird to me too when I look at it, more like it'd be
->>> if rate (1 << 20) which makes sense, if the counter will flip
->>> around 20 bits in 1 second we prescale it by 16.
->>>       
->> Your "makes sense" is as subjective as mine. But on 8815, with 2.4MHz
->> we overflow in around 1790 seconds. I feel it reasonable. If you
->> prescale we get at 150kHz, which is 6.6 usec per tick: I don't like
->> that figure too much.
+>> Note however that the platform data in
+>> arch/arm/mach-nomadik/board-nhk8815.c should be fixed to reference the
+>> new driver.  If you remove my version please at least compile-check
+>> the nhk with the new patch-set.
 >>     
 >
-> Ah I got it backwards, actually I was thinking along the lines
-> that since (16 << 20) == (1 << 25) the latter would be more
-> apropriate thats what I think makes sense, it's so binary...
-> not (1 << 20) sorry for that.
+> What about we put this new FSMC generic thing in, and
+> then remove the old one with the same patch that
+> instead activates the new one. No need to rush that.
+>
+> Right now I mostly worry about having it in the proper
+> place with the proper name and the headers accessible from
+> all archs...
+>
+> Linus Walleij
 >   
-Sorry,
+Agreed.
 
-I'm not following the discussion, but just for the sake
-of precision, should be
+THis also because, as I already mentioned, I seem to remember that the
+Nomadik FSMC it is not exactly the standard one, but a modified (not 
+configured)
+version.
 
-(16 << 20) == (1 << 24)
+So, you may better check with Andrea Gallo whether this is really the case
+or not.
 
-Is it right?
-
-Sorry for intruding,
+Rgds,
 Arm
