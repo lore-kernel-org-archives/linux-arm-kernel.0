@@ -1,47 +1,61 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 6 Sep 2010 16:56:55 +0530
-Subject: [PATCH 35/74] ST SPEAr: Enabling clocks before amba
-	device	registeration
-In-Reply-To: <20100902100247.GL26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<96b4972a92cab5025a89bd71a4e23fa29aa41cba.1283161023.git.viresh.kumar@st.com>
-	<20100902100247.GL26319@n2100.arm.linux.org.uk>
-Message-ID: <4C84CFFF.9080107@st.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 6 Sep 2010 20:28:50 +0900
+Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
+In-Reply-To: <4C84C0BE.3050305@samsung.com>
+References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
+	<AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
+	<4C84AA6D.10509@samsung.com>
+	<AANLkTikakB1Y6N-UT2Hx+PHfdyticHxCFQzs=uc7KWNc@mail.gmail.com>
+	<4C84C0BE.3050305@samsung.com>
+Message-ID: <AANLkTimdpng4BysDfio96KeL2WfRCuoWbUc6G5oUS7Lh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2010 3:32 PM, Russell King - ARM Linux wrote:
-> On Mon, Aug 30, 2010 at 04:08:59PM +0530, Viresh KUMAR wrote:
-> 
-> No description, so I'm going to have to guess about this.
+On Mon, Sep 6, 2010 at 7:21 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> On 2010-09-06 18:17, Jassi Brar wrote:
+>
+>>> I'm thinking of making the parent clock an argument to the
+>>> s5pv210_fimc_setup_clks().
+>>
+>> Yes, that's better since the relevant clock is managed by the CMU
+>
+> What do you mean by the CMU? This function is intended to be called from
+> board startup code.
+Clock-Management-Unit block of the SoC.
 
-Sorry!!
+>>> I really don't like the idea of passing clock name through the platform
+>>> data
+>>> and letting driver to mess with clock's parents.
+>>
+>> In case of SPI the clock mux and scalar is present _within_ the SPI
+>> controller and having to touch SPI regs from outside the driver isn't
+>> what I prefer.
+>
+> I know. It is the same case as with SDHCI and UART controllers. I have an
+> idea how to solve this in a bit more cleaner way. I hope to post a
+> proposition soon.
+I'll be waiting.
 
-> 
->> +static inline void
->> +spear_amba_device_register(struct amba_device **devices, u32 count)
->> +{
->> +	u32 i;
->> +
->> +	for (i = 0; i < count; i++) {
->> +		struct clk *clk = clk_get_sys(devices[i]->dev.init_name, NULL);
->> +		if (IS_ERR(clk))
->> +			continue;
->> +
->> +		clk_enable(clk);
->> +		amba_device_register(devices[i], &iomem_resource);
->> +		clk_disable(clk);
-> 
-> My guess is that you're doing this to work around the fact that your
-> SoC enables/disables both the bus clock and the functional clock to
-> each primecell, and so you're finding that you need to enable the
-> clock to access the device registers.
-> 
-> We've fixed this in the generic code by introducing an 'apb_pclk' clock
-> which the core bus code controls (and eventually drivers.)  See discussion
-> earlier this month/last month on this list about this.
-> 
-> That makes this patch redundant.
-> .
 
-Yes this patch is not required.
+>>> Machine startup code is the
+>>> last place where such things should be changed.
+>>
+>> Until I am enlightened, I'd like to think otherwise.
+>> I think the board designer would already have thought out the clock
+>> sourcing
+>> hierarchy. Setting appropriate parents once at boot-time and having
+>> drivers
+>> not worry about it, should be better.
+>
+> Definitely, but in our case kernel the default fimc_sclk parent points to
+> non-existing clock.
+You mean the default value in mux field of some CMU register points to
+absent source
+of clock on the board?
+Yes, that's why it's machine specific and should be setup by the board
+init code.
+Rather we should never count upon defaults and always set parents explicitly.
