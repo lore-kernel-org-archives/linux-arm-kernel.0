@@ -1,32 +1,43 @@
-From: sundar.iyer@stericsson.com (Sundar R IYER)
-Date: Mon, 6 Sep 2010 09:15:57 +0200
-Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
-References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
-	<33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
-Message-ID: <33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+From: armando.visconti@st.com (Armando Visconti)
+Date: Mon, 6 Sep 2010 09:20:48 +0200
+Subject: [PATCH 2/3] plat-nomadik: Added suspend/resume support for MTU
+	timer.
+In-Reply-To: <AANLkTin-BqN=VKjO3rLJbh3m5OroSfkAF8urhE9Y=yR4@mail.gmail.com>
+References: <1283412633-9883-1-git-send-email-jonas.aberg@stericsson.com>	<1283412633-9883-2-git-send-email-jonas.aberg@stericsson.com>	<20100902160443.GR26319@n2100.arm.linux.org.uk>	<AANLkTikTuuVGnOstk+YGq3R9pwrMT-qwkbo7CXMJ4NB6@mail.gmail.com>	<20100903114900.GA3495@morgana.i.gnudd.com>
+	<AANLkTin-BqN=VKjO3rLJbh3m5OroSfkAF8urhE9Y=yR4@mail.gmail.com>
+Message-ID: <4C849650.8050005@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
->-----Original Message-----
->From: Shilimkar, Santosh [mailto:santosh.shilimkar at ti.com]
-
->Generic Approach seems to be good but I think this might complicate few
->scenario's regarding how _A_ platform wants to handle the hotplug.
+Linus Walleij wrote:
+> 2010/9/3 Alessandro Rubini <rubini-list@gnudd.com>:
+>   
+>> [Me]
+>>     
+>>> Alessandro why do we kick in a prescaler if rate > (16 << 20)?
+>>> Seems weird to me too when I look at it, more like it'd be
+>>> if rate (1 << 20) which makes sense, if the counter will flip
+>>> around 20 bits in 1 second we prescale it by 16.
+>>>       
+>> Your "makes sense" is as subjective as mine. But on 8815, with 2.4MHz
+>> we overflow in around 1790 seconds. I feel it reasonable. If you
+>> prescale we get at 150kHz, which is 6.6 usec per tick: I don't like
+>> that figure too much.
+>>     
 >
+> Ah I got it backwards, actually I was thinking along the lines
+> that since (16 << 20) == (1 << 25) the latter would be more
+> apropriate thats what I think makes sense, it's so binary...
+> not (1 << 20) sorry for that.
+>   
+Sorry,
 
-Yes. But the functions cpu_enter_lowpower and cpu_leave_lowpower()
-are still preserved in platform specific files. Only the top helpers are moved out.
-So, platforms can still work out their custom low power mode implementations;
-which I believe can vary according to the implementation of (say independent) power
-domains for each/multiple cores.
+I'm not following the discussion, but just for the sake
+of precision, should be
 
-Is there anything still you think cannot be generalized?
+(16 << 20) == (1 << 24)
 
->I let other comment on this.
+Is it right?
 
-Regards,
-Sundar
+Sorry for intruding,
+Arm
