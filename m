@@ -1,89 +1,67 @@
-From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Mon, 06 Sep 2010 08:33:50 +0200
-Subject: [RFCv5 0/9] CMA + VCMM integration
-Message-ID: <cover.1283749231.git.mina86@mina86.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 6 Sep 2010 12:39:41 +0530
+Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+In-Reply-To: <33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+Sundar,
 
-This patchset introduces a draft of a redesign of Zach Pfeffer's
-VCMM.  Not all of the functionality of the original VCMM has been
-ported into this patchset.  This is mostly meant as RFC.  Moreover,
-the code for VCMM implementation in this RFC has not been tested.
+> -----Original Message-----
+> From: Sundar R IYER [mailto:sundar.iyer at stericsson.com]
+> Sent: Monday, September 06, 2010 10:13 AM
+> To: Will Deacon; Shilimkar, Santosh; Kukjin Kim; Colin Cross
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 0/2] ARM: factorise CPU hotplug code
+> 
+> Hi All,
+> 
+> Any comments on these?
+> 
+> Regards,
+> Sundar
+> 
+> >-----Original Message-----
+> >From: Sundar R IYER
+> >Sent: Friday, September 03, 2010 5:31 PM
+> >To: linux-arm-kernel at lists.infradead.org
+> >Cc: STEricsson_nomadik_linux; Sundar R IYER
+> >Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+> >
+> >Inspired by Will Deacon's cleanup for the Realview series, this is an
+> attempt
+> >to factor even more common code and move hotplug functions to the generic
+> >arch/arm/common folder
+> >
+> >Sundar Iyer (2):
+> >  ARM: Generalize all CPU Hotplug code across platforms
+> >  ux500: Add CPU hotplug support
+> >
+Generic Approach seems to be good but I think this might complicate few
+scenario's regarding how _A_ platform wants to handle the hotplug.
 
-CMA has not been changed compared to the previous CMA versions so no
-aspects discussed on the list have been addressed yet.
-
-The redesigned VCMM now uses notion of drivers -- a VCM context is
-created for each MMU on the platform and each such context is handled
-by a VCM driver.  A context (or may contexts) for One-to-One mappings
-is created as well and handled with a One-to-One VCM driver.
-
-The patchset introduces a sample (or a template if you will) VCM MMU
-driver as well as a VCM CMA One-to-One driver so it is shown by
-example how VCM drivers are written.
-
-The VCMM framework proposed by this patchset also introduces
-a vcm_make_binding() call which allocates physical memory, creates
-virtual address reservation and binds the two together.  This makes
-life easier for One-to-One mappings and if device drivers limit their
-use of VCM API to a subset of functionality the can work on systems
-with or without MMU with no modifications (only the VCM context would
-need to change).
-
-Please refer to documentation in the second and seventh patch for more
-information regarding CMA and VCMM respectively.
-
-Michal Nazarewicz (9):
-  lib: rbtree: rb_root_init() function added
-  mm: cma: Contiguous Memory Allocator added
-  mm: cma: Added SysFS support
-  mm: cma: Added command line parameters support
-  mm: cma: Test device and application added
-  ARM: cma: Added CMA to Aquila, Goni and c210 universal boards
-  mm: vcm: Virtual Contiguous Memory framework added
-  mm: vcm: Sample driver added
-  mm: vcm: vcm-cma: VCM CMA driver added
-
- Documentation/00-INDEX                             |    4 +
- .../ABI/testing/sysfs-kernel-mm-contiguous         |   53 +
- Documentation/contiguous-memory.txt                |  623 +++++++++
- Documentation/kernel-parameters.txt                |    7 +
- Documentation/virtual-contiguous-memory.txt        |  866 ++++++++++++
- arch/arm/mach-s5pv210/mach-aquila.c                |   31 +
- arch/arm/mach-s5pv210/mach-goni.c                  |   31 +
- arch/arm/mach-s5pv310/mach-universal_c210.c        |   23 +
- drivers/misc/Kconfig                               |    8 +
- drivers/misc/Makefile                              |    1 +
- drivers/misc/cma-dev.c                             |  202 +++
- include/linux/cma.h                                |  479 +++++++
- include/linux/rbtree.h                             |   11 +
- include/linux/vcm-cma.h                            |   38 +
- include/linux/vcm-drv.h                            |  299 +++++
- include/linux/vcm-sample.h                         |   30 +
- include/linux/vcm.h                                |  275 ++++
- mm/Kconfig                                         |  123 ++
- mm/Makefile                                        |    5 +
- mm/cma-best-fit.c                                  |  407 ++++++
- mm/cma.c                                           | 1377 ++++++++++++++++++++
- mm/vcm-cma.c                                       |   84 ++
- mm/vcm-sample.c                                    |  120 ++
- mm/vcm.c                                           |  932 +++++++++++++
- tools/cma/cma-test.c                               |  386 ++++++
- 25 files changed, 6415 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-kernel-mm-contiguous
- create mode 100644 Documentation/contiguous-memory.txt
- create mode 100644 Documentation/virtual-contiguous-memory.txt
- create mode 100644 drivers/misc/cma-dev.c
- create mode 100644 include/linux/cma.h
- create mode 100644 include/linux/vcm-cma.h
- create mode 100644 include/linux/vcm-drv.h
- create mode 100644 include/linux/vcm-sample.h
- create mode 100644 include/linux/vcm.h
- create mode 100644 mm/cma-best-fit.c
- create mode 100644 mm/cma.c
- create mode 100644 mm/vcm-cma.c
- create mode 100644 mm/vcm-sample.c
- create mode 100644 mm/vcm.c
- create mode 100644 tools/cma/cma-test.c
+I let other comment on this.
+> > arch/arm/common/Makefile           |    1 +
+> > arch/arm/common/hotplug.c          |   57
+> >++++++++++++++++++++++++++++++++++++
+> > arch/arm/include/asm/hotplug.h     |   18 +++++++++++
+> > arch/arm/mach-omap2/omap-hotplug.c |   24 +--------------
+> > arch/arm/mach-realview/hotplug.c   |   56 ++++--------------------------
+> -----
+> > arch/arm/mach-s5pv310/hotplug.c    |   56 ++++--------------------------
+> -----
+> > arch/arm/mach-tegra/hotplug.c      |   56 +++++-------------------------
+> -----
+> > arch/arm/mach-ux500/Makefile       |    1 +
+> > arch/arm/mach-ux500/hotplug.c      |   30 +++++++++++++++++++
+> > arch/arm/mach-ux500/platsmp.c      |    4 ++-
+> > 10 files changed, 134 insertions(+), 169 deletions(-)
+> > create mode 100644 arch/arm/common/hotplug.c
+> > create mode 100644 arch/arm/include/asm/hotplug.h
+> > create mode 100644 arch/arm/mach-ux500/hotplug.c
+> >
+> >--
+> >1.7.2.dirty
