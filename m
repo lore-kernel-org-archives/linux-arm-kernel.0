@@ -1,49 +1,71 @@
-From: sundar.iyer@stericsson.com (Sundar R IYER)
-Date: Mon, 6 Sep 2010 06:43:14 +0200
-Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
-In-Reply-To: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
-References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+From: fg@emlix.com (Fabian Godehardt)
+Date: Mon, 6 Sep 2010 05:48:18 +0100
+Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
+	=?iso-8859-1?q?single=09TC?= block
+In-Reply-To: <4C80F2A7.9040007@atmel.com>
+References: <1283517093-12628-1-git-send-email-fg@emlix.com>
+	<4C80F2A7.9040007@atmel.com>
+Message-ID: <201009060548.18521.fg@emlix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi,
 
-Any comments on these?
+Am Freitag 03 September 2010 14:05:43 schrieben Sie:
+> Le 03/09/2010 14:31, Fabian Godehardt :
+> > Without this patch you will not be able to register the first block
+> > because of the second association call on at91_add_device_tc().
+> 
+> Yes, I noticed that.
+> 
+> > Signed-off-by: Fabian Godehardt <fg@emlix.com>
+> 
+> Tell me if my little modification is ok for you. I will then sign it and
+> send it to Russell patch tracking system: what do you think about it?
+> 
+> > ---
+> >  arch/arm/mach-at91/at91sam9g45.c         |   12 +++++++++---
+> >  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+> >  2 files changed, 11 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-at91/at91sam9g45.c
+> > b/arch/arm/mach-at91/at91sam9g45.c index 753c0d3..52ef2d6 100644
+> > --- a/arch/arm/mach-at91/at91sam9g45.c
+> > +++ b/arch/arm/mach-at91/at91sam9g45.c
+> > @@ -121,8 +121,13 @@ static struct clk ssc1_clk = {
+> >  	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
+> >  	.type		= CLK_TYPE_PERIPHERAL,
+> >  };
+> > -static struct clk tcb_clk = {
+> > -	.name		= "tcb_clk",
+> > +static struct clk tcb0_clk = {
+> > +	.name		= "tcb0_clk",
+> > +	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
+> > +	.type		= CLK_TYPE_PERIPHERAL,
+> > +};
+> > +static struct clk tcb1_clk = {
+> > +	.name		= "tcb1_clk",
+> >  	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
+> >  	.type		= CLK_TYPE_PERIPHERAL,
+> 
+> I prefer to add a "fake" clock that depend on the first one instead of
+> doubling the definition: like this:
+> 
+> /* One additional fake clock for second TC block */
+> static struct clk tcb1_clk = {
+>         .name           = "tcb1_clk",
+>         .pmc_mask       = 0,
+>         .type           = CLK_TYPE_PERIPHERAL,
+>         .parent         = &tcb0_clk,
+> };
+> 
+> This way we keep the single clock entry but we provide a fake entry for
+> registering the second TC block.
 
-Regards,
-Sundar
+It's ok and works for me - thanks.
 
->-----Original Message-----
->From: Sundar R IYER
->Sent: Friday, September 03, 2010 5:31 PM
->To: linux-arm-kernel at lists.infradead.org
->Cc: STEricsson_nomadik_linux; Sundar R IYER
->Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
->
->Inspired by Will Deacon's cleanup for the Realview series, this is an attempt
->to factor even more common code and move hotplug functions to the generic
->arch/arm/common folder
->
->Sundar Iyer (2):
->  ARM: Generalize all CPU Hotplug code across platforms
->  ux500: Add CPU hotplug support
->
-> arch/arm/common/Makefile           |    1 +
-> arch/arm/common/hotplug.c          |   57
->++++++++++++++++++++++++++++++++++++
-> arch/arm/include/asm/hotplug.h     |   18 +++++++++++
-> arch/arm/mach-omap2/omap-hotplug.c |   24 +--------------
-> arch/arm/mach-realview/hotplug.c   |   56 ++++-------------------------------
-> arch/arm/mach-s5pv310/hotplug.c    |   56 ++++-------------------------------
-> arch/arm/mach-tegra/hotplug.c      |   56 +++++------------------------------
-> arch/arm/mach-ux500/Makefile       |    1 +
-> arch/arm/mach-ux500/hotplug.c      |   30 +++++++++++++++++++
-> arch/arm/mach-ux500/platsmp.c      |    4 ++-
-> 10 files changed, 134 insertions(+), 169 deletions(-)
-> create mode 100644 arch/arm/common/hotplug.c
-> create mode 100644 arch/arm/include/asm/hotplug.h
-> create mode 100644 arch/arm/mach-ux500/hotplug.c
->
->--
->1.7.2.dirty
+Acked-by: Fabian Godehardt <fg@emlix.com>
+
+
+Best regards,
+Fabian
