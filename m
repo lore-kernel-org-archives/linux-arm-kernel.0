@@ -1,67 +1,59 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 11:12:23 +0200
-Subject: [PATCH 2/6] ARM: S5PC110: add support for gpio interrupts
+Date: Mon, 06 Sep 2010 11:12:25 +0200
+Subject: [PATCH 4/6] ARM: S5PC100: Move external interrupt defines
 In-Reply-To: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
 References: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1283764347-460-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1283764347-460-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5PV210/S5PC110 series can use common s5p gpio interrupt code. This
-patch adds required defines and code to make use of it.
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This patch moves external interrupt defines from gpio.h to regs-gpio.h
+for consistency with s5pv210.
+
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pv210/gpiolib.c           |    6 +++++-
- arch/arm/mach-s5pv210/include/mach/irqs.h |    6 +++++-
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -------
+ arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/arch/arm/mach-s5pv210/gpiolib.c
-index 0d45911..29dfb89 100644
---- a/arch/arm/mach-s5pv210/gpiolib.c
-+++ b/arch/arm/mach-s5pv210/gpiolib.c
-@@ -150,6 +150,7 @@ static struct s3c_gpio_chip s5pv210_gpio_4bit[] = {
- 			.label	= "GPG3",
- 		},
- 	}, {
-+		.config	= &gpio_cfg_noint,
- 		.chip	= {
- 			.base	= S5PV210_GPI(0),
- 			.ngpio	= S5PV210_GPIO_I_NR,
-@@ -259,11 +260,14 @@ static __init int s5pv210_gpiolib_init(void)
- {
- 	struct s3c_gpio_chip *chip = s5pv210_gpio_4bit;
- 	int nr_chips = ARRAY_SIZE(s5pv210_gpio_4bit);
-+	int gpioint_group = 0;
- 	int i = 0;
+diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-s5pc100/include/mach/gpio.h
+index 71ae1f5..29a8a12 100644
+--- a/arch/arm/mach-s5pc100/include/mach/gpio.h
++++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
+@@ -146,13 +146,6 @@ enum s5p_gpio_number {
+ /* define the number of gpios we need to the one after the MP04() range */
+ #define ARCH_NR_GPIOS		(S5PC100_GPIO_END + 1)
  
- 	for (i = 0; i < nr_chips; i++, chip++) {
--		if (chip->config == NULL)
-+		if (chip->config == NULL) {
- 			chip->config = &gpio_cfg;
-+			chip->group = gpioint_group++;
-+		}
- 		if (chip->base == NULL)
- 			chip->base = S5PV210_BANK_BASE(i);
- 	}
-diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
-index cdb8ae4..bb7f277 100644
---- a/arch/arm/mach-s5pv210/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
-@@ -121,8 +121,12 @@
- #define S5P_EINT_BASE1		(S5P_IRQ_VIC0(0))
- #define S5P_EINT_BASE2		(IRQ_VIC_END + 1)
+-#define EINT_MODE		S3C_GPIO_SFN(0x2)
+-
+-#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
+-#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
+-#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
+-#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
+-
+ #include <asm-generic/gpio.h>
  
-+/* GPIO interrupt */
-+#define S5P_GPIOINT_BASE	(IRQ_EINT(31) + 1)
-+#define S5P_GPIOINT_GROUP_MAXNR	22
+ #endif /* __ASM_ARCH_GPIO_H */
+diff --git a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
+index dd6295e..6abe481 100644
+--- a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
++++ b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
+@@ -71,5 +71,12 @@
+ #define S5P_EXTINT_RISEEDGE		(0x03)
+ #define S5P_EXTINT_BOTHEDGE		(0x04)
+ 
++#define EINT_MODE		S3C_GPIO_SFN(0x2)
 +
- /* Set the default NR_IRQS */
--#define NR_IRQS			(IRQ_EINT(31) + 1)
-+#define NR_IRQS			(IRQ_EINT(31) + S5P_GPIOINT_COUNT + 1)
++#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
++#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
++#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
++#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
++
+ #endif /* __ASM_MACH_S5PC100_REGS_GPIO_H */
  
- /* Compatibility */
- #define IRQ_LCD_FIFO		IRQ_LCD0
 -- 
 1.7.2.2
