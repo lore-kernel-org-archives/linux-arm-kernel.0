@@ -1,56 +1,43 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 17:46:37 +0900
-Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
-In-Reply-To: <AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
-References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
-	<AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
-Message-ID: <4C84AA6D.10509@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Sep 2010 09:56:50 +0100
+Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+In-Reply-To: <33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <20100906085650.GA20903@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2010-09-06 13:52, Jassi Brar wrote:
-> On Mon, Sep 6, 2010 at 12:50 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com>  wrote:
-> ....
->> +       parent = clk_get(NULL, "mout_epll");
->> +       if (IS_ERR(parent))
->> +               return PTR_ERR(parent);
->> +
->> +       for (i = 0; err == 0&&  i<  ARRAY_SIZE(fimc_devs); i++) {
->> +               if (fimc_devs[i]) {
->> +                       clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
->> +                       if (IS_ERR(clk_fimc)) {
->> +                               err = PTR_ERR(clk_fimc);
->> +                               break;
->> +                       }
->> +                       clk_set_parent(clk_fimc, parent);
->> +                       clk_put(clk_fimc);
->> +               }
->> +       }
+On Mon, Sep 06, 2010 at 09:15:57AM +0200, Sundar R IYER wrote:
+> Hi Santosh,
+> 
+> >-----Original Message-----
+> >From: Shilimkar, Santosh [mailto:santosh.shilimkar at ti.com]
+> 
+> >Generic Approach seems to be good but I think this might complicate few
+> >scenario's regarding how _A_ platform wants to handle the hotplug.
+> >
+> 
+> Yes. But the functions cpu_enter_lowpower and cpu_leave_lowpower()
+> are still preserved in platform specific files. Only the top helpers
+> are moved out.
 >
-> The sclk_fimc could source clock from a number of options out of a mux.
-> mout_epll is just one of them. Different machines may want to source the
-> clock differently.
+> So, platforms can still work out their custom low power mode
+> implementations; which I believe can vary according to the
+> implementation of (say independent) power domains for each/
+> multiple cores.
 
-Right, I forgot about this case.
+So what if a platform wants to completely power down a CPU?
 
-> So, IMO the parent selection should not be done in platform code, but rather
-> in machine init code.
-> Not the best, but a better solution can be found in
-> arch/arm/mach-s5pc100/dev-spi.c
-> Give it a thought.
+You'd want to implement it such that platform_cpu_die() does all
+the shutdown of the CPU except for power-off, and platform_cpu_kill()
+waits for that to complete before turning power off.
 
-I'm thinking of making the parent clock an argument to the 
-s5pv210_fimc_setup_clks().
+With platform_cpu_kill() and platform_cpu_die() moved into generic
+code, you can no longer do this.
 
-I really don't like the idea of passing clock name through the platform 
-data and letting driver to mess with clock's parents. Machine startup 
-code is the last place where such things should be changed.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Lastly, what if you want to allow CPU0 to be offlined, which is
+possible, though its wake-up is a little more complex because it
+must not be allowed to go through its normal boot?
