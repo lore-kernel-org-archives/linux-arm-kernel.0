@@ -1,47 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Sep 2010 11:03:47 -0700
-Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <20100906104413.GD20903@n2100.arm.linux.org.uk>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-Message-ID: <20100906180346.GC20849@atomide.com>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Mon, 6 Sep 2010 21:09:43 +0200
+Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
+In-Reply-To: <d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+Message-ID: <20100906210943.0e8eb7df@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100906 03:36]:
-> Here's my latest patch (which is combined from two patches.)
-> 
-> Tony, could you follow up with patches for anything which is still
-> required - I think there's two things you've addressed which this
-> currently misses:
-> 
-> 1. not initializing twd_base (I'm not convinced this is safe - rather
->    making smp_prepare_cpus() return early is probably a better idea.)
-> 2. __flush_icache_all()
-> 
-> Note that (2) seems to be complicated by the instruction only being
-> available on ARMv7 and later.
+On Mon, 30 Aug 2010 16:11:00 +0530
+Viresh KUMAR <viresh.kumar@st.com> wrote:
 
-Yeah will check probably on Tuesday, heading to a BBQ as it's a holiday
-here. Also my laptop cooling fan broke a few days ago, got it patched up
-temporarily though: An external fan duct taped to the side of the machine
-until the replacement arrives :)
- 
-> Also note that this should only be used for comparing SMP vs UP versions
-> of the same architecture - in other words, not ARMv6 vs ARMv6K.
+> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 
-Right, ARMv6 vs ARMv6K can be dealt with in another patch once this
-is done.
- 
-> Lastly, what's happening about ARMv6 and ARMv7 processor setup functions?
-> Are we going to split them into those which need SMP bits twiddled and
-> those which don't?  If we are going to split them, someone needs to follow
-> up on this email with patches to do it (preferably to be slotted in
-> before these changes.)
+ Hi, there are quite a few issues. Please read the
+ checklist at http://groups.google.com/group/rtc-linux/web/checklist
 
-No need to split them any longer AFAIK. Or do you have some case in mind
-that's not being handled now, maybe I don't follow you?
+-- 
 
-Regards,
+ Best regards,
 
-Tony 
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
