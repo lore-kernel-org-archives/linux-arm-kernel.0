@@ -1,54 +1,38 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 18:10:00 +0900
-Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
-In-Reply-To: <AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
-References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
-	<AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
-Message-ID: <4C84AFE8.2010402@samsung.com>
+Date: Mon, 06 Sep 2010 11:12:21 +0200
+Subject: [PATCH v3] ARM: S5P: Add support for gpio interrupts
+Message-ID: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On 2010-09-06 13:52, Jassi Brar wrote:
-> On Mon, Sep 6, 2010 at 12:50 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com>  wrote:
-> ....
->> +       parent = clk_get(NULL, "mout_epll");
->> +       if (IS_ERR(parent))
->> +               return PTR_ERR(parent);
->> +
->> +       for (i = 0; err == 0&&  i<  ARRAY_SIZE(fimc_devs); i++) {
->> +               if (fimc_devs[i]) {
->> +                       clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
->> +                       if (IS_ERR(clk_fimc)) {
->> +                               err = PTR_ERR(clk_fimc);
->> +                               break;
->> +                       }
->> +                       clk_set_parent(clk_fimc, parent);
->> +                       clk_put(clk_fimc);
->> +               }
->> +       }
->
-> The sclk_fimc could source clock from a number of options out of a mux.
-> mout_epll is just one of them. Different machines may want to source the
-> clock differently.
+This patch series adds support for gpio interrupts on Samsung S5P SoC
+series (S5PC100 and S5PC110/S5PV210). It is based on the previous
+version created by Joonyoung Shim (which is available from the 
+"[PATCH v2 0/4] ARM: S5P: Support gpio interrupts" thread:
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/1662 ).
 
-Right, I forgot about this case.
+This version has been redesigned to assign irq numbers dynamically to
+reduce resource waste. Such idea has proposed by Ben Dooks some time ago
+(see "[PATCH] ARM: S5P: Dynamicly numbered GPIO interrupt support"
+thread: http://comments.gmane.org/gmane.linux.kernel.samsung-soc/1198 ).
 
-> So, IMO the parent selection should not be done in platform code, but rather
-> in machine init code.
-> Not the best, but a better solution can be found in
-> arch/arm/mach-s5pc100/dev-spi.c
-> Give it a thought.
+The last patch in this series is an example how to use the dynamically
+registered gpio interrupt. The QT602240 touch screen device on Goni
+machine requires it.
 
-I'm thinking of making the parent clock an argument to the 
-s5pv210_fimc_setup_clks().
+The patch series has been rebased onto latest kgene/for-next kernel
+tree.
 
-I really don't like the idea of passing clock name through the platform 
-data and letting driver to mess with clock's parents. Machine startup 
-code is the last place where such things should be changed.
+The complete list of patches:
+
+[PATCH 1/6] ARM: Samsung: Add common s5p gpio interrupt support
+[PATCH 2/6] ARM: S5PC110: add support for gpio interrupts
+[PATCH 3/6] ARM: S5PC100: Use generic S5P gpio interrupts interface
+[PATCH 4/6] ARM: S5PC100: Move external interrupt defines
+[PATCH 5/6] ARM: Samsung: Add common samsung_gpiolib_to_irq function
+[PATCH 6/6] ARM: S5PC110: GONI: Add support for QT602240 TS driver
 
 Best regards
 -- 
