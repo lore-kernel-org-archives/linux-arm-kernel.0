@@ -1,50 +1,37 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 6 Sep 2010 12:30:26 +0200
-Subject: A serial patchs that support FSL's eSDHC
-In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA078545@zch01exm22.fsl.freescale.net>
-References: <1283334305-12453-1-git-send-email-r65037@freescale.com>
-	<20100901101500.GE11407@pengutronix.de>
-	<A88EF4D64D8447468743DC1503C0B6CA078545@zch01exm22.fsl.freescale.net>
-Message-ID: <20100906103026.GA2617@pengutronix.de>
+Date: Mon,  6 Sep 2010 12:34:22 +0200
+Subject: Support for platform-esdhc-controller
+Message-ID: <1283769265-14147-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+This is a patch series adding support for the esdhc-controller as a platform
+device which can be found on e.g. mx35/51. It was tested using a mx35-based
+Phytec pcm043. This is still a WIP! ADMA2 is not supported so far (mx35 just
+has ADMA1 which is not supported by the core?) I will see if I can grab a
+mx51-board later.
 
-(going back to the list. A few more eyes during the process will surely
-help :))
+The following changes since commit 2bfc96a127bc1cc94d26bfaa40159966064f9c8c:
 
-On Fri, Sep 03, 2010 at 06:26:05PM +0800, Zhu Richard-R65037 wrote:
+  Linux 2.6.36-rc3 (2010-08-29 08:36:04 -0700)
 
-> I encounter some problems when I merge my eSDHC driver into
-> sdhci-pltfm.c driver.
-> In the eSDHC solution there is a little complex in the driver
-> implementation refer to the HW/IC design.
-> One private struct such as sdhci_fsl_host in my original codes is
-> needed, and the board specified platform data (such
->  as imxmmc_platform_data struct) is mandatory required too.
-> 
-> sdhci-pltfm.c driver can't provide such kinds of APIs.
-> Do you have any suggestions?
+are available in the git repository at:
+  git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
 
-Well, I think we can do without. In a few minutes, I will post an RFC
-which I just hacked. Please have a look at it, and say if you have
-comments or suggestions. Hopefully you'll agree that this approach is a
-lot less intrusive. I will mainly concentrate on the driver. For the
-platform part, Uwe already gave a few comments. I will also reply to
-some of your patches to clarify some issues.
+Wolfram Sang (3):
+      sdhci-pltfm: Add structure for host-specific data
+      mmc: add driver for imx35/51
+      pcm043: add resources for mmc
+
+ arch/arm/mach-mx3/mach-pcm043.c |   29 ++++++
+ drivers/mmc/host/Kconfig        |    9 ++
+ drivers/mmc/host/Makefile       |    1 +
+ drivers/mmc/host/sdhci-esdhc.c  |  194 +++++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/sdhci-pltfm.c  |   10 ++-
+ drivers/mmc/host/sdhci-pltfm.h  |    6 +
+ 6 files changed, 247 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/mmc/host/sdhci-esdhc.c
 
 Regards,
 
    Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100906/de6ef16d/attachment.sig>
