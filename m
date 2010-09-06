@@ -1,30 +1,53 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 6 Sep 2010 05:40:19 +0200
-Subject: Cpufreq for s3c2440 FriendlyArm
-In-Reply-To: <AANLkTi=mvJywPgZbyGuNu46Ty5F3AkW2wBEa+Hu=skQq@mail.gmail.com>
-References: <AANLkTi=mvJywPgZbyGuNu46Ty5F3AkW2wBEa+Hu=skQq@mail.gmail.com>
-Message-ID: <201009060540.19729.marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 6 Sep 2010 11:50:07 +0800
+Subject: [PATCH] ARM: pxa27x_keypad: added a comment to explain
+	clear_wakeup_event callback
+In-Reply-To: <1283700790-3558-1-git-send-email-mark.brown314@gmail.com>
+References: <1283700790-3558-1-git-send-email-mark.brown314@gmail.com>
+Message-ID: <AANLkTi=9tbLYZO7QPCBiEeUTeedz+wuaAWanEuY4CSO2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Ne 5. z??? 2010 22:30:00 tarek attia napsal(a):
-> Hi all,
-> 
-> Did anyone try the cpufreq on the mini2440 ? and did anyone get it
-> working on the board ?
-> 
-> Each time I do the configuration in the kernel I found nothing on the
-> board ,however after the compilation I found the cpufreq.o & pll.o but
-> no file concerning that on the board .
-> 
-> 
-> Any help will be appreciated.
-
-I believe you have the wrong mailing list here. LAK CCed.
-> 
-> 
-> Best Regards,
+On Sun, Sep 5, 2010 at 11:33 PM, Mark F. Brown <mark.brown314@gmail.com> wrote:
+> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+> ---
+> ?arch/arm/plat-pxa/include/plat/pxa27x_keypad.h | ? ?9 +++++++++
+> ?1 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
+> index 73dacda..abcc36e 100644
+> --- a/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
+> +++ b/arch/arm/plat-pxa/include/plat/pxa27x_keypad.h
+> @@ -25,6 +25,13 @@
+> ?*
+> ?* 4. matrix key and direct key will use the same debounce_interval by
+> ?* ? ?default, which should be sufficient in most cases
+> + *
+> + * pxa168 keypad platform specific parameter
+> + *
+> + * NOTE:
+> + * clear_wakeup_event callback is a workaround required to clear the
+> + * keypad interrupt. The keypad wake must be cleared in addition to
+> + * reading the MI/DI bits in the KPC register.
+> ?*/
+> ?struct pxa27x_keypad_platform_data {
+>
+> @@ -52,6 +59,8 @@ struct pxa27x_keypad_platform_data {
+>
+> ? ? ? ?/* key debounce interval */
+> ? ? ? ?unsigned int ? ?debounce_interval;
+> +
+> + ? ? ? /* clear wakeup event requirement for pxa168 */
+> ? ? ? ?void ? ? ? ? ? ?(*clear_wakeup_event)(void);
+> ?};
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.7.0.4
+>
+>
+
+Merged into below commit, and 'devel' branch pushed.
+
+  ARM: pxa27x_keypad: added wakeup event handler for keypad interrupts
+
+Thanks.
