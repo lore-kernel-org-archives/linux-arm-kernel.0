@@ -1,83 +1,47 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 6 Sep 2010 19:26:19 +0800
-Subject: [PATCH] pxa168fb: fix clear operation
-In-Reply-To: <AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
-References: <1283128337-4605-1-git-send-email-haojian.zhuang@marvell.com>
-	<1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
-	<AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
-Message-ID: <AANLkTi=6gEbWcG5Dq4SZsfdpDCEmxPZzkvonPqc1TcH8@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 6 Sep 2010 16:56:55 +0530
+Subject: [PATCH 35/74] ST SPEAr: Enabling clocks before amba
+	device	registeration
+In-Reply-To: <20100902100247.GL26319@n2100.arm.linux.org.uk>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<96b4972a92cab5025a89bd71a4e23fa29aa41cba.1283161023.git.viresh.kumar@st.com>
+	<20100902100247.GL26319@n2100.arm.linux.org.uk>
+Message-ID: <4C84CFFF.9080107@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 5, 2010 at 7:56 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Mon, Aug 30, 2010 at 8:32 AM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> While fb isn't active, we should clear CFG_GRA_ENA bit. The existing code
->> can't clear this bit.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> ---
->> ?drivers/video/pxa168fb.c | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
->> index ec2ddb2..3f112c9 100644
->> --- a/drivers/video/pxa168fb.c
->> +++ b/drivers/video/pxa168fb.c
->> @@ -298,8 +298,8 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
->> ? ? ? ? * Set bit to enable graphics DMA.
->> ? ? ? ? */
->> ? ? ? ?x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
->> - ? ? ? x |= fbi->active ? 0x00000100 : 0;
->> - ? ? ? fbi->active = 0;
->> + ? ? ? x &= ~CFG_GRA_ENA_MASK;
->> + ? ? ? x |= CFG_GRA_ENA(!!fbi->active);
->
-> This isn't very readable. And since CFG_GRA_ENA is actually a 1-bit
-> field, I'd recommend to change it to something like below:
->
-> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
-> index 5d786bd..59fa751 100644
-> --- a/drivers/video/pxa168fb.c
-> +++ b/drivers/video/pxa168fb.c
-> @@ -298,8 +298,11 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
-> ? ? ? ? * Set bit to enable graphics DMA.
-> ? ? ? ? */
-> ? ? ? ?x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
-> - ? ? ? x |= fbi->active ? 0x00000100 : 0;
-> - ? ? ? fbi->active = 0;
-> +
-> + ? ? ? if (fbi->active)
-> + ? ? ? ? ? ? ? x &= ~CFG_GRA_ENA;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? x |= CFG_GRA_ENA;
->
-> ? ? ? ?/*
-> ? ? ? ? * If we are in a pseudo-color mode, we need to enable
-> diff --git a/drivers/video/pxa168fb.h b/drivers/video/pxa168fb.h
-> index eee0927..e5c34a5 100644
-> --- a/drivers/video/pxa168fb.h
-> +++ b/drivers/video/pxa168fb.h
-> @@ -240,8 +240,7 @@
-> ?#define ? ? CFG_GRA_SWAPYU_MASK ? ? ? ? ? ? ? ? ? ? ? ?0x00000400
-> ?#define ? ? CFG_YUV2RGB_GRA(cvrt) ? ? ? ? ? ? ?((cvrt) << 9)
-> ?#define ? ? CFG_YUV2RGB_GRA_MASK ? ? ? ? ? ? ? 0x00000200
-> -#define ? ? CFG_GRA_ENA(gra) ? ? ? ? ? ? ? ? ? ((gra) << 8)
-> -#define ? ? CFG_GRA_ENA_MASK ? ? ? ? ? ? ? ? ? 0x00000100
-> +#define ? ? CFG_GRA_ENA ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0x10000100
-> ?/* for video part */
-> ?#define ? ? CFG_DMA_FTOGGLE(toggle) ? ? ? ? ? ?((toggle) << 7)
-> ?#define ? ? CFG_DMA_FTOGGLE_MASK ? ? ? ? ? ? ? 0x00000080
->>
->> ? ? ? ?/*
->> ? ? ? ? * If we are in a pseudo-color mode, we need to enable
->> --
->> 1.5.6.5
->>
->>
->
+On 9/2/2010 3:32 PM, Russell King - ARM Linux wrote:
+> On Mon, Aug 30, 2010 at 04:08:59PM +0530, Viresh KUMAR wrote:
+> 
+> No description, so I'm going to have to guess about this.
 
-I'm OK. Should I submit this patch again?
+Sorry!!
 
-Thanks
-Haojian
+> 
+>> +static inline void
+>> +spear_amba_device_register(struct amba_device **devices, u32 count)
+>> +{
+>> +	u32 i;
+>> +
+>> +	for (i = 0; i < count; i++) {
+>> +		struct clk *clk = clk_get_sys(devices[i]->dev.init_name, NULL);
+>> +		if (IS_ERR(clk))
+>> +			continue;
+>> +
+>> +		clk_enable(clk);
+>> +		amba_device_register(devices[i], &iomem_resource);
+>> +		clk_disable(clk);
+> 
+> My guess is that you're doing this to work around the fact that your
+> SoC enables/disables both the bus clock and the functional clock to
+> each primecell, and so you're finding that you need to enable the
+> clock to access the device registers.
+> 
+> We've fixed this in the generic code by introducing an 'apb_pclk' clock
+> which the core bus code controls (and eventually drivers.)  See discussion
+> earlier this month/last month on this list about this.
+> 
+> That makes this patch redundant.
+> .
+
+Yes this patch is not required.
