@@ -1,59 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 06 Sep 2010 18:11:00 +0100
-Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
-In-Reply-To: <20100906163645.GB27858@n2100.arm.linux.org.uk>
-References: <20100902161659.GJ11597@atomide.com>
-	<20100902162039.GM11597@atomide.com>
-	<20100902162537.GU26319@n2100.arm.linux.org.uk>
-	<20100902163453.GR11597@atomide.com>
-	<20100902234746.GF11597@atomide.com>
-	<20100903090734.GJ26319@n2100.arm.linux.org.uk>
-	<20100903091029.GK26319@n2100.arm.linux.org.uk>
-	<1283773594.11660.10.camel@e102109-lin.cambridge.arm.com>
-	<20100906153440.GA27858@n2100.arm.linux.org.uk>
-	<1283788427.12076.125.camel@e102109-lin.cambridge.arm.com>
-	<20100906163645.GB27858@n2100.arm.linux.org.uk>
-Message-ID: <1283793060.12076.192.camel@e102109-lin.cambridge.arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 6 Sep 2010 19:16:06 +0200
+Subject: Cpufreq for s3c2440 FriendlyArm
+In-Reply-To: <AANLkTikg31uF2gTW9F-UeCk3vTEg-vSeKRxN99c68vzT@mail.gmail.com>
+References: <AANLkTi=mvJywPgZbyGuNu46Ty5F3AkW2wBEa+Hu=skQq@mail.gmail.com>
+	<201009060540.19729.marek.vasut@gmail.com>
+	<AANLkTikg31uF2gTW9F-UeCk3vTEg-vSeKRxN99c68vzT@mail.gmail.com>
+Message-ID: <201009061916.06497.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-09-06 at 17:36 +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 06, 2010 at 04:53:47PM +0100, Catalin Marinas wrote:
-> > On Mon, 2010-09-06 at 16:34 +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Sep 06, 2010 at 12:46:34PM +0100, Catalin Marinas wrote:
-> > > > Would this work with Thumb-2 kernel builds? Maybe you can add a W(instr)
-> > > > in the SMP/UP macros to make sure that the instruction is always 32-bit
-> > > > wide.
-> > >
-> > > Probably not, and it's not obvious how to make it work for T2 kernel
-> > > builds.  For the time being, I'm going to make this available only for
-> > > native ARM builds.  We can think about how to make this work for T2
-> > > sometime later.
-> > [...]
-> > > Indeed, that's only half of the problem.  On T2, some of these may be
-> > > 16-bit values, others may be 32-bit values, and this mechanism has no
-> > > way to know the size of the areas.
-> >
-> > We can add the W() macro and they are guaranteed to be 32-bit wide or
-> > get a compilation error. Something like using "UP(W(nop))", though it's
-> > doesn't look as nice.
-> >
-> > The usr_ret macro is always compiled to ARM mode anyway.
+Dne Po 6. z??? 2010 15:29:27 tarek attia napsal(a):
+> On Mon, Sep 6, 2010 at 5:40 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne Ne 5. z??? 2010 22:30:00 tarek attia napsal(a):
+> >> Hi all,
+> >> 
+> >> Did anyone try the cpufreq on the mini2440 ? and did anyone get it
+> >> working on the board ?
+> >> 
+> >> Each time I do the configuration in the kernel I found nothing on the
+> >> board ,however after the compilation I found the cpufreq.o & pll.o but
+> >> no file concerning that on the board .
+> >> 
+> >> 
+> >> Any help will be appreciated.
+> > 
+> > I believe you have the wrong mailing list here. LAK CCed.
 > 
-> That's not the only place - here's another:
+> I know that this is the mailing list for omap,,but I thought that may
+> be anyone did it before.
+
+And what is the damned reason, you don't keep CC? And no, they won't help you in 
+linux-omap.
 > 
-> +       ALT_SMP(test_for_ipi r0, r6, r5, lr)
-> +       ALT_UP_B(9997f)
-> 
-> test_for_ipi may be thumb code, which could be 16-bit aligned.
-
-The branch can be 16-bit aligned as well but we would have to change the
-fixup loop for Thumb-2 to load/store 2 half-words and avoid an alignment
-fault.
-
-Anyway, I agree that for now we should get the ARM builds working and we
-can change the Thumb-2 afterwards, as time allows. It doesn't look like
-something fundamental would prevent this.
-
--- 
-Catalin
+> >> Best Regards,
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
