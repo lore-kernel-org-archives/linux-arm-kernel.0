@@ -1,92 +1,78 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon,  6 Sep 2010 16:21:04 +0200
-Subject: [PATCH v2] AT91: pio: add gpio_is_valid() function
-In-Reply-To: <4C73807F.4090007@atmel.com>
-References: <4C73807F.4090007@atmel.com>
-Message-ID: <1283782864-10567-1-git-send-email-nicolas.ferre@atmel.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 6 Sep 2010 16:46:07 +0300
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+Message-ID: <AANLkTi=kSwGKZ8Hpcvmatj9j2h2JZAWMGR15hMOBOpTx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple gpio_is_valid() function to overload
-the standard one. It takes into account the AT91
-pio numbering to check if a proper value is used.
-The upper limit keeps room for IO expanders above
-regular on-chip GPIO numbers.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
-Changes since v1:
-	define ARCH_NR_GPIOS for AT91 keeping room for IO expanders
-	now use an upper limit to conform with gpiolib
-
- arch/arm/mach-at91/include/mach/gpio.h |   14 ++++++++++++++
- include/asm-generic/gpio.h             |    4 ++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-at91/include/mach/gpio.h b/arch/arm/mach-at91/include/mach/gpio.h
-index bfdd8ab..55828ad 100644
---- a/arch/arm/mach-at91/include/mach/gpio.h
-+++ b/arch/arm/mach-at91/include/mach/gpio.h
-@@ -21,6 +21,10 @@
- #define MAX_GPIO_BANKS		5
- #define NR_BUILTIN_GPIO		(PIN_BASE + (MAX_GPIO_BANKS * 32))
- 
-+/* keep room for a couple of GPIO expanders */
-+#define NR_EXTRA_GPIO		64
-+#define ARCH_NR_GPIOS		(NR_BUILTIN_GPIO + NR_EXTRA_GPIO)
-+
- /* these pin numbers double as IRQ numbers, like AT91xxx_ID_* values */
- 
- #define	AT91_PIN_PA0	(PIN_BASE + 0x00 + 0)
-@@ -189,6 +193,16 @@
- #define	AT91_PIN_PE31	(PIN_BASE + 0x80 + 31)
- 
- #ifndef __ASSEMBLY__
-+static inline int gpio_is_valid(int number)
-+{
-+	if (number >= PIN_BASE &&
-+	    number <= ARCH_NR_GPIOS)
-+		return 1;
-+	return 0;
-+}
-+#define __HAVE_ARCH_GPIO_IS_VALID 1
-+
-+
- /* setup setup routines, called from board init or driver probe() */
- extern int __init_or_module at91_set_GPIO_periph(unsigned pin, int use_pullup);
- extern int __init_or_module at91_set_A_periph(unsigned pin, int use_pullup);
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index c7376bf..264e701 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -22,11 +22,13 @@
- #define ARCH_NR_GPIOS		256
- #endif
- 
-+#ifndef __HAVE_ARCH_GPIO_IS_VALID
- static inline int gpio_is_valid(int number)
- {
- 	/* only some non-negative numbers are valid */
- 	return ((unsigned)number) < ARCH_NR_GPIOS;
- }
-+#endif
- 
- struct device;
- struct seq_file;
-@@ -200,11 +202,13 @@ extern void gpio_unexport(unsigned gpio);
- 
- #else	/* !CONFIG_HAVE_GPIO_LIB */
- 
-+#ifndef __HAVE_ARCH_GPIO_IS_VALID
- static inline int gpio_is_valid(int number)
- {
- 	/* only non-negative numbers are valid */
- 	return number >= 0;
- }
-+#endif
- 
- /* platforms that don't directly support access to GPIOs through I2C, SPI,
-  * or other blocking infrastructure can use these wrappers.
--- 
-1.5.6.5
+On Mon, Sep 6, 2010 at 1:02 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> Hi list,
+>
+> I am trying to improve performance of a very basic framebuffer
+> device connected to a Marvell Kirkwood MV88F6281 via a PCIe->
+> PCI bridge (88SB2211). The kernel I am using is 2.6.32.
+>
+> Mapping the PCI memory space via mmap() resulted in some
+> disappointing ~6.5 MBytes/second. I tried to modify page
+> protection to pgprot_writecombine or pgprot_cached, but while
+> this did reproducably change performance, it was only in
+> some sub-percentage range.
+weird, marking those pages as bufferable (none-cachable) should boost
+the throughput.
+you may also try to set the u-boot variable pcieTune to yes, make sure
+to save the env. variables then reboot the system.
+ I am not sure if I understand
+> correctly how other framebuffers handle this, but it seems
+> the "raw" mmapped write performance is not cared about too
+> much or maybe not that bad with most x86 chip sets?
+> However, the idea left over after some trying and looking
+> around is to use the DMA engine to speed up write() (and
+> also read(), but this is not so important) system calls
+> instead of using mmap.
+>
+> Looking around for example code on how to set up the DMA engine
+> to perform transfers from user buffers, I found this Kconfig
+> seemingly showing exactly the feature I am looking for:
+> http://gpl.nas-central.org/SYNOLOGY/x07-series/514_UNTARED/source/linux-2.6.15/arch/arm/mach-mv88fxx81/LSP/Kconfig
+> (config MV_DMA_COPYUSER
+> ? ? ? ?bool "Support DMA copy_to_user() and copy_from_user"
+> ? ? ? ?depends on (ARCH_MV88f5181) && EXPERIMENTAL)
+>
+> However, I could not find any patch or similar how this is
+> implemented. So here my questions:
+>
+> - Is this feature available as an unofficial patch somewhere?
+yes, but the kernel has the drivers/dma/mv_xor that implements the DMA
+Engine interface, you may use that driver for the DMA offloading.
+> - Is the idea of directly setting up a transfer from user pages
+> ?to PCI memory space possible at all?
+you need to do some hacking for that, but I'm almost sure that it
+won't help. using the cpu should be enough.
+> - Why am I the only one who wants such a thing? ;-)
+>
+> In case of coding stuff myself, I was thinking about something
+> like this for write():
+> - get list of page[s], first page offset, last page transfer size
+> ?from user buffer + size
+> - set up DMA engine to transfer list of [partial] pages
+> - when done, return from write
+>
+> Sounds easy, but I am still puzzled by all the different types
+> of memory in this case, and - much more worrying me - I would think
+> there should be many devices/drivers using such a thing, but
+> I did not find them yet.
+>
+> Any hints are greatly appreciated!
+>
+> Regards,
+> Wolfgang
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
