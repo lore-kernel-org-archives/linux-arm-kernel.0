@@ -1,67 +1,44 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 6 Sep 2010 18:17:01 +0900
-Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
-In-Reply-To: <4C84AA6D.10509@samsung.com>
-References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
-	<AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
-	<4C84AA6D.10509@samsung.com>
-Message-ID: <AANLkTikakB1Y6N-UT2Hx+PHfdyticHxCFQzs=uc7KWNc@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 06 Sep 2010 10:28:53 +0100
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100902161659.GJ11597@atomide.com>
+References: <20100817135205.GC20325@n2100.arm.linux.org.uk>
+	<20100817141210.GJ12184@atomide.com>
+	<20100817154035.GD20325@n2100.arm.linux.org.uk>
+	<20100819073810.GR12184@atomide.com><4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com><20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+Message-ID: <1283765333.1926.2.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 6, 2010 at 5:46 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> On 2010-09-06 13:52, Jassi Brar wrote:
->>
->> On Mon, Sep 6, 2010 at 12:50 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> ?wrote:
->> ....
->>>
->>> + ? ? ? parent = clk_get(NULL, "mout_epll");
->>> + ? ? ? if (IS_ERR(parent))
->>> + ? ? ? ? ? ? ? return PTR_ERR(parent);
->>> +
->>> + ? ? ? for (i = 0; err == 0&& ?i< ?ARRAY_SIZE(fimc_devs); i++) {
->>> + ? ? ? ? ? ? ? if (fimc_devs[i]) {
->>> + ? ? ? ? ? ? ? ? ? ? ? clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
->>> + ? ? ? ? ? ? ? ? ? ? ? if (IS_ERR(clk_fimc)) {
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? err = PTR_ERR(clk_fimc);
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->>> + ? ? ? ? ? ? ? ? ? ? ? }
->>> + ? ? ? ? ? ? ? ? ? ? ? clk_set_parent(clk_fimc, parent);
->>> + ? ? ? ? ? ? ? ? ? ? ? clk_put(clk_fimc);
->>> + ? ? ? ? ? ? ? }
->>> + ? ? ? }
->>
->> The sclk_fimc could source clock from a number of options out of a mux.
->> mout_epll is just one of them. Different machines may want to source the
->> clock differently.
->
-> Right, I forgot about this case.
->
->> So, IMO the parent selection should not be done in platform code, but
->> rather
->> in machine init code.
->> Not the best, but a better solution can be found in
->> arch/arm/mach-s5pc100/dev-spi.c
->> Give it a thought.
->
-> I'm thinking of making the parent clock an argument to the
-> s5pv210_fimc_setup_clks().
-Yes, that's better since the relevant clock is managed by the CMU
+On Thu, 2010-09-02 at 17:16 +0100, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 06:29]:
+> > On Mon, Aug 30, 2010 at 03:55:27PM -0700, Tony Lindgren wrote:
+> > > * Tony Lindgren <tony@atomide.com> [100820 04:59]:
+> > > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [100819 13:13]:
+> > > > > On Thu, Aug 19, 2010 at 12:57:06PM +0300, Tony Lindgren wrote:
+> > > > > > Looks like something is not quite right with smp_on_up part of __fixup_smp,
+> > > > > > returning early before smp_on_up does not produce that.
+> > > > >
+> > > > > It's probably overwriting some register it shouldn't be.  I might be
+> > > > > able to look at this sometime during the coming week... assuming that
+> > > > > the weather is as bad as they forecast and I have 'net connectivity.
+> > >
+> > > This seems to fix it.
+> >
+> > Thanks, merged that into my original patch - so here it is again with
+> > everything updated.
+> 
+> Your patch sure makes things simpler! The problem still is the
+> V6 vs V7 SMP code though.
 
-> I really don't like the idea of passing clock name through the platform data
-> and letting driver to mess with clock's parents.
-In case of SPI the clock mux and scalar is present _within_ the SPI
-controller and having to touch SPI regs from outside the driver isn't
-what I prefer.
+I haven't followed your patches closely but can we restrict the ARMv6
+SMP/UP support to only those cores that have TEX remapping (most of them
+probably)?
 
-> Machine startup code is the
-> last place where such things should be changed.
-Until I am enlightened, I'd like to think otherwise.
-I think the board designer would already have thought out the clock sourcing
-hierarchy. Setting appropriate parents once at boot-time and having drivers
-not worry about it, should be better.
+-- 
+Catalin
