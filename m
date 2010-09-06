@@ -1,116 +1,89 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 6 Sep 2010 18:17:12 +0800
-Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early init
-	testing
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A2@dbde02.ent.ti.com>
-References: <20100819073810.GR12184@atomide.com>
-	<4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902161846.GK11597@atomide.com>
-	<20100902170830.GW26319@n2100.arm.linux.org.uk>
-	<20100902174244.GU11597@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A2@dbde02.ent.ti.com>
-Message-ID: <AANLkTik2FNBv-72C4L7PxBoMsTENSds-PvbAzxGd-h4y@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon,  6 Sep 2010 13:23:21 +0200
+Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every single
+	TC block
+In-Reply-To: <201009060548.18521.fg@emlix.com>
+References: <201009060548.18521.fg@emlix.com>
+Message-ID: <1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+From: Fabian Godehardt <fg@emlix.com>
 
-I tried your latest branch: devel-smp-on-unicore, kernel boots up but
-got lots of WARN_ON fired:
+Without this patch you will not be able to register the first block
+because of the second association call on at91_add_device_tc().
 
+Signed-off-by: Fabian Godehardt <fg@emlix.com>
+[nicolas.ferre at atmel.com: change tcb1_clk to fake child clock of tcb0_clk]
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
-------------[ cut here ]------------
-[    1.149719] WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
-[    1.149780] Modules linked in:
-[    1.149841] [<c01b34c8>] (unwind_backtrace+0x0/0xe4) from
-[<c01e939c>] (warn_slowpath_common+0x4c/0x64)
-[    1.149902] [<c01e939c>] (warn_slowpath_common+0x4c/0x64) from
-[<c01e93cc>] (warn_slowpath_null+0x18/0x1c)
-[    1.149993] [<c01e93cc>] (warn_slowpath_null+0x18/0x1c) from
-[<c0274730>] (pcpu_alloc+0x2fc/0x888)
-[    1.150085] [<c0274730>] (pcpu_alloc+0x2fc/0x888) from [<c0279578>]
-(sget+0x198/0x43c)
-[    1.150146] [<c0279578>] (sget+0x198/0x43c) from [<c0279adc>]
-(get_sb_ns+0x20/0x90)
-[    1.150238] [<c0279adc>] (get_sb_ns+0x20/0x90) from [<c02791a4>]
-(vfs_kern_mount+0x9c/0x18c)
-[    1.150299] [<c02791a4>] (vfs_kern_mount+0x9c/0x18c) from
-[<c0022280>] (init_mqueue_fs+0x68/0xc8)
-[    1.150390] [<c0022280>] (init_mqueue_fs+0x68/0xc8) from
-[<c01ac5d0>] (do_one_initcall+0xcc/0x1a4)
-[    1.150451] [<c01ac5d0>] (do_one_initcall+0xcc/0x1a4) from
-[<c0008760>] (kernel_init+0x148/0x210)
-[    1.150543] [<c0008760>] (kernel_init+0x148/0x210) from
-[<c01adcf8>] (kernel_thread_exit+0x0/0x8)
-[    1.150604] ---[ end trace 1b75b31a2719ed74 ]---
----
+ arch/arm/mach-at91/at91sam9g45.c         |   15 ++++++++++++---
+ arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-It looks like we still missed to set some flag for chuck.
-
--Bryan
-
-On Fri, Sep 3, 2010 at 8:09 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
->
->
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of Tony Lindgren
->> Sent: Thursday, September 02, 2010 11:13 PM
->> To: Russell King - ARM Linux
->> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> Bryan Wu; Will Deacon
->> Subject: Re: [PATCH 1/6] ARM: Add inline function smp_on_up() for early
->> init testing
->>
->> * Russell King - ARM Linux <linux@arm.linux.org.uk> [100902 10:00]:
->> > On Thu, Sep 02, 2010 at 09:18:47AM -0700, Tony Lindgren wrote:
->> >
->> > > --- a/arch/arm/include/asm/smp_plat.h
->> > > +++ b/arch/arm/include/asm/smp_plat.h
->> > > @@ -39,4 +39,20 @@ static inline int cache_ops_need_broadcast(void)
->> > > ?#define UP(instr...) ? ? _str(instr)
->> > > ?#endif
->> > >
->> > > +static inline int smp_on_up(void)
->> > > +{
->> > > +#ifdef CONFIG_SMP_ON_UP
->> > > + int smp_on_up;
->> > > +
->> > > + asm( ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> > > + ? ? ? ? SMP(mov %0, #0) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> > > + ? ? ? ? UP(mov ?%0, #1) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> > > + ? ? ? ? : "=r" (smp_on_up));
->> > > +
->> > > + return smp_on_up;
->> > > +#else
->> > > + return 0;
->> > > +#endif
->> >
->> > I think this is the wrong approach - rather than a function which tells
->> us
->> > just if we are a SMP kernel running on UP, why not something which
->> returns
->> > whether we're running on SMP and use that to eliminate some of these
->> ifdefs?
->>
->> Sure. Will has something like this in his patches:
->>
->> static inline int cpu_is_part_of_mp_system(void)
->> {
->> ? ? ? u32 mpidr;
->> ? ? ? asm volatile("mrc p15, 0, %0, c0, c0, 5" : "=r" (mpidr));
->> ? ? ? return (mpidr >> 31) ? !(mpidr >> 30) : 0;
->> }
->
-> I guess this register is only available on MP Core extensions.
->
-> Regards,
-> Santosh
->
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 753c0d3..c67b47f 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -121,8 +121,8 @@ static struct clk ssc1_clk = {
+ 	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+-static struct clk tcb_clk = {
+-	.name		= "tcb_clk",
++static struct clk tcb0_clk = {
++	.name		= "tcb0_clk",
+ 	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
+ 	.type		= CLK_TYPE_PERIPHERAL,
+ };
+@@ -192,6 +192,14 @@ static struct clk ohci_clk = {
+ 	.parent		= &uhphs_clk,
+ };
+ 
++/* One additional fake clock for second TC block */
++static struct clk tcb1_clk = {
++	.name		= "tcb1_clk",
++	.pmc_mask	= 0,
++	.type		= CLK_TYPE_PERIPHERAL,
++	.parent		= &tcb0_clk,
++};
++
+ static struct clk *periph_clocks[] __initdata = {
+ 	&pioA_clk,
+ 	&pioB_clk,
+@@ -208,7 +216,7 @@ static struct clk *periph_clocks[] __initdata = {
+ 	&spi1_clk,
+ 	&ssc0_clk,
+ 	&ssc1_clk,
+-	&tcb_clk,
++	&tcb0_clk,
+ 	&pwm_clk,
+ 	&tsc_clk,
+ 	&dma_clk,
+@@ -221,6 +229,7 @@ static struct clk *periph_clocks[] __initdata = {
+ 	&mmc1_clk,
+ 	// irq0
+ 	&ohci_clk,
++	&tcb1_clk,
+ };
+ 
+ /*
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 809114d..4822019 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -835,9 +835,9 @@ static struct platform_device at91sam9g45_tcb1_device = {
+ static void __init at91_add_device_tc(void)
+ {
+ 	/* this chip has one clock and irq for all six TC channels */
+-	at91_clock_associate("tcb_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
++	at91_clock_associate("tcb0_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
+ 	platform_device_register(&at91sam9g45_tcb0_device);
+-	at91_clock_associate("tcb_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
++	at91_clock_associate("tcb1_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
+ 	platform_device_register(&at91sam9g45_tcb1_device);
+ }
+ #else
+-- 
+1.5.6.5
