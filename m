@@ -1,57 +1,121 @@
-From: deepak.sikri@st.com (deepaksi)
-Date: Mon, 6 Sep 2010 17:25:31 +0530
-Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
-	Suspend Resume
-In-Reply-To: <20100903073421.GF26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
-	<20100902102323.GP26319@n2100.arm.linux.org.uk>
-	<4C809486.2070308@st.com>
-	<20100903073421.GF26319@n2100.arm.linux.org.uk>
-Message-ID: <4C84D6B3.80104@st.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 6 Sep 2010 14:55:55 +0300
+Subject: [PATCH v5 3/7] wireless: wl12xx: add platform data passing support
+In-Reply-To: <AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
+References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
+	<1283376410-9999-4-git-send-email-ohad@wizery.com>
+	<AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
+Message-ID: <AANLkTim91620+bmHWewucX5tP8Z-NUkrW2cJYJ+jpMoD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/3/2010 1:04 PM, Russell King - ARM Linux wrote:
-> On Fri, Sep 03, 2010 at 11:54:06AM +0530, deepaksi wrote:
->   
->> On 9/2/2010 3:53 PM, Russell King - ARM Linux wrote:
->>     
->>> On Mon, Aug 30, 2010 at 04:09:12PM +0530, Viresh KUMAR wrote:
->>>   
->>>       
->>>> From: Deepak Sikri <deepak.sikri@st.com>
->>>>
->>>>     
->>>>         
->>> The reason being?
->>>
->>>   
->>>       
->> For configuring the wake up sources ( normally in the PM framework for
->> suspend resume operations), you need to use the following set of api
->> enable_irq_wake(). This handler has a appropriate callback for the vic,
->> similar to the plugin that we have added in for gic which does enable
->> the wake interrupt sources only. But since gic handler did not had this
->> call back associated was always returning -ENXIO, which was breaking the
->> existing drivers. In case no checks are provided for the return value of 
->> enable_irq_wake(), the things were fine.
->>     
-> So how are wakeup sources configured if this callback does nothing?
-> .
+2010/9/4 Micha? Miros?aw <mirqus@gmail.com>:
+> 2010/9/1 Ohad Ben-Cohen <ohad@wizery.com>:
+>> Add a simple mechanism to pass platform data to the
+>> SDIO instances of wl12xx.
+>>
+>> This way there is no confusion over who owns the 'embedded data',
+>> typechecking is preserved, and no possibility for the wrong driver to
+>> pick up the data.
+>>
+>> Originally proposed by Russell King.
+>>
+>> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+>> ---
+>> ?drivers/net/wireless/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+>> ?drivers/net/wireless/wl12xx/Kconfig ? ? ? ? ? ? ? ?| ? ?5 ++-
+>> ?drivers/net/wireless/wl12xx/wl12xx_platform_data.c | ? 31 ++++++++++++++++++++
+>> ?include/linux/wl12xx.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?3 ++
+>> ?4 files changed, 40 insertions(+), 1 deletions(-)
+>> ?create mode 100644 drivers/net/wireless/wl12xx/wl12xx_platform_data.c
+>>
+>> diff --git a/drivers/net/wireless/Makefile b/drivers/net/wireless/Makefile
+>> index 5d4ce4d..85af697 100644
+>> --- a/drivers/net/wireless/Makefile
+>> +++ b/drivers/net/wireless/Makefile
+>> @@ -50,5 +50,7 @@ obj-$(CONFIG_ATH_COMMON) ? ? ?+= ath/
+>> ?obj-$(CONFIG_MAC80211_HWSIM) ? += mac80211_hwsim.o
+>>
+>> ?obj-$(CONFIG_WL12XX) ? += wl12xx/
+>> +# small builtin driver bit
+>> +obj-$(CONFIG_WL12XX_PLATFORM_DATA) ? ? += wl12xx/wl12xx_platform_data.o
+>>
+>> ?obj-$(CONFIG_IWM) ? ? ?+= iwmc3200wifi/
+>> diff --git a/drivers/net/wireless/wl12xx/Kconfig b/drivers/net/wireless/wl12xx/Kconfig
+>> index 2f98058..4a8bb25 100644
+>> --- a/drivers/net/wireless/wl12xx/Kconfig
+>> +++ b/drivers/net/wireless/wl12xx/Kconfig
+>> @@ -74,4 +74,7 @@ config WL1271_SDIO
+>> ? ? ? ? ?If you choose to build a module, it'll be called
+>> ? ? ? ? ?wl1271_sdio. Say N if unsure.
+>>
+>> -
+>> +config WL12XX_PLATFORM_DATA
+>> + ? ? ? bool
+>> + ? ? ? depends on WL1271_SDIO != n
+>> + ? ? ? default y
+>> diff --git a/drivers/net/wireless/wl12xx/wl12xx_platform_data.c b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
+>> new file mode 100644
+>> index 0000000..e00973b
+>> --- /dev/null
+>> +++ b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
+>> @@ -0,0 +1,31 @@
+>> +#include <linux/module.h>
+>> +#include <linux/wl12xx.h>
+>> +
+>> +static struct wl12xx_platform_data *platform_data;
+>> +
+>> +int __init wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
+>> +{
+>> + ? ? ? if (platform_data)
+>> + ? ? ? ? ? ? ? return -EBUSY;
+>> + ? ? ? if (!data)
+>> + ? ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? ? platform_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
+>> + ? ? ? if (!platform_data)
+>> + ? ? ? ? ? ? ? return -ENOMEM;
+>> +
+>> + ? ? ? return 0;
+>> +}
+>> +
+>> +int wl12xx_get_platform_data(struct wl12xx_platform_data *data)
+>> +{
+>> + ? ? ? if (!platform_data)
+>> + ? ? ? ? ? ? ? return -ENODEV;
+>> + ? ? ? if (!data)
+>> + ? ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? ? memcpy(data, platform_data, sizeof(*data));
+>> +
+>> + ? ? ? return 0;
+>> +}
+>> +EXPORT_SYMBOL(wl12xx_get_platform_data);
+>> diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+>> index 137ac89..3e33ae1 100644
+>> --- a/include/linux/wl12xx.h
+>> +++ b/include/linux/wl12xx.h
+>> @@ -31,4 +31,7 @@ struct wl12xx_platform_data {
+>> ? ? ? ?bool use_eeprom;
+>> ?};
+>>
+>> +int wl12xx_set_platform_data(const struct wl12xx_platform_data *data);
+>> +int wl12xx_get_platform_data(struct wl12xx_platform_data *data);
+>> +
+>> ?#endif
 >
->   
-In most of the architectures that I could refer across(including SPEAr
-family -SPEAr13xx),
-have a separate power management unit(PMU) which is required to be
-configured to define the wake
-up sources. The PMU takes care of waking up the system from sleep, as
-and when the wake up
-interrupts are triggered. This routing is independent of GIC, and hence
-the handling was not added.
+> Why do you need all that copying? Isn't the data constant?
 
-Contrary to that, in some of our hardware architecture using VIC
-(including SPEAr 3xx/6xx), there
-was no explicit PMU, and the wake up trigger was exclusively done
-through VIC, and hence the VIC
-call backs had the necessary implementation.
+That was the original proposal from Russell;
+
+AFAICT it's very similar to how platform device resources are handled
+- it allows marking the original definition of the data as __initdata
+(need to add that) thus freeing up its space after the initialization
+phase completes. Later, in some scenarios, it might also allow to free
+up the copied data (not done now, but the copying happen only once in
+the lifetime of the driver so I'm fine with it).
+
+>
+> Best Regards,
+> Micha? Miros?aw
+>
