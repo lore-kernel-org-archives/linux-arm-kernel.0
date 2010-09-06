@@ -1,70 +1,110 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 06 Sep 2010 16:16:30 +0100
-Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
-In-Reply-To: <20100906104413.GD20903@n2100.arm.linux.org.uk>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-Message-ID: <1283786190.12076.106.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Sep 2010 16:34:41 +0100
+Subject: [PATCH 3/6] ARM: Fix v7wbi_tlb_flags for SMP on UP
+In-Reply-To: <1283773594.11660.10.camel@e102109-lin.cambridge.arm.com>
+References: <20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902162039.GM11597@atomide.com>
+	<20100902162537.GU26319@n2100.arm.linux.org.uk>
+	<20100902163453.GR11597@atomide.com>
+	<20100902234746.GF11597@atomide.com>
+	<20100903090734.GJ26319@n2100.arm.linux.org.uk>
+	<20100903091029.GK26319@n2100.arm.linux.org.uk>
+	<1283773594.11660.10.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20100906153440.GA27858@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Mon, Sep 06, 2010 at 12:46:34PM +0100, Catalin Marinas wrote:
+> Russell,
+> 
+> I can see you posted another version while writing this e-mail. But I
+> think most comments still apply. 
+> 
+> On Fri, 2010-09-03 at 10:10 +0100, Russell King - ARM Linux wrote:
+> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> > index 6e8f05c..55974d2 100644
+> > --- a/arch/arm/include/asm/assembler.h
+> > +++ b/arch/arm/include/asm/assembler.h
+> > @@ -154,16 +154,32 @@
+> >         .long   9999b,9001f;                    \
+> >         .popsection
+> > 
+> > +#ifdef CONFIG_SMP
+> > +#define SMP(instr...)                                          \
+> > +9998:  instr
+> > +#define UP(instr...)                                           \
+> > +       .pushsection ".smpalt.init", "a"                        ;\
+> > +       .word   9998b                                           ;\
+> > +       instr                                                   ;\
+> > +       .popsection
+> > +#else
+> > +#define SMP(instr...)
+> > +#define UP(instr...) instr
+> > +#endif
+> 
+> Would this work with Thumb-2 kernel builds? Maybe you can add a W(instr)
+> in the SMP/UP macros to make sure that the instruction is always 32-bit
+> wide.
 
-On Mon, 2010-09-06 at 11:44 +0100, Russell King - ARM Linux wrote:
-> +#ifdef CONFIG_SMP_ON_UP
-> +__fixup_smp:
-> +       mov     r7, #0x00070000
-> +       orr     r6, r7, #0xff000000     @ mask 0xff070000
-> +       orr     r7, r7, #0x41000000     @ val 0x41070000
-> +       and     r0, r9, r6
-> +       teq     r0, r7                  @ ARM CPU and ARMv6/v7?
-> +       bne     __fixup_smp_on_up       @ no, assume UP
-> +
-> +       orr     r6, r6, #0x0000ff00
-> +       orr     r6, r6, #0x000000f0     @ mask 0xff07fff0
-> +       orr     r7, r7, #0x0000b000
-> +       orr     r7, r7, #0x00000020     @ val 0x4107b020
-> +       and     r0, r9, r6
-> +       teq     r0, r7                  @ ARM 11MPCore?
-> +       moveq   pc, lr                  @ yes, assume SMP
-> +
-> +       mrc     p15, 0, r0, c0, c0, 5   @ read MIDR
-> +       tst     r0, #1 << 31
-> +       movne   pc, lr                  @ bit 31 => SMP
+Probably not, and it's not obvious how to make it work for T2 kernel
+builds.  For the time being, I'm going to make this available only for
+native ARM builds.  We can think about how to make this work for T2
+sometime later.
 
-An alternative would be to check for hardware coherency support in the
-shareability domain using the MMFR0 register. If we have the new CPUID
-format (all MP systems):
+> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> > index bb8e93a..bb2ef60 100644
+> > --- a/arch/arm/kernel/entry-armv.S
+> > +++ b/arch/arm/kernel/entry-armv.S
+> > @@ -965,11 +965,8 @@ kuser_cmpxchg_fixup:
+> >         beq     1b
+> >         rsbs    r0, r3, #0
+> >         /* beware -- each __kuser slot must be 8 instructions max */
+> > -#ifdef CONFIG_SMP
+> > -       b       __kuser_memory_barrier
+> > -#else
+> > -       usr_ret lr
+> > -#endif
+> > +       SMP(b   __kuser_memory_barrier)
+> > +       UP(usr_ret      lr)
+> 
+> Ah, the automatic W() I mentioned above wouldn't work for macros.
 
-	if (ID_MMFR0<15:12> == 0) 
-		HWCoherency = (ID_MMFR0<11:8> == 1)
-	else 
-		HWCoherency = (ID_MMFR0<31:28> == 1)
+Indeed, that's only half of the problem.  On T2, some of these may be
+16-bit values, others may be 32-bit values, and this mechanism has no
+way to know the size of the areas.
 
-The hw coherency is built for MP systems and this register should be
-valid for both ARMv6 and ARMv7 configurations.
+> > @@ -333,4 +336,35 @@ __create_page_tables:
+> >  ENDPROC(__create_page_tables)
+> >         .ltorg
+> > 
+> > +#ifdef CONFIG_SMP_ON_UP
+> > +__fixup_smp:
+> > +       and     r0, r9, #0xff000000
+> > +       teq     r0, #0x41000000         @ ARM CPU?
+> > +       bne     smp_on_up               @ no, assume UP
+> 
+> That's a bit restricting but I'm not sure we have a better way. If we
+> have the new CPUID format (MIDR[19:16] = 0xf), we can check MMFR0[31:28]
+> for 1 which means "implemented with hardware coherency support".
+> 
+> > +       and     r0, r9, #0x00070000
+> > +       teq     r0, #0x00070000         @ ARMv6/v7?
+> > +       bne     smp_on_up               @ no, assume UP
+> > +       mrc     p15, 0, r0, c0, c0, 5   @ read MIDR
+> 
+> Typo in comment - MPIDR.
 
-Something like below, untested:
+Fixed.
 
-	mov	r6, #0x000f0000		@ mask/val new CPUID
-	and	r0, r9, r6
-	teq	r0, r6			@ ARMv6/v7 new CPUID
-	bne	__fixup_smp_on_up	@ no, assume UP
+> I think this applies to the smp_midr.h file. Should we call it
+> smp_mpidr.h or just mpidr.h?
 
-	mrc	p15, 0, r0, c0, c1, 4	@ MMFR0
-	mov	r6, #0x0000f000		@ mask shareability levels
-	tst	r0, r6
-	moveq	r0, r0, lsr #8		@ outermost shareability
-	movne	r0, r0, lsr #28		@ innermost shareability
-	and	r0, r0, #15
-	cmp	r0, #1			@ check hw coherency support
-	bne	__fixup_smp_on_up	@ no, assume UP
+Already fixed.
 
-We still cannot optimise the case where you have an MP capable processor
-but in a UP-only configuration (maxcpus=1).
+> I think a '.align 2' would be useful as Thumb-2 code may break the
+> alignment of 1f.
 
-For the availability of the Inner Shareable cache and TLB operations, we
-would need to check for the MMFR3<15:12> bits.
-
--- 
-Catalin
+Maybe, but if we restrict this to only ARM builds for the time being,
+there isn't a problem.
