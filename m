@@ -1,44 +1,50 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 6 Sep 2010 13:29:36 +0300
-Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
-In-Reply-To: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
-References: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201009061329.45290.anarsoul@gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 6 Sep 2010 12:30:26 +0200
+Subject: A serial patchs that support FSL's eSDHC
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA078545@zch01exm22.fsl.freescale.net>
+References: <1283334305-12453-1-git-send-email-r65037@freescale.com>
+	<20100901101500.GE11407@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA078545@zch01exm22.fsl.freescale.net>
+Message-ID: <20100906103026.GA2617@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? ????????? ?? 30 ??????? 2010 17:34:22 ????? Vasily Khoruzhick ???????:
-> From: Fabian Godehardt <fg@emlix.com>
-> 
-> This is a patch that seems to make the USB hangs on the S3C244X go away.
-> At least a good amount of ping torture didn't make them come back so far.
-> 
-> The issue is that, if there are several back-to-back packets, sometimes no
-> interrupt is generated for one of them. This seems to be caused by the
-> mysterious dual packet mode, which the USB hardware enters automatically
-> if the endpoint size is half that of the FIFO. (On the 244X, this is the
-> normal situation for bulk data endpoints.)
-> 
-> There is also a timing factor in this. It seems that what happens is that
-> the USB hardware automatically sends an acknowledgement if there is only
-> one packet in the FIFO (the FIFO has space for two). If another packet
-> arrives before the host has retrieved and acknowledged the previous one,
-> no interrupt is generated for that second one.
-> 
-> However, there may be an indication. There is one undocumented bit (none
-> of the 244x manuals document it), OUT_CRS1_REG[1], that seems to be set
-> suspiciously often when this condition occurs. There is also
-> CLR_DATA_TOGGLE, OUT_CRS1_REG[7], which may have a function related to
-> this. (The Samsung manual is rather terse on that, as usual.)
-> 
-> This needs to be examined further. For now, the patch seems to do the
-> trick.
+Hi Richard,
 
-Ping
+(going back to the list. A few more eyes during the process will surely
+help :))
+
+On Fri, Sep 03, 2010 at 06:26:05PM +0800, Zhu Richard-R65037 wrote:
+
+> I encounter some problems when I merge my eSDHC driver into
+> sdhci-pltfm.c driver.
+> In the eSDHC solution there is a little complex in the driver
+> implementation refer to the HW/IC design.
+> One private struct such as sdhci_fsl_host in my original codes is
+> needed, and the board specified platform data (such
+>  as imxmmc_platform_data struct) is mandatory required too.
+> 
+> sdhci-pltfm.c driver can't provide such kinds of APIs.
+> Do you have any suggestions?
+
+Well, I think we can do without. In a few minutes, I will post an RFC
+which I just hacked. Please have a look at it, and say if you have
+comments or suggestions. Hopefully you'll agree that this approach is a
+lot less intrusive. I will mainly concentrate on the driver. For the
+platform part, Uwe already gave a few comments. I will also reply to
+some of your patches to clarify some issues.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100906/45ff392a/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100906/de6ef16d/attachment.sig>
