@@ -1,43 +1,83 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 6 Sep 2010 19:09:44 +0800
-Subject: Colibri PXA320 Power management question
-In-Reply-To: <20100906101320.GD10367@rakim.wolfsonmicro.main>
-References: <AANLkTik_6ziPZwV9EuZwE4SMtJoc10JrBZZ_-mmsuy5a@mail.gmail.com>
-	<20100902142203.GA8381@sirena.org.uk> <4C7FB7B5.2010301@compulab.co.il>
-	<20100902152705.GC5809@rakim.wolfsonmicro.main>
-	<4C7FC606.20904@compulab.co.il>
-	<20100906101320.GD10367@rakim.wolfsonmicro.main>
-Message-ID: <AANLkTin3=pVMpSjtof_mLtMQGL-84qJZMCnfb-0xKfab@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 6 Sep 2010 19:26:19 +0800
+Subject: [PATCH] pxa168fb: fix clear operation
+In-Reply-To: <AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
+References: <1283128337-4605-1-git-send-email-haojian.zhuang@marvell.com>
+	<1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
+	<AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
+Message-ID: <AANLkTi=6gEbWcG5Dq4SZsfdpDCEmxPZzkvonPqc1TcH8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 6, 2010 at 6:13 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Sep 02, 2010 at 06:43:02PM +0300, Mike Rapoport wrote:
->> Mark Brown wrote:
+On Sun, Sep 5, 2010 at 7:56 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Mon, Aug 30, 2010 at 8:32 AM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> While fb isn't active, we should clear CFG_GRA_ENA bit. The existing code
+>> can't clear this bit.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?drivers/video/pxa168fb.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+>> index ec2ddb2..3f112c9 100644
+>> --- a/drivers/video/pxa168fb.c
+>> +++ b/drivers/video/pxa168fb.c
+>> @@ -298,8 +298,8 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
+>> ? ? ? ? * Set bit to enable graphics DMA.
+>> ? ? ? ? */
+>> ? ? ? ?x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+>> - ? ? ? x |= fbi->active ? 0x00000100 : 0;
+>> - ? ? ? fbi->active = 0;
+>> + ? ? ? x &= ~CFG_GRA_ENA_MASK;
+>> + ? ? ? x |= CFG_GRA_ENA(!!fbi->active);
 >
->> >Yes, exactly - what I'm saying is that Linux is set up to use cpufreq
->> >rather than rely on the built in stuff.
+> This isn't very readable. And since CFG_GRA_ENA is actually a 1-bit
+> field, I'd recommend to change it to something like below:
 >
->> There's no contradiction here. The PXA3XX cpufreq implementation
->> could trigger automatic voltage scaling.
+> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+> index 5d786bd..59fa751 100644
+> --- a/drivers/video/pxa168fb.c
+> +++ b/drivers/video/pxa168fb.c
+> @@ -298,8 +298,11 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
+> ? ? ? ? * Set bit to enable graphics DMA.
+> ? ? ? ? */
+> ? ? ? ?x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+> - ? ? ? x |= fbi->active ? 0x00000100 : 0;
+> - ? ? ? fbi->active = 0;
+> +
+> + ? ? ? if (fbi->active)
+> + ? ? ? ? ? ? ? x &= ~CFG_GRA_ENA;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? x |= CFG_GRA_ENA;
 >
-> That'd be slightly entertaining, though, since IIRC the hardware
-> implementation isn't really set up for being constrained - it doesn't
-> expect to be cooperating with software governors.
+> ? ? ? ?/*
+> ? ? ? ? * If we are in a pseudo-color mode, we need to enable
+> diff --git a/drivers/video/pxa168fb.h b/drivers/video/pxa168fb.h
+> index eee0927..e5c34a5 100644
+> --- a/drivers/video/pxa168fb.h
+> +++ b/drivers/video/pxa168fb.h
+> @@ -240,8 +240,7 @@
+> ?#define ? ? CFG_GRA_SWAPYU_MASK ? ? ? ? ? ? ? ? ? ? ? ?0x00000400
+> ?#define ? ? CFG_YUV2RGB_GRA(cvrt) ? ? ? ? ? ? ?((cvrt) << 9)
+> ?#define ? ? CFG_YUV2RGB_GRA_MASK ? ? ? ? ? ? ? 0x00000200
+> -#define ? ? CFG_GRA_ENA(gra) ? ? ? ? ? ? ? ? ? ((gra) << 8)
+> -#define ? ? CFG_GRA_ENA_MASK ? ? ? ? ? ? ? ? ? 0x00000100
+> +#define ? ? CFG_GRA_ENA ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0x10000100
+> ?/* for video part */
+> ?#define ? ? CFG_DMA_FTOGGLE(toggle) ? ? ? ? ? ?((toggle) << 7)
+> ?#define ? ? CFG_DMA_FTOGGLE_MASK ? ? ? ? ? ? ? 0x00000080
+>>
+>> ? ? ? ?/*
+>> ? ? ? ? * If we are in a pseudo-color mode, we need to enable
+>> --
+>> 1.5.6.5
+>>
+>>
 >
 
-It doesn't need to. There is actually an internal command table, and
-not really sure about the mapping scheme though, but when software
-then has only to care about the frequencies, and voltages will be
-adjusted accordingly.
+I'm OK. Should I submit this patch again?
 
-In the other hand, such hardcoded mechanism won't work very well
-with incompatible power management ICs, so if there is such a
-platform, we do need a way to fall back to using regulators.
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks
+Haojian
