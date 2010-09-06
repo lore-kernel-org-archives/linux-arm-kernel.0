@@ -1,19 +1,32 @@
 From: gking@nvidia.com (Gary King)
-Date: Tue,  7 Sep 2010 13:45:34 -0700
-Subject: [PATCH] bounce: call flush_dcache_page after bounce_copy_vec
-Message-ID: <1283892334-9238-1-git-send-email-gking@nvidia.com>
+Date: Mon, 6 Sep 2010 15:37:12 -0700
+Subject: bounce: call flush_dcache_page after bounce_copy_vec
+Message-ID: <mailman.235.1283892872.27306.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have been seeing problems on Tegra 2 (ARMv7 SMP) systems with HIGHMEM
-enabled on 2.6.35 (plus some patches targetted at 2.6.36 to perform
-cache maintenance lazily), and the root cause appears to be that the
-mm bouncing code is calling flush_dcache_page before it copies the
-bounce buffer into the bio.
+the bounced page needs to be flushed after data is copied into it,
+to ensure that architecture implementations can synchronize
+instruction and data caches if necessary.
 
-The patch below reorders these two operations, and eliminates numerous
-arbitrary application crashes on my dev system.
+Signed-off-by: Gary King <gking@nvidia.com>
+---
+ mm/bounce.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Gary
-
---
+diff --git a/mm/bounce.c b/mm/bounce.c
+index 13b6dad..1481de6 100644
+--- a/mm/bounce.c
++++ b/mm/bounce.c
+@@ -116,8 +116,8 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
+ 		 */
+ 		vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
+ 
+-		flush_dcache_page(tovec->bv_page);
+ 		bounce_copy_vec(tovec, vfrom);
++		flush_dcache_page(tovec->bv_page);
+ 	}
+ }
+ 
+-- 
+1.7.0.4
