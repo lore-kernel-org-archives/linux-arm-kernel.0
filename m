@@ -1,89 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon,  6 Sep 2010 13:23:21 +0200
-Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every single
-	TC block
-In-Reply-To: <201009060548.18521.fg@emlix.com>
-References: <201009060548.18521.fg@emlix.com>
-Message-ID: <1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 06 Sep 2010 19:21:50 +0900
+Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
+In-Reply-To: <AANLkTikakB1Y6N-UT2Hx+PHfdyticHxCFQzs=uc7KWNc@mail.gmail.com>
+References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
+	<AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
+	<4C84AA6D.10509@samsung.com>
+	<AANLkTikakB1Y6N-UT2Hx+PHfdyticHxCFQzs=uc7KWNc@mail.gmail.com>
+Message-ID: <4C84C0BE.3050305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabian Godehardt <fg@emlix.com>
+Hello,
 
-Without this patch you will not be able to register the first block
-because of the second association call on at91_add_device_tc().
+On 2010-09-06 18:17, Jassi Brar wrote:
 
-Signed-off-by: Fabian Godehardt <fg@emlix.com>
-[nicolas.ferre at atmel.com: change tcb1_clk to fake child clock of tcb0_clk]
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91sam9g45.c         |   15 ++++++++++++---
- arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
- 2 files changed, 14 insertions(+), 5 deletions(-)
+>> I'm thinking of making the parent clock an argument to the
+>> s5pv210_fimc_setup_clks().
+> Yes, that's better since the relevant clock is managed by the CMU
 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 753c0d3..c67b47f 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -121,8 +121,8 @@ static struct clk ssc1_clk = {
- 	.pmc_mask	= 1 << AT91SAM9G45_ID_SSC1,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
--static struct clk tcb_clk = {
--	.name		= "tcb_clk",
-+static struct clk tcb0_clk = {
-+	.name		= "tcb0_clk",
- 	.pmc_mask	= 1 << AT91SAM9G45_ID_TCB,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
-@@ -192,6 +192,14 @@ static struct clk ohci_clk = {
- 	.parent		= &uhphs_clk,
- };
- 
-+/* One additional fake clock for second TC block */
-+static struct clk tcb1_clk = {
-+	.name		= "tcb1_clk",
-+	.pmc_mask	= 0,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+	.parent		= &tcb0_clk,
-+};
-+
- static struct clk *periph_clocks[] __initdata = {
- 	&pioA_clk,
- 	&pioB_clk,
-@@ -208,7 +216,7 @@ static struct clk *periph_clocks[] __initdata = {
- 	&spi1_clk,
- 	&ssc0_clk,
- 	&ssc1_clk,
--	&tcb_clk,
-+	&tcb0_clk,
- 	&pwm_clk,
- 	&tsc_clk,
- 	&dma_clk,
-@@ -221,6 +229,7 @@ static struct clk *periph_clocks[] __initdata = {
- 	&mmc1_clk,
- 	// irq0
- 	&ohci_clk,
-+	&tcb1_clk,
- };
- 
- /*
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 809114d..4822019 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -835,9 +835,9 @@ static struct platform_device at91sam9g45_tcb1_device = {
- static void __init at91_add_device_tc(void)
- {
- 	/* this chip has one clock and irq for all six TC channels */
--	at91_clock_associate("tcb_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
-+	at91_clock_associate("tcb0_clk", &at91sam9g45_tcb0_device.dev, "t0_clk");
- 	platform_device_register(&at91sam9g45_tcb0_device);
--	at91_clock_associate("tcb_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
-+	at91_clock_associate("tcb1_clk", &at91sam9g45_tcb1_device.dev, "t0_clk");
- 	platform_device_register(&at91sam9g45_tcb1_device);
- }
- #else
+What do you mean by the CMU? This function is intended to be called from 
+board startup code.
+
+>> I really don't like the idea of passing clock name through the platform data
+>> and letting driver to mess with clock's parents.
+> In case of SPI the clock mux and scalar is present _within_ the SPI
+> controller and having to touch SPI regs from outside the driver isn't
+> what I prefer.
+
+I know. It is the same case as with SDHCI and UART controllers. I have 
+an idea how to solve this in a bit more cleaner way. I hope to post a 
+proposition soon.
+
+>> Machine startup code is the
+>> last place where such things should be changed.
+> Until I am enlightened, I'd like to think otherwise.
+> I think the board designer would already have thought out the clock sourcing
+> hierarchy. Setting appropriate parents once at boot-time and having drivers
+> not worry about it, should be better.
+
+Definitely, but in our case kernel the default fimc_sclk parent points 
+to non-existing clock.
+
+Best regards
 -- 
-1.5.6.5
+Marek Szyprowski
+Samsung Poland R&D Center
