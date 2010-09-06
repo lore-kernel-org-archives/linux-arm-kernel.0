@@ -1,37 +1,129 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 6 Sep 2010 13:52:24 +0900
-Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
-In-Reply-To: <1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
-References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 6 Sep 2010 08:33:27 +0200
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <1282948239.2268.155.camel@jstultz-laptop>
+References: <363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+	<20100817085324.GB3330@riccoc20.at.omicron.at>
+	<1282090963.1734.97.camel@localhost>
+	<20100818071942.GA4096@riccoc20.at.omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<1282594125.3111.344.camel@localhost.localdomain>
+	<20100827123849.GC11657@riccoc20.at.omicron.at>
+	<1282948239.2268.155.camel@jstultz-laptop>
+Message-ID: <20100906063327.GA4549@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 6, 2010 at 12:50 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-....
-> + ? ? ? parent = clk_get(NULL, "mout_epll");
-> + ? ? ? if (IS_ERR(parent))
-> + ? ? ? ? ? ? ? return PTR_ERR(parent);
-> +
-> + ? ? ? for (i = 0; err == 0 && i < ARRAY_SIZE(fimc_devs); i++) {
-> + ? ? ? ? ? ? ? if (fimc_devs[i]) {
-> + ? ? ? ? ? ? ? ? ? ? ? clk_fimc = clk_get(fimc_devs[i], "sclk_fimc");
-> + ? ? ? ? ? ? ? ? ? ? ? if (IS_ERR(clk_fimc)) {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? err = PTR_ERR(clk_fimc);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? ? ? ? ? clk_set_parent(clk_fimc, parent);
-> + ? ? ? ? ? ? ? ? ? ? ? clk_put(clk_fimc);
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
+On Fri, Aug 27, 2010 at 03:30:39PM -0700, John Stultz wrote:
+> On Fri, 2010-08-27 at 14:38 +0200, Richard Cochran wrote:
+> > We have not introduced new PPS interface. We use existing PPS subsystem.
+> 
+> Doesn't the pps subsystem have its own way to control the pps signal
+> interrupt? I'm not totally sure here, but given your point above that
+> having multiple pps events it seems like they should be selectable. It
+> seems something that we'd want to control via the global pps interface,
+> rather then having a pps-enable flag on every random bit of hardware
+> that can support it.
 
-The sclk_fimc could source clock from a number of options out of a mux.
-mout_epll is just one of them. Different machines may want to source the
-clock differently.
-So, IMO the parent selection should not be done in platform code, but rather
-in machine init code.
-Not the best, but a better solution can be found in
-arch/arm/mach-s5pc100/dev-spi.c
-Give it a thought.
+The PPS subsystem offers no way to disable PPS interrupts. 
+
+> > > Same for the timestamps and periodic output (ie: and how do they differ
+> > > from reading or setting a timer on CLOCK_PTP?)
+> > 
+> > The posix timer calls won't work:
+> > 
+> > I have a PTP hardware clocks with multiple external timestamp
+> > channels. Using timer_gettime, how can I specify (or decode) the
+> > channel of interest to me?
+> 
+> I guess I'm not following you here. Again, I'm not super familiar with
+> the hardware involved. Could you clarify a bit more? What do you mean by
+> external timestamp? Is this what is used on the packet timestamping? 
+
+No, the packet timestamp occurs in the PHY, MAC, or on the MII bus and
+is an essential feature to support the PTP.
+
+An external timestamp is just a wire going into the clock and is an
+optional feature to make the clock more useful. The clock can latch
+the current time value when an edge is dectected on the wire. Using
+external timestamps, you correlate real world events with the absolute
+time in the clock.
+
+Typically, a clock offers two or more such input channels (wires), but
+timer_gettime does not offer a way to differentiate between them, and
+thus is not suitable.
+
+> The posix clock id interface is frustrating because the flat static
+> enumeration is really limiting.
+> 
+> I wonder if a dynamic enumeration for posix clocks would be possibly a
+> way to go?
+
+I am perfectly happy with this.
+
+> In other words, a driver registers a clock with the system, and the
+> system reserves a clock_id for it from the designated available pool and
+> assigns it back. Then userland could query the driver via something like
+> sysfs to get the clockid for the hardware. 
+> 
+> Would that maybe work? 
+
+I have now posted a sample implementation of this idea. Do you like it?
+
+> > The sysfs will include one class device for each PTP clock. Each clock
+> > has a sysfs attribute with the corresponding clock id.
+> 
+> Do you mean the clock_id # in the posix clocks namespace?
+
+Yes.
+
+> > I would also be happy with the character device idea already
+> > posted. Just pick one of the two, and I'll resubmit the patch set...
+> 
+> Personally, with regard to exposing the ptp clock to userland I'm more
+> comfortable via the chardev. However, the posix clocks/timer api is
+> really close to what you need, so I'm not totally set against it. And
+> maybe the dynamic enumeration would resolve my main problems with it?
+
+Okay, I have posted a draft of the dynamic idea. Can you support it?
+
+> That said, with the chardev method, I don't like the idea of duplicating
+> the existing time apis via a systemtime device. Dropping that from your
+> earlier patch would ease the majority of my objections.
+
+Well, the clock interface needs to offer basic services:
+
+1. Set time
+2. Get time
+3. Jump offset
+4. Adjust frequency
+
+This is similar to what the posix clock and ntp API offer. Using a
+chardev, should I make the ioctls really different, just for the
+purpose of being different?
+
+To me, it makes more sense to offer a familiar interface.
+
+I was perfectly happy with the chardev idea. In fact, that is the way
+I first implemented it. Now, I have also gone ahead and implemented
+the dynamic posix clock idea, too.
+
+> > At this point I would just like to go forward with one of the two
+> > proposed APIs. I had modelled the character device on the posix clock
+> > calls in order to make it immediately familar, and I think it is a
+> > viable approach. After the lkml discussion, I think it is even cleaner
+> > and nicer to just offer a new clock id.
+
+I would like to repeat the sentiment in this last paragraph! I already
+implemented and would be content with either form for the new clock
+control API:
+
+1. Character device
+2. POSIX clock with dynamic ids
+
+Please, just take your pick ;^)
+
+Thanks,
+Richard
