@@ -1,27 +1,49 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 05:50:40 +0200
-Subject: [PATCH] Platform fixes for s5p-fimc
-Message-ID: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+Date: Mon, 06 Sep 2010 05:50:41 +0200
+Subject: [PATCH 1/4] ARM: S5PC110: add fimc clocks.
+In-Reply-To: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1283745044-15514-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+These clocks enables FIMC driver to operate on machines, which bootloader
+power gated FIMC devices to save power on boot.
 
-This patch series fixes a bunch of bugs in s5p-fimc platform support.
-Mainly it adds missing clocks, dma coherent masks and clock setup code
-required on Aquila and Goni targets.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/clock.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-This is a pure bugfix series to get fimc driver working. I hope to get
-it merged for 2.6.36-rc4.
-
-The complete list of patches:
-
-[PATCH 1/4] ARM: S5PC110: add fimc clocks.
-[PATCH 2/4] ARM: Samsung: s5p-fimc: fix dma coherent mask
-[PATCH 3/4] ARM: S5PC110: add common FIMC setup code
-[PATCH 4/4] ARM: S5PC110: use common FIMC clock setup code
-
-Best regards
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index af91fef..9c199ef 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -281,6 +281,24 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip0_ctrl,
+ 		.ctrlbit	= (1<<29),
+ 	}, {
++		.name		= "fimc",
++		.id		= 0,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= "fimc",
++		.id		= 1,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 25),
++	}, {
++		.name		= "fimc",
++		.id		= 2,
++		.parent		= &clk_hclk_dsys.clk,
++		.enable		= s5pv210_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 26),
++	}, {
+ 		.name		= "otg",
+ 		.id		= -1,
+ 		.parent		= &clk_hclk_psys.clk,
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.2.2
