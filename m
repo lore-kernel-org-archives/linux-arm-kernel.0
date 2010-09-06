@@ -1,48 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Sep 2010 19:21:50 +0900
-Subject: [PATCH 3/4] ARM: S5PC110: add common FIMC setup code
-In-Reply-To: <AANLkTikakB1Y6N-UT2Hx+PHfdyticHxCFQzs=uc7KWNc@mail.gmail.com>
-References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-	<1283745044-15514-4-git-send-email-m.szyprowski@samsung.com>
-	<AANLkTinhbmKX5gs4TPZwVUX0WSEQ5RLN+_gHAqXsTj1b@mail.gmail.com>
-	<4C84AA6D.10509@samsung.com>
-	<AANLkTikakB1Y6N-UT2Hx+PHfdyticHxCFQzs=uc7KWNc@mail.gmail.com>
-Message-ID: <4C84C0BE.3050305@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 06 Sep 2010 11:26:30 +0100
+Subject: [PATCH 4/4] ARM: l2x0: Optmise the range based operations
+In-Reply-To: <1280598372-4830-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1280598372-4830-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1283768790.1926.10.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, 2010-07-31 at 23:16 +0530, Santosh Shilimkar wrote:
+> For the big buffers which are in excess of cache size, the maintaince
+> operations by PA are very slow. For such buffers the maintainace
+> operations can be speeded up by using the WAY based method.
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/mm/cache-l2x0.c |   95 ++++++++++++++++++++++++++++------------------
+>  1 files changed, 58 insertions(+), 37 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index b2938d4..c0d6108 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -116,6 +116,18 @@ static void l2x0_flush_all(void)
+>  	spin_unlock_irqrestore(&l2x0_lock, flags);
+>  }
+>  
+> +static void l2x0_clean_all(void)
+> +{
+> +	unsigned long flags;
+> +
+> +	/* clean all ways */
+> +	spin_lock_irqsave(&l2x0_lock, flags);
+> +	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
+> +	cache_wait(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
 
-On 2010-09-06 18:17, Jassi Brar wrote:
+In case you'll base this on top of my PL310 optimisation, you should use
+cache_wait_way() as the cache_wait() becomes a no-op.
 
->> I'm thinking of making the parent clock an argument to the
->> s5pv210_fimc_setup_clks().
-> Yes, that's better since the relevant clock is managed by the CMU
+>  static void l2x0_clean_range(unsigned long start, unsigned long end)
+>  {
+> -	void __iomem *base = l2x0_base;
+> -	unsigned long flags;
+>  
+> -	spin_lock_irqsave(&l2x0_lock, flags);
+> -	start &= ~(CACHE_LINE_SIZE - 1);
+> -	while (start < end) {
+> -		unsigned long blk_end = start + min(end - start, 4096UL);
+> +	if ((end - start) >= l2x0_size) {
+> +		l2x0_clean_all();
+> +	} else {
+> +		void __iomem *base = l2x0_base;
+> +		unsigned long flags, blk_end;
 
-What do you mean by the CMU? This function is intended to be called from 
-board startup code.
+Minor thing - the patch may be cleaner if we use a 'return' instead of
+'else' to avoid further indentation (same for the other functions):
 
->> I really don't like the idea of passing clock name through the platform data
->> and letting driver to mess with clock's parents.
-> In case of SPI the clock mux and scalar is present _within_ the SPI
-> controller and having to touch SPI regs from outside the driver isn't
-> what I prefer.
+	if ((end - start) >= l2x0_size) {
+		l2x0_clean_all();
+		return;
+	}
 
-I know. It is the same case as with SDHCI and UART controllers. I have 
-an idea how to solve this in a bit more cleaner way. I hope to post a 
-proposition soon.
+Otherwise the patch looks fine to me.
 
->> Machine startup code is the
->> last place where such things should be changed.
-> Until I am enlightened, I'd like to think otherwise.
-> I think the board designer would already have thought out the clock sourcing
-> hierarchy. Setting appropriate parents once at boot-time and having drivers
-> not worry about it, should be better.
-
-Definitely, but in our case kernel the default fimc_sclk parent points 
-to non-existing clock.
-
-Best regards
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Catalin
