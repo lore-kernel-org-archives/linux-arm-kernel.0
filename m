@@ -1,179 +1,229 @@
 From: m.nazarewicz@samsung.com (Michal Nazarewicz)
-Date: Mon, 06 Sep 2010 08:33:56 +0200
-Subject: [RFCv5 6/9] ARM: cma: Added CMA to Aquila,
-	Goni and c210 universal boards
+Date: Mon, 06 Sep 2010 08:33:58 +0200
+Subject: [RFCv5 8/9] mm: vcm: Sample driver added
 In-Reply-To: <cover.1283749231.git.mina86@mina86.com>
 References: <cover.1283749231.git.mina86@mina86.com>
-Message-ID: <75d7a03247944cc210dbdd100a7ff57ac582ba4e.1283749231.git.mina86@mina86.com>
+Message-ID: <262a5a5019c1f1a44d5793f7e69776e56f27af06.1283749231.git.mina86@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds CMA memory reservation code to Aquila, Goni and c210
-universal boards.
+This commit adds a sample Virtual Contiguous Memory framework
+driver.  It handles no real hardware and is there only for
+demonstrating purposes.
 
 Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv210/mach-aquila.c         |   31 +++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/mach-goni.c           |   31 +++++++++++++++++++++++++++
- arch/arm/mach-s5pv310/mach-universal_c210.c |   23 ++++++++++++++++++++
- 3 files changed, 85 insertions(+), 0 deletions(-)
+ Documentation/virtual-contiguous-memory.txt |    3 +
+ include/linux/vcm-sample.h                  |   30 +++++++
+ mm/Kconfig                                  |    9 ++
+ mm/Makefile                                 |    1 +
+ mm/vcm-sample.c                             |  120 +++++++++++++++++++++++++++
+ 5 files changed, 163 insertions(+), 0 deletions(-)
+ create mode 100644 include/linux/vcm-sample.h
+ create mode 100644 mm/vcm-sample.c
 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index bf772de..ff89534 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -19,6 +19,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
+diff --git a/Documentation/virtual-contiguous-memory.txt b/Documentation/virtual-contiguous-memory.txt
+index 0c0e90c..6d1014c 100644
+--- a/Documentation/virtual-contiguous-memory.txt
++++ b/Documentation/virtual-contiguous-memory.txt
+@@ -730,6 +730,9 @@ already there.
+ If you want to use this wrapper, you need to select VCM_MMU Kconfig
+ option.
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -486,6 +487,35 @@ static struct platform_device *aquila_devices[] __initdata = {
- 	&s5p_device_fimc2,
- };
++There is a sample driver provided which provides a template for real
++drivers.  It can be found in [[file:../mm/vcm-sample.c][mm/vcm-sample.c]] file.
++
+ *** Context creation
  
-+static void __init aquila_reserve(void)
+ Similarly to normal drivers, MMU driver needs to provide a context
+diff --git a/include/linux/vcm-sample.h b/include/linux/vcm-sample.h
+new file mode 100644
+index 0000000..9a79403
+--- /dev/null
++++ b/include/linux/vcm-sample.h
+@@ -0,0 +1,30 @@
++/*
++ * Virtual Contiguous Memory driver driver template header
++ * Copyright (c) 2010 by Samsung Electronics.
++ * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License or (at your optional) any later version of the license.
++ */
++
++/*
++ * See Documentation/virtual-contiguous-memory.txt for details.
++ */
++
++#ifndef __LINUX_VCM_SAMPLE_H
++#define __LINUX_VCM_SAMPLE_H
++
++#include <linux/vcm.h>
++
++struct vcm;
++
++/**
++ * vcm_samp_create() - creates a VCM context
++ *
++ * ... Documentation goes here ...
++ */
++struct vcm *__must_check vcm_samp_create(/* ... */);
++
++#endif
+diff --git a/mm/Kconfig b/mm/Kconfig
+index 0445f68..be040e7 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -401,3 +401,12 @@ config VCM_O2O
+ # Select if you need vcm_phys_alloc() or vcm_phys_walk() functions
+ config VCM_PHYS
+ 	bool
++
++config VCM_SAMP
++	bool "VCM sample driver"
++	depends on VCM
++	select VCM_MMU
++	help
++	  This enables a sample driver for the VCM framework.  This driver
++	  does not handle any real harwdare.  It's merely an template of
++	  how for real drivers.
+diff --git a/mm/Makefile b/mm/Makefile
+index e908202..c465dfa 100644
+--- a/mm/Makefile
++++ b/mm/Makefile
+@@ -50,3 +50,4 @@ obj-$(CONFIG_DEBUG_KMEMLEAK_TEST) += kmemleak-test.o
+ obj-$(CONFIG_CMA) += cma.o
+ obj-$(CONFIG_CMA_BEST_FIT) += cma-best-fit.o
+ obj-$(CONFIG_VCM) += vcm.o
++obj-$(CONFIG_VCM_SAMPLE) += vcm-sample.o
+diff --git a/mm/vcm-sample.c b/mm/vcm-sample.c
+new file mode 100644
+index 0000000..e265a73
+--- /dev/null
++++ b/mm/vcm-sample.c
+@@ -0,0 +1,120 @@
++/*
++ * Virtual Contiguous Memory driver template
++ * Copyright (c) 2010 by Samsung Electronics.
++ * Written by Michal Nazarewicz (m.nazarewicz at samsung.com)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License or (at your optional) any later version of the license.
++ */
++
++/*
++ * This is just a sample code.  It does nothing useful other then
++ * presenting a template for VCM driver.
++ */
++
++/*
++ * See Documentation/virtual-contiguous-memory.txt for details.
++ */
++
++#include <linux/vcm-drv.h>
++#include <linux/vcm-sample.h>
++
++struct vcm_samp {
++	struct vcm_mmu	mmu;
++	/* ... */
++};
++
++static const unsigned vcm_samp_orders[] = {
++	4 + 20 - PAGES_SHIFT,	/* 16MiB pages */
++	0 + 20 - PAGES_SHIFT,	/*  1MiB pages */
++	6 + 10 - PAGES_SHIFT,	/* 64KiB pages */
++	2 + 10 - PAGES_SHIFT,	/*  4KiB pages */
++};
++
++static int vcm_samp_activate_page(dma_addr_t vaddr, dma_addr_t paddr,
++				  unsigned order, void *priv)
 +{
-+	static struct cma_region regions[] = {
-+		{
-+			.name		= "fw",
-+			.size		=   1 << 20,
-+			{ .alignment	= 128 << 10 },
-+			.start		= 0x32000000,
-+		},
-+		{
-+			.name		= "b1",
-+			.size		=  32 << 20,
-+			.start		= 0x33000000,
-+		},
-+		{
-+			.name		= "b2",
-+			.size		=  16 << 20,
-+			.start		= 0x44000000,
-+		},
-+		{ }
-+	};
++	struct vcm_samp *samp =
++		container_of((struct vcm *)priv, struct vcm_samp, mmu.vcm);
 +
-+	static const char map[] __initconst =
-+		"s5p-mfc5/f=fw;s5p-mfc5/a=b1;s5p-mfc5/b=b2;*=b1,b2";
++	/*
++	 * Handle adding a mapping from virtual page at @vaddr to
++	 * physical page ad @paddr.  The page is of order @order which
++	 * means that it's (PAGE_SIZE << @order) bytes.
++	 */
 +
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
++	return -EOPNOTSUPP;
 +}
 +
- static void __init aquila_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -523,4 +553,5 @@ MACHINE_START(AQUILA, "Aquila")
- 	.map_io		= aquila_map_io,
- 	.init_machine	= aquila_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.reserve	= aquila_reserve,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index fdc5cca..10dc2b9 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -19,6 +19,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -467,6 +468,35 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&s3c_device_hsmmc2,
- };
- 
-+static void __init goni_reserve(void)
++static int vcm_samp_deactivate_page(dma_addr_t vaddr, dma_addr_t paddr,
++				    unsigned order, void *priv)
 +{
-+	static struct cma_region regions[] = {
-+		{
-+			.name		= "fw",
-+			.size		=   1 << 20,
-+			{ .alignment	= 128 << 10 },
-+			.start		= 0x32000000,
-+		},
-+		{
-+			.name		= "b1",
-+			.size		=  32 << 20,
-+			.start		= 0x33000000,
-+		},
-+		{
-+			.name		= "b2",
-+			.size		=  16 << 20,
-+			.start		= 0x44000000,
-+		},
-+		{ }
-+	};
++	struct vcm_samp *samp =
++		container_of((struct vcm *)priv, struct vcm_samp, mmu.vcm);
 +
-+	static const char map[] __initconst =
-+		"s5p-mfc5/f=fw;s5p-mfc5/a=b1;s5p-mfc5/b=b2;*=b1,b2";
++	/*
++	 * Handle removing a mapping from virtual page@@vaddr to
++	 * physical page ad @paddr.  The page is of order @order which
++	 * means that it's (PAGE_SIZE << @order) bytes.
++	 */
 +
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
++	/* It's best not to fail here */
++	return 0;
 +}
 +
- static void __init goni_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -498,4 +528,5 @@ MACHINE_START(GONI, "GONI")
- 	.map_io		= goni_map_io,
- 	.init_machine	= goni_machine_init,
- 	.timer		= &s3c24xx_timer,
-+	.reserve	= goni_reserve,
- MACHINE_END
-diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-index b57efae..f735c52 100644
---- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-+++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-@@ -12,6 +12,7 @@
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
- #include <linux/gpio.h>
-+#include <linux/cma.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -126,6 +127,27 @@ static void __init universal_map_io(void)
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
- }
- 
-+static void __init universal_reserve(void)
++static void vcm_samp_cleanup(struct vcm *vcm)
 +{
-+	static struct cma_region regions[] = {
-+		{
-+			.name		= "r",
-+			.size		=  64 << 20,
-+		},
-+		{
-+			.name		= "fw",
-+			.size		=   1 << 20,
-+		},
-+		{ }
-+	};
++	struct vcm_samp *samp =
++		container_of(res->vcm, struct vcm_samp, mmu.vcm);
 +
-+	static const char map[] __initconst =
-+		"s3c-mfc5/f=fw;*=r";
++	/* Clean ups ... */
 +
-+	cma_set_defaults(regions, map);
-+	cma_early_regions_reserve(NULL);
++	kfree(samp);
 +}
 +
- static void __init universal_machine_init(void)
- {
- #ifdef CONFIG_CACHE_L2X0
-@@ -143,6 +165,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
- 	.boot_params	= S5P_PA_SDRAM + 0x100,
- 	.init_irq	= s5pv310_init_irq,
- 	.map_io		= universal_map_io,
-+	.reserve	= universal_reserve,
- 	.init_machine	= universal_machine_init,
- 	.timer		= &s5pv310_timer,
- MACHINE_END
++struct vcm *__must_check vcm_samp_create(/* ... */)
++{
++	static const struct vcm_mmu_driver driver = {
++		.order           = vcm_samp_orders,
++		.cleanup         = vcm_samp_cleanup,
++		.activate_page   = vcm_samp_activate_page,
++		.deactivate_page = vcm_samp_deactivate_page,
++	};
++
++	struct vcm_samp *samp;
++	struct vcm *vcm;
++
++	switch (0) {
++	case 0:
++	case PAGE_SHIFT == 12:
++		/*
++		 * If you have a compilation error here it means you
++		 * are compiling for a very strange platfrom where
++		 * PAGE_SHIFT is not 12 (ie. PAGE_SIZE is not 4KiB).
++		 * This driver assumes PAGE_SHIFT is 12.
++		 */
++	};
++
++	samp = kzalloc(sizeof *samp, GFP_KERNEL);
++	if (!samp)
++		return ERR_PTR(-ENOMEM);
++
++	/* ... Set things up ... */
++
++	samp->mmu.driver    = &driver;
++	/* skip first 64K so that zero address will be a NULL pointer */
++	samp->mmu.vcm.start =  (64 << 10);
++	samp->mmu.vcm.size  = -(64 << 10);
++
++	vcm = vcm_mmu_init(&samp->mmu);
++	if (!IS_ERR(vcm))
++		return vcm;
++
++	/* ... Error recovery ... */
++
++	kfree(samp);
++	return vcm;
++}
++EXPORT_SYMBOL_GPL(vcm_samp_create);
 -- 
 1.7.1
