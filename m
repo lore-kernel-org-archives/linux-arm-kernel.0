@@ -1,78 +1,60 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 6 Sep 2010 16:46:07 +0300
-Subject: Kirkwood PCI(e) write performance and DMA engine support for
-	copy_{to, from}_user?
-In-Reply-To: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
-References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
-Message-ID: <AANLkTi=kSwGKZ8Hpcvmatj9j2h2JZAWMGR15hMOBOpTx@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 6 Sep 2010 16:46:24 +0300
+Subject: [PATCH v5 3/7] wireless: wl12xx: add platform data passing support
+In-Reply-To: <20100906120716.GE20903@n2100.arm.linux.org.uk>
+References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
+	<1283376410-9999-4-git-send-email-ohad@wizery.com>
+	<AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
+	<20100906120716.GE20903@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=z-cqdwrbXo9pv9WhZkrnb7X+zpVNbJ_-VTJ16@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 6, 2010 at 1:02 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
-> Hi list,
->
-> I am trying to improve performance of a very basic framebuffer
-> device connected to a Marvell Kirkwood MV88F6281 via a PCIe->
-> PCI bridge (88SB2211). The kernel I am using is 2.6.32.
->
-> Mapping the PCI memory space via mmap() resulted in some
-> disappointing ~6.5 MBytes/second. I tried to modify page
-> protection to pgprot_writecombine or pgprot_cached, but while
-> this did reproducably change performance, it was only in
-> some sub-percentage range.
-weird, marking those pages as bufferable (none-cachable) should boost
-the throughput.
-you may also try to set the u-boot variable pcieTune to yes, make sure
-to save the env. variables then reboot the system.
- I am not sure if I understand
-> correctly how other framebuffers handle this, but it seems
-> the "raw" mmapped write performance is not cared about too
-> much or maybe not that bad with most x86 chip sets?
-> However, the idea left over after some trying and looking
-> around is to use the DMA engine to speed up write() (and
-> also read(), but this is not so important) system calls
-> instead of using mmap.
->
-> Looking around for example code on how to set up the DMA engine
-> to perform transfers from user buffers, I found this Kconfig
-> seemingly showing exactly the feature I am looking for:
-> http://gpl.nas-central.org/SYNOLOGY/x07-series/514_UNTARED/source/linux-2.6.15/arch/arm/mach-mv88fxx81/LSP/Kconfig
-> (config MV_DMA_COPYUSER
-> ? ? ? ?bool "Support DMA copy_to_user() and copy_from_user"
-> ? ? ? ?depends on (ARCH_MV88f5181) && EXPERIMENTAL)
->
-> However, I could not find any patch or similar how this is
-> implemented. So here my questions:
->
-> - Is this feature available as an unofficial patch somewhere?
-yes, but the kernel has the drivers/dma/mv_xor that implements the DMA
-Engine interface, you may use that driver for the DMA offloading.
-> - Is the idea of directly setting up a transfer from user pages
-> ?to PCI memory space possible at all?
-you need to do some hacking for that, but I'm almost sure that it
-won't help. using the cpu should be enough.
-> - Why am I the only one who wants such a thing? ;-)
->
-> In case of coding stuff myself, I was thinking about something
-> like this for write():
-> - get list of page[s], first page offset, last page transfer size
-> ?from user buffer + size
-> - set up DMA engine to transfer list of [partial] pages
-> - when done, return from write
->
-> Sounds easy, but I am still puzzled by all the different types
-> of memory in this case, and - much more worrying me - I would think
-> there should be many devices/drivers using such a thing, but
-> I did not find them yet.
->
-> Any hints are greatly appreciated!
->
-> Regards,
-> Wolfgang
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2010/9/6 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> We could instead make wl12xx_get_platform_data() return a const pointer
+> to its own internal storage instead, or ERR pointers for the various
+> failure cases.
+
+Sounds good:
+
+diff --git a/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
+b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
+new file mode 100644
+index 0000000..973b110
+--- /dev/null
++++ b/drivers/net/wireless/wl12xx/wl12xx_platform_data.c
+@@ -0,0 +1,28 @@
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/wl12xx.h>
++
++static const struct wl12xx_platform_data *platform_data;
++
++int __init wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
++{
++	if (platform_data)
++		return -EBUSY;
++	if (!data)
++		return -EINVAL;
++
++	platform_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
++	if (!platform_data)
++		return -ENOMEM;
++
++	return 0;
++}
++
++const struct wl12xx_platform_data *wl12xx_get_platform_data(void)
++{
++	if (!platform_data)
++		return ERR_PTR(-ENODEV);
++
++	return platform_data;
++}
++EXPORT_SYMBOL(wl12xx_get_platform_data);
+
+
+I'll wait a few days to see if there's any other comment, and then
+post v6 with this change.
+
 >
