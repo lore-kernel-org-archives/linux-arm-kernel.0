@@ -1,34 +1,43 @@
-From: rubini-list@gnudd.com (Alessandro Rubini)
-Date: Fri, 3 Sep 2010 13:23:38 +0200
-Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
-In-Reply-To: <4C7F9993.3040700@st.com>
-References: <4C7F9993.3040700@st.com>
-	<cover.1283161023.git.viresh.kumar@st.com>
-	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
-	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
-	<4C7F5B9E.8090406@st.com>
-	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>
-Message-ID: <20100903112338.GA3132@morgana.i.gnudd.com>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Mon, 6 Sep 2010 13:14:22 +0530
+Subject: [PATCH 45/74] SPEAr : SEV Send event to secondary CPUs
+In-Reply-To: <20100902102256.GO26319@n2100.arm.linux.org.uk>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<861ddbfab51ade4893ef92df4bcfa9b203844a9c.1283161023.git.viresh.kumar@st.com>
+	<20100902102256.GO26319@n2100.arm.linux.org.uk>
+Message-ID: <4C849BD6.90007@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus:
->> As I said I think nomadik_nand.c shall be deleted and replaced with
->> this driver.
+Hello Russell,
 
-Armando:
-> As I said before, the SPEAr driver should work on Nomadik too
-> as it looks generic enough and for us it is working
-> on two different platforms with different FSMC versions.
+On 9/2/2010 3:52 PM, Russell King - ARM Linux wrote:
+> On Mon, Aug 30, 2010 at 04:09:09PM +0530, Viresh KUMAR wrote:
+>> diff --git a/arch/arm/mach-spear13xx/include/mach/smp.h b/arch/arm/mach-spear13xx/include/mach/smp.h
+>> index 6e028a1..e2e55fc 100644
+>> --- a/arch/arm/mach-spear13xx/include/mach/smp.h
+>> +++ b/arch/arm/mach-spear13xx/include/mach/smp.h
+>> @@ -24,6 +24,12 @@
+>>  		cpunum &= 0x0F;				\
+>>  	})
+>>  
+>> +/*
+>> + * set_event() is used to wake up secondary core from wfe using sev. Booting
+>> + * code puts the second core into wfe(standby).
+>> + */
+>> +#define set_event()	__asm__ __volatile__ ("sev" : : : "memory")
+> 
+> This shouldn't be something that platforms define on their own.  Please
+> add a sev() macro to arch/arm/include/asm/system.h instead.  Also take a
+> look at arch/arm/mach-omap2/omap-smp.c for an alternative idea about how
+> to handle this.
 
-Ok. I can't test it for a while, so I'll take your word. If needed
-I'll make my homework later to fix 8815 over the new driver.
+OK.
+ 
+> Lastly, consider rolling the OMAP solution into the patch which adds SMP
+> support for spear13xx.
 
-Note however that the platform data in
-arch/arm/mach-nomadik/board-nhk8815.c should be fixed to reference the
-new driver.  If you remove my version please at least compile-check
-the nhk with the new patch-set.
+OK. I would merge it.
 
-thanks
-/alessandro
+regards
+Shiraz
