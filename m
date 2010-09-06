@@ -1,67 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 06 Sep 2010 11:26:30 +0100
-Subject: [PATCH 4/4] ARM: l2x0: Optmise the range based operations
-In-Reply-To: <1280598372-4830-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1280598372-4830-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1283768790.1926.10.camel@e102109-lin.cambridge.arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 6 Sep 2010 13:29:36 +0300
+Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
+In-Reply-To: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+References: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201009061329.45290.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-07-31 at 23:16 +0530, Santosh Shilimkar wrote:
-> For the big buffers which are in excess of cache size, the maintaince
-> operations by PA are very slow. For such buffers the maintainace
-> operations can be speeded up by using the WAY based method.
+? ????????? ?? 30 ??????? 2010 17:34:22 ????? Vasily Khoruzhick ???????:
+> From: Fabian Godehardt <fg@emlix.com>
 > 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/mm/cache-l2x0.c |   95 ++++++++++++++++++++++++++++------------------
->  1 files changed, 58 insertions(+), 37 deletions(-)
+> This is a patch that seems to make the USB hangs on the S3C244X go away.
+> At least a good amount of ping torture didn't make them come back so far.
 > 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index b2938d4..c0d6108 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -116,6 +116,18 @@ static void l2x0_flush_all(void)
->  	spin_unlock_irqrestore(&l2x0_lock, flags);
->  }
->  
-> +static void l2x0_clean_all(void)
-> +{
-> +	unsigned long flags;
-> +
-> +	/* clean all ways */
-> +	spin_lock_irqsave(&l2x0_lock, flags);
-> +	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
-> +	cache_wait(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
+> The issue is that, if there are several back-to-back packets, sometimes no
+> interrupt is generated for one of them. This seems to be caused by the
+> mysterious dual packet mode, which the USB hardware enters automatically
+> if the endpoint size is half that of the FIFO. (On the 244X, this is the
+> normal situation for bulk data endpoints.)
+> 
+> There is also a timing factor in this. It seems that what happens is that
+> the USB hardware automatically sends an acknowledgement if there is only
+> one packet in the FIFO (the FIFO has space for two). If another packet
+> arrives before the host has retrieved and acknowledged the previous one,
+> no interrupt is generated for that second one.
+> 
+> However, there may be an indication. There is one undocumented bit (none
+> of the 244x manuals document it), OUT_CRS1_REG[1], that seems to be set
+> suspiciously often when this condition occurs. There is also
+> CLR_DATA_TOGGLE, OUT_CRS1_REG[7], which may have a function related to
+> this. (The Samsung manual is rather terse on that, as usual.)
+> 
+> This needs to be examined further. For now, the patch seems to do the
+> trick.
 
-In case you'll base this on top of my PL310 optimisation, you should use
-cache_wait_way() as the cache_wait() becomes a no-op.
-
->  static void l2x0_clean_range(unsigned long start, unsigned long end)
->  {
-> -	void __iomem *base = l2x0_base;
-> -	unsigned long flags;
->  
-> -	spin_lock_irqsave(&l2x0_lock, flags);
-> -	start &= ~(CACHE_LINE_SIZE - 1);
-> -	while (start < end) {
-> -		unsigned long blk_end = start + min(end - start, 4096UL);
-> +	if ((end - start) >= l2x0_size) {
-> +		l2x0_clean_all();
-> +	} else {
-> +		void __iomem *base = l2x0_base;
-> +		unsigned long flags, blk_end;
-
-Minor thing - the patch may be cleaner if we use a 'return' instead of
-'else' to avoid further indentation (same for the other functions):
-
-	if ((end - start) >= l2x0_size) {
-		l2x0_clean_all();
-		return;
-	}
-
-Otherwise the patch looks fine to me.
-
--- 
-Catalin
+Ping
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100906/45ff392a/attachment.sig>
