@@ -1,11 +1,11 @@
 From: ww-ml@gmx.de (Wolfgang Wegner)
-Date: Mon, 6 Sep 2010 16:11:53 +0200
+Date: Mon, 6 Sep 2010 16:14:44 +0200
 Subject: Kirkwood PCI(e) write performance and DMA engine support for
 	copy_{to,from}_user?
 In-Reply-To: <20100906140347.GA24522@n2100.arm.linux.org.uk>
 References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
 	<20100906140347.GA24522@n2100.arm.linux.org.uk>
-Message-ID: <20100906141153.GC6897@debian-wegner1.datadisplay.de>
+Message-ID: <20100906141444.GD6897@debian-wegner1.datadisplay.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,20 +27,9 @@ On Mon, Sep 06, 2010 at 03:03:47PM +0100, Russell King - ARM Linux wrote:
 > Framebuffer applications such as Xorg/Qt do not use read/write calls
 > to access their buffers because that will be painfully slow.
 
-That was my impression, too. However, I did not figure out
-how they do actually speed up write access for mmapped
-operation - although in many places the speed/latency of
-PCI transactions is complained about.
-Some really simple frame buffers have a shadow buffer in system
-RAM to avoid read access for framebuffer-internal operations
-that operate on the frame buffer like bitblt etc., but this
-does not help for the mmapped case.
-
-Finding my way through the framebuffer jungle is not the
-easiest thing, so maybe I am missing something really
-obvious here, or is it simply a configuration problem on
-my board and the write performance when using mmap is 
-good when configured properly?
+BTW, the throughput I get with a "dd if=bitmap of=/dev/fb0 bs=512"
+is the same I get from my test application writing longwords
+sequentially to the mmapped frame buffer.
 
 Regards,
 Wolfgang
