@@ -1,21 +1,29 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 6 Sep 2010 14:10:54 -0700
-Subject: [RFCv5 8/9] mm: vcm: Sample driver added
-In-Reply-To: <262a5a5019c1f1a44d5793f7e69776e56f27af06.1283749231.git.mina86@mina86.com>
-References: <cover.1283749231.git.mina86@mina86.com>
-	<262a5a5019c1f1a44d5793f7e69776e56f27af06.1283749231.git.mina86@mina86.com>
-Message-ID: <20100906211054.GC5863@kroah.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Mon, 06 Sep 2010 15:22:14 -0700
+Subject: [PATCH 03/24] arm: mm: add proc info for ScorpionMP
+In-Reply-To: <20100904143231.GB16462@n2100.arm.linux.org.uk>
+References: <1282922978.5075.13.camel@m0nster>
+	<1282925072.26355.61.camel@e102109-lin.cambridge.arm.com>
+	<1282926826.5075.21.camel@m0nster>
+	<20100904143231.GB16462@n2100.arm.linux.org.uk>
+Message-ID: <1283811734.16225.240.camel@desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 06, 2010 at 08:33:58AM +0200, Michal Nazarewicz wrote:
-> --- /dev/null
-> +++ b/include/linux/vcm-sample.h
+On Sat, 2010-09-04 at 15:32 +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 27, 2010 at 09:33:46AM -0700, Daniel Walker wrote:
+> > So your saying it makes more sense to change the msm entry into the
+> > default entry, and make the current default into the
+> > ARM11MPCore/Cortex-A9 entry?
+> > 
+> > There's 4 or 5 other cpu's that have SMP but none have had to jump over
+> > those bits AFAIK ..
+> 
+> What CPUs (CPU not SoC) are you referring to?
+> 
+> CPUs is the core that runs the code.  SoC is the CPU with the peripherals.
+> OMAP is not a CPU.  OMAP is a SoC.
 
-Don't put "sample" code in include/linux/ please.  That's just
-cluttering up the place, don't you think?  Especially as no one else
-needs the file there...
+I guess I'm referring to the SoC then (in this case all SMP SoC's) .. 
 
-thanks,
-
-greg k-h
+Daniel
