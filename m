@@ -1,35 +1,39 @@
-From: ww-ml@gmx.de (Wolfgang Wegner)
-Date: Mon, 6 Sep 2010 16:14:44 +0200
-Subject: Kirkwood PCI(e) write performance and DMA engine support for
-	copy_{to,from}_user?
-In-Reply-To: <20100906140347.GA24522@n2100.arm.linux.org.uk>
-References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
-	<20100906140347.GA24522@n2100.arm.linux.org.uk>
-Message-ID: <20100906141444.GD6897@debian-wegner1.datadisplay.de>
+From: qy03fugy@stud.informatik.uni-erlangen.de (Christian Dietrich)
+Date: Mon, 6 Sep 2010 16:35:54 +0200
+Subject: [PATCH 01/14] arch/arm: Removing undead ifdef __ASSEMBLY__
+In-Reply-To: <cover.1283782698.git.qy03fugy@stud.informatik.uni-erlangen.de>
+References: <cover.1283782698.git.qy03fugy@stud.informatik.uni-erlangen.de>
+Message-ID: <e09809579db119258c1cd1c7dd9bd95859aa9894.1283782700.git.qy03fugy@stud.informatik.uni-erlangen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 06, 2010 at 03:03:47PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 06, 2010 at 12:02:44PM +0200, Wolfgang Wegner wrote:
-> > Mapping the PCI memory space via mmap() resulted in some
-> > disappointing ~6.5 MBytes/second. I tried to modify page
-> > protection to pgprot_writecombine or pgprot_cached, but while
-> > this did reproducably change performance, it was only in
-> > some sub-percentage range. I am not sure if I understand
-> > correctly how other framebuffers handle this, but it seems
-> > the "raw" mmapped write performance is not cared about too
-> > much or maybe not that bad with most x86 chip sets?
-> > However, the idea left over after some trying and looking
-> > around is to use the DMA engine to speed up write() (and
-> > also read(), but this is not so important) system calls
-> > instead of using mmap.
-> 
-> Framebuffer applications such as Xorg/Qt do not use read/write calls
-> to access their buffers because that will be painfully slow.
+The __ASSEMBLY__ ifdef isn't necessary at this point, because it is
+checked in an outer ifdef level already and has no effect here.
 
-BTW, the throughput I get with a "dd if=bitmap of=/dev/fb0 bs=512"
-is the same I get from my test application writing longwords
-sequentially to the mmapped frame buffer.
+Signed-off-by: Christian Dietrich <qy03fugy@stud.informatik.uni-erlangen.de>
+---
+ arch/arm/mach-ixp23xx/include/mach/platform.h |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-Regards,
-Wolfgang
+diff --git a/arch/arm/mach-ixp23xx/include/mach/platform.h b/arch/arm/mach-ixp23xx/include/mach/platform.h
+index db9d941..9f05ea4 100644
+--- a/arch/arm/mach-ixp23xx/include/mach/platform.h
++++ b/arch/arm/mach-ixp23xx/include/mach/platform.h
+@@ -43,7 +43,6 @@ extern struct sys_timer ixp23xx_timer;
+ 
+ #define IXP23XX_UART_XTAL		14745600
+ 
+-#ifndef __ASSEMBLY__
+ /*
+  * Is system memory on the XSI or CPP bus?
+  */
+@@ -51,7 +50,5 @@ static inline unsigned ixp23xx_cpp_boot(void)
+ {
+ 	return (*IXP23XX_EXP_CFG0 & IXP23XX_EXP_CFG0_XSI_NOT_PRES);
+ }
+-#endif
+-
+ 
+ #endif
+-- 
+1.7.0.4
