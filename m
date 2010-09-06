@@ -1,37 +1,47 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon,  6 Sep 2010 12:34:22 +0200
-Subject: Support for platform-esdhc-controller
-Message-ID: <1283769265-14147-1-git-send-email-w.sang@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 06 Sep 2010 11:39:42 +0100
+Subject: [PATCH 0/4] Hacks to allow booting ARM SMP kernel on UP ARMv7
+In-Reply-To: <20100906100632.GC20903@n2100.arm.linux.org.uk>
+References: <4C6CFBAF.6020407@canonical.com>
+	<20100819095705.GU12184@atomide.com>
+	<20100819102025.GA32151@n2100.arm.linux.org.uk>
+	<20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<1283765333.1926.2.camel@e102109-lin.cambridge.arm.com>
+	<20100906093424.GB20903@n2100.arm.linux.org.uk>
+	<1283765910.1926.4.camel@e102109-lin.cambridge.arm.com>
+	<20100906100632.GC20903@n2100.arm.linux.org.uk>
+Message-ID: <1283769582.1926.11.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a patch series adding support for the esdhc-controller as a platform
-device which can be found on e.g. mx35/51. It was tested using a mx35-based
-Phytec pcm043. This is still a WIP! ADMA2 is not supported so far (mx35 just
-has ADMA1 which is not supported by the core?) I will see if I can grab a
-mx51-board later.
+On Mon, 2010-09-06 at 11:06 +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 06, 2010 at 10:38:30AM +0100, Catalin Marinas wrote:
+> > On Mon, 2010-09-06 at 10:34 +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Sep 06, 2010 at 10:28:53AM +0100, Catalin Marinas wrote:
+> > > > I haven't followed your patches closely but can we restrict the ARMv6
+> > > > SMP/UP support to only those cores that have TEX remapping (most of them
+> > > > probably)?
+> > >
+> > > We don't support TEX remapping on ARMv6.
+> >
+> > I know but it's easy to enable if useful for the SMP/UP v6/v7
+> > combination (with some restrictions).
+> 
+> It'll make proc-v6.S much more complicated than it already is, requiring
+> it to carry both the non-remap and remapping code selected via an ifdef.
+> 
+> Is it worth it?  For the sake of one conditional in mmu.c, I don't think
+> so - and the view is that using TEX remapping to get rid of the shared
+> bit is a horrible hack anyway.
+> 
+> In any case, it's unnecessary.  We can use my word-replacement to modify
+> a variable to indicate whether we're running on SMP or not, and so have
+> the test for SMP-on-UP in just one place.  Like this:
 
-The following changes since commit 2bfc96a127bc1cc94d26bfaa40159966064f9c8c:
+It looks fine to me. Thanks.
 
-  Linux 2.6.36-rc3 (2010-08-29 08:36:04 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
-
-Wolfram Sang (3):
-      sdhci-pltfm: Add structure for host-specific data
-      mmc: add driver for imx35/51
-      pcm043: add resources for mmc
-
- arch/arm/mach-mx3/mach-pcm043.c |   29 ++++++
- drivers/mmc/host/Kconfig        |    9 ++
- drivers/mmc/host/Makefile       |    1 +
- drivers/mmc/host/sdhci-esdhc.c  |  194 +++++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/sdhci-pltfm.c  |   10 ++-
- drivers/mmc/host/sdhci-pltfm.h  |    6 +
- 6 files changed, 247 insertions(+), 2 deletions(-)
- create mode 100644 drivers/mmc/host/sdhci-esdhc.c
-
-Regards,
-
-   Wolfram
+-- 
+Catalin
