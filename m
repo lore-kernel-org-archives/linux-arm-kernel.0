@@ -1,26 +1,17 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 6 Sep 2010 15:13:36 +0530
-Subject: [PATCH 10/74] ST SPEAr: Adding support for CLCD on SPEAr3xx/6xx
-In-Reply-To: <20100902090836.GH26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<699e773eaafcd32b38331547247224f9995f2c08.1283161023.git.viresh.kumar@st.com>
-	<20100902090836.GH26319@n2100.arm.linux.org.uk>
-Message-ID: <4C84B7C8.8040609@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 06 Sep 2010 10:46:37 +0100
+Subject: [PATCH 1/4] ARM: l2x0: Fix coding-style in the cache-l2x0.h
+In-Reply-To: <1280598277-4521-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1280598277-4521-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1283766397.1926.5.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2010 2:38 PM, Russell King - ARM Linux wrote:
->> +static int clcd_check(struct clcd_fb *fb, struct fb_var_screeninfo
->> +		*var)
->> +{
->> +	var->xres_virtual = var->xres = (var->xres + 15) & ~15;
->> +	var->yres_virtual = var->yres = (var->yres + 1) & ~1;
->> +
->> +	var->nonstd = 0;
->> +	var->accel_flags = 0;
+On Sat, 2010-07-31 at 23:14 +0530, Santosh Shilimkar wrote:
+> Replace tab with space after #define to be consisten with other
+> define in the file. Also move the bit mask below the register offsets.
 > 
-> This looks insufficient.
-> .
-> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
 
-Ok. will use clcdfb_check.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
