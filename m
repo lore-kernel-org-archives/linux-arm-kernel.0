@@ -1,51 +1,62 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Tue, 07 Sep 2010 03:40:46 +0200
-Subject: [RFCv5 0/9] CMA + VCMM integration
-In-Reply-To: <20100906210905.GB5863@kroah.com>
-References: <cover.1283749231.git.mina86@mina86.com>
-	<20100906210905.GB5863@kroah.com>
-Message-ID: <op.vim2x8i87p4s8u@localhost>
+From: david-b@pacbell.net (David Brownell)
+Date: Mon, 6 Sep 2010 18:51:55 -0700 (PDT)
+Subject: [PATCH v2] AT91: pio: add gpio_is_valid() function
+In-Reply-To: <1283782864-10567-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <51719.68478.qm@web180304.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 06 Sep 2010 23:09:05 +0200, Greg KH <greg@kroah.com> wrote:
 
-> On Mon, Sep 06, 2010 at 08:33:50AM +0200, Michal Nazarewicz wrote:
->> Hello everyone,
->>
->> This patchset introduces a draft of a redesign of Zach Pfeffer's
->> VCMM.
->
-> What is a VCMM?
+--- On Mon, 9/6/10, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-Virtual Contiguous Memory Manager.  The version posted by Zach can
-be found at: <http://article.gmane.org/gmane.linux.kernel.mm/50090>.
-It is an API for managing IO MMU and IO MMU mappings.
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Subject: [PATCH v2] AT91: pio: add gpio_is_valid() function
 
-> What is a CMA?
 
-Contiguous Memory Manager.  The v4 version can be found at
-<http://marc.info/?l=linux-mm&m=128229799415817&w=2>.  It is an API for
-allocating large, physically contiguous blocks of memory.
+Of course there already *IS* a gpio_is_valid(),
+with arch/platform hooks
 
-I haven't expected that anyone who haven't already participated in the
-discussion about CMA and VCMM will get interested by this patchset
-so I was a bit vague in the cover letter.  Sorry about that.
 
->> Not all of the functionality of the original VCMM has been
->> ported into this patchset.  This is mostly meant as RFC.  Moreover,
->> the code for VCMM implementation in this RFC has not been tested.
+> --- a/arch/arm/mach-at91/include/mach/gpio.h
+> +++ b/arch/arm/mach-at91/include/mach/gpio.h
 
-> If you haven't even tested it, why should we review it?
+>  
+> +/* keep room for a couple of GPIO expanders */
+> +#define NR_EXTRA_GPIO??? ???64
+> +#define ARCH_NR_GPIOS??? ???
+> (NR_BUILTIN_GPIO + NR_EXTRA_GPIO)
 
-Ignore the code then and look just at the documentation, please.
-I wanted to post what I have to receive comments about the general
-idea and not necessarily the code itself.  Code is just a mean to show
-how I see the implementation of the idea described in the documentation.
-Because of all that, I marked the patchset as a RFC rather than a PATCH.
+ISTR contemplating something like NR_EXTRA_GPIO
+once too, but deciding against it.  Doing it this
+way (per-platform) seems OK.  ISTR, matches OMAP;
+might be worth generalizing...)
 
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+
+>  #ifndef __ASSEMBLY__
+> +static inline int gpio_is_valid(int number)
+> +{
+> +??? if (number >= PIN_BASE &&
+
+I suppose that clause is the entire reason to
+not like the standard gpio_is_valid() ??  Since
+on AT91 the IRQ and GPIO numbers share the same
+space, but 0..(PIN_BASE-1) are IRQs not GPIOs.
+  Yes?
+
+Worth re-thinking your approach to handling that.
+Most of the numbers in that range are valid GPIO
+numbers -- on non-AT91 platforms.  Maybe AT91
+scould grow to_gpio(N) and to_irq(N) macros.  It
+was handy sharing the spaces when implementing
+GPIO IRQ support, but in retrospect maybe that was
+not the best idea.
+
+
+> +??? ? ? number <=
+> ARCH_NR_GPIOS)
+
+
+More conventional, FWIW -- just return the
+boolean xpression's value ...
+> +??? ??? return 1;
+> +??? return 0;
