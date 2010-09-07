@@ -1,19 +1,32 @@
-From: rajeev-dlh.kumar@st.com (rajeev)
-Date: Tue, 7 Sep 2010 09:00:38 +0530
-Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
-In-Reply-To: <20100906210943.0e8eb7df@linux.lan.towertech.it>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
-	<20100906210943.0e8eb7df@linux.lan.towertech.it>
-Message-ID: <4C85B1DE.70101@st.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 7 Sep 2010 09:21:42 +0530
+Subject: [PATCH 01/74] ST SPEAr: Padmux code Updated
+In-Reply-To: <20100906224901.GC8153@game.jcrosoft.org>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<90f361f70296c1762fae29a8d00d37c51b53cee2.1283161023.git.viresh.kumar@st.com>
+	<20100906224901.GC8153@game.jcrosoft.org>
+Message-ID: <4C85B6CE.2080705@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alessandro Zummo
+On 9/7/2010 4:19 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>  
+>> > -void spear300_pmx_init(void)
+>> > -{
+>> > -	spear_pmx_init(&pmx_driver, SPEAR300_SOC_CONFIG_BASE,
+>> > +	/* pmx initialization */
+>> > +	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
+>> >  			SPEAR300_SOC_CONFIG_SIZE);
+>> > +	if (pmx_driver.base) {
+>> > +		ret = pmx_register(&pmx_driver);
+>> > +		if (ret)
+>> > +			printk(KERN_ERR "padmux: registeration failed. err no"
+>> > +					": %d\n", ret);
+>> > +		iounmap(pmx_driver.base);
+> why unmap it?
 
-On 9/7/2010 12:39 AM, Alessandro Zummo wrote:
->> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
->  Hi, there are quite a few issues. Please read the
->  checklist at http://groups.google.com/group/rtc-linux/web/checklist
+pmx_register will actually enable all selected devices and configure padmux.
+After this we will never change device configuration again. So don't need
+this mapping.
 
-I will go through the checklist.
-Rajeev
+viresh.
