@@ -1,47 +1,55 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 07 Sep 2010 16:18:52 -0400
-Subject: [PATCH 1/2] ARM: link board specific files after core files
+Date: Tue, 07 Sep 2010 16:18:53 -0400
+Subject: [PATCH 2/2] ARM: mxc: turn off HWCAP_NEON for older versions of imx51
+	silicon
 In-Reply-To: <1283890733-6548-1-git-send-email-nico@fluxnic.net>
 References: <1283890733-6548-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1283890733-6548-2-git-send-email-nico@fluxnic.net>
+Message-ID: <1283890733-6548-3-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+From: Amit Kucheria <amit.kucheria@verdurent.com>
 
-This allows for board specific issues to override decisions made in generic
-code that might not be suitable due to some errata or the like, by making
-the initcall hooks from those board specific files run after the core ones,
-therefore avoiding ugly #ifdef's in core code.
+Versions of silicon older than TO3 have broken NEON implementation. Turn off
+NEON in such cases.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 Tested-by: Dave Martin <dave.martin@linaro.org>
 Tested-by: Jason Hui <jason.hui@linaro.org>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/Makefile |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-mx5/cpu.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 64ba313..1373bfe 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -236,13 +236,14 @@ ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
- FASTFPE_OBJ	:=$(FASTFPE)/
- endif
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index 2d37785..548c55b 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -70,6 +70,25 @@ int mx51_revision(void)
+ }
+ EXPORT_SYMBOL(mx51_revision);
  
--# If we have a machine-specific directory, then include it in the build.
--core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
--core-y				+= $(machdirs) $(platdirs)
- core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
- core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
- core-$(CONFIG_VFP)		+= arch/arm/vfp/
- 
-+# If we have a machine-specific directory, then include it in the build.
-+core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-+core-y				+= $(machdirs) $(platdirs)
++#ifdef CONFIG_NEON
 +
- drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/
- 
- libs-y				:= arch/arm/lib/ $(libs-y)
++/* All versions of the silicon before Rev. 3 have broken NEON implementations.
++ * Dependent on link order - so the assumption is that vfp_init is called before us
++ */
++static int __init mx51_neon_fixup(void)
++{
++	if (mx51_revision() <  MX51_CHIP_REV_3_0) {
++		if (elf_hwcap & HWCAP_NEON) {
++			elf_hwcap &= ~HWCAP_NEON;
++			pr_info("Turning off NEON support, detected broken NEON implementation\n");
++		}
++	}
++	return 0;
++}
++
++late_initcall(mx51_neon_fixup);
++#endif
++
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
 -- 
 1.7.2.2.440.g49ea7
