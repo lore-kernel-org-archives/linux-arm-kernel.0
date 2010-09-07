@@ -1,60 +1,72 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 7 Sep 2010 06:13:49 +0200
-Subject: [PATCH] pxa: fix cpu_is_pxa*() not expanded to zero when not
-	configured
-In-Reply-To: <AANLkTinqc=k3H0QL5PKNu6Je=qs=GBNAQ21nv5HkvGom@mail.gmail.com>
-References: <AANLkTinqc=k3H0QL5PKNu6Je=qs=GBNAQ21nv5HkvGom@mail.gmail.com>
-Message-ID: <201009070613.49827.marek.vasut@gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Sep 2010 12:19:23 +0800
+Subject: [PATCH] pio: add arch specific gpio_is_valid() function
+In-Reply-To: <4C85BA83.9080002@bluewatersys.com>
+References: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
+	<4C85A71F.3010402@bluewatersys.com>
+	<AANLkTi=B7O9jDB_pzHS6feWTxHQTfDZ-QLx7jOKaA2vN@mail.gmail.com>
+	<4C85BA83.9080002@bluewatersys.com>
+Message-ID: <AANLkTi=RRSOnPVCEv5ni40D71BeMSV5bccWXnZphzGTX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 7. z??? 2010 06:09:46 Eric Miao napsal(a):
-> Marek,
-> 
-> Could you give this a run?
+On Tue, Sep 7, 2010 at 12:07 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> On 09/07/2010 03:54 PM, Eric Miao wrote:
+>> On Tue, Sep 7, 2010 at 10:44 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+>>> On 09/07/2010 02:23 PM, David Brownell wrote:
+>>>> Still not liking or accepting this proposed
+>>>> change to the GPIO framework.
+>>>>
+>>>> For the AT91 case (where integers 0..N are
+>>>> IRQs, but N..max are GPIOs)
+>>>>
+>>>> A simpler solution is just to use a bit in
+>>>> the integer to indicate IRQ vs GPIO. ?Like
+>>>> maybe the sign bit.. which is never set on
+>>>> valid GPIO numbers, but platforms could let
+>>>> be set on IRQs.
+>>>>
+>>> How about this approach instead?
+>>>
+>>
+>> This doesn't solve the problem with more complicated settings, e.g.
+>> some GPIOs within are not valid, not just the begining ones.
+>
+> Agreed, but this does solve the immediate problem for AT91 in a simple
+> way. Are there boards in the kernel which have holes in the gpio layout?
+>
+> Another possible solution is to loop through all the gpio_chips to see
+> if the number maps to a valid gpio. The obvious downside to this
+> approach is that the complexity of gpio_is_valid becomes reasonably high
+> for something which should be a very simple test and, as you say below,
+> we probably just don't need that fine-grained information.
+>
+>> So the real question here is the semantics of gpio_is_valid(). I'd
+>> personally incline it reads as if a GPIO _number_ is valid generally,
+>> (e.g. like -1 is not a valid GPIO number), instead of that specific
+>> GPIO is valid on that specific platform. The latter can be judged
+>> with gpio_request().
+>
+> Some drivers in the kernel appear to be using this behaviour to have
+> optional gpios, ie setting the foo_gpio = -1 in the platform data for
+> some driver. The documentation also suggests that this is what
+> gpio_is_valid is intended for. However, the documentation also says we
+> may want gpio_is_valid to return invalid on some other numbers.
 
-Fixed the problem.
+Right. So I'd really like David to make the semantics clear. My intention
+is to keep gpio_is_valid() as simple as checking a general range to
+rule out most invalid cases. And just use gpio_request() to handle the
+platform specific cases.
 
-Tested-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
-> b/arch/arm/mach-pxa/include/mach/hardware.h
-> index 7f64d24..b036500 100644
-> --- a/arch/arm/mach-pxa/include/mach/hardware.h
-> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
-> @@ -264,23 +264,35 @@
->   * <= 0x2 for pxa21x/pxa25x/pxa26x/pxa27x
->   * == 0x3 for pxa300/pxa310/pxa320
->   */
-> +#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
->  #define __cpu_is_pxa2xx(id)				\
->  	({						\
->  		unsigned int _id = (id) >> 13 & 0x7;	\
->  		_id <= 0x2;				\
->  	 })
-> +#else
-> +#define __cpu_is_pxa2xx(id)	(0)
-> +#endif
-> 
-> +#ifdef CONFIG_PXA3xx
->  #define __cpu_is_pxa3xx(id)				\
->  	({						\
->  		unsigned int _id = (id) >> 13 & 0x7;	\
->  		_id == 0x3;				\
->  	 })
-> +#else
-> +#define __cpu_is_pxa3xx(id)	(0)
-> +#endif
-> 
-> +#if defined(CONFIG_CPU_PXA930) || defined(CONFIG_CPU_PXA935)
->  #define __cpu_is_pxa93x(id)				\
->  	({						\
->  		unsigned int _id = (id) >> 4 & 0xfff;	\
->  		_id == 0x683 || _id == 0x693;		\
->  	 })
-> +#else
-> +#define __cpu_is_pxa93x(id)	(0)
-> +#endif
-> 
->  #define cpu_is_pxa2xx()					\
->  	({						\
+>
+> ~Ryan
+>
+> --
+> Bluewater Systems Ltd - ARM Technology Solution Centre
+>
+> Ryan Mallon ? ? ? ? ? ? ? ? ? ? 5 Amuri Park, 404 Barbadoes St
+> ryan at bluewatersys.com ? ? ? ? ? PO Box 13 889, Christchurch 8013
+> http://www.bluewatersys.com ? ? New Zealand
+> Phone: +64 3 3779127 ? ? ? ? ? ?Freecall: Australia 1800 148 751
+> Fax: ? +64 3 3779135 ? ? ? ? ? ? ? ? ? ? ?USA 1800 261 2934
+>
