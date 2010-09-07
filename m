@@ -1,58 +1,27 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 16:21:24 +0530
-Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
-	controller driver
-In-Reply-To: <20100906224050.GA8153@game.jcrosoft.org>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
-	<20100906224050.GA8153@game.jcrosoft.org>
-Message-ID: <4C86192C.801@st.com>
+From: pieterg@gmx.com (pieterg)
+Date: Tue, 7 Sep 2010 13:09:15 +0200
+Subject: colibri-pxa300: LCD_LDD / LCD_CS gpio conflict
+In-Reply-To: <AANLkTinhN-Yz1CMQ78zXSNjjqL-GB1VrBTVKU6A=K9gq@mail.gmail.com>
+References: <201009061512.23705.pieterg@gmx.com>
+	<201009071115.46721.pieterg@gmx.com>
+	<AANLkTinhN-Yz1CMQ78zXSNjjqL-GB1VrBTVKU6A=K9gq@mail.gmail.com>
+Message-ID: <201009071309.15413.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 4:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
->> > index 41a2b5e..4f049fe 100644
->> > --- a/arch/arm/mach-spear3xx/clock.c
->> > +++ b/arch/arm/mach-spear3xx/clock.c
->> > @@ -552,6 +552,15 @@ static struct clk adc_clk = {
->> >       .recalc = &follow_parent,
->> >  };
->> >
->> > +#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
-> can you create a macro for this?
-> or even better detect it
-> 
+On Tuesday 07 September 2010 11:50:08 Eric Miao wrote:
+> On Tue, Sep 7, 2010 at 5:15 PM, pieterg <pieterg@gmx.com> wrote:
+> > How about using GPIO127_LCD_CS_N instead? Then at least we won't have a
+> > conflict with the LDD pins.
+> > I don't know why the conflicting GPIO62_LCD_CS_N was chosen in the
+> > first place?
+>
+> That depends on hardware, it's not like whichever pin with functionality
+> of LCD_CS_N can be used. Need to check with schematics if the LCD_CS_N
+> signal is routed to GPIO62 or GPIO127.
 
-It should be statically allocated, registering this to clkdev framework
-should be dynamic, which is done in my local repository (as mentioned in
-i2c patch).
+GPIO127 is available on the colibri connector (as well as 62 of course), but 
+on the evalboard, there is no LCD_CS_N support (neither GPIO62 nor 
+GPIO127).
 
-Regarding creating macros: As we have three machines in spear3xx (300, 310, 320)
-we need to create 4 macros (300 & 310, 310 &320, 300 & 320, 300&310&320),
-This will make it even more complex to read. So, i would like to keep it as it is.
-
->> > +/* emi clock */
->> > +static struct clk emi_clk = {
->> > +     .flags = ALWAYS_ENABLED,
->> > +     .pclk = &ahb_clk,
->> > +     .recalc = &follow_parent,
->> > +};
->> > +#endif
-
-
->> +/* emi nor flash device registeration */
->> > +static struct physmap_flash_data emi_norflash_data;
->> > +
->> > +static struct resource emi_nor_resources[] = {
->> > +     {
->> > +             .start  = SPEAR310_EMI_MEM_0_BASE,
->> > +             .end    = SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
->> > +             .flags  = IORESOURCE_MEM,
->> > +     },
->> > +};
-> it's board specfic not mach
-> 
-> NACK
-
-No. This is machine specific. Same for all boards.
+Rgds, Pieter
