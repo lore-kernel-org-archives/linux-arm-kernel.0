@@ -1,45 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Sep 2010 10:09:08 +0100
-Subject: [PATCH 13/74] ST SPEAr: Update clock framework and definitions
-In-Reply-To: <4C85FF6A.5060904@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<a15d1fca5a6e663c1fee4602013b6160512eb2dd.1283161023.git.viresh.kumar@st.com>
-	<20100906230931.GF8153@game.jcrosoft.org> <4C85B868.6040908@st.com>
-	<20100907040641.GA30509@game.jcrosoft.org>
-	<4C85FF6A.5060904@st.com>
-Message-ID: <20100907090908.GA9978@n2100.arm.linux.org.uk>
+From: pieterg@gmx.com (pieterg)
+Date: Tue, 7 Sep 2010 11:15:46 +0200
+Subject: colibri-pxa300: LCD_LDD / LCD_CS gpio conflict
+In-Reply-To: <AANLkTi=vTp0+x=zzM6j+stWENvZCnOLOpd4LXvaiMh6Z@mail.gmail.com>
+References: <201009061512.23705.pieterg@gmx.com>
+	<201009070920.34414.pieterg@gmx.com>
+	<AANLkTi=vTp0+x=zzM6j+stWENvZCnOLOpd4LXvaiMh6Z@mail.gmail.com>
+Message-ID: <201009071115.46721.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 07, 2010 at 02:31:30PM +0530, viresh kumar wrote:
-> On 9/7/2010 9:36 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 09:28 Tue 07 Sep     , viresh kumar wrote:
-> >> > On 9/7/2010 4:39 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>> > >>  /* array of all spear 13xx clock lookups */
-> >>>>> > >> > @@ -327,18 +749,58 @@ static struct clk_lookup spear_clk_lookups[] = {
-> >>>>> > >> >  	/* clock derived from pll1 clk */
-> >>>>> > >> >  	{.con_id = "cpu_clk",		.clk = &cpu_clk},
-> >>>>> > >> >  	{.con_id = "ahb_clk",		.clk = &ahb_clk},
-> >>>>> > >> > -	{ .con_id = "apb_clk",		.clk = &apb_clk},
-> >>>>> > >> > +	{.con_id = "apb_clk",		.clk = &apb_clk},
-> >>>>> > >> > +
-> >>> > > how about use macro here to simplify the code
-> >>> > > 
-> >>> > > +#define CLKDEV_ID(__clk) { .con_id = #__clk, .clk = &(__clk) }
-> >>> > > and 
-> >>> > > +#define CLKDEV_ID_CLK(__clk) { .con_id = #__clk, .clk = &(__clk##_clk) }
-> >> > 
-> >> > We had that in mind while designing but we chose it this way. There are
-> >> > not many fields to fill here, so it looks fine without macro's too.
-> >> > I didn't wanted to create an abstraction layer here.
-> > the macro will also avoid human mistake
-> 
-> OK. Will do it in a separate patch.
+On Tuesday 07 September 2010 09:29:59 Eric Miao wrote:
+> On Tue, Sep 7, 2010 at 3:20 PM, pieterg <pieterg@gmx.com> wrote:
+> > On Tuesday 07 September 2010 04:43:31 Eric Miao wrote:
+> >> On Mon, Sep 6, 2010 at 9:12 PM, pieterg <pieterg@gmx.com> wrote:
+> >> > In colibri-pxa300.c, line 132, gpio config GPIO62_LCD_CS_N is
+> >> > overriding the GPIO62_LCD_LDD_8 configuration, earlier in the pin
+> >> > config table.
+> >> >
+> >> > As a result, one pixel data line is missing, obviously causing wrong
+> >> > pixel data on passive lcd panels.
+> >> >
+> >> > Not sure what the best workaround should be.
+> >> > LDD_CS is not available on the colibri evalboard as far as I can
+> >> > see, so we might just define GPIO127_LCD_CS_N instead? (till the
+> >> > soc/carrier board configs have been split)
+> >> >
+> >> > Or for now just put GPIO62_LCD_CS_N between
+> >> > #ifdef ?
+> >>
+> >> Possibly define two groups of LCD pin configurations and select them
+> >> when the appropriate LCD expansion card is plugged. If it can be
+> >> detected at run-time, that will be perfect, otherwise have to come
+> >> up with ugly #ifdef .. #else then.
+> >
+> > I don't think you can detect whether an active or passive lcd panel is
+> > used. And since the LCD_CS_N is only used for active panels, we can be
+> > sure that we only need it when CONFIG_FB_PXA_SMARTPANEL is defined.
+> > So though it's ugly, it is already there, and we can use it.
+>
+> CONFIG_FB_PXA_SMARTPANEL is an inclusive config option not
+> a mutual exclusive, so it's enabling a capability. Even if it's selected
+> the board code can still select parallel/smartpanel protocol in the
+> pxafb_mach_info.lcd_conn field. It just cannot be used safely here.
 
-I'd suggest leaving it as is - presumably its already been tested and
-so works.
+OK, I didn't realise that. In that case we cannot use it.
 
-Adding that macro just encourages bad usage anyway - by encouraging
-people to name individual clocks by their source rather than by their
-consumer.  Naming clocks by their source has been proven many times to
-make things more complicated and difficult in the long run.
+> If it's not run-time detectable, the ugliest way is to add a board
+> specific kernel command line option, though I'd shrug.
+
+I think a command line option is almost as ugly as a CONFIG define ;)
+How about using GPIO127_LCD_CS_N instead? Then at least we won't have a 
+conflict with the LDD pins.
+I don't know why the conflicting GPIO62_LCD_CS_N was chosen in the first 
+place?
+
+Rgds, Pieter
