@@ -1,32 +1,46 @@
-From: gking@nvidia.com (Gary King)
-Date: Mon, 6 Sep 2010 15:37:12 -0700
-Subject: bounce: call flush_dcache_page after bounce_copy_vec
-Message-ID: <mailman.235.1283892872.27306.linux-arm-kernel@lists.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Sep 2010 21:56:39 +0100
+Subject: [PATCH 07/74] ST SPEAr13XX: Added compilation support in arch/arm/
+In-Reply-To: <4C862377.1080507@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<b2e8b6b95ceff7d90032be8cd614787519b5c57c.1283161023.git.viresh.kumar@st.com>
+	<20100902162744.GC28968@game.jcrosoft.org>
+	<4C862377.1080507@st.com>
+Message-ID: <20100907205639.GA22176@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the bounced page needs to be flushed after data is copied into it,
-to ensure that architecture implementations can synchronize
-instruction and data caches if necessary.
+On Tue, Sep 07, 2010 at 05:05:19PM +0530, viresh kumar wrote:
+> On 9/2/2010 9:57 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> > index 9295110..950c045 100644
+> >> > --- a/arch/arm/Kconfig
+> >> > +++ b/arch/arm/Kconfig
+> >> > @@ -1144,11 +1144,13 @@ config SMP
+> >> >  	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+> >> >  	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+> >> >  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+> >> > -		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
+> >> > +		 ARCH_S5PV310 || ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 ||\
+> >> > +		 ARCH_VEXPRESS_CA9X4)
+> > can we get rid of such long list by introducing a HAVE somthing
+> > etc....
+> 
+> 
+> I tried to do this, but have some doubts. With this change architectures
+> can not disable features selected using select statement.
+> So, if i want image without SMP for SPEAr13xx now, i can't do it.
+> 
+> 
+> Please correct me if this is not the right way of doing it.
+> 
+> regards,
+> viresh.
+> --------------------------------------
+> 
+> [PATCH] arch/arm/Kconfig: removing arch/machine dependencies from SMP, LOCAL_TIMERS, HAVE_ARM_SCU AND HAVE_ARM_TWD
+> 
+> Individual architectures/machines should select SMP, LOCAL_TIMERS, HAVE_ARM_SCU
+> AND HAVE_ARM_TWD from there config options
 
-Signed-off-by: Gary King <gking@nvidia.com>
----
- mm/bounce.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/mm/bounce.c b/mm/bounce.c
-index 13b6dad..1481de6 100644
---- a/mm/bounce.c
-+++ b/mm/bounce.c
-@@ -116,8 +116,8 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
- 		 */
- 		vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
- 
--		flush_dcache_page(tovec->bv_page);
- 		bounce_copy_vec(tovec, vfrom);
-+		flush_dcache_page(tovec->bv_page);
- 	}
- }
- 
--- 
-1.7.0.4
+I've already killed most of this off.
