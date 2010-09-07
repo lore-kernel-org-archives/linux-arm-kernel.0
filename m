@@ -1,31 +1,20 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 08 Sep 2010 00:30:26 +0100
-Subject: Cpufreq for s3c2440 FriendlyArm
-In-Reply-To: <201009060540.19729.marek.vasut@gmail.com>
-References: <AANLkTi=mvJywPgZbyGuNu46Ty5F3AkW2wBEa+Hu=skQq@mail.gmail.com>
-	<201009060540.19729.marek.vasut@gmail.com>
-Message-ID: <4C86CB12.5080701@fluff.org>
+Date: Wed, 08 Sep 2010 00:31:20 +0100
+Subject: [PATCH RESEND] ARM: s3c2440: fix boot failure introduced by recent
+	changes in gpiolib
+In-Reply-To: <1283537894-7463-1-git-send-email-awg@embtoolkit.org>
+References: <1283537894-7463-1-git-send-email-awg@embtoolkit.org>
+Message-ID: <4C86CB48.6000502@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/10 04:40, Marek Vasut wrote:
-> Dne Ne 5. z??? 2010 22:30:00 tarek attia napsal(a):
->> Hi all,
->>
->> Did anyone try the cpufreq on the mini2440 ? and did anyone get it
->> working on the board ?
->>
->> Each time I do the configuration in the kernel I found nothing on the
->> board ,however after the compilation I found the cpufreq.o & pll.o but
->> no file concerning that on the board .
->>
->>
->> Any help will be appreciated.
+On 03/09/10 19:18, Abdoulaye Walsimou Gaye wrote:
+> Recent changes in s3c gpio break mini2440 board and may be others.
+> The problem is that mach-mini2440.c: mini2440_init()
+> (where we call s3c_gpio_setpull()) is called before s3c2440.c: s3c2440_init()
+> (where we initialize s3c24xx_gpiocfg_default.set_pull function pointer).
+> This causes dereferencing of NULL pointer at boot time and a kernel panic.
 > 
-> I believe you have the wrong mailing list here. LAK CCed.
+> Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
 
-linux-arm-kernel is the right one.
-
-I've not tried on the mini2440, but it did work on other s3c2440
-based machines. it may be there is a small bit of init missing
-for the mini2440 to get the cpufreq running.
+ok, i'll think over this. it is probably the right thing to do.
