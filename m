@@ -1,75 +1,13 @@
-From: qy03fugy@stud.informatik.uni-erlangen.de (Christian Dietrich)
-Date: Mon, 6 Sep 2010 16:35:49 +0200
-Subject: [PATCH 00/14] Removing dead code
-Message-ID: <cover.1283782698.git.qy03fugy@stud.informatik.uni-erlangen.de>
+From: rainbowzjc@gmail.com (rainbowczj rainbowczj)
+Date: Tue, 7 Sep 2010 15:11:26 +0800
+Subject: kernel porting
+Message-ID: <AANLkTinuRo2xSUHo1bQvSvBWgo63wOez+zAyOc=NVTX0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all!
-       
-As part of the VAMOS[0] research project at the University of Erlangen
-we are looking at multiple integrity errors in linux' configuration
-system.
-
-I've been running a check on the whole sourcetree for
-code block which are undead. This means they can't be deselected and
-are always in the kernel if the enviroment of the block is
-selected. They have often the form of
-
-#ifdef ABC
-....
-#ifdef ABC
-fooooo
-#endif
-#endif
-
-Here the ifdefs of the inner block can be removed without any harm. At
-this point we just checked the source code (for the undead), but we
-want to do a crosscheck with the Kconfig for undead code blocks in the
-future.
-
-I build the patches against a vanilla kernel (v2.6.36-rc3) in order to
-try if the kernel compiles with this patches.
-
-Please keep me informed of this patch getting confirmed / merged so we
-can keep track of it.
-
-Regards
-
-        Christian Dietrich
-
-[0] http://vamos1.informatik.uni-erlangen.de/
-
-Christian Dietrich (14):
-  arch/arm: Removing undead ifdef __ASSEMBLY__
-  arch/h8300: Removing dead ifdef __H8300_TLB_H__
-  arch/parisc: Removing undead ifdef CONFIG_PA20
-  arch/{s390,powerpc}: Removing undead ifdef __KERNEL__
-  arch/x86: Removing undead ifdef ACPI/X86_IO_ACPI
-  drivers/net: Removing undead ifdef CHELSIO_T1_1G
-  drivers/scsi: Removing undead ifdef __ISAPNP__
-  drivers/scsi: Removing undead ifdef CONFIG_PCI
-  drivers/scsi: Removing undead ifdef REAL_DMA
-  drivers/video: Removing undead ifdef ATAFB_FALCON
-  drivers/video: Removing undead ifdef CONFIG_FB_MATROX_G
-  include/linux: Removing undead ifdef __KERNEL__
-  kernel/: Removing undead ifdef CONFIG_SMP
-  kernel/: Removing undead ifdef CONFIG_DEBUG_LOCK_ALLOC
-
- arch/arm/mach-ixp23xx/include/mach/platform.h |    3 ---
- arch/h8300/include/asm/tlb.h                  |   13 -------------
- arch/parisc/kernel/unaligned.c                |    3 ---
- arch/powerpc/include/asm/processor.h          |    2 --
- arch/powerpc/include/asm/vdso_datapage.h      |    2 --
- arch/s390/include/asm/processor.h             |    4 ----
- arch/x86/kernel/early-quirks.c                |    2 --
- drivers/net/chelsio/subr.c                    |    2 --
- drivers/scsi/aha152x.c                        |    2 --
- drivers/scsi/aic7xxx_old.c                    |    2 --
- drivers/scsi/atari_NCR5380.c                  |    6 ------
- drivers/video/atafb.c                         |    2 --
- drivers/video/matrox/matroxfb_DAC1064.c       |    5 +----
- include/linux/socket.h                        |    6 +-----
- kernel/sched.c                                |    4 +---
- kernel/srcu.c                                 |    2 --
- 16 files changed, 3 insertions(+), 57 deletions(-)
+I am  the newbie of the kernel porting, Now I am porting the new cpu of arm
+11 to linux, Can you give me some information about how to porting,Thank
+you!
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100907/27343d84/attachment.html>
