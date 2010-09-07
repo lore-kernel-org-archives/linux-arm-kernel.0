@@ -1,75 +1,77 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 6 Sep 2010 23:08:18 -0700
-Subject: [RFCv5 3/9] mm: cma: Added SysFS support
-In-Reply-To: <op.vindmsj07p4s8u@localhost>
-References: <cover.1283749231.git.mina86@mina86.com>
-	<9771a9c07874a642bb587f4c0ebf886d720332b6.1283749231.git.mina86@mina86.com>
-	<20100906210747.GA5863@kroah.com> <op.vindmsj07p4s8u@localhost>
-Message-ID: <20100907060818.GA2609@kroah.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Sep 2010 14:11:45 +0800
+Subject: [PATCH] ARM: pxa: Enable U2D only in case PXA3xx is enabled
+In-Reply-To: <4C85D40C.5090209@compulab.co.il>
+References: <1283806389-18128-1-git-send-email-marek.vasut@gmail.com>
+	<AANLkTintMS3-+tj5JoBoF4o+7WY9E4gZh3_szNsnNyS6@mail.gmail.com>
+	<4C85D40C.5090209@compulab.co.il>
+Message-ID: <AANLkTikfJ+pcY4aQMhGE7FpGapyGeXauGAqW8cUiXB82@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 07, 2010 at 07:31:30AM +0200, Micha?? Nazarewicz wrote:
-> Hello Greg,
+On Tue, Sep 7, 2010 at 1:56 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> ?On 09/07/10 05:26, Eric Miao wrote:
+>> On Tue, Sep 7, 2010 at 4:53 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>>> In case PXA3xx support isn't enabled in kernel, the pxa3xx_u2d_start_hc()
+>>> and pxa3xx_u2d_stop_hc() functions are undefined. Encapsulate their callings
+>>> with #ifdef CONFIG_PXA3xx macro.
+>>>
+>> This isn't necessary. cpu_is_pxa3xx() will expand to zero if CONFIG_PXA3xx
+>> isn't defined, and the whole if () statement will be optimized away by the
+>> compiler.
 >
-> Thanks for reviewing the sysfs part.  Actually, I was never really sure
-> if I shouldn't rather put this code to debugfs and you got me convinced
-> that I should.  Sysfs somehow looked more appealing from kernel's API
-> point of view -- things seem to be more organised in sysfs than in
-> debugfs.  It seems I'll have to port it to debugfs after all
+> That was my intention, but I haven't checked if it really does the job.
 
-Yes, debugfs looks like a much better place for this.  You can do
-whatever you want in debugfs as long as you follow the one rule for it:
-	There are no rules for debugfs.
+It didn't. But I proposed a fix hours ago and it seemed to work. Tested
+by Marek.
 
-> Nonetheless, a few responses to your comments:
 >
->> On Mon, Sep 06, 2010 at 08:33:53AM +0200, Michal Nazarewicz wrote:
->>> +		The "allocators" file list all registered allocators.
->>> +		Allocators with no name are listed as a single minus
->>> +		sign.
+>>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>>> ---
+>>>
+>>> NOTE: I'm adding "Make a proper fix for this thing" into my ToDo. This is just a
+>>> quick patch since I have that exam soon. I'll go for approach 2) from what we
+>>> discussed in the other thread once the exam's past me.
 >
-> On Mon, 06 Sep 2010 23:07:47 +0200, Greg KH <greg@kroah.com> wrote:
->> So this returns more than one value?
+> I've already started working on this yesterday and I'll be glad to have the patch reviewed
+> more carefully then the U2D series were (so we need to fix it right away).
 >
-> Aren't thing like cpufreq governors listed in a single sysfs file?
-
-Yeah, but I don't like it :)
-
-> I remember there was such a file somewhere.  Has that been made
-> deprecated? I cannot seem to find any information on that.
-
-It's best if you really don't do this, but it does happen as it is the
-best way to show the information.  If that's the case, fine.
-
->>> +		The "regions" directory list all reserved regions.
->>
->> Same here?
+>>> ?drivers/usb/host/ohci-pxa27x.c | ? ?4 ++++
+>>> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+>>> index afef7b0..f3c60b9 100644
+>>> --- a/drivers/usb/host/ohci-pxa27x.c
+>>> +++ b/drivers/usb/host/ohci-pxa27x.c
+>>> @@ -236,8 +236,10 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
+>>> ? ? ? ?if (retval < 0)
+>>> ? ? ? ? ? ? ? ?return retval;
+>>>
+>>> +#ifdef CONFIG_PXA3xx
+>>> ? ? ? ?if (cpu_is_pxa3xx())
+>>> ? ? ? ? ? ? ? ?pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
+>>> +#endif
+>>>
+>>> ? ? ? ?uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
+>>> ? ? ? ?__raw_writel(uhchr, ohci->mmio_base + UHCHR);
+>>> @@ -255,8 +257,10 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+>>>
+>>> ? ? ? ?inf = dev->platform_data;
+>>>
+>>> +#ifdef CONFIG_PXA3xx
+>>> ? ? ? ?if (cpu_is_pxa3xx())
+>>> ? ? ? ? ? ? ? ?pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
+>>> +#endif
+>>>
+>>> ? ? ? ?if (inf->exit)
+>>> ? ? ? ? ? ? ? ?inf->exit(dev);
+>>> --
+>>> 1.7.1
+>>>
+>>>
 >
-> regions is actually a directory with subdirectories for each
-> region. ;)
-
-Ah.
-
->>> +static ssize_t cma_sysfs_region_name_show(struct cma_region *reg, char *page)
->>> +{
->>> +	return reg->name ? snprintf(page, PAGE_SIZE, "%s\n", reg->name) : 0;
->>> +}
+> --
+> Regards,
+> Igor.
 >
->> Is a name field ever really going to be bigger than a page?
 >
-> I prefer being on the safe side -- I have no idea what user will provide
-> as region name so I assume as little as possible.
-
-By "user" do you mean userspace, or another kernel driver file?  If it's
-a kernel driver, you can assume that they will be sane.  if userspace,
-assume it's insane and do some checking of the name before you use it.
-
-> For numeric values you are right that snprintf() is a bit paranoid,
-> still I see no good reason why not to use it.
-
-Same goes for no good reason to use it :)
-
-thanks,
-
-greg k-h
