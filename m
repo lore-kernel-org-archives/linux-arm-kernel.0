@@ -1,204 +1,133 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 07 Sep 2010 08:39:43 -0700
-Subject: [PATCH v1] davinci: Add I2C0 devices to MityDSP-L138/MityARM-1808
-	platform
-In-Reply-To: <1283707779-23204-1-git-send-email-michael.williamson@criticallink.com>
-	(Michael Williamson's message of "Sun, 5 Sep 2010 13:29:39 -0400")
-References: <1283707779-23204-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <87r5h5imv4.fsf@deeprootsystems.com>
+From: ww-ml@gmx.de (Wolfgang Wegner)
+Date: Tue, 7 Sep 2010 18:11:57 +0200
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<20100906140347.GA24522@n2100.arm.linux.org.uk>
+	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
+	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
+	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+Message-ID: <20100907161156.GA3625@debian-wegner1.datadisplay.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Williamson <michael.williamson@criticallink.com> writes:
+Hi Saeed,
 
-> This patch adds the i2c0 bus and attached devices to the MityDSP-L138
-> and MityARM-1808 davinci SoM.  Included is a TPS65023 voltage regulator
-> needed for power management and a small 24c02 EPROM that contains
-> factory configuration data.
->
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+On Tue, Sep 07, 2010 at 12:52:39PM +0300, saeed bishara wrote:
+> On Tue, Sep 7, 2010 at 10:58 AM, saeed bishara <saeed.bishara@gmail.com> wrote:
+> > On Mon, Sep 6, 2010 at 5:14 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> >> On Mon, Sep 06, 2010 at 03:03:47PM +0100, Russell King - ARM Linux wrote:
+> >>> On Mon, Sep 06, 2010 at 12:02:44PM +0200, Wolfgang Wegner wrote:
+> >>> > Mapping the PCI memory space via mmap() resulted in some
+> >>> > disappointing ~6.5 MBytes/second. I tried to modify page
+> >>> > protection to pgprot_writecombine or pgprot_cached, but while
+> >>> > this did reproducably change performance, it was only in
+> >>> > some sub-percentage range. I am not sure if I understand
+> >>> > correctly how other framebuffers handle this, but it seems
+> >>> > the "raw" mmapped write performance is not cared about too
+> >>> > much or maybe not that bad with most x86 chip sets?
+> >>> > However, the idea left over after some trying and looking
+> >>> > around is to use the DMA engine to speed up write() (and
+> >>> > also read(), but this is not so important) system calls
+> >>> > instead of using mmap.
+> >>>
+> >>> Framebuffer applications such as Xorg/Qt do not use read/write calls
+> >>> to access their buffers because that will be painfully slow.
+> >>
+> >> BTW, the throughput I get with a "dd if=bitmap of=/dev/fb0 bs=512"
+> >> is the same I get from my test application writing longwords
+> >> sequentially to the mmapped frame buffer.
+> > I'm not sure the writecombine is enabled properly, can you test that on DRAM?
+> > you can do that be reserving some memory (mem=<dram size - 8M>), then
+> > try to test throughput with and without writecombine.
+> >
+> also, in order to sent bursts, make sure that the stm instruction is
+> used, preferred with 8 registers with address aligned to 8*4 bytes.
 
-Applying and queing for 2.6.37 in davinci-next.
+thanks for your hints and patience!
 
-Kevin
+I am not sure if I did things correctly. I set up an 8MB mapping
+from system RAM as you proposed, and am getting 240 MBytes/second
+write data rate with a simple test application filling the whole
+region with 0x12345678 mapped through my driver.
 
-> ---
-> This is based on 08f143b7cdbe9705f6856c2a63b6d3b14b5a8eee of davinci-linux
-> tree.
->
-> Changes since v0:
->    1. Misc formatting
->
->  arch/arm/mach-davinci/board-mityomapl138.c |  145 ++++++++++++++++++++++++++++
->  1 files changed, 145 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-> index 7146916..84d5aff 100644
-> --- a/arch/arm/mach-davinci/board-mityomapl138.c
-> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
-> @@ -13,6 +13,8 @@
->  #include <linux/console.h>
->  #include <linux/platform_device.h>
->  #include <linux/mtd/partitions.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/i2c.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -25,6 +27,141 @@
->  #define MITYOMAPL138_PHY_MASK		0x08 /* hardcoded for now */
->  #define MITYOMAPL138_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
->  
-> +static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
-> +	.bus_freq	= 100,	/* kHz */
-> +	.bus_delay	= 0,	/* usec */
-> +};
-> +
-> +/* TPS65023 voltage regulator support */
-> +/* 1.2V Core */
-> +struct regulator_consumer_supply tps65023_dcdc1_consumers[] = {
-> +	{
-> +		.supply = "cvdd",
-> +	},
-> +};
-> +
-> +/* 1.8V */
-> +struct regulator_consumer_supply tps65023_dcdc2_consumers[] = {
-> +	{
-> +		.supply = "usb0_vdda18",
-> +	},
-> +	{
-> +		.supply = "usb1_vdda18",
-> +	},
-> +	{
-> +		.supply = "ddr_dvdd18",
-> +	},
-> +	{
-> +		.supply = "sata_vddr",
-> +	},
-> +};
-> +
-> +/* 1.2V */
-> +struct regulator_consumer_supply tps65023_dcdc3_consumers[] = {
-> +	{
-> +		.supply = "sata_vdd",
-> +	},
-> +	{
-> +		.supply = "usb_cvdd",
-> +	},
-> +	{
-> +		.supply = "pll0_vdda",
-> +	},
-> +	{
-> +		.supply = "pll1_vdda",
-> +	},
-> +};
-> +
-> +/* 1.8V Aux LDO, not used */
-> +struct regulator_consumer_supply tps65023_ldo1_consumers[] = {
-> +	{
-> +		.supply = "1.8v_aux",
-> +	},
-> +};
-> +
-> +/* FPGA VCC Aux (2.5 or 3.3) LDO */
-> +struct regulator_consumer_supply tps65023_ldo2_consumers[] = {
-> +	{
-> +		.supply = "vccaux",
-> +	},
-> +};
-> +
-> +struct regulator_init_data tps65023_regulator_data[] = {
-> +	/* dcdc1 */
-> +	{
-> +		.constraints = {
-> +			.min_uV = 1150000,
-> +			.max_uV = 1350000,
-> +			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-> +					  REGULATOR_CHANGE_STATUS,
-> +			.boot_on = 1,
-> +		},
-> +		.num_consumer_supplies = ARRAY_SIZE(tps65023_dcdc1_consumers),
-> +		.consumer_supplies = tps65023_dcdc1_consumers,
-> +	},
-> +	/* dcdc2 */
-> +	{
-> +		.constraints = {
-> +			.min_uV = 1800000,
-> +			.max_uV = 1800000,
-> +			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-> +			.boot_on = 1,
-> +		},
-> +		.num_consumer_supplies = ARRAY_SIZE(tps65023_dcdc2_consumers),
-> +		.consumer_supplies = tps65023_dcdc2_consumers,
-> +	},
-> +	/* dcdc3 */
-> +	{
-> +		.constraints = {
-> +			.min_uV = 1200000,
-> +			.max_uV = 1200000,
-> +			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-> +			.boot_on = 1,
-> +		},
-> +		.num_consumer_supplies = ARRAY_SIZE(tps65023_dcdc3_consumers),
-> +		.consumer_supplies = tps65023_dcdc3_consumers,
-> +	},
-> +	/* ldo1 */
-> +	{
-> +		.constraints = {
-> +			.min_uV = 1800000,
-> +			.max_uV = 1800000,
-> +			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-> +			.boot_on = 1,
-> +		},
-> +		.num_consumer_supplies = ARRAY_SIZE(tps65023_ldo1_consumers),
-> +		.consumer_supplies = tps65023_ldo1_consumers,
-> +	},
-> +	/* ldo2 */
-> +	{
-> +		.constraints = {
-> +			.min_uV = 2500000,
-> +			.max_uV = 3300000,
-> +			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-> +					  REGULATOR_CHANGE_STATUS,
-> +			.boot_on = 1,
-> +		},
-> +		.num_consumer_supplies = ARRAY_SIZE(tps65023_ldo2_consumers),
-> +		.consumer_supplies = tps65023_ldo2_consumers,
-> +	},
-> +};
-> +
-> +static struct i2c_board_info __initdata mityomap_tps65023_info[] = {
-> +	{
-> +		I2C_BOARD_INFO("tps65023", 0x48),
-> +		.platform_data = &tps65023_regulator_data[0],
-> +	},
-> +	{
-> +		I2C_BOARD_INFO("24c02", 0x50),
-> +	},
-> +};
-> +
-> +static int __init pmic_tps65023_init(void)
-> +{
-> +	return i2c_register_board_info(1, mityomap_tps65023_info,
-> +					ARRAY_SIZE(mityomap_tps65023_info));
-> +}
-> +
->  /*
->   * MityDSP-L138 includes a 256 MByte large-page NAND flash
->   * (128K blocks).
-> @@ -172,6 +309,14 @@ static void __init mityomapl138_init(void)
->  
->  	davinci_serial_init(&mityomapl138_uart_config);
->  
-> +	ret = da8xx_register_i2c(0, &mityomap_i2c_0_pdata);
-> +	if (ret)
-> +		pr_warning("i2c0 registration failed: %d\n", ret);
-> +
-> +	ret = pmic_tps65023_init();
-> +	if (ret)
-> +		pr_warning("TPS65023 PMIC init failed: %d\n", ret);
-> +
->  	mityomapl138_setup_nand();
->  
->  	mityomapl138_config_emac();
+In the driver, I used the following combinations for ioremap and
+pgprot modification during remap_pfn_range:
+ioremap_wc + pgprot_writecombine(vma->vm_page_prot)
+ioremap_cached + <no modification of vma->vm_page_prot>
+ioremap_nocache + pgprot_noncached(vma->vm_page_prot)
+
+In contrast to my previous test, I could not see even a minimal
+reproducible difference between any of the tests, the absolute
+values of "time" varied only between 0.033 and 0.035 statistically.
+(around 1.299 for writing to my PCI device's memory in the same
+test)
+
+However, I am not getting the writes to use the stm instruction,
+so maybe this is the real limitation.
+Here is my very basic test program:
+
+#define MEMSIZE 0x800000
+
+int main() {
+  int fbfd;
+  unsigned long *fbp, *sfbp;
+  unsigned long i;
+  unsigned long fill_val = 0x12345678;
+
+  fbfd = open("/dev/fb0", O_RDWR);
+  if (!fbfd) {
+    printf("Error: cannot open framebuffer device.\n");
+    exit(1);
+  }
+  fbp = (unsigned long *)mmap(0, MEMSIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+                              fbfd, 0);
+  sfbp = fbp;
+  if(!fbp) {
+    printf("Error: cannot mmap framebuffer\n");
+    exit(1);
+  }
+#if 0
+  for (i = 0; i < (MEMSIZE / 4); i += 8) {
+    *(fbp + i) = fill_val;
+    *(fbp + i + 1) = fill_val;
+    *(fbp + i + 2) = fill_val;
+    *(fbp + i + 3) = fill_val;
+    *(fbp + i + 4) = fill_val;
+    *(fbp + i + 5) = fill_val;
+    *(fbp + i + 6) = fill_val;
+    *(fbp + i + 7) = fill_val;
+  }
+#else
+  for (i = MEMSIZE/32; i; i--) {
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+    *(fbp++) = fill_val;
+  }
+#endif
+  munmap(sfbp, MEMSIZE);
+  close(fbfd);
+  return 0;
+}
+
+Neither of the cases results in stm being used, all use
+str.
+(I am not so deep into assembler, let alone ARM assembler,
+so please bear with my ignorance about what stm is or does
+for now...)
+
+I compiled with CodeSourcery arm-2010q1 toolchain with these
+settings:
+arm-none-linux-gnueabi-gcc -O3  -DARM -std=gnu99 -fgnu89-inline -Wall -Wno-format -pedantic
+
+Could you provide any hint what I could do to get the
+compiler to use stm?
+
+Regards,
+Wolfgang
