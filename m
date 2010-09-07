@@ -1,32 +1,38 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 15:43:22 +0530
-Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
-In-Reply-To: <20100906210943.0e8eb7df@linux.lan.towertech.it>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
-	<20100906210943.0e8eb7df@linux.lan.towertech.it>
-Message-ID: <4C861042.1030409@st.com>
+Date: Tue, 7 Sep 2010 15:47:57 +0530
+Subject: [PATCH 16/74] ST SPEAr: adding support for synopsis i2c designware
+In-Reply-To: <20100907094424.GD30509@game.jcrosoft.org>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<72ad657ab3eb9d61f11741145494eadb061926b9.1283161023.git.viresh.kumar@st.com>
+	<20100906231227.GG8153@game.jcrosoft.org> <4C85B94E.3040307@st.com>
+	<20100907041250.GC30509@game.jcrosoft.org>
+	<4C860307.7040409@st.com>
+	<20100907094424.GD30509@game.jcrosoft.org>
+Message-ID: <4C861155.8050708@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 12:39 AM, Alessandro Zummo wrote:
-> On Mon, 30 Aug 2010 16:11:00 +0530
-> Viresh KUMAR <viresh.kumar@st.com> wrote:
-> 
->> > From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
->  Hi, there are quite a few issues. Please read the
->  checklist at http://groups.google.com/group/rtc-linux/web/checklist
+On 9/7/2010 3:14 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 14:46 Tue 07 Sep     , viresh kumar wrote:
+>> > On 9/7/2010 9:42 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> > > please split your v2 patch series in related changset it will simplify the
+>>> > > review
+>> > 
+>> > Jean,
+>> > 
+>> > I would prefer not to do this change in current series due to following reasons:
+>> > - Would make difficult for reviewers to locate V2 for V1 they have reviewed.
+>> > - My patches are intermixed, so would be difficult for me to create related
+>> > change sets as currently patches are very much intermixed.
+>> > 
+>> > I will take care of this next time i send another patch series.
+> It's really difficult to reiew it and take long time
+> so reduce the number of patch and by related changeset will help a lot
 
-Alessandro,
+Jean: I agree with what you are saying, but doing it in current patch series will
+be difficult.
 
-I tried to find issues in driver, with help of checklist. I could find
-very few changes initially, they are:
-- Correct MODULE_* at end of file
-- add platform dependency in Kconfig
-- remove .owner
-- removed few #includes.
+Russell: Can we go ahead with a single patch set this time. By next time we will
+take care of this.
 
-If there are any more issues that you might have encountered, then
-please let me know before i send V2.
-
-thanks
 viresh.
