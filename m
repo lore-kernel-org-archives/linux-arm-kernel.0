@@ -1,36 +1,109 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 17:24:22 +0530
-Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
-	controller driver
-In-Reply-To: <20100907113850.GE30509@game.jcrosoft.org>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
-	<20100906224050.GA8153@game.jcrosoft.org> <4C86192C.801@st.com>
-	<20100907113850.GE30509@game.jcrosoft.org>
-Message-ID: <4C8627EE.6090606@st.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 07 Sep 2010 15:23:15 +0300
+Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
+In-Reply-To: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
+References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <4C862EB3.4080006@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 5:08 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>> +/* emi nor flash device registeration */
->>>>> > >> > +static struct physmap_flash_data emi_norflash_data;
->>>>> > >> > +
->>>>> > >> > +static struct resource emi_nor_resources[] = {
->>>>> > >> > +     {
->>>>> > >> > +             .start  = SPEAR310_EMI_MEM_0_BASE,
->>>>> > >> > +             .end    = SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
->>>>> > >> > +             .flags  = IORESOURCE_MEM,
->>>>> > >> > +     },
->>>>> > >> > +};
->>> > > it's board specfic not mach
->>> > > 
->>> > > NACK
->> > 
->> > No. This is machine specific. Same for all boards.
-> NACK as you can have a flash at other place and more than one flash
-> and the size depend on the flash
+ Seems that there are some more platforms then Sharp Zaurus
+are interested in this patch.
 
-Correct!! Size has to be board specific. Will modify it.
+Dmitry, Mike, Pavel,
 
-thanks
-viresh.
+What's the status of it?
+
+On 07/31/10 10:09, Marek Vasut wrote:
+> In case regulator was not found, ADS7846 failed to probe.
+>
+> This fixes a problem on some Sharp Zaurus devices, where there is no regulator
+> present and the touchscreen is used.
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+>  drivers/input/touchscreen/ads7846.c |   38 +++++++++++++++++++---------------
+>  1 files changed, 21 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+> index a9fdf55..53b318b 100644
+> --- a/drivers/input/touchscreen/ads7846.c
+> +++ b/drivers/input/touchscreen/ads7846.c
+> @@ -791,7 +791,8 @@ static void ads7846_disable(struct ads7846 *ts)
+>  		}
+>  	}
+>  
+> -	regulator_disable(ts->reg);
+> +	if (ts->reg)
+> +		regulator_disable(ts->reg);
+>  
+>  	/* we know the chip's in lowpower mode since we always
+>  	 * leave it that way after every request
+> @@ -804,7 +805,8 @@ static void ads7846_enable(struct ads7846 *ts)
+>  	if (!ts->disabled)
+>  		return;
+>  
+> -	regulator_enable(ts->reg);
+> +	if (ts->reg)
+> +		regulator_enable(ts->reg);
+>  
+>  	ts->disabled = 0;
+>  	ts->irq_disabled = 0;
+> @@ -1162,16 +1164,15 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+>  	ts->last_msg = m;
+>  
+>  	ts->reg = regulator_get(&spi->dev, "vcc");
+> -	if (IS_ERR(ts->reg)) {
+> -		err = PTR_ERR(ts->reg);
+> -		dev_err(&spi->dev, "unable to get regulator: %d\n", err);
+> -		goto err_free_gpio;
+> -	}
+> -
+> -	err = regulator_enable(ts->reg);
+> -	if (err) {
+> -		dev_err(&spi->dev, "unable to enable regulator: %d\n", err);
+> -		goto err_put_regulator;
+> +	if (IS_ERR(ts->reg))
+> +		ts->reg = NULL;
+> +	else {
+> +		err = regulator_enable(ts->reg);
+> +		if (err) {
+> +			dev_err(&spi->dev, "unable to enable regulator: %d\n",
+> +				err);
+> +			goto err_put_regulator;
+> +		}
+>  	}
+>  
+>  	if (request_irq(spi->irq, ads7846_irq, IRQF_TRIGGER_FALLING,
+> @@ -1218,10 +1219,11 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+>   err_free_irq:
+>  	free_irq(spi->irq, ts);
+>   err_disable_regulator:
+> -	regulator_disable(ts->reg);
+> +	if (ts->reg)
+> +		regulator_disable(ts->reg);
+>   err_put_regulator:
+> -	regulator_put(ts->reg);
+> - err_free_gpio:
+> +	if (ts->reg)
+> +		regulator_put(ts->reg);
+>  	if (ts->gpio_pendown != -1)
+>  		gpio_free(ts->gpio_pendown);
+>   err_cleanup_filter:
+> @@ -1251,8 +1253,10 @@ static int __devexit ads7846_remove(struct spi_device *spi)
+>  	/* suspend left the IRQ disabled */
+>  	enable_irq(ts->spi->irq);
+>  
+> -	regulator_disable(ts->reg);
+> -	regulator_put(ts->reg);
+> +	if (ts->reg) {
+> +		regulator_disable(ts->reg);
+> +		regulator_put(ts->reg);
+> +	}
+>  
+>  	if (ts->gpio_pendown != -1)
+>  		gpio_free(ts->gpio_pendown);
+
+-- 
+Regards,
+Igor.
