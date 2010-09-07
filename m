@@ -1,55 +1,28 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue,  7 Sep 2010 13:27:20 +0530
-Subject: [PATCH 3/6] omap4: l2x0: Override the default l2x0_disable
-In-Reply-To: <1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
+Date: Tue,  7 Sep 2010 13:27:17 +0530
+Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+Message-ID: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine_kexec() calls outer_disable which can crash on OMAP4
-becasue of trustzone restrictions.
+This series is just repost adding Catalin's ack to the patches and
+combining Thomas's two rebased kexec patches.
+It's generated against the mainline 2.6.36-rc3 + Catalin's
+"[PATCH 0/9] Various patches for 2.6.37-rc1" series.
 
-This patch overrides the default l2x0_disable with a OMAP4
-specific implementation taking care of trustzone
+Santosh Shilimkar (4):
+  omap4: l2x0: Override the default l2x0_disable
+  ARM: l2x0: Fix coding-style in the cache-l2x0.h
+  ARM: l2x0: Determine the cache size
+  ARM: l2x0: Optimise the range based operations
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/omap4-common.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+Thomas Gleixner (2):
+  arm: Disable outer (L2) cache in kexec
+  arm: Implement l2x0 cache disable functions
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 13dc979..b557cc2 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -44,6 +44,13 @@ void __init gic_init_irq(void)
- }
- 
- #ifdef CONFIG_CACHE_L2X0
-+
-+static void omap4_l2x0_disable(void)
-+{
-+	/* Disable PL310 L2 Cache controller */
-+	omap_smc1(0x102, 0x0);
-+}
-+
- static int __init omap_l2_cache_init(void)
- {
- 	/*
-@@ -66,6 +73,12 @@ static int __init omap_l2_cache_init(void)
- 	 */
- 	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
- 
-+	/*
-+	 * Override default outer_cache.disable with a OMAP4
-+	 * specific one
-+	*/
-+	outer_cache.disable = omap4_l2x0_disable;
-+
- 	return 0;
- }
- early_initcall(omap_l2_cache_init);
--- 
-1.6.0.4
+ arch/arm/include/asm/hardware/cache-l2x0.h |    9 +++-
+ arch/arm/include/asm/outercache.h          |   24 +++++++++++
+ arch/arm/kernel/machine_kexec.c            |    3 +
+ arch/arm/mach-omap2/omap4-common.c         |   13 ++++++
+ arch/arm/mm/cache-l2x0.c                   |   63 ++++++++++++++++++++++++++-
+ 5 files changed, 106 insertions(+), 6 deletions(-)
