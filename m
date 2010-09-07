@@ -1,30 +1,36 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Tue, 7 Sep 2010 11:10:14 -0700 (PDT)
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <4C85BEFD.402@bluewatersys.com>
-Message-ID: <569801.35222.qm@web180310.mail.gq1.yahoo.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 7 Sep 2010 20:18:59 +0200
+Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+In-Reply-To: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <AANLkTi=chtedwbDDJnZOe5yTqobUeXz=aZYUNNUDpQQm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2010/9/7 Santosh Shilimkar <santosh.shilimkar@ti.com>:
 
+> This series is just repost adding Catalin's ack to the patches and
+> combining Thomas's two rebased kexec patches.
+> It's generated against the mainline 2.6.36-rc3 + Catalin's
+> "[PATCH 0/9] Various patches for 2.6.37-rc1" series.
+>
+> Santosh Shilimkar (4):
+> ?omap4: l2x0: Override the default l2x0_disable
+> ?ARM: l2x0: Fix coding-style in the cache-l2x0.h
+> ?ARM: l2x0: Determine the cache size
+> ?ARM: l2x0: Optimise the range based operations
+>
+> Thomas Gleixner (2):
+> ?arm: Disable outer (L2) cache in kexec
+> ?arm: Implement l2x0 cache disable functions
 
---- On Mon, 9/6/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
+FWIW:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-> >  The intent of my patch was to keep gpio_is_valid
-> simple, but add
-> a simple check for architectures where the base gpio is not
-> zero. Will
-> wait and see what David has to say.
+Can you also include the patch by Per Fransson I sent off to
+Thomas and the list just a few days ago with the subject
+"[PATCH] ARM: ux500 specific L2 cache code"
+in this patch series?
 
-NAK still.  You're trying to abuse gpio_is_valid(),
-which I see no need to support.
-
-
-In terms of GPIO framework architecture, zero is
-the first GPIO in all cases, and is always
-a valid GPIO number, even if it's not
-requestable/swritable/readable on a given board.
-
-Whether it's usable on a given platform depends
-on whether a GPIO controller is registered which
-claims numbers 0..N ... (assuming gpiolib in use).
+Yours,
+Linus Walleij
