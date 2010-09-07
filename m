@@ -1,19 +1,16 @@
-From: david-b@pacbell.net (David Brownell)
-Date: Mon, 6 Sep 2010 19:23:22 -0700 (PDT)
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <20100903164158.GH17702@game.jcrosoft.org>
-Message-ID: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Sep 2010 10:23:26 +0800
+Subject: [PATCH] pxa168fb: fix clear operation
+In-Reply-To: <AANLkTi=6gEbWcG5Dq4SZsfdpDCEmxPZzkvonPqc1TcH8@mail.gmail.com>
+References: <1283128337-4605-1-git-send-email-haojian.zhuang@marvell.com>
+	<1283128337-4605-2-git-send-email-haojian.zhuang@marvell.com>
+	<AANLkTimqMGC=sRM0uzK61ceUdZd=DdvSi4Vi-W=ybgN7@mail.gmail.com>
+	<AANLkTi=6gEbWcG5Dq4SZsfdpDCEmxPZzkvonPqc1TcH8@mail.gmail.com>
+Message-ID: <AANLkTinMCa1jkPuN6-w4VWtwk_n3YgOkKcwUTCyd1bDY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Still not liking or accepting this proposed
-change to the GPIO framework.
+> I'm OK. Should I submit this patch again?
+>
 
-For the AT91 case (where integers 0..N are
-IRQs, but N..max are GPIOs)
-
-A simpler solution is just to use a bit in
-the integer to indicate IRQ vs GPIO.  Like
-maybe the sign bit.. which is never set on
-valid GPIO numbers, but platforms could let
-be set on IRQs.
+Yes please and with Marek's Ack.
