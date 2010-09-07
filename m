@@ -1,32 +1,73 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 09:21:42 +0530
-Subject: [PATCH 01/74] ST SPEAr: Padmux code Updated
-In-Reply-To: <20100906224901.GC8153@game.jcrosoft.org>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<90f361f70296c1762fae29a8d00d37c51b53cee2.1283161023.git.viresh.kumar@st.com>
-	<20100906224901.GC8153@game.jcrosoft.org>
-Message-ID: <4C85B6CE.2080705@st.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Sep 2010 11:54:06 +0800
+Subject: [PATCH] pio: add arch specific gpio_is_valid() function
+In-Reply-To: <4C85A71F.3010402@bluewatersys.com>
+References: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
+	<4C85A71F.3010402@bluewatersys.com>
+Message-ID: <AANLkTi=B7O9jDB_pzHS6feWTxHQTfDZ-QLx7jOKaA2vN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 4:19 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>  
->> > -void spear300_pmx_init(void)
->> > -{
->> > -	spear_pmx_init(&pmx_driver, SPEAR300_SOC_CONFIG_BASE,
->> > +	/* pmx initialization */
->> > +	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
->> >  			SPEAR300_SOC_CONFIG_SIZE);
->> > +	if (pmx_driver.base) {
->> > +		ret = pmx_register(&pmx_driver);
->> > +		if (ret)
->> > +			printk(KERN_ERR "padmux: registeration failed. err no"
->> > +					": %d\n", ret);
->> > +		iounmap(pmx_driver.base);
-> why unmap it?
+On Tue, Sep 7, 2010 at 10:44 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> On 09/07/2010 02:23 PM, David Brownell wrote:
+>> Still not liking or accepting this proposed
+>> change to the GPIO framework.
+>>
+>> For the AT91 case (where integers 0..N are
+>> IRQs, but N..max are GPIOs)
+>>
+>> A simpler solution is just to use a bit in
+>> the integer to indicate IRQ vs GPIO. ?Like
+>> maybe the sign bit.. which is never set on
+>> valid GPIO numbers, but platforms could let
+>> be set on IRQs.
+>>
+> How about this approach instead?
+>
 
-pmx_register will actually enable all selected devices and configure padmux.
-After this we will never change device configuration again. So don't need
-this mapping.
+This doesn't solve the problem with more complicated settings, e.g.
+some GPIOs within are not valid, not just the begining ones.
 
-viresh.
+So the real question here is the semantics of gpio_is_valid(). I'd
+personally incline it reads as if a GPIO _number_ is valid generally,
+(e.g. like -1 is not a valid GPIO number), instead of that specific
+GPIO is valid on that specific platform. The latter can be judged
+with gpio_request().
+
+> ----
+> On some architectures gpio numbering does not start from zero. Allow for
+> correct behaviour of gpio_is_valid on values below the first gpio by
+> adding the architecture overrideable ARCH_FIRST_GPIO.
+>
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+> ----
+>
+> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+> index c7376bf..01aab1f 100644
+> --- a/include/asm-generic/gpio.h
+> +++ b/include/asm-generic/gpio.h
+> @@ -22,10 +22,15 @@
+> ?#define ARCH_NR_GPIOS ? ? ? ? ?256
+> ?#endif
+>
+> +#ifndef ARCH_FIRST_GPIO
+> +#define ARCH_FIRST_GPIO ? ? ? ? ? ? ? ?0
+> +#endif
+> +
+> ?static inline int gpio_is_valid(int number)
+> ?{
+> ? ? ? ?/* only some non-negative numbers are valid */
+> - ? ? ? return ((unsigned)number) < ARCH_NR_GPIOS;
+> + ? ? ? return (number >= ARCH_FIRST_GPIO &&
+> + ? ? ? ? ? ? ? (unsigned)number < ARCH_NR_GPIOS;
+> ?}
+>
+> ?struct device;
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
