@@ -1,181 +1,220 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Tue, 7 Sep 2010 19:20:58 +0800
-Subject: [PATCH 1/6] pxa3xx_nand: make scan procedure more clear
-In-Reply-To: <1283179285-6539-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1283179285-6539-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTinuKC8hWbDZWDkMa8kpBMWUXF4E+9mWnCXFN8WM@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 7 Sep 2010 17:05:19 +0530
+Subject: [PATCH 07/74] ST SPEAr13XX: Added compilation support in arch/arm/
+In-Reply-To: <20100902162744.GC28968@game.jcrosoft.org>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<b2e8b6b95ceff7d90032be8cd614787519b5c57c.1283161023.git.viresh.kumar@st.com>
+	<20100902162744.GC28968@game.jcrosoft.org>
+Message-ID: <4C862377.1080507@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 9/2/2010 9:57 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> > index 9295110..950c045 100644
+>> > --- a/arch/arm/Kconfig
+>> > +++ b/arch/arm/Kconfig
+>> > @@ -1144,11 +1144,13 @@ config SMP
+>> >  	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+>> >  	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+>> >  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+>> > -		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
+>> > +		 ARCH_S5PV310 || ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 ||\
+>> > +		 ARCH_VEXPRESS_CA9X4)
+> can we get rid of such long list by introducing a HAVE somthing
+> etc....
 
 
-On Mon, Aug 30, 2010 at 10:41 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> From: Lei Wen <leiwen@marvell.com>
->
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> ---
-> ?drivers/mtd/nand/pxa3xx_nand.c | ? 88 ++++++++++++++++++++++-----------------
-> ?1 files changed, 50 insertions(+), 38 deletions(-)
->
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index 5d24968..3468a3d 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -126,6 +126,7 @@ struct pxa3xx_nand_info {
-> ? ? ? ?unsigned int ? ? ? ? ? ?buf_start;
-> ? ? ? ?unsigned int ? ? ? ? ? ?buf_count;
->
-> + ? ? ? struct mtd_info ? ? ? ? *mtd;
-> ? ? ? ?/* DMA information */
-> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_dat;
-> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_cmd;
-> @@ -1044,21 +1045,13 @@ static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
-> ? ? ? ?this->chip_delay = 25;
-> ?}
->
-> -static int pxa3xx_nand_probe(struct platform_device *pdev)
-> +static int alloc_nand_resource(struct platform_device *pdev)
-> ?{
-> - ? ? ? struct pxa3xx_nand_platform_data *pdata;
-> + ? ? ? struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
-> ? ? ? ?struct pxa3xx_nand_info *info;
-> - ? ? ? struct nand_chip *this;
-> ? ? ? ?struct mtd_info *mtd;
-> ? ? ? ?struct resource *r;
-> - ? ? ? int ret = 0, irq;
-> -
-> - ? ? ? pdata = pdev->dev.platform_data;
-> -
-> - ? ? ? if (!pdata) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
-> - ? ? ? ? ? ? ? return -ENODEV;
-> - ? ? ? }
-> + ? ? ? int ret, irq;
->
-> ? ? ? ?mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct pxa3xx_nand_info),
-> ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
-> @@ -1070,8 +1063,8 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
-> ? ? ? ?info = (struct pxa3xx_nand_info *)(&mtd[1]);
-> ? ? ? ?info->pdev = pdev;
->
-> - ? ? ? this = &info->nand_chip;
-> ? ? ? ?mtd->priv = info;
-> + ? ? ? info->mtd = mtd;
-> ? ? ? ?mtd->owner = THIS_MODULE;
->
-> ? ? ? ?info->clk = clk_get(&pdev->dev, NULL);
-> @@ -1149,27 +1142,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
-> ? ? ? ?}
->
-> ? ? ? ?pxa3xx_nand_init_mtd(mtd, info);
-> + ? ? ? platform_set_drvdata(pdev, info);
->
-> - ? ? ? platform_set_drvdata(pdev, mtd);
-> -
-> - ? ? ? if (nand_scan(mtd, 1)) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
-> - ? ? ? ? ? ? ? ret = -ENXIO;
-> - ? ? ? ? ? ? ? goto fail_free_irq;
-> - ? ? ? }
-> -
-> - ? ? ? if (mtd_has_cmdlinepart()) {
-> - ? ? ? ? ? ? ? static const char *probes[] = { "cmdlinepart", NULL };
-> - ? ? ? ? ? ? ? struct mtd_partition *parts;
-> - ? ? ? ? ? ? ? int nr_parts;
-> -
-> - ? ? ? ? ? ? ? nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
-> -
-> - ? ? ? ? ? ? ? if (nr_parts)
-> - ? ? ? ? ? ? ? ? ? ? ? return add_mtd_partitions(mtd, parts, nr_parts);
-> - ? ? ? }
-> -
-> - ? ? ? return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
-> + ? ? ? return 0;
->
-> ?fail_free_irq:
-> ? ? ? ?free_irq(irq, info);
-> @@ -1194,8 +1169,8 @@ fail_free_mtd:
->
-> ?static int pxa3xx_nand_remove(struct platform_device *pdev)
-> ?{
-> - ? ? ? struct mtd_info *mtd = platform_get_drvdata(pdev);
-> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
-> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-> + ? ? ? struct mtd_info *mtd = info->mtd;
-> ? ? ? ?struct resource *r;
-> ? ? ? ?int irq;
->
-> @@ -1224,11 +1199,48 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
-> ? ? ? ?return 0;
-> ?}
->
-> +static int pxa3xx_nand_probe(struct platform_device *pdev)
-> +{
-> + ? ? ? struct pxa3xx_nand_platform_data *pdata;
-> + ? ? ? struct pxa3xx_nand_info *info;
-> + ? ? ? int ret;
-> +
-> + ? ? ? pdata = pdev->dev.platform_data;
-> + ? ? ? if (!pdata) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? }
-> +
-> + ? ? ? ret = alloc_nand_resource(pdev);
-> + ? ? ? if (ret)
-> + ? ? ? ? ? ? ? return ret;
-> +
-> + ? ? ? info = platform_get_drvdata(pdev);
-> + ? ? ? if (nand_scan(info->mtd, 1)) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
-> + ? ? ? ? ? ? ? pxa3xx_nand_remove(pdev);
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? }
-> +
-> + ? ? ? if (mtd_has_cmdlinepart()) {
-> + ? ? ? ? ? ? ? static const char *probes[] = { "cmdlinepart", NULL };
-> + ? ? ? ? ? ? ? struct mtd_partition *parts;
-> + ? ? ? ? ? ? ? int nr_parts;
-> +
-> + ? ? ? ? ? ? ? nr_parts = parse_mtd_partitions(info->mtd, probes, &parts, 0);
-> +
-> + ? ? ? ? ? ? ? if (nr_parts)
-> + ? ? ? ? ? ? ? ? ? ? ? return add_mtd_partitions(info->mtd, parts, nr_parts);
-> + ? ? ? }
-> +
-> + ? ? ? return add_mtd_partitions(info->mtd, pdata->parts, pdata->nr_parts);
-> +}
-> +
-> ?#ifdef CONFIG_PM
-> ?static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
-> ?{
-> - ? ? ? struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
-> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
-> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-> + ? ? ? struct mtd_info *mtd = info->mtd;
->
-> ? ? ? ?if (info->state != STATE_READY) {
-> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
-> @@ -1240,8 +1252,8 @@ static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
->
-> ?static int pxa3xx_nand_resume(struct platform_device *pdev)
-> ?{
-> - ? ? ? struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
-> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
-> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-> + ? ? ? struct mtd_info *mtd = info->mtd;
->
-> ? ? ? ?nand_writel(info, NDTR0CS0, info->ndtr0cs0);
-> ? ? ? ?nand_writel(info, NDTR1CS0, info->ndtr1cs0);
-> --
-> 1.7.0.4
->
-Any suggestion on this series? ...
+I tried to do this, but have some doubts. With this change architectures
+can not disable features selected using select statement.
+So, if i want image without SMP for SPEAr13xx now, i can't do it.
 
-Best regards,
-Lei
+
+Please correct me if this is not the right way of doing it.
+
+regards,
+viresh.
+--------------------------------------
+
+[PATCH] arch/arm/Kconfig: removing arch/machine dependencies from SMP, LOCAL_TIMERS, HAVE_ARM_SCU AND HAVE_ARM_TWD
+
+Individual architectures/machines should select SMP, LOCAL_TIMERS, HAVE_ARM_SCU
+AND HAVE_ARM_TWD from there config options
+
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/Kconfig               |   30 +++++++++++++++++-------------
+ arch/arm/mach-omap2/Kconfig    |    4 ++++
+ arch/arm/mach-realview/Kconfig |    8 ++++++++
+ arch/arm/mach-vexpress/Kconfig |    3 +++
+ arch/arm/plat-spear/Kconfig    |    4 ++++
+ 5 files changed, 36 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f6ec629..4617efa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -238,6 +238,8 @@ config ARCH_REALVIEW
+ 	select PLAT_VERSATILE
+ 	select ARM_TIMER_SP804
+ 	select GPIO_PL061 if GPIOLIB
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	help
+ 	  This enables support for ARM Ltd RealView boards.
+ 
+@@ -261,6 +263,7 @@ config ARCH_VEXPRESS
+ 	select ARM_TIMER_SP804
+ 	select COMMON_CLKDEV
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	select HAVE_CLK
+ 	select ICST
+ 	select PLAT_VERSATILE
+@@ -566,6 +569,10 @@ config ARCH_TEGRA
+ 	select HAVE_CLK
+ 	select COMMON_CLKDEV
+ 	select ARCH_HAS_BARRIERS if CACHE_L2X0
++	select SMP
++	select HAVE_ARM_SCU if SMP
++	select LOCAL_TIMERS
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	help
+ 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+ 	  Tegra 6xx and Tegra 2 series).
+@@ -733,6 +740,10 @@ config ARCH_S5PV310
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select GENERIC_CLOCKEVENTS
++	select SMP
++	select HAVE_ARM_SCU if SMP
++	select LOCAL_TIMERS
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	help
+ 	  Samsung S5PV310 series based systems
+ 
+@@ -779,6 +790,10 @@ config ARCH_U8500
+ 	select GENERIC_CLOCKEVENTS
+ 	select COMMON_CLKDEV
+ 	select ARCH_REQUIRE_GPIOLIB
++	select SMP
++	select HAVE_ARM_SCU if SMP
++	select LOCAL_TIMERS
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	help
+ 	  Support for ST-Ericsson's Ux500 architecture
+ 
+@@ -1146,15 +1161,9 @@ source "kernel/time/Kconfig"
+ 
+ config SMP
+ 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+-	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+-		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+-		 ARCH_S5PV310 || ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 ||\
+-		 ARCH_VEXPRESS_CA9X4)
++	depends on EXPERIMENTAL
+ 	depends on GENERIC_CLOCKEVENTS
+ 	select USE_GENERIC_SMP_HELPERS
+-	select HAVE_ARM_SCU if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 ||\
+-		 ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 ||\
+-		 ARCH_VEXPRESS_CA9X4
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+ 	  a system with only one CPU, like most personal computers, say N. If
+@@ -1222,13 +1231,8 @@ config HOTPLUG_CPU
+ 
+ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+-	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+-		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+-		ARCH_S5PV310 || ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 ||\
+-		ARCH_VEXPRESS_CA9X4)
++	depends on SMP
+ 	default y
+-	select HAVE_ARM_TWD if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 || \
+-		ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index b48bacf..674bb71 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -43,6 +43,10 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
+ 	select CPU_V7
+ 	select ARM_GIC
++	select SMP
++	select HAVE_ARM_SCU if SMP
++	select LOCAL_TIMERS
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index b4575ae..30a06ff 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -11,6 +11,8 @@ config REALVIEW_EB_A9MP
+ 	bool "Support Multicore Cortex-A9"
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V7
++	select SMP
++	select LOCAL_TIMERS
+ 	help
+ 	  Enable support for the Cortex-A9MPCore tile on the Realview platform.
+ 
+@@ -18,6 +20,8 @@ config REALVIEW_EB_ARM11MP
+ 	bool "Support ARM11MPCore tile"
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V6
++	select SMP
++	select LOCAL_TIMERS
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	help
+ 	  Enable support for the ARM11MPCore tile on the Realview platform.
+@@ -36,6 +40,8 @@ config MACH_REALVIEW_PB11MP
+ 	select CPU_V6
+ 	select ARM_GIC
+ 	select HAVE_PATA_PLATFORM
++	select SMP
++	select LOCAL_TIMERS
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	help
+ 	  Include support for the ARM(R) RealView MPCore Platform Baseboard.
+@@ -73,6 +79,8 @@ config MACH_REALVIEW_PBX
+ 	select ARM_GIC
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
++	select SMP
++	select LOCAL_TIMERS
+ 	select ZONE_DMA if SPARSEMEM
+ 	help
+ 	  Include support for the ARM(R) RealView PBX platform.
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 3f19b66..8475646 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -5,5 +5,8 @@ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
+ 	select CPU_V7
+ 	select ARM_GIC
++	select SMP
++	select HAVE_ARM_SCU if SMP
++	select LOCAL_TIMERS
+ 
+ endmenu
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index b8e4988..18e2229 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -13,6 +13,10 @@ config ARCH_SPEAR13XX
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select ARCH_SUPPORTS_MSI
++	select SMP
++	select HAVE_ARM_SCU if SMP
++	select LOCAL_TIMERS
++	select HAVE_ARM_TWD if LOCAL_TIMERS
+ 	help
+ 	  Supports for ARM's SPEAR13XX family
