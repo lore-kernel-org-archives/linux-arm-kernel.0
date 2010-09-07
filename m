@@ -1,26 +1,49 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 14:48:32 +0530
-Subject: [PATCH 72/74] SPEAr13xx: Replace defconfigs with single unfied
-	defconfig
-In-Reply-To: <20100902154055.GP26319@n2100.arm.linux.org.uk>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<24d22c52ef8367bd6167f2a511cd86176ab6948e.1283161024.git.viresh.kumar@st.com>
-	<20100902154055.GP26319@n2100.arm.linux.org.uk>
-Message-ID: <4C860368.7050305@st.com>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Tue, 7 Sep 2010 11:32:04 +0200
+Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+In-Reply-To: <20100906085650.GA20903@n2100.arm.linux.org.uk>
+References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+	<20100906085650.GA20903@n2100.arm.linux.org.uk>
+Message-ID: <33A307AF30D7BF4F811B1568FE7A9B181C855B90@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2010 9:10 PM, Russell King - ARM Linux wrote:
->> > We only need one defconfig for SPEAr13xx now since we can build all
->> > boards into one kernel.
-> All this kind of thing should be rolled into previous patches.
-> 
-> We really don't need to know that you developed SPEAr13xx support
-> such that it initially couldn't build all boards into a kernel,
-> what the changes were to achieve a kernel for everything, and that
-> there were several defconfigs in existence before one grand unified
-> one was possible.
+Hello,
 
-Ok.
+>-----Original Message-----
+>From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+>Sent: Monday, September 06, 2010 2:27 PM
+>
+>So what if a platform wants to completely power down a CPU?
+>
 
-viresh.
+Cannot this can be still implemented in the platform_do_lowpower()
+inside the platform code? I think all that would be replaced for the
+platform is the WFI portion, which might be accompanied by requests
+to turn the core off.
+
+>You'd want to implement it such that platform_cpu_die() does all
+>the shutdown of the CPU except for power-off, and platform_cpu_kill()
+>waits for that to complete before turning power off.
+>
+>With platform_cpu_kill() and platform_cpu_die() moved into generic
+>code, you can no longer do this.
+
+I am sorry but I didn't understand this. The erstwhile platform_cpu_die
+contains helpers to prepare/enter/exit low power modes. Am I missing
+something here that the prepare/enter/exit cannot be included in a 
+do_low_power() which is platform specific?
+
+>Lastly, what if you want to allow CPU0 to be offlined, which is
+>possible, though its wake-up is a little more complex because it
+>must not be allowed to go through its normal boot?
+
+I moved this because none of the platforms currently support offlining
+CPU0 in the current code. But, even if it may be possible, wouldn't it be
+generic for the architecture?
+
+Regards,
+Sundar
