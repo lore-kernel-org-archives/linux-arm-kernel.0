@@ -1,46 +1,54 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 14:05:14 +0530
-Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
-In-Reply-To: <20100906224516.GB8153@game.jcrosoft.org>
+Date: Tue, 7 Sep 2010 14:06:36 +0530
+Subject: [PATCH 12/74] ST SPEAr: Correcting SOC Config base address for
+	spear320
+In-Reply-To: <20100906225804.GE8153@game.jcrosoft.org>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
-	<20100906224516.GB8153@game.jcrosoft.org>
-Message-ID: <4C85F942.2080200@st.com>
+	<08862b0d4eeed76cbd151741a1582da7855ca452.1283161023.git.viresh.kumar@st.com>
+	<20100906225804.GE8153@game.jcrosoft.org>
+Message-ID: <4C85F994.10702@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 4:15 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> > diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
->> > index 41c1a53..dc80421 100644
->> > --- a/arch/arm/mach-spear13xx/include/mach/generic.h
->> > +++ b/arch/arm/mach-spear13xx/include/mach/generic.h
->> > @@ -30,6 +30,7 @@
->> >  
->> >  /* Add spear13xx family device structure declarations here */
->> >  extern struct amba_device uart_device;
->> > +extern struct platform_device rtc_device;
-> no need to export all theres platform devices
+On 9/7/2010 4:28 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Hi,
 > 
-> it will be better to export funtion as done on AT91
-> 
-> to register the device
-> 
-> as
-> 
-> spear_rtc_device_add();
-> 
-> and the sme for the other devices etc...
+> 	not relased to this patch series
 
-We don't want to create unnecessary abstraction. Even if we add functions
-then these function prototypes have to be added in generic.h. This will
-increase lines of code, without much advantages.
+Jean,
 
-> 
-> btw you do not respect the kernel coding style please check your patches
-
-Sorry!! But we have been following coding style, have run checkpatch too...
-Can you please pin point where are we wrong, so that we don't commit same
-mistakes again next time.
+Current patch series is named "Updating SPEAr Support".
+This patch is just an bug fix. Why shouldn't it be part of this series.
 
 regards,
-viresh.
+viresh
+
+> On 16:08 Mon 30 Aug     , Viresh KUMAR wrote:
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+>> ---
+>>  arch/arm/mach-spear3xx/include/mach/spear320.h |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
+>> index cacf17a..53677e4 100644
+>> --- a/arch/arm/mach-spear3xx/include/mach/spear320.h
+>> +++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
+>> @@ -62,7 +62,7 @@
+>>  #define SPEAR320_SMII1_BASE		0xAB000000
+>>  #define SPEAR320_SMII1_SIZE		0x01000000
+>>  
+>> -#define SPEAR320_SOC_CONFIG_BASE	0xB4000000
+>> +#define SPEAR320_SOC_CONFIG_BASE	0xB3000000
+>>  #define SPEAR320_SOC_CONFIG_SIZE	0x00000070
+>>  /* Interrupt registers offsets and masks */
+>>  #define INT_STS_MASK_REG		0x04
+>> -- 
+>> 1.7.2.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> .
+> 
