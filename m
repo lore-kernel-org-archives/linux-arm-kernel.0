@@ -1,20 +1,29 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 08 Sep 2010 00:31:20 +0100
-Subject: [PATCH RESEND] ARM: s3c2440: fix boot failure introduced by recent
-	changes in gpiolib
-In-Reply-To: <1283537894-7463-1-git-send-email-awg@embtoolkit.org>
-References: <1283537894-7463-1-git-send-email-awg@embtoolkit.org>
-Message-ID: <4C86CB48.6000502@fluff.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 7 Sep 2010 16:31:19 -0700
+Subject: [PATCH v2 1/2] msm: i2c: Add msm_qup_i2c.h
+In-Reply-To: <1283471059-22262-2-git-send-email-kheitke@codeaurora.org>
+References: <1283471059-22262-1-git-send-email-kheitke@codeaurora.org>
+	<1283471059-22262-2-git-send-email-kheitke@codeaurora.org>
+Message-ID: <20100907233119.GA2707@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/10 19:18, Abdoulaye Walsimou Gaye wrote:
-> Recent changes in s3c gpio break mini2440 board and may be others.
-> The problem is that mach-mini2440.c: mini2440_init()
-> (where we call s3c_gpio_setpull()) is called before s3c2440.c: s3c2440_init()
-> (where we initialize s3c24xx_gpiocfg_default.set_pull function pointer).
-> This causes dereferencing of NULL pointer at boot time and a kernel panic.
+On Thu, Sep 02, 2010 at 05:44:19PM -0600, Kenneth Heitke wrote:
+> Defines the platform data used by the MSM QUP I2C driver.
 > 
-> Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
+> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/include/mach/msm_qup_i2c.h |   28 ++++++++++++++++++++++++++
+>  1 files changed, 28 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-msm/include/mach/msm_qup_i2c.h
 
-ok, i'll think over this. it is probably the right thing to do.
+Acked-by: David Brown <davidb@codeaurora.org>
+
+It's probably easiest to just keep this patch together with the other
+one, and bring them both into the I2C code together.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
