@@ -1,20 +1,31 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 7 Sep 2010 22:22:30 +0100
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <4C8692DE.1020202@bluewatersys.com>
-References: <4C85BEFD.402@bluewatersys.com>
-	<569801.35222.qm@web180310.mail.gq1.yahoo.com>
-	<AANLkTinq98+ryOOKx1o1o21x9VnHz3nRCHh=5Wwixn4o@mail.gmail.com>
-	<4C8692DE.1020202@bluewatersys.com>
-Message-ID: <20100907222230.4a3594be@lxorguk.ukuu.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 7 Sep 2010 23:39:02 +0200
+Subject: [PATCH] ARM: PL330: Accept revisions of the dmac
+In-Reply-To: <AANLkTimzMD3RRH9qBp0AdQ86tOjaFjOAAokrNvo0ydad@mail.gmail.com>
+References: <1283502656-15445-1-git-send-email-jassisinghbrar@gmail.com>
+	<AANLkTimC5Ru-cTGVynnCu2NntHrHa9pB1HSGWEEJNZT7@mail.gmail.com>
+	<AANLkTikeTyUtUQEobgi0eQX47jO0CQ2oGusojHv1ymED@mail.gmail.com>
+	<AANLkTims+16hJT5m3e+_9vf5wfvtRyArHV2ttzbHxid9@mail.gmail.com>
+	<AANLkTimzMD3RRH9qBp0AdQ86tOjaFjOAAokrNvo0ydad@mail.gmail.com>
+Message-ID: <AANLkTinLkRG9oy6qxuez6iQOHSLazjj=X_v_G2Er9grW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Adding:
-> 
-> 	 device->output_pin = -EINVAL;
+2010/9/7 Jassi Brar <jassisinghbrar@gmail.com>:
 
-gpio numbers are unsigned in the rest of the API
+>> +#define amba_config(d) AMBA_CONFIG_BITS((d)->periphid)
+>> +#define amba_rev(d) ? ?AMBA_REV_BITS((d)->periphid)
+>> +#define amba_manf(d) ? AMBA_MANF_BITS((d)->periphid)
+>> +#define amba_part(d) ? AMBA_PART_BITS((d)->periphid)
+>
+> Sorry I missed that I need to read periph_id[0,3] regs and form
+> Peripheral-ID from them,
+> These macros do the reverse - extract fields from the Peripheral-ID.
+> btw, you might want to close argument 'a' in parens as in ((a) & 0xfff) ?
 
-It's unfortunate that 0 was used for a GPIO - I take it this is too late
-to get fixed as we had to fix IRQ numbering and the like ?
+Oh OK I'll fix the macros and put the patch for Russells review in the
+patch tracker anyway, atleast getting the B105F00D magic defined
+somewhere can be helpful.
+
+Yours,
+Linus Walleij
