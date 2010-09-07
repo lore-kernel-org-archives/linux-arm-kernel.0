@@ -1,36 +1,46 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 09:32:22 +0530
-Subject: [PATCH 16/74] ST SPEAr: adding support for synopsis i2c designware
-In-Reply-To: <20100906231227.GG8153@game.jcrosoft.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 7 Sep 2010 06:06:41 +0200
+Subject: [PATCH 13/74] ST SPEAr: Update clock framework and definitions
+In-Reply-To: <4C85B868.6040908@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<72ad657ab3eb9d61f11741145494eadb061926b9.1283161023.git.viresh.kumar@st.com>
-	<20100906231227.GG8153@game.jcrosoft.org>
-Message-ID: <4C85B94E.3040307@st.com>
+	<a15d1fca5a6e663c1fee4602013b6160512eb2dd.1283161023.git.viresh.kumar@st.com>
+	<20100906230931.GF8153@game.jcrosoft.org> <4C85B868.6040908@st.com>
+Message-ID: <20100907040641.GA30509@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean,
+On 09:28 Tue 07 Sep     , viresh kumar wrote:
+> On 9/7/2010 4:39 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>  /* array of all spear 13xx clock lookups */
+> >> > @@ -327,18 +749,58 @@ static struct clk_lookup spear_clk_lookups[] = {
+> >> >  	/* clock derived from pll1 clk */
+> >> >  	{.con_id = "cpu_clk",		.clk = &cpu_clk},
+> >> >  	{.con_id = "ahb_clk",		.clk = &ahb_clk},
+> >> > -	{ .con_id = "apb_clk",		.clk = &apb_clk},
+> >> > +	{.con_id = "apb_clk",		.clk = &apb_clk},
+> >> > +
+> > how about use macro here to simplify the code
+> > 
+> > +#define CLKDEV_ID(__clk) { .con_id = #__clk, .clk = &(__clk) }
+> > and 
+> > +#define CLKDEV_ID_CLK(__clk) { .con_id = #__clk, .clk = &(__clk##_clk) }
+> 
+> We had that in mind while designing but we chose it this way. There are
+> not many fields to fill here, so it looks fine without macro's too.
+> I didn't wanted to create an abstraction layer here.
+the macro will also avoid human mistake
+> 
+> >> > diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+> >> > index 2e87a07..c4dcab2 100644
+> >> > --- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+> >> > +++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+> > how about clock.h header?
+> 
+> If i understand correctly you want me to rename misc_regs.h as clock.h?
+> Actually misc_regs.h have all miscellaneous registers for spear, like:
+> clock specific, reset register, some muxing registers too.. They are
+> not only for "clock". So we kept this name.
+no split it
 
-Thanks for reviewing our patches. Really appreciate your effort.
-
-On 9/7/2010 4:42 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> > @@ -501,6 +510,9 @@ static struct clk_lookup spear_clk_lookups[] = {
->> >  	{ .dev_id = "adc",		.clk = &adc_clk},
->> >  	{ .dev_id = "ssp",		.clk = &ssp_clk},
->> >  	{ .dev_id = "gpio",		.clk = &gpio_clk},
->> > +#ifdef CONFIG_MACH_SPEAR320
->> > +	{ .dev_id = "i2c_designware.1",	.clk = &i2c1_clk},
->> > +#endif
-> how about split this file in 2
-> one for 320 and one for 310 so we can avoid all this ifdef
-
-There was a mistake in this patch series. As you can see in the last patches,
-we worked on single image solution for spear*xx family. When we select all
-machines then all clocks are getting registered. which is wrong?
-
-I have corrected it in my local repo. Now i have created clk_lookup arrays
-for individual machines and one for common clk structures. So you will not
-find this mess finally in V2 release.
-
-thanks
-viresh.
+Best Regards,
+J.
