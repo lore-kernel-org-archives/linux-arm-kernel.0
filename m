@@ -1,109 +1,65 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 07 Sep 2010 15:23:15 +0300
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
-References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <4C862EB3.4080006@compulab.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 07 Sep 2010 13:46:31 +0100
+Subject: [RFC PATCH] ARM: Allow HIGHPTE with OUTER_CACHE if the processor
+	supports outer PTWs
+Message-ID: <20100907124410.7084.64812.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Seems that there are some more platforms then Sharp Zaurus
-are interested in this patch.
+This patch introduces CONFIG_CPU_HAS_OUTER_PTW (selected by CPU_V7) to
+allow HIGHPTE to be selected even when OUTER_CACHE is enabled.
 
-Dmitry, Mike, Pavel,
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
 
-What's the status of it?
+I haven't seen any discussion on the initial patch for HIGHPTE. I'm not
+sure why the limitation on !OUTER_CACHE. The set_pte_ext() at least on
+ARMv6 and ARMv7 doesn't do any outer cache flushing. Do we even need
+something like CPU_HAS_OUTER_PTW?
 
-On 07/31/10 10:09, Marek Vasut wrote:
-> In case regulator was not found, ADS7846 failed to probe.
->
-> This fixes a problem on some Sharp Zaurus devices, where there is no regulator
-> present and the touchscreen is used.
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  drivers/input/touchscreen/ads7846.c |   38 +++++++++++++++++++---------------
->  1 files changed, 21 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
-> index a9fdf55..53b318b 100644
-> --- a/drivers/input/touchscreen/ads7846.c
-> +++ b/drivers/input/touchscreen/ads7846.c
-> @@ -791,7 +791,8 @@ static void ads7846_disable(struct ads7846 *ts)
->  		}
->  	}
->  
-> -	regulator_disable(ts->reg);
-> +	if (ts->reg)
-> +		regulator_disable(ts->reg);
->  
->  	/* we know the chip's in lowpower mode since we always
->  	 * leave it that way after every request
-> @@ -804,7 +805,8 @@ static void ads7846_enable(struct ads7846 *ts)
->  	if (!ts->disabled)
->  		return;
->  
-> -	regulator_enable(ts->reg);
-> +	if (ts->reg)
-> +		regulator_enable(ts->reg);
->  
->  	ts->disabled = 0;
->  	ts->irq_disabled = 0;
-> @@ -1162,16 +1164,15 @@ static int __devinit ads7846_probe(struct spi_device *spi)
->  	ts->last_msg = m;
->  
->  	ts->reg = regulator_get(&spi->dev, "vcc");
-> -	if (IS_ERR(ts->reg)) {
-> -		err = PTR_ERR(ts->reg);
-> -		dev_err(&spi->dev, "unable to get regulator: %d\n", err);
-> -		goto err_free_gpio;
-> -	}
-> -
-> -	err = regulator_enable(ts->reg);
-> -	if (err) {
-> -		dev_err(&spi->dev, "unable to enable regulator: %d\n", err);
-> -		goto err_put_regulator;
-> +	if (IS_ERR(ts->reg))
-> +		ts->reg = NULL;
-> +	else {
-> +		err = regulator_enable(ts->reg);
-> +		if (err) {
-> +			dev_err(&spi->dev, "unable to enable regulator: %d\n",
-> +				err);
-> +			goto err_put_regulator;
-> +		}
->  	}
->  
->  	if (request_irq(spi->irq, ads7846_irq, IRQF_TRIGGER_FALLING,
-> @@ -1218,10 +1219,11 @@ static int __devinit ads7846_probe(struct spi_device *spi)
->   err_free_irq:
->  	free_irq(spi->irq, ts);
->   err_disable_regulator:
-> -	regulator_disable(ts->reg);
-> +	if (ts->reg)
-> +		regulator_disable(ts->reg);
->   err_put_regulator:
-> -	regulator_put(ts->reg);
-> - err_free_gpio:
-> +	if (ts->reg)
-> +		regulator_put(ts->reg);
->  	if (ts->gpio_pendown != -1)
->  		gpio_free(ts->gpio_pendown);
->   err_cleanup_filter:
-> @@ -1251,8 +1253,10 @@ static int __devexit ads7846_remove(struct spi_device *spi)
->  	/* suspend left the IRQ disabled */
->  	enable_irq(ts->spi->irq);
->  
-> -	regulator_disable(ts->reg);
-> -	regulator_put(ts->reg);
-> +	if (ts->reg) {
-> +		regulator_disable(ts->reg);
-> +		regulator_put(ts->reg);
-> +	}
->  
->  	if (ts->gpio_pendown != -1)
->  		gpio_free(ts->gpio_pendown);
+I tested it on Versatile Express and haven't seen any errors.
 
--- 
-Regards,
-Igor.
+
+ arch/arm/Kconfig    |    2 +-
+ arch/arm/mm/Kconfig |    8 ++++++++
+ 2 files changed, 9 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7ed21f..17d00ec 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1318,7 +1318,7 @@ config HIGHMEM
+ config HIGHPTE
+ 	bool "Allocate 2nd-level pagetables from highmem"
+ 	depends on HIGHMEM
+-	depends on !OUTER_CACHE
++	depends on !OUTER_CACHE || CPU_HAS_OUTER_PTW
+ 
+ config HW_PERF_EVENTS
+ 	bool "Enable hardware performance counter support for perf events"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 8493ed0..cf0fa87 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -420,6 +420,7 @@ config CPU_V7
+ 	select CPU_HAS_ASID if MMU
+ 	select CPU_COPY_V6 if MMU
+ 	select CPU_TLB_V7 if MMU
++	select CPU_HAS_OUTER_PTW if MMU
+ 
+ # Figure out what processor architecture version we should be using.
+ # This defines the compiler instruction set which depends on the machine type.
+@@ -607,6 +608,13 @@ config CPU_USE_DOMAINS
+ 	  This option enables or disables the use of domain switching
+ 	  via the set_fs() function.
+ 
++config CPU_HAS_OUTER_PTW
++	bool
++	depends on MMU
++	help
++	  This option is enabled if the processors can perform page
++	  table walks on the outer cache.
++
+ #
+ # CPU supports 36-bit I/O
+ #
