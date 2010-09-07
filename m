@@ -1,85 +1,53 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 07 Sep 2010 09:26:51 +0300
-Subject: [PATCH] ARM: pxa: Enable U2D only in case PXA3xx is enabled
-In-Reply-To: <AANLkTikfJ+pcY4aQMhGE7FpGapyGeXauGAqW8cUiXB82@mail.gmail.com>
-References: <1283806389-18128-1-git-send-email-marek.vasut@gmail.com>
-	<AANLkTintMS3-+tj5JoBoF4o+7WY9E4gZh3_szNsnNyS6@mail.gmail.com>
-	<4C85D40C.5090209@compulab.co.il>
-	<AANLkTikfJ+pcY4aQMhGE7FpGapyGeXauGAqW8cUiXB82@mail.gmail.com>
-Message-ID: <4C85DB2B.6020407@compulab.co.il>
+From: david-b@pacbell.net (David Brownell)
+Date: Mon, 6 Sep 2010 23:33:43 -0700 (PDT)
+Subject: [PATCH] pio: add arch specific gpio_is_valid() function
+In-Reply-To: <4C85A71F.3010402@bluewatersys.com>
+Message-ID: <159882.19856.qm@web180315.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 09/07/10 09:11, Eric Miao wrote:
-> On Tue, Sep 7, 2010 at 1:56 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>  On 09/07/10 05:26, Eric Miao wrote:
->>> On Tue, Sep 7, 2010 at 4:53 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
->>>> In case PXA3xx support isn't enabled in kernel, the pxa3xx_u2d_start_hc()
->>>> and pxa3xx_u2d_stop_hc() functions are undefined. Encapsulate their callings
->>>> with #ifdef CONFIG_PXA3xx macro.
->>>>
->>> This isn't necessary. cpu_is_pxa3xx() will expand to zero if CONFIG_PXA3xx
->>> isn't defined, and the whole if () statement will be optimized away by the
->>> compiler.
->> That was my intention, but I haven't checked if it really does the job.
-> It didn't. But I proposed a fix hours ago and it seemed to work. Tested
-> by Marek.
 
-Oh.. now I see this:
-[PATCH] pxa: fix cpu_is_pxa*() not expanded to zero when not configured
 
-This only fixes the problem for cpu's other then pxa3xx,
-we still need one of the proposed fixes for pxa3xx based boards,
-that don't use U2DC, right?
+--- On Mon, 9/6/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
 
->>>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->>>> ---
->>>>
->>>> NOTE: I'm adding "Make a proper fix for this thing" into my ToDo. This is just a
->>>> quick patch since I have that exam soon. I'll go for approach 2) from what we
->>>> discussed in the other thread once the exam's past me.
->> I've already started working on this yesterday and I'll be glad to have the patch reviewed
->> more carefully then the U2D series were (so we need to fix it right away).
->>
->>>>  drivers/usb/host/ohci-pxa27x.c |    4 ++++
->>>>  1 files changed, 4 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
->>>> index afef7b0..f3c60b9 100644
->>>> --- a/drivers/usb/host/ohci-pxa27x.c
->>>> +++ b/drivers/usb/host/ohci-pxa27x.c
->>>> @@ -236,8 +236,10 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
->>>>        if (retval < 0)
->>>>                return retval;
->>>>
->>>> +#ifdef CONFIG_PXA3xx
->>>>        if (cpu_is_pxa3xx())
->>>>                pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
->>>> +#endif
->>>>
->>>>        uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
->>>>        __raw_writel(uhchr, ohci->mmio_base + UHCHR);
->>>> @@ -255,8 +257,10 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
->>>>
->>>>        inf = dev->platform_data;
->>>>
->>>> +#ifdef CONFIG_PXA3xx
->>>>        if (cpu_is_pxa3xx())
->>>>                pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
->>>> +#endif
->>>>
->>>>        if (inf->exit)
->>>>                inf->exit(dev);
->>>> --
->>>> 1.7.1
->>>>
->>>>
->> --
->> Regards,
->> Igor.
->>
->>
 
--- 
-Regards,
-Igor.
+> How about this approach instead?
+
+Still don't like it, sorry.  gpio_is_valid()
+is not intended as a fine-grained call, there is
+a call which is fine grained; use that instead.
+
+> ----
+> On some architectures gpio numbering does not start from zero.
+
+But on all of them, zero is a valid GPIO number.
+It could get dynamically allocated someday...
+
+ Allow for
+> correct behaviour of gpio_is_valid
+
+I'd say it's already correct ... what's not
+correct is expecting to validate the *active* set
+of GPIOs (some dynamically allocated) through
+that, instead of one of the GPIO setup calls
+like gpio_request, which have explicit guarantees
+of reporting errors for GPIO numbers which are
+not usable on the target board.
+
+
+ on values below the
+> first gpio by
+> adding the architecture overrideable ARCH_FIRST_GPIO.
+
+What are you (?) doing that it even matters
+to a driver  which GPIOs are built into the SOC
+versus external?  Caring about arch-specific
+stuff at this level is a big thought-bug...
+
+And  I'd ask why you're ignoring or bypassing
+the error reporting from gpio_request() ...
+
+That is, just what are you doing that makes
+you want gpio_is_valid() to include error checks
+you are supposed to get via gpio_request as part
+of GPIO configuration?
