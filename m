@@ -1,28 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue,  7 Sep 2010 13:27:17 +0530
-Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
-Message-ID: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 7 Sep 2010 10:58:08 +0300
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <20100906141444.GD6897@debian-wegner1.datadisplay.de>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<20100906140347.GA24522@n2100.arm.linux.org.uk>
+	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
+Message-ID: <AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is just repost adding Catalin's ack to the patches and
-combining Thomas's two rebased kexec patches.
-It's generated against the mainline 2.6.36-rc3 + Catalin's
-"[PATCH 0/9] Various patches for 2.6.37-rc1" series.
+On Mon, Sep 6, 2010 at 5:14 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> On Mon, Sep 06, 2010 at 03:03:47PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Sep 06, 2010 at 12:02:44PM +0200, Wolfgang Wegner wrote:
+>> > Mapping the PCI memory space via mmap() resulted in some
+>> > disappointing ~6.5 MBytes/second. I tried to modify page
+>> > protection to pgprot_writecombine or pgprot_cached, but while
+>> > this did reproducably change performance, it was only in
+>> > some sub-percentage range. I am not sure if I understand
+>> > correctly how other framebuffers handle this, but it seems
+>> > the "raw" mmapped write performance is not cared about too
+>> > much or maybe not that bad with most x86 chip sets?
+>> > However, the idea left over after some trying and looking
+>> > around is to use the DMA engine to speed up write() (and
+>> > also read(), but this is not so important) system calls
+>> > instead of using mmap.
+>>
+>> Framebuffer applications such as Xorg/Qt do not use read/write calls
+>> to access their buffers because that will be painfully slow.
+>
+> BTW, the throughput I get with a "dd if=bitmap of=/dev/fb0 bs=512"
+> is the same I get from my test application writing longwords
+> sequentially to the mmapped frame buffer.
+I'm not sure the writecombine is enabled properly, can you test that on DRAM?
+you can do that be reserving some memory (mem=<dram size - 8M>), then
+try to test throughput with and without writecombine.
 
-Santosh Shilimkar (4):
-  omap4: l2x0: Override the default l2x0_disable
-  ARM: l2x0: Fix coding-style in the cache-l2x0.h
-  ARM: l2x0: Determine the cache size
-  ARM: l2x0: Optimise the range based operations
-
-Thomas Gleixner (2):
-  arm: Disable outer (L2) cache in kexec
-  arm: Implement l2x0 cache disable functions
-
- arch/arm/include/asm/hardware/cache-l2x0.h |    9 +++-
- arch/arm/include/asm/outercache.h          |   24 +++++++++++
- arch/arm/kernel/machine_kexec.c            |    3 +
- arch/arm/mach-omap2/omap4-common.c         |   13 ++++++
- arch/arm/mm/cache-l2x0.c                   |   63 ++++++++++++++++++++++++++-
- 5 files changed, 106 insertions(+), 6 deletions(-)
+saeed
