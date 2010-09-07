@@ -1,37 +1,46 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 7 Sep 2010 14:45:29 +0800
-Subject: [PATCH] ARM: pxa: Enable U2D only in case PXA3xx is enabled
-In-Reply-To: <4C85DB2B.6020407@compulab.co.il>
-References: <1283806389-18128-1-git-send-email-marek.vasut@gmail.com>
-	<AANLkTintMS3-+tj5JoBoF4o+7WY9E4gZh3_szNsnNyS6@mail.gmail.com>
-	<4C85D40C.5090209@compulab.co.il>
-	<AANLkTikfJ+pcY4aQMhGE7FpGapyGeXauGAqW8cUiXB82@mail.gmail.com>
-	<4C85DB2B.6020407@compulab.co.il>
-Message-ID: <AANLkTi=azT7tU2Fznn3X1TXKFg9GoCUJAmhckaF_U=Hz@mail.gmail.com>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Tue, 07 Sep 2010 08:55:12 +0200
+Subject: [RFCv5 3/9] mm: cma: Added SysFS support
+In-Reply-To: <20100907060818.GA2609@kroah.com>
+References: <cover.1283749231.git.mina86@mina86.com>
+	<9771a9c07874a642bb587f4c0ebf886d720332b6.1283749231.git.mina86@mina86.com>
+	<20100906210747.GA5863@kroah.com> <op.vindmsj07p4s8u@localhost>
+	<20100907060818.GA2609@kroah.com>
+Message-ID: <op.vinhiabu7p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 7, 2010 at 2:26 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> ?On 09/07/10 09:11, Eric Miao wrote:
->> On Tue, Sep 7, 2010 at 1:56 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>> ?On 09/07/10 05:26, Eric Miao wrote:
->>>> On Tue, Sep 7, 2010 at 4:53 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>> In case PXA3xx support isn't enabled in kernel, the pxa3xx_u2d_start_hc()
->>>>> and pxa3xx_u2d_stop_hc() functions are undefined. Encapsulate their callings
->>>>> with #ifdef CONFIG_PXA3xx macro.
->>>>>
->>>> This isn't necessary. cpu_is_pxa3xx() will expand to zero if CONFIG_PXA3xx
->>>> isn't defined, and the whole if () statement will be optimized away by the
->>>> compiler.
->>> That was my intention, but I haven't checked if it really does the job.
->> It didn't. But I proposed a fix hours ago and it seemed to work. Tested
->> by Marek.
->
-> Oh.. now I see this:
-> [PATCH] pxa: fix cpu_is_pxa*() not expanded to zero when not configured
->
-> This only fixes the problem for cpu's other then pxa3xx,
-> we still need one of the proposed fixes for pxa3xx based boards,
-> that don't use U2DC, right?
+> On Tue, Sep 07, 2010 at 07:31:30AM +0200, Micha?? Nazarewicz wrote:
+>> Thanks for reviewing the sysfs part.  Actually, I was never really sure
+>> if I shouldn't rather put this code to debugfs and you got me convinced
+>> that I should.  Sysfs somehow looked more appealing from kernel's API
+>> point of view -- things seem to be more organised in sysfs than in
+>> debugfs.  It seems I'll have to port it to debugfs after all
 
-Exactly right.
+On Tue, 07 Sep 2010 08:08:18 +0200, Greg KH <greg@kroah.com> wrote:
+> Yes, debugfs looks like a much better place for this.
+
+I'll fix that in v6 then.
+
+>>>> +static ssize_t cma_sysfs_region_name_show(struct cma_region *reg, char *page)
+>>>> +{
+>>>> +	return reg->name ? snprintf(page, PAGE_SIZE, "%s\n", reg->name) : 0;
+>>>> +}
+
+>>> Is a name field ever really going to be bigger than a page?
+
+>> For numeric values you are right that snprintf() is a bit paranoid,
+>> still I see no good reason why not to use it.
+
+> Same goes for no good reason to use it :)
+
+I somehow prefer to always use "safe" versions of the string manipulation
+functions -- it's better to use it everywhere then to forget it in one
+place.  Call to sprintf() is translated to vsnprintf() anyway so there's
+no performance gain.
+
+-- 
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
