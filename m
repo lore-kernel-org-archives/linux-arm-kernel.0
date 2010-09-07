@@ -1,59 +1,50 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 7 Sep 2010 10:26:42 +0800
-Subject: [PATCH] ARM: pxa: Enable U2D only in case PXA3xx is enabled
-In-Reply-To: <1283806389-18128-1-git-send-email-marek.vasut@gmail.com>
-References: <1283806389-18128-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTintMS3-+tj5JoBoF4o+7WY9E4gZh3_szNsnNyS6@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 6 Sep 2010 19:34:31 -0700
+Subject: [RFCv5 0/9] CMA + VCMM integration
+In-Reply-To: <op.vim2x8i87p4s8u@localhost>
+References: <cover.1283749231.git.mina86@mina86.com>
+	<20100906210905.GB5863@kroah.com> <op.vim2x8i87p4s8u@localhost>
+Message-ID: <20100907023431.GB11972@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 7, 2010 at 4:53 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> In case PXA3xx support isn't enabled in kernel, the pxa3xx_u2d_start_hc()
-> and pxa3xx_u2d_stop_hc() functions are undefined. Encapsulate their callings
-> with #ifdef CONFIG_PXA3xx macro.
+On Tue, Sep 07, 2010 at 03:40:46AM +0200, Micha?? Nazarewicz wrote:
+> On Mon, 06 Sep 2010 23:09:05 +0200, Greg KH <greg@kroah.com> wrote:
 >
+>> On Mon, Sep 06, 2010 at 08:33:50AM +0200, Michal Nazarewicz wrote:
+>>> Hello everyone,
+>>>
+>>> This patchset introduces a draft of a redesign of Zach Pfeffer's
+>>> VCMM.
+>>
+>> What is a VCMM?
+>
+> Virtual Contiguous Memory Manager.  The version posted by Zach can
+> be found at: <http://article.gmane.org/gmane.linux.kernel.mm/50090>.
+> It is an API for managing IO MMU and IO MMU mappings.
+>
+>> What is a CMA?
+>
+> Contiguous Memory Manager.  The v4 version can be found at
+> <http://marc.info/?l=linux-mm&m=128229799415817&w=2>.  It is an API for
+> allocating large, physically contiguous blocks of memory.
+>
+> I haven't expected that anyone who haven't already participated in the
+> discussion about CMA and VCMM will get interested by this patchset
+> so I was a bit vague in the cover letter.  Sorry about that.
+>
+>>> Not all of the functionality of the original VCMM has been
+>>> ported into this patchset.  This is mostly meant as RFC.  Moreover,
+>>> the code for VCMM implementation in this RFC has not been tested.
+>
+>> If you haven't even tested it, why should we review it?
+>
+> Ignore the code then and look just at the documentation, please.
+> I wanted to post what I have to receive comments about the general
+> idea and not necessarily the code itself.  Code is just a mean to show
+> how I see the implementation of the idea described in the documentation.
+> Because of all that, I marked the patchset as a RFC rather than a PATCH.
 
-This isn't necessary. cpu_is_pxa3xx() will expand to zero if CONFIG_PXA3xx
-isn't defined, and the whole if () statement will be optimized away by the
-compiler.
+Oops, I looked at the code, sorry :)
 
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->
-> NOTE: I'm adding "Make a proper fix for this thing" into my ToDo. This is just a
-> quick patch since I have that exam soon. I'll go for approach 2) from what we
-> discussed in the other thread once the exam's past me.
->
-> ?drivers/usb/host/ohci-pxa27x.c | ? ?4 ++++
-> ?1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-> index afef7b0..f3c60b9 100644
-> --- a/drivers/usb/host/ohci-pxa27x.c
-> +++ b/drivers/usb/host/ohci-pxa27x.c
-> @@ -236,8 +236,10 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
-> ? ? ? ?if (retval < 0)
-> ? ? ? ? ? ? ? ?return retval;
->
-> +#ifdef CONFIG_PXA3xx
-> ? ? ? ?if (cpu_is_pxa3xx())
-> ? ? ? ? ? ? ? ?pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
-> +#endif
->
-> ? ? ? ?uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
-> ? ? ? ?__raw_writel(uhchr, ohci->mmio_base + UHCHR);
-> @@ -255,8 +257,10 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
->
-> ? ? ? ?inf = dev->platform_data;
->
-> +#ifdef CONFIG_PXA3xx
-> ? ? ? ?if (cpu_is_pxa3xx())
-> ? ? ? ? ? ? ? ?pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
-> +#endif
->
-> ? ? ? ?if (inf->exit)
-> ? ? ? ? ? ? ? ?inf->exit(dev);
-> --
-> 1.7.1
->
->
+greg k-h
