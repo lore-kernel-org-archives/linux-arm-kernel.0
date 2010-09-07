@@ -1,14 +1,18 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue,  7 Sep 2010 14:29:41 +0900
-Subject: [PATCH 5/5] rtc: rtc-s3c: Fix debug message format on RTC
+Date: Tue,  7 Sep 2010 14:29:37 +0900
+Subject: [PATCH 1/5] rtc: rtc-s3c: Fix access unit from byte to word on RTCCON
 In-Reply-To: <1283837381-9575-1-git-send-email-kgene.kim@samsung.com>
 References: <1283837381-9575-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1283837381-9575-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1283837381-9575-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes debug message format on rtc-s3c.
+From: Changhwan Youn <chaos.youn@samsung.com>
 
+S3C2410_RTCCON of TYPE_S3C64XX RTC should be read/written by readw and writew,
+because TYPE_S3C64XX RTC uses bit8 and bit9.
+
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Ben Dooks <ben-linux@fluff.org>
 ---
@@ -16,56 +20,71 @@ Cc: Ben Dooks <ben-linux@fluff.org>
  1 files changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index 7f15073..3c3ecdf 100644
+index a0d3ec8..557a538 100644
 --- a/drivers/rtc/rtc-s3c.c
 +++ b/drivers/rtc/rtc-s3c.c
-@@ -171,8 +171,8 @@ static int s3c_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
- 		goto retry_get_time;
+@@ -100,7 +100,7 @@ static int s3c_rtc_setpie(struct device *dev, int enabled)
+ 	spin_lock_irq(&s3c_rtc_pie_lock);
+ 
+ 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+-		tmp = readb(s3c_rtc_base + S3C2410_RTCCON);
++		tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
+ 		tmp &= ~S3C64XX_RTCCON_TICEN;
+ 
+ 		if (enabled)
+@@ -323,7 +323,7 @@ static int s3c_rtc_proc(struct device *dev, struct seq_file *seq)
+ 	unsigned int ticnt;
+ 
+ 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+-		ticnt = readb(s3c_rtc_base + S3C2410_RTCCON);
++		ticnt = readw(s3c_rtc_base + S3C2410_RTCCON);
+ 		ticnt &= S3C64XX_RTCCON_TICEN;
+ 	} else {
+ 		ticnt = readb(s3c_rtc_base + S3C2410_TICNT);
+@@ -396,11 +396,11 @@ static void s3c_rtc_enable(struct platform_device *pdev, int en)
+ 		return;
+ 
+ 	if (!en) {
+-		tmp = readb(base + S3C2410_RTCCON);
++		tmp = readw(base + S3C2410_RTCCON);
+ 		if (s3c_rtc_cpu_type == TYPE_S3C64XX)
+ 			tmp &= ~S3C64XX_RTCCON_TICEN;
+ 		tmp &= ~S3C2410_RTCCON_RTCEN;
+-		writeb(tmp, base + S3C2410_RTCCON);
++		writew(tmp, base + S3C2410_RTCCON);
+ 
+ 		if (s3c_rtc_cpu_type == TYPE_S3C2410) {
+ 			tmp = readb(base + S3C2410_TICNT);
+@@ -519,8 +519,8 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+ 
+ 	s3c_rtc_enable(pdev, 1);
+ 
+- 	pr_debug("s3c2410_rtc: RTCCON=%02x\n",
+-		 readb(s3c_rtc_base + S3C2410_RTCCON));
++	pr_debug("s3c2410_rtc: RTCCON=%02x\n",
++		 readw(s3c_rtc_base + S3C2410_RTCCON));
+ 
+ 	device_init_wakeup(&pdev->dev, 1);
+ 
+@@ -583,7 +583,7 @@ static int s3c_rtc_suspend(struct platform_device *pdev, pm_message_t state)
+ 	/* save TICNT for anyone using periodic interrupts */
+ 	ticnt_save = readb(s3c_rtc_base + S3C2410_TICNT);
+ 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
+-		ticnt_en_save = readb(s3c_rtc_base + S3C2410_RTCCON);
++		ticnt_en_save = readw(s3c_rtc_base + S3C2410_RTCCON);
+ 		ticnt_en_save &= S3C64XX_RTCCON_TICEN;
  	}
- 
--	pr_debug("read time %02x.%02x.%02x %02x/%02x/%02x\n",
--		 rtc_tm->tm_year, rtc_tm->tm_mon, rtc_tm->tm_mday,
-+	pr_debug("read time %04d.%02d.%02d %02d:%02d:%02d\n",
-+		 1900 + rtc_tm->tm_year, rtc_tm->tm_mon, rtc_tm->tm_mday,
- 		 rtc_tm->tm_hour, rtc_tm->tm_min, rtc_tm->tm_sec);
- 
- 	rtc_tm->tm_sec = bcd2bin(rtc_tm->tm_sec);
-@@ -193,8 +193,8 @@ static int s3c_rtc_settime(struct device *dev, struct rtc_time *tm)
- 	void __iomem *base = s3c_rtc_base;
- 	int year = tm->tm_year - 100;
- 
--	pr_debug("set time %02d.%02d.%02d %02d/%02d/%02d\n",
--		 tm->tm_year, tm->tm_mon, tm->tm_mday,
-+	pr_debug("set time %04d.%02d.%02d %02d:%02d:%02d\n",
-+		 1900 + tm->tm_year, tm->tm_mon, tm->tm_mday,
- 		 tm->tm_hour, tm->tm_min, tm->tm_sec);
- 
- 	/* we get around y2k by simply not supporting it */
-@@ -231,9 +231,9 @@ static int s3c_rtc_getalarm(struct device *dev, struct rtc_wkalrm *alrm)
- 
- 	alrm->enabled = (alm_en & S3C2410_RTCALM_ALMEN) ? 1 : 0;
- 
--	pr_debug("read alarm %02x %02x.%02x.%02x %02x/%02x/%02x\n",
-+	pr_debug("read alarm %d, %04d.%02d.%02d %02d:%02d:%02d\n",
- 		 alm_en,
--		 alm_tm->tm_year, alm_tm->tm_mon, alm_tm->tm_mday,
-+		 1900 + alm_tm->tm_year, alm_tm->tm_mon, alm_tm->tm_mday,
- 		 alm_tm->tm_hour, alm_tm->tm_min, alm_tm->tm_sec);
- 
- 
-@@ -280,10 +280,10 @@ static int s3c_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
- 	void __iomem *base = s3c_rtc_base;
- 	unsigned int alrm_en;
- 
--	pr_debug("s3c_rtc_setalarm: %d, %02x/%02x/%02x %02x.%02x.%02x\n",
-+	pr_debug("s3c_rtc_setalarm: %d, %04d.%02d.%02d %02d:%02d:%02d\n",
- 		 alrm->enabled,
--		 tm->tm_mday & 0xff, tm->tm_mon & 0xff, tm->tm_year & 0xff,
--		 tm->tm_hour & 0xff, tm->tm_min & 0xff, tm->tm_sec);
-+		 1900 + tm->tm_year, tm->tm_mon, tm->tm_mday,
-+		 tm->tm_hour, tm->tm_min, tm->tm_sec);
- 
- 
- 	alrm_en = readb(base + S3C2410_RTCALM) & S3C2410_RTCALM_ALMEN;
+ 	s3c_rtc_enable(pdev, 0);
+@@ -597,8 +597,8 @@ static int s3c_rtc_resume(struct platform_device *pdev)
+ 	s3c_rtc_enable(pdev, 1);
+ 	writeb(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
+ 	if (s3c_rtc_cpu_type == TYPE_S3C64XX && ticnt_en_save) {
+-		tmp = readb(s3c_rtc_base + S3C2410_RTCCON);
+-		writeb(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
++		tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
++		writew(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
+ 	}
+ 	return 0;
+ }
 -- 
 1.6.2.5
