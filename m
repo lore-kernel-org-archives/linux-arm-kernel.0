@@ -1,27 +1,181 @@
-From: pieterg@gmx.com (pieterg)
-Date: Tue, 7 Sep 2010 13:09:15 +0200
-Subject: colibri-pxa300: LCD_LDD / LCD_CS gpio conflict
-In-Reply-To: <AANLkTinhN-Yz1CMQ78zXSNjjqL-GB1VrBTVKU6A=K9gq@mail.gmail.com>
-References: <201009061512.23705.pieterg@gmx.com>
-	<201009071115.46721.pieterg@gmx.com>
-	<AANLkTinhN-Yz1CMQ78zXSNjjqL-GB1VrBTVKU6A=K9gq@mail.gmail.com>
-Message-ID: <201009071309.15413.pieterg@gmx.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Tue, 7 Sep 2010 19:20:58 +0800
+Subject: [PATCH 1/6] pxa3xx_nand: make scan procedure more clear
+In-Reply-To: <1283179285-6539-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1283179285-6539-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTinuKC8hWbDZWDkMa8kpBMWUXF4E+9mWnCXFN8WM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 September 2010 11:50:08 Eric Miao wrote:
-> On Tue, Sep 7, 2010 at 5:15 PM, pieterg <pieterg@gmx.com> wrote:
-> > How about using GPIO127_LCD_CS_N instead? Then at least we won't have a
-> > conflict with the LDD pins.
-> > I don't know why the conflicting GPIO62_LCD_CS_N was chosen in the
-> > first place?
+Hi,
+
+
+On Mon, Aug 30, 2010 at 10:41 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> From: Lei Wen <leiwen@marvell.com>
 >
-> That depends on hardware, it's not like whichever pin with functionality
-> of LCD_CS_N can be used. Need to check with schematics if the LCD_CS_N
-> signal is routed to GPIO62 or GPIO127.
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> ---
+> ?drivers/mtd/nand/pxa3xx_nand.c | ? 88 ++++++++++++++++++++++-----------------
+> ?1 files changed, 50 insertions(+), 38 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 5d24968..3468a3d 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -126,6 +126,7 @@ struct pxa3xx_nand_info {
+> ? ? ? ?unsigned int ? ? ? ? ? ?buf_start;
+> ? ? ? ?unsigned int ? ? ? ? ? ?buf_count;
+>
+> + ? ? ? struct mtd_info ? ? ? ? *mtd;
+> ? ? ? ?/* DMA information */
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_dat;
+> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? drcmr_cmd;
+> @@ -1044,21 +1045,13 @@ static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
+> ? ? ? ?this->chip_delay = 25;
+> ?}
+>
+> -static int pxa3xx_nand_probe(struct platform_device *pdev)
+> +static int alloc_nand_resource(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct pxa3xx_nand_platform_data *pdata;
+> + ? ? ? struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
+> ? ? ? ?struct pxa3xx_nand_info *info;
+> - ? ? ? struct nand_chip *this;
+> ? ? ? ?struct mtd_info *mtd;
+> ? ? ? ?struct resource *r;
+> - ? ? ? int ret = 0, irq;
+> -
+> - ? ? ? pdata = pdev->dev.platform_data;
+> -
+> - ? ? ? if (!pdata) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
+> - ? ? ? ? ? ? ? return -ENODEV;
+> - ? ? ? }
+> + ? ? ? int ret, irq;
+>
+> ? ? ? ?mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct pxa3xx_nand_info),
+> ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
+> @@ -1070,8 +1063,8 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+> ? ? ? ?info = (struct pxa3xx_nand_info *)(&mtd[1]);
+> ? ? ? ?info->pdev = pdev;
+>
+> - ? ? ? this = &info->nand_chip;
+> ? ? ? ?mtd->priv = info;
+> + ? ? ? info->mtd = mtd;
+> ? ? ? ?mtd->owner = THIS_MODULE;
+>
+> ? ? ? ?info->clk = clk_get(&pdev->dev, NULL);
+> @@ -1149,27 +1142,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+> ? ? ? ?}
+>
+> ? ? ? ?pxa3xx_nand_init_mtd(mtd, info);
+> + ? ? ? platform_set_drvdata(pdev, info);
+>
+> - ? ? ? platform_set_drvdata(pdev, mtd);
+> -
+> - ? ? ? if (nand_scan(mtd, 1)) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
+> - ? ? ? ? ? ? ? ret = -ENXIO;
+> - ? ? ? ? ? ? ? goto fail_free_irq;
+> - ? ? ? }
+> -
+> - ? ? ? if (mtd_has_cmdlinepart()) {
+> - ? ? ? ? ? ? ? static const char *probes[] = { "cmdlinepart", NULL };
+> - ? ? ? ? ? ? ? struct mtd_partition *parts;
+> - ? ? ? ? ? ? ? int nr_parts;
+> -
+> - ? ? ? ? ? ? ? nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
+> -
+> - ? ? ? ? ? ? ? if (nr_parts)
+> - ? ? ? ? ? ? ? ? ? ? ? return add_mtd_partitions(mtd, parts, nr_parts);
+> - ? ? ? }
+> -
+> - ? ? ? return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
+> + ? ? ? return 0;
+>
+> ?fail_free_irq:
+> ? ? ? ?free_irq(irq, info);
+> @@ -1194,8 +1169,8 @@ fail_free_mtd:
+>
+> ?static int pxa3xx_nand_remove(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct mtd_info *mtd = platform_get_drvdata(pdev);
+> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
+> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> + ? ? ? struct mtd_info *mtd = info->mtd;
+> ? ? ? ?struct resource *r;
+> ? ? ? ?int irq;
+>
+> @@ -1224,11 +1199,48 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+> ? ? ? ?return 0;
+> ?}
+>
+> +static int pxa3xx_nand_probe(struct platform_device *pdev)
+> +{
+> + ? ? ? struct pxa3xx_nand_platform_data *pdata;
+> + ? ? ? struct pxa3xx_nand_info *info;
+> + ? ? ? int ret;
+> +
+> + ? ? ? pdata = pdev->dev.platform_data;
+> + ? ? ? if (!pdata) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? ret = alloc_nand_resource(pdev);
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? return ret;
+> +
+> + ? ? ? info = platform_get_drvdata(pdev);
+> + ? ? ? if (nand_scan(info->mtd, 1)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to scan nand\n");
+> + ? ? ? ? ? ? ? pxa3xx_nand_remove(pdev);
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> +
+> + ? ? ? if (mtd_has_cmdlinepart()) {
+> + ? ? ? ? ? ? ? static const char *probes[] = { "cmdlinepart", NULL };
+> + ? ? ? ? ? ? ? struct mtd_partition *parts;
+> + ? ? ? ? ? ? ? int nr_parts;
+> +
+> + ? ? ? ? ? ? ? nr_parts = parse_mtd_partitions(info->mtd, probes, &parts, 0);
+> +
+> + ? ? ? ? ? ? ? if (nr_parts)
+> + ? ? ? ? ? ? ? ? ? ? ? return add_mtd_partitions(info->mtd, parts, nr_parts);
+> + ? ? ? }
+> +
+> + ? ? ? return add_mtd_partitions(info->mtd, pdata->parts, pdata->nr_parts);
+> +}
+> +
+> ?#ifdef CONFIG_PM
+> ?static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+> ?{
+> - ? ? ? struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
+> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
+> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> + ? ? ? struct mtd_info *mtd = info->mtd;
+>
+> ? ? ? ?if (info->state != STATE_READY) {
+> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
+> @@ -1240,8 +1252,8 @@ static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+>
+> ?static int pxa3xx_nand_resume(struct platform_device *pdev)
+> ?{
+> - ? ? ? struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
+> - ? ? ? struct pxa3xx_nand_info *info = mtd->priv;
+> + ? ? ? struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+> + ? ? ? struct mtd_info *mtd = info->mtd;
+>
+> ? ? ? ?nand_writel(info, NDTR0CS0, info->ndtr0cs0);
+> ? ? ? ?nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+> --
+> 1.7.0.4
+>
+Any suggestion on this series? ...
 
-GPIO127 is available on the colibri connector (as well as 62 of course), but 
-on the evalboard, there is no LCD_CS_N support (neither GPIO62 nor 
-GPIO127).
-
-Rgds, Pieter
+Best regards,
+Lei
