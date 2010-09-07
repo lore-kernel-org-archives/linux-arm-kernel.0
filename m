@@ -1,31 +1,19 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Tue, 07 Sep 2010 03:58:50 +0200
-Subject: [RFCv5 8/9] mm: vcm: Sample driver added
-In-Reply-To: <20100906211054.GC5863@kroah.com>
-References: <cover.1283749231.git.mina86@mina86.com>
-	<262a5a5019c1f1a44d5793f7e69776e56f27af06.1283749231.git.mina86@mina86.com>
-	<20100906211054.GC5863@kroah.com>
-Message-ID: <op.vim3scj57p4s8u@localhost>
+From: david-b@pacbell.net (David Brownell)
+Date: Mon, 6 Sep 2010 19:23:22 -0700 (PDT)
+Subject: [PATCH] pio: add arch specific gpio_is_valid() function
+In-Reply-To: <20100903164158.GH17702@game.jcrosoft.org>
+Message-ID: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 06 Sep 2010 23:10:54 +0200, Greg KH <greg@kroah.com> wrote:
+Still not liking or accepting this proposed
+change to the GPIO framework.
 
-> On Mon, Sep 06, 2010 at 08:33:58AM +0200, Michal Nazarewicz wrote:
->> --- /dev/null
->> +++ b/include/linux/vcm-sample.h
->
-> Don't put "sample" code in include/linux/ please.  That's just
-> cluttering up the place, don't you think?  Especially as no one else
-> needs the file there...
+For the AT91 case (where integers 0..N are
+IRQs, but N..max are GPIOs)
 
-Absolutely true.  My plan is to put a real driver in place of the sample
-driver and post it with v6.  For now I just wanted to put a piece of code
-that will look like a driver for presentation purposes.  Sorry for the
-confusion.
-
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+A simpler solution is just to use a bit in
+the integer to indicate IRQ vs GPIO.  Like
+maybe the sign bit.. which is never set on
+valid GPIO numbers, but platforms could let
+be set on IRQs.
