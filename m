@@ -1,90 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Sep 2010 16:36:55 +0200
-Subject: [RFC 3/3] pcm043: add resources for mmc
-In-Reply-To: <1283769265-14147-4-git-send-email-w.sang@pengutronix.de>
-References: <1283769265-14147-1-git-send-email-w.sang@pengutronix.de>
-	<1283769265-14147-4-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20100907143655.GB8924@pengutronix.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue,  7 Sep 2010 17:32:25 +0300
+Subject: [PATCH 2/3] rx1950: add LEDs support
+In-Reply-To: <1283869946-28296-1-git-send-email-anarsoul@gmail.com>
+References: <1283869946-28296-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1283869946-28296-3-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Wolfram,
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+ arch/arm/mach-s3c2440/mach-rx1950.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
 
-On Mon, Sep 06, 2010 at 12:34:25PM +0200, Wolfram Sang wrote:
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> ---
->  arch/arm/mach-mx3/mach-pcm043.c |   29 +++++++++++++++++++++++++++++
->  1 files changed, 29 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-> index 28886f0..44278d3 100644
-> --- a/arch/arm/mach-mx3/mach-pcm043.c
-> +++ b/arch/arm/mach-mx3/mach-pcm043.c
-> @@ -28,6 +28,7 @@
->  #include <linux/usb/otg.h>
->  #include <linux/usb/ulpi.h>
->  #include <linux/fsl_devices.h>
-> +#include <linux/mmc/host.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -139,10 +140,31 @@ static struct i2c_board_info pcm043_i2c_devices[] = {
->  };
->  #endif
->  
-> +static struct resource sdhci_resources[] = {
-> +       {
-> +               .start          = 0x53fb4000,
-> +               .end            = 0x53fb4000 + 0xff,
-> +               .flags          = IORESOURCE_MEM,
-> +       }, {
-> +               .start          = MX35_INT_MMC_SDHC1,
-> +               .end            = MX35_INT_MMC_SDHC1,
-> +               .flags          = IORESOURCE_IRQ,
-> +       },
-> +};
-> +
-> +static struct platform_device sdhci_device = {
-> +       .name           = "sdhci-esdhc",
-> +       .id             = 0,
-> +       .num_resources  = ARRAY_SIZE(sdhci_resources),
-> +       .resource       = sdhci_resources,
-> +};
-> +
-> +
->  static struct platform_device *devices[] __initdata = {
->  	&pcm043_flash,
->  	&mxc_fec_device,
->  	&imx_wdt_device0,
-> +	&sdhci_device,
->  };
->  
->  static struct pad_desc pcm043_pads[] = {
-> @@ -217,6 +239,13 @@ static struct pad_desc pcm043_pads[] = {
->  	/* CAN2 */
->  	MX35_PAD_TX5_RX0__CAN2_TXCAN,
->  	MX35_PAD_TX4_RX1__CAN2_RXCAN,
-> +	/* esdhc */
-> +	MX35_PAD_SD1_CMD__ESDHC1_CMD,
-> +	MX35_PAD_SD1_CLK__ESDHC1_CLK,
-> +	MX35_PAD_SD1_DATA0__ESDHC1_DAT0,
-> +	MX35_PAD_SD1_DATA1__ESDHC1_DAT1,
-> +	MX35_PAD_SD1_DATA2__ESDHC1_DAT2,
-> +	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
->  };
-Can you please rework this to look like
-
-	http://news.gmane.org/find-root.php?group=gmane.linux.ports.arm.kernel&article=89213
-
-(i.e. put a function in arch/arm/plat-mxc/devices/platform-sdhci-esdhc.c
-that dynamically allocates the platform device.)
-
-And then (maybe in a seperate patch) call this new function from the
-init routine of the pcm043.
-
-Thanks
-Uwe
-
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index 1197ab4..3328c86 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -29,6 +29,7 @@
+ #include <linux/pwm_backlight.h>
+ #include <linux/pwm.h>
+ #include <linux/s3c_adc_battery.h>
++#include <linux/leds.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -259,6 +260,37 @@ void rx1950_disable_charger(void)
+ 	gpio_direction_output(S3C2410_GPJ(3), 0);
+ }
+ 
++static struct gpio_led rx1950_leds_desc[] = {
++	{
++		.name				= "Green",
++		.default_trigger	= "main-battery-charging-or-full",
++		.gpio				= S3C2410_GPA(6),
++	},
++	{
++		.name				= "Red",
++		.default_trigger	= "main-battery-full",
++		.gpio				= S3C2410_GPA(7),
++	},
++	{
++		.name				= "Blue",
++		.default_trigger	= "rx1950-acx-mem",
++		.gpio				= S3C2410_GPA(11),
++	},
++};
++
++static struct gpio_led_platform_data rx1950_leds_pdata = {
++	.num_leds	= ARRAY_SIZE(rx1950_leds_desc),
++	.leds		= rx1950_leds_desc,
++};
++
++static struct platform_device rx1950_leds = {
++	.name	= "leds-gpio",
++	.id		= -1,
++	.dev	= {
++				.platform_data = &rx1950_leds_pdata,
++	},
++};
++
+ static struct s3c_adc_bat_pdata rx1950_bat_cfg = {
+ 	.init = rx1950_bat_init,
+ 	.exit = rx1950_bat_exit,
+@@ -663,6 +695,7 @@ static struct platform_device *rx1950_devices[] __initdata = {
+ 	&rx1950_device_gpiokeys,
+ 	&power_supply,
+ 	&rx1950_battery,
++	&rx1950_leds,
+ };
+ 
+ static struct clk *rx1950_clocks[] __initdata = {
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.2
