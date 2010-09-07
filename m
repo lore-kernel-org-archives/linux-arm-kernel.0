@@ -1,45 +1,105 @@
-From: avictor.za@gmail.com (avictor.za at gmail.com)
-Date: Tue, 7 Sep 2010 21:13:12 +0200
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <569801.35222.qm@web180310.mail.gq1.yahoo.com>
-References: <4C85BEFD.402@bluewatersys.com>
-	<569801.35222.qm@web180310.mail.gq1.yahoo.com>
-Message-ID: <AANLkTinq98+ryOOKx1o1o21x9VnHz3nRCHh=5Wwixn4o@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 07 Sep 2010 15:14:08 -0400 (EDT)
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <20100907161156.GA3625@debian-wegner1.datadisplay.de>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<20100906140347.GA24522@n2100.arm.linux.org.uk>
+	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
+	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
+	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+	<20100907161156.GA3625@debian-wegner1.datadisplay.de>
+Message-ID: <alpine.LFD.2.00.1009071443360.19366@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Tue, 7 Sep 2010, Wolfgang Wegner wrote:
 
-> NAK still. ?You're trying to abuse gpio_is_valid(),
-> which I see no need to support.
->
-> In terms of GPIO framework architecture, zero is
-> the first GPIO in all cases, and is always
-> a valid GPIO number, even if it's not
-> requestable/swritable/readable on a given board.
->
-> Whether it's usable on a given platform depends
-> on whether a GPIO controller is registered which
-> claims numbers 0..N ... (assuming gpiolib in use).
+> However, I am not getting the writes to use the stm instruction,
+> so maybe this is the real limitation.
+> Here is my very basic test program:
+> 
+> #define MEMSIZE 0x800000
+> 
+> int main() {
+>   int fbfd;
+>   unsigned long *fbp, *sfbp;
+>   unsigned long i;
+>   unsigned long fill_val = 0x12345678;
+> 
+>   fbfd = open("/dev/fb0", O_RDWR);
+>   if (!fbfd) {
+>     printf("Error: cannot open framebuffer device.\n");
+>     exit(1);
+>   }
+>   fbp = (unsigned long *)mmap(0, MEMSIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+>                               fbfd, 0);
+>   sfbp = fbp;
+>   if(!fbp) {
+>     printf("Error: cannot mmap framebuffer\n");
+>     exit(1);
+>   }
+> #if 0
+>   for (i = 0; i < (MEMSIZE / 4); i += 8) {
+>     *(fbp + i) = fill_val;
+>     *(fbp + i + 1) = fill_val;
+>     *(fbp + i + 2) = fill_val;
+>     *(fbp + i + 3) = fill_val;
+>     *(fbp + i + 4) = fill_val;
+>     *(fbp + i + 5) = fill_val;
+>     *(fbp + i + 6) = fill_val;
+>     *(fbp + i + 7) = fill_val;
+>   }
+> #else
+>   for (i = MEMSIZE/32; i; i--) {
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>     *(fbp++) = fill_val;
+>   }
+> #endif
+>   munmap(sfbp, MEMSIZE);
+>   close(fbfd);
+>   return 0;
+> }
+> 
+> Neither of the cases results in stm being used, all use
+> str.
+> (I am not so deep into assembler, let alone ARM assembler,
+> so please bear with my ignorance about what stm is or does
+> for now...)
 
-How should the following be done in a driver then?
+The STM instruction means store-multiple i.e. it takes a set of 
+registers and write them to memory in one go.  You could try using 
+memset() which should be optimized to use STM in that case:
 
-   if (gpio_is_valid(device->output_pin)) {
-         if (gpio_request(device->output_pin, "driverX") != 0)
-             goto error_handling;
+	memset(fbp, fill_val, MEMSIZE);
 
-         /* continue with gpio setup */
-    }
-    else {
-        /* there is no vcc_pin, so don't do any gpio setup */
-    }
+(although memset() works with chars, so only the LSBs of fill_val will 
+be stored.)
 
-    ....
-
-   if (gpio_is_valid(device->output_pin)) {
-       /* set value high */
-   }
+Otherwise you could open code this test like this:
 
 
-Regards,
-  Andrew Victor
+	register long __r0 asm("r0") = fill_val;
+	register long __r1 asm("r1") = fill_val;
+	register long __r2 asm("r2") = fill_val;
+	register long __r3 asm("r3") = fill_val;
+	register long __r4 asm("r4") = fill_val;
+	register long __r5 asm("r5") = fill_val;
+	register long __r6 asm("r6") = fill_val;
+	register long __r7 asm("r7") = fill_val;
+	for (i = 0; i < MEMSIZE/4; i += 8) {
+		asm volatile(
+			"stmia %0!, {r0 - r7}"
+			: "+r" (fbp)
+			: "r" (__r0), "r" (__r1), "r" (__r2), "r" (__r3),
+			  "r" (__r4), "r" (__r5), "r" (__r6), "r" (__r7));
+	}
+
+
+Nicolas
