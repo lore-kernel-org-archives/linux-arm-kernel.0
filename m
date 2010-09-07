@@ -1,34 +1,20 @@
-From: avictor.za@gmail.com (avictor.za at gmail.com)
-Date: Tue, 7 Sep 2010 21:42:56 +0200
-Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
-	single TC block
-In-Reply-To: <1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
-References: <201009060548.18521.fg@emlix.com>
-	<1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <AANLkTin+vCsG3FUvX6DTUfFe7ZJpbkYyqw_TLvH9ujrJ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 07 Sep 2010 16:18:51 -0400
+Subject: Git pull request: disable Neon on old i.MX51
+Message-ID: <1283890733-6548-1-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Russell, could you please pull:
 
-> +/* One additional fake clock for second TC block */
-> +static struct clk tcb1_clk = {
-> + ? ? ? .name ? ? ? ? ? = "tcb1_clk",
-> + ? ? ? .pmc_mask ? ? ? = 0,
-> + ? ? ? .type ? ? ? ? ? = CLK_TYPE_PERIPHERAL,
-> + ? ? ? .parent ? ? ? ? = &tcb0_clk,
-> +};
-> +
+	git://git.linaro.org/kernel/linux-linaro-next.git for_rmk
 
-Looking at this again...  since type is CLK_TYPE_PERIPHERAL, when you
-call clk_register() the "parent" is changed to the master clock.
+This contains 2 patches to allow i.MX51 code to disable Neon on those
+revisions where it is broken, and so in a generic way.  Those patches
+are following in subsequent emails.  This is based on v2.6.35.
 
-Which means, then later you call clk_enable() the "pmc_mask" is still
-0, so 0 gets written (in pmc_periph_mode) to AT91_PMC_PCER.  So the
-TCB clock won't be enabled.
-
-Or am I missing something?
+[PATCH 1/2] ARM: link board specific files after core files
+[PATCH 2/2] ARM: mxc: turn off HWCAP_NEON for older versions of imx51 silicon
 
 
-Regards,
-  Andrew Victor
+Nicolas
