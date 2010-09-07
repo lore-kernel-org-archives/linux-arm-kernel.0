@@ -1,53 +1,19 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 07 Sep 2010 14:44:47 +1200
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
-References: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
-Message-ID: <4C85A71F.3010402@bluewatersys.com>
+From: rajeev-dlh.kumar@st.com (rajeev)
+Date: Tue, 7 Sep 2010 09:00:38 +0530
+Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
+In-Reply-To: <20100906210943.0e8eb7df@linux.lan.towertech.it>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+	<20100906210943.0e8eb7df@linux.lan.towertech.it>
+Message-ID: <4C85B1DE.70101@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2010 02:23 PM, David Brownell wrote:
-> Still not liking or accepting this proposed
-> change to the GPIO framework.
->
-> For the AT91 case (where integers 0..N are
-> IRQs, but N..max are GPIOs)
->
-> A simpler solution is just to use a bit in
-> the integer to indicate IRQ vs GPIO.  Like
-> maybe the sign bit.. which is never set on
-> valid GPIO numbers, but platforms could let
-> be set on IRQs.
->   
-How about this approach instead?
+Hi Alessandro Zummo
 
-----
-On some architectures gpio numbering does not start from zero. Allow for
-correct behaviour of gpio_is_valid on values below the first gpio by
-adding the architecture overrideable ARCH_FIRST_GPIO.
+On 9/7/2010 12:39 AM, Alessandro Zummo wrote:
+>> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+>  Hi, there are quite a few issues. Please read the
+>  checklist at http://groups.google.com/group/rtc-linux/web/checklist
 
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-----
-
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index c7376bf..01aab1f 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -22,10 +22,15 @@
- #define ARCH_NR_GPIOS		256
- #endif
- 
-+#ifndef ARCH_FIRST_GPIO
-+#define ARCH_FIRST_GPIO		0
-+#endif
-+
- static inline int gpio_is_valid(int number)
- {
- 	/* only some non-negative numbers are valid */
--	return ((unsigned)number) < ARCH_NR_GPIOS;
-+	return (number >= ARCH_FIRST_GPIO &&
-+		(unsigned)number < ARCH_NR_GPIOS;
- }
- 
- struct device;
+I will go through the checklist.
+Rajeev
