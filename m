@@ -1,44 +1,44 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Tue, 7 Sep 2010 12:52:39 +0300
-Subject: Kirkwood PCI(e) write performance and DMA engine support for
-	copy_{to, from}_user?
-In-Reply-To: <AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
-References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
-	<20100906140347.GA24522@n2100.arm.linux.org.uk>
-	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
-	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
-Message-ID: <AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Sep 2010 17:48:26 +0800
+Subject: [PATCH] pxa: fix cpu_is_pxa*() not expanded to zero when not
+	configured
+In-Reply-To: <4C86075C.30802@ru.mvista.com>
+References: <AANLkTinqc=k3H0QL5PKNu6Je=qs=GBNAQ21nv5HkvGom@mail.gmail.com>
+	<4C86075C.30802@ru.mvista.com>
+Message-ID: <AANLkTin3MmcouwsFmTsgZvkxBiryuNNrrU2qQ7aCuLmZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 7, 2010 at 10:58 AM, saeed bishara <saeed.bishara@gmail.com> wrote:
-> On Mon, Sep 6, 2010 at 5:14 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
->> On Mon, Sep 06, 2010 at 03:03:47PM +0100, Russell King - ARM Linux wrote:
->>> On Mon, Sep 06, 2010 at 12:02:44PM +0200, Wolfgang Wegner wrote:
->>> > Mapping the PCI memory space via mmap() resulted in some
->>> > disappointing ~6.5 MBytes/second. I tried to modify page
->>> > protection to pgprot_writecombine or pgprot_cached, but while
->>> > this did reproducably change performance, it was only in
->>> > some sub-percentage range. I am not sure if I understand
->>> > correctly how other framebuffers handle this, but it seems
->>> > the "raw" mmapped write performance is not cared about too
->>> > much or maybe not that bad with most x86 chip sets?
->>> > However, the idea left over after some trying and looking
->>> > around is to use the DMA engine to speed up write() (and
->>> > also read(), but this is not so important) system calls
->>> > instead of using mmap.
->>>
->>> Framebuffer applications such as Xorg/Qt do not use read/write calls
->>> to access their buffers because that will be painfully slow.
->>
->> BTW, the throughput I get with a "dd if=bitmap of=/dev/fb0 bs=512"
->> is the same I get from my test application writing longwords
->> sequentially to the mmapped frame buffer.
-> I'm not sure the writecombine is enabled properly, can you test that on DRAM?
-> you can do that be reserving some memory (mem=<dram size - 8M>), then
-> try to test throughput with and without writecombine.
+On Tue, Sep 7, 2010 at 5:35 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
 >
-also, in order to sent bursts, make sure that the stm instruction is
-used, preferred with 8 registers with address aligned to 8*4 bytes.
- saeed
+> On 07-09-2010 8:09, Eric Miao wrote:
+>
+>> Could you give this a run?
+>
+>> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
+>> b/arch/arm/mach-pxa/include/mach/hardware.h
+>> index 7f64d24..b036500 100644
+>> --- a/arch/arm/mach-pxa/include/mach/hardware.h
+>> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
+>> @@ -264,23 +264,35 @@
+>> ? *<= 0x2 for pxa21x/pxa25x/pxa26x/pxa27x
+>> ? * == 0x3 for pxa300/pxa310/pxa320
+>> ? */
+>> +#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+>> ?#define __cpu_is_pxa2xx(id) ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> ? ? ? ?({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ? ? ? ? ? ? ? ?unsigned int _id = (id)>> ?13& ?0x7; ? ?\
+>> ? ? ? ? ? ? ? ?_id<= 0x2; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ? ? ? ? })
+>> +#else
+>> +#define __cpu_is_pxa2xx(id) ? ?(0)
+>
+> ? Why enclose 0 in parens?
+>
+
+Just one of some coding style habits. Constant in parens in #define
+will always be a bit safer.
+
+> WBR, Sergei
 >
