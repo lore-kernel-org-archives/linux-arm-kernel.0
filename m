@@ -1,64 +1,68 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue,  7 Sep 2010 14:29:40 +0900
-Subject: [PATCH 4/5] rtc: rtc-s3c: Fix on RTC initialization method
+Date: Tue,  7 Sep 2010 14:29:38 +0900
+Subject: [PATCH 2/5] rtc: rtc-s3c: Fix setting missing field of getalarm
 In-Reply-To: <1283837381-9575-1-git-send-email-kgene.kim@samsung.com>
 References: <1283837381-9575-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1283837381-9575-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1283837381-9575-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Changhwan Youn <chaos.youn@samsung.com>
 
-This patch changes RTC initialization method on probe() as
-per Wan ZongShun's suggestion. The 'rtc_valid_tm(tm)' can
-check whether RTC BCD is valid or not.
-
-And should be changed the method of check because previous
-method cannot validate RTC BCD registers properly.
+Current s3c_rtc_getalarm() sets missing field of alarm time with 0xff.
+But this value should be -1 according to drivers/rtc/interface.c.
 
 Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
 ---
- drivers/rtc/rtc-s3c.c |   16 +++++++++++-----
- 1 files changed, 11 insertions(+), 5 deletions(-)
+ drivers/rtc/rtc-s3c.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index c078548..7f15073 100644
+index 557a538..e9eb0a0 100644
 --- a/drivers/rtc/rtc-s3c.c
 +++ b/drivers/rtc/rtc-s3c.c
-@@ -458,8 +458,8 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
- static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- {
- 	struct rtc_device *rtc;
-+	struct rtc_time rtc_tm;
- 	struct resource *res;
--	unsigned int tmp, i;
- 	int ret;
+@@ -242,34 +242,34 @@ static int s3c_rtc_getalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	if (alm_en & S3C2410_RTCALM_SECEN)
+ 		alm_tm->tm_sec = bcd2bin(alm_tm->tm_sec);
+ 	else
+-		alm_tm->tm_sec = 0xff;
++		alm_tm->tm_sec = -1;
  
- 	pr_debug("%s: probe=%p\n", __func__, pdev);
-@@ -540,11 +540,17 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+ 	if (alm_en & S3C2410_RTCALM_MINEN)
+ 		alm_tm->tm_min = bcd2bin(alm_tm->tm_min);
+ 	else
+-		alm_tm->tm_min = 0xff;
++		alm_tm->tm_min = -1;
  
- 	/* Check RTC Time */
+ 	if (alm_en & S3C2410_RTCALM_HOUREN)
+ 		alm_tm->tm_hour = bcd2bin(alm_tm->tm_hour);
+ 	else
+-		alm_tm->tm_hour = 0xff;
++		alm_tm->tm_hour = -1;
  
--	for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
--		tmp = readb(s3c_rtc_base + i);
-+	s3c_rtc_gettime(NULL, &rtc_tm);
+ 	if (alm_en & S3C2410_RTCALM_DAYEN)
+ 		alm_tm->tm_mday = bcd2bin(alm_tm->tm_mday);
+ 	else
+-		alm_tm->tm_mday = 0xff;
++		alm_tm->tm_mday = -1;
  
--		if ((tmp & 0xf) > 0x9 || ((tmp >> 4) & 0xf) > 0x9)
--			writeb(0, s3c_rtc_base + i);
-+	if (rtc_valid_tm(&rtc_tm)) {
-+		rtc_tm.tm_year	= 100;
-+		rtc_tm.tm_mon	= 0;
-+		rtc_tm.tm_mday	= 1;
-+		rtc_tm.tm_hour	= 0;
-+		rtc_tm.tm_min	= 0;
-+		rtc_tm.tm_sec	= 0;
-+
-+		s3c_rtc_settime(NULL, &rtc_tm);
+ 	if (alm_en & S3C2410_RTCALM_MONEN) {
+ 		alm_tm->tm_mon = bcd2bin(alm_tm->tm_mon);
+ 		alm_tm->tm_mon -= 1;
+ 	} else {
+-		alm_tm->tm_mon = 0xff;
++		alm_tm->tm_mon = -1;
  	}
  
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX)
+ 	if (alm_en & S3C2410_RTCALM_YEAREN)
+ 		alm_tm->tm_year = bcd2bin(alm_tm->tm_year);
+ 	else
+-		alm_tm->tm_year = 0xffff;
++		alm_tm->tm_year = -1;
+ 
+ 	return 0;
+ }
 -- 
 1.6.2.5
