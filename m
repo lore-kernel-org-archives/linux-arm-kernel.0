@@ -1,67 +1,73 @@
-From: bn@niasdigital.com (Ben Nizette)
-Date: Tue, 7 Sep 2010 18:41:38 +1000
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <159882.19856.qm@web180315.mail.gq1.yahoo.com>
-References: <159882.19856.qm@web180315.mail.gq1.yahoo.com>
-Message-ID: <0D5B5291-80B9-4576-8DC7-8F33CFF2A803@niasdigital.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 7 Sep 2010 17:56:50 +0900
+Subject: [PATCH 4/5] rtc: rtc-s3c: Fix on RTC initialization method
+In-Reply-To: <1283837381-9575-5-git-send-email-kgene.kim@samsung.com>
+References: <1283837381-9575-1-git-send-email-kgene.kim@samsung.com>
+	<1283837381-9575-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTiketkJttU6zdqU9oD5a14DBB3cYY59RkeTZQuTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 07/09/2010, at 4:33 PM, David Brownell wrote:
-
-> 
-> 
-> --- On Mon, 9/6/10, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> 
-> 
->> How about this approach instead?
-> 
-> Still don't like it, sorry.  gpio_is_valid()
-> is not intended as a fine-grained call, there is
-> a call which is fine grained; use that instead.
-> 
-
-I've been sitting on the sidelines but it seems like the below might
-help :-)
-
----8K---
-
-A recent discussion on LKML [1] highlighted some confusion regarding the
-semantics of the gpio validity checks versus the gpio request mechanism.
-
-gpio_is_valid determines whether a gpio /can/ be attached to a
-controller, gpio_request determines whether that gpio currently /is/
-attached to a controller.  Part of the confusion seems to come at least
-in part from the overlooking of facility for dynamically added gpio
-numbers.
-
-Fix the documentation to clarify these points.
-
-[1] http://lkml.org/lkml/2010/8/23/187
-
-Signed-off-by: Ben Nizette <bn@niasdigital.com>
----
-diff --git a/Documentation/gpio.txt b/Documentation/gpio.txt
-index d96a6db..adc0db2 100644
---- a/Documentation/gpio.txt
-+++ b/Documentation/gpio.txt
-@@ -113,12 +113,13 @@ test if a number could reference a GPIO, you may use this predicate:
-
-	int gpio_is_valid(int number);
-
--A number that's not valid will be rejected by calls which may request
--or free GPIOs (see below).  Other numbers may also be rejected; for
--example, a number might be valid but unused on a given board.
-+This will return true for any number which may represent a valid gpio
-+regardless of whether or not that identifier is currently active.  To
-+determine whether an identifier is linked to a controller and therefore
-+able to be used the request/free mechanism should be used (see below).
-
--Whether a platform supports multiple GPIO controllers is currently a
--platform-specific implementation issue.
-+Whether a platform supports multiple and/or dynamically added GPIO
-+controllers is currently a platform-specific implementation issue.
-
-
-Using GPIOs
+On Tue, Sep 7, 2010 at 2:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> From: Changhwan Youn <chaos.youn@samsung.com>
+>
+> This patch changes RTC initialization method on probe() as
+> per Wan ZongShun's suggestion. The 'rtc_valid_tm(tm)' can
+> check whether RTC BCD is valid or not.
+>
+> And should be changed the method of check because previous
+> method cannot validate RTC BCD registers properly.
+>
+> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> ---
+> ?drivers/rtc/rtc-s3c.c | ? 16 +++++++++++-----
+> ?1 files changed, 11 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index c078548..7f15073 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -458,8 +458,8 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
+> ?static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+> ?{
+> ? ? ? ?struct rtc_device *rtc;
+> + ? ? ? struct rtc_time rtc_tm;
+> ? ? ? ?struct resource *res;
+> - ? ? ? unsigned int tmp, i;
+> ? ? ? ?int ret;
+>
+> ? ? ? ?pr_debug("%s: probe=%p\n", __func__, pdev);
+> @@ -540,11 +540,17 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+>
+> ? ? ? ?/* Check RTC Time */
+>
+> - ? ? ? for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
+> - ? ? ? ? ? ? ? tmp = readb(s3c_rtc_base + i);
+> + ? ? ? s3c_rtc_gettime(NULL, &rtc_tm);
+>
+> - ? ? ? ? ? ? ? if ((tmp & 0xf) > 0x9 || ((tmp >> 4) & 0xf) > 0x9)
+> - ? ? ? ? ? ? ? ? ? ? ? writeb(0, s3c_rtc_base + i);
+> + ? ? ? if (rtc_valid_tm(&rtc_tm)) {
+instead of !rtc_valid_tm(&rtc_tm) ???
+> + ? ? ? ? ? ? ? rtc_tm.tm_year ?= 100;
+> + ? ? ? ? ? ? ? rtc_tm.tm_mon ? = 0;
+> + ? ? ? ? ? ? ? rtc_tm.tm_mday ?= 1;
+> + ? ? ? ? ? ? ? rtc_tm.tm_hour ?= 0;
+> + ? ? ? ? ? ? ? rtc_tm.tm_min ? = 0;
+> + ? ? ? ? ? ? ? rtc_tm.tm_sec ? = 0;
+> +
+> + ? ? ? ? ? ? ? s3c_rtc_settime(NULL, &rtc_tm);
+> ? ? ? ?}
+>
+> ? ? ? ?if (s3c_rtc_cpu_type == TYPE_S3C64XX)
+> --
+> 1.6.2.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
