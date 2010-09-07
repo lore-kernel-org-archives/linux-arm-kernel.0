@@ -1,37 +1,53 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 7 Sep 2010 10:43:31 +0800
-Subject: colibri-pxa300: LCD_LDD / LCD_CS gpio conflict
-In-Reply-To: <201009061512.23705.pieterg@gmx.com>
-References: <201009061512.23705.pieterg@gmx.com>
-Message-ID: <AANLkTim+h8Wu40LoWue2=TeKykAJmr8=rT48gF5eCX6j@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 07 Sep 2010 14:44:47 +1200
+Subject: [PATCH] pio: add arch specific gpio_is_valid() function
+In-Reply-To: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
+References: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
+Message-ID: <4C85A71F.3010402@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 6, 2010 at 9:12 PM, pieterg <pieterg@gmx.com> wrote:
-> In colibri-pxa300.c, line 132, gpio config GPIO62_LCD_CS_N is overriding the
-> GPIO62_LCD_LDD_8 configuration, earlier in the pin config table.
+On 09/07/2010 02:23 PM, David Brownell wrote:
+> Still not liking or accepting this proposed
+> change to the GPIO framework.
 >
-> As a result, one pixel data line is missing, obviously causing wrong pixel
-> data on passive lcd panels.
+> For the AT91 case (where integers 0..N are
+> IRQs, but N..max are GPIOs)
 >
-> Not sure what the best workaround should be.
-> LDD_CS is not available on the colibri evalboard as far as I can see, so we
-> might just define GPIO127_LCD_CS_N instead? (till the soc/carrier board
-> configs have been split)
->
-> Or for now just put GPIO62_LCD_CS_N between
-> #ifdef CONFIG_FB_PXA_SMARTPANEL?
->
+> A simpler solution is just to use a bit in
+> the integer to indicate IRQ vs GPIO.  Like
+> maybe the sign bit.. which is never set on
+> valid GPIO numbers, but platforms could let
+> be set on IRQs.
+>   
+How about this approach instead?
 
-Possibly define two groups of LCD pin configurations and select them
-when the appropriate LCD expansion card is plugged. If it can be
-detected at run-time, that will be perfect, otherwise have to come
-up with ugly #ifdef .. #else then.
+----
+On some architectures gpio numbering does not start from zero. Allow for
+correct behaviour of gpio_is_valid on values below the first gpio by
+adding the architecture overrideable ARCH_FIRST_GPIO.
 
-> Rgds, Pieter
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
+----
+
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index c7376bf..01aab1f 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -22,10 +22,15 @@
+ #define ARCH_NR_GPIOS		256
+ #endif
+ 
++#ifndef ARCH_FIRST_GPIO
++#define ARCH_FIRST_GPIO		0
++#endif
++
+ static inline int gpio_is_valid(int number)
+ {
+ 	/* only some non-negative numbers are valid */
+-	return ((unsigned)number) < ARCH_NR_GPIOS;
++	return (number >= ARCH_FIRST_GPIO &&
++		(unsigned)number < ARCH_NR_GPIOS;
+ }
+ 
+ struct device;
