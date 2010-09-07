@@ -1,53 +1,34 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 08 Sep 2010 07:30:38 +1200
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <AANLkTinq98+ryOOKx1o1o21x9VnHz3nRCHh=5Wwixn4o@mail.gmail.com>
-References: <4C85BEFD.402@bluewatersys.com>	<569801.35222.qm@web180310.mail.gq1.yahoo.com>
-	<AANLkTinq98+ryOOKx1o1o21x9VnHz3nRCHh=5Wwixn4o@mail.gmail.com>
-Message-ID: <4C8692DE.1020202@bluewatersys.com>
+From: avictor.za@gmail.com (avictor.za at gmail.com)
+Date: Tue, 7 Sep 2010 21:42:56 +0200
+Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
+	single TC block
+In-Reply-To: <1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
+References: <201009060548.18521.fg@emlix.com>
+	<1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <AANLkTin+vCsG3FUvX6DTUfFe7ZJpbkYyqw_TLvH9ujrJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-avictor.za at gmail.com wrote:
-> hi,
-> 
->> NAK still.  You're trying to abuse gpio_is_valid(),
->> which I see no need to support.
->>
->> In terms of GPIO framework architecture, zero is
->> the first GPIO in all cases, and is always
->> a valid GPIO number, even if it's not
->> requestable/swritable/readable on a given board.
->>
->> Whether it's usable on a given platform depends
->> on whether a GPIO controller is registered which
->> claims numbers 0..N ... (assuming gpiolib in use).
-> 
-> How should the following be done in a driver then?
-> 
->    if (gpio_is_valid(device->output_pin)) {
->          if (gpio_request(device->output_pin, "driverX") != 0)
->              goto error_handling;
-> 
->          /* continue with gpio setup */
->     }
->     else {
->         /* there is no vcc_pin, so don't do any gpio setup */
+hi,
 
-Adding:
+> +/* One additional fake clock for second TC block */
+> +static struct clk tcb1_clk = {
+> + ? ? ? .name ? ? ? ? ? = "tcb1_clk",
+> + ? ? ? .pmc_mask ? ? ? = 0,
+> + ? ? ? .type ? ? ? ? ? = CLK_TYPE_PERIPHERAL,
+> + ? ? ? .parent ? ? ? ? = &tcb0_clk,
+> +};
+> +
 
-	 device->output_pin = -EINVAL;
+Looking at this again...  since type is CLK_TYPE_PERIPHERAL, when you
+call clk_register() the "parent" is changed to the master clock.
 
-Will force the gpio to be invalid here, so that subsequent uses of
-gpio_is_valid will behave as expected in the case where
-device->output_pin >= 0, but doesn't map to a useable gpio.
+Which means, then later you call clk_enable() the "pmc_mask" is still
+0, so 0 gets written (in pmc_periph_mode) to AT91_PMC_PCER.  So the
+TCB clock won't be enabled.
 
->     }
-> 
->     ....
-> 
->    if (gpio_is_valid(device->output_pin)) {
->        /* set value high */
->    }
+Or am I missing something?
 
-~Ryan
+
+Regards,
+  Andrew Victor
