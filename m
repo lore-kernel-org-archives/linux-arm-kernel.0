@@ -1,25 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 7 Sep 2010 11:04:43 +0100
-Subject: [PATCH v2] regulators: add support max8952 regulator
-In-Reply-To: <1283844202-4158-1-git-send-email-kgene.kim@samsung.com>
-References: <1283844202-4158-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20100907100442.GD7886@rakim.wolfsonmicro.main>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 7 Sep 2010 15:43:22 +0530
+Subject: [PATCH 15/74] ST SPEAr: adding support for rtc
+In-Reply-To: <20100906210943.0e8eb7df@linux.lan.towertech.it>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<d9930e7793964f07a2e0acf7f52b45306e308ddd.1283161023.git.viresh.kumar@st.com>
+	<20100906210943.0e8eb7df@linux.lan.towertech.it>
+Message-ID: <4C861042.1030409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 07, 2010 at 04:23:22PM +0900, Kukjin Kim wrote:
-> From: Changhwan Youn <chaos.youn@samsung.com>
+On 9/7/2010 12:39 AM, Alessandro Zummo wrote:
+> On Mon, 30 Aug 2010 16:11:00 +0530
+> Viresh KUMAR <viresh.kumar@st.com> wrote:
 > 
-> The operation of max8952 is almost similar to max8649 except
-> the output voltage range. This patch adds support the max8952
-> regulator using current max8649 implementation.
-> 
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> > From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+>  Hi, there are quite a few issues. Please read the
+>  checklist at http://groups.google.com/group/rtc-linux/web/checklist
 
-This is OK but it should also include removal of the separate max8952
-driver since the functionality is now merged into this driver.  With
-that
+Alessandro,
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+I tried to find issues in driver, with help of checklist. I could find
+very few changes initially, they are:
+- Correct MODULE_* at end of file
+- add platform dependency in Kconfig
+- remove .owner
+- removed few #includes.
+
+If there are any more issues that you might have encountered, then
+please let me know before i send V2.
+
+thanks
+viresh.
