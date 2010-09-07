@@ -1,97 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  7 Sep 2010 11:23:53 -0700
-Subject: [PATCH 2/3] [ARM] Allow machines to override __delay()
-In-Reply-To: <1283883834-4693-1-git-send-email-sboyd@codeaurora.org>
-References: <1283883834-4693-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1283883834-4693-3-git-send-email-sboyd@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 07 Sep 2010 14:38:30 -0400 (EDT)
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<20100906140347.GA24522@n2100.arm.linux.org.uk>
+	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
+	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
+	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1009071435290.19366@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some machines want to implement their own __delay() routine based
-on fixed timers. Expose functionality to set the __delay()
-routine at runtime. This should allow two machines with different
-__delay() routines to happily co-exist within the same kernel
-with minimal overhead.
+On Tue, 7 Sep 2010, saeed bishara wrote:
 
-Russell expressed concern that using a timer based __delay()
-would cause problems where an iomapped device isn't mapped in
-before a delay call was made (see
-http://article.gmane.org/gmane.linux.ports.arm.kernel/78543 for
-more info). We can sidestep that issue with this approach since
-the __delay() routine _should_ only be pointed to a timer based
-delay once the timer has been properly mapped. Up until that
-point __delay() and udelay() will use delay_loop() which is
-always safe to call.
+> On Tue, Sep 7, 2010 at 10:58 AM, saeed bishara <saeed.bishara@gmail.com> wrote:
+> > On Mon, Sep 6, 2010 at 5:14 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> >> On Mon, Sep 06, 2010 at 03:03:47PM +0100, Russell King - ARM Linux wrote:
+> >>> On Mon, Sep 06, 2010 at 12:02:44PM +0200, Wolfgang Wegner wrote:
+> >>> > Mapping the PCI memory space via mmap() resulted in some
+> >>> > disappointing ~6.5 MBytes/second. I tried to modify page
+> >>> > protection to pgprot_writecombine or pgprot_cached, but while
+> >>> > this did reproducably change performance, it was only in
+> >>> > some sub-percentage range. I am not sure if I understand
+> >>> > correctly how other framebuffers handle this, but it seems
+> >>> > the "raw" mmapped write performance is not cared about too
+> >>> > much or maybe not that bad with most x86 chip sets?
+> >>> > However, the idea left over after some trying and looking
+> >>> > around is to use the DMA engine to speed up write() (and
+> >>> > also read(), but this is not so important) system calls
+> >>> > instead of using mmap.
+> >>>
+> >>> Framebuffer applications such as Xorg/Qt do not use read/write calls
+> >>> to access their buffers because that will be painfully slow.
+> >>
+> >> BTW, the throughput I get with a "dd if=bitmap of=/dev/fb0 bs=512"
+> >> is the same I get from my test application writing longwords
+> >> sequentially to the mmapped frame buffer.
+> > I'm not sure the writecombine is enabled properly, can you test that on DRAM?
+> > you can do that be reserving some memory (mem=<dram size - 8M>), then
+> > try to test throughput with and without writecombine.
+> >
+> also, in order to sent bursts, make sure that the stm instruction is
+> used, preferred with 8 registers with address aligned to 8*4 bytes.
 
-This patch is inspired by x86's delay.c
+The copy_from_user code (through the write() system call) already takes 
+care of this with large enough buffers.  Of course with mmap()'d memory 
+you are responsible for optimizing this yourself.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
----
- arch/arm/include/asm/delay.h |    2 ++
- arch/arm/lib/delay.c         |   21 ++++++++++++++++++---
- 2 files changed, 20 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index ccc5ed5..7c732b5 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -40,5 +40,7 @@ extern void __const_udelay(unsigned long);
- 			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
- 	  __udelay(n))
- 
-+extern void set_delay_fn(void (*fn)(unsigned long));
-+
- #endif /* defined(_ARM_DELAY_H) */
- 
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 5ee0adc..b307fcc 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -3,6 +3,8 @@
-  *
-  *  Copyright (C) 1995, 1996 Russell King
-  *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *  Copyright (C) 1993 Linus Torvalds
-+ *  Copyright (C) 1997 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -12,11 +14,9 @@
- #include <linux/delay.h>
- 
- /*
-- * loops = usecs * HZ * loops_per_jiffy / 1000000
-- *
-  * Oh, if only we had a cycle counter...
-  */
--void __delay(unsigned long loops)
-+void delay_loop(unsigned long loops)
- {
- 	asm volatile(
- 	"1:	subs %0, %0, #1 \n"
-@@ -25,6 +25,21 @@ void __delay(unsigned long loops)
- 	: "r" (loops)
- 	);
- }
-+
-+static void (*delay_fn)(unsigned long) = delay_loop;
-+
-+void set_delay_fn(void (*fn)(unsigned long))
-+{
-+	delay_fn = fn;
-+}
-+
-+/*
-+ * loops = usecs * HZ * loops_per_jiffy / 1000000
-+ */
-+void __delay(unsigned long loops)
-+{
-+	delay_fn(loops);
-+}
- EXPORT_SYMBOL(__delay);
- 
- /*
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Nicolas
