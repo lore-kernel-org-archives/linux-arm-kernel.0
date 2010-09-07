@@ -1,46 +1,57 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Tue, 07 Sep 2010 08:55:12 +0200
-Subject: [RFCv5 3/9] mm: cma: Added SysFS support
-In-Reply-To: <20100907060818.GA2609@kroah.com>
-References: <cover.1283749231.git.mina86@mina86.com>
-	<9771a9c07874a642bb587f4c0ebf886d720332b6.1283749231.git.mina86@mina86.com>
-	<20100906210747.GA5863@kroah.com> <op.vindmsj07p4s8u@localhost>
-	<20100907060818.GA2609@kroah.com>
-Message-ID: <op.vinhiabu7p4s8u@localhost>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 7 Sep 2010 12:48:41 +0530
+Subject: [PATCH 4/4] ARM: l2x0: Optmise the range based operations
+In-Reply-To: <1283768790.1926.10.camel@e102109-lin.cambridge.arm.com>
+References: <1280598372-4830-1-git-send-email-santosh.shilimkar@ti.com>
+	<1283768790.1926.10.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE81D6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Sep 07, 2010 at 07:31:30AM +0200, Micha?? Nazarewicz wrote:
->> Thanks for reviewing the sysfs part.  Actually, I was never really sure
->> if I shouldn't rather put this code to debugfs and you got me convinced
->> that I should.  Sysfs somehow looked more appealing from kernel's API
->> point of view -- things seem to be more organised in sysfs than in
->> debugfs.  It seems I'll have to port it to debugfs after all
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Monday, September 06, 2010 3:57 PM
+> To: Shilimkar, Santosh
+> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 4/4] ARM: l2x0: Optmise the range based operations
+> 
+> On Sat, 2010-07-31 at 23:16 +0530, Santosh Shilimkar wrote:
+> > For the big buffers which are in excess of cache size, the maintaince
+> > operations by PA are very slow. For such buffers the maintainace
+> > operations can be speeded up by using the WAY based method.
+> >
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm/mm/cache-l2x0.c |   95 ++++++++++++++++++++++++++++-----------
+> -------
+> >  1 files changed, 58 insertions(+), 37 deletions(-)
+> >
+> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> > index b2938d4..c0d6108 100644
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -116,6 +116,18 @@ static void l2x0_flush_all(void)
+> >  	spin_unlock_irqrestore(&l2x0_lock, flags);
+> >  }
+> >
+> > +static void l2x0_clean_all(void)
+> > +{
+> > +	unsigned long flags;
+> > +
+> > +	/* clean all ways */
+> > +	spin_lock_irqsave(&l2x0_lock, flags);
+> > +	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
+> > +	cache_wait(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
+> 
+> In case you'll base this on top of my PL310 optimisation, you should use
+> cache_wait_way() as the cache_wait() becomes a no-op.
+> 
+Yep. Will fix that while rebasing.
 
-On Tue, 07 Sep 2010 08:08:18 +0200, Greg KH <greg@kroah.com> wrote:
-> Yes, debugfs looks like a much better place for this.
+Will post the full series with Thomas's two patches included
+on top of your "[PATCH 0/9] Various patches for 2.6.37-rc1" which
+is already in the linux-next
 
-I'll fix that in v6 then.
-
->>>> +static ssize_t cma_sysfs_region_name_show(struct cma_region *reg, char *page)
->>>> +{
->>>> +	return reg->name ? snprintf(page, PAGE_SIZE, "%s\n", reg->name) : 0;
->>>> +}
-
->>> Is a name field ever really going to be bigger than a page?
-
->> For numeric values you are right that snprintf() is a bit paranoid,
->> still I see no good reason why not to use it.
-
-> Same goes for no good reason to use it :)
-
-I somehow prefer to always use "safe" versions of the string manipulation
-functions -- it's better to use it everywhere then to forget it in one
-place.  Call to sprintf() is translated to vsnprintf() anyway so there's
-no performance gain.
-
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+Regards,
+Santosh
