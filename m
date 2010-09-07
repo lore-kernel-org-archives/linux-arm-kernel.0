@@ -1,76 +1,57 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 07 Sep 2010 16:26:37 +1200
-Subject: [PATCH] pio: add arch specific gpio_is_valid() function
-In-Reply-To: <AANLkTi=RRSOnPVCEv5ni40D71BeMSV5bccWXnZphzGTX@mail.gmail.com>
-References: <280328.53116.qm@web180311.mail.gq1.yahoo.com>
-	<4C85A71F.3010402@bluewatersys.com>
-	<AANLkTi=B7O9jDB_pzHS6feWTxHQTfDZ-QLx7jOKaA2vN@mail.gmail.com>
-	<4C85BA83.9080002@bluewatersys.com>
-	<AANLkTi=RRSOnPVCEv5ni40D71BeMSV5bccWXnZphzGTX@mail.gmail.com>
-Message-ID: <4C85BEFD.402@bluewatersys.com>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Tue, 07 Sep 2010 07:31:30 +0200
+Subject: [RFCv5 3/9] mm: cma: Added SysFS support
+In-Reply-To: <20100906210747.GA5863@kroah.com>
+References: <cover.1283749231.git.mina86@mina86.com>
+	<9771a9c07874a642bb587f4c0ebf886d720332b6.1283749231.git.mina86@mina86.com>
+	<20100906210747.GA5863@kroah.com>
+Message-ID: <op.vindmsj07p4s8u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2010 04:19 PM, Eric Miao wrote:
-> On Tue, Sep 7, 2010 at 12:07 PM, Ryan Mallon <ryan@bluewatersys.com> wrote:
->> On 09/07/2010 03:54 PM, Eric Miao wrote:
->>> On Tue, Sep 7, 2010 at 10:44 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
->>>> On 09/07/2010 02:23 PM, David Brownell wrote:
->>>>> Still not liking or accepting this proposed
->>>>> change to the GPIO framework.
->>>>>
->>>>> For the AT91 case (where integers 0..N are
->>>>> IRQs, but N..max are GPIOs)
->>>>>
->>>>> A simpler solution is just to use a bit in
->>>>> the integer to indicate IRQ vs GPIO.  Like
->>>>> maybe the sign bit.. which is never set on
->>>>> valid GPIO numbers, but platforms could let
->>>>> be set on IRQs.
->>>>>
->>>> How about this approach instead?
->>>>
->>>
->>> This doesn't solve the problem with more complicated settings, e.g.
->>> some GPIOs within are not valid, not just the begining ones.
->>
->> Agreed, but this does solve the immediate problem for AT91 in a simple
->> way. Are there boards in the kernel which have holes in the gpio layout?
->>
->> Another possible solution is to loop through all the gpio_chips to see
->> if the number maps to a valid gpio. The obvious downside to this
->> approach is that the complexity of gpio_is_valid becomes reasonably high
->> for something which should be a very simple test and, as you say below,
->> we probably just don't need that fine-grained information.
->>
->>> So the real question here is the semantics of gpio_is_valid(). I'd
->>> personally incline it reads as if a GPIO _number_ is valid generally,
->>> (e.g. like -1 is not a valid GPIO number), instead of that specific
->>> GPIO is valid on that specific platform. The latter can be judged
->>> with gpio_request().
->>
->> Some drivers in the kernel appear to be using this behaviour to have
->> optional gpios, ie setting the foo_gpio = -1 in the platform data for
->> some driver. The documentation also suggests that this is what
->> gpio_is_valid is intended for. However, the documentation also says we
->> may want gpio_is_valid to return invalid on some other numbers.
-> 
-> Right. So I'd really like David to make the semantics clear. My intention
-> is to keep gpio_is_valid() as simple as checking a general range to
-> rule out most invalid cases. And just use gpio_request() to handle the
-> platform specific cases.
+Hello Greg,
 
-Agreed. The intent of my patch was to keep gpio_is_valid simple, but add
-a simple check for architectures where the base gpio is not zero. Will
-wait and see what David has to say.
+Thanks for reviewing the sysfs part.  Actually, I was never really sure
+if I shouldn't rather put this code to debugfs and you got me convinced
+that I should.  Sysfs somehow looked more appealing from kernel's API
+point of view -- things seem to be more organised in sysfs than in
+debugfs.  It seems I'll have to port it to debugfs after all
 
-~Ryan
+Nonetheless, a few responses to your comments:
+
+> On Mon, Sep 06, 2010 at 08:33:53AM +0200, Michal Nazarewicz wrote:
+>> +		The "allocators" file list all registered allocators.
+>> +		Allocators with no name are listed as a single minus
+>> +		sign.
+
+On Mon, 06 Sep 2010 23:07:47 +0200, Greg KH <greg@kroah.com> wrote:
+> So this returns more than one value?
+
+Aren't thing like cpufreq governors listed in a single sysfs file?
+I remember there was such a file somewhere.  Has that been made
+deprecated? I cannot seem to find any information on that.
+
+>> +		The "regions" directory list all reserved regions.
+>
+> Same here?
+
+regions is actually a directory with subdirectories for each
+region. ;)
+
+>> +static ssize_t cma_sysfs_region_name_show(struct cma_region *reg, char *page)
+>> +{
+>> +	return reg->name ? snprintf(page, PAGE_SIZE, "%s\n", reg->name) : 0;
+>> +}
+
+> Is a name field ever really going to be bigger than a page?
+
+I prefer being on the safe side -- I have no idea what user will provide
+as region name so I assume as little as possible.  For numeric values you
+are right that snprintf() is a bit paranoid, still I see no good reason
+why not to use it.
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
