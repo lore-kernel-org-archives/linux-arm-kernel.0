@@ -1,27 +1,26 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Sep 2010 14:46:55 +0530
-Subject: [PATCH 16/74] ST SPEAr: adding support for synopsis i2c designware
-In-Reply-To: <20100907041250.GC30509@game.jcrosoft.org>
+Date: Tue, 7 Sep 2010 14:48:32 +0530
+Subject: [PATCH 72/74] SPEAr13xx: Replace defconfigs with single unfied
+	defconfig
+In-Reply-To: <20100902154055.GP26319@n2100.arm.linux.org.uk>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<72ad657ab3eb9d61f11741145494eadb061926b9.1283161023.git.viresh.kumar@st.com>
-	<20100906231227.GG8153@game.jcrosoft.org> <4C85B94E.3040307@st.com>
-	<20100907041250.GC30509@game.jcrosoft.org>
-Message-ID: <4C860307.7040409@st.com>
+	<24d22c52ef8367bd6167f2a511cd86176ab6948e.1283161024.git.viresh.kumar@st.com>
+	<20100902154055.GP26319@n2100.arm.linux.org.uk>
+Message-ID: <4C860368.7050305@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 9:42 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> please split your v2 patch series in related changset it will simplify the
-> review
+On 9/2/2010 9:10 PM, Russell King - ARM Linux wrote:
+>> > We only need one defconfig for SPEAr13xx now since we can build all
+>> > boards into one kernel.
+> All this kind of thing should be rolled into previous patches.
+> 
+> We really don't need to know that you developed SPEAr13xx support
+> such that it initially couldn't build all boards into a kernel,
+> what the changes were to achieve a kernel for everything, and that
+> there were several defconfigs in existence before one grand unified
+> one was possible.
 
-Jean,
+Ok.
 
-I would prefer not to do this change in current series due to following reasons:
-- Would make difficult for reviewers to locate V2 for V1 they have reviewed.
-- My patches are intermixed, so would be difficult for me to create related
-change sets as currently patches are very much intermixed.
-
-I will take care of this next time i send another patch series.
-
-regards
 viresh.
