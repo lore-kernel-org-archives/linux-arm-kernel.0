@@ -1,73 +1,53 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 7 Sep 2010 17:56:50 +0900
-Subject: [PATCH 4/5] rtc: rtc-s3c: Fix on RTC initialization method
-In-Reply-To: <1283837381-9575-5-git-send-email-kgene.kim@samsung.com>
-References: <1283837381-9575-1-git-send-email-kgene.kim@samsung.com>
-	<1283837381-9575-5-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTiketkJttU6zdqU9oD5a14DBB3cYY59RkeTZQuTw@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 7 Sep 2010 14:31:30 +0530
+Subject: [PATCH 13/74] ST SPEAr: Update clock framework and definitions
+In-Reply-To: <20100907040641.GA30509@game.jcrosoft.org>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<a15d1fca5a6e663c1fee4602013b6160512eb2dd.1283161023.git.viresh.kumar@st.com>
+	<20100906230931.GF8153@game.jcrosoft.org> <4C85B868.6040908@st.com>
+	<20100907040641.GA30509@game.jcrosoft.org>
+Message-ID: <4C85FF6A.5060904@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 7, 2010 at 2:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Changhwan Youn <chaos.youn@samsung.com>
->
-> This patch changes RTC initialization method on probe() as
-> per Wan ZongShun's suggestion. The 'rtc_valid_tm(tm)' can
-> check whether RTC BCD is valid or not.
->
-> And should be changed the method of check because previous
-> method cannot validate RTC BCD registers properly.
->
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> ---
-> ?drivers/rtc/rtc-s3c.c | ? 16 +++++++++++-----
-> ?1 files changed, 11 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index c078548..7f15073 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -458,8 +458,8 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
-> ?static int __devinit s3c_rtc_probe(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct rtc_device *rtc;
-> + ? ? ? struct rtc_time rtc_tm;
-> ? ? ? ?struct resource *res;
-> - ? ? ? unsigned int tmp, i;
-> ? ? ? ?int ret;
->
-> ? ? ? ?pr_debug("%s: probe=%p\n", __func__, pdev);
-> @@ -540,11 +540,17 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
->
-> ? ? ? ?/* Check RTC Time */
->
-> - ? ? ? for (i = S3C2410_RTCSEC; i <= S3C2410_RTCYEAR; i += 0x4) {
-> - ? ? ? ? ? ? ? tmp = readb(s3c_rtc_base + i);
-> + ? ? ? s3c_rtc_gettime(NULL, &rtc_tm);
->
-> - ? ? ? ? ? ? ? if ((tmp & 0xf) > 0x9 || ((tmp >> 4) & 0xf) > 0x9)
-> - ? ? ? ? ? ? ? ? ? ? ? writeb(0, s3c_rtc_base + i);
-> + ? ? ? if (rtc_valid_tm(&rtc_tm)) {
-instead of !rtc_valid_tm(&rtc_tm) ???
-> + ? ? ? ? ? ? ? rtc_tm.tm_year ?= 100;
-> + ? ? ? ? ? ? ? rtc_tm.tm_mon ? = 0;
-> + ? ? ? ? ? ? ? rtc_tm.tm_mday ?= 1;
-> + ? ? ? ? ? ? ? rtc_tm.tm_hour ?= 0;
-> + ? ? ? ? ? ? ? rtc_tm.tm_min ? = 0;
-> + ? ? ? ? ? ? ? rtc_tm.tm_sec ? = 0;
-> +
-> + ? ? ? ? ? ? ? s3c_rtc_settime(NULL, &rtc_tm);
-> ? ? ? ?}
->
-> ? ? ? ?if (s3c_rtc_cpu_type == TYPE_S3C64XX)
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+On 9/7/2010 9:36 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 09:28 Tue 07 Sep     , viresh kumar wrote:
+>> > On 9/7/2010 4:39 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> > >>  /* array of all spear 13xx clock lookups */
+>>>>> > >> > @@ -327,18 +749,58 @@ static struct clk_lookup spear_clk_lookups[] = {
+>>>>> > >> >  	/* clock derived from pll1 clk */
+>>>>> > >> >  	{.con_id = "cpu_clk",		.clk = &cpu_clk},
+>>>>> > >> >  	{.con_id = "ahb_clk",		.clk = &ahb_clk},
+>>>>> > >> > -	{ .con_id = "apb_clk",		.clk = &apb_clk},
+>>>>> > >> > +	{.con_id = "apb_clk",		.clk = &apb_clk},
+>>>>> > >> > +
+>>> > > how about use macro here to simplify the code
+>>> > > 
+>>> > > +#define CLKDEV_ID(__clk) { .con_id = #__clk, .clk = &(__clk) }
+>>> > > and 
+>>> > > +#define CLKDEV_ID_CLK(__clk) { .con_id = #__clk, .clk = &(__clk##_clk) }
+>> > 
+>> > We had that in mind while designing but we chose it this way. There are
+>> > not many fields to fill here, so it looks fine without macro's too.
+>> > I didn't wanted to create an abstraction layer here.
+> the macro will also avoid human mistake
+
+OK. Will do it in a separate patch.
+
+>> > 
+>>>>> > >> > diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+>>>>> > >> > index 2e87a07..c4dcab2 100644
+>>>>> > >> > --- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+>>>>> > >> > +++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
+>>> > > how about clock.h header?
+>> > 
+>> > If i understand correctly you want me to rename misc_regs.h as clock.h?
+>> > Actually misc_regs.h have all miscellaneous registers for spear, like:
+>> > clock specific, reset register, some muxing registers too.. They are
+>> > not only for "clock". So we kept this name.
+> no split it
+
+We have "Miscellaneous Registers" as a seperate module in our device manuals
+and we don't want to break this terminology. Misc regs are intermixed, and it
+is difficult to separate the registers on basis of various system parameters
+(like clock, power etc.)
