@@ -1,36 +1,52 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 7 Sep 2010 20:18:59 +0200
-Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
-In-Reply-To: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <AANLkTi=chtedwbDDJnZOe5yTqobUeXz=aZYUNNUDpQQm@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  7 Sep 2010 11:23:51 -0700
+Subject: [PATCH 0/3] Fixing udelay() on SMP (and non-SMP too)
+Message-ID: <1283883834-4693-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/7 Santosh Shilimkar <santosh.shilimkar@ti.com>:
+(Sorry, resending due to stray comma...)
 
-> This series is just repost adding Catalin's ack to the patches and
-> combining Thomas's two rebased kexec patches.
-> It's generated against the mainline 2.6.36-rc3 + Catalin's
-> "[PATCH 0/9] Various patches for 2.6.37-rc1" series.
->
-> Santosh Shilimkar (4):
-> ?omap4: l2x0: Override the default l2x0_disable
-> ?ARM: l2x0: Fix coding-style in the cache-l2x0.h
-> ?ARM: l2x0: Determine the cache size
-> ?ARM: l2x0: Optimise the range based operations
->
-> Thomas Gleixner (2):
-> ?arm: Disable outer (L2) cache in kexec
-> ?arm: Implement l2x0 cache disable functions
+These patches are another attempt at fixing the udelay()
+issue pointed out on arm-lkml[1][2]. A quick recap: some SMP
+machines can scale their CPU frequencies independent of one
+another. loops_per_jiffy is calibrated globally and used in
+__const_udelay(). If one CPU is running faster than what the
+loops_per_jiffy is calculated (or scaled) for, udelay() will
+be incorrect and not wait long enough (or too long). A similar
+problem occurs if the cpu frequency is scaled during a udelay()
+call.
 
-FWIW:
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+We could fix this issue a couple ways, wholesale replacement
+of __udelay() and __const_udelay() (see [2] for that approach),
+or replacement of __delay() (this series). Option 1 can fail if
+anybody uses udelay() before memory is mapped and also duplicates
+most of the code in asm/delay.h. It also needs to hardcode the
+timer tick frequency, which can sometimes be inaccurate. The
+benefit is that loops_per_jiffy stays the same and thus BogoMIPS
+is unchanged.  Option 2 can't fail since the __delay() loop is
+replaced after memory is mapped in, but it suffers from a low
+BogoMIPS when timers are clocked slowly. It also more accurately
+calculates the timer tick frequency through the use of
+calibrate_delay_direct().
 
-Can you also include the patch by Per Fransson I sent off to
-Thomas and the list just a few days ago with the subject
-"[PATCH] ARM: ux500 specific L2 cache code"
-in this patch series?
+-- Reference --
+[1] http://article.gmane.org/gmane.linux.kernel/977567
+[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/78496 
 
-Yours,
-Linus Walleij
+Stephen Boyd (3):
+  [ARM] Translate delay.S into (mostly) C
+  [ARM] Allow machines to override __delay()
+  [ARM] Implement a timer based __delay() loop
+
+ arch/arm/include/asm/delay.h |    5 ++-
+ arch/arm/kernel/armksyms.c   |    4 --
+ arch/arm/lib/delay.S         |   65 ------------------------------
+ arch/arm/lib/delay.c         |   90 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 94 insertions(+), 70 deletions(-)
+ delete mode 100644 arch/arm/lib/delay.S
+ create mode 100644 arch/arm/lib/delay.c
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
