@@ -1,68 +1,34 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 8 Sep 2010 15:42:22 +0200
-Subject: [PATCH] ARM: Update RealView SMP defconfig
-Message-ID: <1283953342-23811-1-git-send-email-linus.walleij@stericsson.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed,  8 Sep 2010 09:42:39 -0400
+Subject: [PATCH 1/4] ARM: pxa168fb: fix clear operation
+Message-ID: <1283953362-2363-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches the condensed RealView SMP defconfig activating the
-same features mentioned in the vanilla RealView defconfig patch
-submitted earlier.
+While fb isn't active, we should clear CFG_GRA_ENA bit. The existing code
+can't clear this bit.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
 ---
- arch/arm/configs/realview-smp_defconfig |   15 +++++++++++++--
- 1 files changed, 13 insertions(+), 2 deletions(-)
+ drivers/video/pxa168fb.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
-index 9312ef9..5ca7a61 100644
---- a/arch/arm/configs/realview-smp_defconfig
-+++ b/arch/arm/configs/realview-smp_defconfig
-@@ -39,6 +39,7 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_ARM_INTEGRATOR=y
-+CONFIG_ARM_CHARLCD=y
- CONFIG_NETDEVICES=y
- CONFIG_SMSC_PHY=y
- CONFIG_NET_ETHERNET=y
-@@ -52,10 +53,13 @@ CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_LEGACY_PTY_COUNT=16
- # CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_VERSATILE=y
-+CONFIG_SPI=y
-+CONFIG_GPIOLIB=y
- # CONFIG_HWMON is not set
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
-@@ -70,7 +74,13 @@ CONFIG_SND_ARMAACI=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
--CONFIG_INOTIFY=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_DS1307=y
-+CONFIG_RTC_DRV_PL031=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_CRAMFS=y
-@@ -80,6 +90,7 @@ CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_RCU_CPU_STALL_DETECTOR is not set
+diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+index c91a7f7..13c238b 100644
+--- a/drivers/video/pxa168fb.c
++++ b/drivers/video/pxa168fb.c
+@@ -298,8 +298,8 @@ static void set_dma_control0(struct pxa168fb_info *fbi)
+ 	 * Set bit to enable graphics DMA.
+ 	 */
+ 	x = readl(fbi->reg_base + LCD_SPU_DMA_CTRL0);
+-	x |= fbi->active ? 0x00000100 : 0;
+-	fbi->active = 0;
++	x &= ~CFG_GRA_ENA_MASK;
++	x |= fbi->active ? CFG_GRA_ENA(1) : CFG_GRA_ENA(0);
+ 
+ 	/*
+ 	 * If we are in a pseudo-color mode, we need to enable
 -- 
-1.7.2.2
+1.5.6.5
