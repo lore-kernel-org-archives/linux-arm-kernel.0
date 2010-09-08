@@ -1,172 +1,80 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed,  8 Sep 2010 09:42:42 -0400
-Subject: [PATCH 4/4] ARM: mmp: support sparse irq
-In-Reply-To: <1283953362-2363-3-git-send-email-haojian.zhuang@marvell.com>
-References: <1283953362-2363-1-git-send-email-haojian.zhuang@marvell.com>
-	<1283953362-2363-2-git-send-email-haojian.zhuang@marvell.com>
-	<1283953362-2363-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1283953362-2363-4-git-send-email-haojian.zhuang@marvell.com>
+Date: Wed,  8 Sep 2010 09:44:32 -0400
+Subject: [PATCH 1/5] mfd: add codec resource into 88pm860x driver
+Message-ID: <1283953476-2395-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sparse IRQ support in ARCH_MMP.
+Add codec IRQ resources that are used in 88pm860x codec driver.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Samuel Ortiz <sameo@openedhand.com>
 ---
- arch/arm/Kconfig                      |    1 +
- arch/arm/mach-mmp/aspenite.c          |    3 +++
- arch/arm/mach-mmp/flint.c             |    4 ++++
- arch/arm/mach-mmp/include/mach/irqs.h |    4 +---
- arch/arm/mach-mmp/jasper.c            |    5 ++++-
- arch/arm/mach-mmp/ttc_dkb.c           |    4 ++++
- 6 files changed, 17 insertions(+), 4 deletions(-)
+ drivers/mfd/88pm860x-core.c |   44 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45f93e1..eb1d43d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -511,6 +511,7 @@ config ARCH_MMP
- 	select GENERIC_CLOCKEVENTS
- 	select TICK_ONESHOT
- 	select PLAT_PXA
-+	select SPARSE_IRQ
- 	help
- 	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
+diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+index 07933f3..4db10a1 100644
+--- a/drivers/mfd/88pm860x-core.c
++++ b/drivers/mfd/88pm860x-core.c
+@@ -158,6 +158,43 @@ static struct mfd_cell onkey_devs[] = {
+ 	},
+ };
  
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 9e1bd6b..9b1ef76 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -16,6 +16,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/nand.h>
-+#include <linux/interrupt.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -212,6 +213,7 @@ MACHINE_START(ASPENITE, "PXA168-based Aspenite Development Platform")
- 	.phys_io        = APB_PHYS_BASE,
- 	.io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= IRQ_BOARD_START,
- 	.init_irq       = pxa168_init_irq,
- 	.timer          = &pxa168_timer,
- 	.init_machine   = common_init,
-@@ -221,6 +223,7 @@ MACHINE_START(ZYLONITE2, "PXA168-based Zylonite2 Development Platform")
- 	.phys_io        = APB_PHYS_BASE,
- 	.io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= IRQ_BOARD_START,
- 	.init_irq       = pxa168_init_irq,
- 	.timer          = &pxa168_timer,
- 	.init_machine   = common_init,
-diff --git a/arch/arm/mach-mmp/flint.c b/arch/arm/mach-mmp/flint.c
-index e4312d2..c558425 100644
---- a/arch/arm/mach-mmp/flint.c
-+++ b/arch/arm/mach-mmp/flint.c
-@@ -16,6 +16,7 @@
- #include <linux/smc91x.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/interrupt.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -25,6 +26,8 @@
- 
- #include "common.h"
- 
-+#define FLINT_NR_IRQS	(IRQ_BOARD_START + 48)
++static struct resource codec_resources[] = {
++	{
++		/* Headset microphone insertion or removal */
++		.name		= "micin",
++		.start		= PM8607_IRQ_MICIN,
++		.end		= PM8607_IRQ_MICIN,
++		.flags		= IORESOURCE_IRQ,
++	}, {
++		/* Hook-switch press or release */
++		.name		= "hook",
++		.start		= PM8607_IRQ_HOOK,
++		.end		= PM8607_IRQ_HOOK,
++		.flags		= IORESOURCE_IRQ,
++	}, {
++		/* Headset insertion or removal */
++		.name		= "headset",
++		.start		= PM8607_IRQ_HEADSET,
++		.end		= PM8607_IRQ_HEADSET,
++		.flags		= IORESOURCE_IRQ,
++	}, {
++		/* Audio short */
++		.name		= "audio-short",
++		.start		= PM8607_IRQ_AUDIO_SHORT,
++		.end		= PM8607_IRQ_AUDIO_SHORT,
++		.flags		= IORESOURCE_IRQ,
++	},
++};
 +
- static unsigned long flint_pin_config[] __initdata = {
- 	/* UART1 */
- 	GPIO45_UART1_RXD,
-@@ -116,6 +119,7 @@ MACHINE_START(FLINT, "Flint Development Platform")
- 	.phys_io        = APB_PHYS_BASE,
- 	.io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= FLINT_NR_IRQS,
- 	.init_irq       = mmp2_init_irq,
- 	.timer          = &mmp2_timer,
- 	.init_machine   = flint_init,
-diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
-index b379cde..a09d328 100644
---- a/arch/arm/mach-mmp/include/mach/irqs.h
-+++ b/arch/arm/mach-mmp/include/mach/irqs.h
-@@ -222,10 +222,8 @@
- #define IRQ_GPIO_NUM			192
- #define IRQ_GPIO(x)			(IRQ_GPIO_START + (x))
- 
--/* Board IRQ - 64 by default, increase if not enough */
- #define IRQ_BOARD_START			(IRQ_GPIO_START + IRQ_GPIO_NUM)
--#define IRQ_BOARD_END			(IRQ_BOARD_START + 64)
- 
--#define NR_IRQS				(IRQ_BOARD_END)
-+#define NR_IRQS				(IRQ_BOARD_START)
- 
- #endif /* __ASM_MACH_IRQS_H */
-diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
-index 80c3e7a..940ee03 100644
---- a/arch/arm/mach-mmp/jasper.c
-+++ b/arch/arm/mach-mmp/jasper.c
-@@ -18,16 +18,18 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/max8649.h>
- #include <linux/mfd/max8925.h>
-+#include <linux/interrupt.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <mach/addr-map.h>
- #include <mach/mfp-mmp2.h>
- #include <mach/mmp2.h>
--#include <mach/irqs.h>
- 
- #include "common.h"
- 
-+#define JASPER_NR_IRQS		(IRQ_BOARD_START + 48)
++static struct mfd_cell codec_devs[] = {
++	{
++		.name		= "88pm860x-codec",
++		.num_resources	= ARRAY_SIZE(codec_resources),
++		.resources	= &codec_resources[0],
++		.id		= -1,
++	},
++};
 +
- static unsigned long jasper_pin_config[] __initdata = {
- 	/* UART1 */
- 	GPIO29_UART1_RXD,
-@@ -137,6 +139,7 @@ MACHINE_START(MARVELL_JASPER, "Jasper Development Platform")
- 	.phys_io        = APB_PHYS_BASE,
- 	.io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= JASPER_NR_IRQS,
- 	.init_irq       = mmp2_init_irq,
- 	.timer          = &mmp2_timer,
- 	.init_machine   = jasper_init,
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index ee65e05..5457113 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -14,6 +14,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/onenand.h>
-+#include <linux/interrupt.h>
+ static struct resource regulator_resources[] = {
+ 	PM8607_REG_RESOURCE(BUCK1, BUCK1),
+ 	PM8607_REG_RESOURCE(BUCK2, BUCK2),
+@@ -687,6 +724,13 @@ static void __devinit device_8607_init(struct pm860x_chip *chip,
+ 		goto out_dev;
+ 	}
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -24,6 +25,8 @@
- 
- #include "common.h"
- 
-+#define TTCDKB_NR_IRQS		(IRQ_BOARD_START + 24)
-+
- static unsigned long ttc_dkb_pin_config[] __initdata = {
- 	/* UART2 */
- 	GPIO47_UART2_RXD,
-@@ -125,6 +128,7 @@ MACHINE_START(TTC_DKB, "PXA910-based TTC_DKB Development Platform")
- 	.phys_io        = APB_PHYS_BASE,
- 	.io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
- 	.map_io		= mmp_map_io,
-+	.nr_irqs	= TTCDKB_NR_IRQS,
- 	.init_irq       = pxa910_init_irq,
- 	.timer          = &pxa910_timer,
- 	.init_machine   = ttc_dkb_init,
++	ret = mfd_add_devices(chip->dev, 0, &codec_devs[0],
++			      ARRAY_SIZE(codec_devs),
++			      &codec_resources[0], 0);
++	if (ret < 0) {
++		dev_err(chip->dev, "Failed to add codec subdev\n");
++		goto out_dev;
++	}
+ 	return;
+ out_dev:
+ 	mfd_remove_devices(chip->dev);
 -- 
 1.5.6.5
