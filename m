@@ -1,65 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 08 Sep 2010 13:46:15 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: mxc: turn off HWCAP_NEON for older versions of
-	imx51 silicon
-In-Reply-To: <4C8796E6.3010905@ru.mvista.com>
-References: <1283890733-6548-1-git-send-email-nico@fluxnic.net>
-	<1283890733-6548-3-git-send-email-nico@fluxnic.net>
-	<4C8796E6.3010905@ru.mvista.com>
-Message-ID: <alpine.LFD.2.00.1009081334150.19366@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 8 Sep 2010 12:24:54 -0600
+Subject: [spi-devel-general] [PATCH] SPI: fix APB pclk power regression
+	on U300
+In-Reply-To: <AANLkTik+-YwxU7__QnSC8BhEO0-iqAA+u11BBt-2qo9Q@mail.gmail.com>
+References: <1282381656-8644-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTik+-YwxU7__QnSC8BhEO0-iqAA+u11BBt-2qo9Q@mail.gmail.com>
+Message-ID: <20100908182454.GS3686@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Sep 2010, Sergei Shtylyov wrote:
-
-> Hello.
-> 
-> Nicolas Pitre wrote:
-> 
-> > From: Amit Kucheria <amit.kucheria@verdurent.com>
-> 
-> > Versions of silicon older than TO3 have broken NEON implementation. Turn off
-> > NEON in such cases.
-> 
-> > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> > Tested-by: Dave Martin <dave.martin@linaro.org>
-> > Tested-by: Jason Hui <jason.hui@linaro.org>
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+On Mon, Aug 23, 2010 at 10:30:17AM -0700, Kevin Wells wrote:
+> > With the introduction of an AMBA PrimeCell per-cell block clock,
+> > the pclk was left on after probe() unless explicitly disabled.
+> > This clock is wired to the same clock on PL022 causing it to stay
+> > always on since.
+> >
+> > Fix this up properly by clocking the pclk whenever we want to
+> > write into any PL022 registers and clocking the external clock
+> > whenever we want to transmit messages on the bus.
+> >
+> > Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 > > ---
-> >  arch/arm/mach-mx5/cpu.c |   19 +++++++++++++++++++
-> >  1 files changed, 19 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-> > index 2d37785..548c55b 100644
-> > --- a/arch/arm/mach-mx5/cpu.c
-> > +++ b/arch/arm/mach-mx5/cpu.c
-> > @@ -70,6 +70,25 @@ int mx51_revision(void)
-> >  }
-> >  EXPORT_SYMBOL(mx51_revision);
-> >  +#ifdef CONFIG_NEON
-> > +
-> > +/* All versions of the silicon before Rev. 3 have broken NEON
-> > implementations.
-> > + * Dependent on link order - so the assumption is that vfp_init is called
-> > before us
-> > + */
-> > +static int __init mx51_neon_fixup(void)
-> > +{
-> > +	if (mx51_revision() <  MX51_CHIP_REV_3_0) {
+> > Tested on U300 and U8500, even though the pclk stuff came in from
+> > the ARM tree it is probably better to carry this through Grants
+> > tree so as not to disturb other patches going in for PL022.
+> > ---
+> > ?drivers/spi/amba-pl022.c | ? 14 ++++++++------
+> > ?1 files changed, 8 insertions(+), 6 deletions(-)
+> >
 > 
->   Too many spaces after '<'?
+> Tested-by : Kevin Wells <wellsk40@gmail.com>
 
-Yup.
+Applied, thanks.
 
-> > +		if (elf_hwcap & HWCAP_NEON) {
-> 
->    Could be collapsed into the preceding *if*, and so indentation level made
-> one less...
-
-I amended this patch with your suggestion and pushed it out.
-
-Russell, if you pulled this already I'll just send you a fixup patch in 
-that case.
-
-
-Nicolas
+g.
