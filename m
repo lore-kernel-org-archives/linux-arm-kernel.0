@@ -1,24 +1,23 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 8 Sep 2010 16:26:12 +0200
-Subject: [00/12] DMAENGINE: PL08X driver updates
-In-Reply-To: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTi==kKBdOaim+fx5yhpKOo27HWhB7kQiDqv0+BPS@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Sep 2010 15:37:00 +0100
+Subject: [PATCH 3/3] ARM: vexpress: add support for CPU hotplug to
+	ct-ca9x4 tile
+In-Reply-To: <1282060684-27761-4-git-send-email-will.deacon@arm.com>
+References: <1282060684-27761-1-git-send-email-will.deacon@arm.com>
+	<1282060684-27761-2-git-send-email-will.deacon@arm.com>
+	<1282060684-27761-3-git-send-email-will.deacon@arm.com>
+	<1282060684-27761-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20100908143700.GB32659@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/8/31 Linus Walleij <linus.walleij@stericsson.com>:
+On Tue, Aug 17, 2010 at 04:58:04PM +0100, Will Deacon wrote:
+> The Versatile Express platform can support a quad-core Cortex-A9 tile running
+> SMP Linux.
+> 
+> This patch adds support for CPU hotplug when running in this configuration.
 
-> This updates the PL08X driver in the async_tx next branch with
-> a number of fixes and features, each one pretty self-describing.
-> This has been tested with the PrimeCell DMA series on the
-> RealView PB11MPCore and works flawlessly, multiplexing
-> several virtual clients, both devices (slaves) and memcpy
-> channels, across only two (!) available physical channels.
-
-Dan can you ACK and queue this for next?
-
-I know you're busy, just a reminder...
-
-Yours,
-Linus Walleij
+This ties the core tile support into the generic versatile express code,
+something which the current code structure is careful to avoid.  Please
+ensure that we continue to avoid making the generic code rely upon
+CA9x4 code.
