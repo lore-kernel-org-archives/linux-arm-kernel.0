@@ -1,105 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Sep 2010 12:32:44 -0700
-Subject: [PATCH] ARM: Don't try to send IPI on UP systems with CONFIG_SMP
-In-Reply-To: <20100908085657.GA29914@n2100.arm.linux.org.uk>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100906180346.GC20849@atomide.com>
-	<20100908030951.GH22507@atomide.com>
-	<20100908031214.GI22507@atomide.com>
-	<20100908031404.GJ22507@atomide.com>
-	<20100908085657.GA29914@n2100.arm.linux.org.uk>
-Message-ID: <20100908193244.GU22507@atomide.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 8 Sep 2010 12:47:16 -0700
+Subject: [PATCH] bounce: call flush_dcache_page after bounce_copy_vec
+In-Reply-To: <1283892334-9238-1-git-send-email-gking@nvidia.com>
+References: <1283892334-9238-1-git-send-email-gking@nvidia.com>
+Message-ID: <20100908124716.830a0055.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [100908 01:49]:
-> On Tue, Sep 07, 2010 at 08:14:05PM -0700, Tony Lindgren wrote:
-> > This is not needed on UP. Additionally with will cause issues when
-> > booting CONFIG_SMP_ON_UP kernel on earlier ARM cores.
+On Tue,  7 Sep 2010 13:45:34 -0700
+Gary King <gking@nvidia.com> wrote:
+
+> I have been seeing problems on Tegra 2 (ARMv7 SMP) systems with HIGHMEM
+> enabled on 2.6.35 (plus some patches targetted at 2.6.36 to perform
+> cache maintenance lazily), and the root cause appears to be that the
+> mm bouncing code is calling flush_dcache_page before it copies the
+> bounce buffer into the bio.
 > 
-> Doesn't make sense.
-
-Updated below. Basically it's unnecessary to send IPI for one CPU,
-and IPI may not be even supported when booting earlier cores
-with CONFIG_SMP_ON_UP.
- 
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -207,9 +207,7 @@ __setup("reboot=", reboot_setup);
-> >  
-> >  void machine_shutdown(void)
-> >  {
-> > -#ifdef CONFIG_SMP
-> >  	smp_send_stop();
-> > -#endif
+> The patch below reorders these two operations, and eliminates numerous
+> arbitrary application crashes on my dev system.
 > 
-> This will cause a link error as smp.c is not built for uniprocessor
-> builds.
-
-Right that should have not made it to the patch.
- 
-> > --- a/arch/arm/kernel/smp.c
-> > +++ b/arch/arm/kernel/smp.c
-> > @@ -560,12 +560,17 @@ asmlinkage void __exception do_IPI(struct pt_regs *regs)
-> >  
-> >  void smp_send_reschedule(int cpu)
-> >  {
-> > -	send_ipi_message(cpumask_of(cpu), IPI_RESCHEDULE);
-> > +	if (is_smp())
-> > +		send_ipi_message(cpumask_of(cpu), IPI_RESCHEDULE);
+> Gary
 > 
-> There won't be any other CPUs to send an IPI to - and all places which
-> call this are protected by a check for cpu == smp_processor_id() - in
-> other words, this will never be called for the current CPU.
- 
-Good point, it's not needed.
-
-> >  void smp_send_stop(void)
-> >  {
-> >  	cpumask_t mask = cpu_online_map;
-> > +
-> > +	if (!is_smp())
-> > +		return;
-> > +
-> >  	cpu_clear(smp_processor_id(), mask);
+> --
+> >From 678c9bca8d8a8f254f28af91e69fad3aa1be7593 Mon Sep 17 00:00:00 2001
+> From: Gary King <gking@nvidia.com>
+> Date: Mon, 6 Sep 2010 15:37:12 -0700
+> Subject: bounce: call flush_dcache_page after bounce_copy_vec
 > 
-> This results in an empty CPU mask.  It might be better to do instead:
+> the bounced page needs to be flushed after data is copied into it,
+> to ensure that architecture implementations can synchronize
+> instruction and data caches if necessary.
 > 
-> 	if (!cpus_empty(mask))
+> Signed-off-by: Gary King <gking@nvidia.com>
+> ---
+>  mm/bounce.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> >  	send_ipi_message(&mask, IPI_CPU_STOP);
-> >  }
+> diff --git a/mm/bounce.c b/mm/bounce.c
+> index 13b6dad..1481de6 100644
+> --- a/mm/bounce.c
+> +++ b/mm/bounce.c
+> @@ -116,8 +116,8 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
+>  		 */
+>  		vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
+>  
+> -		flush_dcache_page(tovec->bv_page);
+>  		bounce_copy_vec(tovec, vfrom);
+> +		flush_dcache_page(tovec->bv_page);
+>  	}
+>  }
 
-OK, so this patch shrinks to the one change below.
+Oh my, that was bad.
 
-Regards,
-
-Tony
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 7 Sep 2010 18:41:33 -0700
-Subject: [PATCH] ARM: Don't send IPI in smp_send_stop if there's only one CPU
-
-No need to send IPI if there's one CPU, especially when booting
-systems with CONFIG_SMP_ON_UP that may not even support IPI.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 40dc74f..32e16da 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -567,7 +567,8 @@ void smp_send_stop(void)
- {
- 	cpumask_t mask = cpu_online_map;
- 	cpu_clear(smp_processor_id(), mask);
--	send_ipi_message(&mask, IPI_CPU_STOP);
-+	if (!cpus_empty(mask))
-+		send_ipi_message(&mask, IPI_CPU_STOP);
- }
- 
- /*
+I queued your fix for 2.6.36 and tagged it for -stable backporting,
+thanks.
