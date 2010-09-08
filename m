@@ -1,71 +1,64 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed,  8 Sep 2010 09:44:36 -0400
-Subject: [PATCH 5/5] mfd: fix max8925 irq control bit incorrect setting
-In-Reply-To: <1283953476-2395-4-git-send-email-haojian.zhuang@marvell.com>
-References: <1283953476-2395-1-git-send-email-haojian.zhuang@marvell.com>
-	<1283953476-2395-2-git-send-email-haojian.zhuang@marvell.com>
-	<1283953476-2395-3-git-send-email-haojian.zhuang@marvell.com>
-	<1283953476-2395-4-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1283953476-2395-5-git-send-email-haojian.zhuang@marvell.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 08 Sep 2010 18:00:06 +0400
+Subject: [PATCH 2/2] ARM: mxc: turn off HWCAP_NEON for older versions
+	of imx51	silicon
+In-Reply-To: <1283890733-6548-3-git-send-email-nico@fluxnic.net>
+References: <1283890733-6548-1-git-send-email-nico@fluxnic.net>
+	<1283890733-6548-3-git-send-email-nico@fluxnic.net>
+Message-ID: <4C8796E6.3010905@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Liu <kliu5@marvell.com>
+Hello.
 
-In max8925_irq_sync_unlock(), irq control bit is set at the same time.
-Zero means enabling irq, and one means disabling irq.
+Nicolas Pitre wrote:
 
-The original code is:
-	irq_chg[0] &= irq_data->enable;
+> From: Amit Kucheria <amit.kucheria@verdurent.com>
 
-It should be changed to:
-	irq_chg[0] &= ~irq_data->enable;
+> Versions of silicon older than TO3 have broken NEON implementation. Turn off
+> NEON in such cases.
 
-Otherwise, irq control bit is mess.
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> Tested-by: Dave Martin <dave.martin@linaro.org>
+> Tested-by: Jason Hui <jason.hui@linaro.org>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/mach-mx5/cpu.c |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+> index 2d37785..548c55b 100644
+> --- a/arch/arm/mach-mx5/cpu.c
+> +++ b/arch/arm/mach-mx5/cpu.c
+> @@ -70,6 +70,25 @@ int mx51_revision(void)
+>  }
+>  EXPORT_SYMBOL(mx51_revision);
+>  
+> +#ifdef CONFIG_NEON
+> +
+> +/* All versions of the silicon before Rev. 3 have broken NEON implementations.
+> + * Dependent on link order - so the assumption is that vfp_init is called before us
+> + */
+> +static int __init mx51_neon_fixup(void)
+> +{
+> +	if (mx51_revision() <  MX51_CHIP_REV_3_0) {
 
-Signed-off-by: Kevin Liu <kliu5@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Samuel Ortiz <sameo@openedhand.com>
----
- drivers/mfd/max8925-core.c |   13 +++++++------
- 1 files changed, 7 insertions(+), 6 deletions(-)
+   Too many spaces after '<'?
 
-diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
-index f9cdfbe..44695f5 100644
---- a/drivers/mfd/max8925-core.c
-+++ b/drivers/mfd/max8925-core.c
-@@ -434,24 +434,25 @@ static void max8925_irq_sync_unlock(unsigned int irq)
- 	irq_tsc = cache_tsc;
- 	for (i = 0; i < ARRAY_SIZE(max8925_irqs); i++) {
- 		irq_data = &max8925_irqs[i];
-+		/* 1 -- disable, 0 -- enable */
- 		switch (irq_data->mask_reg) {
- 		case MAX8925_CHG_IRQ1_MASK:
--			irq_chg[0] &= irq_data->enable;
-+			irq_chg[0] &= ~irq_data->enable;
- 			break;
- 		case MAX8925_CHG_IRQ2_MASK:
--			irq_chg[1] &= irq_data->enable;
-+			irq_chg[1] &= ~irq_data->enable;
- 			break;
- 		case MAX8925_ON_OFF_IRQ1_MASK:
--			irq_on[0] &= irq_data->enable;
-+			irq_on[0] &= ~irq_data->enable;
- 			break;
- 		case MAX8925_ON_OFF_IRQ2_MASK:
--			irq_on[1] &= irq_data->enable;
-+			irq_on[1] &= ~irq_data->enable;
- 			break;
- 		case MAX8925_RTC_IRQ_MASK:
--			irq_rtc &= irq_data->enable;
-+			irq_rtc &= ~irq_data->enable;
- 			break;
- 		case MAX8925_TSC_IRQ_MASK:
--			irq_tsc &= irq_data->enable;
-+			irq_tsc &= ~irq_data->enable;
- 			break;
- 		default:
- 			dev_err(chip->dev, "wrong IRQ\n");
--- 
-1.5.6.5
+> +		if (elf_hwcap & HWCAP_NEON) {
+
+    Could be collapsed into the preceding *if*, and so indentation level made 
+one less...
+
+> +			elf_hwcap &= ~HWCAP_NEON;
+> +			pr_info("Turning off NEON support, detected broken NEON implementation\n");
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
+> +late_initcall(mx51_neon_fixup);
+> +#endif
+> +
+
+WBR, Sergei
