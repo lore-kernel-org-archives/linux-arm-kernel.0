@@ -1,57 +1,127 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 8 Sep 2010 15:51:14 -0700
-Subject: [PATCH] MMC: move regulator handling closer to core v3
-In-Reply-To: <1283677538-31121-1-git-send-email-linus.walleij@stericsson.com>
-References: <1283677538-31121-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100908155114.880463fc.akpm@linux-foundation.org>
+From: mark.brown314@gmail.com (Mark F. Brown)
+Date: Wed, 8 Sep 2010 19:42:36 -0400
+Subject: [PATCH 1/3] ARM: pxa168: added support for Teton BGA platform
+In-Reply-To: <201009081751.22841.marek.vasut@gmail.com>
+References: <1283914607-10570-1-git-send-email-mark.brown314@gmail.com>
+	<1283914607-10570-2-git-send-email-mark.brown314@gmail.com>
+	<201009081751.22841.marek.vasut@gmail.com>
+Message-ID: <AANLkTim+heO9nDOUhKYatAKts6QcPvcE0tBs=wVtvF4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  5 Sep 2010 11:05:38 +0200
-Linus Walleij <linus.walleij@stericsson.com> wrote:
-
-> After discovering a problem in regulator reference counting I
-> took Mark Brown's advice to move the reference count into the
-> MMC core by making the regulator status a member of
-> struct mmc_host.
-> 
+On Wed, Sep 8, 2010 at 11:51 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Dne St 8. z??? 2010 04:56:45 Mark F. Brown napsal(a):
 >
-> ...
+> ---------------------------
+> Description is missing here
+> ---------------------------
 >
-> -static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
-> +static inline void pxamci_set_power(struct pxamci_host *host,
-> +				    unsigned char power_mode,
-> +				    unsigned int vdd)
->  {
->  	int on;
->  
-> -#ifdef CONFIG_REGULATOR
-> -	if (host->vcc)
-> -		mmc_regulator_set_ocr(host->vcc, vdd);
-> -#endif
-> +	if (host->vcc) {
-> +		int ret;
-> +
-> +		if (power_mode == MMC_POWER_UP)
-> +			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
-> +		else if (power_mode == MMC_POWER_OFF)
-> +			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
-> +	}
-
-There's no point in copying the return value into a local then ignoring
-it.  mmc_regulator_set_ocr() can return a negative errno so we should
-test for that, clean up and propagate the error.
-
-If we really do deliberately ignore the error then there should be a
-code comment which excuses this behaviour and perhaps a warning printk.
-
-The same comments apply to mmci_set_ios().
-
-omap_hsmmc_1_set_power() gets it right.
-
-Why doesn't omap_hsmmc_23_set_sleep() run .before_set_reg() and
-.after_set_reg()?
-
+>> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+>> ---
+>> ?arch/arm/mach-mmp/Kconfig ? ? | ? ?7 ++++++
+>> ?arch/arm/mach-mmp/Makefile ? ?| ? ?1 +
+>> ?arch/arm/mach-mmp/teton_bga.c | ? 47
+>> +++++++++++++++++++++++++++++++++++++++++ 3 files changed, 55
+>> insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-mmp/teton_bga.c
+>>
+>> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+>> index 6ab843e..0711d3b 100644
+>> --- a/arch/arm/mach-mmp/Kconfig
+>> +++ b/arch/arm/mach-mmp/Kconfig
+>> @@ -57,6 +57,13 @@ config MACH_MARVELL_JASPER
+>> ? ? ? ? PXA910-based development board. Since MMP2 is compatible to
+>> ? ? ? ? ARMv6 architecture.
+>>
+>> +config MACH_TETON_BGA
+>> + ? ? bool "Marvell's PXA168 Teton BGA Development Board"
+>> + ? ? select CPU_PXA168
+>> + ? ? help
+>> + ? ? ? Say 'Y' here if you want to support the Marvell PXA168-based
+>> + ? ? ? Teton BGA Development Board.
+>> +
+>> ?endmenu
+>>
+>> ?config CPU_PXA168
+>> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+>> index 8b66d06..751cdbf 100644
+>> --- a/arch/arm/mach-mmp/Makefile
+>> +++ b/arch/arm/mach-mmp/Makefile
+>> @@ -17,3 +17,4 @@ obj-$(CONFIG_MACH_TAVOREVB) += tavorevb.o
+>> ?obj-$(CONFIG_MACH_TTC_DKB) ? += ttc_dkb.o
+>> ?obj-$(CONFIG_MACH_FLINT) ? ? += flint.o
+>> ?obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
+>> +obj-$(CONFIG_MACH_TETON_BGA) += teton_bga.o
+>> diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
+>> new file mode 100644
+>> index 0000000..014cc37
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mmp/teton_bga.c
+>> @@ -0,0 +1,47 @@
+>> +/*
+>> + * ?linux/arch/arm/mach-mmp/teton_bga.c
+>> + *
+>> + * ?Support for the Marvell PXA168 Teton BGA Development Platform.
 >
-> ...
+> Authoring information of this file are missing. Also, MAINTAINERS entry is
+> missing.
+>> + *
+>> + * ?This code is based on aspenite.c
+>> + *
+>> + * ?This program is free software; you can redistribute it and/or modify
+>> + * ?it under the terms of the GNU General Public License version 2 as
+>> + * ?publishhed by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <mach/addr-map.h>
+>> +#include <mach/mfp-pxa168.h>
+>> +#include <mach/pxa168.h>
+>> +#include <mach/gpio.h>
 >
+> use ... #include <linux/gpio.h>
+>
+>> +
+>> +#include "common.h"
+>> +
+>> +static unsigned long teton_bga_pin_config[] __initdata = {
+>> + ? ? /* UART1 */
+>> + ? ? GPIO107_UART1_TXD,
+>> + ? ? GPIO108_UART1_RXD,
+>> +};
+>> +
+>> +static void __init teton_bga_init(void)
+>> +{
+>> + ? ? mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
+>> +
+>> + ? ? /* on-chip devices */
+>> + ? ? pxa168_add_uart(1);
+>
+> Don't we have enum for these magic numbers on pxa168 ?
+>> +}
+>> +
+>> +MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development Platform")
+>> + ? ? .phys_io ? ? ? ?= APB_PHYS_BASE,
+>> + ? ? .io_pg_offst ? ?= (APB_VIRT_BASE >> 18) & 0xfffc,
+>> + ? ? .map_io ? ? ? ? = mmp_map_io,
+>> + ? ? .init_irq ? ? ? = pxa168_init_irq,
+>> + ? ? .timer ? ? ? ? ?= &pxa168_timer,
+>> + ? ? .init_machine ? = teton_bga_init,
+>> +MACHINE_END
+>
+> Cheers
+>
+
+I am assuming you mean the magic number for .io_pg_offst:
+ .io_pg_offst ? ?= (APB_VIRT_BASE >> 18) & 0xfffc,
+
+It seems all of the other platforms in arch/arm are configuring it
+this way. Do you really want me to change this?
+
+Regards,
+-- Mark
