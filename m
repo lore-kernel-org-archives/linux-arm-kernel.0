@@ -1,50 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Sep 2010 20:30:30 -0700
-Subject: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-omap
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75B0@dbde02.ent.ti.com>
-References: <4C6CFBAF.6020407@canonical.com>
-	<20100819095705.GU12184@atomide.com>
-	<20100819102025.GA32151@n2100.arm.linux.org.uk>
-	<20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902162337.GP11597@atomide.com>
-	<20100902193000.GX11597@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75B0@dbde02.ent.ti.com>
-Message-ID: <20100908033030.GM22507@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 8 Sep 2010 07:04:36 +0200
+Subject: [PATCH 5/7] ARM: don't expose CONFIG_ZRELADDR to the users
+In-Reply-To: <AANLkTinEvMREgk=UZr9RJ+FF9maeDQfDv2ZSHDppAGis@mail.gmail.com>
+References: <20100903095504.GC13643@pengutronix.de>
+	<1283507818-1573-5-git-send-email-u.kleine-koenig@pengutronix.de>
+	<AANLkTikg-A7Y19vU+gShPP+zQHpNm-Wzi-m43_dm+OxL@mail.gmail.com>
+	<20100903185356.GD17152@pengutronix.de>
+	<AANLkTikvhJRJNOczM+n21mup+yc-VJS6OyNANUiM=x7U@mail.gmail.com>
+	<AANLkTinEvMREgk=UZr9RJ+FF9maeDQfDv2ZSHDppAGis@mail.gmail.com>
+Message-ID: <20100908050436.GA1614@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100903 05:07]:
+Hello Mathieu,
+
+On Tue, Sep 07, 2010 at 03:39:20PM -0700, Mathieu Rondonneau wrote:
+> > 2010/9/4 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> >> On Fri, Sep 03, 2010 at 09:30:50PM +0800, Eric Miao wrote:
+> >>> 2010/9/3 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >>> >
+> >>> > This value is essential for booting a zImage and only depends on the
+> >>> > memory layout of the machine to boot. ?This value was specified in
+> >>> > Makefile.boot before
+> >>> >
+> >>> > ? ? ? ?e69edc79 (ARM: Auto calculate ZRELADDR and provide option for exceptions)
+> >>> >
+> >>> > and so wasn't available to change via .config.
+> >>> >
+> >>> > The only exception is bcmring that had a extra config for specifing the
+> >>> > address used, which is removed in this commit, too, as it isn't used
+> >>> > anymore since e69edc79. ?This is the only machine that still gets a
+> >>> > possibility to change CONFIG_ZRELADDR.
+> >>>
+> >>> This looks correct to me.
+> >> That's an Ack?
+> >>
+> >
+> > Ack.
+> >
+> 
+> I think it should be:
+> 
+> --- a/arch/arm/mach-bcmring/Makefile.boot
+> +++ b/arch/arm/mach-bcmring/Makefile.boot
+> @@ -1,6 +1,5 @@
+>  # Address where decompressor will be written and eventually executed.
+>  #
+>  # default to SDRAM
+> -zreladdr-y      := $(CONFIG_BCM_ZRELADDR)
+> +zreladdr-y      := $(CONFIG_ZRELADDR)
+>  params_phys-y   := 0x00000800
+> 
+No, the variable zreladdr-y isn't used anymore, see path 7/7.
+
+> 
+> instead of
 > 
 > 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > Sent: Friday, September 03, 2010 1:00 AM
-> > To: Russell King - ARM Linux
-> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > Bryan Wu; Will Deacon
-> > Subject: Re: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-
-> > omap
-> > 
-> > * Tony Lindgren <tony@atomide.com> [100902 09:16]:
-> > > From c04a57fc3b41d886f56ccdc27cf9758de0c95202 Mon Sep 17 00:00:00 2001
-> > > From: Tony Lindgren <tony@atomide.com>
-> > > Date: Tue, 17 Aug 2010 13:33:23 +0300
-> > > Subject: [PATCH 6/6] omap: Fix SMP on UP interrupt handling for multi-
-> > omap
-> > >
-> > > Fix SMP on UP interrupt handling for multi-omap
-> > 
-> > Here's this one updated to use !smp_cpu() instead of smp_on_up().
-> > Looks like the description and subject needed some refreshing too.
-> > 
-> As I commented on other patch we should just avoid doing anything
-> When the CPU is not OMAP4. 
+> --- a/arch/arm/mach-bcmring/Makefile.boot
+> +++ b/arch/arm/mach-bcmring/Makefile.boot
+> @@ -1,6 +1,5 @@
+>  # Address where decompressor will be written and eventually executed.
+>  #
+>  # default to SDRAM
+> -zreladdr-y      := $(CONFIG_BCM_ZRELADDR)
+>  params_phys-y   := 0x00000800
+> 
+> 
+> -Mathieu
+There is no "Mathieu" in arch/arm/mach-bcmring/Makefile.boot to remove
+:-)
 
-Looks like the only fix needed now is the localtimer fix. Posted
-a patch that uses cpu_is_omap44xx() to test for that.
+Best regards
+Uwe
 
-Tony
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
