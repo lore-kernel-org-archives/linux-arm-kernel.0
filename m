@@ -1,96 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Sep 2010 13:26:11 -0700
-Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early
-	init testing
-In-Reply-To: <20100908032642.GL22507@atomide.com>
-References: <20100820120622.GL25742@atomide.com>
-	<20100830225527.GC11597@atomide.com>
-	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
-	<20100902161659.GJ11597@atomide.com>
-	<20100902161846.GK11597@atomide.com>
-	<20100902170830.GW26319@n2100.arm.linux.org.uk>
-	<20100902174244.GU11597@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A2@dbde02.ent.ti.com>
-	<AANLkTik2FNBv-72C4L7PxBoMsTENSds-PvbAzxGd-h4y@mail.gmail.com>
-	<20100908032642.GL22507@atomide.com>
-Message-ID: <20100908202611.GV22507@atomide.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Wed, 8 Sep 2010 22:31:27 +0200
+Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
+	for exceptions
+In-Reply-To: <20100908091149.GC29914@n2100.arm.linux.org.uk>
+References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
+	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
+	<20100902212145.GA15264@n2100.arm.linux.org.uk>
+	<20100902212723.GC26319@n2100.arm.linux.org.uk>
+	<20100903074806.GX14214@pengutronix.de>
+	<20100903095504.GC13643@pengutronix.de>
+	<20100908091149.GC29914@n2100.arm.linux.org.uk>
+Message-ID: <20100908203127.GI10841@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100907 20:19]:
-> * Bryan Wu <bryan.wu@canonical.com> [100906 03:09]:
-> > Tony,
+Uwe,
+
+On Wed, Sep 08, 2010 at 10:11:49AM +0100, Russell King - ARM Linux wrote:
+> > I looked into that and found some more issues.  I hope I catched them
+> > all now.  While doing that removing the zreladdr lines was nearly for
+> > free.  So I did that, too.
 > > 
-> > I tried your latest branch: devel-smp-on-unicore, kernel boots up but
-> > got lots of WARN_ON fired:
-> > 
-> > ---
-> > ------------[ cut here ]------------
-> > [    1.149719] WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
-> > [    1.149780] Modules linked in:
-> > [    1.149841] [<c01b34c8>] (unwind_backtrace+0x0/0xe4) from
-> > [<c01e939c>] (warn_slowpath_common+0x4c/0x64)
-> > [    1.149902] [<c01e939c>] (warn_slowpath_common+0x4c/0x64) from
-> > [<c01e93cc>] (warn_slowpath_null+0x18/0x1c)
-> > [    1.149993] [<c01e93cc>] (warn_slowpath_null+0x18/0x1c) from
-> > [<c0274730>] (pcpu_alloc+0x2fc/0x888)
-> > [    1.150085] [<c0274730>] (pcpu_alloc+0x2fc/0x888) from [<c0279578>]
-> > (sget+0x198/0x43c)
-> > [    1.150146] [<c0279578>] (sget+0x198/0x43c) from [<c0279adc>]
-> > (get_sb_ns+0x20/0x90)
-> > [    1.150238] [<c0279adc>] (get_sb_ns+0x20/0x90) from [<c02791a4>]
-> > (vfs_kern_mount+0x9c/0x18c)
-> > [    1.150299] [<c02791a4>] (vfs_kern_mount+0x9c/0x18c) from
-> > [<c0022280>] (init_mqueue_fs+0x68/0xc8)
-> > [    1.150390] [<c0022280>] (init_mqueue_fs+0x68/0xc8) from
-> > [<c01ac5d0>] (do_one_initcall+0xcc/0x1a4)
-> > [    1.150451] [<c01ac5d0>] (do_one_initcall+0xcc/0x1a4) from
-> > [<c0008760>] (kernel_init+0x148/0x210)
-> > [    1.150543] [<c0008760>] (kernel_init+0x148/0x210) from
-> > [<c01adcf8>] (kernel_thread_exit+0x0/0x8)
-> > [    1.150604] ---[ end trace 1b75b31a2719ed74 ]---
-> > ---
-> > 
-> > It looks like we still missed to set some flag for chuck.
+> > I couldn't determine who to cc: for the ARCH_H720X patch.  Russell, do
+> > you maintain this platform?
 > 
-> Yeah I think there's some .config option that needs to be handled
-> properly to fix this.
+> Nope.
 
-This seems to disappear when CONFIG_LOCK_STAT is disabled,
-I wonder why?
+Sascha does probably maintain H720x. However, I'm not sure if there is
+somebody out there who does still use it actively.
 
-Here are my current changes to omap3_defconfig that I use for testing.
-
-Tony
---- a/arch/arm/configs/omap3_defconfig
-+++ b/arch/arm/configs/omap3_defconfig
-@@ -55,6 +55,7 @@ CONFIG_MACH_OMAP_4430SDP=y
- CONFIG_ARM_THUMBEE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_LEDS=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -218,9 +219,9 @@ CONFIG_USB_DEVICEFS=y
- CONFIG_USB_SUSPEND=y
- # CONFIG_USB_OTG_WHITELIST is not set
- CONFIG_USB_MON=y
--CONFIG_USB_MUSB_HDRC=y
--CONFIG_USB_MUSB_OTG=y
--CONFIG_USB_GADGET_MUSB_HDRC=y
-+# CONFIG_USB_MUSB_HDRC is not set
-+# CONFIG_USB_MUSB_OTG is not set
-+# CONFIG_USB_GADGET_MUSB_HDRC is not set
- CONFIG_USB_MUSB_DEBUG=y
- CONFIG_USB_WDM=y
- CONFIG_USB_STORAGE=y
-@@ -276,7 +277,7 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_SCHEDSTATS=y
- CONFIG_TIMER_STATS=y
- CONFIG_PROVE_LOCKING=y
--CONFIG_LOCK_STAT=y
-+# CONFIG_LOCK_STAT is not set
- CONFIG_DEBUG_SPINLOCK_SLEEP=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- CONFIG_DEBUG_INFO=y
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
