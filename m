@@ -1,362 +1,55 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed,  8 Sep 2010 11:58:12 +0300
-Subject: [PATCH v2 1/3] rx1950: add battery device
-In-Reply-To: <4C86C56B.7090204@fluff.org>
-References: <4C86C56B.7090204@fluff.org>
-Message-ID: <1283936292-10429-1-git-send-email-anarsoul@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 08 Sep 2010 11:00:40 +0200
+Subject: [PATCH] AT91: SAM9G45 - add a separate clock entry for every
+	single TC block
+In-Reply-To: <AANLkTin+vCsG3FUvX6DTUfFe7ZJpbkYyqw_TLvH9ujrJ@mail.gmail.com>
+References: <201009060548.18521.fg@emlix.com>	<1283772201-15453-1-git-send-email-nicolas.ferre@atmel.com>
+	<AANLkTin+vCsG3FUvX6DTUfFe7ZJpbkYyqw_TLvH9ujrJ@mail.gmail.com>
+Message-ID: <4C8750B8.6000107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2: don't force usage of battery driver,
-use named initialisers in LUTs.
+Le 07/09/2010 21:42, avictor.za at gmail.com :
+> hi,
+> 
+>> +/* One additional fake clock for second TC block */
+>> +static struct clk tcb1_clk = {
+>> +       .name           = "tcb1_clk",
+>> +       .pmc_mask       = 0,
+>> +       .type           = CLK_TYPE_PERIPHERAL,
+>> +       .parent         = &tcb0_clk,
+>> +};
+>> +
+> 
+> Looking at this again...  since type is CLK_TYPE_PERIPHERAL, when you
+> call clk_register() the "parent" is changed to the master clock.
+> 
+> Which means, then later you call clk_enable() the "pmc_mask" is still
+> 0, so 0 gets written (in pmc_periph_mode) to AT91_PMC_PCER.  So the
+> TCB clock won't be enabled.
+> 
+> Or am I missing something?
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- arch/arm/mach-s3c2440/mach-rx1950.c |  316 +++++++++++++++++++++++++++++++++++
- 1 files changed, 316 insertions(+), 0 deletions(-)
+You are absolutely right!
 
-diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
-index 142d1f9..2bfa43a 100644
---- a/arch/arm/mach-s3c2440/mach-rx1950.c
-+++ b/arch/arm/mach-s3c2440/mach-rx1950.c
-@@ -25,8 +25,10 @@
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
- #include <linux/sysdev.h>
-+#include <linux/pda_power.h>
- #include <linux/pwm_backlight.h>
- #include <linux/pwm.h>
-+#include <linux/s3c_adc_battery.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -127,6 +129,318 @@ static struct s3c2410fb_display rx1950_display = {
- 
- };
- 
-+static int power_supply_init(struct device *dev)
-+{
-+	return gpio_request(S3C2410_GPF(2), "cable plugged");
-+}
-+
-+static int rx1950_is_ac_online(void)
-+{
-+	return !gpio_get_value(S3C2410_GPF(2));
-+}
-+
-+static void power_supply_exit(struct device *dev)
-+{
-+	gpio_free(S3C2410_GPF(2));
-+}
-+
-+static char *rx1950_supplicants[] = {
-+	"main-battery"
-+};
-+
-+static struct pda_power_pdata power_supply_info = {
-+	.init			= power_supply_init,
-+	.is_ac_online		= rx1950_is_ac_online,
-+	.exit			= power_supply_exit,
-+	.supplied_to		= rx1950_supplicants,
-+	.num_supplicants	= ARRAY_SIZE(rx1950_supplicants),
-+};
-+
-+static struct resource power_supply_resources[] = {
-+	[0] = {
-+			.name	= "ac",
-+			.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE |
-+					  IORESOURCE_IRQ_HIGHEDGE,
-+			.start	= IRQ_EINT2,
-+			.end	= IRQ_EINT2,
-+	},
-+};
-+
-+static struct platform_device power_supply = {
-+	.name			= "pda-power",
-+	.id			= -1,
-+	.dev			= {
-+					.platform_data =
-+						&power_supply_info,
-+	},
-+	.resource		= power_supply_resources,
-+	.num_resources		= ARRAY_SIZE(power_supply_resources),
-+};
-+
-+static const struct s3c_adc_bat_thresh bat_lut_noac[] = {
-+	{
-+		.volt = 4100,
-+		.cur = 156,
-+		.level = 100
-+	},
-+	{
-+		.volt = 4050,
-+		.cur = 156,
-+		.level = 95
-+	},
-+	{
-+		.volt = 4025,
-+		.cur = 141,
-+		.level = 90
-+	},
-+	{
-+		.volt = 3995,
-+		.cur = 144,
-+		.level = 85
-+	},
-+	{
-+		.volt = 3957,
-+		.cur = 162,
-+		.level = 80
-+	},
-+	{
-+		.volt = 3931,
-+		.cur = 147,
-+		.level = 75
-+	},
-+	{
-+		.volt = 3902,
-+		.cur = 147,
-+		.level = 70
-+	},
-+	{
-+		.volt = 3863,
-+		.cur = 153,
-+		.level = 65
-+	},
-+	{
-+		.volt = 3838,
-+		.cur = 150,
-+		.level = 60
-+	},
-+	{
-+		.volt = 3800,
-+		.cur = 153,
-+		.level = 55
-+	},
-+	{
-+		.volt = 3765,
-+		.cur = 153,
-+		.level = 50
-+	},
-+	{
-+		.volt = 3748,
-+		.cur = 172,
-+		.level = 45
-+	},
-+	{
-+		.volt = 3740,
-+		.cur = 153,
-+		.level = 40
-+	},
-+	{
-+		.volt = 3714,
-+		.cur = 175,
-+		.level = 35
-+	},
-+	{
-+		.volt = 3710,
-+		.cur = 156,
-+		.level = 30
-+	},
-+	{
-+		.volt = 3963,
-+		.cur = 156,
-+		.level = 25
-+	},
-+	{
-+		.volt = 3672,
-+		.cur = 178,
-+		.level = 20
-+	},
-+	{
-+		.volt = 3651,
-+		.cur = 178,
-+		.level = 15
-+	},
-+	{
-+		.volt = 3629,
-+		.cur = 178,
-+		.level = 10
-+	},
-+	{
-+		.volt = 3612,
-+		.cur = 162,
-+		.level = 5
-+	},
-+	{
-+		.volt = 3605,
-+		.cur = 162,
-+		.level = 0
-+	},
-+};
-+
-+static const struct s3c_adc_bat_thresh bat_lut_acin[] = {
-+	{
-+		.volt = 4200,
-+		.cur = 0,
-+		.level = 100
-+	},
-+	{
-+		.volt = 4190,
-+		.cur = 0,
-+		.level = 99
-+	},
-+	{
-+		.volt = 4178,
-+		.cur = 0,
-+		.level = 95
-+	},
-+	{
-+		.volt = 4110,
-+		.cur = 0,
-+		.level = 70
-+	},
-+	{
-+		.volt = 4076,
-+		.cur = 0,
-+		.level = 65
-+	},
-+	{
-+		.volt = 4046,
-+		.cur = 0,
-+		.level = 60
-+	},
-+	{
-+		.volt = 4021,
-+		.cur = 0,
-+		.level = 55
-+	},
-+	{
-+		.volt = 3999,
-+		.cur = 0,
-+		.level = 50
-+	},
-+	{
-+		.volt = 3982,
-+		.cur = 0,
-+		.level = 45
-+	},
-+	{
-+		.volt = 3965,
-+		.cur = 0,
-+		.level = 40
-+	},
-+	{
-+		.volt = 3957,
-+		.cur = 0,
-+		.level = 35
-+	},
-+	{
-+		.volt = 3948,
-+		.cur = 0,
-+		.level = 30
-+	},
-+	{
-+		.volt = 3936,
-+		.cur = 0,
-+		.level = 25
-+	},
-+	{
-+		.volt = 3927,
-+		.cur = 0,
-+		.level = 20
-+	},
-+	{
-+		.volt = 3906,
-+		.cur = 0,
-+		.level = 15
-+	},
-+	{
-+		.volt = 3880,
-+		.cur = 0,
-+		.level = 10
-+	},
-+	{
-+		.volt = 3829,
-+		.cur = 0,
-+		.level = 5
-+	},
-+	{
-+		.volt = 3820,
-+		.cur = 0,
-+		.level = 0
-+	},
-+};
-+
-+int rx1950_bat_init(void)
-+{
-+	int ret;
-+
-+	ret = gpio_request(S3C2410_GPJ(2), "rx1950-charger-enable-1");
-+	if (ret)
-+		goto err_gpio1;
-+	ret = gpio_request(S3C2410_GPJ(3), "rx1950-charger-enable-2");
-+	if (ret)
-+		goto err_gpio2;
-+
-+	return 0;
-+
-+err_gpio2:
-+	gpio_free(S3C2410_GPJ(2));
-+err_gpio1:
-+	return ret;
-+}
-+
-+void rx1950_bat_exit(void)
-+{
-+	gpio_free(S3C2410_GPJ(2));
-+	gpio_free(S3C2410_GPJ(3));
-+}
-+
-+void rx1950_enable_charger(void)
-+{
-+	gpio_direction_output(S3C2410_GPJ(2), 1);
-+	gpio_direction_output(S3C2410_GPJ(3), 1);
-+}
-+
-+void rx1950_disable_charger(void)
-+{
-+	gpio_direction_output(S3C2410_GPJ(2), 0);
-+	gpio_direction_output(S3C2410_GPJ(3), 0);
-+}
-+
-+static struct s3c_adc_bat_pdata rx1950_bat_cfg = {
-+	.init = rx1950_bat_init,
-+	.exit = rx1950_bat_exit,
-+	.enable_charger = rx1950_enable_charger,
-+	.disable_charger = rx1950_disable_charger,
-+	.gpio_charge_finished = S3C2410_GPF(3),
-+	.lut_noac = bat_lut_noac,
-+	.lut_noac_cnt = ARRAY_SIZE(bat_lut_noac),
-+	.lut_acin = bat_lut_acin,
-+	.lut_acin_cnt = ARRAY_SIZE(bat_lut_acin),
-+	.volt_channel = 0,
-+	.current_channel = 1,
-+	.volt_mult = 4235,
-+	.current_mult = 2900,
-+	.internal_impedance = 200,
-+};
-+
-+static struct platform_device rx1950_battery = {
-+	.name             = "s3c-adc-battery",
-+	.id               = -1,
-+	.dev = {
-+		.parent = &s3c_device_adc.dev,
-+		.platform_data = &rx1950_bat_cfg,
-+	},
-+};
-+
- static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
- 	.displays = &rx1950_display,
- 	.num_displays = 1,
-@@ -503,6 +817,8 @@ static struct platform_device *rx1950_devices[] __initdata = {
- 	&s3c_device_timer[1],
- 	&rx1950_backlight,
- 	&rx1950_device_gpiokeys,
-+	&power_supply,
-+	&rx1950_battery,
- };
- 
- static struct clk *rx1950_clocks[] __initdata = {
+What do you think about this modification of clk_register() function?
+
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -501,7 +501,8 @@ postcore_initcall(at91_clk_debugfs_init);
+ int __init clk_register(struct clk *clk)
+ {
+        if (clk_is_peripheral(clk)) {
+-               clk->parent = &mck;
++               if (!clk->parent)
++                       clk->parent = &mck;
+                clk->mode = pmc_periph_mode;
+                list_add_tail(&clk->node, &clocks);
+        }
+
+It is a very little modification which implements what I had in mind
+while creating a kind of "child peripheral" clock.
+
+Best regards,
 -- 
-1.7.2.2
+Nicolas Ferre
