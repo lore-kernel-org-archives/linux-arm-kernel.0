@@ -1,55 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Sep 2010 23:07:10 +0100
-Subject: [PATCH 1/7] ARM: specify ZRELADDR for ARCH_TEGRA
-In-Reply-To: <20100908121634.GD1614@pengutronix.de>
-References: <20100903095504.GC13643@pengutronix.de>
-	<1283507818-1573-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTi=7+TcOWu_62EWH6pwFUuizMT47tHJraaqzdJgp@mail.gmail.com>
-	<20100903190155.GE17152@pengutronix.de>
-	<AANLkTin2fEj2kRRoE+RSpBovApMaCKTs+DVz9wvj7M3u@mail.gmail.com>
-	<20100903192329.GB29821@pengutronix.de>
-	<20100908091113.GB29914@n2100.arm.linux.org.uk>
-	<20100908115609.GA32659@n2100.arm.linux.org.uk>
-	<20100908121634.GD1614@pengutronix.de>
-Message-ID: <20100908220710.GA9859@n2100.arm.linux.org.uk>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 8 Sep 2010 15:51:14 -0700
+Subject: [PATCH] MMC: move regulator handling closer to core v3
+In-Reply-To: <1283677538-31121-1-git-send-email-linus.walleij@stericsson.com>
+References: <1283677538-31121-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100908155114.880463fc.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 08, 2010 at 02:16:34PM +0200, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> On Wed, Sep 08, 2010 at 12:56:10PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Sep 08, 2010 at 10:11:13AM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Sep 03, 2010 at 09:23:29PM +0200, Uwe Kleine-K?nig wrote:
-> > > > Hello,
-> > > > 
-> > > > On Fri, Sep 03, 2010 at 12:19:26PM -0700, Erik Gilling wrote:
-> > > > > On Fri, Sep 3, 2010 at 12:01 PM, Uwe Kleine-K?nig
-> > > > > > (hmm, I thought that patches that touch common files like
-> > > > > > arch/arm/Kconfig should go via rmk?!)
-> > > > > 
-> > > > > I looked and saw that others (specifically samsung) had submitted this
-> > > > > fix directly to Linus.  I'm still learning the ropes here and am happy
-> > > > > to hear some clarification either way.
-> > > >
-> > > > Note that just me wondering if it's right doesn't necessarily means it's
-> > > > not.  Russell, can you comment?  Is it trivial enough and obviously only
-> > > > tegra related that it's OK?
-> > > 
-> > > The problem happens when there's related changes already in others git
-> > > trees which clash or conflict with those changes.
-> > > 
-> > > This whole CONFIG_ZRELADDR thing seems like a step backwards towards a
-> > > situation where we will get conflicts with multiple changes - but without
-> > > gaining anything substantial in moving away from Makefile.boot.
-> > > 
-> > > Unless someone can come up with a real justification for CONFIG_ZRELADDR
-> > > I'm mindful to revert it.  (But - if people have sent these changes to
-> > > Linus already, that's going to make reverting it a lot harder.)
-> > 
-> > This is what I'm considering committing to sort out this ZRELADDR mess -
-> > it gives people who want AUTO_ZRELADDR their pie, while allowing us to
-> > keep the proven reliability of original method of handling ZRELADDR.
-> Would be OK for me.  We might have to fix up some machines though.
+On Sun,  5 Sep 2010 11:05:38 +0200
+Linus Walleij <linus.walleij@stericsson.com> wrote:
 
-Any ideas what needs to be fixed?  And is that an acked-by ?
+> After discovering a problem in regulator reference counting I
+> took Mark Brown's advice to move the reference count into the
+> MMC core by making the regulator status a member of
+> struct mmc_host.
+> 
+>
+> ...
+>
+> -static inline void pxamci_set_power(struct pxamci_host *host, unsigned int vdd)
+> +static inline void pxamci_set_power(struct pxamci_host *host,
+> +				    unsigned char power_mode,
+> +				    unsigned int vdd)
+>  {
+>  	int on;
+>  
+> -#ifdef CONFIG_REGULATOR
+> -	if (host->vcc)
+> -		mmc_regulator_set_ocr(host->vcc, vdd);
+> -#endif
+> +	if (host->vcc) {
+> +		int ret;
+> +
+> +		if (power_mode == MMC_POWER_UP)
+> +			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+> +		else if (power_mode == MMC_POWER_OFF)
+> +			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
+> +	}
+
+There's no point in copying the return value into a local then ignoring
+it.  mmc_regulator_set_ocr() can return a negative errno so we should
+test for that, clean up and propagate the error.
+
+If we really do deliberately ignore the error then there should be a
+code comment which excuses this behaviour and perhaps a warning printk.
+
+The same comments apply to mmci_set_ios().
+
+omap_hsmmc_1_set_power() gets it right.
+
+Why doesn't omap_hsmmc_23_set_sleep() run .before_set_reg() and
+.after_set_reg()?
+
+>
+> ...
+>
