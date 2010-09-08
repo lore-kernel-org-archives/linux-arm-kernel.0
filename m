@@ -1,37 +1,100 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Wed, 8 Sep 2010 22:31:27 +0200
-Subject: [PATCH 4/5] [ARM] Auto calculate ZRELADDR and provide option
-	for exceptions
-In-Reply-To: <20100908091149.GC29914@n2100.arm.linux.org.uk>
-References: <1275550613-9553-1-git-send-email-eric.miao@canonical.com>
-	<1275550613-9553-5-git-send-email-eric.miao@canonical.com>
-	<20100902212145.GA15264@n2100.arm.linux.org.uk>
-	<20100902212723.GC26319@n2100.arm.linux.org.uk>
-	<20100903074806.GX14214@pengutronix.de>
-	<20100903095504.GC13643@pengutronix.de>
-	<20100908091149.GC29914@n2100.arm.linux.org.uk>
-Message-ID: <20100908203127.GI10841@pengutronix.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 8 Sep 2010 23:09:18 +0200
+Subject: [PATCH 3/3] ARM: pxa168/teton bga: add board support for i2c and
+	rtc-ds1337
+In-Reply-To: <AANLkTinGE=wxCcnSBiZQFeJxDG21DMd6KEcckavVuTbE@mail.gmail.com>
+References: <1283914607-10570-1-git-send-email-mark.brown314@gmail.com>
+	<201009081754.15515.marek.vasut@gmail.com>
+	<AANLkTinGE=wxCcnSBiZQFeJxDG21DMd6KEcckavVuTbE@mail.gmail.com>
+Message-ID: <201009082309.19382.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
-
-On Wed, Sep 08, 2010 at 10:11:49AM +0100, Russell King - ARM Linux wrote:
-> > I looked into that and found some more issues.  I hope I catched them
-> > all now.  While doing that removing the zreladdr lines was nearly for
-> > free.  So I did that, too.
+Dne St 8. z??? 2010 19:05:02 Mark F. Brown napsal(a):
+> On Wed, Sep 8, 2010 at 11:54 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne St 8. z??? 2010 07:34:24 Haojian Zhuang napsal(a):
+> >> On Wed, Sep 8, 2010 at 10:56 AM, Mark F. Brown <mark.brown314@gmail.com>
 > > 
-> > I couldn't determine who to cc: for the ARCH_H720X patch.  Russell, do
-> > you maintain this platform?
+> > wrote:
+> >> > Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+> >> > ---
+> >> >  arch/arm/mach-mmp/teton_bga.c |   10 ++++++++++
+> >> >  1 files changed, 10 insertions(+), 0 deletions(-)
+> >> > 
+> >> > diff --git a/arch/arm/mach-mmp/teton_bga.c
+> >> > b/arch/arm/mach-mmp/teton_bga.c index bbeda5c..8e5801c 100644
+> >> > --- a/arch/arm/mach-mmp/teton_bga.c
+> >> > +++ b/arch/arm/mach-mmp/teton_bga.c
+> >> > @@ -22,6 +22,7 @@
+> >> >  #include <mach/gpio.h>
+> >> >  #include <linux/input.h>
+> >> >  #include <plat/pxa27x_keypad.h>
+> >> > +#include <linux/i2c.h>
+> >> > 
+> >> >  #include "common.h"
+> >> > 
+> >> > @@ -35,6 +36,10 @@ static unsigned long teton_bga_pin_config[]
+> >> > __initdata = { GPIO110_KP_MKIN0,
+> >> >        GPIO111_KP_MKOUT7,
+> >> >        GPIO112_KP_MKOUT6,
+> >> > +
+> >> > +       /* i2c bus */
+> >> > +       GPIO105_CI2C_SDA,
+> >> > +       GPIO106_CI2C_SCL,
+> >> >  };
+> >> > 
+> >> >  static unsigned int teton_bga_matrix_key_map[] = {
+> >> > @@ -52,6 +57,10 @@ static struct pxa27x_keypad_platform_data
+> >> > teton_bga_keypad_info __initdata = { .debounce_interval      = 30,
+> >> >  };
+> >> > 
+> >> > +static struct i2c_board_info teton_bga_i2c_info[] __initdata = {
+> >> > +       { I2C_BOARD_INFO("ds1337", 0x68), },
+> >> > +};
+> >> > +
+> >> 
+> >> I don't have the schematic of teton. But RTC chips should always has
+> >> an irq pin. Is it also connected in your platform?
+> > 
+> > I think this one doesn't, but I haven't checked.
+> > 
+> > Cheers
+> > 
+> >> >  static void __init teton_bga_init(void)
+> >> >  {
+> >> >        mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
+> >> > @@ -59,6 +68,7 @@ static void __init teton_bga_init(void)
+> >> >        /* on-chip devices */
+> >> >        pxa168_add_uart(1);
+> >> >        pxa168_add_keypad(&teton_bga_keypad_info);
+> >> > +       pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(teton_bga_i2c_info));
+> >> >  }
+> >> > 
+> >> >  MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development
+> >> > Platform") --
+> >> > 1.7.0.4
+> >> > 
+> >> > --
+> >> > To unsubscribe from this list: send the line "unsubscribe
+> >> > linux-kernel" in the body of a message to majordomo at vger.kernel.org
+> >> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> > Please read the FAQ at  http://www.tux.org/lkml/
+> >> 
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> Nope.
+> It actually does have an alarm pin and it is connected as well. I did
+> not include it, because I have not tested the alarm functionality yet.
+> I was going to add it in a later patch. I did test the hardware clock
+> to system clock syncing.
 
-Sascha does probably maintain H720x. However, I'm not sure if there is
-somebody out there who does still use it actively.
+Fix the CC please. And be careful not to screw this up again next time.
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Please add the alarm pin too. Thanks
+
+Cheers
+> 
+> Regards,
+> -- Mark
