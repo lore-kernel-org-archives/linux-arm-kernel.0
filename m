@@ -1,79 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Sep 2010 07:04:36 +0200
-Subject: [PATCH 5/7] ARM: don't expose CONFIG_ZRELADDR to the users
-In-Reply-To: <AANLkTinEvMREgk=UZr9RJ+FF9maeDQfDv2ZSHDppAGis@mail.gmail.com>
-References: <20100903095504.GC13643@pengutronix.de>
-	<1283507818-1573-5-git-send-email-u.kleine-koenig@pengutronix.de>
-	<AANLkTikg-A7Y19vU+gShPP+zQHpNm-Wzi-m43_dm+OxL@mail.gmail.com>
-	<20100903185356.GD17152@pengutronix.de>
-	<AANLkTikvhJRJNOczM+n21mup+yc-VJS6OyNANUiM=x7U@mail.gmail.com>
-	<AANLkTinEvMREgk=UZr9RJ+FF9maeDQfDv2ZSHDppAGis@mail.gmail.com>
-Message-ID: <20100908050436.GA1614@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 8 Sep 2010 13:34:24 +0800
+Subject: [PATCH 3/3] ARM: pxa168/teton bga: add board support for i2c and
+	rtc-ds1337
+In-Reply-To: <1283914607-10570-4-git-send-email-mark.brown314@gmail.com>
+References: <1283914607-10570-1-git-send-email-mark.brown314@gmail.com>
+	<1283914607-10570-4-git-send-email-mark.brown314@gmail.com>
+Message-ID: <AANLkTi=StWVfeGjNCqJWJka0yifXv6rEB6GoZEkq7NT5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mathieu,
+On Wed, Sep 8, 2010 at 10:56 AM, Mark F. Brown <mark.brown314@gmail.com> wrote:
+> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+> ---
+> ?arch/arm/mach-mmp/teton_bga.c | ? 10 ++++++++++
+> ?1 files changed, 10 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
+> index bbeda5c..8e5801c 100644
+> --- a/arch/arm/mach-mmp/teton_bga.c
+> +++ b/arch/arm/mach-mmp/teton_bga.c
+> @@ -22,6 +22,7 @@
+> ?#include <mach/gpio.h>
+> ?#include <linux/input.h>
+> ?#include <plat/pxa27x_keypad.h>
+> +#include <linux/i2c.h>
+>
+> ?#include "common.h"
+>
+> @@ -35,6 +36,10 @@ static unsigned long teton_bga_pin_config[] __initdata = {
+> ? ? ? ?GPIO110_KP_MKIN0,
+> ? ? ? ?GPIO111_KP_MKOUT7,
+> ? ? ? ?GPIO112_KP_MKOUT6,
+> +
+> + ? ? ? /* i2c bus */
+> + ? ? ? GPIO105_CI2C_SDA,
+> + ? ? ? GPIO106_CI2C_SCL,
+> ?};
+>
+> ?static unsigned int teton_bga_matrix_key_map[] = {
+> @@ -52,6 +57,10 @@ static struct pxa27x_keypad_platform_data teton_bga_keypad_info __initdata = {
+> ? ? ? ?.debounce_interval ? ? ?= 30,
+> ?};
+>
+> +static struct i2c_board_info teton_bga_i2c_info[] __initdata = {
+> + ? ? ? { I2C_BOARD_INFO("ds1337", 0x68), },
+> +};
+> +
 
-On Tue, Sep 07, 2010 at 03:39:20PM -0700, Mathieu Rondonneau wrote:
-> > 2010/9/4 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> >> On Fri, Sep 03, 2010 at 09:30:50PM +0800, Eric Miao wrote:
-> >>> 2010/9/3 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >>> >
-> >>> > This value is essential for booting a zImage and only depends on the
-> >>> > memory layout of the machine to boot. ?This value was specified in
-> >>> > Makefile.boot before
-> >>> >
-> >>> > ? ? ? ?e69edc79 (ARM: Auto calculate ZRELADDR and provide option for exceptions)
-> >>> >
-> >>> > and so wasn't available to change via .config.
-> >>> >
-> >>> > The only exception is bcmring that had a extra config for specifing the
-> >>> > address used, which is removed in this commit, too, as it isn't used
-> >>> > anymore since e69edc79. ?This is the only machine that still gets a
-> >>> > possibility to change CONFIG_ZRELADDR.
-> >>>
-> >>> This looks correct to me.
-> >> That's an Ack?
-> >>
-> >
-> > Ack.
-> >
-> 
-> I think it should be:
-> 
-> --- a/arch/arm/mach-bcmring/Makefile.boot
-> +++ b/arch/arm/mach-bcmring/Makefile.boot
-> @@ -1,6 +1,5 @@
->  # Address where decompressor will be written and eventually executed.
->  #
->  # default to SDRAM
-> -zreladdr-y      := $(CONFIG_BCM_ZRELADDR)
-> +zreladdr-y      := $(CONFIG_ZRELADDR)
->  params_phys-y   := 0x00000800
-> 
-No, the variable zreladdr-y isn't used anymore, see path 7/7.
+I don't have the schematic of teton. But RTC chips should always has
+an irq pin. Is it also connected in your platform?
 
-> 
-> instead of
-> 
-> 
-> --- a/arch/arm/mach-bcmring/Makefile.boot
-> +++ b/arch/arm/mach-bcmring/Makefile.boot
-> @@ -1,6 +1,5 @@
->  # Address where decompressor will be written and eventually executed.
->  #
->  # default to SDRAM
-> -zreladdr-y      := $(CONFIG_BCM_ZRELADDR)
->  params_phys-y   := 0x00000800
-> 
-> 
-> -Mathieu
-There is no "Mathieu" in arch/arm/mach-bcmring/Makefile.boot to remove
-:-)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ?static void __init teton_bga_init(void)
+> ?{
+> ? ? ? ?mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
+> @@ -59,6 +68,7 @@ static void __init teton_bga_init(void)
+> ? ? ? ?/* on-chip devices */
+> ? ? ? ?pxa168_add_uart(1);
+> ? ? ? ?pxa168_add_keypad(&teton_bga_keypad_info);
+> + ? ? ? pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(teton_bga_i2c_info));
+> ?}
+>
+> ?MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development Platform")
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
