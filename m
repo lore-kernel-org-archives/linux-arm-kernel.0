@@ -1,65 +1,96 @@
-From: axboe@kernel.dk (Jens Axboe)
-Date: Wed, 08 Sep 2010 21:49:38 +0200
-Subject: [PATCH] bounce: call flush_dcache_page after bounce_copy_vec
-In-Reply-To: <20100908124716.830a0055.akpm@linux-foundation.org>
-References: <1283892334-9238-1-git-send-email-gking@nvidia.com>
-	<20100908124716.830a0055.akpm@linux-foundation.org>
-Message-ID: <4C87E8D2.4050005@kernel.dk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Sep 2010 13:26:11 -0700
+Subject: [PATCH 1/6] ARM: Add inline function smp_on_up() for early
+	init testing
+In-Reply-To: <20100908032642.GL22507@atomide.com>
+References: <20100820120622.GL25742@atomide.com>
+	<20100830225527.GC11597@atomide.com>
+	<20100902133637.GJ26319@n2100.arm.linux.org.uk>
+	<20100902161659.GJ11597@atomide.com>
+	<20100902161846.GK11597@atomide.com>
+	<20100902170830.GW26319@n2100.arm.linux.org.uk>
+	<20100902174244.GU11597@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE75A2@dbde02.ent.ti.com>
+	<AANLkTik2FNBv-72C4L7PxBoMsTENSds-PvbAzxGd-h4y@mail.gmail.com>
+	<20100908032642.GL22507@atomide.com>
+Message-ID: <20100908202611.GV22507@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2010 09:47 PM, Andrew Morton wrote:
-> On Tue,  7 Sep 2010 13:45:34 -0700
-> Gary King <gking@nvidia.com> wrote:
+* Tony Lindgren <tony@atomide.com> [100907 20:19]:
+> * Bryan Wu <bryan.wu@canonical.com> [100906 03:09]:
+> > Tony,
+> > 
+> > I tried your latest branch: devel-smp-on-unicore, kernel boots up but
+> > got lots of WARN_ON fired:
+> > 
+> > ---
+> > ------------[ cut here ]------------
+> > [    1.149719] WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
+> > [    1.149780] Modules linked in:
+> > [    1.149841] [<c01b34c8>] (unwind_backtrace+0x0/0xe4) from
+> > [<c01e939c>] (warn_slowpath_common+0x4c/0x64)
+> > [    1.149902] [<c01e939c>] (warn_slowpath_common+0x4c/0x64) from
+> > [<c01e93cc>] (warn_slowpath_null+0x18/0x1c)
+> > [    1.149993] [<c01e93cc>] (warn_slowpath_null+0x18/0x1c) from
+> > [<c0274730>] (pcpu_alloc+0x2fc/0x888)
+> > [    1.150085] [<c0274730>] (pcpu_alloc+0x2fc/0x888) from [<c0279578>]
+> > (sget+0x198/0x43c)
+> > [    1.150146] [<c0279578>] (sget+0x198/0x43c) from [<c0279adc>]
+> > (get_sb_ns+0x20/0x90)
+> > [    1.150238] [<c0279adc>] (get_sb_ns+0x20/0x90) from [<c02791a4>]
+> > (vfs_kern_mount+0x9c/0x18c)
+> > [    1.150299] [<c02791a4>] (vfs_kern_mount+0x9c/0x18c) from
+> > [<c0022280>] (init_mqueue_fs+0x68/0xc8)
+> > [    1.150390] [<c0022280>] (init_mqueue_fs+0x68/0xc8) from
+> > [<c01ac5d0>] (do_one_initcall+0xcc/0x1a4)
+> > [    1.150451] [<c01ac5d0>] (do_one_initcall+0xcc/0x1a4) from
+> > [<c0008760>] (kernel_init+0x148/0x210)
+> > [    1.150543] [<c0008760>] (kernel_init+0x148/0x210) from
+> > [<c01adcf8>] (kernel_thread_exit+0x0/0x8)
+> > [    1.150604] ---[ end trace 1b75b31a2719ed74 ]---
+> > ---
+> > 
+> > It looks like we still missed to set some flag for chuck.
 > 
->> I have been seeing problems on Tegra 2 (ARMv7 SMP) systems with HIGHMEM
->> enabled on 2.6.35 (plus some patches targetted at 2.6.36 to perform
->> cache maintenance lazily), and the root cause appears to be that the
->> mm bouncing code is calling flush_dcache_page before it copies the
->> bounce buffer into the bio.
->>
->> The patch below reorders these two operations, and eliminates numerous
->> arbitrary application crashes on my dev system.
->>
->> Gary
->>
->> --
->> >From 678c9bca8d8a8f254f28af91e69fad3aa1be7593 Mon Sep 17 00:00:00 2001
->> From: Gary King <gking@nvidia.com>
->> Date: Mon, 6 Sep 2010 15:37:12 -0700
->> Subject: bounce: call flush_dcache_page after bounce_copy_vec
->>
->> the bounced page needs to be flushed after data is copied into it,
->> to ensure that architecture implementations can synchronize
->> instruction and data caches if necessary.
->>
->> Signed-off-by: Gary King <gking@nvidia.com>
->> ---
->>  mm/bounce.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/mm/bounce.c b/mm/bounce.c
->> index 13b6dad..1481de6 100644
->> --- a/mm/bounce.c
->> +++ b/mm/bounce.c
->> @@ -116,8 +116,8 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
->>  		 */
->>  		vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
->>  
->> -		flush_dcache_page(tovec->bv_page);
->>  		bounce_copy_vec(tovec, vfrom);
->> +		flush_dcache_page(tovec->bv_page);
->>  	}
->>  }
-> 
-> Oh my, that was bad.
+> Yeah I think there's some .config option that needs to be handled
+> properly to fix this.
 
-Indeed, I wonder how that could have been wrong for so long.
+This seems to disappear when CONFIG_LOCK_STAT is disabled,
+I wonder why?
 
-> I queued your fix for 2.6.36 and tagged it for -stable backporting,
-> thanks.
+Here are my current changes to omap3_defconfig that I use for testing.
 
-Thanks, you can add my acked-by.
-
--- 
-Jens Axboe
+Tony
+--- a/arch/arm/configs/omap3_defconfig
++++ b/arch/arm/configs/omap3_defconfig
+@@ -55,6 +55,7 @@ CONFIG_MACH_OMAP_4430SDP=y
+ CONFIG_ARM_THUMBEE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_SMP=y
+ CONFIG_AEABI=y
+ CONFIG_LEDS=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -218,9 +219,9 @@ CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_SUSPEND=y
+ # CONFIG_USB_OTG_WHITELIST is not set
+ CONFIG_USB_MON=y
+-CONFIG_USB_MUSB_HDRC=y
+-CONFIG_USB_MUSB_OTG=y
+-CONFIG_USB_GADGET_MUSB_HDRC=y
++# CONFIG_USB_MUSB_HDRC is not set
++# CONFIG_USB_MUSB_OTG is not set
++# CONFIG_USB_GADGET_MUSB_HDRC is not set
+ CONFIG_USB_MUSB_DEBUG=y
+ CONFIG_USB_WDM=y
+ CONFIG_USB_STORAGE=y
+@@ -276,7 +277,7 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_SCHEDSTATS=y
+ CONFIG_TIMER_STATS=y
+ CONFIG_PROVE_LOCKING=y
+-CONFIG_LOCK_STAT=y
++# CONFIG_LOCK_STAT is not set
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_DEBUG_INFO=y
