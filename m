@@ -1,291 +1,872 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  8 Sep 2010 17:11:50 +0900
-Subject: [PATCH v2 02/13] ARM: S5P64X0: Update Kconfig and Makefile
-Message-ID: <1283933510-31527-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed,  8 Sep 2010 17:11:56 +0900
+Subject: [PATCH v2 07/13] ARM: S5P64X0: Update Audio support
+Message-ID: <1283933516-31563-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the Kconfig and Makefile for the S5P6440 and S5P6450
-machines. It also updates arch/arm/ Kconfig and Makefile to include for
-support ARCH_S5P64X0 with one kernel image.
+This patch updates Audio and SPI for S5P6440 and S5P6450 SoCs.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Jassi Brar <jassi.brar@samsung.com>
 ---
 Changes since v1:
-- Added missing selections HAVE_S3C2410_WATCHDOG, _I2C, and _RTC
+- Fix mis-name s3c64x0-xxx
+- Fix mis-name S5P6440_SPI_SRCCLK
+- Build tested with modifying Makefile for test
+- Merged s5p6440_spi_set_info and s5p6450_xxx to one function
 
- arch/arm/Kconfig                                   |   13 +++--
- arch/arm/Makefile                                  |    2 +-
- arch/arm/mach-s5p6440/Kconfig                      |   33 ------------
- arch/arm/mach-s5p6440/Makefile                     |   25 ---------
- arch/arm/mach-s5p64x0/Kconfig                      |   55 ++++++++++++++++++++
- arch/arm/mach-s5p64x0/Makefile                     |   30 +++++++++++
- .../{mach-s5p6440 => mach-s5p64x0}/Makefile.boot   |    0
- arch/arm/plat-s5p/Kconfig                          |    4 +-
- 8 files changed, 95 insertions(+), 67 deletions(-)
- delete mode 100644 arch/arm/mach-s5p6440/Kconfig
- delete mode 100644 arch/arm/mach-s5p6440/Makefile
- create mode 100644 arch/arm/mach-s5p64x0/Kconfig
- create mode 100644 arch/arm/mach-s5p64x0/Makefile
- rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/Makefile.boot (100%)
+ arch/arm/mach-s5p6440/dev-audio.c                |  127 -----------
+ arch/arm/mach-s5p6440/dev-spi.c                  |  176 ---------------
+ arch/arm/mach-s5p6440/include/mach/spi-clocks.h  |   17 --
+ arch/arm/mach-s5p64x0/dev-audio.c                |  164 ++++++++++++++
+ arch/arm/mach-s5p64x0/dev-spi.c                  |  260 ++++++++++++++++++++++
+ arch/arm/mach-s5p64x0/include/mach/spi-clocks.h  |   20 ++
+ arch/arm/plat-samsung/include/plat/devs.h        |    5 +
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 +-
+ 8 files changed, 450 insertions(+), 321 deletions(-)
+ delete mode 100644 arch/arm/mach-s5p6440/dev-audio.c
+ delete mode 100644 arch/arm/mach-s5p6440/dev-spi.c
+ delete mode 100644 arch/arm/mach-s5p6440/include/mach/spi-clocks.h
+ create mode 100644 arch/arm/mach-s5p64x0/dev-audio.c
+ create mode 100644 arch/arm/mach-s5p64x0/dev-spi.c
+ create mode 100644 arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7ed21f..626489b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -679,8 +679,8 @@ config ARCH_S3C64XX
- 	help
- 	  Samsung S3C64XX series based systems
- 
--config ARCH_S5P6440
--	bool "Samsung S5P6440"
-+config ARCH_S5P64X0
-+	bool "Samsung S5P6440 S5P6450"
- 	select CPU_V6
- 	select GENERIC_GPIO
- 	select HAVE_CLK
-@@ -689,7 +689,8 @@ config ARCH_S5P6440
- 	select HAVE_S3C2410_I2C
- 	select HAVE_S3C_RTC
- 	help
--	  Samsung S5P6440 CPU based systems
-+	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
-+	  SMDK6450.
- 
- config ARCH_S5P6442
- 	bool "Samsung S5P6442"
-@@ -929,7 +930,7 @@ if ARCH_S3C64XX
- source "arch/arm/mach-s3c64xx/Kconfig"
- endif
- 
--source "arch/arm/mach-s5p6440/Kconfig"
-+source "arch/arm/mach-s5p64x0/Kconfig"
- 
- source "arch/arm/mach-s5p6442/Kconfig"
- 
-@@ -1232,7 +1233,7 @@ source kernel/Kconfig.preempt
- 
- config HZ
- 	int
--	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || \
-+	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
- 		ARCH_S5P6442 || ARCH_S5PV210 || ARCH_S5PV310
- 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
- 	default AT91_TIMER_HZ if ARCH_AT91
-@@ -1609,7 +1610,7 @@ config ZRELADDR
- 	default 0x10008000 if ARCH_MSM ||\
- 		ARCH_OMAP1 ||\
- 		ARCH_RPC
--	default 0x20008000 if ARCH_S5P6440 ||\
-+	default 0x20008000 if ARCH_S5P64X0 ||\
- 		ARCH_S5P6442 ||\
- 		ARCH_S5PC100 ||\
- 		ARCH_S5PV210
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 59c1ce8..8420f21 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -173,7 +173,7 @@ machine-$(CONFIG_ARCH_RPC)		:= rpc
- machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2416 s3c2440 s3c2443
- machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
- machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
--machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
-+machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
- machine-$(CONFIG_ARCH_S5P6442)		:= s5p6442
- machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
- machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
-diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
+diff --git a/arch/arm/mach-s5p6440/dev-audio.c b/arch/arm/mach-s5p6440/dev-audio.c
 deleted file mode 100644
-index 6a4af7f..0000000
---- a/arch/arm/mach-s5p6440/Kconfig
+index 3ca0d2b..0000000
+--- a/arch/arm/mach-s5p6440/dev-audio.c
 +++ /dev/null
-@@ -1,33 +0,0 @@
--# arch/arm/mach-s5p6440/Kconfig
--#
--# Copyright (c) 2009 Samsung Electronics Co., Ltd.
--#		http://www.samsung.com/
--#
--# Licensed under GPLv2
+@@ -1,127 +0,0 @@
+-/* linux/arch/arm/mach-s5p6440/dev-audio.c
+- *
+- * Copyright (c) 2010 Samsung Electronics Co. Ltd
+- *	Jaswinder Singh <jassi.brar@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
 -
--if ARCH_S5P6440
+-#include <linux/platform_device.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/gpio.h>
 -
--config CPU_S5P6440
--	bool
--	select S3C_PL330_DMA
--	help
--	  Enable S5P6440 CPU support
+-#include <plat/gpio-cfg.h>
+-#include <plat/audio.h>
 -
--config S5P6440_SETUP_I2C1
--	bool
--	help
--	  Common setup code for i2c bus 1.
+-#include <mach/map.h>
+-#include <mach/dma.h>
+-#include <mach/irqs.h>
 -
--config MACH_SMDK6440
--	bool "SMDK6440"
--	select CPU_S5P6440
--	select S3C_DEV_I2C1
--	select S3C_DEV_RTC
--	select S3C_DEV_WDT
--	select SAMSUNG_DEV_ADC
--	select SAMSUNG_DEV_TS
--	select S5P6440_SETUP_I2C1
--	help
--	  Machine support for the Samsung SMDK6440
+-static int s5p6440_cfg_i2s(struct platform_device *pdev)
+-{
+-	/* configure GPIO for i2s port */
+-	switch (pdev->id) {
+-	case -1:
+-		s3c_gpio_cfgpin(S5P6440_GPR(4), S3C_GPIO_SFN(5));
+-		s3c_gpio_cfgpin(S5P6440_GPR(5), S3C_GPIO_SFN(5));
+-		s3c_gpio_cfgpin(S5P6440_GPR(6), S3C_GPIO_SFN(5));
+-		s3c_gpio_cfgpin(S5P6440_GPR(7), S3C_GPIO_SFN(5));
+-		s3c_gpio_cfgpin(S5P6440_GPR(8), S3C_GPIO_SFN(5));
+-		s3c_gpio_cfgpin(S5P6440_GPR(13), S3C_GPIO_SFN(5));
+-		s3c_gpio_cfgpin(S5P6440_GPR(14), S3C_GPIO_SFN(5));
+-		break;
 -
--endif
-diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
+-	default:
+-		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static struct s3c_audio_pdata s3c_i2s_pdata = {
+-	.cfg_gpio = s5p6440_cfg_i2s,
+-};
+-
+-static struct resource s5p6440_iis0_resource[] = {
+-	[0] = {
+-		.start = S5P6440_PA_I2S,
+-		.end   = S5P6440_PA_I2S + 0x100 - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = DMACH_I2S0_TX,
+-		.end   = DMACH_I2S0_TX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-	[2] = {
+-		.start = DMACH_I2S0_RX,
+-		.end   = DMACH_I2S0_RX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-};
+-
+-struct platform_device s5p6440_device_iis = {
+-	.name		  = "s3c64xx-iis-v4",
+-	.id		  = -1,
+-	.num_resources	  = ARRAY_SIZE(s5p6440_iis0_resource),
+-	.resource	  = s5p6440_iis0_resource,
+-	.dev = {
+-		.platform_data = &s3c_i2s_pdata,
+-	},
+-};
+-
+-/* PCM Controller platform_devices */
+-
+-static int s5p6440_pcm_cfg_gpio(struct platform_device *pdev)
+-{
+-	switch (pdev->id) {
+-	case 0:
+-		s3c_gpio_cfgpin(S5P6440_GPR(7), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPR(13), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPR(14), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPR(8), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPR(6), S3C_GPIO_SFN(2));
+-		break;
+-
+-	default:
+-		printk(KERN_DEBUG "Invalid PCM Controller number!");
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static struct s3c_audio_pdata s3c_pcm_pdata = {
+-	.cfg_gpio = s5p6440_pcm_cfg_gpio,
+-};
+-
+-static struct resource s5p6440_pcm0_resource[] = {
+-	[0] = {
+-		.start = S5P6440_PA_PCM,
+-		.end   = S5P6440_PA_PCM + 0x100 - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = DMACH_PCM0_TX,
+-		.end   = DMACH_PCM0_TX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-	[2] = {
+-		.start = DMACH_PCM0_RX,
+-		.end   = DMACH_PCM0_RX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-};
+-
+-struct platform_device s5p6440_device_pcm = {
+-	.name		  = "samsung-pcm",
+-	.id		  = 0,
+-	.num_resources	  = ARRAY_SIZE(s5p6440_pcm0_resource),
+-	.resource	  = s5p6440_pcm0_resource,
+-	.dev = {
+-		.platform_data = &s3c_pcm_pdata,
+-	},
+-};
+diff --git a/arch/arm/mach-s5p6440/dev-spi.c b/arch/arm/mach-s5p6440/dev-spi.c
 deleted file mode 100644
-index c3fe4d3..0000000
---- a/arch/arm/mach-s5p6440/Makefile
+index 510af44..0000000
+--- a/arch/arm/mach-s5p6440/dev-spi.c
 +++ /dev/null
-@@ -1,25 +0,0 @@
--# arch/arm/mach-s5p6440/Makefile
--#
--# Copyright (c) 2009 Samsung Electronics Co., Ltd.
--# 		http://www.samsung.com/
--#
--# Licensed under GPLv2
+@@ -1,176 +0,0 @@
+-/* linux/arch/arm/mach-s5p6440/dev-spi.c
+- *
+- * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+- *	Jaswinder Singh <jassi.brar@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
 -
--obj-y				:=
--obj-m				:=
--obj-n				:=
--obj-				:=
+-#include <linux/platform_device.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/gpio.h>
 -
--# Core support for S5P6440 system
+-#include <mach/dma.h>
+-#include <mach/map.h>
+-#include <mach/irqs.h>
+-#include <mach/spi-clocks.h>
 -
--obj-$(CONFIG_CPU_S5P6440)	+= cpu.o init.o clock.o gpio.o dma.o
--obj-$(CONFIG_CPU_S5P6440)	+= setup-i2c0.o
+-#include <plat/s3c64xx-spi.h>
+-#include <plat/gpio-cfg.h>
 -
--# machine support
+-static char *spi_src_clks[] = {
+-	[S5P6440_SPI_SRCCLK_PCLK] = "pclk",
+-	[S5P6440_SPI_SRCCLK_SCLK] = "spi_epll",
+-};
 -
--obj-$(CONFIG_MACH_SMDK6440)	+= mach-smdk6440.o
+-/* SPI Controller platform_devices */
 -
--# device support
--obj-y				+= dev-audio.o
--obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
--obj-$(CONFIG_S5P6440_SETUP_I2C1)	+= setup-i2c1.o
-diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+-/* Since we emulate multi-cs capability, we do not touch the CS.
+- * The emulated CS is toggled by board specific mechanism, as it can
+- * be either some immediate GPIO or some signal out of some other
+- * chip in between ... or some yet another way.
+- * We simply do not assume anything about CS.
+- */
+-static int s5p6440_spi_cfg_gpio(struct platform_device *pdev)
+-{
+-	switch (pdev->id) {
+-	case 0:
+-		s3c_gpio_cfgpin(S5P6440_GPC(0), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPC(1), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPC(2), S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(S5P6440_GPC(0), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S5P6440_GPC(1), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S5P6440_GPC(2), S3C_GPIO_PULL_UP);
+-		break;
+-
+-	case 1:
+-		s3c_gpio_cfgpin(S5P6440_GPC(4), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPC(5), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5P6440_GPC(6), S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(S5P6440_GPC(4), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S5P6440_GPC(5), S3C_GPIO_PULL_UP);
+-		s3c_gpio_setpull(S5P6440_GPC(6), S3C_GPIO_PULL_UP);
+-		break;
+-
+-	default:
+-		dev_err(&pdev->dev, "Invalid SPI Controller number!");
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static struct resource s5p6440_spi0_resource[] = {
+-	[0] = {
+-		.start = S5P6440_PA_SPI0,
+-		.end   = S5P6440_PA_SPI0 + 0x100 - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = DMACH_SPI0_TX,
+-		.end   = DMACH_SPI0_TX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-	[2] = {
+-		.start = DMACH_SPI0_RX,
+-		.end   = DMACH_SPI0_RX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start = IRQ_SPI0,
+-		.end   = IRQ_SPI0,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct s3c64xx_spi_info s5p6440_spi0_pdata = {
+-	.cfg_gpio = s5p6440_spi_cfg_gpio,
+-	.fifo_lvl_mask = 0x1ff,
+-	.rx_lvl_offset = 15,
+-};
+-
+-static u64 spi_dmamask = DMA_BIT_MASK(32);
+-
+-struct platform_device s5p6440_device_spi0 = {
+-	.name		  = "s3c64xx-spi",
+-	.id		  = 0,
+-	.num_resources	  = ARRAY_SIZE(s5p6440_spi0_resource),
+-	.resource	  = s5p6440_spi0_resource,
+-	.dev = {
+-		.dma_mask		= &spi_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-		.platform_data = &s5p6440_spi0_pdata,
+-	},
+-};
+-
+-static struct resource s5p6440_spi1_resource[] = {
+-	[0] = {
+-		.start = S5P6440_PA_SPI1,
+-		.end   = S5P6440_PA_SPI1 + 0x100 - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start = DMACH_SPI1_TX,
+-		.end   = DMACH_SPI1_TX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-	[2] = {
+-		.start = DMACH_SPI1_RX,
+-		.end   = DMACH_SPI1_RX,
+-		.flags = IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start = IRQ_SPI1,
+-		.end   = IRQ_SPI1,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct s3c64xx_spi_info s5p6440_spi1_pdata = {
+-	.cfg_gpio = s5p6440_spi_cfg_gpio,
+-	.fifo_lvl_mask = 0x7f,
+-	.rx_lvl_offset = 15,
+-};
+-
+-struct platform_device s5p6440_device_spi1 = {
+-	.name		  = "s3c64xx-spi",
+-	.id		  = 1,
+-	.num_resources	  = ARRAY_SIZE(s5p6440_spi1_resource),
+-	.resource	  = s5p6440_spi1_resource,
+-	.dev = {
+-		.dma_mask		= &spi_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-		.platform_data = &s5p6440_spi1_pdata,
+-	},
+-};
+-
+-void __init s5p6440_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+-{
+-	struct s3c64xx_spi_info *pd;
+-
+-	/* Reject invalid configuration */
+-	if (!num_cs || src_clk_nr < 0
+-			|| src_clk_nr > S5P6440_SPI_SRCCLK_SCLK) {
+-		printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
+-		return;
+-	}
+-
+-	switch (cntrlr) {
+-	case 0:
+-		pd = &s5p6440_spi0_pdata;
+-		break;
+-	case 1:
+-		pd = &s5p6440_spi1_pdata;
+-		break;
+-	default:
+-		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
+-							__func__, cntrlr);
+-		return;
+-	}
+-
+-	pd->num_cs = num_cs;
+-	pd->src_clk_nr = src_clk_nr;
+-	pd->src_clk_name = spi_src_clks[src_clk_nr];
+-}
+diff --git a/arch/arm/mach-s5p6440/include/mach/spi-clocks.h b/arch/arm/mach-s5p6440/include/mach/spi-clocks.h
+deleted file mode 100644
+index 5fbca50..0000000
+--- a/arch/arm/mach-s5p6440/include/mach/spi-clocks.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/* linux/arch/arm/mach-s5p6440/include/mach/spi-clocks.h
+- *
+- * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+- *	Jaswinder Singh <jassi.brar@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __S5P6440_PLAT_SPI_CLKS_H
+-#define __S5P6440_PLAT_SPI_CLKS_H __FILE__
+-
+-#define S5P6440_SPI_SRCCLK_PCLK		0
+-#define S5P6440_SPI_SRCCLK_SCLK		1
+-
+-#endif /* __S5P6440_PLAT_SPI_CLKS_H */
+diff --git a/arch/arm/mach-s5p64x0/dev-audio.c b/arch/arm/mach-s5p64x0/dev-audio.c
 new file mode 100644
-index 0000000..488375c
+index 0000000..fa097bd
 --- /dev/null
-+++ b/arch/arm/mach-s5p64x0/Kconfig
-@@ -0,0 +1,55 @@
-+# arch/arm/mach-s5p64x0/Kconfig
-+#
-+# Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+#		http://www.samsung.com/
-+#
-+# Licensed under GPLv2
++++ b/arch/arm/mach-s5p64x0/dev-audio.c
+@@ -0,0 +1,164 @@
++/* linux/arch/arm/mach-s5p64x0/dev-audio.c
++ *
++ * Copyright (c) 2010 Samsung Electronics Co. Ltd
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+if ARCH_S5P64X0
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++#include <linux/gpio.h>
 +
-+config CPU_S5P6440
-+	bool
-+	select PLAT_S5P
-+	select S3C_PL330_DMA
-+	help
-+	  Enable S5P6440 CPU support
++#include <plat/gpio-cfg.h>
++#include <plat/audio.h>
 +
-+config CPU_S5P6450
-+	bool
-+	select PLAT_S5P
-+	select S3C_PL330_DMA
-+	help
-+	  Enable S5P6450 CPU support
++#include <mach/map.h>
++#include <mach/dma.h>
++#include <mach/irqs.h>
 +
-+config S5P64X0_SETUP_I2C1
-+	bool
-+	help
-+	  Common setup code for i2c bus 1.
++static int s5p6440_cfg_i2s(struct platform_device *pdev)
++{
++	/* configure GPIO for i2s port */
++	switch (pdev->id) {
++	case -1:
++		s3c_gpio_cfgpin(S5P6440_GPR(4), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6440_GPR(5), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6440_GPR(6), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6440_GPR(7), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6440_GPR(8), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6440_GPR(13), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6440_GPR(14), S3C_GPIO_SFN(5));
++		break;
 +
-+# machine support
++	default:
++		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
++		return -EINVAL;
++	}
 +
-+config MACH_SMDK6440
-+	bool "SMDK6440"
-+	select CPU_S5P6440
-+	select S3C_DEV_I2C1
-+	select S3C_DEV_RTC
-+	select S3C_DEV_WDT
-+	select SAMSUNG_DEV_ADC
-+	select SAMSUNG_DEV_TS
-+	select S5P64X0_SETUP_I2C1
-+	help
-+	  Machine support for the Samsung SMDK6440
++	return 0;
++}
 +
-+config MACH_SMDK6450
-+	bool "SMDK6450"
-+	select CPU_S5P6450
-+	select S3C_DEV_I2C1
-+	select S3C_DEV_RTC
-+	select S3C_DEV_WDT
-+	select SAMSUNG_DEV_ADC
-+	select SAMSUNG_DEV_TS
-+	select S5P64X0_SETUP_I2C1
-+	help
-+	  Machine support for the Samsung SMDK6450
++static int s5p6450_cfg_i2s(struct platform_device *pdev)
++{
++	/* configure GPIO for i2s port */
++	switch (pdev->id) {
++	case -1:
++		s3c_gpio_cfgpin(S5P6450_GPB(4), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(4), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(5), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(6), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(7), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(8), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(13), S3C_GPIO_SFN(5));
++		s3c_gpio_cfgpin(S5P6450_GPR(14), S3C_GPIO_SFN(5));
++		break;
 +
-+endif
-diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
++	default:
++		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static struct s3c_audio_pdata s5p6440_i2s_pdata = {
++	.cfg_gpio = s5p6440_cfg_i2s,
++};
++
++static struct s3c_audio_pdata s5p6450_i2s_pdata = {
++	.cfg_gpio = s5p6450_cfg_i2s,
++};
++
++static struct resource s5p64x0_iis0_resource[] = {
++	[0] = {
++		.start	= S5P64X0_PA_I2S,
++		.end	= S5P64X0_PA_I2S + 0x100 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= DMACH_I2S0_TX,
++		.end	= DMACH_I2S0_TX,
++		.flags	= IORESOURCE_DMA,
++	},
++	[2] = {
++		.start	= DMACH_I2S0_RX,
++		.end	= DMACH_I2S0_RX,
++		.flags	= IORESOURCE_DMA,
++	},
++};
++
++struct platform_device s5p6440_device_iis = {
++	.name		= "s3c64xx-iis-v4",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s5p64x0_iis0_resource),
++	.resource	= s5p64x0_iis0_resource,
++	.dev = {
++		.platform_data = &s5p6440_i2s_pdata,
++	},
++};
++
++struct platform_device s5p6450_device_iis0 = {
++	.name		= "s3c64xx-iis-v4",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s5p64x0_iis0_resource),
++	.resource	= s5p64x0_iis0_resource,
++	.dev = {
++		.platform_data = &s5p6450_i2s_pdata,
++	},
++};
++
++/* PCM Controller platform_devices */
++
++static int s5p6440_pcm_cfg_gpio(struct platform_device *pdev)
++{
++	switch (pdev->id) {
++	case 0:
++		s3c_gpio_cfgpin(S5P6440_GPR(7), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPR(13), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPR(14), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPR(8), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPR(6), S3C_GPIO_SFN(2));
++		break;
++
++	default:
++		printk(KERN_DEBUG "Invalid PCM Controller number!");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static struct s3c_audio_pdata s5p6440_pcm_pdata = {
++	.cfg_gpio = s5p6440_pcm_cfg_gpio,
++};
++
++static struct resource s5p6440_pcm0_resource[] = {
++	[0] = {
++		.start	= S5P64X0_PA_PCM,
++		.end	= S5P64X0_PA_PCM + 0x100 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= DMACH_PCM0_TX,
++		.end	= DMACH_PCM0_TX,
++		.flags	= IORESOURCE_DMA,
++	},
++	[2] = {
++		.start	= DMACH_PCM0_RX,
++		.end	= DMACH_PCM0_RX,
++		.flags	= IORESOURCE_DMA,
++	},
++};
++
++struct platform_device s5p6440_device_pcm = {
++	.name		= "samsung-pcm",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(s5p6440_pcm0_resource),
++	.resource	= s5p6440_pcm0_resource,
++	.dev = {
++		.platform_data = &s5p6440_pcm_pdata,
++	},
++};
+diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
 new file mode 100644
-index 0000000..2655829
+index 0000000..0dd504a
 --- /dev/null
-+++ b/arch/arm/mach-s5p64x0/Makefile
-@@ -0,0 +1,30 @@
-+# arch/arm/mach-s5p64x0/Makefile
-+#
-+# Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+# 		http://www.samsung.com
-+#
-+# Licensed under GPLv2
++++ b/arch/arm/mach-s5p64x0/dev-spi.c
+@@ -0,0 +1,260 @@
++/* linux/arch/arm/mach-s5p64x0/dev-spi.c
++ *
++ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+obj-y				:=
-+obj-m				:=
-+obj-n				:=
-+obj-				:=
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++#include <linux/gpio.h>
 +
-+# Core support for S5P64X0 system
++#include <mach/dma.h>
++#include <mach/map.h>
++#include <mach/irqs.h>
++#include <mach/regs-clock.h>
++#include <mach/spi-clocks.h>
 +
-+obj-$(CONFIG_ARCH_S5P64X0)	+= cpu.o init.o clock.o dma.o
-+obj-$(CONFIG_ARCH_S5P64X0)	+= setup-i2c0.o
-+obj-$(CONFIG_CPU_S5P6440)	+= clock-s5p6440.o gpio.o
-+obj-$(CONFIG_CPU_S5P6450)	+= clock-s5p6450.o
++#include <plat/s3c64xx-spi.h>
++#include <plat/gpio-cfg.h>
 +
-+# machine support
++static char *s5p6440_spi_src_clks[] = {
++	[S5P64X0_SPI_SRCCLK_PCLK] = "pclk",
++	[S5P64X0_SPI_SRCCLK_SCLK] = "spi_epll",
++};
 +
-+obj-$(CONFIG_MACH_SMDK6440)	+= mach-smdk6440.o
-+obj-$(CONFIG_MACH_SMDK6450)	+= mach-smdk6450.o
++static char *s5p6450_spi_src_clks[] = {
++	[S5P64X0_SPI_SRCCLK_PCLK] = "pclk",
++	[S5P64X0_SPI_SRCCLK_SCLK] = "sclk_spi",
++};
 +
-+# device support
++/* SPI Controller platform_devices */
 +
-+obj-y				+= dev-audio.o
-+obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
++/* Since we emulate multi-cs capability, we do not touch the CS.
++ * The emulated CS is toggled by board specific mechanism, as it can
++ * be either some immediate GPIO or some signal out of some other
++ * chip in between ... or some yet another way.
++ * We simply do not assume anything about CS.
++ */
++static int s5p6440_spi_cfg_gpio(struct platform_device *pdev)
++{
++	switch (pdev->id) {
++	case 0:
++		s3c_gpio_cfgpin(S5P6440_GPC(0), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPC(1), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPC(2), S3C_GPIO_SFN(2));
++		s3c_gpio_setpull(S5P6440_GPC(0), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6440_GPC(1), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6440_GPC(2), S3C_GPIO_PULL_UP);
++		break;
 +
-+obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
-diff --git a/arch/arm/mach-s5p6440/Makefile.boot b/arch/arm/mach-s5p64x0/Makefile.boot
-similarity index 100%
-rename from arch/arm/mach-s5p6440/Makefile.boot
-rename to arch/arm/mach-s5p64x0/Makefile.boot
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index c6a855d..90f97d6 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -7,7 +7,7 @@
++	case 1:
++		s3c_gpio_cfgpin(S5P6440_GPC(4), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPC(5), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6440_GPC(6), S3C_GPIO_SFN(2));
++		s3c_gpio_setpull(S5P6440_GPC(4), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6440_GPC(5), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6440_GPC(6), S3C_GPIO_PULL_UP);
++		break;
++
++	default:
++		dev_err(&pdev->dev, "Invalid SPI Controller number!");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int s5p6450_spi_cfg_gpio(struct platform_device *pdev)
++{
++	switch (pdev->id) {
++	case 0:
++		s3c_gpio_cfgpin(S5P6450_GPC(0), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6450_GPC(1), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6450_GPC(2), S3C_GPIO_SFN(2));
++		s3c_gpio_setpull(S5P6450_GPC(0), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6450_GPC(1), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6450_GPC(2), S3C_GPIO_PULL_UP);
++		break;
++
++	case 1:
++		s3c_gpio_cfgpin(S5P6450_GPC(4), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6450_GPC(5), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5P6450_GPC(6), S3C_GPIO_SFN(2));
++		s3c_gpio_setpull(S5P6450_GPC(4), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6450_GPC(5), S3C_GPIO_PULL_UP);
++		s3c_gpio_setpull(S5P6450_GPC(6), S3C_GPIO_PULL_UP);
++		break;
++
++	default:
++		dev_err(&pdev->dev, "Invalid SPI Controller number!");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static struct resource s5p64x0_spi0_resource[] = {
++	[0] = {
++		.start	= S5P64X0_PA_SPI0,
++		.end	= S5P64X0_PA_SPI0 + 0x100 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= DMACH_SPI0_TX,
++		.end	= DMACH_SPI0_TX,
++		.flags	= IORESOURCE_DMA,
++	},
++	[2] = {
++		.start	= DMACH_SPI0_RX,
++		.end	= DMACH_SPI0_RX,
++		.flags	= IORESOURCE_DMA,
++	},
++	[3] = {
++		.start	= IRQ_SPI0,
++		.end	= IRQ_SPI0,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c64xx_spi_info s5p6440_spi0_pdata = {
++	.cfg_gpio	= s5p6440_spi_cfg_gpio,
++	.fifo_lvl_mask	= 0x1ff,
++	.rx_lvl_offset	= 15,
++};
++
++static struct s3c64xx_spi_info s5p6450_spi0_pdata = {
++	.cfg_gpio	= s5p6450_spi_cfg_gpio,
++	.fifo_lvl_mask	= 0x1ff,
++	.rx_lvl_offset	= 15,
++};
++
++static u64 spi_dmamask = DMA_BIT_MASK(32);
++
++struct platform_device s5p6440_device_spi0 = {
++	.name		= "s3c64xx-spi",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(s5p64x0_spi0_resource),
++	.resource	= s5p64x0_spi0_resource,
++	.dev = {
++		.dma_mask		= &spi_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data = &s5p6440_spi0_pdata,
++	},
++};
++
++struct platform_device s5p6450_device_spi0 = {
++	.name		= "s3c64xx-spi",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(s5p64x0_spi0_resource),
++	.resource	= s5p64x0_spi0_resource,
++	.dev = {
++		.dma_mask		= &spi_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data = &s5p6450_spi0_pdata,
++	},
++};
++
++static struct resource s5p64x0_spi1_resource[] = {
++	[0] = {
++		.start	= S5P64X0_PA_SPI1,
++		.end	= S5P64X0_PA_SPI1 + 0x100 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= DMACH_SPI1_TX,
++		.end	= DMACH_SPI1_TX,
++		.flags	= IORESOURCE_DMA,
++	},
++	[2] = {
++		.start	= DMACH_SPI1_RX,
++		.end	= DMACH_SPI1_RX,
++		.flags	= IORESOURCE_DMA,
++	},
++	[3] = {
++		.start	= IRQ_SPI1,
++		.end	= IRQ_SPI1,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct s3c64xx_spi_info s5p6440_spi1_pdata = {
++	.cfg_gpio	= s5p6440_spi_cfg_gpio,
++	.fifo_lvl_mask	= 0x7f,
++	.rx_lvl_offset	= 15,
++};
++
++static struct s3c64xx_spi_info s5p6450_spi1_pdata = {
++	.cfg_gpio	= s5p6450_spi_cfg_gpio,
++	.fifo_lvl_mask	= 0x7f,
++	.rx_lvl_offset	= 15,
++};
++
++struct platform_device s5p6440_device_spi1 = {
++	.name		= "s3c64xx-spi",
++	.id		= 1,
++	.num_resources	= ARRAY_SIZE(s5p64x0_spi1_resource),
++	.resource	= s5p64x0_spi1_resource,
++	.dev = {
++		.dma_mask		= &spi_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data = &s5p6440_spi1_pdata,
++	},
++};
++
++struct platform_device s5p6450_device_spi1 = {
++	.name		= "s3c64xx-spi",
++	.id		= 1,
++	.num_resources	= ARRAY_SIZE(s5p64x0_spi1_resource),
++	.resource	= s5p64x0_spi1_resource,
++	.dev = {
++		.dma_mask		= &spi_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++		.platform_data = &s5p6450_spi1_pdata,
++	},
++};
++
++void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
++{
++	unsigned int id;
++	struct s3c64xx_spi_info *pd;
++
++	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
++
++	/* Reject invalid configuration */
++	if (!num_cs || src_clk_nr < 0
++			|| src_clk_nr > S5P64X0_SPI_SRCCLK_SCLK) {
++		printk(KERN_ERR "%s: Invalid SPI configuration\n", __func__);
++		return;
++	}
++
++	switch (cntrlr) {
++	case 0:
++		if (id == 0x50000)
++			pd = &s5p6450_spi0_pdata;
++		else
++			pd = &s5p6440_spi0_pdata;
++		break;
++	case 1:
++		if (id == 0x50000)
++			pd = &s5p6450_spi1_pdata;
++		else
++			pd = &s5p6440_spi1_pdata;
++		break;
++	default:
++		printk(KERN_ERR "%s: Invalid SPI controller(%d)\n",
++							__func__, cntrlr);
++		return;
++	}
++
++	pd->num_cs = num_cs;
++	pd->src_clk_nr = src_clk_nr;
++
++	if (id == 0x50000)
++		pd->src_clk_name = s5p6450_spi_src_clks[src_clk_nr];
++	else
++		pd->src_clk_name = s5p6440_spi_src_clks[src_clk_nr];
++}
+diff --git a/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h b/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+new file mode 100644
+index 0000000..170a20a
+--- /dev/null
++++ b/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
+@@ -0,0 +1,20 @@
++/* linux/arch/arm/mach-s5p64x0/include/mach/spi-clocks.h
++ *
++ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ *	Jaswinder Singh <jassi.brar@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_SPI_CLKS_H
++#define __ASM_ARCH_SPI_CLKS_H __FILE__
++
++#define S5P64X0_SPI_SRCCLK_PCLK		0
++#define S5P64X0_SPI_SRCCLK_SCLK		1
++
++#endif /* __ASM_ARCH_SPI_CLKS_H */
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index 85f6f23..10d0d3c 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -67,6 +67,8 @@ extern struct platform_device s5pv210_device_spi0;
+ extern struct platform_device s5pv210_device_spi1;
+ extern struct platform_device s5p6440_device_spi0;
+ extern struct platform_device s5p6440_device_spi1;
++extern struct platform_device s5p6450_device_spi0;
++extern struct platform_device s5p6450_device_spi1;
  
- config PLAT_S5P
- 	bool
--	depends on (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310)
-+	depends on (ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310)
- 	default y
- 	select ARM_VIC if !ARCH_S5PV310
- 	select ARM_GIC if ARCH_S5PV310
-@@ -30,7 +30,7 @@ config S5P_EXT_INT
- 	bool
- 	help
- 	  Use the external interrupts (other than GPIO interrupts.)
--	  Note: Do not choose this for S5P6440.
-+	  Note: Do not choose this for S5P6440 and S5P6450.
+ extern struct platform_device s3c_device_hwmon;
  
- config S5P_DEV_FIMC0
- 	bool
+@@ -95,6 +97,9 @@ extern struct platform_device s5p6442_device_spi;
+ extern struct platform_device s5p6440_device_pcm;
+ extern struct platform_device s5p6440_device_iis;
+ 
++extern struct platform_device s5p6450_device_iis0;
++extern struct platform_device s5p6450_device_pcm0;
++
+ extern struct platform_device s5pc100_device_ac97;
+ extern struct platform_device s5pc100_device_pcm0;
+ extern struct platform_device s5pc100_device_pcm1;
+diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+index e5aba8f..ae8e802 100644
+--- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
++++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
+@@ -65,7 +65,7 @@ struct s3c64xx_spi_info {
+ extern void s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+ extern void s5pc100_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+ extern void s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+-extern void s5p6440_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
++extern void s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+ extern void s5p6442_spi_set_info(int cntrlr, int src_clk_nr, int num_cs);
+ 
+ #endif /* __S3C64XX_PLAT_SPI_H */
 -- 
 1.6.2.5
