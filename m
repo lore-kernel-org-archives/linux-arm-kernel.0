@@ -1,64 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 08 Sep 2010 18:00:06 +0400
-Subject: [PATCH 2/2] ARM: mxc: turn off HWCAP_NEON for older versions
-	of imx51	silicon
-In-Reply-To: <1283890733-6548-3-git-send-email-nico@fluxnic.net>
-References: <1283890733-6548-1-git-send-email-nico@fluxnic.net>
-	<1283890733-6548-3-git-send-email-nico@fluxnic.net>
-Message-ID: <4C8796E6.3010905@ru.mvista.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 8 Sep 2010 23:17:51 +0900
+Subject: [PATCH 1/2] ARM: S3C64XX: Fix dev-spi build
+In-Reply-To: <003201cb4f4c$5e561640$1b0242c0$%kim@samsung.com>
+References: <1283941539-3892-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<003201cb4f4c$5e561640$1b0242c0$%kim@samsung.com>
+Message-ID: <AANLkTimxnfjuNR-Z0eaYwhk8xTDctTBvxcQCVbAvBOG2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Sep 8, 2010 at 8:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Mark Brown wrote:
+>>
+>> The irqs.h usage here got missed in the Samsung platform reorganisation.
+>>
+>> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>
+> Maybe Jassi wants to use 'jassi.brar at samsung.com' e-mail...but I'm not sure
+> ;-)
 
-Nicolas Pitre wrote:
+Yes, that would be better.
 
-> From: Amit Kucheria <amit.kucheria@verdurent.com>
+I have to use personal id because I can't always reply from the official one.
+Otherwise, I'd prefer my work to be tagged with jassi.brar at samsung.com
 
-> Versions of silicon older than TO3 have broken NEON implementation. Turn off
-> NEON in such cases.
-
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> Tested-by: Dave Martin <dave.martin@linaro.org>
-> Tested-by: Jason Hui <jason.hui@linaro.org>
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  arch/arm/mach-mx5/cpu.c |   19 +++++++++++++++++++
->  1 files changed, 19 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-> index 2d37785..548c55b 100644
-> --- a/arch/arm/mach-mx5/cpu.c
-> +++ b/arch/arm/mach-mx5/cpu.c
-> @@ -70,6 +70,25 @@ int mx51_revision(void)
->  }
->  EXPORT_SYMBOL(mx51_revision);
->  
-> +#ifdef CONFIG_NEON
-> +
-> +/* All versions of the silicon before Rev. 3 have broken NEON implementations.
-> + * Dependent on link order - so the assumption is that vfp_init is called before us
-> + */
-> +static int __init mx51_neon_fixup(void)
-> +{
-> +	if (mx51_revision() <  MX51_CHIP_REV_3_0) {
-
-   Too many spaces after '<'?
-
-> +		if (elf_hwcap & HWCAP_NEON) {
-
-    Could be collapsed into the preceding *if*, and so indentation level made 
-one less...
-
-> +			elf_hwcap &= ~HWCAP_NEON;
-> +			pr_info("Turning off NEON support, detected broken NEON implementation\n");
-> +		}
-> +	}
-> +	return 0;
-> +}
-> +
-> +late_initcall(mx51_neon_fixup);
-> +#endif
-> +
-
-WBR, Sergei
+Thanks.
