@@ -1,353 +1,291 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  8 Sep 2010 17:12:05 +0900
-Subject: [PATCH v2 08/13] ARM: S5P64X0: Move DMA support for S5P64X0
-Message-ID: <1283933525-31598-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed,  8 Sep 2010 17:11:50 +0900
+Subject: [PATCH v2 02/13] ARM: S5P64X0: Update Kconfig and Makefile
+Message-ID: <1283933510-31527-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves DMA support files in the mach-s5p64x0
-for S5P6440 and S5P6450 SoCs.
+This patch updates the Kconfig and Makefile for the S5P6440 and S5P6450
+machines. It also updates arch/arm/ Kconfig and Makefile to include for
+support ARCH_S5P64X0 with one kernel image.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Jassi Brar <jassi.brar@samsung.com>
 ---
 Changes since v1:
-- Fixed id of s5p6440_device_pdma
-- Added SoC detection for assign each platform device
-- Removed unuseful dma_ch of m2m transfer
+- Added missing selections HAVE_S3C2410_WATCHDOG, _I2C, and _RTC
 
- arch/arm/mach-s5p6440/dma.c                        |  105 -------------
- arch/arm/mach-s5p64x0/dma.c                        |  165 ++++++++++++++++++++
- .../include/mach/dma.h                             |    0
- arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h |   20 +++
- 4 files changed, 185 insertions(+), 105 deletions(-)
- delete mode 100644 arch/arm/mach-s5p6440/dma.c
- create mode 100644 arch/arm/mach-s5p64x0/dma.c
- rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/include/mach/dma.h (100%)
+ arch/arm/Kconfig                                   |   13 +++--
+ arch/arm/Makefile                                  |    2 +-
+ arch/arm/mach-s5p6440/Kconfig                      |   33 ------------
+ arch/arm/mach-s5p6440/Makefile                     |   25 ---------
+ arch/arm/mach-s5p64x0/Kconfig                      |   55 ++++++++++++++++++++
+ arch/arm/mach-s5p64x0/Makefile                     |   30 +++++++++++
+ .../{mach-s5p6440 => mach-s5p64x0}/Makefile.boot   |    0
+ arch/arm/plat-s5p/Kconfig                          |    4 +-
+ 8 files changed, 95 insertions(+), 67 deletions(-)
+ delete mode 100644 arch/arm/mach-s5p6440/Kconfig
+ delete mode 100644 arch/arm/mach-s5p6440/Makefile
+ create mode 100644 arch/arm/mach-s5p64x0/Kconfig
+ create mode 100644 arch/arm/mach-s5p64x0/Makefile
+ rename arch/arm/{mach-s5p6440 => mach-s5p64x0}/Makefile.boot (100%)
 
-diff --git a/arch/arm/mach-s5p6440/dma.c b/arch/arm/mach-s5p6440/dma.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7ed21f..626489b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -679,8 +679,8 @@ config ARCH_S3C64XX
+ 	help
+ 	  Samsung S3C64XX series based systems
+ 
+-config ARCH_S5P6440
+-	bool "Samsung S5P6440"
++config ARCH_S5P64X0
++	bool "Samsung S5P6440 S5P6450"
+ 	select CPU_V6
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+@@ -689,7 +689,8 @@ config ARCH_S5P6440
+ 	select HAVE_S3C2410_I2C
+ 	select HAVE_S3C_RTC
+ 	help
+-	  Samsung S5P6440 CPU based systems
++	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
++	  SMDK6450.
+ 
+ config ARCH_S5P6442
+ 	bool "Samsung S5P6442"
+@@ -929,7 +930,7 @@ if ARCH_S3C64XX
+ source "arch/arm/mach-s3c64xx/Kconfig"
+ endif
+ 
+-source "arch/arm/mach-s5p6440/Kconfig"
++source "arch/arm/mach-s5p64x0/Kconfig"
+ 
+ source "arch/arm/mach-s5p6442/Kconfig"
+ 
+@@ -1232,7 +1233,7 @@ source kernel/Kconfig.preempt
+ 
+ config HZ
+ 	int
+-	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P6440 || \
++	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
+ 		ARCH_S5P6442 || ARCH_S5PV210 || ARCH_S5PV310
+ 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+ 	default AT91_TIMER_HZ if ARCH_AT91
+@@ -1609,7 +1610,7 @@ config ZRELADDR
+ 	default 0x10008000 if ARCH_MSM ||\
+ 		ARCH_OMAP1 ||\
+ 		ARCH_RPC
+-	default 0x20008000 if ARCH_S5P6440 ||\
++	default 0x20008000 if ARCH_S5P64X0 ||\
+ 		ARCH_S5P6442 ||\
+ 		ARCH_S5PC100 ||\
+ 		ARCH_S5PV210
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 59c1ce8..8420f21 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -173,7 +173,7 @@ machine-$(CONFIG_ARCH_RPC)		:= rpc
+ machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2416 s3c2440 s3c2443
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
+-machine-$(CONFIG_ARCH_S5P6440)		:= s5p6440
++machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
+ machine-$(CONFIG_ARCH_S5P6442)		:= s5p6442
+ machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+ machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
+diff --git a/arch/arm/mach-s5p6440/Kconfig b/arch/arm/mach-s5p6440/Kconfig
 deleted file mode 100644
-index 07606ad..0000000
---- a/arch/arm/mach-s5p6440/dma.c
+index 6a4af7f..0000000
+--- a/arch/arm/mach-s5p6440/Kconfig
 +++ /dev/null
-@@ -1,105 +0,0 @@
--/*
-- * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-- *	Jaswinder Singh <jassi.brar@samsung.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- */
+@@ -1,33 +0,0 @@
+-# arch/arm/mach-s5p6440/Kconfig
+-#
+-# Copyright (c) 2009 Samsung Electronics Co., Ltd.
+-#		http://www.samsung.com/
+-#
+-# Licensed under GPLv2
 -
--#include <linux/platform_device.h>
--#include <linux/dma-mapping.h>
+-if ARCH_S5P6440
 -
--#include <plat/devs.h>
--#include <plat/irqs.h>
+-config CPU_S5P6440
+-	bool
+-	select S3C_PL330_DMA
+-	help
+-	  Enable S5P6440 CPU support
 -
--#include <mach/map.h>
--#include <mach/irqs.h>
+-config S5P6440_SETUP_I2C1
+-	bool
+-	help
+-	  Common setup code for i2c bus 1.
 -
--#include <plat/s3c-pl330-pdata.h>
+-config MACH_SMDK6440
+-	bool "SMDK6440"
+-	select CPU_S5P6440
+-	select S3C_DEV_I2C1
+-	select S3C_DEV_RTC
+-	select S3C_DEV_WDT
+-	select SAMSUNG_DEV_ADC
+-	select SAMSUNG_DEV_TS
+-	select S5P6440_SETUP_I2C1
+-	help
+-	  Machine support for the Samsung SMDK6440
 -
--static u64 dma_dmamask = DMA_BIT_MASK(32);
+-endif
+diff --git a/arch/arm/mach-s5p6440/Makefile b/arch/arm/mach-s5p6440/Makefile
+deleted file mode 100644
+index c3fe4d3..0000000
+--- a/arch/arm/mach-s5p6440/Makefile
++++ /dev/null
+@@ -1,25 +0,0 @@
+-# arch/arm/mach-s5p6440/Makefile
+-#
+-# Copyright (c) 2009 Samsung Electronics Co., Ltd.
+-# 		http://www.samsung.com/
+-#
+-# Licensed under GPLv2
 -
--static struct resource s5p6440_pdma_resource[] = {
--	[0] = {
--		.start  = S5P6440_PA_PDMA,
--		.end    = S5P6440_PA_PDMA + SZ_4K,
--		.flags = IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_DMA0,
--		.end	= IRQ_DMA0,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
+-obj-y				:=
+-obj-m				:=
+-obj-n				:=
+-obj-				:=
 -
--static struct s3c_pl330_platdata s5p6440_pdma_pdata = {
--	.peri = {
--		[0] = DMACH_UART0_RX,
--		[1] = DMACH_UART0_TX,
--		[2] = DMACH_UART1_RX,
--		[3] = DMACH_UART1_TX,
--		[4] = DMACH_UART2_RX,
--		[5] = DMACH_UART2_TX,
--		[6] = DMACH_UART3_RX,
--		[7] = DMACH_UART3_TX,
--		[8] = DMACH_MAX,
--		[9] = DMACH_MAX,
--		[10] = DMACH_PCM0_TX,
--		[11] = DMACH_PCM0_RX,
--		[12] = DMACH_I2S0_TX,
--		[13] = DMACH_I2S0_RX,
--		[14] = DMACH_SPI0_TX,
--		[15] = DMACH_SPI0_RX,
--		[16] = DMACH_MAX,
--		[17] = DMACH_MAX,
--		[18] = DMACH_MAX,
--		[19] = DMACH_MAX,
--		[20] = DMACH_SPI1_TX,
--		[21] = DMACH_SPI1_RX,
--		[22] = DMACH_MAX,
--		[23] = DMACH_MAX,
--		[24] = DMACH_MAX,
--		[25] = DMACH_MAX,
--		[26] = DMACH_MAX,
--		[27] = DMACH_MAX,
--		[28] = DMACH_MAX,
--		[29] = DMACH_PWM,
--		[30] = DMACH_MAX,
--		[31] = DMACH_MAX,
--	},
--};
+-# Core support for S5P6440 system
 -
--static struct platform_device s5p6440_device_pdma = {
--	.name		= "s3c-pl330",
--	.id		= 1,
--	.num_resources	= ARRAY_SIZE(s5p6440_pdma_resource),
--	.resource	= s5p6440_pdma_resource,
--	.dev		= {
--		.dma_mask = &dma_dmamask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--		.platform_data = &s5p6440_pdma_pdata,
--	},
--};
+-obj-$(CONFIG_CPU_S5P6440)	+= cpu.o init.o clock.o gpio.o dma.o
+-obj-$(CONFIG_CPU_S5P6440)	+= setup-i2c0.o
 -
--static struct platform_device *s5p6440_dmacs[] __initdata = {
--	&s5p6440_device_pdma,
--};
+-# machine support
 -
--static int __init s5p6440_dma_init(void)
--{
--	platform_add_devices(s5p6440_dmacs, ARRAY_SIZE(s5p6440_dmacs));
+-obj-$(CONFIG_MACH_SMDK6440)	+= mach-smdk6440.o
 -
--	return 0;
--}
--arch_initcall(s5p6440_dma_init);
-diff --git a/arch/arm/mach-s5p64x0/dma.c b/arch/arm/mach-s5p64x0/dma.c
+-# device support
+-obj-y				+= dev-audio.o
+-obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+-obj-$(CONFIG_S5P6440_SETUP_I2C1)	+= setup-i2c1.o
+diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
 new file mode 100644
-index 0000000..62c44dd
+index 0000000..488375c
 --- /dev/null
-+++ b/arch/arm/mach-s5p64x0/dma.c
-@@ -0,0 +1,165 @@
-+/* linux/arch/arm/mach-s5p64x0/dma.c
-+ *
-+ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-+ *	Jaswinder Singh <jassi.brar@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+*/
++++ b/arch/arm/mach-s5p64x0/Kconfig
+@@ -0,0 +1,55 @@
++# arch/arm/mach-s5p64x0/Kconfig
++#
++# Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
++#		http://www.samsung.com/
++#
++# Licensed under GPLv2
 +
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
++if ARCH_S5P64X0
 +
-+#include <mach/map.h>
-+#include <mach/irqs.h>
-+#include <mach/regs-clock.h>
++config CPU_S5P6440
++	bool
++	select PLAT_S5P
++	select S3C_PL330_DMA
++	help
++	  Enable S5P6440 CPU support
 +
-+#include <plat/devs.h>
-+#include <plat/s3c-pl330-pdata.h>
++config CPU_S5P6450
++	bool
++	select PLAT_S5P
++	select S3C_PL330_DMA
++	help
++	  Enable S5P6450 CPU support
 +
-+static u64 dma_dmamask = DMA_BIT_MASK(32);
++config S5P64X0_SETUP_I2C1
++	bool
++	help
++	  Common setup code for i2c bus 1.
 +
-+static struct resource s5p64x0_pdma_resource[] = {
-+	[0] = {
-+		.start	= S5P64X0_PA_PDMA,
-+		.end	= S5P64X0_PA_PDMA + SZ_4K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_DMA0,
-+		.end	= IRQ_DMA0,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
++# machine support
 +
-+static struct s3c_pl330_platdata s5p6440_pdma_pdata = {
-+	.peri = {
-+		[0] = DMACH_UART0_RX,
-+		[1] = DMACH_UART0_TX,
-+		[2] = DMACH_UART1_RX,
-+		[3] = DMACH_UART1_TX,
-+		[4] = DMACH_UART2_RX,
-+		[5] = DMACH_UART2_TX,
-+		[6] = DMACH_UART3_RX,
-+		[7] = DMACH_UART3_TX,
-+		[8] = DMACH_MAX,
-+		[9] = DMACH_MAX,
-+		[10] = DMACH_PCM0_TX,
-+		[11] = DMACH_PCM0_RX,
-+		[12] = DMACH_I2S0_TX,
-+		[13] = DMACH_I2S0_RX,
-+		[14] = DMACH_SPI0_TX,
-+		[15] = DMACH_SPI0_RX,
-+		[16] = DMACH_MAX,
-+		[17] = DMACH_MAX,
-+		[18] = DMACH_MAX,
-+		[19] = DMACH_MAX,
-+		[20] = DMACH_SPI1_TX,
-+		[21] = DMACH_SPI1_RX,
-+		[22] = DMACH_MAX,
-+		[23] = DMACH_MAX,
-+		[24] = DMACH_MAX,
-+		[25] = DMACH_MAX,
-+		[26] = DMACH_MAX,
-+		[27] = DMACH_MAX,
-+		[28] = DMACH_MAX,
-+		[29] = DMACH_PWM,
-+		[30] = DMACH_MAX,
-+		[31] = DMACH_MAX,
-+	},
-+};
++config MACH_SMDK6440
++	bool "SMDK6440"
++	select CPU_S5P6440
++	select S3C_DEV_I2C1
++	select S3C_DEV_RTC
++	select S3C_DEV_WDT
++	select SAMSUNG_DEV_ADC
++	select SAMSUNG_DEV_TS
++	select S5P64X0_SETUP_I2C1
++	help
++	  Machine support for the Samsung SMDK6440
 +
-+static struct s3c_pl330_platdata s5p6450_pdma_pdata = {
-+	.peri = {
-+		[0] = DMACH_UART0_RX,
-+		[1] = DMACH_UART0_TX,
-+		[2] = DMACH_UART1_RX,
-+		[3] = DMACH_UART1_TX,
-+		[4] = DMACH_UART2_RX,
-+		[5] = DMACH_UART2_TX,
-+		[6] = DMACH_UART3_RX,
-+		[7] = DMACH_UART3_TX,
-+		[8] = DMACH_UART4_RX,
-+		[9] = DMACH_UART4_TX,
-+		[10] = DMACH_PCM0_TX,
-+		[11] = DMACH_PCM0_RX,
-+		[12] = DMACH_I2S0_TX,
-+		[13] = DMACH_I2S0_RX,
-+		[14] = DMACH_SPI0_TX,
-+		[15] = DMACH_SPI0_RX,
-+		[16] = DMACH_PCM1_TX,
-+		[17] = DMACH_PCM1_RX,
-+		[18] = DMACH_PCM2_TX,
-+		[19] = DMACH_PCM2_RX,
-+		[20] = DMACH_SPI1_TX,
-+		[21] = DMACH_SPI1_RX,
-+		[22] = DMACH_USI_TX,
-+		[23] = DMACH_USI_RX,
-+		[24] = DMACH_MAX,
-+		[25] = DMACH_I2S1_TX,
-+		[26] = DMACH_I2S1_RX,
-+		[27] = DMACH_I2S2_TX,
-+		[28] = DMACH_I2S2_RX,
-+		[29] = DMACH_PWM,
-+		[30] = DMACH_UART5_RX,
-+		[31] = DMACH_UART5_TX,
-+	},
-+};
++config MACH_SMDK6450
++	bool "SMDK6450"
++	select CPU_S5P6450
++	select S3C_DEV_I2C1
++	select S3C_DEV_RTC
++	select S3C_DEV_WDT
++	select SAMSUNG_DEV_ADC
++	select SAMSUNG_DEV_TS
++	select S5P64X0_SETUP_I2C1
++	help
++	  Machine support for the Samsung SMDK6450
 +
-+static struct platform_device s5p6440_device_pdma = {
-+	.name		= "s3c-pl330",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(s5p64x0_pdma_resource),
-+	.resource	= s5p64x0_pdma_resource,
-+	.dev		= {
-+		.dma_mask = &dma_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s5p6440_pdma_pdata,
-+	},
-+};
++endif
+diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
+new file mode 100644
+index 0000000..2655829
+--- /dev/null
++++ b/arch/arm/mach-s5p64x0/Makefile
+@@ -0,0 +1,30 @@
++# arch/arm/mach-s5p64x0/Makefile
++#
++# Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
++# 		http://www.samsung.com
++#
++# Licensed under GPLv2
 +
-+static struct platform_device s5p6450_device_pdma = {
-+	.name		= "s3c-pl330",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(s5p64x0_pdma_resource),
-+	.resource	= s5p64x0_pdma_resource,
-+	.dev		= {
-+		.dma_mask = &dma_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s5p6450_pdma_pdata,
-+	},
-+};
++obj-y				:=
++obj-m				:=
++obj-n				:=
++obj-				:=
 +
-+static struct platform_device *s5p6440_dmacs[] __initdata = {
-+	&s5p6440_device_pdma,
-+};
++# Core support for S5P64X0 system
 +
-+static struct platform_device *s5p6450_dmacs[] __initdata = {
-+	&s5p6450_device_pdma,
-+};
++obj-$(CONFIG_ARCH_S5P64X0)	+= cpu.o init.o clock.o dma.o
++obj-$(CONFIG_ARCH_S5P64X0)	+= setup-i2c0.o
++obj-$(CONFIG_CPU_S5P6440)	+= clock-s5p6440.o gpio.o
++obj-$(CONFIG_CPU_S5P6450)	+= clock-s5p6450.o
 +
-+static int __init s5p64x0_dma_init(void)
-+{
-+	unsigned int id;
++# machine support
 +
-+	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
++obj-$(CONFIG_MACH_SMDK6440)	+= mach-smdk6440.o
++obj-$(CONFIG_MACH_SMDK6450)	+= mach-smdk6450.o
 +
-+	if (id == 0x50000)
-+		platform_add_devices(s5p6450_dmacs, ARRAY_SIZE(s5p6450_dmacs));
-+	else
-+		platform_add_devices(s5p6440_dmacs, ARRAY_SIZE(s5p6440_dmacs));
++# device support
 +
-+	return 0;
-+}
-+arch_initcall(s5p64x0_dma_init);
-diff --git a/arch/arm/mach-s5p6440/include/mach/dma.h b/arch/arm/mach-s5p64x0/include/mach/dma.h
++obj-y				+= dev-audio.o
++obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
++
++obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
+diff --git a/arch/arm/mach-s5p6440/Makefile.boot b/arch/arm/mach-s5p64x0/Makefile.boot
 similarity index 100%
-rename from arch/arm/mach-s5p6440/include/mach/dma.h
-rename to arch/arm/mach-s5p64x0/include/mach/dma.h
-diff --git a/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h b/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-index 5fe6721..8107442 100644
---- a/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h
-@@ -32,6 +32,12 @@ enum dma_ch {
- 	DMACH_UART2_TX,
- 	DMACH_UART3_RX,
- 	DMACH_UART3_TX,
-+	DMACH_UART4_RX,
-+	DMACH_UART4_TX,
-+	DMACH_UART5_RX,
-+	DMACH_UART5_TX,
-+	DMACH_USI_RX,
-+	DMACH_USI_TX,
- 	DMACH_IRDA,
- 	DMACH_I2S0_RX,
- 	DMACH_I2S0_TX,
-@@ -64,6 +70,20 @@ enum dma_ch {
- 	DMACH_MSM_REQ2,
- 	DMACH_MSM_REQ1,
- 	DMACH_MSM_REQ0,
-+	DMACH_SLIMBUS0_RX,
-+	DMACH_SLIMBUS0_TX,
-+	DMACH_SLIMBUS0AUX_RX,
-+	DMACH_SLIMBUS0AUX_TX,
-+	DMACH_SLIMBUS1_RX,
-+	DMACH_SLIMBUS1_TX,
-+	DMACH_SLIMBUS2_RX,
-+	DMACH_SLIMBUS2_TX,
-+	DMACH_SLIMBUS3_RX,
-+	DMACH_SLIMBUS3_TX,
-+	DMACH_SLIMBUS4_RX,
-+	DMACH_SLIMBUS4_TX,
-+	DMACH_SLIMBUS5_RX,
-+	DMACH_SLIMBUS5_TX,
- 	/* END Marker, also used to denote a reserved channel */
- 	DMACH_MAX,
- };
+rename from arch/arm/mach-s5p6440/Makefile.boot
+rename to arch/arm/mach-s5p64x0/Makefile.boot
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index c6a855d..90f97d6 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -7,7 +7,7 @@
+ 
+ config PLAT_S5P
+ 	bool
+-	depends on (ARCH_S5P6440 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310)
++	depends on (ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310)
+ 	default y
+ 	select ARM_VIC if !ARCH_S5PV310
+ 	select ARM_GIC if ARCH_S5PV310
+@@ -30,7 +30,7 @@ config S5P_EXT_INT
+ 	bool
+ 	help
+ 	  Use the external interrupts (other than GPIO interrupts.)
+-	  Note: Do not choose this for S5P6440.
++	  Note: Do not choose this for S5P6440 and S5P6450.
+ 
+ config S5P_DEV_FIMC0
+ 	bool
 -- 
 1.6.2.5
