@@ -1,158 +1,94 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 8 Sep 2010 10:22:37 -0600
-Subject: [PATCH 2/2] OMAP1: PM: add simple runtime PM layer to manage
-	clocks
-In-Reply-To: <1283907282-986-2-git-send-email-khilman@deeprootsystems.com>
-References: <1283907282-986-1-git-send-email-khilman@deeprootsystems.com>
-	<1283907282-986-2-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20100908162237.GE3686@angua.secretlab.ca>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Sep 2010 17:46:02 +0100
+Subject: [PATCH 3/3] ARM: vexpress: add support for CPU hotplug
+	to	ct-ca9x4 tile
+In-Reply-To: <20100908143700.GB32659@n2100.arm.linux.org.uk>
+References: <1282060684-27761-1-git-send-email-will.deacon@arm.com>
+	<1282060684-27761-2-git-send-email-will.deacon@arm.com>
+	<1282060684-27761-3-git-send-email-will.deacon@arm.com>
+	<1282060684-27761-4-git-send-email-will.deacon@arm.com>
+	<20100908143700.GB32659@n2100.arm.linux.org.uk>
+Message-ID: <000301cb4f75$52e66570$f8b33050$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 07, 2010 at 05:54:42PM -0700, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@ti.com>
-> 
-> On OMAP1, we do not have omap_device + omap_hwmod to manage the
-> device-specific idle, enable and shutdown.  Instead, just
-> enable/disable device clocks automatically at the runtime PM level.
-> 
-> This allows drivers to not have any OMAP1 specific clock management
-> and allows them to simply use the runtime PM API to manage clocks.
-> 
-> OMAP1 compile fixes Manjunatha GK <manjugk@ti.com>
-> 
-> Cc: Manjunatha GK <manjugk@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+Hi Russell,
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-Also should go via Greg's tree.
-
-g.
-
-> ---
->  arch/arm/mach-omap1/Makefile |    2 +-
->  arch/arm/mach-omap1/pm_bus.c |   98 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 99 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-omap1/pm_bus.c
+> On Tue, Aug 17, 2010 at 04:58:04PM +0100, Will Deacon wrote:
+> > The Versatile Express platform can support a quad-core Cortex-A9 tile running
+> > SMP Linux.
+> >
+> > This patch adds support for CPU hotplug when running in this configuration.
 > 
-> diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-> index facfaeb..9a304d8 100644
-> --- a/arch/arm/mach-omap1/Makefile
-> +++ b/arch/arm/mach-omap1/Makefile
-> @@ -12,7 +12,7 @@ obj-$(CONFIG_OMAP_MPU_TIMER)	+= time.o
->  obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
->  
->  # Power Management
-> -obj-$(CONFIG_PM) += pm.o sleep.o
-> +obj-$(CONFIG_PM) += pm.o sleep.o pm_bus.o
->  
->  # DSP
->  obj-$(CONFIG_OMAP_MBOX_FWK)	+= mailbox_mach.o
-> diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-> new file mode 100644
-> index 0000000..c831348
-> --- /dev/null
-> +++ b/arch/arm/mach-omap1/pm_bus.c
-> @@ -0,0 +1,98 @@
-> +/*
-> + * Runtime PM support code for OMAP1
-> + *
-> + * Author: Kevin Hilman, Deep Root Systems, LLC
-> + *
-> + * Copyright (C) 2010 Texas Instruments, Inc.
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mutex.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +
-> +#include <plat/omap_device.h>
-> +#include <plat/omap-pm.h>
-> +
-> +#ifdef CONFIG_PM_RUNTIME
-> +static int omap1_pm_runtime_suspend(struct device *dev)
-> +{
-> +	struct clk *iclk, *fclk;
-> +	int ret = 0;
-> +
-> +	dev_dbg(dev, "%s\n", __func__);
-> +
-> +	ret = pm_generic_runtime_suspend(dev);
-> +
-> +	fclk = clk_get(dev, "fck");
-> +	if (!IS_ERR(fclk)) {
-> +		clk_disable(fclk);
-> +		clk_put(fclk);
-> +	}
-> +
-> +	iclk = clk_get(dev, "ick");
-> +	if (!IS_ERR(iclk)) {
-> +		clk_disable(iclk);
-> +		clk_put(iclk);
-> +	}
-> +
-> +	return 0;
-> +};
-> +
-> +static int omap1_pm_runtime_resume(struct device *dev)
-> +{
-> +	int ret = 0;
-> +	struct clk *iclk, *fclk;
-> +
-> +	dev_dbg(dev, "%s\n", __func__);
-> +
-> +	iclk = clk_get(dev, "ick");
-> +	if (!IS_ERR(iclk)) {
-> +		clk_enable(iclk);
-> +		clk_put(iclk);
-> +	}
-> +
-> +	fclk = clk_get(dev, "fck");
-> +	if (!IS_ERR(fclk)) {
-> +		clk_enable(fclk);
-> +		clk_put(fclk);
-> +	}
-> +
-> +	return pm_generic_runtime_resume(dev);
-> +};
-> +
-> +static int __init omap1_pm_runtime_init(void)
-> +{
-> +	const struct dev_pm_ops *pm;
-> +	struct dev_pm_ops *omap_pm;
-> +
-> +	pm = platform_bus_get_pm_ops();
-> +	if (!pm) {
-> +		pr_err("%s: unable to get dev_pm_ops from platform_bus\n",
-> +			__func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	omap_pm = kmemdup(pm, sizeof(struct dev_pm_ops), GFP_KERNEL);
-> +	if (!omap_pm) {
-> +		pr_err("%s: unable to alloc memory for new dev_pm_ops\n",
-> +			__func__);
-> +		return -ENOMEM;
-> +	}
-> +		
-> +	omap_pm->runtime_suspend = omap1_pm_runtime_suspend;
-> +	omap_pm->runtime_resume = omap1_pm_runtime_resume;
-> +
-> +	platform_bus_set_pm_ops(omap_pm);
-> +
-> +	return 0;
-> +}
-> +core_initcall(omap1_pm_runtime_init);
-> +#endif /* CONFIG_PM_RUNTIME */
-> -- 
-> 1.7.2.1
-> 
+> This ties the core tile support into the generic versatile express code,
+> something which the current code structure is careful to avoid.  Please
+> ensure that we continue to avoid making the generic code rely upon
+> CA9x4 code.
+
+The cpu_{enter,leave}_lowpower functions are implemented in the tile code
+so they should be ok. I suppose the problem is that we might be able to do
+better than a WFI on some tiles. How about this?:
+
+
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+new file mode 100644
+index 0000000..672e434
+--- /dev/null
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -0,0 +1,47 @@
++/*
++ *  linux/arch/arm/mach-vexpress/hotplug.c
++ *
++ *  Copyright (C) 2010 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/smp.h>
++#include <linux/completion.h>
++
++#include <plat/hotplug.h>
++
++extern volatile int pen_release;
++
++/* CPU-specific functions implemented in the tile support code */
++extern void cpu_enter_lowpower(void);
++extern int cpu_do_lowpower(void);
++extern void cpu_leave_lowpower(void);
++
++void __ref platform_do_lowpower(unsigned int cpu)
++{
++       cpu_enter_lowpower();
++
++       if (cpu_do_lowpower() == -ENODEV) {
++               /*
++                * Tile does not have any low-power hardware so we
++                * put the core into a WFI.
++                */
++               for (;;) {
++                       asm volatile("wfi" : : : "memory");
++
++                       if (pen_release == cpu)
++                               break;
++
++#ifdef DEBUG
++                       printk("CPU%u: spurious wakeup call\n", cpu);
++#endif
++               }
++       }
++
++       cpu_leave_lowpower();
++}
+
+
+The alternative would be to merge all the cpu_* functions into one, but
+then we'd end up replicating the wfi code across all the tiles without
+additional power-saving hardware.
+
+Cheers,
+
+Will
