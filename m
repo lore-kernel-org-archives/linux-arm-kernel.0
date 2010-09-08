@@ -1,43 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Sep 2010 16:12:32 +0100
-Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
-	Suspend Resume
-In-Reply-To: <4C84D6B3.80104@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
-	<20100902102323.GP26319@n2100.arm.linux.org.uk>
-	<4C809486.2070308@st.com>
-	<20100903073421.GF26319@n2100.arm.linux.org.uk>
-	<4C84D6B3.80104@st.com>
-Message-ID: <20100908151232.GD32659@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 08 Sep 2010 16:25:43 +0100
+Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD0D348E@dbde02.ent.ti.com>
+References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+	<AANLkTi=chtedwbDDJnZOe5yTqobUeXz=aZYUNNUDpQQm@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD0D30A5@dbde02.ent.ti.com>
+	<1283958089.10137.55.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD0D348E@dbde02.ent.ti.com>
+Message-ID: <1283959543.10137.65.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 06, 2010 at 05:25:31PM +0530, deepaksi wrote:
-> On 9/3/2010 1:04 PM, Russell King - ARM Linux wrote:
-> > So how are wakeup sources configured if this callback does nothing?
-> > .
->
-> In most of the architectures that I could refer across(including SPEAr
-> family -SPEAr13xx),
-> have a separate power management unit(PMU) which is required to be
-> configured to define the wake
-> up sources. The PMU takes care of waking up the system from sleep, as
-> and when the wake up
-> interrupts are triggered. This routing is independent of GIC, and hence
-> the handling was not added.
-> 
-> Contrary to that, in some of our hardware architecture using VIC
-> (including SPEAr 3xx/6xx), there
-> was no explicit PMU, and the wake up trigger was exclusively done
-> through VIC, and hence the VIC
-> call backs had the necessary implementation.
+On Wed, 2010-09-08 at 16:09 +0100, Shilimkar, Santosh wrote:
+> > On Wed, 2010-09-08 at 08:34 +0100, Shilimkar, Santosh wrote:
+> > > > Can you also include the patch by Per Fransson I sent off to
+> > > > Thomas and the list just a few days ago with the subject
+> > > > "[PATCH] ARM: ux500 specific L2 cache code"
+> > > > in this patch series?
+> > >
+> > > Basically I plan to push all these patches to
+> > > RMK's patch system after getting his OK. I can push
+> > > your patch along with that.
+> > >
+> > > Is that ok with you ?
+> >
+> > Or rather a pull request. AFAIK (unless this was fixed recently) the
+> > patch system doesn't handle the "From: " line to set the correct patch
+> > author.
+> >
+> Oh Yes... pull request-is also doable... I have all these patches pilled up
+> here already ...
+> http://dev.omapzoom.org/?p=santosh/kernel-omap4-base.git;a=shortlog;h=refs/heads/l2x0-for-rmk
 
-What I read into this is that you're using enable_irq_wake() in your
-drivers _and_ another mechanism to configure what wakes up the system
-via the PMU - maybe with drivers explicitly calling out to the PMU
-to achieve this?
+Well, regarding my patches, I'm only OK for you to submit the
+cache-l2x0.c one named:
 
-This sounds a little haphazard, especially from the drivers point of
-view.  Surely there's a more sensible solution to this rather than
-adding do-nothing irq_wake support?
+"ARM: Improve the L2 cache performance when PL310 is used"
+
+The other patches I'll push separately.
+
+Thanks.
+
+-- 
+Catalin
