@@ -1,110 +1,46 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 8 Sep 2010 13:36:17 +0800
-Subject: [PATCH 1/3] ARM: pxa168: added support for Teton BGA platform
-In-Reply-To: <1283914607-10570-2-git-send-email-mark.brown314@gmail.com>
-References: <1283914607-10570-1-git-send-email-mark.brown314@gmail.com>
-	<1283914607-10570-2-git-send-email-mark.brown314@gmail.com>
-Message-ID: <AANLkTikyXsjQadWfp4iZyWGygLtg+kNuuKxdtsoEK6cz@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 8 Sep 2010 09:27:43 +0300
+Subject: [PATCH 1/2] s3c24xx: DMA: don't use autoreload feature
+In-Reply-To: <4C86CC9C.9070506@fluff.org>
+References: <1283872143-32492-1-git-send-email-anarsoul@gmail.com>
+	<1283901799-20461-1-git-send-email-anarsoul@gmail.com>
+	<4C86CC9C.9070506@fluff.org>
+Message-ID: <201009080927.49861.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 8, 2010 at 10:56 AM, Mark F. Brown <mark.brown314@gmail.com> wrote:
-> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
-> ---
-> ?arch/arm/mach-mmp/Kconfig ? ? | ? ?7 ++++++
-> ?arch/arm/mach-mmp/Makefile ? ?| ? ?1 +
-> ?arch/arm/mach-mmp/teton_bga.c | ? 47 +++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 55 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-mmp/teton_bga.c
->
-> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> index 6ab843e..0711d3b 100644
-> --- a/arch/arm/mach-mmp/Kconfig
-> +++ b/arch/arm/mach-mmp/Kconfig
-> @@ -57,6 +57,13 @@ config MACH_MARVELL_JASPER
-> ? ? ? ? ?PXA910-based development board. Since MMP2 is compatible to
-> ? ? ? ? ?ARMv6 architecture.
->
-> +config MACH_TETON_BGA
-> + ? ? ? bool "Marvell's PXA168 Teton BGA Development Board"
-> + ? ? ? select CPU_PXA168
-> + ? ? ? help
-> + ? ? ? ? Say 'Y' here if you want to support the Marvell PXA168-based
-> + ? ? ? ? Teton BGA Development Board.
-> +
-> ?endmenu
->
-> ?config CPU_PXA168
-> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-> index 8b66d06..751cdbf 100644
-> --- a/arch/arm/mach-mmp/Makefile
-> +++ b/arch/arm/mach-mmp/Makefile
-> @@ -17,3 +17,4 @@ obj-$(CONFIG_MACH_TAVOREVB) ? += tavorevb.o
-> ?obj-$(CONFIG_MACH_TTC_DKB) ? ? += ttc_dkb.o
-> ?obj-$(CONFIG_MACH_FLINT) ? ? ? += flint.o
-> ?obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
-> +obj-$(CONFIG_MACH_TETON_BGA) ? += teton_bga.o
-> diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
-> new file mode 100644
-> index 0000000..014cc37
-> --- /dev/null
-> +++ b/arch/arm/mach-mmp/teton_bga.c
-> @@ -0,0 +1,47 @@
-> +/*
-> + * ?linux/arch/arm/mach-mmp/teton_bga.c
-> + *
-> + * ?Support for the Marvell PXA168 Teton BGA Development Platform.
-> + *
-> + * ?This code is based on aspenite.c
-> + *
-> + * ?This program is free software; you can redistribute it and/or modify
-> + * ?it under the terms of the GNU General Public License version 2 as
-> + * ?publishhed by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <mach/addr-map.h>
-> +#include <mach/mfp-pxa168.h>
-> +#include <mach/pxa168.h>
-> +#include <mach/gpio.h>
-> +
-> +#include "common.h"
-> +
-> +static unsigned long teton_bga_pin_config[] __initdata = {
-> + ? ? ? /* UART1 */
-> + ? ? ? GPIO107_UART1_TXD,
-> + ? ? ? GPIO108_UART1_RXD,
-> +};
-> +
-> +static void __init teton_bga_init(void)
-> +{
-> + ? ? ? mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
-> +
-> + ? ? ? /* on-chip devices */
-> + ? ? ? pxa168_add_uart(1);
-> +}
-> +
-> +MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development Platform")
-> + ? ? ? .phys_io ? ? ? ?= APB_PHYS_BASE,
-> + ? ? ? .io_pg_offst ? ?= (APB_VIRT_BASE >> 18) & 0xfffc,
-> + ? ? ? .map_io ? ? ? ? = mmp_map_io,
-> + ? ? ? .init_irq ? ? ? = pxa168_init_irq,
-> + ? ? ? .timer ? ? ? ? ?= &pxa168_timer,
-> + ? ? ? .init_machine ? = teton_bga_init,
-> +MACHINE_END
-> --
-> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+? ????????? ?? 8 ???????? 2010 02:37:00 ????? Ben Dooks ???????:
+> On 08/09/10 00:23, Vasily Khoruzhick wrote:
+> > Some integrated DMA-capable hardware doesn't like autoreload
+> > feature of s3c24xx DMA-engine, that's why s3cmci driver
+> > didn't work with DMA transfers enabled.
+> > 
+> > I rewrote DMA driver not to use autoreload feature and removed
+> > all pre-loading features. Buffer re-load is fast enought to perform
+> > it in IRQ handler, and anyway I don't see any reason to waste CPU
+> > cycles on waiting for buffer load. Driver is much simplier now,
+> > it was tested with s3cmci and s3c24xx-i2s drivers on s3c2442 and
+> > s3c2410 SoCs and works just nice.
+> 
+> I found this really necessary, especially on systems where some
+> drivers can keep the cpu irq load high, such as pio hard-discs.
+> 
+> Can this be changed to a flag that is set to control the behaviour
+> on a per driver basis?
 
-Acked
+Well, that's not easy and result will be a bit complicated :) Your 
+implementation has 4 states and actively uses autoreload flag, but when 
+there's no autoreload/pre-loading there's only 2 states. Btw, all DMA-capable 
+HW on S3C24xx has FIFO, so missing pre-loading should not give big impact, as 
+HW can be fed from FIFO for some time. Can you test if this patch causes some 
+problems on your HW with pio hard-discs?
+
+Regards
+Vasily
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100908/0e46a31b/attachment.sig>
