@@ -1,100 +1,55 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 8 Sep 2010 23:09:18 +0200
-Subject: [PATCH 3/3] ARM: pxa168/teton bga: add board support for i2c and
-	rtc-ds1337
-In-Reply-To: <AANLkTinGE=wxCcnSBiZQFeJxDG21DMd6KEcckavVuTbE@mail.gmail.com>
-References: <1283914607-10570-1-git-send-email-mark.brown314@gmail.com>
-	<201009081754.15515.marek.vasut@gmail.com>
-	<AANLkTinGE=wxCcnSBiZQFeJxDG21DMd6KEcckavVuTbE@mail.gmail.com>
-Message-ID: <201009082309.19382.marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Sep 2010 23:07:10 +0100
+Subject: [PATCH 1/7] ARM: specify ZRELADDR for ARCH_TEGRA
+In-Reply-To: <20100908121634.GD1614@pengutronix.de>
+References: <20100903095504.GC13643@pengutronix.de>
+	<1283507818-1573-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<AANLkTi=7+TcOWu_62EWH6pwFUuizMT47tHJraaqzdJgp@mail.gmail.com>
+	<20100903190155.GE17152@pengutronix.de>
+	<AANLkTin2fEj2kRRoE+RSpBovApMaCKTs+DVz9wvj7M3u@mail.gmail.com>
+	<20100903192329.GB29821@pengutronix.de>
+	<20100908091113.GB29914@n2100.arm.linux.org.uk>
+	<20100908115609.GA32659@n2100.arm.linux.org.uk>
+	<20100908121634.GD1614@pengutronix.de>
+Message-ID: <20100908220710.GA9859@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne St 8. z??? 2010 19:05:02 Mark F. Brown napsal(a):
-> On Wed, Sep 8, 2010 at 11:54 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne St 8. z??? 2010 07:34:24 Haojian Zhuang napsal(a):
-> >> On Wed, Sep 8, 2010 at 10:56 AM, Mark F. Brown <mark.brown314@gmail.com>
-> > 
-> > wrote:
-> >> > Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
-> >> > ---
-> >> >  arch/arm/mach-mmp/teton_bga.c |   10 ++++++++++
-> >> >  1 files changed, 10 insertions(+), 0 deletions(-)
-> >> > 
-> >> > diff --git a/arch/arm/mach-mmp/teton_bga.c
-> >> > b/arch/arm/mach-mmp/teton_bga.c index bbeda5c..8e5801c 100644
-> >> > --- a/arch/arm/mach-mmp/teton_bga.c
-> >> > +++ b/arch/arm/mach-mmp/teton_bga.c
-> >> > @@ -22,6 +22,7 @@
-> >> >  #include <mach/gpio.h>
-> >> >  #include <linux/input.h>
-> >> >  #include <plat/pxa27x_keypad.h>
-> >> > +#include <linux/i2c.h>
-> >> > 
-> >> >  #include "common.h"
-> >> > 
-> >> > @@ -35,6 +36,10 @@ static unsigned long teton_bga_pin_config[]
-> >> > __initdata = { GPIO110_KP_MKIN0,
-> >> >        GPIO111_KP_MKOUT7,
-> >> >        GPIO112_KP_MKOUT6,
-> >> > +
-> >> > +       /* i2c bus */
-> >> > +       GPIO105_CI2C_SDA,
-> >> > +       GPIO106_CI2C_SCL,
-> >> >  };
-> >> > 
-> >> >  static unsigned int teton_bga_matrix_key_map[] = {
-> >> > @@ -52,6 +57,10 @@ static struct pxa27x_keypad_platform_data
-> >> > teton_bga_keypad_info __initdata = { .debounce_interval      = 30,
-> >> >  };
-> >> > 
-> >> > +static struct i2c_board_info teton_bga_i2c_info[] __initdata = {
-> >> > +       { I2C_BOARD_INFO("ds1337", 0x68), },
-> >> > +};
-> >> > +
-> >> 
-> >> I don't have the schematic of teton. But RTC chips should always has
-> >> an irq pin. Is it also connected in your platform?
-> > 
-> > I think this one doesn't, but I haven't checked.
-> > 
-> > Cheers
-> > 
-> >> >  static void __init teton_bga_init(void)
-> >> >  {
-> >> >        mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
-> >> > @@ -59,6 +68,7 @@ static void __init teton_bga_init(void)
-> >> >        /* on-chip devices */
-> >> >        pxa168_add_uart(1);
-> >> >        pxa168_add_keypad(&teton_bga_keypad_info);
-> >> > +       pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(teton_bga_i2c_info));
-> >> >  }
-> >> > 
-> >> >  MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development
-> >> > Platform") --
-> >> > 1.7.0.4
-> >> > 
-> >> > --
-> >> > To unsubscribe from this list: send the line "unsubscribe
-> >> > linux-kernel" in the body of a message to majordomo at vger.kernel.org
-> >> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >> > Please read the FAQ at  http://www.tux.org/lkml/
-> >> 
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Wed, Sep 08, 2010 at 02:16:34PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Russell,
 > 
-> It actually does have an alarm pin and it is connected as well. I did
-> not include it, because I have not tested the alarm functionality yet.
-> I was going to add it in a later patch. I did test the hardware clock
-> to system clock syncing.
+> On Wed, Sep 08, 2010 at 12:56:10PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Sep 08, 2010 at 10:11:13AM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Sep 03, 2010 at 09:23:29PM +0200, Uwe Kleine-K?nig wrote:
+> > > > Hello,
+> > > > 
+> > > > On Fri, Sep 03, 2010 at 12:19:26PM -0700, Erik Gilling wrote:
+> > > > > On Fri, Sep 3, 2010 at 12:01 PM, Uwe Kleine-K?nig
+> > > > > > (hmm, I thought that patches that touch common files like
+> > > > > > arch/arm/Kconfig should go via rmk?!)
+> > > > > 
+> > > > > I looked and saw that others (specifically samsung) had submitted this
+> > > > > fix directly to Linus.  I'm still learning the ropes here and am happy
+> > > > > to hear some clarification either way.
+> > > >
+> > > > Note that just me wondering if it's right doesn't necessarily means it's
+> > > > not.  Russell, can you comment?  Is it trivial enough and obviously only
+> > > > tegra related that it's OK?
+> > > 
+> > > The problem happens when there's related changes already in others git
+> > > trees which clash or conflict with those changes.
+> > > 
+> > > This whole CONFIG_ZRELADDR thing seems like a step backwards towards a
+> > > situation where we will get conflicts with multiple changes - but without
+> > > gaining anything substantial in moving away from Makefile.boot.
+> > > 
+> > > Unless someone can come up with a real justification for CONFIG_ZRELADDR
+> > > I'm mindful to revert it.  (But - if people have sent these changes to
+> > > Linus already, that's going to make reverting it a lot harder.)
+> > 
+> > This is what I'm considering committing to sort out this ZRELADDR mess -
+> > it gives people who want AUTO_ZRELADDR their pie, while allowing us to
+> > keep the proven reliability of original method of handling ZRELADDR.
+> Would be OK for me.  We might have to fix up some machines though.
 
-Fix the CC please. And be careful not to screw this up again next time.
-
-Please add the alarm pin too. Thanks
-
-Cheers
-> 
-> Regards,
-> -- Mark
+Any ideas what needs to be fixed?  And is that an acked-by ?
