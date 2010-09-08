@@ -1,67 +1,74 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Wed,  8 Sep 2010 08:31:47 -0700
-Subject: [PATCH 2/2 v3] msm: gpio: Add gpiomux calls to request and free.
-In-Reply-To: <1283959907-8159-1-git-send-email-gbean@codeaurora.org>
-References: <1283959907-8159-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1283959907-8159-2-git-send-email-gbean@codeaurora.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 8 Sep 2010 21:16:07 +0530
+Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD0D34A0@dbde02.ent.ti.com>
+References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+	<AANLkTi=chtedwbDDJnZOe5yTqobUeXz=aZYUNNUDpQQm@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD0D30A5@dbde02.ent.ti.com>
+	<1283958089.10137.55.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD0D348E@dbde02.ent.ti.com>
+	<1283959543.10137.65.camel@e102109-lin.cambridge.arm.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD0D34A0@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD0D34AF@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpiomux get and put calls to msmgpio request and free,
-in order to allow gpio lines to be properly reference-counted
-and power-managed.
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- arch/arm/mach-msm/gpio.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Shilimkar, Santosh
+> Sent: Wednesday, September 08, 2010 8:59 PM
+> To: Catalin Marinas
+> Cc: Linus Walleij; linux-arm-kernel at lists.infradead.org;
+> tglx at linutronix.de; linux-omap at vger.kernel.org;
+> per.xx.fransson at stericsson.com
+> Subject: RE: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+> 
+> > -----Original Message-----
+> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> > Sent: Wednesday, September 08, 2010 8:56 PM
+> > To: Shilimkar, Santosh
+> > Cc: Linus Walleij; linux-arm-kernel at lists.infradead.org;
+> > tglx at linutronix.de; linux-omap at vger.kernel.org;
+> > per.xx.fransson at stericsson.com
+> > Subject: RE: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+> >
+> > On Wed, 2010-09-08 at 16:09 +0100, Shilimkar, Santosh wrote:
+> > > > On Wed, 2010-09-08 at 08:34 +0100, Shilimkar, Santosh wrote:
+> > > > > > Can you also include the patch by Per Fransson I sent off to
+> > > > > > Thomas and the list just a few days ago with the subject
+> > > > > > "[PATCH] ARM: ux500 specific L2 cache code"
+> > > > > > in this patch series?
+> > > > >
+> > > > > Basically I plan to push all these patches to
+> > > > > RMK's patch system after getting his OK. I can push
+> > > > > your patch along with that.
+> > > > >
+> > > > > Is that ok with you ?
+> > > >
+> > > > Or rather a pull request. AFAIK (unless this was fixed recently) the
+> > > > patch system doesn't handle the "From: " line to set the correct
+> patch
+> > > > author.
+> > > >
+> > > Oh Yes... pull request-is also doable... I have all these patches
+> pilled
+> > up
+> > > here already ...
+> > > http://dev.omapzoom.org/?p=santosh/kernel-omap4-
+> > base.git;a=shortlog;h=refs/heads/l2x0-for-rmk
+> >
+> > Well, regarding my patches, I'm only OK for you to submit the
+> > cache-l2x0.c one named:
+> >
+> > "ARM: Improve the L2 cache performance when PL310 is used"
+> >
+> > The other patches I'll push separately.
+> >
+> Sure.
+> 
+Here is the updated branch including "Per Fransson" patch.
+http://dev.omapzoom.org/?p=santosh/kernel-omap4-base.git;a=shortlog;h=refs/heads/l2x0-pull-rmk
 
-diff --git a/arch/arm/mach-msm/gpio.c b/arch/arm/mach-msm/gpio.c
-index 5040f1c..33051b5 100644
---- a/arch/arm/mach-msm/gpio.c
-+++ b/arch/arm/mach-msm/gpio.c
-@@ -21,6 +21,7 @@
- #include <linux/irq.h>
- #include <linux/module.h>
- #include "gpio_hw.h"
-+#include "gpiomux.h"
- 
- #define FIRST_GPIO_IRQ MSM_GPIO_TO_INT(0)
- 
-@@ -44,6 +45,8 @@
- 			.direction_input = msm_gpio_direction_input,	\
- 			.direction_output = msm_gpio_direction_output,	\
- 			.to_irq = msm_gpio_to_irq,			\
-+			.request = msm_gpio_request,			\
-+			.free = msm_gpio_free,				\
- 		}							\
- 	}
- 
-@@ -171,6 +174,21 @@ static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	return MSM_GPIO_TO_INT(chip->base + offset);
- }
- 
-+#ifdef CONFIG_MSM_GPIOMUX
-+static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	return msm_gpiomux_get(chip->base + offset);
-+}
-+
-+static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	msm_gpiomux_put(chip->base + offset);
-+}
-+#else
-+#define msm_gpio_request NULL
-+#define msm_gpio_free NULL
-+#endif
-+
- struct msm_gpio_chip msm_gpio_chips[] = {
- #if defined(CONFIG_ARCH_MSM7X00A)
- 	MSM_GPIO_BANK(0,   0,  15),
--- 
-1.7.0.4
-
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Santosh
