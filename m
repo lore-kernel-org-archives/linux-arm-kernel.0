@@ -1,36 +1,105 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 8 Sep 2010 12:24:54 -0600
-Subject: [spi-devel-general] [PATCH] SPI: fix APB pclk power regression
-	on U300
-In-Reply-To: <AANLkTik+-YwxU7__QnSC8BhEO0-iqAA+u11BBt-2qo9Q@mail.gmail.com>
-References: <1282381656-8644-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTik+-YwxU7__QnSC8BhEO0-iqAA+u11BBt-2qo9Q@mail.gmail.com>
-Message-ID: <20100908182454.GS3686@angua.secretlab.ca>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Sep 2010 12:32:44 -0700
+Subject: [PATCH] ARM: Don't try to send IPI on UP systems with CONFIG_SMP
+In-Reply-To: <20100908085657.GA29914@n2100.arm.linux.org.uk>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100906180346.GC20849@atomide.com>
+	<20100908030951.GH22507@atomide.com>
+	<20100908031214.GI22507@atomide.com>
+	<20100908031404.GJ22507@atomide.com>
+	<20100908085657.GA29914@n2100.arm.linux.org.uk>
+Message-ID: <20100908193244.GU22507@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 23, 2010 at 10:30:17AM -0700, Kevin Wells wrote:
-> > With the introduction of an AMBA PrimeCell per-cell block clock,
-> > the pclk was left on after probe() unless explicitly disabled.
-> > This clock is wired to the same clock on PL022 causing it to stay
-> > always on since.
-> >
-> > Fix this up properly by clocking the pclk whenever we want to
-> > write into any PL022 registers and clocking the external clock
-> > whenever we want to transmit messages on the bus.
-> >
-> > Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> > ---
-> > Tested on U300 and U8500, even though the pclk stuff came in from
-> > the ARM tree it is probably better to carry this through Grants
-> > tree so as not to disturb other patches going in for PL022.
-> > ---
-> > ?drivers/spi/amba-pl022.c | ? 14 ++++++++------
-> > ?1 files changed, 8 insertions(+), 6 deletions(-)
-> >
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100908 01:49]:
+> On Tue, Sep 07, 2010 at 08:14:05PM -0700, Tony Lindgren wrote:
+> > This is not needed on UP. Additionally with will cause issues when
+> > booting CONFIG_SMP_ON_UP kernel on earlier ARM cores.
 > 
-> Tested-by : Kevin Wells <wellsk40@gmail.com>
+> Doesn't make sense.
 
-Applied, thanks.
+Updated below. Basically it's unnecessary to send IPI for one CPU,
+and IPI may not be even supported when booting earlier cores
+with CONFIG_SMP_ON_UP.
+ 
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > --- a/arch/arm/kernel/process.c
+> > +++ b/arch/arm/kernel/process.c
+> > @@ -207,9 +207,7 @@ __setup("reboot=", reboot_setup);
+> >  
+> >  void machine_shutdown(void)
+> >  {
+> > -#ifdef CONFIG_SMP
+> >  	smp_send_stop();
+> > -#endif
+> 
+> This will cause a link error as smp.c is not built for uniprocessor
+> builds.
 
-g.
+Right that should have not made it to the patch.
+ 
+> > --- a/arch/arm/kernel/smp.c
+> > +++ b/arch/arm/kernel/smp.c
+> > @@ -560,12 +560,17 @@ asmlinkage void __exception do_IPI(struct pt_regs *regs)
+> >  
+> >  void smp_send_reschedule(int cpu)
+> >  {
+> > -	send_ipi_message(cpumask_of(cpu), IPI_RESCHEDULE);
+> > +	if (is_smp())
+> > +		send_ipi_message(cpumask_of(cpu), IPI_RESCHEDULE);
+> 
+> There won't be any other CPUs to send an IPI to - and all places which
+> call this are protected by a check for cpu == smp_processor_id() - in
+> other words, this will never be called for the current CPU.
+ 
+Good point, it's not needed.
+
+> >  void smp_send_stop(void)
+> >  {
+> >  	cpumask_t mask = cpu_online_map;
+> > +
+> > +	if (!is_smp())
+> > +		return;
+> > +
+> >  	cpu_clear(smp_processor_id(), mask);
+> 
+> This results in an empty CPU mask.  It might be better to do instead:
+> 
+> 	if (!cpus_empty(mask))
+> 
+> >  	send_ipi_message(&mask, IPI_CPU_STOP);
+> >  }
+
+OK, so this patch shrinks to the one change below.
+
+Regards,
+
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 7 Sep 2010 18:41:33 -0700
+Subject: [PATCH] ARM: Don't send IPI in smp_send_stop if there's only one CPU
+
+No need to send IPI if there's one CPU, especially when booting
+systems with CONFIG_SMP_ON_UP that may not even support IPI.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 40dc74f..32e16da 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -567,7 +567,8 @@ void smp_send_stop(void)
+ {
+ 	cpumask_t mask = cpu_online_map;
+ 	cpu_clear(smp_processor_id(), mask);
+-	send_ipi_message(&mask, IPI_CPU_STOP);
++	if (!cpus_empty(mask))
++		send_ipi_message(&mask, IPI_CPU_STOP);
+ }
+ 
+ /*
