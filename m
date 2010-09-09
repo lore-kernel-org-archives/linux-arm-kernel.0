@@ -1,26 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Sep 2010 10:41:20 +0100
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <201009091027.18176.marek.vasut@gmail.com>
-References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
-	<4C862EB3.4080006@compulab.co.il>
-	<20100907125335.GD25830@sirena.org.uk>
-	<201009091027.18176.marek.vasut@gmail.com>
-Message-ID: <20100909094120.GB1988@rakim.wolfsonmicro.main>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 9 Sep 2010 11:53:47 +0200
+Subject: [PATCH V3] arm & sh: factorised duplicated clkdev.c
+In-Reply-To: <1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
+	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20100909095347.GA9112@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 09, 2010 at 10:27:17AM +0200, Marek Vasut wrote:
-> Dne ?t 7. z??? 2010 14:53:35 Mark Brown napsal(a):
+On 15:39 Thu 02 Sep     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> factorise some generic infrastructure to assist looking up struct clks
+> for the ARM & SH architecture.
+> 
+> as the code is identical at 99%
+> 
+> put the arch specific code for allocation as example in asm/clkdev.h
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+is it ok?
 
-> > From a regulator API usage point of view a separate implementation of
-> > the same thing was nacked - there are regulator API facilties for hiding
-> > missing regulators from drivers when needed to get systems going, unless
-> > the device genuinely can cope without supplies it should be relying on
-> > those.
-
-> Maybe these platforms should have been fixed prior to applying the patch adding 
-> regulator goo into ads7846 driver then. What's the way to go now then ?
-
-Fix the platforms and use the dummy regulators to keep them going until
-that happens.  It's trivial to do the hookup in the platforms.
+Best Regards,
+J.
