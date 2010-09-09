@@ -1,68 +1,62 @@
-From: redhatter@gentoo.org (Stuart Longland)
-Date: Thu, 9 Sep 2010 10:02:45 +1000
-Subject: Voltage/current/sensor monitoring interface and Wiegand
-Message-ID: <20100909000245.GK14056@atomos.longlandclan.yi.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Sep 2010 09:23:02 +0900
+Subject: [PATCH 1/4] ARM: S5PC110: add fimc clocks.
+In-Reply-To: <1283745044-15514-2-git-send-email-m.szyprowski@samsung.com>
+References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
+	<1283745044-15514-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <000101cb4fb5$2cbbc850$863358f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Marek Szyprowski wrote:
+> 
+> These clocks enables FIMC driver to operate on machines, which bootloader
+> power gated FIMC devices to save power on boot.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/clock.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index af91fef..9c199ef 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -281,6 +281,24 @@ static struct clk init_clocks_disable[] = {
+>  		.enable		= s5pv210_clk_ip0_ctrl,
+>  		.ctrlbit	= (1<<29),
+>  	}, {
+> +		.name		= "fimc",
+> +		.id		= 0,
+> +		.parent		= &clk_hclk_dsys.clk,
+> +		.enable		= s5pv210_clk_ip0_ctrl,
+> +		.ctrlbit	= (1 << 24),
+> +	}, {
+> +		.name		= "fimc",
+> +		.id		= 1,
+> +		.parent		= &clk_hclk_dsys.clk,
+> +		.enable		= s5pv210_clk_ip0_ctrl,
+> +		.ctrlbit	= (1 << 25),
+> +	}, {
+> +		.name		= "fimc",
+> +		.id		= 2,
+> +		.parent		= &clk_hclk_dsys.clk,
+> +		.enable		= s5pv210_clk_ip0_ctrl,
+> +		.ctrlbit	= (1 << 26),
+> +	}, {
+>  		.name		= "otg",
+>  		.id		= -1,
+>  		.parent		= &clk_hclk_psys.clk,
+> --
+> 1.7.2.2
 
-I'm currently writing a driver for an in-house developed sensor
-controller device.  This device communicates via I?C, and functions as a
-multi-function device incorporating:
+Ok..will apply.
 
-- Touchscreen controller
-- Keypad/Button controller
-- LED driver
-- Voltage/current monitor
-- Temperature sensor monitor
-- Light sensor monitor
-- PIR (motion) detection monitor
-- Communications interface (for slow serial links like Wiegand)
+Thanks.
 
-Our target is a Ka-Ro TX27 module, running their supplied kernel
-(2.6.28)... however I'm not afraid to backport things from the latest
-kernel, or to forward port any changes for mainline kernel inclusion.
-(I've already got an experimental patchset that gets these things
-booting kernel 2.6.34.)
-
-The first three on this list, I've got settled pretty nicely using
-existing interfaces.  The things I'm not sure about, are the remaining
-interfaces, and how to best write a driver for them.
-
-How are voltage *monitors* normally written?  (note, not voltage
-*regulators*... this thing does not alter the voltage rails.)  I tried
-to make sense of lm-sensors, but that seems very ad-hoc (maybe I missed
-some document that explains it) to me.  It's hard to be clear on what is
-the *right* way to report a voltage or current reading to userspace.
-
-For the temperature and light sensing... temperature sensors certainly
-exist in the PC world, and maybe I should look closely at how they are
-normally done, but I wasn't sure about the light sensor.  I was thinking
-maybe an input device with some new absolute value reported?
-
-Likewise with the PIR sensor, I notice there's a "gesture" input
-(MSC_GESTURE)... seems appropriate?  Or am I barking up the wrong tree?
-
-The other feature is for things like Wiegand... Looking around I cannot
-see any interface in the Linux kernel for Wiegand interfaces.
-
-<http://en.wikipedia.org/wiki/Wiegand_protocol>
-
-Given the likely use of embedded Linux in security systems, it makes
-sense to come up with a suitable interface out in the open, rather than
-everyone coming up with their own device-specific interfaces.
-
-Apologies if this has been asked before, but I've looked around and
-haven't seen anything... so I figured before I get too deep into this,
-I'd enquire about the Right Way it should be done. ;-)
-
-Regards,
--- 
-Stuart Longland (aka Redhatter, VK4MSL)      .'''.
-Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
-. . . . . . . . . . . . . . . . . . . . . .   .'.'
-http://dev.gentoo.org/~redhatter             :.'
-
-I haven't lost my mind...
-  ...it's backed up on a tape somewhere.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
