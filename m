@@ -1,19 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Sep 2010 09:29:43 +0100
-Subject: Voltage/current/sensor monitoring interface and Wiegand
-In-Reply-To: <20100909050137.GR14056@atomos.longlandclan.yi.org>
-References: <20100909000245.GK14056@atomos.longlandclan.yi.org>
-	<4C884AFA.20604@bluewatersys.com>
-	<20100909050137.GR14056@atomos.longlandclan.yi.org>
-Message-ID: <20100909082942.GA23903@sirena.org.uk>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Thu, 09 Sep 2010 11:40:00 +0300
+Subject: [PATCH 1/5] ARM: omap/fb: move omap_init_fb to .init.text
+In-Reply-To: <1283414622-2663-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1283408230-22652-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1283414622-2663-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1284021600.13006.16.camel@tubuntu.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 09, 2010 at 03:01:37PM +1000, Stuart Longland wrote:
+Hi,
 
-> Ahh okay, I'll have a look there..  The temperature isn't related to the
-> power supply, so I might continue a searchfor its rightful place, but
-> that class of devices seems like a good fit.
+On Thu, 2010-09-02 at 10:03 +0200, ext Uwe Kleine-K?nig wrote:
+> omap_init_fb() is only called as arch_initcall and so can live in
+> .init.text.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-hwmon might be useful also (you can expose the same data via both
-interfaces if you like).
+I picked patches 1, 2 and 3 from this patch set to my tree. They look
+fine, thanks!
+
+Patch 4 should probably go through Tony, and 5 was marked
+work-in-progress.
+
+ Tomi
