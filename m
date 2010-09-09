@@ -1,63 +1,46 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 09 Sep 2010 04:22:36 +0200
-Subject: [PATCH] ARM: Samsung: s5p-fimc: decrease IO registers memory region
-	size
-Message-ID: <1283998956-15327-1-git-send-email-m.szyprowski@samsung.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 09 Sep 2010 14:48:26 +1200
+Subject: Voltage/current/sensor monitoring interface and Wiegand
+In-Reply-To: <20100909000245.GK14056@atomos.longlandclan.yi.org>
+References: <20100909000245.GK14056@atomos.longlandclan.yi.org>
+Message-ID: <4C884AFA.20604@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On 09/09/2010 12:02 PM, Stuart Longland wrote:
+> Hi all,
+> 
+> I'm currently writing a driver for an in-house developed sensor
+> controller device.  This device communicates via I?C, and functions as a
+> multi-function device incorporating:
+> 
+> - Touchscreen controller
+> - Keypad/Button controller
+> - LED driver
+> - Voltage/current monitor
+> - Temperature sensor monitor
+> - Light sensor monitor
+> - PIR (motion) detection monitor
+> - Communications interface (for slow serial links like Wiegand)
 
-IO registers region size of all FIMC versions is less than 1kB so there
-is no need to reserve 1M.
+> How are voltage *monitors* normally written?  (note, not voltage
+> *regulators*... this thing does not alter the voltage rails.)  I tried
+> to make sense of lm-sensors, but that seems very ad-hoc (maybe I missed
+> some document that explains it) to me.  It's hard to be clear on what is
+> the *right* way to report a voltage or current reading to userspace.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/plat-s5p/dev-fimc0.c |    2 +-
- arch/arm/plat-s5p/dev-fimc1.c |    2 +-
- arch/arm/plat-s5p/dev-fimc2.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Depending on your particular application it might make sense to use the
+power supply class (see Documentation/power/power_supply_class.txt) for
+the voltage/current monitoring. If the temperature sensor is related to
+a power supply monitor, then it could also go there.
 
-diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-fimc0.c
-index f9203fa..608770f 100644
---- a/arch/arm/plat-s5p/dev-fimc0.c
-+++ b/arch/arm/plat-s5p/dev-fimc0.c
-@@ -19,7 +19,7 @@
- static struct resource s5p_fimc0_resource[] = {
- 	[0] = {
- 		.start	= S5P_PA_FIMC0,
--		.end	= S5P_PA_FIMC0 + SZ_1M - 1,
-+		.end	= S5P_PA_FIMC0 + SZ_4K - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/plat-s5p/dev-fimc1.c b/arch/arm/plat-s5p/dev-fimc1.c
-index 7ed91a3..76e3a97 100644
---- a/arch/arm/plat-s5p/dev-fimc1.c
-+++ b/arch/arm/plat-s5p/dev-fimc1.c
-@@ -19,7 +19,7 @@
- static struct resource s5p_fimc1_resource[] = {
- 	[0] = {
- 		.start	= S5P_PA_FIMC1,
--		.end	= S5P_PA_FIMC1 + SZ_1M - 1,
-+		.end	= S5P_PA_FIMC1 + SZ_4K - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
-diff --git a/arch/arm/plat-s5p/dev-fimc2.c b/arch/arm/plat-s5p/dev-fimc2.c
-index 5543d6373..24d2981 100644
---- a/arch/arm/plat-s5p/dev-fimc2.c
-+++ b/arch/arm/plat-s5p/dev-fimc2.c
-@@ -19,7 +19,7 @@
- static struct resource s5p_fimc2_resource[] = {
- 	[0] = {
- 		.start	= S5P_PA_FIMC2,
--		.end	= S5P_PA_FIMC2 + SZ_1M - 1,
-+		.end	= S5P_PA_FIMC2 + SZ_4K - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	[1] = {
+~Ryan
+
 -- 
-1.7.2.2
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
