@@ -1,159 +1,52 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Thu, 9 Sep 2010 16:59:46 +0530
-Subject: [PATCH 3/3] ux500: add DB5500 DMA event lines
-In-Reply-To: <1284031786-16265-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1284031786-16265-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <1284031786-16265-3-git-send-email-rabin.vincent@stericsson.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 9 Sep 2010 12:33:09 +0100
+Subject: [PATCH 2/2] ARM: S3C64XX: Prototype SPI devices
+In-Reply-To: <011001cb5010$b2848840$178d98c0$%kim@samsung.com>
+References: <1283941539-3892-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1283941539-3892-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<004201cb4f52$df6e6e20$9e4b4a60$%kim@samsung.com>
+	<20100908124605.GA10413@rakim.wolfsonmicro.main>
+	<011001cb5010$b2848840$178d98c0$%kim@samsung.com>
+Message-ID: <20100909113309.GA25855@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- arch/arm/mach-ux500/ste-dma40-db5500.h |  135 ++++++++++++++++++++++++++++++++
- 1 files changed, 135 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-ux500/ste-dma40-db5500.h
+On Thu, Sep 09, 2010 at 08:18:10PM +0900, Kukjin Kim wrote:
+> Mark Brown wrote:
 
-diff --git a/arch/arm/mach-ux500/ste-dma40-db5500.h b/arch/arm/mach-ux500/ste-dma40-db5500.h
-new file mode 100644
-index 0000000..cb2110c
---- /dev/null
-+++ b/arch/arm/mach-ux500/ste-dma40-db5500.h
-@@ -0,0 +1,135 @@
-+/*
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * Author: Rabin Vincent <rabin.vincent@stericsson.com> for ST-Ericsson
-+ * License terms: GNU General Public License (GPL) version 2
-+ *
-+ * DB5500-SoC-specific configuration for DMA40
-+ */
-+
-+#ifndef STE_DMA40_DB5500_H
-+#define STE_DMA40_DB5500_H
-+
-+#define DB5500_DMA_NR_DEV 64
-+
-+enum dma_src_dev_type {
-+	DB5500_DMA_DEV0_SPI0_RX = 0,
-+	DB5500_DMA_DEV1_SPI1_RX = 1,
-+	DB5500_DMA_DEV2_SPI2_RX = 2,
-+	DB5500_DMA_DEV3_SPI3_RX = 3,
-+	DB5500_DMA_DEV4_USB_OTG_IEP_1_9 = 4,
-+	DB5500_DMA_DEV5_USB_OTG_IEP_2_10 = 5,
-+	DB5500_DMA_DEV6_USB_OTG_IEP_3_11 = 6,
-+	DB5500_DMA_DEV7_IRDA_RFS = 7,
-+	DB5500_DMA_DEV8_IRDA_FIFO_RX = 8,
-+	DB5500_DMA_DEV9_MSP0_RX = 9,
-+	DB5500_DMA_DEV10_MSP1_RX = 10,
-+	DB5500_DMA_DEV11_MSP2_RX = 11,
-+	DB5500_DMA_DEV12_UART0_RX = 12,
-+	DB5500_DMA_DEV13_UART1_RX = 13,
-+	DB5500_DMA_DEV14_UART2_RX = 14,
-+	DB5500_DMA_DEV15_UART3_RX = 15,
-+	DB5500_DMA_DEV16_USB_OTG_IEP_8 = 16,
-+	DB5500_DMA_DEV17_USB_OTG_IEP_1_9 = 17,
-+	DB5500_DMA_DEV18_USB_OTG_IEP_2_10 = 18,
-+	DB5500_DMA_DEV19_USB_OTG_IEP_3_11 = 19,
-+	DB5500_DMA_DEV20_USB_OTG_IEP_4_12 = 20,
-+	DB5500_DMA_DEV21_USB_OTG_IEP_5_13 = 21,
-+	DB5500_DMA_DEV22_USB_OTG_IEP_6_14 = 22,
-+	DB5500_DMA_DEV23_USB_OTG_IEP_7_15 = 23,
-+	DB5500_DMA_DEV24_SDMMC0_RX = 24,
-+	DB5500_DMA_DEV25_SDMMC1_RX = 25,
-+	DB5500_DMA_DEV26_SDMMC2_RX = 26,
-+	DB5500_DMA_DEV27_SDMMC3_RX = 27,
-+	DB5500_DMA_DEV28_SDMMC4_RX = 28,
-+	/* 29 - 32 not used */
-+	DB5500_DMA_DEV33_SDMMC0_RX = 33,
-+	DB5500_DMA_DEV34_SDMMC1_RX = 34,
-+	DB5500_DMA_DEV35_SDMMC2_RX = 35,
-+	DB5500_DMA_DEV36_SDMMC3_RX = 36,
-+	DB5500_DMA_DEV37_SDMMC4_RX = 37,
-+	DB5500_DMA_DEV38_USB_OTG_IEP_8 = 38,
-+	DB5500_DMA_DEV39_USB_OTG_IEP_1_9 = 39,
-+	DB5500_DMA_DEV40_USB_OTG_IEP_2_10 = 40,
-+	DB5500_DMA_DEV41_USB_OTG_IEP_3_11 = 41,
-+	DB5500_DMA_DEV42_USB_OTG_IEP_4_12 = 42,
-+	DB5500_DMA_DEV43_USB_OTG_IEP_5_13 = 43,
-+	DB5500_DMA_DEV44_USB_OTG_IEP_6_14 = 44,
-+	DB5500_DMA_DEV45_USB_OTG_IEP_7_15 = 45,
-+	/* 46 not used */
-+	DB5500_DMA_DEV47_MCDE_RX = 47,
-+	DB5500_DMA_DEV48_CRYPTO1_RX = 48,
-+	/* 49, 50 not used */
-+	DB5500_DMA_DEV49_I2C1_RX = 51,
-+	DB5500_DMA_DEV50_I2C3_RX = 52,
-+	DB5500_DMA_DEV51_I2C2_RX = 53,
-+	/* 54 - 60 not used */
-+	DB5500_DMA_DEV61_CRYPTO0_RX = 61,
-+	/* 62, 63 not used */
-+};
-+
-+enum dma_dest_dev_type {
-+	DB5500_DMA_DEV0_SPI0_TX = 0,
-+	DB5500_DMA_DEV1_SPI1_TX = 1,
-+	DB5500_DMA_DEV2_SPI2_TX = 2,
-+	DB5500_DMA_DEV3_SPI3_TX = 3,
-+	DB5500_DMA_DEV4_USB_OTG_OEP_1_9 = 4,
-+	DB5500_DMA_DEV5_USB_OTG_OEP_2_10 = 5,
-+	DB5500_DMA_DEV6_USB_OTG_OEP_3_11 = 6,
-+	DB5500_DMA_DEV7_IRRC_TX = 7,
-+	DB5500_DMA_DEV8_IRDA_FIFO_TX = 8,
-+	DB5500_DMA_DEV9_MSP0_TX = 9,
-+	DB5500_DMA_DEV10_MSP1_TX = 10,
-+	DB5500_DMA_DEV11_MSP2_TX = 11,
-+	DB5500_DMA_DEV12_UART0_TX = 12,
-+	DB5500_DMA_DEV13_UART1_TX = 13,
-+	DB5500_DMA_DEV14_UART2_TX = 14,
-+	DB5500_DMA_DEV15_UART3_TX = 15,
-+	DB5500_DMA_DEV16_USB_OTG_OEP_8 = 16,
-+	DB5500_DMA_DEV17_USB_OTG_OEP_1_9 = 17,
-+	DB5500_DMA_DEV18_USB_OTG_OEP_2_10 = 18,
-+	DB5500_DMA_DEV19_USB_OTG_OEP_3_11 = 19,
-+	DB5500_DMA_DEV20_USB_OTG_OEP_4_12 = 20,
-+	DB5500_DMA_DEV21_USB_OTG_OEP_5_13 = 21,
-+	DB5500_DMA_DEV22_USB_OTG_OEP_6_14 = 22,
-+	DB5500_DMA_DEV23_USB_OTG_OEP_7_15 = 23,
-+	DB5500_DMA_DEV24_SDMMC0_TX = 24,
-+	DB5500_DMA_DEV25_SDMMC1_TX = 25,
-+	DB5500_DMA_DEV26_SDMMC2_TX = 26,
-+	DB5500_DMA_DEV27_SDMMC3_TX = 27,
-+	DB5500_DMA_DEV28_SDMMC4_TX = 28,
-+	/* 29 - 31 not used */
-+	DB5500_DMA_DEV32_FSMC_TX = 32,
-+	DB5500_DMA_DEV33_SDMMC0_TX = 33,
-+	DB5500_DMA_DEV34_SDMMC1_TX = 34,
-+	DB5500_DMA_DEV35_SDMMC2_TX = 35,
-+	DB5500_DMA_DEV36_SDMMC3_TX = 36,
-+	DB5500_DMA_DEV37_SDMMC4_TX = 37,
-+	DB5500_DMA_DEV38_USB_OTG_OEP_8 = 38,
-+	DB5500_DMA_DEV39_USB_OTG_OEP_1_9 = 39,
-+	DB5500_DMA_DEV40_USB_OTG_OEP_2_10 = 40,
-+	DB5500_DMA_DEV41_USB_OTG_OEP_3_11 = 41,
-+	DB5500_DMA_DEV42_USB_OTG_OEP_4_12 = 42,
-+	DB5500_DMA_DEV43_USB_OTG_OEP_5_13 = 43,
-+	DB5500_DMA_DEV44_USB_OTG_OEP_6_14 = 44,
-+	DB5500_DMA_DEV45_USB_OTG_OEP_7_15 = 45,
-+	/* 46 not used */
-+	DB5500_DMA_DEV47_STM_TX = 47,
-+	DB5500_DMA_DEV48_CRYPTO1_TX = 48,
-+	DB5500_DMA_DEV49_CRYPTO1_TX_HASH1_TX = 49,
-+	DB5500_DMA_DEV50_HASH1_TX = 50,
-+	DB5500_DMA_DEV51_I2C1_TX = 51,
-+	DB5500_DMA_DEV52_I2C3_TX = 52,
-+	DB5500_DMA_DEV53_I2C2_TX = 53,
-+	/* 54, 55 not used */
-+	DB5500_DMA_MEMCPY_TX_1 = 56,
-+	DB5500_DMA_MEMCPY_TX_2 = 57,
-+	DB5500_DMA_MEMCPY_TX_3 = 58,
-+	DB5500_DMA_MEMCPY_TX_4 = 59,
-+	DB5500_DMA_MEMCPY_TX_5 = 60,
-+	DB5500_DMA_DEV61_CRYPTO0_TX = 61,
-+	DB5500_DMA_DEV62_CRYPTO0_TX_HASH0_TX = 62,
-+	DB5500_DMA_DEV63_HASH0_TX = 63,
-+};
-+
-+#endif
--- 
-1.7.2.dirty
+> > It'll have been something along the lines of:
+
+> > 's3c64xx_device_iis0' not declared; should it be static?
+
+> > for each device.  Possibly generated by sparse rather than GCC - I
+> > always build with sparse as well.
+
+> You mean the build warning is 's3c64xx_device_iis0' is not declared..right?
+
+Yes, or words to that effect.
+
+> Hmm...the 's3c64xx_device_iis0' used only in a mach-s3c64xx/mach-smartq.c
+> file.
+> And defined it as extern struct in a plat-samsung/include/plat/devs.h file.
+> ...So...why need to modify mach-s3c64xx/dev-spi.c for it?
+
+The complaint is that the symbol has been defined in the C file with
+global scope but there's no declaration for it.  This means that either
+the symbol is not supposed to be global scope and should be static
+instead (which isn't the case here, machines are supposed to be able to
+reference it) or that there is nothing checking that the declaration
+that other files use to talk about the symbol matches the defintion.  If
+the users are using a different declaration then the memory layout and
+alignment may not be correct for them, causing errors at runtime.
+
+In other words the file has:
+
+struct platform_device s3c64xx_device_iis0 = {
+	...
+};
+
+and the compiler/sparse is expecting to see:
+
+struct platform_device s3c64xx_device_iis0;
+
+before that, which comes from devs.h.
