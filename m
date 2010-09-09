@@ -1,91 +1,66 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Sep 2010 09:41:08 +0900
-Subject: [PATCH 2/4] ARM: Samsung: s5p-fimc: fix dma coherent mask
-In-Reply-To: <1283745044-15514-3-git-send-email-m.szyprowski@samsung.com>
-References: <1283745044-15514-1-git-send-email-m.szyprowski@samsung.com>
-	<1283745044-15514-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <000301cb4fb7$b4448530$1ccd8f90$%kim@samsung.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 9 Sep 2010 08:49:59 +0800
+Subject: [PATCH] bounce: call flush_dcache_page after bounce_copy_vec
+In-Reply-To: <1283892334-9238-1-git-send-email-gking@nvidia.com>
+References: <1283892334-9238-1-git-send-email-gking@nvidia.com>
+Message-ID: <AANLkTi=GiU+N-1a00qxSFpDL8tz0_W3dpc32VXZBs9yZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> FIMC driver uses DMA_coherent allocator, which requires proper dma mask
-> to be set.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/plat-s5p/dev-fimc0.c |    2 ++
->  arch/arm/plat-s5p/dev-fimc1.c |    2 ++
->  arch/arm/plat-s5p/dev-fimc2.c |    2 ++
->  3 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-fimc0.c
-> index d3f1a9b..9f26096 100644
-> --- a/arch/arm/plat-s5p/dev-fimc0.c
-> +++ b/arch/arm/plat-s5p/dev-fimc0.c
-> @@ -33,4 +33,6 @@ struct platform_device s5p_device_fimc0 = {
->  	.id		= 0,
->  	.num_resources	= ARRAY_SIZE(s5p_fimc0_resource),
->  	.resource	= s5p_fimc0_resource,
-> +	.dev.dma_mask	  = &s5p_device_fimc0.dev.coherent_dma_mask,
-> +	.dev.coherent_dma_mask = 0xffffffffUL,
+On Wed, Sep 8, 2010 at 4:45 AM, Gary King <gking@nvidia.com> wrote:
+> I have been seeing problems on Tegra 2 (ARMv7 SMP) systems with HIGHMEM
+> enabled on 2.6.35 (plus some patches targetted at 2.6.36 to perform
+> cache maintenance lazily), and the root cause appears to be that the
+> mm bouncing code is calling flush_dcache_page before it copies the
+> bounce buffer into the bio.
+>
+> The patch below reorders these two operations, and eliminates numerous
+> arbitrary application crashes on my dev system.
+>
 
-Ok...but I prefer following style :-)
-Could you please re-submit your this patch?
+We also experience the package building failure on OMAP4 SMP system
+with HIGHMEM enabled
+on 2.6.35. Thanks a lot for this fixing, we will try it later soon.
 
-diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-fimc0.c
-index d3f1a9b..cb1ff4d 100644
---- a/arch/arm/plat-s5p/dev-fimc0.c
-+++ b/arch/arm/plat-s5p/dev-fimc0.c
-@@ -28,9 +28,15 @@ static struct resource s5p_fimc0_resource[] = {
-        },
- };
+-Bryan
 
-+static u64 s5p_fimc_dma_mask = DMA_BIT_MASK(32);
-+
- struct platform_device s5p_device_fimc0 = {
- 	.name		= "s5p-fimc",
- 	.id		= 0,
- 	.num_resources	= ARRAY_SIZE(s5p_fimc0_resource),
- 	.resource	= s5p_fimc0_resource,
-+	.dev		= {
-+		.dma_mask		= &s5p_fimc_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
- };
-
->  };
-> diff --git a/arch/arm/plat-s5p/dev-fimc1.c b/arch/arm/plat-s5p/dev-fimc1.c
-> index 41bd698..4149c49 100644
-> --- a/arch/arm/plat-s5p/dev-fimc1.c
-> +++ b/arch/arm/plat-s5p/dev-fimc1.c
-> @@ -33,4 +33,6 @@ struct platform_device s5p_device_fimc1 = {
->  	.id		= 1,
->  	.num_resources	= ARRAY_SIZE(s5p_fimc1_resource),
->  	.resource	= s5p_fimc1_resource,
-> +	.dev.dma_mask	  = &s5p_device_fimc1.dev.coherent_dma_mask,
-> +	.dev.coherent_dma_mask = 0xffffffffUL,
->  };
-> diff --git a/arch/arm/plat-s5p/dev-fimc2.c b/arch/arm/plat-s5p/dev-fimc2.c
-> index dfddeda..ced9097 100644
-> --- a/arch/arm/plat-s5p/dev-fimc2.c
-> +++ b/arch/arm/plat-s5p/dev-fimc2.c
-> @@ -33,4 +33,6 @@ struct platform_device s5p_device_fimc2 = {
->  	.id		= 2,
->  	.num_resources	= ARRAY_SIZE(s5p_fimc2_resource),
->  	.resource	= s5p_fimc2_resource,
-> +	.dev.dma_mask	  = &s5p_device_fimc2.dev.coherent_dma_mask,
-> +	.dev.coherent_dma_mask = 0xffffffffUL,
->  };
+> Gary
+>
 > --
-> 1.7.2.2
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> From 678c9bca8d8a8f254f28af91e69fad3aa1be7593 Mon Sep 17 00:00:00 2001
+> From: Gary King <gking@nvidia.com>
+> Date: Mon, 6 Sep 2010 15:37:12 -0700
+> Subject: bounce: call flush_dcache_page after bounce_copy_vec
+>
+> the bounced page needs to be flushed after data is copied into it,
+> to ensure that architecture implementations can synchronize
+> instruction and data caches if necessary.
+>
+> Signed-off-by: Gary King <gking@nvidia.com>
+> ---
+> ?mm/bounce.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/mm/bounce.c b/mm/bounce.c
+> index 13b6dad..1481de6 100644
+> --- a/mm/bounce.c
+> +++ b/mm/bounce.c
+> @@ -116,8 +116,8 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
+> ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ?vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
+>
+> - ? ? ? ? ? ? ? flush_dcache_page(tovec->bv_page);
+> ? ? ? ? ? ? ? ?bounce_copy_vec(tovec, vfrom);
+> + ? ? ? ? ? ? ? flush_dcache_page(tovec->bv_page);
+> ? ? ? ?}
+> ?}
+>
+> --
+> 1.7.0.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
