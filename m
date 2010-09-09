@@ -1,119 +1,72 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Sep 2010 20:20:17 +0900
-Subject: [PATCH v2] ARM: Samsung: s5p-fimc: fix dma coherent mask
-In-Reply-To: <1283998673-14899-1-git-send-email-m.szyprowski@samsung.com>
-References: <000301cb4fb7$b4448530$1ccd8f90$%kim@samsung.com>
-	<1283998673-14899-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <011101cb5010$fdb1d520$f9157f60$%kim@samsung.com>
+Date: Thu, 09 Sep 2010 20:26:17 +0900
+Subject: [PATCH] ARM: Samsung: s5p-fimc: decrease IO registers memory
+	region size
+In-Reply-To: <1283998956-15327-1-git-send-email-m.szyprowski@samsung.com>
+References: <1283998956-15327-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <012001cb5011$d5109150$7f31b3f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> FIMC driver uses DMA_coherent allocator, which requires proper dma mask
-> to be set.
+> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> IO registers region size of all FIMC versions is less than 1kB so there
+> is no need to reserve 1M.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
-> 
-> Chnages since v1:
-> - use DMA_BIT_MASK() macro, minor coding style change
-> 
-> ---
->  arch/arm/plat-s5p/dev-fimc0.c |    7 +++++++
->  arch/arm/plat-s5p/dev-fimc1.c |    7 +++++++
->  arch/arm/plat-s5p/dev-fimc2.c |    7 +++++++
->  3 files changed, 21 insertions(+), 0 deletions(-)
+>  arch/arm/plat-s5p/dev-fimc0.c |    2 +-
+>  arch/arm/plat-s5p/dev-fimc1.c |    2 +-
+>  arch/arm/plat-s5p/dev-fimc2.c |    2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-fimc0.c
-> index d3f1a9b..f9203fa 100644
+> index f9203fa..608770f 100644
 > --- a/arch/arm/plat-s5p/dev-fimc0.c
 > +++ b/arch/arm/plat-s5p/dev-fimc0.c
-> @@ -10,6 +10,7 @@
->   */
-> 
->  #include <linux/kernel.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/platform_device.h>
->  #include <linux/interrupt.h>
->  #include <linux/ioport.h>
-> @@ -28,9 +29,15 @@ static struct resource s5p_fimc0_resource[] = {
+> @@ -19,7 +19,7 @@
+>  static struct resource s5p_fimc0_resource[] = {
+>  	[0] = {
+>  		.start	= S5P_PA_FIMC0,
+> -		.end	= S5P_PA_FIMC0 + SZ_1M - 1,
+> +		.end	= S5P_PA_FIMC0 + SZ_4K - 1,
+>  		.flags	= IORESOURCE_MEM,
 >  	},
->  };
-> 
-> +static u64 s5p_fimc0_dma_mask = DMA_BIT_MASK(32);
-> +
->  struct platform_device s5p_device_fimc0 = {
->  	.name		= "s5p-fimc",
->  	.id		= 0,
->  	.num_resources	= ARRAY_SIZE(s5p_fimc0_resource),
->  	.resource	= s5p_fimc0_resource,
-> +	.dev		= {
-> +		.dma_mask		= &s5p_fimc0_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
->  };
+>  	[1] = {
 > diff --git a/arch/arm/plat-s5p/dev-fimc1.c b/arch/arm/plat-s5p/dev-fimc1.c
-> index 41bd698..7ed91a3 100644
+> index 7ed91a3..76e3a97 100644
 > --- a/arch/arm/plat-s5p/dev-fimc1.c
 > +++ b/arch/arm/plat-s5p/dev-fimc1.c
-> @@ -10,6 +10,7 @@
->   */
-> 
->  #include <linux/kernel.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/platform_device.h>
->  #include <linux/interrupt.h>
->  #include <linux/ioport.h>
-> @@ -28,9 +29,15 @@ static struct resource s5p_fimc1_resource[] = {
+> @@ -19,7 +19,7 @@
+>  static struct resource s5p_fimc1_resource[] = {
+>  	[0] = {
+>  		.start	= S5P_PA_FIMC1,
+> -		.end	= S5P_PA_FIMC1 + SZ_1M - 1,
+> +		.end	= S5P_PA_FIMC1 + SZ_4K - 1,
+>  		.flags	= IORESOURCE_MEM,
 >  	},
->  };
-> 
-> +static u64 s5p_fimc1_dma_mask = DMA_BIT_MASK(32);
-> +
->  struct platform_device s5p_device_fimc1 = {
->  	.name		= "s5p-fimc",
->  	.id		= 1,
->  	.num_resources	= ARRAY_SIZE(s5p_fimc1_resource),
->  	.resource	= s5p_fimc1_resource,
-> +	.dev		= {
-> +		.dma_mask		= &s5p_fimc1_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
->  };
+>  	[1] = {
 > diff --git a/arch/arm/plat-s5p/dev-fimc2.c b/arch/arm/plat-s5p/dev-fimc2.c
-> index dfddeda..5543d6373 100644
+> index 5543d6373..24d2981 100644
 > --- a/arch/arm/plat-s5p/dev-fimc2.c
 > +++ b/arch/arm/plat-s5p/dev-fimc2.c
-> @@ -10,6 +10,7 @@
->   */
-> 
->  #include <linux/kernel.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/platform_device.h>
->  #include <linux/interrupt.h>
->  #include <linux/ioport.h>
-> @@ -28,9 +29,15 @@ static struct resource s5p_fimc2_resource[] = {
+> @@ -19,7 +19,7 @@
+>  static struct resource s5p_fimc2_resource[] = {
+>  	[0] = {
+>  		.start	= S5P_PA_FIMC2,
+> -		.end	= S5P_PA_FIMC2 + SZ_1M - 1,
+> +		.end	= S5P_PA_FIMC2 + SZ_4K - 1,
+>  		.flags	= IORESOURCE_MEM,
 >  	},
->  };
-> 
-> +static u64 s5p_fimc2_dma_mask = DMA_BIT_MASK(32);
-> +
->  struct platform_device s5p_device_fimc2 = {
->  	.name		= "s5p-fimc",
->  	.id		= 2,
->  	.num_resources	= ARRAY_SIZE(s5p_fimc2_resource),
->  	.resource	= s5p_fimc2_resource,
-> +	.dev		= {
-> +		.dma_mask		= &s5p_fimc2_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
->  };
+>  	[1] = {
 > --
 > 1.7.2.2
 
-looks good to me..will apply :-)
+Ok...will apply.
 
 Thanks.
 
