@@ -1,89 +1,42 @@
-From: sunder.svit@gmail.com (Sundar)
-Date: Fri, 10 Sep 2010 00:31:52 +0530
-Subject: [PATCH v3] i2c: QUP based bus driver for Qualcomm MSM chipsets
-In-Reply-To: <1283907557-1874-1-git-send-email-kheitke@codeaurora.org>
-References: <1283907557-1874-1-git-send-email-kheitke@codeaurora.org>
-Message-ID: <AANLkTimHQ=ag5z+SKbGrm5BD-eF+xcDuKp4R_=4tf3cP@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu,  9 Sep 2010 12:58:05 -0700
+Subject: [GIT PULL] generic arm MSM changes for v2.6.37
+Message-ID: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kenneth,
+Russell,
 
-just some error codes and leaks if I am right :)
+I'm sending out the actual patches even tho most of this has been
+discussed already. The proc-info change was suggested by Catalin, but
+I didn't see you given an Ack so I wanted to make sure that was OK.
+The other thing is that I know there are changes in your devel tree
+which conflict with the Kconfig changes I'm making.
 
-On Wed, Sep 8, 2010 at 6:29 AM, Kenneth Heitke <kheitke@codeaurora.org> wrote:
-> +
-> +static int __devinit
-> +qup_i2c_probe(struct platform_device *pdev)
-> +{
-> +
-> + ? ? ? qup_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_phys_addr");
-> + ? ? ? if (!qup_mem) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no qup mem resource?\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
+If it's all ok, please consider pulling this.
 
-I think this should be -ENXIO instead of -ENODEV?
+Daniel
 
-> + ? ? ? gsbi_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "gsbi_qup_i2c_addr");
-> + ? ? ? if (!gsbi_mem) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no gsbi mem resource?\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
 
-Ditto here.
+The following changes since commit 2bfc96a127bc1cc94d26bfaa40159966064f9c8c:
 
-> + ? ? ? in_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_in_intr");
-> +
-> + ? ? ? out_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_out_intr");
-> +
-> + ? ? ? err_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_err_intr");
-> + ? ? ? if (!err_irq) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no error irq resource?\n");
-> + ? ? ? ? ? ? ? return -ENODEV;
-> + ? ? ? }
+  Linux 2.6.36-rc3 (2010-08-29 08:36:04 -0700)
 
-All the same here too?
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
 
-> +
-> + ? ? ? qup_io = devm_request_mem_region(&pdev->dev, qup_mem->start,
-> + ? ? ? ? ? ? ? ? ? ? ? resource_size(qup_mem), pdev->name);
-> + ? ? ? if (!qup_io) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "QUP region already claimed\n");
-> + ? ? ? ? ? ? ? return -EBUSY;
-> + ? ? ? }
-> +
-> + ? ? ? gsbi_io = devm_request_mem_region(&pdev->dev, gsbi_mem->start,
-> + ? ? ? ? ? ? ? ? ? ? ? resource_size(gsbi_mem), pdev->name);
-> + ? ? ? if (!gsbi_io) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "GSBI region already claimed\n");
-> + ? ? ? ? ? ? ? return -EBUSY;
-> + ? ? ? }
-> +
-> + ? ? ? dev = devm_kzalloc(&pdev->dev, sizeof(struct qup_i2c_dev), GFP_KERNEL);
+Abhijeet Dharmapurikar (1):
+      GIC: Dont disable INT in ack callback
 
-[..]
+Daniel Walker (2):
+      arm: dis-allow hotplug on MSM
+      arm: mm: add proc info for ARM11MPCore/Cortex-A9 from ARM
 
-> + ? ? ? if (!dev->base)
-> + ? ? ? ? ? ? ? return -ENOMEM;
+Steve Muckle (1):
+      arm: Kconfig option for ARCH_MSM_SCORPIONMP
 
-Missing *_kzfree whilst returning?
-
-> + ? ? ? dev->gsbi = devm_ioremap(&pdev->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? gsbi_mem->start, resource_size(gsbi_mem));
-> + ? ? ? if (!dev->gsbi)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? clk = clk_get(&pdev->dev, "qup_clk");
-> + ? ? ? if (IS_ERR(clk)) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Could not get clock\n");
-> + ? ? ? ? ? ? ? ret = PTR_ERR(clk);
-> + ? ? ? ? ? ? ? goto err_clk_get_failed;
-
-Will not the devm_iounmap be needed here?
-
-Thanx!
-Sundar
+ arch/arm/Kconfig          |    7 +++++--
+ arch/arm/common/gic.c     |   14 --------------
+ arch/arm/mach-msm/Kconfig |    2 ++
+ arch/arm/mm/proc-v7.S     |   26 +++++++++++++++++++++++++-
+ 4 files changed, 32 insertions(+), 17 deletions(-)
