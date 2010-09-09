@@ -1,140 +1,89 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 9 Sep 2010 20:11:19 +0200
-Subject: [PATCH 1/3] ARM: pxa168: added support for Teton BGA platform
-In-Reply-To: <AANLkTing3Zk1kNsq-j2EXva5VhSGz44GmhmOQQ6KMCP_@mail.gmail.com>
-References: <1283914607-10570-1-git-send-email-mark.brown314@gmail.com>
-	<201009090321.24440.marek.vasut@gmail.com>
-	<AANLkTing3Zk1kNsq-j2EXva5VhSGz44GmhmOQQ6KMCP_@mail.gmail.com>
-Message-ID: <201009092011.19699.marek.vasut@gmail.com>
+From: sunder.svit@gmail.com (Sundar)
+Date: Fri, 10 Sep 2010 00:31:52 +0530
+Subject: [PATCH v3] i2c: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <1283907557-1874-1-git-send-email-kheitke@codeaurora.org>
+References: <1283907557-1874-1-git-send-email-kheitke@codeaurora.org>
+Message-ID: <AANLkTimHQ=ag5z+SKbGrm5BD-eF+xcDuKp4R_=4tf3cP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 9. z??? 2010 09:39:15 Eric Miao napsal(a):
-> On Thu, Sep 9, 2010 at 9:21 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne ?t 9. z??? 2010 01:42:36 Mark F. Brown napsal(a):
-> >> On Wed, Sep 8, 2010 at 11:51 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> > Dne St 8. z??? 2010 04:56:45 Mark F. Brown napsal(a):
-> >> > 
-> >> > ---------------------------
-> >> > Description is missing here
-> >> > ---------------------------
-> >> > 
-> >> >> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
-> >> >> ---
-> >> >>  arch/arm/mach-mmp/Kconfig     |    7 ++++++
-> >> >>  arch/arm/mach-mmp/Makefile    |    1 +
-> >> >>  arch/arm/mach-mmp/teton_bga.c |   47
-> >> >> +++++++++++++++++++++++++++++++++++++++++ 3 files changed, 55
-> >> >> insertions(+), 0 deletions(-)
-> >> >>  create mode 100644 arch/arm/mach-mmp/teton_bga.c
-> >> >> 
-> >> >> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> >> >> index 6ab843e..0711d3b 100644
-> >> >> --- a/arch/arm/mach-mmp/Kconfig
-> >> >> +++ b/arch/arm/mach-mmp/Kconfig
-> >> >> @@ -57,6 +57,13 @@ config MACH_MARVELL_JASPER
-> >> >>         PXA910-based development board. Since MMP2 is compatible to
-> >> >>         ARMv6 architecture.
-> >> >> 
-> >> >> +config MACH_TETON_BGA
-> >> >> +     bool "Marvell's PXA168 Teton BGA Development Board"
-> >> >> +     select CPU_PXA168
-> >> >> +     help
-> >> >> +       Say 'Y' here if you want to support the Marvell PXA168-based
-> >> >> +       Teton BGA Development Board.
-> >> >> +
-> >> >>  endmenu
-> >> >> 
-> >> >>  config CPU_PXA168
-> >> >> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-> >> >> index 8b66d06..751cdbf 100644
-> >> >> --- a/arch/arm/mach-mmp/Makefile
-> >> >> +++ b/arch/arm/mach-mmp/Makefile
-> >> >> @@ -17,3 +17,4 @@ obj-$(CONFIG_MACH_TAVOREVB) += tavorevb.o
-> >> >>  obj-$(CONFIG_MACH_TTC_DKB)   += ttc_dkb.o
-> >> >>  obj-$(CONFIG_MACH_FLINT)     += flint.o
-> >> >>  obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
-> >> >> +obj-$(CONFIG_MACH_TETON_BGA) += teton_bga.o
-> >> >> diff --git a/arch/arm/mach-mmp/teton_bga.c
-> >> >> b/arch/arm/mach-mmp/teton_bga.c new file mode 100644
-> >> >> index 0000000..014cc37
-> >> >> --- /dev/null
-> >> >> +++ b/arch/arm/mach-mmp/teton_bga.c
-> >> >> @@ -0,0 +1,47 @@
-> >> >> +/*
-> >> >> + *  linux/arch/arm/mach-mmp/teton_bga.c
-> >> >> + *
-> >> >> + *  Support for the Marvell PXA168 Teton BGA Development Platform.
-> >> > 
-> >> > Authoring information of this file are missing. Also, MAINTAINERS
-> >> > entry is missing.
-> >> > 
-> >> >> + *
-> >> >> + *  This code is based on aspenite.c
-> >> >> + *
-> >> >> + *  This program is free software; you can redistribute it and/or
-> >> >> modify + *  it under the terms of the GNU General Public License
-> >> >> version 2 as + *  publishhed by the Free Software Foundation.
-> >> >> + */
-> >> >> +
-> >> >> +#include <linux/init.h>
-> >> >> +#include <linux/kernel.h>
-> >> >> +#include <linux/platform_device.h>
-> >> >> +
-> >> >> +#include <asm/mach-types.h>
-> >> >> +#include <asm/mach/arch.h>
-> >> >> +#include <mach/addr-map.h>
-> >> >> +#include <mach/mfp-pxa168.h>
-> >> >> +#include <mach/pxa168.h>
-> >> >> +#include <mach/gpio.h>
-> >> > 
-> >> > use ... #include <linux/gpio.h>
-> >> > 
-> >> >> +
-> >> >> +#include "common.h"
-> >> >> +
-> >> >> +static unsigned long teton_bga_pin_config[] __initdata = {
-> >> >> +     /* UART1 */
-> >> >> +     GPIO107_UART1_TXD,
-> >> >> +     GPIO108_UART1_RXD,
-> >> >> +};
-> >> >> +
-> >> >> +static void __init teton_bga_init(void)
-> >> >> +{
-> >> >> +     mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
-> >> >> +
-> >> >> +     /* on-chip devices */
-> >> >> +     pxa168_add_uart(1);
-> >> > 
-> >> > Don't we have enum for these magic numbers on pxa168 ?
-> >> > 
-> >> >> +}
-> >> >> +
-> >> >> +MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development
-> >> >> Platform") +     .phys_io        = APB_PHYS_BASE,
-> >> >> +     .io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
-> >> >> +     .map_io         = mmp_map_io,
-> >> >> +     .init_irq       = pxa168_init_irq,
-> >> >> +     .timer          = &pxa168_timer,
-> >> >> +     .init_machine   = teton_bga_init,
-> >> >> +MACHINE_END
-> >> > 
-> >> > Cheers
-> >> 
-> >> I am assuming you mean the magic number for .io_pg_offst:
-> >>  .io_pg_offst    = (APB_VIRT_BASE >> 18) & 0xfffc,
-> > 
-> > Nope, sorry, I meant this:
-> > 
-> > +     pxa168_add_uart(1);
-> > 
-> > The (1) seems weird, but whatever. I don't have any pxa168 device.
-> 
-> Actually the parameter means the device ID, so pxa168_add_uart(1)
-> means to add UART1 on pxa168, so it's quite straight-forward.
+Hi Kenneth,
 
-Ah ok, sorry about the confusion.
+just some error codes and leaks if I am right :)
 
-Can we see new version of this patch with my previous comments addressed ?
+On Wed, Sep 8, 2010 at 6:29 AM, Kenneth Heitke <kheitke@codeaurora.org> wrote:
+> +
+> +static int __devinit
+> +qup_i2c_probe(struct platform_device *pdev)
+> +{
+> +
+> + ? ? ? qup_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_phys_addr");
+> + ? ? ? if (!qup_mem) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no qup mem resource?\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
 
-Thanks, Cheers
+I think this should be -ENXIO instead of -ENODEV?
+
+> + ? ? ? gsbi_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "gsbi_qup_i2c_addr");
+> + ? ? ? if (!gsbi_mem) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no gsbi mem resource?\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+
+Ditto here.
+
+> + ? ? ? in_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_in_intr");
+> +
+> + ? ? ? out_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_out_intr");
+> +
+> + ? ? ? err_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "qup_err_intr");
+> + ? ? ? if (!err_irq) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "no error irq resource?\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+
+All the same here too?
+
+> +
+> + ? ? ? qup_io = devm_request_mem_region(&pdev->dev, qup_mem->start,
+> + ? ? ? ? ? ? ? ? ? ? ? resource_size(qup_mem), pdev->name);
+> + ? ? ? if (!qup_io) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "QUP region already claimed\n");
+> + ? ? ? ? ? ? ? return -EBUSY;
+> + ? ? ? }
+> +
+> + ? ? ? gsbi_io = devm_request_mem_region(&pdev->dev, gsbi_mem->start,
+> + ? ? ? ? ? ? ? ? ? ? ? resource_size(gsbi_mem), pdev->name);
+> + ? ? ? if (!gsbi_io) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "GSBI region already claimed\n");
+> + ? ? ? ? ? ? ? return -EBUSY;
+> + ? ? ? }
+> +
+> + ? ? ? dev = devm_kzalloc(&pdev->dev, sizeof(struct qup_i2c_dev), GFP_KERNEL);
+
+[..]
+
+> + ? ? ? if (!dev->base)
+> + ? ? ? ? ? ? ? return -ENOMEM;
+
+Missing *_kzfree whilst returning?
+
+> + ? ? ? dev->gsbi = devm_ioremap(&pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? gsbi_mem->start, resource_size(gsbi_mem));
+> + ? ? ? if (!dev->gsbi)
+> + ? ? ? ? ? ? ? return -ENOMEM;
+> +
+> + ? ? ? clk = clk_get(&pdev->dev, "qup_clk");
+> + ? ? ? if (IS_ERR(clk)) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Could not get clock\n");
+> + ? ? ? ? ? ? ? ret = PTR_ERR(clk);
+> + ? ? ? ? ? ? ? goto err_clk_get_failed;
+
+Will not the devm_iounmap be needed here?
+
+Thanx!
+Sundar
