@@ -1,23 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 9 Sep 2010 11:53:47 +0200
-Subject: [PATCH V3] arm & sh: factorised duplicated clkdev.c
-In-Reply-To: <1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1283431716-21540-1-git-send-email-plagnioj@jcrosoft.com>
-	<1283434786-26479-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20100909095347.GA9112@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Sep 2010 20:11:33 +0900
+Subject: [PATCH 1/2] ARM: S3C64XX: Fix dev-spi build
+In-Reply-To: <20100908160111.GC20504@sirena.org.uk>
+References: <1283941539-3892-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<003201cb4f4c$5e561640$1b0242c0$%kim@samsung.com>
+	<AANLkTimxnfjuNR-Z0eaYwhk8xTDctTBvxcQCVbAvBOG2@mail.gmail.com>
+	<20100908160111.GC20504@sirena.org.uk>
+Message-ID: <010501cb500f$c6cac4a0$54604de0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:39 Thu 02 Sep     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> factorise some generic infrastructure to assist looking up struct clks
-> for the ARM & SH architecture.
+Mark Brown wrote:
 > 
-> as the code is identical at 99%
+> On Wed, Sep 08, 2010 at 11:17:51PM +0900, Jassi Brar wrote:
 > 
-> put the arch specific code for allocation as example in asm/clkdev.h
+> > I have to use personal id because I can't always reply from the official
+one.
+> > Otherwise, I'd prefer my work to be tagged with jassi.brar at samsung.com
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-is it ok?
+> OK, I'll amend it.  I just cut'n'pasted from your ack mail IIRC.
 
-Best Regards,
-J.
+May I amend it when apply it into my tree?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
