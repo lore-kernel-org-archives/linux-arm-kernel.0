@@ -1,34 +1,73 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 9 Sep 2010 09:03:17 +0200
-Subject: [PATCH] MMC: move regulator handling closer to core v3
-In-Reply-To: <20100908155114.880463fc.akpm@linux-foundation.org>
-References: <1283677538-31121-1-git-send-email-linus.walleij@stericsson.com>
-	<20100908155114.880463fc.akpm@linux-foundation.org>
-Message-ID: <AANLkTinADjBaOcfdtGRZK0WdMs0xt+PLWGE7NUBndRr_@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 9 Sep 2010 09:24:25 +0200
+Subject: [PATCH 1/7] ARM: specify ZRELADDR for ARCH_TEGRA
+In-Reply-To: <20100908220710.GA9859@n2100.arm.linux.org.uk>
+References: <20100903095504.GC13643@pengutronix.de>
+	<1283507818-1573-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<AANLkTi=7+TcOWu_62EWH6pwFUuizMT47tHJraaqzdJgp@mail.gmail.com>
+	<20100903190155.GE17152@pengutronix.de>
+	<AANLkTin2fEj2kRRoE+RSpBovApMaCKTs+DVz9wvj7M3u@mail.gmail.com>
+	<20100903192329.GB29821@pengutronix.de>
+	<20100908091113.GB29914@n2100.arm.linux.org.uk>
+	<20100908115609.GA32659@n2100.arm.linux.org.uk>
+	<20100908121634.GD1614@pengutronix.de>
+	<20100908220710.GA9859@n2100.arm.linux.org.uk>
+Message-ID: <20100909072425.GA1828@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/9 Andrew Morton <akpm@linux-foundation.org>:
-> On Sun, ?5 Sep 2010 11:05:38 +0200
-> Linus Walleij <linus.walleij@stericsson.com> wrote:
->> + ? ? if (host->vcc) {
->> + ? ? ? ? ? ? int ret;
->> +
->> + ? ? ? ? ? ? if (power_mode == MMC_POWER_UP)
->> + ? ? ? ? ? ? ? ? ? ? ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
->> + ? ? ? ? ? ? else if (power_mode == MMC_POWER_OFF)
->> + ? ? ? ? ? ? ? ? ? ? ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
->> + ? ? }
->
-> There's no point in copying the return value into a local then ignoring
-> it. ?mmc_regulator_set_ocr() can return a negative errno so we should
-> test for that, clean up and propagate the error.
+Hello Russell,
 
-OK I'll fix.
+On Wed, Sep 08, 2010 at 11:07:10PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 08, 2010 at 02:16:34PM +0200, Uwe Kleine-K?nig wrote:
+> > Hello Russell,
+> > 
+> > On Wed, Sep 08, 2010 at 12:56:10PM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, Sep 08, 2010 at 10:11:13AM +0100, Russell King - ARM Linux wrote:
+> > > > On Fri, Sep 03, 2010 at 09:23:29PM +0200, Uwe Kleine-K?nig wrote:
+> > > > > Hello,
+> > > > > 
+> > > > > On Fri, Sep 03, 2010 at 12:19:26PM -0700, Erik Gilling wrote:
+> > > > > > On Fri, Sep 3, 2010 at 12:01 PM, Uwe Kleine-K?nig
+> > > > > > > (hmm, I thought that patches that touch common files like
+> > > > > > > arch/arm/Kconfig should go via rmk?!)
+> > > > > > 
+> > > > > > I looked and saw that others (specifically samsung) had submitted this
+> > > > > > fix directly to Linus.  I'm still learning the ropes here and am happy
+> > > > > > to hear some clarification either way.
+> > > > >
+> > > > > Note that just me wondering if it's right doesn't necessarily means it's
+> > > > > not.  Russell, can you comment?  Is it trivial enough and obviously only
+> > > > > tegra related that it's OK?
+> > > > 
+> > > > The problem happens when there's related changes already in others git
+> > > > trees which clash or conflict with those changes.
+> > > > 
+> > > > This whole CONFIG_ZRELADDR thing seems like a step backwards towards a
+> > > > situation where we will get conflicts with multiple changes - but without
+> > > > gaining anything substantial in moving away from Makefile.boot.
+> > > > 
+> > > > Unless someone can come up with a real justification for CONFIG_ZRELADDR
+> > > > I'm mindful to revert it.  (But - if people have sent these changes to
+> > > > Linus already, that's going to make reverting it a lot harder.)
+> > > 
+> > > This is what I'm considering committing to sort out this ZRELADDR mess -
+> > > it gives people who want AUTO_ZRELADDR their pie, while allowing us to
+> > > keep the proven reliability of original method of handling ZRELADDR.
+> > Would be OK for me.  We might have to fix up some machines though.
+> 
+> Any ideas what needs to be fixed?
+I thought that there may be platforms that don't have a specification of
+zreladdr-y anymore in Makefile.boot.  Maybe the Tegra-stuff that Linus
+should pull removes it.  Other than that I'd check s3c.  The rest should
+be OK.
 
-> The same comments apply to mmci_set_ios().
+>                                    And is that an acked-by ?
+yeah, you can take it as such.
 
-OK.
+Best regards
+Uwe
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
