@@ -1,61 +1,69 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu,  9 Sep 2010 12:58:06 -0700
-Subject: [PATCH 1/4] arm: Kconfig option for ARCH_MSM_SCORPIONMP
+Date: Thu,  9 Sep 2010 12:58:08 -0700
+Subject: [PATCH 3/4] arm: mm: add proc info for ARM11MPCore/Cortex-A9 from ARM
 In-Reply-To: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
 References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1284062289-10914-2-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1284062289-10914-4-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Muckle <smuckle@codeaurora.org>
+Setting of these bits can cause issues on other SMP SoC's not produced
+by ARM.
 
-ScorpionMP is a configuration of Scorpion processors. It supports local
-timers.
-
-Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/Kconfig          |    6 ++++--
- arch/arm/mach-msm/Kconfig |    2 ++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mm/proc-v7.S |   26 +++++++++++++++++++++++++-
+ 1 files changed, 25 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7ed21f..d2dfbc2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1144,7 +1144,8 @@ config SMP
- 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
- 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
- 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
--		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-+		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4||\
-+		 ARCH_MSM_SCORPIONMP)
- 	depends on GENERIC_CLOCKEVENTS
- 	select USE_GENERIC_SMP_HELPERS
- 	select HAVE_ARM_SCU if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 ||\
-@@ -1218,7 +1219,8 @@ config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
- 		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
--		ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
-+		ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 ||\
-+		ARCH_MSM_SCORPIONMP)
- 	default y
- 	select HAVE_ARM_TWD if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 || \
- 		ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 47264a7..cc59b0c 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -35,6 +35,8 @@ config  ARCH_MSM_ARM11
- 	bool
- config  ARCH_MSM_SCORPION
- 	bool
-+config  ARCH_MSM_SCORPIONMP
-+	bool
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 6a8506d..60cfab9 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -186,13 +186,14 @@ cpu_v7_name:
+  *	It is assumed that:
+  *	- cache type register is implemented
+  */
+-__v7_setup:
++__v7_ca9mp_setup:
+ #ifdef CONFIG_SMP
+ 	mrc	p15, 0, r0, c1, c0, 1
+ 	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
+ 	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
+ 	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
+ #endif
++__v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+ 	bl	v7_flush_dcache_all
+@@ -323,6 +324,29 @@ cpu_elf_name:
  
- config  MSM_VIC
- 	bool
+ 	.section ".proc.info.init", #alloc, #execinstr
+ 
++	.type   __v7_ca9mp_proc_info, #object
++__v7_ca9mp_proc_info:
++	.long	0x410fc090		@ Required ID value
++	.long	0xff0ffff0		@ Mask for ID
++	.long   PMD_TYPE_SECT | \
++		PMD_SECT_AP_WRITE | \
++		PMD_SECT_AP_READ | \
++		PMD_FLAGS
++	.long   PMD_TYPE_SECT | \
++		PMD_SECT_XN | \
++		PMD_SECT_AP_WRITE | \
++		PMD_SECT_AP_READ
++	b	__v7_ca9mp_setup
++	.long	cpu_arch_name
++	.long	cpu_elf_name
++	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
++	.long	cpu_v7_name
++	.long	v7_processor_functions
++	.long	v7wbi_tlb_fns
++	.long	v6_user_fns
++	.long	v7_cache_fns
++	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
++
+ 	/*
+ 	 * Match any ARMv7 processor core.
+ 	 */
 -- 
 1.7.1
