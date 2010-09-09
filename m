@@ -1,33 +1,100 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 9 Sep 2010 22:32:05 +0200
-Subject: [PATCH] ux500: use _cansleep GPIO functions
-Message-ID: <1284064325-14570-1-git-send-email-linus.walleij@stericsson.com>
+From: kheitke@codeaurora.org (Kenneth Heitke)
+Date: Thu, 09 Sep 2010 14:52:19 -0600
+Subject: [PATCH v3] i2c: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <AANLkTimHQ=ag5z+SKbGrm5BD-eF+xcDuKp4R_=4tf3cP@mail.gmail.com>
+References: <1283907557-1874-1-git-send-email-kheitke@codeaurora.org>
+	<AANLkTimHQ=ag5z+SKbGrm5BD-eF+xcDuKp4R_=4tf3cP@mail.gmail.com>
+Message-ID: <4C894903.1050909@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to the patch to MMCI this silences similar messages from
-the platform code.
+Sundar wrote:
+> Hi Kenneth,
+> 
+> just some error codes and leaks if I am right :)
+> 
+> On Wed, Sep 8, 2010 at 6:29 AM, Kenneth Heitke <kheitke@codeaurora.org> wrote:
+>> +
+>> +static int __devinit
+>> +qup_i2c_probe(struct platform_device *pdev)
+>> +{
+>> +
+>> +       qup_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> +                                               "qup_phys_addr");
+>> +       if (!qup_mem) {
+>> +               dev_err(&pdev->dev, "no qup mem resource?\n");
+>> +               return -ENODEV;
+> 
+> I think this should be -ENXIO instead of -ENODEV?
+> 
+>> +       gsbi_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> +                                               "gsbi_qup_i2c_addr");
+>> +       if (!gsbi_mem) {
+>> +               dev_err(&pdev->dev, "no gsbi mem resource?\n");
+>> +               return -ENODEV;
+> 
+> Ditto here.
+> 
+>> +       in_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+>> +                                               "qup_in_intr");
+>> +
+>> +       out_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+>> +                                               "qup_out_intr");
+>> +
+>> +       err_irq = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+>> +                                               "qup_err_intr");
+>> +       if (!err_irq) {
+>> +               dev_err(&pdev->dev, "no error irq resource?\n");
+>> +               return -ENODEV;
+>> +       }
+> 
+> All the same here too?
+> 
+>> +
+>> +       qup_io = devm_request_mem_region(&pdev->dev, qup_mem->start,
+>> +                       resource_size(qup_mem), pdev->name);
+>> +       if (!qup_io) {
+>> +               dev_err(&pdev->dev, "QUP region already claimed\n");
+>> +               return -EBUSY;
+>> +       }
+>> +
+>> +       gsbi_io = devm_request_mem_region(&pdev->dev, gsbi_mem->start,
+>> +                       resource_size(gsbi_mem), pdev->name);
+>> +       if (!gsbi_io) {
+>> +               dev_err(&pdev->dev, "GSBI region already claimed\n");
+>> +               return -EBUSY;
+>> +       }
+>> +
+>> +       dev = devm_kzalloc(&pdev->dev, sizeof(struct qup_i2c_dev), GFP_KERNEL);
+> 
+> [..]
+> 
+>> +       if (!dev->base)
+>> +               return -ENOMEM;
+> 
+> Missing *_kzfree whilst returning?
+> 
+>> +       dev->gsbi = devm_ioremap(&pdev->dev,
+>> +                       gsbi_mem->start, resource_size(gsbi_mem));
+>> +       if (!dev->gsbi)
+>> +               return -ENOMEM;
+>> +
+>> +       clk = clk_get(&pdev->dev, "qup_clk");
+>> +       if (IS_ERR(clk)) {
+>> +               dev_err(&pdev->dev, "Could not get clock\n");
+>> +               ret = PTR_ERR(clk);
+>> +               goto err_clk_get_failed;
+> 
+> Will not the devm_iounmap be needed here?
+> 
+> Thanx!
+> Sundar
+> 
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-ux500/board-mop500-sdi.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Hopefully no leaks since I am using the devm_ calls.  The resources 
+should be freed up automatically on device release and if the probe 
+function fails.  Please let me know if this assumption is not correct.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index 9662d9d..33a65f8 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -93,9 +93,9 @@ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
- 				   unsigned char power_mode)
- {
- 	if (power_mode == MMC_POWER_UP)
--		gpio_set_value(GPIO_SDMMC_EN, 1);
-+		gpio_set_value_cansleep(GPIO_SDMMC_EN, 1);
- 	else if (power_mode == MMC_POWER_OFF)
--		gpio_set_value(GPIO_SDMMC_EN, 0);
-+		gpio_set_value_cansleep(GPIO_SDMMC_EN, 0);
- 
- 	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
- 	       MCI_DATA2DIREN | MCI_DATA31DIREN;
 -- 
-1.6.3.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
