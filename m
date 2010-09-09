@@ -1,31 +1,53 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu,  9 Sep 2010 12:58:07 -0700
-Subject: [PATCH 2/4] arm: dis-allow hotplug on MSM
+Date: Thu,  9 Sep 2010 12:58:09 -0700
+Subject: [PATCH 4/4] GIC: Dont disable INT in ack callback
 In-Reply-To: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
 References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1284062289-10914-3-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1284062289-10914-5-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSM doesn't support hotplug, so we prevent it from being
-select with this added line.
+From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
+Unless gic_ack_irq is called from __do_IRQ, interrupt should not
+be disabled in the ack function.
+
+Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/common/gic.c |   14 --------------
+ 1 files changed, 0 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d2dfbc2..829dd67 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1211,6 +1211,7 @@ config NR_CPUS
- config HOTPLUG_CPU
- 	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
- 	depends on SMP && HOTPLUG && EXPERIMENTAL
-+	depends on !ARCH_MSM
- 	help
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 7dfa9a8..ada6359 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -67,25 +67,11 @@ static inline unsigned int gic_irq(unsigned int irq)
+ 
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+- *
+- * Linux assumes that when we're done with an interrupt we need to
+- * unmask it, in the same way we need to unmask an interrupt when
+- * we first enable it.
+- *
+- * The GIC has a separate notion of "end of interrupt" to re-enable
+- * an interrupt after handling, in order to support hardware
+- * prioritisation.
+- *
+- * We can make the GIC behave in the way that Linux expects by making
+- * our "acknowledge" routine disable the interrupt, then mark it as
+- * complete.
+  */
+ static void gic_ack_irq(unsigned int irq)
+ {
+-	u32 mask = 1 << (irq % 32);
+ 
+ 	spin_lock(&irq_controller_lock);
+-	writel(mask, gic_dist_base(irq) + GIC_DIST_ENABLE_CLEAR + (gic_irq(irq) / 32) * 4);
+ 	writel(gic_irq(irq), gic_cpu_base(irq) + GIC_CPU_EOI);
+ 	spin_unlock(&irq_controller_lock);
+ }
 -- 
 1.7.1
