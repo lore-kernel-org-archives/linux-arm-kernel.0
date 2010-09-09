@@ -1,34 +1,35 @@
-From: redhatter@gentoo.org (Stuart Longland)
-Date: Thu, 9 Sep 2010 15:01:37 +1000
-Subject: Voltage/current/sensor monitoring interface and Wiegand
-In-Reply-To: <4C884AFA.20604@bluewatersys.com>
-References: <20100909000245.GK14056@atomos.longlandclan.yi.org>
-	<4C884AFA.20604@bluewatersys.com>
-Message-ID: <20100909050137.GR14056@atomos.longlandclan.yi.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 9 Sep 2010 10:48:12 +0530
+Subject: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
+In-Reply-To: <1283960984.10137.82.camel@e102109-lin.cambridge.arm.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02CD0D34AF@dbde02.ent.ti.com>
+	<1283960984.10137.82.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD0D3669@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 09, 2010 at 02:48:26PM +1200, Ryan Mallon wrote:
-> On 09/09/2010 12:02 PM, Stuart Longland wrote:
-> > How are voltage *monitors* normally written?  (note, not voltage
-> > *regulators*... this thing does not alter the voltage rails.)  I tried
-> > to make sense of lm-sensors, but that seems very ad-hoc (maybe I missed
-> > some document that explains it) to me.  It's hard to be clear on what is
-> > the *right* way to report a voltage or current reading to userspace.
+Tony,
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Wednesday, September 08, 2010 9:20 PM
+> To: Shilimkar, Santosh
+> Cc: Linus Walleij; Russell King - ARM Linux; linux-arm-
+> kernel at lists.infradead.org; tglx at linutronix.de; linux-
+> omap at vger.kernel.org; per.xx.fransson at stericsson.com
+> Subject: RE: [PATCH 0/6] ARM: l2x0: kexex, cleanup and optimisation
 > 
-> Depending on your particular application it might make sense to use the
-> power supply class (see Documentation/power/power_supply_class.txt) for
-> the voltage/current monitoring. If the temperature sensor is related to
-> a power supply monitor, then it could also go there.
+> On Wed, 2010-09-08 at 16:46 +0100, Shilimkar, Santosh wrote:
+> > Here is the updated branch including "Per Fransson" patch.
+> > http://dev.omapzoom.org/?p=santosh/kernel-omap4-
+> base.git;a=shortlog;h=refs/heads/l2x0-pull-rmk
+> 
+> It looks fine to me.
+> 
 
-Ahh okay, I'll have a look there..  The temperature isn't related to the
-power supply, so I might continue a searchfor its rightful place, but
-that class of devices seems like a good fit.
--- 
-Stuart Longland (aka Redhatter, VK4MSL)      .'''.
-Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
-. . . . . . . . . . . . . . . . . . . . . .   .'.'
-http://dev.gentoo.org/~redhatter             :.'
+Are you ok if " [PATCH 3/6] omap4: l2x0: Override the default l2x0_disable"
+patch gets merged via Russell's tree?
 
-I haven't lost my mind...
-  ...it's backed up on a tape somewhere.
+http://dev.omapzoom.org/?p=santosh/kernel-omap4-base.git;a=blobdiff;f=arch/arm/mach-omap2/omap4-common.c;h=b557cc2c4b10e2ba4b6c4d6e3397611fb2de5952;hp=13dc9794dcc2ea68fe9115cff7be9cd8c074a484;hb=e1612fb084e78d5cba127f360803863e87a1e0cd;hpb=32ff2ccc0ca4d22c211fc5f5cc71b3d9a950c8c3
+
+Regards,
+Santosh
