@@ -1,49 +1,34 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 8 Sep 2010 22:53:44 -0600
-Subject: [PATCH] SPI: move PL022 probe call to subsys_initcall()
-In-Reply-To: <1283763732-19419-1-git-send-email-linus.walleij@stericsson.com>
-References: <1283763732-19419-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100909045344.GC11833@angua.secretlab.ca>
+From: redhatter@gentoo.org (Stuart Longland)
+Date: Thu, 9 Sep 2010 15:01:37 +1000
+Subject: Voltage/current/sensor monitoring interface and Wiegand
+In-Reply-To: <4C884AFA.20604@bluewatersys.com>
+References: <20100909000245.GK14056@atomos.longlandclan.yi.org>
+	<4C884AFA.20604@bluewatersys.com>
+Message-ID: <20100909050137.GR14056@atomos.longlandclan.yi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 06, 2010 at 11:02:12AM +0200, Linus Walleij wrote:
-> The PL022 SPI bus is sometimes used for early stuff like
-> regulators that need to be present at module_init() time, so
-> we move this to a subsys_initcall().
+On Thu, Sep 09, 2010 at 02:48:26PM +1200, Ryan Mallon wrote:
+> On 09/09/2010 12:02 PM, Stuart Longland wrote:
+> > How are voltage *monitors* normally written?  (note, not voltage
+> > *regulators*... this thing does not alter the voltage rails.)  I tried
+> > to make sense of lm-sensors, but that seems very ad-hoc (maybe I missed
+> > some document that explains it) to me.  It's hard to be clear on what is
+> > the *right* way to report a voltage or current reading to userspace.
 > 
-> Cc: Lukasz Baj <lukasz.baj@tieto.com>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> Depending on your particular application it might make sense to use the
+> power supply class (see Documentation/power/power_supply_class.txt) for
+> the voltage/current monitoring. If the temperature sensor is related to
+> a power supply monitor, then it could also go there.
 
-Applied, thanks.
+Ahh okay, I'll have a look there..  The temperature isn't related to the
+power supply, so I might continue a searchfor its rightful place, but
+that class of devices seems like a good fit.
+-- 
+Stuart Longland (aka Redhatter, VK4MSL)      .'''.
+Gentoo Linux/MIPS Cobalt and Docs Developer  '.'` :
+. . . . . . . . . . . . . . . . . . . . . .   .'.'
+http://dev.gentoo.org/~redhatter             :.'
 
-Note on the subject line:  The preferred form for spi patches is:
-
-    spi[/chip]: <description>
-
-'spi' in the header and the optional driver name are both lowercase.
-I fix patches up to match this form, but it is less work for me when I
-don't have to.
-
-g.
-
-> ---
->  drivers/spi/amba-pl022.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index 3db5402..f958072 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -2324,7 +2324,7 @@ static int __init pl022_init(void)
->  	return amba_driver_register(&pl022_driver);
->  }
->  
-> -module_init(pl022_init);
-> +subsys_initcall(pl022_init);
->  
->  static void __exit pl022_exit(void)
->  {
-> -- 
-> 1.6.3.3
-> 
+I haven't lost my mind...
+  ...it's backed up on a tape somewhere.
