@@ -1,117 +1,74 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Sep 2010 19:33:05 +0900
-Subject: [PATCH 4/6] ARM: S5PV210: Enable USB HSOTG gadget build
-In-Reply-To: <1284103403-10696-5-git-send-email-m.szyprowski@samsung.com>
-References: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
-	<1284103403-10696-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <000a01cb50d3$90004750$b000d5f0$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 10 Sep 2010 11:37:40 +0100
+Subject: [PATCH] MMC: move regulator handling closer to core v3
+In-Reply-To: <4C8A02E6.4080906@nokia.com>
+References: <1283677538-31121-1-git-send-email-linus.walleij@stericsson.com>
+	<20100908155114.880463fc.akpm@linux-foundation.org>
+	<4C887837.6060508@nokia.com>
+	<20100909093810.GA1988@rakim.wolfsonmicro.main>
+	<4C88D97F.2080804@nokia.com>
+	<20100909131251.GE25855@rakim.wolfsonmicro.main>
+	<4C8A02E6.4080906@nokia.com>
+Message-ID: <20100910103739.GG3068@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Add the necessary definitions and mapping information to enable the
-> s3c-hsotg gadget to build.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/cpu.c                   |    5 +++++
->  arch/arm/mach-s5pv210/include/mach/map.h      |    6 ++++++
->  arch/arm/mach-s5pv210/include/mach/regs-sys.h |   19
-> +++++++++++++++++++
->  3 files changed, 30 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-sys.h
-> 
-> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-> index c551ab1..6183b55 100644
-> --- a/arch/arm/mach-s5pv210/cpu.c
-> +++ b/arch/arm/mach-s5pv210/cpu.c
-> @@ -84,6 +84,11 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
->  		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
->  		.length		= SZ_4K,
->  		.type		= MT_DEVICE,
-> +	}, {
-> +		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
-> +		.pfn		=__phys_to_pfn(S3C_PA_USB_HSPHY),
+On Fri, Sep 10, 2010 at 01:05:26PM +0300, Adrian Hunter wrote:
+> Mark Brown wrote:
+> >On Thu, Sep 09, 2010 at 03:56:31PM +0300, Adrian Hunter wrote:
 
-It's better to use S5PV210_PA_HSPHY directly without re-mapping.
-Because don't need S3C_PA_USB_HSPHY except here.
+> >                                                I would expect that
+> >anything that needs pre and post change notifications like this is
+> >actually changing the configuration itself (since if it's that sensitive
+> >to changes it seems likely that it wouldn't be enthused about having the
+> >configuration changed while it's trying to do stuff).
 
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE,
->  	}
->  };
-> 
-> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
-> s5pv210/include/mach/map.h
-> index bd9afd5..724a428 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> @@ -73,6 +73,9 @@
-> 
->  #define S5PV210_PA_HSMMC(x)	(0xEB000000 + ((x) * 0x100000))
-> 
-> +#define S5PV210_PA_HSOTG	(0xEC000000)
-> +#define S5PV210_PA_HSPHY	(0xEC100000)
-> +
->  #define S5PV210_PA_VIC0		(0xF2000000)
->  #define S5PV210_PA_VIC1		(0xF2100000)
->  #define S5PV210_PA_VIC2		(0xF2200000)
-> @@ -111,6 +114,9 @@
->  #define S5P_PA_FIMC0		S5PV210_PA_FIMC0
->  #define S5P_PA_FIMC1		S5PV210_PA_FIMC1
->  #define S5P_PA_FIMC2		S5PV210_PA_FIMC2
-> +#define S3C_PA_USB_HSOTG	S5PV210_PA_HSOTG
+> Yes, except when it is the regulator core trying to set the initial power
+> state on or off.
 
-IMHO, would be better if we could define S3C_PA_XXX first than S5P_PA_XXX.
+Like I say, I'd not expect anything that needs this sort of fiddly
+control in the hardware to be happy with doing this outside the driver
+itself - this includes via the constraints.  If it's important that two
+bits of hardware be updated in lockstep then I'd expect you to need to
+probe both bits of hardware and control them from one place, which means
+that using notifiers from constraints would be very limited due to probe
+ordering issues.  You'd need to make sure that the notifiers had access
+to whatever other hardware they need to fiddle with before we started
+applying the constraints which just feels like asking for initialisation
+ordering fun.
 
-> +#define S3C_PA_USB_HSPHY	S5PV210_PA_HSPHY
+> >>For OMAP3 (and OMAP2 in some cases) the 1st SD/SDIO/MMC controller
+> >>can operate at either 1.8V or 3V, however at 3V the board must apply
+> >>voltage level shifting (PBIAS configuation).  Currently the
 
-As I said, no need re-mapping to S3C_PA_USB_HSPHY.
+> >This really sounds like something that's internal to the MMC controller
+> >driver - based on your description I'm very surprised that boards even
+> >get visibility of this.  Surely the MMC controller driver should be
+> >taking care of configuring PBIAS itself, assuming it's something
+> >internal to the chip?
 
-> +#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02000000)
-> 
-How about moving definition of VA_ to plat/map-s5p.h or plat/map-base.h?
-Yeah, I know in the case of s3c64xx, same address mapping is in mach/map.h.
+> It is considered that the driver should know only about hsmmc ip not
+> all of OMAP.  Additionally the OMAP community does not allow the use
+> of the necessary system control registers outside of the board level
+> i.e. arch/arm/mach-omap2 etc.  Hence the driver calls down to the
+> board level.  That is ugly but not a problem.
 
->  #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
->  #define SAMSUNG_PA_CFCON	S5PV210_PA_CFCON
-> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-sys.h
-b/arch/arm/mach-
-> s5pv210/include/mach/regs-sys.h
-> new file mode 100644
-> index 0000000..26691d3
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv210/include/mach/regs-sys.h
-> @@ -0,0 +1,19 @@
-> +/* arch/arm/mach-s5pv210/include/mach/regs-sys.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * S5PV210 - System registers definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#define S5PV210_USB_PHY_CON	(S3C_VA_SYS + 0xE80C)
-> +#define S5PV210_USB_PHY0_EN	(1 << 0)
-> +#define S5PV210_USB_PHY1_EN	(1 << 1)
-> +
-> +/* compatibility defines for s3c-hsotg driver */
-> +#define S3C64XX_OTHERS		S5PV210_USB_PHY_CON
-> +#define S3C64XX_OTHERS_USBMASK	S5PV210_USB_PHY0_EN
-> --
+That sounds like you'll end up with a lot of cut'n'paste for this in
+boards but if it works I guess it's OK.  Are there situations where
+different boards need to do different things?
 
-Others, ok.
+> >                       Adding code to the regulator API so that the OMAP
+> >MMC driver can be notified of the configuration it has applied to itself
+> >(and any failures that ensue) feels baroque.
 
-Thanks.
+> As you wish.  That rules out using the core to turn off the regulator at
+> boot up, but that is OK, the driver can do it.  At present the driver
+> makes the mistake of just doing regulator_enable() / disable() to ensure the
+> regulator is off, without calling down to the board level for the PBIAS
+> configuration.  It also comments the code as an "ugly hack" whereas
+> it is really the only way to do it, if the regulator can't do the
+> PBIAS configuration automatically.  I will just fix the driver and add
+> better comments.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+With the description you've given it really does feel like handling this
+in the MMC driver is the best approach.
