@@ -1,77 +1,36 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 10 Sep 2010 12:13:49 +0200
-Subject: [PATCH] AT91: at91sam9261ek board: remove warnings related to use of
-	SPI or SD/MMC
-In-Reply-To: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1284113629-13768-2-git-send-email-nicolas.ferre@atmel.com>
+Date: Fri, 10 Sep 2010 12:13:48 +0200
+Subject: [PATCH] AT91: dm9000 initialization update
+Message-ID: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sd/mmc data structure is not used if SPI is selected. The configuration
-of PIO on the board prevent from using both interfaces at the same time
-(board dependent).
-Remove the warnings at compilation time adding a preprocessor condition.
+Add information in dm9000 mac/phy chip initialization:
+- irq resource details
+- platform data details
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/board-sam9261ek.c |   30 +++++++++++++++++++-----------
- 1 files changed, 19 insertions(+), 11 deletions(-)
+ arch/arm/mach-at91/board-sam9261ek.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index b4307ab..19d4d2c 100644
+index c4c8865..b4307ab 100644
 --- a/arch/arm/mach-at91/board-sam9261ek.c
 +++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -169,17 +169,6 @@ static struct at91_udc_data __initdata ek_udc_data = {
- 
- 
- /*
-- * MCI (SD/MMC)
-- */
--static struct at91_mmc_data __initdata ek_mmc_data = {
--	.wire4		= 1,
--//	.det_pin	= ... not connected
--//	.wp_pin		= ... not connected
--//	.vcc_pin	= ... not connected
--};
--
--
--/*
-  * NAND flash
-  */
- static struct mtd_partition __initdata ek_nand_partition[] = {
-@@ -247,6 +236,10 @@ static void __init ek_add_device_nand(void)
- 	at91_add_device_nand(&ek_nand_data);
- }
- 
-+/*
-+ * SPI related devices
-+ */
-+#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
- 
- /*
-  * ADS7846 Touchscreen
-@@ -357,6 +350,21 @@ static struct spi_board_info ek_spi_devices[] = {
- #endif
+@@ -93,11 +93,12 @@ static struct resource dm9000_resource[] = {
+ 		.start	= AT91_PIN_PC11,
+ 		.end	= AT91_PIN_PC11,
+ 		.flags	= IORESOURCE_IRQ
++			| IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE,
+ 	}
  };
  
-+#else /* CONFIG_SPI_ATMEL_* */
-+
-+/*
-+ * MCI (SD/MMC)
-+ * spi0 and mmc/sd share the same PIO pins: cannot be used at the same time
-+ */
-+static struct at91_mmc_data __initdata ek_mmc_data = {
-+	.wire4		= 1,
-+//	.det_pin	= ... not connected
-+//	.wp_pin		= ... not connected
-+//	.vcc_pin	= ... not connected
-+};
-+
-+#endif /* CONFIG_SPI_ATMEL_* */
-+
+ static struct dm9000_plat_data dm9000_platdata = {
+-	.flags		= DM9000_PLATF_16BITONLY,
++	.flags		= DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM,
+ };
  
- /*
-  * LCD Controller
+ static struct platform_device dm9000_device = {
 -- 
 1.5.6.5
