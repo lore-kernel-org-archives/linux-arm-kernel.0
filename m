@@ -1,111 +1,124 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Sep 2010 09:23:23 +0200
-Subject: [PATCH 6/6] ARM: S5PC110: add support for MMC regulators on Goni board
+Date: Fri, 10 Sep 2010 09:23:19 +0200
+Subject: [PATCH 2/6] ARM: S5PC110: add support for S6E63M0 LCD controller on
+	Goni board
 In-Reply-To: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
 References: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1284103403-10696-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1284103403-10696-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required platform definitions for MMC power regulators on Samsung
+Add required platform definitions for S6E63M0 LCD controller on Samsung
 Goni board.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s5pv210/mach-goni.c |   44 ++++++++++++++++++++++++++++++++++--
- 1 files changed, 41 insertions(+), 3 deletions(-)
+ arch/arm/mach-s5pv210/mach-goni.c |   71 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 71 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index b28a42b..595afc37 100644
+index b0ae208..b263f3a 100644
 --- a/arch/arm/mach-s5pv210/mach-goni.c
 +++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -16,6 +16,7 @@
+@@ -16,6 +16,9 @@
  #include <linux/i2c.h>
  #include <linux/i2c-gpio.h>
  #include <linux/mfd/max8998.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_gpio.h>
- #include <linux/lcd.h>
-@@ -227,6 +228,10 @@ static void __init goni_radio_init(void)
- /* MAX8998 regulators */
- #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
++#include <linux/spi/spi.h>
++#include <linux/spi/spi_gpio.h>
++#include <linux/lcd.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
+@@ -111,6 +114,70 @@ static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
+ 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
+ };
  
-+static struct regulator_consumer_supply goni_ldo5_consumers[] = {
-+	{ .supply = "vmmc",	.dev = &s3c_device_hsmmc0.dev },
++static int lcd_power_on(struct lcd_device *ld, int enable)
++{
++	return 1;
++}
++
++static int reset_lcd(struct lcd_device *ld)
++{
++	static unsigned int first = 1;
++	int reset_gpio = -1;
++
++	reset_gpio = S5PV210_MP05(5);
++
++	if (first) {
++		gpio_request(reset_gpio, "MLCD_RST");
++		first = 0;
++	}
++
++	gpio_direction_output(reset_gpio, 1);
++	return 1;
++}
++
++static struct lcd_platform_data s6e63m0_platform_data = {
++	.reset			= reset_lcd,
++	.power_on		= lcd_power_on,
++	.lcd_enabled		= 0,
++
++	.reset_delay		= 120,	/* 120ms */
++	.power_on_delay		= 25,	/* 25ms */
++	.power_off_delay	= 200,	/* 200ms */
 +};
 +
- static struct regulator_init_data goni_ldo2_data = {
- 	.constraints	= {
- 		.name		= "VALIVE_1.1V",
-@@ -266,6 +271,8 @@ static struct regulator_init_data goni_ldo5_data = {
- 		.max_uV		= 2800000,
- 		.apply_uV	= 1,
- 	},
-+	.num_consumer_supplies = ARRAY_SIZE(goni_ldo5_consumers),
-+	.consumer_supplies = goni_ldo5_consumers,
- };
- 
- static struct regulator_init_data goni_ldo6_data = {
-@@ -471,6 +478,39 @@ static struct max8998_platform_data goni_max8998_pdata = {
- 	.num_regulators	= ARRAY_SIZE(goni_regulators),
- 	.regulators	= goni_regulators,
- };
-+
-+static struct regulator_consumer_supply mmc2_supplies[] = {
++#define LCD_BUS_NUM	3
++#define DISPLAY_CS	S5PV210_MP01(1)
++static struct spi_board_info spi_board_info[] __initdata = {
 +	{
-+		.dev		= &s3c_device_hsmmc2.dev,
-+		.supply		= "vmmc",
++		.modalias	= "s6e63m0",
++		.platform_data	= (void *)&s6e63m0_platform_data,
++		.max_speed_hz	= 1200000,
++		.bus_num	= LCD_BUS_NUM,
++		.chip_select	= 0,
++		.mode		= SPI_MODE_3,
++		.controller_data = (void *)DISPLAY_CS,
 +	},
 +};
 +
-+static struct regulator_init_data mmc2_fixed_voltage_init_data = {
-+	.constraints		= {
-+		.name		= "V_TF_2.8V",
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(mmc2_supplies),
-+	.consumer_supplies	= mmc2_supplies,
++#define DISPLAY_CLK	S5PV210_MP04(1)
++#define DISPLAY_SI	S5PV210_MP04(3)
++static struct spi_gpio_platform_data lcd_spi_gpio_data = {
++	.sck	= DISPLAY_CLK,
++	.mosi	= DISPLAY_SI,
++	.miso	= SPI_GPIO_NO_MISO,
++
++	.num_chipselect	= 1,
 +};
 +
-+static struct fixed_voltage_config mmc2_fixed_voltage_config = {
-+	.supply_name		= "T_FLASH_EN",
-+	.microvolts		= 2800000,
-+	.gpio			= S5PV210_MP05(4),	/* XM0ADDR_12 */
-+	.enable_high		= true,
-+	.init_data		= &mmc2_fixed_voltage_init_data,
-+};
-+
-+static struct platform_device mmc2_fixed_voltage = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 2,
-+	.dev		= {
-+		.platform_data	= &mmc2_fixed_voltage_config,
++static struct platform_device goni_spi_gpio = {
++	.name	= "spi_gpio",
++	.id	= LCD_BUS_NUM,
++	.dev	= {
++		.parent		= &s3c_device_fb.dev,
++		.platform_data	= &lcd_spi_gpio_data,
 +	},
 +};
 +
- #endif
- 
- /* GPIO I2C PMIC */
-@@ -559,9 +599,6 @@ static struct s3c_sdhci_platdata goni_hsmmc2_data __initdata = {
- 
- static void goni_setup_sdhci(void)
- {
--	gpio_request(GONI_EXT_FLASH_EN, "FLASH_EN");
--	gpio_direction_output(GONI_EXT_FLASH_EN, 1);
--
- 	s3c_sdhci0_set_platdata(&goni_hsmmc0_data);
- 	s3c_sdhci1_set_platdata(&goni_hsmmc1_data);
- 	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
-@@ -573,6 +610,7 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&goni_spi_gpio,
- 	&s3c_device_usb_hsotg,
+ /* KEYPAD */
+ static uint32_t keymap[] __initdata = {
+ 	/* KEY(row, col, keycode) */
+@@ -479,6 +546,7 @@ static void goni_setup_sdhci(void)
+ static struct platform_device *goni_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s5p_device_onenand,
++	&goni_spi_gpio,
  	&goni_i2c_gpio_pmic,
-+	&mmc2_fixed_voltage,
  	&goni_device_gpiokeys,
  	&s5p_device_fimc0,
- 	&s5p_device_fimc1,
+@@ -509,6 +577,9 @@ static void __init goni_machine_init(void)
+ 	/* FB */
+ 	s3c_fb_set_platdata(&goni_lcd_pdata);
+ 
++	/* SPI */
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++
+ 	/* KEYPAD */
+ 	samsung_keypad_set_platdata(&keypad_data);
+ 
 -- 
 1.7.2.2
