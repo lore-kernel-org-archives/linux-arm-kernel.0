@@ -1,49 +1,37 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Fri, 10 Sep 2010 13:41:22 +0530
-Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
-	controller driver
-In-Reply-To: <20100907133227.GG30509@game.jcrosoft.org>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 10 Sep 2010 10:38:20 +0200
+Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
+In-Reply-To: <4C89B257.4000202@st.com>
 References: <cover.1283161023.git.viresh.kumar@st.com>
-	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
-	<20100906224050.GA8153@game.jcrosoft.org> <4C86192C.801@st.com>
-	<20100907113850.GE30509@game.jcrosoft.org>
-	<4C8627EE.6090606@st.com>
-	<20100907133227.GG30509@game.jcrosoft.org>
-Message-ID: <4C89E82A.4000902@st.com>
+	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
+	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
+	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
+	<4C7F5B9E.8090406@st.com>
+	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>
+	<4C7F9993.3040700@st.com>
+	<20100903112338.GA3132@morgana.i.gnudd.com>
+	<AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
+	<4C89B257.4000202@st.com>
+Message-ID: <AANLkTikiwFdnJ8qTrUipPAC9GakLhy=FUe2xcoKuLcE3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 7:02 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:24 Tue 07 Sep     , viresh kumar wrote:
->> On 9/7/2010 5:08 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>>> +/* emi nor flash device registeration */
->>>>>>>>>>> +static struct physmap_flash_data emi_norflash_data;
->>>>>>>>>>> +
->>>>>>>>>>> +static struct resource emi_nor_resources[] = {
->>>>>>>>>>> +     {
->>>>>>>>>>> +             .start  = SPEAR310_EMI_MEM_0_BASE,
->>>>>>>>>>> +             .end    = SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
->>>>>>>>>>> +             .flags  = IORESOURCE_MEM,
->>>>>>>>>>> +     },
->>>>>>>>>>> +};
->>>>>>> it's board specfic not mach
->>>>>>>
->>>>>>> NACK
->>>>>
->>>>> No. This is machine specific. Same for all boards.
->>> NACK as you can have a flash at other place and more than one flash
->>> and the size depend on the flash
->>
->> Correct!! Size has to be board specific. Will modify it.
-> and the start also as you may have 2 nor flash on different bank
-> 
+2010/9/10 viresh kumar <viresh.kumar@st.com>:
 
-The start addresses in our case are fixed for a particular bank.
+>> Right now I mostly worry about having it in the proper
+>> place with the proper name and the headers accessible from
+>> all archs...
+>
+> The solution looks fine to us, but currently we don't have
+> enough bandwidth to rework on the suggested solution.
+>
+> Maybe, we can go ahead with current patch, get it acked. Then send another
+> patch later to fix mentioned issues.
+>
+> How do you suggest to proceed on this?
 
-Regards
-Vipin
+Easy, I will attempt to step in and fix it up and also test it on
+U300. :-)
 
-> Best Regards,
-> J.
-> .
-> 
+Yours,
+Linus Walleij
