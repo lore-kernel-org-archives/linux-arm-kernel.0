@@ -1,77 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Sep 2010 21:00:20 +0900
-Subject: [PATCH 4/6] ARM: S5PC100: Move external interrupt defines
-In-Reply-To: <1283764347-460-5-git-send-email-m.szyprowski@samsung.com>
-References: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
-	<1283764347-460-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <001001cb50df$c0ed7e30$42c87a90$%kim@samsung.com>
+Date: Fri, 10 Sep 2010 21:03:13 +0900
+Subject: [PATCH 2/2] ARM: Update number of VIC for S5P6442 and S5PC100
+In-Reply-To: <1284120193-23291-1-git-send-email-kgene.kim@samsung.com>
+References: <1284120193-23291-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1284120193-23291-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> From: Joonyoung Shim <jy0922.shim@samsung.com>
-> 
-> This patch moves external interrupt defines from gpio.h to regs-gpio.h
-> for consistency with s5pv210.
-> 
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -------
->  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +++++++
->  2 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-
-> s5pc100/include/mach/gpio.h
-> index 71ae1f5..29a8a12 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
-> @@ -146,13 +146,6 @@ enum s5p_gpio_number {
->  /* define the number of gpios we need to the one after the MP04() range
-*/
->  #define ARCH_NR_GPIOS		(S5PC100_GPIO_END + 1)
-> 
-> -#define EINT_MODE		S3C_GPIO_SFN(0x2)
-> -
-> -#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
-> -#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
-> -#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
-> -#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
-> -
->  #include <asm-generic/gpio.h>
-> 
->  #endif /* __ASM_ARCH_GPIO_H */
-> diff --git a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-b/arch/arm/mach-
-> s5pc100/include/mach/regs-gpio.h
-> index dd6295e..6abe481 100644
-> --- a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-> +++ b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
-> @@ -71,5 +71,12 @@
->  #define S5P_EXTINT_RISEEDGE		(0x03)
->  #define S5P_EXTINT_BOTHEDGE		(0x04)
-> 
-> +#define EINT_MODE		S3C_GPIO_SFN(0x2)
-> +
-> +#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
-> +#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
-> +#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
-> +#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
-> +
->  #endif /* __ASM_MACH_S5PC100_REGS_GPIO_H */
-> 
-> --
+Update the number of IVC to handle the 3 VICs of the
+S5P6442 and S5PC100.
 
-This is ok to me, will apply.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Russell King <rmk@arm.linux.org.uk>
+---
+ arch/arm/common/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-And will check other regarding gpio interrupt in this weekend ;-)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 0ac3d81..6480685 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -7,6 +7,7 @@ config ARM_VIC
+ config ARM_VIC_NR
+ 	int
+ 	default 4 if ARCH_S5PV210
++	default 3 if ARCH_S5P6442 || ARCH_S5PC100
+ 	default 2
+ 	depends on ARM_VIC
+ 	help
+-- 
+1.6.2.5
