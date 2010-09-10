@@ -1,56 +1,77 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Fri, 10 Sep 2010 14:36:26 +0530
-Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
-	controller driver
-In-Reply-To: <20100910085613.GK9112@game.jcrosoft.org>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
-	<20100906224050.GA8153@game.jcrosoft.org> <4C86192C.801@st.com>
-	<20100907113850.GE30509@game.jcrosoft.org>
-	<4C8627EE.6090606@st.com>
-	<20100907133227.GG30509@game.jcrosoft.org>
-	<4C89E82A.4000902@st.com> <20100910085613.GK9112@game.jcrosoft.org>
-Message-ID: <4C89F512.3030502@st.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 10 Sep 2010 12:13:49 +0200
+Subject: [PATCH] AT91: at91sam9261ek board: remove warnings related to use of
+	SPI or SD/MMC
+In-Reply-To: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1284113629-13768-2-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/10/2010 2:26 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 13:41 Fri 10 Sep     , Vipin Kumar wrote:
->> On 9/7/2010 7:02 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> On 17:24 Tue 07 Sep     , viresh kumar wrote:
->>>> On 9/7/2010 5:08 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>>>>> +/* emi nor flash device registeration */
->>>>>>>>>>>>> +static struct physmap_flash_data emi_norflash_data;
->>>>>>>>>>>>> +
->>>>>>>>>>>>> +static struct resource emi_nor_resources[] = {
->>>>>>>>>>>>> +     {
->>>>>>>>>>>>> +             .start  = SPEAR310_EMI_MEM_0_BASE,
->>>>>>>>>>>>> +             .end    = SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
->>>>>>>>>>>>> +             .flags  = IORESOURCE_MEM,
->>>>>>>>>>>>> +     },
->>>>>>>>>>>>> +};
->>>>>>>>> it's board specfic not mach
->>>>>>>>>
->>>>>>>>> NACK
->>>>>>>
->>>>>>> No. This is machine specific. Same for all boards.
->>>>> NACK as you can have a flash at other place and more than one flash
->>>>> and the size depend on the flash
->>>>
->>>> Correct!! Size has to be board specific. Will modify it.
->>> and the start also as you may have 2 nor flash on different bank
->>>
->>
->> The start addresses in our case are fixed for a particular bank.
-> but not for the nor so let this decide by every board
-> not by the SoC
-> 
+The sd/mmc data structure is not used if SPI is selected. The configuration
+of PIO on the board prevent from using both interfaces at the same time
+(board dependent).
+Remove the warnings at compilation time adding a preprocessor condition.
 
-The NOR memory is placed within the system memory address space.
-For NAND offourse, it lies beyond system space. 
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/board-sam9261ek.c |   30 +++++++++++++++++++-----------
+ 1 files changed, 19 insertions(+), 11 deletions(-)
 
-EMI is a Parallel NOR memory controller and the base address and 
-maximum size of each bank is fixed in our system...
-
-Regards
-Vipin
+diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+index b4307ab..19d4d2c 100644
+--- a/arch/arm/mach-at91/board-sam9261ek.c
++++ b/arch/arm/mach-at91/board-sam9261ek.c
+@@ -169,17 +169,6 @@ static struct at91_udc_data __initdata ek_udc_data = {
+ 
+ 
+ /*
+- * MCI (SD/MMC)
+- */
+-static struct at91_mmc_data __initdata ek_mmc_data = {
+-	.wire4		= 1,
+-//	.det_pin	= ... not connected
+-//	.wp_pin		= ... not connected
+-//	.vcc_pin	= ... not connected
+-};
+-
+-
+-/*
+  * NAND flash
+  */
+ static struct mtd_partition __initdata ek_nand_partition[] = {
+@@ -247,6 +236,10 @@ static void __init ek_add_device_nand(void)
+ 	at91_add_device_nand(&ek_nand_data);
+ }
+ 
++/*
++ * SPI related devices
++ */
++#if defined(CONFIG_SPI_ATMEL) || defined(CONFIG_SPI_ATMEL_MODULE)
+ 
+ /*
+  * ADS7846 Touchscreen
+@@ -357,6 +350,21 @@ static struct spi_board_info ek_spi_devices[] = {
+ #endif
+ };
+ 
++#else /* CONFIG_SPI_ATMEL_* */
++
++/*
++ * MCI (SD/MMC)
++ * spi0 and mmc/sd share the same PIO pins: cannot be used at the same time
++ */
++static struct at91_mmc_data __initdata ek_mmc_data = {
++	.wire4		= 1,
++//	.det_pin	= ... not connected
++//	.wp_pin		= ... not connected
++//	.vcc_pin	= ... not connected
++};
++
++#endif /* CONFIG_SPI_ATMEL_* */
++
+ 
+ /*
+  * LCD Controller
+-- 
+1.5.6.5
