@@ -1,20 +1,34 @@
-From: Lorenzo.Pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Sep 2010 16:15:01 +0100
-Subject: [PATCH 1/4] arm: Kconfig option for ARCH_MSM_SCORPIONMP
-In-Reply-To: <4C8A0501.6080902@ru.mvista.com>
-References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
-	<1284062289-10914-2-git-send-email-dwalker@codeaurora.org>
-	<4C8A0501.6080902@ru.mvista.com>
-Message-ID: <3A52818B08EC2744B4FE7946745124617B20608A1D@GEORGE.Emea.Arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 10 Sep 2010 18:16:21 +0200
+Subject: [PATCH] ARM: make TCM allocation static and common for all archs
+In-Reply-To: <1278717389-8964-1-git-send-email-linus.walleij@stericsson.com>
+References: <1278717389-8964-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100910161621.GF21361@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01:16 Sat 10 Jul     , Linus Walleij wrote:
+> This changes the TCM handling so that a fixed area is reserved at
+> 0xfffe0000-0xfffeffff for TCM. This areas is used by XScale but
+> XScale does not have TCM so the mechanisms are mutually exclusive.
+> 
+> This change is needed to make TCM detection more dynamic while
+> still being able to compile code into it, and is a must for the
+> unified ARM goals: the current TCM allocation at different places
+> in memory for each machine would be a nightmare if you want to
+> compile a single image for more than one machine with TCM so it
+> has to be nailed down in one place.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> This is another TCM patch, to be applied on top of the other
+> stuff I've sent so far. This has been tested on U300 and PB1176
+> however I haven't sent a patch for activating TCM on the RealViews
+> just yet, because I want to check the potential SMP issues that
+> would affect some of them. It would probably be possible to add
+> it on the mach-versatile though. (I don't have one.)
+> ---
+Any feed back about the tcm?
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
--------------- next part --------------
-An embedded message was scrubbed...
-From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-Subject: Re: Re: [PATCH 1/4] arm: Kconfig option for ARCH_MSM_SCORPIONMP
-Date: Fri, 10 Sep 2010 16:15:01 +0100
-Size: 16583
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100910/32c2d4bc/attachment-0001.mht>
+Best Regards,
+J.
