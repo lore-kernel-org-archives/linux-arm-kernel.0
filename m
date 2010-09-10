@@ -1,80 +1,36 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Fri, 10 Sep 2010 10:10:55 +0800
-Subject: [RFC,PATCH 1/2] Add a common struct clk
-In-Reply-To: <20100613222349.GD31045@fluff.org.uk>
-References: <1275636608.606606.450179637764.0.gpush@pororo>
-	<1275636608.607067.417709988883.1.gpush@pororo>
-	<20100611042046.GA31045@fluff.org.uk>
-	<201006111557.12249.jeremy.kerr@canonical.com>
-	<20100613222349.GD31045@fluff.org.uk>
-Message-ID: <1284084655.2877.23.camel@pororo>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 10 Sep 2010 09:51:43 +0530
+Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
+In-Reply-To: <AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>	<4C7F5B9E.8090406@st.com>	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>	<4C7F9993.3040700@st.com>	<20100903112338.GA3132@morgana.i.gnudd.com>
+	<AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
+Message-ID: <4C89B257.4000202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
-
-> > > > +#define INIT_CLK(name, o) \
-> > > > +	{ .ops = &o, .enable_count = 0, \
-> > > > +		.mutex = __MUTEX_INITIALIZER(name.mutex) }
-> > > 
-> > > how about doing the mutex initinitialisation at registration
-> > > time, will save a pile of non-zero code in the image to mess up
-> > > the compression.
-> > 
-> > I've just yesterday added the following to my tree, to allow dynamic 
-> > initialisation:
-> > 
-> > static inline void clk_init(struct clk *clk, const struct clk_ops *ops)
-> > {
-> > 	clk->ops = ops;
-> > 	clk->enable_count = 0;
-> > 	mutex_init(&clk->mutex);
-> > }
-> > 
-> > So we can do this either way.
+On 9/3/2010 10:56 PM, Linus Walleij wrote:
+>> > Note however that the platform data in
+>> > arch/arm/mach-nomadik/board-nhk8815.c should be fixed to reference the
+>> > new driver.  If you remove my version please at least compile-check
+>> > the nhk with the new patch-set.
+> What about we put this new FSMC generic thing in, and
+> then remove the old one with the same patch that
+> instead activates the new one. No need to rush that.
 > 
-> the above is in my view better.
+> Right now I mostly worry about having it in the proper
+> place with the proper name and the headers accessible from
+> all archs...
 
-After implementing this, it turns out it won't work - we don't have
-access to all clocks in order to do the mutex init (thanks to Jason Hui
-for pointing this out).
+Linus,
 
-At present, I'm calling clk_init_common() (which initialises the mutex)
-from clkdev_add, but there are clocks that don't get initialised. For
-example:
+Sorry for replying late!!!
 
-	struct clk_fixed parent_clk = INIT_CLK(32768);
-	struct clk_foo child_clk = INIT_CLK_FOO(parent.clk);
+The solution looks fine to us, but currently we don't have
+enough bandwidth to rework on the suggested solution.
 
-	struct clk_lookup lookup = {
-		.dev_id = "foo",
-		.clk = child_clk,
-	};
+Maybe, we can go ahead with current patch, get it acked. Then send another
+patch later to fix mentioned issues.
 
-	function platform_clk_init(void)
-	{
-		clkdev_add(lookup);
-	}
+How do you suggest to proceed on this?
 
-In this case, the child_clk's mutex will get initialised, but
-parent_clk's won't. We can't walk the parents of child_clk and
-initialise, as we may re-initialise the mutexes of parents with > 1
-child.
-
-Now, we *could* do the clk_common_init() from board-specific code, and
-require that that code guarantees to call clk_common_init() on every
-clock defined. I think that's a recipe for pain, as there will
-undoubtedly be clocks missed, causing an oops when the clock is first
-used.
-
-So I think the solution will have to be to do the mutex initialisation
-statically. I'm planning to leave clk_common_init() available for clocks
-initalised at runtime, but it will no longer be called automatically
-from core code.
-
-Any thoughts?
-
-Cheers,
-
-
-Jeremy
+viresh.
