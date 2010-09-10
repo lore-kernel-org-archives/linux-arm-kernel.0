@@ -1,88 +1,92 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Sep 2010 09:23:21 +0200
-Subject: [PATCH 4/6] ARM: S5PV210: Enable USB HSOTG gadget build
+Date: Fri, 10 Sep 2010 09:23:20 +0200
+Subject: [PATCH 3/6] ARM: S5PC110: Add si470x radio device to the GONI board
 In-Reply-To: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
 References: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1284103403-10696-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1284103403-10696-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary definitions and mapping information to enable the
-s3c-hsotg gadget to build.
+Add required platform definitions for si470x radio device on Samsung
+Goni board.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-s5pv210/cpu.c                   |    5 +++++
- arch/arm/mach-s5pv210/include/mach/map.h      |    6 ++++++
- arch/arm/mach-s5pv210/include/mach/regs-sys.h |   19 +++++++++++++++++++
- 3 files changed, 30 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-sys.h
+ arch/arm/mach-s5pv210/Kconfig     |    2 ++
+ arch/arm/mach-s5pv210/mach-goni.c |   29 +++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index c551ab1..6183b55 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -84,6 +84,11 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
-+		.pfn		=__phys_to_pfn(S3C_PA_USB_HSPHY),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
- 	}
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index b46925b..b1f671d 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -83,9 +83,11 @@ config MACH_GONI
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_HSMMC2
++	select S3C_DEV_I2C1
+ 	select S5P_DEV_ONENAND
+ 	select SAMSUNG_DEV_KEYPAD
+ 	select S5PV210_SETUP_FB_24BPP
++	select S5PV210_SETUP_I2C1
+ 	select S5PV210_SETUP_KEYPAD
+ 	select S5PV210_SETUP_SDHCI
+ 	help
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index b263f3a..30da422 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -38,6 +38,7 @@
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/fb.h>
++#include <plat/iic.h>
+ #include <plat/keypad.h>
+ #include <plat/sdhci.h>
+ 
+@@ -200,6 +201,27 @@ static struct samsung_keypad_platdata keypad_data __initdata = {
+ 	.cols		= 3,
  };
  
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index bd9afd5..724a428 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -73,6 +73,9 @@
- 
- #define S5PV210_PA_HSMMC(x)	(0xEB000000 + ((x) * 0x100000))
- 
-+#define S5PV210_PA_HSOTG	(0xEC000000)
-+#define S5PV210_PA_HSPHY	(0xEC100000)
++/* Radio */
++static struct i2c_board_info i2c1_devs[] __initdata = {
++	{
++		I2C_BOARD_INFO("si470x", 0x10),
++	},
++};
 +
- #define S5PV210_PA_VIC0		(0xF2000000)
- #define S5PV210_PA_VIC1		(0xF2100000)
- #define S5PV210_PA_VIC2		(0xF2200000)
-@@ -111,6 +114,9 @@
- #define S5P_PA_FIMC0		S5PV210_PA_FIMC0
- #define S5P_PA_FIMC1		S5PV210_PA_FIMC1
- #define S5P_PA_FIMC2		S5PV210_PA_FIMC2
-+#define S3C_PA_USB_HSOTG	S5PV210_PA_HSOTG
-+#define S3C_PA_USB_HSPHY	S5PV210_PA_HSPHY
-+#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02000000)
++static void __init goni_radio_init(void)
++{
++	int gpio;
++
++	gpio = S5PV210_GPJ2(4);			/* XMSMDATA_4 */
++	gpio_request(gpio, "FM_INT");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
++	i2c1_devs[0].irq = gpio_to_irq(gpio);
++
++	gpio = S5PV210_GPJ2(5);			/* XMSMDATA_5 */
++	gpio_request(gpio, "FM_RST");
++	gpio_direction_output(gpio, 1);
++}
++
+ /* MAX8998 regulators */
+ #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
  
- #define SAMSUNG_PA_ADC		S5PV210_PA_ADC
- #define SAMSUNG_PA_CFCON	S5PV210_PA_CFCON
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-sys.h b/arch/arm/mach-s5pv210/include/mach/regs-sys.h
-new file mode 100644
-index 0000000..26691d3
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-sys.h
-@@ -0,0 +1,19 @@
-+/* arch/arm/mach-s5pv210/include/mach/regs-sys.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV210 - System registers definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+@@ -567,6 +589,13 @@ static void __init goni_map_io(void)
+ 
+ static void __init goni_machine_init(void)
+ {
++	/* Radio: call before I2C 1 registeration */
++	goni_radio_init();
 +
-+#define S5PV210_USB_PHY_CON	(S3C_VA_SYS + 0xE80C)
-+#define S5PV210_USB_PHY0_EN	(1 << 0)
-+#define S5PV210_USB_PHY1_EN	(1 << 1)
++	/* I2C1 */
++	s3c_i2c1_set_platdata(NULL);
++	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
 +
-+/* compatibility defines for s3c-hsotg driver */
-+#define S3C64XX_OTHERS		S5PV210_USB_PHY_CON
-+#define S3C64XX_OTHERS_USBMASK	S5PV210_USB_PHY0_EN
+ 	/* PMIC */
+ 	goni_pmic_init();
+ 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
 -- 
 1.7.2.2
