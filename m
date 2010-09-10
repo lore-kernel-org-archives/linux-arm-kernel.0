@@ -1,67 +1,49 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Fri, 10 Sep 2010 15:03:37 -0700
-Subject: [PATCH 2/2 v4] msm: gpio: Add gpiomux calls to request and free.
-In-Reply-To: <1284156217-7278-1-git-send-email-gbean@codeaurora.org>
-References: <1284156217-7278-1-git-send-email-gbean@codeaurora.org>
-Message-ID: <1284156217-7278-2-git-send-email-gbean@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 10 Sep 2010 17:28:57 -0500
+Subject: i.MX35 gpio troubles
+Message-ID: <0D753D10438DA54287A00B02708426976444C4E59F@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpiomux get and put calls to msmgpio request and free,
-in order to allow gpio lines to be properly reference-counted
-and power-managed.
+Hello all,
 
-Signed-off-by: Gregory Bean <gbean@codeaurora.org>
----
- arch/arm/mach-msm/gpio.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+I'm having problems reading some of the gpio pins on an i.MX35 based system.  I have
+verified that the pins "work" I just can't read them from userspace.
 
-diff --git a/arch/arm/mach-msm/gpio.c b/arch/arm/mach-msm/gpio.c
-index 5040f1c..33051b5 100644
---- a/arch/arm/mach-msm/gpio.c
-+++ b/arch/arm/mach-msm/gpio.c
-@@ -21,6 +21,7 @@
- #include <linux/irq.h>
- #include <linux/module.h>
- #include "gpio_hw.h"
-+#include "gpiomux.h"
- 
- #define FIRST_GPIO_IRQ MSM_GPIO_TO_INT(0)
- 
-@@ -44,6 +45,8 @@
- 			.direction_input = msm_gpio_direction_input,	\
- 			.direction_output = msm_gpio_direction_output,	\
- 			.to_irq = msm_gpio_to_irq,			\
-+			.request = msm_gpio_request,			\
-+			.free = msm_gpio_free,				\
- 		}							\
- 	}
- 
-@@ -171,6 +174,21 @@ static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	return MSM_GPIO_TO_INT(chip->base + offset);
- }
- 
-+#ifdef CONFIG_MSM_GPIOMUX
-+static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	return msm_gpiomux_get(chip->base + offset);
-+}
-+
-+static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	msm_gpiomux_put(chip->base + offset);
-+}
-+#else
-+#define msm_gpio_request NULL
-+#define msm_gpio_free NULL
-+#endif
-+
- struct msm_gpio_chip msm_gpio_chips[] = {
- #if defined(CONFIG_ARCH_MSM7X00A)
- 	MSM_GPIO_BANK(0,   0,  15),
--- 
-1.7.0.4
+I am trying to use the upper 6-bits of the lcd port (LD18-23, GPIO3.24-29) as gpio.
+I have them set in the struct pad_desc table as:
 
---
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	MX35_PAD_LD18__GPIO3_24,
+	MX35_PAD_LD19__GPIO3_25,
+	MX35_PAD_LD20__GPIO3_26,
+	MX35_PAD_LD21__GPIO3_27,
+	MX35_PAD_LD22__GPIO3_28,
+	MX35_PAD_LD23__GPIO3_29,
+
+I have also verified that the relevant IOMUX registers are set correctly.
+
+>From userspace I am using the sysfs interface to export the gpio's.  For instance
+GPIO3.24 (LD18) is gpio88:
+
+$ echo 88 > /sys/class/gpio/export
+$ cat /sys/class/gpio/gpio88/direction
+in
+$ cat /sys/class/gpio/gpio88/value
+0
+$ echo out > /sys/class/gpio/gpio88/direction
+$ cat /sys/class/gpio/gpio88/direction
+out
+$ cat /sys/class/gpio/gpio88/value
+0
+$ echo 1 > /sys/class/gpio/gpio88/value
+$ cat /sys/class/gpio/gpio88/value
+0
+
+If I read the GPIO_PSR register I see that bit 24 is 0, but if I read the GPIO_DR
+register I see that bit set correctly.  I can also probe the output signal and see
+that it changes to the correct 'value'.
+
+Any ideas?
+
+Regards,
+Hartley
