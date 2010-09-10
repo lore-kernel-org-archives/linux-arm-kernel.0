@@ -1,37 +1,135 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 10 Sep 2010 11:51:38 +0200
-Subject: [PATCH] AT91: dm9000 initialization update
-In-Reply-To: <20100910092344.GN9112@game.jcrosoft.org>
-References: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
-	<20100910092344.GN9112@game.jcrosoft.org>
-Message-ID: <4C89FFAA.3010503@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 Sep 2010 18:55:50 +0900
+Subject: [PATCH 6/6] ARM: S5PC110: add support for MMC regulators on Goni
+	board
+In-Reply-To: <1284103403-10696-7-git-send-email-m.szyprowski@samsung.com>
+References: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
+	<1284103403-10696-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <000501cb50ce$5c606f60$15214e20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/09/2010 11:23, Jean-Christophe PLAGNIOL-VILLARD :
-> On 12:13 Fri 10 Sep     , Nicolas Ferre wrote:
->> Add information in dm9000 mac/phy chip initialization:
->> - irq resource details
->> - platform data details
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/mach-at91/board-sam9261ek.c |    3 ++-
->>  1 files changed, 2 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
->> index c4c8865..b4307ab 100644
->> --- a/arch/arm/mach-at91/board-sam9261ek.c
->> +++ b/arch/arm/mach-at91/board-sam9261ek.c
->> @@ -93,11 +93,12 @@ static struct resource dm9000_resource[] = {
->>  		.start	= AT91_PIN_PC11,
->>  		.end	= AT91_PIN_PC11,
->>  		.flags	= IORESOURCE_IRQ
->> +			| IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE,
-> both?
+Marek Szyprowski wrote:
+> 
+> Add required platform definitions for MMC power regulators on Samsung
+> Goni board.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s5pv210/mach-goni.c |   44
+> ++++++++++++++++++++++++++++++++++--
+>  1 files changed, 41 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index b28a42b..595afc37 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/i2c.h>
+>  #include <linux/i2c-gpio.h>
+>  #include <linux/mfd/max8998.h>
+> +#include <linux/regulator/fixed.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/spi_gpio.h>
+>  #include <linux/lcd.h>
+> @@ -227,6 +228,10 @@ static void __init goni_radio_init(void)
+>  /* MAX8998 regulators */
+>  #if defined(CONFIG_REGULATOR_MAX8998) ||
+> defined(CONFIG_REGULATOR_MAX8998_MODULE)
+> 
+> +static struct regulator_consumer_supply goni_ldo5_consumers[] = {
+> +	{ .supply = "vmmc",	.dev = &s3c_device_hsmmc0.dev },
+> +};
+> +
+>  static struct regulator_init_data goni_ldo2_data = {
+>  	.constraints	= {
+>  		.name		= "VALIVE_1.1V",
+> @@ -266,6 +271,8 @@ static struct regulator_init_data goni_ldo5_data = {
+>  		.max_uV		= 2800000,
+>  		.apply_uV	= 1,
+>  	},
+> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo5_consumers),
+> +	.consumer_supplies = goni_ldo5_consumers,
+>  };
+> 
+>  static struct regulator_init_data goni_ldo6_data = {
+> @@ -471,6 +478,39 @@ static struct max8998_platform_data
+> goni_max8998_pdata = {
+>  	.num_regulators	= ARRAY_SIZE(goni_regulators),
+>  	.regulators	= goni_regulators,
+>  };
+> +
+> +static struct regulator_consumer_supply mmc2_supplies[] = {
+> +	{
+> +		.dev		= &s3c_device_hsmmc2.dev,
+> +		.supply		= "vmmc",
+> +	},
+> +};
+> +
+> +static struct regulator_init_data mmc2_fixed_voltage_init_data = {
+> +	.constraints		= {
+> +		.name		= "V_TF_2.8V",
+> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies	= ARRAY_SIZE(mmc2_supplies),
+> +	.consumer_supplies	= mmc2_supplies,
+> +};
+> +
+> +static struct fixed_voltage_config mmc2_fixed_voltage_config = {
+> +	.supply_name		= "T_FLASH_EN",
+> +	.microvolts		= 2800000,
+> +	.gpio			= S5PV210_MP05(4),	/* XM0ADDR_12 */
+> +	.enable_high		= true,
+> +	.init_data		= &mmc2_fixed_voltage_init_data,
+> +};
+> +
+> +static struct platform_device mmc2_fixed_voltage = {
+> +	.name		= "reg-fixed-voltage",
+> +	.id		= 2,
+> +	.dev		= {
+> +		.platform_data	= &mmc2_fixed_voltage_config,
+> +	},
+> +};
+> +
+>  #endif
+> 
+>  /* GPIO I2C PMIC */
+> @@ -559,9 +599,6 @@ static struct s3c_sdhci_platdata goni_hsmmc2_data
+> __initdata = {
+> 
+>  static void goni_setup_sdhci(void)
+>  {
+> -	gpio_request(GONI_EXT_FLASH_EN, "FLASH_EN");
+> -	gpio_direction_output(GONI_EXT_FLASH_EN, 1);
+> -
 
-Yes, only configuration supported by GPIO irqs...
+Why need above changes in this patch?
+Others, looks ok.
 
-Regards,
--- 
-Nicolas Ferre
+
+>  	s3c_sdhci0_set_platdata(&goni_hsmmc0_data);
+>  	s3c_sdhci1_set_platdata(&goni_hsmmc1_data);
+>  	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
+> @@ -573,6 +610,7 @@ static struct platform_device *goni_devices[]
+__initdata = {
+>  	&goni_spi_gpio,
+>  	&s3c_device_usb_hsotg,
+>  	&goni_i2c_gpio_pmic,
+> +	&mmc2_fixed_voltage,
+>  	&goni_device_gpiokeys,
+>  	&s5p_device_fimc0,
+>  	&s5p_device_fimc1,
+> --
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
