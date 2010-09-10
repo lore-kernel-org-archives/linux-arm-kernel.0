@@ -1,37 +1,116 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 10 Sep 2010 10:38:20 +0200
-Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
-In-Reply-To: <4C89B257.4000202@st.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>
-	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>
-	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>
-	<4C7F5B9E.8090406@st.com>
-	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>
-	<4C7F9993.3040700@st.com>
-	<20100903112338.GA3132@morgana.i.gnudd.com>
-	<AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
-	<4C89B257.4000202@st.com>
-Message-ID: <AANLkTikiwFdnJ8qTrUipPAC9GakLhy=FUe2xcoKuLcE3@mail.gmail.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Fri, 10 Sep 2010 16:45:28 +0800
+Subject: [PATCH 8/9] esdhc-4 esdhc: fsl esdhc driver based on platform
+	sdhci api
+In-Reply-To: <20100909163952.GI3773@pengutronix.de>
+References: <1283334533-12793-1-git-send-email-r65037@freescale.com>
+	<20100906104729.GB2617@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0787D4@zch01exm22.fsl.freescale.net>
+	<20100907102817.GA7534@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0789F0@zch01exm22.fsl.freescale.net>
+	<20100909163952.GI3773@pengutronix.de>
+Message-ID: <A88EF4D64D8447468743DC1503C0B6CA078AA4@zch01exm22.fsl.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/10 viresh kumar <viresh.kumar@st.com>:
+Hi Wolfram:
 
->> Right now I mostly worry about having it in the proper
->> place with the proper name and the headers accessible from
->> all archs...
->
-> The solution looks fine to us, but currently we don't have
-> enough bandwidth to rework on the suggested solution.
->
-> Maybe, we can go ahead with current patch, get it acked. Then send another
-> patch later to fix mentioned issues.
->
-> How do you suggest to proceed on this?
 
-Easy, I will attempt to step in and fix it up and also test it on
-U300. :-)
+Best Regards,
+Richard Zhu
+Freescale Semiconductor
+Tel: +86-021-28937189
+Email:Hong-Xing.Zhu at freescale.com 
 
-Yours,
-Linus Walleij
+
+-----Original Message-----
+From: Wolfram Sang [mailto:w.sang at pengutronix.de] 
+Sent: Friday, 10 September, 2010 0:40
+To: Zhu Richard-R65037
+Cc: linux-mmc at vger.kernel.org; kernel at pengutronix.de;
+linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 8/9] esdhc-4 esdhc: fsl esdhc driver based on
+platform sdhci api
+
+Hi Richard,
+
+> BTW, Do you know that how to define and pass the kinds of 
+> platform_data-struct special to the board to the sdhci_pltfm.c layer 
+> platform-data struct?
+
+I think we should extend the pdata->init call to also have the
+platform_data as an argument. Then, the platform-specific init routine
+should have all it needs. Will update that tomorrow.
+[<Zhu Richard-r65037>] Thanks. :)
+
+> [<Zhu Richard-r65037>] The one used in sdhci-of-esdhc.c is better than
+
+> the one listed abov; it's more logical and clear. :)
+
+Good, it seems to be complete, too :)
+
+> > I find that the sdhci.c had been support the 8bits bus_width.
+> 
+> Yes, it was added recently, but it might have issues. See here:
+> 
+> http://thread.gmane.org/gmane.linux.kernel.mmc/3370
+> [<Zhu Richard-r65037>] Different IC design may have the different 
+> definitions of the bus width configuration in the HOST_CONTROL
+register.
+> This is not a big issue; we can handle these differences in the SW.
+
+Yes, my point is that we don't handle this at the generic sdhci-core,
+but at the parts which deal with the platform-specific faul^H^H^H^H...
+differences ;)
+
+> About the 8bits supports, I had been verified this feature on i.MX 
+> platforms for a while.
+> The MMC cards 8bits mode can work well on some i.MX eSDHC platforms.
+
+Why only some? Are the others not working or not tested?
+[<Zhu Richard-r65037>] They are not tested in Linux BSP, because some
+boards don't have the 8bit caps in the HW design.
+ They should be ok in 8bits mode, since the 8bits modes are all verified
+in the IC validation.
+
+> One more suggestion, the caps should be handled carefully, because not
+
+> only the caps of the IC design, but also the caps of the board HW 
+> design should be taken care,
+
+Could you give an example when it is board-dependent?
+[<Zhu Richard-r65037>] In some cases, the SD slots maybe only have
+populated 4bits data pins out in HW design, although the caps of IC can
+support up to 8bits bus width.
+
+> [<Zhu Richard-r65037>] I'm checking it, and still trying finding a way
+
+> to pass the board related info (such as the WP pins, and bus width to 
+> sdhci-platfm.c layer)
+
+See above. And here is my current WIP. I factored out the common stuff
+from of and pltfm. Furthermore, I addressed Uwe's comments about adding
+MX35-devices. Expect a few updates (platform-data) tomorrow.
+
+http://git.pengutronix.de/?p=wsa/linux-2.6.git;a=shortlog;h=refs/heads/p
+cm043-wip
+
+(The old branch is still there, just in case you are working with it)
+
+> The host->ops->get_ro should be added into the sdhci.c file although 
+> following the method provided in the RFC patches. How do you think 
+> about that?
+
+I agree, that one seems needed. Shall I integrate this into my series or
+do you want to place this patch ontop of my series?
+[<Zhu Richard-r65037>] You can merge these codes into your patches.
+
+Kind regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang
+|
+Industrial Linux Solutions                 | http://www.pengutronix.de/
+|
