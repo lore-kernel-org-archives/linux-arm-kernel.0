@@ -1,129 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 10 Sep 2010 11:47:14 +0200
-Subject: [PATCH 2/6] i.MX5/clock: add eCSPI and CSPI clock definitions
-In-Reply-To: <4C809410.9090602@gmail.com>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
-	<20100902150112.GM14214@pengutronix.de>
-	<4C809410.9090602@gmail.com>
-Message-ID: <20100910094714.GF30558@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 Sep 2010 18:49:59 +0900
+Subject: [PATCH 1/6] ARM: S5PC110: update framebuffer setup information for
+	Goni
+In-Reply-To: <1284103403-10696-2-git-send-email-m.szyprowski@samsung.com>
+References: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
+	<1284103403-10696-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <000401cb50cd$8b3f72a0$a1be57e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+Marek Szyprowski wrote:
+> 
+> Change the default upper_margin and vsync_len to get rid of repeated last
+> line on the display.
+> 
+How about Aquila board? Maybe same in my thinking.
+And it'd better that another stuff like removing pixclock is in different
+patch.
 
-I currently merge your and our patch set.  Will follow up with the
-result hopefully later today.
+Anyway, looks ok to me...will apply.
 
-On Fri, Sep 03, 2010 at 02:22:08PM +0800, Jason Wang wrote:
->>>  @@ -52,6 +53,18 @@ static int _clk_ccgr_enable(struct clk *clk)
->>>  	return 0;
->>>  }
->>>  +static int _clk_ccgr_enable_inrun(struct clk *clk)
->>> +{
->>> +	u32 reg;
->>> +
->>> +	reg = __raw_readl(clk->enable_reg);
->>> +	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
->>> +	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
->>> +	__raw_writel(reg, clk->enable_reg);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>>     
->> imho this should be consolidated in something like:
->>
->> static int _clk_ccgr_setclk(struct clk *clk, unsigned mode)
->> {
->> 	...
->> }
->>
->> #define _clk_ccgr_enable(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_ON)
->> #define _clk_ccgr_disable(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_OFF)
->> #define _clk_ccgr_enable_inrun(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE)
->>
->>   
-> It makes  code more concise. On the other hand, too many macros will
-> add troubles when we use kgdb to perform sourcecode-level debug.
-Using macros doesn't work here, as they are used as callbacks.  Still
-made it with functions.  Then (apart from the return value)
-_clk_ccgr_enable_inrun and _clk_ccgr_disable_inwait are identically.
-I wonder if this is intended?
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/mach-goni.c |    5 ++---
+>  1 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index d9fe739..b0ae208 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -88,13 +88,12 @@ static struct s3c2410_uartcfg goni_uartcfgs[]
+__initdata = {
+>  /* Frame Buffer */
+>  static struct s3c_fb_pd_win goni_fb_win0 = {
+>  	.win_mode = {
+> -		.pixclock = 1000000000000ULL /
+> ((16+16+2+480)*(28+3+2+800)*55),
+>  		.left_margin	= 16,
+>  		.right_margin	= 16,
+> -		.upper_margin	= 3,
+> +		.upper_margin	= 2,
+>  		.lower_margin	= 28,
+>  		.hsync_len	= 2,
+> -		.vsync_len	= 2,
+> +		.vsync_len	= 1,
+>  		.xres		= 480,
+>  		.yres		= 800,
+>  		.refresh	= 55,
+> --
+> 1.7.2.2
 
-> Anyway, i agree your suggestion.
->>>  static void _clk_ccgr_disable(struct clk *clk)
->>>  {
->>>  	u32 reg;
->>> @@ -762,6 +775,61 @@ static struct clk kpp_clk = {
->>>  	.id = 0,
->>>  };
->>>  +/* eCSPI */
->>> +static unsigned long _clk_ecspi_getrate(struct clk *clk)
->>> +{
->>> +	u32 reg, prediv, podf;
->>> +	unsigned long ret;
->>> +
->>> +	reg = __raw_readl(MXC_CCM_CSCDR2);
->>> +	prediv = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PRED_MASK) >>
->>> +		  MXC_CCM_CSCDR2_CSPI_CLK_PRED_OFFSET) + 1;
->>> +	if (prediv == 1)
->>> +		BUG();
->>> +	podf = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PODF_MASK) >>
->>> +		MXC_CCM_CSCDR2_CSPI_CLK_PODF_OFFSET) + 1;
->>> +
->>> +	ret = clk_get_rate(clk->parent) / (prediv * podf);
->>> +	return ret;
->>> +}
->>> +
->>> +static int _clk_ecspi_set_parent(struct clk *clk, struct clk *parent)
->>> +{
->>> +	u32 reg, mux;
->>> +
->>> +	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk, &pll3_sw_clk,
->>> +		       &lp_apm_clk);
->>> +	reg = __raw_readl(MXC_CCM_CSCMR1) & ~MXC_CCM_CSCMR1_CSPI_CLK_SEL_MASK;
->>> +	reg |= mux << MXC_CCM_CSCMR1_CSPI_CLK_SEL_OFFSET;
->>> +	__raw_writel(reg, MXC_CCM_CSCMR1);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static struct clk ecspi_main_clk = {
->>> +	.parent = &pll3_sw_clk,
->>> +	.get_rate = _clk_ecspi_getrate,
->>> +	.set_parent = _clk_ecspi_set_parent,
->>>     
->> Sascha didn't implement set_parent
->>
->>   
-> ecspi really can change parent root clock.
->>> +};
->>> +
->>> +static struct clk ecspi1_ipg_clk = {
->>> +	.parent = &ipg_clk,
->>> +	.secondary = &spba_clk,
->>> +	.enable_reg = MXC_CCM_CCGR4,
->>> +	.enable_shift = MXC_CCM_CCGRx_CG9_OFFSET,
->>> +	.enable = _clk_ccgr_enable_inrun,
->>> +	.disable = _clk_ccgr_disable,
->>> +};
->>> +
->>> +static struct clk ecspi2_ipg_clk = {
->>> +	.parent = &ipg_clk,
->>> +	.secondary = &aips_tz2_clk,
->>> +	.enable_reg = MXC_CCM_CCGR4,
->>> +	.enable_shift = MXC_CCM_CCGRx_CG11_OFFSET,
->>> +	.enable = _clk_ccgr_enable_inrun,
->>> +	.disable = _clk_ccgr_disable,
->>> +};
-aips_tz2_clk is wrong here, no?  Sascha used spba_clk here, too.  I
-didn't found out yet how to read that out of the reference manual.
 
-Best regards
-Uwe
+Thanks.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
