@@ -1,24 +1,32 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 10 Sep 2010 11:23:06 +0200
-Subject: [PATCH] AT91: at91sam9261ek board: remove warnings related to
-	use of SPI or SD/MMC
-In-Reply-To: <1284113629-13768-2-git-send-email-nicolas.ferre@atmel.com>
+Date: Fri, 10 Sep 2010 11:23:44 +0200
+Subject: [PATCH] AT91: dm9000 initialization update
+In-Reply-To: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1284113629-13768-1-git-send-email-nicolas.ferre@atmel.com>
-	<1284113629-13768-2-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20100910092306.GM9112@game.jcrosoft.org>
+Message-ID: <20100910092344.GN9112@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/*
-> + * MCI (SD/MMC)
-> + * spi0 and mmc/sd share the same PIO pins: cannot be used at the same time
-> + */
-> +static struct at91_mmc_data __initdata ek_mmc_data = {
-> +	.wire4		= 1,
-> +//	.det_pin	= ... not connected
-> +//	.wp_pin		= ... not connected
-> +//	.vcc_pin	= ... not connected
-can we remove this 3 comments
+On 12:13 Fri 10 Sep     , Nicolas Ferre wrote:
+> Add information in dm9000 mac/phy chip initialization:
+> - irq resource details
+> - platform data details
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/board-sam9261ek.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
+> index c4c8865..b4307ab 100644
+> --- a/arch/arm/mach-at91/board-sam9261ek.c
+> +++ b/arch/arm/mach-at91/board-sam9261ek.c
+> @@ -93,11 +93,12 @@ static struct resource dm9000_resource[] = {
+>  		.start	= AT91_PIN_PC11,
+>  		.end	= AT91_PIN_PC11,
+>  		.flags	= IORESOURCE_IRQ
+> +			| IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE,
+both?
 
 Best Regards,
 J.
