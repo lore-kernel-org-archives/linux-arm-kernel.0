@@ -1,36 +1,32 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 10 Sep 2010 09:51:43 +0530
-Subject: [PATCH 27/74] ST SPEAr : NAND interface driver for spear platforms
-In-Reply-To: <AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<07ce8daf18d3a9f13864752074af3490a324d84c.1283161023.git.viresh.kumar@st.com>	<7cd7060b403b448d74649cec5c28c795bcbbdbc3.1283161023.git.viresh.kumar@st.com>	<AANLkTik9Di4k183t+wuY-1eprsO3xBOESaOY5dnxt6ii@mail.gmail.com>	<4C7F5B9E.8090406@st.com>	<AANLkTikwjCh=2Cekg9R1SqacKXC+_ZgV7m+=ZVVCaDba@mail.gmail.com>	<4C7F9993.3040700@st.com>	<20100903112338.GA3132@morgana.i.gnudd.com>
-	<AANLkTinri8ve=wb+tm5zO4JSnz6_RE-n+sZoKU-ipios@mail.gmail.com>
-Message-ID: <4C89B257.4000202@st.com>
+From: peter.ujfalusi@nokia.com (Peter Ujfalusi)
+Date: Fri, 10 Sep 2010 08:30:21 +0300
+Subject: [PATCH] OMAP: McBSP: tx_irq_completion used in rx_irq_handler
+In-Reply-To: <1283966941.3677.178.camel@quad>
+References: <1283966941.3677.178.camel@quad>
+Message-ID: <201009100830.21767.peter.ujfalusi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/3/2010 10:56 PM, Linus Walleij wrote:
->> > Note however that the platform data in
->> > arch/arm/mach-nomadik/board-nhk8815.c should be fixed to reference the
->> > new driver.  If you remove my version please at least compile-check
->> > the nhk with the new patch-set.
-> What about we put this new FSMC generic thing in, and
-> then remove the old one with the same patch that
-> instead activates the new one. No need to rush that.
+On Wednesday 08 September 2010 20:29:01 ext Scott Ellis wrote:
+> Looks like a typo from commit d6d834b010.
 > 
-> Right now I mostly worry about having it in the proper
-> place with the proper name and the headers accessible from
-> all archs...
+> Signed-off-by: Scott Ellis <scott@jumpnowtek.com>
+> ---
+>  arch/arm/plat-omap/mcbsp.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+> index e31496e..0c8612f 100644
+> --- a/arch/arm/plat-omap/mcbsp.c
+> +++ b/arch/arm/plat-omap/mcbsp.c
+> @@ -156,7 +156,7 @@ static irqreturn_t omap_mcbsp_rx_irq_handler(int irq,
+> void *dev_id) /* Writing zero to RSYNC_ERR clears the IRQ */
+>  		MCBSP_WRITE(mcbsp_rx, SPCR1, MCBSP_READ_CACHE(mcbsp_rx, SPCR1));
+>  	} else {
+> -		complete(&mcbsp_rx->tx_irq_completion);
+> +		complete(&mcbsp_rx->rx_irq_completion);
+>  	}
+> 
+>  	return IRQ_HANDLED;
 
-Linus,
-
-Sorry for replying late!!!
-
-The solution looks fine to us, but currently we don't have
-enough bandwidth to rework on the suggested solution.
-
-Maybe, we can go ahead with current patch, get it acked. Then send another
-patch later to fix mentioned issues.
-
-How do you suggest to proceed on this?
-
-viresh.
+Acked-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
