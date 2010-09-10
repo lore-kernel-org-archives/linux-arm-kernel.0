@@ -1,43 +1,52 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 10 Sep 2010 12:04:33 +0200
-Subject: [PATCH 2/6] i.MX5/clock: add eCSPI and CSPI clock definitions
-In-Reply-To: <20100910094714.GF30558@pengutronix.de>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
-	<20100902150112.GM14214@pengutronix.de>
-	<4C809410.9090602@gmail.com>
-	<20100910094714.GF30558@pengutronix.de>
-Message-ID: <19594.689.326396.859751@ipc1.ka-ro>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 10 Sep 2010 14:14:25 +0400
+Subject: [PATCH 1/4] arm: Kconfig option for ARCH_MSM_SCORPIONMP
+In-Reply-To: <1284062289-10914-2-git-send-email-dwalker@codeaurora.org>
+References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
+	<1284062289-10914-2-git-send-email-dwalker@codeaurora.org>
+Message-ID: <4C8A0501.6080902@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-Uwe Kleine-K?nig writes:
-> >>> +static struct clk ecspi2_ipg_clk = {
-> >>> +	.parent = &ipg_clk,
-> >>> +	.secondary = &aips_tz2_clk,
-> >>> +	.enable_reg = MXC_CCM_CCGR4,
-> >>> +	.enable_shift = MXC_CCM_CCGRx_CG11_OFFSET,
-> >>> +	.enable = _clk_ccgr_enable_inrun,
-> >>> +	.disable = _clk_ccgr_disable,
-> >>> +};
-> aips_tz2_clk is wrong here, no?  Sascha used spba_clk here, too.  I
-> didn't found out yet how to read that out of the reference manual.
-> 
-The Freescale BSP used aips_tz2_clk (and spba for cspi1). They should
-know what's right. Maybe a copy/paste error from Sascha?
+On 09-09-2010 23:58, Daniel Walker wrote:
 
+> From: Steve Muckle<smuckle@codeaurora.org>
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> ScorpionMP is a configuration of Scorpion processors. It supports local
+> timers.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> Signed-off-by: Steve Muckle<smuckle@codeaurora.org>
+> Signed-off-by: Jeff Ohlstein<johlstei@codeaurora.org>
+> Signed-off-by: Daniel Walker<dwalker@codeaurora.org>
+[...]
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a7ed21f..d2dfbc2 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1144,7 +1144,8 @@ config SMP
+>   	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+>   	depends on EXPERIMENTAL&&  (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+>   		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+> -		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
+> +		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4||\
+> +		 ARCH_MSM_SCORPIONMP)
+>   	depends on GENERIC_CLOCKEVENTS
+>   	select USE_GENERIC_SMP_HELPERS
+>   	select HAVE_ARM_SCU if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 ||\
+> @@ -1218,7 +1219,8 @@ config LOCAL_TIMERS
+>   	bool "Use local timer interrupts"
+>   	depends on SMP&&  (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+>   		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+> -		ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
+> +		ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 ||\
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+    Could you put spce before \ to keep the style consistent?
+
+> +		ARCH_MSM_SCORPIONMP)
+>   	default y
+>   	select HAVE_ARM_TWD if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 || \
+>   		ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS
+
+WBR, Sergei
