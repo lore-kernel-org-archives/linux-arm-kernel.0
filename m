@@ -1,35 +1,58 @@
 From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 11 Sep 2010 13:22:04 +0200
+Date: Sat, 11 Sep 2010 13:31:28 +0200
 Subject: [PATCH] MMCI: use _cansleep GPIO functions
-In-Reply-To: <AANLkTikOOZED5i86j6Jayqvccmw8pa6+RKmG+xYFF-2b@mail.gmail.com>
+In-Reply-To: <AANLkTi=oMh2ff+VnE3E5-1TpJFsfYe5PoNZOar3OXQfV@mail.gmail.com>
 References: <1284064315-14515-1-git-send-email-linus.walleij@stericsson.com>
 	<AANLkTikOOZED5i86j6Jayqvccmw8pa6+RKmG+xYFF-2b@mail.gmail.com>
-Message-ID: <AANLkTi=oMh2ff+VnE3E5-1TpJFsfYe5PoNZOar3OXQfV@mail.gmail.com>
+	<AANLkTi=oMh2ff+VnE3E5-1TpJFsfYe5PoNZOar3OXQfV@mail.gmail.com>
+Message-ID: <AANLkTimAGB5v3WaAU_7kd0XPyfybLpqz3XYn4uANRBDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/11 Rabin Vincent <rabin@rab.in>:
-> On Fri, Sep 10, 2010 at 2:01 AM, Linus Walleij
-> <linus.walleij@stericsson.com> wrote:
->> - ? ? ? ? ? ? ? status = !!gpio_get_value(host->gpio_cd) ^ plat->cd_invert;
->> + ? ? ? ? ? ? ? status = gpio_get_value_cansleep(host->gpio_cd) ^
->> + ? ? ? ? ? ? ? ? ? ? ? plat->cd_invert;
->
-> Why do you remove the double negation? ?gpio_get_value*()
-> can return non-zero values, and we need to make it 1 for the
-> inversion xor to work.
+2010/9/11 Linus Walleij <linus.ml.walleij@gmail.com>:
 
-Aha I get it. But !! is a bit hard to parse in head is it not...
+> I'll slam in some intermediate bool or something so it's super
+> clear what's happening, OK?
 
-Cast a non-zero to C internal bool type, negate it and then
-negate the negation so the end result is bool, not just
-non-zero. I never saw that idiom before.
+Like this (untested):
 
-I don't know if I'm particularly dumb but it makes my reading
-take time.
+From: Linus Walleij <linus.walleij@stericsson.com>
+Date: Sat, 11 Sep 2010 13:29:04 +0200
+Subject: [PATCH] MMCI: use _cansleep GPIO functions
 
-I'll slam in some intermediate bool or something so it's super
-clear what's happening, OK?
+Currently the kernel is screaming about slowpath at me for the
+wp/cd callbacks. Swicth to the _cansleep variants so as to silence
+this. Also rewrite the double-negate in front of the cd GPIO read
+to make it more clear what is happening.
 
-Yours,
-Linus Walleij
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/mmc/host/mmci.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index f0c7313..603d4d5 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -614,7 +614,7 @@ static int mmci_get_ro(struct mmc_host *mmc)
+ 	if (host->gpio_wp == -ENOSYS)
+ 		return -ENOSYS;
+
+-	return gpio_get_value(host->gpio_wp);
++	return gpio_get_value_cansleep(host->gpio_wp);
+ }
+
+ static int mmci_get_cd(struct mmc_host *mmc)
+@@ -629,7 +629,9 @@ static int mmci_get_cd(struct mmc_host *mmc)
+
+ 		status = plat->status(mmc_dev(host->mmc));
+ 	} else
+-		status = !!gpio_get_value(host->gpio_cd) ^ plat->cd_invert;
++		/* Convert the status to boolean and optionally invert */
++		status = (gpio_get_value_cansleep(host->gpio_cd) ? 1 : 0)
++			^ plat->cd_invert;
+
+ 	/*
+ 	 * Use positive logic throughout - status is zero for no card,
+-- 
+1.7.2.2
