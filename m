@@ -1,21 +1,30 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 11 Sep 2010 14:30:44 +0900
-Subject: [PATCH 0/3] ARM: S5PC210: Use the CPU common L2 cache configuration
-Message-ID: <20100911053044.GA23195@july>
+Date: Sat, 11 Sep 2010 14:30:52 +0900
+Subject: [PATCH 1/3] ARM: L2X0: Add prefetch offset
+Message-ID: <20100911053052.GA23200@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit df423dc7f2a801b9a45d7c501a8eb5c529455ea1:
-  Linus Torvalds (1):
-        Merge branch 'upstream-linus' of git://git.kernel.org/.../jgarzik/libata-dev
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Kyungmin Park (3):
-      ARM: L2X0: Add prefetch offset
-      ARM: S5PC210: Remove L2 cache init at board file
-      ARM: S5PC210: Set the common L2 cache configurations
+PL310 has prefetch offset as 0xF60
 
- arch/arm/include/asm/hardware/cache-l2x0.h  |    1 +
- arch/arm/mach-s5pv310/cpu.c                 |   19 +++++++++++++++++++
- arch/arm/mach-s5pv310/mach-smdkv310.c       |    3 ---
- arch/arm/mach-s5pv310/mach-universal_c210.c |    3 ---
- 4 files changed, 20 insertions(+), 6 deletions(-)
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 6bcba48..cc9bcbb 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -53,6 +53,7 @@
+ #define L2X0_LINE_DATA			0xF10
+ #define L2X0_LINE_TAG			0xF30
+ #define L2X0_DEBUG_CTRL			0xF40
++#define L2X0_PREFETCH_CTRL		0xF60
+ 
+ #ifndef __ASSEMBLY__
+ extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+-- 
+1.5.3.3
