@@ -1,26 +1,44 @@
-From: david.lanzendoerfer@o2s.ch (David =?iso-8859-1?q?Lanzend=F6rfer?=)
-Date: Sat, 11 Sep 2010 15:16:30 +0200
-Subject: Importing RPC server bundle
-Message-ID: <201009111516.34263.david.lanzendoerfer@o2s.ch>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 11 Sep 2010 18:08:40 +0400
+Subject: [PATCH] MMCI: use _cansleep GPIO functions
+In-Reply-To: <AANLkTikT5Jg5dqfjMrNTxb57BaGmcuAqsqiC9e7_d0TW@mail.gmail.com>
+References: <1284064315-14515-1-git-send-email-linus.walleij@stericsson.com>	<AANLkTikOOZED5i86j6Jayqvccmw8pa6+RKmG+xYFF-2b@mail.gmail.com>	<AANLkTi=oMh2ff+VnE3E5-1TpJFsfYe5PoNZOar3OXQfV@mail.gmail.com>	<20100911113236.GA25922@n2100.arm.linux.org.uk>
+	<AANLkTikT5Jg5dqfjMrNTxb57BaGmcuAqsqiC9e7_d0TW@mail.gmail.com>
+Message-ID: <4C8B8D68.103@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-I made finally USB gadget working by import the rpc server bundle from our
-fork[1] of the android kernel release 2.6.32.
-But GNUtoo asked me, why I imported such an old version, also of AMSS.
-So my question now to you folks:
-I can import it and make it work with a new version again,
-but I need to know, what source and place I shall take it from.
+Hello.
 
-Thx in advance
-	leviathan
+Linus Walleij wrote:
 
-[1] http://gitorious.org/htc-msm-2-6-32/leviathan-incoming/commits/msm-gnuconform
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100911/cc1e6b4d/attachment.sig>
+> From: Linus Walleij <linus.walleij@stericsson.com>
+> Date: Sat, 11 Sep 2010 13:36:20 +0200
+> Subject: [PATCH] MMCI: use _cansleep GPIO functions
+
+> Currently the kernel is screaming about slowpath at me for the
+> wp/cd callbacks. Swicth to the _cansleep variants so as to silence
+> this.
+
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  drivers/mmc/host/mmci.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index f0c7313..c5fbf19 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+[...]
+>  static int mmci_get_cd(struct mmc_host *mmc)
+> @@ -629,7 +629,8 @@ static int mmci_get_cd(struct mmc_host *mmc)
+> 
+>  		status = plat->status(mmc_dev(host->mmc));
+>  	} else
+> -		status = !!gpio_get_value(host->gpio_cd) ^ plat->cd_invert;
+> +		status = !!gpio_get_value_cansleep(host->gpio_cd)
+> +			^ plat->cd_invert;
+
+    Should be no space between ^ and operand, no?
+
+WBR, Sergei
