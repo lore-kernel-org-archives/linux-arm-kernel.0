@@ -1,30 +1,47 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 11 Sep 2010 14:30:52 +0900
-Subject: [PATCH 1/3] ARM: L2X0: Add prefetch offset
-Message-ID: <20100911053052.GA23200@july>
+Date: Sat, 11 Sep 2010 14:31:04 +0900
+Subject: [PATCH 2/3] ARM: S5PC210: Remove L2 cache init at board file
+Message-ID: <20100911053104.GA23204@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-PL310 has prefetch offset as 0xF60
+Remove S5PC210 common PL310 cache init code. It will place the cpu common code.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv310/mach-smdkv310.c       |    3 ---
+ arch/arm/mach-s5pv310/mach-universal_c210.c |    3 ---
+ 2 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 6bcba48..cc9bcbb 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -53,6 +53,7 @@
- #define L2X0_LINE_DATA			0xF10
- #define L2X0_LINE_TAG			0xF30
- #define L2X0_DEBUG_CTRL			0xF40
-+#define L2X0_PREFETCH_CTRL		0xF60
+diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
+index 0d6ab77..a0c630d 100644
+--- a/arch/arm/mach-s5pv310/mach-smdkv310.c
++++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
+@@ -74,9 +74,6 @@ static void __init smdkv310_map_io(void)
  
- #ifndef __ASSEMBLY__
- extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+ static void __init smdkv310_machine_init(void)
+ {
+-#ifdef CONFIG_CACHE_L2X0
+-	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
+-#endif
+ }
+ 
+ MACHINE_START(SMDKV310, "SMDKV310")
+diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
+index 2388cb9..4612823 100644
+--- a/arch/arm/mach-s5pv310/mach-universal_c210.c
++++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+@@ -69,9 +69,6 @@ static void __init universal_map_io(void)
+ 
+ static void __init universal_machine_init(void)
+ {
+-#ifdef CONFIG_CACHE_L2X0
+-	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
+-#endif
+ }
+ 
+ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
 -- 
 1.5.3.3
