@@ -1,47 +1,56 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Sat, 11 Sep 2010 14:31:04 +0900
-Subject: [PATCH 2/3] ARM: S5PC210: Remove L2 cache init at board file
-Message-ID: <20100911053104.GA23204@july>
+Date: Sat, 11 Sep 2010 14:31:15 +0900
+Subject: [PATCH 3/3] ARM: S5PC210: Set the common L2 cache configurations
+Message-ID: <20100911053115.GA23209@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Remove S5PC210 common PL310 cache init code. It will place the cpu common code.
+S5PC210 has PL310 1MiB L2 cache.
+It uses the optimized data & tag latency and also enable the prefetch.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv310/mach-smdkv310.c       |    3 ---
- arch/arm/mach-s5pv310/mach-universal_c210.c |    3 ---
- 2 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/mach-s5pv310/cpu.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
-index 0d6ab77..a0c630d 100644
---- a/arch/arm/mach-s5pv310/mach-smdkv310.c
-+++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
-@@ -74,9 +74,6 @@ static void __init smdkv310_map_io(void)
+diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
+index e5b261a..b50312e 100644
+--- a/arch/arm/mach-s5pv310/cpu.c
++++ b/arch/arm/mach-s5pv310/cpu.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach/irq.h>
  
- static void __init smdkv310_machine_init(void)
+ #include <asm/proc-fns.h>
++#include <asm/hardware/cache-l2x0.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/clock.h>
+@@ -121,6 +122,24 @@ static int __init s5pv310_core_init(void)
+ 
+ core_initcall(s5pv310_core_init);
+ 
++static int __init s5pv310_init_cache(void)
++{
++#ifdef CONFIG_CACHE_L2X0
++	void __iomem *p = S5P_VA_L2CC;
++
++	/* TAG,  Data latency control */
++	writel(0x110, p + L2X0_TAG_LATENCY_CTRL);
++	writel(0x110, p + L2X0_DATA_LATENCY_CTRL);
++
++	/* L2 cache prefetch control */
++	writel(0x6, p + L2X0_PREFETCH_CTRL);
++
++	l2x0_init(p, 0x3C070001, 0xC200FFFF);
++#endif
++	return 0;
++}
++early_initcall(s5pv310_init_cache);
++
+ int __init s5pv310_init(void)
  {
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
- }
- 
- MACHINE_START(SMDKV310, "SMDKV310")
-diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-index 2388cb9..4612823 100644
---- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-+++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-@@ -69,9 +69,6 @@ static void __init universal_map_io(void)
- 
- static void __init universal_machine_init(void)
- {
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
- }
- 
- MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	printk(KERN_INFO "S5PV310: Initializing architecture\n");
 -- 
 1.5.3.3
