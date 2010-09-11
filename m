@@ -1,45 +1,32 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 11 Sep 2010 18:11:01 +0400
-Subject: [PATCH] MMCI: use _cansleep GPIO functions
-In-Reply-To: <4C8B8D68.103@ru.mvista.com>
-References: <1284064315-14515-1-git-send-email-linus.walleij@stericsson.com>	<AANLkTikOOZED5i86j6Jayqvccmw8pa6+RKmG+xYFF-2b@mail.gmail.com>	<AANLkTi=oMh2ff+VnE3E5-1TpJFsfYe5PoNZOar3OXQfV@mail.gmail.com>	<20100911113236.GA25922@n2100.arm.linux.org.uk>
-	<AANLkTikT5Jg5dqfjMrNTxb57BaGmcuAqsqiC9e7_d0TW@mail.gmail.com>
-	<4C8B8D68.103@ru.mvista.com>
-Message-ID: <4C8B8DF5.7020503@mvista.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Sat, 11 Sep 2010 14:07:17 +0000
+Subject: mv643xx_eth and MDIO bus PM resume
+Message-ID: <20100911140717.GA21622@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I wrote:
+Hi,
 
->> From: Linus Walleij <linus.walleij@stericsson.com>
->> Date: Sat, 11 Sep 2010 13:36:20 +0200
->> Subject: [PATCH] MMCI: use _cansleep GPIO functions
+I am trying to get some PM support for Kirkwood machines and I have to
+deal with the MDIO bus driver which trigger a kernel crash at resume.
 
->> Currently the kernel is screaming about slowpath at me for the
->> wp/cd callbacks. Swicth to the _cansleep variants so as to silence
->> this.
+The Kirkwood SoC Ethernet driver is mv643xx_eth and don't use the PAL
+machine state. The PHY is handled by calling manually PHY functions.
 
->> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
->> ---
->>  drivers/mmc/host/mmci.c |    5 +++--
->>  1 files changed, 3 insertions(+), 2 deletions(-)
+The problem is that the current mdio_bus_resume() implementation
+_always_ start at resume the PAL state machine even if the driver can't
+handle that. That's the mv643xx_eth case, which don't provide the
+adjust_link() method.
 
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index f0c7313..c5fbf19 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
-> [...]
->>  static int mmci_get_cd(struct mmc_host *mmc)
->> @@ -629,7 +629,8 @@ static int mmci_get_cd(struct mmc_host *mmc)
->>
->>          status = plat->status(mmc_dev(host->mmc));
->>      } else
->> -        status = !!gpio_get_value(host->gpio_cd) ^ plat->cd_invert;
->> +        status = !!gpio_get_value_cansleep(host->gpio_cd)
->> +            ^ plat->cd_invert;
+Any hint to fix this issue is welcome.
 
->    Should be no space between ^ and operand, no?
+Thanks in advance.
 
-    Oops, I've mixed it with ~. Still, I'd have left ^ on the first line.
-
-WBR, Sergei
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100911/275adc68/attachment.sig>
