@@ -1,33 +1,24 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 12 Sep 2010 22:11:54 +0200
-Subject: [PATCH] ARM: supply _cansleep gpio function to U300
-Message-ID: <1284322314-25218-1-git-send-email-linus.walleij@stericsson.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Sun, 12 Sep 2010 23:08:30 +0200
+Subject: [PATCH] ARM: Update number of VIC
+In-Reply-To: <000001cb50e2$50f11940$f2d34bc0$%kim@samsung.com>
+References: <1281697788-18018-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTikyZHX-PmPx8DjyP6ar7wmyiP7Cf9-ttZQJXttZ@mail.gmail.com>
+	<000001cb50e2$50f11940$f2d34bc0$%kim@samsung.com>
+Message-ID: <4C8D414E.1010501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have to use _cansleep gpio accessors in the MMCI driver so as
-to avoid slowpath warnings, now U300 has MMCI but doesn't have
-these functions in place to siply wrap the existing non-sleeping
-functions into sleepable variants.
+Op 10-09-10 14:18, Kukjin Kim schreef:
+> Kyungmin Park wrote:
+>>
+>> Even though it required. I still think ben's patch is better approaches.
+> 
+> Please let me know where it is...I couldn't find it.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-u300/include/mach/gpio.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+I think he means this:
 
-diff --git a/arch/arm/mach-u300/include/mach/gpio.h b/arch/arm/mach-u300/include/mach/gpio.h
-index 7b1fc98..d5a71ab 100644
---- a/arch/arm/mach-u300/include/mach/gpio.h
-+++ b/arch/arm/mach-u300/include/mach/gpio.h
-@@ -273,6 +273,9 @@ extern void gpio_pullup(unsigned gpio, int value);
- extern int gpio_get_value(unsigned gpio);
- extern void gpio_set_value(unsigned gpio, int value);
- 
-+#define gpio_get_value_cansleep gpio_get_value
-+#define gpio_set_value_cansleep gpio_set_value
-+
- /* wrappers to sleep-enable the previous two functions */
- static inline unsigned gpio_to_irq(unsigned gpio)
- {
+http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=commitdiff;h=57c364b57fbcfd5b084e5edb6776da1ef583c2cf
+
 -- 
-1.6.3.3
+Maurus Cuelenaere
