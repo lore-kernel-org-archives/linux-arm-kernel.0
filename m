@@ -1,24 +1,58 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Sun, 12 Sep 2010 23:08:30 +0200
-Subject: [PATCH] ARM: Update number of VIC
-In-Reply-To: <000001cb50e2$50f11940$f2d34bc0$%kim@samsung.com>
-References: <1281697788-18018-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTikyZHX-PmPx8DjyP6ar7wmyiP7Cf9-ttZQJXttZ@mail.gmail.com>
-	<000001cb50e2$50f11940$f2d34bc0$%kim@samsung.com>
-Message-ID: <4C8D414E.1010501@gmail.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Sun, 12 Sep 2010 21:32:40 +0000
+Subject: mv643xx_eth and MDIO bus PM resume
+In-Reply-To: <AANLkTint1UycmX-of4LS2Pw9Co+Ctq=fwWYEFgX99rwr@mail.gmail.com>
+References: <20100911140717.GA21622@kw.sim.vm.gnt>
+	<AANLkTint1UycmX-of4LS2Pw9Co+Ctq=fwWYEFgX99rwr@mail.gmail.com>
+Message-ID: <20100912213239.GA2614@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 10-09-10 14:18, Kukjin Kim schreef:
-> Kyungmin Park wrote:
->>
->> Even though it required. I still think ben's patch is better approaches.
-> 
-> Please let me know where it is...I couldn't find it.
+Hi Saeed,
 
-I think he means this:
+On Sun, Sep 12, 2010 at 01:17:28PM +0200, saeed bishara wrote:
+> On Sat, Sep 11, 2010 at 4:07 PM, Simon Guinot <simon@sequanux.org> wrote:
+> > Hi,
+> >
+> > I am trying to get some PM support for Kirkwood machines and I have to
+> > deal with the MDIO bus driver which trigger a kernel crash at resume.
+> >
+> > The Kirkwood SoC Ethernet driver is mv643xx_eth and don't use the PAL
+> > machine state. The PHY is handled by calling manually PHY functions.
+> >
+> > The problem is that the current mdio_bus_resume() implementation
+> > _always_ start at resume the PAL state machine even if the driver can't
+> > handle that. That's the mv643xx_eth case, which don't provide the
+> > adjust_link() method.
+> >
+> > Any hint to fix this issue is welcome.
+> Simon, can you please post your patch to this driver that adds PM support?
 
-http://git.fluff.org/gitweb?p=bjdooks/linux.git;a=commitdiff;h=57c364b57fbcfd5b084e5edb6776da1ef583c2cf
+Sorry I don't have a such patch yet. For now, I am still working on the
+core power management support.
 
--- 
-Maurus Cuelenaere
+If you want test, some patches are available at:
+
+git://lacie-nas.org/lacie-orion.git pm
+
+And the web url is:
+
+http://git.lacie-nas.org/?p=lacie-orion.git;a=shortlog;h=refs/heads/pm
+
+The next step is to add PM support for the driver mv643xx_eth. As the PM
+core turn off the GE unit clock, probably that some driver code is
+needed to handle suspend and resume. Maybe do you have a such patch ?
+
+Concerning the mdio_bus_resume() issue, I think it is not related with
+the Ethernet driver. At resume the MDIO bus automatically start the PAL
+state machine, even if the adjust_link() function is not supplied. Just
+add a check is probably good enough.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100912/cd3785a9/attachment.sig>
