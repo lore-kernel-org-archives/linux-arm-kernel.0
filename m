@@ -1,26 +1,33 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 12 Sep 2010 13:17:28 +0200
-Subject: mv643xx_eth and MDIO bus PM resume
-In-Reply-To: <20100911140717.GA21622@kw.sim.vm.gnt>
-References: <20100911140717.GA21622@kw.sim.vm.gnt>
-Message-ID: <AANLkTint1UycmX-of4LS2Pw9Co+Ctq=fwWYEFgX99rwr@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sun, 12 Sep 2010 22:11:54 +0200
+Subject: [PATCH] ARM: supply _cansleep gpio function to U300
+Message-ID: <1284322314-25218-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 11, 2010 at 4:07 PM, Simon Guinot <simon@sequanux.org> wrote:
-> Hi,
->
-> I am trying to get some PM support for Kirkwood machines and I have to
-> deal with the MDIO bus driver which trigger a kernel crash at resume.
->
-> The Kirkwood SoC Ethernet driver is mv643xx_eth and don't use the PAL
-> machine state. The PHY is handled by calling manually PHY functions.
->
-> The problem is that the current mdio_bus_resume() implementation
-> _always_ start at resume the PAL state machine even if the driver can't
-> handle that. That's the mv643xx_eth case, which don't provide the
-> adjust_link() method.
->
-> Any hint to fix this issue is welcome.
-Simon, can you please post your patch to this driver that adds PM support?
-saeed
+We have to use _cansleep gpio accessors in the MMCI driver so as
+to avoid slowpath warnings, now U300 has MMCI but doesn't have
+these functions in place to siply wrap the existing non-sleeping
+functions into sleepable variants.
+
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-u300/include/mach/gpio.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-u300/include/mach/gpio.h b/arch/arm/mach-u300/include/mach/gpio.h
+index 7b1fc98..d5a71ab 100644
+--- a/arch/arm/mach-u300/include/mach/gpio.h
++++ b/arch/arm/mach-u300/include/mach/gpio.h
+@@ -273,6 +273,9 @@ extern void gpio_pullup(unsigned gpio, int value);
+ extern int gpio_get_value(unsigned gpio);
+ extern void gpio_set_value(unsigned gpio, int value);
+ 
++#define gpio_get_value_cansleep gpio_get_value
++#define gpio_set_value_cansleep gpio_set_value
++
+ /* wrappers to sleep-enable the previous two functions */
+ static inline unsigned gpio_to_irq(unsigned gpio)
+ {
+-- 
+1.6.3.3
