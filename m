@@ -1,30 +1,27 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 13 Sep 2010 14:41:05 +0200
-Subject: Reg: Linux Porting
-In-Reply-To: <EC921D4B77C99B4EB3CEDAFFCF17D5F73DDED37361@CHN-HCLT-EVS07.HCLT.CORP.HCL.IN>
-References: <EC921D4B77C99B4EB3CEDAFFCF17D5F73DDED37361@CHN-HCLT-EVS07.HCLT.CORP.HCL.IN>
-Message-ID: <201009131441.05698.marek.vasut@gmail.com>
+Date: Mon, 13 Sep 2010 14:42:26 +0200
+Subject: [PATCH v2] AT91: Add flexibity board support
+In-Reply-To: <AANLkTikotyfyvJ76-kemy_NPGEJifEF8PcuWuiomuc_2@mail.gmail.com>
+References: <4C8DFA84.4040501@gmail.com>
+	<201009131256.36523.marek.vasut@gmail.com>
+	<AANLkTikotyfyvJ76-kemy_NPGEJifEF8PcuWuiomuc_2@mail.gmail.com>
+Message-ID: <201009131442.26618.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 13. z??? 2010 13:33:07 StephenPaulraj Chinnadurai-ERS,HCLTech napsal(a):
-> Dear Marek,
+Dne Po 13. z??? 2010 13:02:24 Maxim Osipov napsal(a):
+> Hi!
 > 
-> Hope you are doing well. Thanks for your support for the porting the
-> u-boot.
+> On Mon, Sep 13, 2010 at 2:56 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Dne Po 13. z??? 2010 12:18:44 Maxim Osipov napsal(a):
+> > 
+> > btw. don't you want to modularize this code a bit ? check how
+> > mach-pxa/z2.c or mach-pxa/vpac270.c is done for example.
 > 
-> Now I need to port Linux 2.6.29 to my customized board built around PXA270
-> controller.
+> No, all functionality is needed in the product, so I do not think
+> modularization is necessary.
+> 
+> Kind regards,
+> Maxim
 
-Why such an old version? Noone will help you with deprecated stuff.
-> 
-> Is there any community that is working on Linux PXA 270 porting?
-
-CCed
-> 
-> Kindly suggest me one, so that I can get help from help from them.
-> 
-> Thanks and Regards
-> Stephen Paulraj C
-
-Cheers
+Ok, please fix the include then
