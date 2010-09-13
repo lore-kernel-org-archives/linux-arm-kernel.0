@@ -1,37 +1,38 @@
-From: bmpenrod@endruntechnologies.com (Bruce M. Penrod)
-Date: Mon, 13 Sep 2010 12:43:59 -0700
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <20100913100111.GA30787@n2100.arm.linux.org.uk>
-References: <4C8DD588.7040009@endruntechnologies.com>
-	<20100913100111.GA30787@n2100.arm.linux.org.uk>
-Message-ID: <4C8E7EFF.7020004@endruntechnologies.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 13 Sep 2010 12:47:43 -0700
+Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
+In-Reply-To: <cover.1284406638.git.joe@perches.com>
+References: <cover.1284406638.git.joe@perches.com>
+Message-ID: <b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ drivers/i2c/busses/i2c-stu300.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-
-Russell King - ARM Linux wrote:
-> On Mon, Sep 13, 2010 at 12:40:56AM -0700, Bruce M. Penrod wrote:
->> This seems like a pretty straightforward question, but extensive web  
->> searching hasn't shown a really clear, up-to-date answer.  The most  
->> recent info is circa 2004 and states that 4MB is the largest  
->> uncompressed ARM kernel that may be loaded.  Not being an ARM assembly  
->> guru (head.S baffles me), I'd like to know if that is still true in  
->> 2010, and if it is, why?
-> 
-> It is no longer true; the only limit now is the size of contiguous RAM
-> to fit the kernel image into.
-> 
-
-Interesting.  I finally was able to get an uncompressed kernel a little 
-below 4MB, and now it boots.  I'm working with 2.6.35rc6 on an OpenRD 
-Ultimate (Marvell Kirkwood) with Slackware, doing native compiles.  I'm 
-wondering if there could be any problem with U-Boot for larger kernels 
-than 4MB, but it doesn't complain and says that it is copying the image. 
-  The symptom I had with a much larger kernel (~15MB) is a total hang, 
-not even "Uncompressing linux".
-
-I'll add some innocuous stuff back in until I get above 4MB again and 
-see if it breaks again.
+diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+index 495be45..2f7c09c 100644
+--- a/drivers/i2c/busses/i2c-stu300.c
++++ b/drivers/i2c/busses/i2c-stu300.c
+@@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int bus_nr;
+ 	int ret = 0;
+-	char clk_name[] = "I2C0";
++	char clk_name[sizeof("I2Cx")];
+ 
+ 	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
+ 	if (!dev) {
+@@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	bus_nr = pdev->id;
+-	clk_name[3] += (char)bus_nr;
++	sprintf(clk_name, "I2C%c", '0' + bus_nr);
+ 	dev->clk = clk_get(&pdev->dev, clk_name);
+ 	if (IS_ERR(dev->clk)) {
+ 		ret = PTR_ERR(dev->clk);
 -- 
-Bruce
+1.7.3.rc1
