@@ -1,46 +1,24 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 13 Sep 2010 12:18:50 +0100
-Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
-In-Reply-To: <1284372533.3042.11.camel@e102144-lin.cambridge.arm.com>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<1284372533.3042.11.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <20100913111850.GC14882@console-pimps.org>
+From: sundar.iyer@stericsson.com (Sundar R IYER)
+Date: Mon, 13 Sep 2010 13:24:15 +0200
+Subject: [PATCH 0/2] ARM: factorise CPU hotplug code
+References: <1283515266-25374-1-git-send-email-sundar.iyer@stericsson.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC032@EXDCVYMBSTM006.EQ1STM.local>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CCFE7AF5@dbde02.ent.ti.com>
+	<33A307AF30D7BF4F811B1568FE7A9B181C7DC10D@EXDCVYMBSTM006.EQ1STM.local>
+	<20100906085650.GA20903@n2100.arm.linux.org.uk>
+Message-ID: <33A307AF30D7BF4F811B1568FE7A9B180437521F7E@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 11:08:53AM +0100, Will Deacon wrote:
-> Hi Matt,
-> 
-> On Mon, 2010-09-13 at 07:07 +0100, Matt Fleming wrote:
-> > The perf-events backend for OProfile that Will Deacon wrote in
-> > 8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
-> > perf-events framework as backend") is of use to more architectures
-> > than just ARM. Move the code into drivers/oprofile/ so that SH can use
-> > it instead of the nearly identical copy of its OProfile code.
-> > 
-> [...]
-> > 
-> > Note that I haven't been able to test these patches on an ARM board to
-> > see if I've caused any regressions. If anyone else could do that I'd
-> > appreciate it. Though, I have been able to compile this version of the
-> > series.
-> > 
-> I've tested this patch series on a multicore Cortex-A9 board. If I
-> revert patch 5/6 (ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS)
-> then everything seems to work fine. Otherwise, testing without
-> HW_PERF_EVENTS doesn't fall back to timer mode.
-> 
-> So, with the exception of the patch above:
-> 
-> Tested-by: Will Deacon <will.deacon@arm.com>
+Hello again,
 
-Hi Will, thanks for testing!
+Any recent comments on the cpu hotplug re-factoring patches?
+Do I need to make any further changes in there or should I drop them?
 
-Ah yeah, making oprofile rely on CONFIG_HW_PERF_EVENTS is too
-strict. I hadn't noticed that armpmu_get_pmu_id() is wrapped in
-CONFIG_HW_PERF_EVENTS and had intended op->cpu_type to be NULL and so
-we'd fallback to the timer mode.
+Regards,
+Sundar
 
-This patch needs to be dropped entirely (though another patch should
-conditionally include oprofile_perf.o based on CONFIG_HW_PERF_EVENT
-like I had in my original series).
+>-----Original Message-----
+>From: Sundar R IYER
+>Sent: Tuesday, September 07, 2010 3:02 PM
+>Sundar
