@@ -1,30 +1,91 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 14 Sep 2010 23:23:38 +0200
-Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
-In-Reply-To: <20100906083105X.fujita.tomonori@lab.ntt.co.jp> (FUJITA
-	Tomonori's message of "Mon, 6 Sep 2010 08:32:45 +0900")
-References: <20100901085738.GJ8142@n2100.arm.linux.org.uk>
-	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
-	<20100905112513.GB558@n2100.arm.linux.org.uk>
-	<20100906083105X.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <m34odsrpd1.fsf@intrepid.localdomain>
+From: mtittinge@hotmail.com (Marc Titinger)
+Date: Mon, 13 Sep 2010 09:13:32 +0200
+Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
+In-Reply-To: <cover.1284357372.git.matt@console-pimps.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+Message-ID: <SNT125-W35B89F6AA83C8DD22E7946BA770@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
 
->> > From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
->> > Subject: [PATCH] arm: fix arm: fix pci_set_consistent_dma_mask for dmabounce devices
->> > 
->> > This fixes the regression caused by the commit
->> > 6fee48cd330c68332f9712bc968d934a1a84a32a.
+Hi, 
+
+I'm just being curious : do these patches change the way those chips should be supported, that do not have a PMU-like IP, but implement PC-sampling thanks to a general purpose timer (not the system timer) ?
+
+Thanks and Regards,
+Marc. 
 
 
->> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> Should I send this to Linus? Or Can I assume that someone in ARM camp
-> will do?
-
-It would be nice if you do. TIA.
--- 
-Krzysztof Halasa
+> From: matt at console-pimps.org
+> To: robert.richter at amd.com
+> Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
+> Date: Mon, 13 Sep 2010 07:07:31 +0100
+> CC: linux-arch at vger.kernel.org; linux at arm.linux.org.uk; linux-sh at vger.kernel.org; peterz at infradead.org; fweisbec at gmail.com; will.deacon at arm.com; acme at redhat.com; lethal at linux-sh.org; mingo at elte.hu; linux-arm-kernel at lists.infradead.org
+> 
+> The perf-events backend for OProfile that Will Deacon wrote in
+> 8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
+> perf-events framework as backend") is of use to more architectures
+> than just ARM. Move the code into drivers/oprofile/ so that SH can use
+> it instead of the nearly identical copy of its OProfile code.
+> 
+> The benefit of the backend is that it becomes necessary to only
+> maintain one copy of the PMU accessor functions for each architecture,
+> with bug fixes and new features benefiting both OProfile and perf.
+> 
+> Note that I haven't been able to test these patches on an ARM board to
+> see if I've caused any regressions. If anyone else could do that I'd
+> appreciate it. Though, I have been able to compile this version of the
+> series.
+> 
+> This patch series is based on,
+> 
+>     git://git.kernel.org/pub/scm/linux/kernel/git/rric/oprofile.git core
+> 
+> These patches can also be found at,
+> 
+>     git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/sh-2.6.git perf-oprofile
+> 
+> Changes from v2:
+>  - Rebased against Robert's oprofile core branch
+>  - Moved even more of the ARM code into the generic oprofile code
+>  - Broke the patches up into more logical steps
+> 
+> Changes from v1:
+>  - Prefix the new functons with "oprofile_" instead of "op_".
+>  - Fix ARM compilation errors
+>  - Move all the oprofile-perf logic into oprofile_perf.c
+>  - Include cleanup patch from Will
+> 
+> Matt Fleming (6):
+>   perf: Add helper function to return number of counters
+>   ARM: oprofile: Rename op_arm to oprofile_perf
+>   ARM: oprofile: Move non-ARM code into separate init/exit functions
+>   oprofile: Abstract the perf-events backend
+>   ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS
+>   sh: oprofile: Use perf-events oprofile backend
+> 
+>  arch/arm/Kconfig                 |    2 +-
+>  arch/arm/kernel/perf_event.c     |    6 +
+>  arch/arm/oprofile/Makefile       |    2 +-
+>  arch/arm/oprofile/common.c       |  315 +------------------------------------
+>  arch/sh/Kconfig                  |    2 +-
+>  arch/sh/kernel/perf_event.c      |   17 ++
+>  arch/sh/oprofile/Makefile        |    2 +-
+>  arch/sh/oprofile/common.c        |  104 ++-----------
+>  arch/sh/oprofile/op_impl.h       |   33 ----
+>  drivers/oprofile/oprofile_perf.c |  322 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/oprofile.h         |    6 +
+>  include/linux/perf_event.h       |    1 +
+>  12 files changed, 368 insertions(+), 444 deletions(-)
+>  delete mode 100644 arch/sh/oprofile/op_impl.h
+>  create mode 100644 drivers/oprofile/oprofile_perf.c
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100913/02dd179a/attachment-0001.html>
