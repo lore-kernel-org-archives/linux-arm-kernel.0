@@ -1,173 +1,60 @@
 From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 13 Sep 2010 07:07:33 +0100
-Subject: [PATCH 2/6] ARM: oprofile: Rename op_arm to oprofile_perf
+Date: Mon, 13 Sep 2010 07:07:36 +0100
+Subject: [PATCH 5/6] ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS
 In-Reply-To: <cover.1284357372.git.matt@console-pimps.org>
 References: <cover.1284357372.git.matt@console-pimps.org>
-Message-ID: <61369979994f435ba2ac62f06717644d722ee002.1284357372.git.matt@console-pimps.org>
+Message-ID: <831bc9523fe04ce899bc78230990033fbe009431.1284357372.git.matt@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for moving the generic functions out of this file, give
-the functions more general names (e.g. remove "arm" from the names).
+Currently, oprofile support is only functional if CONFIG_HW_PERF_EVENTS
+is set. If this symbol is not set, oprofile initialisation will fail at
+runtime. Instead of allowing the oprofile code to build but fail at
+runtime it seems less confusing to not allow the code to be built unless
+hardware performance counter support is available.
 
 Signed-off-by: Matt Fleming <matt@console-pimps.org>
 ---
- arch/arm/oprofile/common.c |   68 ++++++++++++++++++++++----------------------
- 1 files changed, 34 insertions(+), 34 deletions(-)
+ arch/arm/Kconfig           |    2 +-
+ arch/arm/oprofile/common.c |    9 ---------
+ 2 files changed, 1 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7ed21f..d29075c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -14,7 +14,7 @@ config ARM
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
+ 	select GENERIC_ATOMIC64 if (!CPU_32v6K)
+-	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
++	select HAVE_OPROFILE if (HW_PERF_EVENTS)
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_KPROBES if (!XIP_KERNEL)
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
 diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 6498e58..ed8291a 100644
+index 9a3ed26..444ea86 100644
 --- a/arch/arm/oprofile/common.c
 +++ b/arch/arm/oprofile/common.c
-@@ -38,8 +38,8 @@ struct op_counter_config {
- 	struct perf_event_attr attr;
- };
+@@ -24,7 +24,6 @@
+ #include <asm/perf_event.h>
+ #include <asm/ptrace.h>
  
--static int op_arm_enabled;
--static DEFINE_MUTEX(op_arm_mutex);
-+static int oprofile_perf_enabled;
-+static DEFINE_MUTEX(oprofile_perf_mutex);
- 
- static struct op_counter_config *counter_config;
- static struct perf_event **perf_events[nr_cpumask_bits];
-@@ -65,7 +65,7 @@ static void op_overflow_handler(struct perf_event *event, int unused,
- }
- 
- /*
-- * Called by op_arm_setup to create perf attributes to mirror the oprofile
-+ * Called by oprofile_perf_setup to create perf attributes to mirror the oprofile
-  * settings in counter_config. Attributes are created as `pinned' events and
-  * so are permanently scheduled on the PMU.
-  */
-@@ -122,7 +122,7 @@ static void op_destroy_counter(int cpu, int event)
- }
- 
- /*
-- * Called by op_arm_start to create active perf events based on the
-+ * Called by oprofile_perf_start to create active perf events based on the
-  * perviously configured attributes.
-  */
- static int op_perf_start(void)
-@@ -142,7 +142,7 @@ out:
- }
- 
- /*
-- * Called by op_arm_stop at the end of a profiling run.
-+ * Called by oprofile_perf_stop at the end of a profiling run.
-  */
- static void op_perf_stop(void)
+-#ifdef CONFIG_HW_PERF_EVENTS
+ static char *op_name_from_perf_id(enum arm_perf_pmu_ids id)
  {
-@@ -174,7 +174,7 @@ static char *op_name_from_perf_id(enum arm_perf_pmu_ids id)
- 	}
- }
- 
--static int op_arm_create_files(struct super_block *sb, struct dentry *root)
-+static int oprofile_perf_create_files(struct super_block *sb, struct dentry *root)
+ 	switch (id) {
+@@ -119,11 +118,3 @@ void __exit oprofile_arch_exit(void)
  {
- 	unsigned int i;
- 
-@@ -195,7 +195,7 @@ static int op_arm_create_files(struct super_block *sb, struct dentry *root)
- 	return 0;
+ 	oprofile_perf_exit();
  }
- 
--static int op_arm_setup(void)
-+static int oprofile_perf_setup(void)
- {
- 	spin_lock(&oprofilefs_lock);
- 	op_perf_setup();
-@@ -203,54 +203,54 @@ static int op_arm_setup(void)
- 	return 0;
- }
- 
--static int op_arm_start(void)
-+static int oprofile_perf_start(void)
- {
- 	int ret = -EBUSY;
- 
--	mutex_lock(&op_arm_mutex);
--	if (!op_arm_enabled) {
-+	mutex_lock(&oprofile_perf_mutex);
-+	if (!oprofile_perf_enabled) {
- 		ret = 0;
- 		op_perf_start();
--		op_arm_enabled = 1;
-+		oprofile_perf_enabled = 1;
- 	}
--	mutex_unlock(&op_arm_mutex);
-+	mutex_unlock(&oprofile_perf_mutex);
- 	return ret;
- }
- 
--static void op_arm_stop(void)
-+static void oprofile_perf_stop(void)
- {
--	mutex_lock(&op_arm_mutex);
--	if (op_arm_enabled)
-+	mutex_lock(&oprofile_perf_mutex);
-+	if (oprofile_perf_enabled)
- 		op_perf_stop();
--	op_arm_enabled = 0;
--	mutex_unlock(&op_arm_mutex);
-+	oprofile_perf_enabled = 0;
-+	mutex_unlock(&oprofile_perf_mutex);
- }
- 
- #ifdef CONFIG_PM
--static int op_arm_suspend(struct platform_device *dev, pm_message_t state)
-+static int oprofile_perf_suspend(struct platform_device *dev, pm_message_t state)
- {
--	mutex_lock(&op_arm_mutex);
--	if (op_arm_enabled)
-+	mutex_lock(&oprofile_perf_mutex);
-+	if (oprofile_perf_enabled)
- 		op_perf_stop();
--	mutex_unlock(&op_arm_mutex);
-+	mutex_unlock(&oprofile_perf_mutex);
- 	return 0;
- }
- 
--static int op_arm_resume(struct platform_device *dev)
-+static int oprofile_perf_resume(struct platform_device *dev)
- {
--	mutex_lock(&op_arm_mutex);
--	if (op_arm_enabled && op_perf_start())
--		op_arm_enabled = 0;
--	mutex_unlock(&op_arm_mutex);
-+	mutex_lock(&oprofile_perf_mutex);
-+	if (oprofile_perf_enabled && op_perf_start())
-+		oprofile_perf_enabled = 0;
-+	mutex_unlock(&oprofile_perf_mutex);
- 	return 0;
- }
- 
- static struct platform_driver oprofile_driver = {
- 	.driver		= {
--		.name		= "arm-oprofile",
-+		.name		= "perf-oprofile",
- 	},
--	.resume		= op_arm_resume,
--	.suspend	= op_arm_suspend,
-+	.resume		= oprofile_perf_resume,
-+	.suspend	= oprofile_perf_suspend,
- };
- 
- static struct platform_device *oprofile_pdev;
-@@ -378,11 +378,11 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
- 	}
- 
- 	ops->backtrace		= arm_backtrace;
--	ops->create_files	= op_arm_create_files;
--	ops->setup		= op_arm_setup;
--	ops->start		= op_arm_start;
--	ops->stop		= op_arm_stop;
--	ops->shutdown		= op_arm_stop;
-+	ops->create_files	= oprofile_perf_create_files;
-+	ops->setup		= oprofile_perf_setup;
-+	ops->start		= oprofile_perf_start;
-+	ops->stop		= oprofile_perf_stop;
-+	ops->shutdown		= oprofile_perf_stop;
- 	ops->cpu_type		= op_name_from_perf_id(armpmu_get_pmu_id());
- 
- 	if (!ops->cpu_type)
+-#else
+-int __init oprofile_arch_init(struct oprofile_operations *ops)
+-{
+-	pr_info("oprofile: hardware counters not available\n");
+-	return -ENODEV;
+-}
+-void __exit oprofile_arch_exit(void) {}
+-#endif /* CONFIG_HW_PERF_EVENTS */
 -- 
 1.7.1
