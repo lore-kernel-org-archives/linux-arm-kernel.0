@@ -1,126 +1,46 @@
-From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Mon, 13 Sep 2010 16:45:59 +0530
-Subject: [PATCH v2] ux500: add CPU hotplug support
-Message-ID: <1284376559-7704-1-git-send-email-sundar.iyer@stericsson.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Mon, 13 Sep 2010 12:18:50 +0100
+Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
+In-Reply-To: <1284372533.3042.11.camel@e102144-lin.cambridge.arm.com>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<1284372533.3042.11.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <20100913111850.GC14882@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
----
+On Mon, Sep 13, 2010 at 11:08:53AM +0100, Will Deacon wrote:
+> Hi Matt,
+> 
+> On Mon, 2010-09-13 at 07:07 +0100, Matt Fleming wrote:
+> > The perf-events backend for OProfile that Will Deacon wrote in
+> > 8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
+> > perf-events framework as backend") is of use to more architectures
+> > than just ARM. Move the code into drivers/oprofile/ so that SH can use
+> > it instead of the nearly identical copy of its OProfile code.
+> > 
+> [...]
+> > 
+> > Note that I haven't been able to test these patches on an ARM board to
+> > see if I've caused any regressions. If anyone else could do that I'd
+> > appreciate it. Though, I have been able to compile this version of the
+> > series.
+> > 
+> I've tested this patch series on a multicore Cortex-A9 board. If I
+> revert patch 5/6 (ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS)
+> then everything seems to work fine. Otherwise, testing without
+> HW_PERF_EVENTS doesn't fall back to timer mode.
+> 
+> So, with the exception of the patch above:
+> 
+> Tested-by: Will Deacon <will.deacon@arm.com>
 
-v2:
- - revert pen_release as __cpuinitdata as per comments
+Hi Will, thanks for testing!
 
- arch/arm/mach-ux500/Makefile  |    1 +
- arch/arm/mach-ux500/hotplug.c |   75 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/platsmp.c |    2 +
- 3 files changed, 78 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-ux500/hotplug.c
+Ah yeah, making oprofile rely on CONFIG_HW_PERF_EVENTS is too
+strict. I hadn't noticed that armpmu_get_pmu_id() is wrapped in
+CONFIG_HW_PERF_EVENTS and had intended op->cpu_type to be NULL and so
+we'd fallback to the timer mode.
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 0097318..bb3e74e 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -8,4 +8,5 @@ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o prcmu.o
- obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o board-mop500-sdi.o
- obj-$(CONFIG_MACH_U5500)	+= board-u5500.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
-diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
-new file mode 100644
-index 0000000..b782a03
---- /dev/null
-+++ b/arch/arm/mach-ux500/hotplug.c
-@@ -0,0 +1,75 @@
-+/*
-+ * Copyright (C) STMicroelectronics 2009
-+ * Copyright (C) ST-Ericsson SA 2010
-+ *
-+ * License Terms: GNU General Public License v2
-+ *	Based on ARM realview platform
-+ *
-+ * Author: Sundar Iyer <sundar.iyer@stericsson.com>
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <linux/completion.h>
-+
-+#include <asm/cacheflush.h>
-+
-+extern volatile int pen_release;
-+
-+static DECLARE_COMPLETION(cpu_killed);
-+
-+static inline void platform_do_lowpower(unsigned int cpu)
-+{
-+	flush_cache_all();
-+
-+	/* we put the platform to just WFI */
-+	for (;;) {
-+		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
-+				: : : "memory");
-+		if (pen_release == cpu) {
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		}
-+	}
-+}
-+
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return wait_for_completion_timeout(&cpu_killed, 5000);
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+#ifdef DEBUG
-+	unsigned int this_cpu = hard_smp_processor_id();
-+
-+	if (cpu != this_cpu) {
-+		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
-+			   this_cpu, cpu);
-+		BUG();
-+	}
-+#endif
-+
-+	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
-+	complete(&cpu_killed);
-+
-+	/* directly enter low power state, skipping secure registers */
-+	platform_do_lowpower(cpu);
-+}
-+
-+int platform_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 438ef16..9e4c678 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -78,6 +78,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
- 	outer_clean_range(__pa(&pen_release), __pa(&pen_release) + 1);
- 
-+	smp_cross_call(cpumask_of(cpu));
-+
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
- 		if (pen_release == -1)
--- 
-1.7.2.dirty
+This patch needs to be dropped entirely (though another patch should
+conditionally include oprofile_perf.o based on CONFIG_HW_PERF_EVENT
+like I had in my original series).
