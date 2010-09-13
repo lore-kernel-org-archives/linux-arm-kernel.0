@@ -1,36 +1,22 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 13 Sep 2010 12:04:44 +0100
-Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
-In-Reply-To: <20100913085137.GE23741@elte.hu>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<SNT125-W35B89F6AA83C8DD22E7946BA770@phx.gbl>
-	<20100913075025.GA14882@console-pimps.org>
-	<20100913085137.GE23741@elte.hu>
-Message-ID: <20100913110444.GB14882@console-pimps.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Sep 2010 12:06:32 +0100
+Subject: [PATCH] ux500: add CPU hotplug support
+In-Reply-To: <1284375698-1824-1-git-send-email-sundar.iyer@stericsson.com>
+References: <1284375698-1824-1-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <20100913110632.GC30787@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 10:51:37AM +0200, Ingo Molnar wrote:
-> 
-> * Matt Fleming <matt@console-pimps.org> wrote:
-> 
-> > On Mon, Sep 13, 2010 at 09:13:32AM +0200, Marc Titinger wrote:
-> > > 
-> > > Hi, 
-> > > 
-> > > I'm just being curious : do these patches change the way those chips 
-> > > should be supported, that do not have a PMU-like IP, but implement 
-> > > PC-sampling thanks to a general purpose timer (not the system timer) 
-> > > ?
-> > 
-> > CPUs that do not have a PMU are not required to use the perf-events 
-> > oprofile backend, it is entirely optional. The pc-sampling timer in 
-> > oprofile is not affected by this series.
-> 
-> It should still work fine though: a generalized oprofile backend should 
-> simply use hrtimer based events. That also has a chance to be higher 
-> quality than the system time fallback, on PMU-less (but high-res-timer 
-> capable) systems.
+On Mon, Sep 13, 2010 at 04:31:38PM +0530, Sundar Iyer wrote:
+> diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+> index 438ef16..ade2e17 100644
+> --- a/arch/arm/mach-ux500/platsmp.c
+> +++ b/arch/arm/mach-ux500/platsmp.c
+> @@ -26,7 +26,7 @@
+>   * control for which core is the next to come out of the secondary
+>   * boot "holding pen"
+>   */
+> -volatile int __cpuinitdata pen_release = -1;
+> +volatile int pen_release = -1;
 
-Yeah, that's a good point. It would make a nice addition to this patch
-series. I may get chance to take a look at it at some point.
+This looks like an unnecessary change.
