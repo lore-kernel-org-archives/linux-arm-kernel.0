@@ -1,22 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 13 Sep 2010 09:41:26 +0100
-Subject: Regression on UP ARM from commit
-	e18d65f0500b95d8724b17d8ea9f1116cf390bbe
-In-Reply-To: <20100913055549.GA14773@jasper.tkos.co.il>
-References: <AANLkTimC5Vz7x9+MNJcewijoyw=Nyr6WWP=YR8cxqarH@mail.gmail.com>
-	<20100913055549.GA14773@jasper.tkos.co.il>
-Message-ID: <20100913084125.GI23903@sirena.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 13 Sep 2010 10:43:48 +0200
+Subject: Maximum bootable kernel size in current ARM linux
+In-Reply-To: <4C8DD588.7040009@endruntechnologies.com>
+References: <4C8DD588.7040009@endruntechnologies.com>
+Message-ID: <201009131043.48688.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 07:55:49AM +0200, Baruch Siach wrote:
-> Hi Linus,
+Dne Po 13. z??? 2010 09:40:56 Bruce M. Penrod napsal(a):
+> This seems like a pretty straightforward question, but extensive web
+> searching hasn't shown a really clear, up-to-date answer.  The most
+> recent info is circa 2004 and states that 4MB is the largest
+> uncompressed ARM kernel that may be loaded.  Not being an ARM assembly
+> guru (head.S baffles me), I'd like to know if that is still true in
+> 2010, and if it is, why?
+> 
+> I'm having one hell of a time compiling a monolithic kernel and keeping
+> it under 4M without leaving out some core networking features I need.
+>  From my searching, it looks like x86 has either removed the limit or
+> raised it to a much higher number.  It's not clear to me why a 32 bit
+> processor would not be able to boot a kernel larger than 4 MB.
 
-> On Sun, Sep 12, 2010 at 11:47:39PM +0200, Linus Walleij wrote:
-> > commit e18d65f0500b95d8724b17d8ea9f1116cf390bbe
-> > "slub: Remove static kmem_cache_cpu array for boot"
+Hey, CCed Russell.
 
-> In which tree have you found this commit? I cant find 
-> e18d65f0500b95d8724b17d8ea9f1116cf390bbe in Linus' (Torvalds) tree up to -rc4.
+Btw. this shouldn't be true anymore. On the other hand, why do you need such a 
+huge kernel?
 
-It's in -next via some means.
+It's not even possible to create kernel that big if you don't have some kind of 
+initramfs in, right? Besides, you can use some kind of a compression, like LZMA 
+or something to keep the size down.
+
+Cheers
+> 
+> Bruce
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
