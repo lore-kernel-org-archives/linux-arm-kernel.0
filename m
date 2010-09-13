@@ -1,139 +1,31 @@
-From: vince@kyllikki.org (Vincent Sanders)
-Date: Mon, 13 Sep 2010 16:13:52 +0100
-Subject: [PATCH 9/9] Remove unused usb-a9263 default configuration
-In-Reply-To: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-Message-ID: <1284390832-7181-10-git-send-email-vince@kyllikki.org>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 13 Sep 2010 17:19:31 +0200
+Subject: amba_pl022 spi->mode fix/cleanup patches
+In-Reply-To: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
+References: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
+Message-ID: <AANLkTimtR6+TFX8w1_6MEEqbvk5-StkUTn5kKd4q3DeZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vincent Sanders <vince@simtec.co.uk>
+2010/9/10  <wellsk40@gmail.com>:
 
-The usb-a9263 default configuration has not built throughout the
-2.6.36 series (since 2.6.35-git1). The kernel link has failed with
+> This patch series updates drivers and platforms that depend on the
+> amba_pl022 driver and use the pl022_config_chip structure for
+> setting up the SPI mode and data transfer width.
 
-fs/built-in.o: In function `nfs_callback_authenticate':
-compr_zlib.c:(.text+0x8cf18): undefined reference to `svc_gss_principal'
+I get regressions from the ab8500-spi.c driver from this patch:
 
-This configuration appers to be unused by the maintainer so remove it.
+> ssp-pl022 ssp0: ARM PL022 driver, device ID: 0x01080022
+> pl022: mapped registers from 0x80002000 to d0834000
+> ab8500-spi spi0.0: unknown chip, revision: 0x80
+> ab8500-spi: probe of spi0.0 failed with error -22
 
-Signed-off-by: Vincent Sanders <vince@kyllikki.org>
----
- arch/arm/configs/usb-a9263_defconfig |  106 ----------------------------------
- 1 files changed, 0 insertions(+), 106 deletions(-)
- delete mode 100644 arch/arm/configs/usb-a9263_defconfig
+The 0x80 above used to be 0x00 before these patches.
+So all of a sudden bit 7 gets set...
 
-diff --git a/arch/arm/configs/usb-a9263_defconfig b/arch/arm/configs/usb-a9263_defconfig
-deleted file mode 100644
-index ee82d09..0000000
---- a/arch/arm/configs/usb-a9263_defconfig
-+++ /dev/null
-@@ -1,106 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--# CONFIG_LOCALVERSION_AUTO is not set
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_AT91=y
--CONFIG_ARCH_AT91SAM9263=y
--CONFIG_MACH_USB_A9263=y
--CONFIG_AT91_SLOW_CLOCK=y
--# CONFIG_ARM_THUMB is not set
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=64M console=ttyS0,115200"
--CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_MULTICAST=y
--CONFIG_IP_ADVANCED_ROUTER=y
--CONFIG_IP_ROUTE_VERBOSE=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_BOOTP=y
--CONFIG_IP_PNP_RARP=y
--CONFIG_IP_MROUTE=y
--CONFIG_IP_PIMSM_V1=y
--CONFIG_IP_PIMSM_V2=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_DATAFLASH=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_ATMEL=y
--CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
--CONFIG_BLK_DEV_LOOP=y
--# CONFIG_MISC_DEVICES is not set
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
--CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
--CONFIG_MII=y
--CONFIG_MACB=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--CONFIG_INPUT_EVBUG=y
--# CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
--CONFIG_SERIAL_ATMEL=y
--CONFIG_SERIAL_ATMEL_CONSOLE=y
--CONFIG_HW_RANDOM=y
--CONFIG_SPI=y
--CONFIG_SPI_ATMEL=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_USB_HID is not set
--CONFIG_USB=y
--CONFIG_USB_DEVICEFS=y
--CONFIG_USB_MON=y
--CONFIG_USB_OHCI_HCD=y
--CONFIG_USB_STORAGE=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_ETH=m
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
--CONFIG_FUSE_FS=m
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
--CONFIG_NFS_V3_ACL=y
--CONFIG_NFS_V4=y
--CONFIG_ROOT_NFS=y
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_CODEPAGE_850=y
--CONFIG_NLS_ISO8859_1=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
--# CONFIG_CRYPTO_HW is not set
--- 
-1.7.0.4
+I don't know why this happens, probably some flag that used to
+be set had not been properly propagated in the first patch to alter
+the AB8500 device registration?
+
+Yours,
+Linus Walleij
