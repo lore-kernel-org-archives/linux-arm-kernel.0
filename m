@@ -1,22 +1,27 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 13 Sep 2010 08:50:25 +0100
-Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
-In-Reply-To: <SNT125-W35B89F6AA83C8DD22E7946BA770@phx.gbl>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<SNT125-W35B89F6AA83C8DD22E7946BA770@phx.gbl>
-Message-ID: <20100913075025.GA14882@console-pimps.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Sep 2010 08:49:38 +0100
+Subject: [PATCH 03/74] ST SPEAr: Formalized timer support
+In-Reply-To: <4C8D9909.4040705@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<eed779f7085ed5686aceb61b48a2c2a7d6af5953.1283161023.git.viresh.kumar@st.com>
+	<20100906225536.GD8153@game.jcrosoft.org> <4C8D9909.4040705@st.com>
+Message-ID: <20100913074938.GA30581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 09:13:32AM +0200, Marc Titinger wrote:
+On Mon, Sep 13, 2010 at 08:52:49AM +0530, Shiraz Hashim wrote:
+> Dear Jean,
 > 
-> Hi, 
+> On 9/7/2010 4:25 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>  
+> >> -#endif
+> >> +static void __init spear3xx_timer_init(void)
+> >> +{
+> >> +	spear_setup_timer();
+> > why not call it directly?
 > 
-> I'm just being curious : do these patches change the way those chips
-> should be supported, that do not have a PMU-like IP, but implement
-> PC-sampling thanks to a general purpose timer (not the system timer)
-> ?
+> A single level of abstraction was provided so that if archs (spear3xx/6xx/13xx)
+> required to do something extra.
 
-CPUs that do not have a PMU are not required to use the perf-events
-oprofile backend, it is entirely optional. The pc-sampling timer in
-oprofile is not affected by this series.
+Please don't build abstraction layers on top of abstraction layers.  Use
+what's already provided instead.
