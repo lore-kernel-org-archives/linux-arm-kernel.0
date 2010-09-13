@@ -1,40 +1,46 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Mon, 13 Sep 2010 18:52:51 +0200
-Subject: amba_pl022 spi->mode fix/cleanup patches
-In-Reply-To: <AANLkTimtR6+TFX8w1_6MEEqbvk5-StkUTn5kKd4q3DeZ@mail.gmail.com>
-References: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
-	<AANLkTimtR6+TFX8w1_6MEEqbvk5-StkUTn5kKd4q3DeZ@mail.gmail.com>
-Message-ID: <083DF309106F364B939360100EC290F80AD49D5232@eu1rdcrdc1wx030.exi.nxp.com>
+From: leon.woestenberg@gmail.com (Leon Woestenberg)
+Date: Mon, 13 Sep 2010 19:10:59 +0200
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <20100909162135.GA3524@debian-wegner1.datadisplay.de>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<20100906140347.GA24522@n2100.arm.linux.org.uk>
+	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
+	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
+	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+	<20100907161156.GA3625@debian-wegner1.datadisplay.de>
+	<alpine.LFD.2.00.1009071443360.19366@xanadu.home>
+	<20100908083558.GA3393@debian-wegner1.datadisplay.de>
+	<20100909162135.GA3524@debian-wegner1.datadisplay.de>
+Message-ID: <AANLkTimAStrSQQZqX4Dsczas+z02-OnDB4RzO0MxbQhN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> 2010/9/10  <wellsk40@gmail.com>:
-> 
-> > This patch series updates drivers and platforms that depend on the
-> > amba_pl022 driver and use the pl022_config_chip structure for
-> > setting up the SPI mode and data transfer width.
-> 
-> I get regressions from the ab8500-spi.c driver from this patch:
-> 
-> > ssp-pl022 ssp0: ARM PL022 driver, device ID: 0x01080022
-> > pl022: mapped registers from 0x80002000 to d0834000
-> > ab8500-spi spi0.0: unknown chip, revision: 0x80
-> > ab8500-spi: probe of spi0.0 failed with error -22
-> 
-> The 0x80 above used to be 0x00 before these patches.
-> So all of a sudden bit 7 gets set...
-> 
-> I don't know why this happens, probably some flag that used to
-> be set had not been properly propagated in the first patch to alter
-> the AB8500 device registration?
-> 
+Hello Wolfgang,
 
-I found a bug in the SPI driver for the SPHA field. This would effect
-SPI mode 1/3 users. Can you please try it once more with the fix?
-(see fix in patch email)
-I was hoping these changes would be very minor, but I have limited
-hardware to do SPI testing without resorting to loopback mode.
+On Thu, Sep 9, 2010 at 6:21 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> On Wed, Sep 08, 2010 at 10:35:58AM +0200, Wolfgang Wegner wrote:
+>>
+> With the FPGA evaluation board I get:
+> - around 38 MBytes/second with Nicolas' inline assembly code
+> - around 6 MBytes/second with any other C code (mmapped) as
+> ?well as write() via dd
+>
+> So the main problem seems to be either our board implementation
+> of the PCIe->PCI bridge or the FPGA. However, I am still wondering
+> how a framebuffer-based application can attain reasonable performance,
+>
+Having implemented a framebuffer demo on an FPGA recently using PCI
+Express, I think the main performance gain is made by having the DMA
+done by the endpoint (FPGA) rather than by the CPU.
 
-Thanks!
-Kevin
+> PS: another PCI device I tried via the PCIe->PCI bridge was
+> ? ?a Intel 82574L GBit NIC, which was able to reach >600MBit/s
+> ? ?throughput when tested with netio or netperf
+>
+Such devices (typically) use endpoint initiated DMA, i.e. they do not
+involve much overhead/latencies on the CPU/host/root complex side.
+
+Regards,
+
+Leon.
