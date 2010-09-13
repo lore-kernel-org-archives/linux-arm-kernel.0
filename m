@@ -1,106 +1,123 @@
 From: vince@kyllikki.org (Vincent Sanders)
-Date: Mon, 13 Sep 2010 16:13:44 +0100
-Subject: [PATCH 1/9] Remove unused default configuration
+Date: Mon, 13 Sep 2010 16:13:45 +0100
+Subject: [PATCH 2/9] Remove unused default configuration
 In-Reply-To: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
 References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-Message-ID: <1284390832-7181-2-git-send-email-vince@kyllikki.org>
+Message-ID: <1284390832-7181-3-git-send-email-vince@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vincent Sanders <vince@simtec.co.uk>
 
-The msm default configuration has not built throughout the 2.6.36
-series (since 2.6.35). The build has failed with
+The mx1 default configuration has not built throughout the 2.6.36
+series (since 2.6.35-git1). The link has failed with
 
-arch/arm/mach-msm/board-halibut.c: In function 'halibut_fixup':
-arch/arm/mach-msm/board-halibut.c:86: error: 'struct membank' has no member named 'node'
-arch/arm/mach-msm/board-halibut.c:86: error: implicit declaration of function 'PHYS_TO_NID'
+fs/built-in.o: In function `nfs_callback_authenticate':
+compr_zlib.c:(.text+0x7c12c): undefined reference to `svc_gss_principal'
 
 This configuration appers to be unused by the maintainer so remove it.
 
 Signed-off-by: Vincent Sanders <vince@kyllikki.org>
 ---
- arch/arm/configs/msm_defconfig |   72 ----------------------------------------
- 1 files changed, 0 insertions(+), 72 deletions(-)
- delete mode 100644 arch/arm/configs/msm_defconfig
+ arch/arm/configs/mx1_defconfig |   90 ----------------------------------------
+ 1 files changed, 0 insertions(+), 90 deletions(-)
+ delete mode 100644 arch/arm/configs/mx1_defconfig
 
-diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
+diff --git a/arch/arm/configs/mx1_defconfig b/arch/arm/configs/mx1_defconfig
 deleted file mode 100644
-index 2b8f7af..0000000
---- a/arch/arm/configs/msm_defconfig
+index 2f38d97..0000000
+--- a/arch/arm/configs/mx1_defconfig
 +++ /dev/null
-@@ -1,72 +0,0 @@
+@@ -1,90 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
 -CONFIG_IKCONFIG=y
 -CONFIG_IKCONFIG_PROC=y
--CONFIG_BLK_DEV_INITRD=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+-CONFIG_EMBEDDED=y
 -CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODULE_FORCE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
 -# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_MSM=y
--CONFIG_MACH_HALIBUT=y
+-CONFIG_ARCH_MXC=y
+-CONFIG_ARCH_MX1=y
+-CONFIG_ARCH_MX1ADS=y
+-CONFIG_MACH_SCB9328=y
+-CONFIG_MXC_IRQ_PRIOR=y
 -CONFIG_NO_HZ=y
 -CONFIG_HIGH_RES_TIMERS=y
 -CONFIG_PREEMPT=y
 -CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=64M console=ttyMSM,115200n8"
+-CONFIG_CMDLINE="noinitrd console=ttymxc0,115200 root=/dev/mtdblock2 rw ip=off"
 -CONFIG_PM=y
+-CONFIG_PM_DEBUG=y
 -CONFIG_NET=y
+-CONFIG_PACKET=y
 -CONFIG_UNIX=y
 -CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
 -# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
 -# CONFIG_INET_XFRM_MODE_TUNNEL is not set
 -# CONFIG_INET_XFRM_MODE_BEET is not set
+-# CONFIG_INET_LRO is not set
 -# CONFIG_INET_DIAG is not set
 -# CONFIG_IPV6 is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_FW_LOADER=m
 -CONFIG_MTD=y
 -CONFIG_MTD_PARTITIONS=y
 -CONFIG_MTD_CMDLINE_PARTS=y
 -CONFIG_MTD_CHAR=y
 -CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_CFI=y
+-CONFIG_MTD_PHYSMAP=y
+-# CONFIG_BLK_DEV is not set
+-# CONFIG_MISC_DEVICES is not set
 -CONFIG_NETDEVICES=y
--CONFIG_DUMMY=y
+-CONFIG_PHYLIB=y
+-CONFIG_SMSC_PHY=y
 -CONFIG_NET_ETHERNET=y
--CONFIG_SMC91X=y
--CONFIG_PPP=y
--CONFIG_PPP_ASYNC=y
--CONFIG_PPP_DEFLATE=y
--CONFIG_PPP_BSDCOMP=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_INPUT_MISC=y
+-CONFIG_DM9000=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+-# CONFIG_INPUT is not set
 -# CONFIG_SERIO is not set
--CONFIG_VT_HW_CONSOLE_BINDING=y
--CONFIG_SERIAL_MSM=y
--CONFIG_SERIAL_MSM_CONSOLE=y
+-# CONFIG_VT is not set
+-CONFIG_SERIAL_IMX=y
+-CONFIG_SERIAL_IMX_CONSOLE=y
 -# CONFIG_LEGACY_PTYS is not set
 -# CONFIG_HW_RANDOM is not set
 -CONFIG_I2C=y
+-CONFIG_I2C_CHARDEV=y
+-CONFIG_I2C_IMX=y
+-CONFIG_W1=y
+-CONFIG_W1_MASTER_MXC=y
+-CONFIG_W1_SLAVE_THERM=y
 -# CONFIG_HWMON is not set
--CONFIG_VIDEO_OUTPUT_CONTROL=y
 -CONFIG_FB=y
--CONFIG_FB_MODE_HELPERS=y
--CONFIG_FB_TILEBLITTING=y
--CONFIG_FB_MSM=y
--# CONFIG_VGA_CONSOLE is not set
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_GADGET_IMX=y
+-CONFIG_USB_ETH=m
+-CONFIG_MMC=y
+-CONFIG_MMC_MXC=y
+-# CONFIG_DNOTIFY is not set
 -CONFIG_INOTIFY=y
 -CONFIG_TMPFS=y
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_SCHEDSTATS=y
--CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_LL=y
+-CONFIG_JFFS2_FS=y
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-CONFIG_NFS_V4=y
+-CONFIG_ROOT_NFS=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
 -- 
 1.7.0.4
