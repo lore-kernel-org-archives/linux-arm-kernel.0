@@ -1,27 +1,62 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 13 Sep 2010 14:42:26 +0200
-Subject: [PATCH v2] AT91: Add flexibity board support
-In-Reply-To: <AANLkTikotyfyvJ76-kemy_NPGEJifEF8PcuWuiomuc_2@mail.gmail.com>
-References: <4C8DFA84.4040501@gmail.com>
-	<201009131256.36523.marek.vasut@gmail.com>
-	<AANLkTikotyfyvJ76-kemy_NPGEJifEF8PcuWuiomuc_2@mail.gmail.com>
-Message-ID: <201009131442.26618.marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Sep 2010 13:53:10 +0100
+Subject: ARM target not boot after remap memory
+In-Reply-To: <AANLkTi=dT1uMrRctB4=Hvh35zVc-DtReWmHj-18cd9XT@mail.gmail.com>
+References: <AANLkTi=tWwaFHB0DY=j0UaqbYdYJpGJpmWdGC4aMufSw@mail.gmail.com>
+	<4C8E1417.4060204@compulab.co.il>
+	<20100913124049.GG30787@n2100.arm.linux.org.uk>
+	<AANLkTi=dT1uMrRctB4=Hvh35zVc-DtReWmHj-18cd9XT@mail.gmail.com>
+Message-ID: <20100913125310.GI30787@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 13. z??? 2010 13:02:24 Maxim Osipov napsal(a):
-> Hi!
-> 
-> On Mon, Sep 13, 2010 at 2:56 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Dne Po 13. z??? 2010 12:18:44 Maxim Osipov napsal(a):
-> > 
-> > btw. don't you want to modularize this code a bit ? check how
-> > mach-pxa/z2.c or mach-pxa/vpac270.c is done for example.
-> 
-> No, all functionality is needed in the product, so I do not think
-> modularization is necessary.
-> 
-> Kind regards,
-> Maxim
+BTW, Please do not drop CCs.
 
-Ok, please fix the include then
+On Mon, Sep 13, 2010 at 02:48:18PM +0200, Robin Theunis wrote:
+> Hi Russell,
+> 
+> Yes I have tested it. I made a breakpoint at 0x2008000 and viewed that
+> the r1 register and there in I found the correct ID.
+> 
+> Robin
+> 
+> 2010/9/13 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Mon, Sep 13, 2010 at 02:07:51PM +0200, Mike Rapoport wrote:
+> >> (add LAKLM to CC)
+> >
+> >>> The problem is now when linux kernel is booting, nothing happens.
+> >>>
+> >>> ---
+> >>> U-Boot> bootm
+> >>> ## Booting kernel from Legacy Image at 21000000 ...
+> >>> ? ?Image Name: ? Linux-2.6.34.1robin9200v1.0
+> >>> ? ?Image Type: ? ARM Linux Kernel Image (uncompressed)
+> >>> ? ?Data Size: ? ?1811796 Bytes = 1.7 MiB
+> >>> ? ?Load Address: 20008000
+> >>> ? ?Entry Point: ?20008000
+> >>> ? ?Verifying Checksum ... OK
+> >>> ? ?Loading Kernel Image ... OK
+> >>> OK
+> >>>
+> >>> Starting kernel ...
+> >>>
+> >>> Uncompressing Linux... done, booting the kernel.
+> >>> ---
+> >>>
+> >>> Here is stalls. With my jtag probe I can locate the problem.
+> >>>
+> >>> ---
+> >>>> halt
+> >>> target state: halted
+> >>> target halted in ARM state due to debug-request, current mode: Supervisor
+> >>> cpsr: 0x600000d3 pc: 0xc000af3c
+> >>> MMU: enabled, D-Cache: enabled, I-Cache: enabled
+> >>>> ? arm disassemble 0xc000af3c
+> >>> 0xc000af3c ? 0xeafffffe ? ? ?B 0xc000af3c
+> >
+> > Probably __error. ?Either your machine isn't supported, or the kernel
+> > doesn't recognise your processor.
+> >
+> > Is your version of uboot sufficiently recent that it passes the correct
+> > machine ID in r1 ?
+> >
