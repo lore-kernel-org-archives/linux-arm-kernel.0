@@ -1,72 +1,106 @@
 From: vince@kyllikki.org (Vincent Sanders)
-Date: Mon, 13 Sep 2010 16:13:48 +0100
-Subject: [PATCH 5/9] Remove unused omap generic 2420 default configuration
+Date: Mon, 13 Sep 2010 16:13:44 +0100
+Subject: [PATCH 1/9] Remove unused default configuration
 In-Reply-To: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
 References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-Message-ID: <1284390832-7181-6-git-send-email-vince@kyllikki.org>
+Message-ID: <1284390832-7181-2-git-send-email-vince@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vincent Sanders <vince@simtec.co.uk>
 
-The omap_generic_2420 default configuration has not built throughout
-the 2.6.36 series (since 2.6.35-git1). The link has failed with
+The msm default configuration has not built throughout the 2.6.36
+series (since 2.6.35). The build has failed with
 
-arch/arm/plat-omap/built-in.o: In function `newled_init':
-/var/tmp/kernel-orig/arch/arm/plat-omap/debug-leds.c:249: undefined reference to `led_classdev_register'
-
-In addition there is a modpost warning about six section mismatches
+arch/arm/mach-msm/board-halibut.c: In function 'halibut_fixup':
+arch/arm/mach-msm/board-halibut.c:86: error: 'struct membank' has no member named 'node'
+arch/arm/mach-msm/board-halibut.c:86: error: implicit declaration of function 'PHYS_TO_NID'
 
 This configuration appers to be unused by the maintainer so remove it.
 
 Signed-off-by: Vincent Sanders <vince@kyllikki.org>
 ---
- arch/arm/configs/omap_generic_2420_defconfig |   37 --------------------------
- 1 files changed, 0 insertions(+), 37 deletions(-)
- delete mode 100644 arch/arm/configs/omap_generic_2420_defconfig
+ arch/arm/configs/msm_defconfig |   72 ----------------------------------------
+ 1 files changed, 0 insertions(+), 72 deletions(-)
+ delete mode 100644 arch/arm/configs/msm_defconfig
 
-diff --git a/arch/arm/configs/omap_generic_2420_defconfig b/arch/arm/configs/omap_generic_2420_defconfig
+diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
 deleted file mode 100644
-index ac08e51..0000000
---- a/arch/arm/configs/omap_generic_2420_defconfig
+index 2b8f7af..0000000
+--- a/arch/arm/configs/msm_defconfig
 +++ /dev/null
-@@ -1,37 +0,0 @@
+@@ -1,72 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_IKCONFIG=y
+-CONFIG_IKCONFIG_PROC=y
 -CONFIG_BLK_DEV_INITRD=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
+-CONFIG_SLAB=y
 -# CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_OMAP=y
--CONFIG_ARCH_OMAP2=y
--# CONFIG_OMAP_MUX is not set
--CONFIG_MACH_OMAP_GENERIC=y
--CONFIG_ARCH_OMAP2420=y
--CONFIG_LEDS=y
--CONFIG_ZBOOT_ROM_TEXT=0x10C08000
--CONFIG_ZBOOT_ROM_BSS=0x10200000
--CONFIG_FPE_NWFPE=y
--CONFIG_BLK_DEV_RAM=y
+-# CONFIG_IOSCHED_DEADLINE is not set
+-# CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_MSM=y
+-CONFIG_MACH_HALIBUT=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+-# CONFIG_OABI_COMPAT is not set
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="mem=64M console=ttyMSM,115200n8"
+-CONFIG_PM=y
+-CONFIG_NET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+-# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+-# CONFIG_INET_XFRM_MODE_BEET is not set
+-# CONFIG_INET_DIAG is not set
+-# CONFIG_IPV6 is not set
+-CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_NETDEVICES=y
+-CONFIG_DUMMY=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_SMC91X=y
+-CONFIG_PPP=y
+-CONFIG_PPP_ASYNC=y
+-CONFIG_PPP_DEFLATE=y
+-CONFIG_PPP_BSDCOMP=y
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
 -CONFIG_INPUT_EVDEV=y
--# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_KEYBOARD_ATKBD is not set
 -# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_INPUT_MISC=y
+-# CONFIG_SERIO is not set
+-CONFIG_VT_HW_CONSOLE_BINDING=y
+-CONFIG_SERIAL_MSM=y
+-CONFIG_SERIAL_MSM_CONSOLE=y
 -# CONFIG_LEGACY_PTYS is not set
--CONFIG_WATCHDOG=y
--CONFIG_WATCHDOG_NOWAYOUT=y
--CONFIG_VIDEO_OUTPUT_CONTROL=m
+-# CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
+-# CONFIG_HWMON is not set
+-CONFIG_VIDEO_OUTPUT_CONTROL=y
+-CONFIG_FB=y
+-CONFIG_FB_MODE_HELPERS=y
+-CONFIG_FB_TILEBLITTING=y
+-CONFIG_FB_MSM=y
 -# CONFIG_VGA_CONSOLE is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
 -CONFIG_INOTIFY=y
--CONFIG_ROMFS_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_MAGIC_SYSRQ=y
 -CONFIG_DEBUG_KERNEL=y
+-CONFIG_SCHEDSTATS=y
+-CONFIG_DEBUG_MUTEXES=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
 -CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
 -CONFIG_DEBUG_LL=y
--CONFIG_CRC_CCITT=y
 -- 
 1.7.0.4
