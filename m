@@ -1,41 +1,42 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 13 Sep 2010 13:05:50 -0700
-Subject: [GIT PULL] generic arm MSM changes for v2.6.37 -v2
-Message-ID: <1284408350.4003.45.camel@c-dwalke-linux.qualcomm.com>
+From: arm@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Mon, 13 Sep 2010 21:08:00 +0100
+Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
+In-Reply-To: <b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
+References: <cover.1284406638.git.joe@perches.com>
+	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
+Message-ID: <4C8E84A0.1010606@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+ Commit message is  somewhat inaccurate...
 
-Here is a replacement pull request. It's the same changes as the last
-one I sent, only without the SMP Kconfig change.
-
-I sent the SMP Kconfig change as a separate patch against your devel
-tree.
-
-Daniel
-
-
-The following changes since commit 49553c2ef88749dd502687f4eb9c258bb10a4f44:
-
-  Linux 2.6.36-rc4 (2010-09-12 16:07:37 -0700)
-
-are available in the git repository at:
-  git://codeaurora.org/quic/kernel/dwalker/linux-msm.git for-russell
-
-Abhijeet Dharmapurikar (1):
-      GIC: Dont disable INT in ack callback
-
-Daniel Walker (2):
-      arm: dis-allow hotplug on MSM
-      arm: mm: add proc info for ARM11MPCore/Cortex-A9 from ARM
-
- arch/arm/Kconfig      |    1 +
- arch/arm/common/gic.c |   14 --------------
- arch/arm/mm/proc-v7.S |   26 +++++++++++++++++++++++++-
- 3 files changed, 26 insertions(+), 15 deletions(-)
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+On 09/13/10 20:47, Joe Perches wrote:
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>  drivers/i2c/busses/i2c-stu300.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+> index 495be45..2f7c09c 100644
+> --- a/drivers/i2c/busses/i2c-stu300.c
+> +++ b/drivers/i2c/busses/i2c-stu300.c
+> @@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	int bus_nr;
+>  	int ret = 0;
+> -	char clk_name[] = "I2C0";
+> +	char clk_name[sizeof("I2Cx")];
+>  
+>  	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
+>  	if (!dev) {
+> @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	bus_nr = pdev->id;
+> -	clk_name[3] += (char)bus_nr;
+> +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
+I'm guessing that there are never more than a couple of these.
+Why is this method a better bet than just putting %d?
+>  	dev->clk = clk_get(&pdev->dev, clk_name);
+>  	if (IS_ERR(dev->clk)) {
+>  		ret = PTR_ERR(dev->clk);
