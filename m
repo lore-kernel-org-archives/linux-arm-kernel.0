@@ -1,42 +1,78 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 13 Sep 2010 13:16:07 -0700
-Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
-In-Reply-To: <4C8E84A0.1010606@jic23.retrosnub.co.uk>
-References: <cover.1284406638.git.joe@perches.com>
-	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
-	<4C8E84A0.1010606@jic23.retrosnub.co.uk>
-Message-ID: <1284408967.26719.36.camel@Joe-Laptop>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 14 Sep 2010 08:53:05 +1200
+Subject: [PATCH v2] AT91: Add flexibity board support
+In-Reply-To: <4C8DFA84.4040501@gmail.com>
+References: <4C8DFA84.4040501@gmail.com>
+Message-ID: <4C8E8F31.2050108@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-09-13 at 21:08 +0100, Jonathan Cameron wrote:
-> Commit message is  somewhat inaccurate...
+On 09/13/2010 10:18 PM, Maxim Osipov wrote:
+> Hello,
+> 
+> This patch adds support for AT91 Flexibity board.
 
-Yeah, sorry 'bout that.
-That's what I get for using a script.
-I did write an intro with more complete description.
+Couple more comments below,
 
-> > diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
-> > @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
-> >  	}
-> >  
-> >  	bus_nr = pdev->id;
-> > -	clk_name[3] += (char)bus_nr;
-> > +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
-> I'm guessing that there are never more than a couple of these.
-> Why is this method a better bet than just putting %d?
+> From ccb19f0d6dbda5356e64c1ce5d0fe1396c548f1a Mon Sep 17 00:00:00 2001
+> From: Maxim Osipov <maxim.osipov@gmail.com>
+> Date: Sun, 12 Sep 2010 16:23:48 +0400
+> Subject: [PATCH v2] AT91: Add flexibity board support
+> 
+> Signed-off-by: Maxim Osipov <maxim.osipov@gmail.com>
+> ---
 
-It tries to standardize the style use and it avoids possible
-future checkpatch warnings of:
-	char foo[] = "bar"
-char array could possibly be static const.
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/input.h>
+> +
+> +#include <asm/mach-types.h>
+> +
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/mach/irq.h>
+> +
+> +#include <mach/hardware.h>
+> +#include <mach/board.h>
+> +#include <mach/gpio.h>
 
-There was another use with "%1.1d" somewhere.
+Use linux/gpio.h
 
-The end result is the same, so I don't really care much
-if this sort of change is applied or not.  The possible
-checkpatch message could just be considered noise but
-Mike Frysinger seemed to prefer it, so I thought I could
-try to accommodate him.
+> +
+> +#include "generic.h"
+> +
+> +
 
-cheers, Joe
+Single blank line here, and between functions.
+
+> +
+> +static void __init flexibity_board_init(void)
+> +{
+> +	/* Serial */
+> +	at91_add_device_serial();
+> +	/* USB Host */
+> +	at91_add_device_usbh(&flexibity_usbh_data);
+> +	/* USB Device */
+> +	at91_add_device_udc(&flexibity_udc_data);
+> +	/* SPI */
+> +	at91_add_device_spi(flexibity_spi_devices,
+> +		ARRAY_SIZE(flexibity_spi_devices));
+> +	/* MMC */
+> +	at91_add_device_mmc(0, &flexibity_mmc_data);
+> +	/* LEDs */
+> +	at91_gpio_leds(flexibity_leds, ARRAY_SIZE(flexibity_leds));
+
+Can we drop all the comments inside this function please. They don't add
+any information and they make it harder to read the actual code.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
