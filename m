@@ -1,68 +1,112 @@
-From: mark.brown314@gmail.com (Mark F. Brown)
-Date: Sun, 12 Sep 2010 23:51:36 -0400
-Subject: [PATCH v2 3/3] ARM: pxa168/teton bga: add board support for i2c and
-	rtc-ds1337
-In-Reply-To: <1284349896-14545-1-git-send-email-mark.brown314@gmail.com>
-References: <1284349896-14545-1-git-send-email-mark.brown314@gmail.com>
-Message-ID: <1284349896-14545-4-git-send-email-mark.brown314@gmail.com>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Mon, 13 Sep 2010 09:34:44 +0530
+Subject: [PATCH 03/74] ST SPEAr: Formalized timer support
+In-Reply-To: <20100913033704.GB11822@game.jcrosoft.org>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<eed779f7085ed5686aceb61b48a2c2a7d6af5953.1283161023.git.viresh.kumar@st.com>
+	<20100906225536.GD8153@game.jcrosoft.org> <4C8D9909.4040705@st.com>
+	<20100913033704.GB11822@game.jcrosoft.org>
+Message-ID: <4C8DA2DC.8080502@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defined I2C/ALARM pin definitions
-DS1337 RTC alarm support is tied to RTC_INT_GPIO
+Dear Jean,
 
-Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
----
- arch/arm/mach-mmp/teton_bga.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+On 9/13/2010 9:07 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 08:52 Mon 13 Sep     , Shiraz Hashim wrote:
+>> Dear Jean,
+>>
+>> On 9/7/2010 4:25 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>  
+>>>> -#endif
+>>>> +static void __init spear3xx_timer_init(void)
+>>>> +{
+>>>> +	spear_setup_timer();
+>>> why not call it directly?
+>>
+>> A single level of abstraction was provided so that if archs (spear3xx/6xx/13xx)
+>> required to do something extra.
+>
+> it does not seems to be needed at all so for now call it directly is enough
+>
 
-diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
-index 2966117..d631bbc 100644
---- a/arch/arm/mach-mmp/teton_bga.c
-+++ b/arch/arm/mach-mmp/teton_bga.c
-@@ -18,6 +18,7 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <plat/pxa27x_keypad.h>
-+#include <linux/i2c.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -38,6 +39,13 @@ static unsigned long teton_bga_pin_config[] __initdata = {
- 	GPIO110_KP_MKIN0,
- 	GPIO111_KP_MKOUT7,
- 	GPIO112_KP_MKOUT6,
-+
-+	/* I2C Bus */
-+	GPIO105_CI2C_SDA,
-+	GPIO106_CI2C_SCL,
-+
-+	/* RTC */
-+	GPIO78_GPIO,
- };
- 
- static unsigned int teton_bga_matrix_key_map[] = {
-@@ -55,6 +63,13 @@ static struct pxa27x_keypad_platform_data teton_bga_keypad_info __initdata = {
- 	.debounce_interval      = 30,
- };
- 
-+static struct i2c_board_info teton_bga_i2c_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("ds1337", 0x68),
-+		.irq = gpio_to_irq(RTC_INT_GPIO)
-+	},
-+};
-+
- static void __init teton_bga_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
-@@ -62,6 +77,7 @@ static void __init teton_bga_init(void)
- 	/* on-chip devices */
- 	pxa168_add_uart(1);
- 	pxa168_add_keypad(&teton_bga_keypad_info);
-+	pxa168_add_twsi(0, NULL, ARRAY_AND_SIZE(teton_bga_i2c_info));
- }
- 
- MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development Platform")
--- 
-1.7.0.4
+OK. So, I think what could be better is to set the parent clock of the gpt in
+the arch specific function like spear3xx_timer_init. This would also remove this
+part from the timer code.
+
+>>>> +/* following defines the parent clock to be used */
+>>>> +#ifdef CONFIG_ARCH_SPEAR13XX
+>>>> +static char pclk_name[] = "osc1_24m_clk";
+>>>> +#else
+>>>> +static char pclk_name[] = "pll3_48m_clk";
+>>>> +#endif
+>>> why 2 name?
+>>
+>> spear13xx has different parent clock for gpt than spear3xx/6xx.
+> so use a generic name which will be an alias specify on the soc clock
+> so here no need to do the ifdef specially if you want to support both of them
+> in the same kernel
+
+As described above would move the parent clock selection to the respective timer
+init function for archs. Would that be fine ?
+
+>>
+>>> it will be better to use clkdev and create an alias
+>>
+>> This is specifically to chose parent clock, which can be different in different
+>> architectures. clkdev corresponding to parent clock is already defined. We use
+>> name here to get the clock.
+>>
+>>> btw how about move the timer to drivers/clocksource?
+>>
+>> I don't know whether this is the right place. Every body else has placed timer
+>> code in his respective mach/plat directory.
+>>
+>>>> +
+>>>>  static void clockevent_set_mode(enum clock_event_mode mode,
+>>>>  				struct clock_event_device *clk_event_dev);
+>>>>  static int clockevent_next_event(unsigned long evt,
+>>>> @@ -215,7 +222,8 @@ static void __init spear_clockevent_init(void)
+>>>>  
+>>>>  void __init spear_setup_timer(void)
+>>>>  {
+>>>> -	struct clk *pll3_clk;
+>>>> +	struct clk *clk;
+>>>> +	int ret;
+>>>>  
+>>>>  	if (!request_mem_region(SPEAR_GPT0_BASE, SZ_1K, "gpt0")) {
+>>>>  		pr_err("%s:cannot get IO addr\n", __func__);
+>>>> @@ -234,26 +242,32 @@ void __init spear_setup_timer(void)
+>>>>  		goto err_iomap;
+>>>>  	}
+>>>>  
+>>>> -	pll3_clk = clk_get(NULL, "pll3_48m_clk");
+>>>> -	if (!pll3_clk) {
+>>>> -		pr_err("%s:couldn't get PLL3 as parent for gpt\n", __func__);
+>>>> +	/* get the parent clock */
+>>>> +	clk = clk_get(NULL, pclk_name);
+>>>> +
+>>>> +	if (!clk) {
+>>>> +		pr_err("%s:couldn't get %s as parent for gpt\n",
+>>>> +				__func__, pclk_name);
+>>>>  		goto err_iomap;
+>>>>  	}
+>>>>  
+>>>> -	clk_set_parent(gpt_clk, pll3_clk);
+>>>> +	clk_set_parent(gpt_clk, clk);
+>>> ??
+>>> why not do this in the clock file?
+
+Better to be done in timer init function of respective archs like spear3xx_timer_init
+
+>>
+>> The functional clock of the timer very much depends on the parent clock it
+>> selects. This is a part of the timer itself, hence it is kept here.
+>
+> it's seems to be more soc depends than timer
+>
+
+yes, OK, would above solution be fine.
+
+regards
+Shiraz
