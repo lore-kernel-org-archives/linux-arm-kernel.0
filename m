@@ -1,112 +1,66 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 13 Sep 2010 12:47:38 -0700
-Subject: [PATCH 00/25] treewide-next: Use static const char arrays
-Message-ID: <cover.1284406638.git.joe@perches.com>
+From: public_filter@yahoo.com (P F)
+Date: Mon, 13 Sep 2010 12:58:41 -0700 (PDT)
+Subject: [RFC] mmaping with VIVT cache
+Message-ID: <210713.63745.qm@web120207.mail.ne1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using static const char foo[] = "bar" can save some
-code and text space, so change the places where it's possible.
+Hi,
 
-Also change the places that use
-	char foo[] = "barX";
-	...
-	foo[3] = value + '0';
-where X is typically changed
-	char foo[sizeof("barX")];
-	...
-	sprintf(foo, "bar%c", value + '0');
+Please excuse the pseudonym.
 
-Joe Perches (25):
-  arch/mips: Use static const char arrays
-  arch/powerpc: Use static const char arrays
-  drivers/acpi: Use static const char arrays
-  drivers/char: Use static const char arrays
-  drivers/i2c: Use static const char arrays
-  drivers/isdn: Use static const char arrays
-  drivers/media: Use static const char arrays
-  drivers/net/atl1c: Use static const char arrays
-  drivers/net/atl1e: Use static const char arrays
-  drivers/net/(intel): Use static const char arrays
-  drivers/net/netxen: Use static const char arrays
-  drivers/net/qlcnic: Use static const char arrays
-  drivers/net/spider_net.c: Use static const char arrays
-  drivers/net/vnxnet3: Use static const char arrays
-  drivers/net/wireless/ipw2x00: Use static const char arrays
-  drivers/s390/char: Use static const char arrays
-  drivers/scsi: Use static const char arrays
-  drivers/serial/suncore.c: Use static const char arrays
-  drivers/staging: Use static const char arrays
-  drivers/usb: Use static const char arrays
-  drivers/video: Use static const char arrays
-  net/dsa: Use static const char arrays
-  net/sunrpc: Use static const char arrays
-  sound: Use static const char arrays
-  tools/perf/util: Use static const char arrays
+I have recently encountered a problem in the context of the UVC (webcam)
+driver.  The driver maintainer, Laurent, suggested that we bring the
+thread to linux-arm-kernel for wider discussion.  See here for reference:
+http://lists.berlios.de/pipermail/linux-uvc-devel/2010-August/005864.html
 
- arch/mips/pnx8550/common/reset.c                   |    4 ++--
- arch/powerpc/boot/addnote.c                        |    4 ++--
- arch/powerpc/boot/cuboot-c2k.c                     |    4 ++--
- arch/powerpc/kernel/irq.c                          |    2 +-
- drivers/acpi/sleep.c                               |    4 ++--
- drivers/char/hvc_vio.c                             |    2 +-
- drivers/i2c/busses/i2c-stu300.c                    |    4 ++--
- drivers/isdn/hysdn/hycapi.c                        |    2 +-
- drivers/isdn/mISDN/dsp_cmx.c                       |    2 +-
- drivers/media/video/zoran/zoran_device.c           |    5 ++---
- drivers/net/atl1c/atl1c.h                          |    4 ++--
- drivers/net/atl1c/atl1c_main.c                     |    4 ++--
- drivers/net/atl1e/atl1e.h                          |    4 ++--
- drivers/net/atl1e/atl1e_main.c                     |    4 ++--
- drivers/net/e1000/e1000.h                          |    2 +-
- drivers/net/e1000/e1000_main.c                     |    4 ++--
- drivers/net/e1000e/e1000.h                         |    2 +-
- drivers/net/e1000e/netdev.c                        |    2 +-
- drivers/net/igb/igb.h                              |    4 ++--
- drivers/net/igb/igb_main.c                         |    4 ++--
- drivers/net/igbvf/igbvf.h                          |    2 +-
- drivers/net/igbvf/netdev.c                         |    2 +-
- drivers/net/ixgb/ixgb.h                            |    2 +-
- drivers/net/ixgb/ixgb_main.c                       |    2 +-
- drivers/net/ixgbe/ixgbe.h                          |    2 +-
- drivers/net/ixgbe/ixgbe_main.c                     |    4 ++--
- drivers/net/ixgbevf/ixgbevf.h                      |    2 +-
- drivers/net/ixgbevf/ixgbevf_main.c                 |    2 +-
- drivers/net/netxen/netxen_nic.h                    |    2 +-
- drivers/net/netxen/netxen_nic_main.c               |    2 +-
- drivers/net/qlcnic/qlcnic.h                        |    2 +-
- drivers/net/qlcnic/qlcnic_main.c                   |    2 +-
- drivers/net/spider_net.c                           |    2 +-
- drivers/net/vmxnet3/vmxnet3_drv.c                  |    2 +-
- drivers/net/vmxnet3/vmxnet3_int.h                  |    2 +-
- drivers/net/wireless/ipw2x00/ipw2100.c             |    2 +-
- drivers/net/wireless/ipw2x00/ipw2200.c             |    2 +-
- drivers/net/wireless/ipw2x00/libipw_module.c       |    2 +-
- drivers/s390/char/vmlogrdr.c                       |    4 ++--
- drivers/scsi/bnx2i/bnx2i_hwi.c                     |    6 +++---
- drivers/scsi/lpfc/lpfc_init.c                      |    2 +-
- drivers/scsi/megaraid/megaraid_mbox.c              |    6 +++---
- drivers/serial/suncore.c                           |    4 ++--
- drivers/staging/brcm80211/util/bcmutils.c          |    2 +-
- drivers/staging/comedi/drivers/comedi_bond.c       |    2 +-
- drivers/staging/cxt1e1/ossiRelease.c               |    2 +-
- drivers/staging/go7007/go7007-driver.c             |    2 +-
- drivers/staging/msm/mdp.c                          |    2 +-
- .../staging/rtl8192e/ieee80211/ieee80211_module.c  |    2 +-
- .../staging/rtl8192u/ieee80211/ieee80211_module.c  |    2 +-
- drivers/staging/tidspbridge/rmgr/dbdcd.c           |    6 +++---
- drivers/usb/atm/ueagle-atm.c                       |   14 +++++---------
- drivers/usb/otg/langwell_otg.c                     |    2 +-
- drivers/video/sh_mipi_dsi.c                        |    4 ++--
- drivers/video/sis/sis_main.c                       |   10 +++++-----
- drivers/video/via/viafbdev.c                       |    2 +-
- net/dsa/dsa.c                                      |    2 +-
- net/dsa/dsa_priv.h                                 |    2 +-
- net/sunrpc/auth_gss/gss_krb5_mech.c                |    2 +-
- sound/core/misc.c                                  |    5 ++++-
- tools/perf/util/ui/setup.c                         |    3 ++-
- tools/perf/util/ui/util.c                          |    3 ++-
- 62 files changed, 98 insertions(+), 98 deletions(-)
+The problem I encountered was this: using an ARM926EJ-S with OHCI USB host,
+I noticed intermittent graphical corruption of frames captured by several
+different webcams, both UVC and non-UVC.
 
--- 
-1.7.3.rc1
+I was able to isolate the corruption down to one specific instance.  In
+this instance, I collected three images:
+1A.jpg - collected from host, prior to corruption
+2A.jpg - collected from host, demonstrating corruption
+2B.jpg - collected from inline USB analyzer, same image as 2A
+
+Images 1A and 2A are in sequence, i.e., 2A immediately follows 1A.  2B is
+not corrupted, and a binary diff between 2A and 2B shows two 32-byte
+chunks have been changed.  A binary diff between 2A and 1A shows that
+these same two chunks match.  Therefore, it seems there is some
+contamination of the second image by the first.
+
+As I described in the linked message, I found a workaround for this issue
+by adding
+  vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot)
+in the UVC driver's mmap() function, but Laurent explained that this was
+invalid.
+
+Does anybody have ideas for a proper fix?  I can reproduce this corruption
+easily, and would be happy to test proposed patches.
+
+Best regards
+
+
+      
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 1A.jpg
+Type: image/jpeg
+Size: 10109 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100913/147ad402/attachment-0003.jpg>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 2A.jpg
+Type: image/jpeg
+Size: 11660 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100913/147ad402/attachment-0004.jpg>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 2B.jpg
+Type: image/jpeg
+Size: 11660 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100913/147ad402/attachment-0005.jpg>
