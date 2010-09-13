@@ -1,58 +1,71 @@
 From: vince@kyllikki.org (Vincent Sanders)
-Date: Mon, 13 Sep 2010 16:13:49 +0100
-Subject: [PATCH 6/9] Remove unused pxa3xx default configuration
+Date: Mon, 13 Sep 2010 16:13:50 +0100
+Subject: [PATCH 7/9] Remove unused qil-a9260 default configuration
 In-Reply-To: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
 References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-Message-ID: <1284390832-7181-7-git-send-email-vince@kyllikki.org>
+Message-ID: <1284390832-7181-8-git-send-email-vince@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vincent Sanders <vince@simtec.co.uk>
 
-The pxa3xx default configuration has not built throughout the 2.6.36
-series (since 2.6.35-git1). The kernel link has failed with
+The qil-a9260 default configuration has not built throughout the
+2.6.36 series (since 2.6.35-git1). The kernel link has failed with
 
 fs/built-in.o: In function `nfs_callback_authenticate':
-compr_lzo.c:(.text+0x817bc): undefined reference to `svc_gss_principal'
+compr_zlib.c:(.text+0x8cf18): undefined reference to `svc_gss_principal'
 
 This configuration appers to be unused by the maintainer so remove it.
 
 Signed-off-by: Vincent Sanders <vince@kyllikki.org>
 ---
- arch/arm/configs/pxa3xx_defconfig |  134 -------------------------------------
- 1 files changed, 0 insertions(+), 134 deletions(-)
- delete mode 100644 arch/arm/configs/pxa3xx_defconfig
+ arch/arm/configs/qil-a9260_defconfig |  115 ----------------------------------
+ 1 files changed, 0 insertions(+), 115 deletions(-)
+ delete mode 100644 arch/arm/configs/qil-a9260_defconfig
 
-diff --git a/arch/arm/configs/pxa3xx_defconfig b/arch/arm/configs/pxa3xx_defconfig
+diff --git a/arch/arm/configs/qil-a9260_defconfig b/arch/arm/configs/qil-a9260_defconfig
 deleted file mode 100644
-index 1677a06..0000000
---- a/arch/arm/configs/pxa3xx_defconfig
+index 9160f3b..0000000
+--- a/arch/arm/configs/qil-a9260_defconfig
 +++ /dev/null
-@@ -1,134 +0,0 @@
+@@ -1,115 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
+-# CONFIG_LOCALVERSION_AUTO is not set
+-# CONFIG_SWAP is not set
 -CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=18
--CONFIG_SYSFS_DEPRECATED_V2=y
+-CONFIG_LOG_BUF_SHIFT=14
 -# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
--CONFIG_KALLSYMS_ALL=y
 -CONFIG_SLAB=y
 -CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
 -# CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_PXA=y
--CONFIG_MACH_LITTLETON=y
--CONFIG_MACH_TAVOREVB=y
--CONFIG_MACH_SAAR=y
--CONFIG_PREEMPT=y
+-# CONFIG_IOSCHED_DEADLINE is not set
+-# CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_AT91=y
+-CONFIG_ARCH_AT91SAM9260=y
+-CONFIG_MACH_QIL_A9260=y
+-CONFIG_AT91_SLOW_CLOCK=y
+-CONFIG_AT91_EARLY_USART0=y
+-# CONFIG_ARM_THUMB is not set
 -CONFIG_AEABI=y
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="root=/dev/nfs rootfstype=nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on console=ttyS0,115200 mem=64M debug"
+-CONFIG_CMDLINE="mem=64M console=ttyS1,115200"
 -CONFIG_FPE_NWFPE=y
+-CONFIG_PM=y
 -CONFIG_NET=y
 -CONFIG_PACKET=y
 -CONFIG_UNIX=y
 -CONFIG_INET=y
+-CONFIG_IP_MULTICAST=y
+-CONFIG_IP_ADVANCED_ROUTER=y
+-CONFIG_IP_ROUTE_VERBOSE=y
 -CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_BOOTP=y
+-CONFIG_IP_PNP_RARP=y
+-CONFIG_IP_MROUTE=y
+-CONFIG_IP_PIMSM_V1=y
+-CONFIG_IP_PIMSM_V2=y
 -# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
 -# CONFIG_INET_XFRM_MODE_TUNNEL is not set
 -# CONFIG_INET_XFRM_MODE_BEET is not set
@@ -60,108 +73,76 @@ index 1677a06..0000000
 -# CONFIG_INET_DIAG is not set
 -# CONFIG_IPV6 is not set
 -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--# CONFIG_STANDALONE is not set
--# CONFIG_PREVENT_FIRMWARE_BUILD is not set
 -CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CMDLINE_PARTS=y
 -CONFIG_MTD_CHAR=y
 -CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_DATAFLASH=y
 -CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
--CONFIG_MTD_NAND_PXA3xx=y
--CONFIG_MTD_NAND_PXA3xx_BUILTIN=y
--CONFIG_MTD_ONENAND=y
--CONFIG_MTD_ONENAND_VERIFY_WRITE=y
--CONFIG_MTD_ONENAND_GENERIC=y
+-CONFIG_MTD_NAND_ATMEL=y
+-CONFIG_MTD_NAND_ATMEL_ECC_SOFT=y
 -CONFIG_BLK_DEV_LOOP=y
--CONFIG_BLK_DEV_RAM=y
 -# CONFIG_MISC_DEVICES is not set
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
 -CONFIG_NETDEVICES=y
 -CONFIG_NET_ETHERNET=y
--CONFIG_SMC91X=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
+-CONFIG_MII=y
+-CONFIG_MACB=y
 -# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_INPUT_EVDEV=y
+-CONFIG_INPUT_EVBUG=y
 -# CONFIG_KEYBOARD_ATKBD is not set
 -CONFIG_KEYBOARD_GPIO=y
--CONFIG_KEYBOARD_PXA27x=y
--CONFIG_KEYBOARD_PXA930_ROTARY=y
--CONFIG_MOUSE_PXA930_TRKBALL=y
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_SERIAL_PXA=y
--CONFIG_SERIAL_PXA_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
+-# CONFIG_INPUT_MOUSE is not set
+-# CONFIG_SERIO is not set
+-CONFIG_SERIAL_ATMEL=y
+-CONFIG_SERIAL_ATMEL_CONSOLE=y
+-CONFIG_HW_RANDOM=y
 -CONFIG_I2C=y
--# CONFIG_I2C_HELPER_AUTO is not set
--CONFIG_I2C_PXA=y
+-CONFIG_I2C_CHARDEV=y
 -CONFIG_SPI=y
--CONFIG_SPI_PXA2XX=y
--CONFIG_GPIO_MAX732X=y
--CONFIG_GPIO_PCA953X=y
--CONFIG_GPIO_PCF857X=y
--CONFIG_GPIO_MAX7301=y
--CONFIG_POWER_SUPPLY=y
--CONFIG_POWER_SUPPLY_DEBUG=y
--CONFIG_PDA_POWER=y
--CONFIG_BATTERY_DA9030=y
+-CONFIG_SPI_ATMEL=y
 -# CONFIG_HWMON is not set
--CONFIG_PMIC_DA903X=y
--CONFIG_REGULATOR=y
--CONFIG_REGULATOR_DEBUG=y
--CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
--CONFIG_REGULATOR_DA903X=y
--CONFIG_FB=y
--CONFIG_FB_PXA=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_LCD_TDO24M=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--# CONFIG_BACKLIGHT_GENERIC is not set
--CONFIG_BACKLIGHT_DA903X=y
+-CONFIG_WATCHDOG=y
+-CONFIG_WATCHDOG_NOWAYOUT=y
 -# CONFIG_VGA_CONSOLE is not set
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--CONFIG_FONTS=y
--CONFIG_FONT_6x11=y
--CONFIG_LOGO=y
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
+-# CONFIG_USB_HID is not set
+-CONFIG_USB=y
+-CONFIG_USB_DEVICEFS=y
+-CONFIG_USB_MON=y
+-CONFIG_USB_OHCI_HCD=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_ETH=m
 -CONFIG_MMC=y
--CONFIG_MMC_PXA=y
+-CONFIG_MMC_AT91=m
 -CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=m
--CONFIG_LEDS_GPIO=m
--CONFIG_LEDS_DA903X=m
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_GPIO=y
 -CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_TIMER=m
--CONFIG_LEDS_TRIGGER_HEARTBEAT=m
--CONFIG_LEDS_TRIGGER_BACKLIGHT=m
--CONFIG_LEDS_TRIGGER_GPIO=m
--CONFIG_LEDS_TRIGGER_DEFAULT_ON=m
+-CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_M41T94=y
+-CONFIG_EXT2_FS=y
+-CONFIG_INOTIFY=y
+-CONFIG_FUSE_FS=m
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
 -CONFIG_JFFS2_FS=y
--CONFIG_JFFS2_FS_WBUF_VERIFY=y
--CONFIG_JFFS2_COMPRESSION_OPTIONS=y
--CONFIG_JFFS2_LZO=y
--CONFIG_JFFS2_RUBIN=y
 -CONFIG_NFS_FS=y
 -CONFIG_NFS_V3=y
 -CONFIG_NFS_V3_ACL=y
 -CONFIG_NFS_V4=y
 -CONFIG_ROOT_NFS=y
--CONFIG_NLS=y
--CONFIG_PRINTK_TIME=y
--CONFIG_MAGIC_SYSRQ=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_CODEPAGE_850=y
+-CONFIG_NLS_ISO8859_1=y
 -CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SHIRQ=y
--CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
--# CONFIG_SCHED_DEBUG is not set
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--# CONFIG_FTRACE is not set
 -CONFIG_DEBUG_USER=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
+-CONFIG_DEBUG_LL=y
 -# CONFIG_CRYPTO_HW is not set
 -- 
 1.7.0.4
