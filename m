@@ -1,74 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Sep 2010 09:39:52 +0100
-Subject: [PATCH 5/6] ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS
-In-Reply-To: <831bc9523fe04ce899bc78230990033fbe009431.1284357372.git.matt@console-pimps.org>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<831bc9523fe04ce899bc78230990033fbe009431.1284357372.git.matt@console-pimps.org>
-Message-ID: <1284367192.3042.2.camel@e102144-lin.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 13 Sep 2010 09:41:26 +0100
+Subject: Regression on UP ARM from commit
+	e18d65f0500b95d8724b17d8ea9f1116cf390bbe
+In-Reply-To: <20100913055549.GA14773@jasper.tkos.co.il>
+References: <AANLkTimC5Vz7x9+MNJcewijoyw=Nyr6WWP=YR8cxqarH@mail.gmail.com>
+	<20100913055549.GA14773@jasper.tkos.co.il>
+Message-ID: <20100913084125.GI23903@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+On Mon, Sep 13, 2010 at 07:55:49AM +0200, Baruch Siach wrote:
+> Hi Linus,
 
-On Mon, 2010-09-13 at 07:07 +0100, Matt Fleming wrote:
-> Currently, oprofile support is only functional if CONFIG_HW_PERF_EVENTS
-> is set. If this symbol is not set, oprofile initialisation will fail at
-> runtime. Instead of allowing the oprofile code to build but fail at
-> runtime it seems less confusing to not allow the code to be built unless
-> hardware performance counter support is available.
-> 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> ---
->  arch/arm/Kconfig           |    2 +-
->  arch/arm/oprofile/common.c |    9 ---------
->  2 files changed, 1 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a7ed21f..d29075c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -14,7 +14,7 @@ config ARM
->         select RTC_LIB
->         select SYS_SUPPORTS_APM_EMULATION
->         select GENERIC_ATOMIC64 if (!CPU_32v6K)
-> -       select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
-> +       select HAVE_OPROFILE if (HW_PERF_EVENTS)
->         select HAVE_ARCH_KGDB
->         select HAVE_KPROBES if (!XIP_KERNEL)
->         select HAVE_KRETPROBES if (HAVE_KPROBES)
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index 9a3ed26..444ea86 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -24,7 +24,6 @@
->  #include <asm/perf_event.h>
->  #include <asm/ptrace.h>
-> 
-> -#ifdef CONFIG_HW_PERF_EVENTS
->  static char *op_name_from_perf_id(enum arm_perf_pmu_ids id)
->  {
->         switch (id) {
-> @@ -119,11 +118,3 @@ void __exit oprofile_arch_exit(void)
->  {
->         oprofile_perf_exit();
->  }
-> -#else
-> -int __init oprofile_arch_init(struct oprofile_operations *ops)
-> -{
-> -       pr_info("oprofile: hardware counters not available\n");
-> -       return -ENODEV;
-> -}
-> -void __exit oprofile_arch_exit(void) {}
-> -#endif /* CONFIG_HW_PERF_EVENTS */
-> --
-> 1.7.1
+> On Sun, Sep 12, 2010 at 11:47:39PM +0200, Linus Walleij wrote:
+> > commit e18d65f0500b95d8724b17d8ea9f1116cf390bbe
+> > "slub: Remove static kmem_cache_cpu array for boot"
 
+> In which tree have you found this commit? I cant find 
+> e18d65f0500b95d8724b17d8ea9f1116cf390bbe in Linus' (Torvalds) tree up to -rc4.
 
-When oprofile_arch_init fails (-ENODEV), oprofile will fall back to
-timer mode. With this patch, how can you make use of a timer fallback?
-
-I'll try and get around to testing the rest of this series today.
-
-Cheers,
-
-Will
+It's in -next via some means.
