@@ -1,155 +1,90 @@
-From: jason77.wang@gmail.com (Jason Wang)
-Date: Mon, 13 Sep 2010 11:31:12 +0800
-Subject: [PATCH 2/6] i.MX5/clock: add eCSPI and CSPI clock definitions
-In-Reply-To: <20100910094714.GF30558@pengutronix.de>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-2-git-send-email-jason77.wang@gmail.com>
-	<1283413924-14210-3-git-send-email-jason77.wang@gmail.com>
-	<20100902150112.GM14214@pengutronix.de>
-	<4C809410.9090602@gmail.com>
-	<20100910094714.GF30558@pengutronix.de>
-Message-ID: <4C8D9B00.8080004@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 13 Sep 2010 05:37:04 +0200
+Subject: [PATCH 03/74] ST SPEAr: Formalized timer support
+In-Reply-To: <4C8D9909.4040705@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<eed779f7085ed5686aceb61b48a2c2a7d6af5953.1283161023.git.viresh.kumar@st.com>
+	<20100906225536.GD8153@game.jcrosoft.org> <4C8D9909.4040705@st.com>
+Message-ID: <20100913033704.GB11822@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote:
-> Hello Jason,
->
-> I currently merge your and our patch set.  Will follow up with the
-> result hopefully later today.
->
-> On Fri, Sep 03, 2010 at 02:22:08PM +0800, Jason Wang wrote:
->   
->>>>  @@ -52,6 +53,18 @@ static int _clk_ccgr_enable(struct clk *clk)
->>>>  	return 0;
->>>>  }
->>>>  +static int _clk_ccgr_enable_inrun(struct clk *clk)
->>>> +{
->>>> +	u32 reg;
->>>> +
->>>> +	reg = __raw_readl(clk->enable_reg);
->>>> +	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
->>>> +	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
->>>> +	__raw_writel(reg, clk->enable_reg);
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +
->>>>     
->>>>         
->>> imho this should be consolidated in something like:
->>>
->>> static int _clk_ccgr_setclk(struct clk *clk, unsigned mode)
->>> {
->>> 	...
->>> }
->>>
->>> #define _clk_ccgr_enable(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_ON)
->>> #define _clk_ccgr_disable(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_OFF)
->>> #define _clk_ccgr_enable_inrun(clk) _clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE)
->>>
->>>   
->>>       
->> It makes  code more concise. On the other hand, too many macros will
->> add troubles when we use kgdb to perform sourcecode-level debug.
->>     
-> Using macros doesn't work here, as they are used as callbacks.  Still
-> made it with functions.  Then (apart from the return value)
-> _clk_ccgr_enable_inrun and _clk_ccgr_disable_inwait are identically.
-> I wonder if this is intended?
->
->   
-This is from Freescale's original design.
+On 08:52 Mon 13 Sep     , Shiraz Hashim wrote:
+> Dear Jean,
+> 
+> On 9/7/2010 4:25 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>  
+> >> -#endif
+> >> +static void __init spear3xx_timer_init(void)
+> >> +{
+> >> +	spear_setup_timer();
+> > why not call it directly?
+> 
+> A single level of abstraction was provided so that if archs (spear3xx/6xx/13xx)
+> required to do something extra.
+it does not seems to be needed at all so for now call it directly is enough
+> >> +/* following defines the parent clock to be used */
+> >> +#ifdef CONFIG_ARCH_SPEAR13XX
+> >> +static char pclk_name[] = "osc1_24m_clk";
+> >> +#else
+> >> +static char pclk_name[] = "pll3_48m_clk";
+> >> +#endif
+> > why 2 name?
+> 
+> spear13xx has different parent clock for gpt than spear3xx/6xx.
+so use a generic name which will be an alias specify on the soc clock
+so here no need to do the ifdef specially if you want to support both of them
+in the same kernel
+> 
+> > it will be better to use clkdev and create an alias
+> 
+> This is specifically to chose parent clock, which can be different in different
+> architectures. clkdev corresponding to parent clock is already defined. We use
+> name here to get the clock.
+> 
+> > btw how about move the timer to drivers/clocksource?
+> 
+> I don't know whether this is the right place. Every body else has placed timer
+> code in his respective mach/plat directory.
+> 
+> >> +
+> >>  static void clockevent_set_mode(enum clock_event_mode mode,
+> >>  				struct clock_event_device *clk_event_dev);
+> >>  static int clockevent_next_event(unsigned long evt,
+> >> @@ -215,7 +222,8 @@ static void __init spear_clockevent_init(void)
+> >>  
+> >>  void __init spear_setup_timer(void)
+> >>  {
+> >> -	struct clk *pll3_clk;
+> >> +	struct clk *clk;
+> >> +	int ret;
+> >>  
+> >>  	if (!request_mem_region(SPEAR_GPT0_BASE, SZ_1K, "gpt0")) {
+> >>  		pr_err("%s:cannot get IO addr\n", __func__);
+> >> @@ -234,26 +242,32 @@ void __init spear_setup_timer(void)
+> >>  		goto err_iomap;
+> >>  	}
+> >>  
+> >> -	pll3_clk = clk_get(NULL, "pll3_48m_clk");
+> >> -	if (!pll3_clk) {
+> >> -		pr_err("%s:couldn't get PLL3 as parent for gpt\n", __func__);
+> >> +	/* get the parent clock */
+> >> +	clk = clk_get(NULL, pclk_name);
+> >> +
+> >> +	if (!clk) {
+> >> +		pr_err("%s:couldn't get %s as parent for gpt\n",
+> >> +				__func__, pclk_name);
+> >>  		goto err_iomap;
+> >>  	}
+> >>  
+> >> -	clk_set_parent(gpt_clk, pll3_clk);
+> >> +	clk_set_parent(gpt_clk, clk);
+> > ??
+> > why not do this in the clock file?
+> 
+> The functional clock of the timer very much depends on the parent clock it
+> selects. This is a part of the timer itself, hence it is kept here.
+it's seems to be more soc depends than timer
 
-enalble_inrun = disable_inwait  = paritial enable = partial disable.
-(clock is enable in free run mode, while is disable in wait/stop mode.)
-
-This function can be both an enable callback and a disable callback.
-I guess that assign this function two names just for logic clear.
->> Anyway, i agree your suggestion.
->>     
->>>>  static void _clk_ccgr_disable(struct clk *clk)
->>>>  {
->>>>  	u32 reg;
->>>> @@ -762,6 +775,61 @@ static struct clk kpp_clk = {
->>>>  	.id = 0,
->>>>  };
->>>>  +/* eCSPI */
->>>> +static unsigned long _clk_ecspi_getrate(struct clk *clk)
->>>> +{
->>>> +	u32 reg, prediv, podf;
->>>> +	unsigned long ret;
->>>> +
->>>> +	reg = __raw_readl(MXC_CCM_CSCDR2);
->>>> +	prediv = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PRED_MASK) >>
->>>> +		  MXC_CCM_CSCDR2_CSPI_CLK_PRED_OFFSET) + 1;
->>>> +	if (prediv == 1)
->>>> +		BUG();
->>>> +	podf = ((reg & MXC_CCM_CSCDR2_CSPI_CLK_PODF_MASK) >>
->>>> +		MXC_CCM_CSCDR2_CSPI_CLK_PODF_OFFSET) + 1;
->>>> +
->>>> +	ret = clk_get_rate(clk->parent) / (prediv * podf);
->>>> +	return ret;
->>>> +}
->>>> +
->>>> +static int _clk_ecspi_set_parent(struct clk *clk, struct clk *parent)
->>>> +{
->>>> +	u32 reg, mux;
->>>> +
->>>> +	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk, &pll3_sw_clk,
->>>> +		       &lp_apm_clk);
->>>> +	reg = __raw_readl(MXC_CCM_CSCMR1) & ~MXC_CCM_CSCMR1_CSPI_CLK_SEL_MASK;
->>>> +	reg |= mux << MXC_CCM_CSCMR1_CSPI_CLK_SEL_OFFSET;
->>>> +	__raw_writel(reg, MXC_CCM_CSCMR1);
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +
->>>> +static struct clk ecspi_main_clk = {
->>>> +	.parent = &pll3_sw_clk,
->>>> +	.get_rate = _clk_ecspi_getrate,
->>>> +	.set_parent = _clk_ecspi_set_parent,
->>>>     
->>>>         
->>> Sascha didn't implement set_parent
->>>
->>>   
->>>       
->> ecspi really can change parent root clock.
->>     
->>>> +};
->>>> +
->>>> +static struct clk ecspi1_ipg_clk = {
->>>> +	.parent = &ipg_clk,
->>>> +	.secondary = &spba_clk,
->>>> +	.enable_reg = MXC_CCM_CCGR4,
->>>> +	.enable_shift = MXC_CCM_CCGRx_CG9_OFFSET,
->>>> +	.enable = _clk_ccgr_enable_inrun,
->>>> +	.disable = _clk_ccgr_disable,
->>>> +};
->>>> +
->>>> +static struct clk ecspi2_ipg_clk = {
->>>> +	.parent = &ipg_clk,
->>>> +	.secondary = &aips_tz2_clk,
->>>> +	.enable_reg = MXC_CCM_CCGR4,
->>>> +	.enable_shift = MXC_CCM_CCGRx_CG11_OFFSET,
->>>> +	.enable = _clk_ccgr_enable_inrun,
->>>> +	.disable = _clk_ccgr_disable,
->>>> +};
->>>>         
-> aips_tz2_clk is wrong here, no?  Sascha used spba_clk here, too.  I
-> didn't found out yet how to read that out of the reference manual.
->
->   
-Just guess from Freescale original design and "charpter 2 Memory Map" of
-MCIMX51RM.pdf.
-
-eCSPI1 is in the AIPS_TZ1(spba) ip module, while eCSPI2 is in the AIPS_TZ2
-ip module, so they have different "secondary ipg parent clock".
-
-Thanks,
-Jason.
-> Best regards
-> Uwe
->
->   
+Best Regards,
+J.
