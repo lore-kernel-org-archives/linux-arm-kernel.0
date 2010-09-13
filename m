@@ -1,31 +1,59 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 13 Sep 2010 17:19:31 +0200
-Subject: amba_pl022 spi->mode fix/cleanup patches
-In-Reply-To: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
-References: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <AANLkTimtR6+TFX8w1_6MEEqbvk5-StkUTn5kKd4q3DeZ@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 13 Sep 2010 23:27:11 +0800
+Subject: [PATCH 1/2] ARM: remove NR_IRQS in gic.c
+In-Reply-To: <1284357078-16248-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1284357078-16248-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTi=aW4PxF+mSB3hcjrZfq=mt3dqY+owa1v+jQs3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/10  <wellsk40@gmail.com>:
+On Mon, Sep 13, 2010 at 1:51 PM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> NR_IRQS is used to specified irq numbers of one cpu. Although this macro
+> is effective, it also blocks building multiple cpu architecutre into
+> one image.
+>
+> After SPARSE IRQ is introduced, nr_irqs could also indicate irq numbers of
+> one cpu architecture. Now use nr_irqs to replace NR_IRQS in gic.c.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 
-> This patch series updates drivers and platforms that depend on the
-> amba_pl022 driver and use the pl022_config_chip structure for
-> setting up the SPI mode and data transfer width.
+This is safe. I'm OK with this.
 
-I get regressions from the ab8500-spi.c driver from this patch:
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
-> ssp-pl022 ssp0: ARM PL022 driver, device ID: 0x01080022
-> pl022: mapped registers from 0x80002000 to d0834000
-> ab8500-spi spi0.0: unknown chip, revision: 0x80
-> ab8500-spi: probe of spi0.0 failed with error -22
 
-The 0x80 above used to be 0x00 before these patches.
-So all of a sudden bit 7 gets set...
-
-I don't know why this happens, probably some flag that used to
-be set had not been properly propagated in the first patch to alter
-the AB8500 device registration?
-
-Yours,
-Linus Walleij
+> ---
+> ?arch/arm/common/gic.c | ? ?6 +++---
+> ?1 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 7dfa9a8..7f43eae 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -191,7 +191,7 @@ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ? ? ? ? ?goto out;
+>
+> ? ? ? ?cascade_irq = gic_irq + chip_data->irq_offset;
+> - ? ? ? if (unlikely(gic_irq < 32 || gic_irq > 1020 || cascade_irq >= NR_IRQS))
+> + ? ? ? if (unlikely(gic_irq < 32 || gic_irq > 1020 || cascade_irq >= nr_irqs))
+> ? ? ? ? ? ? ? ?do_bad_IRQ(cascade_irq, desc);
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?generic_handle_irq(cascade_irq);
+> @@ -249,8 +249,8 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+> ? ? ? ? * Limit this to either the architected maximum, or the
+> ? ? ? ? * platform maximum.
+> ? ? ? ? */
+> - ? ? ? if (max_irq > max(1020, NR_IRQS))
+> - ? ? ? ? ? ? ? max_irq = max(1020, NR_IRQS);
+> + ? ? ? if (max_irq > max(1020, nr_irqs))
+> + ? ? ? ? ? ? ? max_irq = max(1020, nr_irqs);
+>
+> ? ? ? ?/*
+> ? ? ? ? * Set all global interrupts to be level triggered, active low.
+> --
+> 1.5.6.5
+>
+>
