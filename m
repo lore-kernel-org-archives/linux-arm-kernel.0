@@ -1,32 +1,21 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 Sep 2010 12:26:15 +0100
-Subject: [PATCH] ux500: add CPU hotplug support
-In-Reply-To: <20100913110632.GC30787@n2100.arm.linux.org.uk>
-References: <1284375698-1824-1-git-send-email-sundar.iyer@stericsson.com>
-	<20100913110632.GC30787@n2100.arm.linux.org.uk>
-Message-ID: <1284377175.31819.2.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Sep 2010 12:36:07 +0100
+Subject: [PATCH 7/9] ARM: Improve the L2 cache performance when PL310
+	is used
+In-Reply-To: <20100831135841.21304.55366.stgit@e102109-lin.cambridge.arm.com>
+References: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
+	<20100831135841.21304.55366.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20100913113607.GD30787@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-09-13 at 12:06 +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 13, 2010 at 04:31:38PM +0530, Sundar Iyer wrote:
-> > diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-> > index 438ef16..ade2e17 100644
-> > --- a/arch/arm/mach-ux500/platsmp.c
-> > +++ b/arch/arm/mach-ux500/platsmp.c
-> > @@ -26,7 +26,7 @@
-> >   * control for which core is the next to come out of the secondary
-> >   * boot "holding pen"
-> >   */
-> > -volatile int __cpuinitdata pen_release = -1;
-> > +volatile int pen_release = -1;
+On Tue, Aug 31, 2010 at 02:58:41PM +0100, Catalin Marinas wrote:
+> With this L2 cache controller, the cache maintenance by PA and sync
+> operations are atomic and do not require a "wait" loop. This patch
+> conditionally defines the cache_wait() function.
 > 
-> This looks like an unnecessary change.
+> Since L2x0 cache controllers do not work with ARMv7 CPUs, the patch
+> automatically enables CACHE_PL310 when only CPU_V7 is defined.
 
-I think it avoids a build warning about mismatched sections but that's
-probably the wrong way to fix. We get similar warnings on Versatile
-Express and RealView when hotplug is enabled but I haven't had the time
-to investigate properly.
-
--- 
-Catalin
+This should be a run-time test, as we're moving towards integrating
+ARMv6 and ARMv7 support into a single kernel image.
