@@ -1,48 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Sep 2010 13:40:49 +0100
-Subject: ARM target not boot after remap memory
-In-Reply-To: <4C8E1417.4060204@compulab.co.il>
-References: <AANLkTi=tWwaFHB0DY=j0UaqbYdYJpGJpmWdGC4aMufSw@mail.gmail.com>
-	<4C8E1417.4060204@compulab.co.il>
-Message-ID: <20100913124049.GG30787@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 13 Sep 2010 14:41:05 +0200
+Subject: Reg: Linux Porting
+In-Reply-To: <EC921D4B77C99B4EB3CEDAFFCF17D5F73DDED37361@CHN-HCLT-EVS07.HCLT.CORP.HCL.IN>
+References: <EC921D4B77C99B4EB3CEDAFFCF17D5F73DDED37361@CHN-HCLT-EVS07.HCLT.CORP.HCL.IN>
+Message-ID: <201009131441.05698.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 02:07:51PM +0200, Mike Rapoport wrote:
-> (add LAKLM to CC)
+Dne Po 13. z??? 2010 13:33:07 StephenPaulraj Chinnadurai-ERS,HCLTech napsal(a):
+> Dear Marek,
+> 
+> Hope you are doing well. Thanks for your support for the porting the
+> u-boot.
+> 
+> Now I need to port Linux 2.6.29 to my customized board built around PXA270
+> controller.
 
->> The problem is now when linux kernel is booting, nothing happens.
->>
->> ---
->> U-Boot> bootm
->> ## Booting kernel from Legacy Image at 21000000 ...
->>    Image Name:   Linux-2.6.34.1robin9200v1.0
->>    Image Type:   ARM Linux Kernel Image (uncompressed)
->>    Data Size:    1811796 Bytes = 1.7 MiB
->>    Load Address: 20008000
->>    Entry Point:  20008000
->>    Verifying Checksum ... OK
->>    Loading Kernel Image ... OK
->> OK
->>
->> Starting kernel ...
->>
->> Uncompressing Linux... done, booting the kernel.
->> ---
->>
->> Here is stalls. With my jtag probe I can locate the problem.
->>
->> ---
->>> halt
->> target state: halted
->> target halted in ARM state due to debug-request, current mode: Supervisor
->> cpsr: 0x600000d3 pc: 0xc000af3c
->> MMU: enabled, D-Cache: enabled, I-Cache: enabled
->>>   arm disassemble 0xc000af3c
->> 0xc000af3c	0xeafffffe	B 0xc000af3c
+Why such an old version? Noone will help you with deprecated stuff.
+> 
+> Is there any community that is working on Linux PXA 270 porting?
 
-Probably __error.  Either your machine isn't supported, or the kernel
-doesn't recognise your processor.
+CCed
+> 
+> Kindly suggest me one, so that I can get help from help from them.
+> 
+> Thanks and Regards
+> Stephen Paulraj C
 
-Is your version of uboot sufficiently recent that it passes the correct
-machine ID in r1 ?
+Cheers
