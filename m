@@ -1,49 +1,48 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Sep 2010 13:38:13 +0100
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <4C8E11D6.4050402@parrot.com>
-References: <4C8DD588.7040009@endruntechnologies.com>
-	<201009131043.48688.marek.vasut@gmail.com>
-	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>
-	<20100913101039.GC2614@kw.sim.vm.gnt>
-	<20100913101533.GB30787@n2100.arm.linux.org.uk>
-	<4C8E11D6.4050402@parrot.com>
-Message-ID: <20100913123813.GF30787@n2100.arm.linux.org.uk>
+Date: Mon, 13 Sep 2010 13:40:49 +0100
+Subject: ARM target not boot after remap memory
+In-Reply-To: <4C8E1417.4060204@compulab.co.il>
+References: <AANLkTi=tWwaFHB0DY=j0UaqbYdYJpGJpmWdGC4aMufSw@mail.gmail.com>
+	<4C8E1417.4060204@compulab.co.il>
+Message-ID: <20100913124049.GG30787@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 01:58:14PM +0200, Matthieu CASTET wrote:
-> Russell King - ARM Linux a ?crit :
->> On Mon, Sep 13, 2010 at 10:10:39AM +0000, Simon Guinot wrote:
->>> On Mon, Sep 13, 2010 at 05:56:30PM +0800, Haojian Zhuang wrote:
->>>> On Mon, Sep 13, 2010 at 4:43 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>> Cheers
->>>> If initramfs is built in, we'll get a huge kernel. Even using LZMA, my
->>>> kernel size is near 5MB.
->>> The initramfs is located at the end of the init section and before the
->>> text section. Because the kernel must be able to 'branch' between the
->>> init and text sections, the initramfs size can't be greater than the
->>> 'branch' maximum offset. 32MB ?
->>>
->>> I guess that relocate the initramfs just after the text section should
->>> break this limitation.
+On Mon, Sep 13, 2010 at 02:07:51PM +0200, Mike Rapoport wrote:
+> (add LAKLM to CC)
+
+>> The problem is now when linux kernel is booting, nothing happens.
 >>
->> But then means that it won't be freed after init time.
-> And why not putting it before init section ?
+>> ---
+>> U-Boot> bootm
+>> ## Booting kernel from Legacy Image at 21000000 ...
+>>    Image Name:   Linux-2.6.34.1robin9200v1.0
+>>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>>    Data Size:    1811796 Bytes = 1.7 MiB
+>>    Load Address: 20008000
+>>    Entry Point:  20008000
+>>    Verifying Checksum ... OK
+>>    Loading Kernel Image ... OK
+>> OK
+>>
+>> Starting kernel ...
+>>
+>> Uncompressing Linux... done, booting the kernel.
+>> ---
+>>
+>> Here is stalls. With my jtag probe I can locate the problem.
+>>
+>> ---
+>>> halt
+>> target state: halted
+>> target halted in ARM state due to debug-request, current mode: Supervisor
+>> cpsr: 0x600000d3 pc: 0xc000af3c
+>> MMU: enabled, D-Cache: enabled, I-Cache: enabled
+>>>   arm disassemble 0xc000af3c
+>> 0xc000af3c	0xeafffffe	B 0xc000af3c
 
-You still need code at the start of the kernel for the boot loader to
-run, and some of that code needs to be reachable from the __init code.
+Probably __error.  Either your machine isn't supported, or the kernel
+doesn't recognise your processor.
 
-You could move it away from the start of the kernel, replacing it with
-a couple of instructions to branch to it, but then you're into problems
-with setting up a 1:1 MMU mapping to cover the necessary code - and
-making sure that the instructions don't overlap a mapping boundary.
-
-Moreover, putting an initramfs at the very start risks making kernel
-modules useless, as they're placed below the kernel in virtual space.
-Adding an initramfs at the start of the kernel image pushes the kernel
-text further away from the modules, possibly meaning that the modules
-can't be linked.
-
-So, all in all, having a large initramfs built into the kernel is a
-stupid idea.  It's not going to work on ARM.
+Is your version of uboot sufficiently recent that it passes the correct
+machine ID in r1 ?
