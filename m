@@ -1,15 +1,15 @@
 From: vince@kyllikki.org (Vincent Sanders)
-Date: Mon, 13 Sep 2010 16:13:50 +0100
-Subject: [PATCH 7/9] Remove unused qil-a9260 default configuration
+Date: Mon, 13 Sep 2010 16:13:52 +0100
+Subject: [PATCH 9/9] Remove unused usb-a9263 default configuration
 In-Reply-To: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
 References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-Message-ID: <1284390832-7181-8-git-send-email-vince@kyllikki.org>
+Message-ID: <1284390832-7181-10-git-send-email-vince@kyllikki.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vincent Sanders <vince@simtec.co.uk>
 
-The qil-a9260 default configuration has not built throughout the
+The usb-a9263 default configuration has not built throughout the
 2.6.36 series (since 2.6.35-git1). The kernel link has failed with
 
 fs/built-in.o: In function `nfs_callback_authenticate':
@@ -19,16 +19,16 @@ This configuration appers to be unused by the maintainer so remove it.
 
 Signed-off-by: Vincent Sanders <vince@kyllikki.org>
 ---
- arch/arm/configs/qil-a9260_defconfig |  115 ----------------------------------
- 1 files changed, 0 insertions(+), 115 deletions(-)
- delete mode 100644 arch/arm/configs/qil-a9260_defconfig
+ arch/arm/configs/usb-a9263_defconfig |  106 ----------------------------------
+ 1 files changed, 0 insertions(+), 106 deletions(-)
+ delete mode 100644 arch/arm/configs/usb-a9263_defconfig
 
-diff --git a/arch/arm/configs/qil-a9260_defconfig b/arch/arm/configs/qil-a9260_defconfig
+diff --git a/arch/arm/configs/usb-a9263_defconfig b/arch/arm/configs/usb-a9263_defconfig
 deleted file mode 100644
-index 9160f3b..0000000
---- a/arch/arm/configs/qil-a9260_defconfig
+index ee82d09..0000000
+--- a/arch/arm/configs/usb-a9263_defconfig
 +++ /dev/null
-@@ -1,115 +0,0 @@
+@@ -1,106 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
 -# CONFIG_LOCALVERSION_AUTO is not set
 -# CONFIG_SWAP is not set
@@ -42,15 +42,14 @@ index 9160f3b..0000000
 -# CONFIG_IOSCHED_DEADLINE is not set
 -# CONFIG_IOSCHED_CFQ is not set
 -CONFIG_ARCH_AT91=y
--CONFIG_ARCH_AT91SAM9260=y
--CONFIG_MACH_QIL_A9260=y
+-CONFIG_ARCH_AT91SAM9263=y
+-CONFIG_MACH_USB_A9263=y
 -CONFIG_AT91_SLOW_CLOCK=y
--CONFIG_AT91_EARLY_USART0=y
 -# CONFIG_ARM_THUMB is not set
 -CONFIG_AEABI=y
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=64M console=ttyS1,115200"
+-CONFIG_CMDLINE="mem=64M console=ttyS0,115200"
 -CONFIG_FPE_NWFPE=y
 -CONFIG_PM=y
 -CONFIG_NET=y
@@ -101,13 +100,9 @@ index 9160f3b..0000000
 -CONFIG_SERIAL_ATMEL=y
 -CONFIG_SERIAL_ATMEL_CONSOLE=y
 -CONFIG_HW_RANDOM=y
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
 -CONFIG_SPI=y
 -CONFIG_SPI_ATMEL=y
 -# CONFIG_HWMON is not set
--CONFIG_WATCHDOG=y
--CONFIG_WATCHDOG_NOWAYOUT=y
 -# CONFIG_VGA_CONSOLE is not set
 -# CONFIG_USB_HID is not set
 -CONFIG_USB=y
@@ -117,15 +112,11 @@ index 9160f3b..0000000
 -CONFIG_USB_STORAGE=y
 -CONFIG_USB_GADGET=y
 -CONFIG_USB_ETH=m
--CONFIG_MMC=y
--CONFIG_MMC_AT91=m
 -CONFIG_NEW_LEDS=y
 -CONFIG_LEDS_CLASS=y
 -CONFIG_LEDS_GPIO=y
 -CONFIG_LEDS_TRIGGERS=y
 -CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_M41T94=y
 -CONFIG_EXT2_FS=y
 -CONFIG_INOTIFY=y
 -CONFIG_FUSE_FS=m
