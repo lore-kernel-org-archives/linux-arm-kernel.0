@@ -1,34 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 Sep 2010 12:57:10 +0100
-Subject: [PATCH 7/9] ARM: Improve the L2 cache performance when PL310
-	is used
-In-Reply-To: <20100913113607.GD30787@n2100.arm.linux.org.uk>
-References: <20100831135435.21304.38960.stgit@e102109-lin.cambridge.arm.com>
-	<20100831135841.21304.55366.stgit@e102109-lin.cambridge.arm.com>
-	<20100913113607.GD30787@n2100.arm.linux.org.uk>
-Message-ID: <1284379030.875.5.camel@e102109-lin.cambridge.arm.com>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Mon, 13 Sep 2010 13:58:14 +0200
+Subject: Maximum bootable kernel size in current ARM linux
+In-Reply-To: <20100913101533.GB30787@n2100.arm.linux.org.uk>
+References: <4C8DD588.7040009@endruntechnologies.com>	<201009131043.48688.marek.vasut@gmail.com>	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>	<20100913101039.GC2614@kw.sim.vm.gnt>
+	<20100913101533.GB30787@n2100.arm.linux.org.uk>
+Message-ID: <4C8E11D6.4050402@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-09-13 at 12:36 +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 31, 2010 at 02:58:41PM +0100, Catalin Marinas wrote:
-> > With this L2 cache controller, the cache maintenance by PA and sync
-> > operations are atomic and do not require a "wait" loop. This patch
-> > conditionally defines the cache_wait() function.
-> > 
-> > Since L2x0 cache controllers do not work with ARMv7 CPUs, the patch
-> > automatically enables CACHE_PL310 when only CPU_V7 is defined.
+Russell King - ARM Linux a ?crit :
+> On Mon, Sep 13, 2010 at 10:10:39AM +0000, Simon Guinot wrote:
+>> On Mon, Sep 13, 2010 at 05:56:30PM +0800, Haojian Zhuang wrote:
+>>> On Mon, Sep 13, 2010 at 4:43 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>>>> Cheers
+>>> If initramfs is built in, we'll get a huge kernel. Even using LZMA, my
+>>> kernel size is near 5MB.
+>> The initramfs is located at the end of the init section and before the
+>> text section. Because the kernel must be able to 'branch' between the
+>> init and text sections, the initramfs size can't be greater than the
+>> 'branch' maximum offset. 32MB ?
+>>
+>> I guess that relocate the initramfs just after the text section should
+>> break this limitation.
 > 
-> This should be a run-time test, as we're moving towards integrating
-> ARMv6 and ARMv7 support into a single kernel image.
+> But then means that it won't be freed after init time.
+And why not putting it before init section ?
 
-Do we expect to get the full ARMv7 performance when compiling a kernel
-for both ARMv6 and ARMv7? If not, we can force PL310 to be off in this
-configuration.
-
-With the compile-time option we get some macro optimisation but if we
-are to detect it we would need a function pointer for calling
-cache_wait().
-
--- 
-Catalin
+Matthieu
