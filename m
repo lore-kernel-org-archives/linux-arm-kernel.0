@@ -1,40 +1,35 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 13 Sep 2010 10:43:48 +0200
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <4C8DD588.7040009@endruntechnologies.com>
-References: <4C8DD588.7040009@endruntechnologies.com>
-Message-ID: <201009131043.48688.marek.vasut@gmail.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Mon, 13 Sep 2010 10:51:37 +0200
+Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
+In-Reply-To: <20100913075025.GA14882@console-pimps.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<SNT125-W35B89F6AA83C8DD22E7946BA770@phx.gbl>
+	<20100913075025.GA14882@console-pimps.org>
+Message-ID: <20100913085137.GE23741@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Po 13. z??? 2010 09:40:56 Bruce M. Penrod napsal(a):
-> This seems like a pretty straightforward question, but extensive web
-> searching hasn't shown a really clear, up-to-date answer.  The most
-> recent info is circa 2004 and states that 4MB is the largest
-> uncompressed ARM kernel that may be loaded.  Not being an ARM assembly
-> guru (head.S baffles me), I'd like to know if that is still true in
-> 2010, and if it is, why?
+
+* Matt Fleming <matt@console-pimps.org> wrote:
+
+> On Mon, Sep 13, 2010 at 09:13:32AM +0200, Marc Titinger wrote:
+> > 
+> > Hi, 
+> > 
+> > I'm just being curious : do these patches change the way those chips 
+> > should be supported, that do not have a PMU-like IP, but implement 
+> > PC-sampling thanks to a general purpose timer (not the system timer) 
+> > ?
 > 
-> I'm having one hell of a time compiling a monolithic kernel and keeping
-> it under 4M without leaving out some core networking features I need.
->  From my searching, it looks like x86 has either removed the limit or
-> raised it to a much higher number.  It's not clear to me why a 32 bit
-> processor would not be able to boot a kernel larger than 4 MB.
+> CPUs that do not have a PMU are not required to use the perf-events 
+> oprofile backend, it is entirely optional. The pc-sampling timer in 
+> oprofile is not affected by this series.
 
-Hey, CCed Russell.
+It should still work fine though: a generalized oprofile backend should 
+simply use hrtimer based events. That also has a chance to be higher 
+quality than the system time fallback, on PMU-less (but high-res-timer 
+capable) systems.
 
-Btw. this shouldn't be true anymore. On the other hand, why do you need such a 
-huge kernel?
+Thanks,
 
-It's not even possible to create kernel that big if you don't have some kind of 
-initramfs in, right? Besides, you can use some kind of a compression, like LZMA 
-or something to keep the size down.
-
-Cheers
-> 
-> Bruce
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Ingo
