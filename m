@@ -1,45 +1,38 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 14 Sep 2010 15:20:34 +0800
-Subject: Remove unused default configurations
-In-Reply-To: <1284398671.4003.4.camel@c-dwalke-linux.qualcomm.com>
-References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-	<1284398671.4003.4.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <AANLkTin4q+AUWs6YUo38OeYd-CcxtHT6sJOSfK9BbN=e@mail.gmail.com>
+Date: Tue, 14 Sep 2010 15:37:20 +0800
+Subject: [PATCH 01/11] arch/arm: Remove pr_<level> uses of KERN_<level>
+In-Reply-To: <78519236782f0f4a848d67aefb5fe7b3ce375cee.1284267142.git.joe@perches.com>
+References: <cover.1284267142.git.joe@perches.com>
+	<78519236782f0f4a848d67aefb5fe7b3ce375cee.1284267142.git.joe@perches.com>
+Message-ID: <AANLkTinmZbhre05GNcqOh1Sqv+vaN1MqLo4X7dGYuALO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 14, 2010 at 1:24 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> On Mon, 2010-09-13 at 16:13 +0100, Vincent Sanders wrote:
->> Several default configurations have failed to build for the entire
->> 2.6.36 cycle. There are several causes to these faliures. The exact
->> issues can be tracked on http://armlinux.simtec.co.uk/kautobuild/
->>
->> Obviously the maintainers are not using these default configurations
->> because if they were they would have fixed the build issues by now.
->>
->> As Linus has made it very clear the number of default configurations
->> must be reduced as much as possible I have come up with the following
->> series which will remove these nine unused configurations. This will
->> reduce our build coverage by ten machines as all but one are a single
->> config per machine.
->
-> I can't speak for anyone else, but I would prefer to see fixes for the
-> build issues.
+On Sun, Sep 12, 2010 at 1:10 PM, Joe Perches <joe@perches.com> wrote:
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-+1
+Applied to 'fix', with a little bit modification to the subject line to follow
+ARM patch title conventions.
 
-> ARM has way too many build issues.
+> ---
+> ?arch/arm/mach-pxa/cpufreq-pxa2xx.c | ? ?3 +--
+> ?1 files changed, 1 insertions(+), 2 deletions(-)
 >
-> Daniel
+> diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+> index 50d5939..58093d9 100644
+> --- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+> +++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+> @@ -312,8 +312,7 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+> ? ? ? ?freqs.cpu = policy->cpu;
+>
+> ? ? ? ?if (freq_debug)
+> - ? ? ? ? ? ? ? pr_debug(KERN_INFO "Changing CPU frequency to %d Mhz, "
+> - ? ? ? ? ? ? ? ? ? ? ? ?"(SDRAM %d Mhz)\n",
+> + ? ? ? ? ? ? ? pr_debug("Changing CPU frequency to %d Mhz, (SDRAM %d Mhz)\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? freqs.new / 1000, (pxa_freq_settings[idx].div2) ?
+> ? ? ? ? ? ? ? ? ? ? ? ? (new_freq_mem / 2000) : (new_freq_mem / 1000));
 >
 > --
+> 1.7.3.rc1
 >
-> Sent by a consultant of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
