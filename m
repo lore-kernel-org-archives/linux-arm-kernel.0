@@ -1,44 +1,121 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 14 Sep 2010 16:05:02 +0200
-Subject: [PATCH 2/9] Remove unused default configuration
-In-Reply-To: <1284390832-7181-3-git-send-email-vince@kyllikki.org>
-References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-	<1284390832-7181-3-git-send-email-vince@kyllikki.org>
-Message-ID: <20100914140502.GB10870@pengutronix.de>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Tue, 14 Sep 2010 16:18:18 +0200
+Subject: [PATCH v2] ARM: uaccess: Implement strict user copy checks
+In-Reply-To: <201009141510.43446.arnd@arndb.de>
+References: <4C61EE55.5030506@codeaurora.org> <4C8EE708.5000109@codeaurora.org>
+	<20100914082506.GA2201@osiris.boeblingen.de.ibm.com>
+	<201009141510.43446.arnd@arndb.de>
+Message-ID: <20100914141818.GD2201@osiris.boeblingen.de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-
-you seem to have missed to add mx1 to the subject.  This nearly made it
-fall through my filter.  (It's a "manual" one that picks interesting
-mails by looking at the subject.)
-
-On Mon, Sep 13, 2010 at 04:13:45PM +0100, Vincent Sanders wrote:
-> From: Vincent Sanders <vince@simtec.co.uk>
+On Tue, Sep 14, 2010 at 03:10:43PM +0200, Arnd Bergmann wrote:
+> On Tuesday 14 September 2010, Heiko Carstens wrote:
+> > On Mon, Sep 13, 2010 at 08:07:52PM -0700, Stephen Boyd wrote:
+> > > Changing the buf_size variable from an int to a size_t makes the warning
+> > > go away. Perhaps this is because gcc can't reliably eliminate the else
+> > > case when the lower bound isn't 0? Overflow? I'm not really sure. Does
+> > > the kernel/kprobes.c part of this patch work for you?
+> > 
+> > Yes, the warning goes away on s390 as well.
 > 
-> The mx1 default configuration has not built throughout the 2.6.36
-> series (since 2.6.35-git1). The link has failed with
+> Ok, great!
 > 
-> fs/built-in.o: In function `nfs_callback_authenticate':
-> compr_zlib.c:(.text+0x7c12c): undefined reference to `svc_gss_principal'
-> 
-> This configuration appers to be unused by the maintainer so remove it.
-NACK.  This build failure was reported with a patch proposal at Aug 25
-that is a week after it was pulled into Linus' tree which IMHO is fast
-enough considering that the breakage isn't mx1 related at all.  Up to
-now it didn't result in a patch that was accepted into Linus' tree
-though.
+> In that case, I think we should just apply this patch to fix all these
+> warnings for good. There are probably some more in an x86_64 allyesconfig
+> build, but this should make s390 build cleanly again.
 
-The full discussion can be found at
+Nah, that would be too easy.
+allyesconfig with gcc 4.5.2 and both patches applied:
 
-	http://thread.gmane.org/gmane.linux.kernel/1027380
-
-s/appers/appears/ BTW
-
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+In file included from /home2/heicarst/linux-2.6/arch/s390/include/asm/mmu_context.h:13:0,
+                 from /home2/heicarst/linux-2.6/arch/s390/include/asm/elf.h:133,
+                 from include/linux/elf.h:7,
+                 from include/linux/module.h:14,
+                 from net/core/pktgen.c:123:
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:881:20:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1144:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1251:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1273:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1297:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1320:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1343:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1364:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1385:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1406:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1433:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_if_write' at net/core/pktgen.c:1469:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In file included from /home2/heicarst/linux-2.6/arch/s390/include/asm/mmu_context.h:13:0,
+                 from /home2/heicarst/linux-2.6/arch/s390/include/asm/elf.h:133,
+                 from include/linux/elf.h:7,
+                 from include/linux/module.h:14,
+                 from net/core/pktgen.c:123:
+In function 'copy_from_user',
+    inlined from 'pktgen_thread_write' at net/core/pktgen.c:1793:20:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In function 'copy_from_user',
+    inlined from 'pktgen_thread_write' at net/core/pktgen.c:1824:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In file included from /home2/heicarst/linux-2.6/arch/s390/include/asm/mmu_context.h:13:0,
+                 from /home2/heicarst/linux-2.6/arch/s390/include/asm/elf.h:133,
+                 from include/linux/elf.h:7,
+                 from include/linux/module.h:14,
+                 from drivers/net/tun.c:42:
+In function 'copy_from_user',
+    inlined from '__tun_chr_ioctl' at drivers/net/tun.c:1200:21:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In file included from /home2/heicarst/linux-2.6/arch/s390/include/asm/mmu_context.h:13:0,
+                 from /home2/heicarst/linux-2.6/arch/s390/include/asm/elf.h:133,
+                 from include/linux/elf.h:7,
+                 from include/linux/module.h:14,
+                 from include/linux/sysdev.h:25,
+                 from include/linux/cpu.h:22,
+                 from kernel/perf_event.c:14:
+In function 'copy_from_user',
+    inlined from 'perf_copy_attr' at kernel/perf_event.c:5006:22,
+    inlined from 'SYSC_perf_event_open' at kernel/perf_event.c:5110:6,
+    inlined from 'SyS_perf_event_open' at kernel/perf_event.c:5095:1:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In file included from /home2/heicarst/linux-2.6/arch/s390/include/asm/mmu_context.h:13:0,
+                 from /home2/heicarst/linux-2.6/arch/s390/include/asm/elf.h:133,
+                 from include/linux/elf.h:7,
+                 from include/linux/module.h:14,
+                 from drivers/scsi/sg.c:31:
+In function 'copy_from_user',
+    inlined from 'sg_proc_write_adio' at drivers/scsi/sg.c:2373:20:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
+In file included from /home2/heicarst/linux-2.6/arch/s390/include/asm/mmu_context.h:13:0,
+                 from /home2/heicarst/linux-2.6/arch/s390/include/asm/elf.h:133,
+                 from include/linux/elf.h:7,
+                 from include/linux/module.h:14,
+                 from include/linux/textsearch.h:7,
+                 from include/linux/skbuff.h:27,
+                 from include/linux/icmpv6.h:82,
+                 from net/compat.c:19:
+In function 'copy_from_user',
+    inlined from 'compat_sys_socketcall' at net/compat.c:783:20:
+/home2/heicarst/linux-2.6/arch/s390/include/asm/uaccess.h:297:26: warning: call to 'copy_from_user_overflow' declared with attribute warning: copy_from_user() buffer size is not provably correct
