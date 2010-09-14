@@ -1,59 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Sep 2010 13:27:43 -0700
-Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD25F7DB@dbde02.ent.ti.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100914185907.GG8647@atomide.com>
-	<20100914190314.GH8647@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CD25F7DB@dbde02.ent.ti.com>
-Message-ID: <20100914202743.GK8647@atomide.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 15 Sep 2010 08:48:07 +1200
+Subject: [PATCH v2] AT91: Add flexibity board support
+In-Reply-To: <AANLkTi=-n0_uFMKGED-aOtuLEfUyVeMcm5FWX5xM_BT1@mail.gmail.com>
+References: <4C8DFA84.4040501@gmail.com>	<4C8E8F31.2050108@bluewatersys.com>
+	<AANLkTi=-n0_uFMKGED-aOtuLEfUyVeMcm5FWX5xM_BT1@mail.gmail.com>
+Message-ID: <4C8FDF87.4050500@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100914 12:09]:
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > Sent: Wednesday, September 15, 2010 12:33 AM
-> > To: Russell King - ARM Linux
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
-> > bryan.wu at canonical.com
-> > Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
-> > 
-> > With the recent changes to core ARM kernel code, we can now
-> > boot SMP kernel on UP systems. Update omap3_defconfig to
-> > enable SMP. This allows us to remove omap_4430sdp_defconfig.
-> >
-> Not yet.
-> We still have some issues around Ethernet, bridge/syslink,
-> sensors but hopefully we should be able to fix those.
-> Will have a closer look at this and see if these can be
-> easily fixed.
+On 09/14/2010 05:57 PM, Maxim Osipov wrote:
+> Please see my comments below...
+> 
+> On Tue, Sep 14, 2010 at 12:53 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+>> On 09/13/2010 10:18 PM, Maxim Osipov wrote:
+>>
+>>> +static void __init flexibity_board_init(void)
+>>> +{
+>>> +     /* Serial */
+>>> +     at91_add_device_serial();
+>>> +     /* USB Host */
+>>> +     at91_add_device_usbh(&flexibity_usbh_data);
+>>> +     /* USB Device */
+>>> +     at91_add_device_udc(&flexibity_udc_data);
+>>> +     /* SPI */
+>>> +     at91_add_device_spi(flexibity_spi_devices,
+>>> +             ARRAY_SIZE(flexibity_spi_devices));
+>>> +     /* MMC */
+>>> +     at91_add_device_mmc(0, &flexibity_mmc_data);
+>>> +     /* LEDs */
+>>> +     at91_gpio_leds(flexibity_leds, ARRAY_SIZE(flexibity_leds));
+>>
+>> Can we drop all the comments inside this function please. They don't add
+>> any information and they make it harder to read the actual code.
+>>
+> 
+> Ryan, thank you for the review. However I would like to keep these
+> comments - for some devices, like UDC - it really provides
+> clarification. Reading the code is not a problem with proper
+> highlighting scheme.
 
-Sounds like you're having these problems anyways and they
-are not related to the defconfigs?
+There are already comments above each of the structures so it is clear
+what all of these are. IMHO, this commenting is similar to doing:
 
-Considering Linus' earlier comments on the defconfigs, I don't
-see any reasonds not to merge this patch. If TI wants to fix up
-some other things, there's still about two weeks before -rc6.
+	/* Add 1 to i */
+	i++;
 
-> > In addition to enabling SMP, we also need to disable some
-> > options to make the system boot:
-> > 
-> > - For some reason LOCK_STAT causes tons of
-> >   WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
-> >   so disable it for now.
-> > 
-> > - MUSB init fails for multi-omap, disable it for now.
-> > 
-> > - LOCAL_TIMERS hangs on omap4, disable it for now.
->
-> This is expected on omap4 ES1.0 and hence not enabled
-> in the omap_4430sdp_defconfig.
+We don't have this kind of overly verbose commenting in any of the other
+ARM variants, it appears to something that is just cut and pasted around
+the AT91 boards :-). Syntax highlighting or not, reading one for one
+comments on what should be straight forward device registration is annoying.
 
-Maybe add a check for ES1.0 there to the init then?
+~Ryan
 
-Regards,
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Tony
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
