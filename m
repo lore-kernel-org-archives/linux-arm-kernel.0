@@ -1,65 +1,56 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 14 Sep 2010 13:28:50 +0800
-Subject: [PATCH 3/4] ARM: pxa: update cpuid of pxa168 & pxa910
-In-Reply-To: <1283953362-2363-3-git-send-email-haojian.zhuang@marvell.com>
-References: <1283953362-2363-1-git-send-email-haojian.zhuang@marvell.com>
-	<1283953362-2363-2-git-send-email-haojian.zhuang@marvell.com>
-	<1283953362-2363-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTimfF97fYi+j0gOHTem_FdU0SZ9R4HXyPumtN49t@mail.gmail.com>
+From: mfm@muteddisk.com (matt mooney)
+Date: Mon, 13 Sep 2010 22:30:16 -0700
+Subject: [PATCH 3/4] arm: remove cast from void*
+Message-ID: <1284442216-11710-1-git-send-email-mfm@muteddisk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-might be better now for us to move to something like:
+Unnecessary cast from void* in assignment.
 
-#ifdef CONFIG_CPU_PXA168
-static inline int cpu_is_pxa168(void)
-{
-	return ((read_cpuid_id() >> 4) & 0xff == 0x84) &&
-		(mmp_chip_id & 0x0fff == 0x0333);
-}
-#else
-#define cpu_is_pxa168()		(0)
-#endif
+Signed-off-by: matt mooney <mfm@muteddisk.com>
+---
+ arch/arm/mach-omap2/mailbox.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-Although these all need to be re-worked in the end once multiple SoCs can
-be compiled together.
-
-> ?#else
-> -# ?define __cpu_is_pxa168(id) ?(0)
-> +#define __cpu_is_pxa168(id, cid) ? ? ? (0)
-> ?#endif
->
-> ?#ifdef CONFIG_CPU_PXA910
-> -# ?define __cpu_is_pxa910(id) ?\
-> - ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x80; })
-> +#define __cpu_is_pxa910(id, cid) ? ? ? \
-> + ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; \
-> + ? ? ? ? ?unsigned int _cid = (cid) & 0xfff; \
-> + ? ? ? ? ?(_id == 0x84 || _id == 0x80) && (_cid == 0x910 || _cid == 0x920); })
-> ?#else
-> -# ?define __cpu_is_pxa910(id) ?(0)
-> +#define __cpu_is_pxa910(id, cid) ? ? ? (0)
-> ?#endif
->
-> ?#ifdef CONFIG_CPU_MMP2
-> -# ?define __cpu_is_mmp2(id) ? ?\
-> +#define __cpu_is_mmp2(id) ? ? ?\
-> ? ? ? ?({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x58; })
-> ?#else
-> -# ?define __cpu_is_mmp2(id) ? ?(0)
-> +#define __cpu_is_mmp2(id) ? ? ?(0)
-> ?#endif
->
-> -#define cpu_is_pxa168() ? ? ? ? ? ? ? ?({ __cpu_is_pxa168(read_cpuid_id()); })
-> -#define cpu_is_pxa910() ? ? ? ? ? ? ? ?({ __cpu_is_pxa910(read_cpuid_id()); })
-> +#define cpu_is_pxa168() ? ? ? ? ? ? ? ?({ __cpu_is_pxa168(read_cpuid_id(), \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(CHIP_ID)); })
-> +#define cpu_is_pxa910() ? ? ? ? ? ? ? ?({ __cpu_is_pxa910(read_cpuid_id(), \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(CHIP_ID)); })
-> ?#define cpu_is_mmp2() ? ? ? ? ?({ __cpu_is_mmp2(read_cpuid_id()); })
->
-> ?#endif /* __ASM_MACH_CPUTYPE_H */
-> --
-> 1.5.6.5
->
->
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 42dbfa4..40ddeca 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -181,7 +181,7 @@ static int omap2_mbox_fifo_full(struct omap_mbox *mbox)
+ static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
+ 		omap_mbox_type_t irq)
+ {
+-	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
++	struct omap_mbox2_priv *p = mbox->priv;
+ 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+ 
+ 	l = mbox_read_reg(p->irqenable);
+@@ -192,7 +192,7 @@ static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
+ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
+ 		omap_mbox_type_t irq)
+ {
+-	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
++	struct omap_mbox2_priv *p = mbox->priv;
+ 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+ 	l = mbox_read_reg(p->irqdisable);
+ 	l &= ~bit;
+@@ -202,7 +202,7 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
+ static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
+ 		omap_mbox_type_t irq)
+ {
+-	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
++	struct omap_mbox2_priv *p = mbox->priv;
+ 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+ 
+ 	mbox_write_reg(bit, p->irqstatus);
+@@ -214,7 +214,7 @@ static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
+ static int omap2_mbox_is_irq(struct omap_mbox *mbox,
+ 		omap_mbox_type_t irq)
+ {
+-	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
++	struct omap_mbox2_priv *p = mbox->priv;
+ 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+ 	u32 enable = mbox_read_reg(p->irqenable);
+ 	u32 status = mbox_read_reg(p->irqstatus);
+-- 
+1.7.2.1
