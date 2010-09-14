@@ -1,33 +1,30 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 14 Sep 2010 13:55:07 -0700
-Subject: Importing RPC server bundle
-In-Reply-To: <201009111516.34263.david.lanzendoerfer@o2s.ch>
-References: <201009111516.34263.david.lanzendoerfer@o2s.ch>
-Message-ID: <1284497707.31975.11.camel@c-dwalke-linux.qualcomm.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Tue, 14 Sep 2010 23:23:38 +0200
+Subject: [PATCH] arm: fix pci_set_consistent_dma_mask for dmabounce devices
+In-Reply-To: <20100906083105X.fujita.tomonori@lab.ntt.co.jp> (FUJITA
+	Tomonori's message of "Mon, 6 Sep 2010 08:32:45 +0900")
+References: <20100901085738.GJ8142@n2100.arm.linux.org.uk>
+	<20100902114937X.fujita.tomonori@lab.ntt.co.jp>
+	<20100905112513.GB558@n2100.arm.linux.org.uk>
+	<20100906083105X.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <m34odsrpd1.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-09-11 at 15:16 +0200, David Lanzend?rfer wrote:
-> Hi
-> I made finally USB gadget working by import the rpc server bundle from our
-> fork[1] of the android kernel release 2.6.32.
-> But GNUtoo asked me, why I imported such an old version, also of AMSS.
-> So my question now to you folks:
-> I can import it and make it work with a new version again,
-> but I need to know, what source and place I shall take it from.
-> 
-> Thx in advance
-> 	leviathan
-> 
-> [1] http://gitorious.org/htc-msm-2-6-32/leviathan-incoming/commits/msm-gnuconform
+FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp> writes:
+
+>> > From: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+>> > Subject: [PATCH] arm: fix arm: fix pci_set_consistent_dma_mask for dmabounce devices
+>> > 
+>> > This fixes the regression caused by the commit
+>> > 6fee48cd330c68332f9712bc968d934a1a84a32a.
 
 
-Usually we pull things from Google's tree, clean them up, then import
-them potentially with some changes if needed. Is that what you mean?
+>> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> Should I send this to Linus? Or Can I assume that someone in ARM camp
+> will do?
 
-Daniel
-
+It would be nice if you do. TIA.
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Krzysztof Halasa
