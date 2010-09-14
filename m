@@ -1,61 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 14 Sep 2010 14:23:20 +0200
-Subject: [PATCH 2/7] [RFC] ARM: shmobile: remove unneeded hack to
-	calculate zreladdr
-In-Reply-To: <20100914080829.GI7336@linux-sh.org>
-References: <20100903095504.GC13643@pengutronix.de>
-	<1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20100914080829.GI7336@linux-sh.org>
-Message-ID: <20100914122320.GB16960@pengutronix.de>
+From: Dave.Martin@arm.com (Dave P. Martin)
+Date: Tue, 14 Sep 2010 13:35:02 +0100
+Subject: Maximum bootable kernel size in current ARM linux
+In-Reply-To: <20100913101039.GC2614@kw.sim.vm.gnt>
+References: <4C8DD588.7040009@endruntechnologies.com>	<201009131043.48688.marek.vasut@gmail.com>	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>
+	<20100913101039.GC2614@kw.sim.vm.gnt>
+Message-ID: <000001cb5409$4726e000$4b4d010a@Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Paul,
+Hi,
 
-On Tue, Sep 14, 2010 at 05:08:29PM +0900, Paul Mundt wrote:
-> On Fri, Sep 03, 2010 at 11:56:53AM +0200, Uwe Kleine-K??nig wrote:
-> > -config MEMORY_START
-> > -	hex "Physical memory start address"
-> > -	default "0x50000000" if MACH_G3EVM
-> > -	default "0x40000000" if MACH_G4EVM
-> > -	default "0x40000000" if MACH_AP4EVB
-> > -	default "0x00000000"
-> > -	---help---
-> > -	  Tweak this only when porting to a new machine which does not
-> > -	  already have a defconfig. Changing it from the known correct
-> > -	  value on any of the known systems will only lead to disaster.
-> > -
-> 
-> [snip]
-> 
-> > -#define PHYS_OFFSET	UL(CONFIG_MEMORY_START)
-> > +#define SH7367_PHYS_OFFSET UL(0x50000000)
-> > +#define SH7372_PHYS_OFFSET UL(0x40000000)
-> > +#define SH7377_PHYS_OFFSET UL(0x40000000)
-> > +
-> > +#if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
-> > +# if defined(CONFIG_ARCH_SH7367)
-> > +#  define PHYS_OFFSET	SH7367_PHYS_OFFSET
-> > +# elif defined(CONFIG_ARCH_SH7372)
-> > +#  define PHYS_OFFSET	SH7372_PHYS_OFFSET
-> > +# elif defined(CONFIG_ARCH_SH7377)
-> > +#  define PHYS_OFFSET	SH7377_PHYS_OFFSET
-> > +# endif
-> > +#endif /* if !defined(CONFIG_RUNTIME_PHYS_OFFSET) */
-> > +
-> 
-> You've taken a board-specific property and made it CPU-specific. There is
-> nothing about these CPUs that mandates memory starting here, it just
-> happens that for the moment we have 1 board per CPU, but that's not an
-> assumption we can really bank on.
-I choosed to do so as CONFIG_ZRELADDR (which is now reverted) used the
-ARCH_... symbols, too, to select the needed values.  And that's my I
-marked the patch as RFC.  So would you consider this patch acceptible if
-I respin it using the MACH_... symbols?
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org 
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On 
+> Behalf Of Simon Guinot
+> Sent: 13 September 2010 11:11
+> To: Haojian Zhuang
+> Cc: Marek Vasut; Russell King - ARM Linux; 
+> linux-arm-kernel at lists.infradead.org; Bruce M. Penrod
+> Subject: Re: Maximum bootable kernel size in current ARM linux
 
-Best regards
-Uwe
+[...]
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> The initramfs is located at the end of the init section and 
+> before the text section. Because the kernel must be able to 
+> 'branch' between the init and text sections, the initramfs 
+> size can't be greater than the 'branch' maximum offset. 32MB ?
+
+We can also build kernels in Thumb-2 (where the long branch range is +/- 4MB
+IIRC)
+
+I believe the linker should always generate trampolines to extend the range
+of those branches where necessary, even when branching from assembler.  The
+only case where this won't work is if you have individual objects whose text
+section is so large there's nowhere to put the trampolines within the
+required range, or where branch targets are fixed up by something other than
+the linker (I'm guessing that's either a very rare situation or
+nonexistent.)
+
+These kind of fixup problems would result in link-time errors, but I don't
+think I've observed this happening in practice.
+
+Cheers
+---Dave
