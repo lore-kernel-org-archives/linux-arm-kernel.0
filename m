@@ -1,38 +1,60 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 14 Sep 2010 15:37:20 +0800
-Subject: [PATCH 01/11] arch/arm: Remove pr_<level> uses of KERN_<level>
-In-Reply-To: <78519236782f0f4a848d67aefb5fe7b3ce375cee.1284267142.git.joe@perches.com>
-References: <cover.1284267142.git.joe@perches.com>
-	<78519236782f0f4a848d67aefb5fe7b3ce375cee.1284267142.git.joe@perches.com>
-Message-ID: <AANLkTinmZbhre05GNcqOh1Sqv+vaN1MqLo4X7dGYuALO@mail.gmail.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Tue, 14 Sep 2010 09:36:23 +0200
+Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
+In-Reply-To: <4C8E84A0.1010606@jic23.retrosnub.co.uk>
+References: <cover.1284406638.git.joe@perches.com>
+	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
+	<4C8E84A0.1010606@jic23.retrosnub.co.uk>
+Message-ID: <19599.9719.562406.692216@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 12, 2010 at 1:10 PM, Joe Perches <joe@perches.com> wrote:
-> Signed-off-by: Joe Perches <joe@perches.com>
+Hi,
 
-Applied to 'fix', with a little bit modification to the subject line to follow
-ARM patch title conventions.
+Jonathan Cameron writes:
+>  Commit message is  somewhat inaccurate...
+> 
+> On 09/13/10 20:47, Joe Perches wrote:
+> > Signed-off-by: Joe Perches <joe@perches.com>
+> > ---
+> >  drivers/i2c/busses/i2c-stu300.c |    4 ++--
+> >  1 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+> > index 495be45..2f7c09c 100644
+> > --- a/drivers/i2c/busses/i2c-stu300.c
+> > +++ b/drivers/i2c/busses/i2c-stu300.c
+> > @@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
+> >  	struct resource *res;
+> >  	int bus_nr;
+> >  	int ret = 0;
+> > -	char clk_name[] = "I2C0";
+> > +	char clk_name[sizeof("I2Cx")];
+> >  
+> >  	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
+> >  	if (!dev) {
+> > @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
+> >  	}
+> >  
+> >  	bus_nr = pdev->id;
+> > -	clk_name[3] += (char)bus_nr;
+> > +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
+> I'm guessing that there are never more than a couple of these.
+> Why is this method a better bet than just putting %d?
+>
+'%c' will only ever produce one byte of output while '%d' may
+produce up to 11 bytes depending on the value of bus_nr thus
+overflowing the buffer.
 
-> ---
-> ?arch/arm/mach-pxa/cpufreq-pxa2xx.c | ? ?3 +--
-> ?1 files changed, 1 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> index 50d5939..58093d9 100644
-> --- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> +++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
-> @@ -312,8 +312,7 @@ static int pxa_set_target(struct cpufreq_policy *policy,
-> ? ? ? ?freqs.cpu = policy->cpu;
->
-> ? ? ? ?if (freq_debug)
-> - ? ? ? ? ? ? ? pr_debug(KERN_INFO "Changing CPU frequency to %d Mhz, "
-> - ? ? ? ? ? ? ? ? ? ? ? ?"(SDRAM %d Mhz)\n",
-> + ? ? ? ? ? ? ? pr_debug("Changing CPU frequency to %d Mhz, (SDRAM %d Mhz)\n",
-> ? ? ? ? ? ? ? ? ? ? ? ? freqs.new / 1000, (pxa_freq_settings[idx].div2) ?
-> ? ? ? ? ? ? ? ? ? ? ? ? (new_freq_mem / 2000) : (new_freq_mem / 1000));
->
-> --
-> 1.7.3.rc1
->
->
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
