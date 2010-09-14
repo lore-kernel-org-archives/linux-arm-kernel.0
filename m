@@ -1,172 +1,284 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Sep 2010 12:05:08 -0700
-Subject: [PATCH] omap: Update omap3_defconfig for omap2
-In-Reply-To: <20100914190314.GH8647@atomide.com>
+Date: Tue, 14 Sep 2010 11:59:08 -0700
+Subject: [PATCH] ARM: Handle __flush_icache_all for CONFIG_SMP_ON_UP
+In-Reply-To: <20100906104413.GD20903@n2100.arm.linux.org.uk>
 References: <20100817104414.19061.38999.stgit@baageli.muru.com>
 	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100914185907.GG8647@atomide.com>
-	<20100914190314.GH8647@atomide.com>
-Message-ID: <20100914190508.GI8647@atomide.com>
+Message-ID: <20100914185907.GG8647@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to enable ARM_ERRATA_411920 for omap2 and
-remove the omap2 specific defconfigs.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [100906 03:36]:
+> Here's my latest patch (which is combined from two patches.)
+
+I think that patch is now done assuming the fixes I've posted are
+merged, so here's my S-O-B for the bits I've contributed:
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/arch/arm/configs/n8x0_defconfig b/arch/arm/configs/n8x0_defconfig
-deleted file mode 100644
-index 56aebb6..0000000
---- a/arch/arm/configs/n8x0_defconfig
-+++ /dev/null
-@@ -1,94 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_LBDAF is not set
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--CONFIG_ARCH_OMAP=y
--CONFIG_ARCH_OMAP2=y
--CONFIG_OMAP_RESET_CLOCKS=y
--# CONFIG_OMAP_MUX is not set
--# CONFIG_OMAP_MCBSP is not set
--CONFIG_OMAP_MBOX_FWK=y
--CONFIG_OMAP_32K_TIMER=y
--CONFIG_ARCH_OMAP2420=y
--CONFIG_MACH_NOKIA_N8X0=y
--CONFIG_AEABI=y
--CONFIG_LEDS=y
--CONFIG_ZBOOT_ROM_TEXT=0x10C08000
--CONFIG_ZBOOT_ROM_BSS=0x10200000
--CONFIG_CMDLINE="root=/dev/mmcblk0p2 console=ttyS2,115200n8 debug earlyprintk rootwait"
--CONFIG_FPE_NWFPE=y
--CONFIG_VFP=y
--CONFIG_PM=y
--CONFIG_PM_RUNTIME=y
--CONFIG_NET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_ONENAND=y
--CONFIG_MTD_ONENAND_OMAP2=y
--CONFIG_MTD_ONENAND_OTP=y
--CONFIG_BLK_DEV_RAM=y
--# CONFIG_MISC_DEVICES is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--# CONFIG_I2C_COMPAT is not set
--# CONFIG_I2C_HELPER_AUTO is not set
--CONFIG_I2C_OMAP=y
--CONFIG_SPI=y
--CONFIG_SPI_OMAP24XX=y
--# CONFIG_HWMON is not set
--CONFIG_MENELAUS=y
--CONFIG_REGULATOR=y
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--CONFIG_USB=y
--CONFIG_USB_DEBUG=y
--CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
--CONFIG_USB_DEVICEFS=y
--CONFIG_USB_SUSPEND=y
--# CONFIG_USB_OTG_WHITELIST is not set
--CONFIG_USB_MUSB_HDRC=y
--CONFIG_USB_MUSB_OTG=y
--CONFIG_USB_GADGET_MUSB_HDRC=y
--# CONFIG_MUSB_PIO_ONLY is not set
--CONFIG_USB_MUSB_DEBUG=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_GADGET_DEBUG=y
--CONFIG_USB_GADGET_DEBUG_FILES=y
--CONFIG_USB_ETH=m
--CONFIG_USB_ETH_EEM=y
--CONFIG_MMC=y
--CONFIG_MMC_OMAP=y
--CONFIG_EXT3_FS=y
--CONFIG_INOTIFY=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_JFFS2_SUMMARY=y
--CONFIG_JFFS2_COMPRESSION_OPTIONS=y
--CONFIG_JFFS2_LZO=y
--CONFIG_PRINTK_TIME=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
--CONFIG_CRC_CCITT=y
-diff --git a/arch/arm/configs/omap3_defconfig b/arch/arm/configs/omap3_defconfig
-index 833a9bc..d090503 100644
---- a/arch/arm/configs/omap3_defconfig
-+++ b/arch/arm/configs/omap3_defconfig
-@@ -53,6 +53,7 @@ CONFIG_MACH_SBC3530=y
- CONFIG_MACH_OMAP_3630SDP=y
- CONFIG_MACH_OMAP_4430SDP=y
- CONFIG_ARM_THUMBEE=y
-+CONFIG_ARM_ERRATA_411920=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
-diff --git a/arch/arm/configs/omap_generic_2420_defconfig b/arch/arm/configs/omap_generic_2420_defconfig
-deleted file mode 100644
-index ac08e51..0000000
---- a/arch/arm/configs/omap_generic_2420_defconfig
-+++ /dev/null
-@@ -1,37 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_OMAP=y
--CONFIG_ARCH_OMAP2=y
--# CONFIG_OMAP_MUX is not set
--CONFIG_MACH_OMAP_GENERIC=y
--CONFIG_ARCH_OMAP2420=y
--CONFIG_LEDS=y
--CONFIG_ZBOOT_ROM_TEXT=0x10C08000
--CONFIG_ZBOOT_ROM_BSS=0x10200000
--CONFIG_FPE_NWFPE=y
--CONFIG_BLK_DEV_RAM=y
--CONFIG_INPUT_EVDEV=y
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--CONFIG_WATCHDOG=y
--CONFIG_WATCHDOG_NOWAYOUT=y
--CONFIG_VIDEO_OUTPUT_CONTROL=m
--# CONFIG_VGA_CONSOLE is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_INOTIFY=y
--CONFIG_ROMFS_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
--CONFIG_DEBUG_LL=y
--CONFIG_CRC_CCITT=y
+Anybody else care to ack?
+
+> 2. __flush_icache_all()
+> 
+> Note that (2) seems to be complicated by the instruction only being
+> available on ARMv7 and later.
+> 
+> Also note that this should only be used for comparing SMP vs UP versions
+> of the same architecture - in other words, not ARMv6 vs ARMv6K.
+
+Here's a patch for __flush_icache_all. I believe this is the last
+remaining patch we need.
+
+The only other thing I can think of are the conflicts with
+CONFIG_CPU_32v6K, on early ARM1136 and later ARM11 systems if somebody
+wants to compile a kernel that supports both. But that's not needed for
+omap2, so we can boot now omap2, 3 and 4 with a single defconfig :)
+
+Regards,
+
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 14 Sep 2010 11:33:09 -0700
+Subject: [PATCH] ARM: Handle __flush_icache_all for CONFIG_SMP_ON_UP
+
+Do this by adding flush_icache_all to cache_fns for ARMv6 and 7.
+As flush_icache_all may neeed to be called from flush_kern_cache_all,
+add it as the first entry in the cache_fns.
+
+Note that now we can remove the ARM_ERRATA_411920 dependency
+to !SMP so it can be selected on UP ARMv6 processors, such
+as omap2.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f274300..8853cc0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1003,7 +1003,7 @@ endif
+ 
+ config ARM_ERRATA_411920
+ 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
+-	depends on CPU_V6 && !SMP
++	depends on CPU_V6
+ 	help
+ 	  Invalidation of the Instruction Cache operation can
+ 	  fail. This erratum is present in 1136 (before r1p4), 1156 and 1176.
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 4656a24..22902b5 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -156,6 +156,12 @@
+  *	Please note that the implementation of these, and the required
+  *	effects are cache-type (VIVT/VIPT/PIPT) specific.
+  *
++ *	flush_icache_all()
++ *
++ *		Unconditionally clean and invalidate the entire icache.
++ *		Currently only needed for cache-v6.S and cache-v7.S, see
++ *		__flush_icache_all for the generic implementation.
++ *
+  *	flush_kern_all()
+  *
+  *		Unconditionally clean and invalidate the entire cache.
+@@ -206,6 +212,7 @@
+  */
+ 
+ struct cpu_cache_fns {
++	void (*flush_icache_all)(void);
+ 	void (*flush_kern_all)(void);
+ 	void (*flush_user_all)(void);
+ 	void (*flush_user_range)(unsigned long, unsigned long, unsigned int);
+@@ -227,6 +234,7 @@ struct cpu_cache_fns {
+ 
+ extern struct cpu_cache_fns cpu_cache;
+ 
++#define __cpuc_flush_icache_all		cpu_cache.flush_icache_all
+ #define __cpuc_flush_kern_all		cpu_cache.flush_kern_all
+ #define __cpuc_flush_user_all		cpu_cache.flush_user_all
+ #define __cpuc_flush_user_range		cpu_cache.flush_user_range
+@@ -246,6 +254,7 @@ extern struct cpu_cache_fns cpu_cache;
+ 
+ #else
+ 
++#define __cpuc_flush_icache_all		__glue(_CACHE,_flush_icache_all)
+ #define __cpuc_flush_kern_all		__glue(_CACHE,_flush_kern_cache_all)
+ #define __cpuc_flush_user_all		__glue(_CACHE,_flush_user_cache_all)
+ #define __cpuc_flush_user_range		__glue(_CACHE,_flush_user_cache_range)
+@@ -253,6 +262,7 @@ extern struct cpu_cache_fns cpu_cache;
+ #define __cpuc_coherent_user_range	__glue(_CACHE,_coherent_user_range)
+ #define __cpuc_flush_dcache_area	__glue(_CACHE,_flush_kern_dcache_area)
+ 
++extern void __cpuc_flush_icache_all(void);
+ extern void __cpuc_flush_kern_all(void);
+ extern void __cpuc_flush_user_all(void);
+ extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
+@@ -291,6 +301,37 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ /*
+  * Convert calls to our calling convention.
+  */
++
++/* Invalidate I-cache */
++#define __flush_icache_all_generic()					\
++	asm("mcr	p15, 0, %0, c7, c5, 0"				\
++	    : : "r" (0));
++
++/* Invalidate I-cache inner shareable */
++#define __flush_icache_all_v7_smp()					\
++	asm("mcr	p15, 0, %0, c7, c1, 0"				\
++	    : : "r" (0));
++
++/*
++ * Optimized __flush_icache_all for the common cases. Note that UP ARMv7
++ * will fall through to use __flush_icache_all_generic.
++ */
++#if (defined(CONFIG_CPU_V7) && defined(CONFIG_CPU_V6)) ||		\
++	defined(CONFIG_SMP_ON_UP)
++#define __flush_icache_preferred	__cpuc_flush_icache_all
++#elif __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
++#define __flush_icache_preferred	__flush_icache_all_v7_smp
++#elif __LINUX_ARM_ARCH__ == 6 && defined(CONFIG_ARM_ERRATA_411920)
++#define __flush_icache_preferred	__cpuc_flush_icache_all
++#else
++#define __fluch_icache_preferred	__flush_icache_all_generic
++#endif
++
++static inline void __flush_icache_all(void)
++{
++	__flush_icache_preferred();
++}
++
+ #define flush_cache_all()		__cpuc_flush_kern_all()
+ 
+ static inline void vivt_flush_cache_mm(struct mm_struct *mm)
+@@ -366,21 +407,6 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
+ #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
+ extern void flush_dcache_page(struct page *);
+ 
+-static inline void __flush_icache_all(void)
+-{
+-#ifdef CONFIG_ARM_ERRATA_411920
+-	extern void v6_icache_inval_all(void);
+-	v6_icache_inval_all();
+-#elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
+-	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner shareable\n"
+-	    :
+-	    : "r" (0));
+-#else
+-	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+-	    :
+-	    : "r" (0));
+-#endif
+-}
+ static inline void flush_kernel_vmap_range(void *addr, int size)
+ {
+ 	if ((cache_is_vivt() || cache_is_vipt_aliasing()))
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index 86aa689..99fa688 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -21,18 +21,22 @@
+ #define D_CACHE_LINE_SIZE	32
+ #define BTB_FLUSH_SIZE		8
+ 
+-#ifdef CONFIG_ARM_ERRATA_411920
+ /*
+- * Invalidate the entire I cache (this code is a workaround for the ARM1136
+- * erratum 411920 - Invalidate Instruction Cache operation can fail. This
+- * erratum is present in 1136, 1156 and 1176. It does not affect the MPCore.
++ *	v6_flush_icache_all()
++ *
++ *	Flush the whole I-cache.
+  *
+- * Registers:
+- *   r0 - set to 0
+- *   r1 - corrupted
++ *	ARM1136 erratum 411920 - Invalidate Instruction Cache operation can fail.
++ *	This erratum is present in 1136, 1156 and 1176. It does not affect the
++ *	MPCore.
++ *
++ *	Registers:
++ *	r0 - set to 0
++ *	r1 - corrupted
+  */
+-ENTRY(v6_icache_inval_all)
++ENTRY(v6_flush_icache_all)
+ 	mov	r0, #0
++#ifdef CONFIG_ARM_ERRATA_411920
+ 	mrs	r1, cpsr
+ 	cpsid	ifa				@ disable interrupts
+ 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate entire I-cache
+@@ -43,8 +47,11 @@ ENTRY(v6_icache_inval_all)
+ 	.rept	11				@ ARM Ltd recommends at least
+ 	nop					@ 11 NOPs
+ 	.endr
+-	mov	pc, lr
++#else
++	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I-cache
+ #endif
++	mov	pc, lr
++ENDPROC(v6_flush_icache_all)
+ 
+ /*
+  *	v6_flush_cache_all()
+@@ -60,7 +67,7 @@ ENTRY(v6_flush_kern_cache_all)
+ #ifndef CONFIG_ARM_ERRATA_411920
+ 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
+ #else
+-	b	v6_icache_inval_all
++	b	v6_flush_icache_all
+ #endif
+ #else
+ 	mcr	p15, 0, r0, c7, c15, 0		@ Cache clean+invalidate
+@@ -138,7 +145,7 @@ ENTRY(v6_coherent_user_range)
+ #ifndef CONFIG_ARM_ERRATA_411920
+ 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
+ #else
+-	b	v6_icache_inval_all
++	b	v6_flush_icache_all
+ #endif
+ #else
+ 	mcr	p15, 0, r0, c7, c5, 6		@ invalidate BTB
+@@ -312,6 +319,7 @@ ENDPROC(v6_dma_unmap_area)
+ 
+ 	.type	v6_cache_fns, #object
+ ENTRY(v6_cache_fns)
++	.long	v6_flush_icache_all
+ 	.long	v6_flush_kern_cache_all
+ 	.long	v6_flush_user_cache_all
+ 	.long	v6_flush_user_cache_range
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 2aa59d5..2a02ade 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -18,6 +18,21 @@
+ #include "proc-macros.S"
+ 
+ /*
++ *	v7_flush_icache_all()
++ *
++ *	Flush the whole I-cache.
++ *
++ *	Registers:
++ *	r0 - set to 0
++ */
++ENTRY(v7_flush_icache_all)
++	mov	r0, #0
++	SMP(mcr	p15, 0, r0, c7, c1, 0)		@ invalidate I-cache inner shareable
++	UP(mcr	p15, 0, r0, c7, c5, 0)		@ I+BTB cache invalidate
++	mov	pc, lr
++ENDPROC(v7_flush_icache_all)
++
++/*
+  *	v7_flush_dcache_all()
+  *
+  *	Flush the whole D-cache.
+@@ -303,6 +318,7 @@ ENDPROC(v7_dma_unmap_area)
+ 
+ 	.type	v7_cache_fns, #object
+ ENTRY(v7_cache_fns)
++	.long	v7_flush_icache_all
+ 	.long	v7_flush_kern_cache_all
+ 	.long	v7_flush_user_cache_all
+ 	.long	v7_flush_user_cache_range
