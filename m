@@ -1,52 +1,58 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Wed, 15 Sep 2010 00:23:13 +0100
-Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
-In-Reply-To: <b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
-References: <cover.1284406638.git.joe@perches.com>
-	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
-Message-ID: <20100914232313.GC7494@trinity.fluff.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Sep 2010 00:50:43 +0100
+Subject: [RFC] mmaping with VIVT cache
+In-Reply-To: <210713.63745.qm@web120207.mail.ne1.yahoo.com>
+References: <210713.63745.qm@web120207.mail.ne1.yahoo.com>
+Message-ID: <20100914235043.GA31500@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 12:47:43PM -0700, Joe Perches wrote:
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  drivers/i2c/busses/i2c-stu300.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+On Mon, Sep 13, 2010 at 12:58:41PM -0700, P F wrote:
+> Hi,
 > 
-> diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
-> index 495be45..2f7c09c 100644
-> --- a/drivers/i2c/busses/i2c-stu300.c
-> +++ b/drivers/i2c/busses/i2c-stu300.c
-> @@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	int bus_nr;
->  	int ret = 0;
-> -	char clk_name[] = "I2C0";
-> +	char clk_name[sizeof("I2Cx")];
->  
->  	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
->  	if (!dev) {
-> @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
->  	}
->  
->  	bus_nr = pdev->id;
-> -	clk_name[3] += (char)bus_nr;
-> +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
->  	dev->clk = clk_get(&pdev->dev, clk_name);
->  	if (IS_ERR(dev->clk)) {
->  		ret = PTR_ERR(dev->clk);
+> Please excuse the pseudonym.
+> 
+> I have recently encountered a problem in the context of the UVC (webcam)
+> driver.  The driver maintainer, Laurent, suggested that we bring the
+> thread to linux-arm-kernel for wider discussion.  See here for reference:
+> http://lists.berlios.de/pipermail/linux-uvc-devel/2010-August/005864.html
+> 
+> The problem I encountered was this: using an ARM926EJ-S with OHCI USB host,
+> I noticed intermittent graphical corruption of frames captured by several
+> different webcams, both UVC and non-UVC.
+> 
+> I was able to isolate the corruption down to one specific instance.  In
+> this instance, I collected three images:
+> 1A.jpg - collected from host, prior to corruption
+> 2A.jpg - collected from host, demonstrating corruption
+> 2B.jpg - collected from inline USB analyzer, same image as 2A
+> 
+> Images 1A and 2A are in sequence, i.e., 2A immediately follows 1A.  2B is
+> not corrupted, and a binary diff between 2A and 2B shows two 32-byte
+> chunks have been changed.  A binary diff between 2A and 1A shows that
+> these same two chunks match.  Therefore, it seems there is some
+> contamination of the second image by the first.
+> 
+> As I described in the linked message, I found a workaround for this issue
+> by adding
+>   vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot)
+> in the UVC driver's mmap() function, but Laurent explained that this was
+> invalid.
+> 
+> Does anybody have ideas for a proper fix?  I can reproduce this corruption
+> easily, and would be happy to test proposed patches.
 
-personally, i'd prefer to see snprintf() used, to ensure that this sort
-of thing never goes wrong if people decde to change the string. It is
-a pitty there's no good way of temporarily allocating data an having it
-freed in C.
+The fact is that mapping buffers as cacheable into userspace on non-
+coherent architectures _will_ result in the cache contents getting in
+the way of updates to the DMA'd buffer.  It's a fundamental property
+of such hardware implementations.
 
-As such, apologies to Russell about the abuse of the clk_get() call, but
-let's not fix that just now.
+I've tried to introduce an API for mapping "coherent" DMA buffers
+into userspace, and it got nowhere (well, only ARM implements it,
+and hardly anyone uses it) - hence why we still have these problems.
 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+So I don't have an answer to solve your problem - afaiac, it's up to
+the device driver authors to sort it out, and apply pressure to other
+parts of the kernel community (those who resist a way to make this
+kind of thing work) to sort out how to cleanly map buffers used for
+DMA into userspace.
