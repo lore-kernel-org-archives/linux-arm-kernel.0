@@ -1,46 +1,39 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 14 Sep 2010 17:08:29 +0900
-Subject: [PATCH 2/7] [RFC] ARM: shmobile: remove unneeded hack to
-	calculate zreladdr
-In-Reply-To: <1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100903095504.GC13643@pengutronix.de>
-	<1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20100914080829.GI7336@linux-sh.org>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Tue, 14 Sep 2010 16:14:15 +0800
+Subject: ARM: dove: fix __io() definition to use bus based offset
+Message-ID: <AANLkTim+u9qqTaGwzHKGfD+3nGammQDNWG6BoKkwfg2F@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 03, 2010 at 11:56:53AM +0200, Uwe Kleine-K??nig wrote:
-> -config MEMORY_START
-> -	hex "Physical memory start address"
-> -	default "0x50000000" if MACH_G3EVM
-> -	default "0x40000000" if MACH_G4EVM
-> -	default "0x40000000" if MACH_AP4EVB
-> -	default "0x00000000"
-> -	---help---
-> -	  Tweak this only when porting to a new machine which does not
-> -	  already have a defconfig. Changing it from the known correct
-> -	  value on any of the known systems will only lead to disaster.
-> -
+commit 821049d2bab27613f5f18639cf231e1c2230e5a9
+Author: Eric Miao <eric.y.miao@gmail.com>
+Date:   Tue Sep 14 16:06:22 2010 +0800
 
-[snip]
+    ARM: dove: fix __io() definition to use bus based offset
 
-> -#define PHYS_OFFSET	UL(CONFIG_MEMORY_START)
-> +#define SH7367_PHYS_OFFSET UL(0x50000000)
-> +#define SH7372_PHYS_OFFSET UL(0x40000000)
-> +#define SH7377_PHYS_OFFSET UL(0x40000000)
-> +
-> +#if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
-> +# if defined(CONFIG_ARCH_SH7367)
-> +#  define PHYS_OFFSET	SH7367_PHYS_OFFSET
-> +# elif defined(CONFIG_ARCH_SH7372)
-> +#  define PHYS_OFFSET	SH7372_PHYS_OFFSET
-> +# elif defined(CONFIG_ARCH_SH7377)
-> +#  define PHYS_OFFSET	SH7377_PHYS_OFFSET
-> +# endif
-> +#endif /* if !defined(CONFIG_RUNTIME_PHYS_OFFSET) */
-> +
+    Signed-off-by: Eric Miao <eric.miao@canonical.com>
 
-You've taken a board-specific property and made it CPU-specific. There is
-nothing about these CPUs that mandates memory starting here, it just
-happens that for the moment we have 1 board per CPU, but that's not an
-assumption we can really bank on.
+This was proposed month ago, and had some other discussions about
+typesafe_io() and type casting. I hereby simplified the patch to its
+minimum and let's address the real issue first.
+
+Saeed, Acked?
+
+
+diff --git a/arch/arm/mach-dove/include/mach/io.h
+b/arch/arm/mach-dove/include/mach/io.h
+index 3b3e472..eb4936f 100644
+--- a/arch/arm/mach-dove/include/mach/io.h
++++ b/arch/arm/mach-dove/include/mach/io.h
+@@ -13,8 +13,8 @@
+
+ #define IO_SPACE_LIMIT		0xffffffff
+
+-#define __io(a)  ((void __iomem *)(((a) - DOVE_PCIE0_IO_PHYS_BASE) +\
+-				   DOVE_PCIE0_IO_VIRT_BASE))
+-#define __mem_pci(a)		(a)
++#define __io(a)  	((void __iomem *)(((a) - DOVE_PCIE0_IO_BUS_BASE) + \
++						 DOVE_PCIE0_IO_VIRT_BASE))
++#define __mem_pci(a)	(a)
+
+ #endif
