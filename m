@@ -1,184 +1,44 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 14 Sep 2010 14:51:55 +0800
-Subject: [PATCH 6/9] Remove unused pxa3xx default configuration
-In-Reply-To: <1284390832-7181-7-git-send-email-vince@kyllikki.org>
-References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-	<1284390832-7181-7-git-send-email-vince@kyllikki.org>
-Message-ID: <AANLkTi=OWT45QpUq9Hu5FxraLmBPFDMJ+FOPC5efDFFZ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 Sep 2010 09:00:29 +0200
+Subject: [PATCH v2] AT91: Add flexibity board support
+In-Reply-To: <AANLkTi=-n0_uFMKGED-aOtuLEfUyVeMcm5FWX5xM_BT1@mail.gmail.com>
+References: <4C8DFA84.4040501@gmail.com> <4C8E8F31.2050108@bluewatersys.com>
+	<AANLkTi=-n0_uFMKGED-aOtuLEfUyVeMcm5FWX5xM_BT1@mail.gmail.com>
+Message-ID: <20100914070029.GG2138@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 11:13 PM, Vincent Sanders <vince@kyllikki.org> wrote:
-> From: Vincent Sanders <vince@simtec.co.uk>
->
-> The pxa3xx default configuration has not built throughout the 2.6.36
-> series (since 2.6.35-git1). The kernel link has failed with
->
-> fs/built-in.o: In function `nfs_callback_authenticate':
-> compr_lzo.c:(.text+0x817bc): undefined reference to `svc_gss_principal'
->
-> This configuration appers to be unused by the maintainer so remove it.
+On 09:57 Tue 14 Sep     , Maxim Osipov wrote:
+> Please see my comments below...
+> 
+> On Tue, Sep 14, 2010 at 12:53 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> > On 09/13/2010 10:18 PM, Maxim Osipov wrote:
+> >
+> >> +static void __init flexibity_board_init(void)
+> >> +{
+> >> + ? ? /* Serial */
+> >> + ? ? at91_add_device_serial();
+> >> + ? ? /* USB Host */
+> >> + ? ? at91_add_device_usbh(&flexibity_usbh_data);
+> >> + ? ? /* USB Device */
+> >> + ? ? at91_add_device_udc(&flexibity_udc_data);
+> >> + ? ? /* SPI */
+> >> + ? ? at91_add_device_spi(flexibity_spi_devices,
+> >> + ? ? ? ? ? ? ARRAY_SIZE(flexibity_spi_devices));
+> >> + ? ? /* MMC */
+> >> + ? ? at91_add_device_mmc(0, &flexibity_mmc_data);
+> >> + ? ? /* LEDs */
+> >> + ? ? at91_gpio_leds(flexibity_leds, ARRAY_SIZE(flexibity_leds));
+> >
+> > Can we drop all the comments inside this function please. They don't add
+> > any information and they make it harder to read the actual code.
+> >
+> 
+> Ryan, thank you for the review. However I would like to keep these
+> comments - for some devices, like UDC - it really provides
+> clarification. Reading the code is not a problem with proper
+> highlighting scheme.
+agreed no need to change
 
-This is incorrect and I'm still using that.
-
->
-> Signed-off-by: Vincent Sanders <vince@kyllikki.org>
-> ---
-> ?arch/arm/configs/pxa3xx_defconfig | ?134 -------------------------------------
-
-This is not necessary and is not a correct fix. (this is even not a fix, is it?)
-
-Uwe should already have a proper fix for this and supposedly get upstreamed.
-
-> ?1 files changed, 0 insertions(+), 134 deletions(-)
-> ?delete mode 100644 arch/arm/configs/pxa3xx_defconfig
->
-> diff --git a/arch/arm/configs/pxa3xx_defconfig b/arch/arm/configs/pxa3xx_defconfig
-> deleted file mode 100644
-> index 1677a06..0000000
-> --- a/arch/arm/configs/pxa3xx_defconfig
-> +++ /dev/null
-> @@ -1,134 +0,0 @@
-> -CONFIG_EXPERIMENTAL=y
-> -CONFIG_SYSVIPC=y
-> -CONFIG_LOG_BUF_SHIFT=18
-> -CONFIG_SYSFS_DEPRECATED_V2=y
-> -# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
-> -CONFIG_KALLSYMS_ALL=y
-> -CONFIG_SLAB=y
-> -CONFIG_MODULES=y
-> -# CONFIG_BLK_DEV_BSG is not set
-> -CONFIG_ARCH_PXA=y
-> -CONFIG_MACH_LITTLETON=y
-> -CONFIG_MACH_TAVOREVB=y
-> -CONFIG_MACH_SAAR=y
-> -CONFIG_PREEMPT=y
-> -CONFIG_AEABI=y
-> -CONFIG_ZBOOT_ROM_TEXT=0x0
-> -CONFIG_ZBOOT_ROM_BSS=0x0
-> -CONFIG_CMDLINE="root=/dev/nfs rootfstype=nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on console=ttyS0,115200 mem=64M debug"
-> -CONFIG_FPE_NWFPE=y
-> -CONFIG_NET=y
-> -CONFIG_PACKET=y
-> -CONFIG_UNIX=y
-> -CONFIG_INET=y
-> -CONFIG_IP_PNP=y
-> -# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-> -# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-> -# CONFIG_INET_XFRM_MODE_BEET is not set
-> -# CONFIG_INET_LRO is not set
-> -# CONFIG_INET_DIAG is not set
-> -# CONFIG_IPV6 is not set
-> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> -# CONFIG_STANDALONE is not set
-> -# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-> -CONFIG_MTD=y
-> -CONFIG_MTD_CONCAT=y
-> -CONFIG_MTD_CHAR=y
-> -CONFIG_MTD_BLOCK=y
-> -CONFIG_MTD_NAND=y
-> -CONFIG_MTD_NAND_VERIFY_WRITE=y
-> -CONFIG_MTD_NAND_PXA3xx=y
-> -CONFIG_MTD_NAND_PXA3xx_BUILTIN=y
-> -CONFIG_MTD_ONENAND=y
-> -CONFIG_MTD_ONENAND_VERIFY_WRITE=y
-> -CONFIG_MTD_ONENAND_GENERIC=y
-> -CONFIG_BLK_DEV_LOOP=y
-> -CONFIG_BLK_DEV_RAM=y
-> -# CONFIG_MISC_DEVICES is not set
-> -CONFIG_NETDEVICES=y
-> -CONFIG_NET_ETHERNET=y
-> -CONFIG_SMC91X=y
-> -# CONFIG_NETDEV_1000 is not set
-> -# CONFIG_NETDEV_10000 is not set
-> -# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-> -# CONFIG_KEYBOARD_ATKBD is not set
-> -CONFIG_KEYBOARD_GPIO=y
-> -CONFIG_KEYBOARD_PXA27x=y
-> -CONFIG_KEYBOARD_PXA930_ROTARY=y
-> -CONFIG_MOUSE_PXA930_TRKBALL=y
-> -CONFIG_INPUT_TOUCHSCREEN=y
-> -CONFIG_SERIAL_PXA=y
-> -CONFIG_SERIAL_PXA_CONSOLE=y
-> -# CONFIG_LEGACY_PTYS is not set
-> -# CONFIG_HW_RANDOM is not set
-> -CONFIG_I2C=y
-> -# CONFIG_I2C_HELPER_AUTO is not set
-> -CONFIG_I2C_PXA=y
-> -CONFIG_SPI=y
-> -CONFIG_SPI_PXA2XX=y
-> -CONFIG_GPIO_MAX732X=y
-> -CONFIG_GPIO_PCA953X=y
-> -CONFIG_GPIO_PCF857X=y
-> -CONFIG_GPIO_MAX7301=y
-> -CONFIG_POWER_SUPPLY=y
-> -CONFIG_POWER_SUPPLY_DEBUG=y
-> -CONFIG_PDA_POWER=y
-> -CONFIG_BATTERY_DA9030=y
-> -# CONFIG_HWMON is not set
-> -CONFIG_PMIC_DA903X=y
-> -CONFIG_REGULATOR=y
-> -CONFIG_REGULATOR_DEBUG=y
-> -CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
-> -CONFIG_REGULATOR_DA903X=y
-> -CONFIG_FB=y
-> -CONFIG_FB_PXA=y
-> -CONFIG_BACKLIGHT_LCD_SUPPORT=y
-> -CONFIG_LCD_CLASS_DEVICE=y
-> -CONFIG_LCD_TDO24M=y
-> -CONFIG_BACKLIGHT_CLASS_DEVICE=y
-> -# CONFIG_BACKLIGHT_GENERIC is not set
-> -CONFIG_BACKLIGHT_DA903X=y
-> -# CONFIG_VGA_CONSOLE is not set
-> -CONFIG_FRAMEBUFFER_CONSOLE=y
-> -CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-> -CONFIG_FONTS=y
-> -CONFIG_FONT_6x11=y
-> -CONFIG_LOGO=y
-> -# CONFIG_HID_SUPPORT is not set
-> -# CONFIG_USB_SUPPORT is not set
-> -CONFIG_MMC=y
-> -CONFIG_MMC_PXA=y
-> -CONFIG_NEW_LEDS=y
-> -CONFIG_LEDS_CLASS=m
-> -CONFIG_LEDS_GPIO=m
-> -CONFIG_LEDS_DA903X=m
-> -CONFIG_LEDS_TRIGGERS=y
-> -CONFIG_LEDS_TRIGGER_TIMER=m
-> -CONFIG_LEDS_TRIGGER_HEARTBEAT=m
-> -CONFIG_LEDS_TRIGGER_BACKLIGHT=m
-> -CONFIG_LEDS_TRIGGER_GPIO=m
-> -CONFIG_LEDS_TRIGGER_DEFAULT_ON=m
-> -CONFIG_JFFS2_FS=y
-> -CONFIG_JFFS2_FS_WBUF_VERIFY=y
-> -CONFIG_JFFS2_COMPRESSION_OPTIONS=y
-> -CONFIG_JFFS2_LZO=y
-> -CONFIG_JFFS2_RUBIN=y
-> -CONFIG_NFS_FS=y
-> -CONFIG_NFS_V3=y
-> -CONFIG_NFS_V3_ACL=y
-> -CONFIG_NFS_V4=y
-> -CONFIG_ROOT_NFS=y
-> -CONFIG_NLS=y
-> -CONFIG_PRINTK_TIME=y
-> -CONFIG_MAGIC_SYSRQ=y
-> -CONFIG_DEBUG_KERNEL=y
-> -CONFIG_DEBUG_SHIRQ=y
-> -CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
-> -# CONFIG_SCHED_DEBUG is not set
-> -CONFIG_DEBUG_SPINLOCK=y
-> -CONFIG_DEBUG_SPINLOCK_SLEEP=y
-> -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-> -# CONFIG_FTRACE is not set
-> -CONFIG_DEBUG_USER=y
-> -# CONFIG_CRYPTO_ANSI_CPRNG is not set
-> -# CONFIG_CRYPTO_HW is not set
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Best Regards,
+J.
