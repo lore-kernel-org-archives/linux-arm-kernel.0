@@ -1,44 +1,50 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 14 Sep 2010 09:00:29 +0200
-Subject: [PATCH v2] AT91: Add flexibity board support
-In-Reply-To: <AANLkTi=-n0_uFMKGED-aOtuLEfUyVeMcm5FWX5xM_BT1@mail.gmail.com>
-References: <4C8DFA84.4040501@gmail.com> <4C8E8F31.2050108@bluewatersys.com>
-	<AANLkTi=-n0_uFMKGED-aOtuLEfUyVeMcm5FWX5xM_BT1@mail.gmail.com>
-Message-ID: <20100914070029.GG2138@game.jcrosoft.org>
+From: ww-ml@gmx.de (Wolfgang Wegner)
+Date: Tue, 14 Sep 2010 09:03:41 +0200
+Subject: Kirkwood PCI(e) write performance and DMA engine support for
+	copy_{to, from}_user?
+In-Reply-To: <AANLkTimAStrSQQZqX4Dsczas+z02-OnDB4RzO0MxbQhN@mail.gmail.com>
+References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
+	<20100906140347.GA24522@n2100.arm.linux.org.uk>
+	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
+	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
+	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
+	<20100907161156.GA3625@debian-wegner1.datadisplay.de>
+	<alpine.LFD.2.00.1009071443360.19366@xanadu.home>
+	<20100908083558.GA3393@debian-wegner1.datadisplay.de>
+	<20100909162135.GA3524@debian-wegner1.datadisplay.de>
+	<AANLkTimAStrSQQZqX4Dsczas+z02-OnDB4RzO0MxbQhN@mail.gmail.com>
+Message-ID: <20100914070341.GA3438@debian-wegner1.datadisplay.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:57 Tue 14 Sep     , Maxim Osipov wrote:
-> Please see my comments below...
-> 
-> On Tue, Sep 14, 2010 at 12:53 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> > On 09/13/2010 10:18 PM, Maxim Osipov wrote:
-> >
-> >> +static void __init flexibity_board_init(void)
-> >> +{
-> >> + ? ? /* Serial */
-> >> + ? ? at91_add_device_serial();
-> >> + ? ? /* USB Host */
-> >> + ? ? at91_add_device_usbh(&flexibity_usbh_data);
-> >> + ? ? /* USB Device */
-> >> + ? ? at91_add_device_udc(&flexibity_udc_data);
-> >> + ? ? /* SPI */
-> >> + ? ? at91_add_device_spi(flexibity_spi_devices,
-> >> + ? ? ? ? ? ? ARRAY_SIZE(flexibity_spi_devices));
-> >> + ? ? /* MMC */
-> >> + ? ? at91_add_device_mmc(0, &flexibity_mmc_data);
-> >> + ? ? /* LEDs */
-> >> + ? ? at91_gpio_leds(flexibity_leds, ARRAY_SIZE(flexibity_leds));
-> >
-> > Can we drop all the comments inside this function please. They don't add
-> > any information and they make it harder to read the actual code.
-> >
-> 
-> Ryan, thank you for the review. However I would like to keep these
-> comments - for some devices, like UDC - it really provides
-> clarification. Reading the code is not a problem with proper
-> highlighting scheme.
-agreed no need to change
+Hi Leon,
 
-Best Regards,
-J.
+On Mon, Sep 13, 2010 at 07:10:59PM +0200, Leon Woestenberg wrote:
+> Hello Wolfgang,
+> 
+> On Thu, Sep 9, 2010 at 6:21 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
+> > On Wed, Sep 08, 2010 at 10:35:58AM +0200, Wolfgang Wegner wrote:
+> >>
+> > With the FPGA evaluation board I get:
+> > - around 38 MBytes/second with Nicolas' inline assembly code
+> > - around 6 MBytes/second with any other C code (mmapped) as
+> > ?well as write() via dd
+> >
+> > So the main problem seems to be either our board implementation
+> > of the PCIe->PCI bridge or the FPGA. However, I am still wondering
+> > how a framebuffer-based application can attain reasonable performance,
+> >
+> Having implemented a framebuffer demo on an FPGA recently using PCI
+> Express, I think the main performance gain is made by having the DMA
+> done by the endpoint (FPGA) rather than by the CPU.
+
+this is what I read all around, however, I do not see how this
+can improve anything when using an mmap()ed frame buffer for
+pixel-oriented operations...
+This is why I thought about reverting to write() and simply transfer
+complete frames, which would be sufficient for about 90% of my
+application scenarios - and for the other 10% I could live with
+the lower performance.
+
+Regards,
+Wolfgang
