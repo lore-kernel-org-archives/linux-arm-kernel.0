@@ -1,22 +1,31 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Tue, 14 Sep 2010 09:04:38 +0300 (EEST)
-Subject: [PATCH 3/4] arm: remove cast from void*
-In-Reply-To: <1284442216-11710-1-git-send-email-mfm@muteddisk.com>
-References: <1284442216-11710-1-git-send-email-mfm@muteddisk.com>
-Message-ID: <20100914.090438.104058730.Hiroshi.DOYU@nokia.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 14 Sep 2010 14:15:14 +0800
+Subject: [PATCH 6/9] Remove unused pxa3xx default configuration
+In-Reply-To: <1284390832-7181-7-git-send-email-vince@kyllikki.org>
+References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
+	<1284390832-7181-7-git-send-email-vince@kyllikki.org>
+Message-ID: <AANLkTin4=P06Kcscdo6mwtBPt-DFSD=+Gykkh-sT6RE=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+On Mon, Sep 13, 2010 at 11:13 PM, Vincent Sanders <vince@kyllikki.org> wrote:
+> From: Vincent Sanders <vince@simtec.co.uk>
+>
+> The pxa3xx default configuration has not built throughout the 2.6.36
+> series (since 2.6.35-git1). The kernel link has failed with
+>
+> fs/built-in.o: In function `nfs_callback_authenticate':
+> compr_lzo.c:(.text+0x817bc): undefined reference to `svc_gss_principal'
+>
+> This configuration appers to be unused by the maintainer so remove it.
+>
+> Signed-off-by: Vincent Sanders <vince@kyllikki.org>
+> ---
 
-From: ext matt mooney <mfm@muteddisk.com>
-Subject: [PATCH 3/4] arm: remove cast from void*
-Date: Tue, 14 Sep 2010 07:30:16 +0200
+Hi Vincent,
 
-> Unnecessary cast from void* in assignment.
-> 
-> Signed-off-by: matt mooney <mfm@muteddisk.com>
+Thanks for your reporting on this build failure. Please hold on this
+patch. I can fix it.
 
-Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-
-Thanks.
+Best Regards
+Haojian
