@@ -1,61 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Sep 2010 20:48:06 +0100
-Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
-In-Reply-To: <4C8F7157.9060005@jic23.retrosnub.co.uk>
-References: <cover.1284406638.git.joe@perches.com>
-	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
-	<4C8E84A0.1010606@jic23.retrosnub.co.uk>
-	<19599.9719.562406.692216@ipc1.ka-ro>
-	<4C8F7157.9060005@jic23.retrosnub.co.uk>
-Message-ID: <20100914194806.GA26693@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Sep 2010 13:27:43 -0700
+Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD25F7DB@dbde02.ent.ti.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100914185907.GG8647@atomide.com>
+	<20100914190314.GH8647@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD25F7DB@dbde02.ent.ti.com>
+Message-ID: <20100914202743.GK8647@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 14, 2010 at 01:57:59PM +0100, Jonathan Cameron wrote:
-> On 09/14/10 08:36, Lothar Wa?mann wrote:
-> > Hi,
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100914 12:09]:
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > owner at vger.kernel.org] On Behalf Of Tony Lindgren
+> > Sent: Wednesday, September 15, 2010 12:33 AM
+> > To: Russell King - ARM Linux
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
+> > bryan.wu at canonical.com
+> > Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
 > > 
-> > Jonathan Cameron writes:
-> >>  Commit message is  somewhat inaccurate...
-> >>
-> >> On 09/13/10 20:47, Joe Perches wrote:
-> >>> Signed-off-by: Joe Perches <joe@perches.com>
-> >>> ---
-> >>>  drivers/i2c/busses/i2c-stu300.c |    4 ++--
-> >>>  1 files changed, 2 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
-> >>> index 495be45..2f7c09c 100644
-> >>> --- a/drivers/i2c/busses/i2c-stu300.c
-> >>> +++ b/drivers/i2c/busses/i2c-stu300.c
-> >>> @@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
-> >>>  	struct resource *res;
-> >>>  	int bus_nr;
-> >>>  	int ret = 0;
-> >>> -	char clk_name[] = "I2C0";
-> >>> +	char clk_name[sizeof("I2Cx")];
-> >>>  
-> >>>  	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
-> >>>  	if (!dev) {
-> >>> @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
-> >>>  	}
-> >>>  
-> >>>  	bus_nr = pdev->id;
-> >>> -	clk_name[3] += (char)bus_nr;
-> >>> +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
-> >> I'm guessing that there are never more than a couple of these.
-> >> Why is this method a better bet than just putting %d?
-> >>
-> > '%c' will only ever produce one byte of output while '%d' may
-> > produce up to 11 bytes depending on the value of bus_nr thus
-> > overflowing the buffer.
-> Then use an snprintf, or apply a check to ensure it isn't bigger than
-> 9.
-> 
-> If you don't mind having clocks named i2c$ or something equally
-> silly then I guess this is fine.  To my mind, if that is possible
-> this is a bug that should be fixed rather than avoided.
+> > With the recent changes to core ARM kernel code, we can now
+> > boot SMP kernel on UP systems. Update omap3_defconfig to
+> > enable SMP. This allows us to remove omap_4430sdp_defconfig.
+> >
+> Not yet.
+> We still have some issues around Ethernet, bridge/syslink,
+> sensors but hopefully we should be able to fix those.
+> Will have a closer look at this and see if these can be
+> easily fixed.
 
-Even better, fix the implementation so that it conforms to the API
-spec rather than doing its own thing with the consumer connection ID
-argument and ignoring the struct device argument.
+Sounds like you're having these problems anyways and they
+are not related to the defconfigs?
+
+Considering Linus' earlier comments on the defconfigs, I don't
+see any reasonds not to merge this patch. If TI wants to fix up
+some other things, there's still about two weeks before -rc6.
+
+> > In addition to enabling SMP, we also need to disable some
+> > options to make the system boot:
+> > 
+> > - For some reason LOCK_STAT causes tons of
+> >   WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
+> >   so disable it for now.
+> > 
+> > - MUSB init fails for multi-omap, disable it for now.
+> > 
+> > - LOCAL_TIMERS hangs on omap4, disable it for now.
+>
+> This is expected on omap4 ES1.0 and hence not enabled
+> in the omap_4430sdp_defconfig.
+
+Maybe add a check for ES1.0 there to the init then?
+
+Regards,
+
+Tony
