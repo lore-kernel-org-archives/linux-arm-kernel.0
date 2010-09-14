@@ -1,40 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Sep 2010 13:54:09 +0100
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <000001cb5409$4726e000$4b4d010a@Emea.Arm.com>
-References: <4C8DD588.7040009@endruntechnologies.com>
-	<201009131043.48688.marek.vasut@gmail.com>
-	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>
-	<20100913101039.GC2614@kw.sim.vm.gnt>
-	<000001cb5409$4726e000$4b4d010a@Emea.Arm.com>
-Message-ID: <1284468849.933.2.camel@e102109-lin.cambridge.arm.com>
+From: kernel@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Tue, 14 Sep 2010 13:57:59 +0100
+Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
+In-Reply-To: <19599.9719.562406.692216@ipc1.ka-ro>
+References: <cover.1284406638.git.joe@perches.com>	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>	<4C8E84A0.1010606@jic23.retrosnub.co.uk>
+	<19599.9719.562406.692216@ipc1.ka-ro>
+Message-ID: <4C8F7157.9060005@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-09-14 at 13:35 +0100, Dave P. Martin wrote:
-> > The initramfs is located at the end of the init section and 
-> > before the text section. Because the kernel must be able to 
-> > 'branch' between the init and text sections, the initramfs 
-> > size can't be greater than the 'branch' maximum offset. 32MB ?
+On 09/14/10 08:36, Lothar Wa?mann wrote:
+> Hi,
 > 
-> We can also build kernels in Thumb-2 (where the long branch range is +/- 4MB
-> IIRC)
+> Jonathan Cameron writes:
+>>  Commit message is  somewhat inaccurate...
+>>
+>> On 09/13/10 20:47, Joe Perches wrote:
+>>> Signed-off-by: Joe Perches <joe@perches.com>
+>>> ---
+>>>  drivers/i2c/busses/i2c-stu300.c |    4 ++--
+>>>  1 files changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+>>> index 495be45..2f7c09c 100644
+>>> --- a/drivers/i2c/busses/i2c-stu300.c
+>>> +++ b/drivers/i2c/busses/i2c-stu300.c
+>>> @@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
+>>>  	struct resource *res;
+>>>  	int bus_nr;
+>>>  	int ret = 0;
+>>> -	char clk_name[] = "I2C0";
+>>> +	char clk_name[sizeof("I2Cx")];
+>>>  
+>>>  	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
+>>>  	if (!dev) {
+>>> @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
+>>>  	}
+>>>  
+>>>  	bus_nr = pdev->id;
+>>> -	clk_name[3] += (char)bus_nr;
+>>> +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
+>> I'm guessing that there are never more than a couple of these.
+>> Why is this method a better bet than just putting %d?
+>>
+> '%c' will only ever produce one byte of output while '%d' may
+> produce up to 11 bytes depending on the value of bus_nr thus
+> overflowing the buffer.
+Then use an snprintf, or apply a check to ensure it isn't bigger than
+9.
 
-I think the Thumb-2 branch goes up to 16MB range. The Thumb-1 may be
-smaller but we don't support this in the kernel. That's why Thumb-2
-modules are within 8MB below PAGE_OFFSET. But this leaves us with
-maximum 8MB of kernel size.
-
-> I believe the linker should always generate trampolines to extend the range
-> of those branches where necessary, even when branching from assembler.  The
-> only case where this won't work is if you have individual objects whose text
-> section is so large there's nowhere to put the trampolines within the
-> required range, or where branch targets are fixed up by something other than
-> the linker (I'm guessing that's either a very rare situation or
-> nonexistent.)
-
-We would need some additional relocations handling in the modules
-loading code.
-
--- 
-Catalin
+If you don't mind having clocks named i2c$ or something equally
+silly then I guess this is fine.  To my mind, if that is possible
+this is a bug that should be fixed rather than avoided.
