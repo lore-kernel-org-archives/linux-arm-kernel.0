@@ -1,69 +1,202 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 Sep 2010 14:46:06 -0400 (EDT)
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <4C8FB71C.8010208@endruntechnologies.com>
-References: <4C8DD588.7040009@endruntechnologies.com>
-	<20100913100111.GA30787@n2100.arm.linux.org.uk>
-	<4C8E7EFF.7020004@endruntechnologies.com>
-	<alpine.LFD.2.00.1009141330230.19366@xanadu.home>
-	<4C8FB71C.8010208@endruntechnologies.com>
-Message-ID: <alpine.LFD.2.00.1009141442330.19366@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Sep 2010 12:03:14 -0700
+Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
+In-Reply-To: <20100914185907.GG8647@atomide.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100914185907.GG8647@atomide.com>
+Message-ID: <20100914190314.GH8647@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Sep 2010, Bruce M. Penrod wrote:
+With the recent changes to core ARM kernel code, we can now
+boot SMP kernel on UP systems. Update omap3_defconfig to
+enable SMP. This allows us to remove omap_4430sdp_defconfig.
 
-> 
-> 
-> Nicolas Pitre wrote:
-> > On Mon, 13 Sep 2010, Bruce M. Penrod wrote:
-> > 
-> > > 
-> > > Russell King - ARM Linux wrote:
-> > > > On Mon, Sep 13, 2010 at 12:40:56AM -0700, Bruce M. Penrod wrote:
-> > > > > This seems like a pretty straightforward question, but extensive web
-> > > > > searching hasn't shown a really clear, up-to-date answer.  The most
-> > > > > recent info is circa 2004 and states that 4MB is the largest
-> > > > > uncompressed
-> > > > > ARM kernel that may be loaded.  Not being an ARM assembly  guru
-> > > > > (head.S
-> > > > > baffles me), I'd like to know if that is still true in  2010, and if
-> > > > > it
-> > > > > is, why?
-> > > > It is no longer true; the only limit now is the size of contiguous RAM
-> > > > to fit the kernel image into.
-> > > > 
-> > > Interesting.  I finally was able to get an uncompressed kernel a little
-> > > below
-> > > 4MB, and now it boots.  I'm working with 2.6.35rc6 on an OpenRD Ultimate
-> > > (Marvell Kirkwood) with Slackware, doing native compiles.  I'm wondering
-> > > if
-> > > there could be any problem with U-Boot for larger kernels than 4MB, but it
-> > > doesn't complain and says that it is copying the image.  The symptom I had
-> > > with a much larger kernel (~15MB) is a total hang, not even "Uncompressing
-> > > linux".
-> > > 
-> > > I'll add some innocuous stuff back in until I get above 4MB again and see
-> > > if
-> > > it breaks again.
-> > 
-> > When it breaks, do you still see the "Uncompressing Linux... done, booting
-> > the kernel." message?
-> > 
-> > 
-> > Nicolas
-> > 
-> 
-> I think it depended upon how "too big" the kernel was.  With one only slightly
-> larger than 4 MB, I did see "Uncompressing Linux...", but not "done, booting
-> the kernel."  With a very large kernel (15MB), nothing printed at all.
-> 
-> I have not retested since successfully booting one slightly smaller than 4096
-> * 1024.  When I do, I will post the results.  Should happen today.
+In addition to enabling SMP, we also need to disable some
+options to make the system boot:
 
-OK.  Also please provide the size of your arch/arm/boot/zImage as well 
-as arch/arm/boot/Image.  Also, at what address do you load your kernel 
-in memory?
+- For some reason LOCK_STAT causes tons of
+  WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
+  so disable it for now.
 
+- MUSB init fails for multi-omap, disable it for now.
 
-Nicolas
+- LOCAL_TIMERS hangs on omap4, disable it for now.
+
+Also disable DEBUG_LL as this should be only enabled for
+debugging.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/configs/omap3_defconfig b/arch/arm/configs/omap3_defconfig
+index 5db9a6b..833a9bc 100644
+--- a/arch/arm/configs/omap3_defconfig
++++ b/arch/arm/configs/omap3_defconfig
+@@ -55,6 +55,8 @@ CONFIG_MACH_OMAP_4430SDP=y
+ CONFIG_ARM_THUMBEE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_SMP=y
++# CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ CONFIG_LEDS=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -218,9 +220,9 @@ CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_SUSPEND=y
+ # CONFIG_USB_OTG_WHITELIST is not set
+ CONFIG_USB_MON=y
+-CONFIG_USB_MUSB_HDRC=y
+-CONFIG_USB_MUSB_OTG=y
+-CONFIG_USB_GADGET_MUSB_HDRC=y
++# CONFIG_USB_MUSB_HDRC is not set
++# CONFIG_USB_MUSB_OTG is not set
++# CONFIG_USB_GADGET_MUSB_HDRC is not set
+ CONFIG_USB_MUSB_DEBUG=y
+ CONFIG_USB_WDM=y
+ CONFIG_USB_STORAGE=y
+@@ -276,12 +278,11 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_SCHEDSTATS=y
+ CONFIG_TIMER_STATS=y
+ CONFIG_PROVE_LOCKING=y
+-CONFIG_LOCK_STAT=y
++# CONFIG_LOCK_STAT is not set
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_DEBUG_INFO=y
+ # CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-CONFIG_DEBUG_LL=y
+ CONFIG_SECURITY=y
+ CONFIG_CRYPTO_MICHAEL_MIC=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+diff --git a/arch/arm/configs/omap_4430sdp_defconfig b/arch/arm/configs/omap_4430sdp_defconfig
+deleted file mode 100644
+index 14c1e18..0000000
+--- a/arch/arm/configs/omap_4430sdp_defconfig
++++ /dev/null
+@@ -1,125 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_EMBEDDED=y
+-# CONFIG_SYSCTL_SYSCALL is not set
+-# CONFIG_ELF_CORE is not set
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
+-CONFIG_MODULE_SRCVERSION_ALL=y
+-# CONFIG_BLK_DEV_BSG is not set
+-CONFIG_ARCH_OMAP=y
+-CONFIG_ARCH_OMAP4=y
+-# CONFIG_ARCH_OMAP2PLUS_TYPICAL is not set
+-# CONFIG_ARCH_OMAP2 is not set
+-# CONFIG_ARCH_OMAP3 is not set
+-# CONFIG_OMAP_MUX is not set
+-CONFIG_OMAP_32K_TIMER=y
+-CONFIG_OMAP_DM_TIMER=y
+-CONFIG_MACH_OMAP_4430SDP=y
+-# CONFIG_ARM_THUMB is not set
+-CONFIG_PL310_ERRATA_588369=y
+-CONFIG_SMP=y
+-CONFIG_NR_CPUS=2
+-# CONFIG_LOCAL_TIMERS is not set
+-CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="root=/dev/ram0 rw mem=128M console=ttyS2,115200n8 initrd=0x81600000,20M ramdisk_size=20480"
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-CONFIG_BINFMT_MISC=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-CONFIG_IP_PNP_BOOTP=y
+-CONFIG_IP_PNP_RARP=y
+-# CONFIG_IPV6 is not set
+-# CONFIG_WIRELESS is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-# CONFIG_FW_LOADER is not set
+-CONFIG_BLK_DEV_LOOP=y
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=16384
+-# CONFIG_MISC_DEVICES is not set
+-CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_KS8851=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+-# CONFIG_WLAN is not set
+-# CONFIG_INPUT_MOUSEDEV is not set
+-CONFIG_INPUT_EVDEV=y
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-# CONFIG_SERIO is not set
+-CONFIG_SERIAL_8250=y
+-CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_SERIAL_8250_NR_UARTS=32
+-CONFIG_SERIAL_8250_EXTENDED=y
+-CONFIG_SERIAL_8250_MANY_PORTS=y
+-CONFIG_SERIAL_8250_SHARE_IRQ=y
+-CONFIG_SERIAL_8250_DETECT_IRQ=y
+-CONFIG_SERIAL_8250_RSA=y
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_HW_RANDOM=y
+-CONFIG_I2C=y
+-CONFIG_I2C_CHARDEV=y
+-CONFIG_I2C_OMAP=y
+-CONFIG_SPI=y
+-CONFIG_SPI_OMAP24XX=y
+-# CONFIG_HWMON is not set
+-CONFIG_WATCHDOG=y
+-CONFIG_OMAP_WATCHDOG=y
+-CONFIG_TWL4030_CORE=y
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_TWL4030=y
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_MMC=y
+-CONFIG_MMC_OMAP_HS=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_TWL4030=y
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT3_FS=y
+-# CONFIG_EXT3_FS_XATTR is not set
+-CONFIG_INOTIFY=y
+-CONFIG_QUOTA=y
+-CONFIG_QFMT_V2=y
+-CONFIG_MSDOS_FS=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-CONFIG_NFS_V3_ACL=y
+-CONFIG_NFS_V4=y
+-CONFIG_ROOT_NFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_KERNEL=y
+-# CONFIG_DETECT_SOFTLOCKUP is not set
+-CONFIG_DETECT_HUNG_TASK=y
+-# CONFIG_SCHED_DEBUG is not set
+-# CONFIG_DEBUG_PREEMPT is not set
+-# CONFIG_DEBUG_BUGVERBOSE is not set
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-# CONFIG_FTRACE is not set
+-# CONFIG_ARM_UNWIND is not set
+-CONFIG_CRYPTO_ECB=m
+-CONFIG_CRYPTO_PCBC=m
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+-CONFIG_CRC_CCITT=y
+-CONFIG_CRC_T10DIF=y
+-CONFIG_LIBCRC32C=y
