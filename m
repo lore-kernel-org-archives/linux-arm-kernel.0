@@ -1,78 +1,65 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Tue, 14 Sep 2010 10:45:22 +0530
-Subject: [PATCH] mmc: failure of block read wait for long time
-In-Reply-To: <4C8A2C5D.2050408@nokia.com>
-References: <1280230066-27612-1-git-send-email-s-ghorai@ti.com>
-	<4C4EDD85.5060606@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B030E417D80@dbde02.ent.ti.com>
-	<4C4FED36.3010607@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F026ED@dbde02.ent.ti.com>
-	<4C8A19E7.30706@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F026F6@dbde02.ent.ti.com>
-	<4C8A2C5D.2050408@nokia.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 14 Sep 2010 13:28:50 +0800
+Subject: [PATCH 3/4] ARM: pxa: update cpuid of pxa168 & pxa910
+In-Reply-To: <1283953362-2363-3-git-send-email-haojian.zhuang@marvell.com>
+References: <1283953362-2363-1-git-send-email-haojian.zhuang@marvell.com>
+	<1283953362-2363-2-git-send-email-haojian.zhuang@marvell.com>
+	<1283953362-2363-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTimfF97fYi+j0gOHTem_FdU0SZ9R4HXyPumtN49t@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adrian,
+might be better now for us to move to something like:
 
-[..snip..]
-> >>> [Ghorai] Adrian,
-> >>> Yes this works and reduced the retry by 1/4 (2048 to 512 times for 1MB
-> >> data read) form the original code;
-> >>> Initially it was retrying for each page(512 bytes) after multi-block
-> >> read fail; but this solution is retying for each segment(2048 bytes);
-> >>> 1. Now say block layrer reading 1MB and failed for the 1st segment. So
-> >> it will still retry for 1MB/2048-bytes, i.e. 512 times.
-> >>> 2. So do you think any good reason to retry again and again?
-> >> If you have 1MB that is not readable, it sounds like the card is broken.
-> >> Why are so many reads failing?  Has the card been removed?
-> >>
-> >> You might very rarely see ECC errors in a small number of sectors,
-> >> but more than that sounds like something else is broken.
-> >
-> > [Ghorai] yes, one example is we remove the card when reading data,
-> 
-> Well, that is a different case.  Once the card has gone, the block driver
-> can (and will once the remove method is called) error out all I/O
-> requests without sending them to MMC.  That doesn't happen until there
-> is a card detect interrupt and a resulting rescan.
+#ifdef CONFIG_CPU_PXA168
+static inline int cpu_is_pxa168(void)
+{
+	return ((read_cpuid_id() >> 4) & 0xff == 0x84) &&
+		(mmp_chip_id & 0x0fff == 0x0333);
+}
+#else
+#define cpu_is_pxa168()		(0)
+#endif
 
-[Ghorai] here we are discussing two problem, 
-1. If IO failed how to stop retry; because of -
-	a. internal card error
-	b. issue in Filesystem, driver, or host controller issue
-	c. or cards removed.
+Although these all need to be re-worked in the end once multiple SoCs can
+be compiled together.
 
-2. And 2nd how to sync block-layer IO, if card removed,
-	a. case 1: when card removed interrupt support by the platform 
-	b. case 2: when card removed interrupt does not support by the platform?
-
-> 
-> A possible solution is to put a flag on mmc_card to indicate card_gone
-> that gets set as soon as the drivers card detect interrupt shows there
-> is no card (hoping that we are not getting any bouncing on card detect)
-> and then have mmc_wait_for_req() simple return -ENODEV immediately if
-> the card_gone flag is set.  Finally, if the mmc block driver sees
-> a -ENODEV error, it should also check the card_gone flag (via a new
-> core function) and if the card is gone, do not retry - and perhaps
-> even error out the rest of the I/O request queue as well.
-
-[Ghorai] your idea address the 2.a case, but not 2.b, 1.a, 1.b
-
-And the solution I was proposing to return the status of IO failure as soon as possible to above layer; and handle the card removed interrupt separately or any other issue in h/w or s/w or combination of both. Or just think again when platform don't have the card remove interrupt.
-
-So my patch addresses the 1st part
-And for the 2nd part we can submit the patch anytime.
-
-> 
-> I can suggest a patch if you want but I am on vacation next week so
-> it will have to wait a couple of weeks.
-> 
-> > And moreover we should not give the interleave data to apps, as we don't
-> have option to tell application for the valid data.
-> >
-[..snip..]
-http://comments.gmane.org/gmane.linux.kernel.mmc/2714
- 
-> >
+> ?#else
+> -# ?define __cpu_is_pxa168(id) ?(0)
+> +#define __cpu_is_pxa168(id, cid) ? ? ? (0)
+> ?#endif
+>
+> ?#ifdef CONFIG_CPU_PXA910
+> -# ?define __cpu_is_pxa910(id) ?\
+> - ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x80; })
+> +#define __cpu_is_pxa910(id, cid) ? ? ? \
+> + ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; \
+> + ? ? ? ? ?unsigned int _cid = (cid) & 0xfff; \
+> + ? ? ? ? ?(_id == 0x84 || _id == 0x80) && (_cid == 0x910 || _cid == 0x920); })
+> ?#else
+> -# ?define __cpu_is_pxa910(id) ?(0)
+> +#define __cpu_is_pxa910(id, cid) ? ? ? (0)
+> ?#endif
+>
+> ?#ifdef CONFIG_CPU_MMP2
+> -# ?define __cpu_is_mmp2(id) ? ?\
+> +#define __cpu_is_mmp2(id) ? ? ?\
+> ? ? ? ?({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x58; })
+> ?#else
+> -# ?define __cpu_is_mmp2(id) ? ?(0)
+> +#define __cpu_is_mmp2(id) ? ? ?(0)
+> ?#endif
+>
+> -#define cpu_is_pxa168() ? ? ? ? ? ? ? ?({ __cpu_is_pxa168(read_cpuid_id()); })
+> -#define cpu_is_pxa910() ? ? ? ? ? ? ? ?({ __cpu_is_pxa910(read_cpuid_id()); })
+> +#define cpu_is_pxa168() ? ? ? ? ? ? ? ?({ __cpu_is_pxa168(read_cpuid_id(), \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(CHIP_ID)); })
+> +#define cpu_is_pxa910() ? ? ? ? ? ? ? ?({ __cpu_is_pxa910(read_cpuid_id(), \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(CHIP_ID)); })
+> ?#define cpu_is_mmp2() ? ? ? ? ?({ __cpu_is_mmp2(read_cpuid_id()); })
+>
+> ?#endif /* __ASM_MACH_CPUTYPE_H */
+> --
+> 1.5.6.5
+>
+>
