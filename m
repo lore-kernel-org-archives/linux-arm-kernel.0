@@ -1,225 +1,61 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 15 Sep 2010 00:47:40 +0530
-Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
-In-Reply-To: <20100914190314.GH8647@atomide.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100914185907.GG8647@atomide.com> <20100914190314.GH8647@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD25F7DB@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Sep 2010 20:48:06 +0100
+Subject: [PATCH 05/25] drivers/i2c: Use static const char arrays
+In-Reply-To: <4C8F7157.9060005@jic23.retrosnub.co.uk>
+References: <cover.1284406638.git.joe@perches.com>
+	<b0c83cb1b42c6adf38f6322066fb457693f7ac3b.1284406638.git.joe@perches.com>
+	<4C8E84A0.1010606@jic23.retrosnub.co.uk>
+	<19599.9719.562406.692216@ipc1.ka-ro>
+	<4C8F7157.9060005@jic23.retrosnub.co.uk>
+Message-ID: <20100914194806.GA26693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> Sent: Wednesday, September 15, 2010 12:33 AM
-> To: Russell King - ARM Linux
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
-> bryan.wu at canonical.com
-> Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
+On Tue, Sep 14, 2010 at 01:57:59PM +0100, Jonathan Cameron wrote:
+> On 09/14/10 08:36, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Jonathan Cameron writes:
+> >>  Commit message is  somewhat inaccurate...
+> >>
+> >> On 09/13/10 20:47, Joe Perches wrote:
+> >>> Signed-off-by: Joe Perches <joe@perches.com>
+> >>> ---
+> >>>  drivers/i2c/busses/i2c-stu300.c |    4 ++--
+> >>>  1 files changed, 2 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+> >>> index 495be45..2f7c09c 100644
+> >>> --- a/drivers/i2c/busses/i2c-stu300.c
+> >>> +++ b/drivers/i2c/busses/i2c-stu300.c
+> >>> @@ -871,7 +871,7 @@ stu300_probe(struct platform_device *pdev)
+> >>>  	struct resource *res;
+> >>>  	int bus_nr;
+> >>>  	int ret = 0;
+> >>> -	char clk_name[] = "I2C0";
+> >>> +	char clk_name[sizeof("I2Cx")];
+> >>>  
+> >>>  	dev = kzalloc(sizeof(struct stu300_dev), GFP_KERNEL);
+> >>>  	if (!dev) {
+> >>> @@ -881,7 +881,7 @@ stu300_probe(struct platform_device *pdev)
+> >>>  	}
+> >>>  
+> >>>  	bus_nr = pdev->id;
+> >>> -	clk_name[3] += (char)bus_nr;
+> >>> +	sprintf(clk_name, "I2C%c", '0' + bus_nr);
+> >> I'm guessing that there are never more than a couple of these.
+> >> Why is this method a better bet than just putting %d?
+> >>
+> > '%c' will only ever produce one byte of output while '%d' may
+> > produce up to 11 bytes depending on the value of bus_nr thus
+> > overflowing the buffer.
+> Then use an snprintf, or apply a check to ensure it isn't bigger than
+> 9.
 > 
-> With the recent changes to core ARM kernel code, we can now
-> boot SMP kernel on UP systems. Update omap3_defconfig to
-> enable SMP. This allows us to remove omap_4430sdp_defconfig.
->
-Not yet.
-We still have some issues around Ethernet, bridge/syslink,
-sensors but hopefully we should be able to fix those.
-Will have a closer look at this and see if these can be
-easily fixed.
-> In addition to enabling SMP, we also need to disable some
-> options to make the system boot:
-> 
-> - For some reason LOCK_STAT causes tons of
->   WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
->   so disable it for now.
-> 
-> - MUSB init fails for multi-omap, disable it for now.
-> 
-> - LOCAL_TIMERS hangs on omap4, disable it for now.
-This is expected on omap4 ES1.0 and hence not enabled
-in the omap_4430sdp_defconfig.
-> 
-> Also disable DEBUG_LL as this should be only enabled for
-> debugging.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> diff --git a/arch/arm/configs/omap3_defconfig
-> b/arch/arm/configs/omap3_defconfig
-> index 5db9a6b..833a9bc 100644
-> --- a/arch/arm/configs/omap3_defconfig
-> +++ b/arch/arm/configs/omap3_defconfig
-> @@ -55,6 +55,8 @@ CONFIG_MACH_OMAP_4430SDP=y
->  CONFIG_ARM_THUMBEE=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_SMP=y
-> +# CONFIG_LOCAL_TIMERS is not set
->  CONFIG_AEABI=y
->  CONFIG_LEDS=y
->  CONFIG_ZBOOT_ROM_TEXT=0x0
-> @@ -218,9 +220,9 @@ CONFIG_USB_DEVICEFS=y
->  CONFIG_USB_SUSPEND=y
->  # CONFIG_USB_OTG_WHITELIST is not set
->  CONFIG_USB_MON=y
-> -CONFIG_USB_MUSB_HDRC=y
-> -CONFIG_USB_MUSB_OTG=y
-> -CONFIG_USB_GADGET_MUSB_HDRC=y
-> +# CONFIG_USB_MUSB_HDRC is not set
-> +# CONFIG_USB_MUSB_OTG is not set
-> +# CONFIG_USB_GADGET_MUSB_HDRC is not set
->  CONFIG_USB_MUSB_DEBUG=y
->  CONFIG_USB_WDM=y
->  CONFIG_USB_STORAGE=y
-> @@ -276,12 +278,11 @@ CONFIG_DEBUG_KERNEL=y
->  CONFIG_SCHEDSTATS=y
->  CONFIG_TIMER_STATS=y
->  CONFIG_PROVE_LOCKING=y
-> -CONFIG_LOCK_STAT=y
-> +# CONFIG_LOCK_STAT is not set
->  CONFIG_DEBUG_SPINLOCK_SLEEP=y
->  # CONFIG_DEBUG_BUGVERBOSE is not set
->  CONFIG_DEBUG_INFO=y
->  # CONFIG_RCU_CPU_STALL_DETECTOR is not set
-> -CONFIG_DEBUG_LL=y
->  CONFIG_SECURITY=y
->  CONFIG_CRYPTO_MICHAEL_MIC=y
->  # CONFIG_CRYPTO_ANSI_CPRNG is not set
-> diff --git a/arch/arm/configs/omap_4430sdp_defconfig
-> b/arch/arm/configs/omap_4430sdp_defconfig
-> deleted file mode 100644
-> index 14c1e18..0000000
-> --- a/arch/arm/configs/omap_4430sdp_defconfig
-> +++ /dev/null
-> @@ -1,125 +0,0 @@
-> -CONFIG_EXPERIMENTAL=y
-> -CONFIG_SYSVIPC=y
-> -CONFIG_BSD_PROCESS_ACCT=y
-> -CONFIG_LOG_BUF_SHIFT=14
-> -CONFIG_BLK_DEV_INITRD=y
-> -CONFIG_EMBEDDED=y
-> -# CONFIG_SYSCTL_SYSCALL is not set
-> -# CONFIG_ELF_CORE is not set
-> -CONFIG_MODULES=y
-> -CONFIG_MODULE_UNLOAD=y
-> -CONFIG_MODVERSIONS=y
-> -CONFIG_MODULE_SRCVERSION_ALL=y
-> -# CONFIG_BLK_DEV_BSG is not set
-> -CONFIG_ARCH_OMAP=y
-> -CONFIG_ARCH_OMAP4=y
-> -# CONFIG_ARCH_OMAP2PLUS_TYPICAL is not set
-> -# CONFIG_ARCH_OMAP2 is not set
-> -# CONFIG_ARCH_OMAP3 is not set
-> -# CONFIG_OMAP_MUX is not set
-> -CONFIG_OMAP_32K_TIMER=y
-> -CONFIG_OMAP_DM_TIMER=y
-> -CONFIG_MACH_OMAP_4430SDP=y
-> -# CONFIG_ARM_THUMB is not set
-> -CONFIG_PL310_ERRATA_588369=y
-> -CONFIG_SMP=y
-> -CONFIG_NR_CPUS=2
-> -# CONFIG_LOCAL_TIMERS is not set
-> -CONFIG_PREEMPT=y
-> -CONFIG_AEABI=y
-> -CONFIG_ZBOOT_ROM_TEXT=0x0
-> -CONFIG_ZBOOT_ROM_BSS=0x0
-> -CONFIG_CMDLINE="root=/dev/ram0 rw mem=128M console=ttyS2,115200n8
-> initrd=0x81600000,20M ramdisk_size=20480"
-> -CONFIG_VFP=y
-> -CONFIG_NEON=y
-> -CONFIG_BINFMT_MISC=y
-> -CONFIG_NET=y
-> -CONFIG_PACKET=y
-> -CONFIG_INET=y
-> -CONFIG_IP_PNP=y
-> -CONFIG_IP_PNP_DHCP=y
-> -CONFIG_IP_PNP_BOOTP=y
-> -CONFIG_IP_PNP_RARP=y
-> -# CONFIG_IPV6 is not set
-> -# CONFIG_WIRELESS is not set
-> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> -# CONFIG_FW_LOADER is not set
-> -CONFIG_BLK_DEV_LOOP=y
-> -CONFIG_BLK_DEV_RAM=y
-> -CONFIG_BLK_DEV_RAM_SIZE=16384
-> -# CONFIG_MISC_DEVICES is not set
-> -CONFIG_NETDEVICES=y
-> -CONFIG_NET_ETHERNET=y
-> -CONFIG_KS8851=y
-> -# CONFIG_NETDEV_1000 is not set
-> -# CONFIG_NETDEV_10000 is not set
-> -# CONFIG_WLAN is not set
-> -# CONFIG_INPUT_MOUSEDEV is not set
-> -CONFIG_INPUT_EVDEV=y
-> -# CONFIG_INPUT_KEYBOARD is not set
-> -# CONFIG_INPUT_MOUSE is not set
-> -# CONFIG_SERIO is not set
-> -CONFIG_SERIAL_8250=y
-> -CONFIG_SERIAL_8250_CONSOLE=y
-> -CONFIG_SERIAL_8250_NR_UARTS=32
-> -CONFIG_SERIAL_8250_EXTENDED=y
-> -CONFIG_SERIAL_8250_MANY_PORTS=y
-> -CONFIG_SERIAL_8250_SHARE_IRQ=y
-> -CONFIG_SERIAL_8250_DETECT_IRQ=y
-> -CONFIG_SERIAL_8250_RSA=y
-> -# CONFIG_LEGACY_PTYS is not set
-> -CONFIG_HW_RANDOM=y
-> -CONFIG_I2C=y
-> -CONFIG_I2C_CHARDEV=y
-> -CONFIG_I2C_OMAP=y
-> -CONFIG_SPI=y
-> -CONFIG_SPI_OMAP24XX=y
-> -# CONFIG_HWMON is not set
-> -CONFIG_WATCHDOG=y
-> -CONFIG_OMAP_WATCHDOG=y
-> -CONFIG_TWL4030_CORE=y
-> -CONFIG_REGULATOR=y
-> -CONFIG_REGULATOR_TWL4030=y
-> -# CONFIG_VGA_CONSOLE is not set
-> -# CONFIG_HID_SUPPORT is not set
-> -# CONFIG_USB_SUPPORT is not set
-> -CONFIG_MMC=y
-> -CONFIG_MMC_OMAP_HS=y
-> -CONFIG_RTC_CLASS=y
-> -CONFIG_RTC_DRV_TWL4030=y
-> -CONFIG_EXT2_FS=y
-> -CONFIG_EXT3_FS=y
-> -# CONFIG_EXT3_FS_XATTR is not set
-> -CONFIG_INOTIFY=y
-> -CONFIG_QUOTA=y
-> -CONFIG_QFMT_V2=y
-> -CONFIG_MSDOS_FS=y
-> -CONFIG_VFAT_FS=y
-> -CONFIG_TMPFS=y
-> -CONFIG_NFS_FS=y
-> -CONFIG_NFS_V3=y
-> -CONFIG_NFS_V3_ACL=y
-> -CONFIG_NFS_V4=y
-> -CONFIG_ROOT_NFS=y
-> -CONFIG_PARTITION_ADVANCED=y
-> -CONFIG_NLS_CODEPAGE_437=y
-> -CONFIG_NLS_ISO8859_1=y
-> -# CONFIG_ENABLE_WARN_DEPRECATED is not set
-> -# CONFIG_ENABLE_MUST_CHECK is not set
-> -CONFIG_MAGIC_SYSRQ=y
-> -CONFIG_DEBUG_KERNEL=y
-> -# CONFIG_DETECT_SOFTLOCKUP is not set
-> -CONFIG_DETECT_HUNG_TASK=y
-> -# CONFIG_SCHED_DEBUG is not set
-> -# CONFIG_DEBUG_PREEMPT is not set
-> -# CONFIG_DEBUG_BUGVERBOSE is not set
-> -CONFIG_DEBUG_INFO=y
-> -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-> -# CONFIG_FTRACE is not set
-> -# CONFIG_ARM_UNWIND is not set
-> -CONFIG_CRYPTO_ECB=m
-> -CONFIG_CRYPTO_PCBC=m
-> -# CONFIG_CRYPTO_ANSI_CPRNG is not set
-> -CONFIG_CRC_CCITT=y
-> -CONFIG_CRC_T10DIF=y
-> -CONFIG_LIBCRC32C=y
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> If you don't mind having clocks named i2c$ or something equally
+> silly then I guess this is fine.  To my mind, if that is possible
+> this is a bug that should be fixed rather than avoided.
+
+Even better, fix the implementation so that it conforms to the API
+spec rather than doing its own thing with the consumer connection ID
+argument and ignoring the struct device argument.
