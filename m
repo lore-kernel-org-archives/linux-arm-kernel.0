@@ -1,50 +1,166 @@
-From: ww-ml@gmx.de (Wolfgang Wegner)
-Date: Tue, 14 Sep 2010 09:03:41 +0200
-Subject: Kirkwood PCI(e) write performance and DMA engine support for
-	copy_{to, from}_user?
-In-Reply-To: <AANLkTimAStrSQQZqX4Dsczas+z02-OnDB4RzO0MxbQhN@mail.gmail.com>
-References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
-	<20100906140347.GA24522@n2100.arm.linux.org.uk>
-	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
-	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
-	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
-	<20100907161156.GA3625@debian-wegner1.datadisplay.de>
-	<alpine.LFD.2.00.1009071443360.19366@xanadu.home>
-	<20100908083558.GA3393@debian-wegner1.datadisplay.de>
-	<20100909162135.GA3524@debian-wegner1.datadisplay.de>
-	<AANLkTimAStrSQQZqX4Dsczas+z02-OnDB4RzO0MxbQhN@mail.gmail.com>
-Message-ID: <20100914070341.GA3438@debian-wegner1.datadisplay.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 14 Sep 2010 15:08:12 +0800
+Subject: [PATCH v2 1/3] ARM: pxa168: added support for Teton BGA platform
+In-Reply-To: <1284349896-14545-2-git-send-email-mark.brown314@gmail.com>
+References: <1284349896-14545-1-git-send-email-mark.brown314@gmail.com>
+	<1284349896-14545-2-git-send-email-mark.brown314@gmail.com>
+Message-ID: <AANLkTi=gvk0TiQWs0778xFEy-FdsO1qNmc2gzb5mNq8Z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leon,
+On Mon, Sep 13, 2010 at 11:51 AM, Mark F. Brown <mark.brown314@gmail.com> wrote:
+> Added board defintion, header, and debug UART support.
+>
+> Signed-off-by: Mark F. Brown <mark.brown314@gmail.com>
+> ---
+> ?MAINTAINERS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?5 +++
+> ?arch/arm/mach-mmp/Kconfig ? ? ? ? ? ? ? ? ?| ? ?7 ++++
+> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mmp/include/mach/teton_bga.h | ? 27 +++++++++++++++
+> ?arch/arm/mach-mmp/teton_bga.c ? ? ? ? ? ? ?| ? 50 ++++++++++++++++++++++++++++
+> ?5 files changed, 90 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/mach-mmp/include/mach/teton_bga.h
+> ?create mode 100644 arch/arm/mach-mmp/teton_bga.c
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 433f353..d7a4481 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -967,6 +967,11 @@ M: Lennert Buytenhek <kernel@wantstofly.org>
+> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> ?S: ? ? Maintained
+>
+> +ARM/TETON BGA MACHINE SUPPORT
+> +M: ? ? Mark F. Brown <mark.brown314@gmail.com>
+> +L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S: ? ? Maintained
+> +
+> ?ARM/THECUS N2100 MACHINE SUPPORT
+> ?M: ? ? Lennert Buytenhek <kernel@wantstofly.org>
+> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+> index 6ab843e..0711d3b 100644
+> --- a/arch/arm/mach-mmp/Kconfig
+> +++ b/arch/arm/mach-mmp/Kconfig
+> @@ -57,6 +57,13 @@ config MACH_MARVELL_JASPER
+> ? ? ? ? ?PXA910-based development board. Since MMP2 is compatible to
+> ? ? ? ? ?ARMv6 architecture.
+>
+> +config MACH_TETON_BGA
+> + ? ? ? bool "Marvell's PXA168 Teton BGA Development Board"
+> + ? ? ? select CPU_PXA168
+> + ? ? ? help
+> + ? ? ? ? Say 'Y' here if you want to support the Marvell PXA168-based
+> + ? ? ? ? Teton BGA Development Board.
+> +
+> ?endmenu
+>
+> ?config CPU_PXA168
+> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+> index 8b66d06..751cdbf 100644
+> --- a/arch/arm/mach-mmp/Makefile
+> +++ b/arch/arm/mach-mmp/Makefile
+> @@ -17,3 +17,4 @@ obj-$(CONFIG_MACH_TAVOREVB) ? += tavorevb.o
+> ?obj-$(CONFIG_MACH_TTC_DKB) ? ? += ttc_dkb.o
+> ?obj-$(CONFIG_MACH_FLINT) ? ? ? += flint.o
+> ?obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
+> +obj-$(CONFIG_MACH_TETON_BGA) ? += teton_bga.o
+> diff --git a/arch/arm/mach-mmp/include/mach/teton_bga.h b/arch/arm/mach-mmp/include/mach/teton_bga.h
+> new file mode 100644
+> index 0000000..61a539b
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/include/mach/teton_bga.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * ?linux/arch/arm/mach-mmp/include/mach/teton_bga.h
+> + *
+> + * ?Support for the Marvell PXA168 Teton BGA Development Platform.
+> + *
+> + * ?This program is free software; you can redistribute it and/or modify
+> + * ?it under the terms of the GNU General Public License version 2 as
+> + * ?publishhed by the Free Software Foundation.
+> + */
+> +#ifndef __ASM_MACH_TETON_BGA_H
+> +#define __ASM_MACH_TETON_BGA_H
+> +
+> +/* GPIOs */
+> +#define MMC_PWENA_GPIO ? ? ? ? 27
+> +#define USBHPENB_GPIO ? ? ? ? ?55
+> +#define RTC_INT_GPIO ? ? ? ? ? 78
+> +#define LCD_VBLK_EN_GPIO ? ? ? 79
+> +#define LCD_DVDD_EN_GPIO ? ? ? 80
+> +#define RST_WIFI_GPIO ? ? ? ? ?81
+> +#define CF_PWEN_GPIO ? ? ? ? ? 82
+> +#define USB_OC_GPIO ? ? ? ? ? ?83
+> +#define PWM_GPIO ? ? ? ? ? ? ? 84
+> +#define USBHPENA_GPIO ? ? ? ? ?85
+> +#define TS_INT_GPIO ? ? ? ? ? ?86
+> +#define CIR_GPIO ? ? ? ? ? ? ? 108
+> +
+> +#endif /* __ASM_MACH_TETON_BGA_H */
+> diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
+> new file mode 100644
+> index 0000000..49b746b
+> --- /dev/null
+> +++ b/arch/arm/mach-mmp/teton_bga.c
+> @@ -0,0 +1,50 @@
+> +/*
+> + * ?linux/arch/arm/mach-mmp/teton_bga.c
+> + *
+> + * ?Support for the Marvell PXA168 Teton BGA Development Platform.
+> + *
+> + * ?Author: Mark F. Brown <mark.brown314@gmail.com>
+> + *
+> + * ?This code is based on aspenite.c
+> + *
+> + * ?This program is free software; you can redistribute it and/or modify
+> + * ?it under the terms of the GNU General Public License version 2 as
+> + * ?publishhed by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/addr-map.h>
+> +#include <mach/mfp-pxa168.h>
+> +#include <mach/pxa168.h>
+> +#include <mach/teton_bga.h>
+> +
+> +#include "common.h"
+> +
+> +static unsigned long teton_bga_pin_config[] __initdata = {
+> + ? ? ? /* UART1 */
+> + ? ? ? GPIO107_UART1_TXD,
+> + ? ? ? GPIO108_UART1_RXD,
+> +};
+> +
+> +static void __init teton_bga_init(void)
+> +{
+> + ? ? ? mfp_config(ARRAY_AND_SIZE(teton_bga_pin_config));
+> +
+> + ? ? ? /* on-chip devices */
+> + ? ? ? pxa168_add_uart(1);
+> +}
+> +
+> +MACHINE_START(TETON_BGA, "PXA168-based Teton BGA Development Platform")
+> + ? ? ? .phys_io ? ? ? ?= APB_PHYS_BASE,
+> + ? ? ? .io_pg_offst ? ?= (APB_VIRT_BASE >> 18) & 0xfffc,
+> + ? ? ? .map_io ? ? ? ? = mmp_map_io,
 
-On Mon, Sep 13, 2010 at 07:10:59PM +0200, Leon Woestenberg wrote:
-> Hello Wolfgang,
-> 
-> On Thu, Sep 9, 2010 at 6:21 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
-> > On Wed, Sep 08, 2010 at 10:35:58AM +0200, Wolfgang Wegner wrote:
-> >>
-> > With the FPGA evaluation board I get:
-> > - around 38 MBytes/second with Nicolas' inline assembly code
-> > - around 6 MBytes/second with any other C code (mmapped) as
-> > ?well as write() via dd
-> >
-> > So the main problem seems to be either our board implementation
-> > of the PCIe->PCI bridge or the FPGA. However, I am still wondering
-> > how a framebuffer-based application can attain reasonable performance,
-> >
-> Having implemented a framebuffer demo on an FPGA recently using PCI
-> Express, I think the main performance gain is made by having the DMA
-> done by the endpoint (FPGA) rather than by the CPU.
+Added .nr_irqs = IRQ_BOARD_START here, since I've merged Haojian's
+patch for enabling SPARSE_IRQ on MMP.
 
-this is what I read all around, however, I do not see how this
-can improve anything when using an mmap()ed frame buffer for
-pixel-oriented operations...
-This is why I thought about reverting to write() and simply transfer
-complete frames, which would be sufficient for about 90% of my
-application scenarios - and for the other 10% I could live with
-the lower performance.
+Otherwise all good to me, applied to 'devel'.
 
-Regards,
-Wolfgang
+> + ? ? ? .init_irq ? ? ? = pxa168_init_irq,
+> + ? ? ? .timer ? ? ? ? ?= &pxa168_timer,
+> + ? ? ? .init_machine ? = teton_bga_init,
+> +MACHINE_END
+> --
+> 1.7.0.4
+>
+>
