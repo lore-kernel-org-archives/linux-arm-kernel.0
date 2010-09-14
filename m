@@ -1,55 +1,40 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Tue, 14 Sep 2010 10:48:52 +0300
-Subject: dove: fix __io() definition to use bus based offset
-In-Reply-To: <AANLkTim+u9qqTaGwzHKGfD+3nGammQDNWG6BoKkwfg2F@mail.gmail.com>
-References: <AANLkTim+u9qqTaGwzHKGfD+3nGammQDNWG6BoKkwfg2F@mail.gmail.com>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009FD18EE745FA@IL-MB01.marvell.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 14 Sep 2010 17:52:06 +0900
+Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
+In-Reply-To: <20100819160255.GA3948@suse.de>
+References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
+	<Pine.LNX.4.64.1008191634160.26145@axis700.grange>
+	<20100819153527.GE2985@suse.de>
+	<Pine.LNX.4.64.1008191744560.26145@axis700.grange>
+	<20100819160255.GA3948@suse.de>
+Message-ID: <20100914085206.GP7336@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Thu, Aug 19, 2010 at 09:02:55AM -0700, Greg KH wrote:
+> On Thu, Aug 19, 2010 at 05:46:38PM +0200, Guennadi Liakhovetski wrote:
+> > On Thu, 19 Aug 2010, Greg KH wrote:
+> > 
+> > > On Thu, Aug 19, 2010 at 04:40:15PM +0200, Guennadi Liakhovetski wrote:
+> > > > Allocate the bitmap in dma_declare_coherent_memory() together with the struct
+> > > > dma_coherent_mem object.
+> > > 
+> > > You describe what you did, but _why_ are you doing it?
+> > 
+> > Well, to me the subject "_reduce_ the number..." is already a reason 
+> > enough - the fewer kmalloc's of 20 bytes - the better, I think. But if you 
+> > like, I can update the description too.
+> 
+> Yes, as I missed that, others might as well :)
+> 
+Indeed. When this is reposted, it should also include an update for
+Documentation/DMA-API.txt. I'm simply not going to take any DMA API
+patches if they don't include the documentation update. DMA-API.txt is
+one of the few useful parts of Documentation/, we should really strive to
+keep it that way.
 
->-----Original Message-----
-From: eric.y.miao@gmail.com [mailto:eric.y.miao at gmail.com] On 
->Behalf Of Eric Miao
->Sent: Tuesday, September 14, 2010 10:14 AM
->To: linux-arm-kernel
->Cc: Saeed Bishara; Nicolas Pitre
->Subject: ARM: dove: fix __io() definition to use bus based offset
->
->commit 821049d2bab27613f5f18639cf231e1c2230e5a9
->Author: Eric Miao <eric.y.miao@gmail.com>
->Date:   Tue Sep 14 16:06:22 2010 +0800
->
->    ARM: dove: fix __io() definition to use bus based offset
->
->    Signed-off-by: Eric Miao <eric.miao@canonical.com>
->
->This was proposed month ago, and had some other discussions about
->typesafe_io() and type casting. I hereby simplified the patch to its
->minimum and let's address the real issue first.
->
->Saeed, Acked?
-Yes, The patch is ok for me.
->
->
->diff --git a/arch/arm/mach-dove/include/mach/io.h
->b/arch/arm/mach-dove/include/mach/io.h
->index 3b3e472..eb4936f 100644
->--- a/arch/arm/mach-dove/include/mach/io.h
->+++ b/arch/arm/mach-dove/include/mach/io.h
->@@ -13,8 +13,8 @@
->
-> #define IO_SPACE_LIMIT		0xffffffff
->
->-#define __io(a)  ((void __iomem *)(((a) - DOVE_PCIE0_IO_PHYS_BASE) +\
->-				   DOVE_PCIE0_IO_VIRT_BASE))
->-#define __mem_pci(a)		(a)
->+#define __io(a)  	((void __iomem *)(((a) - 
->DOVE_PCIE0_IO_BUS_BASE) + \
->+						 
->DOVE_PCIE0_IO_VIRT_BASE))
->+#define __mem_pci(a)	(a)
->
-> #endif
->
+It would also be nice if on the next iteration DMA API people were Cc'ed,
+this would be at least:
+
+	FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+	James Bottomley <James.Bottomley@HansenPartnership.com>
