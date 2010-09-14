@@ -1,47 +1,184 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 14 Sep 2010 14:37:25 +0800
-Subject: [PATCH 1/1] ARM: pxa: fix NFS build issue
-In-Reply-To: <1284445197-17403-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1284445197-17403-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTinmrATdicROXh7C_c-eH1Pr-r0cGCUfC8WR8ri4@mail.gmail.com>
+Date: Tue, 14 Sep 2010 14:51:55 +0800
+Subject: [PATCH 6/9] Remove unused pxa3xx default configuration
+In-Reply-To: <1284390832-7181-7-git-send-email-vince@kyllikki.org>
+References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
+	<1284390832-7181-7-git-send-email-vince@kyllikki.org>
+Message-ID: <AANLkTi=OWT45QpUq9Hu5FxraLmBPFDMJ+FOPC5efDFFZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 14, 2010 at 2:19 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> fs/built-in.o: In function `nfs_callback_authenticate':
-> compr_lzo.c:(.text+0x81380): undefined reference to `svc_gss_principal'
-> make: *** [.tmp_vmlinux1] Error 1
+On Mon, Sep 13, 2010 at 11:13 PM, Vincent Sanders <vince@kyllikki.org> wrote:
+> From: Vincent Sanders <vince@simtec.co.uk>
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> The pxa3xx default configuration has not built throughout the 2.6.36
+> series (since 2.6.35-git1). The kernel link has failed with
+>
+> fs/built-in.o: In function `nfs_callback_authenticate':
+> compr_lzo.c:(.text+0x817bc): undefined reference to `svc_gss_principal'
+>
+> This configuration appers to be unused by the maintainer so remove it.
 
-Cannot remember the exact link, but this should have been solved by
-adding the correct constraint to the Kconfig.
+This is incorrect and I'm still using that.
 
-Uwe, do you have the link and what's the status of that patch being upstreamed?
-
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Vincent Sanders <vince@simtec.co.uk>
+>
+> Signed-off-by: Vincent Sanders <vince@kyllikki.org>
 > ---
-> ?arch/arm/configs/pxa3xx_defconfig | ? ?4 ++++
-> ?1 files changed, 4 insertions(+), 0 deletions(-)
+> ?arch/arm/configs/pxa3xx_defconfig | ?134 -------------------------------------
+
+This is not necessary and is not a correct fix. (this is even not a fix, is it?)
+
+Uwe should already have a proper fix for this and supposedly get upstreamed.
+
+> ?1 files changed, 0 insertions(+), 134 deletions(-)
+> ?delete mode 100644 arch/arm/configs/pxa3xx_defconfig
 >
 > diff --git a/arch/arm/configs/pxa3xx_defconfig b/arch/arm/configs/pxa3xx_defconfig
-> index 1677a06..6d30baf 100644
+> deleted file mode 100644
+> index 1677a06..0000000
 > --- a/arch/arm/configs/pxa3xx_defconfig
-> +++ b/arch/arm/configs/pxa3xx_defconfig
-> @@ -118,6 +118,10 @@ CONFIG_NFS_V3=y
-> ?CONFIG_NFS_V3_ACL=y
-> ?CONFIG_NFS_V4=y
-> ?CONFIG_ROOT_NFS=y
-> +CONFIG_SUNRPC=y
-> +CONFIG_SUNRPC_GSS=y
-> +CONFIG_RPCSEC_GSS_KRB5=y
-> +CONFIG_RPCSEC_GSS_SPKM3=y
-> ?CONFIG_NLS=y
-> ?CONFIG_PRINTK_TIME=y
-> ?CONFIG_MAGIC_SYSRQ=y
+> +++ /dev/null
+> @@ -1,134 +0,0 @@
+> -CONFIG_EXPERIMENTAL=y
+> -CONFIG_SYSVIPC=y
+> -CONFIG_LOG_BUF_SHIFT=18
+> -CONFIG_SYSFS_DEPRECATED_V2=y
+> -# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+> -CONFIG_KALLSYMS_ALL=y
+> -CONFIG_SLAB=y
+> -CONFIG_MODULES=y
+> -# CONFIG_BLK_DEV_BSG is not set
+> -CONFIG_ARCH_PXA=y
+> -CONFIG_MACH_LITTLETON=y
+> -CONFIG_MACH_TAVOREVB=y
+> -CONFIG_MACH_SAAR=y
+> -CONFIG_PREEMPT=y
+> -CONFIG_AEABI=y
+> -CONFIG_ZBOOT_ROM_TEXT=0x0
+> -CONFIG_ZBOOT_ROM_BSS=0x0
+> -CONFIG_CMDLINE="root=/dev/nfs rootfstype=nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on console=ttyS0,115200 mem=64M debug"
+> -CONFIG_FPE_NWFPE=y
+> -CONFIG_NET=y
+> -CONFIG_PACKET=y
+> -CONFIG_UNIX=y
+> -CONFIG_INET=y
+> -CONFIG_IP_PNP=y
+> -# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+> -# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+> -# CONFIG_INET_XFRM_MODE_BEET is not set
+> -# CONFIG_INET_LRO is not set
+> -# CONFIG_INET_DIAG is not set
+> -# CONFIG_IPV6 is not set
+> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> -# CONFIG_STANDALONE is not set
+> -# CONFIG_PREVENT_FIRMWARE_BUILD is not set
+> -CONFIG_MTD=y
+> -CONFIG_MTD_CONCAT=y
+> -CONFIG_MTD_CHAR=y
+> -CONFIG_MTD_BLOCK=y
+> -CONFIG_MTD_NAND=y
+> -CONFIG_MTD_NAND_VERIFY_WRITE=y
+> -CONFIG_MTD_NAND_PXA3xx=y
+> -CONFIG_MTD_NAND_PXA3xx_BUILTIN=y
+> -CONFIG_MTD_ONENAND=y
+> -CONFIG_MTD_ONENAND_VERIFY_WRITE=y
+> -CONFIG_MTD_ONENAND_GENERIC=y
+> -CONFIG_BLK_DEV_LOOP=y
+> -CONFIG_BLK_DEV_RAM=y
+> -# CONFIG_MISC_DEVICES is not set
+> -CONFIG_NETDEVICES=y
+> -CONFIG_NET_ETHERNET=y
+> -CONFIG_SMC91X=y
+> -# CONFIG_NETDEV_1000 is not set
+> -# CONFIG_NETDEV_10000 is not set
+> -# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+> -# CONFIG_KEYBOARD_ATKBD is not set
+> -CONFIG_KEYBOARD_GPIO=y
+> -CONFIG_KEYBOARD_PXA27x=y
+> -CONFIG_KEYBOARD_PXA930_ROTARY=y
+> -CONFIG_MOUSE_PXA930_TRKBALL=y
+> -CONFIG_INPUT_TOUCHSCREEN=y
+> -CONFIG_SERIAL_PXA=y
+> -CONFIG_SERIAL_PXA_CONSOLE=y
+> -# CONFIG_LEGACY_PTYS is not set
+> -# CONFIG_HW_RANDOM is not set
+> -CONFIG_I2C=y
+> -# CONFIG_I2C_HELPER_AUTO is not set
+> -CONFIG_I2C_PXA=y
+> -CONFIG_SPI=y
+> -CONFIG_SPI_PXA2XX=y
+> -CONFIG_GPIO_MAX732X=y
+> -CONFIG_GPIO_PCA953X=y
+> -CONFIG_GPIO_PCF857X=y
+> -CONFIG_GPIO_MAX7301=y
+> -CONFIG_POWER_SUPPLY=y
+> -CONFIG_POWER_SUPPLY_DEBUG=y
+> -CONFIG_PDA_POWER=y
+> -CONFIG_BATTERY_DA9030=y
+> -# CONFIG_HWMON is not set
+> -CONFIG_PMIC_DA903X=y
+> -CONFIG_REGULATOR=y
+> -CONFIG_REGULATOR_DEBUG=y
+> -CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+> -CONFIG_REGULATOR_DA903X=y
+> -CONFIG_FB=y
+> -CONFIG_FB_PXA=y
+> -CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> -CONFIG_LCD_CLASS_DEVICE=y
+> -CONFIG_LCD_TDO24M=y
+> -CONFIG_BACKLIGHT_CLASS_DEVICE=y
+> -# CONFIG_BACKLIGHT_GENERIC is not set
+> -CONFIG_BACKLIGHT_DA903X=y
+> -# CONFIG_VGA_CONSOLE is not set
+> -CONFIG_FRAMEBUFFER_CONSOLE=y
+> -CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+> -CONFIG_FONTS=y
+> -CONFIG_FONT_6x11=y
+> -CONFIG_LOGO=y
+> -# CONFIG_HID_SUPPORT is not set
+> -# CONFIG_USB_SUPPORT is not set
+> -CONFIG_MMC=y
+> -CONFIG_MMC_PXA=y
+> -CONFIG_NEW_LEDS=y
+> -CONFIG_LEDS_CLASS=m
+> -CONFIG_LEDS_GPIO=m
+> -CONFIG_LEDS_DA903X=m
+> -CONFIG_LEDS_TRIGGERS=y
+> -CONFIG_LEDS_TRIGGER_TIMER=m
+> -CONFIG_LEDS_TRIGGER_HEARTBEAT=m
+> -CONFIG_LEDS_TRIGGER_BACKLIGHT=m
+> -CONFIG_LEDS_TRIGGER_GPIO=m
+> -CONFIG_LEDS_TRIGGER_DEFAULT_ON=m
+> -CONFIG_JFFS2_FS=y
+> -CONFIG_JFFS2_FS_WBUF_VERIFY=y
+> -CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+> -CONFIG_JFFS2_LZO=y
+> -CONFIG_JFFS2_RUBIN=y
+> -CONFIG_NFS_FS=y
+> -CONFIG_NFS_V3=y
+> -CONFIG_NFS_V3_ACL=y
+> -CONFIG_NFS_V4=y
+> -CONFIG_ROOT_NFS=y
+> -CONFIG_NLS=y
+> -CONFIG_PRINTK_TIME=y
+> -CONFIG_MAGIC_SYSRQ=y
+> -CONFIG_DEBUG_KERNEL=y
+> -CONFIG_DEBUG_SHIRQ=y
+> -CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
+> -# CONFIG_SCHED_DEBUG is not set
+> -CONFIG_DEBUG_SPINLOCK=y
+> -CONFIG_DEBUG_SPINLOCK_SLEEP=y
+> -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+> -# CONFIG_FTRACE is not set
+> -CONFIG_DEBUG_USER=y
+> -# CONFIG_CRYPTO_ANSI_CPRNG is not set
+> -# CONFIG_CRYPTO_HW is not set
 > --
-> 1.5.6.5
+> 1.7.0.4
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
