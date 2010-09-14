@@ -1,33 +1,44 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 14 Sep 2010 16:45:57 +0200
-Subject: resend: [PATCH] amba_pl022: Setup SPI configuration based on
-	spi->mode
-In-Reply-To: <083DF309106F364B939360100EC290F80AD49D5230@eu1rdcrdc1wx030.exi.nxp.com>
-References: <AANLkTikbKwo9=xLWo1qEcc2E5aa2iN2F_KCokJPpnWOk@mail.gmail.com>
-	<083DF309106F364B939360100EC290F80AD49D5230@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <AANLkTim4a7eha6Z3pjrZ0kg9VNRcuH52Qs2h4XydsXi4@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 14 Sep 2010 13:32:47 -0400 (EDT)
+Subject: Maximum bootable kernel size in current ARM linux
+In-Reply-To: <4C8E7EFF.7020004@endruntechnologies.com>
+References: <4C8DD588.7040009@endruntechnologies.com>
+	<20100913100111.GA30787@n2100.arm.linux.org.uk>
+	<4C8E7EFF.7020004@endruntechnologies.com>
+Message-ID: <alpine.LFD.2.00.1009141330230.19366@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/13 Kevin Wells <kevin.wells@nxp.com>:
+On Mon, 13 Sep 2010, Bruce M. Penrod wrote:
 
-> SSP_CR0_MASK_SPH (SPHA) should use bit 7, not bit 6.
-> Should be:
-> ? ? ? SSP_WRITE_BITS(chip->cr0, tmp, SSP_CR0_MASK_SPH, 7);
->
->> +
->> ? ? ? ?SSP_WRITE_BITS(chip->cr0, chip_info->clk_freq.scr, SSP_CR0_MASK_SCR,
->> 8);
->> ? ? ? ?/* Loopback is available on all versions except PL023 */
+> 
+> 
+> Russell King - ARM Linux wrote:
+> > On Mon, Sep 13, 2010 at 12:40:56AM -0700, Bruce M. Penrod wrote:
+> > > This seems like a pretty straightforward question, but extensive web
+> > > searching hasn't shown a really clear, up-to-date answer.  The most
+> > > recent info is circa 2004 and states that 4MB is the largest  uncompressed
+> > > ARM kernel that may be loaded.  Not being an ARM assembly  guru (head.S
+> > > baffles me), I'd like to know if that is still true in  2010, and if it
+> > > is, why?
+> > 
+> > It is no longer true; the only limit now is the size of contiguous RAM
+> > to fit the kernel image into.
+> > 
+> 
+> Interesting.  I finally was able to get an uncompressed kernel a little below
+> 4MB, and now it boots.  I'm working with 2.6.35rc6 on an OpenRD Ultimate
+> (Marvell Kirkwood) with Slackware, doing native compiles.  I'm wondering if
+> there could be any problem with U-Boot for larger kernels than 4MB, but it
+> doesn't complain and says that it is copying the image.  The symptom I had
+> with a much larger kernel (~15MB) is a total hang, not even "Uncompressing
+> linux".
+> 
+> I'll add some innocuous stuff back in until I get above 4MB again and see if
+> it breaks again.
 
-That's it!
+When it breaks, do you still see the "Uncompressing Linux... done, 
+booting the kernel." message?
 
-With this correction it starts working, so
-Acked-by/Tested-by/Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
 
-Please submit the whole patch series with corrections and my tag
-so Grant can pick it up, and thanks for doing this because I think
-it is a great improvement to the driver!
-
-Yours,
-Linus Walleij
+Nicolas
