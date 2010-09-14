@@ -1,93 +1,36 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 14 Sep 2010 07:46:05 +0200
-Subject: [PATCH 5/6] ARM: S5PC110: add support for otg usb gadget on Goni
-	board
-In-Reply-To: <000b01cb50d5$37981140$a6c833c0$%kim@samsung.com>
-References: <1284103403-10696-1-git-send-email-m.szyprowski@samsung.com>
-	<1284103403-10696-6-git-send-email-m.szyprowski@samsung.com>
-	<000b01cb50d5$37981140$a6c833c0$%kim@samsung.com>
-Message-ID: <003101cb53d0$222898e0$6679caa0$%szyprowski@samsung.com>
+From: penberg@cs.helsinki.fi (Pekka Enberg)
+Date: Tue, 14 Sep 2010 08:49:44 +0300
+Subject: Regression on UP ARM from commit
+	e18d65f0500b95d8724b17d8ea9f1116cf390bbe
+In-Reply-To: <alpine.DEB.2.00.1009130855430.26275@router.home>
+References: <AANLkTimC5Vz7x9+MNJcewijoyw=Nyr6WWP=YR8cxqarH@mail.gmail.com>
+	<alpine.DEB.2.00.1009130855430.26275@router.home>
+Message-ID: <4C8F0CF8.1050309@cs.helsinki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 9/13/10 4:58 PM, Christoph Lameter wrote:
+> On Sun, 12 Sep 2010, Linus Walleij wrote:
+>
+>> commit e18d65f0500b95d8724b17d8ea9f1116cf390bbe
+>> "slub: Remove static kmem_cache_cpu array for boot"
+>> made my ARM 926 UP system hang at boot, if I revert this (have
+>> to back out a lot of SLUB patches for that) it comes back up. (Same if I
+>> switch to SLAB.)
+>>
+>> Any hints on how I can get patch around this in a nice way?
+>
+> This is UP right? Any more details on this one? Does ARM have
+> earlyprintk?
+>
+> Tejun also has some patches that make the percpu allocator work on UP so
+> that we do not need the hack (you must have the hack which is commit
+> c23e5ad729ac43f5e2fbc080f94cf61f07b4d45f as well to make UP work right!).
+>
+> I am not sure if they are already in -next though.
 
-On Friday, September 10, 2010 12:45 PM Kukjin Kim wrote:
+Yes, they should be in linux-next. I haven't pulled the changes to 
+slab.git, though. Linus, do things work in linux-next if you revert 
+commit 5249d039500f05a5ab379286b1d23ab9b04d3f2c ("Slub: UP bandaid")?
 
-> Marek Szyprowski wrote:
-> >
-> > Add required platform definitions for s3c-hsotg driver to enable usb
-> > gadget support on Samsung Goni board.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-s5pv210/Kconfig     |    1 +
-> >  arch/arm/mach-s5pv210/mach-goni.c |    5 +++++
-> >  2 files changed, 6 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-
-> s5pv210/Kconfig
-> > index b1f671d..f8bac5a 100644
-> > --- a/arch/arm/mach-s5pv210/Kconfig
-> > +++ b/arch/arm/mach-s5pv210/Kconfig
-> > @@ -85,6 +85,7 @@ config MACH_GONI
-> >  	select S3C_DEV_HSMMC2
-> >  	select S3C_DEV_I2C1
-> >  	select S5P_DEV_ONENAND
-> > +	select S3C_DEV_USB_HSOTG
-> >  	select SAMSUNG_DEV_KEYPAD
-> >  	select S5PV210_SETUP_FB_24BPP
-> >  	select S5PV210_SETUP_I2C1
-> > diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-> b/arch/arm/mach-s5pv210/mach-
-> > goni.c
-> > index 30da422..b28a42b 100644
-> > --- a/arch/arm/mach-s5pv210/mach-goni.c
-> > +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> > @@ -41,6 +41,8 @@
-> >  #include <plat/iic.h>
-> >  #include <plat/keypad.h>
-> >  #include <plat/sdhci.h>
-> > +#include <plat/clock.h>
-> > +#include <plat/s5p-clock.h>
-> 
-> Hmm...same 'extern struct clk_xusbxti' defined both.
-> I will sort out :-)
-> 
-> I think, just one inclusion is enough now.
-
-Ok. I will fix this. This patch is quite old and I remember that
-some time ago both includes were required.
-
-> If any problems, please let me know.
-> 
-> >
-> >  /* Following are default values for UCON, ULCON and UFCON UART registers
-> */
-> >  #define GONI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> > @@ -569,6 +571,7 @@ static struct platform_device *goni_devices[]
-> __initdata = {
-> >  	&s3c_device_fb,
-> >  	&s5p_device_onenand,
-> >  	&goni_spi_gpio,
-> > +	&s3c_device_usb_hsotg,
-> >  	&goni_i2c_gpio_pmic,
-> >  	&goni_device_gpiokeys,
-> >  	&s5p_device_fimc0,
-> > @@ -613,6 +616,8 @@ static void __init goni_machine_init(void)
-> >  	samsung_keypad_set_platdata(&keypad_data);
-> >
-> >  	platform_add_devices(goni_devices, ARRAY_SIZE(goni_devices));
-> > +
-> > +	clk_xusbxti.rate = 24000000;
-> >  }
-> >
-> >  MACHINE_START(GONI, "GONI")
-> > --
-> 
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+			Pekka
