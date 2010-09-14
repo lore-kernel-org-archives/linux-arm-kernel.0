@@ -1,22 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 14 Sep 2010 09:05:17 +0100
-Subject: [PATCH v4] ux500: add ab8500-regulators machine specific data
-In-Reply-To: <1284375772-22589-1-git-send-email-sundar.iyer@stericsson.com>
-References: <1284375772-22589-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <20100914080517.GB423@opensource.wolfsonmicro.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 14 Sep 2010 17:08:29 +0900
+Subject: [PATCH 2/7] [RFC] ARM: shmobile: remove unneeded hack to
+	calculate zreladdr
+In-Reply-To: <1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100903095504.GC13643@pengutronix.de>
+	<1283507818-1573-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100914080829.GI7336@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 04:32:52PM +0530, Sundar Iyer wrote:
+On Fri, Sep 03, 2010 at 11:56:53AM +0200, Uwe Kleine-K??nig wrote:
+> -config MEMORY_START
+> -	hex "Physical memory start address"
+> -	default "0x50000000" if MACH_G3EVM
+> -	default "0x40000000" if MACH_G4EVM
+> -	default "0x40000000" if MACH_AP4EVB
+> -	default "0x00000000"
+> -	---help---
+> -	  Tweak this only when porting to a new machine which does not
+> -	  already have a defconfig. Changing it from the known correct
+> -	  value on any of the known systems will only lead to disaster.
+> -
 
-> +	.constraints = {
-> +		.name = "ab8500-vaux1",
-> +		.min_uV = AB8500_VAUXN_LDO_MIN_VOLTAGE,
-> +		.max_uV = AB8500_VAUXN_LDO_MAX_VOLTAGE,
-> +		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|
-> +					REGULATOR_CHANGE_STATUS,
+[snip]
 
-As I keep pointing out this looks a bit odd since there are no consumers
-set up on the regulator and you've got a large number of regulators with
-this same set of constraints.  However, this won't cause a problem
-without any consumers so this should be OK.
+> -#define PHYS_OFFSET	UL(CONFIG_MEMORY_START)
+> +#define SH7367_PHYS_OFFSET UL(0x50000000)
+> +#define SH7372_PHYS_OFFSET UL(0x40000000)
+> +#define SH7377_PHYS_OFFSET UL(0x40000000)
+> +
+> +#if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
+> +# if defined(CONFIG_ARCH_SH7367)
+> +#  define PHYS_OFFSET	SH7367_PHYS_OFFSET
+> +# elif defined(CONFIG_ARCH_SH7372)
+> +#  define PHYS_OFFSET	SH7372_PHYS_OFFSET
+> +# elif defined(CONFIG_ARCH_SH7377)
+> +#  define PHYS_OFFSET	SH7377_PHYS_OFFSET
+> +# endif
+> +#endif /* if !defined(CONFIG_RUNTIME_PHYS_OFFSET) */
+> +
+
+You've taken a board-specific property and made it CPU-specific. There is
+nothing about these CPUs that mandates memory starting here, it just
+happens that for the moment we have 1 board per CPU, but that's not an
+assumption we can really bank on.
