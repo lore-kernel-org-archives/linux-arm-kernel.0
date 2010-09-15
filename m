@@ -1,43 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 15 Sep 2010 09:28:50 +0200
-Subject: [PATCH 4/5] DMA: Add functions to preallocate DMA memory dor
-	devices
-In-Reply-To: <20100902105055.GS26319@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
-	<Pine.LNX.4.64.1008191636590.26145@axis700.grange>
-	<20100902105055.GS26319@n2100.arm.linux.org.uk>
-Message-ID: <20100915072850.GB17325@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Sep 2010 08:31:45 +0100
+Subject: [RFC] mmaping with VIVT cache
+In-Reply-To: <AANLkTinKkoZsEEpM52yhp8yP5W9J_Ym-HfT3j+prDsUJ@mail.gmail.com>
+References: <210713.63745.qm@web120207.mail.ne1.yahoo.com>
+	<20100914235043.GA31500@n2100.arm.linux.org.uk>
+	<AANLkTinKkoZsEEpM52yhp8yP5W9J_Ym-HfT3j+prDsUJ@mail.gmail.com>
+Message-ID: <20100915073145.GA4478@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Sep 02, 2010 at 11:50:55AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 19, 2010 at 04:40:22PM +0200, Guennadi Liakhovetski wrote:
-> > Currently dma_declare_coherent_memory() and dma_release_declared_memory() are
-> > provided to assign DMA memory to a device and to release it. These functions
-> > can be use with device local memory, like on-chip SRAM. However, they are
-> > unsuitable for assigning of generic system RAM to devices, because such system
-> > memory should not be ioremapped, and ioremap() is used internally in the former
-> > of these functions to map the memory.
-> > 
-> > This patch solves this problem by adding two more functions:
-> > dma_preallocate_coherent_memory() and dma_release_preallocated_memory(), which
-> > allocate DMA coherent memory and assign it to the device, and release it back
-> > respectively.
+On Wed, Sep 15, 2010 at 09:06:02AM +0800, Eric Miao wrote:
+> On Wed, Sep 15, 2010 at 7:50 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Sep 13, 2010 at 12:58:41PM -0700, P F wrote:
+> >> Hi,
+> >>
+> >> Please excuse the pseudonym.
+> >>
+> >> I have recently encountered a problem in the context of the UVC (webcam)
+> >> driver. ?The driver maintainer, Laurent, suggested that we bring the
+> >> thread to linux-arm-kernel for wider discussion. ?See here for reference:
+> >> http://lists.berlios.de/pipermail/linux-uvc-devel/2010-August/005864.html
+> >>
+> >> The problem I encountered was this: using an ARM926EJ-S with OHCI USB host,
+> >> I noticed intermittent graphical corruption of frames captured by several
+> >> different webcams, both UVC and non-UVC.
+> >>
+> >> I was able to isolate the corruption down to one specific instance. ?In
+> >> this instance, I collected three images:
+> >> 1A.jpg - collected from host, prior to corruption
+> >> 2A.jpg - collected from host, demonstrating corruption
+> >> 2B.jpg - collected from inline USB analyzer, same image as 2A
+> >>
+> >> Images 1A and 2A are in sequence, i.e., 2A immediately follows 1A. ?2B is
+> >> not corrupted, and a binary diff between 2A and 2B shows two 32-byte
+> >> chunks have been changed. ?A binary diff between 2A and 1A shows that
+> >> these same two chunks match. ?Therefore, it seems there is some
+> >> contamination of the second image by the first.
+> >>
+> >> As I described in the linked message, I found a workaround for this issue
+> >> by adding
+> >> ? vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot)
+> >> in the UVC driver's mmap() function, but Laurent explained that this was
+> >> invalid.
+> >>
+> >> Does anybody have ideas for a proper fix? ?I can reproduce this corruption
+> >> easily, and would be happy to test proposed patches.
+> >
+> > The fact is that mapping buffers as cacheable into userspace on non-
+> > coherent architectures _will_ result in the cache contents getting in
+> > the way of updates to the DMA'd buffer. ?It's a fundamental property
+> > of such hardware implementations.
+> >
 > 
-> This looks like a much saner interface for pre-allocating DMA memory from
-> system memory, rather than trying to use dma_declare_coherent_memory().
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Maybe we can just detect if the buffer is mapped in alias, and modify the
+> PTE, just as what we did to inconsistent write-combine? So to make this
+> transparent to other consistent architectures?
 
-If this series isn't acceptable for the DMA people, I suggest to add it
-locally for ARM if no other solution is found before .36 is released.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+All pages which are mapped into userspace have at least one alias.
