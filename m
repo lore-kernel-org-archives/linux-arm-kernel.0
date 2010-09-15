@@ -1,38 +1,14 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 15 Sep 2010 10:00:22 +0200
-Subject: [PATCH v5 3/7] wireless: wl12xx: add platform data passing support
-In-Reply-To: <AANLkTikAFCd+3ggZKhQXY=+bG==KgLkv3qNVdEGa=GBX@mail.gmail.com>
-References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
-	<1283376410-9999-4-git-send-email-ohad@wizery.com>
-	<AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
-	<20100906120716.GE20903@n2100.arm.linux.org.uk>
-	<AANLkTikAFCd+3ggZKhQXY=+bG==KgLkv3qNVdEGa=GBX@mail.gmail.com>
-Message-ID: <AANLkTinM8vY7CygEN6DBR35WLkU-QOBwuiaRrpfwF6Mz@mail.gmail.com>
+From: jc.lee@samsung.com (Jaecheol Lee)
+Date: Wed, 15 Sep 2010 16:52:37 +0900
+Subject: [PATCH 0/5] ARM: S5PV210: Add support CPUFREQ for S5PV210/S5PC110
+Message-ID: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/6 Micha? Miros?aw <mirqus@gmail.com>:
-> W dniu 6 wrze?nia 2010 14:07 u?ytkownik Russell King - ARM Linux
-> <linux@arm.linux.org.uk> napisa?:
->> On Sat, Sep 04, 2010 at 02:23:19PM +0200, Micha? Miros?aw wrote:
->>> 2010/9/1 Ohad Ben-Cohen <ohad@wizery.com>:
->>> > Add a simple mechanism to pass platform data to the
->>> > SDIO instances of wl12xx.
-> [cut patch]
->>> Why do you need all that copying? Isn't the data constant?
->>
->> The first copy is to allow platforms to have their data marked with
->> __initdata. ?The second copy probably isn't necessary, but avoids
->> problems where the driver may decide to modify the platform data.
->
-> Sorry for pushing at this, but why would you mark data that's meant to
-> be used after init phase as __initdata?
+This patch adds CPUFREQ for S5PV210/S5PC110.
 
-I can remove the first copying as well if Russell is ok with it.
-
-Both ways work for us.
-
->
-> Best Regards,
-> Micha? Miros?aw
->
+[PATCH 1/5] ARM: S5PV210: Add support DMC map_desc table
+[PATCH 2/5] ARM: S5PV210: Add struct clk_ops for clk_fout_apll
+[PATCH 3/5] ARM: S5PV210: Add Register definition for CMU
+[PATCH 4/5] ARM: S5PV210: Add support CPUFREQ
+[PATCH 5/5] ARM: S5PV210: Update Kconfig and Makefile for supporting CPUFREQ driver
