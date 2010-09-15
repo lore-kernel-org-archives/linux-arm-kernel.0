@@ -1,68 +1,74 @@
 From: jc.lee@samsung.com (Jaecheol Lee)
-Date: Wed, 15 Sep 2010 16:52:39 +0900
-Subject: [PATCH 2/5] ARM: S5PV210: Add struct clk_ops for clk_fout_apll
+Date: Wed, 15 Sep 2010 16:52:40 +0900
+Subject: [PATCH 3/5] ARM: S5PV210: Add Register definition for CMU
 In-Reply-To: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
 References: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
-Message-ID: <1284537162-3129-3-git-send-email-jc.lee@samsung.com>
+Message-ID: <1284537162-3129-4-git-send-email-jc.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current fout_apll has fixed rate value which was set in initializing
-S5PV210 clock structures. CPUFREQ driver gets incorrect frequency when
-finding current cpu frequency, because some operation level need to
-change APLL. Newly added get_rate function for fout_apll can give
-correct frequency when calling get_rate function by CPUFREQ driver.
+This patch adds some CMU(Clock Management Unit) registers for
+supporting CPUFREQ and some drivers.
 
 Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 ---
- arch/arm/mach-s5pv210/clock.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h |   31 ++++++++++++++++++++++-
+ 1 files changed, 30 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index d562670..e18e098 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -31,6 +31,8 @@
- #include <plat/clock-clksrc.h>
- #include <plat/s5pv210.h>
+diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+index 499aef7..336b1cf 100644
+--- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
+@@ -67,11 +67,28 @@
+ #define S5P_CLKGATE_BUS1	S5P_CLKREG(0x488)
+ #define S5P_CLK_OUT		S5P_CLKREG(0x500)
  
-+static unsigned long xtal;
++/* DIV/MUX STATUS */
++#define S5P_CLKDIV_STAT0	S5P_CLKREG(0x1000)
++#define S5P_CLKDIV_STAT1	S5P_CLKREG(0x1004)
++#define S5P_CLKMUX_STAT0	S5P_CLKREG(0x1100)
++#define S5P_CLKMUX_STAT1	S5P_CLKREG(0x1104)
 +
- static struct clksrc_clk clk_mout_apll = {
- 	.clk	= {
- 		.name		= "mout_apll",
-@@ -268,6 +270,15 @@ static struct clk_ops clk_hclk_imem_ops = {
- 	.get_rate	= s5pv210_clk_imem_get_rate,
- };
+ /* CLKSRC0 */
+-#define S5P_CLKSRC0_MUX200_MASK		(0x1<<16)
++#define S5P_CLKSRC0_MUX200_SHIFT	(16)
++#define S5P_CLKSRC0_MUX200_MASK		(0x1 << S5P_CLKSRC0_MUX200_SHIFT)
+ #define S5P_CLKSRC0_MUX166_MASK		(0x1<<20)
+ #define S5P_CLKSRC0_MUX133_MASK		(0x1<<24)
  
-+static unsigned long s5pv210_clk_fout_apll_get_rate(struct clk *clk)
-+{
-+	return s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
-+}
++/* CLKSRC2 */
++#define S5P_CLKSRC2_G3D_SHIFT           (0)
++#define S5P_CLKSRC2_G3D_MASK            (0x3 << S5P_CLKSRC2_G3D_SHIFT)
++#define S5P_CLKSRC2_MFC_SHIFT           (4)
++#define S5P_CLKSRC2_MFC_MASK            (0x3 << S5P_CLKSRC2_MFC_SHIFT)
 +
-+static struct clk_ops clk_fout_apll_ops = {
-+	.get_rate	= s5pv210_clk_fout_apll_get_rate,
-+};
++/* CLKSRC6*/
++#define S5P_CLKSRC6_ONEDRAM_SHIFT       (24)
++#define S5P_CLKSRC6_ONEDRAM_MASK        (0x3 << S5P_CLKSRC6_ONEDRAM_SHIFT)
 +
- static struct clk init_clocks_disable[] = {
- 	{
- 		.name		= "rot",
-@@ -958,7 +969,6 @@ static struct clksrc_clk *sysclks[] = {
- void __init_or_cpufreq s5pv210_setup_clocks(void)
- {
- 	struct clk *xtal_clk;
--	unsigned long xtal;
- 	unsigned long vpllsrc;
- 	unsigned long armclk;
- 	unsigned long hclk_msys;
-@@ -996,7 +1006,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
- 	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
- 	vpll = s5p_get_pll45xx(vpllsrc, __raw_readl(S5P_VPLL_CON), pll_4502);
+ /* CLKDIV0 */
+ #define S5P_CLKDIV0_APLL_SHIFT		(0)
+ #define S5P_CLKDIV0_APLL_MASK		(0x7 << S5P_CLKDIV0_APLL_SHIFT)
+@@ -90,8 +107,20 @@
+ #define S5P_CLKDIV0_PCLK66_SHIFT	(28)
+ #define S5P_CLKDIV0_PCLK66_MASK		(0x7 << S5P_CLKDIV0_PCLK66_SHIFT)
  
--	clk_fout_apll.rate = apll;
-+	clk_fout_apll.ops = &clk_fout_apll_ops;
- 	clk_fout_mpll.rate = mpll;
- 	clk_fout_epll.rate = epll;
- 	clk_fout_vpll.rate = vpll;
++/* CLKDIV2 */
++#define S5P_CLKDIV2_G3D_SHIFT           (0)
++#define S5P_CLKDIV2_G3D_MASK            (0xF << S5P_CLKDIV2_G3D_SHIFT)
++#define S5P_CLKDIV2_MFC_SHIFT           (4)
++#define S5P_CLKDIV2_MFC_MASK            (0xF << S5P_CLKDIV2_MFC_SHIFT)
++
++/* CLKDIV6 */
++#define S5P_CLKDIV6_ONEDRAM_SHIFT       (28)
++#define S5P_CLKDIV6_ONEDRAM_MASK        (0xF << S5P_CLKDIV6_ONEDRAM_SHIFT)
++
+ #define S5P_SWRESET		S5P_CLKREG(0x2000)
+ 
++#define S5P_ARM_MCS_CON		S5P_CLKREG(0x6100)
++
+ /* Registers related to power management */
+ #define S5P_PWR_CFG		S5P_CLKREG(0xC000)
+ #define S5P_EINT_WAKEUP_MASK	S5P_CLKREG(0xC004)
 -- 
 1.6.2.5
