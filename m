@@ -1,58 +1,32 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Wed, 15 Sep 2010 11:15:55 +0300
-Subject: [PATCH 0/3] Common struct clk implementation, v7
-In-Reply-To: <1284522014.516876.675872472687.0.gpush@pororo>
-References: <1284522014.516876.675872472687.0.gpush@pororo>
-Message-ID: <4C9080BB.3090703@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Sep 2010 09:25:44 +0100
+Subject: [PATCH v5 3/7] wireless: wl12xx: add platform data passing support
+In-Reply-To: <AANLkTikAFCd+3ggZKhQXY=+bG==KgLkv3qNVdEGa=GBX@mail.gmail.com>
+References: <1283376410-9999-1-git-send-email-ohad@wizery.com>
+	<1283376410-9999-4-git-send-email-ohad@wizery.com>
+	<AANLkTi=goLEUqM1XQ__PrGu4=Erw2utaNP4qFmSgRta2@mail.gmail.com>
+	<20100906120716.GE20903@n2100.arm.linux.org.uk>
+	<AANLkTikAFCd+3ggZKhQXY=+bG==KgLkv3qNVdEGa=GBX@mail.gmail.com>
+Message-ID: <20100915082544.GA4625@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2010 06:40 AM, Jeremy Kerr wrote:
-> Hi all,
->
-> These patches are an attempt to allow platforms to share clock code. At
-> present, the definitions of 'struct clk' are local to platform code,
-> which makes allocating and initialising cross-platform clock sources
-> difficult, and makes it impossible to compile a single image containing
-> support for two ARM platforms with different struct clks.
->
-> The two patches are for the architecture-independent kernel code,
-> introducing the common clk infrastructure. The changelog for the first
-> patch includes details about the new clock definitions.
->
-> As requested by rmk, I've put together a small series of patches
-> illustrating the usage of the common struct clock on the ARM imx51
-> platform. These are available in my git tree:
->
->   git://kernel.ubuntu.com/jk/dt/linux-2.6
->
-> in the clk-common-mx51 branch (clk-common..clk-common-mx51). There is
-> also a port  for versatile (clk-common-versatile) in this tree too.
->
-> The approach I've taken with the imx51 port is to temporarly duplicate
-> the platform-common clock code (ie, for all mxc-based boards) to enable
-> usage of the common struct clk on one machine (imx51), while leaving the
-> others as-is. For a proper platform-wide usage of the common struct clk,
-> we'd be better off doing the whole platform at once. However, mx51 is
-> the only mxc-based HW I have, hence the duplicated example port.
->
-> In the example port, the first change simply converts the mxc's struct
-> clk to a struct clk_mxc, using the new API.  The subsequent patches move
-> certain clocks to more specific data structures (eg clk_fixed and
-> clk_pll) where possible.
->
-> Ben Herrenschmidt is looking at using common struct clk code for powerpc
-> too, hence the kernel-wide approach.
->
-> Many thanks to the following for their input:
->   * Ben Dooks<ben-linux@fluff.org>
->   * Baruch Siach<baruch@tkos.co.il>
->   * Russell King<linux@arm.linux.org.uk>
->   * Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
->   * Lorenzo Pieralisi<Lorenzo.Pieralisi@arm.com>
+On Mon, Sep 06, 2010 at 09:42:41PM +0200, Micha? Miros?aw wrote:
+> W dniu 6 wrze?nia 2010 14:07 u?ytkownik Russell King - ARM Linux
+> <linux@arm.linux.org.uk> napisa?:
+> > On Sat, Sep 04, 2010 at 02:23:19PM +0200, Micha? Miros?aw wrote:
+> >> 2010/9/1 Ohad Ben-Cohen <ohad@wizery.com>:
+> >> > Add a simple mechanism to pass platform data to the
+> >> > SDIO instances of wl12xx.
+> [cut patch]
+> >> Why do you need all that copying? Isn't the data constant?
+> >
+> > The first copy is to allow platforms to have their data marked with
+> > __initdata. ?The second copy probably isn't necessary, but avoids
+> > problems where the driver may decide to modify the platform data.
+> 
+> Sorry for pushing at this, but why would you mark data that's meant to
+> be used after init phase as __initdata?
 
-Funny enough, this morning on my way to work I was thinking exactly
-about the same issue! I was very surprised to discover that you just
-did it :)
-
-Acked-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Because you may have many instances of the data (due to multiple platform
+support), and only need one of them at run-time.
