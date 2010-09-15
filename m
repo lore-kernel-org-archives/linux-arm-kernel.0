@@ -1,558 +1,744 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 16 Sep 2010 00:28:02 +0200
-Subject: [PATCH 3/7] ARM: add PrimeCell generic DMA to MMCI/PL180 v11
-In-Reply-To: <1284589686-28652-3-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 16 Sep 2010 00:28:00 +0200
+Subject: [PATCH 1/7] ARM: add PrimeCell generic DMA to PL022 v11
+In-Reply-To: <1284589686-28652-1-git-send-email-linus.walleij@stericsson.com>
 References: <1284589686-28652-1-git-send-email-linus.walleij@stericsson.com>
-	<1284589686-28652-2-git-send-email-linus.walleij@stericsson.com>
-	<1284589686-28652-3-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1284589686-28652-4-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1284589686-28652-2-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extends the MMCI/PL180 driver with generic DMA engine support
-using the PrimeCell DMA engine interface.
+This extends the PL022 SSP/SPI driver with generic DMA engine
+support using the PrimeCell DMA engine interface. Also fix up the
+test code for the U300 platform.
 
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/mmc/host/mmci.c   |  329 ++++++++++++++++++++++++++++++++++++++++-----
- drivers/mmc/host/mmci.h   |   16 +++
- include/linux/amba/mmci.h |   16 +++
- 3 files changed, 330 insertions(+), 31 deletions(-)
+ arch/arm/mach-u300/dummyspichip.c |    1 +
+ drivers/spi/amba-pl022.c          |  516 ++++++++++++++++++++++++++++++-------
+ include/linux/amba/pl022.h        |    6 +
+ 3 files changed, 435 insertions(+), 88 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index ef9166a..754304f 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -2,7 +2,7 @@
-  *  linux/drivers/mmc/host/mmci.c - ARM PrimeCell MMCI PL180/1 driver
-  *
-  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
-- *  Copyright (C) 2010 ST-Ericsson AB.
-+ *  Copyright (C) 2010 ST-Ericsson SA
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -23,8 +23,10 @@
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
- #include <linux/gpio.h>
--#include <linux/amba/mmci.h>
- #include <linux/regulator/consumer.h>
+diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
+index 03f7936..b86e944 100644
+--- a/arch/arm/mach-u300/dummyspichip.c
++++ b/arch/arm/mach-u300/dummyspichip.c
+@@ -267,6 +267,7 @@ static struct spi_driver pl022_dummy_driver = {
+ 	.driver = {
+ 		.name	= "spi-dummy",
+ 		.owner	= THIS_MODULE,
++		.bus = &spi_bus_type,
+ 	},
+ 	.probe	= pl022_dummy_probe,
+ 	.remove	= __devexit_p(pl022_dummy_remove),
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index aea71fd..be9c239 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -27,7 +27,6 @@
+ /*
+  * TODO:
+  * - add timeout on polled transfers
+- * - add generic DMA framework support
+  */
+ 
+ #include <linux/init.h>
+@@ -45,6 +44,9 @@
+ #include <linux/amba/pl022.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
 +#include <linux/dmaengine.h>
 +#include <linux/dma-mapping.h>
-+#include <linux/amba/mmci.h>
++#include <linux/scatterlist.h>
  
- #include <asm/div64.h>
- #include <asm/io.h>
-@@ -40,6 +42,7 @@ static unsigned int fmax = 515633;
-  * struct variant_data - MMCI variant-specific quirks
-  * @clkreg: default value for MCICLOCK register
-  * @clkreg_enable: enable value for MMCICLOCK register
-+ * @dmareg_enable: enable value for MMCIDATACTRL register
-  * @datalength_bits: number of bits in the MMCIDATALENGTH register
-  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
-  *	      is asserted (likewise for RX)
-@@ -50,6 +53,7 @@ static unsigned int fmax = 515633;
- struct variant_data {
- 	unsigned int		clkreg;
- 	unsigned int		clkreg_enable;
-+	unsigned int		dmareg_enable;
- 	unsigned int		datalength_bits;
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
-@@ -74,6 +78,7 @@ static struct variant_data variant_ux500 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg			= MCI_CLK_ENABLE,
- 	.clkreg_enable		= 1 << 14, /* HWFCEN */
-+	.dmareg_enable		= 1 << 12, /* DMAREQCTRL */
- 	.datalength_bits	= 24,
- 	.singleirq		= true,
+ /*
+  * This macro is used to define some register default values.
+@@ -381,6 +383,14 @@ struct pl022 {
+ 	enum ssp_reading		read;
+ 	enum ssp_writing		write;
+ 	u32				exp_fifo_level;
++	/* DMA settings */
++#ifdef CONFIG_DMADEVICES
++	struct dma_chan			*dma_rx_channel;
++	struct dma_chan			*dma_tx_channel;
++	struct sg_table			sgt_rx;
++	struct sg_table			sgt_tx;
++	char				*dummypage;
++#endif
  };
-@@ -169,6 +174,203 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
- 	sg_miter_start(&host->sg_miter, data->sg, data->sg_len, flags);
- }
  
+ /**
+@@ -406,7 +416,7 @@ struct chip_data {
+ 	u16 dmacr;
+ 	u16 cpsr;
+ 	u8 n_bytes;
+-	u8 enable_dma:1;
++	bool enable_dma;
+ 	enum ssp_reading read;
+ 	enum ssp_writing write;
+ 	void (*cs_control) (u32 command);
+@@ -763,6 +773,371 @@ static void *next_transfer(struct pl022 *pl022)
+ 	}
+ 	return STATE_DONE;
+ }
++
 +/*
-+ * All the DMA operation mode stuff goes inside this ifdef.
-+ * This assumes that you have a generic DMA device interface,
-+ * no custom DMA interfaces are supported.
++ * This DMA functionality is only compiled in if we have
++ * access to the generic DMA devices/DMA engine.
 + */
 +#ifdef CONFIG_DMADEVICES
-+static void __devinit mmci_setup_dma(struct mmci_host *host)
++static void unmap_free_dma_scatter(struct pl022 *pl022)
 +{
-+	struct mmci_platform_data *plat = host->plat;
-+	dma_cap_mask_t mask;
++	/* Unmap and free the SG tables */
++	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_tx.sgl,
++		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
++	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_rx.sgl,
++		     pl022->sgt_rx.nents, DMA_FROM_DEVICE);
++	sg_free_table(&pl022->sgt_rx);
++	sg_free_table(&pl022->sgt_tx);
++}
 +
-+	if (!plat || !plat->dma_filter) {
-+		dev_err(mmc_dev(host->mmc), "no DMA platform data!\n");
-+		return;
++static void dma_callback(void *data)
++{
++	struct pl022 *pl022 = data;
++	struct spi_message *msg = pl022->cur_msg;
++
++	BUG_ON(!pl022->sgt_rx.sgl);
++
++#ifdef VERBOSE_DEBUG
++	/*
++	 * Optionally dump out buffers to inspect contents, this is
++	 * good if you want to convince yourself that the loopback
++	 * read/write contents are the same, when adopting to a new
++	 * DMA engine.
++	 */
++	{
++		struct scatterlist *sg;
++		unsigned int i;
++
++		dma_sync_sg_for_cpu(&pl022->adev->dev,
++				    pl022->sgt_rx.sgl,
++				    pl022->sgt_rx.nents,
++				    DMA_FROM_DEVICE);
++
++		for_each_sg(pl022->sgt_rx.sgl, sg, pl022->sgt_rx.nents, i) {
++			dev_dbg(&pl022->adev->dev, "SPI RX SG ENTRY: %d", i);
++			print_hex_dump(KERN_ERR, "SPI RX: ",
++				       DUMP_PREFIX_OFFSET,
++				       16,
++				       1,
++				       sg_virt(sg),
++				       sg_dma_len(sg),
++				       1);
++		}
++		for_each_sg(pl022->sgt_tx.sgl, sg, pl022->sgt_tx.nents, i) {
++			dev_dbg(&pl022->adev->dev, "SPI TX SG ENTRY: %d", i);
++			print_hex_dump(KERN_ERR, "SPI TX: ",
++				       DUMP_PREFIX_OFFSET,
++				       16,
++				       1,
++				       sg_virt(sg),
++				       sg_dma_len(sg),
++				       1);
++		}
 +	}
++#endif
++
++	unmap_free_dma_scatter(pl022);
++
++	/* Update total bytes transfered */
++	msg->actual_length += pl022->cur_transfer->len;
++	if (pl022->cur_transfer->cs_change)
++		pl022->cur_chip->
++			cs_control(SSP_CHIP_DESELECT);
++
++	/* Move to next transfer */
++	msg->state = next_transfer(pl022);
++	tasklet_schedule(&pl022->pump_transfers);
++}
++
++static void setup_dma_scatter(struct pl022 *pl022,
++			      void *buffer,
++			      unsigned int length,
++			      struct sg_table *sgtab)
++{
++	struct scatterlist *sg;
++	int bytesleft = length;
++	void *bufp = buffer;
++	int mapbytes;
++	int i;
++
++	if (buffer) {
++		for_each_sg(sgtab->sgl, sg, sgtab->nents, i) {
++			/*
++			 * If there are less bytes left than what fits
++			 * in the current page (plus page alignment offset)
++			 * we just feed in this, else we stuff in as much
++			 * as we can.
++			 */
++			if (bytesleft < (PAGE_SIZE - offset_in_page(bufp)))
++				mapbytes = bytesleft;
++			else
++				mapbytes = PAGE_SIZE - offset_in_page(bufp);
++			sg_set_page(sg, virt_to_page(bufp),
++				    mapbytes, offset_in_page(bufp));
++			bufp += mapbytes;
++			bytesleft -= mapbytes;
++			dev_dbg(&pl022->adev->dev,
++				"set RX/TX target page @ %p, %d bytes, %d left\n",
++				bufp, mapbytes, bytesleft);
++		}
++	} else {
++		/* Map the dummy buffer on every page */
++		for_each_sg(sgtab->sgl, sg, sgtab->nents, i) {
++			if (bytesleft < PAGE_SIZE)
++				mapbytes = bytesleft;
++			else
++				mapbytes = PAGE_SIZE;
++			sg_set_page(sg, virt_to_page(pl022->dummypage),
++				    mapbytes, 0);
++			bytesleft -= mapbytes;
++			dev_dbg(&pl022->adev->dev,
++				"set RX/TX to dummy page %d bytes, %d left\n",
++				mapbytes, bytesleft);
++
++		}
++	}
++	BUG_ON(bytesleft);
++}
++
++/**
++ * configure_dma - configures the channels for the next transfer
++ * @pl022: SSP driver's private data structure
++ */
++static int configure_dma(struct pl022 *pl022)
++{
++	struct dma_slave_config rx_conf = {
++		.src_addr = SSP_DR(pl022->phybase),
++		.direction = DMA_FROM_DEVICE,
++		.src_maxburst = pl022->vendor->fifodepth >> 1,
++	};
++	struct dma_slave_config tx_conf = {
++		.dst_addr = SSP_DR(pl022->phybase),
++		.direction = DMA_TO_DEVICE,
++		.dst_maxburst = pl022->vendor->fifodepth >> 1,
++	};
++	unsigned int pages;
++	int ret;
++	int sglen;
++	struct dma_chan *rxchan = pl022->dma_rx_channel;
++	struct dma_chan *txchan = pl022->dma_tx_channel;
++	struct dma_async_tx_descriptor *rxdesc;
++	struct dma_async_tx_descriptor *txdesc;
++	dma_cookie_t cookie;
++
++	/* Check that the channels are available */
++	if (!rxchan || !txchan)
++		return -ENODEV;
++
++	switch (pl022->read) {
++	case READING_NULL:
++		/* Use the same as for writing */
++		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
++		break;
++	case READING_U8:
++		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++		break;
++	case READING_U16:
++		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++		break;
++	case READING_U32:
++		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++		break;
++	}
++
++	switch (pl022->write) {
++	case WRITING_NULL:
++		/* Use the same as for reading */
++		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
++		break;
++	case WRITING_U8:
++		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++		break;
++	case WRITING_U16:
++		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++		break;
++	case WRITING_U32:
++		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;;
++		break;
++	}
++
++	/* SPI pecularity: we need to read and write the same width */
++	if (rx_conf.src_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
++		rx_conf.src_addr_width = tx_conf.dst_addr_width;
++	if (tx_conf.dst_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
++		tx_conf.dst_addr_width = rx_conf.src_addr_width;
++	BUG_ON(rx_conf.src_addr_width != tx_conf.dst_addr_width);
++
++	rxchan->device->device_control(rxchan, DMA_SLAVE_CONFIG,
++				       (unsigned long) &rx_conf);
++	txchan->device->device_control(txchan, DMA_SLAVE_CONFIG,
++				       (unsigned long) &tx_conf);
++
++	/* Create sglists for the transfers */
++	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
++	dev_dbg(&pl022->adev->dev, "using %d pages for transfer\n", pages);
++
++	ret = sg_alloc_table(&pl022->sgt_rx, pages, GFP_KERNEL);
++	if (ret)
++		goto err_alloc_rx_sg;
++
++	ret = sg_alloc_table(&pl022->sgt_tx, pages, GFP_KERNEL);
++	if (ret)
++		goto err_alloc_tx_sg;
++
++	/* Fill in the scatterlists for the RX+TX buffers */
++	setup_dma_scatter(pl022, pl022->rx,
++			  pl022->cur_transfer->len, &pl022->sgt_rx);
++	setup_dma_scatter(pl022, pl022->tx,
++			  pl022->cur_transfer->len, &pl022->sgt_tx);
++
++	/* Map DMA buffers */
++	sglen = dma_map_sg(&pl022->adev->dev, pl022->sgt_rx.sgl,
++			   pl022->sgt_rx.nents, DMA_FROM_DEVICE);
++	if (!sglen)
++		goto err_rx_sgmap;
++
++	sglen = dma_map_sg(&pl022->adev->dev, pl022->sgt_tx.sgl,
++			   pl022->sgt_tx.nents, DMA_TO_DEVICE);
++	if (!sglen)
++		goto err_tx_sgmap;
++
++	/* Send both scatterlists */
++	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
++				      pl022->sgt_rx.sgl,
++				      pl022->sgt_rx.nents,
++				      DMA_FROM_DEVICE,
++				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (!rxdesc)
++		goto err_rxdesc;
++
++	txdesc = txchan->device->device_prep_slave_sg(txchan,
++				      pl022->sgt_tx.sgl,
++				      pl022->sgt_tx.nents,
++				      DMA_TO_DEVICE,
++				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (!txdesc)
++		goto err_txdesc;
++
++	/* Put the callback on the RX transfer only, that should finish last */
++	rxdesc->callback = dma_callback;
++	rxdesc->callback_param = pl022;
++
++	/* Submit and fire RX and TX with TX last so we're ready to read! */
++	cookie = rxdesc->tx_submit(rxdesc);
++	if (dma_submit_error(cookie))
++		goto err_submit_rx;
++	cookie = txdesc->tx_submit(txdesc);
++	if (dma_submit_error(cookie))
++		goto err_submit_tx;
++	rxchan->device->device_issue_pending(rxchan);
++	txchan->device->device_issue_pending(txchan);
++
++	return 0;
++
++err_submit_tx:
++err_submit_rx:
++err_txdesc:
++	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
++err_rxdesc:
++	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
++	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_tx.sgl,
++		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
++err_tx_sgmap:
++	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_rx.sgl,
++		     pl022->sgt_tx.nents, DMA_FROM_DEVICE);
++err_rx_sgmap:
++	sg_free_table(&pl022->sgt_tx);
++err_alloc_tx_sg:
++	sg_free_table(&pl022->sgt_rx);
++err_alloc_rx_sg:
++	return -ENOMEM;
++}
++
++static int __init pl022_dma_probe(struct pl022 *pl022)
++{
++	dma_cap_mask_t mask;
 +
 +	/* Try to acquire a generic DMA engine slave channel */
 +	dma_cap_zero(mask);
 +	dma_cap_set(DMA_SLAVE, mask);
 +	/*
-+	 * If only an RX channel is specified, the driver will
-+	 * attempt to use it bidirectionally, however if it is
-+	 * is specified but cannot be located, DMA will be disabled.
++	 * We need both RX and TX channels to do DMA, else do none
++	 * of them.
 +	 */
-+	host->dma_rx_channel = dma_request_channel(mask,
-+						plat->dma_filter,
-+						plat->dma_rx_param);
-+	/* E.g if no DMA hardware is present */
-+	if (!host->dma_rx_channel) {
-+		dev_err(mmc_dev(host->mmc), "no RX DMA channel!\n");
-+		return;
-+	}
-+	if (plat->dma_tx_param) {
-+		host->dma_tx_channel = dma_request_channel(mask,
-+							   plat->dma_filter,
-+							   plat->dma_tx_param);
-+		if (!host->dma_tx_channel) {
-+			dma_release_channel(host->dma_rx_channel);
-+			host->dma_rx_channel = NULL;
-+			return;
-+		}
-+	} else {
-+		host->dma_tx_channel = host->dma_rx_channel;
-+	}
-+	host->dma_enable = true;
-+	dev_info(mmc_dev(host->mmc), "use DMA channels DMA RX %s, DMA TX %s\n",
-+		 dma_chan_name(host->dma_rx_channel),
-+		 dma_chan_name(host->dma_tx_channel));
-+}
-+
-+/*
-+ * This is used in __devinit or __devexit so inline it
-+ * so it can be discarded.
-+ */
-+static inline void mmci_disable_dma(struct mmci_host *host)
-+{
-+	if (host->dma_rx_channel)
-+		dma_release_channel(host->dma_rx_channel);
-+	if (host->dma_tx_channel)
-+		dma_release_channel(host->dma_tx_channel);
-+	host->dma_enable = false;
-+}
-+
-+static void mmci_dma_data_end(struct mmci_host *host)
-+{
-+	struct mmc_data *data = host->data;
-+
-+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-+		     (data->flags & MMC_DATA_WRITE)
-+		     ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-+}
-+
-+static void mmci_dma_data_error(struct mmci_host *host)
-+{
-+	struct mmc_data *data = host->data;
-+	struct dma_chan *chan;
-+
-+	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
-+	if (data->flags & MMC_DATA_READ)
-+		chan = host->dma_rx_channel;
-+	else
-+		chan = host->dma_tx_channel;
-+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-+		     (data->flags & MMC_DATA_WRITE)
-+		     ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-+	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
-+}
-+
-+static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
-+{
-+	struct variant_data *variant = host->variant;
-+	struct dma_slave_config rx_conf = {
-+		.src_addr = host->phybase + MMCIFIFO,
-+		.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
-+		.direction = DMA_FROM_DEVICE,
-+		.src_maxburst = variant->fifohalfsize >> 2, /* # of words */
-+	};
-+	struct dma_slave_config tx_conf = {
-+		.dst_addr = host->phybase + MMCIFIFO,
-+		.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
-+		.direction = DMA_TO_DEVICE,
-+		.dst_maxburst = variant->fifohalfsize >> 2, /* # of words */
-+	};
-+	struct mmc_data *data = host->data;
-+	enum dma_data_direction direction;
-+	struct dma_chan *chan;
-+	struct dma_async_tx_descriptor *desc;
-+	struct scatterlist *sg;
-+	dma_cookie_t cookie;
-+	int i;
-+
-+	datactrl |= MCI_DPSM_DMAENABLE;
-+	datactrl |= variant->dmareg_enable;
-+
-+	if (data->flags & MMC_DATA_READ) {
-+		direction = DMA_FROM_DEVICE;
-+		chan = host->dma_rx_channel;
-+		chan->device->device_control(chan, DMA_SLAVE_CONFIG,
-+					     (unsigned long) &rx_conf);
-+	} else {
-+		direction = DMA_TO_DEVICE;
-+		chan = host->dma_tx_channel;
-+		chan->device->device_control(chan, DMA_SLAVE_CONFIG,
-+					     (unsigned long) &tx_conf);
++	pl022->dma_rx_channel = dma_request_channel(mask,
++					    pl022->master_info->dma_filter,
++					    pl022->master_info->dma_rx_param);
++	if (!pl022->dma_rx_channel) {
++		dev_err(&pl022->adev->dev, "no RX DMA channel!\n");
++		goto err_no_rxchan;
 +	}
 +
-+	/* Check for weird stuff in the sg list */
-+	for_each_sg(data->sg, sg, data->sg_len, i) {
-+		dev_vdbg(mmc_dev(host->mmc), "MMCI SGlist %d dir %d: length: %08x\n",
-+			 i, direction, sg->length);
-+		if (sg->offset & 3 || sg->length & 3)
-+			return -EINVAL;
++	pl022->dma_tx_channel = dma_request_channel(mask,
++					    pl022->master_info->dma_filter,
++					    pl022->master_info->dma_tx_param);
++	if (!pl022->dma_tx_channel) {
++		dev_err(&pl022->adev->dev, "no TX DMA channel!\n");
++		goto err_no_txchan;
 +	}
 +
-+	dma_map_sg(mmc_dev(host->mmc), data->sg,
-+		   data->sg_len, direction);
++	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
++	if (!pl022->dummypage) {
++		dev_err(&pl022->adev->dev, "no DMA dummypage!\n");
++		goto err_no_dummypage;
++	}
 +
-+	desc = chan->device->device_prep_slave_sg(chan,
-+					data->sg, data->sg_len, direction,
-+					DMA_CTRL_ACK);
-+	if (!desc)
-+		goto unmap_exit;
++	dev_info(&pl022->adev->dev, "setup for DMA on RX %s, TX %s\n",
++		 dma_chan_name(pl022->dma_rx_channel),
++		 dma_chan_name(pl022->dma_tx_channel));
 +
-+	host->dma_desc = desc;
-+	dev_vdbg(mmc_dev(host->mmc), "Submit MMCI DMA job, sglen %d "
-+		 "blksz %04x blks %04x flags %08x\n",
-+		 data->sg_len, data->blksz, data->blocks, data->flags);
-+	cookie = desc->tx_submit(desc);
-+
-+	/* Here overloaded DMA controllers may fail */
-+	if (dma_submit_error(cookie))
-+		goto unmap_exit;
-+
-+	host->dma_on_current_xfer = true;
-+	chan->device->device_issue_pending(chan);
-+
-+	/* Trigger the DMA transfer */
-+	writel(datactrl, host->base + MMCIDATACTRL);
-+	/*
-+	 * Let the MMCI say when the data is ended and it's time
-+	 * to fire next DMA request. When that happens, MMCI will
-+	 * call mmci_data_end()
-+	 */
-+	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
-+	       host->base + MMCIMASK0);
 +	return 0;
 +
-+unmap_exit:
-+	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
-+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len, direction);
-+	host->dma_on_current_xfer = false;
-+	return -ENOMEM;
++err_no_dummypage:
++	dma_release_channel(pl022->dma_tx_channel);
++err_no_txchan:
++	dma_release_channel(pl022->dma_rx_channel);
++	pl022->dma_rx_channel = NULL;
++err_no_rxchan:
++	return -ENODEV;
 +}
++
++static void terminate_dma(struct pl022 *pl022)
++{
++	struct dma_chan *rxchan = pl022->dma_rx_channel;
++	struct dma_chan *txchan = pl022->dma_tx_channel;
++
++	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
++	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
++	unmap_free_dma_scatter(pl022);
++}
++
++static void pl022_dma_remove(struct pl022 *pl022)
++{
++	if (pl022->busy)
++		terminate_dma(pl022);
++	if (pl022->dma_tx_channel)
++		dma_release_channel(pl022->dma_tx_channel);
++	if (pl022->dma_rx_channel)
++		dma_release_channel(pl022->dma_rx_channel);
++	kfree(pl022->dummypage);
++}
++
 +#else
-+/* Blank functions if the DMA engine is not available */
-+static inline void mmci_setup_dma(struct mmci_host *host)
++static inline int configure_dma(struct pl022 *pl022)
 +{
++	return -ENODEV;
 +}
 +
-+static inline void mmci_disable_dma(struct mmci_host *host)
++static inline int pl022_dma_probe(struct pl022 *pl022)
 +{
++	return 0;
 +}
 +
-+static inline void mmci_dma_data_end(struct mmci_host *host)
++static inline void pl022_dma_remove(struct pl022 *pl022)
 +{
-+}
-+
-+static inline void mmci_dma_data_error(struct mmci_host *host)
-+{
-+}
-+
-+static inline int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
-+{
-+	return -ENOSYS;
 +}
 +#endif
 +
- static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct variant_data *variant = host->variant;
-@@ -183,8 +385,8 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	host->data = data;
- 	host->size = data->blksz * data->blocks;
- 	host->data_xfered = 0;
+ /**
+  * pl022_interrupt_handler - Interrupt handler for SSP controller
+  *
+@@ -794,14 +1169,17 @@ static irqreturn_t pl022_interrupt_handler(int irq, void *dev_id)
+ 	if (unlikely(!irq_status))
+ 		return IRQ_NONE;
+ 
+-	/* This handles the error code interrupts */
++	/*
++	 * This handles the FIFO interrupts, the timeout
++	 * interrupts are flatly ignored, they cannot be
++	 * trusted.
++	 */
+ 	if (unlikely(irq_status & SSP_MIS_MASK_RORMIS)) {
+ 		/*
+ 		 * Overrun interrupt - bail out since our Data has been
+ 		 * corrupted
+ 		 */
+-		dev_err(&pl022->adev->dev,
+-			"FIFO overrun\n");
++		dev_err(&pl022->adev->dev, "FIFO overrun\n");
+ 		if (readw(SSP_SR(pl022->virtbase)) & SSP_SR_MASK_RFF)
+ 			dev_err(&pl022->adev->dev,
+ 				"RXFIFO is full\n");
+@@ -896,8 +1274,8 @@ static int set_up_next_transfer(struct pl022 *pl022,
+ }
+ 
+ /**
+- * pump_transfers - Tasklet function which schedules next interrupt transfer
+- * when running in interrupt transfer mode.
++ * pump_transfers - Tasklet function which schedules next transfer
++ * when running in interrupt or DMA transfer mode.
+  * @data: SSP driver private data structure
+  *
+  */
+@@ -954,65 +1332,23 @@ static void pump_transfers(unsigned long data)
+ 	}
+ 	/* Flush the FIFOs and let's go! */
+ 	flush(pl022);
+-	writew(ENABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
+-}
 -
--	mmci_init_sg(host, data);
-+	host->blockend = false;
-+	host->dataend = false;
- 
- 	clks = (unsigned long long)data->timeout_ns * host->cclk;
- 	do_div(clks, 1000000000UL);
-@@ -199,13 +401,32 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	BUG_ON(1 << blksz_bits != data->blksz);
- 
- 	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
--	if (data->flags & MMC_DATA_READ) {
-+
-+	if (data->flags & MMC_DATA_READ)
- 		datactrl |= MCI_DPSM_DIRECTION;
-+
-+	if (host->dma_enable) {
-+		int ret;
-+
-+		/*
-+		 * Attempt to use DMA operation mode, if this
-+		 * should fail, fall back to PIO mode
-+		 */
-+		ret = mmci_dma_start_data(host, datactrl);
-+		if (!ret)
-+			return;
-+	}
-+
-+	/* IRQ mode, map the SG list for CPU reading/writing */
-+	mmci_init_sg(host, data);
-+
-+	if (data->flags & MMC_DATA_READ) {
- 		irqmask = MCI_RXFIFOHALFFULLMASK;
- 
- 		/*
--		 * If we have less than a FIFOSIZE of bytes to transfer,
--		 * trigger a PIO interrupt as soon as any data is available.
-+		 * If we have less than a FIFOSIZE of bytes to
-+		 * transfer, trigger a PIO interrupt as soon as any
-+		 * data is available.
- 		 */
- 		if (host->size < variant->fifosize)
- 			irqmask |= MCI_RXDATAAVLBLMASK;
-@@ -254,20 +475,7 @@ static void
- mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 	      unsigned int status)
- {
--	if (status & MCI_DATABLOCKEND) {
--		host->data_xfered += data->blksz;
--#ifdef CONFIG_ARCH_U300
--		/*
--		 * On the U300 some signal or other is
--		 * badly routed so that a data write does
--		 * not properly terminate with a MCI_DATAEND
--		 * status flag. This quirk will make writes
--		 * work again.
--		 */
--		if (data->flags & MMC_DATA_WRITE)
--			status |= MCI_DATAEND;
--#endif
+-/**
+- * NOT IMPLEMENTED
+- * configure_dma - It configures the DMA pipes for DMA transfers
+- * @data: SSP driver's private data structure
+- *
+- */
+-static int configure_dma(void *data)
+-{
+-	struct pl022 *pl022 = data;
+-	dev_dbg(&pl022->adev->dev, "configure DMA\n");
+-	return -ENOTSUPP;
+-}
+-
+-/**
+- * do_dma_transfer - It handles transfers of the current message
+- * if it is DMA xfer.
+- * NOT FULLY IMPLEMENTED
+- * @data: SSP driver's private data structure
+- */
+-static void do_dma_transfer(void *data)
+-{
+-	struct pl022 *pl022 = data;
+-
+-	if (configure_dma(data)) {
+-		dev_dbg(&pl022->adev->dev, "configuration of DMA Failed!\n");
+-		goto err_config_dma;
 -	}
-+	/* First check for errors */
- 	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
- 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ (status %08x)\n", status);
- 		if (status & MCI_DATACRCFAIL)
-@@ -276,13 +484,19 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 			data->error = -ETIMEDOUT;
- 		else if (status & (MCI_TXUNDERRUN|MCI_RXOVERRUN))
- 			data->error = -EIO;
--		status |= MCI_DATAEND;
-+
-+		/* Force-complete the transaction */
-+		host->blockend = true;
-+		host->dataend = true;
  
- 		/*
- 		 * We hit an error condition.  Ensure that any data
--		 * partially written to a page is properly coherent.
-+		 * partially written to a page is properly coherent,
-+		 * unless we're using DMA.
- 		 */
--		if (data->flags & MMC_DATA_READ) {
-+		if (host->dma_on_current_xfer)
-+			mmci_dma_data_error(host);
-+		else if (data->flags & MMC_DATA_READ) {
- 			struct sg_mapping_iter *sg_miter = &host->sg_miter;
- 			unsigned long flags;
- 
-@@ -294,12 +508,59 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 			local_irq_restore(flags);
- 		}
+-	/* TODO: Implememt DMA setup of pipes here */
+-
+-	/* Enable target chip, set up transfer */
+-	pl022->cur_chip->cs_control(SSP_CHIP_SELECT);
+-	if (set_up_next_transfer(pl022, pl022->cur_transfer)) {
+-		/* Error path */
+-		pl022->cur_msg->state = STATE_ERROR;
+-		pl022->cur_msg->status = -EIO;
+-		giveback(pl022);
++	if (pl022->cur_chip->enable_dma) {
++		if (configure_dma(pl022)) {
++			dev_dbg(&pl022->adev->dev,
++				"configuration of DMA failed, fall back to interrupt mode\n");
++			goto err_config_dma;
++		}
+ 		return;
  	}
--	if (status & MCI_DATAEND) {
+-	/* Enable SSP */
+-	writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
+-	       SSP_CR1(pl022->virtbase));
+-
+-	/* TODO: Enable the DMA transfer here */
+-	return;
+ 
+- err_config_dma:
+-	pl022->cur_msg->state = STATE_ERROR;
+-	pl022->cur_msg->status = -EIO;
+-	giveback(pl022);
+-	return;
++err_config_dma:
++	writew(ENABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
+ }
+ 
+-static void do_interrupt_transfer(void *data)
++static void do_interrupt_dma_transfer(struct pl022 *pl022)
+ {
+-	struct pl022 *pl022 = data;
++	u32 irqflags = ENABLE_ALL_INTERRUPTS;
+ 
+ 	/* Enable target chip */
+ 	pl022->cur_chip->cs_control(SSP_CHIP_SELECT);
+@@ -1023,15 +1359,26 @@ static void do_interrupt_transfer(void *data)
+ 		giveback(pl022);
+ 		return;
+ 	}
++	/* If we're using DMA, set up DMA here */
++	if (pl022->cur_chip->enable_dma) {
++		/* Configure DMA transfer */
++		if (configure_dma(pl022)) {
++			dev_dbg(&pl022->adev->dev,
++				"configuration of DMA failed, fall back to interrupt mode\n");
++			goto err_config_dma;
++		}
++		/* Disable interrupts in DMA mode, IRQ from DMA controller */
++		irqflags = DISABLE_ALL_INTERRUPTS;
++	}
++err_config_dma:
+ 	/* Enable SSP, turn on interrupts */
+ 	writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
+ 	       SSP_CR1(pl022->virtbase));
+-	writew(ENABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
++	writew(irqflags, SSP_IMSC(pl022->virtbase));
+ }
+ 
+-static void do_polling_transfer(void *data)
++static void do_polling_transfer(struct pl022 *pl022)
+ {
+-	struct pl022 *pl022 = data;
+ 	struct spi_message *message = NULL;
+ 	struct spi_transfer *transfer = NULL;
+ 	struct spi_transfer *previous = NULL;
+@@ -1101,7 +1448,7 @@ static void do_polling_transfer(void *data)
+  *
+  * This function checks if there is any spi message in the queue that
+  * needs processing and delegate control to appropriate function
+- * do_polling_transfer()/do_interrupt_transfer()/do_dma_transfer()
++ * do_polling_transfer()/do_interrupt_dma_transfer()
+  * based on the kind of the transfer
+  *
+  */
+@@ -1150,10 +1497,8 @@ static void pump_messages(struct work_struct *work)
+ 
+ 	if (pl022->cur_chip->xfer_type == POLLING_TRANSFER)
+ 		do_polling_transfer(pl022);
+-	else if (pl022->cur_chip->xfer_type == INTERRUPT_TRANSFER)
+-		do_interrupt_transfer(pl022);
+ 	else
+-		do_dma_transfer(pl022);
++		do_interrupt_dma_transfer(pl022);
+ }
+ 
+ 
+@@ -1430,23 +1775,6 @@ static int calculate_effective_freq(struct pl022 *pl022,
+ }
+ 
+ /**
+- * NOT IMPLEMENTED
+- * process_dma_info - Processes the DMA info provided by client drivers
+- * @chip_info: chip info provided by client device
+- * @chip: Runtime state maintained by the SSP controller for each spi device
+- *
+- * This function processes and stores DMA config provided by client driver
+- * into the runtime state maintained by the SSP controller driver
+- */
+-static int process_dma_info(struct pl022_config_chip *chip_info,
+-			    struct chip_data *chip)
+-{
+-	dev_err(chip_info->dev,
+-		"cannot process DMA info, DMA not implemented!\n");
+-	return -ENOTSUPP;
+-}
+-
+-/**
+  * pl022_setup - setup function registered to SPI master framework
+  * @spi: spi device which is requesting setup
+  *
+@@ -1504,8 +1832,6 @@ static int pl022_setup(struct spi_device *spi)
+ 
+ 		dev_dbg(&spi->dev, "allocated memory for controller data\n");
+ 
+-		/* Pointer back to the SPI device */
+-		chip_info->dev = &spi->dev;
+ 		/*
+ 		 * Set controller data default values:
+ 		 * Polling is supported by default
+@@ -1525,6 +1851,9 @@ static int pl022_setup(struct spi_device *spi)
+ 			"using user supplied controller_data settings\n");
+ 	}
+ 
++	/* Pointer back to the SPI device */
++	chip_info->dev = &spi->dev;
 +
-+	/*
-+	 * On ARM variants in PIO mode, MCI_DATABLOCKEND
-+	 * is always sent first, and we increase the
-+	 * transfered number of bytes for that IRQ. Then
-+	 * MCI_DATEND follows and we conclude the transaction.
-+	 * This is also the case in the U300 PIO mode.
-+	 *
-+	 * The Ux500 single-IRQ variant only fires the
-+	 * MCI_DATAEND IRQ at the end of the entire transfer.
-+	 *
-+	 * In DMA mode, the IRQs can arrive out-of-order,
-+	 * e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
-+	 * so in this case we use the flags "blockend" and
-+	 * "dataend" to make sure both IRQs have arrived before
-+	 * concluding the transaction. (This does not apply
-+	 * to the Ux500 which doesn't fire MCI_DATABLOCKEND
-+	 * at all.)
-+	 */
-+	if (status & MCI_DATABLOCKEND) {
-+		/*
-+		 * Just being a little over-cautious, we do not
-+		 * use this progressive update in DMA or single-IRQ
-+		 * mode.
-+		 */
-+		if (!host->variant->singleirq && !host->dma_on_current_xfer)
-+			host->data_xfered += data->blksz;
-+		host->blockend = true;
+ 	/*
+ 	 * We can override with custom divisors, else we use the board
+ 	 * frequency setting
+@@ -1588,9 +1917,8 @@ static int pl022_setup(struct spi_device *spi)
+ 	chip->cpsr = 0;
+ 	if ((chip_info->com_mode == DMA_TRANSFER)
+ 	    && ((pl022->master_info)->enable_dma)) {
+-		chip->enable_dma = 1;
++		chip->enable_dma = true;
+ 		dev_dbg(&spi->dev, "DMA mode set in controller state\n");
+-		status = process_dma_info(chip_info, chip);
+ 		if (status < 0)
+ 			goto err_config_params;
+ 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_ENABLED,
+@@ -1598,7 +1926,7 @@ static int pl022_setup(struct spi_device *spi)
+ 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_ENABLED,
+ 			       SSP_DMACR_MASK_TXDMAE, 1);
+ 	} else {
+-		chip->enable_dma = 0;
++		chip->enable_dma = false;
+ 		dev_dbg(&spi->dev, "DMA mode NOT set in controller state\n");
+ 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_DISABLED,
+ 			       SSP_DMACR_MASK_RXDMAE, 0);
+@@ -1757,6 +2085,7 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
+ 	if (status)
+ 		goto err_no_ioregion;
+ 
++	pl022->phybase = adev->res.start;
+ 	pl022->virtbase = ioremap(adev->res.start, resource_size(&adev->res));
+ 	if (pl022->virtbase == NULL) {
+ 		status = -ENOMEM;
+@@ -1783,6 +2112,14 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
+ 		dev_err(&adev->dev, "probe - cannot get IRQ (%d)\n", status);
+ 		goto err_no_irq;
+ 	}
++
++	/* Get DMA channels */
++	if (platform_info->enable_dma) {
++		status = pl022_dma_probe(pl022);
++		if (status != 0)
++			goto err_no_dma;
 +	}
 +
-+	if (status & MCI_DATAEND)
-+		host->dataend = true;
-+
-+	/*
-+	 * On Ux500 we shall only wait for dataend, on others we must sync
-+	 * with the blockend signal since they can appear out-of-order
-+	 * when using DMA.
-+	 */
-+	if (host->dataend && (host->blockend || host->variant->singleirq)) {
-+		mmci_dma_data_end(host);
- 		mmci_stop_data(host);
- 
--		/* MCI_DATABLOCKEND not used with single irq */
--		if (host->variant->singleirq && !data->error)
--			host->data_xfered = data->blksz * data->blocks;
-+		/* Reset these flags */
-+		host->blockend = false;
-+		host->dataend = false;
-+
-+		/*
-+		 * Single IRQ variants do not transmit MCI_DATABLOCKEND
-+		 * and in DMA mode this signal need to be synchronized
-+		 * with MCI_DATEND
-+		 */
-+		if ((host->variant->singleirq || host->dma_on_current_xfer) && !data->error)
-+			host->data_xfered += data->blksz * data->blocks;
- 
- 		if (!data->stop) {
- 			mmci_request_end(host, data->mrq);
-@@ -719,6 +980,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 		dev_dbg(mmc_dev(mmc), "eventual mclk rate: %u Hz\n",
- 			host->mclk);
+ 	/* Initialize and start queue */
+ 	status = init_queue(pl022);
+ 	if (status != 0) {
+@@ -1811,6 +2148,8 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
+  err_start_queue:
+  err_init_queue:
+ 	destroy_queue(pl022);
++	pl022_dma_remove(pl022);
++ err_no_dma:
+ 	free_irq(adev->irq[0], pl022);
+  err_no_irq:
+ 	clk_put(pl022->clk);
+@@ -1841,6 +2180,7 @@ pl022_remove(struct amba_device *adev)
+ 		return status;
  	}
-+	host->phybase = dev->res.start;
- 	host->base = ioremap(dev->res.start, resource_size(&dev->res));
- 	if (!host->base) {
- 		ret = -ENOMEM;
-@@ -829,6 +1091,8 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	    && host->gpio_cd_irq < 0)
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
-+	mmci_setup_dma(host);
-+
- 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
- 	if (ret)
- 		goto unmap;
-@@ -855,15 +1119,17 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 
- 	mmc_add_host(mmc);
- 
--	dev_info(&dev->dev, "%s: MMCI rev %x cfg %02x at 0x%016llx irq %d,%d\n",
--		mmc_hostname(mmc), amba_rev(dev), amba_config(dev),
--		(unsigned long long)dev->res.start, dev->irq[0], dev->irq[1]);
-+	dev_info(&dev->dev, "%s: MMCI/PL180 manf %x rev %x cfg %02x at 0x%016llx\n",
-+		 mmc_hostname(mmc), amba_manf(dev), amba_rev(dev), amba_config(dev),
-+		 (unsigned long long)dev->res.start);
-+	dev_info(&dev->dev, "IRQ %d, %d (pio)\n", dev->irq[0], dev->irq[1]);
- 
- 	return 0;
- 
-  irq0_free:
- 	free_irq(dev->irq[0], host);
-  unmap:
-+	mmci_disable_dma(host);
- 	if (host->gpio_wp != -ENOSYS)
- 		gpio_free(host->gpio_wp);
-  err_gpio_wp:
-@@ -903,6 +1169,7 @@ static int __devexit mmci_remove(struct amba_device *dev)
- 		writel(0, host->base + MMCICOMMAND);
- 		writel(0, host->base + MMCIDATACTRL);
- 
-+		mmci_disable_dma(host);
- 		free_irq(dev->irq[0], host);
- 		if (!variant->singleirq)
- 			free_irq(dev->irq[1], host);
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index ba203b8..3736d93 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -142,8 +142,11 @@
- 
- struct clk;
- struct variant_data;
-+struct dma_chan;
-+struct dma_async_tx_descriptor;
- 
- struct mmci_host {
-+	phys_addr_t		phybase;
- 	void __iomem		*base;
- 	struct mmc_request	*mrq;
- 	struct mmc_command	*cmd;
-@@ -170,9 +173,22 @@ struct mmci_host {
- 	struct timer_list	timer;
- 	unsigned int		oldstat;
- 
-+	bool			blockend;
-+	bool			dataend;
-+
- 	/* pio stuff */
- 	struct sg_mapping_iter	sg_miter;
- 	unsigned int		size;
-+
- 	struct regulator	*vcc;
-+
-+	/* DMA stuff */
-+	bool			dma_enable;
-+	bool			dma_on_current_xfer;
-+#ifdef CONFIG_DMADEVICES
-+	struct dma_chan		*dma_rx_channel;
-+	struct dma_chan		*dma_tx_channel;
-+	struct dma_async_tx_descriptor *dma_desc;
-+#endif
+ 	load_ssp_default_config(pl022);
++	pl022_dma_remove(pl022);
+ 	free_irq(adev->irq[0], pl022);
+ 	clk_disable(pl022->clk);
+ 	clk_put(pl022->clk);
+diff --git a/include/linux/amba/pl022.h b/include/linux/amba/pl022.h
+index 0ad6977..bf14366 100644
+--- a/include/linux/amba/pl022.h
++++ b/include/linux/amba/pl022.h
+@@ -228,6 +228,7 @@ enum ssp_chip_select {
  };
  
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index f4ee9ac..dbeba68 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -6,6 +6,8 @@
  
- #include <linux/mmc/host.h>
- 
-+/* Just some dummy forwarding */
 +struct dma_chan;
  /**
-  * struct mmci_platform_data - platform configuration for the MMCI
-  * (also known as PL180) block.
-@@ -27,6 +29,17 @@
-  * @cd_invert: true if the gpio_cd pin value is active low
-  * @capabilities: the capabilities of the block as implemented in
-  * this platform, signify anything MMC_CAP_* from mmc/host.h
-+ * @dma_filter: function used to select an apropriate RX and TX
-+ * DMA channel to be used for DMA, if and only if you're deploying the
-+ * generic DMA engine
-+ * @dma_rx_param: parameter passed to the DMA allocation
-+ * filter in order to select an apropriate RX channel. If
-+ * there is a bidirectional RX+TX channel, then just specify
-+ * this and leave dma_tx_param set to NULL
-+ * @dma_tx_param: parameter passed to the DMA allocation
-+ * filter in order to select an apropriate TX channel. If this
-+ * is NULL the driver will attempt to use the RX channel as a
-+ * bidirectional channel
+  * struct pl022_ssp_master - device.platform_data for SPI controller devices.
+  * @num_chipselect: chipselects are used to distinguish individual
+@@ -235,11 +236,16 @@ enum ssp_chip_select {
+  *     each slave has a chipselect signal, but it's common that not
+  *     every chipselect is connected to a slave.
+  * @enable_dma: if true enables DMA driven transfers.
++ * @dma_rx_param: parameter to locate an RX DMA channel.
++ * @dma_tx_param: parameter to locate a TX DMA channel.
   */
- struct mmci_platform_data {
- 	unsigned int f_max;
-@@ -38,6 +51,9 @@ struct mmci_platform_data {
- 	int	gpio_cd;
- 	bool	cd_invert;
- 	unsigned long capabilities;
+ struct pl022_ssp_controller {
+ 	u16 bus_id;
+ 	u8 num_chipselect;
+ 	u8 enable_dma:1;
 +	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
 +	void *dma_rx_param;
 +	void *dma_tx_param;
  };
  
- #endif
+ /**
 -- 
 1.6.3.3
