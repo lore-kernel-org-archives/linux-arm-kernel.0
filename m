@@ -1,76 +1,45 @@
-From: bmpenrod@endruntechnologies.com (Bruce M. Penrod)
-Date: Wed, 15 Sep 2010 13:30:28 -0700
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <alpine.LFD.2.00.1009141442330.19366@xanadu.home>
-References: <4C8DD588.7040009@endruntechnologies.com>	<20100913100111.GA30787@n2100.arm.linux.org.uk>	<4C8E7EFF.7020004@endruntechnologies.com>	<alpine.LFD.2.00.1009141330230.19366@xanadu.home>	<4C8FB71C.8010208@endruntechnologies.com>
-	<alpine.LFD.2.00.1009141442330.19366@xanadu.home>
-Message-ID: <4C912CE4.3000306@endruntechnologies.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 15 Sep 2010 14:56:35 -0700
+Subject: [PATCH 0/4] OMAP OPP layer for 2.6.37
+Message-ID: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series introduces a layer to manage Operating Performance Points (OPPs)
+for OMAP SoCs.
 
+Special thanks to Nishanth for doing the bulk of the work on this
+series and to Thara for doing significant review, testing and updates.
 
-Nicolas Pitre wrote:
-> On Tue, 14 Sep 2010, Bruce M. Penrod wrote:
-> 
->>
->> Nicolas Pitre wrote:
->>> On Mon, 13 Sep 2010, Bruce M. Penrod wrote:
->>>
->>>> Russell King - ARM Linux wrote:
->>>>> On Mon, Sep 13, 2010 at 12:40:56AM -0700, Bruce M. Penrod wrote:
->>>>>> This seems like a pretty straightforward question, but extensive web
->>>>>> searching hasn't shown a really clear, up-to-date answer.  The most
->>>>>> recent info is circa 2004 and states that 4MB is the largest
->>>>>> uncompressed
->>>>>> ARM kernel that may be loaded.  Not being an ARM assembly  guru
->>>>>> (head.S
->>>>>> baffles me), I'd like to know if that is still true in  2010, and if
->>>>>> it
->>>>>> is, why?
->>>>> It is no longer true; the only limit now is the size of contiguous RAM
->>>>> to fit the kernel image into.
->>>>>
->>>> Interesting.  I finally was able to get an uncompressed kernel a little
->>>> below
->>>> 4MB, and now it boots.  I'm working with 2.6.35rc6 on an OpenRD Ultimate
->>>> (Marvell Kirkwood) with Slackware, doing native compiles.  I'm wondering
->>>> if
->>>> there could be any problem with U-Boot for larger kernels than 4MB, but it
->>>> doesn't complain and says that it is copying the image.  The symptom I had
->>>> with a much larger kernel (~15MB) is a total hang, not even "Uncompressing
->>>> linux".
->>>>
->>>> I'll add some innocuous stuff back in until I get above 4MB again and see
->>>> if
->>>> it breaks again.
->>> When it breaks, do you still see the "Uncompressing Linux... done, booting
->>> the kernel." message?
->>>
->>>
->>> Nicolas
->>>
->> I think it depended upon how "too big" the kernel was.  With one only slightly
->> larger than 4 MB, I did see "Uncompressing Linux...", but not "done, booting
->> the kernel."  With a very large kernel (15MB), nothing printed at all.
->>
->> I have not retested since successfully booting one slightly smaller than 4096
->> * 1024.  When I do, I will post the results.  Should happen today.
-> 
-> OK.  Also please provide the size of your arch/arm/boot/zImage as well 
-> as arch/arm/boot/Image.  Also, at what address do you load your kernel 
-> in memory?
-> 
-> 
-> Nicolas
+Kevin Hilman (1):
+  OMAP3: remove OPP interfaces from OMAP PM layer
 
-U-Boot loads the zImage at 0x800000.  Yesterday I added features back 
-into the kernel and am up to 4600 * 1024 with no issues.  So definitely 
-not a hard limit at 4MB.  It takes quite a while to compile on the 
-OpenRD, so it may take a while for me to discover the magic combination 
-that doesn't work.  I removed a LOT of stuff, and I'd rather add it back 
-in gradually to get an idea whether it is a size issue or some bad other 
-thing with a combination of options.
+Nishanth Menon (2):
+  OMAP: introduce OPP layer for device-specific OPPs
+  OMAP3: OPP: add OPP table data and initialization
+
+Paul Walmsley (1):
+  OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
+
+ Documentation/arm/OMAP/omap_pm                |   83 +++++
+ arch/arm/mach-omap2/Makefile                  |    2 +
+ arch/arm/mach-omap2/io.c                      |    3 +-
+ arch/arm/mach-omap2/opp3xxx_data.c            |  126 +++++++
+ arch/arm/mach-omap2/pm.c                      |    6 +
+ arch/arm/mach-omap2/pm.h                      |    1 +
+ arch/arm/plat-omap/Makefile                   |    6 +
+ arch/arm/plat-omap/include/plat/omap-pm.h     |   31 +--
+ arch/arm/plat-omap/include/plat/opp.h         |  145 ++++++++
+ arch/arm/plat-omap/include/plat/opp_twl_tps.h |   21 ++
+ arch/arm/plat-omap/omap-pm-noop.c             |   11 +-
+ arch/arm/plat-omap/opp.c                      |  461 +++++++++++++++++++++++++
+ arch/arm/plat-omap/opp_twl_tps.c              |   41 +++
+ 13 files changed, 904 insertions(+), 33 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/opp3xxx_data.c
+ create mode 100644 arch/arm/plat-omap/include/plat/opp.h
+ create mode 100644 arch/arm/plat-omap/include/plat/opp_twl_tps.h
+ create mode 100644 arch/arm/plat-omap/opp.c
+ create mode 100644 arch/arm/plat-omap/opp_twl_tps.c
 
 -- 
-Bruce Penrod
+1.7.2.1
