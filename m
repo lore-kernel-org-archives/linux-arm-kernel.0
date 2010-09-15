@@ -1,147 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 16 Sep 2010 08:49:39 +0900
-Subject: [PATCH v2] ARM: Samsung: s5p-fimc: fix dma coherent mask
-In-Reply-To: <004201cb53ee$ff8e2a60$feaa7f20$%szyprowski@samsung.com>
-References: <000301cb4fb7$b4448530$1ccd8f90$%kim@samsung.com>
-	<1283998673-14899-1-git-send-email-m.szyprowski@samsung.com>
-	<011101cb5010$fdb1d520$f9157f60$%kim@samsung.com>
-	<004201cb53ee$ff8e2a60$feaa7f20$%szyprowski@samsung.com>
-Message-ID: <027d01cb5530$ac5cb8a0$051629e0$%kim@samsung.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 15 Sep 2010 16:55:36 -0700
+Subject: [PATCH 00/10] OMAP: misc PM queue for 2.6.37
+Message-ID: <1284594946-28963-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-Hi ;-)
+Various OMAP PM related updates targetted for 2.6.37.
 
-> On Thursday, September 09, 2010 1:20 PM Kukjin Kim wrote:
-> 
-> > Marek Szyprowski wrote:
-> > >
-> > > FIMC driver uses DMA_coherent allocator, which requires proper dma
-mask
-> > > to be set.
-> > >
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > ---
-> > >
-> > > Chnages since v1:
-> > > - use DMA_BIT_MASK() macro, minor coding style change
-> > >
-> > > ---
-> > >  arch/arm/plat-s5p/dev-fimc0.c |    7 +++++++
-> > >  arch/arm/plat-s5p/dev-fimc1.c |    7 +++++++
-> > >  arch/arm/plat-s5p/dev-fimc2.c |    7 +++++++
-> > >  3 files changed, 21 insertions(+), 0 deletions(-)
-> > >
-> > > diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-
-> > fimc0.c
-> > > index d3f1a9b..f9203fa 100644
-> > > --- a/arch/arm/plat-s5p/dev-fimc0.c
-> > > +++ b/arch/arm/plat-s5p/dev-fimc0.c
-> > > @@ -10,6 +10,7 @@
-> > >   */
-> > >
-> > >  #include <linux/kernel.h>
-> > > +#include <linux/dma-mapping.h>
-> > >  #include <linux/platform_device.h>
-> > >  #include <linux/interrupt.h>
-> > >  #include <linux/ioport.h>
-> > > @@ -28,9 +29,15 @@ static struct resource s5p_fimc0_resource[] = {
-> > >  	},
-> > >  };
-> > >
-> > > +static u64 s5p_fimc0_dma_mask = DMA_BIT_MASK(32);
-> > > +
-> > >  struct platform_device s5p_device_fimc0 = {
-> > >  	.name		= "s5p-fimc",
-> > >  	.id		= 0,
-> > >  	.num_resources	= ARRAY_SIZE(s5p_fimc0_resource),
-> > >  	.resource	= s5p_fimc0_resource,
-> > > +	.dev		= {
-> > > +		.dma_mask		= &s5p_fimc0_dma_mask,
-> > > +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> > > +	},
-> > >  };
-> > > diff --git a/arch/arm/plat-s5p/dev-fimc1.c b/arch/arm/plat-s5p/dev-
-> > fimc1.c
-> > > index 41bd698..7ed91a3 100644
-> > > --- a/arch/arm/plat-s5p/dev-fimc1.c
-> > > +++ b/arch/arm/plat-s5p/dev-fimc1.c
-> > > @@ -10,6 +10,7 @@
-> > >   */
-> > >
-> > >  #include <linux/kernel.h>
-> > > +#include <linux/dma-mapping.h>
-> > >  #include <linux/platform_device.h>
-> > >  #include <linux/interrupt.h>
-> > >  #include <linux/ioport.h>
-> > > @@ -28,9 +29,15 @@ static struct resource s5p_fimc1_resource[] = {
-> > >  	},
-> > >  };
-> > >
-> > > +static u64 s5p_fimc1_dma_mask = DMA_BIT_MASK(32);
-> > > +
-> > >  struct platform_device s5p_device_fimc1 = {
-> > >  	.name		= "s5p-fimc",
-> > >  	.id		= 1,
-> > >  	.num_resources	= ARRAY_SIZE(s5p_fimc1_resource),
-> > >  	.resource	= s5p_fimc1_resource,
-> > > +	.dev		= {
-> > > +		.dma_mask		= &s5p_fimc1_dma_mask,
-> > > +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> > > +	},
-> > >  };
-> > > diff --git a/arch/arm/plat-s5p/dev-fimc2.c b/arch/arm/plat-s5p/dev-
-> > fimc2.c
-> > > index dfddeda..5543d6373 100644
-> > > --- a/arch/arm/plat-s5p/dev-fimc2.c
-> > > +++ b/arch/arm/plat-s5p/dev-fimc2.c
-> > > @@ -10,6 +10,7 @@
-> > >   */
-> > >
-> > >  #include <linux/kernel.h>
-> > > +#include <linux/dma-mapping.h>
-> > >  #include <linux/platform_device.h>
-> > >  #include <linux/interrupt.h>
-> > >  #include <linux/ioport.h>
-> > > @@ -28,9 +29,15 @@ static struct resource s5p_fimc2_resource[] = {
-> > >  	},
-> > >  };
-> > >
-> > > +static u64 s5p_fimc2_dma_mask = DMA_BIT_MASK(32);
-> > > +
-> > >  struct platform_device s5p_device_fimc2 = {
-> > >  	.name		= "s5p-fimc",
-> > >  	.id		= 2,
-> > >  	.num_resources	= ARRAY_SIZE(s5p_fimc2_resource),
-> > >  	.resource	= s5p_fimc2_resource,
-> > > +	.dev		= {
-> > > +		.dma_mask		= &s5p_fimc2_dma_mask,
-> > > +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> > > +	},
-> > >  };
-> > > --
-> > > 1.7.2.2
-> >
-> > looks good to me..will apply :-)
-> 
-> What about merging this patch also to the kgene/s5p-fixes-for-linus
-branch?
-> IMHO this and the fimc clocks patch are pure bug fixes that should be
-merged
-> into final 2.6.36 kernel. Without these two patches fimc driver is
-useless.
-> 
-Hmm...ok...will sort out with other fixes.
+Also available in my pm-next branch:
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-next
 
-Thanks.
+Kevin Hilman (4):
+  OMAP3: PM: whitespace cleanup around IO wakeup enable
+  OMAP3: PM: move device-specific special cases from PM core into
+    CPUidle
+  Revert "OMAP: omap_device: add omap_device_is_valid()"
+  OMAP: omap_device: make all devices a child of a new parent device
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Paul Walmsley (1):
+  OMAP clockdomain: initialize clockdomain registers when the
+    clockdomain layer starts
+
+Santosh Shilimkar (3):
+  omap: pm-debug: Move common debug code to pm-debug.c
+  omap: pm-debug: Enable wakeup_timer_milliseconds debugfs entry
+  omap: pm: Move set_pwrdm_state routine to common pm.c
+
+Thara Gopinath (2):
+  OMAP: PM debugfs removing OMAP3 hardcodings.
+  OMAP4: pm.c extensions for OMAP4 support
+
+ arch/arm/mach-omap2/clockdomain.c             |  110 ++++---------------------
+ arch/arm/mach-omap2/cpuidle34xx.c             |   50 +++++++++++-
+ arch/arm/mach-omap2/pm-debug.c                |   42 ++++++++-
+ arch/arm/mach-omap2/pm.c                      |   70 +++++++++++++++-
+ arch/arm/mach-omap2/pm.h                      |    4 +-
+ arch/arm/mach-omap2/pm34xx.c                  |   99 ++--------------------
+ arch/arm/plat-omap/include/plat/common.h      |    3 +-
+ arch/arm/plat-omap/include/plat/omap_device.h |    4 +-
+ arch/arm/plat-omap/omap_device.c              |   32 +++-----
+ 9 files changed, 191 insertions(+), 223 deletions(-)
+
+-- 
+1.7.2.1
