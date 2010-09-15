@@ -1,74 +1,69 @@
 From: jc.lee@samsung.com (Jaecheol Lee)
-Date: Wed, 15 Sep 2010 16:52:40 +0900
-Subject: [PATCH 3/5] ARM: S5PV210: Add Register definition for CMU
+Date: Wed, 15 Sep 2010 16:52:38 +0900
+Subject: [PATCH 1/5] ARM: S5PV210: Add support DMC map_desc table
 In-Reply-To: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
 References: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
-Message-ID: <1284537162-3129-4-git-send-email-jc.lee@samsung.com>
+Message-ID: <1284537162-3129-2-git-send-email-jc.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some CMU(Clock Management Unit) registers for
-supporting CPUFREQ and some drivers.
+This patch adds DMC(DRAM Memory Controller) map_desc table.
+Because some driver such as CPUFREQ need to access DMC register.
 
 Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 ---
- arch/arm/mach-s5pv210/include/mach/regs-clock.h |   31 ++++++++++++++++++++++-
- 1 files changed, 30 insertions(+), 1 deletions(-)
+ arch/arm/mach-s5pv210/cpu.c              |   10 ++++++++++
+ arch/arm/mach-s5pv210/include/mach/map.h |    3 +++
+ arch/arm/plat-s5p/include/plat/map-s5p.h |    2 ++
+ 3 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-index 499aef7..336b1cf 100644
---- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-@@ -67,11 +67,28 @@
- #define S5P_CLKGATE_BUS1	S5P_CLKREG(0x488)
- #define S5P_CLK_OUT		S5P_CLKREG(0x500)
+diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+index c551ab1..aebbb7f 100644
+--- a/arch/arm/mach-s5pv210/cpu.c
++++ b/arch/arm/mach-s5pv210/cpu.c
+@@ -84,6 +84,16 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_DMC0,
++		.pfn		= __phys_to_pfn(S5PV210_PA_DMC0),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_DMC1,
++		.pfn		= __phys_to_pfn(S5PV210_PA_DMC1),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
+ 	}
+ };
  
-+/* DIV/MUX STATUS */
-+#define S5P_CLKDIV_STAT0	S5P_CLKREG(0x1000)
-+#define S5P_CLKDIV_STAT1	S5P_CLKREG(0x1004)
-+#define S5P_CLKMUX_STAT0	S5P_CLKREG(0x1100)
-+#define S5P_CLKMUX_STAT1	S5P_CLKREG(0x1104)
-+
- /* CLKSRC0 */
--#define S5P_CLKSRC0_MUX200_MASK		(0x1<<16)
-+#define S5P_CLKSRC0_MUX200_SHIFT	(16)
-+#define S5P_CLKSRC0_MUX200_MASK		(0x1 << S5P_CLKSRC0_MUX200_SHIFT)
- #define S5P_CLKSRC0_MUX166_MASK		(0x1<<20)
- #define S5P_CLKSRC0_MUX133_MASK		(0x1<<24)
+diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
+index bd9afd5..3e89c22 100644
+--- a/arch/arm/mach-s5pv210/include/mach/map.h
++++ b/arch/arm/mach-s5pv210/include/mach/map.h
+@@ -96,6 +96,9 @@
  
-+/* CLKSRC2 */
-+#define S5P_CLKSRC2_G3D_SHIFT           (0)
-+#define S5P_CLKSRC2_G3D_MASK            (0x3 << S5P_CLKSRC2_G3D_SHIFT)
-+#define S5P_CLKSRC2_MFC_SHIFT           (4)
-+#define S5P_CLKSRC2_MFC_MASK            (0x3 << S5P_CLKSRC2_MFC_SHIFT)
-+
-+/* CLKSRC6*/
-+#define S5P_CLKSRC6_ONEDRAM_SHIFT       (24)
-+#define S5P_CLKSRC6_ONEDRAM_MASK        (0x3 << S5P_CLKSRC6_ONEDRAM_SHIFT)
-+
- /* CLKDIV0 */
- #define S5P_CLKDIV0_APLL_SHIFT		(0)
- #define S5P_CLKDIV0_APLL_MASK		(0x7 << S5P_CLKDIV0_APLL_SHIFT)
-@@ -90,8 +107,20 @@
- #define S5P_CLKDIV0_PCLK66_SHIFT	(28)
- #define S5P_CLKDIV0_PCLK66_MASK		(0x7 << S5P_CLKDIV0_PCLK66_SHIFT)
+ #define S5PV210_PA_ADC		(0xE1700000)
  
-+/* CLKDIV2 */
-+#define S5P_CLKDIV2_G3D_SHIFT           (0)
-+#define S5P_CLKDIV2_G3D_MASK            (0xF << S5P_CLKDIV2_G3D_SHIFT)
-+#define S5P_CLKDIV2_MFC_SHIFT           (4)
-+#define S5P_CLKDIV2_MFC_MASK            (0xF << S5P_CLKDIV2_MFC_SHIFT)
++#define S5PV210_PA_DMC0		(0xF0000000)
++#define S5PV210_PA_DMC1		(0xF1400000)
 +
-+/* CLKDIV6 */
-+#define S5P_CLKDIV6_ONEDRAM_SHIFT       (28)
-+#define S5P_CLKDIV6_ONEDRAM_MASK        (0xF << S5P_CLKDIV6_ONEDRAM_SHIFT)
-+
- #define S5P_SWRESET		S5P_CLKREG(0x2000)
+ /* compatibiltiy defines. */
+ #define S3C_PA_UART		S5PV210_PA_UART
+ #define S3C_PA_HSMMC0		S5PV210_PA_HSMMC(0)
+diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
+index c4ff88b..2472894 100644
+--- a/arch/arm/plat-s5p/include/plat/map-s5p.h
++++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
+@@ -18,6 +18,8 @@
+ #define S5P_VA_SYSTIMER		S3C_ADDR(0x01200000)
+ #define S5P_VA_SROMC		S3C_ADDR(0x01100000)
+ #define S5P_VA_SYSRAM		S3C_ADDR(0x01180000)
++#define S5P_VA_DMC0		S3C_ADDR(0x00A00000)
++#define S5P_VA_DMC1		S3C_ADDR(0x00A80000)
  
-+#define S5P_ARM_MCS_CON		S5P_CLKREG(0x6100)
-+
- /* Registers related to power management */
- #define S5P_PWR_CFG		S5P_CLKREG(0xC000)
- #define S5P_EINT_WAKEUP_MASK	S5P_CLKREG(0xC004)
+ #define S5P_VA_COMBINER_BASE	S3C_ADDR(0x00600000)
+ #define S5P_VA_COMBINER(x)	(S5P_VA_COMBINER_BASE + ((x) >> 2) * 0x10)
 -- 
 1.6.2.5
