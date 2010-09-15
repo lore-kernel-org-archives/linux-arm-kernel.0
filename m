@@ -1,60 +1,64 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 Sep 2010 23:35:27 -0400 (EDT)
-Subject: [PATCH] ARM: plug a race with the alignment trap handler
-Message-ID: <alpine.LFD.2.00.1009142332070.19366@xanadu.home>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Wed, 15 Sep 2010 11:40:14 +0800
+Subject: [PATCH 2/3] clk: Generic support for fixed-rate clocks
+In-Reply-To: <1284522014.516876.675872472687.0.gpush@pororo>
+Message-ID: <1284522014.517644.745790554539.2.gpush@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since most platforms will need a fixed-rate clock, add one. This will
+also serve as a basic example of an implementation of struct clk.
 
-When the policy for user space is to ignore misaligned accesses from user
-space, the processor then performs a documented rotation on the accessed
-data.  This is the result of the access being trapped, and the kernel
-disabling the alignment trap before returning to user space again.
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-In kernel space we always want misaligned accesses to be fixed up.  This
-is enforced by always re-enabling the alignment trap on every entry into
-kernel space from user space.  No such re-enabling is performed when an
-exception occurs while already in kernel space as the alignment trap is
-always supposed to be enabled in that case.
+---
+ include/linux/clk.h |   13 +++++++++++++
+ kernel/clk.c        |   14 ++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-There is however a small race window when a misaligned access in user
-space is trapped and the alignment trap disabled, but the CPU didn't
-return to user space just yet.  Any exception would be entered from kernel
-space at that point and the kernel would then execute with the alignment
-trap disabled.
-
-Thanks to Maxime Bizon <mbizon@freebox.fr> for providing a test module
-that made this issue reproducible.
-
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index d073b64..724ba3b 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -885,8 +885,23 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 
- 	if (ai_usermode & UM_SIGNAL)
- 		force_sig(SIGBUS, current);
--	else
--		set_cr(cr_no_alignment);
-+	else {
-+		/*
-+		 * We're about to disable the alignment trap and return to
-+		 * user space.  But if an interrupt occurs before actually
-+		 * reaching user space, then the IRQ vector entry code will
-+		 * notice that we were still in kernel space and therefore
-+		 * the alignment trap won't be re-enabled in that case as it
-+		 * is presumed to be always on from kernel space.
-+		 * Let's prevent that race by disabling interrupts here (they
-+		 * are disabled on the way back to user space anyway in
-+		 * entry-common.S) and disable the alignment trap only if
-+		 * there is no work pending for this thread.
-+		 */
-+		raw_local_irq_disable();
-+		if (!(current_thread_info()->flags & _TIF_WORK_MASK))
-+			set_cr(cr_no_alignment);
-+	}
- 
- 	return 0;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index a95cc82..85e1d44 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -90,6 +90,19 @@ static inline void clk_common_init(struct clk *clk)
+ 	clk->enable_count = 0;
  }
+ 
++/* Simple fixed-rate clock */
++struct clk_fixed {
++	struct clk	clk;
++	unsigned long	rate;
++};
++
++extern struct clk_ops clk_fixed_ops;
++
++#define INIT_CLK_FIXED(r) { \
++	.clk = INIT_CLK(clk_fixed_ops), \
++	.rate = (r) \
++}
++
+ #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+ 
+ /*
+diff --git a/kernel/clk.c b/kernel/clk.c
+index cdea25f..32f25ef 100644
+--- a/kernel/clk.c
++++ b/kernel/clk.c
+@@ -99,3 +99,17 @@ struct clk *clk_get_parent(struct clk *clk)
+ 	return ERR_PTR(-ENOSYS);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
++
++/* clk_fixed support */
++
++#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
++
++static unsigned long clk_fixed_get_rate(struct clk *clk)
++{
++	return to_clk_fixed(clk)->rate;
++}
++
++struct clk_ops clk_fixed_ops = {
++	.get_rate = clk_fixed_get_rate,
++};
++EXPORT_SYMBOL_GPL(clk_fixed_ops);
