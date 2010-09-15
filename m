@@ -1,76 +1,187 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 15 Sep 2010 11:41:08 +0530
-Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
-In-Reply-To: <20100914202743.GK8647@atomide.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100914185907.GG8647@atomide.com> <20100914190314.GH8647@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CD25F7DB@dbde02.ent.ti.com>
-	<20100914202743.GK8647@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD25F9E1@dbde02.ent.ti.com>
+From: thomas.weber.linux@googlemail.com (Thomas Weber)
+Date: Wed, 15 Sep 2010 09:07:24 +0200
+Subject: [PATCH] support for Seagate DockStar
+In-Reply-To: <1281044326-15058-1-git-send-email-ecc@cmu.edu>
+References: <1281044326-15058-1-git-send-email-ecc@cmu.edu>
+Message-ID: <4C9070AC.3000601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Wednesday, September 15, 2010 1:58 AM
-> To: Shilimkar, Santosh
-> Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; linux-
-> omap at vger.kernel.org; bryan.wu at canonical.com
-> Subject: Re: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
+Am 05.08.2010 23:38, schrieb Eric Cooper:
+> This patch adds support for the Seagate FreeAgent DockStar, a Marvell
+> Sheevaplug derivative.  I have already registered the DOCKSTAR machine
+> ID.
 > 
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [100914 12:09]:
-> > > -----Original Message-----
-> > > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > > owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> > > Sent: Wednesday, September 15, 2010 12:33 AM
-> > > To: Russell King - ARM Linux
-> > > Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org;
-> > > bryan.wu at canonical.com
-> > > Subject: [PATCH] omap: Update omap3_defconfig to work with SMP_ON_UP
-> > >
-> > > With the recent changes to core ARM kernel code, we can now
-> > > boot SMP kernel on UP systems. Update omap3_defconfig to
-> > > enable SMP. This allows us to remove omap_4430sdp_defconfig.
-> > >
-> > Not yet.
-> > We still have some issues around Ethernet, bridge/syslink,
-> > sensors but hopefully we should be able to fix those.
-> > Will have a closer look at this and see if these can be
-> > easily fixed.
+> Signed-off-by: Eric Cooper <ecc@cmu.edu>
+> ---
+>  arch/arm/mach-kirkwood/Kconfig          |    6 ++
+>  arch/arm/mach-kirkwood/Makefile         |    1 +
+>  arch/arm/mach-kirkwood/dockstar-setup.c |  112 +++++++++++++++++++++++++++++++
+>  arch/arm/tools/mach-types               |    1 +
+>  4 files changed, 120 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-kirkwood/dockstar-setup.c
 > 
-> Sounds like you're having these problems anyways and they
-> are not related to the defconfigs?
-> 
-Well the issues are because of defconfig but mostly fixable.
-Will hold on my comments till I test the new defconfig on OMAP4.
+> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> index 29b2163..74d832f 100644
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -58,6 +58,12 @@ config MACH_TS41X
+>  	  QNAP TS-410, TS-410U, TS-419P and TS-419U Turbo NAS
+>  	  devices.
+>  
+> +config MACH_DOCKSTAR
+> +	bool "Seagate FreeAgent DockStar"
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  Seagate FreeAgent DockStar.
+> +
+>  config MACH_OPENRD
+>          bool
+>  
+> diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+> index c0cd5d3..025b256 100644
+> --- a/arch/arm/mach-kirkwood/Makefile
+> +++ b/arch/arm/mach-kirkwood/Makefile
+> @@ -9,6 +9,7 @@ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+>  obj-$(CONFIG_MACH_GURUPLUG)		+= guruplug-setup.o
+>  obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
+>  obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
+> +obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
+>  obj-$(CONFIG_MACH_OPENRD)		+= openrd-setup.o
+>  obj-$(CONFIG_MACH_NETSPACE_V2)		+= netspace_v2-setup.o
+>  obj-$(CONFIG_MACH_INETSPACE_V2)		+= netspace_v2-setup.o
+> diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
+> new file mode 100644
+> index 0000000..a90475d
+> --- /dev/null
+> +++ b/arch/arm/mach-kirkwood/dockstar-setup.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * arch/arm/mach-kirkwood/dockstar-setup.c
+> + *
+> + * Seagate FreeAgent DockStar Setup
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/ata_platform.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/mv643xx_eth.h>
+> +#include <linux/gpio.h>
+> +#include <linux/leds.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/kirkwood.h>
+> +#include <plat/mvsdio.h>
+> +#include "common.h"
+> +#include "mpp.h"
+> +
+> +static struct mtd_partition dockstar_nand_parts[] = {
+> +	{
+> +		.name = "u-boot",
+> +		.offset = 0,
+> +		.size = SZ_1M
+> +	}, {
+> +		.name = "uImage",
+> +		.offset = MTDPART_OFS_NXTBLK,
+> +		.size = SZ_4M
+> +	}, {
+> +		.name = "root",
+> +		.offset = MTDPART_OFS_NXTBLK,
+> +		.size = MTDPART_SIZ_FULL
+> +	},
+> +};
+> +
+> +static struct mv643xx_eth_platform_data dockstar_ge00_data = {
+> +	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+> +};
+> +
+> +static struct gpio_led dockstar_led_pins[] = {
+> +	{
+> +		.name			= "dockstar:green:health",
+> +		.default_trigger	= "default-on",
+> +		.gpio			= 46,
+> +		.active_low		= 1,
+> +	},
+> +	{
+> +		.name			= "dockstar:orange:misc",
+> +		.default_trigger	= "none",
+> +		.gpio			= 47,
+> +		.active_low		= 1,
+> +	},
+> +};
+> +
+> +static struct gpio_led_platform_data dockstar_led_data = {
+> +	.leds		= dockstar_led_pins,
+> +	.num_leds	= ARRAY_SIZE(dockstar_led_pins),
+> +};
+> +
+> +static struct platform_device dockstar_leds = {
+> +	.name	= "leds-gpio",
+> +	.id	= -1,
+> +	.dev	= {
+> +		.platform_data	= &dockstar_led_data,
+> +	}
+> +};
+> +
+> +static unsigned int dockstar_mpp_config[] __initdata = {
+> +	MPP29_GPIO,	/* USB Power Enable */
+> +	MPP46_GPIO,	/* LED green */
+> +	MPP47_GPIO,	/* LED orange */
+> +	0
+> +};
+> +
+> +static void __init dockstar_init(void)
+> +{
+> +	/*
+> +	 * Basic setup. Needs to be called early.
+> +	 */
+> +	kirkwood_init();
+> +
+> +	/* setup gpio pin select */
+> +	kirkwood_mpp_conf(dockstar_mpp_config);
+> +
+> +	kirkwood_uart0_init();
+> +	kirkwood_nand_init(ARRAY_AND_SIZE(dockstar_nand_parts), 25);
+> +
+> +	if (gpio_request(29, "USB Power Enable") != 0 ||
+> +	    gpio_direction_output(29, 1) != 0)
+> +		printk(KERN_ERR "can't set up GPIO 29 (USB Power Enable)\n");
 
-> Considering Linus' earlier comments on the defconfigs, I don't
-> see any reasonds not to merge this patch. If TI wants to fix up
-> some other things, there's still about two weeks before -rc6.
->
-Sure. I am just saying let's attempt to fix the remaining issues
-and if it doesn't happen in next week, anyway this patch will
-get merged.
- 
-> > > In addition to enabling SMP, we also need to disable some
-> > > options to make the system boot:
-> > >
-> > > - For some reason LOCK_STAT causes tons of
-> > >   WARNING: at mm/percpu-vm.c:320 pcpu_alloc+0x2fc/0x888()
-> > >   so disable it for now.
-> > >
-> > > - MUSB init fails for multi-omap, disable it for now.
-> > >
-> > > - LOCAL_TIMERS hangs on omap4, disable it for now.
-> >
-> > This is expected on omap4 ES1.0 and hence not enabled
-> > in the omap_4430sdp_defconfig.
-> 
-> Maybe add a check for ES1.0 there to the init then?
-> 
-Yes but its ARM generic code and I don't want to pollute it
-with omap checks.. Will see if some other trick can fix this.
+> +	kirkwood_ehci_init();
+> +
+> +	kirkwood_ge00_init(&dockstar_ge00_data);
+> +
+> +	platform_device_register(&dockstar_leds);
+> +}
+> +
+> +MACHINE_START(DOCKSTAR, "Seagate FreeAgent DockStar")
+> +	.phys_io	= KIRKWOOD_REGS_PHYS_BASE,
+> +	.io_pg_offst	= ((KIRKWOOD_REGS_VIRT_BASE) >> 18) & 0xfffc,
+> +	.boot_params	= 0x00000100,
+> +	.init_machine	= dockstar_init,
+> +	.map_io		= kirkwood_map_io,
+> +	.init_irq	= kirkwood_init_irq,
+> +	.timer		= &kirkwood_timer,
+> +MACHINE_END
+> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> index 48cbdcb..8d56837 100644
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -2950,3 +2950,4 @@ davinci_dm365_dvr	MACH_DAVINCI_DM365_DVR	DAVINCI_DM365_DVR	2963
+>  netviz			MACH_NETVIZ		NETVIZ			2964
+>  flexibity		MACH_FLEXIBITY		FLEXIBITY		2965
+>  wlan_computer		MACH_WLAN_COMPUTER	WLAN_COMPUTER		2966
+> +dockstar		MACH_DOCKSTAR		DOCKSTAR		2998
 
-Regards,
-Santosh
+Hello Eric,
+
+please remove the changes to the mach-types entry.
+And can you add an entry to the kirkwood_defconfig.
+
+Thomas
