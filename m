@@ -1,744 +1,433 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 16 Sep 2010 00:28:00 +0200
-Subject: [PATCH 1/7] ARM: add PrimeCell generic DMA to PL022 v11
-In-Reply-To: <1284589686-28652-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 16 Sep 2010 00:28:03 +0200
+Subject: [PATCH 4/7] ARM: config U300 PL180 PL011 PL022 for DMA v11
+In-Reply-To: <1284589686-28652-4-git-send-email-linus.walleij@stericsson.com>
 References: <1284589686-28652-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1284589686-28652-2-git-send-email-linus.walleij@stericsson.com>
+	<1284589686-28652-2-git-send-email-linus.walleij@stericsson.com>
+	<1284589686-28652-3-git-send-email-linus.walleij@stericsson.com>
+	<1284589686-28652-4-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1284589686-28652-5-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This extends the PL022 SSP/SPI driver with generic DMA engine
-support using the PrimeCell DMA engine interface. Also fix up the
-test code for the U300 platform.
+This will configure the platform data for the PL180, PL011 and
+PL022 PrimeCells found in the U300 to use DMA with the generic
+PrimeCell DMA engine.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- arch/arm/mach-u300/dummyspichip.c |    1 +
- drivers/spi/amba-pl022.c          |  516 ++++++++++++++++++++++++++++++-------
- include/linux/amba/pl022.h        |    6 +
- 3 files changed, 435 insertions(+), 88 deletions(-)
+ arch/arm/mach-u300/core.c |  179 ++++++++++++++++++++++++++++++++++++++++-----
+ arch/arm/mach-u300/mmc.c  |   13 +++-
+ arch/arm/mach-u300/spi.c  |   21 ++++--
+ 3 files changed, 184 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
-index 03f7936..b86e944 100644
---- a/arch/arm/mach-u300/dummyspichip.c
-+++ b/arch/arm/mach-u300/dummyspichip.c
-@@ -267,6 +267,7 @@ static struct spi_driver pl022_dummy_driver = {
- 	.driver = {
- 		.name	= "spi-dummy",
- 		.owner	= THIS_MODULE,
-+		.bus = &spi_bus_type,
- 	},
- 	.probe	= pl022_dummy_probe,
- 	.remove	= __devexit_p(pl022_dummy_remove),
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index aea71fd..be9c239 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -27,7 +27,6 @@
- /*
-  * TODO:
-  * - add timeout on polled transfers
-- * - add generic DMA framework support
-  */
- 
- #include <linux/init.h>
-@@ -45,6 +44,9 @@
- #include <linux/amba/pl022.h>
- #include <linux/io.h>
- #include <linux/slab.h>
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index 5615587..6058f79 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -3,7 +3,7 @@
+  * arch/arm/mach-u300/core.c
+  *
+  *
+- * Copyright (C) 2007-2010 ST-Ericsson AB
++ * Copyright (C) 2007-2010 ST-Ericsson SA
+  * License terms: GNU General Public License (GPL) version 2
+  * Core platform support, IRQ handling and device definitions.
+  * Author: Linus Walleij <linus.walleij@stericsson.com>
+@@ -16,7 +16,9 @@
+ #include <linux/device.h>
+ #include <linux/mm.h>
+ #include <linux/termios.h>
 +#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/scatterlist.h>
+ #include <linux/amba/bus.h>
++#include <linux/amba/serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/clk.h>
+@@ -96,10 +98,20 @@ void __init u300_map_io(void)
+  * Declaration of devices found on the U300 board and
+  * their respective memory locations.
+  */
++
++static struct amba_pl011_data uart0_plat_data = {
++#ifdef CONFIG_COH901318
++	.dma_filter = coh901318_filter_id,
++	.dma_rx_param = (void *) U300_DMA_UART0_RX,
++	.dma_tx_param = (void *) U300_DMA_UART0_TX,
++#endif
++};
++
+ static struct amba_device uart0_device = {
+ 	.dev = {
++		.coherent_dma_mask = ~0,
+ 		.init_name = "uart0", /* Slow device at 0x3000 offset */
+-		.platform_data = NULL,
++		.platform_data = &uart0_plat_data,
+ 	},
+ 	.res = {
+ 		.start = U300_UART0_BASE,
+@@ -111,10 +123,19 @@ static struct amba_device uart0_device = {
+ 
+ /* The U335 have an additional UART1 on the APP CPU */
+ #ifdef CONFIG_MACH_U300_BS335
++static struct amba_pl011_data uart1_plat_data = {
++#ifdef CONFIG_COH901318
++	.dma_filter = coh901318_filter_id,
++	.dma_rx_param = (void *) U300_DMA_UART1_RX,
++	.dma_tx_param = (void *) U300_DMA_UART1_TX,
++#endif
++};
++
+ static struct amba_device uart1_device = {
+ 	.dev = {
++		.coherent_dma_mask = ~0,
+ 		.init_name = "uart1", /* Fast device at 0x7000 offset */
+-		.platform_data = NULL,
++		.platform_data = &uart1_plat_data,
+ 	},
+ 	.res = {
+ 		.start = U300_UART1_BASE,
+@@ -960,42 +981,37 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.priority_high = 0,
+ 		.dev_addr = U300_MSL_BASE + 6 * 0x40 + 0x220,
+ 	},
++	/*
++	 * Don't set up device address, burst count or size of src
++	 * or dst bus for this peripheral - handled by PrimeCell
++	 * DMA extension.
++	 */
+ 	{
+ 		.number = U300_DMA_MMCSD_RX_TX,
+ 		.name = "MMCSD RX TX",
+ 		.priority_high = 0,
+-		.dev_addr =  U300_MMCSD_BASE + 0x080,
+ 		.param.config = COH901318_CX_CFG_CH_DISABLE |
+ 				COH901318_CX_CFG_LCR_DISABLE |
+ 				COH901318_CX_CFG_TC_IRQ_ENABLE |
+ 				COH901318_CX_CFG_BE_IRQ_ENABLE,
+ 		.param.ctrl_lli_chained = 0 |
+ 				COH901318_CX_CTRL_TC_ENABLE |
+-				COH901318_CX_CTRL_BURST_COUNT_32_BYTES |
+-				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
+-				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+ 				COH901318_CX_CTRL_TCP_ENABLE |
+-				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
+ 				COH901318_CX_CTRL_HSP_ENABLE |
+ 				COH901318_CX_CTRL_HSS_DISABLE |
+ 				COH901318_CX_CTRL_DDMA_LEGACY,
+ 		.param.ctrl_lli = 0 |
+ 				COH901318_CX_CTRL_TC_ENABLE |
+-				COH901318_CX_CTRL_BURST_COUNT_32_BYTES |
+-				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
+-				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+ 				COH901318_CX_CTRL_TCP_ENABLE |
+-				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
+ 				COH901318_CX_CTRL_HSP_ENABLE |
+ 				COH901318_CX_CTRL_HSS_DISABLE |
+ 				COH901318_CX_CTRL_DDMA_LEGACY,
+ 		.param.ctrl_lli_last = 0 |
+ 				COH901318_CX_CTRL_TC_ENABLE |
+-				COH901318_CX_CTRL_BURST_COUNT_32_BYTES |
+-				COH901318_CX_CTRL_SRC_BUS_SIZE_32_BITS |
+-				COH901318_CX_CTRL_DST_BUS_SIZE_32_BITS |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+ 				COH901318_CX_CTRL_TCP_DISABLE |
+ 				COH901318_CX_CTRL_TC_IRQ_ENABLE |
+@@ -1014,15 +1030,76 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.name = "MSPRO RX",
+ 		.priority_high = 0,
+ 	},
++	/*
++	 * Don't set up device address, burst count or size of src
++	 * or dst bus for this peripheral - handled by PrimeCell
++	 * DMA extension.
++	 */
+ 	{
+ 		.number = U300_DMA_UART0_TX,
+ 		.name = "UART0 TX",
+ 		.priority_high = 0,
++		.param.config = COH901318_CX_CFG_CH_DISABLE |
++				COH901318_CX_CFG_LCR_DISABLE |
++				COH901318_CX_CFG_TC_IRQ_ENABLE |
++				COH901318_CX_CFG_BE_IRQ_ENABLE,
++		.param.ctrl_lli_chained = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli_last = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
+ 	},
+ 	{
+ 		.number = U300_DMA_UART0_RX,
+ 		.name = "UART0 RX",
+ 		.priority_high = 0,
++		.param.config = COH901318_CX_CFG_CH_DISABLE |
++				COH901318_CX_CFG_LCR_DISABLE |
++				COH901318_CX_CFG_TC_IRQ_ENABLE |
++				COH901318_CX_CFG_BE_IRQ_ENABLE,
++		.param.ctrl_lli_chained = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli_last = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
+ 	},
+ 	{
+ 		.number = U300_DMA_APEX_TX,
+@@ -1080,7 +1157,7 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 				COH901318_CX_CTRL_DST_ADDR_INC_DISABLE |
+ 				COH901318_CX_CTRL_MASTER_MODE_M1RW |
+ 				COH901318_CX_CTRL_TCP_ENABLE |
+-				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
+ 				COH901318_CX_CTRL_HSP_ENABLE |
+ 				COH901318_CX_CTRL_HSS_DISABLE |
+ 				COH901318_CX_CTRL_DDMA_LEGACY |
+@@ -1252,15 +1329,77 @@ const struct coh_dma_channel chan_config[U300_DMA_CHANNELS] = {
+ 		.name = "XGAM PDI",
+ 		.priority_high = 0,
+ 	},
++	/*
++	 * Don't set up device address, burst count or size of src
++	 * or dst bus for this peripheral - handled by PrimeCell
++	 * DMA extension.
++	 */
+ 	{
+ 		.number = U300_DMA_SPI_TX,
+ 		.name = "SPI TX",
+ 		.priority_high = 0,
++		.param.config = COH901318_CX_CFG_CH_DISABLE |
++				COH901318_CX_CFG_LCR_DISABLE |
++				COH901318_CX_CFG_TC_IRQ_ENABLE |
++				COH901318_CX_CFG_BE_IRQ_ENABLE,
++		.param.ctrl_lli_chained = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli_last = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
+ 	},
+ 	{
+ 		.number = U300_DMA_SPI_RX,
+ 		.name = "SPI RX",
+ 		.priority_high = 0,
++		.param.config = COH901318_CX_CFG_CH_DISABLE |
++				COH901318_CX_CFG_LCR_DISABLE |
++				COH901318_CX_CFG_TC_IRQ_ENABLE |
++				COH901318_CX_CFG_BE_IRQ_ENABLE,
++		.param.ctrl_lli_chained = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_DISABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++		.param.ctrl_lli_last = 0 |
++				COH901318_CX_CTRL_TC_ENABLE |
++				COH901318_CX_CTRL_MASTER_MODE_M1RW |
++				COH901318_CX_CTRL_TCP_DISABLE |
++				COH901318_CX_CTRL_TC_IRQ_ENABLE |
++				COH901318_CX_CTRL_HSP_ENABLE |
++				COH901318_CX_CTRL_HSS_DISABLE |
++				COH901318_CX_CTRL_DDMA_LEGACY,
++
+ 	},
+ 	{
+ 		.number = U300_DMA_GENERAL_PURPOSE_0,
+@@ -1617,7 +1756,7 @@ static void __init u300_init_check_chip(void)
+ #endif
+ #ifdef CONFIG_MACH_U300_BS335
+ 	if ((val & 0xFF00U) != 0xf000 && (val & 0xFF00U) != 0xf100) {
+-		printk(KERN_ERR "Platform configured for BS365 " \
++		printk(KERN_ERR "Platform configured for BS335 " \
+ 		       " with DB3350 but %s detected, expect problems!",
+ 		       chipname);
+ 	}
+@@ -1692,12 +1831,12 @@ void __init u300_init_devices(void)
+ 	/* Register subdevices on the I2C buses */
+ 	u300_i2c_register_board_devices();
+ 
+-	/* Register subdevices on the SPI bus */
+-	u300_spi_register_board_devices();
+-
+ 	/* Register the platform devices */
+ 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
+ 
++	/* Register subdevices on the SPI bus */
++	u300_spi_register_board_devices();
++
+ #ifndef CONFIG_MACH_U300_SEMI_IS_SHARED
+ 	/*
+ 	 * Enable SEMI self refresh. Self-refresh of the SDRAM is entered when
+diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
+index de1ac9a..2382175 100644
+--- a/arch/arm/mach-u300/mmc.c
++++ b/arch/arm/mach-u300/mmc.c
+@@ -3,11 +3,11 @@
+  * arch/arm/mach-u300/mmc.c
+  *
+  *
+- * Copyright (C) 2009 ST-Ericsson AB
++ * Copyright (C) 2009 ST-Ericsson SA
+  * License terms: GNU General Public License (GPL) version 2
+  *
+  * Author: Linus Walleij <linus.walleij@stericsson.com>
+- * Author: Johan Lundin <johan.lundin@stericsson.com>
++ * Author: Johan Lundin
+  * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
+  */
+ #include <linux/device.h>
+@@ -19,8 +19,11 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/gpio.h>
++#include <linux/dmaengine.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/slab.h>
++#include <mach/coh901318.h>
++#include <mach/dma_channels.h>
+ 
+ #include "mmc.h"
+ #include "padmux.h"
+@@ -108,6 +111,12 @@ int __devinit mmc_init(struct amba_device *adev)
+ 	mmci_card->mmc0_plat_data.gpio_cd = -1;
+ 	mmci_card->mmc0_plat_data.capabilities = MMC_CAP_MMC_HIGHSPEED |
+ 		MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
++#ifdef CONFIG_COH901318
++	mmci_card->mmc0_plat_data.dma_filter = coh901318_filter_id;
++	mmci_card->mmc0_plat_data.dma_rx_param =
++		(void *) U300_DMA_MMCSD_RX_TX;
++	/* Don't specify a TX channel, this RX channel is bidirectional */
++#endif
+ 
+ 	mmcsd_device->platform_data = (void *) &mmci_card->mmc0_plat_data;
+ 
+diff --git a/arch/arm/mach-u300/spi.c b/arch/arm/mach-u300/spi.c
+index edb2c0d..779abf7 100644
+--- a/arch/arm/mach-u300/spi.c
++++ b/arch/arm/mach-u300/spi.c
+@@ -11,6 +11,9 @@
+ #include <linux/spi/spi.h>
+ #include <linux/amba/pl022.h>
+ #include <linux/err.h>
++#include <mach/coh901318.h>
++#include <mach/dma_channels.h>
++
+ #include "padmux.h"
  
  /*
-  * This macro is used to define some register default values.
-@@ -381,6 +383,14 @@ struct pl022 {
- 	enum ssp_reading		read;
- 	enum ssp_writing		write;
- 	u32				exp_fifo_level;
-+	/* DMA settings */
-+#ifdef CONFIG_DMADEVICES
-+	struct dma_chan			*dma_rx_channel;
-+	struct dma_chan			*dma_tx_channel;
-+	struct sg_table			sgt_rx;
-+	struct sg_table			sgt_tx;
-+	char				*dummypage;
-+#endif
- };
- 
- /**
-@@ -406,7 +416,7 @@ struct chip_data {
- 	u16 dmacr;
- 	u16 cpsr;
- 	u8 n_bytes;
--	u8 enable_dma:1;
-+	bool enable_dma;
- 	enum ssp_reading read;
- 	enum ssp_writing write;
- 	void (*cs_control) (u32 command);
-@@ -763,6 +773,371 @@ static void *next_transfer(struct pl022 *pl022)
- 	}
- 	return STATE_DONE;
- }
-+
-+/*
-+ * This DMA functionality is only compiled in if we have
-+ * access to the generic DMA devices/DMA engine.
-+ */
-+#ifdef CONFIG_DMADEVICES
-+static void unmap_free_dma_scatter(struct pl022 *pl022)
-+{
-+	/* Unmap and free the SG tables */
-+	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_tx.sgl,
-+		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
-+	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_rx.sgl,
-+		     pl022->sgt_rx.nents, DMA_FROM_DEVICE);
-+	sg_free_table(&pl022->sgt_rx);
-+	sg_free_table(&pl022->sgt_tx);
-+}
-+
-+static void dma_callback(void *data)
-+{
-+	struct pl022 *pl022 = data;
-+	struct spi_message *msg = pl022->cur_msg;
-+
-+	BUG_ON(!pl022->sgt_rx.sgl);
-+
-+#ifdef VERBOSE_DEBUG
-+	/*
-+	 * Optionally dump out buffers to inspect contents, this is
-+	 * good if you want to convince yourself that the loopback
-+	 * read/write contents are the same, when adopting to a new
-+	 * DMA engine.
-+	 */
-+	{
-+		struct scatterlist *sg;
-+		unsigned int i;
-+
-+		dma_sync_sg_for_cpu(&pl022->adev->dev,
-+				    pl022->sgt_rx.sgl,
-+				    pl022->sgt_rx.nents,
-+				    DMA_FROM_DEVICE);
-+
-+		for_each_sg(pl022->sgt_rx.sgl, sg, pl022->sgt_rx.nents, i) {
-+			dev_dbg(&pl022->adev->dev, "SPI RX SG ENTRY: %d", i);
-+			print_hex_dump(KERN_ERR, "SPI RX: ",
-+				       DUMP_PREFIX_OFFSET,
-+				       16,
-+				       1,
-+				       sg_virt(sg),
-+				       sg_dma_len(sg),
-+				       1);
-+		}
-+		for_each_sg(pl022->sgt_tx.sgl, sg, pl022->sgt_tx.nents, i) {
-+			dev_dbg(&pl022->adev->dev, "SPI TX SG ENTRY: %d", i);
-+			print_hex_dump(KERN_ERR, "SPI TX: ",
-+				       DUMP_PREFIX_OFFSET,
-+				       16,
-+				       1,
-+				       sg_virt(sg),
-+				       sg_dma_len(sg),
-+				       1);
-+		}
-+	}
-+#endif
-+
-+	unmap_free_dma_scatter(pl022);
-+
-+	/* Update total bytes transfered */
-+	msg->actual_length += pl022->cur_transfer->len;
-+	if (pl022->cur_transfer->cs_change)
-+		pl022->cur_chip->
-+			cs_control(SSP_CHIP_DESELECT);
-+
-+	/* Move to next transfer */
-+	msg->state = next_transfer(pl022);
-+	tasklet_schedule(&pl022->pump_transfers);
-+}
-+
-+static void setup_dma_scatter(struct pl022 *pl022,
-+			      void *buffer,
-+			      unsigned int length,
-+			      struct sg_table *sgtab)
-+{
-+	struct scatterlist *sg;
-+	int bytesleft = length;
-+	void *bufp = buffer;
-+	int mapbytes;
-+	int i;
-+
-+	if (buffer) {
-+		for_each_sg(sgtab->sgl, sg, sgtab->nents, i) {
-+			/*
-+			 * If there are less bytes left than what fits
-+			 * in the current page (plus page alignment offset)
-+			 * we just feed in this, else we stuff in as much
-+			 * as we can.
-+			 */
-+			if (bytesleft < (PAGE_SIZE - offset_in_page(bufp)))
-+				mapbytes = bytesleft;
-+			else
-+				mapbytes = PAGE_SIZE - offset_in_page(bufp);
-+			sg_set_page(sg, virt_to_page(bufp),
-+				    mapbytes, offset_in_page(bufp));
-+			bufp += mapbytes;
-+			bytesleft -= mapbytes;
-+			dev_dbg(&pl022->adev->dev,
-+				"set RX/TX target page @ %p, %d bytes, %d left\n",
-+				bufp, mapbytes, bytesleft);
-+		}
-+	} else {
-+		/* Map the dummy buffer on every page */
-+		for_each_sg(sgtab->sgl, sg, sgtab->nents, i) {
-+			if (bytesleft < PAGE_SIZE)
-+				mapbytes = bytesleft;
-+			else
-+				mapbytes = PAGE_SIZE;
-+			sg_set_page(sg, virt_to_page(pl022->dummypage),
-+				    mapbytes, 0);
-+			bytesleft -= mapbytes;
-+			dev_dbg(&pl022->adev->dev,
-+				"set RX/TX to dummy page %d bytes, %d left\n",
-+				mapbytes, bytesleft);
-+
-+		}
-+	}
-+	BUG_ON(bytesleft);
-+}
-+
-+/**
-+ * configure_dma - configures the channels for the next transfer
-+ * @pl022: SSP driver's private data structure
-+ */
-+static int configure_dma(struct pl022 *pl022)
-+{
-+	struct dma_slave_config rx_conf = {
-+		.src_addr = SSP_DR(pl022->phybase),
-+		.direction = DMA_FROM_DEVICE,
-+		.src_maxburst = pl022->vendor->fifodepth >> 1,
-+	};
-+	struct dma_slave_config tx_conf = {
-+		.dst_addr = SSP_DR(pl022->phybase),
-+		.direction = DMA_TO_DEVICE,
-+		.dst_maxburst = pl022->vendor->fifodepth >> 1,
-+	};
-+	unsigned int pages;
-+	int ret;
-+	int sglen;
-+	struct dma_chan *rxchan = pl022->dma_rx_channel;
-+	struct dma_chan *txchan = pl022->dma_tx_channel;
-+	struct dma_async_tx_descriptor *rxdesc;
-+	struct dma_async_tx_descriptor *txdesc;
-+	dma_cookie_t cookie;
-+
-+	/* Check that the channels are available */
-+	if (!rxchan || !txchan)
-+		return -ENODEV;
-+
-+	switch (pl022->read) {
-+	case READING_NULL:
-+		/* Use the same as for writing */
-+		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
-+		break;
-+	case READING_U8:
-+		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		break;
-+	case READING_U16:
-+		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		break;
-+	case READING_U32:
-+		rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		break;
-+	}
-+
-+	switch (pl022->write) {
-+	case WRITING_NULL:
-+		/* Use the same as for reading */
-+		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
-+		break;
-+	case WRITING_U8:
-+		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		break;
-+	case WRITING_U16:
-+		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		break;
-+	case WRITING_U32:
-+		tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;;
-+		break;
-+	}
-+
-+	/* SPI pecularity: we need to read and write the same width */
-+	if (rx_conf.src_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
-+		rx_conf.src_addr_width = tx_conf.dst_addr_width;
-+	if (tx_conf.dst_addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED)
-+		tx_conf.dst_addr_width = rx_conf.src_addr_width;
-+	BUG_ON(rx_conf.src_addr_width != tx_conf.dst_addr_width);
-+
-+	rxchan->device->device_control(rxchan, DMA_SLAVE_CONFIG,
-+				       (unsigned long) &rx_conf);
-+	txchan->device->device_control(txchan, DMA_SLAVE_CONFIG,
-+				       (unsigned long) &tx_conf);
-+
-+	/* Create sglists for the transfers */
-+	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
-+	dev_dbg(&pl022->adev->dev, "using %d pages for transfer\n", pages);
-+
-+	ret = sg_alloc_table(&pl022->sgt_rx, pages, GFP_KERNEL);
-+	if (ret)
-+		goto err_alloc_rx_sg;
-+
-+	ret = sg_alloc_table(&pl022->sgt_tx, pages, GFP_KERNEL);
-+	if (ret)
-+		goto err_alloc_tx_sg;
-+
-+	/* Fill in the scatterlists for the RX+TX buffers */
-+	setup_dma_scatter(pl022, pl022->rx,
-+			  pl022->cur_transfer->len, &pl022->sgt_rx);
-+	setup_dma_scatter(pl022, pl022->tx,
-+			  pl022->cur_transfer->len, &pl022->sgt_tx);
-+
-+	/* Map DMA buffers */
-+	sglen = dma_map_sg(&pl022->adev->dev, pl022->sgt_rx.sgl,
-+			   pl022->sgt_rx.nents, DMA_FROM_DEVICE);
-+	if (!sglen)
-+		goto err_rx_sgmap;
-+
-+	sglen = dma_map_sg(&pl022->adev->dev, pl022->sgt_tx.sgl,
-+			   pl022->sgt_tx.nents, DMA_TO_DEVICE);
-+	if (!sglen)
-+		goto err_tx_sgmap;
-+
-+	/* Send both scatterlists */
-+	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
-+				      pl022->sgt_rx.sgl,
-+				      pl022->sgt_rx.nents,
-+				      DMA_FROM_DEVICE,
-+				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!rxdesc)
-+		goto err_rxdesc;
-+
-+	txdesc = txchan->device->device_prep_slave_sg(txchan,
-+				      pl022->sgt_tx.sgl,
-+				      pl022->sgt_tx.nents,
-+				      DMA_TO_DEVICE,
-+				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!txdesc)
-+		goto err_txdesc;
-+
-+	/* Put the callback on the RX transfer only, that should finish last */
-+	rxdesc->callback = dma_callback;
-+	rxdesc->callback_param = pl022;
-+
-+	/* Submit and fire RX and TX with TX last so we're ready to read! */
-+	cookie = rxdesc->tx_submit(rxdesc);
-+	if (dma_submit_error(cookie))
-+		goto err_submit_rx;
-+	cookie = txdesc->tx_submit(txdesc);
-+	if (dma_submit_error(cookie))
-+		goto err_submit_tx;
-+	rxchan->device->device_issue_pending(rxchan);
-+	txchan->device->device_issue_pending(txchan);
-+
-+	return 0;
-+
-+err_submit_tx:
-+err_submit_rx:
-+err_txdesc:
-+	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
-+err_rxdesc:
-+	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
-+	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_tx.sgl,
-+		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
-+err_tx_sgmap:
-+	dma_unmap_sg(&pl022->adev->dev, pl022->sgt_rx.sgl,
-+		     pl022->sgt_tx.nents, DMA_FROM_DEVICE);
-+err_rx_sgmap:
-+	sg_free_table(&pl022->sgt_tx);
-+err_alloc_tx_sg:
-+	sg_free_table(&pl022->sgt_rx);
-+err_alloc_rx_sg:
-+	return -ENOMEM;
-+}
-+
-+static int __init pl022_dma_probe(struct pl022 *pl022)
-+{
-+	dma_cap_mask_t mask;
-+
-+	/* Try to acquire a generic DMA engine slave channel */
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+	/*
-+	 * We need both RX and TX channels to do DMA, else do none
-+	 * of them.
-+	 */
-+	pl022->dma_rx_channel = dma_request_channel(mask,
-+					    pl022->master_info->dma_filter,
-+					    pl022->master_info->dma_rx_param);
-+	if (!pl022->dma_rx_channel) {
-+		dev_err(&pl022->adev->dev, "no RX DMA channel!\n");
-+		goto err_no_rxchan;
-+	}
-+
-+	pl022->dma_tx_channel = dma_request_channel(mask,
-+					    pl022->master_info->dma_filter,
-+					    pl022->master_info->dma_tx_param);
-+	if (!pl022->dma_tx_channel) {
-+		dev_err(&pl022->adev->dev, "no TX DMA channel!\n");
-+		goto err_no_txchan;
-+	}
-+
-+	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
-+	if (!pl022->dummypage) {
-+		dev_err(&pl022->adev->dev, "no DMA dummypage!\n");
-+		goto err_no_dummypage;
-+	}
-+
-+	dev_info(&pl022->adev->dev, "setup for DMA on RX %s, TX %s\n",
-+		 dma_chan_name(pl022->dma_rx_channel),
-+		 dma_chan_name(pl022->dma_tx_channel));
-+
-+	return 0;
-+
-+err_no_dummypage:
-+	dma_release_channel(pl022->dma_tx_channel);
-+err_no_txchan:
-+	dma_release_channel(pl022->dma_rx_channel);
-+	pl022->dma_rx_channel = NULL;
-+err_no_rxchan:
-+	return -ENODEV;
-+}
-+
-+static void terminate_dma(struct pl022 *pl022)
-+{
-+	struct dma_chan *rxchan = pl022->dma_rx_channel;
-+	struct dma_chan *txchan = pl022->dma_tx_channel;
-+
-+	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
-+	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
-+	unmap_free_dma_scatter(pl022);
-+}
-+
-+static void pl022_dma_remove(struct pl022 *pl022)
-+{
-+	if (pl022->busy)
-+		terminate_dma(pl022);
-+	if (pl022->dma_tx_channel)
-+		dma_release_channel(pl022->dma_tx_channel);
-+	if (pl022->dma_rx_channel)
-+		dma_release_channel(pl022->dma_rx_channel);
-+	kfree(pl022->dummypage);
-+}
-+
-+#else
-+static inline int configure_dma(struct pl022 *pl022)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int pl022_dma_probe(struct pl022 *pl022)
-+{
-+	return 0;
-+}
-+
-+static inline void pl022_dma_remove(struct pl022 *pl022)
-+{
-+}
-+#endif
-+
- /**
-  * pl022_interrupt_handler - Interrupt handler for SSP controller
-  *
-@@ -794,14 +1169,17 @@ static irqreturn_t pl022_interrupt_handler(int irq, void *dev_id)
- 	if (unlikely(!irq_status))
- 		return IRQ_NONE;
- 
--	/* This handles the error code interrupts */
-+	/*
-+	 * This handles the FIFO interrupts, the timeout
-+	 * interrupts are flatly ignored, they cannot be
-+	 * trusted.
-+	 */
- 	if (unlikely(irq_status & SSP_MIS_MASK_RORMIS)) {
- 		/*
- 		 * Overrun interrupt - bail out since our Data has been
- 		 * corrupted
- 		 */
--		dev_err(&pl022->adev->dev,
--			"FIFO overrun\n");
-+		dev_err(&pl022->adev->dev, "FIFO overrun\n");
- 		if (readw(SSP_SR(pl022->virtbase)) & SSP_SR_MASK_RFF)
- 			dev_err(&pl022->adev->dev,
- 				"RXFIFO is full\n");
-@@ -896,8 +1274,8 @@ static int set_up_next_transfer(struct pl022 *pl022,
+@@ -30,11 +33,8 @@ static void select_dummy_chip(u32 chipselect)
  }
  
- /**
-- * pump_transfers - Tasklet function which schedules next interrupt transfer
-- * when running in interrupt transfer mode.
-+ * pump_transfers - Tasklet function which schedules next transfer
-+ * when running in interrupt or DMA transfer mode.
-  * @data: SSP driver private data structure
-  *
-  */
-@@ -954,65 +1332,23 @@ static void pump_transfers(unsigned long data)
- 	}
- 	/* Flush the FIFOs and let's go! */
- 	flush(pl022);
--	writew(ENABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
--}
--
--/**
-- * NOT IMPLEMENTED
-- * configure_dma - It configures the DMA pipes for DMA transfers
-- * @data: SSP driver's private data structure
-- *
-- */
--static int configure_dma(void *data)
--{
--	struct pl022 *pl022 = data;
--	dev_dbg(&pl022->adev->dev, "configure DMA\n");
--	return -ENOTSUPP;
--}
--
--/**
-- * do_dma_transfer - It handles transfers of the current message
-- * if it is DMA xfer.
-- * NOT FULLY IMPLEMENTED
-- * @data: SSP driver's private data structure
-- */
--static void do_dma_transfer(void *data)
--{
--	struct pl022 *pl022 = data;
--
--	if (configure_dma(data)) {
--		dev_dbg(&pl022->adev->dev, "configuration of DMA Failed!\n");
--		goto err_config_dma;
--	}
- 
--	/* TODO: Implememt DMA setup of pipes here */
--
--	/* Enable target chip, set up transfer */
--	pl022->cur_chip->cs_control(SSP_CHIP_SELECT);
--	if (set_up_next_transfer(pl022, pl022->cur_transfer)) {
--		/* Error path */
--		pl022->cur_msg->state = STATE_ERROR;
--		pl022->cur_msg->status = -EIO;
--		giveback(pl022);
-+	if (pl022->cur_chip->enable_dma) {
-+		if (configure_dma(pl022)) {
-+			dev_dbg(&pl022->adev->dev,
-+				"configuration of DMA failed, fall back to interrupt mode\n");
-+			goto err_config_dma;
-+		}
- 		return;
- 	}
--	/* Enable SSP */
--	writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
--	       SSP_CR1(pl022->virtbase));
--
--	/* TODO: Enable the DMA transfer here */
--	return;
- 
-- err_config_dma:
--	pl022->cur_msg->state = STATE_ERROR;
--	pl022->cur_msg->status = -EIO;
--	giveback(pl022);
--	return;
-+err_config_dma:
-+	writew(ENABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
- }
- 
--static void do_interrupt_transfer(void *data)
-+static void do_interrupt_dma_transfer(struct pl022 *pl022)
- {
--	struct pl022 *pl022 = data;
-+	u32 irqflags = ENABLE_ALL_INTERRUPTS;
- 
- 	/* Enable target chip */
- 	pl022->cur_chip->cs_control(SSP_CHIP_SELECT);
-@@ -1023,15 +1359,26 @@ static void do_interrupt_transfer(void *data)
- 		giveback(pl022);
- 		return;
- 	}
-+	/* If we're using DMA, set up DMA here */
-+	if (pl022->cur_chip->enable_dma) {
-+		/* Configure DMA transfer */
-+		if (configure_dma(pl022)) {
-+			dev_dbg(&pl022->adev->dev,
-+				"configuration of DMA failed, fall back to interrupt mode\n");
-+			goto err_config_dma;
-+		}
-+		/* Disable interrupts in DMA mode, IRQ from DMA controller */
-+		irqflags = DISABLE_ALL_INTERRUPTS;
-+	}
-+err_config_dma:
- 	/* Enable SSP, turn on interrupts */
- 	writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
- 	       SSP_CR1(pl022->virtbase));
--	writew(ENABLE_ALL_INTERRUPTS, SSP_IMSC(pl022->virtbase));
-+	writew(irqflags, SSP_IMSC(pl022->virtbase));
- }
- 
--static void do_polling_transfer(void *data)
-+static void do_polling_transfer(struct pl022 *pl022)
- {
--	struct pl022 *pl022 = data;
- 	struct spi_message *message = NULL;
- 	struct spi_transfer *transfer = NULL;
- 	struct spi_transfer *previous = NULL;
-@@ -1101,7 +1448,7 @@ static void do_polling_transfer(void *data)
-  *
-  * This function checks if there is any spi message in the queue that
-  * needs processing and delegate control to appropriate function
-- * do_polling_transfer()/do_interrupt_transfer()/do_dma_transfer()
-+ * do_polling_transfer()/do_interrupt_dma_transfer()
-  * based on the kind of the transfer
-  *
-  */
-@@ -1150,10 +1497,8 @@ static void pump_messages(struct work_struct *work)
- 
- 	if (pl022->cur_chip->xfer_type == POLLING_TRANSFER)
- 		do_polling_transfer(pl022);
--	else if (pl022->cur_chip->xfer_type == INTERRUPT_TRANSFER)
--		do_interrupt_transfer(pl022);
- 	else
--		do_dma_transfer(pl022);
-+		do_interrupt_dma_transfer(pl022);
- }
- 
- 
-@@ -1430,23 +1775,6 @@ static int calculate_effective_freq(struct pl022 *pl022,
- }
- 
- /**
-- * NOT IMPLEMENTED
-- * process_dma_info - Processes the DMA info provided by client drivers
-- * @chip_info: chip info provided by client device
-- * @chip: Runtime state maintained by the SSP controller for each spi device
-- *
-- * This function processes and stores DMA config provided by client driver
-- * into the runtime state maintained by the SSP controller driver
-- */
--static int process_dma_info(struct pl022_config_chip *chip_info,
--			    struct chip_data *chip)
--{
--	dev_err(chip_info->dev,
--		"cannot process DMA info, DMA not implemented!\n");
--	return -ENOTSUPP;
--}
--
--/**
-  * pl022_setup - setup function registered to SPI master framework
-  * @spi: spi device which is requesting setup
-  *
-@@ -1504,8 +1832,6 @@ static int pl022_setup(struct spi_device *spi)
- 
- 		dev_dbg(&spi->dev, "allocated memory for controller data\n");
- 
--		/* Pointer back to the SPI device */
--		chip_info->dev = &spi->dev;
- 		/*
- 		 * Set controller data default values:
- 		 * Polling is supported by default
-@@ -1525,6 +1851,9 @@ static int pl022_setup(struct spi_device *spi)
- 			"using user supplied controller_data settings\n");
- 	}
- 
-+	/* Pointer back to the SPI device */
-+	chip_info->dev = &spi->dev;
-+
+ struct pl022_config_chip dummy_chip_info = {
+-	/*
+-	 * available POLLING_TRANSFER and INTERRUPT_TRANSFER,
+-	 * DMA_TRANSFER does not work
+-	 */
+-	.com_mode = INTERRUPT_TRANSFER,
++	/* available POLLING_TRANSFER, INTERRUPT_TRANSFER, DMA_TRANSFER */
++	.com_mode = DMA_TRANSFER,
+ 	.iface = SSP_INTERFACE_MOTOROLA_SPI,
+ 	/* We can only act as master but SSP_SLAVE is possible in theory */
+ 	.hierarchy = SSP_MASTER,
+@@ -75,8 +75,6 @@ static struct spi_board_info u300_spi_devices[] = {
+ static struct pl022_ssp_controller ssp_platform_data = {
+ 	/* If you have several SPI buses this varies, we have only bus 0 */
+ 	.bus_id = 0,
+-	/* Set this to 1 when we think we got DMA working */
+-	.enable_dma = 0,
  	/*
- 	 * We can override with custom divisors, else we use the board
- 	 * frequency setting
-@@ -1588,9 +1917,8 @@ static int pl022_setup(struct spi_device *spi)
- 	chip->cpsr = 0;
- 	if ((chip_info->com_mode == DMA_TRANSFER)
- 	    && ((pl022->master_info)->enable_dma)) {
--		chip->enable_dma = 1;
-+		chip->enable_dma = true;
- 		dev_dbg(&spi->dev, "DMA mode set in controller state\n");
--		status = process_dma_info(chip_info, chip);
- 		if (status < 0)
- 			goto err_config_params;
- 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_ENABLED,
-@@ -1598,7 +1926,7 @@ static int pl022_setup(struct spi_device *spi)
- 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_ENABLED,
- 			       SSP_DMACR_MASK_TXDMAE, 1);
- 	} else {
--		chip->enable_dma = 0;
-+		chip->enable_dma = false;
- 		dev_dbg(&spi->dev, "DMA mode NOT set in controller state\n");
- 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_DISABLED,
- 			       SSP_DMACR_MASK_RXDMAE, 0);
-@@ -1757,6 +2085,7 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
- 	if (status)
- 		goto err_no_ioregion;
- 
-+	pl022->phybase = adev->res.start;
- 	pl022->virtbase = ioremap(adev->res.start, resource_size(&adev->res));
- 	if (pl022->virtbase == NULL) {
- 		status = -ENOMEM;
-@@ -1783,6 +2112,14 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
- 		dev_err(&adev->dev, "probe - cannot get IRQ (%d)\n", status);
- 		goto err_no_irq;
- 	}
-+
-+	/* Get DMA channels */
-+	if (platform_info->enable_dma) {
-+		status = pl022_dma_probe(pl022);
-+		if (status != 0)
-+			goto err_no_dma;
-+	}
-+
- 	/* Initialize and start queue */
- 	status = init_queue(pl022);
- 	if (status != 0) {
-@@ -1811,6 +2148,8 @@ pl022_probe(struct amba_device *adev, struct amba_id *id)
-  err_start_queue:
-  err_init_queue:
- 	destroy_queue(pl022);
-+	pl022_dma_remove(pl022);
-+ err_no_dma:
- 	free_irq(adev->irq[0], pl022);
-  err_no_irq:
- 	clk_put(pl022->clk);
-@@ -1841,6 +2180,7 @@ pl022_remove(struct amba_device *adev)
- 		return status;
- 	}
- 	load_ssp_default_config(pl022);
-+	pl022_dma_remove(pl022);
- 	free_irq(adev->irq[0], pl022);
- 	clk_disable(pl022->clk);
- 	clk_put(pl022->clk);
-diff --git a/include/linux/amba/pl022.h b/include/linux/amba/pl022.h
-index 0ad6977..bf14366 100644
---- a/include/linux/amba/pl022.h
-+++ b/include/linux/amba/pl022.h
-@@ -228,6 +228,7 @@ enum ssp_chip_select {
+ 	 * On the APP CPU GPIO 4, 5 and 6 are connected as generic
+ 	 * chip selects for SPI. (Same on U330, U335 and U365.)
+@@ -84,6 +82,14 @@ static struct pl022_ssp_controller ssp_platform_data = {
+ 	 * and do padmuxing accordingly too.
+ 	 */
+ 	.num_chipselect = 3,
++#ifdef CONFIG_COH901318
++	.enable_dma = 1,
++	.dma_filter = coh901318_filter_id,
++	.dma_rx_param = (void *) U300_DMA_SPI_RX,
++	.dma_tx_param = (void *) U300_DMA_SPI_TX,
++#else
++	.enable_dma = 0,
++#endif
  };
  
  
-+struct dma_chan;
- /**
-  * struct pl022_ssp_master - device.platform_data for SPI controller devices.
-  * @num_chipselect: chipselects are used to distinguish individual
-@@ -235,11 +236,16 @@ enum ssp_chip_select {
-  *     each slave has a chipselect signal, but it's common that not
-  *     every chipselect is connected to a slave.
-  * @enable_dma: if true enables DMA driven transfers.
-+ * @dma_rx_param: parameter to locate an RX DMA channel.
-+ * @dma_tx_param: parameter to locate a TX DMA channel.
-  */
- struct pl022_ssp_controller {
- 	u16 bus_id;
- 	u8 num_chipselect;
- 	u8 enable_dma:1;
-+	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
-+	void *dma_rx_param;
-+	void *dma_tx_param;
- };
+@@ -109,6 +115,7 @@ void __init u300_spi_init(struct amba_device *adev)
+ 	}
  
- /**
+ }
++
+ void __init u300_spi_register_board_devices(void)
+ {
+ 	/* Register any SPI devices */
 -- 
 1.6.3.3
