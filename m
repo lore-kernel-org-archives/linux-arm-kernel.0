@@ -1,69 +1,147 @@
-From: leon.woestenberg@gmail.com (Leon Woestenberg)
-Date: Thu, 16 Sep 2010 01:39:54 +0200
-Subject: Kirkwood PCI(e) write performance and DMA engine support for
-	copy_{to, from}_user?
-In-Reply-To: <20100914070341.GA3438@debian-wegner1.datadisplay.de>
-References: <20100906100244.GA6897@debian-wegner1.datadisplay.de>
-	<20100906140347.GA24522@n2100.arm.linux.org.uk>
-	<20100906141444.GD6897@debian-wegner1.datadisplay.de>
-	<AANLkTimqiAuv9XiU55VBxfPO6HZXCs5d9pshS3XDwsFc@mail.gmail.com>
-	<AANLkTi=Mgzw9m+KiyzG7sHqD=mv1Q6WZXqMn_s_+p6Oq@mail.gmail.com>
-	<20100907161156.GA3625@debian-wegner1.datadisplay.de>
-	<alpine.LFD.2.00.1009071443360.19366@xanadu.home>
-	<20100908083558.GA3393@debian-wegner1.datadisplay.de>
-	<20100909162135.GA3524@debian-wegner1.datadisplay.de>
-	<AANLkTimAStrSQQZqX4Dsczas+z02-OnDB4RzO0MxbQhN@mail.gmail.com>
-	<20100914070341.GA3438@debian-wegner1.datadisplay.de>
-Message-ID: <AANLkTikiym2+jCVXCiQVgd+Yp+Pu=SwbsYYuDvKHoygk@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 16 Sep 2010 08:49:39 +0900
+Subject: [PATCH v2] ARM: Samsung: s5p-fimc: fix dma coherent mask
+In-Reply-To: <004201cb53ee$ff8e2a60$feaa7f20$%szyprowski@samsung.com>
+References: <000301cb4fb7$b4448530$1ccd8f90$%kim@samsung.com>
+	<1283998673-14899-1-git-send-email-m.szyprowski@samsung.com>
+	<011101cb5010$fdb1d520$f9157f60$%kim@samsung.com>
+	<004201cb53ee$ff8e2a60$feaa7f20$%szyprowski@samsung.com>
+Message-ID: <027d01cb5530$ac5cb8a0$051629e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfgang,
+Marek Szyprowski wrote:
+> 
+> Hello,
+> 
+Hi ;-)
 
-On Tue, Sep 14, 2010 at 9:03 AM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
-> On Mon, Sep 13, 2010 at 07:10:59PM +0200, Leon Woestenberg wrote:
->> Hello Wolfgang,
->>
->> On Thu, Sep 9, 2010 at 6:21 PM, Wolfgang Wegner <ww-ml@gmx.de> wrote:
->> > On Wed, Sep 08, 2010 at 10:35:58AM +0200, Wolfgang Wegner wrote:
->> >>
->> > With the FPGA evaluation board I get:
->> > - around 38 MBytes/second with Nicolas' inline assembly code
->> > - around 6 MBytes/second with any other C code (mmapped) as
->> > ?well as write() via dd
->> >
->> > So the main problem seems to be either our board implementation
->> > of the PCIe->PCI bridge or the FPGA. However, I am still wondering
->> > how a framebuffer-based application can attain reasonable performance,
->> >
->> Having implemented a framebuffer demo on an FPGA recently using PCI
->> Express, I think the main performance gain is made by having the DMA
->> done by the endpoint (FPGA) rather than by the CPU.
->
-> this is what I read all around, however, I do not see how this
-> can improve anything when using an mmap()ed frame buffer for
-> pixel-oriented operations...
->
-I haven't seen a SoC yet that can reach the bandwidth of PCIe using
-its DMA controller to push data out the PCIe bus. Most of these do not
-support the same type of large read requests that an endpoint may
-perform, typically 512 bytes or even 4096 per read request over PCI
-Express. Couple that with an efficient endpoint  SGDMA controller and
-you reach PCIe full bandwidth, no cycles wasted.
+> On Thursday, September 09, 2010 1:20 PM Kukjin Kim wrote:
+> 
+> > Marek Szyprowski wrote:
+> > >
+> > > FIMC driver uses DMA_coherent allocator, which requires proper dma
+mask
+> > > to be set.
+> > >
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > >
+> > > Chnages since v1:
+> > > - use DMA_BIT_MASK() macro, minor coding style change
+> > >
+> > > ---
+> > >  arch/arm/plat-s5p/dev-fimc0.c |    7 +++++++
+> > >  arch/arm/plat-s5p/dev-fimc1.c |    7 +++++++
+> > >  arch/arm/plat-s5p/dev-fimc2.c |    7 +++++++
+> > >  3 files changed, 21 insertions(+), 0 deletions(-)
+> > >
+> > > diff --git a/arch/arm/plat-s5p/dev-fimc0.c b/arch/arm/plat-s5p/dev-
+> > fimc0.c
+> > > index d3f1a9b..f9203fa 100644
+> > > --- a/arch/arm/plat-s5p/dev-fimc0.c
+> > > +++ b/arch/arm/plat-s5p/dev-fimc0.c
+> > > @@ -10,6 +10,7 @@
+> > >   */
+> > >
+> > >  #include <linux/kernel.h>
+> > > +#include <linux/dma-mapping.h>
+> > >  #include <linux/platform_device.h>
+> > >  #include <linux/interrupt.h>
+> > >  #include <linux/ioport.h>
+> > > @@ -28,9 +29,15 @@ static struct resource s5p_fimc0_resource[] = {
+> > >  	},
+> > >  };
+> > >
+> > > +static u64 s5p_fimc0_dma_mask = DMA_BIT_MASK(32);
+> > > +
+> > >  struct platform_device s5p_device_fimc0 = {
+> > >  	.name		= "s5p-fimc",
+> > >  	.id		= 0,
+> > >  	.num_resources	= ARRAY_SIZE(s5p_fimc0_resource),
+> > >  	.resource	= s5p_fimc0_resource,
+> > > +	.dev		= {
+> > > +		.dma_mask		= &s5p_fimc0_dma_mask,
+> > > +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> > > +	},
+> > >  };
+> > > diff --git a/arch/arm/plat-s5p/dev-fimc1.c b/arch/arm/plat-s5p/dev-
+> > fimc1.c
+> > > index 41bd698..7ed91a3 100644
+> > > --- a/arch/arm/plat-s5p/dev-fimc1.c
+> > > +++ b/arch/arm/plat-s5p/dev-fimc1.c
+> > > @@ -10,6 +10,7 @@
+> > >   */
+> > >
+> > >  #include <linux/kernel.h>
+> > > +#include <linux/dma-mapping.h>
+> > >  #include <linux/platform_device.h>
+> > >  #include <linux/interrupt.h>
+> > >  #include <linux/ioport.h>
+> > > @@ -28,9 +29,15 @@ static struct resource s5p_fimc1_resource[] = {
+> > >  	},
+> > >  };
+> > >
+> > > +static u64 s5p_fimc1_dma_mask = DMA_BIT_MASK(32);
+> > > +
+> > >  struct platform_device s5p_device_fimc1 = {
+> > >  	.name		= "s5p-fimc",
+> > >  	.id		= 1,
+> > >  	.num_resources	= ARRAY_SIZE(s5p_fimc1_resource),
+> > >  	.resource	= s5p_fimc1_resource,
+> > > +	.dev		= {
+> > > +		.dma_mask		= &s5p_fimc1_dma_mask,
+> > > +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> > > +	},
+> > >  };
+> > > diff --git a/arch/arm/plat-s5p/dev-fimc2.c b/arch/arm/plat-s5p/dev-
+> > fimc2.c
+> > > index dfddeda..5543d6373 100644
+> > > --- a/arch/arm/plat-s5p/dev-fimc2.c
+> > > +++ b/arch/arm/plat-s5p/dev-fimc2.c
+> > > @@ -10,6 +10,7 @@
+> > >   */
+> > >
+> > >  #include <linux/kernel.h>
+> > > +#include <linux/dma-mapping.h>
+> > >  #include <linux/platform_device.h>
+> > >  #include <linux/interrupt.h>
+> > >  #include <linux/ioport.h>
+> > > @@ -28,9 +29,15 @@ static struct resource s5p_fimc2_resource[] = {
+> > >  	},
+> > >  };
+> > >
+> > > +static u64 s5p_fimc2_dma_mask = DMA_BIT_MASK(32);
+> > > +
+> > >  struct platform_device s5p_device_fimc2 = {
+> > >  	.name		= "s5p-fimc",
+> > >  	.id		= 2,
+> > >  	.num_resources	= ARRAY_SIZE(s5p_fimc2_resource),
+> > >  	.resource	= s5p_fimc2_resource,
+> > > +	.dev		= {
+> > > +		.dma_mask		= &s5p_fimc2_dma_mask,
+> > > +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> > > +	},
+> > >  };
+> > > --
+> > > 1.7.2.2
+> >
+> > looks good to me..will apply :-)
+> 
+> What about merging this patch also to the kgene/s5p-fixes-for-linus
+branch?
+> IMHO this and the fimc clocks patch are pure bug fixes that should be
+merged
+> into final 2.6.36 kernel. Without these two patches fimc driver is
+useless.
+> 
+Hmm...ok...will sort out with other fixes.
 
-mmap() backed by a good SoC DMA controller may come close, but the max
-payload is usually less (128 bytes).
+Thanks.
 
-Also, most SoC DMA controllers are too limited to set up the kind of
-DMA you want.
-
-> This is why I thought about reverting to write() and simply transfer
-> complete frames, which would be sufficient for about 90% of my
-> application scenarios - and for the other 10% I could live with
-> the lower performance.
->
-Anything that works. How much burden do you want to put on the CPU though?
-
-Regards,
--- 
-Leon
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
