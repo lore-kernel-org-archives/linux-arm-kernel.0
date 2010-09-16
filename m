@@ -1,26 +1,74 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Thu, 16 Sep 2010 21:16:08 +0200
-Subject: resend: [PATCH] amba_pl022: Setup SPI configuration based on
-	spi->mode
-In-Reply-To: <AANLkTim4a7eha6Z3pjrZ0kg9VNRcuH52Qs2h4XydsXi4@mail.gmail.com>
-References: <AANLkTikbKwo9=xLWo1qEcc2E5aa2iN2F_KCokJPpnWOk@mail.gmail.com>
-	<083DF309106F364B939360100EC290F80AD49D5230@eu1rdcrdc1wx030.exi.nxp.com>
-	<AANLkTim4a7eha6Z3pjrZ0kg9VNRcuH52Qs2h4XydsXi4@mail.gmail.com>
-Message-ID: <083DF309106F364B939360100EC290F80AF398DEE4@eu1rdcrdc1wx030.exi.nxp.com>
+From: luciano.coelho@nokia.com (Luciano Coelho)
+Date: Thu, 16 Sep 2010 22:40:18 +0300
+Subject: [PATCH v6 2/7] wl1271: propagate set_power's return value
+In-Reply-To: <1284592929-29616-3-git-send-email-ohad@wizery.com>
+References: <1284592929-29616-1-git-send-email-ohad@wizery.com>
+	<1284592929-29616-3-git-send-email-ohad@wizery.com>
+Message-ID: <1284666018.8951.66.camel@powerslave>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2010-09-16 at 01:22 +0200, ext Ohad Ben-Cohen wrote:
+> Make it possible for the set power method to indicate a
+> success/failure return value. This is needed to support
+> more complex power on/off operations such as SDIO
+> power manipulations.
 > 
-> With this correction it starts working, so
-> Acked-by/Tested-by/Reviewed-by: Linus Walleij
-> <linus.walleij@stericsson.com>
-> 
-> Please submit the whole patch series with corrections and my tag
-> so Grant can pick it up, and thanks for doing this because I think
-> it is a great improvement to the driver!
-> 
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> ---
 
-Thanks! I'll put them up today.
+Some comments below.
 
-> Yours,
-> Linus Walleij
+
+> diff --git a/drivers/net/wireless/wl12xx/wl1271_io.h b/drivers/net/wireless/wl12xx/wl1271_io.h
+> index bc806c7..c1f92e6 100644
+> --- a/drivers/net/wireless/wl12xx/wl1271_io.h
+> +++ b/drivers/net/wireless/wl12xx/wl1271_io.h
+> @@ -144,10 +144,13 @@ static inline void wl1271_power_off(struct wl1271 *wl)
+>  	clear_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
+>  }
+>  
+> -static inline void wl1271_power_on(struct wl1271 *wl)
+> +static inline int wl1271_power_on(struct wl1271 *wl)
+>  {
+> -	wl->if_ops->power(wl, true);
+> -	set_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
+> +	int ret = wl->if_ops->power(wl, true);
+
+I think it look nicer if you keep the "int ret" in one line by itself
+and then do a ret = wl->if_ops... on another one.
+
+
+> +	if (ret == 0)
+> +		set_bit(WL1271_FLAG_GPIO_POWER, &wl->flags);
+> +
+> +	return ret;
+>  }
+
+
+> diff --git a/drivers/net/wireless/wl12xx/wl1271_sdio.c b/drivers/net/wireless/wl12xx/wl1271_sdio.c
+> index b5d9565..1d5dc72 100644
+> --- a/drivers/net/wireless/wl12xx/wl1271_sdio.c
+> +++ b/drivers/net/wireless/wl12xx/wl1271_sdio.c
+> @@ -159,35 +159,38 @@ static void wl1271_sdio_raw_write(struct wl1271 *wl, int addr, void *buf,
+>  		wl1271_error("sdio write failed (%d)", ret);
+>  }
+>  
+> -static void wl1271_sdio_power_on(struct wl1271 *wl)
+> +static int wl1271_sdio_power_on(struct wl1271 *wl)
+>  {
+>  	struct sdio_func *func = wl_to_func(wl);
+>  
+>  	sdio_claim_host(func);
+>  	sdio_enable_func(func);
+>  	sdio_release_host(func);
+> +
+> +	return 0;
+>  }
+
+You seem to always return 0, so the whole chain to pass the value up
+seems unnecessary.  Is this just a preparation for a future patch?
+
+-- 
+Cheers,
+Luca.
