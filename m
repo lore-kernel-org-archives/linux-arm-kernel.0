@@ -1,31 +1,16 @@
-From: luciano.coelho@nokia.com (Luciano Coelho)
-Date: Thu, 16 Sep 2010 23:00:59 +0300
-Subject: [PATCH v6 01/17] wl12xx: make wl12xx.h common to both spi and sdio
-In-Reply-To: <AANLkTinQ3EVOTjfnOy7EXP==b=tpSicDdokBAZ67Lc7O@mail.gmail.com>
-References: <AANLkTikYd+TojQC-R+Vrdou6KSRwFNczBeTnsX7eTDn4@mail.gmail.com>
-	<1284635762-12335-1-git-send-email-ohad@wizery.com>
-	<1284662139.8951.7.camel@powerslave>
-	<AANLkTinQ3EVOTjfnOy7EXP==b=tpSicDdokBAZ67Lc7O@mail.gmail.com>
-Message-ID: <1284667259.8951.75.camel@powerslave>
+From: wellsk40@gmail.com (wellsk40 at gmail.com)
+Date: Thu, 16 Sep 2010 06:18:49 -0700
+Subject: spi: amba_pl022: driver and platform spi->mode fixes
+Message-ID: <1284643130-17659-1-git-send-email-wellsk40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-16 at 21:56 +0200, ext Ohad Ben-Cohen wrote:
-> On Thu, Sep 16, 2010 at 8:35 PM, Luciano Coelho
-> <luciano.coelho@nokia.com> wrote:
-> > Acked-by: Luciano Coelho <luciano.coelho@nokia.com>
-> >
-> > I just wonder why the wl12xx.h move wasn't detected as a rename.  Did
-> > you forget to use the -M option in format-patch?
-> 
-> I thought it's because I stripped the SPI_ from the
-> #ifndef _LINUX_SPI_WL12XX_H, but it should be smarter than that.
-> Probably the -M.
+This patch is a merge of the previously posted and reviewed
+patch series:
+	amba_pl022: Setup SPI configuration based on spi->mode
+	amba_pl022 spi->mode fix/cleanup patches
 
-Yes, it is smarter than that.  With small changes like this, -M will
-still show it as a rename and show the diff instead of the whole file
--ed and +ed back ;)
+It also fixes an incorrect bit assignment for SPHA mode.
 
--- 
-Cheers,
-Luca.
+This patch can be pulled from:
+	git pull git://git.lpclinux.com/linux-2.6-lpc amba_pl022_spimode
