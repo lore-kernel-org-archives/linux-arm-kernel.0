@@ -1,48 +1,53 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 16 Sep 2010 11:58:15 +0900
-Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
-In-Reply-To: <Pine.LNX.4.64.1009150919400.31624@axis700.grange>
-References: <20100819160255.GA3948@suse.de>
-	<20100914085206.GP7336@linux-sh.org>
-	<Pine.LNX.4.64.1009150919400.31624@axis700.grange>
-Message-ID: <20100916115815W.fujita.tomonori@lab.ntt.co.jp>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 15 Sep 2010 21:14:36 -0600
+Subject: amba_pl022 spi->mode fix/cleanup patches
+In-Reply-To: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
+References: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
+Message-ID: <20100916031436.GA7542@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Sep 2010 09:23:54 +0200 (CEST)
-Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-
-> > it should also include an update for
-> > Documentation/DMA-API.txt. I'm simply not going to take any DMA API
-> > patches if they don't include the documentation update. DMA-API.txt is
-> > one of the few useful parts of Documentation/, we should really strive to
-> > keep it that way.
+On Fri, Sep 10, 2010 at 09:19:34AM -0700, wellsk40 at gmail.com wrote:
+> This patch series updates drivers and platforms that depend on the
+> amba_pl022 driver and use the pl022_config_chip structure for
+> setting up the SPI mode and data transfer width.
 > 
-> I believe, this your comment refers to another related patch of mine:
+> The SPI configuration (CPOL/CPHA mode, bit send order, data bits per
+> word, and loopback mode) were previously setup as part of board
+> specific data in the pl022_config_chip structure. This has been
+> changed to now use the .mode field in spi_board_info structure (or
+> drivers that setup the mode). The SPI transfer's data width is now
+> configured from spi->bits_per_word.
 > 
-> [RFC][PATCH] add dma_reserve_coherent_memory()/dma_free_reserved_memory() API
+> The SPI driver changes have been previously submitted to the SPI ML.
+> This patch series need to be layered on that patch series.
 > 
-> Sure, updating the documentation would be the right thing to do here, but 
-> FUJITA Tomonori is nacking this patch for 2.6.36, so, we will either have 
-
-I already explained why the above API is wrong.
-
-
-> to live with a few broken platforms and drivers until 2.6.37, or we'll 
-> have to find another solution, or that NAK has to be reconsidered
-
-Needs to revert the patch that causes the regression. The patch does
-the right thing but also breaks some working platforms. You need to
-fix "working" platforms that does wrong things before the patch.
-
-
-> > It would also be nice if on the next iteration DMA API people were Cc'ed,
-> > this would be at least:
-> > 
-> > 	FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-> > 	James Bottomley <James.Bottomley@HansenPartnership.com>
+> These changes add or fix the .mode field in the plats/boards that use the
+> driver (u300, ux500, lpc32xx). The patches also move the data width
+> from the board specific area to the driver for mfd/ab8500. As the
+> fields in the pl022_config_chip structure are no longer needed, they
+> are removed in the last patch.
 > 
-> Right, sorry, added to the CC now, although, this is not the right thread 
-> to discuss the proposed new API.
+> These changes have been tested on the phy3250 platform (lpc32xx). I
+> was able to test the ab8500 driver to some degree, but I only have a
+> standard pl022. I am unable to test u300 and ux500 changes, but the
+> u300 changes compiled fine.
+> 
+> [PATCH 1/5] mfd/ab8500: Setup SPI transfer for 24 bits
+> [PATCH 2/5] ARM: LPC32XX: Add missing SPI mode and remove unused fields
+> [PATCH 3/5] ARM: U300: spi->mode and spi_bits_per_words updates
+> [PATCH 4/5] ARM: Ux500: Change SPI mode and remove unused fields
+> [PATCH 5/5] spi: amba_pl022: Remove unused fields from pl022_config_chip
 
-Please send to linux-kernel and linux-arch too.
+There are ordering issues with these patches and the patch they depend
+on.  Basically, as-is it is not bisectable.  The above platforms stop
+working after the SPI driver changes are applied, but before these
+patches are.  You'll need to update the mode field for all the users
+in or before the SPI driver changes patch to preserve bisectability.
+Then you can have subsequent cleanup patches....
+
+Or just squash all the patches into the SPI driver patch.  I'd be
+okay with that in this case because the board changes are well
+contained and easy to understand.
+
+g.
