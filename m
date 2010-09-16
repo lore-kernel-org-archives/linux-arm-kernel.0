@@ -1,41 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Sep 2010 17:21:35 -0700
-Subject: [PATCH 3/6] omap4: l2x0: Override the default l2x0_disable
-In-Reply-To: <1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100916002134.GL4174@atomide.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 16 Sep 2010 09:33:18 +0900
+Subject: [PATCH 0/5] ARM: S5PV210: Add support CPUFREQ for S5PV210/S5PC110
+In-Reply-To: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
+References: <1284537162-3129-1-git-send-email-jc.lee@samsung.com>
+Message-ID: <AANLkTikB288=Y8_jMXCwfsEBqwRdOTKyjMJag=SCKYdP@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [100907 00:50]:
-> The machine_kexec() calls outer_disable which can crash on OMAP4
-> becasue of trustzone restrictions.
-> 
-> This patch overrides the default l2x0_disable with a OMAP4
-> specific implementation taking care of trustzone
+First thank you for posting the patches.
+but I'm worry about sending the same feature patches from different divisions.
 
-<snip>
+I'm not sure you're talking with kgene. but there are some codes
+posted by Mr. Ham and get feedback and reviewed with kgene.
+http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/cpufreq
 
-> @@ -66,6 +73,12 @@ static int __init omap_l2_cache_init(void)
+To kgene,
+One code from DMC(me), another code from System LSI(you). then which
+codes do you pick up and apply to mainline?
+and what's rules or principles?
+
+Thank you,
+Kyungmin Park
+
+On Wed, Sep 15, 2010 at 4:52 PM, Jaecheol Lee <jc.lee@samsung.com> wrote:
+> This patch adds CPUFREQ for S5PV210/S5PC110.
 >
->  	 */
->  	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
+> [PATCH 1/5] ARM: S5PV210: Add support DMC map_desc table
+> [PATCH 2/5] ARM: S5PV210: Add struct clk_ops for clk_fout_apll
+> [PATCH 3/5] ARM: S5PV210: Add Register definition for CMU
+> [PATCH 4/5] ARM: S5PV210: Add support CPUFREQ
+> [PATCH 5/5] ARM: S5PV210: Update Kconfig and Makefile for supporting CPUFREQ driver
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
-> +	/*
-> +	 * Override default outer_cache.disable with a OMAP4
-> +	 * specific one
-> +	*/
-> +	outer_cache.disable = omap4_l2x0_disable;
-> +
->  	return 0;
->  }
->  early_initcall(omap_l2_cache_init);
-
-Just to be sure.. No outer_cache functions get set unless
-l2x0_init gets called, right? So omap2 and omap3 functions
-always stay NULL with omap3_defconfig?
-
-Tony
