@@ -1,107 +1,91 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 16 Sep 2010 09:06:36 -0500
-Subject: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB032944262A@dbde02.ent.ti.com>
+From: roger.quadros@nokia.com (Roger Quadros)
+Date: Thu, 16 Sep 2010 17:20:08 +0300
+Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
+In-Reply-To: <4C922347.7050509@ti.com>
 References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
-	<1284587799-9637-3-git-send-email-khilman@deeprootsystems.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
-	<4C920A49.5010105@ti.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB032944262A@dbde02.ent.ti.com>
-Message-ID: <4C92246C.3010404@ti.com>
+	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
+	<4C9221AF.9000804@nokia.com> <4C922347.7050509@ti.com>
+Message-ID: <4C922798.1000304@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gopinath, Thara had written, on 09/16/2010 08:51 AM, the following:
-> 
->>> -----Original Message-----
->>> From: Menon, Nishanth
->>> Sent: Thursday, September 16, 2010 5:45 PM
->>> To: Gopinath, Thara
->>> Cc: Kevin Hilman; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>> Subject: Re: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
->>>
->>> Gopinath, Thara had written, on 09/16/2010 05:40 AM, the following:
->>>>>> -----Original Message-----
->>>>>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
->>> Kevin
->>>>>> Hilman
->>>>>> Sent: Thursday, September 16, 2010 3:27 AM
->>>>>> To: linux-omap at vger.kernel.org
->>>>>> Cc: linux-arm-kernel at lists.infradead.org
->>>>>> Subject: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
->>>>>>
->>>>>> From: Paul Walmsley <paul@pwsan.com>
->>>>>>
->>>>>> The OPP layer code should be independent of the PMIC,
->>>>>> introduce the TWL/TPS-specific code out to its own file.
->>>> Hello Kevin,
->>>>
->>>> I have been using this code for a while now. I really do not think wee need a separate
->>>> file for implementing the vsel to voltage in (uV) and vice versa formulas. Today only voltage
->>> This split introduces a PMIC level abstraction already. Do you have a
->>> suggestion which file it should go to? It is definitely not part of
->>> opp.c, not part of other existing twl files as well. the job of this
->>> file was to introduce conversion routines which can be used by any layer
->>> (voltage layer if need be - it used to be srf and smartreflex before)..
->>> in fact one of your voltage layer patches introduces capability for 6030
->>> as well
->>> http://marc.info/?l=linux-omap&m=128213020927919&w=2
-> 
-> Yes one of my patches has introduces this coz I had no other way
-> to add OMAP4 support. But I still do not understand why cant these
-> APIs be implemented in twl-core.c or twl4030-power.c? 
-Why there? Twl power does regulator operations not conversion 
-operations. core is not the place either as it is function independent.
+On 09/16/2010 05:01 PM, ext Nishanth Menon wrote:
+> Roger Quadros had written, on 09/16/2010 08:54 AM, the following:
+>> Since you are anyways re-sending this you might as well fix these nits.
+> thanks for reviewing..
+>
+>>
+> [..]
+>
+>>> diff --git a/arch/arm/plat-omap/opp.c b/arch/arm/plat-omap/opp.c
+>>> new file mode 100644
+>>> index 0000000..17f93b2
+>>> --- /dev/null
+>>> +++ b/arch/arm/plat-omap/opp.c
+>>> @@ -0,0 +1,461 @@
+>>> +/*
+>>> + * OMAP OPP Interface
+>>> + *
+>>> + * Copyright (C) 2009-2010 Texas Instruments Incorporated.
+>>> + *     Nishanth Menon
+>>> + *     Romit Dasgupta<romit@ti.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>
+>>> +/**
+>>> + * opp_get_voltage() - Gets the voltage corresponding to an opp
+>>> + * @opp:       opp for which voltage has to be returned for
+>>> + *
+>>> + * Return voltage in micro volt corresponding to the opp, else
+>>> + * return 0
+>>> + */
+>>> +unsigned long opp_get_voltage(const struct omap_opp *opp)
+>>> +{
+>>> +       if (unlikely(!opp || IS_ERR(opp)) || !opp->enabled) {
+>>
+>> If !opp->enabled, then is it really an invalid parameter being passed?
+>>
+>> I'm not user if people need to know the voltage of a disabled OPP, but
+>> do we need to limit it?
+>>
+>>> +               pr_err("%s: Invalid parameters being passed\n", __func__);
+>>> +               return 0;
+>>> +       }
+>>> +
+>>> +       return opp->u_volt;
+>>> +}
+>>> +
+>>> +/**
+>>> + * opp_get_freq() - Gets the frequency corresponding to an opp
+>>> + * @opp:       opp for which frequency has to be returned for
+>>> + *
+>>> + * Return frequency in hertz corresponding to the opp, else
+>>> + * return 0
+>>> + */
+>>> +unsigned long opp_get_freq(const struct omap_opp *opp)
+>>> +{
+>>> +       if (unlikely(!opp || IS_ERR(opp)) || !opp->enabled) {
+>>
+>> ditto.
+>
+> Yes, the intent here was for opp operational apis to function ONLY on
+> the enabled opps - this helps to pull out any bugs in the users
+> who might be unintentionally using bad params.
+>
+OK.
 
-> 
->>>> layer is interested in these conversions. Voltage layer has a structure that can be populated with
->>>> the information required from the PMIC. We only need to add two more function pointers to this
->>> structure.
->>>> This info can then be passed from the actual PMIC driver file. This
->>> will make it much
->>>> more simpler for OMAP4 where we have different formulas between different revisions of PMIC. Also
->>>> in the omap voltage code we will no longer have to hard code omap_twl_vsel_to_uv and
->>> omap_twl_uv_to_vsel.
->>> I think the problem is with the voltage layer (which has not been posted
->>> upstream) which is using hard coded function pointer. What the patchset
->>> should have done is to introduce function pointers registration from
->>> twl_tps.c to voltage layer and voltage layer should ideally been using
->>> function pointers by itself.
->>>
->>>> So please consider dropping this patch from this series.
->>> I think I disagree - rationale for having this separated as a pmic
->>> specific file is still sound, only the implementation of the future
->>> framework should have changed (it should be using function pointers
->>> instead of hardcoded function names). in fact I can add additional
->>> suggestion for the voltage layer: the pmic selection should be done from
->>> a board file - This will allow voltage layer to handle numerous PMICs
->>> and combination of PMICs controlling various domains as well.. the only
->>> neat way to handle it is ofcourse using function pointers.
-> 
-> Exactly if voltage layer has to use a func ptr, why not let them be populated
-> by the PMIC driver files directly?
-Again, we are going into the details of how voltage layer will be 
-implemented.. What suggestion do you do when on board x vdd1 is driven 
-by PMIC1, vdd2 by PMIC2? it will have to be somesort of different 
-registration mechanism. but nothing prevents the framework from 
-registering the pointers defined in twl_tps.c
+> do you have any usecase you can think of where we might want to use
+> these on a disabled opp?
 
+Not really. Based on what is an OPP enabled/disabled? Is it possible for 
+an initially enabled OPP to be disabled at some point in time? What 
+triggers this disable?
+OR  does an OPP enabled at boot time remain enabled throughout the power 
+session?
 
-
-> 
->>>
->>> PS: Suggestion
->>> - please fix your mailer to round off for 70/80 char.
-> 
-> Will try.
-> 
->>> - might be good to point folks to rfc patchset for voltage layer to give
->>> context.
-> 
-> https://patchwork.kernel.org/patch/119429/
-
-thanks..
-
--- 
-Regards,
-Nishanth Menon
+regards,
+-roger
