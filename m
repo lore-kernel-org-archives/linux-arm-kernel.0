@@ -1,32 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 Sep 2010 10:53:18 -0700
-Subject: [PATCH 1/5] omap3: Introduce CompuLab CM-T3517 module.
-In-Reply-To: <1284627281-26059-2-git-send-email-grinberg@compulab.co.il>
-References: <1284627281-26059-1-git-send-email-grinberg@compulab.co.il>
-	<1284627281-26059-2-git-send-email-grinberg@compulab.co.il>
-Message-ID: <20100916175317.GF29610@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 16 Sep 2010 13:58:09 -0400 (EDT)
+Subject: Maximum bootable kernel size in current ARM linux
+In-Reply-To: <1284657411.32513.3.camel@e102109-lin.cambridge.arm.com>
+References: <4C8DD588.7040009@endruntechnologies.com>
+	<201009131043.48688.marek.vasut@gmail.com>
+	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>
+	<20100913101039.GC2614@kw.sim.vm.gnt>
+	<000001cb5409$4726e000$4b4d010a@Emea.Arm.com>
+	<1284468849.933.2.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1009141333090.19366@xanadu.home>
+	<1284657411.32513.3.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1009161338140.19366@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [100916 01:46]:
-> Add basic suppot, enable uart and led.
+On Thu, 16 Sep 2010, Catalin Marinas wrote:
+
+> On Tue, 2010-09-14 at 13:37 -0400, Nicolas Pitre wrote:
+> > On Tue, 14 Sep 2010, Catalin Marinas wrote:
+> > 
+> > > I think the Thumb-2 branch goes up to 16MB range. The Thumb-1 may be
+> > > smaller but we don't support this in the kernel. That's why Thumb-2
+> > > modules are within 8MB below PAGE_OFFSET. But this leaves us with
+> > > maximum 8MB of kernel size.
+> > 
+> > Hmmm.  Would be worth moving the pkmap area below modules then.
 > 
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/mach-omap2/Kconfig          |    7 ++
->  arch/arm/mach-omap2/Makefile         |    1 +
->  arch/arm/mach-omap2/board-cm-t3517.c |  109 ++++++++++++++++++++++++++++++++++
->  3 files changed, 117 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/board-cm-t3517.c
+> So currently the pkmap area is at PAGE_OFFSET - 2MB. On a Thumb-2 kernel
+> with highmem enabled we would have 6MB available to modules. Is this big
+> enough? If not, we could move the pkmap area.
 
-Looks like you're missing the debug uart entry for
-arch/arm/plat-omap/include/plat/uncompress.h?
+It is probably enough. But it is just not optimal.  If the area between 
+TASK_SIZE and PAGE_OFFSET-8M is unused, then it would make sense to move 
+the pkmap area there instead.
 
-You can test this by enabling DEBUG_LL and EARLY_PRINTK
-in your .config, then pass earlyprintk in the kernel
-cmdline. Might become handy for debugging the early
-init process for your board.
+> BTW, can it be moved in the top part of the memory rather than below
+> PAGE_OFFSET?
 
-Regards,
+It could, but top memory layout tend to be machine specific, or already 
+used by the consistent DMA.  And the module area is underused anyway.
 
-Tony
+
+Nicolas
