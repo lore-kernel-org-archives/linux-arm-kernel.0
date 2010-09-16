@@ -1,49 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 16 Sep 2010 09:43:01 -0500
-Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
-In-Reply-To: <4C922798.1000304@nokia.com>
-References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
-	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
-	<4C9221AF.9000804@nokia.com> <4C922347.7050509@ti.com>
-	<4C922798.1000304@nokia.com>
-Message-ID: <4C922CF5.3090406@ti.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Thu, 16 Sep 2010 16:48:28 +0200
+Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
+In-Reply-To: <20100913111850.GC14882@console-pimps.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<1284372533.3042.11.camel@e102144-lin.cambridge.arm.com>
+	<20100913111850.GC14882@console-pimps.org>
+Message-ID: <20100916144828.GD13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roger Quadros had written, on 09/16/2010 09:20 AM, the following:
-[...]
->>>> +/**
->>>> + * opp_get_freq() - Gets the frequency corresponding to an opp
->>>> + * @opp:       opp for which frequency has to be returned for
->>>> + *
->>>> + * Return frequency in hertz corresponding to the opp, else
->>>> + * return 0
->>>> + */
->>>> +unsigned long opp_get_freq(const struct omap_opp *opp)
->>>> +{
->>>> +       if (unlikely(!opp || IS_ERR(opp)) || !opp->enabled) {
->>> ditto.
->> Yes, the intent here was for opp operational apis to function ONLY on
->> the enabled opps - this helps to pull out any bugs in the users
->> who might be unintentionally using bad params.
->>
-> OK.
+On 13.09.10 07:18:50, Matt Fleming wrote:
+> On Mon, Sep 13, 2010 at 11:08:53AM +0100, Will Deacon wrote:
+
+> > I've tested this patch series on a multicore Cortex-A9 board. If I
+> > revert patch 5/6 (ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS)
+> > then everything seems to work fine. Otherwise, testing without
+> > HW_PERF_EVENTS doesn't fall back to timer mode.
+> > 
+> > So, with the exception of the patch above:
+> > 
+> > Tested-by: Will Deacon <will.deacon@arm.com>
 > 
->> do you have any usecase you can think of where we might want to use
->> these on a disabled opp?
+> Hi Will, thanks for testing!
 > 
-> Not really. Based on what is an OPP enabled/disabled? Is it possible for 
-> an initially enabled OPP to be disabled at some point in time? What 
-> triggers this disable?
-> OR  does an OPP enabled at boot time remain enabled throughout the power 
-> session?
-At this point - enable/disable is done at init time - there is 
-flexibility for board files to define their own custom OPPs (as some 
-custom boards need to). they dont change once this initial definition is 
-done. there are plans to do dynamic enable disable based on previous 
-discussion in l-o - the framework to use opp layer in that manner is yet 
-to go up yet.
+> Ah yeah, making oprofile rely on CONFIG_HW_PERF_EVENTS is too
+> strict. I hadn't noticed that armpmu_get_pmu_id() is wrapped in
+> CONFIG_HW_PERF_EVENTS and had intended op->cpu_type to be NULL and so
+> we'd fallback to the timer mode.
+> 
+> This patch needs to be dropped entirely (though another patch should
+> conditionally include oprofile_perf.o based on CONFIG_HW_PERF_EVENT
+> like I had in my original series).
+
+Matt,
+
+yes, the patch set looks good so far. With the exception of some minor
+comments I made and patch #5 dropped, we should be fine. Please update
+the patches.
+
+Thanks,
+
+-Robert
 
 -- 
-Regards,
-Nishanth Menon
+Advanced Micro Devices, Inc.
+Operating System Research Center
