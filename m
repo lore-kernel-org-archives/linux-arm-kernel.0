@@ -1,16 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 Sep 2010 10:45:12 -0700
-Subject: [PATCH v6 7/7] omap: zoom: add mmc3/wl1271 device support
-In-Reply-To: <1284593551-30141-1-git-send-email-ohad@wizery.com>
-References: <1284593551-30141-1-git-send-email-ohad@wizery.com>
-Message-ID: <20100916174512.GD29610@atomide.com>
+Date: Thu, 16 Sep 2010 10:48:47 -0700
+Subject: [PATCH 3/5] omap3: cm-t3517: add support for usb host.
+In-Reply-To: <4C91DF66.6020003@compulab.co.il>
+References: <1284627281-26059-1-git-send-email-grinberg@compulab.co.il>
+	<1284627281-26059-4-git-send-email-grinberg@compulab.co.il>
+	<20100916090018.GM3393@legolas.emea.dhcp.ti.com>
+	<4C91DF66.6020003@compulab.co.il>
+Message-ID: <20100916174847.GE29610@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [100915 16:23]:
-> Add MMC3 support on ZOOM, which has the wl1271 device hardwired to.
+* Igor Grinberg <grinberg@compulab.co.il> [100916 02:04]:
+>  Hi,
 > 
-> The wl1271 is a 4-wire, 1.8V, embedded SDIO WLAN device with an
-> external IRQ line, and power-controlled by a GPIO-based fixed regulator.
+> On 09/16/10 11:00, Felipe Balbi wrote:
+> > Hi,
+> >
+> > On Thu, Sep 16, 2010 at 03:54:39AM -0500, Igor Grinberg wrote:
+> >
+> > put a description here.
+> 
+> This is a relatively small patch, is the subject not descriptive enough?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+In that case just copy the subject (without the [PATCH] part) to the
+description for all of your patches.
+
+Regards,
+
+Tony
