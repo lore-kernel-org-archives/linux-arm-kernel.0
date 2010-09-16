@@ -1,49 +1,51 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 16 Sep 2010 22:43:03 +0530
-Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
-In-Reply-To: <4C924F6E.6040804@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 16 Sep 2010 10:16:00 -0700
+Subject: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
+	(Thara Gopinath's message of "Thu, 16 Sep 2010 16:10:06 +0530")
 References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
-	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTimC9NOJ5TSqkb1ekBQ_ei2-Ci2ewL66+4aCnyk=@mail.gmail.com>
-	<87sk19eneu.fsf@deeprootsystems.com>	<4C92386F.2070600@ti.com>
-	<87vd65bsfs.fsf@deeprootsystems.com>
-	<AANLkTim1DD5FOqqxfdV+BoMiq2wmzz6ZuDV6u5_=zUeb@mail.gmail.com>
-	<4C924F6E.6040804@ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD26065F@dbde02.ent.ti.com>
+	<1284587799-9637-3-git-send-email-khilman@deeprootsystems.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
+Message-ID: <874odpbodr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Menon, Nishanth
-> Sent: Thursday, September 16, 2010 10:40 PM
-> To: Linus Walleij
-> Cc: Kevin Hilman; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/4] OMAP: introduce OPP layer for device-specific
-> OPPs
-> 
-> Linus Walleij had written, on 09/16/2010 12:07 PM, the following:
-> > 2010/9/16 Kevin Hilman <khilman@deeprootsystems.com>:
-> >
-> >> lib/opp/* seems more appropriate to me with the header at
-> >> include/linux/opp.h as Linus suggested.
-> >
-> > I second this. I would love to see the generic OPP stuff in
-> > lib/opp/* so we put it in the right place from the beginning and
-> > don't have to painfully refactor everything later (clk.h
-> > especially comes to mind.)
-> cool.. digging a bit deeper into lib directory, I propose the following:
-> lib/opp.c
-> include/linux/opp.h
-> 
-> any soc specific data (for registration etc) -> goes to
-> arch/<arch>/mach-<soc>/oppdata_xyz.c or what ever they choose
-> 
-> the intent being lib/ is no place to put mach or arch specific data
-> definitions.. it is just noise..
-> 
-> if folks are ok with this, will post a new rev soonish..
-> 
-If you like may be you can take this thread over lkml just to get more
-wider perspective
+"Gopinath, Thara" <thara@ti.com> writes:
+
+[...]
+
+>>>From: Paul Walmsley <paul@pwsan.com>
+>>>
+>>>The OPP layer code should be independent of the PMIC,
+>>>introduce the TWL/TPS-specific code out to its own file.
+>
+> Hello Kevin,
+>
+> I have been using this code for a while now. I really do not think wee
+> need a separate file for implementing the vsel to voltage in (uV) and
+> vice versa formulas. Today only voltage layer is interested in these
+> conversions. Voltage layer has a structure that can be populated with
+> the information required from the PMIC. We only need to add two more
+> function pointers to this structure. This info can then be passed from
+> the actual PMIC driver file. This will make it much more simpler for
+> OMAP4 where we have different formulas between different revisions of
+> PMIC. Also in the omap voltage code we will no longer have to hard
+> code omap_twl_vsel_to_uv and omap_twl_uv_to_vsel. 
+
+Feel free to post an RFC series for what you're proposing.  
+
+IMHO, even the voltage layer should not care about these conversions.
+The voltage layer should care about voltages, and the PMIC layer should
+handle these conversions.  IOW, this stuff is best abstracted in the
+PMIC code, or board- or SoC-specific hooks that can be registered with
+the PMIC.
+
+> So please consider dropping this patch from this series.
+
+If you pick this up as part of your voltage series (or more likely as a
+pre-requisite of your voltage series) we can surely drop it from this
+series, at it doesn't really belong with the OPP series.
+
+There are no upstream users of this yet, so dropping it is easy. :)
+
+Kevin
