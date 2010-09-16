@@ -1,47 +1,25 @@
-From: mike.rapoport@gmail.com (Mike Rapoport)
-Date: Fri, 17 Sep 2010 00:27:13 +0200
-Subject: [PATCH 1/3] [ARM] tegra: add PCI Express clocks
-In-Reply-To: <AANLkTinN0rYG7rp5Gs3TyGOAQu5qJ18V_-yEuManuX33@mail.gmail.com>
-References: <cover.1284655723.git.mike@compulab.co.il>
-	<79b943ad0c9d4b99a6207e1a7e3ae09bbbe4fae5.1284655723.git.mike@compulab.co.il>
-	<AANLkTinN0rYG7rp5Gs3TyGOAQu5qJ18V_-yEuManuX33@mail.gmail.com>
-Message-ID: <AANLkTi=Mw33sVDdGLMxKh0HN0fKbzzUKqr6R9NHKEUFT@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Sep 2010 00:05:40 +0100
+Subject: [RFC] mmaping with VIVT cache
+In-Reply-To: <831453.93557.qm@web120220.mail.ne1.yahoo.com>
+References: <831453.93557.qm@web120220.mail.ne1.yahoo.com>
+Message-ID: <20100916230540.GA30916@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 16, 2010 at 11:27 PM, Colin Cross <ccross@google.com> wrote:
-> On Thu, Sep 16, 2010 at 9:53 AM, Mike Rapoport <mike@compulab.co.il> wrote:
->> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
->> ---
->> ?arch/arm/mach-tegra/tegra2_clocks.c | ? 76 +++++++++++++++++++++++++++++++++-
->> ?1 files changed, 73 insertions(+), 3 deletions(-)
->
-> <snip>
->
->> -static int tegra2_pll_clk_wait_for_lock(struct clk *c)
->> +static int tegra2_pll_clk_wait_for_bit_set(struct clk *c, int bit)
->> ?{
->> ? ? ? ?ktime_t before;
->>
->> ? ? ? ?before = ktime_get();
->> - ? ? ? while (!(clk_readl(c->reg + PLL_BASE) & PLL_BASE_LOCK)) {
->> + ? ? ? while (!(clk_readl(c->reg + PLL_BASE) & bit)) {
->> ? ? ? ? ? ? ? ?if (ktime_us_delta(ktime_get(), before) > 5000) {
->> ? ? ? ? ? ? ? ? ? ? ? ?pr_err("Timed out waiting for lock bit on pll %s",
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?c->name);
->> @@ -414,7 +416,7 @@ static int tegra2_pll_clk_enable(struct clk *c)
->> ? ? ? ?val |= PLL_MISC_LOCK_ENABLE;
->> ? ? ? ?clk_writel(val, c->reg + PLL_MISC(c));
->>
->> - ? ? ? tegra2_pll_clk_wait_for_lock(c);
->> + ? ? ? tegra2_pll_clk_wait_for_bit_set(c, PLL_BASE_LOCK);
->>
->> ? ? ? ?return 0;
->> ?}
->
-> I've been told by Nvidia that the pll lock bits are not reliable, and
-> will be removing uses of tegra2_pll_clk_wait_for_lock and replacing
-> them with delays selected by each pll. ?Can you confirm with Nvidia
-> that PLLE_MISC_READY works?
+On Wed, Sep 15, 2010 at 05:25:38PM -0700, P F wrote:
+> The mmap'd buffer is allocated by vmalloc_32(), and later mapped with
+> vmalloc_to_page()/vm_insert_page().  The DMA'd buffer is allocated by
+> usb_buffer_alloc().  At the appropriate time, the DMA'd buffer is
+> memcpy()'d into the mmap'd buffer, and userspace is allowed to handle it,
+> at which point it is corrupt.
 
-I'll try to get a confirmation from NVidia....
+Ah, that's slightly different as you're not talking about the DMA buffers
+themselves.
+
+However, anyone who is not familiar with VIVT or aliasing VIPT caches is
+going to be caught out by this sort of thing (which basically means most
+ARMs, and at least some PA-RISC.)
+
+I don't think we have any APIs in the kernel to handle aliasing between
+the vmalloc space and userspace...
