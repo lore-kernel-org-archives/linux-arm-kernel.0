@@ -1,51 +1,34 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 16 Sep 2010 10:16:00 -0700
-Subject: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
-	(Thara Gopinath's message of "Thu, 16 Sep 2010 16:10:06 +0530")
-References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
-	<1284587799-9637-3-git-send-email-khilman@deeprootsystems.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
-Message-ID: <874odpbodr.fsf@deeprootsystems.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Sep 2010 18:16:51 +0100
+Subject: Maximum bootable kernel size in current ARM linux
+In-Reply-To: <alpine.LFD.2.00.1009141333090.19366@xanadu.home>
+References: <4C8DD588.7040009@endruntechnologies.com>
+	<201009131043.48688.marek.vasut@gmail.com>
+	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>
+	<20100913101039.GC2614@kw.sim.vm.gnt>
+	<000001cb5409$4726e000$4b4d010a@Emea.Arm.com>
+	<1284468849.933.2.camel@e102109-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1009141333090.19366@xanadu.home>
+Message-ID: <1284657411.32513.3.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Gopinath, Thara" <thara@ti.com> writes:
+On Tue, 2010-09-14 at 13:37 -0400, Nicolas Pitre wrote:
+> On Tue, 14 Sep 2010, Catalin Marinas wrote:
+> 
+> > I think the Thumb-2 branch goes up to 16MB range. The Thumb-1 may be
+> > smaller but we don't support this in the kernel. That's why Thumb-2
+> > modules are within 8MB below PAGE_OFFSET. But this leaves us with
+> > maximum 8MB of kernel size.
+> 
+> Hmmm.  Would be worth moving the pkmap area below modules then.
 
-[...]
+So currently the pkmap area is at PAGE_OFFSET - 2MB. On a Thumb-2 kernel
+with highmem enabled we would have 6MB available to modules. Is this big
+enough? If not, we could move the pkmap area.
 
->>>From: Paul Walmsley <paul@pwsan.com>
->>>
->>>The OPP layer code should be independent of the PMIC,
->>>introduce the TWL/TPS-specific code out to its own file.
->
-> Hello Kevin,
->
-> I have been using this code for a while now. I really do not think wee
-> need a separate file for implementing the vsel to voltage in (uV) and
-> vice versa formulas. Today only voltage layer is interested in these
-> conversions. Voltage layer has a structure that can be populated with
-> the information required from the PMIC. We only need to add two more
-> function pointers to this structure. This info can then be passed from
-> the actual PMIC driver file. This will make it much more simpler for
-> OMAP4 where we have different formulas between different revisions of
-> PMIC. Also in the omap voltage code we will no longer have to hard
-> code omap_twl_vsel_to_uv and omap_twl_uv_to_vsel. 
+BTW, can it be moved in the top part of the memory rather than below
+PAGE_OFFSET?
 
-Feel free to post an RFC series for what you're proposing.  
-
-IMHO, even the voltage layer should not care about these conversions.
-The voltage layer should care about voltages, and the PMIC layer should
-handle these conversions.  IOW, this stuff is best abstracted in the
-PMIC code, or board- or SoC-specific hooks that can be registered with
-the PMIC.
-
-> So please consider dropping this patch from this series.
-
-If you pick this up as part of your voltage series (or more likely as a
-pre-requisite of your voltage series) we can surely drop it from this
-series, at it doesn't really belong with the OPP series.
-
-There are no upstream users of this yet, so dropping it is easy. :)
-
-Kevin
+-- 
+Catalin
