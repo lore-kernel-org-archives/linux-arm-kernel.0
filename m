@@ -1,29 +1,35 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 16 Sep 2010 14:16:38 +0200
-Subject: [PATCH] ARM: SAMSUNG: make SAMSUNG_PM_DEBUG select DEBUG_LL
-Message-ID: <4c920aa8.d37b0e0a.4ee4.ffffc4bc@mx.google.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 16 Sep 2010 14:19:59 +0200
+Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
+In-Reply-To: <1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
+References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
+	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <AANLkTimC9NOJ5TSqkb1ekBQ_ei2-Ci2ewL66+4aCnyk=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When selecting SAMSUNG_PM_DEBUG, it complains about a missing printascii()
-function if you do not select DEBUG_LL, so make the former select the latter.
+2010/9/15 Kevin Hilman <khilman@deeprootsystems.com>:
 
-Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
----
- arch/arm/plat-samsung/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> OMAP SOCs have a standard set of tuples consisting of frequency and
+> voltage pairs that the device will support per voltage domain. ?These
+> are called Operating Performance Points or OPPs.
+> (...)
+> This introduces a common handling OPP mechanism accross all OMAPs.
+> As a start this is used for OMAP3.
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 7c0bde7..d5816e7 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -260,6 +260,7 @@ comment "Power management"
- config SAMSUNG_PM_DEBUG
- 	bool "S3C2410 PM Suspend debug"
- 	depends on PM
-+	select DEBUG_LL
- 	help
- 	  Say Y here if you want verbose debugging from the PM Suspend and
- 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
--- 
-1.7.0.4
+OPPs are a generic concept, it's in silicon construction textbooks and all.
+Should this code not be made generic instead? You wouldn't make
+regulators or even DMA platform-specific these days, so why should
+OPPs be?
+
+What in this code is actually OMAP-specific, more than that you name
+some functions omap_*, and how hard would it be to put it under
+arch/arm/common/*.c
+arch/arm/include/asm/*.h
+
+Possible even higher up in the directory hiearchy in include/linux/opp.h
+for the header and drivers/opp/*.c, because I think SuperH and power
+are not that different in this respect.
+
+Yours,
+Linus Walleij
