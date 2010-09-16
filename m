@@ -1,56 +1,70 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 16 Sep 2010 14:09:01 +0200
-Subject: colibri-pxa320/AX88796: phy-read/write problems
-Message-ID: <4C9208DD.8000805@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 16 Sep 2010 07:15:05 -0500
+Subject: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
+References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
+	<1284587799-9637-3-git-send-email-khilman@deeprootsystems.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB03294424F5@dbde02.ent.ti.com>
+Message-ID: <4C920A49.5010105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Gopinath, Thara had written, on 09/16/2010 05:40 AM, the following:
+> 
+>>> -----Original Message-----
+>>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Kevin
+>>> Hilman
+>>> Sent: Thursday, September 16, 2010 3:27 AM
+>>> To: linux-omap at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Subject: [PATCH 2/4] OMAP: OPP: twl/tps: Introduce TWL/TPS-specific code
+>>>
+>>> From: Paul Walmsley <paul@pwsan.com>
+>>>
+>>> The OPP layer code should be independent of the PMIC,
+>>> introduce the TWL/TPS-specific code out to its own file.
+> 
+> Hello Kevin,
+> 
+> I have been using this code for a while now. I really do not think wee need a separate
+> file for implementing the vsel to voltage in (uV) and vice versa formulas. Today only voltage
+This split introduces a PMIC level abstraction already. Do you have a 
+suggestion which file it should go to? It is definitely not part of 
+opp.c, not part of other existing twl files as well. the job of this 
+file was to introduce conversion routines which can be used by any layer 
+(voltage layer if need be - it used to be srf and smartreflex before)..
+in fact one of your voltage layer patches introduces capability for 6030 
+as well
+http://marc.info/?l=linux-omap&m=128213020927919&w=2
 
-my hardware is a toradex colibri PXA320 board using latest stable
-Kernel 2.6.35.4. The Ethernet controller is a AX88796BI.
+> layer is interested in these conversions. Voltage layer has a structure that can be populated with
+> the information required from the PMIC. We only need to add two more function pointers to this structure.
+ > This info can then be passed from the actual PMIC driver file. This 
+will make it much
+> more simpler for OMAP4 where we have different formulas between different revisions of PMIC. Also
+> in the omap voltage code we will no longer have to hard code omap_twl_vsel_to_uv and omap_twl_uv_to_vsel.
+I think the problem is with the voltage layer (which has not been posted 
+upstream) which is using hard coded function pointer. What the patchset 
+should have done is to introduce function pointers registration from 
+twl_tps.c to voltage layer and voltage layer should ideally been using 
+function pointers by itself.
 
-Ethernet is working, but access via MDIO to the AX's internal phy is
-broken. The contents of all registers is 0xffff.
+ > So please consider dropping this patch from this series.
+I think I disagree - rationale for having this separated as a pmic 
+specific file is still sound, only the implementation of the future 
+framework should have changed (it should be using function pointers 
+instead of hardcoded function names). in fact I can add additional 
+suggestion for the voltage layer: the pmic selection should be done from 
+a board file - This will allow voltage layer to handle numerous PMICs 
+and combination of PMICs controlling various domains as well.. the only 
+neat way to handle it is ofcourse using function pointers.
 
-The userspace tool "mii-diag" illustrates the problem:
-root at grabowski:~ mii-diag
-Using the default interface 'eth0'.
-Basic registers of MII PHY #16:  ffff ffff ffff ffff ffff ffff ffff ffff.
-  No MII transceiver present!.
-  Use '--force' to view the information anyway.
 
-If I switch on the phy_debug in the ax88796 driver we see that the
-0xffff are read via "ax_phy_read()" from the hardware, this means it's
-not a problem in the userspace.
+PS: Suggestion
+- please fix your mailer to round off for 70/80 chars..
+- might be good to point folks to rfc patchset for voltage layer to give 
+context.
 
-This is the debug output from the phy register accesses of the generic
-mii code, which is polling the link status every 2 seconds.
-
-[   20.946342] ax_phy_issueaddr: dev c77ec000, 0010, 0001, 2
-[   20.946416] ax_phy_read: 0010.0001 => read ffff
-[   20.946429] ax_phy_issueaddr: dev c77ec000, 0010, 0001, 2
-[   20.946502] ax_phy_read: 0010.0001 => read ffff
-[   22.946336] ax_phy_issueaddr: dev c77ec000, 0010, 0001, 2
-[   22.946410] ax_phy_read: 0010.0001 => read ffff
-[   22.946423] ax_phy_issueaddr: dev c77ec000, 0010, 0001, 2
-[   22.946496] ax_phy_read: 0010.0001 => read ffff
-
-Is this a known problem? It occurs with several colibri boards. Can
-someone with a colibri board or a different board with the ax88796 chip
-try to reproduce the problem.
-
-cheers, Marc
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100916/07ef4880/attachment.sig>
+Regards,
+Nishanth Menon
