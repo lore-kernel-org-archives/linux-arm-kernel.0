@@ -1,73 +1,32 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 15 Sep 2010 16:55:46 -0700
-Subject: [PATCH 10/10] OMAP: omap_device: make all devices a child of a new
-	parent device
-In-Reply-To: <1284594946-28963-1-git-send-email-khilman@deeprootsystems.com>
-References: <1284594946-28963-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1284594946-28963-11-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 15 Sep 2010 17:00:12 -0700
+Subject: [PATCH v2 0/2] OMAP: runtime PM core for 2.6.37
+Message-ID: <1284595214-29155-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to help differentiate omap_devices from normal
-platform_devices, make them all a parent of a new common parent
-device.
+A minor re-spin of the runtime PM series,  targetted for 2.6.37.
 
-Then, in order to determine if a platform_device is also an
-omap_device, checking the parent is all that is needed.
+- rebased to v2.6.36-rc4
+- Acks from Grant added
+- update for name change of the omap_device parent device
+  (c.f. https://patchwork.kernel.org/patch/180152/)
 
-Users of this feature are the runtime PM core for OMAP, where we need
-to know if a device being passed in is an omap_device or not in order
-to know whether to call the omap_device API with it.
+Also available in my pm-runtime branch:
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-runtime
 
-In addition, all omap_devices will now show up under /sys/devices/omap
-instead of /sys/devices/platform
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/plat-omap/include/plat/omap_device.h |    2 ++
- arch/arm/plat-omap/omap_device.c              |   12 ++++++++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+Kevin Hilman (2):
+  OMAP2+: PM: initial runtime PM core support
+  OMAP1: PM: add simple runtime PM layer to manage clocks
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index bad4c3d..28e2d1a 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -36,6 +36,8 @@
- 
- #include <plat/omap_hwmod.h>
- 
-+extern struct device omap_device_parent;
-+
- /* omap_device._state values */
- #define OMAP_DEVICE_STATE_UNKNOWN	0
- #define OMAP_DEVICE_STATE_ENABLED	1
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 7f05f49..8215b1b 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -465,6 +465,7 @@ int omap_device_register(struct omap_device *od)
- {
- 	pr_debug("omap_device: %s: registering\n", od->pdev.name);
- 
-+	od->pdev.dev.parent = &omap_device_parent;
- 	return platform_device_register(&od->pdev);
- }
- 
-@@ -737,3 +738,14 @@ int omap_device_enable_clocks(struct omap_device *od)
- 	/* XXX pass along return value here? */
- 	return 0;
- }
-+
-+struct device omap_device_parent = {
-+	.init_name	= "omap",
-+	.parent         = &platform_bus,
-+};
-+
-+static int __init omap_device_init(void)
-+{
-+	return device_register(&omap_device_parent);
-+}
-+core_initcall(omap_device_init);
+ arch/arm/mach-omap1/Makefile |    2 +-
+ arch/arm/mach-omap1/pm_bus.c |   98 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/Makefile |   10 +++-
+ arch/arm/mach-omap2/pm_bus.c |   85 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 191 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/pm_bus.c
+ create mode 100644 arch/arm/mach-omap2/pm_bus.c
+
 -- 
 1.7.2.1
