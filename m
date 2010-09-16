@@ -1,44 +1,60 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 16 Sep 2010 13:58:09 -0400 (EDT)
-Subject: Maximum bootable kernel size in current ARM linux
-In-Reply-To: <1284657411.32513.3.camel@e102109-lin.cambridge.arm.com>
-References: <4C8DD588.7040009@endruntechnologies.com>
-	<201009131043.48688.marek.vasut@gmail.com>
-	<AANLkTimti4ajAOR0_aZ8aeGu9PN4a0MX8dbpg6dpZJYf@mail.gmail.com>
-	<20100913101039.GC2614@kw.sim.vm.gnt>
-	<000001cb5409$4726e000$4b4d010a@Emea.Arm.com>
-	<1284468849.933.2.camel@e102109-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1009141333090.19366@xanadu.home>
-	<1284657411.32513.3.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1009161338140.19366@xanadu.home>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 16 Sep 2010 11:01:07 -0700
+Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD26065F@dbde02.ent.ti.com>
+	(Santosh Shilimkar's message of "Thu, 16 Sep 2010 22:43:03 +0530")
+References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
+	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
+	<AANLkTimC9NOJ5TSqkb1ekBQ_ei2-Ci2ewL66+4aCnyk=@mail.gmail.com>
+	<87sk19eneu.fsf@deeprootsystems.com> <4C92386F.2070600@ti.com>
+	<87vd65bsfs.fsf@deeprootsystems.com>
+	<AANLkTim1DD5FOqqxfdV+BoMiq2wmzz6ZuDV6u5_=zUeb@mail.gmail.com>
+	<4C924F6E.6040804@ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD26065F@dbde02.ent.ti.com>
+Message-ID: <87lj718t5o.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Sep 2010, Catalin Marinas wrote:
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-> On Tue, 2010-09-14 at 13:37 -0400, Nicolas Pitre wrote:
-> > On Tue, 14 Sep 2010, Catalin Marinas wrote:
-> > 
-> > > I think the Thumb-2 branch goes up to 16MB range. The Thumb-1 may be
-> > > smaller but we don't support this in the kernel. That's why Thumb-2
-> > > modules are within 8MB below PAGE_OFFSET. But this leaves us with
-> > > maximum 8MB of kernel size.
-> > 
-> > Hmmm.  Would be worth moving the pkmap area below modules then.
-> 
-> So currently the pkmap area is at PAGE_OFFSET - 2MB. On a Thumb-2 kernel
-> with highmem enabled we would have 6MB available to modules. Is this big
-> enough? If not, we could move the pkmap area.
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>> owner at vger.kernel.org] On Behalf Of Menon, Nishanth
+>> Sent: Thursday, September 16, 2010 10:40 PM
+>> To: Linus Walleij
+>> Cc: Kevin Hilman; linux-omap at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org
+>> Subject: Re: [PATCH 1/4] OMAP: introduce OPP layer for device-specific
+>> OPPs
+>> 
+>> Linus Walleij had written, on 09/16/2010 12:07 PM, the following:
+>> > 2010/9/16 Kevin Hilman <khilman@deeprootsystems.com>:
+>> >
+>> >> lib/opp/* seems more appropriate to me with the header at
+>> >> include/linux/opp.h as Linus suggested.
+>> >
+>> > I second this. I would love to see the generic OPP stuff in
+>> > lib/opp/* so we put it in the right place from the beginning and
+>> > don't have to painfully refactor everything later (clk.h
+>> > especially comes to mind.)
+>> cool.. digging a bit deeper into lib directory, I propose the following:
+>> lib/opp.c
+>> include/linux/opp.h
+>> 
+>> any soc specific data (for registration etc) -> goes to
+>> arch/<arch>/mach-<soc>/oppdata_xyz.c or what ever they choose
+>> 
+>> the intent being lib/ is no place to put mach or arch specific data
+>> definitions.. it is just noise..
+>> 
+>> if folks are ok with this, will post a new rev soonish..
+>> 
+> If you like may be you can take this thread over lkml just to get more
+> wider perspective
 
-It is probably enough. But it is just not optimal.  If the area between 
-TASK_SIZE and PAGE_OFFSET-8M is unused, then it would make sense to move 
-the pkmap area there instead.
+I propose Nishanth does the slight rework to move this to lib/ and then
+post to l-o, l-a-k and lkml for RFC.  Note that only the generic parts
+should be posted first, the OMAP specific usage of this can be fixed
+after the generic parts are accepted.
 
-> BTW, can it be moved in the top part of the memory rather than below
-> PAGE_OFFSET?
-
-It could, but top memory layout tend to be machine specific, or already 
-used by the consistent DMA.  And the module area is underused anyway.
-
-
-Nicolas
+Kevin
