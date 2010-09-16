@@ -1,35 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 16 Sep 2010 12:10:06 -0500
-Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
-In-Reply-To: <AANLkTim1DD5FOqqxfdV+BoMiq2wmzz6ZuDV6u5_=zUeb@mail.gmail.com>
-References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>	<AANLkTimC9NOJ5TSqkb1ekBQ_ei2-Ci2ewL66+4aCnyk=@mail.gmail.com>	<87sk19eneu.fsf@deeprootsystems.com>	<4C92386F.2070600@ti.com>	<87vd65bsfs.fsf@deeprootsystems.com>
-	<AANLkTim1DD5FOqqxfdV+BoMiq2wmzz6ZuDV6u5_=zUeb@mail.gmail.com>
-Message-ID: <4C924F6E.6040804@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Sep 2010 19:12:12 +0200
+Subject: [PATCH 0/3] [ARM] tegra: PCI Express support
+In-Reply-To: <cover.1284655723.git.mike@compulab.co.il>
+References: <cover.1284655723.git.mike@compulab.co.il>
+Message-ID: <201009161912.12330.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij had written, on 09/16/2010 12:07 PM, the following:
-> 2010/9/16 Kevin Hilman <khilman@deeprootsystems.com>:
+On Thursday 16 September 2010 18:53:33 Mike Rapoport wrote:
+> These patches enable PCI Express support on Tegra2.
+> The implementation is based on original NVidia code from (1), but it
+> is heavily reworked to avoid custom PCI enumeration and make the code
+> more Linux friendly.
 > 
->> lib/opp/* seems more appropriate to me with the header at
->> include/linux/opp.h as Linus suggested.
-> 
-> I second this. I would love to see the generic OPP stuff in
-> lib/opp/* so we put it in the right place from the beginning and
-> don't have to painfully refactor everything later (clk.h
-> especially comes to mind.)
-cool.. digging a bit deeper into lib directory, I propose the following:
-lib/opp.c
-include/linux/opp.h
+> This implementation assumes that the PCIe subsystem is fully powered
+> and ungated by the bootloader.
 
-any soc specific data (for registration etc) -> goes to 
-arch/<arch>/mach-<soc>/oppdata_xyz.c or what ever they choose
+The patches look good to me, but it seems that I/O space accesses are
+still broken and need to be redirected to the PCI I/O range, like
+the (totally untested) patch below.
 
-the intent being lib/ is no place to put mach or arch specific data 
-definitions.. it is just noise..
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-if folks are ok with this, will post a new rev soonish..
-
--- 
-Regards,
-Nishanth Menon
+diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
+index 35edfc3..d54e384 100644
+--- a/arch/arm/mach-tegra/include/mach/io.h
++++ b/arch/arm/mach-tegra/include/mach/io.h
+@@ -21,7 +21,8 @@
+ #ifndef __MACH_TEGRA_IO_H
+ #define __MACH_TEGRA_IO_H
+ 
+-#define IO_SPACE_LIMIT 0xffffffff
++/* Two 1MB windows */
++#define IO_SPACE_LIMIT (SZ_1M + SZ_1M - 1)
+ 
+ /* On TEGRA, many peripherals are very closely packed in
+  * two 256MB io windows (that actually only use about 64KB
+@@ -69,7 +70,7 @@ void tegra_iounmap(volatile void __iomem *addr);
+ 
+ static inline void __iomem *__io(unsigned long addr)
+ {
+-	return (void __iomem *)addr;
++	return addr + tegra_pcie.regs + SZ_4M;
+ }
+ #define __io(a)         __io(a)
+ #define __mem_pci(a)    (a)
