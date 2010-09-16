@@ -1,47 +1,60 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Thu, 16 Sep 2010 16:48:28 +0200
-Subject: [PATCH V3 0/6] Generalise ARM perf-events backend for oprofile
-In-Reply-To: <20100913111850.GC14882@console-pimps.org>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<1284372533.3042.11.camel@e102144-lin.cambridge.arm.com>
-	<20100913111850.GC14882@console-pimps.org>
-Message-ID: <20100916144828.GD13563@erda.amd.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 16 Sep 2010 08:08:41 -0700
+Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
+In-Reply-To: <AANLkTimC9NOJ5TSqkb1ekBQ_ei2-Ci2ewL66+4aCnyk=@mail.gmail.com>
+	(Linus Walleij's message of "Thu, 16 Sep 2010 14:19:59 +0200")
+References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
+	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
+	<AANLkTimC9NOJ5TSqkb1ekBQ_ei2-Ci2ewL66+4aCnyk=@mail.gmail.com>
+Message-ID: <87sk19eneu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.09.10 07:18:50, Matt Fleming wrote:
-> On Mon, Sep 13, 2010 at 11:08:53AM +0100, Will Deacon wrote:
+Hi Linus,
 
-> > I've tested this patch series on a multicore Cortex-A9 board. If I
-> > revert patch 5/6 (ARM: Make oprofile depend on CONFIG_HW_PERF_EVENTS)
-> > then everything seems to work fine. Otherwise, testing without
-> > HW_PERF_EVENTS doesn't fall back to timer mode.
-> > 
-> > So, with the exception of the patch above:
-> > 
-> > Tested-by: Will Deacon <will.deacon@arm.com>
-> 
-> Hi Will, thanks for testing!
-> 
-> Ah yeah, making oprofile rely on CONFIG_HW_PERF_EVENTS is too
-> strict. I hadn't noticed that armpmu_get_pmu_id() is wrapped in
-> CONFIG_HW_PERF_EVENTS and had intended op->cpu_type to be NULL and so
-> we'd fallback to the timer mode.
-> 
-> This patch needs to be dropped entirely (though another patch should
-> conditionally include oprofile_perf.o based on CONFIG_HW_PERF_EVENT
-> like I had in my original series).
+Linus Walleij <linus.walleij@stericsson.com> writes:
 
-Matt,
+> 2010/9/15 Kevin Hilman <khilman@deeprootsystems.com>:
+>
+>> OMAP SOCs have a standard set of tuples consisting of frequency and
+>> voltage pairs that the device will support per voltage domain. ?These
+>> are called Operating Performance Points or OPPs.
+>> (...)
+>> This introduces a common handling OPP mechanism accross all OMAPs.
+>> As a start this is used for OMAP3.
+>
+> OPPs are a generic concept, it's in silicon construction textbooks and all.
+> Should this code not be made generic instead? You wouldn't make
+> regulators or even DMA platform-specific these days, so why should
+> OPPs be?
 
-yes, the patch set looks good so far. With the exception of some minor
-comments I made and patch #5 dropped, we should be fine. Please update
-the patches.
+You're right.
 
-Thanks,
+> What in this code is actually OMAP-specific
 
--Robert
+Only the users.  ;)
 
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+We currently register OPPs using an OMAP hwmod name, but we could easily
+change that to use a struct device instead which would make this
+much more generic (note we manage OPPs per-device, not just for the CPU)
+
+The patch below[1] demonstrates quickly how easily we could remove all OMAP
+specific stuff from opp.[ch], and move it to the OMAP-specific code that
+does the opp_add()
+
+> more than that you name
+> some functions omap_*, and how hard would it be to put it under
+> arch/arm/common/*.c
+> arch/arm/include/asm/*.h
+>
+> Possible even higher up in the directory hiearchy in include/linux/opp.h
+> for the header and drivers/opp/*.c, because I think SuperH and power
+> are not that different in this respect.
+
+Yeah, I guess this isn't ARM specific either, so should be at a higher
+level. 
+
+Nishanth, can take my hack below and continue this evolution?  As I
+demonstrate with this hack, this won't really change anything for us.
+
+Kevin
