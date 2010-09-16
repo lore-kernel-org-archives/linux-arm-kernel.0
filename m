@@ -1,23 +1,39 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 16 Sep 2010 09:36:06 +0200
-Subject: [PATCH] ARM: New option for generating uncompressed uImage.
-In-Reply-To: <1284621783-8196-1-git-send-email-jonas.aberg@stericsson.com>
-References: <1284621783-8196-1-git-send-email-jonas.aberg@stericsson.com>
-Message-ID: <20100916073606.GO23518@game.jcrosoft.org>
+From: s-ghorai@ti.com (Sukumar Ghorai)
+Date: Thu, 16 Sep 2010 13:30:55 +0530
+Subject: [PATCH RESEND v4 0/4] nand prefetch-irq support and ecc layout chanage
+Message-ID: <1284624059-1741-1-git-send-email-s-ghorai@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:23 Thu 16 Sep     , Jonas Aaberg wrote:
-> Some systems do boot faster with an uncompressed kernel.
-> 
-> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-> 
-> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-I mostly never see it
+  The following set of patches applies on linux-2.6.
+   
+   v4: resend of 
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32689.html
+   
+   v3: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32071.html
+   	Rebase on latest codebase and previous patch(posted).	
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31963.html
+	
+   v2: Rebase on latest codebase and previous patch(posted).	
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31471.html
 
-we are faster to uncompress a kernel in ddr
+   v1: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26666.html
 
-can you provide beanchmark
 
-Best Regards,
-J.
+
+Sukumar Ghorai (5):
+  Merge branches 'master' and 'master' of
+    git://git.kernel.org/.../torvalds/linux-2.6
+  omap3: nand: prefetch in irq mode support
+  omap3: nand: configurable fifo threshold to gain the throughput
+  omap: nand: ecc layout select from board file
+  omap: nand: making ecc layout as compatible with romcode ecc
+
+ arch/arm/mach-omap2/board-flash.c      |    5 +-
+ arch/arm/mach-omap2/gpmc.c             |   15 ++-
+ arch/arm/plat-omap/include/plat/gpmc.h |    9 +-
+ arch/arm/plat-omap/include/plat/irqs.h |    1 +
+ arch/arm/plat-omap/include/plat/nand.h |    7 +
+ drivers/mtd/nand/Kconfig               |   14 ++-
+ drivers/mtd/nand/omap2.c               |  277 ++++++++++++++++++++++++++++---
+ 7 files changed, 294 insertions(+), 34 deletions(-)
