@@ -1,100 +1,171 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Thu, 16 Sep 2010 13:30:59 +0530
-Subject: [PATCH RESEND v4 4/4] omap: nand: making ecc layout as compatible
-	with romcode ecc
-In-Reply-To: <1284624059-1741-1-git-send-email-s-ghorai@ti.com>
-References: <1284624059-1741-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1284624059-1741-5-git-send-email-s-ghorai@ti.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Thu, 16 Sep 2010 16:19:24 +0800
+Subject: [PATCH 0/3] Common struct clk implementation, v7
+In-Reply-To: <AANLkTim++mNF=KDabCBCk=jDxbwNFWu=hrDQq=UWR=yM@mail.gmail.com>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<AANLkTim++mNF=KDabCBCk=jDxbwNFWu=hrDQq=UWR=yM@mail.gmail.com>
+Message-ID: <1284625164.3350.62.camel@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    This patch overrides nand ecc layout and bad block descriptor (for 8-bit
-    device) to support hw ecc in romcode layout. So as to have in sync with ecc
-    layout throughout; i.e. x-loader, u-boot and kernel.
+Hi Colin,
 
-    This patch also enables to use romcode ecc for spd and zoom, by default.
+> Having just finished implementing the clock tree support on Tegra, I
+> have a few concerns about these patches, and how they relate to the
+> clk api.
+> 
+Thanks for taking a look through the patches - I'm definitely keen to
+hear more from those doing implementations of either clock API.
 
-    This enables to flash x-loader, u-boot, kernel, FS images from kernel itself
-    and compatiable with other tools.
+> On the spinlock vs. mutex issue (I know, it's been beaten to death).
 
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
----
- arch/arm/mach-omap2/board-flash.c |    2 +-
- drivers/mtd/nand/omap2.c          |   34 ++++++++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 1 deletions(-)
+I wouldn't say beaten to death, I just haven't heard a good case for the
+atomic lock option yet (well, until your email..) :)
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index 5f74c8f..d71c511 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -145,7 +145,7 @@ __init board_nand_init(struct mtd_partition *nand_parts, u8 nr_parts, u8 cs)
- 	board_nand_data.cs		= cs;
- 	board_nand_data.parts		= nand_parts;
- 	board_nand_data.nr_parts	= nr_parts;
--	board_nand_data.ecc_opt		= OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT;
-+	board_nand_data.ecc_opt		= OMAP_ECC_HAMMING_CODE_HW;
- 
- 	gpmc_nand_init(&board_nand_data);
- }
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index dbbd699..33c356b 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -128,6 +128,20 @@ const int use_dma;
- const int use_interrupt;
- #endif
- 
-+/* oob info generated runtime depending on ecc algorithm and layout selected */
-+static struct nand_ecclayout omap_oobinfo;
-+/* Define some generic bad / good block scan pattern which are used
-+ * while scanning a device for factory marked good / bad blocks
-+ */
-+static uint8_t scan_ff_pattern[] = { 0xff };
-+static struct nand_bbt_descr bb_descrip_flashbased = {
-+	.options = NAND_BBT_SCANEMPTY | NAND_BBT_SCANALLPAGES,
-+	.offs = 0,
-+	.len = 1,
-+	.pattern = scan_ff_pattern,
-+};
-+
-+
- struct omap_nand_info {
- 	struct nand_hw_control		controller;
- 	struct omap_nand_platform_data	*pdata;
-@@ -945,6 +959,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 	struct omap_nand_info		*info;
- 	struct omap_nand_platform_data	*pdata;
- 	int				err;
-+	int				i, offset;
- 
- 	pdata = pdev->dev.platform_data;
- 	if (pdata == NULL) {
-@@ -1079,6 +1094,25 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	/* rom code layout */
-+	if (pdata->ecc_opt != OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT) {
-+		offset = (info->nand.options & NAND_BUSWIDTH_16) ? 2 : 1;
-+		if (info->mtd.oobsize == 16) {
-+			info->nand.badblock_pattern = &bb_descrip_flashbased;
-+			omap_oobinfo.eccbytes = 3;
-+		} else
-+			omap_oobinfo.eccbytes  = 3 * 4;
-+
-+		for (i = 0; i < omap_oobinfo.eccbytes; i++)
-+			omap_oobinfo.eccpos[i] = i+offset;
-+
-+		omap_oobinfo.oobfree->offset = offset + omap_oobinfo.eccbytes;
-+		omap_oobinfo.oobfree->length = info->mtd.oobsize -
-+					(offset + omap_oobinfo.eccbytes);
-+
-+		info->nand.ecc.layout = &omap_oobinfo;
-+	}
-+
- #ifdef CONFIG_MTD_PARTITIONS
- 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
- 	if (err > 0)
--- 
-1.7.0.4
+> The clk api does not specify whether or not implementations can sleep.
+>  In fact, it explicitly states that clk_get and clk_put can't be
+> called from atomic context, but does not say anything about the rest
+> of the api, which vaguely implies that they can be called from atomic
+> context.
+
+At present, clk_enable and clk_disable can only be called from
+non-atomic contexts.
+
+All other operations can be called from atomic contexts, *provided that*
+the underlying clock implementation does not block. I'm not planning to
+enforce any rules about the implementations, so this will probably stay
+as an "it depends".
+
+> There are situations in which a non-sleeping clk api is useful, if not
+> necessary.  On msm with a smart panel, the vsync is connected to a
+> gpio, and the vsync interrupt enables the dma controller clock is to
+> start the dma of the framebuffer to the display block.  A similar
+> problem can happen in dma audio, where a low watermark interrupt from
+> the audio block needs to trigger dma to refill the buffer.
+
+Just to clarify - these two examples definitely can't defer the enable,
+right?
+
+> Because of the refcounting in
+> clk_disable, this is not particularly difficult, but a
+> clk_disable_later helper function might simplify it.
+
+Sounds reasonable; something like clk_disable_later would be good.
+
+> Additionally, using a lock per clk struct can cause AB-BA locking
+> issues.  In my implementation, calling clk_enable on a child clock in
+> the clock tree can call clk_enable on its parent if the child clock
+> was not already enabled.
+
+Yep, and my implementation does the same.
+
+>   This leads to the child clock lock being
+> taken, followed by the parent clock lock.  Calling clk_set_rate on the
+> parent requires recalculating the rate of all of the children, which
+> leads to the parent clock lock being taken first, followed by the
+> child clock lock.  Deadlock.
+
+I don't currently enforce any locking in set_rate; if a clock
+implementation does locking in this order (child before parent), then
+it'd have to use a separate lock, rather than acquiring the clk->mutex
+in the set_rate operation.
+
+> I solved these problems by using a single spinlock around all of the
+> clocks, plus an additional mutex around the clocks that need to sleep.
+>  I also locally added clk_*_cansleep functions to the clk api, and
+> used might_sleep to prevent calls to the non-cansleep clk api on
+> clocks that require sleeping.  I'm not happy with this solution, as it
+> uses a local extension to a cross-platform api, but I don't see any
+> way around it.  Some clocks really need to be enabled or disabled from
+> atomic context, and some clocks are impossible to use in atomic
+> context.
+> 
+> I think something a little like the gpio api style of cansleep and non
+> cansleep functions would help would preserve the ability for clocks to
+> avoid sleeping on platforms that don't need to sleep, while allowing
+> drivers that can handle sleeping clocks to remain as widely
+> cross-platform as possible.  Instead of changing all the calls, add a
+> clk_get_nosleep for drivers that will call the clk apis in atomic
+> context, which will catch drivers that are not compatible with the
+> clock they are requesting early on during probe.
+> 
+> Either way, the clk api could use some notes on the restrictions for
+> both the callers and the implementers to ensure compatibility between
+> architectures.
+
+Yes, agreed.
+
+Basically, the reason for choosing a mutex rather than a spinlock is
+based on how easy it is to workaround and use it in the "other" context;
+ie, how we can use a mutex-based clock in an atomic environment, or use
+a spinlock in a non-atomic environment.
+
+With the mutex-based clock, enabling from a atomic environment means
+that the callee needs to defer work to non-atomic context, a fairly
+standard design pattern which (up until your email) I thought would
+cater for all cases.
+
+With a spinlock-based clock, the callee does not need to defer any work,
+but it means that the clock implementation needs to enable/disable the
+clock atomically. For clock implementations that need to sleep, we can
+defer the enabling, but this means that clk_enable() returns before the
+clock is actually enabled, which is not acceptable.
+
+If we really do need both locking semantics, it'd be ugly, we could do
+something like:
+
+struct clk {
+	union {
+		struct mutex mutex;
+		spintlock_t spinlock;
+	} lock;
+	const struct clk_ops *ops;
+	[...]
+};
+
+struct clk_ops {
+	void (*lock)(struct clk *clk);
+	void (*unlock)(struct clk *clk);
+	[ existing clk_ops function pointers ]
+};
+
+And provide the corresponding implementations for lock/unlock:
+
+void clk_mutex_lock(struct clk *clk)
+{
+	mutex_acquire(&clk->lock.mutex);
+}
+
+void clk_spinlock_lock(struct clk *clk)
+{
+	spin_lock(&clk->lock.spinlock);
+}
+
+void clk_noop_lock(struct clk *clk)
+{
+}
+
+Then the implementation can choose the appropriate lock for the clock,
+based on whether it needs to sleep to enable & disable. The core code
+would then call clk->lock() and clk->unlock() instead of manipulating
+clk->mutex directly.
+
+[I've used a union for clarity here - we'd need to do some trickery to
+properly initialise the clock's lock statically, or we could drop the
+union and steal the mutex's spinlock for the atomic case]
+
+The big downside of this is that the locking semantics are no longer
+obvious to the device driver API, which may be getting an atomic clock
+or a non-atomic one. As you suggest, we could add a helper:
+
+ clk_get_atomic()
+
+- which would just do a clk_get() and then BUG_ON() if we have the wrong
+type.
+
+Any thoughts?
+
+Cheers,
+
+
+Jeremy
