@@ -1,75 +1,48 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 16 Sep 2010 04:33:02 +0200
-Subject: [PATCH 11/11] ARM: pxa: Add gpio-leds and vibrator support to PalmTC
-In-Reply-To: <1284604382-23683-1-git-send-email-marek.vasut@gmail.com>
-References: <1284604382-23683-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1284604382-23683-11-git-send-email-marek.vasut@gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 16 Sep 2010 11:58:15 +0900
+Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
+In-Reply-To: <Pine.LNX.4.64.1009150919400.31624@axis700.grange>
+References: <20100819160255.GA3948@suse.de>
+	<20100914085206.GP7336@linux-sh.org>
+	<Pine.LNX.4.64.1009150919400.31624@axis700.grange>
+Message-ID: <20100916115815W.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/palmtc.c |   41 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 41 insertions(+), 0 deletions(-)
+On Wed, 15 Sep 2010 09:23:54 +0200 (CEST)
+Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
 
-diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index 9c74ce9..ccefc4e 100644
---- a/arch/arm/mach-pxa/palmtc.c
-+++ b/arch/arm/mach-pxa/palmtc.c
-@@ -390,6 +390,46 @@ static inline void palmtc_ts_init(void) {}
- #endif
- 
- /******************************************************************************
-+ * LEDs
-+ ******************************************************************************/
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+struct gpio_led palmtc_gpio_leds[] = {
-+{
-+	.name			= "palmtc:green:user",
-+	.default_trigger	= "none",
-+	.gpio			= GPIO_NR_PALMTC_LED_POWER,
-+	.active_low		= 1,
-+}, {
-+	.name			= "palmtc:vibra:vibra",
-+	.default_trigger	= "none",
-+	.gpio			= GPIO_NR_PALMTC_VIBRA_POWER,
-+	.active_low		= 1,
-+}
-+
-+};
-+
-+static struct gpio_led_platform_data palmtc_gpio_led_info = {
-+	.leds		= palmtc_gpio_leds,
-+	.num_leds	= ARRAY_SIZE(palmtc_gpio_leds),
-+};
-+
-+static struct platform_device palmtc_leds = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &palmtc_gpio_led_info,
-+	}
-+};
-+
-+static void __init palmtc_leds_init(void)
-+{
-+	platform_device_register(&palmtc_leds);
-+}
-+#else
-+static inline void palmtc_leds_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * NOR Flash
-  ******************************************************************************/
- #if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
-@@ -502,6 +542,7 @@ static void __init palmtc_init(void)
- 	palmtc_ts_init();
- 	palmtc_nor_init();
- 	palmtc_lcd_init();
-+	palmtc_leds_init();
- };
- 
- MACHINE_START(PALMTC, "Palm Tungsten|C")
--- 
-1.7.1
+> > it should also include an update for
+> > Documentation/DMA-API.txt. I'm simply not going to take any DMA API
+> > patches if they don't include the documentation update. DMA-API.txt is
+> > one of the few useful parts of Documentation/, we should really strive to
+> > keep it that way.
+> 
+> I believe, this your comment refers to another related patch of mine:
+> 
+> [RFC][PATCH] add dma_reserve_coherent_memory()/dma_free_reserved_memory() API
+> 
+> Sure, updating the documentation would be the right thing to do here, but 
+> FUJITA Tomonori is nacking this patch for 2.6.36, so, we will either have 
+
+I already explained why the above API is wrong.
+
+
+> to live with a few broken platforms and drivers until 2.6.37, or we'll 
+> have to find another solution, or that NAK has to be reconsidered
+
+Needs to revert the patch that causes the regression. The patch does
+the right thing but also breaks some working platforms. You need to
+fix "working" platforms that does wrong things before the patch.
+
+
+> > It would also be nice if on the next iteration DMA API people were Cc'ed,
+> > this would be at least:
+> > 
+> > 	FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
+> > 	James Bottomley <James.Bottomley@HansenPartnership.com>
+> 
+> Right, sorry, added to the CC now, although, this is not the right thread 
+> to discuss the proposed new API.
+
+Please send to linux-kernel and linux-arch too.
