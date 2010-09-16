@@ -1,53 +1,38 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Sep 2010 21:14:36 -0600
-Subject: amba_pl022 spi->mode fix/cleanup patches
-In-Reply-To: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
-References: <1284135579-13578-1-git-send-email-wellsk40@gmail.com>
-Message-ID: <20100916031436.GA7542@angua.secretlab.ca>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 16 Sep 2010 13:22:18 +0900
+Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
+In-Reply-To: <Pine.LNX.4.64.1009150919400.31624@axis700.grange>
+References: <Pine.LNX.4.64.1008191623580.26145@axis700.grange>
+	<Pine.LNX.4.64.1008191634160.26145@axis700.grange>
+	<20100819153527.GE2985@suse.de>
+	<Pine.LNX.4.64.1008191744560.26145@axis700.grange>
+	<20100819160255.GA3948@suse.de>
+	<20100914085206.GP7336@linux-sh.org>
+	<Pine.LNX.4.64.1009150919400.31624@axis700.grange>
+Message-ID: <20100916042218.GF7266@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 10, 2010 at 09:19:34AM -0700, wellsk40 at gmail.com wrote:
-> This patch series updates drivers and platforms that depend on the
-> amba_pl022 driver and use the pl022_config_chip structure for
-> setting up the SPI mode and data transfer width.
+On Wed, Sep 15, 2010 at 09:23:54AM +0200, Guennadi Liakhovetski wrote:
+> On Tue, 14 Sep 2010, Paul Mundt wrote:
+> > it should also include an update for
+> > Documentation/DMA-API.txt. I'm simply not going to take any DMA API
+> > patches if they don't include the documentation update. DMA-API.txt is
+> > one of the few useful parts of Documentation/, we should really strive to
+> > keep it that way.
 > 
-> The SPI configuration (CPOL/CPHA mode, bit send order, data bits per
-> word, and loopback mode) were previously setup as part of board
-> specific data in the pl022_config_chip structure. This has been
-> changed to now use the .mode field in spi_board_info structure (or
-> drivers that setup the mode). The SPI transfer's data width is now
-> configured from spi->bits_per_word.
+> I believe, this your comment refers to another related patch of mine:
 > 
-> The SPI driver changes have been previously submitted to the SPI ML.
-> This patch series need to be layered on that patch series.
-> 
-> These changes add or fix the .mode field in the plats/boards that use the
-> driver (u300, ux500, lpc32xx). The patches also move the data width
-> from the board specific area to the driver for mfd/ab8500. As the
-> fields in the pl022_config_chip structure are no longer needed, they
-> are removed in the last patch.
-> 
-> These changes have been tested on the phy3250 platform (lpc32xx). I
-> was able to test the ab8500 driver to some degree, but I only have a
-> standard pl022. I am unable to test u300 and ux500 changes, but the
-> u300 changes compiled fine.
-> 
-> [PATCH 1/5] mfd/ab8500: Setup SPI transfer for 24 bits
-> [PATCH 2/5] ARM: LPC32XX: Add missing SPI mode and remove unused fields
-> [PATCH 3/5] ARM: U300: spi->mode and spi_bits_per_words updates
-> [PATCH 4/5] ARM: Ux500: Change SPI mode and remove unused fields
-> [PATCH 5/5] spi: amba_pl022: Remove unused fields from pl022_config_chip
+Yes, sorry about that, this is what I get for having two mutt sessions
+open at the same time. I ended up reading one patch and replying to the other.
 
-There are ordering issues with these patches and the patch they depend
-on.  Basically, as-is it is not bisectable.  The above platforms stop
-working after the SPI driver changes are applied, but before these
-patches are.  You'll need to update the mode field for all the users
-in or before the SPI driver changes patch to preserve bisectability.
-Then you can have subsequent cleanup patches....
-
-Or just squash all the patches into the SPI driver patch.  I'd be
-okay with that in this case because the board changes are well
-contained and easy to understand.
-
-g.
+> Sure, updating the documentation would be the right thing to do here, but 
+> FUJITA Tomonori is nacking this patch for 2.6.36, so, we will either have 
+> to live with a few broken platforms and drivers until 2.6.37, or we'll 
+> have to find another solution, or that NAK has to be reconsidered
+> 
+I suppose we can live with the breakage for 2.6.36 given that it's just
+enforcing behaviour that shouldn't have been relied upon in the first
+place. At least there is the opportunity to get things fixed up properly
+for 2.6.37, and people that invariably care about it on 2.6.36 will just
+end up backporting anyways.
