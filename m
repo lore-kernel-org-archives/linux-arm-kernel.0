@@ -1,50 +1,21 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 16 Sep 2010 11:26:39 +0530
-Subject: [PATCH 3/6] omap4: l2x0: Override the default l2x0_disable
-In-Reply-To: <20100916002134.GL4174@atomide.com>
-References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
-	<20100916002134.GL4174@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD260130@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Sep 2010 08:04:42 +0100
+Subject: [PATCH 3/5] DMA: reduce the number of memory allocations
+In-Reply-To: <20100916115815W.fujita.tomonori@lab.ntt.co.jp>
+References: <20100819160255.GA3948@suse.de>
+	<20100914085206.GP7336@linux-sh.org>
+	<Pine.LNX.4.64.1009150919400.31624@axis700.grange>
+	<20100916115815W.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20100916070442.GA19994@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Thursday, September 16, 2010 5:52 AM
-> To: Shilimkar, Santosh
-> Cc: linux-arm-kernel at lists.infradead.org; tglx at linutronix.de;
-> catalin.marinas at arm.com; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 3/6] omap4: l2x0: Override the default l2x0_disable
+On Thu, Sep 16, 2010 at 11:58:15AM +0900, FUJITA Tomonori wrote:
+> > to live with a few broken platforms and drivers until 2.6.37, or we'll 
+> > have to find another solution, or that NAK has to be reconsidered
 > 
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [100907 00:50]:
-> > The machine_kexec() calls outer_disable which can crash on OMAP4
-> > becasue of trustzone restrictions.
-> >
-> > This patch overrides the default l2x0_disable with a OMAP4
-> > specific implementation taking care of trustzone
-> 
-> <snip>
-> 
-> > @@ -66,6 +73,12 @@ static int __init omap_l2_cache_init(void)
-> >
-> >  	 */
-> >  	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
-> >
-> > +	/*
-> > +	 * Override default outer_cache.disable with a OMAP4
-> > +	 * specific one
-> > +	*/
-> > +	outer_cache.disable = omap4_l2x0_disable;
-> > +
-> >  	return 0;
-> >  }
-> >  early_initcall(omap_l2_cache_init);
-> 
-> Just to be sure.. No outer_cache functions get set unless
-> l2x0_init gets called, right? So omap2 and omap3 functions
-> always stay NULL with omap3_defconfig?
-> 
-Yes.
+> Needs to revert the patch that causes the regression. The patch does
+> the right thing but also breaks some working platforms. You need to
+> fix "working" platforms that does wrong things before the patch.
+
+Not going to happen.
