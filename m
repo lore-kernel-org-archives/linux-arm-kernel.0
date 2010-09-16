@@ -1,171 +1,297 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Thu, 16 Sep 2010 16:19:24 +0800
-Subject: [PATCH 0/3] Common struct clk implementation, v7
-In-Reply-To: <AANLkTim++mNF=KDabCBCk=jDxbwNFWu=hrDQq=UWR=yM@mail.gmail.com>
-References: <1284522014.516876.675872472687.0.gpush@pororo>
-	<AANLkTim++mNF=KDabCBCk=jDxbwNFWu=hrDQq=UWR=yM@mail.gmail.com>
-Message-ID: <1284625164.3350.62.camel@pororo>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 16 Sep 2010 10:23:35 +0200
+Subject: [PATCH] ARM: remove legacy LEDS support from RealView and Versatile
+Message-ID: <1284625415-8363-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+We have merged proper support for the NEW_LEDS and LEDS_CLASS in
+the RealView and Versatile family in plat-versatile, including the
+heartbeat feature that was provided for these platforms so scrap
+this old LEDS stuff from these platforms.
 
-> Having just finished implementing the clock tree support on Tegra, I
-> have a few concerns about these patches, and how they relate to the
-> clk api.
-> 
-Thanks for taking a look through the patches - I'm definitely keen to
-hear more from those doing implementations of either clock API.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/Kconfig                         |    4 +-
+ arch/arm/mach-realview/core.c            |   39 ---------------------------
+ arch/arm/mach-realview/core.h            |    2 -
+ arch/arm/mach-realview/realview_eb.c     |    4 ---
+ arch/arm/mach-realview/realview_pb1176.c |    4 ---
+ arch/arm/mach-realview/realview_pb11mp.c |    4 ---
+ arch/arm/mach-realview/realview_pba8.c   |    4 ---
+ arch/arm/mach-realview/realview_pbx.c    |    4 ---
+ arch/arm/mach-versatile/core.c           |   42 ------------------------------
+ 9 files changed, 2 insertions(+), 105 deletions(-)
 
-> On the spinlock vs. mutex issue (I know, it's been beaten to death).
-
-I wouldn't say beaten to death, I just haven't heard a good case for the
-atomic lock option yet (well, until your email..) :)
-
-> The clk api does not specify whether or not implementations can sleep.
->  In fact, it explicitly states that clk_get and clk_put can't be
-> called from atomic context, but does not say anything about the rest
-> of the api, which vaguely implies that they can be called from atomic
-> context.
-
-At present, clk_enable and clk_disable can only be called from
-non-atomic contexts.
-
-All other operations can be called from atomic contexts, *provided that*
-the underlying clock implementation does not block. I'm not planning to
-enforce any rules about the implementations, so this will probably stay
-as an "it depends".
-
-> There are situations in which a non-sleeping clk api is useful, if not
-> necessary.  On msm with a smart panel, the vsync is connected to a
-> gpio, and the vsync interrupt enables the dma controller clock is to
-> start the dma of the framebuffer to the display block.  A similar
-> problem can happen in dma audio, where a low watermark interrupt from
-> the audio block needs to trigger dma to refill the buffer.
-
-Just to clarify - these two examples definitely can't defer the enable,
-right?
-
-> Because of the refcounting in
-> clk_disable, this is not particularly difficult, but a
-> clk_disable_later helper function might simplify it.
-
-Sounds reasonable; something like clk_disable_later would be good.
-
-> Additionally, using a lock per clk struct can cause AB-BA locking
-> issues.  In my implementation, calling clk_enable on a child clock in
-> the clock tree can call clk_enable on its parent if the child clock
-> was not already enabled.
-
-Yep, and my implementation does the same.
-
->   This leads to the child clock lock being
-> taken, followed by the parent clock lock.  Calling clk_set_rate on the
-> parent requires recalculating the rate of all of the children, which
-> leads to the parent clock lock being taken first, followed by the
-> child clock lock.  Deadlock.
-
-I don't currently enforce any locking in set_rate; if a clock
-implementation does locking in this order (child before parent), then
-it'd have to use a separate lock, rather than acquiring the clk->mutex
-in the set_rate operation.
-
-> I solved these problems by using a single spinlock around all of the
-> clocks, plus an additional mutex around the clocks that need to sleep.
->  I also locally added clk_*_cansleep functions to the clk api, and
-> used might_sleep to prevent calls to the non-cansleep clk api on
-> clocks that require sleeping.  I'm not happy with this solution, as it
-> uses a local extension to a cross-platform api, but I don't see any
-> way around it.  Some clocks really need to be enabled or disabled from
-> atomic context, and some clocks are impossible to use in atomic
-> context.
-> 
-> I think something a little like the gpio api style of cansleep and non
-> cansleep functions would help would preserve the ability for clocks to
-> avoid sleeping on platforms that don't need to sleep, while allowing
-> drivers that can handle sleeping clocks to remain as widely
-> cross-platform as possible.  Instead of changing all the calls, add a
-> clk_get_nosleep for drivers that will call the clk apis in atomic
-> context, which will catch drivers that are not compatible with the
-> clock they are requesting early on during probe.
-> 
-> Either way, the clk api could use some notes on the restrictions for
-> both the callers and the implementers to ensure compatibility between
-> architectures.
-
-Yes, agreed.
-
-Basically, the reason for choosing a mutex rather than a spinlock is
-based on how easy it is to workaround and use it in the "other" context;
-ie, how we can use a mutex-based clock in an atomic environment, or use
-a spinlock in a non-atomic environment.
-
-With the mutex-based clock, enabling from a atomic environment means
-that the callee needs to defer work to non-atomic context, a fairly
-standard design pattern which (up until your email) I thought would
-cater for all cases.
-
-With a spinlock-based clock, the callee does not need to defer any work,
-but it means that the clock implementation needs to enable/disable the
-clock atomically. For clock implementations that need to sleep, we can
-defer the enabling, but this means that clk_enable() returns before the
-clock is actually enabled, which is not acceptable.
-
-If we really do need both locking semantics, it'd be ugly, we could do
-something like:
-
-struct clk {
-	union {
-		struct mutex mutex;
-		spintlock_t spinlock;
-	} lock;
-	const struct clk_ops *ops;
-	[...]
-};
-
-struct clk_ops {
-	void (*lock)(struct clk *clk);
-	void (*unlock)(struct clk *clk);
-	[ existing clk_ops function pointers ]
-};
-
-And provide the corresponding implementations for lock/unlock:
-
-void clk_mutex_lock(struct clk *clk)
-{
-	mutex_acquire(&clk->lock.mutex);
-}
-
-void clk_spinlock_lock(struct clk *clk)
-{
-	spin_lock(&clk->lock.spinlock);
-}
-
-void clk_noop_lock(struct clk *clk)
-{
-}
-
-Then the implementation can choose the appropriate lock for the clock,
-based on whether it needs to sleep to enable & disable. The core code
-would then call clk->lock() and clk->unlock() instead of manipulating
-clk->mutex directly.
-
-[I've used a union for clarity here - we'd need to do some trickery to
-properly initialise the clock's lock statically, or we could drop the
-union and steal the mutex's spinlock for the atomic case]
-
-The big downside of this is that the locking semantics are no longer
-obvious to the device driver API, which may be getting an atomic clock
-or a non-atomic one. As you suggest, we could add a helper:
-
- clk_get_atomic()
-
-- which would just do a clk_get() and then BUG_ON() if we have the wrong
-type.
-
-Any thoughts?
-
-Cheers,
-
-
-Jeremy
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 948435b..14b367e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1375,9 +1375,9 @@ config LEDS
+ 		   ARCH_EBSA285 || ARCH_INTEGRATOR || \
+ 		   ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_NETWINDER || \
+ 		   ARCH_OMAP || ARCH_P720T || ARCH_PXA_IDP || \
+-		   ARCH_SA1100 || ARCH_SHARK || ARCH_VERSATILE || \
++		   ARCH_SA1100 || ARCH_SHARK || \
+ 		   ARCH_AT91 || ARCH_DAVINCI || \
+-		   ARCH_KS8695 || MACH_RD88F5182 || ARCH_REALVIEW
++		   ARCH_KS8695 || MACH_RD88F5182
+ 	help
+ 	  If you say Y here, the LEDs on your machine will be used
+ 	  to provide useful information about your current system status.
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 07c0815..cdeaa6a 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -35,7 +35,6 @@
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/icst.h>
+@@ -619,44 +618,6 @@ struct clcd_board clcd_plat_data = {
+ 	.remove		= realview_clcd_remove,
+ };
+ 
+-#ifdef CONFIG_LEDS
+-#define VA_LEDS_BASE (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_LED_OFFSET)
+-
+-void realview_leds_event(led_event_t ledevt)
+-{
+-	unsigned long flags;
+-	u32 val;
+-	u32 led = 1 << smp_processor_id();
+-
+-	local_irq_save(flags);
+-	val = readl(VA_LEDS_BASE);
+-
+-	switch (ledevt) {
+-	case led_idle_start:
+-		val = val & ~led;
+-		break;
+-
+-	case led_idle_end:
+-		val = val | led;
+-		break;
+-
+-	case led_timer:
+-		val = val ^ REALVIEW_SYS_LED7;
+-		break;
+-
+-	case led_halted:
+-		val = 0;
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	writel(val, VA_LEDS_BASE);
+-	local_irq_restore(flags);
+-}
+-#endif	/* CONFIG_LEDS */
+-
+ /*
+  * Where is the timer (VA)?
+  */
+diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
+index 781bca6..2f34492 100644
+--- a/arch/arm/mach-realview/core.h
++++ b/arch/arm/mach-realview/core.h
+@@ -26,7 +26,6 @@
+ #include <linux/io.h>
+ 
+ #include <asm/setup.h>
+-#include <asm/leds.h>
+ 
+ #define AMBA_DEVICE(name,busid,base,plat)			\
+ static struct amba_device name##_device = {			\
+@@ -59,7 +58,6 @@ extern void __iomem *timer1_va_base;
+ extern void __iomem *timer2_va_base;
+ extern void __iomem *timer3_va_base;
+ 
+-extern void realview_leds_event(led_event_t ledevt);
+ extern void realview_timer_init(unsigned int timer_irq);
+ extern int realview_flash_register(struct resource *res, u32 num);
+ extern int realview_eth_register(const char *name, struct resource *res);
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 991c1f8..ad0f06b 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -478,9 +477,6 @@ static void __init realview_eb_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_eb_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index d2be12e..a7ceea8 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -370,9 +369,6 @@ static void __init realview_pb1176_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pb1176_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index d591bc0..689b76d 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -373,9 +372,6 @@ static void __init realview_pb11mp_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pb11mp_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 6c37621..3cdab89 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -29,7 +29,6 @@
+ #include <linux/io.h>
+ 
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/pgtable.h>
+@@ -323,9 +322,6 @@ static void __init realview_pba8_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pba8_reset;
+ }
+ 
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 9428eff..a85bee6 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -28,7 +28,6 @@
+ #include <linux/io.h>
+ 
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+ #include <asm/smp_twd.h>
+@@ -409,9 +408,6 @@ static void __init realview_pbx_init(void)
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+ 
+-#ifdef CONFIG_LEDS
+-	leds_event = realview_leds_event;
+-#endif
+ 	realview_reset = realview_pbx_reset;
+ }
+ 
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index e38acb0..91ca481 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -35,7 +35,6 @@
+ #include <asm/clkdev.h>
+ #include <asm/system.h>
+ #include <asm/irq.h>
+-#include <asm/leds.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/icst.h>
+ #include <asm/hardware/vic.h>
+@@ -825,43 +824,6 @@ static struct amba_device *amba_devs[] __initdata = {
+ 	&kmi1_device,
+ };
+ 
+-#ifdef CONFIG_LEDS
+-#define VA_LEDS_BASE (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_LED_OFFSET)
+-
+-static void versatile_leds_event(led_event_t ledevt)
+-{
+-	unsigned long flags;
+-	u32 val;
+-
+-	local_irq_save(flags);
+-	val = readl(VA_LEDS_BASE);
+-
+-	switch (ledevt) {
+-	case led_idle_start:
+-		val = val & ~VERSATILE_SYS_LED0;
+-		break;
+-
+-	case led_idle_end:
+-		val = val | VERSATILE_SYS_LED0;
+-		break;
+-
+-	case led_timer:
+-		val = val ^ VERSATILE_SYS_LED1;
+-		break;
+-
+-	case led_halted:
+-		val = 0;
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	writel(val, VA_LEDS_BASE);
+-	local_irq_restore(flags);
+-}
+-#endif	/* CONFIG_LEDS */
+-
+ void __init versatile_init(void)
+ {
+ 	int i;
+@@ -879,10 +841,6 @@ void __init versatile_init(void)
+ 		struct amba_device *d = amba_devs[i];
+ 		amba_device_register(d, &iomem_resource);
+ 	}
+-
+-#ifdef CONFIG_LEDS
+-	leds_event = versatile_leds_event;
+-#endif
+ }
+ 
+ /*
+-- 
+1.7.2.2
