@@ -1,62 +1,30 @@
 From: luciano.coelho@nokia.com (Luciano Coelho)
-Date: Thu, 16 Sep 2010 22:56:51 +0300
-Subject: [PATCH v6 2/7] wl1271: propagate set_power's return value
-In-Reply-To: <AANLkTimp2JT4XT5EHwKwmMQ+5KYgHTOzpqDwF3UjGDBh@mail.gmail.com>
-References: <1284592929-29616-1-git-send-email-ohad@wizery.com>
-	<1284592929-29616-3-git-send-email-ohad@wizery.com>
-	<1284666018.8951.66.camel@powerslave>
-	<AANLkTimp2JT4XT5EHwKwmMQ+5KYgHTOzpqDwF3UjGDBh@mail.gmail.com>
-Message-ID: <1284667011.8951.73.camel@powerslave>
+Date: Thu, 16 Sep 2010 23:00:59 +0300
+Subject: [PATCH v6 01/17] wl12xx: make wl12xx.h common to both spi and sdio
+In-Reply-To: <AANLkTinQ3EVOTjfnOy7EXP==b=tpSicDdokBAZ67Lc7O@mail.gmail.com>
+References: <AANLkTikYd+TojQC-R+Vrdou6KSRwFNczBeTnsX7eTDn4@mail.gmail.com>
+	<1284635762-12335-1-git-send-email-ohad@wizery.com>
+	<1284662139.8951.7.camel@powerslave>
+	<AANLkTinQ3EVOTjfnOy7EXP==b=tpSicDdokBAZ67Lc7O@mail.gmail.com>
+Message-ID: <1284667259.8951.75.camel@powerslave>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-16 at 21:53 +0200, ext Ohad Ben-Cohen wrote:
-> On Thu, Sep 16, 2010 at 9:40 PM, Luciano Coelho
+On Thu, 2010-09-16 at 21:56 +0200, ext Ohad Ben-Cohen wrote:
+> On Thu, Sep 16, 2010 at 8:35 PM, Luciano Coelho
 > <luciano.coelho@nokia.com> wrote:
-> >> +     int ret = wl->if_ops->power(wl, true);
+> > Acked-by: Luciano Coelho <luciano.coelho@nokia.com>
 > >
-> > I think it look nicer if you keep the "int ret" in one line by itself
-> > and then do a ret = wl->if_ops... on another one.
+> > I just wonder why the wl12xx.h move wasn't detected as a rename.  Did
+> > you forget to use the -M option in format-patch?
 > 
-> Fixed.
-> 
-> >> +static int wl1271_sdio_power_on(struct wl1271 *wl)
-> >>  {
-> >>       struct sdio_func *func = wl_to_func(wl);
-> >>
-> >>       sdio_claim_host(func);
-> >>       sdio_enable_func(func);
-> >>       sdio_release_host(func);
-> >> +
-> >> +     return 0;
-> >>  }
-> >
-> > You seem to always return 0, so the whole chain to pass the value up
-> > seems unnecessary.  Is this just a preparation for a future patch?
-> 
-> Yes, it's soon going to be:
-> 
-> static int wl1271_sdio_power_on(struct wl1271 *wl)
-> {
->        struct sdio_func *func = wl_to_func(wl);
->        int ret;
-> 
->        ret = pm_runtime_get_sync(&func->dev);
->        if (ret)
->                  goto out;
-> 
->        sdio_claim_host(func);
->        sdio_enable_func(func);
->        sdio_release_host(func);
-> 
-> out:
->        return ret;
-> }
-> 
+> I thought it's because I stripped the SPI_ from the
+> #ifndef _LINUX_SPI_WL12XX_H, but it should be smarter than that.
+> Probably the -M.
 
-Ok, that was the only explanation I could think of ;)
-
-Acked-by: Luciano Coelho <luciano.coelho@nokia.com>
+Yes, it is smarter than that.  With small changes like this, -M will
+still show it as a rename and show the diff instead of the whole file
+-ed and +ed back ;)
 
 -- 
 Cheers,
