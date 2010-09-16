@@ -1,103 +1,81 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Thu, 16 Sep 2010 14:55:10 +0200
-Subject: [PATCH 3/6] ARM: oprofile: Move non-ARM code into separate
-	init/exit functions
-In-Reply-To: <7f520b235254cdbf6444ed9f4839fb5c12ff1199.1284357372.git.matt@console-pimps.org>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<7f520b235254cdbf6444ed9f4839fb5c12ff1199.1284357372.git.matt@console-pimps.org>
-Message-ID: <20100916125510.GZ13563@erda.amd.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 16 Sep 2010 22:09:16 +0900
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <1284522014.517347.33297989274.1.gpush@pororo>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<1284522014.517347.33297989274.1.gpush@pororo>
+Message-ID: <AANLkTi=vaOzRcoGM9AnJ+17e0-97b76F5DW964fC3Wwp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.09.10 02:07:34, Matt Fleming wrote:
-> In preparation for moving the majority of this oprofile code into an
-> architecture-neutral place separate the architecture-independent code
-> into oprofile_perf_init() and oprofile_perf_exit().
-> 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> ---
->  arch/arm/oprofile/common.c |   34 +++++++++++++++++++++++++---------
->  1 files changed, 25 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index ed8291a..4d814c3 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -346,7 +346,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
->  		tail = user_backtrace(tail);
->  }
->  
-> -int __init oprofile_arch_init(struct oprofile_operations *ops)
-> +int __init oprofile_perf_init(struct oprofile_operations *ops)
->  {
->  	int cpu, ret = 0;
->  
-> @@ -377,13 +377,16 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->  		}
->  	}
->  
-> -	ops->backtrace		= arm_backtrace;
-> -	ops->create_files	= oprofile_perf_create_files;
-> -	ops->setup		= oprofile_perf_setup;
-> -	ops->start		= oprofile_perf_start;
-> -	ops->stop		= oprofile_perf_stop;
-> -	ops->shutdown		= oprofile_perf_stop;
-> -	ops->cpu_type		= op_name_from_perf_id(armpmu_get_pmu_id());
-> +	if (!ops->create_files)
-> +		ops->create_files = oprofile_perf_create_files;
-> +	if (!ops->setup)
-> +		ops->setup = oprofile_perf_setup;
-> +	if (!ops->start)
-> +		ops->start = oprofile_perf_start;
-> +	if (!ops->stop)
-> +		ops->stop = oprofile_perf_stop;
-> +	if (!ops->shutdown)
-> +		ops->shutdown = oprofile_perf_stop;
+On Wed, Sep 15, 2010 at 12:40 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+> We currently have 21 definitions of struct clk in the ARM architecture,
+> each defined on a per-platform basis. This makes it difficult to define
+> platform- (or architecture-) independent clock sources without making
+> assumptions about struct clk, and impossible to compile two
+> platforms with different struct clks into a single image.
+>
+> This change is an effort to unify struct clk where possible, by defining
+> a common struct clk, containing a set of clock operations. Different
+> clock implementations can set their own operations, and have a standard
+> interface for generic code. The callback interface is exposed to the
+> kernel proper, while the clock implementations only need to be seen by
+> the platform internals.
+>
+> This allows us to share clock code among platforms, and makes it
+> possible to dynamically create clock devices in platform-independent
+> code.
+>
+> Platforms can enable the generic struct clock through
+> CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
+> consists of a common struct clk:
+>
+> struct clk {
+> ? ? ? ?const struct clk_ops ? ?*ops;
+> ? ? ? ?unsigned int ? ? ? ? ? ?enable_count;
+> ? ? ? ?struct mutex ? ? ? ? ? ?mutex;
+> };
+>
+> And a set of clock operations (defined per type of clock):
+>
+> struct clk_ops {
+> ? ? ? int ? ? ? ? ? ? (*enable)(struct clk *);
+> ? ? ? void ? ? ? ? ? ?(*disable)(struct clk *);
+> ? ? ? unsigned long ? (*get_rate)(struct clk *);
+> ? ? ? [...]
+> };
+>
+> To define a hardware-specific clock, machine code can "subclass" the
+> struct clock into a new struct (adding any device-specific data), and
+> provide a set of operations:
+>
+> struct clk_foo {
+> ? ? ? ?struct clk ? ? ?clk;
+> ? ? ? ?void __iomem ? ?*some_register;
+> };
+>
+> struct clk_ops clk_foo_ops = {
+> ? ? ? ?.get_rate = clk_foo_get_rate,
+> };
+>
+> The common clock definitions are based on a development patch from Ben
+> Herrenschmidt <benh@kernel.crashing.org>.
+>
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-I rather tend to not check this and instand hard overwrite it. Do you
-have something in mind why we have checks here? I mean, if something
-must be customizable, the arch init could overwrite it after doing
-perf init.
+I am not sure about the scope of your assumed task, but I would still
+like to bring
+to your notice some points.
 
--Robert
-
->  
->  	if (!ops->cpu_type)
->  		ret = -ENODEV;
-> @@ -400,7 +403,15 @@ out:
->  	return ret;
->  }
->  
-> -void __exit oprofile_arch_exit(void)
-> +int __init oprofile_arch_init(struct oprofile_operations *ops)
-> +{
-> +	ops->backtrace		= arm_backtrace;
-> +	ops->cpu_type		= op_name_from_perf_id(armpmu_get_pmu_id());
-> +
-> +	return oprofile_perf_init(ops);
-> +}
-> +
-> +void __exit oprofile_perf_exit(void)
->  {
->  	int cpu, id;
->  	struct perf_event *event;
-> @@ -418,6 +429,11 @@ void __exit oprofile_arch_exit(void)
->  	kfree(counter_config);
->  	exit_driverfs();
->  }
-> +
-> +void __exit oprofile_arch_exit(void)
-> +{
-> +	oprofile_perf_exit();
-> +}
->  #else
->  int __init oprofile_arch_init(struct oprofile_operations *ops)
->  {
-> -- 
-> 1.7.1
-> 
-> 
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+IMHO any clock api that aims to be used by multiple platforms should be generic
+more than this one. Let me explain.
+Clocks that are simply output of MUX'es inherit the rate of the parent
+clock - they do have
+rate yet this API would return 0 (IIRUIC).
+Another scenario could have a source clock parenting more than one
+child clock via
+different MUX'es. It would be nice to be able to set rate of that
+parent clock (after ensuring
+other siblings won't complain) and have some mechanism to notify other
+siblings of the change.
+Or some better solution.
