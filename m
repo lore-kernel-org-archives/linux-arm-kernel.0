@@ -1,91 +1,76 @@
-From: roger.quadros@nokia.com (Roger Quadros)
-Date: Thu, 16 Sep 2010 17:20:08 +0300
-Subject: [PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs
-In-Reply-To: <4C922347.7050509@ti.com>
-References: <1284587799-9637-1-git-send-email-khilman@deeprootsystems.com>
-	<1284587799-9637-2-git-send-email-khilman@deeprootsystems.com>
-	<4C9221AF.9000804@nokia.com> <4C922347.7050509@ti.com>
-Message-ID: <4C922798.1000304@nokia.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Thu, 16 Sep 2010 16:32:54 +0200
+Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
+Message-ID: <20100916143254.GC13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2010 05:01 PM, ext Nishanth Menon wrote:
-> Roger Quadros had written, on 09/16/2010 08:54 AM, the following:
->> Since you are anyways re-sending this you might as well fix these nits.
-> thanks for reviewing..
->
->>
-> [..]
->
->>> diff --git a/arch/arm/plat-omap/opp.c b/arch/arm/plat-omap/opp.c
->>> new file mode 100644
->>> index 0000000..17f93b2
->>> --- /dev/null
->>> +++ b/arch/arm/plat-omap/opp.c
->>> @@ -0,0 +1,461 @@
->>> +/*
->>> + * OMAP OPP Interface
->>> + *
->>> + * Copyright (C) 2009-2010 Texas Instruments Incorporated.
->>> + *     Nishanth Menon
->>> + *     Romit Dasgupta<romit@ti.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>
->>> +/**
->>> + * opp_get_voltage() - Gets the voltage corresponding to an opp
->>> + * @opp:       opp for which voltage has to be returned for
->>> + *
->>> + * Return voltage in micro volt corresponding to the opp, else
->>> + * return 0
->>> + */
->>> +unsigned long opp_get_voltage(const struct omap_opp *opp)
->>> +{
->>> +       if (unlikely(!opp || IS_ERR(opp)) || !opp->enabled) {
->>
->> If !opp->enabled, then is it really an invalid parameter being passed?
->>
->> I'm not user if people need to know the voltage of a disabled OPP, but
->> do we need to limit it?
->>
->>> +               pr_err("%s: Invalid parameters being passed\n", __func__);
->>> +               return 0;
->>> +       }
->>> +
->>> +       return opp->u_volt;
->>> +}
->>> +
->>> +/**
->>> + * opp_get_freq() - Gets the frequency corresponding to an opp
->>> + * @opp:       opp for which frequency has to be returned for
->>> + *
->>> + * Return frequency in hertz corresponding to the opp, else
->>> + * return 0
->>> + */
->>> +unsigned long opp_get_freq(const struct omap_opp *opp)
->>> +{
->>> +       if (unlikely(!opp || IS_ERR(opp)) || !opp->enabled) {
->>
->> ditto.
->
-> Yes, the intent here was for opp operational apis to function ONLY on
-> the enabled opps - this helps to pull out any bugs in the users
-> who might be unintentionally using bad params.
->
-OK.
+On 13.09.10 02:07:37, Matt Fleming wrote:
+> Now that we've got a generic perf-events based oprofile backend we might
+> as well make use of it seeing as SH doesn't do anything special with its
+> oprofile backend.
+> 
+> Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> ---
+>  arch/sh/Kconfig             |    2 +-
+>  arch/sh/kernel/perf_event.c |    8 +++
+>  arch/sh/oprofile/Makefile   |    2 +-
+>  arch/sh/oprofile/common.c   |  104 ++++--------------------------------------
+>  arch/sh/oprofile/op_impl.h  |   33 --------------
+>  5 files changed, 20 insertions(+), 129 deletions(-)
+>  delete mode 100644 arch/sh/oprofile/op_impl.h
+> 
+> diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+> index 33990fa..dc4a017 100644
+> --- a/arch/sh/Kconfig
+> +++ b/arch/sh/Kconfig
+> @@ -11,7 +11,7 @@ config SUPERH
+>  	select HAVE_CLK
+>  	select HAVE_IDE if HAS_IOPORT
+>  	select HAVE_MEMBLOCK
+> -	select HAVE_OPROFILE
+> +	select HAVE_OPROFILE if PERF_EVENTS
 
-> do you have any usecase you can think of where we might want to use
-> these on a disabled opp?
+Same here, we might want to fall back to timer mode.
 
-Not really. Based on what is an OPP enabled/disabled? Is it possible for 
-an initially enabled OPP to be disabled at some point in time? What 
-triggers this disable?
-OR  does an OPP enabled at boot time remain enabled throughout the power 
-session?
+>  	select HAVE_GENERIC_DMA_COHERENT
+>  	select HAVE_ARCH_TRACEHOOK
+>  	select HAVE_DMA_API_DEBUG
+> diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
+> index 2cb9ad5..3c3fc9a 100644
+> --- a/arch/sh/kernel/perf_event.c
+> +++ b/arch/sh/kernel/perf_event.c
+> @@ -59,6 +59,14 @@ static inline int sh_pmu_initialized(void)
+>  	return !!sh_pmu;
+>  }
+>  
+> +const char *sh_pmu_name(void)
+> +{
+> +	if (!sh_pmu)
+> +		return NULL;
+> +
+> +	return sh_pmu->name;
+> +}
 
-regards,
--roger
+Couldn't we make this a generic function like perf_num_counters()?
+
+[...]
+
+>  void oprofile_arch_exit(void)
+>  {
+> -	if (model && model->exit)
+> -		model->exit();
+> +	oprofile_perf_exit();
+>  }
+
+This will probalby cause a section missmatch. Use __exit marker for
+oprofile_arch_exit().
+
+-Robert
+
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
