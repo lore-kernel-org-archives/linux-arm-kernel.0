@@ -1,39 +1,26 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 18 Sep 2010 00:52:21 +0200
-Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <4C93EB1A.7020203@ti.com>
-References: <1284686973-13993-1-git-send-email-nm@ti.com>
-	<201009180022.51011.rjw@sisk.pl> <4C93EB1A.7020203@ti.com>
-Message-ID: <201009180052.21574.rjw@sisk.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Sep 2010 00:01:27 +0100
+Subject: [PATCH 0/4] CPU hotplug support for Versatile platforms
+In-Reply-To: <4C93DBE6.2040103@gmail.com>
+References: <1284729124-15297-1-git-send-email-will.deacon@arm.com>
+	<4C93DBE6.2040103@gmail.com>
+Message-ID: <20100917230127.GA19718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, September 18, 2010, Nishanth Menon wrote:
-> Rafael J. Wysocki had written, on 09/17/2010 05:22 PM, the following:
-> > On Friday, September 17, 2010, Nishanth Menon wrote:
-> >> Mark Brown had written, on 09/17/2010 10:36 AM, the following:
-> >>> On Thu, Sep 16, 2010 at 08:29:33PM -0500, Nishanth Menon wrote:
-> >>>
-> >>>> +struct opp_def {
-> >>>> +	unsigned long freq;
-> >>>> +	unsigned long u_volt;
-> >>>> +
-> >>>> +	bool enabled;
-> >>>> +};
-> >>> It might be clearer to use some term other than enabled in the code -
-> >>> when reading I wasn't immediately sure if enabled meant that it was
-> >>> available to be selected or if it was the active operating point.  How
-> >>> about 'allowed' (though I'm not 100% happy with that)?
-> >> ;).. The opp is enabled or disabled if it is populated, it is implicit 
-> >> as being available but not enabled- how about active? this would change 
-> >> the opp_enable/disable functions to opp_activate, opp_deactivate..
-> > 
-> > Would that mean that "active" is the one currently in use?
-> 
-> I like the idea Phil pointed out[1] on using "available" instead.. 
-> opp_enable and disable will make the OPP available or not. does this 
-> sound better?
+On Fri, Sep 17, 2010 at 04:21:42PM -0500, Rob Herring wrote:
+> The platform specific SMP code is one area that prevents supporting a  
+> single kernel image. All the functions in platsmp.c need to be converted  
+> to function pointers and a lot of that code is pretty simliar across  
+> platforms. What's needed is a common platsmp.c with something like  
+> platform specific smp_ops like PowerPC. I think addressing that first  
+> would simplify this restructuring as you are doing some of what's  
+> needed, but you introducing new namespace problems like platform_cpu_*.
 
-Yes, it does.
+The split between smp.c and platsmp.c is there to allow different SMP
+implementations from the standard ARM Ltd SMP implementation (and there
+will be different implementations.)
 
-Rafael
+Just because all the SMP implementations that are currently merged are
+the standard ARM Ltd SMP implementation does not mean that we should
+move stuff out of platsmp.c into the generic code.
