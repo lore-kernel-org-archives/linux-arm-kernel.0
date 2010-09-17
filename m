@@ -1,33 +1,44 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 17 Sep 2010 16:59:28 +0100
-Subject: [PATCH 5/5] sdhci-s3c: Add support no internal clock divider
-	in host controller
-In-Reply-To: <AANLkTik23B23RW_kmjaL1PeXNiWtU01aNBwUOPrac6HF@mail.gmail.com>
-References: <1284626223-18944-1-git-send-email-jeongbae.seo@samsung.com>
-	<1284626223-18944-6-git-send-email-jeongbae.seo@samsung.com>
-	<AANLkTik23B23RW_kmjaL1PeXNiWtU01aNBwUOPrac6HF@mail.gmail.com>
-Message-ID: <20100917155928.GA7561@void.printf.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 17 Sep 2010 16:59:37 +0100
+Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
+In-Reply-To: <4C938EE2.1010307@ti.com>
+References: <1284686973-13993-1-git-send-email-nm@ti.com>
+	<20100917153643.GC29739@sirena.org.uk> <4C938EE2.1010307@ti.com>
+Message-ID: <20100917155937.GB29596@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 17, 2010 at 10:53:06AM -0500, Nishanth Menon wrote:
+> Mark Brown had written, on 09/17/2010 10:36 AM, the following:
 
-On Thu, Sep 16, 2010 at 06:08:28PM +0900, Kyungmin Park wrote:
-> Well there are two implementations. and no conclusion yet.
-> as s5pc210 don't support internal SDHCI clock, DMC overrides the
-> function operation itself when s5pc210. System LSI use the quirks.
-> 
-> Choose any one from MMC maintainer.
+> >It might be clearer to use some term other than enabled in the code -
+> >when reading I wasn't immediately sure if enabled meant that it was
+> >available to be selected or if it was the active operating point.  How
+> >about 'allowed' (though I'm not 100% happy with that)?
 
-Both approaches are generally acceptable for MMC, so I would want to
-leave it up to the maintainer of the driver in question (which is Ben,
-in this case?) to choose between them.
+> ;).. The opp is enabled or disabled if it is populated, it is
+> implicit as being available but not enabled- how about active? this
+> would change the opp_enable/disable functions to opp_activate,
+> opp_deactivate..
 
-That said, I think my own mild preference is for Jaehoon's approach.
+> Recommendations folks?
 
-Thanks,
+The enable/disable thing wasn't so noticable in the API itself, it was
+in the data structures that I found it confusing - the core has a
+different idea about what's going on with the system as a whole compared
+to the decision that an individual device is taking.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> >When reading the description I'd expected to see some facility to
+> >trigger selection of an active operating point in the library (possibly
+> >as a separate call since you might have a bunch of operating points
+> >being updated in quick succession) but it looks like that needs to be
+> >supplied externally at the minute?
+
+> The intent is we use the opp_search* functions to pick up the opp
+> and enable/activate it and disable/deactivate it.
+
+Sure, I get that bit.  What I meant was that I was expecting something
+that would say that changes had been made to the enabled/disabled sets
+and that it'd be a good idea to rescan, especially for cases where the
+devices change their requirements but the OPPs need to be done over a
+larger block.
