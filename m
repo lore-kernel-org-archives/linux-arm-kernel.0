@@ -1,22 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Sep 2010 09:41:32 -0700
-Subject: [PATCH 01/14] ARM: mmu: Setup MT_MEMORY and
-	MT_MEMORY_NONCACHED L1 entries
-In-Reply-To: <1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100917164132.GC29610@atomide.com>
+From: ext-phil.2.carmody@nokia.com (Phil Carmody)
+Date: Fri, 17 Sep 2010 19:45:43 +0300
+Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
+In-Reply-To: <20100917153643.GC29739@sirena.org.uk>
+References: <1284686973-13993-1-git-send-email-nm@ti.com>
+	<20100917153643.GC29739@sirena.org.uk>
+Message-ID: <20100917164543.GI20325@esdhcp04044.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [100917 02:40]:
-> This patch populates the L1 entries for MT_MEMORY and MT_MEMORY_NONCACHED
-> types so that at boot-up, we can map memories outside system memory
-> at page level granularity
+On 17/09/10 17:36 +0200, ext Mark Brown wrote:
+> On Thu, Sep 16, 2010 at 08:29:33PM -0500, Nishanth Menon wrote:
 > 
-> Previously the mapping was limiting to section level, which creates
-> unnecessary addiotional mapping for which physical memory may not
+> > +struct opp_def {
+> > +	unsigned long freq;
+> > +	unsigned long u_volt;
+> > +
+> > +	bool enabled;
+> > +};
+> 
+> It might be clearer to use some term other than enabled in the code -
+> when reading I wasn't immediately sure if enabled meant that it was
+> available to be selected or if it was the active operating point.  How
+  ^^^^^^^^^
+> about 'allowed' (though I'm not 100% happy with that)?
 
-Minor typo here, it should be "additional".
+I think your query contains its own answer.
 
-Tony
+Phil
