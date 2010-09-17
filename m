@@ -1,76 +1,44 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Sep 2010 15:17:44 +0530
-Subject: [PATCH 00/14] omap sram, omap4 control module and es2.0 support
-Message-ID: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 17 Sep 2010 15:17:53 +0530
+Subject: [PATCH 09/14] omap4: sram: Fix start address
+In-Reply-To: <1284716878-27667-9-git-send-email-santosh.shilimkar@ti.com>
+References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-6-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-7-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-8-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-9-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is consolidated patch series targetted for 2.6.37 merge window.
-All of these patches have been already posted/reviewed on the list.
+From: Vikram Pandita <vikram.pandita@ti.com>
 
-The series contains
-	- SRAM mapping fixes to avoid speculative aborts
-	- omap4 control module support
-	- Fixes for omap4 HS/GP detection
-	- omap4 es2.0 fixes. MMC and ethernet fixes are queued in respective
-	  trees
-	  
-Boot tested with omap3_defconfig on
-			- OMAP4430 SPP
-			- OMAP4 Panda
-			- OMAP4 Blaze
-			- OMAP3430 SDP
+On OMAP4 there is no need to have SRAM_BOOTLOADER_SZ provision
 
-The following changes since commit 03a7ab083e4d619136d6f07ce70fa9de0bc436fc:
-  Linus Torvalds (1):
-        Merge git://git.kernel.org/.../sfrench/cifs-2.6
+Hence put this macro under CONFIG_ARCH_OMAP2PLUS check
 
-are available in the git repository at:
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/plat-omap/sram.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap_for_2.6.37
-
-David Anders (1):
-      omap4: Panda: Add DEBUG_LL support
-
-Santosh Shilimkar (11):
-      ARM: mmu: Setup MT_MEMORY and MT_MEMORY_NONCACHED L1 entries
-      omap: Map only available sram memory
-      davinci: map sram using MT_MEMORY_NONCACHED instead of MT_DEVICE
-      omap4: control: Add ctrl_pad_base to omap_globals
-      omap4: control: Add accessor api's for pad control module
-      omap4: control: Add the register definition headers
-      omap4: control: Fix the control module register accesses
-      omap4: Update id.c and cpu.h for es2.0
-      omap4: Fix silicon version detection for early samples
-      omap4: l2x0: Fix init parameter for es2.0
-      omap4: Fix bootup crash observed with higher CPU clocks
-
-Vikram Pandita (2):
-      omap: sram: fix is_sram_locked check
-      omap4: sram: Fix start address
-
- arch/arm/mach-davinci/dm355.c                      |    3 +-
- arch/arm/mach-davinci/dm365.c                      |    3 +-
- arch/arm/mach-davinci/dm644x.c                     |    3 +-
- arch/arm/mach-davinci/dm646x.c                     |    3 +-
- arch/arm/mach-omap2/control.c                      |   25 +
- arch/arm/mach-omap2/hsmmc.c                        |   67 +-
- arch/arm/mach-omap2/id.c                           |   40 +-
- .../include/mach/ctrl_module_core_44xx.h           |  391 ++++++
- .../include/mach/ctrl_module_pad_core_44xx.h       | 1409 ++++++++++++++++++++
- .../include/mach/ctrl_module_pad_wkup_44xx.h       |  236 ++++
- .../include/mach/ctrl_module_wkup_44xx.h           |   92 ++
- arch/arm/mach-omap2/omap4-common.c                 |   10 +-
- arch/arm/mm/mmu.c                                  |   17 +-
- arch/arm/plat-omap/common.c                        |    3 +-
- arch/arm/plat-omap/dmtimer.c                       |    2 +-
- arch/arm/plat-omap/include/plat/common.h           |    1 +
- arch/arm/plat-omap/include/plat/control.h          |   31 +-
- arch/arm/plat-omap/include/plat/cpu.h              |    5 +-
- arch/arm/plat-omap/include/plat/uncompress.h       |    1 +
- arch/arm/plat-omap/sram.c                          |   38 +-
- 20 files changed, 2271 insertions(+), 109 deletions(-)
- create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_core_44xx.h
- create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_core_44xx.h
- create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_wkup_44xx.h
- create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 1faaa6e..33ee6b8 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -53,7 +53,7 @@
+ #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+ #define OMAP4_SRAM_PUB_VA	(OMAP4_SRAM_VA + 0x4000)
+ 
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
++#if defined(CONFIG_ARCH_OMAP2PLUS)
+ #define SRAM_BOOTLOADER_SZ	0x00
+ #else
+ #define SRAM_BOOTLOADER_SZ	0x80
+-- 
+1.6.0.4
