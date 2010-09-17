@@ -1,24 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Sep 2010 11:16:02 +0100
-Subject: [PATCH 03/14] davinci: map sram using MT_MEMORY_NONCACHED
-	instead of MT_DEVICE
-In-Reply-To: <1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100917101602.GC27467@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 17 Sep 2010 12:15:17 +0200
+Subject: [PATCH] ARM: fix a kfree address in clkdev code
+In-Reply-To: <Pine.LNX.4.64.1009171120130.4988@axis700.grange>
+References: <Pine.LNX.4.64.1009171120130.4988@axis700.grange>
+Message-ID: <20100917101517.GC13002@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 17, 2010 at 03:17:47PM +0530, Santosh Shilimkar wrote:
-> On Davinci SRAM is mapped as MT_DEVICE becasue of the section
-> mapping pre-requisite instead of intended MT_MEMORY_NONCACHED
+On 11:24 Fri 17 Sep     , Guennadi Liakhovetski wrote:
+> kfree() in clkdev_drop() function should actually be called with an address of
+> a struct clk_lookup_alloc object, and not struct clk_lookup, as presently done.
+> This just happens to work, because "struct clk_lookup cl" is the first
+> member in struct clk_lookup_alloc.
 > 
-> Since the section mapping limitation gets fixed with first
-> patch in this series, the MT_MEMORY_NONCACHED can be used now.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
 > 
-> Have not tested this, so somebody with Davinci hardware can
-> try this out
+> Jean-Christophe, as I said, this is a purely academic patch, I'll send a 
+> similar one to sh, but if your consolidation patch is accepted for 2.6.37, 
+I follow the sh too :)
+> maybe you can just adjust yours to get to the desired result. If, however, 
+> these two patches are merged into 2.6.36, you'll need slightly larger 
+> adjustments to your patch, in both cases trivial though.
+ok I'll update if need it
 
-Is this still true?
+Best Regards,
+J.
