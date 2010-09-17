@@ -1,90 +1,104 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Sep 2010 15:17:48 +0530
-Subject: [PATCH 04/14] omap4: control: Add ctrl_pad_base to omap_globals
-In-Reply-To: <1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 17 Sep 2010 15:17:54 +0530
+Subject: [PATCH 10/14] omap4: Update id.c and cpu.h for es2.0
+In-Reply-To: <1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
 References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-6-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-7-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-8-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-9-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1284716878-27667-11-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On omap4 control module is divided in four IP blocks.
-- CTRL_MODULE_CORE			0x4a002000
-- CTRL_MODULE_PAD_CORE		0x4a100000
-- CTRL_MODULE_WKUP			0x4a30c000
-- CTRL_MODULE_PAD_WKUP		0x4a31e000
+This patch updates the id.c and cpu.h files to support
+omap4 ES2.0 silicon detection.
 
-Addressing all the modules with single base address is not possible
-considering 16 bit offsets. The mux code manages the pad core and pad
-wakeup related base address inside the mux framework. For other usage
-only control core and control pad bases are necessary. So this patch
-maps only needed pad control base address which is used by device drivers
-and infrastructure code
-
-The main control core base is still kept same in this patch to
-keep git-bisect working. This will be fixed in the relevant patch
-in this series.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/control.c            |    7 +++++++
- arch/arm/plat-omap/common.c              |    3 ++-
- arch/arm/plat-omap/include/plat/common.h |    1 +
- 3 files changed, 10 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/id.c              |   29 ++++++++++++++++++++++-------
+ arch/arm/plat-omap/include/plat/cpu.h |    5 ++++-
+ 2 files changed, 26 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index a8d20ee..99c0eb6 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -25,6 +25,7 @@
- #include "sdrc.h"
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 4808bc9..ae70ae9 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -298,7 +298,6 @@ static void __init omap4_check_revision(void)
+ 	u32 idcode;
+ 	u16 hawkeye;
+ 	u8 rev;
+-	char *rev_name = "ES1.0";
  
- static void __iomem *omap2_ctrl_base;
-+static void __iomem *omap4_ctrl_pad_base;
+ 	/*
+ 	 * The IC rev detection is done with hawkeye and rev.
+@@ -309,14 +308,30 @@ static void __init omap4_check_revision(void)
+ 	hawkeye = (idcode >> 12) & 0xffff;
+ 	rev = (idcode >> 28) & 0xff;
  
- #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
- struct omap3_scratchpad {
-@@ -145,6 +146,12 @@ void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
- 		omap2_ctrl_base = ioremap(omap2_globals->ctrl, SZ_4K);
- 		WARN_ON(!omap2_ctrl_base);
- 	}
-+
-+	/* Static mapping, never released */
-+	if (omap2_globals->ctrl_pad) {
-+		omap4_ctrl_pad_base = ioremap(omap2_globals->ctrl_pad, SZ_4K);
-+		WARN_ON(!omap4_ctrl_pad_base);
+-	if ((hawkeye == 0xb852) && (rev == 0x0)) {
+-		omap_revision = OMAP4430_REV_ES1_0;
+-		omap_chip.oc |= CHIP_IS_OMAP4430ES1;
+-		pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
+-		return;
++	switch (hawkeye) {
++	case 0xb852:
++		switch (rev) {
++		case 0:
++			omap_revision = OMAP4430_REV_ES1_0;
++			omap_chip.oc |= CHIP_IS_OMAP4430ES1;
++			break;
++		case 1:
++			omap_revision = OMAP4430_REV_ES2_0;
++			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
++			break;
++		default:
++			omap_revision = OMAP4430_REV_ES2_0;
++			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
 +	}
++	break;
++	default:
++		/* Unknown default to latest silicon rev as default*/
++		omap_revision = OMAP4430_REV_ES2_0;
++		omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+ 	}
+ 
+-	pr_err("Unknown OMAP4 CPU id\n");
++	pr_info("OMAP%04x ES%d.0\n",
++			omap_rev() >> 16, ((omap_rev() >> 12) & 0xf) + 1);
  }
  
- void __iomem *omap_ctrl_base_get(void)
-diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index 3008e71..480718b 100644
---- a/arch/arm/plat-omap/common.c
-+++ b/arch/arm/plat-omap/common.c
-@@ -336,7 +336,8 @@ void __init omap3_map_io(void)
- static struct omap_globals omap4_globals = {
- 	.class	= OMAP443X_CLASS,
- 	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--	.ctrl	= OMAP443X_CTRL_BASE,
-+	.ctrl	= OMAP443X_CTRL_BASE,	/* FIXME: Move this to control core */
-+	.ctrl_pad	= OMAP443X_CTRL_BASE,
- 	.prm	= OMAP4430_PRM_BASE,
- 	.cm	= OMAP4430_CM_BASE,
- 	.cm2	= OMAP4430_CM2_BASE,
-diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-index 9776b41..7cd0180 100644
---- a/arch/arm/plat-omap/include/plat/common.h
-+++ b/arch/arm/plat-omap/include/plat/common.h
-@@ -47,6 +47,7 @@ struct omap_globals {
- 	unsigned long   sdrc;           /* SDRAM Controller */
- 	unsigned long   sms;            /* SDRAM Memory Scheduler */
- 	unsigned long   ctrl;           /* System Control Module */
-+	unsigned long   ctrl_pad;	/* PAD Control Module */
- 	unsigned long   prm;            /* Power and Reset Management */
- 	unsigned long   cm;             /* Clock Management */
- 	unsigned long   cm2;
+ #define OMAP3_SHOW_FEATURE(feat)		\
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 2e2ae53..9b38e4b 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -391,6 +391,7 @@ IS_OMAP_TYPE(3517, 0x3517)
+ 
+ #define OMAP443X_CLASS		0x44300044
+ #define OMAP4430_REV_ES1_0	0x44300044
++#define OMAP4430_REV_ES2_0	0x44301044
+ 
+ /*
+  * omap_chip bits
+@@ -417,10 +418,12 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define CHIP_IS_OMAP4430ES1		(1 << 8)
+ #define CHIP_IS_OMAP3630ES1_1           (1 << 9)
+ #define CHIP_IS_OMAP3630ES1_2           (1 << 10)
++#define CHIP_IS_OMAP4430ES2		(1 << 11)
+ 
+ #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
+ 
+-#define CHIP_IS_OMAP4430		(CHIP_IS_OMAP4430ES1)
++#define CHIP_IS_OMAP4430		(CHIP_IS_OMAP4430ES1 | \
++						 CHIP_IS_OMAP4430ES2)
+ 
+ /*
+  * "GE" here represents "greater than or equal to" in terms of ES
 -- 
 1.6.0.4
