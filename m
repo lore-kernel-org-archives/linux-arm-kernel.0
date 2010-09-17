@@ -1,88 +1,65 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 17 Sep 2010 11:54:33 +0200
-Subject: [PATCH 15/16] ARM: mx5/mx51_3ds: add eCSPI2 support on the imx51_3ds
-	board
+Date: Fri, 17 Sep 2010 11:54:28 +0200
+Subject: [PATCH 10/16] ARM: mx5: add spi_imx device registration
 In-Reply-To: <20100917095247.GB30441@pengutronix.de>
 References: <20100917095247.GB30441@pengutronix.de>
-Message-ID: <1284717274-12850-15-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1284717274-12850-10-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Wang <jason77.wang@gmail.com>
-
-Signed-off-by: Jason Wang <jason77.wang@gmail.com>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx5/Kconfig          |    1 +
- arch/arm/mach-mx5/board-mx51_3ds.c |   20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/devices-imx51.h            |   18 ++++++++++++++++++
+ arch/arm/plat-mxc/devices/platform-spi_imx.c |   12 ++++++++++++
+ 2 files changed, 30 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/devices-imx51.h
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 0848db5..d4d5feb 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -17,6 +17,7 @@ config MACH_MX51_BABBAGE
- 
- config MACH_MX51_3DS
- 	bool "Support MX51PDK (3DS)"
-+	select IMX_HAVE_PLATFORM_SPI_IMX
- 	select MXC_DEBUG_BOARD
- 	help
- 	  Include support for MX51PDK (3DS) platform. This includes specific
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index f95c2fd..c9c4128 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -24,9 +24,11 @@
- #include <mach/imx-uart.h>
- #include <mach/3ds_debugboard.h>
- 
-+#include "devices-imx51.h"
- #include "devices.h"
- 
- #define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
-+#define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
- 
- static struct pad_desc mx51_3ds_pads[] = {
- 	/* UART1 */
-@@ -61,6 +63,12 @@ static struct pad_desc mx51_3ds_pads[] = {
- 	MX51_PAD_KEY_COL3__KEY_COL3,
- 	MX51_PAD_KEY_COL4__KEY_COL4,
- 	MX51_PAD_KEY_COL5__KEY_COL5,
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+new file mode 100644
+index 0000000..fe6c987
+--- /dev/null
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/mx51.h>
++#include <mach/devices-common.h>
 +
-+	/* eCSPI2 */
-+	MX51_PAD_NANDF_RB2__ECSPI2_SCLK,
-+	MX51_PAD_NANDF_RB3__ECSPI2_MISO,
-+	MX51_PAD_NANDF_D15__ECSPI2_MOSI,
-+	MX51_PAD_NANDF_D12__GPIO_3_28,
++extern const struct imx_spi_imx_data imx51_cspi_data __initconst;
++#define imx51_add_cspi(pdata)      \
++	imx_add_spi_imx(&imx51_cspi_data, pdata)
++
++extern struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
++#define imx51_add_ecspi(id, pdata) \
++	imx_add_spi_imx(&imx51_ecspi_data[id], pdata)
+diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/plat-mxc/devices/platform-spi_imx.c
+index bd30d4b..e48340e 100644
+--- a/arch/arm/plat-mxc/devices/platform-spi_imx.c
++++ b/arch/arm/plat-mxc/devices/platform-spi_imx.c
+@@ -68,6 +68,18 @@ const struct imx_spi_imx_data imx35_cspi_data[] __initconst = {
  };
+ #endif /* ifdef CONFIG_ARCH_MX35 */
  
- /* Serial ports */
-@@ -127,6 +135,16 @@ static inline void mxc_init_keypad(void)
- }
- #endif
- 
-+static int mx51_3ds_spi2_cs[] = {
-+	MXC_SPI_CS(0),
-+	MX51_3DS_ECSPI2_CS,
++#ifdef CONFIG_ARCH_MX51
++const struct imx_spi_imx_data imx51_cspi_data __initconst =
++	imx_spi_imx_data_entry_single(MX51, CSPI, "imx51-cspi", 0, , SZ_4K);
++
++const struct imx_spi_imx_data imx51_ecspi_data[] __initconst = {
++#define imx51_ecspi_data_entry(_id, _hwid)				\
++	imx_spi_imx_data_entry(MX51, ECSPI, "imx51-ecspi", _id, _hwid, SZ_4K)
++	imx51_ecspi_data_entry(0, 1),
++	imx51_ecspi_data_entry(1, 2),
 +};
++#endif /* ifdef CONFIG_ARCH_MX51 */
 +
-+static const struct spi_imx_master mx51_3ds_ecspi2_pdata __initconst = {
-+	.chipselect	= mx51_3ds_spi2_cs,
-+	.num_chipselect	= ARRAY_SIZE(mx51_3ds_spi2_cs),
-+};
-+
- /*
-  * Board specific initialization.
-  */
-@@ -136,6 +154,8 @@ static void __init mxc_board_init(void)
- 					ARRAY_SIZE(mx51_3ds_pads));
- 	mxc_init_imx_uart();
- 
-+	imx51_add_ecspi(1, &mx51_3ds_ecspi2_pdata);
-+
- 	if (mxc_expio_init(MX51_CS5_BASE_ADDR, EXPIO_PARENT_INT))
- 		printk(KERN_WARNING "Init of the debugboard failed, all "
- 				    "devices on the board are unusable.\n");
+ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata)
 -- 
 1.7.2.3
