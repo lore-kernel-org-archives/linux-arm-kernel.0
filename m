@@ -1,93 +1,34 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Fri, 17 Sep 2010 23:06:11 +0800
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 17 Sep 2010 20:40:22 +0530
 Subject: [PATCH 00/14] omap sram, omap4 control module and es2.0 support
-In-Reply-To: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
+In-Reply-To: <AANLkTi=z+FE14Uacfhuuk_U_g-9taMsN9tL4VW-j5qt0@mail.gmail.com>
 References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <AANLkTi=z+FE14Uacfhuuk_U_g-9taMsN9tL4VW-j5qt0@mail.gmail.com>
+	<AANLkTi=z+FE14Uacfhuuk_U_g-9taMsN9tL4VW-j5qt0@mail.gmail.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD307E7B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
+> -----Original Message-----
+> From: cooloney at gmail.com [mailto:cooloney at gmail.com] On Behalf Of Bryan Wu
+> Sent: Friday, September 17, 2010 8:36 PM
+> To: Shilimkar, Santosh
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 00/14] omap sram, omap4 control module and es2.0
+> support
+> 
+> Santosh,
+> 
+> Unfortunately, the kernel still cannot find MMC device and mount the
+> root file system on my Panda ES2.0 8 layers board.
+> Did we miss some patches? The Ubuntu 2.6.35 kernel boots fine.
+> 
+Use the patch posted by Madhu for MMC apart from this series
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34855.html
 
-Unfortunately, the kernel still cannot find MMC device and mount the
-root file system on my Panda ES2.0 8 layers board.
-Did we miss some patches? The Ubuntu 2.6.35 kernel boots fine.
+I didn't find any issues with my es2.0 Panda board.
+Kevin also tested his Panda where MMC worked well.
 
--Bryan
+Not sure what is the problem with your board,
 
-On Fri, Sep 17, 2010 at 5:47 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> This is consolidated patch series targetted for 2.6.37 merge window.
-> All of these patches have been already posted/reviewed on the list.
->
-> The series contains
-> ? ? ? ?- SRAM mapping fixes to avoid speculative aborts
-> ? ? ? ?- omap4 control module support
-> ? ? ? ?- Fixes for omap4 HS/GP detection
-> ? ? ? ?- omap4 es2.0 fixes. MMC and ethernet fixes are queued in respective
-> ? ? ? ? ?trees
->
-> Boot tested with omap3_defconfig on
-> ? ? ? ? ? ? ? ? ? ? ? ?- OMAP4430 SPP
-> ? ? ? ? ? ? ? ? ? ? ? ?- OMAP4 Panda
-> ? ? ? ? ? ? ? ? ? ? ? ?- OMAP4 Blaze
-> ? ? ? ? ? ? ? ? ? ? ? ?- OMAP3430 SDP
->
-> The following changes since commit 03a7ab083e4d619136d6f07ce70fa9de0bc436fc:
-> ?Linus Torvalds (1):
-> ? ? ? ?Merge git://git.kernel.org/.../sfrench/cifs-2.6
->
-> are available in the git repository at:
->
-> ?git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap_for_2.6.37
->
-> David Anders (1):
-> ? ? ?omap4: Panda: Add DEBUG_LL support
->
-> Santosh Shilimkar (11):
-> ? ? ?ARM: mmu: Setup MT_MEMORY and MT_MEMORY_NONCACHED L1 entries
-> ? ? ?omap: Map only available sram memory
-> ? ? ?davinci: map sram using MT_MEMORY_NONCACHED instead of MT_DEVICE
-> ? ? ?omap4: control: Add ctrl_pad_base to omap_globals
-> ? ? ?omap4: control: Add accessor api's for pad control module
-> ? ? ?omap4: control: Add the register definition headers
-> ? ? ?omap4: control: Fix the control module register accesses
-> ? ? ?omap4: Update id.c and cpu.h for es2.0
-> ? ? ?omap4: Fix silicon version detection for early samples
-> ? ? ?omap4: l2x0: Fix init parameter for es2.0
-> ? ? ?omap4: Fix bootup crash observed with higher CPU clocks
->
-> Vikram Pandita (2):
-> ? ? ?omap: sram: fix is_sram_locked check
-> ? ? ?omap4: sram: Fix start address
->
-> ?arch/arm/mach-davinci/dm355.c ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +-
-> ?arch/arm/mach-davinci/dm365.c ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +-
-> ?arch/arm/mach-davinci/dm644x.c ? ? ? ? ? ? ? ? ? ? | ? ?3 +-
-> ?arch/arm/mach-davinci/dm646x.c ? ? ? ? ? ? ? ? ? ? | ? ?3 +-
-> ?arch/arm/mach-omap2/control.c ? ? ? ? ? ? ? ? ? ? ?| ? 25 +
-> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 67 +-
-> ?arch/arm/mach-omap2/id.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 40 +-
-> ?.../include/mach/ctrl_module_core_44xx.h ? ? ? ? ? | ?391 ++++++
-> ?.../include/mach/ctrl_module_pad_core_44xx.h ? ? ? | 1409 ++++++++++++++++++++
-> ?.../include/mach/ctrl_module_pad_wkup_44xx.h ? ? ? | ?236 ++++
-> ?.../include/mach/ctrl_module_wkup_44xx.h ? ? ? ? ? | ? 92 ++
-> ?arch/arm/mach-omap2/omap4-common.c ? ? ? ? ? ? ? ? | ? 10 +-
-> ?arch/arm/mm/mmu.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 17 +-
-> ?arch/arm/plat-omap/common.c ? ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +-
-> ?arch/arm/plat-omap/dmtimer.c ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/plat-omap/include/plat/common.h ? ? ? ? ? | ? ?1 +
-> ?arch/arm/plat-omap/include/plat/control.h ? ? ? ? ?| ? 31 +-
-> ?arch/arm/plat-omap/include/plat/cpu.h ? ? ? ? ? ? ?| ? ?5 +-
-> ?arch/arm/plat-omap/include/plat/uncompress.h ? ? ? | ? ?1 +
-> ?arch/arm/plat-omap/sram.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 38 +-
-> ?20 files changed, 2271 insertions(+), 109 deletions(-)
-> ?create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_core_44xx.h
-> ?create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_core_44xx.h
-> ?create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_wkup_44xx.h
-> ?create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Regards,
+Santosh
