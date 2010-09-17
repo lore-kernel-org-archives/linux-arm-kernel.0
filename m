@@ -1,202 +1,90 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Sep 2010 15:17:51 +0530
-Subject: [PATCH 07/14] omap4: control: Fix the control module register accesses
-In-Reply-To: <1284716878-27667-7-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 17 Sep 2010 15:17:48 +0530
+Subject: [PATCH 04/14] omap4: control: Add ctrl_pad_base to omap_globals
+In-Reply-To: <1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
 References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-6-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-7-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1284716878-27667-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch has multiple fixes together. To ensure that git bisect work across
-commits, all changes are clubbed together
+On omap4 control module is divided in four IP blocks.
+- CTRL_MODULE_CORE			0x4a002000
+- CTRL_MODULE_PAD_CORE		0x4a100000
+- CTRL_MODULE_WKUP			0x4a30c000
+- CTRL_MODULE_PAD_WKUP		0x4a31e000
 
-1. Move the common control base address to control core
-2. Remove the manually coeded defines and use the ones from headers.
-3. Fix the the status register define in id.c for OMAP4
-4. Fix all the register define in hsmmc.c
-5. Use the control pad accessor API for omap4 hsmmc register accesses
+Addressing all the modules with single base address is not possible
+considering 16 bit offsets. The mux code manages the pad core and pad
+wakeup related base address inside the mux framework. For other usage
+only control core and control pad bases are necessary. So this patch
+maps only needed pad control base address which is used by device drivers
+and infrastructure code
+
+The main control core base is still kept same in this patch to
+keep git-bisect working. This will be fixed in the relevant patch
+in this series.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/hsmmc.c               |   67 +++++++++++++++-------------
- arch/arm/mach-omap2/id.c                  |    2 +-
- arch/arm/plat-omap/common.c               |    2 +-
- arch/arm/plat-omap/include/plat/control.h |   23 ----------
- 4 files changed, 38 insertions(+), 56 deletions(-)
+ arch/arm/mach-omap2/control.c            |    7 +++++++
+ arch/arm/plat-omap/common.c              |    3 ++-
+ arch/arm/plat-omap/include/plat/common.h |    1 +
+ 3 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index c8f647b..87bdb7b 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -135,10 +135,11 @@ static void omap4_hsmmc1_before_set_reg(struct device *dev, int slot,
- 	 *
- 	 * FIXME handle VMMC1A as needed ...
- 	 */
--	reg = omap_ctrl_readl(control_pbias_offset);
--	reg &= ~(OMAP4_MMC1_PBIASLITE_PWRDNZ | OMAP4_MMC1_PWRDNZ |
--					OMAP4_USBC1_ICUSB_PWRDNZ);
--	omap_ctrl_writel(reg, control_pbias_offset);
-+	reg = omap4_ctrl_pad_readl(control_pbias_offset);
-+	reg &= ~(OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
-+		OMAP4_MMC1_PWRDNZ_MASK |
-+		OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+	omap4_ctrl_pad_writel(reg, control_pbias_offset);
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index a8d20ee..99c0eb6 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -25,6 +25,7 @@
+ #include "sdrc.h"
+ 
+ static void __iomem *omap2_ctrl_base;
++static void __iomem *omap4_ctrl_pad_base;
+ 
+ #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+ struct omap3_scratchpad {
+@@ -145,6 +146,12 @@ void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
+ 		omap2_ctrl_base = ioremap(omap2_globals->ctrl, SZ_4K);
+ 		WARN_ON(!omap2_ctrl_base);
+ 	}
++
++	/* Static mapping, never released */
++	if (omap2_globals->ctrl_pad) {
++		omap4_ctrl_pad_base = ioremap(omap2_globals->ctrl_pad, SZ_4K);
++		WARN_ON(!omap4_ctrl_pad_base);
++	}
  }
  
- static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
-@@ -147,30 +148,33 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 	u32 reg;
- 
- 	if (power_on) {
--		reg = omap_ctrl_readl(control_pbias_offset);
--		reg |= OMAP4_MMC1_PBIASLITE_PWRDNZ;
-+		reg = omap4_ctrl_pad_readl(control_pbias_offset);
-+		reg |= OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK;
- 		if ((1 << vdd) <= MMC_VDD_165_195)
--			reg &= ~OMAP4_MMC1_PBIASLITE_VMODE;
-+			reg &= ~OMAP4_MMC1_PBIASLITE_VMODE_MASK;
- 		else
--			reg |= OMAP4_MMC1_PBIASLITE_VMODE;
--		reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ | OMAP4_MMC1_PWRDNZ |
--						OMAP4_USBC1_ICUSB_PWRDNZ);
--		omap_ctrl_writel(reg, control_pbias_offset);
-+			reg |= OMAP4_MMC1_PBIASLITE_VMODE_MASK;
-+		reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
-+			OMAP4_MMC1_PWRDNZ_MASK |
-+			OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+		omap4_ctrl_pad_writel(reg, control_pbias_offset);
- 		/* 4 microsec delay for comparator to generate an error*/
- 		udelay(4);
--		reg = omap_ctrl_readl(control_pbias_offset);
--		if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR) {
-+		reg = omap4_ctrl_pad_readl(control_pbias_offset);
-+		if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK) {
- 			pr_err("Pbias Voltage is not same as LDO\n");
- 			/* Caution : On VMODE_ERROR Power Down MMC IO */
--			reg &= ~(OMAP4_MMC1_PWRDNZ | OMAP4_USBC1_ICUSB_PWRDNZ);
--			omap_ctrl_writel(reg, control_pbias_offset);
-+			reg &= ~(OMAP4_MMC1_PWRDNZ_MASK |
-+				OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+			omap4_ctrl_pad_writel(reg, control_pbias_offset);
- 		}
- 	} else {
--		reg = omap_ctrl_readl(control_pbias_offset);
--		 reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ |
--			OMAP4_MMC1_PBIASLITE_VMODE | OMAP4_MMC1_PWRDNZ |
--			OMAP4_USBC1_ICUSB_PWRDNZ);
--		omap_ctrl_writel(reg, control_pbias_offset);
-+		reg = omap4_ctrl_pad_readl(control_pbias_offset);
-+		reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
-+			OMAP4_MMC1_PWRDNZ_MASK |
-+			OMAP4_MMC1_PBIASLITE_VMODE_MASK |
-+			OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+		omap4_ctrl_pad_writel(reg, control_pbias_offset);
- 	}
- }
- 
-@@ -218,17 +222,18 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 			control_devconf1_offset = OMAP343X_CONTROL_DEVCONF1;
- 		}
- 	} else {
--		control_pbias_offset = OMAP44XX_CONTROL_PBIAS_LITE;
--		control_mmc1 = OMAP44XX_CONTROL_MMC1;
--		reg = omap_ctrl_readl(control_mmc1);
--		reg |= (OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP0 |
--			OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP1);
--		reg &= ~(OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP2 |
--			OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP3);
--		reg |= (OMAP4_CONTROL_SDMMC1_DR0_SPEEDCTRL |
--			OMAP4_CONTROL_SDMMC1_DR1_SPEEDCTRL |
--			OMAP4_CONTROL_SDMMC1_DR2_SPEEDCTRL);
--		omap_ctrl_writel(reg, control_mmc1);
-+		control_pbias_offset =
-+			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_PBIASLITE;
-+		control_mmc1 = OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MMC1;
-+		reg = omap4_ctrl_pad_readl(control_mmc1);
-+		reg |= (OMAP4_SDMMC1_PUSTRENGTH_GRP0_MASK |
-+			OMAP4_SDMMC1_PUSTRENGTH_GRP1_MASK);
-+		reg &= ~(OMAP4_SDMMC1_PUSTRENGTH_GRP2_MASK |
-+			OMAP4_SDMMC1_PUSTRENGTH_GRP3_MASK);
-+		reg |= (OMAP4_USBC1_DR0_SPEEDCTRL_MASK|
-+			OMAP4_SDMMC1_DR1_SPEEDCTRL_MASK |
-+			OMAP4_SDMMC1_DR2_SPEEDCTRL_MASK);
-+		omap4_ctrl_pad_writel(reg, control_mmc1);
- 	}
- 
- 	for (c = controllers; c->mmc; c++) {
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 9a879f9..4808bc9 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -60,7 +60,7 @@ int omap_type(void)
- 	} else if (cpu_is_omap34xx()) {
- 		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
- 	} else if (cpu_is_omap44xx()) {
--		val = omap_ctrl_readl(OMAP44XX_CONTROL_STATUS);
-+		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
- 	} else {
- 		pr_err("Cannot detect omap type!\n");
- 		goto out;
+ void __iomem *omap_ctrl_base_get(void)
 diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index 480718b..7d668b3 100644
+index 3008e71..480718b 100644
 --- a/arch/arm/plat-omap/common.c
 +++ b/arch/arm/plat-omap/common.c
-@@ -336,7 +336,7 @@ void __init omap3_map_io(void)
+@@ -336,7 +336,8 @@ void __init omap3_map_io(void)
  static struct omap_globals omap4_globals = {
  	.class	= OMAP443X_CLASS,
  	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--	.ctrl	= OMAP443X_CTRL_BASE,	/* FIXME: Move this to control core */
-+	.ctrl	= OMAP443X_SCM_BASE,
- 	.ctrl_pad	= OMAP443X_CTRL_BASE,
+-	.ctrl	= OMAP443X_CTRL_BASE,
++	.ctrl	= OMAP443X_CTRL_BASE,	/* FIXME: Move this to control core */
++	.ctrl_pad	= OMAP443X_CTRL_BASE,
  	.prm	= OMAP4430_PRM_BASE,
  	.cm	= OMAP4430_CM_BASE,
-diff --git a/arch/arm/plat-omap/include/plat/control.h b/arch/arm/plat-omap/include/plat/control.h
-index f571af7..19c9b2a 100644
---- a/arch/arm/plat-omap/include/plat/control.h
-+++ b/arch/arm/plat-omap/include/plat/control.h
-@@ -208,12 +208,6 @@
- #define OMAP3_PADCONF_SAD2D_MSTANDBY   0x250
- #define OMAP3_PADCONF_SAD2D_IDLEACK    0x254
- 
--/* 44xx control status register offset */
--#define OMAP44XX_CONTROL_STATUS		0x2c4
--
--/* 44xx-only CONTROL_GENERAL register offsets */
--#define OMAP44XX_CONTROL_MMC1			0x628
--#define OMAP44XX_CONTROL_PBIAS_LITE		0x600
- /*
-  * REVISIT: This list of registers is not comprehensive - there are more
-  * that should be added.
-@@ -259,23 +253,6 @@
- #define OMAP2_PBIASLITEPWRDNZ0		(1 << 1)
- #define OMAP2_PBIASLITEVMODE0		(1 << 0)
- 
--/* CONTROL_PBIAS_LITE bits for OMAP4 */
--#define OMAP4_MMC1_PWRDNZ			(1 << 26)
--#define OMAP4_MMC1_PBIASLITE_HIZ_MODE		(1 << 25)
--#define OMAP4_MMC1_PBIASLITE_SUPPLY_HI_OUT	(1 << 24)
--#define OMAP4_MMC1_PBIASLITE_VMODE_ERROR	(1 << 23)
--#define OMAP4_MMC1_PBIASLITE_PWRDNZ		(1 << 22)
--#define OMAP4_MMC1_PBIASLITE_VMODE		(1 << 21)
--#define OMAP4_USBC1_ICUSB_PWRDNZ		(1 << 20)
--
--#define OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP0	(1 << 31)
--#define OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP1	(1 << 30)
--#define OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP2	(1 << 29)
--#define OMAP4_CONTROL_SDMMC1_PUSTRENGTHGRP3	(1 << 28)
--#define OMAP4_CONTROL_SDMMC1_DR0_SPEEDCTRL	(1 << 27)
--#define OMAP4_CONTROL_SDMMC1_DR1_SPEEDCTRL	(1 << 26)
--#define OMAP4_CONTROL_SDMMC1_DR2_SPEEDCTRL	(1 << 25)
--
- /* CONTROL_PROG_IO1 bits */
- #define OMAP3630_PRG_SDMMC1_SPEEDCTRL	(1 << 20)
- 
+ 	.cm2	= OMAP4430_CM2_BASE,
+diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
+index 9776b41..7cd0180 100644
+--- a/arch/arm/plat-omap/include/plat/common.h
++++ b/arch/arm/plat-omap/include/plat/common.h
+@@ -47,6 +47,7 @@ struct omap_globals {
+ 	unsigned long   sdrc;           /* SDRAM Controller */
+ 	unsigned long   sms;            /* SDRAM Memory Scheduler */
+ 	unsigned long   ctrl;           /* System Control Module */
++	unsigned long   ctrl_pad;	/* PAD Control Module */
+ 	unsigned long   prm;            /* Power and Reset Management */
+ 	unsigned long   cm;             /* Clock Management */
+ 	unsigned long   cm2;
 -- 
 1.6.0.4
