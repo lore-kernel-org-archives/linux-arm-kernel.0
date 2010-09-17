@@ -1,61 +1,72 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 17 Sep 2010 11:54:27 +0200
-Subject: [PATCH 09/16] ARM: mx51: fix naming of spi related defines
+Date: Fri, 17 Sep 2010 11:54:29 +0200
+Subject: [PATCH 11/16] ARM: mx5/clock-mx51: refactor ccgr callbacks to use
+	common code
 In-Reply-To: <20100917095247.GB30441@pengutronix.de>
 References: <20100917095247.GB30441@pengutronix.de>
-Message-ID: <1284717274-12850-9-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1284717274-12850-11-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The names used now match the processor's reference manual.  Also remove
-MXC from the interrupt defines to match the other imx platforms.
-
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/mx51.h |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 92b39f7..d0fda39 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -67,7 +67,7 @@
- #define MX51_MMC_SDHC1_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x04000)
- #define MX51_MMC_SDHC2_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x08000)
- #define MX51_UART3_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x0c000)
--#define MX51_CSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
-+#define MX51_ECSPI1_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x10000)
- #define MX51_SSI2_BASE_ADDR		(MX51_SPBA0_BASE_ADDR + 0x14000)
- #define MX51_MMC_SDHC3_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x20000)
- #define MX51_MMC_SDHC4_BASE_ADDR	(MX51_SPBA0_BASE_ADDR + 0x24000)
-@@ -121,12 +121,12 @@
- #define MX51_ARM_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xa0000)
- #define MX51_OWIRE_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xa4000)
- #define MX51_FIRI_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xa8000)
--#define MX51_CSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
-+#define MX51_ECSPI2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xac000)
- #define MX51_SDMA_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xb0000)
- #define MX51_SCC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xb4000)
- #define MX51_ROMCP_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xb8000)
- #define MX51_RTIC_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xbc000)
--#define MX51_CSPI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
-+#define MX51_CSPI_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc0000)
- #define MX51_I2C2_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc4000)
- #define MX51_I2C1_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xc8000)
- #define MX51_SSI1_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xcc000)
-@@ -346,9 +346,9 @@
- #define MX51_MXC_INT_UART3		33
- #define MX51_MXC_INT_RESV34		34
- #define MX51_MXC_INT_RESV35		35
--#define MX51_MXC_INT_CSPI1		36
--#define MX51_MXC_INT_CSPI2		37
--#define MX51_MXC_INT_CSPI		38
-+#define MX51_INT_ECSPI1			36
-+#define MX51_INT_ECSPI2			37
-+#define MX51_INT_CSPI			38
- #define MX51_MXC_INT_GPT		39
- #define MX51_MXC_INT_EPIT1		40
- #define MX51_MXC_INT_EPIT2		41
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 57c10a9..fe658bf 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -41,34 +41,36 @@ static struct clk usboh3_clk;
+ 
+ #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
+ 
+-static int _clk_ccgr_enable(struct clk *clk)
++static void _clk_ccgr_setclk(struct clk *clk, unsigned mode)
+ {
+-	u32 reg;
++	u32 reg = __raw_readl(clk->enable_reg);
++
++	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
++	reg |= mode << clk->enable_shift;
+ 
+-	reg = __raw_readl(clk->enable_reg);
+-	reg |= MXC_CCM_CCGRx_MOD_ON << clk->enable_shift;
+ 	__raw_writel(reg, clk->enable_reg);
++}
+ 
++static int _clk_ccgr_enable(struct clk *clk)
++{
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_ON);
+ 	return 0;
+ }
+ 
+ static void _clk_ccgr_disable(struct clk *clk)
+ {
+-	u32 reg;
+-	reg = __raw_readl(clk->enable_reg);
+-	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
+-	__raw_writel(reg, clk->enable_reg);
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_OFF);
++}
+ 
++static int _clk_ccgr_enable_inrun(struct clk *clk)
++{
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE);
++	return 0;
+ }
+ 
+ static void _clk_ccgr_disable_inwait(struct clk *clk)
+ {
+-	u32 reg;
+-
+-	reg = __raw_readl(clk->enable_reg);
+-	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
+-	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
+-	__raw_writel(reg, clk->enable_reg);
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE);
+ }
+ 
+ /*
 -- 
 1.7.2.3
