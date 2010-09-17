@@ -1,43 +1,88 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 17 Sep 2010 11:24:33 +0200 (CEST)
-Subject: [PATCH] ARM: fix a kfree address in clkdev code
-Message-ID: <Pine.LNX.4.64.1009171120130.4988@axis700.grange>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 17 Sep 2010 15:17:47 +0530
+Subject: [PATCH 03/14] davinci: map sram using MT_MEMORY_NONCACHED instead of
+	MT_DEVICE
+In-Reply-To: <1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kfree() in clkdev_drop() function should actually be called with an address of
-a struct clk_lookup_alloc object, and not struct clk_lookup, as presently done.
-This just happens to work, because "struct clk_lookup cl" is the first
-member in struct clk_lookup_alloc.
+On Davinci SRAM is mapped as MT_DEVICE becasue of the section
+mapping pre-requisite instead of intended MT_MEMORY_NONCACHED
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Since the section mapping limitation gets fixed with first
+patch in this series, the MT_MEMORY_NONCACHED can be used now.
+
+Have not tested this, so somebody with Davinci hardware can
+try this out
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
+ arch/arm/mach-davinci/dm355.c  |    3 +--
+ arch/arm/mach-davinci/dm365.c  |    3 +--
+ arch/arm/mach-davinci/dm644x.c |    3 +--
+ arch/arm/mach-davinci/dm646x.c |    3 +--
+ 4 files changed, 4 insertions(+), 8 deletions(-)
 
-Jean-Christophe, as I said, this is a purely academic patch, I'll send a 
-similar one to sh, but if your consolidation patch is accepted for 2.6.37, 
-maybe you can just adjust yours to get to the desired result. If, however, 
-these two patches are merged into 2.6.36, you'll need slightly larger 
-adjustments to your patch, in both cases trivial though.
-
- arch/arm/common/clkdev.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/common/clkdev.c b/arch/arm/common/clkdev.c
-index e2b2bb6..b867d47 100644
---- a/arch/arm/common/clkdev.c
-+++ b/arch/arm/common/clkdev.c
-@@ -171,9 +171,11 @@ EXPORT_SYMBOL(clk_add_alias);
-  */
- void clkdev_drop(struct clk_lookup *cl)
- {
-+	struct clk_lookup_alloc *cla = container_of(cl, struct clk_lookup_alloc, cl);
-+
- 	mutex_lock(&clocks_mutex);
- 	list_del(&cl->node);
- 	mutex_unlock(&clocks_mutex);
--	kfree(cl);
-+	kfree(cla);
- }
- EXPORT_SYMBOL(clkdev_drop);
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 3d996b6..9be261b 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -769,8 +769,7 @@ static struct map_desc dm355_io_desc[] = {
+ 		.virtual	= SRAM_VIRT,
+ 		.pfn		= __phys_to_pfn(0x00010000),
+ 		.length		= SZ_32K,
+-		/* MT_MEMORY_NONCACHED requires supersection alignment */
+-		.type		= MT_DEVICE,
++		.type		= MT_MEMORY_NONCACHED,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 6b6f4c6..7781e35 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -969,8 +969,7 @@ static struct map_desc dm365_io_desc[] = {
+ 		.virtual	= SRAM_VIRT,
+ 		.pfn		= __phys_to_pfn(0x00010000),
+ 		.length		= SZ_32K,
+-		/* MT_MEMORY_NONCACHED requires supersection alignment */
+-		.type		= MT_DEVICE,
++		.type		= MT_MEMORY_NONCACHED,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 40fec31..5e5b0a7 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -653,8 +653,7 @@ static struct map_desc dm644x_io_desc[] = {
+ 		.virtual	= SRAM_VIRT,
+ 		.pfn		= __phys_to_pfn(0x00008000),
+ 		.length		= SZ_16K,
+-		/* MT_MEMORY_NONCACHED requires supersection alignment */
+-		.type		= MT_DEVICE,
++		.type		= MT_MEMORY_NONCACHED,
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index e4a3df1..26e8a9c 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -737,8 +737,7 @@ static struct map_desc dm646x_io_desc[] = {
+ 		.virtual	= SRAM_VIRT,
+ 		.pfn		= __phys_to_pfn(0x00010000),
+ 		.length		= SZ_32K,
+-		/* MT_MEMORY_NONCACHED requires supersection alignment */
+-		.type		= MT_DEVICE,
++		.type		= MT_MEMORY_NONCACHED,
+ 	},
+ };
+ 
 -- 
-1.7.1
+1.6.0.4
