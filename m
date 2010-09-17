@@ -1,30 +1,41 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Fri, 17 Sep 2010 15:31:16 +0200
-Subject: [PATCH] at91: fix arch_gettimeoffset fallout
-Message-ID: <1284730276-21657-1-git-send-email-jacmet@sunsite.dk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 17 Sep 2010 17:34:34 +0400
+Subject: [PATCH v2] davinci: MityDSP-L138/MityARM-1808 read MAC address
+	from I2C Prom
+In-Reply-To: <1284673716-4848-1-git-send-email-michael.williamson@criticallink.com>
+References: <1284673716-4848-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <4C936E6A.2040701@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-5cfc8ee0bb51 (ARM: convert arm to arch_gettimeoffset()) marked all of
-at91 AND at91x40 as needing ARCH_USES_GETTIMEOFFSET, and hence no high
-res timer support / accurate clock_gettime() - But only at91x40 needs it.
+Hello.
 
-Signed-off-by: Peter Korsgaard <peter.korsgaard@barco.com>
----
- arch/arm/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+Michael Williamson wrote:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 553b7cf..a1907b2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -271,7 +271,6 @@ config ARCH_AT91
- 	bool "Atmel AT91"
- 	select ARCH_REQUIRE_GPIOLIB
- 	select HAVE_CLK
--	select ARCH_USES_GETTIMEOFFSET
- 	help
- 	  This enables support for systems based on the Atmel AT91RM9200,
- 	  AT91SAM9 and AT91CAP9 processors.
--- 
-1.7.1
+> For the MityDSP-L138/MityARM-1808 SOMS, read the factory assigned
+> MAC address from the onboard I2C EPROM and assign it to the emac
+> device during platform initialization.
+
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+
+[...]
+
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> index 6f12a18..1fff0bb 100644
+> --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> @@ -15,6 +15,8 @@
+[...]
+> +static void read_factory_config(struct memory_accessor *a, void *context)
+> +{
+[...]
+> +	if (is_valid_ether_addr(factory_config.mac))
+> +		memcpy(&soc_info->emac_pdata->mac_addr[0],
+
+    & and [0] are not needed.
+
+> +			&factory_config.mac[0], ETH_ALEN);
+
+    Same here.
+
+WBR, Sergei
