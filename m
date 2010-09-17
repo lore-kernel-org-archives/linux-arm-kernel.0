@@ -1,31 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Sep 2010 10:03:49 +0100
-Subject: [PATCH/RFC] ARM: add a vma entry for the user accessible
-	vector page
-In-Reply-To: <alpine.LFD.2.00.1009140118510.19366@xanadu.home>
-References: <alpine.LFD.2.00.1009140118510.19366@xanadu.home>
-Message-ID: <20100917090349.GA5164@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 17 Sep 2010 11:24:33 +0200 (CEST)
+Subject: [PATCH] ARM: fix a kfree address in clkdev code
+Message-ID: <Pine.LNX.4.64.1009171120130.4988@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 14, 2010 at 01:24:04AM -0400, Nicolas Pitre wrote:
->     
-> The kernel makes the high vector page visible to user space. This page
-> contains (amongst others) small code segments that can be executed in
-> user space.  Make this page visible through ptrace and /proc/<pid>/mem
-> in order to let gdb perform code parsing needed for proper unwinding.
-> 
-> For example, the ERESTART_RESTARTBLOCK handler actually has a stack
-> frame -- it returns to a PC value stored on the user's stack.   To
-> unwind after a "sleep" system call was interrupted twice, GDB would
-> have to recognize this situation and understand that stack frame
-> layout -- which it currently cannot do.
-> 
-> We could fix this by hard-coding addresses in the vector page range into
-> GDB, but that isn't really portable as not all of those addresses are
-> guaranteed to remain stable across kernel releases.  And having the gdb
-> process make an exception for this page and get  content from its own
-> view of it looks strange, and it is not future proof either.
+kfree() in clkdev_drop() function should actually be called with an address of
+a struct clk_lookup_alloc object, and not struct clk_lookup, as presently done.
+This just happens to work, because "struct clk_lookup cl" is the first
+member in struct clk_lookup_alloc.
 
-What if someone calls munmap() (or one of the other mmap calls) on
-this vma?
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+
+Jean-Christophe, as I said, this is a purely academic patch, I'll send a 
+similar one to sh, but if your consolidation patch is accepted for 2.6.37, 
+maybe you can just adjust yours to get to the desired result. If, however, 
+these two patches are merged into 2.6.36, you'll need slightly larger 
+adjustments to your patch, in both cases trivial though.
+
+ arch/arm/common/clkdev.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/common/clkdev.c b/arch/arm/common/clkdev.c
+index e2b2bb6..b867d47 100644
+--- a/arch/arm/common/clkdev.c
++++ b/arch/arm/common/clkdev.c
+@@ -171,9 +171,11 @@ EXPORT_SYMBOL(clk_add_alias);
+  */
+ void clkdev_drop(struct clk_lookup *cl)
+ {
++	struct clk_lookup_alloc *cla = container_of(cl, struct clk_lookup_alloc, cl);
++
+ 	mutex_lock(&clocks_mutex);
+ 	list_del(&cl->node);
+ 	mutex_unlock(&clocks_mutex);
+-	kfree(cl);
++	kfree(cla);
+ }
+ EXPORT_SYMBOL(clkdev_drop);
+-- 
+1.7.1
