@@ -1,17 +1,37 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 17 Sep 2010 18:44:59 +0900
-Subject: [PATCH v2 0/2] sdhci-s3c: Add support S5PV310/S5PC210 HSMMC
-Message-ID: <1284716701-5140-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 17 Sep 2010 18:45:00 +0900
+Subject: [PATCH v2 1/2] sdhci-s3c: Add support additional host capabilities
+In-Reply-To: <1284716701-5140-1-git-send-email-kgene.kim@samsung.com>
+References: <1284716701-5140-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1284716701-5140-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support S5PV310/S5PC210 HSMMC and additional host capabilities.
+From: Jeongbae Seo <jeongbae.seo@samsung.com>
 
-HSMMC of S5PV310 does not have internal clock divider so need to update for it.
-(used SDHCI_QUIRK_NONSTANDARD_CLOCK quirk and added clk_type plat data)
+This patch adds to support additional host capabilities
+like SD/MMC high speed, SDHCI bus width and etc.
 
-Changes since v1:
-- Separated to each topic
+Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/mmc/host/sdhci-s3c.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-[PATCH v2 1/2] sdhci-s3c: Add support additional host capabilities
-[PATCH v2 2/2] sdhci-s3c: Add support no internal clock divider in host controller
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 71ad416..e6e0438 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -425,6 +425,10 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 	/* HSMMC on Samsung SoCs uses SDCLK as timeout clock */
+ 	host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
+ 
++	/* It supports additional host capabilities if needed */
++	if (pdata->host_caps)
++		host->mmc->caps |= pdata->host_caps;
++
+ 	ret = sdhci_add_host(host);
+ 	if (ret) {
+ 		dev_err(dev, "sdhci_add_host() failed\n");
+-- 
+1.6.2.5
