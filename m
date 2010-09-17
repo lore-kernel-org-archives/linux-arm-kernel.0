@@ -1,25 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Sep 2010 11:15:31 +0100
-Subject: [PATCH 02/14] omap: Map only available sram memory
-In-Reply-To: <1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 17 Sep 2010 11:16:02 +0100
+Subject: [PATCH 03/14] davinci: map sram using MT_MEMORY_NONCACHED
+	instead of MT_DEVICE
+In-Reply-To: <1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
 References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20100917101531.GB27467@n2100.arm.linux.org.uk>
+	<1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20100917101602.GC27467@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 17, 2010 at 03:17:46PM +0530, Santosh Shilimkar wrote:
-> Currently we map 1 MB section while setting up SRAM on OMAPs.
-> The actual physcal OCM RAM available on OMAP SOCs is in order
-
-physical
-
-> of KBs. This patch maps only available sram and removes some
-> non necessary cpu_is_xxx checks.
+On Fri, Sep 17, 2010 at 03:17:47PM +0530, Santosh Shilimkar wrote:
+> On Davinci SRAM is mapped as MT_DEVICE becasue of the section
+> mapping pre-requisite instead of intended MT_MEMORY_NONCACHED
 > 
-> On the newer ARMs with speculation, this is dangerous and can
-> result in untraceable aborts.
+> Since the section mapping limitation gets fixed with first
+> patch in this series, the MT_MEMORY_NONCACHED can be used now.
+> 
+> Have not tested this, so somebody with Davinci hardware can
+> try this out
 
-"this" should be expanded (otherwise it is unclear whether it refers to
-the original code or the new code.)
+Is this still true?
