@@ -1,104 +1,93 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Sep 2010 15:17:54 +0530
-Subject: [PATCH 10/14] omap4: Update id.c and cpu.h for es2.0
-In-Reply-To: <1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 17 Sep 2010 15:17:49 +0530
+Subject: [PATCH 05/14] omap4: control: Add accessor api's for pad control
+	module
+In-Reply-To: <1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
 References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-4-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-5-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-6-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-7-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-8-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-9-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1284716878-27667-11-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1284716878-27667-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the id.c and cpu.h files to support
-omap4 ES2.0 silicon detection.
+On OMAP4 control pad are not addressable from control
+core base. So the common omap_ctrl_read/write APIs breaks
+Hence export separate APIs to manage the omap4 pad control
+registers.
+
+This APIs will work only for OMAP4
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/id.c              |   29 ++++++++++++++++++++++-------
- arch/arm/plat-omap/include/plat/cpu.h |    5 ++++-
- 2 files changed, 26 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/control.c             |   18 ++++++++++++++++++
+ arch/arm/plat-omap/include/plat/control.h |    4 ++++
+ 2 files changed, 22 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 4808bc9..ae70ae9 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -298,7 +298,6 @@ static void __init omap4_check_revision(void)
- 	u32 idcode;
- 	u16 hawkeye;
- 	u8 rev;
--	char *rev_name = "ES1.0";
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 99c0eb6..4ace2d1 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -138,6 +138,7 @@ static struct omap3_control_regs control_context;
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
  
- 	/*
- 	 * The IC rev detection is done with hawkeye and rev.
-@@ -309,14 +308,30 @@ static void __init omap4_check_revision(void)
- 	hawkeye = (idcode >> 12) & 0xffff;
- 	rev = (idcode >> 28) & 0xff;
+ #define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
++#define OMAP_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
  
--	if ((hawkeye == 0xb852) && (rev == 0x0)) {
--		omap_revision = OMAP4430_REV_ES1_0;
--		omap_chip.oc |= CHIP_IS_OMAP4430ES1;
--		pr_info("OMAP%04x %s\n", omap_rev() >> 16, rev_name);
--		return;
-+	switch (hawkeye) {
-+	case 0xb852:
-+		switch (rev) {
-+		case 0:
-+			omap_revision = OMAP4430_REV_ES1_0;
-+			omap_chip.oc |= CHIP_IS_OMAP4430ES1;
-+			break;
-+		case 1:
-+			omap_revision = OMAP4430_REV_ES2_0;
-+			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
-+			break;
-+		default:
-+			omap_revision = OMAP4430_REV_ES2_0;
-+			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
-+	}
-+	break;
-+	default:
-+		/* Unknown default to latest silicon rev as default*/
-+		omap_revision = OMAP4430_REV_ES2_0;
-+		omap_chip.oc |= CHIP_IS_OMAP4430ES2;
- 	}
- 
--	pr_err("Unknown OMAP4 CPU id\n");
-+	pr_info("OMAP%04x ES%d.0\n",
-+			omap_rev() >> 16, ((omap_rev() >> 12) & 0xf) + 1);
+ void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
+ {
+@@ -189,6 +190,23 @@ void omap_ctrl_writel(u32 val, u16 offset)
+ 	__raw_writel(val, OMAP_CTRL_REGADDR(offset));
  }
  
- #define OMAP3_SHOW_FEATURE(feat)		\
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 2e2ae53..9b38e4b 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -391,6 +391,7 @@ IS_OMAP_TYPE(3517, 0x3517)
- 
- #define OMAP443X_CLASS		0x44300044
- #define OMAP4430_REV_ES1_0	0x44300044
-+#define OMAP4430_REV_ES2_0	0x44301044
- 
++/*
++ * On OMAP4 control pad are not addressable from control
++ * core base. So the common omap_ctrl_read/write APIs breaks
++ * Hence export separate APIs to manage the omap4 pad control
++ * registers. This APIs will work only for OMAP4
++ */
++
++u32 omap4_ctrl_pad_readl(u16 offset)
++{
++	return __raw_readl(OMAP_CTRL_PAD_REGADDR(offset));
++}
++
++void omap4_ctrl_pad_writel(u32 val, u16 offset)
++{
++	__raw_writel(val, OMAP_CTRL_PAD_REGADDR(offset));
++}
++
+ #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
  /*
-  * omap_chip bits
-@@ -417,10 +418,12 @@ IS_OMAP_TYPE(3517, 0x3517)
- #define CHIP_IS_OMAP4430ES1		(1 << 8)
- #define CHIP_IS_OMAP3630ES1_1           (1 << 9)
- #define CHIP_IS_OMAP3630ES1_2           (1 << 10)
-+#define CHIP_IS_OMAP4430ES2		(1 << 11)
+  * Clears the scratchpad contents in case of cold boot-
+diff --git a/arch/arm/plat-omap/include/plat/control.h b/arch/arm/plat-omap/include/plat/control.h
+index 131bf40..2916b7e 100644
+--- a/arch/arm/plat-omap/include/plat/control.h
++++ b/arch/arm/plat-omap/include/plat/control.h
+@@ -354,9 +354,11 @@ extern void __iomem *omap_ctrl_base_get(void);
+ extern u8 omap_ctrl_readb(u16 offset);
+ extern u16 omap_ctrl_readw(u16 offset);
+ extern u32 omap_ctrl_readl(u16 offset);
++extern u32 omap4_ctrl_pad_readl(u16 offset);
+ extern void omap_ctrl_writeb(u8 val, u16 offset);
+ extern void omap_ctrl_writew(u16 val, u16 offset);
+ extern void omap_ctrl_writel(u32 val, u16 offset);
++extern void omap4_ctrl_pad_writel(u32 val, u16 offset);
  
- #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
+ extern void omap3_save_scratchpad_contents(void);
+ extern void omap3_clear_scratchpad_contents(void);
+@@ -371,9 +373,11 @@ extern void omap3_control_restore_context(void);
+ #define omap_ctrl_readb(x)		0
+ #define omap_ctrl_readw(x)		0
+ #define omap_ctrl_readl(x)		0
++#define omap4_ctrl_pad_readl(x)		0
+ #define omap_ctrl_writeb(x, y)		WARN_ON(1)
+ #define omap_ctrl_writew(x, y)		WARN_ON(1)
+ #define omap_ctrl_writel(x, y)		WARN_ON(1)
++#define omap4_ctrl_pad_writel(x, y)	WARN_ON(1)
+ #endif
+ #endif	/* __ASSEMBLY__ */
  
--#define CHIP_IS_OMAP4430		(CHIP_IS_OMAP4430ES1)
-+#define CHIP_IS_OMAP4430		(CHIP_IS_OMAP4430ES1 | \
-+						 CHIP_IS_OMAP4430ES2)
- 
- /*
-  * "GE" here represents "greater than or equal to" in terms of ES
 -- 
 1.6.0.4
