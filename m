@@ -1,29 +1,35 @@
-From: ext-phil.2.carmody@nokia.com (Phil Carmody)
-Date: Fri, 17 Sep 2010 19:45:43 +0300
-Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <20100917153643.GC29739@sirena.org.uk>
-References: <1284686973-13993-1-git-send-email-nm@ti.com>
-	<20100917153643.GC29739@sirena.org.uk>
-Message-ID: <20100917164543.GI20325@esdhcp04044.research.nokia.com>
+From: johnstul@us.ibm.com (john stultz)
+Date: Fri, 17 Sep 2010 10:41:38 -0700
+Subject: [PATCH] at91: fix arch_gettimeoffset fallout
+In-Reply-To: <1284730276-21657-1-git-send-email-jacmet@sunsite.dk>
+References: <1284730276-21657-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <1284745298.2451.6.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/10 17:36 +0200, ext Mark Brown wrote:
-> On Thu, Sep 16, 2010 at 08:29:33PM -0500, Nishanth Menon wrote:
-> 
-> > +struct opp_def {
-> > +	unsigned long freq;
-> > +	unsigned long u_volt;
-> > +
-> > +	bool enabled;
-> > +};
-> 
-> It might be clearer to use some term other than enabled in the code -
-> when reading I wasn't immediately sure if enabled meant that it was
-> available to be selected or if it was the active operating point.  How
-  ^^^^^^^^^
-> about 'allowed' (though I'm not 100% happy with that)?
+On Fri, 2010-09-17 at 15:31 +0200, Peter Korsgaard wrote:
+> 5cfc8ee0bb51 (ARM: convert arm to arch_gettimeoffset()) marked all of
+> at91 AND at91x40 as needing ARCH_USES_GETTIMEOFFSET, and hence no high
+> res timer support / accurate clock_gettime() - But only at91x40 needs it.
 
-I think your query contains its own answer.
+Huh, sorry I missed that subtlety! Thanks for hunting this down!
 
-Phil
+Acked-by: John Stultz <johnstul@us.ibm.com>
+
+> Signed-off-by: Peter Korsgaard <peter.korsgaard@barco.com>
+> ---
+>  arch/arm/Kconfig |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 553b7cf..a1907b2 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -271,7 +271,6 @@ config ARCH_AT91
+>  	bool "Atmel AT91"
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select HAVE_CLK
+> -	select ARCH_USES_GETTIMEOFFSET
+>  	help
+>  	  This enables support for systems based on the Atmel AT91RM9200,
+>  	  AT91SAM9 and AT91CAP9 processors.
