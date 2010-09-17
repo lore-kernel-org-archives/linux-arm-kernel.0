@@ -1,59 +1,51 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 17 Sep 2010 13:11:14 +0200
-Subject: [PATCH 04/16] spi/imx: save the spi chip select in config struct,
-	not the gpio to use
-In-Reply-To: <1284717274-12850-4-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100917095247.GB30441@pengutronix.de>
-	<1284717274-12850-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <19603.19666.323684.891456@ipc1.ka-ro>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 17 Sep 2010 16:47:47 +0530
+Subject: [PATCH 14/14] omap4: Fix bootup crash observed with higher CPU
+	clocks
+In-Reply-To: <20100917104133.GP26474@legolas.emea.dhcp.ti.com>
+References: <1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-11-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-12-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-13-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-14-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-15-git-send-email-santosh.shilimkar@ti.com>
+	<7A436F7769CA33409C6B44B358BFFF0C014F13A77C@dlee02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD307C7B@dbde02.ent.ti.com>
+	<7A436F7769CA33409C6B44B358BFFF0C014F13A782@dlee02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB02CD307CA7@dbde02.ent.ti.com>
+	<20100917104133.GP26474@legolas.emea.dhcp.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD307D21@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> -----Original Message-----
+> From: Balbi, Felipe
+> Sent: Friday, September 17, 2010 4:12 PM
+> To: Shilimkar, Santosh
+> Cc: Menon, Nishanth; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Nayak, Rajendra
+> Subject: Re: [PATCH 14/14] omap4: Fix bootup crash observed with higher
+> CPU clocks
+> 
+> hi,
+> 
+> On Fri, Sep 17, 2010 at 05:30:30AM -0500, Shilimkar, Santosh wrote:
+> >Second your thought. Infact I wasn't ok to push this patch to start
+> >with but it's needed till the timer hwmod gets merged
+> 
+> to me, it just looks like "omap_test_timeout()" is timing out and that
+> function is omap_dm_timer_set_source() is returning with a
+> still-disabled clock.
+> 
+> could you check if you get "cm: Module associated with clock
+> gpt<blablabla> didn't enabled in 100000 tries" message on your dmesg ??
+> 
+On OMAP4 specifically, the wait IDLEST support isn't there in the
+clock framework.  This is taken care now in hwmod framework. With
+that we see that we don't need this delay anymore.
 
-> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-> index 60a52d1..23db984 100644
-> --- a/drivers/spi/spi_imx.c
-> +++ b/drivers/spi/spi_imx.c
-> @@ -56,7 +56,7 @@ struct spi_imx_config {
->  	unsigned int speed_hz;
->  	unsigned int bpw;
->  	unsigned int mode;
-> -	int cs;
-> +	u8 cs;
-        ^^^^^^
->  };
->  
->  enum spi_imx_devtype {
-> @@ -218,6 +218,7 @@ static int __maybe_unused spi_imx0_4_config(struct spi_imx_data *spi_imx,
->  		struct spi_imx_config *config)
->  {
->  	unsigned int reg = MX31_CSPICTRL_ENABLE | MX31_CSPICTRL_MASTER;
-> +	int cs = spi_imx->chipselect[config->cs];
->  
->  	reg |= spi_imx_clkdiv_2(spi_imx->spi_clk, config->speed_hz) <<
->  		MX31_CSPICTRL_DR_SHIFT;
-> @@ -230,9 +231,8 @@ static int __maybe_unused spi_imx0_4_config(struct spi_imx_data *spi_imx,
->  		reg |= MX31_CSPICTRL_POL;
->  	if (config->mode & SPI_CS_HIGH)
->  		reg |= MX31_CSPICTRL_SSPOL;
-> -	if (config->cs < 0) {
-> -		reg |= (config->cs + 32) << MX31_CSPICTRL_CS_SHIFT;
-> -	}
-> +	if (cs < 0)
->
-This can never be true, since an 'int' promoted from 'u8' will always
-be positive!
+The delay change is there for some time. May be there were issue 
+with wait IDLEST.
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Regards,
+Santosh
