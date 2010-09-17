@@ -1,237 +1,220 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 17 Sep 2010 11:54:24 +0200
-Subject: [PATCH 06/16] ARM: imx: change the way spi-imx devices are registered
+Date: Fri, 17 Sep 2010 11:54:23 +0200
+Subject: [PATCH 05/16] spi/imx: add support for imx51's eCSPI and CSPI
 In-Reply-To: <20100917095247.GB30441@pengutronix.de>
 References: <20100917095247.GB30441@pengutronix.de>
-Message-ID: <1284717274-12850-6-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1284717274-12850-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group soc specific data in a global struct instead of repeating it for
-each call to imxXX_add_spi_imxX.  The structs holding the actual data
-are placed in .init.constdata and so don't do much harm.  Compared to
-the previous approach this reduces code size to call imx_add_spi_imx.
+i.MX51 comes with two eCSPI interfaces (that are quite different from
+what was known before---the tried and tested Freescale way) and a CSPI
+interface that is identical to the devices found on i.MX25 and i.MX35.
+
+This patch is a merge of two very similar patches (by Jason Wang and Sascha
+Hauer resp.) plus a (now hopefully correct) reimplementation of the
+clock calculation.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/devices-imx21.h               |    9 ++-
- arch/arm/mach-imx/devices-imx27.h               |   12 ++--
- arch/arm/mach-mx25/devices-imx25.h              |   12 ++--
- arch/arm/mach-mx3/devices-imx31.h               |   12 ++--
- arch/arm/mach-mx3/devices-imx35.h               |    9 ++-
- arch/arm/plat-mxc/devices/platform-spi_imx.c    |   76 ++++++++++++++++++++---
- arch/arm/plat-mxc/include/mach/devices-common.h |   10 +++-
- 7 files changed, 103 insertions(+), 37 deletions(-)
+ drivers/spi/Kconfig   |    5 ++-
+ drivers/spi/spi_imx.c |  140 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 143 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/devices-imx21.h b/arch/arm/mach-imx/devices-imx21.h
-index 42788e9..2b45d33 100644
---- a/arch/arm/mach-imx/devices-imx21.h
-+++ b/arch/arm/mach-imx/devices-imx21.h
-@@ -24,7 +24,8 @@
- #define imx21_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v1(MX21_NFC_BASE_ADDR, MX21_INT_NANDFC, pdata)
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 4e9d77b..7e631fa 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -153,7 +153,10 @@ config SPI_IMX_VER_0_4
+ 	def_bool y if ARCH_MX31
  
--#define imx21_add_spi_imx0(pdata)	\
--	imx_add_spi_imx(0, MX21_CSPI1_BASE_ADDR, SZ_4K, MX21_INT_CSPI1, pdata)
--#define imx21_add_spi_imx1(pdata)	\
--	imx_add_spi_imx(1, MX21_CSPI2_BASE_ADDR, SZ_4K, MX21_INT_CSPI2, pdata)
-+extern const struct imx_spi_imx_data imx21_cspi_data[] __initconst;
-+#define imx21_add_cspi(id, pdata)	\
-+	imx_add_spi_imx(&imx21_cspi_data[id], pdata)
-+#define imx21_add_spi_imx0(pdata)	imx21_add_cspi(0, pdata)
-+#define imx21_add_spi_imx1(pdata)	imx21_add_cspi(1, pdata)
-diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
-index 65e7bb7..04bfcf0 100644
---- a/arch/arm/mach-imx/devices-imx27.h
-+++ b/arch/arm/mach-imx/devices-imx27.h
-@@ -30,9 +30,9 @@
- #define imx27_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v1(MX27_NFC_BASE_ADDR, MX27_INT_NANDFC, pdata)
+ config SPI_IMX_VER_0_7
+-	def_bool y if ARCH_MX25 || ARCH_MX35
++	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51
++
++config SPI_IMX_VER_2_3
++	def_bool y if ARCH_MX51
  
--#define imx27_add_spi_imx0(pdata)	\
--	imx_add_spi_imx(0, MX27_CSPI1_BASE_ADDR, SZ_4K, MX27_INT_CSPI1, pdata)
--#define imx27_add_spi_imx1(pdata)	\
--	imx_add_spi_imx(1, MX27_CSPI2_BASE_ADDR, SZ_4K, MX27_INT_CSPI2, pdata)
--#define imx27_add_spi_imx2(pdata)	\
--	imx_add_spi_imx(2, MX27_CSPI3_BASE_ADDR, SZ_4K, MX27_INT_CSPI3, pdata)
-+extern const struct imx_spi_imx_data imx27_cspi_data[] __initconst;
-+#define imx27_add_cspi(id, pdata)	\
-+	imx_add_spi_imx(&imx27_cspi_data[id], pdata)
-+#define imx27_add_spi_imx0(pdata)	imx27_add_cspi(0, pdata)
-+#define imx27_add_spi_imx1(pdata)	imx27_add_cspi(1, pdata)
-+#define imx27_add_spi_imx2(pdata)	imx27_add_cspi(2, pdata)
-diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
-index d86a7c3..34a7061 100644
---- a/arch/arm/mach-mx25/devices-imx25.h
-+++ b/arch/arm/mach-mx25/devices-imx25.h
-@@ -35,9 +35,9 @@
- #define imx25_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v21(MX25_NFC_BASE_ADDR, MX25_INT_NANDFC, pdata)
+ config SPI_IMX
+ 	tristate "Freescale i.MX SPI controllers"
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 23db984..6bab2cf 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -65,6 +65,7 @@ enum spi_imx_devtype {
+ 	SPI_IMX_VER_0_4,
+ 	SPI_IMX_VER_0_5,
+ 	SPI_IMX_VER_0_7,
++	SPI_IMX_VER_2_3,
+ 	SPI_IMX_VER_AUTODETECT,
+ };
  
--#define imx25_add_spi_imx0(pdata)	\
--	imx_add_spi_imx(0, MX25_CSPI1_BASE_ADDR, SZ_16K, MX25_INT_CSPI1, pdata)
--#define imx25_add_spi_imx1(pdata)	\
--	imx_add_spi_imx(1, MX25_CSPI2_BASE_ADDR, SZ_16K, MX25_INT_CSPI2, pdata)
--#define imx25_add_spi_imx2(pdata)	\
--	imx_add_spi_imx(2, MX25_CSPI3_BASE_ADDR, SZ_16K, MX25_INT_CSPI3, pdata)
-+extern const struct imx_spi_imx_data imx25_spi_imx_data[] __initconst;
-+#define imx25_add_spi_imx(id, pdata)	\
-+	imx_add_spi_imx(&imx25_spi_imx_data[id], pdata)
-+#define imx25_add_spi_imx0(pdata)	imx25_add_spi_imx(0, pdata)
-+#define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
-+#define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
-diff --git a/arch/arm/mach-mx3/devices-imx31.h b/arch/arm/mach-mx3/devices-imx31.h
-index 3b1a44a..7b4d022 100644
---- a/arch/arm/mach-mx3/devices-imx31.h
-+++ b/arch/arm/mach-mx3/devices-imx31.h
-@@ -30,9 +30,9 @@
- #define imx31_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v1(MX31_NFC_BASE_ADDR, MX31_INT_NANDFC, pdata)
+@@ -155,7 +156,7 @@ static unsigned int spi_imx_clkdiv_1(unsigned int fin,
+ 	return max;
+ }
  
--#define imx31_add_spi_imx0(pdata)	\
--	imx_add_spi_imx(0, MX31_CSPI1_BASE_ADDR, SZ_4K, MX31_INT_CSPI1, pdata)
--#define imx31_add_spi_imx1(pdata)	\
--	imx_add_spi_imx(1, MX31_CSPI2_BASE_ADDR, SZ_4K, MX31_INT_CSPI2, pdata)
--#define imx31_add_spi_imx2(pdata)	\
--	imx_add_spi_imx(2, MX31_CSPI3_BASE_ADDR, SZ_4K, MX31_INT_CSPI3, pdata)
-+extern const struct imx_spi_imx_data imx31_cspi_data[] __initconst;
-+#define imx31_add_cspi(id, pdata)	\
-+	imx_add_spi_imx(&imx31_cspi_data[id], pdata)
-+#define imx31_add_spi_imx0(pdata)	imx31_add_cspi(0, pdata)
-+#define imx31_add_spi_imx1(pdata)	imx31_add_cspi(1, pdata)
-+#define imx31_add_spi_imx2(pdata)	imx31_add_cspi(2, pdata)
-diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
-index f6a431a..af0bc1f 100644
---- a/arch/arm/mach-mx3/devices-imx35.h
-+++ b/arch/arm/mach-mx3/devices-imx35.h
-@@ -31,7 +31,8 @@
- #define imx35_add_mxc_nand(pdata)	\
- 	imx_add_mxc_nand_v21(MX35_NFC_BASE_ADDR, MX35_INT_NANDFC, pdata)
+-/* MX1, MX31, MX35 */
++/* MX1, MX31, MX35, MX51 CSPI */
+ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+ 		unsigned int fspi)
+ {
+@@ -170,6 +171,128 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+ 	return 7;
+ }
  
--#define imx35_add_spi_imx0(pdata)	\
--	imx_add_spi_imx(0, MX35_CSPI1_BASE_ADDR, SZ_4K, MX35_INT_CSPI1, pdata)
--#define imx35_add_spi_imx1(pdata)	\
--	imx_add_spi_imx(1, MX35_CSPI2_BASE_ADDR, SZ_4K, MX35_INT_CSPI2, pdata)
-+extern const struct imx_spi_imx_data imx35_cspi_data[] __initconst;
-+#define imx35_add_cspi(id, pdata)	\
-+	imx_add_spi_imx(&imx35_cspi_data[id], pdata)
-+#define imx35_add_spi_imx0(pdata)	imx35_add_cspi(0, pdata)
-+#define imx35_add_spi_imx1(pdata)	imx35_add_cspi(1, pdata)
-diff --git a/arch/arm/plat-mxc/devices/platform-spi_imx.c b/arch/arm/plat-mxc/devices/platform-spi_imx.c
-index 2831a6d..412a81f 100644
---- a/arch/arm/plat-mxc/devices/platform-spi_imx.c
-+++ b/arch/arm/plat-mxc/devices/platform-spi_imx.c
-@@ -6,25 +6,83 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
--#include <asm/sizes.h>
-+#include <mach/hardware.h>
- #include <mach/devices-common.h>
- 
--struct platform_device *__init imx_add_spi_imx(int id,
--		resource_size_t iobase, resource_size_t iosize, int irq,
-+#define imx_spi_imx_data_entry_single(soc, type, _devid, _id, hwid, _size) \
-+	{								\
-+		.id = _id,						\
-+		.iobase = soc ## _ ## type ## hwid ## _BASE_ADDR,	\
-+		.iosize = _size,					\
-+		.irq = soc ## _INT_ ## type ## hwid,			\
++#define SPI_IMX2_3_CTRL		0x08
++#define SPI_IMX2_3_CTRL_ENABLE		(1 <<  0)
++#define SPI_IMX2_3_CTRL_XCH		(1 <<  2)
++#define SPI_IMX2_3_CTRL_MODE(cs)	(1 << ((cs) +  4))
++#define SPI_IMX2_3_CTRL_POSTDIV_OFFSET	8
++#define SPI_IMX2_3_CTRL_PREDIV_OFFSET	12
++#define SPI_IMX2_3_CTRL_CS(cs)		((cs) << 18)
++#define SPI_IMX2_3_CTRL_BL_OFFSET	20
++
++#define SPI_IMX2_3_CONFIG	0x0c
++#define SPI_IMX2_3_CONFIG_SCLKPHA(cs)	(1 << ((cs) +  0))
++#define SPI_IMX2_3_CONFIG_SCLKPOL(cs)	(1 << ((cs) +  4))
++#define SPI_IMX2_3_CONFIG_SBBCTRL(cs)	(1 << ((cs) +  8))
++#define SPI_IMX2_3_CONFIG_SSBPOL(cs)	(1 << ((cs) + 12))
++
++#define SPI_IMX2_3_INT		0x10
++#define SPI_IMX2_3_INT_TEEN		(1 <<  0)
++#define SPI_IMX2_3_INT_RREN		(1 <<  3)
++
++#define SPI_IMX2_3_STAT		0x18
++#define SPI_IMX2_3_STAT_RR		(1 <<  3)
++
++/* MX51 eCSPI */
++static unsigned int spi_imx2_3_clkdiv(unsigned int fin, unsigned int fspi)
++{
++	/*
++	 * there are two 4-bit dividers, the pre-divider divides by
++	 * $pre, the post-divider by 2^$post
++	 */
++	unsigned int pre, post;
++
++	if (unlikely(fspi > fin))
++		return 0;
++
++	post = fls(fin) - fls(fspi);
++	if (fin > fspi << post)
++		post++;
++
++	/* now we have: (fin <= fspi << post) with post being minimal */
++
++	post = max(4U, post) - 4;
++	if (unlikely(post > 0xf)) {
++		pr_err("%s: cannot set clock freq: %u (base freq: %u)\n",
++				__func__, fspi, fin);
++		return 0xff;
 +	}
 +
-+#define imx_spi_imx_data_entry(soc, type, devid, id, hwid, size)	\
-+	[id] = imx_spi_imx_data_entry_single(soc, type, devid, id, hwid, size)
++	pre = DIV_ROUND_UP(fin, fspi << post) - 1;
 +
-+#ifdef CONFIG_SOC_IMX21
-+const struct imx_spi_imx_data imx21_cspi_data[] __initconst = {
-+#define imx21_cspi_data_entry(_id, _hwid)                            \
-+	imx_spi_imx_data_entry(MX21, CSPI, "imx21-cspi", _id, _hwid, SZ_4K)
-+	imx21_cspi_data_entry(0, 1),
-+	imx21_cspi_data_entry(1, 2),
++	pr_debug("%s: fin: %u, fspi: %u, post: %u, pre: %u\n",
++			__func__, fin, fspi, post, pre);
++	return (pre << SPI_IMX2_3_CTRL_PREDIV_OFFSET) |
++		(post << SPI_IMX2_3_CTRL_POSTDIV_OFFSET);
++}
++
++static void __maybe_unused spi_imx2_3_intctrl(struct spi_imx_data *spi_imx, int enable)
++{
++	unsigned val = 0;
++
++	if (enable & MXC_INT_TE)
++		val |= SPI_IMX2_3_INT_TEEN;
++
++	if (enable & MXC_INT_RR)
++		val |= SPI_IMX2_3_INT_RREN;
++
++	writel(val, spi_imx->base + SPI_IMX2_3_INT);
++}
++
++static void __maybe_unused spi_imx2_3_trigger(struct spi_imx_data *spi_imx)
++{
++	u32 reg;
++
++	reg = readl(spi_imx->base + SPI_IMX2_3_CTRL);
++	reg |= SPI_IMX2_3_CTRL_XCH;
++	writel(reg, spi_imx->base + SPI_IMX2_3_CTRL);
++}
++
++static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
++		struct spi_imx_config *config)
++{
++	u32 ctrl = SPI_IMX2_3_CTRL_ENABLE, cfg = 0;
++
++	/* set master mode */
++	ctrl |= SPI_IMX2_3_CTRL_MODE(config->cs);
++
++	/* set clock speed */
++	ctrl |= spi_imx2_3_clkdiv(spi_imx->spi_clk, config->speed_hz);
++
++	/* set chip select to use */
++	ctrl |= SPI_IMX2_3_CTRL_CS(config->cs);
++
++	ctrl |= (config->bpw - 1) << SPI_IMX2_3_CTRL_BL_OFFSET;
++
++	cfg |= SPI_IMX2_3_CONFIG_SBBCTRL(config->cs);
++
++	if (config->mode & SPI_CPHA)
++		cfg |= SPI_IMX2_3_CONFIG_SCLKPHA(config->cs);
++
++	if (config->mode & SPI_CPOL)
++		cfg |= SPI_IMX2_3_CONFIG_SCLKPOL(config->cs);
++
++	if (config->mode & SPI_CS_HIGH)
++		cfg |= SPI_IMX2_3_CONFIG_SSBPOL(config->cs);
++
++	writel(ctrl, spi_imx->base + SPI_IMX2_3_CTRL);
++	writel(cfg, spi_imx->base + SPI_IMX2_3_CONFIG);
++
++	return 0;
++}
++
++static int __maybe_unused spi_imx2_3_rx_available(struct spi_imx_data *spi_imx)
++{
++	return readl(spi_imx->base + SPI_IMX2_3_STAT) & SPI_IMX2_3_STAT_RR;
++}
++
++static void __maybe_unused spi_imx2_3_reset(struct spi_imx_data *spi_imx)
++{
++	/* drain receive buffer */
++	while (spi_imx2_3_rx_available(spi_imx))
++		readl(spi_imx->base + MXC_CSPIRXDATA);
++}
++
+ #define MX31_INTREG_TEEN	(1 << 0)
+ #define MX31_INTREG_RREN	(1 << 3)
+ 
+@@ -447,6 +570,15 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+ 		.reset = spi_imx0_4_reset,
+ 	},
+ #endif
++#ifdef CONFIG_SPI_IMX_VER_2_3
++	[SPI_IMX_VER_2_3] = {
++		.intctrl = spi_imx2_3_intctrl,
++		.config = spi_imx2_3_config,
++		.trigger = spi_imx2_3_trigger,
++		.rx_available = spi_imx2_3_rx_available,
++		.reset = spi_imx2_3_reset,
++	},
 +#endif
-+
-+#ifdef CONFIG_ARCH_MX25
-+const struct imx_spi_imx_data imx25_cspi_data[] __initconst = {
-+#define imx25_cspi_data_entry(_id, _hwid)				\
-+	imx_spi_imx_data_entry(MX25, CSPI, "imx25-cspi", _id, _hwid, SZ_16K)
-+	imx25_cspi_data_entry(0, 1),
-+	imx25_cspi_data_entry(1, 2),
-+	imx25_cspi_data_entry(2, 3),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX25 */
-+
-+#ifdef CONFIG_SOC_IMX27
-+const struct imx_spi_imx_data imx27_cspi_data[] __initconst = {
-+#define imx27_cspi_data_entry(_id, _hwid)				\
-+	imx_spi_imx_data_entry(MX27, CSPI, "imx27-cspi", _id, _hwid, SZ_4K)
-+	imx27_cspi_data_entry(0, 1),
-+	imx27_cspi_data_entry(1, 2),
-+	imx27_cspi_data_entry(2, 3),
-+};
-+#endif /* ifdef CONFIG_SOC_IMX27 */
-+
-+#ifdef CONFIG_ARCH_MX31
-+const struct imx_spi_imx_data imx31_cspi_data[] __initconst = {
-+#define imx31_cspi_data_entry(_id, _hwid)				\
-+	imx_spi_imx_data_entry(MX31, CSPI, "imx31-cspi", _id, _hwid, SZ_4K)
-+	imx31_cspi_data_entry(0, 1),
-+	imx31_cspi_data_entry(1, 2),
-+	imx31_cspi_data_entry(2, 3),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX31 */
-+
-+#ifdef CONFIG_ARCH_MX35
-+const struct imx_spi_imx_data imx35_cspi_data[] __initconst = {
-+#define imx35_cspi_data_entry(_id, _hwid)                           \
-+	imx_spi_imx_data_entry(MX35, CSPI, "imx35-cspi", _id, _hwid, SZ_4K)
-+	imx35_cspi_data_entry(0, 1),
-+	imx35_cspi_data_entry(1, 2),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX35 */
-+
-+struct platform_device *__init imx_add_spi_imx(
-+		const struct imx_spi_imx_data *data,
- 		const struct spi_imx_master *pdata)
- {
- 	struct resource res[] = {
- 		{
--			.start = iobase,
--			.end = iobase + iosize - 1,
-+			.start = data->iobase,
-+			.end = data->iobase + data->iosize - 1,
- 			.flags = IORESOURCE_MEM,
- 		}, {
--			.start = irq,
--			.end = irq,
-+			.start = data->irq,
-+			.end = data->irq,
- 			.flags = IORESOURCE_IRQ,
- 		},
- 	};
+ };
  
--	return imx_add_platform_device("spi_imx", id, res, ARRAY_SIZE(res),
--			pdata, sizeof(*pdata));
-+	return imx_add_platform_device("spi_imx", data->id,
-+			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
- }
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index c5f68c5..abe12c29 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -55,6 +55,12 @@ struct platform_device *__init imx_add_mxc_nand_v21(resource_size_t iobase,
- 		int irq, const struct mxc_nand_platform_data *pdata);
- 
- #include <mach/spi.h>
--struct platform_device *__init imx_add_spi_imx(int id,
--		resource_size_t iobase, resource_size_t iosize, int irq,
-+struct imx_spi_imx_data {
-+	int id;
-+	resource_size_t iobase;
-+	resource_size_t iosize;
-+	int irq;
-+};
-+struct platform_device *__init imx_add_spi_imx(
-+		const struct imx_spi_imx_data *data,
- 		const struct spi_imx_master *pdata);
+ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
+@@ -603,6 +735,12 @@ static struct platform_device_id spi_imx_devtype[] = {
+ 		.name = "imx35-cspi",
+ 		.driver_data = SPI_IMX_VER_0_7,
+ 	}, {
++		.name = "imx51-cspi",
++		.driver_data = SPI_IMX_VER_0_7,
++	}, {
++		.name = "imx51-ecspi",
++		.driver_data = SPI_IMX_VER_2_3,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
 -- 
 1.7.2.3
