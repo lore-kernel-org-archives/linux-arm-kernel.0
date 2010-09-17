@@ -1,24 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Sep 2010 09:45:26 +0100
-Subject: [PATCH] ARM: MM: bugfix: initialize spinlock for init_mm.context
-In-Reply-To: <1284699282-22849-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1284699282-22849-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1284713126.19837.0.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Sep 2010 10:03:49 +0100
+Subject: [PATCH/RFC] ARM: add a vma entry for the user accessible
+	vector page
+In-Reply-To: <alpine.LFD.2.00.1009140118510.19366@xanadu.home>
+References: <alpine.LFD.2.00.1009140118510.19366@xanadu.home>
+Message-ID: <20100917090349.GA5164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-09-17 at 13:54 +0900, MyungJoo Ham wrote:
-> init_mm used at kernel/sched.c:idle_task_exit() has spin_lock
-> (init_mm.context.id_lock) that is not initialized when spin_lock/unlock
-> is called at an ARM machine. Note that mm_struct.context.id_lock is usually
-> initialized except for the instance of init_mm at linux/arch/arm/mm/context.c
+On Tue, Sep 14, 2010 at 01:24:04AM -0400, Nicolas Pitre wrote:
+>     
+> The kernel makes the high vector page visible to user space. This page
+> contains (amongst others) small code segments that can be executed in
+> user space.  Make this page visible through ptrace and /proc/<pid>/mem
+> in order to let gdb perform code parsing needed for proper unwinding.
 > 
-> Not initializing this spinlock incurs "BUG: pinlock bad magic" warning when
-> spinlock debug is enabled. We have observed such instances when testing PM in
-> S5PC210 machines.
+> For example, the ERESTART_RESTARTBLOCK handler actually has a stack
+> frame -- it returns to a PC value stored on the user's stack.   To
+> unwind after a "sleep" system call was interrupted twice, GDB would
+> have to recognize this situation and understand that stack frame
+> layout -- which it currently cannot do.
 > 
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> We could fix this by hard-coding addresses in the vector page range into
+> GDB, but that isn't really portable as not all of those addresses are
+> guaranteed to remain stable across kernel releases.  And having the gdb
+> process make an exception for this page and get  content from its own
+> view of it looks strange, and it is not future proof either.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+What if someone calls munmap() (or one of the other mmap calls) on
+this vma?
