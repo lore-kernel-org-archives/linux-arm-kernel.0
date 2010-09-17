@@ -1,7 +1,7 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Sep 2010 15:17:57 +0530
-Subject: [PATCH 13/14] omap4: Panda: Add DEBUG_LL support
-In-Reply-To: <1284716878-27667-13-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 17 Sep 2010 15:17:52 +0530
+Subject: [PATCH 08/14] omap: sram: fix is_sram_locked check
+In-Reply-To: <1284716878-27667-8-git-send-email-santosh.shilimkar@ti.com>
 References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
@@ -10,35 +10,54 @@ References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-6-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-7-git-send-email-santosh.shilimkar@ti.com>
 	<1284716878-27667-8-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-9-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-10-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-11-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-12-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-13-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1284716878-27667-14-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1284716878-27667-9-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Anders <x0132446@ti.com>
+From: Vikram Pandita <vikram.pandita@ti.com>
 
-Add support for use of DEBUG_LL for use with PandaBoard.
+For OMAP24xx/34xx/44xx: omap_type() returns the correct type:
+ OMAP2_DEVICE_TYPE_TEST
+ OMAP2_DEVICE_TYPE_EMU
+ OMAP2_DEVICE_TYPE_SEC
+ OMAP2_DEVICE_TYPE_GP
+ OMAP2_DEVICE_TYPE_BAD
 
-Signed-off-by: David Anders <x0132446@ti.com>
+In current implementation there are two problems:
+Problem 1:
+For 34xx, the current if check will never return true.
+
+Problem 2:
+For 24xx the correct type check should be with omap_type() function
+Verified by checking the TRM 24xx for CONTROL_STATUS register bits
+
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/plat-omap/include/plat/uncompress.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/plat-omap/sram.c |   11 +----------
+ 1 files changed, 1 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index ddf723b..57dffa7 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -153,6 +153,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 
- 		/* omap4 based boards using UART3 */
- 		DEBUG_LL_OMAP4(3, omap_4430sdp);
-+		DEBUG_LL_OMAP4(3, omap4_panda);
- 
- 		/* zoom2/3 external uart */
- 		DEBUG_LL_ZOOM(omap_zoom2);
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 10b3b4c..1faaa6e 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -93,16 +93,7 @@ extern unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
+  */
+ static int is_sram_locked(void)
+ {
+-	int type = 0;
+-
+-	if (cpu_is_omap44xx())
+-		/* Not yet supported */
+-		return 0;
+-
+-	if (cpu_is_omap242x())
+-		type = omap_rev() & OMAP2_DEVICETYPE_MASK;
+-
+-	if (type == GP_DEVICE) {
++	if (OMAP2_DEVICE_TYPE_GP == omap_type()) {
+ 		/* RAMFW: R/W access to all initiators for all qualifier sets */
+ 		if (cpu_is_omap242x()) {
+ 			__raw_writel(0xFF, OMAP24XX_VA_REQINFOPERM0); /* all q-vects */
 -- 
 1.6.0.4
