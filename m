@@ -1,75 +1,114 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 17 Sep 2010 10:53:06 -0500
-Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <20100917153643.GC29739@sirena.org.uk>
+Date: Fri, 17 Sep 2010 10:59:06 -0500
+Subject: [PATCH] opp: introduce library for device-specific OPPs
+In-Reply-To: <4C9383C8.4020608@ti.com>
 References: <1284686973-13993-1-git-send-email-nm@ti.com>
-	<20100917153643.GC29739@sirena.org.uk>
-Message-ID: <4C938EE2.1010307@ti.com>
+	<AANLkTin2fBriymD7p-YfhPL24hMfYttsZBdighCSJxV2@mail.gmail.com>
+	<4C9383C8.4020608@ti.com>
+Message-ID: <4C93904A.9000109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown had written, on 09/17/2010 10:36 AM, the following:
-> On Thu, Sep 16, 2010 at 08:29:33PM -0500, Nishanth Menon wrote:
+Nishanth Menon had written, on 09/17/2010 10:05 AM, the following:
+> Linus Walleij had written, on 09/17/2010 08:41 AM, the following:
+>> 2010/9/17 Nishanth Menon <nm@ti.com>:
+>>
+>>> diff --git a/Documentation/power/00-INDEX b/Documentation/power/00-INDEX
+>>> index fb742c2..45e9d4a 100644
+>>> --- a/Documentation/power/00-INDEX
+>>> +++ b/Documentation/power/00-INDEX
+>>> @@ -14,6 +14,8 @@ interface.txt
+>>>        - Power management user interface in /sys/power
+>>>  notifiers.txt
+>>>        - Registering suspend notifiers in device drivers
+>>> +opp.txt
+>>> +       - Operating Performance Point library
+>>>  pci.txt
+>>>        - How the PCI Subsystem Does Power Management
+>> Hm you add the documentation to the index but not the documentation
+>> itself (easy slip) would you mind posting it?
+> ouch.. Sorry.. I realized that I missed adding MAINTAINER entry as 
+> well.. v2 coming up..
 > 
->> +struct opp_def {
->> +	unsigned long freq;
->> +	unsigned long u_volt;
->> +
->> +	bool enabled;
->> +};
-> 
-> It might be clearer to use some term other than enabled in the code -
-> when reading I wasn't immediately sure if enabled meant that it was
-> available to be selected or if it was the active operating point.  How
-> about 'allowed' (though I'm not 100% happy with that)?
-;).. The opp is enabled or disabled if it is populated, it is implicit 
-as being available but not enabled- how about active? this would change 
-the opp_enable/disable functions to opp_activate, opp_deactivate..
 
-Recommendations folks?
+while the review goes on, I will till end of the day before posting a v2 
+will collated comments, here is the opp.txt documentation for the same.. 
+apologies on missing in my v1..
 
-> 
->> +static inline int opp_add(struct device *dev, const struct opp_def *opp_def)
->> +{
->> +	return ERR_PTR(-EINVAL);
->> +}
-> 
-> Mismatch with the return type and value here.
-/me kicks himself.. ouch.. thanks.. will fix in v2.
+OPP Layer
+==============
+SOCs have a standard set of tuples consisting of frequency and
+voltage pairs that the device will support per voltage domain. This
+is called Operating Performance Point or OPP. The actual definitions
+of OPP varies over silicon within the same family of devices.
+For a specific domain, you can have a set of {frequency, voltage}
+pairs. As the kernel boots and more information is available, a set
+of these are activated based on the precise nature of device the kernel
+boots up on. It is interesting to remember that each IP which belongs
+to a voltage domain may define their own set of OPPs on top of this.
 
-> 
->> +/**
->> + * opp_enable() - Enable a specific OPP
->> + * @opp:	Pointer to opp
->> + *
->> + * Enables a provided opp. If the operation is valid, this returns 0, else the
->> + * corresponding error value.
->> + *
->> + * OPP used here is from the the opp_is_valid/opp_has_freq or other search
->> + * functions
->> + */
->> +int opp_enable(struct opp *opp)
->> +{
->> +	if (unlikely(!opp || IS_ERR(opp))) {
->> +		pr_err("%s: Invalid parameters being passed\n", __func__);
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (!opp->enabled && opp->dev_opp)
->> +		opp->dev_opp->enabled_opp_count++;
->> +
->> +	opp->enabled = true;
->> +
->> +	return 0;
->> +}
-> 
-> When reading the description I'd expected to see some facility to
-> trigger selection of an active operating point in the library (possibly
-> as a separate call since you might have a bunch of operating points
-> being updated in quick succession) but it looks like that needs to be
-> supplied externally at the minute?
-The intent is we use the opp_search* functions to pick up the opp and 
-enable/activate it and disable/deactivate it.
+OPP layer of its own depends on silicon specific implementation and
+board specific data to finalize on the final set of OPPs available
+in a system
+
+OPP layer organizes the data internally using device pointers representing
+individual voltage domains.
+
+NOTE:
+a) the OPP layer implementation expects to be used in multiple contexts
+based on SOC implementation and recommends locking schemes appropriate to
+the usage of SOC.
+b) All pointer returns are expected to be handled by standard error checks
+such as IS_ERR() and appropriate actions taken by the caller.
+c) Dependency of OPP layer is on CONFIG_PM as certain SOCs such as Texas
+Instrument's OMAP support have frameworks to optionally boot at a certain
+opp without needing cpufreq.
+
+Initial list initialization:
+---------------------------
+The SOC implementation calls the following function to add opp per
+domain device.
+
+1. opp_add - add a new OPP - NOTE: use struct opp_def and define
+the custom OPP with OPP_DEF for usage.
+
+Query functions:
+----------------
+Search for OPPs for various cases:
+2. opp_find_freq_exact - exact search function
+3. opp_find_freq_floor - round_up search function
+4. opp_find_freq_ceil - round_down search function
+
+OPP modifier functions:
+----------------------
+This allows opp layer users to add customized OPPs or change the table
+for any need they may have
+5. opp_enable - enable a disabled OPP
+6. opp_disable - disable an enabled OPP
+
+OPP Data retrieval functions:
+----------------------------
+The following sets of functions are useful for drivers to retrieve
+data stored in opp layer for various functions.
+7. opp_get_voltage - retrieve voltage for an opp
+9. opp_get_freq - get the frequency for an opp
+8. opp_get_opp_count - get number of opps enabled for a domain
+
+Cpufreq table generation:
+------------------------
+9. opp_init_cpufreq_table - this translates the OPP layer's internal
+OPP arrangement into a table understood and operated upon by the
+cpufreq layer.
+
+Data Structures:
+---------------
+struct opp * is a handle structure whose internals are known only
+to the OPP layer and is meant to hide the complexity away from users of
+opp layer.
+
+struct opp_def * is the definitions that users can interface with
+opp layer and is meant to define one OPP for a domain device.
+
 
 -- 
 Regards,
