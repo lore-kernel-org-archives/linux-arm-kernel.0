@@ -1,112 +1,70 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Fri, 17 Sep 2010 09:56:06 -0400
-Subject: [PATCH v3] davinci: MityDSP-L138/MityARM-1808 read MAC address from
-	I2C Prom
-Message-ID: <1284731766-2751-1-git-send-email-michael.williamson@criticallink.com>
+From: olivier.barthel@gmail.com (Olivier Barthel)
+Date: Fri, 17 Sep 2010 16:02:09 +0200
+Subject: i.mx25 :trouble with serial flow hardware
+In-Reply-To: <20100917095343.GB3119@pengutronix.de>
+References: <AANLkTikb56gj78izBMhG2kL-mFOis9L0zk_kCYN5Gk6H@mail.gmail.com>
+	<20100917095343.GB3119@pengutronix.de>
+Message-ID: <AANLkTimeOPCtDfcgFtxy=POjtSiG9A7nbcMQ5_=aN+Y4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the MityDSP-L138/MityARM-1808 SOMS, read the factory assigned
-MAC address from the onboard I2C EPROM and assign it to the emac
-device during platform initialization.
-
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Wolfram,
+patch over kernel provided by Karo electronics.
+Regards,
+Olivier
 ---
-Patch is against e90c3a5344683351c7a37f097f1e17d50ee2063c of linux-davinci 
-tree.
+diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+index dd05872..35669ce 100644
+--- a/drivers/serial/imx.c
++++ b/drivers/serial/imx.c
+@@ -338,11 +338,12 @@ static inline void imx_transmit_buffer(struct
+imx_port *sport)
+ 	while (!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
+ 		/* send xmit->buf[xmit->tail]
+ 		 * out the port here */
++        if (uart_circ_empty(xmit))
++            break;
+ 		writel(xmit->buf[xmit->tail], sport->port.membase + URTX0);
+ 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+ 		sport->port.icount.tx++;
+-		if (uart_circ_empty(xmit))
+-			break;
++		
+ 	}
 
-Changes since v2:
-	1) removed 8 bytes of &'s and [0]'s from &foo[0]'s per comments
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+---
 
- arch/arm/mach-davinci/board-mityomapl138.c |   62 ++++++++++++++++++++++++++++
- 1 files changed, 62 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 6f12a18..65f7501 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -15,6 +15,8 @@
- #include <linux/mtd/partitions.h>
- #include <linux/regulator/machine.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/at24.h>
-+#include <linux/etherdevice.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -25,6 +27,65 @@
- #include <mach/mux.h>
- 
- #define MITYOMAPL138_PHY_ID		"0:03"
-+
-+#define FACTORY_CONFIG_MAGIC	0x012C0138
-+#define FACTORY_CONFIG_VERSION	0x00010001
-+
-+/* Data Held in On-Board I2C device */
-+struct factory_config {
-+	u32	magic;
-+	u32	version;
-+	u8	mac[6];
-+	u32	fpga_type;
-+	u32	spare;
-+	u32	serialnumber;
-+	char	partnum[32];
-+};
-+
-+static struct factory_config factory_config;
-+
-+static void read_factory_config(struct memory_accessor *a, void *context)
-+{
-+	int ret;
-+	struct davinci_soc_info *soc_info = &davinci_soc_info;
-+
-+	ret = a->read(a, (char *)&factory_config, 0, sizeof(factory_config));
-+	if (ret != sizeof(struct factory_config)) {
-+		pr_warning("MityOMAPL138: Read Factory Config Failed: %d\n",
-+				ret);
-+		return;
-+	}
-+
-+	if (factory_config.magic != FACTORY_CONFIG_MAGIC) {
-+		pr_warning("MityOMAPL138: Factory Config Magic Wrong (%X)\n",
-+				factory_config.magic);
-+		return;
-+	}
-+
-+	if (factory_config.version != FACTORY_CONFIG_VERSION) {
-+		pr_warning("MityOMAPL138: Factory Config Version Wrong (%X)\n",
-+				factory_config.version);
-+		return;
-+	}
-+
-+	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
-+	pr_info("MityOMAPL138: Part Number = %s\n", factory_config.partnum);
-+	if (is_valid_ether_addr(factory_config.mac))
-+		memcpy(soc_info->emac_pdata->mac_addr,
-+			factory_config.mac, ETH_ALEN);
-+	else
-+		pr_warning("MityOMAPL138: Invalid MAC found "
-+				"in factory config block\n");
-+}
-+
-+static struct at24_platform_data mityomapl138_fd_chip = {
-+	.byte_len	= 256,
-+	.page_size	= 8,
-+	.flags		= AT24_FLAG_READONLY | AT24_FLAG_IRUGO,
-+	.setup		= read_factory_config,
-+	.context	= NULL,
-+};
-+
- static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
- 	.bus_freq	= 100,	/* kHz */
- 	.bus_delay	= 0,	/* usec */
-@@ -151,6 +212,7 @@ static struct i2c_board_info __initdata mityomap_tps65023_info[] = {
- 	},
- 	{
- 		I2C_BOARD_INFO("24c02", 0x50),
-+		.platform_data = &mityomapl138_fd_chip,
- 	},
- };
- 
--- 
-1.7.0.4
+2010/9/17 Wolfram Sang <w.sang@pengutronix.de>:
+> Hi,
+>
+> On Wed, Sep 15, 2010 at 05:38:58PM +0200, Olivier Barthel wrote:
+>
+>> I think the problem is in the function imx_transmit_buffer of file
+>> imx.c when this function is called by imx_start_tx called by
+>> uart_handle_cts_change. It consumes a character in the ring buffer
+>> (tail=tail+1) before testing whether the buffer is empty (tail=head?)
+>> or not. In the next loop, the function detects 4095 items in the
+>> circular buffer.
+>> By moving the test before reading of ring buffer, the problem is
+>> apparently corrected.
+>
+> Sounds reasonable. Can you send a patch? It is easier to review code.
+>
+> Thanks,
+>
+> ? Wolfram
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.10 (GNU/Linux)
+>
+> iEYEARECAAYFAkyTOqcACgkQD27XaX1/VRtwAACbBx7HSaMB78SMyiquwSghJU3f
+> omoAoLvWfdJsFKK2dcfjvnRoX8rExebH
+> =fxNi
+> -----END PGP SIGNATURE-----
+>
+>
