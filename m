@@ -1,57 +1,82 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 17 Sep 2010 10:47:53 +0900
-Subject: [PATCH] ARM: S5PV210: Add audio support to Goni and Aquila board
-In-Reply-To: <4C92C4D3.4010106@samsung.com>
-References: <4C8D8233.2060602@samsung.com> <4C92C4D3.4010106@samsung.com>
-Message-ID: <03b001cb560a$5bc6ad80$13540880$%kim@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 17 Sep 2010 11:16:32 +0900
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <AANLkTi=YqY29cFebB4c9qoMkyQyHmsfCc7p4_UJL_t1p@mail.gmail.com>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<1284522014.517347.33297989274.1.gpush@pororo>
+	<AANLkTi=vaOzRcoGM9AnJ+17e0-97b76F5DW964fC3Wwp@mail.gmail.com>
+	<1284683074.3350.73.camel@pororo>
+	<AANLkTi=YqY29cFebB4c9qoMkyQyHmsfCc7p4_UJL_t1p@mail.gmail.com>
+Message-ID: <AANLkTikazxn8c2mJYDJ-td9LKq-v=0K92=g0oj3cS7W=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
-> 
-> Dear Ben,
-> 
-> Don't you have any comment this patch?
-> Please give your commont for this patch.
-> 
-> Chanwoo Choi
-> 
-> Chanwoo Choi wrote:
-> > This patch the I2C board information for the WM8994 used in the
-Goni/Aquila
-> > as audio codec and adds the I2C/I2S platform drivers. Additionlly, to
-> > control power consumption have registerd the voltage consumer of WM8994
-> > to the regulator framework.
-> >
-> > Additionally, I explain the constraints of the regulator of WM8994
-codec.
-> > All these consumer supply of WM8994 codec connected the
-regulator(VCC_1.8V)
-> > on a circuit diagram. "VCC_1.8V" regulator is always enabled, because it
-is
-> > used to many devices on Goni/Aquila board. This is required especially
-> > when there are many devices physically attached to "VCC_1.8V" and some
-of
-> > they did not "register" as consumers to "VCC_1.8V". "VCC_1.8V" might be
-> > turned off by those who are registered while "unregistered" are still
-active.
-> >
-> > Signed-off-by : Chanwoo Choi <cw00.choi@samsung.com>
-> > Signed-off-by : Joonyoung Shim <jy0922.shim@samsung.com>
-> > Signed-off-by : Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
+On Fri, Sep 17, 2010 at 9:55 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, Sep 17, 2010 at 9:24 AM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+>> Hi Jassi,
+>>
+>>> I am not sure about the scope of your assumed task, but I would still
+>>> like to bring
+>>> to your notice some points.
+>>>
+>>> IMHO any clock api that aims to be used by multiple platforms should be generic
+>>> more than this one. Let me explain.
+>>
+>> None of my patches change the clock API itself. The clock API is already
+>> in use on ARM (ie, multiple platforms) and seems to work for most cases.
+>>
+>>> Clocks that are simply output of MUX'es inherit the rate of the parent
+>>> clock - they do have
+>>> rate yet this API would return 0 (IIRUIC).
+>>
+>> The proposed clock infrastructure does not provide implementations for
+>> the clock operation functions (like get_rate, which you're referring to
+>> here). The behaviour of the clocks is dictated by each implementation of
+>> struct clk. For MUXes, the callback for clk->ops.get_rate would be
+>> something like:
+>>
+>> unsigned long clk_mux_get_rate(struct clk *clk)
+>> {
+>> ? ? ? ?return clk_get_rate(to_clk_mux(clk)->parent);
+>> }
+>>
+>> - so it just returns the rate of the parent (not 0). However, if the
+>> clock implementation has a reason to return 0, it is free to do so.
+>
+> IMHO, the API needs to define a more generic clock that covers the 'classic'
+> and mux'ed clock by same data structure.
+> That implies fixing the API and modify the drivers (if need be) rather than have
+> multiple implementations of API. Let platforms move to the new one at their own
+> pace.
+In retrospect, I think I needed to add more...
+Clock API should assume that output clock of a scaling block provides
+it's clk_get/set_rate,
+while output clock of a MUX/Input-Pad are indicated by absence of
+clk_get/set_rate.
+IMHO, most users would want to set/get rate of the parent in latter
+case because that
+tells the reality better. You might want to do that by default in the
+clk_get/set_rate function. Let the exception(0 return) be defined in
+the clk's get_rate.
 
-Hmm...
++unsigned long clk_get_rate(struct clk *clk)
++{
++       if (clk->ops->get_rate)
++               return clk->ops->get_rate(clk);
++      else
++               return clk_get_rate(clk->parent);
++}
 
-Please add my e-mail for S5P series later...
-I found this patch just now :-(
+The assumed definition of clock also dictates the enable/disable be
+recursively called for the parent as well -- input to scaling block or
+a MUX need
+not be kept enabled if none needs it or be disabled while someone needs it.
 
-Will check soon.
+I think these assumptions are modest and (may I daresay) represent
+majority, while
+still leaving room for exceptions(MUX output implement it's
+get/set_rate, enable/disable
+to override them).
+I feel relieved :)
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards.
