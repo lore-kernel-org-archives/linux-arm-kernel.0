@@ -1,48 +1,57 @@
-From: GKing@nvidia.com (Gary King)
-Date: Thu, 16 Sep 2010 17:14:04 -0700
-Subject: [PATCH 1/3] [ARM] tegra: add PCI Express clocks
-In-Reply-To: <AANLkTi=Mw33sVDdGLMxKh0HN0fKbzzUKqr6R9NHKEUFT@mail.gmail.com>
-References: <cover.1284655723.git.mike@compulab.co.il>
-	<79b943ad0c9d4b99a6207e1a7e3ae09bbbe4fae5.1284655723.git.mike@compulab.co.il>
-	<AANLkTinN0rYG7rp5Gs3TyGOAQu5qJ18V_-yEuManuX33@mail.gmail.com>,
-	<AANLkTi=Mw33sVDdGLMxKh0HN0fKbzzUKqr6R9NHKEUFT@mail.gmail.com>
-Message-ID: <A0A1E7539300DF49AA383E614C7827BC04EBA10BBA@HQMAIL01.nvidia.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Fri, 17 Sep 2010 08:24:34 +0800
+Subject: [PATCH 1/3] Add a common struct clk
+In-Reply-To: <AANLkTi=vaOzRcoGM9AnJ+17e0-97b76F5DW964fC3Wwp@mail.gmail.com>
+References: <1284522014.516876.675872472687.0.gpush@pororo>
+	<1284522014.517347.33297989274.1.gpush@pororo>
+	<AANLkTi=vaOzRcoGM9AnJ+17e0-97b76F5DW964fC3Wwp@mail.gmail.com>
+Message-ID: <1284683074.3350.73.camel@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Sep 16, 2010 at 11:27 PM, Colin Cross <ccross@google.com> wrote:
->> On Thu, Sep 16, 2010 at 9:53 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+Hi Jassi,
 
-<snip>
+> I am not sure about the scope of your assumed task, but I would still
+> like to bring
+> to your notice some points.
+> 
+> IMHO any clock api that aims to be used by multiple platforms should be generic
+> more than this one. Let me explain.
 
->> I've been told by Nvidia that the pll lock bits are not reliable, and
->> will be removing uses of tegra2_pll_clk_wait_for_lock and replacing
->> them with delays selected by each pll.  Can you confirm with Nvidia
->> that PLLE_MISC_READY works?
+None of my patches change the clock API itself. The clock API is already
+in use on ARM (ie, multiple platforms) and seems to work for most cases.
 
-> I'll try to get a confirmation from NVidia....
-> From what I've seen during testing the PLLE_MISC_READY works. When I
-> used loops that counted udelay(1) I've noticed that the
-> PLLE_MISC_READY is set after up to 3usecs.
+> Clocks that are simply output of MUX'es inherit the rate of the parent
+> clock - they do have
+> rate yet this API would return 0 (IIRUIC).
 
-All of the PLL lock bits in Tegra 2 are unreliable.
+The proposed clock infrastructure does not provide implementations for
+the clock operation functions (like get_rate, which you're referring to
+here). The behaviour of the clocks is dictated by each implementation of
+struct clk. For MUXes, the callback for clk->ops.get_rate would be
+something like:
 
-The safe way to ensure that PLLE is stable is to wait 1ms after changing it.
+unsigned long clk_mux_get_rate(struct clk *clk)
+{
+	return clk_get_rate(to_clk_mux(clk)->parent);
+}
 
->> <snip>
->>
->>> +static struct clk_ops tegra_pcie_clk_ops = {
->>> +       .enable     = tegra2_periph_clk_enable,
->>> +       .disable    = tegra2_periph_clk_disable,
->>> +};
->> Why is this needed?  Won't the regular periph ops work?
->
-> They didn't. I haven't found anything about what feeds these clocks,
-> can they change rate, what clock can be their parent and if there is
-> any muxing options for these clocks.
+- so it just returns the rate of the parent (not 0). However, if the
+clock implementation has a reason to return 0, it is free to do so.
 
-You can follow the example used by the csi and isp clocks, which also
-only support enable and disable. give the PCI clocks a single-choice parent
-mux (like mux_clk_m), flags = 0, reg = 0, and a dummy max_rate.
+> Another scenario could have a source clock parenting more than one
+> child clock via
+> different MUX'es. It would be nice to be able to set rate of that
+> parent clock (after ensuring
+> other siblings won't complain) and have some mechanism to notify other
+> siblings of the change.
+> Or some better solution.
 
-- Gary
+Again, these patches don't change the API itself; if we want to
+implement clock-change notifications, that would best be done in a
+separate discussion.
+
+Cheers,
+
+
+Jeremy
