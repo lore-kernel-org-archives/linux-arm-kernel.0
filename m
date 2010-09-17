@@ -1,54 +1,57 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 17 Sep 2010 21:37:05 +0530 (IST)
-Subject: [PATCH 05/11] OMAP: UART: don't do automatic bus-level suspend/resume
-Message-ID: <14067.10.24.255.18.1284739625.squirrel@dbdmail.itg.ti.com>
+Date: Fri, 17 Sep 2010 21:37:14 +0530 (IST)
+Subject: [PATCH 06/11] OMAP: UART: use non-locking versions of hwmod
+	enable/idle functions
+Message-ID: <14140.10.24.255.18.1284739634.squirrel@dbdmail.itg.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Hilman <khilman@deeprootsystems.com>
 
-Since the omap_device for UART is currently managed inside the idle
-path itself,  don't let the bus-level code suspend/resume the UART.
-
-To prevent this, pm_runtime_get() is used when preparing for suspend
-and pm_runtime_put() is used when finished with suspend.
+Since the UART enable/idle is done during the idle path (with
+interrupts disabled), use the non-locking versions of the hwmod
+enable/idle functions.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/serial.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/serial.c |   23 +++++++++++++++++++++--
+ 1 files changed, 21 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index ae1bc63..b47194a 100644
+index b47194a..f03014f 100644
 --- a/arch/arm/mach-omap2/serial.c
 +++ b/arch/arm/mach-omap2/serial.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/serial_8250.h>
-+#include <linux/pm_runtime.h>
+@@ -105,10 +105,29 @@ struct omap_uart_state {
+ static LIST_HEAD(uart_list);
+ static u8 num_uarts;
 
- #ifdef CONFIG_SERIAL_OMAP
- #include <plat/omap-serial.h>
-@@ -530,14 +531,17 @@ void omap_uart_enable_irqs(int enable)
- 	struct omap_uart_state *uart;
-
- 	list_for_each_entry(uart, &uart_list, node) {
--		if (enable)
-+		if (enable) {
-+			pm_runtime_put_sync(&uart->pdev->dev);
- 			ret = request_threaded_irq(uart->irq, NULL,
- 						   omap_uart_interrupt,
- 						   IRQF_SHARED,
- 						   "serial idle",
- 						   (void *)uart);
--		else
-+		} else {
-+			pm_runtime_get_noresume(&uart->pdev->dev);
- 			free_irq(uart->irq, (void *)uart);
-+		}
- 	}
- }
-
++/*
++ * Since these idle/enable hooks are used in the idle path itself
++ * which has interrupts disabled, use the non-locking versions of
++ * the hwmod enable/disable functions.
++ */
++static int uart_idle_hwmod(struct omap_device *od)
++{
++	_omap_hwmod_idle(od->hwmods[0]);
++
++	return 0;
++}
++
++static int uart_enable_hwmod(struct omap_device *od)
++{
++	_omap_hwmod_enable(od->hwmods[0]);
++
++	return 0;
++}
++
+ static struct omap_device_pm_latency omap_uart_latency[] = {
+ 	{
+-		.deactivate_func = omap_device_idle_hwmods,
+-		.activate_func	 = omap_device_enable_hwmods,
++		.deactivate_func = uart_idle_hwmod,
++		.activate_func	 = uart_enable_hwmod,
+ 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+ 	},
+ };
 -- 
 1.6.3.3
