@@ -1,45 +1,145 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 28 Sep 2010 16:45:59 +0400
-Subject: [PATCH] ARM: S5PV310: Optimize interrupt source searching code
-In-Reply-To: <1285637510-16740-1-git-send-email-kgene.kim@samsung.com>
-References: <1285637510-16740-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4CA1E387.709@ru.mvista.com>
+From: jc.lee@samsung.com (JaeCheol Lee)
+Date: Fri, 17 Sep 2010 04:43:25 +0000 (GMT)
+Subject: [PATCH 4/5] ARM: S5PV210: Add support CPUFREQ
+Message-ID: <20025536.189101284698605181.JavaMail.weblogic@epml03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+MyungJoo Ham wrote:
+> 
+> Hello,
+> 
+Hi,
 
-On 28-09-2010 5:31, Kukjin Kim wrote:
+> On Wed, Sep 15, 2010 at 4:52 PM, Jaecheol Lee <jc.lee@samsung.com> wrote:
+> > This patch adds CPUFREQ driver for supporting DFS(Dynamic Frequency
+> Scaling).
+> >
+> > Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+> > ---
+> > ?arch/arm/mach-s5pv210/cpufreq.c | ?415
+> +++++++++++++++++++++++++++++++++++++++
+> > ?1 files changed, 415 insertions(+), 0 deletions(-)
+> > ?create mode 100644 arch/arm/mach-s5pv210/cpufreq.c
+> >
+> > diff --git a/arch/arm/mach-s5pv210/cpufreq.c b/arch/arm/mach-
+> s5pv210/cpufreq.c
+> > new file mode 100644
+> > index 0000000..aa39c2e
+> 
+> (snip)
+> 
+> > +static int s5pv210_target(struct cpufreq_policy *policy,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? unsigned int target_freq,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? unsigned int relation)
+> > +{
+> > + ? ? ? unsigned long reg;
+> > + ? ? ? unsigned int index, priv_index;
+> > + ? ? ? unsigned int pll_changing = 0;
+> > + ? ? ? unsigned int bus_speed_changing = 0;
+> > +
+> > + ? ? ? freqs.old = s5pv210_getspeed ;
+> > +
+> > + ? ? ? if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?target_freq, relation, &index))
+> > + ? ? ? ? ? ? ? return -EINVAL;
+> > +
+> > + ? ? ? freqs.new = s5pv210_freq_table[index].frequency;
+> > + ? ? ? freqs.cpu = 0;
+> > +
+> > + ? ? ? if (freqs.new == freqs.old)
+> > + ? ? ? ? ? ? ? return 0;
+> > +
+> > + ? ? ? /* Finding current running level index */
+> > + ? ? ? if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?freqs.old, relation, &priv_index))
+> > + ? ? ? ? ? ? ? return -EINVAL;
+> > +
+> > + ? ? ? cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > +
+> > + ? ? ? if (freqs.new > freqs.old) {
+> > + ? ? ? ? ? ? ? /* Voltage up: will be implemented */
+> 
+> This could be crucial to the system stability. It is usually not optional.
+> 
+I think it does not occur any stability problem because current default voltage is maximum value.
 
-> From: Changhwan Youn<chaos.youn@samsung.com>
+Actually, tested its functionality on the SMDK with max8698 PMIC driver internally.
+..but there is no max8698 device driver in the current mainline...
 
-> It is reported by Junseok Jung that using clz instruction is
-> better instead of using for-loop to find the interrupt source.
-> This patch modifies interrupt source searching code using __fls().
-> The __fls() is implemented using clz instruction.
+So this feature has been removed in this patch...
+Anyway, will be implemented after submitting max8698 later.
 
-> Suggested-by: Junseok Jung<jundols.jung@samsung.com>
-> Signed-off-by: Changhwan Youn<chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> ---
->   arch/arm/mach-s5pv310/irq-combiner.c |    6 +-----
->   1 files changed, 1 insertions(+), 5 deletions(-)
+> > + ? ? ? }
+> > +
+> > + ? ? ? /* Check if there need to change PLL */
+> > + ? ? ? if ((index == L0) || (priv_index == L0))
+> > + ? ? ? ? ? ? ? pll_changing = 1;
+> > +
+> > + ? ? ? /* Check if there need to change System bus clock */
+> > + ? ? ? if ((index == L4) || (priv_index == L4))
+> > + ? ? ? ? ? ? ? bus_speed_changing = 1;
+> > +
+> > + ? ? ? if (bus_speed_changing) {
+> > + ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ?* Reconfigure DRAM refresh counter value for minimum
+> > + ? ? ? ? ? ? ? ?* temporary clock while changing divider.
+> > + ? ? ? ? ? ? ? ?* expected clock is 83Mhz : 7.8usec/(1/83Mhz) = 0x287
+> > + ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? if (pll_changing)
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x287, S5P_VA_DMC1 + 0x30);
+> > + ? ? ? ? ? ? ? else
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x30c, S5P_VA_DMC1 + 0x30);
+> > +
+> > + ? ? ? ? ? ? ? __raw_writel(0x287, S5P_VA_DMC0 + 0x30);
+> 
+> It'd be better to set values based on the real MPLL, APLL clock
+> speeds, not hard-coding them.
+> 
 
-> diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
-> index 0f70521..39e3647 100644
-> --- a/arch/arm/mach-s5pv310/irq-combiner.c
-> +++ b/arch/arm/mach-s5pv310/irq-combiner.c
-> @@ -66,11 +66,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
->   	if (status == 0)
->   		goto out;
->
-> -	for (combiner_irq = 0; combiner_irq<  32; combiner_irq++) {
-> -		if (status & 0x1)
-> -			break;
-> -		status>>= 1;
-> -	}
-> +	combiner_irq = __fls(status);
+Will modify.
 
-    But the loop finds the *first* set bit, not the last...
+(snip)
 
-WBR, Sergei
+> > +
+> > + ? ? ? ? ? ? ? /* Reconfigure DRAM refresh counter value */
+> > + ? ? ? ? ? ? ? if (index != L4) {
+> > + ? ? ? ? ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* DMC0 : 166Mhz
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* DMC1 : 200Mhz
+> > + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x618, S5P_VA_DMC1 + 0x30);
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x50e, S5P_VA_DMC0 + 0x30);
+> > + ? ? ? ? ? ? ? } else {
+> > + ? ? ? ? ? ? ? ? ? ? ? /*
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* DMC0 : 83Mhz
+> > + ? ? ? ? ? ? ? ? ? ? ? ?* DMC1 : 100Mhz
+> > + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x30c, S5P_VA_DMC1 + 0x30);
+> > + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x287, S5P_VA_DMC0 + 0x30);
+> > + ? ? ? ? ? ? ? }
+> 
+> Same here. It'd better not be hard coded. We can't sure about the
+> clock speeds for different boards.
+> 
+
+Will modify.
+ 
+> > + ? ? ? }
+> > +
+> > + ? ? ? if (freqs.new < freqs.old) {
+> > + ? ? ? ? ? ? ? /* Voltage down: will be implemented */
+> > + ? ? ? }
+> > +
+> > + ? ? ? cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > +
+> > + ? ? ? printk(KERN_INFO "Perf changed[L%d]\n", index);
+> 
+> This may incur too many clutters.
+> 
+
+Yeah, you're right...should be other print level such as KERN_DEBUG.
+
+(snip)
+
+Thanks.
