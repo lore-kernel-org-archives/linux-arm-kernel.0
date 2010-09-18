@@ -1,31 +1,42 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Sun, 19 Sep 2010 11:22:16 +0800
-Subject: [PATCH] ARM: make app read out process num even not use SMP
-Message-ID: <1284866536-21431-1-git-send-email-leiwen@marvell.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 18 Sep 2010 15:58:34 -0500
+Subject: [PATCH 0/4] CPU hotplug support for Versatile platforms
+In-Reply-To: <20100917230127.GA19718@n2100.arm.linux.org.uk>
+References: <1284729124-15297-1-git-send-email-will.deacon@arm.com>
+	<4C93DBE6.2040103@gmail.com>
+	<20100917230127.GA19718@n2100.arm.linux.org.uk>
+Message-ID: <4C9527FA.2030803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some app like trace-cmd need to know the process number, but not
-all arm board is enabled with the SMP. Add this fix up to let those
-app works happy.
+On 09/17/2010 06:01 PM, Russell King - ARM Linux wrote:
+> On Fri, Sep 17, 2010 at 04:21:42PM -0500, Rob Herring wrote:
+>> The platform specific SMP code is one area that prevents supporting a
+>> single kernel image. All the functions in platsmp.c need to be converted
+>> to function pointers and a lot of that code is pretty simliar across
+>> platforms. What's needed is a common platsmp.c with something like
+>> platform specific smp_ops like PowerPC. I think addressing that first
+>> would simplify this restructuring as you are doing some of what's
+>> needed, but you introducing new namespace problems like platform_cpu_*.
+>
+> The split between smp.c and platsmp.c is there to allow different SMP
+> implementations from the standard ARM Ltd SMP implementation (and there
+> will be different implementations.)
+>
+> Just because all the SMP implementations that are currently merged are
+> the standard ARM Ltd SMP implementation does not mean that we should
+> move stuff out of platsmp.c into the generic code.
 
-Signed-off-by: Lei Wen<leiwen@marvell.com>
-Signed-off-by: Lei Wen <leiwen@marvell.com>
----
- arch/arm/kernel/setup.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Agreed, but the interface between smp.c and platsmp.c does not allow for 
+more than one SMP platform in a single image. Granted, there are plenty 
+of other obstacles to multi-platform kernel binaries, but this one would 
+be good to address before there are a bunch of SMP platforns rather than 
+after. Ideally, platsmp.c could be common, but optional for platforms 
+that are significantly different.
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d5231ae..1af3e2d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -917,6 +917,7 @@ static int c_show(struct seq_file *m, void *v)
- 			   (per_cpu(cpu_data, i).loops_per_jiffy / (5000UL/HZ)) % 100);
- 	}
- #else /* CONFIG_SMP */
-+	seq_printf(m, "processor\t: 0\n");
- 	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
- 		   loops_per_jiffy / (500000/HZ),
- 		   (loops_per_jiffy / (5000/HZ)) % 100);
--- 
-1.7.0.4
+The idea I have is add a smp_init function ptr to struct mdesc which 
+would fill in an smp_ops struct of function pointers and call 
+set_cpu_possible for each core. This would replace the direct 
+smp_init_cpus call.
+
+Rob
