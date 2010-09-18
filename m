@@ -1,33 +1,21 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 18 Sep 2010 16:28:57 +0200
-Subject: [PATCH] at91: drop at91x40 support
-In-Reply-To: <4C94875B.3060200@snapgear.com>
-References: <1284790974-11143-1-git-send-email-plagnioj@jcrosoft.com>
-	<4C94875B.3060200@snapgear.com>
-Message-ID: <20100918142857.GA12003@game.jcrosoft.org>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Sat, 18 Sep 2010 16:24:57 +0100
+Subject: make[2]: *** No rule to make target `.config',
+	needed by `arch/arm/boot/compressed/vmlinux.lds'
+Message-ID: <4C94D9C9.2060309@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:33 Sat 18 Sep     , Greg Ungerer wrote:
-> On 18/09/10 16:22, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >as it's broken for releases and no one care about it
-> >
-> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> >Cc: Andrew Victor<linux@maxim.org.za>
-> >Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
-> >Cc: Greg Ungerer<gerg@snapgear.com>
-> 
-> NAK, I care. I sent a fix to this very list about a week ago
-> to fix the current compile problem.
-sorry but not see it
-and I see it failled to build for at least 4 releases and
-no debug-macro.S for years
-since what 4 or 5 years we just have the timer and irq
+when using the environment variable KCONFIG_CONFIG
 
-do you have plan to update it?
+This comes from:
 
-or I do not see the current implementation very usefull so I still prefer to
-drop it
+arch/arm/boot/compressed/Makefile
 
-Best Regards,
-J.
+$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile .config
+	@sed "$(SEDFLAGS)" < $< > $@
+
+My immediate feel is that changing that .config for $(KCONFIG_CONFIG)
+ought to fix the problem. Is this right or am I missing something?
+
+Jonathan
