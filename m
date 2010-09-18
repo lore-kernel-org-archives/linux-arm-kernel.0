@@ -1,63 +1,25 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 18 Sep 2010 11:04:42 +0100
+Date: Sat, 18 Sep 2010 11:08:27 +0100
 Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <87hbhnq43x.fsf@deeprootsystems.com>
+In-Reply-To: <20100917164543.GI20325@esdhcp04044.research.nokia.com>
 References: <1284686973-13993-1-git-send-email-nm@ti.com>
-	<20100917153643.GC29739@sirena.org.uk> <4C938EE2.1010307@ti.com>
-	<20100917155937.GB29596@rakim.wolfsonmicro.main>
-	<87hbhnq43x.fsf@deeprootsystems.com>
-Message-ID: <20100918100442.GB22248@opensource.wolfsonmicro.com>
+	<20100917153643.GC29739@sirena.org.uk>
+	<20100917164543.GI20325@esdhcp04044.research.nokia.com>
+Message-ID: <20100918100827.GC22248@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 17, 2010 at 05:37:06PM -0700, Kevin Hilman wrote:
-> [trimmed Cc list a bit, as vger bounced my last reply due to header too long]
-> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+On Fri, Sep 17, 2010 at 07:45:43PM +0300, Phil Carmody wrote:
+> On 17/09/10 17:36 +0200, ext Mark Brown wrote:
 
-> > The enable/disable thing wasn't so noticable in the API itself, it was
-> > in the data structures that I found it confusing - the core has a
-> > different idea about what's going on with the system as a whole compared
-> > to the decision that an individual device is taking.
+> > It might be clearer to use some term other than enabled in the code -
+> > when reading I wasn't immediately sure if enabled meant that it was
+> > available to be selected or if it was the active operating point.  How
+>   ^^^^^^^^^
+> > about 'allowed' (though I'm not 100% happy with that)?
 
-> Can you clarify your confusion here?  I don't follow the problem you're
-> raising.
+> I think your query contains its own answer.
 
-The confusion is between the enable flag meaning that the operating
-point is on the list that can be chosen from and it being the currently
-active one.  It's clear once you understand what the API does but the
-current naming makes that harder to grasp.
-
-> As I write this, I agree with what Phil pointed out; that 'available' is
-> probably the right name for this flag, instead of 'enabled.'
-
-Yup, me too.
-
-> > Sure, I get that bit.  What I meant was that I was expecting something
-> > that would say that changes had been made to the enabled/disabled sets
-> > and that it'd be a good idea to rescan, especially for cases where the
-> > devices change their requirements but the OPPs need to be done over a
-> > larger block.
-
-> I guess you're thinking of notifiers, so if the list of available OPPs
-> changes, a driver could (re)search to see if a more optimal OPP was
-> available?
-
-Yup, or at least some suggestion in the API for how this should be done.
-
-> Certainly sounds possible, but not sure how useful in practice.  OPP
-> change decisions are not very often, so any OPP database updates may not
-> affect a device OPP change currently in progress, but would take effect
-> the next time that device makes an OPP change.
-
-Like I say, the main use case would be when the device itself is not
-making the actual operating point decision but is feeding in to a wider
-block - if the device implements the decision then it really shouldn't
-need to notify itself about it, though I guess it might be handy.
-
-> Either way, this is something that could easily be added if it seems
-> useful.
-
-My concern there would be divergent idioms for working with the API.
-It'd seem better to start everyone off down the same path if we can
-rather than have differences between platforms which make life harder
-when moving between mulitple platforms.
+Yeah, I didn't pick that because all of them are available in the sense
+that they could in the future be enabled but I do think it's the best
+option.
