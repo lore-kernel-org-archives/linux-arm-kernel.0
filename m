@@ -1,30 +1,30 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Sat, 18 Sep 2010 11:52:12 -0700
-Subject: [00/12] DMAENGINE: PL08X driver updates
-In-Reply-To: <AANLkTi==kKBdOaim+fx5yhpKOo27HWhB7kQiDqv0+BPS@mail.gmail.com>
-References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTi==kKBdOaim+fx5yhpKOo27HWhB7kQiDqv0+BPS@mail.gmail.com>
-Message-ID: <AANLkTi=XH4_0UH8cN_uNzrTmf9GuASe32977gtgUVigU@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Sat, 18 Sep 2010 21:01:54 +0200
+Subject: [PATCH] at91: fix arch_gettimeoffset fallout
+In-Reply-To: <20100918010839.GC21110@game.jcrosoft.org> (Jean-Christophe
+	PLAGNIOL-VILLARD's message of "Sat, 18 Sep 2010 03:08:39 +0200")
+References: <1284730276-21657-1-git-send-email-jacmet@sunsite.dk>
+	<20100918010839.GC21110@game.jcrosoft.org>
+Message-ID: <877hii6fkt.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 8, 2010 at 7:26 AM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/8/31 Linus Walleij <linus.walleij@stericsson.com>:
->
->> This updates the PL08X driver in the async_tx next branch with
->> a number of fixes and features, each one pretty self-describing.
->> This has been tested with the PrimeCell DMA series on the
->> RealView PB11MPCore and works flawlessly, multiplexing
->> several virtual clients, both devices (slaves) and memcpy
->> channels, across only two (!) available physical channels.
->
-> Dan can you ACK and queue this for next?
->
-> I know you're busy, just a reminder...
->
+>>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
 
-I'm back at work this coming week and will get all this queued up.
+Hi,
 
---
-Dan
+ >> 5cfc8ee0bb51 (ARM: convert arm to arch_gettimeoffset()) marked all of
+ >> at91 AND at91x40 as needing ARCH_USES_GETTIMEOFFSET, and hence no high
+ >> res timer support / accurate clock_gettime() - But only at91x40 needs it.
+ >> 
+ >> Signed-off-by: Peter Korsgaard <peter.korsgaard@barco.com>
+
+ Jean-Christophe> Acked-by: Jean-Christophe PLAGNIOL-VILLARD
+ <plagnioj@jcrosoft.com>
+
+Thanks, submitted to rmk's patch tracker as 6400 with those two
+acked-by's and a a cc to stable@
+
+
+-- 
+Bye, Peter Korsgaard
