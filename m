@@ -1,85 +1,30 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 18 Sep 2010 20:41:41 +0200
-Subject: [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <4C93FAD1.80108@ti.com>
-References: <[PATCH 1/4] OMAP: introduce OPP layer for device-specific OPPs>
-	<201009180107.51664.rjw@sisk.pl> <4C93FAD1.80108@ti.com>
-Message-ID: <201009182041.41675.rjw@sisk.pl>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Sat, 18 Sep 2010 11:52:12 -0700
+Subject: [00/12] DMAENGINE: PL08X driver updates
+In-Reply-To: <AANLkTi==kKBdOaim+fx5yhpKOo27HWhB7kQiDqv0+BPS@mail.gmail.com>
+References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTi==kKBdOaim+fx5yhpKOo27HWhB7kQiDqv0+BPS@mail.gmail.com>
+Message-ID: <AANLkTi=XH4_0UH8cN_uNzrTmf9GuASe32977gtgUVigU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Trimming the CC list.]
+On Wed, Sep 8, 2010 at 7:26 AM, Linus Walleij
+<linus.ml.walleij@gmail.com> wrote:
+> 2010/8/31 Linus Walleij <linus.walleij@stericsson.com>:
+>
+>> This updates the PL08X driver in the async_tx next branch with
+>> a number of fixes and features, each one pretty self-describing.
+>> This has been tested with the PrimeCell DMA series on the
+>> RealView PB11MPCore and works flawlessly, multiplexing
+>> several virtual clients, both devices (slaves) and memcpy
+>> channels, across only two (!) available physical channels.
+>
+> Dan can you ACK and queue this for next?
+>
+> I know you're busy, just a reminder...
+>
 
-On Saturday, September 18, 2010, Nishanth Menon wrote:
-> Rafael J. Wysocki had written, on 09/17/2010 06:07 PM, the following:
-...
-> > 
-> > Apart from this, it might be a good idea to help callers a bit and actually
-> > introduce some sort of locking into the framework.
-> in OMAP implementation we have need to use these apis from irq_locked 
-> contexts as well..  lock implementation will prevent thier necessary 
-> usage.
+I'm back at work this coming week and will get all this queued up.
 
-Why so?  You can use spin_lock_irqsave/spin_unclock_irqrestore  to
-avoid that.
-
-> instead we have implemented lock mechanisms in higher layers and 
-> ensured that the opp table does not change once created - the rest of 
-> them are query functions - the risk is on opp_enable/disable.
-
-OK, but this way you practically make the users of the framework duplicate
-some code for the locking purposes.  This is kind of suboptimal, and error
-prone too.
-
-> >> In terms of the lifetime rules on the nodes in the list:
-> >> The list is expected to be maintained once created, entries are expected 
-> >> to be added optimally and not expected to be destroyed, the choice of 
-> >> list implementation was for reducing the complexity of the code itself 
-> >> and not yet meant as a mechanism to dynamically add and delete nodes on 
-> >> the fly.. Essentially, it was intended for the SOC framework to ensure 
-> >> it plugs in the OPP entries optimally and not create a humongous list of 
-> >> all possible OPPs for all families of the vendor SOCs - even though it 
-> >> is possible to use the OPP layer so - it just wont be smart to do so 
-> >> considering list scan latencies on hot paths such as cpufreq transitions 
-> >> or idle transitions.
-> > 
-> > If the list nodes are not supposed to be added and removed dynamically,
-> > it probably would make sense to create data structures containing
-> > the "available" OPPs only, once they are known, and simply free the object
-> > representing the other ones.
-> I covered the usage in my reply here: 
-> http://marc.info/?l=linux-arm-kernel&m=128476570300466&w=2
-> but to repeat, the list is dynamic during initialization but remains 
-> static after initialization based on SOC framework implementation - this 
-> is best implemented with a list (we had started with an original array 
-> implementation which evolved to the current list implementation 
-> http://marc.info/?l=linux-omap&m=125912217718770&w=2)
-
-Well, my point is, since the _final_ set of OPPs doesn't really change, there's
-no need to use a list for storing it in principle.
-
-Your current algorithm seems to be:
-(1) Create a list of all _possible_ OPPs.
-(2) Mark the ones that can actually be used on the given hardware as
-    "available".
-(3) Whenever we need to find an OPP to use, browse the entire list.
-
-This isn't optimal, because the OPPs that are not marked as "available" in (2)
-will never be used, although they _will_ be inspected while browsing the list.
-So, I think a better algorithm would be:
-(1) Create a list of all possible OPPs.
-(2) Drop the nonavailable OPPs from the list.
-(3) Whenever we need to find an OPP to use, browse the entire list.
-
-But then, it may be better to simply move the list we get in (2) into an
-array, because the browsing is going to require fewer memory accesses in
-that case (also, an array would use less memory than the list).  So, perhaps,
-it's better to change the algorithm even further:
-(1) Create a list of all possible OPPs.
-(2) Drop the nonavailable OPPs from the list.
-(3) Move the list we got in (2) into a sorted array.
-(4) Whenever we need to find an OPP to use, browse the array
-     (perhaps using binary search).
-
-Thanks,
-Rafael
+--
+Dan
