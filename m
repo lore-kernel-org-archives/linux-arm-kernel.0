@@ -1,36 +1,33 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 18 Sep 2010 16:07:37 +0200
-Subject: [Openpxa-users] colibri pxa320 NAND errors
-In-Reply-To: <201009181604.25548.pieterg@gmx.com>
-References: <201009161827.04823.pieterg@gmx.com>
-	<201009181219.38933.marek.vasut@gmail.com>
-	<201009181604.25548.pieterg@gmx.com>
-Message-ID: <201009181607.38352.marek.vasut@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 18 Sep 2010 16:28:57 +0200
+Subject: [PATCH] at91: drop at91x40 support
+In-Reply-To: <4C94875B.3060200@snapgear.com>
+References: <1284790974-11143-1-git-send-email-plagnioj@jcrosoft.com>
+	<4C94875B.3060200@snapgear.com>
+Message-ID: <20100918142857.GA12003@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 18. z??? 2010 16:04:25 pieterg napsal(a):
-> On Saturday 18 September 2010 12:19:38 Marek Vasut wrote:
-> > Dne ?t 16. z??? 2010 18:27:04 pieterg napsal(a):
-> > > I'm getting a whole lot of single bit errors, and also many double bit
-> > > errors. As a result, my filesystem gets corrupted, even after a single
-> > > reboot.
-> > 
-> > Maybe the NAND's misconfigured, what bootloader do you use ?
+On 19:33 Sat 18 Sep     , Greg Ungerer wrote:
+> On 18/09/10 16:22, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >as it's broken for releases and no one care about it
+> >
+> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> >Cc: Andrew Victor<linux@maxim.org.za>
+> >Cc: Nicolas Ferre<nicolas.ferre@atmel.com>
+> >Cc: Greg Ungerer<gerg@snapgear.com>
 > 
-> I'm using u-boot.
-> Mostly 2009.3, but to rule out bad NAND configuration, I've tried the
-> latest
+> NAK, I care. I sent a fix to this very list about a week ago
+> to fix the current compile problem.
+sorry but not see it
+and I see it failled to build for at least 4 releases and
+no debug-macro.S for years
+since what 4 or 5 years we just have the timer and irq
 
-All right ... I'll jump on a bullet train, go back home, grab my tdex board and 
-test it.
+do you have plan to update it?
 
-Cheers
-> 
-> u-boot-pxa branch, with the same results:
-> > > To make sure it's not my heavily modified old 2009.3 u-boot, which is
-> > > causing the problems because of some faulty nand controller
-> > > configuration, I've just built the latest openpxa u-boot, and booted it
-> > > with OBM2. But the results are the same.
-> 
-> Rgds, Pieter
+or I do not see the current implementation very usefull so I still prefer to
+drop it
+
+Best Regards,
+J.
