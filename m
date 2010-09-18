@@ -1,88 +1,63 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Sat, 18 Sep 2010 14:48:35 +0530
-Subject: [PATCH 03/11] OMAP: UART: omap_device converions, remove implicit
-	8520 assumptions
-In-Reply-To: <87ocbwrl5w.fsf@deeprootsystems.com>
-References: <14049.10.24.255.18.1284739601.squirrel@dbdmail.itg.ti.com>
-	<87ocbwrl5w.fsf@deeprootsystems.com>
-Message-ID: <AANLkTiniFVGzH-f6k9wn7Pk08R2EuWoDahC-Txo8-xcu@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 18 Sep 2010 11:04:42 +0100
+Subject: [linux-pm] [PATCH] opp: introduce library for device-specific OPPs
+In-Reply-To: <87hbhnq43x.fsf@deeprootsystems.com>
+References: <1284686973-13993-1-git-send-email-nm@ti.com>
+	<20100917153643.GC29739@sirena.org.uk> <4C938EE2.1010307@ti.com>
+	<20100917155937.GB29596@rakim.wolfsonmicro.main>
+	<87hbhnq43x.fsf@deeprootsystems.com>
+Message-ID: <20100918100442.GB22248@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 18, 2010 at 5:13 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> From: Kevin Hilman <khilman@ti.com>
->>
->> Major rework of OMAP UART init for omap_device conversion as well as
->> use with either 8250 driver or new omap-serial driver.
->>
->> In preparation for a new omap-serial driver, remove 8250 assumptions
->> and dependencies from the serial core.
->>
->> Convert UART core and PM support to use omap_device layer. Also add
->> support for both console on 8250 or omap-serial driver.
->>
->> omap_device conversion:
->> - Convert clock API calls to omap_device calls
->> - Remove all static platform_data setup and configuration. ?This is
->> ? all done by the omap_device build phase.
->>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> ?arch/arm/mach-omap2/serial.c | ?528 +++++++++++++++++++++---------------------
->> ?1 files changed, 259 insertions(+), 269 deletions(-)
->>
->
-> [...]
->
->> + ? ? /*
->> + ? ? ?* Need to block sleep long enough for interrupt driven
->> + ? ? ?* driver to start. ?Console driver is in polling mode
->> + ? ? ?* so device needs to be kept enabled while polling driver
->> + ? ? ?* is in use.
->> + ? ? ?*/
->> + ? ? uart->timeout = (30 * HZ);
->
-> My fault, but there's a bug here. ?This long timeout is only needed
-> when the init-time timout is non-zero, so should be:
->
-> ? ? ? ?if (uart->timeout)
-> ? ? ? ? ? ? ? ?uart->timeout = (30 * HZ);
->
-> Without this, even though the default timeout is zero (meaning, UARTs
-> should not timeout and go idle), a timer will fire 30 seconds after boot
-> and cause the UARTs to go idle.
->
-> I discovered this when seeing the UARTs go idle, even though the
-> timeouts were all set to zero.
->
-> Can you fold this into your the next version?
+On Fri, Sep 17, 2010 at 05:37:06PM -0700, Kevin Hilman wrote:
+> [trimmed Cc list a bit, as vger bounced my last reply due to header too long]
+> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
+> > The enable/disable thing wasn't so noticable in the API itself, it was
+> > in the data structures that I found it confusing - the core has a
+> > different idea about what's going on with the system as a whole compared
+> > to the decision that an individual device is taking.
 
-Thanks for this update and review.
+> Can you clarify your confusion here?  I don't follow the problem you're
+> raising.
 
-Will incorporate this change.
+The confusion is between the enable flag meaning that the operating
+point is on the list that can be chosen from and it being the currently
+active one.  It's clear once you understand what the API does but the
+current naming makes that harder to grasp.
 
-Thanks,
-Govindraj.R
+> As I write this, I agree with what Phil pointed out; that 'available' is
+> probably the right name for this flag, instead of 'enabled.'
 
+Yup, me too.
 
->
-> Thanks,
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> > Sure, I get that bit.  What I meant was that I was expecting something
+> > that would say that changes had been made to the enabled/disabled sets
+> > and that it'd be a good idea to rescan, especially for cases where the
+> > devices change their requirements but the OPPs need to be done over a
+> > larger block.
 
+> I guess you're thinking of notifiers, so if the list of available OPPs
+> changes, a driver could (re)search to see if a more optimal OPP was
+> available?
 
+Yup, or at least some suggestion in the API for how this should be done.
 
--- 
----
-Regards,
-Govindraj.R
+> Certainly sounds possible, but not sure how useful in practice.  OPP
+> change decisions are not very often, so any OPP database updates may not
+> affect a device OPP change currently in progress, but would take effect
+> the next time that device makes an OPP change.
+
+Like I say, the main use case would be when the device itself is not
+making the actual operating point decision but is feeding in to a wider
+block - if the device implements the decision then it really shouldn't
+need to notify itself about it, though I guess it might be handy.
+
+> Either way, this is something that could easily be added if it seems
+> useful.
+
+My concern there would be divergent idioms for working with the API.
+It'd seem better to start everyone off down the same path if we can
+rather than have differences between platforms which make life harder
+when moving between mulitple platforms.
