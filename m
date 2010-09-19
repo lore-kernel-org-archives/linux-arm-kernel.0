@@ -1,60 +1,76 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 19 Sep 2010 09:54:23 +0200
-Subject: [PATCH 1/3] [ARM] tegra: add PCI Express clocks
-In-Reply-To: <A0A1E7539300DF49AA383E614C7827BC04EBA10BBA@HQMAIL01.nvidia.com>
-References: <cover.1284655723.git.mike@compulab.co.il>	<79b943ad0c9d4b99a6207e1a7e3ae09bbbe4fae5.1284655723.git.mike@compulab.co.il>	<AANLkTinN0rYG7rp5Gs3TyGOAQu5qJ18V_-yEuManuX33@mail.gmail.com>,
-	<AANLkTi=Mw33sVDdGLMxKh0HN0fKbzzUKqr6R9NHKEUFT@mail.gmail.com>
-	<A0A1E7539300DF49AA383E614C7827BC04EBA10BBA@HQMAIL01.nvidia.com>
-Message-ID: <4C95C1AF.7080903@compulab.co.il>
+From: jason77.wang@gmail.com (Jason Wang)
+Date: Sun, 19 Sep 2010 16:47:49 +0800
+Subject: [PATCH 04/16] spi/imx: save the spi chip select in config	struct,
+	not the gpio to use
+In-Reply-To: <20100917112026.GE27467@n2100.arm.linux.org.uk>
+References: <20100917095247.GB30441@pengutronix.de>
+	<1284717274-12850-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<19603.19666.323684.891456@ipc1.ka-ro>
+	<20100917112026.GE27467@n2100.arm.linux.org.uk>
+Message-ID: <4C95CE35.7030303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gary King wrote:
->> On Thu, Sep 16, 2010 at 11:27 PM, Colin Cross <ccross@google.com> wrote:
->>> On Thu, Sep 16, 2010 at 9:53 AM, Mike Rapoport <mike@compulab.co.il> wrote:
-> 
-> <snip>
-> 
->>> I've been told by Nvidia that the pll lock bits are not reliable, and
->>> will be removing uses of tegra2_pll_clk_wait_for_lock and replacing
->>> them with delays selected by each pll.  Can you confirm with Nvidia
->>> that PLLE_MISC_READY works?
-> 
->> I'll try to get a confirmation from NVidia....
->> From what I've seen during testing the PLLE_MISC_READY works. When I
->> used loops that counted udelay(1) I've noticed that the
->> PLLE_MISC_READY is set after up to 3usecs.
-> 
-> All of the PLL lock bits in Tegra 2 are unreliable.
-> 
-> The safe way to ensure that PLLE is stable is to wait 1ms after changing it.
-
-1 millisecond is a long time... Can you please elaborate about the unreliability 
-of PLL lock bits?
-
->>> <snip>
+Russell King - ARM Linux wrote:
+> On Fri, Sep 17, 2010 at 01:11:14PM +0200, Lothar Wa?mann wrote:
+>   
+>> Hi,
+>>
+>>     
+>>> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+>>> index 60a52d1..23db984 100644
+>>> --- a/drivers/spi/spi_imx.c
+>>> +++ b/drivers/spi/spi_imx.c
+>>> @@ -56,7 +56,7 @@ struct spi_imx_config {
+>>>  	unsigned int speed_hz;
+>>>  	unsigned int bpw;
+>>>  	unsigned int mode;
+>>> -	int cs;
+>>> +	u8 cs;
+>>>       
+>>         ^^^^^^
+>>     
+>
+> u8 cs in spi_imx_config.
+>
+>   
+>>>  };
+>>>  
+>>>  enum spi_imx_devtype {
+>>> @@ -218,6 +218,7 @@ static int __maybe_unused spi_imx0_4_config(struct spi_imx_data *spi_imx,
+>>>  		struct spi_imx_config *config)
+>>>  {
+>>>  	unsigned int reg = MX31_CSPICTRL_ENABLE | MX31_CSPICTRL_MASTER;
+>>> +	int cs = spi_imx->chipselect[config->cs];
+>>>       
+>
+> which is used as an index to this array (which presumably is an array of
+> ints.)  Let's hope that it is 256 entries long (maybe it should be
+> checked before use?)
+>
+>   
+>>>  
+>>>  	reg |= spi_imx_clkdiv_2(spi_imx->spi_clk, config->speed_hz) <<
+>>>  		MX31_CSPICTRL_DR_SHIFT;
+>>> @@ -230,9 +231,8 @@ static int __maybe_unused spi_imx0_4_config(struct spi_imx_data *spi_imx,
+>>>  		reg |= MX31_CSPICTRL_POL;
+>>>  	if (config->mode & SPI_CS_HIGH)
+>>>  		reg |= MX31_CSPICTRL_SSPOL;
+>>> -	if (config->cs < 0) {
+>>> -		reg |= (config->cs + 32) << MX31_CSPICTRL_CS_SHIFT;
+>>> -	}
+>>> +	if (cs < 0)
 >>>
->>>> +static struct clk_ops tegra_pcie_clk_ops = {
->>>> +       .enable     = tegra2_periph_clk_enable,
->>>> +       .disable    = tegra2_periph_clk_disable,
->>>> +};
->>> Why is this needed?  Won't the regular periph ops work?
->> They didn't. I haven't found anything about what feeds these clocks,
->> can they change rate, what clock can be their parent and if there is
->> any muxing options for these clocks.
-> 
-> You can follow the example used by the csi and isp clocks, which also
-> only support enable and disable. give the PCI clocks a single-choice parent
-> mux (like mux_clk_m), flags = 0, reg = 0, and a dummy max_rate.
+>>>       
+>> This can never be true, since an 'int' promoted from 'u8' will always
+>> be positive!
+>>     
+>
+> This is the value of chipselect[config->cs] not of the u8 config->cs.
+>
+>   
+Yes, here (cs < 0) means a SPI dedicate internal CS pin, while (cs >= 0)
+means a GPIO act as a SPI CS pin.
 
-Ok, I'll try.
-
-> - Gary--
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
--- 
-Sincerely yours,
-Mike.
+Thanks,
+Jason.
