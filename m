@@ -1,28 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Sep 2010 11:34:06 +0100
-Subject: make[2]: *** No rule to make target `.config', needed by
-	`arch/arm/boot/compressed/vmlinux.lds'
-In-Reply-To: <4C94D9C9.2060309@cam.ac.uk>
-References: <4C94D9C9.2060309@cam.ac.uk>
-Message-ID: <20100919103406.GA9098@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 19 Sep 2010 15:51:47 +0400
+Subject: [PATCH] ARM: make app read out process num even not use SMP
+In-Reply-To: <1284866536-21431-1-git-send-email-leiwen@marvell.com>
+References: <1284866536-21431-1-git-send-email-leiwen@marvell.com>
+Message-ID: <4C95F953.9020807@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 18, 2010 at 04:24:57PM +0100, Jonathan Cameron wrote:
-> when using the environment variable KCONFIG_CONFIG
-> 
-> This comes from:
-> 
-> arch/arm/boot/compressed/Makefile
-> 
-> $(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile .config
-> 	@sed "$(SEDFLAGS)" < $< > $@
-> 
-> My immediate feel is that changing that .config for $(KCONFIG_CONFIG)
-> ought to fix the problem. Is this right or am I missing something?
+Hello.
 
-Does this work with relative pathnames, such as:
+On 19-09-2010 7:22, Lei Wen wrote:
 
-make ARCH=arm KCONFIG_CONFIG=my_config zImage
+> Some app like trace-cmd need to know the process number, but not
+> all arm board is enabled with the SMP. Add this fix up to let those
+> app works happy.
 
-?
+> Signed-off-by: Lei Wen<leiwen@marvell.com>
+> Signed-off-by: Lei Wen<leiwen@marvell.com>
+
+    One signoff is enough. :-)
+
+WBR, Sergei
