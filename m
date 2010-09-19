@@ -1,66 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 Sep 2010 16:39:44 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Sep 2010 16:02:43 +0100
 Subject: [PATCH 0/3] [ARM] tegra: PCI Express support
-In-Reply-To: <4C961906.4040303@compulab.co.il>
+In-Reply-To: <201009191639.44488.arnd@arndb.de>
 References: <cover.1284655723.git.mike@compulab.co.il>
 	<201009161912.12330.arnd@arndb.de>
 	<4C961906.4040303@compulab.co.il>
-Message-ID: <201009191639.44488.arnd@arndb.de>
+	<201009191639.44488.arnd@arndb.de>
+Message-ID: <20100919150242.GD9098@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 September 2010 16:07:02 Mike Rapoport wrote:
-> > diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
-> > index 35edfc3..d54e384 100644
-> > --- a/arch/arm/mach-tegra/include/mach/io.h
-> > +++ b/arch/arm/mach-tegra/include/mach/io.h
-> > @@ -21,7 +21,8 @@
-> >  #ifndef __MACH_TEGRA_IO_H
-> >  #define __MACH_TEGRA_IO_H
-> >  
-> > -#define IO_SPACE_LIMIT 0xffffffff
-> > +/* Two 1MB windows */
-> > +#define IO_SPACE_LIMIT (SZ_1M + SZ_1M - 1)
+On Sun, Sep 19, 2010 at 04:39:44PM +0200, Arnd Bergmann wrote:
+> On Sunday 19 September 2010 16:07:02 Mike Rapoport wrote:
+> > As far as I understand, the IO space should be mapped prior to use and __io 
+> > should return the virtual address.
 > 
-> This would limit ioport_resource to 2M, and request_resource(&ioport_resource, 
-> &res) will fail because ioport_resource does not take into account that IO can 
-> start somewhere else than at 0.
+> That's right. You already map all the PCI registers including the I/O port
+> mapping at initialization time, but you must not attempt to access these
+> during boot before that time.
 
-Normally, the ioport_resource is limited to 65536 bytes in practice,
-because that's the most that many PCI cards decode.
+Yes.  __io() takes the IO port address, and returns a virtual address
+for the inb() et.al. macros to deference to perform the actual access.
 
-The only reason to let the I/O window start at something other than 0 is
-to leave space for legacy ISA devices, so typically the available range
-is between 0x1000 and 0xffff.
+So, for example if you have a PCI serial card inserted which appears at
+0x3f8, then inb(0x3f8) should access the first register on the PCI serial
+card.  As inb(0x3f8) equates to __raw_readb(__io(0x3f8)), __io(0x3f8)
+must return the virtual address to access that port.
 
-I don't see that as a limitation here.
+Eg, on DC21285 (footbridge) systems, the PCI IO window is at 0x7c000000
+physical, mapped into 0xff000000 virtual.  So __io(0x3f8) translates to
+0xff0003f8 virtual, which hits 0x7c0003f8 physical, and 0x3f8 as an IO
+access on the PCI bus.
 
-> >  /* On TEGRA, many peripherals are very closely packed in
-> >   * two 256MB io windows (that actually only use about 64KB
-> > @@ -69,7 +70,7 @@ void tegra_iounmap(volatile void __iomem *addr);
-> >  
-> >  static inline void __iomem *__io(unsigned long addr)
-> >  {
-> > -     return (void __iomem *)addr;
-> > +     return addr + tegra_pcie.regs + SZ_4M;
-> 
-> I wish things were that simple :)
-> As far as I understand, the IO space should be mapped prior to use and __io 
-> should return the virtual address.
-
-That's right. You already map all the PCI registers including the I/O port
-mapping at initialization time, but you must not attempt to access these
-during boot before that time.
-
-You should probably mask the size as above, which I forgot:
-
-static inline void __iomem *__io(unsigned long addr)
-{
-     return (addr & IO_SPACE_LIMIT) + (tegra_pcie.regs + SZ_4M);
-}
-
-Hopefully it's clearer that way, and certainly safer in case someone
-passes the physical address of the I/O window into __io rather than
-the offset.
-
-	Arnd
+Things become a little more complicated when you have PCMCIA cards with
+separate IO regions, as on SA11x0 and PXA systems.  These don't tend to
+have PCI, so we adopted there to have __io() do a 1:1 translation, and
+arrange for the "bus IO" address to be the actual virtual address.
