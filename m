@@ -1,26 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 19 Sep 2010 20:46:44 +0100
-Subject: [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <201009180107.51664.rjw@sisk.pl>
-References: <20100917121958.1dbb57af.akpm@linux-foundation.org>
-	<4C93DC4E.5020506@ti.com> <201009180107.51664.rjw@sisk.pl>
-Message-ID: <20100919194643.GB9871@sirena.org.uk>
+From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Mon, 20 Sep 2010 01:55:26 +0200
+Subject: [PATCH] ARM: (trivial) fix format warning in arch/arm/mm/init.c
+Message-ID: <20100919235526.GA31892@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 18, 2010 at 01:07:51AM +0200, Rafael J. Wysocki wrote:
-> On Friday, September 17, 2010, Nishanth Menon wrote:
+/mnt/src/linux-git/arch/arm/mm/init.c: In function ?mem_init?:
+/mnt/src/linux-git/arch/arm/mm/init.c:548:4: warning: format ?%4d? expects type ?int?, but argument 22 has type ?long int?
+/mnt/src/linux-git/arch/arm/mm/init.c:548:4: warning: format ?%4d? expects type ?int?, but argument 25 has type ?long int?
+/mnt/src/linux-git/arch/arm/mm/init.c:548:4: warning: format ?%4d? expects type ?int?, but argument 28 has type ?long int?
 
-> > there were a few OMAP followon patches from
-> > http://marc.info/?l=linux-omap&m=128152135801634&w=2
-> > which will actually use this for OMAP3 platform.
+(with gcc-4.5.1)
 
-> Still, the $subject patch doesn't use it.  So perhaps add it in a separate patch?
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+---
+ arch/arm/mm/init.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-By the same argument nothing in this patch causes the code to become
-used so we may as well not include it at all :)
+Patch against current linux.git (after 2.6.36-rc4).
 
-More seriously, looking at a lot of the questions that people are
-raising it might make the review a bit easier if the patch were posted
-in a series along with an initial user or two to provide some context
-for the expected usage.
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 7185b00..009797d 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -521,9 +521,9 @@ void __init mem_init(void)
+ 			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+ #endif
+ 			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+-			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
+-			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
+-			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n",
++			"      .init : 0x%p" " - 0x%p" "   (%4ld kB)\n"
++			"      .text : 0x%p" " - 0x%p" "   (%4ld kB)\n"
++			"      .data : 0x%p" " - 0x%p" "   (%4ld kB)\n",
+ 
+ 			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
+ 				(PAGE_SIZE)),
+-- 
+1.7.1
