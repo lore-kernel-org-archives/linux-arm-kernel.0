@@ -1,66 +1,66 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Sun, 19 Sep 2010 15:51:08 +0200
-Subject: [PATCH] leds: leds-ns2: fix locking
-In-Reply-To: <20100919134108.GE2614@kw.sim.vm.gnt>
-References: <20100919134108.GE2614@kw.sim.vm.gnt>
-Message-ID: <1284904268-12809-1-git-send-email-simon@sequanux.org>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Sun, 19 Sep 2010 16:07:02 +0200
+Subject: [PATCH 0/3] [ARM] tegra: PCI Express support
+In-Reply-To: <201009161912.12330.arnd@arndb.de>
+References: <cover.1284655723.git.mike@compulab.co.il>
+	<201009161912.12330.arnd@arndb.de>
+Message-ID: <4C961906.4040303@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <sguinot@lacie.com>
+Arnd Bergmann wrote:
+> On Thursday 16 September 2010 18:53:33 Mike Rapoport wrote:
+>> These patches enable PCI Express support on Tegra2.
+>> The implementation is based on original NVidia code from (1), but it
+>> is heavily reworked to avoid custom PCI enumeration and make the code
+>> more Linux friendly.
+>>
+>> This implementation assumes that the PCIe subsystem is fully powered
+>> and ungated by the bootloader.
+> 
+> The patches look good to me, but it seems that I/O space accesses are
+> still broken and need to be redirected to the PCI I/O range, like
+> the (totally untested) patch below.
 
-This patch replace all the lock functions with the irq safe variant.
-The ns2_led_{set,get}_mode() functions must be safe in all context.
+Thanks for catching this.
 
-For example, the trigger timer call led_set_brightness() in a softirq
-context.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
+> index 35edfc3..d54e384 100644
+> --- a/arch/arm/mach-tegra/include/mach/io.h
+> +++ b/arch/arm/mach-tegra/include/mach/io.h
+> @@ -21,7 +21,8 @@
+>  #ifndef __MACH_TEGRA_IO_H
+>  #define __MACH_TEGRA_IO_H
+>  
+> -#define IO_SPACE_LIMIT 0xffffffff
+> +/* Two 1MB windows */
+> +#define IO_SPACE_LIMIT (SZ_1M + SZ_1M - 1)
 
-Signed-off-by: Simon Guinot <sguinot@lacie.com>
----
- drivers/leds/leds-ns2.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+This would limit ioport_resource to 2M, and request_resource(&ioport_resource, 
+&res) will fail because ioport_resource does not take into account that IO can 
+start somewhere else than at 0.
+>  
+>  /* On TEGRA, many peripherals are very closely packed in
+>   * two 256MB io windows (that actually only use about 64KB
+> @@ -69,7 +70,7 @@ void tegra_iounmap(volatile void __iomem *addr);
+>  
+>  static inline void __iomem *__io(unsigned long addr)
+>  {
+> -	return (void __iomem *)addr;
+> +	return addr + tegra_pcie.regs + SZ_4M;
 
-diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
-index 74dce4b..350eb34 100644
---- a/drivers/leds/leds-ns2.c
-+++ b/drivers/leds/leds-ns2.c
-@@ -81,7 +81,7 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
- 	int cmd_level;
- 	int slow_level;
- 
--	read_lock(&led_dat->rw_lock);
-+	read_lock_irq(&led_dat->rw_lock);
- 
- 	cmd_level = gpio_get_value(led_dat->cmd);
- 	slow_level = gpio_get_value(led_dat->slow);
-@@ -95,7 +95,7 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
- 		}
- 	}
- 
--	read_unlock(&led_dat->rw_lock);
-+	read_unlock_irq(&led_dat->rw_lock);
- 
- 	return ret;
- }
-@@ -104,8 +104,9 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
- 			     enum ns2_led_modes mode)
- {
- 	int i;
-+	unsigned long flags;
- 
--	write_lock(&led_dat->rw_lock);
-+	write_lock_irqsave(&led_dat->rw_lock, flags);
- 
- 	for (i = 0; i < ARRAY_SIZE(ns2_led_modval); i++) {
- 		if (mode == ns2_led_modval[i].mode) {
-@@ -116,7 +117,7 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
- 		}
- 	}
- 
--	write_unlock(&led_dat->rw_lock);
-+	write_unlock_irqrestore(&led_dat->rw_lock, flags);
- }
- 
- static void ns2_led_set(struct led_classdev *led_cdev,
+I wish things were that simple :)
+As far as I understand, the IO space should be mapped prior to use and __io 
+should return the virtual address.
+I'll add it for the next re-spin.
+
+>  }
+>  #define __io(a)         __io(a)
+>  #define __mem_pci(a)    (a)
+
+
 -- 
-1.6.3.1
+Sincerely yours,
+Mike.
