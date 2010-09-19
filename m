@@ -1,83 +1,26 @@
-From: awg@embtoolkit.org (Abdoulaye Walsimou Gaye)
-Date: Sun, 19 Sep 2010 20:48:54 +0200
-Subject: [PATCH V3 1/1] ARM: s3c2440: various fixes in Kconfig file
-In-Reply-To: <4C86CBC8.7010503@fluff.org>
-References: <4C86CBC8.7010503@fluff.org>
-Message-ID: <1284922134-19952-1-git-send-email-awg@embtoolkit.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 19 Sep 2010 20:46:44 +0100
+Subject: [PATCH] opp: introduce library for device-specific OPPs
+In-Reply-To: <201009180107.51664.rjw@sisk.pl>
+References: <20100917121958.1dbb57af.akpm@linux-foundation.org>
+	<4C93DC4E.5020506@ti.com> <201009180107.51664.rjw@sisk.pl>
+Message-ID: <20100919194643.GB9871@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* kconfig symbols defined in arch/arm/mach-s3c2440/Kconfig are only available
-  when ARCH_S3C2410 is selected, so no need to make some of them depend
-  on ARCH_S3C2410.
-* fix CPU_S3C24405B typo in "config S3C2440_DMA".
-* mini2440: remove unconditionally select of SND_S3C24XX_SOC_S3C24XX_UDA134X.
-Those fixes avoid the following warnings at make time:
+On Sat, Sep 18, 2010 at 01:07:51AM +0200, Rafael J. Wysocki wrote:
+> On Friday, September 17, 2010, Nishanth Menon wrote:
 
-scripts/kconfig/qconf arch/arm/Kconfig
-warning: (MACH_MINI2440 && ARCH_S3C2410) selects SND_S3C24XX_SOC_S3C24XX_UDA134X
-which has unmet direct dependencies (SND_S3C24XX_SOC && ARCH_S3C2410)
-warning: (CPU_S3C2440 && ARCH_S3C2410 && S3C2410_DMA) selects S3C2440_DMA which 
-has unmet direct dependencies (ARCH_S3C2410 && CPU_S3C24405B)
-warning: (CPU_S3C2440 && ARCH_S3C2410 || CPU_S3C2442 && ARCH_S3C2410)
-selects CPU_S3C244X which has unmet direct dependencies (!ARCH_S3C2410)
+> > there were a few OMAP followon patches from
+> > http://marc.info/?l=linux-omap&m=128152135801634&w=2
+> > which will actually use this for OMAP3 platform.
 
-Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
----
-changes since v1:
-include warnings observed without this patch
-changes since v2:
-take into account comments from Ben about unconditional select of some kconfig
-symbols
+> Still, the $subject patch doesn't use it.  So perhaps add it in a separate patch?
 
- arch/arm/mach-s3c2440/Kconfig |    7 ++-----
- 1 files changed, 2 insertions(+), 5 deletions(-)
+By the same argument nothing in this patch causes the code to become
+used so we may as well not include it at all :)
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index cd8e7de..ff024a6 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -4,7 +4,6 @@
- 
- config CPU_S3C2440
- 	bool
--	depends on ARCH_S3C2410
- 	select CPU_ARM920T
- 	select S3C_GPIO_PULL_UP
- 	select S3C2410_CLOCK
-@@ -18,7 +17,6 @@ config CPU_S3C2440
- 
- config CPU_S3C2442
- 	bool
--	depends on ARCH_S3C2410
- 	select CPU_ARM920T
- 	select S3C2410_CLOCK
- 	select S3C2410_GPIO
-@@ -30,7 +28,7 @@ config CPU_S3C2442
- 
- config CPU_S3C244X
- 	bool
--	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
-+	depends on CPU_S3C2440 || CPU_S3C2442
- 	help
- 	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
- 
-@@ -72,7 +70,7 @@ config S3C2440_PLL_16934400
- 
- config S3C2440_DMA
- 	bool
--	depends on ARCH_S3C2410 && CPU_S3C24405B
-+	depends on CPU_S3C2440
- 	help
- 	  Support for S3C2440 specific DMA code5A
- 
-@@ -181,7 +179,6 @@ config MACH_MINI2440
- 	select CPU_S3C2440
- 	select EEPROM_AT24
- 	select LEDS_TRIGGER_BACKLIGHT
--	select SND_S3C24XX_SOC_S3C24XX_UDA134X
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
- 	help
--- 
-1.7.0.4
+More seriously, looking at a lot of the questions that people are
+raising it might make the review a bit easier if the patch were posted
+in a series along with an initial user or two to provide some context
+for the expected usage.
