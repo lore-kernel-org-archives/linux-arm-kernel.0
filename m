@@ -1,30 +1,64 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Sun, 19 Sep 2010 09:05:44 -0400
-Subject: [PATCH] ARM: make app read out process num even not use SMP
-In-Reply-To: <20100919122920.GB9098@n2100.arm.linux.org.uk>
-References: <1284866536-21431-1-git-send-email-leiwen@marvell.com>
-	<20100919122920.GB9098@n2100.arm.linux.org.uk>
-Message-ID: <1284901544.23787.2529.camel@gandalf.stny.rr.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Sun, 19 Sep 2010 15:30:59 +0200
+Subject: [PATCH] leds: leds-ns2: fix locking
+Message-ID: <1284903059-22935-1-git-send-email-simon@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2010-09-19 at 13:29 +0100, Russell King - ARM Linux wrote:
-> On Sun, Sep 19, 2010 at 11:22:16AM +0800, Lei Wen wrote:
-> > Some app like trace-cmd need to know the process number, but not
-> 
-> That'll be "processor number".
-> 
-> > all arm board is enabled with the SMP. Add this fix up to let those
-> > app works happy.
-> 
-> We have historically never given the "processor: 0" line on uniprocessor
-> systems - and many other architectures do not provide this line either.
-> 
-> I'd suggest trace-cmd is fixed so that it doesn't assume presence of this
-> line.
+From: sguinot <sguinot@e0769a12-487d-4b36-8fb5-9ece92c58341>
 
-I'll fix that.
+This patch replace all the lock functions with the irq safe variant.
+The ns2_led_{set,get}_mode() functions must be safe in all context.
 
-Thanks!
+For example, the trigger timer call led_set_brightness() in a softirq
+context.
 
--- Steve
+Signed-off-by: Simon Guinot <sguinot@lacie.com>
+---
+ drivers/leds/leds-ns2.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
+index 74dce4b..350eb34 100644
+--- a/drivers/leds/leds-ns2.c
++++ b/drivers/leds/leds-ns2.c
+@@ -81,7 +81,7 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
+ 	int cmd_level;
+ 	int slow_level;
+ 
+-	read_lock(&led_dat->rw_lock);
++	read_lock_irq(&led_dat->rw_lock);
+ 
+ 	cmd_level = gpio_get_value(led_dat->cmd);
+ 	slow_level = gpio_get_value(led_dat->slow);
+@@ -95,7 +95,7 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
+ 		}
+ 	}
+ 
+-	read_unlock(&led_dat->rw_lock);
++	read_unlock_irq(&led_dat->rw_lock);
+ 
+ 	return ret;
+ }
+@@ -104,8 +104,9 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
+ 			     enum ns2_led_modes mode)
+ {
+ 	int i;
++	unsigned long flags;
+ 
+-	write_lock(&led_dat->rw_lock);
++	write_lock_irqsave(&led_dat->rw_lock, flags);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(ns2_led_modval); i++) {
+ 		if (mode == ns2_led_modval[i].mode) {
+@@ -116,7 +117,7 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
+ 		}
+ 	}
+ 
+-	write_unlock(&led_dat->rw_lock);
++	write_unlock_irqrestore(&led_dat->rw_lock, flags);
+ }
+ 
+ static void ns2_led_set(struct led_classdev *led_cdev,
+-- 
+1.6.3.1
