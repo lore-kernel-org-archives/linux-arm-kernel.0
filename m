@@ -1,66 +1,51 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 19 Sep 2010 16:07:02 +0200
-Subject: [PATCH 0/3] [ARM] tegra: PCI Express support
-In-Reply-To: <201009161912.12330.arnd@arndb.de>
-References: <cover.1284655723.git.mike@compulab.co.il>
-	<201009161912.12330.arnd@arndb.de>
-Message-ID: <4C961906.4040303@compulab.co.il>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Sun, 19 Sep 2010 16:12:15 +0200
+Subject: [PATCH] dmaengine: fix interrupt clearing for mv_xor
+In-Reply-To: <1284759231-3188-1-git-send-email-simon@sequanux.org>
+References: <1284759231-3188-1-git-send-email-simon@sequanux.org>
+Message-ID: <AANLkTimybyerarsWzh_4sqZj_BUXrox022f2fhPbhp6+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> On Thursday 16 September 2010 18:53:33 Mike Rapoport wrote:
->> These patches enable PCI Express support on Tegra2.
->> The implementation is based on original NVidia code from (1), but it
->> is heavily reworked to avoid custom PCI enumeration and make the code
->> more Linux friendly.
->>
->> This implementation assumes that the PCIe subsystem is fully powered
->> and ungated by the bootloader.
-> 
-> The patches look good to me, but it seems that I/O space accesses are
-> still broken and need to be redirected to the PCI I/O range, like
-> the (totally untested) patch below.
-
-Thanks for catching this.
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
-> index 35edfc3..d54e384 100644
-> --- a/arch/arm/mach-tegra/include/mach/io.h
-> +++ b/arch/arm/mach-tegra/include/mach/io.h
-> @@ -21,7 +21,8 @@
->  #ifndef __MACH_TEGRA_IO_H
->  #define __MACH_TEGRA_IO_H
->  
-> -#define IO_SPACE_LIMIT 0xffffffff
-> +/* Two 1MB windows */
-> +#define IO_SPACE_LIMIT (SZ_1M + SZ_1M - 1)
-
-This would limit ioport_resource to 2M, and request_resource(&ioport_resource, 
-&res) will fail because ioport_resource does not take into account that IO can 
-start somewhere else than at 0.
->  
->  /* On TEGRA, many peripherals are very closely packed in
->   * two 256MB io windows (that actually only use about 64KB
-> @@ -69,7 +70,7 @@ void tegra_iounmap(volatile void __iomem *addr);
->  
->  static inline void __iomem *__io(unsigned long addr)
->  {
-> -	return (void __iomem *)addr;
-> +	return addr + tegra_pcie.regs + SZ_4M;
-
-I wish things were that simple :)
-As far as I understand, the IO space should be mapped prior to use and __io 
-should return the virtual address.
-I'll add it for the next re-spin.
-
->  }
->  #define __io(a)         __io(a)
->  #define __mem_pci(a)    (a)
-
-
--- 
-Sincerely yours,
-Mike.
+On Fri, Sep 17, 2010 at 11:33 PM, Simon Guinot <simon@sequanux.org> wrote:
+> From: Simon Guinot <sguinot@lacie.com>
+>
+> When using simultaneously the two DMA channels on a same engine, some
+> transfers are never completed. For example, an endless lock can occur
+> while writing heavily on a RAID5 array (with async-tx offload support
+> enabled).
+>
+> Note that this issue can also be reproduced by using the DMA test
+> client.
+>
+> On a same engine, the interrupt cause register is shared between two
+> DMA channels. This patch make sure that the cause bit is only cleared
+> for the requested channel.
+>
+> Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> Tested-by: Luc Saillard <luc@saillard.org>
+> ---
+> ?drivers/dma/mv_xor.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> index 86c5ae9..411d5bf 100644
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -162,7 +162,7 @@ static int mv_is_err_intr(u32 intr_cause)
+>
+> ?static void mv_xor_device_clear_eoc_cause(struct mv_xor_chan *chan)
+> ?{
+> - ? ? ? u32 val = (1 << (1 + (chan->idx * 16)));
+> + ? ? ? u32 val = ~(1 << (chan->idx * 16));
+> ? ? ? ?dev_dbg(chan->device->common.dev, "%s, val 0x%08x\n", __func__, val);
+> ? ? ? ?__raw_writel(val, XOR_INTR_CAUSE(chan));
+> ?}
+The patch looks fine, it clears the "End Of Descriptor" interrupt that
+set by mv_chan_unmask_interrupts, and it clears that interrupt by
+writing 0 only to that one.
+saeed
+> --
+> 1.6.3.1
+>
+>
