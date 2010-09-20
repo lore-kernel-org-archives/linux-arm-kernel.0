@@ -1,40 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Sep 2010 16:58:06 +0100
-Subject: Machine name/id change request
-In-Reply-To: <AANLkTinBw_NJj=BcAOq5BzPGqrO8FW7fzmUVK8TGH7A7@mail.gmail.com>
-References: <AANLkTikm78_dj03xxaHMi10V+_B9B_8FRg1kRbL2OPBK@mail.gmail.com>
-	<20100920154441.GG30793@n2100.arm.linux.org.uk>
-	<AANLkTinBw_NJj=BcAOq5BzPGqrO8FW7fzmUVK8TGH7A7@mail.gmail.com>
-Message-ID: <20100920155806.GA5177@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 20 Sep 2010 09:21:19 -0700
+Subject: [PATCH 00/11] OMAP: Serial: Add omap-serial driver with platform
+	support
+In-Reply-To: <AANLkTik-+RC7y=dJnDdxzrqMFnTzRV-j8s5FtmMy8ZhE@mail.gmail.com>
+	(Govindraj's message of "Sat, 18 Sep 2010 14:47:22 +0530")
+References: <13965.10.24.255.18.1284739547.squirrel@dbdmail.itg.ti.com>
+	<87tylorl9i.fsf@deeprootsystems.com>
+	<AANLkTik-+RC7y=dJnDdxzrqMFnTzRV-j8s5FtmMy8ZhE@mail.gmail.com>
+Message-ID: <87wrqg2xog.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 20, 2010 at 06:48:54PM +0300, Amit Kucheria wrote:
-> On Mon, Sep 20, 2010 at 6:44 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Sep 20, 2010 at 10:32:51AM -0500, Matt Sealey wrote:
-> >> Hello,
-> >>
-> >> Is it possible for us to change a machine name/id in the database and
-> >> future kernels?
-> >>
-> >> We have two systems originally designed by Pegatron and registered
-> >> under their codenames, but for now retailing and marketed under the
-> >> "Efika MX" brand. We would like to change the id data for
-> >>
-> >> id 2336, originally MX51_LANGE51 but changed to MX51_EFIKAMX (mx51_efikamx etc.)
-> >> id 2370, originally MX51_KUNLUN but changed to MX51_EFIKASB (mx51_efikasb etc.)
-> >
-> > As they're not in mainline then we can. ?Bear in mind that kernels
-> > which contain this code using the old identifiers will break when
-> > someone decides to download a new copy of the file after the change.
-> >
-> > Updated.
-> >
-> > Is Sean Hsieh still responsible for these?
-> 
-> You can add my name there since I'll be submitting the board files.
+Govindraj <govindraj.ti@gmail.com> writes:
 
-Remind me to fix it up when you submit something to the patch system/
-machine registry.  Neither Matt nor yourself currently appears in
-the existing list of people...
+> On Sat, Sep 18, 2010 at 5:11 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>
+>>> This patch series adds a serial driver to handle uarts on omap platforms.
+>>> Currenlty omap-uarts are handled with 8250 driver, since updating
+>>> this driver with omap specific features will over load
+>>> the 8250 driver with all omap-specific data thus a new driver
+>>> is added to configure and support features like
+>>> dma, h/w, s/w flowcontrol for omap-uarts.
+>>> Also the patch series updates various low level platform specific
+>>> serial data to support omap-uarts with hwmod framework and adds support
+>>> for uart4 on OMAP3630.
+>>
+>> This series is missing a couple things to work more broadly on all
+>> boards, specifically 3630-based boards.
+>>
+>> First, due to the current UART idle code base, you need to enable all
+>> OMAP UARTs 36xx. ?Enabling less than all OMAP UARTs will break the
+>> current idle code. ?As we discussed, the next phase we will move the
+>> idle management from this serial.c hackery into the omap-serial driver
+>> iteself. ?Until then, you need to call omap_serial_init() on
+>> Zoom2/Zoom3. ?Patch below[1]
+>>
+>> Also, you previously had a patch that updated omap_uart_idle_init() to
+>> handle 36xx and specifically UART4. ?Without that, struct
+>> omap_uart_state is not setup correctly for UART4, and thus cannot be
+>> properly idled on 3630.
+>
+> ok fine, I will I incorporate initialize all uarts patch for zoom boards.
+>
+> Are you referring to this patch?
+> https://patchwork.kernel.org/patch/108066/
+>
+> Is this still needed if we have initialized all uarts?
+> This patch might not needed if we have initialized all uarts right?
+
+Right.  We don't need the above patchwork patch if all UARTs are
+initialized.
+
+The other patch I was referring to was the one that added UART4 support
+to omap_uart_idle_init() (added the wk_en, wk_st, padconf etc.)  I had a
+pending request for you to drop the muxmode from that patch, but the
+rest of it was still needed.
+
+>>
+>> Also, it's been a while since I tested this on OMAP2. ?Please re-test on
+>> OMAP2 with the whole series. ?Also, please report here the other
+>> platforms this was tested on. ?The final needs to be tested on OMAP2, 3
+>> and 4 before merge.
+>
+> Yes Sure,
+>
+> Just FYI this patch series was also tested on omap2,3,4.
+>
+
+OK, be sure to test Zoom3, because my testing on Zoom3 led to a crash as
+soon as idle was enabled due to the missing init of all UARTs.
+
+Thanks,
+
+Kevin
