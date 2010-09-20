@@ -1,104 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 20 Sep 2010 14:55:37 +0200
-Subject: [PATCHv2 7/7] ARM: S5PC110: add support for MMC regulators on Goni
-	board
-In-Reply-To: <1284987337-15365-1-git-send-email-m.szyprowski@samsung.com>
-References: <1284987337-15365-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1284987337-15365-8-git-send-email-m.szyprowski@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 20 Sep 2010 15:01:19 +0200
+Subject: [PATCH 1/3] dmaengine: add possibility for cyclic transfers
+In-Reply-To: <1281956870-12463-2-git-send-email-s.hauer@pengutronix.de>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20100920130119.GA23406@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required platform definitions for MMC power regulators on Samsung
-Goni board. GPIO pin GONI_EXT_FLASH_EN has been transferred from machine
-startup code to fixed voltage regulator.
+Hi Dan,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s5pv210/mach-goni.c |   40 ++++++++++++++++++++++++++++++++++--
- 1 files changed, 37 insertions(+), 3 deletions(-)
+Any comment to this patch?
 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 68e22f2..a7fbe08 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -16,6 +16,7 @@
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
- #include <linux/mfd/max8998.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_gpio.h>
- #include <linux/lcd.h>
-@@ -226,6 +227,10 @@ static void __init goni_radio_init(void)
- /* MAX8998 regulators */
- #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
- 
-+static struct regulator_consumer_supply goni_ldo5_consumers[] = {
-+	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
-+};
-+
- static struct regulator_init_data goni_ldo2_data = {
- 	.constraints	= {
- 		.name		= "VALIVE_1.1V",
-@@ -265,6 +270,8 @@ static struct regulator_init_data goni_ldo5_data = {
- 		.max_uV		= 2800000,
- 		.apply_uV	= 1,
- 	},
-+	.num_consumer_supplies = ARRAY_SIZE(goni_ldo5_consumers),
-+	.consumer_supplies = goni_ldo5_consumers,
- };
- 
- static struct regulator_init_data goni_ldo6_data = {
-@@ -556,11 +563,37 @@ static struct s3c_sdhci_platdata goni_hsmmc2_data __initdata = {
- 	.ext_cd_gpio_invert	= 1,
- };
- 
-+static struct regulator_consumer_supply mmc2_supplies[] = {
-+	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"),
-+};
-+
-+static struct regulator_init_data mmc2_fixed_voltage_init_data = {
-+	.constraints		= {
-+		.name		= "V_TF_2.8V",
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(mmc2_supplies),
-+	.consumer_supplies	= mmc2_supplies,
-+};
-+
-+static struct fixed_voltage_config mmc2_fixed_voltage_config = {
-+	.supply_name		= "EXT_FLASH_EN",
-+	.microvolts		= 2800000,
-+	.gpio			= GONI_EXT_FLASH_EN,
-+	.enable_high		= true,
-+	.init_data		= &mmc2_fixed_voltage_init_data,
-+};
-+
-+static struct platform_device mmc2_fixed_voltage = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 2,
-+	.dev		= {
-+		.platform_data	= &mmc2_fixed_voltage_config,
-+	},
-+};
-+
- static void goni_setup_sdhci(void)
- {
--	gpio_request(GONI_EXT_FLASH_EN, "FLASH_EN");
--	gpio_direction_output(GONI_EXT_FLASH_EN, 1);
--
- 	s3c_sdhci0_set_platdata(&goni_hsmmc0_data);
- 	s3c_sdhci1_set_platdata(&goni_hsmmc1_data);
- 	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
-@@ -572,6 +605,7 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&goni_spi_gpio,
- 	&s3c_device_usb_hsotg,
- 	&goni_i2c_gpio_pmic,
-+	&mmc2_fixed_voltage,
- 	&goni_device_gpiokeys,
- 	&s5p_device_fimc0,
- 	&s5p_device_fimc1,
+Sascha
+
+On Mon, Aug 16, 2010 at 01:07:48PM +0200, Sascha Hauer wrote:
+> Cyclic transfers are useful for audio where a single buffer divided
+> in periods has to be transfered endlessly until stopped. After being
+> prepared the transfer is started using the dma_async_descriptor->tx_submit
+> function. dma_async_descriptor->callback is called after each period.
+> The transfer is stopped using the DMA_TERMINATE_ALL callback.
+> While being used for cyclic transfers the channel cannot be used
+> for other transfer types.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Haavard Skinnemoen <haavard.skinnemoen@atmel.com>
+> ---
+>  drivers/dma/dmaengine.c   |    2 ++
+>  include/linux/dmaengine.h |    6 +++++-
+>  2 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index 9d31d5e..e5e79ce 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -692,6 +692,8 @@ int dma_async_device_register(struct dma_device *device)
+>  		!device->device_prep_dma_interrupt);
+>  	BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
+>  		!device->device_prep_slave_sg);
+> +	BUG_ON(dma_has_cap(DMA_CYCLIC, device->cap_mask) &&
+> +		!device->device_prep_dma_cyclic);
+>  	BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
+>  		!device->device_control);
+>  
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index c61d4ca..0df7864 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -67,10 +67,11 @@ enum dma_transaction_type {
+>  	DMA_PRIVATE,
+>  	DMA_ASYNC_TX,
+>  	DMA_SLAVE,
+> +	DMA_CYCLIC,
+>  };
+>  
+>  /* last transaction type for creation of the capabilities mask */
+> -#define DMA_TX_TYPE_END (DMA_SLAVE + 1)
+> +#define DMA_TX_TYPE_END (DMA_CYCLIC + 1)
+>  
+>  
+>  /**
+> @@ -478,6 +479,9 @@ struct dma_device {
+>  		struct dma_chan *chan, struct scatterlist *sgl,
+>  		unsigned int sg_len, enum dma_data_direction direction,
+>  		unsigned long flags);
+> +	struct dma_async_tx_descriptor *(*device_prep_dma_cyclic)(
+> +		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+> +		size_t period_len, enum dma_data_direction direction);
+>  	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  		unsigned long arg);
+>  
+> -- 
+> 1.7.1
+> 
+> 
+
 -- 
-1.7.1.569.g6f426
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
