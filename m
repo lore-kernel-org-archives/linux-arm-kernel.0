@@ -1,77 +1,32 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 20 Sep 2010 09:21:19 -0700
-Subject: [PATCH 00/11] OMAP: Serial: Add omap-serial driver with platform
-	support
-In-Reply-To: <AANLkTik-+RC7y=dJnDdxzrqMFnTzRV-j8s5FtmMy8ZhE@mail.gmail.com>
-	(Govindraj's message of "Sat, 18 Sep 2010 14:47:22 +0530")
-References: <13965.10.24.255.18.1284739547.squirrel@dbdmail.itg.ti.com>
-	<87tylorl9i.fsf@deeprootsystems.com>
-	<AANLkTik-+RC7y=dJnDdxzrqMFnTzRV-j8s5FtmMy8ZhE@mail.gmail.com>
-Message-ID: <87wrqg2xog.fsf@deeprootsystems.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 20 Sep 2010 18:31:07 +0200
+Subject: [PATCH] atmel_usba_udc: force vbus_pin at -EINVAL when gpio_request
+	failled
+Message-ID: <1285000267-22964-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Govindraj <govindraj.ti@gmail.com> writes:
+to ensure gpio_is_valid return false
 
-> On Sat, Sep 18, 2010 at 5:11 AM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> "Govindraj.R" <govindraj.raja@ti.com> writes:
->>
->>> This patch series adds a serial driver to handle uarts on omap platforms.
->>> Currenlty omap-uarts are handled with 8250 driver, since updating
->>> this driver with omap specific features will over load
->>> the 8250 driver with all omap-specific data thus a new driver
->>> is added to configure and support features like
->>> dma, h/w, s/w flowcontrol for omap-uarts.
->>> Also the patch series updates various low level platform specific
->>> serial data to support omap-uarts with hwmod framework and adds support
->>> for uart4 on OMAP3630.
->>
->> This series is missing a couple things to work more broadly on all
->> boards, specifically 3630-based boards.
->>
->> First, due to the current UART idle code base, you need to enable all
->> OMAP UARTs 36xx. ?Enabling less than all OMAP UARTs will break the
->> current idle code. ?As we discussed, the next phase we will move the
->> idle management from this serial.c hackery into the omap-serial driver
->> iteself. ?Until then, you need to call omap_serial_init() on
->> Zoom2/Zoom3. ?Patch below[1]
->>
->> Also, you previously had a patch that updated omap_uart_idle_init() to
->> handle 36xx and specifically UART4. ?Without that, struct
->> omap_uart_state is not setup correctly for UART4, and thus cannot be
->> properly idled on 3630.
->
-> ok fine, I will I incorporate initialize all uarts patch for zoom boards.
->
-> Are you referring to this patch?
-> https://patchwork.kernel.org/patch/108066/
->
-> Is this still needed if we have initialized all uarts?
-> This patch might not needed if we have initialized all uarts right?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/usb/gadget/atmel_usba_udc.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Right.  We don't need the above patchwork patch if all UARTs are
-initialized.
-
-The other patch I was referring to was the one that added UART4 support
-to omap_uart_idle_init() (added the wk_en, wk_st, padconf etc.)  I had a
-pending request for you to drop the muxmode from that patch, but the
-rest of it was still needed.
-
->>
->> Also, it's been a while since I tested this on OMAP2. ?Please re-test on
->> OMAP2 with the whole series. ?Also, please report here the other
->> platforms this was tested on. ?The final needs to be tested on OMAP2, 3
->> and 4 before merge.
->
-> Yes Sure,
->
-> Just FYI this patch series was also tested on omap2,3,4.
->
-
-OK, be sure to test Zoom3, because my testing on Zoom3 led to a crash as
-soon as idle was enabled due to the missing init of all UARTs.
-
-Thanks,
-
-Kevin
+diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+index d623c7b..7d84ee9 100644
+--- a/drivers/usb/gadget/atmel_usba_udc.c
++++ b/drivers/usb/gadget/atmel_usba_udc.c
+@@ -2014,6 +2014,9 @@ static int __init usba_udc_probe(struct platform_device *pdev)
+ 			} else {
+ 				disable_irq(gpio_to_irq(udc->vbus_pin));
+ 			}
++		} else {
++			/* gpio_request fail so use -EINVAL for gpio_is_valid */
++			ubc->vbus_pin = -EINVAL;
+ 		}
+ 	}
+ 
+-- 
+1.7.1
