@@ -1,7 +1,7 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 19 Sep 2010 20:09:10 -0400
-Subject: [PATCH] ARM: pxa: reduce the scope of get_clk_frequency_khz()
-Message-ID: <1284941351-28067-1-git-send-email-haojian.zhuang@marvell.com>
+Date: Sun, 19 Sep 2010 20:10:12 -0400
+Subject: [PATCH 1/2] ARM: pxa: reduce the scope of get_clk_frequency_khz()
+Message-ID: <1284941413-28103-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
