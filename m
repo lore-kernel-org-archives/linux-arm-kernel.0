@@ -1,118 +1,45 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 20 Sep 2010 19:35:17 +0200
-Subject: [PATCH] opp: introduce library for device-specific OPPs
-In-Reply-To: <87eicoz5yi.fsf@deeprootsystems.com>
-References: <201009180107.51664.rjw@sisk.pl> <201009201838.59013.rjw@sisk.pl>
-	<87eicoz5yi.fsf@deeprootsystems.com>
-Message-ID: <201009201935.17255.rjw@sisk.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Sep 2010 19:07:08 +0100
+Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <4C979216.3000706@gmail.com>
+References: <4C809486.2070308@st.com>
+	<20100903073421.GF26319@n2100.arm.linux.org.uk>
+	<4C84D6B3.80104@st.com>
+	<20100908151232.GD32659@n2100.arm.linux.org.uk>
+	<4C885FF2.7060201@st.com> <4C976541.6000203@st.com>
+	<20100920134808.GD30793@n2100.arm.linux.org.uk>
+	<4C97760A.60404@gmail.com>
+	<20100920150749.GF30793@n2100.arm.linux.org.uk>
+	<4C979216.3000706@gmail.com>
+Message-ID: <20100920180708.GB5177@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 20, 2010, Kevin Hilman wrote:
-> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
-> 
-> > On Monday, September 20, 2010, Kevin Hilman wrote:
-> >> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
-> >> 
-> >> [...]
-> >> 
-> >> >> >> In terms of the lifetime rules on the nodes in the list:
-> >> >> >> The list is expected to be maintained once created, entries are expected 
-> >> >> >> to be added optimally and not expected to be destroyed, the choice of 
-> >> >> >> list implementation was for reducing the complexity of the code itself 
-> >> >> >> and not yet meant as a mechanism to dynamically add and delete nodes on 
-> >> >> >> the fly.. Essentially, it was intended for the SOC framework to ensure 
-> >> >> >> it plugs in the OPP entries optimally and not create a humongous list of 
-> >> >> >> all possible OPPs for all families of the vendor SOCs - even though it 
-> >> >> >> is possible to use the OPP layer so - it just wont be smart to do so 
-> >> >> >> considering list scan latencies on hot paths such as cpufreq transitions 
-> >> >> >> or idle transitions.
-> >> >> > 
-> >> >> > If the list nodes are not supposed to be added and removed dynamically,
-> >> >> > it probably would make sense to create data structures containing
-> >> >> > the "available" OPPs only, once they are known, and simply free the object
-> >> >> > representing the other ones.
-> >> >> I covered the usage in my reply here: 
-> >> >> http://marc.info/?l=linux-arm-kernel&m=128476570300466&w=2
-> >> >> but to repeat, the list is dynamic during initialization but remains 
-> >> >> static after initialization based on SOC framework implementation - this 
-> >> >> is best implemented with a list (we had started with an original array 
-> >> >> implementation which evolved to the current list implementation 
-> >> >> http://marc.info/?l=linux-omap&m=125912217718770&w=2)
-> >> >
-> >> > Well, my point is, since the _final_ set of OPPs doesn't really
-> >> > change, there's no need to use a list for storing it in principle.
-> >> >
-> >> > Your current algorithm seems to be:
-> >> > (1) Create a list of all _possible_ OPPs.
-> >> > (2) Mark the ones that can actually be used on the given hardware as
-> >> >     "available".
-> >> > (3) Whenever we need to find an OPP to use, browse the entire list.
-> >> > This isn't optimal, because the OPPs that are not marked as "available" in (2)
-> >> > will never be used, although they _will_ be inspected while browsing the list.
-> >> 
-> >> A little clarificaion about "will never be used" below...
-> >> 
-> >> > So, I think a better algorithm would be:
-> >> > (1) Create a list of all possible OPPs.
-> >> > (2) Drop the nonavailable OPPs from the list.
-> >> > (3) Whenever we need to find an OPP to use, browse the entire list.
-> >> >
-> >> > But then, it may be better to simply move the list we get in (2) into an
-> >> > array, because the browsing is going to require fewer memory accesses in
-> >> > that case (also, an array would use less memory than the list).  So, perhaps,
-> >> > it's better to change the algorithm even further:
-> >> > (1) Create a list of all possible OPPs.
-> >> > (2) Drop the nonavailable OPPs from the list.
-> >> > (3) Move the list we got in (2) into a sorted array.
-> >> > (4) Whenever we need to find an OPP to use, browse the array
-> >> >      (perhaps using binary search).
-> >> 
-> >> Just a little clarification on "available."  The intended use of this flag
-> >> was not just a one-time "available on hardware X."  It was also intended
-> >> to be able to add/remove availbale OPPs dynamically at run-time.
-> >> 
-> >> More specifically, it's intended for use to *temporarily* remove an OPP
-> >> from being selected.  The production usage of this would primarily for
-> >> thermal considerations (e.g. don't use OPPx until the temperature drops)
-> >> 
-> >> However, for PM development & debug, we also use this to temporarily
-> >> take a class of OPPs out of the running for test/debug purposes
-> >> (e.g. driver X runs great at OPPx and OPPy, but not OPPz.)  So the
-> >> ability to temporarily be selective about OPPs at runtime for
-> >> debug/development is extremely useful.
-> >> 
-> >> So, to summarize, "most of the time", all the OPPs that were added (via
-> >> opp_add()) will be "available".  Ones that are !availble will likely
-> >> only be so temporarily, so I'm not sure that the overhead of keeping a
-> >> separate structure for the available and !available OPPs is worth it.
-> >> Especially, since OPP changes are relatively infrequent.
-> >
-> > Well, the Nishanth's description doesn't match this, so thanks for the
-> > clarification.
-> 
-> Agreed, we need to update the doc file to reflect this.
-> 
-> > In that case you might consider using a red-black tree for storing the
-> > "available" OPPs, so that you can add-remove them dynamically, but
-> > you can avoid a linear search through the entire list every time you need to
-> > find and available OPP.  Since we have standard helpers for handling rbtrees,
-> > that shouldn't be a big deal.
-> 
-> That's a possibility, but do you think rbtrees are worth it for a
-> relatively small number of OPPs for any given device?  We're using this
-> to track a list of OPPs for any struct device, so there may be multiple
-> independent OPP lists, but each would have a small number of OPPs.
-> 
-> For example, on OMAP, while the CPU might have a larger number of OPPs
-> (5-6), most devices will have a small number of OPPs (1-3.)  I gather
-> this is similar for many of the embedded SoCs available today.
-> 
-> Considering such a small number of OPPs, is the extra complexity of an
-> rbtree worth it?
+On Mon, Sep 20, 2010 at 11:55:50AM -0500, Rob Herring wrote:
+> There is no programming distinction between an irq and an wakeup if the  
+> GIC is powered on in suspend which is platform dependent. It is only a  
+> s/w distinction of what interrupts you allow to wake you up. If GIC  
+> remains powered, then it can assert nirq to the core and wake-up. If the  
+> core is powered down, the external power controller can monitor the NIRQ  
+> line to wake-up the core. So the powergating of the core has no impact  
+> on the prvgramming of the GIC for wake-up.
 
-OK, probably not.  If there's so few of them, I agree that using lists is
-probably better, but please put the numbers information into the doc too. :-)
+Well, not everyone does this - and I know of no platforms where it has
+been reported for the GIC to be able to wake the system up.  TI OMAP
+doesn't allow it, neither does the one being discussed in this thread.
 
-Thanks,
-Rafael
+The system being discussed here has an external power controller which
+needs to be appropriately programmed.
+
+You can see this because the proposed patch doesn't add code like that
+in vic.c, but adds a no-operation function so that set_wake() becomes
+a no-op returning zero.
+
+> How about adding a set_wake function ptr as a parameter to  
+> gic_dist_init? If a platform needs more than the basic operation, they  
+> can override it.
+
+As I can see, we're not talking about wake-up being able to be done from
+the IRQ controller here, but something entirely external and unrelated
+to it.
