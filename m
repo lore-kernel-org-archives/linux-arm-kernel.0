@@ -1,29 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Sep 2010 17:33:58 +0200
-Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
-	driver
-In-Reply-To: <4C95CF86.30306@gmail.com>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<20100902082759.GE14214@pengutronix.de>
-	<4C7F777E.1090104@gmail.com>
-	<20100902143908.GK14214@pengutronix.de>
-	<20100917095247.GB30441@pengutronix.de> <4C95CF86.30306@gmail.com>
-Message-ID: <20100920153358.GF32291@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Sep 2010 16:44:41 +0100
+Subject: Machine name/id change request
+In-Reply-To: <AANLkTikm78_dj03xxaHMi10V+_B9B_8FRg1kRbL2OPBK@mail.gmail.com>
+References: <AANLkTikm78_dj03xxaHMi10V+_B9B_8FRg1kRbL2OPBK@mail.gmail.com>
+Message-ID: <20100920154441.GG30793@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Mon, Sep 20, 2010 at 10:32:51AM -0500, Matt Sealey wrote:
+> Hello,
+> 
+> Is it possible for us to change a machine name/id in the database and
+> future kernels?
+> 
+> We have two systems originally designed by Pegatron and registered
+> under their codenames, but for now retailing and marketed under the
+> "Efika MX" brand. We would like to change the id data for
+> 
+> id 2336, originally MX51_LANGE51 but changed to MX51_EFIKAMX (mx51_efikamx etc.)
+> id 2370, originally MX51_KUNLUN but changed to MX51_EFIKASB (mx51_efikasb etc.)
 
-> I have performed a git pull for your repository based off 2.6.36-rc4, and
-> built and validated these patches  on imx51_3ds board, they worked fine.
-> The spi flash can be read without any problems.
->
-> And your patches looks pretty good to me. :-).
-This is an ack for all patches in my series?
+As they're not in mainline then we can.  Bear in mind that kernels
+which contain this code using the old identifiers will break when
+someone decides to download a new copy of the file after the change.
 
-Best regards
-Uwe
+Updated.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Is Sean Hsieh still responsible for these?
