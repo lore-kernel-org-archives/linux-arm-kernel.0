@@ -1,28 +1,53 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 20 Sep 2010 16:46:34 +0200
-Subject: [PATCH 3/5] omap3: cm-t3517: add support for usb host.
-In-Reply-To: <20100920063913.GB32493@legolas.emea.dhcp.ti.com>
-References: <1284627281-26059-1-git-send-email-grinberg@compulab.co.il>
-	<1284627281-26059-4-git-send-email-grinberg@compulab.co.il>
-	<20100916090018.GM3393@legolas.emea.dhcp.ti.com>
-	<4C91DF66.6020003@compulab.co.il>
-	<20100920063913.GB32493@legolas.emea.dhcp.ti.com>
-Message-ID: <4C9773CA.4010102@compulab.co.il>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 20 Sep 2010 22:46:52 +0800
+Subject: [PATCH 09/11] ARM: pxa: Correct touch IRQ passing to UCB1400 on
+	vpac270
+In-Reply-To: <1284604382-23683-9-git-send-email-marek.vasut@gmail.com>
+References: <1284604382-23683-1-git-send-email-marek.vasut@gmail.com>
+	<1284604382-23683-9-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTi=9Ftot-=UEFwCqFzq8F1QL+PzDKg80RW+Eui4y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 09/20/10 08:39, Felipe Balbi wrote:
-> On Thu, Sep 16, 2010 at 04:12:06AM -0500, Igor Grinberg wrote:
->> Yes it will, but even if the hub reset gpio is for some reason unavailable,
->> we don't want to disable ehci completely...
+On Thu, Sep 16, 2010 at 10:33 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/vpac270.c | ? 12 +++++-------
+> ?1 files changed, 5 insertions(+), 7 deletions(-)
 >
-> then you should set the gpio to an invalid number, otherwise you might
-> cause lots of WARN() to appear due to fiddling with unrequested gpio.
+> diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
+> index c9b747c..e851d13 100644
+> --- a/arch/arm/mach-pxa/vpac270.c
+> +++ b/arch/arm/mach-pxa/vpac270.c
+> @@ -429,20 +429,18 @@ static inline void vpac270_eth_init(void) {}
+> ?******************************************************************************/
+> ?#if ? ?defined(CONFIG_TOUCHSCREEN_UCB1400) || \
+> ? ? ? ?defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
+> -static pxa2xx_audio_ops_t vpac270_ac97_pdata = {
+> - ? ? ? .reset_gpio ? ? = 95,
+> -};
+> -
+> ?static struct ucb1400_pdata vpac270_ucb1400_pdata = {
+> ? ? ? ?.irq ? ? ? ? ? ?= IRQ_GPIO(GPIO113_VPAC270_TS_IRQ),
+> ?};
+>
+> +static pxa2xx_audio_ops_t vpac270_ac97_pdata = {
+> + ? ? ? .reset_gpio ? ? = 95,
+> + ? ? ? .codec_pdata ? ?= { &vpac270_ucb1400_pdata, },
+> +};
+> +
+> ?static struct platform_device vpac270_ucb1400_device = {
+> ? ? ? ?.name ? ? ? ? ? = "ucb1400_core",
+> ? ? ? ?.id ? ? ? ? ? ? = -1,
+> - ? ? ? .dev ? ? ? ? ? ?= {
+> - ? ? ? ? ? ? ? .platform_data = &vpac270_ucb1400_pdata,
+> - ? ? ? },
+> ?};
+>
+> ?static void __init vpac270_ts_init(void)
+> --
+> 1.7.1
+>
+>
 
-What gpio should be set to invalid number?
-It is a reset gpio for usb _hub_ and it has nothing to do with ehci.
-Can you please, explain the case when I might cause those WARN()'s?
-
--- 
-Regards,
-Igor.
+Looks good to me.
