@@ -1,47 +1,39 @@
-From: shankar.vk@gmail.com (Uma shankar)
-Date: Sun, 19 Sep 2010 20:33:16 +0530
-Subject: setting and removing break-point from within kernel
-In-Reply-To: <AANLkTi=-Npp=YWqEG6YpQ+EzP0PtMacJaB18roDFZ40E@mail.gmail.com>
-References: <AANLkTi=-Npp=YWqEG6YpQ+EzP0PtMacJaB18roDFZ40E@mail.gmail.com>
-Message-ID: <AANLkTinHvMZJyKYjCoGecPRV_4U=S8y5_WHN1z8Uq33w@mail.gmail.com>
+From: yad.naveen@gmail.com (naveen yadav)
+Date: Mon, 20 Sep 2010 10:41:20 +0530
+Subject: Issue in using mmap on ARM target
+In-Reply-To: <AANLkTi=VS34cbaH9TNA9aZ7mVavoTaAiAwMfuRXSxbd8@mail.gmail.com>
+References: <AANLkTi=VS34cbaH9TNA9aZ7mVavoTaAiAwMfuRXSxbd8@mail.gmail.com>
+Message-ID: <AANLkTi=JXei9uPHR-yn3OUnamV5eu+CbQ+ebaS27=dut@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-? ? ? ? I am trying to debug ?a subtle ?timing-dependent ?bug in kernel.
+I am facing one issue when executing below progmra on ARM target. The
+same program work well on X86 host machine,
 
-I found that ?if ?I could set up ?a break-point ?from within ?kernel
-at run-time, this ?would help.
+When execute on Host(x86). the result are as expected.
+[root at localhost naveen]# ./a.out ?0000 b 2
+/dev/mem opened.
+Memory mapped at address 0xb7f00000.
+Value at address 0x0 (0xb7f00000): 0x24
+Written 0x2; readback 0x2
 
-The condition to trigger is
-"If ?0 is written ?at ?virtual address ?0xCEC8F004 , then stop".
+But when execute on Target(ARM):
+# ./a.out 0 w 20
+/dev/mem opened.
+Memory mapped at address 0x40003000.
+Value at address 0x0 (0x40003000): 0xEA000006
+Written 0x14; readback 0xEA000006
+#
+The value does not change. any idea ....
 
-The address is on kernel-stack
 
-My ?SOC has a onchip ?JTAG-based ?debug block.
-
-What I have in mind ?is ?to do as ?below -
-
-signed long __sched schedule_timeout(signed long timeout)
-{
-?struct timer_list timer;
-?unsigned long expire;
-// some ?kernel code
-
-// setup ?conditional break-point
-
-// some ?kernel code ?runs here
-// some ?kernel code
-// some ?kernel code
-
-// ?remove ?the break-point
-
-// some ?kernel code ?runs here
-
-}
-
-     Has anyone tried this ?
-     Any ideas ?
-                                       Thanks
-                                       shankar
+Kind regards
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: devmem2.c
+Type: application/octet-stream
+Size: 3550 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100920/56f2707f/attachment-0001.obj>
