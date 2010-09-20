@@ -1,38 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Sep 2010 14:37:03 +0100
-Subject: [PATCH] mmc: failure of block read wait for long time
-In-Reply-To: <4C975CFB.6070907@nokia.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B0315F026ED@dbde02.ent.ti.com>
-	<4C8A19E7.30706@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F026F6@dbde02.ent.ti.com>
-	<4C8A2C5D.2050408@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
-	<4C971320.7050906@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03160624F6@dbde02.ent.ti.com>
-	<4C974A5D.5050608@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03160626B5@dbde02.ent.ti.com>
-	<4C975CFB.6070907@nokia.com>
-Message-ID: <20100920133703.GC30793@n2100.arm.linux.org.uk>
+From: deepak.sikri@st.com (deepaksi)
+Date: Mon, 20 Sep 2010 19:14:33 +0530
+Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <4C885FF2.7060201@st.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<47425e7be671c44d949b1804436b5c301d20d793.1283161023.git.viresh.kumar@st.com>
+	<20100902102323.GP26319@n2100.arm.linux.org.uk>
+	<4C809486.2070308@st.com>
+	<20100903073421.GF26319@n2100.arm.linux.org.uk>
+	<4C84D6B3.80104@st.com>
+	<20100908151232.GD32659@n2100.arm.linux.org.uk>
+	<4C885FF2.7060201@st.com>
+Message-ID: <4C976541.6000203@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 20, 2010 at 04:09:15PM +0300, Adrian Hunter wrote:
-> The SD/MMC protocol does not indicate which sector has the error.
-> There is no possibility of trying the ith+1-segment because i is
-> unknown.
+Hi Russell,
 
-Not entirely true.
 
-I seem to remember that the MMC protocol (and probably SD protocol)
-provides an ack at the end of each data block to say whether the data
-block was correct or not.
 
-Some hosts tell you when they receive this ack, and you can track how
-many blocks have been successfully read without error.  The ARM MMCI
-primecell does this.
 
-However, some hosts don't give you this information, in which case you
-don't know where the error occurred in the read - so when a read fails,
-you can only safely report that no bytes were read successfully.  This
-means that even if the error was on the last block, there's no way to
-know this.
+On 9/9/2010 9:47 AM, deepaksi wrote:
+> On 9/8/2010 8:42 PM, Russell King - ARM Linux wrote:
+>   
+>> On Mon, Sep 06, 2010 at 05:25:31PM +0530, deepaksi wrote:
+>>   
+>>     
+>>> On 9/3/2010 1:04 PM, Russell King - ARM Linux wrote:
+>>>     
+>>>       
+>>>> So how are wakeup sources configured if this callback does nothing?
+>>>> .
+>>>>       
+>>>>         
+>>> In most of the architectures that I could refer across(including SPEAr
+>>> family -SPEAr13xx),
+>>> have a separate power management unit(PMU) which is required to be
+>>> configured to define the wake
+>>> up sources. The PMU takes care of waking up the system from sleep, as
+>>> and when the wake up
+>>> interrupts are triggered. This routing is independent of GIC, and hence
+>>> the handling was not added.
+>>>
+>>> Contrary to that, in some of our hardware architecture using VIC
+>>> (including SPEAr 3xx/6xx), there
+>>> was no explicit PMU, and the wake up trigger was exclusively done
+>>> through VIC, and hence the VIC
+>>> call backs had the necessary implementation.
+>>>     
+>>>       
+>> What I read into this is that you're using enable_irq_wake() in your
+>> drivers _and_ another mechanism to configure what wakes up the system
+>> via the PMU - maybe with drivers explicitly calling out to the PMU
+>> to achieve this?
+>>   
+>>     
+> This is even true for the drivers already in the kernel for example
+> stmmac driver ( using synopsis GMAC core): drivers/net/stmmac/
+> if we don not check for the return type, then probably it makes sense to
+> remove the dunny handlers, else another alternative could be to modify
+> the enable_irq_wake() call, to return the proper values.
+>
+> Changing the driver specific to SPEAr is fine, but SPEAr platform does
+> uses the existing drivers in the kernel.
+>
+>
+>   
+>> This sounds a little haphazard, especially from the drivers point of
+>> view.  Surely there's a more sensible solution to this rather than
+>> adding do-nothing irq_wake support?
+>> .
+>>
+>>   
+>>     
+> How do you recommend to go about this ?
+>
+>   
+I request you to provide some more inputs on this, so that we can close
+the issue.
+
+Rgds
+Deepak
