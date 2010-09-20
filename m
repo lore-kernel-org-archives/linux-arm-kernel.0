@@ -1,32 +1,98 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Sep 2010 18:31:07 +0200
-Subject: [PATCH] atmel_usba_udc: force vbus_pin at -EINVAL when gpio_request
-	failled
-Message-ID: <1285000267-22964-1-git-send-email-plagnioj@jcrosoft.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 20 Sep 2010 18:38:58 +0200
+Subject: [PATCH] opp: introduce library for device-specific OPPs
+In-Reply-To: <878w2w4erv.fsf@deeprootsystems.com>
+References: <201009180107.51664.rjw@sisk.pl> <201009182041.41675.rjw@sisk.pl>
+	<878w2w4erv.fsf@deeprootsystems.com>
+Message-ID: <201009201838.59013.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-to ensure gpio_is_valid return false
+On Monday, September 20, 2010, Kevin Hilman wrote:
+> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
+> 
+> [...]
+> 
+> >> >> In terms of the lifetime rules on the nodes in the list:
+> >> >> The list is expected to be maintained once created, entries are expected 
+> >> >> to be added optimally and not expected to be destroyed, the choice of 
+> >> >> list implementation was for reducing the complexity of the code itself 
+> >> >> and not yet meant as a mechanism to dynamically add and delete nodes on 
+> >> >> the fly.. Essentially, it was intended for the SOC framework to ensure 
+> >> >> it plugs in the OPP entries optimally and not create a humongous list of 
+> >> >> all possible OPPs for all families of the vendor SOCs - even though it 
+> >> >> is possible to use the OPP layer so - it just wont be smart to do so 
+> >> >> considering list scan latencies on hot paths such as cpufreq transitions 
+> >> >> or idle transitions.
+> >> > 
+> >> > If the list nodes are not supposed to be added and removed dynamically,
+> >> > it probably would make sense to create data structures containing
+> >> > the "available" OPPs only, once they are known, and simply free the object
+> >> > representing the other ones.
+> >> I covered the usage in my reply here: 
+> >> http://marc.info/?l=linux-arm-kernel&m=128476570300466&w=2
+> >> but to repeat, the list is dynamic during initialization but remains 
+> >> static after initialization based on SOC framework implementation - this 
+> >> is best implemented with a list (we had started with an original array 
+> >> implementation which evolved to the current list implementation 
+> >> http://marc.info/?l=linux-omap&m=125912217718770&w=2)
+> >
+> > Well, my point is, since the _final_ set of OPPs doesn't really
+> > change, there's no need to use a list for storing it in principle.
+> >
+> > Your current algorithm seems to be:
+> > (1) Create a list of all _possible_ OPPs.
+> > (2) Mark the ones that can actually be used on the given hardware as
+> >     "available".
+> > (3) Whenever we need to find an OPP to use, browse the entire list.
+> > This isn't optimal, because the OPPs that are not marked as "available" in (2)
+> > will never be used, although they _will_ be inspected while browsing the list.
+> 
+> A little clarificaion about "will never be used" below...
+> 
+> > So, I think a better algorithm would be:
+> > (1) Create a list of all possible OPPs.
+> > (2) Drop the nonavailable OPPs from the list.
+> > (3) Whenever we need to find an OPP to use, browse the entire list.
+> >
+> > But then, it may be better to simply move the list we get in (2) into an
+> > array, because the browsing is going to require fewer memory accesses in
+> > that case (also, an array would use less memory than the list).  So, perhaps,
+> > it's better to change the algorithm even further:
+> > (1) Create a list of all possible OPPs.
+> > (2) Drop the nonavailable OPPs from the list.
+> > (3) Move the list we got in (2) into a sorted array.
+> > (4) Whenever we need to find an OPP to use, browse the array
+> >      (perhaps using binary search).
+> 
+> Just a little clarification on "available."  The intended use of this flag
+> was not just a one-time "available on hardware X."  It was also intended
+> to be able to add/remove availbale OPPs dynamically at run-time.
+> 
+> More specifically, it's intended for use to *temporarily* remove an OPP
+> from being selected.  The production usage of this would primarily for
+> thermal considerations (e.g. don't use OPPx until the temperature drops)
+> 
+> However, for PM development & debug, we also use this to temporarily
+> take a class of OPPs out of the running for test/debug purposes
+> (e.g. driver X runs great at OPPx and OPPy, but not OPPz.)  So the
+> ability to temporarily be selective about OPPs at runtime for
+> debug/development is extremely useful.
+> 
+> So, to summarize, "most of the time", all the OPPs that were added (via
+> opp_add()) will be "available".  Ones that are !availble will likely
+> only be so temporarily, so I'm not sure that the overhead of keeping a
+> separate structure for the available and !available OPPs is worth it.
+> Especially, since OPP changes are relatively infrequent.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- drivers/usb/gadget/atmel_usba_udc.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Well, the Nishanth's description doesn't match this, so thanks for the
+clarification.
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index d623c7b..7d84ee9 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -2014,6 +2014,9 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 			} else {
- 				disable_irq(gpio_to_irq(udc->vbus_pin));
- 			}
-+		} else {
-+			/* gpio_request fail so use -EINVAL for gpio_is_valid */
-+			ubc->vbus_pin = -EINVAL;
- 		}
- 	}
- 
--- 
-1.7.1
+In that case you might consider using a red-black tree for storing the
+"available" OPPs, so that you can add-remove them dynamically, but
+you can avoid a linear search through the entire list every time you need to
+find and available OPP.  Since we have standard helpers for handling rbtrees,
+that shouldn't be a big deal.
+
+Thanks,
+Rafael
