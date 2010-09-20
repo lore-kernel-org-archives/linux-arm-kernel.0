@@ -1,173 +1,82 @@
 From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 21 Sep 2010 00:00:51 +0200
-Subject: [PATCH] ARM: s3c2442: Setup gpio {set,get}_pull callbacks
-Message-ID: <1285020052-20020-1-git-send-email-lars@metafoo.de>
+Date: Tue, 21 Sep 2010 00:00:52 +0200
+Subject: [PATCH] ARM: s3c24xx: Set ARCH_NR_GPIOS according to the selected SoC
+	types.
+In-Reply-To: <1285020052-20020-1-git-send-email-lars@metafoo.de>
+References: <1285020052-20020-1-git-send-email-lars@metafoo.de>
+Message-ID: <1285020052-20020-2-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the {set,get}_pull callbacks of the s3c24xx_gpiocfg_default structure
-are not initalized for the s3c2442 cpu type. This results in a NULL-pointer
-deref upon calling s3c_gpio_setpull.
+Currently the code in gpiolib.c tries to register GPIO BANKA to BANKM.
+ARCH_NR_GPIOS on the other hand is set only to 256, which would be the
+equivalent of BANKA to BANKH. Thus the registration of all other banks will fail.
 
-The s3c2442 has pulldowns instead of pullups compared to the s3c2440.
-The method of controlling them is the same though.
-So this patch modifies the existing s3c_gpio_{get,set}pull_1up helper functions
-to take an additional parameter deciding whether the pin has a pullup or
-pulldown.
-The s3c_gpio_{get,set}pull_1{down,up} functions then wrap that functions passing
-either S3C_GPIO_PULL_UP or S3C_GPIO_PULL_DOWN.
-
-Furthermore this patch sets up the s3c24xx_gpiocfg_default.{get,set}_pull fields
-in the s3c2442 cpu init function to the new pulldown helper functions.
+This patch fixes this by setting S3C_GPIO_END according to the selected SoC
+types. S3C_GPIO_END is set to the maximum of the number of GPIOs over all
+selected SoC types. Thus it is ensured that memory is not wasted if support for
+SoCs with higher GPIO numbers is not built-in.
+When registering the banks it is made sure that banks which are outside of that
+range are not even tried to be registered. Otherwise there would a problem with
+configs where CONFIG_S3C24XX_GPIO_EXTRA is set to a non zero value.
 
 Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 ---
- arch/arm/mach-s3c2440/Kconfig                      |    1 +
- arch/arm/mach-s3c2440/s3c2442.c                    |    7 +++
- arch/arm/plat-samsung/gpio-config.c                |   43 ++++++++++++++++---
- .../plat-samsung/include/plat/gpio-cfg-helpers.h   |   11 +++++
- 4 files changed, 55 insertions(+), 7 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/gpio.h |   25 ++++++++++++-------------
+ arch/arm/plat-s3c24xx/gpiolib.c           |    2 ++
+ 2 files changed, 14 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index cd8e7de..136ebd0 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -20,6 +20,7 @@ config CPU_S3C2442
- 	bool
- 	depends on ARCH_S3C2410
- 	select CPU_ARM920T
-+	select S3C_GPIO_PULL_DOWN
- 	select S3C2410_CLOCK
- 	select S3C2410_GPIO
- 	select S3C2410_PM if PM
-diff --git a/arch/arm/mach-s3c2440/s3c2442.c b/arch/arm/mach-s3c2440/s3c2442.c
-index 188ad1e..0dbc91c 100644
---- a/arch/arm/mach-s3c2440/s3c2442.c
-+++ b/arch/arm/mach-s3c2440/s3c2442.c
-@@ -32,6 +32,7 @@
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
- #include <linux/mutex.h>
-+#include <linux/gpio.h>
- #include <linux/clk.h>
- #include <linux/io.h>
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio.h b/arch/arm/mach-s3c2410/include/mach/gpio.h
+index b649bf2..80dfe25 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio.h
+@@ -16,22 +16,21 @@
+ #define gpio_cansleep	__gpio_cansleep
+ #define gpio_to_irq	__gpio_to_irq
  
-@@ -44,6 +45,10 @@
- #include <plat/clock.h>
- #include <plat/cpu.h>
+-/* some boards require extra gpio capacity to support external
+- * devices that need GPIO.
+- */
++#include <mach/gpio-fns.h>
++#include <mach/gpio-nrs.h>
  
-+#include <plat/gpio-core.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/gpio-cfg-helpers.h>
-+
- /* S3C2442 extended clock support */
- 
- static unsigned long s3c2442_camif_upll_round(struct clk *clk,
-@@ -160,6 +165,8 @@ static struct sys_device s3c2442_sysdev = {
- int __init s3c2442_init(void)
- {
- 	printk("S3C2442: Initialising architecture\n");
-+	s3c24xx_gpiocfg_default.set_pull = s3c_gpio_setpull_1down;
-+	s3c24xx_gpiocfg_default.get_pull = s3c_gpio_getpull_1down;
- 
- 	return sysdev_register(&s3c2442_sysdev);
- }
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index 57b68a5..1abc81e 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -230,16 +230,16 @@ s3c_gpio_pull_t s3c_gpio_getpull_updown(struct s3c_gpio_chip *chip,
- }
+-#ifdef CONFIG_CPU_S3C244X
+-#define ARCH_NR_GPIOS	(32 * 9 + CONFIG_S3C24XX_GPIO_EXTRA)
++#if defined(CPU_S3C2416) || defined(CPU_S3C2443)
++#define S3C_GPIO_END	S3C2410_GPM(S3C2410_GPIO_M_NR)
++#elif defined(CONFIG_CPU_S3C244X)
++#define S3C_GPIO_END	S3C2410_GPJ(S3C2410_GPIO_J_NR)
+ #else
+-#define ARCH_NR_GPIOS	(256 + CONFIG_S3C24XX_GPIO_EXTRA)
++#define S3C_GPIO_END	S3C2410_GPH(S3C2410_GPIO_H_NR)
  #endif
  
--#ifdef CONFIG_S3C_GPIO_PULL_UP
--int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
--			 unsigned int off, s3c_gpio_pull_t pull)
-+#if defined(CONFIG_S3C_GPIO_PULL_UP) || defined(CONFIG_S3C_GPIO_PULL_DOWN)
-+static int s3c_gpio_setpull_1(struct s3c_gpio_chip *chip,
-+			 unsigned int off, s3c_gpio_pull_t pull, s3c_gpio_pull_t updown)
- {
- 	void __iomem *reg = chip->base + 0x08;
- 	u32 pup = __raw_readl(reg);
- 
- 	pup = __raw_readl(reg);
- 
--	if (pup == S3C_GPIO_PULL_UP)
-+	if (pup == updown)
- 		pup &= ~(1 << off);
- 	else if (pup == S3C_GPIO_PULL_NONE)
- 		pup |= (1 << off);
-@@ -250,17 +250,46 @@ int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
- 	return 0;
- }
- 
--s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
--				     unsigned int off)
-+static s3c_gpio_pull_t s3c_gpio_getpull_1(struct s3c_gpio_chip *chip,
-+				     unsigned int off, s3c_gpio_pull_t updown)
- {
- 	void __iomem *reg = chip->base + 0x08;
- 	u32 pup = __raw_readl(reg);
- 
- 	pup &= (1 << off);
--	return pup ? S3C_GPIO_PULL_NONE : S3C_GPIO_PULL_UP;
-+	return pup ? S3C_GPIO_PULL_NONE : updown;
-+}
-+#endif /* defined(CONFIG_S3C_GPIO_PULL_UP) || defined(CONFIG_S3C_GPIO_PULL_DOWN) */
++/* some boards require extra gpio capacity to support external
++ * devices that need GPIO.
++ */
++#define ARCH_NR_GPIOS (S3C_GPIO_END + CONFIG_S3C24XX_GPIO_EXTRA)
 +
-+#ifdef CONFIG_S3C_GPIO_PULL_UP
-+s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
-+				     unsigned int off)
-+{
-+	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_UP);
-+}
-+
-+int s3c_gpio_setpull_1up(struct s3c_gpio_chip *chip,
-+			 unsigned int off, s3c_gpio_pull_t pull)
-+{
-+	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_UP);
- }
- #endif /* CONFIG_S3C_GPIO_PULL_UP */
+ #include <asm-generic/gpio.h>
+-#include <mach/gpio-nrs.h>
+-#include <mach/gpio-fns.h>
  
-+#ifdef CONFIG_S3C_GPIO_PULL_DOWN
-+s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
-+				     unsigned int off)
-+{
-+	return s3c_gpio_getpull_1(chip, off, S3C_GPIO_PULL_DOWN);
-+}
-+
-+int s3c_gpio_setpull_1down(struct s3c_gpio_chip *chip,
-+			 unsigned int off, s3c_gpio_pull_t pull)
-+{
-+	return s3c_gpio_setpull_1(chip, off, pull, S3C_GPIO_PULL_DOWN);
-+}
-+#endif /* CONFIG_S3C_GPIO_PULL_DOWN */
-+
-+
- #ifdef CONFIG_S5P_GPIO_DRVSTR
- s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
- {
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-index 3e21c75..9fd2947 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-@@ -204,6 +204,17 @@ extern s3c_gpio_pull_t s3c_gpio_getpull_1up(struct s3c_gpio_chip *chip,
- 					    unsigned int off);
+-#ifdef CONFIG_CPU_S3C24XX
+-#define S3C_GPIO_END	(S3C2410_GPIO_BANKJ + 32)
+-#else
+-#define S3C_GPIO_END	(S3C2410_GPIO_BANKH + 32)
+-#endif
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+index 4c0896f..65b6126 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -221,6 +221,8 @@ static __init int s3c24xx_gpiolib_init(void)
+ 	int gpn;
  
- /**
-+ * s3c_gpio_getpull_1down() - Get configuration for choice of down or none
-+ * @chip: The gpio chip that the GPIO pin belongs to
-+ * @off: The offset to the pin to get the configuration of.
-+ *
-+ * This helper function reads the state of the pull-down resistor for the
-+ * given GPIO in the same case as s3c_gpio_setpull_1down.
-+*/
-+extern s3c_gpio_pull_t s3c_gpio_getpull_1down(struct s3c_gpio_chip *chip,
-+					    unsigned int off);
-+
-+/**
-  * s3c_gpio_setpull_s3c2443() - Pull configuration for s3c2443.
-  * @chip: The gpio chip that is being configured.
-  * @off: The offset for the GPIO being configured.
+ 	for (gpn = 0; gpn < ARRAY_SIZE(s3c24xx_gpios); gpn++, chip++) {
++		if (chip->chip.base >= S3C_GPIO_END)
++			break;
+ 		if (!chip->config)
+ 			chip->config = &s3c24xx_gpiocfg_default;
+ 
 -- 
 1.5.6.5
