@@ -1,77 +1,48 @@
 From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Mon, 20 Sep 2010 15:04:53 +0900
-Subject: [PATCH v2 4/6] ARM: S5PV210: Add Register definition for CMU
+Date: Mon, 20 Sep 2010 15:04:55 +0900
+Subject: [PATCH v2 6/6] ARM: S5PV210: Update Kconfig and Makefile for
+	supporting CPUFREQ driver
 In-Reply-To: <1284962695-8542-1-git-send-email-sbkim73@samsung.com>
 References: <1284962695-8542-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1284962695-8542-5-git-send-email-sbkim73@samsung.com>
+Message-ID: <1284962695-8542-7-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jaecheol Lee <jc.lee@samsung.com>
 
-This patch adds some CMU(Clock Management Unit) registers for
-supporting CPUFREQ and some drivers.
+This patch adds ARCH_HAS_CPUFREQ in arch/arm/Kconfig for S5PV210,
+and updates mach-s5pv210/Makefile for supporting build CPUFREQ driver.
 
 Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 ---
- arch/arm/mach-s5pv210/include/mach/regs-clock.h |   31 ++++++++++++++++++++++-
- 1 files changed, 30 insertions(+), 1 deletions(-)
+ arch/arm/Kconfig               |    1 +
+ arch/arm/mach-s5pv210/Makefile |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/regs-clock.h b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-index 499aef7..336b1cf 100644
---- a/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-+++ b/arch/arm/mach-s5pv210/include/mach/regs-clock.h
-@@ -67,11 +67,28 @@
- #define S5P_CLKGATE_BUS1	S5P_CLKREG(0x488)
- #define S5P_CLK_OUT		S5P_CLKREG(0x500)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index bce9193..7bff1d2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -721,6 +721,7 @@ config ARCH_S5PV210
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
+ 	select ARM_L1_CACHE_SHIFT_6
++	select ARCH_HAS_CPUFREQ
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select HAVE_S3C2410_I2C
+ 	select HAVE_S3C_RTC
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 7045489..833d803 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -14,6 +14,7 @@ obj-				:=
  
-+/* DIV/MUX STATUS */
-+#define S5P_CLKDIV_STAT0	S5P_CLKREG(0x1000)
-+#define S5P_CLKDIV_STAT1	S5P_CLKREG(0x1004)
-+#define S5P_CLKMUX_STAT0	S5P_CLKREG(0x1100)
-+#define S5P_CLKMUX_STAT1	S5P_CLKREG(0x1104)
-+
- /* CLKSRC0 */
--#define S5P_CLKSRC0_MUX200_MASK		(0x1<<16)
-+#define S5P_CLKSRC0_MUX200_SHIFT	(16)
-+#define S5P_CLKSRC0_MUX200_MASK		(0x1 << S5P_CLKSRC0_MUX200_SHIFT)
- #define S5P_CLKSRC0_MUX166_MASK		(0x1<<20)
- #define S5P_CLKSRC0_MUX133_MASK		(0x1<<24)
+ obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o gpiolib.o
+ obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
++obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
  
-+/* CLKSRC2 */
-+#define S5P_CLKSRC2_G3D_SHIFT           (0)
-+#define S5P_CLKSRC2_G3D_MASK            (0x3 << S5P_CLKSRC2_G3D_SHIFT)
-+#define S5P_CLKSRC2_MFC_SHIFT           (4)
-+#define S5P_CLKSRC2_MFC_MASK            (0x3 << S5P_CLKSRC2_MFC_SHIFT)
-+
-+/* CLKSRC6*/
-+#define S5P_CLKSRC6_ONEDRAM_SHIFT       (24)
-+#define S5P_CLKSRC6_ONEDRAM_MASK        (0x3 << S5P_CLKSRC6_ONEDRAM_SHIFT)
-+
- /* CLKDIV0 */
- #define S5P_CLKDIV0_APLL_SHIFT		(0)
- #define S5P_CLKDIV0_APLL_MASK		(0x7 << S5P_CLKDIV0_APLL_SHIFT)
-@@ -90,8 +107,20 @@
- #define S5P_CLKDIV0_PCLK66_SHIFT	(28)
- #define S5P_CLKDIV0_PCLK66_MASK		(0x7 << S5P_CLKDIV0_PCLK66_SHIFT)
+ # machine support
  
-+/* CLKDIV2 */
-+#define S5P_CLKDIV2_G3D_SHIFT           (0)
-+#define S5P_CLKDIV2_G3D_MASK            (0xF << S5P_CLKDIV2_G3D_SHIFT)
-+#define S5P_CLKDIV2_MFC_SHIFT           (4)
-+#define S5P_CLKDIV2_MFC_MASK            (0xF << S5P_CLKDIV2_MFC_SHIFT)
-+
-+/* CLKDIV6 */
-+#define S5P_CLKDIV6_ONEDRAM_SHIFT       (28)
-+#define S5P_CLKDIV6_ONEDRAM_MASK        (0xF << S5P_CLKDIV6_ONEDRAM_SHIFT)
-+
- #define S5P_SWRESET		S5P_CLKREG(0x2000)
- 
-+#define S5P_ARM_MCS_CON		S5P_CLKREG(0x6100)
-+
- /* Registers related to power management */
- #define S5P_PWR_CFG		S5P_CLKREG(0xC000)
- #define S5P_EINT_WAKEUP_MASK	S5P_CLKREG(0xC004)
 -- 
 1.6.2.5
