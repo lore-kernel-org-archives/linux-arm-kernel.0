@@ -1,41 +1,74 @@
-From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Mon, 20 Sep 2010 01:55:26 +0200
-Subject: [PATCH] ARM: (trivial) fix format warning in arch/arm/mm/init.c
-Message-ID: <20100919235526.GA31892@rere.qmqm.pl>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 19 Sep 2010 21:34:37 -0400 (EDT)
+Subject: [PATCH] leds: leds-ns2: fix locking
+In-Reply-To: <1284903059-22935-1-git-send-email-simon@sequanux.org>
+References: <1284903059-22935-1-git-send-email-simon@sequanux.org>
+Message-ID: <alpine.LFD.2.00.1009192130270.13233@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-/mnt/src/linux-git/arch/arm/mm/init.c: In function ?mem_init?:
-/mnt/src/linux-git/arch/arm/mm/init.c:548:4: warning: format ?%4d? expects type ?int?, but argument 22 has type ?long int?
-/mnt/src/linux-git/arch/arm/mm/init.c:548:4: warning: format ?%4d? expects type ?int?, but argument 25 has type ?long int?
-/mnt/src/linux-git/arch/arm/mm/init.c:548:4: warning: format ?%4d? expects type ?int?, but argument 28 has type ?long int?
+On Sun, 19 Sep 2010, Simon Guinot wrote:
 
-(with gcc-4.5.1)
+> From: sguinot <sguinot@e0769a12-487d-4b36-8fb5-9ece92c58341>
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
----
- arch/arm/mm/init.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+You should find out why your Git setup produces the above.  Your 
+identity was most likely misconfigured when making this commit.
 
-Patch against current linux.git (after 2.6.36-rc4).
+I've fixed it up locally.
 
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 7185b00..009797d 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -521,9 +521,9 @@ void __init mem_init(void)
- 			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
- #endif
- 			"    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
--			"      .init : 0x%p" " - 0x%p" "   (%4d kB)\n"
--			"      .text : 0x%p" " - 0x%p" "   (%4d kB)\n"
--			"      .data : 0x%p" " - 0x%p" "   (%4d kB)\n",
-+			"      .init : 0x%p" " - 0x%p" "   (%4ld kB)\n"
-+			"      .text : 0x%p" " - 0x%p" "   (%4ld kB)\n"
-+			"      .data : 0x%p" " - 0x%p" "   (%4ld kB)\n",
- 
- 			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
- 				(PAGE_SIZE)),
--- 
-1.7.1
+> This patch replace all the lock functions with the irq safe variant.
+> The ns2_led_{set,get}_mode() functions must be safe in all context.
+> 
+> For example, the trigger timer call led_set_brightness() in a softirq
+> context.
+> 
+> Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> ---
+>  drivers/leds/leds-ns2.c |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
+> index 74dce4b..350eb34 100644
+> --- a/drivers/leds/leds-ns2.c
+> +++ b/drivers/leds/leds-ns2.c
+> @@ -81,7 +81,7 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
+>  	int cmd_level;
+>  	int slow_level;
+>  
+> -	read_lock(&led_dat->rw_lock);
+> +	read_lock_irq(&led_dat->rw_lock);
+>  
+>  	cmd_level = gpio_get_value(led_dat->cmd);
+>  	slow_level = gpio_get_value(led_dat->slow);
+> @@ -95,7 +95,7 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
+>  		}
+>  	}
+>  
+> -	read_unlock(&led_dat->rw_lock);
+> +	read_unlock_irq(&led_dat->rw_lock);
+>  
+>  	return ret;
+>  }
+> @@ -104,8 +104,9 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
+>  			     enum ns2_led_modes mode)
+>  {
+>  	int i;
+> +	unsigned long flags;
+>  
+> -	write_lock(&led_dat->rw_lock);
+> +	write_lock_irqsave(&led_dat->rw_lock, flags);
+>  
+>  	for (i = 0; i < ARRAY_SIZE(ns2_led_modval); i++) {
+>  		if (mode == ns2_led_modval[i].mode) {
+> @@ -116,7 +117,7 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
+>  		}
+>  	}
+>  
+> -	write_unlock(&led_dat->rw_lock);
+> +	write_unlock_irqrestore(&led_dat->rw_lock, flags);
+>  }
+>  
+>  static void ns2_led_set(struct led_classdev *led_cdev,
+> -- 
+> 1.6.3.1
+> 
