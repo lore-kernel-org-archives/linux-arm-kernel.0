@@ -1,128 +1,278 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 20 Sep 2010 22:43:33 +0800
-Subject: [PATCH 06/11] ARM: pxa: Colibri PXA320 PCMCIA driver
-In-Reply-To: <1284604382-23683-6-git-send-email-marek.vasut@gmail.com>
+Date: Mon, 20 Sep 2010 22:44:07 +0800
+Subject: [PATCH 07/11] ARM: pxa: Modularize Palm Tungsten|C
+In-Reply-To: <1284604382-23683-7-git-send-email-marek.vasut@gmail.com>
 References: <1284604382-23683-1-git-send-email-marek.vasut@gmail.com>
-	<1284604382-23683-6-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTi=X5CiJn5G+QrNXhYBeYiFpnQmTAOk5UOdWgB=w@mail.gmail.com>
+	<1284604382-23683-7-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTi=9vz3u74t+BdBaLBxQam4XfLk189UuuyKjdduN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Looks good.
+
 On Thu, Sep 16, 2010 at 10:32 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
 > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> Acked-by: Daniel Mack <daniel@caiaq.de>
 > ---
-> ?arch/arm/mach-pxa/colibri-pxa320.c | ? 21 +++++++++++++++++++++
-> ?drivers/pcmcia/Kconfig ? ? ? ? ? ? | ? ?3 ++-
-> ?drivers/pcmcia/Makefile ? ? ? ? ? ?| ? ?1 +
-> ?drivers/pcmcia/pxa2xx_colibri.c ? ?| ? 17 ++++++++++++++++-
-> ?4 files changed, 40 insertions(+), 2 deletions(-)
+> ?arch/arm/mach-pxa/palmtc.c | ?147 ++++++++++++++++++++++++++++++++++---------
+> ?1 files changed, 116 insertions(+), 31 deletions(-)
 >
-> diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
-> index 7c003cd..6cd83fa 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa320.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa320.c
-> @@ -73,6 +73,27 @@ static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {
-> ? ? ? ?/* I2C */
-> ? ? ? ?GPIO32_I2C_SCL,
-> ? ? ? ?GPIO33_I2C_SDA,
-> +
-> + ? ? ? /* PCMCIA */
-> + ? ? ? MFP_CFG(GPIO59, AF7), ? /* PRST ; AF7 to tristate */
-> + ? ? ? MFP_CFG(GPIO61, AF7), ? /* PCE1 ; AF7 to tristate */
-> + ? ? ? MFP_CFG(GPIO60, AF7), ? /* PCE2 ; AF7 to tristate */
-> + ? ? ? MFP_CFG(GPIO62, AF7), ? /* PCD ; AF7 to tristate */
-> + ? ? ? MFP_CFG(GPIO56, AF7), ? /* PSKTSEL ; AF7 to tristate */
-
-If this is useful for other platforms, making them macros would be helpful.
-
-And using MFP_CFG() directly is not encouraged, any specific reason
-to use this?
-
-> + ? ? ? GPIO27_GPIO, ? ? ? ? ? ?/* RDnWR ; input/tristate */
-> + ? ? ? GPIO50_GPIO, ? ? ? ? ? ?/* PREG ; input/tristate */
-> + ? ? ? GPIO2_RDY,
-> + ? ? ? GPIO5_NPIOR,
-> + ? ? ? GPIO6_NPIOW,
-> + ? ? ? GPIO7_NPIOS16,
-> + ? ? ? GPIO8_NPWAIT,
-> + ? ? ? GPIO29_GPIO, ? ? ? ? ? ?/* PRDY (READY GPIO) */
-> + ? ? ? GPIO57_GPIO, ? ? ? ? ? ?/* PPEN (POWER GPIO) */
-> + ? ? ? GPIO81_GPIO, ? ? ? ? ? ?/* PCD (DETECT GPIO) */
-> + ? ? ? GPIO77_GPIO, ? ? ? ? ? ?/* PRST (RESET GPIO) */
-> + ? ? ? GPIO53_GPIO, ? ? ? ? ? ?/* PBVD1 */
-> + ? ? ? GPIO79_GPIO, ? ? ? ? ? ?/* PBVD2 */
-> + ? ? ? GPIO54_GPIO, ? ? ? ? ? ?/* POE */
+> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+> index ce1104d..7f868d4 100644
+> --- a/arch/arm/mach-pxa/palmtc.c
+> +++ b/arch/arm/mach-pxa/palmtc.c
+> @@ -25,6 +25,7 @@
+> ?#include <linux/power_supply.h>
+> ?#include <linux/gpio_keys.h>
+> ?#include <linux/mtd/physmap.h>
+> +#include <linux/usb/gpio_vbus.h>
+>
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -116,6 +117,7 @@ static unsigned long palmtc_pin_config[] __initdata = {
+> ?/******************************************************************************
+> ?* SD/MMC card controller
+> ?******************************************************************************/
+> +#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
+> ?static struct pxamci_platform_data palmtc_mci_platform_data = {
+> ? ? ? ?.ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
+> ? ? ? ?.gpio_power ? ? ? ? ? ? = GPIO_NR_PALMTC_SD_POWER,
+> @@ -124,9 +126,18 @@ static struct pxamci_platform_data palmtc_mci_platform_data = {
+> ? ? ? ?.detect_delay_ms ? ? ? ?= 200,
 > ?};
-> ?#else
-> ?static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {};
-> diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-> index e9acf03..de886f3 100644
-> --- a/drivers/pcmcia/Kconfig
-> +++ b/drivers/pcmcia/Kconfig
-> @@ -215,7 +215,8 @@ config PCMCIA_PXA2XX
-> ? ? ? ?depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
-> ? ? ? ? ? ? ? ? ? ?|| MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
-> ? ? ? ? ? ? ? ? ? ?|| ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
-> - ? ? ? ? ? ? ? ? ? || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI)
-> + ? ? ? ? ? ? ? ? ? || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI \
-> + ? ? ? ? ? ? ? ? ? || MACH_COLIBRI320)
-> ? ? ? ?select PCMCIA_SOC_COMMON
-> ? ? ? ?help
-> ? ? ? ? ?Say Y here to include support for the PXA2xx PCMCIA controller
-> diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-> index 2fee7ef..9a44a90 100644
-> --- a/drivers/pcmcia/Makefile
-> +++ b/drivers/pcmcia/Makefile
-> @@ -71,6 +71,7 @@ pxa2xx-obj-$(CONFIG_MACH_STARGATE2) ? ? ? ? ? += pxa2xx_stargate2.o
-> ?pxa2xx-obj-$(CONFIG_MACH_VPAC270) ? ? ? ? ? ? ?+= pxa2xx_vpac270.o
-> ?pxa2xx-obj-$(CONFIG_MACH_BALLOON3) ? ? ? ? ? ? += pxa2xx_balloon3.o
-> ?pxa2xx-obj-$(CONFIG_MACH_COLIBRI) ? ? ? ? ? ? ?+= pxa2xx_colibri.o
-> +pxa2xx-obj-$(CONFIG_MACH_COLIBRI320) ? ? ? ? ? += pxa2xx_colibri.o
 >
-> ?obj-$(CONFIG_PCMCIA_PXA2XX) ? ? ? ? ? ? ? ? ? ?+= pxa2xx_base.o $(pxa2xx-obj-y)
->
-> diff --git a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
-> index 4ed876c..c3f7219 100644
-> --- a/drivers/pcmcia/pxa2xx_colibri.c
-> +++ b/drivers/pcmcia/pxa2xx_colibri.c
-> @@ -27,6 +27,13 @@
-> ?#define ? ? ? ?COLIBRI270_DETECT_GPIO ?84
-> ?#define ? ? ? ?COLIBRI270_READY_GPIO ? 1
->
-> +#define ? ? ? ?COLIBRI320_RESET_GPIO ? 77
-> +#define ? ? ? ?COLIBRI320_PPEN_GPIO ? ?57
-> +#define ? ? ? ?COLIBRI320_BVD1_GPIO ? ?53
-> +#define ? ? ? ?COLIBRI320_BVD2_GPIO ? ?79
-> +#define ? ? ? ?COLIBRI320_DETECT_GPIO ?81
-> +#define ? ? ? ?COLIBRI320_READY_GPIO ? 29
+> +static void __init palmtc_mmc_init(void)
+> +{
+> + ? ? ? pxa_set_mci_info(&palmtc_mci_platform_data);
+> +}
+> +#else
+> +static inline void palmtc_mmc_init(void) {}
+> +#endif
 > +
-> ?static struct {
-> ? ? ? ?int ? ? reset_gpio;
-> ? ? ? ?int ? ? ppen_gpio;
-> @@ -186,6 +193,14 @@ static int __init colibri_pcmcia_init(void)
-> ? ? ? ? ? ? ? ?colibri_pcmcia_gpio.bvd2_gpio ? = COLIBRI270_BVD2_GPIO;
-> ? ? ? ? ? ? ? ?colibri_pcmcia_gpio.detect_gpio = COLIBRI270_DETECT_GPIO;
-> ? ? ? ? ? ? ? ?colibri_pcmcia_gpio.ready_gpio ?= COLIBRI270_READY_GPIO;
-> + ? ? ? /* Colibri PXA320 */
-> + ? ? ? } else if (machine_is_colibri320()) {
-> + ? ? ? ? ? ? ? colibri_pcmcia_gpio.reset_gpio ?= COLIBRI320_RESET_GPIO;
-> + ? ? ? ? ? ? ? colibri_pcmcia_gpio.ppen_gpio ? = COLIBRI320_PPEN_GPIO;
-> + ? ? ? ? ? ? ? colibri_pcmcia_gpio.bvd1_gpio ? = COLIBRI320_BVD1_GPIO;
-> + ? ? ? ? ? ? ? colibri_pcmcia_gpio.bvd2_gpio ? = COLIBRI320_BVD2_GPIO;
-> + ? ? ? ? ? ? ? colibri_pcmcia_gpio.detect_gpio = COLIBRI320_DETECT_GPIO;
-> + ? ? ? ? ? ? ? colibri_pcmcia_gpio.ready_gpio ?= COLIBRI320_READY_GPIO;
-> ? ? ? ?}
+> ?/******************************************************************************
+> ?* GPIO keys
+> ?******************************************************************************/
+> +#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+> ?static struct gpio_keys_button palmtc_pxa_buttons[] = {
+> ? ? ? ?{KEY_F8, GPIO_NR_PALMTC_HOTSYNC_BUTTON, 1, "HotSync Button", EV_KEY, 1},
+> ?};
+> @@ -144,9 +155,18 @@ static struct platform_device palmtc_pxa_keys = {
+> ? ? ? ?},
+> ?};
 >
-> ? ? ? ?ret = platform_device_add_data(colibri_pcmcia_device,
-> @@ -209,6 +224,6 @@ module_init(colibri_pcmcia_init);
-> ?module_exit(colibri_pcmcia_exit);
+> +static void __init palmtc_keys_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmtc_pxa_keys);
+> +}
+> +#else
+> +static inline void palmtc_keys_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* Backlight
+> ?******************************************************************************/
+> +#if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
+> ?static int palmtc_backlight_init(struct device *dev)
+> ?{
+> ? ? ? ?int ret;
+> @@ -196,17 +216,35 @@ static struct platform_device palmtc_backlight = {
+> ? ? ? ?},
+> ?};
 >
-> ?MODULE_AUTHOR("Marek Vasut <marek.vasut@gmail.com>");
-> -MODULE_DESCRIPTION("PCMCIA support for Toradex Colibri PXA270");
-> +MODULE_DESCRIPTION("PCMCIA support for Toradex Colibri PXA270/PXA320");
-> ?MODULE_ALIAS("platform:pxa2xx-pcmcia");
-> ?MODULE_LICENSE("GPL");
+> +static void __init palmtc_pwm_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmtc_backlight);
+> +}
+> +#else
+> +static inline void palmtc_pwm_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* IrDA
+> ?******************************************************************************/
+> +#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
+> ?static struct pxaficp_platform_data palmtc_ficp_platform_data = {
+> ? ? ? ?.gpio_pwdown ? ? ? ? ? ?= GPIO_NR_PALMTC_IR_DISABLE,
+> ? ? ? ?.transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
+> ?};
+>
+> +static void __init palmtc_irda_init(void)
+> +{
+> + ? ? ? pxa_set_ficp_info(&palmtc_ficp_platform_data);
+> +}
+> +#else
+> +static inline void palmtc_irda_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* Keyboard
+> ?******************************************************************************/
+> +#if defined(CONFIG_KEYBOARD_MATRIX) || defined(CONFIG_KEYBOARD_MATRIX_MODULE)
+> ?static const uint32_t palmtc_matrix_keys[] = {
+> ? ? ? ?KEY(0, 0, KEY_F1),
+> ? ? ? ?KEY(0, 1, KEY_X),
+> @@ -290,27 +328,63 @@ static struct platform_device palmtc_keyboard = {
+> ? ? ? ? ? ? ? ?.platform_data = &palmtc_keypad_platform_data,
+> ? ? ? ?},
+> ?};
+> +static void __init palmtc_mkp_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmtc_keyboard);
+> +}
+> +#else
+> +static inline void palmtc_mkp_init(void) {}
+> +#endif
+>
+> ?/******************************************************************************
+> ?* UDC
+> ?******************************************************************************/
+> -static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
+> +#if defined(CONFIG_USB_GADGET_PXA25X)||defined(CONFIG_USB_GADGET_PXA25X_MODULE)
+> +static struct gpio_vbus_mach_info palmtc_udc_info = {
+> ? ? ? ?.gpio_vbus ? ? ? ? ? ? ?= GPIO_NR_PALMTC_USB_DETECT_N,
+> ? ? ? ?.gpio_vbus_inverted ? ? = 1,
+> ? ? ? ?.gpio_pullup ? ? ? ? ? ?= GPIO_NR_PALMTC_USB_POWER,
+> ?};
+>
+> +static struct platform_device palmtc_gpio_vbus = {
+> + ? ? ? .name ? = "gpio-vbus",
+> + ? ? ? .id ? ? = -1,
+> + ? ? ? .dev ? ?= {
+> + ? ? ? ? ? ? ? .platform_data ?= &palmtc_udc_info,
+> + ? ? ? },
+> +};
+> +
+> +static void __init palmtc_udc_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmtc_gpio_vbus);
+> +};
+> +#else
+> +static inline void palmtc_udc_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* Touchscreen / Battery / GPIO-extender
+> ?******************************************************************************/
+> -static struct platform_device palmtc_ucb1400_core = {
+> +#if ? ?defined(CONFIG_TOUCHSCREEN_UCB1400) || \
+> + ? ? ? defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
+> +static struct platform_device palmtc_ucb1400_device = {
+> ? ? ? ?.name ? = "ucb1400_core",
+> ? ? ? ?.id ? ? = -1,
+> ?};
+>
+> +static void __init palmtc_ts_init(void)
+> +{
+> + ? ? ? pxa_set_ac97_info(NULL);
+> + ? ? ? platform_device_register(&palmtc_ucb1400_device);
+> +}
+> +#else
+> +static inline void palmtc_ts_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* NOR Flash
+> ?******************************************************************************/
+> +#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+> ?static struct resource palmtc_flash_resource = {
+> ? ? ? ?.start ?= PXA_CS0_PHYS,
+> ? ? ? ?.end ? ?= PXA_CS0_PHYS + SZ_16M - 1,
+> @@ -356,24 +430,33 @@ static struct platform_device palmtc_flash = {
+> ? ? ? ?},
+> ?};
+>
+> +static void __init palmtc_nor_init(void)
+> +{
+> + ? ? ? platform_device_register(&palmtc_flash);
+> +}
+> +#else
+> +static inline void palmtc_nor_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* Framebuffer
+> ?******************************************************************************/
+> +#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
+> ?static struct pxafb_mode_info palmtc_lcd_modes[] = {
+> -{
+> - ? ? ? .pixclock ? ? ? = 115384,
+> - ? ? ? .xres ? ? ? ? ? = 320,
+> - ? ? ? .yres ? ? ? ? ? = 320,
+> - ? ? ? .bpp ? ? ? ? ? ?= 16,
+> -
+> - ? ? ? .left_margin ? ?= 27,
+> - ? ? ? .right_margin ? = 7,
+> - ? ? ? .upper_margin ? = 7,
+> - ? ? ? .lower_margin ? = 8,
+> -
+> - ? ? ? .hsync_len ? ? ?= 6,
+> - ? ? ? .vsync_len ? ? ?= 1,
+> -},
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .pixclock ? ? ? = 115384,
+> + ? ? ? ? ? ? ? .xres ? ? ? ? ? = 320,
+> + ? ? ? ? ? ? ? .yres ? ? ? ? ? = 320,
+> + ? ? ? ? ? ? ? .bpp ? ? ? ? ? ?= 16,
+> +
+> + ? ? ? ? ? ? ? .left_margin ? ?= 27,
+> + ? ? ? ? ? ? ? .right_margin ? = 7,
+> + ? ? ? ? ? ? ? .upper_margin ? = 7,
+> + ? ? ? ? ? ? ? .lower_margin ? = 8,
+> +
+> + ? ? ? ? ? ? ? .hsync_len ? ? ?= 6,
+> + ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
+> + ? ? ? },
+> ?};
+>
+> ?static struct pxafb_mach_info palmtc_lcd_screen = {
+> @@ -382,17 +465,17 @@ static struct pxafb_mach_info palmtc_lcd_screen = {
+> ? ? ? ?.lcd_conn ? ? ? ? ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+> ?};
+>
+> +static void __init palmtc_lcd_init(void)
+> +{
+> + ? ? ? set_pxa_fb_info(&palmtc_lcd_screen);
+> +}
+> +#else
+> +static inline void palmtc_lcd_init(void) {}
+> +#endif
+> +
+> ?/******************************************************************************
+> ?* Machine init
+> ?******************************************************************************/
+> -static struct platform_device *devices[] __initdata = {
+> - ? ? ? &palmtc_backlight,
+> - ? ? ? &palmtc_ucb1400_core,
+> - ? ? ? &palmtc_keyboard,
+> - ? ? ? &palmtc_pxa_keys,
+> - ? ? ? &palmtc_flash,
+> -};
+> -
+> ?static void __init palmtc_init(void)
+> ?{
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmtc_pin_config));
+> @@ -402,13 +485,15 @@ static void __init palmtc_init(void)
+> ? ? ? ?pxa_set_stuart_info(NULL);
+> ? ? ? ?pxa_set_hwuart_info(NULL);
+>
+> - ? ? ? set_pxa_fb_info(&palmtc_lcd_screen);
+> - ? ? ? pxa_set_mci_info(&palmtc_mci_platform_data);
+> - ? ? ? pxa_set_udc_info(&palmtc_udc_info);
+> - ? ? ? pxa_set_ac97_info(NULL);
+> - ? ? ? pxa_set_ficp_info(&palmtc_ficp_platform_data);
+> -
+> - ? ? ? platform_add_devices(devices, ARRAY_SIZE(devices));
+> + ? ? ? palmtc_mmc_init();
+> + ? ? ? palmtc_keys_init();
+> + ? ? ? palmtc_pwm_init();
+> + ? ? ? palmtc_irda_init();
+> + ? ? ? palmtc_mkp_init();
+> + ? ? ? palmtc_udc_init();
+> + ? ? ? palmtc_ts_init();
+> + ? ? ? palmtc_nor_init();
+> + ? ? ? palmtc_lcd_init();
+> ?};
+>
+> ?MACHINE_START(PALMTC, "Palm Tungsten|C")
 > --
 > 1.7.1
 >
