@@ -1,43 +1,112 @@
-From: penberg@kernel.org (Pekka Enberg)
-Date: Mon, 20 Sep 2010 10:42:16 +0300
-Subject: Regression on UP ARM from commit
-	e18d65f0500b95d8724b17d8ea9f1116cf390bbe
-In-Reply-To: <4C8F0CF8.1050309@cs.helsinki.fi>
-References: <AANLkTimC5Vz7x9+MNJcewijoyw=Nyr6WWP=YR8cxqarH@mail.gmail.com>
-	<alpine.DEB.2.00.1009130855430.26275@router.home>
-	<4C8F0CF8.1050309@cs.helsinki.fi>
-Message-ID: <AANLkTikE1qnxHcLKax08cVOo_doeXzj5+42-Bt87FGCZ@mail.gmail.com>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Mon, 20 Sep 2010 10:54:08 +0300
+Subject: [PATCH] mmc: failure of block read wait for long time
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
+References: <1280230066-27612-1-git-send-email-s-ghorai@ti.com>
+	<4C4EDD85.5060606@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B030E417D80@dbde02.ent.ti.com>
+	<4C4FED36.3010607@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F026ED@dbde02.ent.ti.com>
+	<4C8A19E7.30706@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F026F6@dbde02.ent.ti.com>
+	<4C8A2C5D.2050408@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
+Message-ID: <4C971320.7050906@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 14, 2010 at 8:49 AM, Pekka Enberg <penberg@cs.helsinki.fi> wrote:
-> On 9/13/10 4:58 PM, Christoph Lameter wrote:
->>
->> On Sun, 12 Sep 2010, Linus Walleij wrote:
->>
->>> commit e18d65f0500b95d8724b17d8ea9f1116cf390bbe
->>> "slub: Remove static kmem_cache_cpu array for boot"
->>> made my ARM 926 UP system hang at boot, if I revert this (have
->>> to back out a lot of SLUB patches for that) it comes back up. (Same if I
->>> switch to SLAB.)
->>>
->>> Any hints on how I can get patch around this in a nice way?
->>
->> This is UP right? Any more details on this one? Does ARM have
->> earlyprintk?
->>
->> Tejun also has some patches that make the percpu allocator work on UP so
->> that we do not need the hack (you must have the hack which is commit
->> c23e5ad729ac43f5e2fbc080f94cf61f07b4d45f as well to make UP work right!).
->>
->> I am not sure if they are already in -next though.
+On 14/09/10 08:15, ext Ghorai, Sukumar wrote:
+> Adrian,
 >
-> Yes, they should be in linux-next. I haven't pulled the changes to slab.git,
-> though. Linus, do things work in linux-next if you revert commit
-> 5249d039500f05a5ab379286b1d23ab9b04d3f2c ("Slub: UP bandaid")?
+> [..snip..]
+>>>>> [Ghorai] Adrian,
+>>>>> Yes this works and reduced the retry by 1/4 (2048 to 512 times for 1MB
+>>>> data read) form the original code;
+>>>>> Initially it was retrying for each page(512 bytes) after multi-block
+>>>> read fail; but this solution is retying for each segment(2048 bytes);
+>>>>> 1. Now say block layrer reading 1MB and failed for the 1st segment. So
+>>>> it will still retry for 1MB/2048-bytes, i.e. 512 times.
+>>>>> 2. So do you think any good reason to retry again and again?
+>>>> If you have 1MB that is not readable, it sounds like the card is broken.
+>>>> Why are so many reads failing?  Has the card been removed?
+>>>>
+>>>> You might very rarely see ECC errors in a small number of sectors,
+>>>> but more than that sounds like something else is broken.
+>>>
+>>> [Ghorai] yes, one example is we remove the card when reading data,
+>>
+>> Well, that is a different case.  Once the card has gone, the block driver
+>> can (and will once the remove method is called) error out all I/O
+>> requests without sending them to MMC.  That doesn't happen until there
+>> is a card detect interrupt and a resulting rescan.
+>
+> [Ghorai] here we are discussing two problem,
+> 1. If IO failed how to stop retry; because of -
+> 	a. internal card error
+> 	b. issue in Filesystem, driver, or host controller issue
+> 	c. or cards removed.
+>
+> 2. And 2nd how to sync block-layer IO, if card removed,
+> 	a. case 1: when card removed interrupt support by the platform
+> 	b. case 2: when card removed interrupt does not support by the platform?
+>
+>>
+>> A possible solution is to put a flag on mmc_card to indicate card_gone
+>> that gets set as soon as the drivers card detect interrupt shows there
+>> is no card (hoping that we are not getting any bouncing on card detect)
+>> and then have mmc_wait_for_req() simple return -ENODEV immediately if
+>> the card_gone flag is set.  Finally, if the mmc block driver sees
+>> a -ENODEV error, it should also check the card_gone flag (via a new
+>> core function) and if the card is gone, do not retry - and perhaps
+>> even error out the rest of the I/O request queue as well.
+>
+> [Ghorai] your idea address the 2.a case, but not 2.b, 1.a, 1.b
 
-Linus, care to retest linux-next on your configuration? The above
-commit has now been replaced with proper UP per-cpu allocator support
-by Tejun Heo.
+The card removal case can be extended to use the bus ops detect method
+when there is no card detect irq.  I will send a RFC patch.
 
-                        Pekka
+With respect to 1.a:
+  - If the card has an internal error, then it is broken.  The user
+  should remove the card and use a better one.  I do not see how reducing
+  retry delays really helps the user very much.  Arguably if the card
+  becomes unresponsive, the MMC core could provide a facility to
+  reinitialise the card, but that is yet another issue.
+
+With respect to 1.b:
+  - The file system cannot cause the block driver to have I/O errors.
+  - If there are errors in the driver they should be fixed.
+  - If there are hardware problems with the host controller, then
+  it is up to the host controller driver to deal with them e.g.
+  by resetting the controller.  I don't see what this has to do with
+  the block driver.
+
+You leave out the important case of ECC errors.  I am concerned about
+this because of the possibility that it happens inside a file system
+journal e.g. EXT4 journal.  Perhaps the journal may be recovered if the
+error only affects the last transaction, but perhaps not if it destroys
+other transactions - which could happen if the approach you suggest
+is taken.
+
+>
+> And the solution I was proposing to return the status of IO failure as soon as possible to above layer; and handle the card removed interrupt separately or any other issue in h/w or s/w or combination of both. Or just think again when platform don't have the card remove interrupt.
+>
+> So my patch addresses the 1st part
+
+It is absolutely unacceptable to return I/O errors to the upper layers
+for segments that do not have errors.
+
+> And for the 2nd part we can submit the patch anytime.
+>
+>>
+>> I can suggest a patch if you want but I am on vacation next week so
+>> it will have to wait a couple of weeks.
+>>
+>>> And moreover we should not give the interleave data to apps, as we don't
+>> have option to tell application for the valid data.
+>>>
+> [..snip..]
+> http://comments.gmane.org/gmane.linux.kernel.mmc/2714
+>
+>>>
+>
+>
