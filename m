@@ -1,278 +1,155 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 20 Sep 2010 22:44:07 +0800
-Subject: [PATCH 07/11] ARM: pxa: Modularize Palm Tungsten|C
-In-Reply-To: <1284604382-23683-7-git-send-email-marek.vasut@gmail.com>
+Date: Mon, 20 Sep 2010 22:45:59 +0800
+Subject: [PATCH 08/11] UCB1400: Pass ucb1400-gpio data through ac97 bus
+In-Reply-To: <1284604382-23683-8-git-send-email-marek.vasut@gmail.com>
 References: <1284604382-23683-1-git-send-email-marek.vasut@gmail.com>
-	<1284604382-23683-7-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTi=9vz3u74t+BdBaLBxQam4XfLk189UuuyKjdduN@mail.gmail.com>
+	<1284604382-23683-8-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTimpAV3ukE08kBoT9w3S5LFtWuiPA1HbKxt3gsM8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good.
+Cc'ed David.
+
+David,
+
+Do you mind it goes through my tree as there is subsequent patches
+following that have dependency? In that case, your Ack is mostly
+welcome.
 
 On Thu, Sep 16, 2010 at 10:32 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
 > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 > ---
-> ?arch/arm/mach-pxa/palmtc.c | ?147 ++++++++++++++++++++++++++++++++++---------
-> ?1 files changed, 116 insertions(+), 31 deletions(-)
+> ?drivers/gpio/ucb1400_gpio.c | ? 19 ++++++-------------
+> ?drivers/mfd/ucb1400_core.c ?| ? ?5 +++++
+> ?include/linux/ucb1400.h ? ? | ? 19 ++++++-------------
+> ?3 files changed, 17 insertions(+), 26 deletions(-)
 >
-> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-> index ce1104d..7f868d4 100644
-> --- a/arch/arm/mach-pxa/palmtc.c
-> +++ b/arch/arm/mach-pxa/palmtc.c
-> @@ -25,6 +25,7 @@
-> ?#include <linux/power_supply.h>
-> ?#include <linux/gpio_keys.h>
-> ?#include <linux/mtd/physmap.h>
-> +#include <linux/usb/gpio_vbus.h>
+> diff --git a/drivers/gpio/ucb1400_gpio.c b/drivers/gpio/ucb1400_gpio.c
+> index 50e6bd1..fba45a5 100644
+> --- a/drivers/gpio/ucb1400_gpio.c
+> +++ b/drivers/gpio/ucb1400_gpio.c
+> @@ -12,8 +12,6 @@
+> ?#include <linux/module.h>
+> ?#include <linux/ucb1400.h>
 >
-> ?#include <asm/mach-types.h>
-> ?#include <asm/mach/arch.h>
-> @@ -116,6 +117,7 @@ static unsigned long palmtc_pin_config[] __initdata = {
-> ?/******************************************************************************
-> ?* SD/MMC card controller
-> ?******************************************************************************/
-> +#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-> ?static struct pxamci_platform_data palmtc_mci_platform_data = {
-> ? ? ? ?.ocr_mask ? ? ? ? ? ? ? = MMC_VDD_32_33 | MMC_VDD_33_34,
-> ? ? ? ?.gpio_power ? ? ? ? ? ? = GPIO_NR_PALMTC_SD_POWER,
-> @@ -124,9 +126,18 @@ static struct pxamci_platform_data palmtc_mci_platform_data = {
-> ? ? ? ?.detect_delay_ms ? ? ? ?= 200,
-> ?};
->
-> +static void __init palmtc_mmc_init(void)
-> +{
-> + ? ? ? pxa_set_mci_info(&palmtc_mci_platform_data);
-> +}
-> +#else
-> +static inline void palmtc_mmc_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* GPIO keys
-> ?******************************************************************************/
-> +#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-> ?static struct gpio_keys_button palmtc_pxa_buttons[] = {
-> ? ? ? ?{KEY_F8, GPIO_NR_PALMTC_HOTSYNC_BUTTON, 1, "HotSync Button", EV_KEY, 1},
-> ?};
-> @@ -144,9 +155,18 @@ static struct platform_device palmtc_pxa_keys = {
-> ? ? ? ?},
-> ?};
->
-> +static void __init palmtc_keys_init(void)
-> +{
-> + ? ? ? platform_device_register(&palmtc_pxa_keys);
-> +}
-> +#else
-> +static inline void palmtc_keys_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* Backlight
-> ?******************************************************************************/
-> +#if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
-> ?static int palmtc_backlight_init(struct device *dev)
+> -struct ucb1400_gpio_data *ucbdata;
+> -
+> ?static int ucb1400_gpio_dir_in(struct gpio_chip *gc, unsigned off)
 > ?{
-> ? ? ? ?int ret;
-> @@ -196,17 +216,35 @@ static struct platform_device palmtc_backlight = {
-> ? ? ? ?},
-> ?};
+> ? ? ? ?struct ucb1400_gpio *gpio;
+> @@ -50,7 +48,7 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+> ? ? ? ?struct ucb1400_gpio *ucb = dev->dev.platform_data;
+> ? ? ? ?int err = 0;
 >
-> +static void __init palmtc_pwm_init(void)
-> +{
-> + ? ? ? platform_device_register(&palmtc_backlight);
-> +}
-> +#else
-> +static inline void palmtc_pwm_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* IrDA
-> ?******************************************************************************/
-> +#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
-> ?static struct pxaficp_platform_data palmtc_ficp_platform_data = {
-> ? ? ? ?.gpio_pwdown ? ? ? ? ? ?= GPIO_NR_PALMTC_IR_DISABLE,
-> ? ? ? ?.transceiver_cap ? ? ? ?= IR_SIRMODE | IR_OFF,
-> ?};
+> - ? ? ? if (!(ucbdata && ucbdata->gpio_offset)) {
+> + ? ? ? if (!(ucb && ucb->gpio_offset)) {
+> ? ? ? ? ? ? ? ?err = -EINVAL;
+> ? ? ? ? ? ? ? ?goto err;
+> ? ? ? ?}
+> @@ -58,7 +56,7 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+> ? ? ? ?platform_set_drvdata(dev, ucb);
 >
-> +static void __init palmtc_irda_init(void)
-> +{
-> + ? ? ? pxa_set_ficp_info(&palmtc_ficp_platform_data);
-> +}
-> +#else
-> +static inline void palmtc_irda_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* Keyboard
-> ?******************************************************************************/
-> +#if defined(CONFIG_KEYBOARD_MATRIX) || defined(CONFIG_KEYBOARD_MATRIX_MODULE)
-> ?static const uint32_t palmtc_matrix_keys[] = {
-> ? ? ? ?KEY(0, 0, KEY_F1),
-> ? ? ? ?KEY(0, 1, KEY_X),
-> @@ -290,27 +328,63 @@ static struct platform_device palmtc_keyboard = {
-> ? ? ? ? ? ? ? ?.platform_data = &palmtc_keypad_platform_data,
-> ? ? ? ?},
-> ?};
-> +static void __init palmtc_mkp_init(void)
-> +{
-> + ? ? ? platform_device_register(&palmtc_keyboard);
-> +}
-> +#else
-> +static inline void palmtc_mkp_init(void) {}
-> +#endif
+> ? ? ? ?ucb->gc.label = "ucb1400_gpio";
+> - ? ? ? ucb->gc.base = ucbdata->gpio_offset;
+> + ? ? ? ucb->gc.base = ucb->gpio_offset;
+> ? ? ? ?ucb->gc.ngpio = 10;
+> ? ? ? ?ucb->gc.owner = THIS_MODULE;
 >
-> ?/******************************************************************************
-> ?* UDC
-> ?******************************************************************************/
-> -static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
-> +#if defined(CONFIG_USB_GADGET_PXA25X)||defined(CONFIG_USB_GADGET_PXA25X_MODULE)
-> +static struct gpio_vbus_mach_info palmtc_udc_info = {
-> ? ? ? ?.gpio_vbus ? ? ? ? ? ? ?= GPIO_NR_PALMTC_USB_DETECT_N,
-> ? ? ? ?.gpio_vbus_inverted ? ? = 1,
-> ? ? ? ?.gpio_pullup ? ? ? ? ? ?= GPIO_NR_PALMTC_USB_POWER,
-> ?};
+> @@ -72,8 +70,8 @@ static int ucb1400_gpio_probe(struct platform_device *dev)
+> ? ? ? ?if (err)
+> ? ? ? ? ? ? ? ?goto err;
 >
-> +static struct platform_device palmtc_gpio_vbus = {
-> + ? ? ? .name ? = "gpio-vbus",
-> + ? ? ? .id ? ? = -1,
-> + ? ? ? .dev ? ?= {
-> + ? ? ? ? ? ? ? .platform_data ?= &palmtc_udc_info,
-> + ? ? ? },
-> +};
-> +
-> +static void __init palmtc_udc_init(void)
-> +{
-> + ? ? ? platform_device_register(&palmtc_gpio_vbus);
-> +};
-> +#else
-> +static inline void palmtc_udc_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* Touchscreen / Battery / GPIO-extender
-> ?******************************************************************************/
-> -static struct platform_device palmtc_ucb1400_core = {
-> +#if ? ?defined(CONFIG_TOUCHSCREEN_UCB1400) || \
-> + ? ? ? defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-> +static struct platform_device palmtc_ucb1400_device = {
-> ? ? ? ?.name ? = "ucb1400_core",
-> ? ? ? ?.id ? ? = -1,
-> ?};
+> - ? ? ? if (ucbdata && ucbdata->gpio_setup)
+> - ? ? ? ? ? ? ? err = ucbdata->gpio_setup(&dev->dev, ucb->gc.ngpio);
+> + ? ? ? if (ucb && ucb->gpio_setup)
+> + ? ? ? ? ? ? ? err = ucb->gpio_setup(&dev->dev, ucb->gc.ngpio);
 >
-> +static void __init palmtc_ts_init(void)
-> +{
-> + ? ? ? pxa_set_ac97_info(NULL);
-> + ? ? ? platform_device_register(&palmtc_ucb1400_device);
-> +}
-> +#else
-> +static inline void palmtc_ts_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* NOR Flash
-> ?******************************************************************************/
-> +#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
-> ?static struct resource palmtc_flash_resource = {
-> ? ? ? ?.start ?= PXA_CS0_PHYS,
-> ? ? ? ?.end ? ?= PXA_CS0_PHYS + SZ_16M - 1,
-> @@ -356,24 +430,33 @@ static struct platform_device palmtc_flash = {
-> ? ? ? ?},
-> ?};
+> ?err:
+> ? ? ? ?return err;
+> @@ -85,8 +83,8 @@ static int ucb1400_gpio_remove(struct platform_device *dev)
+> ? ? ? ?int err = 0;
+> ? ? ? ?struct ucb1400_gpio *ucb = platform_get_drvdata(dev);
 >
-> +static void __init palmtc_nor_init(void)
-> +{
-> + ? ? ? platform_device_register(&palmtc_flash);
-> +}
-> +#else
-> +static inline void palmtc_nor_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* Framebuffer
-> ?******************************************************************************/
-> +#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-> ?static struct pxafb_mode_info palmtc_lcd_modes[] = {
+> - ? ? ? if (ucbdata && ucbdata->gpio_teardown) {
+> - ? ? ? ? ? ? ? err = ucbdata->gpio_teardown(&dev->dev, ucb->gc.ngpio);
+> + ? ? ? if (ucb && ucb->gpio_teardown) {
+> + ? ? ? ? ? ? ? err = ucb->gpio_teardown(&dev->dev, ucb->gc.ngpio);
+> ? ? ? ? ? ? ? ?if (err)
+> ? ? ? ? ? ? ? ? ? ? ? ?return err;
+> ? ? ? ?}
+> @@ -113,11 +111,6 @@ static void __exit ucb1400_gpio_exit(void)
+> ? ? ? ?platform_driver_unregister(&ucb1400_gpio_driver);
+> ?}
+>
+> -void __init ucb1400_gpio_set_data(struct ucb1400_gpio_data *data)
 > -{
-> - ? ? ? .pixclock ? ? ? = 115384,
-> - ? ? ? .xres ? ? ? ? ? = 320,
-> - ? ? ? .yres ? ? ? ? ? = 320,
-> - ? ? ? .bpp ? ? ? ? ? ?= 16,
+> - ? ? ? ucbdata = data;
+> -}
 > -
-> - ? ? ? .left_margin ? ?= 27,
-> - ? ? ? .right_margin ? = 7,
-> - ? ? ? .upper_margin ? = 7,
-> - ? ? ? .lower_margin ? = 8,
-> -
-> - ? ? ? .hsync_len ? ? ?= 6,
-> - ? ? ? .vsync_len ? ? ?= 1,
-> -},
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .pixclock ? ? ? = 115384,
-> + ? ? ? ? ? ? ? .xres ? ? ? ? ? = 320,
-> + ? ? ? ? ? ? ? .yres ? ? ? ? ? = 320,
-> + ? ? ? ? ? ? ? .bpp ? ? ? ? ? ?= 16,
-> +
-> + ? ? ? ? ? ? ? .left_margin ? ?= 27,
-> + ? ? ? ? ? ? ? .right_margin ? = 7,
-> + ? ? ? ? ? ? ? .upper_margin ? = 7,
-> + ? ? ? ? ? ? ? .lower_margin ? = 8,
-> +
-> + ? ? ? ? ? ? ? .hsync_len ? ? ?= 6,
-> + ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
-> + ? ? ? },
-> ?};
+> ?module_init(ucb1400_gpio_init);
+> ?module_exit(ucb1400_gpio_exit);
 >
-> ?static struct pxafb_mach_info palmtc_lcd_screen = {
-> @@ -382,17 +465,17 @@ static struct pxafb_mach_info palmtc_lcd_screen = {
-> ? ? ? ?.lcd_conn ? ? ? ? ? ? ? = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
-> ?};
+> diff --git a/drivers/mfd/ucb1400_core.c b/drivers/mfd/ucb1400_core.c
+> index d73f84b..63f4969 100644
+> --- a/drivers/mfd/ucb1400_core.c
+> +++ b/drivers/mfd/ucb1400_core.c
+> @@ -75,6 +75,11 @@ static int ucb1400_core_probe(struct device *dev)
 >
-> +static void __init palmtc_lcd_init(void)
-> +{
-> + ? ? ? set_pxa_fb_info(&palmtc_lcd_screen);
-> +}
-> +#else
-> +static inline void palmtc_lcd_init(void) {}
-> +#endif
-> +
-> ?/******************************************************************************
-> ?* Machine init
-> ?******************************************************************************/
-> -static struct platform_device *devices[] __initdata = {
-> - ? ? ? &palmtc_backlight,
-> - ? ? ? &palmtc_ucb1400_core,
-> - ? ? ? &palmtc_keyboard,
-> - ? ? ? &palmtc_pxa_keys,
-> - ? ? ? &palmtc_flash,
+> ? ? ? ?/* GPIO */
+> ? ? ? ?ucb_gpio.ac97 = ac97;
+> + ? ? ? if (pdata) {
+> + ? ? ? ? ? ? ? ucb_gpio.gpio_setup = pdata->gpio_setup;
+> + ? ? ? ? ? ? ? ucb_gpio.gpio_teardown = pdata->gpio_teardown;
+> + ? ? ? ? ? ? ? ucb_gpio.gpio_offset = pdata->gpio_offset;
+> + ? ? ? }
+> ? ? ? ?ucb->ucb1400_gpio = platform_device_alloc("ucb1400_gpio", -1);
+> ? ? ? ?if (!ucb->ucb1400_gpio) {
+> ? ? ? ? ? ? ? ?err = -ENOMEM;
+> diff --git a/include/linux/ucb1400.h b/include/linux/ucb1400.h
+> index 1b47909..1a6bfdd 100644
+> --- a/include/linux/ucb1400.h
+> +++ b/include/linux/ucb1400.h
+> @@ -83,15 +83,12 @@
+> ?#define UCB_ID ? ? ? ? ? ? ? ? 0x7e
+> ?#define UCB_ID_1400 ? ? ? ? ? ? 0x4304
+>
+> -struct ucb1400_gpio_data {
+> - ? ? ? int gpio_offset;
+> - ? ? ? int (*gpio_setup)(struct device *dev, int ngpio);
+> - ? ? ? int (*gpio_teardown)(struct device *dev, int ngpio);
 > -};
 > -
-> ?static void __init palmtc_init(void)
-> ?{
-> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(palmtc_pin_config));
-> @@ -402,13 +485,15 @@ static void __init palmtc_init(void)
-> ? ? ? ?pxa_set_stuart_info(NULL);
-> ? ? ? ?pxa_set_hwuart_info(NULL);
->
-> - ? ? ? set_pxa_fb_info(&palmtc_lcd_screen);
-> - ? ? ? pxa_set_mci_info(&palmtc_mci_platform_data);
-> - ? ? ? pxa_set_udc_info(&palmtc_udc_info);
-> - ? ? ? pxa_set_ac97_info(NULL);
-> - ? ? ? pxa_set_ficp_info(&palmtc_ficp_platform_data);
-> -
-> - ? ? ? platform_add_devices(devices, ARRAY_SIZE(devices));
-> + ? ? ? palmtc_mmc_init();
-> + ? ? ? palmtc_keys_init();
-> + ? ? ? palmtc_pwm_init();
-> + ? ? ? palmtc_irda_init();
-> + ? ? ? palmtc_mkp_init();
-> + ? ? ? palmtc_udc_init();
-> + ? ? ? palmtc_ts_init();
-> + ? ? ? palmtc_nor_init();
-> + ? ? ? palmtc_lcd_init();
+> ?struct ucb1400_gpio {
+> ? ? ? ?struct gpio_chip ? ? ? ?gc;
+> ? ? ? ?struct snd_ac97 ? ? ? ? *ac97;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? gpio_offset;
+> + ? ? ? int (*gpio_setup)(struct device *dev, int ngpio);
+> + ? ? ? int (*gpio_teardown)(struct device *dev, int ngpio);
 > ?};
 >
-> ?MACHINE_START(PALMTC, "Palm Tungsten|C")
+> ?struct ucb1400_ts {
+> @@ -112,6 +109,9 @@ struct ucb1400 {
+>
+> ?struct ucb1400_pdata {
+> ? ? ? ?int ? ? irq;
+> + ? ? ? int ? ? gpio_offset;
+> + ? ? ? int (*gpio_setup)(struct device *dev, int ngpio);
+> + ? ? ? int (*gpio_teardown)(struct device *dev, int ngpio);
+> ?};
+>
+> ?static inline u16 ucb1400_reg_read(struct snd_ac97 *ac97, u16 reg)
+> @@ -163,11 +163,4 @@ static inline void ucb1400_adc_disable(struct snd_ac97 *ac97)
+>
+> ?unsigned int ucb1400_adc_read(struct snd_ac97 *ac97, u16 adc_channel,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int adcsync);
+> -
+> -#ifdef CONFIG_GPIO_UCB1400
+> -void __init ucb1400_gpio_set_data(struct ucb1400_gpio_data *data);
+> -#else
+> -static inline void ucb1400_gpio_set_data(struct ucb1400_gpio_data *data) {}
+> -#endif
+> -
+> ?#endif
 > --
 > 1.7.1
 >
