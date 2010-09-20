@@ -1,174 +1,176 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 20 Sep 2010 15:38:05 +0900
-Subject: [PATCH 1/2] ARM: S5PV310: Add support RTC
-Message-ID: <1284964685-15717-1-git-send-email-kgene.kim@samsung.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 20 Sep 2010 09:15:00 +0200
+Subject: [PATCH 0/3] [ARM] tegra: PCI Express support
+In-Reply-To: <20100919160103.GF9098@n2100.arm.linux.org.uk>
+References: <cover.1284655723.git.mike@compulab.co.il>	<201009161912.12330.arnd@arndb.de>	<4C961906.4040303@compulab.co.il>	<201009191639.44488.arnd@arndb.de>	<4C962DF0.8060209@compulab.co.il>
+	<20100919160103.GF9098@n2100.arm.linux.org.uk>
+Message-ID: <4C9709F4.9040308@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changhwan Youn <chaos.youn@samsung.com>
+Russell King - ARM Linux wrote:
+> On Sun, Sep 19, 2010 at 05:36:16PM +0200, Mike Rapoport wrote:
+>> Since ARM doesn't have special IO access instructions and all IO is memory
+>> mapped, from the CPU perspective IO window would be at some arbitrary 
+>> physical address. For Tegra this address can be anywhere between 
+>> 0x80004000 and 0x8fffffff. With sizes and offsets in my implementation 
+>> the  IO resources would be defined as follows:
+>> struct tegra_pcie_io_res[] = {
+>> 	[0] = {
+>> 		.start = 0x80400000,
+>> 		.end   = 0x804fffff,
+>> 		.flags	= IORESOURCE_IO,
+>> 	},
+>> 	[1] = {
+>> 		.start = 0x80500000,
+>> 		.end   = 0x805fffff,
+>> 		.flags	= IORESOURCE_IO,
+>> 	},
+>> }
+> 
+> These aren't IO resources - they're describing an area of physical
+> host memory, so they should be IORESOURCE_MEM.
+> 
+>> And then a call to request_resource(&ioport_resource, &tegra_pcie_io_res) 
+>> fails because Tegra IO resources do not fit into the global 
+>> ioport_resource definition.
+> 
+> And therefore they should not be registered against the ioport resource.
+> 
+> 
+> Think about it like this:
+> 
+> iomem_resource (CPU physical
+> address space view):
+> +------------+ 0x00000000
+> |  RAM etc   |
+> /            /
+> /            /
+> |            |                    ioport_resource
+> +------------+ 0x80400000 ------> +-----------------+ 0x00000000
+> |            |                    | PCI peripherals |
+> |            |                    |                 |
+> |            | 0x804003f8         +-----------------+ 0x000003f8
+> |            |                    | Eg, PCI serial  |
+> |PCI IO space| 0x804003ff         +-----------------+ 0x000003ff
+> |            |                    |                 |
+> |            |                    |                 |
+> |            |                    | PCI peripherals |
+> |            |                    |                 |
+> |            |                    |                 |
+> +------------+ 0x805fffff ------> +-----------------+ 0x001fffff
+> |            |
+> /other stuff /
+> /            /
+> |            |
+> +------------+ 0xffffffff
+> 
+> So the iomem resource tree is entirely separate from the ioport resource
+> tree, and the two never overlap.  The iomem resource tree represents the
+> physical MMIO space, and just contains a reservation for the entire block
+> of PCI IO space.  The ioport resource represents the entirely separate
+> PCI IO space resource tree.
 
-This patch adds support RTC for S5PV310 and S5PC210.
+ From what you are saying I understand that the region reservation should look like:
 
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Jemings Ko <jemings@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-NOTE: tested on SMDKV310 and SMDKC210.
+static struct resource res_mmio = {
+	.name	= "PCI IO"
+	.start	= 0x80400000,
+	.end	= 0x80400000 + IO_SIZE,
+	.flags	= IORESOURCE_MEM,
+};
 
- arch/arm/Kconfig                          |    1 +
- arch/arm/mach-s5pv310/Kconfig             |    2 ++
- arch/arm/mach-s5pv310/clock.c             |    5 +++++
- arch/arm/mach-s5pv310/include/mach/irqs.h |    3 +++
- arch/arm/mach-s5pv310/include/mach/map.h  |    2 ++
- arch/arm/mach-s5pv310/mach-smdkc210.c     |    7 +++++++
- arch/arm/mach-s5pv310/mach-smdkv310.c     |    7 +++++++
- 7 files changed, 27 insertions(+), 0 deletions(-)
+static struct resource pcie_res[] = {
+	[0] = {
+		.name	= "PCIe IO",
+		.start	= 0x1000,
+		.end	= 0x1000 + IO_SIZE - 1,
+		.flags	= IORESOURCE_IO,
+	},
+	[1] = {
+		.name	= "PCIe MEM",
+		.start	= MEM_BASE,
+		.end	= MEM_BASE + MEM_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bce9193..efa8d7e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -734,6 +734,7 @@ config ARCH_S5PV310
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_S3C_RTC
- 	help
- 	  Samsung S5PV310 series based systems
- 
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index 9ac29fe..4de5d72 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -33,6 +33,7 @@ config MACH_SMDKC210
- 	bool "SMDKC210"
- 	select CPU_S5PV310
- 	select ARCH_SPARSEMEM_ENABLE
-+	select S3C_DEV_RTC
- 	help
- 	  Machine support for Samsung SMDKC210
- 	  S5PC210(MCP) is one of package option of S5PV310
-@@ -53,6 +54,7 @@ config MACH_SMDKV310
- 	bool "SMDKV310"
- 	select CPU_S5PV310
- 	select ARCH_SPARSEMEM_ENABLE
-+	select S3C_DEV_RTC
- 	help
- 	  Machine support for Samsung SMDKV310
- 
-diff --git a/arch/arm/mach-s5pv310/clock.c b/arch/arm/mach-s5pv310/clock.c
-index 262a46f..8ffd80e 100644
---- a/arch/arm/mach-s5pv310/clock.c
-+++ b/arch/arm/mach-s5pv310/clock.c
-@@ -472,6 +472,11 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s5pv310_clk_ip_peril_ctrl,
- 		.ctrlbit	= (1 << 15),
- 	}, {
-+		.name		= "rtc",
-+		.id		= -1,
-+		.enable		= s5pv310_clk_ip_perir_ctrl,
-+		.ctrlbit	= (1 << 15),
-+	}, {
- 		.name		= "watchdog",
- 		.id		= -1,
- 		.enable		= s5pv310_clk_ip_perir_ctrl,
-diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-s5pv310/include/mach/irqs.h
-index 7b4b09f..e81332f 100644
---- a/arch/arm/mach-s5pv310/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
-@@ -60,6 +60,9 @@
- #define IRQ_TIMER3_VIC		COMBINER_IRQ(22, 3)
- #define IRQ_TIMER4_VIC		COMBINER_IRQ(22, 4)
- 
-+#define IRQ_RTC_ALARM		COMBINER_IRQ(23, 0)
-+#define IRQ_RTC_TIC		COMBINER_IRQ(23, 1)
-+
- #define IRQ_UART0		COMBINER_IRQ(26, 0)
- #define IRQ_UART1		COMBINER_IRQ(26, 1)
- #define IRQ_UART2		COMBINER_IRQ(26, 2)
-diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
-index aff6d23..7523653 100644
---- a/arch/arm/mach-s5pv310/include/mach/map.h
-+++ b/arch/arm/mach-s5pv310/include/mach/map.h
-@@ -40,6 +40,7 @@
- #define S5PV310_PA_CMU			(0x10030000)
- 
- #define S5PV310_PA_WATCHDOG		(0x10060000)
-+#define S5PV310_PA_RTC			(0x10070000)
- 
- #define S5PV310_PA_COMBINER		(0x10448000)
- 
-@@ -81,6 +82,7 @@
- #define S3C_PA_HSMMC2			S5PV310_PA_HSMMC(2)
- #define S3C_PA_HSMMC3			S5PV310_PA_HSMMC(3)
- #define S3C_PA_IIC			S5PV310_PA_IIC0
-+#define S3C_PA_RTC			S5PV310_PA_RTC
- #define S3C_PA_WDT			S5PV310_PA_WATCHDOG
- 
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-s5pv310/mach-smdkc210.c b/arch/arm/mach-s5pv310/mach-smdkc210.c
-index 71a3bec..5b34d9e 100644
---- a/arch/arm/mach-s5pv310/mach-smdkc210.c
-+++ b/arch/arm/mach-s5pv310/mach-smdkc210.c
-@@ -17,6 +17,7 @@
- #include <plat/regs-serial.h>
- #include <plat/s5pv310.h>
- #include <plat/cpu.h>
-+#include <plat/devs.h>
- 
- #include <mach/map.h>
- 
-@@ -65,6 +66,10 @@ static struct s3c2410_uartcfg smdkc210_uartcfgs[] __initdata = {
- 	},
- };
- 
-+static struct platform_device *smdkc210_devices[] __initdata = {
-+	&s3c_device_rtc,
-+};
-+
- static void __init smdkc210_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -77,6 +82,8 @@ static void __init smdkc210_machine_init(void)
- #ifdef CONFIG_CACHE_L2X0
- 	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
- #endif
-+
-+	platform_add_devices(smdkc210_devices, ARRAY_SIZE(smdkc210_devices));
- }
- 
- MACHINE_START(SMDKC210, "SMDKC210")
-diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
-index 0d6ab77..06062c8 100644
---- a/arch/arm/mach-s5pv310/mach-smdkv310.c
-+++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
-@@ -17,6 +17,7 @@
- #include <plat/regs-serial.h>
- #include <plat/s5pv310.h>
- #include <plat/cpu.h>
-+#include <plat/devs.h>
- 
- #include <mach/map.h>
- 
-@@ -65,6 +66,10 @@ static struct s3c2410_uartcfg smdkv310_uartcfgs[] __initdata = {
- 	},
- };
- 
-+static struct platform_device *smdkv310_devices[] __initdata = {
-+	&s3c_device_rtc,
-+};
-+
- static void __init smdkv310_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -77,6 +82,8 @@ static void __init smdkv310_machine_init(void)
- #ifdef CONFIG_CACHE_L2X0
- 	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
- #endif
-+
-+	platform_add_devices(smdkv310_devices, ARRAY_SIZE(smdkv310_devices));
- }
- 
- MACHINE_START(SMDKV310, "SMDKV310")
+static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
+{
+	request_region(&iomem_resource, &res_mmio);
+	request_region(&iomem_resource, &pcie_res[1]);
+	request_region(&ioport_resource, &pcie_res[0]);
+	sys->resource[0] = &pcie_res[0];
+	sys->resource[1] = &pcie_res[1];
+}
+
+I've used 0x1000 as IO resources start because having it 0 would cause 
+pcibios_enable_device to fail.
+
+Is the above setup reasonable enough or I'm missing something else?
+
+> To illustrate this better, on Footbridge, this is what you see in
+> /proc/iomem:
+> 00000000-07ffffff : System RAM
+>   0002d000-002a9fff : Kernel text
+>   002aa000-002e7c77 : Kernel data
+> 42000160-4200017f : Footbridge UART
+> a0000000-bfffffff : Footbridge prefetch
+>   a0000000-a001ffff : 0000:00:07.0
+>   a0020000-a003ffff : 0000:00:08.0
+>   a0040000-a004ffff : 0000:00:09.0
+> c0000000-ffffffff : Footbridge non-prefetch
+>   c0000000-c3ffffff : 0000:00:09.0
+>   c4000000-c4000fff : 0000:00:06.3
+>   c4001000-c400107f : 0000:00:08.0
+> 
+> Note that 7c000000-7c00ffff is the address range used for PCI IO accesses,
+> and isn't requested in the above (mainly because we never registered a
+> separate resource for it.)
+> 
+> and /proc/ioports:
+> 0000-000f : dma1
+> 0020-003f : pic1
+> 0060-006f : i8042
+> 0070-0073 : rtc_cmos
+>   0070-0073 : rtc0
+> 0080-008f : dma low page
+> 00a0-00bf : pic2
+> 00c0-00df : dma2
+> 01f0-01f7 : ide0
+> 0213-0213 : ISAPnP
+> 02f8-02ff : serial8250.0
+>   02f8-02ff : serial
+> 03c0-03df : vga+
+> 03f6-03f6 : ide0
+> 03f8-03ff : serial8250.0
+>   03f8-03ff : serial
+> 0480-048f : dma high page
+> 0a79-0a79 : isapnp write
+> 1000-107f : 0000:00:08.0
+> 1080-108f : 0000:00:06.1
+>   1080-1087 : ide0
+> 1090-109f : 0000:00:07.0
+>   1090-1097 : ide1
+>   1098-109f : ide2
+> 10a0-10a7 : 0000:00:07.0
+>   10a0-10a7 : ide1
+> 10a8-10af : 0000:00:07.0
+>   10a8-10af : ide2
+> 10b0-10b3 : 0000:00:07.0
+>   10b2-10b2 : ide1
+> 10b4-10b7 : 0000:00:07.0
+>   10b6-10b6 : ide2
+> ff00-ff7f : Footbridge
+> 
+> Note that IO accesses correspond to 0x7c000000 + IO address in iomem space.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
 -- 
-1.6.2.5
+Sincerely yours,
+Mike.
