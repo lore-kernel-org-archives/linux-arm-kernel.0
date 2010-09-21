@@ -1,65 +1,40 @@
 From: ben@simtec.co.uk (Ben Dooks)
-Date: Tue, 21 Sep 2010 01:24:20 +0100
-Subject: [PATCH v2 2/2] sdhci-s3c: Add support no internal clock divider
-	in	host controller
-In-Reply-To: <1284716701-5140-3-git-send-email-kgene.kim@samsung.com>
-References: <1284716701-5140-1-git-send-email-kgene.kim@samsung.com>
-	<1284716701-5140-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4C97FB34.1000802@simtec.co.uk>
+Date: Tue, 21 Sep 2010 01:30:16 +0100
+Subject: colibri-pxa320/AX88796: phy-read/write problems
+In-Reply-To: <4C9208DD.8000805@pengutronix.de>
+References: <4C9208DD.8000805@pengutronix.de>
+Message-ID: <4C97FC98.9080309@simtec.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/10 10:45, Kukjin Kim wrote:
-> From: Hyuk Lee <hyuk1.lee@samsung.com>
+On 16/09/10 13:09, Marc Kleine-Budde wrote:
+> Hello,
 > 
-> This patch adds to support no internal clock divider in SDHCI.
-> The external clock divider can be used to make a proper clock
-> because SDHCI doesn't support internal clock divider by itself.
+> my hardware is a toradex colibri PXA320 board using latest stable
+> Kernel 2.6.35.4. The Ethernet controller is a AX88796BI.
 > 
-> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   60 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 60 insertions(+), 0 deletions(-)
+> Ethernet is working, but access via MDIO to the AX's internal phy is
+> broken. The contents of all registers is 0xffff.
 > 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index e6e0438..5ad5ed7 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -96,6 +96,13 @@ static unsigned int sdhci_s3c_get_max_clk(struct sdhci_host *host)
->  	unsigned int rate, max;
->  	int clk;
->  
-> +	/*
-> +	 * There is only one clock source(sclk) if there is no clock divider
-> +	 * in the host controller
-> +	 */
-> +	if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK)
-> +		return clk_round_rate(ourhost->clk_bus[2], UINT_MAX);
+> The userspace tool "mii-diag" illustrates the problem:
+> root at grabowski:~ mii-diag
+> Using the default interface 'eth0'.
+> Basic registers of MII PHY #16:  ffff ffff ffff ffff ffff ffff ffff ffff.
+>   No MII transceiver present!.
+>   Use '--force' to view the information anyway.
+> 
+> If I switch on the phy_debug in the ax88796 driver we see that the
+> 0xffff are read via "ax_phy_read()" from the hardware, this means it's
+> not a problem in the userspace.
 
-interesting, <linux/clk.h> doesn't have a second parameter to
-clk_round_rate().
+I've not tried it with a PXA, but it was working with a S3C2440 based
+system when it was written, so I do beleive it should work. However
+I've not had a chance to test the MII code for a few releases so have
+no idea if it does still work.
 
-
->  	/* note, a reset will reset the clock source */
->  
->  	sdhci_s3c_check_sclk(host);
-> @@ -130,6 +137,15 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
->  	if (!clksrc)
->  		return UINT_MAX;
->  
-> +	/*
-> +	 * There is only one clock source(sclk) if there is no clock divider
-> +	 * in the host controller
-> +	 */
-> +	if (ourhost->host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK) {
-> +		rate = clk_round_rate(clksrc, wanted);
-> +		return wanted - rate;
-> +	}
-
-Why does this need a quirk, instead of just having one clock available
-in the list of usable clocks?
+Do you know if the hardware is correct? Has any other linux version
+managed to talk to the MII interface, or other OS/bootloader
+combination?
 
 -- 
 Ben
