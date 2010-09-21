@@ -1,95 +1,40 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 21 Sep 2010 18:03:13 +0200
-Subject: [PATCH 5/5] omap3: cm-t3517: add support for TI HECC
-In-Reply-To: <1285084993-27683-1-git-send-email-grinberg@compulab.co.il>
-References: <1285084993-27683-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1285084993-27683-6-git-send-email-grinberg@compulab.co.il>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Tue, 21 Sep 2010 21:35:20 +0530
+Subject: [PATCH] ARM: fix build break due to typo in cacheflush.h
+Message-ID: <1285085120-29780-1-git-send-email-gadiyar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add support for TI HECC.
+commit 9d85ac1e6 introduced a small typo. This causes the build
+to break when CONFIG_CPU_V7 is set and CONFIG_CPU_V6 and
+CONFIG_SMP_ON_UP are not. (log below)
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+  CC      init/main.o
+In file included from include/linux/highmem.h:9,
+                 from include/linux/pagemap.h:10,
+                 from include/linux/mempolicy.h:70,
+                 from init/main.c:50:
+arch/arm/include/asm/cacheflush.h: In function '__flush_icache_all':
+arch/arm/include/asm/cacheflush.h:332: error: implicit declaration of function '__flush_icache_preferred'
+make[1]: *** [init/main.o] Error 1
+make: *** [init] Error 2
+
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-cm-t3517.c |   45 ++++++++++++++++++++++++++++++++++
- 1 files changed, 45 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/cacheflush.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index 4c26cf5..1115b8a 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -32,6 +32,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/can/platform/ti_hecc.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -44,6 +45,8 @@
- #include <plat/nand.h>
- #include <plat/gpmc.h>
- 
-+#include <mach/am35xx.h>
-+
- #include "mux.h"
- 
- #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-@@ -77,6 +80,47 @@ static void __init cm_t3517_init_leds(void)
- static inline void cm_t3517_init_leds(void) {}
+Index: linux-omap-2.6/arch/arm/include/asm/cacheflush.h
+===================================================================
+--- linux-omap-2.6.orig/arch/arm/include/asm/cacheflush.h
++++ linux-omap-2.6/arch/arm/include/asm/cacheflush.h
+@@ -324,7 +324,7 @@ extern void copy_to_user_page(struct vm_
+ #elif __LINUX_ARM_ARCH__ == 6 && defined(CONFIG_ARM_ERRATA_411920)
+ #define __flush_icache_preferred	__cpuc_flush_icache_all
+ #else
+-#define __fluch_icache_preferred	__flush_icache_all_generic
++#define __flush_icache_preferred	__flush_icache_all_generic
  #endif
  
-+#if defined(CONFIG_CAN_TI_HECC) || defined(CONFIG_CAN_TI_HECC_MODULE)
-+static struct resource cm_t3517_hecc_resources[] = {
-+	{
-+		.start	= AM35XX_IPSS_HECC_BASE,
-+		.end	= AM35XX_IPSS_HECC_BASE + SZ_16K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= INT_35XX_HECC0_IRQ,
-+		.end	= INT_35XX_HECC0_IRQ,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct ti_hecc_platform_data cm_t3517_hecc_pdata = {
-+	.scc_hecc_offset	= AM35XX_HECC_SCC_HECC_OFFSET,
-+	.scc_ram_offset		= AM35XX_HECC_SCC_RAM_OFFSET,
-+	.hecc_ram_offset	= AM35XX_HECC_RAM_OFFSET,
-+	.mbx_offset		= AM35XX_HECC_MBOX_OFFSET,
-+	.int_line		= AM35XX_HECC_INT_LINE,
-+	.version		= AM35XX_HECC_VERSION,
-+};
-+
-+static struct platform_device cm_t3517_hecc_device = {
-+	.name		= "ti_hecc",
-+	.id		= 1,
-+	.num_resources	= ARRAY_SIZE(cm_t3517_hecc_resources),
-+	.resource	= cm_t3517_hecc_resources,
-+	.dev		= {
-+		.platform_data	= &cm_t3517_hecc_pdata,
-+	},
-+};
-+
-+static void cm_t3517_init_hecc(void)
-+{
-+	platform_device_register(&cm_t3517_hecc_device);
-+}
-+#else
-+static inline void cm_t3517_init_hecc(void) {}
-+#endif
-+
- #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
- #define RTC_IO_GPIO		(153)
- #define RTC_WR_GPIO		(154)
-@@ -235,6 +279,7 @@ static void __init cm_t3517_init(void)
- 	cm_t3517_init_nand();
- 	cm_t3517_init_rtc();
- 	cm_t3517_init_usbh();
-+	cm_t3517_init_hecc();
- }
- 
- MACHINE_START(CM_T3517, "Compulab CM-T3517")
--- 
-1.7.1
+ static inline void __flush_icache_all(void)
