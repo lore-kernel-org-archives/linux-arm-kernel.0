@@ -1,186 +1,264 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Wed, 22 Sep 2010 00:21:25 +0800
-Subject: [PATCH 1/6 V2] pxa3xx_nand: make scan procedure more clear
-In-Reply-To: <AANLkTinGdpt3kiCas6tpEZPbTknEe1Upz9D_aLgfNWo_@mail.gmail.com>
-References: <AANLkTinGdpt3kiCas6tpEZPbTknEe1Upz9D_aLgfNWo_@mail.gmail.com>
-Message-ID: <1285086085-2264-1-git-send-email-leiwen@marvell.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 21 Sep 2010 09:16:00 -0700
+Subject: [PATCH] ARM: Handle __flush_icache_all for CONFIG_SMP_ON_UP
+In-Reply-To: <20100914185907.GG8647@atomide.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100914185907.GG8647@atomide.com>
+Message-ID: <20100921161600.GT4611@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
----
- drivers/mtd/nand/pxa3xx_nand.c |   98 ++++++++++++++++++++++------------------
- 1 files changed, 54 insertions(+), 44 deletions(-)
+* Tony Lindgren <tony@atomide.com> [100914 12:04]:
+> 
+> Here's a patch for __flush_icache_all. I believe this is the last
+> remaining patch we need.
+> 
+> The only other thing I can think of are the conflicts with
+> CONFIG_CPU_32v6K, on early ARM1136 and later ARM11 systems if somebody
+> wants to compile a kernel that supports both. But that's not needed for
+> omap2, so we can boot now omap2, 3 and 4 with a single defconfig :)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 17f8518..aff28dc 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -126,6 +126,7 @@ struct pxa3xx_nand_info {
- 	unsigned int 		buf_start;
- 	unsigned int		buf_count;
+Here's an updated version with a typo fix s/fluch/flush/ from Anand.
+
+Regards,
+
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 20 Sep 2010 16:37:16 -0700
+Subject: [PATCH] ARM: Handle __flush_icache_all for CONFIG_SMP_ON_UP
+
+Do this by adding flush_icache_all to cache_fns for ARMv6 and 7.
+As flush_icache_all may neeed to be called from flush_kern_cache_all,
+add it as the first entry in the cache_fns.
+
+Note that now we can remove the ARM_ERRATA_411920 dependency
+to !SMP so it can be selected on UP ARMv6 processors, such
+as omap2.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1017,7 +1017,7 @@ endif
  
-+	struct mtd_info         *mtd;
- 	/* DMA information */
- 	int			drcmr_dat;
- 	int			drcmr_cmd;
-@@ -1044,34 +1045,26 @@ static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
- 	this->chip_delay = 25;
- }
+ config ARM_ERRATA_411920
+ 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
+-	depends on CPU_V6 && !SMP
++	depends on CPU_V6
+ 	help
+ 	  Invalidation of the Instruction Cache operation can
+ 	  fail. This erratum is present in 1136 (before r1p4), 1156 and 1176.
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -156,6 +156,12 @@
+  *	Please note that the implementation of these, and the required
+  *	effects are cache-type (VIVT/VIPT/PIPT) specific.
+  *
++ *	flush_icache_all()
++ *
++ *		Unconditionally clean and invalidate the entire icache.
++ *		Currently only needed for cache-v6.S and cache-v7.S, see
++ *		__flush_icache_all for the generic implementation.
++ *
+  *	flush_kern_all()
+  *
+  *		Unconditionally clean and invalidate the entire cache.
+@@ -206,6 +212,7 @@
+  */
  
--static int pxa3xx_nand_probe(struct platform_device *pdev)
-+static struct pxa3xx_nand_info *alloc_nand_resource(struct platform_device *pdev)
- {
--	struct pxa3xx_nand_platform_data *pdata;
-+	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
- 	struct pxa3xx_nand_info *info;
--	struct nand_chip *this;
- 	struct mtd_info *mtd;
- 	struct resource *r;
--	int ret = 0, irq;
--
--	pdata = pdev->dev.platform_data;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "no platform data defined\n");
--		return -ENODEV;
--	}
-+	int ret, irq;
+ struct cpu_cache_fns {
++	void (*flush_icache_all)(void);
+ 	void (*flush_kern_all)(void);
+ 	void (*flush_user_all)(void);
+ 	void (*flush_user_range)(unsigned long, unsigned long, unsigned int);
+@@ -227,6 +234,7 @@ struct cpu_cache_fns {
  
- 	mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct pxa3xx_nand_info),
- 			GFP_KERNEL);
- 	if (!mtd) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
--		return -ENOMEM;
-+		return NULL;
- 	}
+ extern struct cpu_cache_fns cpu_cache;
  
- 	info = (struct pxa3xx_nand_info *)(&mtd[1]);
- 	info->pdev = pdev;
++#define __cpuc_flush_icache_all		cpu_cache.flush_icache_all
+ #define __cpuc_flush_kern_all		cpu_cache.flush_kern_all
+ #define __cpuc_flush_user_all		cpu_cache.flush_user_all
+ #define __cpuc_flush_user_range		cpu_cache.flush_user_range
+@@ -246,6 +254,7 @@ extern struct cpu_cache_fns cpu_cache;
  
--	this = &info->nand_chip;
- 	mtd->priv = info;
-+	info->mtd = mtd;
- 	mtd->owner = THIS_MODULE;
+ #else
  
- 	info->clk = clk_get(&pdev->dev, NULL);
-@@ -1149,31 +1142,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
- 	}
++#define __cpuc_flush_icache_all		__glue(_CACHE,_flush_icache_all)
+ #define __cpuc_flush_kern_all		__glue(_CACHE,_flush_kern_cache_all)
+ #define __cpuc_flush_user_all		__glue(_CACHE,_flush_user_cache_all)
+ #define __cpuc_flush_user_range		__glue(_CACHE,_flush_user_cache_range)
+@@ -253,6 +262,7 @@ extern struct cpu_cache_fns cpu_cache;
+ #define __cpuc_coherent_user_range	__glue(_CACHE,_coherent_user_range)
+ #define __cpuc_flush_dcache_area	__glue(_CACHE,_flush_kern_dcache_area)
  
- 	pxa3xx_nand_init_mtd(mtd, info);
-+	platform_set_drvdata(pdev, info);
- 
--	platform_set_drvdata(pdev, mtd);
--
--	if (nand_scan(mtd, 1)) {
--		dev_err(&pdev->dev, "failed to scan nand\n");
--		ret = -ENXIO;
--		goto fail_free_irq;
--	}
--
--#ifdef CONFIG_MTD_PARTITIONS
--	if (mtd_has_cmdlinepart()) {
--		static const char *probes[] = { "cmdlinepart", NULL };
--		struct mtd_partition *parts;
--		int nr_parts;
--
--		nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
--
--		if (nr_parts)
--			return add_mtd_partitions(mtd, parts, nr_parts);
--	}
--
--	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
--#else
--	return 0;
--#endif
-+	return info;
- 
- fail_free_irq:
- 	free_irq(irq, info);
-@@ -1193,13 +1164,13 @@ fail_put_clk:
- 	clk_put(info->clk);
- fail_free_mtd:
- 	kfree(mtd);
--	return ret;
-+	return NULL;
- }
- 
- static int pxa3xx_nand_remove(struct platform_device *pdev)
- {
--	struct mtd_info *mtd = platform_get_drvdata(pdev);
--	struct pxa3xx_nand_info *info = mtd->priv;
-+	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-+	struct mtd_info *mtd = info->mtd;
- 	struct resource *r;
- 	int irq;
- 
-@@ -1230,11 +1201,50 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int pxa3xx_nand_probe(struct platform_device *pdev)
-+{
-+	struct pxa3xx_nand_platform_data *pdata;
-+	struct pxa3xx_nand_info *info;
++extern void __cpuc_flush_icache_all(void);
+ extern void __cpuc_flush_kern_all(void);
+ extern void __cpuc_flush_user_all(void);
+ extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
+@@ -291,6 +301,37 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ /*
+  * Convert calls to our calling convention.
+  */
 +
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "no platform data defined\n");
-+		return -ENODEV;
-+	}
++/* Invalidate I-cache */
++#define __flush_icache_all_generic()					\
++	asm("mcr	p15, 0, %0, c7, c5, 0"				\
++	    : : "r" (0));
 +
-+	info = alloc_nand_resource(pdev);
-+	if (info == NULL)
-+		return -ENOMEM;
++/* Invalidate I-cache inner shareable */
++#define __flush_icache_all_v7_smp()					\
++	asm("mcr	p15, 0, %0, c7, c1, 0"				\
++	    : : "r" (0));
 +
-+	if (nand_scan(info->mtd, 1)) {
-+		dev_err(&pdev->dev, "failed to scan nand\n");
-+		pxa3xx_nand_remove(pdev);
-+		return -ENODEV;
-+	}
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	if (mtd_has_cmdlinepart()) {
-+		static const char *probes[] = { "cmdlinepart", NULL };
-+		struct mtd_partition *parts;
-+		int nr_parts;
-+
-+		nr_parts = parse_mtd_partitions(info->mtd, probes, &parts, 0);
-+
-+		if (nr_parts)
-+			return add_mtd_partitions(mtd, parts, nr_parts);
-+	}
-+
-+	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
++/*
++ * Optimized __flush_icache_all for the common cases. Note that UP ARMv7
++ * will fall through to use __flush_icache_all_generic.
++ */
++#if (defined(CONFIG_CPU_V7) && defined(CONFIG_CPU_V6)) ||		\
++	defined(CONFIG_SMP_ON_UP)
++#define __flush_icache_preferred	__cpuc_flush_icache_all
++#elif __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
++#define __flush_icache_preferred	__flush_icache_all_v7_smp
++#elif __LINUX_ARM_ARCH__ == 6 && defined(CONFIG_ARM_ERRATA_411920)
++#define __flush_icache_preferred	__cpuc_flush_icache_all
 +#else
-+	return 0;
++#define __flush_icache_preferred	__flush_icache_all_generic
 +#endif
++
++static inline void __flush_icache_all(void)
++{
++	__flush_icache_preferred();
 +}
 +
- #ifdef CONFIG_PM
- static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+ #define flush_cache_all()		__cpuc_flush_kern_all()
+ 
+ static inline void vivt_flush_cache_mm(struct mm_struct *mm)
+@@ -366,21 +407,6 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
+ #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
+ extern void flush_dcache_page(struct page *);
+ 
+-static inline void __flush_icache_all(void)
+-{
+-#ifdef CONFIG_ARM_ERRATA_411920
+-	extern void v6_icache_inval_all(void);
+-	v6_icache_inval_all();
+-#elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
+-	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner shareable\n"
+-	    :
+-	    : "r" (0));
+-#else
+-	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
+-	    :
+-	    : "r" (0));
+-#endif
+-}
+ static inline void flush_kernel_vmap_range(void *addr, int size)
  {
--	struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
--	struct pxa3xx_nand_info *info = mtd->priv;
-+	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-+	struct mtd_info *mtd = info->mtd;
+ 	if ((cache_is_vivt() || cache_is_vipt_aliasing()))
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -21,18 +21,22 @@
+ #define D_CACHE_LINE_SIZE	32
+ #define BTB_FLUSH_SIZE		8
  
- 	if (info->state != STATE_READY) {
- 		dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
-@@ -1246,8 +1256,8 @@ static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+-#ifdef CONFIG_ARM_ERRATA_411920
+ /*
+- * Invalidate the entire I cache (this code is a workaround for the ARM1136
+- * erratum 411920 - Invalidate Instruction Cache operation can fail. This
+- * erratum is present in 1136, 1156 and 1176. It does not affect the MPCore.
++ *	v6_flush_icache_all()
++ *
++ *	Flush the whole I-cache.
+  *
+- * Registers:
+- *   r0 - set to 0
+- *   r1 - corrupted
++ *	ARM1136 erratum 411920 - Invalidate Instruction Cache operation can fail.
++ *	This erratum is present in 1136, 1156 and 1176. It does not affect the
++ *	MPCore.
++ *
++ *	Registers:
++ *	r0 - set to 0
++ *	r1 - corrupted
+  */
+-ENTRY(v6_icache_inval_all)
++ENTRY(v6_flush_icache_all)
+ 	mov	r0, #0
++#ifdef CONFIG_ARM_ERRATA_411920
+ 	mrs	r1, cpsr
+ 	cpsid	ifa				@ disable interrupts
+ 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate entire I-cache
+@@ -43,8 +47,11 @@ ENTRY(v6_icache_inval_all)
+ 	.rept	11				@ ARM Ltd recommends at least
+ 	nop					@ 11 NOPs
+ 	.endr
+-	mov	pc, lr
++#else
++	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I-cache
+ #endif
++	mov	pc, lr
++ENDPROC(v6_flush_icache_all)
  
- static int pxa3xx_nand_resume(struct platform_device *pdev)
- {
--	struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
--	struct pxa3xx_nand_info *info = mtd->priv;
-+	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-+	struct mtd_info *mtd = info->mtd;
+ /*
+  *	v6_flush_cache_all()
+@@ -60,7 +67,7 @@ ENTRY(v6_flush_kern_cache_all)
+ #ifndef CONFIG_ARM_ERRATA_411920
+ 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
+ #else
+-	b	v6_icache_inval_all
++	b	v6_flush_icache_all
+ #endif
+ #else
+ 	mcr	p15, 0, r0, c7, c15, 0		@ Cache clean+invalidate
+@@ -138,7 +145,7 @@ ENTRY(v6_coherent_user_range)
+ #ifndef CONFIG_ARM_ERRATA_411920
+ 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
+ #else
+-	b	v6_icache_inval_all
++	b	v6_flush_icache_all
+ #endif
+ #else
+ 	mcr	p15, 0, r0, c7, c5, 6		@ invalidate BTB
+@@ -312,6 +319,7 @@ ENDPROC(v6_dma_unmap_area)
  
- 	nand_writel(info, NDTR0CS0, info->ndtr0cs0);
- 	nand_writel(info, NDTR1CS0, info->ndtr1cs0);
--- 
-1.7.0.4
+ 	.type	v6_cache_fns, #object
+ ENTRY(v6_cache_fns)
++	.long	v6_flush_icache_all
+ 	.long	v6_flush_kern_cache_all
+ 	.long	v6_flush_user_cache_all
+ 	.long	v6_flush_user_cache_range
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -18,6 +18,21 @@
+ #include "proc-macros.S"
+ 
+ /*
++ *	v7_flush_icache_all()
++ *
++ *	Flush the whole I-cache.
++ *
++ *	Registers:
++ *	r0 - set to 0
++ */
++ENTRY(v7_flush_icache_all)
++	mov	r0, #0
++	ALT_SMP(mcr	p15, 0, r0, c7, c1, 0)		@ invalidate I-cache inner shareable
++	ALT_UP(mcr	p15, 0, r0, c7, c5, 0)		@ I+BTB cache invalidate
++	mov	pc, lr
++ENDPROC(v7_flush_icache_all)
++
++/*
+  *	v7_flush_dcache_all()
+  *
+  *	Flush the whole D-cache.
+@@ -303,6 +318,7 @@ ENDPROC(v7_dma_unmap_area)
+ 
+ 	.type	v7_cache_fns, #object
+ ENTRY(v7_cache_fns)
++	.long	v7_flush_icache_all
+ 	.long	v7_flush_kern_cache_all
+ 	.long	v7_flush_user_cache_all
+ 	.long	v7_flush_user_cache_range
