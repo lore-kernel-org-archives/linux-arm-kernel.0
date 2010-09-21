@@ -1,264 +1,616 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Sep 2010 09:16:00 -0700
-Subject: [PATCH] ARM: Handle __flush_icache_all for CONFIG_SMP_ON_UP
-In-Reply-To: <20100914185907.GG8647@atomide.com>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100914185907.GG8647@atomide.com>
-Message-ID: <20100921161600.GT4611@atomide.com>
+From: leiwen@marvell.com (Lei Wen)
+Date: Wed, 22 Sep 2010 00:28:09 +0800
+Subject: [PATCH 2/6 V2] pxa3xx_nand: rework irq logic
+In-Reply-To: <AANLkTinH_-2tdyfe_o6gzbWLKD5ahjVz4jJfapXsCkrL@mail.gmail.com>
+References: <AANLkTinH_-2tdyfe_o6gzbWLKD5ahjVz4jJfapXsCkrL@mail.gmail.com>
+Message-ID: <1285086489-3046-1-git-send-email-leiwen@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [100914 12:04]:
-> 
-> Here's a patch for __flush_icache_all. I believe this is the last
-> remaining patch we need.
-> 
-> The only other thing I can think of are the conflicts with
-> CONFIG_CPU_32v6K, on early ARM1136 and later ARM11 systems if somebody
-> wants to compile a kernel that supports both. But that's not needed for
-> omap2, so we can boot now omap2, 3 and 4 with a single defconfig :)
+Enable all irq when we start the nand controller, and
+put all the transaction logic in the pxa3xx_nand_irq.
 
-Here's an updated version with a typo fix s/fluch/flush/ from Anand.
+By doing this way, we could dramatically increase the
+performance by avoid unnecessary delay.
 
-Regards,
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+---
+V2:
+Change log:
+Abandon use bit or state mode
+Modify pxa3xx_nand_stop logic as suggested
 
-Tony
+ drivers/mtd/nand/pxa3xx_nand.c |  319 +++++++++++++++++++---------------------
+ 1 files changed, 153 insertions(+), 166 deletions(-)
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 20 Sep 2010 16:37:16 -0700
-Subject: [PATCH] ARM: Handle __flush_icache_all for CONFIG_SMP_ON_UP
-
-Do this by adding flush_icache_all to cache_fns for ARMv6 and 7.
-As flush_icache_all may neeed to be called from flush_kern_cache_all,
-add it as the first entry in the cache_fns.
-
-Note that now we can remove the ARM_ERRATA_411920 dependency
-to !SMP so it can be selected on UP ARMv6 processors, such
-as omap2.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1017,7 +1017,7 @@ endif
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index aff28dc..dc24000 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -27,6 +27,7 @@
+ #include <plat/pxa3xx_nand.h>
  
- config ARM_ERRATA_411920
- 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
--	depends on CPU_V6 && !SMP
-+	depends on CPU_V6
- 	help
- 	  Invalidation of the Instruction Cache operation can
- 	  fail. This erratum is present in 1136 (before r1p4), 1156 and 1176.
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -156,6 +156,12 @@
-  *	Please note that the implementation of these, and the required
-  *	effects are cache-type (VIVT/VIPT/PIPT) specific.
-  *
-+ *	flush_icache_all()
-+ *
-+ *		Unconditionally clean and invalidate the entire icache.
-+ *		Currently only needed for cache-v6.S and cache-v7.S, see
-+ *		__flush_icache_all for the generic implementation.
-+ *
-  *	flush_kern_all()
-  *
-  *		Unconditionally clean and invalidate the entire cache.
-@@ -206,6 +212,7 @@
-  */
+ #define	CHIP_DELAY_TIMEOUT	(2 * HZ/10)
++#define NAND_STOP_DELAY		(2 * HZ/50)
  
- struct cpu_cache_fns {
-+	void (*flush_icache_all)(void);
- 	void (*flush_kern_all)(void);
- 	void (*flush_user_all)(void);
- 	void (*flush_user_range)(unsigned long, unsigned long, unsigned int);
-@@ -227,6 +234,7 @@ struct cpu_cache_fns {
+ /* registers and bit definitions */
+ #define NDCR		(0x00) /* Control register */
+@@ -52,16 +53,18 @@
+ #define NDCR_ND_MODE		(0x3 << 21)
+ #define NDCR_NAND_MODE   	(0x0)
+ #define NDCR_CLR_PG_CNT		(0x1 << 20)
+-#define NDCR_CLR_ECC		(0x1 << 19)
++#define NDCR_STOP_ON_UNCOR	(0x1 << 19)
+ #define NDCR_RD_ID_CNT_MASK	(0x7 << 16)
+ #define NDCR_RD_ID_CNT(x)	(((x) << 16) & NDCR_RD_ID_CNT_MASK)
  
- extern struct cpu_cache_fns cpu_cache;
+ #define NDCR_RA_START		(0x1 << 15)
+ #define NDCR_PG_PER_BLK		(0x1 << 14)
+ #define NDCR_ND_ARB_EN		(0x1 << 12)
++#define NDCR_INT_MASK           (0xFFF)
  
-+#define __cpuc_flush_icache_all		cpu_cache.flush_icache_all
- #define __cpuc_flush_kern_all		cpu_cache.flush_kern_all
- #define __cpuc_flush_user_all		cpu_cache.flush_user_all
- #define __cpuc_flush_user_range		cpu_cache.flush_user_range
-@@ -246,6 +254,7 @@ extern struct cpu_cache_fns cpu_cache;
+ #define NDSR_MASK		(0xfff)
+-#define NDSR_RDY		(0x1 << 11)
++#define NDSR_RDY                (0x1 << 12)
++#define NDSR_FLASH_RDY          (0x1 << 11)
+ #define NDSR_CS0_PAGED		(0x1 << 10)
+ #define NDSR_CS1_PAGED		(0x1 << 9)
+ #define NDSR_CS0_CMDD		(0x1 << 8)
+@@ -104,13 +107,15 @@ enum {
+ };
  
- #else
+ enum {
+-	STATE_READY	= 0,
++	STATE_IDLE = 0,
+ 	STATE_CMD_HANDLE,
+ 	STATE_DMA_READING,
+ 	STATE_DMA_WRITING,
+ 	STATE_DMA_DONE,
+ 	STATE_PIO_READING,
+ 	STATE_PIO_WRITING,
++	STATE_CMD_DONE,
++	STATE_READY,
+ };
  
-+#define __cpuc_flush_icache_all		__glue(_CACHE,_flush_icache_all)
- #define __cpuc_flush_kern_all		__glue(_CACHE,_flush_kern_cache_all)
- #define __cpuc_flush_user_all		__glue(_CACHE,_flush_user_cache_all)
- #define __cpuc_flush_user_range		__glue(_CACHE,_flush_user_cache_range)
-@@ -253,6 +262,7 @@ extern struct cpu_cache_fns cpu_cache;
- #define __cpuc_coherent_user_range	__glue(_CACHE,_coherent_user_range)
- #define __cpuc_flush_dcache_area	__glue(_CACHE,_flush_kern_dcache_area)
+ struct pxa3xx_nand_info {
+@@ -292,7 +297,48 @@ static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
+ 	}
+ }
  
-+extern void __cpuc_flush_icache_all(void);
- extern void __cpuc_flush_kern_all(void);
- extern void __cpuc_flush_user_all(void);
- extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
-@@ -291,6 +301,37 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
- /*
-  * Convert calls to our calling convention.
-  */
-+
-+/* Invalidate I-cache */
-+#define __flush_icache_all_generic()					\
-+	asm("mcr	p15, 0, %0, c7, c5, 0"				\
-+	    : : "r" (0));
-+
-+/* Invalidate I-cache inner shareable */
-+#define __flush_icache_all_v7_smp()					\
-+	asm("mcr	p15, 0, %0, c7, c1, 0"				\
-+	    : : "r" (0));
-+
-+/*
-+ * Optimized __flush_icache_all for the common cases. Note that UP ARMv7
-+ * will fall through to use __flush_icache_all_generic.
+-static int prepare_read_prog_cmd(struct pxa3xx_nand_info *info,
++/**
++ * NOTE: it is a must to set ND_RUN firstly, then write
++ * command buffer, otherwise, it does not work.
++ * We enable all the interrupt@the same time, and
++ * let pxa3xx_nand_irq to handle all logic.
 + */
-+#if (defined(CONFIG_CPU_V7) && defined(CONFIG_CPU_V6)) ||		\
-+	defined(CONFIG_SMP_ON_UP)
-+#define __flush_icache_preferred	__cpuc_flush_icache_all
-+#elif __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
-+#define __flush_icache_preferred	__flush_icache_all_v7_smp
-+#elif __LINUX_ARM_ARCH__ == 6 && defined(CONFIG_ARM_ERRATA_411920)
-+#define __flush_icache_preferred	__cpuc_flush_icache_all
-+#else
-+#define __flush_icache_preferred	__flush_icache_all_generic
-+#endif
-+
-+static inline void __flush_icache_all(void)
++static void pxa3xx_nand_start(struct pxa3xx_nand_info *info)
 +{
-+	__flush_icache_preferred();
++	uint32_t ndcr;
++
++	ndcr = info->reg_ndcr;
++	ndcr |= info->use_ecc ? NDCR_ECC_EN : 0;
++	ndcr |= info->use_dma ? NDCR_DMA_EN : 0;
++	ndcr |= NDCR_ND_RUN;
++
++	/* clear status bits and run */
++	nand_writel(info, NDCR, 0);
++	nand_writel(info, NDSR, NDSR_MASK);
++	nand_writel(info, NDCR, ndcr);
 +}
 +
- #define flush_cache_all()		__cpuc_flush_kern_all()
- 
- static inline void vivt_flush_cache_mm(struct mm_struct *mm)
-@@ -366,21 +407,6 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
- #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
- extern void flush_dcache_page(struct page *);
- 
--static inline void __flush_icache_all(void)
--{
--#ifdef CONFIG_ARM_ERRATA_411920
--	extern void v6_icache_inval_all(void);
--	v6_icache_inval_all();
--#elif defined(CONFIG_SMP) && __LINUX_ARM_ARCH__ >= 7
--	asm("mcr	p15, 0, %0, c7, c1, 0	@ invalidate I-cache inner shareable\n"
--	    :
--	    : "r" (0));
--#else
--	asm("mcr	p15, 0, %0, c7, c5, 0	@ invalidate I-cache\n"
--	    :
--	    : "r" (0));
--#endif
--}
- static inline void flush_kernel_vmap_range(void *addr, int size)
- {
- 	if ((cache_is_vivt() || cache_is_vipt_aliasing()))
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -21,18 +21,22 @@
- #define D_CACHE_LINE_SIZE	32
- #define BTB_FLUSH_SIZE		8
- 
--#ifdef CONFIG_ARM_ERRATA_411920
- /*
-- * Invalidate the entire I cache (this code is a workaround for the ARM1136
-- * erratum 411920 - Invalidate Instruction Cache operation can fail. This
-- * erratum is present in 1136, 1156 and 1176. It does not affect the MPCore.
-+ *	v6_flush_icache_all()
-+ *
-+ *	Flush the whole I-cache.
-  *
-- * Registers:
-- *   r0 - set to 0
-- *   r1 - corrupted
-+ *	ARM1136 erratum 411920 - Invalidate Instruction Cache operation can fail.
-+ *	This erratum is present in 1136, 1156 and 1176. It does not affect the
-+ *	MPCore.
-+ *
-+ *	Registers:
-+ *	r0 - set to 0
-+ *	r1 - corrupted
-  */
--ENTRY(v6_icache_inval_all)
-+ENTRY(v6_flush_icache_all)
- 	mov	r0, #0
-+#ifdef CONFIG_ARM_ERRATA_411920
- 	mrs	r1, cpsr
- 	cpsid	ifa				@ disable interrupts
- 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate entire I-cache
-@@ -43,8 +47,11 @@ ENTRY(v6_icache_inval_all)
- 	.rept	11				@ ARM Ltd recommends at least
- 	nop					@ 11 NOPs
- 	.endr
--	mov	pc, lr
-+#else
-+	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I-cache
- #endif
-+	mov	pc, lr
-+ENDPROC(v6_flush_icache_all)
- 
- /*
-  *	v6_flush_cache_all()
-@@ -60,7 +67,7 @@ ENTRY(v6_flush_kern_cache_all)
- #ifndef CONFIG_ARM_ERRATA_411920
- 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
- #else
--	b	v6_icache_inval_all
-+	b	v6_flush_icache_all
- #endif
- #else
- 	mcr	p15, 0, r0, c7, c15, 0		@ Cache clean+invalidate
-@@ -138,7 +145,7 @@ ENTRY(v6_coherent_user_range)
- #ifndef CONFIG_ARM_ERRATA_411920
- 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
- #else
--	b	v6_icache_inval_all
-+	b	v6_flush_icache_all
- #endif
- #else
- 	mcr	p15, 0, r0, c7, c5, 6		@ invalidate BTB
-@@ -312,6 +319,7 @@ ENDPROC(v6_dma_unmap_area)
- 
- 	.type	v6_cache_fns, #object
- ENTRY(v6_cache_fns)
-+	.long	v6_flush_icache_all
- 	.long	v6_flush_kern_cache_all
- 	.long	v6_flush_user_cache_all
- 	.long	v6_flush_user_cache_range
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -18,6 +18,21 @@
- #include "proc-macros.S"
- 
- /*
-+ *	v7_flush_icache_all()
-+ *
-+ *	Flush the whole I-cache.
-+ *
-+ *	Registers:
-+ *	r0 - set to 0
-+ */
-+ENTRY(v7_flush_icache_all)
-+	mov	r0, #0
-+	ALT_SMP(mcr	p15, 0, r0, c7, c1, 0)		@ invalidate I-cache inner shareable
-+	ALT_UP(mcr	p15, 0, r0, c7, c5, 0)		@ I+BTB cache invalidate
-+	mov	pc, lr
-+ENDPROC(v7_flush_icache_all)
++static void pxa3xx_nand_stop(struct pxa3xx_nand_info *info)
++{
++	uint32_t ndcr;
++	int timeout = NAND_STOP_DELAY;
 +
-+/*
-  *	v7_flush_dcache_all()
-  *
-  *	Flush the whole D-cache.
-@@ -303,6 +318,7 @@ ENDPROC(v7_dma_unmap_area)
++	/* wait RUN bit in NDCR become 0 */
++	ndcr = nand_readl(info, NDCR);
++	while ((ndcr & NDCR_ND_RUN) && (timeout -- > 0)) {
++		ndcr = nand_readl(info, NDCR);
++		udelay(1);
++	}
++
++	if (timeout <= 0) {
++		ndcr &= ~NDCR_ND_RUN;
++		nand_writel(info, NDCR, ndcr);
++	}
++	/* clear status bits */
++	nand_writel(info, NDSR, NDSR_MASK);
++}
++
++static void prepare_read_prog_cmd(struct pxa3xx_nand_info *info,
+ 		uint16_t cmd, int column, int page_addr)
+ {
+ 	const struct pxa3xx_nand_cmdset *cmdset = info->cmdset;
+@@ -319,21 +365,18 @@ static int prepare_read_prog_cmd(struct pxa3xx_nand_info *info,
  
- 	.type	v7_cache_fns, #object
- ENTRY(v7_cache_fns)
-+	.long	v7_flush_icache_all
- 	.long	v7_flush_kern_cache_all
- 	.long	v7_flush_user_cache_all
- 	.long	v7_flush_user_cache_range
+ 	if (cmd == cmdset->program)
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(1) | NDCB0_AUTO_RS;
+-
+-	return 0;
+ }
+ 
+-static int prepare_erase_cmd(struct pxa3xx_nand_info *info,
++static void prepare_erase_cmd(struct pxa3xx_nand_info *info,
+ 			uint16_t cmd, int page_addr)
+ {
+ 	info->ndcb0 = cmd | ((cmd & 0xff00) ? NDCB0_DBC : 0);
+ 	info->ndcb0 |= NDCB0_CMD_TYPE(2) | NDCB0_AUTO_RS | NDCB0_ADDR_CYC(3);
+ 	info->ndcb1 = page_addr;
+ 	info->ndcb2 = 0;
+-	return 0;
+ }
+ 
+-static int prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
++static void prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
+ {
+ 	const struct pxa3xx_nand_cmdset *cmdset = info->cmdset;
+ 
+@@ -343,7 +386,7 @@ static int prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
+ 
+ 	info->oob_size = 0;
+ 	if (cmd == cmdset->read_id) {
+-		info->ndcb0 |= NDCB0_CMD_TYPE(3);
++		info->ndcb0 |= NDCB0_CMD_TYPE(3) | NDCB0_ADDR_CYC(1);
+ 		info->data_size = 8;
+ 	} else if (cmd == cmdset->read_status) {
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(4);
+@@ -352,9 +395,7 @@ static int prepare_other_cmd(struct pxa3xx_nand_info *info, uint16_t cmd)
+ 		   cmd == cmdset->unlock) {
+ 		info->ndcb0 |= NDCB0_CMD_TYPE(5);
+ 	} else
+-		return -EINVAL;
+-
+-	return 0;
++		BUG();
+ }
+ 
+ static void enable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+@@ -402,10 +443,8 @@ static int write_cmd(struct pxa3xx_nand_info *info)
+ 	return 0;
+ }
+ 
+-static int handle_data_pio(struct pxa3xx_nand_info *info)
++static void handle_data_pio(struct pxa3xx_nand_info *info)
+ {
+-	int ret, timeout = CHIP_DELAY_TIMEOUT;
+-
+ 	switch (info->state) {
+ 	case STATE_PIO_WRITING:
+ 		__raw_writesl(info->mmio_base + NDDB, info->data_buff,
+@@ -413,14 +452,6 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
+ 		if (info->oob_size > 0)
+ 			__raw_writesl(info->mmio_base + NDDB, info->oob_buff,
+ 					DIV_ROUND_UP(info->oob_size, 4));
+-
+-		enable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+-
+-		ret = wait_for_completion_timeout(&info->cmd_complete, timeout);
+-		if (!ret) {
+-			printk(KERN_ERR "program command time out\n");
+-			return -1;
+-		}
+ 		break;
+ 	case STATE_PIO_READING:
+ 		__raw_readsl(info->mmio_base + NDDB, info->data_buff,
+@@ -432,14 +463,11 @@ static int handle_data_pio(struct pxa3xx_nand_info *info)
+ 	default:
+ 		printk(KERN_ERR "%s: invalid state %d\n", __func__,
+ 				info->state);
+-		return -EINVAL;
++		BUG();
+ 	}
+-
+-	info->state = STATE_READY;
+-	return 0;
+ }
+ 
+-static void start_data_dma(struct pxa3xx_nand_info *info, int dir_out)
++static void start_data_dma(struct pxa3xx_nand_info *info)
+ {
+ 	struct pxa_dma_desc *desc = info->data_desc;
+ 	int dma_len = ALIGN(info->data_size + info->oob_size, 32);
+@@ -447,14 +475,21 @@ static void start_data_dma(struct pxa3xx_nand_info *info, int dir_out)
+ 	desc->ddadr = DDADR_STOP;
+ 	desc->dcmd = DCMD_ENDIRQEN | DCMD_WIDTH4 | DCMD_BURST32 | dma_len;
+ 
+-	if (dir_out) {
++	switch (info->state) {
++	case STATE_DMA_WRITING:
+ 		desc->dsadr = info->data_buff_phys;
+ 		desc->dtadr = info->mmio_phys + NDDB;
+ 		desc->dcmd |= DCMD_INCSRCADDR | DCMD_FLOWTRG;
+-	} else {
++		break;
++	case STATE_DMA_READING:
+ 		desc->dtadr = info->data_buff_phys;
+ 		desc->dsadr = info->mmio_phys + NDDB;
+ 		desc->dcmd |= DCMD_INCTRGADDR | DCMD_FLOWSRC;
++		break;
++	default:
++		printk(KERN_ERR "%s: invalid state %d\n", __func__,
++				info->state);
++		BUG();
+ 	}
+ 
+ 	DRCMR(info->drcmr_dat) = DRCMR_MAPVLD | info->data_dma_ch;
+@@ -472,93 +507,60 @@ static void pxa3xx_nand_data_dma_irq(int channel, void *data)
+ 
+ 	if (dcsr & DCSR_BUSERR) {
+ 		info->retcode = ERR_DMABUSERR;
+-		complete(&info->cmd_complete);
+ 	}
+ 
+-	if (info->state == STATE_DMA_WRITING) {
+-		info->state = STATE_DMA_DONE;
+-		enable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+-	} else {
+-		info->state = STATE_READY;
+-		complete(&info->cmd_complete);
+-	}
++	info->state = STATE_DMA_DONE;
++	enable_int(info, NDCR_INT_MASK);
++	nand_writel(info, NDSR, NDSR_WRDREQ | NDSR_RDDREQ);
+ }
+ 
+ static irqreturn_t pxa3xx_nand_irq(int irq, void *devid)
+ {
+ 	struct pxa3xx_nand_info *info = devid;
+-	unsigned int status;
++	unsigned int status, is_completed = 0;
+ 
+ 	status = nand_readl(info, NDSR);
+ 
+-	if (status & (NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR)) {
+-		if (status & NDSR_DBERR)
+-			info->retcode = ERR_DBERR;
+-		else if (status & NDSR_SBERR)
+-			info->retcode = ERR_SBERR;
+-
+-		disable_int(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+-
+-		if (info->use_dma) {
+-			info->state = STATE_DMA_READING;
+-			start_data_dma(info, 0);
+-		} else {
+-			info->state = STATE_PIO_READING;
+-			complete(&info->cmd_complete);
+-		}
+-	} else if (status & NDSR_WRDREQ) {
+-		disable_int(info, NDSR_WRDREQ);
++	if (status & NDSR_DBERR)
++		info->retcode = ERR_DBERR;
++	if (status & NDSR_SBERR)
++		info->retcode = ERR_SBERR;
++	if (status & (NDSR_RDDREQ | NDSR_WRDREQ)) {
++		/* whether use dma to transfer data */
+ 		if (info->use_dma) {
+-			info->state = STATE_DMA_WRITING;
+-			start_data_dma(info, 1);
++			disable_int(info, NDCR_INT_MASK);
++			info->state = (status & NDSR_RDDREQ) ?
++				      STATE_DMA_READING : STATE_DMA_WRITING;
++			start_data_dma(info);
++			goto NORMAL_IRQ_EXIT;
+ 		} else {
+-			info->state = STATE_PIO_WRITING;
+-			complete(&info->cmd_complete);
++			info->state = (status & NDSR_RDDREQ) ?
++				      STATE_PIO_READING : STATE_PIO_WRITING;
++			handle_data_pio(info);
+ 		}
+-	} else if (status & (NDSR_CS0_BBD | NDSR_CS0_CMDD)) {
+-		if (status & NDSR_CS0_BBD)
+-			info->retcode = ERR_BBERR;
+-
+-		disable_int(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
+-		info->state = STATE_READY;
+-		complete(&info->cmd_complete);
+ 	}
+-	nand_writel(info, NDSR, status);
+-	return IRQ_HANDLED;
+-}
+-
+-static int pxa3xx_nand_do_cmd(struct pxa3xx_nand_info *info, uint32_t event)
+-{
+-	uint32_t ndcr;
+-	int ret, timeout = CHIP_DELAY_TIMEOUT;
+-
+-	if (write_cmd(info)) {
+-		info->retcode = ERR_SENDCMD;
+-		goto fail_stop;
++	if (status & NDSR_CS0_CMDD) {
++		info->state = STATE_CMD_DONE;
++		is_completed = 1;
+ 	}
++	if (status & NDSR_FLASH_RDY)
++		info->state = STATE_READY;
+ 
+-	info->state = STATE_CMD_HANDLE;
+-
+-	enable_int(info, event);
+-
+-	ret = wait_for_completion_timeout(&info->cmd_complete, timeout);
+-	if (!ret) {
+-		printk(KERN_ERR "command execution timed out\n");
+-		info->retcode = ERR_SENDCMD;
+-		goto fail_stop;
++	if (status & NDSR_WRCMDREQ) {
++		nand_writel(info, NDSR, NDSR_WRCMDREQ);
++		status &= ~NDSR_WRCMDREQ;
++		info->state = STATE_CMD_HANDLE;
++		nand_writel(info, NDCB0, info->ndcb0);
++		nand_writel(info, NDCB0, info->ndcb1);
++		nand_writel(info, NDCB0, info->ndcb2);
+ 	}
+ 
+-	if (info->use_dma == 0 && info->data_size > 0)
+-		if (handle_data_pio(info))
+-			goto fail_stop;
+-
+-	return 0;
+-
+-fail_stop:
+-	ndcr = nand_readl(info, NDCR);
+-	nand_writel(info, NDCR, ndcr & ~NDCR_ND_RUN);
+-	udelay(10);
+-	return -ETIMEDOUT;
++	/* clear NDSR to let the controller exit the IRQ */
++	nand_writel(info, NDSR, status);
++	if (is_completed)
++		complete(&info->cmd_complete);
++NORMAL_IRQ_EXIT:
++	return IRQ_HANDLED;
+ }
+ 
+ static int pxa3xx_nand_dev_ready(struct mtd_info *mtd)
+@@ -580,14 +582,12 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ {
+ 	struct pxa3xx_nand_info *info = mtd->priv;
+ 	const struct pxa3xx_nand_cmdset *cmdset = info->cmdset;
+-	int ret;
++	int ret, exec_cmd = 0;
+ 
+ 	info->use_dma = (use_dma) ? 1 : 0;
+ 	info->use_ecc = 0;
+ 	info->data_size = 0;
+-	info->state = STATE_READY;
+-
+-	init_completion(&info->cmd_complete);
++	info->state = 0;
+ 
+ 	switch (command) {
+ 	case NAND_CMD_READOOB:
+@@ -596,14 +596,12 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 		info->buf_start = mtd->writesize + column;
+ 		memset(info->data_buff, 0xFF, info->buf_count);
+ 
+-		if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
+-			break;
+-
+-		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+-
++		prepare_read_prog_cmd(info, cmdset->read1, column, page_addr);
+ 		/* We only are OOB, so if the data has error, does not matter */
+ 		if (info->retcode == ERR_DBERR)
+ 			info->retcode = ERR_NONE;
++
++		exec_cmd = 1;
+ 		break;
+ 
+ 	case NAND_CMD_READ0:
+@@ -613,11 +611,7 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 		info->buf_count = mtd->writesize + mtd->oobsize;
+ 		memset(info->data_buff, 0xFF, info->buf_count);
+ 
+-		if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
+-			break;
+-
+-		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
+-
++		prepare_read_prog_cmd(info, cmdset->read1, column, page_addr);
+ 		if (info->retcode == ERR_DBERR) {
+ 			/* for blank page (all 0xff), HW will calculate its ECC as
+ 			 * 0, which is different from the ECC information within
+@@ -626,6 +620,8 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 			if (is_buf_blank(info->data_buff, mtd->writesize))
+ 				info->retcode = ERR_NONE;
+ 		}
++
++		exec_cmd = 1;
+ 		break;
+ 	case NAND_CMD_SEQIN:
+ 		info->buf_start = column;
+@@ -639,17 +635,13 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 	case NAND_CMD_PAGEPROG:
+ 		info->use_ecc = (info->seqin_column >= mtd->writesize) ? 0 : 1;
+ 
+-		if (prepare_read_prog_cmd(info, cmdset->program,
+-				info->seqin_column, info->seqin_page_addr))
+-			break;
+-
+-		pxa3xx_nand_do_cmd(info, NDSR_WRDREQ);
++		prepare_read_prog_cmd(info, cmdset->program,
++				info->seqin_column, info->seqin_page_addr);
++		exec_cmd = 1;
+ 		break;
+ 	case NAND_CMD_ERASE1:
+-		if (prepare_erase_cmd(info, cmdset->erase, page_addr))
+-			break;
+-
+-		pxa3xx_nand_do_cmd(info, NDSR_CS0_BBD | NDSR_CS0_CMDD);
++		prepare_erase_cmd(info, cmdset->erase, page_addr);
++		exec_cmd = 1;
+ 		break;
+ 	case NAND_CMD_ERASE2:
+ 		break;
+@@ -660,39 +652,35 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 		info->buf_count = (command == NAND_CMD_READID) ?
+ 				info->read_id_bytes : 1;
+ 
+-		if (prepare_other_cmd(info, (command == NAND_CMD_READID) ?
+-				cmdset->read_id : cmdset->read_status))
+-			break;
+-
+-		pxa3xx_nand_do_cmd(info, NDSR_RDDREQ);
++		prepare_other_cmd(info, (command == NAND_CMD_READID) ?
++				cmdset->read_id : cmdset->read_status);
++		exec_cmd = 1;
+ 		break;
+ 	case NAND_CMD_RESET:
+-		if (prepare_other_cmd(info, cmdset->reset))
+-			break;
+-
+-		ret = pxa3xx_nand_do_cmd(info, NDSR_CS0_CMDD);
+-		if (ret == 0) {
+-			int timeout = 2;
+-			uint32_t ndcr;
+-
+-			while (timeout--) {
+-				if (nand_readl(info, NDSR) & NDSR_RDY)
+-					break;
+-				msleep(10);
+-			}
+-
+-			ndcr = nand_readl(info, NDCR);
+-			nand_writel(info, NDCR, ndcr & ~NDCR_ND_RUN);
+-		}
++		prepare_other_cmd(info, cmdset->reset);
++		exec_cmd = 1;
+ 		break;
+ 	default:
+ 		printk(KERN_ERR "non-supported command.\n");
+ 		break;
+ 	}
+ 
+-	if (info->retcode == ERR_DBERR) {
+-		printk(KERN_ERR "double bit error @ page %08x\n", page_addr);
+-		info->retcode = ERR_NONE;
++	if (exec_cmd) {
++		init_completion(&info->cmd_complete);
++		pxa3xx_nand_start(info);
++
++		ret = wait_for_completion_timeout(&info->cmd_complete,
++				CHIP_DELAY_TIMEOUT);
++		if (!ret) {
++			printk(KERN_ERR "Wait time out!!!\n");
++			/* Stop State Machine for next command cycle */
++			pxa3xx_nand_stop(info);
++		}
++		info->state = STATE_IDLE;
++		if (info->retcode == ERR_DBERR) {
++			printk(KERN_ERR "double bit error @ page %08x\n", page_addr);
++			info->retcode = ERR_NONE;
++		}
+ 	}
+ }
+ 
+@@ -807,10 +795,7 @@ static int __readid(struct pxa3xx_nand_info *info, uint32_t *id)
+ 	uint32_t ndcr;
+ 	uint8_t  id_buff[8];
+ 
+-	if (prepare_other_cmd(info, cmdset->read_id)) {
+-		printk(KERN_ERR "failed to prepare command\n");
+-		return -EINVAL;
+-	}
++	prepare_other_cmd(info, cmdset->read_id);
+ 
+ 	/* Send command */
+ 	if (write_cmd(info))
+@@ -836,7 +821,7 @@ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+ {
+ 	struct platform_device *pdev = info->pdev;
+ 	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
+-	uint32_t ndcr = 0x00000FFF; /* disable all interrupts */
++	uint32_t ndcr = 0x0; /* enable all interrupts */
+ 
+ 	if (f->page_size != 2048 && f->page_size != 512)
+ 		return -EINVAL;
+@@ -887,11 +872,12 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
+ 	info->read_id_bytes = (info->page_size == 2048) ? 4 : 2;
+ 	info->reg_ndcr = ndcr;
+ 
+-	if (__readid(info, &id))
++	pxa3xx_nand_cmdfunc(info->mtd, NAND_CMD_READID, 0, 0);
++	id = *((uint16_t *)(info->data_buff));
++	if (id == 0)
+ 		return -ENODEV;
+ 
+ 	/* Lookup the flash id */
+-	id = (id >> 8) & 0xff;		/* device id is byte 2 */
+ 	for (i = 0; nand_flash_ids[i].name != NULL; i++) {
+ 		if (id == nand_flash_ids[i].id) {
+ 			type =  &nand_flash_ids[i];
+@@ -935,8 +921,8 @@ static int pxa3xx_nand_detect_flash(struct pxa3xx_nand_info *info,
+ 	/* we use default timing to detect id */
+ 	f = DEFAULT_FLASH_TYPE;
+ 	pxa3xx_nand_config_flash(info, f);
+-	if (__readid(info, &id))
+-		goto fail_detect;
++	pxa3xx_nand_cmdfunc(info->mtd, NAND_CMD_READID, 0, 0);
++	id = *((uint16_t *)(info->data_buff));
+ 
+ 	for (i=0; i<ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1; i++) {
+ 		/* we first choose the flash definition from platfrom */
+@@ -954,7 +940,6 @@ static int pxa3xx_nand_detect_flash(struct pxa3xx_nand_info *info,
+ 	dev_warn(&info->pdev->dev,
+ 		 "failed to detect configured nand flash; found %04x instead of\n",
+ 		 id);
+-fail_detect:
+ 	return -ENODEV;
+ }
+ 
+@@ -1176,10 +1161,6 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+-	del_mtd_device(mtd);
+-#ifdef CONFIG_MTD_PARTITIONS
+-	del_mtd_partitions(mtd);
+-#endif
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq >= 0)
+ 		free_irq(irq, info);
+@@ -1197,7 +1178,13 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	clk_disable(info->clk);
+ 	clk_put(info->clk);
+ 
+-	kfree(mtd);
++	if (mtd) {
++		del_mtd_device(mtd);
++#ifdef CONFIG_MTD_PARTITIONS
++		del_mtd_partitions(mtd);
++#endif
++		kfree(mtd);
++	}
+ 	return 0;
+ }
+ 
+@@ -1231,10 +1218,10 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
+ 		nr_parts = parse_mtd_partitions(info->mtd, probes, &parts, 0);
+ 
+ 		if (nr_parts)
+-			return add_mtd_partitions(mtd, parts, nr_parts);
++			return add_mtd_partitions(info->mtd, parts, nr_parts);
+ 	}
+ 
+-	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
++	return add_mtd_partitions(info->mtd, pdata->parts, pdata->nr_parts);
+ #else
+ 	return 0;
+ #endif
+@@ -1246,7 +1233,7 @@ static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+ 	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+ 	struct mtd_info *mtd = info->mtd;
+ 
+-	if (info->state != STATE_READY) {
++	if (info->state) {
+ 		dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
+ 		return -EAGAIN;
+ 	}
+-- 
+1.7.0.4
