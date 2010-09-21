@@ -1,228 +1,151 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 21 Sep 2010 14:30:10 +0200
-Subject: [PATCH 4/4] mmc: sdhci-pltfm: add pltfm-driver for imx35/51
-In-Reply-To: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
-References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1285072210-10207-5-git-send-email-w.sang@pengutronix.de>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Tue, 21 Sep 2010 18:24:39 +0530
+Subject: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode support
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B0316062730@dbde02.ent.ti.com>
+References: <1284624059-1741-1-git-send-email-s-ghorai@ti.com>
+	<1284624059-1741-2-git-send-email-s-ghorai@ti.com>
+	<20100917175504.GG29610@atomide.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0316062730@dbde02.ent.ti.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B031610E073@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver adds basic support for the esdhc-core found on e.g.
-imx35/51. It adds up to the pltfm-core.
+Tony,
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- drivers/mmc/host/Kconfig       |    9 +++
- drivers/mmc/host/Makefile      |    1 +
- drivers/mmc/host/sdhci-esdhc.c |  141 ++++++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/sdhci-pltfm.c |    3 +
- drivers/mmc/host/sdhci-pltfm.h |    1 +
- 5 files changed, 155 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mmc/host/sdhci-esdhc.c
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Ghorai, Sukumar
+> Sent: Monday, September 20, 2010 7:01 PM
+> To: Tony Lindgren
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode
+> support
+> 
+> Tony,
+> 
+> > -----Original Message-----
+> > From: Ghorai, Sukumar
+> > Sent: Saturday, September 18, 2010 11:55 PM
+> > To: 'Tony Lindgren'
+> > Cc: 'linux-omap at vger.kernel.org'; 'linux-mtd at lists.infradead.org';
+> 'linux-
+> > arm-kernel at lists.infradead.org'
+> > Subject: RE: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode
+> > support
+> >
+> > Tony,
+> >
+> > > -----Original Message-----
+> > > From: Tony Lindgren [mailto:tony at atomide.com]
+> > > Sent: Friday, September 17, 2010 11:25 PM
+> > > To: Ghorai, Sukumar
+> > > Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
+> > arm-
+> > > kernel at lists.infradead.org; Vimal Singh
+> > > Subject: Re: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode
+> > > support
+> > >
+> > > * Sukumar Ghorai <s-ghorai@ti.com> [100916 00:53]:
+> > > > This patch enable prefetch-irq mode for NAND.
+> > > >
+> > > > --- a/drivers/mtd/nand/omap2.c
+> > > > +++ b/drivers/mtd/nand/omap2.c
+> > > > @@ -467,6 +485,152 @@ static void omap_write_buf_dma_pref(struct
+> > > mtd_info *mtd,
+> > > >  		omap_nand_dma_transfer(mtd, (u_char *) buf, len, 0x1);
+> > > >  }
+> > > >
+> > > > +/*
+> > > > + * omap_nand_irq - GMPC irq handler
+> > > > + * @this_irq: gpmc irq number
+> > > > + * @dev: omap_nand_info structure pointer is passed here
+> > > > + */
+> > > > +static irqreturn_t omap_nand_irq(int this_irq, void *dev)
+> > > > +{
+> > > > +	struct omap_nand_info *info = (struct omap_nand_info *) dev;
+> > > > +	u32 bytes;
+> > > > +	u32 irq_stat;
+> > > > +
+> > > > +	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
+> > > > +	bytes = gpmc_read_status(GPMC_PREFETCH_FIFO_CNT);
+> > > > +	bytes = bytes  & 0xFFFC; /* io in multiple of 4 bytes */
+> > > > +	if (info->iomode == OMAP_NAND_IO_WRITE) { /* checks for write
+> io */
+> > > > +		if (irq_stat & 0x2)
+> > > > +			goto done;
+> > > > +
+> > > > +		if (info->buf_len & (info->buf_len < bytes))
+> > > > +			bytes = info->buf_len;
+> > > > +		else if (!info->buf_len)
+> > > > +			bytes = 0;
+> > > > +		iowrite32_rep(info->nand.IO_ADDR_W,
+> > > > +						(u32 *)info->buf, bytes >> 2);
+> > > > +		info->buf = info->buf + bytes;
+> > > > +		info->buf_len -= bytes;
+> > > > +
+> > > > +	} else {
+> > > > +		ioread32_rep(info->nand.IO_ADDR_R,
+> > > > +						(u32 *)info->buf, bytes >> 2);
+> > > > +		info->buf = info->buf + bytes;
+> > > > +
+> > > > +		if (irq_stat & 0x2)
+> > > > +			goto done;
+> > > > +	}
+> > > > +	gpmc_cs_configure(info->gpmc_cs, GPMC_SET_IRQ_STATUS,
+> irq_stat);
+> > > > +	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
+> > > > +
+> > > > +	return IRQ_HANDLED;
+> > > > +
+> > > > +done:
+> > > > +	complete(&info->comp);
+> > > > +	/* disable irq */
+> > > > +	gpmc_cs_configure(info->gpmc_cs, GPMC_ENABLE_IRQ, 0);
+> > > > +
+> > > > +	/* clear status */
+> > > > +	gpmc_cs_configure(info->gpmc_cs, GPMC_SET_IRQ_STATUS,
+> irq_stat);
+> > > > +	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
+> > > > +
+> > > > +	return IRQ_HANDLED;
+> > > > +}
+> > >
+> > > This handler should be in gpmc.c as it may be needed for other GPMC
+> > > connected devices on the same system. You can use chained irq handlers
+> > > to allow all the drivers to use the interrupt then.
+> >
+> > [Ghorai]
+> > You mean as this function used the gpmc-irq number in nand file, so
+> > handler should move to gpmc.c file?
+> > 	1. For that we need to add one io-struct (to keep io buffer status)
+> > in gpmc.c;
+> >
+> > 	2. Also need help how to sync between gpmc.c/omap_nand_irq() and
+> > omap2.c/omap_write_buf_irq_pref(), men how read/write function know that
+> > work done in interrupt-context? Or you prefer to move the complete IO
+> > function (omap_read/write_buf_irq_pref) to gpmc.c?
+> >
+> > 	3. gpmc does not now about the read and write address that's
+> > applicable for NAND. So how to pass the IO address from omap2.c to
+> gpmc.c,
+> > interrupt handler?
+> >
+> >
+> > So, please let me know your suggestion again such that I can post this
+> > time itself. Otherwise again it will miss from coming release, this was
+> > posted/reviewed for last release too. And suggest to void repeating of
+> > missing release window again.
+> 
+> [Ghorai] Please reply with your 2nd suggestion.
+[Ghorai] Please reply with your 2nd suggestion.
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 6f12d5d..20d03f5 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -143,6 +143,15 @@ config MMC_SDHCI_MV
- 
- 	  If unsure, say N.
- 
-+config MMC_SDHCI_ESDHC
-+	bool "SDHCI platform support for the Freescale eSDHC controller"
-+	depends on MMC_SDHCI_PLTFM
-+	select MMC_SDHCI_IO_ACCESSORS
-+	help
-+	  This selects the Freescale eSDHC controller support.
-+
-+	  If unsure, say N.
-+
- config MMC_SDHCI_S3C
- 	tristate "SDHCI support on Samsung S3C SoC"
- 	depends on MMC_SDHCI && PLAT_SAMSUNG
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index 697bbfe..445d1e5 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -42,6 +42,7 @@ obj-$(CONFIG_MMC_USHC)		+= ushc.o
- obj-$(CONFIG_MMC_SDHCI_PLTFM)			+= sdhci-platform.o
- sdhci-platform-y				:= sdhci-pltfm.o
- sdhci-platform-$(CONFIG_MMC_SDHCI_CNS3XXX)	+= sdhci-cns3xxx.o
-+sdhci-platform-$(CONFIG_MMC_SDHCI_ESDHC)	+= sdhci-esdhc.o
- 
- obj-$(CONFIG_MMC_SDHCI_OF)	+= sdhci-of.o
- sdhci-of-y				:= sdhci-of-core.o
-diff --git a/drivers/mmc/host/sdhci-esdhc.c b/drivers/mmc/host/sdhci-esdhc.c
-new file mode 100644
-index 0000000..132e9c9
---- /dev/null
-+++ b/drivers/mmc/host/sdhci-esdhc.c
-@@ -0,0 +1,141 @@
-+/*
-+ * Freescale eSDHC controller driver for the platform bus.
-+ *
-+ * derived from the OF-version.
-+ *
-+ * Copyright (c) 2010 Pengutronix e.K.
-+ *   Author: Wolfram Sang <w.sang@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/sdhci-pltfm.h>
-+#include "sdhci.h"
-+#include "sdhci-esdhc.h"
-+#include "sdhci-pltfm.h"
-+
-+static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, int reg)
-+{
-+	void __iomem *base = host->ioaddr + (reg & ~0x3);
-+	u32 shift = (reg & 0x3) * 8;
-+
-+	writel(((readl(base) & ~(mask << shift)) | (val << shift)), base);
-+}
-+
-+static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
-+{
-+	if (unlikely(reg == SDHCI_HOST_VERSION))
-+		reg ^= 2;
-+
-+	return readw(host->ioaddr + reg);
-+}
-+
-+static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+
-+	switch (reg) {
-+	case SDHCI_TRANSFER_MODE:
-+		/*
-+		 * Postpone this write, we must do it together with a
-+		 * command write that is down below.
-+		 */
-+		pltfm_host->scratchpad = val;
-+		return;
-+	case SDHCI_COMMAND:
-+		writel(val << 16 | pltfm_host->scratchpad,
-+			host->ioaddr + SDHCI_TRANSFER_MODE);
-+		return;
-+	case SDHCI_BLOCK_SIZE:
-+		val &= ~SDHCI_MAKE_BLKSZ(0x7, 0);
-+		break;
-+	}
-+	esdhc_clrset_le(host, 0xffff, val, reg);
-+}
-+
-+static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
-+{
-+	u32 new_val;
-+
-+	switch (reg) {
-+	case SDHCI_POWER_CONTROL:
-+		/*
-+		 * FSL put some DMA bits here
-+		 * If your board has a regulator, code should be here
-+		 */
-+		return;
-+	case SDHCI_HOST_CONTROL:
-+		/* FSL messed up here, so we can just keep those two */
-+		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
-+		/* ensure the endianess */
-+		new_val |= ESDHC_HOST_CONTROL_LE;
-+		/* DMA mode bits are shifted */
-+		new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-+
-+		esdhc_clrset_le(host, 0xffff, new_val, reg);
-+		return;
-+	}
-+	esdhc_clrset_le(host, 0xff, val, reg);
-+}
-+
-+static unsigned int esdhc_pltfm_get_max_clock(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	return clk_get_rate(pltfm_host->clk);
-+}
-+
-+static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	return clk_get_rate(pltfm_host->clk) / 256 / 16;
-+}
-+
-+static int esdhc_pltfm_init(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct clk *clk;
-+
-+	clk = clk_get(NULL, "sdhc");
-+	if (IS_ERR(clk)) {
-+		dev_err(mmc_dev(host->mmc), "clk err\n");
-+		return -ENODEV;
-+	}
-+	clk_enable(clk);
-+	pltfm_host->clk = clk;
-+
-+	return 0;
-+}
-+
-+static void esdhc_pltfm_exit(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+
-+	clk_disable(pltfm_host->clk);
-+	clk_put(pltfm_host->clk);
-+}
-+
-+static struct sdhci_ops sdhci_esdhc_ops = {
-+	.read_w = esdhc_readw_le,
-+	.write_w = esdhc_writew_le,
-+	.write_b = esdhc_writeb_le,
-+	.set_clock = esdhc_set_clock,
-+	.get_max_clock = esdhc_pltfm_get_max_clock,
-+	.get_min_clock = esdhc_pltfm_get_min_clock,
-+};
-+
-+struct sdhci_pltfm_data sdhci_esdhc_pdata = {
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
-+			| SDHCI_QUIRK_BROKEN_ADMA,
-+	/* ADMA has issues. Might be fixable */
-+	/* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
-+	.ops = &sdhci_esdhc_ops,
-+	.init = esdhc_pltfm_init,
-+	.exit = esdhc_pltfm_exit,
-+};
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index ff0271c..6ba3f3d 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -164,6 +164,9 @@ static const struct platform_device_id sdhci_pltfm_ids[] = {
- #ifdef CONFIG_MMC_SDHCI_CNS3XXX
- 	{ "sdhci-cns3xxx", (kernel_ulong_t)&sdhci_cns3xxx_pdata },
- #endif
-+#ifdef CONFIG_MMC_SDHCI_ESDHC
-+	{ "sdhci-esdhc", (kernel_ulong_t)&sdhci_esdhc_pdata },
-+#endif
- 	{ },
- };
- MODULE_DEVICE_TABLE(platform, sdhci_pltfm_ids);
-diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-index 2b43ed5..deb4d27 100644
---- a/drivers/mmc/host/sdhci-pltfm.h
-+++ b/drivers/mmc/host/sdhci-pltfm.h
-@@ -19,5 +19,6 @@ struct sdhci_pltfm_host {
- };
- 
- extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
-+extern struct sdhci_pltfm_data sdhci_esdhc_pdata;
- 
- #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
--- 
-1.7.1
+> >
+> > >
+> > > Regards,
+> > >
+> > > Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
