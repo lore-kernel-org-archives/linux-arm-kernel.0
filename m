@@ -1,81 +1,183 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 22 Sep 2010 08:02:26 +1000
-Subject: Regarding hw irq to Linux irq mapping on ARM
-In-Reply-To: <AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
-References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
-	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
-Message-ID: <1285106546.30449.158.camel@pasglop>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 22 Sep 2010 00:21:35 +0200
+Subject: [PATCH v7 4/6] OMAP4: hwmod data: Add watchdog timer
+In-Reply-To: <1285076228-24736-5-git-send-email-charu@ti.com>
+References: <1285076228-24736-1-git-send-email-charu@ti.com>
+	<1285076228-24736-5-git-send-email-charu@ti.com>
+Message-ID: <4C992FEF.60106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-09-21 at 16:57 -0300, Grant Likely wrote:
-> On Tue, Sep 21, 2010 at 7:25 AM, Shaju Abraham <shaju.abraham@linaro.org> wrote:
-> > Hi Grant
-> >
-> > Since there does not exist a mechanism to map the hw irq to linux irq
-> > on ARM (device tree), I would like to discuss  with you the plans or
-> > ideas to implement the same.
+Hi Charu,
 
-Note that the powerpc hw -> linux IRQ mapping (virtualized irq numbering
-scheme) is orthogonal to the device-tree. It can be used without the
-device-tree and the device-tree doesn't mandate such a scheme.
+On 9/21/2010 3:37 PM, Varadarajan, Charulatha wrote:
+> From: Benoit Cousson<b-cousson@ti.com>
+>
+> Add watchdog timer hwmod data for OMAP4 chip
+>
+> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> Signed-off-by: Charulatha V<charu@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  135 ++++++++++++++++++++++++++++
+>   1 files changed, 135 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index e20b0ee..8660fea 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -452,6 +452,136 @@ static struct omap_hwmod omap44xx_mpu_hwmod = {
+>   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+>   };
+>
+> +/*
+> + * 'wd_timer' class
+> + * 32-bit watchdog upward counter that generates a pulse on the reset pin on
+> + * overflow condition
+> + */
+> +
+> +static struct omap_hwmod_class_sysconfig omap44xx_wd_timer_sysc = {
+> +	.rev_offs	= 0x0000,
+> +	.sysc_offs	= 0x0010,
+> +	.syss_offs	= 0x0014,
+> +	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_EMUFREE |
+> +			   SYSC_HAS_SOFTRESET),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	=&omap_hwmod_sysc_type1,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_wd_timer_hwmod_class = {
+> +	.name = "wd_timer",
+> +	.sysc =&omap44xx_wd_timer_sysc,
+> +};
+> +
+> +/* wd_timer2 */
+> +static struct omap_hwmod omap44xx_wd_timer2_hwmod;
+> +static struct omap_hwmod_irq_info omap44xx_wd_timer2_irqs[] = {
+> +	{ .irq = 80 + OMAP44XX_IRQ_GIC_START },
+> +};
+> +
+> +static struct omap_hwmod_addr_space omap44xx_wd_timer2_addrs[] = {
+> +	{
+> +		.pa_start	= 0x4a314000,
+> +		.pa_end		= 0x4a31407f,
+> +		.flags		= ADDR_TYPE_RT
+> +	},
+> +};
+> +
+> +/* l4_wkup ->  wd_timer2 */
+> +static struct omap_hwmod_ocp_if omap44xx_l4_wkup__wd_timer2 = {
+> +	.master		=&omap44xx_l4_wkup_hwmod,
+> +	.slave		=&omap44xx_wd_timer2_hwmod,
+> +	.clk		= "l4_wkup_clk_mux_ck",
+> +	.addr		= omap44xx_wd_timer2_addrs,
+> +	.addr_cnt	= ARRAY_SIZE(omap44xx_wd_timer2_addrs),
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* wd_timer2 slave ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_wd_timer2_slaves[] = {
+> +	&omap44xx_l4_wkup__wd_timer2,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_wd_timer2_hwmod = {
+> +	.name		= "wd_timer2",
+> +	.class		=&omap44xx_wd_timer_hwmod_class,
+> +	.mpu_irqs	= omap44xx_wd_timer2_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_wd_timer2_irqs),
+> +	.main_clk	= "wd_timer2_fck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_reg = OMAP4430_CM_WKUP_WDT2_CLKCTRL,
+> +		},
+> +	},
+> +	.slaves		= omap44xx_wd_timer2_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer2_slaves),
+> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+> +};
+> +
+> +/* wd_timer3 */
+> +static struct omap_hwmod omap44xx_wd_timer3_hwmod;
+> +static struct omap_hwmod_irq_info omap44xx_wd_timer3_irqs[] = {
+> +	{ .irq = 36 + OMAP44XX_IRQ_GIC_START },
+> +};
+> +
+> +static struct omap_hwmod_addr_space omap44xx_wd_timer3_addrs[] = {
+> +	{
+> +		.pa_start	= 0x40130000,
+> +		.pa_end		= 0x4013007f,
+> +		.flags		= ADDR_TYPE_RT
+> +	},
+> +};
+> +
+> +/* l4_abe ->  wd_timer3 */
+> +static struct omap_hwmod_ocp_if omap44xx_l4_abe__wd_timer3 = {
+> +	.master		=&omap44xx_l4_abe_hwmod,
+> +	.slave		=&omap44xx_wd_timer3_hwmod,
+> +	.clk		= "ocp_abe_iclk",
+> +	.addr		= omap44xx_wd_timer3_addrs,
+> +	.addr_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_addrs),
+> +	.user		= OCP_USER_MPU,
+> +};
+> +
+> +/* l4_abe ->  wd_timer3 (dma) */
+> +static struct omap_hwmod_addr_space omap44xx_wd_timer3_dma_addrs[] = {
+> +	{
+> +		.pa_start	= 0x49030000,
+> +		.pa_end		= 0x4903007f,
+> +		.flags		= ADDR_TYPE_RT
+> +	},
+> +};
+> +
+> +static struct omap_hwmod_ocp_if omap44xx_l4_abe__wd_timer3_dma = {
+> +	.master		=&omap44xx_l4_abe_hwmod,
+> +	.slave		=&omap44xx_wd_timer3_hwmod,
+> +	.clk		= "ocp_abe_iclk",
+> +	.addr		= omap44xx_wd_timer3_dma_addrs,
+> +	.addr_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_dma_addrs),
+> +	.user		= OCP_USER_SDMA,
+> +};
+> +
+> +/* wd_timer3 slave ports */
+> +static struct omap_hwmod_ocp_if *omap44xx_wd_timer3_slaves[] = {
+> +	&omap44xx_l4_abe__wd_timer3,
+> +	&omap44xx_l4_abe__wd_timer3_dma,
+> +};
+> +
+> +static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+> +	.name		= "wd_timer3",
+> +	.class		=&omap44xx_wd_timer_hwmod_class,
+> +	.mpu_irqs	= omap44xx_wd_timer3_irqs,
+> +	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_irqs),
+> +	.main_clk	= "wd_timer3_fck",
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_reg = OMAP4430_CM1_ABE_WDT3_CLKCTRL,
+> +		},
+> +	},
+> +	.slaves		= omap44xx_wd_timer3_slaves,
+> +	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer3_slaves),
+> +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+> +};
+> +
+>   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>   	/* dmm class */
+>   	&omap44xx_dmm_hwmod,
+> @@ -472,6 +602,11 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+>
+>   	/* mpu class */
+>   	&omap44xx_mpu_hwmod,
+> +	/* wd_timer class */
+> +	&omap44xx_wd_timer2_hwmod,
+> +
+> +	/* wd_timer3 not yet supported */
+> +/*	&omap44xx_wd_timer3_hwmod, */
 
-However, when used together, it does provide some nice features such as
-making most cases of cascaded controllers totally trivial.
+Sorry, I forgot to comment that part in your previous revision.
+What we agreed with Kevin is to enable that hwmod watchdog as well in 
+order to allow the hwmod core to initialize properly this module, even 
+if it not used by any driver yet.
 
-> I don't have any immediate plans, but this topic has come up a lot in
-> the last two weeks, so I guess I need to focus on it.  :-)  [cc'ing
-> devicetree-discuss and linux-arm-kernel as well as Lorenzo and Eric
-> since this is a conversation that should be had publically]
-> 
-> > Can you share with me your thoughts on it?
-> > I have browsed through the power pc code for the same. But not sure
-> > the same approach is usable on ARM as well.
-> 
-> I haven't thought deeply about the powerpc implementation of virqs to
-> determine if it is suitable for other architectures or not, but the
-> concept behind it is sound.  We need a method of mapping controller
-> specific IRQ (or hw irq) numbers into the global Linux irq space
-> (referred to a virqs from this point on).  First it requires a
-> per-controller reference which can be a pointer to a per-controller
-> data structure, or any other unique identifier.  It could even be the
-> interrupt controller device tree node pointer.  Just so long as there
-> is a reliable method to derive the virq from the controller reference
-> + hw irq number.
+Beside that you can add my Acked-by: for the whole series.
 
-I like keeping it somewhat orthogonal. See how I do that on powerpc.
-That way, you can still exploit it, map interrupts etc... even if your
-device-tree happens to be deficient or missing.
-
-The main grief one could have with my scheme is the naming of irq_host
-which has confused people in the past. It should probably be irq_domain
-to make clear what it is. It generally have a 1:1 relationship to the
-irq_chip but there are cases where that isn't the case (essentially
-where you have multiple irq_chip per domain) for various reasons so it's
-better to keep those separate.
-
-> There also needs to be a method for each interrupt controller to
-> register itself and allocate a portion of the virq range.  This
-> shouldn't be too hard.  PowerPC handles this with the irq_map[] flat
-> table.  This approach is limited to whatever NR_IRQs is set to, and
-> could potentially be limited by that, but on the other hand the number
-> of discrete IRQ sources in a system is limited so a flat table
-> (instead of a dynamic hash table) is probably sufficient.  It is
-> certainly simpler to implement.
-
-It's an implementation detail. We can make sure nothing accesses the
-table directly so we can turn it into something else if needed.
-
-> I think the first step is to simply try generalizing the code in
-> arch/powerpc/kernel/irq.c.  It isn't very complex and it would give a
-> better impression of what needs to be done.  The ARM interrupt
-> controller drivers would need to be modified to register with the virq
-> infrastructure.  None of this is either ARM or OF specific; it would
-> be useful for any system than need to dynamically allocate IRQ
-> numbers.  I could see some x86 use cases (Xilinx FPGAs) where this
-> would be useful.
-
-Right.
-
-Cheers
-Ben.
+Thanks,
+Benoit
