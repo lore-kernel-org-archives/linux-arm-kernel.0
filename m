@@ -1,40 +1,24 @@
-From: ben@simtec.co.uk (Ben Dooks)
-Date: Tue, 21 Sep 2010 01:30:16 +0100
-Subject: colibri-pxa320/AX88796: phy-read/write problems
-In-Reply-To: <4C9208DD.8000805@pengutronix.de>
-References: <4C9208DD.8000805@pengutronix.de>
-Message-ID: <4C97FC98.9080309@simtec.co.uk>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 21 Sep 2010 02:17:11 +0100
+Subject: [PATCH] sdhci-s3c: fix incorrect spinlock usage after merge
+In-Reply-To: <1284987822-17955-1-git-send-email-m.szyprowski@samsung.com>
+References: <1284987822-17955-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20100921011711.GB5873@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/10 13:09, Marc Kleine-Budde wrote:
-> Hello,
-> 
-> my hardware is a toradex colibri PXA320 board using latest stable
-> Kernel 2.6.35.4. The Ethernet controller is a AX88796BI.
-> 
-> Ethernet is working, but access via MDIO to the AX's internal phy is
-> broken. The contents of all registers is 0xffff.
-> 
-> The userspace tool "mii-diag" illustrates the problem:
-> root at grabowski:~ mii-diag
-> Using the default interface 'eth0'.
-> Basic registers of MII PHY #16:  ffff ffff ffff ffff ffff ffff ffff ffff.
->   No MII transceiver present!.
->   Use '--force' to view the information anyway.
-> 
-> If I switch on the phy_debug in the ax88796 driver we see that the
-> 0xffff are read via "ax_phy_read()" from the hardware, this means it's
-> not a problem in the userspace.
+On Mon, Sep 20, 2010 at 03:03:42PM +0200, Marek Szyprowski wrote:
+> In the commit f522886e202a34a2191dd5d471b3c4d46410a9a0 a merge conflict
+> in the sdhci-s3c driver been fixed. However the fix used incorrect
+> spinlock operation - it cause a race with sdhci interrupt service. The
+> correct way to solve it is to use spin_lock_irqsave/irqrestore() calls.
 
-I've not tried it with a PXA, but it was working with a S3C2440 based
-system when it was written, so I do beleive it should work. However
-I've not had a chance to test the MII code for a few releases so have
-no idea if it does still work.
+Thanks, applied to mmc-next with:
+Signed-off-by: Chris Ball <cjb@laptop.org>
 
-Do you know if the hardware is correct? Has any other linux version
-managed to talk to the MII interface, or other OS/bootloader
-combination?
+Andrew, not sure how best to get this upstream -- do you want to send
+this up to Linus (for -rc5) via your queue in -mm?
 
 -- 
-Ben
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
