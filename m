@@ -1,59 +1,68 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 21 Sep 2010 14:30:06 +0200
-Subject: [PATCH 0/4] Adding support for esdhc on mx35/51
-Message-ID: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
+Date: Tue, 21 Sep 2010 14:30:07 +0200
+Subject: [PATCH 1/4] mmc: sdhci-pltfm: Add structure for host-specific data
+In-Reply-To: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
+References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1285072210-10207-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We need to carry some information per host, e.g. the clock. Add a
+structure for it and initialize it in the generic part.
 
-this series adds basic support for the esdhc-controller found on mx35/51-cpus.
-It first extends the sdhci-pltfm-driver to have a runtime-structure for data
-(1/4), does a bit of cleanup (2/4), extracts a few parts which can be shared
-with the OF-version (3/4) and finally adds the driver (4/4).
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/mmc/host/sdhci-pltfm.c |    7 +++++--
+ drivers/mmc/host/sdhci-pltfm.h |    5 +++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-Note that the support is basic at the moment. Still to be done are:
-
-* ADMA support (Richard Zhu mentioned it has issues and knows the details)
-
-* 8-Bit bus width (needs more research; it breaks some cards for me :( )
-
-* voltage switching using a regulator (I don't have such hardware, hopefully
-  Richard can pick this up)
-
-* write_protect using a GPIO (we need to retrieve board-specific data for that;
-  an RFC follows after this series)
-
-Platform resources could be posted after write_protect issue has been sorted
-out.
-
-Please review and/or give comments. Please let me also know if you intend to
-work on a missing bit.
-
-Thanks,
-
-   Wolfram
-
-===
-
-Wolfram Sang (4):
-  mmc: sdhci-pltfm: Add structure for host-specific data
-  mmc: sdhci-pltfm: move .h-file into apropriate subdir
-  mmc: sdhci-of-esdhc: factor out common stuff
-  mmc: sdhci-pltfm: add pltfm-driver for imx35/51
-
- drivers/mmc/host/Kconfig          |    9 +++
- drivers/mmc/host/Makefile         |    1 +
- drivers/mmc/host/sdhci-cns3xxx.c  |    2 +-
- drivers/mmc/host/sdhci-esdhc.c    |  141 +++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/sdhci-esdhc.h    |   81 +++++++++++++++++++++
- drivers/mmc/host/sdhci-of-esdhc.c |   70 ++----------------
- drivers/mmc/host/sdhci-pltfm.c    |   12 +++-
- drivers/mmc/host/sdhci-pltfm.h    |    8 ++-
- include/linux/mmc/sdhci-pltfm.h   |   35 +++++++++
- include/linux/sdhci-pltfm.h       |   35 ---------
- 10 files changed, 292 insertions(+), 102 deletions(-)
- create mode 100644 drivers/mmc/host/sdhci-esdhc.c
- create mode 100644 drivers/mmc/host/sdhci-esdhc.h
- create mode 100644 include/linux/mmc/sdhci-pltfm.h
- delete mode 100644 include/linux/sdhci-pltfm.h
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index e045e3c..bf522a1 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+ 	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
+ 	struct resource *iomem;
+ 	int ret;
+ 
+@@ -72,15 +73,17 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 			"experience problems.\n");
+ 
+ 	if (pdev->dev.parent)
+-		host = sdhci_alloc_host(pdev->dev.parent, 0);
++		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
+ 	else
+-		host = sdhci_alloc_host(&pdev->dev, 0);
++		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
+ 
+ 	if (IS_ERR(host)) {
+ 		ret = PTR_ERR(host);
+ 		goto err;
+ 	}
+ 
++	pltfm_host = sdhci_priv(host);
++
+ 	host->hw_name = "platform";
+ 	if (pdata && pdata->ops)
+ 		host->ops = pdata->ops;
+diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+index 900f329..c393289 100644
+--- a/drivers/mmc/host/sdhci-pltfm.h
++++ b/drivers/mmc/host/sdhci-pltfm.h
+@@ -13,6 +13,11 @@
+ 
+ #include <linux/sdhci-pltfm.h>
+ 
++struct sdhci_pltfm_host {
++	struct clk *clk;
++	u32 scratchpad; /* to handle quirks across io-accessor calls */
++};
++
+ extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+ 
+ #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
+-- 
+1.7.1
