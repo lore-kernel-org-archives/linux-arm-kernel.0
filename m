@@ -1,34 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Sep 2010 10:07:00 +0300
-Subject: [PATCH 3/5] omap3: cm-t3517: add support for usb host.
-In-Reply-To: <4C9773CA.4010102@compulab.co.il>
-References: <1284627281-26059-1-git-send-email-grinberg@compulab.co.il>
-	<1284627281-26059-4-git-send-email-grinberg@compulab.co.il>
-	<20100916090018.GM3393@legolas.emea.dhcp.ti.com>
-	<4C91DF66.6020003@compulab.co.il>
-	<20100920063913.GB32493@legolas.emea.dhcp.ti.com>
-	<4C9773CA.4010102@compulab.co.il>
-Message-ID: <20100921070700.GH11123@legolas.emea.dhcp.ti.com>
+From: kishorek.kadiyala@gmail.com (kishore kadiyala)
+Date: Tue, 21 Sep 2010 12:51:07 +0530
+Subject: [PATCH v2 3/4] omap4 hsmmc: Register offset handling
+In-Reply-To: <4C97CA90.9030706@ti.com>
+References: <33958.10.24.255.17.1284827654.squirrel@dbdmail.itg.ti.com>
+	<4C97CA90.9030706@ti.com>
+Message-ID: <AANLkTi=v0qF6+T2CjeAOiwJRBv8ripPvuRXVgttqmYPK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 20, 2010 at 09:46:34AM -0500, Igor Grinberg wrote:
-> On 09/20/10 08:39, Felipe Balbi wrote:
->> On Thu, Sep 16, 2010 at 04:12:06AM -0500, Igor Grinberg wrote:
->>> Yes it will, but even if the hub reset gpio is for some reason unavailable,
->>> we don't want to disable ehci completely...
->>
->> then you should set the gpio to an invalid number, otherwise you might
->> cause lots of WARN() to appear due to fiddling with unrequested gpio.
+Hi Benoit,
+
+On Tue, Sep 21, 2010 at 2:26 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Kishore
 >
->What gpio should be set to invalid number?
+> On 9/18/2010 6:34 PM, Kadiyala, Kishore wrote:
+>>
+>> The offset handling implementation of omap4 mmc registers which
+>> was already present can't be reused once hwmod modifications are done
+>> for mmc driver.
+>> Since hwmod data file for OMAP4 is an auto generated the base
+>> address for MMC will remain same as OMAP3 and thus the offset deviation
+>> of registers should be updated in the hsmmc driver.
+>
+> That explanation does not sound very accurate to me.
+> The fact that the hwmods are auto-generated has nothing to do with your
+> offset problem.
 
-the one which fails to be requested.
+Agree the change log needs to be updated  as said  but when
+coming to implementation this how it is:
 
->It is a reset gpio for usb _hub_ and it has nothing to do with ehci.
->Can you please, explain the case when I might cause those WARN()'s?
+With current mainline kernel, offset appending is already implemented in
+mach-omap2/devices.c and works fine [here bases are updated with 0x100
+and then passed to driver which has same register offset's as OMAP3].
 
-ok, I misunderstood then. Nevermind
+When hwmod modifications are done to the MMC driver, the base address are
+picked from omap_hwmod_44xx_data.c and omap_device is build.
+Coming to the driver it still has the same old register offset's as OMAP3 and
+there should be a way to add 0x100 some where.
 
--- 
-balbi
+The current patch moves the offset appending to the driver file which is updated
+in mach-omap2/hsmmc.c which will fit for current implementation and even
+hwmod adaptation.
+
+>The real cause is due to the update of the IP to support the
+> new PM programming model.
+> Because of that, and to keep a certain level of compatibility, the legacy
+> registers were all shifted by 0x100 and the new one were added from offset 0
+> to 0x10.
+>
+> Regards,
+> Benoit
+>
+
+<snip>
+
+Regards,
+Kishore
