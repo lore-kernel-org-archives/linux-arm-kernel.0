@@ -1,113 +1,53 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 21 Sep 2010 13:05:57 -0700
-Subject: [PATCH 00/11] OMAP: Serial: Add omap-serial driver with platform
-	support
-In-Reply-To: <AANLkTinqiknLaBmMj17fi31TsZ+eaSkCcgd-wbQvMpz-@mail.gmail.com>
-	(Govindraj's message of "Tue, 21 Sep 2010 21:07:29 +0530")
-References: <13965.10.24.255.18.1284739547.squirrel@dbdmail.itg.ti.com>
-	<87tylorl9i.fsf@deeprootsystems.com>
-	<AANLkTik-+RC7y=dJnDdxzrqMFnTzRV-j8s5FtmMy8ZhE@mail.gmail.com>
-	<87wrqg2xog.fsf@deeprootsystems.com>
-	<AANLkTinqiknLaBmMj17fi31TsZ+eaSkCcgd-wbQvMpz-@mail.gmail.com>
-Message-ID: <87lj6uj1zu.fsf@deeprootsystems.com>
+From: kyle@moffetthome.net (Kyle Moffett)
+Date: Tue, 21 Sep 2010 16:47:45 -0400
+Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
+In-Reply-To: <1282948239.2268.155.camel@jstultz-laptop>
+References: <cover.1281956490.git.richard.cochran@omicron.at>
+	<363bd749a38d0b785d8431e591bf54c38db4c2d7.1281956490.git.richard.cochran@omicron.at>
+	<AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
+	<20100817085324.GB3330@riccoc20.at.omicron.at>
+	<1282090963.1734.97.camel@localhost>
+	<20100818071942.GA4096@riccoc20.at.omicron.at>
+	<1282176776.2865.100.camel@localhost.localdomain>
+	<20100819055518.GA4084@riccoc20.at.omicron.at>
+	<1282594125.3111.344.camel@localhost.localdomain>
+	<20100827123849.GC11657@riccoc20.at.omicron.at>
+	<1282948239.2268.155.camel@jstultz-laptop>
+Message-ID: <AANLkTinRM3_kBc5S3wV=_S6P8+x7A43kz0qSYbixJYnq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Govindraj <govindraj.ti@gmail.com> writes:
-
-> <SNIP>
+On Fri, Aug 27, 2010 at 18:30, John Stultz <johnstul@us.ibm.com> wrote:
+> On one side, there is the view that the kernel should abstract and hide
+> the hardware details to increase app portability. And the other is that
+> the raw hardware details should be exposed, so the OS stays out of the
+> way.
 >
->>>>> Also the patch series updates various low level platform specific
->>>>> serial data to support omap-uarts with hwmod framework and adds support
->>>>> for uart4 on OMAP3630.
->>>>
->>>> This series is missing a couple things to work more broadly on all
->>>> boards, specifically 3630-based boards.
->>>>
->>>> First, due to the current UART idle code base, you need to enable all
->>>> OMAP UARTs 36xx. ?Enabling less than all OMAP UARTs will break the
->>>> current idle code. ?As we discussed, the next phase we will move the
->>>> idle management from this serial.c hackery into the omap-serial driver
->>>> iteself. ?Until then, you need to call omap_serial_init() on
->>>> Zoom2/Zoom3. ?Patch below[1]
->>>>
->>>> Also, you previously had a patch that updated omap_uart_idle_init() to
->>>> handle 36xx and specifically UART4. ?Without that, struct
->>>> omap_uart_state is not setup correctly for UART4, and thus cannot be
->>>> properly idled on 3630.
->>>
->>> ok fine, I will I incorporate initialize all uarts patch for zoom boards.
->>>
->>> Are you referring to this patch?
->>> https://patchwork.kernel.org/patch/108066/
->>>
->>> Is this still needed if we have initialized all uarts?
->>> This patch might not needed if we have initialized all uarts right?
->>
->> Right. ?We don't need the above patchwork patch if all UARTs are
->> initialized.
->>
->> The other patch I was referring to was the one that added UART4 support
->> to omap_uart_idle_init() (added the wk_en, wk_st, padconf etc.) ?I had a
->> pending request for you to drop the muxmode from that patch, but the
->> rest of it was still needed.
->>
->>>>
->>>> Also, it's been a while since I tested this on OMAP2. ?Please re-test on
->>>> OMAP2 with the whole series. ?Also, please report here the other
->>>> platforms this was tested on. ?The final needs to be tested on OMAP2, 3
->>>> and 4 before merge.
->>>
->>> Yes Sure,
->>>
->>> Just FYI this patch series was also tested on omap2,3,4.
->>>
->>
->> OK, be sure to test Zoom3, because my testing on Zoom3 led to a crash as
->> soon as idle was enabled due to the missing init of all UARTs.
+> Neither of these views are always right. Ideally we can come up with a
+> abstracted way to provide the hardware data needed that's generic enough
+> that applications don't have to be changed when moving between hardware
+> or configurations.
 >
+> The posix clock id interface is frustrating because the flat static
+> enumeration is really limiting.
 >
-> This patch series applied on top of pm-core branch
->
-> commit 4c1f85cdc189d41ee53c1bc3957a908c91cffc00
-> Merge: ca1684b 96c4e27
-> Author: Kevin Hilman <khilman@deeprootsystems.com>
-> Date:   Thu Sep 16 15:29:06 2010 -0700
->
-> with below changes:
->
-> 1) if (uart->timeout)
->                 uart->timeout = (30 * HZ);
->
-> 2) #define DEFAULT_TIMEOUT 5 [temporary change for timeout]
+> I wonder if a dynamic enumeration for posix clocks would be possibly a
+> way to go?
 
-Doing this masks the problem.  If you do 1 without 2, you'll see that
-UART4 can never go idle.
+Well how about something much more straightforward:
 
-Please test without this change and use the sysfs files to enable the
-timeouts:
+#define CLOCK_FD 0x80000000
+fd = open("/dev/clocks/some_clock_name", O_RDONLY);
+clock_gettime(CLOCK_FD | fd, &ts);
 
-  echo 5 > /sys/devices/platform/omap/omap-hsuart.0/sleep_timeout 
-  echo 5 > /sys/devices/platform/omap/omap-hsuart.1/sleep_timeout 
-  echo 5 > /sys/devices/platform/omap/omap-hsuart.2/sleep_timeout 
-  echo 5 > /sys/devices/platform/omap/omap-hsuart.3/sleep_timeout 
+This would provide all of the standard character-device semantics that
+everyone is accustomed to, and furthermore you could allow non-root
+users to manage specific clocks using just DAC permission bits.
 
-> I see ret count getting incremented on ZOOM3 even without "UART4 support
-> to omap_uart_idle_init()" patch.
->
-> I dont see any crash.
+You'd still probably need to add a clock_adjtimex() syscall, but it
+could easily fail with EINVAL for software or per-thread clocks, but
+that seems like it would nicely abstract the hardware without forcing
+a numeric address space.
 
-It has to do more than not crash for this to be acceptable.   All UARTs
-need to have the same capabilities.
-
-Currently, UART4 has no padconf, wk_en, or wk_st fields set.  This means
-1) it's sysfs entry  doesn't get a 'sleep_timeout' file so it cannot be
-made changed and 2) wakeups on UART4 cannot work.
-
-As I said before, you had all this stuff in a previous series.  I only
-requested you drop the 'muxmode' stuff from that patch, but everything
-else (padconf, wk_en, wk_st) was fine.
-
-Please add this back to the series.
-
-Kevin
+Cheers,
+Kyle Moffett
