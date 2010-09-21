@@ -1,35 +1,32 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 20 Sep 2010 18:29:12 -0700
-Subject: [PATCH] sdhci-s3c: fix incorrect spinlock usage after merge
-In-Reply-To: <20100921011711.GB5873@void.printf.net>
-References: <1284987822-17955-1-git-send-email-m.szyprowski@samsung.com>
-	<20100921011711.GB5873@void.printf.net>
-Message-ID: <20100920182912.a29ff3d1.akpm@linux-foundation.org>
+From: jason77.wang@gmail.com (Jason Wang)
+Date: Tue, 21 Sep 2010 09:39:35 +0800
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
+	driver
+In-Reply-To: <20100920153358.GF32291@pengutronix.de>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>	<20100902082759.GE14214@pengutronix.de>	<4C7F777E.1090104@gmail.com>	<20100902143908.GK14214@pengutronix.de>	<20100917095247.GB30441@pengutronix.de>
+	<4C95CF86.30306@gmail.com> <20100920153358.GF32291@pengutronix.de>
+Message-ID: <4C980CD7.1040005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Sep 2010 02:17:11 +0100 Chris Ball <cjb@laptop.org> wrote:
+Uwe Kleine-K?nig wrote:
+> Hi Jason,
+>
+>   
+>> I have performed a git pull for your repository based off 2.6.36-rc4, and
+>> built and validated these patches  on imx51_3ds board, they worked fine.
+>> The spi flash can be read without any problems.
+>>
+>> And your patches looks pretty good to me. :-).
+>>     
+> This is an ack for all patches in my series?
+>
+>   
+Yes, all patches look fine to me.
 
-> On Mon, Sep 20, 2010 at 03:03:42PM +0200, Marek Szyprowski wrote:
-> > In the commit f522886e202a34a2191dd5d471b3c4d46410a9a0 a merge conflict
-> > in the sdhci-s3c driver been fixed. However the fix used incorrect
-> > spinlock operation - it cause a race with sdhci interrupt service. The
-> > correct way to solve it is to use spin_lock_irqsave/irqrestore() calls.
-> 
-> Thanks, applied to mmc-next with:
-> Signed-off-by: Chris Ball <cjb@laptop.org>
-> 
-> Andrew, not sure how best to get this upstream -- do you want to send
-> this up to Linus (for -rc5) via your queue in -mm?
-
-Ordinarily I'd expect you to send it to Linus.
-
-I tend to merge important-looking bugfixes in my tree in case
-maintainers lose them (happens regularly).  I'll then start spamming
-the maintainer with the patch.  If the maintainer remains dead then I
-might merge it myself, or I might tag it for -stable backporting and
-try again in the next kernel.  
-
-If the maintainer can't be bothered setting up a pull request then he
-can just send an acked-by and explicitly ask me to merge it up and
-I'll then add it to my next approximately-weekly Linus patchbombing.
+Thanks,
+Jason.
+> Best regards
+> Uwe
+>
+>   
