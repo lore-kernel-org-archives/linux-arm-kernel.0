@@ -1,80 +1,96 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Tue, 21 Sep 2010 21:56:22 +0530
-Subject: [PATCH 3/5] omap3: cm-t3517: add support for usb host.
-In-Reply-To: <1285084993-27683-4-git-send-email-grinberg@compulab.co.il>
-References: <1285084993-27683-1-git-send-email-grinberg@compulab.co.il>
-	<1285084993-27683-4-git-send-email-grinberg@compulab.co.il>
-Message-ID: <AANLkTin+canp9yrE-Jmv=n56dPFByZWU73uaRNBkruP6@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 21 Sep 2010 09:26:58 -0700
+Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A3478@dbde02.ent.ti.com>
+References: <1285069770-4261-1-git-send-email-manjugk@ti.com>
+	<1285076060.14206.3.camel@chotu>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402785A3478@dbde02.ent.ti.com>
+Message-ID: <20100921162658.GA2310@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 21, 2010 at 9:33 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> add support for hsusb host ports 1, 2 and on-module usb hub.
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
-> ?arch/arm/mach-omap2/board-cm-t3517.c | ? 50 ++++++++++++++++++++++++++++++++++
+Hi,
 
-...
+On Tue, Sep 21, 2010 at 07:11:01PM +0530, G, Manjunath Kondaiah wrote:
+> 
+> Hi,
+> 
+> > -----Original Message-----
+> > From: Ameya Palande [mailto:ameya.palande at nokia.com] 
+> > Sent: Tuesday, September 21, 2010 7:04 PM
+> > To: G, Manjunath Kondaiah
+> > Cc: linux-omap at vger.kernel.org; linux-input at vger.kernel.org; 
+> > Dmitry Torokhov; linux-arm-kernel at lists.infradead.org; Tony Lindgren
+> > Subject: Re: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
+> > 
+> > Hi Manjunath,
+> > 
+> > On Tue, 2010-09-21 at 13:49 +0200, ext G, Manjunath Kondaiah wrote:
+> > > The failure exit paths seems to be wrong in probe function.
+> > > This patch corrects exit failure paths for error handling cases.
+> > 
 
-> @@ -100,6 +102,47 @@ static void __init cm_t3517_init_rtc(void)
-> ?static inline void cm_t3517_init_rtc(void) {}
-> ?#endif
->
-> +#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
-
-Hi Igor,
+And also adds memory leak...
 
 
-Do we really need to make these conditional on the driver being built?
+> > https://patchwork.kernel.org/patch/160551/
+> > Any comments on this?
+> 
+> Looks fine. Sorry, I didn't look at the change. This version seems to 
+> be better. 
+> 
 
-The hardware is present on the board at all times, right?
-It should be okay to execute this code independent of whether
-the driver is built or not. The device registration can be unconditional
-and if there is no driver present, we won't probe anyway.
+I do not understand why we need to separate memory allocations. It looks
+like the minimal patch should be like one below.
 
-(I see some similar logic in usb-ehci.c - probably a good idea to remove
-it as well).
+Thanks.
 
-- Anand
+-- 
+Dmitry
 
-> +#define HSUSB1_RESET_GPIO ? ? ?(146)
-> +#define HSUSB2_RESET_GPIO ? ? ?(147)
-> +#define USB_HUB_RESET_GPIO ? ? (152)
-> +
-> +static struct ehci_hcd_omap_platform_data cm_t3517_ehci_pdata __initdata = {
-> + ? ? ? .port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-> + ? ? ? .port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
-> + ? ? ? .port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-> +
-> + ? ? ? .phy_reset ?= true,
-> + ? ? ? .reset_gpio_port[0] ?= HSUSB1_RESET_GPIO,
-> + ? ? ? .reset_gpio_port[1] ?= HSUSB2_RESET_GPIO,
-> + ? ? ? .reset_gpio_port[2] ?= -EINVAL,
-> +};
-> +
-> +static int cm_t3517_init_usbh(void)
-> +{
-> + ? ? ? int err;
-> +
-> + ? ? ? err = gpio_request(USB_HUB_RESET_GPIO, "usb hub rst");
-> + ? ? ? if (err) {
-> + ? ? ? ? ? ? ? pr_err("CM-T3517: usb hub rst gpio request failed: %d\n", err);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? gpio_direction_output(USB_HUB_RESET_GPIO, 0);
-> + ? ? ? ? ? ? ? udelay(10);
-> + ? ? ? ? ? ? ? gpio_set_value(USB_HUB_RESET_GPIO, 1);
-> + ? ? ? ? ? ? ? msleep(1);
-> + ? ? ? }
-> +
-> + ? ? ? usb_ehci_init(&cm_t3517_ehci_pdata);
-> +
-> + ? ? ? return 0;
-> +}
-> +#else
-> +static inline int cm_t3517_init_usbh(void)
-> +{
-> + ? ? ? return 0;
-> +}
-> +#endif
-> +
+
+Input: twl4030_keypad - fix error handling path
+
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+We should not try to call free_irq() when request_irq() failed.
+
+Reported-by: G, Manjunath Kondaiah <manjugk@ti.com>
+Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+---
+
+ drivers/input/keyboard/twl4030_keypad.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
+
+
+diff --git a/drivers/input/keyboard/twl4030_keypad.c b/drivers/input/keyboard/twl4030_keypad.c
+index fb16b5e..09bef79 100644
+--- a/drivers/input/keyboard/twl4030_keypad.c
++++ b/drivers/input/keyboard/twl4030_keypad.c
+@@ -406,23 +406,22 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
+ 	if (error) {
+ 		dev_info(kp->dbg_dev, "request_irq failed for irq no=%d\n",
+ 			kp->irq);
+-		goto err3;
++		goto err2;
+ 	}
+ 
+ 	/* Enable KP and TO interrupts now. */
+ 	reg = (u8) ~(KEYP_IMR1_KP | KEYP_IMR1_TO);
+ 	if (twl4030_kpwrite_u8(kp, reg, KEYP_IMR1)) {
+ 		error = -EIO;
+-		goto err4;
++		goto err3;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, kp);
+ 	return 0;
+ 
+-err4:
++err3:
+ 	/* mask all events - we don't care about the result */
+ 	(void) twl4030_kpwrite_u8(kp, 0xff, KEYP_IMR1);
+-err3:
+ 	free_irq(kp->irq, NULL);
+ err2:
+ 	input_unregister_device(input);
