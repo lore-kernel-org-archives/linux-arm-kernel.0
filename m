@@ -1,56 +1,82 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 21 Sep 2010 04:15:49 +0100
-Subject: [PATCH] sdhci-s3c: fix incorrect spinlock usage after merge
-In-Reply-To: <1284987822-17955-1-git-send-email-m.szyprowski@samsung.com>
-References: <1284987822-17955-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100921031547.GA7073@void.printf.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 21 Sep 2010 07:16:41 +0200
+Subject: [PATCH 4/6] ARM: S5PC100: Move external interrupt defines
+In-Reply-To: <001001cb50df$c0ed7e30$42c87a90$%kim@samsung.com>
+References: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
+	<1283764347-460-5-git-send-email-m.szyprowski@samsung.com>
+	<001001cb50df$c0ed7e30$42c87a90$%kim@samsung.com>
+Message-ID: <000001cb594c$3025c7c0$90715740$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Hello,
 
-On Mon, Sep 20, 2010 at 03:03:42PM +0200, Marek Szyprowski wrote:
-> In the commit f522886e202a34a2191dd5d471b3c4d46410a9a0 a merge conflict
-> in the sdhci-s3c driver been fixed. However the fix used incorrect
-> spinlock operation - it cause a race with sdhci interrupt service. The
-> correct way to solve it is to use spin_lock_irqsave/irqrestore() calls.
+On Friday, September 10, 2010 2:00 PM Kukjin Kim wrote:
+
+> Marek Szyprowski wrote:
+> >
+> > From: Joonyoung Shim <jy0922.shim@samsung.com>
+> >
+> > This patch moves external interrupt defines from gpio.h to regs-gpio.h
+> > for consistency with s5pv210.
+> >
+> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pc100/include/mach/gpio.h      |    7 -------
+> >  arch/arm/mach-s5pc100/include/mach/regs-gpio.h |    7 +++++++
+> >  2 files changed, 7 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s5pc100/include/mach/gpio.h b/arch/arm/mach-
+> > s5pc100/include/mach/gpio.h
+> > index 71ae1f5..29a8a12 100644
+> > --- a/arch/arm/mach-s5pc100/include/mach/gpio.h
+> > +++ b/arch/arm/mach-s5pc100/include/mach/gpio.h
+> > @@ -146,13 +146,6 @@ enum s5p_gpio_number {
+> >  /* define the number of gpios we need to the one after the MP04() range
+> */
+> >  #define ARCH_NR_GPIOS		(S5PC100_GPIO_END + 1)
+> >
+> > -#define EINT_MODE		S3C_GPIO_SFN(0x2)
+> > -
+> > -#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
+> > -#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
+> > -#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
+> > -#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
+> > -
+> >  #include <asm-generic/gpio.h>
+> >
+> >  #endif /* __ASM_ARCH_GPIO_H */
+> > diff --git a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
+> b/arch/arm/mach-
+> > s5pc100/include/mach/regs-gpio.h
+> > index dd6295e..6abe481 100644
+> > --- a/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
+> > +++ b/arch/arm/mach-s5pc100/include/mach/regs-gpio.h
+> > @@ -71,5 +71,12 @@
+> >  #define S5P_EXTINT_RISEEDGE		(0x03)
+> >  #define S5P_EXTINT_BOTHEDGE		(0x04)
+> >
+> > +#define EINT_MODE		S3C_GPIO_SFN(0x2)
+> > +
+> > +#define EINT_GPIO_0(x)		S5PC100_GPH0(x)
+> > +#define EINT_GPIO_1(x)		S5PC100_GPH1(x)
+> > +#define EINT_GPIO_2(x)		S5PC100_GPH2(x)
+> > +#define EINT_GPIO_3(x)		S5PC100_GPH3(x)
+> > +
+> >  #endif /* __ASM_MACH_S5PC100_REGS_GPIO_H */
+> >
+> > --
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
+> This is ok to me, will apply.
 > 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 71ad416..735d431 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -241,8 +241,10 @@ static struct sdhci_ops sdhci_s3c_ops = {
->  static void sdhci_s3c_notify_change(struct platform_device *dev, int state)
->  {
->  	struct sdhci_host *host = platform_get_drvdata(dev);
-> +	unsigned long flags;
-> +
->  	if (host) {
-> -		spin_lock(&host->lock);
-> +		spin_lock_irqsave(&host->lock, flags);
->  		if (state) {
->  			dev_dbg(&dev->dev, "card inserted.\n");
->  			host->flags &= ~SDHCI_DEVICE_DEAD;
-> @@ -253,7 +255,7 @@ static void sdhci_s3c_notify_change(struct platform_device *dev, int state)
->  			host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
->  		}
->  		tasklet_schedule(&host->card_tasklet);
-> -		spin_unlock(&host->lock);
-> +		spin_unlock_irqrestore(&host->lock, flags);
->  	}
->  }
->  
+> And will check other regarding gpio interrupt in this weekend ;-)
 
-Could I have your ACK on this before I send it to Linus, please?
+Is there any progress on gpio interrupts? Over 2 weeks passed since I
+posted the patches...
 
-Thanks,
-
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
