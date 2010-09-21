@@ -1,67 +1,126 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Sep 2010 10:34:53 -0600
-Subject: [PATCH 10/11] OMAP: hwmod: Force a softreset during _setup
+Date: Tue, 21 Sep 2010 10:34:54 -0600
+Subject: [PATCH 11/11] OMAP: hwmod: add an hardreset API for use by other core
+	code
 In-Reply-To: <20100921163021.20258.87587.stgit@twilight.localdomain>
 References: <20100921163021.20258.87587.stgit@twilight.localdomain>
-Message-ID: <20100921163452.20258.37165.stgit@twilight.localdomain>
+Message-ID: <20100921163453.20258.55542.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+Expose an hardreset API from hwmod in order to assert / deassert all the
+individual reset lines that belong to an hwmod.  This API is needed by
+some of the more complicated processor drivers, e.g., DSP/Bridge,
+Syslink, etc.
 
-Force the softreset of every IPs during the _setup phase.
-IPs that cannot support softreset or that should not
-be reset must set the HWMOD_INIT_NO_RESET flag in the
-hwmod struct.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |   78 ++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    4 +
+ 2 files changed, 82 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index f4a569c..3e90984 100644
+index 3e90984..8c27923 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -980,8 +980,8 @@ static int _reset(struct omap_hwmod *oh)
+@@ -1829,6 +1829,84 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ }
  
- 	/* clocks must be on for this operation */
- 	if (oh->_state != _HWMOD_STATE_ENABLED) {
--		WARN(1, "omap_hwmod: %s: reset can only be entered from "
--		     "enabled state\n", oh->name);
-+		pr_warning("omap_hwmod: %s: reset can only be entered from "
-+			   "enabled state\n", oh->name);
- 		return -EINVAL;
- 	}
- 
-@@ -998,8 +998,8 @@ static int _reset(struct omap_hwmod *oh)
- 			  MAX_MODULE_SOFTRESET_WAIT, c);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
--		WARN(1, "omap_hwmod: %s: softreset failed (waited %d usec)\n",
--		     oh->name, MAX_MODULE_SOFTRESET_WAIT);
-+		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
-+			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
- 	else
- 		pr_debug("omap_hwmod: %s: softreset in %d usec\n", oh->name, c);
- 
-@@ -1198,12 +1198,12 @@ static int _setup(struct omap_hwmod *oh, void *data)
- 	}
- 
- 	if (!(oh->flags & HWMOD_INIT_NO_RESET)) {
-+		_reset(oh);
+ /**
++ * omap_hwmod_assert_hardreset - assert the HW reset line of submodules
++ * contained in the hwmod module.
++ * @oh: struct omap_hwmod *
++ * @name: name of the reset line to lookup and assert
++ *
++ * Some IP like dsp, ipu or iva contain processor that require
++ * an HW reset line to be assert / deassert in order to enable fully
++ * the IP.  Returns -EINVAL if @oh is null or if the operation is not
++ * yet supported on this OMAP; otherwise, passes along the return value
++ * from _assert_hardreset().
++ */
++int omap_hwmod_assert_hardreset(struct omap_hwmod *oh, const char *name)
++{
++	int ret;
 +
- 		/*
--		 * XXX Do the OCP_SYSCONFIG bits need to be
--		 * reprogrammed after a reset?  If not, then this can
--		 * be removed.  If they do, then probably the
--		 * _omap_hwmod_enable() function should be split to avoid the
--		 * rewrite of the OCP_SYSCONFIG register.
-+		 * OCP_SYSCONFIG bits need to be reprogrammed after a softreset.
-+		 * The _omap_hwmod_enable() function should be split to
-+		 * avoid the rewrite of the OCP_SYSCONFIG register.
- 		 */
- 		if (oh->class->sysc) {
- 			_update_sysc_cache(oh);
++	if (!oh)
++		return -EINVAL;
++
++	mutex_lock(&oh->_mutex);
++	ret = _assert_hardreset(oh, name);
++	mutex_unlock(&oh->_mutex);
++
++	return ret;
++}
++
++/**
++ * omap_hwmod_deassert_hardreset - deassert the HW reset line of submodules
++ * contained in the hwmod module.
++ * @oh: struct omap_hwmod *
++ * @name: name of the reset line to look up and deassert
++ *
++ * Some IP like dsp, ipu or iva contain processor that require
++ * an HW reset line to be assert / deassert in order to enable fully
++ * the IP.  Returns -EINVAL if @oh is null or if the operation is not
++ * yet supported on this OMAP; otherwise, passes along the return value
++ * from _deassert_hardreset().
++ */
++int omap_hwmod_deassert_hardreset(struct omap_hwmod *oh, const char *name)
++{
++	int ret;
++
++	if (!oh)
++		return -EINVAL;
++
++	mutex_lock(&oh->_mutex);
++	ret = _deassert_hardreset(oh, name);
++	mutex_unlock(&oh->_mutex);
++
++	return ret;
++}
++
++/**
++ * omap_hwmod_read_hardreset - read the HW reset line state of submodules
++ * contained in the hwmod module
++ * @oh: struct omap_hwmod *
++ * @name: name of the reset line to look up and read
++ *
++ * Return the current state of the hwmod @oh's reset line named @name:
++ * returns -EINVAL upon parameter error or if this operation
++ * is unsupported on the current OMAP; otherwise, passes along the return
++ * value from _read_hardreset().
++ */
++int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name)
++{
++	int ret;
++
++	if (!oh)
++		return -EINVAL;
++
++	mutex_lock(&oh->_mutex);
++	ret = _read_hardreset(oh, name);
++	mutex_unlock(&oh->_mutex);
++
++	return ret;
++}
++
++
++/**
+  * omap_hwmod_for_each_by_class - call @fn for each hwmod of class @classname
+  * @classname: struct omap_hwmod_class name to search for
+  * @fn: callback function pointer to call for each hwmod in class @classname
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 590bfae..7fde44d 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -512,6 +512,10 @@ int omap_hwmod_idle(struct omap_hwmod *oh);
+ int _omap_hwmod_idle(struct omap_hwmod *oh);
+ int omap_hwmod_shutdown(struct omap_hwmod *oh);
+ 
++int omap_hwmod_assert_hardreset(struct omap_hwmod *oh, const char *name);
++int omap_hwmod_deassert_hardreset(struct omap_hwmod *oh, const char *name);
++int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name);
++
+ int omap_hwmod_enable_clocks(struct omap_hwmod *oh);
+ int omap_hwmod_disable_clocks(struct omap_hwmod *oh);
+ 
