@@ -1,276 +1,186 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 21 Sep 2010 19:37:14 +0530
-Subject: [PATCH v3 3/5] OMAP4: hwmod: add I2C hwmods for OMAP4430
-In-Reply-To: <1285078036-12789-3-git-send-email-rnayak@ti.com>
+Date: Tue, 21 Sep 2010 19:37:16 +0530
+Subject: [PATCH v3 5/5] OMAP: I2C: Convert i2c driver to use PM runtime api's
+In-Reply-To: <1285078036-12789-5-git-send-email-rnayak@ti.com>
 References: <1285078036-12789-1-git-send-email-rnayak@ti.com>
 	<1285078036-12789-2-git-send-email-rnayak@ti.com>
 	<1285078036-12789-3-git-send-email-rnayak@ti.com>
-Message-ID: <1285078036-12789-4-git-send-email-rnayak@ti.com>
+	<1285078036-12789-4-git-send-email-rnayak@ti.com>
+	<1285078036-12789-5-git-send-email-rnayak@ti.com>
+Message-ID: <1285078036-12789-6-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hwmod structures for I2C controllers on OMAP4430.
+This patch converts the i2c driver to use PM runtime apis
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  237 ++++++++++++++++++++++++++++
- 1 files changed, 237 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   67 +++++++++++++----------------------------
+ 1 files changed, 21 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index e20b0ee..2cb63fc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -383,6 +383,238 @@ static struct omap_hwmod omap44xx_l4_wkup_hwmod = {
- };
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 7674efb..126bde9 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -39,6 +39,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/i2c-omap.h>
++#include <linux/pm_runtime.h>
  
- /*
-+ * 'i2c' class
-+ * multimaster high-speed i2c controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_i2c_sysc = {
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0090,
-+	.sysc_flags	= (SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_CLOCKACTIVITY | SYSC_HAS_SOFTRESET |
-+			   SYSC_HAS_AUTOIDLE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
-+	.name = "i2c",
-+	.sysc = &omap44xx_i2c_sysc,
-+};
-+
-+/* i2c1 */
-+static struct omap_hwmod omap44xx_i2c1_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_i2c1_irqs[] = {
-+	{ .irq = 56 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_i2c1_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = 26 + OMAP44XX_DMA_REQ_START },
-+	{ .name = "rx", .dma_req = 27 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_i2c1_addrs[] = {
-+	{
-+		.pa_start	= 0x48070000,
-+		.pa_end		= 0x480700ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> i2c1 */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__i2c1 = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_i2c1_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_i2c1_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_i2c1_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* i2c1 slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_i2c1_slaves[] = {
-+	&omap44xx_l4_per__i2c1,
-+};
-+
-+static struct omap_hwmod omap44xx_i2c1_hwmod = {
-+	.name		= "i2c1",
-+	.class		= &omap44xx_i2c_hwmod_class,
-+	.flags		= HWMOD_INIT_NO_RESET,
-+	.mpu_irqs	= omap44xx_i2c1_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c1_irqs),
-+	.sdma_reqs	= omap44xx_i2c1_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_i2c1_sdma_reqs),
-+	.main_clk	= "i2c1_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_L4PER_I2C1_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_i2c1_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c1_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/* i2c2 */
-+static struct omap_hwmod omap44xx_i2c2_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_i2c2_irqs[] = {
-+	{ .irq = 57 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_i2c2_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = 28 + OMAP44XX_DMA_REQ_START },
-+	{ .name = "rx", .dma_req = 29 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_i2c2_addrs[] = {
-+	{
-+		.pa_start	= 0x48072000,
-+		.pa_end		= 0x480720ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> i2c2 */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__i2c2 = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_i2c2_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_i2c2_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_i2c2_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* i2c2 slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_i2c2_slaves[] = {
-+	&omap44xx_l4_per__i2c2,
-+};
-+
-+static struct omap_hwmod omap44xx_i2c2_hwmod = {
-+	.name		= "i2c2",
-+	.class		= &omap44xx_i2c_hwmod_class,
-+	.flags		= HWMOD_INIT_NO_RESET,
-+	.mpu_irqs	= omap44xx_i2c2_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c2_irqs),
-+	.sdma_reqs	= omap44xx_i2c2_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_i2c2_sdma_reqs),
-+	.main_clk	= "i2c2_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_L4PER_I2C2_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_i2c2_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c2_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/* i2c3 */
-+static struct omap_hwmod omap44xx_i2c3_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_i2c3_irqs[] = {
-+	{ .irq = 61 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_i2c3_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = 24 + OMAP44XX_DMA_REQ_START },
-+	{ .name = "rx", .dma_req = 25 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_i2c3_addrs[] = {
-+	{
-+		.pa_start	= 0x48060000,
-+		.pa_end		= 0x480600ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> i2c3 */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__i2c3 = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_i2c3_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_i2c3_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_i2c3_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* i2c3 slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_i2c3_slaves[] = {
-+	&omap44xx_l4_per__i2c3,
-+};
-+
-+static struct omap_hwmod omap44xx_i2c3_hwmod = {
-+	.name		= "i2c3",
-+	.class		= &omap44xx_i2c_hwmod_class,
-+	.flags		= HWMOD_INIT_NO_RESET,
-+	.mpu_irqs	= omap44xx_i2c3_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c3_irqs),
-+	.sdma_reqs	= omap44xx_i2c3_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_i2c3_sdma_reqs),
-+	.main_clk	= "i2c3_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_L4PER_I2C3_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_i2c3_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c3_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/* i2c4 */
-+static struct omap_hwmod omap44xx_i2c4_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_i2c4_irqs[] = {
-+	{ .irq = 62 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_i2c4_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = 123 + OMAP44XX_DMA_REQ_START },
-+	{ .name = "rx", .dma_req = 124 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_i2c4_addrs[] = {
-+	{
-+		.pa_start	= 0x48350000,
-+		.pa_end		= 0x483500ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> i2c4 */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__i2c4 = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_i2c4_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_i2c4_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_i2c4_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* i2c4 slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_i2c4_slaves[] = {
-+	&omap44xx_l4_per__i2c4,
-+};
-+
-+static struct omap_hwmod omap44xx_i2c4_hwmod = {
-+	.name		= "i2c4",
-+	.class		= &omap44xx_i2c_hwmod_class,
-+	.flags		= HWMOD_INIT_NO_RESET,
-+	.mpu_irqs	= omap44xx_i2c4_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c4_irqs),
-+	.sdma_reqs	= omap44xx_i2c4_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_i2c4_sdma_reqs),
-+	.main_clk	= "i2c4_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_L4PER_I2C4_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_i2c4_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_i2c4_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/*
-  * 'mpu_bus' class
-  * instance(s): mpu_private
-  */
-@@ -467,6 +699,11 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_l4_cfg_hwmod,
- 	&omap44xx_l4_per_hwmod,
- 	&omap44xx_l4_wkup_hwmod,
-+	/* i2c class */
-+	&omap44xx_i2c1_hwmod,
-+	&omap44xx_i2c2_hwmod,
-+	&omap44xx_i2c3_hwmod,
-+	&omap44xx_i2c4_hwmod,
- 	/* mpu_bus class */
- 	&omap44xx_mpu_private_hwmod,
+ /* I2C controller revisions */
+ #define OMAP_I2C_REV_2			0x20
+@@ -175,8 +176,6 @@ struct omap_i2c_dev {
+ 	void __iomem		*base;		/* virtual */
+ 	int			irq;
+ 	int			reg_shift;      /* bit shift for I2C register addresses */
+-	struct clk		*iclk;		/* Interface clock */
+-	struct clk		*fclk;		/* Functional clock */
+ 	struct completion	cmd_complete;
+ 	struct resource		*ioarea;
+ 	u32			latency;	/* maximum mpu wkup latency */
+@@ -265,45 +264,18 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+ 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
+ }
  
+-static int __init omap_i2c_get_clocks(struct omap_i2c_dev *dev)
++static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+ {
+-	int ret;
++	struct platform_device *pdev;
++	struct omap_i2c_bus_platform_data *pdata;
+ 
+-	dev->iclk = clk_get(dev->dev, "ick");
+-	if (IS_ERR(dev->iclk)) {
+-		ret = PTR_ERR(dev->iclk);
+-		dev->iclk = NULL;
+-		return ret;
+-	}
++	WARN_ON(!dev->idle);
+ 
+-	dev->fclk = clk_get(dev->dev, "fck");
+-	if (IS_ERR(dev->fclk)) {
+-		ret = PTR_ERR(dev->fclk);
+-		if (dev->iclk != NULL) {
+-			clk_put(dev->iclk);
+-			dev->iclk = NULL;
+-		}
+-		dev->fclk = NULL;
+-		return ret;
+-	}
++	pdev = to_platform_device(dev->dev);
++	pdata = pdev->dev.platform_data;
+ 
+-	return 0;
+-}
++	pm_runtime_get_sync(&pdev->dev);
+ 
+-static void omap_i2c_put_clocks(struct omap_i2c_dev *dev)
+-{
+-	clk_put(dev->fclk);
+-	dev->fclk = NULL;
+-	clk_put(dev->iclk);
+-	dev->iclk = NULL;
+-}
+-
+-static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+-{
+-	WARN_ON(!dev->idle);
+-
+-	clk_enable(dev->iclk);
+-	clk_enable(dev->fclk);
+ 	if (cpu_is_omap34xx()) {
+ 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+@@ -326,10 +298,15 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
+ 
+ static void omap_i2c_idle(struct omap_i2c_dev *dev)
+ {
++	struct platform_device *pdev;
++	struct omap_i2c_bus_platform_data *pdata;
+ 	u16 iv;
+ 
+ 	WARN_ON(dev->idle);
+ 
++	pdev = to_platform_device(dev->dev);
++	pdata = pdev->dev.platform_data;
++
+ 	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+ 	if (dev->rev >= OMAP_I2C_REV_ON_4430)
+ 		omap_i2c_write_reg(dev, OMAP_I2C_IRQENABLE_CLR, 1);
+@@ -345,8 +322,8 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
+ 		omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 	}
+ 	dev->idle = 1;
+-	clk_disable(dev->fclk);
+-	clk_disable(dev->iclk);
++
++	pm_runtime_put_sync(&pdev->dev);
+ }
+ 
+ static int omap_i2c_init(struct omap_i2c_dev *dev)
+@@ -356,6 +333,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 	unsigned long fclk_rate = 12000000;
+ 	unsigned long timeout;
+ 	unsigned long internal_clk = 0;
++	struct clk *fclk;
+ 
+ 	if (dev->rev >= OMAP_I2C_REV_2) {
+ 		/* Disable I2C controller before soft reset */
+@@ -414,7 +392,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 		 * always returns 12MHz for the functional clock, we can
+ 		 * do this bit unconditionally.
+ 		 */
+-		fclk_rate = clk_get_rate(dev->fclk);
++		fclk = clk_get(dev->dev, "fck");
++		fclk_rate = clk_get_rate(fclk);
+ 
+ 		/* TRM for 5912 says the I2C clock must be prescaled to be
+ 		 * between 7 - 12 MHz. The XOR input clock is typically
+@@ -443,7 +422,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 			internal_clk = 9600;
+ 		else
+ 			internal_clk = 4000;
+-		fclk_rate = clk_get_rate(dev->fclk) / 1000;
++		fclk = clk_get(dev->dev, "fck");
++		fclk_rate = clk_get_rate(fclk) / 1000;
+ 
+ 		/* Compute prescaler divisor */
+ 		psc = fclk_rate / internal_clk;
+@@ -1046,14 +1026,12 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	else
+ 		dev->reg_shift = 2;
+ 
+-	if ((r = omap_i2c_get_clocks(dev)) != 0)
+-		goto err_iounmap;
+-
+ 	if (cpu_is_omap44xx())
+ 		dev->regs = (u8 *) omap4_reg_map;
+ 	else
+ 		dev->regs = (u8 *) reg_map;
+ 
++	pm_runtime_enable(&pdev->dev);
+ 	omap_i2c_unidle(dev);
+ 
+ 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
+@@ -1125,8 +1103,6 @@ err_free_irq:
+ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	omap_i2c_idle(dev);
+-	omap_i2c_put_clocks(dev);
+-err_iounmap:
+ 	iounmap(dev->base);
+ err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+@@ -1148,7 +1124,6 @@ omap_i2c_remove(struct platform_device *pdev)
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+-	omap_i2c_put_clocks(dev);
+ 	iounmap(dev->base);
+ 	kfree(dev);
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
 1.5.4.7
