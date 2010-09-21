@@ -1,25 +1,34 @@
-From: maxim.osipov@gmail.com (Maxim Osipov)
-Date: Tue, 21 Sep 2010 10:48:56 +0400
-Subject: [PATCH v3] AT91: Add flexibity board support
-In-Reply-To: <AANLkTinooMVLhGPE7rnD7=eLw2e5UxS0HD+ReY7NpA35@mail.gmail.com>
-References: <4C8F2B1B.7090003@gmail.com>
-	<AANLkTinooMVLhGPE7rnD7=eLw2e5UxS0HD+ReY7NpA35@mail.gmail.com>
-Message-ID: <AANLkTi=WGt0Pma_YvypkxKbe48t3OtWW3rvpgBzfohwG@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 21 Sep 2010 10:07:00 +0300
+Subject: [PATCH 3/5] omap3: cm-t3517: add support for usb host.
+In-Reply-To: <4C9773CA.4010102@compulab.co.il>
+References: <1284627281-26059-1-git-send-email-grinberg@compulab.co.il>
+	<1284627281-26059-4-git-send-email-grinberg@compulab.co.il>
+	<20100916090018.GM3393@legolas.emea.dhcp.ti.com>
+	<4C91DF66.6020003@compulab.co.il>
+	<20100920063913.GB32493@legolas.emea.dhcp.ti.com>
+	<4C9773CA.4010102@compulab.co.il>
+Message-ID: <20100921070700.GH11123@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 21, 2010 at 10:42 AM, avictor.za at gmail.com
-<avictor.za@gmail.com> wrote:
-> hi Maxim,
+On Mon, Sep 20, 2010 at 09:46:34AM -0500, Igor Grinberg wrote:
+> On 09/20/10 08:39, Felipe Balbi wrote:
+>> On Thu, Sep 16, 2010 at 04:12:06AM -0500, Igor Grinberg wrote:
+>>> Yes it will, but even if the hub reset gpio is for some reason unavailable,
+>>> we don't want to disable ehci completely...
+>>
+>> then you should set the gpio to an invalid number, otherwise you might
+>> cause lots of WARN() to appear due to fiddling with unrequested gpio.
 >
->> Subject: [PATCH] AT91: Add flexibity board support
-> Acked-by: Andrew Victor <linux@maxim.org.za>
->
-> Please submit the patch to Russell King's patch-tracking system.
->
+>What gpio should be set to invalid number?
 
-Thank you. It is already in Incoming of patch-tracking system. I will
-add your ack there.
+the one which fails to be requested.
 
-Kind regards,
-Maxim
+>It is a reset gpio for usb _hub_ and it has nothing to do with ehci.
+>Can you please, explain the case when I might cause those WARN()'s?
+
+ok, I misunderstood then. Nevermind
+
+-- 
+balbi
