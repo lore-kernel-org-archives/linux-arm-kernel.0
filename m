@@ -1,22 +1,42 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 21 Sep 2010 17:20:32 +0530
-Subject: [PATCH 00/74] Updating SPEAr Support
-In-Reply-To: <201009211332.14002.matthias.fuchs@esd.eu>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<201009211332.14002.matthias.fuchs@esd.eu>
-Message-ID: <4C989C08.7090901@st.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 21 Sep 2010 14:17:49 +0200
+Subject: [PATCH v2 0/3] *** SUBJECT HERE ***
+Message-ID: <cover.1285070872.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2010 05:02 PM, Matthias Fuchs wrote:
-> Hi Viresh,
-> 
-> are you also planning a USB gadget driver for the SPEAr?
-> Or is this already done?
+These patches enable PCI Express support on Tegra2.
+The implementation is based on original NVidia code from (1), but it
+is heavily reworked to avoid custom PCI enumeration and make the code
+more Linux friendly.
 
-Matthias,
+This implementation assumes that the PCIe subsystem is fully powered
+and ungated by the bootloader.
 
-It is under testing currently, will be available in our next
-branch in few days.
+[1] git://nv-tegra.nvidia.com/linux-2.6.git
 
-viresh
+v2 changes:
+   * Update PCIe clocks implementation as per Colin and Gary suggestions
+   * Update I/O space access as suggested by Arnd and Russell.
+   * Remove debug leftovers and unify error reporting
+
+The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
+  Linus Torvalds (1):
+        Linux 2.6.36-rc5
+
+Mike Rapoport (3):
+  [ARM] tegra: add PCI Express clocks
+  [ARM] tegra: add PCI Express support
+  [ARM] tegra: harmony: enable PCI Express
+
+ arch/arm/mach-tegra/Kconfig                 |    4 +
+ arch/arm/mach-tegra/Makefile                |    2 +
+ arch/arm/mach-tegra/board-harmony-pcie.c    |   52 ++
+ arch/arm/mach-tegra/board.h                 |    1 +
+ arch/arm/mach-tegra/include/mach/hardware.h |    4 +
+ arch/arm/mach-tegra/include/mach/io.h       |   12 +-
+ arch/arm/mach-tegra/pcie.c                  |  915 +++++++++++++++++++++++++++
+ arch/arm/mach-tegra/tegra2_clocks.c         |   46 ++
+ 8 files changed, 1035 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/board-harmony-pcie.c
+ create mode 100644 arch/arm/mach-tegra/pcie.c
