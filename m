@@ -1,108 +1,226 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Sep 2010 10:34:42 -0600
-Subject: [PATCH 01/11] OMAP: hwmod: Rename dma_ch to dma_req
+Date: Tue, 21 Sep 2010 10:34:47 -0600
+Subject: [PATCH 05/11] [PATCH] OMAP: hwmod: separate list locking and hwmod
+	hardware locking
 In-Reply-To: <20100921163021.20258.87587.stgit@twilight.localdomain>
 References: <20100921163021.20258.87587.stgit@twilight.localdomain>
-Message-ID: <20100921163438.20258.13212.stgit@twilight.localdomain>
+Message-ID: <20100921163446.20258.84736.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+From: Kevin Hilman <khilman@ti.com>
 
-The dma request line attribute was named dma channel, which leads
-to confusion with the real dma channel definition.
+Currently omap_hwmod_mutex is being used to protect both the list
+access/modification and concurrent access to hwmod functions.  This
+patch separates these two types of locking.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+First, omap_hwmod_mutex is used only to protect access and
+modification of omap_hwmod_list.  Also cleaned up some comments
+referring to this mutex that are no longer needed.
+
+Then, for protecting concurrent access to hwmod functions, use a
+per-hwmod mutex.  This protects concurrent access to a single hwmod,
+but would allow concurrent access to different hwmods.
+
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+[paul at pwsan.com: added structure documentation; changed mutex variable
+ name]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   10 +++++-----
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   12 ++++++------
- 2 files changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |   62 +++++++++++++-------------
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +
+ 2 files changed, 33 insertions(+), 32 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index cb911d7..8bf19a7 100644
+index 100115f..3084409 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1468,7 +1468,7 @@ int omap_hwmod_count_resources(struct omap_hwmod *oh)
+@@ -767,10 +767,10 @@ static struct omap_hwmod *_lookup(const char *name)
+  * @data: not used; pass NULL
+  *
+  * Called by omap_hwmod_late_init() (after omap2_clk_init()).
+- * Resolves all clock names embedded in the hwmod.  Must be called
+- * with omap_hwmod_mutex held.  Returns -EINVAL if the omap_hwmod
+- * has not yet been registered or if the clocks have already been
+- * initialized, 0 on success, or a non-zero error on failure.
++ * Resolves all clock names embedded in the hwmod.  Returns -EINVAL if
++ * the omap_hwmod has not yet been registered or if the clocks have
++ * already been initialized, 0 on success, or a non-zero error on
++ * failure.
+  */
+ static int _init_clocks(struct omap_hwmod *oh, void *data)
  {
- 	int ret, i;
- 
--	ret = oh->mpu_irqs_cnt + oh->sdma_chs_cnt;
-+	ret = oh->mpu_irqs_cnt + oh->sdma_reqs_cnt;
- 
- 	for (i = 0; i < oh->slaves_cnt; i++)
- 		ret += oh->slaves[i]->addr_cnt;
-@@ -1501,10 +1501,10 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
- 		r++;
+@@ -838,10 +838,9 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+  * @oh: struct omap_hwmod *
+  *
+  * Resets an omap_hwmod @oh via the OCP_SYSCONFIG bit.  hwmod must be
+- * enabled for this to work.  Must be called with omap_hwmod_mutex
+- * held.  Returns -EINVAL if the hwmod cannot be reset this way or if
+- * the hwmod is in the wrong state, -ETIMEDOUT if the module did not
+- * reset in time, or 0 upon success.
++ * enabled for this to work.  Returns -EINVAL if the hwmod cannot be
++ * reset this way or if the hwmod is in the wrong state, -ETIMEDOUT if
++ * the module did not reset in time, or 0 upon success.
+  */
+ static int _reset(struct omap_hwmod *oh)
+ {
+@@ -891,9 +890,8 @@ static int _reset(struct omap_hwmod *oh)
+  * @oh: struct omap_hwmod *
+  *
+  * Enables an omap_hwmod @oh such that the MPU can access the hwmod's
+- * register target.  Must be called with omap_hwmod_mutex held.
+- * Returns -EINVAL if the hwmod is in the wrong state or passes along
+- * the return value of _wait_target_ready().
++ * register target.  Returns -EINVAL if the hwmod is in the wrong
++ * state or passes along the return value of _wait_target_ready().
+  */
+ int _omap_hwmod_enable(struct omap_hwmod *oh)
+ {
+@@ -1004,11 +1002,10 @@ static int _shutdown(struct omap_hwmod *oh)
+  * @skip_setup_idle_p: do not idle hwmods at the end of the fn if 1
+  *
+  * Writes the CLOCKACTIVITY bits @clockact to the hwmod @oh
+- * OCP_SYSCONFIG register.  Must be called with omap_hwmod_mutex held.
+- * @skip_setup_idle is intended to be used on a system that will not
+- * call omap_hwmod_enable() to enable devices (e.g., a system without
+- * PM runtime).  Returns -EINVAL if the hwmod is in the wrong state or
+- * returns 0.
++ * OCP_SYSCONFIG register.  @skip_setup_idle is intended to be used on
++ * a system that will not call omap_hwmod_enable() to enable devices
++ * (e.g., a system without PM runtime).  Returns -EINVAL if the hwmod
++ * is in the wrong state or returns 0.
+  */
+ static int _setup(struct omap_hwmod *oh, void *data)
+ {
+@@ -1038,6 +1035,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
+ 		}
  	}
  
--	for (i = 0; i < oh->sdma_chs_cnt; i++) {
--		(res + r)->name = (oh->sdma_chs + i)->name;
--		(res + r)->start = (oh->sdma_chs + i)->dma_ch;
--		(res + r)->end = (oh->sdma_chs + i)->dma_ch;
-+	for (i = 0; i < oh->sdma_reqs_cnt; i++) {
-+		(res + r)->name = (oh->sdma_reqs + i)->name;
-+		(res + r)->start = (oh->sdma_reqs + i)->dma_req;
-+		(res + r)->end = (oh->sdma_reqs + i)->dma_req;
- 		(res + r)->flags = IORESOURCE_DMA;
- 		r++;
- 	}
++	mutex_init(&oh->_mutex);
+ 	oh->_state = _HWMOD_STATE_INITIALIZED;
+ 
+ 	r = _omap_hwmod_enable(oh);
+@@ -1323,9 +1321,9 @@ int omap_hwmod_enable(struct omap_hwmod *oh)
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	r = _omap_hwmod_enable(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return r;
+ }
+@@ -1343,9 +1341,9 @@ int omap_hwmod_idle(struct omap_hwmod *oh)
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	_omap_hwmod_idle(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return 0;
+ }
+@@ -1363,9 +1361,9 @@ int omap_hwmod_shutdown(struct omap_hwmod *oh)
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	_shutdown(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return 0;
+ }
+@@ -1378,9 +1376,9 @@ int omap_hwmod_shutdown(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_enable_clocks(struct omap_hwmod *oh)
+ {
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	_enable_clocks(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return 0;
+ }
+@@ -1393,9 +1391,9 @@ int omap_hwmod_enable_clocks(struct omap_hwmod *oh)
+  */
+ int omap_hwmod_disable_clocks(struct omap_hwmod *oh)
+ {
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	_disable_clocks(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return 0;
+ }
+@@ -1443,9 +1441,9 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	r = _reset(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return r;
+ }
+@@ -1646,9 +1644,9 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+ 		return -EINVAL;
+ 
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	_enable_wakeup(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return 0;
+ }
+@@ -1671,9 +1669,9 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+ 		return -EINVAL;
+ 
+-	mutex_lock(&omap_hwmod_mutex);
++	mutex_lock(&oh->_mutex);
+ 	_disable_wakeup(oh);
+-	mutex_unlock(&omap_hwmod_mutex);
++	mutex_unlock(&oh->_mutex);
+ 
+ 	return 0;
+ }
 diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index a4e508d..5506d80 100644
+index 5506d80..03350ba 100644
 --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
 +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -96,7 +96,7 @@ struct omap_hwmod_irq_info {
- /**
-  * struct omap_hwmod_dma_info - DMA channels used by the hwmod
-  * @name: name of the DMA channel (module local name)
-- * @dma_ch: DMA channel ID
-+ * @dma_req: DMA request ID
-  *
-  * @name should be something short, e.g., "tx" or "rx".  It is for use
-  * by platform_get_resource_byname().  It is defined locally to the
-@@ -104,7 +104,7 @@ struct omap_hwmod_irq_info {
-  */
- struct omap_hwmod_dma_info {
- 	const char	*name;
--	u16		dma_ch;
-+	u16		dma_req;
- };
+@@ -35,6 +35,7 @@
+ #include <linux/kernel.h>
+ #include <linux/list.h>
+ #include <linux/ioport.h>
++#include <linux/mutex.h>
+ #include <plat/cpu.h>
  
- /**
-@@ -410,7 +410,7 @@ struct omap_hwmod_class {
-  * @class: struct omap_hwmod_class * to the class of this hwmod
-  * @od: struct omap_device currently associated with this hwmod (internal use)
-  * @mpu_irqs: ptr to an array of MPU IRQs (see also mpu_irqs_cnt)
-- * @sdma_chs: ptr to an array of SDMA channel IDs (see also sdma_chs_cnt)
-+ * @sdma_reqs: ptr to an array of System DMA request IDs (see sdma_reqs_cnt)
-  * @prcm: PRCM data pertaining to this hwmod
-  * @main_clk: main clock: OMAP clock name
-  * @_clk: pointer to the main struct clk (filled in at runtime)
-@@ -424,7 +424,7 @@ struct omap_hwmod_class {
-  * @msuspendmux_reg_id: CONTROL_MSUSPENDMUX register ID (1-6)
-  * @msuspendmux_shift: CONTROL_MSUSPENDMUX register bit shift
-  * @mpu_irqs_cnt: number of @mpu_irqs
-- * @sdma_chs_cnt: number of @sdma_chs
-+ * @sdma_reqs_cnt: number of @sdma_reqs
-  * @opt_clks_cnt: number of @opt_clks
-  * @master_cnt: number of @master entries
-  * @slaves_cnt: number of @slave entries
-@@ -448,7 +448,7 @@ struct omap_hwmod {
- 	struct omap_hwmod_class		*class;
- 	struct omap_device		*od;
- 	struct omap_hwmod_irq_info	*mpu_irqs;
--	struct omap_hwmod_dma_info	*sdma_chs;
-+	struct omap_hwmod_dma_info	*sdma_reqs;
- 	union {
- 		struct omap_hwmod_omap2_prcm omap2;
- 		struct omap_hwmod_omap4_prcm omap4;
-@@ -468,7 +468,7 @@ struct omap_hwmod {
- 	u8				msuspendmux_shift;
- 	u8				response_lat;
- 	u8				mpu_irqs_cnt;
--	u8				sdma_chs_cnt;
-+	u8				sdma_reqs_cnt;
- 	u8				opt_clks_cnt;
- 	u8				masters_cnt;
- 	u8				slaves_cnt;
+ struct omap_device;
+@@ -433,6 +434,7 @@ struct omap_hwmod_class {
+  * @_state: internal-use hwmod state
+  * @flags: hwmod flags (documented below)
+  * @omap_chip: OMAP chips this hwmod is present on
++ * @_mutex: mutex serializing operations on this hwmod
+  * @node: list node for hwmod list (internal use)
+  *
+  * @main_clk refers to this module's "main clock," which for our
+@@ -461,6 +463,7 @@ struct omap_hwmod {
+ 	void				*dev_attr;
+ 	u32				_sysc_cache;
+ 	void __iomem			*_mpu_rt_va;
++	struct mutex			_mutex;
+ 	struct list_head		node;
+ 	u16				flags;
+ 	u8				_mpu_port_index;
