@@ -1,68 +1,145 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 21 Sep 2010 14:30:07 +0200
-Subject: [PATCH 1/4] mmc: sdhci-pltfm: Add structure for host-specific data
+Date: Tue, 21 Sep 2010 14:30:08 +0200
+Subject: [PATCH 2/4] mmc: sdhci-pltfm: move .h-file into apropriate subdir
 In-Reply-To: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
 References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1285072210-10207-2-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1285072210-10207-3-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to carry some information per host, e.g. the clock. Add a
-structure for it and initialize it in the generic part.
+Make use of the mmc-directory.
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- drivers/mmc/host/sdhci-pltfm.c |    7 +++++--
- drivers/mmc/host/sdhci-pltfm.h |    5 +++++
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci-cns3xxx.c |    2 +-
+ drivers/mmc/host/sdhci-pltfm.c   |    2 +-
+ drivers/mmc/host/sdhci-pltfm.h   |    2 +-
+ include/linux/mmc/sdhci-pltfm.h  |   35 +++++++++++++++++++++++++++++++++++
+ include/linux/sdhci-pltfm.h      |   35 -----------------------------------
+ 5 files changed, 38 insertions(+), 38 deletions(-)
+ create mode 100644 include/linux/mmc/sdhci-pltfm.h
+ delete mode 100644 include/linux/sdhci-pltfm.h
 
+diff --git a/drivers/mmc/host/sdhci-cns3xxx.c b/drivers/mmc/host/sdhci-cns3xxx.c
+index b7050b3..9ebd1d7 100644
+--- a/drivers/mmc/host/sdhci-cns3xxx.c
++++ b/drivers/mmc/host/sdhci-cns3xxx.c
+@@ -15,7 +15,7 @@
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/mmc/host.h>
+-#include <linux/sdhci-pltfm.h>
++#include <linux/mmc/sdhci-pltfm.h>
+ #include <mach/cns3xxx.h>
+ #include "sdhci.h"
+ #include "sdhci-pltfm.h"
 diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index e045e3c..bf522a1 100644
+index bf522a1..ff0271c 100644
 --- a/drivers/mmc/host/sdhci-pltfm.c
 +++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
- 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
- 	const struct platform_device_id *platid = platform_get_device_id(pdev);
- 	struct sdhci_host *host;
-+	struct sdhci_pltfm_host *pltfm_host;
- 	struct resource *iomem;
- 	int ret;
+@@ -30,7 +30,7 @@
+ #include <linux/mmc/host.h>
  
-@@ -72,15 +73,17 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
- 			"experience problems.\n");
+ #include <linux/io.h>
+-#include <linux/sdhci-pltfm.h>
++#include <linux/mmc/sdhci-pltfm.h>
  
- 	if (pdev->dev.parent)
--		host = sdhci_alloc_host(pdev->dev.parent, 0);
-+		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
- 	else
--		host = sdhci_alloc_host(&pdev->dev, 0);
-+		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
- 
- 	if (IS_ERR(host)) {
- 		ret = PTR_ERR(host);
- 		goto err;
- 	}
- 
-+	pltfm_host = sdhci_priv(host);
-+
- 	host->hw_name = "platform";
- 	if (pdata && pdata->ops)
- 		host->ops = pdata->ops;
+ #include "sdhci.h"
+ #include "sdhci-pltfm.h"
 diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-index 900f329..c393289 100644
+index c393289..2b43ed5 100644
 --- a/drivers/mmc/host/sdhci-pltfm.h
 +++ b/drivers/mmc/host/sdhci-pltfm.h
-@@ -13,6 +13,11 @@
+@@ -11,7 +11,7 @@
+ #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
+ #define _DRIVERS_MMC_SDHCI_PLTFM_H
  
- #include <linux/sdhci-pltfm.h>
+-#include <linux/sdhci-pltfm.h>
++#include <linux/mmc/sdhci-pltfm.h>
  
-+struct sdhci_pltfm_host {
-+	struct clk *clk;
-+	u32 scratchpad; /* to handle quirks across io-accessor calls */
+ struct sdhci_pltfm_host {
+ 	struct clk *clk;
+diff --git a/include/linux/mmc/sdhci-pltfm.h b/include/linux/mmc/sdhci-pltfm.h
+new file mode 100644
+index 0000000..0239bd7
+--- /dev/null
++++ b/include/linux/mmc/sdhci-pltfm.h
+@@ -0,0 +1,35 @@
++/*
++ * Platform data declarations for the sdhci-pltfm driver.
++ *
++ * Copyright (c) 2010 MontaVista Software, LLC.
++ *
++ * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or (at
++ * your option) any later version.
++ */
++
++#ifndef _SDHCI_PLTFM_H
++#define _SDHCI_PLTFM_H
++
++struct sdhci_ops;
++struct sdhci_host;
++
++/**
++ * struct sdhci_pltfm_data - SDHCI platform-specific information & hooks
++ * @ops: optional pointer to the platform-provided SDHCI ops
++ * @quirks: optional SDHCI quirks
++ * @init: optional hook that is called during device probe, before the
++ *        driver tries to access any SDHCI registers
++ * @exit: optional hook that is called during device removal
++ */
++struct sdhci_pltfm_data {
++	struct sdhci_ops *ops;
++	unsigned int quirks;
++	int (*init)(struct sdhci_host *host);
++	void (*exit)(struct sdhci_host *host);
 +};
 +
- extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
- 
- #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
++#endif /* _SDHCI_PLTFM_H */
+diff --git a/include/linux/sdhci-pltfm.h b/include/linux/sdhci-pltfm.h
+deleted file mode 100644
+index 0239bd7..0000000
+--- a/include/linux/sdhci-pltfm.h
++++ /dev/null
+@@ -1,35 +0,0 @@
+-/*
+- * Platform data declarations for the sdhci-pltfm driver.
+- *
+- * Copyright (c) 2010 MontaVista Software, LLC.
+- *
+- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or (at
+- * your option) any later version.
+- */
+-
+-#ifndef _SDHCI_PLTFM_H
+-#define _SDHCI_PLTFM_H
+-
+-struct sdhci_ops;
+-struct sdhci_host;
+-
+-/**
+- * struct sdhci_pltfm_data - SDHCI platform-specific information & hooks
+- * @ops: optional pointer to the platform-provided SDHCI ops
+- * @quirks: optional SDHCI quirks
+- * @init: optional hook that is called during device probe, before the
+- *        driver tries to access any SDHCI registers
+- * @exit: optional hook that is called during device removal
+- */
+-struct sdhci_pltfm_data {
+-	struct sdhci_ops *ops;
+-	unsigned int quirks;
+-	int (*init)(struct sdhci_host *host);
+-	void (*exit)(struct sdhci_host *host);
+-};
+-
+-#endif /* _SDHCI_PLTFM_H */
 -- 
 1.7.1
