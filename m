@@ -1,151 +1,61 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Tue, 21 Sep 2010 18:24:39 +0530
-Subject: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode support
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B0316062730@dbde02.ent.ti.com>
-References: <1284624059-1741-1-git-send-email-s-ghorai@ti.com>
-	<1284624059-1741-2-git-send-email-s-ghorai@ti.com>
-	<20100917175504.GG29610@atomide.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0316062730@dbde02.ent.ti.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B031610E073@dbde02.ent.ti.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Tue, 21 Sep 2010 16:58:23 +0400
+Subject: [PATCH 3/4] mmc: sdhci-of-esdhc: factor out common stuff
+In-Reply-To: <1285072210-10207-4-git-send-email-w.sang@pengutronix.de>
+References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
+	<1285072210-10207-4-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20100921125823.GA31408@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, Sep 21, 2010 at 02:30:09PM +0200, Wolfram Sang wrote:
+> Put everything which can be shared between the OF and platform version
+> of this driver into a local .h-file.
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+[...]
+> +
+> +static void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
+> +{
+> +	int pre_div = 2;
+> +	int div = 1;
+> +	u32 temp;
+> +
+> +	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> +	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
+> +	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> +
+> +	if (clock == 0)
+> +		goto out;
+> +
+> +	while (host->max_clk / pre_div / 16 > clock && pre_div < 256)
+> +		pre_div *= 2;
+> +
+> +	while (host->max_clk / pre_div / div > clock && div < 16)
+> +		div++;
+> +
+> +	dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
+> +		clock, host->max_clk / pre_div / div);
+> +
+> +	pre_div >>= 1;
+> +	div--;
+> +
+> +	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> +	temp |= (ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN |
+> +		  (div << ESDHC_DIVIDER_SHIFT) | (pre_div << ESDHC_PREDIV_SHIFT));
+> +	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> +	mdelay(100);
+> +out:
+> +	host->clock = clock;
+> +}
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Ghorai, Sukumar
-> Sent: Monday, September 20, 2010 7:01 PM
-> To: Tony Lindgren
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode
-> support
-> 
-> Tony,
-> 
-> > -----Original Message-----
-> > From: Ghorai, Sukumar
-> > Sent: Saturday, September 18, 2010 11:55 PM
-> > To: 'Tony Lindgren'
-> > Cc: 'linux-omap at vger.kernel.org'; 'linux-mtd at lists.infradead.org';
-> 'linux-
-> > arm-kernel at lists.infradead.org'
-> > Subject: RE: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode
-> > support
-> >
-> > Tony,
-> >
-> > > -----Original Message-----
-> > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > Sent: Friday, September 17, 2010 11:25 PM
-> > > To: Ghorai, Sukumar
-> > > Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
-> > arm-
-> > > kernel at lists.infradead.org; Vimal Singh
-> > > Subject: Re: [PATCH RESEND v4 1/4] omap3: nand: prefetch in irq mode
-> > > support
-> > >
-> > > * Sukumar Ghorai <s-ghorai@ti.com> [100916 00:53]:
-> > > > This patch enable prefetch-irq mode for NAND.
-> > > >
-> > > > --- a/drivers/mtd/nand/omap2.c
-> > > > +++ b/drivers/mtd/nand/omap2.c
-> > > > @@ -467,6 +485,152 @@ static void omap_write_buf_dma_pref(struct
-> > > mtd_info *mtd,
-> > > >  		omap_nand_dma_transfer(mtd, (u_char *) buf, len, 0x1);
-> > > >  }
-> > > >
-> > > > +/*
-> > > > + * omap_nand_irq - GMPC irq handler
-> > > > + * @this_irq: gpmc irq number
-> > > > + * @dev: omap_nand_info structure pointer is passed here
-> > > > + */
-> > > > +static irqreturn_t omap_nand_irq(int this_irq, void *dev)
-> > > > +{
-> > > > +	struct omap_nand_info *info = (struct omap_nand_info *) dev;
-> > > > +	u32 bytes;
-> > > > +	u32 irq_stat;
-> > > > +
-> > > > +	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
-> > > > +	bytes = gpmc_read_status(GPMC_PREFETCH_FIFO_CNT);
-> > > > +	bytes = bytes  & 0xFFFC; /* io in multiple of 4 bytes */
-> > > > +	if (info->iomode == OMAP_NAND_IO_WRITE) { /* checks for write
-> io */
-> > > > +		if (irq_stat & 0x2)
-> > > > +			goto done;
-> > > > +
-> > > > +		if (info->buf_len & (info->buf_len < bytes))
-> > > > +			bytes = info->buf_len;
-> > > > +		else if (!info->buf_len)
-> > > > +			bytes = 0;
-> > > > +		iowrite32_rep(info->nand.IO_ADDR_W,
-> > > > +						(u32 *)info->buf, bytes >> 2);
-> > > > +		info->buf = info->buf + bytes;
-> > > > +		info->buf_len -= bytes;
-> > > > +
-> > > > +	} else {
-> > > > +		ioread32_rep(info->nand.IO_ADDR_R,
-> > > > +						(u32 *)info->buf, bytes >> 2);
-> > > > +		info->buf = info->buf + bytes;
-> > > > +
-> > > > +		if (irq_stat & 0x2)
-> > > > +			goto done;
-> > > > +	}
-> > > > +	gpmc_cs_configure(info->gpmc_cs, GPMC_SET_IRQ_STATUS,
-> irq_stat);
-> > > > +	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
-> > > > +
-> > > > +	return IRQ_HANDLED;
-> > > > +
-> > > > +done:
-> > > > +	complete(&info->comp);
-> > > > +	/* disable irq */
-> > > > +	gpmc_cs_configure(info->gpmc_cs, GPMC_ENABLE_IRQ, 0);
-> > > > +
-> > > > +	/* clear status */
-> > > > +	gpmc_cs_configure(info->gpmc_cs, GPMC_SET_IRQ_STATUS,
-> irq_stat);
-> > > > +	irq_stat = gpmc_read_status(GPMC_GET_IRQ_STATUS);
-> > > > +
-> > > > +	return IRQ_HANDLED;
-> > > > +}
-> > >
-> > > This handler should be in gpmc.c as it may be needed for other GPMC
-> > > connected devices on the same system. You can use chained irq handlers
-> > > to allow all the drivers to use the interrupt then.
-> >
-> > [Ghorai]
-> > You mean as this function used the gpmc-irq number in nand file, so
-> > handler should move to gpmc.c file?
-> > 	1. For that we need to add one io-struct (to keep io buffer status)
-> > in gpmc.c;
-> >
-> > 	2. Also need help how to sync between gpmc.c/omap_nand_irq() and
-> > omap2.c/omap_write_buf_irq_pref(), men how read/write function know that
-> > work done in interrupt-context? Or you prefer to move the complete IO
-> > function (omap_read/write_buf_irq_pref) to gpmc.c?
-> >
-> > 	3. gpmc does not now about the read and write address that's
-> > applicable for NAND. So how to pass the IO address from omap2.c to
-> gpmc.c,
-> > interrupt handler?
-> >
-> >
-> > So, please let me know your suggestion again such that I can post this
-> > time itself. Otherwise again it will miss from coming release, this was
-> > posted/reviewed for last release too. And suggest to void repeating of
-> > missing release window again.
-> 
-> [Ghorai] Please reply with your 2nd suggestion.
-[Ghorai] Please reply with your 2nd suggestion.
+This function is too big for a header. How about moving it
+to sdhci-esdhc.c, which would hold common bits for eSDHC?
 
-> >
-> > >
-> > > Regards,
-> > >
-> > > Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
