@@ -1,426 +1,428 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 21 Sep 2010 19:37:12 +0530
-Subject: [PATCH v3 1/5] OMAP2xxx: hwmod: add I2C hwmods for OMAP2420, 2430
-In-Reply-To: <1285078036-12789-1-git-send-email-rnayak@ti.com>
-References: <1285078036-12789-1-git-send-email-rnayak@ti.com>
-Message-ID: <1285078036-12789-2-git-send-email-rnayak@ti.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Tue, 21 Sep 2010 16:18:15 +0200
+Subject: [PATCH] mfd: regulator: max8998: BUCK1/2 control augmented by GPIO
+	pins
+Message-ID: <1285078695-24753-1-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Walmsley <paul@pwsan.com>
+This patch facilitates the faster voltage change for BUCK1/2 regulators. It uses
+MAX8998 GPIO pins to control output voltage. This feature is extremely useful
+for Dynamic Voltage Scalling (DVS) implementation.
+This patch has been tested at Samsung GONI and AQUILA targets.
+Corresponding platform code will be submitted in a separate patch.
 
-Add hwmod structures for I2C controllers on OMAP2420/2430.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-omap2/cm-regbits-24xx.h      |    4 +
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |  140 +++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |  154 +++++++++++++++++++++++++++-
- 3 files changed, 294 insertions(+), 4 deletions(-)
+ drivers/mfd/max8998.c               |    5 +-
+ drivers/regulator/max8998.c         |  192 +++++++++++++++++++++++++++++++----
+ include/linux/mfd/max8998-private.h |    9 ++
+ include/linux/mfd/max8998.h         |   42 ++++++++
+ 4 files changed, 228 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm-regbits-24xx.h b/arch/arm/mach-omap2/cm-regbits-24xx.h
-index da51cc3..5986e2b 100644
---- a/arch/arm/mach-omap2/cm-regbits-24xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-24xx.h
-@@ -126,8 +126,12 @@
- #define OMAP24XX_ST_HDQ_MASK				(1 << 23)
- #define OMAP2420_ST_I2C2_SHIFT				20
- #define OMAP2420_ST_I2C2_MASK				(1 << 20)
-+#define OMAP2430_ST_I2CHS1_SHIFT			20
-+#define OMAP2430_ST_I2CHS1_MASK				(1 << 20)
- #define OMAP2420_ST_I2C1_SHIFT				19
- #define OMAP2420_ST_I2C1_MASK				(1 << 19)
-+#define OMAP2430_ST_I2CHS2_SHIFT			19
-+#define OMAP2430_ST_I2CHS2_MASK				(1 << 19)
- #define OMAP24XX_ST_MCBSP2_SHIFT			16
- #define OMAP24XX_ST_MCBSP2_MASK				(1 << 16)
- #define OMAP24XX_ST_MCBSP1_SHIFT			15
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index 3cc768e..d5e1c9d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -15,9 +15,12 @@
- #include <mach/irqs.h>
- #include <plat/cpu.h>
- #include <plat/dma.h>
-+#include <plat/i2c.h>
-+#include <plat/omap24xx.h>
- 
- #include "omap_hwmod_common_data.h"
- 
-+#include "cm-regbits-24xx.h"
- #include "prm-regbits-24xx.h"
- 
- /*
-@@ -71,6 +74,8 @@ static struct omap_hwmod omap2420_l3_main_hwmod = {
- };
- 
- static struct omap_hwmod omap2420_l4_wkup_hwmod;
-+static struct omap_hwmod omap2420_i2c1_hwmod;
-+static struct omap_hwmod omap2420_i2c2_hwmod;
- 
- /* L4_CORE -> L4_WKUP interface */
- static struct omap_hwmod_ocp_if omap2420_l4_core__l4_wkup = {
-@@ -79,6 +84,45 @@ static struct omap_hwmod_ocp_if omap2420_l4_core__l4_wkup = {
- 	.user	= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* I2C IP block address space length (in bytes) */
-+#define OMAP2_I2C_AS_LEN		128
-+
-+/* L4 CORE -> I2C1 interface */
-+static struct omap_hwmod_addr_space omap2420_i2c1_addr_space[] = {
-+	{
-+		.pa_start	= 0x48070000,
-+		.pa_end		= 0x48070000 + OMAP2_I2C_AS_LEN - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+};
-+
-+static struct omap_hwmod_ocp_if omap2420_l4_core__i2c1 = {
-+	.master		= &omap2420_l4_core_hwmod,
-+	.slave		= &omap2420_i2c1_hwmod,
-+	.clk		= "i2c1_ick",
-+	.addr		= omap2420_i2c1_addr_space,
-+	.addr_cnt	= ARRAY_SIZE(omap2420_i2c1_addr_space),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* L4 CORE -> I2C2 interface */
-+static struct omap_hwmod_addr_space omap2420_i2c2_addr_space[] = {
-+	{
-+		.pa_start	= 0x48072000,
-+		.pa_end		= 0x48072000 + OMAP2_I2C_AS_LEN - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+};
-+
-+static struct omap_hwmod_ocp_if omap2420_l4_core__i2c2 = {
-+	.master		= &omap2420_l4_core_hwmod,
-+	.slave		= &omap2420_i2c2_hwmod,
-+	.clk		= "i2c2_ick",
-+	.addr		= omap2420_i2c2_addr_space,
-+	.addr_cnt	= ARRAY_SIZE(omap2420_i2c2_addr_space),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* Slave interfaces on the L4_CORE interconnect */
- static struct omap_hwmod_ocp_if *omap2420_l4_core_slaves[] = {
- 	&omap2420_l3_main__l4_core,
-@@ -87,6 +131,8 @@ static struct omap_hwmod_ocp_if *omap2420_l4_core_slaves[] = {
- /* Master interfaces on the L4_CORE interconnect */
- static struct omap_hwmod_ocp_if *omap2420_l4_core_masters[] = {
- 	&omap2420_l4_core__l4_wkup,
-+	&omap2420_l4_core__i2c1,
-+	&omap2420_l4_core__i2c2
- };
- 
- /* L4 CORE */
-@@ -165,12 +211,104 @@ static struct omap_hwmod omap2420_iva_hwmod = {
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420)
- };
- 
-+/* I2C common */
-+static struct omap_hwmod_class_sysconfig i2c_sysc = {
-+	.rev_offs	= 0x00,
-+	.sysc_offs	= 0x20,
-+	.syss_offs	= 0x10,
-+	.sysc_flags	= SYSC_HAS_SOFTRESET,
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class i2c_class = {
-+	.name		= "i2c",
-+	.sysc		= &i2c_sysc,
-+};
-+
-+static struct omap_i2c_dev_attr i2c_dev_attr;
-+
-+/* I2C1 */
-+
-+static struct omap_hwmod_irq_info i2c1_mpu_irqs[] = {
-+	{ .irq = INT_24XX_I2C1_IRQ, },
-+};
-+
-+static struct omap_hwmod_dma_info i2c1_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = OMAP24XX_DMA_I2C1_TX },
-+	{ .name = "rx", .dma_req = OMAP24XX_DMA_I2C1_RX },
-+};
-+
-+static struct omap_hwmod_ocp_if *omap2420_i2c1_slaves[] = {
-+	&omap2420_l4_core__i2c1,
-+};
-+
-+static struct omap_hwmod omap2420_i2c1_hwmod = {
-+	.name		= "i2c1",
-+	.mpu_irqs	= i2c1_mpu_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(i2c1_mpu_irqs),
-+	.sdma_reqs	= i2c1_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(i2c1_sdma_reqs),
-+	.main_clk	= "i2c1_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP2420_EN_I2C1_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP2420_ST_I2C1_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2420_i2c1_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2420_i2c1_slaves),
-+	.class		= &i2c_class,
-+	.dev_attr	= &i2c_dev_attr,
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
-+};
-+
-+/* I2C2 */
-+
-+static struct omap_hwmod_irq_info i2c2_mpu_irqs[] = {
-+	{ .irq = INT_24XX_I2C2_IRQ, },
-+};
-+
-+static struct omap_hwmod_dma_info i2c2_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = OMAP24XX_DMA_I2C2_TX },
-+	{ .name = "rx", .dma_req = OMAP24XX_DMA_I2C2_RX },
-+};
-+
-+static struct omap_hwmod_ocp_if *omap2420_i2c2_slaves[] = {
-+	&omap2420_l4_core__i2c2,
-+};
-+
-+static struct omap_hwmod omap2420_i2c2_hwmod = {
-+	.name		= "i2c2",
-+	.mpu_irqs	= i2c2_mpu_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(i2c2_mpu_irqs),
-+	.sdma_reqs	= i2c2_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(i2c2_sdma_reqs),
-+	.main_clk	= "i2c2_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP2420_EN_I2C2_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP2420_ST_I2C2_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2420_i2c2_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2420_i2c2_slaves),
-+	.class		= &i2c_class,
-+	.dev_attr	= &i2c_dev_attr,
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
-+};
-+
- static __initdata struct omap_hwmod *omap2420_hwmods[] = {
- 	&omap2420_l3_main_hwmod,
- 	&omap2420_l4_core_hwmod,
- 	&omap2420_l4_wkup_hwmod,
- 	&omap2420_mpu_hwmod,
- 	&omap2420_iva_hwmod,
-+	&omap2420_i2c1_hwmod,
-+	&omap2420_i2c2_hwmod,
- 	NULL,
- };
- 
-@@ -178,5 +316,3 @@ int __init omap2420_hwmod_init(void)
- {
- 	return omap_hwmod_init(omap2420_hwmods);
+diff --git a/drivers/mfd/max8998.c b/drivers/mfd/max8998.c
+index 310fd80..a720f41 100644
+--- a/drivers/mfd/max8998.c
++++ b/drivers/mfd/max8998.c
+@@ -133,6 +133,7 @@ static int max8998_i2c_probe(struct i2c_client *i2c,
+ 	max8998->dev = &i2c->dev;
+ 	max8998->i2c = i2c;
+ 	max8998->irq = i2c->irq;
++	max8998->type = id->driver_data;
+ 	if (pdata) {
+ 		max8998->ono = pdata->ono;
+ 		max8998->irq_base = pdata->irq_base;
+@@ -169,8 +170,8 @@ static int max8998_i2c_remove(struct i2c_client *i2c)
  }
--
--
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 4526628..72d5f7a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -15,10 +15,13 @@
- #include <mach/irqs.h>
- #include <plat/cpu.h>
- #include <plat/dma.h>
-+#include <plat/i2c.h>
-+#include <plat/omap24xx.h>
  
- #include "omap_hwmod_common_data.h"
- 
- #include "prm-regbits-24xx.h"
-+#include "cm-regbits-24xx.h"
- 
- /*
-  * OMAP2430 hardware module integration data
-@@ -71,6 +74,47 @@ static struct omap_hwmod omap2430_l3_main_hwmod = {
+ static const struct i2c_device_id max8998_i2c_id[] = {
+-	{ "max8998", 0 },
+-	{ "lp3974", 0 },
++	{ "max8998", TYPE_MAX8998 },
++	{ "lp3974", TYPE_LP3974},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(i2c, max8998_i2c_id);
+diff --git a/drivers/regulator/max8998.c b/drivers/regulator/max8998.c
+index 7f5fe6f..7fe37b2 100644
+--- a/drivers/regulator/max8998.c
++++ b/drivers/regulator/max8998.c
+@@ -39,6 +39,8 @@ struct max8998_data {
+ 	struct max8998_dev	*iodev;
+ 	int			num_regulators;
+ 	struct regulator_dev	**rdev;
++	unsigned int		buck1_idx;
++	unsigned int		buck2_idx;
  };
  
- static struct omap_hwmod omap2430_l4_wkup_hwmod;
-+static struct omap_hwmod omap2430_i2c1_hwmod;
-+static struct omap_hwmod omap2430_i2c2_hwmod;
-+
-+/* I2C IP block address space length (in bytes) */
-+#define OMAP2_I2C_AS_LEN		128
-+
-+/* L4 CORE -> I2C1 interface */
-+static struct omap_hwmod_addr_space omap2430_i2c1_addr_space[] = {
-+	{
-+		.pa_start	= 0x48070000,
-+		.pa_end		= 0x48070000 + OMAP2_I2C_AS_LEN - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+};
-+
-+static struct omap_hwmod_ocp_if omap2430_l4_core__i2c1 = {
-+	.master		= &omap2430_l4_core_hwmod,
-+	.slave		= &omap2430_i2c1_hwmod,
-+	.clk		= "i2c1_ick",
-+	.addr		= omap2430_i2c1_addr_space,
-+	.addr_cnt	= ARRAY_SIZE(omap2430_i2c1_addr_space),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* L4 CORE -> I2C2 interface */
-+static struct omap_hwmod_addr_space omap2430_i2c2_addr_space[] = {
-+	{
-+		.pa_start	= 0x48072000,
-+		.pa_end		= 0x48072000 + OMAP2_I2C_AS_LEN - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+};
-+
-+static struct omap_hwmod_ocp_if omap2430_l4_core__i2c2 = {
-+	.master		= &omap2430_l4_core_hwmod,
-+	.slave		= &omap2430_i2c2_hwmod,
-+	.clk		= "i2c2_ick",
-+	.addr		= omap2430_i2c2_addr_space,
-+	.addr_cnt	= ARRAY_SIZE(omap2430_i2c2_addr_space),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
- 
- /* L4_CORE -> L4_WKUP interface */
- static struct omap_hwmod_ocp_if omap2430_l4_core__l4_wkup = {
-@@ -165,12 +209,120 @@ static struct omap_hwmod omap2430_iva_hwmod = {
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
- };
- 
-+/* I2C common */
-+static struct omap_hwmod_class_sysconfig i2c_sysc = {
-+	.rev_offs	= 0x00,
-+	.sysc_offs	= 0x20,
-+	.syss_offs	= 0x10,
-+	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class i2c_class = {
-+	.name		= "i2c",
-+	.sysc		= &i2c_sysc,
-+};
-+
-+static struct omap_i2c_dev_attr i2c_dev_attr;
-+
-+/* I2C1 */
-+
-+static struct omap_i2c_dev_attr i2c1_dev_attr = {
-+	.fifo_depth	= 8, /* bytes */
-+};
-+
-+static struct omap_hwmod_irq_info i2c1_mpu_irqs[] = {
-+	{ .irq = INT_24XX_I2C1_IRQ, },
-+};
-+
-+static struct omap_hwmod_dma_info i2c1_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = OMAP24XX_DMA_I2C1_TX },
-+	{ .name = "rx", .dma_req = OMAP24XX_DMA_I2C1_RX },
-+};
-+
-+static struct omap_hwmod_ocp_if *omap2430_i2c1_slaves[] = {
-+	&omap2430_l4_core__i2c1,
-+};
-+
-+static struct omap_hwmod omap2430_i2c1_hwmod = {
-+	.name		= "i2c1",
-+	.mpu_irqs	= i2c1_mpu_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(i2c1_mpu_irqs),
-+	.sdma_reqs	= i2c1_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(i2c1_sdma_reqs),
-+	.main_clk	= "i2c1_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			/*
-+			 * NOTE: The CM_FCLKEN* and CM_ICLKEN* for
-+			 * I2CHS IP's do not follow the usual pattern.
-+			 * prcm_reg_id alone cannot be used to program
-+			 * the iclk and fclk. Needs to be handled using
-+			 * additonal flags when clk handling is moved
-+			 * to hwmod framework.
-+			 */
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP2430_EN_I2CHS1_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP2430_ST_I2CHS1_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2430_i2c1_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2430_i2c1_slaves),
-+	.class		= &i2c_class,
-+	.dev_attr	= &i2c1_dev_attr,
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
-+};
-+
-+/* I2C2 */
-+
-+static struct omap_i2c_dev_attr i2c2_dev_attr = {
-+	.fifo_depth	= 8, /* bytes */
-+};
-+
-+static struct omap_hwmod_irq_info i2c2_mpu_irqs[] = {
-+	{ .irq = INT_24XX_I2C2_IRQ, },
-+};
-+
-+static struct omap_hwmod_dma_info i2c2_sdma_reqs[] = {
-+	{ .name = "tx", .dma_req = OMAP24XX_DMA_I2C2_TX },
-+	{ .name = "rx", .dma_req = OMAP24XX_DMA_I2C2_RX },
-+};
-+
-+static struct omap_hwmod_ocp_if *omap2430_i2c2_slaves[] = {
-+	&omap2430_l4_core__i2c2,
-+};
-+
-+static struct omap_hwmod omap2430_i2c2_hwmod = {
-+	.name		= "i2c2",
-+	.mpu_irqs	= i2c2_mpu_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(i2c2_mpu_irqs),
-+	.sdma_reqs	= i2c2_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(i2c2_sdma_reqs),
-+	.main_clk	= "i2c2_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP2430_EN_I2CHS2_SHIFT,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP2430_ST_I2CHS2_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2430_i2c2_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2430_i2c2_slaves),
-+	.class		= &i2c_class,
-+	.dev_attr	= &i2c2_dev_attr,
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
-+};
-+
- static __initdata struct omap_hwmod *omap2430_hwmods[] = {
- 	&omap2430_l3_main_hwmod,
- 	&omap2430_l4_core_hwmod,
- 	&omap2430_l4_wkup_hwmod,
- 	&omap2430_mpu_hwmod,
- 	&omap2430_iva_hwmod,
-+	&omap2430_i2c1_hwmod,
-+	&omap2430_i2c2_hwmod,
- 	NULL,
- };
- 
-@@ -178,5 +330,3 @@ int __init omap2430_hwmod_init(void)
+ struct voltage_map_desc {
+@@ -218,6 +220,7 @@ static int max8998_get_voltage_register(struct regulator_dev *rdev,
+ 				int *_reg, int *_shift, int *_mask)
  {
- 	return omap_hwmod_init(omap2430_hwmods);
+ 	int ldo = max8998_get_ldo(rdev);
++	struct max8998_data *max8998 = rdev_get_drvdata(rdev);
+ 	int reg, shift = 0, mask = 0xff;
+ 
+ 	switch (ldo) {
+@@ -254,10 +257,10 @@ static int max8998_get_voltage_register(struct regulator_dev *rdev,
+ 		reg = MAX8998_REG_LDO12 + (ldo - MAX8998_LDO12);
+ 		break;
+ 	case MAX8998_BUCK1:
+-		reg = MAX8998_REG_BUCK1_DVSARM1;
++		reg = MAX8998_REG_BUCK1_DVSARM1 + max8998->buck1_idx;
+ 		break;
+ 	case MAX8998_BUCK2:
+-		reg = MAX8998_REG_BUCK2_DVSINT1;
++		reg = MAX8998_REG_BUCK2_DVSINT1 + max8998->buck2_idx;
+ 		break;
+ 	case MAX8998_BUCK3:
+ 		reg = MAX8998_REG_BUCK3;
+@@ -297,19 +300,71 @@ static int max8998_get_voltage(struct regulator_dev *rdev)
+ 	return max8998_list_voltage(rdev, val);
  }
+ 
+-static int max8998_set_voltage(struct regulator_dev *rdev,
++static int max8998_set_voltage_ldo(struct regulator_dev *rdev,
+ 				int min_uV, int max_uV)
+ {
+ 	struct max8998_data *max8998 = rdev_get_drvdata(rdev);
+ 	struct i2c_client *i2c = max8998->iodev->i2c;
+ 	int min_vol = min_uV / 1000, max_vol = max_uV / 1000;
+-	int previous_vol = 0;
+ 	const struct voltage_map_desc *desc;
+ 	int ldo = max8998_get_ldo(rdev);
+ 	int reg, shift = 0, mask, ret;
+ 	int i = 0;
+-	u8 val;
++
++	if (ldo >= ARRAY_SIZE(ldo_voltage_map))
++		return -EINVAL;
++
++	desc = ldo_voltage_map[ldo];
++	if (desc == NULL)
++		return -EINVAL;
++
++	if (max_vol < desc->min || min_vol > desc->max)
++		return -EINVAL;
++
++	while (desc->min + desc->step*i < min_vol &&
++	       desc->min + desc->step*i < desc->max)
++		i++;
++
++	if (desc->min + desc->step*i > max_vol)
++		return -EINVAL;
++
++	ret = max8998_get_voltage_register(rdev, &reg, &shift, &mask);
++	if (ret)
++		return ret;
++
++	ret = max8998_update_reg(i2c, reg, i<<shift, mask<<shift);
++
++	return ret;
++}
++
++static inline void buck1_gpio_set(int gpio1, int gpio2, int v)
++{
++	gpio_set_value(gpio1, v & 0x1);
++	gpio_set_value(gpio2, (v >> 1) & 0x1);
++}
++
++static inline void buck2_gpio_set(int gpio, int v)
++{
++	gpio_set_value(gpio, v & 0x1);
++}
++
++static int max8998_set_voltage_buck(struct regulator_dev *rdev,
++				    int min_uV, int max_uV)
++{
++	struct max8998_data *max8998 = rdev_get_drvdata(rdev);
++	struct max8998_platform_data *pdata =
++		dev_get_platdata(max8998->iodev->dev);
++	struct i2c_client *i2c = max8998->iodev->i2c;
++	int min_vol = min_uV / 1000, max_vol = max_uV / 1000;
++	int previous_vol = 0;
++	const struct voltage_map_desc *desc;
++	int ldo = max8998_get_ldo(rdev);
++	int reg, shift = 0, mask, ret;
++	int i = 0, j = 0;
+ 	bool en_ramp = false;
++	int difference = 0;
++	u8 dvs_arm_no = 0;
++	u8 val = 0;
+ 
+ 	if (ldo >= ARRAY_SIZE(ldo_voltage_map))
+ 		return -EINVAL;
+@@ -332,24 +387,86 @@ static int max8998_set_voltage(struct regulator_dev *rdev,
+ 	if (ret)
+ 		return ret;
+ 
+-	/* wait for RAMP_UP_DELAY if rdev is BUCK1/2 and
+-	 * ENRAMP is ON */
+-	if (ldo == MAX8998_BUCK1 || ldo == MAX8998_BUCK2) {
+-		max8998_read_reg(i2c, MAX8998_REG_ONOFF4, &val);
+-		if (val & (1 << 4)) {
+-			en_ramp = true;
+-			previous_vol = max8998_get_voltage(rdev);
++	previous_vol = max8998_get_voltage(rdev);
++
++	/* Check if voltage needs to be changed */
++	/* if previous_voltage equal new voltage, return */
++	if (previous_vol == max8998_list_voltage(rdev, i)) {
++		dev_dbg(max8998->dev, "No voltage change, old:%d, new:%d\n",
++			previous_vol, max8998_list_voltage(rdev, i));
++		return ret;
++	}
++	if (ldo == MAX8998_BUCK1) {
++
++		dvs_arm_no = ARRAY_SIZE(pdata->dvsarm);
++		dev_dbg(max8998->dev,
++			"BUCK1, i:%d, dvs1:%d, dvs2:%d, dvs3:%d, dvs4:%d\n",
++			i, pdata->dvsarm[0], pdata->dvsarm[1],
++			pdata->dvsarm[2], pdata->dvsarm[3]);
++
++		for (j = 0; j < dvs_arm_no; j++) {
++			if (pdata->dvsarm[j] == i) {
++				max8998->buck1_idx = j;
++				buck1_gpio_set(pdata->set1,
++					       pdata->set2, j);
++				break;
++			}
++			if (j == (dvs_arm_no - 1)) {
++				/* no predefine regulator found */
++				max8998->buck1_idx = j;
++				ret = max8998_get_voltage_register(rdev, &reg,
++								   &shift,
++								   &mask);
++				ret = max8998_write_reg(i2c, reg, i);
++				buck1_gpio_set(pdata->set1,
++					       pdata->set2, j);
++			}
+ 		}
+ 	}
++	if (ldo == MAX8998_BUCK2) {
++		dev_dbg(max8998->dev, "BUCK2, i:%d dvs1:%d, dvs2:%d\n", i,
++			pdata->dvsint[0], pdata->dvsint[1]);
+ 
+-	ret = max8998_update_reg(i2c, reg, i<<shift, mask<<shift);
++		if (pdata->dvsint[0] == i) {
++			max8998->buck1_idx = 0;
++			buck2_gpio_set(pdata->set3, 0);
++		} else {
++			max8998->buck1_idx = 1;
++			ret = max8998_get_voltage_register(rdev, &reg,
++							   &shift, &mask);
++			ret = max8998_write_reg(i2c, reg, i);
++			buck2_gpio_set(pdata->set3, 1);
++		}
++	}
++
++	if ((ldo == MAX8998_BUCK3) || (ldo == MAX8998_BUCK4))
++		ret = max8998_update_reg(i2c, reg, i<<shift, mask<<shift);
+ 
+-	if (en_ramp == true) {
+-		int difference = desc->min + desc->step*i - previous_vol/1000;
++	/* Wait until voltage is stabilized */
++	max8998_read_reg(i2c, MAX8998_REG_ONOFF4, &val);
++	/* lp3974 hasn't got ENRAMP bit - ramp is assumed as true */
++	dev_dbg(max8998->dev, "name:%s\n", i2c->name);
++	if (max8998->iodev->type == TYPE_LP3974) {
++		difference = desc->min + desc->step*i - previous_vol/1000;
+ 		if (difference > 0)
+ 			udelay(difference / ((val & 0x0f) + 1));
+ 	}
+ 
++	/* MAX8998 has ENRAMP bit implemented */
++	if (max8998->iodev->type == TYPE_MAX8998) {
++		if (val & (1 << 4)) {
++			en_ramp = true;
++			difference = desc->min + desc->step*i -
++				previous_vol/1000;
++			if (difference > 0)
++				udelay(difference / ((val & 0x0f) + 1));
++		}
++	}
++
++	dev_dbg(max8998->dev, "SET1:%d, SET2:%d, SET3:%d\n",
++		gpio_get_value(pdata->set1), gpio_get_value(pdata->set2),
++		gpio_get_value(pdata->set3));
++
+ 	return ret;
+ }
+ 
+@@ -359,7 +476,7 @@ static struct regulator_ops max8998_ldo_ops = {
+ 	.enable			= max8998_ldo_enable,
+ 	.disable		= max8998_ldo_disable,
+ 	.get_voltage		= max8998_get_voltage,
+-	.set_voltage		= max8998_set_voltage,
++	.set_voltage		= max8998_set_voltage_ldo,
+ 	.set_suspend_enable	= max8998_ldo_enable,
+ 	.set_suspend_disable	= max8998_ldo_disable,
+ };
+@@ -370,7 +487,7 @@ static struct regulator_ops max8998_buck_ops = {
+ 	.enable			= max8998_ldo_enable,
+ 	.disable		= max8998_ldo_disable,
+ 	.get_voltage		= max8998_get_voltage,
+-	.set_voltage		= max8998_set_voltage,
++	.set_voltage		= max8998_set_voltage_buck,
+ 	.set_suspend_enable	= max8998_ldo_enable,
+ 	.set_suspend_disable	= max8998_ldo_disable,
+ };
+@@ -543,6 +660,8 @@ static __devinit int max8998_pmic_probe(struct platform_device *pdev)
+ 	struct max8998_platform_data *pdata = dev_get_platdata(iodev->dev);
+ 	struct regulator_dev **rdev;
+ 	struct max8998_data *max8998;
++	struct i2c_client *i2c;
++	u8 dvs_arm_no = 0;
+ 	int i, ret, size;
+ 
+ 	if (!pdata) {
+@@ -566,6 +685,44 @@ static __devinit int max8998_pmic_probe(struct platform_device *pdev)
+ 	max8998->iodev = iodev;
+ 	max8998->num_regulators = pdata->num_regulators;
+ 	platform_set_drvdata(pdev, max8998);
++	i2c = max8998->iodev->i2c;
++
++	/* Check if platform data for max8998 has been declared */
++	if (pdata->dvsarm[0] != 0 && pdata->dvsarm[1] != 0 &&
++	    pdata->dvsarm[2] != 0 && pdata->dvsarm[3] != 0 &&
++	    pdata->dvsint[0] != 0 && pdata->dvsint[1] != 0) {
++			dvs_arm_no = ARRAY_SIZE(pdata->dvsarm);
++			pdata->dvsarm[dvs_arm_no - 1] = pdata->dvsarm_init;
++
++			for (i = 0; i < dvs_arm_no; ++i) {
++				max8998_write_reg(i2c,
++						  MAX8998_REG_BUCK1_DVSARM1 + i,
++						  pdata->dvsarm[i]);
++			}
++
++			pdata->dvsint[1] = pdata->dvsint_init;
++			max8998_write_reg(i2c, MAX8998_REG_BUCK2_DVSINT1,
++					  pdata->dvsint[0]);
++			max8998_write_reg(i2c, MAX8998_REG_BUCK2_DVSINT2,
++					  pdata->dvsint[1]);
++
++			/* Set default values */
++			max8998->buck1_idx = 3;
++			max8998->buck2_idx = 1;
++		}
++	if (pdata->set1 != 0 && pdata->set2 != 0 && pdata->set3 != 0) {
++			gpio_request(pdata->set1, "PMIC SET1");
++			gpio_direction_output(pdata->set1,
++					      max8998->buck1_idx & 0x1);
++
++			gpio_request(pdata->set2, "PMIC SET2");
++			gpio_direction_output(pdata->set2,
++					      (max8998->buck1_idx >> 1) & 0x1);
++
++			gpio_request(pdata->set3, "PMIC SET3");
++			gpio_direction_output(pdata->set3,
++					      max8998->buck2_idx & 0x1);
++		}
+ 
+ 	for (i = 0; i < pdata->num_regulators; i++) {
+ 		const struct voltage_map_desc *desc;
+@@ -587,7 +744,6 @@ static __devinit int max8998_pmic_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
 -
--
+ 	return 0;
+ err:
+ 	for (i = 0; i < max8998->num_regulators; i++)
+diff --git a/include/linux/mfd/max8998-private.h b/include/linux/mfd/max8998-private.h
+index 170f665..1a990b8 100644
+--- a/include/linux/mfd/max8998-private.h
++++ b/include/linux/mfd/max8998-private.h
+@@ -101,6 +101,13 @@ enum {
+ 	MAX8998_IRQ_NR,
+ };
+ 
++/* MAX8998 various variants */
++enum {
++	TYPE_MAX8998 = 0, /* Default */
++	TYPE_LP3974,	/* National version of MAX8998 */
++	TYPE_LP3979,	/* Added AVS */
++};
++
+ #define MAX8998_IRQ_DCINF_MASK		(1 << 2)
+ #define MAX8998_IRQ_DCINR_MASK		(1 << 3)
+ #define MAX8998_IRQ_JIGF_MASK		(1 << 4)
+@@ -135,6 +142,7 @@ enum {
+  * @ono: power onoff IRQ number for max8998
+  * @irq_masks_cur: currently active value
+  * @irq_masks_cache: cached hardware value
++ * @type: indicate which max8998 "variant" is used
+  */
+ struct max8998_dev {
+ 	struct device *dev;
+@@ -148,6 +156,7 @@ struct max8998_dev {
+ 	int ono;
+ 	u8 irq_masks_cur[MAX8998_NUM_IRQ_REGS];
+ 	u8 irq_masks_cache[MAX8998_NUM_IRQ_REGS];
++	int type;
+ };
+ 
+ int max8998_irq_init(struct max8998_dev *max8998);
+diff --git a/include/linux/mfd/max8998.h b/include/linux/mfd/max8998.h
+index d47ed4c..c89686a 100644
+--- a/include/linux/mfd/max8998.h
++++ b/include/linux/mfd/max8998.h
+@@ -54,6 +54,41 @@ enum {
+ 	MAX8998_ESAFEOUT2,
+ };
+ 
++enum {
++	MAX8998_DVS_750mV,
++	MAX8998_DVS_775mV,
++	MAX8998_DVS_800mV,
++	MAX8998_DVS_825mV,
++	MAX8998_DVS_850mV,
++	MAX8998_DVS_875mV,
++	MAX8998_DVS_900mV,
++	MAX8998_DVS_925mV,
++	MAX8998_DVS_950mV,
++	MAX8998_DVS_975mV,
++	MAX8998_DVS_1000mV,
++	MAX8998_DVS_1025mV,
++	MAX8998_DVS_1050mV,
++	MAX8998_DVS_1075mV,
++	MAX8998_DVS_1100mV,
++	MAX8998_DVS_1125mV,
++	MAX8998_DVS_1150mV,
++	MAX8998_DVS_1175mV,
++	MAX8998_DVS_1200mV,
++	MAX8998_DVS_1225mV,
++	MAX8998_DVS_1250mV,
++	MAX8998_DVS_1275mV,
++	MAX8998_DVS_1300mV,
++	MAX8998_DVS_1325mV,
++	MAX8998_DVS_1350mV,
++	MAX8998_DVS_1375mV,
++	MAX8998_DVS_1400mV,
++	MAX8998_DVS_1425mV,
++	MAX8998_DVS_1450mV,
++	MAX8998_DVS_1475mV,
++	MAX8998_DVS_1500mV,
++	MAX8998_DVS_1525mV,
++};
++
+ /**
+  * max8998_regulator_data - regulator data
+  * @id: regulator id
+@@ -76,6 +111,13 @@ struct max8998_platform_data {
+ 	int				num_regulators;
+ 	int				irq_base;
+ 	int				ono;
++	u8              dvsarm[4];
++	u8		dvsint[2];
++	u8              dvsarm_init;
++	u8              dvsint_init;
++	int		set1;
++	int		set2;
++	int		set3;
+ };
+ 
+ #endif /*  __LINUX_MFD_MAX8998_H */
 -- 
-1.5.4.7
+1.7.1
