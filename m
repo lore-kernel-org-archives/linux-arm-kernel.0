@@ -1,39 +1,82 @@
-From: yad.naveen@gmail.com (naveen yadav)
-Date: Mon, 20 Sep 2010 10:41:20 +0530
-Subject: Issue in using mmap on ARM target
-In-Reply-To: <AANLkTi=VS34cbaH9TNA9aZ7mVavoTaAiAwMfuRXSxbd8@mail.gmail.com>
-References: <AANLkTi=VS34cbaH9TNA9aZ7mVavoTaAiAwMfuRXSxbd8@mail.gmail.com>
-Message-ID: <AANLkTi=JXei9uPHR-yn3OUnamV5eu+CbQ+ebaS27=dut@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 22 Sep 2010 14:19:02 +0530
+Subject: [GIT PULL] omap2 sparse fixes  
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A38F9@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Tony,
 
-I am facing one issue when executing below progmra on ARM target. The
-same program work well on X86 host machine,
+Please pull omap2 sparse fixes from:
 
-When execute on Host(x86). the result are as expected.
-[root at localhost naveen]# ./a.out ?0000 b 2
-/dev/mem opened.
-Memory mapped at address 0xb7f00000.
-Value at address 0x0 (0xb7f00000): 0x24
-Written 0x2; readback 0x2
+  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
 
-But when execute on Target(ARM):
-# ./a.out 0 w 20
-/dev/mem opened.
-Memory mapped at address 0x40003000.
-Value at address 0x0 (0x40003000): 0xEA000006
-Written 0x14; readback 0xEA000006
-#
-The value does not change. any idea ....
+Regards,
+Manjunath
 
 
-Kind regards
+The following changes since commit 8b15575cae7a93a784c3005c42b069edd9ba64dd:
+  Sage Weil (1):
+        fs: {lock,unlock}_flocks() stubs to prepare for BKL removal
+
+are available in the git repository at:
+
+  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
+
+G, Manjunath Kondaiah (10):
+      OMAP: mach-omap2: Fix incorrect assignment warnings
+      OMAP: mach-omap2: Fix static declaration warnings
+      OMAP: mach-omap2: Fix static function warnings
+      OMAP: mach-omap2: Fix miscellaneous sparse warnings
+      OMAP: plat-omap: Fix static function warnings
+      OMAP: NAND: Fix static declaration warning
+      TWL CORE: Fix sparse warning
+      TWL IRQ: Fix fucntion declaration warnings
+      OMAP2/3: Convert write/read functions to raw read/write
+      OMAP3: Keypad: Fix incorrect type initializer
+
+ arch/arm/mach-omap2/board-3430sdp.c            |    2 +-
+ arch/arm/mach-omap2/board-am3517evm.c          |    5 +--
+ arch/arm/mach-omap2/board-cm-t35.c             |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c         |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c           |    4 +-
+ arch/arm/mach-omap2/board-ldp.c                |    2 +-
+ arch/arm/mach-omap2/board-n8x0.c               |   16 +------------
+ arch/arm/mach-omap2/board-omap3evm.c           |    8 +++---
+ arch/arm/mach-omap2/board-omap3stalker.c       |    4 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c     |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c   |    4 ++-
+ arch/arm/mach-omap2/board-rx51-sdram.c         |    2 +-
+ arch/arm/mach-omap2/board-rx51-video.c         |    2 +
+ arch/arm/mach-omap2/board-zoom-debugboard.c    |    2 +
+ arch/arm/mach-omap2/board-zoom-peripherals.c   |    4 ++-
+ arch/arm/mach-omap2/control.c                  |    5 ++-
+ arch/arm/mach-omap2/gpmc-onenand.c             |    8 +++---
+ arch/arm/mach-omap2/include/mach/board-flash.h |    2 +
+ arch/arm/mach-omap2/include/mach/board-rx51.h  |   11 +++++++++
+ arch/arm/mach-omap2/irq.c                      |    1 -
+ arch/arm/mach-omap2/mux2420.c                  |    2 +-
+ arch/arm/mach-omap2/mux2430.c                  |    2 +-
+ arch/arm/mach-omap2/mux34xx.c                  |   12 +++++-----
+ arch/arm/mach-omap2/pm-debug.c                 |    2 +-
+ arch/arm/mach-omap2/pm34xx.c                   |    2 +-
+ arch/arm/mach-omap2/powerdomain.c              |   28 ------------------------
+ arch/arm/mach-omap2/prcm.c                     |    2 +-
+ arch/arm/mach-omap2/timer-gp.c                 |    1 +
+ arch/arm/plat-omap/cpu-omap.c                  |    4 +-
+ arch/arm/plat-omap/dmtimer.c                   |    6 ++--
+ arch/arm/plat-omap/fb.c                        |    1 +
+ arch/arm/plat-omap/include/plat/dmtimer.h      |    4 ++-
+ arch/arm/plat-omap/include/plat/sdrc.h         |    1 +
+ arch/arm/plat-omap/mcbsp.c                     |   10 ++++----
+ arch/arm/plat-omap/sram.c                      |   13 ++++++-----
+ drivers/mfd/twl-core.c                         |    2 +-
+ drivers/mtd/nand/omap2.c                       |    6 ++--
+ drivers/mtd/onenand/omap2.c                    |    2 +-
+ include/linux/i2c/twl.h                        |    5 ++++
+ include/linux/omapfb.h                         |    5 ++++
+ 40 files changed, 96 insertions(+), 102 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/include/mach/board-rx51.h
 -------------- next part --------------
-A non-text attachment was scrubbed...
-Name: devmem2.c
-Type: application/octet-stream
-Size: 3550 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100920/56f2707f/attachment-0001.obj>
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100922/8d8ec67f/attachment-0001.html>
