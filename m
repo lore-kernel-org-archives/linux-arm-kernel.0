@@ -1,26 +1,32 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 22 Sep 2010 12:14:21 +0200
-Subject: [PATCH 1/5] ptp: Added a brand new class driver for ptp clocks.
-In-Reply-To: <AANLkTinRM3_kBc5S3wV=_S6P8+x7A43kz0qSYbixJYnq@mail.gmail.com>
-References: <AANLkTik_2MKMhOuDGOmu8Kzyq-ipLe+Bxrb3FaD+Tv4U@mail.gmail.com>
-	<20100817085324.GB3330@riccoc20.at.omicron.at>
-	<1282090963.1734.97.camel@localhost>
-	<20100818071942.GA4096@riccoc20.at.omicron.at>
-	<1282176776.2865.100.camel@localhost.localdomain>
-	<20100819055518.GA4084@riccoc20.at.omicron.at>
-	<1282594125.3111.344.camel@localhost.localdomain>
-	<20100827123849.GC11657@riccoc20.at.omicron.at>
-	<1282948239.2268.155.camel@jstultz-laptop>
-	<AANLkTinRM3_kBc5S3wV=_S6P8+x7A43kz0qSYbixJYnq@mail.gmail.com>
-Message-ID: <20100922101421.GA3337@riccoc20.at.omicron.at>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 22 Sep 2010 11:26:51 +0100
+Subject: [PATCH] mfd: regulator: max8998: BUCK1/2 control augmented by
+	GPIO pins
+In-Reply-To: <20100922084641.6be55f02@lmajewski.digital.local>
+References: <1285078695-24753-1-git-send-email-l.majewski@samsung.com>
+	<20100921150107.GA32476@sirena.org.uk>
+	<20100922084641.6be55f02@lmajewski.digital.local>
+Message-ID: <20100922102651.GA22361@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 21, 2010 at 04:47:45PM -0400, Kyle Moffett wrote:
-> Well how about something much more straightforward:
+On Wed, Sep 22, 2010 at 08:46:41AM +0200, Lukasz Majewski wrote:
+> Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-I am about to post another patch set for discussion, so please comment
-on it when it appears.
+> > For the voltage selection values I'm somewhat surprised to see them
+> > specified in the platform data - I would instead expect to see them
+> > figured out at runtime based on the voltages that are being set.
 
-Thanks,
-Richard
+> I'd like to ask you for clarification on this statement. Correct me if
+> I'm wrong, but I think that some default voltage values should be
+> declared in platform data (according to the chip manual) to facilitate
+> dynamic voltage scaling feature. I suspect that this information is
+> platform specific and should be adjusted for each chip separately.
+
+Assume that I've never seen the chip datasheet.  What exactly is this
+platform data configuring?  
+
+I would expect to see platform data configuring the default state of the
+GPIOs at power up but that doesn't seem to be what's being configured
+here.  For anything configured via registers I would expect the driver
+to read the state of the chip at startup.
