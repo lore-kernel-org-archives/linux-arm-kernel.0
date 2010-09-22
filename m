@@ -1,44 +1,105 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Sep 2010 18:19:25 -0600
-Subject: [PATCH 0/5] OMAP: hwmod: second set of core patches for 2.6.37
-Message-ID: <20100922001834.8621.76144.stgit@twilight.localdomain>
+Date: Tue, 21 Sep 2010 18:19:37 -0600
+Subject: [PATCH 4/5] OMAP: hwmod: Handle opt clocks node using clk_add_alias
+In-Reply-To: <20100922001834.8621.76144.stgit@twilight.localdomain>
+References: <20100922001834.8621.76144.stgit@twilight.localdomain>
+Message-ID: <20100922001934.8621.17518.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Partha Basak <p-basak2@ti.com>
 
-Here are a few more hwmod core patches, intended for merging via
-Tony's tree for 2.6.37.
+For every optional clock present per hwmod per omap-device, this function
+adds an entry in the clocks list of the form <dev-id=dev_name, con-id=role>,
+if an entry is already present in the list of the form <dev-id=NULL, con-id=role>.
 
-I've added these patches to the existing hwmod core series, available
-via git at
+The function is called from within the framework inside omap_device_build_ss(),
+after omap_device_register.
 
-git://git.pwsan.com/linux-2.6 hwmod_2.6.37
+This allows drivers to get a pointer to its optional clocks based on its role
+by calling clk_get(<dev*>, <role>).
 
-based on v2.6.36-rc5.
+Link to discussions related to this patch:
+http://www.spinics.net/lists/linux-omap/msg34809.html
 
-
-regards,
-
-- Paul
-
+Signed-off-by: Charulatha V <charu@ti.com>
+Signed-off-by: Partha Basak <p-basak2@ti.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+[paul at pwsan.com: simplified loop iterator; removed the superfluous clk_get(),
+ using the clk_get() in clk_add_alias() instead]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
+ arch/arm/plat-omap/omap_device.c |   43 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 42 insertions(+), 1 deletions(-)
 
-Benoit Cousson (2):
-      OMAP: hwmod: Fix softreset status check for some new OMAP4 IPs
-      OMAP: hwmod: Fix softreset for modules with optional clocks
-
-Partha Basak (1):
-      OMAP: hwmod: Handle opt clocks node using clk_add_alias
-
-Paul Walmsley (1):
-      OMAP: hwmod: improve documentation, clean up function names
-
-Rajendra Nayak (1):
-      OMAP: hwmod: Enable module wakeup if in smartidle
-
-
- arch/arm/mach-omap2/omap_hwmod.c             |  220 ++++++++++++++++++++++----
- arch/arm/plat-omap/include/plat/omap_hwmod.h |   19 +-
- arch/arm/plat-omap/omap_device.c             |   43 +++++
- 3 files changed, 239 insertions(+), 43 deletions(-)
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index d2b1609..ceba58a 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -82,6 +82,7 @@
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ 
+ #include <plat/omap_device.h>
+ #include <plat/omap_hwmod.h>
+@@ -243,6 +244,44 @@ static inline struct omap_device *_find_by_pdev(struct platform_device *pdev)
+ 	return container_of(pdev, struct omap_device, pdev);
+ }
+ 
++/**
++ * _add_optional_clock_alias - Add clock alias for hwmod optional clocks
++ * @od: struct omap_device *od
++ *
++ * For every optional clock present per hwmod per omap_device, this function
++ * adds an entry in the clocks list of the form <dev-id=dev_name, con-id=role>
++ * if an entry is already present in it with the form <dev-id=NULL, con-id=role>
++ *
++ * The function is called from inside omap_device_build_ss(), after
++ * omap_device_register.
++ *
++ * This allows drivers to get a pointer to its optional clocks based on its role
++ * by calling clk_get(<dev*>, <role>).
++ *
++ * No return value.
++ */
++static void _add_optional_clock_alias(struct omap_device *od,
++				      struct omap_hwmod *oh)
++{
++	int i;
++
++	for (i = 0; i < oh->opt_clks_cnt; i++) {
++		struct omap_hwmod_opt_clk *oc;
++		int r;
++
++		oc = &oh->opt_clks[i];
++
++		if (!oc->_clk)
++			continue;
++
++		r = clk_add_alias(oc->role, dev_name(&od->pdev.dev),
++				  (char *)oc->clk, &od->pdev.dev);
++		if (r)
++			pr_err("omap_device: %s: clk_add_alias for %s failed\n",
++			       dev_name(&od->pdev.dev), oc->role);
++	}
++}
++
+ 
+ /* Public functions for use by core code */
+ 
+@@ -421,8 +460,10 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 	else
+ 		ret = omap_device_register(od);
+ 
+-	for (i = 0; i < oh_cnt; i++)
++	for (i = 0; i < oh_cnt; i++) {
+ 		hwmods[i]->od = od;
++		_add_optional_clock_alias(od, hwmods[i]);
++	}
+ 
+ 	if (ret)
+ 		goto odbs_exit4;
