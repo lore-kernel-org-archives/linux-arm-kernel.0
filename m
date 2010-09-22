@@ -1,36 +1,38 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Wed, 22 Sep 2010 13:08:29 +0200
-Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <20100922104846.GQ32018@game.jcrosoft.org> (Jean-Christophe
-	PLAGNIOL-VILLARD's message of "Wed, 22 Sep 2010 12:48:46 +0200")
-References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
-	<20100922104846.GQ32018@game.jcrosoft.org>
-Message-ID: <87lj6uavde.fsf@macbook.be.48ers.dk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 22 Sep 2010 08:52:18 -0300
+Subject: Regarding hw irq to Linux irq mapping on ARM
+In-Reply-To: <AANLkTik6Nwt3O9hG971nzzEtiCLobSaWasZ4hjWCketh@mail.gmail.com>
+References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
+	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
+	<1285106546.30449.158.camel@pasglop>
+	<AANLkTik6Nwt3O9hG971nzzEtiCLobSaWasZ4hjWCketh@mail.gmail.com>
+Message-ID: <6ff62ca4-128a-436f-b85a-987849804a6e@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
 
-Hi,
 
- >> Use a correct udelay value to get bus speed around 100KHz. The udelay
- >> value was most likely copied from the older devices, but the 9g45
- >> is signicantly faster (400MHz, DDR, ..), so a udelay of 2 gives a
- >> bus speed of around 190KHz, which is too fast for some devices.
- >> A udelay value of 5 gives a bus speed of around 90KHz here.
- >> 
- >> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+"Shaju Abraham" <shajuabraham@gmail.com> wrote:
 
- Jean-Christophe> in this case it will be better to overwite it at board
- Jean-Christophe> than force it for all of them
+>On Wed, Sep 22, 2010 at 3:32 AM, Benjamin Herrenschmidt
+><benh@kernel.crashing.org> wrote:
+>> The main grief one could have with my scheme is the naming of irq_host
+>> which has confused people in the past. It should probably be irq_domain
+>> to make clear what it is. It generally have a 1:1 relationship to the
+>> irq_chip but there are cases where that isn't the case (essentially
+>> where you have multiple irq_chip per domain) for various reasons so it's
+>> better to keep those separate.
+>>
+>
+>How do we handle multiplexed interrupts ? For example a single interrupt line
+>representing multple irq sources.
+>We have ARM systems with  single interrupt line on a VIC  muxed to
+>192 different GPIO sources (each capable of generating interrupts). For such a
+>system the virq to hw irq mapping can get complex.
 
-You don't expect most 9g45 users will run at 400MHz? It seems pretty
-likely to me. In any case, a safe (but somewhat slow) default seems
-better than a potentially unsafe one.
+Assign a separate irq number to each gpio.  In effect, this makes the gpio controller an irq controller.
 
-Now, I agree that it would be nice to add an interface to tweak this
-delay if needed (extra argument to at91_add_device_i2c()?), but that's
-next to the discussion about what the default should be.
+g.
 
 -- 
-Bye, Peter Korsgaard
+Sent from my Android phone with K-9 Mail. Please excuse my brevity.
