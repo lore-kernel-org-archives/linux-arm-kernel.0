@@ -1,79 +1,61 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 22 Sep 2010 14:26:12 +0530
-Subject: [GIT PULL] omap2 sparse fixes  
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Wed, 22 Sep 2010 16:59:22 +0800
+Subject: Regarding hw irq to Linux irq mapping on ARM
+In-Reply-To: <1285133481.30449.170.camel@pasglop>
+References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
+	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
+	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
+	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
+	<1285133481.30449.170.camel@pasglop>
+Message-ID: <AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
- 
-Please pull omap2 sparse fixes from:
- 
-  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
- 
-Regards,
-Manjunath
- 
- 
-The following changes since commit 8b15575cae7a93a784c3005c42b069edd9ba64dd:
-  Sage Weil (1):
-        fs: {lock,unlock}_flocks() stubs to prepare for BKL removal
- 
-are available in the git repository at:
- 
-  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
- 
-G, Manjunath Kondaiah (10):
-      OMAP: mach-omap2: Fix incorrect assignment warnings
-      OMAP: mach-omap2: Fix static declaration warnings
-      OMAP: mach-omap2: Fix static function warnings
-      OMAP: mach-omap2: Fix miscellaneous sparse warnings
-      OMAP: plat-omap: Fix static function warnings
-      OMAP: NAND: Fix static declaration warning
-      TWL CORE: Fix sparse warning
-      TWL IRQ: Fix fucntion declaration warnings
-      OMAP2/3: Convert write/read functions to raw read/write
-      OMAP3: Keypad: Fix incorrect type initializer
- 
- arch/arm/mach-omap2/board-3430sdp.c            |    2 +-
- arch/arm/mach-omap2/board-am3517evm.c          |    5 +--
- arch/arm/mach-omap2/board-cm-t35.c             |    2 +-
- arch/arm/mach-omap2/board-devkit8000.c         |    2 +-
- arch/arm/mach-omap2/board-igep0020.c           |    4 +-
- arch/arm/mach-omap2/board-ldp.c                |    2 +-
- arch/arm/mach-omap2/board-n8x0.c               |   16 +------------
- arch/arm/mach-omap2/board-omap3evm.c           |    8 +++---
- arch/arm/mach-omap2/board-omap3stalker.c       |    4 +-
- arch/arm/mach-omap2/board-omap3touchbook.c     |    2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c   |    4 ++-
- arch/arm/mach-omap2/board-rx51-sdram.c         |    2 +-
- arch/arm/mach-omap2/board-rx51-video.c         |    2 +
- arch/arm/mach-omap2/board-zoom-debugboard.c    |    2 +
- arch/arm/mach-omap2/board-zoom-peripherals.c   |    4 ++-
- arch/arm/mach-omap2/control.c                  |    5 ++-
- arch/arm/mach-omap2/gpmc-onenand.c             |    8 +++---
- arch/arm/mach-omap2/include/mach/board-flash.h |    2 +
- arch/arm/mach-omap2/include/mach/board-rx51.h  |   11 +++++++++
- arch/arm/mach-omap2/irq.c                      |    1 -
- arch/arm/mach-omap2/mux2420.c                  |    2 +-
- arch/arm/mach-omap2/mux2430.c                  |    2 +-
- arch/arm/mach-omap2/mux34xx.c                  |   12 +++++-----
- arch/arm/mach-omap2/pm-debug.c                 |    2 +-
- arch/arm/mach-omap2/pm34xx.c                   |    2 +-
- arch/arm/mach-omap2/powerdomain.c              |   28 ------------------------
- arch/arm/mach-omap2/prcm.c                     |    2 +-
- arch/arm/mach-omap2/timer-gp.c                 |    1 +
- arch/arm/plat-omap/cpu-omap.c                  |    4 +-
- arch/arm/plat-omap/dmtimer.c                   |    6 ++--
- arch/arm/plat-omap/fb.c                        |    1 +
- arch/arm/plat-omap/include/plat/dmtimer.h      |    4 ++-
- arch/arm/plat-omap/include/plat/sdrc.h         |    1 +
- arch/arm/plat-omap/mcbsp.c                     |   10 ++++----
- arch/arm/plat-omap/sram.c                      |   13 ++++++-----
- drivers/mfd/twl-core.c                         |    2 +-
- drivers/mtd/nand/omap2.c                       |    6 ++--
- drivers/mtd/onenand/omap2.c                    |    2 +-
- include/linux/i2c/twl.h                        |    5 ++++
- include/linux/omapfb.h                         |    5 ++++
- 40 files changed, 96 insertions(+), 102 deletions(-)
- create mode 100644 arch/arm/mach-omap2/include/mach/board-rx51.h
+On Wed, Sep 22, 2010 at 1:31 PM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Wed, 2010-09-22 at 00:08 -0300, Grant Likely wrote:
+>> > Add all the I2C, SPI based irq extenders to that list. They seem to
+>> > pop up all over the place in rapid speed even in x86. We are happy
+>> > citizens of the embedded horror^Wuniverse now.
+>>
+>> *shudder*
+>>
+>> What's the irq handling latency on those? ?Glad I haven't had to deal
+>> with any of them yet.
+>
+> And i2c in many cases want to be called from sleep'able context... might
+> be a good idea to restrict some of these to threaded interrupts. A whole
+> different discussion I suppose.
+>
+
+My problem is that ARM has only one IRQ line, and normally connected to
+a SoC specific IRQ controller, the mapping of the controller status bits
+into the linux IRQ number is currently handled in an assembly macro for
+performance consideration. This can be changed to using a function pointer
+for when mutliple SoCs are compiled [1].
+
+All the other IRQs are actually chained to these first level IRQ numbers,
+so the other question is how these can be properly mapped. Currently, most
+ARM platforms handle this in board level. Taking an example of I2C GPIO
+expander pca953x.c, there is a 'irq_base' field in its platform data, this
+value could be different from board to board, and the board setup code has
+the responsibility to get it right. Other devices having a resource can be
+passed the correct IRQ number in its resource array.
+
+My understanding is that this simplest scheme should work in most cases,
+the assumption here is that the board setup code knows how to handle the
+IRQs, i.e. how many IRQs are used, and how they are actually mapped. The
+only requirement is that those external chip driver with IRQ capability
+are sanely written with dynamic configuration of its IRQ base and number.
+
+  [1] http://www.spinics.net/lists/arm-kernel/msg88817.html.
+
+> Cheers,
+> Ben.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
