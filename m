@@ -1,37 +1,50 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 22 Sep 2010 18:05:30 +0200
+Date: Wed, 22 Sep 2010 18:06:06 +0200
 Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <87hbhhbyce.fsf@macbook.be.48ers.dk>
-References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>	<20100922104846.GQ32018@game.jcrosoft.org>	<87lj6uavde.fsf@macbook.be.48ers.dk>	<20100922143406.GT32018@game.jcrosoft.org>
-	<87hbhhbyce.fsf@macbook.be.48ers.dk>
-Message-ID: <4C9A294A.4040806@atmel.com>
+In-Reply-To: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <4C9A296E.6060503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/09/2010 17:18, Peter Korsgaard :
->>>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
+Le 22/09/2010 11:31, Peter Korsgaard :
+> Use a correct udelay value to get bus speed around 100KHz. The udelay
+> value was most likely copied from the older devices, but the 9g45
+> is signicantly faster (400MHz, DDR, ..), so a udelay of 2 gives a
+> bus speed of around 190KHz, which is too fast for some devices.
+> A udelay value of 5 gives a bus speed of around 90KHz here.
 > 
-> Hi,
-> 
->  >> You don't expect most 9g45 users will run at 400MHz? It seems pretty
->  >> likely to me. In any case, a safe (but somewhat slow) default seems
->  >> better than a potentially unsafe one.
->  >> 
->  >> Now, I agree that it would be nice to add an interface to tweak this
->  >> delay if needed (extra argument to at91_add_device_i2c()?), but that's
->  >> next to the discussion about what the default should be.
-> 
->  Jean-Christophe> I'd prefer to calculate it
-> 
->  Jean-Christophe> so we specify which max freq we want in my mind it
->  Jean-Christophe> will be good to be as in spi to specific per device
->  Jean-Christophe> it's max speed so we can adapt the bus freq
-> 
-> Yes, that sounds like a nice long term idea, but let's fix the immediate
-> problem in the mean time, right?
+> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-I am in favor of this wisdom.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Bye,
+> ---
+>  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 5e71ccd..1276bab 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -426,7 +426,7 @@ static struct i2c_gpio_platform_data pdata_i2c0 = {
+>  	.sda_is_open_drain	= 1,
+>  	.scl_pin		= AT91_PIN_PA21,
+>  	.scl_is_open_drain	= 1,
+> -	.udelay			= 2,		/* ~100 kHz */
+> +	.udelay			= 5,		/* ~100 kHz */
+>  };
+>  
+>  static struct platform_device at91sam9g45_twi0_device = {
+> @@ -440,7 +440,7 @@ static struct i2c_gpio_platform_data pdata_i2c1 = {
+>  	.sda_is_open_drain	= 1,
+>  	.scl_pin		= AT91_PIN_PB11,
+>  	.scl_is_open_drain	= 1,
+> -	.udelay			= 2,		/* ~100 kHz */
+> +	.udelay			= 5,		/* ~100 kHz */
+>  };
+>  
+>  static struct platform_device at91sam9g45_twi1_device = {
+
+
 -- 
 Nicolas Ferre
