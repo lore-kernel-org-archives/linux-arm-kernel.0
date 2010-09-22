@@ -1,39 +1,41 @@
-From: jk@ozlabs.org (Jeremy Kerr)
-Date: Wed, 22 Sep 2010 21:06:45 +0800
-Subject: [PATCH 1/2 v3]Update broken web addresses.
-In-Reply-To: <20100922105852.GC4710@linux-mips.org>
-References: <1285118957-24965-1-git-send-email-justinmattock@gmail.com>
-	<20100922105852.GC4710@linux-mips.org>
-Message-ID: <1285160805.2796.0.camel@pororo>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Sep 2010 16:34:06 +0200
+Subject: [PATCH] at91sam9g45: fix i2c bus speed
+In-Reply-To: <87lj6uavde.fsf@macbook.be.48ers.dk>
+References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+	<20100922104846.GQ32018@game.jcrosoft.org>
+	<87lj6uavde.fsf@macbook.be.48ers.dk>
+Message-ID: <20100922143406.GT32018@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralf,
-
-> On Tue, Sep 21, 2010 at 06:29:16PM -0700, Justin P. Mattock wrote:
-> > Date:   Tue, 21 Sep 2010 18:29:16 -0700
-> > From: "Justin P. Mattock" <justinmattock@gmail.com>
-> > To: trivial at kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org,
-> >  linux-omap at vger.kernel.org, linux-m32r at ml.linux-m32r.org,
-> >  linux-m68k at lists.linux-m68k.org, linux-mips at linux-mips.org,
-> >  linuxppc-dev at lists.ozlabs.org, linux-laptop at vger.kernel.org, "Justin P.
-> >  Mattock" <justinmattock@gmail.com>, "Maciej W. Rozycki"
-> >  <macro@linux-mips.org>, Finn Thain <fthain@telegraphics.com.au>, Randy
-> >  Dunlap <rdunlap@xenotime.net>
-> > Subject: [PATCH 1/2 v3]Update broken web addresses.
-> > Content-Type: text/plain; charset=UTF-8
+On 13:08 Wed 22 Sep     , Peter Korsgaard wrote:
+> >>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
 > 
-> Patchwork MIME butchers the subject of this patch, see
+> Hi,
 > 
-> https://patchwork.linux-mips.org/patch/1587/
-> https://patchwork.kernel.org/patch/198382/
+>  >> Use a correct udelay value to get bus speed around 100KHz. The udelay
+>  >> value was most likely copied from the older devices, but the 9g45
+>  >> is signicantly faster (400MHz, DDR, ..), so a udelay of 2 gives a
+>  >> bus speed of around 190KHz, which is too fast for some devices.
+>  >> A udelay value of 5 gives a bus speed of around 90KHz here.
+>  >> 
+>  >> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 > 
+>  Jean-Christophe> in this case it will be better to overwite it at board
+>  Jean-Christophe> than force it for all of them
+> 
+> You don't expect most 9g45 users will run at 400MHz? It seems pretty
+> likely to me. In any case, a safe (but somewhat slow) default seems
+> better than a potentially unsafe one.
+> 
+> Now, I agree that it would be nice to add an interface to tweak this
+> delay if needed (extra argument to at91_add_device_i2c()?), but that's
+> next to the discussion about what the default should be.
+I'd prefer to calculate it
 
-Thanks for the heads-up - I'll see what's happening with the header
-decoding here.
+so we specify which max freq we want in my mind it will be good to be as in
+spi to specific per device it's max speed so we can adapt the bus freq
 
-Cheers,
-
-
-Jeremy
+Best Regards,
+J.
