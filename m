@@ -1,32 +1,43 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Wed, 22 Sep 2010 11:56:34 -0400
-Subject: mpcore_wdt A9 questions
-In-Reply-To: <99c9a321-49a1-42da-b49f-5cdd5c03e17a@SG2EHSMHS008.ehs.local>
-References: <1274090044-10236-1-git-send-email-viresh.kumar@st.com>
-	<AANLkTil2PtnsKdAHvW5-1WMQyTj6v3uLtrn2CNaZSXkc@mail.gmail.com>
-	<4BF12767.4010402@st.com>
-	<AANLkTikCC108eWniEBwzYsbkEUYQocICaLtd7FD_vMQ1@mail.gmail.com>
-	<20100518132050.GA8748@mvista.com> <4BF362F1.5070100@st.com>
-	<AANLkTinQ34da0F0Xp_Rqh0F8fbh0lbSmD2Q68RLNDlIC@mail.gmail.com>
-	<99c9a321-49a1-42da-b49f-5cdd5c03e17a@SG2EHSMHS008.ehs.local>
-Message-ID: <20100922155634.GQ3555@mvista.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 22 Sep 2010 16:58:04 +0100
+Subject: [PATCH v2 3/3] mfd: regulator: max8998: mfd code
+In-Reply-To: <1285169410-22343-4-git-send-email-l.majewski@samsung.com>
+References: <1285169410-22343-1-git-send-email-l.majewski@samsung.com>
+	<1285169410-22343-4-git-send-email-l.majewski@samsung.com>
+Message-ID: <20100922155804.GK26395@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello John,
+On Wed, Sep 22, 2010 at 05:30:10PM +0200, Lukasz Majewski wrote:
 
-On Wed, Sep 22, 2010 at 09:36:52AM -0600, John Linn wrote:
-> Hi,
-> 
-> The A9 has a watchdog timer per CPU, but I don't see a way to use more
-> than one watchdog timer (one for each CPU) using the mpcore_wdt driver.
-> 
-> I tried to do my research but maybe I missed something. Is this a
-> limitation of watchdog timers in Linux or just this driver?
+Please provide a more descriptive changelog which says what the
+functional changes are; it's clear that the changes are in MFD but what
+do they do?
 
-It's not strictly a limitation in the watchdog subsystem, I suspect
-it just not something that anyone has needed thus far.  Anyway,
-here's something I was working on for upstream which adds support
-for all MPCore watchdog timers.  N.B. This is based on v2.6.34 give or
-take, not sure if it applies to current.  It still has issues with
-per-cpu interrupts but interrupts aren't currently used, so...
+> +	max8998->type = id->driver_data;
+
+This needs to be the first patch in the series, I think - the others
+won't build without this.  Each patch in the series should leave the
+kernel buildable, partly for review (so we see things added before they
+are used) and partly so that things like git bisect work well.
+
+> +/* MAX8998 output voltages */
+> +enum {
+> +	MAX8998_DVS_750mV = 0,
+> +	MAX8998_DVS_775mV,
+
+My previous comments about this being better as a value than an
+enumerated type still apply.
+
+> + * @buck1_vol: BUCK1 voltage levels
+> + * @buck2_vol: BUCK2 voltage levels
+
+So as far as I can tell (and I may be missing something since "voltage
+levels" and code is all I have) these are the voltages programmed for
+the various voltage selections at system startup?  I would very strongly
+expect these to be read back from the chip when the driver starts when.
+
+> + * @buck1_init_idx: BUCK1 initial voltage index
+> + * @buck2_init_idx: BUCK2 initial voltage index
+
+It'd be clearer to describe these as the initial GPIO setting.
