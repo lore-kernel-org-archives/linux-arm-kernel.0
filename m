@@ -1,50 +1,81 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 22 Sep 2010 18:06:06 +0200
-Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
-References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <4C9A296E.6060503@atmel.com>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Wed, 22 Sep 2010 11:06:09 -0500
+Subject: [PATCH 13/13 v2] OMAP3: SERIAL: Initialize all omap-uarts for
+	zoom      boards
+In-Reply-To: <37596.172.24.137.131.1285168492.squirrel@dbdmail.itg.ti.com>
+References: <37596.172.24.137.131.1285168492.squirrel@dbdmail.itg.ti.com>
+Message-ID: <A24693684029E5489D1D202277BE894472767CED@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/09/2010 11:31, Peter Korsgaard :
-> Use a correct udelay value to get bus speed around 100KHz. The udelay
-> value was most likely copied from the older devices, but the 9g45
-> is signicantly faster (400MHz, DDR, ..), so a udelay of 2 gives a
-> bus speed of around 190KHz, which is too fast for some devices.
-> A udelay value of 5 gives a bus speed of around 90KHz here.
+Hi Govindraj,
+
+Just one non-functional comment below.
+
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Raja, Govindraj
+> Sent: Wednesday, September 22, 2010 10:15 AM
+> To: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; linux-serial at vger.kernel.org;
+> Kevin Hilman; Tony Lindgren; Gadiyar, Anand
+> Subject: [PATCH 13/13 v2] OMAP3: SERIAL: Initialize all omap-uarts for
+> zoom boards
 > 
-> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+> Iniatize all omap-uarts for zoom boards.
+> Remove serial_init from 3630sdp board init
+> as zoom_peripheral_init does the same.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I think this description mismatches slightly to what is really 
+being done in the patch.
 
+I mean, the way you say it, it's like the omap_serial_init
+was already in zoom_peripheral_init... which is not.
+
+Regards,
+Sergio
+
+> 
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 > ---
->  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-omap2/board-3630sdp.c          |    1 -
+>  arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
+>  2 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 5e71ccd..1276bab 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -426,7 +426,7 @@ static struct i2c_gpio_platform_data pdata_i2c0 = {
->  	.sda_is_open_drain	= 1,
->  	.scl_pin		= AT91_PIN_PA21,
->  	.scl_is_open_drain	= 1,
-> -	.udelay			= 2,		/* ~100 kHz */
-> +	.udelay			= 5,		/* ~100 kHz */
->  };
->  
->  static struct platform_device at91sam9g45_twi0_device = {
-> @@ -440,7 +440,7 @@ static struct i2c_gpio_platform_data pdata_i2c1 = {
->  	.sda_is_open_drain	= 1,
->  	.scl_pin		= AT91_PIN_PB11,
->  	.scl_is_open_drain	= 1,
-> -	.udelay			= 2,		/* ~100 kHz */
-> +	.udelay			= 5,		/* ~100 kHz */
->  };
->  
->  static struct platform_device at91sam9g45_twi1_device = {
-
-
--- 
-Nicolas Ferre
+> diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-
+> omap2/board-3630sdp.c
+> index b359c3f..d510451 100644
+> --- a/arch/arm/mach-omap2/board-3630sdp.c
+> +++ b/arch/arm/mach-omap2/board-3630sdp.c
+> @@ -208,7 +208,6 @@ static struct flash_partitions sdp_flash_partitions[]
+> = {
+>  static void __init omap_sdp_init(void)
+>  {
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
+> -	omap_serial_init();
+>  	zoom_peripherals_init();
+>  	board_smc91x_init();
+>  	board_flash_init(sdp_flash_partitions, chip_sel_sdp);
+> diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c
+> b/arch/arm/mach-omap2/board-zoom-peripherals.c
+> index 6b39849..641765a 100644
+> --- a/arch/arm/mach-omap2/board-zoom-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+> @@ -282,4 +282,5 @@ void __init zoom_peripherals_init(void)
+>  	omap_i2c_init();
+>  	usb_musb_init(&musb_board_data);
+>  	enable_board_wakeup_source();
+> +	omap_serial_init();
+>  }
+> --
+> 1.6.3.3
+> 
+> 
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
