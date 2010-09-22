@@ -1,45 +1,36 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 22 Sep 2010 20:44:52 +0530 (IST)
-Subject: [PATCH 13/13 v2] OMAP3: SERIAL: Initialize all omap-uarts for zoom
-	boards
-Message-ID: <37596.172.24.137.131.1285168492.squirrel@dbdmail.itg.ti.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 22 Sep 2010 17:18:57 +0200
+Subject: [PATCH] at91sam9g45: fix i2c bus speed
+In-Reply-To: <20100922143406.GT32018@game.jcrosoft.org> (Jean-Christophe
+	PLAGNIOL-VILLARD's message of "Wed, 22 Sep 2010 16:34:06 +0200")
+References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+	<20100922104846.GQ32018@game.jcrosoft.org>
+	<87lj6uavde.fsf@macbook.be.48ers.dk>
+	<20100922143406.GT32018@game.jcrosoft.org>
+Message-ID: <87hbhhbyce.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Iniatize all omap-uarts for zoom boards.
-Remove serial_init from 3630sdp board init
-as zoom_peripheral_init does the same.
+>>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/board-3630sdp.c          |    1 -
- arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
- 2 files changed, 1 insertions(+), 1 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
-index b359c3f..d510451 100644
---- a/arch/arm/mach-omap2/board-3630sdp.c
-+++ b/arch/arm/mach-omap2/board-3630sdp.c
-@@ -208,7 +208,6 @@ static struct flash_partitions sdp_flash_partitions[] = {
- static void __init omap_sdp_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
--	omap_serial_init();
- 	zoom_peripherals_init();
- 	board_smc91x_init();
- 	board_flash_init(sdp_flash_partitions, chip_sel_sdp);
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c
-b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index 6b39849..641765a 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -282,4 +282,5 @@ void __init zoom_peripherals_init(void)
- 	omap_i2c_init();
- 	usb_musb_init(&musb_board_data);
- 	enable_board_wakeup_source();
-+	omap_serial_init();
- }
+ >> You don't expect most 9g45 users will run at 400MHz? It seems pretty
+ >> likely to me. In any case, a safe (but somewhat slow) default seems
+ >> better than a potentially unsafe one.
+ >> 
+ >> Now, I agree that it would be nice to add an interface to tweak this
+ >> delay if needed (extra argument to at91_add_device_i2c()?), but that's
+ >> next to the discussion about what the default should be.
+
+ Jean-Christophe> I'd prefer to calculate it
+
+ Jean-Christophe> so we specify which max freq we want in my mind it
+ Jean-Christophe> will be good to be as in spi to specific per device
+ Jean-Christophe> it's max speed so we can adapt the bus freq
+
+Yes, that sounds like a nice long term idea, but let's fix the immediate
+problem in the mean time, right?
+
 -- 
-1.6.3.3
+Bye, Peter Korsgaard
