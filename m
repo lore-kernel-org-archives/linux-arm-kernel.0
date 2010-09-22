@@ -1,105 +1,144 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Sep 2010 18:19:37 -0600
-Subject: [PATCH 4/5] OMAP: hwmod: Handle opt clocks node using clk_add_alias
+Date: Tue, 21 Sep 2010 18:19:31 -0600
+Subject: [PATCH 2/5] OMAP: hwmod: Fix softreset for modules with optional
+	clocks
 In-Reply-To: <20100922001834.8621.76144.stgit@twilight.localdomain>
 References: <20100922001834.8621.76144.stgit@twilight.localdomain>
-Message-ID: <20100922001934.8621.17518.stgit@twilight.localdomain>
+Message-ID: <20100922001928.8621.60528.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Partha Basak <p-basak2@ti.com>
+From: Benoit Cousson <b-cousson@ti.com>
 
-For every optional clock present per hwmod per omap-device, this function
-adds an entry in the clocks list of the form <dev-id=dev_name, con-id=role>,
-if an entry is already present in the list of the form <dev-id=NULL, con-id=role>.
+Some modules (like GPIO, DSS...) require optionals clock to be enabled
+in order to complete the sofreset properly.
+Add a HWMOD_CONTROL_OPT_CLKS_IN_RESET flag to force all optional clocks
+to be enabled before reset. Disabled them once the reset is done.
 
-The function is called from within the framework inside omap_device_build_ss(),
-after omap_device_register.
+TODO:
+For the moment it is very hard to understand from the HW spec, which
+optional clock is needed and which one is not. So the current approach
+will enable all the optional clocks.
+Paul proposed a much finer approach that will allow to tag only the needed
+clock in the optional clock table. This might be doable as soon as we have
+a clear understanding of these dependencies.
 
-This allows drivers to get a pointer to its optional clocks based on its role
-by calling clk_get(<dev*>, <role>).
-
-Link to discussions related to this patch:
-http://www.spinics.net/lists/linux-omap/msg34809.html
-
-Signed-off-by: Charulatha V <charu@ti.com>
-Signed-off-by: Partha Basak <p-basak2@ti.com>
+Reported-by: Partha Basak <p-basak2@ti.com>
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: simplified loop iterator; removed the superfluous clk_get(),
- using the clk_get() in clk_add_alias() instead]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/plat-omap/omap_device.c |   43 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 42 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |   51 +++++++++++++++++++++++---
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    5 +++
+ 2 files changed, 51 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index d2b1609..ceba58a 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -82,6 +82,7 @@
- #include <linux/slab.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/clk.h>
- 
- #include <plat/omap_device.h>
- #include <plat/omap_hwmod.h>
-@@ -243,6 +244,44 @@ static inline struct omap_device *_find_by_pdev(struct platform_device *pdev)
- 	return container_of(pdev, struct omap_device, pdev);
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 5027879..f320cfb 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -546,6 +546,36 @@ static int _disable_clocks(struct omap_hwmod *oh)
+ 	return 0;
  }
  
-+/**
-+ * _add_optional_clock_alias - Add clock alias for hwmod optional clocks
-+ * @od: struct omap_device *od
-+ *
-+ * For every optional clock present per hwmod per omap_device, this function
-+ * adds an entry in the clocks list of the form <dev-id=dev_name, con-id=role>
-+ * if an entry is already present in it with the form <dev-id=NULL, con-id=role>
-+ *
-+ * The function is called from inside omap_device_build_ss(), after
-+ * omap_device_register.
-+ *
-+ * This allows drivers to get a pointer to its optional clocks based on its role
-+ * by calling clk_get(<dev*>, <role>).
-+ *
-+ * No return value.
-+ */
-+static void _add_optional_clock_alias(struct omap_device *od,
-+				      struct omap_hwmod *oh)
++static void _enable_optional_clocks(struct omap_hwmod *oh)
 +{
++	struct omap_hwmod_opt_clk *oc;
 +	int i;
 +
-+	for (i = 0; i < oh->opt_clks_cnt; i++) {
-+		struct omap_hwmod_opt_clk *oc;
-+		int r;
++	pr_debug("omap_hwmod: %s: enabling optional clocks\n", oh->name);
 +
-+		oc = &oh->opt_clks[i];
-+
-+		if (!oc->_clk)
-+			continue;
-+
-+		r = clk_add_alias(oc->role, dev_name(&od->pdev.dev),
-+				  (char *)oc->clk, &od->pdev.dev);
-+		if (r)
-+			pr_err("omap_device: %s: clk_add_alias for %s failed\n",
-+			       dev_name(&od->pdev.dev), oc->role);
-+	}
++	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
++		if (oc->_clk) {
++			pr_debug("omap_hwmod: enable %s:%s\n", oc->role,
++				 oc->_clk->name);
++			clk_enable(oc->_clk);
++		}
 +}
 +
++static void _disable_optional_clocks(struct omap_hwmod *oh)
++{
++	struct omap_hwmod_opt_clk *oc;
++	int i;
++
++	pr_debug("omap_hwmod: %s: disabling optional clocks\n", oh->name);
++
++	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
++		if (oc->_clk) {
++			pr_debug("omap_hwmod: disable %s:%s\n", oc->role,
++				 oc->_clk->name);
++			clk_disable(oc->_clk);
++		}
++}
++
+ /**
+  * _find_mpu_port_index - find hwmod OCP slave port ID intended for MPU use
+  * @oh: struct omap_hwmod *
+@@ -976,8 +1006,9 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _reset(struct omap_hwmod *oh)
+ {
+-	u32 r, v;
++	u32 v;
+ 	int c = 0;
++	int ret = 0;
  
- /* Public functions for use by core code */
+ 	if (!oh->class->sysc ||
+ 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
+@@ -990,12 +1021,16 @@ static int _reset(struct omap_hwmod *oh)
+ 		return -EINVAL;
+ 	}
  
-@@ -421,8 +460,10 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
- 	else
- 		ret = omap_device_register(od);
++	/* For some modules, all optionnal clocks need to be enabled as well */
++	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
++		_enable_optional_clocks(oh);
++
+ 	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
  
--	for (i = 0; i < oh_cnt; i++)
-+	for (i = 0; i < oh_cnt; i++) {
- 		hwmods[i]->od = od;
-+		_add_optional_clock_alias(od, hwmods[i]);
-+	}
+ 	v = oh->_sysc_cache;
+-	r = _set_softreset(oh, &v);
+-	if (r)
+-		return r;
++	ret = _set_softreset(oh, &v);
++	if (ret)
++		goto dis_opt_clks;
+ 	_write_sysconfig(v, oh);
  
- 	if (ret)
- 		goto odbs_exit4;
+ 	if (oh->class->sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
+@@ -1020,7 +1055,13 @@ static int _reset(struct omap_hwmod *oh)
+ 	 * _wait_target_ready() or _reset()
+ 	 */
+ 
+-	return (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
++	ret = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
++
++dis_opt_clks:
++	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
++		_disable_optional_clocks(oh);
++
++	return ret;
+ }
+ 
+ /**
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index faa0827..ee53758 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -369,6 +369,10 @@ struct omap_hwmod_omap4_prcm {
+  * HWMOD_SET_DEFAULT_CLOCKACT: program CLOCKACTIVITY bits at startup
+  * HWMOD_NO_IDLEST : this module does not have idle status - this is the case
+  *     only for few initiator modules on OMAP2 & 3.
++ * HWMOD_CONTROL_OPT_CLKS_IN_RESET: Enable all optional clocks during reset.
++ *     This is needed for devices like DSS that require optional clocks enabled
++ *     in order to complete the reset. Optional clocks will be disabled
++ *     again after the reset.
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -377,6 +381,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_NO_OCP_AUTOIDLE			(1 << 4)
+ #define HWMOD_SET_DEFAULT_CLOCKACT		(1 << 5)
+ #define HWMOD_NO_IDLEST				(1 << 6)
++#define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ 
+ /*
+  * omap_hwmod._int_flags definitions
