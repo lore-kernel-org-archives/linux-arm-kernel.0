@@ -1,39 +1,39 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 22 Sep 2010 13:14:58 -0700
-Subject: [PATCH 00/13 v2] OMAP: Serial: Add omap-serial driver with
-	platform support
-In-Reply-To: <37596.172.24.137.131.1285168390.squirrel@dbdmail.itg.ti.com>
-	(Govindraj R.'s message of "Wed, 22 Sep 2010 20:43:10 +0530 (IST)")
-References: <37596.172.24.137.131.1285168390.squirrel@dbdmail.itg.ti.com>
-Message-ID: <87k4mda62l.fsf@deeprootsystems.com>
+Date: Wed, 22 Sep 2010 13:26:00 -0700
+Subject: [PATCH 10/13 v2] OMAP3: serial: Fix uart4 handling for 3630
+In-Reply-To: <37596.172.24.137.131.1285168469.squirrel@dbdmail.itg.ti.com>
+	(Govindraj R.'s message of "Wed, 22 Sep 2010 20:44:29 +0530 (IST)")
+References: <37596.172.24.137.131.1285168469.squirrel@dbdmail.itg.ti.com>
+Message-ID: <87d3s5a5k7.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 "Govindraj.R" <govindraj.raja@ti.com> writes:
 
-> This patch series adds a serial driver to handle uarts on omap platforms.
-> Currenlty omap-uarts are handled with 8250 driver, since updating
-> this driver with omap specific features will over load
-> the 8250 driver with all omap-specific data thus a new driver
-> is added to configure and support features like
-> dma, h/w, s/w flowcontrol for omap-uarts.
-> Also the patch series updates various low level platform specific
-> serial data to support omap-uarts with hwmod framework and adds support
-> for uart4 on OMAP3630.
+> This patch makes the following:
+>  - Adds missing wakeup padding register handling.
+>  - Fixes a hardcode to use PER module ONLY on UART3.
 >
-> v1 to v2 changes:
-> ----------------
-> 1) Incorporate timeout check
-> 	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35106.html
-> 2) Add wk_st, padconf etc for uart4
-> 	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35105.html
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+>  arch/arm/mach-omap2/serial.c |    8 ++++++--
+>  1 files changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index 72b5c98..c1404af 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -57,7 +57,7 @@
+>   * disabled via sysfs. This also causes that any deeper omap sleep states are
+>   * blocked.
+>   */
+> -#define DEFAULT_TIMEOUT 0
+> +#define DEFAULT_TIMEOUT 5
 
-3) All UARTs initialized for Zoom2/3
+Oops
 
-Also, please report platforms this was tested on, and what was tested.
-You need to validate retention and off-mode during idle and suspend, as
-well as enabling/disabling the UART sleep_timeout values via sysfs.
-
-Thanks,
+Please leave this at zero.
 
 Kevin
