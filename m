@@ -1,68 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 22 Sep 2010 00:08:17 -0300
-Subject: Regarding hw irq to Linux irq mapping on ARM
-In-Reply-To: <alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
-References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
-	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
-	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
-Message-ID: <AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
+From: justinmattock@gmail.com (Justin P. Mattock)
+Date: Tue, 21 Sep 2010 20:57:08 -0700
+Subject: [PATCH 1/2 v3]Update broken web addresses.
+In-Reply-To: <alpine.LNX.2.00.1009221310500.4570@nippy.intranet>
+References: <1285118957-24965-1-git-send-email-justinmattock@gmail.com>
+	<alpine.LNX.2.00.1009221310500.4570@nippy.intranet>
+Message-ID: <4C997E94.8070407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 21, 2010 at 6:45 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Tue, 21 Sep 2010, Grant Likely wrote:
->> On Tue, Sep 21, 2010 at 7:25 AM, Shaju Abraham <shaju.abraham@linaro.org> wrote:
->> > Hi Grant
->> >
->> > Since there does not exist a mechanism to map the hw irq to linux irq
->> > on ARM (device tree), I would like to discuss ?with you the plans or
->> > ideas to implement the same.
->>
->> I don't have any immediate plans, but this topic has come up a lot in
->> the last two weeks, so I guess I need to focus on it. ?:-) ?[cc'ing
->> devicetree-discuss and linux-arm-kernel as well as Lorenzo and Eric
->> since this is a conversation that should be had publically]
->>
->> > Can you share with me your thoughts on it?
->> > I have browsed through the power pc code for the same. But not sure
->> > the same approach is usable on ARM as well.
->>
->> I haven't thought deeply about the powerpc implementation of virqs to
->> determine if it is suitable for other architectures or not, but the
->> concept behind it is sound. ?We need a method of mapping controller
->> specific IRQ (or hw irq) numbers into the global Linux irq space
->> (referred to a virqs from this point on). ?First it requires a
->> per-controller reference which can be a pointer to a per-controller
->> data structure, or any other unique identifier. ?It could even be the
->> interrupt controller device tree node pointer. ?Just so long as there
->> is a reliable method to derive the virq from the controller reference
->> + hw irq number.
->>
->> There also needs to be a method for each interrupt controller to
->> register itself and allocate a portion of the virq range. ?This
->> shouldn't be too hard. ?PowerPC handles this with the irq_map[] flat
->> table. ?This approach is limited to whatever NR_IRQs is set to, and
->> could potentially be limited by that, but on the other hand the number
->> of discrete IRQ sources in a system is limited so a flat table
->> (instead of a dynamic hash table) is probably sufficient. ?It is
->> certainly simpler to implement.
->>
->> I think the first step is to simply try generalizing the code in
->> arch/powerpc/kernel/irq.c. ?It isn't very complex and it would give a
->> better impression of what needs to be done. ?The ARM interrupt
->> controller drivers would need to be modified to register with the virq
->> infrastructure. ?None of this is either ARM or OF specific; it would
->> be useful for any system than need to dynamically allocate IRQ
->> numbers. ?I could see some x86 use cases (Xilinx FPGAs) where this
->> would be useful.
+On 09/21/2010 08:25 PM, Finn Thain wrote:
 >
-> Add all the I2C, SPI based irq extenders to that list. They seem to
-> pop up all over the place in rapid speed even in x86. We are happy
-> citizens of the embedded horror^Wuniverse now.
+> On Tue, 21 Sep 2010, Justin P. Mattock wrote:
+>
+>> Below is an update from the original, with changes to the broken web
+>> addresses and removal of archive.org and moved to a seperate patch for
+>> you guys to decide if you want to use this and/or just leave the old url
+>> in and leave it at that..
+>> Please dont apply this to anything just comments and fixes for now,
+>
+> You can use [RFC] in the Subject line instead of [PATCH] to indicate this.
+>
 
-*shudder*
+alright..
 
-What's the irq handling latency on those?  Glad I haven't had to deal
-with any of them yet.
+>
+>> diff --git a/arch/m68k/mac/macboing.c b/arch/m68k/mac/macboing.c
+>> index 8f06408..234d9ee 100644
+>> --- a/arch/m68k/mac/macboing.c
+>> +++ b/arch/m68k/mac/macboing.c
+>> @@ -114,7 +114,8 @@ static void mac_init_asc( void )
+>>   			 *   16-bit I/O functionality.  The PowerBook 500 series computers
+>>   			 *   support 16-bit stereo output, but only mono input."
+>>   			 *
+>> -			 *   http://til.info.apple.com/techinfo.nsf/artnum/n16405
+>> +			 *   Article number 16405:
+>> +			 *   http://support.apple.com/kb/TA32601
+>>   			 *
+>>   			 * --David Kilzer
+>>   			 */
+>
+> "TIL article number 16405" would allow people to find the document by
+> number...
+>
 
-g.
+so putting this "TIL article number 16405" is correct instead of Article 
+number 16405:
+
+>
+>> diff --git a/arch/m68k/q40/README b/arch/m68k/q40/README
+>> index 6bdbf48..92806c0 100644
+>> --- a/arch/m68k/q40/README
+>> +++ b/arch/m68k/q40/README
+>> @@ -3,7 +3,7 @@ Linux for the Q40
+>>
+>>   You may try http://www.geocities.com/SiliconValley/Bay/2602/ for
+>>   some up to date information. Booter and other tools will be also
+>> -available from this place or ftp.uni-erlangen.de/linux/680x0/q40/
+>> +available from this place or http://www.linux-m68k.org/mail.html
+>>   and mirrors.
+>>
+>>   Hints to documentation usually refer to the linux source tree in
+>
+> No. We already discussed this change. Please refer back to my review of
+> the first version of the patch. You got it right in the second version
+> (that I also reviewed), but now you've gone back to the first version...
+>
+> Finn
+>
+
+pretty bad.. I don't know what happened there..
+
+
+Justin P. Mattock
