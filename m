@@ -1,116 +1,119 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 22 Sep 2010 10:24:53 +0200
-Subject: [PATCH 3/5] omap3: cm-t3517: add support for usb host.
-In-Reply-To: <AANLkTin+canp9yrE-Jmv=n56dPFByZWU73uaRNBkruP6@mail.gmail.com>
-References: <1285084993-27683-1-git-send-email-grinberg@compulab.co.il>
-	<1285084993-27683-4-git-send-email-grinberg@compulab.co.il>
-	<AANLkTin+canp9yrE-Jmv=n56dPFByZWU73uaRNBkruP6@mail.gmail.com>
-Message-ID: <4C99BD55.3070706@compulab.co.il>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 22 Sep 2010 11:51:19 +0300
+Subject: [PATCH v2 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <33908.10.24.255.17.1284827636.squirrel@dbdmail.itg.ti.com>
+References: <33908.10.24.255.17.1284827636.squirrel@dbdmail.itg.ti.com>
+Message-ID: <20100922085119.GD29725@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 09/21/10 18:26, Gadiyar, Anand wrote:
-> On Tue, Sep 21, 2010 at 9:33 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->> add support for hsusb host ports 1, 2 and on-module usb hub.
->>
->> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->> ---
->>  arch/arm/mach-omap2/board-cm-t3517.c |   50 ++++++++++++++++++++++++++++++++++
-> ...
+Hi,
+
+On Sat, Sep 18, 2010 at 11:33:56AM -0500, kishore kadiyala wrote:
+>@@ -223,6 +224,81 @@ int twl6030_interrupt_mask(u8 bit_mask, u8 offset)
+> }
+> EXPORT_SYMBOL(twl6030_interrupt_mask);
 >
->> @@ -100,6 +102,47 @@ static void __init cm_t3517_init_rtc(void)
->>  static inline void cm_t3517_init_rtc(void) {}
->>  #endif
->>
->> +#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
-> Hi Igor,
+>+int twl6030_mmc_card_detect_config(void)
+>+{
+>+	int ret;
+>+	u8 reg_val = 0;
+>+
+>+	/* Unmasking the Card detect Interrupt line for MMC1 from Phoenix */
+>+	if (twl_class_is_6030()) {
 
-Hi
+which other class can this be ?
 
-> Do we really need to make these conditional on the driver being built?
+>+	/*
+>+	 * Intially Configuring MMC_CTRL for receving interrupts &
+>+	 * Card status on TWL6030 for MMC1
+>+	 */
+>+	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val, TWL6030_MMCCTRL);
+>+	if (ret < 0) {
+>+		pr_err("twl6030: Failed to read MMCCTRL, error %d\n", ret);
+>+		return ret;
+>+	}
+>+	reg_val &= ~VMMC_AUTO_OFF;
+>+	reg_val |= SW_FC;
+>+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val, TWL6030_MMCCTRL);
+>+	if (ret < 0) {
+>+		pr_err("twl6030: Failed to write MMCCTRL, error %d\n", ret);
+>+		return ret;
+>+	}
+>+
+>+	/* Configuring PullUp-PullDown register */
+>+	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val,
+>+						TWL6030_CFG_INPUT_PUPD3);
 
-This is depends on what are we trying to achieve...
-I can think of two things:
-[1] Simple, clear and nice code without ifdefs
-[2] Smaller kernel, a bit less resources wasted and a bit faster boot time
+is this a gpio ? Could gpiolib take care of this ?
 
-> The hardware is present on the board at all times, right?
+>+	if (ret < 0) {
+>+		pr_err("twl6030: Failed to read CFG_INPUT_PUPD3, error %d\n",
+>+									ret);
+>+		return ret;
+>+	}
+>+	reg_val &= ~(MMC_PU | MMC_PD);
+>+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
+>+						TWL6030_CFG_INPUT_PUPD3);
 
-Yes, it is inside the SoC, except for the usb hub.
+ditto.
 
-> It should be okay to execute this code independent of whether
-> the driver is built or not. The device registration can be unconditional
-> and if there is no driver present, we won't probe anyway.
+>+int twl6030_mmc_card_detect(struct device *dev, int slot)
+>+{
+>+	int ret = -EIO;
+>+	u8 read_reg = 0;
+>+	struct platform_device *pdev = container_of(dev,
+>+					struct platform_device, dev);
 
-It is ok, but again it depends on what we are trying to achieve here.
+how about:
 
-If we want [1], then indeed we need to remove the ifdefs also inside usb-ehci.c,
-so pros:
- * we'll get nice and clean code,
-cons:
- * a bit bigger kernel,
- * "floating" device without a driver,
- * a bit resources wasted for this device,
- * a bit slower startup time (device registration, gpio toggling, etc.).
+	struct platform_device *pdev = to_platform_device(dev);
 
-If we want [2], then we'll have the opposite of [1] ;)
-
-Personally, I don't mind either way... ,
-but I want the code to be consistent (in this case with usb-ehci.c).
-
-> (I see some similar logic in usb-ehci.c - probably a good idea to remove
-> it as well).
-
-...
-
-> - Anand
+>diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>index 562dbbb..a51894d 100644
+>--- a/drivers/mmc/host/omap_hsmmc.c
+>+++ b/drivers/mmc/host/omap_hsmmc.c
+>@@ -466,8 +466,6 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
+> 	int ret;
 >
->> +#define HSUSB1_RESET_GPIO      (146)
->> +#define HSUSB2_RESET_GPIO      (147)
->> +#define USB_HUB_RESET_GPIO     (152)
->> +
->> +static struct ehci_hcd_omap_platform_data cm_t3517_ehci_pdata __initdata = {
->> +       .port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
->> +       .port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
->> +       .port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
->> +
->> +       .phy_reset  = true,
->> +       .reset_gpio_port[0]  = HSUSB1_RESET_GPIO,
->> +       .reset_gpio_port[1]  = HSUSB2_RESET_GPIO,
->> +       .reset_gpio_port[2]  = -EINVAL,
->> +};
->> +
->> +static int cm_t3517_init_usbh(void)
->> +{
->> +       int err;
->> +
->> +       err = gpio_request(USB_HUB_RESET_GPIO, "usb hub rst");
->> +       if (err) {
->> +               pr_err("CM-T3517: usb hub rst gpio request failed: %d\n", err);
->> +       } else {
->> +               gpio_direction_output(USB_HUB_RESET_GPIO, 0);
->> +               udelay(10);
->> +               gpio_set_value(USB_HUB_RESET_GPIO, 1);
->> +               msleep(1);
->> +       }
->> +
->> +       usb_ehci_init(&cm_t3517_ehci_pdata);
->> +
->> +       return 0;
->> +}
->> +#else
->> +static inline int cm_t3517_init_usbh(void)
->> +{
->> +       return 0;
->> +}
->> +#endif
->> +
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 	if (gpio_is_valid(pdata->slots[0].switch_pin)) {
+>-		pdata->suspend = omap_hsmmc_suspend_cdirq;
+>-		pdata->resume = omap_hsmmc_resume_cdirq;
+> 		if (pdata->slots[0].cover)
+> 			pdata->slots[0].get_cover_state =
+> 					omap_hsmmc_get_cover_state;
+>@@ -2211,6 +2209,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+> 				"Unable to grab MMC CD IRQ\n");
+> 			goto err_irq_cd;
+> 		}
+>+		pdata->suspend = omap_hsmmc_suspend_cdirq;
+>+		pdata->resume = omap_hsmmc_resume_cdirq;
+
+this doesn't look to be part of $SUBJECT, care to explain ?
+
+>@@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
+> int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
+> int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
 >
+>+/* Card detect Configuration for MMC1 Controller on OMAP4 */
+>+#ifdef CONFIG_TWL4030_CORE
+>+int twl6030_mmc_card_detect_config(void);
+>+#else
+>+static inline int twl6030_mmc_card_detect_config(void)
+>+{
+>+	pr_err("twl6030_mmc_card_detect_config not supported\n");
+
+pr_debug() would be better ??
+
+>+/* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
+>+#ifdef CONFIG_TWL4030_CORE
+>+int twl6030_mmc_card_detect(struct device *dev, int slot);
+>+#else
+>+static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
+>+{
+>+	pr_err("Call back twl6030_mmc_card_detect not supported\n");
+
+ditto.
 
 -- 
-Regards,
-Igor.
+balbi
