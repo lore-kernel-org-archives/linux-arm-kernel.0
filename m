@@ -1,42 +1,160 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Wed, 22 Sep 2010 11:31:26 +0200
-Subject: [PATCH] at91sam9g45: fix i2c bus speed
-Message-ID: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+From: kishorek.kadiyala@gmail.com (kishore kadiyala)
+Date: Wed, 22 Sep 2010 15:08:35 +0530
+Subject: [PATCH v2 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <20100922085119.GD29725@legolas.emea.dhcp.ti.com>
+References: <33908.10.24.255.17.1284827636.squirrel@dbdmail.itg.ti.com>
+	<20100922085119.GD29725@legolas.emea.dhcp.ti.com>
+Message-ID: <AANLkTimMgAtKeiodbhNdsZnhP=Kbrk_-ZgqnzS9gPgyp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a correct udelay value to get bus speed around 100KHz. The udelay
-value was most likely copied from the older devices, but the 9g45
-is signicantly faster (400MHz, DDR, ..), so a udelay of 2 gives a
-bus speed of around 190KHz, which is too fast for some devices.
-A udelay value of 5 gives a bus speed of around 90KHz here.
+Hi balbi,
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
----
- arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+On Wed, Sep 22, 2010 at 2:21 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Sat, Sep 18, 2010 at 11:33:56AM -0500, kishore kadiyala wrote:
+>>
+>> @@ -223,6 +224,81 @@ int twl6030_interrupt_mask(u8 bit_mask, u8 offset)
+>> }
+>> EXPORT_SYMBOL(twl6030_interrupt_mask);
+>>
+>> +int twl6030_mmc_card_detect_config(void)
+>> +{
+>> + ? ? ? int ret;
+>> + ? ? ? u8 reg_val = 0;
+>> +
+>> + ? ? ? /* Unmasking the Card detect Interrupt line for MMC1 from Phoenix
+>> */
+>> + ? ? ? if (twl_class_is_6030()) {
+>
+> which other class can this be ?
 
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 5e71ccd..1276bab 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -426,7 +426,7 @@ static struct i2c_gpio_platform_data pdata_i2c0 = {
- 	.sda_is_open_drain	= 1,
- 	.scl_pin		= AT91_PIN_PA21,
- 	.scl_is_open_drain	= 1,
--	.udelay			= 2,		/* ~100 kHz */
-+	.udelay			= 5,		/* ~100 kHz */
- };
- 
- static struct platform_device at91sam9g45_twi0_device = {
-@@ -440,7 +440,7 @@ static struct i2c_gpio_platform_data pdata_i2c1 = {
- 	.sda_is_open_drain	= 1,
- 	.scl_pin		= AT91_PIN_PB11,
- 	.scl_is_open_drain	= 1,
--	.udelay			= 2,		/* ~100 kHz */
-+	.udelay			= 5,		/* ~100 kHz */
- };
- 
- static struct platform_device at91sam9g45_twi1_device = {
--- 
-1.7.1
+It can only be a 6030 class.
+as twl6030_mmc_card_detect_config is called only in board file I can
+remove the check.
+
+>
+>> + ? ? ? /*
+>> + ? ? ? ?* Intially Configuring MMC_CTRL for receving interrupts &
+>> + ? ? ? ?* Card status on TWL6030 for MMC1
+>> + ? ? ? ?*/
+>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val,
+>> TWL6030_MMCCTRL);
+>> + ? ? ? if (ret < 0) {
+>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read MMCCTRL, error %d\n",
+>> ret);
+>> + ? ? ? ? ? ? ? return ret;
+>> + ? ? ? }
+>> + ? ? ? reg_val &= ~VMMC_AUTO_OFF;
+>> + ? ? ? reg_val |= SW_FC;
+>> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
+>> TWL6030_MMCCTRL);
+>> + ? ? ? if (ret < 0) {
+>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write MMCCTRL, error %d\n",
+>> ret);
+>> + ? ? ? ? ? ? ? return ret;
+>> + ? ? ? }
+>> +
+>> + ? ? ? /* Configuring PullUp-PullDown register */
+>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
+>
+> is this a gpio ? Could gpiolib take care of this ?
+
+This is not a gpio but an interrupt line from twl6030 to MMC controller
+
+>
+>> + ? ? ? if (ret < 0) {
+>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read CFG_INPUT_PUPD3, error
+>> %d\n",
+>> +
+>> ret);
+>> + ? ? ? ? ? ? ? return ret;
+>> + ? ? ? }
+>> + ? ? ? reg_val &= ~(MMC_PU | MMC_PD);
+>> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
+>
+> ditto.
+This is not a gpio
+>
+>> +int twl6030_mmc_card_detect(struct device *dev, int slot)
+>> +{
+>> + ? ? ? int ret = -EIO;
+>> + ? ? ? u8 read_reg = 0;
+>> + ? ? ? struct platform_device *pdev = container_of(dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct platform_device, dev);
+>
+> how about:
+>
+> ? ? ? ?struct platform_device *pdev = to_platform_device(dev);
+
+ok will use this .
+
+>
+>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>> index 562dbbb..a51894d 100644
+>> --- a/drivers/mmc/host/omap_hsmmc.c
+>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>> @@ -466,8 +466,6 @@ static int omap_hsmmc_gpio_init(struct
+>> omap_mmc_platform_data *pdata)
+>> ? ? ? ?int ret;
+>>
+>> ? ? ? ?if (gpio_is_valid(pdata->slots[0].switch_pin)) {
+>> - ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
+>> - ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
+>> ? ? ? ? ? ? ? ?if (pdata->slots[0].cover)
+>> ? ? ? ? ? ? ? ? ? ? ? ?pdata->slots[0].get_cover_state =
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_cover_state;
+>> @@ -2211,6 +2209,8 @@ static int __init omap_hsmmc_probe(struct
+>> platform_device *pdev)
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"Unable to grab MMC CD IRQ\n");
+>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_irq_cd;
+>> ? ? ? ? ? ? ? ?}
+>> + ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
+>> + ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
+>
+> this doesn't look to be part of $SUBJECT, care to explain ?
+
+I've just moved the initialization of suspend & resume which was
+previously done in omap_hsmmc_gpio_init.
+Ok will update in the log
+
+>
+>> @@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg,
+>> unsigned num_bytes);
+>> int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
+>> int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+>>
+>> +/* Card detect Configuration for MMC1 Controller on OMAP4 */
+>> +#ifdef CONFIG_TWL4030_CORE
+>> +int twl6030_mmc_card_detect_config(void);
+>> +#else
+>> +static inline int twl6030_mmc_card_detect_config(void)
+>> +{
+>> + ? ? ? pr_err("twl6030_mmc_card_detect_config not supported\n");
+>
+> pr_debug() would be better ??
+
+ok will update with pr_debug
+
+>
+>> +/* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
+>> +#ifdef CONFIG_TWL4030_CORE
+>> +int twl6030_mmc_card_detect(struct device *dev, int slot);
+>> +#else
+>> +static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
+>> +{
+>> + ? ? ? pr_err("Call back twl6030_mmc_card_detect not supported\n");
+>
+> ditto.
+
+ok will update with pr_debug
+
+>
+> --
+> balbi
+
+Regards,
+Kishore
