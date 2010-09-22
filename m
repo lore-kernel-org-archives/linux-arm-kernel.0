@@ -1,74 +1,42 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 22 Sep 2010 11:28:28 +0200
-Subject: [PATCH] mx3fb and ipu_idmac cleanups
-In-Reply-To: <1285146693-22644-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1285146693-22644-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20100922092827.GD2693@pengutronix.de>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 22 Sep 2010 11:31:26 +0200
+Subject: [PATCH] at91sam9g45: fix i2c bus speed
+Message-ID: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 22, 2010 at 11:11:33AM +0200, Michael Grzeschik wrote:
-> From: Juergen Beisert <j.beisert@pengutronix.de>
-> 
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
->  drivers/dma/ipu/ipu_idmac.c |    2 +-
->  drivers/video/mx3fb.c       |    6 +++---
->  2 files changed, 4 insertions(+), 4 deletions(-)
+Use a correct udelay value to get bus speed around 100KHz. The udelay
+value was most likely copied from the older devices, but the 9g45
+is signicantly faster (400MHz, DDR, ..), so a udelay of 2 gives a
+bus speed of around 190KHz, which is too fast for some devices.
+A udelay value of 5 gives a bus speed of around 90KHz here.
 
-Ehrm, I think it makes sense to split them up.
+Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+---
+ arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> 
-> diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-> index cb26ee9..e065703 100644
-> --- a/drivers/dma/ipu/ipu_idmac.c
-> +++ b/drivers/dma/ipu/ipu_idmac.c
-> @@ -321,7 +321,7 @@ static void ipu_ch_param_set_size(union chan_param_mem *params,
->  		params->ip.wid2	= 4;		/* Blue bit width - 1 */
->  		break;
->  	case IPU_PIX_FMT_BGR24:
-> -		params->ip.bpp	= 1;		/* 24 BPP & RGB PFS */
-> +		params->ip.bpp	= 1;		/* 24 BPP & BGR PFS */
->  		params->ip.pfs	= 4;
->  		params->ip.npb	= 7;
->  		params->ip.sat	= 2;		/* SAT = 32-bit access */
-> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-> index 7cfc170..658f10a 100644
-> --- a/drivers/video/mx3fb.c
-> +++ b/drivers/video/mx3fb.c
-> @@ -660,12 +660,12 @@ static uint32_t bpp_to_pixfmt(int bpp)
->  {
->  	uint32_t pixfmt = 0;
->  	switch (bpp) {
-> -	case 24:
-> -		pixfmt = IPU_PIX_FMT_BGR24;
-> -		break;
->  	case 32:
->  		pixfmt = IPU_PIX_FMT_BGR32;
->  		break;
-> +	case 24:
-> +		pixfmt = IPU_PIX_FMT_BGR24;
-> +		break;
->  	case 16:
->  		pixfmt = IPU_PIX_FMT_RGB565;
->  		break;
-> -- 
-> 1.7.2.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 5e71ccd..1276bab 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -426,7 +426,7 @@ static struct i2c_gpio_platform_data pdata_i2c0 = {
+ 	.sda_is_open_drain	= 1,
+ 	.scl_pin		= AT91_PIN_PA21,
+ 	.scl_is_open_drain	= 1,
+-	.udelay			= 2,		/* ~100 kHz */
++	.udelay			= 5,		/* ~100 kHz */
+ };
+ 
+ static struct platform_device at91sam9g45_twi0_device = {
+@@ -440,7 +440,7 @@ static struct i2c_gpio_platform_data pdata_i2c1 = {
+ 	.sda_is_open_drain	= 1,
+ 	.scl_pin		= AT91_PIN_PB11,
+ 	.scl_is_open_drain	= 1,
+-	.udelay			= 2,		/* ~100 kHz */
++	.udelay			= 5,		/* ~100 kHz */
+ };
+ 
+ static struct platform_device at91sam9g45_twi1_device = {
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100922/79f2317a/attachment-0001.sig>
+1.7.1
