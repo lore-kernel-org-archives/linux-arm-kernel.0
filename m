@@ -1,28 +1,61 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 22 Sep 2010 15:31:21 +1000
-Subject: Regarding hw irq to Linux irq mapping on ARM
-In-Reply-To: <AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
-References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
-	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
-	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
-	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
-Message-ID: <1285133481.30449.170.camel@pasglop>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Wed, 22 Sep 2010 11:02:08 +0530
+Subject: [PATCH] mmc: failure of block read wait for long time
+In-Reply-To: <20100920133703.GC30793@n2100.arm.linux.org.uk>
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B0315F026ED@dbde02.ent.ti.com>
+	<4C8A19E7.30706@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F026F6@dbde02.ent.ti.com>
+	<4C8A2C5D.2050408@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
+	<4C971320.7050906@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B03160624F6@dbde02.ent.ti.com>
+	<4C974A5D.5050608@nokia.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B03160626B5@dbde02.ent.ti.com>
+	<4C975CFB.6070907@nokia.com>
+	<20100920133703.GC30793@n2100.arm.linux.org.uk>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B031610E332@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-09-22 at 00:08 -0300, Grant Likely wrote:
-> > Add all the I2C, SPI based irq extenders to that list. They seem to
-> > pop up all over the place in rapid speed even in x86. We are happy
-> > citizens of the embedded horror^Wuniverse now.
-> 
-> *shudder*
-> 
-> What's the irq handling latency on those?  Glad I haven't had to deal
-> with any of them yet.
+Chris,
 
-And i2c in many cases want to be called from sleep'able context... might
-be a good idea to restrict some of these to threaded interrupts. A whole
-different discussion I suppose.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Monday, September 20, 2010 7:07 PM
+> To: Adrian Hunter
+> Cc: Ghorai, Sukumar; linux-mmc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] mmc: failure of block read wait for long time
+> 
+> On Mon, Sep 20, 2010 at 04:09:15PM +0300, Adrian Hunter wrote:
+> > The SD/MMC protocol does not indicate which sector has the error.
+> > There is no possibility of trying the ith+1-segment because i is
+> > unknown.
+> 
+> Not entirely true.
+> 
+> I seem to remember that the MMC protocol (and probably SD protocol)
+> provides an ack at the end of each data block to say whether the data
+> block was correct or not.
+> 
+> Some hosts tell you when they receive this ack, and you can track how
+> many blocks have been successfully read without error.  The ARM MMCI
+> primecell does this.
+> 
+> However, some hosts don't give you this information, in which case you
+> don't know where the error occurred in the read - so when a read fails,
+> you can only safely report that no bytes were read successfully.  This
+> means that even if the error was on the last block, there's no way to
+> know this.
+[Ghorai]
+Would you please review and merge this patch [1] (attached too)?
+[1] http://comments.gmane.org/gmane.linux.kernel.mmc/2714
 
-Cheers,
-Ben.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mmc-failure-of-block-read-wait-for-long-time.patch
+Type: application/octet-stream
+Size: 1114 bytes
+Desc: 0001-mmc-failure-of-block-read-wait-for-long-time.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100922/ee9f688f/attachment.obj>
