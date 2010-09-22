@@ -1,101 +1,55 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 21 Sep 2010 18:19:28 -0600
-Subject: [PATCH 1/5] OMAP: hwmod: Fix softreset status check for some new
-	OMAP4 IPs
+Date: Tue, 21 Sep 2010 18:19:34 -0600
+Subject: [PATCH 3/5] OMAP: hwmod: Enable module wakeup if in smartidle
 In-Reply-To: <20100922001834.8621.76144.stgit@twilight.localdomain>
 References: <20100922001834.8621.76144.stgit@twilight.localdomain>
-Message-ID: <20100922001925.8621.29632.stgit@twilight.localdomain>
+Message-ID: <20100922001931.8621.46565.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+From: Rajendra Nayak <rnayak@ti.com>
 
-In OMAP3 a specific SYSSTATUS register was used to get the softreset status.
-Starting in OMAP4, some IPs does not have SYSSTATUS register and instead
-use the SYSC softreset bit to provide the status.
+If a module's OCP slave port is programmed to be in smartidle,
+its also necessary that they have module level wakeup enabled.
+Update _sysc_enable in hwmod framework to do this.
 
-Other cases might exist:
-- Some IPs like McBSP does have a softreset control but no reset status.
-- Some IPs that represent subsystem, like the DSS, can contains
-a reset status without softreset control. The status is the aggregation
-of all the sub modules reset status.
+The thread "[PATCH 7/8] : Hwmod api changes" archived here:
 
-- Add a new flag (SYSC_HAS_RESET_STATUS) to identify the new programming model
-and replace the previous SYSS_MISSING, that was used to flag IP with
-softreset control but without the SYSSTATUS register, with a specific
-SYSS_HAS_RESET_STATUS flag.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34212.html
 
-- MCSPI and MMC contains both programming models, so the legacy one
-will be prevented by removing the syss offset field that become useless.
+has additional technical information on the rationale of this patch.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Partha Basak <p-basak2@ti.com>
+Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
+[paul at pwsan.com: revised patch description]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c             |   22 +++++++++++++++++-----
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 ++-
- 2 files changed, 19 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 8c27923..5027879 100644
+index f320cfb..3f3d61a 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -967,6 +967,12 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
-  * enabled for this to work.  Returns -EINVAL if the hwmod cannot be
-  * reset this way or if the hwmod is in the wrong state, -ETIMEDOUT if
-  * the module did not reset in time, or 0 upon success.
-+ *
-+ * In OMAP3 a specific SYSSTATUS register is used to get the reset status.
-+ * Starting in OMAP4, some IPs does not have SYSSTATUS register and instead
-+ * use the SYSCONFIG softreset bit to provide the status.
-+ *
-+ * Note that some IP like McBSP does have a reset control but no reset status.
-  */
- static int _reset(struct omap_hwmod *oh)
- {
-@@ -974,8 +980,7 @@ static int _reset(struct omap_hwmod *oh)
- 	int c = 0;
+@@ -691,8 +691,6 @@ static void _sysc_enable(struct omap_hwmod *oh)
+ 		_set_module_autoidle(oh, idlemode, &v);
+ 	}
  
- 	if (!oh->class->sysc ||
--	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET) ||
--	    (oh->class->sysc->sysc_flags & SYSS_MISSING))
-+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
- 		return -EINVAL;
+-	/* XXX OCP ENAWAKEUP bit? */
+-
+ 	/*
+ 	 * XXX The clock framework should handle this, by
+ 	 * calling into this code.  But this must wait until the
+@@ -703,6 +701,10 @@ static void _sysc_enable(struct omap_hwmod *oh)
+ 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
  
- 	/* clocks must be on for this operation */
-@@ -993,9 +998,16 @@ static int _reset(struct omap_hwmod *oh)
- 		return r;
  	_write_sysconfig(v, oh);
++
++	/* If slave is in SMARTIDLE, also enable wakeup */
++	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
++			_enable_wakeup(oh);
+ }
  
--	omap_test_timeout((omap_hwmod_readl(oh, oh->class->sysc->syss_offs) &
--			   SYSS_RESETDONE_MASK),
--			  MAX_MODULE_SOFTRESET_WAIT, c);
-+	if (oh->class->sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
-+		omap_test_timeout((omap_hwmod_readl(oh,
-+						    oh->class->sysc->syss_offs)
-+				   & SYSS_RESETDONE_MASK),
-+				  MAX_MODULE_SOFTRESET_WAIT, c);
-+	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS)
-+		omap_test_timeout(!(omap_hwmod_readl(oh,
-+						     oh->class->sysc->sysc_offs)
-+				   & SYSC_TYPE2_SOFTRESET_MASK),
-+				  MAX_MODULE_SOFTRESET_WAIT, c);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
- 		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 7fde44d..faa0827 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -251,8 +251,9 @@ struct omap_hwmod_ocp_if {
- #define SYSC_HAS_CLOCKACTIVITY	(1 << 4)
- #define SYSC_HAS_SIDLEMODE	(1 << 5)
- #define SYSC_HAS_MIDLEMODE	(1 << 6)
--#define SYSS_MISSING		(1 << 7)
-+#define SYSS_HAS_RESET_STATUS	(1 << 7)
- #define SYSC_NO_CACHE		(1 << 8)  /* XXX SW flag, belongs elsewhere */
-+#define SYSC_HAS_RESET_STATUS	(1 << 9)
- 
- /* omap_hwmod_sysconfig.clockact flags */
- #define CLOCKACT_TEST_BOTH	0x0
+ /**
