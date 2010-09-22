@@ -1,28 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 22 Sep 2010 11:54:39 +0100
-Subject: Regarding hw irq to Linux irq mapping on ARM
-In-Reply-To: <20100922105111.GA20986@sirena.org.uk>
-References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
-	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
-	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
-	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
-	<20100922105111.GA20986@sirena.org.uk>
-Message-ID: <20100922105439.GB20986@sirena.org.uk>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Wed, 22 Sep 2010 11:58:52 +0100
+Subject: [PATCH 1/2 v3]Update broken web addresses.
+In-Reply-To: <1285118957-24965-1-git-send-email-justinmattock@gmail.com>
+References: <1285118957-24965-1-git-send-email-justinmattock@gmail.com>
+Message-ID: <20100922105852.GC4710@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 22, 2010 at 11:51:11AM +0100, Mark Brown wrote:
-> On Wed, Sep 22, 2010 at 12:08:17AM -0300, Grant Likely wrote:
+On Tue, Sep 21, 2010 at 06:29:16PM -0700, Justin P. Mattock wrote:
+> Date:   Tue, 21 Sep 2010 18:29:16 -0700
+> From: "Justin P. Mattock" <justinmattock@gmail.com>
+> To: trivial at kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org,
+>  linux-omap at vger.kernel.org, linux-m32r at ml.linux-m32r.org,
+>  linux-m68k at lists.linux-m68k.org, linux-mips at linux-mips.org,
+>  linuxppc-dev at lists.ozlabs.org, linux-laptop at vger.kernel.org, "Justin P.
+>  Mattock" <justinmattock@gmail.com>, "Maciej W. Rozycki"
+>  <macro@linux-mips.org>, Finn Thain <fthain@telegraphics.com.au>, Randy
+>  Dunlap <rdunlap@xenotime.net>
+> Subject: [PATCH 1/2 v3]Update broken web addresses.
+> Content-Type: text/plain; charset=UTF-8
 
-> > What's the irq handling latency on those?  Glad I haven't had to deal
-> > with any of them yet.
+Patchwork MIME butchers the subject of this patch, see
 
-> Milisecondish, but depends on bus congestion and bus type.  You need to
-> schedule a thread which then does one but typically more register I/O
-> operations on the device (read one or more IRQ status registers, and
-> typically write back to acknowledge the interrupts as well).  These tend
-> for obvious reasons to be for low volume interrupts like jack detection.
+https://patchwork.linux-mips.org/patch/1587/
+https://patchwork.kernel.org/patch/198382/
 
-Incidentally, if you want to look at an implementation the wm831x
-contains an implementation of such a controller (in drivers/mfd/wm831x-irq.c)
-the structure of which has been cloned for quite a few of these chips.
+  Ralf
