@@ -1,81 +1,36 @@
-From: saaguirre@ti.com (Aguirre, Sergio)
-Date: Wed, 22 Sep 2010 11:06:09 -0500
-Subject: [PATCH 13/13 v2] OMAP3: SERIAL: Initialize all omap-uarts for
-	zoom      boards
-In-Reply-To: <37596.172.24.137.131.1285168492.squirrel@dbdmail.itg.ti.com>
-References: <37596.172.24.137.131.1285168492.squirrel@dbdmail.itg.ti.com>
-Message-ID: <A24693684029E5489D1D202277BE894472767CED@dlee02.ent.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Sep 2010 18:09:04 +0200
+Subject: [PATCH] at91sam9g45: fix i2c bus speed
+In-Reply-To: <20100922145442.GA3753@debian-wegner1.datadisplay.de>
+References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+	<20100922104846.GQ32018@game.jcrosoft.org>
+	<87lj6uavde.fsf@macbook.be.48ers.dk>
+	<20100922143406.GT32018@game.jcrosoft.org>
+	<20100922145442.GA3753@debian-wegner1.datadisplay.de>
+Message-ID: <20100922160904.GU32018@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Govindraj,
+On 16:54 Wed 22 Sep     , Wolfgang Wegner wrote:
+> Hi,
+> 
+> On Wed, Sep 22, 2010 at 04:34:06PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 13:08 Wed 22 Sep     , Peter Korsgaard wrote:
+> [...]
+> > > Now, I agree that it would be nice to add an interface to tweak this
+> > > delay if needed (extra argument to at91_add_device_i2c()?), but that's
+> > > next to the discussion about what the default should be.
+> > I'd prefer to calculate it
+> > 
+> > so we specify which max freq we want in my mind it will be good to be as in
+> > spi to specific per device it's max speed so we can adapt the bus freq
+> 
+> sorry in case I got you wrong, but please keep in mind that in
+> contrast to SPI the addressing in I2C is done via the serial data,
+> so the bus speed has to be _permanently_ adapted to match the
+> slowest device present.
+yeah that's the idea but each i2c device specify it's speed then we put the
+bus speed at the lowest
 
-Just one non-functional comment below.
-
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Raja, Govindraj
-> Sent: Wednesday, September 22, 2010 10:15 AM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-serial at vger.kernel.org;
-> Kevin Hilman; Tony Lindgren; Gadiyar, Anand
-> Subject: [PATCH 13/13 v2] OMAP3: SERIAL: Initialize all omap-uarts for
-> zoom boards
-> 
-> Iniatize all omap-uarts for zoom boards.
-> Remove serial_init from 3630sdp board init
-> as zoom_peripheral_init does the same.
-
-I think this description mismatches slightly to what is really 
-being done in the patch.
-
-I mean, the way you say it, it's like the omap_serial_init
-was already in zoom_peripheral_init... which is not.
-
-Regards,
-Sergio
-
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> ---
->  arch/arm/mach-omap2/board-3630sdp.c          |    1 -
->  arch/arm/mach-omap2/board-zoom-peripherals.c |    1 +
->  2 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-
-> omap2/board-3630sdp.c
-> index b359c3f..d510451 100644
-> --- a/arch/arm/mach-omap2/board-3630sdp.c
-> +++ b/arch/arm/mach-omap2/board-3630sdp.c
-> @@ -208,7 +208,6 @@ static struct flash_partitions sdp_flash_partitions[]
-> = {
->  static void __init omap_sdp_init(void)
->  {
->  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
-> -	omap_serial_init();
->  	zoom_peripherals_init();
->  	board_smc91x_init();
->  	board_flash_init(sdp_flash_partitions, chip_sel_sdp);
-> diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c
-> b/arch/arm/mach-omap2/board-zoom-peripherals.c
-> index 6b39849..641765a 100644
-> --- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-> +++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-> @@ -282,4 +282,5 @@ void __init zoom_peripherals_init(void)
->  	omap_i2c_init();
->  	usb_musb_init(&musb_board_data);
->  	enable_board_wakeup_source();
-> +	omap_serial_init();
->  }
-> --
-> 1.6.3.3
-> 
-> 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Best Regards,
+J.
