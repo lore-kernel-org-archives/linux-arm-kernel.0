@@ -1,122 +1,51 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 22 Sep 2010 14:38:59 +0530
-Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
-In-Reply-To: <20100921162658.GA2310@core.coreip.homeip.net>
-References: <1285069770-4261-1-git-send-email-manjugk@ti.com>
-	<1285076060.14206.3.camel@chotu>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402785A3478@dbde02.ent.ti.com>
-	<20100921162658.GA2310@core.coreip.homeip.net>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A3920@dbde02.ent.ti.com>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Wed, 22 Sep 2010 11:11:33 +0200
+Subject: [PATCH] mx3fb and ipu_idmac cleanups
+Message-ID: <1285146693-22644-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+From: Juergen Beisert <j.beisert@pengutronix.de>
 
-> -----Original Message-----
-> From: Dmitry Torokhov [mailto:dmitry.torokhov at gmail.com] 
-> Sent: Tuesday, September 21, 2010 9:57 PM
-> To: G, Manjunath Kondaiah
-> Cc: Ameya Palande; linux-omap at vger.kernel.org; 
-> linux-input at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Tony Lindgren
-> Subject: Re: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
-> 
-> Hi,
-> 
-> On Tue, Sep 21, 2010 at 07:11:01PM +0530, G, Manjunath Kondaiah wrote:
-> > 
-> > Hi,
-> > 
-> > > -----Original Message-----
-> > > From: Ameya Palande [mailto:ameya.palande at nokia.com]
-> > > Sent: Tuesday, September 21, 2010 7:04 PM
-> > > To: G, Manjunath Kondaiah
-> > > Cc: linux-omap at vger.kernel.org; 
-> linux-input at vger.kernel.org; Dmitry 
-> > > Torokhov; linux-arm-kernel at lists.infradead.org; Tony Lindgren
-> > > Subject: Re: [PATCH v2] OMAP3: Keypad: Fix failure exit path in 
-> > > probe
-> > > 
-> > > Hi Manjunath,
-> > > 
-> > > On Tue, 2010-09-21 at 13:49 +0200, ext G, Manjunath 
-> Kondaiah wrote:
-> > > > The failure exit paths seems to be wrong in probe function.
-> > > > This patch corrects exit failure paths for error handling cases.
-> > > 
-> 
-> And also adds memory leak...
-> 
-> 
-> > > https://patchwork.kernel.org/patch/160551/
-> > > Any comments on this?
-> > 
-> > Looks fine. Sorry, I didn't look at the change. This 
-> version seems to 
-> > be better.
-> > 
-> 
-> I do not understand why we need to separate memory 
-> allocations. It looks
-> like the minimal patch should be like one below.
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ drivers/dma/ipu/ipu_idmac.c |    2 +-
+ drivers/video/mx3fb.c       |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Thanks. I am ok with this minimal patch.
-
--Manjunath
-
-> 
-> Thanks.
-> 
-> -- 
-> Dmitry
-> 
-> 
-> Input: twl4030_keypad - fix error handling path
-> 
-> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> We should not try to call free_irq() when request_irq() failed.
-> 
-> Reported-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
-> ---
-> 
->  drivers/input/keyboard/twl4030_keypad.c |    7 +++----
->  1 files changed, 3 insertions(+), 4 deletions(-)
-> 
-> 
-> diff --git a/drivers/input/keyboard/twl4030_keypad.c 
-> b/drivers/input/keyboard/twl4030_keypad.c
-> index fb16b5e..09bef79 100644
-> --- a/drivers/input/keyboard/twl4030_keypad.c
-> +++ b/drivers/input/keyboard/twl4030_keypad.c
-> @@ -406,23 +406,22 @@ static int __devinit 
-> twl4030_kp_probe(struct platform_device *pdev)
->  	if (error) {
->  		dev_info(kp->dbg_dev, "request_irq failed for 
-> irq no=%d\n",
->  			kp->irq);
-> -		goto err3;
-> +		goto err2;
->  	}
->  
->  	/* Enable KP and TO interrupts now. */
->  	reg = (u8) ~(KEYP_IMR1_KP | KEYP_IMR1_TO);
->  	if (twl4030_kpwrite_u8(kp, reg, KEYP_IMR1)) {
->  		error = -EIO;
-> -		goto err4;
-> +		goto err3;
->  	}
->  
->  	platform_set_drvdata(pdev, kp);
->  	return 0;
->  
-> -err4:
-> +err3:
->  	/* mask all events - we don't care about the result */
->  	(void) twl4030_kpwrite_u8(kp, 0xff, KEYP_IMR1);
-> -err3:
->  	free_irq(kp->irq, NULL);
->  err2:
->  	input_unregister_device(input);
-> 
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index cb26ee9..e065703 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -321,7 +321,7 @@ static void ipu_ch_param_set_size(union chan_param_mem *params,
+ 		params->ip.wid2	= 4;		/* Blue bit width - 1 */
+ 		break;
+ 	case IPU_PIX_FMT_BGR24:
+-		params->ip.bpp	= 1;		/* 24 BPP & RGB PFS */
++		params->ip.bpp	= 1;		/* 24 BPP & BGR PFS */
+ 		params->ip.pfs	= 4;
+ 		params->ip.npb	= 7;
+ 		params->ip.sat	= 2;		/* SAT = 32-bit access */
+diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+index 7cfc170..658f10a 100644
+--- a/drivers/video/mx3fb.c
++++ b/drivers/video/mx3fb.c
+@@ -660,12 +660,12 @@ static uint32_t bpp_to_pixfmt(int bpp)
+ {
+ 	uint32_t pixfmt = 0;
+ 	switch (bpp) {
+-	case 24:
+-		pixfmt = IPU_PIX_FMT_BGR24;
+-		break;
+ 	case 32:
+ 		pixfmt = IPU_PIX_FMT_BGR32;
+ 		break;
++	case 24:
++		pixfmt = IPU_PIX_FMT_BGR24;
++		break;
+ 	case 16:
+ 		pixfmt = IPU_PIX_FMT_RGB565;
+ 		break;
+-- 
+1.7.2.3
