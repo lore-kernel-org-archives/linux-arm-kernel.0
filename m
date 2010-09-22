@@ -1,36 +1,66 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 22 Sep 2010 18:09:04 +0200
-Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <20100922145442.GA3753@debian-wegner1.datadisplay.de>
-References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
-	<20100922104846.GQ32018@game.jcrosoft.org>
-	<87lj6uavde.fsf@macbook.be.48ers.dk>
-	<20100922143406.GT32018@game.jcrosoft.org>
-	<20100922145442.GA3753@debian-wegner1.datadisplay.de>
-Message-ID: <20100922160904.GU32018@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 22 Sep 2010 17:11:05 +0100
+Subject: [PATCH v2 1/3] mfd: regulator: max8998: set_voltage_buck
+	routine added
+In-Reply-To: <1285169410-22343-2-git-send-email-l.majewski@samsung.com>
+References: <1285169410-22343-1-git-send-email-l.majewski@samsung.com>
+	<1285169410-22343-2-git-send-email-l.majewski@samsung.com>
+Message-ID: <20100922161104.GL26395@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:54 Wed 22 Sep     , Wolfgang Wegner wrote:
-> Hi,
-> 
-> On Wed, Sep 22, 2010 at 04:34:06PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 13:08 Wed 22 Sep     , Peter Korsgaard wrote:
-> [...]
-> > > Now, I agree that it would be nice to add an interface to tweak this
-> > > delay if needed (extra argument to at91_add_device_i2c()?), but that's
-> > > next to the discussion about what the default should be.
-> > I'd prefer to calculate it
-> > 
-> > so we specify which max freq we want in my mind it will be good to be as in
-> > spi to specific per device it's max speed so we can adapt the bus freq
-> 
-> sorry in case I got you wrong, but please keep in mind that in
-> contrast to SPI the addressing in I2C is done via the serial data,
-> so the bus speed has to be _permanently_ adapted to match the
-> slowest device present.
-yeah that's the idea but each i2c device specify it's speed then we put the
-bus speed at the lowest
+On Wed, Sep 22, 2010 at 05:30:08PM +0200, Lukasz Majewski wrote:
+> Separate routine for setting BUCK regulators voltage.
 
-Best Regards,
-J.
+This is doing more than that...
+
+> +	unsigned int		buck1_idx; /* voltage index (0 to 3) */
+> +	unsigned int		buck2_idx; /* voltage index (0 to 1) */
+
+...it's also changing things over to use this new GPIO based selection
+scheme.  This is rather missing the point of my suggestion to split the
+code reorganisation out from the new functionality - the goal is to just
+have the code motion and then separately add the new functionality.
+
+See also my comments about ensuring each patch in the series is
+buildable.
+
+> +		for (j = 0; j < ARRAY_SIZE(pdata->buck1_vol); j++) {
+> +			if (pdata->buck1_vol[j] == i) {
+> +				max8998->buck1_idx = j;
+> +				buck1_gpio_set(pdata->buck1_set1,
+> +					       pdata->buck1_set2, j);
+> +				break;
+> +			}
+> +			if (j == (ARRAY_SIZE(pdata->buck1_vol) - 1)) {
+> +				/* no predefine regulator found */
+> +				max8998->buck1_idx = j;
+> +				ret = max8998_get_voltage_register(rdev, &reg,
+> +								   &shift,
+> +								   &mask);
+> +				ret = max8998_write_reg(i2c, reg, i);
+> +				buck1_gpio_set(pdata->buck1_set1,
+> +					       pdata->buck1_set2, j);
+> +			}
+
+So this essentially reserves one of the voltage selections for register
+written values and requires the others to be specified as platform data
+or from the hardware?  It'd be nicer to do this using something like
+rotating through the slots or (better yet) LRU so that the driver just
+figures out which voltages are being used by the consumer rather than
+the platform data having to know exactly which voltages will be set by
+the consumers in advance.
+
+> +		if (pdata->buck2_vol[0] == i) {
+> +			max8998->buck1_idx = 0;
+> +			buck2_gpio_set(pdata->buck2_set3, 0);
+> +		} else {
+> +			max8998->buck1_idx = 1;
+> +			ret = max8998_get_voltage_register(rdev, &reg,
+> +							   &shift, &mask);
+> +			ret = max8998_write_reg(i2c, reg, i);
+> +			buck2_gpio_set(pdata->buck2_set3, 1);
+> +		}
+
+Ditto here.  The WM831x driver is an example of being smarter about
+this.
