@@ -1,49 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Sep 2010 16:42:02 +0100
-Subject: [PATCH] ARM: kprobes-decode: add support for MOVW instruction
-Message-ID: <1285170122-19823-1-git-send-email-will.deacon@arm.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Wed, 22 Sep 2010 11:56:34 -0400
+Subject: mpcore_wdt A9 questions
+In-Reply-To: <99c9a321-49a1-42da-b49f-5cdd5c03e17a@SG2EHSMHS008.ehs.local>
+References: <1274090044-10236-1-git-send-email-viresh.kumar@st.com>
+	<AANLkTil2PtnsKdAHvW5-1WMQyTj6v3uLtrn2CNaZSXkc@mail.gmail.com>
+	<4BF12767.4010402@st.com>
+	<AANLkTikCC108eWniEBwzYsbkEUYQocICaLtd7FD_vMQ1@mail.gmail.com>
+	<20100518132050.GA8748@mvista.com> <4BF362F1.5070100@st.com>
+	<AANLkTinQ34da0F0Xp_Rqh0F8fbh0lbSmD2Q68RLNDlIC@mail.gmail.com>
+	<99c9a321-49a1-42da-b49f-5cdd5c03e17a@SG2EHSMHS008.ehs.local>
+Message-ID: <20100922155634.GQ3555@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MOVW instruction moves a 16-bit immediate into the bottom halfword
-of the destination register.
+Hello John,
 
-This patch ensures that kprobes leaves the 16-bit immediate intact, rather
-than assume a 12-bit immediate and mask out the upper 4 bits.
+On Wed, Sep 22, 2010 at 09:36:52AM -0600, John Linn wrote:
+> Hi,
+> 
+> The A9 has a watchdog timer per CPU, but I don't see a way to use more
+> than one watchdog timer (one for each CPU) using the mpcore_wdt driver.
+> 
+> I tried to do my research but maybe I missed something. Is this a
+> limitation of watchdog timers in Linux or just this driver?
 
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/kprobes-decode.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
-index 8bccbfa..2c1f005 100644
---- a/arch/arm/kernel/kprobes-decode.c
-+++ b/arch/arm/kernel/kprobes-decode.c
-@@ -1162,11 +1162,12 @@ space_cccc_001x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- {
- 	/*
- 	 * MSR   : cccc 0011 0x10 xxxx xxxx xxxx xxxx xxxx
--	 * Undef : cccc 0011 0x00 xxxx xxxx xxxx xxxx xxxx
-+	 * Undef : cccc 0011 0100 xxxx xxxx xxxx xxxx xxxx
- 	 * ALU op with S bit and Rd == 15 :
- 	 *	   cccc 001x xxx1 xxxx 1111 xxxx xxxx xxxx
- 	 */
--	if ((insn & 0x0f900000) == 0x03200000 ||	/* MSR & Undef */
-+	if ((insn & 0x0fb00000) == 0x03200000 ||	/* MSR */
-+	    (insn & 0x0ff00000) == 0x03400000 ||	/* Undef */
- 	    (insn & 0x0e10f000) == 0x0210f000)		/* ALU s-bit, R15  */
- 		return INSN_REJECTED;
- 
-@@ -1177,7 +1178,7 @@ space_cccc_001x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	 * *S (bit 20) updates condition codes
- 	 * ADC/SBC/RSC reads the C flag
- 	 */
--	insn &= 0xfff00fff;	/* Rn = r0, Rd = r0 */
-+	insn &= 0xffff0fff;	/* Rd = r0 */
- 	asi->insn[0] = insn;
- 	asi->insn_handler = (insn & (1 << 20)) ?  /* S-bit */
- 			emulate_alu_imm_rwflags : emulate_alu_imm_rflags;
--- 
-1.7.0.4
+It's not strictly a limitation in the watchdog subsystem, I suspect
+it just not something that anyone has needed thus far.  Anyway,
+here's something I was working on for upstream which adds support
+for all MPCore watchdog timers.  N.B. This is based on v2.6.34 give or
+take, not sure if it applies to current.  It still has issues with
+per-cpu interrupts but interrupts aren't currently used, so...
