@@ -1,108 +1,174 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Thu, 23 Sep 2010 15:49:32 -0500 (CDT)
-Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
-In-Reply-To: <1285273684.2587.92.camel@localhost.localdomain>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-	<alpine.DEB.2.00.1009231238170.2962@router.home>
-	<1285268380.2587.11.camel@localhost.localdomain>
-	<alpine.DEB.2.00.1009231402420.2962@router.home>
-	<1285273684.2587.92.camel@localhost.localdomain>
-Message-ID: <alpine.DEB.2.00.1009231533040.7522@router.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Sep 2010 17:04:00 -0400 (EDT)
+Subject: [PATCH] ARM: do not define VMALLOC_END relative to PAGE_OFFSET
+Message-ID: <alpine.LFD.2.00.1009231703010.13233@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Sep 2010, john stultz wrote:
 
-> > The HPET or pit timesource are also quite slow these days. You only need
-> > access periodically to essentially tune the TSC ratio.
->
-> If we're using the TSC, then we're not using the PTP clock as you
-> suggest. Further the HPET and PIT aren't used to steer the system time
-> when we are using the TSC as a clocksource. Its only used to calibrate
-> the initial constant freq used by the timekeeping code (and if its
-> non-constant, we throw it out).
+VMALLOC_END is supposed to be an absolute value, while PAGE_OFFSET may
+vary depending on the selected user:kernel memory split mode through
+CONFIG_VMSPLIT_*.  In fact, the goal of moving PAGE_OFFSET down is to
+accommodate more directly addressed RAM by the kernel below the vmalloc
+area, and having VMALLOC_END move along PAGE_OFFSET is rather against
+the very reason why PAGE_OFFSET can be moved in the first place.
 
-There is no other scalable time source available for fast timer access
-than the time stamp counter in the cpu. Other time source require
-memory accesses which is inherently slower.
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-An accurate other time source is used to adjust this clock. NTP does that
-via the clock interfaces from user space which has its problems with
-accuracy. PTP can provide the network synced time access
-that would a more accurate calibration of the time.
-
-> 2) The way PTP clocks are steered to sync with network time causes their
-> hardware freq to actually change. Since these adjustments are done on
-> the hardware clock level, and not on the system time level, the
-> adjustments to sync the system time/freq would then be made incorrect by
-> PTP hardware adjustments.
-
-Right. So use these as a way to fine tune the TSC clock (and thereby the
-system time).
-
-> 3) Further, the PTP hardware counter can be simply set to a new offset
-> to put it in line with the network time. This could cause trouble with
-> timekeeping much like unsynced TSCs do.
-
-You can do the same for system time.
-
-> Now, what you seem to be suggesting is to use the TSC (or whatever
-> clocksource the system time is using) but to steer the system time using
-> the PTP clock. This is actually what is being proposed, however, the
-> steering is done in userland. This is due to the fact that there are two
-> components to the steering, 1) adjusting the PTP clock hardware to
-> network time and 2) adjusting the system time to the PTP hardware. By
-> exposing the PTP clock to userland via the posix clocks interface, we
-> allow this to easily be done.
-
-Userland code would introduce latencies that would make sub microsecond
-time sync very difficult.
-
-> > We can switch underlying clocks for system time already. We can adapt to a
-> > different hw frequency.
->
-> Actually no. The timekeeping code requires a fixed freq counter. Dealing
-> with hardware freq changes is difficult, because error is introduced by
-> the latency between when the freq changes and when the timekeeping code
-> is notified of it. So the system treats the hardware counters as fixed
-> freq. Now, hardware does vary freq ever so slightly as thermal
-> conditions change, but this is addressed in userland and corrected via
-> adjtimex.
-
-Acadmic hair splitting? I have repeatedly switched between different
-clocks on various systems. So its difficult but we do it?
-
-> Unnecessary layers? Where? This approach has less in-kernel layers, as
-> it exposes the PTP clock to userland, instead of trying to layer things
-> on top of it and stretching the system time abstraction to cover it.
-
-You dont need the user APIs if you directly use the PTP time source to
-steer the system clock. In fact I think you have to do it in kernel space
-since user space latencies will degrade accuracy otherwise.
-
-> I've argued through the approach trying to keep it all internal to the
-> kernel, but to do so would be anything but trivial. Further, there's the
-> case of master-clocks, where the PTP hardware must be synced to system
-> time, instead of the other way around. And then there's the case of
-> boundary-clocks, which may have multiple PTP hardware clocks that have
-> to be synced.
-
-Ok maybe we need some sort of control interface to manage the clock like
-the others have.
-
-> I think exposing this through the posix clock interface is really the
-> best approach. Its not a static clockid, so its not something most apps
-> will ever have to deal with, but it allows the few apps that really need
-> to have access to the PTP clock hardware can do so in a clean way.
-
-It implies clock tuning in userspace for a potential sub microsecond
-accurate clock. The clock accuracy will be limited by user space
-latencies and noise. You wont be able to discipline the system clock
-accurately.
-
-The posix clocks today assumes one notion of real "time" in the kernel.
-All clocks increase in lockstep (aside from offset updates). This approach
-here result in multiple notions of "time" increasing at various speeds.
-And it implies that someone is user space is trying to tinker around with
-extremely low latencies using system call APIs that take much longer than
-these intervals to process the data.
+diff --git a/arch/arm/mach-aaec2000/include/mach/vmalloc.h b/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+index 551f68f..cff4e0a 100644
+--- a/arch/arm/mach-aaec2000/include/mach/vmalloc.h
++++ b/arch/arm/mach-aaec2000/include/mach/vmalloc.h
+@@ -11,6 +11,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END		(PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END		0xd0000000
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-bcmring/include/mach/vmalloc.h b/arch/arm/mach-bcmring/include/mach/vmalloc.h
+index 35e2ead..3db3a09 100644
+--- a/arch/arm/mach-bcmring/include/mach/vmalloc.h
++++ b/arch/arm/mach-bcmring/include/mach/vmalloc.h
+@@ -22,4 +22,4 @@
+  * 0xe0000000 to 0xefffffff. This gives us 256 MB of vm space and handles
+  * larger physical memory designs better.
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x30000000)
++#define VMALLOC_END       0xf0000000
+diff --git a/arch/arm/mach-clps711x/include/mach/vmalloc.h b/arch/arm/mach-clps711x/include/mach/vmalloc.h
+index ea6cc7b..30b3a287 100644
+--- a/arch/arm/mach-clps711x/include/mach/vmalloc.h
++++ b/arch/arm/mach-clps711x/include/mach/vmalloc.h
+@@ -17,4 +17,4 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END       0xd0000000
+diff --git a/arch/arm/mach-ebsa110/include/mach/vmalloc.h b/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+index 9b44c19..60bde56 100644
+--- a/arch/arm/mach-ebsa110/include/mach/vmalloc.h
++++ b/arch/arm/mach-ebsa110/include/mach/vmalloc.h
+@@ -7,4 +7,4 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x1f000000)
++#define VMALLOC_END       0xdf000000
+diff --git a/arch/arm/mach-footbridge/include/mach/vmalloc.h b/arch/arm/mach-footbridge/include/mach/vmalloc.h
+index d0958d8..0ffbb7c 100644
+--- a/arch/arm/mach-footbridge/include/mach/vmalloc.h
++++ b/arch/arm/mach-footbridge/include/mach/vmalloc.h
+@@ -7,4 +7,4 @@
+  */
+ 
+ 
+-#define VMALLOC_END       (PAGE_OFFSET + 0x30000000)
++#define VMALLOC_END       0xf0000000
+diff --git a/arch/arm/mach-h720x/include/mach/vmalloc.h b/arch/arm/mach-h720x/include/mach/vmalloc.h
+index ff1460d..a45915b 100644
+--- a/arch/arm/mach-h720x/include/mach/vmalloc.h
++++ b/arch/arm/mach-h720x/include/mach/vmalloc.h
+@@ -5,6 +5,6 @@
+ #ifndef __ARCH_ARM_VMALLOC_H
+ #define __ARCH_ARM_VMALLOC_H
+ 
+-#define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END       0xd0000000
+ 
+ #endif
+diff --git a/arch/arm/mach-integrator/include/mach/vmalloc.h b/arch/arm/mach-integrator/include/mach/vmalloc.h
+index e87ab0b..e056e7c 100644
+--- a/arch/arm/mach-integrator/include/mach/vmalloc.h
++++ b/arch/arm/mach-integrator/include/mach/vmalloc.h
+@@ -17,4 +17,4 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END       0xd0000000
+diff --git a/arch/arm/mach-msm/include/mach/vmalloc.h b/arch/arm/mach-msm/include/mach/vmalloc.h
+index 05f81fd..31a32ad 100644
+--- a/arch/arm/mach-msm/include/mach/vmalloc.h
++++ b/arch/arm/mach-msm/include/mach/vmalloc.h
+@@ -16,7 +16,7 @@
+ #ifndef __ASM_ARCH_MSM_VMALLOC_H
+ #define __ASM_ARCH_MSM_VMALLOC_H
+ 
+-#define VMALLOC_END	  (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END	  0xd0000000
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-netx/include/mach/vmalloc.h b/arch/arm/mach-netx/include/mach/vmalloc.h
+index 25d5cc6..7cca357 100644
+--- a/arch/arm/mach-netx/include/mach/vmalloc.h
++++ b/arch/arm/mach-netx/include/mach/vmalloc.h
+@@ -16,4 +16,4 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END       0xd0000000
+diff --git a/arch/arm/mach-omap1/include/mach/vmalloc.h b/arch/arm/mach-omap1/include/mach/vmalloc.h
+index 1b2af14..b001f67 100644
+--- a/arch/arm/mach-omap1/include/mach/vmalloc.h
++++ b/arch/arm/mach-omap1/include/mach/vmalloc.h
+@@ -17,4 +17,4 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  */
+-#define VMALLOC_END	(PAGE_OFFSET + 0x18000000)
++#define VMALLOC_END	0xd8000000
+diff --git a/arch/arm/mach-omap2/include/mach/vmalloc.h b/arch/arm/mach-omap2/include/mach/vmalloc.h
+index 9ce9b6e..4da31e9 100644
+--- a/arch/arm/mach-omap2/include/mach/vmalloc.h
++++ b/arch/arm/mach-omap2/include/mach/vmalloc.h
+@@ -17,4 +17,4 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  */
+-#define VMALLOC_END	  (PAGE_OFFSET + 0x38000000)
++#define VMALLOC_END	  0xf8000000
+diff --git a/arch/arm/mach-pnx4008/include/mach/vmalloc.h b/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+index 2ad3983..31b65ee 100644
+--- a/arch/arm/mach-pnx4008/include/mach/vmalloc.h
++++ b/arch/arm/mach-pnx4008/include/mach/vmalloc.h
+@@ -17,4 +17,4 @@
+  * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+  * area for the same reason. ;)
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END       0xd0000000
+diff --git a/arch/arm/mach-rpc/include/mach/vmalloc.h b/arch/arm/mach-rpc/include/mach/vmalloc.h
+index 9a96fd6..3bcd86f 100644
+--- a/arch/arm/mach-rpc/include/mach/vmalloc.h
++++ b/arch/arm/mach-rpc/include/mach/vmalloc.h
+@@ -7,4 +7,4 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x1c000000)
++#define VMALLOC_END       0xdc000000
+diff --git a/arch/arm/mach-shark/include/mach/vmalloc.h b/arch/arm/mach-shark/include/mach/vmalloc.h
+index f6c6837..8e845b6 100644
+--- a/arch/arm/mach-shark/include/mach/vmalloc.h
++++ b/arch/arm/mach-shark/include/mach/vmalloc.h
+@@ -1,4 +1,4 @@
+ /*
+  * arch/arm/mach-shark/include/mach/vmalloc.h
+  */
+-#define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
++#define VMALLOC_END       0xd0000000
+diff --git a/arch/arm/mach-versatile/include/mach/vmalloc.h b/arch/arm/mach-versatile/include/mach/vmalloc.h
+index 427e361..ebd8a25 100644
+--- a/arch/arm/mach-versatile/include/mach/vmalloc.h
++++ b/arch/arm/mach-versatile/include/mach/vmalloc.h
+@@ -18,4 +18,4 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#define VMALLOC_END		(PAGE_OFFSET + 0x18000000)
++#define VMALLOC_END		0xd8000000
