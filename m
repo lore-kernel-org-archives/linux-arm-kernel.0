@@ -1,57 +1,47 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 23 Sep 2010 16:45:20 +0530
-Subject: [PATCH 10/13 v2] OMAP3: serial: Fix uart4 handling for 3630
-In-Reply-To: <87d3s5a5k7.fsf@deeprootsystems.com>
-References: <37596.172.24.137.131.1285168469.squirrel@dbdmail.itg.ti.com>
-	<87d3s5a5k7.fsf@deeprootsystems.com>
-Message-ID: <AANLkTikYO5=3PE9YbkFteJ63hsR4n1zE80voNz23P+6X@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 23 Sep 2010 13:16:04 +0200
+Subject: [PATCH] at91sam9g45: fix i2c bus speed
+In-Reply-To: <877hicafx5.fsf@macbook.be.48ers.dk>
+References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
+	<4C9B0D4D.4050102@atmel.com> <87k4mcak6b.fsf@macbook.be.48ers.dk>
+	<20100923093104.GA22397@n2100.arm.linux.org.uk>
+	<87fwx0ahgl.fsf@macbook.be.48ers.dk>
+	<20100923103645.GA23295@n2100.arm.linux.org.uk>
+	<877hicafx5.fsf@macbook.be.48ers.dk>
+Message-ID: <20100923111604.GZ32018@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 1:56 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> This patch makes the following:
->> ?- Adds missing wakeup padding register handling.
->> ?- Fixes a hardcode to use PER module ONLY on UART3.
->>
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->> Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->> ---
->> ?arch/arm/mach-omap2/serial.c | ? ?8 ++++++--
->> ?1 files changed, 6 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->> index 72b5c98..c1404af 100644
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -57,7 +57,7 @@
->> ? * disabled via sysfs. This also causes that any deeper omap sleep states are
->> ? * blocked.
->> ? */
->> -#define DEFAULT_TIMEOUT 0
->> +#define DEFAULT_TIMEOUT 5
->
-> Oops
->
-> Please leave this at zero.
+On 12:54 Thu 23 Sep     , Peter Korsgaard wrote:
+> >>>>> "Russell" == Russell King <- ARM Linux <linux@arm.linux.org.uk>> writes:
+> 
+> Hi,
+> 
+>  Russell> Jean is right - if you want to care this much about getting the I2C
+>  Russell> transfer rate as close to 100kHz or 400kHz (without exceeding it),
+>  Russell> you need to pass the required speed and run some sort of calibration
+>  Russell> in the driver to calculate the correct delay.
+> 
+> I don't care about all those things. I just want to fix the obvious bug
+> that happened while copying this code from the older (slower) SoCs
+> without taking into consideration the faster gpio handling - E.G.
+> 
+> -       .udelay                 = 2,            /* ~100 kHz */
+> +       .udelay                 = 5,            /* ~100 kHz */
+> 
+> So the comment matches and devices that don't handle >100KHz works on
+> the new SoCs as well.
+> 
+> And yes, if you run the SoC at nonstandard (slower) speed this might be
+> slower than 100Khz, but that's still safe, so not a big deal.
+except you can also overclock the SoC in some case so it's still not safe
 
-Yes my mistake.
-Will correct this.
+and force this speed for all boards :(
 
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+so specify the speed in the board is the right way to fix the current issue
 
+as you may find some stupid i2c chip that does not work at 100kHz (some low
+cost MCU as example)
 
-
--- 
----
-Regards,
-Govindraj.R
+Best Regards,
+J.
