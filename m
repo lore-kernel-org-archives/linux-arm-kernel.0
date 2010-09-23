@@ -1,34 +1,99 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 23 Sep 2010 15:53:05 -0600
-Subject: [PATCH] ARM: abstract atags parsing
-In-Reply-To: <20100923213113.GC26295@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1009231713570.13233@xanadu.home>
-	<20100923213113.GC26295@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikwT-w_6Y+yzZ014g6tijUTUzZUAa7g=eE8F+nt@mail.gmail.com>
+From: johnstul@us.ibm.com (john stultz)
+Date: Thu, 23 Sep 2010 15:03:40 -0700
+Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <20100923223025.2877cce2@lxorguk.ukuu.org.uk>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<20100923213654.0c64b047@lxorguk.ukuu.org.uk>
+	<1285274952.2587.113.camel@localhost.localdomain>
+	<20100923223025.2877cce2@lxorguk.ukuu.org.uk>
+Message-ID: <1285279420.2587.175.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 3:31 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Sep 23, 2010 at 05:18:02PM -0400, Nicolas Pitre wrote:
->> This code movement will make it cleaner and easier to introduce support
->> for device tree which is basically an alternative to atags. No functional
->> changes are introduced by this patch.
->
-> I don't see any point to this churn.
+On Thu, 2010-09-23 at 22:30 +0100, Alan Cox wrote:
+> O> I don't see how this is a problem, as it exposes the multiple hardware
+> > clocks via different posix clock ids. So in the boundary clock case, you
+> > can configure which side is the client and which side is the master in a
+> > config file and the PTPd will appropriately steer them individually.
+> 
+> They may all be slaves - that means you can't treat them as part of
+> system time.
 
-I can carry it in test-devicetree branch until you become okay with it.
-
-> DT has yet to be shown to be useful on anything but the ARM evaluation
-> boards, and that's one of the pre-conditions to it becoming acceptable
-> (which has been pending for a few years now.)
-
-I started working on ARM DT support in November/December 2009.  Not
-even a year yet.
-
-g.
+Sure, and that's something one would configure. So I'm not sure I see
+how exposing the different hardware bits via a clock_id is problematic.
+They're just clocks that are being exposed. The steering of system time
+to PTP or PTP to system time  (or just PTP to other PTP clocks).
 
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+> > on module unload, but I don't think we need a use-count to prevent the
+> > module from being unloaded.
+> > 
+> > My question would be: How do we handle a USB network device ($14.99 now
+> > with PTP!) being unplugged? We can't say "Sorry! That's in use!". So we
+> > note the hardware is gone, and return the proper error code.
+> > 
+> > Or am I missing something else?
+> 
+> Open list
+> Oh number 31 appears to be the device I want
+> Close list
+> 
+> 	USB unplugged
+> 	Random other device plugged
+> 
+> clock_op(31, ....)
+> 
+> Oh bugger I've just reprogrammed the wrong time source.
+
+Ok. So its just the issue of clock_id reuse. I was confusing it with
+some sort of module use counting issue.  And yea, I can see how it might
+be  easier to re-use the file descriptor then re-implementing the reuse
+logic in the posix-clock registration.
+
+
+> We don't have stop the device being removed, instead of a disaster you get
+> 
+> 	clock_op(fd, blah)
+> 	-ENODEV
+> 
+> which btw is how just about everything else USB works when you pull the
+> hardware.
+
+Right, which was what I was thinking as well, but assuming we didn't
+re-use clockids quickly.
+ 
+> > So, I don't really see how that's so different from what is being
+> > proposed. The clock_id is dynamically assigned per registered clock, and
+> > exposed via the sysfs interface from ptp hardware entry.
+> > 
+> > The only difference is the open/close reference counting, which I don't
+> > think is necessary here (since we can't always keep the hardware from
+> > going away).
+> 
+> It is absolutely neccessary in order that you can be sure that two calls
+> actually relate to the *same* device. It's as fundamental as the
+> difference betweeh chmod and fchmod although with the added ugliness of
+> some random numeric identifier stuck in the middle.
+> 
+> It also btw makes it much easier to fix up the existing random collection
+> of /dev/rtc devices - because you can open them and issue fclock_adjtime
+> if we are careful how we do it and it makes sense.
+
+Wait, you're suggesting we add new fclock_* calls that duplicate the
+posix interface? That doesn't sound great to me.
+
+What did you think of Kyle Moffett's suggestion of utilizing the fd to
+map to the clock_id which could then be used by the posix clocks
+interface?
+
+Although I'm still not sure if it wouldn't be so hard to just simply
+increment the id on each registration and index to a clock through a
+reasonably small hash table. I suspect that would solve the
+enumeration/reuse issue without much trouble (but again, I'm open to
+being corrected if I'm missing something larger).
+
+But yes, in summary, this is an issue to be addressed one way or
+another.
+
+thanks
+-john
