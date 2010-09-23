@@ -1,86 +1,212 @@
-From: pieterg@gmx.com (pieterg)
-Date: Thu, 23 Sep 2010 17:29:47 +0200
-Subject: pxa3xx_nand issues
-In-Reply-To: <201009231332.26566.pieterg@gmx.com>
-References: <201009221912.24905.pieterg@gmx.com>
-	<AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
-	<201009231332.26566.pieterg@gmx.com>
-Message-ID: <201009231729.48147.pieterg@gmx.com>
+From: ian@opensource.wolfsonmicro.com (Ian Lartey)
+Date: Thu, 23 Sep 2010 16:32:01 +0100
+Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31 ADS board
+Message-ID: <1285255921.1864.24.camel@Tapajos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 September 2010 13:32:26 pieterg wrote:
-> On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
-> > On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
-> > > In my search for the cause of the huge number of single/double bit
-> > > errors I'm experiencing on colibri pxa320/310 devices, I've come
-> > > across this commit
-> > > 
-http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
-> > > According to the commitlog, it attempts to work around an issue
-> > > regarding non-page-aligned reads.
-> > > The workaround seems to force page-aligned access, by dropping the
-> > > offset within the page (column address bytes).
-> > > However, in my setup (with a jffs2 filesystem on nand),
-> > > non-page-aligned reads never occur, but non-page-aligned writes occur
-> > > very frequently. (during the jffs2 gc).
-> > > These are also affected by this commit, while the commitlog does not
-> > > state whether or not the same issue would occur for the program
-> > > command, and in that case, whether or not the same workaround would
-> > > apply.
-> > >
-> > > I've tried to revert the commit, but unfortunately this doesn't
-> > > reduce the huge number of single/double bit errors (and jffs2 crc
-> > > errors as a result) I'm getting.
-> > >
-> > > But having these non-aligned writes during GC, would that indicate a
-> > > problem with my jffs2 image parameters perhaps?
-> > > (though I cannot imagine this could actually cause double bit errors)
-> >
-> > It might not be related to the commit above.  The NAND controller will
-> > always read the whole page and ignoring the column address, that patch
-> > tries to make less confusion. The offset is actually handled completely
-> > by software (memorized).
->
-> I can see how the read offset works, but I do not quite see how this
-> would work for writes (which call the same prepare_read_prog_cmd, and
-> have their column address stripped as well).
-> Found out that this happens when writing oob data by the way; these are
-> writes with offset 2048 within the page. Jffs2 does this when writing
-> cleanmarkers.
+>From 581b35e4bf37a0467dfb419d67217808eb238fd5 Mon Sep 17 00:00:00 2001
+From: Ian Lartey <ian@opensource.wolfsonmicro.com>
+Date: Thu, 23 Sep 2010 11:36:08 +0100
+Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31 ADS board
 
-Tested this, and found out that this commit is actually quite essential for 
-writes as well.
-Without it, the OOB data doesn't get written.
-So we can close this part of the topic, commit 7f9938d0 is perfectly fine.
+Revert "ARM: mx3/mx31ads: fold board header in its only user"
 
-> I could identify about 10 eraseblocks with pages which produce
-> single/double bit errors.
-> After I marked them bad (manually), I've seen no more bit errors, and the
-> jffs2 rootfs has remained perfectly healthy.
+This reverts commit ccfa7c269843001077df02d98918c6c9bde91395.
+As the board header is also used cs89x0 ethernet driver by the i.MX31 ADS.
 
-Turned out to be a short-term solution.
-After a while I got more double-bit errors, and ended up bad-marking a dozen 
-or so other eraseblocks, and it does not seem to stop.
+Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
+---
+ Resend due to error in To: list.
 
-Strangest thing is that when I write a new jffs2 image with uboot (nand 
-erase, nand write) or with the kernel (flash_eraseall, nandwrite), it never 
-contains any biterrors when I mount it.
-Only after the filesystem has been mounted, gets modified, and then after 
-the first reboot, the biterrors are there.
+ arch/arm/mach-mx3/mach-mx31ads.c               |   43 ++-------
+ arch/arm/plat-mxc/include/mach/board-mx31ads.h |  117 ++++++++++++++++++++++++
+ 2 files changed, 124 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
 
-One other issue which I noticed because besides double bit errors I get many 
-single bit errors as well; the ERR_SBERR is never cleared.
-ERR_DBERR is cleared to ERR_NONE in two locations, but ERR_SBERR is not.
-(probably in order to allow pxa3xx_nand_ecc_correct to pick it up)
-However, I've seen that the retcode could still be ERR_SBERR in 
-pxa3xx_nand_waitfunc, causing an erase error to be assumed, as a result all 
-eraseblocks in the partition ended up being marked bad in a loop, till 
-there were no more remaining eraseblocks.
-I guess ERR_SBERR should probably be ignored in pxa3xx_nand_waitfunc?
-
-That's what I did in the remainder of my tests (after having unmarked the 
-blocks that were wrongly marked bad) so I think this issue did not 
-contribute to my biterror problems.
-
-Rgds, Pieter
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index 94b3e7c..7d13e99 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -29,6 +29,7 @@
+ #include <asm/memory.h>
+ #include <asm/mach/map.h>
+ #include <mach/common.h>
++#include <mach/board-mx31ads.h>
+ #include <mach/iomux-mx3.h>
+ 
+ #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+@@ -40,42 +41,12 @@
+ #include "devices-imx31.h"
+ #include "devices.h"
+ 
+-/* Base address of PBC controller */
+-#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
+-/* Offsets for the PBC Controller register */
+-
+-/* PBC Board interrupt status register */
+-#define PBC_INTSTATUS           0x000016
+-
+-/* PBC Board interrupt current status register */
+-#define PBC_INTCURR_STATUS      0x000018
+-
+-/* PBC Interrupt mask register set address */
+-#define PBC_INTMASK_SET         0x00001A
+-
+-/* PBC Interrupt mask register clear address */
+-#define PBC_INTMASK_CLEAR       0x00001C
+-
+-/* External UART A */
+-#define PBC_SC16C652_UARTA      0x010000
+-
+-/* External UART B */
+-#define PBC_SC16C652_UARTB      0x010010
+-
+-#define PBC_INTSTATUS_REG	(PBC_INTSTATUS + PBC_BASE_ADDRESS)
+-#define PBC_INTMASK_SET_REG	(PBC_INTMASK_SET + PBC_BASE_ADDRESS)
+-#define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
+-#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
+-
+-#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+-#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
+-
+-#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
+-#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
+-
+-#define MXC_MAX_EXP_IO_LINES	16
+-/*
+- * This file contains the board-specific initialization routines.
++/*!
++ * @file mx31ads.c
++ *
++ * @brief This file contains the board-specific initialization routines.
++ *
++ * @ingroup System
+  */
+ 
+ #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+new file mode 100644
+index 0000000..095a199
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+@@ -0,0 +1,117 @@
++/*
++ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++
++#include <mach/hardware.h>
++
++/* Base address of PBC controller */
++#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
++/* Offsets for the PBC Controller register */
++
++/* PBC Board status register offset */
++#define PBC_BSTAT               0x000002
++
++/* PBC Board control register 1 set address */
++#define PBC_BCTRL1_SET          0x000004
++
++/* PBC Board control register 1 clear address */
++#define PBC_BCTRL1_CLEAR        0x000006
++
++/* PBC Board control register 2 set address */
++#define PBC_BCTRL2_SET          0x000008
++
++/* PBC Board control register 2 clear address */
++#define PBC_BCTRL2_CLEAR        0x00000A
++
++/* PBC Board control register 3 set address */
++#define PBC_BCTRL3_SET          0x00000C
++
++/* PBC Board control register 3 clear address */
++#define PBC_BCTRL3_CLEAR        0x00000E
++
++/* PBC Board control register 4 set address */
++#define PBC_BCTRL4_SET          0x000010
++
++/* PBC Board control register 4 clear address */
++#define PBC_BCTRL4_CLEAR        0x000012
++
++/* PBC Board status register 1 */
++#define PBC_BSTAT1              0x000014
++
++/* PBC Board interrupt status register */
++#define PBC_INTSTATUS           0x000016
++
++/* PBC Board interrupt current status register */
++#define PBC_INTCURR_STATUS      0x000018
++
++/* PBC Interrupt mask register set address */
++#define PBC_INTMASK_SET         0x00001A
++
++/* PBC Interrupt mask register clear address */
++#define PBC_INTMASK_CLEAR       0x00001C
++
++/* External UART A */
++#define PBC_SC16C652_UARTA      0x010000
++
++/* External UART B */
++#define PBC_SC16C652_UARTB      0x010010
++
++/* Ethernet Controller IO base address */
++#define PBC_CS8900A_IOBASE      0x020000
++
++/* Ethernet Controller Memory base address */
++#define PBC_CS8900A_MEMBASE     0x021000
++
++/* Ethernet Controller DMA base address */
++#define PBC_CS8900A_DMABASE     0x022000
++
++/* External chip select 0 */
++#define PBC_XCS0                0x040000
++
++/* LCD Display enable */
++#define PBC_LCD_EN_B            0x060000
++
++/* Code test debug enable */
++#define PBC_CODE_B              0x070000
++
++/* PSRAM memory select */
++#define PBC_PSRAM_B             0x5000000
++
++#define PBC_INTSTATUS_REG	(PBC_INTSTATUS + PBC_BASE_ADDRESS)
++#define PBC_INTCURR_STATUS_REG	(PBC_INTCURR_STATUS + PBC_BASE_ADDRESS)
++#define PBC_INTMASK_SET_REG	(PBC_INTMASK_SET + PBC_BASE_ADDRESS)
++#define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
++#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
++
++#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
++#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
++
++#define EXPIO_INT_LOW_BAT	(MXC_EXP_IO_BASE + 0)
++#define EXPIO_INT_PB_IRQ	(MXC_EXP_IO_BASE + 1)
++#define EXPIO_INT_OTG_FS_OVR	(MXC_EXP_IO_BASE + 2)
++#define EXPIO_INT_FSH_OVR	(MXC_EXP_IO_BASE + 3)
++#define EXPIO_INT_RES4		(MXC_EXP_IO_BASE + 4)
++#define EXPIO_INT_RES5		(MXC_EXP_IO_BASE + 5)
++#define EXPIO_INT_RES6		(MXC_EXP_IO_BASE + 6)
++#define EXPIO_INT_RES7		(MXC_EXP_IO_BASE + 7)
++#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
++#define EXPIO_INT_OTG_FS_INT	(MXC_EXP_IO_BASE + 9)
++#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
++#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
++#define EXPIO_INT_SYNTH_IRQ	(MXC_EXP_IO_BASE + 12)
++#define EXPIO_INT_CE_INT1	(MXC_EXP_IO_BASE + 13)
++#define EXPIO_INT_CE_INT2	(MXC_EXP_IO_BASE + 14)
++#define EXPIO_INT_RES15		(MXC_EXP_IO_BASE + 15)
++
++#define MXC_MAX_EXP_IO_LINES	16
++
++#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
+-- 
+1.7.0.4
