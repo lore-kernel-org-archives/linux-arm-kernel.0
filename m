@@ -1,55 +1,116 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Sep 2010 15:58:52 -0700
-Subject: [GIT PULL] omap2 sparse fixes
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
-Message-ID: <20100923225851.GR4211@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 23 Sep 2010 17:25:26 -0600 (MDT)
+Subject: [PATCH 03/10] OMAP3: PM: move device-specific special cases from
+	PM core into CPUidle
+In-Reply-To: <878w2vkp65.fsf@deeprootsystems.com>
+References: <1284594946-28963-1-git-send-email-khilman@deeprootsystems.com>
+	<1284594946-28963-4-git-send-email-khilman@deeprootsystems.com>
+	<alpine.DEB.2.00.1009210147180.17727@utopia.booyaka.com>
+	<878w2vkp65.fsf@deeprootsystems.com>
+Message-ID: <alpine.DEB.2.00.1009231709000.10678@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [100922 01:48]:
-> Hi Tony,
->  
-> Please pull omap2 sparse fixes from:
->  
->   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
->  
-> Regards,
-> Manjunath
->  
->  
-> The following changes since commit 8b15575cae7a93a784c3005c42b069edd9ba64dd:
->   Sage Weil (1):
->         fs: {lock,unlock}_flocks() stubs to prepare for BKL removal
->  
-> are available in the git repository at:
->  
->   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
->  
-> G, Manjunath Kondaiah (10):
->       OMAP: mach-omap2: Fix incorrect assignment warnings
->       OMAP: mach-omap2: Fix static declaration warnings
->       OMAP: mach-omap2: Fix static function warnings
->       OMAP: mach-omap2: Fix miscellaneous sparse warnings
->       OMAP: plat-omap: Fix static function warnings
->       OMAP: NAND: Fix static declaration warning
->       TWL CORE: Fix sparse warning
->       TWL IRQ: Fix fucntion declaration warnings
->       OMAP2/3: Convert write/read functions to raw read/write
->       OMAP3: Keypad: Fix incorrect type initializer
+Hi Kevin
 
-Manjunath, this looks safe to pull, however one request though:
-Can you please rebase it on v2.6.35 or v2.6.36-rc5?
+On Tue, 21 Sep 2010, Kevin Hilman wrote:
 
-Now your branch is on some commit after the -rc5 tag.
-It's better to base branches at the most recent stable tag
-(v2.6.35) or a recent -rc tag (v2.6.36-rc5).
+> Paul Walmsley <paul@pwsan.com> writes:
+> 
+> > On Wed, 15 Sep 2010, Kevin Hilman wrote:
+> >
+> >> In an effort to simplify the core idle path, move any device-specific
+> >> special case handling from the core PM idle path into the CPUidle
+> >> pre-idle checking path.
+> >
+> > As with the original patch, I don't quite understand the improvement 
+> > here.  In particular, this part:
+> >
+> >> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+> >> index 3d3d035..0923b82 100644
+> >> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+> >> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> >> @@ -233,14 +234,54 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+> >>  			       struct cpuidle_state *state)
+> >>  {
+> >>  	struct cpuidle_state *new_state = next_valid_state(dev, state);
+> >> +	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
+> >> +	u32 cam_state;
+> >> +	struct omap3_processor_cx *cx;
+> >> +	int ret;
+> >>  
+> >>  	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap3_idle_bm_check()) {
+> >>  		BUG_ON(!dev->safe_state);
+> >>  		new_state = dev->safe_state;
+> >> +		goto select_state;
+> >> +	}
+> >> +
+> >> +	cx = cpuidle_get_statedata(state);
+> >> +	core_next_state = cx->core_state;
+> >> +
+> >> +	/*
+> >> +	 * Prevent idle completely if CAM is active.
+> >> +	 * CAM does not have wakeup capability in OMAP3.
+> >> +	 */
+> >> +	cam_state = pwrdm_read_pwrst(cam_pd);
+> >> +	if (cam_state == PWRDM_POWER_ON) {
+> >> +		new_state = dev->safe_state;
+> >> +		goto select_state;
+> >>  	}
+> >>  
+> >> +	/*
+> >> +	 * Prevent PER off if CORE is not in retention or off as this
+> >> +	 * would disable PER wakeups completely.
+> >> +	 */
+> >> +	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
+> >> +	if ((per_next_state == PWRDM_POWER_OFF) &&
+> >> +	    (core_next_state > PWRDM_POWER_RET)) {
+> >> +		per_next_state = PWRDM_POWER_RET;
+> >> +		pwrdm_set_next_pwrst(per_pd, per_next_state);
+> >> +	}
+> >> +
+> >> +	/* Are we changing PER target state? */
+> >> +	if (per_next_state != per_saved_state)
+> >> +		pwrdm_set_next_pwrst(per_pd, per_next_state);
+> >
+> > In this case, the PER / CORE constraints don't have anything to do with 
+> > the MPU or CPUIdle, so they don't seem to belong in the CPUIdle code.  The 
+> > extra comments are certainly nice -- they make it more clear as to what is 
+> > going on here -- but maybe those can just be added to pm34xx.c ?
+> 
+> CPUidle currently manages MPU and CORE powerdomains, so the CORE
+> constraints seem to make perfect sense here (at least to me.)
 
-Otherwise we end up moving our linux-omap tree forward too unless
-I use git pull --rebase option.. I've updated the elinux.org wiki
-instructions for that too, sorry if the earlier instructions there
-were a bit unclear.
+I do mean CORE also -- basically, anything that is not the CPU.  IMHO 
+CPUIdle shouldn't manage CORE directly since it's not part of the CPU.  
+Also since OMAPs have other processors (e.g., DSP, DMA, etc) that can use 
+the CORE independently of the CPU's power state, it doesn't make sense for 
+that code to live inside CPUIdle -- probably it should live in some type 
+of SystemIdle, CORE powerdomain idle or L3 idle.  Again IMHO, the C states 
+should only represent the MPU's idle state.
 
-Thanks,
+> The question is probably more about the PER constraints.
+> 
+> The basic goal of this is to streamline the core idle (omap_sram_idle())
+> to be the minimum streamline idle, and to move all the constraint
+> checking and activity checking to higher layers (like CPUidle.)
+> Specifically, I'm working towards moving the device-specific idle
+> constraints out of the core idle path (omap_sram_idle()) and move them
+> into higher layers where we're checking for activity etc.
+> 
+> This is just a baby step towards moving the device-idle out of CPUidle
+> completely to a place where it can be managed by the driver themeselves
+> using runtime PM or by using constraints instead of these hard-coded
+> hacks.
 
-Tony
+I agree completely with the goal; it's the implementation that I don't 
+like ;-)  But if you agree with the basic idea, that CORE / PER / 
+whatever-idle should ultimately go elsewhere, since I don't have time to 
+come up with a constructive alternative at the moment, would you be 
+willing to just drop a FIXME comment in that code, near the CAM and the 
+PER / CORE stuff, that mentions that that code should ultimately be 
+segmented out into its own idle code?
+
+thanks
+
+- Paul
