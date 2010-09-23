@@ -1,27 +1,27 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 23 Sep 2010 12:21:14 +0200
+Date: Thu, 23 Sep 2010 12:24:42 +0200
 Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <20100923093104.GA22397@n2100.arm.linux.org.uk> (Russell King's
-	message of "Thu, 23 Sep 2010 10:31:04 +0100")
+In-Reply-To: <20100923100928.GX32018@game.jcrosoft.org> (Jean-Christophe
+	PLAGNIOL-VILLARD's message of "Thu, 23 Sep 2010 12:09:28 +0200")
 References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
 	<4C9B0D4D.4050102@atmel.com> <87k4mcak6b.fsf@macbook.be.48ers.dk>
 	<20100923093104.GA22397@n2100.arm.linux.org.uk>
-Message-ID: <87fwx0ahgl.fsf@macbook.be.48ers.dk>
+	<20100923100928.GX32018@game.jcrosoft.org>
+Message-ID: <87bp7oahat.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Russell" == Russell King <- ARM Linux <linux@arm.linux.org.uk>> writes:
+>>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
 
 Hi,
 
- Russell> udelay(5) should always give something approximating a 5us
- Russell> delay, as we calibrate this delay loop against the system
- Russell> timer.  What I could believe is probably going on here is that
- Russell> writing to the hardware is adding additional delays - but
- Russell> that's nothing to do with the CPU speed itself.
+ Jean-Christophe> and we can not fix it easly so I do think it will be
+ Jean-Christophe> better to pass the speed of the bus that we want from
+ Jean-Christophe> the board and then calcualte it depending on the SOC
 
-Well, the gpio handling (sw) overhead is to a certain degree related to
-the CPU speed.
+Configurable i2c bus speed for boards wanting something else than the
+standard 100KHz could certainly be a nice thing, but that's something
+that can be added later when/if needed.
 
 -- 
 Bye, Peter Korsgaard
