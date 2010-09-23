@@ -1,55 +1,120 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 24 Sep 2010 00:45:32 +0100
-Subject: Regarding hw irq to Linux irq mapping on ARM
-In-Reply-To: <AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>
-References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>	<1285133481.30449.170.camel@pasglop>
-	<AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>
-Message-ID: <4C9BE69C.9070609@fluff.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 23 Sep 2010 16:47:31 -0700
+Subject: [PATCH 03/10] OMAP3: PM: move device-specific special cases from
+	PM core into CPUidle
+In-Reply-To: <alpine.DEB.2.00.1009231709000.10678@utopia.booyaka.com> (Paul
+	Walmsley's message of "Thu, 23 Sep 2010 17:25:26 -0600 (MDT)")
+References: <1284594946-28963-1-git-send-email-khilman@deeprootsystems.com>
+	<1284594946-28963-4-git-send-email-khilman@deeprootsystems.com>
+	<alpine.DEB.2.00.1009210147180.17727@utopia.booyaka.com>
+	<878w2vkp65.fsf@deeprootsystems.com>
+	<alpine.DEB.2.00.1009231709000.10678@utopia.booyaka.com>
+Message-ID: <87eickowdo.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/10 09:59, Eric Miao wrote:
-> On Wed, Sep 22, 2010 at 1:31 PM, Benjamin Herrenschmidt
-> <benh@kernel.crashing.org> wrote:
->> On Wed, 2010-09-22 at 00:08 -0300, Grant Likely wrote:
->>>> Add all the I2C, SPI based irq extenders to that list. They seem to
->>>> pop up all over the place in rapid speed even in x86. We are happy
->>>> citizens of the embedded horror^Wuniverse now.
->>>
->>> *shudder*
->>>
->>> What's the irq handling latency on those?  Glad I haven't had to deal
->>> with any of them yet.
+Paul Walmsley <paul@pwsan.com> writes:
 
-Some new i2c busses can be in the MHz region, so not so slouchy.
+> Hi Kevin
+>
+> On Tue, 21 Sep 2010, Kevin Hilman wrote:
+>
+>> Paul Walmsley <paul@pwsan.com> writes:
+>> 
+>> > On Wed, 15 Sep 2010, Kevin Hilman wrote:
+>> >
+>> >> In an effort to simplify the core idle path, move any device-specific
+>> >> special case handling from the core PM idle path into the CPUidle
+>> >> pre-idle checking path.
+>> >
+>> > As with the original patch, I don't quite understand the improvement 
+>> > here.  In particular, this part:
+>> >
+>> >> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+>> >> index 3d3d035..0923b82 100644
+>> >> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> >> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>> >> @@ -233,14 +234,54 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>> >>  			       struct cpuidle_state *state)
+>> >>  {
+>> >>  	struct cpuidle_state *new_state = next_valid_state(dev, state);
+>> >> +	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
+>> >> +	u32 cam_state;
+>> >> +	struct omap3_processor_cx *cx;
+>> >> +	int ret;
+>> >>  
+>> >>  	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap3_idle_bm_check()) {
+>> >>  		BUG_ON(!dev->safe_state);
+>> >>  		new_state = dev->safe_state;
+>> >> +		goto select_state;
+>> >> +	}
+>> >> +
+>> >> +	cx = cpuidle_get_statedata(state);
+>> >> +	core_next_state = cx->core_state;
+>> >> +
+>> >> +	/*
+>> >> +	 * Prevent idle completely if CAM is active.
+>> >> +	 * CAM does not have wakeup capability in OMAP3.
+>> >> +	 */
+>> >> +	cam_state = pwrdm_read_pwrst(cam_pd);
+>> >> +	if (cam_state == PWRDM_POWER_ON) {
+>> >> +		new_state = dev->safe_state;
+>> >> +		goto select_state;
+>> >>  	}
+>> >>  
+>> >> +	/*
+>> >> +	 * Prevent PER off if CORE is not in retention or off as this
+>> >> +	 * would disable PER wakeups completely.
+>> >> +	 */
+>> >> +	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
+>> >> +	if ((per_next_state == PWRDM_POWER_OFF) &&
+>> >> +	    (core_next_state > PWRDM_POWER_RET)) {
+>> >> +		per_next_state = PWRDM_POWER_RET;
+>> >> +		pwrdm_set_next_pwrst(per_pd, per_next_state);
+>> >> +	}
+>> >> +
+>> >> +	/* Are we changing PER target state? */
+>> >> +	if (per_next_state != per_saved_state)
+>> >> +		pwrdm_set_next_pwrst(per_pd, per_next_state);
+>> >
+>> > In this case, the PER / CORE constraints don't have anything to do with 
+>> > the MPU or CPUIdle, so they don't seem to belong in the CPUIdle code.  The 
+>> > extra comments are certainly nice -- they make it more clear as to what is 
+>> > going on here -- but maybe those can just be added to pm34xx.c ?
+>> 
+>> CPUidle currently manages MPU and CORE powerdomains, so the CORE
+>> constraints seem to make perfect sense here (at least to me.)
+>
+> I do mean CORE also -- basically, anything that is not the CPU.  IMHO 
+> CPUIdle shouldn't manage CORE directly since it's not part of the CPU.  
+> Also since OMAPs have other processors (e.g., DSP, DMA, etc) that can use 
+> the CORE independently of the CPU's power state, it doesn't make sense for 
+> that code to live inside CPUIdle -- probably it should live in some type 
+> of SystemIdle, CORE powerdomain idle or L3 idle.  Again IMHO, the C states 
+> should only represent the MPU's idle state.
+>
+>> The question is probably more about the PER constraints.
+>> 
+>> The basic goal of this is to streamline the core idle (omap_sram_idle())
+>> to be the minimum streamline idle, and to move all the constraint
+>> checking and activity checking to higher layers (like CPUidle.)
+>> Specifically, I'm working towards moving the device-specific idle
+>> constraints out of the core idle path (omap_sram_idle()) and move them
+>> into higher layers where we're checking for activity etc.
+>> 
+>> This is just a baby step towards moving the device-idle out of CPUidle
+>> completely to a place where it can be managed by the driver themeselves
+>> using runtime PM or by using constraints instead of these hard-coded
+>> hacks.
+>
+> I agree completely with the goal; it's the implementation that I don't 
+> like ;-)  But if you agree with the basic idea, that CORE / PER / 
+> whatever-idle should ultimately go elsewhere, since I don't have time to 
+> come up with a constructive alternative at the moment, would you be 
+> willing to just drop a FIXME comment in that code, near the CAM and the 
+> PER / CORE stuff, that mentions that that code should ultimately be 
+> segmented out into its own idle code?
 
->> And i2c in many cases want to be called from sleep'able context... might
->> be a good idea to restrict some of these to threaded interrupts. A whole
->> different discussion I suppose.
+Absolutely...  will do.
 
-The i2c case, it is generally the code decoding the interrupt that needs
-to do this, and is part of the i2c specific driver, and is written as
-some form of thread or work-queue.
-
-> 
-> My problem is that ARM has only one IRQ line, and normally connected to
-> a SoC specific IRQ controller, the mapping of the controller status bits
-> into the linux IRQ number is currently handled in an assembly macro for
-> performance consideration. This can be changed to using a function pointer
-> for when mutliple SoCs are compiled [1].
-> 
-> All the other IRQs are actually chained to these first level IRQ numbers,
-> so the other question is how these can be properly mapped. Currently, most
-> ARM platforms handle this in board level. Taking an example of I2C GPIO
-> expander pca953x.c, there is a 'irq_base' field in its platform data, this
-> value could be different from board to board, and the board setup code has
-> the responsibility to get it right. Other devices having a resource can be
-> passed the correct IRQ number in its resource array.
-
-Well, this is generally because it was (and maybe still is) to
-dynamically get an interrupt number. It would be really useful
-to update the IRQ system to allow dynamic interrupt addition.
-
-There are times when it would be useful to have a usb driver
-detect a plugin, allocate an interrupt and then register that
-with some other part of the system, as one exapmple.
+Kevin
