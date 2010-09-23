@@ -1,36 +1,106 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 23 Sep 2010 16:22:05 +0200
-Subject: [PATCH] sdhci-s3c: fix NULL ptr access in sdhci_s3c_remove
-Message-ID: <1285251725-6210-1-git-send-email-m.szyprowski@samsung.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 23 Sep 2010 20:02:37 +0530
+Subject: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
+Message-ID: <1285252363-3630-1-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If not all clocks has been defined in platform data, driver will cause
-a null pointer dereference when it is being removed. This patch fixes
-this issue.
+Series of patches to port watchdog module to use hwmod APIs
+for OMAP2PLUS chips and use runtime APIs for all OMAP chips.
+For this hwmod database for OMAP2PLUS watchdog instances are
+populated and implements watchdog module to use PM runtime APIs.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/mmc/host/sdhci-s3c.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+This patch series is generated on "origin/pm-core" which
+has Kevin's pm-next series, the runtime PM core patch series,
+and a collection of hwmod fixes that Paul/Benoit have lined up
+for 2.6.37.
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 71ad416..757d92c 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -481,8 +481,10 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
- 	sdhci_remove_host(host, 1);
- 
- 	for (ptr = 0; ptr < 3; ptr++) {
--		clk_disable(sc->clk_bus[ptr]);
--		clk_put(sc->clk_bus[ptr]);
-+		if (sc->clk_bus[ptr]) {
-+			clk_disable(sc->clk_bus[ptr]);
-+			clk_put(sc->clk_bus[ptr]);
-+		}
- 	}
- 	clk_disable(sc->clk_io);
- 	clk_put(sc->clk_io);
--- 
-1.7.1.569.g6f426
+Tested on OMAP2430, OMAP4430 (ES1.0 & ES2.0), OMAP3430 SDP boards
+and zoom3 board. Also verified that this patch series does not
+break the OMAP1 build.
+
+This series is tested on OMAP4430 ES2 using the below series
+(dependency series for ES2.0 silicon)
+http://www.spinics.net/lists/linux-omap/msg36023.html
+
+Version History:
+---------------
+Version v8:
+*Enable wd_timer3 in the hwmod list
+
+Version v7:
+*Use EN_*SHIFT macros for module_bit and ST_*SHIFT macros for
+idlest_idle_bit in OMAP2&3 hwmod database
+(based on suggestions given by Paul for I2C hwmod series)
+*Remove new definitions of EN_*SHIFT macros as they already exist
+Some of the v7 links:
+https://patchwork.kernel.org/patch/197022/
+
+Version v6:
+*Split omap_init_wdt() into separate omap_init_wdt functions
+under mach-omap1 and mach-omap2 and set them up with
+subsys_initcall
+*Include wd_timer3 database for OMAP4
+*In hwmod database follow naming convention "wd_timerX"
+Some of the v6 links:
+http://www.spinics.net/lists/linux-omap/msg36678.html
+https://patchwork.kernel.org/patch/188242/
+https://patchwork.kernel.org/patch/188222/
+
+Version v5:
+*Delete wdt_runtime_resume and wdt_runtime_suspend
+functions as the fix for the return values in the generic
+runtime PM calls has been queued for 2.6.37 (see below link)
+https://lists.linux-foundation.org/pipermail/linux-pm/2010-September/028466.html
+Some of the v5 links:
+https://patchwork.kernel.org/patch/181812/
+https://patchwork.kernel.org/patch/181782/
+https://patchwork.kernel.org/patch/181772/
+https://patchwork.kernel.org/patch/181792/
+
+Version v4:
+*Implement hwmod adapdation first and then PM runtime adaptation
+as two different patches in the series
+*Remove inclusion of omap_device.h in the driver file.
+Some of the v4 links:
+https://patchwork.kernel.org/patch/174672/
+https://patchwork.kernel.org/patch/174662/
+
+Version v3:
+*Fix Minor comments like renaming omap1 watchdog structures
+with an omap1_ prefix
+Some of the v3 links:
+https://patchwork.kernel.org/patch/119698/
+https://patchwork.kernel.org/patch/119696/ 
+
+Version v2:
+*Rebase to latest kernel
+Some of the v2 links:
+http://www.spinics.net/lists/linux-omap/msg34741.html
+http://www.spinics.net/lists/linux-omap/msg34673.html
+
+Version v1:
+*Initial series
+Some of the v1 links:
+http://www.spinics.net/lists/linux-omap/msg30628.html
+http://www.spinics.net/lists/linux-omap/msg30625.html
+
+Benoit Cousson (1):
+  OMAP4: hwmod data: Add watchdog timer
+
+Varadarajan, Charulatha (5):
+  OMAP3: hwmod data: Add watchdog timer
+  OMAP2420: hwmod data: Add watchdog timer
+  OMAP2430: hwmod data: Add watchdog timer
+  OMAP2PLUS: WDT: use omap_device_build for device registration
+  OMAP: WDT: Use PM runtime APIs instead of clk FW APIs
+
+ arch/arm/mach-omap1/devices.c              |   27 ++++++
+ arch/arm/mach-omap2/devices.c              |   39 ++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |   64 +++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   64 +++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   66 ++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  135 ++++++++++++++++++++++++++++
+ arch/arm/plat-omap/devices.c               |   41 ---------
+ drivers/watchdog/omap_wdt.c                |   42 ++-------
+ 8 files changed, 402 insertions(+), 76 deletions(-)
