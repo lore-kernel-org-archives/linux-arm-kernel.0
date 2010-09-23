@@ -1,153 +1,68 @@
-From: san.mlists@gmail.com (Santhosh N)
-Date: Thu, 23 Sep 2010 12:35:22 +0530
-Subject: PXA270 audio problem
-In-Reply-To: <AANLkTimOM7EnMgfDVqZ-Oq_cLOUwR-GeKEwDD9HsLqQa@mail.gmail.com>
-References: <AANLkTi=_AANevVpthOKuRfkkvU9mKMWsmpHc+XohoUwg@mail.gmail.com>
-	<AANLkTimOM7EnMgfDVqZ-Oq_cLOUwR-GeKEwDD9HsLqQa@mail.gmail.com>
-Message-ID: <AANLkTimRPZijUXcecbBSexuthttJ76-NYVbs0cc3iyZm@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 23 Sep 2010 01:23:12 -0600 (MDT)
+Subject: [GIT PULL] OMAP: hwmod fixes and improvements for 2.6.37
+Message-ID: <alpine.DEB.2.00.1009230121290.18576@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Following are the AC97 and DMA register dumps. I am printing out the
-DMA registers from the pxa2xx_pcm_trigger function.
+Hi Tony,
 
-I have noticed that, the touchscreen and audio record continues to
-work after the problem. In the problem state, the DMA interrupts occur
-for audio record but not for playback.
+The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
 
-AC97:
-BeforeProblem			AfterProblem
-0:00 = 02a0			0:00 = 02a0
-0:02 = 0d0d			0:02 = 0d0d
-0:04 = 0000			0:04 = 0000
-0:06 = 0000			0:06 = 0000
-0:08 = 0000			0:08 = 0000
-0:0a = 0000			0:0a = 0000
-0:0c = 0000			0:0c = 0000
-0:0e = 0000			0:0e = 0000
-0:10 = 0000			0:10 = 0000
-0:12 = 0000			0:12 = 0000
-0:14 = 0000			0:14 = 0000
-0:16 = 0000			0:16 = 0000
-0:18 = 0000			0:18 = 0000
-0:1a = 0000			0:1a = 0000
-0:1c = 0000			0:1c = 0000
-0:1e = 0000			0:1e = 0000
-0:20 = 0000			0:20 = 0000
-0:22 = 0000			0:22 = 0000
-0:24 = 0000			0:24 = 0000
-0:26 = 000b			0:26 = 000b
-0:28 = 0001			0:28 = 0001
-0:2a = 0001			0:2a = 0001
-0:2c = 5622			0:2c = 3e80
-0:2e = 0000			0:2e = 0000
-0:30 = 0000			0:30 = 0000
-0:32 = bb80			0:32 = bb80
-0:34 = 0000			0:34 = 0000
-0:36 = 0000			0:36 = 0000
-0:38 = 0000			0:38 = 0000
-0:3a = 0000			0:3a = 0000
-0:3c = 0000			0:3c = 0000
-0:3e = 0000			0:3e = 0000
-0:40 = 0000			0:40 = 0000
-0:42 = 0000			0:42 = 0000
-0:44 = 0000			0:44 = 0000
-0:46 = 0000			0:46 = 0000
-0:48 = 0000			0:48 = 0000
-0:4a = 0000			0:4a = 0000
-0:4c = 0000			0:4c = 0000
-0:4e = 0000			0:4e = 0000
-0:50 = 0000			0:50 = 0000
-0:52 = 0000			0:52 = 0000
-0:54 = 0000			0:54 = 0000
-0:56 = 0000			0:56 = 0000
-0:58 = 0000			0:58 = 0000
-0:5a = 0000			0:5a = 0000
-0:5c = 0000			0:5c = 0000
-0:5e = 0000			0:5e = 0000
-0:60 = 0000			0:60 = 0000
-0:62 = 0000			0:62 = 0000
-0:64 = 0948			0:64 = 0948
-0:66 = 0000			0:66 = 0000
-0:68 = 824b			0:68 = 824b
-0:6a = 0050			0:6a = 0050
-0:6c = 0030			0:6c = 0030
-0:6e = 2004			0:6e = 2004
-0:70 = 0000			0:70 = 0000
-0:72 = 0000			0:72 = 0000
-0:74 = 0000			0:74 = 0000
-0:76 = 0000			0:76 = 0000
-0:78 = 0000			0:78 = 0000
-0:7a = 0000			0:7a = 0000
-0:7c = 5053			0:7c = 5053
-0:7e = 4304			0:7e = 4304
+  Linux 2.6.36-rc5 (2010-09-20 16:56:53 -0700)
 
-Only diff in the above is in the 02C(Audio sample rate control) register.
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 hwmod_2.6.37
 
-DMA:
-BeforeProblem
-::: DMA Channel: 8, Trigger Start
-DDADR = 0xB714A010
-DSADR = 0xB7100040
-DTADR = 0x40500040
-DCMD  = 0x9023CFC0
-DCSR  = 0x80000000
-::: DMA Channel: 8, Trigger Stop
-DDADR = 0xB714A0E0
-DSADR = 0xB710D000
-DTADR = 0x40500040
-DCMD  = 0x9023D000
-DCSR  = 0x00000008
+Benoit Cousson (6):
+      OMAP: hwmod: Rename dma_ch to dma_req
+      OMAP: hwmod: Do not disable clocks if hwmod already in idle
+      OMAP4: prcm: Add temporarily helper functions for rmw and read inside the PRM
+      OMAP: hwmod: Force a softreset during _setup
+      OMAP: hwmod: Fix softreset status check for some new OMAP4 IPs
+      OMAP: hwmod: Fix softreset for modules with optional clocks
+
+Beno?t Cousson (2):
+      OMAP4: PRM: add module hard reset support
+      OMAP: hwmod: Add hardreset management support
+
+Kevin Hilman (1):
+      OMAP: hwmod: separate list locking and hwmod hardware locking
+
+Liam Girdwood (1):
+      OMAP: hwmod: Fix omap_hwmod_reset wrong state test
+
+Partha Basak (1):
+      OMAP: hwmod: Handle opt clocks node using clk_add_alias
+
+Paul Walmsley (3):
+      OMAP2/3: PRM: add module hard reset support
+      OMAP: hwmod: add an hardreset API for use by other core code
+      OMAP: hwmod: improve documentation, clean up function names
+
+Rajeev Kulkarni (1):
+      OMAP4: prcm: Fix global warm reset bit position
+
+Rajendra Nayak (1):
+      OMAP: hwmod: Enable module wakeup if in smartidle
+
+ arch/arm/mach-omap2/Makefile                 |    4 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |  562 +++++++++++++++++++++----
+ arch/arm/mach-omap2/prcm.c                   |   29 ++-
+ arch/arm/mach-omap2/prm.h                    |   18 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx.c           |  110 +++++
+ arch/arm/mach-omap2/prm44xx.c                |  116 ++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   55 ++-
+ arch/arm/plat-omap/include/plat/prcm.h       |    2 +
+ arch/arm/plat-omap/omap_device.c             |   43 ++-
+ 9 files changed, 829 insertions(+), 110 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/prm2xxx_3xxx.c
+ create mode 100644 arch/arm/mach-omap2/prm44xx.c
 
 
-AfterProblem
-::: DMA Channel: 8, Trigger Start
-DDADR = 0xB70B7010
-DSADR = 0xB7100000
-DTADR = 0x40500040
-DCMD  = 0x9023D000
-DCSR  = 0x80000000
-ALSA sound/core/pcm_native.c:1512: playback drain error (DMA or IRQ trouble?)
-::: DMA Channel: 8, Trigger Stop
-DDADR = 0xB70B7010
-DSADR = 0xB7100000
-DTADR = 0x40500040
-DCMD  = 0x9023D000
-DCSR  = 0x00000008
+There may be a few more minor hwmod patches coming, but these are the 
+important ones that some of the driver hwmod conversions depend on.
 
-Each dump above is after playing a mp3 file using madplay.
 
-Regards,
-Santhosh N
-
-On Thu, Sep 23, 2010 at 11:38 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, Sep 23, 2010 at 1:33 PM, Santhosh N <san.mlists@gmail.com> wrote:
->> Dear All,
->>
->> I am running linux 2.6.26 kernel on a PXA270 board. A UCB1400 chip
->> used for audio and touchscreen in that. I have been facing a problem
->> with audio.
->>
->> The audio plays properly, but suddenly stops. I get the following message:
->> ALSA sound/core/pcm_native.c:1513: playback drain error (DMA or IRQ trouble?)
->>
->> I have noticed that the DMA interrupts stop coming. Where as the AC97
->> interrupts come properly.
->>
->> Any help in solving this will be grateful.
->>
->
-> Dumping the DMA registers and the AC97 controller registers would
-> be helpful.
->
->> Regards,
->> Santhosh N
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+- Paul
