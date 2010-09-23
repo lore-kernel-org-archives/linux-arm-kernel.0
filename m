@@ -1,81 +1,61 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Thu, 23 Sep 2010 12:53:20 -0500 (CDT)
-Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
-In-Reply-To: <cover.1285261533.git.richard.cochran@omicron.at>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-Message-ID: <alpine.DEB.2.00.1009231238170.2962@router.home>
+From: mattjreimer@gmail.com (Matt Reimer)
+Date: Thu, 23 Sep 2010 11:03:17 -0700
+Subject: pxa3xx_nand issues
+In-Reply-To: <201009231729.48147.pieterg@gmx.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
+	<201009231332.26566.pieterg@gmx.com>
+	<201009231729.48147.pieterg@gmx.com>
+Message-ID: <AANLkTikXvuzVuNuZ_t0Sk6Br9FsfDp=HaJu0Q4WS1iLu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Sep 2010, Richard Cochran wrote:
-
->   Support for obtaining timestamps from a PHC already exists via the
->   SO_TIMESTAMPING socket option, integrated in kernel version 2.6.30.
->   This patch set completes the picture by allow user space programs to
->   adjust the PHC and to control its ancillary features.
-
-Is there a way to use the PHC as a system clock? I think the main benefit
-of PTP is to have syncronized time on multiple machines in a cluster. That
-may mean getting rid of ntp and using an in kernel PHC based way to sync time.
-
->    So as far as the POSIX standard is concerned, offering a clock id
->    to represent the PHC would be acceptable.
-
-Sure but what would you do with it? HPET timer support has no such need.
-
-> 3.2.1 Using the POSIX Clock API
-> --------------------------------
+On Thu, Sep 23, 2010 at 8:29 AM, pieterg <pieterg@gmx.com> wrote:
+> On Thursday 23 September 2010 13:32:26 pieterg wrote:
+>> On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
+>> > On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
+>> > > In my search for the cause of the huge number of single/double bit
+>> > > errors I'm experiencing on colibri pxa320/310 devices, I've come
+>> > > across this commit
+>> > >
+> http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
+>> > > According to the commitlog, it attempts to work around an issue
+>> > > regarding non-page-aligned reads.
+>> > > The workaround seems to force page-aligned access, by dropping the
+>> > > offset within the page (column address bytes).
+>> > > However, in my setup (with a jffs2 filesystem on nand),
+>> > > non-page-aligned reads never occur, but non-page-aligned writes occur
+>> > > very frequently. (during the jffs2 gc).
+>> > > These are also affected by this commit, while the commitlog does not
+>> > > state whether or not the same issue would occur for the program
+>> > > command, and in that case, whether or not the same workaround would
+>> > > apply.
+>> > >
+>> > > I've tried to revert the commit, but unfortunately this doesn't
+>> > > reduce the huge number of single/double bit errors (and jffs2 crc
+>> > > errors as a result) I'm getting.
+>> > >
+>> > > But having these non-aligned writes during GC, would that indicate a
+>> > > problem with my jffs2 image parameters perhaps?
+>> > > (though I cannot imagine this could actually cause double bit errors)
+>> >
+>> > It might not be related to the commit above. ?The NAND controller will
+>> > always read the whole page and ignoring the column address, that patch
+>> > tries to make less confusion. The offset is actually handled completely
+>> > by software (memorized).
+>>
+>> I can see how the read offset works, but I do not quite see how this
+>> would work for writes (which call the same prepare_read_prog_cmd, and
+>> have their column address stripped as well).
+>> Found out that this happens when writing oob data by the way; these are
+>> writes with offset 2048 within the page. Jffs2 does this when writing
+>> cleanmarkers.
 >
->     Looking at the mapping from PHC operation to the POSIX clock API,
->     we see that two of the basic clock operations, marked with *, have
->     no POSIX equivalent. The items marked NA are peculiar to PHCs and
->     will be discussed separately, below.
->
->       Clock Operation               POSIX function
->      -----------------------------+-----------------------------
->       Set time                      clock_gettime
->       Get time                      clock_settime
->       Shift the clock               *
->       Adjust clock frequency        *
->      -----------------------------+-----------------------------
->       Time stamp external events    NA
->       Enable PPS events             NA
->       Periodic output signals       NA
->       One shot or periodic alarms   timer_create, timer_settime
->
->     In contrast to the standard Linux system clock, a PHC is
->     adjustable in hardware, for example using frequency compensation
->     registers or a VCO. The ability to directly tune the PHC is
->     essential to reap the benefit of hardware timestamping.
+> Tested this, and found out that this commit is actually quite essential for
+> writes as well.
+> Without it, the OOB data doesn't get written.
+> So we can close this part of the topic, commit 7f9938d0 is perfectly fine.
 
-There is a reason for not being able to shift posix clocks: The system has
-one time base. The various clocks are contributing to maintaining that
-sytem wide time.
+IIRC I came up with this patch while trying to use JFFS2 on a pxa320.
 
-I do not understand why you want to maintain different clocks running at
-different speeds. Certainly interesting for some uses I guess that I
-do not have the energy to imagine right now. But can we get the PTP killer
-feature of synchronized accurate system time first?
-
-> 3.3 Synchronizing the Linux System Time
-> ========================================
->
->    One could offer a PHC as a combined clock source and clock event
->    device. The advantage of this approach would be that it obviates
->    the need for synchronization when the PHC is selected as the system
->    timer. However, some PHCs, namely the PHY based clocks, cannot be
->    used in this way.
-
-Why not? Do PHY based clock not at least provide a counter that increments
-in synchronized intervals throughout the network?
-
->    Instead, the patch set provides a way to offer a Pulse Per Second
->    (PPS) event from the PHC to the Linux PPS subsystem. A user space
->    application can read the PPS events and tune the system clock, just
->    like when using other external time sources like radio clocks or
->    GPS.
-
-User space is subject to various latencies created by the OS etc. I would
-that in order to have fine grained (read microsecond) accurary we would
-have to run the portions that are relevant to obtaining the desired
-accuracy in the kernel.
+Matt
