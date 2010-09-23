@@ -1,32 +1,71 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Fri, 24 Sep 2010 00:34:22 +0100
-Subject: [PATCH] ARM: abstract atags parsing
-In-Reply-To: <AANLkTikwT-w_6Y+yzZ014g6tijUTUzZUAa7g=eE8F+nt@mail.gmail.com>
-References: <alpine.LFD.2.00.1009231713570.13233@xanadu.home>	<20100923213113.GC26295@n2100.arm.linux.org.uk>
-	<AANLkTikwT-w_6Y+yzZ014g6tijUTUzZUAa7g=eE8F+nt@mail.gmail.com>
-Message-ID: <4C9BE3FE.1070704@fluff.org>
+Date: Fri, 24 Sep 2010 00:40:39 +0100
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <20100923190212.18863.25678.stgit@darius-desktop>
+References: <20100923190212.18863.25678.stgit@darius-desktop>
+Message-ID: <4C9BE577.4050504@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/10 22:53, Grant Likely wrote:
-> On Thu, Sep 23, 2010 at 3:31 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Sep 23, 2010 at 05:18:02PM -0400, Nicolas Pitre wrote:
->>> This code movement will make it cleaner and easier to introduce support
->>> for device tree which is basically an alternative to atags. No functional
->>> changes are introduced by this patch.
->>
->> I don't see any point to this churn.
-> 
-> I can carry it in test-devicetree branch until you become okay with it.
-> 
->> DT has yet to be shown to be useful on anything but the ARM evaluation
->> boards, and that's one of the pre-conditions to it becoming acceptable
->> (which has been pending for a few years now.)
-> 
-> I started working on ARM DT support in November/December 2009.  Not
-> even a year yet.
+On 23/09/10 20:15, Darius Augulis wrote:
+> Swap device and driver names in serial/samsung.c
 
-I don't believe you're the only one to be or have been working on it,
-but I've no direct references to other work and can't be bothered to
-go and find any.
+This is far too short, please see the notes below on trying
+to make this more informative.
+
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> ---
+> 
+> This patch was submitted about 3 months ago, but still not merged.
+> There was another similar patch from Joonyoung Shim
+> <jy0922.shim@samsung.com> and was discussed here:
+> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+> Joonyoung Shim acked my patch and other people on ARM mailing list
+> acked it. The maintainer, Ben Dooks, still not responding for
+> a long time. Another maintainer, Kukjin Kim, refused to merge
+> it without Ben's review.
+> I would like to ask somebody pick up this bugfix.
+
+I belive last time this was brought up I asked about the affect
+this has on the userspace. The following issues would be helpful
+or essential to have noted in the header about the effect of this.
+
+- Does it change the /dev name of the device? if so I would thinl
+  carefully about applying it, as it would be a change in the way
+  that userspace sees the kernel.
+
+- Does it change the kernel output itself? A note on what diffeences
+  can be seen in things like dmesg would be helpful.
+
+- Are there any other side effects
+
+- Why is this a bug? Maybe the previous points will explain what is
+  going on, but if not, then a reasonably concise description of
+  what is going on here.
+
+>  drivers/serial/samsung.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+> index b1156ba..25c0d0f 100644
+> --- a/drivers/serial/samsung.c
+> +++ b/drivers/serial/samsung.c
+> @@ -883,10 +883,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+>  
+>  static struct uart_driver s3c24xx_uart_drv = {
+>  	.owner		= THIS_MODULE,
+> -	.dev_name	= "s3c2410_serial",
+> +	.driver_name    = "s3c2410_serial",
+>  	.nr		= CONFIG_SERIAL_SAMSUNG_UARTS,
+>  	.cons		= S3C24XX_SERIAL_CONSOLE,
+> -	.driver_name	= S3C24XX_SERIAL_NAME,
+> +	.dev_name       = S3C24XX_SERIAL_NAME,
+>  	.major		= S3C24XX_SERIAL_MAJOR,
+>  	.minor		= S3C24XX_SERIAL_MINOR,
+>  };
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
