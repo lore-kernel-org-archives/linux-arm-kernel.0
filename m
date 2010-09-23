@@ -1,55 +1,55 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 23 Sep 2010 11:18:55 -0700
-Subject: [PATCH 3/3] OMAP: GPIO: ensure debounce clocks are disabled during
-	idle/suspend
-In-Reply-To: <1285265935-3477-1-git-send-email-khilman@deeprootsystems.com>
-References: <1285265935-3477-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285265935-3477-4-git-send-email-khilman@deeprootsystems.com>
+From: cl@linux.com (Christoph Lameter)
+Date: Thu, 23 Sep 2010 13:36:41 -0500 (CDT)
+Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <AANLkTim0JqVTyvrvjLRp1Cg423MdrwmyZG2uN6uSyeLb@mail.gmail.com>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<alpine.DEB.2.00.1009231238170.2962@router.home>
+	<AANLkTim0JqVTyvrvjLRp1Cg423MdrwmyZG2uN6uSyeLb@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1009231327000.2962@router.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a GPIO bank has more than one GPIO with debounce enabled, the
-debounce clock will not be fully disabled before going to
-idle/suspend.
+On Thu, 23 Sep 2010, Jacob Keller wrote:
 
-In the idle path, we just do a single clk_disable() of the bank's
-debounce clock.  If there are multiple debounce-enabled GPIOs in the
-bank, that clocks usage count will be > 1, so the clk_disable() will
-not actually disable the clock.
+> > There is a reason for not being able to shift posix clocks: The system has
+> > one time base. The various clocks are contributing to maintaining that
+> > sytem wide time.
+> >
+> > Adjusting clocks is absolutely essential for proper functioning of the PTP
+> protocol. The slave obtains and calculates the offset from master and uses
+> that in order to adjust the clock properly, The problem is that the
+> timestamps are done via the hardware. We need a method to expose that
+> hardware so that the ptp software can properly adjust those clocks.
 
-So the fix is to clk_disable() for every debounce-enabled GPIO in the
-bank (and an equivalent clk_enable() of course.)
+There is no way to use that clock directly to avoid all the user space
+tuning etc? There are already tuning mechanisms in the kernel that do this
+with system time based on periodic clocks. If you calculate the
+nanoseconds since the epoch then you should be able to use that to tune
+system time.
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/plat-omap/gpio.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+> > I do not understand why you want to maintain different clocks running at
+> > different speeds. Certainly interesting for some uses I guess that I
+> > do not have the energy to imagine right now. But can we get the PTP killer
+> > feature of synchronized accurate system time first?
+> >
+>
+> The problem is maintaining a hardware clock at the correct speed/frequency
+> and time. The timestamping is done via hardware, and that hardware clock
+> needs to be accurate. We need to be able to modify that clock. Yes, having
+> the system time be the same value would be nice, but the problem comes
+> because we don't want to jump through hoops to keep that hardware clock
+> accurate to the ptp protocol running on the network.
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 7951eef..11c5b0e 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -2085,8 +2085,9 @@ void omap2_gpio_prepare_for_idle(int power_state)
- 	for (i = min; i < gpio_bank_count; i++) {
- 		struct gpio_bank *bank = &gpio_bank[i];
- 		u32 l1, l2;
-+		int j;
- 
--		if (bank->dbck_enable_mask)
-+		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
- 			clk_disable(bank->dbck);
- 
- 		if (power_state > PWRDM_POWER_OFF)
-@@ -2152,8 +2153,9 @@ void omap2_gpio_resume_after_idle(void)
- 	for (i = min; i < gpio_bank_count; i++) {
- 		struct gpio_bank *bank = &gpio_bank[i];
- 		u32 l, gen, gen0, gen1;
-+		int j;
- 
--		if (bank->dbck_enable_mask)
-+		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
- 			clk_enable(bank->dbck);
- 
- 		if (!workaround_enabled)
--- 
-1.7.2.1
+Then allow system time == hardware clock?
+
+> All of the necessary features for microsecond or better accuracy are done
+> via the hardware. You can get accuracy to within <10 mircoseconds while only
+> sending sync packets and such once per second. The reason is because the
+> hardware timestamps are very accurate. But if we can't properly adjust the
+> clocks time and frequency, we cannot maintain the accuracy of the
+> timestamps.
+
+You can already adjust the system time with the existing APIs. Tuning
+hardware clocks is currently done using device specific controls. But I
+would think that you do not need to expose this to user space if you can
+do it all in kernel.
