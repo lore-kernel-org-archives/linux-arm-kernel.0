@@ -1,114 +1,205 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 23 Sep 2010 20:02:40 +0530
-Subject: [PATCH v8 3/6] OMAP2430: hwmod data: Add watchdog timer
-In-Reply-To: <1285252363-3630-1-git-send-email-charu@ti.com>
-References: <1285252363-3630-1-git-send-email-charu@ti.com>
-Message-ID: <1285252363-3630-4-git-send-email-charu@ti.com>
+From: ian@opensource.wolfsonmicro.com (Ian Lartey)
+Date: Thu, 23 Sep 2010 15:38:15 +0100
+Subject: [PATCH] Fixing ethernet driver compilation error for i.MX32 ADS board
+Message-ID: <1285252695.1864.10.camel@Tapajos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog timer hwmod data for OMAP2430 chip
+Revert "ARM: mx3/mx31ads: fold board header in its only user"
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Acked-by: Cousson, Benoit <b-cousson@ti.com>
+This reverts commit ccfa7c269843001077df02d98918c6c9bde91395.
+As the board header is also used cs89x0 ethernet driver by the i.MX32 ADS.
+
+Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |   64 ++++++++++++++++++++++++++++
- 1 files changed, 64 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/mach-mx31ads.c               |   43 ++-------
+ arch/arm/plat-mxc/include/mach/board-mx31ads.h |  117 ++++++++++++++++++++++++
+ 2 files changed, 124 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 4526628..7ec927a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -19,6 +19,7 @@
- #include "omap_hwmod_common_data.h"
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index 94b3e7c..7d13e99 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -29,6 +29,7 @@
+ #include <asm/memory.h>
+ #include <asm/mach/map.h>
+ #include <mach/common.h>
++#include <mach/board-mx31ads.h>
+ #include <mach/iomux-mx3.h>
  
- #include "prm-regbits-24xx.h"
-+#include "cm-regbits-24xx.h"
+ #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+@@ -40,42 +41,12 @@
+ #include "devices-imx31.h"
+ #include "devices.h"
  
- /*
-  * OMAP2430 hardware module integration data
-@@ -33,6 +34,7 @@ static struct omap_hwmod omap2430_mpu_hwmod;
- static struct omap_hwmod omap2430_iva_hwmod;
- static struct omap_hwmod omap2430_l3_main_hwmod;
- static struct omap_hwmod omap2430_l4_core_hwmod;
-+static struct omap_hwmod omap2430_wd_timer2_hwmod;
+-/* Base address of PBC controller */
+-#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
+-/* Offsets for the PBC Controller register */
+-
+-/* PBC Board interrupt status register */
+-#define PBC_INTSTATUS           0x000016
+-
+-/* PBC Board interrupt current status register */
+-#define PBC_INTCURR_STATUS      0x000018
+-
+-/* PBC Interrupt mask register set address */
+-#define PBC_INTMASK_SET         0x00001A
+-
+-/* PBC Interrupt mask register clear address */
+-#define PBC_INTMASK_CLEAR       0x00001C
+-
+-/* External UART A */
+-#define PBC_SC16C652_UARTA      0x010000
+-
+-/* External UART B */
+-#define PBC_SC16C652_UARTB      0x010010
+-
+-#define PBC_INTSTATUS_REG	(PBC_INTSTATUS + PBC_BASE_ADDRESS)
+-#define PBC_INTMASK_SET_REG	(PBC_INTMASK_SET + PBC_BASE_ADDRESS)
+-#define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
+-#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
+-
+-#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+-#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
+-
+-#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
+-#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
+-
+-#define MXC_MAX_EXP_IO_LINES	16
+-/*
+- * This file contains the board-specific initialization routines.
++/*!
++ * @file mx31ads.c
++ *
++ * @brief This file contains the board-specific initialization routines.
++ *
++ * @ingroup System
+  */
  
- /* L3 -> L4_CORE interface */
- static struct omap_hwmod_ocp_if omap2430_l3_main__l4_core = {
-@@ -165,12 +167,74 @@ static struct omap_hwmod omap2430_iva_hwmod = {
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
- };
- 
-+/* l4_wkup -> wd_timer2 */
-+static struct omap_hwmod_addr_space omap2430_wd_timer2_addrs[] = {
-+	{
-+		.pa_start	= 0x49016000,
-+		.pa_end		= 0x4901607f,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+static struct omap_hwmod_ocp_if omap2430_l4_wkup__wd_timer2 = {
-+	.master		= &omap2430_l4_wkup_hwmod,
-+	.slave		= &omap2430_wd_timer2_hwmod,
-+	.clk		= "mpu_wdt_ick",
-+	.addr		= omap2430_wd_timer2_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap2430_wd_timer2_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
+ #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+new file mode 100644
+index 0000000..095a199
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+@@ -0,0 +1,117 @@
 +/*
-+ * 'wd_timer' class
-+ * 32-bit watchdog upward counter that generates a pulse on the reset pin on
-+ * overflow condition
++ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
 + */
 +
-+static struct omap_hwmod_class_sysconfig omap2430_wd_timer_sysc = {
-+	.rev_offs	= 0x0,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_EMUFREE | SYSC_HAS_SOFTRESET |
-+			   SYSC_HAS_AUTOIDLE),
-+	.sysc_fields    = &omap_hwmod_sysc_type1,
-+};
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+static struct omap_hwmod_class omap2430_wd_timer_hwmod_class = {
-+	.name = "wd_timer",
-+	.sysc = &omap2430_wd_timer_sysc,
-+};
++#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
 +
-+/* wd_timer2 */
-+static struct omap_hwmod_ocp_if *omap2430_wd_timer2_slaves[] = {
-+	&omap2430_l4_wkup__wd_timer2,
-+};
++#include <mach/hardware.h>
 +
-+static struct omap_hwmod omap2430_wd_timer2_hwmod = {
-+	.name		= "wd_timer2",
-+	.class		= &omap2430_wd_timer_hwmod_class,
-+	.main_clk	= "mpu_wdt_fck",
-+	.prcm		= {
-+		.omap2 = {
-+			.prcm_reg_id = 1,
-+			.module_bit = OMAP24XX_EN_MPU_WDT_SHIFT,
-+			.module_offs = WKUP_MOD,
-+			.idlest_reg_id = 1,
-+			.idlest_idle_bit = OMAP24XX_ST_MPU_WDT_SHIFT,
-+		},
-+	},
-+	.slaves		= omap2430_wd_timer2_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap2430_wd_timer2_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430),
-+};
++/* Base address of PBC controller */
++#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
++/* Offsets for the PBC Controller register */
 +
- static __initdata struct omap_hwmod *omap2430_hwmods[] = {
- 	&omap2430_l3_main_hwmod,
- 	&omap2430_l4_core_hwmod,
- 	&omap2430_l4_wkup_hwmod,
- 	&omap2430_mpu_hwmod,
- 	&omap2430_iva_hwmod,
-+	&omap2430_wd_timer2_hwmod,
- 	NULL,
- };
- 
++/* PBC Board status register offset */
++#define PBC_BSTAT               0x000002
++
++/* PBC Board control register 1 set address */
++#define PBC_BCTRL1_SET          0x000004
++
++/* PBC Board control register 1 clear address */
++#define PBC_BCTRL1_CLEAR        0x000006
++
++/* PBC Board control register 2 set address */
++#define PBC_BCTRL2_SET          0x000008
++
++/* PBC Board control register 2 clear address */
++#define PBC_BCTRL2_CLEAR        0x00000A
++
++/* PBC Board control register 3 set address */
++#define PBC_BCTRL3_SET          0x00000C
++
++/* PBC Board control register 3 clear address */
++#define PBC_BCTRL3_CLEAR        0x00000E
++
++/* PBC Board control register 4 set address */
++#define PBC_BCTRL4_SET          0x000010
++
++/* PBC Board control register 4 clear address */
++#define PBC_BCTRL4_CLEAR        0x000012
++
++/* PBC Board status register 1 */
++#define PBC_BSTAT1              0x000014
++
++/* PBC Board interrupt status register */
++#define PBC_INTSTATUS           0x000016
++
++/* PBC Board interrupt current status register */
++#define PBC_INTCURR_STATUS      0x000018
++
++/* PBC Interrupt mask register set address */
++#define PBC_INTMASK_SET         0x00001A
++
++/* PBC Interrupt mask register clear address */
++#define PBC_INTMASK_CLEAR       0x00001C
++
++/* External UART A */
++#define PBC_SC16C652_UARTA      0x010000
++
++/* External UART B */
++#define PBC_SC16C652_UARTB      0x010010
++
++/* Ethernet Controller IO base address */
++#define PBC_CS8900A_IOBASE      0x020000
++
++/* Ethernet Controller Memory base address */
++#define PBC_CS8900A_MEMBASE     0x021000
++
++/* Ethernet Controller DMA base address */
++#define PBC_CS8900A_DMABASE     0x022000
++
++/* External chip select 0 */
++#define PBC_XCS0                0x040000
++
++/* LCD Display enable */
++#define PBC_LCD_EN_B            0x060000
++
++/* Code test debug enable */
++#define PBC_CODE_B              0x070000
++
++/* PSRAM memory select */
++#define PBC_PSRAM_B             0x5000000
++
++#define PBC_INTSTATUS_REG	(PBC_INTSTATUS + PBC_BASE_ADDRESS)
++#define PBC_INTCURR_STATUS_REG	(PBC_INTCURR_STATUS + PBC_BASE_ADDRESS)
++#define PBC_INTMASK_SET_REG	(PBC_INTMASK_SET + PBC_BASE_ADDRESS)
++#define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
++#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
++
++#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
++#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
++
++#define EXPIO_INT_LOW_BAT	(MXC_EXP_IO_BASE + 0)
++#define EXPIO_INT_PB_IRQ	(MXC_EXP_IO_BASE + 1)
++#define EXPIO_INT_OTG_FS_OVR	(MXC_EXP_IO_BASE + 2)
++#define EXPIO_INT_FSH_OVR	(MXC_EXP_IO_BASE + 3)
++#define EXPIO_INT_RES4		(MXC_EXP_IO_BASE + 4)
++#define EXPIO_INT_RES5		(MXC_EXP_IO_BASE + 5)
++#define EXPIO_INT_RES6		(MXC_EXP_IO_BASE + 6)
++#define EXPIO_INT_RES7		(MXC_EXP_IO_BASE + 7)
++#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
++#define EXPIO_INT_OTG_FS_INT	(MXC_EXP_IO_BASE + 9)
++#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
++#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
++#define EXPIO_INT_SYNTH_IRQ	(MXC_EXP_IO_BASE + 12)
++#define EXPIO_INT_CE_INT1	(MXC_EXP_IO_BASE + 13)
++#define EXPIO_INT_CE_INT2	(MXC_EXP_IO_BASE + 14)
++#define EXPIO_INT_RES15		(MXC_EXP_IO_BASE + 15)
++
++#define MXC_MAX_EXP_IO_LINES	16
++
++#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
 -- 
 1.7.0.4
