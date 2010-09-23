@@ -1,47 +1,153 @@
-From: mfm@muteddisk.com (matt mooney)
-Date: Wed, 22 Sep 2010 23:50:18 -0700
-Subject: [PATCH 04/20] arm: change to new flag variables
-Message-ID: <1285224618-29564-1-git-send-email-mfm@muteddisk.com>
+From: san.mlists@gmail.com (Santhosh N)
+Date: Thu, 23 Sep 2010 12:35:22 +0530
+Subject: PXA270 audio problem
+In-Reply-To: <AANLkTimOM7EnMgfDVqZ-Oq_cLOUwR-GeKEwDD9HsLqQa@mail.gmail.com>
+References: <AANLkTi=_AANevVpthOKuRfkkvU9mKMWsmpHc+XohoUwg@mail.gmail.com>
+	<AANLkTimOM7EnMgfDVqZ-Oq_cLOUwR-GeKEwDD9HsLqQa@mail.gmail.com>
+Message-ID: <AANLkTimRPZijUXcecbBSexuthttJ76-NYVbs0cc3iyZm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace EXTRA_CFLAGS with ccflags-y and EXTRA_AFLAGS with asflags-y.
+Hi,
 
-Signed-off-by: matt mooney <mfm@muteddisk.com>
----
- arch/arm/boot/compressed/Makefile |    4 ++--
- arch/arm/vfp/Makefile             |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Following are the AC97 and DMA register dumps. I am printing out the
+DMA registers from the pxa2xx_pcm_trigger function.
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index b23f6bc..9ba5726 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -76,8 +76,8 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
- KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
- 
--EXTRA_CFLAGS  := -fpic -fno-builtin
--EXTRA_AFLAGS  := -Wa,-march=all
-+ccflags-y := -fpic -fno-builtin
-+asflags-y := -Wa,-march=all
- 
- # Supply ZRELADDR to the decompressor via a linker symbol.
- ifneq ($(CONFIG_AUTO_ZRELADDR),y)
-diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
-index 39f6d8e..6de73aa 100644
---- a/arch/arm/vfp/Makefile
-+++ b/arch/arm/vfp/Makefile
-@@ -4,8 +4,8 @@
- # Copyright (C) 2001 ARM Limited
- #
- 
--# EXTRA_CFLAGS := -DDEBUG
--# EXTRA_AFLAGS := -DDEBUG
-+# ccflags-y := -DDEBUG
-+# asflags-y := -DDEBUG
- 
- KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
- LDFLAGS		+=--no-warn-mismatch
--- 
-1.7.2.1
+I have noticed that, the touchscreen and audio record continues to
+work after the problem. In the problem state, the DMA interrupts occur
+for audio record but not for playback.
+
+AC97:
+BeforeProblem			AfterProblem
+0:00 = 02a0			0:00 = 02a0
+0:02 = 0d0d			0:02 = 0d0d
+0:04 = 0000			0:04 = 0000
+0:06 = 0000			0:06 = 0000
+0:08 = 0000			0:08 = 0000
+0:0a = 0000			0:0a = 0000
+0:0c = 0000			0:0c = 0000
+0:0e = 0000			0:0e = 0000
+0:10 = 0000			0:10 = 0000
+0:12 = 0000			0:12 = 0000
+0:14 = 0000			0:14 = 0000
+0:16 = 0000			0:16 = 0000
+0:18 = 0000			0:18 = 0000
+0:1a = 0000			0:1a = 0000
+0:1c = 0000			0:1c = 0000
+0:1e = 0000			0:1e = 0000
+0:20 = 0000			0:20 = 0000
+0:22 = 0000			0:22 = 0000
+0:24 = 0000			0:24 = 0000
+0:26 = 000b			0:26 = 000b
+0:28 = 0001			0:28 = 0001
+0:2a = 0001			0:2a = 0001
+0:2c = 5622			0:2c = 3e80
+0:2e = 0000			0:2e = 0000
+0:30 = 0000			0:30 = 0000
+0:32 = bb80			0:32 = bb80
+0:34 = 0000			0:34 = 0000
+0:36 = 0000			0:36 = 0000
+0:38 = 0000			0:38 = 0000
+0:3a = 0000			0:3a = 0000
+0:3c = 0000			0:3c = 0000
+0:3e = 0000			0:3e = 0000
+0:40 = 0000			0:40 = 0000
+0:42 = 0000			0:42 = 0000
+0:44 = 0000			0:44 = 0000
+0:46 = 0000			0:46 = 0000
+0:48 = 0000			0:48 = 0000
+0:4a = 0000			0:4a = 0000
+0:4c = 0000			0:4c = 0000
+0:4e = 0000			0:4e = 0000
+0:50 = 0000			0:50 = 0000
+0:52 = 0000			0:52 = 0000
+0:54 = 0000			0:54 = 0000
+0:56 = 0000			0:56 = 0000
+0:58 = 0000			0:58 = 0000
+0:5a = 0000			0:5a = 0000
+0:5c = 0000			0:5c = 0000
+0:5e = 0000			0:5e = 0000
+0:60 = 0000			0:60 = 0000
+0:62 = 0000			0:62 = 0000
+0:64 = 0948			0:64 = 0948
+0:66 = 0000			0:66 = 0000
+0:68 = 824b			0:68 = 824b
+0:6a = 0050			0:6a = 0050
+0:6c = 0030			0:6c = 0030
+0:6e = 2004			0:6e = 2004
+0:70 = 0000			0:70 = 0000
+0:72 = 0000			0:72 = 0000
+0:74 = 0000			0:74 = 0000
+0:76 = 0000			0:76 = 0000
+0:78 = 0000			0:78 = 0000
+0:7a = 0000			0:7a = 0000
+0:7c = 5053			0:7c = 5053
+0:7e = 4304			0:7e = 4304
+
+Only diff in the above is in the 02C(Audio sample rate control) register.
+
+DMA:
+BeforeProblem
+::: DMA Channel: 8, Trigger Start
+DDADR = 0xB714A010
+DSADR = 0xB7100040
+DTADR = 0x40500040
+DCMD  = 0x9023CFC0
+DCSR  = 0x80000000
+::: DMA Channel: 8, Trigger Stop
+DDADR = 0xB714A0E0
+DSADR = 0xB710D000
+DTADR = 0x40500040
+DCMD  = 0x9023D000
+DCSR  = 0x00000008
+
+
+AfterProblem
+::: DMA Channel: 8, Trigger Start
+DDADR = 0xB70B7010
+DSADR = 0xB7100000
+DTADR = 0x40500040
+DCMD  = 0x9023D000
+DCSR  = 0x80000000
+ALSA sound/core/pcm_native.c:1512: playback drain error (DMA or IRQ trouble?)
+::: DMA Channel: 8, Trigger Stop
+DDADR = 0xB70B7010
+DSADR = 0xB7100000
+DTADR = 0x40500040
+DCMD  = 0x9023D000
+DCSR  = 0x00000008
+
+Each dump above is after playing a mp3 file using madplay.
+
+Regards,
+Santhosh N
+
+On Thu, Sep 23, 2010 at 11:38 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Thu, Sep 23, 2010 at 1:33 PM, Santhosh N <san.mlists@gmail.com> wrote:
+>> Dear All,
+>>
+>> I am running linux 2.6.26 kernel on a PXA270 board. A UCB1400 chip
+>> used for audio and touchscreen in that. I have been facing a problem
+>> with audio.
+>>
+>> The audio plays properly, but suddenly stops. I get the following message:
+>> ALSA sound/core/pcm_native.c:1513: playback drain error (DMA or IRQ trouble?)
+>>
+>> I have noticed that the DMA interrupts stop coming. Where as the AC97
+>> interrupts come properly.
+>>
+>> Any help in solving this will be grateful.
+>>
+>
+> Dumping the DMA registers and the AC97 controller registers would
+> be helpful.
+>
+>> Regards,
+>> Santhosh N
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
