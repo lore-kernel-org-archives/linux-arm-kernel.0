@@ -1,41 +1,38 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 Sep 2010 14:00:23 +0200
-Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <87zkv88zln.fsf@macbook.be.48ers.dk>
-References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
-	<4C9B0D4D.4050102@atmel.com> <87k4mcak6b.fsf@macbook.be.48ers.dk>
-	<20100923093104.GA22397@n2100.arm.linux.org.uk>
-	<87fwx0ahgl.fsf@macbook.be.48ers.dk>
-	<20100923103645.GA23295@n2100.arm.linux.org.uk>
-	<877hicafx5.fsf@macbook.be.48ers.dk>
-	<20100923111604.GZ32018@game.jcrosoft.org>
-	<87zkv88zln.fsf@macbook.be.48ers.dk>
-Message-ID: <20100923120023.GD32018@game.jcrosoft.org>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 23 Sep 2010 16:00:31 +0300
+Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
+In-Reply-To: <AANLkTi=LHxCHrAvWgscZDeHUZ3LfVjwARSf60DZYV8gL@mail.gmail.com>
+References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTikuKC2n488ZNAeSr83p9cju2ZQCGU1W_FXqgzVy@mail.gmail.com>
+	<1284971979.2286.46.camel@localhost>
+	<AANLkTi=LHxCHrAvWgscZDeHUZ3LfVjwARSf60DZYV8gL@mail.gmail.com>
+Message-ID: <1285246831.29268.118.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:32 Thu 23 Sep     , Peter Korsgaard wrote:
-> >>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
+On Wed, 2010-09-22 at 10:10 +0200, Linus Walleij wrote:
+> 2010/9/20 Artem Bityutskiy <dedekind1@gmail.com>:
+> > On Tue, 2010-09-14 at 10:52 +0200, Linus Walleij wrote:
+> >> 2010/9/13 Linus Walleij <linus.walleij@stericsson.com>:
+> >>
+> >> > This is the same driver submitted by ST Micros SPEAr team but
+> >> > generalized and tested on the ST-Ericsson U300. It probably
+> >> > easily works on the NHK8815 too.
+> >>
+> >> David if this one looks OK then can you merge both patches through
+> >> the MTD tree?
+> >
+> > I've pushed both patches to my l2-mtd-2.6.git / master, without signing
+> > this off myself.
 > 
-> Hi,
-> 
->  >> And yes, if you run the SoC at nonstandard (slower) speed this might be
->  >> slower than 100Khz, but that's still safe, so not a big deal.
-> 
->  Jean-Christophe> except you can also overclock the SoC in some case so
->  Jean-Christophe> it's still not safe
-> 
-> Sure, you can do lots of crazy stuff. Instead of discussion this back
-> and forward, do you agree that udelay=5 is better/safer/more sensible
-> than the current udelay=2 value?
-no it's not safer it's hardcoded value where it's board specific
-so we just close our eyes on the problem by doing this
-it's time to fix it correctly
-> 
->  Jean-Christophe> and force this speed for all boards :(
-> 
-> Just like it has always been.
-does not means it's right
+> Thanks Artem, are you integrating MTD to Linus (Torvalds)?
 
+Not me, dwmw2 should pick patches from my tree.
+
+> This git is not part of linux-next right?
+
+Right.
+
+-- 
 Best Regards,
-J.
+Artem Bityutskiy (????? ????????)
