@@ -1,53 +1,72 @@
-From: public_filter@yahoo.com (P F)
-Date: Fri, 17 Sep 2010 12:07:50 -0700 (PDT)
-Subject: [RFC] mmaping with VIVT cache
-Message-ID: <589851.42712.qm@web120206.mail.ne1.yahoo.com>
+From: jacob.keller@gmail.com (Jacob Keller)
+Date: Thu, 23 Sep 2010 11:21:55 -0700
+Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <alpine.DEB.2.00.1009231238170.2962@router.home>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<alpine.DEB.2.00.1009231238170.2962@router.home>
+Message-ID: <AANLkTim0JqVTyvrvjLRp1Cg423MdrwmyZG2uN6uSyeLb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Thu, 9/16/10, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Wed, Sep 15, 2010 at 05:25:38PM-0700, P F wrote:
-> > The mmap'd buffer is allocated by vmalloc_32(), and later mapped with
-> > vmalloc_to_page()/vm_insert_page().? The DMA'dbuffer is allocated by
-> > usb_buffer_alloc().? At the appropriate time, the DMA'd buffer is
-> > memcpy()'d into the mmap'd buffer, and userspace is allowed to handle
-> > it, at which point it is corrupt.
-> 
-> Ah, that's slightly different as you're not talking about
-> the DMA buffers themselves.
-> 
-> However, anyone who is not familiar with VIVT or aliasing
-> VIPT caches is going to be caught out by this sort of thing (which
-> basically means most ARMs, and at least some PA-RISC.)
-
-Again, thank you for the explanation, Russell.? For some reason I did not
-quite grok the root cause of this issue before, but it is now clear to me.
-
-> I don't think we have any APIs in the kernel to handle
-> aliasing between the vmalloc space and userspace...
-
-Perhaps I am revealing my ignorance of the driver ecosystem, but I find
-this somewhat surprising.? I would think that this sort of construction
-would not be uncommon.
-
-For this issue, I can see two solutions:
-1.) somehow make the vmalloc'd space non-cacheable so both the user- and
-kernelspace mappings match, and there is no cache to alias
-2.) invalidate the cache of the userspace mapping before handing the
-buffer to userspace (after memcpy() above)
-
-As Laurent noted earlier, (1) is a nonstarter as it has a negative
-performance impact.? (2) I propose is a valid and correct solution.? This
-is driver-specific, but each buffer corresponds to an image frame (e.g.,
-from a webcam), so they are independent, and therefore it does not make
-sense to share the cache between frames.? As long as userspace holds the
-buffer, the cache is valid, but once it relinquishes the buffer, the cache
-holds only stale data and should be purged.
-
->From your comment, I take it that there is no kernel API to invalidate the
-cache of a range in a VMA.  Do you think linux-mm would be a more
-appropriate forum to continue investigating?  Any input would be
-appreciated.
+>
+> >     In contrast to the standard Linux system clock, a PHC is
+> >     adjustable in hardware, for example using frequency compensation
+> >     registers or a VCO. The ability to directly tune the PHC is
+> >     essential to reap the benefit of hardware timestamping.
+>
+> There is a reason for not being able to shift posix clocks: The system has
+> one time base. The various clocks are contributing to maintaining that
+> sytem wide time.
+>
+> Adjusting clocks is absolutely essential for proper functioning of the PTP
+protocol. The slave obtains and calculates the offset from master and uses
+that in order to adjust the clock properly, The problem is that the
+timestamps are done via the hardware. We need a method to expose that
+hardware so that the ptp software can properly adjust those clocks.
 
 
-      
+> I do not understand why you want to maintain different clocks running at
+> different speeds. Certainly interesting for some uses I guess that I
+> do not have the energy to imagine right now. But can we get the PTP killer
+> feature of synchronized accurate system time first?
+>
+
+The problem is maintaining a hardware clock at the correct speed/frequency
+and time. The timestamping is done via hardware, and that hardware clock
+needs to be accurate. We need to be able to modify that clock. Yes, having
+the system time be the same value would be nice, but the problem comes
+because we don't want to jump through hoops to keep that hardware clock
+accurate to the ptp protocol running on the network.
+
+
+
+>
+> >    Instead, the patch set provides a way to offer a Pulse Per Second
+> >    (PPS) event from the PHC to the Linux PPS subsystem. A user space
+> >    application can read the PPS events and tune the system clock, just
+> >    like when using other external time sources like radio clocks or
+> >    GPS.
+>
+> User space is subject to various latencies created by the OS etc. I would
+> that in order to have fine grained (read microsecond) accurary we would
+> have to run the portions that are relevant to obtaining the desired
+> accuracy in the kernel.
+>
+
+All of the necessary features for microsecond or better accuracy are done
+via the hardware. You can get accuracy to within <10 mircoseconds while only
+sending sync packets and such once per second. The reason is because the
+hardware timestamps are very accurate. But if we can't properly adjust the
+clocks time and frequency, we cannot maintain the accuracy of the
+timestamps.
+
+>
+>
+ --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100923/b689e292/attachment-0001.html>
