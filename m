@@ -1,55 +1,64 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Thu, 23 Sep 2010 13:36:41 -0500 (CDT)
+From: johnstul@us.ibm.com (john stultz)
+Date: Thu, 23 Sep 2010 11:59:40 -0700
 Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
-In-Reply-To: <AANLkTim0JqVTyvrvjLRp1Cg423MdrwmyZG2uN6uSyeLb@mail.gmail.com>
+In-Reply-To: <alpine.DEB.2.00.1009231238170.2962@router.home>
 References: <cover.1285261533.git.richard.cochran@omicron.at>
 	<alpine.DEB.2.00.1009231238170.2962@router.home>
-	<AANLkTim0JqVTyvrvjLRp1Cg423MdrwmyZG2uN6uSyeLb@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1009231327000.2962@router.home>
+Message-ID: <1285268380.2587.11.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Sep 2010, Jacob Keller wrote:
+On Thu, 2010-09-23 at 12:53 -0500, Christoph Lameter wrote:
+> On Thu, 23 Sep 2010, Richard Cochran wrote:
+> >     In contrast to the standard Linux system clock, a PHC is
+> >     adjustable in hardware, for example using frequency compensation
+> >     registers or a VCO. The ability to directly tune the PHC is
+> >     essential to reap the benefit of hardware timestamping.
+> 
+> There is a reason for not being able to shift posix clocks: The system has
+> one time base. The various clocks are contributing to maintaining that
+> sytem wide time.
+> 
+> I do not understand why you want to maintain different clocks running at
+> different speeds. Certainly interesting for some uses I guess that I
+> do not have the energy to imagine right now. But can we get the PTP killer
+> feature of synchronized accurate system time first?
 
-> > There is a reason for not being able to shift posix clocks: The system has
-> > one time base. The various clocks are contributing to maintaining that
-> > sytem wide time.
+This was my initial gut reaction as well, but in the end, I agree with
+Richard that in the case of one or multiple PTP hardware clocks, we
+really can't abstract over the different time domains.
+
+
+
+> > 3.3 Synchronizing the Linux System Time
+> > ========================================
 > >
-> > Adjusting clocks is absolutely essential for proper functioning of the PTP
-> protocol. The slave obtains and calculates the offset from master and uses
-> that in order to adjust the clock properly, The problem is that the
-> timestamps are done via the hardware. We need a method to expose that
-> hardware so that the ptp software can properly adjust those clocks.
+> >    One could offer a PHC as a combined clock source and clock event
+> >    device. The advantage of this approach would be that it obviates
+> >    the need for synchronization when the PHC is selected as the system
+> >    timer. However, some PHCs, namely the PHY based clocks, cannot be
+> >    used in this way.
+> 
+> Why not? Do PHY based clock not at least provide a counter that increments
+> in synchronized intervals throughout the network?
 
-There is no way to use that clock directly to avoid all the user space
-tuning etc? There are already tuning mechanisms in the kernel that do this
-with system time based on periodic clocks. If you calculate the
-nanoseconds since the epoch then you should be able to use that to tune
-system time.
+I really don't think the PTP clock can be used as a clocksource sanely.
 
-> > I do not understand why you want to maintain different clocks running at
-> > different speeds. Certainly interesting for some uses I guess that I
-> > do not have the energy to imagine right now. But can we get the PTP killer
-> > feature of synchronized accurate system time first?
-> >
->
-> The problem is maintaining a hardware clock at the correct speed/frequency
-> and time. The timestamping is done via hardware, and that hardware clock
-> needs to be accurate. We need to be able to modify that clock. Yes, having
-> the system time be the same value would be nice, but the problem comes
-> because we don't want to jump through hoops to keep that hardware clock
-> accurate to the ptp protocol running on the network.
+First, the hardware access is much to slow for system timekeeping.
 
-Then allow system time == hardware clock?
+Second, there is the problem that the system time is a software clock,
+and adjustments made (like freq) are made in the layer that interprets
+the underlying hardware cycle counter. Adjustments made in PTP (in order
+to sync the network timestamps) are made at the hardware level. 
 
-> All of the necessary features for microsecond or better accuracy are done
-> via the hardware. You can get accuracy to within <10 mircoseconds while only
-> sending sync packets and such once per second. The reason is because the
-> hardware timestamps are very accurate. But if we can't properly adjust the
-> clocks time and frequency, we cannot maintain the accuracy of the
-> timestamps.
+This would cause a disconnect between the hardware freq understood by
+the system time management code and the actual hardware freq.
 
-You can already adjust the system time with the existing APIs. Tuning
-hardware clocks is currently done using device specific controls. But I
-would think that you do not need to expose this to user space if you can
-do it all in kernel.
+Richard, I'd actually strike this paragraph from the rational, as I feel
+it has the tendency to confuse as it suggests having the PHC as a
+clocksource is feasible when really it isn't. Or alternatively, maybe
+express more clearly why its not feasible, so it doesn't just seem like
+a minor design choice.
+
+thanks
+-john
