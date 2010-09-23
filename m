@@ -1,132 +1,60 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 22 Sep 2010 19:29:56 -0500
-Subject: [PATCH v3] power: introduce library for device-specific OPPs
-In-Reply-To: <201009230203.09230.rjw@sisk.pl>
-References: <[PATCH] opp: introduce library for device-specific OPPs>
-	<1285192054-454-1-git-send-email-nm@ti.com>
-	<201009230203.09230.rjw@sisk.pl>
-Message-ID: <4C9A9F84.7000104@ti.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 22 Sep 2010 21:59:13 -0700
+Subject: [PATCH 11/12] DMAENGINE: let PL08X memcpy TXDs wait
+In-Reply-To: <1283256734-3408-12-git-send-email-linus.walleij@stericsson.com>
+References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-6-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-7-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-8-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-9-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-10-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-11-git-send-email-linus.walleij@stericsson.com>
+	<1283256734-3408-12-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <AANLkTimGu1R0vqpLK9X30CxkibO6N964D1Y-fQvAdA9D@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki had written, on 09/22/2010 07:03 PM, the following:
-> [Trimming the CC list slightly.]
-[...]
+On Tue, Aug 31, 2010 at 5:12 AM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> This change makes the memcpy transfers wait for a physical channel
+> to become available if no free channel is available when the job
+> is submitted. When the first physical channel fires its tasklet,
+> it will spin over the memcpy channels to see if one of these is
+> waiting.
+>
+> This is necessary to get the memcpy semantics right: the generic
+> memcpy API assume transfers never fail, and with our oversubscribed
+> physical channels this becomes a problem: sometimes submit would
+> fail. This fixes it by letting the memcpy channels pull a free
+> channel ASAP.
+>
+> The slave channels shall however *fail* if no channel is available
+> since the device will then either fall back to some PIO mode or
+> retry.
+>
 
-> ...
-> 
-> First, thanks for addressing the previous comments, things look much better
-> now.  In particular the documentation has been improved a lot in my view.
-Thanks for the excellent reviews :)
+This patch does not sit right with me.  It seems a bit arbitrary that
+memcpy operations will be queued while slave operations are failed.
+Is there anyway to know at prep time whether a subsequent submit will
+fail?  Are there any cases where a slave might want its operation
+queued?
 
-[...]
+The prep routine is meant to guarantee that all the resources for a
+transaction have been acquired.  The only reason ->tx_submit() has a
+return value is to support the net_dma usage model that uses opaque
+cookies for tracking transactions.
 
->> +
->> +WARNING on OPP List Modification Vs Query operations:
->> +----------------------------------------------------
->> +The OPP layer's query functions are expected to be used in multiple contexts
->> +(including calls from interrupt locked context) based on SoC framework
->> +implementation. Only OPP modification functions are guaranteed exclusivity by
->> +the OPP library. Exclusivity between query functions and modification functions
->> +should be handled by the users such as the SoC framework appropriately; else,
->> +there is a risk for the query functions to retrieve stale data.
-> 
-> Well, this sounds like a good use case for RCU.
-Kevin did point out rwlock but am I confusing with
-http://lwn.net/Articles/364583/
-If I get the message right, rwlock is more or less on it's way out?
+If we make tx_submit() fallable we should go back and ensure that all
+usages are prepared to handle failure.
 
-[...]
+--
+Dan
 
->> +static struct device_opp *find_device_opp(struct device *dev)
->> +{
->> +     struct device_opp *tmp_dev_opp, *dev_opp = ERR_PTR(-ENODEV);
->> +
->> +     if (unlikely(!dev || IS_ERR(dev))) {
->> +             pr_err("%s: Invalid parameters being passed\n", __func__);
->> +             return ERR_PTR(-EINVAL);
->> +     }
->> +
->> +     list_for_each_entry(tmp_dev_opp, &dev_opp_list, node) {
->> +             if (tmp_dev_opp->dev == dev) {
->> +                     dev_opp = tmp_dev_opp;
->> +                     break;
->> +             }
->> +     }
-> 
-> As I said, it seems you can use RCU read locking around the list traversal
-> to protect it from concurrent modification.
-> 
->> +     return dev_opp;
->> +}
->> +
-[...]
-
->> +struct opp *opp_find_freq_exact(struct device *dev,
->> +                                  unsigned long freq, bool available)
->> +{
->> +     struct device_opp *dev_opp;
->> +     struct opp *temp_opp, *opp = ERR_PTR(-ENODEV);
->> +
->> +     dev_opp = find_device_opp(dev);
->> +     if (IS_ERR(dev_opp))
->> +             return opp;
->> +
->> +     list_for_each_entry(temp_opp, &dev_opp->opp_list, node) {
->> +             if (temp_opp->available == available &&
->> +                             temp_opp->rate == freq) {
->> +                     opp = temp_opp;
->> +                     break;
->> +             }
->> +     }
->> +
-> 
-> Same here.
-> 
->> +     return opp;
->> +}
->> +
->> +/**
->> + * opp_find_freq_ceil() - Search for an rounded ceil freq
->> + * @dev:     device for which we do this operation
->> + * @freq:    Start frequency
->> + *
->> + * Search for the matching ceil *available* OPP from a starting freq
->> + * for a device.
->> + *
->> + * Returns matching *opp and refreshes *freq accordingly, else returns
->> + * ERR_PTR in case of error and should be handled using IS_ERR.
->> + *
->> + * Example usages:
->> + *   * find match/next highest available frequency *
->> + *   freq = 350000;
->> + *   opp = opp_find_freq_ceil(dev, &freq))
->> + *   if (IS_ERR(opp))
->> + *           pr_err("unable to find a higher frequency\n");
->> + *   else
->> + *           pr_info("match freq = %ld\n", freq);
->> + *
->> + *   * print all supported frequencies in ascending order *
->> + *   freq = 0; * Search for the lowest available frequency *
->> + *   while (!IS_ERR(opp = opp_find_freq_ceil(OPP_MPU, &freq)) {
->> + *           pr_info("freq = %ld\n", freq);
->> + *           freq++; * for next higher match *
->> + *   }
-> 
-> I think it's sufficient to put the examples into the doc (the ones below too).
-> 
-Ack. thanks for pointing it out.. will fix in v4.
-
->> +     freq_table[i].index = i;
->> +     freq_table[i].frequency = CPUFREQ_TABLE_END;
->> +
->> +     *table = &freq_table[0];
->> +}
->> +#endif               /* CONFIG_CPU_FREQ */
-> 
-> The rest looks fine to me.
-thx.
-
--- 
-Regards,
-Nishanth Menon
+sidenote: this driver needs to be converted to a dma descriptor pool
+(allocated at device_alloc_chan_resources time), or at a minimum use
+GFP_NOWAIT in device_prep_dma_memcpy because that routine may be
+called from atomic contexts.
