@@ -1,51 +1,50 @@
-From: kishorek.kadiyala@gmail.com (kishore kadiyala)
-Date: Thu, 23 Sep 2010 11:22:20 +0530
-Subject: [PATCH v3 1/4] omap4 hsmmc: Adding card detect support for MMC1
-In-Reply-To: <8F7AF80515AF0D4D93307E594F3CB40E5F57C548@dlee03.ent.ti.com>
-References: <14833.10.24.255.18.1285173812.squirrel@dbdmail.itg.ti.com>
-	<8F7AF80515AF0D4D93307E594F3CB40E5F57C548@dlee03.ent.ti.com>
-Message-ID: <AANLkTikLqi4=OOJ_ciMqTt7HKJzDo-WsZJ8D2CpP712c@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 23 Sep 2010 14:05:56 +0800
+Subject: pxa3xx_nand issues
+In-Reply-To: <201009221912.24905.pieterg@gmx.com>
+References: <201009221912.24905.pieterg@gmx.com>
+Message-ID: <AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
-
-On Thu, Sep 23, 2010 at 1:19 AM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
-> Kishore,
+On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
+> In my search for the cause of the huge number of single/double bit errors
+> I'm experiencing on colibri pxa320/310 devices, I've come across this
+> commit
 >
->> +int twl6030_mmc_card_detect(struct device *dev, int slot)
->> +{
->> + ? ? int ret = -EIO;
->> + ? ? u8 read_reg = 0;
->> + ? ? struct platform_device *pdev = to_platform_device(dev);
->> +
->> + ? ? switch (pdev->id) {
->> + ? ? case 0:
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* BIT0 of REG_MMC_CTRL
->> + ? ? ? ? ? ? ?* 0 - Card not present ,1 - Card present
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &read_reg,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_MMCCTRL);
->> + ? ? ? ? ? ? if (ret >= 0)
->> + ? ? ? ? ? ? ? ? ? ? ret = read_reg & STS_MMC;
->> + ? ? ? ? ? ? break;
+> http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
 >
-> nitpick: may be you don't need a switch statement for only one case.
+> According to the commitlog, it attempts to work around an issue regarding
+> non-page-aligned reads.
+> The workaround seems to force page-aligned access, by dropping the offset
+> within the page (column address bytes).
+> However, in my setup (with a jffs2 filesystem on nand), non-page-aligned
+> reads never occur, but non-page-aligned writes occur very frequently.
+> (during the jffs2 gc).
+> These are also affected by this commit, while the commitlog does not state
+> whether or not the same issue would occur for the program command, and in
+> that case, whether or not the same workaround would apply.
+>
+> I've tried to revert the commit, but unfortunately this doesn't reduce the
+> huge number of single/double bit errors (and jffs2 crc errors as a result)
+> I'm getting.
+>
+> But having these non-aligned writes during GC, would that indicate a problem
+> with my jffs2 image parameters perhaps?
+> (though I cannot imagine this could actually cause double bit errors)
+>
 
+It might not be related to the commit above.  The NAND controller will
+always read the whole page and ignoring the column address, that patch
+tries to make less confusion. The offset is actually handled completely
+by software (memorized).
 
->From bogus@does.not.exist.com  Sat Sep 18 23:17:21 2010
-From: bogus@does.not.exist.com ()
-Date: Sun, 19 Sep 2010 03:17:21 -0000
-Subject: No subject
-Message-ID: <mailman.4.1285221143.1886.linux-arm-kernel@lists.infradead.org>
+Cc'ed Haojian and Lei.
 
-and current patch supports card detect feature only for one controller i.e =
-MMC1
-as of now. Once the interfaces connected on the remaining 4 MMC controllers
-are defined further additions will be required for respective cases.
-
-<snip>
-
-Regards,
-Kishore
+> Rgds, Pieter
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
