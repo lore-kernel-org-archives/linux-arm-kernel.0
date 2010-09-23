@@ -1,152 +1,86 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 23 Sep 2010 08:29:37 -0700
-Subject: [PATCH 11/12] DMAENGINE: let PL08X memcpy TXDs wait
-In-Reply-To: <AANLkTik+6oAHBjT1LDZthYhVUTwVzs3kTgM2LPn10vbY@mail.gmail.com>
-References: <1283256734-3408-1-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-2-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-3-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-4-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-5-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-6-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-7-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-8-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-9-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-10-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-11-git-send-email-linus.walleij@stericsson.com>
-	<1283256734-3408-12-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTimGu1R0vqpLK9X30CxkibO6N964D1Y-fQvAdA9D@mail.gmail.com>
-	<AANLkTik+6oAHBjT1LDZthYhVUTwVzs3kTgM2LPn10vbY@mail.gmail.com>
-Message-ID: <AANLkTimEN6mwzYTYyex45p9icjaHeGaWrLvbtrDMUTkD@mail.gmail.com>
+From: pieterg@gmx.com (pieterg)
+Date: Thu, 23 Sep 2010 17:29:47 +0200
+Subject: pxa3xx_nand issues
+In-Reply-To: <201009231332.26566.pieterg@gmx.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
+	<201009231332.26566.pieterg@gmx.com>
+Message-ID: <201009231729.48147.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 12:39 AM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/9/23 Dan Williams <dan.j.williams@intel.com>:
->> On Tue, Aug 31, 2010 at 5:12 AM, Linus Walleij
->> <linus.walleij@stericsson.com> wrote:
->>> This change makes the memcpy transfers wait for a physical channel
->>> to become available if no free channel is available when the job
->>> is submitted. When the first physical channel fires its tasklet,
->>> it will spin over the memcpy channels to see if one of these is
->>> waiting.
->>>
->>> This is necessary to get the memcpy semantics right: the generic
->>> memcpy API assume transfers never fail, and with our oversubscribed
->>> physical channels this becomes a problem: sometimes submit would
->>> fail. This fixes it by letting the memcpy channels pull a free
->>> channel ASAP.
->>>
->>> The slave channels shall however *fail* if no channel is available
->>> since the device will then either fall back to some PIO mode or
->>> retry.
->>>
->>
->> This patch does not sit right with me. ?It seems a bit arbitrary that
->> memcpy operations will be queued while slave operations are failed.
+On Thursday 23 September 2010 13:32:26 pieterg wrote:
+> On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
+> > On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
+> > > In my search for the cause of the huge number of single/double bit
+> > > errors I'm experiencing on colibri pxa320/310 devices, I've come
+> > > across this commit
+> > > 
+http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
+> > > According to the commitlog, it attempts to work around an issue
+> > > regarding non-page-aligned reads.
+> > > The workaround seems to force page-aligned access, by dropping the
+> > > offset within the page (column address bytes).
+> > > However, in my setup (with a jffs2 filesystem on nand),
+> > > non-page-aligned reads never occur, but non-page-aligned writes occur
+> > > very frequently. (during the jffs2 gc).
+> > > These are also affected by this commit, while the commitlog does not
+> > > state whether or not the same issue would occur for the program
+> > > command, and in that case, whether or not the same workaround would
+> > > apply.
+> > >
+> > > I've tried to revert the commit, but unfortunately this doesn't
+> > > reduce the huge number of single/double bit errors (and jffs2 crc
+> > > errors as a result) I'm getting.
+> > >
+> > > But having these non-aligned writes during GC, would that indicate a
+> > > problem with my jffs2 image parameters perhaps?
+> > > (though I cannot imagine this could actually cause double bit errors)
+> >
+> > It might not be related to the commit above.  The NAND controller will
+> > always read the whole page and ignoring the column address, that patch
+> > tries to make less confusion. The offset is actually handled completely
+> > by software (memorized).
 >
-> I was sort of suspecting a discussion around this...
->
-> Background: the PL081 that I'm testing on only has *two* physical
-> channels, they can be used for memcpy, slave transfers (RX/TX).
->
-> My first option was to set one channel aside for memcpy and
-> one for dev xfers and be done with it.
->
-> But that would be devastating if
-> I was only using them for memcpy or only devxfer, since it would
-> slash performance in half. So I decided to let memcpy and
-> dev xfers battle for the channels with oversubscription and exposing
-> two virtual memcpy channels.
->
-> Whereas the slave drivers I've written are prepared to handle the
-> case where a transfer fails gracefully (and not treat it as an error)
-> and fall back to IRQ/PIO mode, the memcpy tests in
-> drivers/dma/dmatest.c does treat a failure to prep() or submit()
-> as an error.
+> I can see how the read offset works, but I do not quite see how this
+> would work for writes (which call the same prepare_read_prog_cmd, and
+> have their column address stripped as well).
+> Found out that this happens when writing oob data by the way; these are
+> writes with offset 2048 within the page. Jffs2 does this when writing
+> cleanmarkers.
 
-Yeah, that is a hold over from when the original ioatdma driver
-performed memory allocations at submit time (fixed here a0587bcf).
+Tested this, and found out that this commit is actually quite essential for 
+writes as well.
+Without it, the OOB data doesn't get written.
+So we can close this part of the topic, commit 7f9938d0 is perfectly fine.
 
->
-> So for this reason I'm queueing memcpy requests until
-> there is a channel ready.
->
-> Are you suggesting I should rewrite the memcpy tests instead
-> so they gracefully handle a failed prep() call, not treat it as an
-> error and either:
->
-> - retry or
-> - copy with a regular klibc memcpy() call?
+> I could identify about 10 eraseblocks with pages which produce
+> single/double bit errors.
+> After I marked them bad (manually), I've seen no more bit errors, and the
+> jffs2 rootfs has remained perfectly healthy.
 
-I was more thinking that at a minimum all slave drivers would follow
-the same semantic and expect their submit requests to be queued or
-fail, as it stands we have a mix of both across all slave
-implementations.
+Turned out to be a short-term solution.
+After a while I got more double-bit errors, and ended up bad-marking a dozen 
+or so other eraseblocks, and it does not seem to stop.
 
->
->> Is there anyway to know at prep time whether a subsequent submit will
->> fail? ?Are there any cases where a slave might want its operation
->> queued?
->>
->> The prep routine is meant to guarantee that all the resources for a
->> transaction have been acquired. ?The only reason ->tx_submit() has a
->> return value is to support the net_dma usage model that uses opaque
->> cookies for tracking transactions.
->
-> It is possible to do this at prep() time. However that assumes that every
-> device transfer has code that executes this sequence:
->
-> .device_prep_slave_sg()
-> .tx_submit()
-> .device_issue_pending()
->
-> In direct succession. If there is an arbitrary delay between prep()
-> and submit() (where I currently fail xfers) the physical channels
-> may starve if prep() allocates them.
+Strangest thing is that when I write a new jffs2 image with uboot (nand 
+erase, nand write) or with the kernel (flash_eraseall, nandwrite), it never 
+contains any biterrors when I mount it.
+Only after the filesystem has been mounted, gets modified, and then after 
+the first reboot, the biterrors are there.
 
-There is precedent, albeit a bit inelegant, for taking a lock in
-prep() and dropping it in submit().  The ioatdma driver does this to
-ensure in-order submission because the hardware caches the address of
-the next descriptor in the ring.  Out-of-order submission would
-require a hardware reset to clear that cache prep() and submit() are
-not paired.
+One other issue which I noticed because besides double bit errors I get many 
+single bit errors as well; the ERR_SBERR is never cleared.
+ERR_DBERR is cleared to ERR_NONE in two locations, but ERR_SBERR is not.
+(probably in order to allow pxa3xx_nand_ecc_correct to pick it up)
+However, I've seen that the retcode could still be ERR_SBERR in 
+pxa3xx_nand_waitfunc, causing an erase error to be assumed, as a result all 
+eraseblocks in the partition ended up being marked bad in a loop, till 
+there were no more remaining eraseblocks.
+I guess ERR_SBERR should probably be ignored in pxa3xx_nand_waitfunc?
 
-> If I can safely assume that prep() and .tx_submit() are in quick
-> succession, I can reserve the physical channel at prep() time.
->
+That's what I did in the remainder of my tests (after having unmarked the 
+blocks that were wrongly marked bad) so I think this issue did not 
+contribute to my biterror problems.
 
-It is safe to actively enforce this as long as you never plan to
-support the async_tx channel switching capability (only a few raid
-drivers use this presently).  I'm converting to be an explicit opt-in
-because most drivers don't need this and can use the cut down version
-of dma_async_tx_descriptor.
-
-> This seems to be the case in current code where only quick
-> things like setting a callback etc is done between prep() and
-> .tx_submit().
->
-> So I'll spin the PL08x around to reserve channels on
-> prep() instead.
->
-> (By the way: we should rename .tx_submit() to just .submit()
-> since in device context this can just as well be RX!)
-
-The 'tx' in async_tx came "asynchronous transfer/transform"  where the
-'x' is transfer or transform.  I'd also like to change drop the
-'device_' from the method names and rename dma_async_tx_descriptor to
-something shorter, but I'm not sure it is worth the thrash.
-
->> If we make tx_submit() fallable we should go back and ensure that all
->> usages are prepared to handle failure.
->
-> OK I've implemented failure path for tx_submit() in all my
-> drivers but I also have it for prep() of course. I hope I can keep
-> that code... I'll take out the comments about allocation failure
-> and move them to the prep() calls though.
->
-
-Sounds good.
-
---
-Dan
+Rgds, Pieter
