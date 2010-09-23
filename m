@@ -1,36 +1,19 @@
-From: christian@riesch.at (Christian Riesch)
-Date: Thu, 23 Sep 2010 23:26:56 +0200
-Subject: [PATCH 6/8] ptp: Added a clock that uses the eTSEC found on the
-	MPC85xx.
-In-Reply-To: <20100923214359.3f287b11@lxorguk.ukuu.org.uk>
-References: <cover.1285261533.git.richard.cochran@omicron.at>	<57b64051c816dc9cb856bbb9f38fc901c9d3d651.1285261535.git.richard.cochran@omicron.at>	<alpine.DEB.2.00.1009231348150.2962@router.home>
-	<20100923214359.3f287b11@lxorguk.ukuu.org.uk>
-Message-ID: <4C9BC620.3@riesch.at>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Sep 2010 22:31:13 +0100
+Subject: [PATCH] ARM: abstract atags parsing
+In-Reply-To: <alpine.LFD.2.00.1009231713570.13233@xanadu.home>
+References: <alpine.LFD.2.00.1009231713570.13233@xanadu.home>
+Message-ID: <20100923213113.GC26295@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan Cox wrote:
->> Please do not introduce useless additional layers for clock sync. Load
->> these ptp clocks like the other regular clock modules and make them sync
->> system time like any other clock.
-> 
-> I don't think you understand PTP. PTP has masters, a system can need to
-> be honouring multiple conflicting masters at once.
+On Thu, Sep 23, 2010 at 05:18:02PM -0400, Nicolas Pitre wrote:
+> This code movement will make it cleaner and easier to introduce support 
+> for device tree which is basically an alternative to atags. No functional
+> changes are introduced by this patch.
 
-AFAIK the master's should not be conflicting. The Best Master Clock 
-algorithm (BMC) defined in IEEE1588 selects the best master clock. This 
-clock distributes its notion of time on the network while the other 
-masters, that is the other clocks/nodes that are configured to 
-potentially become a master, keep quiet. So usually we will only have 
-one source of time (the master clock selected by the BMC) and we will 
-steer our single PHC (PTP hardware clock) to follow this master (Of 
-course there may be use-cases that require more than one PTP clock, 
-e.g., for research purposes).
+I don't see any point to this churn.
 
-However, if the clock selected by the BMC is switched off, loses its 
-network connection..., the second best clock is selected by the BMC and 
-becomes master. This clock may be less accurate and thus our slave clock 
-has to switch from one notion of time to another. Is that the conflict 
-you mentioned?
-
-Christian
+DT has yet to be shown to be useful on anything but the ARM evaluation
+boards, and that's one of the pre-conditions to it becoming acceptable
+(which has been pending for a few years now.)
