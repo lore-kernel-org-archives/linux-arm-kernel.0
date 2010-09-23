@@ -1,47 +1,42 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 23 Sep 2010 20:12:57 +0100
-Subject: [PATCH] sdhci-s3c: fix NULL ptr access in sdhci_s3c_remove
-In-Reply-To: <1285251725-6210-1-git-send-email-m.szyprowski@samsung.com>
-References: <1285251725-6210-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20100923191257.GA2739@void.printf.net>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Thu, 23 Sep 2010 22:15:31 +0300
+Subject: [RESEND PATCH] serial: samsung: fix device name
+Message-ID: <20100923190212.18863.25678.stgit@darius-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Swap device and driver names in serial/samsung.c
 
-On Thu, Sep 23, 2010 at 04:22:05PM +0200, Marek Szyprowski wrote:
-> If not all clocks has been defined in platform data, driver will cause
-> a null pointer dereference when it is being removed. This patch fixes
-> this issue.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 71ad416..757d92c 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -481,8 +481,10 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
->  	sdhci_remove_host(host, 1);
->  
->  	for (ptr = 0; ptr < 3; ptr++) {
-> -		clk_disable(sc->clk_bus[ptr]);
-> -		clk_put(sc->clk_bus[ptr]);
-> +		if (sc->clk_bus[ptr]) {
-> +			clk_disable(sc->clk_bus[ptr]);
-> +			clk_put(sc->clk_bus[ptr]);
-> +		}
->  	}
->  	clk_disable(sc->clk_io);
->  	clk_put(sc->clk_io);
+Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+---
 
-I'll send this to Linus for .36 after you reply with an ACK.
+This patch was submitted about 3 months ago, but still not merged.
+There was another similar patch from Joonyoung Shim
+<jy0922.shim@samsung.com> and was discussed here:
+http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+Joonyoung Shim acked my patch and other people on ARM mailing list
+acked it. The maintainer, Ben Dooks, still not responding for
+a long time. Another maintainer, Kukjin Kim, refused to merge
+it without Ben's review.
+I would like to ask somebody pick up this bugfix.
 
-Thanks,
+ drivers/serial/samsung.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+index b1156ba..25c0d0f 100644
+--- a/drivers/serial/samsung.c
++++ b/drivers/serial/samsung.c
+@@ -883,10 +883,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+ 
+ static struct uart_driver s3c24xx_uart_drv = {
+ 	.owner		= THIS_MODULE,
+-	.dev_name	= "s3c2410_serial",
++	.driver_name    = "s3c2410_serial",
+ 	.nr		= CONFIG_SERIAL_SAMSUNG_UARTS,
+ 	.cons		= S3C24XX_SERIAL_CONSOLE,
+-	.driver_name	= S3C24XX_SERIAL_NAME,
++	.dev_name       = S3C24XX_SERIAL_NAME,
+ 	.major		= S3C24XX_SERIAL_MAJOR,
+ 	.minor		= S3C24XX_SERIAL_MINOR,
+ };
