@@ -1,49 +1,69 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 23 Sep 2010 13:32:20 +0200
-Subject: [PATCH] at91sam9g45: fix i2c bus speed
-In-Reply-To: <20100923111604.GZ32018@game.jcrosoft.org> (Jean-Christophe
-	PLAGNIOL-VILLARD's message of "Thu, 23 Sep 2010 13:16:04 +0200")
-References: <1285147886-17100-1-git-send-email-jacmet@sunsite.dk>
-	<4C9B0D4D.4050102@atmel.com> <87k4mcak6b.fsf@macbook.be.48ers.dk>
-	<20100923093104.GA22397@n2100.arm.linux.org.uk>
-	<87fwx0ahgl.fsf@macbook.be.48ers.dk>
-	<20100923103645.GA23295@n2100.arm.linux.org.uk>
-	<877hicafx5.fsf@macbook.be.48ers.dk>
-	<20100923111604.GZ32018@game.jcrosoft.org>
-Message-ID: <87zkv88zln.fsf@macbook.be.48ers.dk>
+From: pieterg@gmx.com (pieterg)
+Date: Thu, 23 Sep 2010 13:32:26 +0200
+Subject: pxa3xx_nand issues
+In-Reply-To: <AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
+Message-ID: <201009231332.26566.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Jean-Christophe" == Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> writes:
+On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
+> On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
+> > In my search for the cause of the huge number of single/double bit
+> > errors I'm experiencing on colibri pxa320/310 devices, I've come across
+> > this commit
+> >
+> > 
+http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
+> >
+> > According to the commitlog, it attempts to work around an issue
+> > regarding non-page-aligned reads.
+> > The workaround seems to force page-aligned access, by dropping the
+> > offset within the page (column address bytes).
+> > However, in my setup (with a jffs2 filesystem on nand),
+> > non-page-aligned reads never occur, but non-page-aligned writes occur
+> > very frequently. (during the jffs2 gc).
+> > These are also affected by this commit, while the commitlog does not
+> > state whether or not the same issue would occur for the program
+> > command, and in that case, whether or not the same workaround would
+> > apply.
+> >
+> > I've tried to revert the commit, but unfortunately this doesn't reduce
+> > the huge number of single/double bit errors (and jffs2 crc errors as a
+> > result) I'm getting.
+> >
+> > But having these non-aligned writes during GC, would that indicate a
+> > problem with my jffs2 image parameters perhaps?
+> > (though I cannot imagine this could actually cause double bit errors)
+>
+> It might not be related to the commit above.  The NAND controller will
+> always read the whole page and ignoring the column address, that patch
+> tries to make less confusion. The offset is actually handled completely
+> by software (memorized).
 
-Hi,
+I can see how the read offset works, but I do not quite see how this would 
+work for writes (which call the same prepare_read_prog_cmd, and have their 
+column address stripped as well).
+Found out that this happens when writing oob data by the way; these are 
+writes with offset 2048 within the page. Jffs2 does this when writing 
+cleanmarkers.
 
- >> And yes, if you run the SoC at nonstandard (slower) speed this might be
- >> slower than 100Khz, but that's still safe, so not a big deal.
+However, I'm also convinced that this is probably unrelated to my problems.
+In fact, the problem always occurs on the same pages.
+I could identify about 10 eraseblocks with pages which produce single/double 
+bit errors.
+After I marked them bad (manually), I've seen no more bit errors, and the 
+jffs2 rootfs has remained perfectly healthy.
 
- Jean-Christophe> except you can also overclock the SoC in some case so
- Jean-Christophe> it's still not safe
+Apparently a double bit error is not a reason to consider a block bad; jffs2 
+does not mark a block bad untill it failed to be erased more than 2 times.
+But it seems the nand controller (or at least the pxa3xx_nand driver) 
+doesn't report any problems when erasing these blocks. (I will further 
+investigate this)
 
-Sure, you can do lots of crazy stuff. Instead of discussion this back
-and forward, do you agree that udelay=5 is better/safer/more sensible
-than the current udelay=2 value?
+I would happily blame this on the NAND which might be bad, if this were just 
+a single board instead of all colibri pxa320/310 boards I've tried so far, 
+more than 5 in total.
 
- Jean-Christophe> and force this speed for all boards :(
-
-Just like it has always been.
-
- Jean-Christophe> so specify the speed in the board is the right way to
- Jean-Christophe> fix the current issue
-
-I disagree. The problem is that the I2C speed was forced to run too
-fast, against what the comment says and the knowledge that some devices
-don't support fast/highspeed i2c.
-
- Jean-Christophe> as you may find some stupid i2c chip that does not
- Jean-Christophe> work at 100kHz (some low cost MCU as example)
-
-If they don't work at 100KHz, then they most likely don't work at 185KHz
-either, so that's not a regression.
-
--- 
-Bye, Peter Korsgaard
+Rgds, Pieter
