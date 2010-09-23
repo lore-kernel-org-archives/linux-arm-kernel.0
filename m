@@ -1,61 +1,81 @@
-From: johnstul@us.ibm.com (john stultz)
-Date: Thu, 23 Sep 2010 12:48:51 -0700
-Subject: [PATCH 1/8] posix clocks: introduce a syscall for clock tuning.
-In-Reply-To: <b94ef1cd9c04ef3ad5964408bd0af7251add78de.1285261534.git.richard.cochran@omicron.at>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-	<b94ef1cd9c04ef3ad5964408bd0af7251add78de.1285261534.git.richard.cochran@omicron.at>
-Message-ID: <1285271331.2587.56.camel@localhost.localdomain>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 23 Sep 2010 12:53:58 -0700
+Subject: [PATCH 2/3] dmaengine: add wrapper functions for dmaengine
+In-Reply-To: <1281956870-12463-3-git-send-email-s.hauer@pengutronix.de>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <AANLkTin8v_29HESnmhE5==3OLmb29bmoOY1iona4C+eD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-23 at 19:31 +0200, Richard Cochran wrote:
-> A new syscall is introduced that allows tuning of a POSIX clock. The
-> syscall is implemented for four architectures: arm, blackfin, powerpc,
-> and x86.
-> 
-> The new syscall, clock_adjtime, takes two parameters, the clock ID,
-> and a pointer to a struct timex. The semantics of the timex struct
-> have been expanded by one additional mode flag, which allows an
-> absolute offset correction. When specificied, the clock offset is
-> immediately corrected by adding the given time value to the current
-> time value.
-
-
-So I'd still split this patch up a little bit more.
-
-1) Patch that implements the ADJ_SETOFFSET  (*and its implementation*)
-in do_adjtimex.
-
-2) Patch that adds the new syscall and clock_id multiplexing.
-
-3) Patches that wire it up to the rest of the architectures (there's
-still a bunch missing here).
-
-
-
-And one little nit in the code:
-
-> diff --git a/kernel/posix-timers.c b/kernel/posix-timers.c
-> index 9ca4973..446b566 100644
-> --- a/kernel/posix-timers.c
-> +++ b/kernel/posix-timers.c
-> @@ -197,6 +197,14 @@ static int common_timer_create(struct k_itimer *new_timer)
->  	return 0;
->  }
-> 
-> +static inline int common_clock_adj(const clockid_t which_clock, struct timex *t)
+On Mon, Aug 16, 2010 at 4:07 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Currently dmaengine users have to explicitely dereference function
+> pointers in struct dma_device. For the convenience of drivers and
+> to be more flexible when changing the dmaengine later add static
+> inline wrapper functions for the dma commands.
+>
+> This patch is not complete yet. If there's consensus on this patch
+> I'll provide an updated patch with the missing functions.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?include/linux/dmaengine.h | ? 41 +++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 41 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 0df7864..635c60b 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -491,6 +491,47 @@ struct dma_device {
+> ? ? ? ?void (*device_issue_pending)(struct dma_chan *chan);
+> ?};
+>
+> +static inline int dmaengine_device_control(struct dma_chan *chan,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_ctrl_cmd cmd,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long arg)
 > +{
-> +	if (CLOCK_REALTIME == which_clock)
-> +		return do_adjtimex(t);
-> +	else
-> +		return -EOPNOTSUPP;
+> + ? ? ? return chan->device->device_control(chan, cmd, arg);
+> +}
+> +
+> +static inline int dmaengine_slave_config(struct dma_chan *chan,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_slave_config *config)
+> +{
+> + ? ? ? return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+> + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)config);
+> +}
+> +
+> +static inline int dmaengine_terminate_all(struct dma_chan *chan)
+> +{
+> + ? ? ? return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+> +}
+> +
+> +static inline struct dma_async_tx_descriptor *dmaengine_prep_slave_sg(
+> + ? ? ? ? ? ? ? struct dma_chan *chan, struct scatterlist *sgl,
+> + ? ? ? ? ? ? ? unsigned int sg_len, enum dma_data_direction direction,
+> + ? ? ? ? ? ? ? unsigned long flags)
+> +{
+> + ? ? ? return chan->device->device_prep_slave_sg(chan, sgl, sg_len, direction,
+> + ? ? ? ? ? ? ? ? ? ? ? flags);
+> +}
+> +
+> +static inline struct dma_async_tx_descriptor *dmaengine_prep_cyclic(
+> + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+> + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
+> +{
+> + ? ? ? return chan->device->device_prep_dma_cyclic(chan, buf_addr, buf_len,
+> + ? ? ? ? ? ? ? ? ? ? ? period_len, direction);
+> +}
+> +
+
+No strong disagreements on the above, the type safety of
+dmaengine_slave_config() is nice.
+
+> +static inline int dmaengine_tx_submit(struct dma_async_tx_descriptor *desc)
+> +{
+> + ? ? ? return desc->tx_submit(desc);
 > +}
 
+This one can drop the tx.
 
-Would it make sense to point to the do_adjtimex() in the k_clock
-definition for CLOCK_REALTIME rather then conditionalizing it here?
-
-
-
-thanks
--john
+--
+Dan
