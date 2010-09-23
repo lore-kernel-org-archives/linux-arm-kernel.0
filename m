@@ -1,103 +1,82 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Thu, 23 Sep 2010 22:30:25 +0100
-Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
-In-Reply-To: <1285274952.2587.113.camel@localhost.localdomain>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-	<20100923213654.0c64b047@lxorguk.ukuu.org.uk>
-	<1285274952.2587.113.camel@localhost.localdomain>
-Message-ID: <20100923223025.2877cce2@lxorguk.ukuu.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Sep 2010 17:08:44 -0400 (EDT)
+Subject: [PATCH] ARM: implement CONFIG_STRICT_DEVMEM by disabling access to RAM
+	via /dev/mem
+Message-ID: <alpine.LFD.2.00.1009231707300.13233@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-O> I don't see how this is a problem, as it exposes the multiple hardware
-> clocks via different posix clock ids. So in the boundary clock case, you
-> can configure which side is the client and which side is the master in a
-> config file and the PTPd will appropriately steer them individually.
 
-They may all be slaves - that means you can't treat them as part of
-system time.
-> 
+There are very few legitimate use cases, if any, for directly accessing
+system RAM through /dev/mem.  So let's mimic what they do on x86 and
+forbid it when CONFIG_STRICT_DEVMEM is turned on.
 
-> on module unload, but I don't think we need a use-count to prevent the
-> module from being unloaded.
-> 
-> My question would be: How do we handle a USB network device ($14.99 now
-> with PTP!) being unplugged? We can't say "Sorry! That's in use!". So we
-> note the hardware is gone, and return the proper error code.
-> 
-> Or am I missing something else?
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Open list
-Oh number 31 appears to be the device I want
-Close list
-
-	USB unplugged
-	Random other device plugged
-
-clock_op(31, ....)
-
-Oh bugger I've just reprogrammed the wrong time source.
-
-We don't have stop the device being removed, instead of a disaster you get
-
-	clock_op(fd, blah)
-	-ENODEV
-
-which btw is how just about everything else USB works when you pull the
-hardware.
-
-> > And about 40 already supported by char driver interface clocks and rtcs
-> > in the kernel...
-> 
-> And those char driver interfaces are all subtly different.
-> 
-> I actually recently submitted an RFC to expose the RTC devices via the
-> posix clock/timer interface, because working with the RTC hardware
-> device directly is terrible for managing alarm interrupts. 
-
-Given that driver interfaces are sane and posix clock/timer interfaces
-have totally broken enumeration maybe you have it backwards. But if you
-follow through to my proposal maybe there is a saner answer still
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 91344af..c29fb38 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -2,6 +2,20 @@ menu "Kernel hacking"
  
-> For instance, you easily run into the case where your TV recording
-> application programs an alarm to record your favorite show at 8pm. Then
-> your backup script programs an alarm to wake up at 2am to do your
-> nightly backups. Your box suspends and the next morning, you're missing
-> your favorite show!
-
-Poor resource management, and yes I'd agree you want a sensible interface.
-
-
-> > Drop the clockid_t and swap it for a file handle like a proper Unix or
-> > Linux interface. The rest is much the same
-> > 
-> > 	fd = open /sys/class/timesource/[whatever]
-> > 
-> > 	various queries you may want to do to check the name etc
-> > 
-> > 	fclock_adjtime(fd, ...)
-> > 	
-> > 
-> > The posix interface is fundamentally flawed. It only works for staticly
-> > enumerable objects. Unix avoided that forty years ago by making the
-> > identifier a handle which immediately cures all your object lifetime
-> > problems in one swoop.
-> 
-> So, I don't really see how that's so different from what is being
-> proposed. The clock_id is dynamically assigned per registered clock, and
-> exposed via the sysfs interface from ptp hardware entry.
-> 
-> The only difference is the open/close reference counting, which I don't
-> think is necessary here (since we can't always keep the hardware from
-> going away).
-
-It is absolutely neccessary in order that you can be sure that two calls
-actually relate to the *same* device. It's as fundamental as the
-difference betweeh chmod and fchmod although with the added ugliness of
-some random numeric identifier stuck in the middle.
-
-It also btw makes it much easier to fix up the existing random collection
-of /dev/rtc devices - because you can open them and issue fclock_adjtime
-if we are careful how we do it and it makes sense.
-
-Alan
+ source "lib/Kconfig.debug"
+ 
++config STRICT_DEVMEM
++	bool "Filter access to /dev/mem"
++	depends on MMU
++	---help---
++	  If this option is disabled, you allow userspace (root) access to all
++	  of memory, including kernel and userspace memory. Accidental
++	  access to this is obviously disastrous, but specific access can
++	  be used by people debugging the kernel.
++
++	  If this option is switched on, the /dev/mem file only allows
++	  userspace access to memory mapped peripherals.
++
++          If in doubt, say Y.
++
+ # RMK wants arm kernels compiled with frame pointers or stack unwinding.
+ # If you know what you are doing and are willing to live without stack
+ # traces, you can get a slightly smaller kernel by setting this option to
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 1261b1f9..815efa2 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -294,6 +294,7 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+ #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+ extern int valid_phys_addr_range(unsigned long addr, size_t size);
+ extern int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
++extern int devmem_is_allowed(unsigned long pfn);
+ #endif
+ 
+ /*
+diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+index 4f5b396..b0a9830 100644
+--- a/arch/arm/mm/mmap.c
++++ b/arch/arm/mm/mmap.c
+@@ -144,3 +144,25 @@ int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
+ {
+ 	return !(pfn + (size >> PAGE_SHIFT) > 0x00100000);
+ }
++
++#ifdef CONFIG_STRICT_DEVMEM
++
++#include <linux/ioport.h>
++
++/*
++ * devmem_is_allowed() checks to see if /dev/mem access to a certain
++ * address is valid. The argument is a physical page number.
++ * We mimic x86 here by disallowing access to system RAM as well as
++ * device-exclusive MMIO regions. This effectively disable read()/write()
++ * on /dev/mem.
++ */
++int devmem_is_allowed(unsigned long pfn)
++{
++	if (iomem_is_exclusive(pfn << PAGE_SHIFT))
++		return 0;
++	if (!page_is_ram(pfn))
++		return 1;
++	return 0;
++}
++
++#endif
