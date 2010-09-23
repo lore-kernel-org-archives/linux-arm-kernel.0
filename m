@@ -1,36 +1,47 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 23 Sep 2010 14:08:05 +0800
-Subject: PXA270 audio problem
-In-Reply-To: <AANLkTi=_AANevVpthOKuRfkkvU9mKMWsmpHc+XohoUwg@mail.gmail.com>
-References: <AANLkTi=_AANevVpthOKuRfkkvU9mKMWsmpHc+XohoUwg@mail.gmail.com>
-Message-ID: <AANLkTimOM7EnMgfDVqZ-Oq_cLOUwR-GeKEwDD9HsLqQa@mail.gmail.com>
+From: mfm@muteddisk.com (matt mooney)
+Date: Wed, 22 Sep 2010 23:50:18 -0700
+Subject: [PATCH 04/20] arm: change to new flag variables
+Message-ID: <1285224618-29564-1-git-send-email-mfm@muteddisk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 1:33 PM, Santhosh N <san.mlists@gmail.com> wrote:
-> Dear All,
->
-> I am running linux 2.6.26 kernel on a PXA270 board. A UCB1400 chip
-> used for audio and touchscreen in that. I have been facing a problem
-> with audio.
->
-> The audio plays properly, but suddenly stops. I get the following message:
-> ALSA sound/core/pcm_native.c:1513: playback drain error (DMA or IRQ trouble?)
->
-> I have noticed that the DMA interrupts stop coming. Where as the AC97
-> interrupts come properly.
->
-> Any help in solving this will be grateful.
->
+Replace EXTRA_CFLAGS with ccflags-y and EXTRA_AFLAGS with asflags-y.
 
-Dumping the DMA registers and the AC97 controller registers would
-be helpful.
+Signed-off-by: matt mooney <mfm@muteddisk.com>
+---
+ arch/arm/boot/compressed/Makefile |    4 ++--
+ arch/arm/vfp/Makefile             |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-> Regards,
-> Santhosh N
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index b23f6bc..9ba5726 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -76,8 +76,8 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
+-EXTRA_CFLAGS  := -fpic -fno-builtin
+-EXTRA_AFLAGS  := -Wa,-march=all
++ccflags-y := -fpic -fno-builtin
++asflags-y := -Wa,-march=all
+ 
+ # Supply ZRELADDR to the decompressor via a linker symbol.
+ ifneq ($(CONFIG_AUTO_ZRELADDR),y)
+diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+index 39f6d8e..6de73aa 100644
+--- a/arch/arm/vfp/Makefile
++++ b/arch/arm/vfp/Makefile
+@@ -4,8 +4,8 @@
+ # Copyright (C) 2001 ARM Limited
+ #
+ 
+-# EXTRA_CFLAGS := -DDEBUG
+-# EXTRA_AFLAGS := -DDEBUG
++# ccflags-y := -DDEBUG
++# asflags-y := -DDEBUG
+ 
+ KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
+ LDFLAGS		+=--no-warn-mismatch
+-- 
+1.7.2.1
