@@ -1,47 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Sep 2010 16:03:22 -0700
-Subject: [GIT PULL] omap: sram fixes and omap4 es2.0 support
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD469D0D@dbde02.ent.ti.com>
-References: <EAF47CD23C76F840A9E7FCE10091EFAB02CD469D0D@dbde02.ent.ti.com>
-Message-ID: <20100924230322.GN4211@atomide.com>
+From: tim.nordell@logicpd.com (Tim Nordell)
+Date: Fri, 24 Sep 2010 18:12:45 -0500
+Subject: [PATCH v3 0/5] LogicPD minimal board support for LV_SOM and Torpedo
+In-Reply-To: <1285358338-3403-1-git-send-email-tim.nordell@logicpd.com>
+References: <1285358338-3403-1-git-send-email-tim.nordell@logicpd.com>
+Message-ID: <1285369970-29454-1-git-send-email-tim.nordell@logicpd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100923 23:24]:
-> Tony,
-> 
-> The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
->   Linus Torvalds (1):
->         Linux 2.6.36-rc5
-> 
-> are available in the git repository at:
-> 
->   git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap_for_2.6.37
+Adding minimal board support for LogicPD's LV_SOM and Torpedo devkits.  
+This mainly includes only Serial, Ethernet and SD card support for now.
 
-Thanks, pulling these into omap-for-linus.
+This was tested (and based) against 2.6.36-rc5.
 
-Tony
+
+>From bogus@does.not.exist.com  Sat Sep 18 23:17:21 2010
+From: bogus@does.not.exist.com ()
+Date: Sun, 19 Sep 2010 03:17:21 -0000
+Subject: No subject
+Message-ID: <mailman.7.1285369975.1886.linux-arm-kernel@lists.infradead.org>
+
+ - Added in a fifth patch that configures UART1 for low level debug
+   support on the LV_SOM and Torpedo
+
+Differences from Patch v2 1/4:
+ - I've removed the init_sdram() functions and have passed NULL into
+   sdrc parameters for omap2_init_common_hw().  This is mainly because
+   we have multiple revisions of these boards that contain different
+   memory settings and since we currently don't have any code in the
+   kernel for detecting which revision is being used (it is possible
+   and will be done later), we will leave it up to the boot loader to
+   correctly setup the memory timings.
+
+ - Modified the description slightly in Kconfig so that the LV_SOM
+   and torpedo were consistent in their naming.  Removed a couple of
+   trailing spaces here as well
+   
+ - Fixed indentation of "vmmc", line inside omap3logic_vmmc1_supply
  
-> David Anders (1):
->       omap4: Panda: Add DEBUG_LL support
-> 
-> Santosh Shilimkar (3):
->       omap4: Update id.c and cpu.h for es2.0
->       omap4: l2x0: Fix init parameter for es2.0
->       omap4: Fix bootup crash observed with higher CPU clocks
-> 
-> Vikram Pandita (2):
->       omap: sram: fix is_sram_locked check
->       omap4: sram: Fix start address
-> 
->  arch/arm/mach-omap2/id.c                     |   38 +++++++++++++++++++++-----
->  arch/arm/mach-omap2/omap4-common.c           |   10 +++++--
->  arch/arm/plat-omap/dmtimer.c                 |    2 +-
->  arch/arm/plat-omap/include/plat/cpu.h        |    5 +++-
->  arch/arm/plat-omap/include/plat/uncompress.h |    1 +
->  arch/arm/plat-omap/sram.c                    |   13 +-------
->  6 files changed, 46 insertions(+), 23 deletions(-)
-> 
-> Regards,
-> Santosh
-> (As per thread: http://www.spinics.net/lists/linux-omap/msg37131.html)
+ - Removed omap3logic_map_io() and replaced with generic
+   omap3_map_io().  These functions were identical and it didn't make 
+   sense to have the local board one.
+   
+ - Removed addition of boards to omap2_defconfig, and added "default y"
+   to both boards in Kconfig
+
+Differences from Patch v2 2/4:
+ - Moved comments in board_mmc_init() relating to which board was
+   detected to inside each each conditional portion of code rather
+   than immediately above the given code section
+ 
+Differences from Patch v2 3/4:
+ - No changes
+ 
+Differences from Patch v2 4/4:
+ - Moved the omap3torpedo_fix_pbias_voltage() out to part of the 
+   omap3logic_init() function rather than being called from within
+   the SMSC911x init function.  This is because there are other IRQ 
+   lines that also use the pins affected by having the rail turned on
+   for these GPIO pins.
+   
+ - Moved the comments to just inside the conditionals for lv_som 
+   versus torpedo selection in board_smsc911x_init(), rather than 
+   above the conditionals of each.
+   
+ - Removed dead code from within board_smsc911x_init().
+
+Note: I am taking over from Jacob Tanenbaum's earlier patches that were
+submitted in August.  I wasn't sure entirely what the protocol was,
+so these are all signed by me.
+
+Tim Nordell (5):
+  Adding LogicPD OMAP3 board support
+  ARM: OMAP3LOGIC: Adding SDMMC support
+  ARM: OMAP3: Add generic smsc911x support when connected to GPMC
+  ARM: OMAP3LOGIC: Added SMSC Ethernet board support
+  ARM: OMAP3LOGIC: Adding low-level debug support
+
+ arch/arm/mach-omap2/Kconfig                     |   18 ++
+ arch/arm/mach-omap2/Makefile                    |    7 +
+ arch/arm/mach-omap2/board-omap3logic.c          |  244 +++++++++++++++++++++++
+ arch/arm/mach-omap2/gpmc-smsc911x.c             |  113 +++++++++++
+ arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |   35 ++++
+ arch/arm/plat-omap/include/plat/uncompress.h    |    2 +
+ 6 files changed, 419 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-omap3logic.c
+ create mode 100644 arch/arm/mach-omap2/gpmc-smsc911x.c
+ create mode 100644 arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
