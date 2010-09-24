@@ -1,32 +1,75 @@
-From: tim.nordell@logicpd.com (Tim Nordell)
-Date: Fri, 24 Sep 2010 18:12:50 -0500
-Subject: [PATCH v3 5/5] ARM: OMAP3LOGIC: Adding low-level debug support
-In-Reply-To: <1285358338-3403-1-git-send-email-tim.nordell@logicpd.com>
-References: <1285358338-3403-1-git-send-email-tim.nordell@logicpd.com>
-Message-ID: <1285369970-29454-6-git-send-email-tim.nordell@logicpd.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 24 Sep 2010 16:44:46 -0700
+Subject: RFC: mixing device idle and CPUidle or non-atomic idle notifiers
+Message-ID: <87iq1uwvtd.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defined UART1 as the low-level debug port for both the
-omap3530_lv_som board and the omap3_torpedo board.
+Now that we have runtime PM for devices, I'm exploring ways of how to
+couple the runtime PM of certain devices with CPUidle transitions.
+Ideally, CPUidle should only manage CPU idle states, and device idle
+states would be managed separately using runtime PM.  However, there are
+cases where the device idle transistions need to be coordinated with CPU
+idle transistions.  This is already a proposed topic for the PM
+mini-conf at Plumbers'[1], so this RFC is to get the discussion started.
 
-Signed-off-by: Tim Nordell <tim.nordell@logicpd.com>
----
- arch/arm/plat-omap/include/plat/uncompress.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+In the wild west (before runtime PM), we managed these special cases on
+OMAP by having some special hacks^Whooks for certain drivers that were
+called during idle.  When these devices are converted to using runtime
+PM, ideally we'd like initiate device runtime PM transitions for these
+devices somehow coordinated with CPU idle transitions.
 
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index ddf723b..ff9f3a2 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -139,6 +139,8 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		DEBUG_LL_OMAP2(1, omap3evm);
- 		DEBUG_LL_OMAP3(1, omap_3430sdp);
- 		DEBUG_LL_OMAP3(1, omap_3630sdp);
-+		DEBUG_LL_OMAP3(1, omap3530_lv_som);
-+		DEBUG_LL_OMAP3(1, omap3_torpedo);
- 
- 		/* omap3 based boards using UART3 */
- 		DEBUG_LL_OMAP3(3, cm_t35);
--- 
-1.7.1
+So, I started to explore how to coordinate device runtime PM transitions
+with CPU idle transitions.
+
+One of the fundamental problems is that by the time CPUidle is entered,
+interrupts are already disabled, and runtime PM cannot be used from
+interrupts disabled context (c.f. thread on linux-pm[1].)
+
+So that led me down the path of exploring whether we really need to have
+interrupts disabled during the early part of CPUidle.  It seems to me
+that during the time when the governor is selecting a state, and when
+the platform-specific code is checking for device/bus activity,
+interrupts do not really need to be disabled yet.  At least, I didn't
+come up with a good reason why they need to be disabled so early, hence
+the RFC.
+
+Here's a simplified version how it works today:
+
+/* arch/arm/kernel/process.c, arch/x86/kernel/process_*.c */
+cpu_idle()  
+    local_irq_disable()    
+    pm_idle()  --> cpuidle_idle_call()
+
+cpuidle_idle_call()
+    dev->prepare()
+    target_state = governor->select()  /* selects next state */
+    target_state->enter()
+        /* the ->enter hook must enable IRQs before returning */
+
+As a quick hack, I just (re)enabled interrupts in our CPUidle
+->prepare() hook (they're later disabled again before the core idle is
+run.)  This allowed the calling of device-specific idle functions which
+then use runtime PM and thus allows device-specific idle to be
+coordinated with the CPU idle.
+
+So back to the main question... do we really need interrupts disabled so
+early in the idle path? 
+
+I'm sure I'm missing something obvious about why this can't work, but
+it's Friday and my brain prefers to think about beer rather than
+CPUidle.
+
+Or, as another potential option...
+
+I just discovered that x86_64 has an atomic idle_notifier called just
+before idle (c.f. arch/x86/kernel/process_64.c.)  However this is also
+done with interrupts disabled, so using this has the same problems with
+interrupts disabled.  But, what about adding an additional notifier
+chain that happens with interrupts still enabled....  hmm, will
+ponder that over that beer...
+
+Kevin
+
+[1] http://www.linuxplumbersconf.org/2010/ocw/proposals/717
+[1] https://lists.linux-foundation.org/pipermail/linux-pm/2010-August/028124.html
