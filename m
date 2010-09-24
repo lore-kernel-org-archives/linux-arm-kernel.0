@@ -1,39 +1,143 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 24 Sep 2010 10:40:11 -0600
-Subject: [PATCH 0/3] OMAP: hwmod/device/CM: bug fixes for 2.6.37
-Message-ID: <20100924163936.19418.47065.stgit@twilight.localdomain>
+Date: Fri, 24 Sep 2010 10:40:12 -0600
+Subject: [PATCH 1/3] OMAP: omap_device: Fix to support multiple hwmods for a
+	single device
+In-Reply-To: <20100924163936.19418.47065.stgit@twilight.localdomain>
+References: <20100924163936.19418.47065.stgit@twilight.localdomain>
+Message-ID: <20100924164011.19418.20378.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Kishon Vijay Abraham I <kishon@ti.com>
 
-Here are a few bugfix patches for the omap_hwmod, omap_device,
-and CM code, intended to be merged in 2.6.37 via Tony's tree.
- 
-This series applies on top of the 2.6.37 hwmod patches sent earlier;
-unfortunately the third patch touches the same code as a patch in that
-series, so this series can't be based on v2.6.36-rc5.
+Currently there is a bug in the existing omap_device core code when
+extracting the hwmod structures passed to omap_device_build_ss(). This bug
+gets exposed only when passing multiple hwmod structures to
+omap_device_build_ss() resulting in incorrect extraction from second hwmod
+structure.
 
+This fix uses the pointer to pointer to omap_hwmod structure (array of
+pointers to omap_hwmod structure) passed to omap_device_build_ss() to
+correctly extract the appropriate omap_hwmod structure.
 
-- Paul
+This patch has been created and tested on lo/master and mainline.
 
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Acked-by: Benoit Cousson <b-cousson@ti.com>
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Charulatha V <charu@ti.com>
+Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
-
-   text	   data	    bss	    dec	    hex	filename
-3361500	 176832	  99336	3637668	 3781a4	vmlinux.omap_4430sdp_defconfig.orig
-3361468	 176832	  99336	3637636	 378184	vmlinux.omap_4430sdp_defconfig.patched
-
-Hema HK (1):
-      OMAP: hwmod: Set autoidle after smartidle during _sysc_enable
-
-Kishon Vijay Abraham I (1):
-      OMAP: omap_device: Fix to support multiple hwmods for a single device
-
-Rajendra Nayak (1):
-      OMAP4: PM: Declare idle modules as functional too
-
-
- arch/arm/mach-omap2/cm4xxx.c     |    9 +++++----
- arch/arm/mach-omap2/omap_hwmod.c |   17 +++++++++++------
  arch/arm/plat-omap/omap_device.c |   35 ++++++++++++++---------------------
- 3 files changed, 30 insertions(+), 31 deletions(-)
+ 1 files changed, 14 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index ceba58a..533ad13 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -296,12 +296,11 @@ static void _add_optional_clock_alias(struct omap_device *od,
+  */
+ int omap_device_count_resources(struct omap_device *od)
+ {
+-	struct omap_hwmod *oh;
+ 	int c = 0;
+ 	int i;
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+-		c += omap_hwmod_count_resources(oh);
++	for (i = 0; i < od->hwmods_cnt; i++)
++		c += omap_hwmod_count_resources(od->hwmods[i]);
+ 
+ 	pr_debug("omap_device: %s: counted %d total resources across %d "
+ 		 "hwmods\n", od->pdev.name, c, od->hwmods_cnt);
+@@ -328,12 +327,11 @@ int omap_device_count_resources(struct omap_device *od)
+  */
+ int omap_device_fill_resources(struct omap_device *od, struct resource *res)
+ {
+-	struct omap_hwmod *oh;
+ 	int c = 0;
+ 	int i, r;
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++) {
+-		r = omap_hwmod_fill_resources(oh, res);
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		r = omap_hwmod_fill_resources(od->hwmods[i], res);
+ 		res += r;
+ 		c += r;
+ 	}
+@@ -607,7 +605,6 @@ int omap_device_shutdown(struct platform_device *pdev)
+ {
+ 	int ret, i;
+ 	struct omap_device *od;
+-	struct omap_hwmod *oh;
+ 
+ 	od = _find_by_pdev(pdev);
+ 
+@@ -620,8 +617,8 @@ int omap_device_shutdown(struct platform_device *pdev)
+ 
+ 	ret = _omap_device_deactivate(od, IGNORE_WAKEUP_LAT);
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+-		omap_hwmod_shutdown(oh);
++	for (i = 0; i < od->hwmods_cnt; i++)
++		omap_hwmod_shutdown(od->hwmods[i]);
+ 
+ 	od->_state = OMAP_DEVICE_STATE_SHUTDOWN;
+ 
+@@ -733,11 +730,10 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od)
+  */
+ int omap_device_enable_hwmods(struct omap_device *od)
+ {
+-	struct omap_hwmod *oh;
+ 	int i;
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+-		omap_hwmod_enable(oh);
++	for (i = 0; i < od->hwmods_cnt; i++)
++		omap_hwmod_enable(od->hwmods[i]);
+ 
+ 	/* XXX pass along return value here? */
+ 	return 0;
+@@ -751,11 +747,10 @@ int omap_device_enable_hwmods(struct omap_device *od)
+  */
+ int omap_device_idle_hwmods(struct omap_device *od)
+ {
+-	struct omap_hwmod *oh;
+ 	int i;
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+-		omap_hwmod_idle(oh);
++	for (i = 0; i < od->hwmods_cnt; i++)
++		omap_hwmod_idle(od->hwmods[i]);
+ 
+ 	/* XXX pass along return value here? */
+ 	return 0;
+@@ -770,11 +765,10 @@ int omap_device_idle_hwmods(struct omap_device *od)
+  */
+ int omap_device_disable_clocks(struct omap_device *od)
+ {
+-	struct omap_hwmod *oh;
+ 	int i;
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+-		omap_hwmod_disable_clocks(oh);
++	for (i = 0; i < od->hwmods_cnt; i++)
++		omap_hwmod_disable_clocks(od->hwmods[i]);
+ 
+ 	/* XXX pass along return value here? */
+ 	return 0;
+@@ -789,11 +783,10 @@ int omap_device_disable_clocks(struct omap_device *od)
+  */
+ int omap_device_enable_clocks(struct omap_device *od)
+ {
+-	struct omap_hwmod *oh;
+ 	int i;
+ 
+-	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+-		omap_hwmod_enable_clocks(oh);
++	for (i = 0; i < od->hwmods_cnt; i++)
++		omap_hwmod_enable_clocks(od->hwmods[i]);
+ 
+ 	/* XXX pass along return value here? */
+ 	return 0;
