@@ -1,51 +1,54 @@
 From: kishorek.kadiyala@gmail.com (kishore kadiyala)
-Date: Fri, 24 Sep 2010 21:54:36 +0530
-Subject: [PATCH v3 2/4] omap4 hsmmc: Fix the init if CONFIG_MMC_OMAP_HS is
-	not set
-In-Reply-To: <4C9A457B.4060500@ru.mvista.com>
-References: <14880.10.24.255.18.1285173821.squirrel@dbdmail.itg.ti.com>
-	<4C9A457B.4060500@ru.mvista.com>
-Message-ID: <AANLkTikADtXK=+vi_r9c7XHbwt1UjZoJv2VndmbJEqau@mail.gmail.com>
+Date: Fri, 24 Sep 2010 22:01:48 +0530
+Subject: [PATCH v3 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <AANLkTikLqi4=OOJ_ciMqTt7HKJzDo-WsZJ8D2CpP712c@mail.gmail.com>
+References: <14833.10.24.255.18.1285173812.squirrel@dbdmail.itg.ti.com>
+	<8F7AF80515AF0D4D93307E594F3CB40E5F57C548@dlee03.ent.ti.com>
+	<AANLkTikLqi4=OOJ_ciMqTt7HKJzDo-WsZJ8D2CpP712c@mail.gmail.com>
+Message-ID: <AANLkTim0Qm=x3vVuT26oSNzTg+BZV+KCAJj5oVs3etWD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 22, 2010 at 11:35 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
-> kishore kadiyala wrote:
->
->> From: Benoit Cousson <b-cousson@ti.com>
->
->> Avoid possible crash if CONFIG_MMC_OMAP_HS is not set
->
->> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
->> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
->> ---
->> ?arch/arm/mach-omap2/board-4430sdp.c | ? ?8 +++++++-
->> ?1 files changed, 7 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-4430sdp.c
->> b/arch/arm/mach-omap2/board-4430sdp.c
->> index a49f285..ac8541c 100644
->> --- a/arch/arm/mach-omap2/board-4430sdp.c
->> +++ b/arch/arm/mach-omap2/board-4430sdp.c
->> @@ -240,8 +240,14 @@ static int omap4_twl6030_hsmmc_late_init(struct
->> device *dev)
->>
->> ?static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
->> ?{
->> - ? ? ? struct omap_mmc_platform_data *pdata = dev->platform_data;
->> + ? ? ? struct omap_mmc_platform_data *pdata;
->>
->> + ? ? ? /* dev can be null if CONFIG_MMC_OMAP_HS is not set */
->> + ? ? ? if (!dev) {
->> + ? ? ? ? ? ? ? pr_err("Failed omap4_twl6030_hsmmc_set_late_init\n");
->
-> ? pr_err("Failed %s\n", __func__);
+Hi Hari,
 
-OK , will have as mentioned
+
+On Thu, Sep 23, 2010 at 11:22 AM, kishore kadiyala
+<kishorek.kadiyala@gmail.com> wrote:
+> Hi Hari,
 >
-> WBR, Sergei
+> On Thu, Sep 23, 2010 at 1:19 AM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
+>> Kishore,
+>>
+>>> +int twl6030_mmc_card_detect(struct device *dev, int slot)
+>>> +{
+>>> + ? ? int ret = -EIO;
+>>> + ? ? u8 read_reg = 0;
+>>> + ? ? struct platform_device *pdev = to_platform_device(dev);
+>>> +
+>>> + ? ? switch (pdev->id) {
+>>> + ? ? case 0:
+>>> + ? ? ? ? ? ? /*
+>>> + ? ? ? ? ? ? ?* BIT0 of REG_MMC_CTRL
+>>> + ? ? ? ? ? ? ?* 0 - Card not present ,1 - Card present
+>>> + ? ? ? ? ? ? ?*/
+>>> + ? ? ? ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &read_reg,
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_MMCCTRL);
+>>> + ? ? ? ? ? ? if (ret >= 0)
+>>> + ? ? ? ? ? ? ? ? ? ? ret = read_reg & STS_MMC;
+>>> + ? ? ? ? ? ? break;
+>>
+>> nitpick: may be you don't need a switch statement for only one case.
+>
+> From future perspective,since there are 5 MMC controllers on OMAP4
+> and current patch supports card detect feature only for one controller i.e MMC1
+> as of now. Once the interfaces connected on the remaining 4 MMC controllers
+> are defined further additions will be required for respective cases.
+
+
+Correcting my previous comment, I've just verified twl6030 current
+version spec on OMAP4
+which can provide card detect interrupt only for one MMC controller i.e MMC1.
+I will replace switch with if.
 
 Regards,
 Kishore
