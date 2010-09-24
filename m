@@ -1,45 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 24 Sep 2010 11:17:51 -0600 (MDT)
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 24 Sep 2010 12:26:55 -0500
 Subject: [PATCH 1/2] OMAP: features: export symbol omap3_features
-In-Reply-To: <alpine.DEB.2.00.1009241053400.10678@utopia.booyaka.com>
+In-Reply-To: <alpine.DEB.2.00.1009241114290.10678@utopia.booyaka.com>
 References: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
 	<alpine.DEB.2.00.1009240920370.10678@utopia.booyaka.com>
 	<4C9CD72E.40407@ti.com>
 	<alpine.DEB.2.00.1009241053400.10678@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1009241114290.10678@utopia.booyaka.com>
+	<alpine.DEB.2.00.1009241114290.10678@utopia.booyaka.com>
+Message-ID: <4C9CDF5F.8090006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Sep 2010, Paul Walmsley wrote:
-
-> On Fri, 24 Sep 2010, Nishanth Menon wrote:
+Paul Walmsley had written, on 09/24/2010 12:17 PM, the following:
+> On Fri, 24 Sep 2010, Paul Walmsley wrote:
 > 
-> > The intent of omap_has_featureX() is to ensure that the drivers dont do
-> > cpu_is_omap123(). Now if we had OMAP dma driver which has DMA chaining - what
-> > options do we have DMA driver?
-> > 
-> > a) we introduce it based on cpu_is_omap123() -> bad bad nightmare for
-> > maintenance
-> > b) we introduce it based on module h/w block(TI internal terminology "IP
-> > block") revision -> unfortunately no luck in some of the h/w blocks.
-> > c) we use if (omap_has_dma_chaining())
+>> On Fri, 24 Sep 2010, Nishanth Menon wrote:
+>>
+>>> The intent of omap_has_featureX() is to ensure that the drivers dont do
+>>> cpu_is_omap123(). Now if we had OMAP dma driver which has DMA chaining - what
+>>> options do we have DMA driver?
+>>>
+>>> a) we introduce it based on cpu_is_omap123() -> bad bad nightmare for
+>>> maintenance
+>>> b) we introduce it based on module h/w block(TI internal terminology "IP
+>>> block") revision -> unfortunately no luck in some of the h/w blocks.
+>>> c) we use if (omap_has_dma_chaining())
+>> d) you pass in errata/feature flags via a platform_data struct, like 
+>> McBSP, McSPI, MMC, MUSB, I2C, etc. already do on OMAP.  On OMAP1, which 
+>> doesn't have hwmod support, you set your platform_data in your OMAP1 
+>> integration code.  On OMAP2+ (which has hwmod support), you define your 
+>> errata/feature flags and any other integration data that you need to pass 
+>> via the struct omap_hwmod.dev_attr field, then pass that data via struct 
+>> platform_data in the OMAP2+ integration code.
 > 
-> d) you pass in errata/feature flags via a platform_data struct, like 
-> McBSP, McSPI, MMC, MUSB, I2C, etc. already do on OMAP.  On OMAP1, which 
-> doesn't have hwmod support, you set your platform_data in your OMAP1 
-> integration code.  On OMAP2+ (which has hwmod support), you define your 
-> errata/feature flags and any other integration data that you need to pass 
-> via the struct omap_hwmod.dev_attr field, then pass that data via struct 
-> platform_data in the OMAP2+ integration code.
+> Just to clarify something that may be unclear: there's no problem with 
+> calling cpu_is_omapXXXX(), or any other OMAP core-specific function, from 
+> the OMAP<->driver integration code, living in arch/arm/*omap*.  The 
+> results of those functions can then be passed through platform_data.  But 
+> there is a problem with calling OMAP core-specific functions directly from 
+> the driver code itself, since driver code should be completely 
+> platform-independent -- e.g., the same DMA controller could exist on OMAP, 
+> DaVinci, etc.
+> 
+yep. your comment makes sense now. thanks for clarifying. NAK from me as 
+well.
 
-Just to clarify something that may be unclear: there's no problem with 
-calling cpu_is_omapXXXX(), or any other OMAP core-specific function, from 
-the OMAP<->driver integration code, living in arch/arm/*omap*.  The 
-results of those functions can then be passed through platform_data.  But 
-there is a problem with calling OMAP core-specific functions directly from 
-the driver code itself, since driver code should be completely 
-platform-independent -- e.g., the same DMA controller could exist on OMAP, 
-DaVinci, etc.
-
-
-- Paul
+-- 
+Regards,
+Nishanth Menon
