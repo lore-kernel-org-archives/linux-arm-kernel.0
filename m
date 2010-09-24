@@ -1,55 +1,27 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 24 Sep 2010 07:58:09 -0700
-Subject: [PATCH 1/2] OMAP: features: export symbol omap3_features
-In-Reply-To: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com> (Omar
-	Ramirez Luna's message of "Thu, 23 Sep 2010 22:41:04 -0500")
-References: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <874odfkx32.fsf@deeprootsystems.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 24 Sep 2010 16:06:08 +0100
+Subject: Regarding hw irq to Linux irq mapping on ARM
+In-Reply-To: <4C9BE69C.9070609@fluff.org>
+References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
+	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
+	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
+	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
+	<1285133481.30449.170.camel@pasglop>
+	<AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>
+	<4C9BE69C.9070609@fluff.org>
+Message-ID: <20100924150608.GB30666@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Omar Ramirez Luna <omar.ramirez@ti.com> writes:
+On Fri, Sep 24, 2010 at 12:45:32AM +0100, Ben Dooks wrote:
+> On 22/09/10 09:59, Eric Miao wrote:
 
-> From: Kevin Hilman <khilman@deeprootsystems.com>
+> >> And i2c in many cases want to be called from sleep'able context... might
+> >> be a good idea to restrict some of these to threaded interrupts. A whole
+> >> different discussion I suppose.
 
-Minor nit, can you make the subject something like:
+> The i2c case, it is generally the code decoding the interrupt that needs
+> to do this, and is part of the i2c specific driver, and is written as
+> some form of thread or work-queue.
 
-   OMAP: features: make feature checks available to modules
-
-Thanks,
-
-Kevin
-
-> Since omap3_features is a global variable, only code
-> built-in the kernel can make use of it and thus use
-> omap_has ##feat functions; exporting this as a kernel
-> symbol makes modules able to use feature detection
-> framework too.
->
-> Thread: http://marc.info/?l=linux-omap&m=128528822902211&w=2
->
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-> CC: Tony Lindgren <tony@atomide.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Nishanth Menon <nm@ti.com>
-> CC: Paul Walmsley <paul@pwsan.com>
-> CC: Sanjeev Premi <premi@ti.com>
-> CC: linux-omap at vger.kernel.org
-> CC: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/mach-omap2/id.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 9a879f9..a8c6d19 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -31,6 +31,7 @@ static struct omap_chip_id omap_chip;
->  static unsigned int omap_revision;
->  
->  u32 omap3_features;
-> +EXPORT_SYMBOL(omap3_features);
->  
->  unsigned int omap_rev(void)
->  {
+The standard thing these days is a threaded IRQ handler.
