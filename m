@@ -1,495 +1,221 @@
-From: ashley.hughes@blueyonder.co.uk (Ash Hughes)
-Date: Fri, 24 Sep 2010 19:06:46 +0100
-Subject: [PATCH 1/1] ARM Orion: added Buffalo LS-CHL support
-Message-ID: <000001cb5c13$41f1f0e0$c5d5d2a0$@blueyonder.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Sep 2010 11:12:09 -0700
+Subject: [PATCH 00/11] omap patches for review for v2.6.37 merge window
+In-Reply-To: <20100924085337.69c99bd8.jhnikula@gmail.com>
+References: <20100924014938.10325.35279.stgit@baageli.muru.com>
+	<20100924085337.69c99bd8.jhnikula@gmail.com>
+Message-ID: <20100924181209.GF4211@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ash Hughes <ashley.hughes@blueyonder.co.uk>
-Adds support for Buffalo Linkstation Live v3 (LS-CHL) NAS drives.
-Signed-off-by: Ash Hughes <ashley.hughes@blueyonder.co.uk>
+* Jarkko Nikula <jhnikula@gmail.com> [100923 22:45]:
+> On Thu, 23 Sep 2010 18:50:38 -0700
+> Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > Hi all,
+> > 
+> > Here are some omap patches that have not yet been posted to
+> > linux-arm-kernel for review.
+> > 
+> > Jarkko Nikula (4):
+> >       omap: n8x0: Cleanup i2c1 and menelaus registration
+> >       omap: n8x0: Register i2c2 and add board info with tlv320aic3xfor N810
+> >       omap: n8x0: Mux i2s codec port pins for McBSP block
+> >       omap2: McBSP: Remove mux code for OMAP2420 McBSP2 and docleanups
+> > 
+> ...
+> > Subramaniam C.A (1):
+> >       omap: i2c: Avoid compilation error in case the header is included multiple times
+> > 
+> Hmm... I wonder do I have something wrong or in patchwork but it looks
+> like somehow a line feed gets introduced to subject line of some of
+> my patches. And it seems to do with my patches only.
+> 
+> Original patch in my mailbox or archive doesn't show it but it is in
+> patchwork.
+> 
+> http://marc.info/?l=linux-omap&m=128324955316265&w=2
+> https://patchwork.kernel.org/patch/144841/mbox
 
----
+Hmm yeah looks like patchwork wraps the subject line.. Need to look
+to see where the bug is later on.
 
-Code has been in use for several months:
-http://forum.buffalo.nas-central.org/viewtopic.php?f=18&t=13566
+Here's the patch with fixed subject.
 
-diff -urBN linux-2.6.34-vanilla/arch/arm/mach-orion5x/Kconfig linux-2.6.34/arch/arm/mach-orion5x/Kconfig
---- linux-2.6.34-vanilla/arch/arm/mach-orion5x/Kconfig	2010-05-16 22:17:36.000000000 +0100
-+++ linux-2.6.34/arch/arm/mach-orion5x/Kconfig	2010-06-11 13:46:45.665614309 +0100
-@@ -50,6 +50,13 @@
- 	  Buffalo Linkstation Pro/Live platform. Both v1 and
- 	  v2 devices are supported.
+Tony
+
+
+From: Jarkko Nikula <jhnikula@gmail.com>
+Date: Tue, 31 Aug 2010 10:12:56 +0000
+Subject: [PATCH] omap2: McBSP: Remove mux code for OMAP2420 McBSP2 and do cleanups
+
+This 'legacy' OMAP2420 McBSP2 muxing code is currently broken after recent
+conversion to new mux code. The omap_mcbsp_request calling this code is
+usually called after booting whereas the omap_mux_init_signal is __init
+marked so null pointer dereference would occur.
+
+Fix this by removing the muxing code and let the bootloader or board file to
+do it if necessary. Remove also omap2_mcbsp_ops as there is no use for it.
+
+Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index 467aae2..88b8790 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -23,29 +23,6 @@
+ #include <plat/cpu.h>
+ #include <plat/mcbsp.h>
  
-+config MACH_LINKSTATION_LSCHL
-+	bool "Buffalo Linkstation Live v3 (LS-CHL)"
-+	select I2C_BOARDINFO
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Buffalo Linkstation Live v3 (LS-CHL) platform.
-+
- config MACH_LINKSTATION_MINI
- 	bool "Buffalo Linkstation Mini"
- 	select I2C_BOARDINFO
-diff -urBN linux-2.6.34-vanilla/arch/arm/mach-orion5x/ls-chl-setup.c
-linux-2.6.34/arch/arm/mach-orion5x/ls-chl-setup.c
---- linux-2.6.34-vanilla/arch/arm/mach-orion5x/ls-chl-setup.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-2.6.34/arch/arm/mach-orion5x/ls-chl-setup.c	2010-09-24 03:56:24.432077623 +0100
-@@ -0,0 +1,449 @@
-+/*
-+ * arch/arm/mach-orion5x/ls-chl-setup.c
-+ *
-+ * Maintainer: Ash Hughes <ashley.hughes@blueyonder.co.uk>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/proc_fs.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/pci.h>
-+#include <linux/irq.h>
-+#include <linux/delay.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/leds.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
-+#include <linux/i2c.h>
-+#include <linux/serial_reg.h>
-+#include <linux/ata_platform.h>
-+#include <asm/mach-types.h>
-+#include <asm/gpio.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/pci.h>
-+#include "common.h"
-+#include "mpp.h"
-+#include "include/mach/system.h"
-+#include <asm/uaccess.h>
-+
-+/*****************************************************************************
-+ * Linkstation LS-CHL Info
-+ ****************************************************************************/
-+
-+/*
-+ * 256K NOR flash Device bus boot chip select
-+ */
-+
-+#define LSCHL_NOR_BOOT_BASE	0xf4000000
-+#define LSCHL_NOR_BOOT_SIZE	SZ_256K
-+
-+/*****************************************************************************
-+ * 256KB NOR Flash on BOOT Device
-+ ****************************************************************************/
-+
-+static struct physmap_flash_data lschl_nor_flash_data = {
-+	.width		= 1,
-+};
-+
-+static struct resource lschl_nor_flash_resource = {
-+	.flags	= IORESOURCE_MEM,
-+	.start	= LSCHL_NOR_BOOT_BASE,
-+	.end	= LSCHL_NOR_BOOT_BASE + LSCHL_NOR_BOOT_SIZE - 1,
-+};
-+
-+static struct platform_device lschl_nor_flash = {
-+	.name			= "physmap-flash",
-+	.id			= 0,
-+	.dev		= {
-+		.platform_data	= &lschl_nor_flash_data,
-+	},
-+	.num_resources		= 1,
-+	.resource		= &lschl_nor_flash_resource,
-+};
-+
-+/*****************************************************************************
-+ * Ethernet
-+ ****************************************************************************/
-+
-+static struct mv643xx_eth_platform_data lschl_eth_data = {
-+	.phy_addr	= 8,
-+};
-+
-+/*****************************************************************************
-+ * RTC 5C372a on I2C bus
-+ ****************************************************************************/
-+
-+static struct i2c_board_info __initdata lschl_i2c_rtc = {
-+	I2C_BOARD_INFO("rs5c372a", 0x32),
-+};
-+
-+/*****************************************************************************
-+ * LEDs attached to GPIO
-+ ****************************************************************************/
-+
-+#define LSCHL_GPIO_LED_ALARM	2
-+#define LSCHL_GPIO_LED_INFO	3
-+#define LSCHL_GPIO_LED_FUNC	17
-+#define LSCHL_GPIO_LED_PWR	0
-+
-+static struct gpio_led lschl_led_pins[] = {
-+	{
-+		.name	   = "alarm:red",
-+		.gpio	   = LSCHL_GPIO_LED_ALARM,
-+		.active_low     = 1,
-+	}, {
-+		.name	   = "info:amber",
-+		.gpio	   = LSCHL_GPIO_LED_INFO,
-+		.active_low     = 1,
-+	}, {
-+		.name	   = "func:blue:top",
-+		.gpio	   = LSCHL_GPIO_LED_FUNC,
-+		.active_low     = 1,
-+	}, {
-+		.name	   = "power:blue:bottom",
-+		.gpio	   = LSCHL_GPIO_LED_PWR,
-+	},
-+};
-+
-+static struct gpio_led_platform_data lschl_led_data = {
-+	.leds	   = lschl_led_pins,
-+	.num_leds       = ARRAY_SIZE(lschl_led_pins),
-+};
-+
-+static struct platform_device lschl_leds = {
-+	.name   = "leds-gpio",
-+	.id     = -1,
-+	.dev    = {
-+		.platform_data  = &lschl_led_data,
-+	},
-+};
-+
-+/*****************************************************************************
-+ * SATA
-+ ****************************************************************************/
-+static struct mv_sata_platform_data lschl_sata_data = {
-+	.n_ports	= 2,
-+};
-+
-+
-+/*****************************************************************************
-+ * LS-CHL specific power off method: reboot
-+ ****************************************************************************/
-+/*
-+ * On the LS-CHL, the shutdown process is following:
-+ * - Userland monitors key events until the power switch goes to off position
-+ * - The board reboots
-+ * - U-boot starts and goes into an idle mode waiting for the user
-+ *   to move the switch to ON position
-+ *
-+ */
-+
-+static void lschl_power_off(void)
-+{
-+	arch_reset(0, NULL);
-+}
-+
-+
-+/*****************************************************************************
-+ * General Setup
-+ ****************************************************************************/
-+#define LSCHL_GPIO_USB_POWER	9
-+#define LSCHL_GPIO_AUTO_POWER	17
-+#define LSCHL_GPIO_POWER	18
-+
-+/****************************************************************************
-+ * GPIO Attached Keys
-+ ****************************************************************************/
-+#define LSCHL_GPIO_KEY_FUNC		15
-+#define LSCHL_GPIO_KEY_POWER		8
-+#define LSCHL_GPIO_KEY_AUTOPOWER	10
-+#define LSCHL_SW_POWER		0x00
-+#define LSCHL_SW_AUTOPOWER	0x01
-+#define LSCHL_SW_FUNC		0x02
-+
-+static struct gpio_keys_button lschl_buttons[] = {
-+	{
-+		.type		= EV_SW,
-+		.code	   = LSCHL_SW_POWER,
-+		.gpio	   = LSCHL_GPIO_KEY_POWER,
-+		.desc	   = "Power-on Switch",
-+		.active_low     = 1,
-+	}, {
-+		.type		= EV_SW,
-+		.code	   = LSCHL_SW_AUTOPOWER,
-+		.gpio	   = LSCHL_GPIO_KEY_AUTOPOWER,
-+		.desc	   = "Power-auto Switch",
-+		.active_low     = 1,
-+	}, {
-+		.type		= EV_SW,
-+		.code	   = LSCHL_SW_FUNC,
-+		.gpio	   = LSCHL_GPIO_KEY_FUNC,
-+		.desc	   = "Function Switch",
-+		.active_low     = 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data lschl_button_data = {
-+	.buttons	= lschl_buttons,
-+	.nbuttons       = ARRAY_SIZE(lschl_buttons),
-+};
-+
-+static struct platform_device lschl_button_device = {
-+	.name	   = "gpio-keys",
-+	.id	     = -1,
-+	.num_resources  = 0,
-+	.dev	    = {
-+		.platform_data  = &lschl_button_data,
-+	},
-+};
-+
-+#define LSCHL_GPIO_HDD_POWER	1
-+
-+static struct orion5x_mpp_mode lschl_mpp_modes[] __initdata = {
-+	{  0, MPP_GPIO }, /* LED POWER */
-+	{  1, MPP_GPIO }, /* HDD POWER */
-+	{  2, MPP_GPIO }, /* LED ALARM */
-+	{  3, MPP_GPIO }, /* LED INFO */
-+	{  4, MPP_UNUSED },
-+	{  5, MPP_UNUSED },
-+	{  6, MPP_GPIO }, /* FAN LOCK */
-+	{  7, MPP_GPIO }, /* SW INIT */
-+	{  8, MPP_GPIO }, /* SW POWER */
-+	{  9, MPP_GPIO }, /* USB POWER */
-+	{ 10, MPP_GPIO }, /* SW AUTO POWER */
-+	{ 11, MPP_UNUSED },
-+	{ 12, MPP_UNUSED },
-+	{ 13, MPP_UNUSED },
-+	{ 14, MPP_GPIO }, /* FAN HIGH */
-+	{ 15, MPP_GPIO }, /* SW FUNC */
-+	{ 16, MPP_GPIO }, /* FAN LOW */
-+	{ 17, MPP_GPIO }, /* LED FUNC */
-+	{ 18, MPP_UNUSED },
-+	{ 19, MPP_UNUSED },
-+	{ -1 },
-+};
-+
-+
-+#define LSCHL_GPIO_FAN_LOW	16
-+#define LSCHL_GPIO_FAN_HIGH	14
-+#define LSCHL_GPIO_FAN_LOCK	6
-+
-+#define BUFFALO_GPIO_FAN_STOP	0
-+#define BUFFALO_GPIO_FAN_SLOW	1
-+#define BUFFALO_GPIO_FAN_FAST	2
-+#define BUFFALO_GPIO_FAN_FULL	3
-+
-+#define BuffaloGpio_FanStop()	FanControlWrite(BUFFALO_GPIO_FAN_STOP)
-+#define BuffaloGpio_FanSlow()	FanControlWrite(BUFFALO_GPIO_FAN_SLOW)
-+#define BuffaloGpio_FanFast()	FanControlWrite(BUFFALO_GPIO_FAN_FAST)
-+#define BuffaloGpio_FanFull()	FanControlWrite(BUFFALO_GPIO_FAN_FULL)
-+
-+
-+void
-+FanControlWrite(unsigned int value)
-+{
-+	switch (value) {
-+	case BUFFALO_GPIO_FAN_STOP:
-+		gpio_set_value(LSCHL_GPIO_FAN_LOW, 1);
-+		gpio_set_value(LSCHL_GPIO_FAN_HIGH, 1);
-+		break;
-+	case BUFFALO_GPIO_FAN_SLOW:
-+		gpio_set_value(LSCHL_GPIO_FAN_LOW, 1);
-+		gpio_set_value(LSCHL_GPIO_FAN_HIGH, 0);
-+		break;
-+	case BUFFALO_GPIO_FAN_FAST:
-+		gpio_set_value(LSCHL_GPIO_FAN_LOW, 0);
-+		gpio_set_value(LSCHL_GPIO_FAN_HIGH, 1);
-+		break;
-+	case BUFFALO_GPIO_FAN_FULL:
-+		gpio_set_value(LSCHL_GPIO_FAN_LOW, 0);
-+		gpio_set_value(LSCHL_GPIO_FAN_HIGH, 0);
-+		break;
-+	default:
-+		break;
-+	} /* end of switch */
-+}
-+
-+unsigned int
-+BuffaloGpio_FanControlRead(void)
-+{
-+
-+	int fan_low = gpio_get_value(LSCHL_GPIO_FAN_LOW);
-+	int fan_high = gpio_get_value(LSCHL_GPIO_FAN_HIGH);
-+
-+	if (!fan_low && !fan_high)
-+		return BUFFALO_GPIO_FAN_FULL;
-+	else if (!fan_low && fan_high)
-+		return BUFFALO_GPIO_FAN_FAST;
-+	else if (fan_low && !fan_high)
-+		return BUFFALO_GPIO_FAN_SLOW;
-+	else if (fan_low && fan_high)
-+		return BUFFALO_GPIO_FAN_STOP;
-+	return 0;
-+}
-+
-+static int
-+FanStatusRead(char *pg, char **st, off_t off, int length, int *eof, void *data)
-+{
-+
-+	int len = 0;
-+	off_t begin = 0;
-+
-+	int PinStat = gpio_get_value(LSCHL_GPIO_FAN_LOCK);
-+
-+	if (!PinStat)
-+		len = sprintf(pg, "Fine\n");
-+	else
-+		len = sprintf(pg, "Stop\n");
-+	*st = pg + (off - begin);
-+	len -= (off - begin);
-+	if (len > length)
-+		len = length;
-+	return len;
-+}
-+
-+
-+
-+static int
-+FanStatusWrite(struct file *fp, const char *buf, unsigned long cnt, void *d) {
-+	return cnt;
-+}
-+
-+static int
-+FanCtlWrite(struct file *filep, const char *buf, unsigned long cnt, void *data)
-+{
-+	int len, ret;
-+	char *ptr, tState[8];
-+
-+	if (cnt > 8)
-+		len = 8;
-+	else
-+		len = cnt;
-+
-+	ret = copy_from_user(tState, buf, len);
-+	if (ret < 0) {
-+		printk(KERN_ERR "%s: Setting fan speed failed\n", "ls-chl");
-+		return -EFAULT;
-+	}
-+
-+	ptr = strrchr(tState, '\n');
-+	if (ptr)
-+		*ptr = '\0';
-+
-+	if (strncmp(tState, "stop", strlen("stop")) == 0)
-+		BuffaloGpio_FanStop();
-+	else if (strncmp(tState, "slow", strlen("slow")) == 0)
-+		BuffaloGpio_FanSlow();
-+	else if (strncmp(tState, "fast", strlen("fast")) == 0)
-+		BuffaloGpio_FanFast();
-+	else if (strncmp(tState, "full", strlen("full")) == 0)
-+		BuffaloGpio_FanFull();
-+	return cnt;
-+}
-+
-+static int
-+FanCtlRead(char *pg, char **start, off_t off, int length, int *eof, void *data)
-+{
-+	int len = 0;
-+	off_t begin = 0;
-+
-+	unsigned int fan_status = BuffaloGpio_FanControlRead();
-+
-+	switch (fan_status) {
-+	case BUFFALO_GPIO_FAN_STOP:
-+		len += sprintf(pg, "stop\n");
-+		break;
-+	case BUFFALO_GPIO_FAN_SLOW:
-+		len += sprintf(pg, "slow\n");
-+		break;
-+	case BUFFALO_GPIO_FAN_FAST:
-+		len += sprintf(pg, "fast\n");
-+		break;
-+	case BUFFALO_GPIO_FAN_FULL:
-+		len += sprintf(pg, "full\n");
-+		break;
-+	default:
-+		break;
-+	} /* end of switch */
-+
-+	*start = pg + (off - begin);
-+	len -= (off - begin);
-+	if (len > length)
-+		len = length;
-+	return len;
-+}
-+
-+
-+
-+
-+static void __init lschl_init(void)
-+{
-+	/*
-+	 * Setup basic Orion functions. Need to be called early.
-+	 */
-+	struct proc_dir_entry *pde;
-+	orion5x_init();
-+
-+	orion5x_mpp_conf(lschl_mpp_modes);
-+
-+	/*
-+	 * Configure peripherals.
-+	 */
-+	orion5x_ehci0_init();
-+	orion5x_ehci1_init();
-+	orion5x_eth_init(&lschl_eth_data);
-+	orion5x_i2c_init();
-+	orion5x_sata_init(&lschl_sata_data);
-+	orion5x_uart0_init();
-+	orion5x_xor_init();
-+
-+	orion5x_setup_dev_boot_win(LSCHL_NOR_BOOT_BASE,
-+				   LSCHL_NOR_BOOT_SIZE);
-+	platform_device_register(&lschl_nor_flash);
-+
-+	platform_device_register(&lschl_leds);
-+
-+	platform_device_register(&lschl_button_device);
-+
-+	i2c_register_board_info(0, &lschl_i2c_rtc, 1);
-+
-+	pde = proc_mkdir("buffalo", 0);
-+	pde = proc_mkdir("buffalo/gpio", 0);
-+	pde = proc_mkdir("buffalo/gpio/fan", 0);
-+	pde = create_proc_entry("buffalo/gpio/fan/control", 0644, 0);
-+	pde->read_proc = FanCtlRead;
-+	pde->write_proc = FanCtlWrite;
-+	pde = create_proc_entry("buffalo/gpio/fan/lock", 0, 0);
-+	pde->read_proc = FanStatusRead;
-+	pde->write_proc = FanStatusWrite;
-+
-+	/* slow down fan */
-+	BuffaloGpio_FanSlow();
-+	/* usb power on */
-+	gpio_set_value(LSCHL_GPIO_USB_POWER, 1);
-+
-+	/* register power-off method */
-+	pm_power_off = lschl_power_off;
-+
-+	pr_info("%s: finished\n", __func__);
-+}
-+
-+#ifdef CONFIG_MACH_LINKSTATION_LSCHL
-+MACHINE_START(LINKSTATION_LSCHL, "Buffalo Linkstation LiveV3 (LS-CHL)")
-+	/* Maintainer: Ash Hughes <ashley.hughes@blueyonder.co.uk> */
-+	.phys_io	= ORION5X_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((ORION5X_REGS_VIRT_BASE) >> 18) & 0xFFFC,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= lschl_init,
-+	.map_io		= orion5x_map_io,
-+	.init_irq	= orion5x_init_irq,
-+	.timer		= &orion5x_timer,
-+	.fixup		= tag_fixup_mem32,
-+MACHINE_END
-+#endif
-diff -urBN linux-2.6.34-vanilla/arch/arm/mach-orion5x/Makefile linux-2.6.34/arch/arm/mach-orion5x/Makefile
---- linux-2.6.34-vanilla/arch/arm/mach-orion5x/Makefile	2010-05-16 22:17:36.000000000 +0100
-+++ linux-2.6.34/arch/arm/mach-orion5x/Makefile	2010-08-18 12:33:02.714982012 +0100
-@@ -21,3 +21,4 @@
- obj-$(CONFIG_MACH_RD88F5181L_GE)	+= rd88f5181l-ge-setup.o
- obj-$(CONFIG_MACH_RD88F5181L_FXO)	+= rd88f5181l-fxo-setup.o
- obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
-+obj-$(CONFIG_MACH_LINKSTATION_LSCHL)   += ls-chl-setup.o
+-#include "mux.h"
+-
+-static void omap2_mcbsp2_mux_setup(void)
+-{
+-	omap_mux_init_signal("eac_ac_sclk.mcbsp2_clkx", OMAP_PULL_ENA);
+-	omap_mux_init_signal("eac_ac_fs.mcbsp2_fsx", OMAP_PULL_ENA);
+-	omap_mux_init_signal("eac_ac_din.mcbsp2_dr", OMAP_PULL_ENA);
+-	omap_mux_init_signal("eac_ac_dout.mcbsp2_dx", OMAP_PULL_ENA);
+-	omap_mux_init_gpio(117, OMAP_PULL_ENA);
+-	/*
+-	 * TODO: Need to add MUX settings for OMAP 2430 SDP
+-	 */
+-}
+-
+-static void omap2_mcbsp_request(unsigned int id)
+-{
+-	if (cpu_is_omap2420() && (id == OMAP_MCBSP2))
+-		omap2_mcbsp2_mux_setup();
+-}
+-
+-static struct omap_mcbsp_ops omap2_mcbsp_ops = {
+-	.request	= omap2_mcbsp_request,
+-};
+ 
+ #ifdef CONFIG_ARCH_OMAP2420
+ static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
+@@ -55,7 +32,6 @@ static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
+ 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base	= OMAP24XX_MCBSP2_BASE,
+@@ -63,7 +39,6 @@ static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
+ 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ };
+ #define OMAP2420_MCBSP_PDATA_SZ		ARRAY_SIZE(omap2420_mcbsp_pdata)
+@@ -82,7 +57,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
+ 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base	= OMAP24XX_MCBSP2_BASE,
+@@ -90,7 +64,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
+ 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base	= OMAP2430_MCBSP3_BASE,
+@@ -98,7 +71,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
+ 		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base	= OMAP2430_MCBSP4_BASE,
+@@ -106,7 +78,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
+ 		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base	= OMAP2430_MCBSP5_BASE,
+@@ -114,7 +85,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
+ 		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 	},
+ };
+ #define OMAP2430_MCBSP_PDATA_SZ		ARRAY_SIZE(omap2430_mcbsp_pdata)
+@@ -133,7 +103,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
+ 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
+ 	},
+ 	{
+@@ -143,7 +112,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
+ 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 		.buffer_size	= 0x500, /* The FIFO has 1024 + 256 locations */
+ 	},
+ 	{
+@@ -153,7 +121,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
+ 		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
+ 	},
+ 	{
+@@ -162,7 +129,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
+ 		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
+ 	},
+ 	{
+@@ -171,7 +137,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
+ 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
+ 		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
+ 		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
+-		.ops		= &omap2_mcbsp_ops,
+ 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
+ 	},
+ };
+@@ -189,28 +154,24 @@ static struct omap_mcbsp_platform_data omap44xx_mcbsp_pdata[] = {
+ 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP1_RX,
+ 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP1_TX,
+ 		.tx_irq         = OMAP44XX_IRQ_MCBSP1,
+-		.ops            = &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base      = OMAP44XX_MCBSP2_BASE,
+ 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP2_RX,
+ 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP2_TX,
+ 		.tx_irq         = OMAP44XX_IRQ_MCBSP2,
+-		.ops            = &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base      = OMAP44XX_MCBSP3_BASE,
+ 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP3_RX,
+ 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP3_TX,
+ 		.tx_irq         = OMAP44XX_IRQ_MCBSP3,
+-		.ops            = &omap2_mcbsp_ops,
+ 	},
+ 	{
+ 		.phys_base      = OMAP44XX_MCBSP4_BASE,
+ 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP4_RX,
+ 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP4_TX,
+ 		.tx_irq         = OMAP44XX_IRQ_MCBSP4,
+-		.ops            = &omap2_mcbsp_ops,
+ 	},
+ };
+ #define OMAP44XX_MCBSP_PDATA_SZ		ARRAY_SIZE(omap44xx_mcbsp_pdata)
