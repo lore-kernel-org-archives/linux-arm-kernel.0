@@ -1,131 +1,182 @@
-From: shubhrajyoti@ti.com (Datta, Shubhrajyoti)
-Date: Fri, 24 Sep 2010 17:00:05 +0530
-Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
-In-Reply-To: <1285069770-4261-1-git-send-email-manjugk@ti.com>
-References: <1285069770-4261-1-git-send-email-manjugk@ti.com>
-Message-ID: <0680EC522D0CC943BC586913CF3768C003C21EEB60@dbde02.ent.ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 24 Sep 2010 13:35:38 +0200
+Subject: PXA270 audio problem
+In-Reply-To: <AANLkTikerg6JUt8Kv5M9N1UbHaQE6seeiSYdSVOoNghb@mail.gmail.com>
+References: <AANLkTi=_AANevVpthOKuRfkkvU9mKMWsmpHc+XohoUwg@mail.gmail.com>
+	<AANLkTimRPZijUXcecbBSexuthttJ76-NYVbs0cc3iyZm@mail.gmail.com>
+	<AANLkTikerg6JUt8Kv5M9N1UbHaQE6seeiSYdSVOoNghb@mail.gmail.com>
+Message-ID: <201009241335.38801.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dne ?t 23. z??? 2010 09:24:51 Santhosh N napsal(a):
+> Hi,
+> 
+> Following is the way I reach the no audio playback state.
+> 
+> I have put a loop in a shell script and play a short mp3 file
+> repeatedly. The no audio playback state is reached sometimes very
+> quickly and sometimes after a while.
 
-
-> -----Original Message-----
-> From: linux-input-owner at vger.kernel.org [mailto:linux-input-
-> owner at vger.kernel.org] On Behalf Of G, Manjunath Kondaiah
-> Sent: Tuesday, September 21, 2010 5:20 PM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-input at vger.kernel.org; Dmitry Torokhov; linux-arm-
-> kernel at lists.infradead.org; Tony Lindgren
-> Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
+Can you try more up-to-date kernel ? There were many changes in ucb1400 driver 
+happening
 > 
-> The failure exit paths seems to be wrong in probe function.
-> This patch corrects exit failure paths for error handling
-> cases.
+> Regards,
+> Santhosh N
 > 
-> Boot warning incase of request irq failure:
+> On Thu, Sep 23, 2010 at 12:35 PM, Santhosh N <san.mlists@gmail.com> wrote:
+> > Hi,
+> > 
+> > Following are the AC97 and DMA register dumps. I am printing out the
+> > DMA registers from the pxa2xx_pcm_trigger function.
+> > 
+> > I have noticed that, the touchscreen and audio record continues to
+> > work after the problem. In the problem state, the DMA interrupts occur
+> > for audio record but not for playback.
+> > 
+> > AC97:
+> > BeforeProblem                   AfterProblem
+> > 0:00 = 02a0                     0:00 = 02a0
+> > 0:02 = 0d0d                     0:02 = 0d0d
+> > 0:04 = 0000                     0:04 = 0000
+> > 0:06 = 0000                     0:06 = 0000
+> > 0:08 = 0000                     0:08 = 0000
+> > 0:0a = 0000                     0:0a = 0000
+> > 0:0c = 0000                     0:0c = 0000
+> > 0:0e = 0000                     0:0e = 0000
+> > 0:10 = 0000                     0:10 = 0000
+> > 0:12 = 0000                     0:12 = 0000
+> > 0:14 = 0000                     0:14 = 0000
+> > 0:16 = 0000                     0:16 = 0000
+> > 0:18 = 0000                     0:18 = 0000
+> > 0:1a = 0000                     0:1a = 0000
+> > 0:1c = 0000                     0:1c = 0000
+> > 0:1e = 0000                     0:1e = 0000
+> > 0:20 = 0000                     0:20 = 0000
+> > 0:22 = 0000                     0:22 = 0000
+> > 0:24 = 0000                     0:24 = 0000
+> > 0:26 = 000b                     0:26 = 000b
+> > 0:28 = 0001                     0:28 = 0001
+> > 0:2a = 0001                     0:2a = 0001
+> > 0:2c = 5622                     0:2c = 3e80
+> > 0:2e = 0000                     0:2e = 0000
+> > 0:30 = 0000                     0:30 = 0000
+> > 0:32 = bb80                     0:32 = bb80
+> > 0:34 = 0000                     0:34 = 0000
+> > 0:36 = 0000                     0:36 = 0000
+> > 0:38 = 0000                     0:38 = 0000
+> > 0:3a = 0000                     0:3a = 0000
+> > 0:3c = 0000                     0:3c = 0000
+> > 0:3e = 0000                     0:3e = 0000
+> > 0:40 = 0000                     0:40 = 0000
+> > 0:42 = 0000                     0:42 = 0000
+> > 0:44 = 0000                     0:44 = 0000
+> > 0:46 = 0000                     0:46 = 0000
+> > 0:48 = 0000                     0:48 = 0000
+> > 0:4a = 0000                     0:4a = 0000
+> > 0:4c = 0000                     0:4c = 0000
+> > 0:4e = 0000                     0:4e = 0000
+> > 0:50 = 0000                     0:50 = 0000
+> > 0:52 = 0000                     0:52 = 0000
+> > 0:54 = 0000                     0:54 = 0000
+> > 0:56 = 0000                     0:56 = 0000
+> > 0:58 = 0000                     0:58 = 0000
+> > 0:5a = 0000                     0:5a = 0000
+> > 0:5c = 0000                     0:5c = 0000
+> > 0:5e = 0000                     0:5e = 0000
+> > 0:60 = 0000                     0:60 = 0000
+> > 0:62 = 0000                     0:62 = 0000
+> > 0:64 = 0948                     0:64 = 0948
+> > 0:66 = 0000                     0:66 = 0000
+> > 0:68 = 824b                     0:68 = 824b
+> > 0:6a = 0050                     0:6a = 0050
+> > 0:6c = 0030                     0:6c = 0030
+> > 0:6e = 2004                     0:6e = 2004
+> > 0:70 = 0000                     0:70 = 0000
+> > 0:72 = 0000                     0:72 = 0000
+> > 0:74 = 0000                     0:74 = 0000
+> > 0:76 = 0000                     0:76 = 0000
+> > 0:78 = 0000                     0:78 = 0000
+> > 0:7a = 0000                     0:7a = 0000
+> > 0:7c = 5053                     0:7c = 5053
+> > 0:7e = 4304                     0:7e = 4304
+> > 
+> > Only diff in the above is in the 02C(Audio sample rate control) register.
+> > 
+> > DMA:
+> > BeforeProblem
+> > 
+> > ::: DMA Channel: 8, Trigger Start
+> > 
+> > DDADR = 0xB714A010
+> > DSADR = 0xB7100040
+> > DTADR = 0x40500040
+> > DCMD  = 0x9023CFC0
+> > DCSR  = 0x80000000
+> > 
+> > ::: DMA Channel: 8, Trigger Stop
+> > 
+> > DDADR = 0xB714A0E0
+> > DSADR = 0xB710D000
+> > DTADR = 0x40500040
+> > DCMD  = 0x9023D000
+> > DCSR  = 0x00000008
+> > 
+> > 
+> > AfterProblem
+> > 
+> > ::: DMA Channel: 8, Trigger Start
+> > 
+> > DDADR = 0xB70B7010
+> > DSADR = 0xB7100000
+> > DTADR = 0x40500040
+> > DCMD  = 0x9023D000
+> > DCSR  = 0x80000000
+> > ALSA sound/core/pcm_native.c:1512: playback drain error (DMA or IRQ
+> > trouble?)
+> > 
+> > ::: DMA Channel: 8, Trigger Stop
+> > 
+> > DDADR = 0xB70B7010
+> > DSADR = 0xB7100000
+> > DTADR = 0x40500040
+> > DCMD  = 0x9023D000
+> > DCSR  = 0x00000008
+> > 
+> > Each dump above is after playing a mp3 file using madplay.
+> > 
+> > Regards,
+> > Santhosh N
+> > 
+> > On Thu, Sep 23, 2010 at 11:38 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> >> On Thu, Sep 23, 2010 at 1:33 PM, Santhosh N <san.mlists@gmail.com> wrote:
+> >>> Dear All,
+> >>> 
+> >>> I am running linux 2.6.26 kernel on a PXA270 board. A UCB1400 chip
+> >>> used for audio and touchscreen in that. I have been facing a problem
+> >>> with audio.
+> >>> 
+> >>> The audio plays properly, but suddenly stops. I get the following
+> >>> message: ALSA sound/core/pcm_native.c:1513: playback drain error (DMA
+> >>> or IRQ trouble?)
+> >>> 
+> >>> I have noticed that the DMA interrupts stop coming. Where as the AC97
+> >>> interrupts come properly.
+> >>> 
+> >>> Any help in solving this will be grateful.
+> >> 
+> >> Dumping the DMA registers and the AC97 controller registers would
+> >> be helpful.
+> >> 
+> >>> Regards,
+> >>> Santhosh N
+> >>> 
+> >>> _______________________________________________
+> >>> linux-arm-kernel mailing list
+> >>> linux-arm-kernel at lists.infradead.org
+> >>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> [    1.553985] twl4030_keypad twl4030_keypad: request_irq failed for irq
-> no=369
-> [    1.561157] ------------[ cut here ]------------
-> [    1.565795] WARNING: at kernel/irq/manage.c:899 __free_irq+0x88/0x164()
-> [    1.572418] Trying to free already-free IRQ 369
-> [    1.576965] Modules linked in:
-> [    1.580047] [<c00470ec>] (unwind_backtrace+0x0/0xe4) from [<c0078b5c>]
-> (warn_slowpath_common+0x4c/0x64)
-> [    1.589477] [<c0078b5c>] (warn_slowpath_common+0x4c/0x64) from
-> [<c0078bf4>] (warn_slowpath_fmt+0x2c/0x3c)
-> [    1.599060] [<c0078bf4>] (warn_slowpath_fmt+0x2c/0x3c) from
-> [<c00adb90>] (__free_irq+0x88/0x164)
-> [    1.607849] [<c00adb90>] (__free_irq+0x88/0x164) from [<c00adca8>]
-> (free_irq+0x3c/0x5c)
-> [    1.615875] [<c00adca8>] (free_irq+0x3c/0x5c) from [<c043ab2c>]
-> (twl4030_kp_probe+0x308/0x374)
-> [    1.624511] [<c043ab2c>] (twl4030_kp_probe+0x308/0x374) from
-> [<c023c338>] (platform_drv_probe+0x14/0x18)
-> [    1.634033] [<c023c338>] (platform_drv_probe+0x14/0x18) from
-> [<c023b4dc>] (driver_probe_device+0xc8/0x184)
-> [    1.643707] [<c023b4dc>] (driver_probe_device+0xc8/0x184) from
-> [<c023b600>] (__driver_attach+0x68/0x8c)
-> [    1.653106] [<c023b600>] (__driver_attach+0x68/0x8c) from [<c023ad34>]
-> (bus_for_each_dev+0x48/0x74)
-> [    1.662170] [<c023ad34>] (bus_for_each_dev+0x48/0x74) from [<c023a690>]
-> (bus_add_driver+0x9c/0x210)
-> [    1.671234] [<c023a690>] (bus_add_driver+0x9c/0x210) from [<c023b8f8>]
-> (driver_register+0xa8/0x134)
-> [    1.680297] [<c023b8f8>] (driver_register+0xa8/0x134) from [<c0041340>]
-> (do_one_initcall+0x58/0x1b4)
-> [    1.689453] [<c0041340>] (do_one_initcall+0x58/0x1b4) from [<c0008574>]
-> (kernel_init+0x98/0x150)
-> [    1.698272] [<c0008574>] (kernel_init+0x98/0x150) from [<c0042970>]
-> (kernel_thread_exit+0x0/0x8)
-> [    1.707214] ---[ end trace 6559b322ad3cbdfe ]---
-> [    1.718292] twl4030_keypad: probe of twl4030_keypad failed with error -
-> 16
-> 
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> Cc: linux-input at vger.kernel.org
-> Cc: Dmitry Torokhov <dtor@mail.ru>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-input at vger.kernel.org
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  version v1 : initial patch
->  version v2 : CC'ed input subsystem and arm kernel mailing lists.
-> 
->  drivers/input/keyboard/twl4030_keypad.c |   10 ++++------
->  1 files changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/input/keyboard/twl4030_keypad.c
-> b/drivers/input/keyboard/twl4030_keypad.c
-> index fb16b5e..39a9f30 100644
-> --- a/drivers/input/keyboard/twl4030_keypad.c
-> +++ b/drivers/input/keyboard/twl4030_keypad.c
-> @@ -347,8 +347,7 @@ static int __devinit twl4030_kp_probe(struct
-> platform_device *pdev)
->  	kp = kzalloc(sizeof(*kp), GFP_KERNEL);
->  	input = input_allocate_device();
->  	if (!kp || !input) {
-> -		error = -ENOMEM;
-> -		goto err1;
-Wont you leak memory here ?
-
-
-> +		return -ENOMEM;
->  	}
-> 
->  	/* Get the debug Device */
-> @@ -406,23 +405,22 @@ static int __devinit twl4030_kp_probe(struct
-> platform_device *pdev)
->  	if (error) {
->  		dev_info(kp->dbg_dev, "request_irq failed for irq no=%d\n",
->  			kp->irq);
-> -		goto err3;
-> +		goto err2;
->  	}
-> 
->  	/* Enable KP and TO interrupts now. */
->  	reg = (u8) ~(KEYP_IMR1_KP | KEYP_IMR1_TO);
->  	if (twl4030_kpwrite_u8(kp, reg, KEYP_IMR1)) {
->  		error = -EIO;
-> -		goto err4;
-> +		goto err3;
->  	}
-> 
->  	platform_set_drvdata(pdev, kp);
->  	return 0;
-> 
-> -err4:
-> +err3:
->  	/* mask all events - we don't care about the result */
->  	(void) twl4030_kpwrite_u8(kp, 0xff, KEYP_IMR1);
-> -err3:
->  	free_irq(kp->irq, NULL);
->  err2:
->  	input_unregister_device(input);
-> --
-> 1.7.0.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-input" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
