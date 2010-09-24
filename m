@@ -1,32 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 24 Sep 2010 09:25:44 +0200
-Subject: [PATCH 1/3] dmaengine: add possibility for cyclic transfers
-In-Reply-To: <AANLkTi=B1ZkoYZ3hjuzz8Uj=W-04cE+iedaMwurUMRPy@mail.gmail.com>
-References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
-	<1281956870-12463-2-git-send-email-s.hauer@pengutronix.de>
-	<20100920130119.GA23406@pengutronix.de>
-	<AANLkTi=B1ZkoYZ3hjuzz8Uj=W-04cE+iedaMwurUMRPy@mail.gmail.com>
-Message-ID: <20100924072544.GN23406@pengutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 24 Sep 2010 09:29:46 +0200
+Subject: [PATCH 1/8] posix clocks: introduce a syscall for clock tuning.
+In-Reply-To: <1285271331.2587.56.camel@localhost.localdomain>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<b94ef1cd9c04ef3ad5964408bd0af7251add78de.1285261534.git.richard.cochran@omicron.at>
+	<1285271331.2587.56.camel@localhost.localdomain>
+Message-ID: <20100924072946.GA5043@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 12:42:20PM -0700, Dan Williams wrote:
-> On Mon, Sep 20, 2010 at 6:01 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > Hi Dan,
-> >
-> > Any comment to this patch?
+On Thu, Sep 23, 2010 at 12:48:51PM -0700, john stultz wrote:
+> On Thu, 2010-09-23 at 19:31 +0200, Richard Cochran wrote:
+> > A new syscall is introduced that allows tuning of a POSIX clock. The
+> > syscall is implemented for four architectures: arm, blackfin, powerpc,
+> > and x86.
+> > 
+> > The new syscall, clock_adjtime, takes two parameters, the clock ID,
+> > and a pointer to a struct timex. The semantics of the timex struct
+> > have been expanded by one additional mode flag, which allows an
+> > absolute offset correction. When specificied, the clock offset is
+> > immediately corrected by adding the given time value to the current
+> > time value.
 > 
-> Looks good to me especially given the unique implications for
-> callbacks.  Although, I'd like to put a description of the
-> prep_dma_cyclic semantics in the source code.  Can you respin this
-> with a description added to the kernel-doc for struct dma_device?
+> 
+> So I'd still split this patch up a little bit more.
+> 
+> 1) Patch that implements the ADJ_SETOFFSET  (*and its implementation*)
+> in do_adjtimex.
+> 
+> 2) Patch that adds the new syscall and clock_id multiplexing.
+> 
+> 3) Patches that wire it up to the rest of the architectures (there's
+> still a bunch missing here).
 
-Sure, will do.
+I was not sure what the policy is about adding syscalls. Is it the
+syscall author's responsibility to add it into every arch?
 
-Sascha
+The last time (see a2e2725541fad7) the commit only added half of some
+archs, and ignored others. In my patch, the syscall *really* works on
+the archs that are present in the patch.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+(Actually, I did not test blackfin, since I don't have one, but I
+included it since I know they have a PTP hardware clock.)
+
+> > +static inline int common_clock_adj(const clockid_t which_clock, struct timex *t)
+> > +{
+> > +	if (CLOCK_REALTIME == which_clock)
+> > +		return do_adjtimex(t);
+> > +	else
+> > +		return -EOPNOTSUPP;
+> > +}
+> 
+> 
+> Would it make sense to point to the do_adjtimex() in the k_clock
+> definition for CLOCK_REALTIME rather then conditionalizing it here?
+
+But what about CLOCK_MONOTONIC_RAW, for example?
+
+Does it make sense to allow it to be adjusted?
+
+Thanks,
+Richard
