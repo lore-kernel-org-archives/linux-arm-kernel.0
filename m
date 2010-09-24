@@ -1,68 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Sep 2010 15:52:55 -0700
-Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
-In-Reply-To: <AANLkTikNLn-VuCQb2q7wZVbYORxV6uhia_oOBsQg3ZiJ@mail.gmail.com>
-References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
-	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
-	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
-	<AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
-	<AANLkTikNLn-VuCQb2q7wZVbYORxV6uhia_oOBsQg3ZiJ@mail.gmail.com>
-Message-ID: <20100924225254.GK4211@atomide.com>
+Date: Fri, 24 Sep 2010 16:03:22 -0700
+Subject: [GIT PULL] omap: sram fixes and omap4 es2.0 support
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD469D0D@dbde02.ent.ti.com>
+References: <EAF47CD23C76F840A9E7FCE10091EFAB02CD469D0D@dbde02.ent.ti.com>
+Message-ID: <20100924230322.GN4211@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Micha? Miros?aw <mirqus@gmail.com> [100924 09:03]:
-> W dniu 24 wrze?nia 2010 17:38 u?ytkownik Cory Maccarrone
-> <darkstar6262@gmail.com> napisa?:
-> > 2010/9/24 Micha? Miros?aw <mirqus@gmail.com>:
-> >> 2010/8/18 Cory Maccarrone <darkstar6262@gmail.com>:
-> >>> This change adds in MMC and I2C support to the HTC Herald board, as well
-> >>> as adding the HTCPLD driver for the PLD used on this phone. ?It also
-> >>> adds in the gpio-keys entries for the front directional keys and
-> >>> selector and the cursor keys on the slide-out keyboard, and gpio-leds
-> >>> support for the LEDs attached to the htcpld.
-> >>>
-> >>> Additionally, SPI bus support (using the spi100k driver) and
-> >>> touchscreen support (using the ads7846 driver) were added.
-> >>>
-> >>> Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
-> >>> ---
-> >> [...]
-> >>> +/* MMC Card */
-> >>> +#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
-> >>> +static struct omap_mmc_platform_data htc_mmc1_data = {
-> >>> + ? ? ? .nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
-> >>> + ? ? ? .switch_slot ? ? ? ? ? ? ? ? ? ?= NULL,
-> >>> + ? ? ? .slots[0] ? ? ? = {
-> >>> + ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_30_31 |
-> >>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MMC_VDD_32_33 | MMC_VDD_33_34,
-> >>> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "mmcblk",
-> >>> + ? ? ? ? ? ? ? .nomux ? ? ? ? ? ? ? ? ?= 1,
-> >>> + ? ? ? ? ? ? ? .wires ? ? ? ? ? ? ? ? ?= 4,
-> >>> + ? ? ? ? ? ? ? .switch_pin ? ? ? ? ? ? = -1,
-> >>> + ? ? ? },
-> >>> +};
-> >> [...]
-> >> What voltages can this MMC controller provide? That's a rather unusual OCR mask.
-> > Not really sure, I wasn't the one who first came up with that mask.
-> > All I know is that it seems to work, and not just for my device, but
-> > lots of other HTC OMAP850 devices we've tried it on too.
-> >
-> > I'm interested though, what in particular makes it unusual?
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100923 23:24]:
+> Tony,
 > 
-> It specifies, that device supports voltage ranges:
-> 2.8V - 2.9V, 3.0V - 3.1V, 3.2V - 3.4V
-> (so: 2.9V - 3.0V and 3.1V - 3.2V are not available).
-> Are there really 2.8V, 3.0V, 3.3V VDDs settable?
+> The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
+>   Linus Torvalds (1):
+>         Linux 2.6.36-rc5
 > 
-> If the host supports only VDD = 3.3V for example, then correct OCR
-> mask would be: MMC_VDD_32_33 | MMC_VDD_33_34 (or just one flag).
+> are available in the git repository at:
+> 
+>   git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap_for_2.6.37
 
-Looks like also board-sx1-mmc.c and board-h[23]-mmc.c have the
-same spotty voltage range.
-
-Cory, care to do a patch that fixes it for all of them?
-
-Regards,
+Thanks, pulling these into omap-for-linus.
 
 Tony
+ 
+> David Anders (1):
+>       omap4: Panda: Add DEBUG_LL support
+> 
+> Santosh Shilimkar (3):
+>       omap4: Update id.c and cpu.h for es2.0
+>       omap4: l2x0: Fix init parameter for es2.0
+>       omap4: Fix bootup crash observed with higher CPU clocks
+> 
+> Vikram Pandita (2):
+>       omap: sram: fix is_sram_locked check
+>       omap4: sram: Fix start address
+> 
+>  arch/arm/mach-omap2/id.c                     |   38 +++++++++++++++++++++-----
+>  arch/arm/mach-omap2/omap4-common.c           |   10 +++++--
+>  arch/arm/plat-omap/dmtimer.c                 |    2 +-
+>  arch/arm/plat-omap/include/plat/cpu.h        |    5 +++-
+>  arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+>  arch/arm/plat-omap/sram.c                    |   13 +-------
+>  6 files changed, 46 insertions(+), 23 deletions(-)
+> 
+> Regards,
+> Santosh
+> (As per thread: http://www.spinics.net/lists/linux-omap/msg37131.html)
