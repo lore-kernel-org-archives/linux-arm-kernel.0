@@ -1,26 +1,40 @@
-From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
-Date: Fri, 24 Sep 2010 13:17:41 +0800
-Subject: Could it be a case of deadlock on SMP?
-In-Reply-To: <20100920185927.GC5177@n2100.arm.linux.org.uk>
-References: <AANLkTinNq6WVNT543QcG+1eVB9te1mmypD4pEvpFhqoJ@mail.gmail.com>
-	<20100920185927.GC5177@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=j5A1=VvE9nz5yGEuOt45-ie98S_SwuD9zXSuk@mail.gmail.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Fri, 24 Sep 2010 08:53:37 +0300
+Subject: [PATCH 00/11] omap patches for review for v2.6.37 merge window
+In-Reply-To: <20100924014938.10325.35279.stgit@baageli.muru.com>
+References: <20100924014938.10325.35279.stgit@baageli.muru.com>
+Message-ID: <20100924085337.69c99bd8.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 21, 2010 at 2:59 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Sep 21, 2010 at 02:46:57AM +0800, Andrew Yan-Pai Chen wrote:
->> We try to verify our dual-core processor (non v7) by LTP tests.
->
-> Is this a non-ARM SMP implementation then?
->
-> If this is an ARM SMP implementation, then please provide the
-> CPU model, revision and variant information.
->
-The CPU we use is still under developing.
-It is a ARM SMP implementation which uses v5te ISA by Faraday Tech.
+On Thu, 23 Sep 2010 18:50:38 -0700
+Tony Lindgren <tony@atomide.com> wrote:
+
+> Hi all,
+> 
+> Here are some omap patches that have not yet been posted to
+> linux-arm-kernel for review.
+> 
+> Jarkko Nikula (4):
+>       omap: n8x0: Cleanup i2c1 and menelaus registration
+>       omap: n8x0: Register i2c2 and add board info with tlv320aic3xfor N810
+>       omap: n8x0: Mux i2s codec port pins for McBSP block
+>       omap2: McBSP: Remove mux code for OMAP2420 McBSP2 and docleanups
+> 
+...
+> Subramaniam C.A (1):
+>       omap: i2c: Avoid compilation error in case the header is included multiple times
+> 
+Hmm... I wonder do I have something wrong or in patchwork but it looks
+like somehow a line feed gets introduced to subject line of some of
+my patches. And it seems to do with my patches only.
+
+Original patch in my mailbox or archive doesn't show it but it is in
+patchwork.
+
+http://marc.info/?l=linux-omap&m=128324955316265&w=2
+https://patchwork.kernel.org/patch/144841/mbox
 
 
-BR,
-Andrew
+-- 
+Jarkko
