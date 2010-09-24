@@ -1,221 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Sep 2010 11:12:09 -0700
-Subject: [PATCH 00/11] omap patches for review for v2.6.37 merge window
-In-Reply-To: <20100924085337.69c99bd8.jhnikula@gmail.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924085337.69c99bd8.jhnikula@gmail.com>
-Message-ID: <20100924181209.GF4211@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 24 Sep 2010 20:18:39 +0200
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
+	driver
+In-Reply-To: <AANLkTimKGjz0=3KGhH-Oek9=k6OQ=738Ydcwn7D-RpdB@mail.gmail.com>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<20100902082759.GE14214@pengutronix.de>
+	<4C7F777E.1090104@gmail.com>
+	<20100902143908.GK14214@pengutronix.de>
+	<20100917095247.GB30441@pengutronix.de>
+	<AANLkTi=mMGe10rDhA6g0OZYXhSW3=M07PKr6yN8VwnnJ@mail.gmail.com>
+	<20100924091120.GA25312@pengutronix.de>
+	<AANLkTimKGjz0=3KGhH-Oek9=k6OQ=738Ydcwn7D-RpdB@mail.gmail.com>
+Message-ID: <20100924181839.GC25312@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [100923 22:45]:
-> On Thu, 23 Sep 2010 18:50:38 -0700
-> Tony Lindgren <tony@atomide.com> wrote:
+Hello Grant,
+
+On Fri, Sep 24, 2010 at 10:12:47AM -0600, Grant Likely wrote:
+> >> I'm fine with this series.
+> >>
+> >> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> >>
+> >> What tree do you want to merge them through?
+> > I thought that the five patches touching drivers/spi should go via your
+> > tree, the others via Sascha's. ?Assuming this is OK for you, too, do you
+> > prefer to pick the patches out here or should I prepare a branch with
+> > these patches for you to pull?
 > 
-> > Hi all,
-> > 
-> > Here are some omap patches that have not yet been posted to
-> > linux-arm-kernel for review.
-> > 
-> > Jarkko Nikula (4):
-> >       omap: n8x0: Cleanup i2c1 and menelaus registration
-> >       omap: n8x0: Register i2c2 and add board info with tlv320aic3xfor N810
-> >       omap: n8x0: Mux i2s codec port pins for McBSP block
-> >       omap2: McBSP: Remove mux code for OMAP2420 McBSP2 and docleanups
-> > 
-> ...
-> > Subramaniam C.A (1):
-> >       omap: i2c: Avoid compilation error in case the header is included multiple times
-> > 
-> Hmm... I wonder do I have something wrong or in patchwork but it looks
-> like somehow a line feed gets introduced to subject line of some of
-> my patches. And it seems to do with my patches only.
-> 
-> Original patch in my mailbox or archive doesn't show it but it is in
-> patchwork.
-> 
-> http://marc.info/?l=linux-omap&m=128324955316265&w=2
-> https://patchwork.kernel.org/patch/144841/mbox
+> You can just add my acked-by and take the whole series via Sascha.  No
+> sense breaking them up.
+OK, that makes it a bit easier for us.
 
-Hmm yeah looks like patchwork wraps the subject line.. Need to look
-to see where the bug is later on.
+Thanks
+Uwe
 
-Here's the patch with fixed subject.
-
-Tony
-
-
-From: Jarkko Nikula <jhnikula@gmail.com>
-Date: Tue, 31 Aug 2010 10:12:56 +0000
-Subject: [PATCH] omap2: McBSP: Remove mux code for OMAP2420 McBSP2 and do cleanups
-
-This 'legacy' OMAP2420 McBSP2 muxing code is currently broken after recent
-conversion to new mux code. The omap_mcbsp_request calling this code is
-usually called after booting whereas the omap_mux_init_signal is __init
-marked so null pointer dereference would occur.
-
-Fix this by removing the muxing code and let the bootloader or board file to
-do it if necessary. Remove also omap2_mcbsp_ops as there is no use for it.
-
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index 467aae2..88b8790 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -23,29 +23,6 @@
- #include <plat/cpu.h>
- #include <plat/mcbsp.h>
- 
--#include "mux.h"
--
--static void omap2_mcbsp2_mux_setup(void)
--{
--	omap_mux_init_signal("eac_ac_sclk.mcbsp2_clkx", OMAP_PULL_ENA);
--	omap_mux_init_signal("eac_ac_fs.mcbsp2_fsx", OMAP_PULL_ENA);
--	omap_mux_init_signal("eac_ac_din.mcbsp2_dr", OMAP_PULL_ENA);
--	omap_mux_init_signal("eac_ac_dout.mcbsp2_dx", OMAP_PULL_ENA);
--	omap_mux_init_gpio(117, OMAP_PULL_ENA);
--	/*
--	 * TODO: Need to add MUX settings for OMAP 2430 SDP
--	 */
--}
--
--static void omap2_mcbsp_request(unsigned int id)
--{
--	if (cpu_is_omap2420() && (id == OMAP_MCBSP2))
--		omap2_mcbsp2_mux_setup();
--}
--
--static struct omap_mcbsp_ops omap2_mcbsp_ops = {
--	.request	= omap2_mcbsp_request,
--};
- 
- #ifdef CONFIG_ARCH_OMAP2420
- static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
-@@ -55,7 +32,6 @@ static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
- 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base	= OMAP24XX_MCBSP2_BASE,
-@@ -63,7 +39,6 @@ static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
- 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- };
- #define OMAP2420_MCBSP_PDATA_SZ		ARRAY_SIZE(omap2420_mcbsp_pdata)
-@@ -82,7 +57,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
- 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base	= OMAP24XX_MCBSP2_BASE,
-@@ -90,7 +64,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
- 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base	= OMAP2430_MCBSP3_BASE,
-@@ -98,7 +71,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
- 		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base	= OMAP2430_MCBSP4_BASE,
-@@ -106,7 +78,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
- 		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base	= OMAP2430_MCBSP5_BASE,
-@@ -114,7 +85,6 @@ static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
- 		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 	},
- };
- #define OMAP2430_MCBSP_PDATA_SZ		ARRAY_SIZE(omap2430_mcbsp_pdata)
-@@ -133,7 +103,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
- 		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
- 	},
- 	{
-@@ -143,7 +112,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
- 		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 		.buffer_size	= 0x500, /* The FIFO has 1024 + 256 locations */
- 	},
- 	{
-@@ -153,7 +121,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
- 		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
- 	},
- 	{
-@@ -162,7 +129,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
- 		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
- 	},
- 	{
-@@ -171,7 +137,6 @@ static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
- 		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
- 		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
- 		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
--		.ops		= &omap2_mcbsp_ops,
- 		.buffer_size	= 0x80, /* The FIFO has 128 locations */
- 	},
- };
-@@ -189,28 +154,24 @@ static struct omap_mcbsp_platform_data omap44xx_mcbsp_pdata[] = {
- 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP1_RX,
- 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP1_TX,
- 		.tx_irq         = OMAP44XX_IRQ_MCBSP1,
--		.ops            = &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base      = OMAP44XX_MCBSP2_BASE,
- 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP2_RX,
- 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP2_TX,
- 		.tx_irq         = OMAP44XX_IRQ_MCBSP2,
--		.ops            = &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base      = OMAP44XX_MCBSP3_BASE,
- 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP3_RX,
- 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP3_TX,
- 		.tx_irq         = OMAP44XX_IRQ_MCBSP3,
--		.ops            = &omap2_mcbsp_ops,
- 	},
- 	{
- 		.phys_base      = OMAP44XX_MCBSP4_BASE,
- 		.dma_rx_sync    = OMAP44XX_DMA_MCBSP4_RX,
- 		.dma_tx_sync    = OMAP44XX_DMA_MCBSP4_TX,
- 		.tx_irq         = OMAP44XX_IRQ_MCBSP4,
--		.ops            = &omap2_mcbsp_ops,
- 	},
- };
- #define OMAP44XX_MCBSP_PDATA_SZ		ARRAY_SIZE(omap44xx_mcbsp_pdata)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
