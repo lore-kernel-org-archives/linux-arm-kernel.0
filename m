@@ -1,78 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 24 Sep 2010 11:11:20 +0200
-Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
-	driver
-In-Reply-To: <AANLkTi=mMGe10rDhA6g0OZYXhSW3=M07PKr6yN8VwnnJ@mail.gmail.com>
-References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
-	<20100902082759.GE14214@pengutronix.de>
-	<4C7F777E.1090104@gmail.com>
-	<20100902143908.GK14214@pengutronix.de>
-	<20100917095247.GB30441@pengutronix.de>
-	<AANLkTi=mMGe10rDhA6g0OZYXhSW3=M07PKr6yN8VwnnJ@mail.gmail.com>
-Message-ID: <20100924091120.GA25312@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 24 Sep 2010 10:21:24 +0100
+Subject: [PATCH] mfd: regulator: max8998: BUCK1/2 control augmented by
+	GPIO pins
+In-Reply-To: <20100924110825.138ce87f@lmajewski.digital.local>
+References: <1285078695-24753-1-git-send-email-l.majewski@samsung.com>
+	<20100921150107.GA32476@sirena.org.uk>
+	<20100924110825.138ce87f@lmajewski.digital.local>
+Message-ID: <20100924092123.GG32112@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Grant,
+On Fri, Sep 24, 2010 at 11:08:25AM +0200, Lukasz Majewski wrote:
 
-On Fri, Sep 24, 2010 at 01:00:14AM -0600, Grant Likely wrote:
-> > Jason Wang (4):
-> > ? ? ?ARM: mx5/clock-mx51: add spi clocks
-> > ? ? ?ARM: mx5/iomux-mx51: add iomux definitions for eCSPI2 on the imx51_3ds board
-> > ? ? ?ARM: mx5/mx51_3ds: add eCSPI2 support on the imx51_3ds board
-> > ? ? ?ARM: mx5/mx51_3ds: add SPI NOR flash in the board init stage
-> >
-> > Uwe Kleine-K?nig (12):
-> > ? ? ?spi/imx: default to m on platforms that have such devices
-> > ? ? ?spi/imx: convert driver to use platform ids
-> > ? ? ?spi/imx: get rid of more ifs depending on the used cpu
-> > ? ? ?spi/imx: save the spi chip select in config struct, not the gpio to use
-> > ? ? ?spi/imx: add support for imx51's eCSPI and CSPI
-> > ? ? ?ARM: imx: change the way spi-imx devices are registered
-> > ? ? ?ARM: imx: use platform ids for spi_imx devices
-> > ? ? ?ARM: mx51: clean up mx51 header
-> > ? ? ?ARM: mx51: fix naming of spi related defines
-> > ? ? ?ARM: mx5: add spi_imx device registration
-> > ? ? ?ARM: mx5/clock-mx51: refactor ccgr callbacks to use common code
-> > ? ? ?ARM: mx5/clock-mx51: new macro that defines a clk with all members
-> >
-> > ?arch/arm/mach-imx/clock-imx1.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> > ?arch/arm/mach-imx/clock-imx21.c ? ? ? ? ? ? ? ? | ? ?6 +-
-> > ?arch/arm/mach-imx/clock-imx27.c ? ? ? ? ? ? ? ? | ? ?6 +-
-> > ?arch/arm/mach-imx/devices-imx21.h ? ? ? ? ? ? ? | ? ?9 +-
-> > ?arch/arm/mach-imx/devices-imx27.h ? ? ? ? ? ? ? | ? 12 +-
-> > ?arch/arm/mach-mx25/clock.c ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +-
-> > ?arch/arm/mach-mx25/devices-imx25.h ? ? ? ? ? ? ?| ? 12 +-
-> > ?arch/arm/mach-mx3/clock-imx31.c ? ? ? ? ? ? ? ? | ? ?6 +-
-> > ?arch/arm/mach-mx3/clock-imx35.c ? ? ? ? ? ? ? ? | ? ?4 +-
-> > ?arch/arm/mach-mx3/devices-imx31.h ? ? ? ? ? ? ? | ? 12 +-
-> > ?arch/arm/mach-mx3/devices-imx35.h ? ? ? ? ? ? ? | ? ?9 +-
-> > ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> > ?arch/arm/mach-mx5/board-mx51_3ds.c ? ? ? ? ? ? ?| ? 33 ++
-> > ?arch/arm/mach-mx5/clock-mx51.c ? ? ? ? ? ? ? ? ?| ?113 ++++-
-> > ?arch/arm/mach-mx5/devices-imx51.h ? ? ? ? ? ? ? | ? 18 +
-> > ?arch/arm/plat-mxc/devices/platform-spi_imx.c ? ?| ? 89 +++-
-> > ?arch/arm/plat-mxc/include/mach/devices-common.h | ? 11 +-
-> > ?arch/arm/plat-mxc/include/mach/iomux-mx51.h ? ? | ? ?5 +
-> > ?arch/arm/plat-mxc/include/mach/mx51.h ? ? ? ? ? | ?608 +++++++++++------------
-> > ?drivers/spi/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 16 +
-> > ?drivers/spi/spi_imx.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ?394 ++++++++++++---
-> > ?21 files changed, 919 insertions(+), 453 deletions(-)
-> > ?create mode 100644 arch/arm/mach-mx5/devices-imx51.h
-> 
-> I'm fine with this series.
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> What tree do you want to merge them through?
-I thought that the five patches touching drivers/spi should go via your
-tree, the others via Sascha's.  Assuming this is OK for you, too, do you
-prefer to pick the patches out here or should I prepare a branch with
-these patches for you to pull?
+> Unfortunately there is problem with this distinction and use of
+> gpio_is_valid.
 
-Best regards
-Uwe
+> The gpio_is_valid is simply defined as  
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> return ((unsigned)number) < ARCH_NR_GPIOS;
+
+> For which 0 is also a valid GPIO.
+
+I understand that on some platforms it is actually a valid GPIO.
+
+> One workaround for this is to check explicitly the condition:
+> pdata->buck1_set1 != 0 , but this is neither elegant nor it prevents
+> the situation when on some architecture GPIO 0 is valid.
+
+The standard check is gpio_is_valid() with the GPIO set to -1 if it's
+not valid.
+
+> is the replacement algorithm. I think that circular buffer
+> implementation would be a feasible solution for 4/2 bytes elements
+> array.
+
+> With more extended functionality, when more voltage levels would be
+> available, more sophisticated approach (like LRU) may be used.
+
+The problem here is that this is going to be pretty pessimal if the
+system is using more than four different voltages; you get no advantage
+at all from the preprogramming.
