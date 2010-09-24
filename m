@@ -1,172 +1,38 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 8 Sep 2010 16:37:42 -0700
-Subject: [PATCH 03/13] OMAP3: PM: move device-specific special cases from PM core into CPUidle
-Message-ID: <mailman.6.1285287382.1886.linux-arm-kernel@lists.infradead.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Sep 2010 17:30:36 -0700
+Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
+In-Reply-To: <AANLkTimLL-vT-sspq8oTGotoKQhxS6en-+S5g0-HpYJ=@mail.gmail.com>
+References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
+	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
+	<20100923172254.GM4211@atomide.com>
+	<AANLkTimLL-vT-sspq8oTGotoKQhxS6en-+S5g0-HpYJ=@mail.gmail.com>
+Message-ID: <20100924003035.GY4211@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an effort to simplify the core idle path, move any device-specific
-special case handling from the core PM idle path into the CPUidle
-pre-idle checking path.
+* Cory Maccarrone <darkstar6262@gmail.com> [100923 10:18]:
+> On Thu, Sep 23, 2010 at 10:22 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Cory Maccarrone <darkstar6262@gmail.com> [100817 21:28]:
+> >> This change adds in MMC and I2C support to the HTC Herald board, as well
+> >> as adding the HTCPLD driver for the PLD used on this phone. ?It also
+> >> adds in the gpio-keys entries for the front directional keys and
+> >> selector and the cursor keys on the slide-out keyboard, and gpio-leds
+> >> support for the LEDs attached to the htcpld.
+> >>
+> >> Additionally, SPI bus support (using the spi100k driver) and
+> >> touchscreen support (using the ads7846 driver) were added.
+> >
+> > Thanks, I'll add this into omap-for-linus for the upcoming merge
+> > window. Cory, can you please check if you have other pending
+> > patches? I don't see others in patchwork.kernel.org, but thought
+> > there may be some that did not get merged last merge window?
+> >
+> 
+> I believe you have everything.  I had submitted a series of 5 patches
+> that you commented on, and this one was the boiled down combination of
+> all of those (minus one element which I'm still looking into).  So,
+> just this one should be pending.
 
-This keeps the core, interrupts-disabled idle path streamlined and
-independent of any device-specific handling, and also allows CPUidle
-to do the checking only for certain C-states as needed.  This patch
-has the device checks in place for all states with the CHECK_BM flag,
-namely all states >= C2.
+OK thanks.
 
-This patch was inspired by a similar patch written by Tero Kristo as
-part of a larger series to add INACTIVE state support.
-
-NOTE: This is a baby-step towards decoupling device idle (or system
-idle) from CPU idle.  Eventually, CPUidle should only manage the CPU,
-and device/system idle should be managed elsewhere.
-
-Cc: Tero Kristo <tero.kristo@nokia.com>
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
----
- arch/arm/mach-omap2/cpuidle34xx.c |   58 +++++++++++++++++++++++++++++++++++--
- arch/arm/mach-omap2/pm34xx.c      |   14 +--------
- 2 files changed, 56 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 3d3d035..8ea012e 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -60,7 +60,8 @@ struct omap3_processor_cx {
- 
- struct omap3_processor_cx omap3_power_states[OMAP3_MAX_STATES];
- struct omap3_processor_cx current_cx_state;
--struct powerdomain *mpu_pd, *core_pd;
-+struct powerdomain *mpu_pd, *core_pd, *per_pd;
-+struct powerdomain *cam_pd;
- 
- /*
-  * The latencies/thresholds for various C states have
-@@ -233,14 +234,62 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 			       struct cpuidle_state *state)
- {
- 	struct cpuidle_state *new_state = next_valid_state(dev, state);
-+	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
-+	u32 cam_state;
-+	struct omap3_processor_cx *cx;
-+	int ret;
- 
- 	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap3_idle_bm_check()) {
- 		BUG_ON(!dev->safe_state);
- 		new_state = dev->safe_state;
-+		goto select_state;
-+	}
-+
-+	cx = cpuidle_get_statedata(state);
-+	core_next_state = cx->core_state;
-+
-+	/*
-+	 * FIXME: we currently manage device-specific idle states
-+	 *        for PER and CORE in combination with CPU-specific
-+	 *        idle states.  This is wrong, and device-specific
-+	 *        idle managment needs to be separated out into 
-+	 *        its own code.
-+	 */
-+
-+	/*
-+	 * Prevent idle completely if CAM is active.
-+	 * CAM does not have wakeup capability in OMAP3.
-+	 */
-+	cam_state = pwrdm_read_pwrst(cam_pd);
-+	if (cam_state == PWRDM_POWER_ON) {
-+		new_state = dev->safe_state;
-+		goto select_state;
-+	}
-+
-+	/*
-+	 * Prevent PER off if CORE is not in retention or off as this
-+	 * would disable PER wakeups completely.
-+	 */
-+	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
-+	if ((per_next_state == PWRDM_POWER_OFF) &&
-+	    (core_next_state > PWRDM_POWER_RET)) {
-+		per_next_state = PWRDM_POWER_RET;
-+		pwrdm_set_next_pwrst(per_pd, per_next_state);
- 	}
- 
-+	/* Are we changing PER target state? */
-+	if (per_next_state != per_saved_state)
-+		pwrdm_set_next_pwrst(per_pd, per_next_state);
-+
-+select_state:
- 	dev->last_state = new_state;
--	return omap3_enter_idle(dev, new_state);
-+	ret = omap3_enter_idle(dev, new_state);
-+
-+	/* Restore original PER state if it was modified */
-+	if (per_next_state != per_saved_state)
-+		pwrdm_set_next_pwrst(per_pd, per_saved_state);
-+
-+	return ret;
- }
- 
- DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
-@@ -328,7 +377,8 @@ void omap_init_power_states(void)
- 			cpuidle_params_table[OMAP3_STATE_C2].threshold;
- 	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C2].core_state = PWRDM_POWER_ON;
--	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
-+	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID |
-+				CPUIDLE_FLAG_CHECK_BM;
- 
- 	/* C3 . MPU CSWR + Core inactive */
- 	omap3_power_states[OMAP3_STATE_C3].valid =
-@@ -426,6 +476,8 @@ int __init omap3_idle_init(void)
- 
- 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
- 	core_pd = pwrdm_lookup("core_pwrdm");
-+	per_pd = pwrdm_lookup("per_pwrdm");
-+	cam_pd = pwrdm_lookup("cam_pwrdm");
- 
- 	omap_init_power_states();
- 	cpuidle_register_driver(&omap3_idle_driver);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 429268e..bb2ba1e 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -346,7 +346,6 @@ void omap_sram_idle(void)
- 	int core_next_state = PWRDM_POWER_ON;
- 	int core_prev_state, per_prev_state;
- 	u32 sdrc_pwr = 0;
--	int per_state_modified = 0;
- 
- 	if (!_omap_sram_idle)
- 		return;
-@@ -391,19 +390,10 @@ void omap_sram_idle(void)
- 	if (per_next_state < PWRDM_POWER_ON) {
- 		omap_uart_prepare_idle(2);
- 		omap2_gpio_prepare_for_idle(per_next_state);
--		if (per_next_state == PWRDM_POWER_OFF) {
--			if (core_next_state == PWRDM_POWER_ON) {
--				per_next_state = PWRDM_POWER_RET;
--				pwrdm_set_next_pwrst(per_pwrdm, per_next_state);
--				per_state_modified = 1;
--			} else
-+		if (per_next_state == PWRDM_POWER_OFF)
- 				omap3_per_save_context();
--		}
- 	}
- 
--	if (pwrdm_read_pwrst(cam_pwrdm) == PWRDM_POWER_ON)
--		omap2_clkdm_deny_idle(mpu_pwrdm->pwrdm_clkdms[0]);
--
- 	/* CORE */
- 	if (core_next_state < PWRDM_POWER_ON) {
- 		omap_uart_prepare_idle(0);
-@@ -470,8 +460,6 @@ void omap_sram_idle(void)
- 		if (per_prev_state == PWRDM_POWER_OFF)
- 			omap3_per_restore_context();
- 		omap_uart_resume_idle(2);
--		if (per_state_modified)
--			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
- 	}
- 
- 	/* Disable IO-PAD and IO-CHAIN wakeup */
--- 
-1.7.2.1
+Tony
