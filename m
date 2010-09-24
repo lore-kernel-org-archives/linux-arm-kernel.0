@@ -1,27 +1,31 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 24 Sep 2010 11:20:04 +1000
-Subject: [PATCH 1/8] posix clocks: introduce a syscall for clock tuning.
-In-Reply-To: <alpine.LFD.2.00.1009240008390.2416@localhost6.localdomain6>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-	<b94ef1cd9c04ef3ad5964408bd0af7251add78de.1285261534.git.richard.cochran@omicron.at>
-	<1285279423.5158.20.camel@pasglop>
-	<alpine.LFD.2.00.1009240008390.2416@localhost6.localdomain6>
-Message-ID: <1285291204.14081.8.camel@pasglop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Sep 2010 21:27:03 -0400 (EDT)
+Subject: [PATCH] ARM: abstract atags parsing
+In-Reply-To: <AANLkTikwT-w_6Y+yzZ014g6tijUTUzZUAa7g=eE8F+nt@mail.gmail.com>
+References: <alpine.LFD.2.00.1009231713570.13233@xanadu.home>
+	<20100923213113.GC26295@n2100.arm.linux.org.uk>
+	<AANLkTikwT-w_6Y+yzZ014g6tijUTUzZUAa7g=eE8F+nt@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1009232122010.13233@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-09-24 at 00:12 +0200, Thomas Gleixner wrote:
-> > This list is getting way too much unrelated stuff, which I find
-> > annoying, it would be nice if we were all a bit more careful here
-> with
-> > our CC lists.
+On Thu, 23 Sep 2010, Grant Likely wrote:
+
+> On Thu, Sep 23, 2010 at 3:31 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Sep 23, 2010 at 05:18:02PM -0400, Nicolas Pitre wrote:
+> >> This code movement will make it cleaner and easier to introduce support
+> >> for device tree which is basically an alternative to atags. No functional
+> >> changes are introduced by this patch.
+> >
+> > I don't see any point to this churn.
 > 
-> Says the guy who missed to trim the useless context of the original
-> mail, which made me scroll down all the way just to find out that
-> there is nothing to see. 
+> I can carry it in test-devicetree branch until you become okay with it.
 
-Heh, you can usually ignore what's after my signature :-) At least I
-didn't put my reply all the way down the bottom !
+That is probably the best course of action.  I thought this was a nice 
+cleanup that could stand on its own, but if RMK doesn't want it without 
+a bigger reason (e.g. full DT implementation) then it is best if you 
+carry it in your repository.
 
-Cheers,
-Ben.
+
+Nicolas
