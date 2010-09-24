@@ -1,69 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Sep 2010 18:13:24 -0700
-Subject: [PATCH 00/14] omap sram, omap4 control module and es2.0 support
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB02CD307F35@dbde02.ent.ti.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1009171147560.6562@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CD307F35@dbde02.ent.ti.com>
-Message-ID: <20100924011323.GC4211@atomide.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 24 Sep 2010 11:20:04 +1000
+Subject: [PATCH 1/8] posix clocks: introduce a syscall for clock tuning.
+In-Reply-To: <alpine.LFD.2.00.1009240008390.2416@localhost6.localdomain6>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<b94ef1cd9c04ef3ad5964408bd0af7251add78de.1285261534.git.richard.cochran@omicron.at>
+	<1285279423.5158.20.camel@pasglop>
+	<alpine.LFD.2.00.1009240008390.2416@localhost6.localdomain6>
+Message-ID: <1285291204.14081.8.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [100918 00:24]:
->  -----Original Message-----
-> > From: Paul Walmsley [mailto:paul at pwsan.com]
-> > Sent: Friday, September 17, 2010 11:21 PM
-> > To: Shilimkar, Santosh
-> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 00/14] omap sram, omap4 control module and es2.0
-> > support
-> > 
-> > Hello Santosh
-> > 
-> > On Fri, 17 Sep 2010, Santosh Shilimkar wrote:
-> > 
-> > > This is consolidated patch series targetted for 2.6.37 merge window.
-> > > All of these patches have been already posted/reviewed on the list.
-> > 
-> > Patch 6 is missing, could you please look into why?
-> > 
-> Mostly because of size of the patch, You can pick this from the
-> below git link 
+On Fri, 2010-09-24 at 00:12 +0200, Thomas Gleixner wrote:
+> > This list is getting way too much unrelated stuff, which I find
+> > annoying, it would be nice if we were all a bit more careful here
+> with
+> > our CC lists.
 > 
-> > Also, please split all of the SCM changes out into a separate
-> > series/branch since they will be going in through my tree.  Am reviewing
-> > those now.
-> > 
-> Ok done. I have split the series and kept scm changes on 'omap4_scm_2.6.37'
-> head and rest on 'omap_for_2.6.37'
+> Says the guy who missed to trim the useless context of the original
+> mail, which made me scroll down all the way just to find out that
+> there is nothing to see. 
 
-Santosh, the "Setup MT_MEMORY and MT_MEMORY_NONCACHED L1 entries" should
-get tested in the arm tree to avoid nasty surprises. Please do the following
-split:
+Heh, you can usually ignore what's after my signature :-) At least I
+didn't put my reply all the way down the bottom !
 
-1. A series for Russell to pull
-ARM: mmu: Setup MT_MEMORY and MT_MEMORY_NONCACHED L1 entries
-omap: Map only available sram memory
-davinci: map sram using MT_MEMORY_NONCACHED instead of MT_DEVICE
-
-You can add my Acked-by: Tony Lindgren <tony@atomide.com> to
-the "Map only available sram memory" patch.
-
-2. A series for me to pull
-omap4: sram: Fix start address
-omap4: Update id.c and cpu.h for es2.0
-omap4: l2x0: Fix init parameter for es2.0
-omap4: Panda: Add DEBUG_LL support
-omap4: Fix bootup crash observed with higher CPU clocks
-
-3. A series for Paul to pull (already in omap4_scm_2.6.37)
-omap4: control: Add ctrl_pad_base to omap_globals
-omap4: control: Add accessor api's for pad control module
-omap4: control: Add the register definition headers
-omap4: control: Fix the control module register accesses
-
-Please base them either on v2.6.35 or v2.6.36-rc5.
-
-Regards,
-
-Tony
+Cheers,
+Ben.
