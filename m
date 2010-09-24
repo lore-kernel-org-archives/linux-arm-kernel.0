@@ -1,66 +1,102 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 24 Sep 2010 08:43:10 +0200
-Subject: [PATCH 0/4] Adding support for esdhc on mx35/51
-In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D4BC5@zch01exm22.fsl.freescale.net>
-References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
-	<A88EF4D64D8447468743DC1503C0B6CA0D4BC5@zch01exm22.fsl.freescale.net>
-Message-ID: <20100924064310.GA30543@pengutronix.de>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Fri, 24 Sep 2010 09:57:19 +0300
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <4C9BE577.4050504@fluff.org>
+References: <20100923190212.18863.25678.stgit@darius-desktop>
+	<4C9BE577.4050504@fluff.org>
+Message-ID: <AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hi,
 
-> * About the share between i.MX and PPC eSDHC.
-> Why configure a few parts be shared between the i.MX eSDHC and PPC
-> eSDHC? Can they be separated into two independent systems?
+On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On 23/09/10 20:15, Darius Augulis wrote:
+>> Swap device and driver names in serial/samsung.c
+>
+> This is far too short, please see the notes below on trying
+> to make this more informative.
+>
+>> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+>> ---
+>>
+>> This patch was submitted about 3 months ago, but still not merged.
+>> There was another similar patch from Joonyoung Shim
+>> <jy0922.shim@samsung.com> and was discussed here:
+>> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+>> Joonyoung Shim acked my patch and other people on ARM mailing list
+>> acked it. The maintainer, Ben Dooks, still not responding for
+>> a long time. Another maintainer, Kukjin Kim, refused to merge
+>> it without Ben's review.
+>> I would like to ask somebody pick up this bugfix.
+>
+> I belive last time this was brought up I asked about the affect
+> this has on the userspace. The following issues would be helpful
+> or essential to have noted in the header about the effect of this.
+>
+> - Does it change the /dev name of the device? if so I would thinl
+>  carefully about applying it, as it would be a change in the way
+>  that userspace sees the kernel.
 
-The rule of thumb is to avoid code-duplication. Assume the PPC driver gets
-fixed an off-by-one error in the freq-calculation, you surely want to have that
-fix on imx, too.
+It does - now devices are named /dev/s3c2410_serial, and patch changes
+its name to /dev/ttySAC
 
-> It would bring the conveniences to maintain stuff in the future if we
-> separate them.
+>
+> - Does it change the kernel output itself? A note on what diffeences
+>  can be seen in things like dmesg would be helpful.
 
-If you can name these conveniences and they are convincing, we can keep them
-seperate. At the moment, I don't see them (what doesn't mean they don't exist)
+It does. Serial driver reports device names when probing, so there
+will appear ttySACx instead of
+s3c2410_serialx.
 
-> And there is already one set of eSDHC driver for all the i.MX SOCs.
+>
+> - Are there any other side effects
+>
+> - Why is this a bug? Maybe the previous points will explain what is
+>  going on, but if not, then a reasonably concise description of
+>  what is going on here.
 
-I am confused: which set do you mean?
+This is bug, because of several points:
 
-> As we know that i.MX and PPC are the disparate SOC families.
+1. Because it contradicts kernel documentation. Please read
+Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
+This should be enough to apply this patch.
 
-Well, if the eSDHC-core itself is the same or very similar, that doesn't really
-matter IMO. Especially as the of-platform-bus might disappear somewhen in the
-future, the PPC and imx-drivers could become more similar.
+2. Because s3c2410_serial isn't correct name for serial device node.
+It's name of Samsung serial driver.
 
-> * About the driver name of i.MX eSDHC driver, I think that use the imx
-> to identify it is better than esdhc.
+3. Because now almost all userspace systems workaround it by creating symlink
+/dev/ttySACx > /dev/s3c2410_serialx and only then put some getty on
+created symlink, not on original device.
+Systems which don't create this symlink, fail to boot at all, because
+of wrong console name. Good example is Buildroot.
 
-I picked up Anton's suggestion 'sdhci-esdhc-imx.c' so far. Although I am still
-not sure if 'sdhci-esdhc-pltfm.c' would be more precise.
-
-> As I know that the eSDHC name wouldn't be used anymore in next
-> generation SOCs of i.MX family.
-> So the name of imx would be much clear and exact.
-
-Not really, because all _existing_ implementations are called eSDHC, no? :) If
-some future incarnations have a different name, but behave the same or very
-similar, this is usually no problem. Check for example the I2C eeprom driver
-which is named 'at24' but support basically all EEPROMs and not only Atmel
-ones. Same goes for a couple of RTC-drivers, etc...
-
-Kind regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100924/b4783607/attachment.sig>
+>
+>> ?drivers/serial/samsung.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+>> index b1156ba..25c0d0f 100644
+>> --- a/drivers/serial/samsung.c
+>> +++ b/drivers/serial/samsung.c
+>> @@ -883,10 +883,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+>>
+>> ?static struct uart_driver s3c24xx_uart_drv = {
+>> ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
+>> - ? ? .dev_name ? ? ? = "s3c2410_serial",
+>> + ? ? .driver_name ? ?= "s3c2410_serial",
+>> ? ? ? .nr ? ? ? ? ? ? = CONFIG_SERIAL_SAMSUNG_UARTS,
+>> ? ? ? .cons ? ? ? ? ? = S3C24XX_SERIAL_CONSOLE,
+>> - ? ? .driver_name ? ?= S3C24XX_SERIAL_NAME,
+>> + ? ? .dev_name ? ? ? = S3C24XX_SERIAL_NAME,
+>> ? ? ? .major ? ? ? ? ?= S3C24XX_SERIAL_MAJOR,
+>> ? ? ? .minor ? ? ? ? ?= S3C24XX_SERIAL_MINOR,
+>> ?};
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
