@@ -1,87 +1,35 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 24 Sep 2010 08:45:45 -0700
-Subject: [PATCH 2/3] dmaengine: add wrapper functions for dmaengine
-In-Reply-To: <20100924072523.GM23406@pengutronix.de>
-References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
-	<1281956870-12463-3-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTin8v_29HESnmhE5==3OLmb29bmoOY1iona4C+eD@mail.gmail.com>
-	<20100924072523.GM23406@pengutronix.de>
-Message-ID: <AANLkTi=tY=W05K5N77Xv6kz5CX9U2=Gvm2vDavMN5DSu@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Sep 2010 17:00:38 +0100
+Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
+In-Reply-To: <AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
+References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
+	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
+	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
+	<AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
+Message-ID: <20100924160038.GD14809@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 24, 2010 at 12:25 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Dan,
->
-> On Thu, Sep 23, 2010 at 12:53:58PM -0700, Dan Williams wrote:
->> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->> > index 0df7864..635c60b 100644
->> > --- a/include/linux/dmaengine.h
->> > +++ b/include/linux/dmaengine.h
->> > @@ -491,6 +491,47 @@ struct dma_device {
->> > ? ? ? ?void (*device_issue_pending)(struct dma_chan *chan);
->> > ?};
->> >
->> > +static inline int dmaengine_device_control(struct dma_chan *chan,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_ctrl_cmd cmd,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long arg)
->> > +{
->> > + ? ? ? return chan->device->device_control(chan, cmd, arg);
->> > +}
->> > +
->> > +static inline int dmaengine_slave_config(struct dma_chan *chan,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_slave_config *config)
->> > +{
->> > + ? ? ? return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
->> > + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)config);
->> > +}
->> > +
->> > +static inline int dmaengine_terminate_all(struct dma_chan *chan)
->> > +{
->> > + ? ? ? return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
->> > +}
->> > +
->> > +static inline struct dma_async_tx_descriptor *dmaengine_prep_slave_sg(
->> > + ? ? ? ? ? ? ? struct dma_chan *chan, struct scatterlist *sgl,
->> > + ? ? ? ? ? ? ? unsigned int sg_len, enum dma_data_direction direction,
->> > + ? ? ? ? ? ? ? unsigned long flags)
->> > +{
->> > + ? ? ? return chan->device->device_prep_slave_sg(chan, sgl, sg_len, direction,
->> > + ? ? ? ? ? ? ? ? ? ? ? flags);
->> > +}
->> > +
->> > +static inline struct dma_async_tx_descriptor *dmaengine_prep_cyclic(
->> > + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
->> > + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
->> > +{
->> > + ? ? ? return chan->device->device_prep_dma_cyclic(chan, buf_addr, buf_len,
->> > + ? ? ? ? ? ? ? ? ? ? ? period_len, direction);
->> > +}
->> > +
->>
->> No strong disagreements on the above, the type safety of
->> dmaengine_slave_config() is nice.
->
-> So you have only small disagreements? ;) I can drop the dmaengine_prep_*
-> functions and only keep the device_control functions if like it better.
->
+On Fri, Sep 24, 2010 at 08:38:37AM -0700, Cory Maccarrone wrote:
+> Not really sure, I wasn't the one who first came up with that mask.
+> All I know is that it seems to work, and not just for my device, but
+> lots of other HTC OMAP850 devices we've tried it on too.
+> 
+> I'm interested though, what in particular makes it unusual?
 
-The prep versions may just be code churn, unless there is another
-advantage for having a helper... debug/tracing perhaps?
+It's normal to set all bits between the maximum and minimum voltages
+rather than alternate bits.  So if you support voltages between 3.0
+and 3.5 volts, all these should be used:
 
->>
->> > +static inline int dmaengine_tx_submit(struct dma_async_tx_descriptor *desc)
->> > +{
->> > + ? ? ? return desc->tx_submit(desc);
->> > +}
->>
->> This one can drop the tx.
->
-> You mean the function should be named dmaengine_submit?
+#define MMC_VDD_30_31           0x00040000      /* VDD voltage 3.0 ~ 3.1 */
+#define MMC_VDD_31_32           0x00080000      /* VDD voltage 3.1 ~ 3.2 */
+#define MMC_VDD_32_33           0x00100000      /* VDD voltage 3.2 ~ 3.3 */
+#define MMC_VDD_33_34           0x00200000      /* VDD voltage 3.3 ~ 3.4 */
+#define MMC_VDD_34_35           0x00400000      /* VDD voltage 3.4 ~ 3.5 */
 
-Yes, the "tx" is often mistaken, understandably, for "transmit".
-Linus proposed renaming ->tx_submit() to just ->submit().  This helper
-would be a softer way to introduce that rename.
+rather than just MMC_VDD_30_31, MMC_VDD_32_33, MMC_VDD_34_35.
 
---
-Dan
+Note that if you support just one voltage, (eg, 3.3V) you should
+use the two which overlap this - MMC_VDD_32_33 and MMC_VDD_33_34.
+There are cards which go unresponsive if you supply just a single
+bit in the OCR mask.
