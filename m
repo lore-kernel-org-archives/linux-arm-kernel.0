@@ -1,54 +1,87 @@
-From: darkstar6262@gmail.com (Cory Maccarrone)
-Date: Fri, 24 Sep 2010 08:38:37 -0700
-Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
-In-Reply-To: <AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
-References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
-	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
-	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
-Message-ID: <AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 24 Sep 2010 08:45:45 -0700
+Subject: [PATCH 2/3] dmaengine: add wrapper functions for dmaengine
+In-Reply-To: <20100924072523.GM23406@pengutronix.de>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-3-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTin8v_29HESnmhE5==3OLmb29bmoOY1iona4C+eD@mail.gmail.com>
+	<20100924072523.GM23406@pengutronix.de>
+Message-ID: <AANLkTi=tY=W05K5N77Xv6kz5CX9U2=Gvm2vDavMN5DSu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/24 Micha? Miros?aw <mirqus@gmail.com>:
-> 2010/8/18 Cory Maccarrone <darkstar6262@gmail.com>:
->> This change adds in MMC and I2C support to the HTC Herald board, as well
->> as adding the HTCPLD driver for the PLD used on this phone. ?It also
->> adds in the gpio-keys entries for the front directional keys and
->> selector and the cursor keys on the slide-out keyboard, and gpio-leds
->> support for the LEDs attached to the htcpld.
+On Fri, Sep 24, 2010 at 12:25 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Dan,
+>
+> On Thu, Sep 23, 2010 at 12:53:58PM -0700, Dan Williams wrote:
+>> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> > index 0df7864..635c60b 100644
+>> > --- a/include/linux/dmaengine.h
+>> > +++ b/include/linux/dmaengine.h
+>> > @@ -491,6 +491,47 @@ struct dma_device {
+>> > ? ? ? ?void (*device_issue_pending)(struct dma_chan *chan);
+>> > ?};
+>> >
+>> > +static inline int dmaengine_device_control(struct dma_chan *chan,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_ctrl_cmd cmd,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long arg)
+>> > +{
+>> > + ? ? ? return chan->device->device_control(chan, cmd, arg);
+>> > +}
+>> > +
+>> > +static inline int dmaengine_slave_config(struct dma_chan *chan,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_slave_config *config)
+>> > +{
+>> > + ? ? ? return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+>> > + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)config);
+>> > +}
+>> > +
+>> > +static inline int dmaengine_terminate_all(struct dma_chan *chan)
+>> > +{
+>> > + ? ? ? return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+>> > +}
+>> > +
+>> > +static inline struct dma_async_tx_descriptor *dmaengine_prep_slave_sg(
+>> > + ? ? ? ? ? ? ? struct dma_chan *chan, struct scatterlist *sgl,
+>> > + ? ? ? ? ? ? ? unsigned int sg_len, enum dma_data_direction direction,
+>> > + ? ? ? ? ? ? ? unsigned long flags)
+>> > +{
+>> > + ? ? ? return chan->device->device_prep_slave_sg(chan, sgl, sg_len, direction,
+>> > + ? ? ? ? ? ? ? ? ? ? ? flags);
+>> > +}
+>> > +
+>> > +static inline struct dma_async_tx_descriptor *dmaengine_prep_cyclic(
+>> > + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+>> > + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
+>> > +{
+>> > + ? ? ? return chan->device->device_prep_dma_cyclic(chan, buf_addr, buf_len,
+>> > + ? ? ? ? ? ? ? ? ? ? ? period_len, direction);
+>> > +}
+>> > +
 >>
->> Additionally, SPI bus support (using the spi100k driver) and
->> touchscreen support (using the ads7846 driver) were added.
+>> No strong disagreements on the above, the type safety of
+>> dmaengine_slave_config() is nice.
+>
+> So you have only small disagreements? ;) I can drop the dmaengine_prep_*
+> functions and only keep the device_control functions if like it better.
+>
+
+The prep versions may just be code churn, unless there is another
+advantage for having a helper... debug/tracing perhaps?
+
 >>
->> Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
->> ---
-> [...]
->> +/* MMC Card */
->> +#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
->> +static struct omap_mmc_platform_data htc_mmc1_data = {
->> + ? ? ? .nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
->> + ? ? ? .switch_slot ? ? ? ? ? ? ? ? ? ?= NULL,
->> + ? ? ? .slots[0] ? ? ? = {
->> + ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_30_31 |
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MMC_VDD_32_33 | MMC_VDD_33_34,
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "mmcblk",
->> + ? ? ? ? ? ? ? .nomux ? ? ? ? ? ? ? ? ?= 1,
->> + ? ? ? ? ? ? ? .wires ? ? ? ? ? ? ? ? ?= 4,
->> + ? ? ? ? ? ? ? .switch_pin ? ? ? ? ? ? = -1,
->> + ? ? ? },
->> +};
-> [...]
+>> > +static inline int dmaengine_tx_submit(struct dma_async_tx_descriptor *desc)
+>> > +{
+>> > + ? ? ? return desc->tx_submit(desc);
+>> > +}
+>>
+>> This one can drop the tx.
 >
-> What voltages can this MMC controller provide? That's a rather unusual OCR mask.
->
-> Best Regards,
-> Micha? Miros?aw
->
+> You mean the function should be named dmaengine_submit?
 
-Not really sure, I wasn't the one who first came up with that mask.
-All I know is that it seems to work, and not just for my device, but
-lots of other HTC OMAP850 devices we've tried it on too.
+Yes, the "tx" is often mistaken, understandably, for "transmit".
+Linus proposed renaming ->tx_submit() to just ->submit().  This helper
+would be a softer way to introduce that rename.
 
-I'm interested though, what in particular makes it unusual?
-
-- Cory
+--
+Dan
