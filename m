@@ -1,68 +1,66 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 24 Sep 2010 12:12:21 +0530
-Subject: [PATCH 00/14] omap sram, omap4 control module and es2.0 support
-In-Reply-To: <20100924011323.GC4211@atomide.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1009171147560.6562@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB02CD307F35@dbde02.ent.ti.com>
-	<20100924011323.GC4211@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB02CD469D24@dbde02.ent.ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 24 Sep 2010 08:43:10 +0200
+Subject: [PATCH 0/4] Adding support for esdhc on mx35/51
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D4BC5@zch01exm22.fsl.freescale.net>
+References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0D4BC5@zch01exm22.fsl.freescale.net>
+Message-ID: <20100924064310.GA30543@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Friday, September 24, 2010 6:43 AM
-> To: Shilimkar, Santosh
-> Cc: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 00/14] omap sram, omap4 control module and es2.0
-> support
-> 
+Hi Richard,
 
-<snip..>
+> * About the share between i.MX and PPC eSDHC.
+> Why configure a few parts be shared between the i.MX eSDHC and PPC
+> eSDHC? Can they be separated into two independent systems?
 
-> Santosh, the "Setup MT_MEMORY and MT_MEMORY_NONCACHED L1 entries" should
-> get tested in the arm tree to avoid nasty surprises. Please do the
-> following
-> split:
-> 
-> 1. A series for Russell to pull
-> ARM: mmu: Setup MT_MEMORY and MT_MEMORY_NONCACHED L1 entries
-> omap: Map only available sram memory
-> davinci: map sram using MT_MEMORY_NONCACHED instead of MT_DEVICE
-> 
-> You can add my Acked-by: Tony Lindgren <tony@atomide.com> to
-> the "Map only available sram memory" patch.
-Have submitted above three patches to RMK's patch system with
-your ack on the mentioned patch
-	-	patch 6407/1
-	-	patch 6408/1
-	-	patch 6409/1
-They are also available at:
-git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git
-omap_for_2.6.37-rmk
+The rule of thumb is to avoid code-duplication. Assume the PPC driver gets
+fixed an off-by-one error in the freq-calculation, you surely want to have that
+fix on imx, too.
 
-> 
-> 2. A series for me to pull
-> omap4: sram: Fix start address
-> omap4: Update id.c and cpu.h for es2.0
-> omap4: l2x0: Fix init parameter for es2.0
-> omap4: Panda: Add DEBUG_LL support
-> omap4: Fix bootup crash observed with higher CPU clocks
->
-The pull request is sent to you with patches rebased on
-v2.6.36-rc5
- 
-> 3. A series for Paul to pull (already in omap4_scm_2.6.37)
-> omap4: control: Add ctrl_pad_base to omap_globals
-> omap4: control: Add accessor api's for pad control module
-> omap4: control: Add the register definition headers
-> omap4: control: Fix the control module register accesses
-> 
-This series is already available. I just rebased on 
-v2.6.36-rc5 as you suggested.
+> It would bring the conveniences to maintain stuff in the future if we
+> separate them.
 
-Regards,
-Santosh
+If you can name these conveniences and they are convincing, we can keep them
+seperate. At the moment, I don't see them (what doesn't mean they don't exist)
+
+> And there is already one set of eSDHC driver for all the i.MX SOCs.
+
+I am confused: which set do you mean?
+
+> As we know that i.MX and PPC are the disparate SOC families.
+
+Well, if the eSDHC-core itself is the same or very similar, that doesn't really
+matter IMO. Especially as the of-platform-bus might disappear somewhen in the
+future, the PPC and imx-drivers could become more similar.
+
+> * About the driver name of i.MX eSDHC driver, I think that use the imx
+> to identify it is better than esdhc.
+
+I picked up Anton's suggestion 'sdhci-esdhc-imx.c' so far. Although I am still
+not sure if 'sdhci-esdhc-pltfm.c' would be more precise.
+
+> As I know that the eSDHC name wouldn't be used anymore in next
+> generation SOCs of i.MX family.
+> So the name of imx would be much clear and exact.
+
+Not really, because all _existing_ implementations are called eSDHC, no? :) If
+some future incarnations have a different name, but behave the same or very
+similar, this is usually no problem. Check for example the I2C eeprom driver
+which is named 'at24' but support basically all EEPROMs and not only Atmel
+ones. Same goes for a couple of RTC-drivers, etc...
+
+Kind regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100924/b4783607/attachment.sig>
