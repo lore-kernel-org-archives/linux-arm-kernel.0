@@ -1,37 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Sep 2010 18:50:53 -0700
-Subject: [PATCH 04/11] omap: n8x0: Mux i2s codec port pins for McBSP block
+Date: Thu, 23 Sep 2010 18:50:56 -0700
+Subject: [PATCH 05/11] omap3: Remove non-existent config option
 In-Reply-To: <20100924014938.10325.35279.stgit@baageli.muru.com>
 References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-Message-ID: <20100924015053.10325.31208.stgit@baageli.muru.com>
+Message-ID: <20100924015056.10325.95854.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jarkko Nikula <jhnikula@gmail.com>
+From: Yogesh Marathe <yogesh_marathe@ti.com>
 
-Bootloader on Nokia N800 and N810 muxes I2C codec port pins for EAC block.
-As there is no driver and use for EAC, mux those pins for McBSP instead
-since N810 ASoC drivers can use it.
+The definition of "iva2" device in iommu_device
+is wrapped inside CONFIG_MPU_BRIDGE_IOMMU, but
+this option is not defined in KConfig.
 
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+This patch removes the wrapper and makes "iva2"
+available as another iommu_device.
+
+Signed-off-by: Yogesh Marathe <yogesh_marathe@ti.com>
+Signed-off-by: Sanjeev Premi <premi@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-n8x0.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap-iommu.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index 7863633..8fd2269 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -660,6 +660,11 @@ static void __init n8x0_init_irq(void)
- 
- #ifdef CONFIG_OMAP_MUX
- static struct omap_board_mux board_mux[] __initdata = {
-+	/* I2S codec port pins for McBSP block */
-+	OMAP2420_MUX(EAC_AC_SCLK, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
-+	OMAP2420_MUX(EAC_AC_FS, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
-+	OMAP2420_MUX(EAC_AC_DIN, OMAP_MUX_MODE1 | OMAP_PIN_INPUT),
-+	OMAP2420_MUX(EAC_AC_DOUT, OMAP_MUX_MODE1 | OMAP_PIN_OUTPUT),
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+index f5a1aad..bb8c01d 100644
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ b/arch/arm/mach-omap2/omap-iommu.c
+@@ -35,7 +35,6 @@ static struct iommu_device omap3_devices[] = {
+ 			.clk_name = "cam_ick",
+ 		},
+ 	},
+-#if defined(CONFIG_MPU_BRIDGE_IOMMU)
+ 	{
+ 		.base = 0x5d000000,
+ 		.irq = 28,
+@@ -45,7 +44,6 @@ static struct iommu_device omap3_devices[] = {
+ 			.clk_name = "iva2_ck",
+ 		},
+ 	},
+-#endif
  };
- #else
+ #define NR_OMAP3_IOMMU_DEVICES ARRAY_SIZE(omap3_devices)
+ static struct platform_device *omap3_iommu_pdev[NR_OMAP3_IOMMU_DEVICES];
