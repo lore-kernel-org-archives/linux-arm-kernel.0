@@ -1,43 +1,30 @@
-From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
-Date: Fri, 24 Sep 2010 18:00:25 +0800
-Subject: Could it be a case of deadlock on SMP?
-In-Reply-To: <20100924074007.GA11371@n2100.arm.linux.org.uk>
-References: <AANLkTinNq6WVNT543QcG+1eVB9te1mmypD4pEvpFhqoJ@mail.gmail.com>
-	<20100920185927.GC5177@n2100.arm.linux.org.uk>
-	<AANLkTi=j5A1=VvE9nz5yGEuOt45-ie98S_SwuD9zXSuk@mail.gmail.com>
-	<20100924074007.GA11371@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimCC_bNNpBUs39-a0ei_g3EY=414chTkd9az3Yi@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 24 Sep 2010 13:00:49 +0300
+Subject: [PATCH 05/11] omap3: Remove non-existent config option
+In-Reply-To: <20100924015056.10325.95854.stgit@baageli.muru.com>
+References: <20100924014938.10325.35279.stgit@baageli.muru.com>
+	<20100924015056.10325.95854.stgit@baageli.muru.com>
+Message-ID: <AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 24, 2010 at 3:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Sep 24, 2010 at 01:17:41PM +0800, Andrew Yan-Pai Chen wrote:
->> On Tue, Sep 21, 2010 at 2:59 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Sep 21, 2010 at 02:46:57AM +0800, Andrew Yan-Pai Chen wrote:
->> >> We try to verify our dual-core processor (non v7) by LTP tests.
->> >
->> > Is this a non-ARM SMP implementation then?
->> >
->> > If this is an ARM SMP implementation, then please provide the
->> > CPU model, revision and variant information.
->> >
->> The CPU we use is still under developing.
->> It is a ARM SMP implementation which uses v5te ISA by Faraday Tech.
+On Fri, Sep 24, 2010 at 4:50 AM, Tony Lindgren <tony@atomide.com> wrote:
+> From: Yogesh Marathe <yogesh_marathe@ti.com>
 >
-> So it's not the ARM SMP implementation if it's v5te ISA, as it won't
-> have the load/store exclusive operations necessary for performing
-> locking safely.
+> The definition of "iva2" device in iommu_device
+> is wrapped inside CONFIG_MPU_BRIDGE_IOMMU, but
+> this option is not defined in KConfig.
 >
-> As the ARM SMP implementation works, and the code you're modifying is
-> common to all SMP implementations, I'd say you have a bug in the CPU
-> hardware or your implementation, rather than the kernel.
->
-Hi Russell,
+> This patch removes the wrapper and makes "iva2"
+> available as another iommu_device.
 
-Some extension instructions (coprocessor) have been implemented by
-hardware for ensuring exclusive accesses and processor-specific codes
-required for SMP have been ported as well. The kernel is able to boot
-and run. We met this problem when trying to perform a long-lasting LTP
-test.
+NAK.
+
+This would break tidspbridge's MMU. This was discussed before:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/58302/focus=58305
+
+When tidspbridge has migrated to iommu, then it should define
+CONFIG_MPU_BRIDGE_IOMMU.
+
+-- 
+Felipe Contreras
