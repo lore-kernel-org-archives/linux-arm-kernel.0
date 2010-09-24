@@ -1,102 +1,96 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Fri, 24 Sep 2010 09:57:19 +0300
-Subject: [RESEND PATCH] serial: samsung: fix device name
-In-Reply-To: <4C9BE577.4050504@fluff.org>
-References: <20100923190212.18863.25678.stgit@darius-desktop>
-	<4C9BE577.4050504@fluff.org>
-Message-ID: <AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 24 Sep 2010 01:00:14 -0600
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
+	driver
+In-Reply-To: <20100917095247.GB30441@pengutronix.de>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<20100902082759.GE14214@pengutronix.de> <4C7F777E.1090104@gmail.com>
+	<20100902143908.GK14214@pengutronix.de>
+	<20100917095247.GB30441@pengutronix.de>
+Message-ID: <AANLkTi=mMGe10rDhA6g0OZYXhSW3=M07PKr6yN8VwnnJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On 23/09/10 20:15, Darius Augulis wrote:
->> Swap device and driver names in serial/samsung.c
+2010/9/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
 >
-> This is far too short, please see the notes below on trying
-> to make this more informative.
->
->> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
->> ---
+> On Thu, Sep 02, 2010 at 04:39:08PM +0200, Uwe Kleine-K?nig wrote:
+>> Hello Jason,
 >>
->> This patch was submitted about 3 months ago, but still not merged.
->> There was another similar patch from Joonyoung Shim
->> <jy0922.shim@samsung.com> and was discussed here:
->> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
->> Joonyoung Shim acked my patch and other people on ARM mailing list
->> acked it. The maintainer, Ben Dooks, still not responding for
->> a long time. Another maintainer, Kukjin Kim, refused to merge
->> it without Ben's review.
->> I would like to ask somebody pick up this bugfix.
+>> >> Actually I would prefer our patches, but of course I'm biased :-)
+>> >>
+>> >> I don't know how we should handle this. ?And Sascha is on vacation this
+>> >> and next week. ?I will investigate if our patches are already free to be
+>> >> posted.
+>> OK, I can post our patches. ?I think the driver part is quite similar,
+>> the platform part is not. ?But look for yourself, I'll post them in reply to
+>> this mail. ?Hopefully we can join forces to get the best out of the two
+>> approaches.
+> I now made the effort to try doing this. ?I hope this is OK though it
+> feels strage that no commit is attributed to Sascha.
 >
-> I belive last time this was brought up I asked about the affect
-> this has on the userspace. The following issues would be helpful
-> or essential to have noted in the header about the effect of this.
+> The following changes since commit 5b1caa2452a2cf09417ab657ae3a2275ebd78103:
 >
-> - Does it change the /dev name of the device? if so I would thinl
->  carefully about applying it, as it would be a change in the way
->  that userspace sees the kernel.
-
-It does - now devices are named /dev/s3c2410_serial, and patch changes
-its name to /dev/ttySAC
-
+> ?ARM: mx5/mx51_babbage: Add FEC support (2010-09-13 11:31:22 +0200)
 >
-> - Does it change the kernel output itself? A note on what diffeences
->  can be seen in things like dmesg would be helpful.
-
-It does. Serial driver reports device names when probing, so there
-will appear ttySACx instead of
-s3c2410_serialx.
-
+> are available in the git repository at:
+> ?git://git.pengutronix.de/git/ukl/linux-2.6.git spi-imx51
 >
-> - Are there any other side effects
+> (5b1caa2452a2cf09417ab657ae3a2275ebd78103 is the result of rebasing
+> Sascha's for-2.6.37 branch on top of 2.6.36-rc4---done mainly to contain
+> the for-2.6.36 branch)
 >
-> - Why is this a bug? Maybe the previous points will explain what is
->  going on, but if not, then a reasonably concise description of
->  what is going on here.
-
-This is bug, because of several points:
-
-1. Because it contradicts kernel documentation. Please read
-Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
-This should be enough to apply this patch.
-
-2. Because s3c2410_serial isn't correct name for serial device node.
-It's name of Samsung serial driver.
-
-3. Because now almost all userspace systems workaround it by creating symlink
-/dev/ttySACx > /dev/s3c2410_serialx and only then put some getty on
-created symlink, not on original device.
-Systems which don't create this symlink, fail to boot at all, because
-of wrong console name. Good example is Buildroot.
-
+> Jason Wang (4):
+> ? ? ?ARM: mx5/clock-mx51: add spi clocks
+> ? ? ?ARM: mx5/iomux-mx51: add iomux definitions for eCSPI2 on the imx51_3ds board
+> ? ? ?ARM: mx5/mx51_3ds: add eCSPI2 support on the imx51_3ds board
+> ? ? ?ARM: mx5/mx51_3ds: add SPI NOR flash in the board init stage
 >
->> ?drivers/serial/samsung.c | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
->> index b1156ba..25c0d0f 100644
->> --- a/drivers/serial/samsung.c
->> +++ b/drivers/serial/samsung.c
->> @@ -883,10 +883,10 @@ static struct uart_ops s3c24xx_serial_ops = {
->>
->> ?static struct uart_driver s3c24xx_uart_drv = {
->> ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
->> - ? ? .dev_name ? ? ? = "s3c2410_serial",
->> + ? ? .driver_name ? ?= "s3c2410_serial",
->> ? ? ? .nr ? ? ? ? ? ? = CONFIG_SERIAL_SAMSUNG_UARTS,
->> ? ? ? .cons ? ? ? ? ? = S3C24XX_SERIAL_CONSOLE,
->> - ? ? .driver_name ? ?= S3C24XX_SERIAL_NAME,
->> + ? ? .dev_name ? ? ? = S3C24XX_SERIAL_NAME,
->> ? ? ? .major ? ? ? ? ?= S3C24XX_SERIAL_MAJOR,
->> ? ? ? .minor ? ? ? ? ?= S3C24XX_SERIAL_MINOR,
->> ?};
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Uwe Kleine-K?nig (12):
+> ? ? ?spi/imx: default to m on platforms that have such devices
+> ? ? ?spi/imx: convert driver to use platform ids
+> ? ? ?spi/imx: get rid of more ifs depending on the used cpu
+> ? ? ?spi/imx: save the spi chip select in config struct, not the gpio to use
+> ? ? ?spi/imx: add support for imx51's eCSPI and CSPI
+> ? ? ?ARM: imx: change the way spi-imx devices are registered
+> ? ? ?ARM: imx: use platform ids for spi_imx devices
+> ? ? ?ARM: mx51: clean up mx51 header
+> ? ? ?ARM: mx51: fix naming of spi related defines
+> ? ? ?ARM: mx5: add spi_imx device registration
+> ? ? ?ARM: mx5/clock-mx51: refactor ccgr callbacks to use common code
+> ? ? ?ARM: mx5/clock-mx51: new macro that defines a clk with all members
 >
+> ?arch/arm/mach-imx/clock-imx1.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-imx/clock-imx21.c ? ? ? ? ? ? ? ? | ? ?6 +-
+> ?arch/arm/mach-imx/clock-imx27.c ? ? ? ? ? ? ? ? | ? ?6 +-
+> ?arch/arm/mach-imx/devices-imx21.h ? ? ? ? ? ? ? | ? ?9 +-
+> ?arch/arm/mach-imx/devices-imx27.h ? ? ? ? ? ? ? | ? 12 +-
+> ?arch/arm/mach-mx25/clock.c ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +-
+> ?arch/arm/mach-mx25/devices-imx25.h ? ? ? ? ? ? ?| ? 12 +-
+> ?arch/arm/mach-mx3/clock-imx31.c ? ? ? ? ? ? ? ? | ? ?6 +-
+> ?arch/arm/mach-mx3/clock-imx35.c ? ? ? ? ? ? ? ? | ? ?4 +-
+> ?arch/arm/mach-mx3/devices-imx31.h ? ? ? ? ? ? ? | ? 12 +-
+> ?arch/arm/mach-mx3/devices-imx35.h ? ? ? ? ? ? ? | ? ?9 +-
+> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mx5/board-mx51_3ds.c ? ? ? ? ? ? ?| ? 33 ++
+> ?arch/arm/mach-mx5/clock-mx51.c ? ? ? ? ? ? ? ? ?| ?113 ++++-
+> ?arch/arm/mach-mx5/devices-imx51.h ? ? ? ? ? ? ? | ? 18 +
+> ?arch/arm/plat-mxc/devices/platform-spi_imx.c ? ?| ? 89 +++-
+> ?arch/arm/plat-mxc/include/mach/devices-common.h | ? 11 +-
+> ?arch/arm/plat-mxc/include/mach/iomux-mx51.h ? ? | ? ?5 +
+> ?arch/arm/plat-mxc/include/mach/mx51.h ? ? ? ? ? | ?608 +++++++++++------------
+> ?drivers/spi/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 16 +
+> ?drivers/spi/spi_imx.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ?394 ++++++++++++---
+> ?21 files changed, 919 insertions(+), 453 deletions(-)
+> ?create mode 100644 arch/arm/mach-mx5/devices-imx51.h
 >
+> Thanks
+> Uwe
+
+I'm fine with this series.
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+What tree do you want to merge them through?
+
+g.
