@@ -1,77 +1,47 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Fri, 24 Sep 2010 11:57:55 +0800
-Subject: [PATCH 4/4] esdhc-4 mx51: enable fsl esdhc driver
-In-Reply-To: <1285300467-5158-5-git-send-email-r65037@freescale.com>
-References: <1285300467-5158-1-git-send-email-r65037@freescale.com>
-	<1285300467-5158-2-git-send-email-r65037@freescale.com>
-	<1285300467-5158-3-git-send-email-r65037@freescale.com>
-	<1285300467-5158-4-git-send-email-r65037@freescale.com>
-	<1285300467-5158-5-git-send-email-r65037@freescale.com>
-Message-ID: <A88EF4D64D8447468743DC1503C0B6CA0D4BDC@zch01exm22.fsl.freescale.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 23 Sep 2010 22:33:22 -0600
+Subject: [PATCH] ARM: abstract atags parsing
+In-Reply-To: <4C9BE3FE.1070704@fluff.org>
+References: <alpine.LFD.2.00.1009231713570.13233@xanadu.home>
+	<20100923213113.GC26295@n2100.arm.linux.org.uk>
+	<AANLkTikwT-w_6Y+yzZ014g6tijUTUzZUAa7g=eE8F+nt@mail.gmail.com>
+	<4C9BE3FE.1070704@fluff.org>
+Message-ID: <20100924043322.GA19260@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-Why I can't use the --compose to post the additional msg before sending
-out the serial patches?
-:(
-Anyway, paste them here:
+On Fri, Sep 24, 2010 at 12:34:22AM +0100, Ben Dooks wrote:
+> On 23/09/10 22:53, Grant Likely wrote:
+> > On Thu, Sep 23, 2010 at 3:31 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Thu, Sep 23, 2010 at 05:18:02PM -0400, Nicolas Pitre wrote:
+> >>> This code movement will make it cleaner and easier to introduce support
+> >>> for device tree which is basically an alternative to atags. No functional
+> >>> changes are introduced by this patch.
+> >>
+> >> I don't see any point to this churn.
+> > 
+> > I can carry it in test-devicetree branch until you become okay with it.
+> > 
+> >> DT has yet to be shown to be useful on anything but the ARM evaluation
+> >> boards, and that's one of the pre-conditions to it becoming acceptable
+> >> (which has been pending for a few years now.)
+> > 
+> > I started working on ARM DT support in November/December 2009.  Not
+> > even a year yet.
+>
+> I don't believe you're the only one to be or have been working on it,
+> but I've no direct references to other work and can't be bothered to
+> go and find any.
 
-Hi Wolfram:
-Here are the patches that enable the sdhci of i.MX51.
-The IO and WP functions are verified on i.MX51 BBG board.
-The missing bits of the HOST_CONTROL and so on had been made up in the
-4-3 patch.
+There was an attempt or two before I started working on it.  Janboe Ye
+posted one version on May 27, 09, but it wasn't viable.  Basically
+took the approach of duplicating the powerpc code instead of moving it
+to a common location and generalizing it.
 
+Jeremy Kerr started hacking on it shortly after I began, and quite a few
+other engineers have started working on it since.  The MIPS folks also
+have patches pending to add support, and I've also got x86 patches
+that may very well get merged in the next window.
 
-Hi Uwe:
-I would change MSL part to the "dynamically allocated method" later.
-
-Any review/comments/suggestions are appreciated.
-Thanks in advanced.
-
-
-Best Regards,
-Richard Zhu
-Freescale Semiconductor
-Tel: +86-021-28937189
-Email:Hong-Xing.Zhu at freescale.com 
-
-
------Original Message-----
-From: Zhu Richard-R65037 
-Sent: Friday, 24 September, 2010 11:54
-To: w.sang at pengutronix.de; u.kleine-koenig at pengutronix.de;
-linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org; Zhu Richard-R65037
-Subject: [PATCH 4/4] esdhc-4 mx51: enable fsl esdhc driver
-
-Enable the fsl esdhc driver on mx51 platforms
-
-Signed-off-by: Richard Zhu <r65037@freescale.com>
----
- arch/arm/configs/mx51_defconfig |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/configs/mx51_defconfig
-b/arch/arm/configs/mx51_defconfig index a665ecb..4f3067b 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -106,8 +106,13 @@ CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
- CONFIG_MMC=y
--CONFIG_MMC_BLOCK=m
--CONFIG_MMC_SDHCI=m
-+CONFIG_MMC_BLOCK=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_IO_ACCESSORS=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_IMX=y
-+# CONFIG_MMC_MXC is not set
-+# CONFIG_MEMSTICK is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=m
- CONFIG_RTC_CLASS=y
---
-1.7.0
+g.
