@@ -1,45 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 24 Sep 2010 16:42:49 +0200
-Subject: [RFC] SoC name and revision in /proc/cpuinfo
-In-Reply-To: <20100924140652.GA14809@n2100.arm.linux.org.uk>
-References: <20100924135356.GA17651@game.jcrosoft.org>
-	<20100924140652.GA14809@n2100.arm.linux.org.uk>
-Message-ID: <20100924144249.GB17651@game.jcrosoft.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 24 Sep 2010 07:58:09 -0700
+Subject: [PATCH 1/2] OMAP: features: export symbol omap3_features
+In-Reply-To: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com> (Omar
+	Ramirez Luna's message of "Thu, 23 Sep 2010 22:41:04 -0500")
+References: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <874odfkx32.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:06 Fri 24 Sep     , Russell King - ARM Linux wrote:
-> On Fri, Sep 24, 2010 at 03:53:56PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > Hi Russell,
-> > 
-> > 	On AT91 for some userland library we need to known the cpu model and revision
-> > 	so I'd like to known if it's ok with you to extend it?
-> > 
-> > 	as
-> > 	cpu familly:	at91
-> > 	cpu type:	at91sam9g20
-> > 	cpu revision:	1.1
-> 
-> You're mixing up the CPU with the SoC.  The CPU is what's in the core of
-> the SoC and has no peripherals etc.  The SoC is the entire chip.  "Central
-> Processing Unit."  "System on a Chip."
-> 
-> I'd much rather see SoC information kept separate from the CPU information.
-I knwon the diff between cpu and soc but today others arch do this the same way
-via cpuinfo as example sh or others.
+Omar Ramirez Luna <omar.ramirez@ti.com> writes:
 
-So what do you propose?
+> From: Kevin Hilman <khilman@deeprootsystems.com>
 
-is this better
+Minor nit, can you make the subject something like:
 
-soc familly:	at91
-soc type:	at91am9g20
-soc revision:	1.1
+   OMAP: features: make feature checks available to modules
 
-or you will prefer we create a new entry like sysinfo?
+Thanks,
 
-because today we store the hardware name, revision abd serial in cpuinfo
-also
+Kevin
 
-Best Regards,
-J.
+> Since omap3_features is a global variable, only code
+> built-in the kernel can make use of it and thus use
+> omap_has ##feat functions; exporting this as a kernel
+> symbol makes modules able to use feature detection
+> framework too.
+>
+> Thread: http://marc.info/?l=linux-omap&m=128528822902211&w=2
+>
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Nishanth Menon <nm@ti.com>
+> CC: Paul Walmsley <paul@pwsan.com>
+> CC: Sanjeev Premi <premi@ti.com>
+> CC: linux-omap at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/mach-omap2/id.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 9a879f9..a8c6d19 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -31,6 +31,7 @@ static struct omap_chip_id omap_chip;
+>  static unsigned int omap_revision;
+>  
+>  u32 omap3_features;
+> +EXPORT_SYMBOL(omap3_features);
+>  
+>  unsigned int omap_rev(void)
+>  {
