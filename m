@@ -1,70 +1,82 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 24 Sep 2010 01:08:32 -0600
-Subject: [PATCH 12/12] omap3: Prevent SDRC deadlock when L3 is changing
-	frequency
-In-Reply-To: <20100924070643.14014.11359.stgit@twilight.localdomain>
-References: <20100924070643.14014.11359.stgit@twilight.localdomain>
-Message-ID: <20100924070826.14014.40979.stgit@twilight.localdomain>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 24 Sep 2010 09:25:23 +0200
+Subject: [PATCH 2/3] dmaengine: add wrapper functions for dmaengine
+In-Reply-To: <AANLkTin8v_29HESnmhE5==3OLmb29bmoOY1iona4C+eD@mail.gmail.com>
+References: <1281956870-12463-1-git-send-email-s.hauer@pengutronix.de>
+	<1281956870-12463-3-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTin8v_29HESnmhE5==3OLmb29bmoOY1iona4C+eD@mail.gmail.com>
+Message-ID: <20100924072523.GM23406@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Hunter <jon-hunter@ti.com>
+Hi Dan,
 
-When changing the L3 clock frequency, the CPU is executing from internal RAM
-and the SDRC clock is disabled. During this time accesses made to external
-DDR are stalled. If the ARM subsystem attempts to access the DDR while the
-SDRC clock is disabled this will stall the CPU until the access to the SDRC
-timeouts. A timeout on the SDRC should never occur. Once a timeout occurs all
-the following accesses will be aborted and the DDR is no longer accessible.
+On Thu, Sep 23, 2010 at 12:53:58PM -0700, Dan Williams wrote:
+> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> > index 0df7864..635c60b 100644
+> > --- a/include/linux/dmaengine.h
+> > +++ b/include/linux/dmaengine.h
+> > @@ -491,6 +491,47 @@ struct dma_device {
+> > ? ? ? ?void (*device_issue_pending)(struct dma_chan *chan);
+> > ?};
+> >
+> > +static inline int dmaengine_device_control(struct dma_chan *chan,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?enum dma_ctrl_cmd cmd,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long arg)
+> > +{
+> > + ? ? ? return chan->device->device_control(chan, cmd, arg);
+> > +}
+> > +
+> > +static inline int dmaengine_slave_config(struct dma_chan *chan,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_slave_config *config)
+> > +{
+> > + ? ? ? return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+> > + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)config);
+> > +}
+> > +
+> > +static inline int dmaengine_terminate_all(struct dma_chan *chan)
+> > +{
+> > + ? ? ? return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+> > +}
+> > +
+> > +static inline struct dma_async_tx_descriptor *dmaengine_prep_slave_sg(
+> > + ? ? ? ? ? ? ? struct dma_chan *chan, struct scatterlist *sgl,
+> > + ? ? ? ? ? ? ? unsigned int sg_len, enum dma_data_direction direction,
+> > + ? ? ? ? ? ? ? unsigned long flags)
+> > +{
+> > + ? ? ? return chan->device->device_prep_slave_sg(chan, sgl, sg_len, direction,
+> > + ? ? ? ? ? ? ? ? ? ? ? flags);
+> > +}
+> > +
+> > +static inline struct dma_async_tx_descriptor *dmaengine_prep_cyclic(
+> > + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+> > + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
+> > +{
+> > + ? ? ? return chan->device->device_prep_dma_cyclic(chan, buf_addr, buf_len,
+> > + ? ? ? ? ? ? ? ? ? ? ? period_len, direction);
+> > +}
+> > +
+> 
+> No strong disagreements on the above, the type safety of
+> dmaengine_slave_config() is nice.
 
-Although the code being executed in the internal RAM does not directly access
-the DDR, it was found that the branch prediction logic in the CPU may cause
-the CPU to prefetch code from a DDR location while the SDRC clock is disabled.
-This was causing an SDRC timeout which resulted in a system hang.
+So you have only small disagreements? ;) I can drop the dmaengine_prep_*
+functions and only keep the device_control functions if like it better.
 
-This patch fixes this problem by ensuring the branch prediction logic is
-disabled while changing the L3 clock frequency. The branch prediction logic
-is disabled by clearing the Z-bit in the ARM CTRL register.
+> 
+> > +static inline int dmaengine_tx_submit(struct dma_async_tx_descriptor *desc)
+> > +{
+> > + ? ? ? return desc->tx_submit(desc);
+> > +}
+> 
+> This one can drop the tx.
 
-Disabling the branch prediction logic does not have any noticable impact
-on the execution time of this code section. The hardware observability
-signals were used to monitor the sdrc idle time with and without this
-patch when operating at different CPU frequencies (150MHz, 500MHz and
-600MHz) and the total sdrc idle time when changing frequenct was in
-the range of 9-11us. This was measured on an omap3430 SDP running the
-omapzoom p-android-omap-2.6.29 branch.
+You mean the function should be named dmaengine_submit?
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Richard Woodruff <r-woodruff2@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/sram34xx.S |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+Sascha
 
-diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
-index de99ba2..3637274 100644
---- a/arch/arm/mach-omap2/sram34xx.S
-+++ b/arch/arm/mach-omap2/sram34xx.S
-@@ -129,8 +129,11 @@ ENTRY(omap3_sram_configure_core_dpll)
- 	ldr	r4, [sp, #80]
- 	str     r4, omap_sdrc_mr_1_val
- skip_cs1_params:
-+	mrc	p15, 0, r8, c1, c0, 0	@ read ctrl register
-+	bic	r10, r8, #0x800		@ clear Z-bit, disable branch prediction
-+	mcr	p15, 0, r10, c1, c0, 0	@ write ctrl register
- 	dsb				@ flush buffered writes to interconnect
--
-+	isb				@ prevent speculative exec past here
- 	cmp	r3, #1			@ if increasing SDRC clk rate,
- 	bleq	configure_sdrc		@ program the SDRC regs early (for RFR)
- 	cmp	r1, #SDRC_UNLOCK_DLL	@ set the intended DLL state
-@@ -148,6 +151,7 @@ skip_cs1_params:
- 	beq	return_to_sdram		@ return to SDRAM code, otherwise,
- 	bl	configure_sdrc		@ reprogram SDRC regs now
- return_to_sdram:
-+	mcr	p15, 0, r8, c1, c0, 0	@ restore ctrl register
- 	isb				@ prevent speculative exec past here
- 	mov 	r0, #0 			@ return value
- 	ldmfd	sp!, {r1-r12, pc}	@ restore regs and return
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
