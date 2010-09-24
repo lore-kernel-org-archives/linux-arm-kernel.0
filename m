@@ -1,68 +1,45 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Fri, 24 Sep 2010 20:05:26 +0530
-Subject: [PATCH] mmc: failure of block read wait for long time
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B0315F026F6@dbde02.ent.ti.com>
-	<4C8A2C5D.2050408@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
-	<4C971320.7050906@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03160624F6@dbde02.ent.ti.com>
-	<4C974A5D.5050608@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03160626B5@dbde02.ent.ti.com>
-	<4C975CFB.6070907@nokia.com>
-	<20100920133703.GC30793@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B031610E332@dbde02.ent.ti.com>
-	<20100922124309.GA15699@void.printf.net>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B031619EEB8@dbde02.ent.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 24 Sep 2010 16:42:49 +0200
+Subject: [RFC] SoC name and revision in /proc/cpuinfo
+In-Reply-To: <20100924140652.GA14809@n2100.arm.linux.org.uk>
+References: <20100924135356.GA17651@game.jcrosoft.org>
+	<20100924140652.GA14809@n2100.arm.linux.org.uk>
+Message-ID: <20100924144249.GB17651@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris and Adrian,
+On 15:06 Fri 24 Sep     , Russell King - ARM Linux wrote:
+> On Fri, Sep 24, 2010 at 03:53:56PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > Hi Russell,
+> > 
+> > 	On AT91 for some userland library we need to known the cpu model and revision
+> > 	so I'd like to known if it's ok with you to extend it?
+> > 
+> > 	as
+> > 	cpu familly:	at91
+> > 	cpu type:	at91sam9g20
+> > 	cpu revision:	1.1
+> 
+> You're mixing up the CPU with the SoC.  The CPU is what's in the core of
+> the SoC and has no peripherals etc.  The SoC is the entire chip.  "Central
+> Processing Unit."  "System on a Chip."
+> 
+> I'd much rather see SoC information kept separate from the CPU information.
+I knwon the diff between cpu and soc but today others arch do this the same way
+via cpuinfo as example sh or others.
 
-[..snip..]
-> 
-> > -----Original Message-----
-> > From: Chris Ball [mailto:cjb at laptop.org]
-> > Sent: Wednesday, September 22, 2010 6:13 PM
-> > To: Ghorai, Sukumar
-> > Cc: Adrian Hunter; linux-mmc at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; Russell King - ARM Linux
-> > Subject: Re: [PATCH] mmc: failure of block read wait for long time
-> >
-> > On Wed, Sep 22, 2010 at 11:02:08AM +0530, Ghorai, Sukumar wrote:
-> > > Would you please review and merge this patch [1] (attached too)?
-> > > [1] http://comments.gmane.org/gmane.linux.kernel.mmc/2714
-> >
-> > I've been following the thread.  I believe Adrian has NACKed this patch,
-> > by saying "It is absolutely unacceptable to return I/O errors to the
-> > upper layers for segments that do not have errors."
-> 
-> [Ghorai]
-> I think Russell also mentioned his opinion. Would you please add your idea
-> too?
-> 
-> 1. I would prefer Adrian to explain again what this statement means, in
-> the context - data read fail and how we make it success?
-> 
-> 2. if data read fail for sector(x) why we have to try for
-> sector(x+1, ..x+n)?
-> 
-> 3. how to inform reader function which sector having the valid data out of
-> (1...n) sectors.
-> 
-> 4. do we have any driver/code in Linux or any other os, which give inter-
-> leave data and return as success?
-> 
-[Ghorai] please reply with your input on my/ Russell's suggestion?
+So what do you propose?
 
-> >
-> > I think it's possible to merge patches to improve the situation (such
-> > as the idea of noticing a card disappearing earlier), but your initial
-> > patch is not the patch to do that.  You should continue to work with
-> > Adrian -- when he's happy that a patch does not break the semantics
-> > above, we can consider merging it.
-> >
-> > Thanks,
-> >
-> > --
-> > Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> > One Laptop Per Child
+is this better
+
+soc familly:	at91
+soc type:	at91am9g20
+soc revision:	1.1
+
+or you will prefer we create a new entry like sysinfo?
+
+because today we store the hardware name, revision abd serial in cpuinfo
+also
+
+Best Regards,
+J.
