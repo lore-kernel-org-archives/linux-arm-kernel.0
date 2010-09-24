@@ -1,66 +1,91 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 24 Sep 2010 10:49:12 +0200
-Subject: [PATCH 6/8] ptp: Added a clock that uses the eTSEC found on
-	the MPC85xx.
-In-Reply-To: <alpine.DEB.2.00.1009231348150.2962@router.home>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-	<57b64051c816dc9cb856bbb9f38fc901c9d3d651.1285261535.git.richard.cochran@omicron.at>
-	<alpine.DEB.2.00.1009231348150.2962@router.home>
-Message-ID: <20100924084912.GA15286@riccoc20.at.omicron.at>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 24 Sep 2010 10:57:44 +0200
+Subject: [PATCH 0/4] Adding support for esdhc on mx35/51
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D4BFC@zch01exm22.fsl.freescale.net>
+References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0D4BC5@zch01exm22.fsl.freescale.net>
+	<20100924064310.GA30543@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0D4BFC@zch01exm22.fsl.freescale.net>
+Message-ID: <20100924085744.GA10334@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 02:17:36PM -0500, Christoph Lameter wrote:
-> On Thu, 23 Sep 2010, Richard Cochran wrote:
-> > +  These properties set the operational parameters for the PTP
-> > +  clock. You must choose these carefully for the clock to work right.
-> > +  Here is how to figure good values:
-> > +
-> > +  TimerOsc     = system clock               MHz
-> > +  tclk_period  = desired clock period       nanoseconds
-> > +  NominalFreq  = 1000 / tclk_period         MHz
-> > +  FreqDivRatio = TimerOsc / NominalFreq     (must be greater that 1.0)
-> > +  tmr_add      = ceil(2^32 / FreqDivRatio)
-> > +  OutputClock  = NominalFreq / tmr_prsc     MHz
-> > +  PulseWidth   = 1 / OutputClock            microseconds
-> > +  FiperFreq1   = desired frequency in Hz
-> > +  FiperDiv1    = 1000000 * OutputClock / FiperFreq1
-> > +  tmr_fiper1   = tmr_prsc * tclk_period * FiperDiv1 - tclk_period
-> > +  max_adj      = 1000000000 * (FreqDivRatio - 1.0) - 1
-> 
-> Great stuff for clock synchronization...
-> 
-> > +  The calculation for tmr_fiper2 is the same as for tmr_fiper1. The
-> > +  driver expects that tmr_fiper1 will be correctly set to produce a 1
-> > +  Pulse Per Second (PPS) signal, since this will be offered to the PPS
-> > +  subsystem to synchronize the Linux clock.
-> 
-> Argh. And conceptually completely screwed up. Why go through the PPS
-> subsystem if you can directly tune the system clock based on a number of
-> the cool periodic clock features that you have above? See how the other
-> clocks do that easily? Look into drivers/clocksource. Add it there.
-> 
-> Please do not introduce useless additional layers for clock sync. Load
-> these ptp clocks like the other regular clock modules and make them sync
-> system time like any other clock.
-> 
-> Really guys: I want a PTP solution! Now! And not some idiotic additional
-> kernel layers that just pass bits around because its so much fun and
-> screws up clock accurary in due to the latency noise introduced while
-> having so much fun with the bits.
+On Fri, Sep 24, 2010 at 03:08:52PM +0800, Zhu Richard-R65037 wrote:
+> Hi Wolfram:
+> See my comments.
 
-(Sorry if this message comes twice. Mutt/Gmail flaked out again.)
+BTW can't you get your mailer to quote like all others do? It is
+inconvenient to read this way.
 
-I think you misunderstood this particular patch. The device tree
-parameters are really just internal driver stuff. When you use the
-eTSEC, you must make some design choices at the same time as you plan
-your board. The proper values for some of the eTSEC registers are
-based on these design choices. Since the Freescale documentation is a
-bit thin on this, I added a few notes to help my fellow board
-designers.
+> > It would bring the conveniences to maintain stuff in the future if we 
+> > separate them.
+> 
+> If you can name these conveniences and they are convincing, we can keep
+> them seperate. At the moment, I don't see them (what doesn't mean they
+> don't exist)
+> [<Zhu Richard-r65037>] As Anton's description different eSDHC IP on the
+> i.MX and the PPC may have the different IC bugs or limitations.
 
-Because these values are closely related to the board itself, I think
-that it is nicer to configure them via the device tree than using
-either CONFIG_ variables or platform data.
+Sure thing. I don't see any problem with that as I don't want to merge
+them completely, but just to share the common parts. Fixups can be done
+in the specific part.
 
-Richard
+> As I know that although in the i.MX SOC family, there are a few
+> differences between different SOCs. And the behaviors of SW driver may
+> be impacted by these differences.
+
+If you have even more incarnations of a similar core in the future to
+come, that is another reason to share those parts which are in common.
+Smaller differences can easily be handled in sdhci-esdhc-imx.c, I think.
+For example, if stuff like
+
+	if (cpu_is_mx35())
+		quirks |= SDHCI_QUIRKS_NO_MULTIBLOCK;
+
+will do, why would you want to duplicate all the code covering the
+non-standard register layouts? Check the imx-spi driver how to handle
+variations of a similar core.
+
+> I'm afraid that the differences of eSDHC IP module between i.MX and PPC
+> maybe bigger and bigger in future.
+
+If the core of a future IMX99 might be too different, we can have a
+custom driver then, but for now, I think a common driver is the way to
+go.
+
+> BTW, the block size of the i.MX eSDHC is not forced to 2K size. Up to
+> now, the default 512byes per sector is used in FSL i.MX Linux BSP.
+
+It is forced to 2K, because it would be otherwise set to 4K (according
+to the cap-register) which is not conform to the spec 2.0. What is the
+advantage of 512 byte?
+
+> > And there is already one set of eSDHC driver for all the i.MX SOCs.
+> 
+> I am confused: which set do you mean?
+> [<Zhu Richard-r65037>] The driver used for i.MX eSDHC. The one used by
+> i.MX35 in Linux kernel now, and the coming MX51 and so on.
+> It is better that one driver supports all i.MX SOC's eSDHC modules in
+> future (MX25, MX35, MX51, MX53...).
+
+? Now I am totally confused. That is what I am aiming for :D My driver
+was mainly tested on MX35 back then, but was clearly intended to be for
+MX51. It was clearly mentioned in the subject "[PATCH 0/4] Adding
+support for esdhc on mx35/51". Frankly, I was hoping for a patchset from
+you adding the stuff you need for you MX51-board on top of mine, and not
+a completely new series. Will have a look at that now...
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100924/7479cd13/attachment-0001.sig>
