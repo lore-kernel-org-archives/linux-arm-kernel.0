@@ -1,21 +1,41 @@
 From: r65037@freescale.com (Richard Zhu)
-Date: Fri, 24 Sep 2010 11:54:23 +0800
-Subject: [4-0] serial patches that enable the eSDHC on iMX51
-Message-ID: <1285300467-5158-1-git-send-email-r65037@freescale.com>
+Date: Fri, 24 Sep 2010 11:54:27 +0800
+Subject: [PATCH 4/4] esdhc-4 mx51: enable fsl esdhc driver
+In-Reply-To: <1285300467-5158-4-git-send-email-r65037@freescale.com>
+References: <1285300467-5158-1-git-send-email-r65037@freescale.com>
+	<1285300467-5158-2-git-send-email-r65037@freescale.com>
+	<1285300467-5158-3-git-send-email-r65037@freescale.com>
+	<1285300467-5158-4-git-send-email-r65037@freescale.com>
+Message-ID: <1285300467-5158-5-git-send-email-r65037@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All:
-Sorry, for wrong --compose usage.
+Enable the fsl esdhc driver on mx51 platforms
 
-Hi Wolfram:
-Here are the patches that enable the sdhci of i.MX51.
-The IO and WP funcs are verified on i.MX51 BBG board.
-The misssing bits of the HOST_CONTROL and so on had been made up in the 4-3 patch.
+Signed-off-by: Richard Zhu <r65037@freescale.com>
+---
+ arch/arm/configs/mx51_defconfig |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-
-Hi Uwe:
-I would change MSL part to the "dynamically allocated method" later.
-
-Any review/comments/suggestions are appreciated.
-Thanks in advanced.
+diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+index a665ecb..4f3067b 100644
+--- a/arch/arm/configs/mx51_defconfig
++++ b/arch/arm/configs/mx51_defconfig
+@@ -106,8 +106,13 @@ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MXC=y
+ CONFIG_MMC=y
+-CONFIG_MMC_BLOCK=m
+-CONFIG_MMC_SDHCI=m
++CONFIG_MMC_BLOCK=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_IO_ACCESSORS=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_IMX=y
++# CONFIG_MMC_MXC is not set
++# CONFIG_MEMSTICK is not set
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=m
+ CONFIG_RTC_CLASS=y
+-- 
+1.7.0
