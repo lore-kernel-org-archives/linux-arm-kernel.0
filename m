@@ -1,46 +1,48 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 24 Sep 2010 12:58:42 +0200
-Subject: [PATCH 0/4] Adding support for esdhc on mx35/51
-In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D4C19@zch01exm22.fsl.freescale.net>
-References: <1285072210-10207-1-git-send-email-w.sang@pengutronix.de>
-	<A88EF4D64D8447468743DC1503C0B6CA0D4BC5@zch01exm22.fsl.freescale.net>
-	<20100924064310.GA30543@pengutronix.de>
-	<A88EF4D64D8447468743DC1503C0B6CA0D4BFC@zch01exm22.fsl.freescale.net>
-	<20100924085744.GA10334@pengutronix.de>
-	<A88EF4D64D8447468743DC1503C0B6CA0D4C19@zch01exm22.fsl.freescale.net>
-Message-ID: <20100924105842.GD10334@pengutronix.de>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 24 Sep 2010 12:52:38 +0100
+Subject: [PATCH 6/8] ptp: Added a clock that uses the eTSEC found on the
+	MPC85xx.
+In-Reply-To: <4C9BC620.3@riesch.at>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<57b64051c816dc9cb856bbb9f38fc901c9d3d651.1285261535.git.richard.cochran@omicron.at>
+	<alpine.DEB.2.00.1009231348150.2962@router.home>
+	<20100923214359.3f287b11@lxorguk.ukuu.org.uk>
+	<4C9BC620.3@riesch.at>
+Message-ID: <20100924125238.4c30f3a4@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 24, 2010 at 05:40:15PM +0800, Zhu Richard-R65037 wrote:
+> However, if the clock selected by the BMC is switched off, loses its 
+> network connection..., the second best clock is selected by the BMC and 
+> becomes master. This clock may be less accurate and thus our slave clock 
+> has to switch from one notion of time to another. Is that the conflict 
+> you mentioned?
 
-> Hi Wolfram:
-> Sorry to bring the confusions to you.
+No you get situations where you have policy reasons for trusting
+particular clocks for particular things.
 
-Well, no worries, maybe I was not clear as well. Hope we have everything
-clear now :)
+So you may have a PTP or NTP clock providing basic system time but also
+have other PTP clocks that are actually being used for synchronization
+work.
 
-> I will use your git repos and make up the missing bits (i.e:the
-> HOST_CONROL and so on) and verify the func on MX51 BBG boards later.
-> BTW, Is the URL of your git repos the following one?
-> git://git.pengutronix.de/git/wsa/linux-2.6.git
+With NTP it's not so far been a big issue - NTP isn't used for industrial
+high precision control and the cases we end up with multiple NTP clocks
+it's on a virtualised systems where it is isolated.
 
-Yes. I pushed out the current status of my branch, but I haven't
-implemented all requested changes from Anton yet. Will do on Monday.
-If you can't afford to wait for this updated branch, please keep your
-changes well separated to reduce merge conflicts.
+With high precision clocks you sometimes want to honour a specific PTP
+time source and use it rather than try and merge it with your other time
+sources (which may differ from the equipment elsewhere). What matters is
+things like all the parts of a several mile long conveyor belt of hot
+steel slab stopping at the same moment [1].
 
-Thanks!
+In lots of control applications you've got assorted different time planes
+which wish to talk their own time and you have to accept it, so we need
+to support that kind of use.
 
-   Wolfram
+I agree entirely the normal boring 'I installed my distro and..' case for
+PTP or for NTP is merging all the sources, running the algorithm and using
+the system time for it. Likewise almost all "normal" application code
+will be watching system time.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100924/7e0bbaf8/attachment.sig>
+Alan
+[1] Which was my first encounter with writing Vax/VMS assembly language
