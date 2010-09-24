@@ -1,52 +1,76 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Fri, 24 Sep 2010 20:47:12 +0530
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 24 Sep 2010 09:34:04 -0600 (MDT)
+Subject: [PATCH 1/2] OMAP: features: export symbol omap3_features
+In-Reply-To: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
+References: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <alpine.DEB.2.00.1009240920370.10678@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Felipe Contreras [mailto:felipe.contreras at gmail.com] 
-> Sent: Friday, September 24, 2010 3:31 PM
-> To: Tony Lindgren
-> Cc: linux-arm-kernel at lists.infradead.org; 
-> linux-omap at vger.kernel.org; Premi, Sanjeev; Marathe, Yogesh
-> Subject: Re: [PATCH 05/11] omap3: Remove non-existent config option
-> 
-> On Fri, Sep 24, 2010 at 4:50 AM, Tony Lindgren 
-> <tony@atomide.com> wrote:
-> > From: Yogesh Marathe <yogesh_marathe@ti.com>
-> >
-> > The definition of "iva2" device in iommu_device
-> > is wrapped inside CONFIG_MPU_BRIDGE_IOMMU, but
-> > this option is not defined in KConfig.
-> >
-> > This patch removes the wrapper and makes "iva2"
-> > available as another iommu_device.
-> 
-> NAK.
-> 
-> This would break tidspbridge's MMU. This was discussed before:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/58302/focus=58305
-> 
-> When tidspbridge has migrated to iommu, then it should define
-> CONFIG_MPU_BRIDGE_IOMMU.
+Hi Omar, Kevin,
 
-Felipe,
+On Thu, 23 Sep 2010, Omar Ramirez Luna wrote:
 
-  Can you go through earlier discussion on this patch
-  http://marc.info/?l=linux-omap&m=127979007623260&w=2
-
-  I believe these concerns were discussed. I am unable to
-  open the gmane thread (getting 504) - so can't be sure
-  if Hiroshi had referred to same discussion.
-
-~sanjeev
+> From: Kevin Hilman <khilman@deeprootsystems.com>
 > 
+> Since omap3_features is a global variable, only code
+> built-in the kernel can make use of it and thus use
+> omap_has ##feat functions; exporting this as a kernel
+> symbol makes modules able to use feature detection
+> framework too.
+> 
+> Thread: http://marc.info/?l=linux-omap&m=128528822902211&w=2
+> 
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Nishanth Menon <nm@ti.com>
+> CC: Paul Walmsley <paul@pwsan.com>
+> CC: Sanjeev Premi <premi@ti.com>
+> CC: linux-omap at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/mach-omap2/id.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 9a879f9..a8c6d19 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -31,6 +31,7 @@ static struct omap_chip_id omap_chip;
+>  static unsigned int omap_revision;
+>  
+>  u32 omap3_features;
+> +EXPORT_SYMBOL(omap3_features);
+>  
+>  unsigned int omap_rev(void)
+>  {
 > -- 
-> Felipe Contreras
+> 1.7.1
 > 
+
+This omap3_features variable should not be used directly by any device 
+drivers since it is an OMAP-ism.  This type of feature info should be 
+passed through struct platform_data.  Looks like this would be quite easy 
+to add by editing mach-omap2/devices.c and adding platform_data?
+
+...
+
+In the medium-term, definitely all of those 
+
+    #if defined(CONFIG_ARCH_OMAP*)
+
+and 
+
+    if (cpu_is_omap*()) {
+
+in this driver need to be removed.  The integration code (currently in 
+mach-omap2/devices.c) is what should handle this, or better yet, struct 
+dev_attr from hwmod.
+
+Also the entire mailboxes driver at some point should be moved into 
+drivers/* ...
+
+
+- Paul
