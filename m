@@ -1,74 +1,79 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 24 Sep 2010 11:51:58 -0500
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 24 Sep 2010 11:06:21 -0600 (MDT)
 Subject: [PATCH 1/2] OMAP: features: export symbol omap3_features
-In-Reply-To: <alpine.DEB.2.00.1009240920370.10678@utopia.booyaka.com>
+In-Reply-To: <4C9CD72E.40407@ti.com>
 References: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
 	<alpine.DEB.2.00.1009240920370.10678@utopia.booyaka.com>
-Message-ID: <4C9CD72E.40407@ti.com>
+	<4C9CD72E.40407@ti.com>
+Message-ID: <alpine.DEB.2.00.1009241053400.10678@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley had written, on 09/24/2010 10:34 AM, the following:
-[...]
->>  
->>  u32 omap3_features;
->> +EXPORT_SYMBOL(omap3_features);
->>  
->>  unsigned int omap_rev(void)
->>  {
->> -- 
->> 1.7.1
->>
-> 
-> This omap3_features variable should not be used directly by any device 
-> drivers since it is an OMAP-ism.  This type of feature info should be 
-> passed through struct platform_data.  Looks like this would be quite easy 
-> to add by editing mach-omap2/devices.c and adding platform_data?
-> 
-> ...
-> 
-> In the medium-term, definitely all of those 
-> 
->     #if defined(CONFIG_ARCH_OMAP*)
-> 
-> and 
-> 
->     if (cpu_is_omap*()) {
-> 
-> in this driver need to be removed.  The integration code (currently in 
-> mach-omap2/devices.c) is what should handle this, or better yet, struct 
-> dev_attr from hwmod.
-> 
-> Also the entire mailboxes driver at some point should be moved into 
-> drivers/* ...
-just my 2 cents:
+On Fri, 24 Sep 2010, Nishanth Menon wrote:
 
-The intent of omap_has_featureX() is to ensure that the drivers dont do 
-cpu_is_omap123(). Now if we had OMAP dma driver which has DMA chaining - 
-what options do we have DMA driver?
+> Paul Walmsley had written, on 09/24/2010 10:34 AM, the following:
+> [...]
+> > >   u32 omap3_features;
+> > > +EXPORT_SYMBOL(omap3_features);
+> > >   unsigned int omap_rev(void)
+> > >  {
+> > > -- 
+> > > 1.7.1
+> > > 
+> > 
+> > This omap3_features variable should not be used directly by any device
+> > drivers since it is an OMAP-ism.  This type of feature info should be passed
+> > through struct platform_data.  Looks like this would be quite easy to add by
+> > editing mach-omap2/devices.c and adding platform_data?
+> > 
+> > ...
+> > 
+> > In the medium-term, definitely all of those 
+> >     #if defined(CONFIG_ARCH_OMAP*)
+> > 
+> > and 
+> >     if (cpu_is_omap*()) {
+> > 
+> > in this driver need to be removed.  The integration code (currently in
+> > mach-omap2/devices.c) is what should handle this, or better yet, struct
+> > dev_attr from hwmod.
+> > 
+> > Also the entire mailboxes driver at some point should be moved into
+> > drivers/* ...
+> just my 2 cents:
+> 
+> The intent of omap_has_featureX() is to ensure that the drivers dont do
+> cpu_is_omap123(). Now if we had OMAP dma driver which has DMA chaining - what
+> options do we have DMA driver?
+> 
+> a) we introduce it based on cpu_is_omap123() -> bad bad nightmare for
+> maintenance
+> b) we introduce it based on module h/w block(TI internal terminology "IP
+> block") revision -> unfortunately no luck in some of the h/w blocks.
+> c) we use if (omap_has_dma_chaining())
 
-a) we introduce it based on cpu_is_omap123() -> bad bad nightmare for 
-maintenance
-b) we introduce it based on module h/w block(TI internal terminology "IP 
-block") revision -> unfortunately no luck in some of the h/w blocks.
-c) we use if (omap_has_dma_chaining())
+d) you pass in errata/feature flags via a platform_data struct, like 
+McBSP, McSPI, MMC, MUSB, I2C, etc. already do on OMAP.  On OMAP1, which 
+doesn't have hwmod support, you set your platform_data in your OMAP1 
+integration code.  On OMAP2+ (which has hwmod support), you define your 
+errata/feature flags and any other integration data that you need to pass 
+via the struct omap_hwmod.dev_attr field, then pass that data via struct 
+platform_data in the OMAP2+ integration code.  See for example
 
-If the hwmod itself was expanded to contain feature, and erratas then it 
-is excellent solution - one stop information source for all drivers and 
-a standardized soln as well.. (but we dont have it on omap1).
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg13288.html
 
-by not exporting this, the drivers are restricted to being static, and 
-exporting allows those omap specific ones to be loadable (if someone 
-really wants so minimalist a system - i believe i2c is an example of 
-loadable module)..
+and
 
-I believe omap_has_feature() is a readable and maintainable way of 
-handling features and exporting helps those drivers to become modules 
-(yes with the risk of some other driver misusing it as well) - this 
-definitely is something we've been doing for some time in l-o I guess.. 
-a better alternative might be hwmod - but I am no expert to comment on 
-it's feasibility..
+http://marc.info/?l=linux-omap&m=124419789124570&w=2
 
--- 
-Regards,
-Nishanth Menon
+(search for "dev_attr" in both cases)
+
+...
+
+As an aside, I think that any errata/features that can be automatically 
+discriminated by the IP block revision register are better handled that 
+way than by platform_data; but of course, as you mention, the hardware 
+people sometimes neglect to bump that when they change something.
+
+
+- Paul
