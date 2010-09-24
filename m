@@ -1,44 +1,21 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Thu, 23 Sep 2010 22:41:04 -0500
-Subject: [PATCH 1/2] OMAP: features: export symbol omap3_features
-Message-ID: <1285299665-21639-1-git-send-email-omar.ramirez@ti.com>
+From: r65037@freescale.com (Richard Zhu)
+Date: Fri, 24 Sep 2010 11:54:23 +0800
+Subject: [4-0] serial patches that enable the eSDHC on iMX51
+Message-ID: <1285300467-5158-1-git-send-email-r65037@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@deeprootsystems.com>
+Hi All:
+Sorry, for wrong --compose usage.
 
-Since omap3_features is a global variable, only code
-built-in the kernel can make use of it and thus use
-omap_has ##feat functions; exporting this as a kernel
-symbol makes modules able to use feature detection
-framework too.
+Hi Wolfram:
+Here are the patches that enable the sdhci of i.MX51.
+The IO and WP funcs are verified on i.MX51 BBG board.
+The misssing bits of the HOST_CONTROL and so on had been made up in the 4-3 patch.
 
-Thread: http://marc.info/?l=linux-omap&m=128528822902211&w=2
 
-Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
-CC: Tony Lindgren <tony@atomide.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Nishanth Menon <nm@ti.com>
-CC: Paul Walmsley <paul@pwsan.com>
-CC: Sanjeev Premi <premi@ti.com>
-CC: linux-omap at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
----
- arch/arm/mach-omap2/id.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Hi Uwe:
+I would change MSL part to the "dynamically allocated method" later.
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 9a879f9..a8c6d19 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -31,6 +31,7 @@ static struct omap_chip_id omap_chip;
- static unsigned int omap_revision;
- 
- u32 omap3_features;
-+EXPORT_SYMBOL(omap3_features);
- 
- unsigned int omap_rev(void)
- {
--- 
-1.7.1
+Any review/comments/suggestions are appreciated.
+Thanks in advanced.
