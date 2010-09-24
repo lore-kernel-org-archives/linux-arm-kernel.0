@@ -1,60 +1,77 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Fri, 24 Sep 2010 18:11:28 +0200
-Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
-In-Reply-To: <AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
-References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
-	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
-	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
-	<AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
-Message-ID: <AANLkTikNLn-VuCQb2q7wZVbYORxV6uhia_oOBsQg3ZiJ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 24 Sep 2010 10:12:47 -0600
+Subject: [PATCH 0/6] add spi support for i.MX51 in the existing spi_imx
+	driver
+In-Reply-To: <20100924091120.GA25312@pengutronix.de>
+References: <1283413924-14210-1-git-send-email-jason77.wang@gmail.com>
+	<20100902082759.GE14214@pengutronix.de> <4C7F777E.1090104@gmail.com>
+	<20100902143908.GK14214@pengutronix.de>
+	<20100917095247.GB30441@pengutronix.de>
+	<AANLkTi=mMGe10rDhA6g0OZYXhSW3=M07PKr6yN8VwnnJ@mail.gmail.com>
+	<20100924091120.GA25312@pengutronix.de>
+Message-ID: <AANLkTimKGjz0=3KGhH-Oek9=k6OQ=738Ydcwn7D-RpdB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 24 wrze?nia 2010 17:38 u?ytkownik Cory Maccarrone
-<darkstar6262@gmail.com> napisa?:
-> 2010/9/24 Micha? Miros?aw <mirqus@gmail.com>:
->> 2010/8/18 Cory Maccarrone <darkstar6262@gmail.com>:
->>> This change adds in MMC and I2C support to the HTC Herald board, as well
->>> as adding the HTCPLD driver for the PLD used on this phone. ?It also
->>> adds in the gpio-keys entries for the front directional keys and
->>> selector and the cursor keys on the slide-out keyboard, and gpio-leds
->>> support for the LEDs attached to the htcpld.
->>>
->>> Additionally, SPI bus support (using the spi100k driver) and
->>> touchscreen support (using the ads7846 driver) were added.
->>>
->>> Signed-off-by: Cory Maccarrone <darkstar6262@gmail.com>
->>> ---
->> [...]
->>> +/* MMC Card */
->>> +#if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE)
->>> +static struct omap_mmc_platform_data htc_mmc1_data = {
->>> + ? ? ? .nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
->>> + ? ? ? .switch_slot ? ? ? ? ? ? ? ? ? ?= NULL,
->>> + ? ? ? .slots[0] ? ? ? = {
->>> + ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_30_31 |
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MMC_VDD_32_33 | MMC_VDD_33_34,
->>> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "mmcblk",
->>> + ? ? ? ? ? ? ? .nomux ? ? ? ? ? ? ? ? ?= 1,
->>> + ? ? ? ? ? ? ? .wires ? ? ? ? ? ? ? ? ?= 4,
->>> + ? ? ? ? ? ? ? .switch_pin ? ? ? ? ? ? = -1,
->>> + ? ? ? },
->>> +};
->> [...]
->> What voltages can this MMC controller provide? That's a rather unusual OCR mask.
-> Not really sure, I wasn't the one who first came up with that mask.
-> All I know is that it seems to work, and not just for my device, but
-> lots of other HTC OMAP850 devices we've tried it on too.
+2010/9/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Grant,
 >
-> I'm interested though, what in particular makes it unusual?
+> On Fri, Sep 24, 2010 at 01:00:14AM -0600, Grant Likely wrote:
+>> > Jason Wang (4):
+>> > ? ? ?ARM: mx5/clock-mx51: add spi clocks
+>> > ? ? ?ARM: mx5/iomux-mx51: add iomux definitions for eCSPI2 on the imx51_3ds board
+>> > ? ? ?ARM: mx5/mx51_3ds: add eCSPI2 support on the imx51_3ds board
+>> > ? ? ?ARM: mx5/mx51_3ds: add SPI NOR flash in the board init stage
+>> >
+>> > Uwe Kleine-K?nig (12):
+>> > ? ? ?spi/imx: default to m on platforms that have such devices
+>> > ? ? ?spi/imx: convert driver to use platform ids
+>> > ? ? ?spi/imx: get rid of more ifs depending on the used cpu
+>> > ? ? ?spi/imx: save the spi chip select in config struct, not the gpio to use
+>> > ? ? ?spi/imx: add support for imx51's eCSPI and CSPI
+>> > ? ? ?ARM: imx: change the way spi-imx devices are registered
+>> > ? ? ?ARM: imx: use platform ids for spi_imx devices
+>> > ? ? ?ARM: mx51: clean up mx51 header
+>> > ? ? ?ARM: mx51: fix naming of spi related defines
+>> > ? ? ?ARM: mx5: add spi_imx device registration
+>> > ? ? ?ARM: mx5/clock-mx51: refactor ccgr callbacks to use common code
+>> > ? ? ?ARM: mx5/clock-mx51: new macro that defines a clk with all members
+>> >
+>> > ?arch/arm/mach-imx/clock-imx1.c ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> > ?arch/arm/mach-imx/clock-imx21.c ? ? ? ? ? ? ? ? | ? ?6 +-
+>> > ?arch/arm/mach-imx/clock-imx27.c ? ? ? ? ? ? ? ? | ? ?6 +-
+>> > ?arch/arm/mach-imx/devices-imx21.h ? ? ? ? ? ? ? | ? ?9 +-
+>> > ?arch/arm/mach-imx/devices-imx27.h ? ? ? ? ? ? ? | ? 12 +-
+>> > ?arch/arm/mach-mx25/clock.c ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +-
+>> > ?arch/arm/mach-mx25/devices-imx25.h ? ? ? ? ? ? ?| ? 12 +-
+>> > ?arch/arm/mach-mx3/clock-imx31.c ? ? ? ? ? ? ? ? | ? ?6 +-
+>> > ?arch/arm/mach-mx3/clock-imx35.c ? ? ? ? ? ? ? ? | ? ?4 +-
+>> > ?arch/arm/mach-mx3/devices-imx31.h ? ? ? ? ? ? ? | ? 12 +-
+>> > ?arch/arm/mach-mx3/devices-imx35.h ? ? ? ? ? ? ? | ? ?9 +-
+>> > ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+>> > ?arch/arm/mach-mx5/board-mx51_3ds.c ? ? ? ? ? ? ?| ? 33 ++
+>> > ?arch/arm/mach-mx5/clock-mx51.c ? ? ? ? ? ? ? ? ?| ?113 ++++-
+>> > ?arch/arm/mach-mx5/devices-imx51.h ? ? ? ? ? ? ? | ? 18 +
+>> > ?arch/arm/plat-mxc/devices/platform-spi_imx.c ? ?| ? 89 +++-
+>> > ?arch/arm/plat-mxc/include/mach/devices-common.h | ? 11 +-
+>> > ?arch/arm/plat-mxc/include/mach/iomux-mx51.h ? ? | ? ?5 +
+>> > ?arch/arm/plat-mxc/include/mach/mx51.h ? ? ? ? ? | ?608 +++++++++++------------
+>> > ?drivers/spi/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 16 +
+>> > ?drivers/spi/spi_imx.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ?394 ++++++++++++---
+>> > ?21 files changed, 919 insertions(+), 453 deletions(-)
+>> > ?create mode 100644 arch/arm/mach-mx5/devices-imx51.h
+>>
+>> I'm fine with this series.
+>>
+>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> What tree do you want to merge them through?
+> I thought that the five patches touching drivers/spi should go via your
+> tree, the others via Sascha's. ?Assuming this is OK for you, too, do you
+> prefer to pick the patches out here or should I prepare a branch with
+> these patches for you to pull?
 
-It specifies, that device supports voltage ranges:
-2.8V - 2.9V, 3.0V - 3.1V, 3.2V - 3.4V
-(so: 2.9V - 3.0V and 3.1V - 3.2V are not available).
-Are there really 2.8V, 3.0V, 3.3V VDDs settable?
+You can just add my acked-by and take the whole series via Sascha.  No
+sense breaking them up.
 
-If the host supports only VDD = 3.3V for example, then correct OCR
-mask would be: MMC_VDD_32_33 | MMC_VDD_33_34 (or just one flag).
-
-Best Regards,
-Micha? Miros?aw
+g.
