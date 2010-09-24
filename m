@@ -1,54 +1,113 @@
-From: kishorek.kadiyala@gmail.com (kishore kadiyala)
-Date: Fri, 24 Sep 2010 22:01:48 +0530
-Subject: [PATCH v3 1/4] omap4 hsmmc: Adding card detect support for MMC1
-In-Reply-To: <AANLkTikLqi4=OOJ_ciMqTt7HKJzDo-WsZJ8D2CpP712c@mail.gmail.com>
-References: <14833.10.24.255.18.1285173812.squirrel@dbdmail.itg.ti.com>
-	<8F7AF80515AF0D4D93307E594F3CB40E5F57C548@dlee03.ent.ti.com>
-	<AANLkTikLqi4=OOJ_ciMqTt7HKJzDo-WsZJ8D2CpP712c@mail.gmail.com>
-Message-ID: <AANLkTim0Qm=x3vVuT26oSNzTg+BZV+KCAJj5oVs3etWD@mail.gmail.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Fri, 24 Sep 2010 19:37:52 +0300
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+References: <20100923190212.18863.25678.stgit@darius-desktop>	<4C9BE577.4050504@fluff.org>
+	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+Message-ID: <4C9CD3E0.6060000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
-
-
-On Thu, Sep 23, 2010 at 11:22 AM, kishore kadiyala
-<kishorek.kadiyala@gmail.com> wrote:
-> Hi Hari,
+On 09/24/2010 09:57 AM, Darius Augulis wrote:
+> Hi,
 >
-> On Thu, Sep 23, 2010 at 1:19 AM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
->> Kishore,
+> On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks<ben-linux@fluff.org>  wrote:
+>> On 23/09/10 20:15, Darius Augulis wrote:
+>>> Swap device and driver names in serial/samsung.c
 >>
->>> +int twl6030_mmc_card_detect(struct device *dev, int slot)
->>> +{
->>> + ? ? int ret = -EIO;
->>> + ? ? u8 read_reg = 0;
->>> + ? ? struct platform_device *pdev = to_platform_device(dev);
->>> +
->>> + ? ? switch (pdev->id) {
->>> + ? ? case 0:
->>> + ? ? ? ? ? ? /*
->>> + ? ? ? ? ? ? ?* BIT0 of REG_MMC_CTRL
->>> + ? ? ? ? ? ? ?* 0 - Card not present ,1 - Card present
->>> + ? ? ? ? ? ? ?*/
->>> + ? ? ? ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &read_reg,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_MMCCTRL);
->>> + ? ? ? ? ? ? if (ret >= 0)
->>> + ? ? ? ? ? ? ? ? ? ? ret = read_reg & STS_MMC;
->>> + ? ? ? ? ? ? break;
+>> This is far too short, please see the notes below on trying
+>> to make this more informative.
 >>
->> nitpick: may be you don't need a switch statement for only one case.
+>>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+>>> ---
+>>>
+>>> This patch was submitted about 3 months ago, but still not merged.
+>>> There was another similar patch from Joonyoung Shim
+>>> <jy0922.shim@samsung.com>  and was discussed here:
+>>> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+>>> Joonyoung Shim acked my patch and other people on ARM mailing list
+>>> acked it. The maintainer, Ben Dooks, still not responding for
+>>> a long time. Another maintainer, Kukjin Kim, refused to merge
+>>> it without Ben's review.
+>>> I would like to ask somebody pick up this bugfix.
+>>
+>> I belive last time this was brought up I asked about the affect
+>> this has on the userspace. The following issues would be helpful
+>> or essential to have noted in the header about the effect of this.
+>>
+>> - Does it change the /dev name of the device? if so I would thinl
+>>   carefully about applying it, as it would be a change in the way
+>>   that userspace sees the kernel.
 >
-> From future perspective,since there are 5 MMC controllers on OMAP4
-> and current patch supports card detect feature only for one controller i.e MMC1
-> as of now. Once the interfaces connected on the remaining 4 MMC controllers
-> are defined further additions will be required for respective cases.
+> It does - now devices are named /dev/s3c2410_serial, and patch changes
+> its name to /dev/ttySAC
+>
+>>
+>> - Does it change the kernel output itself? A note on what diffeences
+>>   can be seen in things like dmesg would be helpful.
+>
+> It does. Serial driver reports device names when probing, so there
+> will appear ttySACx instead of
+> s3c2410_serialx.
+>
+>>
+>> - Are there any other side effects
+>>
+>> - Why is this a bug? Maybe the previous points will explain what is
+>>   going on, but if not, then a reasonably concise description of
+>>   what is going on here.
+>
+> This is bug, because of several points:
+>
+> 1. Because it contradicts kernel documentation. Please read
+> Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
+> This should be enough to apply this patch.
+>
+> 2. Because s3c2410_serial isn't correct name for serial device node.
+> It's name of Samsung serial driver.
+>
+> 3. Because now almost all userspace systems workaround it by creating symlink
+> /dev/ttySACx>  /dev/s3c2410_serialx and only then put some getty on
+> created symlink, not on original device.
+> Systems which don't create this symlink, fail to boot at all, because
+> of wrong console name. Good example is Buildroot.
 
+I had similar issue with buildroot too, because in /etc/securetty it is
+defained as ttySAC0
 
-Correcting my previous comment, I've just verified twl6030 current
-version spec on OMAP4
-which can provide card detect interrupt only for one MMC controller i.e MMC1.
-I will replace switch with if.
+4. For console in kernel boot command line you must enter console=ttySACx.
+Why it sould be different in userspace?
 
-Regards,
-Kishore
+For me it seems taht this bug was not noticed earlier, because most embedded
+systems were using static device nodes and ttySACx was used in these cases.
+	
+>>
+>>>   drivers/serial/samsung.c |    4 ++--
+>>>   1 files changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/serial/samsung.c b/drivers/serial/samsung.c
+>>> index b1156ba..25c0d0f 100644
+>>> --- a/drivers/serial/samsung.c
+>>> +++ b/drivers/serial/samsung.c
+>>> @@ -883,10 +883,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+>>>
+>>>   static struct uart_driver s3c24xx_uart_drv = {
+>>>        .owner          = THIS_MODULE,
+>>> -     .dev_name       = "s3c2410_serial",
+>>> +     .driver_name    = "s3c2410_serial",
+>>>        .nr             = CONFIG_SERIAL_SAMSUNG_UARTS,
+>>>        .cons           = S3C24XX_SERIAL_CONSOLE,
+>>> -     .driver_name    = S3C24XX_SERIAL_NAME,
+>>> +     .dev_name       = S3C24XX_SERIAL_NAME,
+>>>        .major          = S3C24XX_SERIAL_MAJOR,
+>>>        .minor          = S3C24XX_SERIAL_MINOR,
+>>>   };
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>
