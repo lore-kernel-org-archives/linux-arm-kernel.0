@@ -1,45 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Sep 2010 18:50:56 -0700
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
+Date: Thu, 23 Sep 2010 18:50:59 -0700
+Subject: [PATCH 06/11] omap: usb: fix build warning
 In-Reply-To: <20100924014938.10325.35279.stgit@baageli.muru.com>
 References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-Message-ID: <20100924015056.10325.95854.stgit@baageli.muru.com>
+Message-ID: <20100924015059.10325.14660.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yogesh Marathe <yogesh_marathe@ti.com>
+From: Anand Gadiyar <gadiyar@ti.com>
 
-The definition of "iva2" device in iommu_device
-is wrapped inside CONFIG_MPU_BRIDGE_IOMMU, but
-this option is not defined in KConfig.
+Fix this and similar build warnings when building with
+omap_4430sdp_defconfig.
 
-This patch removes the wrapper and makes "iva2"
-available as another iommu_device.
+ CC      arch/arm/mach-omap2/board-4430sdp.o
+In file included from arch/arm/mach-omap2/board-4430sdp.c:36:
+arch/arm/plat-omap/include/plat/usb.h:109: warning: return type defaults to 'int'
 
-Signed-off-by: Yogesh Marathe <yogesh_marathe@ti.com>
-Signed-off-by: Sanjeev Premi <premi@ti.com>
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Acked-by: Felipe Balbi <felipe.balbi@nokia.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap-iommu.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/include/plat/usb.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
-index f5a1aad..bb8c01d 100644
---- a/arch/arm/mach-omap2/omap-iommu.c
-+++ b/arch/arm/mach-omap2/omap-iommu.c
-@@ -35,7 +35,6 @@ static struct iommu_device omap3_devices[] = {
- 			.clk_name = "cam_ick",
- 		},
- 	},
--#if defined(CONFIG_MPU_BRIDGE_IOMMU)
- 	{
- 		.base = 0x5d000000,
- 		.irq = 28,
-@@ -45,7 +44,6 @@ static struct iommu_device omap3_devices[] = {
- 			.clk_name = "iva2_ck",
- 		},
- 	},
--#endif
- };
- #define NR_OMAP3_IOMMU_DEVICES ARRAY_SIZE(omap3_devices)
- static struct platform_device *omap3_iommu_pdev[NR_OMAP3_IOMMU_DEVICES];
+diff --git a/arch/arm/plat-omap/include/plat/usb.h b/arch/arm/plat-omap/include/plat/usb.h
+index 2a9427c..6674562 100644
+--- a/arch/arm/plat-omap/include/plat/usb.h
++++ b/arch/arm/plat-omap/include/plat/usb.h
+@@ -105,7 +105,7 @@ static inline void omap1_usb_init(struct omap_usb_config *pdata)
+ #if defined(CONFIG_ARCH_OMAP_OTG) || defined(CONFIG_ARCH_OMAP_OTG_MODULE)
+ void omap2_usbfs_init(struct omap_usb_config *pdata);
+ #else
+-static inline omap2_usbfs_init(struct omap_usb_config *pdata)
++static inline void omap2_usbfs_init(struct omap_usb_config *pdata)
+ {
+ }
+ #endif
