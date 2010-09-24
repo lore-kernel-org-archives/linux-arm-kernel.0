@@ -1,36 +1,130 @@
-From: ben@simtec.co.uk (Ben Dooks)
-Date: Fri, 24 Sep 2010 00:54:34 +0100
-Subject: [PATCH] ARM: SAMSUNG: make SAMSUNG_PM_DEBUG select DEBUG_LL
-In-Reply-To: <4c920aa8.d37b0e0a.4ee4.ffffc4bc@mx.google.com>
-References: <4c920aa8.d37b0e0a.4ee4.ffffc4bc@mx.google.com>
-Message-ID: <4C9BE8BA.7000804@simtec.co.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 23 Sep 2010 17:16:14 -0700
+Subject: [PATCH 03/10] OMAP3: PM: move device-specific special cases from
+	PM core into CPUidle
+In-Reply-To: <87eickowdo.fsf@deeprootsystems.com> (Kevin Hilman's message of
+	"Thu, 23 Sep 2010 16:47:31 -0700")
+References: <1284594946-28963-1-git-send-email-khilman@deeprootsystems.com>
+	<1284594946-28963-4-git-send-email-khilman@deeprootsystems.com>
+	<alpine.DEB.2.00.1009210147180.17727@utopia.booyaka.com>
+	<878w2vkp65.fsf@deeprootsystems.com>
+	<alpine.DEB.2.00.1009231709000.10678@utopia.booyaka.com>
+	<87eickowdo.fsf@deeprootsystems.com>
+Message-ID: <87vd5wm1wx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/10 13:16, Maurus Cuelenaere wrote:
-> When selecting SAMSUNG_PM_DEBUG, it complains about a missing printascii()
-> function if you do not select DEBUG_LL, so make the former select the latter.
-> 
-> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
-> ---
->  arch/arm/plat-samsung/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 7c0bde7..d5816e7 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -260,6 +260,7 @@ comment "Power management"
->  config SAMSUNG_PM_DEBUG
->  	bool "S3C2410 PM Suspend debug"
->  	depends on PM
-> +	select DEBUG_LL
->  	help
->  	  Say Y here if you want verbose debugging from the PM Suspend and
->  	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-Either this, or having SAMSUNG_PM_DEBUG depend on DEBUG_LL.. Personally
-I think this is probably best, unless it's offensive to anyone else?
+> Paul Walmsley <paul@pwsan.com> writes:
+>
+>> Hi Kevin
+>>
+>> On Tue, 21 Sep 2010, Kevin Hilman wrote:
+>>
+>>> Paul Walmsley <paul@pwsan.com> writes:
+>>> 
+>>> > On Wed, 15 Sep 2010, Kevin Hilman wrote:
+>>> >
+>>> >> In an effort to simplify the core idle path, move any device-specific
+>>> >> special case handling from the core PM idle path into the CPUidle
+>>> >> pre-idle checking path.
+>>> >
+>>> > As with the original patch, I don't quite understand the improvement 
+>>> > here.  In particular, this part:
+>>> >
+>>> >> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+>>> >> index 3d3d035..0923b82 100644
+>>> >> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>>> >> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>>> >> @@ -233,14 +234,54 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>>> >>  			       struct cpuidle_state *state)
+>>> >>  {
+>>> >>  	struct cpuidle_state *new_state = next_valid_state(dev, state);
+>>> >> +	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
+>>> >> +	u32 cam_state;
+>>> >> +	struct omap3_processor_cx *cx;
+>>> >> +	int ret;
+>>> >>  
+>>> >>  	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap3_idle_bm_check()) {
+>>> >>  		BUG_ON(!dev->safe_state);
+>>> >>  		new_state = dev->safe_state;
+>>> >> +		goto select_state;
+>>> >> +	}
+>>> >> +
+>>> >> +	cx = cpuidle_get_statedata(state);
+>>> >> +	core_next_state = cx->core_state;
+>>> >> +
+>>> >> +	/*
+>>> >> +	 * Prevent idle completely if CAM is active.
+>>> >> +	 * CAM does not have wakeup capability in OMAP3.
+>>> >> +	 */
+>>> >> +	cam_state = pwrdm_read_pwrst(cam_pd);
+>>> >> +	if (cam_state == PWRDM_POWER_ON) {
+>>> >> +		new_state = dev->safe_state;
+>>> >> +		goto select_state;
+>>> >>  	}
+>>> >>  
+>>> >> +	/*
+>>> >> +	 * Prevent PER off if CORE is not in retention or off as this
+>>> >> +	 * would disable PER wakeups completely.
+>>> >> +	 */
+>>> >> +	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
+>>> >> +	if ((per_next_state == PWRDM_POWER_OFF) &&
+>>> >> +	    (core_next_state > PWRDM_POWER_RET)) {
+>>> >> +		per_next_state = PWRDM_POWER_RET;
+>>> >> +		pwrdm_set_next_pwrst(per_pd, per_next_state);
+>>> >> +	}
+>>> >> +
+>>> >> +	/* Are we changing PER target state? */
+>>> >> +	if (per_next_state != per_saved_state)
+>>> >> +		pwrdm_set_next_pwrst(per_pd, per_next_state);
+>>> >
+>>> > In this case, the PER / CORE constraints don't have anything to do with 
+>>> > the MPU or CPUIdle, so they don't seem to belong in the CPUIdle code.  The 
+>>> > extra comments are certainly nice -- they make it more clear as to what is 
+>>> > going on here -- but maybe those can just be added to pm34xx.c ?
+>>> 
+>>> CPUidle currently manages MPU and CORE powerdomains, so the CORE
+>>> constraints seem to make perfect sense here (at least to me.)
+>>
+>> I do mean CORE also -- basically, anything that is not the CPU.  IMHO 
+>> CPUIdle shouldn't manage CORE directly since it's not part of the CPU.  
+>> Also since OMAPs have other processors (e.g., DSP, DMA, etc) that can use 
+>> the CORE independently of the CPU's power state, it doesn't make sense for 
+>> that code to live inside CPUIdle -- probably it should live in some type 
+>> of SystemIdle, CORE powerdomain idle or L3 idle.  Again IMHO, the C states 
+>> should only represent the MPU's idle state.
+>>
+>>> The question is probably more about the PER constraints.
+>>> 
+>>> The basic goal of this is to streamline the core idle (omap_sram_idle())
+>>> to be the minimum streamline idle, and to move all the constraint
+>>> checking and activity checking to higher layers (like CPUidle.)
+>>> Specifically, I'm working towards moving the device-specific idle
+>>> constraints out of the core idle path (omap_sram_idle()) and move them
+>>> into higher layers where we're checking for activity etc.
+>>> 
+>>> This is just a baby step towards moving the device-idle out of CPUidle
+>>> completely to a place where it can be managed by the driver themeselves
+>>> using runtime PM or by using constraints instead of these hard-coded
+>>> hacks.
+>>
+>> I agree completely with the goal; it's the implementation that I don't 
+>> like ;-)  But if you agree with the basic idea, that CORE / PER / 
+>> whatever-idle should ultimately go elsewhere, since I don't have time to 
+>> come up with a constructive alternative at the moment, would you be 
+>> willing to just drop a FIXME comment in that code, near the CAM and the 
+>> PER / CORE stuff, that mentions that that code should ultimately be 
+>> segmented out into its own idle code?
+>
+> Absolutely...  will do.
+>
 
--- 
-Ben
+Here's an updated patch, which will be included in the forthcoming
+pm-next pull request.  I updated the changelog with a 'NOTE' and also
+added a FIXME in the code.
+
+Thanks for the feedback Paul.
+
+Kevin
