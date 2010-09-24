@@ -1,25 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Sep 2010 15:06:52 +0100
-Subject: [RFC] SoC name and revision in /proc/cpuinfo
-In-Reply-To: <20100924135356.GA17651@game.jcrosoft.org>
-References: <20100924135356.GA17651@game.jcrosoft.org>
-Message-ID: <20100924140652.GA14809@n2100.arm.linux.org.uk>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 24 Sep 2010 15:57:13 +0100
+Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <20100924135001.GB3113@riccoc20.at.omicron.at>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<1285270733.2587.46.camel@localhost.localdomain>
+	<20100924135001.GB3113@riccoc20.at.omicron.at>
+Message-ID: <20100924155713.45be6513@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 24, 2010 at 03:53:56PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Hi Russell,
+> > Instead, I think having the id hanging off the class driver is much
+> > better, as it allows mapping the actual hardware to the id more clearly.
+> > 
+> > So I'd drop the "timesource" listing. And maybe change "id" to
+> > "clock_id" so its a little more clear what the id is for.
 > 
-> 	On AT91 for some userland library we need to known the cpu model and revision
-> 	so I'd like to known if it's ok with you to extend it?
+> Okay, I will drop /sys/class/timesource (hope Alan Cox agrees :)
+
+It makes sense to hang anything off the physical id
+
+> I threw it out there mostly for the sake of discussion. I imagined
+> that there could be other properties in that directory, like time
+> scale (TAI, UTC, etc). But it seems like we don't really need anything
+> in that direction.
+
+They can still hang off the physical device. Thats really a detail
+
+> > interrupts are awfully frequent, so systems concerned with power-saving
+> > and deep idles probably would like something that could be done at a
+> > more coarse interval.
 > 
-> 	as
-> 	cpu familly:	at91
-> 	cpu type:	at91sam9g20
-> 	cpu revision:	1.1
+> We could always make the pulse rate programmable, for power-saving
+> applications.
 
-You're mixing up the CPU with the SoC.  The CPU is what's in the core of
-the SoC and has no peripherals etc.  The SoC is the entire chip.  "Central
-Processing Unit."  "System on a Chip."
+I would expect the kernel drivers to be responsible for
+- Turning off when they can
+- Picking rates that are power optimal for the requirement
 
-I'd much rather see SoC information kept separate from the CPU information.
+The latter is a bit interesting as I don't see anything in any of the
+timer APIs to express accuracy (a problem we have in kernel too).
+Historically it simply hasn't mattered.
