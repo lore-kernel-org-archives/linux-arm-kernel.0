@@ -1,32 +1,26 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sat, 25 Sep 2010 23:53:24 +0100
-Subject: [PATCH] sdhci-s3c: fix NULL ptr access in sdhci_s3c_remove
-In-Reply-To: <20100923120803.832975f6.akpm@linux-foundation.org>
-References: <1285251725-6210-1-git-send-email-m.szyprowski@samsung.com>
-	<20100923120803.832975f6.akpm@linux-foundation.org>
-Message-ID: <20100925225324.GA30732@void.printf.net>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Sun, 26 Sep 2010 00:08:57 +0100
+Subject: Regarding hw irq to Linux irq mapping on ARM
+In-Reply-To: <20100924150608.GB30666@sirena.org.uk>
+References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>	<1285133481.30449.170.camel@pasglop>	<AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>	<4C9BE69C.9070609@fluff.org>
+	<20100924150608.GB30666@sirena.org.uk>
+Message-ID: <4C9E8109.2000408@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 23, 2010 at 12:08:03PM -0700, Andrew Morton wrote:
-> The patch applies OK to 2.6.35.  Is the bug present there as well?  If
-> so, should we fix it in earlier kernels?  If so then the way in which
-> we indicate this is by adding
+On 24/09/10 16:06, Mark Brown wrote:
+> On Fri, Sep 24, 2010 at 12:45:32AM +0100, Ben Dooks wrote:
+>> On 22/09/10 09:59, Eric Miao wrote:
 > 
-> 	Cc: <stable@kernel.org>
+>>>> And i2c in many cases want to be called from sleep'able context... might
+>>>> be a good idea to restrict some of these to threaded interrupts. A whole
+>>>> different discussion I suppose.
 > 
-> to the changelog.
+>> The i2c case, it is generally the code decoding the interrupt that needs
+>> to do this, and is part of the i2c specific driver, and is written as
+>> some form of thread or work-queue.
+> 
+> The standard thing these days is a threaded IRQ handler.
 
-Marek, Kyungmin, what do you think?
-
-Andrew, I've been waiting for an ACK from Ben Dooks, since he's listed
-in MAINTAINERS for this driver, but he hasn't replied yet (I've tried 
-pinging privately).  I'll plan on sending Marek's two s3c fixes to
-Linus tomorrow regardless (this one with Cc: <stable@kernel.org>)
-along with my MAINTAINERS update for MMC unless anyone objects.
-
-Thanks,
-
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Yes, however my first point was really do we care the method
+for the interrupt's detection when talking about mapping them?
