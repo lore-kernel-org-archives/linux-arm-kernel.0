@@ -1,45 +1,32 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 25 Sep 2010 22:55:20 +0200
-Subject: [PATCH v4] power: introduce library for device-specific OPPs
-In-Reply-To: <20100924193742.GJ2375@linux.vnet.ibm.com>
-References: <1285332640-16736-1-git-send-email-nm@ti.com>
-	<20100924193742.GJ2375@linux.vnet.ibm.com>
-Message-ID: <201009252255.20933.rjw@sisk.pl>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 25 Sep 2010 23:53:24 +0100
+Subject: [PATCH] sdhci-s3c: fix NULL ptr access in sdhci_s3c_remove
+In-Reply-To: <20100923120803.832975f6.akpm@linux-foundation.org>
+References: <1285251725-6210-1-git-send-email-m.szyprowski@samsung.com>
+	<20100923120803.832975f6.akpm@linux-foundation.org>
+Message-ID: <20100925225324.GA30732@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 24, 2010, Paul E. McKenney wrote:
-> On Fri, Sep 24, 2010 at 07:50:40AM -0500, Nishanth Menon wrote:
-...
+On Thu, Sep 23, 2010 at 12:08:03PM -0700, Andrew Morton wrote:
+> The patch applies OK to 2.6.35.  Is the bug present there as well?  If
+> so, should we fix it in earlier kernels?  If so then the way in which
+> we indicate this is by adding
 > 
-> Looks like a good start!!!  Some questions and suggestions about RCU
-> usage interspersed below.
-...
-> > + * Locking: RCU reader.
-> > + */
-> > +int opp_get_opp_count(struct device *dev)
-> > +{
-> > +	struct device_opp *dev_opp;
-> > +	struct opp *temp_opp;
-> > +	int count = 0;
-> > +
-> > +	dev_opp = find_device_opp(dev);
-> > +	if (IS_ERR(dev_opp))
-> > +		return PTR_ERR(dev_opp);
-> > +
-> > +	rcu_read_lock();
-> > +	list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
-> > +		if (temp_opp->available)
-> > +			count++;
-> > +	}
-> > +	rcu_read_unlock();
+> 	Cc: <stable@kernel.org>
 > 
-> This one is OK as well.  You are returning a count, so if all of the
-> counted structures are freed at this point, no problem.  The count was
-> valid when it was accumulated, and the fact that it might now be obsolete
-> is (usually) not a problem.
+> to the changelog.
 
-However, it looks like it should run rcu_read_lock() before calling
-find_device_opp(dev), shouldn't it?
+Marek, Kyungmin, what do you think?
 
-Rafael
+Andrew, I've been waiting for an ACK from Ben Dooks, since he's listed
+in MAINTAINERS for this driver, but he hasn't replied yet (I've tried 
+pinging privately).  I'll plan on sending Marek's two s3c fixes to
+Linus tomorrow regardless (this one with Cc: <stable@kernel.org>)
+along with my MAINTAINERS update for MMC unless anyone objects.
+
+Thanks,
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
