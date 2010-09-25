@@ -1,133 +1,78 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Sep 2010 17:27:17 -0700
-Subject: [PATCH 6/7] omap: 4430sdp board support for proximity sensor
+Date: Fri, 24 Sep 2010 17:27:20 -0700
+Subject: [PATCH 7/7] omap4: board-omap4panda: adding leds status1 and status2
 In-Reply-To: <20100925002608.24551.67183.stgit@baageli.muru.com>
 References: <20100925002608.24551.67183.stgit@baageli.muru.com>
-Message-ID: <20100925002717.24551.63605.stgit@baageli.muru.com>
+Message-ID: <20100925002720.24551.11276.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shubhrajyoti Datta <shubhrajyoti@ti.com>
+From: Ricardo Salveti de Araujo <ricardo.salveti@canonical.com>
 
-omap 4430sdp board support for the  proximity sensor via GPIO keys.
-The proximity sensor is connected to GPIO and is registered as a
-GPIO key.
-- Making the default state of the sensor off at bootup
-- The init is called before platform_add_devices
+At Pandaboard we have 2 status leds, so adding them with similar usage as
+we have for Beagleboard (heartbeat and mmc0). The patch basically adds the
+platform data required by leds-gpio driver.
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Signed-off-by: Ricardo Salveti de Araujo <ricardo.salveti@canonical.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c |   61 +++++++++++++++++++++++++++++++++++
- 1 files changed, 61 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-omap4panda.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 5b6a48d..d2b9173 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index c03d1d5..22a8fd3 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
 @@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/leds.h>
+ #include <linux/gpio.h>
  #include <linux/usb/otg.h>
- #include <linux/spi/spi.h>
  #include <linux/i2c/twl.h>
-+#include <linux/gpio_keys.h>
- #include <linux/regulator/machine.h>
- #include <linux/leds.h>
+@@ -40,6 +41,36 @@
+ #include "hsmmc.h"
  
-@@ -40,6 +41,8 @@
- #define ETH_KS8851_IRQ			34
- #define ETH_KS8851_POWER_ON		48
- #define ETH_KS8851_QUART		138
-+#define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
-+#define OMAP4_SFH7741_ENABLE_GPIO		188
  
- static struct gpio_led sdp4430_gpio_leds[] = {
- 	{
-@@ -77,11 +80,47 @@ static struct gpio_led sdp4430_gpio_leds[] = {
- 
- };
- 
-+static struct gpio_keys_button sdp4430_gpio_keys[] = {
++static struct gpio_led gpio_leds[] = {
 +	{
-+		.desc			= "Proximity Sensor",
-+		.type			= EV_SW,
-+		.code			= SW_FRONT_PROXIMITY,
-+		.gpio			= OMAP4_SFH7741_SENSOR_OUTPUT_GPIO,
-+		.active_low		= 0,
-+	}
-+};
-+
- static struct gpio_led_platform_data sdp4430_led_data = {
- 	.leds	= sdp4430_gpio_leds,
- 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
- };
- 
-+static int omap_prox_activate(struct device *dev)
-+{
-+	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
-+	return 0;
-+}
-+
-+static void omap_prox_deactivate(struct device *dev)
-+{
-+	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 0);
-+}
-+
-+static struct gpio_keys_platform_data sdp4430_gpio_keys_data = {
-+	.buttons	= sdp4430_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(sdp4430_gpio_keys),
-+	.enable		= omap_prox_activate,
-+	.disable	= omap_prox_deactivate,
-+};
-+
-+static struct platform_device sdp4430_gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &sdp4430_gpio_keys_data,
++		.name			= "pandaboard::status1",
++		.default_trigger	= "heartbeat",
++		.gpio			= 7,
++	},
++	{
++		.name			= "pandaboard::status2",
++		.default_trigger	= "mmc0",
++		.gpio			= 8,
 +	},
 +};
 +
- static struct platform_device sdp4430_leds_gpio = {
- 	.name	= "leds-gpio",
- 	.id	= -1,
-@@ -161,6 +200,7 @@ static struct platform_device sdp4430_lcd_device = {
- 
- static struct platform_device *sdp4430_devices[] __initdata = {
- 	&sdp4430_lcd_device,
-+	&sdp4430_gpio_keys_device,
- 	&sdp4430_leds_gpio,
- };
- 
-@@ -432,11 +472,32 @@ static int __init omap4_i2c_init(void)
- 				ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
- 	return 0;
- }
++static struct gpio_led_platform_data gpio_led_info = {
++	.leds		= gpio_leds,
++	.num_leds	= ARRAY_SIZE(gpio_leds),
++};
 +
-+static void __init omap_sfh7741prox_init(void)
-+{
-+	int  error;
++static struct platform_device leds_gpio = {
++	.name	= "leds-gpio",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &gpio_led_info,
++	},
++};
 +
-+	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
-+	if (error < 0) {
-+		pr_err("%s:failed to request GPIO %d, error %d\n",
-+			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-+		return;
-+	}
++static struct platform_device *panda_devices[] __initdata = {
++	&leds_gpio,
++};
 +
-+	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
-+	if (error < 0) {
-+		pr_err("%s: GPIO configuration failed: GPIO %d,error %d\n",
-+			 __func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-+		gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
-+	}
-+}
-+
- static void __init omap_4430sdp_init(void)
+ static void __init omap4_panda_init_irq(void)
  {
+ 	omap2_init_common_hw(NULL, NULL);
+@@ -277,6 +308,7 @@ static void __init omap4_panda_init(void)
  	int status;
  
- 	omap4_i2c_init();
-+	omap_sfh7741prox_init();
- 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+ 	omap4_panda_i2c_init();
++	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
  	omap_serial_init();
  	omap4_twl6030_hsmmc_init(mmc);
+ 	/* OMAP4 Panda uses internal transceiver so register nop transceiver */
