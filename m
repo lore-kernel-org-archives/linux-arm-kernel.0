@@ -1,58 +1,40 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Sep 2010 17:19:15 -0700
-Subject: [GIT PULL] omap2 sparse fixes
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
-	<20100923225851.GR4211@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
-Message-ID: <20100925001914.GO4211@atomide.com>
+Date: Fri, 24 Sep 2010 17:26:57 -0700
+Subject: [PATCH 0/7] omap board changes for v2.6.37 merge window
+Message-ID: <20100925002608.24551.67183.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [100924 12:33]:
-> 
-> Tony,
-> Here is new pull request which is rebased to 2.6.36-rc5.
-> 
-> -Manjunath
-> 
-> The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
->   Linus Torvalds (1):
->         Linux 2.6.36-rc5
-> 
-> are available in the git repository at:
-> 
->   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes
-> 
-> G, Manjunath Kondaiah (10):
->       OMAP: mach-omap2: Fix incorrect assignment warnings
->       OMAP: mach-omap2: Fix static declaration warnings
->       OMAP: mach-omap2: Fix static function warnings
->       OMAP: mach-omap2: Fix miscellaneous sparse warnings
->       OMAP: plat-omap: Fix static function warnings
->       OMAP: NAND: Fix static declaration warning
->       TWL CORE: Fix sparse warning
->       TWL IRQ: Fix fucntion declaration warnings
->       OMAP2/3: Convert write/read functions to raw read/write
->       OMAP3: Keypad: Fix incorrect type initializer
+Hi all,
 
-Hmm tried pulling these, but ran into an issue where at least 2430
-takes about a minute to boot with these patches with no output
-on the console intially.
-
-Can you please check that? Will not merge for now until we
-figure out what changes with these patches.
-
-Then, I also noticed the following exports getting added:
-
-+EXPORT_SYMBOL(omap2_gp_clockevent_set_gptimer);
-+EXPORT_SYMBOL(omapfb_reserve_sram);
-+EXPORT_SYMBOL(omap_sram_init);
-
-These should not be exported, they are only intended to be called
-from the low-level platform init code. So exporting them is not
-the right fix for these.
+Here are some board files for review for the upcoming merge window.
 
 Regards,
 
 Tony
+
+---
+
+Mathieu J. Poirier (1):
+      Adding i2c eeprom driver to read EDID
+
+Ricardo Salveti de Araujo (1):
+      omap4: board-omap4panda: adding leds status1 and status2
+
+Robert Nelson (3):
+      omap: Beagle: revision detection
+      omap: Beagle: only Cx boards use pin 23 for write protect
+      omap: Beagle: no gpio_wp pin connection on xM
+
+Shubhrajyoti Datta (2):
+      hmc5843: Digital compass board file
+      omap: 4430sdp board support for proximity sensor
+
+
+ arch/arm/mach-omap2/board-4430sdp.c     |   69 +++++++++++++++++++++
+ arch/arm/mach-omap2/board-omap3beagle.c |  101 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/board-omap4panda.c  |   32 ++++++++++
+ 3 files changed, 199 insertions(+), 3 deletions(-)
+
+-- 
+Signature
