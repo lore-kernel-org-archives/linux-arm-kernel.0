@@ -1,36 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Sep 2010 17:27:13 -0700
-Subject: [PATCH 4/7] omap: Beagle: no gpio_wp pin connection on xM
+Date: Fri, 24 Sep 2010 17:27:15 -0700
+Subject: [PATCH 5/7] Adding i2c eeprom driver to read EDID
 In-Reply-To: <20100925002608.24551.67183.stgit@baageli.muru.com>
 References: <20100925002608.24551.67183.stgit@baageli.muru.com>
-Message-ID: <20100925002713.24551.85624.stgit@baageli.muru.com>
+Message-ID: <20100925002715.24551.94749.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Nelson <robertcnelson@gmail.com>
+From: Mathieu J. Poirier <mathieu.poirier@canonical.com>
 
-The omap3630 based BeagleBoard xM uses a MicroSD card slot with
-no write protection.
+Adding i2c eeprom driver to access monitor EDID binary information
+from user space, something that is required by 'decode-edid' and
+'parse-edid'.
 
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+BugLink: https://bugs.launchpad.net/bugs/608279
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@canonical.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 1908b33..5534841 100644
+index 5534841..e27f3bf 100644
 --- a/arch/arm/mach-omap2/board-omap3beagle.c
 +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -272,7 +272,9 @@ static struct gpio_led gpio_leds[];
- static int beagle_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
+@@ -412,13 +412,19 @@ static struct i2c_board_info __initdata beagle_i2c_boardinfo[] = {
+ 	},
+ };
+ 
++static struct i2c_board_info __initdata beagle_i2c_eeprom[] = {
++       {
++               I2C_BOARD_INFO("eeprom", 0x50),
++       },
++};
++
+ static int __init omap3_beagle_i2c_init(void)
  {
--	if ((omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C1_3) ||
-+	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
-+		mmc[0].gpio_wp = -EINVAL;
-+	} else if ((omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C1_3) ||
- 		(omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C4)) {
- 		omap_mux_init_gpio(23, OMAP_PIN_INPUT);
- 		mmc[0].gpio_wp = 23;
+ 	omap_register_i2c_bus(1, 2600, beagle_i2c_boardinfo,
+ 			ARRAY_SIZE(beagle_i2c_boardinfo));
+ 	/* Bus 3 is attached to the DVI port where devices like the pico DLP
+ 	 * projector don't work reliably with 400kHz */
+-	omap_register_i2c_bus(3, 100, NULL, 0);
++	omap_register_i2c_bus(3, 100, beagle_i2c_eeprom, ARRAY_SIZE(beagle_i2c_eeprom));
+ 	return 0;
+ }
+ 
