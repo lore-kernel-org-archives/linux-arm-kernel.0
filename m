@@ -1,77 +1,19 @@
-From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Sat, 25 Sep 2010 20:19:06 +0200
-Subject: [PATCH 6/6] omap3: Remove VMMC2 regulator on IGEP v2 because it's not
-	used.
-In-Reply-To: <1285438746-7311-1-git-send-email-eballetbo@gmail.com>
-References: <1285438746-7311-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1285438746-7311-7-git-send-email-eballetbo@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 25 Sep 2010 19:58:05 +0100
+Subject: [PATCH] ARM: SECCOMP support
+In-Reply-To: <alpine.LFD.2.00.1009251220420.13233@xanadu.home>
+References: <alpine.LFD.2.00.1009231709230.13233@xanadu.home>
+	<20100925113413.GA3044@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1009251220420.13233@xanadu.home>
+Message-ID: <20100925185805.GB3044@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   26 +++-----------------------
- 1 files changed, 3 insertions(+), 23 deletions(-)
+On Sat, Sep 25, 2010 at 12:31:07PM -0400, Nicolas Pitre wrote:
+> Well, for one thing, the syscall tracing has the ability to change the 
+> actual syscall number.  So this looked like a possible hole that could 
+> somehow be exploited to escape the seccomp control.  So I went with the 
+> safest way.
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index c5eaa43..fa450b1 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -260,10 +260,6 @@ static struct regulator_consumer_supply igep2_vmmc1_supply = {
- 	.supply		= "vmmc",
- };
- 
--static struct regulator_consumer_supply igep2_vmmc2_supply = {
--	.supply		= "vmmc",
--};
--
- /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
- static struct regulator_init_data igep2_vmmc1 = {
- 	.constraints = {
-@@ -279,21 +275,6 @@ static struct regulator_init_data igep2_vmmc1 = {
- 	.consumer_supplies      = &igep2_vmmc1_supply,
- };
- 
--/* VMMC2 for OMAP VDD_MMC2 (i/o) and MMC2 WIFI */
--static struct regulator_init_data igep2_vmmc2 = {
--	.constraints = {
--		.min_uV			= 1850000,
--		.max_uV			= 3150000,
--		.valid_modes_mask	= REGULATOR_MODE_NORMAL
--					| REGULATOR_MODE_STANDBY,
--		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
--					| REGULATOR_CHANGE_MODE
--					| REGULATOR_CHANGE_STATUS,
--	},
--	.num_consumer_supplies  = 1,
--	.consumer_supplies      = &igep2_vmmc2_supply,
--};
--
- static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
-@@ -390,11 +371,11 @@ static int igep2_twl_gpio_setup(struct device *dev,
- 	mmc[0].gpio_cd = gpio + 0;
- 	omap2_hsmmc_init(mmc);
- 
--	/* link regulators to MMC adapters ... we "know" the
-+	/*
-+	 * link regulators to MMC adapters ... we "know" the
- 	 * regulators will be set up only *after* we return.
--	*/
-+	 */
- 	igep2_vmmc1_supply.dev = mmc[0].dev;
--	igep2_vmmc2_supply.dev = mmc[1].dev;
- 
- 	/*
- 	 * REVISIT: need ehci-omap hooks for external VBUS
-@@ -534,7 +515,6 @@ static struct twl4030_platform_data igep2_twldata = {
- 	.codec		= &igep2_codec_data,
- 	.gpio		= &igep2_twl4030_gpio_pdata,
- 	.vmmc1          = &igep2_vmmc1,
--	.vmmc2		= &igep2_vmmc2,
- 	.vpll2		= &igep2_vpll2,
- 
- };
--- 
-1.7.0.4
+That is also true for x86 - the seccomp test on x86 is done first,
+before the syscall entry trap.
