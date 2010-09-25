@@ -1,45 +1,42 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 25 Sep 2010 18:42:33 +0300
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-Message-ID: <AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 25 Sep 2010 12:31:07 -0400 (EDT)
+Subject: [PATCH] ARM: SECCOMP support
+In-Reply-To: <20100925113413.GA3044@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1009231709230.13233@xanadu.home>
+	<20100925113413.GA3044@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1009251220420.13233@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 24, 2010 at 6:17 PM, Premi, Sanjeev <premi@ti.com> wrote:
->> On Fri, Sep 24, 2010 at 4:50 AM, Tony Lindgren
->> <tony@atomide.com> wrote:
->> > From: Yogesh Marathe <yogesh_marathe@ti.com>
->> >
->> > The definition of "iva2" device in iommu_device
->> > is wrapped inside CONFIG_MPU_BRIDGE_IOMMU, but
->> > this option is not defined in KConfig.
->> >
->> > This patch removes the wrapper and makes "iva2"
->> > available as another iommu_device.
->>
->> NAK.
->>
->> This would break tidspbridge's MMU. This was discussed before:
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/58302/focus=58305
->>
->> When tidspbridge has migrated to iommu, then it should define
->> CONFIG_MPU_BRIDGE_IOMMU.
->
-> ?Can you go through earlier discussion on this patch
-> ?http://marc.info/?l=linux-omap&m=127979007623260&w=2
->
-> ?I believe these concerns were discussed. I am unable to
-> ?open the gmane thread (getting 504) - so can't be sure
-> ?if Hiroshi had referred to same discussion.
+On Sat, 25 Sep 2010, Russell King - ARM Linux wrote:
 
-When you merge iommu support, then either you enable
-CONFIG_MPU_BRIDGE_IOMMU unconditionally, or you apply this patch, but
-this patch alone will only break things.
+> On Thu, Sep 23, 2010 at 05:11:36PM -0400, Nicolas Pitre wrote:
+> > diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> > index f05a35a..cdd0a88 100644
+> > --- a/arch/arm/kernel/entry-common.S
+> > +++ b/arch/arm/kernel/entry-common.S
+> > @@ -314,6 +314,16 @@ ENTRY(vector_swi)
+> >  	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
+> >  	bne	__sys_trace
+> >  
+> > +#ifdef CONFIG_SECCOMP
+> > +	tst	ip, #_TIF_SECCOMP
+> > +	beq	1f
+> > +	mov	r0, scno
+> > +	bl	__secure_computing	
+> > +	add	r0, sp, #S_R0 + S_OFF		@ pointer to regs
+> > +	ldmia	r0, {r0 - r3}			@ have to reload r0 - r3
+> > +1:
+> > +#endif
+> 
+> Why not do this before the test for TIF_SYSCALL_TRACE?  You're doing
+> the same check in both paths, and x86 checks for secure computing
+> before any syscall tracing stuff.
 
--- 
-Felipe Contreras
+Well, for one thing, the syscall tracing has the ability to change the 
+actual syscall number.  So this looked like a possible hole that could 
+somehow be exploited to escape the seccomp control.  So I went with the 
+safest way.
+
+
+Nicolas
