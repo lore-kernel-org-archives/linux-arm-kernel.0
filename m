@@ -1,201 +1,212 @@
-From: chlrbgh0@gmail.com (Kyuho Choi)
-Date: Mon, 27 Sep 2010 01:32:33 +0900
-Subject: [PATCH] ARM: S5PV210: Add Torbreck board support
-Message-ID: <1285518753-30722-1-git-send-email-chlrbgh0@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 27 Sep 2010 00:17:48 +0300
+Subject: [PATCH v3 1/3] rx1950: add battery device
+In-Reply-To: <4C9E8A69.8020000@simtec.co.uk>
+References: <4C9E8A69.8020000@simtec.co.uk>
+Message-ID: <1285535868-14108-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds to support Torbreck board of aESOP community using
-Samsung S5PV210 SoC.
+This patch adds registration of appropriate device for
+s3c-adc-battery driver, so battery monitoring and charging are
+available on RX1950 PDA now.
 
-Signed-off-by: Kyuho Choi <chlrbgh0@gmail.com>
-Signed-off-by: Hyunchul Ko <ghcstop@gmail.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-s5pv210/Kconfig         |   18 +++++
- arch/arm/mach-s5pv210/Makefile        |    1 +
- arch/arm/mach-s5pv210/mach-torbreck.c |  133 +++++++++++++++++++++++++++++++++
- 3 files changed, 152 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/mach-torbreck.c
+v2: don't force usage of battery driver,
+use named initialisers in LUTs.
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index d3a3895..c5ec466 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -139,6 +139,24 @@ config MACH_SMDKV210
- 	help
- 	  Machine support for Samsung SMDKV210
+v3: add comment to patch, make LUTs look tiny again.
+
+ arch/arm/mach-s3c2440/mach-rx1950.c |  160 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 160 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
+index 142d1f9..a4d8c15 100644
+--- a/arch/arm/mach-s3c2440/mach-rx1950.c
++++ b/arch/arm/mach-s3c2440/mach-rx1950.c
+@@ -25,8 +25,10 @@
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/sysdev.h>
++#include <linux/pda_power.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/pwm.h>
++#include <linux/s3c_adc_battery.h>
  
-+config MACH_TORBRECK
-+	bool "Torbreck"
-+	select CPU_S5PV210
-+	select ARCH_SPARSEMEM_ENABLE
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C_DEV_HSMMC2
-+	select S3C_DEV_HSMMC3
-+	select S3C_DEV_I2C1
-+	select S3C_DEV_I2C2
-+	select S3C_DEV_RTC
-+	select S3C_DEV_WDT
-+	select S5PV210_SETUP_I2C1
-+	select S5PV210_SETUP_I2C2
-+	select S5PV210_SETUP_SDHCI
-+	help
-+	  Machine support for aESOP Torbreck
-+
- endmenu
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -127,6 +129,162 @@ static struct s3c2410fb_display rx1950_display = {
  
- endif
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index 05048c5..927c2b7 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_MACH_AQUILA)	+= mach-aquila.o
- obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
- obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
- obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
-+obj-$(CONFIG_MACH_TORBRECK)	+= mach-torbreck.o
+ };
  
- # device support
- 
-diff --git a/arch/arm/mach-s5pv210/mach-torbreck.c b/arch/arm/mach-s5pv210/mach-torbreck.c
-new file mode 100644
-index 0000000..3142250
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/mach-torbreck.c
-@@ -0,0 +1,133 @@
-+/* linux/arch/arm/mach-s5pv210/mach-torbreck.c
-+ *
-+ * Copyright (c) 2010 aESOP Community
-+ *		http://www.aesop.or.kr/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++static int power_supply_init(struct device *dev)
++{
++	return gpio_request(S3C2410_GPF(2), "cable plugged");
++}
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/i2c.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
++static int rx1950_is_ac_online(void)
++{
++	return !gpio_get_value(S3C2410_GPF(2));
++}
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
++static void power_supply_exit(struct device *dev)
++{
++	gpio_free(S3C2410_GPF(2));
++}
 +
-+#include <mach/map.h>
-+#include <mach/regs-clock.h>
++static char *rx1950_supplicants[] = {
++	"main-battery"
++};
 +
-+#include <plat/regs-serial.h>
-+#include <plat/s5pv210.h>
-+#include <plat/devs.h>
-+#include <plat/cpu.h>
-+#include <plat/iic.h>
++static struct pda_power_pdata power_supply_info = {
++	.init			= power_supply_init,
++	.is_ac_online		= rx1950_is_ac_online,
++	.exit			= power_supply_exit,
++	.supplied_to		= rx1950_supplicants,
++	.num_supplicants	= ARRAY_SIZE(rx1950_supplicants),
++};
 +
-+/* Following are default values for UCON, ULCON and UFCON UART registers */
-+#define TORBRECK_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				 S3C2410_UCON_RXILEVEL |	\
-+				 S3C2410_UCON_TXIRQMODE |	\
-+				 S3C2410_UCON_RXIRQMODE |	\
-+				 S3C2410_UCON_RXFIFO_TOI |	\
-+				 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define TORBRECK_ULCON_DEFAULT	S3C2410_LCON_CS8
-+
-+#define TORBRECK_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				 S5PV210_UFCON_TXTRIG4 |	\
-+				 S5PV210_UFCON_RXTRIG4)
-+
-+static struct s3c2410_uartcfg torbreck_uartcfgs[] __initdata = {
++static struct resource power_supply_resources[] = {
 +	[0] = {
-+		.hwport		= 0,
-+		.flags		= 0,
-+		.ucon		= TORBRECK_UCON_DEFAULT,
-+		.ulcon		= TORBRECK_ULCON_DEFAULT,
-+		.ufcon		= TORBRECK_UFCON_DEFAULT,
-+	},
-+	[1] = {
-+		.hwport		= 1,
-+		.flags		= 0,
-+		.ucon		= TORBRECK_UCON_DEFAULT,
-+		.ulcon		= TORBRECK_ULCON_DEFAULT,
-+		.ufcon		= TORBRECK_UFCON_DEFAULT,
-+	},
-+	[2] = {
-+		.hwport		= 2,
-+		.flags		= 0,
-+		.ucon		= TORBRECK_UCON_DEFAULT,
-+		.ulcon		= TORBRECK_ULCON_DEFAULT,
-+		.ufcon		= TORBRECK_UFCON_DEFAULT,
-+	},
-+	[3] = {
-+		.hwport		= 3,
-+		.flags		= 0,
-+		.ucon		= TORBRECK_UCON_DEFAULT,
-+		.ulcon		= TORBRECK_ULCON_DEFAULT,
-+		.ufcon		= TORBRECK_UFCON_DEFAULT,
++			.name	= "ac",
++			.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE |
++					  IORESOURCE_IRQ_HIGHEDGE,
++			.start	= IRQ_EINT2,
++			.end	= IRQ_EINT2,
 +	},
 +};
 +
-+static struct platform_device *torbreck_devices[] __initdata = {
-+	&s5pv210_device_iis0,
-+	&s3c_device_cfcon,
-+	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc1,
-+	&s3c_device_hsmmc2,
-+	&s3c_device_hsmmc3,
-+	&s3c_device_i2c0,
-+	&s3c_device_i2c1,
-+	&s3c_device_i2c2,
-+	&s3c_device_rtc,
-+	&s3c_device_wdt,
++static struct platform_device power_supply = {
++	.name			= "pda-power",
++	.id			= -1,
++	.dev			= {
++					.platform_data =
++						&power_supply_info,
++	},
++	.resource		= power_supply_resources,
++	.num_resources		= ARRAY_SIZE(power_supply_resources),
 +};
 +
-+static struct i2c_board_info torbreck_i2c_devs0[] __initdata = {
-+	/* To Be Updated */
++static const struct s3c_adc_bat_thresh bat_lut_noac[] = {
++	{ .volt = 4100, .cur = 156, .level = 100},
++	{ .volt = 4050, .cur = 156, .level = 95},
++	{ .volt = 4025, .cur = 141, .level = 90},
++	{ .volt = 3995, .cur = 144, .level = 85},
++	{ .volt = 3957, .cur = 162, .level = 80},
++	{ .volt = 3931, .cur = 147, .level = 75},
++	{ .volt = 3902, .cur = 147, .level = 70},
++	{ .volt = 3863, .cur = 153, .level = 65},
++	{ .volt = 3838, .cur = 150, .level = 60},
++	{ .volt = 3800, .cur = 153, .level = 55},
++	{ .volt = 3765, .cur = 153, .level = 50},
++	{ .volt = 3748, .cur = 172, .level = 45},
++	{ .volt = 3740, .cur = 153, .level = 40},
++	{ .volt = 3714, .cur = 175, .level = 35},
++	{ .volt = 3710, .cur = 156, .level = 30},
++	{ .volt = 3963, .cur = 156, .level = 25},
++	{ .volt = 3672, .cur = 178, .level = 20},
++	{ .volt = 3651, .cur = 178, .level = 15},
++	{ .volt = 3629, .cur = 178, .level = 10},
++	{ .volt = 3612, .cur = 162, .level = 5},
++	{ .volt = 3605, .cur = 162, .level = 0},
 +};
 +
-+static struct i2c_board_info torbreck_i2c_devs1[] __initdata = {
-+	/* To Be Updated */
++static const struct s3c_adc_bat_thresh bat_lut_acin[] = {
++	{ .volt = 4200, .cur = 0, .level = 100},
++	{ .volt = 4190, .cur = 0, .level = 99},
++	{ .volt = 4178, .cur = 0, .level = 95},
++	{ .volt = 4110, .cur = 0, .level = 70},
++	{ .volt = 4076, .cur = 0, .level = 65},
++	{ .volt = 4046, .cur = 0, .level = 60},
++	{ .volt = 4021, .cur = 0, .level = 55},
++	{ .volt = 3999, .cur = 0, .level = 50},
++	{ .volt = 3982, .cur = 0, .level = 45},
++	{ .volt = 3965, .cur = 0, .level = 40},
++	{ .volt = 3957, .cur = 0, .level = 35},
++	{ .volt = 3948, .cur = 0, .level = 30},
++	{ .volt = 3936, .cur = 0, .level = 25},
++	{ .volt = 3927, .cur = 0, .level = 20},
++	{ .volt = 3906, .cur = 0, .level = 15},
++	{ .volt = 3880, .cur = 0, .level = 10},
++	{ .volt = 3829, .cur = 0, .level = 5},
++	{ .volt = 3820, .cur = 0, .level = 0},
 +};
 +
-+static struct i2c_board_info torbreck_i2c_devs2[] __initdata = {
-+	/* To Be Updated */
-+};
-+
-+static void __init torbreck_map_io(void)
++int rx1950_bat_init(void)
 +{
-+	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-+	s3c24xx_init_clocks(24000000);
-+	s3c24xx_init_uarts(torbreck_uartcfgs, ARRAY_SIZE(torbreck_uartcfgs));
++	int ret;
++
++	ret = gpio_request(S3C2410_GPJ(2), "rx1950-charger-enable-1");
++	if (ret)
++		goto err_gpio1;
++	ret = gpio_request(S3C2410_GPJ(3), "rx1950-charger-enable-2");
++	if (ret)
++		goto err_gpio2;
++
++	return 0;
++
++err_gpio2:
++	gpio_free(S3C2410_GPJ(2));
++err_gpio1:
++	return ret;
 +}
 +
-+static void __init torbreck_machine_init(void)
++void rx1950_bat_exit(void)
 +{
-+	s3c_i2c0_set_platdata(NULL);
-+	s3c_i2c1_set_platdata(NULL);
-+	s3c_i2c2_set_platdata(NULL);
-+	i2c_register_board_info(0, torbreck_i2c_devs0,
-+			ARRAY_SIZE(torbreck_i2c_devs0));
-+	i2c_register_board_info(1, torbreck_i2c_devs1,
-+			ARRAY_SIZE(torbreck_i2c_devs1));
-+	i2c_register_board_info(2, torbreck_i2c_devs2,
-+			ARRAY_SIZE(torbreck_i2c_devs2));
-+
-+	platform_add_devices(torbreck_devices, ARRAY_SIZE(torbreck_devices));
++	gpio_free(S3C2410_GPJ(2));
++	gpio_free(S3C2410_GPJ(3));
 +}
 +
-+MACHINE_START(TORBRECK, "TORBRECK")
-+	/* Maintainer: Hyunchul Ko <ghcstop@gmail.com> */
-+	.phys_io	= S3C_PA_UART & 0xfff00000,
-+	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-+	.boot_params	= S5P_PA_SDRAM + 0x100,
-+	.init_irq	= s5pv210_init_irq,
-+	.map_io		= torbreck_map_io,
-+	.init_machine	= torbreck_machine_init,
-+	.timer		= &s3c24xx_timer,
-+MACHINE_END
++void rx1950_enable_charger(void)
++{
++	gpio_direction_output(S3C2410_GPJ(2), 1);
++	gpio_direction_output(S3C2410_GPJ(3), 1);
++}
++
++void rx1950_disable_charger(void)
++{
++	gpio_direction_output(S3C2410_GPJ(2), 0);
++	gpio_direction_output(S3C2410_GPJ(3), 0);
++}
++
++static struct s3c_adc_bat_pdata rx1950_bat_cfg = {
++	.init = rx1950_bat_init,
++	.exit = rx1950_bat_exit,
++	.enable_charger = rx1950_enable_charger,
++	.disable_charger = rx1950_disable_charger,
++	.gpio_charge_finished = S3C2410_GPF(3),
++	.lut_noac = bat_lut_noac,
++	.lut_noac_cnt = ARRAY_SIZE(bat_lut_noac),
++	.lut_acin = bat_lut_acin,
++	.lut_acin_cnt = ARRAY_SIZE(bat_lut_acin),
++	.volt_channel = 0,
++	.current_channel = 1,
++	.volt_mult = 4235,
++	.current_mult = 2900,
++	.internal_impedance = 200,
++};
++
++static struct platform_device rx1950_battery = {
++	.name             = "s3c-adc-battery",
++	.id               = -1,
++	.dev = {
++		.parent = &s3c_device_adc.dev,
++		.platform_data = &rx1950_bat_cfg,
++	},
++};
++
+ static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
+ 	.displays = &rx1950_display,
+ 	.num_displays = 1,
+@@ -503,6 +661,8 @@ static struct platform_device *rx1950_devices[] __initdata = {
+ 	&s3c_device_timer[1],
+ 	&rx1950_backlight,
+ 	&rx1950_device_gpiokeys,
++	&power_supply,
++	&rx1950_battery,
+ };
+ 
+ static struct clk *rx1950_clocks[] __initdata = {
 -- 
-1.5.6.3
+1.7.3
