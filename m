@@ -1,212 +1,88 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 27 Sep 2010 00:17:48 +0300
-Subject: [PATCH v3 1/3] rx1950: add battery device
-In-Reply-To: <4C9E8A69.8020000@simtec.co.uk>
-References: <4C9E8A69.8020000@simtec.co.uk>
-Message-ID: <1285535868-14108-1-git-send-email-anarsoul@gmail.com>
+Date: Mon, 27 Sep 2010 00:27:41 +0300
+Subject: [PATCH v2 3/5] h1940: implement mmc_power function
+In-Reply-To: <4C9E8916.3010904@fluff.org>
+References: <4C9E8916.3010904@fluff.org>
+Message-ID: <1285536461-15049-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds registration of appropriate device for
-s3c-adc-battery driver, so battery monitoring and charging are
-available on RX1950 PDA now.
+This patch implements h1940-specific set_power callback for
+s3cmci driver, so card power can be disabled when card is not inserted
+or before suspend. Without this patch PDA consumes power in suspend when
+card is inserted.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
-v2: don't force usage of battery driver,
-use named initialisers in LUTs.
+v2: Add description to patch
 
-v3: add comment to patch, make LUTs look tiny again.
+ arch/arm/mach-s3c2410/include/mach/h1940-latch.h |    2 +-
+ arch/arm/mach-s3c2410/mach-h1940.c               |   23 +++++++++++++++++++--
+ 2 files changed, 21 insertions(+), 4 deletions(-)
 
- arch/arm/mach-s3c2440/mach-rx1950.c |  160 +++++++++++++++++++++++++++++++++++
- 1 files changed, 160 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s3c2440/mach-rx1950.c b/arch/arm/mach-s3c2440/mach-rx1950.c
-index 142d1f9..a4d8c15 100644
---- a/arch/arm/mach-s3c2440/mach-rx1950.c
-+++ b/arch/arm/mach-s3c2440/mach-rx1950.c
-@@ -25,8 +25,10 @@
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
- #include <linux/sysdev.h>
-+#include <linux/pda_power.h>
- #include <linux/pwm_backlight.h>
- #include <linux/pwm.h>
-+#include <linux/s3c_adc_battery.h>
+diff --git a/arch/arm/mach-s3c2410/include/mach/h1940-latch.h b/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
+index 73586f2..ef7d8cf 100644
+--- a/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
++++ b/arch/arm/mach-s3c2410/include/mach/h1940-latch.h
+@@ -35,7 +35,7 @@
+ #define H1940_LATCH_AUDIO_POWER		H1940_LATCH_GPIO(9)
+ #define H1940_LATCH_SM803_ENABLE	H1940_LATCH_GPIO(10)
+ #define H1940_LATCH_LCD_P4		H1940_LATCH_GPIO(11)
+-#define H1940_LATCH_CPUQ5		H1940_LATCH_GPIO(12)
++#define H1940_LATCH_SD_POWER		H1940_LATCH_GPIO(12)
+ #define H1940_LATCH_BLUETOOTH_POWER	H1940_LATCH_GPIO(13)
+ #define H1940_LATCH_LED_GREEN		H1940_LATCH_GPIO(14)
+ #define H1940_LATCH_LED_FLASH		H1940_LATCH_GPIO(15)
+diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
+index f0493bd..cc8660e 100644
+--- a/arch/arm/mach-s3c2410/mach-h1940.c
++++ b/arch/arm/mach-s3c2410/mach-h1940.c
+@@ -112,8 +112,7 @@ static unsigned int latch_state = H1940_LATCH_BIT(H1940_LATCH_LCD_P4) |
+ 	H1940_LATCH_BIT(H1940_LATCH_LCD_P1)			|
+ 	H1940_LATCH_BIT(H1940_LATCH_LCD_P2)			|
+ 	H1940_LATCH_BIT(H1940_LATCH_LCD_P3)			|
+-	H1940_LATCH_BIT(H1940_LATCH_MAX1698_nSHUTDOWN)   |
+-	H1940_LATCH_BIT(H1940_LATCH_CPUQ5);
++	H1940_LATCH_BIT(H1940_LATCH_MAX1698_nSHUTDOWN);
  
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -127,6 +129,162 @@ static struct s3c2410fb_display rx1950_display = {
- 
+ static void h1940_latch_control(unsigned int clear, unsigned int set)
+ {
+@@ -247,10 +246,25 @@ static struct platform_device h1940_device_bluetooth = {
+ 	.id               = -1,
  };
  
-+static int power_supply_init(struct device *dev)
++static void h1940_set_mmc_power(unsigned char power_mode, unsigned short vdd)
 +{
-+	return gpio_request(S3C2410_GPF(2), "cable plugged");
++	switch (power_mode) {
++	case MMC_POWER_OFF:
++		gpio_set_value(H1940_LATCH_SD_POWER, 0);
++		break;
++	case MMC_POWER_UP:
++	case MMC_POWER_ON:
++		gpio_set_value(H1940_LATCH_SD_POWER, 1);
++		break;
++	default:
++		break;
++	};
 +}
 +
-+static int rx1950_is_ac_online(void)
-+{
-+	return !gpio_get_value(S3C2410_GPF(2));
-+}
-+
-+static void power_supply_exit(struct device *dev)
-+{
-+	gpio_free(S3C2410_GPF(2));
-+}
-+
-+static char *rx1950_supplicants[] = {
-+	"main-battery"
-+};
-+
-+static struct pda_power_pdata power_supply_info = {
-+	.init			= power_supply_init,
-+	.is_ac_online		= rx1950_is_ac_online,
-+	.exit			= power_supply_exit,
-+	.supplied_to		= rx1950_supplicants,
-+	.num_supplicants	= ARRAY_SIZE(rx1950_supplicants),
-+};
-+
-+static struct resource power_supply_resources[] = {
-+	[0] = {
-+			.name	= "ac",
-+			.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE |
-+					  IORESOURCE_IRQ_HIGHEDGE,
-+			.start	= IRQ_EINT2,
-+			.end	= IRQ_EINT2,
-+	},
-+};
-+
-+static struct platform_device power_supply = {
-+	.name			= "pda-power",
-+	.id			= -1,
-+	.dev			= {
-+					.platform_data =
-+						&power_supply_info,
-+	},
-+	.resource		= power_supply_resources,
-+	.num_resources		= ARRAY_SIZE(power_supply_resources),
-+};
-+
-+static const struct s3c_adc_bat_thresh bat_lut_noac[] = {
-+	{ .volt = 4100, .cur = 156, .level = 100},
-+	{ .volt = 4050, .cur = 156, .level = 95},
-+	{ .volt = 4025, .cur = 141, .level = 90},
-+	{ .volt = 3995, .cur = 144, .level = 85},
-+	{ .volt = 3957, .cur = 162, .level = 80},
-+	{ .volt = 3931, .cur = 147, .level = 75},
-+	{ .volt = 3902, .cur = 147, .level = 70},
-+	{ .volt = 3863, .cur = 153, .level = 65},
-+	{ .volt = 3838, .cur = 150, .level = 60},
-+	{ .volt = 3800, .cur = 153, .level = 55},
-+	{ .volt = 3765, .cur = 153, .level = 50},
-+	{ .volt = 3748, .cur = 172, .level = 45},
-+	{ .volt = 3740, .cur = 153, .level = 40},
-+	{ .volt = 3714, .cur = 175, .level = 35},
-+	{ .volt = 3710, .cur = 156, .level = 30},
-+	{ .volt = 3963, .cur = 156, .level = 25},
-+	{ .volt = 3672, .cur = 178, .level = 20},
-+	{ .volt = 3651, .cur = 178, .level = 15},
-+	{ .volt = 3629, .cur = 178, .level = 10},
-+	{ .volt = 3612, .cur = 162, .level = 5},
-+	{ .volt = 3605, .cur = 162, .level = 0},
-+};
-+
-+static const struct s3c_adc_bat_thresh bat_lut_acin[] = {
-+	{ .volt = 4200, .cur = 0, .level = 100},
-+	{ .volt = 4190, .cur = 0, .level = 99},
-+	{ .volt = 4178, .cur = 0, .level = 95},
-+	{ .volt = 4110, .cur = 0, .level = 70},
-+	{ .volt = 4076, .cur = 0, .level = 65},
-+	{ .volt = 4046, .cur = 0, .level = 60},
-+	{ .volt = 4021, .cur = 0, .level = 55},
-+	{ .volt = 3999, .cur = 0, .level = 50},
-+	{ .volt = 3982, .cur = 0, .level = 45},
-+	{ .volt = 3965, .cur = 0, .level = 40},
-+	{ .volt = 3957, .cur = 0, .level = 35},
-+	{ .volt = 3948, .cur = 0, .level = 30},
-+	{ .volt = 3936, .cur = 0, .level = 25},
-+	{ .volt = 3927, .cur = 0, .level = 20},
-+	{ .volt = 3906, .cur = 0, .level = 15},
-+	{ .volt = 3880, .cur = 0, .level = 10},
-+	{ .volt = 3829, .cur = 0, .level = 5},
-+	{ .volt = 3820, .cur = 0, .level = 0},
-+};
-+
-+int rx1950_bat_init(void)
-+{
-+	int ret;
-+
-+	ret = gpio_request(S3C2410_GPJ(2), "rx1950-charger-enable-1");
-+	if (ret)
-+		goto err_gpio1;
-+	ret = gpio_request(S3C2410_GPJ(3), "rx1950-charger-enable-2");
-+	if (ret)
-+		goto err_gpio2;
-+
-+	return 0;
-+
-+err_gpio2:
-+	gpio_free(S3C2410_GPJ(2));
-+err_gpio1:
-+	return ret;
-+}
-+
-+void rx1950_bat_exit(void)
-+{
-+	gpio_free(S3C2410_GPJ(2));
-+	gpio_free(S3C2410_GPJ(3));
-+}
-+
-+void rx1950_enable_charger(void)
-+{
-+	gpio_direction_output(S3C2410_GPJ(2), 1);
-+	gpio_direction_output(S3C2410_GPJ(3), 1);
-+}
-+
-+void rx1950_disable_charger(void)
-+{
-+	gpio_direction_output(S3C2410_GPJ(2), 0);
-+	gpio_direction_output(S3C2410_GPJ(3), 0);
-+}
-+
-+static struct s3c_adc_bat_pdata rx1950_bat_cfg = {
-+	.init = rx1950_bat_init,
-+	.exit = rx1950_bat_exit,
-+	.enable_charger = rx1950_enable_charger,
-+	.disable_charger = rx1950_disable_charger,
-+	.gpio_charge_finished = S3C2410_GPF(3),
-+	.lut_noac = bat_lut_noac,
-+	.lut_noac_cnt = ARRAY_SIZE(bat_lut_noac),
-+	.lut_acin = bat_lut_acin,
-+	.lut_acin_cnt = ARRAY_SIZE(bat_lut_acin),
-+	.volt_channel = 0,
-+	.current_channel = 1,
-+	.volt_mult = 4235,
-+	.current_mult = 2900,
-+	.internal_impedance = 200,
-+};
-+
-+static struct platform_device rx1950_battery = {
-+	.name             = "s3c-adc-battery",
-+	.id               = -1,
-+	.dev = {
-+		.parent = &s3c_device_adc.dev,
-+		.platform_data = &rx1950_bat_cfg,
-+	},
-+};
-+
- static struct s3c2410fb_mach_info rx1950_lcd_cfg = {
- 	.displays = &rx1950_display,
- 	.num_displays = 1,
-@@ -503,6 +661,8 @@ static struct platform_device *rx1950_devices[] __initdata = {
- 	&s3c_device_timer[1],
- 	&rx1950_backlight,
- 	&rx1950_device_gpiokeys,
-+	&power_supply,
-+	&rx1950_battery,
+ static struct s3c24xx_mci_pdata h1940_mmc_cfg __initdata = {
+ 	.gpio_detect   = S3C2410_GPF(5),
+ 	.gpio_wprotect = S3C2410_GPH(8),
+-	.set_power     = NULL,
++	.set_power     = h1940_set_mmc_power,
+ 	.ocr_avail     = MMC_VDD_32_33,
  };
  
- static struct clk *rx1950_clocks[] __initdata = {
+@@ -397,6 +411,9 @@ static void __init h1940_init(void)
+ 	gpio_request(H1940_LATCH_USB_DP, "USB pullup");
+ 	gpio_direction_output(H1940_LATCH_USB_DP, 0);
+ 
++	gpio_request(H1940_LATCH_SD_POWER, "SD power");
++	gpio_direction_output(H1940_LATCH_SD_POWER, 0);
++
+ 	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
+ }
+ 
 -- 
 1.7.3
