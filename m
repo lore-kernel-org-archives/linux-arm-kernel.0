@@ -1,132 +1,123 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 26 Sep 2010 20:45:14 +0800
-Subject: [PATCH 1/1] ARM: mmp: update cpuid of pxa168 and pxa910
-In-Reply-To: <1285485793-10738-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1285485793-10738-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTik3RgQWJw1AVD4UXa64c2Edui3aFXeZyHcWvNOU@mail.gmail.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Sun, 26 Sep 2010 22:32:47 +0800
+Subject: pxa3xx_nand issues
+In-Reply-To: <201009231729.48147.pieterg@gmx.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<AANLkTikdru5gH=ySKw13CzrDwbhNCArgQqjcE2cydB4L@mail.gmail.com>
+	<201009231332.26566.pieterg@gmx.com>
+	<201009231729.48147.pieterg@gmx.com>
+Message-ID: <AANLkTik47Q48EbjFz9eak0vF1AstWv_sgB+BPQtDWEVF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 26, 2010 at 3:23 PM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> Correct the cpuid of pxa168 and pxa910.
+On Thu, Sep 23, 2010 at 11:29 PM, pieterg <pieterg@gmx.com> wrote:
+> On Thursday 23 September 2010 13:32:26 pieterg wrote:
+>> On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
+>> > On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
+>> > > In my search for the cause of the huge number of single/double bit
+>> > > errors I'm experiencing on colibri pxa320/310 devices, I've come
+>> > > across this commit
+>> > >
+> http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a=commit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
+>> > > According to the commitlog, it attempts to work around an issue
+>> > > regarding non-page-aligned reads.
+>> > > The workaround seems to force page-aligned access, by dropping the
+>> > > offset within the page (column address bytes).
+>> > > However, in my setup (with a jffs2 filesystem on nand),
+>> > > non-page-aligned reads never occur, but non-page-aligned writes occur
+>> > > very frequently. (during the jffs2 gc).
+>> > > These are also affected by this commit, while the commitlog does not
+>> > > state whether or not the same issue would occur for the program
+>> > > command, and in that case, whether or not the same workaround would
+>> > > apply.
+>> > >
+>> > > I've tried to revert the commit, but unfortunately this doesn't
+>> > > reduce the huge number of single/double bit errors (and jffs2 crc
+>> > > errors as a result) I'm getting.
+>> > >
+>> > > But having these non-aligned writes during GC, would that indicate a
+>> > > problem with my jffs2 image parameters perhaps?
+>> > > (though I cannot imagine this could actually cause double bit errors)
+>> >
+>> > It might not be related to the commit above. ?The NAND controller will
+>> > always read the whole page and ignoring the column address, that patch
+>> > tries to make less confusion. The offset is actually handled completely
+>> > by software (memorized).
+>>
+>> I can see how the read offset works, but I do not quite see how this
+>> would work for writes (which call the same prepare_read_prog_cmd, and
+>> have their column address stripped as well).
+>> Found out that this happens when writing oob data by the way; these are
+>> writes with offset 2048 within the page. Jffs2 does this when writing
+>> cleanmarkers.
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> ---
-> ?arch/arm/mach-mmp/common.c ? ? ? ? ? ? ? | ? ?7 ++++
-> ?arch/arm/mach-mmp/include/mach/cputype.h | ? 50 +++++++++++++++++++----------
-> ?2 files changed, 40 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/common.c b/arch/arm/mach-mmp/common.c
-> index 3b29fa7..9993a56 100644
-> --- a/arch/arm/mach-mmp/common.c
-> +++ b/arch/arm/mach-mmp/common.c
-> @@ -14,9 +14,14 @@
-> ?#include <asm/page.h>
-> ?#include <asm/mach/map.h>
-> ?#include <mach/addr-map.h>
-> +#include <mach/cputype.h>
->
-> ?#include "common.h"
->
-> +#define MMP_CHIPID ? ? (AXI_VIRT_BASE + 0x82c00)
-> +
-> +unsigned int mmp_chip_id;
-> +
+> Tested this, and found out that this commit is actually quite essential for
+> writes as well.
+> Without it, the OOB data doesn't get written.
+> So we can close this part of the topic, commit 7f9938d0 is perfectly fine.
 
-This should be EXPORT_SYMBOL()'ed, otherwise cpu_is_* macros()
-won't work in modules. The compiler warning was due to missing of
-declaration of EXPORT_SYMBOL(), #include <linux/module.h> will solve
-this. I've updated my local commit for this.
+PXA3xx NAND controller write semantic is to send whole page of data to
+the NAND flash with
+the page's address. If you set the ndcr1 not page align value, it is
+also fine by pxa3xx_nand
+sending the data to the flash, but nand flash would not accept this
+kind of behavior as
+it is defined in its spec.
 
-Thanks for testing.
+Certainly, if you really need to do this, there is still has ways. :)
+Send the RANDOM DATA INPUT command (0x80 + 5cycle address + 0x85 +
+2cycles column address) + 0x10 would serve this.
+But seems the pxa310 cannot do such job, which is supported by newer
+silicon in pxa168 or mmp2.
 
-> ?static struct map_desc standard_io_desc[] __initdata = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(APB_PHYS_BASE),
-> @@ -34,4 +39,6 @@ static struct map_desc standard_io_desc[] __initdata = {
-> ?void __init mmp_map_io(void)
-> ?{
-> ? ? ? ?iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
-> +
-> + ? ? ? mmp_chip_id = __raw_readl(MMP_CHIPID);
-> ?}
-> diff --git a/arch/arm/mach-mmp/include/mach/cputype.h b/arch/arm/mach-mmp/include/mach/cputype.h
-> index 83b1872..cc63615 100644
-> --- a/arch/arm/mach-mmp/include/mach/cputype.h
-> +++ b/arch/arm/mach-mmp/include/mach/cputype.h
-> @@ -4,36 +4,52 @@
-> ?#include <asm/cputype.h>
 >
-> ?/*
-> - * ?CPU ? Stepping ? OLD_ID ? ? ? CPU_ID ? ? ?CHIP_ID
-> + * ?CPU ? Stepping ? CPU_ID ? ? ?CHIP_ID
-> ?*
-> - * PXA168 ? ?A0 ? ?0x41159263 ? 0x56158400 ? 0x00A0A333
-> - * PXA910 ? ?Y0 ? ?0x41159262 ? 0x56158000 ? 0x00F0C910
-> - * MMP2 ? ? ? ? ? ? Z0 ? ? ? ? ? ? ? ? 0x560f5811
-> + * PXA168 ? ?S0 ? ?0x56158400 ? 0x0000C910
-> + * PXA168 ? ?A0 ? ?0x56158400 ? 0x00A0A168
-> + * PXA910 ? ?Y1 ? ?0x56158400 ? 0x00F2C920
-> + * PXA910 ? ?A0 ? ?0x56158400 ? 0x00F2C910
-> + * PXA910 ? ?A1 ? ?0x56158400 ? 0x00A0C910
-> + * PXA920 ? ?Y0 ? ?0x56158400 ? 0x00F2C920
-> + * PXA920 ? ?A0 ? ?0x56158400 ? 0x00A0C920
-> + * PXA920 ? ?A1 ? ?0x56158400 ? 0x00A1C920
-> + * MMP2 ? ? ? ? ? ? Z0 ? ?0x560f5811 ? 0x00F00410
-> + * MMP2 ? ? ?Z1 ? ?0x560f5811 ? 0x00E00410
-> + * MMP2 ? ? ?A0 ? ?0x560f5811 ? 0x00A0A610
-> ?*/
+>> I could identify about 10 eraseblocks with pages which produce
+>> single/double bit errors.
+>> After I marked them bad (manually), I've seen no more bit errors, and the
+>> jffs2 rootfs has remained perfectly healthy.
 >
-> +extern unsigned int mmp_chip_id;
-> +
-> ?#ifdef CONFIG_CPU_PXA168
-> -# ?define __cpu_is_pxa168(id) ?\
-> - ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x84; })
-> +static inline int cpu_is_pxa168(void)
-> +{
-> + ? ? ? return (((read_cpuid_id() >> 8) & 0xff) == 0x84)
-> + ? ? ? ? ? ? ? && ((mmp_chip_id & 0xfff) == 0x168);
-> +}
-> ?#else
-> -# ?define __cpu_is_pxa168(id) ?(0)
-> +#define cpu_is_pxa168() ? ? ? ?(0)
-> ?#endif
+> Turned out to be a short-term solution.
+> After a while I got more double-bit errors, and ended up bad-marking a dozen
+> or so other eraseblocks, and it does not seem to stop.
 >
-> +/* cpu_is_pxa910() is shared on both pxa910 and pxa920 */
-> ?#ifdef CONFIG_CPU_PXA910
-> -# ?define __cpu_is_pxa910(id) ?\
-> - ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x80; })
-> +static inline int cpu_is_pxa910(void)
-> +{
-> + ? ? ? return (((read_cpuid_id() >> 8) & 0xff) == 0x84)
-> + ? ? ? ? ? ? ? && (((mmp_chip_id & 0xfff) == 0x910)
-> + ? ? ? ? ? ? ? || ((mmp_chip_id & 0xfff) == 0x920));
-> +}
-> ?#else
-> -# ?define __cpu_is_pxa910(id) ?(0)
-> +#define cpu_is_pxa910() ? ? ? ?(0)
-> ?#endif
+> Strangest thing is that when I write a new jffs2 image with uboot (nand
+> erase, nand write) or with the kernel (flash_eraseall, nandwrite), it never
+> contains any biterrors when I mount it.
+> Only after the filesystem has been mounted, gets modified, and then after
+> the first reboot, the biterrors are there.
+
+You may notice that when a new file system is mounted, the flash is
+only read by controller.
+This mean your uboot is all right for writing, and your kernel is also
+ok for reading.
+While your driver write function may got broken. Timing? Not so sure...
+
 >
-> ?#ifdef CONFIG_CPU_MMP2
-> -# ?define __cpu_is_mmp2(id) ? ?\
-> - ? ? ? ({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x58; })
-> +static inline int cpu_is_mmp2(void)
-> +{
-> + ? ? ? return (((read_cpuid_id() >> 8) & 0xff) == 0x58);
-> +}
-> ?#else
-> -# ?define __cpu_is_mmp2(id) ? ?(0)
-> +#define cpu_is_mmp2() ?(0)
-> ?#endif
+> One other issue which I noticed because besides double bit errors I get many
+> single bit errors as well; the ERR_SBERR is never cleared.
+> ERR_DBERR is cleared to ERR_NONE in two locations, but ERR_SBERR is not.
+> (probably in order to allow pxa3xx_nand_ecc_correct to pick it up)
+> However, I've seen that the retcode could still be ERR_SBERR in
+> pxa3xx_nand_waitfunc, causing an erase error to be assumed, as a result all
+> eraseblocks in the partition ended up being marked bad in a loop, till
+> there were no more remaining eraseblocks.
+> I guess ERR_SBERR should probably be ignored in pxa3xx_nand_waitfunc?
+
+Em, Although ERR_SBERR indicate this error can be corrected by nand
+controller, it
+still make sense to report this to upper level. FS like UBIFS could
+use this message to
+do the flash data integrity maintenance. This already be fixed in my
+patch set which
+sent a month ago.
 >
-> -#define cpu_is_pxa168() ? ? ? ? ? ? ? ?({ __cpu_is_pxa168(read_cpuid_id()); })
-> -#define cpu_is_pxa910() ? ? ? ? ? ? ? ?({ __cpu_is_pxa910(read_cpuid_id()); })
-> -#define cpu_is_mmp2() ? ? ? ? ?({ __cpu_is_mmp2(read_cpuid_id()); })
-> -
-> ?#endif /* __ASM_MACH_CPUTYPE_H */
-> --
-> 1.5.6.5
->
->
+> That's what I did in the remainder of my tests (after having unmarked the
+> blocks that were wrongly marked bad) so I think this issue did not
+> contribute to my biterror problems.
+
+Biterr may be caused by timing, bad block... I think you'd better use
+the mtd test built in linux
+kernel to make sure timing is all right.
+
+Best regards,
+Lei
