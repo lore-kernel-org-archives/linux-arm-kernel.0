@@ -1,118 +1,475 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Sun, 26 Sep 2010 15:23:13 +0800
-Subject: [PATCH 1/1] ARM: mmp: update cpuid of pxa168 and pxa910
-Message-ID: <1285485793-10738-1-git-send-email-haojian.zhuang@marvell.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Sun, 26 Sep 2010 04:56:16 -0400
+Subject: [PATCH 3/4] esdhc-3 esdhc: fsl esdhc driver based on sdhci driver
+In-Reply-To: <1285299788-32209-4-git-send-email-r65037@freescale.com>
+References: <1285299788-32209-1-git-send-email-r65037@freescale.com>
+	<1285299788-32209-2-git-send-email-r65037@freescale.com>
+	<1285299788-32209-3-git-send-email-r65037@freescale.com>
+	<1285299788-32209-4-git-send-email-r65037@freescale.com>
+Message-ID: <AANLkTimLX-+Jyc-_Csqz09yPH1SKCwArV=NC0rEEqtrf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct the cpuid of pxa168 and pxa910.
+On Thu, Sep 23, 2010 at 11:43 PM, Richard Zhu <r65037@freescale.com> wrote:
+> Based on SDHCI API, esdhc driver supports PIO and simple internal
+> DMA modes.
+>
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> ---
+> ?drivers/mmc/host/Kconfig ? ? | ? 13 ++
+> ?drivers/mmc/host/Makefile ? ?| ? ?1 +
+> ?drivers/mmc/host/sdhci-imx.c | ?395 ++++++++++++++++++++++++++++++++++++++++++
+> ?3 files changed, 409 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/mmc/host/sdhci-imx.c
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 283190b..ce2840c 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -130,6 +130,19 @@ config MMC_SDHCI_CNS3XXX
+>
+> ? ? ? ? ?If unsure, say N.
+>
+> +config MMC_SDHCI_IMX
+> + ? ? ? tristate "Freescale i.MX platform eSDHCI support"
+> + ? ? ? depends on ARCH_MX5 && MMC_SDHCI
+> + ? ? ? depends on MMC_SDHCI_PLTFM
+> + ? ? ? select MMC_SDHCI_IO_ACCESSORS
+> + ? ? ? help
+> + ? ? ? ? This selects the Freescale i.MX Enhanced Secure Card Host
+> + ? ? ? ? Controller Interface.
+> + ? ? ? ? If you have a i.MX platform with a Multimedia Card slot,
+> + ? ? ? ? say Y or M here.
+> +
+> + ? ? ? ? If unsure, say N.
+> +
+> ?config MMC_SDHCI_S3C
+> ? ? ? ?tristate "SDHCI support on Samsung S3C SoC"
+> ? ? ? ?depends on MMC_SDHCI && (PLAT_S3C24XX || PLAT_S3C64XX)
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index 840bcb5..ae7c3e7 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -40,6 +40,7 @@ obj-$(CONFIG_MMC_JZ4740) ? ? ?+= jz4740_mmc.o
+> ?obj-$(CONFIG_MMC_SDHCI_PLTFM) ? ? ? ? ? ? ? ? ?+= sdhci-platform.o
+> ?sdhci-platform-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? := sdhci-pltfm.o
+> ?sdhci-platform-$(CONFIG_MMC_SDHCI_CNS3XXX) ? ? += sdhci-cns3xxx.o
+> +sdhci-platform-$(CONFIG_MMC_SDHCI_IMX) ? ? ? ? += sdhci-imx.o
+>
+> ?obj-$(CONFIG_MMC_SDHCI_OF) ? ? += sdhci-of.o
+> ?sdhci-of-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? := sdhci-of-core.o
+> diff --git a/drivers/mmc/host/sdhci-imx.c b/drivers/mmc/host/sdhci-imx.c
+> new file mode 100644
+> index 0000000..6e34bcd
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci-imx.c
+> @@ -0,0 +1,395 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + */
+> +
+> +/*
+> + * sdhci-imx.c Support for SDHCI platform devices
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+> + */
+> +
+> +/* Supports:
+> + * SDHCI imx devices
+> + *
+> + * Inspired by sdhci-pci.c, by Pierre Ossman
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/highmem.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/gpio.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/mmc/host.h>
+> +#include <linux/sdhci-pltfm.h>
+> +
+> +#include <mach/mmc.h>
+> +
+> +#include "sdhci.h"
+> +#include "sdhci-pltfm.h"
+> +
+> +/* Vendor specified registors */
+> +#define ? ? ? ?FSL_SDHCI_WML ? ? ? ? ? 0x44
+> +#define ? ? ? ?FSL_SDHCI_WML_16_WORDS ?0x08100810
+> +#define ? ? ? ?FSL_SDHCI_WML_32_WORDS ?0x08200820
+> +#define ? ? ? ?FSL_SDHCI_WML_64_WORDS ?0x08400840
+> +#define ? ? ? ?FSL_SDHCI_WML_128_WORDS 0x08800880
+> +
+> +/* Non-standard clock control registor */
+> +#define ESDHC_SYSTEM_CONTROL ? 0x2C
+> +#define ESDHC_CLOCK_MASK ? ? ? 0x0000FFF0
+> +#define ESDHC_PREDIV_SHIFT ? ? 8
+> +#define ESDHC_DIVIDER_SHIFT ? ?4
+> +#define ESDHC_CLOCK_PEREN ? ? ?0x00000004
+> +#define ESDHC_CLOCK_HCKEN ? ? ?0x00000002
+> +#define ESDHC_CLOCK_IPGEN ? ? ?0x00000001
+> +
+> +/* Non-standard host control registor */
+> +#define ? ? ? ?ESDHC_SDHCI_CTRL_8BITBUS ? ? ? ?0x00000004
+> +#define ? ? ? ?FSL_ESDHC_HOST_CONTROL_RES ? ? ?0x33E
+> +#define ESDHC_HOST_CONTROL_LE ? ? ? ? ?0x20
+> +
+> +/*****************************************************************************\
+> + * ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *
+> + * SDHCI core callbacks ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?*
+> + * ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *
+> +\*****************************************************************************/
+> +
+> +static u32 sdhci_imx_readl(struct sdhci_host *host, int reg)
+> +{
+> + ? ? ? return readl(host->ioaddr + reg);
+> +}
+> +
+> +static u16 sdhci_imx_readw(struct sdhci_host *host, int reg)
+> +{
+> + ? ? ? u32 val;
+> + ? ? ? u16 rc;
+> +
+> + ? ? ? if (reg % 4 == 3) {
+> + ? ? ? ? ? ? ? printk(KERN_ERR "Invalid reg address!\n");
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? }
+> +
+> + ? ? ? val = readl(host->ioaddr + (reg / 4) * 4);
+> + ? ? ? rc = (val >> (reg % 4) * 8) & 0xFFFF;
+> +
+> + ? ? ? return rc;
+> +}
+> +
+> +static u8 sdhci_imx_readb(struct sdhci_host *host, int reg)
+> +{
+> + ? ? ? u32 val;
+> + ? ? ? u8 rc;
+> +
+> + ? ? ? val = readl(host->ioaddr + (reg / 4) * 4);
+> + ? ? ? rc = (val >> (reg % 4) * 8) & 0xFF;
+> + ? ? ? if (reg == SDHCI_HOST_CONTROL) {
+> + ? ? ? ? ? ? ? /* Bus width */
+> + ? ? ? ? ? ? ? if (val & ESDHC_SDHCI_CTRL_8BITBUS) {
+> + ? ? ? ? ? ? ? ? ? ? ? rc |= SDHCI_CTRL_8BITBUS;
+> + ? ? ? ? ? ? ? ? ? ? ? rc &= ~SDHCI_CTRL_4BITBUS;
+> + ? ? ? ? ? ? ? } else if (val & SDHCI_CTRL_4BITBUS) {
+> + ? ? ? ? ? ? ? ? ? ? ? rc &= ~SDHCI_CTRL_8BITBUS;
+> + ? ? ? ? ? ? ? ? ? ? ? rc |= SDHCI_CTRL_4BITBUS;
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? rc &= ~SDHCI_CTRL_8BITBUS;
+> + ? ? ? ? ? ? ? ? ? ? ? rc &= ~SDHCI_CTRL_4BITBUS;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? /* DMA */
+> + ? ? ? ? ? ? ? if (val & (SDHCI_CTRL_DMA_MASK << 5))
+> + ? ? ? ? ? ? ? ? ? ? ? rc |= ((val >> 5) & SDHCI_CTRL_DMA_MASK);
+> + ? ? ? ? ? ? ? /* FIXME D3CD */
+> + ? ? ? }
+> +
+> + ? ? ? return rc;
+> +}
+> +
+> +static void sdhci_imx_writel(struct sdhci_host *host, u32 val, int reg)
+> +{
+> + ? ? ? writel(val, host->ioaddr + reg);
+> +}
+> +
+> +static void sdhci_imx_writew(struct sdhci_host *host, u16 val, int reg)
+> +{
+> + ? ? ? struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> + ? ? ? u32 io_val;
+> +
+> + ? ? ? if (reg % 4 == 3) {
+> + ? ? ? ? ? ? ? printk(KERN_ERR "Invalid reg address!\n");
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? if (reg == SDHCI_BLOCK_SIZE) {
+> + ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ?* Two last DMA bits are reserved, and first one is used for
+> + ? ? ? ? ? ? ? ?* non-standard blksz of 4096 bytes that we don't support
+> + ? ? ? ? ? ? ? ?* yet. So clear the DMA boundary bits.
+> + ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? val &= ~SDHCI_MAKE_BLKSZ(0x7, 0);
+> + ? ? ? }
+> +
+> + ? ? ? io_val = readl(host->ioaddr + (reg / 4) * 4);
+> + ? ? ? io_val &= ~(0xFFFF << ((reg % 4) * 8));
+> + ? ? ? io_val |= val << ((reg % 4) * 8);
+> +
+> + ? ? ? switch (reg) {
+> + ? ? ? case SDHCI_TRANSFER_MODE:
+> + ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ?* Postpone this write, we must do it together with a
+> + ? ? ? ? ? ? ? ?* command write that is down below.
+> + ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? pltfm_host->scratchpad = val;
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? case SDHCI_COMMAND:
+> + ? ? ? ? ? ? ? writel(io_val | pltfm_host->scratchpad,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->ioaddr + ?SDHCI_TRANSFER_MODE);
+> + ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ?* Make a double check that the warte mark level register is
+> + ? ? ? ? ? ? ? ?* configured properly. default value is FSL_SDHCI_WML_16_WORDS
+> + ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? if (readl(host->ioaddr + FSL_SDHCI_WML)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? == FSL_SDHCI_WML_16_WORDS) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (host->flags & SDHCI_REQ_USE_DMA)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? writel(FSL_SDHCI_WML_64_WORDS,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->ioaddr + FSL_SDHCI_WML);
+> + ? ? ? ? ? ? ? ? ? ? ? else
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? writel(FSL_SDHCI_WML_128_WORDS,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->ioaddr + FSL_SDHCI_WML);
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? writel(io_val, host->ioaddr + (reg / 4) * 4);
+> +}
+> +
+> +static void sdhci_imx_set_power(struct sdhci_host *host, u8 power)
+> +{
+> + ? ? ? int voltage = 0;
+> +
+> + ? ? ? /* There is no sdhci standard PWR CTL REG in imx sdhci */
+> + ? ? ? if (host->pwr == power)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? if (host->vmmc) {
+> + ? ? ? ? ? ? ? if (power == (unsigned short)-1) {
+> + ? ? ? ? ? ? ? ? ? ? ? regulator_disable(host->vmmc);
+> + ? ? ? ? ? ? ? ? ? ? ? dev_dbg(mmc_dev(host->mmc), "mmc power off\n");
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? if (power == 7)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? voltage = 1800000;
+> + ? ? ? ? ? ? ? ? ? ? ? else if (power >= 8)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? voltage = 2000000 + (power - 8) * 100000;
+> + ? ? ? ? ? ? ? ? ? ? ? regulator_set_voltage(host->vmmc, voltage, voltage);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? if (regulator_enable(host->vmmc) == 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_dbg(mmc_dev(host->mmc), "mmc power on\n");
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? msleep(1);
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? host->pwr = power;
+> +}
+> +
+> +static void sdhci_imx_writeb(struct sdhci_host *host, u8 val, int reg)
+> +{
+> + ? ? ? u32 io_val;
+> +
+> + ? ? ? /* Since there is no power register in FSL eSDHC, handle it in SW */
+> + ? ? ? if (reg == SDHCI_POWER_CONTROL) {
+> + ? ? ? ? ? ? ? sdhci_imx_set_power(host, val);
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? if (reg == SDHCI_HOST_CONTROL) {
+> + ? ? ? ? ? ? ? io_val = readl(host->ioaddr + SDHCI_HOST_CONTROL);
+> + ? ? ? ? ? ? ? /* Bit7~6, andi bit0 */
+> + ? ? ? ? ? ? ? io_val |= (val & ~FSL_ESDHC_HOST_CONTROL_RES);
+> + ? ? ? ? ? ? ? /* Ensure the LE mode */
+> + ? ? ? ? ? ? ? io_val |= ESDHC_HOST_CONTROL_LE;
+> + ? ? ? ? ? ? ? /* Configure the bus_width 8bits, 4bits, or 1bit*/
+> + ? ? ? ? ? ? ? if (val & SDHCI_CTRL_8BITBUS) {
+> + ? ? ? ? ? ? ? ? ? ? ? io_val |= ESDHC_SDHCI_CTRL_8BITBUS;
+> + ? ? ? ? ? ? ? ? ? ? ? io_val &= ~SDHCI_CTRL_4BITBUS;
+> + ? ? ? ? ? ? ? } else if (val & SDHCI_CTRL_4BITBUS) {
+> + ? ? ? ? ? ? ? ? ? ? ? io_val &= ~ESDHC_SDHCI_CTRL_8BITBUS;
+> + ? ? ? ? ? ? ? ? ? ? ? io_val |= SDHCI_CTRL_4BITBUS;
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? io_val &= ~ESDHC_SDHCI_CTRL_8BITBUS;
+> + ? ? ? ? ? ? ? ? ? ? ? io_val &= ~SDHCI_CTRL_4BITBUS;
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? /* Configure the DMA */
+> + ? ? ? ? ? ? ? if (val & SDHCI_CTRL_DMA_MASK)
+> + ? ? ? ? ? ? ? ? ? ? ? io_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
+> + ? ? ? ? ? ? ? writel(io_val, host->ioaddr + SDHCI_HOST_CONTROL);
+> +
+> + ? ? ? ? ? ? ? return;
+> + ? ? ? }
+> +
+> + ? ? ? io_val = readl(host->ioaddr + (reg / 4) * 4);
+> + ? ? ? io_val &= ~(0xFF << ((reg % 4) * 8));
+> + ? ? ? io_val |= val << ((reg % 4) * 8);
+> +
+> + ? ? ? writel(io_val, host->ioaddr + (reg / 4) * 4);
+> +}
+> +
+> +static unsigned int sdhci_imx_get_max_clock(struct sdhci_host *host)
+> +{
+> + ? ? ? struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> + ? ? ? return clk_get_rate(pltfm_host->clk);
+> +}
+> +
+> +static unsigned int sdhci_imx_get_min_clock(struct sdhci_host *host)
+> +{
+> + ? ? ? struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> + ? ? ? return clk_get_rate(pltfm_host->clk) / 256 / 16;
+> +}
+> +
+> +static unsigned int sdhci_imx_get_timeout_clock(struct sdhci_host *host)
+> +{
+> + ? ? ? return sdhci_imx_get_max_clock(host) / 1000000;
+> +}
+> +
+> +static unsigned int sdhci_imx_get_ro(struct sdhci_host *host)
+> +{
+> + ? ? ? struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> + ? ? ? return gpio_get_value(pltfm_host->wp_gpio);
+> +}
+> +
+> +static void sdhci_imx_set_clock(struct sdhci_host *host, unsigned int clock)
+> +{
+> + ? ? ? int pre_div = 2;
+> + ? ? ? int div = 1;
+> + ? ? ? u32 temp;
+> +
+> + ? ? ? temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> + ? ? ? temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
+> + ? ? ? ? ? ? ? ? ? ? ? | ESDHC_CLOCK_MASK);
+> + ? ? ? sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> +
+> + ? ? ? if (clock == 0)
+> + ? ? ? ? ? ? ? goto out;
+> +
+> + ? ? ? while (host->max_clk / pre_div / 16 > clock && pre_div < 256)
+> + ? ? ? ? ? ? ? pre_div *= 2;
+> +
+> + ? ? ? while (host->max_clk / pre_div / div > clock && div < 16)
+> + ? ? ? ? ? ? ? div++;
+> +
+> + ? ? ? dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
+> + ? ? ? ? ? ? ? clock, host->max_clk / pre_div / div);
+> +
+> + ? ? ? pre_div >>= 1;
+> + ? ? ? div--;
+> +
+> + ? ? ? temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> + ? ? ? temp |= (ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
+> + ? ? ? ? ? ? ? ? ? ? ? | (div << ESDHC_DIVIDER_SHIFT)
+> + ? ? ? ? ? ? ? ? ? ? ? | (pre_div << ESDHC_PREDIV_SHIFT));
+> + ? ? ? sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> + ? ? ? mdelay(10);
+> +out:
+> + ? ? ? host->clock = clock;
+> +}
+> +
+> +static int sdhci_imx_enable_dma(struct sdhci_host *host)
+> +{
+> + ? ? ? u32 ctrl;
+> +
+> + ? ? ? ctrl = readl(host->ioaddr + SDHCI_HOST_CONTROL);
+> + ? ? ? ctrl &= ~(SDHCI_CTRL_DMA_MASK << 5);
+> + ? ? ? if ((host->flags & SDHCI_REQ_USE_DMA) &&
+> + ? ? ? ? ? ? ? (host->flags & SDHCI_USE_ADMA))
+> + ? ? ? ? ? ? ? ctrl |= (SDHCI_CTRL_ADMA32 << 8);
+> + ? ? ? else if (host->flags & SDHCI_REQ_USE_DMA)
+> + ? ? ? ? ? ? ? ctrl |= (SDHCI_CTRL_SDMA << 8);
+> +
+> + ? ? ? writel(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
+> +
+> + ? ? ? if (host->flags & SDHCI_REQ_USE_DMA)
+> + ? ? ? ? ? ? ? writel(FSL_SDHCI_WML_64_WORDS,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->ioaddr + FSL_SDHCI_WML);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? writel(FSL_SDHCI_WML_128_WORDS,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->ioaddr + FSL_SDHCI_WML);
+> + ? ? ? return 0;
+> +}
+> +
+> +static int __match_sdhci_imx(struct device *dev, void *data)
+> +{
+> + ? ? ? return !strncmp(dev_name(dev), "imx-sdhci", 9);
+> +}
+> +static int sdhci_imx_init(struct sdhci_host *host)
+> +{
+> + ? ? ? struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> + ? ? ? struct clk *clk;
+> + ? ? ? struct device *dev;
+> +
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
----
- arch/arm/mach-mmp/common.c               |    7 ++++
- arch/arm/mach-mmp/include/mach/cputype.h |   50 +++++++++++++++++++----------
- 2 files changed, 40 insertions(+), 17 deletions(-)
+Not sure how many device is served, what driver get here is only
+imx-sdhci.0, but  imx-sdhci.1,  imx-sdhci.2 will never come up.
+So this method only right for one device.
 
-diff --git a/arch/arm/mach-mmp/common.c b/arch/arm/mach-mmp/common.c
-index 3b29fa7..9993a56 100644
---- a/arch/arm/mach-mmp/common.c
-+++ b/arch/arm/mach-mmp/common.c
-@@ -14,9 +14,14 @@
- #include <asm/page.h>
- #include <asm/mach/map.h>
- #include <mach/addr-map.h>
-+#include <mach/cputype.h>
- 
- #include "common.h"
- 
-+#define MMP_CHIPID	(AXI_VIRT_BASE + 0x82c00)
-+
-+unsigned int mmp_chip_id;
-+
- static struct map_desc standard_io_desc[] __initdata = {
- 	{
- 		.pfn		= __phys_to_pfn(APB_PHYS_BASE),
-@@ -34,4 +39,6 @@ static struct map_desc standard_io_desc[] __initdata = {
- void __init mmp_map_io(void)
- {
- 	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
-+
-+	mmp_chip_id = __raw_readl(MMP_CHIPID);
- }
-diff --git a/arch/arm/mach-mmp/include/mach/cputype.h b/arch/arm/mach-mmp/include/mach/cputype.h
-index 83b1872..cc63615 100644
---- a/arch/arm/mach-mmp/include/mach/cputype.h
-+++ b/arch/arm/mach-mmp/include/mach/cputype.h
-@@ -4,36 +4,52 @@
- #include <asm/cputype.h>
- 
- /*
-- *  CPU   Stepping   OLD_ID       CPU_ID      CHIP_ID
-+ *  CPU   Stepping   CPU_ID      CHIP_ID
-  *
-- * PXA168    A0    0x41159263   0x56158400   0x00A0A333
-- * PXA910    Y0    0x41159262   0x56158000   0x00F0C910
-- * MMP2	     Z0			0x560f5811
-+ * PXA168    S0    0x56158400   0x0000C910
-+ * PXA168    A0    0x56158400   0x00A0A168
-+ * PXA910    Y1    0x56158400   0x00F2C920
-+ * PXA910    A0    0x56158400   0x00F2C910
-+ * PXA910    A1    0x56158400   0x00A0C910
-+ * PXA920    Y0    0x56158400   0x00F2C920
-+ * PXA920    A0    0x56158400   0x00A0C920
-+ * PXA920    A1    0x56158400   0x00A1C920
-+ * MMP2	     Z0	   0x560f5811   0x00F00410
-+ * MMP2      Z1    0x560f5811   0x00E00410
-+ * MMP2      A0    0x560f5811   0x00A0A610
-  */
- 
-+extern unsigned int mmp_chip_id;
-+
- #ifdef CONFIG_CPU_PXA168
--#  define __cpu_is_pxa168(id)	\
--	({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x84; })
-+static inline int cpu_is_pxa168(void)
-+{
-+	return (((read_cpuid_id() >> 8) & 0xff) == 0x84)
-+		&& ((mmp_chip_id & 0xfff) == 0x168);
-+}
- #else
--#  define __cpu_is_pxa168(id)	(0)
-+#define cpu_is_pxa168()	(0)
- #endif
- 
-+/* cpu_is_pxa910() is shared on both pxa910 and pxa920 */
- #ifdef CONFIG_CPU_PXA910
--#  define __cpu_is_pxa910(id)	\
--	({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x80; })
-+static inline int cpu_is_pxa910(void)
-+{
-+	return (((read_cpuid_id() >> 8) & 0xff) == 0x84)
-+		&& (((mmp_chip_id & 0xfff) == 0x910)
-+		|| ((mmp_chip_id & 0xfff) == 0x920));
-+}
- #else
--#  define __cpu_is_pxa910(id)	(0)
-+#define cpu_is_pxa910()	(0)
- #endif
- 
- #ifdef CONFIG_CPU_MMP2
--#  define __cpu_is_mmp2(id)	\
--	({ unsigned int _id = ((id) >> 8) & 0xff; _id == 0x58; })
-+static inline int cpu_is_mmp2(void)
-+{
-+	return (((read_cpuid_id() >> 8) & 0xff) == 0x58);
-+}
- #else
--#  define __cpu_is_mmp2(id)	(0)
-+#define cpu_is_mmp2()	(0)
- #endif
- 
--#define cpu_is_pxa168()		({ __cpu_is_pxa168(read_cpuid_id()); })
--#define cpu_is_pxa910()		({ __cpu_is_pxa910(read_cpuid_id()); })
--#define cpu_is_mmp2()		({ __cpu_is_mmp2(read_cpuid_id()); })
--
- #endif /* __ASM_MACH_CPUTYPE_H */
--- 
-1.5.6.5
+> + ? ? ? dev = device_find_child(mmc_dev(host->mmc), NULL, __match_sdhci_imx);
+> + ? ? ? clk = clk_get(dev, "imx_sdhc_clk");
+> + ? ? ? if (IS_ERR(clk)) {
+> + ? ? ? ? ? ? ? dev_err(mmc_dev(host->mmc), "clk err\n");
+> + ? ? ? ? ? ? ? return -ENODEV;
+> + ? ? ? }
+> + ? ? ? clk_enable(clk);
+> + ? ? ? pltfm_host->clk = clk;
+> + ? ? ? dev_dbg(dev, "SDHC clock:%lu\n", clk_get_rate(clk));
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +static void sdhci_imx_exit(struct sdhci_host *host)
+> +{
+> + ? ? ? struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +
+> + ? ? ? clk_disable(pltfm_host->clk);
+> + ? ? ? clk_put(pltfm_host->clk);
+> +}
+> +
+> +
+> +static struct sdhci_ops sdhci_imx_ops = {
+> + ? ? ? .read_l ? ? ? ? ? ? ? ? = sdhci_imx_readl,
+> + ? ? ? .read_w ? ? ? ? ? ? ? ? = sdhci_imx_readw,
+> + ? ? ? .read_b ? ? ? ? ? ? ? ? = sdhci_imx_readb,
+> + ? ? ? .write_l ? ? ? ? ? ? ? ?= sdhci_imx_writel,
+> + ? ? ? .write_w ? ? ? ? ? ? ? ?= sdhci_imx_writew,
+> + ? ? ? .write_b ? ? ? ? ? ? ? ?= sdhci_imx_writeb,
+> + ? ? ? .set_clock ? ? ? ? ? ? ?= sdhci_imx_set_clock,
+> + ? ? ? .enable_dma ? ? ? ? ? ? = sdhci_imx_enable_dma,
+> + ? ? ? .get_max_clock ? ? ? ? ?= sdhci_imx_get_max_clock,
+> + ? ? ? .get_min_clock ? ? ? ? ?= sdhci_imx_get_min_clock,
+> + ? ? ? .get_timeout_clock ? ? ?= sdhci_imx_get_timeout_clock,
+> + ? ? ? .get_ro ? ? ? ? ? ? ? ? = sdhci_imx_get_ro,
+> +};
+> +
+> +struct sdhci_pltfm_data sdhci_imx_pdata = {
+> + ? ? ? .ops = &sdhci_imx_ops,
+> + ? ? ? .quirks = SDHCI_QUIRK_BROKEN_ADMA
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_32BIT_DMA_ADDR
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_32BIT_ADMA_SIZE
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_NO_BUSY_IRQ
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_BROKEN_CARD_DETECTION
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_NONSTANDARD_CLOCK
+> + ? ? ? ? ? ? ? | SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET,
+> + ? ? ? .init = sdhci_imx_init,
+> + ? ? ? .exit = sdhci_imx_exit,
+> +};
+> --
+> 1.7.0
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
