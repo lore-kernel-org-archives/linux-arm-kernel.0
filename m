@@ -1,34 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Sep 2010 10:15:31 -0700
-Subject: Regarding hw irq to Linux irq mapping on ARM
-In-Reply-To: <4C9E8109.2000408@fluff.org>
-References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
-	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
-	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
-	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
-	<1285133481.30449.170.camel@pasglop>
-	<AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>
-	<4C9BE69C.9070609@fluff.org> <20100924150608.GB30666@sirena.org.uk>
-	<4C9E8109.2000408@fluff.org>
-Message-ID: <20100927171530.GA15007@opensource.wolfsonmicro.com>
+From: pieterg@gmx.com (pieterg)
+Date: Mon, 27 Sep 2010 19:39:04 +0200
+Subject: pxa3xx_nand issues
+In-Reply-To: <201009271550.50399.pieterg@gmx.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<AANLkTi==hNcdTg9TNDxVmx4SuhnmDYXx_d_H1Q8Z6wOH@mail.gmail.com>
+	<201009271550.50399.pieterg@gmx.com>
+Message-ID: <201009271939.04710.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 26, 2010 at 12:08:57AM +0100, Ben Dooks wrote:
-> On 24/09/10 16:06, Mark Brown wrote:
-> > On Fri, Sep 24, 2010 at 12:45:32AM +0100, Ben Dooks wrote:
+On Monday 27 September 2010 15:50:50 pieterg wrote:
+> On Monday 27 September 2010 14:22:37 Lei Wen wrote:
+> > Does your jffs2 image make correct? Page size and block size set right?
+>
+> I think so.
+> --eraseblock=0x20000 --pad --no-cleanmarkers
 
-> >> The i2c case, it is generally the code decoding the interrupt that needs
-> >> to do this, and is part of the i2c specific driver, and is written as
-> >> some form of thread or work-queue.
+Well... that caused most of my problems.
+--pad means pad to eraseblock size, not pagesize.
+So the first writes in the new filesystem would cause pages in that last 
+eraseblock to be overwritten.
+With SLC I always got away with that, but with MLC, clearly not.
 
-> > The standard thing these days is a threaded IRQ handler.
+(now I'm still left with lots of singlebit errors, and occasional jffs2 CRC 
+errors, pxa3xx_nand was obviously not meant to deal with such low quality 
+MLC, no action is taken on bit errors, but at least everything can be 
+explained now)
 
-> Yes, however my first point was really do we care the method
-> for the interrupt's detection when talking about mapping them?
+Thanks everybody for helping me find the cause of this problem.
 
-Not really in the assignment of numbers but the fact that you're in an
-interrupt thread rather than primary IRQ context does make a difference
-to the IRQ handler, though some don't actually need to worry about it
-and could benefit from being able to specify that they don't mind which
-context they're in and can accept either context.
+Rgds, Pieter
