@@ -1,20 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Sep 2010 09:04:30 -0700
-Subject: [PATCH v3 3/5] mfd: regulator: max8998: BUCK1/2 internal
-	voltages and indexes defined
-In-Reply-To: <1285590747-32404-4-git-send-email-l.majewski@samsung.com>
-References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-	<1285590747-32404-4-git-send-email-l.majewski@samsung.com>
-Message-ID: <20100927160429.GG13754@opensource.wolfsonmicro.com>
+From: tim.nordell@logicpd.com (Tim Nordell)
+Date: Mon, 27 Sep 2010 11:05:46 -0500
+Subject: [PATCH v4 0/4] LogicPD minimal board support for LV_SOM and Torpedo
+Message-ID: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 27, 2010 at 02:32:25PM +0200, Lukasz Majewski wrote:
-> BUCK1/2 internal voltages and indexes defined in the struct max8998_data
-> max_get_voltage_register now uses index values to chose proper register
-> More generic BUCK1/2 registers names provided
-> 
-> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+This was tested (and based) against 2.6.36-rc5
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Difference from patch v3 1/4:
+ - Merged DEBUG_LL support patch (patch v3 5/5) into first patch
+ - Added "select OMAP_PACKAGE_CBB" into Kconfig for both boards
+
+Tim Nordell (4):
+  Adding LogicPD OMAP3 board support
+  ARM: OMAP3LOGIC: Adding SDMMC support
+  ARM: OMAP3: Add generic smsc911x support when connected to GPMC
+  ARM: OMAP3LOGIC: Added SMSC Ethernet board support
+
+ arch/arm/mach-omap2/Kconfig                     |   20 ++
+ arch/arm/mach-omap2/Makefile                    |    7 +
+ arch/arm/mach-omap2/board-omap3logic.c          |  244 +++++++++++++++++++++++
+ arch/arm/mach-omap2/gpmc-smsc911x.c             |  113 +++++++++++
+ arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |   35 ++++
+ arch/arm/plat-omap/include/plat/uncompress.h    |    2 +
+ 6 files changed, 421 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-omap3logic.c
+ create mode 100644 arch/arm/mach-omap2/gpmc-smsc911x.c
+ create mode 100644 arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
