@@ -1,234 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 27 Sep 2010 09:29:05 -0500
-Subject: [PATCH v4] power: introduce library for device-specific OPPs
-In-Reply-To: <20100924214003.GL2375@linux.vnet.ibm.com>
-References: <1285332640-16736-1-git-send-email-nm@ti.com>
-	<20100924193742.GJ2375@linux.vnet.ibm.com>
-	<4C9D177D.6090708@ti.com>
-	<20100924214003.GL2375@linux.vnet.ibm.com>
-Message-ID: <4CA0AA31.3030801@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 Sep 2010 16:31:34 +0200
+Subject: [PATCH 33/40] ARM: mx5/iomux-mx51: Fix input path of some pins
+	in gpio mode
+In-Reply-To: <19616.42835.922236.123809@ipc1.ka-ro>
+References: <20100927135009.GC6271@pengutronix.de>
+	<1285595476-10025-33-git-send-email-u.kleine-koenig@pengutronix.de>
+	<19616.42835.922236.123809@ipc1.ka-ro>
+Message-ID: <20100927143134.GX23406@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul E. McKenney had written, on 09/24/2010 04:40 PM, the following:
-[...]
->>>> +/**
->>>> + * opp_find_freq_ceil() - Search for an rounded ceil freq
->>>> + * @dev:     device for which we do this operation
->>>> + * @freq:    Start frequency
->>>> + *
->>>> + * Search for the matching ceil *available* OPP from a starting freq
->>>> + * for a device.
->>>> + *
->>>> + * Returns matching *opp and refreshes *freq accordingly, else returns
->>>> + * ERR_PTR in case of error and should be handled using IS_ERR.
->>>> + *
->>>> + * Locking: RCU reader.
->>>> + */
->>>> +struct opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq)
->>>> +{
->>>> +     struct device_opp *dev_opp;
->>>> +     struct opp *temp_opp, *opp = ERR_PTR(-ENODEV);
->>>> +
->>>> +     if (!dev || !freq) {
->>>> +             pr_err("%s: invalid param dev=%p freq=%p\n", __func__,
->>>> +                             dev, freq);
->>>> +             return ERR_PTR(-EINVAL);
->>>> +     }
->>>> +
->>>> +     dev_opp = find_device_opp(dev);
->>>> +     if (IS_ERR(dev_opp))
->>>> +             return opp;
->>>> +
->>>> +     rcu_read_lock();
->>>> +     list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
->>>> +             if (temp_opp->available && temp_opp->rate >= *freq) {
->>>> +                     opp = temp_opp;
->>>> +                     *freq = opp->rate;
->>>> +                     break;
->>>> +             }
->>>> +     }
->>>> +     rcu_read_unlock();
->>> And this one also has the same problem that find_device_opp() does.
->> guessing opp ptr here.. am I right? if it is about device_opp, it is
->> not going to be freed as I mentioned above - at least we dont give
->> an function to update(hence free) it.
+On Mon, Sep 27, 2010 at 04:16:51PM +0200, Lothar Wa?mann wrote:
+> Hi,
 > 
-> It really does look to me that you are passing a pointer to the thing
-> being freed out of an RCU read-side critical section.  If you are really
-> doing this, you do need to do something to fix it.  I outlined some of
-> the options earlier.
-ack. will try to fix in v5.
+> > diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > index 9250273..639d631 100644
+> > --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > @@ -274,15 +274,15 @@ typedef enum iomux_config {
+> >  #define MX51_PAD_USBH1_DATA5__USBH1_DATA5       IOMUX_PAD(0x69C, 0x29C, 0, 0x0,   0, MX51_USBH1_PAD_CTRL)
+> >  #define MX51_PAD_USBH1_DATA6__USBH1_DATA6       IOMUX_PAD(0x6A0, 0x2A0, 0, 0x0,   0, MX51_USBH1_PAD_CTRL)
+> >  #define MX51_PAD_USBH1_DATA7__USBH1_DATA7       IOMUX_PAD(0x6A4, 0x2A4, 0, 0x0,   0, MX51_USBH1_PAD_CTRL)
+> > -#define MX51_PAD_DI1_PIN11__GPIO_3_0            IOMUX_PAD(0x6A8, 0x2A8, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DI1_PIN12__GPIO_3_1            IOMUX_PAD(0x6AC, 0x2AC, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DI1_PIN13__GPIO_3_2            IOMUX_PAD(0x6B0, 0x2B0, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DI1_D0_CS__GPIO_3_3            IOMUX_PAD(0x6B4, 0x2B4, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DI1_D1_CS__GPIO_3_4            IOMUX_PAD(0x6B8, 0x2B8, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DISPB2_SER_DIN__GPIO_3_5       IOMUX_PAD(0x6BC, 0x2BC, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DISPB2_SER_DIO__GPIO_3_6       IOMUX_PAD(0x6C0, 0x2C0, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DISPB2_SER_CLK__GPIO_3_7       IOMUX_PAD(0x6C4, 0x2C4, 4, 0x0,   0, NO_PAD_CTRL)
+> > -#define MX51_PAD_DISPB2_SER_RS__GPIO_3_8        IOMUX_PAD(0x6C8, 0x2C8, 4, 0x0,   0, NO_PAD_CTRL)
+> > +#define MX51_PAD_DI1_PIN11__GPIO_3_0            IOMUX_PAD(0x6A8, 0x2A8, 4, 0x974, 1, NO_PAD_CTRL)
+>                                                                               ^^^^^
+> Where did you get this from?
+> According to my copy of the i.MX51 Reference Manual (MCIMX51RM Rev. 0 11/2009)
+> the register at 0x974 is IOMUXC_FEC_FEC_TX_CLK_SELECT_INPUT which
+> controls the pads:
+> |0: Selecting BGA contact: NANDF_RDY_INT for Mode: ALT1.
+> |1: Selecting BGA contact: DISP2_DAT13 for Mode: ALT2.
+> but not DI1_PIN11. DI1_PIN11 does not have any input mux.
 
-> 
->>>> +     return opp;
->>>> +}
->>>> +
->>>> +/**
->>>> + * opp_find_freq_floor() - Search for a rounded floor freq
->>>> + * @dev:     device for which we do this operation
->>>> + * @freq:    Start frequency
->>>> + *
->>>> + * Search for the matching floor *available* OPP from a starting freq
->>>> + * for a device.
->>>> + *
->>>> + * Returns matching *opp and refreshes *freq accordingly, else returns
->>>> + * ERR_PTR in case of error and should be handled using IS_ERR.
->>>> + *
->>>> + * Locking: RCU reader.
->>>> + */
->>>> +struct opp *opp_find_freq_floor(struct device *dev, unsigned long *freq)
->>>> +{
->>>> +     struct device_opp *dev_opp;
->>>> +     struct opp *temp_opp, *opp = ERR_PTR(-ENODEV);
->>>> +
->>>> +     if (!dev || !freq) {
->>>> +             pr_err("%s: invalid param dev=%p freq=%p\n", __func__,
->>>> +                             dev, freq);
->>>> +             return ERR_PTR(-EINVAL);
->>>> +     }
->>>> +
->>>> +     dev_opp = find_device_opp(dev);
->>>> +     if (IS_ERR(dev_opp))
->>>> +             return opp;
->>>> +
->>>> +     rcu_read_lock();
->>>> +     list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
->>>> +             if (temp_opp->available) {
->>>> +                     /* go to the next node, before choosing prev */
->>>> +                     if (temp_opp->rate > *freq)
->>>> +                             break;
->>>> +                     else
->>>> +                             opp = temp_opp;
->>>> +             }
->>>> +     }
->>>> +     if (!IS_ERR(opp))
->>>> +             *freq = opp->rate;
->>>> +     rcu_read_unlock();
->>> As does this one.
->> guessing opp ptr here.. am I right?
-> 
-> Again, here it looks to me like you are passing a pointer out of an RCU
-> read-side critical section that could be freed out from under you.  If
-> so, again, this must be fixed.
-> 
-[...]
->>>> +static int opp_set_availability(struct opp *opp, bool availability_req)
->>>> +{
->>>> +     struct opp *new_opp, *tmp_opp;
->>>> +     bool is_available;
->>>> +
->>>> +     if (unlikely(!opp || IS_ERR(opp))) {
->>>> +             pr_err("%s: Invalid parameters being passed\n", __func__);
->>>> +             return -EINVAL;
->>>> +     }
->>>> +
->>>> +     new_opp = kmalloc(sizeof(struct opp), GFP_KERNEL);
->>>> +     if (!new_opp) {
->>>> +             pr_warning("%s: unable to allocate opp\n", __func__);
->>>> +             return -ENOMEM;
->>>> +     }
->>>> +
->>>> +     mutex_lock(&opp->dev_opp->lock);
->>>> +
->>>> +     rcu_read_lock();
->>>> +     tmp_opp = rcu_dereference(opp);
->>>> +     is_available = tmp_opp->available;
->>>> +     rcu_read_unlock();
->>>> +
->>>> +     /* Is update really needed? */
->>>> +     if (is_available == availability_req) {
->>>> +             mutex_unlock(&opp->dev_opp->lock);
->>>> +             kfree(tmp_opp);
->>>> +             return 0;
->>>> +     }
->>>> +
->>>> +     *new_opp = *opp;
->>>> +     new_opp->available = availability_req;
->>>> +     list_replace_rcu(&opp->node, &new_opp->node);
->>>> +
->>>> +     mutex_unlock(&opp->dev_opp->lock);
->>>> +     synchronize_rcu();
->>> If you decide to rely on reference counts to fix the problem in
->>> find_device_opp(), you will need to check the reference counts here.
->>> Again, please see Documentation/RCU/rcuref.txt.
->> Does the original point about not needing to free dev_opp resolve this?
-> 
-> For the dev_opp case, yes.  However, I believe that my point is still
-> valid for the opp case.
-Ack. I missed that :(.. let me relook at the logic yet again. hopefully 
-fix in v5.
+Indeed, checked in the newer rev1 Manual from 2/2010 aswell.
 
-> 
->>>> +     kfree(opp);
->>>> +
->>>> +     return 0;
->>>> +}
->>>> +
->>>> +/**
->>>> + * opp_enable() - Enable a specific OPP
->>>> + * @opp:     Pointer to opp
->>>> + *
->>>> + * Enables a provided opp. If the operation is valid, this returns 0, else the
->>>> + * corresponding error value. It is meant to be used for users an OPP available
->>>> + * after being temporarily made unavailable with opp_disable.
->>>> + *
->>>> + * Locking: RCU, mutex
->>> By "Locking: RCU", you presumably don't mean that the caller must do
->>> an rcu_read_lock() -- this would result in a synchronize_rcu() being
->>> invoked in an RCU read-side critical section, which is illegal.
->> aye..thx. I will make it more verbose. Does the following sound right?
->>
->> Locking used internally: RCU copy-update and read_lock used, mutex
->>
->> and for the readers:
->>
->> Locking used internally: RCU read_lock used
->>
->> or do we need to go all verbatim about the implementation here?
->>
->> I intended the user to know the context in which they can call it,
->> for example, since mutex is used, dont think of using this in
->> interrupt context. since read_locks are already used, dont need to
->> double lock it.. opp library takes care of it's own exclusivity.
-> 
-> I would stick to the constraints on the caller, and describe the internals
-> elsewhere, for example, near the data-structure definitions.  But tastes
-> do vary on this.
-
-okay. let me see how to clean this up.
-
-[..]
->>>> +void opp_init_cpufreq_table(struct device *dev,
->>>> +                         struct cpufreq_frequency_table **table)
->>>> +{
->>>> +     struct device_opp *dev_opp;
->>>> +     struct opp *opp;
->>>> +     struct cpufreq_frequency_table *freq_table;
->>>> +     int i = 0;
->>>> +
->>>> +     dev_opp = find_device_opp(dev);
->>>> +     if (IS_ERR(dev_opp)) {
->>>> +             pr_warning("%s: unable to find device\n", __func__);
->>>> +             return;
->>>> +     }
->>>> +
->>>> +     freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) *
->>>> +                          (opp_get_opp_count(dev) + 1), GFP_ATOMIC);
->>>> +     if (!freq_table) {
->>>> +             pr_warning("%s: failed to allocate frequency table\n",
->>>> +                        __func__);
->>>> +             return;
->>> How does the caller tell that the allocation failed?  Should the caller
->>> set the pointer passed in through the "table" argument to NULL before
->>> calling this function?  Or should this function set *table to NULL
->>> before returning in this case?
->> Good catch. Thanks. I would rather change the return to int and pass
->> proper errors to caller so that they can handle it appropriately.
-> 
-> Works for me!
-thx.
+Sascha
 
 -- 
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
