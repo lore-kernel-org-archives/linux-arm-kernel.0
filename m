@@ -1,62 +1,102 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 27 Sep 2010 16:47:51 +0200
-Subject: [PATCH 33/40] ARM: mx5/iomux-mx51: Fix input path of some pins
-	in gpio mode
-In-Reply-To: <20100927143134.GX23406@pengutronix.de>
-References: <20100927135009.GC6271@pengutronix.de>
-	<1285595476-10025-33-git-send-email-u.kleine-koenig@pengutronix.de>
-	<19616.42835.922236.123809@ipc1.ka-ro>
-	<20100927143134.GX23406@pengutronix.de>
-Message-ID: <20100927144751.GE6271@pengutronix.de>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Mon, 27 Sep 2010 20:19:11 +0530 (IST)
+Subject: [PATCH 00/13 v3] OMAP: Serial: Add omap-serial driver with
+	platform support
+Message-ID: <43448.10.24.255.17.1285598951.squirrel@dbdmail.itg.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+This patch series adds a serial driver to handle uarts on omap platforms.
+Currenlty omap-uarts are handled with 8250 driver, since updating
+this driver with omap specific features will over load
+the 8250 driver with all omap-specific data thus a new driver
+is added to configure and support features like
+dma, h/w, s/w flowcontrol for omap-uarts.
+Also the patch series updates various low level platform specific
+serial data to support omap-uarts with hwmod framework and adds support
+for uart4 on OMAP3630.
 
-On Mon, Sep 27, 2010 at 04:31:34PM +0200, Sascha Hauer wrote:
-> On Mon, Sep 27, 2010 at 04:16:51PM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > > diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> > > index 9250273..639d631 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> > > +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> > > @@ -274,15 +274,15 @@ typedef enum iomux_config {
-> > >  #define MX51_PAD_USBH1_DATA5__USBH1_DATA5       IOMUX_PAD(0x69C, 0x29C, 0, 0x0,   0, MX51_USBH1_PAD_CTRL)
-> > >  #define MX51_PAD_USBH1_DATA6__USBH1_DATA6       IOMUX_PAD(0x6A0, 0x2A0, 0, 0x0,   0, MX51_USBH1_PAD_CTRL)
-> > >  #define MX51_PAD_USBH1_DATA7__USBH1_DATA7       IOMUX_PAD(0x6A4, 0x2A4, 0, 0x0,   0, MX51_USBH1_PAD_CTRL)
-> > > -#define MX51_PAD_DI1_PIN11__GPIO_3_0            IOMUX_PAD(0x6A8, 0x2A8, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DI1_PIN12__GPIO_3_1            IOMUX_PAD(0x6AC, 0x2AC, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DI1_PIN13__GPIO_3_2            IOMUX_PAD(0x6B0, 0x2B0, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DI1_D0_CS__GPIO_3_3            IOMUX_PAD(0x6B4, 0x2B4, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DI1_D1_CS__GPIO_3_4            IOMUX_PAD(0x6B8, 0x2B8, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DISPB2_SER_DIN__GPIO_3_5       IOMUX_PAD(0x6BC, 0x2BC, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DISPB2_SER_DIO__GPIO_3_6       IOMUX_PAD(0x6C0, 0x2C0, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DISPB2_SER_CLK__GPIO_3_7       IOMUX_PAD(0x6C4, 0x2C4, 4, 0x0,   0, NO_PAD_CTRL)
-> > > -#define MX51_PAD_DISPB2_SER_RS__GPIO_3_8        IOMUX_PAD(0x6C8, 0x2C8, 4, 0x0,   0, NO_PAD_CTRL)
-> > > +#define MX51_PAD_DI1_PIN11__GPIO_3_0            IOMUX_PAD(0x6A8, 0x2A8, 4, 0x974, 1, NO_PAD_CTRL)
-> >                                                                               ^^^^^
-> > Where did you get this from?
-> > According to my copy of the i.MX51 Reference Manual (MCIMX51RM Rev. 0 11/2009)
-> > the register at 0x974 is IOMUXC_FEC_FEC_TX_CLK_SELECT_INPUT which
-> > controls the pads:
-> > |0: Selecting BGA contact: NANDF_RDY_INT for Mode: ALT1.
-> > |1: Selecting BGA contact: DISP2_DAT13 for Mode: ALT2.
-> > but not DI1_PIN11. DI1_PIN11 does not have any input mux.
-> 
-> Indeed, checked in the newer rev1 Manual from 2/2010 aswell.
-So I assume the definition for MX51_PAD_DI1_PIN11__GPIO_3_0 has to stay
-as it was, i.e.
+Patch series applies cleanly on pm-core branch on kevins PM tree.
+http://git.kernel.org/?p=linux/kernel/git/khilman/linux-omap-pm.git;
+a=shortlog;h=refs/heads/pm-core
 
-#define MX51_PAD_DI1_PIN11__GPIO_3_0 IOMUX_PAD(0x6A8, 0x2A8, 4, 0x0, 0, NO_PAD_CTRL)
+Patch series Testing Status Update:
+-----------------------------------
+OMAP4:(SDP): Boot tested with ttyO* and ttyS* interfaces using this patch series.
 
-Will fix up accordingly.
+OMAP2(2430SDP): Boot tested with ttyO* and ttyS* interfaces using this patch series.
+		(Couldn't test pm functionality here due to board shortage).
 
-@Lothar: good catch, I'm glad you're that attentive.
+OMAP3:(3430/3630SDP, ZOOM2/3):
+Boot tested for console with ttyS* and ttyO* interfaces.
+PM functionality checked omap3:
+1) ret count: debugfs mounted sleep_while_idle enabled, checked for ret count
+   values to increment this was done by setting sysfs timeout for all uarts.
+   Also checked by unsetting uart sysfs timeout to check ret count
+   stopped incrementing.
+2) core off count: debugfs mounted sleep_while_idle and enable_off_mode enabled
+   checked for core_off count to increment for core/per_pwrdm.
+3) Susupend: Done using echo mem > /sys/power/state.
+   Ensured no difference in behaviour with and without this patch series.
 
-Thanks
-Uwe
+v2 to v3 changes:
+-----------------
+1) Minor changes with omap-serial
+	https://patchwork.kernel.org/patch/199652/
+2) Undo the timeout macro modification done by mistake.
+	https://patchwork.kernel.org/patch/199642/
+3) update description log for patch:
+	OMAP3: SERIAL: Initialize all omap-uarts for zoom boards
+	https://patchwork.kernel.org/patch/199672/
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+v1 to v2 changes:
+-----------------
+1) Incorporate timeout check
+       http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35106.html
+2) Add wk_st, padconf etc for uart4
+       http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35105.html
+
+Benoit Cousson (1):
+  OMAP4: UART: Add uart1-4 hwmods data for omap4
+
+Govindraj.R (8):
+  OMAP2: UART: remove set_uart_globals.
+  OMAP clock: Add uart4_ick/fck definitions for 3630
+  OMAP3: PRCM: Consider UART4 for 3630 chip in prcm_setup_regs
+  OMAP3: PM: Add prepare idle and resume idle call for uart4
+  OMAP3: serial: Fix uart4 handling for 3630
+  serial: Add OMAP high-speed UART driver
+  OMAP: SERIAL: Enable omap-serial driver in Kconfig.
+  OMAP3: SERIAL: Initialize all omap-uarts for zoom boards
+
+Kevin Hilman (4):
+  OMAP2/3: UART: add omap_hwmod data for UARTs 1-4
+  OMAP: UART: omap_device converions, remove implicit 8520 assumptions
+  OMAP: UART: don't do automatic bus-level suspend/resume
+  OMAP: UART: use non-locking versions of hwmod enable/idle functions
+
+ arch/arm/mach-omap2/Kconfig                   |   11 +-
+ arch/arm/mach-omap2/board-3630sdp.c           |    1 -
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |    1 +
+ arch/arm/mach-omap2/clock3xxx_data.c          |   22 +
+ arch/arm/mach-omap2/cm-regbits-34xx.h         |    2 +
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c    |  193 ++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c    |  193 ++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |  253 +++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |  235 +++++
+ arch/arm/mach-omap2/pm34xx.c                  |   17 +-
+ arch/arm/mach-omap2/prcm-common.h             |    5 +
+ arch/arm/mach-omap2/prm-regbits-34xx.h        |    1 +
+ arch/arm/mach-omap2/serial.c                  |  555 ++++++-----
+ arch/arm/plat-omap/common.c                   |   16 -
+ arch/arm/plat-omap/include/plat/common.h      |    1 -
+ arch/arm/plat-omap/include/plat/dma.h         |    2 +
+ arch/arm/plat-omap/include/plat/irqs.h        |    2 +
+ arch/arm/plat-omap/include/plat/omap-serial.h |  129 +++
+ drivers/serial/Kconfig                        |   27 +
+ drivers/serial/Makefile                       |    1 +
+ drivers/serial/omap-serial.c                  | 1333 +++++++++++++++++++++++++
+ include/linux/serial_core.h                   |    3 +
+ 22 files changed, 2707 insertions(+), 296 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/omap-serial.h
+ create mode 100644 drivers/serial/omap-serial.c
