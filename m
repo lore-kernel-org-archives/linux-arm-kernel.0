@@ -1,70 +1,86 @@
 From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Mon, 27 Sep 2010 19:41:45 +0530
-Subject: [PATCH RESEND v5 0/5] nand prefetch-irq support and ecc layout chanage
-Message-ID: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
+Date: Mon, 27 Sep 2010 19:41:50 +0530
+Subject: [PATCH RESEND v5 5/5] omap: nand: making ecc layout as compatible
+	with romcode ecc
+In-Reply-To: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
+References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
+Message-ID: <1285596710-25658-6-git-send-email-s-ghorai@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following set of patches applies on linux-2.6.
-     
-The main motivations behind this patch series are -
-	1. support NAND I/O in irq mode.
-	2. support of different ECC schema. 
-	3. also to make ecc layout as like in romcode ecc layout
+This patch overrides nand ecc layout and bad block descriptor (for 8-bit
+device) to support hw ecc in romcode layout. So as to have in sync with ecc
+layout throughout; i.e. x-loader, u-boot and kernel.
 
-v5: This address the input as to support the irq_chained in GPMC.
-And resend of
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35848.html
+This patch also enables to use romcode ecc for spd and zoom, by default.
 
-v4: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34882.html
-and resend of 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32689.html
+This enables to flash x-loader, u-boot, kernel, FS images from kernel itself
+and compatiable with other tools.
 
-v3: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32071.html
-Rebase on latest codebase and previous patch(posted).	
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31963.html
+Signed-off-by: Vimal Singh <vimalsingh@ti.com>
+Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+---
+ drivers/mtd/nand/omap2.c |   34 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 34 insertions(+), 0 deletions(-)
 
-v2: Rebase on latest codebase and previous patch(posted).	
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31471.html
-
-v1: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26666.html
-
-Sukumar Ghorai (5):
-  omap gpmc: enable irq mode in gpmc
-  omap3: nand: prefetch in irq mode support
-  omap3: nand: configurable fifo threshold to gain the throughput
-  omap: nand: ecc layout select from board file
-  omap: nand: making ecc layout as compatible with romcode ecc
-
- arch/arm/mach-omap2/board-2430sdp.c        |    1 +
- arch/arm/mach-omap2/board-3430sdp.c        |    1 +
- arch/arm/mach-omap2/board-3630sdp.c        |    1 +
- arch/arm/mach-omap2/board-4430sdp.c        |    2 +
- arch/arm/mach-omap2/board-am3517evm.c      |    2 +
- arch/arm/mach-omap2/board-apollon.c        |    1 +
- arch/arm/mach-omap2/board-cm-t35.c         |    1 +
- arch/arm/mach-omap2/board-devkit8000.c     |    1 +
- arch/arm/mach-omap2/board-flash.c          |    5 +-
- arch/arm/mach-omap2/board-generic.c        |    2 +
- arch/arm/mach-omap2/board-h4.c             |    1 +
- arch/arm/mach-omap2/board-igep0020.c       |    1 +
- arch/arm/mach-omap2/board-ldp.c            |    1 +
- arch/arm/mach-omap2/board-n8x0.c           |    2 +
- arch/arm/mach-omap2/board-omap3beagle.c    |    1 +
- arch/arm/mach-omap2/board-omap3evm.c       |    2 +
- arch/arm/mach-omap2/board-omap3pandora.c   |    2 +
- arch/arm/mach-omap2/board-omap3stalker.c   |    1 +
- arch/arm/mach-omap2/board-omap3touchbook.c |    1 +
- arch/arm/mach-omap2/board-omap4panda.c     |    2 +
- arch/arm/mach-omap2/board-overo.c          |    1 +
- arch/arm/mach-omap2/board-rx51.c           |    1 +
- arch/arm/mach-omap2/board-zoom2.c          |    2 +
- arch/arm/mach-omap2/board-zoom3.c          |    2 +
- arch/arm/mach-omap2/gpmc.c                 |   48 +++++-
- arch/arm/mach-omap2/io.c                   |    2 -
- arch/arm/plat-omap/include/plat/gpmc.h     |   16 ++-
- arch/arm/plat-omap/include/plat/irqs.h     |    9 +-
- arch/arm/plat-omap/include/plat/nand.h     |    3 +
- drivers/mtd/nand/Kconfig                   |   14 ++-
- drivers/mtd/nand/omap2.c                   |  277 +++++++++++++++++++++++++---
- 31 files changed, 367 insertions(+), 39 deletions(-)
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 3fd9ee0..9ccfd88 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -128,6 +128,20 @@ const int use_dma;
+ const int use_interrupt;
+ #endif
+ 
++/* oob info generated runtime depending on ecc algorithm and layout selected */
++static struct nand_ecclayout omap_oobinfo;
++/* Define some generic bad / good block scan pattern which are used
++ * while scanning a device for factory marked good / bad blocks
++ */
++static uint8_t scan_ff_pattern[] = { 0xff };
++static struct nand_bbt_descr bb_descrip_flashbased = {
++	.options = NAND_BBT_SCANEMPTY | NAND_BBT_SCANALLPAGES,
++	.offs = 0,
++	.len = 1,
++	.pattern = scan_ff_pattern,
++};
++
++
+ struct omap_nand_info {
+ 	struct nand_hw_control		controller;
+ 	struct omap_nand_platform_data	*pdata;
+@@ -946,6 +960,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 	struct omap_nand_info		*info;
+ 	struct omap_nand_platform_data	*pdata;
+ 	int				err;
++	int				i, offset;
+ 
+ 	pdata = pdev->dev.platform_data;
+ 	if (pdata == NULL) {
+@@ -1079,6 +1094,25 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/* rom code layout */
++	if (pdata->ecc_opt != OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT) {
++		offset = (info->nand.options & NAND_BUSWIDTH_16) ? 2 : 1;
++		if (info->mtd.oobsize == 16) {
++			info->nand.badblock_pattern = &bb_descrip_flashbased;
++			omap_oobinfo.eccbytes = 3;
++		} else
++			omap_oobinfo.eccbytes  = 3 * 4;
++
++		for (i = 0; i < omap_oobinfo.eccbytes; i++)
++			omap_oobinfo.eccpos[i] = i+offset;
++
++		omap_oobinfo.oobfree->offset = offset + omap_oobinfo.eccbytes;
++		omap_oobinfo.oobfree->length = info->mtd.oobsize -
++					(offset + omap_oobinfo.eccbytes);
++
++		info->nand.ecc.layout = &omap_oobinfo;
++	}
++
+ #ifdef CONFIG_MTD_PARTITIONS
+ 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
+ 	if (err > 0)
+-- 
+1.7.0.4
