@@ -1,15 +1,15 @@
 From: pieterg@gmx.com (pieterg)
-Date: Mon, 27 Sep 2010 13:38:20 +0200
+Date: Mon, 27 Sep 2010 13:54:40 +0200
 Subject: pxa3xx_nand issues
-In-Reply-To: <AANLkTik8N+ATdhygBsatnrYJ0MOLd+L5ujB47Xrf_O_D@mail.gmail.com>
+In-Reply-To: <AANLkTik47Q48EbjFz9eak0vF1AstWv_sgB+BPQtDWEVF@mail.gmail.com>
 References: <201009221912.24905.pieterg@gmx.com>
 	<201009231729.48147.pieterg@gmx.com>
-	<AANLkTik8N+ATdhygBsatnrYJ0MOLd+L5ujB47Xrf_O_D@mail.gmail.com>
-Message-ID: <201009271338.21084.pieterg@gmx.com>
+	<AANLkTik47Q48EbjFz9eak0vF1AstWv_sgB+BPQtDWEVF@mail.gmail.com>
+Message-ID: <201009271354.41094.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 25 September 2010 04:50:04 Haojian Zhuang wrote:
+On Sunday 26 September 2010 16:32:47 Lei Wen wrote:
 > On Thu, Sep 23, 2010 at 11:29 PM, pieterg <pieterg@gmx.com> wrote:
 > > On Thursday 23 September 2010 13:32:26 pieterg wrote:
 > >> On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
@@ -59,7 +59,21 @@ On Saturday 25 September 2010 04:50:04 Haojian Zhuang wrote:
 > > Without it, the OOB data doesn't get written.
 > > So we can close this part of the topic, commit 7f9938d0 is perfectly
 > > fine.
-> >
+>
+> PXA3xx NAND controller write semantic is to send whole page of data to
+> the NAND flash with
+> the page's address. If you set the ndcr1 not page align value, it is
+> also fine by pxa3xx_nand
+> sending the data to the flash, but nand flash would not accept this
+> kind of behavior as
+> it is defined in its spec.
+>
+> Certainly, if you really need to do this, there is still has ways. :)
+> Send the RANDOM DATA INPUT command (0x80 + 5cycle address + 0x85 +
+> 2cycles column address) + 0x10 would serve this.
+> But seems the pxa310 cannot do such job, which is supported by newer
+> silicon in pxa168 or mmp2.
+>
 > >> I could identify about 10 eraseblocks with pages which produce
 > >> single/double bit errors.
 > >> After I marked them bad (manually), I've seen no more bit errors, and
@@ -75,18 +89,48 @@ On Saturday 25 September 2010 04:50:04 Haojian Zhuang wrote:
 > > Only after the filesystem has been mounted, gets modified, and then
 > > after the first reboot, the biterrors are there.
 >
-> Could you make sure whether these "wrong" block are truely bad block?
-> Maybe you can erase/write them continuously multi-times in XDB.
+> You may notice that when a new file system is mounted, the flash is
+> only read by controller.
+> This mean your uboot is all right for writing, and your kernel is also
+> ok for reading.
+> While your driver write function may got broken. Timing? Not so sure...
+>
+> > One other issue which I noticed because besides double bit errors I get
+> > many single bit errors as well; the ERR_SBERR is never cleared.
+> > ERR_DBERR is cleared to ERR_NONE in two locations, but ERR_SBERR is
+> > not. (probably in order to allow pxa3xx_nand_ecc_correct to pick it up)
+> > However, I've seen that the retcode could still be ERR_SBERR in
+> > pxa3xx_nand_waitfunc, causing an erase error to be assumed, as a result
+> > all eraseblocks in the partition ended up being marked bad in a loop,
+> > till there were no more remaining eraseblocks.
+> > I guess ERR_SBERR should probably be ignored in pxa3xx_nand_waitfunc?
+>
+> Em, Although ERR_SBERR indicate this error can be corrected by nand
+> controller, it
+> still make sense to report this to upper level. FS like UBIFS could
+> use this message to
+> do the flash data integrity maintenance. This already be fixed in my
+> patch set which
+> sent a month ago.
+>
+> > That's what I did in the remainder of my tests (after having unmarked
+> > the blocks that were wrongly marked bad) so I think this issue did not
+> > contribute to my biterror problems.
+>
+> Biterr may be caused by timing, bad block... I think you'd better use
+> the mtd test built in linux
+> kernel to make sure timing is all right.
 
-Unfortunately I don't have XDB.
-However, I can erase/write/read them with u-boot and with the kernel 
-(flash_eraseall / nandwrite), several times, without ever getting a 
-NDSR_CS0_BBD status.
-However, I get many NDSR_DBERR and NDSR_SBERR interrupts.
+Which mtd test in particular?
+I've run most tests, without any errors:
 
-But because these occur during a read, the kernel never takes any action, 
-the blocks will not be marked bad.
-(And I find it hard to believe that such a huge number of blocks on a brand 
-new chip would actually be bad)
+-oobtest (complains only about read-past-oob-size not returning a proper 
+error)
+-pagetest
+-subpagetest
+-readtest
+-speedtest
+
+Not even a single bit error during any of those tests.
 
 Rgds, Pieter
