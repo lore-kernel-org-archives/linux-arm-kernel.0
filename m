@@ -1,74 +1,38 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 27 Sep 2010 15:51:01 +0200
-Subject: [PATCH 25/40] ARM: mx5/clock-mx51: refactor ccgr callbacks to use
-	common code
+Date: Mon, 27 Sep 2010 15:50:38 +0200
+Subject: [PATCH 02/40] ARM: imx: ehci: use void __iomem * to hold i/o addresses
 In-Reply-To: <20100927135009.GC6271@pengutronix.de>
 References: <20100927135009.GC6271@pengutronix.de>
-Message-ID: <1285595476-10025-25-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1285595476-10025-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jason Wang <jason77.wang@gmail.com>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+This fixes:
+
+	arch/arm/plat-mxc/ehci.c: In function 'mxc_initialize_usb_hw':
+	arch/arm/plat-mxc/ehci.c:260: warning: assignment makes integer from pointer without a cast
+	arch/arm/plat-mxc/ehci.c:263: warning: assignment makes integer from pointer without a cast
+	arch/arm/plat-mxc/ehci.c:270: warning: assignment makes integer from pointer without a cast
+
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx5/clock-mx51.c |   30 ++++++++++++++++--------------
- 1 files changed, 16 insertions(+), 14 deletions(-)
+ arch/arm/plat-mxc/ehci.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-index 57c10a9..fe658bf 100644
---- a/arch/arm/mach-mx5/clock-mx51.c
-+++ b/arch/arm/mach-mx5/clock-mx51.c
-@@ -41,34 +41,36 @@ static struct clk usboh3_clk;
+diff --git a/arch/arm/plat-mxc/ehci.c b/arch/arm/plat-mxc/ehci.c
+index 35a064f..9915607 100644
+--- a/arch/arm/plat-mxc/ehci.c
++++ b/arch/arm/plat-mxc/ehci.c
+@@ -249,8 +249,8 @@ int mxc_initialize_usb_hw(int port, unsigned int flags)
+ #ifdef CONFIG_ARCH_MX51
+ 	if (cpu_is_mx51()) {
+ 		void __iomem *usb_base;
+-		u32 usbotg_base;
+-		u32 usbother_base;
++		void __iomem *usbotg_base;
++		void __iomem *usbother_base;
+ 		int ret = 0;
  
- #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
- 
--static int _clk_ccgr_enable(struct clk *clk)
-+static void _clk_ccgr_setclk(struct clk *clk, unsigned mode)
- {
--	u32 reg;
-+	u32 reg = __raw_readl(clk->enable_reg);
-+
-+	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
-+	reg |= mode << clk->enable_shift;
- 
--	reg = __raw_readl(clk->enable_reg);
--	reg |= MXC_CCM_CCGRx_MOD_ON << clk->enable_shift;
- 	__raw_writel(reg, clk->enable_reg);
-+}
- 
-+static int _clk_ccgr_enable(struct clk *clk)
-+{
-+	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_ON);
- 	return 0;
- }
- 
- static void _clk_ccgr_disable(struct clk *clk)
- {
--	u32 reg;
--	reg = __raw_readl(clk->enable_reg);
--	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
--	__raw_writel(reg, clk->enable_reg);
-+	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_OFF);
-+}
- 
-+static int _clk_ccgr_enable_inrun(struct clk *clk)
-+{
-+	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE);
-+	return 0;
- }
- 
- static void _clk_ccgr_disable_inwait(struct clk *clk)
- {
--	u32 reg;
--
--	reg = __raw_readl(clk->enable_reg);
--	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
--	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
--	__raw_writel(reg, clk->enable_reg);
-+	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE);
- }
- 
- /*
+ 		usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
 -- 
 1.7.2.3
