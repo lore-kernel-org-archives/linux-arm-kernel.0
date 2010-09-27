@@ -1,23 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 27 Sep 2010 19:57:03 +0200
-Subject: imx patches for 2.6.37
-In-Reply-To: <201009271909.58594.philippe.retornaz@epfl.ch>
-References: <20100927135009.GC6271@pengutronix.de>
-	<201009271909.58594.philippe.retornaz@epfl.ch>
-Message-ID: <20100927175703.GB24254@pengutronix.de>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 27 Sep 2010 19:38:45 +0100
+Subject: [PATCH v3 0/5] mfd: regulator: max8998: BUCK1/2 control
+	augmented by GPIO pins
+In-Reply-To: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
+References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <1285612725.9061.29.camel@vega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Philippe,
+On Mon, 2010-09-27 at 14:32 +0200, Lukasz Majewski wrote:
+> This patch series provides the "fast patch" for BUCK1/2 voltage setting. When requested
+> voltage is required and it is available at MAX8998 internal registers, no I2C communication
+> is performed and voltage is changed by GPIO setting.
+> 
+> For BUCK1 two predefined, maximum voltages may be defined. BUCK2 allows for one such 
+> value definition.
+> 
+> Changes v3:
+> - GPIOs not defined at platform data ( i.e. = 0) are causing WARN_ON
+> - patches are presenting changes in the driver in a more clear way
+> - ability to add predefined (preferably maximal) voltage values
+> - no constants used when predefined voltage values defined
+> - checks if driver is operating at valid GPIOs 
+> 
+> Lukasz Majewski (5):
+>   mfd: regulator: max8998: separate set_voltage for ldo and buck
+>   mfd: regulator: max8998: Support for chips compliant with max8998
+>   mfd: regulator: max8998: BUCK1/2 internal voltages and their index
+>     added
+>   mfd: regulator: max8998: voltages and GPIOs added to platform data
+>     structure
+>   mfd: regulator: max8998: BUCK1/2 voltage change with use of GPIOs
+> 
+>  drivers/mfd/max8998.c               |    5 +-
+>  drivers/regulator/max8998.c         |  257 ++++++++++++++++++++++++++++++++---
+>  include/linux/mfd/max8998-private.h |   23 +++-
+>  include/linux/mfd/max8998.h         |   12 ++
+>  4 files changed, 268 insertions(+), 29 deletions(-)
 
-On Mon, Sep 27, 2010 at 07:09:58PM +0200, Philippe R?tornaz wrote:
-> Are the sdma patches in the pipeline too ? Or it will be for .38 ? 
-SDMA is not my line of country but Sascha's.  AFAIK he waits for
-comments from Dan.
+Do you want to take this or shall I ?
 
-Best regards
-Uwe
+Thanks
+
+Liam
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
