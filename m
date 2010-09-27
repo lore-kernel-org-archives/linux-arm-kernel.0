@@ -1,32 +1,23 @@
-From: pieterg@gmx.com (pieterg)
-Date: Mon, 27 Sep 2010 19:39:04 +0200
-Subject: pxa3xx_nand issues
-In-Reply-To: <201009271550.50399.pieterg@gmx.com>
-References: <201009221912.24905.pieterg@gmx.com>
-	<AANLkTi==hNcdTg9TNDxVmx4SuhnmDYXx_d_H1Q8Z6wOH@mail.gmail.com>
-	<201009271550.50399.pieterg@gmx.com>
-Message-ID: <201009271939.04710.pieterg@gmx.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 27 Sep 2010 19:57:03 +0200
+Subject: imx patches for 2.6.37
+In-Reply-To: <201009271909.58594.philippe.retornaz@epfl.ch>
+References: <20100927135009.GC6271@pengutronix.de>
+	<201009271909.58594.philippe.retornaz@epfl.ch>
+Message-ID: <20100927175703.GB24254@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 September 2010 15:50:50 pieterg wrote:
-> On Monday 27 September 2010 14:22:37 Lei Wen wrote:
-> > Does your jffs2 image make correct? Page size and block size set right?
->
-> I think so.
-> --eraseblock=0x20000 --pad --no-cleanmarkers
+Hello Philippe,
 
-Well... that caused most of my problems.
---pad means pad to eraseblock size, not pagesize.
-So the first writes in the new filesystem would cause pages in that last 
-eraseblock to be overwritten.
-With SLC I always got away with that, but with MLC, clearly not.
+On Mon, Sep 27, 2010 at 07:09:58PM +0200, Philippe R?tornaz wrote:
+> Are the sdma patches in the pipeline too ? Or it will be for .38 ? 
+SDMA is not my line of country but Sascha's.  AFAIK he waits for
+comments from Dan.
 
-(now I'm still left with lots of singlebit errors, and occasional jffs2 CRC 
-errors, pxa3xx_nand was obviously not meant to deal with such low quality 
-MLC, no action is taken on bit errors, but at least everything can be 
-explained now)
+Best regards
+Uwe
 
-Thanks everybody for helping me find the cause of this problem.
-
-Rgds, Pieter
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
