@@ -1,231 +1,96 @@
-From: kishorek.kadiyala@gmail.com (kishore kadiyala)
-Date: Mon, 27 Sep 2010 13:25:01 +0530
-Subject: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for MMC1
-In-Reply-To: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
-References: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
-Message-ID: <AANLkTi=YvtrfmUTc-YBAUjEXn1v3pPLmhb92J60AhU28@mail.gmail.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Mon, 27 Sep 2010 11:20:00 +0300
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <4C9FE2C4.8070302@fluff.org>
+References: <20100923190212.18863.25678.stgit@darius-desktop>
+	<4C9BE577.4050504@fluff.org>
+	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+	<4C9CD3E0.6060000@gmail.com> <4C9FE2C4.8070302@fluff.org>
+Message-ID: <AANLkTimy=eJKeANFi7VspoB6GrRzW1=36vjbfuNqPRRJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+On Mon, Sep 27, 2010 at 3:18 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On 24/09/10 17:37, Paulius Zaleckas wrote:
+>> On 09/24/2010 09:57 AM, Darius Augulis wrote:
+>>> Hi,
+>>>
+>>> On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks<ben-linux@fluff.org> ?wrote:
+>>>> On 23/09/10 20:15, Darius Augulis wrote:
+>>>>> Swap device and driver names in serial/samsung.c
+>>>>
+>>>> This is far too short, please see the notes below on trying
+>>>> to make this more informative.
+>>>>
+>>>>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+>>>>> ---
+>>>>>
+>>>>> This patch was submitted about 3 months ago, but still not merged.
+>>>>> There was another similar patch from Joonyoung Shim
+>>>>> <jy0922.shim@samsung.com> ?and was discussed here:
+>>>>> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+>>>>> Joonyoung Shim acked my patch and other people on ARM mailing list
+>>>>> acked it. The maintainer, Ben Dooks, still not responding for
+>>>>> a long time. Another maintainer, Kukjin Kim, refused to merge
+>>>>> it without Ben's review.
+>>>>> I would like to ask somebody pick up this bugfix.
+>>>>
+>>>> I belive last time this was brought up I asked about the affect
+>>>> this has on the userspace. The following issues would be helpful
+>>>> or essential to have noted in the header about the effect of this.
+>>>>
+>>>> - Does it change the /dev name of the device? if so I would thinl
+>>>> ? carefully about applying it, as it would be a change in the way
+>>>> ? that userspace sees the kernel.
+>>>
+>>> It does - now devices are named /dev/s3c2410_serial, and patch changes
+>>> its name to /dev/ttySAC
+>>>
+>>>>
+>>>> - Does it change the kernel output itself? A note on what diffeences
+>>>> ? can be seen in things like dmesg would be helpful.
+>>>
+>>> It does. Serial driver reports device names when probing, so there
+>>> will appear ttySACx instead of
+>>> s3c2410_serialx.
+>>>
+>>>>
+>>>> - Are there any other side effects
+>>>>
+>>>> - Why is this a bug? Maybe the previous points will explain what is
+>>>> ? going on, but if not, then a reasonably concise description of
+>>>> ? what is going on here.
+>>>
+>>> This is bug, because of several points:
+>>>
+>>> 1. Because it contradicts kernel documentation. Please read
+>>> Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
+>>> This should be enough to apply this patch.
+>>>
+>>> 2. Because s3c2410_serial isn't correct name for serial device node.
+>>> It's name of Samsung serial driver.
+>>>
+>>> 3. Because now almost all userspace systems workaround it by creating
+>>> symlink
+>>> /dev/ttySACx> ?/dev/s3c2410_serialx and only then put some getty on
+>>> created symlink, not on original device.
+>>> Systems which don't create this symlink, fail to boot at all, because
+>>> of wrong console name. Good example is Buildroot.
+>>
+>> I had similar issue with buildroot too, because in /etc/securetty it is
+>> defained as ttySAC0
+>>
+>> 4. For console in kernel boot command line you must enter console=ttySACx.
+>> Why it sould be different in userspace?
+>>
+>> For me it seems taht this bug was not noticed earlier, because most
+>> embedded
+>> systems were using static device nodes and ttySACx was used in these cases.
+>
+> As long as these are explained, then I'm reasonably happy for this to be
+> applied, as long as there are no other complaints.
+>
+> However, this is a big change, and I think it should await the next
+> merge window.
 
-On Fri, Sep 24, 2010 at 10:43 PM, kishore kadiyala
-<kishore.kadiyala@ti.com> wrote:
-> Adding card detect callback function and card detect configuration
-> function for MMC1 Controller on OMAP4.
->
-> Card detect configuration function does initial configuration of the
-> MMC Control & PullUp-PullDown registers of Phoenix.
->
-> For MMC1 Controller, card detect interrupt source is
-> twl6030 which is non-gpio. The card detect call back function provides
-> card present/absent status by reading MMC Control register present
-> on twl6030.
->
-> Since OMAP4 doesn't use any GPIO line as used in OMAP3 for card detect,
-> the suspend/resume initialization which was done in omap_hsmmc_gpio_init
-> previously is moved to the probe thus making it generic for both OMAP3 & OMAP4.
->
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Madhusudhan Chikkature <madhu.cr@ti.com>
-> Cc: Adrian Hunter <adrian.hunter@nokia.com>
-> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
-> ---
-> ?arch/arm/mach-omap2/board-4430sdp.c | ? ?7 +++-
-> ?drivers/mfd/twl6030-irq.c ? ? ? ? ? | ? 73 +++++++++++++++++++++++++++++++++++
-> ?drivers/mmc/host/omap_hsmmc.c ? ? ? | ? ?4 +-
-> ?include/linux/i2c/twl.h ? ? ? ? ? ? | ? 31 +++++++++++++++
-> ?4 files changed, 112 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 9447644..a49f285 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -227,9 +227,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
-> ? ? ? ?struct omap_mmc_platform_data *pdata = dev->platform_data;
->
-> ? ? ? ?/* Setting MMC1 Card detect Irq */
-> - ? ? ? if (pdev->id == 0)
-> + ? ? ? if (pdev->id == 0) {
-> + ? ? ? ? ? ? ? ret = twl6030_mmc_card_detect_config();
-> + ? ? ? ? ? ? ? if (ret)
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("Failed configuring MMC1 card detect\n");
-> ? ? ? ? ? ? ? ?pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MMCDETECT_INTR_OFFSET;
-> + ? ? ? ? ? ? ? pdata->slots[0].card_detect = twl6030_mmc_card_detect;
-> + ? ? ? }
-> ? ? ? ?return ret;
-> ?}
->
-> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
-> index 10bf228..2d3bb82 100644
-> --- a/drivers/mfd/twl6030-irq.c
-> +++ b/drivers/mfd/twl6030-irq.c
-> @@ -36,6 +36,7 @@
-> ?#include <linux/irq.h>
-> ?#include <linux/kthread.h>
-> ?#include <linux/i2c/twl.h>
-> +#include <linux/platform_device.h>
->
-> ?/*
-> ?* TWL6030 (unlike its predecessors, which had two level interrupt handling)
-> @@ -223,6 +224,78 @@ int twl6030_interrupt_mask(u8 bit_mask, u8 offset)
-> ?}
-> ?EXPORT_SYMBOL(twl6030_interrupt_mask);
->
-> +int twl6030_mmc_card_detect_config(void)
-> +{
-> + ? ? ? int ret;
-> + ? ? ? u8 reg_val = 0;
-> +
-> + ? ? ? /* Unmasking the Card detect Interrupt line for MMC1 from Phoenix */
-> + ? ? ? twl6030_interrupt_unmask(TWL6030_MMCDETECT_INT_MASK,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? REG_INT_MSK_LINE_B);
-> + ? ? ? twl6030_interrupt_unmask(TWL6030_MMCDETECT_INT_MASK,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? REG_INT_MSK_STS_B);
-> + ? ? ? /*
-> + ? ? ? ?* Intially Configuring MMC_CTRL for receving interrupts &
-> + ? ? ? ?* Card status on TWL6030 for MMC1
-> + ? ? ? ?*/
-> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val, TWL6030_MMCCTRL);
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read MMCCTRL, error %d\n", ret);
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> + ? ? ? reg_val &= ~VMMC_AUTO_OFF;
-> + ? ? ? reg_val |= SW_FC;
-> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val, TWL6030_MMCCTRL);
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write MMCCTRL, error %d\n", ret);
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> +
-> + ? ? ? /* Configuring PullUp-PullDown register */
-> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read CFG_INPUT_PUPD3, error %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> + ? ? ? reg_val &= ~(MMC_PU | MMC_PD);
-> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write CFG_INPUT_PUPD3, error %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> + ? ? ? return 0;
-> +}
-> +EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
-> +
-> +int twl6030_mmc_card_detect(struct device *dev, int slot)
-> +{
-> + ? ? ? int ret = -EIO;
-> + ? ? ? u8 read_reg = 0;
-> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> +
-> + ? ? ? if (pdev->id) {
-> + ? ? ? ? ? ? ? /* TWL6030 provide's Card detect support for
-> + ? ? ? ? ? ? ? ?* only MMC1 controller.
-> + ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? pr_err("Unkown MMC controller %d in %s\n", pdev->id, __func__);
-> + ? ? ? ? ? ? ? return ret;
-> + ? ? ? }
-> + ? ? ? /*
-> + ? ? ? ?* BIT0 of MMC_CTRL on TWL6030 provides card status for MMC1
-> + ? ? ? ?* 0 - Card not present ,1 - Card present
-> + ? ? ? ?*/
-> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &read_reg,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_MMCCTRL);
-> + ? ? ? if (ret >= 0)
-> + ? ? ? ? ? ? ? ret = read_reg & STS_MMC;
-> + ? ? ? return ret;
-> +}
-> +EXPORT_SYMBOL(twl6030_mmc_card_detect);
-> +
-> ?int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
-> ?{
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 562dbbb..a51894d 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -466,8 +466,6 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
-> ? ? ? ?int ret;
->
-> ? ? ? ?if (gpio_is_valid(pdata->slots[0].switch_pin)) {
-> - ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
-> - ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
-> ? ? ? ? ? ? ? ?if (pdata->slots[0].cover)
-> ? ? ? ? ? ? ? ? ? ? ? ?pdata->slots[0].get_cover_state =
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_cover_state;
-> @@ -2211,6 +2209,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"Unable to grab MMC CD IRQ\n");
-> ? ? ? ? ? ? ? ? ? ? ? ?goto err_irq_cd;
-> ? ? ? ? ? ? ? ?}
-> + ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
-> + ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
-> ? ? ? ?}
->
-> ? ? ? ?omap_hsmmc_disable_irq(host);
-> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-> index 6de90bf..e64894c 100644
-> --- a/include/linux/i2c/twl.h
-> +++ b/include/linux/i2c/twl.h
-> @@ -141,6 +141,16 @@
-> ?#define TWL6030_CHARGER_CTRL_INT_MASK ?0x10
-> ?#define TWL6030_CHARGER_FAULT_INT_MASK ? ? ? ? 0x60
->
-> +#define TWL6030_MMCCTRL ? ? ? ? ? ? ? ?0xEE
-> +#define VMMC_AUTO_OFF ? ? ? ? ? ? ? ? ?(0x1 << 3)
-> +#define SW_FC ? ? ? ? ? ? ? ? ? ? ? ? ?(0x1 << 2)
-> +#define STS_MMC ? ? ? ? ? ? ? ? ? ? ? ?0x1
-> +
-> +#define TWL6030_CFG_INPUT_PUPD3 ? ? ? ?0xF2
-> +#define MMC_PU ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 3)
-> +#define MMC_PD ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 2)
-> +
-> +
->
-> ?#define TWL4030_CLASS_ID ? ? ? ? ? ? ? 0x4030
-> ?#define TWL6030_CLASS_ID ? ? ? ? ? ? ? 0x6030
-> @@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
-> ?int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
-> ?int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
->
-> +/* Card detect Configuration for MMC1 Controller on OMAP4 */
-> +#ifdef CONFIG_TWL4030_CORE
-> +int twl6030_mmc_card_detect_config(void);
-> +#else
-> +static inline int twl6030_mmc_card_detect_config(void)
-> +{
-> + ? ? ? pr_debug("twl6030_mmc_card_detect_config not supported\n");
-> + ? ? ? return 0;
-> +}
-> +#endif
-> +
-> +/* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
-> +#ifdef CONFIG_TWL4030_CORE
-> +int twl6030_mmc_card_detect(struct device *dev, int slot);
-> +#else
-> +static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
-> +{
-> + ? ? ? pr_debug("Call back twl6030_mmc_card_detect not supported\n");
-> + ? ? ? return -EIO;
-> +}
-> +#endif
-> ?/*----------------------------------------------------------------------*/
->
-> ?/*
-> --
-> 1.7.0.4
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+I also agree that it should be applied to next release.
