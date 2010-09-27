@@ -1,18 +1,24 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 27 Sep 2010 01:13:42 +0100
-Subject: [PATCH] ARM: s3c2442: gta02: Fix usage gpio bank j pin definitions
-In-Reply-To: <1285352658-20355-1-git-send-email-lars@metafoo.de>
-References: <1285352658-20355-1-git-send-email-lars@metafoo.de>
-Message-ID: <4C9FE1B6.2060005@fluff.org>
+Date: Mon, 27 Sep 2010 01:17:01 +0100
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <20100924073453.GA3840@richter>
+References: <20100923190212.18863.25678.stgit@darius-desktop>	<4C9BE577.4050504@fluff.org>	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+	<20100924073453.GA3840@richter>
+Message-ID: <4C9FE27D.80407@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/10 19:24, Lars-Peter Clausen wrote:
-> The gta02 header file still uses the old S3C2410_GPJx defines instead of the
-> S3C2410_GPJ(x) macro. Since the S3C2410_GPJx defines have already been removed
-> this causes a build failure.
-> This patches fixes the issue by doing a s,S3C2410_GPJ([\d]+),S3C2410_GPJ(\1),g
-> on the file.
+On 24/09/10 08:34, Simon Richter wrote:
+> Hi,
+> 
+> On Fri, Sep 24, 2010 at 09:57:19AM +0300, Darius Augulis wrote:
+> 
+>> It does - now devices are named /dev/s3c2410_serial, and patch changes
+>> its name to /dev/ttySAC
+> 
+> I wonder if it'd make sense to name them ttyS[0-9]. I've never
+> understood why the platform standard fixed serial ports on any device
+> should have a different name.
 
-Is this currently causing a build error? If so, please add the snippet
-of the build log. Otherwise it'll get queued for the next merge.
+Different driver. And yes, we've built systems with both this and
+an 8250 base chip.
