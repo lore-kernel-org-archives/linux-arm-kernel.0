@@ -1,83 +1,66 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 27 Sep 2010 14:32:25 +0200
-Subject: [PATCH v3 3/5] mfd: regulator: max8998: BUCK1/2 internal voltages and
-	indexes defined
-In-Reply-To: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <1285590747-32404-4-git-send-email-l.majewski@samsung.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Mon, 27 Sep 2010 14:59:30 +0200
+Subject: [PATCH] KS8695: make add_preferred_console() and device name
+	configurable
+Message-ID: <4CA09532.7010804@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BUCK1/2 internal voltages and indexes defined in the struct max8998_data
-max_get_voltage_register now uses index values to chose proper register
-More generic BUCK1/2 registers names provided
+add_preferred_console() makes sense only when bootloader doesn't
+provide "console" parameter or KS8695s serial port is the only
+UART provided on the system. Otherwise the external UART will
+be omitted even if proper "console" parameter is provided.
 
-Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/regulator/max8998.c         |   10 ++++++++--
- include/linux/mfd/max8998-private.h |   12 ++++++------
- 2 files changed, 14 insertions(+), 8 deletions(-)
+This patch makes add_preferred_console() configurable and port
+name is now configurable too.
 
-diff --git a/drivers/regulator/max8998.c b/drivers/regulator/max8998.c
-index 1e5bd50..7ae0639 100644
---- a/drivers/regulator/max8998.c
-+++ b/drivers/regulator/max8998.c
-@@ -39,6 +39,11 @@ struct max8998_data {
- 	struct max8998_dev	*iodev;
- 	int			num_regulators;
- 	struct regulator_dev	**rdev;
-+	u8                      buck1_vol[4]; /* voltages for selection */
-+	u8                      buck2_vol[2];
-+	unsigned int		buck1_idx; /* index to last changed voltage */
-+					   /* value in a set */
-+	unsigned int		buck2_idx;
- };
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+
+Index: b/drivers/serial/Kconfig
+===================================================================
+--- a/drivers/serial/Kconfig	2010-08-27 01:47:12.000000000 +0200
++++ b/drivers/serial/Kconfig	2010-09-13 12:31:26.000000000 +0200
+@@ -426,6 +426,20 @@
+ 	  receives all kernel messages and warnings and which allows
+ 	  logins in single user mode).
  
- struct voltage_map_desc {
-@@ -218,6 +223,7 @@ static int max8998_get_voltage_register(struct regulator_dev *rdev,
- 				int *_reg, int *_shift, int *_mask)
++config SERIAL_KS8695_CONSOLE_NAME
++	string "Console device name"
++	depends on SERIAL_KS8695_CONSOLE=y
++	default "ttyAM"
++	help
++	  Specify console device name
++
++config SERIAL_KS8695_CONSOLE_PREFFERED
++	bool "Add KS8695 console as preffered one"
++	depends on SERIAL_KS8695_CONSOLE=y
++	help
++	  Adds specified console device name as a preffered console, so any
++	  console=x kernel parameter will be ignored
++
+ config SERIAL_CLPS711X
+ 	tristate "CLPS711X serial port support"
+ 	depends on ARM && ARCH_CLPS711X
+Index: b/drivers/serial/serial_ks8695.c
+===================================================================
+--- a/drivers/serial/serial_ks8695.c	2010-08-27 01:47:12.000000000 +0200
++++ b/drivers/serial/serial_ks8695.c	2010-09-13 12:23:33.000000000 +0200
+@@ -38,7 +38,7 @@
+ 
+ #define SERIAL_KS8695_MAJOR	204
+ #define SERIAL_KS8695_MINOR	16
+-#define SERIAL_KS8695_DEVNAME	"ttyAM"
++#define SERIAL_KS8695_DEVNAME	CONFIG_SERIAL_KS8695_CONSOLE_NAME
+ 
+ #define SERIAL_KS8695_NR	1
+ 
+@@ -650,7 +650,9 @@
+ 
+ static int __init ks8695_console_init(void)
  {
- 	int ldo = max8998_get_ldo(rdev);
-+	struct max8998_data *max8998 = rdev_get_drvdata(rdev);
- 	int reg, shift = 0, mask = 0xff;
- 
- 	switch (ldo) {
-@@ -254,10 +260,10 @@ static int max8998_get_voltage_register(struct regulator_dev *rdev,
- 		reg = MAX8998_REG_LDO12 + (ldo - MAX8998_LDO12);
- 		break;
- 	case MAX8998_BUCK1:
--		reg = MAX8998_REG_BUCK1_DVSARM1;
-+		reg = MAX8998_REG_BUCK1_VOLTAGE1 + max8998->buck1_idx;
- 		break;
- 	case MAX8998_BUCK2:
--		reg = MAX8998_REG_BUCK2_DVSINT1;
-+		reg = MAX8998_REG_BUCK2_VOLTAGE1 + max8998->buck2_idx;
- 		break;
- 	case MAX8998_BUCK3:
- 		reg = MAX8998_REG_BUCK3;
-diff --git a/include/linux/mfd/max8998-private.h b/include/linux/mfd/max8998-private.h
-index 0ff4211..7363dea 100644
---- a/include/linux/mfd/max8998-private.h
-+++ b/include/linux/mfd/max8998-private.h
-@@ -48,12 +48,12 @@ enum {
- 	MAX8998_REG_ONOFF2,
- 	MAX8998_REG_ONOFF3,
- 	MAX8998_REG_ONOFF4,
--	MAX8998_REG_BUCK1_DVSARM1,
--	MAX8998_REG_BUCK1_DVSARM2,
--	MAX8998_REG_BUCK1_DVSARM3,
--	MAX8998_REG_BUCK1_DVSARM4,
--	MAX8998_REG_BUCK2_DVSINT1,
--	MAX8998_REG_BUCK2_DVSINT2,
-+	MAX8998_REG_BUCK1_VOLTAGE1,
-+	MAX8998_REG_BUCK1_VOLTAGE2,
-+	MAX8998_REG_BUCK1_VOLTAGE3,
-+	MAX8998_REG_BUCK1_VOLTAGE4,
-+	MAX8998_REG_BUCK2_VOLTAGE1,
-+	MAX8998_REG_BUCK2_VOLTAGE2,
- 	MAX8998_REG_BUCK3,
- 	MAX8998_REG_BUCK4,
- 	MAX8998_REG_LDO2_LDO3,
--- 
-1.7.1
++#ifdef CONFIG_SERIAL_KS8695_CONSOLE_PREFFERED
+ 	add_preferred_console(SERIAL_KS8695_DEVNAME, 0, NULL);
++#endif
+ 	register_console(&ks8695_console);
+ 	return 0;
+ }
