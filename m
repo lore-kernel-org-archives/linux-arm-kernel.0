@@ -1,146 +1,175 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 27 Sep 2010 15:50:09 +0200
-Subject: imx patches for 2.6.37
-Message-ID: <20100927135009.GC6271@pengutronix.de>
+From: pieterg@gmx.com (pieterg)
+Date: Mon, 27 Sep 2010 15:50:50 +0200
+Subject: pxa3xx_nand issues
+In-Reply-To: <AANLkTi==hNcdTg9TNDxVmx4SuhnmDYXx_d_H1Q8Z6wOH@mail.gmail.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<201009271354.41094.pieterg@gmx.com>
+	<AANLkTi==hNcdTg9TNDxVmx4SuhnmDYXx_d_H1Q8Z6wOH@mail.gmail.com>
+Message-ID: <201009271550.50399.pieterg@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Monday 27 September 2010 14:22:37 Lei Wen wrote:
+> On Mon, Sep 27, 2010 at 7:54 PM, pieterg <pieterg@gmx.com> wrote:
+> > On Sunday 26 September 2010 16:32:47 Lei Wen wrote:
+> >> On Thu, Sep 23, 2010 at 11:29 PM, pieterg <pieterg@gmx.com> wrote:
+> >> > On Thursday 23 September 2010 13:32:26 pieterg wrote:
+> >> >> On Thursday 23 September 2010 08:05:56 Eric Miao wrote:
+> >> >> > On Thu, Sep 23, 2010 at 1:12 AM, pieterg <pieterg@gmx.com> wrote:
+> >> >> > > In my search for the cause of the huge number of single/double
+> >> >> > > bit errors I'm experiencing on colibri pxa320/310 devices, I've
+> >> >> > > come across this commit
+> >> >
+> >> > http://git.kernel.org/?p=linux/kernel/git/ycmiao/pxa-linux-2.6.git;a
+> >> >=co mmit;h=7f9938d0fd6c778bd0ce296a3e3b50266de2b892
+> >> >
+> >> >> > > According to the commitlog, it attempts to work around an issue
+> >> >> > > regarding non-page-aligned reads.
+> >> >> > > The workaround seems to force page-aligned access, by dropping
+> >> >> > > the offset within the page (column address bytes).
+> >> >> > > However, in my setup (with a jffs2 filesystem on nand),
+> >> >> > > non-page-aligned reads never occur, but non-page-aligned writes
+> >> >> > > occur very frequently. (during the jffs2 gc).
+> >> >> > > These are also affected by this commit, while the commitlog
+> >> >> > > does not state whether or not the same issue would occur for
+> >> >> > > the program command, and in that case, whether or not the same
+> >> >> > > workaround would apply.
+> >> >> > >
+> >> >> > > I've tried to revert the commit, but unfortunately this doesn't
+> >> >> > > reduce the huge number of single/double bit errors (and jffs2
+> >> >> > > crc errors as a result) I'm getting.
+> >> >> > >
+> >> >> > > But having these non-aligned writes during GC, would that
+> >> >> > > indicate a problem with my jffs2 image parameters perhaps?
+> >> >> > > (though I cannot imagine this could actually cause double bit
+> >> >> > > errors)
+> >> >> >
+> >> >> > It might not be related to the commit above. ?The NAND controller
+> >> >> > will always read the whole page and ignoring the column address,
+> >> >> > that patch tries to make less confusion. The offset is actually
+> >> >> > handled completely by software (memorized).
+> >> >>
+> >> >> I can see how the read offset works, but I do not quite see how
+> >> >> this would work for writes (which call the same
+> >> >> prepare_read_prog_cmd, and have their column address stripped as
+> >> >> well).
+> >> >> Found out that this happens when writing oob data by the way; these
+> >> >> are writes with offset 2048 within the page. Jffs2 does this when
+> >> >> writing cleanmarkers.
+> >> >
+> >> > Tested this, and found out that this commit is actually quite
+> >> > essential for writes as well.
+> >> > Without it, the OOB data doesn't get written.
+> >> > So we can close this part of the topic, commit 7f9938d0 is perfectly
+> >> > fine.
+> >>
+> >> PXA3xx NAND controller write semantic is to send whole page of data to
+> >> the NAND flash with
+> >> the page's address. If you set the ndcr1 not page align value, it is
+> >> also fine by pxa3xx_nand
+> >> sending the data to the flash, but nand flash would not accept this
+> >> kind of behavior as
+> >> it is defined in its spec.
+> >>
+> >> Certainly, if you really need to do this, there is still has ways. :)
+> >> Send the RANDOM DATA INPUT command (0x80 + 5cycle address + 0x85 +
+> >> 2cycles column address) + 0x10 would serve this.
+> >> But seems the pxa310 cannot do such job, which is supported by newer
+> >> silicon in pxa168 or mmp2.
+> >>
+> >> >> I could identify about 10 eraseblocks with pages which produce
+> >> >> single/double bit errors.
+> >> >> After I marked them bad (manually), I've seen no more bit errors,
+> >> >> and the jffs2 rootfs has remained perfectly healthy.
+> >> >
+> >> > Turned out to be a short-term solution.
+> >> > After a while I got more double-bit errors, and ended up bad-marking
+> >> > a dozen or so other eraseblocks, and it does not seem to stop.
+> >> >
+> >> > Strangest thing is that when I write a new jffs2 image with uboot
+> >> > (nand erase, nand write) or with the kernel (flash_eraseall,
+> >> > nandwrite), it never contains any biterrors when I mount it.
+> >> > Only after the filesystem has been mounted, gets modified, and then
+> >> > after the first reboot, the biterrors are there.
+> >>
+> >> You may notice that when a new file system is mounted, the flash is
+> >> only read by controller.
+> >> This mean your uboot is all right for writing, and your kernel is also
+> >> ok for reading.
+> >> While your driver write function may got broken. Timing? Not so
+> >> sure...
+> >>
+> >> > One other issue which I noticed because besides double bit errors I
+> >> > get many single bit errors as well; the ERR_SBERR is never cleared.
+> >> > ERR_DBERR is cleared to ERR_NONE in two locations, but ERR_SBERR is
+> >> > not. (probably in order to allow pxa3xx_nand_ecc_correct to pick it
+> >> > up) However, I've seen that the retcode could still be ERR_SBERR in
+> >> > pxa3xx_nand_waitfunc, causing an erase error to be assumed, as a
+> >> > result all eraseblocks in the partition ended up being marked bad in
+> >> > a loop, till there were no more remaining eraseblocks.
+> >> > I guess ERR_SBERR should probably be ignored in
+> >> > pxa3xx_nand_waitfunc?
+> >>
+> >> Em, Although ERR_SBERR indicate this error can be corrected by nand
+> >> controller, it
+> >> still make sense to report this to upper level. FS like UBIFS could
+> >> use this message to
+> >> do the flash data integrity maintenance. This already be fixed in my
+> >> patch set which
+> >> sent a month ago.
+> >>
+> >> > That's what I did in the remainder of my tests (after having
+> >> > unmarked the blocks that were wrongly marked bad) so I think this
+> >> > issue did not contribute to my biterror problems.
+> >>
+> >> Biterr may be caused by timing, bad block... I think you'd better use
+> >> the mtd test built in linux
+> >> kernel to make sure timing is all right.
+> >
+> > Which mtd test in particular?
+> > I've run most tests, without any errors:
+> >
+> > -oobtest (complains only about read-past-oob-size not returning a
+> > proper error)
+> > -pagetest
+> > -subpagetest
+> > -readtest
+> > -speedtest
+> >
+> > Not even a single bit error during any of those tests.
+>
+> That is so weird...
+> Does your jffs2 image make correct? Page size and block size set right?
 
-here is my patch stack of imx patches for 2.6.37.  I rebased Sascha's
-current imx-for-2.6.37 branch on 2.6.36-rc4 to fix some conflicts in my
-patches as imx-for-2.6.37 didn't contain some imx patches already in
-mainline.  The series contains five patches to drivers/spi, they were
-acked by Grant Likely and he's OK with them going via Sascha's tree.
+I think so.
+--eraseblock=0x20000 --pad --no-cleanmarkers
+I'm not specifying a --pagesize because as far as I understand, this is not 
+related to the flash page. So the default (4K) should be fine.
 
-I send all patches that are not in Sascha's for-2.6.37 branch as reply
-to this mail even if some of them might already have been seen here, to
-have them all in place.
+But just to rule out any mkfs.jffs2 related problems, I've also tried to 
+mount an empty partition, and copy my rootfs contents into it.
+That results in the exact same kind of problems.
 
-The following changes since commit 3efee47db7a191443b529740b35240d63ae1ad20:
+> You must know that if you write twice on one page, you could also see the
+> double bit error or single bit error, but it doesn't relate with the
+> bad block or
+> timing. And this could explain why you could get all test passed in mtd
+> tests.
 
-  ARM: mx5/mx51_babbage: Add FEC support (2010-09-27 12:53:00 +0200)
+Yes, it very much looks like that.
+After the initial writing of the image and mounting the filesystem, 
+everything is still fine. But after making changes to the mounted 
+filesystem, the problems start.
+But I cannot see how/why jffs2 would decide to write without erasing first.
+The problems start in the first eraseblock after the last one written with 
+nandwrite.
+That block was definitely erased with flash_eraseall (I obviously erased the 
+entire partition), no cleanmarkers were written, so even an immediate page 
+write by jffs2 would be fine.
 
-are available in the git repository at:
-  git://git.pengutronix.de/git/ukl/linux-2.6.git imx/for-2.6.37
+(this is not only a jffs2 issue by the way, tried ubifs as well, though I 
+did not test it as thorougly as jffs2; as soon as I saw the first double 
+bit error with ubifs I assumed the situation was the same and I could just 
+as well stick to jffs2 to debug this problem)
 
-Jason Wang (4):
-      ARM: mx5/clock-mx51: add spi clocks
-      ARM: mx5/iomux-mx51: add iomux definitions for eCSPI2 on the imx51_3ds board
-      ARM: mx5/mx51_3ds: add eCSPI2 support on the imx51_3ds board
-      ARM: mx5/mx51_3ds: add SPI NOR flash in the board init stage
-
-Sascha Hauer (9):
-      ARM: mx5/mx51_babbage: fix compiler warnings
-      ARM: mx5/iomux-mx51: Add SPI controller pads
-      ARM: mx5/iomux-mx51: Add aud3 primary function defines
-      ARM: mx5/iomux-mx51: Fix input path of some pins in gpio mode
-      ARM: mx5: Add Nand clock support
-      ARM: mx51: add imx-ssi devices
-      ARM: mx51: Add audmux support
-      ARM: mx5: dynamically register mxc-nand device
-      ARM: mx5: clock-imx51: make *ipg clocks secondary clocks of their corresponding peripheral clocks
-
-Uwe Kleine-K?nig (27):
-      ARM: imx: remove #ifdefery for unmerged flexcan driver
-      ARM: imx: ehci: use void __iomem * to hold i/o addresses
-      ARM: mx5/mx51_babbage: don't use PHYS_OFFSET
-      ARM: mx27_defconfig: enable switches used in mx27 code
-      ARM: mx3_defconfig: add new machine MACH_EUKREA_CPUIMX35
-      ARM: remove mx31pdk_defconfig
-      ARM: mx51_defconfig: add new boards MACH_MX51_3DS and MACH_EUKREA_CPUIMX51
-      ARM: mx51: clean up mx51 header
-      ARM: mx51: fix naming of spi related defines
-      ARM: mx51: use IMX_IO_ADDRESS to define MX51_IO_ADDRESS
-      ARM: imx: change the way spi-imx devices are registered
-      ARM: imx: change the way imx-uarts are registered
-      ARM: imx: dynamically allocate imx-ssi devices
-      ARM: imx: reorganize imx-i2c device registration to use a struct per SoC
-      ARM: mx5: dynamically register imx-i2c devices
-      ARM: imx: fix name of macros to add imx-i2c devices
-      spi/imx: default to m on platforms that have such devices
-      spi/imx: convert driver to use platform ids
-      spi/imx: get rid of more ifs depending on the used cpu
-      spi/imx: save the spi chip select in config struct, not the gpio to use
-      spi/imx: add support for imx51's eCSPI and CSPI
-      ARM: imx: use platform ids for spi_imx devices
-      ARM: mx5: add spi_imx device registration
-      ARM: mx5/clock-mx51: refactor ccgr callbacks to use common code
-      ARM: mx5/clock-mx51: new macro that defines a clk with all members
-      ARM: mx51: dynamically register imx-uart devices
-      ARM: imx: reorganize nand registration to use a struct
-
- arch/arm/configs/mx27_defconfig                 |   15 +-
- arch/arm/configs/mx31pdk_defconfig              |   44 --
- arch/arm/configs/mx3_defconfig                  |    2 +-
- arch/arm/configs/mx51_defconfig                 |    9 +-
- arch/arm/mach-imx/Kconfig                       |    5 +-
- arch/arm/mach-imx/clock-imx1.c                  |    2 +-
- arch/arm/mach-imx/clock-imx21.c                 |    6 +-
- arch/arm/mach-imx/clock-imx27.c                 |    6 +-
- arch/arm/mach-imx/devices-imx1.h                |   14 +-
- arch/arm/mach-imx/devices-imx21.h               |   36 +-
- arch/arm/mach-imx/devices-imx27.h               |   47 +-
- arch/arm/mach-imx/devices.c                     |   35 --
- arch/arm/mach-imx/devices.h                     |    2 -
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c    |    6 +-
- arch/arm/mach-imx/mach-cpuimx27.c               |    2 +-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c     |    4 +-
- arch/arm/mach-imx/mach-mx1ads.c                 |    2 +-
- arch/arm/mach-imx/mach-mx27ads.c                |    2 +-
- arch/arm/mach-imx/mach-mxt_td60.c               |    4 +-
- arch/arm/mach-imx/mach-pca100.c                 |    7 +-
- arch/arm/mach-imx/mach-pcm038.c                 |    2 +-
- arch/arm/mach-mx25/Kconfig                      |    4 +-
- arch/arm/mach-mx25/clock.c                      |    6 +-
- arch/arm/mach-mx25/devices-imx25.h              |   49 +-
- arch/arm/mach-mx25/devices.c                    |   38 --
- arch/arm/mach-mx25/devices.h                    |    2 -
- arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c   |    6 +-
- arch/arm/mach-mx3/Kconfig                       |    6 +-
- arch/arm/mach-mx3/clock-imx31.c                 |    6 +-
- arch/arm/mach-mx3/clock-imx35.c                 |    4 +-
- arch/arm/mach-mx3/devices-imx31.h               |   49 +-
- arch/arm/mach-mx3/devices-imx35.h               |   40 +-
- arch/arm/mach-mx3/devices.c                     |   42 --
- arch/arm/mach-mx3/devices.h                     |    3 -
- arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c    |    6 +-
- arch/arm/mach-mx3/mach-mx31ads.c                |    2 +-
- arch/arm/mach-mx3/mach-pcm043.c                 |    5 +-
- arch/arm/mach-mx5/Kconfig                       |    7 +
- arch/arm/mach-mx5/board-cpuimx51.c              |   12 +-
- arch/arm/mach-mx5/board-mx51_3ds.c              |   42 ++-
- arch/arm/mach-mx5/board-mx51_babbage.c          |   16 +-
- arch/arm/mach-mx5/clock-mx51.c                  |  226 +++++++-
- arch/arm/mach-mx5/devices-imx51.h               |   34 ++
- arch/arm/mach-mx5/devices.c                     |   95 ----
- arch/arm/mach-mx5/devices.h                     |    5 -
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c    |    7 +-
- arch/arm/plat-mxc/audmux-v2.c                   |    8 +-
- arch/arm/plat-mxc/devices/Kconfig               |    3 +
- arch/arm/plat-mxc/devices/Makefile              |    6 +-
- arch/arm/plat-mxc/devices/platform-imx-i2c.c    |   84 +++-
- arch/arm/plat-mxc/devices/platform-imx-ssi.c    |  107 ++++
- arch/arm/plat-mxc/devices/platform-imx-uart.c   |  137 ++++-
- arch/arm/plat-mxc/devices/platform-mxc_nand.c   |   85 +++-
- arch/arm/plat-mxc/devices/platform-spi_imx.c    |   89 +++-
- arch/arm/plat-mxc/ehci.c                        |    4 +-
- arch/arm/plat-mxc/include/mach/devices-common.h |   93 +++-
- arch/arm/plat-mxc/include/mach/iomux-mx51.h     |   33 +-
- arch/arm/plat-mxc/include/mach/mx21.h           |    2 +-
- arch/arm/plat-mxc/include/mach/mx25.h           |   11 +-
- arch/arm/plat-mxc/include/mach/mx27.h           |    2 +-
- arch/arm/plat-mxc/include/mach/mx31.h           |   11 +-
- arch/arm/plat-mxc/include/mach/mx35.h           |   11 +-
- arch/arm/plat-mxc/include/mach/mx51.h           |  657 +++++++++++------------
- drivers/spi/Kconfig                             |   16 +
- drivers/spi/spi_imx.c                           |  394 +++++++++++---
- 65 files changed, 1716 insertions(+), 1001 deletions(-)
- delete mode 100644 arch/arm/configs/mx31pdk_defconfig
- create mode 100644 arch/arm/mach-mx5/devices-imx51.h
- create mode 100644 arch/arm/plat-mxc/devices/platform-imx-ssi.c
-
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Rgds, Pieter
