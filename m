@@ -1,58 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 27 Sep 2010 09:25:30 -0500
-Subject: [PATCH v4] power: introduce library for device-specific OPPs
-In-Reply-To: <20100926005636.GB3396@linux.vnet.ibm.com>
-References: <1285332640-16736-1-git-send-email-nm@ti.com>
-	<20100924193742.GJ2375@linux.vnet.ibm.com>
-	<201009252255.20933.rjw@sisk.pl>
-	<20100926005636.GB3396@linux.vnet.ibm.com>
-Message-ID: <4CA0A95A.4000408@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 27 Sep 2010 16:27:35 +0200
+Subject: [PATCH 31/40] ARM: mx5/iomux-mx51: Add SPI controller pads
+In-Reply-To: <1285595476-10025-31-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100927135009.GC6271@pengutronix.de>
+	<1285595476-10025-31-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20100927142735.GD6271@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul E. McKenney had written, on 09/25/2010 07:56 PM, the following:
-> On Sat, Sep 25, 2010 at 10:55:20PM +0200, Rafael J. Wysocki wrote:
->> On Friday, September 24, 2010, Paul E. McKenney wrote:
->>> On Fri, Sep 24, 2010 at 07:50:40AM -0500, Nishanth Menon wrote:
->> ...
->>> Looks like a good start!!!  Some questions and suggestions about RCU
->>> usage interspersed below.
->> ...
->>>> + * Locking: RCU reader.
->>>> + */
->>>> +int opp_get_opp_count(struct device *dev)
->>>> +{
->>>> +	struct device_opp *dev_opp;
->>>> +	struct opp *temp_opp;
->>>> +	int count = 0;
->>>> +
->>>> +	dev_opp = find_device_opp(dev);
->>>> +	if (IS_ERR(dev_opp))
->>>> +		return PTR_ERR(dev_opp);
->>>> +
->>>> +	rcu_read_lock();
->>>> +	list_for_each_entry_rcu(temp_opp, &dev_opp->opp_list, node) {
->>>> +		if (temp_opp->available)
->>>> +			count++;
->>>> +	}
->>>> +	rcu_read_unlock();
->>> This one is OK as well.  You are returning a count, so if all of the
->>> counted structures are freed at this point, no problem.  The count was
->>> valid when it was accumulated, and the fact that it might now be obsolete
->>> is (usually) not a problem.
->> However, it looks like it should run rcu_read_lock() before calling
->> find_device_opp(dev), shouldn't it?
-> 
-> Indeed it does appear that you are right -- good catch!!!
-> 
-> 							Thanx, Paul
-dev_opp as discussed before is safe as it is never freed 
-(find_device_opp uses it's own rcu_read_lock, the rcu_read_lock in this 
-context is for the opp list. what am I missing?
+Hello,
 
-ack on Paul's comments w.r.t risk on opp structures itself.. will look 
-to fix that in v5.
+On Mon, Sep 27, 2010 at 03:51:07PM +0200, Uwe Kleine-K?nig wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/plat-mxc/include/mach/iomux-mx51.h |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> index d0ef881..c885f89 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> @@ -218,11 +218,17 @@ typedef enum iomux_config {
+>  #define MX51_PAD_AUD3_BB_RXD__GPIO_4_19         IOMUX_PAD(0x5F4, 0x204, 3, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_AUD3_BB_CK__GPIO_4_20          IOMUX_PAD(0x5F8, 0x208, 3, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_AUD3_BB_FS__GPIO_4_21          IOMUX_PAD(0x5FC, 0x20C, 3, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_CSPI1_MOSI__CSPI1_MOSI         IOMUX_PAD(0x600, 0x210, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_CSPI1_MOSI__GPIO_4_22          IOMUX_PAD(0x600, 0x210, 3, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_CSPI1_MISO__CSPI1_MISO         IOMUX_PAD(0x604, 0x214, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_CSPI1_MISO__GPIO_4_23          IOMUX_PAD(0x604, 0x214, 3, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_CSPI1_SS0__CSPI1_SS0           IOMUX_PAD(0x608, 0x218, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_CSPI1_SS0__GPIO_4_24           IOMUX_PAD(0x608, 0x218, 3, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_CSPI1_SS1__CSPI1_SS1           IOMUX_PAD(0x60C, 0x21C, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_CSPI1_SS1__GPIO_4_25           IOMUX_PAD(0x60C, 0x21C, 3, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_CSPI1_RDY__CSPI1_RDY           IOMUX_PAD(0x610, 0x220, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_CSPI1_RDY__GPIO_4_26           IOMUX_PAD(0x610, 0x220, 3, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_CSPI1_SCLK__CSPI1_SCLK         IOMUX_PAD(0x614, 0x224, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_CSPI1_SCLK__GPIO_4_27          IOMUX_PAD(0x614, 0x224, 3, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_UART1_RXD__UART1_RXD           IOMUX_PAD(0x618, 0x228, 0, 0x9e4, 0, MX51_UART1_PAD_CTRL | PAD_CTL_SRE_FAST)
+>  #define MX51_PAD_UART1_TXD__UART1_TXD           IOMUX_PAD(0x61C, 0x22C, 0, 0x0,   0, MX51_UART1_PAD_CTRL | PAD_CTL_SRE_FAST)
+This patch doesn't match the naming scheme of patch 28 (ARM:
+mx5/iomux-mx51: add iomux definitions for eCSPI2 on the imx51_3ds
+board).  I fixed my tree using s/__CSPI/__ECSPI/.  Moreover I did
+s/NO_PAD_CTRL/MX51_ECSPI_PAD_CTRL/ as is done in patch 28, too.
+
+Best regards
+Uwe
 
 -- 
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
