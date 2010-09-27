@@ -1,86 +1,103 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Mon, 27 Sep 2010 19:07:14 +0530
-Subject: [PATCH v5 5/5] omap: nand: making ecc layout as compatible with
-	romcode ecc
-In-Reply-To: <1285594634-19277-1-git-send-email-s-ghorai@ti.com>
-References: <1285594634-19277-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1285594634-19277-6-git-send-email-s-ghorai@ti.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Mon, 27 Sep 2010 19:11:37 +0530
+Subject: [GIT PULL] omap2 sparse fixes
+In-Reply-To: <20100925001914.GO4211@atomide.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+	<20100923225851.GR4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
+	<20100925001914.GO4211@atomide.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F8D00@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    This patch overrides nand ecc layout and bad block descriptor (for 8-bit
-    device) to support hw ecc in romcode layout. So as to have in sync with ecc
-    layout throughout; i.e. x-loader, u-boot and kernel.
 
-    This patch also enables to use romcode ecc for spd and zoom, by default.
+Hi Tony, 
 
-    This enables to flash x-loader, u-boot, kernel, FS images from kernel itself
-    and compatiable with other tools.
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com] 
+> Sent: Saturday, September 25, 2010 5:49 AM
+> To: G, Manjunath Kondaiah
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [GIT PULL] omap2 sparse fixes
+> 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [100924 12:33]:
+> > 
+> > Tony,
+> > Here is new pull request which is rebased to 2.6.36-rc5.
+> > 
+> > -Manjunath
+> > 
+> > The following changes since commit 
+> b30a3f6257ed2105259b404d419b4964e363928c:
+> >   Linus Torvalds (1):
+> >         Linux 2.6.36-rc5
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git 
+> > sparse_fixes
+> > 
+> > G, Manjunath Kondaiah (10):
+> >       OMAP: mach-omap2: Fix incorrect assignment warnings
+> >       OMAP: mach-omap2: Fix static declaration warnings
+> >       OMAP: mach-omap2: Fix static function warnings
+> >       OMAP: mach-omap2: Fix miscellaneous sparse warnings
+> >       OMAP: plat-omap: Fix static function warnings
+> >       OMAP: NAND: Fix static declaration warning
+> >       TWL CORE: Fix sparse warning
+> >       TWL IRQ: Fix fucntion declaration warnings
+> >       OMAP2/3: Convert write/read functions to raw read/write
+> >       OMAP3: Keypad: Fix incorrect type initializer
+> 
+> Hmm tried pulling these, but ran into an issue where at least 
+> 2430 takes about a minute to boot with these patches with no 
+> output on the console intially.
 
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
----
- drivers/mtd/nand/omap2.c |   34 ++++++++++++++++++++++++++++++++++
- 1 files changed, 34 insertions(+), 0 deletions(-)
+Here is test report for all the boards:
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 3fd9ee0..9ccfd88 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -128,6 +128,20 @@ const int use_dma;
- const int use_interrupt;
- #endif
- 
-+/* oob info generated runtime depending on ecc algorithm and layout selected */
-+static struct nand_ecclayout omap_oobinfo;
-+/* Define some generic bad / good block scan pattern which are used
-+ * while scanning a device for factory marked good / bad blocks
-+ */
-+static uint8_t scan_ff_pattern[] = { 0xff };
-+static struct nand_bbt_descr bb_descrip_flashbased = {
-+	.options = NAND_BBT_SCANEMPTY | NAND_BBT_SCANALLPAGES,
-+	.offs = 0,
-+	.len = 1,
-+	.pattern = scan_ff_pattern,
-+};
-+
-+
- struct omap_nand_info {
- 	struct nand_hw_control		controller;
- 	struct omap_nand_platform_data	*pdata;
-@@ -946,6 +960,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 	struct omap_nand_info		*info;
- 	struct omap_nand_platform_data	*pdata;
- 	int				err;
-+	int				i, offset;
- 
- 	pdata = pdev->dev.platform_data;
- 	if (pdata == NULL) {
-@@ -1079,6 +1094,25 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	/* rom code layout */
-+	if (pdata->ecc_opt != OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT) {
-+		offset = (info->nand.options & NAND_BUSWIDTH_16) ? 2 : 1;
-+		if (info->mtd.oobsize == 16) {
-+			info->nand.badblock_pattern = &bb_descrip_flashbased;
-+			omap_oobinfo.eccbytes = 3;
-+		} else
-+			omap_oobinfo.eccbytes  = 3 * 4;
-+
-+		for (i = 0; i < omap_oobinfo.eccbytes; i++)
-+			omap_oobinfo.eccpos[i] = i+offset;
-+
-+		omap_oobinfo.oobfree->offset = offset + omap_oobinfo.eccbytes;
-+		omap_oobinfo.oobfree->length = info->mtd.oobsize -
-+					(offset + omap_oobinfo.eccbytes);
-+
-+		info->nand.ecc.layout = &omap_oobinfo;
-+	}
-+
- #ifdef CONFIG_MTD_PARTITIONS
- 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
- 	if (err > 0)
--- 
-1.7.0.4
+1. omap3_defconfig with 2.6.36-rc5 code as is does not seems to be
+boot. Enabled early printk and found it was due to musb driver. 
+Boot log is here:
+2430sdp_omap3_defconfig_bootlog_nochanges2code.txt
+http://pastebin.com/wd92PMmE
+
+
+2. Disabled musb in omap3_defconfig and boot seems be fine.
+2430sdp_omap3_defconfig_bootlog_usbdisable
+http://pastebin.com/eExED5q4
+
+
+3. With sparse fix series, booting is as expected with omap3_defconfig
+2430sdp_omap3_defconfig_bootlog_usbdisable_sparse_fixes.txt
+http://pastebin.com/GMX4y2fS
+
+
+4. Here zoom3 boot log:
+Zoom3_omap3_defconfig_bootlog_usbdisable_sparse_fixes.
+http://pastebin.com/C2A6YXAL
+
+
+5. omap4 sdp boot log(with es2.0 patches pulled from for-next branch)
+omap4sdp_es2.0_omap3_defconfig_bootlog_sparse_fixes.
+http://pastebin.com/ebiP1X2h
+
+
+> 
+> Can you please check that? Will not merge for now until we 
+> figure out what changes with these patches.
+> 
+> Then, I also noticed the following exports getting added:
+> 
+> +EXPORT_SYMBOL(omap2_gp_clockevent_set_gptimer);
+> +EXPORT_SYMBOL(omapfb_reserve_sram);
+> +EXPORT_SYMBOL(omap_sram_init);
+> 
+> These should not be exported, they are only intended to be 
+> called from the low-level platform init code. So exporting 
+> them is not the right fix for these.
+
+I have declared these API's as extern functions in respective
+header files. If it is ok, I can push the changes to git branch
+for pull request.
+
+-Manjunath
