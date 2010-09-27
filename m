@@ -1,36 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Sep 2010 09:24:20 -0700
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
-Message-ID: <20100927162420.GU4211@atomide.com>
+From: imp@bsdimp.com (M. Warner Losh)
+Date: Mon, 27 Sep 2010 10:14:23 -0600 (MDT)
+Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <alpine.DEB.2.00.1009271038150.9258@router.home>
+References: <alpine.DEB.2.00.1009231533040.7522@router.home>
+	<1285278136.2587.154.camel@localhost.localdomain>
+	<alpine.DEB.2.00.1009271038150.9258@router.home>
+Message-ID: <20100927.101423.702773873740300798.imp@bsdimp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Contreras <felipe.contreras@gmail.com> [100927 08:47]:
-> On Mon, Sep 27, 2010 at 2:02 PM, Marathe, Yogesh <yogesh_marathe@ti.com> wrote:
-> >> When you merge iommu support, then either you enable
-> >> CONFIG_MPU_BRIDGE_IOMMU unconditionally, or you apply this patch, but
-> >> this patch alone will only break things.
-> >
-> > Any other driver which does not depend on bridge and interested in using iommu should get the handle when iommu_get("iva2") is called.
-> 
-> That's a hypothetical driver, right? The only driver that would ever
-> be interested in the "iva2" iommu is tidspbridge, and this patch would
-> brake it.
-> 
-> > It is not happening in original case. I think there should not be restrictions on other drivers to define un-related compile time define if they just want to use iommu driver. I feel the implementation that is breaking due to removal of this define should be fixed.
-> 
-> I couldn't parse that correctly. However, what's wrong with the
-> proposal? Let's think about CONFIG_MPU_BRIDGE_IOMMU when the iommu
-> patches come.
+In message: <alpine.DEB.2.00.1009271038150.9258@router.home>
+            Christoph Lameter <cl@linux.com> writes:
+: On Thu, 23 Sep 2010, john stultz wrote:
+: > The design actually avoids most userland induced latency.
+: >
+: > 1) On the PTP hardware syncing point, the reference packet gets
+: > timestamped with the PTP hardware time on arrival. This allows the
+: > offset calculation to be done in userland without introducing latency.
+: 
+: The timestamps allows the calculation of the network transmission time I
+: guess and therefore its more accurate to calculate that effect out. Ok but
+: then the overhead of getting to code in user space (that does the proper
+: clock adjustments) is resulting in the addition of a relatively long time
+: that is subject to OS scheduling latencies and noises.
 
-Let's not break the existing code. Dropping this patch for now.
+The timestamps at the hardware level allow you to factor out variation
+caused by OS Scheduling, OS network stack delay and internal buffering
+on the NIC.  Variation in measurements is what kills accuracy.
 
-Tony
+When steering a clock by making an error measurement of the phase and
+frequency of it, the latency induced by OS scheduling tends to be
+unimportant.  It is far more important to know when you steered the
+clock (called adjtime or friends) than to steer it at any fixed
+latency to when the data for the measurements was made.  Measuring the
+time of steer can tolerate errors in the range of OS scheduling
+latencies easily, since that tends to produce a very small effect.  It
+introduces an error in your expected phase for the next measurement on
+the order of the product of the time of steer error times the change
+in fractional frequency (abs( 1 - (nu_new / nu_old))).  Even if the
+estimate is really bad at 100ms, most steers are on the order about
+one part per million.  This leads to a sub-nanosecond phase error
+estimate in the next measurement cycle (a non-accumulating error).  A
+1ms error leads to maybe tens of picoseconds of estimate error.
+
+This is a common error that I've seen repeated in this thread.  The
+only reason that it has historically been important is because when
+you are doing timestamping in software based on an interrupt, that
+stuff does matter.
+
+Warner
