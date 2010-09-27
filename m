@@ -1,65 +1,54 @@
 From: wirtl@H-27099-0. (Tobias Wirtl (none))
-Date: Thu, 23 Sep 2010 08:33:19 +0200
-Subject: [PATCH 2/3] Added the M3IF base address
-Message-ID: <mailman.1.1285945727.1947.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 27 Sep 2010 15:59:19 +0200
+Subject: [PATCH 3/3] added support for "run twice" mem2mem transfers
+Message-ID: <mailman.2.1285945728.1947.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+-it's possible to run a prepared mem2mem channel more than 1 time
 ---
- drivers/dma/imx-sdma.c |   18 ++++++++++++++++--
- 1 files changed, 16 insertions(+), 2 deletions(-)
+ drivers/dma/imx-sdma.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 1091047..325827e 100644
+index 325827e..03d94b5 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -755,7 +755,7 @@ static int sdma_config_channel(int channel)
- 		/* Address */
- 		sdma->shp_addr =3D sdma->per_address;
- 	} else {
--		sdma->watermark_level =3D 0; /* FIXME: M3_BASE_ADDRESS */
-+		sdma->watermark_level =3D MX35_M3IF_BASE_ADDR;
- 	}
+@@ -945,7 +945,7 @@ static dma_cookie_t sdma_tx_submit(struct
+dma_async_tx_descriptor *tx)
+ 	spin_lock_irq(&sdma->lock);
 =20
- 	ret =3D sdma_load_context(channel);
-@@ -1075,8 +1075,10 @@ static struct dma_async_tx_descriptor
-*sdma_prep_slave_sg(
- {
- 	struct sdma_channel *sdma =3D to_sdma_chan(chan);
- 	int ret, i, count;
-+	unsigned int slave_offset =3D 0;
- 	int channel =3D chan->chan_id;
- 	struct scatterlist *sg;
+ 	cookie =3D sdma_assign_cookie(sdma);
+-
 +=09
+ 	sdma_enable_channel(tx->chan->chan_id);
 =20
+ 	spin_unlock_irq(&sdma->lock);
+@@ -1038,7 +1038,8 @@ static struct dma_async_tx_descriptor
+*sdma_prep_dma_memcpy(
  	if (sdma->busy)
  		return NULL;
-@@ -1102,8 +1104,20 @@ static struct dma_async_tx_descriptor
-*sdma_prep_slave_sg(
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct sdma_buffer_descriptor *bd =3D &sdma->bd[i];
- 		int param;
--		bd->buffer_addr =3D sgl->dma_address;
-+		if (sdma->peripheral_type =3D=3D IMX_DMATYPE_MEMORY) {
-+			if (direction =3D=3D DMA_FROM_DEVICE){
-+				bd->buffer_addr =3D sdma->per_address +
-slave_offset;
-+				bd->ext_buffer_addr =3D sg->dma_address;
-+			} else {
-+                                bd->buffer_addr =3D sg->dma_address;
-+				bd->ext_buffer_addr =3D sdma->per_address
-+ slave_offset;
-+			}
-+			pr_debug("SDMA prepare mem sg src=3D%08x
-dst=3D%08x\n",bd->buffer_addr,bd->ext_buffer_addr);
-+		} else {
-+			bd->buffer_addr =3D sgl->dma_address;
-+		}
- 		count =3D sg->length;
-+		slave_offset +=3D count;
+ 	sdma->busy =3D 1;
+-	sdma->flags =3D 0;
++=09
++	sdma->flags =3D IMX_DMA_SG_LOOP; //if the prepared transfer is
+used again
+ =09
+ 	sdma->direction =3D DMA_FROM_DEVICE; //doesn't matter
+ =09
+@@ -1054,7 +1055,7 @@ static struct dma_async_tx_descriptor
+*sdma_prep_dma_memcpy(
+ 	bd->ext_buffer_addr =3D dest;
+ 	bd->mode.count =3D len;
+ 	bd->mode.command =3D 0;
+-        bd->mode.status =3D BD_DONE | BD_EXTD | BD_CONT | BD_INTR;
++        bd->mode.status =3D BD_DONE | BD_EXTD | BD_INTR | BD_WRAP;
+//BD_DONE | BD_EXTD | BD_CONT | BD_INTR | BD_WRAP;
 =20
- 		if (count > 0xffff) {
- 			pr_err("SDMA channel %d: maximum bytes for sg
-entry exceeded: %d > %d\n",
+ 	sdma->num_bd =3D 1;
+=20
 --=20
 1.7.0.4
+
+
+=20
