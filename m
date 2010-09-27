@@ -1,135 +1,86 @@
 From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Mon, 27 Sep 2010 19:07:13 +0530
-Subject: [PATCH v5 4/5] omap: nand: ecc layout select from board file
+Date: Mon, 27 Sep 2010 19:07:14 +0530
+Subject: [PATCH v5 5/5] omap: nand: making ecc layout as compatible with
+	romcode ecc
 In-Reply-To: <1285594634-19277-1-git-send-email-s-ghorai@ti.com>
 References: <1285594634-19277-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1285594634-19277-5-git-send-email-s-ghorai@ti.com>
+Message-ID: <1285594634-19277-6-git-send-email-s-ghorai@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    This patch makes it possible to select sw or hw (different layout options)
-    ecc scheme supported by omap nand driver.  And hw ecc layout selected for
-    sdp and zoom boards, by default.
+    This patch overrides nand ecc layout and bad block descriptor (for 8-bit
+    device) to support hw ecc in romcode layout. So as to have in sync with ecc
+    layout throughout; i.e. x-loader, u-boot and kernel.
+
+    This patch also enables to use romcode ecc for spd and zoom, by default.
+
+    This enables to flash x-loader, u-boot, kernel, FS images from kernel itself
+    and compatiable with other tools.
 
 Signed-off-by: Vimal Singh <vimalsingh@ti.com>
 Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
 ---
- arch/arm/mach-omap2/board-flash.c      |    1 +
- arch/arm/plat-omap/include/plat/gpmc.h |    7 +++++++
- arch/arm/plat-omap/include/plat/nand.h |    2 ++
- drivers/mtd/nand/omap2.c               |   29 +++++++++++++----------------
- 4 files changed, 23 insertions(+), 16 deletions(-)
+ drivers/mtd/nand/omap2.c |   34 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 34 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index 2355e4a..ecd41ae 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -144,6 +144,7 @@ __init board_nand_init(struct mtd_partition *nand_parts, u8 nr_parts, u8 cs)
- 	board_nand_data.cs		= cs;
- 	board_nand_data.parts		= nand_parts;
- 	board_nand_data.nr_parts	= nr_parts;
-+	board_nand_data.ecc_opt		= OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT;
- 
- 	board_nand_data.gpmc_irq = OMAP_GPMC_IRQ_BASE + cs;
- 	gpmc_nand_init(&board_nand_data);
-diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index fb82335..54902d8 100644
---- a/arch/arm/plat-omap/include/plat/gpmc.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -86,6 +86,13 @@
- #define PREFETCH_FIFOTHRESHOLD_MAX	0x40
- #define PREFETCH_FIFOTHRESHOLD(val)	(val << 8)
- 
-+enum omap_ecc{
-+	OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT = 0,
-+		/* 1-bit s/w ecc and layout different from romcode */
-+	OMAP_ECC_HAMMING_CODE_HW,/* 1-bit ecc, romcode layout */
-+	OMAP_ECC_HAMMING_CODE_SW,/* 1-bit ecc, romcode layout */
-+};
-+
- /*
-  * Note that all values in this struct are in nanoseconds, while
-  * the register values are in gpmc_fck cycles.
-diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-omap/include/plat/nand.h
-index 5e69463..d5b6fc6 100644
---- a/arch/arm/plat-omap/include/plat/nand.h
-+++ b/arch/arm/plat-omap/include/plat/nand.h
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <plat/gpmc.h>
- #include <linux/mtd/partitions.h>
- 
- struct omap_nand_platform_data {
-@@ -23,6 +24,7 @@ struct omap_nand_platform_data {
- 	int			gpmc_irq;
- 	unsigned long		phys_base;
- 	int			devsize;
-+	enum omap_ecc           ecc_opt;
- };
- 
- /* minimum size for IO mapping */
 diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 5ac7f7c..3fd9ee0 100644
+index 3fd9ee0..9ccfd88 100644
 --- a/drivers/mtd/nand/omap2.c
 +++ b/drivers/mtd/nand/omap2.c
-@@ -7,7 +7,6 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--#define CONFIG_MTD_NAND_OMAP_HWECC
+@@ -128,6 +128,20 @@ const int use_dma;
+ const int use_interrupt;
+ #endif
  
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-@@ -659,8 +658,6 @@ static int omap_verify_buf(struct mtd_info *mtd, const u_char * buf, int len)
- 	return 0;
- }
- 
--#ifdef CONFIG_MTD_NAND_OMAP_HWECC
--
- /**
-  * gen_true_ecc - This function will generate true ECC value
-  * @ecc_buf: buffer to store ecc code
-@@ -880,8 +877,6 @@ static void omap_enable_hwecc(struct mtd_info *mtd, int mode)
- 	gpmc_enable_hwecc(info->gpmc_cs, mode, dev_width, info->nand.ecc.size);
- }
- 
--#endif
--
- /**
-  * omap_wait - wait until the command is done
-  * @mtd: MTD device structure
-@@ -1059,17 +1054,19 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 	}
- 	info->nand.verify_buf = omap_verify_buf;
- 
--#ifdef CONFIG_MTD_NAND_OMAP_HWECC
--	info->nand.ecc.bytes		= 3;
--	info->nand.ecc.size		= 512;
--	info->nand.ecc.calculate	= omap_calculate_ecc;
--	info->nand.ecc.hwctl		= omap_enable_hwecc;
--	info->nand.ecc.correct		= omap_correct_data;
--	info->nand.ecc.mode		= NAND_ECC_HW;
--
--#else
--	info->nand.ecc.mode = NAND_ECC_SOFT;
--#endif
-+	/* selsect the ecc type */
-+	if ((pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT) ||
-+		(pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW)) {
-+		info->nand.ecc.bytes		= 3;
-+		info->nand.ecc.size		= 512;
-+		info->nand.ecc.calculate	= omap_calculate_ecc;
-+		info->nand.ecc.hwctl		= omap_enable_hwecc;
-+		info->nand.ecc.correct		= omap_correct_data;
-+		info->nand.ecc.mode		= NAND_ECC_HW;
++/* oob info generated runtime depending on ecc algorithm and layout selected */
++static struct nand_ecclayout omap_oobinfo;
++/* Define some generic bad / good block scan pattern which are used
++ * while scanning a device for factory marked good / bad blocks
++ */
++static uint8_t scan_ff_pattern[] = { 0xff };
++static struct nand_bbt_descr bb_descrip_flashbased = {
++	.options = NAND_BBT_SCANEMPTY | NAND_BBT_SCANALLPAGES,
++	.offs = 0,
++	.len = 1,
++	.pattern = scan_ff_pattern,
++};
 +
-+	} else if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_SW) {
-+		info->nand.ecc.mode = NAND_ECC_SOFT;
-+	}
++
+ struct omap_nand_info {
+ 	struct nand_hw_control		controller;
+ 	struct omap_nand_platform_data	*pdata;
+@@ -946,6 +960,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 	struct omap_nand_info		*info;
+ 	struct omap_nand_platform_data	*pdata;
+ 	int				err;
++	int				i, offset;
  
- 	/* DIP switches on some boards change between 8 and 16 bit
- 	 * bus widths for flash.  Try the other width if the first try fails.
+ 	pdata = pdev->dev.platform_data;
+ 	if (pdata == NULL) {
+@@ -1079,6 +1094,25 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	/* rom code layout */
++	if (pdata->ecc_opt != OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT) {
++		offset = (info->nand.options & NAND_BUSWIDTH_16) ? 2 : 1;
++		if (info->mtd.oobsize == 16) {
++			info->nand.badblock_pattern = &bb_descrip_flashbased;
++			omap_oobinfo.eccbytes = 3;
++		} else
++			omap_oobinfo.eccbytes  = 3 * 4;
++
++		for (i = 0; i < omap_oobinfo.eccbytes; i++)
++			omap_oobinfo.eccpos[i] = i+offset;
++
++		omap_oobinfo.oobfree->offset = offset + omap_oobinfo.eccbytes;
++		omap_oobinfo.oobfree->length = info->mtd.oobsize -
++					(offset + omap_oobinfo.eccbytes);
++
++		info->nand.ecc.layout = &omap_oobinfo;
++	}
++
+ #ifdef CONFIG_MTD_PARTITIONS
+ 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
+ 	if (err > 0)
 -- 
 1.7.0.4
