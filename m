@@ -1,33 +1,19 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 27 Sep 2010 18:56:08 +0300
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-Message-ID: <AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
+From: cl@linux.com (Christoph Lameter)
+Date: Mon, 27 Sep 2010 10:56:09 -0500 (CDT)
+Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <20100924150246.0e6064b6@lxorguk.ukuu.org.uk>
+References: <cover.1285261533.git.richard.cochran@omicron.at>
+	<20100923213654.0c64b047@lxorguk.ukuu.org.uk>
+	<20100924131407.GA3113@riccoc20.at.omicron.at>
+	<20100924150246.0e6064b6@lxorguk.ukuu.org.uk>
+Message-ID: <alpine.DEB.2.00.1009271054320.9258@router.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 27, 2010 at 2:02 PM, Marathe, Yogesh <yogesh_marathe@ti.com> wrote:
->> When you merge iommu support, then either you enable
->> CONFIG_MPU_BRIDGE_IOMMU unconditionally, or you apply this patch, but
->> this patch alone will only break things.
->
-> Any other driver which does not depend on bridge and interested in using iommu should get the handle when iommu_get("iva2") is called.
 
-That's a hypothetical driver, right? The only driver that would ever
-be interested in the "iva2" iommu is tidspbridge, and this patch would
-brake it.
+On Fri, 24 Sep 2010, Alan Cox wrote:
 
-> It is not happening in original case. I think there should not be restrictions on other drivers to define un-related compile time define if they just want to use iommu driver. I feel the implementation that is breaking due to removal of this define should be fixed.
+> Whether you add new syscalls or do the fd passing using flags and hide
+> the ugly bits in glibc is another question.
 
-I couldn't parse that correctly. However, what's wrong with the
-proposal? Let's think about CONFIG_MPU_BRIDGE_IOMMU when the iommu
-patches come.
-
--- 
-Felipe Contreras
+Use device specific ioctls instead of syscalls?
