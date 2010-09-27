@@ -1,33 +1,62 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 27 Sep 2010 21:01:38 +0100
-Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
-In-Reply-To: <20100916143254.GC13563@erda.amd.com>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
-	<20100916143254.GC13563@erda.amd.com>
-Message-ID: <20100927200138.GG28588@console-pimps.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 27 Sep 2010 13:02:47 -0700
+Subject: [PATCH v3 0/5] Convert I2C driver to use omap_device/runtime PM
+In-Reply-To: <1285078036-12789-1-git-send-email-rnayak@ti.com> (Rajendra
+	Nayak's message of "Tue, 21 Sep 2010 19:37:11 +0530")
+References: <1285078036-12789-1-git-send-email-rnayak@ti.com>
+Message-ID: <87vd5rnee0.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 16, 2010 at 04:32:54PM +0200, Robert Richter wrote:
-> > diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
-> > index 2cb9ad5..3c3fc9a 100644
-> > --- a/arch/sh/kernel/perf_event.c
-> > +++ b/arch/sh/kernel/perf_event.c
-> > @@ -59,6 +59,14 @@ static inline int sh_pmu_initialized(void)
-> >  	return !!sh_pmu;
-> >  }
-> >  
-> > +const char *sh_pmu_name(void)
-> > +{
-> > +	if (!sh_pmu)
-> > +		return NULL;
-> > +
-> > +	return sh_pmu->name;
-> > +}
-> 
-> Couldn't we make this a generic function like perf_num_counters()?
+Ben,
 
-Well, ARM doesn't have names as strings for its pmus currently. What's
-more, ARM wouldn't use it; SH would be the only user of this function. I
-don't think this one makes sense to be a generic function.
+Rajendra Nayak <rnayak@ti.com> writes:
+
+> This series makes I2C device registration use hwmod and omap_device api's
+> and converts the I2C driver to use runtime PM api's.
+>
+> Patches apply on the pm-core branch from Kevin's tree.
+
+If you're OK with the driver changes in PATCH 5/5, with your Ack, we can
+queue this via the OMAP tree with all the platform changes that it
+depends on.
+
+Thanks,
+
+Kevin
+
+> v3 has minor review comment fixes over v2
+> The series is boot tested on a 2430sdp platform along with being tested
+> on 3430sdp and 4430sdp.
+>
+> 4430sdp tests are done using the below series 
+> http://www.spinics.net/lists/linux-omap/msg36023.html
+>
+> Paul Walmsley (2):
+>   OMAP2xxx: hwmod: add I2C hwmods for OMAP2420, 2430
+>   OMAP: I2C: split device registration and convert OMAP2+ to
+>     omap_device
+>
+> Rajendra Nayak (3):
+>   OMAP3: hwmod: add I2C hwmods for OMAP3430
+>   OMAP4: hwmod: add I2C hwmods for OMAP4430
+>   OMAP: I2C: Convert i2c driver to use PM runtime api's
+>
+>  arch/arm/mach-omap2/cm-regbits-24xx.h      |    4 +
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c |  140 ++++++++++++++++-
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |  154 ++++++++++++++++++-
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  232 +++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  237 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/prm-regbits-34xx.h     |    3 +
+>  arch/arm/plat-omap/i2c.c                   |  124 ++++++---------
+>  arch/arm/plat-omap/include/plat/i2c.h      |   16 ++
+>  arch/arm/plat-omap/include/plat/l4_3xxx.h  |   24 +++
+>  drivers/i2c/busses/i2c-omap.c              |   67 +++------
+>  include/linux/i2c-omap.h                   |    5 +
+>  11 files changed, 881 insertions(+), 125 deletions(-)
+>  create mode 100644 arch/arm/plat-omap/include/plat/l4_3xxx.h
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
