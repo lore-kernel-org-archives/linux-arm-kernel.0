@@ -1,41 +1,102 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 27 Sep 2010 15:51:07 +0200
-Subject: [PATCH 31/40] ARM: mx5/iomux-mx51: Add SPI controller pads
+Date: Mon, 27 Sep 2010 15:51:03 +0200
+Subject: [PATCH 27/40] ARM: mx5/clock-mx51: add spi clocks
 In-Reply-To: <20100927135009.GC6271@pengutronix.de>
 References: <20100927135009.GC6271@pengutronix.de>
-Message-ID: <1285595476-10025-31-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1285595476-10025-27-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+From: Jason Wang <jason77.wang@gmail.com>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Jason Wang <jason77.wang@gmail.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |   57 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 57 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index d0ef881..c885f89 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -218,11 +218,17 @@ typedef enum iomux_config {
- #define MX51_PAD_AUD3_BB_RXD__GPIO_4_19         IOMUX_PAD(0x5F4, 0x204, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_AUD3_BB_CK__GPIO_4_20          IOMUX_PAD(0x5F8, 0x208, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_AUD3_BB_FS__GPIO_4_21          IOMUX_PAD(0x5FC, 0x20C, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_CSPI1_MOSI__CSPI1_MOSI         IOMUX_PAD(0x600, 0x210, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_CSPI1_MOSI__GPIO_4_22          IOMUX_PAD(0x600, 0x210, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_CSPI1_MISO__CSPI1_MISO         IOMUX_PAD(0x604, 0x214, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_CSPI1_MISO__GPIO_4_23          IOMUX_PAD(0x604, 0x214, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_CSPI1_SS0__CSPI1_SS0           IOMUX_PAD(0x608, 0x218, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_CSPI1_SS0__GPIO_4_24           IOMUX_PAD(0x608, 0x218, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_CSPI1_SS1__CSPI1_SS1           IOMUX_PAD(0x60C, 0x21C, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_CSPI1_SS1__GPIO_4_25           IOMUX_PAD(0x60C, 0x21C, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_CSPI1_RDY__CSPI1_RDY           IOMUX_PAD(0x610, 0x220, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_CSPI1_RDY__GPIO_4_26           IOMUX_PAD(0x610, 0x220, 3, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_CSPI1_SCLK__CSPI1_SCLK         IOMUX_PAD(0x614, 0x224, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_CSPI1_SCLK__GPIO_4_27          IOMUX_PAD(0x614, 0x224, 3, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_UART1_RXD__UART1_RXD           IOMUX_PAD(0x618, 0x228, 0, 0x9e4, 0, MX51_UART1_PAD_CTRL | PAD_CTL_SRE_FAST)
- #define MX51_PAD_UART1_TXD__UART1_TXD           IOMUX_PAD(0x61C, 0x22C, 0, 0x0,   0, MX51_UART1_PAD_CTRL | PAD_CTL_SRE_FAST)
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 0e39698..68aef2d 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -764,6 +764,42 @@ static struct clk kpp_clk = {
+ 	.id = 0,
+ };
+ 
++/* eCSPI */
++static unsigned long clk_ecspi_get_rate(struct clk *clk)
++{
++	u32 reg, pred, podf;
++
++	reg = __raw_readl(MXC_CCM_CSCDR2);
++
++	pred = (reg & MXC_CCM_CSCDR2_CSPI_CLK_PRED_MASK) >>
++			MXC_CCM_CSCDR2_CSPI_CLK_PRED_OFFSET;
++	podf = (reg & MXC_CCM_CSCDR2_CSPI_CLK_PODF_MASK) >>
++			MXC_CCM_CSCDR2_CSPI_CLK_PODF_OFFSET;
++
++	return DIV_ROUND_CLOSEST(clk_get_rate(clk->parent),
++			(pred + 1) * (podf + 1));
++}
++
++static int clk_ecspi_set_parent(struct clk *clk, struct clk *parent)
++{
++	u32 reg, mux;
++
++	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk, &pll3_sw_clk,
++			&lp_apm_clk);
++
++	reg = __raw_readl(MXC_CCM_CSCMR1) & ~MXC_CCM_CSCMR1_CSPI_CLK_SEL_MASK;
++	reg |= mux << MXC_CCM_CSCMR1_CSPI_CLK_SEL_OFFSET;
++	__raw_writel(reg, MXC_CCM_CSCMR1);
++
++	return 0;
++}
++
++static struct clk ecspi_main_clk = {
++	.parent = &pll3_sw_clk,
++	.get_rate = clk_ecspi_get_rate,
++	.set_parent = clk_ecspi_set_parent,
++};
++
+ #define DEFINE_CLOCK_FULL(name, i, er, es, gr, sr, e, d, p, s)		\
+ 	static struct clk name = {					\
+ 		.id		= i,					\
+@@ -816,6 +852,24 @@ DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
+ DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
+ 	NULL,  NULL, &ipg_clk, NULL);
+ 
++/* eCSPI */
++DEFINE_CLOCK_FULL(ecspi1_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG9_OFFSET,
++		NULL, NULL, _clk_ccgr_enable_inrun, _clk_ccgr_disable,
++		&ipg_clk, &spba_clk);
++DEFINE_CLOCK(ecspi1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG10_OFFSET,
++		NULL, NULL, &ecspi_main_clk, &ecspi1_ipg_clk);
++DEFINE_CLOCK_FULL(ecspi2_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG11_OFFSET,
++		NULL, NULL, _clk_ccgr_enable_inrun, _clk_ccgr_disable,
++		&ipg_clk, &aips_tz2_clk);
++DEFINE_CLOCK(ecspi2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG12_OFFSET,
++		NULL, NULL, &ecspi_main_clk, &ecspi2_ipg_clk);
++
++/* CSPI */
++DEFINE_CLOCK(cspi_ipg_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG9_OFFSET,
++		NULL, NULL, &ipg_clk, &aips_tz2_clk);
++DEFINE_CLOCK(cspi_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG13_OFFSET,
++		NULL, NULL, &ipg_clk, &cspi_ipg_clk);
++
+ #define _REGISTER_CLOCK(d, n, c) \
+        { \
+ 		.dev_id = d, \
+@@ -839,6 +893,9 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+ 	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
++	_REGISTER_CLOCK("imx51-ecspi.0", NULL, ecspi1_clk)
++	_REGISTER_CLOCK("imx51-ecspi.1", NULL, ecspi2_clk)
++	_REGISTER_CLOCK("imx51-cspi.0", NULL, cspi_clk)
+ };
+ 
+ static void clk_tree_init(void)
 -- 
 1.7.2.3
