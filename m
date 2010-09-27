@@ -1,79 +1,41 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 27 Sep 2010 09:32:49 +0300
-Subject: [PATCH v3 5/5] h1940: add UDA1380 to i2c devices list
-In-Reply-To: <1284241600-32738-1-git-send-email-anarsoul@gmail.com>
-References: <1284241600-32738-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1285569169-5034-1-git-send-email-anarsoul@gmail.com>
+From: kishorek.kadiyala@gmail.com (kishore kadiyala)
+Date: Mon, 27 Sep 2010 13:22:47 +0530
+Subject: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <20100925003859.GR4211@atomide.com>
+References: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
+	<20100925003859.GR4211@atomide.com>
+Message-ID: <AANLkTikr4mG_oFngkFvH7TWEvm0P2M2M8-dZV4Xtm5B-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register UDA1380 codec during H1940 machine init
+Hi Tony,
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
-v2: Add UDA1380 reset pin
-v3: Add verbose comment to patch
+On Sat, Sep 25, 2010 at 6:08 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * kishore kadiyala <kishore.kadiyala@ti.com> [100924 10:05]:
+>> Adding card detect callback function and card detect configuration
+>> function for MMC1 Controller on OMAP4.
+>>
+>> Card detect configuration function does initial configuration of the
+>> MMC Control & PullUp-PullDown registers of Phoenix.
+>>
+>> For MMC1 Controller, card detect interrupt source is
+>> twl6030 which is non-gpio. The card detect call back function provides
+>> card present/absent status by reading MMC Control register present
+>> on twl6030.
+>>
+>> Since OMAP4 doesn't use any GPIO line as used in OMAP3 for card detect,
+>> the suspend/resume initialization which was done in omap_hsmmc_gpio_init
+>> previously is moved to the probe thus making it generic for both OMAP3 & OMAP4.
+>
+>> --- a/drivers/mfd/twl6030-irq.c
+>> +++ b/drivers/mfd/twl6030-irq.c
+>
+> Looks like this patch should be sent to Samuel Ortiz as it's mostly
+> mfd related.
 
- arch/arm/mach-s3c2410/mach-h1940.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+Thanks , I will send this patch to Samuel.
 
-diff --git a/arch/arm/mach-s3c2410/mach-h1940.c b/arch/arm/mach-s3c2410/mach-h1940.c
-index 974c6e4..a5cd324 100644
---- a/arch/arm/mach-s3c2410/mach-h1940.c
-+++ b/arch/arm/mach-s3c2410/mach-h1940.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/pwm_backlight.h>
-+#include <linux/i2c.h>
- #include <video/platform_lcd.h>
- 
- #include <linux/mmc/host.h>
-@@ -59,6 +60,8 @@
- #include <plat/mci.h>
- #include <plat/ts.h>
- 
-+#include <sound/uda1380.h>
-+
- #define H1940_LATCH		((void __force __iomem *)0xF8000000)
- 
- #define H1940_PA_LATCH		S3C2410_CS2
-@@ -365,12 +368,26 @@ static struct platform_device h1940_lcd_powerdev = {
- 	.dev.platform_data      = &h1940_lcd_power_data,
- };
- 
-+static struct uda1380_platform_data uda1380_info = {
-+	.gpio_power	= H1940_LATCH_UDA_POWER,
-+	.gpio_reset	= S3C2410_GPA(12),
-+	.dac_clk	= UDA1380_DAC_CLK_SYSCLK,
-+};
-+
-+static struct i2c_board_info h1940_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("uda1380", 0x1a),
-+		.platform_data = &uda1380_info,
-+	},
-+};
-+
- static struct platform_device *h1940_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_lcd,
- 	&s3c_device_wdt,
- 	&s3c_device_i2c0,
- 	&s3c_device_iis,
-+	&s3c_device_pcm,
- 	&s3c_device_usbgadget,
- 	&h1940_device_leds,
- 	&h1940_device_bluetooth,
-@@ -465,6 +482,9 @@ static void __init h1940_init(void)
- 	gpio_direction_output(H1940_LATCH_SD_POWER, 0);
- 
- 	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
-+
-+	i2c_register_board_info(0, h1940_i2c_devices,
-+		ARRAY_SIZE(h1940_i2c_devices));
- }
- 
- MACHINE_START(H1940, "IPAQ-H1940")
--- 
-1.7.3
+<snip>
+
+Regards,
+Kishore
