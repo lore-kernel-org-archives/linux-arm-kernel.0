@@ -1,12 +1,12 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Mon, 27 Sep 2010 11:20:00 +0300
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Mon, 27 Sep 2010 11:24:14 +0300
 Subject: [RESEND PATCH] serial: samsung: fix device name
 In-Reply-To: <4C9FE2C4.8070302@fluff.org>
 References: <20100923190212.18863.25678.stgit@darius-desktop>
 	<4C9BE577.4050504@fluff.org>
 	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
 	<4C9CD3E0.6060000@gmail.com> <4C9FE2C4.8070302@fluff.org>
-Message-ID: <AANLkTimy=eJKeANFi7VspoB6GrRzW1=36vjbfuNqPRRJ@mail.gmail.com>
+Message-ID: <AANLkTinwwtE5t16zvpsU5eZvEtJedJr=0x_10DcB0U5z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -93,4 +93,7 @@ On Mon, Sep 27, 2010 at 3:18 AM, Ben Dooks <ben-linux@fluff.org> wrote:
 > However, this is a big change, and I think it should await the next
 > merge window.
 
-I also agree that it should be applied to next release.
+I agree that too.
+
+
+>
