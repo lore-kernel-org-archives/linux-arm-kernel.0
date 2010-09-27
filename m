@@ -1,26 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Sep 2010 09:13:06 -0700
-Subject: [PATCH v3 5/5] mfd: regulator: max8998: BUCK1/2 voltage change
-	with use of GPIOs
-In-Reply-To: <1285590747-32404-6-git-send-email-l.majewski@samsung.com>
-References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-	<1285590747-32404-6-git-send-email-l.majewski@samsung.com>
-Message-ID: <20100927161305.GH13754@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Sep 2010 09:24:20 -0700
+Subject: [PATCH 05/11] omap3: Remove non-existent config option
+In-Reply-To: <AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
+References: <20100924014938.10325.35279.stgit@baageli.muru.com>
+	<20100924015056.10325.95854.stgit@baageli.muru.com>
+	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
+	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
+	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
+Message-ID: <20100927162420.GU4211@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 27, 2010 at 02:32:27PM +0200, Lukasz Majewski wrote:
+* Felipe Contreras <felipe.contreras@gmail.com> [100927 08:47]:
+> On Mon, Sep 27, 2010 at 2:02 PM, Marathe, Yogesh <yogesh_marathe@ti.com> wrote:
+> >> When you merge iommu support, then either you enable
+> >> CONFIG_MPU_BRIDGE_IOMMU unconditionally, or you apply this patch, but
+> >> this patch alone will only break things.
+> >
+> > Any other driver which does not depend on bridge and interested in using iommu should get the handle when iommu_get("iva2") is called.
+> 
+> That's a hypothetical driver, right? The only driver that would ever
+> be interested in the "iva2" iommu is tidspbridge, and this patch would
+> brake it.
+> 
+> > It is not happening in original case. I think there should not be restrictions on other drivers to define un-related compile time define if they just want to use iommu driver. I feel the implementation that is breaking due to removal of this define should be fixed.
+> 
+> I couldn't parse that correctly. However, what's wrong with the
+> proposal? Let's think about CONFIG_MPU_BRIDGE_IOMMU when the iommu
+> patches come.
 
-> - Predefined maximum voltages (as defined at platform data) are always
-> available
+Let's not break the existing code. Dropping this patch for now.
 
-What I was suggesting with this was that you use the upper end of the
-voltage range that gets passed in with regulator_set_voltage() rather
-than the platform data - that way the user doesn't need to know what
-voltages the drivers are doing and the config can't drift out of sync
-with the code.
-
-However, this does look good overall so it seems best to apply this and
-the previous patch now so:
-
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Tony
