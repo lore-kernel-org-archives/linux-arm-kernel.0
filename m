@@ -1,62 +1,69 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 27 Sep 2010 13:02:47 -0700
-Subject: [PATCH v3 0/5] Convert I2C driver to use omap_device/runtime PM
-In-Reply-To: <1285078036-12789-1-git-send-email-rnayak@ti.com> (Rajendra
-	Nayak's message of "Tue, 21 Sep 2010 19:37:11 +0530")
-References: <1285078036-12789-1-git-send-email-rnayak@ti.com>
-Message-ID: <87vd5rnee0.fsf@deeprootsystems.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 27 Sep 2010 14:08:46 -0600 (MDT)
+Subject: [GIT PULL v2] OMAP: clock/CM/PRM/SCM updates for OMAP4 ES2, OMAP3
+	CORE DVFS fix: for 2.6.37
+Message-ID: <alpine.DEB.2.00.1009271404200.5171@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben,
+Hi Tony, 
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Thanks for catching my mistake in the previous pull request for these 
+patches - it inadvertently also contained the patches from the pull 
+request "OMAP: hwmod fixes and improvements for 2.6.37".  This updated 
+pull request contains just the new patches that were posted from this 
+series:
 
-> This series makes I2C device registration use hwmod and omap_device api's
-> and converts the I2C driver to use runtime PM api's.
->
-> Patches apply on the pm-core branch from Kevin's tree.
+The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
 
-If you're OK with the driver changes in PATCH 5/5, with your Ack, we can
-queue this via the OMAP tree with all the platform changes that it
-depends on.
+  Linux 2.6.36-rc5 (2010-09-20 16:56:53 -0700)
 
-Thanks,
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 omap4_and_sdrc_2.6.27
 
-Kevin
+Benoit Cousson (3):
+      OMAP4: clock: Fix clock names and align with hwmod names
+      OMAP4: clock: Add optional clock nodes
+      OMAP4: clocks: Fix ES2 clock issues
 
-> v3 has minor review comment fixes over v2
-> The series is boot tested on a 2430sdp platform along with being tested
-> on 3430sdp and 4430sdp.
->
-> 4430sdp tests are done using the below series 
-> http://www.spinics.net/lists/linux-omap/msg36023.html
->
-> Paul Walmsley (2):
->   OMAP2xxx: hwmod: add I2C hwmods for OMAP2420, 2430
->   OMAP: I2C: split device registration and convert OMAP2+ to
->     omap_device
->
-> Rajendra Nayak (3):
->   OMAP3: hwmod: add I2C hwmods for OMAP3430
->   OMAP4: hwmod: add I2C hwmods for OMAP4430
->   OMAP: I2C: Convert i2c driver to use PM runtime api's
->
->  arch/arm/mach-omap2/cm-regbits-24xx.h      |    4 +
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c |  140 ++++++++++++++++-
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c |  154 ++++++++++++++++++-
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  232 +++++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  237 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prm-regbits-34xx.h     |    3 +
->  arch/arm/plat-omap/i2c.c                   |  124 ++++++---------
->  arch/arm/plat-omap/include/plat/i2c.h      |   16 ++
->  arch/arm/plat-omap/include/plat/l4_3xxx.h  |   24 +++
->  drivers/i2c/busses/i2c-omap.c              |   67 +++------
->  include/linux/i2c-omap.h                   |    5 +
->  11 files changed, 881 insertions(+), 125 deletions(-)
->  create mode 100644 arch/arm/plat-omap/include/plat/l4_3xxx.h
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Jon Hunter (1):
+      omap3: Prevent SDRC deadlock when L3 is changing frequency
+
+Rajendra Nayak (4):
+      OMAP4: clocks: Update clock tree for ES2
+      OMAP4: CM & PRM: Update PRCM register bitshifts and masks for ES2
+      OMAP4: PM: Define additional registers for ES2
+      OMAP4: powerdomain: Update DSS logic state for ES2
+
+Santosh Shilimkar (4):
+      omap4: control: Add ctrl_pad_base to omap_globals
+      omap4: control: Add accessor api's for pad control module
+      omap4: control: Add the register definition headers
+      omap4: control: Fix the control module register accesses
+
+ arch/arm/mach-omap2/clock44xx_data.c               | 1310 +++++++++++-------
+ arch/arm/mach-omap2/cm-regbits-44xx.h              | 1287 ++++++++++---------
+ arch/arm/mach-omap2/cm44xx.h                       |   90 ++-
+ arch/arm/mach-omap2/control.c                      |   25 +
+ arch/arm/mach-omap2/hsmmc.c                        |   67 +-
+ arch/arm/mach-omap2/id.c                           |    2 +-
+ .../include/mach/ctrl_module_core_44xx.h           |  391 ++++++
+ .../include/mach/ctrl_module_pad_core_44xx.h       | 1409 ++++++++++++++++++++
+ .../include/mach/ctrl_module_pad_wkup_44xx.h       |  236 ++++
+ .../include/mach/ctrl_module_wkup_44xx.h           |   92 ++
+ arch/arm/mach-omap2/powerdomains44xx.h             |    2 +-
+ arch/arm/mach-omap2/prm-regbits-44xx.h             | 1314 ++++++++++---------
+ arch/arm/mach-omap2/prm44xx.h                      |   14 +-
+ arch/arm/mach-omap2/sram34xx.S                     |    6 +-
+ arch/arm/plat-omap/common.c                        |    3 +-
+ arch/arm/plat-omap/include/plat/common.h           |    1 +
+ arch/arm/plat-omap/include/plat/control.h          |   31 +-
+ arch/arm/plat-omap/include/plat/powerdomain.h      |    1 +
+ 18 files changed, 4499 insertions(+), 1782 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_core_44xx.h
+ create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_core_44xx.h
+ create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_pad_wkup_44xx.h
+ create mode 100644 arch/arm/mach-omap2/include/mach/ctrl_module_wkup_44xx.h
+
+
+- Paul
