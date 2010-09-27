@@ -1,16 +1,29 @@
-From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
-Date: Mon, 27 Sep 2010 19:09:58 +0200
-Subject: imx patches for 2.6.37
-In-Reply-To: <20100927135009.GC6271@pengutronix.de>
-References: <20100927135009.GC6271@pengutronix.de>
-Message-ID: <201009271909.58594.philippe.retornaz@epfl.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Sep 2010 18:13:49 +0100
+Subject: [PATCH] ARM: kprobes-decode: add support for MOVW instruction
+In-Reply-To: <alpine.LFD.2.00.1009271301050.1146@xanadu.home>
+References: <1285170122-19823-1-git-send-email-will.deacon@arm.com>
+	<000201cb5e46$3265b8c0$97312a40$%deacon@arm.com>
+	<alpine.LFD.2.00.1009271301050.1146@xanadu.home>
+Message-ID: <000901cb5e67$5a52f660$0ef8e320$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+> On Mon, 27 Sep 2010, Will Deacon wrote:
+> 
+> > > The MOVW instruction moves a 16-bit immediate into the bottom halfword
+> > > of the destination register.
+> > >
+> > > This patch ensures that kprobes leaves the 16-bit immediate intact, rather
+> > > than assume a 12-bit immediate and mask out the upper 4 bits.
+> > >
+> > > Cc: Nicolas Pitre <nico@fluxnic.net>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Are the sdma patches in the pipeline too ? Or it will be for .38 ? 
+Cheers Nicolas,
 
-Thanks,
+Submitted as 6412/1.
 
-Philippe
+Will
