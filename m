@@ -1,71 +1,59 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 27 Sep 2010 18:40:08 +0530
-Subject: [PATCH v2 08/10] TWL IRQ: Fix fucntion declaration warnings
-In-Reply-To: <20100927111609.GF2560@sortiz-mobl>
-References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
-	<1285063280-4057-9-git-send-email-manjugk@ti.com>
-	<20100927111609.GF2560@sortiz-mobl>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F8CCE@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Sep 2010 14:16:29 +0100
+Subject: [PATCH] ARM: kprobes-decode: add support for MOVW instruction
+In-Reply-To: <1285170122-19823-1-git-send-email-will.deacon@arm.com>
+References: <1285170122-19823-1-git-send-email-will.deacon@arm.com>
+Message-ID: <000201cb5e46$3265b8c0$97312a40$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Samuel,
-
-> -----Original Message-----
-> From: Samuel Ortiz [mailto:sameo at linux.intel.com] 
-> Sent: Monday, September 27, 2010 4:46 PM
-> To: G, Manjunath Kondaiah
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Tony Lindgren; Menon, Nishanth
-> Subject: Re: [PATCH v2 08/10] TWL IRQ: Fix fucntion 
-> declaration warnings
+> The MOVW instruction moves a 16-bit immediate into the bottom halfword
+> of the destination register.
 > 
-> Hi Manjunath,
+> This patch ensures that kprobes leaves the 16-bit immediate intact, rather
+> than assume a 12-bit immediate and mask out the upper 4 bits.
 > 
-> On Tue, Sep 21, 2010 at 03:31:18PM +0530, G, Manjunath Kondaiah wrote:
-> > Fixes following sparse warnings for twl4030 and twl6030 irq files.
-> > 
-> > drivers/mfd/twl4030-irq.c:783:5: warning: symbol 
-> 'twl4030_init_irq' was not declared. Should it be static?
-> > drivers/mfd/twl4030-irq.c:863:5: warning: symbol 
-> 'twl4030_exit_irq' was not declared. Should it be static?
-> > drivers/mfd/twl4030-irq.c:873:5: warning: symbol 
-> 'twl4030_init_chip_irq' was not declared. Should it be static?
-> > 
-> > drivers/mfd/twl6030-irq.c:226:5: warning: symbol 
-> 'twl6030_init_irq' was not declared. Should it be static?
-> > drivers/mfd/twl6030-irq.c:290:5: warning: symbol 
-> 'twl6030_exit_irq' was not declared. Should it be static?
-> > 
-> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Nishanth Menon <nm@ti.com>
-> > ---
-> >  include/linux/i2c/twl.h |    5 +++++
-> >  1 files changed, 5 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/include/linux/i2c/twl.h 
-> b/include/linux/i2c/twl.h index 
-> > 6de90bf..c61e90a 100644
-> > --- a/include/linux/i2c/twl.h
-> > +++ b/include/linux/i2c/twl.h
-> > @@ -172,6 +172,11 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, 
-> > unsigned num_bytes);
-> >  
-> >  int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);  int 
-> > twl6030_interrupt_mask(u8 bit_mask, u8 offset);
-> > +int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned 
-> > +irq_end); int twl6030_exit_irq(void); int twl4030_init_irq(int 
-> > +irq_num, unsigned irq_base, unsigned irq_end); int 
-> > +twl4030_exit_irq(void); int twl4030_init_chip_irq(const 
-> char *chip);
-> No, we don't want to export those. Try defining them as 
-> extern from twl*-irq.c.
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/kprobes-decode.c |    7 ++++---
+>  1 files changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/kprobes-decode.c b/arch/arm/kernel/kprobes-decode.c
+> index 8bccbfa..2c1f005 100644
+> --- a/arch/arm/kernel/kprobes-decode.c
+> +++ b/arch/arm/kernel/kprobes-decode.c
+> @@ -1162,11 +1162,12 @@ space_cccc_001x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+>  {
+>  	/*
+>  	 * MSR   : cccc 0011 0x10 xxxx xxxx xxxx xxxx xxxx
+> -	 * Undef : cccc 0011 0x00 xxxx xxxx xxxx xxxx xxxx
+> +	 * Undef : cccc 0011 0100 xxxx xxxx xxxx xxxx xxxx
+>  	 * ALU op with S bit and Rd == 15 :
+>  	 *	   cccc 001x xxx1 xxxx 1111 xxxx xxxx xxxx
+>  	 */
+> -	if ((insn & 0x0f900000) == 0x03200000 ||	/* MSR & Undef */
+> +	if ((insn & 0x0fb00000) == 0x03200000 ||	/* MSR */
+> +	    (insn & 0x0ff00000) == 0x03400000 ||	/* Undef */
+>  	    (insn & 0x0e10f000) == 0x0210f000)		/* ALU s-bit, R15  */
+>  		return INSN_REJECTED;
+> 
+> @@ -1177,7 +1178,7 @@ space_cccc_001x(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+>  	 * *S (bit 20) updates condition codes
+>  	 * ADC/SBC/RSC reads the C flag
+>  	 */
+> -	insn &= 0xfff00fff;	/* Rn = r0, Rd = r0 */
+> +	insn &= 0xffff0fff;	/* Rd = r0 */
+>  	asi->insn[0] = insn;
+>  	asi->insn_handler = (insn & (1 << 20)) ?  /* S-bit */
+>  			emulate_alu_imm_rwflags : emulate_alu_imm_rflags;
+> --
+> 1.7.0.4
 
-Having extern in .c file will generate checkpatch warning as:
-WARNING: externs should be avoided in .c files
+I forgot to mention; without this patch the kprobes smoke tests
+(CONFIG_KPROBES_SANITY_TEST) fail on ARM. If nobody objects, I'll
+submit this to the patch system this week.
 
--Manjunath
+Thanks,
+
+Will
