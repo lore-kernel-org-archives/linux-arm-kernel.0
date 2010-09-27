@@ -1,29 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Sep 2010 18:13:49 +0100
-Subject: [PATCH] ARM: kprobes-decode: add support for MOVW instruction
-In-Reply-To: <alpine.LFD.2.00.1009271301050.1146@xanadu.home>
-References: <1285170122-19823-1-git-send-email-will.deacon@arm.com>
-	<000201cb5e46$3265b8c0$97312a40$%deacon@arm.com>
-	<alpine.LFD.2.00.1009271301050.1146@xanadu.home>
-Message-ID: <000901cb5e67$5a52f660$0ef8e320$@deacon@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Sep 2010 10:15:31 -0700
+Subject: Regarding hw irq to Linux irq mapping on ARM
+In-Reply-To: <4C9E8109.2000408@fluff.org>
+References: <AANLkTi=6nCJnfLB1uc0uLGOvOm0CX_R=j-8GQWTzmmep@mail.gmail.com>
+	<AANLkTimp7+BLNBwZyBiPS0JgB_mno+gp8+mK=VdOd3+_@mail.gmail.com>
+	<alpine.LFD.2.00.1009212342580.2416@localhost6.localdomain6>
+	<AANLkTinrfJkK85v2epOY95YWaVyMBcxSF2xakHqsM7vh@mail.gmail.com>
+	<1285133481.30449.170.camel@pasglop>
+	<AANLkTik8tGUwbch4OLShac8AqMu5+A9XgOk4uAZsYjxs@mail.gmail.com>
+	<4C9BE69C.9070609@fluff.org> <20100924150608.GB30666@sirena.org.uk>
+	<4C9E8109.2000408@fluff.org>
+Message-ID: <20100927171530.GA15007@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, 27 Sep 2010, Will Deacon wrote:
-> 
-> > > The MOVW instruction moves a 16-bit immediate into the bottom halfword
-> > > of the destination register.
-> > >
-> > > This patch ensures that kprobes leaves the 16-bit immediate intact, rather
-> > > than assume a 12-bit immediate and mask out the upper 4 bits.
-> > >
-> > > Cc: Nicolas Pitre <nico@fluxnic.net>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+On Sun, Sep 26, 2010 at 12:08:57AM +0100, Ben Dooks wrote:
+> On 24/09/10 16:06, Mark Brown wrote:
+> > On Fri, Sep 24, 2010 at 12:45:32AM +0100, Ben Dooks wrote:
 
-Cheers Nicolas,
+> >> The i2c case, it is generally the code decoding the interrupt that needs
+> >> to do this, and is part of the i2c specific driver, and is written as
+> >> some form of thread or work-queue.
 
-Submitted as 6412/1.
+> > The standard thing these days is a threaded IRQ handler.
 
-Will
+> Yes, however my first point was really do we care the method
+> for the interrupt's detection when talking about mapping them?
+
+Not really in the assignment of numbers but the fact that you're in an
+interrupt thread rather than primary IRQ context does make a difference
+to the IRQ handler, though some don't actually need to worry about it
+and could benefit from being able to specify that they don't mind which
+context they're in and can accept either context.
