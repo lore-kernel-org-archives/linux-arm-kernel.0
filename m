@@ -1,203 +1,77 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Mon, 27 Sep 2010 23:36:45 +0100
-Subject: [PATCH v3 5/5] OMAP: I2C: Convert i2c driver to use PM runtime
-	api's
-In-Reply-To: <1285078036-12789-6-git-send-email-rnayak@ti.com>
-References: <1285078036-12789-1-git-send-email-rnayak@ti.com>
-	<1285078036-12789-2-git-send-email-rnayak@ti.com>
-	<1285078036-12789-3-git-send-email-rnayak@ti.com>
-	<1285078036-12789-4-git-send-email-rnayak@ti.com>
-	<1285078036-12789-5-git-send-email-rnayak@ti.com>
-	<1285078036-12789-6-git-send-email-rnayak@ti.com>
-Message-ID: <20100927223645.GJ21564@trinity.fluff.org>
+From: robert.richter@amd.com (Robert Richter)
+Date: Tue, 28 Sep 2010 00:45:51 +0200
+Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <20100927222627.GH28588@console-pimps.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
+	<20100916143254.GC13563@erda.amd.com>
+	<20100927200138.GG28588@console-pimps.org>
+	<20100927220703.GV13563@erda.amd.com>
+	<20100927222627.GH28588@console-pimps.org>
+Message-ID: <20100927224551.GX13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 21, 2010 at 07:37:16PM +0530, Rajendra Nayak wrote:
-> This patch converts the i2c driver to use PM runtime apis
+On 27.09.10 18:26:27, Matt Fleming wrote:
+> On Tue, Sep 28, 2010 at 12:07:03AM +0200, Robert Richter wrote:
+> > On 27.09.10 16:01:38, Matt Fleming wrote:
+> > > On Thu, Sep 16, 2010 at 04:32:54PM +0200, Robert Richter wrote:
+> > > > > diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
+> > > > > index 2cb9ad5..3c3fc9a 100644
+> > > > > --- a/arch/sh/kernel/perf_event.c
+> > > > > +++ b/arch/sh/kernel/perf_event.c
+> > > > > @@ -59,6 +59,14 @@ static inline int sh_pmu_initialized(void)
+> > > > >  	return !!sh_pmu;
+> > > > >  }
+> > > > >  
+> > > > > +const char *sh_pmu_name(void)
+> > > > > +{
+> > > > > +	if (!sh_pmu)
+> > > > > +		return NULL;
+> > > > > +
+> > > > > +	return sh_pmu->name;
+> > > > > +}
+> > > > 
+> > > > Couldn't we make this a generic function like perf_num_counters()?
+> > > 
+> > > Well, ARM doesn't have names as strings for its pmus currently. What's
+> > > more, ARM wouldn't use it; SH would be the only user of this function. I
+> > > don't think this one makes sense to be a generic function.
+> > 
+> > I didn't catch this with my first review, the function will need an
+> > EXPORT_SYMBOL_GPL() to allow building modules. This will mean an
+> > interface extension what should be non-arch. So, for architectures we
+> > need the pmu name like SH we just implement the generic function. For
+> > ARM we don't need to provide this function.
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   67 +++++++++++++----------------------------
->  1 files changed, 21 insertions(+), 46 deletions(-)
+> Yeah my bad, I just hit this EXPORT_SYMBOL_GPL issue when compiling
+> oprofile as a module.
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 7674efb..126bde9 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -39,6 +39,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/i2c-omap.h>
-> +#include <linux/pm_runtime.h>
->  
->  /* I2C controller revisions */
->  #define OMAP_I2C_REV_2			0x20
-> @@ -175,8 +176,6 @@ struct omap_i2c_dev {
->  	void __iomem		*base;		/* virtual */
->  	int			irq;
->  	int			reg_shift;      /* bit shift for I2C register addresses */
-> -	struct clk		*iclk;		/* Interface clock */
-> -	struct clk		*fclk;		/* Functional clock */
->  	struct completion	cmd_complete;
->  	struct resource		*ioarea;
->  	u32			latency;	/* maximum mpu wkup latency */
-> @@ -265,45 +264,18 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
->  				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
->  }
->  
-> -static int __init omap_i2c_get_clocks(struct omap_i2c_dev *dev)
-> +static void omap_i2c_unidle(struct omap_i2c_dev *dev)
->  {
-> -	int ret;
-> +	struct platform_device *pdev;
-> +	struct omap_i2c_bus_platform_data *pdata;
->  
-> -	dev->iclk = clk_get(dev->dev, "ick");
-> -	if (IS_ERR(dev->iclk)) {
-> -		ret = PTR_ERR(dev->iclk);
-> -		dev->iclk = NULL;
-> -		return ret;
-> -	}
-> +	WARN_ON(!dev->idle);
->  
-> -	dev->fclk = clk_get(dev->dev, "fck");
-> -	if (IS_ERR(dev->fclk)) {
-> -		ret = PTR_ERR(dev->fclk);
-> -		if (dev->iclk != NULL) {
-> -			clk_put(dev->iclk);
-> -			dev->iclk = NULL;
-> -		}
-> -		dev->fclk = NULL;
-> -		return ret;
-> -	}
-> +	pdev = to_platform_device(dev->dev);
-> +	pdata = pdev->dev.platform_data;
->  
-> -	return 0;
-> -}
-> +	pm_runtime_get_sync(&pdev->dev);
->  
-> -static void omap_i2c_put_clocks(struct omap_i2c_dev *dev)
-> -{
-> -	clk_put(dev->fclk);
-> -	dev->fclk = NULL;
-> -	clk_put(dev->iclk);
-> -	dev->iclk = NULL;
-> -}
-> -
-> -static void omap_i2c_unidle(struct omap_i2c_dev *dev)
-> -{
-> -	WARN_ON(!dev->idle);
-> -
-> -	clk_enable(dev->iclk);
-> -	clk_enable(dev->fclk);
->  	if (cpu_is_omap34xx()) {
->  		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-> @@ -326,10 +298,15 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
->  
->  static void omap_i2c_idle(struct omap_i2c_dev *dev)
->  {
-> +	struct platform_device *pdev;
-> +	struct omap_i2c_bus_platform_data *pdata;
->  	u16 iv;
->  
->  	WARN_ON(dev->idle);
->  
-> +	pdev = to_platform_device(dev->dev);
-> +	pdata = pdev->dev.platform_data;
-> +
->  	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
->  	if (dev->rev >= OMAP_I2C_REV_ON_4430)
->  		omap_i2c_write_reg(dev, OMAP_I2C_IRQENABLE_CLR, 1);
-> @@ -345,8 +322,8 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
->  		omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
->  	}
->  	dev->idle = 1;
-> -	clk_disable(dev->fclk);
-> -	clk_disable(dev->iclk);
-> +
-> +	pm_runtime_put_sync(&pdev->dev);
->  }
->  
->  static int omap_i2c_init(struct omap_i2c_dev *dev)
-> @@ -356,6 +333,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  	unsigned long fclk_rate = 12000000;
->  	unsigned long timeout;
->  	unsigned long internal_clk = 0;
-> +	struct clk *fclk;
->  
->  	if (dev->rev >= OMAP_I2C_REV_2) {
->  		/* Disable I2C controller before soft reset */
-> @@ -414,7 +392,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  		 * always returns 12MHz for the functional clock, we can
->  		 * do this bit unconditionally.
->  		 */
-> -		fclk_rate = clk_get_rate(dev->fclk);
-> +		fclk = clk_get(dev->dev, "fck");
-> +		fclk_rate = clk_get_rate(fclk);
->  
->  		/* TRM for 5912 says the I2C clock must be prescaled to be
->  		 * between 7 - 12 MHz. The XOR input clock is typically
-> @@ -443,7 +422,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  			internal_clk = 9600;
->  		else
->  			internal_clk = 4000;
-> -		fclk_rate = clk_get_rate(dev->fclk) / 1000;
-> +		fclk = clk_get(dev->dev, "fck");
-> +		fclk_rate = clk_get_rate(fclk) / 1000;
+> > Most of the interface is defined in linux/perf_event.h. We shouldn't
+> > move this to asm/perf_event.h, so this is one more argument for the
+> > non-arch implementation.
+> 
+> I'm not advocating moving this function to asm/perf_event.h.
+> 
+> > As the implementation of the function would be optional, why should we
+> > make it architectural?
+> 
+> I don't see why we should pollute the perf namespace with a function
+> that is only being used inside the SH oprofile code? There would be
+> exactly one use of this function and I doubt the perf guys will want
+> this function exposed. In it's current state, it really is no use to any
+> architecture other than SH.
+> 
+> We can always add a generic perf_pmu_name() function later if needed,
+> but it's definitely not needed at the moment.
 
-You don't put the clk after getting it and using it once?
-  
->  		/* Compute prescaler divisor */
->  		psc = fclk_rate / internal_clk;
-> @@ -1046,14 +1026,12 @@ omap_i2c_probe(struct platform_device *pdev)
->  	else
->  		dev->reg_shift = 2;
->  
-> -	if ((r = omap_i2c_get_clocks(dev)) != 0)
-> -		goto err_iounmap;
-> -
->  	if (cpu_is_omap44xx())
->  		dev->regs = (u8 *) omap4_reg_map;
->  	else
->  		dev->regs = (u8 *) reg_map;
->  
-> +	pm_runtime_enable(&pdev->dev);
->  	omap_i2c_unidle(dev);
->  
->  	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
-> @@ -1125,8 +1103,6 @@ err_free_irq:
->  err_unuse_clocks:
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	omap_i2c_idle(dev);
-> -	omap_i2c_put_clocks(dev);
-> -err_iounmap:
->  	iounmap(dev->base);
->  err_free_mem:
->  	platform_set_drvdata(pdev, NULL);
-> @@ -1148,7 +1124,6 @@ omap_i2c_remove(struct platform_device *pdev)
->  	free_irq(dev->irq, dev);
->  	i2c_del_adapter(&dev->adapter);
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> -	omap_i2c_put_clocks(dev);
->  	iounmap(dev->base);
->  	kfree(dev);
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -- 
-> 1.5.4.7
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Ok, so then let's implement sh_pmu_name() in
+arch/sh/oprofile/common.c, we import asm/perf_event.h to get access to
+struct sh_pmu. This could be implemented as a static function then and
+we also get rid of this interface thing.
+
+-Robert
 
 -- 
--- 
-Ben
-
-Q:      What's a light-year?
-A:      One-third less calories than a regular year.
+Advanced Micro Devices, Inc.
+Operating System Research Center
