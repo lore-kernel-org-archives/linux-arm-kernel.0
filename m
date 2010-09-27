@@ -1,63 +1,74 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 27 Sep 2010 15:50:37 +0200
-Subject: [PATCH 01/40] ARM: imx: remove #ifdefery for unmerged flexcan driver
+Date: Mon, 27 Sep 2010 15:51:01 +0200
+Subject: [PATCH 25/40] ARM: mx5/clock-mx51: refactor ccgr callbacks to use
+	common code
 In-Reply-To: <20100927135009.GC6271@pengutronix.de>
 References: <20100927135009.GC6271@pengutronix.de>
-Message-ID: <1285595476-10025-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1285595476-10025-25-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flexcan driver was merged as e955cead.
-
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Cc: Wolfgang Grandegger <wg@grandegger.com>
+Acked-by: Jason Wang <jason77.wang@gmail.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/plat-mxc/devices/Makefile              |    5 +----
- arch/arm/plat-mxc/include/mach/devices-common.h |   12 ------------
- 2 files changed, 1 insertions(+), 16 deletions(-)
+ arch/arm/mach-mx5/clock-mx51.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index 347da51..2062ab4 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -1,7 +1,4 @@
--ifdef CONFIG_CAN_FLEXCAN
--# the ifdef can be removed once the flexcan driver has been merged
--obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) +=  platform-flexcan.o
--endif
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index c5f68c5..4a170a8 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -14,23 +14,11 @@ struct platform_device *imx_add_platform_device(const char *name, int id,
- 		const struct resource *res, unsigned int num_resources,
- 		const void *data, size_t size_data);
+diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+index 57c10a9..fe658bf 100644
+--- a/arch/arm/mach-mx5/clock-mx51.c
++++ b/arch/arm/mach-mx5/clock-mx51.c
+@@ -41,34 +41,36 @@ static struct clk usboh3_clk;
  
--#if defined (CONFIG_CAN_FLEXCAN) || defined (CONFIG_CAN_FLEXCAN_MODULE)
- #include <linux/can/platform/flexcan.h>
- struct platform_device *__init imx_add_flexcan(int id,
- 		resource_size_t iobase, resource_size_t iosize,
- 		resource_size_t irq,
- 		const struct flexcan_platform_data *pdata);
--#else
--/* the ifdef can be removed once the flexcan driver has been merged */
--struct flexcan_platform_data;
--static inline struct platform_device *__init imx_add_flexcan(int id,
--		resource_size_t iobase, resource_size_t iosize,
--		resource_size_t irq,
--		const struct flexcan_platform_data *pdata)
--{
--	return NULL;
--}
--#endif
+ #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
  
- #include <mach/i2c.h>
- struct platform_device *__init imx_add_imx_i2c(int id,
+-static int _clk_ccgr_enable(struct clk *clk)
++static void _clk_ccgr_setclk(struct clk *clk, unsigned mode)
+ {
+-	u32 reg;
++	u32 reg = __raw_readl(clk->enable_reg);
++
++	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
++	reg |= mode << clk->enable_shift;
+ 
+-	reg = __raw_readl(clk->enable_reg);
+-	reg |= MXC_CCM_CCGRx_MOD_ON << clk->enable_shift;
+ 	__raw_writel(reg, clk->enable_reg);
++}
+ 
++static int _clk_ccgr_enable(struct clk *clk)
++{
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_ON);
+ 	return 0;
+ }
+ 
+ static void _clk_ccgr_disable(struct clk *clk)
+ {
+-	u32 reg;
+-	reg = __raw_readl(clk->enable_reg);
+-	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
+-	__raw_writel(reg, clk->enable_reg);
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_OFF);
++}
+ 
++static int _clk_ccgr_enable_inrun(struct clk *clk)
++{
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE);
++	return 0;
+ }
+ 
+ static void _clk_ccgr_disable_inwait(struct clk *clk)
+ {
+-	u32 reg;
+-
+-	reg = __raw_readl(clk->enable_reg);
+-	reg &= ~(MXC_CCM_CCGRx_CG_MASK << clk->enable_shift);
+-	reg |= MXC_CCM_CCGRx_MOD_IDLE << clk->enable_shift;
+-	__raw_writel(reg, clk->enable_reg);
++	_clk_ccgr_setclk(clk, MXC_CCM_CCGRx_MOD_IDLE);
+ }
+ 
+ /*
 -- 
 1.7.2.3
