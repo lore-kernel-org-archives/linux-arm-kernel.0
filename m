@@ -1,220 +1,748 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 27 Sep 2010 11:58:44 +0900
-Subject: [PATCH] ARM: S5PV210: Add Torbreck board support
-In-Reply-To: <1285463130-14227-1-git-send-email-chlrbgh0@gmail.com>
-References: <1285463130-14227-1-git-send-email-chlrbgh0@gmail.com>
-Message-ID: <AANLkTik5SkqjEz5Ymtg6RvwfrU0i8XzhPQq3Un7gMbP=@mail.gmail.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Mon, 27 Sep 2010 14:49:45 +0900
+Subject: [PATCH] drivers: lcd: Add support ld9040 amoled panel driver
+Message-ID: <1285566585-32272-1-git-send-email-dh09.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch is ld9040 amoled panel driver. I resend
+because there was no comment.
 
-Looks good to me except minor fixup.
+It is similar to s6e63m0 panel driver and use spi gpio
+to send panel information.
 
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+---
+ drivers/video/backlight/Kconfig  |    7 +
+ drivers/video/backlight/Makefile |    1 +
+ drivers/video/backlight/ld9040.c |  687 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 695 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/video/backlight/ld9040.c
 
-On Sun, Sep 26, 2010 at 10:05 AM, Kyuho Choi <chlrbgh0@gmail.com> wrote:
-> This patch adds to support Torbreck board of aESOP community using
-> Samsung S5PV210 SoC.
->
-> Signed-off-by: Kyuho Choi <chlrbgh0@gmail.com>
-> Signed-off-by: Hyunchul Ko <ghcstop@gmail.com>
-> ---
-> ?arch/arm/mach-s5pv210/Kconfig ? ? ? ? | ? 18 +++++
-> ?arch/arm/mach-s5pv210/Makefile ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-s5pv210/mach-torbreck.c | ?133 +++++++++++++++++++++++++++++++++
-> ?3 files changed, 152 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-s5pv210/mach-torbreck.c
->
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index d3a3895..c5ec466 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -139,6 +139,24 @@ config MACH_SMDKV210
-> ? ? ? ?help
-> ? ? ? ? ?Machine support for Samsung SMDKV210
->
-> +config MACH_TORBRECK
-> + ? ? ? bool "Torbreck"
-> + ? ? ? select CPU_S5PV210
-> + ? ? ? select ARCH_SPARSEMEM_ENABLE
-> + ? ? ? select S3C_DEV_HSMMC
-> + ? ? ? select S3C_DEV_HSMMC1
-> + ? ? ? select S3C_DEV_HSMMC2
-> + ? ? ? select S3C_DEV_HSMMC3
-> + ? ? ? select S3C_DEV_I2C1
-> + ? ? ? select S3C_DEV_I2C2
-> + ? ? ? select S3C_DEV_RTC
-> + ? ? ? select S3C_DEV_WDT
-> + ? ? ? select S5PV210_SETUP_I2C1
-> + ? ? ? select S5PV210_SETUP_I2C2
-> + ? ? ? select S5PV210_SETUP_SDHCI
-> + ? ? ? help
-> + ? ? ? ? Machine support for aESOP Torbreck
-Just question. Does it TDROID board?
-> +
-> ?endmenu
->
-> ?endif
-> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-> index 05048c5..927c2b7 100644
-> --- a/arch/arm/mach-s5pv210/Makefile
-> +++ b/arch/arm/mach-s5pv210/Makefile
-> @@ -21,6 +21,7 @@ obj-$(CONFIG_MACH_AQUILA) ? ? += mach-aquila.o
-> ?obj-$(CONFIG_MACH_SMDKV210) ? ?+= mach-smdkv210.o
-> ?obj-$(CONFIG_MACH_SMDKC110) ? ?+= mach-smdkc110.o
-> ?obj-$(CONFIG_MACH_GONI) ? ? ? ? ? ? ? ?+= mach-goni.o
-> +obj-$(CONFIG_MACH_TORBRECK) ? ?+= mach-torbreck.o
->
-> ?# device support
->
-> diff --git a/arch/arm/mach-s5pv210/mach-torbreck.c b/arch/arm/mach-s5pv210/mach-torbreck.c
-> new file mode 100644
-> index 0000000..3142250
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv210/mach-torbreck.c
-> @@ -0,0 +1,133 @@
-> +/* linux/arch/arm/mach-s5pv210/mach-torbreck.c
-> + *
-> + * Copyright (c) 2010 aESOP Community
-> + * ? ? ? ? ? ? http://www.aesop.or.kr/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/i2c.h>
-> +#include <linux/init.h>
-> +#include <linux/serial_core.h>
-> +
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include <mach/map.h>
-> +#include <mach/regs-clock.h>
-> +
-> +#include <plat/regs-serial.h>
-> +#include <plat/s5pv210.h>
-> +#include <plat/devs.h>
-> +#include <plat/cpu.h>
-> +#include <plat/iic.h>
-> +
-> +/* Following are default values for UCON, ULCON and UFCON UART registers */
-> +#define TORBRECK_UCON_DEFAULT ?(S3C2410_UCON_TXILEVEL | ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_RXILEVEL | ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_TXIRQMODE | ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_RXIRQMODE | ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2410_UCON_RXFIFO_TOI | ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S3C2443_UCON_RXERR_IRQEN)
-> +
-> +#define TORBRECK_ULCON_DEFAULT S3C2410_LCON_CS8
-> +
-> +#define TORBRECK_UFCON_DEFAULT (S3C2410_UFCON_FIFOMODE | ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S5PV210_UFCON_TXTRIG4 | ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?S5PV210_UFCON_RXTRIG4)
-
-Any reason to use TRIG4? just use the full trigger e.g., 256.
-> +
-> +static struct s3c2410_uartcfg torbreck_uartcfgs[] __initdata = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
-There's no code for flags, please remove it all.
-> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = TORBRECK_UCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= TORBRECK_ULCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= TORBRECK_UFCON_DEFAULT,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
-> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = TORBRECK_UCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= TORBRECK_ULCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= TORBRECK_UFCON_DEFAULT,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 2,
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
-> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = TORBRECK_UCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= TORBRECK_ULCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= TORBRECK_UFCON_DEFAULT,
-> + ? ? ? },
-> + ? ? ? [3] = {
-> + ? ? ? ? ? ? ? .hwport ? ? ? ? = 3,
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0,
-> + ? ? ? ? ? ? ? .ucon ? ? ? ? ? = TORBRECK_UCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ulcon ? ? ? ? ?= TORBRECK_ULCON_DEFAULT,
-> + ? ? ? ? ? ? ? .ufcon ? ? ? ? ?= TORBRECK_UFCON_DEFAULT,
-> + ? ? ? },
-> +};
-> +
-> +static struct platform_device *torbreck_devices[] __initdata = {
-> + ? ? ? &s5pv210_device_iis0,
-> + ? ? ? &s3c_device_cfcon,
-> + ? ? ? &s3c_device_hsmmc0,
-> + ? ? ? &s3c_device_hsmmc1,
-> + ? ? ? &s3c_device_hsmmc2,
-> + ? ? ? &s3c_device_hsmmc3,
-> + ? ? ? &s3c_device_i2c0,
-> + ? ? ? &s3c_device_i2c1,
-> + ? ? ? &s3c_device_i2c2,
-> + ? ? ? &s3c_device_rtc,
-> + ? ? ? &s3c_device_wdt,
-> +};
-> +
-> +static struct i2c_board_info torbreck_i2c_devs0[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> +static struct i2c_board_info torbreck_i2c_devs1[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> +static struct i2c_board_info torbreck_i2c_devs2[] __initdata = {
-> + ? ? ? /* To Be Updated */
-> +};
-> +
-> +static void __init torbreck_map_io(void)
-> +{
-> + ? ? ? s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> + ? ? ? s3c24xx_init_clocks(24000000);
-> + ? ? ? s3c24xx_init_uarts(torbreck_uartcfgs, ARRAY_SIZE(torbreck_uartcfgs));
-> +}
-> +
-> +static void __init torbreck_machine_init(void)
-> +{
-> + ? ? ? s3c_i2c0_set_platdata(NULL);
-> + ? ? ? s3c_i2c1_set_platdata(NULL);
-> + ? ? ? s3c_i2c2_set_platdata(NULL);
-> + ? ? ? i2c_register_board_info(0, torbreck_i2c_devs0,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(torbreck_i2c_devs0));
-> + ? ? ? i2c_register_board_info(1, torbreck_i2c_devs1,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(torbreck_i2c_devs1));
-> + ? ? ? i2c_register_board_info(2, torbreck_i2c_devs2,
-> + ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(torbreck_i2c_devs2));
-> +
-> + ? ? ? platform_add_devices(torbreck_devices, ARRAY_SIZE(torbreck_devices));
-> +}
-> +
-> +MACHINE_START(TORBRECK, "TORBRECK")
-> + ? ? ? /* Maintainer: Hyunchul Ko <ghcstop@gmail.com> */
-> + ? ? ? .phys_io ? ? ? ?= S3C_PA_UART & 0xfff00000,
-> + ? ? ? .io_pg_offst ? ?= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
-> + ? ? ? .boot_params ? ?= S5P_PA_SDRAM + 0x100,
-> + ? ? ? .init_irq ? ? ? = s5pv210_init_irq,
-> + ? ? ? .map_io ? ? ? ? = torbreck_map_io,
-> + ? ? ? .init_machine ? = torbreck_machine_init,
-> + ? ? ? .timer ? ? ? ? ?= &s3c24xx_timer,
-> +MACHINE_END
-> --
-> 1.5.6.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+index e54a337..b8381d0 100644
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -109,6 +109,13 @@ config LCD_S6E63M0
+ 	  If you have an S6E63M0 LCD Panel, say Y to enable its
+ 	  LCD control driver.
+ 
++config LCD_LD9040
++	bool "LD9040 AMOLED LCD Driver"
++	depends on SPI && BACKLIGHT_CLASS_DEVICE
++	help
++	  If you have an LD9040 LCD Panel, say Y to enable its
++	  LCD control driver.
++
+ endif # LCD_CLASS_DEVICE
+ 
+ #
+diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
+index 44c0f81..a52248e 100644
+--- a/drivers/video/backlight/Makefile
++++ b/drivers/video/backlight/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_LCD_VGG2432A4)	   += vgg2432a4.o
+ obj-$(CONFIG_LCD_TDO24M)	   += tdo24m.o
+ obj-$(CONFIG_LCD_TOSA)		   += tosa_lcd.o
+ obj-$(CONFIG_LCD_S6E63M0)	+= s6e63m0.o
++obj-$(CONFIG_LCD_LD9040)	+= ld9040.o
+ 
+ obj-$(CONFIG_BACKLIGHT_CLASS_DEVICE) += backlight.o
+ obj-$(CONFIG_BACKLIGHT_ATMEL_PWM)    += atmel-pwm-bl.o
+diff --git a/drivers/video/backlight/ld9040.c b/drivers/video/backlight/ld9040.c
+new file mode 100644
+index 0000000..7a2109f
+--- /dev/null
++++ b/drivers/video/backlight/ld9040.c
+@@ -0,0 +1,687 @@
++/*
++ * ld9040 AMOLED LCD panel driver.
++ *
++ * Author: Donghwa Lee  <dh09.lee@samsung.com>
++ *
++ * Derived from drivers/video/omap/lcd-apollon.c
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
++ */
++
++#include <linux/wait.h>
++#include <linux/fb.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/spi/spi.h>
++#include <linux/irq.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/lcd.h>
++#include <linux/backlight.h>
++
++#define SLEEPMSEC		0x1000
++#define ENDDEF		0x2000
++#define DEFMASK		0xFF00
++#define COMMAND_ONLY	0xFE
++#define DATA_ONLY		0xFF
++
++#define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
++
++struct ld9040 {
++	struct device			*dev;
++	struct spi_device		*spi;
++	unsigned int			power;
++	struct lcd_device		*ld;
++	struct lcd_platform_data	*lcd_pd;
++};
++
++static const unsigned short SEQ_SWRESET[] = {
++	0x01, COMMAND_ONLY,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_USER_SETTING[] = {
++	0xF0, 0x5A,
++
++	DATA_ONLY, 0x5A,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_ELVSS[] = {
++	0xB1, 0x0B,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x16,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_GTCON[] = {
++	0xF7, 0x09,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_GAMMA_SET1[] = {
++	0xF9, 0x18,
++
++	DATA_ONLY, 0x9A,
++	DATA_ONLY, 0xB0,
++	DATA_ONLY, 0xAB,
++	DATA_ONLY, 0xC4,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0xAA,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0xA1,
++	DATA_ONLY, 0xB5,
++	DATA_ONLY, 0xB0,
++	DATA_ONLY, 0xC7,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0xC5,
++	DATA_ONLY, 0x24,
++	DATA_ONLY, 0xA7,
++	DATA_ONLY, 0xAC,
++	DATA_ONLY, 0x9A,
++	DATA_ONLY, 0xB6,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0xE5,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_GAMMA_CTRL[] = {
++	0xFB, 0x00,
++
++	DATA_ONLY, 0x5A,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_APON[] = {
++	0xF3, 0x00,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x0A,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_DISPCTL[] = {
++	0xF2, 0x02,
++
++	DATA_ONLY, 0x03,
++	DATA_ONLY, 0x1C,
++	DATA_ONLY, 0x10,
++	DATA_ONLY, 0x10,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_SLPOUT[] = {
++	0x11, COMMAND_ONLY,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_SLPIN[] = {
++	0x10, COMMAND_ONLY,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_DISPON[] = {
++	0x29, COMMAND_ONLY,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_DISPOFF[] = {
++	0x28, COMMAND_ONLY,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VCI1_1ST_EN[] = {
++	0xF3, 0x10,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VL1_EN[] = {
++	0xF3, 0x11,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VL2_EN[] = {
++	0xF3, 0x13,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VCI1_2ND_EN[] = {
++	0xF3, 0x33,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VL3_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VREG1_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0x01,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VGH_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0x11,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VGL_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0x31,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x02,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VMOS_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xB1,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VINT_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xF1,
++	/* DATA_ONLY, 0x71,	VMOS/VBL/VBH not used */
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VBH_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xF9,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_VBL_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xFD,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_GAM_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xFF,
++	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_SD_AMP_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xFF,
++	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
++	DATA_ONLY, 0x80,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_GLS_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xFF,
++	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
++	DATA_ONLY, 0x81,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_ELS_EN[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xFF,
++	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
++	DATA_ONLY, 0x83,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
++	ENDDEF, 0x00
++};
++
++static const unsigned short SEQ_EL_ON[] = {
++	0xF3, 0x37,
++
++	DATA_ONLY, 0xFF,
++	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
++	DATA_ONLY, 0x87,
++	DATA_ONLY, 0x00,
++	DATA_ONLY, 0x03,
++	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
++	ENDDEF, 0x00
++};
++
++static int ld9040_spi_write_byte(struct ld9040 *lcd, int addr, int data)
++{
++	u16 buf[1];
++	struct spi_message msg;
++
++	struct spi_transfer xfer = {
++		.len		= 2,
++		.tx_buf		= buf,
++	};
++
++	buf[0] = (addr << 8) | data;
++
++	spi_message_init(&msg);
++	spi_message_add_tail(&xfer, &msg);
++
++	return spi_sync(lcd->spi, &msg);
++}
++
++static int ld9040_spi_write(struct ld9040 *lcd, unsigned char address,
++	unsigned char command)
++{
++	int ret = 0;
++
++	if (address != DATA_ONLY)
++		ret = ld9040_spi_write_byte(lcd, 0x0, address);
++	if (command != COMMAND_ONLY)
++		ret = ld9040_spi_write_byte(lcd, 0x1, command);
++
++	return ret;
++}
++
++static int ld9040_panel_send_sequence(struct ld9040 *lcd,
++	const unsigned short *wbuf)
++{
++	int ret = 0, i = 0;
++
++	while ((wbuf[i] & DEFMASK) != ENDDEF) {
++		if ((wbuf[i] & DEFMASK) != SLEEPMSEC) {
++			ret = ld9040_spi_write(lcd, wbuf[i], wbuf[i+1]);
++			if (ret)
++				break;
++		} else
++			udelay(wbuf[i+1]*1000);
++		i += 2;
++	}
++
++	return ret;
++}
++
++static int ld9040_ldi_init(struct ld9040 *lcd)
++{
++	int ret, i;
++	const unsigned short *init_seq[] = {
++		SEQ_USER_SETTING,
++		SEQ_ELVSS,
++		SEQ_GTCON,
++		SEQ_GAMMA_SET1,
++		SEQ_GAMMA_CTRL,
++		SEQ_SLPOUT,
++	};
++
++	for (i = 0; i < ARRAY_SIZE(init_seq); i++) {
++		ret = ld9040_panel_send_sequence(lcd, init_seq[i]);
++		mdelay(5);
++		if (ret)
++			break;
++	}
++
++	return ret;
++}
++
++static int ld9040_ldi_enable(struct ld9040 *lcd)
++{
++	int ret = 0;
++
++	ret = ld9040_panel_send_sequence(lcd, SEQ_DISPON);
++
++	return ret;
++}
++
++static int ld9040_ldi_disable(struct ld9040 *lcd)
++{
++	int ret;
++
++	ret = ld9040_panel_send_sequence(lcd, SEQ_DISPOFF);
++
++	return ret;
++}
++
++static int ld9040_power_on(struct ld9040 *lcd)
++{
++	int ret = 0;
++	struct lcd_platform_data *pd = NULL;
++	pd = lcd->lcd_pd;
++	if (!pd) {
++		dev_err(lcd->dev, "platform data is NULL.\n");
++		return -EFAULT;
++	}
++
++	if (!pd->power_on) {
++		dev_err(lcd->dev, "power_on is NULL.\n");
++		return -EFAULT;
++	} else {
++		pd->power_on(lcd->ld, 1);
++		mdelay(pd->power_on_delay);
++	}
++
++	if (!pd->reset) {
++		dev_err(lcd->dev, "reset is NULL.\n");
++		return -EFAULT;
++	} else {
++		pd->reset(lcd->ld);
++		mdelay(pd->reset_delay);
++	}
++
++	ret = ld9040_ldi_init(lcd);
++	if (ret) {
++		dev_err(lcd->dev, "failed to initialize ldi.\n");
++		return ret;
++	}
++
++	ret = ld9040_ldi_enable(lcd);
++	if (ret) {
++		dev_err(lcd->dev, "failed to enable ldi.\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ld9040_power_off(struct ld9040 *lcd)
++{
++	int ret = 0;
++	struct lcd_platform_data *pd = NULL;
++
++	pd = lcd->lcd_pd;
++	if (!pd) {
++		dev_err(lcd->dev, "platform data is NULL.\n");
++		return -EFAULT;
++	}
++
++	ret = ld9040_ldi_disable(lcd);
++	if (ret) {
++		dev_err(lcd->dev, "lcd setting failed.\n");
++		return -EIO;
++	}
++
++	mdelay(pd->power_off_delay);
++
++	if (!pd->power_on) {
++		dev_err(lcd->dev, "power_on is NULL.\n");
++		return -EFAULT;
++	} else
++		pd->power_on(lcd->ld, 0);
++
++	return 0;
++}
++
++static int ld9040_power(struct ld9040 *lcd, int power)
++{
++	int ret = 0;
++
++	if (POWER_IS_ON(power) && !POWER_IS_ON(lcd->power))
++		ret = ld9040_power_on(lcd);
++	else if (!POWER_IS_ON(power) && POWER_IS_ON(lcd->power))
++		ret = ld9040_power_off(lcd);
++
++	if (!ret)
++		lcd->power = power;
++
++	return ret;
++}
++
++static int ld9040_set_power(struct lcd_device *ld, int power)
++{
++	struct ld9040 *lcd = lcd_get_data(ld);
++
++	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
++		power != FB_BLANK_NORMAL) {
++		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
++		return -EINVAL;
++	}
++
++	return ld9040_power(lcd, power);
++}
++
++static int ld9040_get_power(struct lcd_device *ld)
++{
++	struct ld9040 *lcd = lcd_get_data(ld);
++
++	return lcd->power;
++}
++
++static struct lcd_ops ld9040_lcd_ops = {
++	.set_power = ld9040_set_power,
++	.get_power = ld9040_get_power,
++};
++
++
++static int __init ld9040_probe(struct spi_device *spi)
++{
++	int ret = 0;
++	struct ld9040 *lcd = NULL;
++	struct lcd_device *ld = NULL;
++
++	lcd = kzalloc(sizeof(struct ld9040), GFP_KERNEL);
++	if (!lcd)
++		return -ENOMEM;
++
++	/* ld9040 lcd panel uses 3-wire 9bits SPI Mode. */
++	spi->bits_per_word = 9;
++
++	ret = spi_setup(spi);
++	if (ret < 0) {
++		dev_err(&spi->dev, "spi setup failed.\n");
++		goto out_free_lcd;
++	}
++
++	lcd->spi = spi;
++	lcd->dev = &spi->dev;
++
++	lcd->lcd_pd = (struct lcd_platform_data *)spi->dev.platform_data;
++	if (!lcd->lcd_pd) {
++		dev_err(&spi->dev, "platform data is NULL.\n");
++		goto out_free_lcd;
++	}
++
++	ld = lcd_device_register("ld9040", &spi->dev, lcd, &ld9040_lcd_ops);
++	if (IS_ERR(ld)) {
++		ret = PTR_ERR(ld);
++		goto out_free_lcd;
++	}
++
++	lcd->ld = ld;
++
++	/*
++	 * if lcd panel was on from bootloader like u-boot then
++	 * do not lcd on.
++	 */
++	if (!lcd->lcd_pd->lcd_enabled) {
++		/*
++		 * if lcd panel was off from bootloader then
++		 * current lcd status is powerdown and then
++		 * it enables lcd panel.
++		 */
++		lcd->power = FB_BLANK_POWERDOWN;
++
++		ld9040_power(lcd, FB_BLANK_UNBLANK);
++	} else
++		lcd->power = FB_BLANK_UNBLANK;
++
++	dev_set_drvdata(&spi->dev, lcd);
++
++	dev_info(&spi->dev, "ld9040 panel driver has been probed.\n");
++	return 0;
++
++out_free_lcd:
++	kfree(lcd);
++	return ret;
++}
++
++static int __devexit ld9040_remove(struct spi_device *spi)
++{
++	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
++
++	ld9040_power(lcd, FB_BLANK_POWERDOWN);
++	lcd_device_unregister(lcd->ld);
++	kfree(lcd);
++
++	return 0;
++}
++
++#if defined(CONFIG_PM)
++unsigned int beforepower;
++
++static int ld9040_suspend(struct spi_device *spi, pm_message_t mesg)
++{
++	int ret = 0;
++	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
++
++	dev_dbg(&spi->dev, "lcd->power = %d\n", lcd->power);
++
++	beforepower = lcd->power;
++
++	/*
++	 * when lcd panel is suspend, lcd panel becomes off
++	 * regardless of status.
++	 */
++	ret = ld9040_power(lcd, FB_BLANK_POWERDOWN);
++
++	return ret;
++}
++
++static int ld9040_resume(struct spi_device *spi)
++{
++	int ret = 0;
++	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
++
++	/*
++	 * after suspended, if lcd panel status is FB_BLANK_UNBLANK
++	 * (at that time, power is FB_BLANK_UNBLANK) then
++	 * it changes that status to FB_BLANK_POWERDOWN to get lcd on.
++	 */
++	if (beforepower == FB_BLANK_UNBLANK)
++		lcd->power = FB_BLANK_POWERDOWN;
++
++	dev_dbg(&spi->dev, "power = %d\n", beforepower);
++
++	ret = ld9040_power(lcd, beforepower);
++
++	return ret;
++}
++#else
++#define ld9040_suspend		NULL
++#define ld9040_resume		NULL
++#endif
++
++/* Power down all displays on reboot, poweroff or halt. */
++static void ld9040_shutdown(struct spi_device *spi)
++{
++	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
++
++	ld9040_power(lcd, FB_BLANK_POWERDOWN);
++}
++
++static struct spi_driver ld9040_driver = {
++	.driver = {
++		.name	= "ld9040",
++		.bus	= &spi_bus_type,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= ld9040_probe,
++	.remove		= __devexit_p(ld9040_remove),
++	.shutdown	= ld9040_shutdown,
++	.suspend	= ld9040_suspend,
++	.resume		= ld9040_resume,
++};
++
++static int __init ld9040_init(void)
++{
++	return spi_register_driver(&ld9040_driver);
++}
++
++static void __exit ld9040_exit(void)
++{
++	spi_unregister_driver(&ld9040_driver);
++}
++
++module_init(ld9040_init);
++module_exit(ld9040_exit);
++
++MODULE_AUTHOR("Donghwa Lee <dh09.lee@samsung.com>");
++MODULE_DESCRIPTION("ld9040 LCD Driver");
++MODULE_LICENSE("GPL");
++
+-- 
+1.6.0.4
