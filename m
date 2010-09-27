@@ -1,156 +1,100 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Mon, 27 Sep 2010 00:57:42 +0100
-Subject: [PATCH 0/3] Common struct clk implementation, v7
-In-Reply-To: <AANLkTim++mNF=KDabCBCk=jDxbwNFWu=hrDQq=UWR=yM@mail.gmail.com>
-References: <1284522014.516876.675872472687.0.gpush@pororo>
-	<AANLkTim++mNF=KDabCBCk=jDxbwNFWu=hrDQq=UWR=yM@mail.gmail.com>
-Message-ID: <4C9FDDF6.5000702@fluff.org>
+Date: Mon, 27 Sep 2010 01:08:34 +0100
+Subject: [PATCH] s3c: add support for mini6410
+In-Reply-To: <20100916172402.18683.30937.stgit@darius-desktop>
+References: <20100916172402.18683.30937.stgit@darius-desktop>
+Message-ID: <4C9FE082.4050808@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/10 00:15, Colin Cross wrote:
-> On Tue, Sep 14, 2010 at 8:40 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
->> Hi all,
->>
->> These patches are an attempt to allow platforms to share clock code. At
->> present, the definitions of 'struct clk' are local to platform code,
->> which makes allocating and initialising cross-platform clock sources
->> difficult, and makes it impossible to compile a single image containing
->> support for two ARM platforms with different struct clks.
+On 16/09/10 18:24, Darius Augulis wrote:
+> Add support for mini6410 board from FriendlyARM
 > 
-> Having just finished implementing the clock tree support on Tegra, I
-> have a few concerns about these patches, and how they relate to the
-> clk api.
-> 
-> On the spinlock vs. mutex issue (I know, it's been beaten to death).
-> The clk api does not specify whether or not implementations can sleep.
->  In fact, it explicitly states that clk_get and clk_put can't be
-> called from atomic context, but does not say anything about the rest
-> of the api, which vaguely implies that they can be called from atomic
-> context.
-
-Personally, I took the view that they where never allowable from an
-atomic context. We may need to lock the relevant clock hardware and
-as such it makes it a bit of a headache if we have clock implementations
-which communicate via something like i2c or spi. It could be that
-clocks are sourced form some form of PMIC, PLL or other external device.
-
-> There are situations in which a non-sleeping clk api is useful, if not
-> necessary.  On msm with a smart panel, the vsync is connected to a
-> gpio, and the vsync interrupt enables the dma controller clock is to
-> start the dma of the framebuffer to the display block.  A similar
-> problem can happen in dma audio, where a low watermark interrupt from
-> the audio block needs to trigger dma to refill the buffer.  Leaving
-> the dma clock on before the vsync or low watermark interrupt would
-> prevent entering the lowest power idle state.
-
-Is the DMA clock seperate from the device bus clock in this case?
-
-> There is also a very common use case for clk_disable in an interrupt.
-> When an I2C transaction completes, the irq handler should disable the
-> clock if there are no other queued transactions.  With a non-sleeping
-> clk api, this is easy.  With a sleeping clk api, the clk_disable needs
-> to be deferred to non-atomic context.  Because of the refcounting in
-> clk_disable, this is not particularly difficult, but a
-> clk_disable_later helper function might simplify it.
-
-IIRC, the I2C APIs aren't call-able from an atomic context, so the
-clk_enable() and clk_disable() calls could be done from the context
-initiating and completing the transaction, and not the interrupt
-handler.
-
-> However, some of the clocks on Tegra can not be controlled from atomic
-> context.  Some clocks have voltage requirements, so enabling the clock
-> may require a call to the regulator api to increase the voltage, which
-> will call into the i2c api, which sleeps.
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
 >
-> Additionally, using a lock per clk struct can cause AB-BA locking
-> issues.  In my implementation, calling clk_enable on a child clock in
-> the clock tree can call clk_enable on its parent if the child clock
-> was not already enabled.  This leads to the child clock lock being
-> taken, followed by the parent clock lock.  Calling clk_set_rate on the
-> parent requires recalculating the rate of all of the children, which
-> leads to the parent clock lock being taken first, followed by the
-> child clock lock.  Deadlock.
+> +obj-$(CONFIG_MACH_MINI6410)     += mach-mini6410.o
+>  obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
+>  obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+>  obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
+> diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+> new file mode 100644
+> index 0000000..560e347
+> --- /dev/null
+> +++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+> @@ -0,0 +1,154 @@
+> +/* linux/arch/arm/mach-s3c64xx/mach-mini6410.c
+> + *
+> + * Copyright 2010 Darius Augulis <augulis.darius@gmail.com>
+> + * Copyright 2008 Openmoko, Inc.
+> + * Copyright 2008 Simtec Electronics
+> + *	Ben Dooks <ben@simtec.co.uk>
+> + *	http://armlinux.simtec.co.uk/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> +*/
 
-Hmm, either the lock has to be explicitly for the 'enable' count or
-we end up with some really nasty locking problems.
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/gpio.h>
+> +#include <linux/kernel.h>
+> +#include <linux/list.h>
+> +#include <linux/dm9000.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/types.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <mach/map.h>
+> +#include <mach/regs-gpio.h>
+> +#include <mach/regs-srom.h>
+> +#include <mach/s3c6410.h>
+> +#include <plat/cpu.h>
+> +#include <plat/devs.h>
+> +#include <plat/regs-serial.h>
 
-> I solved these problems by using a single spinlock around all of the
-> clocks, plus an additional mutex around the clocks that need to sleep.
->  I also locally added clk_*_cansleep functions to the clk api, and
-> used might_sleep to prevent calls to the non-cansleep clk api on
-> clocks that require sleeping.  I'm not happy with this solution, as it
-> uses a local extension to a cross-platform api, but I don't see any
-> way around it.  Some clocks really need to be enabled or disabled from
-> atomic context, and some clocks are impossible to use in atomic
-> context.
+My preference is to split up the include blocks with a blank line.
 
-I'd like to see some comment about the use of the clk_ api from atomic
-context, and then sorting this out before we try and get a unified API
-sorted out.
 
-> I think something a little like the gpio api style of cansleep and non
-> cansleep functions would help would preserve the ability for clocks to
-> avoid sleeping on platforms that don't need to sleep, while allowing
-> drivers that can handle sleeping clocks to remain as widely
-> cross-platform as possible.  Instead of changing all the calls, add a
-> clk_get_nosleep for drivers that will call the clk apis in atomic
-> context, which will catch drivers that are not compatible with the
-> clock they are requesting early on during probe.
-> 
-> Either way, the clk api could use some notes on the restrictions for
-> both the callers and the implementers to ensure compatibility between
-> architectures.  Which calls can sleep?  Can clk_set_rate or
-> clk_set_parent be called on a clock that is already enabled, and, if
-> so, what is the expected behavior for the children of the clock that
-> is changed?
+> +#define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
+> +#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
+> +#define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
+> +
+> +static struct s3c2410_uartcfg mini6410_uartcfgs[] __initdata = {
+> +	[0] = {
+> +		.hwport	= 0,
+> +		.flags	= 0,
+> +		.ucon	= UCON,
+> +		.ulcon	= ULCON,
+> +		.ufcon	= UFCON,
+> +	},
+> +	[1] = {
+> +		.hwport	= 1,
+> +		.flags	= 0,
+> +		.ucon	= UCON,
+> +		.ulcon	= ULCON,
+> +		.ufcon	= UFCON,
+> +	},
+> +	[2] = {
+> +		.hwport	= 2,
+> +		.flags	= 0,
+> +		.ucon	= UCON,
+> +		.ulcon	= ULCON,
+> +		.ufcon	= UFCON,
+> +	},
+> +	[3] = {
+> +		.hwport	= 3,
+> +		.flags	= 0,
+> +		.ucon	= UCON,
+> +		.ulcon	= ULCON,
+> +		.ufcon	= UFCON,
+> +	},
+> +};
 
-Some of that is implementation specific, IIRC if they can't return an
-error they should be able to. In the case of most of the Samsung code
-the user is allowed to set_parent and set_rate on a running clock, and
-in some cases the clock has to be temporarily stopped whilst the MUX
-change is being sorted out.
+I'm beginging to think we should just have a standard
+implementation of these.
 
-For the child case, on the Samsung code it is very rare that we've
-ended up having to change the rate of the parent clocks, as we often
-have fixed-rate sources for the child clocks, and thus use these as
-a really useful stable source. Often the set_rate and the set_parent
-calls are being done on the child clocks directly connected to the
-peripherals.
-
-I would propose that if we do have a common clk_api, then we have a
-common set of notifiers (a-la, or use the current in kernel ones)
-that can be called when a clock changes rate so that drivers can take
-notice of this. It may be also a good idea for drivers to register
-a range of clock rates they can tolerate so that setting the rate of
-the parent can take these into account.
-
-(On the above, I belive someone at ST has alreayd been looking at
- this sort of thing, but their implementation was rather large and
- needed a pile of tidying up).
-
-However, I think we should carefully sort out who handles the set_parent
-implementation, whether it is in the clk core api, or has at-least
-a useful helper in there to ensure that the following is met:
-
-- when parent changes, the parent's child count is changed
-- if the child is enabled, the following needs to be done:
-  - call clk_enable() for the new parent
-  - call the implementation's set_parent
-  - call clk_disbale() for the old parent
-
-I believe this sort of thing is very useful to have in the core
-implemetation, as it is the sort of thing people will get wrong
-on a regular basis, as well as being common to all but the simplest
-of clock implementations.
-
-note, this may then cause problems on how you deal with a system
-which has booted and is just setting the clocks up, as we may end
-up disabling a clock that is being used elsewhere (but we just
-don't know it).
-
-second note, this is also even more fun for resume, where clock
-control registers may not have been kept over resume. Simply
-rewriting these registers from store may end up causing problems
-with glitching clocks, etc.
+Otherwise looks good, up to myself and Kukjin to agree
+on who should merge.
