@@ -1,91 +1,33 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Mon, 27 Sep 2010 10:52:02 -0500 (CDT)
-Subject: [PATCH v6 0/8] ptp: IEEE 1588 hardware clock support
-In-Reply-To: <1285278136.2587.154.camel@localhost.localdomain>
-References: <cover.1285261533.git.richard.cochran@omicron.at>
-	<alpine.DEB.2.00.1009231238170.2962@router.home>
-	<1285268380.2587.11.camel@localhost.localdomain>
-	<alpine.DEB.2.00.1009231402420.2962@router.home>
-	<1285273684.2587.92.camel@localhost.localdomain>
-	<alpine.DEB.2.00.1009231533040.7522@router.home>
-	<1285278136.2587.154.camel@localhost.localdomain>
-Message-ID: <alpine.DEB.2.00.1009271038150.9258@router.home>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 27 Sep 2010 18:56:08 +0300
+Subject: [PATCH 05/11] omap3: Remove non-existent config option
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
+References: <20100924014938.10325.35279.stgit@baageli.muru.com>
+	<20100924015056.10325.95854.stgit@baageli.muru.com>
+	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
+	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
+Message-ID: <AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Sep 2010, john stultz wrote:
-
-> > > 3) Further, the PTP hardware counter can be simply set to a new offset
-> > > to put it in line with the network time. This could cause trouble with
-> > > timekeeping much like unsynced TSCs do.
-> >
-> > You can do the same for system time.
+On Mon, Sep 27, 2010 at 2:02 PM, Marathe, Yogesh <yogesh_marathe@ti.com> wrote:
+>> When you merge iommu support, then either you enable
+>> CONFIG_MPU_BRIDGE_IOMMU unconditionally, or you apply this patch, but
+>> this patch alone will only break things.
 >
-> Settimeofday does allow CLOCK_REALTIME to jump, but the CLOCK_MONOTONIC
-> time cannot jump around. Having a clocksource that is non-monotonic
-> would break this.
+> Any other driver which does not depend on bridge and interested in using iommu should get the handle when iommu_get("iva2") is called.
 
-Currently time runs at the same speed. CLOCK_MONOTONIC runs at a offset
-to CLOCK_REALTIME. We are creating APIs here that allow time to run at
-different speeds.
+That's a hypothetical driver, right? The only driver that would ever
+be interested in the "iva2" iommu is tidspbridge, and this patch would
+brake it.
 
-> The design actually avoids most userland induced latency.
->
-> 1) On the PTP hardware syncing point, the reference packet gets
-> timestamped with the PTP hardware time on arrival. This allows the
-> offset calculation to be done in userland without introducing latency.
+> It is not happening in original case. I think there should not be restrictions on other drivers to define un-related compile time define if they just want to use iommu driver. I feel the implementation that is breaking due to removal of this define should be fixed.
 
-The timestamps allows the calculation of the network transmission time I
-guess and therefore its more accurate to calculate that effect out. Ok but
-then the overhead of getting to code in user space (that does the proper
-clock adjustments) is resulting in the addition of a relatively long time
-that is subject to OS scheduling latencies and noises.
+I couldn't parse that correctly. However, what's wrong with the
+proposal? Let's think about CONFIG_MPU_BRIDGE_IOMMU when the iommu
+patches come.
 
-> 2) On the system syncing side, the proposal for the PPS interrupt allows
-> the PTP hardware to trigger an interrupt on the second boundary that
-> would take a timestamp of the system time. Then the pps interface allows
-> for the timestamp to be read from userland allowing the offset to be
-> calculated without introducing additional latency.
-
-Sorry dont really get the whole picture here it seems. Sounds like one is
-going through additional unnecessary layers. Why would the PTP hardware
-triggger an interrupt? I thought the PTP messages came in via
-timestamping and are then processed by software. Then the software is
-issuing a hardware interrupt that then triggers the PPS subsystem. And
-that is supposed to be better than directly interfacing with the PTP?
-
-
-> Additionally, even just in userland, it would be easy to bracket two
-> reads of the system time around one read of the PTP clock to bound any
-> userland latency fairly well. It may not be as good as the PPS interface
-> (although that depends on the interrupt latency), but if the accesses
-> are all local, it probably could get fairly close.
-
-That sounds hacky.
-
-> > Ok maybe we need some sort of control interface to manage the clock like
-> > the others have.
->
-> That's what the clock_adjtime call provides.
-
-Ummm... You are managing a hardware device with hardware (driver) specific
-settings. That is currently being done via ioctls. Why generalize it?
-
-> > The posix clocks today assumes one notion of real "time" in the kernel.
-> > All clocks increase in lockstep (aside from offset updates).
->
-> Not true. The cputime clockids do not increment at the same rate (as the
-> apps don't always run). Further CLOCK_MONOTONIC_RAW provides a non-freq
-> corrected view of CLOCK_MONOTONIC, so it increments at a slightly
-> different rate.
-
-cputime clockids are not tracking time but cpu resource use.
-
-> Re-using the fairly nice (Alan of course disagrees :) posix interface
-> seems at least a little better for application developers who actually
-> have to use the hardware.
-
-Well it may also be confusing for others. The application developers also
-will have a hard time using a generic clock interface to control PTP
-device specific things like frequencies, rates etc etc. So you always need
-to ioctl/device specific control interface regardless.
+-- 
+Felipe Contreras
