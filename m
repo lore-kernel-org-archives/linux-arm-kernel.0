@@ -1,666 +1,470 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 28 Sep 2010 16:34:01 +0200
-Subject: [PATCH 7/7] ARM: config Versatiles PL011 PL022 for DMA v12
-In-Reply-To: <1285684441-21700-7-git-send-email-linus.walleij@stericsson.com>
-References: <1285684441-21700-1-git-send-email-linus.walleij@stericsson.com>
-	<1285684441-21700-2-git-send-email-linus.walleij@stericsson.com>
-	<1285684441-21700-3-git-send-email-linus.walleij@stericsson.com>
-	<1285684441-21700-4-git-send-email-linus.walleij@stericsson.com>
-	<1285684441-21700-5-git-send-email-linus.walleij@stericsson.com>
-	<1285684441-21700-6-git-send-email-linus.walleij@stericsson.com>
-	<1285684441-21700-7-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1285684441-21700-8-git-send-email-linus.walleij@stericsson.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 28 Sep 2010 23:43:47 +0900
+Subject: [PATCH 1/6] ARM: Samsung: Add common s5p gpio interrupt support
+In-Reply-To: <00a501cb5f18$e6b11590$b41340b0$%szyprowski@samsung.com>
+References: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
+	<1283764347-460-2-git-send-email-m.szyprowski@samsung.com>
+	<00c001cb5f15$f9e6de40$edb49ac0$%kim@samsung.com>
+	<00a501cb5f18$e6b11590$b41340b0$%szyprowski@samsung.com>
+Message-ID: <AANLkTikycUQzxZqB9D297qg4Y_AyP7vqDn2W81A22K+-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the platform necessary to make the PL08x driver from the
-async_tx tree probe successfully with the RealView boards (except
-for the PB1176 which lacks a working DMAC) and thus makes the
-memcpy channels available on all of them.
+Hi Marek,
 
-Further it implements the logic for muxing the FPGA off-chip
-(slave) DMA channels, so that devices on the FPGA can request
-their DMA channels and have them muxed in on request.
+On Sep 28, 2010 11:24 PM, "Marek Szyprowski"
+<m.szyprowski@samsung.com> wrote:> Hello,
+>
+> On Tuesday, September 28, 2010 4:04 PM Kukjin Kim wrote:
+>
+>> Marek Szyprowski wrote:
+>> >
+>> > This patch adds common code to enable support of gpio interrupts on s5p
+>> > series.
+>> >
+>> > The total number of gpio pins is quite large on s5p series. Registering
+>> > irq support for all of them would be a resource waste. Because of that
+>> > the interrupt support for standard gpio pins is registered dynamically
+>> > by the s5p_register_gpio_interrupt() function.
+>>
+>> Hi,
+>>
+>> I checked only S5PV210/S5PC110 GPIO interrupt.
+>>
+>> >
+>> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+>> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> > ---
+>> >  arch/arm/plat-s5p/Kconfig                      |    5 +
+>> >  arch/arm/plat-s5p/Makefile                     |    1 +
+>> >  arch/arm/plat-s5p/include/plat/irqs.h          |    5 +
+>> >  arch/arm/plat-s5p/irq-gpioint.c                |  243
+>> > ++++++++++++++++++++++++
+>> >  arch/arm/plat-samsung/include/plat/gpio-cfg.h  |   18 ++
+>> >  arch/arm/plat-samsung/include/plat/gpio-core.h |    4 +
+>> >  6 files changed, 276 insertions(+), 0 deletions(-)
+>> >  create mode 100644 arch/arm/plat-s5p/irq-gpioint.c
+>> >
+>> > diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+>> > index 407e323..d77d518 100644
+>> > --- a/arch/arm/plat-s5p/Kconfig
+>> > +++ b/arch/arm/plat-s5p/Kconfig
+>> > @@ -32,6 +32,11 @@ config S5P_EXT_INT
+>> >  	  Use the external interrupts (other than GPIO interrupts.)
+>> >  	  Note: Do not choose this for S5P6440.
+>> >
+>> > +config S5P_GPIO_INT
+>> > +	bool
+>> > +	help
+>> > +	  Common code for the GPIO interrupts (other than external
+>> interrupts.)
+>> > +
+>> >  config S5P_DEV_FIMC0
+>> >  	bool
+>> >  	help
+>> > diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+>> > index f3e917e..e0823be 100644
+>> > --- a/arch/arm/plat-s5p/Makefile
+>> > +++ b/arch/arm/plat-s5p/Makefile
+>> > @@ -18,6 +18,7 @@ obj-y				+= cpu.o
+>> >  obj-y				+= clock.o
+>> >  obj-y				+= irq.o
+>> >  obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
+>> > +obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpioint.o
+>> >
+>> >  # devices
+>> >
+>> > diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-
+>> > s5p/include/plat/irqs.h
+>> > index 3fb3a3a..50bcf1e 100644
+>> > --- a/arch/arm/plat-s5p/include/plat/irqs.h
+>> > +++ b/arch/arm/plat-s5p/include/plat/irqs.h
+>> > @@ -94,4 +94,9 @@
+>> >  						((irq) - S5P_EINT_BASE1) : \
+>> >  						((irq) + 16 -
+>> > S5P_EINT_BASE2))
+>> >
+>> > +/* GPIO interrupt (registered by s5p_register_gpio_interrupt) */
+>> > +#define S5P_GPIOINT_GROUP_COUNT 4
+>> > +#define S5P_GPIOINT_GROUP_SIZE	8
+>>
+>> Is it possible to support S5P SoCs GPIO interrupt with only 4-GROUPs?
+>
+> Yes, it won't be a problem. Just 4 interrupt slots will be wasted. Not a bit problem
+> imho.
+>
+>>
+>> > +#define S5P_GPIOINT_COUNT	(S5P_GPIOINT_GROUP_COUNT *
+>> > S5P_GPIOINT_GROUP_SIZE)
+>> > +
+>> >  #endif /* __ASM_PLAT_S5P_IRQS_H */
+>> > diff --git a/arch/arm/plat-s5p/irq-gpioint.c
+>> b/arch/arm/plat-s5p/irq-gpioint.c
+>> > new file mode 100644
+>> > index 0000000..7409ae0
+>> > --- /dev/null
+>> > +++ b/arch/arm/plat-s5p/irq-gpioint.c
+>> > @@ -0,0 +1,243 @@
+>> > +/* linux/arch/arm/plat-s5p/irq-gpioint.c
+>> > + *
+>> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+>> > + * Author: Kyungmin Park <kyungmin.park@samsung.com>
+>> > + * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+>> > + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+>> > + *
+>> > + *  This program is free software; you can redistribute  it and/or modify
+>> it
+>> > + *  under  the terms of  the GNU General  Public License as published by
+>> the
+>> > + *  Free Software Foundation;  either version 2 of the  License, or (at
+>> your
+>> > + *  option) any later version.
+>> > + *
+>> > + */
+>> > +
+>> > +#include <linux/kernel.h>
+>> > +#include <linux/interrupt.h>
+>> > +#include <linux/irq.h>
+>> > +#include <linux/io.h>
+>> > +#include <linux/gpio.h>
+>> > +
+>> > +#include <mach/map.h>
+>> > +#include <plat/gpio-core.h>
+>> > +#include <plat/gpio-cfg.h>
+>> > +
+>> > +#define S5P_GPIOREG(x)			(S5P_VA_GPIO + (x))
+>> > +
+>> > +#define GPIOINT_CON_OFFSET		0x700
+>> > +#define GPIOINT_MASK_OFFSET		0x900
+>> > +#define GPIOINT_PEND_OFFSET		0xA00
+>> > +
+>> > +#define GPIOINT_LEVEL_LOW		0x0
+>> > +#define GPIOINT_LEVEL_HIGH		0x1
+>> > +#define GPIOINT_EDGE_FALLING		0x2
+>> > +#define GPIOINT_EDGE_RISING		0x3
+>> > +#define GPIOINT_EDGE_BOTH		0x4
+>>
+>> I remember Kyungmin's patch about interrupt polarity of GPIO Interrupt and
+>> GPIO External Interrupt.
+>> How about merging them into plat-s5p/include
+>
+> I'm ok with this.
+>
+>> Hmm...let's think the proper name...
+>>
+>> > +
+>> > +static struct s3c_gpio_chip *irq_chips[S5P_GPIOINT_GROUP_MAXNR];
+>>
+>> Where is the definition of S5P_GPIOINT_GROUP_MAXNR?
+>
+> It will be defined by the proper user of the common irq-gpioint.c code. See the
+> next commit ("ARM: S5PC110: add support for gpio interrupts"). To avoid any
+> build breaks irq-gpioint.c code is compiled conditionally if selected by the
+> machine that requires/uses it.
+>
+>> > +
+>> > +static int s5p_gpioint_get_group(unsigned int irq)
+>> > +{
+>> > +	struct gpio_chip *chip = get_irq_data(irq);
+>> > +	struct s3c_gpio_chip *s3c_chip = container_of(chip,
+>> > +			struct s3c_gpio_chip, chip);
+>> > +	int group;
+>> > +
+>> > +	for (group = 0; group < S5P_GPIOINT_GROUP_MAXNR; group++)
+>> > +		if (s3c_chip == irq_chips[group])
+>> > +			break;
+>> > +
+>> > +	return group;
+>> > +}
+>> > +
+>> > +static int s5p_gpioint_get_offset(unsigned int irq)
+>> > +{
+>> > +	struct gpio_chip *chip = get_irq_data(irq);
+>> > +	struct s3c_gpio_chip *s3c_chip = container_of(chip,
+>> > +			struct s3c_gpio_chip, chip);
+>> > +
+>> > +	return irq - s3c_chip->irq_base;
+>> > +}
+>> > +
+>> > +static void s5p_gpioint_ack(unsigned int irq)
+>> > +{
+>> > +	int group, offset, pend_offset;
+>> > +	unsigned int value;
+>> > +
+>> > +	group = s5p_gpioint_get_group(irq);
+>> > +	offset = s5p_gpioint_get_offset(irq);
+>> > +	pend_offset = group << 2;
+>> > +
+>> > +	value = __raw_readl(S5P_GPIOREG(GPIOINT_PEND_OFFSET) +
+>> > pend_offset);
+>> > +	value |= 1 << offset;
+>> > +	__raw_writel(value, S5P_GPIOREG(GPIOINT_PEND_OFFSET) +
+>> > pend_offset);
+>> > +}
+>> > +
+>> > +static void s5p_gpioint_mask(unsigned int irq)
+>> > +{
+>> > +	int group, offset, mask_offset;
+>> > +	unsigned int value;
+>> > +
+>> > +	group = s5p_gpioint_get_group(irq);
+>> > +	offset = s5p_gpioint_get_offset(irq);
+>> > +	mask_offset = group << 2;
+>> > +
+>> > +	value = __raw_readl(S5P_GPIOREG(GPIOINT_MASK_OFFSET) +
+>> > mask_offset);
+>> > +	value |= 1 << offset;
+>> > +	__raw_writel(value, S5P_GPIOREG(GPIOINT_MASK_OFFSET) +
+>> > mask_offset);
+>> > +}
+>> > +
+>> > +static void s5p_gpioint_unmask(unsigned int irq)
+>> > +{
+>> > +	int group, offset, mask_offset;
+>> > +	unsigned int value;
+>> > +
+>> > +	group = s5p_gpioint_get_group(irq);
+>> > +	offset = s5p_gpioint_get_offset(irq);
+>> > +	mask_offset = group << 2;
+>> > +
+>> > +	value = __raw_readl(S5P_GPIOREG(GPIOINT_MASK_OFFSET) +
+>> > mask_offset);
+>> > +	value &= ~(1 << offset);
+>> > +	__raw_writel(value, S5P_GPIOREG(GPIOINT_MASK_OFFSET) +
+>> > mask_offset);
+>> > +}
+>> > +
+>> > +static void s5p_gpioint_mask_ack(unsigned int irq)
+>> > +{
+>> > +	s5p_gpioint_mask(irq);
+>> > +	s5p_gpioint_ack(irq);
+>> > +}
+>> > +
+>> > +static int s5p_gpioint_set_type(unsigned int irq, unsigned int type)
+>> > +{
+>> > +	int group, offset, con_offset;
+>> > +	unsigned int value;
+>> > +
+>> > +	group = s5p_gpioint_get_group(irq);
+>> > +	offset = s5p_gpioint_get_offset(irq);
+>> > +	con_offset = group << 2;
+>> > +
+>> > +	switch (type) {
+>> > +	case IRQ_TYPE_NONE:
+>> > +		printk(KERN_WARNING "No irq type\n");
+>> > +		return -EINVAL;
+>> > +	case IRQ_TYPE_EDGE_RISING:
+>> > +		type = GPIOINT_EDGE_RISING;
+>> > +		break;
+>> > +	case IRQ_TYPE_EDGE_FALLING:
+>> > +		type = GPIOINT_EDGE_FALLING;
+>> > +		break;
+>> > +	case IRQ_TYPE_EDGE_BOTH:
+>> > +		type = GPIOINT_EDGE_BOTH;
+>> > +		break;
+>> > +	case IRQ_TYPE_LEVEL_HIGH:
+>> > +		type = GPIOINT_LEVEL_HIGH;
+>> > +		break;
+>> > +	case IRQ_TYPE_LEVEL_LOW:
+>> > +		type = GPIOINT_LEVEL_LOW;
+>> > +		break;
+>> > +	default:
+>> > +		BUG();
+>>
+>> how about merging IRQ_TYPE_NONE and 'default'?
+>> And basically, rerely happened exception case, so it's better move
+>> IRQ_TYPE_NONE to later in switch case.
+>
+> Ok, I can change this.
+>
+>> > +	}
+>> > +
+>> > +	value = __raw_readl(S5P_GPIOREG(GPIOINT_CON_OFFSET) +
+>> > con_offset);
+>> > +	value &= ~(0xf << (offset * 0x4));
+>>
+>> 0x7 is enough on S5PV210...but need to check another S5P SoCs.
+>>
+>> > +	value |= (type << (offset * 0x4));
+>> > +	__raw_writel(value, S5P_GPIOREG(GPIOINT_CON_OFFSET) +
+>> > con_offset);
+>> > +
+>> > +	return 0;
+>> > +}
+>> > +
+>> > +struct irq_chip s5p_gpioint = {
+>> > +	.name		= "GPIO",
+>>
+>> how about s5p-gpioint?
+>
+> ok, no problem.
 
-Platform data for the PL022 and PL011 is supplied.
+Please use the GPIO as is, I don't like s5p- prefix.
+It's not major issue. I want to use normal way like VIC, GIC, PIC and so on.
+It's displayed at /proc/interrupts so no need to add *int suffix.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-versatile/core.c                  |  506 ++++++++++++++++++++++-
- arch/arm/mach-versatile/include/mach/platform.h |    6 +
- arch/arm/mach-versatile/versatile_pb.c          |   17 +-
- 3 files changed, 524 insertions(+), 5 deletions(-)
+Thank you
+Kyungmin Park
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index e38acb0..0890b22 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -25,6 +25,8 @@
- #include <linux/sysdev.h>
- #include <linux/interrupt.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/pl08x.h>
-+#include <linux/amba/serial.h>
- #include <linux/amba/clcd.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
-@@ -39,6 +41,7 @@
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/icst.h>
- #include <asm/hardware/vic.h>
-+#include <asm/hardware/pl080.h>
- #include <asm/mach-types.h>
- 
- #include <asm/mach/arch.h>
-@@ -717,6 +720,482 @@ static struct clcd_board clcd_plat_data = {
- 	.remove		= versatile_clcd_remove,
- };
- 
-+/*
-+ * DMA config
-+ * The DMA channel routing is static on the PA926EJ-S
-+ * and dynamic on the PB926EJ-S using SYS_DMAPSR0..SYS_DMAPSR2
-+ */
-+
-+struct pb926ejs_dma_signal {
-+	unsigned int id;
-+	struct pl08x_dma_chan *user;
-+	u32 ctrlreg;
-+};
-+
-+/*
-+ * The three first channels on ARM926EJ-S are muxed,
-+ * but to make things simple we enable all channels
-+ * to be muxed, however most of the channels will just
-+ * me muxed on top of themselves.
-+ */
-+static struct pb926ejs_dma_signal pl080_muxtab[] = {
-+	[0] = {
-+		.id = 0,
-+		.ctrlreg = VERSATILE_SYS_DMAPSR0,
-+	},
-+	[1] = {
-+		.id = 1,
-+		.ctrlreg = VERSATILE_SYS_DMAPSR1,
-+	},
-+	[2] = {
-+		.id = 2,
-+		.ctrlreg = VERSATILE_SYS_DMAPSR2,
-+	},
-+	[3] = {
-+		.id = 3,
-+	},
-+	[4] = {
-+		.id = 4,
-+	},
-+	[5] = {
-+		.id = 5,
-+	},
-+	[6] = {
-+		.id = 6,
-+	},
-+	[7] = {
-+		.id = 7,
-+	},
-+	[8] = {
-+		.id = 8,
-+	},
-+	[9] = {
-+		.id = 9,
-+	},
-+	[10] = {
-+		.id = 10,
-+	},
-+	[11] = {
-+		.id = 11,
-+	},
-+	[12] = {
-+		.id = 12,
-+	},
-+	[13] = {
-+		.id = 13,
-+	},
-+	[14] = {
-+		.id = 14,
-+	},
-+	[15] = {
-+		.id = 15,
-+	},
-+};
-+
-+/* This is a lock for the above muxing array */
-+static spinlock_t muxlock = SPIN_LOCK_UNLOCKED;
-+
-+static int pl080_get_signal(struct pl08x_dma_chan *ch)
-+{
-+	struct pl08x_channel_data *cd = ch->cd;
-+
-+	pr_debug("requesting DMA signal on channel %s\n", ch->name);
-+
-+	/*
-+	 * The AB926EJ-S is simple - only static assignments
-+	 * so the channel is already muxed in and ready to go.
-+	 */
-+	if (machine_is_versatile_ab())
-+		return cd->min_signal;
-+
-+	/* The PB926EJ-S is hairier */
-+	if (machine_is_versatile_pb()) {
-+		unsigned long flags;
-+		int i;
-+
-+		if (cd->min_signal > ARRAY_SIZE(pl080_muxtab) ||
-+		    cd->max_signal > ARRAY_SIZE(pl080_muxtab) ||
-+		    (cd->max_signal < cd->min_signal)) {
-+			pr_err("%s: illegal muxing constraints for %s\n",
-+			       __func__, ch->name);
-+			return -EINVAL;
-+		}
-+		/* Try to find a signal to use */
-+		spin_lock_irqsave(&muxlock, flags);
-+		for (i = cd->min_signal; i <= cd->max_signal; i++) {
-+			if (!pl080_muxtab[i].user) {
-+				u32 val;
-+
-+				pl080_muxtab[i].user = ch;
-+				/* If the channels need to be muxed in, mux them! */
-+				if (pl080_muxtab[i].ctrlreg) {
-+					val = readl(__io_address(pl080_muxtab[i].ctrlreg));
-+					val &= 0xFFFFFF70U;
-+					val |= 0x80; /* Turn on muxing */
-+					val |= cd->muxval; /* Mux in the right peripheral */
-+					writel(val, __io_address(pl080_muxtab[i].ctrlreg));
-+					pr_debug("%s: muxing in %s at channel %d writing value "
-+						 "%08x to register %08x\n",
-+						 __func__, ch->name, i,
-+						 val, pl080_muxtab[i].ctrlreg);
-+				}
-+				spin_unlock_irqrestore(&muxlock, flags);
-+				return pl080_muxtab[i].id;
-+			}
-+		}
-+		spin_unlock_irqrestore(&muxlock, flags);
-+	}
-+
-+	return -EBUSY;
-+}
-+
-+static void pl080_put_signal(struct pl08x_dma_chan *ch)
-+{
-+	struct pl08x_channel_data *cd = ch->cd;
-+	unsigned long flags;
-+	int i;
-+
-+	pr_debug("releasing DMA signal on channel %s\n", ch->name);
-+	if (cd->min_signal > ARRAY_SIZE(pl080_muxtab) ||
-+	    cd->max_signal > ARRAY_SIZE(pl080_muxtab) ||
-+	    (cd->max_signal < cd->min_signal)) {
-+		pr_err("%s: illegal muxing constraints for %s\n",
-+		       __func__, ch->name);
-+		return;
-+	}
-+	spin_lock_irqsave(&muxlock, flags);
-+	for (i = cd->min_signal; i <= cd->max_signal; i++) {
-+		if (pl080_muxtab[i].user == ch) {
-+			pl080_muxtab[i].user = NULL;
-+			if (pl080_muxtab[i].ctrlreg) {
-+				u32 val;
-+
-+				val = readl(__io_address(pl080_muxtab[i].ctrlreg));
-+				val &= 0xFFFFFF70U; /* Disable, select no channel */
-+				writel(val, __io_address(pl080_muxtab[i].ctrlreg));
-+				pr_debug("%s: muxing out %s at channel %d writing value "
-+				       "%08x to register %08x\n",
-+				       __func__, ch->name, i,
-+				       val, pl080_muxtab[i].ctrlreg);
-+			}
-+			spin_unlock_irqrestore(&muxlock, flags);
-+			return;
-+		}
-+	}
-+	spin_unlock_irqrestore(&muxlock, flags);
-+	pr_debug("%s: unable to release muxing on channel %s\n",
-+	       __func__, ch->name);
-+}
-+
-+struct pl08x_platform_data pl080_plat_data = {
-+	.memcpy_channel = {
-+		.bus_id = "memcpy",
-+		/*
-+		 * We pass in some optimal memcpy config, the
-+		 * driver will augment it if need be. 256 byte
-+		 * bursts and 32bit bus width.
-+		 */
-+		.cctl =
-+		(PL080_BSIZE_256 << PL080_CONTROL_SB_SIZE_SHIFT |	\
-+		 PL080_BSIZE_256 << PL080_CONTROL_DB_SIZE_SHIFT |	\
-+		 PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT |	\
-+		 PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT |	\
-+		 PL080_CONTROL_PROT_BUFF |				\
-+		 PL080_CONTROL_PROT_CACHE |				\
-+		 PL080_CONTROL_PROT_SYS),
-+		/* Flow control: DMAC controls this */
-+		.ccfg = PL080_FLOW_MEM2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	.get_signal = pl080_get_signal,
-+	.put_signal = pl080_put_signal,
-+};
-+
-+#define PRIMECELL_DEFAULT_CCTL (PL080_BSIZE_8 << PL080_CONTROL_SB_SIZE_SHIFT | \
-+			PL080_BSIZE_8 << PL080_CONTROL_DB_SIZE_SHIFT | \
-+			PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT | \
-+			PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT | \
-+			PL080_CONTROL_PROT_SYS)
-+
-+static struct pl08x_channel_data ab926ejs_chan_data[] = {
-+	[0] = {
-+		.bus_id = "aacirx",
-+		.min_signal = 0,
-+		.max_signal = 0,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[1] = {
-+		.bus_id = "aacitx",
-+		.min_signal = 1,
-+		.max_signal = 1,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[2] = {
-+		.bus_id = "mci0",
-+		.min_signal = 2,
-+		.max_signal = 2,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[3] = {
-+		.bus_id = "reserved",
-+		.min_signal = 3,
-+		.max_signal = 3,
-+	},
-+	[4] = {
-+		.bus_id = "reserved",
-+		.min_signal = 4,
-+		.max_signal = 4,
-+	},
-+	[5] = {
-+		.bus_id = "reserved",
-+		.min_signal = 5,
-+		.max_signal = 5,
-+	},
-+	[6] = {
-+		.bus_id = "scirx",
-+		.min_signal = 6,
-+		.max_signal = 6,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[7] = {
-+		.bus_id = "scitx",
-+		.min_signal = 7,
-+		.max_signal = 7,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[8] = {
-+		.bus_id = "ssprx",
-+		.min_signal = 8,
-+		.max_signal = 8,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[9] = {
-+		.bus_id = "ssptx",
-+		.min_signal = 9,
-+		.max_signal = 9,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[10] = {
-+		.bus_id = "uart2rx",
-+		.min_signal = 10,
-+		.max_signal = 10,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[11] = {
-+		.bus_id = "uart2tx",
-+		.min_signal = 11,
-+		.max_signal = 11,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[12] = {
-+		.bus_id = "uart1rx",
-+		.min_signal = 12,
-+		.max_signal = 12,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[13] = {
-+		.bus_id = "uart1tx",
-+		.min_signal = 13,
-+		.max_signal = 13,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[14] = {
-+		.bus_id = "uart0rx",
-+		.min_signal = 14,
-+		.max_signal = 14,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[15] = {
-+		.bus_id = "uart0tx",
-+		.min_signal = 15,
-+		.max_signal = 15,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+};
-+
-+/* For the PB926EJ-S we define some extra virtual channels */
-+static struct pl08x_channel_data pb926ejs_chan_data[] = {
-+	[0] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "aacitx",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x00,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[1] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "aacirx",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x01,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[2] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "usba",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x02,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[3] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "usbb",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x03,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[4] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "mci0",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x04,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[5] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "mci1",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x05,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[6] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "uart3tx",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x06,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[7] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "uart3rx",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x07,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[8] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "sciinta",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x08,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[9] = {
-+		/* Muxed on channel 0-3 */
-+		.bus_id = "sciintb",
-+		.min_signal = 0,
-+		.max_signal = 2,
-+		.muxval = 0x09,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+	},
-+	[10] = {
-+		.bus_id = "scirx",
-+		.min_signal = 6,
-+		.max_signal = 6,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[11] = {
-+		.bus_id = "scitx",
-+		.min_signal = 7,
-+		.max_signal = 7,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[12] = {
-+		.bus_id = "ssprx",
-+		.min_signal = 8,
-+		.max_signal = 8,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[13] = {
-+		.bus_id = "ssptx",
-+		.min_signal = 9,
-+		.max_signal = 9,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[14] = {
-+		.bus_id = "uart2rx",
-+		.min_signal = 10,
-+		.max_signal = 10,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[15] = {
-+		.bus_id = "uart2tx",
-+		.min_signal = 11,
-+		.max_signal = 11,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[16] = {
-+		.bus_id = "uart1rx",
-+		.min_signal = 12,
-+		.max_signal = 12,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[17] = {
-+		.bus_id = "uart1tx",
-+		.min_signal = 13,
-+		.max_signal = 13,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[18] = {
-+		.bus_id = "uart0rx",
-+		.min_signal = 14,
-+		.max_signal = 14,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_PER2MEM << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+	[19] = {
-+		.bus_id = "uart0tx",
-+		.min_signal = 15,
-+		.max_signal = 15,
-+		.cctl = PRIMECELL_DEFAULT_CCTL,
-+		.ccfg = PL080_FLOW_MEM2PER << PL080_CONFIG_FLOW_CONTROL_SHIFT,
-+	},
-+};
-+
-+static void __init pl080_fixup(void)
-+{
-+	if (machine_is_versatile_ab()) {
-+		pl080_plat_data.slave_channels = ab926ejs_chan_data;
-+		pl080_plat_data.num_slave_channels =
-+			ARRAY_SIZE(ab926ejs_chan_data);
-+	}
-+	if (machine_is_versatile_pb()) {
-+		pl080_plat_data.slave_channels = pb926ejs_chan_data;
-+		pl080_plat_data.num_slave_channels =
-+			ARRAY_SIZE(pb926ejs_chan_data);
-+	}
-+}
-+
- static struct pl061_platform_data gpio0_plat_data = {
- 	.gpio_base	= 0,
- 	.irq_base	= IRQ_GPIO0_START,
-@@ -733,6 +1212,24 @@ static struct pl022_ssp_controller ssp0_plat_data = {
- 	.num_chipselect = 1,
- };
- 
-+static struct amba_pl011_data uart0_plat_data = {
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart0rx",
-+	.dma_tx_param = (void *) "uart0tx",
-+};
-+
-+static struct amba_pl011_data uart1_plat_data = {
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart1rx",
-+	.dma_tx_param = (void *) "uart1tx",
-+};
-+
-+static struct amba_pl011_data uart2_plat_data = {
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart2rx",
-+	.dma_tx_param = (void *) "uart2tx",
-+};
-+
- #define AACI_IRQ	{ IRQ_AACI, NO_IRQ }
- #define AACI_DMA	{ 0x80, 0x81 }
- #define MMCI0_IRQ	{ IRQ_MMCI0A,IRQ_SIC_MMCI0B }
-@@ -792,16 +1289,16 @@ AMBA_DEVICE(kmi1,  "fpga:07", KMI1,     NULL);
- AMBA_DEVICE(smc,   "dev:00",  SMC,      NULL);
- AMBA_DEVICE(mpmc,  "dev:10",  MPMC,     NULL);
- AMBA_DEVICE(clcd,  "dev:20",  CLCD,     &clcd_plat_data);
--AMBA_DEVICE(dmac,  "dev:30",  DMAC,     NULL);
-+AMBA_DEVICE(dmac,  "dev:30",  DMAC,     &pl080_plat_data);
- AMBA_DEVICE(sctl,  "dev:e0",  SCTL,     NULL);
- AMBA_DEVICE(wdog,  "dev:e1",  WATCHDOG, NULL);
- AMBA_DEVICE(gpio0, "dev:e4",  GPIO0,    &gpio0_plat_data);
- AMBA_DEVICE(gpio1, "dev:e5",  GPIO1,    &gpio1_plat_data);
- AMBA_DEVICE(rtc,   "dev:e8",  RTC,      NULL);
- AMBA_DEVICE(sci0,  "dev:f0",  SCI,      NULL);
--AMBA_DEVICE(uart0, "dev:f1",  UART0,    NULL);
--AMBA_DEVICE(uart1, "dev:f2",  UART1,    NULL);
--AMBA_DEVICE(uart2, "dev:f3",  UART2,    NULL);
-+AMBA_DEVICE(uart0, "dev:f1",  UART0,    &uart0_plat_data);
-+AMBA_DEVICE(uart1, "dev:f2",  UART1,    &uart1_plat_data);
-+AMBA_DEVICE(uart2, "dev:f3",  UART2,    &uart2_plat_data);
- AMBA_DEVICE(ssp0,  "dev:f4",  SSP,      &ssp0_plat_data);
- 
- static struct amba_device *amba_devs[] __initdata = {
-@@ -874,6 +1371,7 @@ void __init versatile_init(void)
- 	platform_device_register(&versatile_i2c_device);
- 	platform_device_register(&smc91x_device);
- 	platform_device_register(&char_lcd_device);
-+	pl080_fixup();
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
-diff --git a/arch/arm/mach-versatile/include/mach/platform.h b/arch/arm/mach-versatile/include/mach/platform.h
-index ec08740..fa0907c 100644
---- a/arch/arm/mach-versatile/include/mach/platform.h
-+++ b/arch/arm/mach-versatile/include/mach/platform.h
-@@ -86,6 +86,9 @@
- #define VERSATILE_SYS_BOOTCS_OFFSET           0x58
- #define VERSATILE_SYS_24MHz_OFFSET            0x5C
- #define VERSATILE_SYS_MISC_OFFSET             0x60
-+#define VERSATILE_SYS_DMAPSR0_OFFSET          0x64 /* Only on PB926EJ-S */
-+#define VERSATILE_SYS_DMAPSR1_OFFSET          0x68 /* Only on PB926EJ-S */
-+#define VERSATILE_SYS_DMAPSR2_OFFSET          0x6C /* Only on PB926EJ-S */
- #define VERSATILE_SYS_TEST_OSC0_OFFSET        0x80
- #define VERSATILE_SYS_TEST_OSC1_OFFSET        0x84
- #define VERSATILE_SYS_TEST_OSC2_OFFSET        0x88
-@@ -124,6 +127,9 @@
- #define VERSATILE_SYS_BOOTCS                  (VERSATILE_SYS_BASE + VERSATILE_SYS_BOOTCS_OFFSET)
- #define VERSATILE_SYS_24MHz                   (VERSATILE_SYS_BASE + VERSATILE_SYS_24MHz_OFFSET)
- #define VERSATILE_SYS_MISC                    (VERSATILE_SYS_BASE + VERSATILE_SYS_MISC_OFFSET)
-+#define VERSATILE_SYS_DMAPSR0                 (VERSATILE_SYS_BASE + VERSATILE_SYS_DMAPSR0_OFFSET) /* Only on PB926EJ-S */
-+#define VERSATILE_SYS_DMAPSR1                 (VERSATILE_SYS_BASE + VERSATILE_SYS_DMAPSR1_OFFSET) /* Only on PB926EJ-S */
-+#define VERSATILE_SYS_DMAPSR2                 (VERSATILE_SYS_BASE + VERSATILE_SYS_DMAPSR2_OFFSET) /* Only on PB926EJ-S */
- #define VERSATILE_SYS_TEST_OSC0               (VERSATILE_SYS_BASE + VERSATILE_SYS_TEST_OSC0_OFFSET)
- #define VERSATILE_SYS_TEST_OSC1               (VERSATILE_SYS_BASE + VERSATILE_SYS_TEST_OSC1_OFFSET)
- #define VERSATILE_SYS_TEST_OSC2               (VERSATILE_SYS_BASE + VERSATILE_SYS_TEST_OSC2_OFFSET)
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index 239cd30..ecb6bf6 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -25,6 +25,8 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
-+#include <linux/amba/serial.h>
-+#include <linux/amba/pl08x.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -46,6 +48,11 @@ static struct mmci_platform_data mmc1_plat_data = {
- 	.status		= mmc_status,
- 	.gpio_wp	= -1,
- 	.gpio_cd	= -1,
-+#ifdef CONFIG_AMBA_PL08X
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "mci1",
-+	/* Don't specify a TX channel, this RX channel is bidirectional */
-+#endif
- };
- 
- static struct pl061_platform_data gpio2_plat_data = {
-@@ -58,6 +65,14 @@ static struct pl061_platform_data gpio3_plat_data = {
- 	.irq_base	= IRQ_GPIO3_START,
- };
- 
-+static struct amba_pl011_data uart3_plat_data = {
-+#ifdef CONFIG_AMBA_PL08X
-+	.dma_filter = pl08x_filter_id,
-+	.dma_rx_param = (void *) "uart3rx",
-+	.dma_tx_param = (void *) "uart3tx",
-+#endif
-+};
-+
- #define UART3_IRQ	{ IRQ_SIC_UART3, NO_IRQ }
- #define UART3_DMA	{ 0x86, 0x87 }
- #define SCI1_IRQ	{ IRQ_SIC_SCI3, NO_IRQ }
-@@ -78,7 +93,7 @@ static struct pl061_platform_data gpio3_plat_data = {
-  */
- 
- /* FPGA Primecells */
--AMBA_DEVICE(uart3, "fpga:09", UART3,    NULL);
-+AMBA_DEVICE(uart3, "fpga:09", UART3,    &uart3_plat_data);
- AMBA_DEVICE(sci1,  "fpga:0a", SCI1,     NULL);
- AMBA_DEVICE(mmc1,  "fpga:0b", MMCI1,    &mmc1_plat_data);
- 
--- 
-1.6.3.3
+>
+>>
+>> > +	.ack		= s5p_gpioint_ack,
+>> > +	.mask		= s5p_gpioint_mask,
+>> > +	.mask_ack	= s5p_gpioint_mask_ack,
+>> > +	.unmask		= s5p_gpioint_unmask,
+>> > +	.set_type	= s5p_gpioint_set_type,
+>> > +};
+>> > +
+>> > +static void s5p_gpioint_handler(unsigned int irq, struct irq_desc *desc)
+>> > +{
+>> > +	int group, offset, pend_offset, mask_offset;
+>> > +	int real_irq;
+>> > +	unsigned int pend, mask;
+>> > +
+>> > +	for (group = 0; group < S5P_GPIOINT_GROUP_MAXNR; group++) {
+>> > +		pend_offset = group << 2;
+>> > +		pend = __raw_readl(S5P_GPIOREG(GPIOINT_PEND_OFFSET) +
+>> > +				pend_offset);
+>> > +		if (!pend)
+>> > +			continue;
+>> > +
+>> > +		mask_offset = group << 2;
+>> > +		mask = __raw_readl(S5P_GPIOREG(GPIOINT_MASK_OFFSET) +
+>> > +				mask_offset);
+>> > +		pend &= ~mask;
+>> > +
+>> > +		for (offset = 0; offset < 8; offset++) {
+>> > +			if (pend & (1 << offset)) {
+>> > +				struct s3c_gpio_chip *chip =
+>> irq_chips[group];
+>> > +				if (chip) {
+>> > +					real_irq = chip->irq_base + offset;
+>> > +					generic_handle_irq(real_irq);
+>> > +				}
+>> > +			}
+>> > +		}
+>> > +	}
+>> > +}
+>> > +
+>> > +static __init int s5p_gpioint_add(struct s3c_gpio_chip *chip)
+>> > +{
+>> > +	static int used_gpioint_groups = 0;
+>> > +	static bool handler_registered = 0;
+>> > +	int irq, group = chip->group;
+>> > +	int i;
+>> > +
+>> > +	if (used_gpioint_groups >= S5P_GPIOINT_GROUP_COUNT)
+>> > +		return -ENOMEM;
+>> > +
+>> > +	chip->irq_base = S5P_GPIOINT_BASE +
+>> > +			 used_gpioint_groups * S5P_GPIOINT_GROUP_SIZE;
+>>
+>> Where is S5P_GPIOINT_BASE?
+>
+> see the next commit...
+>
+>>
+>> > +	used_gpioint_groups++;
+>> > +
+>> > +	if (!handler_registered) {
+>> > +		set_irq_chained_handler(IRQ_GPIOINT, s5p_gpioint_handler);
+>>
+>> As you know, IRQ_GPIOINT defined only in the mach-s5p6442, mach-s5pc100 and
+>> mach-s5pv210.
+>> It means can be happend build error with mach-s5p64x0 or mach-s5pv310.
+>
+> Nope, this code is compiled conditionally only if the platform requires/supports
+> it.
+>
+>>
+>> > +		handler_registered = 1;
+>> > +	}
+>> > +
+>> > +	irq_chips[group] = chip;
+>> > +	for (i = 0; i < chip->chip.ngpio; i++) {
+>> > +		irq = chip->irq_base + i;
+>> > +		set_irq_chip(irq, &s5p_gpioint);
+>> > +		set_irq_data(irq, &chip->chip);
+>>
+>> Do we really need set_irq_data?
+>
+> Yes, to get the gpio bank group number in s5p_gpioint_get_group() function.
+>
+>>
+>> > +		set_irq_handler(irq, handle_level_irq);
+>> > +		set_irq_flags(irq, IRQF_VALID);
+>> > +	}
+>> > +	return 0;
+>> > +}
+>> > +
+>> > +int __init s5p_register_gpio_interrupt(int pin)
+>> > +{
+>> > +	struct s3c_gpio_chip *my_chip = s3c_gpiolib_getchip(pin);
+>> > +	int offset, group;
+>> > +	int ret;
+>> > +
+>> > +	if (!my_chip)
+>> > +		return -EINVAL;
+>> > +
+>> > +	offset = pin - my_chip->chip.base;
+>> > +	group = my_chip->group;
+>> > +
+>> > +	/* check if the group has been already registered */
+>> > +	if (my_chip->irq_base)
+>> > +		return my_chip->irq_base + offset;
+>> > +
+>> > +	/* register gpio group */
+>> > +	ret = s5p_gpioint_add(my_chip);
+>> > +	if (ret == 0) {
+>> > +		printk(KERN_INFO "Registered interrupt support for gpio
+>> > group %d.\n",
+>> > +		       group);
+>> > +		return my_chip->irq_base + offset;
+>> > +	}
+>> > +	return ret;
+>> > +}
+>> > diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
+>> b/arch/arm/plat-
+>> > samsung/include/plat/gpio-cfg.h
+>> > index db4112c..41479a0 100644
+>> > --- a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
+>> > +++ b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
+>> > @@ -169,4 +169,22 @@ extern s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned
+>> > int pin);
+>> >  */
+>> >  extern int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t
+>> drvstr);
+>> >
+>> > +/**
+>> > + * s5p_register_gpio_interrupt() - register interrupt support for a gpio
+>> group
+>> > + * @pin: The pin number from the group to be registered
+>> > + *
+>> > + * This function registers gpio interrupt support for the group that the
+>> > + * specified pin belongs to.
+>> > + *
+>> > + * The total number of gpio pins is quite large ob s5p series.
+>> Registering
+>> > + * irq support for all of them would be a resource waste. Because of that
+>> the
+>> > + * interrupt support for standard gpio pins is registered dynamically.
+>> > + *
+>> > + * It will return the irq number of the interrupt that has been
+>> registered
+>> > + * or -ENOMEM if no more gpio interrupts can be registered. It is allowed
+>> > + * to call this function more than once for the same gpio group (the
+>> group
+>> > + * will be registered only once).
+>> > + */
+>> > +extern int s5p_register_gpio_interrupt(int pin);
+>> > +
+>> >  #endif /* __PLAT_GPIO_CFG_H */
+>> > diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
+>> b/arch/arm/plat-
+>> > samsung/include/plat/gpio-core.h
+>> > index e358c7d..c22c27c 100644
+>> > --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
+>> > +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+>> > @@ -43,6 +43,8 @@ struct s3c_gpio_cfg;
+>> >   * struct s3c_gpio_chip - wrapper
