@@ -1,62 +1,122 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Sep 2010 08:48:40 +0100
-Subject: [PATCH v3 5/5] OMAP: I2C: Convert i2c driver to use PM runtime
-	api's
-In-Reply-To: <0680EC522D0CC943BC586913CF3768C003FF05988F@dbde02.ent.ti.com>
-References: <1285078036-12789-1-git-send-email-rnayak@ti.com>
-	<1285078036-12789-2-git-send-email-rnayak@ti.com>
-	<1285078036-12789-3-git-send-email-rnayak@ti.com>
-	<1285078036-12789-4-git-send-email-rnayak@ti.com>
-	<1285078036-12789-5-git-send-email-rnayak@ti.com>
-	<1285078036-12789-6-git-send-email-rnayak@ti.com>
-	<20100927223645.GJ21564@trinity.fluff.org>
-	<0680EC522D0CC943BC586913CF3768C003FF05981F@dbde02.ent.ti.com>
-	<0680EC522D0CC943BC586913CF3768C003FF05988F@dbde02.ent.ti.com>
-Message-ID: <20100928074840.GA29252@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Sep 2010 16:53:27 +0900
+Subject: [PATCHv2 5/7] ARM: S5PV210: Enable USB HSOTG gadget build
+In-Reply-To: <1284987337-15365-6-git-send-email-m.szyprowski@samsung.com>
+References: <1284987337-15365-1-git-send-email-m.szyprowski@samsung.com>
+	<1284987337-15365-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <006001cb5ee2$40765db0$c1631910$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 28, 2010 at 12:29:01PM +0530, Nayak, Rajendra wrote:
-> <snip>...
-> > > >
-> > > >  static int omap_i2c_init(struct omap_i2c_dev *dev)
-> > > > @@ -356,6 +333,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
-> > > >  	unsigned long fclk_rate = 12000000;
-> > > >  	unsigned long timeout;
-> > > >  	unsigned long internal_clk = 0;
-> > > > +	struct clk *fclk;
-> > > >
-> > > >  	if (dev->rev >= OMAP_I2C_REV_2) {
-> > > >  		/* Disable I2C controller before soft reset */
-> > > > @@ -414,7 +392,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
-> > > >  		 * always returns 12MHz for the functional clock, we can
-> > > >  		 * do this bit unconditionally.
-> > > >  		 */
-> > > > -		fclk_rate = clk_get_rate(dev->fclk);
-> > > > +		fclk = clk_get(dev->dev, "fck");
-> > > > +		fclk_rate = clk_get_rate(fclk);
-> > > >
-> > > >  		/* TRM for 5912 says the I2C clock must be prescaled to be
-> > > >  		 * between 7 - 12 MHz. The XOR input clock is typically
-> > > > @@ -443,7 +422,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
-> > > >  			internal_clk = 9600;
-> > > >  		else
-> > > >  			internal_clk = 4000;
-> > > > -		fclk_rate = clk_get_rate(dev->fclk) / 1000;
-> > > > +		fclk = clk_get(dev->dev, "fck");
-> > > > +		fclk_rate = clk_get_rate(fclk) / 1000;
-> > >
-> > > You don't put the clk after getting it and using it once?
-> > 
-> > clk_get needs an equivalent clk_put and not clk_get_rate. clk_get_rate
-> > is used to merely know the existing rate of the clock.
+Marek wrote:
 > 
-> Sorry, I guess you did mean the clk_get above the clk_get_rate does not have
-> an equivalent clk_put.
-> I could put a clk_put for readability, but a clk_put on OMAP actually does map
-> to an empty function.
-> See arch/arm/plat-omap/include/plat/clkdev.h
-> clk_get merely returns a pointer to the clk struct and does not do any usecounting,
-> hence a clk_put does not do anything.
+> Add the necessary definitions and mapping information to enable the
+> s3c-hsotg gadget to build.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> s5pv210 otg
 
-That's no reason to avoid using it.
+Maybe miss typing? ;-)
+
+> ---
+>  arch/arm/mach-s5pv210/cpu.c                   |    5 +++++
+>  arch/arm/mach-s5pv210/include/mach/map.h      |    4 ++++
+>  arch/arm/mach-s5pv210/include/mach/regs-sys.h |   19
+> +++++++++++++++++++
+>  arch/arm/plat-s5p/include/plat/map-s5p.h      |    1 +
+>  4 files changed, 29 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/include/mach/regs-sys.h
+> 
+> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
+> index c551ab1..8e4a39f 100644
+> --- a/arch/arm/mach-s5pv210/cpu.c
+> +++ b/arch/arm/mach-s5pv210/cpu.c
+> @@ -84,6 +84,11 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
+>  		.pfn		= __phys_to_pfn(S5PV210_PA_SROMC),
+>  		.length		= SZ_4K,
+>  		.type		= MT_DEVICE,
+> +	}, {
+> +		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
+> +		.pfn		=__phys_to_pfn(S5PV210_PA_HSPHY),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+>  	}
+>  };
+> 
+> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
+> s5pv210/include/mach/map.h
+> index b86d040..abe20d0 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/map.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
+> @@ -73,6 +73,9 @@
+> 
+>  #define S5PV210_PA_HSMMC(x)	(0xEB000000 + ((x) * 0x100000))
+> 
+> +#define S5PV210_PA_HSOTG	(0xEC000000)
+> +#define S5PV210_PA_HSPHY	(0xEC100000)
+> +
+>  #define S5PV210_PA_VIC0		(0xF2000000)
+>  #define S5PV210_PA_VIC1		(0xF2100000)
+>  #define S5PV210_PA_VIC2		(0xF2200000)
+> @@ -108,6 +111,7 @@
+>  #define S3C_PA_FB		S5PV210_PA_FB
+>  #define S3C_PA_RTC		S5PV210_PA_RTC
+>  #define S3C_PA_WDT		S5PV210_PA_WATCHDOG
+> +#define S3C_PA_USB_HSOTG	S5PV210_PA_HSOTG
+>  #define S5P_PA_FIMC0		S5PV210_PA_FIMC0
+>  #define S5P_PA_FIMC1		S5PV210_PA_FIMC1
+>  #define S5P_PA_FIMC2		S5PV210_PA_FIMC2
+> diff --git a/arch/arm/mach-s5pv210/include/mach/regs-sys.h
+b/arch/arm/mach-
+> s5pv210/include/mach/regs-sys.h
+> new file mode 100644
+> index 0000000..26691d3
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/include/mach/regs-sys.h
+> @@ -0,0 +1,19 @@
+> +/* arch/arm/mach-s5pv210/include/mach/regs-sys.h
+> + *
+> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com/
+> + *
+> + * S5PV210 - System registers definitions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#define S5PV210_USB_PHY_CON	(S3C_VA_SYS + 0xE80C)
+> +#define S5PV210_USB_PHY0_EN	(1 << 0)
+> +#define S5PV210_USB_PHY1_EN	(1 << 1)
+> +
+> +/* compatibility defines for s3c-hsotg driver */
+> +#define S3C64XX_OTHERS		S5PV210_USB_PHY_CON
+> +#define S3C64XX_OTHERS_USBMASK	S5PV210_USB_PHY0_EN
+> diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-
+> s5p/include/plat/map-s5p.h
+> index c4ff88b..dc5bce9 100644
+> --- a/arch/arm/plat-s5p/include/plat/map-s5p.h
+> +++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
+> @@ -18,6 +18,7 @@
+>  #define S5P_VA_SYSTIMER		S3C_ADDR(0x01200000)
+>  #define S5P_VA_SROMC		S3C_ADDR(0x01100000)
+>  #define S5P_VA_SYSRAM		S3C_ADDR(0x01180000)
+> +#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02000000)
+> 
+>  #define S5P_VA_COMBINER_BASE	S3C_ADDR(0x00600000)
+>  #define S5P_VA_COMBINER(x)	(S5P_VA_COMBINER_BASE + ((x) >> 2) *
+> 0x10)
+> --
+
+Looks ok...will apply with removing above miss typing.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
