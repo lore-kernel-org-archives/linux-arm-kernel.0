@@ -1,111 +1,117 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 28 Sep 2010 15:19:46 +0900
-Subject: [PATCH] s3c: add support for mini6410
-In-Reply-To: <4C9FE082.4050808@fluff.org>
-References: <20100916172402.18683.30937.stgit@darius-desktop>
-	<4C9FE082.4050808@fluff.org>
-Message-ID: <004d01cb5ed5$28505770$78f10650$%kim@samsung.com>
+Date: Tue, 28 Sep 2010 15:27:49 +0900
+Subject: [PATCHv2 7/7] ARM: S5PC110: add support for MMC regulators on Goni
+	board
+In-Reply-To: <1284987337-15365-8-git-send-email-m.szyprowski@samsung.com>
+References: <1284987337-15365-1-git-send-email-m.szyprowski@samsung.com>
+	<1284987337-15365-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <005001cb5ed6$490137e0$db03a7a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
+Marek Szyprowski wrote:
 > 
-> On 16/09/10 18:24, Darius Augulis wrote:
-> > Add support for mini6410 board from FriendlyARM
-> >
-> > Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
-> >
-> > +obj-$(CONFIG_MACH_MINI6410)     += mach-mini6410.o
-> >  obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
-> >  obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
-> >  obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
-> > diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-
-> s3c64xx/mach-mini6410.c
-> > new file mode 100644
-> > index 0000000..560e347
-> > --- /dev/null
-> > +++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-> > @@ -0,0 +1,154 @@
-> > +/* linux/arch/arm/mach-s3c64xx/mach-mini6410.c
-> > + *
-> > + * Copyright 2010 Darius Augulis <augulis.darius@gmail.com>
-> > + * Copyright 2008 Openmoko, Inc.
-> > + * Copyright 2008 Simtec Electronics
-> > + *	Ben Dooks <ben@simtec.co.uk>
-> > + *	http://armlinux.simtec.co.uk/
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > +*/
+> Add required platform definitions for MMC power regulators on Samsung
+> Goni board. GPIO pin GONI_EXT_FLASH_EN has been transferred from machine
+> startup code to fixed voltage regulator.
 > 
-> > +#include <linux/init.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/gpio.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/list.h>
-> > +#include <linux/dm9000.h>
-> > +#include <linux/serial_core.h>
-> > +#include <linux/types.h>
-> > +#include <asm/mach-types.h>
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/mach/map.h>
-> > +#include <mach/map.h>
-> > +#include <mach/regs-gpio.h>
-> > +#include <mach/regs-srom.h>
-> > +#include <mach/s3c6410.h>
-> > +#include <plat/cpu.h>
-> > +#include <plat/devs.h>
-> > +#include <plat/regs-serial.h>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s5pv210/mach-goni.c |   40
+> ++++++++++++++++++++++++++++++++++--
+>  1 files changed, 37 insertions(+), 3 deletions(-)
 > 
-> My preference is to split up the include blocks with a blank line.
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index 68e22f2..a7fbe08 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/i2c.h>
+>  #include <linux/i2c-gpio.h>
+>  #include <linux/mfd/max8998.h>
+> +#include <linux/regulator/fixed.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/spi_gpio.h>
+>  #include <linux/lcd.h>
+> @@ -226,6 +227,10 @@ static void __init goni_radio_init(void)
+>  /* MAX8998 regulators */
+>  #if defined(CONFIG_REGULATOR_MAX8998) ||
+> defined(CONFIG_REGULATOR_MAX8998_MODULE)
 > 
+> +static struct regulator_consumer_supply goni_ldo5_consumers[] = {
+> +	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+> +};
+> +
+>  static struct regulator_init_data goni_ldo2_data = {
+>  	.constraints	= {
+>  		.name		= "VALIVE_1.1V",
+> @@ -265,6 +270,8 @@ static struct regulator_init_data goni_ldo5_data = {
+>  		.max_uV		= 2800000,
+>  		.apply_uV	= 1,
+>  	},
+> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo5_consumers),
+> +	.consumer_supplies = goni_ldo5_consumers,
+>  };
 > 
-> > +#define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
-> > +#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE |
-> S3C2410_LCON_STOPB)
-> > +#define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
-> > +
-> > +static struct s3c2410_uartcfg mini6410_uartcfgs[] __initdata = {
-> > +	[0] = {
-> > +		.hwport	= 0,
-> > +		.flags	= 0,
-> > +		.ucon	= UCON,
-> > +		.ulcon	= ULCON,
-> > +		.ufcon	= UFCON,
-> > +	},
-> > +	[1] = {
-> > +		.hwport	= 1,
-> > +		.flags	= 0,
-> > +		.ucon	= UCON,
-> > +		.ulcon	= ULCON,
-> > +		.ufcon	= UFCON,
-> > +	},
-> > +	[2] = {
-> > +		.hwport	= 2,
-> > +		.flags	= 0,
-> > +		.ucon	= UCON,
-> > +		.ulcon	= ULCON,
-> > +		.ufcon	= UFCON,
-> > +	},
-> > +	[3] = {
-> > +		.hwport	= 3,
-> > +		.flags	= 0,
-> > +		.ucon	= UCON,
-> > +		.ulcon	= ULCON,
-> > +		.ufcon	= UFCON,
-> > +	},
-> > +};
+>  static struct regulator_init_data goni_ldo6_data = {
+> @@ -556,11 +563,37 @@ static struct s3c_sdhci_platdata goni_hsmmc2_data
+> __initdata = {
+>  	.ext_cd_gpio_invert	= 1,
+>  };
 > 
-> I'm beginging to think we should just have a standard
-> implementation of these.
-> 
-> Otherwise looks good, up to myself and Kukjin to agree
-> on who should merge.
+> +static struct regulator_consumer_supply mmc2_supplies[] = {
+> +	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"),
+> +};
+> +
+> +static struct regulator_init_data mmc2_fixed_voltage_init_data = {
+> +	.constraints		= {
+> +		.name		= "V_TF_2.8V",
+> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies	= ARRAY_SIZE(mmc2_supplies),
+> +	.consumer_supplies	= mmc2_supplies,
+> +};
+> +
+> +static struct fixed_voltage_config mmc2_fixed_voltage_config = {
+> +	.supply_name		= "EXT_FLASH_EN",
+> +	.microvolts		= 2800000,
+> +	.gpio			= GONI_EXT_FLASH_EN,
+> +	.enable_high		= true,
+> +	.init_data		= &mmc2_fixed_voltage_init_data,
+> +};
+> +
+> +static struct platform_device mmc2_fixed_voltage = {
+> +	.name		= "reg-fixed-voltage",
+> +	.id		= 2,
+> +	.dev		= {
+> +		.platform_data	= &mmc2_fixed_voltage_config,
+> +	},
+> +};
+> +
+>  static void goni_setup_sdhci(void)
+>  {
+> -	gpio_request(GONI_EXT_FLASH_EN, "FLASH_EN");
+> -	gpio_direction_output(GONI_EXT_FLASH_EN, 1);
+> -
+>  	s3c_sdhci0_set_platdata(&goni_hsmmc0_data);
+>  	s3c_sdhci1_set_platdata(&goni_hsmmc1_data);
+>  	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
+> @@ -572,6 +605,7 @@ static struct platform_device *goni_devices[]
+__initdata = {
+>  	&goni_spi_gpio,
+>  	&s3c_device_usb_hsotg,
+>  	&goni_i2c_gpio_pmic,
+> +	&mmc2_fixed_voltage,
+>  	&goni_device_gpiokeys,
+>  	&s5p_device_fimc0,
+>  	&s5p_device_fimc1,
+> --
 
-Ben, your tree is more suitable for this.
-And if any s3c64xx stuff in my tree, will send to you.
+Ok...will apply with Mark Brown's reviewed-by.
 
 Thanks.
 
