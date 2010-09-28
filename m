@@ -1,97 +1,92 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Sep 2010 20:33:46 -0700
-Subject: [PATCH 2/3] [ARM] Allow machines to override __delay()
-In-Reply-To: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1285644827-6846-3-git-send-email-sboyd@codeaurora.org>
+From: jeongbae.seo@samsung.com (Jeongbae Seo)
+Date: Tue, 28 Sep 2010 13:02:34 +0900
+Subject: [PATCH v2 2/2] sdhci-s3c: Add support no internal clock divider in
+	host controller
+In-Reply-To: <4C97FB34.1000802@simtec.co.uk>
+References: <1284716701-5140-1-git-send-email-kgene.kim@samsung.com>
+	<1284716701-5140-3-git-send-email-kgene.kim@samsung.com>
+	<4C97FB34.1000802@simtec.co.uk>
+Message-ID: <006e01cb5ec1$fe00b770$fa022650$%seo@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some machines want to implement their own __delay() routine based
-on fixed timers. Expose functionality to set the __delay()
-routine at runtime. This should allow two machines with different
-__delay() routines to happily co-exist within the same kernel
-with minimal overhead.
+Ben Dooks worte:
+> On 17/09/10 10:45, Kukjin Kim wrote:
+> > From: Hyuk Lee <hyuk1.lee@samsung.com>
+> >
+> > This patch adds to support no internal clock divider in SDHCI.
+> > The external clock divider can be used to make a proper clock
+> > because SDHCI doesn't support internal clock divider by itself.
+> >
+> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
+> > Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> >  drivers/mmc/host/sdhci-s3c.c |   60
+> ++++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 60 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> > index e6e0438..5ad5ed7 100644
+> > --- a/drivers/mmc/host/sdhci-s3c.c
+> > +++ b/drivers/mmc/host/sdhci-s3c.c
+> > @@ -96,6 +96,13 @@ static unsigned int sdhci_s3c_get_max_clk(struct
+> sdhci_host *host)
+> >  	unsigned int rate, max;
+> >  	int clk;
+> >
+> > +	/*
+> > +	 * There is only one clock source(sclk) if there is no clock
+> divider
+> > +	 * in the host controller
+> > +	 */
+> > +	if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK)
+> > +		return clk_round_rate(ourhost->clk_bus[2], UINT_MAX);
+> 
+> interesting, <linux/clk.h> doesn't have a second parameter to
+> clk_round_rate().
+> 
+Hi Ben,
 
-Russell expressed concern that using a timer based __delay()
-would cause problems where an iomapped device isn't mapped in
-before a delay call was made (see
-http://article.gmane.org/gmane.linux.ports.arm.kernel/78543 for
-more info). We can sidestep that issue with this approach since
-the __delay() routine _should_ only be pointed to a timer based
-delay once the timer has been properly mapped. Up until that
-point __delay() and udelay() will use delay_loop() which is
-always safe to call.
+Thanks for your comments.
 
-This patch is inspired by x86's delay.c
+When I see clk_round_rate in <linux/clk.h>, which function is defined 
+as "long clk_round_rate(struct clk *clk, unsigned long rate)" that has two
+parameters.
+Please let me know if you have another meaning for this.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
----
- arch/arm/include/asm/delay.h |    2 ++
- arch/arm/lib/delay.c         |   21 ++++++++++++++++++---
- 2 files changed, 20 insertions(+), 3 deletions(-)
+> 
+> >  	/* note, a reset will reset the clock source */
+> >
+> >  	sdhci_s3c_check_sclk(host);
+> > @@ -130,6 +137,15 @@ static unsigned int sdhci_s3c_consider_clock(struct
+> sdhci_s3c *ourhost,
+> >  	if (!clksrc)
+> >  		return UINT_MAX;
+> >
+> > +	/*
+> > +	 * There is only one clock source(sclk) if there is no clock
+> divider
+> > +	 * in the host controller
+> > +	 */
+> > +	if (ourhost->host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK) {
+> > +		rate = clk_round_rate(clksrc, wanted);
+> > +		return wanted - rate;
+> > +	}
+> 
+> Why does this need a quirk, instead of just having one clock available
+> in the list of usable clocks?
+> 
 
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index ccc5ed5..7c732b5 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -40,5 +40,7 @@ extern void __const_udelay(unsigned long);
- 			__const_udelay((n) * ((2199023U*HZ)>>11))) :	\
- 	  __udelay(n))
- 
-+extern void set_delay_fn(void (*fn)(unsigned long));
-+
- #endif /* defined(_ARM_DELAY_H) */
- 
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 5ee0adc..b307fcc 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -3,6 +3,8 @@
-  *
-  *  Copyright (C) 1995, 1996 Russell King
-  *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *  Copyright (C) 1993 Linus Torvalds
-+ *  Copyright (C) 1997 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -12,11 +14,9 @@
- #include <linux/delay.h>
- 
- /*
-- * loops = usecs * HZ * loops_per_jiffy / 1000000
-- *
-  * Oh, if only we had a cycle counter...
-  */
--void __delay(unsigned long loops)
-+void delay_loop(unsigned long loops)
- {
- 	asm volatile(
- 	"1:	subs %0, %0, #1 \n"
-@@ -25,6 +25,21 @@ void __delay(unsigned long loops)
- 	: "r" (loops)
- 	);
- }
-+
-+static void (*delay_fn)(unsigned long) = delay_loop;
-+
-+void set_delay_fn(void (*fn)(unsigned long))
-+{
-+	delay_fn = fn;
-+}
-+
-+/*
-+ * loops = usecs * HZ * loops_per_jiffy / 1000000
-+ */
-+void __delay(unsigned long loops)
-+{
-+	delay_fn(loops);
-+}
- EXPORT_SYMBOL(__delay);
- 
- /*
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+The available clock is made by dividing a clock source with a certain
+divider value.
+Most of the host controller has this capability that can divide a clock what
+we want.
+However, the host controller of both S5PC210 and S5PV310 don't have this so
+we have to
+Add additional routine to make a proper clock with outland clock divider
+instead of
+Internal clock divider in host controller.
+
+Best Regards,
+Jeongbae Seo
