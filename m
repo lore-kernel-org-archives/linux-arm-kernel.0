@@ -1,26 +1,96 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 28 Sep 2010 14:50:27 +0900
-Subject: [PATCH] ARM: S5PC210: Use nr_irqs instead of NR_IRQS
-Message-ID: <20100928055027.GA29101@july>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Sep 2010 14:55:15 +0900
+Subject: [PATCH] ARM: S5PV210: Add Torbreck board support
+In-Reply-To: <AANLkTik1YAd8W75DzrDmfhFYG-JE8__Tu4uq83RKsioC@mail.gmail.com>
+References: <1285463130-14227-1-git-send-email-chlrbgh0@gmail.com>
+	<AANLkTik5SkqjEz5Ymtg6RvwfrU0i8XzhPQq3Un7gMbP=@mail.gmail.com>
+	<AANLkTik1YAd8W75DzrDmfhFYG-JE8__Tu4uq83RKsioC@mail.gmail.com>
+Message-ID: <004c01cb5ed1$bb44b890$31ce29b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+??? wrote:
+Hi, 
 
-Don't use the NR_IRQS at code. It makes hard to work sparse IRQ.
+Welcome to Linux mainline ;-)
+I have some comments about your patches.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
-index 0f70521..1bb38bf 100644
---- a/arch/arm/mach-s5pv310/irq-combiner.c
-+++ b/arch/arm/mach-s5pv310/irq-combiner.c
-@@ -73,7 +73,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- 	}
- 
- 	cascade_irq = combiner_irq + (chip_data->irq_offset & ~31);
--	if (unlikely(cascade_irq >= NR_IRQS))
-+	if (unlikely(cascade_irq >= nr_irqs))
- 		do_bad_IRQ(cascade_irq, desc);
- 	else
- 		generic_handle_irq(cascade_irq);
+Firstly could you please use English character in the representing name in e-mail client not Korean character :-)
+And make sure it's text type.
+
+>Hi,
+>Thank you for your interesting.
+>On Mon, Sep 27, 2010 at 11:58 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+
+(snip)
+
+>> +#define TORBRECK_UFCON_DEFAULT (S3C2410_UFCON_FIFOMODE |       \
+>> +                                S5PV210_UFCON_TXTRIG4 |        \
+>> +                                S5PV210_UFCON_RXTRIG4)
+>Any reason to use TRIG4? just use the full trigger e.g., 256.
+> 
+>Okay, I'll fix it.
+> 
+Hmm...Kyungmin, any reason to use full trigger here?
+
+It depends on board...so it doesn't matter TRIG4 or anything else if there is no problem on your board.
+It means the maximum value is not best condition...only depends on your situation/condition.
+
+>> +
+>> +static struct s3c2410_uartcfg torbreck_uartcfgs[] __initdata = {
+>> +       [0] = {
+>> +               .hwport         = 0,
+>> +               .flags          = 0,
+>There's no code for flags, please remove it all.
+> 
+>Okay, I'll remove it.
+> 
+I think no need to modify it.
+Actually I said many times about this...
+
+And as Ben Dooks said in other patch, the format will be changed soon.
+
+>> +               .ucon           = TORBRECK_UCON_DEFAULT,
+>> +               .ulcon          = TORBRECK_ULCON_DEFAULT,
+>> +               .ufcon          = TORBRECK_UFCON_DEFAULT,
+>> +       },
+>> +       [1] = {
+>> +               .hwport         = 1,
+>> +               .flags          = 0,
+>> +               .ucon           = TORBRECK_UCON_DEFAULT,
+>> +               .ulcon          = TORBRECK_ULCON_DEFAULT,
+>> +               .ufcon          = TORBRECK_UFCON_DEFAULT,
+>> +       },
+>> +       [2] = {
+>> +               .hwport         = 2,
+>> +               .flags          = 0,
+>> +               .ucon           = TORBRECK_UCON_DEFAULT,
+>> +               .ulcon          = TORBRECK_ULCON_DEFAULT,
+>> +               .ufcon          = TORBRECK_UFCON_DEFAULT,
+>> +       },
+>> +       [3] = {
+>> +               .hwport         = 3,
+>> +               .flags          = 0,
+>> +               .ucon           = TORBRECK_UCON_DEFAULT,
+>> +               .ulcon          = TORBRECK_ULCON_DEFAULT,
+>> +               .ufcon          = TORBRECK_UFCON_DEFAULT,
+>> +       },
+>> +};
+>> +
+
+(snip)
+
+>> --
+>> 1.5.6.3
+>>
+If possible, please use later version git.
+It doesn't mean latest git is best...
+This is just private opinion. :-)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
