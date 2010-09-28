@@ -1,45 +1,102 @@
-From: hemanthv@ti.com (Hemanth V)
-Date: Tue, 28 Sep 2010 15:04:43 +0530 (IST)
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 28 Sep 2010 11:57:42 +0200
 Subject: [PATCH 1/7] pwm: Add pwm core driver
-In-Reply-To: <F45880696056844FA6A73F415B568C69532DC2FB21@EXDCVYMBSTM006.EQ1STM.loca
-	l>
+In-Reply-To: <F45880696056844FA6A73F415B568C69532DC2FB6B@EXDCVYMBSTM006.EQ1STM.local>
 References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
 	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
-	<201009281114.31223.anarsoul@gmail.com>   
-	<F45880696056844FA6A73F415B568C69532DC2FA8F@EXDCVYMBSTM006.EQ1STM.local>
-	<63731.10.24.255.18.1285663815.squirrel@dbdmail.itg.ti.com>
-	<F45880696056844FA6A73F415B568C69532DC2FB21@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <19145.10.24.255.18.1285666483.squirrel@dbdmail.itg.ti.com>
+	<4CA1AD2B.8000905@metafoo.de>
+	<F45880696056844FA6A73F415B568C69532DC2FB6B@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <4CA1BC16.3020702@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> >> On 28 of September 2010 10:40:42 Arun Murthy wrote:
->> >> > The existing pwm based led and backlight driver makes use of the
->> >> > pwm(include/linux/pwm.h). So all the board specific pwm drivers
->> will
->> >> > be exposing the same set of function name as in
->> include/linux/pwm.h.
->> >> > As a result build fails.
->> >>
->> >> Which build fails? One with multi-SoC support? Please be more
->> specific.
->> > Sure will add this in v2.
->> >
->>
->> Could you clarify for the benefit of all, which specific issues you are
->> trying to address with this patch series
-> 1. Now since all the pwm driver export same set of function(pwm_enable, pwm_disable,..), if it happens that there are two pwm driver enabled this
-> leads to re-declaration and results in build failure. The proper way to handle this would be to have a pwm core function, and let all the pwm
-> drivers register to the pwm core driver.
-> 2. The above scenario also occurs in place of multi-soc environment. Lets say OMAP has a pwm module and that is being used for primary lcd backlight
-> and twl has a backlight that is being used for controlling the charging led brightness. In this case there exists 2 pwm drivers and one pwm driver
-> will be used by pwm_bl.c and other by leds-pwm.c
+Arun MURTHY wrote:
+>>> +menuconfig PWM_DEVICES
+>>> +	bool "PWM devices"
+>>> +	default y
+>>> +	---help---
+>>> +	  Say Y here to get to see options for device drivers from
+>> various
+>>> +	  different categories. This option alone does not add any kernel
+>> code.
+>>> +
+>>> +	  If you say N, all options in this submenu will be skipped and
+>> disabled.
+>>> +
+>> Shouldn't PWM_DEVICES select HAVE_PWM?
+> 
+> 
+> No not required, the entire concept is to remove HAVE_PWM and use PWM_CORE.
 
-Speaking specifically of OMAP4, twl6030 supports multiple PWMs i.e for display/keypad backlight, charging
-led. But there should not be need for multiple drivers since twl6030-pwm should be able to support
-all these (currently it doesnot though). So there would single pwm_enable, pwm_disable exported and driver
-internally takes care configuring the correct PWM based on id. Would it not be similar
-situation for other hardware also.
+Well in patch 4 you say that PWM_CORE is currently limited to ARM. Furthermore you
+change the pwm-backlight and pwm-led Kconfig entries to depend on HAVE_PWM ||
+PWM_CORE. Adding a select HAVE_PWM here would make those changes unnecessary.
+HAVE_PWM should be set, when pwm_* functions are available. When your pwm-core driver
+is selected they are available.
 
-Thanks
-Hemanth
+> 
+>>> +struct pwm_dev_info {
+>>> +	struct pwm_device *pwm_dev;
+>>> +	struct list_head list;
+>>> +};
+>>> +static struct pwm_dev_info *di;
+>> Why not embed the list head into pwm_device. That would certainly make
+>> pwm_device_unregister much simpler.
+> pwm_device will be passed to each and every pwm driver that are registered as client with pwm core.
+> The list consists of the registered pwm drivers and is to be handled by pwm core.
+> Why should each and every pwm driver get to know about the entire pwm driver list?
+Declare the list field to be private, by saying that it should only be touched by the
+core. Right now you allocate a rather small additional structure for each registered
+device. This could be easily be avoided by embedding the list field into the
+pwm_device struct.
+
+> And also since the pwm_request/register/unregister are the one which require this list having this list inst in local/static device information structure seems to be right.
+> 
+>>> +	}
+>>> +	pwm->pwm_dev = pwm_dev;
+>>> +	list_add_tail(&pwm->list, &di->list);
+>>> +	up_write(&pwm_list_lock);
+>>> +
+>> I guess you only need to lock the list when accessing the list and
+>> adding the new
+>> pwm_dev.
+> 
+> Oops, thanks for pointing out, will implement this in the v2 patch.
+>>> +struct pwm_ops {
+>>> +	int (*pwm_config)(struct pwm_device *pwm, int duty_ns, int
+>> period_ns);
+>>> +	int (*pwm_enable)(struct pwm_device *pwm);
+>>> +	int (*pwm_disable)(struct pwm_device *pwm);
+>>> +	char *name;
+>>> +};
+>>> +
+>> Shouldn't name be part of the pwm_device? That would allow the ops to
+>> be shared
+>> between different devices.
+> Good catch, the reason being that 2 or more devices can share the same ops and get registered to pwm core.
+> But the catch lies while identifying the pwm device while the clients are requesting for.
+> The pwm backlight will request the pwm driver by name. This is parameter that distinguishes among different pwm devices irrespective of same ops or not.
+Yes. And thats why it should go into the pwm_device struct itself.
+
+If an additional ops struct is allocated for each device anyway we would be better of
+embedding it directly into the device struct instead of just holding a pointer to it.
+
+> 
+>>> +int pwm_device_register(struct pwm_device *pwm_dev);
+>>> +int pwm_device_unregister(struct pwm_device *pwm_dev);
+>>> +
+>>>  #endif /* __LINUX_PWM_H */
+>> It might be also a good idea to add a device class for pwm devices.
+> Sure, but can you please explain with an example the use case.
+>
+Well, for one it helps to keep data structured.
+And there would be functions to traverse all devices of a class, so you could get rid
+of your "di" list.
+
+
+> Thanks and Regards,
+> Arun R Murthy
+> -------------
+> 
+
+- Lars
