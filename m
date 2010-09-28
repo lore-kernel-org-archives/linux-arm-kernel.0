@@ -1,118 +1,24 @@
-From: ext-phil.2.carmody@nokia.com (Phil Carmody)
-Date: Tue, 28 Sep 2010 13:44:57 +0300
-Subject: [PATCH 1/4] calibrate: extract fall-back calculation into own helper
-In-Reply-To: <1285670700-11099-1-git-send-email-ext-phil.2.carmody@nokia.com>
-References: <1285670700-11099-1-git-send-email-ext-phil.2.carmody@nokia.com>
-Message-ID: <1285670700-11099-2-git-send-email-ext-phil.2.carmody@nokia.com>
+From: arun.murthy@stericsson.com (Arun MURTHY)
+Date: Tue, 28 Sep 2010 12:48:12 +0200
+Subject: [PATCH 3/7] leds: pwm: add a new element 'name' to platform data
+In-Reply-To: <4CA1C6C4.20504@mvista.com>
+References: <1285670134-18063-1-git-send-email-arun.murthy@stericsson.com>
+	<1285670134-18063-4-git-send-email-arun.murthy@stericsson.com>
+	<4CA1C6C4.20504@mvista.com>
+Message-ID: <F45880696056844FA6A73F415B568C69532DC2FC97@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... so that it can be modified more clinically.
+> > @@ -16,6 +16,7 @@ struct led_pwm {
+> >   struct led_pwm_platform_data {
+> >   	int			num_leds;
+> >   	struct led_pwm	*leds;
+> > +	char *name;
+> >   };
+> 
+>     Shouldn't '*name'be aligned, at least with '*leds'?
+Sure, will take care of this in the v2 patch.
 
-This is almost entirely cosmetic. The only change to the operation
-is that the global variable is only set once after the estimation is
-completed, rather than taking on all the intermediate values. However,
-there are no readers of that variable, so this change is unimportant.
-
-Signed-off-by: Phil Carmody <ext-phil.2.carmody@nokia.com>
----
- init/calibrate.c |   73 +++++++++++++++++++++++++++++------------------------
- 1 files changed, 40 insertions(+), 33 deletions(-)
-
-diff --git a/init/calibrate.c b/init/calibrate.c
-index 6eb48e5..f7042ff 100644
---- a/init/calibrate.c
-+++ b/init/calibrate.c
-@@ -119,10 +119,47 @@ static unsigned long __cpuinit calibrate_delay_direct(void) {return 0;}
-  */
- #define LPS_PREC 8
- 
--void __cpuinit calibrate_delay(void)
-+static unsigned long __cpuinit calibrate_delay_converge(void)
- {
--	unsigned long ticks, loopbit;
-+	unsigned long lpj, ticks, loopbit;
- 	int lps_precision = LPS_PREC;
-+
-+	lpj = (1<<12);
-+	while ((lpj <<= 1) != 0) {
-+		/* wait for "start of" clock tick */
-+		ticks = jiffies;
-+		while (ticks == jiffies)
-+			/* nothing */;
-+		/* Go .. */
-+		ticks = jiffies;
-+		__delay(lpj);
-+		ticks = jiffies - ticks;
-+		if (ticks)
-+			break;
-+	}
-+
-+	/*
-+	 * Do a binary approximation to get lpj set to
-+	 * equal one clock (up to lps_precision bits)
-+	 */
-+	lpj >>= 1;
-+	loopbit = lpj;
-+	while (lps_precision-- && (loopbit >>= 1)) {
-+		lpj |= loopbit;
-+		ticks = jiffies;
-+		while (ticks == jiffies)
-+			/* nothing */;
-+		ticks = jiffies;
-+		__delay(lpj);
-+		if (jiffies != ticks)	/* longer than 1 tick */
-+			lpj &= ~loopbit;
-+	}
-+
-+	return lpj;
-+}
-+
-+void __cpuinit calibrate_delay(void)
-+{
- 	static bool printed;
- 
- 	if (preset_lpj) {
-@@ -139,39 +176,9 @@ void __cpuinit calibrate_delay(void)
- 			pr_info("Calibrating delay using timer "
- 				"specific routine.. ");
- 	} else {
--		loops_per_jiffy = (1<<12);
--
- 		if (!printed)
- 			pr_info("Calibrating delay loop... ");
--		while ((loops_per_jiffy <<= 1) != 0) {
--			/* wait for "start of" clock tick */
--			ticks = jiffies;
--			while (ticks == jiffies)
--				/* nothing */;
--			/* Go .. */
--			ticks = jiffies;
--			__delay(loops_per_jiffy);
--			ticks = jiffies - ticks;
--			if (ticks)
--				break;
--		}
--
--		/*
--		 * Do a binary approximation to get loops_per_jiffy set to
--		 * equal one clock (up to lps_precision bits)
--		 */
--		loops_per_jiffy >>= 1;
--		loopbit = loops_per_jiffy;
--		while (lps_precision-- && (loopbit >>= 1)) {
--			loops_per_jiffy |= loopbit;
--			ticks = jiffies;
--			while (ticks == jiffies)
--				/* nothing */;
--			ticks = jiffies;
--			__delay(loops_per_jiffy);
--			if (jiffies != ticks)	/* longer than 1 tick */
--				loops_per_jiffy &= ~loopbit;
--		}
-+		loops_per_jiffy = calibrate_delay_converge();
- 	}
- 	if (!printed)
- 		pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
--- 
-1.7.2.rc1.37.gf8c40
+Thanks and Regards,
+Arun R Murthy
+-------------
