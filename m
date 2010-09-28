@@ -1,90 +1,125 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Tue, 28 Sep 2010 17:03:37 +0900
-Subject: [PATCH v3] regulators: add support max8952 regulator
-In-Reply-To: <006201cb5ee3$0100fc20$0302f460$%kim@samsung.com>
-References: <1283901976-32588-1-git-send-email-kgene.kim@samsung.com>
-	<01a401cb4f01$73d60ac0$5b822040$%park@samsung.com>
-	<006201cb5ee3$0100fc20$0302f460$%kim@samsung.com>
-Message-ID: <AANLkTi=nE5Z1uMKuzTWE+eG9Dh_e11nJ5hh-0AS7hyhe@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 28 Sep 2010 13:42:17 +0530
+Subject: [GIT PULL] omap2 sparse fixes
+In-Reply-To: <20100925001914.GO4211@atomide.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+	<20100923225851.GR4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
+	<20100925001914.GO4211@atomide.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 28, 2010 at 4:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kukjin Kim wrote:
->>
->> Kyungmin Park wrote:
->> >
->> > Do you check the DVS feature?
->> > It can support the DVS by GPIOs and platform can set the each voltages
-> at
->> > each mode.
->> >
->> Ok...I agree about the feature's necessity that you said.
->>
->> However, we don't need separate driver which has same/similar
-> functionality.
->> So...would be better that could implement it in max8649...
->>
->> Could you please do it based on this?...in fact, can't test it on SMDK.
->>
-> Hmm...
-> Kyungmin, if you have no time to do it, my team will do it.
->
-> Is it ok?
-No problem, go ahead.
 
-Thank you,
-Kyungmin Park
->
->> Thanks.
->>
->> Best regards,
->> Kgene.
->> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
->>
->> > As quick review of max8649. It can't support it.
->> >
->> > Thank you,
->> > Kyungmin Park
->> >
->> > -----Original Message-----
->> > From: Kukjin Kim [mailto:kgene.kim at samsung.com]
->> > Sent: Wednesday, September 08, 2010 8:26 AM
->> > To: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> > linux-samsung-soc at vger.kernel.org
->> > Cc: lrg at slimlogic.co.uk; Changhwan Youn; Kukjin Kim; MyungJoo Ham;
->> Kyungmin
->> > Park
->> > Subject: [PATCH v3] regulators: add support max8952 regulator
->> >
->> > From: Changhwan Youn <chaos.youn@samsung.com>
->> >
->> > The operation of max8952 is almost similar to max8649 except the output
->> > voltage range. This patch adds support the max8952 regulator using
->> > current max8649 implementation. And removes separate max8952.[ch] files
->> > since the functionality is now merged into this driver.
->> >
->> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
->> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> > Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
->> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> > Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> > ---
->> > Following is as per Mark Brown's suggestion.
->> > Changes since v2:
->> > - Removed separate max8952.[ch] files
->> >
->> > Changes since v1:
->> > - Added returning fail when detected wrong ID
->> > - Added matching the ID from the chip in case the user got things wrong
->> > - Added enum chip ID instead of 0, 1
->> >
->> (snip)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Tony,
+
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com] 
+> Sent: Saturday, September 25, 2010 5:49 AM
+> To: G, Manjunath Kondaiah
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [GIT PULL] omap2 sparse fixes
+> 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [100924 12:33]:
+> > 
+> > Tony,
+> > Here is new pull request which is rebased to 2.6.36-rc5.
+> > 
+> > -Manjunath
+> > 
+> > The following changes since commit 
+> b30a3f6257ed2105259b404d419b4964e363928c:
+> >   Linus Torvalds (1):
+> >         Linux 2.6.36-rc5
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git 
+> > sparse_fixes
+> > 
+> > G, Manjunath Kondaiah (10):
+> >       OMAP: mach-omap2: Fix incorrect assignment warnings
+> >       OMAP: mach-omap2: Fix static declaration warnings
+> >       OMAP: mach-omap2: Fix static function warnings
+> >       OMAP: mach-omap2: Fix miscellaneous sparse warnings
+> >       OMAP: plat-omap: Fix static function warnings
+> >       OMAP: NAND: Fix static declaration warning
+> >       TWL CORE: Fix sparse warning
+> >       TWL IRQ: Fix fucntion declaration warnings
+> >       OMAP2/3: Convert write/read functions to raw read/write
+> >       OMAP3: Keypad: Fix incorrect type initializer
+> 
+> Hmm tried pulling these, but ran into an issue where at least 
+> 2430 takes about a minute to boot with these patches with no 
+> output on the console intially.
+> 
+> Can you please check that? Will not merge for now until we 
+> figure out what changes with these patches.
+> 
+> Then, I also noticed the following exports getting added:
+> 
+> +EXPORT_SYMBOL(omap2_gp_clockevent_set_gptimer);
+> +EXPORT_SYMBOL(omapfb_reserve_sram);
+> +EXPORT_SYMBOL(omap_sram_init);
+> 
+> These should not be exported, they are only intended to be 
+> called from the low-level platform init code. So exporting 
+> them is not the right fix for these.
+
+Similar comments received for twl irq apis's hence it was aligned
+to declare these functions as extern functions in local header(if exists) 
+or create new header in the source file directory for these declarations.
+
+Three patches are fixed using above method which are:
+OMAP: mach-omap2: Fix static function warnings
+OMAP: plat-omap: Fix static function warnings
+TWL IRQ: Fix fucntion declaration warnings
+
+The patch series is tested on below boards(with omap3_defconfig)
+and links for boot logs is provided below:
+
+beagle boot log:
+http://pastebin.com/jz6ZGHsH
+
+zoom3 boot log:
+http://pastebin.com/T0YjunCk
+
+2430sdp boot log:
+http://pastebin.com/7BbpieYS
+
+As I mentioned in other e-mail, 2430sdp with omap3_defconfig boots
+only after disabling usb. OMAP4SDPES2.0 boots with ES2.0 patches from
+for-next branch.
+
+Here is all parse errors fixed with this series:
+
+Sparse warns before fixes:
+http://pastebin.com/yct2p201
+
+Sparse warns after fixes:
+http://pastebin.com/qpnTbYwL
+
+All the tested patches are pushed to new branch at:
+
+The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
+  Linus Torvalds (1):
+        Linux 2.6.36-rc5
+
+are available in the git repository at:
+
+  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes_v3
+
+G, Manjunath Kondaiah (10):
+      OMAP: mach-omap2: Fix incorrect assignment warnings
+      OMAP: mach-omap2: Fix static declaration warnings
+      OMAP2plus: Fix static function warnings
+      OMAP: mach-omap2: Fix miscellaneous sparse warnings
+      OMAP: plat-omap: Fix static function warnings
+      OMAP: NAND: Fix static declaration warning
+      TWL CORE: Fix sparse warning
+      TWL IRQ: Fix fucntion declaration warnings
+      OMAP2/3: Convert write/read functions to raw read/write
+      OMAP3: Keypad: Fix incorrect type initializer
+
+
+-Manjunath
