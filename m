@@ -1,28 +1,51 @@
 From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Tue, 28 Sep 2010 11:04:48 +0900
-Subject: [PATCH v3 0/3] ARM: S5PV210: Add MIPI-DSI support
-Message-ID: <4CA14D40.7000801@samsung.com>
+Date: Tue, 28 Sep 2010 11:05:05 +0900
+Subject: [PATCH v3 1/3] S5PV210: FB: support command mode
+Message-ID: <1285639505-21980-1-git-send-email-dh09.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- This patch is for MIPI-DSI controller based on S5PV210 (or S5PC110).
+I had tested MIPI-DSI to use commnad mode as per H/W
+and the newest FB only uses RGB mode. So some structure
+was added to use command mode (CPU interface).
 
-I send v3 patch on behalf of Inki Dae.
-This patch is separated from FB that described v2 patches.
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: InKi Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/fb.h |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-This version includes below contents.
-- fb_cmdmode structure that used s3c_fb_win
-it can be used command mode (CPI or I80 interface)
-- several header files related mipi-dsi
-- mipi-dsi drivers
-
-
-This patch was tested on cpu interface based on MIPI-DSI.
-It consists of the flowing patches,
-
-[PATCH v3 1/3] S5PV210: FB: support command mode
-[PATCH v3 2/3] S5PV210: MIPI-DSI: add machine specific header files
-[PATCH v3 3/3] S5PV210: add MIPI-DSI driver
-
-Best regards,
-Donghwa Lee
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index cb3ca3a..2190500 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -22,6 +22,18 @@
+  */
+ #define S3C_FB_MAX_WIN	(5)
+ 
++struct fb_cmdmode {
++	const char *name;	/* optional */
++	u32 refresh;		/* optional */
++	u32 xres;
++	u32 yres;
++	u32 pixclock;
++	u32 cs_setup;
++	u32 wr_setup;
++	u32 wr_act;
++	u32 wr_hold;
++};
++
+ /**
+  * struct s3c_fb_pd_win - per window setup data
+  * @win_mode: The display parameters to initialise (not for window 0)
+@@ -30,6 +42,7 @@
+  */
+ struct s3c_fb_pd_win {
+ 	struct fb_videomode	win_mode;
++	struct fb_cmdmode	cmd_mode;
+ 
+ 	unsigned short		default_bpp;
+ 	unsigned short		max_bpp;
+-- 
+1.6.0.4
