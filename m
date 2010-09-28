@@ -1,63 +1,72 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 28 Sep 2010 12:10:53 +0200
-Subject: [PATCH 4/7] pwm: Align existing pwm drivers with pwm-core driver
-In-Reply-To: <F45880696056844FA6A73F415B568C69532DC2FB98@EXDCVYMBSTM006.EQ1STM.local>
+From: hemanthv@ti.com (Hemanth V)
+Date: Tue, 28 Sep 2010 16:11:55 +0530 (IST)
+Subject: [PATCH 1/7] pwm: Add pwm core driver
+In-Reply-To: <F45880696056844FA6A73F415B568C69532DC2FBF9@EXDCVYMBSTM006.EQ1STM.loca
+	l>
 References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
-	<1285659648-21409-5-git-send-email-arun.murthy@stericsson.com>
-	<4CA1AE21.8070306@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FB98@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <4CA1BF2D.2070609@metafoo.de>
+	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
+	<201009281114.31223.anarsoul@gmail.com>      
+	<F45880696056844FA6A73F415B568C69532DC2FA8F@EXDCVYMBSTM006.EQ1STM.local>
+	<63731.10.24.255.18.1285663815.squirrel@dbdmail.itg.ti.com>   
+	<F45880696056844FA6A73F415B568C69532DC2FB21@EXDCVYMBSTM006.EQ1STM.local>
+	<19145.10.24.255.18.1285666483.squirrel@dbdmail.itg.ti.com>
+	<F45880696056844FA6A73F415B568C69532DC2FBF9@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <48808.10.24.255.18.1285670515.squirrel@dbdmail.itg.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arun MURTHY wrote:
->>> mips-jz4740: pwm: Align with new pwm core driver
->>>
->>> PWM core driver has been added and has been enabled only for ARM
->>> platform. The same can be utilised for mips also.
->>> Please align with the pwm core driver(drivers/pwm-core.c).
+>> >> >> On 28 of September 2010 10:40:42 Arun Murthy wrote:
+>> >> >> > The existing pwm based led and backlight driver makes use of
+>> the
+>> >> >> > pwm(include/linux/pwm.h). So all the board specific pwm drivers
+>> >> will
+>> >> >> > be exposing the same set of function name as in
+>> >> include/linux/pwm.h.
+>> >> >> > As a result build fails.
+>> >> >>
+>> >> >> Which build fails? One with multi-SoC support? Please be more
+>> >> specific.
+>> >> > Sure will add this in v2.
+>> >> >
+>> >>
+>> >> Could you clarify for the benefit of all, which specific issues you
+>> are
+>> >> trying to address with this patch series
+>> > 1. Now since all the pwm driver export same set of
+>> function(pwm_enable, pwm_disable,..), if it happens that there are two
+>> pwm driver enabled this
+>> > leads to re-declaration and results in build failure. The proper way
+>> to handle this would be to have a pwm core function, and let all the
+>> pwm
+>> > drivers register to the pwm core driver.
+>> > 2. The above scenario also occurs in place of multi-soc environment.
+>> Lets say OMAP has a pwm module and that is being used for primary lcd
+>> backlight
+>> > and twl has a backlight that is being used for controlling the
+>> charging led brightness. In this case there exists 2 pwm drivers and
+>> one pwm driver
+>> > will be used by pwm_bl.c and other by leds-pwm.c
 >>
->> Is there any reason for artificially limiting it to ARM?
-> 
-> No not at all, right now I have aligned all existing pwm drivers in ARM to make use of the pwm core driver.
-> But faced difficulty in aligning the mips-jz4740 pwm driver, without having much knowledge about the device/data sheet.
-> Hence I have let it to the maintainer of that driver to align and thereafter this limitation will be removed.
-> Have also comments the same as TODO in the driver.
-> 
-
-Ok, I'll take care of adjusting the jz4740 pwm driver once the pwm-core is in proper
-shape.
-But I still think it would be better to have a config symbol which would be selected
-by SoC code and on which PWM_CORE would depend. Then it would be possible for SoC
-implementation to device whether it wants to provide it's own PWM API implementation
-or use pwm-core.
-
->>> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
->>> index 5d10106..a88640c 100644
->>> --- a/drivers/pwm/Kconfig
->>> +++ b/drivers/pwm/Kconfig
->>> @@ -4,6 +4,7 @@
->>>
->>>  menuconfig PWM_DEVICES
->>>  	bool "PWM devices"
->>> +	depends on ARM
->>>  	default y
->>>  	---help---
->>>  	  Say Y here to get to see options for device drivers from
->> various
->>> diff --git a/drivers/pwm/pwm-core.c b/drivers/pwm/pwm-core.c
->>> index b84027a..3a0d426 100644
+>> Speaking specifically of OMAP4, twl6030 supports multiple PWMs i.e for
+>> display/keypad backlight, charging
+>> led. But there should not be need for multiple drivers since twl6030-
+>> pwm should be able to support
+>> all these (currently it doesnot though). So there would single
+>> pwm_enable, pwm_disable exported and driver
+>> internally takes care configuring the correct PWM based on id. Would it
+>> not be similar
+>> situation for other hardware also.
 >>
->>
->> Why can't these changes be in the initial patch which adds pwm-core?
->>
-> Since by default this driver is enabled, and if there is some other pwm driver enabled, both happen to export the same function(pwm_enable/pwm_disable,..) After applying the first patch build may fail.
-> 
-I would understand that if you were just moving code around, but the pwm_device
-struct looks completly different now.
+> You are right, there is only one pwm module in twl4030/twl6030 and this module might have any number or pwm's line PWM1, PWM2, PWM3 etc.
+> My consideration is when you have two separate pwm modules on different soc. Its not in case of OMAP boards. But that was just an example that I
+> gave.
+>
+> Let me be more specific, consider an environment where there is an APE and Power Management subsystem(separate IC but on same board/platform)
+> APE has a pwm module and Power Management SubSystem also has pwm module. Both are part of the platform.
+> Not there exists two drivers in a single platform and both of them are enabled. Building such a kernel results in re-declaration build error.
+>
 
+Is this something specific to ST chipsets or do you know of any other chips which might use this feature.
 
-> Thanks and Regards,
-> Arun R Murthy
-> -------------
-> 
+Thanks
+Hemanth
