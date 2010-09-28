@@ -1,25 +1,19 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Sep 2010 09:50:33 -0700
-Subject: [PATCH] omap: Fix compile dependency to LEDS_CLASS
-Message-ID: <20100928165032.GC3117@atomide.com>
+Date: Tue, 28 Sep 2010 09:55:19 -0700
+Subject: [PATCH 1/3 RESEND] arm: remove cast from void*
+In-Reply-To: <3502bb742dfb494eaa0faeb155fedb98dae2b946.1285638395.git.mfm@muteddisk.com>
+References: <cover.1285638395.git.mfm@muteddisk.com>
+	<3502bb742dfb494eaa0faeb155fedb98dae2b946.1285638395.git.mfm@muteddisk.com>
+Message-ID: <20100928165518.GD3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we LEDS_CLASS is not selected, we will get undefined reference
-to `led_classdev_register'.
+* matt mooney <mfm@muteddisk.com> [100927 18:57]:
+> Unnecessary cast from void* in assignment.
+> 
+> Signed-off-by: matt mooney <mfm@muteddisk.com>
+> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Thanks, queuing this for the upcoming merge window.
 
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index e39a417..a92cb49 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -33,7 +33,7 @@ config OMAP_DEBUG_DEVICES
- config OMAP_DEBUG_LEDS
- 	bool
- 	depends on OMAP_DEBUG_DEVICES
--	default y if LEDS
-+	default y if LEDS_CLASS
- 
- config OMAP_RESET_CLOCKS
- 	bool "Reset unused clocks during boot"
+Tony
