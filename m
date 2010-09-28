@@ -1,59 +1,50 @@
-From: mfm@muteddisk.com (matt mooney)
-Date: Mon, 27 Sep 2010 19:04:32 -0700
-Subject: [PATCH 1/3 RESEND] arm: remove cast from void*
-In-Reply-To: <cover.1285638395.git.mfm@muteddisk.com>
-References: <cover.1285638395.git.mfm@muteddisk.com>
-Message-ID: <3502bb742dfb494eaa0faeb155fedb98dae2b946.1285638395.git.mfm@muteddisk.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 27 Sep 2010 20:33:44 -0700
+Subject: [PATCH 0/3] Fixing udelay() on SMP (and non-SMP too)
+Message-ID: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unnecessary cast from void* in assignment.
+These patches are another attempt at fixing the udelay()
+issue pointed out on arm-lkml[1][2]. A quick recap: some SMP
+machines can scale their CPU frequencies independent of one
+another. loops_per_jiffy is calibrated globally and used in
+__const_udelay(). If one CPU is running faster than what the
+loops_per_jiffy is calculated (or scaled) for, udelay() will
+be incorrect and not wait long enough (or too long). A similar
+problem occurs if the cpu frequency is scaled during a udelay()
+call.
 
-Signed-off-by: matt mooney <mfm@muteddisk.com>
-Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
----
- arch/arm/mach-omap2/mailbox.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+We could fix this issue a couple ways, wholesale replacement
+of __udelay() and __const_udelay() (see [2] for that approach),
+or replacement of __delay() (this series). Option 1 can fail if
+anybody uses udelay() before memory is mapped and also duplicates
+most of the code in asm/delay.h. It also needs to hardcode the
+timer tick frequency, which can sometimes be inaccurate. The
+benefit is that loops_per_jiffy stays the same and thus BogoMIPS
+is unchanged.  Option 2 can't fail since the __delay() loop is
+replaced after memory is mapped in, but it suffers from a low
+BogoMIPS when timers are clocked slowly. It also more accurately
+calculates the timer tick frequency through the use of
+calibrate_delay_direct().
 
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 42dbfa4..40ddeca 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -181,7 +181,7 @@ static int omap2_mbox_fifo_full(struct omap_mbox *mbox)
- static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
- 		omap_mbox_type_t irq)
- {
--	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
-+	struct omap_mbox2_priv *p = mbox->priv;
- 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
- 
- 	l = mbox_read_reg(p->irqenable);
-@@ -192,7 +192,7 @@ static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
- static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
- 		omap_mbox_type_t irq)
- {
--	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
-+	struct omap_mbox2_priv *p = mbox->priv;
- 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
- 	l = mbox_read_reg(p->irqdisable);
- 	l &= ~bit;
-@@ -202,7 +202,7 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
- static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
- 		omap_mbox_type_t irq)
- {
--	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
-+	struct omap_mbox2_priv *p = mbox->priv;
- 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
- 
- 	mbox_write_reg(bit, p->irqstatus);
-@@ -214,7 +214,7 @@ static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
- static int omap2_mbox_is_irq(struct omap_mbox *mbox,
- 		omap_mbox_type_t irq)
- {
--	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
-+	struct omap_mbox2_priv *p = mbox->priv;
- 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
- 	u32 enable = mbox_read_reg(p->irqenable);
- 	u32 status = mbox_read_reg(p->irqstatus);
+-- Reference --
+[1] http://article.gmane.org/gmane.linux.kernel/977567
+[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/78496 
+
+Stephen Boyd (3):
+  [ARM] Translate delay.S into (mostly) C
+  [ARM] Allow machines to override __delay()
+  [ARM] Implement a timer based __delay() loop
+
+ arch/arm/include/asm/delay.h |    5 ++-
+ arch/arm/kernel/armksyms.c   |    4 --
+ arch/arm/lib/delay.S         |   65 ------------------------------
+ arch/arm/lib/delay.c         |   90 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 94 insertions(+), 70 deletions(-)
+ delete mode 100644 arch/arm/lib/delay.S
+ create mode 100644 arch/arm/lib/delay.c
+
 -- 
-1.7.2.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
