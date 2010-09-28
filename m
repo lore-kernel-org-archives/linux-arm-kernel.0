@@ -1,92 +1,44 @@
-From: jeongbae.seo@samsung.com (Jeongbae Seo)
-Date: Tue, 28 Sep 2010 13:02:34 +0900
-Subject: [PATCH v2 2/2] sdhci-s3c: Add support no internal clock divider in
-	host controller
-In-Reply-To: <4C97FB34.1000802@simtec.co.uk>
-References: <1284716701-5140-1-git-send-email-kgene.kim@samsung.com>
-	<1284716701-5140-3-git-send-email-kgene.kim@samsung.com>
-	<4C97FB34.1000802@simtec.co.uk>
-Message-ID: <006e01cb5ec1$fe00b770$fa022650$%seo@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Sep 2010 13:22:17 +0900
+Subject: [PATCH v2] ARM: S5PV310: Optimize interrupt source searching code
+Message-ID: <1285647737-28820-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks worte:
-> On 17/09/10 10:45, Kukjin Kim wrote:
-> > From: Hyuk Lee <hyuk1.lee@samsung.com>
-> >
-> > This patch adds to support no internal clock divider in SDHCI.
-> > The external clock divider can be used to make a proper clock
-> > because SDHCI doesn't support internal clock divider by itself.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  drivers/mmc/host/sdhci-s3c.c |   60
-> ++++++++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 60 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> > index e6e0438..5ad5ed7 100644
-> > --- a/drivers/mmc/host/sdhci-s3c.c
-> > +++ b/drivers/mmc/host/sdhci-s3c.c
-> > @@ -96,6 +96,13 @@ static unsigned int sdhci_s3c_get_max_clk(struct
-> sdhci_host *host)
-> >  	unsigned int rate, max;
-> >  	int clk;
-> >
-> > +	/*
-> > +	 * There is only one clock source(sclk) if there is no clock
-> divider
-> > +	 * in the host controller
-> > +	 */
-> > +	if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK)
-> > +		return clk_round_rate(ourhost->clk_bus[2], UINT_MAX);
-> 
-> interesting, <linux/clk.h> doesn't have a second parameter to
-> clk_round_rate().
-> 
-Hi Ben,
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-Thanks for your comments.
+It is reported by Junseok Jung that using clz instruction is
+better instead of using for-loop to find the interrupt source.
+This patch modifies interrupt source searching code using __ffs().
+The __ffs() is implemented using clz instruction.
 
-When I see clk_round_rate in <linux/clk.h>, which function is defined 
-as "long clk_round_rate(struct clk *clk, unsigned long rate)" that has two
-parameters.
-Please let me know if you have another meaning for this.
+Suggested-by: Junseok Jung <jundols.jung@samsung.com>
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v1:
+- Modified to ffs as per Troy Kisky's pointing out
+  In this case, the ffs is more suitable according to original code.
 
-> 
-> >  	/* note, a reset will reset the clock source */
-> >
-> >  	sdhci_s3c_check_sclk(host);
-> > @@ -130,6 +137,15 @@ static unsigned int sdhci_s3c_consider_clock(struct
-> sdhci_s3c *ourhost,
-> >  	if (!clksrc)
-> >  		return UINT_MAX;
-> >
-> > +	/*
-> > +	 * There is only one clock source(sclk) if there is no clock
-> divider
-> > +	 * in the host controller
-> > +	 */
-> > +	if (ourhost->host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK) {
-> > +		rate = clk_round_rate(clksrc, wanted);
-> > +		return wanted - rate;
-> > +	}
-> 
-> Why does this need a quirk, instead of just having one clock available
-> in the list of usable clocks?
-> 
+ arch/arm/mach-s5pv310/irq-combiner.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-The available clock is made by dividing a clock source with a certain
-divider value.
-Most of the host controller has this capability that can divide a clock what
-we want.
-However, the host controller of both S5PC210 and S5PV310 don't have this so
-we have to
-Add additional routine to make a proper clock with outland clock divider
-instead of
-Internal clock divider in host controller.
-
-Best Regards,
-Jeongbae Seo
+diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
+index 0f70521..c3f88c3 100644
+--- a/arch/arm/mach-s5pv310/irq-combiner.c
++++ b/arch/arm/mach-s5pv310/irq-combiner.c
+@@ -66,11 +66,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	if (status == 0)
+ 		goto out;
+ 
+-	for (combiner_irq = 0; combiner_irq < 32; combiner_irq++) {
+-		if (status & 0x1)
+-			break;
+-		status >>= 1;
+-	}
++	combiner_irq = __ffs(status);
+ 
+ 	cascade_irq = combiner_irq + (chip_data->irq_offset & ~31);
+ 	if (unlikely(cascade_irq >= NR_IRQS))
+-- 
+1.6.2.5
