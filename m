@@ -1,43 +1,40 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 28 Sep 2010 10:06:30 +0900
-Subject: [PATCH v2] ARM: MM: bugfix: initialize spinlock for init_mm.context
-Message-ID: <1285635990-3036-1-git-send-email-myungjoo.ham@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Sep 2010 10:31:50 +0900
+Subject: [PATCH] ARM: S5PV310: Optimize interrupt source searching code
+Message-ID: <1285637510-16740-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-init_mm used at kernel/sched.c:idle_task_exit() has spin_lock
-(init_mm.context.id_lock) that is not initialized when spin_lock/unlock
-is called at an ARM machine. Note that mm_struct.context.id_lock is usually
-initialized except for the instance of init_mm at linux/arch/arm/mm/context.c
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-Not initializing this spinlock incurs "BUG: pinlock bad magic" warning when
-spinlock debug is enabled. We have observed such instances when testing PM in
-S5PC210 machines.
+It is reported by Junseok Jung that using clz instruction is
+better instead of using for-loop to find the interrupt source.
+This patch modifies interrupt source searching code using __fls().
+The __fls() is implemented using clz instruction.
 
-
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
---
-changes
-	v2: fixed incorrect initializer parameter (list_lock -> id_lock)
+Suggested-by: Junseok Jung <jundols.jung@samsung.com>
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/include/asm/mmu.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv310/irq-combiner.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
-index 68870c7..c18540b 100644
---- a/arch/arm/include/asm/mmu.h
-+++ b/arch/arm/include/asm/mmu.h
-@@ -13,6 +13,10 @@ typedef struct {
+diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
+index 0f70521..39e3647 100644
+--- a/arch/arm/mach-s5pv310/irq-combiner.c
++++ b/arch/arm/mach-s5pv310/irq-combiner.c
+@@ -66,11 +66,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	if (status == 0)
+ 		goto out;
  
- #ifdef CONFIG_CPU_HAS_ASID
- #define ASID(mm)	((mm)->context.id & 255)
-+
-+/* init_mm.context.id_lock should be initialized. */
-+#define INIT_MM_CONTEXT(name)                                                 \
-+	.context.id_lock    = __SPIN_LOCK_UNLOCKED(name.context.id_lock),
- #else
- #define ASID(mm)	(0)
- #endif
+-	for (combiner_irq = 0; combiner_irq < 32; combiner_irq++) {
+-		if (status & 0x1)
+-			break;
+-		status >>= 1;
+-	}
++	combiner_irq = __fls(status);
+ 
+ 	cascade_irq = combiner_irq + (chip_data->irq_offset & ~31);
+ 	if (unlikely(cascade_irq >= NR_IRQS))
 -- 
-1.6.3.3
+1.6.2.5
