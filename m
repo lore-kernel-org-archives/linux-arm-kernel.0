@@ -1,217 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 30 Sep 2010 16:44:53 +0200
-Subject: [PATCH 16/40 v2] ARM: mx5: dynamically register imx-i2c devices
-In-Reply-To: <1285595476-10025-16-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1285595476-10025-16-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1285857893-31479-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 28 Sep 2010 10:46:18 -0700
+Subject: [PATCH 1/7] pwm: Add pwm core driver
+In-Reply-To: <1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
+References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
+	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
+Message-ID: <20100928174617.GE10739@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+On Tue, Sep 28, 2010 at 01:10:42PM +0530, Arun Murthy wrote:
 
-I just noticed that I missed to adapt board-mx51_babbage in the first
-attempt.
+> The existing pwm based led and backlight driver makes use of the
+> pwm(include/linux/pwm.h). So all the board specific pwm drivers will
+> be exposing the same set of function name as in include/linux/pwm.h.
+> As a result build fails.
 
-I just updated my repository with this new patch.
+As others have said it's *really* not clear what the problem is here...
 
-Best regards
-Uwe
+Please also take a look at the work which Bill Gatliff was doing on a
+similar PWM core API and the resulting discussion - how does your code
+differ from his, and is any of the feedback on his proposal relevant to
+yours?
 
- arch/arm/mach-mx5/Kconfig                    |    2 +
- arch/arm/mach-mx5/board-cpuimx51.c           |    6 ++--
- arch/arm/mach-mx5/board-mx51_babbage.c       |    7 ++---
- arch/arm/mach-mx5/devices-imx51.h            |   14 +++++++++
- arch/arm/mach-mx5/devices.c                  |   38 --------------------------
- arch/arm/mach-mx5/devices.h                  |    2 -
- arch/arm/plat-mxc/devices/platform-imx-i2c.c |    9 ++++++
- 7 files changed, 31 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/mach-mx5/devices-imx51.h
+> +void __deprecated pwm_free(struct pwm_device *pwm)
+> +{
+> +}
+> +
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 0848db5..e57caef 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -10,6 +10,7 @@ comment "MX5 platforms:"
- 
- config MACH_MX51_BABBAGE
- 	bool "Support MX51 BABBAGE platforms"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	help
- 	  Include support for MX51 Babbage platform, also known as MX51EVK in
- 	  u-boot. This includes specific configurations for the board and its
-@@ -24,6 +25,7 @@ config MACH_MX51_3DS
- 
- config MACH_EUKREA_CPUIMX51
- 	bool "Support Eukrea CPUIMX51 module"
-+	select IMX_HAVE_PLATFORM_IMX_I2C
- 	help
- 	  Include support for Eukrea CPUIMX51 platform. This includes
- 	  specific configurations for the module and its peripherals.
-diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-index 623607a..d52f252 100644
---- a/arch/arm/mach-mx5/board-cpuimx51.c
-+++ b/arch/arm/mach-mx5/board-cpuimx51.c
-@@ -30,7 +30,6 @@
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx51.h>
--#include <mach/i2c.h>
- #include <mach/mxc_ehci.h>
- 
- #include <asm/irq.h>
-@@ -152,7 +151,8 @@ static struct imxuart_platform_data uart_pdata = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
- 
--static struct imxi2c_platform_data eukrea_cpuimx51_i2c_data = {
-+static const
-+struct imxi2c_platform_data eukrea_cpuimx51_i2c_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -255,7 +255,7 @@ static void __init eukrea_cpuimx51_init(void)
- 
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
--	mxc_register_device(&mxc_i2c_device1, &eukrea_cpuimx51_i2c_data);
-+	imx51_add_imx_i2c(1, &eukrea_cpuimx51_i2c_data);
- 	i2c_register_board_info(1, eukrea_cpuimx51_i2c_devices,
- 				ARRAY_SIZE(eukrea_cpuimx51_i2c_devices));
- 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index caa8f68..3f3075d 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -23,7 +23,6 @@
- #include <mach/hardware.h>
- #include <mach/imx-uart.h>
- #include <mach/iomux-mx51.h>
--#include <mach/i2c.h>
- #include <mach/mxc_ehci.h>
- 
- #include <asm/irq.h>
-@@ -137,7 +136,7 @@ static inline void mxc_init_imx_uart(void)
- }
- #endif /* SERIAL_IMX */
- 
--static struct imxi2c_platform_data babbage_i2c_data = {
-+static const struct imxi2c_platform_data babbage_i2c_data __initconst = {
- 	.bitrate = 100000,
- };
- 
-@@ -293,8 +292,8 @@ static void __init mxc_board_init(void)
- 	babbage_fec_reset();
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
--	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
--	mxc_register_device(&mxc_i2c_device1, &babbage_i2c_data);
-+	imx51_add_imx_i2c(0, &babbage_i2c_data);
-+	imx51_add_imx_i2c(1, &babbage_i2c_data);
- 	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
- 
- 	if (otg_mode_host)
-diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-new file mode 100644
-index 0000000..a3cc383
---- /dev/null
-+++ b/arch/arm/mach-mx5/devices-imx51.h
-@@ -0,0 +1,14 @@
-+/*
-+ * Copyright (C) 2010 Pengutronix
-+ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+#include <mach/mx51.h>
-+#include <mach/devices-common.h>
-+
-+extern const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst;
-+#define imx51_add_imx_i2c(id, pdata)	\
-+	imx_add_imx_i2c(&imx51_imx_i2c_data[id], pdata)
-diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-index 1920ff4..70b76d1 100644
---- a/arch/arm/mach-mx5/devices.c
-+++ b/arch/arm/mach-mx5/devices.c
-@@ -93,44 +93,6 @@ struct platform_device mxc_fec_device = {
- 	.resource = mxc_fec_resources,
- };
- 
--static struct resource mxc_i2c0_resources[] = {
--	{
--		.start = MX51_I2C1_BASE_ADDR,
--		.end = MX51_I2C1_BASE_ADDR + SZ_4K - 1,
--		.flags = IORESOURCE_MEM,
--	}, {
--		.start = MX51_MXC_INT_I2C1,
--		.end = MX51_MXC_INT_I2C1,
--		.flags = IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device mxc_i2c_device0 = {
--	.name = "imx-i2c",
--	.id = 0,
--	.num_resources = ARRAY_SIZE(mxc_i2c0_resources),
--	.resource = mxc_i2c0_resources,
--};
--
--static struct resource mxc_i2c1_resources[] = {
--	{
--		.start = MX51_I2C2_BASE_ADDR,
--		.end = MX51_I2C2_BASE_ADDR + SZ_4K - 1,
--		.flags = IORESOURCE_MEM,
--	}, {
--		.start = MX51_MXC_INT_I2C2,
--		.end = MX51_MXC_INT_I2C2,
--		.flags = IORESOURCE_IRQ,
--	},
--};
--
--struct platform_device mxc_i2c_device1 = {
--	.name = "imx-i2c",
--	.id = 1,
--	.num_resources = ARRAY_SIZE(mxc_i2c1_resources),
--	.resource = mxc_i2c1_resources,
--};
--
- static struct resource mxc_hsi2c_resources[] = {
- 	{
- 		.start = MX51_HSI2C_DMA_BASE_ADDR,
-diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-index e509cfa..5c2918f 100644
---- a/arch/arm/mach-mx5/devices.h
-+++ b/arch/arm/mach-mx5/devices.h
-@@ -6,7 +6,5 @@ extern struct platform_device mxc_usbdr_host_device;
- extern struct platform_device mxc_usbh1_device;
- extern struct platform_device mxc_usbdr_udc_device;
- extern struct platform_device mxc_wdt;
--extern struct platform_device mxc_i2c_device0;
--extern struct platform_device mxc_i2c_device1;
- extern struct platform_device mxc_hsi2c_device;
- extern struct platform_device mxc_keypad_device;
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-i2c.c b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-index ab9670b..ca988d4 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-@@ -68,6 +68,15 @@ const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_ARCH_MX35 */
- 
-+#ifdef CONFIG_ARCH_MX51
-+const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst = {
-+#define imx51_imx_i2c_data_entry(_id, _hwid)				\
-+	imx_imx_i2c_data_entry(MX51, _id, _hwid, SZ_4K)
-+	imx51_imx_i2c_data_entry(0, 1),
-+	imx51_imx_i2c_data_entry(1, 2),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX51 */
-+
- struct platform_device *__init imx_add_imx_i2c(
- 		const struct imx_imx_i2c_data *data,
- 		const struct imxi2c_platform_data *pdata)
--- 
-1.7.2.3
+Shouldn't this either be an inline function directly in the header or
+exported?
+
+> +int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+> +{
+> +	return pwm->pops->pwm_config(pwm, duty_ns, period_ns);
+> +}
+> +EXPORT_SYMBOL(pwm_config);
+
+I'd expect some handling of fixed function PWMs (though I'd expect those
+to be rare).
+
+> +	down_write(&pwm_list_lock);
+> +	pwm = kzalloc(sizeof(struct pwm_dev_info), GFP_KERNEL);
+> +	if (!pwm) {
+> +		up_write(&pwm_list_lock);
+> +		return -ENOMEM;
+> +	}
+
+No need to take the lock until the allocation succeeded.
+
+> +static int __init pwm_init(void)
+> +{
+> +	struct pwm_dev_info *pwm;
+> +
+> +	pwm = kzalloc(sizeof(struct pwm_dev_info), GFP_KERNEL);
+> +	if (!pwm)
+> +		return -ENOMEM;
+> +	INIT_LIST_HEAD(&pwm->list);
+> +	di = pwm;
+> +	return 0;
+
+Why not just use static data for the list head?
+
+> +subsys_initcall(pwm_init);
+> +module_exit(pwm_exit);
+
+Usually these are located next to the functions.
