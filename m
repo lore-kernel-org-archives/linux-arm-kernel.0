@@ -1,51 +1,30 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 28 Sep 2010 15:06:11 +0200
-Subject: [PATCH 1/7] pwm: Add pwm core driver
-In-Reply-To: <040c01cb5f0c$29bcb3b0$LocalHost@wipblrx0099946>
-References: <1285670134-18063-1-git-send-email-arun.murthy@stericsson.com>
-	<1285670134-18063-2-git-send-email-arun.murthy@stericsson.com>
-	<040c01cb5f0c$29bcb3b0$LocalHost@wipblrx0099946>
-Message-ID: <20100928130610.GB20749@sortiz-mobl>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Tue, 28 Sep 2010 15:03:57 +0200
+Subject: Recall: [PATCH 4/4] esdhc-4 mx51: enable fsl esdhc driver
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D4BD4@zch01exm22.fsl.freescale.net>
+References: <A88EF4D64D8447468743DC1503C0B6CA0D4BD4@zch01exm22.fsl.freescale.net>
+Message-ID: <19617.59325.889947.562800@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 28, 2010 at 06:23:24PM +0530, Hemanth V wrote:
-> ----- Original Message ----- From: "Arun Murthy"
-> <arun.murthy@stericsson.com>
-> 
-> 
-> >The existing pwm based led and backlight driver makes use of the
-> >pwm(include/linux/pwm.h). So all the board specific pwm drivers will
-> >be exposing the same set of function name as in include/linux/pwm.h.
-> >As a result build fails in case of multi soc environments where each soc
-> >has a pwm device in it.
-> 
-> This seems very specific to ST environment,  
-No it's not. It's an issue Arun has hit while enabling one of the ST MFD chip,
-but he's tackling a generic issue.
+Hi,
 
-> looking at the driver list from
-> ( [PATCH 4/7] pwm: Align existing pwm drivers with pwm-core ) it seems
-> most multi SOC environments might support PWM in either one of the SOC.
-> 
-> arch/arm/plat-mxc/pwm.c
-> arch/arm/plat-pxa/pwm.c
-> arch/arm/plat-samsung/pwm.c
-> arch/mips/jz4740/pwm.c
-> drivers/mfd/twl6030-pwm.c
-> 
-> Unless people have examples of other SOCs which might use this,
-> the better approach might be to go for a custom driver rather than changing
-> the framework.
-I wouldn't call the current pwm code a framework. It's a bunch of header
-definitions that happens to work in the specific case of 1 pwm per
-sub architecture.
-What Arun is proposing is an actual framework. And it seems to be clean and
-simple enough.
+> Zhu Richard-R65037 would like to recall the message, "[PATCH 4/4] esdhc-4 mx51: enable fsl esdhc driver".
+The mailing list archive is just one mouse click away from the URL
+listed at the bottom of each message posted on this list:
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Cheers,
-Samuel.
 
+Lothar Wa?mann
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
