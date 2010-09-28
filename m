@@ -1,73 +1,48 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Tue, 28 Sep 2010 20:33:20 +0530
-Subject: [PATCH] mmc: failure of block read wait for long time
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B0315F026F6@dbde02.ent.ti.com>
-	<4C8A2C5D.2050408@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0315F0318B@dbde02.ent.ti.com>
-	<4C971320.7050906@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03160624F6@dbde02.ent.ti.com>
-	<4C974A5D.5050608@nokia.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03160626B5@dbde02.ent.ti.com>
-	<4C975CFB.6070907@nokia.com>
-	<20100920133703.GC30793@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B031610E332@dbde02.ent.ti.com>
-	<20100922124309.GA15699@void.printf.net>  
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03560991F7@dbde02.ent.ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 28 Sep 2010 08:19:43 -0700
+Subject: [PATCH 11/13 v3] serial: Add OMAP high-speed UART driver
+In-Reply-To: <20100928074720.GA12778@suse.de> (Greg KH's message of "Tue, 28
+	Sep 2010 00:47:20 -0700")
+References: <43868.10.24.255.17.1285599049.squirrel@dbdmail.itg.ti.com>
+	<87bp7ilu4f.fsf@deeprootsystems.com>
+	<20100928075249.091ea0b2@linux.intel.com>
+	<20100928074720.GA12778@suse.de>
+Message-ID: <871v8dki9c.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris and Adrian,
+Greg KH <gregkh@suse.de> writes:
 
-[..snip..]
-> 
-> Chris and Adrian,
-> 
-> [..snip..]
-> >
-> > > -----Original Message-----
-[..snip..]
-> > > Subject: Re: [PATCH] mmc: failure of block read wait for long time
-> > >
-> > > On Wed, Sep 22, 2010 at 11:02:08AM +0530, Ghorai, Sukumar wrote:
-> > > > Would you please review and merge this patch [1] (attached too)?
-> > > > [1] http://comments.gmane.org/gmane.linux.kernel.mmc/2714
-> > >
-> > > I've been following the thread.  I believe Adrian has NACKed this
-> patch,
-> > > by saying "It is absolutely unacceptable to return I/O errors to the
-> > > upper layers for segments that do not have errors."
-> >
-> > [Ghorai]
-> > I think Russell also mentioned his opinion. Would you please add your
-> idea
-> > too?
-> >
-> > 1. I would prefer Adrian to explain again what this statement means, in
-> > the context - data read fail and how we make it success?
-> >
-> > 2. if data read fail for sector(x) why we have to try for
-> > sector(x+1, ..x+n)?
-> >
-> > 3. how to inform reader function which sector having the valid data out
-> of
-> > (1...n) sectors.
-> >
-> > 4. do we have any driver/code in Linux or any other os, which give
-> inter-
-> > leave data and return as success?
-> >
-> [Ghorai] please reply with your input on my/ Russell's suggestion?
-[Ghorai] any input?
-> 
-> > >
-> > > I think it's possible to merge patches to improve the situation (such
-> > > as the idea of noticing a card disappearing earlier), but your initial
-> > > patch is not the patch to do that.  You should continue to work with
-> > > Adrian -- when he's happy that a patch does not break the semantics
-> > > above, we can consider merging it.
-> > >
-> > > Thanks,
-> > >
-> > > --
-> > > Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> > > One Laptop Per Child
+> On Tue, Sep 28, 2010 at 07:52:49AM +0100, Alan Cox wrote:
+>> On Mon, 27 Sep 2010 15:05:52 -0700
+>> Kevin Hilman <khilman@deeprootsystems.com> wrote:
+>> 
+>> > "Govindraj.R" <govindraj.raja@ti.com> writes:
+>> > 
+>> > > This patch adds driver support for OMAP2/3/4 high speed UART.
+>> > 
+>> > Cc'ing Greg KH and Alan Cox for review of the the new serial driver in
+>> > this series.
+>> > 
+>> > Greg/Alan, this has been on linux-serial several times now with review
+>> > mostly from OMAP folks.  If this looks OK from your side, with your
+>> > ack(s) we can merge via the OMAP tree with the rest of the series
+>> > which is a major reorg/cleanup of the OMAP platform init for serial
+>> > drivers.
+>> 
+>> Looks fine to me
+
+Alan, I'm assuming this as an Acked-by.  
+
+Thanks for the review.
+
+> Same here, feel free to add:
+> 	Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
+>
+> and add it to the omap tree.
+
+Greg, will merge this series via the OMAP tree.
+
+Thanks,
+
+Kevin
