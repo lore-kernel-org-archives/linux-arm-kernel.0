@@ -1,50 +1,46 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 28 Sep 2010 16:07:29 +0900
-Subject: [PATCHv2 1/7] ARM: S5PC110: update framebuffer setup information
-	for Goni
-In-Reply-To: <1284987337-15365-2-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 28 Sep 2010 16:08:44 +0900
+Subject: [PATCHv2 2/7] ARM: S5PC110: fb setup for Goni - remove pixel clock
+In-Reply-To: <1284987337-15365-3-git-send-email-m.szyprowski@samsung.com>
 References: <1284987337-15365-1-git-send-email-m.szyprowski@samsung.com>
-	<1284987337-15365-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <005801cb5edb$d46579e0$7d306da0$%kim@samsung.com>
+	<1284987337-15365-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <005901cb5edb$ffd2e090$ff78a1b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> Change the default upper_margin and vsync_len to get rid of repeated last
-> line on the display.
+> Since commit 67a38950f0917aecfe1a3e46720d8bbb0020 there is no need
+> to set pixel clock for the s3c-fb driver's window information.
+> The correct pixel clock value can be automatically calculated from
+> the other screen parameters. This patch removes the redundant pixel clock
+> parameter.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pv210/mach-goni.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-s5pv210/mach-goni.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/mach-s5pv210/mach-goni.c
 b/arch/arm/mach-s5pv210/mach-
 > goni.c
-> index d9fe739..4bd5582 100644
+> index 4bd5582..b0ae208 100644
 > --- a/arch/arm/mach-s5pv210/mach-goni.c
 > +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -91,10 +91,10 @@ static struct s3c_fb_pd_win goni_fb_win0 = {
->  		.pixclock = 1000000000000ULL /
+> @@ -88,7 +88,6 @@ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata
+= {
+>  /* Frame Buffer */
+>  static struct s3c_fb_pd_win goni_fb_win0 = {
+>  	.win_mode = {
+> -		.pixclock = 1000000000000ULL /
 > ((16+16+2+480)*(28+3+2+800)*55),
 >  		.left_margin	= 16,
 >  		.right_margin	= 16,
-> -		.upper_margin	= 3,
-> +		.upper_margin	= 2,
->  		.lower_margin	= 28,
->  		.hsync_len	= 2,
-> -		.vsync_len	= 2,
-> +		.vsync_len	= 1,
->  		.xres		= 480,
->  		.yres		= 800,
->  		.refresh	= 55,
+>  		.upper_margin	= 2,
 > --
 
-This is better than your previous patch to me.
-
-Will apply.
+Ok..will apply.
 
 Thanks.
 
