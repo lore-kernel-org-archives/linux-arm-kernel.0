@@ -1,125 +1,35 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 28 Sep 2010 13:42:17 +0530
-Subject: [GIT PULL] omap2 sparse fixes
-In-Reply-To: <20100925001914.GO4211@atomide.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
-	<20100923225851.GR4211@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
-	<20100925001914.GO4211@atomide.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 28 Sep 2010 09:33:56 +0100
+Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <20100927224551.GX13563@erda.amd.com>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
+	<20100916143254.GC13563@erda.amd.com>
+	<20100927200138.GG28588@console-pimps.org>
+	<20100927220703.GV13563@erda.amd.com>
+	<20100927222627.GH28588@console-pimps.org>
+	<20100927224551.GX13563@erda.amd.com>
+Message-ID: <20100928083355.GA4037@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Tony,
-
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com] 
-> Sent: Saturday, September 25, 2010 5:49 AM
-> To: G, Manjunath Kondaiah
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [GIT PULL] omap2 sparse fixes
-> 
-> * G, Manjunath Kondaiah <manjugk@ti.com> [100924 12:33]:
+On Tue, Sep 28, 2010 at 12:45:51AM +0200, Robert Richter wrote:
+> On 27.09.10 18:26:27, Matt Fleming wrote:
 > > 
-> > Tony,
-> > Here is new pull request which is rebased to 2.6.36-rc5.
+> > I don't see why we should pollute the perf namespace with a function
+> > that is only being used inside the SH oprofile code? There would be
+> > exactly one use of this function and I doubt the perf guys will want
+> > this function exposed. In it's current state, it really is no use to any
+> > architecture other than SH.
 > > 
-> > -Manjunath
-> > 
-> > The following changes since commit 
-> b30a3f6257ed2105259b404d419b4964e363928c:
-> >   Linus Torvalds (1):
-> >         Linux 2.6.36-rc5
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git 
-> > sparse_fixes
-> > 
-> > G, Manjunath Kondaiah (10):
-> >       OMAP: mach-omap2: Fix incorrect assignment warnings
-> >       OMAP: mach-omap2: Fix static declaration warnings
-> >       OMAP: mach-omap2: Fix static function warnings
-> >       OMAP: mach-omap2: Fix miscellaneous sparse warnings
-> >       OMAP: plat-omap: Fix static function warnings
-> >       OMAP: NAND: Fix static declaration warning
-> >       TWL CORE: Fix sparse warning
-> >       TWL IRQ: Fix fucntion declaration warnings
-> >       OMAP2/3: Convert write/read functions to raw read/write
-> >       OMAP3: Keypad: Fix incorrect type initializer
+> > We can always add a generic perf_pmu_name() function later if needed,
+> > but it's definitely not needed at the moment.
 > 
-> Hmm tried pulling these, but ran into an issue where at least 
-> 2430 takes about a minute to boot with these patches with no 
-> output on the console intially.
-> 
-> Can you please check that? Will not merge for now until we 
-> figure out what changes with these patches.
-> 
-> Then, I also noticed the following exports getting added:
-> 
-> +EXPORT_SYMBOL(omap2_gp_clockevent_set_gptimer);
-> +EXPORT_SYMBOL(omapfb_reserve_sram);
-> +EXPORT_SYMBOL(omap_sram_init);
-> 
-> These should not be exported, they are only intended to be 
-> called from the low-level platform init code. So exporting 
-> them is not the right fix for these.
+> Ok, so then let's implement sh_pmu_name() in
+> arch/sh/oprofile/common.c, we import asm/perf_event.h to get access to
+> struct sh_pmu. This could be implemented as a static function then and
+> we also get rid of this interface thing.
 
-Similar comments received for twl irq apis's hence it was aligned
-to declare these functions as extern functions in local header(if exists) 
-or create new header in the source file directory for these declarations.
-
-Three patches are fixed using above method which are:
-OMAP: mach-omap2: Fix static function warnings
-OMAP: plat-omap: Fix static function warnings
-TWL IRQ: Fix fucntion declaration warnings
-
-The patch series is tested on below boards(with omap3_defconfig)
-and links for boot logs is provided below:
-
-beagle boot log:
-http://pastebin.com/jz6ZGHsH
-
-zoom3 boot log:
-http://pastebin.com/T0YjunCk
-
-2430sdp boot log:
-http://pastebin.com/7BbpieYS
-
-As I mentioned in other e-mail, 2430sdp with omap3_defconfig boots
-only after disabling usb. OMAP4SDPES2.0 boots with ES2.0 patches from
-for-next branch.
-
-Here is all parse errors fixed with this series:
-
-Sparse warns before fixes:
-http://pastebin.com/yct2p201
-
-Sparse warns after fixes:
-http://pastebin.com/qpnTbYwL
-
-All the tested patches are pushed to new branch at:
-
-The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
-  Linus Torvalds (1):
-        Linux 2.6.36-rc5
-
-are available in the git repository at:
-
-  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes_v3
-
-G, Manjunath Kondaiah (10):
-      OMAP: mach-omap2: Fix incorrect assignment warnings
-      OMAP: mach-omap2: Fix static declaration warnings
-      OMAP2plus: Fix static function warnings
-      OMAP: mach-omap2: Fix miscellaneous sparse warnings
-      OMAP: plat-omap: Fix static function warnings
-      OMAP: NAND: Fix static declaration warning
-      TWL CORE: Fix sparse warning
-      TWL IRQ: Fix fucntion declaration warnings
-      OMAP2/3: Convert write/read functions to raw read/write
-      OMAP3: Keypad: Fix incorrect type initializer
-
-
--Manjunath
+That seems OK to me s'long as Paul (the author of the perf events code
+for SH) doesn't have a problem with us exposing the struct sh_pmu *
+outside of arch/sh/kernel/perf_event.c
