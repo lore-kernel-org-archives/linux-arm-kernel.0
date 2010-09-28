@@ -1,47 +1,66 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Tue, 28 Sep 2010 15:08:56 +0200
-Subject: Issue in using mmap on ARM target
-In-Reply-To: <AANLkTi=JXei9uPHR-yn3OUnamV5eu+CbQ+ebaS27=dut@mail.gmail.com>
-References: <AANLkTi=VS34cbaH9TNA9aZ7mVavoTaAiAwMfuRXSxbd8@mail.gmail.com>
-	<AANLkTi=JXei9uPHR-yn3OUnamV5eu+CbQ+ebaS27=dut@mail.gmail.com>
-Message-ID: <19617.59624.559668.889841@ipc1.ka-ro>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Sep 2010 22:10:55 +0900
+Subject: [PATCH] ARM: S5PV310: Optimize interrupt source searching code
+In-Reply-To: <4CA1E387.709@ru.mvista.com>
+References: <1285637510-16740-1-git-send-email-kgene.kim@samsung.com>
+	<4CA1E387.709@ru.mvista.com>
+Message-ID: <008a01cb5f0e$9a433df0$cec9b9d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> I am facing one issue when executing below progmra on ARM target. The
-> same program work well on X86 host machine,
+Sergei Shtylyov wrote:
 > 
-> When execute on Host(x86). the result are as expected.
-> [root at localhost naveen]# ./a.out ?0000 b 2
-> /dev/mem opened.
-> Memory mapped at address 0xb7f00000.
-> Value at address 0x0 (0xb7f00000): 0x24
-> Written 0x2; readback 0x2
+> Hello.
 > 
-> But when execute on Target(ARM):
-> # ./a.out 0 w 20
-> /dev/mem opened.
-> Memory mapped at address 0x40003000.
-> Value at address 0x0 (0x40003000): 0xEA000006
-> Written 0x14; readback 0xEA000006
-> #
-> The value does not change. any idea ....
+Hi ;-)
+
+> On 28-09-2010 5:31, Kukjin Kim wrote:
 > 
-There is no RAM at (physical) address 0.
-You should check the PHYS_OFFSET setting of your machine to find out
-where your RAM is located.
+> > From: Changhwan Youn<chaos.youn@samsung.com>
+> 
+> > It is reported by Junseok Jung that using clz instruction is
+> > better instead of using for-loop to find the interrupt source.
+> > This patch modifies interrupt source searching code using __fls().
+> > The __fls() is implemented using clz instruction.
+> 
+> > Suggested-by: Junseok Jung<jundols.jung@samsung.com>
+> > Signed-off-by: Changhwan Youn<chaos.youn@samsung.com>
+> > Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> > ---
+> >   arch/arm/mach-s5pv310/irq-combiner.c |    6 +-----
+> >   1 files changed, 1 insertions(+), 5 deletions(-)
+> 
+> > diff --git a/arch/arm/mach-s5pv310/irq-combiner.c
+b/arch/arm/mach-s5pv310/irq-
+> combiner.c
+> > index 0f70521..39e3647 100644
+> > --- a/arch/arm/mach-s5pv310/irq-combiner.c
+> > +++ b/arch/arm/mach-s5pv310/irq-combiner.c
+> > @@ -66,11 +66,7 @@ static void combiner_handle_cascade_irq(unsigned int
+irq,
+> struct irq_desc *desc)
+> >   	if (status == 0)
+> >   		goto out;
+> >
+> > -	for (combiner_irq = 0; combiner_irq<  32; combiner_irq++) {
+> > -		if (status & 0x1)
+> > -			break;
+> > -		status>>= 1;
+> > -	}
+> > +	combiner_irq = __fls(status);
+> 
+>     But the loop finds the *first* set bit, not the last...
+> 
+Yes, you're right.
+So I already re-submitted like following :-)
 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-September/027071.
+html
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Thanks for your pointing out.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
