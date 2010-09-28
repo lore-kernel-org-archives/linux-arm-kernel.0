@@ -1,19 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Sep 2010 09:55:19 -0700
-Subject: [PATCH 1/3 RESEND] arm: remove cast from void*
-In-Reply-To: <3502bb742dfb494eaa0faeb155fedb98dae2b946.1285638395.git.mfm@muteddisk.com>
-References: <cover.1285638395.git.mfm@muteddisk.com>
-	<3502bb742dfb494eaa0faeb155fedb98dae2b946.1285638395.git.mfm@muteddisk.com>
-Message-ID: <20100928165518.GD3117@atomide.com>
+Date: Tue, 28 Sep 2010 10:19:09 -0700
+Subject: [PATCH v4 0/4] LogicPD minimal board support for LV_SOM and
+	Torpedo
+In-Reply-To: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
+References: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
+Message-ID: <20100928171908.GE3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* matt mooney <mfm@muteddisk.com> [100927 18:57]:
-> Unnecessary cast from void* in assignment.
+* Tim Nordell <tim.nordell@logicpd.com> [100927 08:57]:
+> This was tested (and based) against 2.6.36-rc5
 > 
-> Signed-off-by: matt mooney <mfm@muteddisk.com>
-> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+> Difference from patch v3 1/4:
+>  - Merged DEBUG_LL support patch (patch v3 5/5) into first patch
+>  - Added "select OMAP_PACKAGE_CBB" into Kconfig for both boards
+> 
+> Tim Nordell (4):
+>   Adding LogicPD OMAP3 board support
+>   ARM: OMAP3LOGIC: Adding SDMMC support
+>   ARM: OMAP3: Add generic smsc911x support when connected to GPMC
+>   ARM: OMAP3LOGIC: Added SMSC Ethernet board support
+> 
+>  arch/arm/mach-omap2/Kconfig                     |   20 ++
+>  arch/arm/mach-omap2/Makefile                    |    7 +
+>  arch/arm/mach-omap2/board-omap3logic.c          |  244 +++++++++++++++++++++++
+>  arch/arm/mach-omap2/gpmc-smsc911x.c             |  113 +++++++++++
+>  arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |   35 ++++
+>  arch/arm/plat-omap/include/plat/uncompress.h    |    2 +
+>  6 files changed, 421 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/board-omap3logic.c
+>  create mode 100644 arch/arm/mach-omap2/gpmc-smsc911x.c
+>  create mode 100644 arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
 
-Thanks, queuing this for the upcoming merge window.
+Thanks, queuing all of them for the upcoming merge window.
+I've updated the MMC related patch with the following to
+keep it compiling with the MMC related platform init changes.
+
+Regards,
 
 Tony
+
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -26,6 +26,7 @@
+ #include <linux/regulator/machine.h>
+ 
+ #include <linux/i2c/twl.h>
++#include <linux/mmc/host.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -112,7 +113,7 @@ static struct omap2_hsmmc_info __initdata board_mmc_info[] = {
+ 	{
+ 		.name		= "external",
+ 		.mmc		= 1,
+-		.wires		= 4,
++		.caps		= MMC_CAP_4_BIT_DATA,
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+ 	},
