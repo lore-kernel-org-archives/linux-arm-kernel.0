@@ -1,48 +1,44 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 28 Sep 2010 08:19:43 -0700
-Subject: [PATCH 11/13 v3] serial: Add OMAP high-speed UART driver
-In-Reply-To: <20100928074720.GA12778@suse.de> (Greg KH's message of "Tue, 28
-	Sep 2010 00:47:20 -0700")
-References: <43868.10.24.255.17.1285599049.squirrel@dbdmail.itg.ti.com>
-	<87bp7ilu4f.fsf@deeprootsystems.com>
-	<20100928075249.091ea0b2@linux.intel.com>
-	<20100928074720.GA12778@suse.de>
-Message-ID: <871v8dki9c.fsf@deeprootsystems.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Sep 2010 08:21:39 -0700
+Subject: [GIT PULL] omap2 sparse fixes
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+	<20100923225851.GR4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
+	<20100925001914.GO4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
+Message-ID: <20100928152139.GB3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg KH <gregkh@suse.de> writes:
+* G, Manjunath Kondaiah <manjugk@ti.com> [100928 01:04]:
+> 
+> Three patches are fixed using above method which are:
+> OMAP: mach-omap2: Fix static function warnings
+> OMAP: plat-omap: Fix static function warnings
+> TWL IRQ: Fix fucntion declaration warnings
 
-> On Tue, Sep 28, 2010 at 07:52:49AM +0100, Alan Cox wrote:
->> On Mon, 27 Sep 2010 15:05:52 -0700
->> Kevin Hilman <khilman@deeprootsystems.com> wrote:
->> 
->> > "Govindraj.R" <govindraj.raja@ti.com> writes:
->> > 
->> > > This patch adds driver support for OMAP2/3/4 high speed UART.
->> > 
->> > Cc'ing Greg KH and Alan Cox for review of the the new serial driver in
->> > this series.
->> > 
->> > Greg/Alan, this has been on linux-serial several times now with review
->> > mostly from OMAP folks.  If this looks OK from your side, with your
->> > ack(s) we can merge via the OMAP tree with the rest of the series
->> > which is a major reorg/cleanup of the OMAP platform init for serial
->> > drivers.
->> 
->> Looks fine to me
+OK thanks.
+ 
+> are available in the git repository at:
+> 
+>   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git sparse_fixes_v3
+> 
+> G, Manjunath Kondaiah (10):
+>       OMAP: mach-omap2: Fix incorrect assignment warnings
+>       OMAP: mach-omap2: Fix static declaration warnings
+>       OMAP2plus: Fix static function warnings
+>       OMAP: mach-omap2: Fix miscellaneous sparse warnings
+>       OMAP: plat-omap: Fix static function warnings
+>       OMAP: NAND: Fix static declaration warning
+>       TWL CORE: Fix sparse warning
+>       TWL IRQ: Fix fucntion declaration warnings
 
-Alan, I'm assuming this as an Acked-by.  
+Didn't Samuel just reply that he has applied these two TWL fixes?
 
-Thanks for the review.
+>       OMAP2/3: Convert write/read functions to raw read/write
+>       OMAP3: Keypad: Fix incorrect type initializer
 
-> Same here, feel free to add:
-> 	Acked-by: Greg Kroah-Hartman <gregkh@suse.de>
->
-> and add it to the omap tree.
+Regards,
 
-Greg, will merge this series via the OMAP tree.
-
-Thanks,
-
-Kevin
+Tony
