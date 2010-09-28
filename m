@@ -1,69 +1,60 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 28 Sep 2010 13:51:37 -0400 (EDT)
-Subject: [PATCH] [ARM] Introduce patching of phys_to_virt and vice versa
-In-Reply-To: <AANLkTinttOaK4COroXBbruXeCyFztLsfdW85XXqTDMJO@mail.gmail.com>
-References: <1277542025-19881-1-git-send-email-eric.miao@canonical.com>
-	<1278083164.15298.55.camel@ra7055-laptop>
-	<20100720211629.GB10553@n2100.arm.linux.org.uk>
-	<AANLkTimyif7CCoNwdKMCA=P+y=0e9uhwfhRchbMuB7eY@mail.gmail.com>
-	<20100805094521.GB23473@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1008061256170.28809@xanadu.home>
-	<20100808222402.GF23623@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1008091251460.10330@xanadu.home>
-	<AANLkTinttOaK4COroXBbruXeCyFztLsfdW85XXqTDMJO@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1009281339330.1146@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Sep 2010 11:31:59 -0700
+Subject: [GIT PULL] omap2 sparse fixes
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F94C9@dbde02.ent.ti.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+	<20100923225851.GR4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
+	<20100925001914.GO4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
+	<20100928152139.GB3117@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F94C9@dbde02.ent.ti.com>
+Message-ID: <20100928183157.GH3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Sep 2010, Eric Miao wrote:
-
-> On Tue, Aug 10, 2010 at 12:55 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Sun, 8 Aug 2010, Russell King - ARM Linux wrote:
-> >
-> >> On Fri, Aug 06, 2010 at 01:07:46PM -0400, Nicolas Pitre wrote:
-> >> > No idea. ?That depends how gcc is considering inline asm. ?Given there
-> >> > is one input operand, I suppose gcc would account for the delay slot
-> >> > before that operand is actually available.
-> >>
-> >> For something which could very well become by default enabled across
-> >> the board - due to the push to have a single kernel binary for lots
-> >> of significantly different platforms - it seems little research has
-> >> been carried out on this point.
-> >>
-> >> While I agree that other obvious solutions would be more expensive, I
-> >> think it makes sense to have the commit which is introducing this
-> >> method include a proper evaluation, not least so that people who need
-> >> to make the decision to enable this aren't repeating the same research
-> >> that someone else has done (or, worse, just decide to enable it 'just
-> >> because' without any understanding of what the effect may be.)
-> >
-> > Sure, I agree. ?I'll contact gcc people for a definitive answer.
-> >
+* G, Manjunath Kondaiah <manjugk@ti.com> [100928 08:26]:
 > 
-> Nico, any feedback?
-
-Yes.  As far as scheduling goes, the current gcc implementation simply 
-considers any inline assembly as a pipeline flush.  This is not perfect, 
-but without the volatile this is still acceptable as demonstrated by 
-your comparison example, probably better than dereferencing a global 
-variable.  I'll ask the Linaro toolchain group to see if it is 
-possible to improve gcc for this, but I suspect the improvement would be 
-marginal compared to the current results.
-
-> >> I think we also need to consider whether the volatile is really required.
-> >> This asm() doesn't have any side effects other than its output operand,
-> >> so I suspect that the volatile may get in the way of some optimisations
-> >> (such as deleting the operation if the output is not actually used.)
-> >
-> > Indeed, the volatile should go. ?This is even getting in the way of
-> > better scheduling.
-> >
 > 
-> Yep. I don't see the necessity here for the volatile. Actually after removing
-> it, it resulted a better instruction scheduling.
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com] 
+> > Sent: Tuesday, September 28, 2010 8:52 PM
+> > To: G, Manjunath Kondaiah
+> > Cc: linux-omap at vger.kernel.org; 
+> > linux-arm-kernel at lists.infradead.org; Samuel Ortiz; Dmitry 
+> > Torokhov; linux-mtd at lists.infradead.org; Russell King - ARM Linux
+> > Subject: Re: [GIT PULL] omap2 sparse fixes
+> > 
+> > * G, Manjunath Kondaiah <manjugk@ti.com> [100928 01:04]:
+> > > 
+> > > Three patches are fixed using above method which are:
+> > > OMAP: mach-omap2: Fix static function warnings
+> > > OMAP: plat-omap: Fix static function warnings TWL IRQ: Fix fucntion 
+> > > declaration warnings
+> > 
+> > OK thanks.
+> >  
+> > > are available in the git repository at:
+> > > 
+> > >   git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git 
+> > > sparse_fixes_v3
+> > > 
+> > > G, Manjunath Kondaiah (10):
+> > >       OMAP: mach-omap2: Fix incorrect assignment warnings
+> > >       OMAP: mach-omap2: Fix static declaration warnings
+> > >       OMAP2plus: Fix static function warnings
+> > >       OMAP: mach-omap2: Fix miscellaneous sparse warnings
+> > >       OMAP: plat-omap: Fix static function warnings
+> > >       OMAP: NAND: Fix static declaration warning
+> > >       TWL CORE: Fix sparse warning
+> > >       TWL IRQ: Fix fucntion declaration warnings
+> > 
+> > Didn't Samuel just reply that he has applied these two TWL fixes?
+> 
+> Samuel applied only one patch and other patch is yet to be applied.
+> Do you want me to pull out these two twl patches from the series?
 
-Indeed.  The volatile qualifier for inline assembly is a big hammer 
-preventing any code movement around and across them.
+Yes please take out all patches that are not in arch/arm/*omap*/ path.
+The others really should go to the driver maintainers.
 
-
-Nicolas
+Tony
