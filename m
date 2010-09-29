@@ -1,513 +1,94 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Sep 2010 16:28:57 +0200
-Subject: [PATCH 2/4] esdhc-2 mx51: Modify the MSL codes when
-	upstreaming fsl esdhc driver
-In-Reply-To: <1285300467-5158-3-git-send-email-r65037@freescale.com>
-References: <1285300467-5158-1-git-send-email-r65037@freescale.com>
-	<1285300467-5158-2-git-send-email-r65037@freescale.com>
-	<1285300467-5158-3-git-send-email-r65037@freescale.com>
-Message-ID: <20100929142857.GD29811@pengutronix.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 29 Sep 2010 07:37:26 -0700
+Subject: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02B1E@dbde02.ent.ti.com>
+	(Charulatha Varadarajan's message of "Wed, 29 Sep 2010 18:44:03
+	+0530")
+References: <1285252363-3630-1-git-send-email-charu@ti.com>
+	<877hi5740v.fsf@deeprootsystems.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CD02B1E@dbde02.ent.ti.com>
+Message-ID: <87d3rw62ft.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Richard,
+"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-On Fri, Sep 24, 2010 at 11:54:25AM +0800, Richard Zhu wrote:
-> Modify the machine specific codes and add the eSDHC1 and eSDHC2 support
-> on MX51 BBG platform.
-> IOMUX, CLOCK, register the device.
-> 
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx51_babbage.c      |   38 ++++++
-I think board changes should go in a seperate patch
+>> -----Original Message-----
+>> From: Kevin Hilman [mailto:khilman at deeprootsystems.com]
+>> Sent: Wednesday, September 29, 2010 6:36 AM
+>> To: Varadarajan, Charulatha
+>> Cc: tony at atomide.com; wim at iguana.be; linux-omap at vger.kernel.org; linux-
+>> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> paul at pwsan.com; Cousson, Benoit; Nayak, Rajendra; Basak, Partha
+>> Subject: Re: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
+>> 
+>> Hi Charu,
+>> 
+>> "Varadarajan, Charulatha" <charu@ti.com> writes:
+>> 
+>> > Series of patches to port watchdog module to use hwmod APIs
+>> > for OMAP2PLUS chips and use runtime APIs for all OMAP chips.
+>> > For this hwmod database for OMAP2PLUS watchdog instances are
+>> > populated and implements watchdog module to use PM runtime APIs.
+>> >
+>> > This patch series is generated on "origin/pm-core" which
+>> > has Kevin's pm-next series, the runtime PM core patch series,
+>> > and a collection of hwmod fixes that Paul/Benoit have lined up
+>> > for 2.6.37.
+>> >
+>> > Tested on OMAP2430, OMAP4430 (ES1.0 & ES2.0), OMAP3430 SDP boards
+>> > and zoom3 board. Also verified that this patch series does not
+>> > break the OMAP1 build.
+>> 
+>> I found a little snag with this series.  Try testing with
+>> omap2plus_defconfig and changing CONFIG_OMAP_WATCHDOG=n.
+>> 
+>> If CONFIG_OMAP_WATCHDOG is not enabled in the kernel config, the system
+>> will reboot soon after bootup. 
+>
+> Thanks for finding this issue.
+>
+> After watchdog module reset, the WDTs are enabled. The default time
+> for a system reset after a watchdog module reset is ~10s as per the
+> default value of the WDT registers. Hence the above problem is observed.
+>
+> If CONFIG_OMAP_WATCHDOG is defined, wdt's probe is called within this
+> 10s time and watchdog_disable is called during probe. Hence we are not
+> finding this issue if CONFIG_OMAP_WATCHDOG is defined.
+>
+> Ideally, because of the above, watchdog should be with
+> HWMOD_INIT_NO_RESET flag.
+>
+> If agreed, I would send the below patch (extended to other OMAPs)
+> on top of my watchdog timer hwmod series with proper change log.
 
->  arch/arm/mach-mx5/clock-mx51.c              |  193 +++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.c                 |   46 +++++++
->  arch/arm/mach-mx5/devices.h                 |    2 +
->  arch/arm/plat-mxc/include/mach/iomux-mx51.h |   33 +++--
->  5 files changed, 298 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 6e384d9..e79f8a1 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -17,6 +17,7 @@
->  #include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/fsl_devices.h>
-> +#include <linux/sdhci-pltfm.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -24,6 +25,7 @@
->  #include <mach/iomux-mx51.h>
->  #include <mach/i2c.h>
->  #include <mach/mxc_ehci.h>
-> +#include <mach/mmc.h>
->  
->  #include <asm/irq.h>
->  #include <asm/setup.h>
-> @@ -33,6 +35,8 @@
->  
->  #include "devices.h"
->  
-> +#define BABBAGE_SDHCI1_WP	(0*32 + 1)	/* GPIO_1_1 */
-> +#define BABBAGE_SDHCI2_WP	(0*32 + 5)	/* GPIO_1_5 */
->  #define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
->  #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
->  #define BABBAGE_PHY_RESET (1*32 +5)	/* GPIO_2_5 */
-> @@ -93,6 +97,24 @@ static struct pad_desc mx51babbage_pads[] = {
->  
->  	/* USB HUB reset line*/
->  	MX51_PAD_GPIO_1_7__GPIO_1_7,
-> +
-> +	/* SDHCI1 IOMUX */
-> +	MX51_PAD_SD1_CMD__SD1_CMD,
-> +	MX51_PAD_SD1_CLK__SD1_CLK,
-> +	MX51_PAD_SD1_DATA0__SD1_DATA0,
-> +	MX51_PAD_SD1_DATA1__SD1_DATA1,
-> +	MX51_PAD_SD1_DATA2__SD1_DATA2,
-> +	MX51_PAD_SD1_DATA3__SD1_DATA3,
-> +	MX51_PAD_GPIO_1_1__GPIO_1_1,
-> +
-> +	/* SDHCI2 IOMUX */
-> +	MX51_PAD_SD2_CMD__SD2_CMD,
-> +	MX51_PAD_SD2_CLK__SD2_CLK,
-> +	MX51_PAD_SD2_DATA0__SD2_DATA0,
-> +	MX51_PAD_SD2_DATA1__SD2_DATA1,
-> +	MX51_PAD_SD2_DATA2__SD2_DATA2,
-> +	MX51_PAD_SD2_DATA3__SD2_DATA3,
-> +	MX51_PAD_GPIO_1_5__GPIO_1_5,
+Using HWMOD_INIT_NO_RESET makes us still dependent on the bootloader
+settings.
+
+Instead, I would rather have a small piece of code in omap_init_wdt()
+which disarms the watchdog so we don't have any assumptions about
+bootloader behavior.
+
+The question remains whether this disarm should be
+#ifndef CONFIG_OMAP_WATCHDOG or if it should happen all the time.  In
+case the watchdog is a module, it's probe may not happen within the
+timeout period and they system may reboot also, so I lean towards
+disarming the watchdog unconditionally.
+
+Kevin
+
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-
+> omap2/omap_hwmod_3xxx_data.c
+> index 5bfe9c9..c567b24 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -260,6 +260,7 @@ static struct omap_hwmod omap3xxx_wd_timer2_hwmod = {
+>         .slaves         = omap3xxx_wd_timer2_slaves,
+>         .slaves_cnt     = ARRAY_SIZE(omap3xxx_wd_timer2_slaves),
+>         .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+> +       .flags          = HWMOD_INIT_NO_RESET,
 >  };
->  
->  /* Serial ports */
-> @@ -240,6 +262,20 @@ static int __init babbage_otg_mode(char *options)
->  }
->  __setup("otg_mode=", babbage_otg_mode);
->  
-> +struct sdhci_pltfm_data mmc1_data = {
-> +	/* Board specified max bus width */
-> +	.caps = MMC_CAP_4_BIT_DATA,
-> +	/* GPIO pin number that used as the Write Protect */
-This sentence no (complete) verb.
-
-> +	.wp_gpio = BABBAGE_SDHCI1_WP,
-> +};
-> +
-> +struct sdhci_pltfm_data mmc2_data = {
-> +	/* Board specified max bus width */
-> +	.caps = MMC_CAP_4_BIT_DATA,
-> +	/* GPIO pin number that used as the Write Protect */
-> +	.wp_gpio = BABBAGE_SDHCI2_WP,
-> +};
-> +
->  /*
->   * Board specific initialization.
->   */
-> @@ -255,6 +291,8 @@ static void __init mxc_board_init(void)
->  	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
->  	mxc_register_device(&mxc_i2c_device1, &babbage_i2c_data);
->  	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
-> +	mxc_register_device(&mxcsdhc1_device, &mmc1_data);
-> +	mxc_register_device(&mxcsdhc2_device, &mmc2_data);
->  
->  	if (otg_mode_host)
->  		mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
-> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
-> index 6af69de..3526fd3 100644
-> --- a/arch/arm/mach-mx5/clock-mx51.c
-> +++ b/arch/arm/mach-mx5/clock-mx51.c
-> @@ -41,6 +41,35 @@ static struct clk usboh3_clk;
->  
->  #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
->  
-> +static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
-> +{
-Can we have a comment please about what this function does?
-> +	u32 min_pre, temp_pre, old_err, err;
-> +
-> +	if (div >= 512) {
-> +		*pre = 8;
-> +		*post = 64;
-> +	} else if (div >= 8) {
-declare the variables here please.
-
-> +		min_pre = (div - 1) / 64 + 1;
-> +		old_err = 8;
-> +		for (temp_pre = 8; temp_pre >= min_pre; temp_pre--) {
-> +			err = div % temp_pre;
-> +			if (err == 0) {
-> +				*pre = temp_pre;
-> +				break;
-> +			}
-> +			err = temp_pre - err;
-> +			if (err < old_err) {
-> +				old_err = err;
-> +				*pre = temp_pre;
-> +			}
-> +		}
-> +		*post = (div + *pre - 1) / *pre;
-> +	} else if (div < 8) {
-This if is unnecessary as the else branch is only hit if !(div >= 8)
-
-> +		*pre = div;
-> +		*post = 1;
-> +	}
-> +}
-> +
->  static int _clk_ccgr_enable(struct clk *clk)
->  {
->  	u32 reg;
-> @@ -762,6 +791,160 @@ static struct clk kpp_clk = {
->  	.id = 0,
->  };
->  
-> +static int _clk_esdhc1_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	u32 reg, mux;
-> +	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk,
-> +			&pll3_sw_clk, &lp_apm_clk);
-> +	reg = __raw_readl(MXC_CCM_CSCMR1) &
-> +		~MXC_CCM_CSCMR1_ESDHC1_MSHC1_CLK_SEL_MASK;
-> +	reg |= mux << MXC_CCM_CSCMR1_ESDHC1_MSHC1_CLK_SEL_OFFSET;
-> +	__raw_writel(reg, MXC_CCM_CSCMR1);
-> +
-> +	return 0;
-> +}
-> +
-> +static unsigned long _clk_esdhc1_get_rate(struct clk *clk)
-> +{
-> +	u32 reg, prediv, podf;
-> +	unsigned long parent_rate;
-> +
-> +	parent_rate = clk_get_rate(clk->parent);
-> +
-> +	reg = __raw_readl(MXC_CCM_CSCDR1);
-> +	prediv = ((reg & MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_MASK) >>
-> +		  MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_OFFSET) + 1;
-> +	podf = ((reg & MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PODF_MASK) >>
-> +		MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PODF_OFFSET) + 1;
-> +
-> +	return parent_rate / (prediv * podf);
-> +}
-> +
-> +static int _clk_esdhc1_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	u32 reg, div, parent_rate;
-> +	u32 pre = 0, post = 0;
-> +
-> +	parent_rate = clk_get_rate(clk->parent);
-> +	div = parent_rate / rate;
-> +
-> +	if ((parent_rate / div) != rate)
-> +		return -EINVAL;
-> +
-> +	__calc_pre_post_dividers(div, &pre, &post);
-> +
-> +	/* Set sdhc1 clock divider */
-> +	reg = __raw_readl(MXC_CCM_CSCDR1) &
-> +		~(MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_MASK
-> +				| MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PODF_MASK);
-> +	reg |= (post - 1) << MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PODF_OFFSET;
-> +	reg |= (pre - 1) << MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_OFFSET;
-> +	__raw_writel(reg, MXC_CCM_CSCDR1);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clk esdhc1_clk[] = {
-> +	{
-> +		.id = 0,
-> +		.parent = &pll2_sw_clk,
-> +		.secondary = &esdhc1_clk[1],
-> +		.enable_shift = MXC_CCM_CCGRx_CG1_OFFSET,
-> +		.enable_reg = MXC_CCM_CCGR3,
-> +		.get_rate = _clk_esdhc1_get_rate,
-> +		.set_rate = _clk_esdhc1_set_rate,
-> +		.enable = _clk_max_enable,
-> +		.disable = _clk_max_disable,
-> +		.set_parent = _clk_esdhc1_set_parent,
-> +	},
-> +	{
-> +		.id = 0,
-> +		.parent = &ipg_clk,
-> +		.secondary = NULL,
-> +		.enable = _clk_max_enable,
-> +		.enable_reg = MXC_CCM_CCGR3,
-> +		.enable_shift = MXC_CCM_CCGRx_CG0_OFFSET,
-> +		.disable = _clk_max_disable,
-> +	}
-> +};
-> +
-> +static int _clk_esdhc2_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	u32 reg, mux;
-> +
-> +	mux = _get_mux(parent, &pll1_sw_clk, &pll2_sw_clk,
-> +			&pll3_sw_clk, &lp_apm_clk);
-> +	reg = __raw_readl(MXC_CCM_CSCMR1) &
-> +		~MXC_CCM_CSCMR1_ESDHC2_MSHC2_CLK_SEL_MASK;
-> +	reg |= mux << MXC_CCM_CSCMR1_ESDHC2_MSHC2_CLK_SEL_OFFSET;
-> +
-> +	__raw_writel(reg, MXC_CCM_CSCMR1);
-Maybe it's time to make this idiom a function and call this?  Something
-like
-
-	static void sensiblefuncname(struct clk *parent, ...)
-	{
-		u32 mux = _get_mux(...);
-		reg = __raw_readl(offset) & ~mask;
-		reg |= mux << __ffs(mask);
-
-		__raw_writel(reg, offset);
-	}
-
-What do you think?
-
-> +	return 0;
-> +}
-> +
-> +static unsigned long _clk_esdhc2_get_rate(struct clk *clk)
-> +{
-> +	u32 reg, prediv, podf;
-> +	unsigned long parent_rate;
-> +
-> +	parent_rate = clk_get_rate(clk->parent);
-> +
-> +	reg = __raw_readl(MXC_CCM_CSCDR1);
-> +	prediv = ((reg & MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PRED_MASK) >>
-> +		  MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PRED_OFFSET) + 1;
-> +	podf = ((reg & MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_MASK) >>
-> +		MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_OFFSET) + 1;
-> +
-> +	return parent_rate / (prediv * podf);
-Maybe round here?
-
-> +}
-> +
-> +static int _clk_esdhc2_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	u32 reg, div, parent_rate;
-> +	u32 pre = 0, post = 0;
-> +
-> +	parent_rate = clk_get_rate(clk->parent);
-> +	div = parent_rate / rate;
-> +	if ((parent_rate / div) != rate)
-> +		return -EINVAL;
-> +
-> +	__calc_pre_post_dividers(div, &pre, &post);
-> +
-> +	/* Set sdhc1 clock divider */
-> +	reg = __raw_readl(MXC_CCM_CSCDR1) &
-> +		~(MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PRED_MASK
-> +				| MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_MASK);
-> +	reg |= (post - 1) << MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_OFFSET;
-> +	reg |= (pre - 1) << MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PRED_OFFSET;
-> +	__raw_writel(reg, MXC_CCM_CSCDR1);
-> +
-> +	return 0;
-I havn't checked, but I assume the functions _clk_esdhc1_set_rate and
-_clk_esdhc2_set_rate can share some code?
-
-> +}
-> +
-> +static struct clk esdhc2_clk[] = {
-> +	{
-> +		.id = 1,
-> +		.parent = &pll2_sw_clk,
-> +		.secondary = &esdhc2_clk[1],
-> +		.enable_shift = MXC_CCM_CCGRx_CG3_OFFSET,
-> +		.enable_reg = MXC_CCM_CCGR3,
-> +		.get_rate = _clk_esdhc2_get_rate,
-> +		.set_rate = _clk_esdhc2_set_rate,
-> +		.enable = _clk_max_enable,
-> +		.disable = _clk_max_disable,
-> +		.set_parent = _clk_esdhc2_set_parent,
-> +	},
-> +	{
-> +		.id = 1,
-> +		.parent = &ipg_clk,
-> +		.secondary = NULL,
-> +		.enable_shift = MXC_CCM_CCGRx_CG2_OFFSET,
-> +		.enable_reg = MXC_CCM_CCGR3,
-> +		.enable = _clk_max_enable,
-> +		.disable = _clk_max_disable,
-> +	}
-> +};
-> +
->  #define DEFINE_CLOCK(name, i, er, es, gr, sr, p, s)	\
->  	static struct clk name = {			\
->  		.id		= i,			\
-> @@ -837,6 +1020,8 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
->  	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
->  	_REGISTER_CLOCK("imx-keypad.0", NULL, kpp_clk)
-> +	_REGISTER_CLOCK("imx-sdhci.0", "imx_sdhc_clk", esdhc1_clk[0])
-> +	_REGISTER_CLOCK("imx-sdhci.1", "imx_sdhc_clk", esdhc2_clk[0])
-Is the string needed here?
-
->  };
->  
->  static void clk_tree_init(void)
-> @@ -880,6 +1065,14 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
->  	/* set the usboh3_clk parent to pll2_sw_clk */
->  	clk_set_parent(&usboh3_clk, &pll2_sw_clk);
->  
-> +	/* Set SDHC parents to be PLL2 */
-> +	clk_set_parent(&esdhc1_clk[0], &pll2_sw_clk);
-> +	clk_set_parent(&esdhc2_clk[0], &pll2_sw_clk);
-> +
-> +	/* set SDHC root clock as 166.25MHZ*/
-> +	clk_set_rate(&esdhc1_clk[0], 166250000);
-> +	clk_set_rate(&esdhc2_clk[0], 166250000);
-> +
->  	/* System timer */
->  	mxc_timer_init(&gpt_clk, MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR),
->  		MX51_MXC_INT_GPT);
-> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
-> index 1920ff4..c137b36 100644
-> --- a/arch/arm/mach-mx5/devices.c
-> +++ b/arch/arm/mach-mx5/devices.c
-> @@ -245,6 +245,52 @@ struct platform_device mxc_keypad_device = {
->  	.resource = mxc_kpp_resources,
->  };
->  
-> +static struct resource mxcsdhc1_resources[] = {
-> +	{
-> +		.start = MX51_MMC_SDHC1_BASE_ADDR,
-> +		.end = MX51_MMC_SDHC1_BASE_ADDR + SZ_4K - 1,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_MMC_SDHC1,
-> +		.end = MX51_MXC_INT_MMC_SDHC1,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +static struct resource mxcsdhc2_resources[] = {
-> +	{
-> +		.start = MX51_MMC_SDHC2_BASE_ADDR,
-> +		.end = MX51_MMC_SDHC2_BASE_ADDR + SZ_4K - 1,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +	{
-> +		.start = MX51_MXC_INT_MMC_SDHC2,
-> +		.end = MX51_MXC_INT_MMC_SDHC2,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> + struct platform_device mxcsdhc1_device = {
-> +	.name = "imx-sdhci",
-> +	.id = 0,
-> +	.num_resources = ARRAY_SIZE(mxcsdhc1_resources),
-> +	.resource = mxcsdhc1_resources,
-> +	.dev = {
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> + struct platform_device mxcsdhc2_device = {
-> +	.name = "imx-sdhci",
-> +	.id = 1,
-> +	.num_resources = ARRAY_SIZE(mxcsdhc2_resources),
-> +	.resource = mxcsdhc2_resources,
-> +	.dev = {
-> +		.coherent_dma_mask = DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-I would prefer using dynamic creation of these devices.  See Sascha's
-for-2.6.37 branch
-
->  static struct mxc_gpio_port mxc_gpio_ports[] = {
->  	{
->  		.chip.label = "gpio-0",
-> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
-> index e509cfa..21b9a6f 100644
-> --- a/arch/arm/mach-mx5/devices.h
-> +++ b/arch/arm/mach-mx5/devices.h
-> @@ -10,3 +10,5 @@ extern struct platform_device mxc_i2c_device0;
->  extern struct platform_device mxc_i2c_device1;
->  extern struct platform_device mxc_hsi2c_device;
->  extern struct platform_device mxc_keypad_device;
-> +extern struct platform_device mxcsdhc1_device;
-> +extern struct platform_device mxcsdhc2_device;
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> index 21bfa46..8963852 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> @@ -45,6 +45,9 @@ typedef enum iomux_config {
->  				PAD_CTL_PKE | PAD_CTL_HYS)
->  #define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
->  				PAD_CTL_SRE_FAST)
-> +#define MX51_SDHCI_PAD_CTRL 	(PAD_CTL_DSE_HIGH | PAD_CTL_PUS_47K_UP | \
-> +				PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_SRE_FAST | \
-> +				PAD_CTL_DVS)
->  
->  /*
->   * The naming convention for the pad modes is MX51_PAD_<padname>__<padmode>
-> @@ -294,20 +297,22 @@ typedef enum iomux_config {
->  #define MX51_PAD_DISP2_DAT13__DISP2_DAT13       IOMUX_PAD(0x790, 0x388, 0, 0x0,   0, NO_PAD_CTRL)
->  #define MX51_PAD_DISP2_DAT14__DISP2_DAT14       IOMUX_PAD(0x794, 0x38C, 0, 0x0,   0, NO_PAD_CTRL)
->  #define MX51_PAD_DISP2_DAT15__DISP2_DAT15       IOMUX_PAD(0x798, 0x390, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD1_CMD__SD1_CMD               IOMUX_PAD(0x79C, 0x394, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD1_CLK__SD1_CLK               IOMUX_PAD(0x7A0, 0x398, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD1_DATA0__SD1_DATA0           IOMUX_PAD(0x7A4, 0x39C, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD1_DATA1__SD1_DATA1           IOMUX_PAD(0x7A8, 0x3A0, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD1_DATA2__SD1_DATA2           IOMUX_PAD(0x7AC, 0x3A4, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD1_DATA3__SD1_DATA3           IOMUX_PAD(0x7B0, 0x3A8, 0, 0x0,   0, NO_PAD_CTRL)
-> +#define MX51_PAD_SD1_CMD__SD1_CMD	IOMUX_PAD(0x79C, 0x394, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD1_CLK__SD1_CLK 	IOMUX_PAD(0x7A0, 0x398, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL \
-> +		| PAD_CTL_HYS)
-Please align the IOMUX_PAD, and there is a space before the tab in the
-definition of MX51_PAD_SD1_CLK__SD1_CLK.
-
-> +#define MX51_PAD_SD1_DATA0__SD1_DATA0	IOMUX_PAD(0x7A4, 0x39C, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD1_DATA1__SD1_DATA1	IOMUX_PAD(0x7A8, 0x3A0, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD1_DATA2__SD1_DATA2	IOMUX_PAD(0x7AC, 0x3A4, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD1_DATA3__SD1_DATA3	IOMUX_PAD(0x7B0, 0x3A8, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_0__GPIO_1_0		IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_GPIO_1_1__GPIO_1_1		IOMUX_PAD(0x7B8, 0x3B0, 1, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD2_CMD__SD2_CMD               IOMUX_PAD(0x7BC, 0x3B4, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD2_CLK__SD2_CLK               IOMUX_PAD(0x7C0, 0x3B8, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD2_DATA0__SD2_DATA0           IOMUX_PAD(0x7C4, 0x3BC, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD2_DATA1__SD2_DATA1           IOMUX_PAD(0x7C8, 0x3C0, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD2_DATA2__SD2_DATA2           IOMUX_PAD(0x7CC, 0x3C4, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_SD2_DATA3__SD2_DATA3           IOMUX_PAD(0x7D0, 0x3C8, 0, 0x0,   0, NO_PAD_CTRL)
-> +#define MX51_PAD_GPIO_1_1__GPIO_1_1	IOMUX_PAD(0x7B8, 0x3B0, IOMUX_CONFIG_GPIO, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD2_CMD__SD2_CMD	IOMUX_PAD(0x7BC, 0x3B4, IOMUX_CONFIG_SION, 0x0, 1, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD2_CLK__SD2_CLK	IOMUX_PAD(0x7C0, 0x3B8, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL \
-> +		| PAD_CTL_HYS)
-> +#define MX51_PAD_SD2_DATA0__SD2_DATA0	IOMUX_PAD(0x7C4, 0x3BC, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD2_DATA1__SD2_DATA1	IOMUX_PAD(0x7C8, 0x3C0, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD2_DATA2__SD2_DATA2	IOMUX_PAD(0x7CC, 0x3C4, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
-> +#define MX51_PAD_SD2_DATA3__SD2_DATA3	IOMUX_PAD(0x7D0, 0x3C8, IOMUX_CONFIG_SION, 0x0, 0, MX51_SDHCI_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, NO_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_2__I2C2_SCL		IOMUX_PAD(0x7D4, 0x3CC, (2 | IOMUX_CONFIG_SION), \
->  							0x9b8,   3, MX51_I2C_PAD_CTRL)
-> @@ -316,7 +321,7 @@ typedef enum iomux_config {
->  							0x9bc,   3, MX51_I2C_PAD_CTRL)
->  #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, NO_PAD_CTRL)
-> -#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, NO_PAD_CTRL)
-> +#define MX51_PAD_GPIO_1_5__GPIO_1_5	IOMUX_PAD(0x808, 0x3DC, IOMUX_CONFIG_GPIO, 0x0, 1, MX51_SDHCI_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   1, MX51_GPIO_PAD_CTRL)
-> -- 
-> 1.7.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> -V Charulatha
+>
+> <<snip>>
