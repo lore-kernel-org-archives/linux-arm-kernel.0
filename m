@@ -1,25 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 Sep 2010 14:09:07 +0100
-Subject: [PATCH v2] ARM: MM: bugfix: initialize spinlock for
-	init_mm.context
-In-Reply-To: <1285635990-3036-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1285635990-3036-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1285765747.7983.34.camel@e102109-lin.cambridge.arm.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Wed, 29 Sep 2010 18:44:03 +0530
+Subject: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
+In-Reply-To: <877hi5740v.fsf@deeprootsystems.com>
+References: <1285252363-3630-1-git-send-email-charu@ti.com>
+	<877hi5740v.fsf@deeprootsystems.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02B1E@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-09-28 at 02:06 +0100, MyungJoo Ham wrote:
-> init_mm used at kernel/sched.c:idle_task_exit() has spin_lock
-> (init_mm.context.id_lock) that is not initialized when spin_lock/unlock
-> is called at an ARM machine. Note that mm_struct.context.id_lock is usually
-> initialized except for the instance of init_mm at linux/arch/arm/mm/context.c
-> 
-> Not initializing this spinlock incurs "BUG: pinlock bad magic" warning when
-> spinlock debug is enabled. We have observed such instances when testing PM in
-> S5PC210 machines.
-> 
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at deeprootsystems.com]
+> Sent: Wednesday, September 29, 2010 6:36 AM
+> To: Varadarajan, Charulatha
+> Cc: tony at atomide.com; wim at iguana.be; linux-omap at vger.kernel.org; linux-
+> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> paul at pwsan.com; Cousson, Benoit; Nayak, Rajendra; Basak, Partha
+> Subject: Re: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
+> 
+> Hi Charu,
+> 
+> "Varadarajan, Charulatha" <charu@ti.com> writes:
+> 
+> > Series of patches to port watchdog module to use hwmod APIs
+> > for OMAP2PLUS chips and use runtime APIs for all OMAP chips.
+> > For this hwmod database for OMAP2PLUS watchdog instances are
+> > populated and implements watchdog module to use PM runtime APIs.
+> >
+> > This patch series is generated on "origin/pm-core" which
+> > has Kevin's pm-next series, the runtime PM core patch series,
+> > and a collection of hwmod fixes that Paul/Benoit have lined up
+> > for 2.6.37.
+> >
+> > Tested on OMAP2430, OMAP4430 (ES1.0 & ES2.0), OMAP3430 SDP boards
+> > and zoom3 board. Also verified that this patch series does not
+> > break the OMAP1 build.
+> 
+> I found a little snag with this series.  Try testing with
+> omap2plus_defconfig and changing CONFIG_OMAP_WATCHDOG=n.
+> 
+> If CONFIG_OMAP_WATCHDOG is not enabled in the kernel config, the system
+> will reboot soon after bootup. 
+
+Thanks for finding this issue.
+
+After watchdog module reset, the WDTs are enabled. The default time
+for a system reset after a watchdog module reset is ~10s as per the
+default value of the WDT registers. Hence the above problem is observed.
+
+If CONFIG_OMAP_WATCHDOG is defined, wdt's probe is called within this
+10s time and watchdog_disable is called during probe. Hence we are not
+finding this issue if CONFIG_OMAP_WATCHDOG is defined.
+
+Ideally, because of the above, watchdog should be with
+HWMOD_INIT_NO_RESET flag.
+
+If agreed, I would send the below patch (extended to other OMAPs)
+on top of my watchdog timer hwmod series with proper change log.
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-
+omap2/omap_hwmod_3xxx_data.c
+index 5bfe9c9..c567b24 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -260,6 +260,7 @@ static struct omap_hwmod omap3xxx_wd_timer2_hwmod = {
+        .slaves         = omap3xxx_wd_timer2_slaves,
+        .slaves_cnt     = ARRAY_SIZE(omap3xxx_wd_timer2_slaves),
+        .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++       .flags          = HWMOD_INIT_NO_RESET,
+ };
+
+-V Charulatha
+
+<<snip>>
