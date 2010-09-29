@@ -1,87 +1,22 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 29 Sep 2010 18:50:27 +0200
-Subject: [PATCH] oprofile, arm: proper release resources on failure
-In-Reply-To: <1285774784.30080.19.camel@e102144-lin.cambridge.arm.com>
-References: <20100929145225.GJ13563@erda.amd.com>
-	<1285774784.30080.19.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <20100929165027.GP13563@erda.amd.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Sep 2010 17:52:11 +0100
+Subject: [PATCH] ARM: mmu: Fix MT_MEMORY and MT_MEMORY_NONCACHED pte flags
+In-Reply-To: <1285778596-12560-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1285778596-12560-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1285779131.7983.93.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.09.10 11:39:44, Will Deacon wrote:
-
-> I have a few minor clarifications:
-> > 
+On Wed, 2010-09-29 at 17:43 +0100, Santosh Shilimkar wrote:
+> The commit f1a2481c0 sets up the default flags for MT_MEMORY and
+> MT_MEMORY_NONCACHED memory types. L_PTE_USER flag is wrongly
+> set as default for these entries so remove it. Also adding
+> the 'L_PTE_WRITE' flag so that these pages become read-write
+> instead of just being read-only
 > 
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index 0691176..72e09eb 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -102,6 +102,7 @@ static int op_create_counter(int cpu, int event)
-> >         if (IS_ERR(pevent)) {
-> >                 ret = PTR_ERR(pevent);
-> >         } else if (pevent->state != PERF_EVENT_STATE_ACTIVE) {
-> > +               perf_event_release_kernel(pevent);
-> >                 pr_warning("oprofile: failed to enable event %d "
-> >                                 "on CPU %d\n", event, cpu);
-> >                 ret = -EBUSY;
-> 
-> 
-> Yup, this is needed. Thanks! It would be nice to do away with the
-> else statement altogether but I think adding a pinned event and
-> then failing to activate it still succeeds in
-> perf_event_create_kernel_counter.
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Yes, I have cleanup code already for this. But as this is an -rc and
-stable fix, I didn't want to change too much here. But I will send a
-follow-on patch with the cleanup I made.
-
-> 
-> 
-> > @@ -365,6 +366,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-> >         ret = init_driverfs();
-> >         if (ret) {
-> >                 kfree(counter_config);
-> > +               counter_config = NULL;
-> >                 return ret;
-> >         }
-> > 
-> > @@ -402,7 +404,6 @@ void oprofile_arch_exit(void)
-> >         struct perf_event *event;
-> > 
-> >         if (*perf_events) {
-> > -               exit_driverfs();
-> >                 for_each_possible_cpu(cpu) {
-> >                         for (id = 0; id < perf_num_counters; ++id) {
-> >                                 event = perf_events[cpu][id];
-> > @@ -413,8 +414,10 @@ void oprofile_arch_exit(void)
-> >                 }
-> >         }
-> > 
-> > -       if (counter_config)
-> > +       if (counter_config) {
-> >                 kfree(counter_config);
-> > +               exit_driverfs();
-> > +       }
-> >  }
-> >  #else
-> >  int __init oprofile_arch_init(struct oprofile_operations *ops)
-> > --
-> > 1.7.2.2
-> > 
-> 
-> Hmm, these three hunks conflict with the patches I posted last
-> month to fix the resource allocation and freeing. Can't we
-> merge those patches instead? I have versions against -rc6 here:
-
-Yes, these patches are also in my oprofile/core branch and its changes
-conflict, but are scheduled for the next merge window. This fix is for
-urgent and for 2.6.36. We will then merge back rc7 or 2.6.36 to
-oprofile/core and solve the conflicts. But if you don't have something
-else for -rc7/.36 that conflicts, this should be ok.
-
--Robert
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
