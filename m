@@ -1,68 +1,52 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Wed, 29 Sep 2010 11:32:23 +0530
-Subject: [PATCH v5 2/5] omap3: nand: prefetch in irq mode support
-In-Reply-To: <20100928222933.GT3117@atomide.com>
-References: <1285594634-19277-1-git-send-email-s-ghorai@ti.com>
-	<1285594634-19277-3-git-send-email-s-ghorai@ti.com>
-	<20100928222933.GT3117@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03564763D3@dbde02.ent.ti.com>
+From: hashim.kernel@gmail.com (hashim alig)
+Date: Wed, 29 Sep 2010 11:36:52 +0530
+Subject: High Latency in PL310 L2 cache maintenance operations
+In-Reply-To: <1285685447.14312.2.camel@e102109-lin.cambridge.arm.com>
+References: <AANLkTinMYZmzy=J1TOEPs6dKs2gCwzazECop_riK2nwd@mail.gmail.com>
+	<1285685358.14312.1.camel@e102109-lin.cambridge.arm.com>
+	<1285685447.14312.2.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTik5G2mW6D8f6XpKFffbY1OxYLO3n05H+Q3rUvT7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Catalin,
 
+On Tue, Sep 28, 2010 at 8:20 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Tue, 2010-09-28 at 15:49 +0100, Catalin Marinas wrote:
+>> On Tue, 2010-09-28 at 14:25 +0100, hashim alig wrote:
+>> > I am using linux-2.6.32 kernel on a platform which is ARM-Cortex A9
+>> > SMP (dual core, each at 500 MHz) with PL310 as the L2 cache. I observe
+>> > high latency in cache maintainance operations (both invalidation and
+>> > clean) which is around 90 cycles for every cache line (32 bytes).
+>> > Is it normal? What should be the practical range ?
+>> > I also tried with linux-2.6.35 over which I applied few L2 patches
+>> > from Catalin but observation remains same.
+>>
+>> Have you applied this patch from Will Deacon:
+>>
+>> http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=c3d0fd52ce0c36836aefd53ce9b25f193daa2e5e
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Wednesday, September 29, 2010 4:00 AM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org; Vimal Singh
-> Subject: Re: [PATCH v5 2/5] omap3: nand: prefetch in irq mode support
-> 
-> * Sukumar Ghorai <s-ghorai@ti.com> [100927 06:30]:
-> >  This patch enable prefetch-irq mode for NAND.
-> 
-> > --- a/drivers/mtd/nand/Kconfig
-> > +++ b/drivers/mtd/nand/Kconfig
-> > @@ -112,6 +112,9 @@ config MTD_NAND_OMAP_PREFETCH
-> >  	help
-> >  	 The NAND device can be accessed for Read/Write using GPMC PREFETCH
-> engine
-> >  	 to improve the performance.
-> > +	 GPMC PREFETCH can be configured eigther in MPU interrupt mode or in
-> DMA
-> > +	 interrupt mode. If not selected any of them prefetch will be used
-> in
-> > +	 polling mode.
-> >
-> >  config MTD_NAND_OMAP_PREFETCH_DMA
-> >  	depends on MTD_NAND_OMAP_PREFETCH
-> > @@ -120,7 +123,16 @@ config MTD_NAND_OMAP_PREFETCH_DMA
-> >  	help
-> >  	 The GPMC PREFETCH engine can be configured eigther in MPU interrupt
-> mode
-> >  	 or in DMA interrupt mode.
-> > -	 Say y for DMA mode or MPU mode will be used
-> > +	 Say y for DMA mode
-> > +
-> > +config MTD_NAND_OMAP_PREFETCH_IRQ
-> > +	depends on MTD_NAND_OMAP_PREFETCH && !MTD_NAND_OMAP_PREFETCH_DMA
-> > +	bool "IRQ mode"
-> > +	default n
-> > +	help
-> > +	 The GPMC PREFETCH engine can be configured eigther in MPU interrupt
-> mode
-> > +	 or in DMA interrupt mode.
-> > +	 Say y for IRQ mode
-> >
-> >  config MTD_NAND_IDS
-> >  	tristate
-> 
-> The configuration to use the prefetch IRQ should be passed in the
-> platform_data
-> from the board-*.c files. What if you want to to boot a distro kernel on
-> omap2, 3 and 4 and only some of the boards can use the prefetch interrupt?
-[Ghorai] thanks.. we will provide the interface to select the io mode and ecc mode from board file.
+NO. But I have played with latencies.
 
-> 
-> Tony
+> Forgot to mention - this patch is for Versatile Express, you would need
+> to do something similar in your platform. We can't really set the
+> default values in the l2x0 code since these latencies depend on the
+> hardware configuration.
+
+OK. I have actually played with latency registers but saw no
+improvement, even the system
+became unstable.
+Following is the ideal configuration of PL310 registers (as reported
+by h/w designers) and on which L2 and system is stable.
+
+Auxillary Control Reg (0x104) - 0x02060000
+Tag RAM Latency (0x108)     - 0x00000110
+Data RAM Latency (0x10C)   - 0x00000220
+
+One more thing, port filtering at L2 is enabled with following configuration
+Addr filtering start (offset 0xc00)    -    0x1
+Addr filtering end (offset 0xc04)    -    0x08000000
+
+regards
+Shiraz
