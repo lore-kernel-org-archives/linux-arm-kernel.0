@@ -1,37 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 Sep 2010 09:55:02 +0100
-Subject: High Latency in PL310 L2 cache maintenance operations
-In-Reply-To: <AANLkTik5G2mW6D8f6XpKFffbY1OxYLO3n05H+Q3rUvT7@mail.gmail.com>
-References: <AANLkTinMYZmzy=J1TOEPs6dKs2gCwzazECop_riK2nwd@mail.gmail.com>
-	<1285685358.14312.1.camel@e102109-lin.cambridge.arm.com>
-	<1285685447.14312.2.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTik5G2mW6D8f6XpKFffbY1OxYLO3n05H+Q3rUvT7@mail.gmail.com>
-Message-ID: <1285750502.4497.4.camel@e102109-lin.cambridge.arm.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 29 Sep 2010 18:11:14 +0900
+Subject: Request: Update the Universal board to use the correct machine name
+Message-ID: <20100929091114.GA21218@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-09-29 at 07:06 +0100, hashim alig wrote:
-> On Tue, Sep 28, 2010 at 8:20 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Tue, 2010-09-28 at 15:49 +0100, Catalin Marinas wrote:
-> >> On Tue, 2010-09-28 at 14:25 +0100, hashim alig wrote:
-> >> > I am using linux-2.6.32 kernel on a platform which is ARM-Cortex A9
-> >> > SMP (dual core, each at 500 MHz) with PL310 as the L2 cache. I observe
-> >> > high latency in cache maintainance operations (both invalidation and
-> >> > clean) which is around 90 cycles for every cache line (32 bytes).
-> >> > Is it normal? What should be the practical range ?
-> >> > I also tried with linux-2.6.35 over which I applied few L2 patches
-> >> > from Catalin but observation remains same.
-> >>
-> >> Have you applied this patch from Will Deacon:
-> >>
-> >> http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=c3d0fd52ce0c36836aefd53ce9b25f193daa2e5e
-> 
-> NO. But I have played with latencies.
+Hi Russel,
 
-There are a couple of commits that made a difference in the L2
-maintenance - 0eb948dd7f7 and 3d1074349b (reducing the amount of
-spinlock operations, merged in 2.6.33). Do you have these applied?
+As previous time, Kgene suggestted to use the universal_c210 but mach-types file is not yet updated. It makes compile error can't make a image.
 
--- 
-Catalin
+Could you update the mach-types?
+
+Thank you,
+Kyungmin Park
+
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 55590a4..787891e 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -2971,7 +2971,7 @@ premierwave_en		MACH_PREMIERWAVE_EN	PREMIERWAVE_EN		2985
+ wasabi			MACH_WASABI		WASABI			2986
+ vivow			MACH_VIVOW		VIVOW			2987
+ mx50_rdp		MACH_MX50_RDP		MX50_RDP		2988
+-universal		MACH_UNIVERSAL		UNIVERSAL		2989
++universal_c210		MACH_UNIVERSAL_C210	UNIVERSAL_C210		2989
+ real6410		MACH_REAL6410		REAL6410		2990
+ spx_sakura		MACH_SPX_SAKURA		SPX_SAKURA		2991
+ ij3k_2440		MACH_IJ3K_2440		IJ3K_2440		2992
