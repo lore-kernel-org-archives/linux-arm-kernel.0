@@ -1,58 +1,63 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 29 Sep 2010 23:52:50 +0200
-Subject: [PATCH] amba-pl011: add missing ST specific registers
-In-Reply-To: <20100929145932.GG30987@game.jcrosoft.org>
-References: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
-	<20100929145932.GG30987@game.jcrosoft.org>
-Message-ID: <AANLkTik4nUG+6Mjaf+7fQ5CwdYNv9nSDmzkeyirhA3Kt@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 29 Sep 2010 15:35:45 -0600 (MDT)
+Subject: [PATCH v2 03/10] OMAP: mach-omap2: Fix static function
+ warnings
+In-Reply-To: <1285063280-4057-4-git-send-email-manjugk@ti.com>
+References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
+	<1285063280-4057-4-git-send-email-manjugk@ti.com>
+Message-ID: <alpine.DEB.2.00.1009291534210.5439@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/9/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> On 14:51 Wed 29 Sep ? ? , Linus Walleij wrote:
->> From: Jonas Aaberg <jonas.aberg@stericsson.com>
->>
->> The ST Micro derivates have several extra interesting registers
->> that we may soon use for something interesting so may just as
->> well define them in the header.
->>
->> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
->> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
->> ---
->> ?include/linux/amba/serial.h | ? 11 +++++++++++
->> ?1 files changed, 11 insertions(+), 0 deletions(-)
->>
->> diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
->> index e1b634b..6021588 100644
->> --- a/include/linux/amba/serial.h
->> +++ b/include/linux/amba/serial.h
->> @@ -32,7 +32,9 @@
->> ?#define UART01x_RSR ? ? ? ? ?0x04 ? ?/* Receive status register (Read). */
->> ?#define UART01x_ECR ? ? ? ? ?0x04 ? ?/* Error clear register (Write). */
->> ?#define UART010_LCRH ? ? ? ? 0x08 ? ?/* Line control register, high byte. */
->> +#define ST_UART011_DMAWM ? ? 0x08 ? ?/* DMA watermark configure register. */
-> this
->> ?#define UART010_LCRM ? ? ? ? 0x0C ? ?/* Line control register, middle byte. */
->> +#define ST_UART011_TIMEOUT ? 0x0C ? ?/* Timeout period register. */
-> abd this are overwritng the default register how do plan to handle it?
+Hello Manjunath,
 
-No it really isn't. (Unless I misunderstand what you're saying here.)
+one comment:
 
-The other register is for the PL010 serial/amba-pl010.c and this patch adds
-registers used in our PL011 derivate in serial/amba-pl011.c, it is a habit
-of our hardware engineers to recycle register allocations from PL010
-for the new PL011 derivate.
+On Tue, 21 Sep 2010, G, Manjunath Kondaiah wrote:
 
-Even if they did overlap (as is the case in some other PrimeCell drivers)
-we usually handle this by runtime-switches per PrimeCell ID-based
-vendor data so there is a clear design pattern for how to handle that.
+>  arch/arm/mach-omap2/powerdomain.c              |   28 ------------------------
+>  12 files changed, 27 insertions(+), 47 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/include/mach/board-rx51.h
+> 
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 6527ec3..6e51079 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -981,34 +981,6 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
+>  }
+>  
+>  /**
+> - * pwrdm_set_lowpwrstchange - Request a low power state change
+> - * @pwrdm: struct powerdomain *
+> - *
+> - * Allows a powerdomain to transtion to a lower power sleep state
+> - * from an existing sleep state without waking up the powerdomain.
+> - * Returns -EINVAL if the powerdomain pointer is null or if the
+> - * powerdomain does not support LOWPOWERSTATECHANGE, or returns 0
+> - * upon success.
+> - */
+> -int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
+> -{
+> -	if (!pwrdm)
+> -		return -EINVAL;
+> -
+> -	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE))
+> -		return -EINVAL;
+> -
+> -	pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
+> -		 pwrdm->name);
+> -
+> -	prm_rmw_mod_reg_bits(OMAP4430_LOWPOWERSTATECHANGE_MASK,
+> -			     (1 << OMAP4430_LOWPOWERSTATECHANGE_SHIFT),
+> -			     pwrdm->prcm_offs, pwrstctrl_reg_offs);
+> -
+> -	return 0;
+> -}
+> -
 
-> btw you have whitespace in patch
+Please don't delete this function.  It will be needed for OMAP4 power 
+management.  Instead, just add a prototype in 
+plat-omap/include/plat/powerdomains.h.
 
-Where? I can only see tabs.. I even downloaded the patch off the list
-and ran it through checkpatch in the fears there was. We usually adjust
-our whitespace to be the same as the file we're changing but in this case
-even checkpatch is happy.
 
-Yours
-Linus Walleij
+- Paul
