@@ -1,52 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Sep 2010 15:49:19 +0900
-Subject: [PATCH v3] ARM: S5P: Add support for gpio interrupts
-In-Reply-To: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
-References: <1283764347-460-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <014101cb5fa2$7701f9f0$6505edd0$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 29 Sep 2010 13:09:48 +0530
+Subject: [GIT PULL] ARM: l2x0: kexex, cleanup and optimisation for 2.6.37
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02838@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-Hi :-)
+The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
+  Linus Torvalds (1):
+        Linux 2.6.36-rc5
 
-> This patch series adds support for gpio interrupts on Samsung S5P SoC
-> series (S5PC100 and S5PC110/S5PV210). It is based on the previous
-> version created by Joonyoung Shim (which is available from the
-> "[PATCH v2 0/4] ARM: S5P: Support gpio interrupts" thread:
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/1662 ).
-> 
-> This version has been redesigned to assign irq numbers dynamically to
-> reduce resource waste. Such idea has proposed by Ben Dooks some time ago
-> (see "[PATCH] ARM: S5P: Dynamicly numbered GPIO interrupt support"
-> thread: http://comments.gmane.org/gmane.linux.kernel.samsung-soc/1198 ).
-> 
-> The last patch in this series is an example how to use the dynamically
-> registered gpio interrupt. The QT602240 touch screen device on Goni
-> machine requires it.
-> 
-> The patch series has been rebased onto latest kgene/for-next kernel
-> tree.
-> 
-> The complete list of patches:
-> 
-> [PATCH 1/6] ARM: Samsung: Add common s5p gpio interrupt support
-> [PATCH 2/6] ARM: S5PC110: add support for gpio interrupts
-> [PATCH 3/6] ARM: S5PC100: Use generic S5P gpio interrupts interface
-> [PATCH 4/6] ARM: S5PC100: Move external interrupt defines
-> [PATCH 5/6] ARM: Samsung: Add common samsung_gpiolib_to_irq function
-> [PATCH 6/6] ARM: S5PC110: GONI: Add support for QT602240 TS driver
-> 
-Ok...initial reading your 2nd to 5th patches, looks ok to me...will apply.
-Others, will check/review soon.
+are available in the git repository at:
 
-Thanks.
+  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git l2x0-pull-rmk
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Catalin Marinas (1):
+      ARM: Improve the L2 cache performance when PL310 is used
+
+Per Fransson (1):
+      ARM: ux500 specific L2 cache code
+
+Santosh Shilimkar (4):
+      omap4: l2x0: Override the default l2x0_disable
+      ARM: l2x0: Fix coding-style in the cache-l2x0.h
+      ARM: l2x0: Determine the cache size
+      ARM: l2x0: Optimise the range based operations
+
+Thomas Gleixner (2):
+      arm: Disable outer (L2) cache in kexec
+      arm: Implement l2x0 cache disable functions
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |    9 ++-
+ arch/arm/include/asm/outercache.h          |   24 +++++++++
+ arch/arm/kernel/machine_kexec.c            |    3 +
+ arch/arm/mach-omap2/omap4-common.c         |   13 +++++
+ arch/arm/mach-ux500/cpu.c                  |   45 ++++++++++++++++
+ arch/arm/mm/Kconfig                        |    8 +++
+ arch/arm/mm/cache-l2x0.c                   |   78 +++++++++++++++++++++++++--
+ 7 files changed, 171 insertions(+), 9 deletions(-)
+
+Regards,
+Santosh
+Thread where this was discussed:
+http://marc.info/?l=linux-omap&m=128396111204338&w=2
