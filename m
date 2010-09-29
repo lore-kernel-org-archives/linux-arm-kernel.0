@@ -1,44 +1,44 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 29 Sep 2010 13:09:48 +0530
-Subject: [GIT PULL] ARM: l2x0: kexex, cleanup and optimisation for 2.6.37
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02838@dbde02.ent.ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 29 Sep 2010 17:20:55 +0900
+Subject: [PATCH 1/7] SPI: add PrimeCell generic DMA to PL022 v12
+In-Reply-To: <1285684441-21700-2-git-send-email-linus.walleij@stericsson.com>
+References: <1285684441-21700-1-git-send-email-linus.walleij@stericsson.com>
+	<1285684441-21700-2-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100929082055.GC4703@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b30a3f6257ed2105259b404d419b4964e363928c:
-  Linus Torvalds (1):
-        Linux 2.6.36-rc5
+On Tue, Sep 28, 2010 at 04:33:55PM +0200, Linus Walleij wrote:
+> This extends the PL022 SSP/SPI driver with generic DMA engine
+> support using the PrimeCell DMA engine interface. Also fix up the
+> test code for the U300 platform.
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+> Changes:
+> - Switch CONFIG_DMADEVICES for CONFIG_DMA_ENGINE to counter
+>   a compilation error spotted by Grant.
+> ---
+>  arch/arm/mach-u300/dummyspichip.c |    1 +
+>  drivers/spi/amba-pl022.c          |  516 ++++++++++++++++++++++++++++++-------
+>  include/linux/amba/pl022.h        |    6 +
+>  3 files changed, 435 insertions(+), 88 deletions(-)
+> 
+> diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
+> index 03f7936..b86e944 100644
+> --- a/arch/arm/mach-u300/dummyspichip.c
+> +++ b/arch/arm/mach-u300/dummyspichip.c
+> @@ -267,6 +267,7 @@ static struct spi_driver pl022_dummy_driver = {
+>  	.driver = {
+>  		.name	= "spi-dummy",
+>  		.owner	= THIS_MODULE,
+> +		.bus = &spi_bus_type,
 
-are available in the git repository at:
+This shouldn't be necessary.  spi_register_driver already sets the bus
+type field.
 
-  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git l2x0-pull-rmk
+Otherwise, this patch looks good.  If you're okay with me dropping
+this hunk, then I'll pick up this patch into my next-spi branch.
 
-Catalin Marinas (1):
-      ARM: Improve the L2 cache performance when PL310 is used
-
-Per Fransson (1):
-      ARM: ux500 specific L2 cache code
-
-Santosh Shilimkar (4):
-      omap4: l2x0: Override the default l2x0_disable
-      ARM: l2x0: Fix coding-style in the cache-l2x0.h
-      ARM: l2x0: Determine the cache size
-      ARM: l2x0: Optimise the range based operations
-
-Thomas Gleixner (2):
-      arm: Disable outer (L2) cache in kexec
-      arm: Implement l2x0 cache disable functions
-
- arch/arm/include/asm/hardware/cache-l2x0.h |    9 ++-
- arch/arm/include/asm/outercache.h          |   24 +++++++++
- arch/arm/kernel/machine_kexec.c            |    3 +
- arch/arm/mach-omap2/omap4-common.c         |   13 +++++
- arch/arm/mach-ux500/cpu.c                  |   45 ++++++++++++++++
- arch/arm/mm/Kconfig                        |    8 +++
- arch/arm/mm/cache-l2x0.c                   |   78 +++++++++++++++++++++++++--
- 7 files changed, 171 insertions(+), 9 deletions(-)
-
-Regards,
-Santosh
-Thread where this was discussed:
-http://marc.info/?l=linux-omap&m=128396111204338&w=2
+g.
