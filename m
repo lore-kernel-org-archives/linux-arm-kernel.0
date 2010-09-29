@@ -1,41 +1,58 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 29 Sep 2010 16:59:32 +0200
-Subject: [PATCH] amba-pl011: add missing ST specific registers
-In-Reply-To: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
-References: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100929145932.GG30987@game.jcrosoft.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 29 Sep 2010 20:31:35 +0530
+Subject: [PATCH 01/14] ARM: mmu: Setup MT_MEMORY and MT_MEMORY_NONCACHED
+	L1 entries
+In-Reply-To: <tnxzkv0hac6.fsf@e102109-lin.cambridge.arm.com>
+References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
+	<tnxzkv0hac6.fsf@e102109-lin.cambridge.arm.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02BC2@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:51 Wed 29 Sep     , Linus Walleij wrote:
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Wednesday, September 29, 2010 8:21 PM
+> To: Shilimkar, Santosh
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 01/14] ARM: mmu: Setup MT_MEMORY and
+> MT_MEMORY_NONCACHED L1 entries
 > 
-> The ST Micro derivates have several extra interesting registers
-> that we may soon use for something interesting so may just as
-> well define them in the header.
+> Hi Santosh,
 > 
-> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> ---
->  include/linux/amba/serial.h |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> > This patch populates the L1 entries for MT_MEMORY and
+> MT_MEMORY_NONCACHED
+> > types so that at boot-up, we can map memories outside system memory
+> > at page level granularity
+> >
+> > Previously the mapping was limiting to section level, which creates
+> > unnecessary addiotional mapping for which physical memory may not
+> > present. On the newer ARM with speculation, this is dangerous and can
+> > result in untraceable aborts.
+> >
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Reviewed-by: Russell King <linux@arm.linux.org.uk>
+> > ---
+> >  arch/arm/mm/mmu.c |   17 +++++++++++++++--
+> >  1 files changed, 15 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> > index 6e1c4f6..3e986a6 100644
+> > --- a/arch/arm/mm/mmu.c
+> > +++ b/arch/arm/mm/mmu.c
+> > @@ -246,6 +246,9 @@ static struct mem_type mem_types[] = {
+> >  		.domain    = DOMAIN_USER,
+> >  	},
+> >  	[MT_MEMORY] = {
+> > +		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+> > +				L_PTE_USER | L_PTE_EXEC,
+> > +		.prot_l1   = PMD_TYPE_TABLE,
 > 
-> diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
-> index e1b634b..6021588 100644
-> --- a/include/linux/amba/serial.h
-> +++ b/include/linux/amba/serial.h
-> @@ -32,7 +32,9 @@
->  #define UART01x_RSR		0x04	/* Receive status register (Read). */
->  #define UART01x_ECR		0x04	/* Error clear register (Write). */
->  #define UART010_LCRH		0x08	/* Line control register, high byte. */
-> +#define ST_UART011_DMAWM	0x08    /* DMA watermark configure register. */
-this
->  #define UART010_LCRM		0x0C	/* Line control register, middle byte. */
-> +#define ST_UART011_TIMEOUT	0x0C    /* Timeout period register. */
-abd this are overwritng the default register how do plan to handle it?
-it will be better to add them at the same time as you use them
+> Just a quick question - does this need to have L_PTE_USER? Is it
+> read-only or it needs L_PTE_WRITE as well?
+> 
+I think you are right. It should have "L_PTE_WRITE" as well.
 
-btw you have whitespace in patch
-
-Best Regards,
-J.
+Regards,
+Santosh
