@@ -1,70 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Sep 2010 21:36:59 +0900
-Subject: [PATCH v3 3/3] ARM: S5PC100/S5PC110/S5PC210: Remove duplicated
-	selete PLAT_S5P at each ARCH_S5P series
-In-Reply-To: <20100929014724.GA823@july>
-References: <20100929014724.GA823@july>
-Message-ID: <001c01cb5fd3$0506a1d0$0f13e570$%kim@samsung.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 29 Sep 2010 14:51:29 +0200
+Subject: [PATCH] amba-pl011: add missing ST specific registers
+Message-ID: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> It's already selected whtn S5P series. So remove it.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pc100/Kconfig |    1 -
->  arch/arm/mach-s5pv210/Kconfig |    1 -
->  arch/arm/mach-s5pv310/Kconfig |    1 -
->  3 files changed, 0 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
-> index 77ae4bf..b8fbf2f 100644
-> --- a/arch/arm/mach-s5pc100/Kconfig
-> +++ b/arch/arm/mach-s5pc100/Kconfig
-> @@ -9,7 +9,6 @@ if ARCH_S5PC100
-> 
->  config CPU_S5PC100
->  	bool
-> -	select PLAT_S5P
->  	select S5P_EXT_INT
->  	select S3C_PL330_DMA
->  	help
-> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-> index 97e4f11..6ddc232 100644
-> --- a/arch/arm/mach-s5pv210/Kconfig
-> +++ b/arch/arm/mach-s5pv210/Kconfig
-> @@ -11,7 +11,6 @@ if ARCH_S5PV210
-> 
->  config CPU_S5PV210
->  	bool
-> -	select PLAT_S5P
->  	select S3C_PL330_DMA
->  	select S5P_EXT_INT
->  	help
-> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index ec8b350..4839fef 100644
-> --- a/arch/arm/mach-s5pv310/Kconfig
-> +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -11,7 +11,6 @@ if ARCH_S5PV310
-> 
->  config CPU_S5PV310
->  	bool
-> -	select PLAT_S5P
->  	help
->  	  Enable S5PV310 CPU support
-> 
-> --
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-Ok..will apply.
+The ST Micro derivates have several extra interesting registers
+that we may soon use for something interesting so may just as
+well define them in the header.
 
-Thanks.
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ include/linux/amba/serial.h |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
+index e1b634b..6021588 100644
+--- a/include/linux/amba/serial.h
++++ b/include/linux/amba/serial.h
+@@ -32,7 +32,9 @@
+ #define UART01x_RSR		0x04	/* Receive status register (Read). */
+ #define UART01x_ECR		0x04	/* Error clear register (Write). */
+ #define UART010_LCRH		0x08	/* Line control register, high byte. */
++#define ST_UART011_DMAWM	0x08    /* DMA watermark configure register. */
+ #define UART010_LCRM		0x0C	/* Line control register, middle byte. */
++#define ST_UART011_TIMEOUT	0x0C    /* Timeout period register. */
+ #define UART010_LCRL		0x10	/* Line control register, low byte. */
+ #define UART010_CR		0x14	/* Control register. */
+ #define UART01x_FR		0x18	/* Flag register (Read only). */
+@@ -51,6 +53,15 @@
+ #define UART011_MIS		0x40	/* Masked interrupt status. */
+ #define UART011_ICR		0x44	/* Interrupt clear register. */
+ #define UART011_DMACR		0x48	/* DMA control register. */
++#define ST_UART011_XFCR		0x50	/* XON/XOFF control register. */
++#define ST_UART011_XON1		0x54	/* XON1 register. */
++#define ST_UART011_XON2		0x58	/* XON2 register. */
++#define ST_UART011_XOFF1	0x5C	/* XON1 register. */
++#define ST_UART011_XOFF2	0x60	/* XON2 register. */
++#define ST_UART011_ITCR		0x80	/* Integration test control register. */
++#define ST_UART011_ITIP		0x84	/* Integration test input register. */
++#define ST_UART011_ABCR		0x100	/* Autobaud control register. */
++#define ST_UART011_ABIMSC	0x15C	/* Autobaud interrupt mask/clear register. */
+ 
+ #define UART011_DR_OE		(1 << 11)
+ #define UART011_DR_BE		(1 << 10)
+-- 
+1.6.3.3
