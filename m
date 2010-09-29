@@ -1,10 +1,10 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Sep 2010 10:24:57 +0900
-Subject: [PATCH v2 2/3] ARM: S5PC210: Place the common SPARSEMEM at
-	ARCH_S5PV310
-In-Reply-To: <20100929003907.GA495@july>
-References: <20100929003907.GA495@july>
-Message-ID: <010201cb5f75$24c42dc0$6e4c8940$%kim@samsung.com>
+Date: Wed, 29 Sep 2010 10:30:21 +0900
+Subject: [PATCH v2 3/3] ARM: S5PC100/S5PC110/S5PC210: Selete PLAT_S5P at
+	each ARCH_S5P series
+In-Reply-To: <20100929003913.GA499@july>
+References: <20100929003913.GA499@july>
+Message-ID: <011701cb5f75$e8770e40$b9652ac0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,50 +12,87 @@ Kyungmin Park wrote:
 > 
 > From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> In case of s5pc210 CPU. It uses the SPARSEMEM as default memory
-> configuration
-> So move to ARCH_S5PV310 config.
+> As it's default configuration for each SoC, Move to the machine config.
 > 
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/Kconfig              |    1 +
->  arch/arm/mach-s5pv310/Kconfig |    2 --
->  2 files changed, 1 insertions(+), 2 deletions(-)
+>  arch/arm/Kconfig              |    3 +++
+>  arch/arm/mach-s5pc100/Kconfig |    1 -
+>  arch/arm/mach-s5pv210/Kconfig |    1 -
+>  arch/arm/mach-s5pv310/Kconfig |    1 -
+>  4 files changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e112987..d10099d 100644
+> index d10099d..4da2d18 100644
 > --- a/arch/arm/Kconfig
 > +++ b/arch/arm/Kconfig
-> @@ -731,6 +731,7 @@ config ARCH_S5PV210
->  config ARCH_S5PV310
->  	bool "Samsung S5PV310/S5PC210"
->  	select CPU_V7
-> +	select ARCH_SPARSEMEM_ENABLE
+> @@ -711,6 +711,7 @@ config ARCH_S5PC100
+>  	select HAVE_S3C2410_I2C
+>  	select HAVE_S3C_RTC
+>  	select HAVE_S3C2410_WATCHDOG
+> +	select PLAT_S5P
+>  	help
+>  	  Samsung S5PC100 series based systems
+> 
+> @@ -725,6 +726,7 @@ config ARCH_S5PV210
+>  	select HAVE_S3C2410_I2C
+>  	select HAVE_S3C_RTC
+>  	select HAVE_S3C2410_WATCHDOG
+> +	select PLAT_S5P
+>  	help
+>  	  Samsung S5PV210/S5PC110 series based systems
+> 
+> @@ -735,6 +737,7 @@ config ARCH_S5PV310
 >  	select GENERIC_GPIO
 >  	select HAVE_CLK
 >  	select GENERIC_CLOCKEVENTS
+> +	select PLAT_S5P
+>  	help
+>  	  Samsung S5PV310 series based systems
+> 
+> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+> index 77ae4bf..b8fbf2f 100644
+> --- a/arch/arm/mach-s5pc100/Kconfig
+> +++ b/arch/arm/mach-s5pc100/Kconfig
+> @@ -9,7 +9,6 @@ if ARCH_S5PC100
+> 
+>  config CPU_S5PC100
+>  	bool
+> -	select PLAT_S5P
+>  	select S5P_EXT_INT
+>  	select S3C_PL330_DMA
+>  	help
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 97e4f11..6ddc232 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -11,7 +11,6 @@ if ARCH_S5PV210
+> 
+>  config CPU_S5PV210
+>  	bool
+> -	select PLAT_S5P
+>  	select S3C_PL330_DMA
+>  	select S5P_EXT_INT
+>  	help
 > diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index 331b5bd..ec8b350 100644
+> index ec8b350..4839fef 100644
 > --- a/arch/arm/mach-s5pv310/Kconfig
 > +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -30,14 +30,12 @@ config S5PV310_SETUP_I2C2
->  config MACH_SMDKV310
->  	bool "SMDKV310"
->  	select CPU_S5PV310
-> -	select ARCH_SPARSEMEM_ENABLE
->  	help
->  	  Machine support for Samsung SMDKV310
+> @@ -11,7 +11,6 @@ if ARCH_S5PV310
 > 
->  config MACH_UNIVERSAL_C210
->  	bool "Mobile UNIVERSAL_C210 Board"
->  	select CPU_S5PV310
-> -	select ARCH_SPARSEMEM_ENABLE
+>  config CPU_S5PV310
+>  	bool
+> -	select PLAT_S5P
 >  	help
->  	  Machine support for Samsung Mobile Universal S5PC210 Reference
->  	  Board. S5PC210(MCP) is one of package option of S5PV310
+>  	  Enable S5PV310 CPU support
+> 
 > --
 
-Ok..will apply.
+Yes, you're right.
+But just removing 'select PLAT_S5P' from each CPU_S5PXXXX is enough.
+Because PLAT_S5P is selected if select ARCH_S5PXXXX in the plat-s5p/Kconfig
+
+So no need to add 'select PLAT_S5P' into ARCH_S5PXXXX config.
 
 Thanks.
 
