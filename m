@@ -1,51 +1,80 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 29 Sep 2010 14:51:29 +0200
-Subject: [PATCH] amba-pl011: add missing ST specific registers
-Message-ID: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Sep 2010 13:56:13 +0100
+Subject: [RFC PATCH] ARM: Allow HIGHPTE with OUTER_CACHE if the
+	processor supports outer PTWs
+In-Reply-To: <20100907124410.7084.64812.stgit@e102109-lin.cambridge.arm.com>
+References: <20100907124410.7084.64812.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <1285764973.7983.33.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
+Hi Russell,
 
-The ST Micro derivates have several extra interesting registers
-that we may soon use for something interesting so may just as
-well define them in the header.
+On Tue, 2010-09-07 at 13:46 +0100, Catalin Marinas wrote:
+> This patch introduces CONFIG_CPU_HAS_OUTER_PTW (selected by CPU_V7) to
+> allow HIGHPTE to be selected even when OUTER_CACHE is enabled.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> 
+> I haven't seen any discussion on the initial patch for HIGHPTE. I'm not
+> sure why the limitation on !OUTER_CACHE. The set_pte_ext() at least on
+> ARMv6 and ARMv7 doesn't do any outer cache flushing. Do we even need
+> something like CPU_HAS_OUTER_PTW?
 
-Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- include/linux/amba/serial.h |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+Any thoughts on this since you pushed the original patch for HIGHPTE? Is
+there any architecture that does outer cache maintenance by physical
+address in set_pte_ext()?
 
-diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
-index e1b634b..6021588 100644
---- a/include/linux/amba/serial.h
-+++ b/include/linux/amba/serial.h
-@@ -32,7 +32,9 @@
- #define UART01x_RSR		0x04	/* Receive status register (Read). */
- #define UART01x_ECR		0x04	/* Error clear register (Write). */
- #define UART010_LCRH		0x08	/* Line control register, high byte. */
-+#define ST_UART011_DMAWM	0x08    /* DMA watermark configure register. */
- #define UART010_LCRM		0x0C	/* Line control register, middle byte. */
-+#define ST_UART011_TIMEOUT	0x0C    /* Timeout period register. */
- #define UART010_LCRL		0x10	/* Line control register, low byte. */
- #define UART010_CR		0x14	/* Control register. */
- #define UART01x_FR		0x18	/* Flag register (Read only). */
-@@ -51,6 +53,15 @@
- #define UART011_MIS		0x40	/* Masked interrupt status. */
- #define UART011_ICR		0x44	/* Interrupt clear register. */
- #define UART011_DMACR		0x48	/* DMA control register. */
-+#define ST_UART011_XFCR		0x50	/* XON/XOFF control register. */
-+#define ST_UART011_XON1		0x54	/* XON1 register. */
-+#define ST_UART011_XON2		0x58	/* XON2 register. */
-+#define ST_UART011_XOFF1	0x5C	/* XON1 register. */
-+#define ST_UART011_XOFF2	0x60	/* XON2 register. */
-+#define ST_UART011_ITCR		0x80	/* Integration test control register. */
-+#define ST_UART011_ITIP		0x84	/* Integration test input register. */
-+#define ST_UART011_ABCR		0x100	/* Autobaud control register. */
-+#define ST_UART011_ABIMSC	0x15C	/* Autobaud interrupt mask/clear register. */
- 
- #define UART011_DR_OE		(1 << 11)
- #define UART011_DR_BE		(1 << 10)
+(keeping the patch below for reference, though I think we should just
+drop the restriction on !OUTER_CACHE)
+
+> I tested it on Versatile Express and haven't seen any errors.
+> 
+> 
+>  arch/arm/Kconfig    |    2 +-
+>  arch/arm/mm/Kconfig |    8 ++++++++
+>  2 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a7ed21f..17d00ec 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1318,7 +1318,7 @@ config HIGHMEM
+>  config HIGHPTE
+>         bool "Allocate 2nd-level pagetables from highmem"
+>         depends on HIGHMEM
+> -       depends on !OUTER_CACHE
+> +       depends on !OUTER_CACHE || CPU_HAS_OUTER_PTW
+> 
+>  config HW_PERF_EVENTS
+>         bool "Enable hardware performance counter support for perf events"
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 8493ed0..cf0fa87 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -420,6 +420,7 @@ config CPU_V7
+>         select CPU_HAS_ASID if MMU
+>         select CPU_COPY_V6 if MMU
+>         select CPU_TLB_V7 if MMU
+> +       select CPU_HAS_OUTER_PTW if MMU
+> 
+>  # Figure out what processor architecture version we should be using.
+>  # This defines the compiler instruction set which depends on the machine type.
+> @@ -607,6 +608,13 @@ config CPU_USE_DOMAINS
+>           This option enables or disables the use of domain switching
+>           via the set_fs() function.
+> 
+> +config CPU_HAS_OUTER_PTW
+> +       bool
+> +       depends on MMU
+> +       help
+> +         This option is enabled if the processors can perform page
+> +         table walks on the outer cache.
+> +
+>  #
+>  # CPU supports 36-bit I/O
+>  #
+
 -- 
-1.6.3.3
+Catalin
