@@ -1,67 +1,41 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 29 Sep 2010 16:03:11 +0200
-Subject: [PATCH] oprofile, arm: proper release resources on failure
-Message-ID: <mailman.2.1285771963.1946.linux-arm-kernel@lists.infradead.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 29 Sep 2010 16:59:32 +0200
+Subject: [PATCH] amba-pl011: add missing ST specific registers
+In-Reply-To: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
+References: <1285764689-4772-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100929145932.GG30987@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a resource leak on failure, where the oprofilefs and
-some counters may not released properly.
+On 14:51 Wed 29 Sep     , Linus Walleij wrote:
+> From: Jonas Aaberg <jonas.aberg@stericsson.com>
+> 
+> The ST Micro derivates have several extra interesting registers
+> that we may soon use for something interesting so may just as
+> well define them in the header.
+> 
+> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  include/linux/amba/serial.h |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
+> index e1b634b..6021588 100644
+> --- a/include/linux/amba/serial.h
+> +++ b/include/linux/amba/serial.h
+> @@ -32,7 +32,9 @@
+>  #define UART01x_RSR		0x04	/* Receive status register (Read). */
+>  #define UART01x_ECR		0x04	/* Error clear register (Write). */
+>  #define UART010_LCRH		0x08	/* Line control register, high byte. */
+> +#define ST_UART011_DMAWM	0x08    /* DMA watermark configure register. */
+this
+>  #define UART010_LCRM		0x0C	/* Line control register, middle byte. */
+> +#define ST_UART011_TIMEOUT	0x0C    /* Timeout period register. */
+abd this are overwritng the default register how do plan to handle it?
+it will be better to add them at the same time as you use them
 
-Fix is also for 2.6.35-stable.
+btw you have whitespace in patch
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: stable at kernel.org
-Signed-off-by: Robert Richter <robert.richter@amd.com>
----
- arch/arm/oprofile/common.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 0691176..72e09eb 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -102,6 +102,7 @@ static int op_create_counter(int cpu, int event)
- 	if (IS_ERR(pevent)) {
- 		ret = PTR_ERR(pevent);
- 	} else if (pevent->state != PERF_EVENT_STATE_ACTIVE) {
-+		perf_event_release_kernel(pevent);
- 		pr_warning("oprofile: failed to enable event %d "
- 				"on CPU %d\n", event, cpu);
- 		ret = -EBUSY;
-@@ -365,6 +366,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
- 	ret = init_driverfs();
- 	if (ret) {
- 		kfree(counter_config);
-+		counter_config = NULL;
- 		return ret;
- 	}
- 
-@@ -402,7 +404,6 @@ void oprofile_arch_exit(void)
- 	struct perf_event *event;
- 
- 	if (*perf_events) {
--		exit_driverfs();
- 		for_each_possible_cpu(cpu) {
- 			for (id = 0; id < perf_num_counters; ++id) {
- 				event = perf_events[cpu][id];
-@@ -413,8 +414,10 @@ void oprofile_arch_exit(void)
- 		}
- 	}
- 
--	if (counter_config)
-+	if (counter_config) {
- 		kfree(counter_config);
-+		exit_driverfs();
-+	}
- }
- #else
- int __init oprofile_arch_init(struct oprofile_operations *ops)
--- 
-1.7.2.2
-
-
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Best Regards,
+J.
