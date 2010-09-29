@@ -1,198 +1,112 @@
-From: arun.murthy@stericsson.com (Arun MURTHY)
-Date: Wed, 29 Sep 2010 06:49:34 +0200
-Subject: [PATCH 1/7] pwm: Add pwm core driver
-In-Reply-To: <4CA25841.4090702@metafoo.de>
-References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
-	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
-	<4CA1AD2B.8000905@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FB6B@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA1BC16.3020702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FC60@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA25841.4090702@metafoo.de>
-Message-ID: <F45880696056844FA6A73F415B568C69532DC8B7E4@EXDCVYMBSTM006.EQ1STM.local>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 29 Sep 2010 07:28:30 +0200
+Subject: [PATCHv2 4/7] ARM: S5PC110: Add si470x radio device to the GONI
+	board
+In-Reply-To: <00c101cb5f16$1c5542a0$54ffc7e0$%kim@samsung.com>
+References: <1284987337-15365-1-git-send-email-m.szyprowski@samsung.com>
+	<1284987337-15365-5-git-send-email-m.szyprowski@samsung.com>
+	<005f01cb5ee0$e16f63d0$a44e2b70$%kim@samsung.com>
+	<007401cb5f0e$3b4e5000$b1eaf000$%szyprowski@samsung.com>
+	<00c101cb5f16$1c5542a0$54ffc7e0$%kim@samsung.com>
+Message-ID: <00b601cb5f97$2a304ce0$7e90e6a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Arun MURTHY wrote:
-> >>>> Shouldn't PWM_DEVICES select HAVE_PWM?
-> >>>
-> >>> No not required, the entire concept is to remove HAVE_PWM and use
-> >> PWM_CORE.
-> >>
-> >> Well in patch 4 you say that PWM_CORE is currently limited to ARM.
-> >> Furthermore you
-> >> change the pwm-backlight and pwm-led Kconfig entries to depend on
-> >> HAVE_PWM ||
-> >> PWM_CORE. Adding a select HAVE_PWM here would make those changes
-> >> unnecessary.
-> > HAVE_PWM is retained just because the mips pwm driver is not aligned
-> with the pwm core driver.
-> > On mips pwm driver aligning to the pwm core driver HAVE_PWM will be
-> replaced by PWM_CORE.
-> >
-> >> HAVE_PWM should be set, when pwm_* functions are available. When
-> your
-> >> pwm-core driver
-> >> is selected they are available.
-> > On applying this patch set pwm_* function will be exported in
-> pwm_core driver and in mips pwm driver.
-> > Since mips pwm driver is not aligned with the pwm core, HAVE_PWM is
-> retained and removed in places where pwm drivers register to pwm core
-> driver.
-> 
-> pwm_{enable,disable,request,free} are the interface of the pwm api.
-> Your pwm-core is
-> one implementation of that interface. A somewhat special though,
-> because it tries to
-> be a generic implementation.
-> There are still other implementations though. For example right now the
-> mips jz4740 one.
-> In my opinion HAVE_PWM should be defined if there is a implementation
-> for the pwm
-> interface is available.
-> I know that your plan is that in the end pwm-core is the only
-> implementation of the
-> pwm interface.
-Yes for that reason, I still have retained the HAVE_PWM, once that is
-also aligned with pwm core, HAVE_PWM will be totally removed.
-I am in the process of doing the same in this series of patch, but was
-blocked by mips jz4740 pwm driver.
-Will do that very soon in near future.
+Hello,
 
-> 
-> But right now it is not and on the other hand some SoC implementors
-> might choose that
-> they want to provide their own minimal pwm interface implementation.
-> Furthermore this would allow you to start with pwm-core for one SoC
-> which you have on
-> your desk and where you can properly test things and keep the patches
-> clean from
-> clutter changing all the different archs.
-> Once pwm-core is in a proper shape you or other people can start
-> porting all the
-> different SoC support code to pwm-core.
-That's the exact reason for me to come up with this core driver, which has
-the minimal part and the one that are common in all pwm drivers.
-Not only common most if not all pwm drivers just make use of only these
-functions.
-Moreover I have aligned all existing pwm driver in my patch 4/7 :-)
+On Tuesday, September 28, 2010 4:05 PM Kukjin Kim wrote:
 
+> > On Tuesday, September 28, 2010 9:44 AM Kukjin Kim wrote:
+> >
+> > > Marek Szyprowski wrote:
+> > > >
+> > > > Add required platform definitions for si470x radio device on Samsung
+> > > > Goni board.
+> > > >
+> > > > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > ---
+> > > >  arch/arm/mach-s5pv210/Kconfig     |    2 ++
+> > > >  arch/arm/mach-s5pv210/mach-goni.c |   30
+> > > > ++++++++++++++++++++++++++++++
+> > > >  2 files changed, 32 insertions(+), 0 deletions(-)
+> > > >
+> > > > diff --git a/arch/arm/mach-s5pv210/Kconfig
+> b/arch/arm/mach-s5pv210/Kconfig
+> > > > index b46925b..b1f671d 100644
+> > > > --- a/arch/arm/mach-s5pv210/Kconfig
+> > > > +++ b/arch/arm/mach-s5pv210/Kconfig
+> > > > @@ -83,9 +83,11 @@ config MACH_GONI
+> > > >  	select S3C_DEV_HSMMC
+> > > >  	select S3C_DEV_HSMMC1
+> > > >  	select S3C_DEV_HSMMC2
+> > > > +	select S3C_DEV_I2C1
+> > > >  	select S5P_DEV_ONENAND
+> > > >  	select SAMSUNG_DEV_KEYPAD
+> > > >  	select S5PV210_SETUP_FB_24BPP
+> > > > +	select S5PV210_SETUP_I2C1
+> > > >  	select S5PV210_SETUP_KEYPAD
+> > > >  	select S5PV210_SETUP_SDHCI
+> > > >  	help
+> > > > diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+> > > b/arch/arm/mach-s5pv210/mach-
+> > > > goni.c
+> > > > index b263f3a..5677c4d 100644
+> > > > --- a/arch/arm/mach-s5pv210/mach-goni.c
+> > > > +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> > > > @@ -38,6 +38,7 @@
+> > > >  #include <plat/devs.h>
+> > > >  #include <plat/cpu.h>
+> > > >  #include <plat/fb.h>
+> > > > +#include <plat/iic.h>
+> > > >  #include <plat/keypad.h>
+> > > >  #include <plat/sdhci.h>
+> > > >
+> > > > @@ -200,6 +201,27 @@ static struct samsung_keypad_platdata keypad_data
+> > > > __initdata = {
+> > > >  	.cols		= 3,
+> > > >  };
+> > > >
+> > > > +/* Radio */
+> > > > +static struct i2c_board_info i2c1_devs[] __initdata = {
+> > > > +	{
+> > > > +		I2C_BOARD_INFO("si470x", 0x10),
+> > > > +	},
+> > > > +};
+> > > > +
+> > > > +static void __init goni_radio_init(void)
+> > > > +{
+> > > > +	int gpio;
+> > > > +
+> > > > +	gpio = S5PV210_GPJ2(4);			/* XMSMDATA_4 */
+> > > > +	gpio_request(gpio, "FM_INT");
+> > >
+> > > If returned fail?
+> >
+> > Then there is something seriously wrong either with the platform or
+> machine
+> > startup code.
+> >
+> > It is quite common to omit a check in the machine init code. Just take a
+> look
+> > at mach-s3c64xx/mach-smdk6410.c, smdk6410_machine_init() function. Lack of
+> > checks here doesn't really have ANY impact on the stability of the kernel
+> imho.
+> >
+> Yeah...right now in our codes, something checked the returning of
+> gpio_request, and others not and the board designer already know where it is
+> used.
 > 
-> Similar behavior is for example true for the gpio api. There is gpiolib
-> which is the
-> generic implementation which allows having gpio chips outside of the
-> chip. On the
-> other hand there are still archs which choose to have their own gpio
-> api implementation.
-> 
-> >
-> >>> pwm_device will be passed to each and every pwm driver that are
-> >> registered as client with pwm core.
-> >>> The list consists of the registered pwm drivers and is to be
-> handled
-> >> by pwm core.
-> >>> Why should each and every pwm driver get to know about the entire
-> pwm
-> >> driver list?
-> >> Declare the list field to be private, by saying that it should only
-> be
-> >> touched by the
-> >> core. Right now you allocate a rather small additional structure for
-> >> each registered
-> >> device. This could be easily be avoided by embedding the list field
-> >> into the
-> >> pwm_device struct.
-> >
-> > The one that is being allocated in register is the pwm_device and
-> this has to. Because each pwm driver will have their own data related
-> to ops, pwm_id.
-> > Also note that there exists an element "data" that points to the pwm
-> device specific information. Hence this allocation is required.
-> >
-> >>>>> +	}
-> >>>>> +	pwm->pwm_dev = pwm_dev;
-> >>>>> +	list_add_tail(&pwm->list, &di->list);
-> >>>>> +	up_write(&pwm_list_lock);
-> >>>>> +
-> >>>> I guess you only need to lock the list when accessing the list and
-> >>>> adding the new
-> >>>> pwm_dev.
-> >>> Oops, thanks for pointing out, will implement this in the v2 patch.
-> > Coming back to this, I guess the locking has to be done while
-> traversing the list also, as my present pointer in the list my get over
-> written by the time I add an element to list. Please let me know if I
-> am wrong.
-> >
-> >>>>> +struct pwm_ops {
-> >>>>> +	int (*pwm_config)(struct pwm_device *pwm, int duty_ns, int
-> >>>> period_ns);
-> >>>>> +	int (*pwm_enable)(struct pwm_device *pwm);
-> >>>>> +	int (*pwm_disable)(struct pwm_device *pwm);
-> >>>>> +	char *name;
-> >>>>> +};
-> >>>>> +
-> >>>> Shouldn't name be part of the pwm_device? That would allow the ops
-> >> to
-> >>>> be shared
-> >>>> between different devices.
-> >>> Good catch, the reason being that 2 or more devices can share the
-> >> same ops and get registered to pwm core.
-> >>> But the catch lies while identifying the pwm device while the
-> clients
-> >> are requesting for.
-> >>> The pwm backlight will request the pwm driver by name. This is
-> >> parameter that distinguishes among different pwm devices
-> irrespective
-> >> of same ops or not.
-> >> Yes. And thats why it should go into the pwm_device struct itself.
-> >>
-> >> If an additional ops struct is allocated for each device anyway we
-> >> would be better of
-> >> embedding it directly into the device struct instead of just holding
-> a
-> >> pointer to it.
-> > Yes ops structure will be allocated. But how can we get access to the
-> ops structure of another driver?
-> > And moreover two pwm driver sharing same ops ideally means a single
-> pwm module. If not everything atleast the pwm registers of two
-> different modules changes. So this scenario can never occur.
-> >
-> >>>>>  #endif /* __LINUX_PWM_H */
-> >>>> It might be also a good idea to add a device class for pwm
-> devices.
-> >>> Sure, but can you please explain with an example the use case.
-> >>>
-> >> Well, for one it helps to keep data structured.
-> >> And there would be functions to traverse all devices of a class, so
-> you
-> >> could get rid
-> >> of your "di" list.
-> > Sorry, I didn't get you can you please elaborate more?
-> >
-> Sure. You would create a "struct class" device class for pwm devices.
-> For each
-> registered pwm device there would then be a "struct device"
-> representing the pwm
-> device whithin the linux device tree.
-> This has serveral advantages:
-> For one you can use this for keeping track of the all the pwm devices
-> instead of
-> having your custom list. You can use class_for_each_device and
-> class_find_device
-> instead of traversing your list. This would make the core much simpler
-> and more readable.
-> Also you can use the device structure for refcounting of modules and
-> devices. Right
-> now if a pwm-core driver, like the twl6040, is build as a module you
-> can remove the
-> module while another driver, for example pwm-backlight, is using a pwm
-> device from
-> the pwm-core driver. Then upon accessing the pwm device from the pwm-
-> backlight driver
-> the code would crash, because it would access already freed memory.
-> 
-Can this be taken after this patch is merged?
+> Hmm...I'm not sure which is better to us...but is it better there is
+> exception/error handling?
+> Or...is it useless code?
 
-Thanks and Regards,
-Arun R Murthy
-------------
+IMHO such code is useless. If requesting a gpio fails then the kernel will throw
+an ops or warning on the first use of that gpio pin, so the board designer will
+know that something is really wrong there.
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
