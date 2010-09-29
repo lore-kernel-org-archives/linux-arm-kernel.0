@@ -1,44 +1,34 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 29 Sep 2010 08:43:01 -0700
-Subject: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02BA7@dbde02.ent.ti.com>
-	(Charulatha Varadarajan's message of "Wed, 29 Sep 2010 20:16:41
-	+0530")
-References: <1285252363-3630-1-git-send-email-charu@ti.com>
-	<877hi5740v.fsf@deeprootsystems.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CD02B1E@dbde02.ent.ti.com>
-	<87d3rw62ft.fsf@deeprootsystems.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CD02BA7@dbde02.ent.ti.com>
-Message-ID: <87y6ak1rp6.fsf@deeprootsystems.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Sep 2010 17:14:30 +0100
+Subject: [PATCH 1/2] ARM: add memory types for the TCMs
+In-Reply-To: <20100929154249.GA24118@n2100.arm.linux.org.uk>
+References: <1278623805-17027-1-git-send-email-linus.walleij@stericsson.com>
+	<20100929154249.GA24118@n2100.arm.linux.org.uk>
+Message-ID: <1285776870.7983.87.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
+On Wed, 2010-09-29 at 16:42 +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 08, 2010 at 11:16:45PM +0200, Linus Walleij wrote:
+> > I'm especially in the dark about the usage of the L_PTE_* stuff,
+> > and when to use DOMAIN_KERNEL, DOMAIN_USER and DOMAIN_IO. For
+> > example: does DOMAIN_KERNEL imply kernel usage? DOMAIN_KERNEL
+> > for ITCM makes the code non-executable. Does DOMAIN_USER imply
+> > that L_PTE_USER shall also be set?
+> 
+> Sorry, should've replied to this much earlier.  We now have a problem in
+> that this stuff for the ITCM entry is wrong (identified via Santosh's
+> MT_MEMORY problems).
+> 
+> L_PTE_* define what ends up in the PTE entries.  L_PTE_USER and
+> L_PTE_WRITE operate together:
+> 
+> - None set, page is read-only in SVC mode, inaccessible in user mode.
+> - L_PTE_WRITE, page is read-write in SVC mode, inaccessible in user mode.
+> - L_PTE_USER, page is read-write in SVC mode, read-only in user mode.
 
-[...]
+Just a small addition - with the domains removal patch on ARMv7, this
+becomes read-only for both SVC and user modes.
 
->> 
->> Instead, I would rather have a small piece of code in omap_init_wdt()
->> which disarms the watchdog so we don't have any assumptions about
->> bootloader behavior.
->> 
->> The question remains whether this disarm should be
->> #ifndef CONFIG_OMAP_WATCHDOG or if it should happen all the time.  In
->> case the watchdog is a module, it's probe may not happen within the
->> timeout period and they system may reboot also, so I lean towards
->> disarming the watchdog unconditionally.
->
-> Agreed. But this shall be handled in mach-omap2/devices.c by directly
-> accessing the watchdog registers and disabling it, as the watchdog driver
-> would not be available by this time. 
-
-Correct.
-
-> If this okay, I would send a separate patch on top my hwmod series to
-> handle this.
-
-Yes please.
-
-Thanks,
-
-Kevin
+-- 
+Catalin
