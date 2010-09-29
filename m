@@ -1,134 +1,65 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Sep 2010 21:16:36 +0900
-Subject: [PATCH 1/2] ARM: S5PV210: Add audio support to Aquila
-In-Reply-To: <4C527C11.5090409@samsung.com>
-References: <4C4F9E4C.7000001@samsung.com>
-	<20100729173825.GE24781@opensource.wolfsonmicro.com>
-	<4C527C11.5090409@samsung.com>
-Message-ID: <001b01cb5fd0$2c73bd50$855b37f0$%kim@samsung.com>
+Date: Wed, 29 Sep 2010 21:36:59 +0900
+Subject: [PATCH v3 3/3] ARM: S5PC100/S5PC110/S5PC210: Remove duplicated
+	selete PLAT_S5P at each ARCH_S5P series
+In-Reply-To: <20100929014724.GA823@july>
+References: <20100929014724.GA823@july>
+Message-ID: <001c01cb5fd3$0506a1d0$0f13e570$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
+Kyungmin Park wrote:
 > 
-> Mark Brown wrote:
-> > On Wed, Jul 28, 2010 at 12:04:44PM +0900, Chanwoo Choi wrote:
-> >
-> >> +static struct regulator_consumer_supply wm8994_fixed_voltage0_supplies[] =
-> {
-> >> +	{
-> >> +		.dev_name	= "5-001a",
-> >> +		.supply		= "DBVDD",
-> >> +	}, {
-> >> +		.dev_name	= "5-001a",
-> >> +		.supply		= "AVDD2",
-> >> +	}, {
-> >> +		.dev_name	= "5-001a",
-> >> +		.supply		= "CPVDD",
-> >> +	},
-> >> +
-> >> +};
-> >> +
-> >> +static struct regulator_consumer_supply wm8994_fixed_voltage1_supplies[] =
-> {
-> >
-> > All these fixed voltage regulators seem a bit suspicous for a mobile
-> > phone - I'd have expected that the supplies would all be being provided
-> > by your PMIC except for things taken directly from the battery supply
-> > (like the speakers tend to be, for example)?  There's no problem with
-> > the code itself, it just looks a bit odd.
-> >
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> All these consumer supply of WM8994 codec connected the below
-> regulator(VCC_1.8V) on
-> a circuit diagram. "VCC_1.8V" regualtor is always enabled, because it is used to
-> many devices.
-> Then I haven't connected all these consumer supply of WM8994 codec to
-> "VCC_1.8V" regulator.
-> I will modify that the consumer supply would be provided by PMIC.
+> It's already selected whtn S5P series. So remove it.
 > 
-> static struct regulator_init_data aquila_buck3_data = {
-> 	.constraints	= {
-> 		.name		= "VCC_1.8V",
-> 		.min_uV		= 1800000,
-> 		.max_uV		= 1800000,
-> 		.apply_uV	= 1,
-> 		.state_mem	= {
-> 			.enabled = 1,
-> 		},
-> 	},
-> };
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pc100/Kconfig |    1 -
+>  arch/arm/mach-s5pv210/Kconfig |    1 -
+>  arch/arm/mach-s5pv310/Kconfig |    1 -
+>  3 files changed, 0 insertions(+), 3 deletions(-)
 > 
-> >> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
-> >> +	{
-> >> +		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
-> >> +		I2C_BOARD_INFO("wm8994", 0x34 >> 1),
-> >> +		.platform_data	= &wm8994_platform_data,
-> >> +	},
-> >> +};
-> >
-> > Probably clearer for generic Linux use to specify the address as 0x1a
-> > directly.
+> diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+> index 77ae4bf..b8fbf2f 100644
+> --- a/arch/arm/mach-s5pc100/Kconfig
+> +++ b/arch/arm/mach-s5pc100/Kconfig
+> @@ -9,7 +9,6 @@ if ARCH_S5PC100
 > 
-> Ok, I will do.
+>  config CPU_S5PC100
+>  	bool
+> -	select PLAT_S5P
+>  	select S5P_EXT_INT
+>  	select S3C_PL330_DMA
+>  	help
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 97e4f11..6ddc232 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -11,7 +11,6 @@ if ARCH_S5PV210
 > 
-> >
-> >> +static void __init aquila_sound_init(void)
-> >> +{
-> >> +	unsigned int gpio;
-> >> +
-> >> +	/* CODEC_XTAL_EN */
-> >> +	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
-> >> +	gpio_request(gpio, "CODEC_XTAL_EN");
-> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
-> >> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> >> +	gpio_direction_output(gpio, 1);
-> >
-> > Might be as well to provide some or all this stuff in your audio machine
-> > driver?
+>  config CPU_S5PV210
+>  	bool
+> -	select PLAT_S5P
+>  	select S3C_PL330_DMA
+>  	select S5P_EXT_INT
+>  	help
+> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+> index ec8b350..4839fef 100644
+> --- a/arch/arm/mach-s5pv310/Kconfig
+> +++ b/arch/arm/mach-s5pv310/Kconfig
+> @@ -11,7 +11,6 @@ if ARCH_S5PV310
 > 
-> The Aquila board have a oscillator which provide main clock to
-> WM8994 audio codec. The oscillator provide 24MHz clock to WM8994 audio codec
-> (MCLK1 pin). I set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
+>  config CPU_S5PV310
+>  	bool
+> -	select PLAT_S5P
+>  	help
+>  	  Enable S5PV310 CPU support
 > 
-> >
-> >> +	/* MICBIAS_EN */
-> >> +	gpio = S5PV210_GPJ4(2);			/* XMSMRN */
-> >> +	gpio_request(gpio, "MICBIAS_EN");
-> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
-> >> +	gpio_direction_output(gpio, 1);
-> >
-> > This in particular would benefit from keeping the request of the GPIO
-> > joined up with the driver that uses it.
-> 
-> Ok, I will move this code to machine driver(sound/soc/s3c24xxx/aquila_wm8994.c).
-> 
-> >> +	/* ADC_EN */
-> >> +	gpio = S5PV210_GPJ3(2);
-> >> +	gpio_request(gpio, "ADC_EN");
-> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
-> >> +	gpio_direction_output(gpio, 1);
-> >
-> > I'm not sure what this does?
-> >
-> 
-> I explained below description about "ADC_EN" :
-> "ADC_EN : This gpio enable the ADC device which is used to detect
->  the kind of jack. (SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT)
->  According to the kind of jack, an electric current is changed.
->  (Only used on Aquila board) "
-> 
-> When inserting the jack to Aquila board, I used ADC driver so that, detecting
-> the kind of jack(SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT).
-> 
-> I will separately make the another function to initialize ADC driver.
-> 
-> Thank you for your comment.
-> Chanwoo Choi
-> 
-Hi,
+> --
 
-How was going on?
+Ok..will apply.
 
 Thanks.
 
