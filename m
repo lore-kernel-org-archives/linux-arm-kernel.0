@@ -1,193 +1,223 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Sep 2010 20:58:23 +0900
-Subject: [PATCH 2/2] ARM: S5PV310: Update CPU hotplug implementation
-In-Reply-To: <1284700388-9394-3-git-send-email-kgene.kim@samsung.com>
-References: <1284700388-9394-1-git-send-email-kgene.kim@samsung.com>
-	<1284700388-9394-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <001901cb5fcd$a0a5b5a0$e1f120e0$%kim@samsung.com>
+Date: Wed, 29 Sep 2010 21:07:11 +0900
+Subject: [PATCH] ARM: S5PV210: Add Torbreck board support
+In-Reply-To: <1285518753-30722-1-git-send-email-chlrbgh0@gmail.com>
+References: <1285518753-30722-1-git-send-email-chlrbgh0@gmail.com>
+Message-ID: <001a01cb5fce$dbaf94d0$930ebe70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Kyuho Choi wrote:
 > 
-> From: Changhwan Youn <chaos.youn@samsung.com>
+> This patch adds to support Torbreck board of aESOP community using
+> Samsung S5PV210 SoC.
 > 
-> This patch updates CPU hotplug implementation to reduce CPU power
-> consumption
-> and will turn off the CPU power when CPU1 is unplugged while previous CPU
-> hotplug
-> used CPU idle.
-> This patch removes init memory freeing code to use CPU boot code when CPU1
-is
-> plugged-in again and adds vfp_enable() call to allow to access CP10 and
-CP11.
-> 
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Russell King <rmk@arm.linux.org.uk>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-
-Hi all,
-
-Please check changing of arch/arm/mm/init.c and arch/arm/vfp/vfpmodule.c.
-- Removed init memory freeing code to use CPU boot code when CPU1 is
-plugged-in again.
-- Added vfp_enable() call to allow to access CP10 and CP11.
-
+> Signed-off-by: Kyuho Choi <chlrbgh0@gmail.com>
+> Signed-off-by: Hyunchul Ko <ghcstop@gmail.com>
 > ---
->  arch/arm/mach-s5pv310/hotplug.c |   12 +++++++-----
->  arch/arm/mach-s5pv310/platsmp.c |   34
-> ++++++++++++++++++++++++++++++++++
->  arch/arm/mm/init.c              |    2 ++
->  arch/arm/vfp/vfpmodule.c        |    2 +-
->  4 files changed, 44 insertions(+), 6 deletions(-)
+>  arch/arm/mach-s5pv210/Kconfig         |   18 +++++
+>  arch/arm/mach-s5pv210/Makefile        |    1 +
+>  arch/arm/mach-s5pv210/mach-torbreck.c |  133
+> +++++++++++++++++++++++++++++++++
+>  3 files changed, 152 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv210/mach-torbreck.c
 > 
-> diff --git a/arch/arm/mach-s5pv310/hotplug.c
-b/arch/arm/mach-s5pv310/hotplug.c
-> index 03652c3..0e188fe 100644
-> --- a/arch/arm/mach-s5pv310/hotplug.c
-> +++ b/arch/arm/mach-s5pv310/hotplug.c
-> @@ -14,9 +14,12 @@
->  #include <linux/errno.h>
->  #include <linux/smp.h>
->  #include <linux/completion.h>
-> +#include <linux/io.h>
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index d3a3895..c5ec466 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -139,6 +139,24 @@ config MACH_SMDKV210
+>  	help
+>  	  Machine support for Samsung SMDKV210
 > 
->  #include <asm/cacheflush.h>
-> 
-> +#include <mach/regs-pmu.h>
+> +config MACH_TORBRECK
+> +	bool "Torbreck"
+> +	select CPU_S5PV210
+> +	select ARCH_SPARSEMEM_ENABLE
+> +	select S3C_DEV_HSMMC
+> +	select S3C_DEV_HSMMC1
+> +	select S3C_DEV_HSMMC2
+> +	select S3C_DEV_HSMMC3
+> +	select S3C_DEV_I2C1
+> +	select S3C_DEV_I2C2
+> +	select S3C_DEV_RTC
+> +	select S3C_DEV_WDT
+> +	select S5PV210_SETUP_I2C1
+> +	select S5PV210_SETUP_I2C2
+> +	select S5PV210_SETUP_SDHCI
+> +	help
+> +	  Machine support for aESOP Torbreck
 > +
->  extern volatile int pen_release;
+>  endmenu
 > 
->  static DECLARE_COMPLETION(cpu_killed);
-> @@ -61,12 +64,11 @@ static inline void cpu_leave_lowpower(void)
+>  endif
+> diff --git a/arch/arm/mach-s5pv210/Makefile
+b/arch/arm/mach-s5pv210/Makefile
+> index 05048c5..927c2b7 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -21,6 +21,7 @@ obj-$(CONFIG_MACH_AQUILA)	+= mach-aquila.o
+>  obj-$(CONFIG_MACH_SMDKV210)	+= mach-smdkv210.o
+>  obj-$(CONFIG_MACH_SMDKC110)	+= mach-smdkc110.o
+>  obj-$(CONFIG_MACH_GONI)		+= mach-goni.o
+> +obj-$(CONFIG_MACH_TORBRECK)	+= mach-torbreck.o
 > 
->  static inline void platform_do_lowpower(unsigned int cpu)
->  {
-> -	/*
-> -	 * there is no power-control hardware on this platform, so all
-> -	 * we can do is put the core into WFI; this is safe as the calling
-> -	 * code will have already disabled interrupts
-> -	 */
->  	for (;;) {
-> +		/* make cpu1 to be turned off at next WFI command */
-> +		if (cpu == 1)
-> +			__raw_writel(0, S5PV310_ARM_CORE1_CONF);
+>  # device support
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-torbreck.c b/arch/arm/mach-
+> s5pv210/mach-torbreck.c
+> new file mode 100644
+> index 0000000..3142250
+> --- /dev/null
+> +++ b/arch/arm/mach-s5pv210/mach-torbreck.c
+> @@ -0,0 +1,133 @@
+> +/* linux/arch/arm/mach-s5pv210/mach-torbreck.c
+> + *
+> + * Copyright (c) 2010 aESOP Community
+> + *		http://www.aesop.or.kr/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
->  		/*
->  		 * here's the WFI
->  		 */
-> diff --git a/arch/arm/mach-s5pv310/platsmp.c
-b/arch/arm/mach-s5pv310/platsmp.c
-> index d357c19..d10c4ad 100644
-> --- a/arch/arm/mach-s5pv310/platsmp.c
-> +++ b/arch/arm/mach-s5pv310/platsmp.c
-> @@ -28,8 +28,10 @@
-> 
->  #include <mach/hardware.h>
->  #include <mach/regs-clock.h>
-> +#include <mach/regs-pmu.h>
-> 
->  extern void s5pv310_secondary_startup(void);
-> +extern void vfp_enable(void *unused);
-> 
->  /*
->   * control for which core is the next to come out of the secondary
-> @@ -47,6 +49,10 @@ static DEFINE_SPINLOCK(boot_lock);
-> 
->  void __cpuinit platform_secondary_init(unsigned int cpu)
->  {
-> +#ifdef CONFIG_VFP
-> +	vfp_enable(NULL);
-> +#endif
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/i2c.h>
+> +#include <linux/init.h>
+> +#include <linux/serial_core.h>
 > +
->  	trace_hardirqs_off();
-> 
->  	/*
-> @@ -92,6 +98,27 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
-> task_struct *idle)
->  	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
->  	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-> 
-> +	if (!(__raw_readl(S5PV310_ARM_CORE1_STAT) &
-> S5PV310_CORE_PWR_EN)) {
-> +		__raw_writel(S5PV310_CORE_PWR_EN,
-> +			     S5PV310_ARM_CORE1_CONF);
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/setup.h>
+> +#include <asm/mach-types.h>
 > +
-> +		timeout = 10;
+> +#include <mach/map.h>
+> +#include <mach/regs-clock.h>
 > +
-> +		/* wait max 10 ms until cpu1 is on */
-> +		while ((__raw_readl(S5PV310_ARM_CORE1_STAT)
-> +			& S5PV310_CORE_PWR_EN) !=
-> S5PV310_CORE_PWR_EN) {
-> +			if (timeout-- == 0)
-> +				break;
+> +#include <plat/regs-serial.h>
+> +#include <plat/s5pv210.h>
+> +#include <plat/devs.h>
+> +#include <plat/cpu.h>
+> +#include <plat/iic.h>
 > +
-> +			mdelay(1);
-> +		}
+> +/* Following are default values for UCON, ULCON and UFCON UART registers
+*/
+> +#define TORBRECK_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+> +				 S3C2410_UCON_RXILEVEL |	\
+> +				 S3C2410_UCON_TXIRQMODE |	\
+> +				 S3C2410_UCON_RXIRQMODE |	\
+> +				 S3C2410_UCON_RXFIFO_TOI |	\
+> +				 S3C2443_UCON_RXERR_IRQEN)
 > +
-> +		if (timeout == 0) {
-> +			printk(KERN_ERR "cpu1 power-up failed");
-> +			return -ETIMEDOUT;
-> +		}
-> +	}
+> +#define TORBRECK_ULCON_DEFAULT	S3C2410_LCON_CS8
 > +
->  	/*
->  	 * Send the secondary CPU a soft interrupt, thereby causing
->  	 * the boot monitor to read the system wide flags register,
-> @@ -102,6 +129,13 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
-> task_struct *idle)
->  	timeout = jiffies + (1 * HZ);
->  	while (time_before(jiffies, timeout)) {
->  		smp_rmb();
+> +#define TORBRECK_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
+> +				 S5PV210_UFCON_TXTRIG4 |	\
+> +				 S5PV210_UFCON_RXTRIG4)
 > +
-> +		if (!__raw_readl(S5P_VA_SYSRAM)) {
+> +static struct s3c2410_uartcfg torbreck_uartcfgs[] __initdata = {
+> +	[0] = {
+> +		.hwport		= 0,
+> +		.flags		= 0,
+> +		.ucon		= TORBRECK_UCON_DEFAULT,
+> +		.ulcon		= TORBRECK_ULCON_DEFAULT,
+> +		.ufcon		= TORBRECK_UFCON_DEFAULT,
+> +	},
+> +	[1] = {
+> +		.hwport		= 1,
+> +		.flags		= 0,
+> +		.ucon		= TORBRECK_UCON_DEFAULT,
+> +		.ulcon		= TORBRECK_ULCON_DEFAULT,
+> +		.ufcon		= TORBRECK_UFCON_DEFAULT,
+> +	},
+> +	[2] = {
+> +		.hwport		= 2,
+> +		.flags		= 0,
+> +		.ucon		= TORBRECK_UCON_DEFAULT,
+> +		.ulcon		= TORBRECK_ULCON_DEFAULT,
+> +		.ufcon		= TORBRECK_UFCON_DEFAULT,
+> +	},
+> +	[3] = {
+> +		.hwport		= 3,
+> +		.flags		= 0,
+> +		.ucon		= TORBRECK_UCON_DEFAULT,
+> +		.ulcon		= TORBRECK_ULCON_DEFAULT,
+> +		.ufcon		= TORBRECK_UFCON_DEFAULT,
+> +	},
+> +};
 > +
-> 	__raw_writel(BSYM(virt_to_phys(s5pv310_secondary_startup)),
-> +				     S5P_VA_SYSRAM);
-> +			smp_cross_call(cpumask_of(cpu));
-> +		}
+> +static struct platform_device *torbreck_devices[] __initdata = {
+> +	&s5pv210_device_iis0,
+> +	&s3c_device_cfcon,
+> +	&s3c_device_hsmmc0,
+> +	&s3c_device_hsmmc1,
+> +	&s3c_device_hsmmc2,
+> +	&s3c_device_hsmmc3,
+> +	&s3c_device_i2c0,
+> +	&s3c_device_i2c1,
+> +	&s3c_device_i2c2,
+> +	&s3c_device_rtc,
+> +	&s3c_device_wdt,
+> +};
 > +
->  		if (pen_release == -1)
->  			break;
-> 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 7185b00..57c4c5c 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -589,10 +589,12 @@ void free_initmem(void)
->  				    "TCM link");
->  #endif
-> 
-> +#ifndef CONFIG_HOTPLUG_CPU
->  	if (!machine_is_integrator() && !machine_is_cintegrator())
->  		totalram_pages +=
-free_area(__phys_to_pfn(__pa(__init_begin)),
->  					    __phys_to_pfn(__pa(__init_end)),
->  					    "init");
-> +#endif
->  }
-> 
->  #ifdef CONFIG_BLK_DEV_INITRD
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 8063a32..eee8f67 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -364,7 +364,7 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs
-> *regs)
->  	preempt_enable();
->  }
-> 
-> -static void vfp_enable(void *unused)
-> +void vfp_enable(void *unused)
->  {
->  	u32 access = get_copro_access();
-> 
+> +static struct i2c_board_info torbreck_i2c_devs0[] __initdata = {
+> +	/* To Be Updated */
+> +};
+> +
+> +static struct i2c_board_info torbreck_i2c_devs1[] __initdata = {
+> +	/* To Be Updated */
+> +};
+> +
+> +static struct i2c_board_info torbreck_i2c_devs2[] __initdata = {
+> +	/* To Be Updated */
+> +};
+> +
+> +static void __init torbreck_map_io(void)
+> +{
+> +	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> +	s3c24xx_init_clocks(24000000);
+> +	s3c24xx_init_uarts(torbreck_uartcfgs,
+ARRAY_SIZE(torbreck_uartcfgs));
+> +}
+> +
+> +static void __init torbreck_machine_init(void)
+> +{
+> +	s3c_i2c0_set_platdata(NULL);
+> +	s3c_i2c1_set_platdata(NULL);
+> +	s3c_i2c2_set_platdata(NULL);
+> +	i2c_register_board_info(0, torbreck_i2c_devs0,
+> +			ARRAY_SIZE(torbreck_i2c_devs0));
+> +	i2c_register_board_info(1, torbreck_i2c_devs1,
+> +			ARRAY_SIZE(torbreck_i2c_devs1));
+> +	i2c_register_board_info(2, torbreck_i2c_devs2,
+> +			ARRAY_SIZE(torbreck_i2c_devs2));
+> +
+> +	platform_add_devices(torbreck_devices,
+ARRAY_SIZE(torbreck_devices));
+> +}
+> +
+> +MACHINE_START(TORBRECK, "TORBRECK")
+> +	/* Maintainer: Hyunchul Ko <ghcstop@gmail.com> */
+> +	.phys_io	= S3C_PA_UART & 0xfff00000,
+> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
+> +	.boot_params	= S5P_PA_SDRAM + 0x100,
+> +	.init_irq	= s5pv210_init_irq,
+> +	.map_io		= torbreck_map_io,
+> +	.init_machine	= torbreck_machine_init,
+> +	.timer		= &s3c24xx_timer,
+> +MACHINE_END
 > --
 
+Ok...will apply this.
+
+If needs bug fixes or any patches for your board, please don't hesitate to
+send/submit your patch like this time.
+
+As you know, there is default configuration, s5pv210_defconfig for S5PV210
+SoC.
+If you want to add your board to it, please send updated it after merging
+your board number into mach-types in the mainline.
 
 Thanks.
 
