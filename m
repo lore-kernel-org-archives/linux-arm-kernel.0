@@ -1,52 +1,108 @@
-From: hashim.kernel@gmail.com (hashim alig)
-Date: Wed, 29 Sep 2010 11:36:52 +0530
-Subject: High Latency in PL310 L2 cache maintenance operations
-In-Reply-To: <1285685447.14312.2.camel@e102109-lin.cambridge.arm.com>
-References: <AANLkTinMYZmzy=J1TOEPs6dKs2gCwzazECop_riK2nwd@mail.gmail.com>
-	<1285685358.14312.1.camel@e102109-lin.cambridge.arm.com>
-	<1285685447.14312.2.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTik5G2mW6D8f6XpKFffbY1OxYLO3n05H+Q3rUvT7@mail.gmail.com>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Wed, 29 Sep 2010 12:07:48 +0530
+Subject: [PATCH v5 1/5] omap gpmc: enable irq mode in gpmc
+In-Reply-To: <20100928222727.GS3117@atomide.com>
+References: <1285594634-19277-1-git-send-email-s-ghorai@ti.com>
+	<1285594634-19277-2-git-send-email-s-ghorai@ti.com>
+	<20100928222727.GS3117@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B0356476436@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Catalin,
 
-On Tue, Sep 28, 2010 at 8:20 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, 2010-09-28 at 15:49 +0100, Catalin Marinas wrote:
->> On Tue, 2010-09-28 at 14:25 +0100, hashim alig wrote:
->> > I am using linux-2.6.32 kernel on a platform which is ARM-Cortex A9
->> > SMP (dual core, each at 500 MHz) with PL310 as the L2 cache. I observe
->> > high latency in cache maintainance operations (both invalidation and
->> > clean) which is around 90 cycles for every cache line (32 bytes).
->> > Is it normal? What should be the practical range ?
->> > I also tried with linux-2.6.35 over which I applied few L2 patches
->> > from Catalin but observation remains same.
->>
->> Have you applied this patch from Will Deacon:
->>
->> http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=c3d0fd52ce0c36836aefd53ce9b25f193daa2e5e
 
-NO. But I have played with latencies.
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Wednesday, September 29, 2010 3:57 AM
+> To: Ghorai, Sukumar
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v5 1/5] omap gpmc: enable irq mode in gpmc
+> 
+> * Sukumar Ghorai <s-ghorai@ti.com> [100927 06:30]:
+> >   add support the irq mode in GPMC.
+> >   gpmc_init() function move after omap_init_irq() as it has dependecy on
+> irq.
+> 
+> > --- a/arch/arm/mach-omap2/board-2430sdp.c
+> > +++ b/arch/arm/mach-omap2/board-2430sdp.c
+> > @@ -144,6 +144,7 @@ static void __init omap_2430sdp_init_irq(void)
+> >  	omap_board_config_size = ARRAY_SIZE(sdp2430_config);
+> >  	omap2_init_common_hw(NULL, NULL);
+> >  	omap_init_irq();
+> > +	gpmc_init();
+> >  	omap_gpio_init();
+> >  }
+> >
+> > diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-
+> omap2/board-3430sdp.c
+> > index 67b95b5..549cd62 100644
+> > --- a/arch/arm/mach-omap2/board-3430sdp.c
+> > +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> > @@ -328,6 +328,7 @@ static void __init omap_3430sdp_init_irq(void)
+> >  	omap3_pm_init_cpuidle(omap3_cpuidle_params_table);
+> >  	omap2_init_common_hw(hyb18m512160af6_sdrc_params, NULL);
+> >  	omap_init_irq();
+> > +	gpmc_init();
+> >  	omap_gpio_init();
+> >  }
+> ...
+> 
+> You can avoid adding gpmc_init() by making it a subsys_initcall().
+> Just make sure you return early from it with if (!cpu_class_is_omap2()).
+[Ghorai] will do
+> 
+> > --- a/arch/arm/mach-omap2/gpmc.c
+> > +++ b/arch/arm/mach-omap2/gpmc.c
+> > @@ -713,6 +721,31 @@ void __init gpmc_init(void)
+> >  	l |= (0x02 << 3) | (1 << 0);
+> >  	gpmc_write_reg(GPMC_SYSCONFIG, l);
+> >  	gpmc_mem_init();
+> > +
+> > +	/* initalize the irq_chained */
+> > +	irq = OMAP_GPMC_IRQ_BASE;
+> > +	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
+> > +		set_irq_handler(irq, handle_simple_irq);
+> > +		set_irq_flags(irq, IRQF_VALID);
+> > +		irq++;
+> > +	}
+> > +
+> > +	if (request_irq(20, gpmc_handle_irq, IRQF_SHARED, "gpmc",
+> gpmc_base))
+> > +		printk(KERN_ERR "gpmc: irq-%d could not claim: err %d\n",
+> > +							INT_34XX_GPMC_IRQ, irq);
+> > +}
+> 
+> Hmm, this does not look right.. Shouldn't you call
+> set_irq_chained_handler()
+> somewhere too? 
+[Ghorai] its not use, as multi-lebel irq is not there.
+>Also, are you sure the interrupt is 20 for all of mach-
+> omap2?
+> It should be added to the irqs.h files.
+[Ghorai] it's added in irqs.h, and will remove the hard coded value. Last minute mistake.
 
-> Forgot to mention - this patch is for Versatile Express, you would need
-> to do something similar in your platform. We can't really set the
-> default values in the l2x0 code since these latencies depend on the
-> hardware configuration.
+> 
+> > +static irqreturn_t gpmc_handle_irq(int irq, void *dev)
+> > +{
+> > +	u8 cs;
+> > +
+> > +	if (irq != INT_34XX_GPMC_IRQ)
+> > +		return IRQ_HANDLED;
+> > +	/* check cs to invoke the irq */
+> > +	cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1)) >> CS_NUM_SHIFT) & 0x7;
+> > +	generic_handle_irq(OMAP_GPMC_IRQ_BASE+cs);
+> > +
+> > +	return IRQ_HANDLED;
+> >  }
+> 
+> Doesn't doing OMAP_GPMC_IRQ_BASE + cs overlap with some other irq?
+[Ghorai] will check the boundary condition too -
+if(OMAP_GPMC_IRQ_BASE + cs <= OMAP_GPMC_IRQ_END)
 
-OK. I have actually played with latency registers but saw no
-improvement, even the system
-became unstable.
-Following is the ideal configuration of PL310 registers (as reported
-by h/w designers) and on which L2 and system is stable.
+And will re-submit.
 
-Auxillary Control Reg (0x104) - 0x02060000
-Tag RAM Latency (0x108)     - 0x00000110
-Data RAM Latency (0x10C)   - 0x00000220
-
-One more thing, port filtering at L2 is enabled with following configuration
-Addr filtering start (offset 0xc00)    -    0x1
-Addr filtering end (offset 0xc04)    -    0x08000000
-
-regards
-Shiraz
+> 
+> Regards,
+> 
+> Tony
