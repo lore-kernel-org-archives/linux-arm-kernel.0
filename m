@@ -1,128 +1,83 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 28 Sep 2010 18:05:36 -0700
-Subject: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
-In-Reply-To: <1285252363-3630-1-git-send-email-charu@ti.com> (Charulatha
-	Varadarajan's message of "Thu, 23 Sep 2010 20:02:37 +0530")
-References: <1285252363-3630-1-git-send-email-charu@ti.com>
-Message-ID: <877hi5740v.fsf@deeprootsystems.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 29 Sep 2010 10:24:12 +0900
+Subject: [PATCH v2 1/3] ARM: S5PC110: Place the common SPARSEMEM at
+	ARCH_S5PV210
+In-Reply-To: <20100929003901.GA491@july>
+References: <20100929003901.GA491@july>
+Message-ID: <010101cb5f75$09ecd740$1dc685c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Charu,
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> In case of s5pc110 CPU. It uses the SPARSEMEM as default memory
+> configuration.
+> So move to ARCH_S5PV210 config.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/Kconfig              |    1 +
+>  arch/arm/mach-s5pv210/Kconfig |    4 ----
+>  2 files changed, 1 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 553b7cf..e112987 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -717,6 +717,7 @@ config ARCH_S5PC100
+>  config ARCH_S5PV210
+>  	bool "Samsung S5PV210/S5PC110"
+>  	select CPU_V7
+> +	select ARCH_SPARSEMEM_ENABLE
+>  	select GENERIC_GPIO
+>  	select HAVE_CLK
+>  	select ARM_L1_CACHE_SHIFT_6
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index d3a3895..97e4f11 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -63,7 +63,6 @@ menu "S5PC110 Machines"
+>  config MACH_AQUILA
+>  	bool "Aquila"
+>  	select CPU_S5PV210
+> -	select ARCH_SPARSEMEM_ENABLE
+>  	select S3C_DEV_FB
+>  	select S5P_DEV_FIMC0
+>  	select S5P_DEV_FIMC1
+> @@ -80,7 +79,6 @@ config MACH_AQUILA
+>  config MACH_GONI
+>  	bool "GONI"
+>  	select CPU_S5PV210
+> -	select ARCH_SPARSEMEM_ENABLE
+>  	select S3C_DEV_FB
+>  	select S5P_DEV_FIMC0
+>  	select S5P_DEV_FIMC1
+> @@ -98,7 +96,6 @@ config MACH_GONI
+>  config MACH_SMDKC110
+>  	bool "SMDKC110"
+>  	select CPU_S5PV210
+> -	select ARCH_SPARSEMEM_ENABLE
+>  	select S3C_DEV_I2C1
+>  	select S3C_DEV_I2C2
+>  	select S3C_DEV_RTC
+> @@ -118,7 +115,6 @@ menu "S5PV210 Machines"
+>  config MACH_SMDKV210
+>  	bool "SMDKV210"
+>  	select CPU_S5PV210
+> -	select ARCH_SPARSEMEM_ENABLE
+>  	select S3C_DEV_HSMMC
+>  	select S3C_DEV_HSMMC1
+>  	select S3C_DEV_HSMMC2
+> --
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
+Looks ok to me..will apply.
 
-> Series of patches to port watchdog module to use hwmod APIs
-> for OMAP2PLUS chips and use runtime APIs for all OMAP chips.
-> For this hwmod database for OMAP2PLUS watchdog instances are
-> populated and implements watchdog module to use PM runtime APIs.
->
-> This patch series is generated on "origin/pm-core" which
-> has Kevin's pm-next series, the runtime PM core patch series,
-> and a collection of hwmod fixes that Paul/Benoit have lined up
-> for 2.6.37.
->
-> Tested on OMAP2430, OMAP4430 (ES1.0 & ES2.0), OMAP3430 SDP boards
-> and zoom3 board. Also verified that this patch series does not
-> break the OMAP1 build.
+Thanks.
 
-I found a little snag with this series.  Try testing with
-omap2plus_defconfig and changing CONFIG_OMAP_WATCHDOG=n.
-
-If CONFIG_OMAP_WATCHDOG is not enabled in the kernel config, the system
-will reboot soon after bootup.  One of the things the bootloader
-historically has done was disable the watchdog so a driver wasn't needed.
-With a reset of the IP triggered by the hwmod init, we lose this setting
-and the watchog is armed by default.
-
-I think we need to handle this case when CONFIG_OMAP_WATCHDOG=n in the
-device init code by disabling the watchdog.
-
-Kevin
-
-
-> This series is tested on OMAP4430 ES2 using the below series
-> (dependency series for ES2.0 silicon)
-> http://www.spinics.net/lists/linux-omap/msg36023.html
->
-> Version History:
-> ---------------
-> Version v8:
-> *Enable wd_timer3 in the hwmod list
->
-> Version v7:
-> *Use EN_*SHIFT macros for module_bit and ST_*SHIFT macros for
-> idlest_idle_bit in OMAP2&3 hwmod database
-> (based on suggestions given by Paul for I2C hwmod series)
-> *Remove new definitions of EN_*SHIFT macros as they already exist
-> Some of the v7 links:
-> https://patchwork.kernel.org/patch/197022/
->
-> Version v6:
-> *Split omap_init_wdt() into separate omap_init_wdt functions
-> under mach-omap1 and mach-omap2 and set them up with
-> subsys_initcall
-> *Include wd_timer3 database for OMAP4
-> *In hwmod database follow naming convention "wd_timerX"
-> Some of the v6 links:
-> http://www.spinics.net/lists/linux-omap/msg36678.html
-> https://patchwork.kernel.org/patch/188242/
-> https://patchwork.kernel.org/patch/188222/
->
-> Version v5:
-> *Delete wdt_runtime_resume and wdt_runtime_suspend
-> functions as the fix for the return values in the generic
-> runtime PM calls has been queued for 2.6.37 (see below link)
-> https://lists.linux-foundation.org/pipermail/linux-pm/2010-September/028466.html
-> Some of the v5 links:
-> https://patchwork.kernel.org/patch/181812/
-> https://patchwork.kernel.org/patch/181782/
-> https://patchwork.kernel.org/patch/181772/
-> https://patchwork.kernel.org/patch/181792/
->
-> Version v4:
-> *Implement hwmod adapdation first and then PM runtime adaptation
-> as two different patches in the series
-> *Remove inclusion of omap_device.h in the driver file.
-> Some of the v4 links:
-> https://patchwork.kernel.org/patch/174672/
-> https://patchwork.kernel.org/patch/174662/
->
-> Version v3:
-> *Fix Minor comments like renaming omap1 watchdog structures
-> with an omap1_ prefix
-> Some of the v3 links:
-> https://patchwork.kernel.org/patch/119698/
-> https://patchwork.kernel.org/patch/119696/ 
->
-> Version v2:
-> *Rebase to latest kernel
-> Some of the v2 links:
-> http://www.spinics.net/lists/linux-omap/msg34741.html
-> http://www.spinics.net/lists/linux-omap/msg34673.html
->
-> Version v1:
-> *Initial series
-> Some of the v1 links:
-> http://www.spinics.net/lists/linux-omap/msg30628.html
-> http://www.spinics.net/lists/linux-omap/msg30625.html
->
-> Benoit Cousson (1):
->   OMAP4: hwmod data: Add watchdog timer
->
-> Varadarajan, Charulatha (5):
->   OMAP3: hwmod data: Add watchdog timer
->   OMAP2420: hwmod data: Add watchdog timer
->   OMAP2430: hwmod data: Add watchdog timer
->   OMAP2PLUS: WDT: use omap_device_build for device registration
->   OMAP: WDT: Use PM runtime APIs instead of clk FW APIs
->
->  arch/arm/mach-omap1/devices.c              |   27 ++++++
->  arch/arm/mach-omap2/devices.c              |   39 ++++++++
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c |   64 +++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c |   64 +++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   66 ++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  135 ++++++++++++++++++++++++++++
->  arch/arm/plat-omap/devices.c               |   41 ---------
->  drivers/watchdog/omap_wdt.c                |   42 ++-------
->  8 files changed, 402 insertions(+), 76 deletions(-)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
