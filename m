@@ -1,31 +1,40 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Wed, 29 Sep 2010 14:34:36 +0300
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <8F7AF80515AF0D4D93307E594F3CB40E5F6A365B@dlee03.ent.ti.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
-	<8F7AF80515AF0D4D93307E594F3CB40E5F6A365B@dlee03.ent.ti.com>
-Message-ID: <AANLkTimD_MRbuTnBMPzAKPTmrDwjLkLVmr9bTSNROb5L@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 29 Sep 2010 13:54:11 +0200
+Subject: [PATCH 1/7] SPI: add PrimeCell generic DMA to PL022 v12
+In-Reply-To: <20100929082055.GC4703@angua.secretlab.ca>
+References: <1285684441-21700-1-git-send-email-linus.walleij@stericsson.com>
+	<1285684441-21700-2-git-send-email-linus.walleij@stericsson.com>
+	<20100929082055.GC4703@angua.secretlab.ca>
+Message-ID: <4CA328E3.3040502@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
+Grant Likely wrote:
 
-On Mon, Sep 27, 2010 at 7:28 PM, Kanigeri, Hari <h-kanigeri2@ti.com> wrote:
-> Yogesh is coming from dsplink requirement to use iommu. I see his comment as why Bridge requirement should be imposed on other IPCs that need iommu.
+> On Tue, Sep 28, 2010 at 04:33:55PM +0200, Linus Walleij wrote:
 
-Ahh, that explains a lot. However, dsp-link can just enable
-CONFIG_MPU_BRIDGE_IOMMU, and that's it, right? Perhaps it would make
-sense to rename to CONFIG_OMAP_IOMMU_IVA2, or something like that. But
-not remove it and break tidspbridge, which is already in staging.
+>> This extends the PL022 SSP/SPI driver with generic DMA engine
+>> support using the PrimeCell DMA engine interface. Also fix up the
+>> test code for the U300 platform.
+>> (...)
+>> --- a/arch/arm/mach-u300/dummyspichip.c
+>> +++ b/arch/arm/mach-u300/dummyspichip.c
+>> @@ -267,6 +267,7 @@ static struct spi_driver pl022_dummy_driver = {
+>>  	.driver = {
+>>  		.name	= "spi-dummy",
+>>  		.owner	= THIS_MODULE,
+>> +		.bus = &spi_bus_type,
+> 
+> This shouldn't be necessary.  spi_register_driver already sets the bus
+> type field.
+> 
+> Otherwise, this patch looks good.  If you're okay with me dropping
+> this hunk, then I'll pick up this patch into my next-spi branch.
 
-Once both are working happily with CONFIG_OMAP_IOMMU_IVA2 on, _then_
-it can be removed.
+OK just drop it, thanks Grant.
 
--- 
-Felipe Contreras
+I need to come up with the right way to refactor that dummychip anyway
+to I'll churn it out completely sooner or later.
+
+Yours,
+Linus Walleij
