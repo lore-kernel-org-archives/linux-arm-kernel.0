@@ -1,48 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Sep 2010 16:42:49 +0100
-Subject: [PATCH 1/2] ARM: add memory types for the TCMs
-In-Reply-To: <1278623805-17027-1-git-send-email-linus.walleij@stericsson.com>
-References: <1278623805-17027-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20100929154249.GA24118@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 29 Sep 2010 08:43:01 -0700
+Subject: [PATCH v8 0/6] OMAP: WDT: Implement WDT in hwmod way
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CD02BA7@dbde02.ent.ti.com>
+	(Charulatha Varadarajan's message of "Wed, 29 Sep 2010 20:16:41
+	+0530")
+References: <1285252363-3630-1-git-send-email-charu@ti.com>
+	<877hi5740v.fsf@deeprootsystems.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CD02B1E@dbde02.ent.ti.com>
+	<87d3rw62ft.fsf@deeprootsystems.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CD02BA7@dbde02.ent.ti.com>
+Message-ID: <87y6ak1rp6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 08, 2010 at 11:16:45PM +0200, Linus Walleij wrote:
-> I'm especially in the dark about the usage of the L_PTE_* stuff,
-> and when to use DOMAIN_KERNEL, DOMAIN_USER and DOMAIN_IO. For
-> example: does DOMAIN_KERNEL imply kernel usage? DOMAIN_KERNEL
-> for ITCM makes the code non-executable. Does DOMAIN_USER imply
-> that L_PTE_USER shall also be set?
+"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-Sorry, should've replied to this much earlier.  We now have a problem in
-that this stuff for the ITCM entry is wrong (identified via Santosh's
-MT_MEMORY problems).
+[...]
 
-L_PTE_* define what ends up in the PTE entries.  L_PTE_USER and
-L_PTE_WRITE operate together:
+>> 
+>> Instead, I would rather have a small piece of code in omap_init_wdt()
+>> which disarms the watchdog so we don't have any assumptions about
+>> bootloader behavior.
+>> 
+>> The question remains whether this disarm should be
+>> #ifndef CONFIG_OMAP_WATCHDOG or if it should happen all the time.  In
+>> case the watchdog is a module, it's probe may not happen within the
+>> timeout period and they system may reboot also, so I lean towards
+>> disarming the watchdog unconditionally.
+>
+> Agreed. But this shall be handled in mach-omap2/devices.c by directly
+> accessing the watchdog registers and disabling it, as the watchdog driver
+> would not be available by this time. 
 
-- None set, page is read-only in SVC mode, inaccessible in user mode.
-- L_PTE_WRITE, page is read-write in SVC mode, inaccessible in user mode.
-- L_PTE_USER, page is read-write in SVC mode, read-only in user mode.
-- L_PTE_USER|L_PTE_WRITE, page is read-write in both SVC and user mode.
+Correct.
 
-The domain stuff determines how these permissions are modified when
-set_fs(KERNEL_DS) is in effect.
+> If this okay, I would send a separate patch on top my hwmod series to
+> handle this.
 
-DOMAIN_IO covers any statically allocated IO device, and is always in
-client mode.  This means the permissions are never bypassed.
+Yes please.
 
-DOMAIN_USER covers userspace mappings, and likewise is always in client
-mode.
+Thanks,
 
-DOMAIN_KERNEL covers the kernel direct-mapped RAM, vmalloc and ioremap
-space.  This is normally in client mode when set_fs(USER_DS) is in
-effect.  When set_fs(KERNEL_DS) is set (which happens when we want to
-use user-accessing functions such as get_user() on data in kernel space)
-this domain is switched to manager mode, thereby bypassing the normal
-MMU protections.
-
-IO stuff in kernel space should be mapped without L_PTE_USER and
-DOMAIN_IO.  Everything else in kernel space should be mapped without
-L_PTE_USER and DOMAIN_KERNEL, with the exception of the user-accessible
-high vectors page.
+Kevin
