@@ -1,66 +1,71 @@
-From: yogesh_marathe@ti.com (Marathe, Yogesh)
-Date: Wed, 29 Sep 2010 18:58:27 +0530
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <AANLkTimD_MRbuTnBMPzAKPTmrDwjLkLVmr9bTSNROb5L@mail.gmail.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
-	<8F7AF80515AF0D4D93307E594F3CB40E5F6A365B@dlee03.ent.ti.com>
-	<AANLkTimD_MRbuTnBMPzAKPTmrDwjLkLVmr9bTSNROb5L@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930234006B4C@dbde02.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 29 Sep 2010 16:14:45 +0200
+Subject: [PATCH] ARM: Samsung: add a workaround for get_clock() for serial
+	driver
+Message-ID: <1285769685-11849-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Serial drivers call get_clock() very early, before platform bus
+has been set up, this requires a special check to let them get
+a proper clock. Without this patch, a serial console is broken
+on Universal C210 board.
 
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-samsung/clock.c |   25 ++++++++++++++++++++++++-
+ 1 files changed, 24 insertions(+), 1 deletions(-)
 
-> -----Original Message-----
-> From: Felipe Contreras [mailto:felipe.contreras at gmail.com]
-> Sent: Wednesday, September 29, 2010 5:05 PM
-> To: Kanigeri, Hari
-> Cc: Marathe, Yogesh; Premi, Sanjeev; Tony Lindgren; linux-arm-
-> kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 05/11] omap3: Remove non-existent config
-> option
-> 
-> Hi Hari,
-> 
-> On Mon, Sep 27, 2010 at 7:28 PM, Kanigeri, Hari <h-
-> kanigeri2 at ti.com> wrote:
-> > Yogesh is coming from dsplink requirement to use iommu. I see his
-> comment as why Bridge requirement should be imposed on other IPCs
-> that need iommu.
-> 
-> Ahh, that explains a lot. However, dsp-link can just enable
-> CONFIG_MPU_BRIDGE_IOMMU, and that's it, right? Perhaps it would
-> make
-> sense to rename to CONFIG_OMAP_IOMMU_IVA2, or something like
-> that. But
-> not remove it and break tidspbridge, which is already in staging.
-> 
-> Once both are working happily with CONFIG_OMAP_IOMMU_IVA2 on,
-> _then_
-> it can be removed.
-> 
-> --
-> Felipe Contreras
-
-Felipe,
-
-dsplink and syslink (two drivers who use iommu) should not enable
-CONFIG_MPU_BRIDGE_IOMMU as dspbridge and dsplink /syslink 
-can not co-exist as they are using same resources. Not applying patch
-breaks dsplink/sylink any one which is being used. Defining this config
-makes them co-exist. 
-
-I'm ok with changing name to CONFIG_OMAP_IOMMU_IVA2 but ideally
-then that will also break the dspbridge. 
-
-One more way would be to soure revert the patch and apply on dspbridge branch if it breaks the builds on that branch rather than
-breaking others in master.
-
-Regards,
-Yogesh.
+diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+index 90a2051..da847f1 100644
+--- a/arch/arm/plat-samsung/clock.c
++++ b/arch/arm/plat-samsung/clock.c
+@@ -48,6 +48,9 @@
+ #include <plat/clock.h>
+ #include <plat/cpu.h>
+ 
++#include <linux/serial_core.h>
++#include <plat/regs-serial.h> /* for s3c24xx_uart_devs */
++
+ /* clock information */
+ 
+ static LIST_HEAD(clocks);
+@@ -65,6 +68,26 @@ static int clk_null_enable(struct clk *clk, int enable)
+ 	return 0;
+ }
+ 
++static int dev_is_s3c_uart(struct device *dev)
++{
++	struct platform_device **pdev = s3c24xx_uart_devs;
++	int i;
++	for (i=0; i<ARRAY_SIZE(s3c24xx_uart_devs); i++, pdev++)
++		if (*pdev && dev == &(*pdev)->dev)
++			return 1;
++	return 0;
++}
++
++/* Serial drivers call get_clock() very early, before platform bus
++   has been set up, this requires a special check to let them get
++   a proper clock */
++
++static int dev_is_platform_device(struct device *dev)
++{
++	return dev->bus == &platform_bus_type ||
++	       (dev->bus == NULL && dev_is_s3c_uart(dev));
++}
++
+ /* Clock API calls */
+ 
+ struct clk *clk_get(struct device *dev, const char *id)
+@@ -73,7 +96,7 @@ struct clk *clk_get(struct device *dev, const char *id)
+ 	struct clk *clk = ERR_PTR(-ENOENT);
+ 	int idno;
+ 
+-	if (dev == NULL || dev->bus != &platform_bus_type)
++	if (dev == NULL || !dev_is_platform_device(dev))
+ 		idno = -1;
+ 	else
+ 		idno = to_platform_device(dev)->id;
+-- 
+1.7.1.569.g6f426
