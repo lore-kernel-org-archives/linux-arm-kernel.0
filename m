@@ -1,48 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Sep 2010 16:02:42 +0100
-Subject: [PATCH 01/14] ARM: mmu: Setup MT_MEMORY and
-	MT_MEMORY_NONCACHED L1 entries
-In-Reply-To: <tnxzkv0hac6.fsf@e102109-lin.cambridge.arm.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
-	<tnxzkv0hac6.fsf@e102109-lin.cambridge.arm.com>
-Message-ID: <20100929150242.GA21646@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Sep 2010 16:39:44 +0100
+Subject: [PATCH] oprofile, arm: proper release resources on failure
+In-Reply-To: <20100929145225.GJ13563@erda.amd.com>
+References: <20100929145225.GJ13563@erda.amd.com>
+Message-ID: <1285774784.30080.19.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 29, 2010 at 03:51:21PM +0100, Catalin Marinas wrote:
-> Hi Santosh,
+On Wed, 2010-09-29 at 15:52 +0100, Robert Richter wrote:
+> Will,
 > 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> > This patch populates the L1 entries for MT_MEMORY and MT_MEMORY_NONCACHED
-> > types so that at boot-up, we can map memories outside system memory
-> > at page level granularity
-> >
-> > Previously the mapping was limiting to section level, which creates
-> > unnecessary addiotional mapping for which physical memory may not
-> > present. On the newer ARM with speculation, this is dangerous and can
-> > result in untraceable aborts.
-> >
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Reviewed-by: Russell King <linux@arm.linux.org.uk>
-> > ---
-> >  arch/arm/mm/mmu.c |   17 +++++++++++++++--
-> >  1 files changed, 15 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> > index 6e1c4f6..3e986a6 100644
-> > --- a/arch/arm/mm/mmu.c
-> > +++ b/arch/arm/mm/mmu.c
-> > @@ -246,6 +246,9 @@ static struct mem_type mem_types[] = {
-> >  		.domain    = DOMAIN_USER,
-> >  	},
-> >  	[MT_MEMORY] = {
-> > +		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-> > +				L_PTE_USER | L_PTE_EXEC,
-> > +		.prot_l1   = PMD_TYPE_TABLE,
-> 
-> Just a quick question - does this need to have L_PTE_USER? Is it
-> read-only or it needs L_PTE_WRITE as well?
 
-Eek.  It should not have L_PTE_USER or else it will be accessible to
-userspace.
+Hi Robert,
+
+
+> the patch below fixes a resource leak I found during code review. Can
+> you please review and test it (I don't have an ARM environment for
+> this available). If you are fine with the change, please ack. I want
+> to send it upstream via tip/perf/urgent.
+> 
+
+I have a few minor clarifications:
+> 
+
+> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> index 0691176..72e09eb 100644
+> --- a/arch/arm/oprofile/common.c
+> +++ b/arch/arm/oprofile/common.c
+> @@ -102,6 +102,7 @@ static int op_create_counter(int cpu, int event)
+>         if (IS_ERR(pevent)) {
+>                 ret = PTR_ERR(pevent);
+>         } else if (pevent->state != PERF_EVENT_STATE_ACTIVE) {
+> +               perf_event_release_kernel(pevent);
+>                 pr_warning("oprofile: failed to enable event %d "
+>                                 "on CPU %d\n", event, cpu);
+>                 ret = -EBUSY;
+
+
+Yup, this is needed. Thanks! It would be nice to do away with the
+else statement altogether but I think adding a pinned event and
+then failing to activate it still succeeds in
+perf_event_create_kernel_counter.
+
+
+> @@ -365,6 +366,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+>         ret = init_driverfs();
+>         if (ret) {
+>                 kfree(counter_config);
+> +               counter_config = NULL;
+>                 return ret;
+>         }
+> 
+> @@ -402,7 +404,6 @@ void oprofile_arch_exit(void)
+>         struct perf_event *event;
+> 
+>         if (*perf_events) {
+> -               exit_driverfs();
+>                 for_each_possible_cpu(cpu) {
+>                         for (id = 0; id < perf_num_counters; ++id) {
+>                                 event = perf_events[cpu][id];
+> @@ -413,8 +414,10 @@ void oprofile_arch_exit(void)
+>                 }
+>         }
+> 
+> -       if (counter_config)
+> +       if (counter_config) {
+>                 kfree(counter_config);
+> +               exit_driverfs();
+> +       }
+>  }
+>  #else
+>  int __init oprofile_arch_init(struct oprofile_operations *ops)
+> --
+> 1.7.2.2
+> 
+
+Hmm, these three hunks conflict with the patches I posted last
+month to fix the resource allocation and freeing. Can't we
+merge those patches instead? I have versions against -rc6 here:
+
+git://linux-arm.org/linux-2.6-wd.git oprofile-mm
+
+Cheers,
+
+Will
