@@ -1,40 +1,139 @@
-From: soni.trilok@gmail.com (Trilok Soni)
-Date: Wed, 29 Sep 2010 17:42:31 +0530
-Subject: [PATCH 1/7] pwm: Add pwm core driver
-In-Reply-To: <F45880696056844FA6A73F415B568C69532DC8B7E4@EXDCVYMBSTM006.EQ1STM.local>
-References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
-	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
-	<4CA1AD2B.8000905@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FB6B@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA1BC16.3020702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FC60@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA25841.4090702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC8B7E4@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <AANLkTingb8ox5h5rN1YrxONibfrWLicoiS6yqKf_v5bJ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 29 Sep 2010 21:16:36 +0900
+Subject: [PATCH 1/2] ARM: S5PV210: Add audio support to Aquila
+In-Reply-To: <4C527C11.5090409@samsung.com>
+References: <4C4F9E4C.7000001@samsung.com>
+	<20100729173825.GE24781@opensource.wolfsonmicro.com>
+	<4C527C11.5090409@samsung.com>
+Message-ID: <001b01cb5fd0$2c73bd50$855b37f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun,
+Chanwoo Choi wrote:
+> 
+> Mark Brown wrote:
+> > On Wed, Jul 28, 2010 at 12:04:44PM +0900, Chanwoo Choi wrote:
+> >
+> >> +static struct regulator_consumer_supply wm8994_fixed_voltage0_supplies[] =
+> {
+> >> +	{
+> >> +		.dev_name	= "5-001a",
+> >> +		.supply		= "DBVDD",
+> >> +	}, {
+> >> +		.dev_name	= "5-001a",
+> >> +		.supply		= "AVDD2",
+> >> +	}, {
+> >> +		.dev_name	= "5-001a",
+> >> +		.supply		= "CPVDD",
+> >> +	},
+> >> +
+> >> +};
+> >> +
+> >> +static struct regulator_consumer_supply wm8994_fixed_voltage1_supplies[] =
+> {
+> >
+> > All these fixed voltage regulators seem a bit suspicous for a mobile
+> > phone - I'd have expected that the supplies would all be being provided
+> > by your PMIC except for things taken directly from the battery supply
+> > (like the speakers tend to be, for example)?  There's no problem with
+> > the code itself, it just looks a bit odd.
+> >
+> 
+> All these consumer supply of WM8994 codec connected the below
+> regulator(VCC_1.8V) on
+> a circuit diagram. "VCC_1.8V" regualtor is always enabled, because it is used to
+> many devices.
+> Then I haven't connected all these consumer supply of WM8994 codec to
+> "VCC_1.8V" regulator.
+> I will modify that the consumer supply would be provided by PMIC.
+> 
+> static struct regulator_init_data aquila_buck3_data = {
+> 	.constraints	= {
+> 		.name		= "VCC_1.8V",
+> 		.min_uV		= 1800000,
+> 		.max_uV		= 1800000,
+> 		.apply_uV	= 1,
+> 		.state_mem	= {
+> 			.enabled = 1,
+> 		},
+> 	},
+> };
+> 
+> >> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
+> >> +	{
+> >> +		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
+> >> +		I2C_BOARD_INFO("wm8994", 0x34 >> 1),
+> >> +		.platform_data	= &wm8994_platform_data,
+> >> +	},
+> >> +};
+> >
+> > Probably clearer for generic Linux use to specify the address as 0x1a
+> > directly.
+> 
+> Ok, I will do.
+> 
+> >
+> >> +static void __init aquila_sound_init(void)
+> >> +{
+> >> +	unsigned int gpio;
+> >> +
+> >> +	/* CODEC_XTAL_EN */
+> >> +	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
+> >> +	gpio_request(gpio, "CODEC_XTAL_EN");
+> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
+> >> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> >> +	gpio_direction_output(gpio, 1);
+> >
+> > Might be as well to provide some or all this stuff in your audio machine
+> > driver?
+> 
+> The Aquila board have a oscillator which provide main clock to
+> WM8994 audio codec. The oscillator provide 24MHz clock to WM8994 audio codec
+> (MCLK1 pin). I set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
+> 
+> >
+> >> +	/* MICBIAS_EN */
+> >> +	gpio = S5PV210_GPJ4(2);			/* XMSMRN */
+> >> +	gpio_request(gpio, "MICBIAS_EN");
+> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
+> >> +	gpio_direction_output(gpio, 1);
+> >
+> > This in particular would benefit from keeping the request of the GPIO
+> > joined up with the driver that uses it.
+> 
+> Ok, I will move this code to machine driver(sound/soc/s3c24xxx/aquila_wm8994.c).
+> 
+> >> +	/* ADC_EN */
+> >> +	gpio = S5PV210_GPJ3(2);
+> >> +	gpio_request(gpio, "ADC_EN");
+> >> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
+> >> +	gpio_direction_output(gpio, 1);
+> >
+> > I'm not sure what this does?
+> >
+> 
+> I explained below description about "ADC_EN" :
+> "ADC_EN : This gpio enable the ADC device which is used to detect
+>  the kind of jack. (SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT)
+>  According to the kind of jack, an electric current is changed.
+>  (Only used on Aquila board) "
+> 
+> When inserting the jack to Aquila board, I used ADC driver so that, detecting
+> the kind of jack(SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT).
+> 
+> I will separately make the another function to initialize ADC driver.
+> 
+> Thank you for your comment.
+> Chanwoo Choi
+> 
+Hi,
 
-Adding Bill Gatliff (anyway, CC list already crowded)
+How was going on?
 
-On Wed, Sep 29, 2010 at 10:19 AM, Arun MURTHY
-<arun.murthy@stericsson.com> wrote:
->> Arun MURTHY wrote:
->> >>>> Shouldn't PWM_DEVICES select HAVE_PWM?
->> >>>
->> >>> No not required, the entire concept is to remove HAVE_PWM and use
->> >> PWM_CORE.
+Thanks.
 
-There is already nice and clean framework written by Bill for PWM, if
-you grep the LKML and linux-embedded mailing list archive then you
-will get his patches, and it seems that he had promised to send the
-updated version few week back, but not heard from him (may be because
-he was travelling as per FB status).
-
-Please evaluate that framework too.
-
--- 
----Trilok Soni
-http://triloksoni.wordpress.com
-http://www.linkedin.com/in/triloksoni
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
