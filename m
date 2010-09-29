@@ -1,93 +1,75 @@
-From: richard.rojfors@pelagicore.com (=?UTF-8?B?UmljaGFyZCBSw7ZqZm9ycw==?=)
-Date: Wed, 29 Sep 2010 23:24:25 +0200
-Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
-In-Reply-To: <1285790884-3516-2-git-send-email-w.sang@pengutronix.de>
-References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
-	<1285790884-3516-2-git-send-email-w.sang@pengutronix.de>
-Message-ID: <4CA3AE89.2030107@pelagicore.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Sep 2010 14:56:36 -0700
+Subject: [GIT PULL] omap2 sparse fixes
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB7FE8F9@dbde02.ent.ti.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+	<20100923225851.GR4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
+	<20100925001914.GO4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
+	<20100928152139.GB3117@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F94C9@dbde02.ent.ti.com>
+	<20100928183157.GH3117@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB7FE8F9@dbde02.ent.ti.com>
+Message-ID: <20100929215635.GC3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2010 10:07 PM, Wolfram Sang wrote:
-> We need to carry some information per host, e.g. the clock. Add a
-> structure for it and initialize it in the generic part. Also do not use
-> the parent of the platform_device (if it is available), this breaks the
-> clock-matching on ARM.
+* G, Manjunath Kondaiah <manjugk@ti.com> [100929 12:42]:
+> 
+> Tony,
+> 
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com] 
+> > Sent: Wednesday, September 29, 2010 12:02 AM
+> > To: G, Manjunath Kondaiah
+> > Cc: linux-omap at vger.kernel.org; 
+> > linux-arm-kernel at lists.infradead.org; Samuel Ortiz; Dmitry 
+> > Torokhov; linux-mtd at lists.infradead.org; Russell King - ARM Linux
+> > Subject: Re: [GIT PULL] omap2 sparse fixes
+> > 
+> > * G, Manjunath Kondaiah <manjugk@ti.com> [100928 08:26]:
+> ...
+> 
+> > Yes please take out all patches that are not in arch/arm/*omap*/ path.
+> > The others really should go to the driver maintainers.
+> > 
+> > Tony
+> 
+> Here is new branch which has only arch/arm/*omap*/ related patches.
 
-The reason it's there is for instance a case when the shdci device is exposed
-from a MFD device which sits on top of PCI. Then the parent (PCI device)
-is the device that is DMA capable. This patch will break such usage.
+Thanks. Noticed one more thing though:
 
-What is the purpose of this patch? You allocate space for an extra struct,
-which you have a pointer pointing to, but you never use the pointer?
+In your patch "OMAP: mach-omap2: Fix static function warnings" looks like
+you're adding omap2_gp_clockevent_set_gptimer twice:
 
->
-> Signed-off-by: Wolfram Sang<w.sang@pengutronix.de>
-> Cc: Richard R?jfors<richard.rojfors.ext@mocean-labs.com>
-> ---
->
-> Changes since last version:
->
-> * added types.h
+--- a/arch/arm/plat-omap/include/plat/timer-gp.h
++++ b/arch/arm/mach-omap2/timer-gp.h
+@@ -11,7 +11,6 @@
+ #ifndef __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_TIMER_GP_H
+ #define __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_TIMER_GP_H
+ 
+-int __init omap2_gp_clockevent_set_gptimer(u8 id);
++extern int __init omap2_gp_clockevent_set_gptimer(u8 id);
+ 
+ #endif
+-
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -81,6 +81,6 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);
+ void omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value);
+ 
+ int omap_dm_timers_active(void);
+-
++int omap2_gp_clockevent_set_gptimer(u8 id);
+ 
+ #endif /* __ASM_ARCH_DMTIMER_H */
 
-I saw no types.h?
+Please also be careful that your branch contains the same patches
+as you've posted for review. Nobody wants to pull different stuff
+than what was posted! Also looks like Paul had one comment related
+to the same patch.
 
-> * removed usage of pdev->dev.parent to ensure clk-matching
->    Please speak up if this has a use case I failed to see!
->
->   drivers/mmc/host/sdhci-pltfm.c |    8 ++++----
->   drivers/mmc/host/sdhci-pltfm.h |    7 +++++++
->   2 files changed, 11 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index e045e3c..095ca9d 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
->   	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
->   	const struct platform_device_id *platid = platform_get_device_id(pdev);
->   	struct sdhci_host *host;
-> +	struct sdhci_pltfm_host *pltfm_host;
->   	struct resource *iomem;
->   	int ret;
->
-> @@ -71,16 +72,15 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
->   		dev_err(&pdev->dev, "Invalid iomem size. You may "
->   			"experience problems.\n");
->
-> -	if (pdev->dev.parent)
-> -		host = sdhci_alloc_host(pdev->dev.parent, 0);
-> -	else
-> -		host = sdhci_alloc_host(&pdev->dev, 0);
-> +	host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
->
->   	if (IS_ERR(host)) {
->   		ret = PTR_ERR(host);
->   		goto err;
->   	}
->
-> +	pltfm_host = sdhci_priv(host);
-> +
->   	host->hw_name = "platform";
->   	if (pdata&&  pdata->ops)
->   		host->ops = pdata->ops;
-> diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-> index 900f329..93a0319 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.h
-> +++ b/drivers/mmc/host/sdhci-pltfm.h
-> @@ -11,8 +11,15 @@
->   #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
->   #define _DRIVERS_MMC_SDHCI_PLTFM_H
->
-> +#include<linux/clk.h>
-> +#include<linux/types.h>
->   #include<linux/sdhci-pltfm.h>
->
-> +struct sdhci_pltfm_host {
-> +	struct clk *clk;
-> +	u32 scratchpad; /* to handle quirks across io-accessor calls */
-> +};
-> +
->   extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
->
->   #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
+Regards,
+
+Tony
