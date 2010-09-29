@@ -1,79 +1,106 @@
-From: augulis.darius@gmail.com (Darius Augulis)
-Date: Wed, 29 Sep 2010 22:37:04 +0300
-Subject: [PATCH 9/9] ARM: S3C64XX: add touchscreen support for mach-mini6410
-In-Reply-To: <20100929192354.25307.40197.stgit@darius-desktop>
-References: <20100929192354.25307.40197.stgit@darius-desktop>
-Message-ID: <20100929193649.25307.66741.stgit@darius-desktop>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Thu, 30 Sep 2010 01:21:00 +0530
+Subject: [GIT PULL] omap2 sparse fixes
+In-Reply-To: <20100928183157.GH3117@atomide.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
+	<20100923225851.GR4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
+	<20100925001914.GO4211@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
+	<20100928152139.GB3117@atomide.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F94C9@dbde02.ent.ti.com>
+	<20100928183157.GH3117@atomide.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB7FE8F9@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add touchscreen device support for mach-mini6410
 
-Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
----
- arch/arm/mach-s3c64xx/Kconfig         |    2 ++
- arch/arm/mach-s3c64xx/mach-mini6410.c |   12 ++++++++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+Tony,
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index b514e3a..fe1fd30 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -108,6 +108,8 @@ config MACH_MINI6410
- 	select S3C_DEV_NAND
- 	select S3C_DEV_FB
- 	select S3C64XX_SETUP_FB_24BPP
-+	select SAMSUNG_DEV_ADC
-+	select SAMSUNG_DEV_TS
- 	help
- 	  Machine support for the FriendlyARM MINI6410
- 
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 90f1976..2c585a7 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -35,11 +35,14 @@
- #include <mach/regs-srom.h>
- #include <mach/s3c6410.h>
- 
-+#include <plat/adc.h>
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/fb.h>
- #include <plat/nand.h>
- #include <plat/regs-serial.h>
-+#include <plat/ts.h>
-+
- #include <video/platform_lcd.h>
- 
- #define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
-@@ -202,6 +205,12 @@ static struct platform_device mini6410_lcd_powerdev = {
- 	.dev.platform_data	= &mini6410_lcd_power_data,
- };
- 
-+static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
-+	.delay			= 10000,
-+	.presc			= 49,
-+	.oversampling_shift	= 2,
-+};
-+
- static struct platform_device *mini6410_devices[] __initdata = {
- 	&mini6410_device_eth,
- 	&s3c_device_hsmmc0,
-@@ -210,6 +219,8 @@ static struct platform_device *mini6410_devices[] __initdata = {
- 	&s3c_device_nand,
- 	&s3c_device_fb,
- 	&mini6410_lcd_powerdev,
-+	&s3c_device_adc,
-+	&s3c_device_ts,
- };
- 
- static void __init mini6410_map_io(void)
-@@ -308,6 +319,7 @@ static void __init mini6410_machine_init(void)
- 
- 	s3c_nand_set_platdata(&mini6410_nand_info);
- 	s3c_fb_set_platdata(&mini6410_lcd_pdata);
-+	s3c24xx_ts_set_platdata(&s3c_ts_platform);
- 
- 	/* configure nCS1 width to 16 bits */
- 
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com] 
+> Sent: Wednesday, September 29, 2010 12:02 AM
+> To: G, Manjunath Kondaiah
+> Cc: linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; Samuel Ortiz; Dmitry 
+> Torokhov; linux-mtd at lists.infradead.org; Russell King - ARM Linux
+> Subject: Re: [GIT PULL] omap2 sparse fixes
+> 
+> * G, Manjunath Kondaiah <manjugk@ti.com> [100928 08:26]:
+...
+
+> Yes please take out all patches that are not in arch/arm/*omap*/ path.
+> The others really should go to the driver maintainers.
+> 
+> Tony
+
+Here is new branch which has only arch/arm/*omap*/ related patches.
+
+-Manjunath
+
+The following changes since commit 899611ee7d373e5eeda08e9a8632684e1ebbbf00:
+  Linus Torvalds (1):
+        Linux 2.6.36-rc6
+
+are available in the git repository at:
+
+  git://dev.omapzoom.org/pub/scm/manju/kernel-omap3-dev.git omap_sparse_fixes
+
+G, Manjunath Kondaiah (7):
+      OMAP: mach-omap2: Fix incorrect assignment warnings
+      OMAP: mach-omap2: Fix static declaration warnings
+      OMAP: mach-omap2: Fix static function warnings
+      OMAP: mach-omap2: Fix miscellaneous sparse warnings
+      OMAP: plat-omap: Fix static function warnings
+      OMAP: Convert write/read functions to raw read/write
+      OMAP3: Keypad: Fix incorrect type initializer
+
+ arch/arm/mach-omap2/board-3430sdp.c                |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c                |    3 +-
+ arch/arm/mach-omap2/board-am3517evm.c              |    5 +--
+ arch/arm/mach-omap2/board-cm-t35.c                 |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |    4 +-
+ arch/arm/mach-omap2/board-igep0020.c               |    4 +-
+ arch/arm/mach-omap2/board-ldp.c                    |    2 +-
+ arch/arm/mach-omap2/board-n8x0.c                   |   16 +----------
+ arch/arm/mach-omap2/board-omap3beagle.c            |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |    8 +++---
+ arch/arm/mach-omap2/board-omap3stalker.c           |    6 ++--
+ arch/arm/mach-omap2/board-omap3touchbook.c         |    4 +-
+ arch/arm/mach-omap2/board-omap4panda.c             |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |    4 ++-
+ arch/arm/mach-omap2/board-rx51-sdram.c             |    2 +-
+ arch/arm/mach-omap2/board-rx51-video.c             |    2 +
+ arch/arm/mach-omap2/board-zoom-debugboard.c        |    2 +
+ arch/arm/mach-omap2/board-zoom-peripherals.c       |    4 ++-
+ arch/arm/mach-omap2/control.c                      |    5 ++-
+ arch/arm/mach-omap2/gpmc-onenand.c                 |    8 +++---
+ arch/arm/mach-omap2/include/mach/board-flash.h     |    2 +
+ arch/arm/mach-omap2/include/mach/board-rx51.h      |   11 ++++++++
+ arch/arm/mach-omap2/io.c                           |    1 +
+ arch/arm/mach-omap2/io.h                           |    7 +++++
+ arch/arm/mach-omap2/irq.c                          |    1 -
+ arch/arm/mach-omap2/mux2420.c                      |    2 +-
+ arch/arm/mach-omap2/mux2430.c                      |    2 +-
+ arch/arm/mach-omap2/mux34xx.c                      |   12 ++++----
+ arch/arm/mach-omap2/pm-debug.c                     |    2 +-
+ arch/arm/mach-omap2/pm34xx.c                       |    2 +-
+ arch/arm/mach-omap2/powerdomain.c                  |   28 --------------------
+ arch/arm/mach-omap2/prcm.c                         |    2 +-
+ .../include/plat => mach-omap2}/timer-gp.h         |    3 +-
+ arch/arm/plat-omap/cpu-omap.c                      |    4 +-
+ arch/arm/plat-omap/dmtimer.c                       |    6 ++--
+ arch/arm/plat-omap/fb.c                            |    2 +
+ arch/arm/plat-omap/fb.h                            |   10 +++++++
+ arch/arm/plat-omap/include/plat/dmtimer.h          |    4 ++-
+ arch/arm/plat-omap/include/plat/sdrc.h             |    1 +
+ arch/arm/plat-omap/include/plat/sram.h             |    1 -
+ arch/arm/plat-omap/mcbsp.c                         |   10 +++---
+ arch/arm/plat-omap/sram.c                          |   21 ++++++--------
+ arch/arm/plat-omap/sram.h                          |    6 ++++
+ 43 files changed, 115 insertions(+), 112 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/include/mach/board-rx51.h
+ create mode 100644 arch/arm/mach-omap2/io.h
+ rename arch/arm/{plat-omap/include/plat => mach-omap2}/timer-gp.h (86%)
+ create mode 100644 arch/arm/plat-omap/fb.h
+ create mode 100644 arch/arm/plat-omap/sram.h
