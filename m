@@ -1,75 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Sep 2010 14:56:36 -0700
-Subject: [GIT PULL] omap2 sparse fixes
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB7FE8F9@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E9402785A390E@dbde02.ent.ti.com>
-	<20100923225851.GR4211@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F859E@dbde02.ent.ti.com>
-	<20100925001914.GO4211@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F917C@dbde02.ent.ti.com>
-	<20100928152139.GB3117@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB3F94C9@dbde02.ent.ti.com>
-	<20100928183157.GH3117@atomide.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB7FE8F9@dbde02.ent.ti.com>
-Message-ID: <20100929215635.GC3117@atomide.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 29 Sep 2010 14:56:08 -0700
+Subject: imx patches for 2.6.37
+In-Reply-To: <20100927175703.GB24254@pengutronix.de>
+References: <20100927135009.GC6271@pengutronix.de>
+	<201009271909.58594.philippe.retornaz@epfl.ch>
+	<20100927175703.GB24254@pengutronix.de>
+Message-ID: <AANLkTi=pF8XfW+vAZNp413qXe81cHHho8L2asYNR6As=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* G, Manjunath Kondaiah <manjugk@ti.com> [100929 12:42]:
-> 
-> Tony,
-> 
-> > -----Original Message-----
-> > From: Tony Lindgren [mailto:tony at atomide.com] 
-> > Sent: Wednesday, September 29, 2010 12:02 AM
-> > To: G, Manjunath Kondaiah
-> > Cc: linux-omap at vger.kernel.org; 
-> > linux-arm-kernel at lists.infradead.org; Samuel Ortiz; Dmitry 
-> > Torokhov; linux-mtd at lists.infradead.org; Russell King - ARM Linux
-> > Subject: Re: [GIT PULL] omap2 sparse fixes
-> > 
-> > * G, Manjunath Kondaiah <manjugk@ti.com> [100928 08:26]:
-> ...
-> 
-> > Yes please take out all patches that are not in arch/arm/*omap*/ path.
-> > The others really should go to the driver maintainers.
-> > 
-> > Tony
-> 
-> Here is new branch which has only arch/arm/*omap*/ related patches.
+2010/9/27 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Philippe,
+>
+> On Mon, Sep 27, 2010 at 07:09:58PM +0200, Philippe R?tornaz wrote:
+>> Are the sdma patches in the pipeline too ? Or it will be for .38 ?
+> SDMA is not my line of country but Sascha's. ?AFAIK he waits for
+> comments from Dan.
+>
 
-Thanks. Noticed one more thing though:
+Fyi. I supplied comments to Sascha and am just waiting for the respun patches.
 
-In your patch "OMAP: mach-omap2: Fix static function warnings" looks like
-you're adding omap2_gp_clockevent_set_gptimer twice:
-
---- a/arch/arm/plat-omap/include/plat/timer-gp.h
-+++ b/arch/arm/mach-omap2/timer-gp.h
-@@ -11,7 +11,6 @@
- #ifndef __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_TIMER_GP_H
- #define __ARCH_ARM_PLAT_OMAP_INCLUDE_MACH_TIMER_GP_H
- 
--int __init omap2_gp_clockevent_set_gptimer(u8 id);
-+extern int __init omap2_gp_clockevent_set_gptimer(u8 id);
- 
- #endif
--
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -81,6 +81,6 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);
- void omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value);
- 
- int omap_dm_timers_active(void);
--
-+int omap2_gp_clockevent_set_gptimer(u8 id);
- 
- #endif /* __ASM_ARCH_DMTIMER_H */
-
-Please also be careful that your branch contains the same patches
-as you've posted for review. Nobody wants to pull different stuff
-than what was posted! Also looks like Paul had one comment related
-to the same patch.
-
-Regards,
-
-Tony
+--
+Dan
