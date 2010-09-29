@@ -1,86 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Sep 2010 16:39:44 +0100
-Subject: [PATCH] oprofile, arm: proper release resources on failure
-In-Reply-To: <20100929145225.GJ13563@erda.amd.com>
-References: <20100929145225.GJ13563@erda.amd.com>
-Message-ID: <1285774784.30080.19.camel@e102144-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Sep 2010 16:42:49 +0100
+Subject: [PATCH 1/2] ARM: add memory types for the TCMs
+In-Reply-To: <1278623805-17027-1-git-send-email-linus.walleij@stericsson.com>
+References: <1278623805-17027-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20100929154249.GA24118@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-09-29 at 15:52 +0100, Robert Richter wrote:
-> Will,
-> 
+On Thu, Jul 08, 2010 at 11:16:45PM +0200, Linus Walleij wrote:
+> I'm especially in the dark about the usage of the L_PTE_* stuff,
+> and when to use DOMAIN_KERNEL, DOMAIN_USER and DOMAIN_IO. For
+> example: does DOMAIN_KERNEL imply kernel usage? DOMAIN_KERNEL
+> for ITCM makes the code non-executable. Does DOMAIN_USER imply
+> that L_PTE_USER shall also be set?
 
-Hi Robert,
+Sorry, should've replied to this much earlier.  We now have a problem in
+that this stuff for the ITCM entry is wrong (identified via Santosh's
+MT_MEMORY problems).
 
+L_PTE_* define what ends up in the PTE entries.  L_PTE_USER and
+L_PTE_WRITE operate together:
 
-> the patch below fixes a resource leak I found during code review. Can
-> you please review and test it (I don't have an ARM environment for
-> this available). If you are fine with the change, please ack. I want
-> to send it upstream via tip/perf/urgent.
-> 
+- None set, page is read-only in SVC mode, inaccessible in user mode.
+- L_PTE_WRITE, page is read-write in SVC mode, inaccessible in user mode.
+- L_PTE_USER, page is read-write in SVC mode, read-only in user mode.
+- L_PTE_USER|L_PTE_WRITE, page is read-write in both SVC and user mode.
 
-I have a few minor clarifications:
-> 
+The domain stuff determines how these permissions are modified when
+set_fs(KERNEL_DS) is in effect.
 
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index 0691176..72e09eb 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -102,6 +102,7 @@ static int op_create_counter(int cpu, int event)
->         if (IS_ERR(pevent)) {
->                 ret = PTR_ERR(pevent);
->         } else if (pevent->state != PERF_EVENT_STATE_ACTIVE) {
-> +               perf_event_release_kernel(pevent);
->                 pr_warning("oprofile: failed to enable event %d "
->                                 "on CPU %d\n", event, cpu);
->                 ret = -EBUSY;
+DOMAIN_IO covers any statically allocated IO device, and is always in
+client mode.  This means the permissions are never bypassed.
 
+DOMAIN_USER covers userspace mappings, and likewise is always in client
+mode.
 
-Yup, this is needed. Thanks! It would be nice to do away with the
-else statement altogether but I think adding a pinned event and
-then failing to activate it still succeeds in
-perf_event_create_kernel_counter.
+DOMAIN_KERNEL covers the kernel direct-mapped RAM, vmalloc and ioremap
+space.  This is normally in client mode when set_fs(USER_DS) is in
+effect.  When set_fs(KERNEL_DS) is set (which happens when we want to
+use user-accessing functions such as get_user() on data in kernel space)
+this domain is switched to manager mode, thereby bypassing the normal
+MMU protections.
 
-
-> @@ -365,6 +366,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->         ret = init_driverfs();
->         if (ret) {
->                 kfree(counter_config);
-> +               counter_config = NULL;
->                 return ret;
->         }
-> 
-> @@ -402,7 +404,6 @@ void oprofile_arch_exit(void)
->         struct perf_event *event;
-> 
->         if (*perf_events) {
-> -               exit_driverfs();
->                 for_each_possible_cpu(cpu) {
->                         for (id = 0; id < perf_num_counters; ++id) {
->                                 event = perf_events[cpu][id];
-> @@ -413,8 +414,10 @@ void oprofile_arch_exit(void)
->                 }
->         }
-> 
-> -       if (counter_config)
-> +       if (counter_config) {
->                 kfree(counter_config);
-> +               exit_driverfs();
-> +       }
->  }
->  #else
->  int __init oprofile_arch_init(struct oprofile_operations *ops)
-> --
-> 1.7.2.2
-> 
-
-Hmm, these three hunks conflict with the patches I posted last
-month to fix the resource allocation and freeing. Can't we
-merge those patches instead? I have versions against -rc6 here:
-
-git://linux-arm.org/linux-2.6-wd.git oprofile-mm
-
-Cheers,
-
-Will
+IO stuff in kernel space should be mapped without L_PTE_USER and
+DOMAIN_IO.  Everything else in kernel space should be mapped without
+L_PTE_USER and DOMAIN_KERNEL, with the exception of the user-accessible
+high vectors page.
