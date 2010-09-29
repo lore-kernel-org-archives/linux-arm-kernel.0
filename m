@@ -1,69 +1,52 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 29 Sep 2010 09:39:01 +0900
-Subject: [PATCH v2 1/3] ARM: S5PC110: Place the common SPARSEMEM
-	at	ARCH_S5PV210
-Message-ID: <20100929003901.GA491@july>
+Date: Wed, 29 Sep 2010 09:39:07 +0900
+Subject: [PATCH v2 2/3] ARM: S5PC210: Place the common SPARSEMEM
+	at	ARCH_S5PV310
+Message-ID: <20100929003907.GA495@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-In case of s5pc110 CPU. It uses the SPARSEMEM as default memory configuration.
-So move to ARCH_S5PV210 config.
+In case of s5pc210 CPU. It uses the SPARSEMEM as default memory configuration
+So move to ARCH_S5PV310 config.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
  arch/arm/Kconfig              |    1 +
- arch/arm/mach-s5pv210/Kconfig |    4 ----
- 2 files changed, 1 insertions(+), 4 deletions(-)
+ arch/arm/mach-s5pv310/Kconfig |    2 --
+ 2 files changed, 1 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 553b7cf..e112987 100644
+index e112987..d10099d 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -717,6 +717,7 @@ config ARCH_S5PC100
- config ARCH_S5PV210
- 	bool "Samsung S5PV210/S5PC110"
+@@ -731,6 +731,7 @@ config ARCH_S5PV210
+ config ARCH_S5PV310
+ 	bool "Samsung S5PV310/S5PC210"
  	select CPU_V7
 +	select ARCH_SPARSEMEM_ENABLE
  	select GENERIC_GPIO
  	select HAVE_CLK
- 	select ARM_L1_CACHE_SHIFT_6
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index d3a3895..97e4f11 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -63,7 +63,6 @@ menu "S5PC110 Machines"
- config MACH_AQUILA
- 	bool "Aquila"
- 	select CPU_S5PV210
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+index 331b5bd..ec8b350 100644
+--- a/arch/arm/mach-s5pv310/Kconfig
++++ b/arch/arm/mach-s5pv310/Kconfig
+@@ -30,14 +30,12 @@ config S5PV310_SETUP_I2C2
+ config MACH_SMDKV310
+ 	bool "SMDKV310"
+ 	select CPU_S5PV310
 -	select ARCH_SPARSEMEM_ENABLE
- 	select S3C_DEV_FB
- 	select S5P_DEV_FIMC0
- 	select S5P_DEV_FIMC1
-@@ -80,7 +79,6 @@ config MACH_AQUILA
- config MACH_GONI
- 	bool "GONI"
- 	select CPU_S5PV210
+ 	help
+ 	  Machine support for Samsung SMDKV310
+ 
+ config MACH_UNIVERSAL_C210
+ 	bool "Mobile UNIVERSAL_C210 Board"
+ 	select CPU_S5PV310
 -	select ARCH_SPARSEMEM_ENABLE
- 	select S3C_DEV_FB
- 	select S5P_DEV_FIMC0
- 	select S5P_DEV_FIMC1
-@@ -98,7 +96,6 @@ config MACH_GONI
- config MACH_SMDKC110
- 	bool "SMDKC110"
- 	select CPU_S5PV210
--	select ARCH_SPARSEMEM_ENABLE
- 	select S3C_DEV_I2C1
- 	select S3C_DEV_I2C2
- 	select S3C_DEV_RTC
-@@ -118,7 +115,6 @@ menu "S5PV210 Machines"
- config MACH_SMDKV210
- 	bool "SMDKV210"
- 	select CPU_S5PV210
--	select ARCH_SPARSEMEM_ENABLE
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
+ 	help
+ 	  Machine support for Samsung Mobile Universal S5PC210 Reference
+ 	  Board. S5PC210(MCP) is one of package option of S5PV310
 -- 
 1.5.3.3
