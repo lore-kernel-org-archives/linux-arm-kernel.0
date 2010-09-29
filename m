@@ -1,42 +1,82 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 29 Sep 2010 22:07:58 +0200
-Subject: [PATCH V3 0/6] SD/MMC-driver for MX35/51 (and improvements to SDHCI)
-Message-ID: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+Date: Wed, 29 Sep 2010 22:07:59 +0200
+Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
+In-Reply-To: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1285790884-3516-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, here is the next version of my patch series. The first four are
-updates/improvements for sdhci and sdhci-pltfm and are of generic interest,
-too. I am still hoping for some Acked-by/Tested-by tags ;) Changes from the
-previous version are mentioned in the seperate files. I should have addressed
-all concerns raised. If not, please speak up.
+We need to carry some information per host, e.g. the clock. Add a
+structure for it and initialize it in the generic part. Also do not use
+the parent of the platform_device (if it is available), this breaks the
+clock-matching on ARM.
 
-Thanks,
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Richard R?jfors <richard.rojfors.ext@mocean-labs.com>
+---
 
-   Wolfram
+Changes since last version:
 
-Wolfram Sang (6):
-  mmc: sdhci-pltfm: Add structure for host-specific data
-  mmc: sdhci-pltfm: move .h-file into apropriate subdir
-  mmc: sdhci: introduce private get_ro
-  mmc: sdhci_pltfm: pass more data on custom init-call
-  mmc: sdhci-of-esdhc: factor out common stuff
-  mmc: sdhci-pltfm: add pltfm-driver for imx35/51
+* added types.h
+* removed usage of pdev->dev.parent to ensure clk-matching
+  Please speak up if this has a use case I failed to see!
 
- drivers/mmc/host/Kconfig           |   10 +++
- drivers/mmc/host/Makefile          |    1 +
- drivers/mmc/host/sdhci-cns3xxx.c   |    2 +-
- drivers/mmc/host/sdhci-esdhc-imx.c |  143 ++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/sdhci-esdhc.h     |   81 ++++++++++++++++++++
- drivers/mmc/host/sdhci-of-esdhc.c  |   70 ++----------------
- drivers/mmc/host/sdhci-pltfm.c     |   22 ++++--
- drivers/mmc/host/sdhci-pltfm.h     |   10 ++-
- drivers/mmc/host/sdhci.c           |   11 ++-
- drivers/mmc/host/sdhci.h           |    1 +
- include/linux/mmc/sdhci-pltfm.h    |   35 +++++++++
- include/linux/sdhci-pltfm.h        |   35 ---------
- 12 files changed, 310 insertions(+), 111 deletions(-)
- create mode 100644 drivers/mmc/host/sdhci-esdhc-imx.c
- create mode 100644 drivers/mmc/host/sdhci-esdhc.h
- create mode 100644 include/linux/mmc/sdhci-pltfm.h
- delete mode 100644 include/linux/sdhci-pltfm.h
+ drivers/mmc/host/sdhci-pltfm.c |    8 ++++----
+ drivers/mmc/host/sdhci-pltfm.h |    7 +++++++
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index e045e3c..095ca9d 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+ 	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
+ 	struct resource *iomem;
+ 	int ret;
+ 
+@@ -71,16 +72,15 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Invalid iomem size. You may "
+ 			"experience problems.\n");
+ 
+-	if (pdev->dev.parent)
+-		host = sdhci_alloc_host(pdev->dev.parent, 0);
+-	else
+-		host = sdhci_alloc_host(&pdev->dev, 0);
++	host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
+ 
+ 	if (IS_ERR(host)) {
+ 		ret = PTR_ERR(host);
+ 		goto err;
+ 	}
+ 
++	pltfm_host = sdhci_priv(host);
++
+ 	host->hw_name = "platform";
+ 	if (pdata && pdata->ops)
+ 		host->ops = pdata->ops;
+diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+index 900f329..93a0319 100644
+--- a/drivers/mmc/host/sdhci-pltfm.h
++++ b/drivers/mmc/host/sdhci-pltfm.h
+@@ -11,8 +11,15 @@
+ #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
+ #define _DRIVERS_MMC_SDHCI_PLTFM_H
+ 
++#include <linux/clk.h>
++#include <linux/types.h>
+ #include <linux/sdhci-pltfm.h>
+ 
++struct sdhci_pltfm_host {
++	struct clk *clk;
++	u32 scratchpad; /* to handle quirks across io-accessor calls */
++};
++
+ extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+ 
+ #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
+-- 
+1.7.1
