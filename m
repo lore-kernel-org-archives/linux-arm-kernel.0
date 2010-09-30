@@ -1,44 +1,129 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 30 Sep 2010 09:45:37 -0700
-Subject: [PATCH 2/4] arm: dis-allow hotplug on MSM
-In-Reply-To: <20100930071919.GA6434@ucw.cz>
-References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
-	<1284062289-10914-3-git-send-email-dwalker@codeaurora.org>
-	<20100930071919.GA6434@ucw.cz>
-Message-ID: <1285865137.14953.4.camel@c-dwalke-linux.qualcomm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 30 Sep 2010 18:46:08 +0200
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com>, <20100930150713.GG3117@atomide.com>,
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
+Message-ID: <4CA4BED0.7020108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-30 at 09:19 +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > MSM doesn't support hotplug, so we prevent it from being
-> > select with this added line.
-> > 
-> > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> > ---
-> >  arch/arm/Kconfig |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index d2dfbc2..829dd67 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1211,6 +1211,7 @@ config NR_CPUS
-> >  config HOTPLUG_CPU
-> >  	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
-> >  	depends on SMP && HOTPLUG && EXPERIMENTAL
-> > +	depends on !ARCH_MSM
-> >  	help
-> >  	  Say Y here to experiment with turning CPUs off and on.  CPUs
-> >  	  can be controlled through /sys/devices/system/cpu.
-> 
-> This is goodbye to s2ram support, AFAICT.
+On 9/30/2010 6:32 PM, Varadarajan, Charulatha wrote:
+> Benoit,
+>
+> <<snip>>
+>
+>>> With OMAP2PLUS watchdog implemented in hwmod fw way, the
+>>> module is reset during init.
+>>
+>> In that case hwmod fw just highlighted the real behavior that was hidden
+>> so far by the X-loader.
+>
+> Yes.
+>
+>>
+>> You should as well add a link to the email thread with Kevin that raised
+>> the issue.
+>
+> Okay.
+>
+> <<snip>>
+>
+>>> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+>>> index 8e2f0aa..9f44fc6 100644
+>>> --- a/arch/arm/mach-omap2/devices.c
+>>> +++ b/arch/arm/mach-omap2/devices.c
+>>> @@ -916,11 +916,55 @@ static inline void omap_init_vout(void) {}
+>>>
+>>>    /*-------------------------------------------------------------------------*/
+>>>
+>>> +/*
+>>> + * WDT mdoule is reset during init which enables the watchdog.
+>>
+>> typo: module
+>
+> Okay will correct it.
+>
+>>
+>> The real explanation is that you should not assume anything from the
+>> boot loader at that time, so always stop the wdt.
+>
+> It is not an assumption from bootloader. After the WDT reset, the
+> WDT is enabled and the reset values of WDT registers makes the system to
+> reboot (in ~10s) as WDT is enabled.
 
-This depends on SMP tho. It's like saying,
+The implicit assumption in the previous code is that the bootloader 
+already stopped it. That exactly for that reason that hwmod is reseting 
+every IPs, because we don't have a clue about what X-loader / u-boot can 
+do between a cold-reset and the kernel boot.
 
-depends on 
--- 
+>
+>>
+>>> + * Hence it is required to disable the watchdog after the WDT reset
+>>> + * during init. Otherwise the system would reboot as per the default
+>>> + * watchdog timer registers settings.
+>>> + */
+>>> +#define OMAP_WDT_WPS	(0x34)
+>>> +#define OMAP_WDT_SPR	(0x48)
+>>> +
+>>> +static int omap2_disable_wdt(struct omap_hwmod *oh, void *user)
+>>
+>> You should call it unused if the parameter is not used.
+>
+> Okay.
+>
+>>
+>>> +{
+>>> +	void __iomem *base;
+>>> +
+>>> +	if (!oh)
+>>> +		pr_err("Could not look up wdtimer_hwmod\n");
+>>> +
+>>> +	base = oh->_mpu_rt_va;
+>>
+>> Paul added an hwmod API to get that va (something like *_get_mpu_rt_va).
+>
+> Okay. Will use that.
+>
+>>
+>>> +
+>>> +	/* Enable the clocks before accessing the WDT registers */
+>>> +	omap_hwmod_enable(oh);
+>>
+>> The enable can fail, so you should check the return value.
+>
+> Okay.
+>
+>>
+>>> +
+>>> +	/* sequence required to disable watchdog */
+>>> +	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);	/* TIMER_MODE */
+>>> +	while (__raw_readl(base + OMAP_WDT_WPS)&   0x10)
+>>> +		cpu_relax();
+>>> +
+>>> +	__raw_writel(0x5555, base + OMAP_WDT_SPR);	/* TIMER_MODE */
+>>> +	while (__raw_readl(base + OMAP_WDT_WPS)&   0x10)
+>>> +		cpu_relax();
+>>> +
+>>> +	omap_hwmod_idle(oh);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static void __init omap_disable_wdt(void)
+>>> +{
+>>> +	if (cpu_class_is_omap2())
+>>
+>> This code is already in mach-omap2/devices.c, so that test should be
+>> useless.
+>
+> I do not see a cpu_class_is_omap2() check in omap2_init_devices(). Please
+> point out where this check is done while/before calling omap_disable_wdt()?
+>
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+And Paul has just answered that one...
+
+Benoit
