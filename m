@@ -1,75 +1,61 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 30 Sep 2010 15:50:18 +0900
-Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
-In-Reply-To: <AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
-References: <20100930044859.GA16923@july>
-	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
-	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
-Message-ID: <AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 30 Sep 2010 08:56:52 +0200
+Subject: [PATCH] ARM: define a dummy filter function for ste_dma40
+Message-ID: <1285829812-10991-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 3:27 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Thu, Sep 30, 2010 at 3:20 PM, Jeongbae Seo <jeongbae.seo@samsung.com> wrote:
->> Kyungmin wrote:
->>> From: Kyungmin Park <kyungmin.park@samsung.com>
->>>
->>> S5PC210 support more I2C devices than previous SoCs.
->>> And to prevent the wrong usage use the s5p prefix instead of s3c.
->>>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ? ?| ? 15 +++++++
->>> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? | ? ?5 ++
->>> ?arch/arm/mach-s5pv310/setup-i2c3.c ? ? ? | ? 25 +++++++++++
->>> ?arch/arm/mach-s5pv310/setup-i2c4.c ? ? ? | ? 25 +++++++++++
->>> ?arch/arm/mach-s5pv310/setup-i2c5.c ? ? ? | ? 25 +++++++++++
->>> ?arch/arm/mach-s5pv310/setup-i2c6.c ? ? ? | ? 25 +++++++++++
->>> ?arch/arm/mach-s5pv310/setup-i2c7.c ? ? ? | ? 25 +++++++++++
->>> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ?| ? 25 +++++++++++
->>> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? | ? ?5 ++
->>> ?arch/arm/plat-s5p/dev-i2c3.c ? ? ? ? ? ? | ? 67
->>> ++++++++++++++++++++++++++++++
->>> ?arch/arm/plat-s5p/dev-i2c4.c ? ? ? ? ? ? | ? 67
->>> ++++++++++++++++++++++++++++++
->>> ?arch/arm/plat-s5p/dev-i2c5.c ? ? ? ? ? ? | ? 67
->>> ++++++++++++++++++++++++++++++
->>> ?arch/arm/plat-s5p/dev-i2c6.c ? ? ? ? ? ? | ? 67
->>> ++++++++++++++++++++++++++++++
->>> ?arch/arm/plat-s5p/dev-i2c7.c ? ? ? ? ? ? | ? 67
->>> ++++++++++++++++++++++++++++++
->>> ?arch/arm/plat-samsung/include/plat/iic.h | ? ?5 ++
->>> ?15 files changed, 515 insertions(+), 0 deletions(-)
->>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
->>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
->>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
->>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
->>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
->>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c3.c
->>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c4.c
->>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c5.c
->>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c6.c
->>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c7.c
->>>
->>
->> Hi Kyungmin,
->>
->> We are considering another way not to make additional new i2c dev files.
->> In my opinion, this patch looks not bad but we'd better make an effort to
->> avoid having the more similar file.
->
-> Actually I also it's not good approach, but as there's no comment or
-> discuss about this I send the patches.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/022615.html
->
-> If you have good method or approaches, I'm welcome.
+All platform data has to be made conditional on CONFIG_STEDMA40
+or we can provide a simple dummy filter functions as to avoid
+cluttering the code with other #ifdef:s.
 
-First, these are device definitions and gpio set callbacks and
-shouldn't take much
-of space. So, perhaps these all could be built upon single I2C support
-selection.
+Acked-by: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/plat-nomadik/include/plat/ste_dma40.h |   26 ++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
 
-Second, if we must build them conditionally, how about having all in
-one file with
-each device's definition and callback surrounded by corresponding ifdef ?
-That would alteast save us file-count.
+diff --git a/arch/arm/plat-nomadik/include/plat/ste_dma40.h b/arch/arm/plat-nomadik/include/plat/ste_dma40.h
+index 1127af2..cf92e74 100644
+--- a/arch/arm/plat-nomadik/include/plat/ste_dma40.h
++++ b/arch/arm/plat-nomadik/include/plat/ste_dma40.h
+@@ -170,6 +170,8 @@ struct stedma40_platform_data {
+ 	int				 disabled_channels[STEDMA40_MAX_PHYS];
+ };
+ 
++#ifdef CONFIG_STE_DMA40
++
+ /**
+  * setdma40_set_psize() - Used for changing the package size of an
+  * already configured dma channel.
+@@ -245,4 +247,28 @@ dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
+ 						  direction, flags);
+ }
+ 
++#else
++static inline int stedma40_set_psize(struct dma_chan *chan,
++		       int src_psize,
++		       int dst_psize)
++{
++	return 0;
++}
++
++static inline bool stedma40_filter(struct dma_chan *chan, void *data)
++{
++	return false;
++}
++
++static inline struct
++dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
++					    dma_addr_t addr,
++					    unsigned int size,
++					    enum dma_data_direction direction,
++					    unsigned long flags)
++{
++	return NULL;
++}
++#endif
++
+ #endif
+-- 
+1.6.3.3
