@@ -1,47 +1,39 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 30 Sep 2010 22:06:47 +0530
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 30 Sep 2010 10:43:05 -0600 (MDT)
 Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <87k4m3jpus.fsf@deeprootsystems.com>
-References: <1285834270-32766-1-git-send-email-charu@ti.com>,
-	<87k4m3jpus.fsf@deeprootsystems.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF8141@dbde02.ent.ti.com>
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com>, <20100930150713.GG3117@atomide.com>,
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1009301040390.5439@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+Hello Charu,
 
-> "Varadarajan, Charulatha" <charu@ti.com> writes:
+On Thu, 30 Sep 2010, Varadarajan, Charulatha wrote:
+
+> > > diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> > > index 8e2f0aa..9f44fc6 100644
+> > > --- a/arch/arm/mach-omap2/devices.c
+> > > +++ b/arch/arm/mach-omap2/devices.c
+> > > +
+> > > +static void __init omap_disable_wdt(void)
+> > > +{
+> > > +	if (cpu_class_is_omap2())
+> > 
+> > This code is already in mach-omap2/devices.c, so that test should be 
+> > useless.
 > 
+> I do not see a cpu_class_is_omap2() check in omap2_init_devices(). Please
+> point out where this check is done while/before calling omap_disable_wdt()?
 
-<<snip>>
+It's implicit, due to the directory arch/arm/mach-omap2/ -- code in that 
+directory is only built for OMAP2+ systems -- and right now there are no 
+plans for OMAP1+ multi-arch booting.  So it's safe to assume that any code 
+in arch/arm/mach-omap2 will only run on OMAP2+ boards.
 
-> > With OMAP2PLUS watchdog implemented in hwmod fw way, the
-> > module is reset during init.
-> 
-> Please drop this sentence, as it's not directly related to hwmod, but
-> related to hardware reset, and was previously masked by most bootloaders.
-> 
 
-Okay, will modify accordingly.
-
-> > After a watchdog timer module reset, the WDTs are enabled. The
-> > default time for a system reset after a watchdog module reset
-> > is ~10s as per the default value of the WDT registers. Hence
-> > the system would be reset after 10s, if watchdog is not disabled
-> > within 10s.
-> >
-> > This patch fixes the above issue by disabling the watchdog timer
-> > after reset during initialization of devices.
-> 
-> Should also describe what happends if/when the watchdog driver is
-> loaded.  
-
-Okay. Will add it to the description.
-
-> 
-> Kevin
-> 
-> > Signed-off-by: Charulatha V <charu@ti.com>
-> > Reported-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-<<snip>>
+- Paul
