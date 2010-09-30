@@ -1,31 +1,45 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 30 Sep 2010 11:40:48 +0200
-Subject: [PATCH] spi/pl022: make sure the chip_info dev pointer is set
-Message-ID: <1285839648-7368-1-git-send-email-linus.walleij@stericsson.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Thu, 30 Sep 2010 13:42:02 +0400
+Subject: [PATCH 4/6] mmc: sdhci_pltfm: pass more data on custom init-call
+In-Reply-To: <19620.19198.88841.623775@ipc1.ka-ro>
+References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+	<1285790884-3516-5-git-send-email-w.sang@pengutronix.de>
+	<19620.19198.88841.623775@ipc1.ka-ro>
+Message-ID: <20100930094202.GA581@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We forgot to set the pointer back to the device if the user
-supplied all device settings, leading to crashing debug prints
-as controller data is verified.
+On Thu, Sep 30, 2010 at 10:31:58AM +0200, Lothar Wa?mann wrote:
+> > The custom init call may need more data to perform its job, so we pass
+> > it a pointer to pdata, too. Also, always use the platform_id specific
+> > data even if platform_data is present. Doing that, platform_data can
+> > additionally be parsed by init() for board-specific information (via
+> > sdhci->mmc->parent).
+> > 
+> Why not a pointer to the platform_device itself? Then the callback
+> function would have even more information (e.g. platform_device ID)
+> and could easily get at the platform_data too.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/spi/amba-pl022.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+dev->platform_data may not be there. There are two ways to pass
+the "platform data" to the sdhci-pltfm driver:
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 4c37c4e..90a7e5d 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -1574,6 +1574,8 @@ static int pl022_setup(struct spi_device *spi)
- 		chip_info->duplex = SSP_MICROWIRE_CHANNEL_FULL_DUPLEX;
- 		chip_info->cs_control = null_cs_control;
- 	} else {
-+		/* Users should not set this field */
-+		chip_info->dev = &spi->dev;
- 		dev_dbg(&spi->dev,
- 			"using user supplied controller_data settings\n");
- 	}
+a) via dev->platform_data
+b) via platform_device_id->driver_data
+
+Technically, we can do something like this in the probe():
+
+if (!pdev->dev.platform_data)
+	pdev->dev.platform_data = platform_device_id->driver_data;
+
+pdata->init(dev);
+
+Note, in this case we must also NULLify platform_data it at remove(),
+as platform_device_release() will try to free statically allocated
+memory.
+
+Thanks,
+
 -- 
-1.6.3.3
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
