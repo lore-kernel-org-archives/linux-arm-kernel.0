@@ -1,115 +1,217 @@
-From: ccross@google.com (Colin Cross)
-Date: Thu, 30 Sep 2010 20:27:21 -0700
-Subject: [PATCH 3/3] ARM: twd_smp: add clock api support
-In-Reply-To: <4CA551FF.3080100@gmail.com>
-References: <1285886952-30888-1-git-send-email-robherring2@gmail.com>
-	<1285886952-30888-3-git-send-email-robherring2@gmail.com>
-	<AANLkTi=L69BXQZfT3VAeLgyBBHA2O8ELeLdqL1Onk3t=@mail.gmail.com>
-	<4CA5417B.5020200@gmail.com>
-	<AANLkTik=JXaDKbx97avUKerDQeK-O9gRuyfAZPHDQ2Yp@mail.gmail.com>
-	<4CA551FF.3080100@gmail.com>
-Message-ID: <AANLkTim3wYDNySWxba3-xWkj495GTiGxWN9L08Rnaa9C@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 30 Sep 2010 16:44:53 +0200
+Subject: [PATCH 16/40 v2] ARM: mx5: dynamically register imx-i2c devices
+In-Reply-To: <1285595476-10025-16-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1285595476-10025-16-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1285857893-31479-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 8:14 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 09/30/2010 09:30 PM, Colin Cross wrote:
->>
->> On Thu, Sep 30, 2010 at 7:03 PM, Rob Herring<robherring2@gmail.com>
->> ?wrote:
->>>
->>> On 09/30/2010 07:49 PM, Colin Cross wrote:
->>>>
->>>> On Thu, Sep 30, 2010 at 3:49 PM, Rob Herring<robherring2@gmail.com>
->>>> ?wrote:
->>>>>
->>>>> From: Rob Herring<rob.herring@smooth-stone.com>
->>>>>
->>>>> The private timer freq is currently dynamically detected
->>>>> using jiffies count to determine the rate. This method adds
->>>>> a delay to boot-up, so use the clock api instead to get the
->>>>> clock rate.
->>>>>
->>>>> Signed-off-by: Rob Herring<rob.herring@smooth-stone.com>
->>>>> ---
->>>>> ?arch/arm/include/asm/smp_twd.h | ? ?2 ++
->>>>> ?arch/arm/kernel/smp_twd.c ? ? ?| ? ?7 +++++++
->>>>> ?2 files changed, 9 insertions(+), 0 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/include/asm/smp_twd.h
->>>>> b/arch/arm/include/asm/smp_twd.h
->>>>> index 634f357..bafad52 100644
->>>>> --- a/arch/arm/include/asm/smp_twd.h
->>>>> +++ b/arch/arm/include/asm/smp_twd.h
->>>>> @@ -19,11 +19,13 @@
->>>>> ?#define TWD_TIMER_CONTROL_IT_ENABLE ? ?(1<< ? ?2)
->>>>>
->>>>> ?struct clock_event_device;
->>>>> +struct clk;
->>>>>
->>>>> ?extern void __iomem *twd_base;
->>>>>
->>>>> ?void twd_timer_stop(void);
->>>>> ?int twd_timer_ack(void);
->>>>> ?void twd_timer_setup(struct clock_event_device *);
->>>>> +void twd_timer_init(void __iomem *base, struct clk *clk);
->>>>>
->>>>> ?#endif
->>>>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
->>>>> index 35882fb..1a3c959 100644
->>>>> --- a/arch/arm/kernel/smp_twd.c
->>>>> +++ b/arch/arm/kernel/smp_twd.c
->>>>> @@ -17,6 +17,7 @@
->>>>> ?#include<linux/clockchips.h>
->>>>> ?#include<linux/irq.h>
->>>>> ?#include<linux/io.h>
->>>>> +#include<linux/clk.h>
->>>>>
->>>>> ?#include<asm/smp_twd.h>
->>>>> ?#include<asm/hardware/gic.h>
->>>>> @@ -151,6 +152,12 @@ void __cpuinit twd_timer_setup(struct
->>>>> clock_event_device *clk)
->>>>> ? ? ? ?clockevents_register_device(clk);
->>>>> ?}
->>>>>
->>>>> +void __init twd_timer_init(void __iomem *base, struct clk *clk)
->>>>> +{
->>>>> + ? ? ? twd_base = base;
->>>>> + ? ? ? twd_timer_rate = clk_get_rate(clk);
->>>>> +}
->>>>> +
->>>>> ?#ifdef CONFIG_HOTPLUG_CPU
->>>>> ?/*
->>>>> ?* take a local timer down
->>>>
->>>> The local timers run off the PERIPHCLK in the CPU, which is specified
->>>> as the CPU clock divided by an implementation defined integer>= 2.
->>>> If you take the divider value as a parameter to twd_timer_init, the
->>>> clock that is passed in can be the cpu's clock.
->>>
->>> That is an implementation detail of the A9. Future designs could be
->>> completely asynchronous. Using the clock api works either way.
->>
->> True. ?That could still be handled by passing a divider of 1. ?For all
->> current implementations, this api will be used with clock that is a
->> constant divider of an existing clock. ?Taking a divider value would
->> avoid having to create a new clock that may not be similar to any
->> other clock in the device.
->
-> If I pass in a divider, what clock rate do I divide with it? If I only have
-> the divider, then I'm dependent on knowing CLK freq (the cpu freq in A9
-> case). Ultimately I have to know the timer clock rate to setup a clock_event
-> device. I'm open to passing in the clock rate directly, but having the clk
-> ptr is more flexible. Other examples of timer init like i.MX use the same
-> arguments.
->
-> The point of this api is to avoid spending 5 jiffies on the primary cpu to
-> calculate the rate. That is a significant chunk of the kernel boot time.
-> Calling this function is entirely optional and the old way still works.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-I like the idea of passing in the clk pointer - it would simplify
-problems I've been having with rescaling the localtimer when the cpu
-frequency changes.  However, it would reduce the amount of
-machine-specific code necessary if I could pass in the
-already-existing clock (cpu clock, for A9), as well as the value of
-the divider that is present inside cpu (4 for Tegra2).
+I just noticed that I missed to adapt board-mx51_babbage in the first
+attempt.
+
+I just updated my repository with this new patch.
+
+Best regards
+Uwe
+
+ arch/arm/mach-mx5/Kconfig                    |    2 +
+ arch/arm/mach-mx5/board-cpuimx51.c           |    6 ++--
+ arch/arm/mach-mx5/board-mx51_babbage.c       |    7 ++---
+ arch/arm/mach-mx5/devices-imx51.h            |   14 +++++++++
+ arch/arm/mach-mx5/devices.c                  |   38 --------------------------
+ arch/arm/mach-mx5/devices.h                  |    2 -
+ arch/arm/plat-mxc/devices/platform-imx-i2c.c |    9 ++++++
+ 7 files changed, 31 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/devices-imx51.h
+
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 0848db5..e57caef 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -10,6 +10,7 @@ comment "MX5 platforms:"
+ 
+ config MACH_MX51_BABBAGE
+ 	bool "Support MX51 BABBAGE platforms"
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	help
+ 	  Include support for MX51 Babbage platform, also known as MX51EVK in
+ 	  u-boot. This includes specific configurations for the board and its
+@@ -24,6 +25,7 @@ config MACH_MX51_3DS
+ 
+ config MACH_EUKREA_CPUIMX51
+ 	bool "Support Eukrea CPUIMX51 module"
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	help
+ 	  Include support for Eukrea CPUIMX51 platform. This includes
+ 	  specific configurations for the module and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+index 623607a..d52f252 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51.c
++++ b/arch/arm/mach-mx5/board-cpuimx51.c
+@@ -30,7 +30,6 @@
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
+-#include <mach/i2c.h>
+ #include <mach/mxc_ehci.h>
+ 
+ #include <asm/irq.h>
+@@ -152,7 +151,8 @@ static struct imxuart_platform_data uart_pdata = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+-static struct imxi2c_platform_data eukrea_cpuimx51_i2c_data = {
++static const
++struct imxi2c_platform_data eukrea_cpuimx51_i2c_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
+@@ -255,7 +255,7 @@ static void __init eukrea_cpuimx51_init(void)
+ 
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
+-	mxc_register_device(&mxc_i2c_device1, &eukrea_cpuimx51_i2c_data);
++	imx51_add_imx_i2c(1, &eukrea_cpuimx51_i2c_data);
+ 	i2c_register_board_info(1, eukrea_cpuimx51_i2c_devices,
+ 				ARRAY_SIZE(eukrea_cpuimx51_i2c_devices));
+ 
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index caa8f68..3f3075d 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -23,7 +23,6 @@
+ #include <mach/hardware.h>
+ #include <mach/imx-uart.h>
+ #include <mach/iomux-mx51.h>
+-#include <mach/i2c.h>
+ #include <mach/mxc_ehci.h>
+ 
+ #include <asm/irq.h>
+@@ -137,7 +136,7 @@ static inline void mxc_init_imx_uart(void)
+ }
+ #endif /* SERIAL_IMX */
+ 
+-static struct imxi2c_platform_data babbage_i2c_data = {
++static const struct imxi2c_platform_data babbage_i2c_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
+@@ -293,8 +292,8 @@ static void __init mxc_board_init(void)
+ 	babbage_fec_reset();
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 
+-	mxc_register_device(&mxc_i2c_device0, &babbage_i2c_data);
+-	mxc_register_device(&mxc_i2c_device1, &babbage_i2c_data);
++	imx51_add_imx_i2c(0, &babbage_i2c_data);
++	imx51_add_imx_i2c(1, &babbage_i2c_data);
+ 	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
+ 
+ 	if (otg_mode_host)
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+new file mode 100644
+index 0000000..a3cc383
+--- /dev/null
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -0,0 +1,14 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/mx51.h>
++#include <mach/devices-common.h>
++
++extern const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst;
++#define imx51_add_imx_i2c(id, pdata)	\
++	imx_add_imx_i2c(&imx51_imx_i2c_data[id], pdata)
+diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
+index 1920ff4..70b76d1 100644
+--- a/arch/arm/mach-mx5/devices.c
++++ b/arch/arm/mach-mx5/devices.c
+@@ -93,44 +93,6 @@ struct platform_device mxc_fec_device = {
+ 	.resource = mxc_fec_resources,
+ };
+ 
+-static struct resource mxc_i2c0_resources[] = {
+-	{
+-		.start = MX51_I2C1_BASE_ADDR,
+-		.end = MX51_I2C1_BASE_ADDR + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX51_MXC_INT_I2C1,
+-		.end = MX51_MXC_INT_I2C1,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_i2c_device0 = {
+-	.name = "imx-i2c",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(mxc_i2c0_resources),
+-	.resource = mxc_i2c0_resources,
+-};
+-
+-static struct resource mxc_i2c1_resources[] = {
+-	{
+-		.start = MX51_I2C2_BASE_ADDR,
+-		.end = MX51_I2C2_BASE_ADDR + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.start = MX51_MXC_INT_I2C2,
+-		.end = MX51_MXC_INT_I2C2,
+-		.flags = IORESOURCE_IRQ,
+-	},
+-};
+-
+-struct platform_device mxc_i2c_device1 = {
+-	.name = "imx-i2c",
+-	.id = 1,
+-	.num_resources = ARRAY_SIZE(mxc_i2c1_resources),
+-	.resource = mxc_i2c1_resources,
+-};
+-
+ static struct resource mxc_hsi2c_resources[] = {
+ 	{
+ 		.start = MX51_HSI2C_DMA_BASE_ADDR,
+diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
+index e509cfa..5c2918f 100644
+--- a/arch/arm/mach-mx5/devices.h
++++ b/arch/arm/mach-mx5/devices.h
+@@ -6,7 +6,5 @@ extern struct platform_device mxc_usbdr_host_device;
+ extern struct platform_device mxc_usbh1_device;
+ extern struct platform_device mxc_usbdr_udc_device;
+ extern struct platform_device mxc_wdt;
+-extern struct platform_device mxc_i2c_device0;
+-extern struct platform_device mxc_i2c_device1;
+ extern struct platform_device mxc_hsi2c_device;
+ extern struct platform_device mxc_keypad_device;
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-i2c.c b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
+index ab9670b..ca988d4 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-i2c.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
+@@ -68,6 +68,15 @@ const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst = {
+ };
+ #endif /* ifdef CONFIG_ARCH_MX35 */
+ 
++#ifdef CONFIG_ARCH_MX51
++const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst = {
++#define imx51_imx_i2c_data_entry(_id, _hwid)				\
++	imx_imx_i2c_data_entry(MX51, _id, _hwid, SZ_4K)
++	imx51_imx_i2c_data_entry(0, 1),
++	imx51_imx_i2c_data_entry(1, 2),
++};
++#endif /* ifdef CONFIG_ARCH_MX51 */
++
+ struct platform_device *__init imx_add_imx_i2c(
+ 		const struct imx_imx_i2c_data *data,
+ 		const struct imxi2c_platform_data *pdata)
+-- 
+1.7.2.3
