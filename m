@@ -1,107 +1,51 @@
-From: jongsun.han@samsung.com (Jongsun Han)
-Date: Thu, 30 Sep 2010 18:27:48 +0900
-Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
-In-Reply-To: <AANLkTin9tR4+CBa+r6mHsJdFYxzkaK1CA+_WKhTZkacs@mail.gmail.com>
-References: <20100930044859.GA16923@july>
-	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
-	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
-	<AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
-	<AANLkTin9tR4+CBa+r6mHsJdFYxzkaK1CA+_WKhTZkacs@mail.gmail.com>
-Message-ID: <006601cb6081$bf8a7140$3e9f53c0$%han@samsung.com>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Thu, 30 Sep 2010 15:07:08 +0530
+Subject: [PATCH 52/74] ST SPEAr13xx: Adding CPU hotplug support added
+	for SMP platforms
+In-Reply-To: <AANLkTimzKd14U0k10Pjgb9UBWB2gixivvja8Qh_zMMLR@mail.gmail.com>
+References: <cover.1283161023.git.viresh.kumar@st.com>	<1980a48cb88189ce617fbfa2742d3259dd400b7b.1283161023.git.viresh.kumar@st.com>
+	<AANLkTimzKd14U0k10Pjgb9UBWB2gixivvja8Qh_zMMLR@mail.gmail.com>
+Message-ID: <4CA45A44.80604@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 3:50 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> > On Thu, Sep 30, 2010 at 3:27 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> >> On Thu, Sep 30, 2010 at 3:20 PM, Jeongbae Seo <jeongbae.seo@samsung.com>
-> wrote:
-> >>> Kyungmin wrote:
-> >>>> From: Kyungmin Park <kyungmin.park@samsung.com>
-> >>>>
-> >>>> S5PC210 support more I2C devices than previous SoCs.
-> >>>> And to prevent the wrong usage use the s5p prefix instead of s3c.
-> >>>>
-> >>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >>>> ---
-> >>>> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ? ?| ? 15 +++++++
-> >>>> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? | ? ?5 ++
-> >>>> ?arch/arm/mach-s5pv310/setup-i2c3.c ? ? ? | ? 25 +++++++++++
-> >>>> ?arch/arm/mach-s5pv310/setup-i2c4.c ? ? ? | ? 25 +++++++++++
-> >>>> ?arch/arm/mach-s5pv310/setup-i2c5.c ? ? ? | ? 25 +++++++++++
-> >>>> ?arch/arm/mach-s5pv310/setup-i2c6.c ? ? ? | ? 25 +++++++++++
-> >>>> ?arch/arm/mach-s5pv310/setup-i2c7.c ? ? ? | ? 25 +++++++++++
-> >>>> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ?| ? 25 +++++++++++
-> >>>> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? | ? ?5 ++
-> >>>> ?arch/arm/plat-s5p/dev-i2c3.c ? ? ? ? ? ? | ? 67
-> >>>> ++++++++++++++++++++++++++++++
-> >>>> ?arch/arm/plat-s5p/dev-i2c4.c ? ? ? ? ? ? | ? 67
-> >>>> ++++++++++++++++++++++++++++++
-> >>>> ?arch/arm/plat-s5p/dev-i2c5.c ? ? ? ? ? ? | ? 67
-> >>>> ++++++++++++++++++++++++++++++
-> >>>> ?arch/arm/plat-s5p/dev-i2c6.c ? ? ? ? ? ? | ? 67
-> >>>> ++++++++++++++++++++++++++++++
-> >>>> ?arch/arm/plat-s5p/dev-i2c7.c ? ? ? ? ? ? | ? 67
-> >>>> ++++++++++++++++++++++++++++++
-> >>>> ?arch/arm/plat-samsung/include/plat/iic.h | ? ?5 ++
-> >>>> ?15 files changed, 515 insertions(+), 0 deletions(-)
-> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
-> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
-> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
-> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
-> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
-> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c3.c
-> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c4.c
-> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c5.c
-> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c6.c
-> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c7.c
-> >>>>
-> >>>
-> >>> Hi Kyungmin,
-> >>>
-> >>> We are considering another way not to make additional new i2c dev files.
-> >>> In my opinion, this patch looks not bad but we'd better make an effort to
-> >>> avoid having the more similar file.
-> >>
-> >> Actually I also it's not good approach, but as there's no comment or
-> >> discuss about this I send the patches.
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
-> August/022615.html
-> >>
-> >> If you have good method or approaches, I'm welcome.
-> >
-> > First, these are device definitions and gpio set callbacks and
-> > shouldn't take much
-> > of space. So, perhaps these all could be built upon single I2C support
-> > selection.
+Hello Sundar,
+
+Sorry for replying so late :).
+
+On 9/3/2010 11:30 AM, Sundar wrote:
+> Hi,
 > 
-> That's my first propose.
-
-Hi, Kyungmin and Jassi
-
-I think that parts of i2c in S5PV310 aren't used depending on the usage of
-S5PV310.
-It's better define the number of i2c devs being used instead of using single I2C
-support selection.
-
-> >
-> > Second, if we must build them conditionally, how about having all in
-> > one file with
-> > each device's definition and callback surrounded by corresponding ifdef ?
-> > That would alteast save us file-count.
+> On Mon, Aug 30, 2010 at 4:09 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
+>> From: Deepak Sikri <deepak.sikri@st.com>
+>>
+>> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+>> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+>> ---
 > 
-> This method is also no problem if all of person are agreed.
+>> +       flush_cache_all();
+>> +       asm volatile(
+>> +       "       mcr     p15, 0, %1, c7, c5, 0\n"
+>> +       "       mcr     p15, 0, %1, c7, c10, 4\n"
 > 
-> So just choose it and make a conclusion.
->
-> Thank you,
-> Kyungmin Park
-> >
+> Isnt this a Cortex-A9 platform? If yes, then this is not implemented
+> on the Cortex-A9 if I am right.
+> You should use a dsb() here.
 
-I agree with Jassi's opinion keeping setup-i2c(0..2) and dev-i2c(0..2) for
-backward
-compatibility and adding a file which handles i2c(0..7) for S5PV310 and coming
-Samsung
-soc.
+yes, I would place dsb here.
 
-Best Regards
-Jongsun Han
+>> +               /*
+>> +                * here's the WFI
+>> +                */
+>> +               asm(".word      0xe320f003\n"
+>> +                   :
+> 
+> Also, why not a simple asm volatile("wfi" : : : "memory"); instead of
+> hard coded values.
+
+Would add a wfi() macro in asm/system.h including sev() as suggested by
+Russell. This statement would be replaced by a simple wfi().
+
+regards
+Shiraz
