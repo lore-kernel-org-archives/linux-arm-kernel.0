@@ -1,91 +1,60 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 30 Sep 2010 13:41:10 +0530
-Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-Message-ID: <1285834270-32766-1-git-send-email-charu@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Sep 2010 09:14:25 +0100
+Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <20100930010407.GA18073@linux-sh.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
+	<20100916143254.GC13563@erda.amd.com>
+	<20100927200138.GG28588@console-pimps.org>
+	<20100927220703.GV13563@erda.amd.com>
+	<20100927222627.GH28588@console-pimps.org>
+	<20100930010407.GA18073@linux-sh.org>
+Message-ID: <1285834465.9104.7.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With OMAP2PLUS watchdog implemented in hwmod fw way, the
-module is reset during init.
+Paul,
 
-After a watchdog timer module reset, the WDTs are enabled. The
-default time for a system reset after a watchdog module reset
-is ~10s as per the default value of the WDT registers. Hence
-the system would be reset after 10s, if watchdog is not disabled
-within 10s.
+On Thu, 2010-09-30 at 02:04 +0100, Paul Mundt wrote:
+> On Mon, Sep 27, 2010 at 11:26:27PM +0100, Matt Fleming wrote:
+> > On Tue, Sep 28, 2010 at 12:07:03AM +0200, Robert Richter wrote:
+> > > On 27.09.10 16:01:38, Matt Fleming wrote:
+> > > > Well, ARM doesn't have names as strings for its pmus currently. What's
+> > > > more, ARM wouldn't use it; SH would be the only user of this function. I
+> > > > don't think this one makes sense to be a generic function.
+> > >
+> 
+> Er, what? Yes it does. It has this silly id to string mapping thing that
+> is at present duplicated between the perf and the oprofile code for no
+> reason. Having a generic (albeit optional) perf_pmu_name() would allow
+> this to be cleaned up.
+> 
 
-This patch fixes the above issue by disabling the watchdog timer
-after reset during initialization of devices.
+It's not as silly as it appears. As you mention below, OProfile uses
+strings to identify the correct CPU model in userspace. With ARM, there
+is some horrible legacy here which means that the strings are extremely
+misleading (arm/mpcore => arm/11mpcore, arm/armv7 => Cortex A8). Rather
+than continue this mess into perf, I decided to separate the two and use
+a common numeric scheme for when they have to talk to each other.
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Reported-by: Kevin Hilman <khilman@deeprootsystems.com>
----
-This patch is dependent on the below patch series (wdt hwmod) and
-is created on top of pm-core branch.
-http://www.spinics.net/lists/linux-omap/msg37043.html
+> > > As the implementation of the function would be optional, why should we
+> > > make it architectural?
+> >
+> > I don't see why we should pollute the perf namespace with a function
+> > that is only being used inside the SH oprofile code? There would be
+> > exactly one use of this function and I doubt the perf guys will want
+> > this function exposed. In it's current state, it really is no use to any
+> > architecture other than SH.
+> >
+> This has nothing at all to do with the SH oprofile code and everything to
+> do with oprofile in general. This is the vary basis for the CPU model
+> matching in the oprofile userspace tools, it's string based by design.
+> Given that we're already seeing architetures double up their strings in
+> both places, this really wants a consensus and to be dealt with before
+> other architetures start getting the wrong idea.
 
- arch/arm/mach-omap2/devices.c |   44 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 44 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 8e2f0aa..9f44fc6 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -916,11 +916,55 @@ static inline void omap_init_vout(void) {}
- 
- /*-------------------------------------------------------------------------*/
- 
-+/*
-+ * WDT mdoule is reset during init which enables the watchdog.
-+ * Hence it is required to disable the watchdog after the WDT reset
-+ * during init. Otherwise the system would reboot as per the default
-+ * watchdog timer registers settings.
-+ */
-+#define OMAP_WDT_WPS	(0x34)
-+#define OMAP_WDT_SPR	(0x48)
-+
-+static int omap2_disable_wdt(struct omap_hwmod *oh, void *user)
-+{
-+	void __iomem *base;
-+
-+	if (!oh)
-+		pr_err("Could not look up wdtimer_hwmod\n");
-+
-+	base = oh->_mpu_rt_va;
-+
-+	/* Enable the clocks before accessing the WDT registers */
-+	omap_hwmod_enable(oh);
-+
-+	/* sequence required to disable watchdog */
-+	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);	/* TIMER_MODE */
-+	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
-+		cpu_relax();
-+
-+	__raw_writel(0x5555, base + OMAP_WDT_SPR);	/* TIMER_MODE */
-+	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
-+		cpu_relax();
-+
-+	omap_hwmod_idle(oh);
-+
-+	return 0;
-+}
-+
-+static void __init omap_disable_wdt(void)
-+{
-+	if (cpu_class_is_omap2())
-+		omap_hwmod_for_each_by_class("wd_timer",
-+						omap2_disable_wdt, NULL);
-+	return;
-+}
-+
- static int __init omap2_init_devices(void)
- {
- 	/* please keep these calls, and their implementations above,
- 	 * in alphabetical order so they're easier to sort through.
- 	 */
-+	omap_disable_wdt();
- 	omap_hsmmc_reset();
- 	omap_init_camera();
- 	omap_init_mbox();
--- 
-1.7.0.4
+I agree that if you have sane strings for OProfile then there's no
+reason to define new ones for perf.
+
+Will
