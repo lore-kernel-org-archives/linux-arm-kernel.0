@@ -1,153 +1,55 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Thu, 30 Sep 2010 13:55:14 +0900
-Subject: [PATCH 1/2] ARM: S5PV210: Add audio support to Aquila
-In-Reply-To: <005a01cb6041$de5c9020$9b15b060$%kim@samsung.com>
-References: <4C4F9E4C.7000001@samsung.com>
-	<20100729173825.GE24781@opensource.wolfsonmicro.com>
-	<4C527C11.5090409@samsung.com>
-	<001b01cb5fd0$2c73bd50$855b37f0$%kim@samsung.com>
-	<4CA3E67A.3070309@gmail.com>
-	<005a01cb6041$de5c9020$9b15b060$%kim@samsung.com>
-Message-ID: <4CA41832.5070301@gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Thu, 30 Sep 2010 11:03:58 +0530
+Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
+	Suspend Resume
+In-Reply-To: <20100920180708.GB5177@n2100.arm.linux.org.uk>
+References: <4C809486.2070308@st.com>
+	<20100903073421.GF26319@n2100.arm.linux.org.uk>
+	<4C84D6B3.80104@st.com>
+	<20100908151232.GD32659@n2100.arm.linux.org.uk>
+	<4C885FF2.7060201@st.com> <4C976541.6000203@st.com>
+	<20100920134808.GD30793@n2100.arm.linux.org.uk>
+	<4C97760A.60404@gmail.com>
+	<20100920150749.GF30793@n2100.arm.linux.org.uk>
+	<4C979216.3000706@gmail.com>
+	<20100920180708.GB5177@n2100.arm.linux.org.uk>
+Message-ID: <4CA42146.5020608@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Kukjin Kim wrote:
-> Chanwoo Choi wrote:
->> Kukjin Kim wrote:
->>> Chanwoo Choi wrote:
->>>> Mark Brown wrote:
->>>>> On Wed, Jul 28, 2010 at 12:04:44PM +0900, Chanwoo Choi wrote:
->>>>>
->>>>>> +static struct regulator_consumer_supply wm8994_fixed_voltage0_supplies[]
->> =
->>>> {
->>>>>> +	{
->>>>>> +		.dev_name	= "5-001a",
->>>>>> +		.supply		= "DBVDD",
->>>>>> +	}, {
->>>>>> +		.dev_name	= "5-001a",
->>>>>> +		.supply		= "AVDD2",
->>>>>> +	}, {
->>>>>> +		.dev_name	= "5-001a",
->>>>>> +		.supply		= "CPVDD",
->>>>>> +	},
->>>>>> +
->>>>>> +};
->>>>>> +
->>>>>> +static struct regulator_consumer_supply wm8994_fixed_voltage1_supplies[]
->> =
->>>> {
->>>>> All these fixed voltage regulators seem a bit suspicous for a mobile
->>>>> phone - I'd have expected that the supplies would all be being provided
->>>>> by your PMIC except for things taken directly from the battery supply
->>>>> (like the speakers tend to be, for example)?  There's no problem with
->>>>> the code itself, it just looks a bit odd.
->>>>>
->>>> All these consumer supply of WM8994 codec connected the below
->>>> regulator(VCC_1.8V) on
->>>> a circuit diagram. "VCC_1.8V" regualtor is always enabled, because it is used
->> to
->>>> many devices.
->>>> Then I haven't connected all these consumer supply of WM8994 codec to
->>>> "VCC_1.8V" regulator.
->>>> I will modify that the consumer supply would be provided by PMIC.
->>>>
->>>> static struct regulator_init_data aquila_buck3_data = {
->>>> 	.constraints	= {
->>>> 		.name		= "VCC_1.8V",
->>>> 		.min_uV		= 1800000,
->>>> 		.max_uV		= 1800000,
->>>> 		.apply_uV	= 1,
->>>> 		.state_mem	= {
->>>> 			.enabled = 1,
->>>> 		},
->>>> 	},
->>>> };
->>>>
->>>>>> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
->>>>>> +	{
->>>>>> +		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
->>>>>> +		I2C_BOARD_INFO("wm8994", 0x34 >> 1),
->>>>>> +		.platform_data	= &wm8994_platform_data,
->>>>>> +	},
->>>>>> +};
->>>>> Probably clearer for generic Linux use to specify the address as 0x1a
->>>>> directly.
->>>> Ok, I will do.
->>>>
->>>>>> +static void __init aquila_sound_init(void)
->>>>>> +{
->>>>>> +	unsigned int gpio;
->>>>>> +
->>>>>> +	/* CODEC_XTAL_EN */
->>>>>> +	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
->>>>>> +	gpio_request(gpio, "CODEC_XTAL_EN");
->>>>>> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
->>>>>> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
->>>>>> +	gpio_direction_output(gpio, 1);
->>>>> Might be as well to provide some or all this stuff in your audio machine
->>>>> driver?
->>>> The Aquila board have a oscillator which provide main clock to
->>>> WM8994 audio codec. The oscillator provide 24MHz clock to WM8994 audio
->> codec
->>>> (MCLK1 pin). I set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
->>>>
->>>>>> +	/* MICBIAS_EN */
->>>>>> +	gpio = S5PV210_GPJ4(2);			/* XMSMRN */
->>>>>> +	gpio_request(gpio, "MICBIAS_EN");
->>>>>> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
->>>>>> +	gpio_direction_output(gpio, 1);
->>>>> This in particular would benefit from keeping the request of the GPIO
->>>>> joined up with the driver that uses it.
->>>> Ok, I will move this code to machine
->> driver(sound/soc/s3c24xxx/aquila_wm8994.c).
->>>>>> +	/* ADC_EN */
->>>>>> +	gpio = S5PV210_GPJ3(2);
->>>>>> +	gpio_request(gpio, "ADC_EN");
->>>>>> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
->>>>>> +	gpio_direction_output(gpio, 1);
->>>>> I'm not sure what this does?
->>>>>
->>>> I explained below description about "ADC_EN" :
->>>> "ADC_EN : This gpio enable the ADC device which is used to detect
->>>>  the kind of jack. (SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT)
->>>>  According to the kind of jack, an electric current is changed.
->>>>  (Only used on Aquila board) "
->>>>
->>>> When inserting the jack to Aquila board, I used ADC driver so that, detecting
->>>> the kind of jack(SND_JACK_HEADPHONE/HEADSET/MECHANICAL/AVOUT).
->>>>
->>>> I will separately make the another function to initialize ADC driver.
->>>>
->>>> Thank you for your comment.
->>>> Chanwoo Choi
->>>>
->>> Hi,
->>>
->>> How was going on?
->>>
->> I did post this patch and reviewed by maintainer.
->> The request was reflected to following patch.
->> Also, I did explain the constraints of the regulator of WM8994 codec
->> and resend following patch. This patch include Goni and Aquila board code
->> related to audio.
->> 	[PATCH] ARM: S5PV210: Add audio support to Goni and Aquila board
->>
->> This is my mistake, "RESEND" word is leaved out in the subject.
->>
-> Hmm...so may missed. :-(
+On 09/20/2010 11:37 PM, Russell King - ARM Linux wrote:
+> On Mon, Sep 20, 2010 at 11:55:50AM -0500, Rob Herring wrote:
+>> There is no programming distinction between an irq and an wakeup if the  
+>> GIC is powered on in suspend which is platform dependent. It is only a  
+>> s/w distinction of what interrupts you allow to wake you up. If GIC  
+>> remains powered, then it can assert nirq to the core and wake-up. If the  
+>> core is powered down, the external power controller can monitor the NIRQ  
+>> line to wake-up the core. So the powergating of the core has no impact  
+>> on the prvgramming of the GIC for wake-up.
 > 
-> It would helpful to me if you could add patch version and changelog.
+> Well, not everyone does this - and I know of no platforms where it has
+> been reported for the GIC to be able to wake the system up.  TI OMAP
+> doesn't allow it, neither does the one being discussed in this thread.
+> 
+> The system being discussed here has an external power controller which
+> needs to be appropriately programmed.
+> 
+> You can see this because the proposed patch doesn't add code like that
+> in vic.c, but adds a no-operation function so that set_wake() becomes
+> a no-op returning zero.
+> 
+>> How about adding a set_wake function ptr as a parameter to  
+>> gic_dist_init? If a platform needs more than the basic operation, they  
+>> can override it.
+> 
+> As I can see, we're not talking about wake-up being able to be done from
+> the IRQ controller here, but something entirely external and unrelated
+> to it.
+> .
 > 
 
-You refer to following url :
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-September/025677.html
+Russell,
 
-Do you need additional info(changelog, patch version)?
+Should i keep this patch in "SPEAr Support patch series version 2"?
 
-Thanks
-
-Best regards,
-Chanwoo Choi.
+viresh.
