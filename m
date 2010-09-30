@@ -1,51 +1,31 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Thu, 30 Sep 2010 15:07:08 +0530
-Subject: [PATCH 52/74] ST SPEAr13xx: Adding CPU hotplug support added
-	for SMP platforms
-In-Reply-To: <AANLkTimzKd14U0k10Pjgb9UBWB2gixivvja8Qh_zMMLR@mail.gmail.com>
-References: <cover.1283161023.git.viresh.kumar@st.com>	<1980a48cb88189ce617fbfa2742d3259dd400b7b.1283161023.git.viresh.kumar@st.com>
-	<AANLkTimzKd14U0k10Pjgb9UBWB2gixivvja8Qh_zMMLR@mail.gmail.com>
-Message-ID: <4CA45A44.80604@st.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 30 Sep 2010 11:40:48 +0200
+Subject: [PATCH] spi/pl022: make sure the chip_info dev pointer is set
+Message-ID: <1285839648-7368-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sundar,
+We forgot to set the pointer back to the device if the user
+supplied all device settings, leading to crashing debug prints
+as controller data is verified.
 
-Sorry for replying so late :).
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/spi/amba-pl022.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-On 9/3/2010 11:30 AM, Sundar wrote:
-> Hi,
-> 
-> On Mon, Aug 30, 2010 at 4:09 PM, Viresh KUMAR <viresh.kumar@st.com> wrote:
->> From: Deepak Sikri <deepak.sikri@st.com>
->>
->> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
->> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> ---
-> 
->> +       flush_cache_all();
->> +       asm volatile(
->> +       "       mcr     p15, 0, %1, c7, c5, 0\n"
->> +       "       mcr     p15, 0, %1, c7, c10, 4\n"
-> 
-> Isnt this a Cortex-A9 platform? If yes, then this is not implemented
-> on the Cortex-A9 if I am right.
-> You should use a dsb() here.
-
-yes, I would place dsb here.
-
->> +               /*
->> +                * here's the WFI
->> +                */
->> +               asm(".word      0xe320f003\n"
->> +                   :
-> 
-> Also, why not a simple asm volatile("wfi" : : : "memory"); instead of
-> hard coded values.
-
-Would add a wfi() macro in asm/system.h including sev() as suggested by
-Russell. This statement would be replaced by a simple wfi().
-
-regards
-Shiraz
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index 4c37c4e..90a7e5d 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -1574,6 +1574,8 @@ static int pl022_setup(struct spi_device *spi)
+ 		chip_info->duplex = SSP_MICROWIRE_CHANNEL_FULL_DUPLEX;
+ 		chip_info->cs_control = null_cs_control;
+ 	} else {
++		/* Users should not set this field */
++		chip_info->dev = &spi->dev;
+ 		dev_dbg(&spi->dev,
+ 			"using user supplied controller_data settings\n");
+ 	}
+-- 
+1.6.3.3
