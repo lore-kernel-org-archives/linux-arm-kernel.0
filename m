@@ -1,45 +1,145 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 30 Sep 2010 20:45:36 +0900
-Subject: [PATCH] ARM: Samsung S5P: Unify defines for both gpio interrupt
-	types
-In-Reply-To: <00e101cb6093$34f4d270$9ede7750$%szyprowski@samsung.com>
-References: <1285841906-21194-1-git-send-email-m.szyprowski@samsung.com>
-	<00a501cb6091$e25692c0$a703b840$%kim@samsung.com>
-	<00e101cb6093$34f4d270$9ede7750$%szyprowski@samsung.com>
-Message-ID: <00a801cb6095$0212ef20$0638cd60$%kim@samsung.com>
+From: ian@opensource.wolfsonmicro.com (Ian Lartey)
+Date: Thu, 30 Sep 2010 13:57:24 +0100
+Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31 ADS board
+Message-ID: <1285851444-18123-1-git-send-email-ian@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-Hi,
+This is only a partial revert of "ARM: mx3/mx31ads: fold board header in its only user"
+[commit ccfa7c269843001077df02d98918c6c9bde91395)]
 
-(snip)
+As some of the the board defines are also used in the cs89x0 ethernet driver by the i.MX31 ADS.
 
-> >
-> > Ok..firstly looks ok to me now.
-> > But I don't know...in the future may have to revert back due to S5P64XX.
-> 
-> Well, these defines are used only by plat-s5p/irq-{eint,gpioint}.c. These
-generic
-> functions cannot be used for S5P64XX anyway, because it has S3C64XX style
-of
-> gpio
-> registers afair. IMHO this shouldn't be a problem. Just S5P64XX would need
-to
-> provide it's own code for gpio/ext interrupts (or share the code with
-s3c64xx
-> somehow).
-> 
-Yes, you're right. It seems to have been useless worry.
-However, it is likely to think of once again later.
+Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-mx3/mach-mx31ads.c               |   43 +++---------------
+ arch/arm/plat-mxc/include/mach/board-mx31ads.h |   57 ++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index 94b3e7c..7d13e99 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -29,6 +29,7 @@
+ #include <asm/memory.h>
+ #include <asm/mach/map.h>
+ #include <mach/common.h>
++#include <mach/board-mx31ads.h>
+ #include <mach/iomux-mx3.h>
+ 
+ #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+@@ -40,42 +41,12 @@
+ #include "devices-imx31.h"
+ #include "devices.h"
+ 
+-/* Base address of PBC controller */
+-#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
+-/* Offsets for the PBC Controller register */
+-
+-/* PBC Board interrupt status register */
+-#define PBC_INTSTATUS           0x000016
+-
+-/* PBC Board interrupt current status register */
+-#define PBC_INTCURR_STATUS      0x000018
+-
+-/* PBC Interrupt mask register set address */
+-#define PBC_INTMASK_SET         0x00001A
+-
+-/* PBC Interrupt mask register clear address */
+-#define PBC_INTMASK_CLEAR       0x00001C
+-
+-/* External UART A */
+-#define PBC_SC16C652_UARTA      0x010000
+-
+-/* External UART B */
+-#define PBC_SC16C652_UARTB      0x010010
+-
+-#define PBC_INTSTATUS_REG	(PBC_INTSTATUS + PBC_BASE_ADDRESS)
+-#define PBC_INTMASK_SET_REG	(PBC_INTMASK_SET + PBC_BASE_ADDRESS)
+-#define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
+-#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
+-
+-#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+-#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
+-
+-#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
+-#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
+-
+-#define MXC_MAX_EXP_IO_LINES	16
+-/*
+- * This file contains the board-specific initialization routines.
++/*!
++ * @file mx31ads.c
++ *
++ * @brief This file contains the board-specific initialization routines.
++ *
++ * @ingroup System
+  */
+ 
+ #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+new file mode 100644
+index 0000000..6a019bd
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+@@ -0,0 +1,57 @@
++/*
++ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++
++#include <mach/hardware.h>
++
++/* Base address of PBC controller */
++#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
++/* Offsets for the PBC Controller register */
++
++/* PBC Board interrupt status register */
++#define PBC_INTSTATUS           0x000016
++
++/* PBC Board interrupt current status register */
++#define PBC_INTCURR_STATUS      0x000018
++
++/* PBC Interrupt mask register set address */
++#define PBC_INTMASK_SET         0x00001A
++
++/* PBC Interrupt mask register clear address */
++#define PBC_INTMASK_CLEAR       0x00001C
++
++/* External UART A */
++#define PBC_SC16C652_UARTA      0x010000
++
++/* External UART B */
++#define PBC_SC16C652_UARTB      0x010010
++
++/* Ethernet Controller IO base address */
++#define PBC_CS8900A_IOBASE      0x020000
++
++#define PBC_INTSTATUS_REG	(PBC_INTSTATUS + PBC_BASE_ADDRESS)
++#define PBC_INTMASK_SET_REG	(PBC_INTMASK_SET + PBC_BASE_ADDRESS)
++#define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
++#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
++
++#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
++#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
++
++
++#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
++
++#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
++#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
++
++#define MXC_MAX_EXP_IO_LINES	16
++
++#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
+-- 
+1.7.0.4
