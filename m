@@ -1,71 +1,52 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 30 Sep 2010 18:57:35 +0200
-Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
-References: <1285834270-32766-1-git-send-email-charu@ti.com>
-	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
-	<4CA49ADE.6080202@ti.com>, <20100930150713.GG3117@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
-Message-ID: <4CA4C17F.7060106@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 30 Sep 2010 10:02:37 -0700
+Subject: [PATCH 2/2] ARM: S5PV310: Update CPU hotplug implementation
+In-Reply-To: <001901cb5fcd$a0a5b5a0$e1f120e0$%kim@samsung.com>
+References: <1284700388-9394-1-git-send-email-kgene.kim@samsung.com>
+	<1284700388-9394-3-git-send-email-kgene.kim@samsung.com>
+	<001901cb5fcd$a0a5b5a0$e1f120e0$%kim@samsung.com>
+Message-ID: <AANLkTinaGsnZg-nTGvXS4xw-_8e8+pLpL4hYN-HMNYfh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/30/2010 5:55 PM, Varadarajan, Charulatha wrote:
-> Tony/ Benoit,
->
->>>
->>> I think that disabling it should be done only if the CONFIG_OMAP_WDT
->>> is not set.
+On Wed, Sep 29, 2010 at 4:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kukjin Kim wrote:
 >>
->> How about disabling is done always unless CONFIG_WATCHDOG_NOWAYOUT
->> is set?
->
-> As given in the patch description, this patch does a disable of watchdog
-> timer, during init, to avoid the system rebooting that happens due to
-> enabling of watchdog timer after a reset of the module (during hwmod init).
->
-> According to the default WDT registers values, the system reboot would
-> happen in ~10s if watchdog is enabled with default values. Hence, after
-> a WDT module reset during init, the watchdog has to be disabled within 10s
-> otherwise the system will keep rebooting.
->
-> Hence irrespective of CONFIG_WATCHDOG_NOWAYOUT/ CONFIG_OMAP_WDT,
-> the watchdog timer needs to be disabled after a WDT reset has happened.
-
-No, not necessarily, this is the whole point about a watchdog, you need 
-just need to ping it to prove that the system is alive.
-
-In case you didn't notice, every watchdogs are started during a cold 
-reset since OMAP1610. Even Phoenix contains a watchdog that is started 
-by default.
-This is by construction... and this is done like that for a good reason. 
-So stopping a watchdog just after the reset in a bootloader is not 
-necessarily the behavior that user of a watchdog are expecting, 
-otherwise it will not be started by default at boot time.
-
-In your description, it looks like this behavior is a HW bug that we 
-have to fix... It is just the way it is supposed to work.
-
-Regards,
-Benoit
-
->
-> Later on, the watchdog timer probe would be called (if CONFIG_OMAP_WDT
-> is defined) which takes care of doing the regular the watchdog timer
-> settings. After this, normal operations like open, close, ioctl operations
-> are supported (if CONFIG_OMAP_WDT is defined).
-> Based on CONFIG_WATCHDOG_NOWAYOUT definition, disabling the watchdog
-> may/may not be supported.
->
-> Hence omap2_disable_wdt() introduced in this patch is not going to affect
-> the watchdog operations in anyway execpt that it is fixing the reboot issue
-> observed due to a watchdog timer reset. And this has to be done irrespective
-> of any OMAP watchdog timer related flags.
->
-> I guess, omap_wdt_disable() call during the WDT probe might be due to
-> similar reasons.
->
->> That way product kernels can set CONFIG_WATCHDOG_NOWAYOUT
->> and for the rest of us we can let fsck run the standard Linux way.
+>> From: Changhwan Youn <chaos.youn@samsung.com>
 >>
->> Tony
+>> This patch updates CPU hotplug implementation to reduce CPU power
+>> consumption
+>> and will turn off the CPU power when CPU1 is unplugged while previous CPU
+>> hotplug
+>> used CPU idle.
+>> This patch removes init memory freeing code to use CPU boot code when CPU1
+> is
+>> plugged-in again and adds vfp_enable() call to allow to access CP10 and
+> CP11.
+>>
+>> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Russell King <rmk@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+>
+
+snip
+
+>> +#ifndef CONFIG_HOTPLUG_CPU
+>> ? ? ? if (!machine_is_integrator() && !machine_is_cintegrator())
+>> ? ? ? ? ? ? ? totalram_pages +=
+> free_area(__phys_to_pfn(__pa(__init_begin)),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __phys_to_pfn(__pa(__init_end)),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "init");
+>> +#endif
+>> ?}
+>>
+>> ?#ifdef CONFIG_BLK_DEV_INITRD
+
+I don't think this is necessary.  Any symbol that is necessary for CPU
+hotplug should be marked with __cpuinit instead of __init.  The linker
+script will put __cpuinit symbols outside the __init_begin -
+__init_end section if CONFIG_HOTPLUG_CPU is enabled.
