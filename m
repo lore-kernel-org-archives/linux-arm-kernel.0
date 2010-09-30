@@ -1,25 +1,36 @@
 From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Thu, 30 Sep 2010 10:31:58 +0200
-Subject: [PATCH 4/6] mmc: sdhci_pltfm: pass more data on custom init-call
-In-Reply-To: <1285790884-3516-5-git-send-email-w.sang@pengutronix.de>
-References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
-	<1285790884-3516-5-git-send-email-w.sang@pengutronix.de>
-Message-ID: <19620.19198.88841.623775@ipc1.ka-ro>
+Date: Thu, 30 Sep 2010 10:45:26 +0200
+Subject: [PATCH 3/7] ARM: Samsung: Use the correct I2C2 interrupt
+In-Reply-To: <20100930044832.GA16905@july>
+References: <20100930044832.GA16905@july>
+Message-ID: <19620.20006.852861.438279@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Wolfram Sang writes:
-> The custom init call may need more data to perform its job, so we pass
-> it a pointer to pdata, too. Also, always use the platform_id specific
-> data even if platform_data is present. Doing that, platform_data can
-> additionally be parsed by init() for board-specific information (via
-> sdhci->mmc->parent).
+Kyungmin Park writes:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-Why not a pointer to the platform_device itself? Then the callback
-function would have even more information (e.g. platform_device ID)
-and could easily get at the platform_data too.
+> Use the correct I2C2 interrupt.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/plat-samsung/dev-i2c2.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/dev-i2c2.c b/arch/arm/plat-samsung/dev-i2c2.c
+> index 07036de..ff4ba69 100644
+> --- a/arch/arm/plat-samsung/dev-i2c2.c
+> +++ b/arch/arm/plat-samsung/dev-i2c2.c
+> @@ -32,8 +32,8 @@ static struct resource s3c_i2c_resource[] = {
+>  		.flags = IORESOURCE_MEM,
+>  	},
+>  	[1] = {
+> -		.start = IRQ_CAN0,
+> -		.end   = IRQ_CAN0,
+> +		.start = IRQ_IIC2,
+> +		.end   = IRQ_IIC2,
+>
+Is there any reason for using 'IIC' here to refer to 'I2C'?
 
 
 Lothar Wa?mann
