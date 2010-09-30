@@ -1,75 +1,121 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Thu, 30 Sep 2010 18:21:27 +0200
-Subject: [PATCH] spi/pl022: compare bitwidth to enums
-In-Reply-To: <AANLkTimGpfazBPYp3cc4pSFUJ_Q7GaPVxRtB2=YSM5YE@mail.gmail.com>
-References: <1285840671-9567-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin6fPnDdSqQiWKH8kTnREV2g8p94HzQQcjcpKLs@mail.gmail.com>
-	<AANLkTimGpfazBPYp3cc4pSFUJ_Q7GaPVxRtB2=YSM5YE@mail.gmail.com>
-Message-ID: <083DF309106F364B939360100EC290F80B06721D75@eu1rdcrdc1wx030.exi.nxp.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 30 Sep 2010 22:02:53 +0530
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com>, <20100930150713.GG3117@atomide.com>,
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Benoit,
 
-> >> The enums from <linux/amba/pl022.h> are actually off-by-one
-> >> since bitwidth 4 is defined as 0x03, causing weirdness when
-> >> we were trying out some 9-bit peripheral. Fix this by
-> >> comparing to the enum values rather than hardcoded values
-> >> and also fixing the enum to something reasonable.
-> >>
-> >> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-> >> (...)
-> >> - ? ? ? if (chip_info->data_size <= 8) {
-> >> + ? ? ? if (chip_info->data_size <= SSP_DATA_BITS_8) {
-> >> ? ? ? ? ? ? ? ?dev_dbg(&spi->dev, "1 <= n <=8 bits per word\n");
-> >> ? ? ? ? ? ? ? ?chip->n_bytes = 1;
-> >> ? ? ? ? ? ? ? ?chip->read = READING_U8;
-> >> ? ? ? ? ? ? ? ?chip->write = WRITING_U8;
-> >> - ? ? ? } else if (chip_info->data_size <= 16) {
-> >> + ? ? ? } else if (chip_info->data_size <= SSP_DATA_BITS_16) {
-> >
-> > I just realized that Kevin Wells patch actually patch away this problem
-> > so merge his patch and disregard this for the optimal solution.
-> >
-> >> ?enum ssp_data_size {
-> >> - ? ? ? SSP_DATA_BITS_4 = 0x03, SSP_DATA_BITS_5, SSP_DATA_BITS_6,
-> >> + ? ? ? SSP_DATA_BITS_4 = 0x04, SSP_DATA_BITS_5, SSP_DATA_BITS_6,
-> >
-> > This is not good because this is used for default register
-> > settings too (I didn't notice, typical).
+<<snip>>
+
+> > With OMAP2PLUS watchdog implemented in hwmod fw way, the
+> > module is reset during init.
 > 
-> And it creates a 1:1 mapping of name to the same number.  Insane!
-> Just use the integer number directly.  :-)
+> In that case hwmod fw just highlighted the real behavior that was hidden 
+> so far by the X-loader.
 
-The spi->mode patch I submitted a few weeks ago actually removed the
-data_size field from chip_info and uses spi->data_bus_bits instead.
-The values passed into the dss field for the control0 register
-subtracts 1 from the spi->data_bus_bits to get the correct value now.
-
-Reference: 09/16/2010
-[PATCH] spi: amba_pl022: Add spi->mode support to AMBA SPI driver
+Yes.
 
 > 
+> You should as well add a link to the email thread with Kevin that raised 
+> the issue.
+
+Okay.
+
+<<snip>>
+
+> > diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> > index 8e2f0aa..9f44fc6 100644
+> > --- a/arch/arm/mach-omap2/devices.c
+> > +++ b/arch/arm/mach-omap2/devices.c
+> > @@ -916,11 +916,55 @@ static inline void omap_init_vout(void) {}
 > >
-> > If anyone still wants a patch for older kernels I can provide a
-> > patch against 2.6.36-rc6 with just the first two hunks.
+> >   /*-------------------------------------------------------------------------*/
 > >
-> > Yours,
-> > Linus Walleij
-> >
+> > +/*
+> > + * WDT mdoule is reset during init which enables the watchdog.
+> 
+> typo: module
+
+Okay will correct it.
+
+> 
+> The real explanation is that you should not assume anything from the 
+> boot loader at that time, so always stop the wdt.
+
+It is not an assumption from bootloader. After the WDT reset, the 
+WDT is enabled and the reset values of WDT registers makes the system to
+reboot (in ~10s) as WDT is enabled.
+
+> 
+> > + * Hence it is required to disable the watchdog after the WDT reset
+> > + * during init. Otherwise the system would reboot as per the default
+> > + * watchdog timer registers settings.
+> > + */
+> > +#define OMAP_WDT_WPS	(0x34)
+> > +#define OMAP_WDT_SPR	(0x48)
+> > +
+> > +static int omap2_disable_wdt(struct omap_hwmod *oh, void *user)
+> 
+> You should call it unused if the parameter is not used.
+
+Okay.
+
+> 
+> > +{
+> > +	void __iomem *base;
+> > +
+> > +	if (!oh)
+> > +		pr_err("Could not look up wdtimer_hwmod\n");
+> > +
+> > +	base = oh->_mpu_rt_va;
+> 
+> Paul added an hwmod API to get that va (something like *_get_mpu_rt_va).
+
+Okay. Will use that.
+
+> 
+> > +
+> > +	/* Enable the clocks before accessing the WDT registers */
+> > +	omap_hwmod_enable(oh);
+> 
+> The enable can fail, so you should check the return value.
+
+Okay.
+
+> 
+> > +
+> > +	/* sequence required to disable watchdog */
+> > +	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);	/* TIMER_MODE */
+> > +	while (__raw_readl(base + OMAP_WDT_WPS)&  0x10)
+> > +		cpu_relax();
+> > +
+> > +	__raw_writel(0x5555, base + OMAP_WDT_SPR);	/* TIMER_MODE */
+> > +	while (__raw_readl(base + OMAP_WDT_WPS)&  0x10)
+> > +		cpu_relax();
+> > +
+> > +	omap_hwmod_idle(oh);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void __init omap_disable_wdt(void)
+> > +{
+> > +	if (cpu_class_is_omap2())
+> 
+> This code is already in mach-omap2/devices.c, so that test should be 
+> useless.
+
+I do not see a cpu_class_is_omap2() check in omap2_init_devices(). Please
+point out where this check is done while/before calling omap_disable_wdt()?
+
 > 
 > 
-> 
-> --
-> Grant Likely, B.Sc., P.Eng.
-> Secret Lab Technologies Ltd.
-> 
-> --------------------------------------------------------------------------
-> ----
-> Start uncovering the many advantages of virtual appliances
-> and start using them to simplify application deployment and
-> accelerate your shift to cloud computing.
-> http://p.sf.net/sfu/novell-sfdev2dev
-> _______________________________________________
-> spi-devel-general mailing list
-> spi-devel-general at lists.sourceforge.net
-> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
+
+<<snip>>
