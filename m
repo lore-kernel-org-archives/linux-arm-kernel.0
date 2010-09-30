@@ -1,59 +1,107 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 30 Sep 2010 18:16:17 +0900
-Subject: [PATCH 3/7] ARM: Samsung: Use the correct I2C2 interrupt
-In-Reply-To: <19620.20006.852861.438279@ipc1.ka-ro>
-References: <20100930044832.GA16905@july>
-	<19620.20006.852861.438279@ipc1.ka-ro>
-Message-ID: <AANLkTim2saP2wGxF1U3v-p=PRvqOD+TFJwQ772kt1N-F@mail.gmail.com>
+From: jongsun.han@samsung.com (Jongsun Han)
+Date: Thu, 30 Sep 2010 18:27:48 +0900
+Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
+In-Reply-To: <AANLkTin9tR4+CBa+r6mHsJdFYxzkaK1CA+_WKhTZkacs@mail.gmail.com>
+References: <20100930044859.GA16923@july>
+	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
+	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
+	<AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
+	<AANLkTin9tR4+CBa+r6mHsJdFYxzkaK1CA+_WKhTZkacs@mail.gmail.com>
+Message-ID: <006601cb6081$bf8a7140$3e9f53c0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 5:45 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> Kyungmin Park writes:
->> From: Kyungmin Park <kyungmin.park@samsung.com>
->>
->> Use the correct I2C2 interrupt.
->>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/plat-samsung/dev-i2c2.c | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/plat-samsung/dev-i2c2.c b/arch/arm/plat-samsung/dev-i2c2.c
->> index 07036de..ff4ba69 100644
->> --- a/arch/arm/plat-samsung/dev-i2c2.c
->> +++ b/arch/arm/plat-samsung/dev-i2c2.c
->> @@ -32,8 +32,8 @@ static struct resource s3c_i2c_resource[] = {
->> ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
->> ? ? ? },
->> ? ? ? [1] = {
->> - ? ? ? ? ? ? .start = IRQ_CAN0,
->> - ? ? ? ? ? ? .end ? = IRQ_CAN0,
->> + ? ? ? ? ? ? .start = IRQ_IIC2,
->> + ? ? ? ? ? ? .end ? = IRQ_IIC2,
->>
-> Is there any reason for using 'IIC' here to refer to 'I2C'?
+On Thu, Sep 30, 2010 at 3:50 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> > On Thu, Sep 30, 2010 at 3:27 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+> >> On Thu, Sep 30, 2010 at 3:20 PM, Jeongbae Seo <jeongbae.seo@samsung.com>
+> wrote:
+> >>> Kyungmin wrote:
+> >>>> From: Kyungmin Park <kyungmin.park@samsung.com>
+> >>>>
+> >>>> S5PC210 support more I2C devices than previous SoCs.
+> >>>> And to prevent the wrong usage use the s5p prefix instead of s3c.
+> >>>>
+> >>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >>>> ---
+> >>>> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ? ?| ? 15 +++++++
+> >>>> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? | ? ?5 ++
+> >>>> ?arch/arm/mach-s5pv310/setup-i2c3.c ? ? ? | ? 25 +++++++++++
+> >>>> ?arch/arm/mach-s5pv310/setup-i2c4.c ? ? ? | ? 25 +++++++++++
+> >>>> ?arch/arm/mach-s5pv310/setup-i2c5.c ? ? ? | ? 25 +++++++++++
+> >>>> ?arch/arm/mach-s5pv310/setup-i2c6.c ? ? ? | ? 25 +++++++++++
+> >>>> ?arch/arm/mach-s5pv310/setup-i2c7.c ? ? ? | ? 25 +++++++++++
+> >>>> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ?| ? 25 +++++++++++
+> >>>> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? | ? ?5 ++
+> >>>> ?arch/arm/plat-s5p/dev-i2c3.c ? ? ? ? ? ? | ? 67
+> >>>> ++++++++++++++++++++++++++++++
+> >>>> ?arch/arm/plat-s5p/dev-i2c4.c ? ? ? ? ? ? | ? 67
+> >>>> ++++++++++++++++++++++++++++++
+> >>>> ?arch/arm/plat-s5p/dev-i2c5.c ? ? ? ? ? ? | ? 67
+> >>>> ++++++++++++++++++++++++++++++
+> >>>> ?arch/arm/plat-s5p/dev-i2c6.c ? ? ? ? ? ? | ? 67
+> >>>> ++++++++++++++++++++++++++++++
+> >>>> ?arch/arm/plat-s5p/dev-i2c7.c ? ? ? ? ? ? | ? 67
+> >>>> ++++++++++++++++++++++++++++++
+> >>>> ?arch/arm/plat-samsung/include/plat/iic.h | ? ?5 ++
+> >>>> ?15 files changed, 515 insertions(+), 0 deletions(-)
+> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
+> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
+> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
+> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
+> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
+> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c3.c
+> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c4.c
+> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c5.c
+> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c6.c
+> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c7.c
+> >>>>
+> >>>
+> >>> Hi Kyungmin,
+> >>>
+> >>> We are considering another way not to make additional new i2c dev files.
+> >>> In my opinion, this patch looks not bad but we'd better make an effort to
+> >>> avoid having the more similar file.
+> >>
+> >> Actually I also it's not good approach, but as there's no comment or
+> >> discuss about this I send the patches.
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
+> August/022615.html
+> >>
+> >> If you have good method or approaches, I'm welcome.
+> >
+> > First, these are device definitions and gpio set callbacks and
+> > shouldn't take much
+> > of space. So, perhaps these all could be built upon single I2C support
+> > selection.
+> 
+> That's my first propose.
 
-Historical reason previous s3c24xx series use this name. I don't want
-to break the s3c24xx series codes.
-Instead I use the I2C after S5P series. I2C3, I2C4 and so on.
+Hi, Kyungmin and Jassi
 
-If all person who works on s3c24xx and s5p series agree that use the
-I2C. It can be used.
+I think that parts of i2c in S5PV310 aren't used depending on the usage of
+S5PV310.
+It's better define the number of i2c devs being used instead of using single I2C
+support selection.
 
-Thank you,
-Kyungmin Park
+> >
+> > Second, if we must build them conditionally, how about having all in
+> > one file with
+> > each device's definition and callback surrounded by corresponding ifdef ?
+> > That would alteast save us file-count.
+> 
+> This method is also no problem if all of person are agreed.
+> 
+> So just choose it and make a conclusion.
 >
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
->
+> Thank you,
+> Kyungmin Park
+> >
+
+I agree with Jassi's opinion keeping setup-i2c(0..2) and dev-i2c(0..2) for
+backward
+compatibility and adding a file which handles i2c(0..7) for S5PV310 and coming
+Samsung
+soc.
+
+Best Regards
+Jongsun Han
