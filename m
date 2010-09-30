@@ -1,75 +1,110 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Sep 2010 11:46:31 -0700
-Subject: [PATCH 3/3] OMAP1: Amstrad Delta: add camera controlled LEDS trigger
-In-Reply-To: <20100930184459.12052.14542.stgit@baageli.muru.com>
-References: <20100930184459.12052.14542.stgit@baageli.muru.com>
-Message-ID: <20100930184631.12052.91647.stgit@baageli.muru.com>
+Date: Thu, 30 Sep 2010 11:48:41 -0700
+Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
+In-Reply-To: <AANLkTinmfEYq9SRNRWY9xOkwS-FE_LDyBOeGLoyYLNtZ@mail.gmail.com>
+References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
+	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
+	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
+	<AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
+	<AANLkTikNLn-VuCQb2q7wZVbYORxV6uhia_oOBsQg3ZiJ@mail.gmail.com>
+	<20100924225254.GK4211@atomide.com>
+	<AANLkTinmfEYq9SRNRWY9xOkwS-FE_LDyBOeGLoyYLNtZ@mail.gmail.com>
+Message-ID: <20100930184841.GL3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+* Cory Maccarrone <darkstar6262@gmail.com> [100930 11:34]:
+> >
+> > Looks like also board-sx1-mmc.c and board-h[23]-mmc.c have the
+> > same spotty voltage range.
+> >
+> > Cory, care to do a patch that fixes it for all of them?
+> >
+> 
+> Yeah, I can do that.  I'll resubmit this patch too with the fixed up ranges.
 
-This patch extends the Amstrad Delta camera support with LEDS trigger that can
-be used for automatic control of the on-board camera LED. The led turns on
-automatically on camera device open and turns off on camera device close.
+Turns out I already did it :) Care to test/ack this one?
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 30 Sep 2010 11:40:56 -0700
+Subject: [PATCH] omap: Fix spotty MMC voltages
+
+As noted by Micha? Miros?aw <mirqus@gmail.com>, the voltages should
+cover the supported voltage range instead of missing some values
+within the range.
+
+Reported-by: Micha? Miros?aw <mirqus@gmail.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap1/board-ams-delta.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 12f7f60..248e8bb 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
-+#include <linux/leds.h>
- #include <linux/platform_device.h>
- #include <linux/serial_8250.h>
- 
-@@ -222,11 +223,30 @@ static struct i2c_board_info ams_delta_camera_board_info[] = {
+diff --git a/arch/arm/mach-omap1/board-h2-mmc.c b/arch/arm/mach-omap1/board-h2-mmc.c
+index b30c499..50d9032 100644
+--- a/arch/arm/mach-omap1/board-h2-mmc.c
++++ b/arch/arm/mach-omap1/board-h2-mmc.c
+@@ -58,7 +58,8 @@ static struct omap_mmc_platform_data mmc1_data = {
+ 	.dma_mask			= 0xffffffff,
+ 	.slots[0]       = {
+ 		.set_power              = mmc_set_power,
+-		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_30_31 |
++		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_29_30 |
++					  MMC_VDD_30_31 | MMC_VDD_31_32 |
+ 					  MMC_VDD_32_33 | MMC_VDD_33_34,
+ 		.name                   = "mmcblk",
  	},
- };
- 
-+#ifdef CONFIG_LEDS_TRIGGERS
-+DEFINE_LED_TRIGGER(ams_delta_camera_led_trigger);
-+
-+static int ams_delta_camera_power(struct device *dev, int power)
-+{
-+	/*
-+	 * turn on camera LED
-+	 */
-+	if (power)
-+		led_trigger_event(ams_delta_camera_led_trigger, LED_FULL);
-+	else
-+		led_trigger_event(ams_delta_camera_led_trigger, LED_OFF);
-+	return 0;
-+}
-+#else
-+#define ams_delta_camera_power	NULL
-+#endif
-+
- static struct soc_camera_link __initdata ams_delta_iclink = {
- 	.bus_id         = 0,	/* OMAP1 SoC camera bus */
- 	.i2c_adapter_id = 1,
- 	.board_info     = &ams_delta_camera_board_info[0],
- 	.module_name    = "ov6650",
-+	.power		= ams_delta_camera_power,
- };
- 
- static struct platform_device ams_delta_camera_device = {
-@@ -281,6 +301,10 @@ static void __init ams_delta_init(void)
- 
- 	omap1_usb_init(&ams_delta_usb_config);
- 	omap1_set_camera_info(&ams_delta_camera_platform_data);
-+#ifdef CONFIG_LEDS_TRIGGERS
-+	led_trigger_register_simple("ams_delta_camera",
-+			&ams_delta_camera_led_trigger);
-+#endif
- 	platform_add_devices(ams_delta_devices, ARRAY_SIZE(ams_delta_devices));
- 
- #ifdef CONFIG_AMS_DELTA_FIQ
+diff --git a/arch/arm/mach-omap1/board-h3-mmc.c b/arch/arm/mach-omap1/board-h3-mmc.c
+index 54b0f06..9f073bf 100644
+--- a/arch/arm/mach-omap1/board-h3-mmc.c
++++ b/arch/arm/mach-omap1/board-h3-mmc.c
+@@ -40,7 +40,8 @@ static struct omap_mmc_platform_data mmc1_data = {
+ 	.dma_mask			= 0xffffffff,
+ 	.slots[0]       = {
+ 		.set_power              = mmc_set_power,
+-		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_30_31 |
++		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_29_30 |
++					  MMC_VDD_30_31 | MMC_VDD_31_32 |
+ 					  MMC_VDD_32_33 | MMC_VDD_33_34,
+ 		.name                   = "mmcblk",
+ 	},
+diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
+index 7ea75c1..909fdeb 100644
+--- a/arch/arm/mach-omap1/board-htcherald.c
++++ b/arch/arm/mach-omap1/board-htcherald.c
+@@ -410,7 +410,8 @@ static struct omap_mmc_platform_data htc_mmc1_data = {
+ 	.nr_slots                       = 1,
+ 	.switch_slot                    = NULL,
+ 	.slots[0]       = {
+-		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_30_31 |
++		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_29_30 |
++					  MMC_VDD_30_31 | MMC_VDD_31_32 |
+ 					  MMC_VDD_32_33 | MMC_VDD_33_34,
+ 		.name                   = "mmcblk",
+ 		.nomux                  = 1,
+diff --git a/arch/arm/mach-omap1/board-sx1-mmc.c b/arch/arm/mach-omap1/board-sx1-mmc.c
+index 5b33ae8..be5a365 100644
+--- a/arch/arm/mach-omap1/board-sx1-mmc.c
++++ b/arch/arm/mach-omap1/board-sx1-mmc.c
+@@ -44,7 +44,8 @@ static struct omap_mmc_platform_data mmc1_data = {
+ 	.nr_slots                       = 1,
+ 	.slots[0]       = {
+ 		.set_power              = mmc_set_power,
+-		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_30_31 |
++		.ocr_mask               = MMC_VDD_28_29 | MMC_VDD_29_30 |
++					  MMC_VDD_30_31 | MMC_VDD_31_32 |
+ 					  MMC_VDD_32_33 | MMC_VDD_33_34,
+ 		.name                   = "mmcblk",
+ 	},
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index 7a93bd5..abd7e77 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -493,7 +493,8 @@ static struct omap_mmc_platform_data mmc1_data = {
+ 		.set_bus_mode		= n8x0_mmc_set_bus_mode,
+ 		.get_cover_state	= n8x0_mmc_get_cover_state,
+ 		.ocr_mask		= MMC_VDD_165_195 | MMC_VDD_30_31 |
+-						MMC_VDD_32_33   | MMC_VDD_33_34,
++						MMC_VDD_31_32 | MMC_VDD_32_33 |
++						MMC_VDD_33_34,
+ 		.name			= "internal",
+ 	},
+ 	.slots[1] = {
