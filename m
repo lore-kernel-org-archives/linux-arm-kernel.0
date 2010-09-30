@@ -1,47 +1,91 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 30 Sep 2010 16:50:30 +0900
-Subject: [PATCH v2 2/3] ARM: S5PC210: Remove L2 cache init at board file
-Message-ID: <20100930075030.GA11808@july>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 30 Sep 2010 13:41:10 +0530
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+Message-ID: <1285834270-32766-1-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+With OMAP2PLUS watchdog implemented in hwmod fw way, the
+module is reset during init.
 
-Remove S5PC210 common PL310 cache init code. It will place the cpu common code.
+After a watchdog timer module reset, the WDTs are enabled. The
+default time for a system reset after a watchdog module reset
+is ~10s as per the default value of the WDT registers. Hence
+the system would be reset after 10s, if watchdog is not disabled
+within 10s.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+This patch fixes the above issue by disabling the watchdog timer
+after reset during initialization of devices.
+
+Signed-off-by: Charulatha V <charu@ti.com>
+Reported-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-s5pv310/mach-smdkv310.c       |    3 ---
- arch/arm/mach-s5pv310/mach-universal_c210.c |    3 ---
- 2 files changed, 0 insertions(+), 6 deletions(-)
+This patch is dependent on the below patch series (wdt hwmod) and
+is created on top of pm-core branch.
+http://www.spinics.net/lists/linux-omap/msg37043.html
 
-diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
-index 0d6ab77..a0c630d 100644
---- a/arch/arm/mach-s5pv310/mach-smdkv310.c
-+++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
-@@ -74,9 +74,6 @@ static void __init smdkv310_map_io(void)
+ arch/arm/mach-omap2/devices.c |   44 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 8e2f0aa..9f44fc6 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -916,11 +916,55 @@ static inline void omap_init_vout(void) {}
  
- static void __init smdkv310_machine_init(void)
+ /*-------------------------------------------------------------------------*/
+ 
++/*
++ * WDT mdoule is reset during init which enables the watchdog.
++ * Hence it is required to disable the watchdog after the WDT reset
++ * during init. Otherwise the system would reboot as per the default
++ * watchdog timer registers settings.
++ */
++#define OMAP_WDT_WPS	(0x34)
++#define OMAP_WDT_SPR	(0x48)
++
++static int omap2_disable_wdt(struct omap_hwmod *oh, void *user)
++{
++	void __iomem *base;
++
++	if (!oh)
++		pr_err("Could not look up wdtimer_hwmod\n");
++
++	base = oh->_mpu_rt_va;
++
++	/* Enable the clocks before accessing the WDT registers */
++	omap_hwmod_enable(oh);
++
++	/* sequence required to disable watchdog */
++	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);	/* TIMER_MODE */
++	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
++		cpu_relax();
++
++	__raw_writel(0x5555, base + OMAP_WDT_SPR);	/* TIMER_MODE */
++	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
++		cpu_relax();
++
++	omap_hwmod_idle(oh);
++
++	return 0;
++}
++
++static void __init omap_disable_wdt(void)
++{
++	if (cpu_class_is_omap2())
++		omap_hwmod_for_each_by_class("wd_timer",
++						omap2_disable_wdt, NULL);
++	return;
++}
++
+ static int __init omap2_init_devices(void)
  {
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
- }
- 
- MACHINE_START(SMDKV310, "SMDKV310")
-diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-index 2388cb9..4612823 100644
---- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-+++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-@@ -69,9 +69,6 @@ static void __init universal_map_io(void)
- 
- static void __init universal_machine_init(void)
- {
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
- }
- 
- MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	/* please keep these calls, and their implementations above,
+ 	 * in alphabetical order so they're easier to sort through.
+ 	 */
++	omap_disable_wdt();
+ 	omap_hsmmc_reset();
+ 	omap_init_camera();
+ 	omap_init_mbox();
 -- 
-1.5.3.3
+1.7.0.4
