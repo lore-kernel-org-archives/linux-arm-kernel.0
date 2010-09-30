@@ -1,39 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 30 Sep 2010 10:43:05 -0600 (MDT)
-Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
-References: <1285834270-32766-1-git-send-email-charu@ti.com>
-	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
-	<4CA49ADE.6080202@ti.com>, <20100930150713.GG3117@atomide.com>,
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1009301040390.5439@utopia.booyaka.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 30 Sep 2010 09:45:37 -0700
+Subject: [PATCH 2/4] arm: dis-allow hotplug on MSM
+In-Reply-To: <20100930071919.GA6434@ucw.cz>
+References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
+	<1284062289-10914-3-git-send-email-dwalker@codeaurora.org>
+	<20100930071919.GA6434@ucw.cz>
+Message-ID: <1285865137.14953.4.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Charu,
-
-On Thu, 30 Sep 2010, Varadarajan, Charulatha wrote:
-
-> > > diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> > > index 8e2f0aa..9f44fc6 100644
-> > > --- a/arch/arm/mach-omap2/devices.c
-> > > +++ b/arch/arm/mach-omap2/devices.c
-> > > +
-> > > +static void __init omap_disable_wdt(void)
-> > > +{
-> > > +	if (cpu_class_is_omap2())
-> > 
-> > This code is already in mach-omap2/devices.c, so that test should be 
-> > useless.
+On Thu, 2010-09-30 at 09:19 +0200, Pavel Machek wrote:
+> Hi!
 > 
-> I do not see a cpu_class_is_omap2() check in omap2_init_devices(). Please
-> point out where this check is done while/before calling omap_disable_wdt()?
+> > MSM doesn't support hotplug, so we prevent it from being
+> > select with this added line.
+> > 
+> > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> > ---
+> >  arch/arm/Kconfig |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index d2dfbc2..829dd67 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1211,6 +1211,7 @@ config NR_CPUS
+> >  config HOTPLUG_CPU
+> >  	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+> >  	depends on SMP && HOTPLUG && EXPERIMENTAL
+> > +	depends on !ARCH_MSM
+> >  	help
+> >  	  Say Y here to experiment with turning CPUs off and on.  CPUs
+> >  	  can be controlled through /sys/devices/system/cpu.
+> 
+> This is goodbye to s2ram support, AFAICT.
 
-It's implicit, due to the directory arch/arm/mach-omap2/ -- code in that 
-directory is only built for OMAP2+ systems -- and right now there are no 
-plans for OMAP1+ multi-arch booting.  So it's safe to assume that any code 
-in arch/arm/mach-omap2 will only run on OMAP2+ boards.
+This depends on SMP tho. It's like saying,
 
+depends on 
+-- 
 
-- Paul
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
