@@ -1,42 +1,33 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Thu, 30 Sep 2010 10:04:08 +0900
-Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
-In-Reply-To: <20100927222627.GH28588@console-pimps.org>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
-	<20100916143254.GC13563@erda.amd.com>
-	<20100927200138.GG28588@console-pimps.org>
-	<20100927220703.GV13563@erda.amd.com>
-	<20100927222627.GH28588@console-pimps.org>
-Message-ID: <20100930010407.GA18073@linux-sh.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 30 Sep 2010 09:45:14 +0900
+Subject: Please don't edit the subject. Use S5PC110 & S5PC210 as is
+Message-ID: <AANLkTi=NFz95jvk73cgXGV-kzj7FFazgMJ6D+GOXr3Kb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 27, 2010 at 11:26:27PM +0100, Matt Fleming wrote:
-> On Tue, Sep 28, 2010 at 12:07:03AM +0200, Robert Richter wrote:
-> > On 27.09.10 16:01:38, Matt Fleming wrote:
-> > > Well, ARM doesn't have names as strings for its pmus currently. What's
-> > > more, ARM wouldn't use it; SH would be the only user of this function. I
-> > > don't think this one makes sense to be a generic function.
-> > 
+Hi,
 
-Er, what? Yes it does. It has this silly id to string mapping thing that
-is at present duplicated between the perf and the oprofile code for no
-reason. Having a generic (albeit optional) perf_pmu_name() would allow
-this to be cleaned up.
+Please don't edit the subject.
 
-> > As the implementation of the function would be optional, why should we
-> > make it architectural?
-> 
-> I don't see why we should pollute the perf namespace with a function
-> that is only being used inside the SH oprofile code? There would be
-> exactly one use of this function and I doubt the perf guys will want
-> this function exposed. In it's current state, it really is no use to any
-> architecture other than SH.
-> 
-This has nothing at all to do with the SH oprofile code and everything to
-do with oprofile in general. This is the vary basis for the CPU model
-matching in the oprofile userspace tools, it's string based by design.
-Given that we're already seeing architetures double up their strings in
-both places, this really wants a consensus and to be dealt with before
-other architetures start getting the wrong idea.
+http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=commitdiff;h=d8c3d96f5df54251c06686bb00811e4b7e0f6547
+http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=commitdiff;h=7dcde8f18b0df4d332d6b359fd6270772a42f71f
+
+Patches from DMC we decide to use the S5PC110 & S5PC210 as we're only
+received the Spec C110 & C210.
+Most of people including mobile division don't know the V210 & V310
+SOC receptively.
+
+We're already confusing with names, we always talk with C110 & C210
+but works on V210 & V310 directory.
+
+well question. What's the SOC is used at Galaxy S & wave phone?
+
+I think S5PC110 is more well known than S5PV210.
+
+http://lwn.net/Articles/399720/
+The conclusion of the 2.6.36 merge window
+Systems and processors: Income s.r.o. PXA270 single-board computers,
+Wiliboard WBD-111 boards, and Samsung S5PC210-based systems.
+
+Thank you,
+Kyungmin Park
