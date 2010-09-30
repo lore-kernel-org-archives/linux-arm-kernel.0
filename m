@@ -1,19 +1,23 @@
 From: ccross@google.com (Colin Cross)
-Date: Wed, 29 Sep 2010 21:36:50 -0700
-Subject: [PATCH v3 2/3] [ARM] tegra: add PCI Express support
-In-Reply-To: <0711b4bce0135b85e0a3f4c1805836de4163be5d.1285579189.git.mike@compulab.co.il>
+Date: Wed, 29 Sep 2010 21:37:38 -0700
+Subject: [PATCH v3 3/3] [ARM] tegra: harmony: enable PCI Express
+In-Reply-To: <37648cc049e5296526d58eb2224744374a474c61.1285579189.git.mike@compulab.co.il>
 References: <cover.1285579189.git.mike@compulab.co.il>
-	<0711b4bce0135b85e0a3f4c1805836de4163be5d.1285579189.git.mike@compulab.co.il>
-Message-ID: <AANLkTik5Umxd9+Yrb8JkbARq5uNVxTKyOxnvnHCWzk_V@mail.gmail.com>
+	<37648cc049e5296526d58eb2224744374a474c61.1285579189.git.mike@compulab.co.il>
+Message-ID: <AANLkTi=fg9j+uMQtpZhFSURhd+SVJ=+t=uDrsg3eW_YF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Sep 27, 2010 at 2:26 AM, Mike Rapoport <mike@compulab.co.il> wrote:
 > Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Olof Johansson <olof@lixom.net>
 > CC: Colin Cross <ccross@google.com>
 > CC: Gary King <GKing@nvidia.com>
+> ---
+> ?arch/arm/mach-tegra/Makefile ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-tegra/board-harmony-pcie.c | ? 57 ++++++++++++++++++++++++++++++
+> ?2 files changed, 58 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/mach-tegra/board-harmony-pcie.c
 
 Ack
 Pushed to tegra/for-next
