@@ -1,54 +1,58 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Sep 2010 21:48:57 +0100
-Subject: [PATCH 2/4] arm: dis-allow hotplug on MSM
-In-Reply-To: <1285879245.14953.29.camel@c-dwalke-linux.qualcomm.com>
-References: <1284062289-10914-3-git-send-email-dwalker@codeaurora.org>
-	<20100930071919.GA6434@ucw.cz>
-	<1285865137.14953.4.camel@c-dwalke-linux.qualcomm.com>
-	<1285870183.14953.7.camel@c-dwalke-linux.qualcomm.com>
-	<20100930195237.GA2174@elf.ucw.cz>
-	<1285876546.14953.10.camel@c-dwalke-linux.qualcomm.com>
-	<20100930200246.GB2174@elf.ucw.cz>
-	<1285877287.14953.13.camel@c-dwalke-linux.qualcomm.com>
-	<20100930201749.GA11660@n2100.arm.linux.org.uk>
-	<1285879245.14953.29.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20100930204857.GB11660@n2100.arm.linux.org.uk>
+Date: Thu, 30 Sep 2010 22:21:01 +0100
+Subject: [PATCH 2/2] ARM: S5PV310: Update CPU hotplug implementation
+In-Reply-To: <AANLkTinaGsnZg-nTGvXS4xw-_8e8+pLpL4hYN-HMNYfh@mail.gmail.com>
+References: <1284700388-9394-1-git-send-email-kgene.kim@samsung.com>
+	<1284700388-9394-3-git-send-email-kgene.kim@samsung.com>
+	<001901cb5fcd$a0a5b5a0$e1f120e0$%kim@samsung.com>
+	<AANLkTinaGsnZg-nTGvXS4xw-_8e8+pLpL4hYN-HMNYfh@mail.gmail.com>
+Message-ID: <20100930212101.GC11660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 01:40:45PM -0700, Daniel Walker wrote:
-> On Thu, 2010-09-30 at 21:17 +0100, Russell King - ARM Linux wrote:
-> > If you make them spin, you'll eat power until the system powers them off.
-> > As things currently stand though, we don't have enough code out of the
-> > init sections to allow a SMP restart from power-off.  So, S2RAM isn't
-> > going to work on secondary processors at the moment _anyway_.
+On Thu, Sep 30, 2010 at 10:02:37AM -0700, Colin Cross wrote:
+> On Wed, Sep 29, 2010 at 4:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Kukjin Kim wrote:
+> >>
+> >> From: Changhwan Youn <chaos.youn@samsung.com>
+> >>
+> >> This patch updates CPU hotplug implementation to reduce CPU power
+> >> consumption
+> >> and will turn off the CPU power when CPU1 is unplugged while previous CPU
+> >> hotplug
+> >> used CPU idle.
+> >> This patch removes init memory freeing code to use CPU boot code when CPU1
+> > is
+> >> plugged-in again and adds vfp_enable() call to allow to access CP10 and
+> > CP11.
+> >>
+> >> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> >> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> >> Cc: Russell King <rmk@arm.linux.org.uk>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Colin Cross <ccross@android.com>
+> > Cc: Erik Gilling <konkers@android.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> >
 > 
-> When you say "SMP restart" do you mean resume?
-
-Yes.
-
-> If I did make them spin wouldn't suspend and resume work at that point?
-
-Normally with S2RAM, CPU state is saved, and the CPU is powered down.
-That's how it seems to work on all the ARM UP platforms, and I don't
-see any reason why someone implementing suspend would want to leave
-the CPUs powered during S2RAM - they'd gobble power.
-
-> > Current CPU hotplug implementations are based around taking CPUs offline
-> > without powering them off for run-time power saving only.
+> snip
 > 
-> What I was thinking with the stubs is to fake the offlining. So it's not
-> power efficient , but suspend still works.
+> >> +#ifndef CONFIG_HOTPLUG_CPU
+> >> ? ? ? if (!machine_is_integrator() && !machine_is_cintegrator())
+> >> ? ? ? ? ? ? ? totalram_pages +=
+> > free_area(__phys_to_pfn(__pa(__init_begin)),
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __phys_to_pfn(__pa(__init_end)),
+> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "init");
+> >> +#endif
+> >> ?}
+> >>
+> >> ?#ifdef CONFIG_BLK_DEV_INITRD
+> 
+> I don't think this is necessary.  Any symbol that is necessary for CPU
+> hotplug should be marked with __cpuinit instead of __init.  The linker
+> script will put __cpuinit symbols outside the __init_begin -
+> __init_end section if CONFIG_HOTPLUG_CPU is enabled.
 
-The question you need to research is: does putting the system into
-suspend mode result in power being lost to the CPUs?
-
-If the answer is yes, then as things currently stand you'll lose the
-secondary CPUs when you try to resume the system as the code necessary
-to bring them back online will have been discarded.
-
-If the answer is no, suspend won't be useful because the other CPUs will
-be spinning, thereby consuming more power than an idle system would be.
-
-I think you'll find though that suspend mode will result in power being
-lost to all CPUs.
+That's the theory, but not everything required for a complete restart of
+a secondary CPU (iow, if it's powered off) is in the right section yet.
+I'll have patches hopefully tomorrow to address this.
