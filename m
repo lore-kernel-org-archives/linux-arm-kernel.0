@@ -1,52 +1,71 @@
-From: ian@opensource.wolfsonmicro.com (Ian Lartey)
-Date: Thu, 30 Sep 2010 15:49:31 +0100
-Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31
-	ADS board
-In-Reply-To: <20100930132914.GP29811@pengutronix.de>
-References: <1285851444-18123-1-git-send-email-ian@opensource.wolfsonmicro.com>
-	<20100930132914.GP29811@pengutronix.de>
-Message-ID: <1285858171.1864.10033.camel@Tapajos>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 30 Sep 2010 07:51:45 -0700
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+In-Reply-To: <4CA49ADE.6080202@ti.com> (Benoit Cousson's message of "Thu, 30
+	Sep 2010 16:12:46 +0200")
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com>
+Message-ID: <87tyl7gu7y.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-30 at 15:29 +0200, Uwe Kleine-K?nig wrote:
-> Hi Ian,
-> 
-> On Thu, Sep 30, 2010 at 01:57:24PM +0100, Ian Lartey wrote:
-> > This is only a partial revert of "ARM: mx3/mx31ads: fold board header in its only user"
-> > [commit ccfa7c269843001077df02d98918c6c9bde91395)]
-> > 
-> > As some of the the board defines are also used in the cs89x0 ethernet driver by the i.MX31 ADS.
-> Can you please line break the commit log.  AFAIK up to 76 chars are
-> usual for the kernel.
+"Cousson, Benoit" <b-cousson@ti.com> writes:
 
-Ah, sorry about that, I'll reformat the lines.
+> On 9/30/2010 3:55 PM, Kevin Hilman wrote:
+>> "Cousson, Benoit"<b-cousson@ti.com>  writes:
+>>
+>>> Hi Charu,
+>>>
+>>> On 9/30/2010 10:11 AM, Varadarajan, Charulatha wrote:
+>>>> With OMAP2PLUS watchdog implemented in hwmod fw way, the
+>>>> module is reset during init.
+>>>
+>>> In that case hwmod fw just highlighted the real behavior that was
+>>> hidden so far by the X-loader.
+>>>
+>>> You should as well add a link to the email thread with Kevin that
+>>> raised the issue.
+>>>
+>>>> After a watchdog timer module reset, the WDTs are enabled. The
+>>>> default time for a system reset after a watchdog module reset
+>>>> is ~10s as per the default value of the WDT registers. Hence
+>>>> the system would be reset after 10s, if watchdog is not disabled
+>>>> within 10s.
+>>>>
+>>>> This patch fixes the above issue by disabling the watchdog timer
+>>>> after reset during initialization of devices.
+>>>
+>>> I'm still wondering as well what is the expected behavior of the
+>>> watchdog in a real product. If it is started by default at boot time,
+>>> this is probably for a good reason (or maybe not...).
+>>>
+>>> So, disabling it all the time is maybe not the best solution.
+>>
+>> I'm not sure what the other options are.  If you don't have a watchdog
+>> driver, and the watchdog is armed, it will reboot the system.
+>>
+>> The approach in this patch is just to continue the behavior that all
+>> bootloaders currently do, but make it explicit in the kernel.
+>
+> Yes, because we are not a building a product, and for us watchdog is a
+> pain. But I'm not sure that a real product will disable that at all
+> during the boot process.
 
-> 
-> Hmmm, I took a look into drivers/net/cs89x0.c.  This driver definitly
-> needs a cleanup, e.g. should start to provide a platform driver.
-> Maybe it can even be merged with drivers/net/mac89x0.c?
-> 
-> I think the best for know would be the following:
-> 
->  - reintroduce mach/board-mx31ads.h but only defining the symbols used
->    by cs89x0 together with a comment saying that the constants are
->    needed for the cs89x0 ethernet driver.
+Maybe not.  But wouldn't a product just ensure the real watchdog
+driver is loaded?
 
-This time round I have just added the defines needed for the cs89x0 
-to the ones that were moved back into mach-mx31ads.h from
-mach-mx31ads.c . I think this is what you mean, yes ?
+Or more likely, in addition to the hundreds of other out-of-tree
+patches, they would just remove $SUBJECT patch.  ;)
 
-> 
->  - In a second patch add CS89x0 to mx31_defconfig
+> I think that disabling it should be done only if the CONFIG_OMAP_WDT
+> is not set.
 
-Will do.
+That's not easy either, as the watchdog driver can be built as a module,
+and may (or may not) be loaded some unknown time from the kernel boot,
+resulting in a likely
 
-> 
-> Best regards
-> Uwe
-> 
+Kevin
 
-
-Regards,
-          Ian.
+> But since I don't have a clue about a product can use that, it will be
+> good to have such inputs to understand the usecase.
