@@ -1,60 +1,39 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 30 Sep 2010 11:09:43 -0700
-Subject: [PATCH 2/4] arm: dis-allow hotplug on MSM
-In-Reply-To: <1285865137.14953.4.camel@c-dwalke-linux.qualcomm.com>
-References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
-	<1284062289-10914-3-git-send-email-dwalker@codeaurora.org>
-	<20100930071919.GA6434@ucw.cz>
-	<1285865137.14953.4.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <1285870183.14953.7.camel@c-dwalke-linux.qualcomm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 30 Sep 2010 20:14:33 +0200
+Subject: [PATCH 1/2] Fixing ethernet driver compilation error for
+	i.MX31 ADS board
+In-Reply-To: <1285861655-6513-1-git-send-email-ian@opensource.wolfsonmicro.com>
+References: <1285861655-6513-1-git-send-email-ian@opensource.wolfsonmicro.com>
+Message-ID: <20100930181433.GS29811@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-30 at 09:45 -0700, Daniel Walker wrote:
-> On Thu, 2010-09-30 at 09:19 +0200, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > MSM doesn't support hotplug, so we prevent it from being
-> > > select with this added line.
-> > > 
-> > > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> > > ---
-> > >  arch/arm/Kconfig |    1 +
-> > >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index d2dfbc2..829dd67 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -1211,6 +1211,7 @@ config NR_CPUS
-> > >  config HOTPLUG_CPU
-> > >  	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
-> > >  	depends on SMP && HOTPLUG && EXPERIMENTAL
-> > > +	depends on !ARCH_MSM
-> > >  	help
-> > >  	  Say Y here to experiment with turning CPUs off and on.  CPUs
-> > >  	  can be controlled through /sys/devices/system/cpu.
-> > 
-> > This is goodbye to s2ram support, AFAICT.
+Hello,
+
+On Thu, Sep 30, 2010 at 04:47:34PM +0100, Ian Lartey wrote:
+> This is only a partial revert of "ARM: mx3/mx31ads: fold board header in
+> its only user" [commit ccfa7c269843001077df02d98918c6c9bde91395)]
 > 
-> This depends on SMP tho. It's like saying,
+> As some of the the board defines are also used in the cs89x0 ethernet
+> driver by the i.MX31 ADS.
 > 
-> depends on 
+> Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
+It seems you got me wrong.  I wanted you to just define the constants in
+arch/arm/plat-mxc/include/mach/board-mx31ads.h that are needed by the
+cs89x0 driver.  That is PBC_BASE_ADDRESS, PBC_CS8900A_IOBASE and
+EXPIO_INT_ENET_INT.  And I wanted a comment like:
 
-That's weird, there was more to this email..
+	/* 
+	 * These symbols are used by drivers/net/cs89x0.c.
+	 * This is ugly as hell, but we have to provide them until
+	 * someone fixed the driver.
+	 */
 
-It's like saying,
+And you definitly shouldn't reintroduce these doxygen comments.
 
-depends on SMP && HOTPLUG && EXPERIMENTAL && !ARCH_MSM
-
-But ARCH_MSM has no SMP, so the whole thing should short circuit right
-at the start. It's only when you bring in SMP that it get interesting.
-
-suspend to ram works on UP tho, so UP boards shouldn't be effected.
-
-Daniel
+Best regards
+Uwe
 
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
