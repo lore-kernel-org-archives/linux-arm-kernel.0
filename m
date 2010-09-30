@@ -1,55 +1,60 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Thu, 30 Sep 2010 11:03:58 +0530
-Subject: [PATCH 48/74] GIC: Added dummy handlers for Power Management
-	Suspend Resume
-In-Reply-To: <20100920180708.GB5177@n2100.arm.linux.org.uk>
-References: <4C809486.2070308@st.com>
-	<20100903073421.GF26319@n2100.arm.linux.org.uk>
-	<4C84D6B3.80104@st.com>
-	<20100908151232.GD32659@n2100.arm.linux.org.uk>
-	<4C885FF2.7060201@st.com> <4C976541.6000203@st.com>
-	<20100920134808.GD30793@n2100.arm.linux.org.uk>
-	<4C97760A.60404@gmail.com>
-	<20100920150749.GF30793@n2100.arm.linux.org.uk>
-	<4C979216.3000706@gmail.com>
-	<20100920180708.GB5177@n2100.arm.linux.org.uk>
-Message-ID: <4CA42146.5020608@st.com>
+From: jeongbae.seo@samsung.com (Jeongbae Seo)
+Date: Thu, 30 Sep 2010 14:40:17 +0900
+Subject: [PATCH 5/5] sdhci-s3c: Add support no internal clock divider	in
+	host controller
+In-Reply-To: <20100930015154.GA1269@void.printf.net>
+References: <1284626223-18944-1-git-send-email-jeongbae.seo@samsung.com>
+	<1284626223-18944-6-git-send-email-jeongbae.seo@samsung.com>
+	<AANLkTik23B23RW_kmjaL1PeXNiWtU01aNBwUOPrac6HF@mail.gmail.com>
+	<20100917155928.GA7561@void.printf.net>
+	<AANLkTimyvrSxQiF4A4pbmK8nME2ko9MRtqvcuMrY2rKR@mail.gmail.com>
+	<20100930015154.GA1269@void.printf.net>
+Message-ID: <000a01cb6061$f9fc3220$edf49660$%seo@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2010 11:37 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 20, 2010 at 11:55:50AM -0500, Rob Herring wrote:
->> There is no programming distinction between an irq and an wakeup if the  
->> GIC is powered on in suspend which is platform dependent. It is only a  
->> s/w distinction of what interrupts you allow to wake you up. If GIC  
->> remains powered, then it can assert nirq to the core and wake-up. If the  
->> core is powered down, the external power controller can monitor the NIRQ  
->> line to wake-up the core. So the powergating of the core has no impact  
->> on the prvgramming of the GIC for wake-up.
-> 
-> Well, not everyone does this - and I know of no platforms where it has
-> been reported for the GIC to be able to wake the system up.  TI OMAP
-> doesn't allow it, neither does the one being discussed in this thread.
-> 
-> The system being discussed here has an external power controller which
-> needs to be appropriately programmed.
-> 
-> You can see this because the proposed patch doesn't add code like that
-> in vic.c, but adds a no-operation function so that set_wake() becomes
-> a no-op returning zero.
-> 
->> How about adding a set_wake function ptr as a parameter to  
->> gic_dist_init? If a platform needs more than the basic operation, they  
->> can override it.
-> 
-> As I can see, we're not talking about wake-up being able to be done from
-> the IRQ controller here, but something entirely external and unrelated
-> to it.
-> .
-> 
+Chris wrote:
 
-Russell,
+> Hi Kyungmin, Ben,
+> 
+> On Thu, Sep 30, 2010 at 10:18:12AM +0900, Kyungmin Park wrote:
+> > On Sat, Sep 18, 2010 at 12:59 AM, Chris Ball <cjb@laptop.org> wrote:
+> > > Hi,
+> > >
+> > > On Thu, Sep 16, 2010 at 06:08:28PM +0900, Kyungmin Park wrote:
+> > >> Well there are two implementations. and no conclusion yet.
+> > >> as s5pc210 don't support internal SDHCI clock, DMC overrides the
+> > >> function operation itself when s5pc210. System LSI use the quirks.
+> > >>
+> > >> Choose any one from MMC maintainer.
+> > >
+> > > Both approaches are generally acceptable for MMC, so I would want to
+> > > leave it up to the maintainer of the driver in question (which is Ben,
+> > > in this case?) to choose between them.
+> >
+> > Hi Chris,
+> >
+> > Did you get the opinion from Ben?
+> >
+> > I hope this decision will be done before 2.6.37 merge windows start to
+> > support SDHCI support on s5pc210.
+> 
+> Hm, I didn't, and Ben's been silent about the urgent sdhci-s3c patches
+> too.  Ben, are you just dealing with a large backlog, or are you
+> interested in nominating someone else to take over sdhci-s3c?
 
-Should i keep this patch in "SPEAr Support patch series version 2"?
+Hi Chris, Kyungmin
 
-viresh.
+I'd like to let you know that Ben had reviewed and commented for
+"[PATCH v2 2/2] sdhci-s3c: Add support no internal clock divider" in host
+controller in 9/21. However, our response was late due to our holidays. I
+made a response in 9/28 that why we use this quirk and now we're waiting for
+his opinion.
+
+Kyungmin, did you check Ben's review comments for this ? When I saw it, his
+approach is just a bit different from you and me. Please let us know if you
+have any idea about his comments.
+
+Thanks,
+Best Regards
+Jeongbae Seo
