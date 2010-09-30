@@ -1,51 +1,33 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 30 Sep 2010 13:48:22 +0900
-Subject: [PATCH 1/7] ARM: S5PC210: Universal OneNAND support
-Message-ID: <20100930044822.GA16897@july>
+Date: Thu, 30 Sep 2010 13:48:27 +0900
+Subject: [PATCH 2/7] ARM: S5PC110: Fix wrong interrupt I2C2 number
+Message-ID: <20100930044827.GA16901@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-OneNAND device support for Universal board.
+It's I2C2 interrupt number instead of CAN0.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-s5pv310/Kconfig               |    1 +
- arch/arm/mach-s5pv310/mach-universal_c210.c |    2 ++
- 2 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/include/mach/irqs.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index 9941852..178eab9 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -40,6 +40,7 @@ config MACH_SMDKC210
- config MACH_UNIVERSAL_C210
- 	bool "Mobile UNIVERSAL_C210 Board"
- 	select CPU_S5PV310
-+	select S5P_DEV_ONENAND
- 	help
- 	  Machine support for Samsung Mobile Universal S5PC210 Reference
- 	  Board. S5PC210(MCP) is one of package option of S5PV310
-diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-index b57efae..e169849 100644
---- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-+++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-@@ -20,6 +20,7 @@
- #include <plat/regs-serial.h>
- #include <plat/s5pv310.h>
- #include <plat/cpu.h>
-+#include <plat/devs.h>
- 
- #include <mach/map.h>
- 
-@@ -117,6 +118,7 @@ static struct platform_device universal_gpio_keys = {
- 
- static struct platform_device *universal_devices[] __initdata = {
- 	&universal_gpio_keys,
-+	&s5p_device_onenand,
- };
- 
- static void __init universal_map_io(void)
+diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
+index cdb8ae4..5ab1833 100644
+--- a/arch/arm/mach-s5pv210/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+@@ -55,8 +55,8 @@
+ #define IRQ_SPI1		S5P_IRQ_VIC1(16)
+ #define IRQ_SPI2		S5P_IRQ_VIC1(17)
+ #define IRQ_IRDA		S5P_IRQ_VIC1(18)
+-#define IRQ_CAN0		S5P_IRQ_VIC1(19)
+-#define IRQ_CAN1		S5P_IRQ_VIC1(20)
++#define IRQ_IIC2		S5P_IRQ_VIC1(19)
++#define IRQ_I2C_HDMI_PHY	S5P_IRQ_VIC1(20)
+ #define IRQ_HSIRX		S5P_IRQ_VIC1(21)
+ #define IRQ_HSITX		S5P_IRQ_VIC1(22)
+ #define IRQ_UHOST		S5P_IRQ_VIC1(23)
 -- 
 1.5.3.3
