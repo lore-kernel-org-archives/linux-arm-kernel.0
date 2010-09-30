@@ -1,60 +1,137 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Sep 2010 09:14:25 +0100
-Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
-In-Reply-To: <20100930010407.GA18073@linux-sh.org>
-References: <cover.1284357372.git.matt@console-pimps.org>
-	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
-	<20100916143254.GC13563@erda.amd.com>
-	<20100927200138.GG28588@console-pimps.org>
-	<20100927220703.GV13563@erda.amd.com>
-	<20100927222627.GH28588@console-pimps.org>
-	<20100930010407.GA18073@linux-sh.org>
-Message-ID: <1285834465.9104.7.camel@e102144-lin.cambridge.arm.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 30 Sep 2010 10:16:05 +0200
+Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
+In-Reply-To: <4CA3AE89.2030107@pelagicore.com>
+References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+	<1285790884-3516-2-git-send-email-w.sang@pengutronix.de>
+	<4CA3AE89.2030107@pelagicore.com>
+Message-ID: <20100930081605.GA2655@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+Hi Richard,
 
-On Thu, 2010-09-30 at 02:04 +0100, Paul Mundt wrote:
-> On Mon, Sep 27, 2010 at 11:26:27PM +0100, Matt Fleming wrote:
-> > On Tue, Sep 28, 2010 at 12:07:03AM +0200, Robert Richter wrote:
-> > > On 27.09.10 16:01:38, Matt Fleming wrote:
-> > > > Well, ARM doesn't have names as strings for its pmus currently. What's
-> > > > more, ARM wouldn't use it; SH would be the only user of this function. I
-> > > > don't think this one makes sense to be a generic function.
-> > >
+On Wed, Sep 29, 2010 at 11:24:25PM +0200, Richard R?jfors wrote:
+> On 09/29/2010 10:07 PM, Wolfram Sang wrote:
+> >We need to carry some information per host, e.g. the clock. Add a
+> >structure for it and initialize it in the generic part. Also do not use
+> >the parent of the platform_device (if it is available), this breaks the
+> >clock-matching on ARM.
 > 
-> Er, what? Yes it does. It has this silly id to string mapping thing that
-> is at present duplicated between the perf and the oprofile code for no
-> reason. Having a generic (albeit optional) perf_pmu_name() would allow
-> this to be cleaned up.
+> The reason it's there is for instance a case when the shdci device is exposed
+> from a MFD device which sits on top of PCI. Then the parent (PCI device)
+> is the device that is DMA capable. This patch will break such usage.
+
+I feared that there is a reason. The problem I see is now, that the parent gets
+always set (from drivers/base/platform.c):
+
+37c12e74 (Russell King            2005-11-05 21:19:33 +0000  235) int platform_device_add(struct platform_device *pdev)
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  236) {
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  237)       int i, ret = 0;
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  238) 
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  239)       if (!pdev)
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  240)               return -EINVAL;
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  241) 
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  242)       if (!pdev->dev.parent)
+^1da177e (Linus Torvalds          2005-04-16 15:20:36 -0700  243)               pdev->dev.parent = &platform_bus;
+...
+
+So, sdhci-plftm cannot access the platform_data connected to the original
+platform_device via host->mmc->parent.
+
+> What is the purpose of this patch? You allocate space for an extra struct,
+> which you have a pointer pointing to, but you never use the pointer?
+
+We want to extend sdhci-pltfm to support the various sdhci-cores on (for now
+mainly) ARM platforms. A number of those cores need board specific information
+to be used in a custom init()-call, which shall be passed via platform_data.
+The pointer will be used in the platform specific extensions.
+
+> >
+> >Signed-off-by: Wolfram Sang<w.sang@pengutronix.de>
+> >Cc: Richard R?jfors<richard.rojfors.ext@mocean-labs.com>
+> >---
+> >
+> >Changes since last version:
+> >
+> >* added types.h
 > 
+> I saw no types.h?
 
-It's not as silly as it appears. As you mention below, OProfile uses
-strings to identify the correct CPU model in userspace. With ARM, there
-is some horrible legacy here which means that the strings are extremely
-misleading (arm/mpcore => arm/11mpcore, arm/armv7 => Cortex A8). Rather
-than continue this mess into perf, I decided to separate the two and use
-a common numeric scheme for when they have to talk to each other.
+In the second chunk, the include file.
 
-> > > As the implementation of the function would be optional, why should we
-> > > make it architectural?
+Thanks,
+
+   Wolfram
+
+> 
+> >* removed usage of pdev->dev.parent to ensure clk-matching
+> >   Please speak up if this has a use case I failed to see!
 > >
-> > I don't see why we should pollute the perf namespace with a function
-> > that is only being used inside the SH oprofile code? There would be
-> > exactly one use of this function and I doubt the perf guys will want
-> > this function exposed. In it's current state, it really is no use to any
-> > architecture other than SH.
+> >  drivers/mmc/host/sdhci-pltfm.c |    8 ++++----
+> >  drivers/mmc/host/sdhci-pltfm.h |    7 +++++++
+> >  2 files changed, 11 insertions(+), 4 deletions(-)
 > >
-> This has nothing at all to do with the SH oprofile code and everything to
-> do with oprofile in general. This is the vary basis for the CPU model
-> matching in the oprofile userspace tools, it's string based by design.
-> Given that we're already seeing architetures double up their strings in
-> both places, this really wants a consensus and to be dealt with before
-> other architetures start getting the wrong idea.
+> >diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> >index e045e3c..095ca9d 100644
+> >--- a/drivers/mmc/host/sdhci-pltfm.c
+> >+++ b/drivers/mmc/host/sdhci-pltfm.c
+> >@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+> >  	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+> >  	const struct platform_device_id *platid = platform_get_device_id(pdev);
+> >  	struct sdhci_host *host;
+> >+	struct sdhci_pltfm_host *pltfm_host;
+> >  	struct resource *iomem;
+> >  	int ret;
+> >
+> >@@ -71,16 +72,15 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+> >  		dev_err(&pdev->dev, "Invalid iomem size. You may "
+> >  			"experience problems.\n");
+> >
+> >-	if (pdev->dev.parent)
+> >-		host = sdhci_alloc_host(pdev->dev.parent, 0);
+> >-	else
+> >-		host = sdhci_alloc_host(&pdev->dev, 0);
+> >+	host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
+> >
+> >  	if (IS_ERR(host)) {
+> >  		ret = PTR_ERR(host);
+> >  		goto err;
+> >  	}
+> >
+> >+	pltfm_host = sdhci_priv(host);
+> >+
+> >  	host->hw_name = "platform";
+> >  	if (pdata&&  pdata->ops)
+> >  		host->ops = pdata->ops;
+> >diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+> >index 900f329..93a0319 100644
+> >--- a/drivers/mmc/host/sdhci-pltfm.h
+> >+++ b/drivers/mmc/host/sdhci-pltfm.h
+> >@@ -11,8 +11,15 @@
+> >  #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
+> >  #define _DRIVERS_MMC_SDHCI_PLTFM_H
+> >
+> >+#include<linux/clk.h>
+> >+#include<linux/types.h>
+> >  #include<linux/sdhci-pltfm.h>
+> >
+> >+struct sdhci_pltfm_host {
+> >+	struct clk *clk;
+> >+	u32 scratchpad; /* to handle quirks across io-accessor calls */
+> >+};
+> >+
+> >  extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+> >
+> >  #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
 
-
-I agree that if you have sane strings for OProfile then there's no
-reason to define new ones for perf.
-
-Will
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100930/fba09373/attachment.sig>
