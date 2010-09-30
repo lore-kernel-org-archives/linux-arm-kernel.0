@@ -1,44 +1,42 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 30 Sep 2010 08:58:10 +0900
-Subject: [PATCH 1/3] ARM: L2X0: Add prefetch offset
-In-Reply-To: <20100911053052.GA23200@july>
-References: <20100911053052.GA23200@july>
-Message-ID: <AANLkTiky_7y9x7DcU+0W=e33DSH=GhDM3_R2DrqT23UF@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 30 Sep 2010 10:04:08 +0900
+Subject: [PATCH 6/6] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <20100927222627.GH28588@console-pimps.org>
+References: <cover.1284357372.git.matt@console-pimps.org>
+	<e75f8fa563b4bfb2b4cf62fe64ae398ea5e1831a.1284357372.git.matt@console-pimps.org>
+	<20100916143254.GC13563@erda.amd.com>
+	<20100927200138.GG28588@console-pimps.org>
+	<20100927220703.GV13563@erda.amd.com>
+	<20100927222627.GH28588@console-pimps.org>
+Message-ID: <20100930010407.GA18073@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Mon, Sep 27, 2010 at 11:26:27PM +0100, Matt Fleming wrote:
+> On Tue, Sep 28, 2010 at 12:07:03AM +0200, Robert Richter wrote:
+> > On 27.09.10 16:01:38, Matt Fleming wrote:
+> > > Well, ARM doesn't have names as strings for its pmus currently. What's
+> > > more, ARM wouldn't use it; SH would be the only user of this function. I
+> > > don't think this one makes sense to be a generic function.
+> > 
 
-Any comments?
+Er, what? Yes it does. It has this silly id to string mapping thing that
+is at present duplicated between the perf and the oprofile code for no
+reason. Having a generic (albeit optional) perf_pmu_name() would allow
+this to be cleaned up.
 
-On Sat, Sep 11, 2010 at 2:30 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
->
-> PL310 has prefetch offset as 0xF60
->
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> index 6bcba48..cc9bcbb 100644
-> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
-> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-> @@ -53,6 +53,7 @@
-> ?#define L2X0_LINE_DATA ? ? ? ? ? ? ? ? 0xF10
-> ?#define L2X0_LINE_TAG ? ? ? ? ? ? ? ? ?0xF30
-> ?#define L2X0_DEBUG_CTRL ? ? ? ? ? ? ? ? ? ? ? ?0xF40
-> +#define L2X0_PREFETCH_CTRL ? ? ? ? ? ? 0xF60
->
-> ?#ifndef __ASSEMBLY__
-> ?extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
-> --
-> 1.5.3.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> > As the implementation of the function would be optional, why should we
+> > make it architectural?
+> 
+> I don't see why we should pollute the perf namespace with a function
+> that is only being used inside the SH oprofile code? There would be
+> exactly one use of this function and I doubt the perf guys will want
+> this function exposed. In it's current state, it really is no use to any
+> architecture other than SH.
+> 
+This has nothing at all to do with the SH oprofile code and everything to
+do with oprofile in general. This is the vary basis for the CPU model
+matching in the oprofile userspace tools, it's string based by design.
+Given that we're already seeing architetures double up their strings in
+both places, this really wants a consensus and to be dealt with before
+other architetures start getting the wrong idea.
