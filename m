@@ -1,79 +1,38 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 30 Sep 2010 19:50:24 +0900
-Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
-In-Reply-To: <00a001cb608c$f94de230$ebe9a690$%kim@samsung.com>
-References: <20100930044859.GA16923@july>
-	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
-	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
-	<AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
-	<AANLkTin9tR4+CBa+r6mHsJdFYxzkaK1CA+_WKhTZkacs@mail.gmail.com>
-	<006601cb6081$bf8a7140$3e9f53c0$%han@samsung.com>
-	<AANLkTikmTyOnmA7eaN0_Vysf+0BviDX428MhZHTffpe7@mail.gmail.com>
-	<006b01cb6088$ffc17b80$ff447280$%han@samsung.com>
-	<AANLkTikgXpJPnbQGchvHSCTshKzAO5GJyGHio=6Q0RZJ@mail.gmail.com>
-	<00a001cb608c$f94de230$ebe9a690$%kim@samsung.com>
-Message-ID: <AANLkTi=JGtts8Pv0tidP+Xx0iP6DYNHx37=ifS8RdAJX@mail.gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Thu, 30 Sep 2010 15:09:22 +0400
+Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
+In-Reply-To: <20100930101938.GE2655@pengutronix.de>
+References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+	<1285790884-3516-2-git-send-email-w.sang@pengutronix.de>
+	<4CA3AE89.2030107@pelagicore.com>
+	<20100930081605.GA2655@pengutronix.de>
+	<4CA45E6D.4070308@pelagicore.com>
+	<20100930101938.GE2655@pengutronix.de>
+Message-ID: <20100930110922.GA8464@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 7:48 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kyungmin Park wrote:
->>
->> On Thu, Sep 30, 2010 at 7:19 PM, Jongsun Han <jongsun.han@samsung.com>
->> wrote:
->> > On Thu, Sep 30, 2010 at 6:27 PM, Jongsun Han <jongsun.han@samsung.com>
->> >> wrote:
->> >> > On Thu, Sep 30, 2010 at 3:50 PM, Jassi Brar
-> <jassisinghbrar@gmail.com>
->> >> wrote:
->> >> >> > On Thu, Sep 30, 2010 at 3:27 PM, Kyungmin Park
->> <kmpark@infradead.org>
->> >> wrote:
->> >> >> >> On Thu, Sep 30, 2010 at 3:20 PM, Jeongbae Seo
->> >> <jeongbae.seo@samsung.com>
->> >> >> wrote:
->> >> >> >>> Kyungmin wrote:
->> >> >> >>>> From: Kyungmin Park <kyungmin.park@samsung.com>
->> >> >> >>>>
->> >> >> >>>> S5PC210 support more I2C devices than previous SoCs.
->> >> >> >>>> And to prevent the wrong usage use the s5p prefix instead of
-> s3c.
->> >> >> >>>>
->> >> >> >>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> >> >> >>>> ---
->
-> (snip)
->
->> To Kgene,
->> Any comments? I think you already mentioned that don't use #ifdef ~
->> #endif at c files if possible.
->> In this case are you okay?
->>
-> Hi :-)
->
-> I know his patch will be submitted soon...maybe tomorrow?
-> So how about talking about that tomorrow?
->
-> And...we should support it with any method...
-> Let's make good output together.
+On Thu, Sep 30, 2010 at 12:19:38PM +0200, Wolfram Sang wrote:
+[...]
+> > You're right it wouldn't. But isn't it a bit risky even if you could access it,
+> > in the long the platform_data coild point to something that is in the __devinit section
+> > or similar?
+> 
+> The use-case we see now is in the custom init() call, i.e. setting up
+> GPIO, enabling clocks. That is in the same section. Accessing
+> platform_data later is in deed always risky and should not be done,
+> sdhci-pltfm is no special case here.
 
-Another one, except the drivers/mmc/host/sdhci-s3c.c since it's now discussing.
-Please update the sdhci codes also under arch/arm/mach-s5p*/
+I don't think that it's always risky, it's more driver-specific.
 
-Thank you,
-Kyungmin Park
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Many drivers access it from everywhere, see drivers/mmc/host/mmc_spi.c
+for example. In general, if the driver needs most of the platform data
+in the run-time, it makes no sense to duplicate or copy the pdata into
+the private struct field by field.
+
+Thanks,
+
+-- 
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
