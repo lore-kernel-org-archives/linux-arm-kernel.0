@@ -1,50 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Sep 2010 12:15:35 -0700
-Subject: [PATCH] [OMAP] HTCHERALD: MMC, I2C, HTCPLD, SPI, TSC2046
-In-Reply-To: <AANLkTimsk+vbi15xz5bxJyQrF0yXF3i7Dn=TajjV3tkU@mail.gmail.com>
-References: <1282106047-7619-1-git-send-email-darkstar6262@gmail.com>
-	<1282106146-7727-1-git-send-email-darkstar6262@gmail.com>
-	<AANLkTik83Q8wdZdv=oG86Yp3Lgbxezp-mFtHMcQpKd8c@mail.gmail.com>
-	<AANLkTinh=oRnuf1RQ3_=UEuke4PHaPB-172peMca7Ya7@mail.gmail.com>
-	<AANLkTikNLn-VuCQb2q7wZVbYORxV6uhia_oOBsQg3ZiJ@mail.gmail.com>
-	<20100924225254.GK4211@atomide.com>
-	<AANLkTinmfEYq9SRNRWY9xOkwS-FE_LDyBOeGLoyYLNtZ@mail.gmail.com>
-	<20100930184841.GL3117@atomide.com>
-	<AANLkTimsk+vbi15xz5bxJyQrF0yXF3i7Dn=TajjV3tkU@mail.gmail.com>
-Message-ID: <20100930191535.GM3117@atomide.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 30 Sep 2010 21:52:37 +0200
+Subject: [PATCH 2/4] arm: dis-allow hotplug on MSM
+In-Reply-To: <1285870183.14953.7.camel@c-dwalke-linux.qualcomm.com>
+References: <1284062289-10914-1-git-send-email-dwalker@codeaurora.org>
+	<1284062289-10914-3-git-send-email-dwalker@codeaurora.org>
+	<20100930071919.GA6434@ucw.cz>
+	<1285865137.14953.4.camel@c-dwalke-linux.qualcomm.com>
+	<1285870183.14953.7.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20100930195237.GA2174@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Micha? Miros?aw <mirqus@gmail.com> [100930 11:57]:
-> 2010/9/30 Tony Lindgren <tony@atomide.com>:
-> > * Cory Maccarrone <darkstar6262@gmail.com> [100930 11:34]:
-> >> > Looks like also board-sx1-mmc.c and board-h[23]-mmc.c have the
-> >> > same spotty voltage range.
-> >> > Cory, care to do a patch that fixes it for all of them?
-> >> Yeah, I can do that. ?I'll resubmit this patch too with the fixed up ranges.
-> > Turns out I already did it :) Care to test/ack this one?
-> 
-> [...]
-> > diff --git a/arch/arm/mach-omap1/board-sx1-mmc.c b/arch/arm/mach-omap1/board-sx1-mmc.c
-> > index 5b33ae8..be5a365 100644
-> > --- a/arch/arm/mach-omap1/board-sx1-mmc.c
-> > +++ b/arch/arm/mach-omap1/board-sx1-mmc.c
-> > @@ -44,7 +44,8 @@ static struct omap_mmc_platform_data mmc1_data = {
-> > ? ? ? ?.nr_slots ? ? ? ? ? ? ? ? ? ? ? = 1,
-> > ? ? ? ?.slots[0] ? ? ? = {
-> > ? ? ? ? ? ? ? ?.set_power ? ? ? ? ? ? ?= mmc_set_power,
-> > - ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_30_31 |
-> > + ? ? ? ? ? ? ? .ocr_mask ? ? ? ? ? ? ? = MMC_VDD_28_29 | MMC_VDD_29_30 |
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MMC_VDD_30_31 | MMC_VDD_31_32 |
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MMC_VDD_32_33 | MMC_VDD_33_34,
-> > ? ? ? ? ? ? ? ?.name ? ? ? ? ? ? ? ? ? = "mmcblk",
-> > ? ? ? ?},
-> [...]
-> 
-> Al least this one seems wrong (haven't checked others) as the
-> mmc_set_power() ignores vdd parameter. This suggests that the board
-> supports only one particular voltage, not the whole range.
+Hi!
 
-Hmm yeah good catch. With the external power it's board specific. 
+> > > > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> > > > ---
+> > > >  arch/arm/Kconfig |    1 +
+> > > >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > > index d2dfbc2..829dd67 100644
+> > > > --- a/arch/arm/Kconfig
+> > > > +++ b/arch/arm/Kconfig
+> > > > @@ -1211,6 +1211,7 @@ config NR_CPUS
+> > > >  config HOTPLUG_CPU
+> > > >  	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+> > > >  	depends on SMP && HOTPLUG && EXPERIMENTAL
+> > > > +	depends on !ARCH_MSM
+> > > >  	help
+> > > >  	  Say Y here to experiment with turning CPUs off and on.  CPUs
+> > > >  	  can be controlled through /sys/devices/system/cpu.
+> > > 
+> > > This is goodbye to s2ram support, AFAICT.
+> > 
+> > This depends on SMP tho. It's like saying,
+> > 
+> > depends on 
+> 
+> That's weird, there was more to this email..
+> 
+> It's like saying,
+> 
+> depends on SMP && HOTPLUG && EXPERIMENTAL && !ARCH_MSM
+> 
+> But ARCH_MSM has no SMP, so the whole thing should short circuit right
+> at the start. It's only when you bring in SMP that it get interesting.
 
-Tony
+If arch_msm has no SMP, then why is change needed?
+
+(I was trying to warn you that you'll need HOTPLUG support to get SMP
+suspend support.)
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
