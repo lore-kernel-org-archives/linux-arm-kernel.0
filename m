@@ -1,70 +1,90 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 30 Sep 2010 22:35:05 +0530
-Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
-References: <1285834270-32766-1-git-send-email-charu@ti.com>
-	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
-	<4CA49ADE.6080202@ti.com>,<20100930150713.GG3117@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CD03185@dbde02.ent.ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 30 Sep 2010 10:07:18 -0700
+Subject: [PATCH] ARM: add cpu_idle_wait() to support CPUidle on SMP
+	systems.
+In-Reply-To: <1285692192-32075-1-git-send-email-khilman@deeprootsystems.com>
+	(Kevin Hilman's message of "Tue, 28 Sep 2010 09:43:12 -0700")
+References: <1285692192-32075-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <87hbh7f9dl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Varadarajan, Charulatha
-> Sent: Thursday, September 30, 2010 9:25 PM
-> To: Tony Lindgren; Cousson, Benoit
-> Cc: Kevin Hilman; Menon, Nishanth; wim at iguana.be; linux-
-> omap at vger.kernel.org; linux-watchdog at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; paul at pwsan.com; Nayak, Rajendra; Basak, Partha
-> Subject: RE: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during
-> init
-> 
-> Tony/ Benoit,
-> 
-> > >
-> > > I think that disabling it should be done only if the CONFIG_OMAP_WDT
-> > > is not set.
-> >
-> > How about disabling is done always unless CONFIG_WATCHDOG_NOWAYOUT
-> > is set?
-> 
-> As given in the patch description, this patch does a disable of watchdog
-> timer, during init, to avoid the system rebooting that happens due to
-> enabling of watchdog timer after a reset of the module (during hwmod init).
-> 
-> According to the default WDT registers values, the system reboot would
-> happen in ~10s if watchdog is enabled with default values. Hence, after
-> a WDT module reset during init, the watchdog has to be disabled within 10s
-> otherwise the system will keep rebooting.
-> 
-> Hence irrespective of CONFIG_WATCHDOG_NOWAYOUT/ CONFIG_OMAP_WDT,
-> the watchdog timer needs to be disabled after a WDT reset has happened.
-> 
-One more option is to avoid the software reset using the CONFIG_OMAP_WDT
-flag. Something like below.
+Russell,
 
---------------
-static struct omap_hwmod omap44xx_wd_timer2_hwmod = {
-	.name		= "wd_timer2",
-	.class		= &omap44xx_wd_timer_hwmod_class,
-	.mpu_irqs	= omap44xx_wd_timer2_irqs,
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-+ #ifndef CONFIG_OMAP_WDT,
-+ .flags		= HWMOD_INIT_NO_RESET,
-+ #endif
-	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_wd_timer2_irqs),
-	.main_clk	= "wd_timer2_fck",
-	.prcm = {
-		.omap4 = {
-			.clkctrl_reg = OMAP4430_CM_WKUP_WDT2_CLKCTRL,
-		},
-	},
-	.slaves		= omap44xx_wd_timer2_slaves,
-	.slaves_cnt	= ARRAY_SIZE(omap44xx_wd_timer2_slaves),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-};
+> In order for CPUidle to work on SMP systems, an implementation of
+> cpu_idle_wait() is needed.
+>
+> This patch duplicates the x86 implementation of cpu_idle_wait() for
+> ARM.
+>
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 
-Regards,
-Santosh
+Are you OK with this for the patch system for 2.6.37?
+
+Kevin
+
+> ---
+>  arch/arm/Kconfig              |    3 +++
+>  arch/arm/include/asm/system.h |    2 ++
+>  arch/arm/kernel/process.c     |   19 +++++++++++++++++++
+>  3 files changed, 24 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 553b7cf..10ce6dc 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -145,6 +145,9 @@ config ARCH_HAS_CPUFREQ
+>  	  and that the relevant menu configurations are displayed for
+>  	  it.
+>  
+> +config ARCH_HAS_CPU_IDLE_WAIT
+> +       def_bool y
+> +
+>  config GENERIC_HWEIGHT
+>  	bool
+>  	default y
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index 8ba1ccf..48e360c 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -325,6 +325,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>  extern void disable_hlt(void);
+>  extern void enable_hlt(void);
+>  
+> +void cpu_idle_wait(void);
+> +
+>  #include <asm-generic/cmpxchg-local.h>
+>  
+>  #if __LINUX_ARM_ARCH__ < 6
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 401e38b..23def52 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -135,6 +135,25 @@ EXPORT_SYMBOL(pm_power_off);
+>  void (*arm_pm_restart)(char str, const char *cmd) = arm_machine_restart;
+>  EXPORT_SYMBOL_GPL(arm_pm_restart);
+>  
+> +static void do_nothing(void *unused)
+> +{
+> +}
+> +
+> +/*
+> + * cpu_idle_wait - Used to ensure that all the CPUs discard old value of
+> + * pm_idle and update to new pm_idle value. Required while changing pm_idle
+> + * handler on SMP systems.
+> + *
+> + * Caller must have changed pm_idle to the new value before the call. Old
+> + * pm_idle value will not be used by any CPU after the return of this function.
+> + */
+> +void cpu_idle_wait(void)
+> +{
+> +	smp_mb();
+> +	/* kick all the CPUs so that they exit out of pm_idle */
+> +	smp_call_function(do_nothing, NULL, 1);
+> +}
+> +EXPORT_SYMBOL_GPL(cpu_idle_wait);
+>  
+>  /*
+>   * This is our default idle handler.  We need to disable
