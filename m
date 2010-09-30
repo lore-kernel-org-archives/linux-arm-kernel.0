@@ -1,52 +1,51 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 30 Sep 2010 13:48:14 +0900
-Subject: [PATCH 0/7] ARM: S5PC210: I2C devices support and Universal board
-	updates
-Message-ID: <20100930044814.GA16892@july>
+Date: Thu, 30 Sep 2010 13:48:22 +0900
+Subject: [PATCH 1/7] ARM: S5PC210: Universal OneNAND support
+Message-ID: <20100930044822.GA16897@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit aff078a9da27e0effb2a149834089e5788943d4b:
-  Marek Szyprowski (1):
-        ARM: S5PV210: Enable USB HSOTG gadget build
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Kyungmin Park (7):
-      ARM: S5PC210: Universal OneNAND support
-      ARM: S5PC110: Fix wrong interrupt I2C2 number
-      ARM: Samsung: Use the correct I2C2 interrupt
-      ARM: S5PC210: I2C1/2 support
-      ARM: S5PC210: I2C0/1 devices support on Universal board
-      ARM: S5PC210: Define the more I2C{3,4,5,6,7} address & interrupt
-      ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
+OneNAND device support for Universal board.
 
- arch/arm/mach-s5pv210/include/mach/irqs.h   |    4 +-
- arch/arm/mach-s5pv310/Kconfig               |   18 +++++++
- arch/arm/mach-s5pv310/Makefile              |    5 ++
- arch/arm/mach-s5pv310/include/mach/irqs.h   |    7 +++
- arch/arm/mach-s5pv310/include/mach/map.h    |   11 ++++-
- arch/arm/mach-s5pv310/mach-universal_c210.c |   16 ++++++
- arch/arm/mach-s5pv310/setup-i2c3.c          |   25 ++++++++++
- arch/arm/mach-s5pv310/setup-i2c4.c          |   25 ++++++++++
- arch/arm/mach-s5pv310/setup-i2c5.c          |   25 ++++++++++
- arch/arm/mach-s5pv310/setup-i2c6.c          |   25 ++++++++++
- arch/arm/mach-s5pv310/setup-i2c7.c          |   25 ++++++++++
- arch/arm/plat-s5p/Kconfig                   |   25 ++++++++++
- arch/arm/plat-s5p/Makefile                  |    5 ++
- arch/arm/plat-s5p/dev-i2c3.c                |   67 +++++++++++++++++++++++++++
- arch/arm/plat-s5p/dev-i2c4.c                |   67 +++++++++++++++++++++++++++
- arch/arm/plat-s5p/dev-i2c5.c                |   67 +++++++++++++++++++++++++++
- arch/arm/plat-s5p/dev-i2c6.c                |   67 +++++++++++++++++++++++++++
- arch/arm/plat-s5p/dev-i2c7.c                |   67 +++++++++++++++++++++++++++
- arch/arm/plat-samsung/dev-i2c2.c            |    4 +-
- arch/arm/plat-samsung/include/plat/iic.h    |    5 ++
- 20 files changed, 554 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
- create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
- create mode 100644 arch/arm/plat-s5p/dev-i2c3.c
- create mode 100644 arch/arm/plat-s5p/dev-i2c4.c
- create mode 100644 arch/arm/plat-s5p/dev-i2c5.c
- create mode 100644 arch/arm/plat-s5p/dev-i2c6.c
- create mode 100644 arch/arm/plat-s5p/dev-i2c7.c
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv310/Kconfig               |    1 +
+ arch/arm/mach-s5pv310/mach-universal_c210.c |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+index 9941852..178eab9 100644
+--- a/arch/arm/mach-s5pv310/Kconfig
++++ b/arch/arm/mach-s5pv310/Kconfig
+@@ -40,6 +40,7 @@ config MACH_SMDKC210
+ config MACH_UNIVERSAL_C210
+ 	bool "Mobile UNIVERSAL_C210 Board"
+ 	select CPU_S5PV310
++	select S5P_DEV_ONENAND
+ 	help
+ 	  Machine support for Samsung Mobile Universal S5PC210 Reference
+ 	  Board. S5PC210(MCP) is one of package option of S5PV310
+diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
+index b57efae..e169849 100644
+--- a/arch/arm/mach-s5pv310/mach-universal_c210.c
++++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+@@ -20,6 +20,7 @@
+ #include <plat/regs-serial.h>
+ #include <plat/s5pv310.h>
+ #include <plat/cpu.h>
++#include <plat/devs.h>
+ 
+ #include <mach/map.h>
+ 
+@@ -117,6 +118,7 @@ static struct platform_device universal_gpio_keys = {
+ 
+ static struct platform_device *universal_devices[] __initdata = {
+ 	&universal_gpio_keys,
++	&s5p_device_onenand,
+ };
+ 
+ static void __init universal_map_io(void)
+-- 
+1.5.3.3
