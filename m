@@ -1,69 +1,165 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 30 Sep 2010 12:19:38 +0200
-Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
-In-Reply-To: <4CA45E6D.4070308@pelagicore.com>
-References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
-	<1285790884-3516-2-git-send-email-w.sang@pengutronix.de>
-	<4CA3AE89.2030107@pelagicore.com>
-	<20100930081605.GA2655@pengutronix.de>
-	<4CA45E6D.4070308@pelagicore.com>
-Message-ID: <20100930101938.GE2655@pengutronix.de>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 30 Sep 2010 19:40:55 +0900
+Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
+In-Reply-To: <006b01cb6088$ffc17b80$ff447280$%han@samsung.com>
+References: <20100930044859.GA16923@july>
+	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
+	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
+	<AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
+	<AANLkTin9tR4+CBa+r6mHsJdFYxzkaK1CA+_WKhTZkacs@mail.gmail.com>
+	<006601cb6081$bf8a7140$3e9f53c0$%han@samsung.com>
+	<AANLkTikmTyOnmA7eaN0_Vysf+0BviDX428MhZHTffpe7@mail.gmail.com>
+	<006b01cb6088$ffc17b80$ff447280$%han@samsung.com>
+Message-ID: <AANLkTikgXpJPnbQGchvHSCTshKzAO5GJyGHio=6Q0RZJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 11:54:53AM +0200, Richard R?jfors wrote:
-> On 09/30/2010 10:16 AM, Wolfram Sang wrote:
-> >Hi Richard,
-> >
-> >On Wed, Sep 29, 2010 at 11:24:25PM +0200, Richard R?jfors wrote:
-> >>On 09/29/2010 10:07 PM, Wolfram Sang wrote:
-> >>>We need to carry some information per host, e.g. the clock. Add a
-> >>>structure for it and initialize it in the generic part. Also do not use
-> >>>the parent of the platform_device (if it is available), this breaks the
-> >>>clock-matching on ARM.
-> >>
-> >>The reason it's there is for instance a case when the shdci device is exposed
-> >>from a MFD device which sits on top of PCI. Then the parent (PCI device)
-> >>is the device that is DMA capable. This patch will break such usage.
-> >
-> >I feared that there is a reason. The problem I see is now, that the parent gets
-> >always set (from drivers/base/platform.c):
-> 
-> Then we obviously need to pass more information in the platform_data to be able
-> to chose which device to be used.
+On Thu, Sep 30, 2010 at 7:19 PM, Jongsun Han <jongsun.han@samsung.com> wrote:
+> On Thu, Sep 30, 2010 at 6:27 PM, Jongsun Han <jongsun.han@samsung.com>
+>> wrote:
+>> > On Thu, Sep 30, 2010 at 3:50 PM, Jassi Brar <jassisinghbrar@gmail.com>
+>> wrote:
+>> >> > On Thu, Sep 30, 2010 at 3:27 PM, Kyungmin Park <kmpark@infradead.org>
+>> wrote:
+>> >> >> On Thu, Sep 30, 2010 at 3:20 PM, Jeongbae Seo
+>> <jeongbae.seo@samsung.com>
+>> >> wrote:
+>> >> >>> Kyungmin wrote:
+>> >> >>>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>> >> >>>>
+>> >> >>>> S5PC210 support more I2C devices than previous SoCs.
+>> >> >>>> And to prevent the wrong usage use the s5p prefix instead of s3c.
+>> >> >>>>
+>> >> >>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> >> >>>> ---
+>> >> >>>> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ? ?| ? 15 +++++++
+>> >> >>>> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? | ? ?5 ++
+>> >> >>>> ?arch/arm/mach-s5pv310/setup-i2c3.c ? ? ? | ? 25 +++++++++++
+>> >> >>>> ?arch/arm/mach-s5pv310/setup-i2c4.c ? ? ? | ? 25 +++++++++++
+>> >> >>>> ?arch/arm/mach-s5pv310/setup-i2c5.c ? ? ? | ? 25 +++++++++++
+>> >> >>>> ?arch/arm/mach-s5pv310/setup-i2c6.c ? ? ? | ? 25 +++++++++++
+>> >> >>>> ?arch/arm/mach-s5pv310/setup-i2c7.c ? ? ? | ? 25 +++++++++++
+>> >> >>>> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ?| ? 25 +++++++++++
+>> >> >>>> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? | ? ?5 ++
+>> >> >>>> ?arch/arm/plat-s5p/dev-i2c3.c ? ? ? ? ? ? | ? 67
+>> >> >>>> ++++++++++++++++++++++++++++++
+>> >> >>>> ?arch/arm/plat-s5p/dev-i2c4.c ? ? ? ? ? ? | ? 67
+>> >> >>>> ++++++++++++++++++++++++++++++
+>> >> >>>> ?arch/arm/plat-s5p/dev-i2c5.c ? ? ? ? ? ? | ? 67
+>> >> >>>> ++++++++++++++++++++++++++++++
+>> >> >>>> ?arch/arm/plat-s5p/dev-i2c6.c ? ? ? ? ? ? | ? 67
+>> >> >>>> ++++++++++++++++++++++++++++++
+>> >> >>>> ?arch/arm/plat-s5p/dev-i2c7.c ? ? ? ? ? ? | ? 67
+>> >> >>>> ++++++++++++++++++++++++++++++
+>> >> >>>> ?arch/arm/plat-samsung/include/plat/iic.h | ? ?5 ++
+>> >> >>>> ?15 files changed, 515 insertions(+), 0 deletions(-)
+>> >> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
+>> >> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
+>> >> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
+>> >> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
+>> >> >>>> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
+>> >> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c3.c
+>> >> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c4.c
+>> >> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c5.c
+>> >> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c6.c
+>> >> >>>> ?create mode 100644 arch/arm/plat-s5p/dev-i2c7.c
+>> >> >>>>
+>> >> >>>
+>> >> >>> Hi Kyungmin,
+>> >> >>>
+>> >> >>> We are considering another way not to make additional new i2c dev
+>> files.
+>> >> >>> In my opinion, this patch looks not bad but we'd better make an
+>> effort to
+>> >> >>> avoid having the more similar file.
+>> >> >>
+>> >> >> Actually I also it's not good approach, but as there's no comment or
+>> >> >> discuss about this I send the patches.
+>> >> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
+>> >> August/022615.html
+>> >> >>
+>> >> >> If you have good method or approaches, I'm welcome.
+>> >> >
+>> >> > First, these are device definitions and gpio set callbacks and
+>> >> > shouldn't take much
+>> >> > of space. So, perhaps these all could be built upon single I2C
+>> support
+>> >> > selection.
+>> >>
+>> >> That's my first propose.
+>> >
+>> > Hi, Kyungmin and Jassi
+>> >
+>> > I think that parts of i2c in S5PV310 aren't used depending on the usage
+>> of
+>> > S5PV310.
+>> > It's better define the number of i2c devs being used instead of using
+>> single I2C
+>> > support selection.
+>>
+>> Can you tell me in detail? I don't know what do you mean?
+>> and FYI, universal board uses all I2Cs except I2C2.
+>>
+>
+> For example,
+> If i2c(0..4) except 2 are used in S5PV310, set the number of i2c dev as 5.
+> Then only i2c(0..4) are built without building i2c(5..7).
+then what's the condition of I2C2?
 
-Yeah, that was my idea, too.
+If it don't use i2c2 and i2c3, then how to configure it?
+>
+>> >
+>> >> >
+>> >> > Second, if we must build them conditionally, how about having all in
+>> >> > one file with
+>> >> > each device's definition and callback surrounded by corresponding
+>> ifdef ?
+>> >> > That would alteast save us file-count.
+>> >>
+>> >> This method is also no problem if all of person are agreed.
+>> >>
+>> >> So just choose it and make a conclusion.
+>> >>
+>> >> Thank you,
+>> >> Kyungmin Park
+>> >> >
+>> >
+>> > I agree with Jassi's opinion keeping setup-i2c(0..2) and dev-i2c(0..2)
+>> for
+>> > backward compatibility and
+>>
+>> Of course it should be. and there's no code to brake the existing codes.
+>>
+>> > adding a file which handles i2c(0..7) for S5PV310 and coming
+>> > Samsung
+>> > soc.
+>>
+>> Do you mean create the new i2c[0-7] for s5pv310?
+>> I think it's better to give some example how to implement as your word.
+>>
+>
+> set-i2c.c in S5PV310 machine directory sets all i2c related gpio.
+> dev-i2c.c which is created in plat directory sets all i2c devs plat data.
+You mean use the #ifdef ~ #endif for each I2Cs.
 
-> >So, sdhci-plftm cannot access the platform_data connected to the original
-> >platform_device via host->mmc->parent.
-> 
-> You're right it wouldn't. But isn't it a bit risky even if you could access it,
-> in the long the platform_data coild point to something that is in the __devinit section
-> or similar?
+To Kgene,
+Any comments? I think you already mentioned that don't use #ifdef ~
+#endif at c files if possible.
+In this case are you okay?
 
-The use-case we see now is in the custom init() call, i.e. setting up
-GPIO, enabling clocks. That is in the same section. Accessing
-platform_data later is in deed always risky and should not be done,
-sdhci-pltfm is no special case here.
+Thank you,
+Kyungmin Park
 
-> What about extend the struct you defined with the pieces needed, and access it via
-> sdhci_priv?
-
-At the moment, I don't think this is needed. Will think more about it
-(and the other comments) next week, already preparing for a long weekend
-\o/
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20100930/d0f79250/attachment.sig>
+>
+>> >
+>> > Best Regards
+>> > Jongsun Han
+>> >
+>> >
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
