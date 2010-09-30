@@ -1,57 +1,52 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 30 Sep 2010 23:37:09 +0900
-Subject: [PATCH] spi/pl022: compare bitwidth to enums
-In-Reply-To: <AANLkTin6fPnDdSqQiWKH8kTnREV2g8p94HzQQcjcpKLs@mail.gmail.com>
-References: <1285840671-9567-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin6fPnDdSqQiWKH8kTnREV2g8p94HzQQcjcpKLs@mail.gmail.com>
-Message-ID: <AANLkTimGpfazBPYp3cc4pSFUJ_Q7GaPVxRtB2=YSM5YE@mail.gmail.com>
+From: ian@opensource.wolfsonmicro.com (Ian Lartey)
+Date: Thu, 30 Sep 2010 15:49:31 +0100
+Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31
+	ADS board
+In-Reply-To: <20100930132914.GP29811@pengutronix.de>
+References: <1285851444-18123-1-git-send-email-ian@opensource.wolfsonmicro.com>
+	<20100930132914.GP29811@pengutronix.de>
+Message-ID: <1285858171.1864.10033.camel@Tapajos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 8:34 PM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> 2010/9/30 Linus Walleij <linus.walleij@stericsson.com>:
->
->> The enums from <linux/amba/pl022.h> are actually off-by-one
->> since bitwidth 4 is defined as 0x03, causing weirdness when
->> we were trying out some 9-bit peripheral. Fix this by
->> comparing to the enum values rather than hardcoded values
->> and also fixing the enum to something reasonable.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
->> (...)
->> - ? ? ? if (chip_info->data_size <= 8) {
->> + ? ? ? if (chip_info->data_size <= SSP_DATA_BITS_8) {
->> ? ? ? ? ? ? ? ?dev_dbg(&spi->dev, "1 <= n <=8 bits per word\n");
->> ? ? ? ? ? ? ? ?chip->n_bytes = 1;
->> ? ? ? ? ? ? ? ?chip->read = READING_U8;
->> ? ? ? ? ? ? ? ?chip->write = WRITING_U8;
->> - ? ? ? } else if (chip_info->data_size <= 16) {
->> + ? ? ? } else if (chip_info->data_size <= SSP_DATA_BITS_16) {
->
-> I just realized that Kevin Wells patch actually patch away this problem
-> so merge his patch and disregard this for the optimal solution.
->
->> ?enum ssp_data_size {
->> - ? ? ? SSP_DATA_BITS_4 = 0x03, SSP_DATA_BITS_5, SSP_DATA_BITS_6,
->> + ? ? ? SSP_DATA_BITS_4 = 0x04, SSP_DATA_BITS_5, SSP_DATA_BITS_6,
->
-> This is not good because this is used for default register
-> settings too (I didn't notice, typical).
+On Thu, 2010-09-30 at 15:29 +0200, Uwe Kleine-K?nig wrote:
+> Hi Ian,
+> 
+> On Thu, Sep 30, 2010 at 01:57:24PM +0100, Ian Lartey wrote:
+> > This is only a partial revert of "ARM: mx3/mx31ads: fold board header in its only user"
+> > [commit ccfa7c269843001077df02d98918c6c9bde91395)]
+> > 
+> > As some of the the board defines are also used in the cs89x0 ethernet driver by the i.MX31 ADS.
+> Can you please line break the commit log.  AFAIK up to 76 chars are
+> usual for the kernel.
 
-And it creates a 1:1 mapping of name to the same number.  Insane!
-Just use the integer number directly.  :-)
+Ah, sorry about that, I'll reformat the lines.
 
->
-> If anyone still wants a patch for older kernels I can provide a
-> patch against 2.6.36-rc6 with just the first two hunks.
->
-> Yours,
-> Linus Walleij
->
+> 
+> Hmmm, I took a look into drivers/net/cs89x0.c.  This driver definitly
+> needs a cleanup, e.g. should start to provide a platform driver.
+> Maybe it can even be merged with drivers/net/mac89x0.c?
+> 
+> I think the best for know would be the following:
+> 
+>  - reintroduce mach/board-mx31ads.h but only defining the symbols used
+>    by cs89x0 together with a comment saying that the constants are
+>    needed for the cs89x0 ethernet driver.
+
+This time round I have just added the defines needed for the cs89x0 
+to the ones that were moved back into mach-mx31ads.h from
+mach-mx31ads.c . I think this is what you mean, yes ?
+
+> 
+>  - In a second patch add CS89x0 to mx31_defconfig
+
+Will do.
+
+> 
+> Best regards
+> Uwe
+> 
 
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Regards,
+          Ian.
