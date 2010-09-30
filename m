@@ -1,101 +1,117 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Sep 2010 11:46:20 -0700
-Subject: [PATCH 1/3] OMAP1: Add support for SoC camera interface
+Date: Thu, 30 Sep 2010 11:46:28 -0700
+Subject: [PATCH 2/3] OMAP1: Amstrad Delta: add support for camera
 In-Reply-To: <20100930184459.12052.14542.stgit@baageli.muru.com>
 References: <20100930184459.12052.14542.stgit@baageli.muru.com>
-Message-ID: <20100930184620.12052.14564.stgit@baageli.muru.com>
+Message-ID: <20100930184628.12052.829.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 
-This patch adds a definition of the OMAP1 camera interface platform device,
-and a function that allows for providing a board specific platform data.
-The device will be used with the upcoming OMAP1 SoC camera interface driver.
+This patch adds configuration data and initialization code required for camera
+support to the Amstrad Delta board.
+
+Three devices are declared: SoC camera, OMAP1 camera interface and OV6650
+sensor.
+
+Default 12MHz clock has been selected for driving the sensor. Pixel clock has
+been limited to get reasonable frame rates, not exceeding the board
+capabilities. Since both devices (interface and sensor) support both pixel
+clock polarities, decision on polarity selection has been left to drivers.
+Interface GPIO line has been found not functional, thus not configured.
 
 Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/devices.c             |   43 +++++++++++++++++++++++++++++
- arch/arm/mach-omap1/include/mach/camera.h |   11 +++++++
- 2 files changed, 54 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap1/include/mach/camera.h
+ arch/arm/mach-omap1/board-ams-delta.c |   45 +++++++++++++++++++++++++++++++++
+ 1 files changed, 45 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index aa07256..2c9a030 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -9,6 +9,7 @@
-  * (at your option) any later version.
-  */
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 41992ab..12f7f60 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -19,6 +19,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/serial_8250.h>
  
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -191,6 +192,48 @@ static inline void omap_init_spi100k(void)
- }
- #endif
++#include <media/soc_camera.h>
++
+ #include <asm/serial.h>
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -32,6 +34,7 @@
+ #include <plat/usb.h>
+ #include <plat/board.h>
+ #include <plat/common.h>
++#include <mach/camera.h>
  
-+
-+#define OMAP1_CAMERA_BASE	0xfffb6800
-+#define OMAP1_CAMERA_IOSIZE	0x1c
-+
-+static struct resource omap1_camera_resources[] = {
-+	[0] = {
-+		.start	= OMAP1_CAMERA_BASE,
-+		.end	= OMAP1_CAMERA_BASE + OMAP1_CAMERA_IOSIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= INT_CAMERA,
-+		.flags	= IORESOURCE_IRQ,
+ #include <mach/ams-delta-fiq.h>
+ 
+@@ -213,10 +216,37 @@ static struct platform_device ams_delta_led_device = {
+ 	.id	= -1
+ };
+ 
++static struct i2c_board_info ams_delta_camera_board_info[] = {
++	{
++		I2C_BOARD_INFO("ov6650", 0x60),
 +	},
 +};
 +
-+static u64 omap1_camera_dma_mask = DMA_BIT_MASK(32);
-+
-+static struct platform_device omap1_camera_device = {
-+	.name		= "omap1-camera",
-+	.id		= 0, /* This is used to put cameras on this interface */
-+	.dev		= {
-+		.dma_mask		= &omap1_camera_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+	.num_resources	= ARRAY_SIZE(omap1_camera_resources),
-+	.resource	= omap1_camera_resources,
++static struct soc_camera_link __initdata ams_delta_iclink = {
++	.bus_id         = 0,	/* OMAP1 SoC camera bus */
++	.i2c_adapter_id = 1,
++	.board_info     = &ams_delta_camera_board_info[0],
++	.module_name    = "ov6650",
 +};
 +
-+void __init omap1_camera_init(void *info)
-+{
-+	struct platform_device *dev = &omap1_camera_device;
-+	int ret;
++static struct platform_device ams_delta_camera_device = {
++	.name   = "soc-camera-pdrv",
++	.id     = 0,
++	.dev    = {
++		.platform_data = &ams_delta_iclink,
++	},
++};
 +
-+	dev->dev.platform_data = info;
++static struct omap1_cam_platform_data ams_delta_camera_platform_data = {
++	.camexclk_khz	= 12000,	/* default 12MHz clock, no extra DPLL */
++	.lclk_khz_max	= 1334,		/* results in 5fps CIF, 10fps QCIF */
++};
 +
-+	ret = platform_device_register(dev);
-+	if (ret)
-+		dev_err(&dev->dev, "unable to register device: %d\n", ret);
-+}
-+
-+
- /*-------------------------------------------------------------------------*/
+ static struct platform_device *ams_delta_devices[] __initdata = {
+ 	&ams_delta_kp_device,
+ 	&ams_delta_lcd_device,
+ 	&ams_delta_led_device,
++	&ams_delta_camera_device,
+ };
  
- static inline void omap_init_sti(void) {}
-diff --git a/arch/arm/mach-omap1/include/mach/camera.h b/arch/arm/mach-omap1/include/mach/camera.h
-new file mode 100644
-index 0000000..fd54b45
---- /dev/null
-+++ b/arch/arm/mach-omap1/include/mach/camera.h
-@@ -0,0 +1,11 @@
-+#ifndef __ASM_ARCH_CAMERA_H_
-+#define __ASM_ARCH_CAMERA_H_
+ static void __init ams_delta_init(void)
+@@ -225,6 +255,20 @@ static void __init ams_delta_init(void)
+ 	omap_cfg_reg(UART1_TX);
+ 	omap_cfg_reg(UART1_RTS);
+ 
++	/* parallel camera interface */
++	omap_cfg_reg(H19_1610_CAM_EXCLK);
++	omap_cfg_reg(J15_1610_CAM_LCLK);
++	omap_cfg_reg(L18_1610_CAM_VS);
++	omap_cfg_reg(L15_1610_CAM_HS);
++	omap_cfg_reg(L19_1610_CAM_D0);
++	omap_cfg_reg(K14_1610_CAM_D1);
++	omap_cfg_reg(K15_1610_CAM_D2);
++	omap_cfg_reg(K19_1610_CAM_D3);
++	omap_cfg_reg(K18_1610_CAM_D4);
++	omap_cfg_reg(J14_1610_CAM_D5);
++	omap_cfg_reg(J19_1610_CAM_D6);
++	omap_cfg_reg(J18_1610_CAM_D7);
 +
-+void omap1_camera_init(void *);
-+
-+static inline void omap1_set_camera_info(struct omap1_cam_platform_data *info)
-+{
-+	omap1_camera_init(info);
-+}
-+
-+#endif /* __ASM_ARCH_CAMERA_H_ */
+ 	iotable_init(ams_delta_io_desc, ARRAY_SIZE(ams_delta_io_desc));
+ 
+ 	omap_board_config = ams_delta_config;
+@@ -236,6 +280,7 @@ static void __init ams_delta_init(void)
+ 	ams_delta_latch2_write(~0, 0);
+ 
+ 	omap1_usb_init(&ams_delta_usb_config);
++	omap1_set_camera_info(&ams_delta_camera_platform_data);
+ 	platform_add_devices(ams_delta_devices, ARRAY_SIZE(ams_delta_devices));
+ 
+ #ifdef CONFIG_AMS_DELTA_FIQ
