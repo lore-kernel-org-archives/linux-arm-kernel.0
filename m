@@ -1,90 +1,65 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 30 Sep 2010 10:07:18 -0700
-Subject: [PATCH] ARM: add cpu_idle_wait() to support CPUidle on SMP
-	systems.
-In-Reply-To: <1285692192-32075-1-git-send-email-khilman@deeprootsystems.com>
-	(Kevin Hilman's message of "Tue, 28 Sep 2010 09:43:12 -0700")
-References: <1285692192-32075-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <87hbh7f9dl.fsf@deeprootsystems.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 30 Sep 2010 22:36:42 +0530
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+In-Reply-To: <4CA4C17F.7060106@ti.com>
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com>,<20100930150713.GG3117@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>,
+	<4CA4C17F.7060106@ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF8142@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+>> Tony/ Benoit,
+>>
+>>>>
+>>>> I think that disabling it should be done only if the CONFIG_OMAP_WDT
+>>>> is not set.
+>>>
+>>> How about disabling is done always unless CONFIG_WATCHDOG_NOWAYOUT
+>>> is set?
+>>
+>> As given in the patch description, this patch does a disable of watchdog
+>> timer, during init, to avoid the system rebooting that happens due to
+>> enabling of watchdog timer after a reset of the module (during hwmod init).
+>>
+>> According to the default WDT registers values, the system reboot would
+>> happen in ~10s if watchdog is enabled with default values. Hence, after
+>> a WDT module reset during init, the watchdog has to be disabled within 10s
+>> otherwise the system will keep rebooting.
+>>
+>> Hence irrespective of CONFIG_WATCHDOG_NOWAYOUT/ CONFIG_OMAP_WDT,
+>> the watchdog timer needs to be disabled after a WDT reset has happened.
+> 
+> No, not necessarily, this is the whole point about a watchdog, you need
+> just need to ping it to prove that the system is alive.
+> 
 
-Kevin Hilman <khilman@deeprootsystems.com> writes:
+Agreed
 
-> In order for CPUidle to work on SMP systems, an implementation of
-> cpu_idle_wait() is needed.
+> In case you didn't notice, every watchdogs are started during a cold
+> reset since OMAP1610. Even Phoenix contains a watchdog that is started
+> by default.
+> This is by construction... and this is done like that for a good reason.
+
+Yes.
+
+> So stopping a watchdog just after the reset in a bootloader is not
+> necessarily the behavior that user of a watchdog are expecting,
+> otherwise it will not be started by default at boot time.
+
+But, how do we handle this? enable INIT_NO_RESET flag?
+
 >
-> This patch duplicates the x86 implementation of cpu_idle_wait() for
-> ARM.
->
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> In your description, it looks like this behavior is a HW bug that we
+> have to fix...
 
-Are you OK with this for the patch system for 2.6.37?
+Sorry if it sounded like that. 
 
-Kevin
+> It is just the way it is supposed to work.
 
-> ---
->  arch/arm/Kconfig              |    3 +++
->  arch/arm/include/asm/system.h |    2 ++
->  arch/arm/kernel/process.c     |   19 +++++++++++++++++++
->  3 files changed, 24 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 553b7cf..10ce6dc 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -145,6 +145,9 @@ config ARCH_HAS_CPUFREQ
->  	  and that the relevant menu configurations are displayed for
->  	  it.
->  
-> +config ARCH_HAS_CPU_IDLE_WAIT
-> +       def_bool y
-> +
->  config GENERIC_HWEIGHT
->  	bool
->  	default y
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 8ba1ccf..48e360c 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -325,6 +325,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
->  extern void disable_hlt(void);
->  extern void enable_hlt(void);
->  
-> +void cpu_idle_wait(void);
-> +
->  #include <asm-generic/cmpxchg-local.h>
->  
->  #if __LINUX_ARM_ARCH__ < 6
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 401e38b..23def52 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -135,6 +135,25 @@ EXPORT_SYMBOL(pm_power_off);
->  void (*arm_pm_restart)(char str, const char *cmd) = arm_machine_restart;
->  EXPORT_SYMBOL_GPL(arm_pm_restart);
->  
-> +static void do_nothing(void *unused)
-> +{
-> +}
-> +
-> +/*
-> + * cpu_idle_wait - Used to ensure that all the CPUs discard old value of
-> + * pm_idle and update to new pm_idle value. Required while changing pm_idle
-> + * handler on SMP systems.
-> + *
-> + * Caller must have changed pm_idle to the new value before the call. Old
-> + * pm_idle value will not be used by any CPU after the return of this function.
-> + */
-> +void cpu_idle_wait(void)
-> +{
-> +	smp_mb();
-> +	/* kick all the CPUs so that they exit out of pm_idle */
-> +	smp_call_function(do_nothing, NULL, 1);
-> +}
-> +EXPORT_SYMBOL_GPL(cpu_idle_wait);
->  
->  /*
->   * This is our default idle handler.  We need to disable
+Yes. That's correct
+
+Regards,
+Benoit
