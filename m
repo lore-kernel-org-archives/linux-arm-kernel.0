@@ -1,129 +1,48 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 30 Sep 2010 18:46:08 +0200
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Sep 2010 09:51:04 -0700
 Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
+In-Reply-To: <alpine.DEB.2.00.1009301040390.5439@utopia.booyaka.com>
 References: <1285834270-32766-1-git-send-email-charu@ti.com>
 	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
-	<4CA49ADE.6080202@ti.com>, <20100930150713.GG3117@atomide.com>,
+	<4CA49ADE.6080202@ti.com> <20100930150713.GG3117@atomide.com>
 	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
 	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813F@dbde02.ent.ti.com>
-Message-ID: <4CA4BED0.7020108@ti.com>
+	<alpine.DEB.2.00.1009301040390.5439@utopia.booyaka.com>
+Message-ID: <20100930165104.GJ3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/30/2010 6:32 PM, Varadarajan, Charulatha wrote:
-> Benoit,
->
-> <<snip>>
->
->>> With OMAP2PLUS watchdog implemented in hwmod fw way, the
->>> module is reset during init.
->>
->> In that case hwmod fw just highlighted the real behavior that was hidden
->> so far by the X-loader.
->
-> Yes.
->
->>
->> You should as well add a link to the email thread with Kevin that raised
->> the issue.
->
-> Okay.
->
-> <<snip>>
->
->>> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
->>> index 8e2f0aa..9f44fc6 100644
->>> --- a/arch/arm/mach-omap2/devices.c
->>> +++ b/arch/arm/mach-omap2/devices.c
->>> @@ -916,11 +916,55 @@ static inline void omap_init_vout(void) {}
->>>
->>>    /*-------------------------------------------------------------------------*/
->>>
->>> +/*
->>> + * WDT mdoule is reset during init which enables the watchdog.
->>
->> typo: module
->
-> Okay will correct it.
->
->>
->> The real explanation is that you should not assume anything from the
->> boot loader at that time, so always stop the wdt.
->
-> It is not an assumption from bootloader. After the WDT reset, the
-> WDT is enabled and the reset values of WDT registers makes the system to
-> reboot (in ~10s) as WDT is enabled.
+* Paul Walmsley <paul@pwsan.com> [100930 09:34]:
+> Hello Charu,
+> 
+> On Thu, 30 Sep 2010, Varadarajan, Charulatha wrote:
+> 
+> > > > diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> > > > index 8e2f0aa..9f44fc6 100644
+> > > > --- a/arch/arm/mach-omap2/devices.c
+> > > > +++ b/arch/arm/mach-omap2/devices.c
+> > > > +
+> > > > +static void __init omap_disable_wdt(void)
+> > > > +{
+> > > > +	if (cpu_class_is_omap2())
+> > > 
+> > > This code is already in mach-omap2/devices.c, so that test should be 
+> > > useless.
+> > 
+> > I do not see a cpu_class_is_omap2() check in omap2_init_devices(). Please
+> > point out where this check is done while/before calling omap_disable_wdt()?
+> 
+> It's implicit, due to the directory arch/arm/mach-omap2/ -- code in that 
+> directory is only built for OMAP2+ systems -- and right now there are no 
+> plans for OMAP1+ multi-arch booting.  So it's safe to assume that any code 
+> in arch/arm/mach-omap2 will only run on OMAP2+ boards.
 
-The implicit assumption in the previous code is that the bootloader 
-already stopped it. That exactly for that reason that hwmod is reseting 
-every IPs, because we don't have a clue about what X-loader / u-boot can 
-do between a cold-reset and the kernel boot.
+That might change pretty fast though. There are already experimental patches
+to build in multiple ARM archs into a single kernel binary.
 
->
->>
->>> + * Hence it is required to disable the watchdog after the WDT reset
->>> + * during init. Otherwise the system would reboot as per the default
->>> + * watchdog timer registers settings.
->>> + */
->>> +#define OMAP_WDT_WPS	(0x34)
->>> +#define OMAP_WDT_SPR	(0x48)
->>> +
->>> +static int omap2_disable_wdt(struct omap_hwmod *oh, void *user)
->>
->> You should call it unused if the parameter is not used.
->
-> Okay.
->
->>
->>> +{
->>> +	void __iomem *base;
->>> +
->>> +	if (!oh)
->>> +		pr_err("Could not look up wdtimer_hwmod\n");
->>> +
->>> +	base = oh->_mpu_rt_va;
->>
->> Paul added an hwmod API to get that va (something like *_get_mpu_rt_va).
->
-> Okay. Will use that.
->
->>
->>> +
->>> +	/* Enable the clocks before accessing the WDT registers */
->>> +	omap_hwmod_enable(oh);
->>
->> The enable can fail, so you should check the return value.
->
-> Okay.
->
->>
->>> +
->>> +	/* sequence required to disable watchdog */
->>> +	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);	/* TIMER_MODE */
->>> +	while (__raw_readl(base + OMAP_WDT_WPS)&   0x10)
->>> +		cpu_relax();
->>> +
->>> +	__raw_writel(0x5555, base + OMAP_WDT_SPR);	/* TIMER_MODE */
->>> +	while (__raw_readl(base + OMAP_WDT_WPS)&   0x10)
->>> +		cpu_relax();
->>> +
->>> +	omap_hwmod_idle(oh);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static void __init omap_disable_wdt(void)
->>> +{
->>> +	if (cpu_class_is_omap2())
->>
->> This code is already in mach-omap2/devices.c, so that test should be
->> useless.
->
-> I do not see a cpu_class_is_omap2() check in omap2_init_devices(). Please
-> point out where this check is done while/before calling omap_disable_wdt()?
->
+So we should already have these checks in place to avoid the initcalls running
+on other ARM archs.
 
-And Paul has just answered that one...
+Regards,
 
-Benoit
+Tony
