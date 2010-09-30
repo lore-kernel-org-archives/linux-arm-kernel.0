@@ -1,48 +1,65 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 30 Sep 2010 02:51:54 +0100
-Subject: [PATCH 5/5] sdhci-s3c: Add support no internal clock divider
-	in host controller
-In-Reply-To: <AANLkTimyvrSxQiF4A4pbmK8nME2ko9MRtqvcuMrY2rKR@mail.gmail.com>
-References: <1284626223-18944-1-git-send-email-jeongbae.seo@samsung.com>
-	<1284626223-18944-6-git-send-email-jeongbae.seo@samsung.com>
-	<AANLkTik23B23RW_kmjaL1PeXNiWtU01aNBwUOPrac6HF@mail.gmail.com>
-	<20100917155928.GA7561@void.printf.net>
-	<AANLkTimyvrSxQiF4A4pbmK8nME2ko9MRtqvcuMrY2rKR@mail.gmail.com>
-Message-ID: <20100930015154.GA1269@void.printf.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 30 Sep 2010 11:38:33 +0900
+Subject: Please don't edit the subject. Use S5PC110 & S5PC210 as is
+In-Reply-To: <AANLkTi=NFz95jvk73cgXGV-kzj7FFazgMJ6D+GOXr3Kb@mail.gmail.com>
+References: <AANLkTi=NFz95jvk73cgXGV-kzj7FFazgMJ6D+GOXr3Kb@mail.gmail.com>
+Message-ID: <006201cb6048$962b6810$c2823830$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kyungmin, Ben,
-
-On Thu, Sep 30, 2010 at 10:18:12AM +0900, Kyungmin Park wrote:
-> On Sat, Sep 18, 2010 at 12:59 AM, Chris Ball <cjb@laptop.org> wrote:
-> > Hi,
-> >
-> > On Thu, Sep 16, 2010 at 06:08:28PM +0900, Kyungmin Park wrote:
-> >> Well there are two implementations. and no conclusion yet.
-> >> as s5pc210 don't support internal SDHCI clock, DMC overrides the
-> >> function operation itself when s5pc210. System LSI use the quirks.
-> >>
-> >> Choose any one from MMC maintainer.
-> >
-> > Both approaches are generally acceptable for MMC, so I would want to
-> > leave it up to the maintainer of the driver in question (which is Ben,
-> > in this case?) to choose between them.
+Kyungmin Park wrote:
 > 
-> Hi Chris,
+> Hi,
 > 
-> Did you get the opinion from Ben?
+> Please don't edit the subject.
 > 
-> I hope this decision will be done before 2.6.37 merge windows start to
-> support SDHCI support on s5pc210.
+> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-
+> samsung.git;a=commitdiff;h=d8c3d96f5df54251c06686bb00811e4b7e0f6547
+> http://git.kernel.org/?p=linux/kernel/git/kgene/linux-
+> samsung.git;a=commitdiff;h=7dcde8f18b0df4d332d6b359fd6270772a42f71f
+> 
+> Patches from DMC we decide to use the S5PC110 & S5PC210 as we're only
+> received the Spec C110 & C210.
+> Most of people including mobile division don't know the V210 & V310
+> SOC receptively.
+> 
+> We're already confusing with names, we always talk with C110 & C210
+> but works on V210 & V310 directory.
+> 
+> well question. What's the SOC is used at Galaxy S & wave phone?
+> 
+> I think S5PC110 is more well known than S5PV210.
+> 
+> http://lwn.net/Articles/399720/
+> The conclusion of the 2.6.36 merge window
+> Systems and processors: Income s.r.o. PXA270 single-board computers,
+> Wiliboard WBD-111 boards, and Samsung S5PC210-based systems.
+> 
+> Thank you,
+> Kyungmin Park
 
-Hm, I didn't, and Ben's been silent about the urgent sdhci-s3c patches
-too.  Ben, are you just dealing with a large backlog, or are you 
-interested in nominating someone else to take over sdhci-s3c?
+As I'm a maintainer of Samsung S5P SoCs, I would like to use second column
+in the subject line to indicate the ARCH_XXX name like following.
+'ARM: S5PV210: <patch subject>'
+As you know, it means the patch is mainly regarding ARCH_S5PV210
+(arch/arm/mach-s5pv210/).
 
-Thanks,
+It can be help to many people, including me that the title speak where it
+belong to.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+And I believe someone who can use git log to see the log and source, S5PC110
+is in the 'arch/arm/mach-s5pv210/'.
+
+If you want to display S5PC110 or S5PC210 in the subject, you can properly
+add it in the last column of the title.
+
+And Hmm...
+I wonder why posted this to LKML
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
