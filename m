@@ -1,131 +1,59 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 30 Sep 2010 11:07:13 +0200
-Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <1285834270-32766-1-git-send-email-charu@ti.com>
-References: <1285834270-32766-1-git-send-email-charu@ti.com>
-Message-ID: <4CA45341.3080300@ti.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 30 Sep 2010 18:16:17 +0900
+Subject: [PATCH 3/7] ARM: Samsung: Use the correct I2C2 interrupt
+In-Reply-To: <19620.20006.852861.438279@ipc1.ka-ro>
+References: <20100930044832.GA16905@july>
+	<19620.20006.852861.438279@ipc1.ka-ro>
+Message-ID: <AANLkTim2saP2wGxF1U3v-p=PRvqOD+TFJwQ772kt1N-F@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Charu,
+On Thu, Sep 30, 2010 at 5:45 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> Kyungmin Park writes:
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> Use the correct I2C2 interrupt.
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> ?arch/arm/plat-samsung/dev-i2c2.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-samsung/dev-i2c2.c b/arch/arm/plat-samsung/dev-i2c2.c
+>> index 07036de..ff4ba69 100644
+>> --- a/arch/arm/plat-samsung/dev-i2c2.c
+>> +++ b/arch/arm/plat-samsung/dev-i2c2.c
+>> @@ -32,8 +32,8 @@ static struct resource s3c_i2c_resource[] = {
+>> ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+>> ? ? ? },
+>> ? ? ? [1] = {
+>> - ? ? ? ? ? ? .start = IRQ_CAN0,
+>> - ? ? ? ? ? ? .end ? = IRQ_CAN0,
+>> + ? ? ? ? ? ? .start = IRQ_IIC2,
+>> + ? ? ? ? ? ? .end ? = IRQ_IIC2,
+>>
+> Is there any reason for using 'IIC' here to refer to 'I2C'?
 
-On 9/30/2010 10:11 AM, Varadarajan, Charulatha wrote:
-> With OMAP2PLUS watchdog implemented in hwmod fw way, the
-> module is reset during init.
+Historical reason previous s3c24xx series use this name. I don't want
+to break the s3c24xx series codes.
+Instead I use the I2C after S5P series. I2C3, I2C4 and so on.
 
-In that case hwmod fw just highlighted the real behavior that was hidden 
-so far by the X-loader.
+If all person who works on s3c24xx and s5p series agree that use the
+I2C. It can be used.
 
-You should as well add a link to the email thread with Kevin that raised 
-the issue.
-
-> After a watchdog timer module reset, the WDTs are enabled. The
-> default time for a system reset after a watchdog module reset
-> is ~10s as per the default value of the WDT registers. Hence
-> the system would be reset after 10s, if watchdog is not disabled
-> within 10s.
+Thank you,
+Kyungmin Park
 >
-> This patch fixes the above issue by disabling the watchdog timer
-> after reset during initialization of devices.
-
-I'm still wondering as well what is the expected behavior of the 
-watchdog in a real product. If it is started by default at boot time, 
-this is probably for a good reason (or maybe not...).
-So, disabling it all the time is maybe not the best solution.
-
-Nishanth (M),
-Do you have an idea on that topic?
-
 >
-> Signed-off-by: Charulatha V<charu@ti.com>
-> Reported-by: Kevin Hilman<khilman@deeprootsystems.com>
-> ---
-> This patch is dependent on the below patch series (wdt hwmod) and
-> is created on top of pm-core branch.
-> http://www.spinics.net/lists/linux-omap/msg37043.html
+> Lothar Wa?mann
+> --
+> ___________________________________________________________
 >
->   arch/arm/mach-omap2/devices.c |   44 +++++++++++++++++++++++++++++++++++++++++
->   1 files changed, 44 insertions(+), 0 deletions(-)
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 >
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 8e2f0aa..9f44fc6 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -916,11 +916,55 @@ static inline void omap_init_vout(void) {}
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
 >
->   /*-------------------------------------------------------------------------*/
->
-> +/*
-> + * WDT mdoule is reset during init which enables the watchdog.
-
-typo: module
-
-The real explanation is that you should not assume anything from the 
-boot loader at that time, so always stop the wdt.
-
-> + * Hence it is required to disable the watchdog after the WDT reset
-> + * during init. Otherwise the system would reboot as per the default
-> + * watchdog timer registers settings.
-> + */
-> +#define OMAP_WDT_WPS	(0x34)
-> +#define OMAP_WDT_SPR	(0x48)
-> +
-> +static int omap2_disable_wdt(struct omap_hwmod *oh, void *user)
-
-You should call it unused if the parameter is not used.
-
-> +{
-> +	void __iomem *base;
-> +
-> +	if (!oh)
-> +		pr_err("Could not look up wdtimer_hwmod\n");
-> +
-> +	base = oh->_mpu_rt_va;
-
-Paul added an hwmod API to get that va (something like *_get_mpu_rt_va).
-
-> +
-> +	/* Enable the clocks before accessing the WDT registers */
-> +	omap_hwmod_enable(oh);
-
-The enable can fail, so you should check the return value.
-
-> +
-> +	/* sequence required to disable watchdog */
-> +	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);	/* TIMER_MODE */
-> +	while (__raw_readl(base + OMAP_WDT_WPS)&  0x10)
-> +		cpu_relax();
-> +
-> +	__raw_writel(0x5555, base + OMAP_WDT_SPR);	/* TIMER_MODE */
-> +	while (__raw_readl(base + OMAP_WDT_WPS)&  0x10)
-> +		cpu_relax();
-> +
-> +	omap_hwmod_idle(oh);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init omap_disable_wdt(void)
-> +{
-> +	if (cpu_class_is_omap2())
-
-This code is already in mach-omap2/devices.c, so that test should be 
-useless.
-
-Regards,
-Benoit
-
-> +		omap_hwmod_for_each_by_class("wd_timer",
-> +						omap2_disable_wdt, NULL);
-> +	return;
-> +}
-> +
->   static int __init omap2_init_devices(void)
->   {
->   	/* please keep these calls, and their implementations above,
->   	 * in alphabetical order so they're easier to sort through.
->   	 */
-> +	omap_disable_wdt();
->   	omap_hsmmc_reset();
->   	omap_init_camera();
->   	omap_init_mbox();
