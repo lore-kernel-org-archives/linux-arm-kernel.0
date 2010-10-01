@@ -1,45 +1,70 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 1 Oct 2010 14:40:02 +0900
-Subject: [PATCH 3/3] ARM: S5PV210: Add voltage consumer of WM8994 to the
-	regulator framework
-In-Reply-To: <20101001053139.GE30949@sirena.org.uk>
-References: <4CA5623D.3000002@samsung.com>
-	<20101001053139.GE30949@sirena.org.uk>
-Message-ID: <AANLkTinRgTJdPowTEZX0nix2FR31A-8cVmBUf7n8zdE7@mail.gmail.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Fri, 1 Oct 2010 11:12:40 +0530
+Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
+	controller driver
+In-Reply-To: <20100906224050.GA8153@game.jcrosoft.org>
+References: <cover.1283161023.git.viresh.kumar@st.com>
+	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
+	<20100906224050.GA8153@game.jcrosoft.org>
+Message-ID: <4CA574D0.1020907@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 1, 2010 at 2:31 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Fri, Oct 01, 2010 at 01:23:25PM +0900, Chanwoo Choi wrote:
->
->> Additionally, I explain the constraints of the regulator of WM8994 codec.
->> All these consumer supply of WM8994 codec connected the regulator(VCC_1.8V)
->> on a circuit diagram. "VCC_1.8V" regulator is always enabled, because it is
->> used to many devices on Goni/Aquila board. This is required especially
->
-> It would be nicer to connect this to the regulator on the PMIC (I'm
-> assuming there is one), even if it is always enabled. ?That said, is the
-> PMIC on these boards supported by Linux yet?
+On 9/7/2010 4:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> diff --git a/arch/arm/mach-spear3xx/emi.c b/arch/arm/mach-spear3xx/emi.c
+>> > new file mode 100644
+>> > index 0000000..dd5cb8e
+>> > --- /dev/null
+>> > +++ b/arch/arm/mach-spear3xx/emi.c
+>> > @@ -0,0 +1,86 @@
+>> > +/*
+>> > + * arch/arm/mach-spear3xx/emi.c
+>> > + *
+>> > + * EMI (External Memory Interface) file
+>> > + *
+>> > + * Copyright (C) 2010 ST Microelectronics
+>> > + * Vipin Kumar<vipin.kumar@st.com>
+>> > + *
+>> > + * This file is licensed under the terms of the GNU General Public
+>> > + * License version 2. This program is licensed "as is" without any
+>> > + * warranty of any kind, whether express or implied.
+>> > + */
+>> > +
+>> > +#include <linux/clk.h>
+>> > +#include <linux/err.h>
+>> > +#include <linux/init.h>
+>> > +#include <linux/io.h>
+>> > +#include <mach/emi.h>
+>> > +
+>> > +int __init emi_init(struct platform_device *pdev, unsigned long base,
+>> > +             u32 bank, u32 width)
+>> > +{
+> how about request the memory region
+> 
+> and use platform device to register the bank ressource instead of define
+> 
+> it will make it more flexible
 
-FYI: now wm8994 codec is connected to I/O power directly. and there's
-no connection with PMIC.
-Maybe you mean the I/O power LDO and use it. but it's always on in
-case of s5pc110.
-and can't turn off the this LDO on max8998 except the sleep.
 
-Thank you,
-Kyungmin Park
->
->> when there are many devices physically attached to "VCC_1.8V" and some of
->> they did not "register" as consumers to "VCC_1.8V". "VCC_1.8V" might be
->> turned off by those who are registered while "unregistered" are still active
->
-> You can set the always_on flag in the regulator constraints to prevent
-> this happening - if that flag is set the supply will be kept active even
-> if all consumers are disabled.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Hello Jean,
+
+Sorry for replying late
+
+Since the physmap driver implementation is generic for all the CFI device 
+controllers, the driver expects only the actual flash base address in 
+resource. Offcourse, the controller needs to be initialized separately.
+
+Moreover, in most of the platforms where physmap driver is being used, the 
+controllers are initialized independently. i.e only the NOR flash base 
+addresses are passed as resource
+
+examples are 
+
+arch/arm/mach-at91/board-cap9adk.c
+arch/arm/mach-ep93xx/adssphere.c
+arch/arm/mach-ep93xx/micro9.c
+
+and many more
+
+Regards
+Vipin
