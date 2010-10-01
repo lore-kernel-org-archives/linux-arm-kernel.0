@@ -1,67 +1,111 @@
-From: ian@opensource.wolfsonmicro.com (Ian Lartey)
-Date: Fri, 01 Oct 2010 11:46:36 +0100
-Subject: [PATCH 2/2] Adding cs89x0, standard ethernet driver for iMX31
-	platform.
-In-Reply-To: <20100930182313.GT29811@pengutronix.de>
-References: <1285861655-6513-1-git-send-email-ian@opensource.wolfsonmicro.com>
-	<1285861655-6513-2-git-send-email-ian@opensource.wolfsonmicro.com>
-	<20100930182313.GT29811@pengutronix.de>
-Message-ID: <1285929996.1864.11438.camel@Tapajos>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Fri, 1 Oct 2010 16:22:40 +0530
+Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
+In-Reply-To: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
+References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4CA5BD78.9080808@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-09-30 at 20:23 +0200, Uwe Kleine-K?nig wrote:
-> On Thu, Sep 30, 2010 at 04:47:35PM +0100, Ian Lartey wrote:
-> > Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
-> > ---
-> >  arch/arm/configs/mx3_defconfig |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-> > index 161f907..b0b3409 100644
-> > --- a/arch/arm/configs/mx3_defconfig
-> > +++ b/arch/arm/configs/mx3_defconfig
-> > @@ -68,6 +68,8 @@ CONFIG_NET_ETHERNET=y
-> >  CONFIG_SMSC911X=y
-> >  CONFIG_DNET=y
-> >  CONFIG_FEC=y
-> > +CONFIG_CS89x0=y
-> > +CONFIG_CS89x0_NONISA_IRQ=y
-> >  # CONFIG_NETDEV_1000 is not set
-> >  # CONFIG_NETDEV_10000 is not set
-> >  # CONFIG_INPUT is not set
-> This change is bad for two reasons:
-> 
->  - I just tested a kernel with CONFIG_CS89x0=y on a Phytec Phycore
->    pcm043 using your updated defconfig and it barfs:
-> 
-> 	[.....]
 
-Ouch, I'll see if I can correct that. (Needs to be done before I can add
-the config file change). Uwe I don't have another i.MX3 (apart from the
-i.MV31ADS) would you be able to test further changes for me please to
-help catch this kind of thing ?
- 
-> 
->    (Did I already mention that this cs89x0 driver is ugly and needs a
->    general overhaul?)
-> 
+Hello David, Linus
 
-Yes, and I'm getting additional errors from the cs89x0 driver once it is
-up and running so I was going to start looking for help once my changes
-were in.... any volunteers ?
+> +#include <linux/mtd/nand_ecc.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <mtd/fsmc.h>
+> +#include <mtd/mtd-abi.h>
+> +
+> +static struct nand_ecclayout fsmc_ecc1_layout = {
+> +       .eccbytes = 24,
+> +       .eccpos = {2, 3, 4, 18, 19, 20, 34, 35, 36, 50, 51, 52,
+> +               66, 67, 68, 82, 83, 84, 98, 99, 100, 114, 115, 116},
+> +       .oobfree = {
+> +               {.offset = 8, .length = 8},
+> +               {.offset = 24, .length = 8},
+> +               {.offset = 40, .length = 8},
+> +               {.offset = 56, .length = 8},
+> +               {.offset = 72, .length = 8},
+> +               {.offset = 88, .length = 8},
+> +               {.offset = 104, .length = 8},
+> +               {.offset = 120, .length = 8}
+> +       }
+> +};
+> +
+> +static struct nand_ecclayout fsmc_ecc4_lp_layout = {
+> +       .eccbytes = 104,
+> +       .eccpos = {  2,   3,   4,   5,   6,   7,   8,
+> +               9,  10,  11,  12,  13,  14,
+> +               18,  19,  20,  21,  22,  23,  24,
+> +               25,  26,  27,  28,  29,  30,
+> +               34,  35,  36,  37,  38,  39,  40,
+> +               41,  42,  43,  44,  45,  46,
+> +               50,  51,  52,  53,  54,  55,  56,
+> +               57,  58,  59,  60,  61,  62,
+> +               66,  67,  68,  69,  70,  71,  72,
+> +               73,  74,  75,  76,  77,  78,
+> +               82,  83,  84,  85,  86,  87,  88,
+> +               89,  90,  91,  92,  93,  94,
+> +               98,  99, 100, 101, 102, 103, 104,
+> +               105, 106, 107, 108, 109, 110,
+> +               114, 115, 116, 117, 118, 119, 120,
+> +               121, 122, 123, 124, 125, 126
+> +       },
+> +       .oobfree = {
+> +               {.offset = 15, .length = 3},
+> +               {.offset = 31, .length = 3},
+> +               {.offset = 47, .length = 3},
+> +               {.offset = 63, .length = 3},
+> +               {.offset = 79, .length = 3},
+> +               {.offset = 95, .length = 3},
+> +               {.offset = 111, .length = 3},
+> +               {.offset = 127, .length = 1}
+> +       }
+> +};
+> +
 
->  - adding "CONFIG_CS89x0_NONISA_IRQ=y" is redundant as it is always on
->    for MACH_MX31ADS.
-> 
-> So I suggest to just add CONFIG_CS89x0=m
+I just noticed that the above array is based on an earlier patch which increased 
+the array size from 64 to 128. 
 
-Agreed.
- 
-> 
-> Best regards
-> Uwe
-> 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/024372.html
 
-Best Regards,
-             Ian.
+This patch itself was under the lense of reviewers for a long time. Actually, 
+increasing this array breaks mtd abi as pointed by Artem
+
+
+Quoting from his mail
+
+> The old interface should remain unchanged in that include/mtd/mtd-abi.h.
+> If an application using the old interface calls any of the ecc ioctls
+> for a nand chip with > 64 bytes ecc it should return an error.
+
+It will, because size of the structure is part of the ioctl number,
+even. See the corresponding ioctl macro definition.
+
+> I still think the eccpos field should be a pointer, so that it can
+> allocate as much space as is needed for the ecc. This also means that
+> the kernel doesn't need to be changed every time a new NAND chips
+> appears with a bigger ecc size.
+
+Sure, this is the whole point: go ahead and design the new ioctl, and
+then deprecate the old one. Just invest men/hours into that and we are
+all right :-)
+
+
+This means that the patch sent by linus can be added only after a new ioctl
+is defined and the old one deprecated
+
+> +#define __MTD_FSMC_H
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/types.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <asm/param.h>
+
+Linus, there is a checkpatch warining here :)
+
+Best Regards
+Vipin
