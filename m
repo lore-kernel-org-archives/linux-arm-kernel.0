@@ -1,253 +1,209 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:26:04 +0530
-Subject: [PATCH V2 44/69] SPEAr CPU freq: Adding support for CPU Freq framework
+Date: Fri,  1 Oct 2010 17:26:17 +0530
+Subject: [PATCH V2 57/69] SPEAr3xx: Make local structures static
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <0260f7ebc3d1dd80c3bb40faefc946e35f9436fd.1285933332.git.viresh.kumar@st.com>
+Message-ID: <a4419b75d9a8f793c745d89e1cd0ba5d23880bd1.1285933332.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Ryan Mallon <ryan@bluewatersys.com>
 
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+Several structures in arch/arm/mach-spear3xx are not marked static
+like they should be. Fix this.
+
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/Kconfig                |    1 +
- arch/arm/mach-spear13xx/clock.c |    1 +
- arch/arm/mach-spear3xx/clock.c  |    1 +
- arch/arm/mach-spear6xx/clock.c  |    1 +
- arch/arm/plat-spear/Makefile    |    2 +-
- arch/arm/plat-spear/cpufreq.c   |  159 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 164 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/plat-spear/cpufreq.c
+ arch/arm/mach-spear3xx/spear300.c |    6 +++---
+ arch/arm/mach-spear3xx/spear310.c |   16 ++++++++--------
+ arch/arm/mach-spear3xx/spear320.c |   12 ++++++------
+ arch/arm/mach-spear3xx/spear3xx.c |    2 --
+ 4 files changed, 17 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 158bf06..cdd0a2b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -821,6 +821,7 @@ config PLAT_SPEAR
- 	select COMMON_CLKDEV
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
-+	select ARCH_HAS_CPUFREQ
- 	help
- 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
- 
-diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index 4f320fa..79942a9 100644
---- a/arch/arm/mach-spear13xx/clock.c
-+++ b/arch/arm/mach-spear13xx/clock.c
-@@ -91,6 +91,7 @@ static struct pll_clk_config pll1_config = {
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	/* PCLK 24MHz */
-+	{.mode = 0, .m = 0x64, .n = 0x03, .p = 0x2}, /* 400 MHz */
- 	{.mode = 0, .m = 0x7D, .n = 0x03, .p = 0x2}, /* 500 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x03, .p = 0x2}, /* 664 MHz */
- 	{.mode = 0, .m = 0xC8, .n = 0x03, .p = 0x2}, /* 800 MHz */
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 4f049fe..64d9cdc 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
- 
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
-+	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 9885fe9..bbaf872 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -114,7 +114,6 @@ struct pmx_mode caml_lcd_mode = {
+ 	.value = 0x0F,
  };
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 99cc21d..f1429f5 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
  
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
-+	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
+-/* devices */
+ /* Pad multiplexing for FSMC 2 NAND devices */
+ static struct pmx_mux_reg pmx_fsmc_2_mux[] = {
+ 	{
+@@ -700,7 +699,7 @@ struct platform_device sdhci_device = {
  };
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 1c8ee4a..c25e5b8 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -6,7 +6,7 @@
- obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
  
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
--
-+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
- obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
-diff --git a/arch/arm/plat-spear/cpufreq.c b/arch/arm/plat-spear/cpufreq.c
-new file mode 100644
-index 0000000..9384d65
---- /dev/null
-+++ b/arch/arm/plat-spear/cpufreq.c
-@@ -0,0 +1,159 @@
-+/*
-+ * arch/arm/plat-spear/cpufreq.c
-+ *
-+ * CPU Frequency Scaling for SPEAr platform
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri<deepak.sikri@st.com>
-+ *
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_IT_PERS_S,
+ 		.enb_mask = IT_PERS_S_IRQ_MASK,
+@@ -740,7 +739,8 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras1 = {
 +
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/cpufreq.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <asm/system.h>
-+#include <mach/hardware.h>
-+
-+#define CPU_CLK		"cpu_clk"
-+
-+#ifdef CONFIG_ARCH_SPEAR13XX
-+#define MIN_CPU_FREQ	200000
-+#define MAX_CPU_FREQ	500000
-+
-+static u32 spear_cpu_freq[] = {
-+	200000,	/* 200 MHZ */
-+	250000,	/* 250 MHZ */
-+	332000,	/* 332 MHZ */
-+	400000,	/* 400 MHZ */
-+	500000,	/* 500 MHZ */
-+};
-+#elif defined(CONFIG_ARCH_SPEAR6XX) || defined(CONFIG_ARCH_SPEAR3XX)
-+#define MIN_CPU_FREQ	166000
-+#define MAX_CPU_FREQ	332000
-+
-+static u32 spear_cpu_freq[] = {
-+	166000,	/* 166 MHZ */
-+	266000,	/* 266 MHZ */
-+	332000,	/* 333 MHZ */
-+};
-+#endif
-+
-+static struct
-+	cpufreq_frequency_table spear_freq_tbl[ARRAY_SIZE(spear_cpu_freq) + 1];
-+static struct clk *cpu_clk;
-+
-+int spear_cpufreq_verify(struct cpufreq_policy *policy)
-+{
-+	return cpufreq_frequency_table_verify(policy, spear_freq_tbl);
-+}
-+
-+unsigned int spear_cpufreq_get(unsigned int cpu)
-+{
-+	unsigned long rate;
-+
-+	if (cpu)
-+		return 0;
-+
-+	rate = clk_get_rate(cpu_clk) / 1000;
-+	return rate;
-+}
-+
-+static int spear_cpufreq_target(struct cpufreq_policy *policy,
-+		unsigned int target_freq, unsigned int relation)
-+{
-+	struct cpufreq_freqs freqs;
-+	int ret = 0;
-+	int index;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
-+				target_freq, relation, &index))
-+		return -EINVAL;
-+
-+	freqs.old = spear_cpufreq_get(0);
-+	freqs.new = spear_cpu_freq[index];
-+	freqs.cpu = policy->cpu;
-+
-+	if (freqs.old == target_freq)
-+		return 0;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
-+	return ret;
-+}
-+
-+static int spear_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int result;
-+	int i = 0;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	cpu_clk = clk_get(NULL, CPU_CLK);
-+	if (IS_ERR(cpu_clk))
-+		return PTR_ERR(cpu_clk);
-+
-+	policy->cpuinfo.min_freq = MIN_CPU_FREQ;
-+	policy->cpuinfo.max_freq = MAX_CPU_FREQ;
-+	policy->cur = policy->min = policy->max = spear_cpufreq_get(0);
-+
-+	for (i = 0; i < ARRAY_SIZE(spear_cpu_freq); i++) {
-+		spear_freq_tbl[i].index = i;
-+		spear_freq_tbl[i].frequency = spear_cpu_freq[i];
-+	}
-+
-+	spear_freq_tbl[i].index = i;
-+	spear_freq_tbl[i].frequency = CPUFREQ_TABLE_END;
-+	result = cpufreq_frequency_table_cpuinfo(policy, spear_freq_tbl);
-+	if (!result)
-+		cpufreq_frequency_table_get_attr(spear_freq_tbl,
-+				policy->cpu);
-+
-+	policy->cpuinfo.transition_latency = 300*1000; /*250 uS*/
-+
-+	return 0;
-+}
-+
-+static int spear_cpufreq_exit(struct cpufreq_policy *policy)
-+{
-+	clk_put(cpu_clk);
-+	return 0;
-+}
-+
-+static struct freq_attr *spear_cpufreq_attr[] = {
-+	 &cpufreq_freq_attr_scaling_available_freqs,
-+	 NULL,
-+};
-+
-+static struct cpufreq_driver spear_driver = {
-+	.flags		= CPUFREQ_STICKY,
-+	.verify		= spear_cpufreq_verify,
-+	.target		= spear_cpufreq_target,
-+	.get		= spear_cpufreq_get,
-+	.init		= spear_cpufreq_init,
-+	.exit		= spear_cpufreq_exit,
-+	.name		= "spear_cpufreq",
-+	.attr		= spear_cpufreq_attr,
-+};
-+
-+static int __init spear_cpufreq_register(void)
-+{
-+	return cpufreq_register_driver(&spear_driver);
-+}
-+
-+arch_initcall(spear_cpufreq_register);
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index be2f9de..7d4ff0e 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -363,7 +363,7 @@ struct platform_device plgpio_device = {
+ 
+ 
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_SMII0,
+ 		.status_mask = SMII0_IRQ_MASK,
+@@ -391,7 +391,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+@@ -403,7 +403,7 @@ struct spear_shirq shirq_ras1 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras2_config[] = {
++static struct shirq_dev_config shirq_ras2_config[] = {
+ 	{
+ 		.virq = VIRQ_UART1,
+ 		.status_mask = UART1_IRQ_MASK,
+@@ -422,7 +422,7 @@ struct shirq_dev_config shirq_ras2_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras2 = {
++static struct spear_shirq shirq_ras2 = {
+ 	.irq = IRQ_GEN_RAS_2,
+ 	.dev_config = shirq_ras2_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras2_config),
+@@ -434,14 +434,14 @@ struct spear_shirq shirq_ras2 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras3_config[] = {
++static struct shirq_dev_config shirq_ras3_config[] = {
+ 	{
+ 		.virq = VIRQ_EMI,
+ 		.status_mask = EMI_IRQ_MASK,
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras3 = {
++static struct spear_shirq shirq_ras3 = {
+ 	.irq = IRQ_GEN_RAS_3,
+ 	.dev_config = shirq_ras3_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
+@@ -453,7 +453,7 @@ struct spear_shirq shirq_ras3 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_intrcomm_ras_config[] = {
++static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	{
+ 		.virq = VIRQ_TDM_HDLC,
+ 		.status_mask = TDM_HDLC_IRQ_MASK,
+@@ -466,7 +466,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_intrcomm_ras = {
++static struct spear_shirq shirq_intrcomm_ras = {
+ 	.irq = IRQ_INTRCOMM_RAS_ARM,
+ 	.dev_config = shirq_intrcomm_ras_config,
+ 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index bd308b8..948ca8e 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -835,7 +835,7 @@ struct platform_device sdhci_device = {
+ };
+ 
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_EMI,
+ 		.status_mask = EMI_IRQ_MASK,
+@@ -851,7 +851,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+@@ -864,7 +864,7 @@ struct spear_shirq shirq_ras1 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras3_config[] = {
++static struct shirq_dev_config shirq_ras3_config[] = {
+ 	{
+ 		.virq = VIRQ_PLGPIO,
+ 		.enb_mask = GPIO_IRQ_MASK,
+@@ -883,7 +883,7 @@ struct shirq_dev_config shirq_ras3_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras3 = {
++static struct spear_shirq shirq_ras3 = {
+ 	.irq = IRQ_GEN_RAS_3,
+ 	.dev_config = shirq_ras3_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
+@@ -897,7 +897,7 @@ struct spear_shirq shirq_ras3 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_intrcomm_ras_config[] = {
++static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	{
+ 		.virq = VIRQ_CANU,
+ 		.status_mask = CAN_U_IRQ_MASK,
+@@ -945,7 +945,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_intrcomm_ras = {
++static struct spear_shirq shirq_intrcomm_ras = {
+ 	.irq = IRQ_INTRCOMM_RAS_ARM,
+ 	.dev_config = shirq_intrcomm_ras_config,
+ 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index ec1340c..544072d 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -292,7 +292,6 @@ void __init spear3xx_map_io(void)
+ }
+ 
+ /* pad multiplexing support */
+-/* devices */
+ 
+ /* Pad multiplexing for firda device */
+ static struct pmx_mux_reg pmx_firda_mux[] = {
+@@ -625,7 +624,6 @@ struct pmx_dev pmx_timer_1_2 = {
+ };
+ 
+ #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
+-/* plgpios devices */
+ /* Pad multiplexing for plgpio_0_1 devices */
+ static struct pmx_mux_reg pmx_plgpio_0_1_mux[] = {
+ 	{
 -- 
 1.7.2.2
