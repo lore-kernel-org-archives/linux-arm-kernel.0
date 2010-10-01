@@ -1,30 +1,22 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 1 Oct 2010 02:20:38 +0200
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <20100909094120.GB1988@rakim.wolfsonmicro.main>
-References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
-	<201009091027.18176.marek.vasut@gmail.com>
-	<20100909094120.GB1988@rakim.wolfsonmicro.main>
-Message-ID: <201010010220.38321.marek.vasut@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 1 Oct 2010 04:39:21 +0200
+Subject: [PATCH 1/3] ARM: move timer-sp.c from versatile to common
+In-Reply-To: <1285886952-30888-1-git-send-email-robherring2@gmail.com>
+References: <1285886952-30888-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20101001023921.GB25320@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 9. z??? 2010 11:41:20 Mark Brown napsal(a):
-> On Thu, Sep 09, 2010 at 10:27:17AM +0200, Marek Vasut wrote:
-> > Dne ?t 7. z??? 2010 14:53:35 Mark Brown napsal(a):
-> > > From a regulator API usage point of view a separate implementation of
-> > > the same thing was nacked - there are regulator API facilties for
-> > > hiding missing regulators from drivers when needed to get systems
-> > > going, unless the device genuinely can cope without supplies it should
-> > > be relying on those.
-> > 
-> > Maybe these platforms should have been fixed prior to applying the patch
-> > adding regulator goo into ads7846 driver then. What's the way to go now
-> > then ?
+On 17:49 Thu 30 Sep     , Rob Herring wrote:
+> From: Rob Herring <rob.herring@smooth-stone.com>
 > 
-> Fix the platforms and use the dummy regulators to keep them going until
-> that happens.  It's trivial to do the hookup in the platforms.
+> The timer-sp h/w used on versatile platforms can also be used for other
+> platforms, so move it to a common location.
+> 
+> Rename timer names for clocksource and clockevent to generic name.
+> Which timer instance is which is platform dependent.
+> 
+How about move it to drivers/clocksource ?
 
-Igor, any update on this?
-
-Thanks!
+Best Regards,
+J.
