@@ -1,9 +1,9 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri,  1 Oct 2010 14:29:59 -0700
-Subject: [PATCH 35/47] davinci: cleanup mdio arch code and switch to phy_id
+Date: Fri,  1 Oct 2010 14:30:00 -0700
+Subject: [PATCH 36/47] omap: cleanup unused davinci mdio arch code
 In-Reply-To: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
 References: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285968611-26890-36-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1285968611-26890-37-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,325 +12,42 @@ From: Cyril Chemparathy <cyril@ti.com>
 This patch removes davinci architecture code that has now been rendered
 useless by the previous patches in the MDIO separation series.
 
-In addition, the earlier phy_mask definitions have been replaced with
-corresponding phy_id definitions.
-
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-Tested-by: Caglar Akyuz <caglarakyuz@gmail.com>
+Acked-by: David S. Miller <davem@davemloft.net>
+Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c     |    7 ++-----
- arch/arm/mach-davinci/board-da850-evm.c     |    7 ++-----
- arch/arm/mach-davinci/board-dm365-evm.c     |    7 ++-----
- arch/arm/mach-davinci/board-dm644x-evm.c    |    8 ++------
- arch/arm/mach-davinci/board-dm646x-evm.c    |    7 ++-----
- arch/arm/mach-davinci/board-mityomapl138.c  |    8 ++------
- arch/arm/mach-davinci/board-neuros-osd2.c   |    7 ++-----
- arch/arm/mach-davinci/board-sffsdr.c        |    7 ++-----
- arch/arm/mach-davinci/devices-da8xx.c       |    2 --
- arch/arm/mach-davinci/dm365.c               |    1 -
- arch/arm/mach-davinci/dm644x.c              |    1 -
- arch/arm/mach-davinci/dm646x.c              |    1 -
- arch/arm/mach-davinci/include/mach/dm365.h  |    1 -
- arch/arm/mach-davinci/include/mach/dm644x.h |    1 -
- arch/arm/mach-davinci/include/mach/dm646x.h |    1 -
- 15 files changed, 16 insertions(+), 50 deletions(-)
+ arch/arm/mach-omap2/board-am3517evm.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index ef1ab0b..1bb89d3 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -31,9 +31,7 @@
- #include <mach/usb.h>
- #include <mach/aemif.h>
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index 5dd1b73..5225df6 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -39,7 +39,6 @@
  
--#define DA830_EVM_PHY_MASK		0x0
--#define DA830_EVM_MDIO_FREQUENCY	2200000	/* PHY bus frequency */
--
-+#define DA830_EVM_PHY_ID		""
- /*
-  * USB1 VBUS is controlled by GPIO1[15], over-current is reported on GPIO2[4].
-  */
-@@ -558,9 +556,8 @@ static __init void da830_evm_init(void)
+ #include "mux.h"
  
- 	da830_evm_usb_init();
+-#define AM35XX_EVM_PHY_MASK		(0xF)
+ #define AM35XX_EVM_MDIO_FREQUENCY	(1000000)
  
--	soc_info->emac_pdata->phy_mask = DA830_EVM_PHY_MASK;
--	soc_info->emac_pdata->mdio_max_freq = DA830_EVM_MDIO_FREQUENCY;
- 	soc_info->emac_pdata->rmii_en = 1;
-+	soc_info->emac_pdata->phy_id = DA830_EVM_PHY_ID;
- 
- 	ret = davinci_cfg_reg_list(da830_cpgmac_pins);
- 	if (ret)
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index ac2297c..5e435b0 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -38,9 +38,7 @@
- #include <mach/mux.h>
- #include <mach/aemif.h>
- 
--#define DA850_EVM_PHY_MASK		0x1
--#define DA850_EVM_MDIO_FREQUENCY	2200000 /* PHY bus frequency */
--
-+#define DA850_EVM_PHY_ID		"0:00"
- #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
- #define DA850_LCD_BL_PIN		GPIO_TO_PIN(2, 15)
- 
-@@ -678,8 +676,7 @@ static int __init da850_evm_config_emac(void)
- 	/* Enable/Disable MII MDIO clock */
- 	gpio_direction_output(DA850_MII_MDIO_CLKEN_PIN, rmii_en);
- 
--	soc_info->emac_pdata->phy_mask = DA850_EVM_PHY_MASK;
--	soc_info->emac_pdata->mdio_max_freq = DA850_EVM_MDIO_FREQUENCY;
-+	soc_info->emac_pdata->phy_id = DA850_EVM_PHY_ID;
- 
- 	ret = da8xx_register_emac();
- 	if (ret)
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index bdea2da..a06b84c 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -54,9 +54,7 @@ static inline int have_tvp7002(void)
- 	return 0;
- }
- 
--#define DM365_EVM_PHY_MASK		(0x2)
--#define DM365_EVM_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
--
-+#define DM365_EVM_PHY_ID		"0:01"
- /*
-  * A MAX-II CPLD is used for various board control functions.
-  */
-@@ -535,8 +533,7 @@ fail:
- 
- 		/* ... and ENET ... */
- 		dm365evm_emac_configure();
--		soc_info->emac_pdata->phy_mask = DM365_EVM_PHY_MASK;
--		soc_info->emac_pdata->mdio_max_freq = DM365_EVM_MDIO_FREQUENCY;
-+		soc_info->emac_pdata->phy_id = DM365_EVM_PHY_ID;
- 		resets &= ~BIT(3);
- 
- 		/* ... and AIC33 */
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 65bb940..44a2f0a 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -39,9 +39,7 @@
- #include <mach/usb.h>
- #include <mach/aemif.h>
- 
--#define DM644X_EVM_PHY_MASK		(0x2)
--#define DM644X_EVM_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
--
-+#define DM644X_EVM_PHY_ID		"0:01"
- #define LXT971_PHY_ID	(0x001378e2)
- #define LXT971_PHY_MASK	(0xfffffff0)
- 
-@@ -707,9 +705,7 @@ static __init void davinci_evm_init(void)
- 	davinci_serial_init(&uart_config);
- 	dm644x_init_asp(&dm644x_evm_snd_data);
- 
--	soc_info->emac_pdata->phy_mask = DM644X_EVM_PHY_MASK;
--	soc_info->emac_pdata->mdio_max_freq = DM644X_EVM_MDIO_FREQUENCY;
--
-+	soc_info->emac_pdata->phy_id = DM644X_EVM_PHY_ID;
- 	/* Register the fixup for PHY on DaVinci */
- 	phy_register_fixup_for_uid(LXT971_PHY_ID, LXT971_PHY_MASK,
- 					davinci_phy_fixup);
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 5a29955..67669bb 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -729,9 +729,7 @@ static struct davinci_uart_config uart_config __initdata = {
- 	.enabled_uarts = (1 << 0),
+ static struct mdio_platform_data am3517_evm_mdio_pdata = {
+@@ -64,8 +63,6 @@ static struct platform_device am3517_mdio_device = {
  };
  
--#define DM646X_EVM_PHY_MASK		(0x2)
--#define DM646X_EVM_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
--
-+#define DM646X_EVM_PHY_ID		"0:01"
- /*
-  * The following EDMA channels/slots are not being used by drivers (for
-  * example: Timer, GPIO, UART events etc) on dm646x, hence they are being
-@@ -784,8 +782,7 @@ static __init void evm_init(void)
- 	if (HAS_ATA)
- 		davinci_init_ide();
- 
--	soc_info->emac_pdata->phy_mask = DM646X_EVM_PHY_MASK;
--	soc_info->emac_pdata->mdio_max_freq = DM646X_EVM_MDIO_FREQUENCY;
-+	soc_info->emac_pdata->phy_id = DM646X_EVM_PHY_ID;
- }
- 
- #define DM646X_EVM_REF_FREQ		27000000
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 84d5aff..6f12a18 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -24,9 +24,7 @@
- #include <mach/nand.h>
- #include <mach/mux.h>
- 
--#define MITYOMAPL138_PHY_MASK		0x08 /* hardcoded for now */
--#define MITYOMAPL138_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
--
-+#define MITYOMAPL138_PHY_ID		"0:03"
- static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
- 	.bus_freq	= 100,	/* kHz */
- 	.bus_delay	= 0,	/* usec */
-@@ -273,9 +271,7 @@ static void __init mityomapl138_config_emac(void)
- 	/* configure the CFGCHIP3 register for RMII or MII */
- 	__raw_writel(val, cfg_chip3_base);
- 
--	soc_info->emac_pdata->phy_mask = MITYOMAPL138_PHY_MASK;
--	pr_debug("setting phy_mask to %x\n", soc_info->emac_pdata->phy_mask);
--	soc_info->emac_pdata->mdio_max_freq = MITYOMAPL138_MDIO_FREQUENCY;
-+	soc_info->emac_pdata->phy_id = MITYOMAPL138_PHY_ID;
- 
- 	ret = da8xx_register_emac();
- 	if (ret)
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index 4c30e92..04a8d16 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -39,9 +39,7 @@
- #include <mach/mmc.h>
- #include <mach/usb.h>
- 
--#define NEUROS_OSD2_PHY_MASK		0x2
--#define NEUROS_OSD2_MDIO_FREQUENCY	2200000 /* PHY bus frequency */
--
-+#define NEUROS_OSD2_PHY_ID		"0:01"
- #define LXT971_PHY_ID			0x001378e2
- #define LXT971_PHY_MASK			0xfffffff0
- 
-@@ -252,8 +250,7 @@ static __init void davinci_ntosd2_init(void)
- 	davinci_serial_init(&uart_config);
- 	dm644x_init_asp(&dm644x_ntosd2_snd_data);
- 
--	soc_info->emac_pdata->phy_mask = NEUROS_OSD2_PHY_MASK;
--	soc_info->emac_pdata->mdio_max_freq = NEUROS_OSD2_MDIO_FREQUENCY;
-+	soc_info->emac_pdata->phy_id = NEUROS_OSD2_PHY_ID;
- 
- 	davinci_setup_usb(1000, 8);
- 	/*
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index 23e664a..ab4292d 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -42,9 +42,7 @@
- #include <mach/mux.h>
- #include <mach/usb.h>
- 
--#define SFFSDR_PHY_MASK		(0x2)
--#define SFFSDR_MDIO_FREQUENCY	(2200000) /* PHY bus frequency */
--
-+#define SFFSDR_PHY_ID		"0:01"
- static struct mtd_partition davinci_sffsdr_nandflash_partition[] = {
- 	/* U-Boot Environment: Block 0
- 	 * UBL:                Block 1
-@@ -143,8 +141,7 @@ static __init void davinci_sffsdr_init(void)
- 			     ARRAY_SIZE(davinci_sffsdr_devices));
- 	sffsdr_init_i2c();
- 	davinci_serial_init(&uart_config);
--	soc_info->emac_pdata->phy_mask = SFFSDR_PHY_MASK;
--	soc_info->emac_pdata->mdio_max_freq = SFFSDR_MDIO_FREQUENCY;
-+	soc_info->emac_pdata->phy_id = SFFSDR_PHY_ID;
- 	davinci_setup_usb(0, 0); /* We support only peripheral mode. */
- 
- 	/* mux VLYNQ pins */
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 9039221..9eec630 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -42,7 +42,6 @@
- #define DA8XX_EMAC_CTRL_REG_OFFSET	0x3000
- #define DA8XX_EMAC_MOD_REG_OFFSET	0x2000
- #define DA8XX_EMAC_RAM_OFFSET		0x0000
--#define DA8XX_MDIO_REG_OFFSET		0x4000
- #define DA8XX_EMAC_CTRL_RAM_SIZE	SZ_8K
- 
- void __iomem *da8xx_syscfg0_base;
-@@ -381,7 +380,6 @@ struct emac_platform_data da8xx_emac_pdata = {
- 	.ctrl_reg_offset	= DA8XX_EMAC_CTRL_REG_OFFSET,
- 	.ctrl_mod_reg_offset	= DA8XX_EMAC_MOD_REG_OFFSET,
- 	.ctrl_ram_offset	= DA8XX_EMAC_RAM_OFFSET,
--	.mdio_reg_offset	= DA8XX_MDIO_REG_OFFSET,
- 	.ctrl_ram_size		= DA8XX_EMAC_CTRL_RAM_SIZE,
- 	.version		= EMAC_VERSION_2,
+ static struct emac_platform_data am3517_evm_emac_pdata = {
+-	.phy_mask	= AM35XX_EVM_PHY_MASK,
+-	.mdio_max_freq	= AM35XX_EVM_MDIO_FREQUENCY,
+ 	.rmii_en	= 1,
  };
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 71f0f9d..240f392 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -691,7 +691,6 @@ static struct emac_platform_data dm365_emac_pdata = {
- 	.ctrl_reg_offset	= DM365_EMAC_CNTRL_OFFSET,
- 	.ctrl_mod_reg_offset	= DM365_EMAC_CNTRL_MOD_OFFSET,
- 	.ctrl_ram_offset	= DM365_EMAC_CNTRL_RAM_OFFSET,
--	.mdio_reg_offset	= DM365_EMAC_MDIO_OFFSET,
- 	.ctrl_ram_size		= DM365_EMAC_CNTRL_RAM_SIZE,
- 	.version		= EMAC_VERSION_2,
- };
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index c103b2c..41b7a95 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -322,7 +322,6 @@ static struct emac_platform_data dm644x_emac_pdata = {
- 	.ctrl_reg_offset	= DM644X_EMAC_CNTRL_OFFSET,
- 	.ctrl_mod_reg_offset	= DM644X_EMAC_CNTRL_MOD_OFFSET,
- 	.ctrl_ram_offset	= DM644X_EMAC_CNTRL_RAM_OFFSET,
--	.mdio_reg_offset	= DM644X_EMAC_MDIO_OFFSET,
- 	.ctrl_ram_size		= DM644X_EMAC_CNTRL_RAM_SIZE,
- 	.version		= EMAC_VERSION_1,
- };
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 8da886b..08db90f 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -358,7 +358,6 @@ static struct emac_platform_data dm646x_emac_pdata = {
- 	.ctrl_reg_offset	= DM646X_EMAC_CNTRL_OFFSET,
- 	.ctrl_mod_reg_offset	= DM646X_EMAC_CNTRL_MOD_OFFSET,
- 	.ctrl_ram_offset	= DM646X_EMAC_CNTRL_RAM_OFFSET,
--	.mdio_reg_offset	= DM646X_EMAC_MDIO_OFFSET,
- 	.ctrl_ram_size		= DM646X_EMAC_CNTRL_RAM_SIZE,
- 	.version		= EMAC_VERSION_2,
- };
-diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
-index dbb5052..2563bf4 100644
---- a/arch/arm/mach-davinci/include/mach/dm365.h
-+++ b/arch/arm/mach-davinci/include/mach/dm365.h
-@@ -25,7 +25,6 @@
- #define DM365_EMAC_CNTRL_OFFSET		(0x0000)
- #define DM365_EMAC_CNTRL_MOD_OFFSET	(0x3000)
- #define DM365_EMAC_CNTRL_RAM_OFFSET	(0x1000)
--#define DM365_EMAC_MDIO_OFFSET		(0x4000)
- #define DM365_EMAC_CNTRL_RAM_SIZE	(0x2000)
  
- /* Base of key scan register bank */
-diff --git a/arch/arm/mach-davinci/include/mach/dm644x.h b/arch/arm/mach-davinci/include/mach/dm644x.h
-index 5159117..5a1b26d 100644
---- a/arch/arm/mach-davinci/include/mach/dm644x.h
-+++ b/arch/arm/mach-davinci/include/mach/dm644x.h
-@@ -32,7 +32,6 @@
- #define DM644X_EMAC_CNTRL_OFFSET	(0x0000)
- #define DM644X_EMAC_CNTRL_MOD_OFFSET	(0x1000)
- #define DM644X_EMAC_CNTRL_RAM_OFFSET	(0x2000)
--#define DM644X_EMAC_MDIO_OFFSET		(0x4000)
- #define DM644X_EMAC_CNTRL_RAM_SIZE	(0x2000)
- 
- #define DM644X_ASYNC_EMIF_CONTROL_BASE	0x01E00000
-diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
-index 1c4dca9..7a27f3f 100644
---- a/arch/arm/mach-davinci/include/mach/dm646x.h
-+++ b/arch/arm/mach-davinci/include/mach/dm646x.h
-@@ -23,7 +23,6 @@
- #define DM646X_EMAC_CNTRL_OFFSET	(0x0000)
- #define DM646X_EMAC_CNTRL_MOD_OFFSET	(0x1000)
- #define DM646X_EMAC_CNTRL_RAM_OFFSET	(0x2000)
--#define DM646X_EMAC_MDIO_OFFSET		(0x4000)
- #define DM646X_EMAC_CNTRL_RAM_SIZE	(0x2000)
- 
- #define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
+@@ -135,7 +132,6 @@ void am3517_evm_ethernet_init(struct emac_platform_data *pdata)
+ 	pdata->ctrl_reg_offset		= AM35XX_EMAC_CNTRL_OFFSET;
+ 	pdata->ctrl_mod_reg_offset	= AM35XX_EMAC_CNTRL_MOD_OFFSET;
+ 	pdata->ctrl_ram_offset		= AM35XX_EMAC_CNTRL_RAM_OFFSET;
+-	pdata->mdio_reg_offset		= AM35XX_EMAC_MDIO_OFFSET;
+ 	pdata->ctrl_ram_size		= AM35XX_EMAC_CNTRL_RAM_SIZE;
+ 	pdata->version			= EMAC_VERSION_2;
+ 	pdata->hw_ram_addr		= AM35XX_EMAC_HW_RAM_ADDR;
 -- 
 1.7.2.1
