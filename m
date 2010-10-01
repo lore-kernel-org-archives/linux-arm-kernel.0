@@ -1,52 +1,49 @@
-From: arun.murthy@stericsson.com (Arun MURTHY)
-Date: Fri, 1 Oct 2010 10:46:15 +0200
-Subject: [PATCH 1/7] pwm: Add pwm core driver
-In-Reply-To: <AANLkTimPgPY9rX_MYZTv0PpRQgfWGoSeSE9WWy_ami-V@mail.gmail.com>
-References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
-	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
-	<4CA1AD2B.8000905@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FB6B@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA1BC16.3020702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FC60@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA25841.4090702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC8B7E4@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTingb8ox5h5rN1YrxONibfrWLicoiS6yqKf_v5bJ@mail.gmail.com>
-	<F45880696056844FA6A73F415B568C69532DCF32BC@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTikTo42Q5-yMEwyQH4mt=qLjaKrtJK3ydZNFyqai@mail.gmail.com>
-	<F45880696056844FA6A73F415B568C69532DCF33BB@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTimPgPY9rX_MYZTv0PpRQgfWGoSeSE9WWy_ami-V@mail.gmail.com>
-Message-ID: <F45880696056844FA6A73F415B568C69532DCF34AE@EXDCVYMBSTM006.EQ1STM.local>
+From: ibr@radix50.net (Baurzhan Ismagulov)
+Date: Fri, 1 Oct 2010 10:49:48 +0200
+Subject: USB Mass Storage write problem
+In-Reply-To: <20101001160035.7c67e481@morgan>
+References: <20101001160035.7c67e481@morgan>
+Message-ID: <20101001084948.GC5214@radix50.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Oct 1, 2010 at 4:25 PM, Arun MURTHY
-> <arun.murthy@stericsson.com> wrote:
-> > You can have a look at the pwm_config_nosleep(),pwm_set_polarity(),
-> > pwm_synchronize(),pwm_unsynchronize(), pwm_set_handler() etc.
-> > These are not being used by the exsting pwm drivers except Atmel pwm.
-> How would your 'simple' driver handle Atmel then ?
-> What if future's SoCs start providing those 'advance' features like
-> Atmel's ?
+On Fri, Oct 01, 2010 at 04:00:35PM +0800, Morgan Howe wrote:
+> During the test process nothing will ever report failure, however,
+> after the test completes, doing an MD5 check of the files will show
+> that some files were not written properly.  The file sizes are all
+> correct, but checking the contents we can see that in the bad files, at
+> some arbitrary point in the file it will stop writing the actual data
+> and the rest of the file will just be zero-filled.  The subsequent files
+> after the bad one will be perfectly fine for a while (usually >1GB
+> worth of files) and then randomly another file will get corrupted in
+> this manner.  Using 2 16GB SD cards we usually see around 2-6 bad files
+> for a full test run (until disk full).  We have tested this in both the
+> 2.6.22.6 kernel and 2.6.35.
 > 
-The pwm core driver is the intersection of all pwm drivers and not union
-of all pwm driver. I refer this as simple pwm core driver / framework.
-Atmel pwm is of a separate classification.
-It includes GPIO also. Though, Atmel can use the pwm core driver framework
-for functionalities like pwm_enable, pwm_disable, pwm_config, etc and remaining
-functionalities specific to Atmel will be handled in Atlmel pwm driver and
-will not be exposed to the entire kernel.
-Its that the present day pwm device that has been made easy though, by providing
-the same functionality.
+> Has anyone experienced anything like this or have some idea where to
+> look?
 
-> > I mean not the functions but the functionality.
-> > PWM is a simple device and most of its clients are controlling
-> intensity
-> > of backlight, leds, vibrator etc.
-> > I don't think these complex functionality are required.
-> oh dear !
-Here I mean why should all those function be exposed to the entire kernel,
-as most of the pwm devices do not use them.
+I had a somewhat similar problem which turned out to be floating DMA
+control lines of the USB controller, which resulted in incorrect reads
+from and writes to the flash on the CPU bus.
 
-Thanks and Regards,
-Arun R Murthy
-------------
+In your case, I'd disable all drivers that are not used in the test case
+and repeat the test.
+
+The next step could be tracing the lowest-level writing routine in the
+kernel in order to see whether it is called at all, gets the right data
+(e.g., you could generate a file that has the same checksum for every
+block written, etc.) and correctly handles status information from the
+hardware.
+
+If this is also doesn't reveal the problem, logic analyzer could help to
+see what happens in the hardware and to compare good and bad writes.
+
+That said, such problems are often hard to find systematically.
+Sometimes testing different configurations, hardware, etc. helps better;
+for example, do you have a configuration that passes your test?
+
+With kind regards,
+-- 
+Baurzhan Ismagulov
+http://www.kz-easy.com/
