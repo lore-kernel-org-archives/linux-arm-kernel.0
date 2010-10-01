@@ -1,165 +1,35 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Fri, 1 Oct 2010 15:51:19 -0500
-Subject: [PATCH] ARM: imx: Add iram allocator functions
-Message-ID: <1285966279-27719-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri,  1 Oct 2010 14:01:18 -0700
+Subject: [GIT PULL] OMAP: couple more PM fixes for 2.6.37
+Message-ID: <1285966880-26448-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Tony,
 
-Add iram allocation functions using GENERIC_ALLOCATOR. The
-allocation size is 4KB multiples to guarantee alignment. The
-idea for these functions is for i.MX platforms to use them
-to dynamically allocate IRAM usage.
+Here are a couple more PM related fixes for 2.6.37.  The one from Lo?c
+fixes one of the compile errors that's been reported a couple times
+now.
 
-Applies on 2.6.36-rc6
+This branch is based on my pm-next branch which is already pulled into
+your omap-for-linus branch, so should merge smoothly
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/plat-mxc/Kconfig                   |    5 ++
- arch/arm/plat-mxc/Makefile                  |    1 +
- arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
- arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
- 4 files changed, 103 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
- create mode 100644 arch/arm/plat-mxc/iram.c
+Kevin
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 6785db4..283d5bc 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -57,6 +57,11 @@ source "arch/arm/mach-mx5/Kconfig"
- 
- endmenu
- 
-+config IRAM_ALLOC
-+	bool
-+	default y
-+	select GENERIC_ALLOCATOR
-+
- config MXC_IRQ_PRIOR
- 	bool "Use IRQ priority"
- 	help
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 78d405e..35cf07b 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
- 
- obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-+obj-$(CONFIG_IRAM_ALLOC) += iram.o
- obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
-diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-mxc/include/mach/iram_alloc.h
-new file mode 100644
-index 0000000..12881aa
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#ifdef CONFIG_IRAM_ALLOC
-+int __init iram_init(unsigned long base, unsigned long size);
-+void *iram_alloc(unsigned int size, unsigned long *dma_addr);
-+void iram_free(unsigned long dma_addr, unsigned int size);
-+#else
-+static inline int __init iram_init(unsigned long base, unsigned long size)
-+{
-+	return -ENOMEM;
-+}
-+static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-+{
-+	return NULL;
-+}
-+static inline void iram_free(unsigned long base, unsigned long size) {}
-+#endif
-+
-diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
-new file mode 100644
-index 0000000..3d2a391
---- /dev/null
-+++ b/arch/arm/plat-mxc/iram.c
-@@ -0,0 +1,62 @@
-+/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/spinlock.h>
-+#include <linux/genalloc.h>
-+
-+static unsigned long iram_phys_base;
-+static __iomem void *iram_virt_base;
-+static struct gen_pool *iram_pool;
-+
-+#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
-+
-+void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-+{
-+	if (!iram_pool)
-+		return NULL;
-+
-+	*dma_addr = gen_pool_alloc(iram_pool, size);
-+	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
-+	return iram_phys_to_virt(*dma_addr);
-+}
-+EXPORT_SYMBOL(iram_alloc);
-+
-+void iram_free(unsigned long addr, unsigned int size)
-+{
-+	if (!iram_pool)
-+		return;
-+
-+	gen_pool_free(iram_pool, addr, size);
-+}
-+EXPORT_SYMBOL(iram_free);
-+
-+int __init iram_init(unsigned long base, unsigned long size)
-+{
-+	iram_phys_base = base;
-+
-+	iram_pool = gen_pool_create(12, -1);
-+	gen_pool_add(iram_pool, base, size, -1);
-+	iram_virt_base = ioremap(iram_phys_base, size);
-+
-+	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
-+	return 0;
-+}
--- 
-1.6.0.4
+
+The following changes since commit 0aed043517ad4135cb458a46e9e99e21cbb59c69:
+
+  OMAP: GPIO: ensure debounce clocks are disabled during idle/suspend (2010-09-23 17:14:17 -0700)
+
+are available in the git repository at:
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git pm-next-2
+
+Kevin Hilman (1):
+      OMAP3: CPUidle: remove redundant setting of PER next power state
+
+Lo?c Minier (1):
+      OMAP: PM: Fix build when CONFIG_PM_DEBUG isn't set
+
+ arch/arm/mach-omap2/cpuidle34xx.c |    4 +---
+ arch/arm/mach-omap2/pm.h          |    7 ++++---
+ 2 files changed, 5 insertions(+), 6 deletions(-)
