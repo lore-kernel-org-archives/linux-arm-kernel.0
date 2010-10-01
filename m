@@ -1,74 +1,105 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri,  1 Oct 2010 21:04:58 +0900
-Subject: [PATCH 01/27] ARM: SAMSUNG: Add GPIO configuration for a range of pins
-In-Reply-To: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
-References: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1285934724-5007-2-git-send-email-kgene.kim@samsung.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Fri,  1 Oct 2010 17:26:28 +0530
+Subject: [PATCH V2 68/69] ST SPEAr: Adding information in Documentation/ and
+	MAINTAINERS
+In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>
+Message-ID: <ffb4a467d09710964cb451eb1ccefc597985fbef.1285933332.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben-linux@fluff.org>
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
-Add s3c_gpio_cfgpin_range() to configure a range of pins to the given
-value. This is useful for a number of blocks where the pins are in order
-and saves multiple calls to s3c_gpio_cfgpin().
-
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/plat-samsung/gpio-config.c           |   15 +++++++++++++++
- arch/arm/plat-samsung/include/plat/gpio-cfg.h |   13 +++++++++++++
- 2 files changed, 28 insertions(+), 0 deletions(-)
+ Documentation/arm/SPEAr/overview.txt |   34 +++++++++++++++++++++++-----------
+ MAINTAINERS                          |    6 ++++++
+ 2 files changed, 29 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index e3d41ea..fa180dc 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -41,6 +41,21 @@ int s3c_gpio_cfgpin(unsigned int pin, unsigned int config)
- }
- EXPORT_SYMBOL(s3c_gpio_cfgpin);
+diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
+index 253a35c..4e510061 100644
+--- a/Documentation/arm/SPEAr/overview.txt
++++ b/Documentation/arm/SPEAr/overview.txt
+@@ -9,8 +9,9 @@ Introduction
  
-+int s3c_gpio_cfgpin_range(unsigned int start, unsigned int nr,
-+			  unsigned int cfg)
-+{
-+	int ret;
-+
-+	for (; nr > 0; nr--, start++) {
-+		ret = s3c_gpio_cfgpin(start, cfg);
-+		if (ret != 0)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(s3c_gpio_cfgpin_range);
-+
- unsigned s3c_gpio_getcfg(unsigned int pin)
- {
- 	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg.h b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-index 5b43b95..5fa3d89 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg.h
-@@ -108,6 +108,19 @@ extern int s3c_gpio_cfgpin(unsigned int pin, unsigned int to);
-  */
- extern unsigned s3c_gpio_getcfg(unsigned int pin);
+   The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
+   supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
+-  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
+-  series is in progress.
++  SPEAr310, SPEAr320, SPEAr600, SPEAr1300 and SPEAr1310 SOCs are supported.
++  SPEAr3XX and SPEAr6XX are based on ARM9 whereas SPEAr13XX is based on latest
++  ARM Cortex A9 CPUs.
  
-+/**
-+ * s3c_gpio_cfgpin_range() - Change the GPIO function for configuring pin range
-+ * @start: The pin number to start at
-+ * @nr: The number of pins to configure from @start.
-+ * @cfg: The configuration for the pin's function
-+ *
-+ * Call s3c_gpio_cfgpin() for the @nr pins starting at @start.
-+ *
-+ * @sa s3c_gpio_cfgpin.
-+ */
-+extern int s3c_gpio_cfgpin_range(unsigned int start, unsigned int nr,
-+				 unsigned int cfg);
+   Hierarchy in SPEAr is as follows:
+ 
+@@ -27,16 +28,25 @@ Introduction
+ 			- SPEAr600_EVB (Evaluation Board)
+ 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
+ 		- SPEAr1300 (SOC)
++			- SPEAr1300_EVB (Evaluation Board)
++		- SPEAr1310 (SOC)
++			- SPEAr1310_EVB (Evaluation Board)
+ 
+   Configuration
+   -------------
+ 
+-  A generic configuration is provided for each machine, and can be used as the
++  A generic configuration is provided for each machine family, and can be used as the
+   default by
+-	make spear600_defconfig
+-	make spear300_defconfig
+-	make spear310_defconfig
+-	make spear320_defconfig
++	#make ARCH=arm spear13xx_defconfig
++	#make ARCH=arm spear3xx_defconfig
++	#make ARCH=arm spear6xx_defconfig
 +
- /* Define values for the pull-{up,down} available for each gpio pin.
-  *
-  * These values control the state of the weak pull-{up,down} resistors
++  Compilation
++  -----------
++
++  After applying default configuration, Linux kernel for SPEAr architecture
++  can be compiled as
++	#make ARCH=arm CROSS_COMPILE=arm-linux- uImage
+ 
+   Layout
+   ------
+@@ -48,13 +58,15 @@ Introduction
+   Each machine series have a directory with name arch/arm/mach-spear followed by
+   series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
+ 
+-  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
+-  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
++  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c, for
++  spear6xx is mach-spear6xx/spear6xx.c and similarly for spear13xx is
++  mach-spear13xx/spear13xx.c. mach-spear* also contain soc/machine
+   specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
+-  mach-spear* also contains board specific files for each machine type.
++  Board specific files for each machine type is also contained in mach-spear*
++  folder.
+ 
+ 
+   Document Author
+   ---------------
+ 
+-  Viresh Kumar, (c) 2010 ST Microelectronics
++  Viresh Kumar, Shiraz Hashim (c) 2010 ST Microelectronics
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 668682d..97520d9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5462,6 +5462,12 @@ W:	http://www.st.com/spear
+ S:	Maintained
+ F:	arch/arm/plat-spear/
+ 
++SPEAR13XX MACHINE SUPPORT
++M:	Shiraz Hashim <shiraz.hashim@st.com>
++W:	http://www.st.com/spear
++S:	Maintained
++F:	arch/arm/mach-spear13xx/
++
+ SPEAR3XX MACHINE SUPPORT
+ M:	Viresh Kumar <viresh.kumar@st.com>
+ W:	http://www.st.com/spear
 -- 
-1.6.2.5
+1.7.2.2
