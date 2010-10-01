@@ -1,273 +1,211 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 1 Oct 2010 13:29:27 +0200
-Subject: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for MMC1
-In-Reply-To: <AANLkTim1H=qam8Sjbv_EUXGtf09TObTViYMiN17uMFQ1@mail.gmail.com>
-References: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
-	<AANLkTi=YvtrfmUTc-YBAUjEXn1v3pPLmhb92J60AhU28@mail.gmail.com>
-	<AANLkTim5d6XP0nuJLF2DxDGP2DuBK5VUajd=YhXQnT2C@mail.gmail.com>
-	<AANLkTi=oX7CT8RF39kT-7niutF3PEeSeC1A_L5TcWuO4@mail.gmail.com>
-	<AANLkTim1H=qam8Sjbv_EUXGtf09TObTViYMiN17uMFQ1@mail.gmail.com>
-Message-ID: <20101001112926.GC3064@sortiz-mobl>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 1 Oct 2010 13:33:13 +0200
+Subject: [PATCH] spi/pl022: fix dubious allocation staticize platform data
+Message-ID: <1285932793-30431-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 01, 2010 at 12:29:48PM +0530, kishore kadiyala wrote:
-> Ping !!
-Applied !!
+This removes some dubious allocation of a local chipinfo struct
+in favor of a constant preset, tagging that one const revealed
+further problems with platform data being modified so fixed up
+these too.
 
-BTW, please add the full patch when you cc me, so that I don't have to dig
-through patchwork to grab something I can git-am.
+Reported-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+Note: this is based on top of the previous patch for fixing
+the device pointer issue, which is in turn based on Kevins
+modebits patch.
+---
+ drivers/spi/amba-pl022.c |   96 ++++++++++++++++++++++------------------------
+ 1 files changed, 46 insertions(+), 50 deletions(-)
 
-Cheers,
-Samuel.
-
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index b01ee5b..8a0b9eb 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -1593,7 +1593,7 @@ static int destroy_queue(struct pl022 *pl022)
+ }
  
-> On Wed, Sep 29, 2010 at 4:11 PM, kishore kadiyala
-> <kishorek.kadiyala@gmail.com> wrote:
-> > Gentle Reminder !
-> >
-> > Regards,
-> > Kishore
-> >
-> > On Tue, Sep 28, 2010 at 12:22 PM, kishore kadiyala
-> > <kishorek.kadiyala@gmail.com> wrote:
-> >> Hi Samuel,
-> >>
-> >> Could you please review this patch which touches mfd/twl6030-irq.c for
-> >> card detect support
-> >> of MMC1 controller on OMAP4.
-> >>
-> >> Regards,
-> >> Kishore
-> >>
-> >> On Mon, Sep 27, 2010 at 1:25 PM, kishore kadiyala
-> >> <kishorek.kadiyala@gmail.com> wrote:
-> >>> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> >>>
-> >>> On Fri, Sep 24, 2010 at 10:43 PM, kishore kadiyala
-> >>> <kishore.kadiyala@ti.com> wrote:
-> >>>> Adding card detect callback function and card detect configuration
-> >>>> function for MMC1 Controller on OMAP4.
-> >>>>
-> >>>> Card detect configuration function does initial configuration of the
-> >>>> MMC Control & PullUp-PullDown registers of Phoenix.
-> >>>>
-> >>>> For MMC1 Controller, card detect interrupt source is
-> >>>> twl6030 which is non-gpio. The card detect call back function provides
-> >>>> card present/absent status by reading MMC Control register present
-> >>>> on twl6030.
-> >>>>
-> >>>> Since OMAP4 doesn't use any GPIO line as used in OMAP3 for card detect,
-> >>>> the suspend/resume initialization which was done in omap_hsmmc_gpio_init
-> >>>> previously is moved to the probe thus making it generic for both OMAP3 & OMAP4.
-> >>>>
-> >>>> Cc: Tony Lindgren <tony@atomide.com>
-> >>>> Cc: Andrew Morton <akpm@linux-foundation.org>
-> >>>> Cc: Madhusudhan Chikkature <madhu.cr@ti.com>
-> >>>> Cc: Adrian Hunter <adrian.hunter@nokia.com>
-> >>>> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
-> >>>> ---
-> >>>> ?arch/arm/mach-omap2/board-4430sdp.c | ? ?7 +++-
-> >>>> ?drivers/mfd/twl6030-irq.c ? ? ? ? ? | ? 73 +++++++++++++++++++++++++++++++++++
-> >>>> ?drivers/mmc/host/omap_hsmmc.c ? ? ? | ? ?4 +-
-> >>>> ?include/linux/i2c/twl.h ? ? ? ? ? ? | ? 31 +++++++++++++++
-> >>>> ?4 files changed, 112 insertions(+), 3 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> >>>> index 9447644..a49f285 100644
-> >>>> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> >>>> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> >>>> @@ -227,9 +227,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
-> >>>> ? ? ? ?struct omap_mmc_platform_data *pdata = dev->platform_data;
-> >>>>
-> >>>> ? ? ? ?/* Setting MMC1 Card detect Irq */
-> >>>> - ? ? ? if (pdev->id == 0)
-> >>>> + ? ? ? if (pdev->id == 0) {
-> >>>> + ? ? ? ? ? ? ? ret = twl6030_mmc_card_detect_config();
-> >>>> + ? ? ? ? ? ? ? if (ret)
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? pr_err("Failed configuring MMC1 card detect\n");
-> >>>> ? ? ? ? ? ? ? ?pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
-> >>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MMCDETECT_INTR_OFFSET;
-> >>>> + ? ? ? ? ? ? ? pdata->slots[0].card_detect = twl6030_mmc_card_detect;
-> >>>> + ? ? ? }
-> >>>> ? ? ? ?return ret;
-> >>>> ?}
-> >>>>
-> >>>> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
-> >>>> index 10bf228..2d3bb82 100644
-> >>>> --- a/drivers/mfd/twl6030-irq.c
-> >>>> +++ b/drivers/mfd/twl6030-irq.c
-> >>>> @@ -36,6 +36,7 @@
-> >>>> ?#include <linux/irq.h>
-> >>>> ?#include <linux/kthread.h>
-> >>>> ?#include <linux/i2c/twl.h>
-> >>>> +#include <linux/platform_device.h>
-> >>>>
-> >>>> ?/*
-> >>>> ?* TWL6030 (unlike its predecessors, which had two level interrupt handling)
-> >>>> @@ -223,6 +224,78 @@ int twl6030_interrupt_mask(u8 bit_mask, u8 offset)
-> >>>> ?}
-> >>>> ?EXPORT_SYMBOL(twl6030_interrupt_mask);
-> >>>>
-> >>>> +int twl6030_mmc_card_detect_config(void)
-> >>>> +{
-> >>>> + ? ? ? int ret;
-> >>>> + ? ? ? u8 reg_val = 0;
-> >>>> +
-> >>>> + ? ? ? /* Unmasking the Card detect Interrupt line for MMC1 from Phoenix */
-> >>>> + ? ? ? twl6030_interrupt_unmask(TWL6030_MMCDETECT_INT_MASK,
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? REG_INT_MSK_LINE_B);
-> >>>> + ? ? ? twl6030_interrupt_unmask(TWL6030_MMCDETECT_INT_MASK,
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? REG_INT_MSK_STS_B);
-> >>>> + ? ? ? /*
-> >>>> + ? ? ? ?* Intially Configuring MMC_CTRL for receving interrupts &
-> >>>> + ? ? ? ?* Card status on TWL6030 for MMC1
-> >>>> + ? ? ? ?*/
-> >>>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val, TWL6030_MMCCTRL);
-> >>>> + ? ? ? if (ret < 0) {
-> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read MMCCTRL, error %d\n", ret);
-> >>>> + ? ? ? ? ? ? ? return ret;
-> >>>> + ? ? ? }
-> >>>> + ? ? ? reg_val &= ~VMMC_AUTO_OFF;
-> >>>> + ? ? ? reg_val |= SW_FC;
-> >>>> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val, TWL6030_MMCCTRL);
-> >>>> + ? ? ? if (ret < 0) {
-> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write MMCCTRL, error %d\n", ret);
-> >>>> + ? ? ? ? ? ? ? return ret;
-> >>>> + ? ? ? }
-> >>>> +
-> >>>> + ? ? ? /* Configuring PullUp-PullDown register */
-> >>>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val,
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
-> >>>> + ? ? ? if (ret < 0) {
-> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read CFG_INPUT_PUPD3, error %d\n",
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
-> >>>> + ? ? ? ? ? ? ? return ret;
-> >>>> + ? ? ? }
-> >>>> + ? ? ? reg_val &= ~(MMC_PU | MMC_PD);
-> >>>> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
-> >>>> + ? ? ? if (ret < 0) {
-> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write CFG_INPUT_PUPD3, error %d\n",
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
-> >>>> + ? ? ? ? ? ? ? return ret;
-> >>>> + ? ? ? }
-> >>>> + ? ? ? return 0;
-> >>>> +}
-> >>>> +EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
-> >>>> +
-> >>>> +int twl6030_mmc_card_detect(struct device *dev, int slot)
-> >>>> +{
-> >>>> + ? ? ? int ret = -EIO;
-> >>>> + ? ? ? u8 read_reg = 0;
-> >>>> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> >>>> +
-> >>>> + ? ? ? if (pdev->id) {
-> >>>> + ? ? ? ? ? ? ? /* TWL6030 provide's Card detect support for
-> >>>> + ? ? ? ? ? ? ? ?* only MMC1 controller.
-> >>>> + ? ? ? ? ? ? ? ?*/
-> >>>> + ? ? ? ? ? ? ? pr_err("Unkown MMC controller %d in %s\n", pdev->id, __func__);
-> >>>> + ? ? ? ? ? ? ? return ret;
-> >>>> + ? ? ? }
-> >>>> + ? ? ? /*
-> >>>> + ? ? ? ?* BIT0 of MMC_CTRL on TWL6030 provides card status for MMC1
-> >>>> + ? ? ? ?* 0 - Card not present ,1 - Card present
-> >>>> + ? ? ? ?*/
-> >>>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &read_reg,
-> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_MMCCTRL);
-> >>>> + ? ? ? if (ret >= 0)
-> >>>> + ? ? ? ? ? ? ? ret = read_reg & STS_MMC;
-> >>>> + ? ? ? return ret;
-> >>>> +}
-> >>>> +EXPORT_SYMBOL(twl6030_mmc_card_detect);
-> >>>> +
-> >>>> ?int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
-> >>>> ?{
-> >>>>
-> >>>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> >>>> index 562dbbb..a51894d 100644
-> >>>> --- a/drivers/mmc/host/omap_hsmmc.c
-> >>>> +++ b/drivers/mmc/host/omap_hsmmc.c
-> >>>> @@ -466,8 +466,6 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
-> >>>> ? ? ? ?int ret;
-> >>>>
-> >>>> ? ? ? ?if (gpio_is_valid(pdata->slots[0].switch_pin)) {
-> >>>> - ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
-> >>>> - ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
-> >>>> ? ? ? ? ? ? ? ?if (pdata->slots[0].cover)
-> >>>> ? ? ? ? ? ? ? ? ? ? ? ?pdata->slots[0].get_cover_state =
-> >>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_cover_state;
-> >>>> @@ -2211,6 +2209,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
-> >>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"Unable to grab MMC CD IRQ\n");
-> >>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_irq_cd;
-> >>>> ? ? ? ? ? ? ? ?}
-> >>>> + ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
-> >>>> + ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
-> >>>> ? ? ? ?}
-> >>>>
-> >>>> ? ? ? ?omap_hsmmc_disable_irq(host);
-> >>>> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-> >>>> index 6de90bf..e64894c 100644
-> >>>> --- a/include/linux/i2c/twl.h
-> >>>> +++ b/include/linux/i2c/twl.h
-> >>>> @@ -141,6 +141,16 @@
-> >>>> ?#define TWL6030_CHARGER_CTRL_INT_MASK ?0x10
-> >>>> ?#define TWL6030_CHARGER_FAULT_INT_MASK ? ? ? ? 0x60
-> >>>>
-> >>>> +#define TWL6030_MMCCTRL ? ? ? ? ? ? ? ?0xEE
-> >>>> +#define VMMC_AUTO_OFF ? ? ? ? ? ? ? ? ?(0x1 << 3)
-> >>>> +#define SW_FC ? ? ? ? ? ? ? ? ? ? ? ? ?(0x1 << 2)
-> >>>> +#define STS_MMC ? ? ? ? ? ? ? ? ? ? ? ?0x1
-> >>>> +
-> >>>> +#define TWL6030_CFG_INPUT_PUPD3 ? ? ? ?0xF2
-> >>>> +#define MMC_PU ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 3)
-> >>>> +#define MMC_PD ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 2)
-> >>>> +
-> >>>> +
-> >>>>
-> >>>> ?#define TWL4030_CLASS_ID ? ? ? ? ? ? ? 0x4030
-> >>>> ?#define TWL6030_CLASS_ID ? ? ? ? ? ? ? 0x6030
-> >>>> @@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
-> >>>> ?int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
-> >>>> ?int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
-> >>>>
-> >>>> +/* Card detect Configuration for MMC1 Controller on OMAP4 */
-> >>>> +#ifdef CONFIG_TWL4030_CORE
-> >>>> +int twl6030_mmc_card_detect_config(void);
-> >>>> +#else
-> >>>> +static inline int twl6030_mmc_card_detect_config(void)
-> >>>> +{
-> >>>> + ? ? ? pr_debug("twl6030_mmc_card_detect_config not supported\n");
-> >>>> + ? ? ? return 0;
-> >>>> +}
-> >>>> +#endif
-> >>>> +
-> >>>> +/* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
-> >>>> +#ifdef CONFIG_TWL4030_CORE
-> >>>> +int twl6030_mmc_card_detect(struct device *dev, int slot);
-> >>>> +#else
-> >>>> +static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
-> >>>> +{
-> >>>> + ? ? ? pr_debug("Call back twl6030_mmc_card_detect not supported\n");
-> >>>> + ? ? ? return -EIO;
-> >>>> +}
-> >>>> +#endif
-> >>>> ?/*----------------------------------------------------------------------*/
-> >>>>
-> >>>> ?/*
-> >>>> --
-> >>>> 1.7.0.4
-> >>>>
-> >>>>
-> >>>> --
-> >>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> >>>> the body of a message to majordomo at vger.kernel.org
-> >>>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> >>>>
-> >>>
-> >>
-> >
-
+ static int verify_controller_parameters(struct pl022 *pl022,
+-					struct pl022_config_chip *chip_info)
++				struct pl022_config_chip const *chip_info)
+ {
+ 	if ((chip_info->iface < SSP_INTERFACE_MOTOROLA_SPI)
+ 	    || (chip_info->iface > SSP_INTERFACE_UNIDIRECTIONAL)) {
+@@ -1614,12 +1614,6 @@ static int verify_controller_parameters(struct pl022 *pl022,
+ 			"hierarchy is configured incorrectly\n");
+ 		return -EINVAL;
+ 	}
+-	if (((chip_info->clk_freq).cpsdvsr < CPSDVR_MIN)
+-	    || ((chip_info->clk_freq).cpsdvsr > CPSDVR_MAX)) {
+-		dev_err(&pl022->adev->dev,
+-			"cpsdvsr is configured incorrectly\n");
+-		return -EINVAL;
+-	}
+ 	if ((chip_info->com_mode != INTERRUPT_TRANSFER)
+ 	    && (chip_info->com_mode != DMA_TRANSFER)
+ 	    && (chip_info->com_mode != POLLING_TRANSFER)) {
+@@ -1670,11 +1664,6 @@ static int verify_controller_parameters(struct pl022 *pl022,
+ 			return -EINVAL;
+ 		}
+ 	}
+-	if (chip_info->cs_control == NULL) {
+-		dev_warn(&pl022->adev->dev,
+-			"Chip Select Function is NULL for this chip\n");
+-		chip_info->cs_control = null_cs_control;
+-	}
+ 	return 0;
+ }
+ 
+@@ -1774,6 +1763,25 @@ static int calculate_effective_freq(struct pl022 *pl022,
+ 	return 0;
+ }
+ 
++
++/*
++ * A piece of default chip info unless the platform
++ * supplies it.
++ */
++static const struct pl022_config_chip pl022_default_chip_info = {
++	.com_mode = POLLING_TRANSFER,
++	.iface = SSP_INTERFACE_MOTOROLA_SPI,
++	.hierarchy = SSP_SLAVE,
++	.slave_tx_disable = DO_NOT_DRIVE_TX,
++	.rx_lev_trig = SSP_RX_1_OR_MORE_ELEM,
++	.tx_lev_trig = SSP_TX_1_OR_MORE_EMPTY_LOC,
++	.ctrl_len = SSP_BITS_8,
++	.wait_state = SSP_MWIRE_WAIT_ZERO,
++	.duplex = SSP_MICROWIRE_CHANNEL_FULL_DUPLEX,
++	.cs_control = null_cs_control,
++};
++
++
+ /**
+  * pl022_setup - setup function registered to SPI master framework
+  * @spi: spi device which is requesting setup
+@@ -1788,8 +1796,9 @@ static int calculate_effective_freq(struct pl022 *pl022,
+  */
+ static int pl022_setup(struct spi_device *spi)
+ {
+-	struct pl022_config_chip *chip_info;
++	struct pl022_config_chip const *chip_info;
+ 	struct chip_data *chip;
++	struct ssp_clock_params clk_freq;
+ 	int status = 0;
+ 	struct pl022 *pl022 = spi_master_get_devdata(spi->master);
+ 	unsigned int bits = spi->bits_per_word;
+@@ -1816,40 +1825,13 @@ static int pl022_setup(struct spi_device *spi)
+ 	chip_info = spi->controller_data;
+ 
+ 	if (chip_info == NULL) {
++		chip_info = &pl022_default_chip_info;
+ 		/* spi_board_info.controller_data not is supplied */
+ 		dev_dbg(&spi->dev,
+ 			"using default controller_data settings\n");
+-
+-		chip_info =
+-			kzalloc(sizeof(struct pl022_config_chip), GFP_KERNEL);
+-
+-		if (!chip_info) {
+-			dev_err(&spi->dev,
+-				"cannot allocate controller data\n");
+-			status = -ENOMEM;
+-			goto err_first_setup;
+-		}
+-
+-		dev_dbg(&spi->dev, "allocated memory for controller data\n");
+-
+-		/*
+-		 * Set controller data default values:
+-		 * Polling is supported by default
+-		 */
+-		chip_info->com_mode = POLLING_TRANSFER;
+-		chip_info->iface = SSP_INTERFACE_MOTOROLA_SPI;
+-		chip_info->hierarchy = SSP_SLAVE;
+-		chip_info->slave_tx_disable = DO_NOT_DRIVE_TX;
+-		chip_info->rx_lev_trig = SSP_RX_1_OR_MORE_ELEM;
+-		chip_info->tx_lev_trig = SSP_TX_1_OR_MORE_EMPTY_LOC;
+-		chip_info->ctrl_len = SSP_BITS_8;
+-		chip_info->wait_state = SSP_MWIRE_WAIT_ZERO;
+-		chip_info->duplex = SSP_MICROWIRE_CHANNEL_FULL_DUPLEX;
+-		chip_info->cs_control = null_cs_control;
+-	} else {
++	} else
+ 		dev_dbg(&spi->dev,
+ 			"using user supplied controller_data settings\n");
+-	}
+ 
+ 	/*
+ 	 * We can override with custom divisors, else we use the board
+@@ -1859,22 +1841,37 @@ static int pl022_setup(struct spi_device *spi)
+ 	    && (0 == chip_info->clk_freq.scr)) {
+ 		status = calculate_effective_freq(pl022,
+ 						  spi->max_speed_hz,
+-						  &chip_info->clk_freq);
++						  &clk_freq);
+ 		if (status < 0)
+ 			goto err_config_params;
+ 	} else {
+-		if ((chip_info->clk_freq.cpsdvsr % 2) != 0)
+-			chip_info->clk_freq.cpsdvsr =
+-				chip_info->clk_freq.cpsdvsr - 1;
++		memcpy(&clk_freq, &chip_info->clk_freq, sizeof(clk_freq));
++		if ((clk_freq.cpsdvsr % 2) != 0)
++			clk_freq.cpsdvsr =
++				clk_freq.cpsdvsr - 1;
+ 	}
++	if ((clk_freq.cpsdvsr < CPSDVR_MIN)
++	    || (clk_freq.cpsdvsr > CPSDVR_MAX)) {
++		dev_err(&spi->dev,
++			"cpsdvsr is configured incorrectly\n");
++		goto err_config_params;
++	}
++
++
+ 	status = verify_controller_parameters(pl022, chip_info);
+ 	if (status) {
+ 		dev_err(&spi->dev, "controller data is incorrect");
+ 		goto err_config_params;
+ 	}
++
+ 	/* Now set controller state based on controller data */
+ 	chip->xfer_type = chip_info->com_mode;
+-	chip->cs_control = chip_info->cs_control;
++	if (!chip_info->cs_control) {
++		chip->cs_control = null_cs_control;
++		dev_warn(&spi->dev,
++			 "chip select function is NULL for this chip\n");
++	} else
++		chip->cs_control = chip_info->cs_control;
+ 
+ 	if (bits <= 3) {
+ 		/* PL022 doesn't support less than 4-bits */
+@@ -1931,7 +1928,7 @@ static int pl022_setup(struct spi_device *spi)
+ 			       SSP_DMACR_MASK_TXDMAE, 1);
+ 	}
+ 
+-	chip->cpsr = chip_info->clk_freq.cpsdvsr;
++	chip->cpsr = clk_freq.cpsdvsr;
+ 
+ 	/* Special setup for the ST micro extended control registers */
+ 	if (pl022->vendor->extended_cr) {
+@@ -1988,7 +1985,7 @@ static int pl022_setup(struct spi_device *spi)
+ 		tmp = SSP_CLK_FIRST_EDGE;
+ 	SSP_WRITE_BITS(chip->cr0, tmp, SSP_CR0_MASK_SPH, 7);
+ 
+-	SSP_WRITE_BITS(chip->cr0, chip_info->clk_freq.scr, SSP_CR0_MASK_SCR, 8);
++	SSP_WRITE_BITS(chip->cr0, clk_freq.scr, SSP_CR0_MASK_SCR, 8);
+ 	/* Loopback is available on all versions except PL023 */
+ 	if (!pl022->vendor->pl023) {
+ 		if (spi->mode & SPI_LOOP)
+@@ -2006,7 +2003,6 @@ static int pl022_setup(struct spi_device *spi)
+ 	return status;
+  err_config_params:
+ 	spi_set_ctldata(spi, NULL);
+- err_first_setup:
+ 	kfree(chip);
+ 	return status;
+ }
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.6.3.3
