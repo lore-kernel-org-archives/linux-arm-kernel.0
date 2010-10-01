@@ -1,21 +1,29 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 01 Oct 2010 14:21:29 +0900
-Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
-In-Reply-To: <4CA560B7.5080505@st.com>
-References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
-	<4CA560B7.5080505@st.com>
-Message-ID: <1285910489.31224.14.camel@macbook.infradead.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 1 Oct 2010 06:28:13 +0100
+Subject: [PATCH 2/3] ARM: S5PV210: Add init code of audio to Goni and
+	Aquila board
+In-Reply-To: <4CA5623B.5030405@samsung.com>
+References: <4CA5623B.5030405@samsung.com>
+Message-ID: <20101001052813.GD30949@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-10-01 at 09:46 +0530, viresh kumar wrote:
-> 
-> 
-> Just one query, what should be the location of fsmc.h
-> include/mtd/ or include/linux/mtd ?? 
+On Fri, Oct 01, 2010 at 01:23:23PM +0900, Chanwoo Choi wrote:
+> This patch add initializtion code of audio and I2S platform drivers
+> to Goni and Aquila board.
 
-We use include/mtd/ for headers which are exported to userspace. Looks
-like this should be include/linux/mtd/
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
--- 
-dwmw2
+> +static void __init aquila_sound_init(void)
+> +{
+> +	unsigned int gpio;
+> +
+> +	/* CODEC_XTAL_EN 
+> +	 *
+> +	 * The Aquila board have a oscillator which provide main clock
+> +	 * to WM8994 codec. The oscillator provide 24MHz clock to WM8994
+> +	 * clock. Set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
+> +	 * */
+
+In future we should be able to arrange for this clock to be disabled
+when the CODEC is totally idle, giving a marginal power saving.
