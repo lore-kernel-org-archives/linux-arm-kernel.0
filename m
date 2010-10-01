@@ -1,79 +1,42 @@
-From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Fri,  1 Oct 2010 23:09:09 +0200
-Subject: [PATCHv3 6/6] omap3: Remove VMMC2 regulator on IGEP v2.
-In-Reply-To: <1285967349-32767-1-git-send-email-eballetbo@gmail.com>
-References: <1285967349-32767-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1285967349-32767-7-git-send-email-eballetbo@gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 01 Oct 2010 14:15:58 -0700
+Subject: [PATCH] ARM: add cpu_idle_wait() to support CPUidle on SMP
+	systems.
+In-Reply-To: <AANLkTi=EkQNd4JFrwCY1qH6XOq0+O_5ZuxaJY1dQg=cw@mail.gmail.com>
+	(Colin Cross's message of "Thu, 30 Sep 2010 11:04:28 -0700")
+References: <1285692192-32075-1-git-send-email-khilman@deeprootsystems.com>
+	<87hbh7f9dl.fsf@deeprootsystems.com>
+	<AANLkTi=EkQNd4JFrwCY1qH6XOq0+O_5ZuxaJY1dQg=cw@mail.gmail.com>
+Message-ID: <87sk0p7gxd.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VMMC2 regulator is configured but it's not used for the IGEP v2, so
-remove this regulator from board.
+Colin Cross <ccross@google.com> writes:
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   26 +++-----------------------
- 1 files changed, 3 insertions(+), 23 deletions(-)
+> On Thu, Sep 30, 2010 at 10:07 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> Russell,
+>>
+>> Kevin Hilman <khilman@deeprootsystems.com> writes:
+>>
+>>> In order for CPUidle to work on SMP systems, an implementation of
+>>> cpu_idle_wait() is needed.
+>>>
+>>> This patch duplicates the x86 implementation of cpu_idle_wait() for
+>>> ARM.
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+>>
+>> Are you OK with this for the patch system for 2.6.37?
+>
+> Tested-by: Colin Cross <ccross@android.com>
+>
+> CPUidle works on Tegra2 with this patch.
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index e253ebc..19187ae 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -260,10 +260,6 @@ static struct regulator_consumer_supply igep2_vmmc1_supply = {
- 	.supply		= "vmmc",
- };
- 
--static struct regulator_consumer_supply igep2_vmmc2_supply = {
--	.supply		= "vmmc",
--};
--
- /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
- static struct regulator_init_data igep2_vmmc1 = {
- 	.constraints = {
-@@ -279,21 +275,6 @@ static struct regulator_init_data igep2_vmmc1 = {
- 	.consumer_supplies      = &igep2_vmmc1_supply,
- };
- 
--/* VMMC2 for OMAP VDD_MMC2 (i/o) and MMC2 WIFI */
--static struct regulator_init_data igep2_vmmc2 = {
--	.constraints = {
--		.min_uV			= 1850000,
--		.max_uV			= 3150000,
--		.valid_modes_mask	= REGULATOR_MODE_NORMAL
--					| REGULATOR_MODE_STANDBY,
--		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
--					| REGULATOR_CHANGE_MODE
--					| REGULATOR_CHANGE_STATUS,
--	},
--	.num_consumer_supplies  = 1,
--	.consumer_supplies      = &igep2_vmmc2_supply,
--};
--
- static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
-@@ -390,11 +371,11 @@ static int igep2_twl_gpio_setup(struct device *dev,
- 	mmc[0].gpio_cd = gpio + 0;
- 	omap2_hsmmc_init(mmc);
- 
--	/* link regulators to MMC adapters ... we "know" the
-+	/*
-+	 * link regulators to MMC adapters ... we "know" the
- 	 * regulators will be set up only *after* we return.
--	*/
-+	 */
- 	igep2_vmmc1_supply.dev = mmc[0].dev;
--	igep2_vmmc2_supply.dev = mmc[1].dev;
- 
- 	/*
- 	 * REVISIT: need ehci-omap hooks for external VBUS
-@@ -536,7 +517,6 @@ static struct twl4030_platform_data igep2_twldata = {
- 	.codec		= &igep2_codec_data,
- 	.gpio		= &igep2_twl4030_gpio_pdata,
- 	.vmmc1          = &igep2_vmmc1,
--	.vmmc2		= &igep2_vmmc2,
- 	.vpll2		= &igep2_vpll2,
- 
- };
--- 
-1.7.0.4
+Thanks for testing.
+
+Patch is now queued in Russell's patch system as 6428/1
+
+   http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6428/1
+
+Kevin
