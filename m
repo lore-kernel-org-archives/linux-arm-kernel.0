@@ -1,46 +1,67 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 1 Oct 2010 19:39:44 +0900
-Subject: [PATCH 1/7] pwm: Add pwm core driver
-In-Reply-To: <F45880696056844FA6A73F415B568C69532DCF34AE@EXDCVYMBSTM006.EQ1STM.local>
-References: <1285659648-21409-1-git-send-email-arun.murthy@stericsson.com>
-	<1285659648-21409-2-git-send-email-arun.murthy@stericsson.com>
-	<4CA1AD2B.8000905@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FB6B@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA1BC16.3020702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC2FC60@EXDCVYMBSTM006.EQ1STM.local>
-	<4CA25841.4090702@metafoo.de>
-	<F45880696056844FA6A73F415B568C69532DC8B7E4@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTingb8ox5h5rN1YrxONibfrWLicoiS6yqKf_v5bJ@mail.gmail.com>
-	<F45880696056844FA6A73F415B568C69532DCF32BC@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTikTo42Q5-yMEwyQH4mt=qLjaKrtJK3ydZNFyqai@mail.gmail.com>
-	<F45880696056844FA6A73F415B568C69532DCF33BB@EXDCVYMBSTM006.EQ1STM.local>
-	<AANLkTimPgPY9rX_MYZTv0PpRQgfWGoSeSE9WWy_ami-V@mail.gmail.com>
-	<F45880696056844FA6A73F415B568C69532DCF34AE@EXDCVYMBSTM006.EQ1STM.local>
-Message-ID: <AANLkTi=+1y9Bok0xnFueSfRsQGwnDVmySNNbNjgY_AdQ@mail.gmail.com>
+From: ian@opensource.wolfsonmicro.com (Ian Lartey)
+Date: Fri, 01 Oct 2010 11:46:36 +0100
+Subject: [PATCH 2/2] Adding cs89x0, standard ethernet driver for iMX31
+	platform.
+In-Reply-To: <20100930182313.GT29811@pengutronix.de>
+References: <1285861655-6513-1-git-send-email-ian@opensource.wolfsonmicro.com>
+	<1285861655-6513-2-git-send-email-ian@opensource.wolfsonmicro.com>
+	<20100930182313.GT29811@pengutronix.de>
+Message-ID: <1285929996.1864.11438.camel@Tapajos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 1, 2010 at 5:46 PM, Arun MURTHY <arun.murthy@stericsson.com> wrote:
->> On Fri, Oct 1, 2010 at 4:25 PM, Arun MURTHY
->> <arun.murthy@stericsson.com> wrote:
->> > You can have a look at the pwm_config_nosleep(),pwm_set_polarity(),
->> > pwm_synchronize(),pwm_unsynchronize(), pwm_set_handler() etc.
->> > These are not being used by the exsting pwm drivers except Atmel pwm.
->> How would your 'simple' driver handle Atmel then ?
->> What if future's SoCs start providing those 'advance' features like
->> Atmel's ?
->>
-> The pwm core driver is the intersection of all pwm drivers and not union
-> of all pwm driver. I refer this as simple pwm core driver / framework.
-> Atmel pwm is of a separate classification.
-> It includes GPIO also. Though, Atmel can use the pwm core driver framework
-> for functionalities like pwm_enable, pwm_disable, pwm_config, etc and remaining
-> functionalities specific to Atmel will be handled in Atlmel pwm driver and
-> will not be exposed to the entire kernel.
-> Its that the present day pwm device that has been made easy though, by providing
-> the same functionality.
-It's sad that Bill Gatliff didn't/couldn't take his work to conclusive end.
-The work was apparently better
-http://www.mail-archive.com/linux-embedded at vger.kernel.org/msg02599.html
+On Thu, 2010-09-30 at 20:23 +0200, Uwe Kleine-K?nig wrote:
+> On Thu, Sep 30, 2010 at 04:47:35PM +0100, Ian Lartey wrote:
+> > Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
+> > ---
+> >  arch/arm/configs/mx3_defconfig |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
+> > index 161f907..b0b3409 100644
+> > --- a/arch/arm/configs/mx3_defconfig
+> > +++ b/arch/arm/configs/mx3_defconfig
+> > @@ -68,6 +68,8 @@ CONFIG_NET_ETHERNET=y
+> >  CONFIG_SMSC911X=y
+> >  CONFIG_DNET=y
+> >  CONFIG_FEC=y
+> > +CONFIG_CS89x0=y
+> > +CONFIG_CS89x0_NONISA_IRQ=y
+> >  # CONFIG_NETDEV_1000 is not set
+> >  # CONFIG_NETDEV_10000 is not set
+> >  # CONFIG_INPUT is not set
+> This change is bad for two reasons:
+> 
+>  - I just tested a kernel with CONFIG_CS89x0=y on a Phytec Phycore
+>    pcm043 using your updated defconfig and it barfs:
+> 
+> 	[.....]
 
-Best of luck.
+Ouch, I'll see if I can correct that. (Needs to be done before I can add
+the config file change). Uwe I don't have another i.MX3 (apart from the
+i.MV31ADS) would you be able to test further changes for me please to
+help catch this kind of thing ?
+ 
+> 
+>    (Did I already mention that this cs89x0 driver is ugly and needs a
+>    general overhaul?)
+> 
+
+Yes, and I'm getting additional errors from the cs89x0 driver once it is
+up and running so I was going to start looking for help once my changes
+were in.... any volunteers ?
+
+>  - adding "CONFIG_CS89x0_NONISA_IRQ=y" is redundant as it is always on
+>    for MACH_MX31ADS.
+> 
+> So I suggest to just add CONFIG_CS89x0=m
+
+Agreed.
+ 
+> 
+> Best regards
+> Uwe
+> 
+
+Best Regards,
+             Ian.
