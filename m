@@ -1,229 +1,383 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:25:43 +0530
-Subject: [PATCH V2 23/69] ST SPEAr: Added ARM PL061 GPIO Support on SPEAr13xx
-	and modified resource size
+Date: Fri,  1 Oct 2010 17:26:29 +0530
+Subject: [PATCH V2 69/69] ST SPEAr: Updating defconfigs
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <c33de42441410537175db463dbaff5652e3b1f7e.1285933331.git.viresh.kumar@st.com>
+Message-ID: <68d391813bcedde825ee7b207b533abfbe20c585.1285933332.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/include/mach/gpio.h    |   18 +++++++++++
- arch/arm/mach-spear13xx/include/mach/irqs.h    |   10 ++++++-
- arch/arm/mach-spear13xx/include/mach/spear.h   |    4 +-
- arch/arm/mach-spear13xx/spear1300_evb.c        |    2 +
- arch/arm/mach-spear13xx/spear13xx.c            |   37 ++++++++++++++++++++++++
- arch/arm/mach-spear3xx/spear300.c              |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c              |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c              |    9 ++----
- 9 files changed, 74 insertions(+), 11 deletions(-)
+ arch/arm/configs/spear13xx_defconfig |   78 ++++++++++++++++++++++++++++++---
+ arch/arm/configs/spear3xx_defconfig  |   80 +++++++++++++++++++++++++++++++---
+ arch/arm/configs/spear6xx_defconfig  |   72 ++++++++++++++++++++++++++++---
+ 3 files changed, 211 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index fd9f9a6..f3e6d95 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -29,6 +29,7 @@
- #define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
- 
- /* Add spear13xx family device structure declarations here */
-+extern struct amba_device spear13xx_gpio_device[];
- extern struct amba_device spear13xx_uart_device;
- extern struct platform_device spear13xx_ehci0_device;
- extern struct platform_device spear13xx_ehci1_device;
-diff --git a/arch/arm/mach-spear13xx/include/mach/gpio.h b/arch/arm/mach-spear13xx/include/mach/gpio.h
-index 43fa541..2f8ad23 100644
---- a/arch/arm/mach-spear13xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear13xx/include/mach/gpio.h
-@@ -16,4 +16,22 @@
- 
- #include <plat/gpio.h>
- 
-+#define GPIO0_0			0
-+#define GPIO0_1			1
-+#define GPIO0_2			2
-+#define GPIO0_3			3
-+#define GPIO0_4			4
-+#define GPIO0_5			5
-+#define GPIO0_6			6
-+#define GPIO0_7			7
-+
-+#define GPIO1_0			8
-+#define GPIO1_1			9
-+#define GPIO1_2			10
-+#define GPIO1_3			11
-+#define GPIO1_4			12
-+#define GPIO1_5			13
-+#define GPIO1_6			14
-+#define GPIO1_7			15
-+
- #endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
-index 036bfc6..10b64c1 100644
---- a/arch/arm/mach-spear13xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
-@@ -86,6 +86,14 @@
- 
- #define IRQ_GIC_END		(IRQ_SHPI_START + 128)
- 
--#define NR_IRQS			IRQ_GIC_END
-+#define VIRQ_START		IRQ_GIC_END
-+
-+/* GPIO pins virtual irqs */
-+#define SPEAR_GPIO0_INT_BASE	(VIRQ_START + 0)
-+#define SPEAR_GPIO1_INT_BASE	(SPEAR_GPIO0_INT_BASE + 8)
-+#define SPEAR_GPIO_INT_END	(SPEAR_GPIO1_INT_BASE + 8)
-+
-+#define VIRQ_END		SPEAR_GPIO_INT_END
-+#define NR_IRQS			VIRQ_END
- 
- #endif /* __MACH_IRQS_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-index d4b11a4..282ef2f 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-@@ -43,8 +43,8 @@
- #define SPEAR13XX_GPT2_BASE		0xE0480000
- #define SPEAR13XX_GPT3_BASE		0xE0500000
- #define SPEAR13XX_RTC_BASE		0xE0580000
--#define SPEAR13XX_GPIOA_BASE		0xE0600000
--#define SPEAR13XX_GPIOB_BASE		0xE0680000
-+#define SPEAR13XX_GPIO0_BASE		0xE0600000
-+#define SPEAR13XX_GPIO1_BASE		0xE0680000
- #define SPEAR13XX_MISC_BASE		0xE0700000
- #define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
- 
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 0c7c996..2b2598c 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -19,6 +19,8 @@
- #include <plat/keyboard.h>
- 
- static struct amba_device *amba_devs[] __initdata = {
-+	&spear13xx_gpio_device[0],
-+	&spear13xx_gpio_device[1],
- 	&spear13xx_uart_device,
- };
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index d19e325..2037cd2 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/types.h>
-+#include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
- #include <asm/hardware/gic.h>
-@@ -24,6 +25,42 @@
- #include <mach/hardware.h>
- 
- /* Add spear13xx machines common devices here */
-+/* gpio device registeration */
-+static struct pl061_platform_data gpio_plat_data[] = {
-+	{
-+		.gpio_base	= 0,
-+		.irq_base	= SPEAR_GPIO0_INT_BASE,
-+	}, {
-+		.gpio_base	= 8,
-+		.irq_base	= SPEAR_GPIO1_INT_BASE,
-+	},
-+};
-+
-+struct amba_device spear13xx_gpio_device[] = {
-+	{
-+		.dev = {
-+			.init_name = "gpio0",
-+			.platform_data = &gpio_plat_data[0],
-+		},
-+		.res = {
-+			.start = SPEAR13XX_GPIO0_BASE,
-+			.end = SPEAR13XX_GPIO0_BASE + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		},
-+		.irq = {IRQ_GPIO0, NO_IRQ},
-+	}, {
-+		.dev = {
-+			.init_name = "gpio1",
-+			.platform_data = &gpio_plat_data[1],
-+		},
-+		.res = {
-+			.start = SPEAR13XX_GPIO1_BASE,
-+			.end = SPEAR13XX_GPIO1_BASE + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		},
-+		.irq = {IRQ_GPIO1, NO_IRQ},
-+	}
-+};
- 
- /* uart device registeration */
- struct amba_device spear13xx_uart_device = {
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 44ba52e..c80d4e1 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -401,7 +401,7 @@ struct amba_device gpio1_device = {
- 	},
- 	.res = {
- 		.start = SPEAR300_GPIO_BASE,
--		.end = SPEAR300_GPIO_BASE + SPEAR300_GPIO_SIZE - 1,
-+		.end = SPEAR300_GPIO_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.irq = {VIRQ_GPIO1, NO_IRQ},
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 588004f..61d607b 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -35,7 +35,7 @@ struct amba_device gpio_device = {
- 	},
- 	.res = {
- 		.start = SPEAR3XX_ICM3_GPIO_BASE,
--		.end = SPEAR3XX_ICM3_GPIO_BASE + SPEAR3XX_ICM3_GPIO_SIZE - 1,
-+		.end = SPEAR3XX_ICM3_GPIO_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.irq = {IRQ_BASIC_GPIO, NO_IRQ},
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 94bbcdf..e78c2e5 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -89,8 +89,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_CPU_GPIO_BASE,
--			.end = SPEAR6XX_CPU_GPIO_BASE +
--				SPEAR6XX_CPU_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_CPU_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_LOCAL_GPIO, NO_IRQ},
-@@ -101,8 +100,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM3_GPIO_BASE,
--			.end = SPEAR6XX_ICM3_GPIO_BASE +
--				SPEAR6XX_ICM3_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_ICM3_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_BASIC_GPIO, NO_IRQ},
-@@ -113,8 +111,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM2_GPIO_BASE,
--			.end = SPEAR6XX_ICM2_GPIO_BASE +
--				SPEAR6XX_ICM2_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_ICM2_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_APPL_GPIO, NO_IRQ},
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 9f3baf8..d764fee 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -10,31 +10,94 @@ CONFIG_PLAT_SPEAR=y
+ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_BOARD_SPEAR1300_EVB=y
+ CONFIG_BOARD_SPEAR1310_EVB=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCIEPORTBUS=y
++# CONFIG_PCIEAER is not set
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_AEABI=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_STAT_DETAILS=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
++CONFIG_ARPD=y
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CONCAT=y
+ CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_ST=y
++CONFIG_CHR_DEV_OSST=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_NETDEVICES=y
++# CONFIG_WLAN is not set
+ CONFIG_INPUT_FF_MEMLESS=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_INPUT_EVDEV=y
++CONFIG_INPUT_EVBUG=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_SPEAR=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_RAW_DRIVER=y
+ CONFIG_MAX_RAW_DEVS=8192
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_SPIDEV=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_TEST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_SPEAR=y
++CONFIG_RTC_CLASS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_SECURITY=y
+@@ -42,16 +105,18 @@ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
++CONFIG_NLS_ASCII=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
+@@ -59,3 +124,4 @@ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
++# CONFIG_ARM_UNWIND is not set
+diff --git a/arch/arm/configs/spear3xx_defconfig b/arch/arm/configs/spear3xx_defconfig
+index fea7e1f..5a210ce 100644
+--- a/arch/arm/configs/spear3xx_defconfig
++++ b/arch/arm/configs/spear3xx_defconfig
+@@ -10,13 +10,54 @@ CONFIG_PLAT_SPEAR=y
+ CONFIG_BOARD_SPEAR300_EVB=y
+ CONFIG_BOARD_SPEAR310_EVB=y
+ CONFIG_BOARD_SPEAR320_EVB=y
++CONFIG_AEABI=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_ARPD=y
++# CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++CONFIG_SCSI_TGT=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_ST=y
++CONFIG_CHR_DEV_OSST=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_NETDEVICES=y
++# CONFIG_WLAN is not set
+ CONFIG_INPUT_FF_MEMLESS=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_SPEAR=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+@@ -24,30 +65,55 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_RAW_DRIVER=y
+ CONFIG_MAX_RAW_DEVS=8192
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_FB_ARMCLCD_SAMSUNG_LMS700=y
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_TEST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_SPEAR=y
++CONFIG_RTC_CLASS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
++CONFIG_NLS_ASCII=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
++# CONFIG_ARM_UNWIND is not set
+diff --git a/arch/arm/configs/spear6xx_defconfig b/arch/arm/configs/spear6xx_defconfig
+index cef2e83..5217396 100644
+--- a/arch/arm/configs/spear6xx_defconfig
++++ b/arch/arm/configs/spear6xx_defconfig
+@@ -9,10 +9,48 @@ CONFIG_MODVERSIONS=y
+ CONFIG_PLAT_SPEAR=y
+ CONFIG_ARCH_SPEAR6XX=y
+ CONFIG_BOARD_SPEAR600_EVB=y
++CONFIG_AEABI=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_ARPD=y
++# CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_ST=y
++CONFIG_CHR_DEV_OSST=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_NETDEVICES=y
++# CONFIG_WLAN is not set
+ CONFIG_INPUT_FF_MEMLESS=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+@@ -20,30 +58,52 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_RAW_DRIVER=y
+ CONFIG_MAX_RAW_DEVS=8192
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_FB_ARMCLCD_SAMSUNG_LMS700=y
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_TEST=y
++CONFIG_RTC_CLASS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
++CONFIG_NLS_ASCII=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
++# CONFIG_ARM_UNWIND is not set
 -- 
 1.7.2.2
