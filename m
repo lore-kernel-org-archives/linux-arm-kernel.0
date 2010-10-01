@@ -1,70 +1,72 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Fri, 1 Oct 2010 11:12:40 +0530
-Subject: [PATCH 43/74] ST SPEAr : EMI (Extrenal Memory Interface)
-	controller driver
-In-Reply-To: <20100906224050.GA8153@game.jcrosoft.org>
-References: <cover.1283161023.git.viresh.kumar@st.com>
-	<468bb871e1ce062fbde39f78600b23a896b57a72.1283161023.git.viresh.kumar@st.com>
-	<20100906224050.GA8153@game.jcrosoft.org>
-Message-ID: <4CA574D0.1020907@st.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 1 Oct 2010 15:16:30 +0900
+Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
+In-Reply-To: <00ed01cb6129$8d1e2eb0$a75a8c10$%szyprowski@samsung.com>
+References: <20100930044859.GA16923@july>
+	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
+	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
+	<AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
+	<00e201cb6094$c52391a0$4f6ab4e0$%szyprowski@samsung.com>
+	<AANLkTikvsxXF+iXcfzLoMM+_2pr5zd1sYvhu1EVoBh+f@mail.gmail.com>
+	<00ed01cb6129$8d1e2eb0$a75a8c10$%szyprowski@samsung.com>
+Message-ID: <AANLkTikr-QEpBBdkxRc-VtsVoOH32oXu7gQhrZB3WCyY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/7/2010 4:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> diff --git a/arch/arm/mach-spear3xx/emi.c b/arch/arm/mach-spear3xx/emi.c
->> > new file mode 100644
->> > index 0000000..dd5cb8e
->> > --- /dev/null
->> > +++ b/arch/arm/mach-spear3xx/emi.c
->> > @@ -0,0 +1,86 @@
->> > +/*
->> > + * arch/arm/mach-spear3xx/emi.c
->> > + *
->> > + * EMI (External Memory Interface) file
->> > + *
->> > + * Copyright (C) 2010 ST Microelectronics
->> > + * Vipin Kumar<vipin.kumar@st.com>
->> > + *
->> > + * This file is licensed under the terms of the GNU General Public
->> > + * License version 2. This program is licensed "as is" without any
->> > + * warranty of any kind, whether express or implied.
->> > + */
->> > +
->> > +#include <linux/clk.h>
->> > +#include <linux/err.h>
->> > +#include <linux/init.h>
->> > +#include <linux/io.h>
->> > +#include <mach/emi.h>
->> > +
->> > +int __init emi_init(struct platform_device *pdev, unsigned long base,
->> > +             u32 bank, u32 width)
->> > +{
-> how about request the memory region
-> 
-> and use platform device to register the bank ressource instead of define
-> 
-> it will make it more flexible
+On Fri, Oct 1, 2010 at 2:28 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> On Friday, October 01, 2010 1:52 AM Jassi Brar wrote:
+>
+>> On Thu, Sep 30, 2010 at 8:43 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>> >> >> We are considering another way not to make additional new i2c dev files.
+>> >> >> In my opinion, this patch looks not bad but we'd better make an effort to
+>> >> >> avoid having the more similar file.
+>> >> >
+>> >> > Actually I also it's not good approach, but as there's no comment or
+>> >> > discuss about this I send the patches.
+>> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/022615.html
+>> >> >
+>> >> > If you have good method or approaches, I'm welcome.
+>> >>
+>> >> First, these are device definitions and gpio set callbacks and
+>> >> shouldn't take much
+>> >> of space. So, perhaps these all could be built upon single I2C support
+>> >> selection.
+>> >>
+>> >> Second, if we must build them conditionally, how about having all in
+>> >> one file with
+>> >> each device's definition and callback surrounded by corresponding ifdef ?
+>> >> That would alteast save us file-count.
+>> >
+>> > I don't think this is a good idea. IMHO we should now follow the current style
+>> > of defining platform devices and the convert all at once. Mixing style always
+>> > causes a lot of confusion.
+>>
+>> You mean to keep defining every controller in in a dedicated file ?
+>
+> Yes, what's the problem with many files? The i2c patches are ready, they match the
+> way the other Samsung devices are defined in mainline kernel. It imho really important
+> to have a common style across the same chip family to make the code easier to understand
+> for someone new.
+Talking about common style, dev-audio.c and dev-spi.c defines all
+controllers in same file.
+Also, the decision was made while Ben was here. Unfortunately he
+didn't mandate all devices
+do that.
+Now, that we don't really have a 'common style', IMHO we'd better take
+the better path if not the best.
 
+>> If yes, my second option is still better, IMO.
+>> If no, please explain what do you mean by current style.
+>
+> Well, postponing a merge of such simple code as i2c device definition is imho the
+> worst solution. Especially because the new style / framework still has not been agreed
+> yet, although a few proposals have been made a long time ago.
+I don't think merging 7 files in 1 and adding ifdefs should take more
+than a few hours including
+testing. But of course, I can't assume the speed of the developer.
 
-Hello Jean,
-
-Sorry for replying late
-
-Since the physmap driver implementation is generic for all the CFI device 
-controllers, the driver expects only the actual flash base address in 
-resource. Offcourse, the controller needs to be initialized separately.
-
-Moreover, in most of the platforms where physmap driver is being used, the 
-controllers are initialized independently. i.e only the NOR flash base 
-addresses are passed as resource
-
-examples are 
-
-arch/arm/mach-at91/board-cap9adk.c
-arch/arm/mach-ep93xx/adssphere.c
-arch/arm/mach-ep93xx/micro9.c
-
-and many more
-
-Regards
-Vipin
+Thanks.
