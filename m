@@ -1,30 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Oct 2010 00:24:26 -0700
-Subject: [PATCH 3/3] ARM: S5PV210: Add voltage consumer of WM8994 to
-	the regulator framework
-In-Reply-To: <AANLkTinRgTJdPowTEZX0nix2FR31A-8cVmBUf7n8zdE7@mail.gmail.com>
-References: <4CA5623D.3000002@samsung.com>
-	<20101001053139.GE30949@sirena.org.uk>
-	<AANLkTinRgTJdPowTEZX0nix2FR31A-8cVmBUf7n8zdE7@mail.gmail.com>
-Message-ID: <20101001072425.GD20529@opensource.wolfsonmicro.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 1 Oct 2010 09:25:09 +0200
+Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
+In-Reply-To: <1285910489.31224.14.camel@macbook.infradead.org>
+References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
+	<4CA560B7.5080505@st.com>
+	<1285910489.31224.14.camel@macbook.infradead.org>
+Message-ID: <AANLkTintC=5Mo82QS0xxB143WrHrijqGOqdyZ=2BxCYe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 01, 2010 at 02:40:02PM +0900, Kyungmin Park wrote:
+2010/10/1 David Woodhouse <dwmw2@infradead.org>:
+> On Fri, 2010-10-01 at 09:46 +0530, viresh kumar wrote:
 
-> FYI: now wm8994 codec is connected to I/O power directly. and there's
-> no connection with PMIC.
+>> Just one query, what should be the location of fsmc.h
+>> include/mtd/ or include/linux/mtd ??
+>
+> We use include/mtd/ for headers which are exported to userspace. Looks
+> like this should be include/linux/mtd/
 
-Presumably there's a power rail connection...
+Aha, I'll respin it then.
 
-> Maybe you mean the I/O power LDO and use it. but it's always on in
-> case of s5pc110.
-
-...like this.
-
-> and can't turn off the this LDO on max8998 except the sleep.
-
-It's still good to show the actual connection on the board for clarity -
-like I say, the regulator API can handle always on regulators and
-keeping the regulator setup in software close to the schematic helps
-make the code easier to follow.
+Yours,
+Linus Walleij
