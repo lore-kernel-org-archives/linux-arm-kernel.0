@@ -1,31 +1,40 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Sat,  2 Oct 2010 09:19:57 +0900
-Subject: [PATCH] ARM: S5PV210: Fix build error on pm
-Message-ID: <1285978797-7964-1-git-send-email-sbkim73@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 01 Oct 2010 16:34:15 -0700
+Subject: [PATCH 4/8] omap: pandora: enable twl4030 charger
+In-Reply-To: <20101001233315.31894.49599.stgit@baageli.muru.com>
+References: <20101001233315.31894.49599.stgit@baageli.muru.com>
+Message-ID: <20101001233415.31894.50639.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes build error by S3C2410 PM
-Suspend debug option due to undefined address
+From: Grazvydas Ignotas <notasas@gmail.com>
 
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+Add platform data to make use of newly added charging driver.
+
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-s5pv210/include/mach/map.h |    3 +++
+ arch/arm/mach-omap2/board-omap3pandora.c |    3 +++
  1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-s5pv210/include/mach/map.h
-index bd9afd5..9722042 100644
---- a/arch/arm/mach-s5pv210/include/mach/map.h
-+++ b/arch/arm/mach-s5pv210/include/mach/map.h
-@@ -57,6 +57,9 @@
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 7c222ba..7192635 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -533,6 +533,8 @@ static struct twl4030_codec_data omap3pandora_codec_data = {
+ 	.audio = &omap3pandora_audio_data,
+ };
  
- #define S5P_SZ_UART		SZ_256
- 
-+#define S3C_VA_UARTx(x)		(S3C_VA_UART + (S3C_PA_UART & 0xfffff) \
-+				+ ((x) * S3C_UART_OFFSET))
++static struct twl4030_bci_platform_data pandora_bci_data;
 +
- #define S5PV210_PA_SROMC	(0xE8000000)
+ static struct twl4030_platform_data omap3pandora_twldata = {
+ 	.irq_base	= TWL4030_IRQ_BASE,
+ 	.irq_end	= TWL4030_IRQ_END,
+@@ -548,6 +550,7 @@ static struct twl4030_platform_data omap3pandora_twldata = {
+ 	.vaux4		= &pandora_vaux4,
+ 	.vsim		= &pandora_vsim,
+ 	.keypad		= &pandora_kp_data,
++	.bci		= &pandora_bci_data,
+ };
  
- #define S5PV210_PA_CFCON	(0xE8200000)
--- 
-1.6.2.5
+ static struct i2c_board_info __initdata omap3pandora_i2c_boardinfo[] = {
