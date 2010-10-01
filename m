@@ -1,61 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri,  1 Oct 2010 21:05:20 +0900
-Subject: [PATCH 23/27] ARM: S5PC100: Change to using s3c_gpio_cfgrange_nopull()
-In-Reply-To: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
-References: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1285934724-5007-24-git-send-email-kgene.kim@samsung.com>
+From: viresh.kumar@st.com (Viresh KUMAR)
+Date: Fri,  1 Oct 2010 17:26:25 +0530
+Subject: [PATCH V2 65/69] ST SPEAR6xx: renaming spear600_defconfig as
+	spear6xx_defconfig
+In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>
+Message-ID: <9c685d931c33e6b5d549519d6cec8da6c3fdbab7.1285933332.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben-linux@fluff.org>
-
-Change code setting special-function and no pull-up to use
-the s3c_gpio_cfgrange_nopull() wrapper.
-
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-s5pc100/setup-sdhci-gpio.c |   12 ++++--------
- 1 files changed, 4 insertions(+), 8 deletions(-)
+ .../{spear600_defconfig => spear6xx_defconfig}     |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+ rename arch/arm/configs/{spear600_defconfig => spear6xx_defconfig} (97%)
 
-diff --git a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-index a8d22a7..03c02d0 100644
---- a/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-+++ b/arch/arm/mach-s5pc100/setup-sdhci-gpio.c
-@@ -33,12 +33,10 @@ void s5pc100_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
- 		num = width - 2;
- 
- 	/* Set all the necessary GPG0/GPG1 pins to special-function 0 */
--	s3c_gpio_cfgall_range(S5PC100_GPG0(0), 2 + num,
--			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
-+	s3c_gpio_cfgrange_nopull(S5PC100_GPG0(0), 2 + num, S3C_GPIO_SFN(2));
- 
- 	if (width == 8)
--		s3c_gpio_cfgall_range(S5PC100_GPG1(0), 2,
--				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
-+		s3c_gpio_cfgrange_nopull(S5PC100_GPG1(0), 2, S3C_GPIO_SFN(2));
- 
- 	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
- 		s3c_gpio_setpull(S5PC100_GPG1(2), S3C_GPIO_PULL_UP);
-@@ -51,8 +49,7 @@ void s5pc100_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
- 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
- 
- 	/* Set all the necessary GPG2 pins to special-function 2 */
--	s3c_gpio_cfgall_range(S5PC100_GPG2(0), 2 + width,
--			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
-+	s3c_gpio_cfgrange_nopull(S5PC100_GPG2(0), 2 + width, S3C_GPIO_SFN(2));
- 
- 	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
- 		s3c_gpio_setpull(S5PC100_GPG2(6), S3C_GPIO_PULL_UP);
-@@ -65,8 +62,7 @@ void s5pc100_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
- 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
- 
- 	/* Set all the necessary GPG3 pins to special-function 2 */
--	s3c_gpio_cfgall_range(S5PC100_GPG3(0), 2 + width,
--			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
-+	s3c_gpio_cfgrange_nopull(S5PC100_GPG3(0), 2 + width, S3C_GPIO_SFN(2));
- 
- 	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
- 		s3c_gpio_setpull(S5PC100_GPG3(6), S3C_GPIO_PULL_UP);
+diff --git a/arch/arm/configs/spear600_defconfig b/arch/arm/configs/spear6xx_defconfig
+similarity index 97%
+rename from arch/arm/configs/spear600_defconfig
+rename to arch/arm/configs/spear6xx_defconfig
+index 6777c11..cef2e83 100644
+--- a/arch/arm/configs/spear600_defconfig
++++ b/arch/arm/configs/spear6xx_defconfig
+@@ -8,6 +8,7 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_PLAT_SPEAR=y
+ CONFIG_ARCH_SPEAR6XX=y
++CONFIG_BOARD_SPEAR600_EVB=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_BLK_DEV_RAM=y
+@@ -22,7 +23,6 @@ CONFIG_MAX_RAW_DEVS=8192
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ # CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_EXT2_FS=y
 -- 
-1.6.2.5
+1.7.2.2
