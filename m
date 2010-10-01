@@ -1,34 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 1 Oct 2010 11:27:53 -0700
-Subject: [PATCH 3/3] ARM: S5PV210: Add voltage consumer of WM8994 to
-	the regulator framework
-In-Reply-To: <AANLkTi=4XjbTDb_vukFicO2tXYvww-dGFyaErwx1i-BF@mail.gmail.com>
-References: <4CA5623D.3000002@samsung.com>
-	<20101001053139.GE30949@sirena.org.uk>
-	<AANLkTinRgTJdPowTEZX0nix2FR31A-8cVmBUf7n8zdE7@mail.gmail.com>
-	<20101001072425.GD20529@opensource.wolfsonmicro.com>
-	<AANLkTi=4XjbTDb_vukFicO2tXYvww-dGFyaErwx1i-BF@mail.gmail.com>
-Message-ID: <20101001182752.GD21157@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Oct 2010 19:34:31 +0100
+Subject: [PATCH 3/3] ARM: twd_smp: add clock api support
+In-Reply-To: <AANLkTi=zwxKhhO7ERBvWfeHF7yO4beex5CYioPtiyWpA@mail.gmail.com>
+References: <1285886952-30888-1-git-send-email-robherring2@gmail.com>
+	<1285886952-30888-3-git-send-email-robherring2@gmail.com>
+	<AANLkTi=L69BXQZfT3VAeLgyBBHA2O8ELeLdqL1Onk3t=@mail.gmail.com>
+	<4CA5417B.5020200@gmail.com>
+	<AANLkTik=JXaDKbx97avUKerDQeK-O9gRuyfAZPHDQ2Yp@mail.gmail.com>
+	<4CA551FF.3080100@gmail.com>
+	<AANLkTim3wYDNySWxba3-xWkj495GTiGxWN9L08Rnaa9C@mail.gmail.com>
+	<4CA614AA.8090305@gmail.com>
+	<AANLkTi=zwxKhhO7ERBvWfeHF7yO4beex5CYioPtiyWpA@mail.gmail.com>
+Message-ID: <20101001183431.GB22533@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 01, 2010 at 05:25:43PM +0900, Kyungmin Park wrote:
-> On Fri, Oct 1, 2010 at 4:24 PM, Mark Brown
+On Fri, Oct 01, 2010 at 11:22:31AM -0700, Colin Cross wrote:
+> The timer APIs require that a timer take at least as long as requested
+> to fire.  If you change the TWD prescaler before the CPU frequency
+> increases, or after the CPU frequency decreases, the timer interrupt
+> will not fire until a small time after the requested time.
 
-> > It's still good to show the actual connection on the board for clarity -
-> > like I say, the regulator API can handle always on regulators and
-> > keeping the regulator setup in software close to the schematic helps
-> > make the code easier to follow.
+That maybe - and for TWD which is used for local timer purposes only,
+that's fine.  What wouldn't be fine is if your clocksource counter
+changes frequency...
 
-> It's best but in most case schematic is confidential. so it's impossible.
+In any case, I'm not sure that passing in a struct clk pointer is
+really the right way to go - the point of the clk API is to remove
+such passing of static structures.
 
-Right, this is normal - even with widely available reference boards the
-schematics are often distributed only under NDA.  Since the information
-exposed is at the same level as describing where the devices are on
-buses and so on this isn't usually a problem.
+How about instead using clk_get_sys() to obtain a clock for the TWD?
 
-> And as you concerns there's no power issues related with codes. it's
-> already verified design. I think wolfsonmicro already confirmed.
-
-Using a fixed voltage regulator won't cause a problem in operation, the
-issue is one of code quality.
+Do we need separate connection IDs for each TWD, or are all TWDs in
+a system always clocked together?
