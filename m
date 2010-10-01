@@ -1,207 +1,103 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 30 Sep 2010 19:48:53 -0700
-Subject: [PATCH 1/2] gic: Add functions to save and restore gic state
-Message-ID: <1285901335-26354-1-git-send-email-ccross@android.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 30 Sep 2010 22:14:07 -0500
+Subject: [PATCH 3/3] ARM: twd_smp: add clock api support
+In-Reply-To: <AANLkTik=JXaDKbx97avUKerDQeK-O9gRuyfAZPHDQ2Yp@mail.gmail.com>
+References: <1285886952-30888-1-git-send-email-robherring2@gmail.com>	<1285886952-30888-3-git-send-email-robherring2@gmail.com>	<AANLkTi=L69BXQZfT3VAeLgyBBHA2O8ELeLdqL1Onk3t=@mail.gmail.com>	<4CA5417B.5020200@gmail.com>
+	<AANLkTik=JXaDKbx97avUKerDQeK-O9gRuyfAZPHDQ2Yp@mail.gmail.com>
+Message-ID: <4CA551FF.3080100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on systems with idle states which power-gate the logic including
-the gic, such as tegra, the gic distributor needs to be shut down
-and restored on entry and exit from the architecture idle code
+On 09/30/2010 09:30 PM, Colin Cross wrote:
+> On Thu, Sep 30, 2010 at 7:03 PM, Rob Herring<robherring2@gmail.com>  wrote:
+>> On 09/30/2010 07:49 PM, Colin Cross wrote:
+>>>
+>>> On Thu, Sep 30, 2010 at 3:49 PM, Rob Herring<robherring2@gmail.com>
+>>>   wrote:
+>>>>
+>>>> From: Rob Herring<rob.herring@smooth-stone.com>
+>>>>
+>>>> The private timer freq is currently dynamically detected
+>>>> using jiffies count to determine the rate. This method adds
+>>>> a delay to boot-up, so use the clock api instead to get the
+>>>> clock rate.
+>>>>
+>>>> Signed-off-by: Rob Herring<rob.herring@smooth-stone.com>
+>>>> ---
+>>>>   arch/arm/include/asm/smp_twd.h |    2 ++
+>>>>   arch/arm/kernel/smp_twd.c      |    7 +++++++
+>>>>   2 files changed, 9 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/smp_twd.h
+>>>> b/arch/arm/include/asm/smp_twd.h
+>>>> index 634f357..bafad52 100644
+>>>> --- a/arch/arm/include/asm/smp_twd.h
+>>>> +++ b/arch/arm/include/asm/smp_twd.h
+>>>> @@ -19,11 +19,13 @@
+>>>>   #define TWD_TIMER_CONTROL_IT_ENABLE    (1<<    2)
+>>>>
+>>>>   struct clock_event_device;
+>>>> +struct clk;
+>>>>
+>>>>   extern void __iomem *twd_base;
+>>>>
+>>>>   void twd_timer_stop(void);
+>>>>   int twd_timer_ack(void);
+>>>>   void twd_timer_setup(struct clock_event_device *);
+>>>> +void twd_timer_init(void __iomem *base, struct clk *clk);
+>>>>
+>>>>   #endif
+>>>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+>>>> index 35882fb..1a3c959 100644
+>>>> --- a/arch/arm/kernel/smp_twd.c
+>>>> +++ b/arch/arm/kernel/smp_twd.c
+>>>> @@ -17,6 +17,7 @@
+>>>>   #include<linux/clockchips.h>
+>>>>   #include<linux/irq.h>
+>>>>   #include<linux/io.h>
+>>>> +#include<linux/clk.h>
+>>>>
+>>>>   #include<asm/smp_twd.h>
+>>>>   #include<asm/hardware/gic.h>
+>>>> @@ -151,6 +152,12 @@ void __cpuinit twd_timer_setup(struct
+>>>> clock_event_device *clk)
+>>>>         clockevents_register_device(clk);
+>>>>   }
+>>>>
+>>>> +void __init twd_timer_init(void __iomem *base, struct clk *clk)
+>>>> +{
+>>>> +       twd_base = base;
+>>>> +       twd_timer_rate = clk_get_rate(clk);
+>>>> +}
+>>>> +
+>>>>   #ifdef CONFIG_HOTPLUG_CPU
+>>>>   /*
+>>>>   * take a local timer down
+>>>
+>>> The local timers run off the PERIPHCLK in the CPU, which is specified
+>>> as the CPU clock divided by an implementation defined integer>= 2.
+>>> If you take the divider value as a parameter to twd_timer_init, the
+>>> clock that is passed in can be the cpu's clock.
+>>
+>> That is an implementation detail of the A9. Future designs could be
+>> completely asynchronous. Using the clock api works either way.
+>
+> True.  That could still be handled by passing a divider of 1.  For all
+> current implementations, this api will be used with clock that is a
+> constant divider of an existing clock.  Taking a divider value would
+> avoid having to create a new clock that may not be similar to any
+> other clock in the device.
 
-Change-Id: I17603f5ac70d65c05587d0647cce3ba87675e117
-Original-author: Gary King <gking@nvidia.com>
-Signed-off-by: Gary King <gking@nvidia.com>
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/common/gic.c               |  123 ++++++++++++++++++++++++++++++++--
- arch/arm/include/asm/hardware/gic.h |    4 +
- 2 files changed, 119 insertions(+), 8 deletions(-)
+If I pass in a divider, what clock rate do I divide with it? If I only 
+have the divider, then I'm dependent on knowing CLK freq (the cpu freq 
+in A9 case). Ultimately I have to know the timer clock rate to setup a 
+clock_event device. I'm open to passing in the clock rate directly, but 
+having the clk ptr is more flexible. Other examples of timer init like 
+i.MX use the same arguments.
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 7dfa9a8..cfbe8b1 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -39,6 +39,13 @@ struct gic_chip_data {
- 	unsigned int irq_offset;
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
-+#ifdef CONFIG_PM
-+	u32 saved_enable[DIV_ROUND_UP(1020, 32)];
-+	u32 saved_conf[DIV_ROUND_UP(1020, 16)];
-+	u32 saved_pri[DIV_ROUND_UP(1020, 4)];
-+	u32 saved_target[DIV_ROUND_UP(1020, 4)];
-+#endif
-+	unsigned int max_irq;
- };
- 
- #ifndef MAX_GIC_NR
-@@ -221,21 +228,15 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
- 	set_irq_chained_handler(irq, gic_handle_cascade_irq);
- }
- 
--void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
--			  unsigned int irq_start)
-+static unsigned int _gic_dist_init(unsigned int gic_nr)
- {
- 	unsigned int max_irq, i;
-+	void __iomem *base = gic_data[gic_nr].dist_base;
- 	u32 cpumask = 1 << smp_processor_id();
- 
--	if (gic_nr >= MAX_GIC_NR)
--		BUG();
--
- 	cpumask |= cpumask << 8;
- 	cpumask |= cpumask << 16;
- 
--	gic_data[gic_nr].dist_base = base;
--	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
--
- 	writel(0, base + GIC_DIST_CTRL);
- 
- 	/*
-@@ -276,6 +277,96 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
- 	for (i = 0; i < max_irq; i += 32)
- 		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
- 
-+	return max_irq;
-+}
-+
-+static void _gic_dist_exit(unsigned int gic_nr)
-+{
-+	writel(0, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
-+}
-+
-+#ifdef CONFIG_PM
-+void gic_dist_save(unsigned int gic_nr)
-+{
-+	unsigned int max_irq = gic_data[gic_nr].max_irq;
-+	void __iomem *dist_base = gic_data[gic_nr].dist_base;
-+	int i;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	_gic_dist_exit(gic_nr);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
-+		gic_data[gic_nr].saved_conf[i] =
-+			readl(dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		gic_data[gic_nr].saved_pri[i] =
-+			readl(dist_base + GIC_DIST_PRI + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		gic_data[gic_nr].saved_target[i] =
-+			readl(dist_base + GIC_DIST_TARGET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
-+		gic_data[gic_nr].saved_enable[i] =
-+			readl(dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+}
-+
-+void gic_dist_restore(unsigned int gic_nr)
-+{
-+	unsigned int max_irq;
-+	unsigned int i;
-+	void __iomem *dist_base;
-+	void __iomem *cpu_base;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	_gic_dist_init(gic_nr);
-+
-+	max_irq = gic_data[gic_nr].max_irq;
-+	dist_base = gic_data[gic_nr].dist_base;
-+	cpu_base = gic_data[gic_nr].cpu_base;
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
-+		writel(gic_data[gic_nr].saved_conf[i],
-+			dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		writel(gic_data[gic_nr].saved_pri[i],
-+			dist_base + GIC_DIST_PRI + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-+		writel(gic_data[gic_nr].saved_target[i],
-+			dist_base + GIC_DIST_TARGET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
-+		writel(gic_data[gic_nr].saved_enable[i],
-+			dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+
-+	writel(1, dist_base + GIC_DIST_CTRL);
-+	writel(0xf0, cpu_base + GIC_CPU_PRIMASK);
-+	writel(1, cpu_base + GIC_CPU_CTRL);
-+}
-+#endif
-+
-+void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
-+			  unsigned int irq_start)
-+{
-+	unsigned int max_irq;
-+	unsigned int i;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	gic_data[gic_nr].dist_base = base;
-+	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
-+
-+	max_irq = _gic_dist_init(gic_nr);
-+	gic_data[gic_nr].max_irq = max_irq;
-+
- 	/*
- 	 * Setup the Linux IRQ subsystem.
- 	 */
-@@ -289,6 +380,14 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
- 	writel(1, base + GIC_DIST_CTRL);
- }
- 
-+void gic_dist_exit(unsigned int gic_nr)
-+{
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	_gic_dist_exit(gic_nr);
-+}
-+
- void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
- {
- 	if (gic_nr >= MAX_GIC_NR)
-@@ -300,6 +399,14 @@ void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
- 	writel(1, base + GIC_CPU_CTRL);
- }
- 
-+void gic_cpu_exit(unsigned int gic_nr)
-+{
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
-+}
-+
- #ifdef CONFIG_SMP
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 7f34333..0a198b0 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -34,7 +34,11 @@
- 
- #ifndef __ASSEMBLY__
- void gic_dist_init(unsigned int gic_nr, void __iomem *base, unsigned int irq_start);
-+void gic_dist_save(unsigned int gic_nr);
-+void gic_dist_restore(unsigned int gic_nr);
-+void gic_dist_exit(unsigned int gic_nr);
- void gic_cpu_init(unsigned int gic_nr, void __iomem *base);
-+void gic_cpu_exit(unsigned int gic_nr);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
- #endif
--- 
-1.7.1
+The point of this api is to avoid spending 5 jiffies on the primary cpu 
+to calculate the rate. That is a significant chunk of the kernel boot 
+time. Calling this function is entirely optional and the old way still 
+works.
+
+Rob
