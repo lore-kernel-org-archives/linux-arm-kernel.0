@@ -1,59 +1,92 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri,  1 Oct 2010 14:29:41 -0700
-Subject: [PATCH 17/47] DA850: Split MMCSD clock into two to support both MMCSD
-	peripherals
+Date: Fri,  1 Oct 2010 14:29:42 -0700
+Subject: [PATCH 18/47] DA850: Add MMCSD1 resources,
+	platform device and convenience registration function
 In-Reply-To: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
 References: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285968611-26890-18-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1285968611-26890-19-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Juha Kuikka <juha.kuikka@elektrobit.com>
 
-Split mmcsd_clk into mmcsd0_clk and mmcsd1_clk and add davinci_mmc.1
-in preparation for adding support for MMCSD1 peripheral in DA850.
+Add resources, platform device and convenience registration function for DA850's second MMC/SD controller (MMCSD1).
 
 Signed-off-by: Juha Kuikka <juha.kuikka@elektrobit.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/da850.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/devices-da8xx.c      |   39 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
+ 2 files changed, 40 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index c2a3ce5..63916b9 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -325,12 +325,19 @@ static struct clk lcdc_clk = {
- 	.gpsc		= 1,
- };
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 52bc7b1..caeb7f4 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -24,6 +24,7 @@
+ #include "clock.h"
  
--static struct clk mmcsd_clk = {
--	.name		= "mmcsd",
-+static struct clk mmcsd0_clk = {
-+	.name		= "mmcsd0",
- 	.parent		= &pll0_sysclk2,
- 	.lpsc		= DA8XX_LPSC0_MMC_SD,
- };
+ #define DA8XX_TPCC_BASE			0x01c00000
++#define DA850_MMCSD1_BASE		0x01e1b000
+ #define DA850_TPCC1_BASE		0x01e30000
+ #define DA8XX_TPTC0_BASE		0x01c08000
+ #define DA8XX_TPTC1_BASE		0x01c08400
+@@ -566,6 +567,44 @@ int __init da8xx_register_mmcsd0(struct davinci_mmc_config *config)
+ 	return platform_device_register(&da8xx_mmcsd0_device);
+ }
  
-+static struct clk mmcsd1_clk = {
-+	.name		= "mmcsd1",
-+	.parent		= &pll0_sysclk2,
-+	.lpsc		= DA850_LPSC1_MMC_SD1,
-+	.gpsc		= 1,
++#ifdef CONFIG_ARCH_DAVINCI_DA850
++static struct resource da850_mmcsd1_resources[] = {
++	{		/* registers */
++		.start	= DA850_MMCSD1_BASE,
++		.end	= DA850_MMCSD1_BASE + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	{		/* interrupt */
++		.start	= IRQ_DA850_MMCSDINT0_1,
++		.end	= IRQ_DA850_MMCSDINT0_1,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{		/* DMA RX */
++		.start	= EDMA_CTLR_CHAN(1, 28),
++		.end	= EDMA_CTLR_CHAN(1, 28),
++		.flags	= IORESOURCE_DMA,
++	},
++	{		/* DMA TX */
++		.start	= EDMA_CTLR_CHAN(1, 29),
++		.end	= EDMA_CTLR_CHAN(1, 29),
++		.flags	= IORESOURCE_DMA,
++	},
 +};
 +
- static struct clk aemif_clk = {
- 	.name		= "aemif",
- 	.parent		= &pll0_sysclk3,
-@@ -377,7 +384,8 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("davinci_emac.1",	NULL,		&emac_clk),
- 	CLK("davinci-mcasp.0",	NULL,		&mcasp_clk),
- 	CLK("da8xx_lcdc.0",	NULL,		&lcdc_clk),
--	CLK("davinci_mmc.0",	NULL,		&mmcsd_clk),
-+	CLK("davinci_mmc.0",	NULL,		&mmcsd0_clk),
-+	CLK("davinci_mmc.1",	NULL,		&mmcsd1_clk),
- 	CLK(NULL,		"aemif",	&aemif_clk),
- 	CLK(NULL,		NULL,		NULL),
- };
++static struct platform_device da850_mmcsd1_device = {
++	.name		= "davinci_mmc",
++	.id		= 1,
++	.num_resources	= ARRAY_SIZE(da850_mmcsd1_resources),
++	.resource	= da850_mmcsd1_resources,
++};
++
++int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
++{
++	da850_mmcsd1_device.dev.platform_data = config;
++	return platform_device_register(&da850_mmcsd1_device);
++}
++#endif
++
+ static struct resource da8xx_rtc_resources[] = {
+ 	{
+ 		.start		= DA8XX_RTC_BASE,
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 504f2f6..4247b3f 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -76,6 +76,7 @@ int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
+ int da8xx_register_emac(void);
+ int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
+ int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
++int da850_register_mmcsd1(struct davinci_mmc_config *config);
+ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
+ int da8xx_register_rtc(void);
+ int da850_register_cpufreq(char *async_clk);
 -- 
 1.7.2.1
