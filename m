@@ -1,52 +1,73 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 01 Oct 2010 16:33:57 -0700
-Subject: [PATCH 0/8] omap2+ patches for v2.6.37 merge window
-Message-ID: <20101001233315.31894.49599.stgit@baageli.muru.com>
+Date: Fri, 01 Oct 2010 16:34:17 -0700
+Subject: [PATCH 5/8] OMAP4 ES2: HSMMC soft reset change
+In-Reply-To: <20101001233315.31894.49599.stgit@baageli.muru.com>
+References: <20101001233315.31894.49599.stgit@baageli.muru.com>
+Message-ID: <20101001233417.31894.33130.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Madhusudhan Chikkature <madhu.cr@ti.com>
 
-Here are some omap2/3/4 related patches I've picked up.
+The omap4 es2 hsmmc has a updated soft reset logic.After the
+reset is issued monitor a 0->1 transition first. The reset of
+CMD or DATA lines is complete only after a 0->1->0 transition
+of SRC or SRD bits.
 
-Regards,
-
-Tony
-
+Signed-off-by: Madhusudhan Chikkature <madhu.cr@ti.com>
+Tested-by: Anand Gadiyar <gadiyar@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/mach-omap2/hsmmc.c           |    3 +++
+ arch/arm/plat-omap/include/plat/mmc.h |    1 +
+ drivers/mmc/host/omap_hsmmc.c         |   11 +++++++++++
+ 3 files changed, 15 insertions(+), 0 deletions(-)
 
-Benoit Cousson (1):
-      omap4 hsmmc: Fix the init if CONFIG_MMC_OMAP_HS is not set
-
-Grazvydas Ignotas (2):
-      omap: pandora: add fixed regulator for wlan
-      omap: pandora: enable twl4030 charger
-
-Madhusudhan Chikkature (1):
-      OMAP4 ES2: HSMMC soft reset change
-
-Sanjeev Premi (1):
-      omap2/3: Update revision identification
-
-Tony Lindgren (1):
-      omap: Fix omap_mux_init_signal not to trash muxname
-
-kishore kadiyala (2):
-      omap4 hsmmc: Register offset handling
-      omap4 hsmmc: Update ocr mask for MMC2 for regulator to use
-
-
- arch/arm/mach-omap2/board-4430sdp.c      |    9 +++-
- arch/arm/mach-omap2/board-omap3pandora.c |   46 +++++++++++++++----
- arch/arm/mach-omap2/devices.c            |    8 +--
- arch/arm/mach-omap2/hsmmc.c              |    7 +++
- arch/arm/mach-omap2/id.c                 |   72 ++++++++++++++++++++----------
- arch/arm/mach-omap2/mux.c                |   13 +++--
- arch/arm/mach-omap2/mux.h                |    2 -
- arch/arm/plat-omap/include/plat/cpu.h    |   36 ++++++++-------
- arch/arm/plat-omap/include/plat/mmc.h    |    4 ++
- drivers/mmc/host/omap_hsmmc.c            |   25 ++++++++++
- 10 files changed, 156 insertions(+), 66 deletions(-)
-
--- 
-Signature
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index eb92b81..df1311d 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -303,6 +303,9 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
+ 		else
+ 			mmc->slots[0].features |= HSMMC_HAS_PBIAS;
+ 
++		if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
++			mmc->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
++
+ 		switch (c->mmc) {
+ 		case 1:
+ 			if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
+diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+index bc85010..0f0f113 100644
+--- a/arch/arm/plat-omap/include/plat/mmc.h
++++ b/arch/arm/plat-omap/include/plat/mmc.h
+@@ -110,6 +110,7 @@ struct omap_mmc_platform_data {
+ 
+ 		/* we can put the features above into this variable */
+ #define HSMMC_HAS_PBIAS		(1 << 0)
++#define HSMMC_HAS_UPDATED_RESET	(1 << 1)
+ 		unsigned features;
+ 
+ 		int switch_pin;			/* gpio (card detect) */
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 53f8fa5..69858e7 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -982,6 +982,17 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+ 			 OMAP_HSMMC_READ(host->base, SYSCTL) | bit);
+ 
++	/*
++	 * OMAP4 ES2 and greater has an updated reset logic.
++	 * Monitor a 0->1 transition first
++	 */
++	if (mmc_slot(host).features & HSMMC_HAS_UPDATED_RESET) {
++		while ((!(OMAP_HSMMC_READ(host, SYSCTL) & bit))
++					&& (i++ < limit))
++			cpu_relax();
++	}
++	i = 0;
++
+ 	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & bit) &&
+ 		(i++ < limit))
+ 		cpu_relax();
