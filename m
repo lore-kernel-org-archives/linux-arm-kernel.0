@@ -1,302 +1,76 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:26:01 +0530
-Subject: [PATCH V2 41/69] SPEAr Clock Framework: Adding support for PLL
-	frequency change
+Date: Fri,  1 Oct 2010 17:26:10 +0530
+Subject: [PATCH V2 50/69] ST SPEAr13xx: Modified static mappings
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <e9532ec2012f0e96068ecb2f57088e550a80aa00.1285933332.git.viresh.kumar@st.com>
+Message-ID: <81ee7baeea114d591582d1adf33b67f45af5df12.1285933332.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
+The new static io mappings map regions in 0xE...,.... space to
+0xF...,.... and those in space 0x6...,.... to 0xE...,.... range.
+This is done to accomodate regions of RAS configuration registers to be
+used by clock frameowrk and possibly others.
+
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/spear3xx.c        |    5 +
- arch/arm/mach-spear6xx/spear6xx.c        |    5 +
- arch/arm/plat-spear/Makefile             |    2 +-
- arch/arm/plat-spear/clock.c              |    6 +-
- arch/arm/plat-spear/include/plat/clock.h |    1 +
- arch/arm/plat-spear/pll_clk.S            |  187 ++++++++++++++++++++++++++++++
- 6 files changed, 201 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/plat-spear/pll_clk.S
+ arch/arm/mach-spear13xx/include/mach/hardware.h |    7 ++++++-
+ arch/arm/mach-spear13xx/include/mach/vmalloc.h  |    2 +-
+ arch/arm/mach-spear13xx/spear13xx.c             |    8 ++++++++
+ 3 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index dcbe020..c9727ac 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -271,6 +271,11 @@ struct map_desc spear3xx_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_MISC_REG_BASE),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE
-+	}, {
-+		.virtual	= IO_ADDRESS(SPEAR3XX_ICM3_SDRAM_CTRL_BASE),
-+		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SDRAM_CTRL_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE
- 	},
- };
+diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+index 4abc2c0..44cd0c2 100644
+--- a/arch/arm/mach-spear13xx/include/mach/hardware.h
++++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+@@ -17,7 +17,12 @@
+ #include <mach/spear.h>
  
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index cd2153c..cc2692e 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -430,6 +430,11 @@ static struct map_desc spear6xx_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE
-+	}, {
-+		.virtual	= IO_ADDRESS(SPEAR6XX_ICM3_SDRAM_CTRL_BASE),
-+		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SDRAM_CTRL_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE
- 	},
- };
- 
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 50c680c..0e2cf75 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Common support
--obj-y	:= clcd.o clock.o time.o smi.o
-+obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
- 
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-index fb1c87b..ee8f82b 100644
---- a/arch/arm/plat-spear/clock.c
-+++ b/arch/arm/plat-spear/clock.c
-@@ -586,11 +586,10 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
- 			 * call routine to put ddr in refresh mode, and
- 			 * configure pll.
- 			 */
--			/* TBD */
-+			pll_set_rate(tbls[i].m, tbls[i].p, tbls[i].n);
- 			clk->rate = rate;
- 		}
--
--		return ret;
-+		return 0;
- 	}
- 
- 	val = readl(config->mode_reg) &
-@@ -616,7 +615,6 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
- 			config->masks->norm_fdbk_m_shift;
- 
- 	writel(val, config->cfg_reg);
--
- 	clk->rate = rate;
- 
- 	return 0;
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-index 6ddcf93..00d6854 100644
---- a/arch/arm/plat-spear/include/plat/clock.h
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -264,5 +264,6 @@ int aux_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long clcd_calc_rate(struct clk *clk, int index);
- int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate);
-+void pll_set_rate(u16 pdiv, u8 nmul, u8 hclkdiv);
- 
- #endif /* __PLAT_CLOCK_H */
-diff --git a/arch/arm/plat-spear/pll_clk.S b/arch/arm/plat-spear/pll_clk.S
-new file mode 100644
-index 0000000..d0687b4
---- /dev/null
-+++ b/arch/arm/plat-spear/pll_clk.S
-@@ -0,0 +1,187 @@
+ /* Vitual to physical translation of statically mapped space */
+-#define IO_ADDRESS(x)		(x | 0xF0000000)
 +/*
-+ * arch/arm/plat-spear/pll_clk.S
-+ *
-+ * SPEAR3xx and SPEAR6xx specific functions that will run in
-+ * cache. These funstions intend to configure the PLL.
-+ *
-+ * Copyright (ST) 2010 Deepak Sikri <deepak.sikri@.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * if phy_addr is 0x8...,.... and above then map it to  0xF...,....
++ * else map it to 0xE...,....
 + */
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <mach/hardware.h>
-+#include <mach/suspend.h>
++#define IO_ADDRESS(x)   ((x) | ((((x) >> 31) << 28) | 0xE0000000))
+ 
+ /* typesafe io address */
+ #define __io_address(n)		__io(IO_ADDRESS(n))
+diff --git a/arch/arm/mach-spear13xx/include/mach/vmalloc.h b/arch/arm/mach-spear13xx/include/mach/vmalloc.h
+index 85ad57e..9f329d1 100644
+--- a/arch/arm/mach-spear13xx/include/mach/vmalloc.h
++++ b/arch/arm/mach-spear13xx/include/mach/vmalloc.h
+@@ -13,6 +13,6 @@
+ #ifndef __MACH_VMALLOC_H
+ #define __MACH_VMALLOC_H
+ 
+-#include <plat/vmalloc.h>
++#define VMALLOC_END		0xEC800000
+ 
+ #endif /* __MACH_VMALLOC_H */
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index 8c8a21d..d6a6dc0 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -582,6 +582,14 @@ struct map_desc spear13xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR13XX_SYSRAM1_BASE),
+ 		.length		= SZ_1M,
+ 		.type		= MT_MEMORY_NONCACHED
++#ifdef CONFIG_MACH_SPEAR1310
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR1310_RAS_BASE),
++		.pfn		= __phys_to_pfn(SPEAR1310_RAS_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
 +
-+#if defined(CONFIG_ARCH_SPEAR3XX) || defined(CONFIG_ARCH_SPEAR6XX)
-+.text
-+ENTRY(pll_set_rate)
-+	stmfd	sp!, {r0-r12, lr}
-+
-+	/* Lock down the TLB entry to the current victim */
-+	mrc	p15, 0, r3, c10, c0, 0	/* read the lockdown register */
-+	orr	r3, r3, #1		/* set the preserved bit */
-+	mcr	p15, 0, r3, c10, c0, 0	/* write to the lockdown register */
-+
-+	/*
-+	 * set r4 to the value of the address to be locked down.
-+	 * Invalidate the TLB single entry in TLB to ensure that
-+	 * the locked address is not already in TLB.
-+	 * MPMC, System Controller & Miscellaneous register address
-+	 * are locked down below.
-+	 */
-+
-+	ldr	r4, MPMC_BASE_VA
-+	/* Invalidate the MPMC virtual address in TLB. */
-+	mcr	p15, 0, r4, c8, c7, 1
-+	/* TLB will miss and entry will be reloaded */
-+	ldr	r4, [r4]
-+	/* read the lockdown register (victim will have rloaded) */
-+	mrc	p15, 0, r3, c10, c0, 0
-+
-+	ldr	r4, SYS_CTRL_BASE_VA
-+	/* Invalidate the System controller virtual address in TLB */
-+	mcr	p15, 0, r4, c8, c7, 1
-+	/* TLB will miss and entry will be reloaded */
-+	ldr	r4, [r4]
-+	/* read the lockdown register (victim will have rloaded) */
-+	mrc	p15, 0, r3, c10, c0, 0
-+
-+	ldr	r4, MISC_BASE_VA
-+	/* Invalidate the Miscellaneous registers virtual address in TLB */
-+	mcr	p15, 0, r4, c8, c7, 1
-+	/* TLB will miss and entry will be reloaded */
-+	ldr	r4, [r4]
-+	/* read the lockdown register (victim will have rloaded) */
-+	mrc	p15, 0, r3, c10, c0, 0
-+
-+	/* clear preserve bit */
-+	bic	r3, r3, #1
-+	/* write to the lockdown register */
-+	mcr	p15, 0, r3, c10, c0, 0
-+
-+	ldr	r7, MPMC_BASE_VA
-+	ldr	r8, SYS_CTRL_BASE_VA
-+	ldr	r6, MISC_BASE_VA
-+	/* Prefetch certain instructions in the cache. */
-+	adr	r4, cache_prefetch_start1
-+	adr	r5, cache_prefetch_end1
-+	mvn	r3, #0x1F
-+	ands	r4, r3, r4
-+	/* Lock Instructions in i-cache */
-+fetch_loop:
-+	/*
-+	 * copy a cache-line-sized block of main memory to a cache
-+	 * line in the I-cache.
-+	 */
-+	mcr	p15, 0, r4, c7, c13, 1
-+	cmp	r4, r5
-+	addls	r4, r4, #0x20
-+	bls	fetch_loop
-+cache_prefetch_start1:
-+	/* Put SDRAM in self-refresh mode */
-+	ldr	r3, [r7, #0x1c]
-+	/* Clear START bit(24) of MEMCTL_GP_03 register in MPMC */
-+	ldr	r4, =0x1000000
-+	bic	r3, r3, r4
-+	str	r3, [r7, #0x1c]
-+
-+	ldr	r3, [r7, #0xe4]
-+	ldr	r4, =0xffff0000
-+	/* Latch the current self refresh time */
-+	mov	r9, r3
-+	/* Increase the self refresh exit time */
-+	bic	r3, r3, r4
-+	ldr	r4, =0xffff
-+	/* Program the SDRAM self refresh exit time on read command */
-+	orr	r3, r3, r4, LSL #16
-+	str	r3, [r7, #0xe4]
-+
-+	ldr	r3, [r7, #0x1c]
-+	/* Set the SREFRESH bit(16) */
-+	ldr	r4, =0x10000
-+	orr	r3, r3, r4
-+	str	r3, [r7, #0x1c]
-+
-+	/* Put the system in slow mode, use system controller */
-+	ldr	r3, [r8]
-+	bic	r3, r3, #0x7
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	orr	r3, r3, #0x2
-+	str	r3, [r8]
-+
-+wait_till_slow_mode:
-+	ldr	r3, [r8]
-+	and	r3, r3, #0x78	/* Wait for the mode to be updated */
-+	cmp	r3, #0x10	/* Poll the SCCTRL register status bits (6:3) */
-+	bne wait_till_slow_mode
-+
-+	/*
-+	 * reprogram the m(r0), p(r2), n(r1) values in the PLL
-+	 * control registers (PLL_FRQ register in misc space).
-+	 */
-+	ldr	r3, [r6, #0x0c]
-+	bic	r3, r3, #0x00ff
-+	/* Program the PLL post divisor: p */
-+	orr	r3, r3, r2
-+	str	r3, [r6, #0x0c]
-+
-+	ldr	r3, [r6, #0x0c]
-+	ldr	r4, =0xffff0000
-+	bic	r3, r3, r4
-+	bic	r3, r3, #0x0700
-+	/* Program the PLL pre divisor: n */
-+	orr	r3, r3, r1, LSL #8
-+	/* Program the PLL feedback divisor: m */
-+	orr	r3, r3, r0, LSL #24
-+	str	r3, [r6, #0x0c]
-+
-+	/* Move the system in Normal mode, use system controller */
-+	ldr	r3, [r8, #0x0]
-+	ldr	r4, =0xfffffff8
-+	/* Set the apt mode bits(2:0) in SCCTRL register */
-+	and	r3, r3, r4
-+	orr	r3, r3, #0x4
-+	str	r3, [r8, #0x0]
-+
-+wait_till_normal_mode:
-+	ldr	r3, [r8, #0x0]
-+	and	r3, r3, #0x78
-+	cmp	r3, #0x20	/* Poll the SCCTRL register status bits (6:3) */
-+	bne wait_till_normal_mode
-+
-+	/* Exit DDR-SDRAM from self-refresh mode */
-+	ldr	r10, MPMC_BASE_VA
-+	/* Clear the SREFRESH bit(16) */
-+	ldr	r3, [r10, #0x1c]
-+	ldr	r4, =0x10000
-+	bic	r3, r3, r4
-+	str	r3, [r10, #0x1c]
-+	/* Restore the SDRAM self refresh exit time on read command */
-+	mov	r3, r9
-+	str	r3, [r7, #0xe4]
-+	/* Begin the command processing in controller */
-+	ldr	r4, =0x1000000
-+	orr	r3, r3, r4
-+	/* Set START bit(24) of MEMCTL_GP_03 register in MPMC*/
-+	str	r3, [r10, #0x1c]
-+
-+	ldmfd	sp!, {r0-r12, pc}
-+
-+/* This is the end of the code to be copied */
-+
-+SYS_CTRL_BASE_VA :
-+	.word IO_ADDRESS(SYS_CTRL_BASE_PA)
-+MPMC_BASE_VA :
-+	.word IO_ADDRESS(MPMC_BASE_PA)
-+MISC_BASE_VA :
-+	.word IO_ADDRESS(MISC_BASE_PA)
-+cache_prefetch_end1 :
-+
-+#elif defined(CONFIG_ARCH_SPEAR13XX)
-+.text
-+ENTRY(pll_set_rate)
 +#endif
+ 	},
+ };
+ 
 -- 
 1.7.2.2
