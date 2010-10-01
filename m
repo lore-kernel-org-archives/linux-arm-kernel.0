@@ -1,92 +1,43 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri,  1 Oct 2010 14:29:42 -0700
-Subject: [PATCH 18/47] DA850: Add MMCSD1 resources,
-	platform device and convenience registration function
+Date: Fri,  1 Oct 2010 14:29:43 -0700
+Subject: [PATCH 19/47] davinci: dm365 evm: use EDMAQ_3 as the audio DMA queue
 In-Reply-To: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
 References: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285968611-26890-19-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1285968611-26890-20-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Juha Kuikka <juha.kuikka@elektrobit.com>
+From: Sekhar Nori <nsekhar@ti.com>
 
-Add resources, platform device and convenience registration function for DA850's second MMC/SD controller (MMCSD1).
+By default the audio driver uses EDMAQ_0 as the DMA queue,
+but on DM365 this queue is specially designed for video
+transfers with a large fifo size. Having both audio and
+video transfers on the same queue leads to noise on the
+audio side.
 
-Signed-off-by: Juha Kuikka <juha.kuikka@elektrobit.com>
+This patch changes the audio queue number for DM365 to
+EDMAQ_3.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c      |   39 ++++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
- 2 files changed, 40 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-dm365-evm.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 52bc7b1..caeb7f4 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -24,6 +24,7 @@
- #include "clock.h"
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 84acef1..bdea2da 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -175,7 +175,9 @@ static struct at24_platform_data eeprom_info = {
+ 	.context	= (void *)0x7f00,
+ };
  
- #define DA8XX_TPCC_BASE			0x01c00000
-+#define DA850_MMCSD1_BASE		0x01e1b000
- #define DA850_TPCC1_BASE		0x01e30000
- #define DA8XX_TPTC0_BASE		0x01c08000
- #define DA8XX_TPTC1_BASE		0x01c08400
-@@ -566,6 +567,44 @@ int __init da8xx_register_mmcsd0(struct davinci_mmc_config *config)
- 	return platform_device_register(&da8xx_mmcsd0_device);
- }
+-static struct snd_platform_data dm365_evm_snd_data;
++static struct snd_platform_data dm365_evm_snd_data = {
++	.asp_chan_q = EVENTQ_3,
++};
  
-+#ifdef CONFIG_ARCH_DAVINCI_DA850
-+static struct resource da850_mmcsd1_resources[] = {
-+	{		/* registers */
-+		.start	= DA850_MMCSD1_BASE,
-+		.end	= DA850_MMCSD1_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{		/* interrupt */
-+		.start	= IRQ_DA850_MMCSDINT0_1,
-+		.end	= IRQ_DA850_MMCSDINT0_1,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{		/* DMA RX */
-+		.start	= EDMA_CTLR_CHAN(1, 28),
-+		.end	= EDMA_CTLR_CHAN(1, 28),
-+		.flags	= IORESOURCE_DMA,
-+	},
-+	{		/* DMA TX */
-+		.start	= EDMA_CTLR_CHAN(1, 29),
-+		.end	= EDMA_CTLR_CHAN(1, 29),
-+		.flags	= IORESOURCE_DMA,
-+	},
-+};
-+
-+static struct platform_device da850_mmcsd1_device = {
-+	.name		= "davinci_mmc",
-+	.id		= 1,
-+	.num_resources	= ARRAY_SIZE(da850_mmcsd1_resources),
-+	.resource	= da850_mmcsd1_resources,
-+};
-+
-+int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
-+{
-+	da850_mmcsd1_device.dev.platform_data = config;
-+	return platform_device_register(&da850_mmcsd1_device);
-+}
-+#endif
-+
- static struct resource da8xx_rtc_resources[] = {
+ static struct i2c_board_info i2c_info[] = {
  	{
- 		.start		= DA8XX_RTC_BASE,
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 504f2f6..4247b3f 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -76,6 +76,7 @@ int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
- int da8xx_register_emac(void);
- int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
- int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
-+int da850_register_mmcsd1(struct davinci_mmc_config *config);
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
- int da8xx_register_rtc(void);
- int da850_register_cpufreq(char *async_clk);
 -- 
 1.7.2.1
