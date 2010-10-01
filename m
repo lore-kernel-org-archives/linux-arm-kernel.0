@@ -1,55 +1,32 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Fri, 1 Oct 2010 21:42:13 +0530
-Subject: multiple linux-next OMAP3 build errors
-In-Reply-To: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
-References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
-Message-ID: <66d796b6ecbd63bba36875b86752cedb@mail.gmail.com>
+From: x0095840@ti.com (Fernando Guzman Lugo)
+Date: Fri,  1 Oct 2010 11:28:41 -0500
+Subject: [PATCH] scatterlist: define SG chain for arm architecture
+Message-ID: <1285950521-8093-1-git-send-email-x0095840@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grazvydas Ignotas wrote:
->
-> hi,
->
-> I've been building linux-next for a while now and keep getting these
-> build errors, just posting them here in case not all are known. Not
-> familiar enough with that code to send patches unfortunately.
->
->   AS      arch/arm/mm/proc-v7.o
-> arch/arm/mm/proc-v7.S: Assembler messages:
-> arch/arm/mm/proc-v7.S:363: Error: undefined symbol `PMD_FLAGS' in
-operation
->
->   CC      drivers/usb/musb/musb_gadget.o
-> drivers/usb/musb/musb_gadget.c:1789: error: 'usb_gadget_register_driver'
-undeclared here (not in a function)
-> drivers/usb/musb/musb_gadget.c:1789: warning: type defaults to 'int' in
-declaration of 'usb_gadget_register_driver'
->
->   CC      drivers/video/omap2/vram.o
-> drivers/video/omap2/vram.c: In function
-'omap_vram_reserve_sdram_memblock':
-> drivers/video/omap2/vram.c:568: error: implicit declaration of function
-'memblock_region_is_memory'
->
->   LD      .tmp_vmlinux1
-> arch/arm/mach-omap2/built-in.o: In function `serial_write_reg':
-> /home/notaz/dev/pnd/kernel/linux-next/arch/arm/mach-omap2/serial.c:168:
-undefined reference to `enable_off_mode'
-> arch/arm/mach-omap2/built-in.o: In function `omap_uart_prepare_idle':
-> /home/notaz/dev/pnd/kernel/linux-next/arch/arm/mach-omap2/serial.c:404:
-undefined reference to `enable_off_mode'
-> arch/arm/mach-omap2/built-in.o: In function `omap3_can_sleep':
-> /home/notaz/dev/pnd/kernel/linux-next/arch/arm/mach-omap2/pm34xx.c:484:
-undefined reference to `sleep_while_idle'
->
-> I'm using this customized config:
-> http://notaz.gp2x.de/misc/pnd/config_next_101001
+Define SG chain for ARM architecture in order to work
+with big buffers. This patch is needed in order to
+iovmm users can pass a big buffer to map it and ARM
+architecture has not issues using SG chain.
 
+This change was suggested by FUJITA Tomonori.
 
-Thanks for reporting. I'll take a stab at fixing some of these.
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+---
+ arch/arm/include/asm/scatterlist.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-We've been playing with autobuilding linux-omap and linux-omap-pm,
-but didn't think of looking at linux-next. We'll start now.
-
-- Anand
+diff --git a/arch/arm/include/asm/scatterlist.h b/arch/arm/include/asm/scatterlist.h
+index 2f87870..3de0a0b 100644
+--- a/arch/arm/include/asm/scatterlist.h
++++ b/arch/arm/include/asm/scatterlist.h
+@@ -5,4 +5,6 @@
+ #include <asm/types.h>
+ #include <asm-generic/scatterlist.h>
+ 
++#define ARCH_HAS_SG_CHAIN
++
+ #endif /* _ASMARM_SCATTERLIST_H */
+-- 
+1.6.3.3
