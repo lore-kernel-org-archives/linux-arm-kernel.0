@@ -1,106 +1,72 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 01 Oct 2010 16:34:13 -0700
-Subject: [PATCH 3/8] omap: pandora: add fixed regulator for wlan
+Date: Fri, 01 Oct 2010 16:34:02 -0700
+Subject: [PATCH 1/8] omap: Fix omap_mux_init_signal not to trash muxname
 In-Reply-To: <20101001233315.31894.49599.stgit@baageli.muru.com>
 References: <20101001233315.31894.49599.stgit@baageli.muru.com>
-Message-ID: <20101001233413.31894.99754.stgit@baageli.muru.com>
+Message-ID: <20101001233402.31894.59103.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grazvydas Ignotas <notasas@gmail.com>
+Otherwise the muxname passed to the function will get truncated.
 
-Instead of enabling the wifi module explicitly using GPIO, add a fixed
-regulator and hook it to MMC host card power control. This way it will
-only be enabled when SDIO subsystem wants to talk to it, saving power
-(as done by Zoom boards).
+Based on an earlier patch by rockefeller.lin at innocomm.com.
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+Reported-by: rockefeller.lin at innocomm.com
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-omap3pandora.c |   43 ++++++++++++++++++++++--------
- 1 files changed, 32 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/mux.c |   13 +++++++------
+ arch/arm/mach-omap2/mux.h |    2 +-
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 2d2e6fc..7c222ba 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -34,6 +34,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
-+#include <linux/regulator/fixed.h>
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 6c2f8f0..e33740c 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -127,17 +127,16 @@ int __init omap_mux_init_gpio(int gpio, int val)
+ 	return 0;
+ }
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -345,6 +346,9 @@ static struct regulator_consumer_supply pandora_vmmc1_supply =
- static struct regulator_consumer_supply pandora_vmmc2_supply =
- 	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.1");
+-int __init omap_mux_init_signal(char *muxname, int val)
++int __init omap_mux_init_signal(const char *muxname, int val)
+ {
+ 	struct omap_mux_entry *e;
+-	char *m0_name = NULL, *mode_name = NULL;
+-	int found = 0;
++	const char *mode_name;
++	int found = 0, mode0_len = 0;
  
-+static struct regulator_consumer_supply pandora_vmmc3_supply =
-+	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.2");
-+
- static struct regulator_consumer_supply pandora_vdda_dac_supply =
- 	REGULATOR_SUPPLY("vdda_dac", "omapdss");
+ 	mode_name = strchr(muxname, '.');
+ 	if (mode_name) {
+-		*mode_name = '\0';
++		mode0_len = strlen(muxname) - strlen(mode_name);
+ 		mode_name++;
+-		m0_name = muxname;
+ 	} else {
+ 		mode_name = muxname;
+ 	}
+@@ -147,9 +146,11 @@ int __init omap_mux_init_signal(char *muxname, int val)
+ 		char *m0_entry = m->muxnames[0];
+ 		int i;
  
-@@ -489,6 +493,33 @@ static struct regulator_init_data pandora_vsim = {
- 	.consumer_supplies	= &pandora_adac_supply,
- };
+-		if (m0_name && strcmp(m0_name, m0_entry))
++		/* First check for full name in mode0.muxmode format */
++		if (mode0_len && strncmp(muxname, m0_entry, mode0_len))
+ 			continue;
  
-+/* Fixed regulator internal to Wifi module */
-+static struct regulator_init_data pandora_vmmc3 = {
-+	.constraints = {
-+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &pandora_vmmc3_supply,
-+};
-+
-+static struct fixed_voltage_config pandora_vwlan = {
-+	.supply_name		= "vwlan",
-+	.microvolts		= 1800000, /* 1.8V */
-+	.gpio			= PANDORA_WIFI_NRESET_GPIO,
-+	.startup_delay		= 50000, /* 50ms */
-+	.enable_high		= 1,
-+	.enabled_at_boot	= 0,
-+	.init_data		= &pandora_vmmc3,
-+};
-+
-+static struct platform_device pandora_vwlan_device = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 1,
-+	.dev = {
-+		.platform_data = &pandora_vwlan,
-+	},
-+};
-+
- static struct twl4030_usb_data omap3pandora_usb_data = {
- 	.usb_mode	= T2_USB_MODE_ULPI,
- };
-@@ -645,19 +676,8 @@ static void pandora_wl1251_init(void)
- 	if (pandora_wl1251_pdata.irq < 0)
- 		goto fail_irq;
++		/* Then check for muxmode only */
+ 		for (i = 0; i < OMAP_MUX_NR_MODES; i++) {
+ 			char *mode_cur = m->muxnames[i];
  
--	ret = gpio_request(PANDORA_WIFI_NRESET_GPIO, "wl1251 nreset");
--	if (ret < 0)
--		goto fail_irq;
--
--	/* start powered so that it probes with MMC subsystem */
--	ret = gpio_direction_output(PANDORA_WIFI_NRESET_GPIO, 1);
--	if (ret < 0)
--		goto fail_nreset;
--
- 	return;
+diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+index a8e040c..350c04f 100644
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -120,7 +120,7 @@ int omap_mux_init_gpio(int gpio, int val);
+  * @muxname:		Mux name in mode0_name.signal_name format
+  * @val:		Options for the mux register value
+  */
+-int omap_mux_init_signal(char *muxname, int val);
++int omap_mux_init_signal(const char *muxname, int val);
  
--fail_nreset:
--	gpio_free(PANDORA_WIFI_NRESET_GPIO);
- fail_irq:
- 	gpio_free(PANDORA_WIFI_IRQ_GPIO);
- fail:
-@@ -669,6 +689,7 @@ static struct platform_device *omap3pandora_devices[] __initdata = {
- 	&pandora_keys_gpio,
- 	&pandora_dss_device,
- 	&pandora_wl1251_data,
-+	&pandora_vwlan_device,
- };
+ #else
  
- static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
