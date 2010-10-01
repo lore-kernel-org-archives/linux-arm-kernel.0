@@ -1,68 +1,54 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri,  1 Oct 2010 14:29:49 -0700
-Subject: [PATCH 25/47] davinci: dm6467t evm: setup NAND flash timing
+Date: Fri,  1 Oct 2010 14:29:50 -0700
+Subject: [PATCH 26/47] davinci: Add machine checks to DA8XX serial console
+	init routines
 In-Reply-To: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
 References: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285968611-26890-26-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1285968611-26890-27-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
+From: Michael Williamson <michael.williamson@criticallink.com>
 
-Setup NAND flash timing on DM6467T EVM.
+This patch adds machine checks in the serial console init routines
+for the DA8XX EVM boards.  This is needed because there are other
+DA8XX based machines that use a different UART/tty as the console
+and may be included in a common kernel build.
 
-Without the timing setup, the NAND flash on DM6467T
-RevC EVM reports a number of random bad blocks because
-of read errors.
-
-Also, with this, copying a 100M file on RevB EVM takes
-~35 sec against 1 minute 30 seconds earlier.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-dm646x-evm.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c |    3 +++
+ arch/arm/mach-davinci/board-da850-evm.c |    3 +++
+ 2 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 4502f34..5a29955 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -42,6 +42,7 @@
- #include <mach/nand.h>
- #include <mach/clock.h>
- #include <mach/cdce949.h>
-+#include <mach/aemif.h>
- 
- #include "clock.h"
- 
-@@ -71,6 +72,16 @@ static struct mtd_partition davinci_nand_partitions[] = {
- 	}
- };
- 
-+static struct davinci_aemif_timing dm6467tevm_nandflash_timing = {
-+	.wsetup		= 29,
-+	.wstrobe	= 24,
-+	.whold		= 14,
-+	.rsetup		= 19,
-+	.rstrobe	= 33,
-+	.rhold		= 0,
-+	.ta		= 29,
-+};
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index de82739..ef1ab0b 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -598,6 +598,9 @@ static __init void da830_evm_init(void)
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
+ static int __init da830_evm_console_init(void)
+ {
++	if (!machine_is_davinci_da830_evm())
++		return 0;
 +
- static struct davinci_nand_pdata davinci_nand_data = {
- 	.mask_cle 		= 0x80000,
- 	.mask_ale 		= 0x40000,
-@@ -763,6 +774,9 @@ static __init void evm_init(void)
- 	dm646x_init_mcasp0(&dm646x_evm_snd_data[0]);
- 	dm646x_init_mcasp1(&dm646x_evm_snd_data[1]);
- 
-+	if (machine_is_davinci_dm6467tevm())
-+		davinci_nand_data.timing = &dm6467tevm_nandflash_timing;
+ 	return add_preferred_console("ttyS", 2, "115200");
+ }
+ console_initcall(da830_evm_console_init);
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index c1d45d7..ac2297c 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -859,6 +859,9 @@ static __init void da850_evm_init(void)
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
+ static int __init da850_evm_console_init(void)
+ {
++	if (!machine_is_davinci_da850_evm())
++		return 0;
 +
- 	platform_device_register(&davinci_nand_device);
- 
- 	dm646x_init_edma(dm646x_edma_rsv);
+ 	return add_preferred_console("ttyS", 2, "115200");
+ }
+ console_initcall(da850_evm_console_init);
 -- 
 1.7.2.1
