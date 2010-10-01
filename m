@@ -1,55 +1,80 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 1 Oct 2010 09:25:34 +0200
-Subject: pxa3xx_nand issues
-In-Reply-To: <201010010855.52532.pieterg@gmx.com>
-References: <201009221912.24905.pieterg@gmx.com>
-	<201010010215.09514.marek.vasut@gmail.com>
-	<201010010855.52532.pieterg@gmx.com>
-Message-ID: <201010010925.34759.marek.vasut@gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 1 Oct 2010 12:56:14 +0530
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+In-Reply-To: <87bp7ff962.fsf@deeprootsystems.com>
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com> <20100930150713.GG3117@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CD03185@dbde02.ent.ti.com>
+	<87bp7ff962.fsf@deeprootsystems.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CD033D6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 1. ??jna 2010 08:55:52 pieterg napsal(a):
-> On Friday 01 October 2010 02:15:09 Marek Vasut wrote:
-> > Dne Po 27. z??? 2010 19:39:04 pieterg napsal(a):
-> > > On Monday 27 September 2010 15:50:50 pieterg wrote:
-> > > > On Monday 27 September 2010 14:22:37 Lei Wen wrote:
-> > > > > Does your jffs2 image make correct? Page size and block size set
-> > > > > right?
-> > > > 
-> > > > I think so.
-> > > > --eraseblock=0x20000 --pad --no-cleanmarkers
-> > > 
-> > > Well... that caused most of my problems.
-> > > --pad means pad to eraseblock size, not pagesize.
-> > > So the first writes in the new filesystem would cause pages in that
-> > > last eraseblock to be overwritten.
-> > > With SLC I always got away with that, but with MLC, clearly not.
-> > > 
-> > > (now I'm still left with lots of singlebit errors, and occasional jffs2
-> > > CRC errors, pxa3xx_nand was obviously not meant to deal with such low
-> > > quality MLC, no action is taken on bit errors, but at least everything
-> > > can be explained now)
-> > > 
-> > > Thanks everybody for helping me find the cause of this problem.
-> > 
-> > So this is closed?
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at deeprootsystems.com]
+> Sent: Thursday, September 30, 2010 10:42 PM
+> To: Shilimkar, Santosh
+> Cc: Varadarajan, Charulatha; Tony Lindgren; Cousson, Benoit; Menon,
+> Nishanth; wim at iguana.be; linux-omap at vger.kernel.org; linux-
+> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> paul at pwsan.com; Nayak, Rajendra; Basak, Partha
+> Subject: Re: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during
+> init
 > 
-> Yes, I guess what remains (many single bit errors, and occasional double
-> bit errors) is 'normal' for this type of MLC NAND.
-> Still not happy with it, especially since there is no way to recover when
-> double bit errors occur, but for now this will have to do.
+> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 > 
-> > btw. wont ubifs be better choice for such a big flash ?
+> >> -----Original Message-----
+> >> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> >> owner at vger.kernel.org] On Behalf Of Varadarajan, Charulatha
+> >> Sent: Thursday, September 30, 2010 9:25 PM
+> >> To: Tony Lindgren; Cousson, Benoit
+> >> Cc: Kevin Hilman; Menon, Nishanth; wim at iguana.be; linux-
+> >> omap at vger.kernel.org; linux-watchdog at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org; paul at pwsan.com; Nayak, Rajendra; Basak,
+> Partha
+> >> Subject: RE: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset
+> during
+> >> init
+> >>
+> >> Tony/ Benoit,
+> >>
+> >> > >
+> >> > > I think that disabling it should be done only if the
+> CONFIG_OMAP_WDT
+> >> > > is not set.
+> >> >
+> >> > How about disabling is done always unless CONFIG_WATCHDOG_NOWAYOUT
+> >> > is set?
+> >>
+> >> As given in the patch description, this patch does a disable of
+> watchdog
+> >> timer, during init, to avoid the system rebooting that happens due to
+> >> enabling of watchdog timer after a reset of the module (during hwmod
+> init).
+> >>
+> >> According to the default WDT registers values, the system reboot would
+> >> happen in ~10s if watchdog is enabled with default values. Hence, after
+> >> a WDT module reset during init, the watchdog has to be disabled within
+> 10s
+> >> otherwise the system will keep rebooting.
+> >>
+> >> Hence irrespective of CONFIG_WATCHDOG_NOWAYOUT/ CONFIG_OMAP_WDT,
+> >> the watchdog timer needs to be disabled after a WDT reset has happened.
+> >>
+> > One more option is to avoid the software reset using the CONFIG_OMAP_WDT
+> > flag. Something like below.
 > 
-> Certainly, it's on my list (after I've updated to the latest u-boot to get
-> ubi support there as well)
+> This was already proposed by Charu, and rejected.
+> 
+> Doing this means we have a dependency on particular bootloader init, and
+> we'd like to get rid of *all* assumptions about what the bootloader does
+> (or does not do.)
+> 
+you mean is not depeding on bootloader to disable WDT. Make sense.
 
-I'm currently fixing 2010.09, there were some changes that broke support for 
-every pxa (or rather every ARM) machine. I have two machines fixed, but those are 
-still pxa2xx. PXA3xx is on the list and thanks to this, pxa3xx should soon also 
-hit mainline (well ... when, that depends on Wolfgang).
+Thanks
 
-Cheers
-> 
-> Rgds, Pieter
+Regards,
+Santosh
