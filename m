@@ -1,718 +1,302 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:25:48 +0530
-Subject: [PATCH V2 28/69] ST SPEAr: Adding machine support for nand
+Date: Fri,  1 Oct 2010 17:26:01 +0530
+Subject: [PATCH V2 41/69] SPEAr Clock Framework: Adding support for PLL
+	frequency change
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <1076320a0194c19ef0b4beefdf3c43a44e200439.1285933331.git.viresh.kumar@st.com>
+Message-ID: <e9532ec2012f0e96068ecb2f57088e550a80aa00.1285933332.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vipin Kumar <vipin.kumar@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
-Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/generic.h   |    2 +
- arch/arm/mach-spear13xx/include/mach/misc_regs.h |   10 ++
- arch/arm/mach-spear13xx/spear1300_evb.c          |    9 ++
- arch/arm/mach-spear13xx/spear13xx.c              |   58 +++++++++++++
- arch/arm/mach-spear3xx/include/mach/generic.h    |   15 ++--
- arch/arm/mach-spear3xx/include/mach/spear320.h   |    3 +
- arch/arm/mach-spear3xx/spear300.c                |   98 ++++++++++++++++++++++
- arch/arm/mach-spear3xx/spear300_evb.c            |    8 ++
- arch/arm/mach-spear3xx/spear310.c                |   26 ++++++
- arch/arm/mach-spear3xx/spear310_evb.c            |    8 ++
- arch/arm/mach-spear3xx/spear320.c                |   26 ++++++
- arch/arm/mach-spear3xx/spear320_evb.c            |    8 ++
- arch/arm/mach-spear6xx/include/mach/generic.h    |    1 +
- arch/arm/mach-spear6xx/spear600_evb.c            |    8 ++
- arch/arm/mach-spear6xx/spear6xx.c                |   26 ++++++
- arch/arm/plat-spear/include/plat/fsmc.h          |   36 ++++++++
- 16 files changed, 336 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/plat-spear/include/plat/fsmc.h
+ arch/arm/mach-spear3xx/spear3xx.c        |    5 +
+ arch/arm/mach-spear6xx/spear6xx.c        |    5 +
+ arch/arm/plat-spear/Makefile             |    2 +-
+ arch/arm/plat-spear/clock.c              |    6 +-
+ arch/arm/plat-spear/include/plat/clock.h |    1 +
+ arch/arm/plat-spear/pll_clk.S            |  187 ++++++++++++++++++++++++++++++
+ 6 files changed, 201 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/plat-spear/pll_clk.S
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 960ff06..745dd99 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -35,6 +35,7 @@ extern struct platform_device spear13xx_ehci0_device;
- extern struct platform_device spear13xx_ehci1_device;
- extern struct platform_device spear13xx_i2c_device;
- extern struct platform_device spear13xx_kbd_device;
-+extern struct platform_device spear13xx_nand_device;
- extern struct platform_device spear13xx_ohci0_device;
- extern struct platform_device spear13xx_ohci1_device;
- extern struct platform_device spear13xx_rtc_device;
-@@ -51,6 +52,7 @@ void __init spear1300_init(void);
- void __init spear13xx_map_io(void);
- void __init spear13xx_init_irq(void);
- void __init spear13xx_init(void);
-+void __init nand_mach_init(u32 busw);
- void spear13xx_secondary_startup(void);
- 
- #endif /* __MACH_GENERIC_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-index a8a1119..e6823db 100644
---- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-@@ -210,6 +210,16 @@
- 	#define CF_MMC_ACTIVE	0x2
- 	#define XD_MMC_ACTIVE	0x3
- #define FSMC_CFG		((unsigned int *)(MISC_BASE + 0x330))
-+	/* FSMC_CFG register masks */
-+	#define FSMC_MEMSEL_MASK	0x3
-+	#define FSMC_MEMSEL_SHIFT	0
-+	#define FSMC_MEM_NOR		0
-+	#define FSMC_MEM_NAND		1
-+	#define FSMC_MEM_SRAM		2
-+	#define NAND_BANK_MASK		0x3
-+	#define NAND_BANK_SHIFT		2
-+	#define NAND_DEV_WIDTH16	4
-+
- #define MPMC_CTR_STS		((unsigned int *)(MISC_BASE + 0x334))
- 
- /* Inter-Processor Communication Registers */
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 1e637fa..56a4294 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -12,11 +12,14 @@
-  */
- 
- #include <linux/types.h>
-+#include <linux/mtd/nand.h>
-+#include <mtd/fsmc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
- #include <plat/keyboard.h>
-+#include <plat/fsmc.h>
- #include <plat/smi.h>
- 
- static struct amba_device *amba_devs[] __initdata = {
-@@ -30,6 +33,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&spear13xx_ehci1_device,
- 	&spear13xx_i2c_device,
- 	&spear13xx_kbd_device,
-+	&spear13xx_nand_device,
- 	&spear13xx_ohci0_device,
- 	&spear13xx_ohci1_device,
- 	&spear13xx_rtc_device,
-@@ -52,6 +56,11 @@ static void __init spear1300_evb_init(void)
- 	/* set keyboard plat data */
- 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
- 
-+	/* set nand device's plat data */
-+	fsmc_nand_set_plat_data(&spear13xx_nand_device, NULL, 0,
-+			NAND_SKIP_BBTSCAN, FSMC_NAND_BW8);
-+	nand_mach_init(FSMC_NAND_BW8);
-+
- 	/* call spear1300 machine init function */
- 	spear1300_init();
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index f7d30a9..55d654f 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -15,6 +15,7 @@
- #include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
-+#include <mtd/fsmc.h>
- #include <asm/hardware/gic.h>
- #include <asm/irq.h>
- #include <asm/localtimer.h>
-@@ -23,6 +24,7 @@
- #include <mach/irqs.h>
- #include <mach/generic.h>
- #include <mach/hardware.h>
-+#include <mach/misc_regs.h>
- 
- /* Add spear13xx machines common devices here */
- /* gpio device registeration */
-@@ -97,6 +99,62 @@ struct platform_device spear13xx_i2c_device = {
- 	.resource = i2c_resources,
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index dcbe020..c9727ac 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -271,6 +271,11 @@ struct map_desc spear3xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_MISC_REG_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR3XX_ICM3_SDRAM_CTRL_BASE),
++		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SDRAM_CTRL_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
+ 	},
  };
- 
-+/* nand device registeration */
-+void __init nand_mach_init(u32 busw)
-+{
-+	u32 fsmc_cfg = readl(FSMC_CFG);
-+	fsmc_cfg &= ~(FSMC_MEMSEL_MASK << FSMC_MEMSEL_SHIFT);
-+	fsmc_cfg |= (FSMC_MEM_NAND << FSMC_MEMSEL_SHIFT);
-+
-+	if (busw == FSMC_NAND_BW16)
-+		fsmc_cfg |= 1 << NAND_DEV_WIDTH16;
-+	else
-+		fsmc_cfg &= ~(1 << NAND_DEV_WIDTH16);
-+
-+	writel(fsmc_cfg, FSMC_CFG);
-+}
-+
-+static void nand_select_bank(u32 bank, u32 busw)
-+{
-+	u32 fsmc_cfg = readl(FSMC_CFG);
-+
-+	fsmc_cfg &= ~(NAND_BANK_MASK << NAND_BANK_SHIFT);
-+	fsmc_cfg |= (bank << NAND_BANK_SHIFT);
-+
-+	if (busw)
-+		fsmc_cfg |= 1 << NAND_DEV_WIDTH16;
-+	else
-+		fsmc_cfg &= ~(1 << NAND_DEV_WIDTH16);
-+
-+	writel(fsmc_cfg, FSMC_CFG);
-+}
-+
-+static struct fsmc_nand_platform_data nand_platform_data = {
-+	.select_bank = nand_select_bank,
-+};
-+
-+static struct resource nand_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR13XX_FSMC_MEM_BASE,
-+		.end = SPEAR13XX_FSMC_MEM_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR13XX_FSMC_BASE,
-+		.end = SPEAR13XX_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device spear13xx_nand_device = {
-+	.name = "nand",
-+	.id = -1,
-+	.resource = nand_resources,
-+	.num_resources = ARRAY_SIZE(nand_resources),
-+	.dev.platform_data = &nand_platform_data,
-+};
-+
- /* usb host device registeration */
- static struct resource ehci0_resources[] = {
- 	[0] = {
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 91c0c09..6aac229 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -111,6 +111,10 @@ extern struct pmx_driver pmx_driver;
- extern struct amba_device clcd_device;
- extern struct amba_device gpio1_device;
- extern struct platform_device kbd_device;
-+extern struct platform_device nand0_device;
-+extern struct platform_device nand1_device;
-+extern struct platform_device nand2_device;
-+extern struct platform_device nand3_device;
- 
- /* pad mux modes */
- extern struct pmx_mode nand_mode;
-@@ -148,12 +152,12 @@ void __init spear300_init(void);
- 
- /* Add misc structure declarations here */
- extern struct clcd_board clcd_plat_data;
--#endif /* CONFIG_MACH_SPEAR300 */
- 
- /* spear310 declarations */
--#ifdef CONFIG_MACH_SPEAR310
-+#elif defined(CONFIG_MACH_SPEAR310)
- /* Add spear310 machine device structure declarations here */
- extern struct platform_device plgpio_device;
-+extern struct platform_device nand_device;
- 
- /* pad mux devices */
- extern struct pmx_dev pmx_emi_cs_0_1_4_5;
-@@ -168,13 +172,12 @@ extern struct pmx_dev pmx_tdm0;
- /* Add spear310 machine function declarations here */
- void __init spear310_init(void);
- 
--#endif /* CONFIG_MACH_SPEAR310 */
--
- /* spear320 declarations */
--#ifdef CONFIG_MACH_SPEAR320
-+#elif defined(CONFIG_MACH_SPEAR320)
- /* Add spear320 machine device structure declarations here */
- extern struct amba_device clcd_device;
- extern struct platform_device i2c1_device;
-+extern struct platform_device nand_device;
- extern struct platform_device plgpio_device;
- extern struct platform_device pwm_device;
- 
-@@ -213,6 +216,6 @@ void __init spear320_init(void);
- 
- /* Add misc structure declarations here */
- extern struct clcd_board clcd_plat_data;
--#endif /* CONFIG_MACH_SPEAR320 */
-+#endif
- 
- #endif /* __MACH_GENERIC_H */
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
-index 53677e4..aa6727c 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear320.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
-@@ -22,6 +22,9 @@
- #define SPEAR320_FSMC_BASE		0x4C000000
- #define SPEAR320_FSMC_SIZE		0x01000000
- 
-+#define SPEAR320_NAND_BASE		0x50000000
-+#define SPEAR320_NAND_SIZE		0x04000000
-+
- #define SPEAR320_I2S_BASE		0x60000000
- #define SPEAR320_I2S_SIZE		0x10000000
- 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index c80d4e1..c213614 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -14,6 +14,7 @@
- #include <linux/types.h>
- #include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
-+#include <mtd/fsmc.h>
- #include <asm/irq.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-@@ -426,6 +427,103 @@ struct platform_device kbd_device = {
- 	.resource = kbd_resources,
- };
- 
-+/* nand device registeration */
-+static struct fsmc_nand_platform_data nand0_platform_data;
-+
-+static struct resource nand0_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR300_NAND_0_BASE,
-+		.end = SPEAR300_NAND_0_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR300_FSMC_BASE,
-+		.end = SPEAR300_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand0_device = {
-+	.name = "nand",
-+	.id = 0,
-+	.resource = nand0_resources,
-+	.num_resources = ARRAY_SIZE(nand0_resources),
-+	.dev.platform_data = &nand0_platform_data,
-+};
-+
-+static struct fsmc_nand_platform_data nand1_platform_data;
-+
-+static struct resource nand1_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR300_NAND_1_BASE,
-+		.end = SPEAR300_NAND_1_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR300_FSMC_BASE,
-+		.end = SPEAR300_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand1_device = {
-+	.name = "nand",
-+	.id = 1,
-+	.resource = nand1_resources,
-+	.num_resources = ARRAY_SIZE(nand1_resources),
-+	.dev.platform_data = &nand1_platform_data,
-+};
-+
-+static struct fsmc_nand_platform_data nand2_platform_data;
-+
-+static struct resource nand2_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR300_NAND_2_BASE,
-+		.end = SPEAR300_NAND_2_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR300_FSMC_BASE,
-+		.end = SPEAR300_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand2_device = {
-+	.name = "nand",
-+	.id = 2,
-+	.resource = nand2_resources,
-+	.num_resources = ARRAY_SIZE(nand2_resources),
-+	.dev.platform_data = &nand2_platform_data,
-+};
-+
-+static struct fsmc_nand_platform_data nand3_platform_data;
-+
-+static struct resource nand3_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR300_NAND_3_BASE,
-+		.end = SPEAR300_NAND_3_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR300_FSMC_BASE,
-+		.end = SPEAR300_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand3_device = {
-+	.name = "nand",
-+	.id = 3,
-+	.resource = nand3_resources,
-+	.num_resources = ARRAY_SIZE(nand3_resources),
-+	.dev.platform_data = &nand3_platform_data,
-+};
-+
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index 7bd8963..41ad013 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -11,10 +11,13 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/mtd/nand.h>
-+#include <mtd/fsmc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/fsmc.h>
- #include <plat/keyboard.h>
- #include <plat/smi.h>
- 
-@@ -49,6 +52,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 	&ehci_device,
- 	&i2c_device,
-+	&nand0_device,
- 	&ohci0_device,
- 	&ohci1_device,
- 	&rtc_device,
-@@ -79,6 +83,10 @@ static void __init spear300_evb_init(void)
- 	/* set keyboard plat data */
- 	kbd_set_plat_data(&kbd_device, &kbd_data);
- 
-+	/* set nand0 device's plat data */
-+	fsmc_nand_set_plat_data(&nand0_device, NULL, 0, NAND_SKIP_BBTSCAN,
-+			FSMC_NAND_BW8);
-+
- 	/* call spear300 machine init function */
- 	spear300_init();
- 
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 88b55b5..1c84303 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/ptrace.h>
-+#include <mtd/fsmc.h>
- #include <asm/irq.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-@@ -177,6 +178,31 @@ int spear300_o2p(int offset)
- 		return offset + 2;
- }
- 
-+/* nand device registeration */
-+static struct fsmc_nand_platform_data nand_platform_data;
-+
-+static struct resource nand_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR310_NAND_BASE,
-+		.end = SPEAR310_NAND_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR310_FSMC_BASE,
-+		.end = SPEAR310_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand_device = {
-+	.name = "nand",
-+	.id = -1,
-+	.resource = nand_resources,
-+	.num_resources = ARRAY_SIZE(nand_resources),
-+	.dev.platform_data = &nand_platform_data,
-+};
-+
- static struct plgpio_platform_data plgpio_plat_data = {
- 	.gpio_base = 8,
- 	.irq_base = SPEAR_PLGPIO_INT_BASE,
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index cd076c9..857afae 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -11,10 +11,13 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/mtd/nand.h>
-+#include <mtd/fsmc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/fsmc.h>
- #include <plat/smi.h>
- 
- /* padmux devices to enable */
-@@ -54,6 +57,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 	&ehci_device,
- 	&i2c_device,
-+	&nand_device,
- 	&ohci0_device,
- 	&ohci1_device,
- 	&rtc_device,
-@@ -72,6 +76,10 @@ static void __init spear310_evb_init(void)
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
- 
-+	/* set nand device's plat data */
-+	fsmc_nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
-+			FSMC_NAND_BW8);
-+
- 	/* call spear310 machine init function */
- 	spear310_init();
- 
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 75e7890..3def755 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/ptrace.h>
-+#include <mtd/fsmc.h>
- #include <asm/irq.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-@@ -431,6 +432,31 @@ struct platform_device i2c1_device = {
- 	.resource = i2c1_resources,
- };
- 
-+/* nand device registeration */
-+static struct fsmc_nand_platform_data nand_platform_data;
-+
-+static struct resource nand_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR320_NAND_BASE,
-+		.end = SPEAR320_NAND_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR320_FSMC_BASE,
-+		.end = SPEAR320_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand_device = {
-+	.name = "nand",
-+	.id = -1,
-+	.resource = nand_resources,
-+	.num_resources = ARRAY_SIZE(nand_resources),
-+	.dev.platform_data = &nand_platform_data,
-+};
-+
- static struct resource plgpio_resources[] = {
- 	{
- 		.start = SPEAR320_SOC_CONFIG_BASE,
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 7f7b5dd..3a066bb 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -11,10 +11,13 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/mtd/nand.h>
-+#include <mtd/fsmc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/fsmc.h>
- #include <plat/smi.h>
- 
- /* padmux devices to enable */
-@@ -52,6 +55,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 	&ehci_device,
- 	&i2c_device,
-+	&nand_device,
- 	&ohci0_device,
- 	&ohci1_device,
- 	&rtc_device,
-@@ -72,6 +76,10 @@ static void __init spear320_evb_init(void)
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
- 
-+	/* set nand device's plat data */
-+	fsmc_nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
-+			FSMC_NAND_BW8);
-+
- 	/* call spear320 machine init function */
- 	spear320_init();
- 
-diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index f885898..ff90419 100644
---- a/arch/arm/mach-spear6xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -36,6 +36,7 @@ extern struct amba_device wdt_device;
- extern struct platform_device ehci0_device;
- extern struct platform_device ehci1_device;
- extern struct platform_device i2c_device;
-+extern struct platform_device nand_device;
- extern struct platform_device ohci0_device;
- extern struct platform_device ohci1_device;
- extern struct platform_device rtc_device;
-diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
-index 0eb5f50..f3b1fb4 100644
---- a/arch/arm/mach-spear6xx/spear600_evb.c
-+++ b/arch/arm/mach-spear6xx/spear600_evb.c
-@@ -11,10 +11,13 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/mtd/nand.h>
-+#include <mtd/fsmc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/fsmc.h>
- #include <plat/smi.h>
- 
- static struct amba_device *amba_devs[] __initdata = {
-@@ -33,6 +36,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&i2c_device,
- 	&ohci0_device,
- 	&ohci1_device,
-+	&nand_device,
- 	&rtc_device,
- 	&smi_device,
- };
-@@ -41,6 +45,10 @@ static void __init spear600_evb_init(void)
- {
- 	unsigned int i;
- 
-+	/* set nand device's plat data */
-+	fsmc_nand_set_plat_data(&nand_device, NULL, 0, NAND_SKIP_BBTSCAN,
-+			FSMC_NAND_BW8);
-+
- 	/* call spear600 machine init function */
- 	spear600_init();
  
 diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 2eec8ac..cc4fd39 100644
+index cd2153c..cc2692e 100644
 --- a/arch/arm/mach-spear6xx/spear6xx.c
 +++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -15,6 +15,7 @@
- #include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
-+#include <mtd/fsmc.h>
- #include <asm/hardware/vic.h>
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
-@@ -152,6 +153,31 @@ struct platform_device i2c_device = {
- 	.resource = i2c_resources,
+@@ -430,6 +430,11 @@ static struct map_desc spear6xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR6XX_ICM3_SDRAM_CTRL_BASE),
++		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SDRAM_CTRL_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
+ 	},
  };
  
-+/* nand device registeration */
-+static struct fsmc_nand_platform_data nand_platform_data;
-+
-+static struct resource nand_resources[] = {
-+	{
-+		.name = "nand_data",
-+		.start = SPEAR6XX_ICM1_NAND_BASE,
-+		.end = SPEAR6XX_ICM1_NAND_BASE + SZ_16 - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.name = "fsmc_regs",
-+		.start = SPEAR6XX_ICM1_FSMC_BASE,
-+		.end = SPEAR6XX_ICM1_FSMC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device nand_device = {
-+	.name = "nand",
-+	.id = -1,
-+	.resource = nand_resources,
-+	.num_resources = ARRAY_SIZE(nand_resources),
-+	.dev.platform_data = &nand_platform_data,
-+};
-+
- /* usb host device registeration */
- static struct resource ehci0_resources[] = {
- 	[0] = {
-diff --git a/arch/arm/plat-spear/include/plat/fsmc.h b/arch/arm/plat-spear/include/plat/fsmc.h
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index 50c680c..0e2cf75 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -3,7 +3,7 @@
+ #
+ 
+ # Common support
+-obj-y	:= clcd.o clock.o time.o smi.o
++obj-y	:= clcd.o clock.o pll_clk.o smi.o time.o
+ 
+ obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index fb1c87b..ee8f82b 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -586,11 +586,10 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+ 			 * call routine to put ddr in refresh mode, and
+ 			 * configure pll.
+ 			 */
+-			/* TBD */
++			pll_set_rate(tbls[i].m, tbls[i].p, tbls[i].n);
+ 			clk->rate = rate;
+ 		}
+-
+-		return ret;
++		return 0;
+ 	}
+ 
+ 	val = readl(config->mode_reg) &
+@@ -616,7 +615,6 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
+ 			config->masks->norm_fdbk_m_shift;
+ 
+ 	writel(val, config->cfg_reg);
+-
+ 	clk->rate = rate;
+ 
+ 	return 0;
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index 6ddcf93..00d6854 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -264,5 +264,6 @@ int aux_clk_set_rate(struct clk *clk, unsigned long desired_rate);
+ unsigned long clcd_calc_rate(struct clk *clk, int index);
+ int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
+ int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate);
++void pll_set_rate(u16 pdiv, u8 nmul, u8 hclkdiv);
+ 
+ #endif /* __PLAT_CLOCK_H */
+diff --git a/arch/arm/plat-spear/pll_clk.S b/arch/arm/plat-spear/pll_clk.S
 new file mode 100644
-index 0000000..bb161fb
+index 0000000..d0687b4
 --- /dev/null
-+++ b/arch/arm/plat-spear/include/plat/fsmc.h
-@@ -0,0 +1,36 @@
++++ b/arch/arm/plat-spear/pll_clk.S
+@@ -0,0 +1,187 @@
 +/*
-+ * arch/arm/plat-spear/include/plat/fsmc.h
++ * arch/arm/plat-spear/pll_clk.S
 + *
-+ * FSMC definitions for SPEAr platform
++ * SPEAR3xx and SPEAR6xx specific functions that will run in
++ * cache. These funstions intend to configure the PLL.
 + *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Vipin Kumar <vipin.kumar@st.com>
++ * Copyright (ST) 2010 Deepak Sikri <deepak.sikri@.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef __PLAT_FSMC_H
-+#define __PLAT_FSMC_H
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <mach/hardware.h>
++#include <mach/suspend.h>
 +
-+#include <mtd/fsmc.h>
++#if defined(CONFIG_ARCH_SPEAR3XX) || defined(CONFIG_ARCH_SPEAR6XX)
++.text
++ENTRY(pll_set_rate)
++	stmfd	sp!, {r0-r12, lr}
 +
-+/* This function is used to set platform data field of pdev->dev */
-+static inline void fsmc_nand_set_plat_data(struct platform_device *pdev,
-+		struct mtd_partition *partitions, unsigned int nr_partitions,
-+		unsigned int options, unsigned int width)
-+{
-+	struct fsmc_nand_platform_data *plat_data;
-+	plat_data = dev_get_platdata(&pdev->dev);
++	/* Lock down the TLB entry to the current victim */
++	mrc	p15, 0, r3, c10, c0, 0	/* read the lockdown register */
++	orr	r3, r3, #1		/* set the preserved bit */
++	mcr	p15, 0, r3, c10, c0, 0	/* write to the lockdown register */
 +
-+	if (partitions) {
-+		plat_data->partitions = partitions;
-+		plat_data->nr_partitions = nr_partitions;
-+	}
++	/*
++	 * set r4 to the value of the address to be locked down.
++	 * Invalidate the TLB single entry in TLB to ensure that
++	 * the locked address is not already in TLB.
++	 * MPMC, System Controller & Miscellaneous register address
++	 * are locked down below.
++	 */
 +
-+	plat_data->options = options;
-+	plat_data->width = width;
-+}
++	ldr	r4, MPMC_BASE_VA
++	/* Invalidate the MPMC virtual address in TLB. */
++	mcr	p15, 0, r4, c8, c7, 1
++	/* TLB will miss and entry will be reloaded */
++	ldr	r4, [r4]
++	/* read the lockdown register (victim will have rloaded) */
++	mrc	p15, 0, r3, c10, c0, 0
 +
-+#endif /* __PLAT_FSMC_H */
++	ldr	r4, SYS_CTRL_BASE_VA
++	/* Invalidate the System controller virtual address in TLB */
++	mcr	p15, 0, r4, c8, c7, 1
++	/* TLB will miss and entry will be reloaded */
++	ldr	r4, [r4]
++	/* read the lockdown register (victim will have rloaded) */
++	mrc	p15, 0, r3, c10, c0, 0
++
++	ldr	r4, MISC_BASE_VA
++	/* Invalidate the Miscellaneous registers virtual address in TLB */
++	mcr	p15, 0, r4, c8, c7, 1
++	/* TLB will miss and entry will be reloaded */
++	ldr	r4, [r4]
++	/* read the lockdown register (victim will have rloaded) */
++	mrc	p15, 0, r3, c10, c0, 0
++
++	/* clear preserve bit */
++	bic	r3, r3, #1
++	/* write to the lockdown register */
++	mcr	p15, 0, r3, c10, c0, 0
++
++	ldr	r7, MPMC_BASE_VA
++	ldr	r8, SYS_CTRL_BASE_VA
++	ldr	r6, MISC_BASE_VA
++	/* Prefetch certain instructions in the cache. */
++	adr	r4, cache_prefetch_start1
++	adr	r5, cache_prefetch_end1
++	mvn	r3, #0x1F
++	ands	r4, r3, r4
++	/* Lock Instructions in i-cache */
++fetch_loop:
++	/*
++	 * copy a cache-line-sized block of main memory to a cache
++	 * line in the I-cache.
++	 */
++	mcr	p15, 0, r4, c7, c13, 1
++	cmp	r4, r5
++	addls	r4, r4, #0x20
++	bls	fetch_loop
++cache_prefetch_start1:
++	/* Put SDRAM in self-refresh mode */
++	ldr	r3, [r7, #0x1c]
++	/* Clear START bit(24) of MEMCTL_GP_03 register in MPMC */
++	ldr	r4, =0x1000000
++	bic	r3, r3, r4
++	str	r3, [r7, #0x1c]
++
++	ldr	r3, [r7, #0xe4]
++	ldr	r4, =0xffff0000
++	/* Latch the current self refresh time */
++	mov	r9, r3
++	/* Increase the self refresh exit time */
++	bic	r3, r3, r4
++	ldr	r4, =0xffff
++	/* Program the SDRAM self refresh exit time on read command */
++	orr	r3, r3, r4, LSL #16
++	str	r3, [r7, #0xe4]
++
++	ldr	r3, [r7, #0x1c]
++	/* Set the SREFRESH bit(16) */
++	ldr	r4, =0x10000
++	orr	r3, r3, r4
++	str	r3, [r7, #0x1c]
++
++	/* Put the system in slow mode, use system controller */
++	ldr	r3, [r8]
++	bic	r3, r3, #0x7
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	orr	r3, r3, #0x2
++	str	r3, [r8]
++
++wait_till_slow_mode:
++	ldr	r3, [r8]
++	and	r3, r3, #0x78	/* Wait for the mode to be updated */
++	cmp	r3, #0x10	/* Poll the SCCTRL register status bits (6:3) */
++	bne wait_till_slow_mode
++
++	/*
++	 * reprogram the m(r0), p(r2), n(r1) values in the PLL
++	 * control registers (PLL_FRQ register in misc space).
++	 */
++	ldr	r3, [r6, #0x0c]
++	bic	r3, r3, #0x00ff
++	/* Program the PLL post divisor: p */
++	orr	r3, r3, r2
++	str	r3, [r6, #0x0c]
++
++	ldr	r3, [r6, #0x0c]
++	ldr	r4, =0xffff0000
++	bic	r3, r3, r4
++	bic	r3, r3, #0x0700
++	/* Program the PLL pre divisor: n */
++	orr	r3, r3, r1, LSL #8
++	/* Program the PLL feedback divisor: m */
++	orr	r3, r3, r0, LSL #24
++	str	r3, [r6, #0x0c]
++
++	/* Move the system in Normal mode, use system controller */
++	ldr	r3, [r8, #0x0]
++	ldr	r4, =0xfffffff8
++	/* Set the apt mode bits(2:0) in SCCTRL register */
++	and	r3, r3, r4
++	orr	r3, r3, #0x4
++	str	r3, [r8, #0x0]
++
++wait_till_normal_mode:
++	ldr	r3, [r8, #0x0]
++	and	r3, r3, #0x78
++	cmp	r3, #0x20	/* Poll the SCCTRL register status bits (6:3) */
++	bne wait_till_normal_mode
++
++	/* Exit DDR-SDRAM from self-refresh mode */
++	ldr	r10, MPMC_BASE_VA
++	/* Clear the SREFRESH bit(16) */
++	ldr	r3, [r10, #0x1c]
++	ldr	r4, =0x10000
++	bic	r3, r3, r4
++	str	r3, [r10, #0x1c]
++	/* Restore the SDRAM self refresh exit time on read command */
++	mov	r3, r9
++	str	r3, [r7, #0xe4]
++	/* Begin the command processing in controller */
++	ldr	r4, =0x1000000
++	orr	r3, r3, r4
++	/* Set START bit(24) of MEMCTL_GP_03 register in MPMC*/
++	str	r3, [r10, #0x1c]
++
++	ldmfd	sp!, {r0-r12, pc}
++
++/* This is the end of the code to be copied */
++
++SYS_CTRL_BASE_VA :
++	.word IO_ADDRESS(SYS_CTRL_BASE_PA)
++MPMC_BASE_VA :
++	.word IO_ADDRESS(MPMC_BASE_PA)
++MISC_BASE_VA :
++	.word IO_ADDRESS(MISC_BASE_PA)
++cache_prefetch_end1 :
++
++#elif defined(CONFIG_ARCH_SPEAR13XX)
++.text
++ENTRY(pll_set_rate)
++#endif
 -- 
 1.7.2.2
