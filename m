@@ -1,314 +1,339 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:26:00 +0530
-Subject: [PATCH V2 40/69] ST SPEAr : FSMC (Flexible Static Memory Controller)
-	NOR interface driver
+Date: Fri,  1 Oct 2010 17:25:42 +0530
+Subject: [PATCH V2 22/69] ST SPEAr: Adding machine support for keyboard
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <001f1c5109c19d2ef6517c78daf560cc2f300180.1285933332.git.viresh.kumar@st.com>
+Message-ID: <5eb8338cba759ba92beaeb5d1cca301ab0077582.1285933331.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vipin Kumar <vipin.kumar@st.com>
+From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 
-SPEAr1300 SoC supports FSMC to interface with various memories
-(NOR/NAND/SRAM). This patch adds the support for FSMC over NOR interface.
-
-The driver being used is driver/mtd/maps/physmap.c
-
-Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/Makefile               |    2 +-
- arch/arm/mach-spear13xx/fsmc-nor.c             |   85 ++++++++++++++++++++++++
  arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/spear1300_evb.c        |   17 +++++
- arch/arm/mach-spear13xx/spear1310_evb.c        |   17 +++++
- arch/arm/mach-spear13xx/spear13xx.c            |   20 ++++++
- arch/arm/plat-spear/include/plat/fsmc.h        |   15 ++++
- include/mtd/fsmc.h                             |    2 +
- 8 files changed, 158 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/fsmc-nor.c
+ arch/arm/mach-spear13xx/spear1300_evb.c        |   14 +++
+ arch/arm/mach-spear13xx/spear13xx.c            |   19 +++
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    1 +
+ arch/arm/mach-spear3xx/spear300.c              |   19 +++
+ arch/arm/mach-spear3xx/spear300_evb.c          |   14 +++
+ arch/arm/plat-spear/include/plat/keyboard.h    |  144 ++++++++++++++++++++++++
+ 7 files changed, 212 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-spear/include/plat/keyboard.h
 
-diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index 838405a..9312fcd 100644
---- a/arch/arm/mach-spear13xx/Makefile
-+++ b/arch/arm/mach-spear13xx/Makefile
-@@ -3,7 +3,7 @@
- #
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index a75ed3a..fd9f9a6 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -33,6 +33,7 @@ extern struct amba_device spear13xx_uart_device;
+ extern struct platform_device spear13xx_ehci0_device;
+ extern struct platform_device spear13xx_ehci1_device;
+ extern struct platform_device spear13xx_i2c_device;
++extern struct platform_device spear13xx_kbd_device;
+ extern struct platform_device spear13xx_ohci0_device;
+ extern struct platform_device spear13xx_ohci1_device;
+ extern struct platform_device spear13xx_rtc_device;
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index 9f53361..0c7c996 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -16,6 +16,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <plat/keyboard.h>
  
- # common files
--obj-y					+= spear13xx.o clock.o
-+obj-y					+= spear13xx.o clock.o fsmc-nor.o
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
- obj-$(CONFIG_PCIEPORTBUS)		+= pcie.o
-diff --git a/arch/arm/mach-spear13xx/fsmc-nor.c b/arch/arm/mach-spear13xx/fsmc-nor.c
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&spear13xx_uart_device,
+@@ -25,15 +26,28 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&spear13xx_ehci0_device,
+ 	&spear13xx_ehci1_device,
+ 	&spear13xx_i2c_device,
++	&spear13xx_kbd_device,
+ 	&spear13xx_ohci0_device,
+ 	&spear13xx_ohci1_device,
+ 	&spear13xx_rtc_device,
+ };
+ 
++/* keyboard specific platform data */
++static DECLARE_KEYMAP(spear_keymap);
++
++static struct kbd_platform_data kbd_data = {
++	.keymap = spear_keymap,
++	.keymapsize = ARRAY_SIZE(spear_keymap),
++	.rep = 1,
++};
++
+ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
+ 
++	/* set keyboard plat data */
++	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
++
+ 	/* call spear1300 machine init function */
+ 	spear1300_init();
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index c201e31..d19e325 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -166,6 +166,25 @@ struct platform_device spear13xx_ohci1_device = {
+ 	.resource = ohci1_resources,
+ };
+ 
++/* keyboard device registration */
++static struct resource kbd_resources[] = {
++	{
++		.start = SPEAR13XX_KBD_BASE,
++		.end = SPEAR13XX_KBD_BASE + SZ_1K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_KBD,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device spear13xx_kbd_device = {
++	.name = "keyboard",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(kbd_resources),
++	.resource = kbd_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 3eb2737..70f7ee2 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -108,6 +108,7 @@ extern struct pmx_driver pmx_driver;
+ /* Add spear300 machine device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device gpio1_device;
++extern struct platform_device kbd_device;
+ 
+ /* pad mux modes */
+ extern struct pmx_mode nand_mode;
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index fb7d5f1..44ba52e 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -407,6 +407,25 @@ struct amba_device gpio1_device = {
+ 	.irq = {VIRQ_GPIO1, NO_IRQ},
+ };
+ 
++/* keyboard device registration */
++static struct resource kbd_resources[] = {
++	{
++		.start = SPEAR300_KEYBOARD_BASE,
++		.end = SPEAR300_KEYBOARD_BASE + SZ_1K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = VIRQ_KEYBOARD,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device kbd_device = {
++	.name = "keyboard",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(kbd_resources),
++	.resource = kbd_resources,
++};
++
+ /* spear3xx shared irq */
+ struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 3b3c6ce..afb773e 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <plat/keyboard.h>
+ 
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+@@ -51,6 +52,16 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&rtc_device,
+ 
+ 	/* spear300 specific devices */
++	&kbd_device,
++};
++
++/* keyboard specific platform data */
++static DECLARE_KEYMAP(spear_keymap);
++
++static struct kbd_platform_data kbd_data = {
++	.keymap = spear_keymap,
++	.keymapsize = ARRAY_SIZE(spear_keymap),
++	.rep = 1,
+ };
+ 
+ static void __init spear300_evb_init(void)
+@@ -62,6 +73,9 @@ static void __init spear300_evb_init(void)
+ 	pmx_driver.devs = pmx_devs;
+ 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
+ 
++	/* set keyboard plat data */
++	kbd_set_plat_data(&kbd_device, &kbd_data);
++
+ 	/* call spear300 machine init function */
+ 	spear300_init();
+ 
+diff --git a/arch/arm/plat-spear/include/plat/keyboard.h b/arch/arm/plat-spear/include/plat/keyboard.h
 new file mode 100644
-index 0000000..03234b6
+index 0000000..29448bc
 --- /dev/null
-+++ b/arch/arm/mach-spear13xx/fsmc-nor.c
-@@ -0,0 +1,85 @@
++++ b/arch/arm/plat-spear/include/plat/keyboard.h
+@@ -0,0 +1,144 @@
 +/*
-+ * arch/arm/mach-spear13xx/fsmc-nor.c
-+ *
-+ * FSMC (Flexible Static Memory Controller) interface for NOR
++ * arch/arm/plat-spear/include/plat/keyboard.h
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Vipin Kumar<vipin.kumar@st.com>
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <plat/fsmc.h>
++#ifndef __PLAT_KEYBOARD_H
++#define __PLAT_KEYBOARD_H
 +
-+int __init fsmc_nor_init(struct platform_device *pdev, unsigned long base,
-+		u32 bank, u32 width)
++#include <linux/bitops.h>
++#include <linux/input.h>
++#include <linux/input/matrix_keypad.h>
++#include <linux/types.h>
++
++#define DECLARE_KEYMAP(name) \
++int name[] = {\
++	KEY(0, 0, KEY_ESC), \
++	KEY(0, 1, KEY_1), \
++	KEY(0, 2, KEY_2), \
++	KEY(0, 3, KEY_3), \
++	KEY(0, 4, KEY_4), \
++	KEY(0, 5, KEY_5), \
++	KEY(0, 6, KEY_6), \
++	KEY(0, 7, KEY_7), \
++	KEY(0, 8, KEY_8), \
++	KEY(1, 0, KEY_9), \
++	KEY(1, 1, KEY_MINUS), \
++	KEY(1, 2, KEY_EQUAL), \
++	KEY(1, 3, KEY_BACKSPACE), \
++	KEY(1, 4, KEY_TAB), \
++	KEY(1, 5, KEY_Q), \
++	KEY(1, 6, KEY_W), \
++	KEY(1, 7, KEY_E), \
++	KEY(1, 8, KEY_R), \
++	KEY(2, 0, KEY_T), \
++	KEY(2, 1, KEY_Y), \
++	KEY(2, 2, KEY_U), \
++	KEY(2, 3, KEY_I), \
++	KEY(2, 4, KEY_O), \
++	KEY(2, 5, KEY_P), \
++	KEY(2, 6, KEY_LEFTBRACE), \
++	KEY(2, 7, KEY_RIGHTBRACE), \
++	KEY(2, 8, KEY_ENTER), \
++	KEY(3, 0, KEY_LEFTCTRL), \
++	KEY(3, 1, KEY_A), \
++	KEY(3, 2, KEY_S), \
++	KEY(3, 3, KEY_D), \
++	KEY(3, 4, KEY_F), \
++	KEY(3, 5, KEY_G), \
++	KEY(3, 6, KEY_H), \
++	KEY(3, 7, KEY_J), \
++	KEY(3, 8, KEY_K), \
++	KEY(4, 0, KEY_L), \
++	KEY(4, 1, KEY_SEMICOLON), \
++	KEY(4, 2, KEY_APOSTROPHE), \
++	KEY(4, 3, KEY_GRAVE), \
++	KEY(4, 4, KEY_LEFTSHIFT), \
++	KEY(4, 5, KEY_BACKSLASH), \
++	KEY(4, 6, KEY_Z), \
++	KEY(4, 7, KEY_X), \
++	KEY(4, 8, KEY_C), \
++	KEY(4, 0, KEY_L), \
++	KEY(4, 1, KEY_SEMICOLON), \
++	KEY(4, 2, KEY_APOSTROPHE), \
++	KEY(4, 3, KEY_GRAVE), \
++	KEY(4, 4, KEY_LEFTSHIFT), \
++	KEY(4, 5, KEY_BACKSLASH), \
++	KEY(4, 6, KEY_Z), \
++	KEY(4, 7, KEY_X), \
++	KEY(4, 8, KEY_C), \
++	KEY(4, 0, KEY_L), \
++	KEY(4, 1, KEY_SEMICOLON), \
++	KEY(4, 2, KEY_APOSTROPHE), \
++	KEY(4, 3, KEY_GRAVE), \
++	KEY(4, 4, KEY_LEFTSHIFT), \
++	KEY(4, 5, KEY_BACKSLASH), \
++	KEY(4, 6, KEY_Z), \
++	KEY(4, 7, KEY_X), \
++	KEY(4, 8, KEY_C), \
++	KEY(5, 0, KEY_V), \
++	KEY(5, 1, KEY_B), \
++	KEY(5, 2, KEY_N), \
++	KEY(5, 3, KEY_M), \
++	KEY(5, 4, KEY_COMMA), \
++	KEY(5, 5, KEY_DOT), \
++	KEY(5, 6, KEY_SLASH), \
++	KEY(5, 7, KEY_RIGHTSHIFT), \
++	KEY(5, 8, KEY_KPASTERISK), \
++	KEY(6, 0, KEY_LEFTALT), \
++	KEY(6, 1, KEY_SPACE), \
++	KEY(6, 2, KEY_CAPSLOCK), \
++	KEY(6, 3, KEY_F1), \
++	KEY(6, 4, KEY_F2), \
++	KEY(6, 5, KEY_F3), \
++	KEY(6, 6, KEY_F4), \
++	KEY(6, 7, KEY_F5), \
++	KEY(6, 8, KEY_F6), \
++	KEY(7, 0, KEY_F7), \
++	KEY(7, 1, KEY_F8), \
++	KEY(7, 2, KEY_F9), \
++	KEY(7, 3, KEY_F10), \
++	KEY(7, 4, KEY_NUMLOCK), \
++	KEY(7, 5, KEY_SCROLLLOCK), \
++	KEY(7, 6, KEY_KP7), \
++	KEY(7, 7, KEY_KP8), \
++	KEY(7, 8, KEY_KP9), \
++	KEY(8, 0, KEY_KPMINUS), \
++	KEY(8, 1, KEY_KP4), \
++	KEY(8, 2, KEY_KP5), \
++	KEY(8, 3, KEY_KP6), \
++	KEY(8, 4, KEY_KPPLUS), \
++	KEY(8, 5, KEY_KP1), \
++	KEY(8, 6, KEY_KP2), \
++	KEY(8, 7, KEY_KP3), \
++	KEY(8, 8, KEY_KP0), \
++};
++/**
++ * struct kbd_platform_data - keymap for spear keyboards
++ * keymap: pointer to array of values encoded with KEY() macro representing
++ * keymap
++ * keymapsize: number of entries (initialized) in this keymap
++ * rep: current values for autorepeat parameters
++ *
++ * This structure is supposed to be used by platform code to supply
++ * keymaps to drivers that implement keyboards.
++ */
++struct kbd_platform_data {
++	int *keymap;
++	unsigned int keymapsize;
++	bool rep;
++};
++
++/* This function is used to set platform data field of pdev->dev */
++static inline void
++kbd_set_plat_data(struct platform_device *pdev, struct kbd_platform_data *data)
 +{
-+	void __iomem *fsmc_nor_base;
-+	struct fsmc_regs *regs;
-+	struct clk *clk;
-+	int ret;
-+	u32 ctrl;
-+
-+	if (bank > (FSMC_MAX_NOR_BANKS - 1))
-+		return -EINVAL;
-+
-+	fsmc_nor_base = ioremap(base, FSMC_NOR_REG_SIZE);
-+	if (!fsmc_nor_base)
-+		return -ENOMEM;
-+
-+	clk = clk_get(NULL, "fsmc");
-+	if (IS_ERR(clk)) {
-+		iounmap(fsmc_nor_base);
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_enable(clk);
-+	if (ret) {
-+		iounmap(fsmc_nor_base);
-+		return ret;
-+	}
-+
-+	regs = (struct fsmc_regs *)fsmc_nor_base;
-+
-+	ctrl = WAIT_ENB | WRT_ENABLE | WPROT | NOR_DEV | BANK_ENABLE;
-+
-+	switch (width) {
-+	case FSMC_FLASH_WIDTH8:
-+		ctrl |= WIDTH_8;
-+		break;
-+
-+	case FSMC_FLASH_WIDTH16:
-+		ctrl |= WIDTH_16;
-+		break;
-+
-+	case FSMC_FLASH_WIDTH32:
-+		ctrl |= WIDTH_32;
-+		break;
-+
-+	default:
-+		ctrl |= WIDTH_8;
-+		break;
-+	}
-+
-+	writel(ctrl, &regs->nor_bank_regs[bank].ctrl);
-+	writel(0x0FFFFFFF, &regs->nor_bank_regs[bank].ctrl_tim);
-+	writel(ctrl | RSTPWRDWN, &regs->nor_bank_regs[bank].ctrl);
-+
-+	iounmap(fsmc_nor_base);
-+
-+	return 0;
++	pdev->dev.platform_data = data;
 +}
-+
-+void __init fsmc_init_board_info(struct platform_device *pdev,
-+		struct mtd_partition *partitions, unsigned int nr_partitions,
-+		unsigned int width)
-+{
-+	fsmc_nor_set_plat_data(pdev, partitions, nr_partitions, width);
-+}
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index cd54e62..9b0f009 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -34,6 +34,7 @@ extern struct amba_device spear13xx_ssp_device;
- extern struct amba_device spear13xx_uart_device;
- extern struct platform_device spear13xx_ehci0_device;
- extern struct platform_device spear13xx_ehci1_device;
-+extern struct platform_device spear13xx_fsmc_nor_device;
- extern struct platform_device spear13xx_i2c_device;
- extern struct platform_device spear13xx_kbd_device;
- extern struct platform_device spear13xx_nand_device;
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 269d9b0..e56fbd4 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -22,11 +22,21 @@
- #include <mach/generic.h>
- #include <mach/spear.h>
- #include <mach/pcie.h>
-+#include <plat/fsmc.h>
- #include <plat/keyboard.h>
- #include <plat/fsmc.h>
- #include <plat/smi.h>
- #include <plat/spi.h>
- 
-+#define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
-+
-+static struct mtd_partition partition_info[] = {
-+	PARTITION("X-loader", 0, 1 * 0x20000),
-+	PARTITION("U-Boot", 0x20000, 3 * 0x20000),
-+	PARTITION("Kernel", 0x80000, 24 * 0x20000),
-+	PARTITION("Root File System", 0x380000, 84 * 0x20000),
-+};
-+
- static struct amba_device *amba_devs[] __initdata = {
- 	&spear13xx_gpio_device[0],
- 	&spear13xx_gpio_device[1],
-@@ -114,6 +124,13 @@ static void __init spear1300_evb_init(void)
- 	enable_pcie0_clk();
- 	pcie_init(&spear1300_pcie_port_is_host);
- #endif
-+	/* initialize fsmc related data in fsmc plat data */
-+	fsmc_init_board_info(&spear13xx_fsmc_nor_device, partition_info,
-+			ARRAY_SIZE(partition_info), FSMC_FLASH_WIDTH8);
-+
-+	/* Initialize fsmc regiters */
-+	fsmc_nor_init(&spear13xx_fsmc_nor_device, SPEAR13XX_FSMC_BASE, 0,
-+			FSMC_FLASH_WIDTH8);
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
-index c1227bc..f6b4323 100644
---- a/arch/arm/mach-spear13xx/spear1310_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1310_evb.c
-@@ -27,6 +27,15 @@
- #include <plat/smi.h>
- #include <plat/spi.h>
- 
-+#define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
-+
-+static struct mtd_partition partition_info[] = {
-+	PARTITION("X-loader", 0, 1 * 0x20000),
-+	PARTITION("U-Boot", 0x20000, 3 * 0x20000),
-+	PARTITION("Kernel", 0x80000, 24 * 0x20000),
-+	PARTITION("Root File System", 0x380000, 84 * 0x20000),
-+};
-+
- static struct amba_device *amba_devs[] __initdata = {
- 	/* spear13xx specific devices */
- 	&spear13xx_gpio_device[0],
-@@ -115,6 +124,14 @@ static void __init spear1310_evb_init(void)
- 	/* initialize serial nor related data in smi plat data */
- 	smi_init_board_info(&spear13xx_smi_device);
- 
-+	/* initialize fsmc related data in fsmc plat data */
-+	fsmc_init_board_info(&spear13xx_fsmc_nor_device, partition_info,
-+			ARRAY_SIZE(partition_info), FSMC_FLASH_WIDTH8);
-+
-+	/* Initialize fsmc regiters */
-+	fsmc_nor_init(&spear13xx_fsmc_nor_device, SPEAR13XX_FSMC_BASE, 0,
-+			FSMC_FLASH_WIDTH8);
-+
- #ifdef CONFIG_PCIEPORTBUS
- 	/* Enable PCIE0 clk */
- 	enable_pcie0_clk();
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 76920ec..cdf132e 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -14,6 +14,7 @@
- #include <linux/types.h>
- #include <linux/amba/pl022.h>
- #include <linux/amba/pl061.h>
-+#include <linux/mtd/physmap.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
- #include <mtd/fsmc.h>
-@@ -130,6 +131,25 @@ struct platform_device spear13xx_i2c_device = {
- 	.resource = i2c_resources,
- };
- 
-+/* fsmc nor flash device registeration */
-+static struct physmap_flash_data fsmc_norflash_data;
-+
-+static struct resource fsmc_nor_resources[] = {
-+	{
-+		.start	= SPEAR13XX_FSMC_MEM_BASE,
-+		.end	= SPEAR13XX_FSMC_MEM_BASE + SZ_16M - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device spear13xx_fsmc_nor_device = {
-+	.name	= "physmap-flash",
-+	.id	= -1,
-+	.resource = fsmc_nor_resources,
-+	.num_resources = ARRAY_SIZE(fsmc_nor_resources),
-+	.dev.platform_data = &fsmc_norflash_data,
-+};
-+
- /* nand device registeration */
- void __init nand_mach_init(u32 busw)
- {
-diff --git a/arch/arm/plat-spear/include/plat/fsmc.h b/arch/arm/plat-spear/include/plat/fsmc.h
-index bb161fb..6ecf2e7 100644
---- a/arch/arm/plat-spear/include/plat/fsmc.h
-+++ b/arch/arm/plat-spear/include/plat/fsmc.h
-@@ -14,6 +14,7 @@
- #ifndef __PLAT_FSMC_H
- #define __PLAT_FSMC_H
- 
-+#include <linux/mtd/physmap.h>
- #include <mtd/fsmc.h>
- 
- /* This function is used to set platform data field of pdev->dev */
-@@ -33,4 +34,18 @@ static inline void fsmc_nand_set_plat_data(struct platform_device *pdev,
- 	plat_data->width = width;
- }
- 
-+static inline void fsmc_nor_set_plat_data(struct platform_device *pdev,
-+		struct mtd_partition *partitions, unsigned int nr_partitions,
-+		unsigned int width)
-+{
-+	struct physmap_flash_data *plat_data;
-+	plat_data = dev_get_platdata(&pdev->dev);
-+
-+	if (partitions) {
-+		plat_data->parts = partitions;
-+		plat_data->nr_parts = nr_partitions;
-+	}
-+
-+	plat_data->width = width;
-+}
- #endif /* __PLAT_FSMC_H */
-diff --git a/include/mtd/fsmc.h b/include/mtd/fsmc.h
-index 7b8921b..95725d9 100644
---- a/include/mtd/fsmc.h
-+++ b/include/mtd/fsmc.h
-@@ -44,6 +44,7 @@
- 
- #define FSMC_FLASH_WIDTH8	1
- #define FSMC_FLASH_WIDTH16	2
-+#define FSMC_FLASH_WIDTH32	4
- 
- struct fsmc_nor_bank_regs {
- 	u32 ctrl;
-@@ -56,6 +57,7 @@ struct fsmc_nor_bank_regs {
- #define NOR_DEV			(2 << 2)
- #define WIDTH_8			(0 << 4)
- #define WIDTH_16		(1 << 4)
-+#define WIDTH_32		(2 << 4)
- #define RSTPWRDWN		(1 << 6)
- #define WPROT			(1 << 7)
- #define WRT_ENABLE		(1 << 12)
++#endif /* __PLAT_KEYBOARD_H */
 -- 
 1.7.2.2
