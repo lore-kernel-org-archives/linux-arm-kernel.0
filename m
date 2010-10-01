@@ -1,35 +1,52 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Oct 2010 19:34:31 +0100
-Subject: [PATCH 3/3] ARM: twd_smp: add clock api support
-In-Reply-To: <AANLkTi=zwxKhhO7ERBvWfeHF7yO4beex5CYioPtiyWpA@mail.gmail.com>
-References: <1285886952-30888-1-git-send-email-robherring2@gmail.com>
-	<1285886952-30888-3-git-send-email-robherring2@gmail.com>
-	<AANLkTi=L69BXQZfT3VAeLgyBBHA2O8ELeLdqL1Onk3t=@mail.gmail.com>
-	<4CA5417B.5020200@gmail.com>
-	<AANLkTik=JXaDKbx97avUKerDQeK-O9gRuyfAZPHDQ2Yp@mail.gmail.com>
-	<4CA551FF.3080100@gmail.com>
-	<AANLkTim3wYDNySWxba3-xWkj495GTiGxWN9L08Rnaa9C@mail.gmail.com>
-	<4CA614AA.8090305@gmail.com>
-	<AANLkTi=zwxKhhO7ERBvWfeHF7yO4beex5CYioPtiyWpA@mail.gmail.com>
-Message-ID: <20101001183431.GB22533@n2100.arm.linux.org.uk>
+Date: Fri, 1 Oct 2010 19:40:12 +0100
+Subject: [PATCH 2/3] ARM: timer-sp: support timer clock freq other than
+	1MHz
+In-Reply-To: <4CA5295C.60007@gmail.com>
+References: <4CA5295C.60007@gmail.com>
+Message-ID: <20101001184012.GC22533@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 01, 2010 at 11:22:31AM -0700, Colin Cross wrote:
-> The timer APIs require that a timer take at least as long as requested
-> to fire.  If you change the TWD prescaler before the CPU frequency
-> increases, or after the CPU frequency decreases, the timer interrupt
-> will not fire until a small time after the requested time.
+On Thu, Sep 30, 2010 at 07:20:44PM -0500, Rob Herring wrote:
+> The timer-sp code is fixed to 1MHz timer clock. Add clock
+> api calls to get the timer clock frequency.
 
-That maybe - and for TWD which is used for local timer purposes only,
-that's fine.  What wouldn't be fine is if your clocksource counter
-changes frequency...
+This patch isn't threaded with the others (and as a result is separated by
+at least 50 messages in my mailbox!)  Also the patch seems to be broken
+by "inteligent" formatting.
 
-In any case, I'm not sure that passing in a struct clk pointer is
-really the right way to go - the point of the clk API is to remove
-such passing of static structures.
+> @@ -50,10 +52,19 @@ static struct clocksource clocksource_sp804 = {
+>   void __init sp804_clocksource_init(void __iomem *base)
+>  {
+> +	struct clk *clk;
+>  	struct clocksource *cs = &clocksource_sp804;
+>   	clksrc_base = base;
+>  +	if (sp804_rate == 0) {
+> +		clk = clk_get_sys(NULL, "sp804_timer");
 
-How about instead using clk_get_sys() to obtain a clock for the TWD?
+Why just a connection ID with a NULL device name?  This is wrong.  It
+should at least be:
 
-Do we need separate connection IDs for each TWD, or are all TWDs in
-a system always clocked together?
+		clk = clk_get_sys("sp804", NULL);
+
+Now, one issue here is that the ARM platforms have several of these -
+normally 4, or maybe 8.  Some ARM platforms have them clocked differently
+(they're even on two different boards.)  So we do need some kind of
+connection ID there to identify which one.
+
+I'd suggest passing in a const string to this function to set both the
+clocksource name (to identify which sp804 is being used) and used as
+a connection ID with clk_get_sys().
+
+>  @@ -140,12 +151,21 @@ static struct irqaction sp804_timer_irq = {
+>   void __init sp804_clockevents_init(void __iomem *base, unsigned int  
+> timer_irq)
+>  {
+> +	struct clk *clk;
+>  	struct clock_event_device *evt = &sp804_clockevent;
+>   	clkevt_base = base;
+>  +	if (sp804_rate == 0) {
+> +		clk = clk_get_sys(NULL, "sp804_timer");
+
+Same comments here.
