@@ -1,339 +1,543 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:25:42 +0530
-Subject: [PATCH V2 22/69] ST SPEAr: Adding machine support for keyboard
+Date: Fri,  1 Oct 2010 17:25:39 +0530
+Subject: [PATCH V2 19/69] USB host: Adding USB ehci & ohci support for spear
+	platform
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <5eb8338cba759ba92beaeb5d1cca301ab0077582.1285933331.git.viresh.kumar@st.com>
+Message-ID: <c566b56b02b0bccd220a3d0e90d40a845ab97175.1285933331.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+This patch adds support for ehci and ohci controller in the SPEAr platform
+
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/spear1300_evb.c        |   14 +++
- arch/arm/mach-spear13xx/spear13xx.c            |   19 +++
- arch/arm/mach-spear3xx/include/mach/generic.h  |    1 +
- arch/arm/mach-spear3xx/spear300.c              |   19 +++
- arch/arm/mach-spear3xx/spear300_evb.c          |   14 +++
- arch/arm/plat-spear/include/plat/keyboard.h    |  144 ++++++++++++++++++++++++
- 7 files changed, 212 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-spear/include/plat/keyboard.h
+ drivers/usb/Kconfig           |    2 +
+ drivers/usb/host/ehci-hcd.c   |    5 +
+ drivers/usb/host/ehci-spear.c |  211 ++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/ohci-hcd.c   |    5 +
+ drivers/usb/host/ohci-spear.c |  240 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 463 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/usb/host/ehci-spear.c
+ create mode 100644 drivers/usb/host/ohci-spear.c
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index a75ed3a..fd9f9a6 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -33,6 +33,7 @@ extern struct amba_device spear13xx_uart_device;
- extern struct platform_device spear13xx_ehci0_device;
- extern struct platform_device spear13xx_ehci1_device;
- extern struct platform_device spear13xx_i2c_device;
-+extern struct platform_device spear13xx_kbd_device;
- extern struct platform_device spear13xx_ohci0_device;
- extern struct platform_device spear13xx_ohci1_device;
- extern struct platform_device spear13xx_rtc_device;
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 9f53361..0c7c996 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -16,6 +16,7 @@
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/keyboard.h>
+diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
+index 4aa00e6..108f69d 100644
+--- a/drivers/usb/Kconfig
++++ b/drivers/usb/Kconfig
+@@ -41,6 +41,7 @@ config USB_ARCH_HAS_OHCI
+ 	default y if MFD_TC6393XB
+ 	default y if ARCH_W90X900
+ 	default y if ARCH_DAVINCI_DA8XX
++	default y if PLAT_SPEAR
+ 	# PPC:
+ 	default y if STB03xxx
+ 	default y if PPC_MPC52xx
+@@ -65,6 +66,7 @@ config USB_ARCH_HAS_EHCI
+ 	default y if ARCH_AT91SAM9G45
+ 	default y if ARCH_MXC
+ 	default y if ARCH_OMAP3
++	default y if PLAT_SPEAR
+ 	default PCI
  
- static struct amba_device *amba_devs[] __initdata = {
- 	&spear13xx_uart_device,
-@@ -25,15 +26,28 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&spear13xx_ehci0_device,
- 	&spear13xx_ehci1_device,
- 	&spear13xx_i2c_device,
-+	&spear13xx_kbd_device,
- 	&spear13xx_ohci0_device,
- 	&spear13xx_ohci1_device,
- 	&spear13xx_rtc_device,
- };
+ # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 34a928d..2101725 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1197,6 +1197,11 @@ MODULE_LICENSE ("GPL");
+ #define	PLATFORM_DRIVER		ehci_atmel_driver
+ #endif
  
-+/* keyboard specific platform data */
-+static DECLARE_KEYMAP(spear_keymap);
++#ifdef CONFIG_PLAT_SPEAR
++#include "ehci-spear.c"
++#define PLATFORM_DRIVER		spear_ehci_hcd_driver
++#endif
 +
-+static struct kbd_platform_data kbd_data = {
-+	.keymap = spear_keymap,
-+	.keymapsize = ARRAY_SIZE(spear_keymap),
-+	.rep = 1,
-+};
-+
- static void __init spear1300_evb_init(void)
- {
- 	unsigned int i;
- 
-+	/* set keyboard plat data */
-+	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
-+
- 	/* call spear1300 machine init function */
- 	spear1300_init();
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index c201e31..d19e325 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -166,6 +166,25 @@ struct platform_device spear13xx_ohci1_device = {
- 	.resource = ohci1_resources,
- };
- 
-+/* keyboard device registration */
-+static struct resource kbd_resources[] = {
-+	{
-+		.start = SPEAR13XX_KBD_BASE,
-+		.end = SPEAR13XX_KBD_BASE + SZ_1K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_KBD,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device spear13xx_kbd_device = {
-+	.name = "keyboard",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(kbd_resources),
-+	.resource = kbd_resources,
-+};
-+
- /* rtc device registration */
- static struct resource rtc_resources[] = {
- 	{
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 3eb2737..70f7ee2 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -108,6 +108,7 @@ extern struct pmx_driver pmx_driver;
- /* Add spear300 machine device structure declarations here */
- extern struct amba_device clcd_device;
- extern struct amba_device gpio1_device;
-+extern struct platform_device kbd_device;
- 
- /* pad mux modes */
- extern struct pmx_mode nand_mode;
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index fb7d5f1..44ba52e 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -407,6 +407,25 @@ struct amba_device gpio1_device = {
- 	.irq = {VIRQ_GPIO1, NO_IRQ},
- };
- 
-+/* keyboard device registration */
-+static struct resource kbd_resources[] = {
-+	{
-+		.start = SPEAR300_KEYBOARD_BASE,
-+		.end = SPEAR300_KEYBOARD_BASE + SZ_1K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = VIRQ_KEYBOARD,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device kbd_device = {
-+	.name = "keyboard",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(kbd_resources),
-+	.resource = kbd_resources,
-+};
-+
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index 3b3c6ce..afb773e 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -15,6 +15,7 @@
- #include <asm/mach-types.h>
- #include <mach/generic.h>
- #include <mach/spear.h>
-+#include <plat/keyboard.h>
- 
- /* padmux devices to enable */
- static struct pmx_dev *pmx_devs[] = {
-@@ -51,6 +52,16 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&rtc_device,
- 
- 	/* spear300 specific devices */
-+	&kbd_device,
-+};
-+
-+/* keyboard specific platform data */
-+static DECLARE_KEYMAP(spear_keymap);
-+
-+static struct kbd_platform_data kbd_data = {
-+	.keymap = spear_keymap,
-+	.keymapsize = ARRAY_SIZE(spear_keymap),
-+	.rep = 1,
- };
- 
- static void __init spear300_evb_init(void)
-@@ -62,6 +73,9 @@ static void __init spear300_evb_init(void)
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
- 
-+	/* set keyboard plat data */
-+	kbd_set_plat_data(&kbd_device, &kbd_data);
-+
- 	/* call spear300 machine init function */
- 	spear300_init();
- 
-diff --git a/arch/arm/plat-spear/include/plat/keyboard.h b/arch/arm/plat-spear/include/plat/keyboard.h
+ #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
+     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
+     !defined(XILINX_OF_PLATFORM_DRIVER)
+diff --git a/drivers/usb/host/ehci-spear.c b/drivers/usb/host/ehci-spear.c
 new file mode 100644
-index 0000000..29448bc
+index 0000000..b586fe9
 --- /dev/null
-+++ b/arch/arm/plat-spear/include/plat/keyboard.h
-@@ -0,0 +1,144 @@
++++ b/drivers/usb/host/ehci-spear.c
+@@ -0,0 +1,211 @@
 +/*
-+ * arch/arm/plat-spear/include/plat/keyboard.h
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++* Driver for EHCI HCD on SPEAR SOC
++*
++* Copyright (C) 2010 ST Micro Electronics,
++* Deepak Sikri <deepak.sikri@st.com>
++*
++* Based on various ehci-*.c drivers
++*
++* This file is subject to the terms and conditions of the GNU General Public
++* License. See the file COPYING in the main directory of this archive for
++* more details.
++*/
 +
-+#ifndef __PLAT_KEYBOARD_H
-+#define __PLAT_KEYBOARD_H
++#include <linux/platform_device.h>
++#include <linux/clk.h>
 +
-+#include <linux/bitops.h>
-+#include <linux/input.h>
-+#include <linux/input/matrix_keypad.h>
-+#include <linux/types.h>
-+
-+#define DECLARE_KEYMAP(name) \
-+int name[] = {\
-+	KEY(0, 0, KEY_ESC), \
-+	KEY(0, 1, KEY_1), \
-+	KEY(0, 2, KEY_2), \
-+	KEY(0, 3, KEY_3), \
-+	KEY(0, 4, KEY_4), \
-+	KEY(0, 5, KEY_5), \
-+	KEY(0, 6, KEY_6), \
-+	KEY(0, 7, KEY_7), \
-+	KEY(0, 8, KEY_8), \
-+	KEY(1, 0, KEY_9), \
-+	KEY(1, 1, KEY_MINUS), \
-+	KEY(1, 2, KEY_EQUAL), \
-+	KEY(1, 3, KEY_BACKSPACE), \
-+	KEY(1, 4, KEY_TAB), \
-+	KEY(1, 5, KEY_Q), \
-+	KEY(1, 6, KEY_W), \
-+	KEY(1, 7, KEY_E), \
-+	KEY(1, 8, KEY_R), \
-+	KEY(2, 0, KEY_T), \
-+	KEY(2, 1, KEY_Y), \
-+	KEY(2, 2, KEY_U), \
-+	KEY(2, 3, KEY_I), \
-+	KEY(2, 4, KEY_O), \
-+	KEY(2, 5, KEY_P), \
-+	KEY(2, 6, KEY_LEFTBRACE), \
-+	KEY(2, 7, KEY_RIGHTBRACE), \
-+	KEY(2, 8, KEY_ENTER), \
-+	KEY(3, 0, KEY_LEFTCTRL), \
-+	KEY(3, 1, KEY_A), \
-+	KEY(3, 2, KEY_S), \
-+	KEY(3, 3, KEY_D), \
-+	KEY(3, 4, KEY_F), \
-+	KEY(3, 5, KEY_G), \
-+	KEY(3, 6, KEY_H), \
-+	KEY(3, 7, KEY_J), \
-+	KEY(3, 8, KEY_K), \
-+	KEY(4, 0, KEY_L), \
-+	KEY(4, 1, KEY_SEMICOLON), \
-+	KEY(4, 2, KEY_APOSTROPHE), \
-+	KEY(4, 3, KEY_GRAVE), \
-+	KEY(4, 4, KEY_LEFTSHIFT), \
-+	KEY(4, 5, KEY_BACKSLASH), \
-+	KEY(4, 6, KEY_Z), \
-+	KEY(4, 7, KEY_X), \
-+	KEY(4, 8, KEY_C), \
-+	KEY(4, 0, KEY_L), \
-+	KEY(4, 1, KEY_SEMICOLON), \
-+	KEY(4, 2, KEY_APOSTROPHE), \
-+	KEY(4, 3, KEY_GRAVE), \
-+	KEY(4, 4, KEY_LEFTSHIFT), \
-+	KEY(4, 5, KEY_BACKSLASH), \
-+	KEY(4, 6, KEY_Z), \
-+	KEY(4, 7, KEY_X), \
-+	KEY(4, 8, KEY_C), \
-+	KEY(4, 0, KEY_L), \
-+	KEY(4, 1, KEY_SEMICOLON), \
-+	KEY(4, 2, KEY_APOSTROPHE), \
-+	KEY(4, 3, KEY_GRAVE), \
-+	KEY(4, 4, KEY_LEFTSHIFT), \
-+	KEY(4, 5, KEY_BACKSLASH), \
-+	KEY(4, 6, KEY_Z), \
-+	KEY(4, 7, KEY_X), \
-+	KEY(4, 8, KEY_C), \
-+	KEY(5, 0, KEY_V), \
-+	KEY(5, 1, KEY_B), \
-+	KEY(5, 2, KEY_N), \
-+	KEY(5, 3, KEY_M), \
-+	KEY(5, 4, KEY_COMMA), \
-+	KEY(5, 5, KEY_DOT), \
-+	KEY(5, 6, KEY_SLASH), \
-+	KEY(5, 7, KEY_RIGHTSHIFT), \
-+	KEY(5, 8, KEY_KPASTERISK), \
-+	KEY(6, 0, KEY_LEFTALT), \
-+	KEY(6, 1, KEY_SPACE), \
-+	KEY(6, 2, KEY_CAPSLOCK), \
-+	KEY(6, 3, KEY_F1), \
-+	KEY(6, 4, KEY_F2), \
-+	KEY(6, 5, KEY_F3), \
-+	KEY(6, 6, KEY_F4), \
-+	KEY(6, 7, KEY_F5), \
-+	KEY(6, 8, KEY_F6), \
-+	KEY(7, 0, KEY_F7), \
-+	KEY(7, 1, KEY_F8), \
-+	KEY(7, 2, KEY_F9), \
-+	KEY(7, 3, KEY_F10), \
-+	KEY(7, 4, KEY_NUMLOCK), \
-+	KEY(7, 5, KEY_SCROLLLOCK), \
-+	KEY(7, 6, KEY_KP7), \
-+	KEY(7, 7, KEY_KP8), \
-+	KEY(7, 8, KEY_KP9), \
-+	KEY(8, 0, KEY_KPMINUS), \
-+	KEY(8, 1, KEY_KP4), \
-+	KEY(8, 2, KEY_KP5), \
-+	KEY(8, 3, KEY_KP6), \
-+	KEY(8, 4, KEY_KPPLUS), \
-+	KEY(8, 5, KEY_KP1), \
-+	KEY(8, 6, KEY_KP2), \
-+	KEY(8, 7, KEY_KP3), \
-+	KEY(8, 8, KEY_KP0), \
-+};
-+/**
-+ * struct kbd_platform_data - keymap for spear keyboards
-+ * keymap: pointer to array of values encoded with KEY() macro representing
-+ * keymap
-+ * keymapsize: number of entries (initialized) in this keymap
-+ * rep: current values for autorepeat parameters
-+ *
-+ * This structure is supposed to be used by platform code to supply
-+ * keymaps to drivers that implement keyboards.
-+ */
-+struct kbd_platform_data {
-+	int *keymap;
-+	unsigned int keymapsize;
-+	bool rep;
++struct spear_ehci {
++	struct ehci_hcd ehci;
++	struct clk *clk;
 +};
 +
-+/* This function is used to set platform data field of pdev->dev */
-+static inline void
-+kbd_set_plat_data(struct platform_device *pdev, struct kbd_platform_data *data)
++#define to_spear_ehci(hcd)	(struct spear_ehci *)hcd_to_ehci(hcd)
++
++static void spear_start_ehci(struct spear_ehci *ehci)
 +{
-+	pdev->dev.platform_data = data;
++	clk_enable(ehci->clk);
 +}
-+#endif /* __PLAT_KEYBOARD_H */
++
++static void spear_stop_ehci(struct spear_ehci *ehci)
++{
++	clk_disable(ehci->clk);
++}
++
++static int ehci_spear_setup(struct usb_hcd *hcd)
++{
++	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
++	int retval = 0;
++
++	/* registers start at offset 0x0 */
++	ehci->caps = hcd->regs;
++	ehci->regs = hcd->regs + HC_LENGTH(ehci_readl(ehci,
++				&ehci->caps->hc_capbase));
++	/* cache this readonly data; minimize chip reads */
++	ehci->hcs_params = ehci_readl(ehci, &ehci->caps->hcs_params);
++	retval = ehci_halt(ehci);
++	if (retval)
++		return retval;
++
++	retval = ehci_init(hcd);
++	if (retval)
++		return retval;
++
++	ehci_reset(ehci);
++	ehci_port_power(ehci, 0);
++
++	return retval;
++}
++
++static const struct hc_driver ehci_spear_hc_driver = {
++	.description		= hcd_name,
++	.product_desc		= "SPEAr EHCI",
++	.hcd_priv_size		= sizeof(struct spear_ehci),
++
++	/* generic hardware linkage */
++	.irq			= ehci_irq,
++	.flags			= HCD_MEMORY | HCD_USB2,
++
++	/* basic lifecycle operations */
++	.reset			= ehci_spear_setup,
++	.start			= ehci_run,
++	.stop			= ehci_stop,
++	.shutdown		= ehci_shutdown,
++
++	/* managing i/o requests and associated device resources */
++	.urb_enqueue		= ehci_urb_enqueue,
++	.urb_dequeue		= ehci_urb_dequeue,
++	.endpoint_disable	= ehci_endpoint_disable,
++	.endpoint_reset		= ehci_endpoint_reset,
++
++	/* scheduling support */
++	.get_frame_number	= ehci_get_frame,
++
++	/* root hub support */
++	.hub_status_data	= ehci_hub_status_data,
++	.hub_control		= ehci_hub_control,
++	.bus_suspend		= ehci_bus_suspend,
++	.bus_resume		= ehci_bus_resume,
++	.relinquish_port	= ehci_relinquish_port,
++	.port_handed_over	= ehci_port_handed_over,
++};
++
++static int spear_ehci_hcd_drv_probe(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd ;
++	struct spear_ehci *ehci;
++	struct resource *res;
++	struct clk *usbh_clk;
++	const struct hc_driver *driver = &ehci_spear_hc_driver;
++	int *pdata = pdev->dev.platform_data;
++	int irq, retval;
++	char clk_name[20] = "usbh_clk";
++
++	if (pdata == NULL)
++		return -EFAULT;
++
++	if (usb_disabled())
++		return -ENODEV;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		retval = irq;
++		goto fail_irq_get;
++	}
++
++	if (*pdata >= 0)
++		sprintf(clk_name, "usbh.%01d_clk", *pdata);
++
++	usbh_clk = clk_get(NULL, clk_name);
++	if (IS_ERR(usbh_clk)) {
++		dev_err(&pdev->dev, "Error getting interface clock\n");
++		retval = PTR_ERR(usbh_clk);
++		goto fail_get_usbh_clk;
++	}
++
++	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
++	if (!hcd) {
++		retval = -ENOMEM;
++		goto fail_create_hcd;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		retval = -ENODEV;
++		goto fail_request_resource;
++	}
++
++	hcd->rsrc_start = res->start;
++	hcd->rsrc_len = resource_size(res);
++	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len,
++				driver->description)) {
++		retval = -EBUSY;
++		goto fail_request_resource;
++	}
++
++	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
++	if (hcd->regs == NULL) {
++		dev_dbg(&pdev->dev, "error mapping memory\n");
++		retval = -ENOMEM;
++		goto fail_ioremap;
++	}
++
++	ehci = (struct spear_ehci *)hcd_to_ehci(hcd);
++	ehci->clk = usbh_clk;
++
++	spear_start_ehci(ehci);
++	retval = usb_add_hcd(hcd, irq, IRQF_SHARED | IRQF_DISABLED);
++	if (retval)
++		goto fail_add_hcd;
++
++	return retval;
++
++fail_add_hcd:
++	spear_stop_ehci(ehci);
++	iounmap(hcd->regs);
++fail_ioremap:
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++fail_request_resource:
++	usb_put_hcd(hcd);
++fail_create_hcd:
++	clk_put(usbh_clk);
++fail_get_usbh_clk:
++fail_irq_get:
++	dev_err(&pdev->dev, "init fail, %d\n", retval);
++
++	return retval ;
++}
++
++static int spear_ehci_hcd_drv_remove(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct spear_ehci *ehci_p = to_spear_ehci(hcd);
++
++	if (!hcd)
++		return 0;
++	if (in_interrupt())
++		BUG();
++	usb_remove_hcd(hcd);
++
++	if (ehci_p->clk)
++		spear_stop_ehci(ehci_p);
++	iounmap(hcd->regs);
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++	usb_put_hcd(hcd);
++
++	if (ehci_p->clk)
++		clk_put(ehci_p->clk);
++
++	return 0;
++}
++
++static struct platform_driver spear_ehci_hcd_driver = {
++	.probe		= spear_ehci_hcd_drv_probe,
++	.remove		= spear_ehci_hcd_drv_remove,
++	.shutdown	= usb_hcd_platform_shutdown,
++	.driver		= {
++		.name = "spear-ehci",
++		.bus = &platform_bus_type
++	}
++};
++
++MODULE_ALIAS("platform:spear-ehci");
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index c3b4ccc..8104fd3 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1075,6 +1075,11 @@ MODULE_LICENSE ("GPL");
+ #define OF_PLATFORM_DRIVER	ohci_hcd_ppc_of_driver
+ #endif
+ 
++#ifdef CONFIG_PLAT_SPEAR
++#include "ohci-spear.c"
++#define PLATFORM_DRIVER		spear_ohci_hcd_driver
++#endif
++
+ #ifdef CONFIG_PPC_PS3
+ #include "ohci-ps3.c"
+ #define PS3_SYSTEM_BUS_DRIVER	ps3_ohci_driver
+diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
+new file mode 100644
+index 0000000..4fd4bea
+--- /dev/null
++++ b/drivers/usb/host/ohci-spear.c
+@@ -0,0 +1,240 @@
++/*
++* OHCI HCD (Host Controller Driver) for USB.
++*
++* Copyright (C) 2010 ST Microelectronics.
++* Deepak Sikri<deepak.sikri@st.com>
++*
++* Based on various ohci-*.c drivers
++*
++* This file is licensed under the terms of the GNU General Public
++* License version 2. This program is licensed "as is" without any
++* warranty of any kind, whether express or implied.
++*/
++
++#include <linux/signal.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++
++struct spear_ohci {
++	struct ohci_hcd ohci;
++	struct clk *clk;
++};
++
++#define to_spear_ohci(hcd)	(struct spear_ohci *)hcd_to_ohci(hcd)
++
++static void spear_start_ohci(struct spear_ohci *ohci)
++{
++	clk_enable(ohci->clk);
++}
++
++static void spear_stop_ohci(struct spear_ohci *ohci)
++{
++	clk_disable(ohci->clk);
++}
++
++static int __devinit ohci_spear_start(struct usb_hcd *hcd)
++{
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
++	int ret;
++
++	ret = ohci_init(ohci);
++	if (ret < 0)
++		return ret;
++	ohci->regs = hcd->regs;
++
++	ret = ohci_run(ohci);
++	if (ret < 0) {
++		dev_err(hcd->self.controller, "can't start\n");
++		ohci_stop(hcd);
++		return ret;
++	}
++
++	create_debug_files(ohci);
++
++#ifdef DEBUG
++	ohci_dump(ohci, 1);
++#endif
++	return 0;
++}
++
++static const struct hc_driver ohci_spear_hc_driver = {
++	.description		= hcd_name,
++	.product_desc		= "SPEAr OHCI",
++	.hcd_priv_size		= sizeof(struct spear_ohci),
++
++	/* generic hardware linkage */
++	.irq			= ohci_irq,
++	.flags			= HCD_USB11 | HCD_MEMORY,
++
++	/* basic lifecycle operations */
++	.start			= ohci_spear_start,
++	.stop			= ohci_stop,
++	.shutdown		= ohci_shutdown,
++#ifdef	CONFIG_PM
++	.bus_suspend		= ohci_bus_suspend,
++	.bus_resume		= ohci_bus_resume,
++#endif
++
++	/* managing i/o requests and associated device resources */
++	.urb_enqueue		= ohci_urb_enqueue,
++	.urb_dequeue		= ohci_urb_dequeue,
++	.endpoint_disable	= ohci_endpoint_disable,
++
++	/* scheduling support */
++	.get_frame_number	= ohci_get_frame,
++
++	/* root hub support */
++	.hub_status_data	= ohci_hub_status_data,
++	.hub_control		= ohci_hub_control,
++
++	.start_port_reset	= ohci_start_port_reset,
++};
++
++static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
++{
++	const struct hc_driver *driver = &ohci_spear_hc_driver;
++	struct usb_hcd *hcd = NULL;
++	struct clk *usbh_clk;
++	struct spear_ohci *ohci_p;
++	struct resource *res;
++	int retval, irq;
++	int *pdata = pdev->dev.platform_data;
++	char clk_name[20] = "usbh_clk";
++
++	if (pdata == NULL)
++		return -EFAULT;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		retval = irq;
++		goto fail_irq_get;
++	}
++
++	if (*pdata >= 0)
++		sprintf(clk_name, "usbh.%01d_clk", *pdata);
++
++	usbh_clk = clk_get(NULL, clk_name);
++	if (IS_ERR(usbh_clk)) {
++		dev_err(&pdev->dev, "Error getting interface clock\n");
++		retval = PTR_ERR(usbh_clk);
++		goto fail_get_usbh_clk;
++	}
++
++	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
++	if (!hcd) {
++		retval = -ENOMEM;
++		goto fail_create_hcd;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		retval = -ENODEV;
++		goto fail_request_resource;
++	}
++
++	hcd->rsrc_start = pdev->resource[0].start;
++	hcd->rsrc_len = resource_size(res);
++	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
++		dev_dbg(&pdev->dev, "request_mem_region failed\n");
++		retval = -EBUSY;
++		goto fail_request_resource;
++	}
++
++	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
++	if (!hcd->regs) {
++		dev_dbg(&pdev->dev, "ioremap failed\n");
++		retval = -ENOMEM;
++		goto fail_ioremap;
++	}
++
++	ohci_p = (struct spear_ohci *)hcd_to_ohci(hcd);
++	ohci_p->clk = usbh_clk;
++	spear_start_ohci(ohci_p);
++	ohci_hcd_init(hcd_to_ohci(hcd));
++
++	retval = usb_add_hcd(hcd, platform_get_irq(pdev, 0), IRQF_DISABLED);
++	if (retval == 0)
++		return retval;
++
++	spear_stop_ohci(ohci_p);
++	iounmap(hcd->regs);
++fail_ioremap:
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++fail_request_resource:
++	usb_put_hcd(hcd);
++fail_create_hcd:
++	clk_put(usbh_clk);
++fail_get_usbh_clk:
++fail_irq_get:
++	dev_err(&pdev->dev, "init fail, %d\n", retval);
++
++	return retval;
++}
++
++static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
++
++	usb_remove_hcd(hcd);
++	if (ohci_p->clk)
++		spear_stop_ohci(ohci_p);
++
++	iounmap(hcd->regs);
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++	usb_put_hcd(hcd);
++
++	if (ohci_p->clk)
++		clk_put(ohci_p->clk);
++	platform_set_drvdata(pdev, NULL);
++	return 0;
++}
++
++#if defined(CONFIG_PM)
++static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
++		pm_message_t message)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(dev);
++	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
++
++	if (time_before(jiffies, ohci->next_statechange))
++		msleep(5);
++	ohci->next_statechange = jiffies;
++
++	spear_stop_ohci(ohci_p);
++	ohci_to_hcd(ohci)->state = HC_STATE_SUSPENDED;
++	return 0;
++}
++
++static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
++{
++	struct usb_hcd *hcd = platform_get_drvdata(dev);
++	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
++
++	if (time_before(jiffies, ohci->next_statechange))
++		msleep(5);
++	ohci->next_statechange = jiffies;
++
++	spear_start_ohci(ohci_p);
++	ohci_finish_controller_resume(hcd);
++	return 0;
++}
++#endif
++
++/* Driver definition to register with the platform bus */
++static struct platform_driver spear_ohci_hcd_driver = {
++	.probe =	spear_ohci_hcd_drv_probe,
++	.remove =	spear_ohci_hcd_drv_remove,
++#ifdef CONFIG_PM
++	.suspend =	spear_ohci_hcd_drv_suspend,
++	.resume =	spear_ohci_hcd_drv_resume,
++#endif
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "spear-ohci",
++	},
++};
++
++MODULE_ALIAS("platform:spear-ohci");
 -- 
 1.7.2.2
