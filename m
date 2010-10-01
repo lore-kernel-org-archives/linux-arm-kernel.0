@@ -1,120 +1,44 @@
-From: kishorek.kadiyala@gmail.com (kishore kadiyala)
-Date: Fri, 1 Oct 2010 20:44:11 +0530
-Subject: [PATCH v2 3/4] omap4 hsmmc: Register offset handling
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C50E@dbde02.ent.ti.com>
-References: <33958.10.24.255.17.1284827654.squirrel@dbdmail.itg.ti.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C50E@dbde02.ent.ti.com>
-Message-ID: <AANLkTinoFUwMZxzkD-YxcW=L=0FD6XBHE3t-1VEv2heY@mail.gmail.com>
+From: d.cristiani@idem-tech.it (Dylan Cristiani)
+Date: Fri, 1 Oct 2010 17:37:06 +0200
+Subject: PXA270 linux-2.6.35.7 boot hang
+In-Reply-To: <AANLkTi=JEUbxmTZ6PHbz_Gi7KvNf+KJat7R1ot5LQ1SH@mail.gmail.com>
+References: <AANLkTim4HqQkT0uZTpsGCsFqObVA+v+Q7wHekGp5V+f3@mail.gmail.com>
+	<AANLkTi=JEUbxmTZ6PHbz_Gi7KvNf+KJat7R1ot5LQ1SH@mail.gmail.com>
+Message-ID: <20101001173706.00006c12@unknown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Manju,
+On Fri, 1 Oct 2010 21:53:14 +0800
+Eric Miao <eric.y.miao@gmail.com> wrote:
 
-On Fri, Oct 1, 2010 at 8:32 PM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
->
->
->
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org
->> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
->> Kadiyala, Kishore
->> Sent: Saturday, September 18, 2010 10:04 PM
->> To: linux-mmc at vger.kernel.org; linux-omap at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org
->> Cc: khilman at deeprootsystems.com; Cousson, Benoit
->> Subject: [PATCH v2 3/4] omap4 hsmmc: Register offset handling
->>
->> The offset handling implementation of omap4 mmc registers
->> which was already present can't be reused once hwmod
->> modifications are done for mmc driver.
->> Since hwmod data file for OMAP4 is an auto generated the base
->> address for MMC will remain same as OMAP3 and thus the offset
->> deviation of registers should be updated in the hsmmc driver.
->> The omap-mmc platform data is updated with a register offset
->> which will be updated and used in the driver accordingly.
->>
->> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
->> ---
->> ?arch/arm/mach-omap2/devices.c ? ? ? ? | ? ?8 +++-----
->> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? | ? ?4 ++++
->> ?arch/arm/plat-omap/include/plat/mmc.h | ? ?3 +++
->> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? | ? ?2 +-
->> ?4 files changed, 11 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/devices.c
->> b/arch/arm/mach-omap2/devices.c index 2dbb265..bb7ec13 100644
->> --- a/arch/arm/mach-omap2/devices.c
->> +++ b/arch/arm/mach-omap2/devices.c
->> @@ -745,13 +745,13 @@ void __init omap2_init_mmc(struct
->> omap_mmc_platform_data **mmc_data,
->> ? ? ? ? ? ? ? case 3:
->> ? ? ? ? ? ? ? ? ? ? ? if (!cpu_is_omap44xx())
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return;
->> - ? ? ? ? ? ? ? ? ? ? base = OMAP4_MMC4_BASE + OMAP4_MMC_REG_OFFSET;
->> + ? ? ? ? ? ? ? ? ? ? base = OMAP4_MMC4_BASE;
->> ? ? ? ? ? ? ? ? ? ? ? irq = OMAP44XX_IRQ_MMC4;
->> ? ? ? ? ? ? ? ? ? ? ? break;
->> ? ? ? ? ? ? ? case 4:
->> ? ? ? ? ? ? ? ? ? ? ? if (!cpu_is_omap44xx())
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? return;
->> - ? ? ? ? ? ? ? ? ? ? base = OMAP4_MMC5_BASE + OMAP4_MMC_REG_OFFSET;
->> + ? ? ? ? ? ? ? ? ? ? base = OMAP4_MMC5_BASE;
->> ? ? ? ? ? ? ? ? ? ? ? irq = OMAP44XX_IRQ_MMC5;
->> ? ? ? ? ? ? ? ? ? ? ? break;
->> ? ? ? ? ? ? ? default:
->> @@ -762,10 +762,8 @@ void __init omap2_init_mmc(struct
->> omap_mmc_platform_data **mmc_data,
->> ? ? ? ? ? ? ? ? ? ? ? size = OMAP2420_MMC_SIZE;
->> ? ? ? ? ? ? ? ? ? ? ? name = "mmci-omap";
->> ? ? ? ? ? ? ? } else if (cpu_is_omap44xx()) {
->> - ? ? ? ? ? ? ? ? ? ? if (i < 3) {
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? base += OMAP4_MMC_REG_OFFSET;
->> + ? ? ? ? ? ? ? ? ? ? if (i < 3)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq += OMAP44XX_IRQ_GIC_START;
->> - ? ? ? ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? ? ? ? ? size = OMAP4_HSMMC_SIZE;
->> ? ? ? ? ? ? ? ? ? ? ? name = "mmci-omap-hs";
->> ? ? ? ? ? ? ? } else {
->> diff --git a/arch/arm/mach-omap2/hsmmc.c
->> b/arch/arm/mach-omap2/hsmmc.c index c8f647b..49d76a7 100644
->> --- a/arch/arm/mach-omap2/hsmmc.c
->> +++ b/arch/arm/mach-omap2/hsmmc.c
->> @@ -261,6 +261,10 @@ void __init omap2_hsmmc_init(struct
->> omap2_hsmmc_info *controllers)
->> ? ? ? ? ? ? ? mmc->slots[0].wires = c->wires;
->> ? ? ? ? ? ? ? mmc->slots[0].internal_clock = !c->ext_clock;
->> ? ? ? ? ? ? ? mmc->dma_mask = 0xffffffff;
->> + ? ? ? ? ? ? if (cpu_is_omap44xx())
->> + ? ? ? ? ? ? ? ? ? ? mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
->> + ? ? ? ? ? ? else
->> + ? ? ? ? ? ? ? ? ? ? mmc->reg_offset = 0;
->
-> 1. Since you mentioned that, this is useful for hwmod, the
-> register offsets should use enum and static tables. You can
-> refer to i2c-omap.c for more details and dma hwmod review
-> comments for more details.
-> https://patchwork.kernel.org/patch/126251/
-
-I've avoided using static tables for register offset handling as suggested
-by Benoit for HSMMC driver.Instead had the offset updated in hsmmc.c
-and used in driver.
-
-Could you check the latest version V4
-http://www.spinics.net/lists/linux-omap/msg37226.html
-
-
->
-> 2. Replace macros with inline functions for low level read/write
-> functions.
-
-Didn't touch this in the latest V4
-
-Regards,
-Kishore
->
-> ?-Manjunath
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> On Fri, Oct 1, 2010 at 6:33 PM, Santhosh N <san.mlists@gmail.com>
+> wrote:
+> > Hi,
+> >
+> > I am porting the latest linux kernel 2.6.35.7 on our PXA270 board.
+> > The kernel starts booting and stops at:
+> > Uncompressing Linux... done, booting the kernel.
+> >
+> > I can run the linux kernel 2.6.26 on the same board without any
+> > issues. I am passing the boot args as:
+> > bootargs=console=ttyS2,460800 rw root=1f02
+> >
+> > The STUART is used as the debug serial port. I had to change the
+> > uart_base to STUART in arch/arm/mach-pxa/include/mach/uncompress.h
+> > to get ?"Uncompressing Linux... done, booting the kernel.".
+> >
+> > I have set also set CONFIG_SERIAL_PXA_CONSOLE=y.
+> >
+> > Can anyone tell if I am missing something?
+> >
+> 
+> There could be many reasons. But you may want to turn on DEBUG_LL
+> and earlyprintk for some early diagnostic messages. You got
+> "Uncompress ..." messages so I assume the UART is setup correctly to
+> this weird 460800 baudrate (though I doubt STUART on PXA27x is able
+> to do that)
+i agree with Eric but i remember that the maximum baud rate is 921,600
+bps for all S-FF-BTUART pxa's uarts; maybe you can try also to migrate
+from working kernel 2.6.26 to 2.6.27.... and so on, to see when it
+first hangs, then seeing what was changed, with relation with
+your specific cpu and/or platform, could be the trick.
