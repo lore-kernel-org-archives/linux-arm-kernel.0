@@ -1,98 +1,165 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 1 Oct 2010 23:15:44 +0300
-Subject: [PATCH 02/14] omap: Map only available sram memory
-In-Reply-To: <1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <AANLkTi=PM1x7zXbSMRxBHVZ5Z2+4iwebvbiGizca_rC8@mail.gmail.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Fri, 1 Oct 2010 15:51:19 -0500
+Subject: [PATCH] ARM: imx: Add iram allocator functions
+Message-ID: <1285966279-27719-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 17, 2010 at 12:47 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Currently we map 1 MB section while setting up SRAM on OMAPs.
-> The actual physcal OCM RAM available on OMAP SOCs is in order
-> of KBs. This patch maps only available sram and removes some
-> non necessary cpu_is_xxx checks.
->
-> On the newer ARMs with speculation, this is dangerous and can
-> result in untraceable aborts.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-This hangs OMAP3 pandora:
+Add iram allocation functions using GENERIC_ALLOCATOR. The
+allocation size is 4KB multiples to guarantee alignment. The
+idea for these functions is for i.MX platforms to use them
+to dynamically allocate IRAM usage.
 
-[    0.000000] Linux version
-2.6.36-rc6-next-20101001-00002-ge76bb53-dirty (notaz at pixelinis) (gcc
-version 4.3.3 (Sourcery G++ Lite 2009q1-20
-[    0.000000] CPU: ARMv7 Processor [411fc082] revision 2 (ARMv7), cr=10c53c7f
-[    0.000000] CPU: VIPT nonaliasing data cache, VIPT nonaliasing
-instruction cache
-[    0.000000] Machine: Pandora Handheld Console
-[    0.000000] Ignoring unrecognised tag 0x54410008
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Reserving 6422528 bytes SDRAM for VRAM
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] OMAP3430/3530 ES2.1 (l2cache iva sgx neon isp )
-[    0.000000] SRAM: Mapped pa 0x40200000 to va 0xfe400000 size: 0x10000
-(stuck here)
+Applies on 2.6.36-rc6
 
-reverting this fixes the problem.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/plat-mxc/Kconfig                   |    5 ++
+ arch/arm/plat-mxc/Makefile                  |    1 +
+ arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
+ arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
+ 4 files changed, 103 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
+ create mode 100644 arch/arm/plat-mxc/iram.c
 
-> ---
-> ?arch/arm/plat-omap/sram.c | ? 25 +++++--------------------
-> ?1 files changed, 5 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-> index 226b2e8..10b3b4c 100644
-> --- a/arch/arm/plat-omap/sram.c
-> +++ b/arch/arm/plat-omap/sram.c
-> @@ -220,20 +220,7 @@ void __init omap_map_sram(void)
-> ? ? ? ?if (omap_sram_size == 0)
-> ? ? ? ? ? ? ? ?return;
->
-> - ? ? ? if (cpu_is_omap24xx()) {
-> - ? ? ? ? ? ? ? omap_sram_io_desc[0].virtual = OMAP2_SRAM_VA;
-> -
-> - ? ? ? ? ? ? ? base = OMAP2_SRAM_PA;
-> - ? ? ? ? ? ? ? base = ROUND_DOWN(base, PAGE_SIZE);
-> - ? ? ? ? ? ? ? omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
-> - ? ? ? }
-> -
-> ? ? ? ?if (cpu_is_omap34xx()) {
-> - ? ? ? ? ? ? ? omap_sram_io_desc[0].virtual = OMAP3_SRAM_VA;
-> - ? ? ? ? ? ? ? base = OMAP3_SRAM_PA;
-> - ? ? ? ? ? ? ? base = ROUND_DOWN(base, PAGE_SIZE);
-> - ? ? ? ? ? ? ? omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
-> -
-> ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? * SRAM must be marked as non-cached on OMAP3 since the
-> ? ? ? ? ? ? ? ? * CORE DPLL M2 divider change code (in SRAM) runs with the
-> @@ -244,13 +231,11 @@ void __init omap_map_sram(void)
-> ? ? ? ? ? ? ? ?omap_sram_io_desc[0].type = MT_MEMORY_NONCACHED;
-> ? ? ? ?}
->
-> - ? ? ? if (cpu_is_omap44xx()) {
-> - ? ? ? ? ? ? ? omap_sram_io_desc[0].virtual = OMAP4_SRAM_VA;
-> - ? ? ? ? ? ? ? base = OMAP4_SRAM_PA;
-> - ? ? ? ? ? ? ? base = ROUND_DOWN(base, PAGE_SIZE);
-> - ? ? ? ? ? ? ? omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
-> - ? ? ? }
-> - ? ? ? omap_sram_io_desc[0].length = 1024 * 1024; ? ? ?/* Use section desc */
-> + ? ? ? omap_sram_io_desc[0].virtual = omap_sram_base;
-> + ? ? ? base = omap_sram_start;
-> + ? ? ? base = ROUND_DOWN(base, PAGE_SIZE);
-> + ? ? ? omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
-> + ? ? ? omap_sram_io_desc[0].length = ROUND_DOWN(omap_sram_size, PAGE_SIZE);
-> ? ? ? ?iotable_init(omap_sram_io_desc, ARRAY_SIZE(omap_sram_io_desc));
->
-> ? ? ? ?printk(KERN_INFO "SRAM: Mapped pa 0x%08lx to va 0x%08lx size: 0x%lx\n",
-> --
-> 1.6.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index 6785db4..283d5bc 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -57,6 +57,11 @@ source "arch/arm/mach-mx5/Kconfig"
+ 
+ endmenu
+ 
++config IRAM_ALLOC
++	bool
++	default y
++	select GENERIC_ALLOCATOR
++
+ config MXC_IRQ_PRIOR
+ 	bool "Use IRQ priority"
+ 	help
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 78d405e..35cf07b 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
++obj-$(CONFIG_IRAM_ALLOC) += iram.o
+ obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+new file mode 100644
+index 0000000..12881aa
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#ifdef CONFIG_IRAM_ALLOC
++int __init iram_init(unsigned long base, unsigned long size);
++void *iram_alloc(unsigned int size, unsigned long *dma_addr);
++void iram_free(unsigned long dma_addr, unsigned int size);
++#else
++static inline int __init iram_init(unsigned long base, unsigned long size)
++{
++	return -ENOMEM;
++}
++static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
++{
++	return NULL;
++}
++static inline void iram_free(unsigned long base, unsigned long size) {}
++#endif
++
+diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
+new file mode 100644
+index 0000000..3d2a391
+--- /dev/null
++++ b/arch/arm/plat-mxc/iram.c
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/genalloc.h>
++
++static unsigned long iram_phys_base;
++static __iomem void *iram_virt_base;
++static struct gen_pool *iram_pool;
++
++#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
++
++void *iram_alloc(unsigned int size, unsigned long *dma_addr)
++{
++	if (!iram_pool)
++		return NULL;
++
++	*dma_addr = gen_pool_alloc(iram_pool, size);
++	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
++	return iram_phys_to_virt(*dma_addr);
++}
++EXPORT_SYMBOL(iram_alloc);
++
++void iram_free(unsigned long addr, unsigned int size)
++{
++	if (!iram_pool)
++		return;
++
++	gen_pool_free(iram_pool, addr, size);
++}
++EXPORT_SYMBOL(iram_free);
++
++int __init iram_init(unsigned long base, unsigned long size)
++{
++	iram_phys_base = base;
++
++	iram_pool = gen_pool_create(12, -1);
++	gen_pool_add(iram_pool, base, size, -1);
++	iram_virt_base = ioremap(iram_phys_base, size);
++
++	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
++	return 0;
++}
+-- 
+1.6.0.4
