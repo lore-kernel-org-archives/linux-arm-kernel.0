@@ -1,106 +1,73 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri,  1 Oct 2010 14:29:38 -0700
-Subject: [PATCH 14/47] DA850: move MII/RMII pin lists to the board file
+Date: Fri,  1 Oct 2010 14:29:39 -0700
+Subject: [PATCH 15/47] arm: mach-davinci: check irq2ctlr() result
 In-Reply-To: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
 References: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285968611-26890-15-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1285968611-26890-16-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+From: Kulikov Vasiliy <segooon@gmail.com>
 
-The CPGMAC pin list in da850.c was incorrectly split into two MII/RMII mode
-specific pin lists, while what pin group is used is a function of how the board
-is wired.  Copy the pin lists to board-da850-evm.c, renaming them accordingly,
-and merge the two lists in da850.c into one, da850_cpgmac_pins[], representing
-the CPGMAC module as a whole...
+If irq2ctlr() fails return IRQ_NONE.
+Also as it can fail make 'ctlr' signed.
 
-Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-Tested-by: Ben Gardiner <bengardiner@nanometrics.ca>
+The semantic patch that finds this problem (many false-positive results):
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@ r1 @
+identifier f;
+@@
+int f(...) { ... }
+
+@@
+identifier r1.f;
+type T;
+unsigned T x;
+@@
+
+*x = f(...)
+ ...
+*x > 0
+
+Signed-off-by: Kulikov Vasiliy <segooon@gmail.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c    |   21 +++++++++++++++++++--
- arch/arm/mach-davinci/da850.c              |   12 +++---------
- arch/arm/mach-davinci/include/mach/da8xx.h |    1 -
- 3 files changed, 22 insertions(+), 12 deletions(-)
+ arch/arm/mach-davinci/dma.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 482d458..190ebd3 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -600,6 +600,23 @@ static const short da850_evm_lcdc_pins[] = {
- 	-1
- };
- 
-+static const short da850_evm_mii_pins[] = {
-+	DA850_MII_TXEN, DA850_MII_TXCLK, DA850_MII_COL, DA850_MII_TXD_3,
-+	DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
-+	DA850_MII_CRS, DA850_MII_RXCLK, DA850_MII_RXDV, DA850_MII_RXD_3,
-+	DA850_MII_RXD_2, DA850_MII_RXD_1, DA850_MII_RXD_0, DA850_MDIO_CLK,
-+	DA850_MDIO_D,
-+	-1
-+};
-+
-+static const short da850_evm_rmii_pins[] = {
-+	DA850_RMII_TXD_0, DA850_RMII_TXD_1, DA850_RMII_TXEN,
-+	DA850_RMII_CRS_DV, DA850_RMII_RXD_0, DA850_RMII_RXD_1,
-+	DA850_RMII_RXER, DA850_RMII_MHZ_50_CLK, DA850_MDIO_CLK,
-+	DA850_MDIO_D,
-+	-1
-+};
-+
- static int __init da850_evm_config_emac(void)
+diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+index 2ede598..6b96698 100644
+--- a/arch/arm/mach-davinci/dma.c
++++ b/arch/arm/mach-davinci/dma.c
+@@ -354,10 +354,12 @@ static int irq2ctlr(int irq)
+ static irqreturn_t dma_irq_handler(int irq, void *data)
  {
- 	void __iomem *cfg_chip3_base;
-@@ -617,12 +634,12 @@ static int __init da850_evm_config_emac(void)
+ 	int i;
+-	unsigned ctlr;
++	int ctlr;
+ 	unsigned int cnt = 0;
  
- 	if (rmii_en) {
- 		val |= BIT(8);
--		ret = davinci_cfg_reg_list(da850_rmii_pins);
-+		ret = davinci_cfg_reg_list(da850_evm_rmii_pins);
- 		pr_info("EMAC: RMII PHY configured, MII PHY will not be"
- 							" functional\n");
- 	} else {
- 		val &= ~BIT(8);
--		ret = davinci_cfg_reg_list(da850_cpgmac_pins);
-+		ret = davinci_cfg_reg_list(da850_evm_mii_pins);
- 		pr_info("EMAC: MII PHY configured, RMII PHY will not be"
- 							" functional\n");
- 	}
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index efb904e..c2a3ce5 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -574,15 +574,9 @@ const short da850_cpgmac_pins[] __initdata = {
- 	DA850_MII_TXD_2, DA850_MII_TXD_1, DA850_MII_TXD_0, DA850_MII_RXER,
- 	DA850_MII_CRS, DA850_MII_RXCLK, DA850_MII_RXDV, DA850_MII_RXD_3,
- 	DA850_MII_RXD_2, DA850_MII_RXD_1, DA850_MII_RXD_0, DA850_MDIO_CLK,
--	DA850_MDIO_D,
--	-1
--};
--
--const short da850_rmii_pins[] __initdata = {
--	DA850_RMII_TXD_0, DA850_RMII_TXD_1, DA850_RMII_TXEN,
--	DA850_RMII_CRS_DV, DA850_RMII_RXD_0, DA850_RMII_RXD_1,
--	DA850_RMII_RXER, DA850_RMII_MHZ_50_CLK, DA850_MDIO_CLK,
--	DA850_MDIO_D,
-+	DA850_MDIO_D, DA850_RMII_TXD_0, DA850_RMII_TXD_1, DA850_RMII_TXEN,
-+	DA850_RMII_CRS_DV, DA850_RMII_RXD_0, DA850_RMII_RXD_1, DA850_RMII_RXER,
-+	DA850_RMII_MHZ_50_CLK,
- 	-1
- };
+ 	ctlr = irq2ctlr(irq);
++	if (ctlr < 0)
++		return IRQ_NONE;
  
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 8de2dbb..504f2f6 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -121,7 +121,6 @@ extern const short da850_uart2_pins[];
- extern const short da850_i2c0_pins[];
- extern const short da850_i2c1_pins[];
- extern const short da850_cpgmac_pins[];
--extern const short da850_rmii_pins[];
- extern const short da850_mcasp_pins[];
- extern const short da850_lcdcntl_pins[];
- extern const short da850_mmcsd0_pins[];
+ 	dev_dbg(data, "dma_irq_handler\n");
+ 
+@@ -408,10 +410,12 @@ static irqreturn_t dma_irq_handler(int irq, void *data)
+ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ {
+ 	int i;
+-	unsigned ctlr;
++	int ctlr;
+ 	unsigned int cnt = 0;
+ 
+ 	ctlr = irq2ctlr(irq);
++	if (ctlr < 0)
++		return IRQ_NONE;
+ 
+ 	dev_dbg(data, "dma_ccerr_handler\n");
+ 
 -- 
 1.7.2.1
