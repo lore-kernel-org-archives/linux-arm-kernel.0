@@ -1,42 +1,184 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:26:25 +0530
-Subject: [PATCH V2 65/69] ST SPEAR6xx: renaming spear600_defconfig as
-	spear6xx_defconfig
-In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
-References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <9c685d931c33e6b5d549519d6cec8da6c3fdbab7.1285933332.git.viresh.kumar@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri,  1 Oct 2010 21:05:12 +0900
+Subject: [PATCH 15/27] ARM: S5PV210: Change to using s3c_gpio_cfgall_range()
+In-Reply-To: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
+References: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1285934724-5007-16-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
----
- .../{spear600_defconfig => spear6xx_defconfig}     |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
- rename arch/arm/configs/{spear600_defconfig => spear6xx_defconfig} (97%)
+From: Ben Dooks <ben-linux@fluff.org>
 
-diff --git a/arch/arm/configs/spear600_defconfig b/arch/arm/configs/spear6xx_defconfig
-similarity index 97%
-rename from arch/arm/configs/spear600_defconfig
-rename to arch/arm/configs/spear6xx_defconfig
-index 6777c11..cef2e83 100644
---- a/arch/arm/configs/spear600_defconfig
-+++ b/arch/arm/configs/spear6xx_defconfig
-@@ -8,6 +8,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_PLAT_SPEAR=y
- CONFIG_ARCH_SPEAR6XX=y
-+CONFIG_BOARD_SPEAR600_EVB=y
- CONFIG_BINFMT_MISC=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
-@@ -22,7 +23,6 @@ CONFIG_MAX_RAW_DEVS=8192
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PL061=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
+Change the code setting a range of GPIO pins' configuration and
+pull state to use the recently introduced s3c_gpio_cfgall_range().
+
+Mop up a few missed s3c_gpio_cfgpin_range() changes.
+
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-s5pv210/setup-fb-24bpp.c   |   34 ++++++-------------
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c |   54 +++++++++++-------------------
+ 2 files changed, 31 insertions(+), 57 deletions(-)
+
+diff --git a/arch/arm/mach-s5pv210/setup-fb-24bpp.c b/arch/arm/mach-s5pv210/setup-fb-24bpp.c
+index 928cf1f..a33fe96 100644
+--- a/arch/arm/mach-s5pv210/setup-fb-24bpp.c
++++ b/arch/arm/mach-s5pv210/setup-fb-24bpp.c
+@@ -21,33 +21,21 @@
+ #include <mach/regs-clock.h>
+ #include <plat/gpio-cfg.h>
+ 
+-void s5pv210_fb_gpio_setup_24bpp(void)
++static void s5pv210_fb_cfg_gpios(unsigned int base, unsigned int nr)
+ {
+-	unsigned int gpio = 0;
+-
+-	for (gpio = S5PV210_GPF0(0); gpio <= S5PV210_GPF0(7); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
++	s3c_gpio_cfgall_range(base, nr, S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+-	for (gpio = S5PV210_GPF1(0); gpio <= S5PV210_GPF1(7); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
++	for (; nr > 0; nr--, base++)
++		s5p_gpio_set_drvstr(base, S5P_GPIO_DRVSTR_LV4);
++}
+ 
+-	for (gpio = S5PV210_GPF2(0); gpio <= S5PV210_GPF2(7); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+ 
+-	for (gpio = S5PV210_GPF3(0); gpio <= S5PV210_GPF3(3); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
++void s5pv210_fb_gpio_setup_24bpp(void)
++{
++	s5pv210_fb_cfg_gpios(S5PV210_GPF0(0), 8);
++	s5pv210_fb_cfg_gpios(S5PV210_GPF1(0), 8);
++	s5pv210_fb_cfg_gpios(S5PV210_GPF2(0), 8);
++	s5pv210_fb_cfg_gpios(S5PV210_GPF3(0), 4);
+ 
+ 	/* Set DISPLAY_CONTROL register for Display path selection.
+ 	 *
+diff --git a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
+index 7064278..f5499ae 100644
+--- a/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
++++ b/arch/arm/mach-s5pv210/setup-sdhci-gpio.c
+@@ -26,24 +26,20 @@
+ void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG0/GPG1 pins to special-function 2 */
+-	s3c_gpio_cfgpin_range(S5PV210_GPG0(0), 2, S3C_GPIO_SFN(2));
+-	for (gpio = S5PV210_GPG0(0); gpio < S5PV210_GPG0(2); gpio++)
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgall_range(S5PV210_GPG0(0), 2,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+ 	switch (width) {
+ 	case 8:
+ 		/* GPG1[3:6] special-funtion 3 */
+-		s3c_gpio_cfgpin_range(S5PV210_GPG1(3), 4, S3C_GPIO_SFN(3));
+-		for (gpio = S5PV210_GPG1(3); gpio <= S5PV210_GPG1(6); gpio++)
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgall_range(S5PV210_GPG1(3), 4,
++				      S3C_GPIO_SFN(3), S3C_GPIO_PULL_NONE);
+ 	case 4:
+ 		/* GPG0[3:6] special-funtion 2 */
+-		s3c_gpio_cfgpin_range(S5PV210_GPG0(3), 4, S3C_GPIO_SFN(2));
+-		for (gpio = S5PV210_GPG0(3); gpio <= S5PV210_GPG0(6); gpio++)
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgall_range(S5PV210_GPG0(3), 4,
++				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 	default:
+ 		break;
+ 	}
+@@ -57,17 +53,14 @@ void s5pv210_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+ void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG1[0:1] pins to special-function 2 */
+-	s3c_gpio_cfgpin_range(S5PV210_GPG1(0), 2, S3C_GPIO_SFN(2));
+-	for (gpio = S5PV210_GPG1(0); gpio < S5PV210_GPG1(2); gpio++)
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgall_range(S5PV210_GPG1(0), 2,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+ 	/* Data pin GPG1[3:6] to special-function 2 */
+-	s3c_gpio_cfgpin_range(S5PV210_GPG1(3), 4, S3C_GPIO_SFN(2));
+-	for (gpio = S5PV210_GPG1(3); gpio <= S5PV210_GPG1(6); gpio++)
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgall_range(S5PV210_GPG1(3), 4,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+ 	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+ 		s3c_gpio_setpull(S5PV210_GPG1(2), S3C_GPIO_PULL_UP);
+@@ -78,24 +71,20 @@ void s5pv210_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG2[0:1] pins to special-function 2 */
+-	s3c_gpio_cfgpin_range(S5PV210_GPG2(0), 2, S3C_GPIO_SFN(2));
+-	for (gpio = S5PV210_GPG2(0); gpio < S5PV210_GPG2(2); gpio++)
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgall_range(S5PV210_GPG2(0), 2,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+ 	switch (width) {
+ 	case 8:
+ 		/* Data pin GPG3[3:6] to special-function 3 */
+-		s3c_gpio_cfgpin_range(S5PV210_GPG3(3), 4, S3C_GPIO_SFN(3));
+-		for (gpio = S5PV210_GPG3(3); gpio <= S5PV210_GPG3(6); gpio++)
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgall_range(S5PV210_GPG3(3), 4,
++				      S3C_GPIO_SFN(3), S3C_GPIO_PULL_NONE);
+ 	case 4:
+ 		/* Data pin GPG2[3:6] to special-function 2 */
+-		s3c_gpio_cfgpin_range(S5PV210_GPG2(3), 4, S3C_GPIO_SFN(2));
+-		for (gpio = S5PV210_GPG2(3); gpio <= S5PV210_GPG2(6); gpio++)
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++		s3c_gpio_cfgall_range(S5PV210_GPG2(3), 4,
++				      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 	default:
+ 		break;
+ 	}
+@@ -109,17 +98,14 @@ void s5pv210_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+ void s5pv210_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
+ {
+ 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+ 
+ 	/* Set all the necessary GPG3[0:1] pins to special-function 2 */
+-	s3c_gpio_cfgpin_range(S5PV210_GPG3(0), 2, S3C_GPIO_SFN(2));
+-	for (gpio = S5PV210_GPG3(0); gpio < S5PV210_GPG3(2); gpio++)
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgall_range(S5PV210_GPG3(0), 2,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+ 	/* Data pin GPG3[3:6] to special-function 2 */
+-	s3c_gpio_cfgpin_range(S5PV210_GPG3(3), 4, S3C_GPIO_SFN(2));
+-	for (gpio = S5PV210_GPG3(3); gpio <= S5PV210_GPG3(6); gpio++)
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++	s3c_gpio_cfgall_range(S5PV210_GPG3(3), 4,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_NONE);
+ 
+ 	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+ 		s3c_gpio_setpull(S5PV210_GPG3(2), S3C_GPIO_PULL_UP);
 -- 
-1.7.2.2
+1.6.2.5
