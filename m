@@ -1,47 +1,44 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 1 Oct 2010 08:52:11 +0900
-Subject: [PATCH 7/7] ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
-In-Reply-To: <00e201cb6094$c52391a0$4f6ab4e0$%szyprowski@samsung.com>
-References: <20100930044859.GA16923@july>
-	<000b01cb6067$99850240$cc8f06c0$%seo@samsung.com>
-	<AANLkTinC9U3mehOVGWSM26TjMVyx9o6fBgLrXUKQmOcb@mail.gmail.com>
-	<AANLkTik9Q7e=nzOmKsxEBeeJn-5JcQpKJfTSfGqLB21G@mail.gmail.com>
-	<00e201cb6094$c52391a0$4f6ab4e0$%szyprowski@samsung.com>
-Message-ID: <AANLkTikvsxXF+iXcfzLoMM+_2pr5zd1sYvhu1EVoBh+f@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 1 Oct 2010 02:15:09 +0200
+Subject: pxa3xx_nand issues
+In-Reply-To: <201009271939.04710.pieterg@gmx.com>
+References: <201009221912.24905.pieterg@gmx.com>
+	<201009271550.50399.pieterg@gmx.com>
+	<201009271939.04710.pieterg@gmx.com>
+Message-ID: <201010010215.09514.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 30, 2010 at 8:43 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
->> >> We are considering another way not to make additional new i2c dev files.
->> >> In my opinion, this patch looks not bad but we'd better make an effort to
->> >> avoid having the more similar file.
->> >
->> > Actually I also it's not good approach, but as there's no comment or
->> > discuss about this I send the patches.
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/022615.html
->> >
->> > If you have good method or approaches, I'm welcome.
->>
->> First, these are device definitions and gpio set callbacks and
->> shouldn't take much
->> of space. So, perhaps these all could be built upon single I2C support
->> selection.
->>
->> Second, if we must build them conditionally, how about having all in
->> one file with
->> each device's definition and callback surrounded by corresponding ifdef ?
->> That would alteast save us file-count.
->
-> I don't think this is a good idea. IMHO we should now follow the current style
-> of defining platform devices and the convert all at once. Mixing style always
-> causes a lot of confusion.
-You mean to keep defining every controller in in a dedicated file ?
-If yes, my second option is still better, IMO.
-If no, please explain what do you mean by current style.
+Dne Po 27. z??? 2010 19:39:04 pieterg napsal(a):
+> On Monday 27 September 2010 15:50:50 pieterg wrote:
+> > On Monday 27 September 2010 14:22:37 Lei Wen wrote:
+> > > Does your jffs2 image make correct? Page size and block size set right?
+> > 
+> > I think so.
+> > --eraseblock=0x20000 --pad --no-cleanmarkers
+> 
+> Well... that caused most of my problems.
+> --pad means pad to eraseblock size, not pagesize.
+> So the first writes in the new filesystem would cause pages in that last
+> eraseblock to be overwritten.
+> With SLC I always got away with that, but with MLC, clearly not.
+> 
+> (now I'm still left with lots of singlebit errors, and occasional jffs2 CRC
+> errors, pxa3xx_nand was obviously not meant to deal with such low quality
+> MLC, no action is taken on bit errors, but at least everything can be
+> explained now)
+> 
+> Thanks everybody for helping me find the cause of this problem.
 
-> We should however agree on the new way of creating devices asap, as everyone
-> can notice that the current style is not the best for advanced socs like
-> C210/V310. This would save the time later when we would need to merge patches
-> for different styles of devices.
-I would prefer my first option out of all discussed in this thread.
+So this is closed?
+
+btw. wont ubifs be better choice for such a big flash ?
+
+Cheers
+> 
+> Rgds, Pieter
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
