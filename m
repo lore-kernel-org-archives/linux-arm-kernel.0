@@ -1,71 +1,83 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 01 Oct 2010 07:43:08 -0700
-Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE06C@dbde02.ent.ti.com>
-	(Charulatha Varadarajan's message of "Fri, 1 Oct 2010 19:03:53 +0530")
-References: <1285834270-32766-1-git-send-email-charu@ti.com>
-	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
-	<4CA49ADE.6080202@ti.com> <20100930150713.GG3117@atomide.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CD03185@dbde02.ent.ti.com>
-	<87bp7ff962.fsf@deeprootsystems.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CD033D6@dbde02.ent.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE06C@dbde02.ent.ti.com>
-Message-ID: <8762xmdldv.fsf@deeprootsystems.com>
+From: kishorek.kadiyala@gmail.com (kishore kadiyala)
+Date: Fri, 1 Oct 2010 20:14:50 +0530
+Subject: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE0BB@dbde02.ent.ti.com>
+References: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
+	<AANLkTi=YvtrfmUTc-YBAUjEXn1v3pPLmhb92J60AhU28@mail.gmail.com>
+	<AANLkTim5d6XP0nuJLF2DxDGP2DuBK5VUajd=YhXQnT2C@mail.gmail.com>
+	<AANLkTi=oX7CT8RF39kT-7niutF3PEeSeC1A_L5TcWuO4@mail.gmail.com>
+	<AANLkTim1H=qam8Sjbv_EUXGtf09TObTViYMiN17uMFQ1@mail.gmail.com>
+	<20101001112926.GC3064@sortiz-mobl>
+	<AANLkTims1qZ_X9F4rzkJE9Gat_pwWZxO2nPkRTpa6Cc5@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE0BB@dbde02.ent.ti.com>
+Message-ID: <AANLkTikBcUZjMEAa1AuAdVohLkbVXki0nW4NpBOC-hJJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
-
-> Tony, Benoit, Kevin,
+On Fri, Oct 1, 2010 at 8:11 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
 >
->> > >> > >
->> > >> > > I think that disabling it should be done only if the
->> > CONFIG_OMAP_WDT
->> > >> > > is not set.
->> > >> >
->> > >> > How about disabling is done always unless CONFIG_WATCHDOG_NOWAYOUT
->> > >> > is set?
->> > >>
->> > >> As given in the patch description, this patch does a disable of
->> > watchdog
->> > >> timer, during init, to avoid the system rebooting that happens due to
->> > >> enabling of watchdog timer after a reset of the module (during hwmod
->> > init).
->> > >>
->> > >> According to the default WDT registers values, the system reboot
->> would
->> > >> happen in ~10s if watchdog is enabled with default values. Hence,
->> after
->> > >> a WDT module reset during init, the watchdog has to be disabled
->> within
->> > 10s
->> > >> otherwise the system will keep rebooting.
->> > >>
->> > >> Hence irrespective of CONFIG_WATCHDOG_NOWAYOUT/ CONFIG_OMAP_WDT,
->> > >> the watchdog timer needs to be disabled after a WDT reset has
->> happened.
->> > >>
->> > > One more option is to avoid the software reset using the
->> CONFIG_OMAP_WDT
->> > > flag. Something like below.
->> >
->> > This was already proposed by Charu, and rejected.
->> >
->> > Doing this means we have a dependency on particular bootloader init, and
->> > we'd like to get rid of *all* assumptions about what the bootloader does
->> > (or does not do.)
->> >
->> you mean is not depeding on bootloader to disable WDT. Make sense.
->> 
+> <<snip>>
 >
-> Let me know your opinion on how to handle this issue.
+>> >> >>>> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+>> >> >>>> index 6de90bf..e64894c 100644
+>> >> >>>> --- a/include/linux/i2c/twl.h
+>> >> >>>> +++ b/include/linux/i2c/twl.h
+>> >> >>>> @@ -141,6 +141,16 @@
+>> >> >>>> ?#define TWL6030_CHARGER_CTRL_INT_MASK ?0x10
+>> >> >>>> ?#define TWL6030_CHARGER_FAULT_INT_MASK ? ? ? ? 0x60
+>> >> >>>>
+>> >> >>>> +#define TWL6030_MMCCTRL ? ? ? ? ? ? ? ?0xEE
+>> >> >>>> +#define VMMC_AUTO_OFF ? ? ? ? ? ? ? ? ?(0x1 << 3)
+>> >> >>>> +#define SW_FC ? ? ? ? ? ? ? ? ? ? ? ? ?(0x1 << 2)
+>> >> >>>> +#define STS_MMC ? ? ? ? ? ? ? ? ? ? ? ?0x1
+>> >> >>>> +
+>> >> >>>> +#define TWL6030_CFG_INPUT_PUPD3 ? ? ? ?0xF2
+>> >> >>>> +#define MMC_PU ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 3)
+>> >> >>>> +#define MMC_PD ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 2)
+>> >> >>>> +
+>> >> >>>> +
+>> >> >>>>
+>> >> >>>> ?#define TWL4030_CLASS_ID ? ? ? ? ? ? ? 0x4030
+>> >> >>>> ?#define TWL6030_CLASS_ID ? ? ? ? ? ? ? 0x6030
+>> >> >>>> @@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8
+>> *value, u8 reg, unsigned num_bytes);
+>> >> >>>> ?int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
+>> >> >>>> ?int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+>> >> >>>>
+>> >> >>>> +/* Card detect Configuration for MMC1 Controller on OMAP4 */
+>> >> >>>> +#ifdef CONFIG_TWL4030_CORE
+>> >> >>>> +int twl6030_mmc_card_detect_config(void);
+>> >> >>>> +#else
+>> >> >>>> +static inline int twl6030_mmc_card_detect_config(void)
+>> >> >>>> +{
+>> >> >>>> + ? ? ? pr_debug("twl6030_mmc_card_detect_config not
+>> supported\n");
+>> >> >>>> + ? ? ? return 0;
+>> >> >>>> +}
+>> >> >>>> +#endif
+>> >> >>>> +
+>> >> >>>> +/* MMC1 Controller on OMAP4 uses Phoenix irq for
+>> Card detect */
+>> >> >>>> +#ifdef CONFIG_TWL4030_CORE
+>> >> >>>> +int twl6030_mmc_card_detect(struct device *dev, int slot);
+>> >> >>>> +#else
+>> >> >>>> +static inline int twl6030_mmc_card_detect(struct
+>> device *dev, int slot)
+>> >> >>>> +{
+>> >> >>>> + ? ? ? pr_debug("Call back twl6030_mmc_card_detect
+>> not supported\n");
+>
+> Use dev_dbg() instead of pr_debug...
+> Same comment applies across this patch series whereever pr_err/pr_debug
+> APIs are used.
 
-IMO, we should do what your original patch did: always disable the WDT,
-just like most/all bootloaders do.
+Couldn't get it  how it makes a difference ? could you explain
 
-If we want to make changes later to support product needs (like no
-disable on boot, etc.) that is a separate issue and should be done in a
-separate patch.
-
-Kevin
+Regards,
+Kishore
+>
+>> >> >>>> + ? ? ? return -EIO;
+>> >> >>>> +}
+>> >> >>>> +#endif
+>
+> <<snip>>
