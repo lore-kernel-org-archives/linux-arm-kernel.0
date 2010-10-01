@@ -1,111 +1,85 @@
-From: vipin.kumar@st.com (Vipin Kumar)
-Date: Fri, 1 Oct 2010 16:22:40 +0530
-Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
-In-Reply-To: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
-References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4CA5BD78.9080808@st.com>
+From: yogesh_marathe@ti.com (Marathe, Yogesh)
+Date: Fri, 1 Oct 2010 16:59:01 +0530
+Subject: [PATCH 05/11] omap3: Remove non-existent config option
+In-Reply-To: <AANLkTinZqx2nFuoYoCYpD4+PG7_J=ACLBxAwOvpVm4c9@mail.gmail.com>
+References: <20100924014938.10325.35279.stgit@baageli.muru.com>
+	<20100924015056.10325.95854.stgit@baageli.muru.com>
+	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
+	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
+	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
+	<8F7AF80515AF0D4D93307E594F3CB40E5F6A365B@dlee03.ent.ti.com>
+	<AANLkTimD_MRbuTnBMPzAKPTmrDwjLkLVmr9bTSNROb5L@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930234006B4C@dbde02.ent.ti.com>
+	<AANLkTinZqx2nFuoYoCYpD4+PG7_J=ACLBxAwOvpVm4c9@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593023412B2C1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Felipe Contreras [mailto:felipe.contreras at gmail.com]
+> Sent: Thursday, September 30, 2010 12:42 AM
+> To: Marathe, Yogesh
+> Cc: Kanigeri, Hari; Premi, Sanjeev; Tony Lindgren; linux-arm-
+> kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 05/11] omap3: Remove non-existent config
+> option
+> 
+> On Wed, Sep 29, 2010 at 4:28 PM, Marathe, Yogesh
+> <yogesh_marathe@ti.com> wrote:
+> > dsplink and syslink (two drivers who use iommu) should not enable
+> > CONFIG_MPU_BRIDGE_IOMMU as dspbridge and dsplink /syslink
+> > can not co-exist as they are using same resources. Not applying
+> patch
+> > breaks dsplink/sylink any one which is being used. Defining this
+> config
+> > makes them co-exist.
+> 
+> No, for dsp-link you would have:
+> CONFIG_TIDSPBRIDGE=n
+> CONFIG_OMAP_IOMMU_IVA2=y
+> 
+> It would be exactly the same as applying your patch.
+> 
+> And tidspbridge is not using iommu right now.
 
-Hello David, Linus
+I noticed that you have added OMAP_IOMMU_IVA2 to Kconfig. In this
+case I need CONFIG_OMAP_IOMMU_IVA2=y by default on master so
+that iommu is open to use for all other drivers by default.
 
-> +#include <linux/mtd/nand_ecc.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <mtd/fsmc.h>
-> +#include <mtd/mtd-abi.h>
-> +
-> +static struct nand_ecclayout fsmc_ecc1_layout = {
-> +       .eccbytes = 24,
-> +       .eccpos = {2, 3, 4, 18, 19, 20, 34, 35, 36, 50, 51, 52,
-> +               66, 67, 68, 82, 83, 84, 98, 99, 100, 114, 115, 116},
-> +       .oobfree = {
-> +               {.offset = 8, .length = 8},
-> +               {.offset = 24, .length = 8},
-> +               {.offset = 40, .length = 8},
-> +               {.offset = 56, .length = 8},
-> +               {.offset = 72, .length = 8},
-> +               {.offset = 88, .length = 8},
-> +               {.offset = 104, .length = 8},
-> +               {.offset = 120, .length = 8}
-> +       }
-> +};
-> +
-> +static struct nand_ecclayout fsmc_ecc4_lp_layout = {
-> +       .eccbytes = 104,
-> +       .eccpos = {  2,   3,   4,   5,   6,   7,   8,
-> +               9,  10,  11,  12,  13,  14,
-> +               18,  19,  20,  21,  22,  23,  24,
-> +               25,  26,  27,  28,  29,  30,
-> +               34,  35,  36,  37,  38,  39,  40,
-> +               41,  42,  43,  44,  45,  46,
-> +               50,  51,  52,  53,  54,  55,  56,
-> +               57,  58,  59,  60,  61,  62,
-> +               66,  67,  68,  69,  70,  71,  72,
-> +               73,  74,  75,  76,  77,  78,
-> +               82,  83,  84,  85,  86,  87,  88,
-> +               89,  90,  91,  92,  93,  94,
-> +               98,  99, 100, 101, 102, 103, 104,
-> +               105, 106, 107, 108, 109, 110,
-> +               114, 115, 116, 117, 118, 119, 120,
-> +               121, 122, 123, 124, 125, 126
-> +       },
-> +       .oobfree = {
-> +               {.offset = 15, .length = 3},
-> +               {.offset = 31, .length = 3},
-> +               {.offset = 47, .length = 3},
-> +               {.offset = 63, .length = 3},
-> +               {.offset = 79, .length = 3},
-> +               {.offset = 95, .length = 3},
-> +               {.offset = 111, .length = 3},
-> +               {.offset = 127, .length = 1}
-> +       }
-> +};
-> +
+> And AFAIK syslink is not for omap3, so omap3_devices is not relevant.
+> 
+> > I'm ok with changing name to CONFIG_OMAP_IOMMU_IVA2 but
+> ideally
+> > then that will also break the dspbridge.
+> 
+> No, grep for MPU_BRIDGE_IOMMU on the current tidspbridge in
+> mainline;
+> it's not defined anywhere, so CONFIG_OMAP_IOMMU_IVA2, or
+> CONFIG_FOOBAR, it doesn't matter for tidspbridge right now. And
+> MPU_BRIDGE_IOMMU doesn't depend on tidspbridge on any way.
 
-I just noticed that the above array is based on an earlier patch which increased 
-the array size from 64 to 128. 
+Please explain, how removing CONFIG_MPU_BRIDGE_IOMMU
+Or any other the config name in place, breaks tidspbridge? 
+My patch is removing the 'if defined'.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/024372.html
-
-This patch itself was under the lense of reviewers for a long time. Actually, 
-increasing this array breaks mtd abi as pointed by Artem
-
-
-Quoting from his mail
-
-> The old interface should remain unchanged in that include/mtd/mtd-abi.h.
-> If an application using the old interface calls any of the ecc ioctls
-> for a nand chip with > 64 bytes ecc it should return an error.
-
-It will, because size of the structure is part of the ioctl number,
-even. See the corresponding ioctl macro definition.
-
-> I still think the eccpos field should be a pointer, so that it can
-> allocate as much space as is needed for the ecc. This also means that
-> the kernel doesn't need to be changed every time a new NAND chips
-> appears with a bigger ecc size.
-
-Sure, this is the whole point: go ahead and design the new ioctl, and
-then deprecate the old one. Just invest men/hours into that and we are
-all right :-)
-
-
-This means that the patch sent by linus can be added only after a new ioctl
-is defined and the old one deprecated
-
-> +#define __MTD_FSMC_H
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/types.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <asm/param.h>
-
-Linus, there is a checkpatch warining here :)
-
-Best Regards
-Vipin
+> 
+> > One more way would be to soure revert the patch and apply on
+> dspbridge branch if it breaks the builds on that branch rather than
+> > breaking others in master.
+> 
+> There is no tidspbrige branch; it's in mainline:
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-
+> 2.6.git;a=tree;f=drivers/staging/tidspbridge
+> 
+> But that doesn't matter, even if it was in a branch, iommu should not
+> break either tidspbridge, or dsp-link, and driver branches should not
+> modify anything outside their domain (ideally).
+> 
+> All you need to do is 'select OMAP_IOMMU_IVA2', although the
+> attached
+> patch would be needed.
+> 
+> --
+> Felipe Contreras
