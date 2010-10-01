@@ -1,105 +1,106 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 01 Oct 2010 16:34:23 -0700
-Subject: [PATCH 7/8] omap4 hsmmc: Register offset handling
+Date: Fri, 01 Oct 2010 16:34:13 -0700
+Subject: [PATCH 3/8] omap: pandora: add fixed regulator for wlan
 In-Reply-To: <20101001233315.31894.49599.stgit@baageli.muru.com>
 References: <20101001233315.31894.49599.stgit@baageli.muru.com>
-Message-ID: <20101001233423.31894.80954.stgit@baageli.muru.com>
+Message-ID: <20101001233413.31894.99754.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: kishore kadiyala <kishore.kadiyala@ti.com>
+From: Grazvydas Ignotas <notasas@gmail.com>
 
-In OMAP4, as per new PM programming model, the legacy registers
-which were there in OMAP3 are all shifted by 0x100 while new one's
-are added from offset 0 to 0x10.
-For OMAP4, the register offset appending of 0x100 done in devices.c
-currently, is moved to driver file.This change fits in for current
-implementation as well as once the driver undergoes hwmod adaptation.
+Instead of enabling the wifi module explicitly using GPIO, add a fixed
+regulator and hook it to MMC host card power control. This way it will
+only be enabled when SDIO subsystem wants to talk to it, saving power
+(as done by Zoom boards).
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Madhusudhan Chikkature <madhu.cr@ti.com>
-Cc: Adrian Hunter <adrian.hunter@nokia.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/devices.c         |    8 +++-----
- arch/arm/mach-omap2/hsmmc.c           |    4 ++++
- arch/arm/plat-omap/include/plat/mmc.h |    3 +++
- drivers/mmc/host/omap_hsmmc.c         |    2 ++
- 4 files changed, 12 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/board-omap3pandora.c |   43 ++++++++++++++++++++++--------
+ 1 files changed, 32 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 9e5d51b..9bd4b34 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -817,13 +817,13 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 		case 3:
- 			if (!cpu_is_omap44xx())
- 				return;
--			base = OMAP4_MMC4_BASE + OMAP4_MMC_REG_OFFSET;
-+			base = OMAP4_MMC4_BASE;
- 			irq = OMAP44XX_IRQ_MMC4;
- 			break;
- 		case 4:
- 			if (!cpu_is_omap44xx())
- 				return;
--			base = OMAP4_MMC5_BASE + OMAP4_MMC_REG_OFFSET;
-+			base = OMAP4_MMC5_BASE;
- 			irq = OMAP44XX_IRQ_MMC5;
- 			break;
- 		default:
-@@ -834,10 +834,8 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 			size = OMAP2420_MMC_SIZE;
- 			name = "mmci-omap";
- 		} else if (cpu_is_omap44xx()) {
--			if (i < 3) {
--				base += OMAP4_MMC_REG_OFFSET;
-+			if (i < 3)
- 				irq += OMAP44XX_IRQ_GIC_START;
--			}
- 			size = OMAP4_HSMMC_SIZE;
- 			name = "mmci-omap-hs";
- 		} else {
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index df1311d..ab78a5a 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -266,6 +266,10 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 		mmc->slots[0].caps = c->caps;
- 		mmc->slots[0].internal_clock = !c->ext_clock;
- 		mmc->dma_mask = 0xffffffff;
-+		if (cpu_is_omap44xx())
-+			mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
-+		else
-+			mmc->reg_offset = 0;
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 2d2e6fc..7c222ba 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -34,6 +34,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/card.h>
++#include <linux/regulator/fixed.h>
  
- 		mmc->get_context_loss_count = hsmmc_get_context_loss;
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -345,6 +346,9 @@ static struct regulator_consumer_supply pandora_vmmc1_supply =
+ static struct regulator_consumer_supply pandora_vmmc2_supply =
+ 	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.1");
  
-diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-index 0f0f113..3107892 100644
---- a/arch/arm/plat-omap/include/plat/mmc.h
-+++ b/arch/arm/plat-omap/include/plat/mmc.h
-@@ -71,6 +71,9 @@ struct omap_mmc_platform_data {
- 
- 	u64 dma_mask;
- 
-+	/* Register offset deviation */
-+	u16 reg_offset;
++static struct regulator_consumer_supply pandora_vmmc3_supply =
++	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.2");
 +
- 	struct omap_mmc_slot_data {
+ static struct regulator_consumer_supply pandora_vdda_dac_supply =
+ 	REGULATOR_SUPPLY("vdda_dac", "omapdss");
  
- 		/*
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 69858e7..dc95756 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2014,6 +2014,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 	if (res == NULL || irq < 0)
- 		return -ENXIO;
+@@ -489,6 +493,33 @@ static struct regulator_init_data pandora_vsim = {
+ 	.consumer_supplies	= &pandora_adac_supply,
+ };
  
-+	res->start += pdata->reg_offset;
-+	res->end += pdata->reg_offset;
- 	res = request_mem_region(res->start, res->end - res->start + 1,
- 							pdev->name);
- 	if (res == NULL)
++/* Fixed regulator internal to Wifi module */
++static struct regulator_init_data pandora_vmmc3 = {
++	.constraints = {
++		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &pandora_vmmc3_supply,
++};
++
++static struct fixed_voltage_config pandora_vwlan = {
++	.supply_name		= "vwlan",
++	.microvolts		= 1800000, /* 1.8V */
++	.gpio			= PANDORA_WIFI_NRESET_GPIO,
++	.startup_delay		= 50000, /* 50ms */
++	.enable_high		= 1,
++	.enabled_at_boot	= 0,
++	.init_data		= &pandora_vmmc3,
++};
++
++static struct platform_device pandora_vwlan_device = {
++	.name		= "reg-fixed-voltage",
++	.id		= 1,
++	.dev = {
++		.platform_data = &pandora_vwlan,
++	},
++};
++
+ static struct twl4030_usb_data omap3pandora_usb_data = {
+ 	.usb_mode	= T2_USB_MODE_ULPI,
+ };
+@@ -645,19 +676,8 @@ static void pandora_wl1251_init(void)
+ 	if (pandora_wl1251_pdata.irq < 0)
+ 		goto fail_irq;
+ 
+-	ret = gpio_request(PANDORA_WIFI_NRESET_GPIO, "wl1251 nreset");
+-	if (ret < 0)
+-		goto fail_irq;
+-
+-	/* start powered so that it probes with MMC subsystem */
+-	ret = gpio_direction_output(PANDORA_WIFI_NRESET_GPIO, 1);
+-	if (ret < 0)
+-		goto fail_nreset;
+-
+ 	return;
+ 
+-fail_nreset:
+-	gpio_free(PANDORA_WIFI_NRESET_GPIO);
+ fail_irq:
+ 	gpio_free(PANDORA_WIFI_IRQ_GPIO);
+ fail:
+@@ -669,6 +689,7 @@ static struct platform_device *omap3pandora_devices[] __initdata = {
+ 	&pandora_keys_gpio,
+ 	&pandora_dss_device,
+ 	&pandora_wl1251_data,
++	&pandora_vwlan_device,
+ };
+ 
+ static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
