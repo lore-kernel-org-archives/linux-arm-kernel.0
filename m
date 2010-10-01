@@ -1,9 +1,10 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:25:30 +0530
-Subject: [PATCH V2 10/69] ST SPEAr1300: Adding default config file
+Date: Fri,  1 Oct 2010 17:25:28 +0530
+Subject: [PATCH V2 08/69] ST SPEAr: Adding support for SPEAr13xx SoC in spear
+	generic plat/
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <5d3248523e9eacf0adfcf2576690219173ba6cff.1285933331.git.viresh.kumar@st.com>
+Message-ID: <859b84aaf534f604c01ebf037cd9e32738ceebdc.1285933331.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,75 +13,34 @@ From: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear13xx_defconfig |   60 ++++++++++++++++++++++++++++++++++
- 1 files changed, 60 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/spear13xx_defconfig
+ arch/arm/plat-spear/Kconfig |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-new file mode 100644
-index 0000000..10b1cf5
---- /dev/null
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -0,0 +1,60 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR13XX=y
-+CONFIG_BOARD_SPEAR1300_EVB=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=2
-+CONFIG_AEABI=y
-+CONFIG_BINFMT_MISC=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_CONCAT=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+# CONFIG_HWMON is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT2_FS_SECURITY=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_SECURITY=y
-+CONFIG_AUTOFS4_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=m
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DETECT_HUNG_TASK=y
-+CONFIG_DEBUG_SPINLOCK=y
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+CONFIG_DEBUG_INFO=y
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 1bb3dbc..29a25d2 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -8,6 +8,13 @@ choice
+ 	prompt "ST SPEAr Family"
+ 	default ARCH_SPEAR3XX
+ 
++config ARCH_SPEAR13XX
++	bool "SPEAr13XX"
++	select ARM_GIC
++	select CPU_V7
++	help
++	  Supports for ARM's SPEAR13XX family
++
+ config ARCH_SPEAR3XX
+ 	bool "SPEAr3XX"
+ 	select ARM_VIC
+@@ -25,6 +32,7 @@ config ARCH_SPEAR6XX
+ endchoice
+ 
+ # Adding SPEAr machine specific configuration files
++source "arch/arm/mach-spear13xx/Kconfig"
+ source "arch/arm/mach-spear3xx/Kconfig"
+ source "arch/arm/mach-spear6xx/Kconfig"
+ 
 -- 
 1.7.2.2
