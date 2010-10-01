@@ -1,42 +1,60 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 1 Oct 2010 21:53:14 +0800
-Subject: PXA270 linux-2.6.35.7 boot hang
-In-Reply-To: <AANLkTim4HqQkT0uZTpsGCsFqObVA+v+Q7wHekGp5V+f3@mail.gmail.com>
-References: <AANLkTim4HqQkT0uZTpsGCsFqObVA+v+Q7wHekGp5V+f3@mail.gmail.com>
-Message-ID: <AANLkTi=JEUbxmTZ6PHbz_Gi7KvNf+KJat7R1ot5LQ1SH@mail.gmail.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Fri, 1 Oct 2010 19:03:53 +0530
+Subject: [PATCH] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CD033D6@dbde02.ent.ti.com>
+References: <1285834270-32766-1-git-send-email-charu@ti.com>
+	<4CA45341.3080300@ti.com> <87vd5njpyq.fsf@deeprootsystems.com>
+	<4CA49ADE.6080202@ti.com> <20100930150713.GG3117@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CCF813E@dbde02.ent.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CD03185@dbde02.ent.ti.com>
+	<87bp7ff962.fsf@deeprootsystems.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CD033D6@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE06C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 1, 2010 at 6:33 PM, Santhosh N <san.mlists@gmail.com> wrote:
-> Hi,
->
-> I am porting the latest linux kernel 2.6.35.7 on our PXA270 board. The
-> kernel starts booting and stops at:
-> Uncompressing Linux... done, booting the kernel.
->
-> I can run the linux kernel 2.6.26 on the same board without any
-> issues. I am passing the boot args as:
-> bootargs=console=ttyS2,460800 rw root=1f02
->
-> The STUART is used as the debug serial port. I had to change the
-> uart_base to STUART in arch/arm/mach-pxa/include/mach/uncompress.h to
-> get ?"Uncompressing Linux... done, booting the kernel.".
->
-> I have set also set CONFIG_SERIAL_PXA_CONSOLE=y.
->
-> Can anyone tell if I am missing something?
->
+Tony, Benoit, Kevin,
 
-There could be many reasons. But you may want to turn on DEBUG_LL
-and earlyprintk for some early diagnostic messages. You got "Uncompress
-..." messages so I assume the UART is setup correctly to this weird
-460800 baudrate (though I doubt STUART on PXA27x is able to do that)
+> > >> > >
+> > >> > > I think that disabling it should be done only if the
+> > CONFIG_OMAP_WDT
+> > >> > > is not set.
+> > >> >
+> > >> > How about disabling is done always unless CONFIG_WATCHDOG_NOWAYOUT
+> > >> > is set?
+> > >>
+> > >> As given in the patch description, this patch does a disable of
+> > watchdog
+> > >> timer, during init, to avoid the system rebooting that happens due to
+> > >> enabling of watchdog timer after a reset of the module (during hwmod
+> > init).
+> > >>
+> > >> According to the default WDT registers values, the system reboot
+> would
+> > >> happen in ~10s if watchdog is enabled with default values. Hence,
+> after
+> > >> a WDT module reset during init, the watchdog has to be disabled
+> within
+> > 10s
+> > >> otherwise the system will keep rebooting.
+> > >>
+> > >> Hence irrespective of CONFIG_WATCHDOG_NOWAYOUT/ CONFIG_OMAP_WDT,
+> > >> the watchdog timer needs to be disabled after a WDT reset has
+> happened.
+> > >>
+> > > One more option is to avoid the software reset using the
+> CONFIG_OMAP_WDT
+> > > flag. Something like below.
+> >
+> > This was already proposed by Charu, and rejected.
+> >
+> > Doing this means we have a dependency on particular bootloader init, and
+> > we'd like to get rid of *all* assumptions about what the bootloader does
+> > (or does not do.)
+> >
+> you mean is not depeding on bootloader to disable WDT. Make sense.
+> 
 
-> Warm regards,
-> Santhosh N
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Let me know your opinion on how to handle this issue.
+
+- V Charulatha
