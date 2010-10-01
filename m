@@ -1,511 +1,421 @@
 From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:25:52 +0530
-Subject: [PATCH V2 32/69] ST SPEAr: Adding support for SDHCI (SDIO)
+Date: Fri,  1 Oct 2010 17:25:41 +0530
+Subject: [PATCH V2 21/69] Keyboard: Adding support for spear-keyboard
 In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
 References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <df88865302536cd3d2f9defaaf00f178633fd96b.1285933332.git.viresh.kumar@st.com>
+Message-ID: <584e4ecc7883807e1fae0e6c53b2837954935e53.1285933331.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
----
- arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/spear1300_evb.c        |    1 +
- arch/arm/mach-spear13xx/spear13xx.c            |   34 +++++++++++++-
- arch/arm/mach-spear3xx/include/mach/generic.h  |   13 ++++--
- arch/arm/mach-spear3xx/include/mach/irqs.h     |    4 +-
- arch/arm/mach-spear3xx/include/mach/spear300.h |    4 +-
- arch/arm/mach-spear3xx/include/mach/spear320.h |    6 +-
- arch/arm/mach-spear3xx/spear300.c              |   62 ++++++++++++++++++++----
- arch/arm/mach-spear3xx/spear300_evb.c          |   18 +++++++-
- arch/arm/mach-spear3xx/spear320.c              |   43 +++++++++++++----
- arch/arm/mach-spear3xx/spear320_evb.c          |   15 +++++-
- 11 files changed, 167 insertions(+), 34 deletions(-)
+From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 7419e0b..bfd0667 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -40,6 +40,7 @@ extern struct platform_device spear13xx_nand_device;
- extern struct platform_device spear13xx_ohci0_device;
- extern struct platform_device spear13xx_ohci1_device;
- extern struct platform_device spear13xx_rtc_device;
-+extern struct platform_device spear13xx_sdhci_device;
- extern struct platform_device spear13xx_smi_device;
- extern struct sys_timer spear13xx_timer;
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+---
+ drivers/input/keyboard/Kconfig          |    9 +
+ drivers/input/keyboard/Makefile         |    1 +
+ drivers/input/keyboard/spear-keyboard.c |  362 +++++++++++++++++++++++++++++++
+ 3 files changed, 372 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/input/keyboard/spear-keyboard.c
+
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index 9cc488d..cb9f6b1 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -424,6 +424,15 @@ config KEYBOARD_OMAP
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called omap-keypad.
  
-diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index ba46f61..269d9b0 100644
---- a/arch/arm/mach-spear13xx/spear1300_evb.c
-+++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -43,6 +43,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&spear13xx_ohci0_device,
- 	&spear13xx_ohci1_device,
- 	&spear13xx_rtc_device,
-+	&spear13xx_sdhci_device,
- 	&spear13xx_smi_device,
- };
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 6455ebb..b058c3b 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -349,6 +349,16 @@ struct platform_device spear13xx_smi_device = {
- 	.resource = smi_resources,
- };
- 
-+static void sdhci_enable(void)
-+{
-+	unsigned val = readl(PERIP_CFG);
++config KEYBOARD_SPEAR
++	tristate "ST SPEAR keyboard support"
++	depends on PLAT_SPEAR
++	help
++	  Say Y here if you want to use the SPEAR keyboard.
 +
-+	/* This function enables SD/MMC interface out of SD/MMC, CF, XD */
-+	val &= ~(MCIF_SEL_MASK << MCIF_SEL_SHIFT);
-+	val |= SD_MMC_ACTIVE << MCIF_SEL_SHIFT;
-+	writel(val, PERIP_CFG);
-+}
++	  To compile this driver as a module, choose M here: the
++	  module will be called spear-keboard.
 +
- #ifdef CONFIG_PCIEPORTBUS
- /* PCIE0 clock always needs to be enabled if any of the three PCIE port
-  * have to be used. So call this function from the board initilization
-@@ -377,10 +387,32 @@ int enable_pcie0_clk(void)
- }
- #endif
- 
-+/* sdhci (sdio) device declaration */
-+static struct resource sdhci_resources[] = {
-+	{
-+		.start	= SPEAR13XX_MCIF_SDHCI_BASE,
-+		.end	= SPEAR13XX_MCIF_SDHCI_BASE + SZ_256 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.start	= IRQ_SDHCI,
-+		.flags	= IORESOURCE_IRQ,
-+	}
-+};
+ config KEYBOARD_TWL4030
+ 	tristate "TI TWL4030/TWL5030/TPS659x0 keypad support"
+ 	depends on TWL4030_CORE
+diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
+index 504b591..b21c54d 100644
+--- a/drivers/input/keyboard/Makefile
++++ b/drivers/input/keyboard/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_KEYBOARD_PXA930_ROTARY)	+= pxa930_rotary.o
+ obj-$(CONFIG_KEYBOARD_QT2160)		+= qt2160.o
+ obj-$(CONFIG_KEYBOARD_SAMSUNG)		+= samsung-keypad.o
+ obj-$(CONFIG_KEYBOARD_SH_KEYSC)		+= sh_keysc.o
++obj-$(CONFIG_KEYBOARD_SPEAR)		+= spear-keyboard.o
+ obj-$(CONFIG_KEYBOARD_STMPE)		+= stmpe-keypad.o
+ obj-$(CONFIG_KEYBOARD_STOWAWAY)		+= stowaway.o
+ obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
+diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+new file mode 100644
+index 0000000..4830e11
+--- /dev/null
++++ b/drivers/input/keyboard/spear-keyboard.c
+@@ -0,0 +1,362 @@
++/*
++ * drivers/input/keyboard/keyboard-spear.c
++ *
++ * SPEAr Keyboard Driver
++ * Based on omap-keypad driver
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+struct platform_device spear13xx_sdhci_device = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+	},
-+	.name = "sdhci",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(sdhci_resources),
-+	.resource = sdhci_resources,
-+};
-+
- /* Do spear13xx familiy common initialization part here */
- void __init spear13xx_init(void)
- {
--	/* nothing to do for now */
-+	sdhci_enable();
- }
- 
- /* This will initialize vic */
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 04ce8700..9bd9424 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -116,6 +116,7 @@ extern struct platform_device nand0_device;
- extern struct platform_device nand1_device;
- extern struct platform_device nand2_device;
- extern struct platform_device nand3_device;
-+extern struct platform_device sdhci_device;
- 
- /* pad mux modes */
- extern struct pmx_mode nand_mode;
-@@ -144,12 +145,15 @@ extern struct pmx_dev pmx_telecom_camera;
- extern struct pmx_dev pmx_telecom_dac;
- extern struct pmx_dev pmx_telecom_i2s;
- extern struct pmx_dev pmx_telecom_boot_pins;
--extern struct pmx_dev pmx_telecom_sdio_4bit;
--extern struct pmx_dev pmx_telecom_sdio_8bit;
-+extern struct pmx_dev pmx_telecom_sdhci_4bit;
-+extern struct pmx_dev pmx_telecom_sdhci_8bit;
- extern struct pmx_dev pmx_gpio1;
- 
- /* Add spear300 machine function declarations here */
- void __init spear300_init(void);
-+#define SDHCI_MEM_ENB	0x1
-+#define I2S_MEM_ENB	0x2
-+void sdhci_i2s_mem_enable(u8 mask);
- 
- /* Add misc structure declarations here */
- extern struct clcd_board clcd_plat_data;
-@@ -182,6 +186,7 @@ extern struct platform_device i2c1_device;
- extern struct platform_device nand_device;
- extern struct platform_device plgpio_device;
- extern struct platform_device pwm_device;
-+extern struct platform_device sdhci_device;
- 
- /* pad mux modes */
- extern struct pmx_mode auto_net_smii_mode;
-@@ -194,14 +199,14 @@ extern struct pmx_dev pmx_clcd;
- extern struct pmx_dev pmx_emi;
- extern struct pmx_dev pmx_fsmc;
- extern struct pmx_dev pmx_spp;
--extern struct pmx_dev pmx_sdio;
-+extern struct pmx_dev pmx_sdhci;
- extern struct pmx_dev pmx_i2s;
- extern struct pmx_dev pmx_uart1;
- extern struct pmx_dev pmx_uart1_modem;
- extern struct pmx_dev pmx_uart2;
- extern struct pmx_dev pmx_touchscreen;
- extern struct pmx_dev pmx_can;
--extern struct pmx_dev pmx_sdio_led;
-+extern struct pmx_dev pmx_sdhci_led;
- extern struct pmx_dev pmx_pwm0;
- extern struct pmx_dev pmx_pwm1;
- extern struct pmx_dev pmx_pwm2;
-diff --git a/arch/arm/mach-spear3xx/include/mach/irqs.h b/arch/arm/mach-spear3xx/include/mach/irqs.h
-index 5ad7574..df0c1f3 100644
---- a/arch/arm/mach-spear3xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear3xx/include/mach/irqs.h
-@@ -69,7 +69,7 @@
- #define IRQ_CLCD				IRQ_GEN_RAS_3
- 
- /* IRQs sharing IRQ_INTRCOMM_RAS_ARM */
--#define IRQ_SDIO				IRQ_INTRCOMM_RAS_ARM
-+#define IRQ_SDHCI				IRQ_INTRCOMM_RAS_ARM
- 
- /* GPIO pins virtual irqs */
- #define SPEAR_GPIO_INT_BASE			(VIRQ_START + 9)
-@@ -115,7 +115,7 @@
- #define VIRQ_SPP				(VIRQ_START + 2)
- 
- /* IRQs sharing IRQ_GEN_RAS_2 */
--#define IRQ_SDIO				IRQ_GEN_RAS_2
-+#define IRQ_SDHCI				IRQ_GEN_RAS_2
- 
- /* IRQs sharing IRQ_GEN_RAS_3 */
- #define VIRQ_PLGPIO				(VIRQ_START + 3)
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear300.h b/arch/arm/mach-spear3xx/include/mach/spear300.h
-index ccaa765..1059d5a 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear300.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear300.h
-@@ -39,8 +39,8 @@
- #define SPEAR300_CLCD_BASE		0x60000000
- #define SPEAR300_CLCD_SIZE		0x10000000
- 
--#define SPEAR300_SDIO_BASE		0x70000000
--#define SPEAR300_SDIO_SIZE		0x10000000
-+#define SPEAR300_SDHCI_BASE		0x70000000
-+#define SPEAR300_SDHCI_SIZE		0x10000000
- 
- #define SPEAR300_NAND_0_BASE		0x80000000
- #define SPEAR300_NAND_0_SIZE		0x04000000
-diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
-index aa6727c..89f5bfb 100644
---- a/arch/arm/mach-spear3xx/include/mach/spear320.h
-+++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
-@@ -28,8 +28,8 @@
- #define SPEAR320_I2S_BASE		0x60000000
- #define SPEAR320_I2S_SIZE		0x10000000
- 
--#define SPEAR320_SDIO_BASE		0x70000000
--#define SPEAR320_SDIO_SIZE		0x10000000
-+#define SPEAR320_SDHCI_BASE		0x70000000
-+#define SPEAR320_SDHCI_SIZE		0x10000000
- 
- #define SPEAR320_CLCD_BASE		0x90000000
- #define SPEAR320_CLCD_SIZE		0x10000000
-@@ -77,7 +77,7 @@
- #define EMI_IRQ_MASK			(1 << 7)
- #define CLCD_IRQ_MASK			(1 << 8)
- #define SPP_IRQ_MASK			(1 << 9)
--#define SDIO_IRQ_MASK			(1 << 10)
-+#define SDHCI_IRQ_MASK			(1 << 10)
- #define CAN_U_IRQ_MASK			(1 << 11)
- #define CAN_L_IRQ_MASK			(1 << 12)
- #define UART1_IRQ_MASK			(1 << 13)
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index c213614..fd83f53 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -311,7 +311,7 @@ struct pmx_dev pmx_telecom_boot_pins = {
- 	.enb_on_reset = 1,
- };
- 
--struct pmx_dev_mode pmx_telecom_sdio_4bit_modes[] = {
-+struct pmx_dev_mode pmx_telecom_sdhci_4bit_modes[] = {
- 	{
- 		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
- 			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
-@@ -324,14 +324,14 @@ struct pmx_dev_mode pmx_telecom_sdio_4bit_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_sdio_4bit = {
--	.name = "telecom_sdio_4bit",
--	.modes = pmx_telecom_sdio_4bit_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_sdio_4bit_modes),
-+struct pmx_dev pmx_telecom_sdhci_4bit = {
-+	.name = "telecom_sdhci_4bit",
-+	.modes = pmx_telecom_sdhci_4bit_modes,
-+	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_4bit_modes),
- 	.enb_on_reset = 1,
- };
- 
--struct pmx_dev_mode pmx_telecom_sdio_8bit_modes[] = {
-+struct pmx_dev_mode pmx_telecom_sdhci_8bit_modes[] = {
- 	{
- 		.ids = PHOTO_FRAME_MODE | LEND_IP_PHONE_MODE |
- 			HEND_IP_PHONE_MODE | LEND_WIFI_PHONE_MODE |
-@@ -343,10 +343,10 @@ struct pmx_dev_mode pmx_telecom_sdio_8bit_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_telecom_sdio_8bit = {
--	.name = "telecom_sdio_8bit",
--	.modes = pmx_telecom_sdio_8bit_modes,
--	.mode_count = ARRAY_SIZE(pmx_telecom_sdio_8bit_modes),
-+struct pmx_dev pmx_telecom_sdhci_8bit = {
-+	.name = "telecom_sdhci_8bit",
-+	.modes = pmx_telecom_sdhci_8bit_modes,
-+	.mode_count = ARRAY_SIZE(pmx_telecom_sdhci_8bit_modes),
- 	.enb_on_reset = 1,
- };
- 
-@@ -524,6 +524,28 @@ struct platform_device nand3_device = {
- 	.dev.platform_data = &nand3_platform_data,
- };
- 
-+/* sdhci (sdio) device declaration */
-+static struct resource sdhci_resources[] = {
-+	{
-+		.start	= SPEAR300_SDHCI_BASE,
-+		.end	= SPEAR300_SDHCI_BASE + SZ_256 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.start	= IRQ_SDHCI,
-+		.flags	= IORESOURCE_IRQ,
-+	}
-+};
-+
-+struct platform_device sdhci_device = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
-+	},
-+	.name = "sdhci",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(sdhci_resources),
-+	.resource = sdhci_resources,
-+};
-+
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -577,6 +599,26 @@ struct spear_shirq shirq_ras1 = {
- 	},
- };
- 
-+/* Function handling sdhci and i2s memory sharing */
-+#define SDHCI_MEM_SELECT	0x20000000
-+void sdhci_i2s_mem_enable(u8 mask)
-+{
-+	u32 val;
-+	void __iomem *base = ioremap(SPEAR300_SOC_CONFIG_BASE,
-+			SPEAR300_SOC_CONFIG_SIZE);
-+	if (!base) {
-+		pr_debug("sdhci_i2s_enb: ioremap fail\n");
-+		return;
-+	}
-+
-+	val = readl(base + MODE_CONFIG_REG);
-+	if (mask == SDHCI_MEM_ENB)
-+		val |= SDHCI_MEM_SELECT;
-+	else
-+		val &= ~SDHCI_MEM_SELECT;
-+	writel(val, base + MODE_CONFIG_REG);
-+}
-+
- /* spear300 routines */
- void __init spear300_init(void)
- {
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index c702cc3..2bcb55f 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -17,6 +17,7 @@
- #include <asm/mach-types.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
-+#include <linux/mmc/sdhci-spear.h>
- #include <mach/generic.h>
- #include <mach/gpio.h>
- #include <mach/spear.h>
-@@ -37,7 +38,7 @@ static struct pmx_dev *pmx_devs[] = {
- 	/* spear300 specific devices */
- 	&pmx_fsmc_2_chips,
- 	&pmx_clcd,
--	&pmx_telecom_sdio_4bit,
-+	&pmx_telecom_sdhci_4bit,
- 	&pmx_gpio1,
- };
- 
-@@ -65,6 +66,15 @@ static struct platform_device *plat_devs[] __initdata = {
- 
- 	/* spear300 specific devices */
- 	&kbd_device,
-+	&sdhci_device,
-+};
-+
-+/* sdhci board specific information */
-+static struct sdhci_plat_data sdhci_plat_data = {
-+	.card_power_gpio = RAS_GPIO_2,
-+	.power_active_high = 0,
-+	.power_always_enb = 0,
-+	.card_int_gpio = RAS_GPIO_0,
- };
- 
- /* keyboard specific platform data */
-@@ -115,6 +125,12 @@ static void __init spear300_evb_init(void)
- 	fsmc_nand_set_plat_data(&nand0_device, NULL, 0, NAND_SKIP_BBTSCAN,
- 			FSMC_NAND_BW8);
- 
-+	/* set sdhci device platform data */
-+	sdhci_set_plat_data(&sdhci_device, &sdhci_plat_data);
-+
-+	/* Enable sdhci memory */
-+	sdhci_i2s_mem_enable(SDHCI_MEM_ENB);
-+
- 	/* call spear300 machine init function */
- 	spear300_init();
- 
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index f87cc97..e14e201 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -13,6 +13,8 @@
- 
- #include <linux/amba/pl022.h>
- #include <linux/ptrace.h>
++#include <linux/clk.h>
++#include <linux/errno.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/input.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pm_wakeup.h>
++#include <linux/slab.h>
 +#include <linux/types.h>
-+#include <linux/mmc/sdhci-spear.h>
- #include <mtd/fsmc.h>
- #include <asm/irq.h>
- #include <mach/generic.h>
-@@ -113,7 +115,7 @@ struct pmx_dev pmx_spp = {
- 	.enb_on_reset = 1,
- };
- 
--struct pmx_dev_mode pmx_sdio_modes[] = {
-+struct pmx_dev_mode pmx_sdhci_modes[] = {
- 	{
- 		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE |
- 			SMALL_PRINTERS_MODE,
-@@ -121,10 +123,10 @@ struct pmx_dev_mode pmx_sdio_modes[] = {
- 	},
- };
- 
--struct pmx_dev pmx_sdio = {
--	.name = "sdio",
--	.modes = pmx_sdio_modes,
--	.mode_count = ARRAY_SIZE(pmx_sdio_modes),
-+struct pmx_dev pmx_sdhci = {
-+	.name = "sdhci",
-+	.modes = pmx_sdhci_modes,
-+	.mode_count = ARRAY_SIZE(pmx_sdhci_modes),
- 	.enb_on_reset = 1,
- };
- 
-@@ -218,17 +220,17 @@ struct pmx_dev pmx_can = {
- 	.enb_on_reset = 1,
- };
- 
--struct pmx_dev_mode pmx_sdio_led_modes[] = {
-+struct pmx_dev_mode pmx_sdhci_led_modes[] = {
- 	{
- 		.ids = AUTO_NET_SMII_MODE | AUTO_NET_MII_MODE,
- 		.mask = PMX_SSP_CS_MASK,
- 	},
- };
- 
--struct pmx_dev pmx_sdio_led = {
--	.name = "sdio_led",
--	.modes = pmx_sdio_led_modes,
--	.mode_count = ARRAY_SIZE(pmx_sdio_led_modes),
-+struct pmx_dev pmx_sdhci_led = {
-+	.name = "sdhci_led",
-+	.modes = pmx_sdhci_led_modes,
-+	.mode_count = ARRAY_SIZE(pmx_sdhci_led_modes),
- 	.enb_on_reset = 1,
- };
- 
-@@ -536,6 +538,27 @@ struct platform_device pwm_device = {
- 	.resource = pwm_resources,
- };
- 
-+/* sdhci (sdio) device registeration */
-+static struct resource sdhci_resources[] = {
-+	{
-+		.start	= SPEAR320_SDHCI_BASE,
-+		.end	= SPEAR320_SDHCI_BASE + SZ_256 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.start	= IRQ_SDHCI,
-+		.flags	= IORESOURCE_IRQ,
++#include <plat/keyboard.h>
++
++/* Keyboard Regsiters */
++#define MODE_REG	0x00	/* 16 bit reg */
++#define STATUS_REG	0x0C	/* 2 bit reg */
++#define DATA_REG	0x10	/* 8 bit reg */
++#define INTR_MASK	0x54
++
++/* Register Values */
++/*
++ * pclk freq mask = (APB FEQ -1)= 82 MHZ.Programme bit 15-9 in mode
++ * control register as 1010010(82MHZ)
++ */
++#define PCLK_FREQ_MSK	0xA400	/* 82 MHz */
++#define START_SCAN	0x0100
++#define SCAN_RATE_10	0x0000
++#define SCAN_RATE_20	0x0004
++#define SCAN_RATE_40	0x0008
++#define SCAN_RATE_80	0x000C
++#define MODE_KEYBOARD	0x0002
++#define DATA_AVAIL	0x2
++
++#define KEY_MASK	0xFF000000
++#define KEY_VALUE	0x00FFFFFF
++#define ROW_MASK	0xF0
++#define COLUMN_MASK	0x0F
++#define ROW_SHIFT	4
++
++struct spear_kbd {
++	struct input_dev *input;
++	void __iomem *io_base;		/* Keyboard Base Address */
++	struct clk *clk;
++	u8 last_key ;
++	u8 last_event;
++	int *keymap;
++	int keymapsize;
++};
++/* TODO: Need to optimize this function */
++static inline int get_key_value(struct spear_kbd *dev, int row, int col)
++{
++	int i, key;
++
++	key = KEY(row, col, 0);
++	for (i = 0; i < dev->keymapsize; i++)
++		if ((dev->keymap[i] & KEY_MASK) == key)
++			return dev->keymap[i] & KEY_VALUE;
++	return -ENOKEY;
++}
++
++static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
++{
++	struct spear_kbd *dev = dev_id;
++	int key;
++	u8 sts, val = 0;
++
++	sts = readb(dev->io_base + STATUS_REG);
++	if (sts & DATA_AVAIL) {
++		/* following reads active (row, col) pair */
++		val = readb(dev->io_base + DATA_REG);
++		key = get_key_value(dev, (val & ROW_MASK)>>ROW_SHIFT, (val
++					& COLUMN_MASK));
++
++		/* valid key press event */
++		if (key >= 0) {
++			if (dev->last_event == 1) {
++				/* check if we missed a release event */
++				input_report_key(dev->input, dev->last_key,
++						!dev->last_event);
++			}
++			/* notify key press */
++			dev->last_event = 1;
++			dev->last_key = key;
++			input_report_key(dev->input, key, dev->last_event);
++		} else {
++			/* notify key release */
++			dev->last_event = 0;
++			input_report_key(dev->input, dev->last_key,
++					dev->last_event);
++		}
++	} else
++		return IRQ_NONE;
++
++	/* clear interrupt */
++	writeb(0, dev->io_base + STATUS_REG);
++
++	return IRQ_HANDLED;
++}
++
++static int spear_kbd_open(struct input_dev *dev)
++{
++	struct spear_kbd *kbd = input_get_drvdata(dev);
++	u16 val;
++
++	/* start key scan */
++	val = readw(kbd->io_base + MODE_REG);
++	val |= START_SCAN;
++	writew(val, kbd->io_base + MODE_REG);
++
++	return 0;
++}
++
++static void spear_kbd_close(struct input_dev *dev)
++{
++	struct spear_kbd *kbd = input_get_drvdata(dev);
++	u16 val;
++
++	/* stop key scan */
++	val = readw(kbd->io_base + MODE_REG);
++	val &= ~START_SCAN;
++	writew(val, kbd->io_base + MODE_REG);
++}
++
++static int __init spear_kbd_probe(struct platform_device *pdev)
++{
++	struct spear_kbd *kbd;
++	struct kbd_platform_data *pdata = pdev->dev.platform_data;
++	struct resource *res;
++	int i, ret, irq, size;
++	u16 val = 0;
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "Invalid platform data\n");
++		return -EINVAL;
 +	}
-+};
 +
-+struct platform_device sdhci_device = {
-+	.dev = {
-+		.coherent_dma_mask = ~0,
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no keyboard resource defined\n");
++		return -EBUSY;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
++		dev_err(&pdev->dev, "keyboard region already claimed\n");
++		return -EBUSY;
++	}
++
++	kbd = kzalloc(sizeof(*kbd), GFP_KERNEL);
++	if (!kbd) {
++		dev_err(&pdev->dev, "out of memory\n");
++		ret = -ENOMEM;
++		goto err_release_mem_region;
++	}
++
++	kbd->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(kbd->clk)) {
++		ret = PTR_ERR(kbd->clk);
++		goto err_kfree;
++	}
++
++	ret = clk_enable(kbd->clk);
++	if (ret < 0)
++		goto err_clk_put;
++
++	platform_set_drvdata(pdev, kbd);
++	kbd->keymapsize = pdata->keymapsize;
++	size = kbd->keymapsize * sizeof(*pdata->keymap);
++	kbd->keymap = kmalloc(size, GFP_KERNEL);
++	if (!kbd->keymap)
++		goto err_clear_plat_data;
++
++	memcpy(kbd->keymap, pdata->keymap, size);
++
++	kbd->io_base = ioremap(res->start, resource_size(res));
++	if (!kbd->io_base) {
++		dev_err(&pdev->dev, "ioremap fail for kbd_region\n");
++		ret = -ENOMEM;
++		goto err_kfree_keymap;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "not able to get irq for the device\n");
++		ret = irq;
++		goto err_iounmap;
++	}
++
++	kbd->input = input_allocate_device();
++	if (!kbd->input) {
++		ret = -ENOMEM;
++		dev_err(&pdev->dev, "input device allocation fail\n");
++		goto err_iounmap;
++	}
++
++	if (pdata->rep)
++		__set_bit(EV_REP, kbd->input->evbit);
++
++	/* setup input device */
++	__set_bit(EV_KEY, kbd->input->evbit);
++
++	for (i = 0; i < kbd->keymapsize; i++)
++		__set_bit(kbd->keymap[i] & KEY_MAX, kbd->input->keybit);
++
++	kbd->input->name = "keyboard";
++	kbd->input->phys = "keyboard/input0";
++	kbd->input->dev.parent = &pdev->dev;
++	kbd->input->id.bustype = BUS_HOST;
++	kbd->input->id.vendor = 0x0001;
++	kbd->input->id.product = 0x0001;
++	kbd->input->id.version = 0x0100;
++	kbd->input->open = spear_kbd_open;
++	kbd->input->close = spear_kbd_close;
++	input_set_drvdata(kbd->input, kbd);
++
++	ret = input_register_device(kbd->input);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Unable to register keyboard device\n");
++		goto err_free_dev;
++	}
++
++	/* program keyboard */
++	val |= SCAN_RATE_80 | MODE_KEYBOARD | PCLK_FREQ_MSK;
++	writew(val, kbd->io_base + MODE_REG);
++
++	writeb(1, kbd->io_base + STATUS_REG);
++
++	device_init_wakeup(&pdev->dev, 1);
++
++	ret = request_irq(irq, spear_kbd_interrupt, 0, "keyboard",
++			kbd);
++	if (ret) {
++		dev_err(&pdev->dev, "request_irq fail\n");
++		goto err_unregister_dev;
++	}
++
++	return 0;
++
++err_unregister_dev:
++	input_unregister_device(kbd->input);
++	goto err_iounmap;
++err_free_dev:
++	input_free_device(kbd->input);
++err_iounmap:
++	iounmap(kbd->io_base);
++err_kfree_keymap:
++	kfree(kbd->keymap);
++err_clear_plat_data:
++	platform_set_drvdata(pdev, NULL);
++	clk_disable(kbd->clk);
++err_clk_put:
++	clk_put(kbd->clk);
++err_kfree:
++	kfree(kbd);
++err_release_mem_region:
++	release_mem_region(res->start, resource_size(res));
++
++	return ret;
++}
++
++static int spear_kbd_remove(struct platform_device *pdev)
++{
++	struct spear_kbd *kbd = platform_get_drvdata(pdev);
++	struct resource *res;
++	int irq;
++
++	irq = platform_get_irq(pdev, 0);
++	free_irq(irq, pdev);
++
++	/* unregister input device */
++	input_unregister_device(kbd->input);
++
++	iounmap(kbd->io_base);
++	kfree(kbd->keymap);
++	platform_set_drvdata(pdev, NULL);
++	clk_disable(kbd->clk);
++	clk_put(kbd->clk);
++	kfree(kbd);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res)
++		release_mem_region(res->start, resource_size(res));
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int spear_kbd_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct spear_kbd *kbd = platform_get_drvdata(pdev);
++	int irq;
++
++	irq = platform_get_irq(pdev, 0);
++	clk_disable(kbd->clk);
++	if (device_may_wakeup(&pdev->dev))
++		enable_irq_wake(irq);
++
++	return 0;
++}
++
++static int spear_kbd_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct spear_kbd *kbd = platform_get_drvdata(pdev);
++	int irq;
++
++	irq = platform_get_irq(pdev, 0);
++	if (device_may_wakeup(&pdev->dev))
++		disable_irq_wake(irq);
++	clk_enable(kbd->clk);
++
++	return 0;
++}
++
++static const struct dev_pm_ops spear_kbd_pm_ops = {
++	.suspend	= spear_kbd_suspend,
++	.resume		= spear_kbd_resume,
++};
++#endif
++
++static struct platform_driver spear_kbd_driver = {
++	.probe		= spear_kbd_probe,
++	.remove		= spear_kbd_remove,
++	.driver		= {
++		.name	= "keyboard",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_PM
++		.pm	= &spear_kbd_pm_ops,
++#endif
 +	},
-+	.name = "sdhci",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(sdhci_resources),
-+	.resource = sdhci_resources,
-+};
- 
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index dcca84e..2142ad9 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -16,6 +16,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- #include <linux/spi/flash.h>
-+#include <linux/mmc/sdhci-spear.h>
- #include <linux/spi/spi.h>
- #include <mach/generic.h>
- #include <mach/gpio.h>
-@@ -34,7 +35,7 @@ static struct pmx_dev *pmx_devs[] = {
- 
- 	/* spear320 specific devices */
- 	&pmx_fsmc,
--	&pmx_sdio,
-+	&pmx_sdhci,
- 	&pmx_i2s,
- 	&pmx_uart1,
- 	&pmx_uart2,
-@@ -69,6 +70,15 @@ static struct platform_device *plat_devs[] __initdata = {
- 	&i2c1_device,
- 	&plgpio_device,
- 	&pwm_device,
-+	&sdhci_device,
 +};
 +
-+/* sdhci board specific information */
-+static struct sdhci_plat_data sdhci_plat_data = {
-+	.card_power_gpio = PLGPIO_61,
-+	.power_active_high = 0,
-+	.power_always_enb = 1,
-+	.card_int_gpio = -1,
- };
- 
- static struct spi_board_info __initdata spi_board_info[] = {
-@@ -83,6 +93,9 @@ static void __init spear320_evb_init(void)
- {
- 	unsigned int i;
- 
-+	/* set sdhci device platform data */
-+	sdhci_set_plat_data(&sdhci_device, &sdhci_plat_data);
++static int __devinit spear_kbd_init(void)
++{
++	return platform_driver_register(&spear_kbd_driver);
++}
++module_init(spear_kbd_init);
 +
- 	/* padmux initialization, must be done before spear320_init */
- 	pmx_driver.mode = &auto_net_mii_mode;
- 	pmx_driver.devs = pmx_devs;
++static void __exit spear_kbd_exit(void)
++{
++	platform_driver_unregister(&spear_kbd_driver);
++}
++module_exit(spear_kbd_exit);
++
++MODULE_AUTHOR("Rajeev Kumar");
++MODULE_DESCRIPTION("SPEAr Keyboard Driver");
++MODULE_LICENSE("GPL");
 -- 
 1.7.2.2
