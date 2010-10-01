@@ -1,94 +1,34 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 1 Oct 2010 11:22:31 -0700
-Subject: [PATCH 3/3] ARM: twd_smp: add clock api support
-In-Reply-To: <4CA614AA.8090305@gmail.com>
-References: <1285886952-30888-1-git-send-email-robherring2@gmail.com>
-	<1285886952-30888-3-git-send-email-robherring2@gmail.com>
-	<AANLkTi=L69BXQZfT3VAeLgyBBHA2O8ELeLdqL1Onk3t=@mail.gmail.com>
-	<4CA5417B.5020200@gmail.com>
-	<AANLkTik=JXaDKbx97avUKerDQeK-O9gRuyfAZPHDQ2Yp@mail.gmail.com>
-	<4CA551FF.3080100@gmail.com>
-	<AANLkTim3wYDNySWxba3-xWkj495GTiGxWN9L08Rnaa9C@mail.gmail.com>
-	<4CA614AA.8090305@gmail.com>
-Message-ID: <AANLkTi=zwxKhhO7ERBvWfeHF7yO4beex5CYioPtiyWpA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 1 Oct 2010 11:27:53 -0700
+Subject: [PATCH 3/3] ARM: S5PV210: Add voltage consumer of WM8994 to
+	the regulator framework
+In-Reply-To: <AANLkTi=4XjbTDb_vukFicO2tXYvww-dGFyaErwx1i-BF@mail.gmail.com>
+References: <4CA5623D.3000002@samsung.com>
+	<20101001053139.GE30949@sirena.org.uk>
+	<AANLkTinRgTJdPowTEZX0nix2FR31A-8cVmBUf7n8zdE7@mail.gmail.com>
+	<20101001072425.GD20529@opensource.wolfsonmicro.com>
+	<AANLkTi=4XjbTDb_vukFicO2tXYvww-dGFyaErwx1i-BF@mail.gmail.com>
+Message-ID: <20101001182752.GD21157@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 1, 2010 at 10:04 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 09/30/2010 10:27 PM, Colin Cross wrote:
->>
->> On Thu, Sep 30, 2010 at 8:14 PM, Rob Herring<robherring2@gmail.com>
->> ?wrote:
->>>
->>> On 09/30/2010 09:30 PM, Colin Cross wrote:
->>>>
->>>> On Thu, Sep 30, 2010 at 7:03 PM, Rob Herring<robherring2@gmail.com>
->>>> ?wrote:
->>>>>
->>>>> On 09/30/2010 07:49 PM, Colin Cross wrote:
+On Fri, Oct 01, 2010 at 05:25:43PM +0900, Kyungmin Park wrote:
+> On Fri, Oct 1, 2010 at 4:24 PM, Mark Brown
 
-snip
+> > It's still good to show the actual connection on the board for clarity -
+> > like I say, the regulator API can handle always on regulators and
+> > keeping the regulator setup in software close to the schematic helps
+> > make the code easier to follow.
 
->>>>>> The local timers run off the PERIPHCLK in the CPU, which is specified
->>>>>> as the CPU clock divided by an implementation defined integer>= 2.
->>>>>> If you take the divider value as a parameter to twd_timer_init, the
->>>>>> clock that is passed in can be the cpu's clock.
->>>>>
->>>>> That is an implementation detail of the A9. Future designs could be
->>>>> completely asynchronous. Using the clock api works either way.
->>>>
->>>> True. ?That could still be handled by passing a divider of 1. ?For all
->>>> current implementations, this api will be used with clock that is a
->>>> constant divider of an existing clock. ?Taking a divider value would
->>>> avoid having to create a new clock that may not be similar to any
->>>> other clock in the device.
->>>
->>> If I pass in a divider, what clock rate do I divide with it? If I only
->>> have
->>> the divider, then I'm dependent on knowing CLK freq (the cpu freq in A9
->>> case). Ultimately I have to know the timer clock rate to setup a
->>> clock_event
->>> device. I'm open to passing in the clock rate directly, but having the
->>> clk
->>> ptr is more flexible. Other examples of timer init like i.MX use the same
->>> arguments.
->>>
->>> The point of this api is to avoid spending 5 jiffies on the primary cpu
->>> to
->>> calculate the rate. That is a significant chunk of the kernel boot time.
->>> Calling this function is entirely optional and the old way still works.
->>
->> I like the idea of passing in the clk pointer - it would simplify
->> problems I've been having with rescaling the localtimer when the cpu
->> frequency changes. ?However, it would reduce the amount of
->> machine-specific code necessary if I could pass in the
->> already-existing clock (cpu clock, for A9), as well as the value of
->> the divider that is present inside cpu (4 for Tegra2).
->
-> You are assuming all hardware would have a fixed divider. There is no
-> requirement that the CLK:PERIPHCLK ratio is fixed. Well designed clock
-> controller h/w would support CLK changing while maintaining PERIPHCLK rate
-> or at least support changing the ratio.
+> It's best but in most case schematic is confidential. so it's impossible.
 
-The ARM specification for Cortex A9 requires a fixed CLK:PERIPHCLK
-ratio, which AFAICT covers at least 5 out of the 6 current users of
-the twd driver.
+Right, this is normal - even with widely available reference boards the
+schematics are often distributed only under NDA.  Since the information
+exposed is at the same level as describing where the devices are on
+buses and so on this isn't usually a problem.
 
-> You will need to get the clock rate every set_next_event and somehow sync
-> cpu freq changes to when no timers are active on all cores. Or just accept
-> the timer inaccuracy for 1 time. Good luck with that... ;)
+> And as you concerns there's no power issues related with codes. it's
+> already verified design. I think wolfsonmicro already confirmed.
 
-The timer APIs require that a timer take at least as long as requested
-to fire.  If you change the TWD prescaler before the CPU frequency
-increases, or after the CPU frequency decreases, the timer interrupt
-will not fire until a small time after the requested time.
-
-> What is the problem of defining another clock in the platform? The watchdogs
-> if implemented also need that clock.
-
-It would be a convenient shortcut.  On Tegra, we don't use the A9
-watchdog, because it gets powered down in idle.  Defining a new clock
-is not a trivial task - on Tegra we have no fixed dividers like this,
-so we would need a new clock type.  An extra argument, which can be
-set to 1 if your local timer block has no divider, would save ~20 LoC
-on each existing platform, but either way would work.
+Using a fixed voltage regulator won't cause a problem in operation, the
+issue is one of code quality.
