@@ -1,88 +1,83 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri,  1 Oct 2010 14:29:34 -0700
-Subject: [PATCH 10/47] davinci: cpufreq: add support for keeping an additional
-	clock constant
+Date: Fri,  1 Oct 2010 14:29:35 -0700
+Subject: [PATCH 11/47] davinci: am18x/da850/omap-l138: keep async clock
+	constant with cpufreq
 In-Reply-To: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
 References: <1285968611-26890-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <1285968611-26890-11-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1285968611-26890-12-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sekhar Nori <nsekhar@ti.com>
 
-On OMAP-L138 SoC, some of the sysclks need not be at a fixed ratio
-to CPU clock and can be kept at a relatively constant rate by
-adjusting the PLLDIVn ratio even as cpufreq goes ahead and changes
-the CPU clock.
-
-This feature can be used to keep the EMIFA (PLL0 SYSCLK3) clock at a
-constant rate so that the EMIF timings need not be re-programmed
-whenever the CPU frequency changes.
-
-This patch adds the required suppport to cpufreq driver.
+Keep PLL0 SYSCLK3 at a constant rate of 100MHz. This enables the AEMIF
+timing to remain valid even as the PLL0 output is changed by cpufreq
+driver to save power.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-davinci/cpufreq.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c    |    2 +-
+ arch/arm/mach-davinci/da850.c              |   10 +++++++++-
+ arch/arm/mach-davinci/include/mach/da8xx.h |    2 +-
+ 3 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/cpufreq.c b/arch/arm/mach-davinci/cpufreq.c
-index bc80142..343de73 100644
---- a/arch/arm/mach-davinci/cpufreq.c
-+++ b/arch/arm/mach-davinci/cpufreq.c
-@@ -34,6 +34,8 @@
- struct davinci_cpufreq {
- 	struct device *dev;
- 	struct clk *armclk;
-+	struct clk *asyncclk;
-+	unsigned long asyncrate;
- };
- static struct davinci_cpufreq cpufreq;
- 
-@@ -114,6 +116,12 @@ static int davinci_target(struct cpufreq_policy *policy,
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index f5f9472..c2800a98 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -787,7 +787,7 @@ static __init void da850_evm_init(void)
  	if (ret)
- 		goto out;
+ 		pr_warning("da850_evm_init: rtc setup failed: %d\n", ret);
  
-+	if (cpufreq.asyncclk) {
-+		ret = clk_set_rate(cpufreq.asyncclk, cpufreq.asyncrate);
-+		if (ret)
-+			goto out;
-+	}
-+
- 	/* if moving to lower freq, lower the voltage after lowering freq */
- 	if (pdata->set_voltage && freqs.new < freqs.old)
- 		pdata->set_voltage(idx);
-@@ -191,6 +199,7 @@ static struct cpufreq_driver davinci_driver = {
- static int __init davinci_cpufreq_probe(struct platform_device *pdev)
+-	ret = da850_register_cpufreq();
++	ret = da850_register_cpufreq("pll0_sysclk3");
+ 	if (ret)
+ 		pr_warning("da850_evm_init: cpufreq registration failed: %d\n",
+ 				ret);
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 6932d80..5af7cfb 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -86,6 +86,8 @@ static struct clk pll0_sysclk3 = {
+ 	.parent		= &pll0_clk,
+ 	.flags		= CLK_PLL,
+ 	.div_reg	= PLLDIV3,
++	.set_rate	= davinci_set_sysclk_rate,
++	.maxrate	= 100000000,
+ };
+ 
+ static struct clk pll0_sysclk4 = {
+@@ -929,10 +931,16 @@ static struct platform_device da850_cpufreq_device = {
+ 	.dev = {
+ 		.platform_data	= &cpufreq_info,
+ 	},
++	.id = -1,
+ };
+ 
+-int __init da850_register_cpufreq(void)
++int __init da850_register_cpufreq(char *async_clk)
  {
- 	struct davinci_cpufreq_config *pdata = pdev->dev.platform_data;
-+	struct clk *asyncclk;
- 
- 	if (!pdata)
- 		return -EINVAL;
-@@ -205,6 +214,12 @@ static int __init davinci_cpufreq_probe(struct platform_device *pdev)
- 		return PTR_ERR(cpufreq.armclk);
- 	}
- 
-+	asyncclk = clk_get(cpufreq.dev, "async");
-+	if (!IS_ERR(asyncclk)) {
-+		cpufreq.asyncclk = asyncclk;
-+		cpufreq.asyncrate = clk_get_rate(asyncclk);
-+	}
++	/* cpufreq driver can help keep an "async" clock constant */
++	if (async_clk)
++		clk_add_alias("async", da850_cpufreq_device.name,
++							async_clk, NULL);
 +
- 	return cpufreq_register_driver(&davinci_driver);
+ 	return platform_device_register(&da850_cpufreq_device);
  }
  
-@@ -212,6 +227,9 @@ static int __exit davinci_cpufreq_remove(struct platform_device *pdev)
- {
- 	clk_put(cpufreq.armclk);
- 
-+	if (cpufreq.asyncclk)
-+		clk_put(cpufreq.asyncclk);
-+
- 	return cpufreq_unregister_driver(&davinci_driver);
- }
- 
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 3c07059..2c3f418 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -78,7 +78,7 @@ int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
+ int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
+ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
+ int da8xx_register_rtc(void);
+-int da850_register_cpufreq(void);
++int da850_register_cpufreq(char *async_clk);
+ int da8xx_register_cpuidle(void);
+ void __iomem * __init da8xx_get_mem_ctlr(void);
+ int da850_register_pm(struct platform_device *pdev);
 -- 
 1.7.2.1
