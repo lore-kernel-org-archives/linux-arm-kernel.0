@@ -1,169 +1,283 @@
-From: viresh.kumar@st.com (Viresh KUMAR)
-Date: Fri,  1 Oct 2010 17:26:21 +0530
-Subject: [PATCH V2 61/69] SPEAr3xx: Replace defconfigs with single unified
-	defconfig
-In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
-References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <753e3ba7b912827f53554165d8a7d6e6c3c30610.1285933332.git.viresh.kumar@st.com>
+From: kishorek.kadiyala@gmail.com (kishore kadiyala)
+Date: Fri, 1 Oct 2010 17:32:11 +0530
+Subject: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <20101001112926.GC3064@sortiz-mobl>
+References: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
+	<AANLkTi=YvtrfmUTc-YBAUjEXn1v3pPLmhb92J60AhU28@mail.gmail.com>
+	<AANLkTim5d6XP0nuJLF2DxDGP2DuBK5VUajd=YhXQnT2C@mail.gmail.com>
+	<AANLkTi=oX7CT8RF39kT-7niutF3PEeSeC1A_L5TcWuO4@mail.gmail.com>
+	<AANLkTim1H=qam8Sjbv_EUXGtf09TObTViYMiN17uMFQ1@mail.gmail.com>
+	<20101001112926.GC3064@sortiz-mobl>
+Message-ID: <AANLkTims1qZ_X9F4rzkJE9Gat_pwWZxO2nPkRTpa6Cc5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryan Mallon <ryan@bluewatersys.com>
+Samuel,
 
-We only need one defconfig for SPEAr3xx now since we can build all
-three boards into one kernel.
+Sorry , I will ensure to CC you for MFD related changes in future.
 
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/configs/spear310_defconfig                |   52 --------------------
- arch/arm/configs/spear320_defconfig                |   52 --------------------
- .../{spear300_defconfig => spear3xx_defconfig}     |    4 +-
- 3 files changed, 3 insertions(+), 105 deletions(-)
- delete mode 100644 arch/arm/configs/spear310_defconfig
- delete mode 100644 arch/arm/configs/spear320_defconfig
- rename arch/arm/configs/{spear300_defconfig => spear3xx_defconfig} (93%)
+Regards,
+Kishore
 
-diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
-deleted file mode 100644
-index 824e444..0000000
---- a/arch/arm/configs/spear310_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR310=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
-deleted file mode 100644
-index 842f7f3..0000000
---- a/arch/arm/configs/spear320_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR320=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear3xx_defconfig
-similarity index 93%
-rename from arch/arm/configs/spear300_defconfig
-rename to arch/arm/configs/spear3xx_defconfig
-index cf29f3e..fea7e1f 100644
---- a/arch/arm/configs/spear300_defconfig
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -7,6 +7,9 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_PLAT_SPEAR=y
-+CONFIG_BOARD_SPEAR300_EVB=y
-+CONFIG_BOARD_SPEAR310_EVB=y
-+CONFIG_BOARD_SPEAR320_EVB=y
- CONFIG_BINFMT_MISC=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
-@@ -24,7 +27,6 @@ CONFIG_MAX_RAW_DEVS=8192
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PL061=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
--- 
-1.7.2.2
+On Fri, Oct 1, 2010 at 4:59 PM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> On Fri, Oct 01, 2010 at 12:29:48PM +0530, kishore kadiyala wrote:
+>> Ping !!
+> Applied !!
+>
+> BTW, please add the full patch when you cc me, so that I don't have to dig
+> through patchwork to grab something I can git-am.
+>
+> Cheers,
+> Samuel.
+>
+>
+>> On Wed, Sep 29, 2010 at 4:11 PM, kishore kadiyala
+>> <kishorek.kadiyala@gmail.com> wrote:
+>> > Gentle Reminder !
+>> >
+>> > Regards,
+>> > Kishore
+>> >
+>> > On Tue, Sep 28, 2010 at 12:22 PM, kishore kadiyala
+>> > <kishorek.kadiyala@gmail.com> wrote:
+>> >> Hi Samuel,
+>> >>
+>> >> Could you please review this patch which touches mfd/twl6030-irq.c for
+>> >> card detect support
+>> >> of MMC1 controller on OMAP4.
+>> >>
+>> >> Regards,
+>> >> Kishore
+>> >>
+>> >> On Mon, Sep 27, 2010 at 1:25 PM, kishore kadiyala
+>> >> <kishorek.kadiyala@gmail.com> wrote:
+>> >>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>> >>>
+>> >>> On Fri, Sep 24, 2010 at 10:43 PM, kishore kadiyala
+>> >>> <kishore.kadiyala@ti.com> wrote:
+>> >>>> Adding card detect callback function and card detect configuration
+>> >>>> function for MMC1 Controller on OMAP4.
+>> >>>>
+>> >>>> Card detect configuration function does initial configuration of the
+>> >>>> MMC Control & PullUp-PullDown registers of Phoenix.
+>> >>>>
+>> >>>> For MMC1 Controller, card detect interrupt source is
+>> >>>> twl6030 which is non-gpio. The card detect call back function provides
+>> >>>> card present/absent status by reading MMC Control register present
+>> >>>> on twl6030.
+>> >>>>
+>> >>>> Since OMAP4 doesn't use any GPIO line as used in OMAP3 for card detect,
+>> >>>> the suspend/resume initialization which was done in omap_hsmmc_gpio_init
+>> >>>> previously is moved to the probe thus making it generic for both OMAP3 & OMAP4.
+>> >>>>
+>> >>>> Cc: Tony Lindgren <tony@atomide.com>
+>> >>>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> >>>> Cc: Madhusudhan Chikkature <madhu.cr@ti.com>
+>> >>>> Cc: Adrian Hunter <adrian.hunter@nokia.com>
+>> >>>> Signed-off-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
+>> >>>> ---
+>> >>>> ?arch/arm/mach-omap2/board-4430sdp.c | ? ?7 +++-
+>> >>>> ?drivers/mfd/twl6030-irq.c ? ? ? ? ? | ? 73 +++++++++++++++++++++++++++++++++++
+>> >>>> ?drivers/mmc/host/omap_hsmmc.c ? ? ? | ? ?4 +-
+>> >>>> ?include/linux/i2c/twl.h ? ? ? ? ? ? | ? 31 +++++++++++++++
+>> >>>> ?4 files changed, 112 insertions(+), 3 deletions(-)
+>> >>>>
+>> >>>> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+>> >>>> index 9447644..a49f285 100644
+>> >>>> --- a/arch/arm/mach-omap2/board-4430sdp.c
+>> >>>> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+>> >>>> @@ -227,9 +227,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+>> >>>> ? ? ? ?struct omap_mmc_platform_data *pdata = dev->platform_data;
+>> >>>>
+>> >>>> ? ? ? ?/* Setting MMC1 Card detect Irq */
+>> >>>> - ? ? ? if (pdev->id == 0)
+>> >>>> + ? ? ? if (pdev->id == 0) {
+>> >>>> + ? ? ? ? ? ? ? ret = twl6030_mmc_card_detect_config();
+>> >>>> + ? ? ? ? ? ? ? if (ret)
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? pr_err("Failed configuring MMC1 card detect\n");
+>> >>>> ? ? ? ? ? ? ? ?pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
+>> >>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?MMCDETECT_INTR_OFFSET;
+>> >>>> + ? ? ? ? ? ? ? pdata->slots[0].card_detect = twl6030_mmc_card_detect;
+>> >>>> + ? ? ? }
+>> >>>> ? ? ? ?return ret;
+>> >>>> ?}
+>> >>>>
+>> >>>> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
+>> >>>> index 10bf228..2d3bb82 100644
+>> >>>> --- a/drivers/mfd/twl6030-irq.c
+>> >>>> +++ b/drivers/mfd/twl6030-irq.c
+>> >>>> @@ -36,6 +36,7 @@
+>> >>>> ?#include <linux/irq.h>
+>> >>>> ?#include <linux/kthread.h>
+>> >>>> ?#include <linux/i2c/twl.h>
+>> >>>> +#include <linux/platform_device.h>
+>> >>>>
+>> >>>> ?/*
+>> >>>> ?* TWL6030 (unlike its predecessors, which had two level interrupt handling)
+>> >>>> @@ -223,6 +224,78 @@ int twl6030_interrupt_mask(u8 bit_mask, u8 offset)
+>> >>>> ?}
+>> >>>> ?EXPORT_SYMBOL(twl6030_interrupt_mask);
+>> >>>>
+>> >>>> +int twl6030_mmc_card_detect_config(void)
+>> >>>> +{
+>> >>>> + ? ? ? int ret;
+>> >>>> + ? ? ? u8 reg_val = 0;
+>> >>>> +
+>> >>>> + ? ? ? /* Unmasking the Card detect Interrupt line for MMC1 from Phoenix */
+>> >>>> + ? ? ? twl6030_interrupt_unmask(TWL6030_MMCDETECT_INT_MASK,
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? REG_INT_MSK_LINE_B);
+>> >>>> + ? ? ? twl6030_interrupt_unmask(TWL6030_MMCDETECT_INT_MASK,
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? REG_INT_MSK_STS_B);
+>> >>>> + ? ? ? /*
+>> >>>> + ? ? ? ?* Intially Configuring MMC_CTRL for receving interrupts &
+>> >>>> + ? ? ? ?* Card status on TWL6030 for MMC1
+>> >>>> + ? ? ? ?*/
+>> >>>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val, TWL6030_MMCCTRL);
+>> >>>> + ? ? ? if (ret < 0) {
+>> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read MMCCTRL, error %d\n", ret);
+>> >>>> + ? ? ? ? ? ? ? return ret;
+>> >>>> + ? ? ? }
+>> >>>> + ? ? ? reg_val &= ~VMMC_AUTO_OFF;
+>> >>>> + ? ? ? reg_val |= SW_FC;
+>> >>>> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val, TWL6030_MMCCTRL);
+>> >>>> + ? ? ? if (ret < 0) {
+>> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write MMCCTRL, error %d\n", ret);
+>> >>>> + ? ? ? ? ? ? ? return ret;
+>> >>>> + ? ? ? }
+>> >>>> +
+>> >>>> + ? ? ? /* Configuring PullUp-PullDown register */
+>> >>>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &reg_val,
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
+>> >>>> + ? ? ? if (ret < 0) {
+>> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to read CFG_INPUT_PUPD3, error %d\n",
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
+>> >>>> + ? ? ? ? ? ? ? return ret;
+>> >>>> + ? ? ? }
+>> >>>> + ? ? ? reg_val &= ~(MMC_PU | MMC_PD);
+>> >>>> + ? ? ? ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_CFG_INPUT_PUPD3);
+>> >>>> + ? ? ? if (ret < 0) {
+>> >>>> + ? ? ? ? ? ? ? pr_err("twl6030: Failed to write CFG_INPUT_PUPD3, error %d\n",
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
+>> >>>> + ? ? ? ? ? ? ? return ret;
+>> >>>> + ? ? ? }
+>> >>>> + ? ? ? return 0;
+>> >>>> +}
+>> >>>> +EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
+>> >>>> +
+>> >>>> +int twl6030_mmc_card_detect(struct device *dev, int slot)
+>> >>>> +{
+>> >>>> + ? ? ? int ret = -EIO;
+>> >>>> + ? ? ? u8 read_reg = 0;
+>> >>>> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
+>> >>>> +
+>> >>>> + ? ? ? if (pdev->id) {
+>> >>>> + ? ? ? ? ? ? ? /* TWL6030 provide's Card detect support for
+>> >>>> + ? ? ? ? ? ? ? ?* only MMC1 controller.
+>> >>>> + ? ? ? ? ? ? ? ?*/
+>> >>>> + ? ? ? ? ? ? ? pr_err("Unkown MMC controller %d in %s\n", pdev->id, __func__);
+>> >>>> + ? ? ? ? ? ? ? return ret;
+>> >>>> + ? ? ? }
+>> >>>> + ? ? ? /*
+>> >>>> + ? ? ? ?* BIT0 of MMC_CTRL on TWL6030 provides card status for MMC1
+>> >>>> + ? ? ? ?* 0 - Card not present ,1 - Card present
+>> >>>> + ? ? ? ?*/
+>> >>>> + ? ? ? ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &read_reg,
+>> >>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL6030_MMCCTRL);
+>> >>>> + ? ? ? if (ret >= 0)
+>> >>>> + ? ? ? ? ? ? ? ret = read_reg & STS_MMC;
+>> >>>> + ? ? ? return ret;
+>> >>>> +}
+>> >>>> +EXPORT_SYMBOL(twl6030_mmc_card_detect);
+>> >>>> +
+>> >>>> ?int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
+>> >>>> ?{
+>> >>>>
+>> >>>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>> >>>> index 562dbbb..a51894d 100644
+>> >>>> --- a/drivers/mmc/host/omap_hsmmc.c
+>> >>>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>> >>>> @@ -466,8 +466,6 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
+>> >>>> ? ? ? ?int ret;
+>> >>>>
+>> >>>> ? ? ? ?if (gpio_is_valid(pdata->slots[0].switch_pin)) {
+>> >>>> - ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
+>> >>>> - ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
+>> >>>> ? ? ? ? ? ? ? ?if (pdata->slots[0].cover)
+>> >>>> ? ? ? ? ? ? ? ? ? ? ? ?pdata->slots[0].get_cover_state =
+>> >>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_cover_state;
+>> >>>> @@ -2211,6 +2209,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+>> >>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"Unable to grab MMC CD IRQ\n");
+>> >>>> ? ? ? ? ? ? ? ? ? ? ? ?goto err_irq_cd;
+>> >>>> ? ? ? ? ? ? ? ?}
+>> >>>> + ? ? ? ? ? ? ? pdata->suspend = omap_hsmmc_suspend_cdirq;
+>> >>>> + ? ? ? ? ? ? ? pdata->resume = omap_hsmmc_resume_cdirq;
+>> >>>> ? ? ? ?}
+>> >>>>
+>> >>>> ? ? ? ?omap_hsmmc_disable_irq(host);
+>> >>>> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+>> >>>> index 6de90bf..e64894c 100644
+>> >>>> --- a/include/linux/i2c/twl.h
+>> >>>> +++ b/include/linux/i2c/twl.h
+>> >>>> @@ -141,6 +141,16 @@
+>> >>>> ?#define TWL6030_CHARGER_CTRL_INT_MASK ?0x10
+>> >>>> ?#define TWL6030_CHARGER_FAULT_INT_MASK ? ? ? ? 0x60
+>> >>>>
+>> >>>> +#define TWL6030_MMCCTRL ? ? ? ? ? ? ? ?0xEE
+>> >>>> +#define VMMC_AUTO_OFF ? ? ? ? ? ? ? ? ?(0x1 << 3)
+>> >>>> +#define SW_FC ? ? ? ? ? ? ? ? ? ? ? ? ?(0x1 << 2)
+>> >>>> +#define STS_MMC ? ? ? ? ? ? ? ? ? ? ? ?0x1
+>> >>>> +
+>> >>>> +#define TWL6030_CFG_INPUT_PUPD3 ? ? ? ?0xF2
+>> >>>> +#define MMC_PU ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 3)
+>> >>>> +#define MMC_PD ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 2)
+>> >>>> +
+>> >>>> +
+>> >>>>
+>> >>>> ?#define TWL4030_CLASS_ID ? ? ? ? ? ? ? 0x4030
+>> >>>> ?#define TWL6030_CLASS_ID ? ? ? ? ? ? ? 0x6030
+>> >>>> @@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
+>> >>>> ?int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
+>> >>>> ?int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+>> >>>>
+>> >>>> +/* Card detect Configuration for MMC1 Controller on OMAP4 */
+>> >>>> +#ifdef CONFIG_TWL4030_CORE
+>> >>>> +int twl6030_mmc_card_detect_config(void);
+>> >>>> +#else
+>> >>>> +static inline int twl6030_mmc_card_detect_config(void)
+>> >>>> +{
+>> >>>> + ? ? ? pr_debug("twl6030_mmc_card_detect_config not supported\n");
+>> >>>> + ? ? ? return 0;
+>> >>>> +}
+>> >>>> +#endif
+>> >>>> +
+>> >>>> +/* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
+>> >>>> +#ifdef CONFIG_TWL4030_CORE
+>> >>>> +int twl6030_mmc_card_detect(struct device *dev, int slot);
+>> >>>> +#else
+>> >>>> +static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
+>> >>>> +{
+>> >>>> + ? ? ? pr_debug("Call back twl6030_mmc_card_detect not supported\n");
+>> >>>> + ? ? ? return -EIO;
+>> >>>> +}
+>> >>>> +#endif
+>> >>>> ?/*----------------------------------------------------------------------*/
+>> >>>>
+>> >>>> ?/*
+>> >>>> --
+>> >>>> 1.7.0.4
+>> >>>>
+>> >>>>
+>> >>>> --
+>> >>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> >>>> the body of a message to majordomo at vger.kernel.org
+>> >>>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> >>>>
+>> >>>
+>> >>
+>> >
+>
+> --
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
+>
