@@ -1,40 +1,159 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 01 Oct 2010 16:34:15 -0700
-Subject: [PATCH 4/8] omap: pandora: enable twl4030 charger
-In-Reply-To: <20101001233315.31894.49599.stgit@baageli.muru.com>
-References: <20101001233315.31894.49599.stgit@baageli.muru.com>
-Message-ID: <20101001233415.31894.50639.stgit@baageli.muru.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Sat, 2 Oct 2010 10:23:02 +0900
+Subject: [PATCH 06/27] ARM: S5P64X0: 2nd Change to using
+	s3c_gpio_cfgpin_range()
+In-Reply-To: <1285934724-5007-7-git-send-email-kgene.kim@samsung.com>
+References: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
+	<1285934724-5007-7-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTimBW5udfRN=0=ZHoAwkn+2ewyUX-0B5jLfrsT+i@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grazvydas Ignotas <notasas@gmail.com>
+Hi,
 
-Add platform data to make use of newly added charging driver.
+On Fri, Oct 1, 2010 at 9:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This patch changes the code setting ranges of GPIO pins in mach-s5p64x0 using
+> s3c_gpio_cfgpin() to use the recently introduced s3c_gpio_cfgpin_range().
+> NOTE: This is for missed things from the previous patch.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-s5p64x0/dev-spi.c ? ?| ? 24 ++++++++++++------------
+> ?arch/arm/mach-s5p64x0/setup-i2c0.c | ? ?6 ++----
+> ?arch/arm/mach-s5p64x0/setup-i2c1.c | ? ?6 ++----
+> ?3 files changed, 16 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
+> index 5b69ec4..be64fee 100644
+> --- a/arch/arm/mach-s5p64x0/dev-spi.c
+> +++ b/arch/arm/mach-s5p64x0/dev-spi.c
+> @@ -39,20 +39,18 @@ static char *s5p64x0_spi_src_clks[] = {
+> ?*/
+> ?static int s5p6440_spi_cfg_gpio(struct platform_device *pdev)
+> ?{
+> + ? ? ? unsigned int base;
+> +
+> ? ? ? ?switch (pdev->id) {
+> ? ? ? ?case 0:
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(0), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(1), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(2), S3C_GPIO_SFN(2));
+> + ? ? ? ? ? ? ? base = S5P6440_GPC(0);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(0), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(1), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(2), S3C_GPIO_PULL_UP);
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-omap3pandora.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Also make a wrapper, s3c_gpio_cfgrange_pullup, then you can also
+remove above codes.
+There's lots of codes use PULL_UP as default pin setup.
 
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 7c222ba..7192635 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -533,6 +533,8 @@ static struct twl4030_codec_data omap3pandora_codec_data = {
- 	.audio = &omap3pandora_audio_data,
- };
- 
-+static struct twl4030_bci_platform_data pandora_bci_data;
-+
- static struct twl4030_platform_data omap3pandora_twldata = {
- 	.irq_base	= TWL4030_IRQ_BASE,
- 	.irq_end	= TWL4030_IRQ_END,
-@@ -548,6 +550,7 @@ static struct twl4030_platform_data omap3pandora_twldata = {
- 	.vaux4		= &pandora_vaux4,
- 	.vsim		= &pandora_vsim,
- 	.keypad		= &pandora_kp_data,
-+	.bci		= &pandora_bci_data,
- };
- 
- static struct i2c_board_info __initdata omap3pandora_i2c_boardinfo[] = {
+Thank you,
+Kyungmin Park
+> ? ? ? ? ? ? ? ?break;
+>
+> ? ? ? ?case 1:
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(4), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(5), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(6), S3C_GPIO_SFN(2));
+> + ? ? ? ? ? ? ? base = S5P6440_GPC(4);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(4), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(5), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(6), S3C_GPIO_PULL_UP);
+> @@ -63,25 +61,25 @@ static int s5p6440_spi_cfg_gpio(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?}
+>
+> + ? ? ? s3c_gpio_cfgpin_range(base, 3, S3C_GPIO_SFN(2));
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> ?static int s5p6450_spi_cfg_gpio(struct platform_device *pdev)
+> ?{
+> + ? ? ? unsigned int base;
+> +
+> ? ? ? ?switch (pdev->id) {
+> ? ? ? ?case 0:
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6450_GPC(0), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6450_GPC(1), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6450_GPC(2), S3C_GPIO_SFN(2));
+> + ? ? ? ? ? ? ? base = S5P6450_GPC(0);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6450_GPC(0), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6450_GPC(1), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6450_GPC(2), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?break;
+>
+> ? ? ? ?case 1:
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6450_GPC(4), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6450_GPC(5), S3C_GPIO_SFN(2));
+> - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6450_GPC(6), S3C_GPIO_SFN(2));
+> + ? ? ? ? ? ? ? base = S5P6450_GPC(4);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6450_GPC(4), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6450_GPC(5), S3C_GPIO_PULL_UP);
+> ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6450_GPC(6), S3C_GPIO_PULL_UP);
+> @@ -92,6 +90,8 @@ static int s5p6450_spi_cfg_gpio(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?}
+>
+> + ? ? ? s3c_gpio_cfgpin_range(base, 3, S3C_GPIO_SFN(2));
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> diff --git a/arch/arm/mach-s5p64x0/setup-i2c0.c b/arch/arm/mach-s5p64x0/setup-i2c0.c
+> index dc4cc65..75ef9e5 100644
+> --- a/arch/arm/mach-s5p64x0/setup-i2c0.c
+> +++ b/arch/arm/mach-s5p64x0/setup-i2c0.c
+> @@ -25,17 +25,15 @@ struct platform_device; /* don't need the contents */
+>
+> ?void s5p6440_i2c0_cfg_gpio(struct platform_device *dev)
+> ?{
+> - ? ? ? s3c_gpio_cfgpin(S5P6440_GPB(5), S3C_GPIO_SFN(2));
+> + ? ? ? s3c_gpio_cfgpin_range(S5P6440_GPB(5), 2, S3C_GPIO_SFN(2));
+> ? ? ? ?s3c_gpio_setpull(S5P6440_GPB(5), S3C_GPIO_PULL_UP);
+> - ? ? ? s3c_gpio_cfgpin(S5P6440_GPB(6), S3C_GPIO_SFN(2));
+> ? ? ? ?s3c_gpio_setpull(S5P6440_GPB(6), S3C_GPIO_PULL_UP);
+> ?}
+>
+> ?void s5p6450_i2c0_cfg_gpio(struct platform_device *dev)
+> ?{
+> - ? ? ? s3c_gpio_cfgpin(S5P6450_GPB(5), S3C_GPIO_SFN(2));
+> + ? ? ? s3c_gpio_cfgpin_range(S5P6450_GPB(5), 2, S3C_GPIO_SFN(2));
+> ? ? ? ?s3c_gpio_setpull(S5P6450_GPB(5), S3C_GPIO_PULL_UP);
+> - ? ? ? s3c_gpio_cfgpin(S5P6450_GPB(6), S3C_GPIO_SFN(2));
+> ? ? ? ?s3c_gpio_setpull(S5P6450_GPB(6), S3C_GPIO_PULL_UP);
+> ?}
+>
+> diff --git a/arch/arm/mach-s5p64x0/setup-i2c1.c b/arch/arm/mach-s5p64x0/setup-i2c1.c
+> index 2edd791..5d5dd3c 100644
+> --- a/arch/arm/mach-s5p64x0/setup-i2c1.c
+> +++ b/arch/arm/mach-s5p64x0/setup-i2c1.c
+> @@ -25,17 +25,15 @@ struct platform_device; /* don't need the contents */
+>
+> ?void s5p6440_i2c1_cfg_gpio(struct platform_device *dev)
+> ?{
+> - ? ? ? s3c_gpio_cfgpin(S5P6440_GPR(9), S3C_GPIO_SFN(6));
+> + ? ? ? s3c_gpio_cfgpin_range(S5P6440_GPR(9), 2, S3C_GPIO_SFN(6));
+> ? ? ? ?s3c_gpio_setpull(S5P6440_GPR(9), S3C_GPIO_PULL_UP);
+> - ? ? ? s3c_gpio_cfgpin(S5P6440_GPR(10), S3C_GPIO_SFN(6));
+> ? ? ? ?s3c_gpio_setpull(S5P6440_GPR(10), S3C_GPIO_PULL_UP);
+> ?}
+>
+> ?void s5p6450_i2c1_cfg_gpio(struct platform_device *dev)
+> ?{
+> - ? ? ? s3c_gpio_cfgpin(S5P6450_GPR(9), S3C_GPIO_SFN(6));
+> + ? ? ? s3c_gpio_cfgpin_range(S5P6450_GPR(9), 2, S3C_GPIO_SFN(6));
+> ? ? ? ?s3c_gpio_setpull(S5P6450_GPR(9), S3C_GPIO_PULL_UP);
+> - ? ? ? s3c_gpio_cfgpin(S5P6450_GPR(10), S3C_GPIO_SFN(6));
+> ? ? ? ?s3c_gpio_setpull(S5P6450_GPR(10), S3C_GPIO_PULL_UP);
+> ?}
+>
+> --
+> 1.6.2.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
