@@ -1,53 +1,84 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Sat,  2 Oct 2010 17:15:29 +0200
-Subject: [PATCH 4/4] eukrea_mbimxsd for cpuimx25: add CAN & SDCard support
+Date: Sat,  2 Oct 2010 17:15:26 +0200
+Subject: [PATCH 1/4] mach-cpuimx35: remove unecessary tsc2007 functions +
+	style cleanup
 In-Reply-To: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
 References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1286032529-26509-4-git-send-email-eric@eukrea.com>
+Message-ID: <1286032529-26509-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+- remove functions which are no more necessary for tsc2007
+- indent platform_data for better readability
+
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
- arch/arm/mach-mx25/Kconfig                    |    2 ++
- arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c |    5 +++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/mach-cpuimx35.c |   32 +++++---------------------------
+ 1 files changed, 5 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/Kconfig b/arch/arm/mach-mx25/Kconfig
-index c71a7bc..60cc16e 100644
---- a/arch/arm/mach-mx25/Kconfig
-+++ b/arch/arm/mach-mx25/Kconfig
-@@ -12,6 +12,8 @@ config MACH_EUKREA_CPUIMX25
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_NAND
-+	select IMX_HAVE_PLATFORM_FLEXCAN
-+	select IMX_HAVE_PLATFORM_ESDHC
- 	select MXC_ULPI if USB_ULPI
+diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
+index 2a4f8b7..ea0a85f 100644
+--- a/arch/arm/mach-mx3/mach-cpuimx35.c
++++ b/arch/arm/mach-mx3/mach-cpuimx35.c
+@@ -31,6 +31,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
+ #include <linux/fsl_devices.h>
++#include <linux/i2c-gpio.h>
  
- choice
-diff --git a/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
-index 4aaadc7..f4c4c6f 100644
---- a/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
-+++ b/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
-@@ -90,6 +90,9 @@ static struct pad_desc eukrea_mbimxsd_pads[] = {
- 	MX25_PAD_KPP_COL2__AUD5_TXC,
- 	MX25_PAD_KPP_COL1__AUD5_RXD,
- 	MX25_PAD_KPP_COL0__AUD5_TXD,
-+	/* CAN */
-+	MX25_PAD_GPIO_D__CAN2_RX,
-+	MX25_PAD_GPIO_C__CAN2_TX,
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -53,39 +54,16 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
  };
  
- #define GPIO_LED1	83
-@@ -240,6 +243,8 @@ void __init eukrea_mbimxsd25_baseboard_init(void)
- 	imx25_add_imx_uart1(&uart_pdata);
- 	mxc_register_device(&mx25_fb_device, &eukrea_mximxsd_fb_pdata);
- 	mxc_register_device(&imx_ssi_device0, &eukrea_mbimxsd_ssi_pdata);
-+	imx25_add_flexcan1(NULL);
-+	imx25_add_esdhc0(NULL);
+ static const struct imxi2c_platform_data
+-eukrea_cpuimx35_i2c0_data __initconst = {
+-	.bitrate = 50000,
++		eukrea_cpuimx35_i2c0_data __initconst = {
++	.bitrate =		100000,
+ };
  
- 	gpio_request(GPIO_LED1, "LED1");
- 	gpio_direction_output(GPIO_LED1, 1);
+-#define TSC2007_IRQGPIO		(2 * 32 + 2)
+-static int ts_get_pendown_state(void)
+-{
+-	int val = 0;
+-	gpio_free(TSC2007_IRQGPIO);
+-	gpio_request(TSC2007_IRQGPIO, NULL);
+-	gpio_direction_input(TSC2007_IRQGPIO);
+-
+-	val = gpio_get_value(TSC2007_IRQGPIO);
+-
+-	gpio_free(TSC2007_IRQGPIO);
+-	gpio_request(TSC2007_IRQGPIO, NULL);
+-
+-	return val ? 0 : 1;
+-}
+-
+-static int ts_init(void)
+-{
+-	gpio_request(TSC2007_IRQGPIO, NULL);
+-	return 0;
+-}
+-
+ static struct tsc2007_platform_data tsc2007_info = {
+ 	.model			= 2007,
+ 	.x_plate_ohms		= 180,
+-	.get_pendown_state	= ts_get_pendown_state,
+-	.init_platform_hw	= ts_init,
+ };
+ 
++#define TSC2007_IRQGPIO		(2 * 32 + 2)
+ static struct i2c_board_info eukrea_cpuimx35_i2c_devices[] = {
+ 	{
+ 		I2C_BOARD_INFO("pcf8563", 0x51),
+@@ -135,7 +113,7 @@ static struct pad_desc eukrea_cpuimx35_pads[] = {
+ };
+ 
+ static const struct mxc_nand_platform_data
+-eukrea_cpuimx35_nand_board_info __initconst = {
++		eukrea_cpuimx35_nand_board_info __initconst = {
+ 	.width		= 1,
+ 	.hw_ecc		= 1,
+ 	.flash_bbt	= 1,
 -- 
 1.7.0.4
