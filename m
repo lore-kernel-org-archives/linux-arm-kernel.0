@@ -1,32 +1,108 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Sat, 02 Oct 2010 14:33:33 +0100
-Subject: [PATCH v3 4/5] mfd: regulator: max8998: voltages and GPIOs
-	defined at platform data structure
-In-Reply-To: <20100927184336.GK2560@sortiz-mobl>
-References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-	<1285590747-32404-5-git-send-email-l.majewski@samsung.com>
-	<20100927184336.GK2560@sortiz-mobl>
-Message-ID: <1286026413.3125.27.camel@odin>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 2 Oct 2010 14:27:06 +0200
+Subject: [PATCHv2] omap3: Add minimal OMAP3 IGEP module support.
+In-Reply-To: <1286012995-2697-2-git-send-email-eballetbo@gmail.com>
+References: <1286012995-2697-1-git-send-email-eballetbo@gmail.com>
+	<1286012995-2697-2-git-send-email-eballetbo@gmail.com>
+Message-ID: <201010021427.07226.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-09-27 at 20:43 +0200, Samuel Ortiz wrote:
-> Hi Lukasz,
-> 
-> On Mon, Sep 27, 2010 at 02:32:26PM +0200, Lukasz Majewski wrote:
-> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Fine with me:
-> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-> 
+Hi Enric,
 
-Lukasz, this is not applying against the regulator next tree.
-Can you redo and add Mark and Samuels Acks.
+On Saturday 02 October 2010 11:49:55 Enric Balletbo i Serra wrote:
+> The OMAP3 IGEP module is a low-power, high performance production-ready
+> system-on-module (SOM) based on TI's OMAP3 family. More about this
+> board at www.igep.es.
 
-Thanks
+[snip]
 
-Liam
+> diff --git a/arch/arm/mach-omap2/board-igep0030.c
+> b/arch/arm/mach-omap2/board-igep0030.c new file mode 100644
+> index 0000000..7313ef5
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-igep0030.c
+
+[snip]
+
+> +static int igep3_onenand_setup(void __iomem *onenand_base, int freq)
+> +{
+> +	/* nothing is required to be setup for onenand as of now */
+> +	return 0;
+> +}
+> +
+> +static struct omap_onenand_platform_data igep3_onenand_pdata = {
+> +	.parts = igep3_onenand_partitions,
+> +	.nr_parts = ARRAY_SIZE(igep3_onenand_partitions),
+> +	.onenand_setup = igep3_onenand_setup,
+> +	.dma_channel	= -1,	/* disable DMA in OMAP OneNAND driver */
+> +};
+
+You can just set onenand_setup to NULL instead of adding a no-op function.
+
+[snip]
+
+> +void __init igep3_flash_init(void)
+> +{
+> +	u8 cs = 0;
+> +	u8 onenandcs = GPMC_CS_NUM + 1;
+> +
+> +	while (cs < GPMC_CS_NUM) {
+
+What's wrong with "for (cs = 0; cs < GPMC_CS_NUM; cs++)" ? :-)
+
+> +		u32 ret = 0;
+
+No need to initialize ret to 0, you're assigning it right after.
+
+> +		ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+> +
+> +		/* Check if NAND/oneNAND is configured */
+> +		if ((ret & 0xC00) == 0x800)
+> +			/* NAND found */
+> +			pr_err("IGEP3: Unsupported NAND found\n");
+> +		else {
+> +			ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
+> +			if ((ret & 0x3F) == (ONENAND_MAP >> 24))
+> +				/* ONENAND found */
+> +				onenandcs = cs;
+> +		}
+> +		cs++;
+> +	}
+> +	if (onenandcs > GPMC_CS_NUM) {
+> +		pr_err("IGEP3: Unable to find configuration in GPMC\n");
+> +		return;
+> +	}
+> +
+> +	if (onenandcs < GPMC_CS_NUM) {
+
+No need to check for onenandcs < GPMC_CS_NUM here, it will always be true.
+
+> +		igep3_onenand_pdata.cs = onenandcs;
+> +		if (platform_device_register(&igep3_onenand_device) < 0)
+> +			pr_err("IGEP3: Unable to register OneNAND device\n");
+> +	}
+> +}
+
+[snip]
+
+> +static void __init igep3_init_irq(void)
+> +{
+> +	omap_board_config = igep3_config;
+> +	omap_board_config_size = ARRAY_SIZE(igep3_config);
+
+No need for this. omap_board_config_size is implicitly initialized to 0 in 
+plat-omap/common.c so get_config() won't dereference omap_board_config. You 
+can remove the empty igep3_config array.
+
+> +	omap2_init_common_hw(m65kxxxxam_sdrc_params, m65kxxxxam_sdrc_params);
+> +	omap_init_irq();
+> +	omap_gpio_init();
+> +}
+
+[snip]
+
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Regards,
+
+Laurent Pinchart
