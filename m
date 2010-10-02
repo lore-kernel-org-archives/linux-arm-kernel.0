@@ -1,115 +1,69 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Sat,  2 Oct 2010 16:06:11 +0530
-Subject: [PATCH v2] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
-Message-ID: <1286015771-22041-1-git-send-email-charu@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 02 Oct 2010 20:16:48 +0900
+Subject: [PATCH 06/27] ARM: S5P64X0: 2nd Change to using
+	s3c_gpio_cfgpin_range()
+In-Reply-To: <AANLkTimBW5udfRN=0=ZHoAwkn+2ewyUX-0B5jLfrsT+i@mail.gmail.com>
+References: <1285934724-5007-1-git-send-email-kgene.kim@samsung.com>
+	<1285934724-5007-7-git-send-email-kgene.kim@samsung.com>
+	<AANLkTimBW5udfRN=0=ZHoAwkn+2ewyUX-0B5jLfrsT+i@mail.gmail.com>
+Message-ID: <014b01cb6223$510dafe0$f3290fa0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inorder to avoid any assumptions from bootloader, the watchdog
-timer module is reset during init. This enables the watchdog
-timer.
+Kyungmin Park wrote:
+> 
+> Hi,
+> 
+Hi :-)
 
-Therefore, it is required to disable WDT after it is reset
-during init. Otherwise the system would reboot as per the default
-watchdog timer registers settings.
+> On Fri, Oct 1, 2010 at 9:05 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch changes the code setting ranges of GPIO pins in mach-s5p64x0
+using
+> > s3c_gpio_cfgpin() to use the recently introduced
+s3c_gpio_cfgpin_range().
+> > NOTE: This is for missed things from the previous patch.
+> >
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?arch/arm/mach-s5p64x0/dev-spi.c ? ?| ? 24 ++++++++++++------------
+> > ?arch/arm/mach-s5p64x0/setup-i2c0.c | ? ?6 ++----
+> > ?arch/arm/mach-s5p64x0/setup-i2c1.c | ? ?6 ++----
+> > ?3 files changed, 16 insertions(+), 20 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-s5p64x0/dev-spi.c
+b/arch/arm/mach-s5p64x0/dev-spi.c
+> > index 5b69ec4..be64fee 100644
+> > --- a/arch/arm/mach-s5p64x0/dev-spi.c
+> > +++ b/arch/arm/mach-s5p64x0/dev-spi.c
+> > @@ -39,20 +39,18 @@ static char *s5p64x0_spi_src_clks[] = {
+> > ?*/
+> > ?static int s5p6440_spi_cfg_gpio(struct platform_device *pdev)
+> > ?{
+> > + ? ? ? unsigned int base;
+> > +
+> > ? ? ? ?switch (pdev->id) {
+> > ? ? ? ?case 0:
+> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(0), S3C_GPIO_SFN(2));
+> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(1), S3C_GPIO_SFN(2));
+> > - ? ? ? ? ? ? ? s3c_gpio_cfgpin(S5P6440_GPC(2), S3C_GPIO_SFN(2));
+> > + ? ? ? ? ? ? ? base = S5P6440_GPC(0);
+> > ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(0), S3C_GPIO_PULL_UP);
+> > ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(1), S3C_GPIO_PULL_UP);
+> > ? ? ? ? ? ? ? ?s3c_gpio_setpull(S5P6440_GPC(2), S3C_GPIO_PULL_UP);
+> 
+> Also make a wrapper, s3c_gpio_cfgrange_pullup, then you can also
+> remove above codes.
+> There's lots of codes use PULL_UP as default pin setup.
+> 
+Thanks for your suggestion.
+Ok..will consider it.
 
-Later, when the watchdog driver is loaded, the watchdog timer settings
-is adjusted as per the default timer_margin set in the driver and the
-driver would supports the normal operations supported by OMAP watchdog
-timer.
+(snip)
 
-Link to related discussions:
-https://patchwork.kernel.org/patch/219072/
+Thanks.
 
-Issue reported by Kevin can be found at:
-https://patchwork.kernel.org/patch/217262/
-
-Signed-off-by: Charulatha V <charu@ti.com>
-Reported-by: Kevin Hilman <khilman@deeprootsystems.com>
----
-This patch is dependent on the below patch series (wdt hwmod) and
-is created on top of pm-core branch. It also applies on pm-hwmods branch.
-http://www.spinics.net/lists/linux-omap/msg37043.html
-
- arch/arm/mach-omap2/devices.c |   59 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 8e2f0aa..6eaec8d 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -916,11 +916,72 @@ static inline void omap_init_vout(void) {}
- 
- /*-------------------------------------------------------------------------*/
- 
-+/*
-+ * Inorder to avoid any assumptions from bootloader regarding WDT
-+ * settings, WDT module is reset during init. This enables the watchdog
-+ * timer. Hence it is required to disable the watchdog after the WDT reset
-+ * during init. Otherwise the system would reboot as per the default
-+ * watchdog timer registers settings.
-+ */
-+#define OMAP_WDT_WPS	(0x34)
-+#define OMAP_WDT_SPR	(0x48)
-+
-+static int omap2_disable_wdt(struct omap_hwmod *oh, void *unused)
-+{
-+	void __iomem *base;
-+	int ret;
-+
-+	if (!oh) {
-+		pr_err("%s: Could not look up wdtimer_hwmod\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	base = omap_hwmod_get_mpu_rt_va(oh);
-+	if (!base) {
-+		pr_err("%s: Could not get the base address for %s\n",
-+				oh->name, __func__);
-+		return -EINVAL;
-+	}
-+
-+	/* Enable the clocks before accessing the WDT registers */
-+	ret = omap_hwmod_enable(oh);
-+	if (ret) {
-+		pr_err("%s: Could not enable clocks for %s\n",
-+				oh->name, __func__);
-+		return ret;
-+	}
-+
-+	/* sequence required to disable watchdog */
-+	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);
-+	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
-+		cpu_relax();
-+
-+	__raw_writel(0x5555, base + OMAP_WDT_SPR);
-+	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
-+		cpu_relax();
-+
-+	ret = omap_hwmod_idle(oh);
-+	if (ret)
-+		pr_err("%s: Could not disable clocks for %s\n",
-+				oh->name, __func__);
-+
-+	return ret;
-+}
-+
-+static void __init omap_disable_wdt(void)
-+{
-+	if (cpu_class_is_omap2())
-+		omap_hwmod_for_each_by_class("wd_timer",
-+						omap2_disable_wdt, NULL);
-+	return;
-+}
-+
- static int __init omap2_init_devices(void)
- {
- 	/* please keep these calls, and their implementations above,
- 	 * in alphabetical order so they're easier to sort through.
- 	 */
-+	omap_disable_wdt();
- 	omap_hsmmc_reset();
- 	omap_init_camera();
- 	omap_init_mbox();
--- 
-1.7.0.4
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
