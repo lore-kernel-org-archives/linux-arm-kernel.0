@@ -1,52 +1,115 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 02 Oct 2010 19:59:52 +0900
-Subject: [PATCH] ARM: S5PV210: Fix build error on pm
-In-Reply-To: <1285978797-7964-1-git-send-email-sbkim73@samsung.com>
-References: <1285978797-7964-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <014901cb6220$f2806f50$d7814df0$%kim@samsung.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Sat,  2 Oct 2010 16:06:11 +0530
+Subject: [PATCH v2] OMAP2PLUS: WDT: Fix: Disable WDT after reset during init
+Message-ID: <1286015771-22041-1-git-send-email-charu@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sangbeom Kim wrote:
-> 
-> This patch fixes build error by S3C2410 PM
-> Suspend debug option due to undefined address
-> 
-> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/include/mach/map.h |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/include/mach/map.h b/arch/arm/mach-
-> s5pv210/include/mach/map.h
-> index bd9afd5..9722042 100644
-> --- a/arch/arm/mach-s5pv210/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv210/include/mach/map.h
-> @@ -57,6 +57,9 @@
-> 
->  #define S5P_SZ_UART		SZ_256
-> 
-> +#define S3C_VA_UARTx(x)		(S3C_VA_UART + (S3C_PA_UART &
-> 0xfffff) \
-> +				+ ((x) * S3C_UART_OFFSET))
-> +
+Inorder to avoid any assumptions from bootloader, the watchdog
+timer module is reset during init. This enables the watchdog
+timer.
 
-In the case of S5PV210, no need to plus '(S3C_PA_UART & 0xfffff)'.
-It is needed to keep the UART virtual address aligned to an 1MiB boundary
-for the boot process to work.
+Therefore, it is required to disable WDT after it is reset
+during init. Otherwise the system would reboot as per the default
+watchdog timer registers settings.
 
-In here, already aligned..so no need it.
+Later, when the watchdog driver is loaded, the watchdog timer settings
+is adjusted as per the default timer_margin set in the driver and the
+driver would supports the normal operations supported by OMAP watchdog
+timer.
 
->  #define S5PV210_PA_SROMC	(0xE8000000)
-> 
->  #define S5PV210_PA_CFCON	(0xE8200000)
-> --
-> 1.6.2.5
+Link to related discussions:
+https://patchwork.kernel.org/patch/219072/
 
-Thanks.
+Issue reported by Kevin can be found at:
+https://patchwork.kernel.org/patch/217262/
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Signed-off-by: Charulatha V <charu@ti.com>
+Reported-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+This patch is dependent on the below patch series (wdt hwmod) and
+is created on top of pm-core branch. It also applies on pm-hwmods branch.
+http://www.spinics.net/lists/linux-omap/msg37043.html
+
+ arch/arm/mach-omap2/devices.c |   59 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 59 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 8e2f0aa..6eaec8d 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -916,11 +916,72 @@ static inline void omap_init_vout(void) {}
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++/*
++ * Inorder to avoid any assumptions from bootloader regarding WDT
++ * settings, WDT module is reset during init. This enables the watchdog
++ * timer. Hence it is required to disable the watchdog after the WDT reset
++ * during init. Otherwise the system would reboot as per the default
++ * watchdog timer registers settings.
++ */
++#define OMAP_WDT_WPS	(0x34)
++#define OMAP_WDT_SPR	(0x48)
++
++static int omap2_disable_wdt(struct omap_hwmod *oh, void *unused)
++{
++	void __iomem *base;
++	int ret;
++
++	if (!oh) {
++		pr_err("%s: Could not look up wdtimer_hwmod\n", __func__);
++		return -EINVAL;
++	}
++
++	base = omap_hwmod_get_mpu_rt_va(oh);
++	if (!base) {
++		pr_err("%s: Could not get the base address for %s\n",
++				oh->name, __func__);
++		return -EINVAL;
++	}
++
++	/* Enable the clocks before accessing the WDT registers */
++	ret = omap_hwmod_enable(oh);
++	if (ret) {
++		pr_err("%s: Could not enable clocks for %s\n",
++				oh->name, __func__);
++		return ret;
++	}
++
++	/* sequence required to disable watchdog */
++	__raw_writel(0xAAAA, base + OMAP_WDT_SPR);
++	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
++		cpu_relax();
++
++	__raw_writel(0x5555, base + OMAP_WDT_SPR);
++	while (__raw_readl(base + OMAP_WDT_WPS) & 0x10)
++		cpu_relax();
++
++	ret = omap_hwmod_idle(oh);
++	if (ret)
++		pr_err("%s: Could not disable clocks for %s\n",
++				oh->name, __func__);
++
++	return ret;
++}
++
++static void __init omap_disable_wdt(void)
++{
++	if (cpu_class_is_omap2())
++		omap_hwmod_for_each_by_class("wd_timer",
++						omap2_disable_wdt, NULL);
++	return;
++}
++
+ static int __init omap2_init_devices(void)
+ {
+ 	/* please keep these calls, and their implementations above,
+ 	 * in alphabetical order so they're easier to sort through.
+ 	 */
++	omap_disable_wdt();
+ 	omap_hsmmc_reset();
+ 	omap_init_camera();
+ 	omap_init_mbox();
+-- 
+1.7.0.4
