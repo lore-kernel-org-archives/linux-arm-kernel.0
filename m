@@ -1,62 +1,63 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Sat, 2 Oct 2010 13:19:19 +0530
-Subject: [PATCH 02/14] omap: Map only available sram memory
-In-Reply-To: <20101001225303.GF3117@atomide.com>
-References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
-	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
-	<AANLkTi=PM1x7zXbSMRxBHVZ5Z2+4iwebvbiGizca_rC8@mail.gmail.com>
-	<20101001225303.GF3117@atomide.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE18C@dbde02.ent.ti.com>
+From: david.cohen@nokia.com (David Cohen)
+Date: Sat, 2 Oct 2010 11:04:27 +0300
+Subject: [PATCHv3 1/6] omap3: Add external VBUS power switch and
+	overcurrent detect on IGEP v2 board.
+In-Reply-To: <1285967349-32767-2-git-send-email-eballetbo@gmail.com>
+References: <1285967349-32767-1-git-send-email-eballetbo@gmail.com>
+	<1285967349-32767-2-git-send-email-eballetbo@gmail.com>
+Message-ID: <20101002080427.GC14377@esdhcp036161.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Saturday, October 02, 2010 4:23 AM
-> To: Grazvydas Ignotas
-> Cc: Shilimkar, Santosh; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Russell King - ARM Linux
-> Subject: Re: [PATCH 02/14] omap: Map only available sram memory
-> 
-> * Grazvydas Ignotas <notasas@gmail.com> [101001 13:07]:
-> > On Fri, Sep 17, 2010 at 12:47 PM, Santosh Shilimkar
-> > <santosh.shilimkar@ti.com> wrote:
-> > > Currently we map 1 MB section while setting up SRAM on OMAPs.
-> > > The actual physcal OCM RAM available on OMAP SOCs is in order
-> > > of KBs. This patch maps only available sram and removes some
-> > > non necessary cpu_is_xxx checks.
-> > >
-> > > On the newer ARMs with speculation, this is dangerous and can
-> > > result in untraceable aborts.
-> > >
-> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >
-> > This hangs OMAP3 pandora:
-> >
-> > [    0.000000] Linux version
-> > 2.6.36-rc6-next-20101001-00002-ge76bb53-dirty (notaz at pixelinis) (gcc
-> > version 4.3.3 (Sourcery G++ Lite 2009q1-20
-> > [    0.000000] CPU: ARMv7 Processor [411fc082] revision 2 (ARMv7),
-> cr=10c53c7f
-> > [    0.000000] CPU: VIPT nonaliasing data cache, VIPT nonaliasing
-> > instruction cache
-> > [    0.000000] Machine: Pandora Handheld Console
-> > [    0.000000] Ignoring unrecognised tag 0x54410008
-> > [    0.000000] bootconsole [earlycon0] enabled
-> > [    0.000000] Reserving 6422528 bytes SDRAM for VRAM
-> > [    0.000000] Memory policy: ECC disabled, Data cache writeback
-> > [    0.000000] OMAP3430/3530 ES2.1 (l2cache iva sgx neon isp )
-> > [    0.000000] SRAM: Mapped pa 0x40200000 to va 0xfe400000 size: 0x10000
-> > (stuck here)
-> >
-> > reverting this fixes the problem.
-> 
-> Hmm, boots fine here with overo. Any idea what in this patch breaks
-> pandora?
-> 
-The change in this patch is not board dependent really. Have tested this
-on 3430SDP. Pandora is OMAP3 based, right ?
+Hi,
 
-Regards,
-Santosh 
+On Fri, Oct 01, 2010 at 11:09:04PM +0200, ext Enric Balletbo i Serra wrote:
+> GPIO for various devices are missing from the board initialization.
+> This patch adds support for the VBUS and over current gpios.  Without this
+> patch, input/outputs from these two sources are ignored.
+> 
+> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-igep0020.c |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+> index 175f043..07dbdb7 100644
+> --- a/arch/arm/mach-omap2/board-igep0020.c
+> +++ b/arch/arm/mach-omap2/board-igep0020.c
+> @@ -274,6 +274,22 @@ static int igep2_twl_gpio_setup(struct device *dev,
+>  	igep2_vmmc1_supply.dev = mmc[0].dev;
+>  	igep2_vmmc2_supply.dev = mmc[1].dev;
+>  
+> +	/*
+> +	 * REVISIT: need ehci-omap hooks for external VBUS
+> +	 * power switch and overcurrent detect
+> +	 */
+> +	if ((gpio_request(gpio + 1, "GPIO_EHCI_NOC") < 0) ||
+> +	    (gpio_direction_input(gpio + 1) < 0))
+> +		pr_err("IGEP2: Could not obtain gpio for EHCI NOC");
+
+Shouldb't you return error if it can't request the GPIO?
+
+> +
+> +	/*
+> +	 * TWL4030_GPIO_MAX + 0 == ledA, GPIO_USBH_CPEN
+> +	 * (out, active low)
+> +	 */
+> +	if ((gpio_request(gpio + TWL4030_GPIO_MAX, "GPIO_USBH_CPEN") < 0) ||
+> +	    (gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0) < 0))
+> +		pr_err("IGEP2: Could not obtain gpio for USBH_CPEN");
+
+Same here.
+
+> +
+>  	return 0;
+>  };
+>  
+> -- 
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
