@@ -1,52 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 02 Oct 2010 00:00:08 -0400 (EDT)
-Subject: Git pull request: core features and fixes for next merge window
-Message-ID: <alpine.LFD.2.00.1010012352040.1146@xanadu.home>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Sat, 2 Oct 2010 13:19:19 +0530
+Subject: [PATCH 02/14] omap: Map only available sram memory
+In-Reply-To: <20101001225303.GF3117@atomide.com>
+References: <1284716878-27667-1-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-2-git-send-email-santosh.shilimkar@ti.com>
+	<1284716878-27667-3-git-send-email-santosh.shilimkar@ti.com>
+	<AANLkTi=PM1x7zXbSMRxBHVZ5Z2+4iwebvbiGizca_rC8@mail.gmail.com>
+	<20101001225303.GF3117@atomide.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE18C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, could you please pull the following:
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Saturday, October 02, 2010 4:23 AM
+> To: Grazvydas Ignotas
+> Cc: Shilimkar, Santosh; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Russell King - ARM Linux
+> Subject: Re: [PATCH 02/14] omap: Map only available sram memory
+> 
+> * Grazvydas Ignotas <notasas@gmail.com> [101001 13:07]:
+> > On Fri, Sep 17, 2010 at 12:47 PM, Santosh Shilimkar
+> > <santosh.shilimkar@ti.com> wrote:
+> > > Currently we map 1 MB section while setting up SRAM on OMAPs.
+> > > The actual physcal OCM RAM available on OMAP SOCs is in order
+> > > of KBs. This patch maps only available sram and removes some
+> > > non necessary cpu_is_xxx checks.
+> > >
+> > > On the newer ARMs with speculation, this is dangerous and can
+> > > result in untraceable aborts.
+> > >
+> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >
+> > This hangs OMAP3 pandora:
+> >
+> > [    0.000000] Linux version
+> > 2.6.36-rc6-next-20101001-00002-ge76bb53-dirty (notaz at pixelinis) (gcc
+> > version 4.3.3 (Sourcery G++ Lite 2009q1-20
+> > [    0.000000] CPU: ARMv7 Processor [411fc082] revision 2 (ARMv7),
+> cr=10c53c7f
+> > [    0.000000] CPU: VIPT nonaliasing data cache, VIPT nonaliasing
+> > instruction cache
+> > [    0.000000] Machine: Pandora Handheld Console
+> > [    0.000000] Ignoring unrecognised tag 0x54410008
+> > [    0.000000] bootconsole [earlycon0] enabled
+> > [    0.000000] Reserving 6422528 bytes SDRAM for VRAM
+> > [    0.000000] Memory policy: ECC disabled, Data cache writeback
+> > [    0.000000] OMAP3430/3530 ES2.1 (l2cache iva sgx neon isp )
+> > [    0.000000] SRAM: Mapped pa 0x40200000 to va 0xfe400000 size: 0x10000
+> > (stuck here)
+> >
+> > reverting this fixes the problem.
+> 
+> Hmm, boots fine here with overo. Any idea what in this patch breaks
+> pandora?
+> 
+The change in this patch is not board dependent really. Have tested this
+on 3430SDP. Pandora is OMAP3 based, right ?
 
-	git://git.linaro.org/kernel/linux-linaro-next.git for_rmk
-
-This contains a few changes that were posted on the list, including all 
-received feedback.  Based on v2.6.36-rc6.
-
-Amit Kucheria (1):
-      ARM: mxc: turn off HWCAP_NEON for older versions of imx51 silicon
-
-Nicolas Pitre (5):
-      ARM: link board specific files after core files
-      ARM: do not define VMALLOC_END relative to PAGE_OFFSET
-      ARM: implement CONFIG_STRICT_DEVMEM by disabling access to RAM via /dev/mem
-      ARM: SECCOMP support
-      ARM: add a vma entry for the user accessible vector page
-
- arch/arm/Kconfig                                |   14 ++++++++
- arch/arm/Kconfig.debug                          |   14 ++++++++
- arch/arm/Makefile                               |    7 ++--
- arch/arm/include/asm/elf.h                      |    4 ++
- arch/arm/include/asm/io.h                       |    1 +
- arch/arm/include/asm/mmu_context.h              |   29 ++++++++++++++++-
- arch/arm/include/asm/seccomp.h                  |   11 ++++++
- arch/arm/include/asm/thread_info.h              |    2 +
- arch/arm/kernel/entry-common.S                  |   15 +++++++-
- arch/arm/kernel/process.c                       |   21 ++++++++++++
- arch/arm/mach-aaec2000/include/mach/vmalloc.h   |    2 +-
- arch/arm/mach-bcmring/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-clps711x/include/mach/vmalloc.h   |    2 +-
- arch/arm/mach-ebsa110/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-footbridge/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-h720x/include/mach/vmalloc.h      |    2 +-
- arch/arm/mach-integrator/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-msm/include/mach/vmalloc.h        |    2 +-
- arch/arm/mach-mx5/cpu.c                         |   19 +++++++++++
- arch/arm/mach-netx/include/mach/vmalloc.h       |    2 +-
- arch/arm/mach-omap1/include/mach/vmalloc.h      |    2 +-
- arch/arm/mach-omap2/include/mach/vmalloc.h      |    2 +-
- arch/arm/mach-pnx4008/include/mach/vmalloc.h    |    2 +-
- arch/arm/mach-rpc/include/mach/vmalloc.h        |    2 +-
- arch/arm/mach-shark/include/mach/vmalloc.h      |    2 +-
- arch/arm/mach-versatile/include/mach/vmalloc.h  |    2 +-
- arch/arm/mm/mmap.c                              |   22 +++++++++++++
- 27 files changed, 168 insertions(+), 21 deletions(-)
+Regards,
+Santosh 
