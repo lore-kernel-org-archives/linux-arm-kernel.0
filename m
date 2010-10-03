@@ -1,113 +1,209 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 3 Oct 2010 12:41:03 +0100
-Subject: I.MX35 GPIO IRQ + Preempt -> Oops
-In-Reply-To: <4CA739B4.1020506@eukrea.com>
-References: <4CA739B4.1020506@eukrea.com>
-Message-ID: <20101003114103.GC32736@n2100.arm.linux.org.uk>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 03 Oct 2010 14:22:34 +0200
+Subject: [PATCH] [RFC][ARM] pxa: rework pxa3xx-ulpi driver calls for
+	ohci-pxa27x
+In-Reply-To: <4C97743E.7080707@compulab.co.il>
+References: <1283868849-7079-1-git-send-email-grinberg@compulab.co.il>
+	<4C97743E.7080707@compulab.co.il>
+Message-ID: <4CA8758A.3020805@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 02, 2010 at 03:55:00PM +0200, Eric B?nard wrote:
-> Do you have any idea of where to search for this problem's reason ?
+ Eric, David, Marek,
 
-Well...
+Any comments on this?
 
-> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT
-> last sysfs file: /sys/class/vc/vcs3/dev
-> Modules linked in:
-> CPU: 0    Not tainted  (2.6.36-rc6-00050-g4ac6ae6-dirty #33)
-> PC is at default_idle+0x24/0x28
-> LR is at default_idle+0x20/0x28
-> pc : [<c0026fa8>]    lr : [<c0026fa4>]    psr: 60000013
-> sp : c0425fc8  ip : c7be8044  fp : 00000000
-> r10: 8001d9a0  r9 : 4117b363  r8 : 8001da08
-> r7 : c0427ba0  r6 : c001ef04  r5 : c001ef08  r4 : c0424000
-> r3 : 00000000  r2 : c0425fc8  r1 : 00000000  r0 : 00000001
-> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> Control: 00c5387d  Table: 87b70008  DAC: 00000017
-> Process swapper (pid: 0, stack limit = 0xc0424268)
-> Stack: (0xc0425fc8 to 0xc0426000)
-> 5fc0:                   c0026f84 c002748c c0453054 c00088f0 c00084a8 00000000
-> 5fe0: 00000000 c001ef08 00000000 00c5387d c044b9e0 80008034 00000000 00000000
-> [<c0026fa8>] (default_idle+0x24/0x28) from [<c002748c>] (cpu_idle+0x40/0x8c)
-> [<c002748c>] (cpu_idle+0x40/0x8c) from [<c00088f0>] (start_kernel+0x20c/0x250)
-> [<c00088f0>] (start_kernel+0x20c/0x250) from [<80008034>] (0x80008034)
-> Code: e3130002 1a000000 eb001f1f f1080080 (e8bd8008)
+On 09/20/10 16:48, Igor Grinberg wrote:
+>  ping
+>
+> On 09/07/10 17:14, Igor Grinberg wrote:
+>> This patch reworks Marek's quick fix for pxa3xx-u2d crash when ULPI not
+>> used by:
+>> 1) Introducing the struct u2d_hc_ops for start/stop the U2DC Host mode.
+>> 2) Enabling the Host functionality only when ULPI is used.
+>>
+>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>> ---
+>>  arch/arm/mach-pxa/cm-x300.c                 |    1 +
+>>  arch/arm/mach-pxa/include/mach/ohci.h       |    2 +
+>>  arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h |   12 +++--
+>>  arch/arm/mach-pxa/pxa3xx-ulpi.c             |   66 +++++++++++++++++++--------
+>>  drivers/usb/host/ohci-pxa27x.c              |    8 ++--
+>>  5 files changed, 62 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+>> index 8e0b562..952b475 100644
+>> --- a/arch/arm/mach-pxa/cm-x300.c
+>> +++ b/arch/arm/mach-pxa/cm-x300.c
+>> @@ -566,6 +566,7 @@ static struct pxaohci_platform_data cm_x300_ohci_platform_data = {
+>>  
+>>  static void __init cm_x300_init_ohci(void)
+>>  {
+>> +	cm_x300_ohci_platform_data.u2d_hc_ops = pxa3xx_get_u2d_hc_ops();
+>>  	pxa_set_ohci_info(&cm_x300_ohci_platform_data);
+>>  }
+>>  #else
+>> diff --git a/arch/arm/mach-pxa/include/mach/ohci.h b/arch/arm/mach-pxa/include/mach/ohci.h
+>> index 95b6e2a..0924e26 100644
+>> --- a/arch/arm/mach-pxa/include/mach/ohci.h
+>> +++ b/arch/arm/mach-pxa/include/mach/ohci.h
+>> @@ -29,6 +29,8 @@ struct pxaohci_platform_data {
+>>  #define PMM_PERPORT_MODE       3
+>>  
+>>  	int power_budget;
+>> +
+>> +	struct pxa3xx_u2d_hc_ops *u2d_hc_ops;
+>>  };
+>>  
+>>  extern void pxa_set_ohci_info(struct pxaohci_platform_data *info);
+>> diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h b/arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+>> index 9d82cb6..6f37f43 100644
+>> --- a/arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+>> +++ b/arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
+>> @@ -25,10 +25,14 @@ struct pxa3xx_u2d_platform_data {
+>>  };
+>>  
+>>  
+>> -/* Start PXA3xx U2D host */
+>> -int pxa3xx_u2d_start_hc(struct usb_bus *host);
+>> -/* Stop PXA3xx U2D host */
+>> -void pxa3xx_u2d_stop_hc(struct usb_bus *host);
+>> +struct pxa3xx_u2d_hc_ops {
+>> +	/* Start PXA3xx U2D host */
+>> +	int (*start_hc)(struct usb_bus *host);
+>> +	/* Stop PXA3xx U2D host */
+>> +	void (*stop_hc)(struct usb_bus *host);
+>> +};
+>> +
+>> +struct pxa3xx_u2d_hc_ops *pxa3xx_get_u2d_hc_ops(void);
+>>  
+>>  extern void pxa3xx_set_u2d_info(struct pxa3xx_u2d_platform_data *info);
+>>  
+>> diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+>> index ce7168b..7e76cbe 100644
+>> --- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
+>> +++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+>> @@ -234,27 +234,18 @@ static void pxa310_otg_exit(void)
+>>  {
+>>  	kfree(u2d->otg);
+>>  }
+>> -#else
+>> -static inline void pxa310_u2d_setup_otg_hc(void) {}
+>> -static inline int pxa310_start_otg_hc(struct usb_bus *host)
+>> -{
+>> -	return 0;
+>> -}
+>> -static inline void pxa310_stop_otg_hc(void) {}
+>> -static inline int pxa310_otg_init(struct pxa3xx_u2d_platform_data *pdata)
+>> -{
+>> -	return 0;
+>> -}
+>> -static inline void pxa310_otg_exit(void) {}
+>> -#endif /* CONFIG_PXA310_ULPI */
+>>  
+>> -int pxa3xx_u2d_start_hc(struct usb_bus *host)
+>> +static int pxa3xx_u2d_start_hc(struct usb_bus *host)
+>>  {
+>>  	int err = 0;
+>>  
+>> -	/* In case the PXA3xx ULPI isn't used, do nothing. */
+>> -	if (!u2d)
+>> +	if (!u2d) {
+>> +		pr_err("%s: Error: u2d struct is not initialized! "
+>> +		       "ULPI enabed, but pxa3xx-u2d device not registered?",
+>> +		       __func__);
+>> +
+>>  		return 0;
+>> +	}
+>>  
+>>  	clk_enable(u2d->clk);
+>>  
+>> @@ -266,11 +257,15 @@ int pxa3xx_u2d_start_hc(struct usb_bus *host)
+>>  	return err;
+>>  }
+>>  
+>> -void pxa3xx_u2d_stop_hc(struct usb_bus *host)
+>> +static void pxa3xx_u2d_stop_hc(struct usb_bus *host)
+>>  {
+>> -	/* In case the PXA3xx ULPI isn't used, do nothing. */
+>> -	if (!u2d)
+>> +	if (!u2d) {
+>> +		pr_err("%s: Error: u2d struct is not initialized! "
+>> +		       "ULPI enabed, but pxa3xx-u2d device not registered?",
+>> +		       __func__);
+>> +
+>>  		return;
+>> +	}
+>>  
+>>  	if (cpu_is_pxa310())
+>>  		pxa310_stop_otg_hc();
+>> @@ -278,6 +273,39 @@ void pxa3xx_u2d_stop_hc(struct usb_bus *host)
+>>  	clk_disable(u2d->clk);
+>>  }
+>>  
+>> +static struct pxa3xx_u2d_hc_ops u2d_hc_ops = {
+>> +	.start_hc	= pxa3xx_u2d_start_hc,
+>> +	.stop_hc	= pxa3xx_u2d_stop_hc,
+>> +};
+>> +
+>> +struct pxa3xx_u2d_hc_ops *pxa3xx_get_u2d_hc_ops(void)
+>> +{
+>> +	return &u2d_hc_ops;
+>> +}
+>> +#else
+>> +static inline void pxa310_u2d_setup_otg_hc(void) {}
+>> +static inline int pxa310_start_otg_hc(struct usb_bus *host)
+>> +{
+>> +	return 0;
+>> +}
+>> +static inline void pxa310_stop_otg_hc(void) {}
+>> +static inline int pxa310_otg_init(struct pxa3xx_u2d_platform_data *pdata)
+>> +{
+>> +	return 0;
+>> +}
+>> +static inline void pxa310_otg_exit(void) {}
+>> +static inline int pxa3xx_u2d_start_hc(struct usb_bus *host)
+>> +{
+>> +	return 0;
+>> +}
+>> +static inline void pxa3xx_u2d_stop_hc(struct usb_bus *host) {}
+>> +
+>> +struct pxa3xx_u2d_hc_ops *pxa3xx_get_u2d_hc_ops(void)
+>> +{
+>> +	return NULL;
+>> +}
+>> +#endif /* CONFIG_PXA310_ULPI */
+>> +
+>>  static int pxa3xx_u2d_probe(struct platform_device *pdev)
+>>  {
+>>  	struct pxa3xx_u2d_platform_data *pdata = pdev->dev.platform_data;
+>> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+>> index afef7b0..61ff775 100644
+>> --- a/drivers/usb/host/ohci-pxa27x.c
+>> +++ b/drivers/usb/host/ohci-pxa27x.c
+>> @@ -236,8 +236,8 @@ static int pxa27x_start_hc(struct pxa27x_ohci *ohci, struct device *dev)
+>>  	if (retval < 0)
+>>  		return retval;
+>>  
+>> -	if (cpu_is_pxa3xx())
+>> -		pxa3xx_u2d_start_hc(&ohci_to_hcd(&ohci->ohci)->self);
+>> +	if (cpu_is_pxa3xx() && inf->u2d_hc_ops)
+>> +		inf->u2d_hc_ops->start_hc(&ohci_to_hcd(&ohci->ohci)->self);
+>>  
+>>  	uhchr = __raw_readl(ohci->mmio_base + UHCHR) & ~UHCHR_SSE;
+>>  	__raw_writel(uhchr, ohci->mmio_base + UHCHR);
+>> @@ -255,8 +255,8 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+>>  
+>>  	inf = dev->platform_data;
+>>  
+>> -	if (cpu_is_pxa3xx())
+>> -		pxa3xx_u2d_stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
+>> +	if (cpu_is_pxa3xx() && inf->u2d_hc_ops)
+>> +		inf->u2d_hc_ops->stop_hc(&ohci_to_hcd(&ohci->ohci)->self);
+>>  
+>>  	if (inf->exit)
+>>  		inf->exit(dev);
 
-This disassembles to:
-
-   0:   e3130002        tst     r3, #2  ; 0x2
-   4:   1a000000        bne     0xc
-   8:   eb001f1f        bl      0x7c8c
-   c:   f1080080        cpsie   i
-  10:   e8bd8008        pop     {r3, pc}
-
-Doesn't look like any undefined instructions there.
-
-> Unable to handle kernel paging request at virtual address 80020054
-> pgd = c0004000
-> [80020054] *pgd=00000000
-> Internal error: Oops: 805 [#1] PREEMPT
-> last sysfs file: /sys/class/i2c-dev/i2c-0/dev
-> Modules linked in:
-> CPU: 0    Not tainted  (2.6.36-rc6-00046-g6e4172c-dirty #4)
-> PC is at default_idle+0x24/0x2c
-> LR is at default_idle+0x20/0x2c
-> pc : [<c002a008>]    lr : [<c002a004>]    psr: 60000013
-> sp : c043bfc0  ip : c0440438  fp : 00000000
-> r10: 8001ffb8  r9 : 4117b363  r8 : 80020020
-> r7 : c043daf8  r6 : c045e850  r5 : c043db04  r4 : c043a000
-> r3 : 00000000  r2 : 60000013  r1 : 00000000  r0 : 2625a000
-> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> Control: 00c5387d  Table: 87018008  DAC: 00000017
-> Process swapper (pid: 0, stack limit = 0xc043a268)
-> Stack: (0xc043bfc0 to 0xc043c000)
-> bfc0: 00000000 c002a4f8 c0465f5c c045e7c4 c0021520 c0008964 c00084c0 00000000
-> bfe0: 00000000 c0021520 00c5387d c045e890 c0021924 80008034 00000000 00000000
-> [<c002a008>] (default_idle+0x24/0x2c) from [<c002a4f8>] (cpu_idle+0x44/0x9c)
-> [<c002a4f8>] (cpu_idle+0x44/0x9c) from [<c0008964>] (start_kernel+0x21c/0x26c)
-> [<c0008964>] (start_kernel+0x21c/0x26c) from [<80008034>] (0x80008034)
-> Code: e3130002 1a000000 eb0020e7 f1080080 (e28dd004)
-
-This disassembles to:
-
-   0:   e3130002        tst     r3, #2  ; 0x2
-   4:   1a000000        bne     0xc
-   8:   eb0020e7        bl      0x83ac
-   c:   f1080080        cpsie   i
-  10:   e28dd004        add     sp, sp, #4      ; 0x4
-
-Doesn't make sense for that last instruction to cause a data abort.
-
-> Unable to handle kernel NULL pointer dereference at virtual address 00000085
-> pgd = c0004000
-> [00000085] *pgd=00000000
-> Internal error: Oops: 17 [#1] PREEMPT
-> last sysfs file: /sys/class/vc/vcs3/dev
-> Modules linked in:
-> CPU: 0    Not tainted  (2.6.36-rc6-00050-g4ac6ae6-dirty #35)
-> PC is at arch_randomize_brk+0x8/0x24
-> LR is at default_idle+0x20/0x28
-> pc : [<c0026fb4>]    lr : [<c0026fa4>]    psr: 60000013
-> sp : c0425fc0  ip : c753e044  fp : 00000000
-> r10: 8001d99c  r9 : 4117b363  r8 : 8001da04
-> r7 : c0427ba0  r6 : c001ef04  r5 : c001ef08  r4 : 00000001
-> r3 : 00000000  r2 : c0425fc8  r1 : 00000000  r0 : 00000001
-> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> Control: 00c5387d  Table: 874e4008  DAC: 00000017
-> Process swapper (pid: 0, stack limit = 0xc0424268)
-> Stack: (0xc0425fc0 to 0xc0426000)
-> 5fc0: c0424000 c0026fa4 c0026f84 c002748c c0453054 c00088f0 c00084a8 00000000
-> 5fe0: 00000000 c001ef08 00000000 00c5387d c044b9e0 80008034 00000000 00000000
-> [<c0026fb4>] (arch_randomize_brk+0x8/0x24) from [<c0026fa4>] (default_idle+0x20/0x28)
-> [<c0026fa4>] (default_idle+0x20/0x28) from [<c002748c>] (cpu_idle+0x40/0x8c)
-> [<c002748c>] (cpu_idle+0x40/0x8c) from [<c00088f0>] (start_kernel+0x20c/0x250)
-> [<c00088f0>] (start_kernel+0x20c/0x250) from [<80008034>] (0x80008034)
-> Code: f1080080 e8bd8008 e92d4010 e1a04000 (e5900084)
-
-Doesn't make sense for the PC to get into arch_randomize_brk() from
-default_idle().
-
-The common theme here looks like instruction cache corruption in
-default_idle() - iow, the CPU isn't executing the code which is in
-memory.
+-- 
+Regards,
+Igor.
