@@ -1,65 +1,48 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 3 Oct 2010 05:42:21 +0200
-Subject: PXA270 linux-2.6.35.7 boot hang
-In-Reply-To: <20101001173706.00006c12@unknown>
-References: <AANLkTim4HqQkT0uZTpsGCsFqObVA+v+Q7wHekGp5V+f3@mail.gmail.com>
-	<AANLkTi=JEUbxmTZ6PHbz_Gi7KvNf+KJat7R1ot5LQ1SH@mail.gmail.com>
-	<20101001173706.00006c12@unknown>
-Message-ID: <201010030542.22204.marek.vasut@gmail.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Sun, 3 Oct 2010 20:02:52 +0900
+Subject: [PATCH] scatterlist: define SG chain for arm architecture
+In-Reply-To: <20101001163958.GA22533@n2100.arm.linux.org.uk>
+References: <1285950521-8093-1-git-send-email-x0095840@ti.com>
+	<20101001163958.GA22533@n2100.arm.linux.org.uk>
+Message-ID: <20101003195758B.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 1. ??jna 2010 17:37:06 Dylan Cristiani napsal(a):
-> On Fri, 1 Oct 2010 21:53:14 +0800
-> 
-> Eric Miao <eric.y.miao@gmail.com> wrote:
-> > On Fri, Oct 1, 2010 at 6:33 PM, Santhosh N <san.mlists@gmail.com>
+On Fri, 1 Oct 2010 17:39:58 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Fri, Oct 01, 2010 at 11:28:41AM -0500, Fernando Guzman Lugo wrote:
+> > Define SG chain for ARM architecture in order to work
+> > with big buffers. This patch is needed in order to
+> > iovmm users can pass a big buffer to map it and ARM
+> > architecture has not issues using SG chain.
 > > 
-> > wrote:
-> > > Hi,
-> > > 
-> > > I am porting the latest linux kernel 2.6.35.7 on our PXA270 board.
-> > > The kernel starts booting and stops at:
-> > > Uncompressing Linux... done, booting the kernel.
-> > > 
-> > > I can run the linux kernel 2.6.26 on the same board without any
-> > > issues. I am passing the boot args as:
-> > > bootargs=console=ttyS2,460800 rw root=1f02
-> > > 
-> > > The STUART is used as the debug serial port. I had to change the
-> > > uart_base to STUART in arch/arm/mach-pxa/include/mach/uncompress.h
-> > > to get  "Uncompressing Linux... done, booting the kernel.".
-> > > 
-> > > I have set also set CONFIG_SERIAL_PXA_CONSOLE=y.
-> > > 
-> > > Can anyone tell if I am missing something?
-> > 
-> > There could be many reasons. But you may want to turn on DEBUG_LL
-> > and earlyprintk for some early diagnostic messages. You got
-> > "Uncompress ..." messages so I assume the UART is setup correctly to
-> > this weird 460800 baudrate (though I doubt STUART on PXA27x is able
-> > to do that)
+> > This change was suggested by FUJITA Tomonori.
 > 
-> i agree with Eric but i remember that the maximum baud rate is 921,600
-> bps for all S-FF-BTUART pxa's uarts; maybe you can try also to migrate
-> from working kernel 2.6.26 to 2.6.27.... and so on, to see when it
-> first hangs, then seeing what was changed, with relation with
-> your specific cpu and/or platform, could be the trick.
+> Have you audited all places where SG lists are used in the ARM
+> architecture to ensure that SG chain support is safe?  (That
+> goes for ARM generic code and ARM specific drivers.)
 
-You can send me a sample board, one more into collection never hurts :-D
+As far as I know, only SCSI actually uses SG chain feature (that is,
+sending chained scatter lists). All SCSI drivers were converted when
+we added SG chain feature. So what you need to care about is the dma
+code.
 
-btw. as Eric pointed out already (and according to brief look at Table 212 ... 
-or am I missing something), the baudrate setting looks suspicious. What setting 
-do you use in U-Boot (I believe you use U-Boot by seeing "bootargs=").
+There are only several files that actually use scatter list under
+arch/arm.
 
-Also, what serial port do you use in U-Boot ? (grep UART 
-include/configs/yourboard.h ; grep BAUD include/configs/yourboard.h)
 
-Also, what U-Boot do you use (and from where) ?
+>From bogus@does.not.exist.com  Sat Oct  2 09:29:56 2010
+From: bogus@does.not.exist.com ()
+Date: Sat, 02 Oct 2010 13:29:56 -0000
+Subject: No subject
+Message-ID: <mailman.0.1286103837.18775.linux-arm-kernel@lists.infradead.org>
 
-Cheers
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+arch/arm/common/dmabounce.c, arch/arm/kernel/dma.c, and
+arch/arm/include/asm/dma-mapping.h looks fine.
+
+arm/mach-imx/dma-v1.c also looks like to use chained sg API properly
+(but this isn't used with SCSI, right?).
+
+Seems that arch/arm/plat-omap/iovmm.c can handle the chained SG
+too. It doesn't allocate the chained SG now though.
