@@ -1,80 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 2 Oct 2010 20:11:51 -0600 (MDT)
-Subject: [GIT PULL] OMAP: SCM/McBSP/clock: branch integration patches for
-	2.6.37
-Message-ID: <alpine.DEB.2.00.1010022010190.22941@utopia.booyaka.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 3 Oct 2010 05:42:21 +0200
+Subject: PXA270 linux-2.6.35.7 boot hang
+In-Reply-To: <20101001173706.00006c12@unknown>
+References: <AANLkTim4HqQkT0uZTpsGCsFqObVA+v+Q7wHekGp5V+f3@mail.gmail.com>
+	<AANLkTi=JEUbxmTZ6PHbz_Gi7KvNf+KJat7R1ot5LQ1SH@mail.gmail.com>
+	<20101001173706.00006c12@unknown>
+Message-ID: <201010030542.22204.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dne P? 1. ??jna 2010 17:37:06 Dylan Cristiani napsal(a):
+> On Fri, 1 Oct 2010 21:53:14 +0800
+> 
+> Eric Miao <eric.y.miao@gmail.com> wrote:
+> > On Fri, Oct 1, 2010 at 6:33 PM, Santhosh N <san.mlists@gmail.com>
+> > 
+> > wrote:
+> > > Hi,
+> > > 
+> > > I am porting the latest linux kernel 2.6.35.7 on our PXA270 board.
+> > > The kernel starts booting and stops at:
+> > > Uncompressing Linux... done, booting the kernel.
+> > > 
+> > > I can run the linux kernel 2.6.26 on the same board without any
+> > > issues. I am passing the boot args as:
+> > > bootargs=console=ttyS2,460800 rw root=1f02
+> > > 
+> > > The STUART is used as the debug serial port. I had to change the
+> > > uart_base to STUART in arch/arm/mach-pxa/include/mach/uncompress.h
+> > > to get  "Uncompressing Linux... done, booting the kernel.".
+> > > 
+> > > I have set also set CONFIG_SERIAL_PXA_CONSOLE=y.
+> > > 
+> > > Can anyone tell if I am missing something?
+> > 
+> > There could be many reasons. But you may want to turn on DEBUG_LL
+> > and earlyprintk for some early diagnostic messages. You got
+> > "Uncompress ..." messages so I assume the UART is setup correctly to
+> > this weird 460800 baudrate (though I doubt STUART on PXA27x is able
+> > to do that)
+> 
+> i agree with Eric but i remember that the maximum baud rate is 921,600
+> bps for all S-FF-BTUART pxa's uarts; maybe you can try also to migrate
+> from working kernel 2.6.26 to 2.6.27.... and so on, to see when it
+> first hangs, then seeing what was changed, with relation with
+> your specific cpu and/or platform, could be the trick.
 
-Hello Tony,
+You can send me a sample board, one more into collection never hurts :-D
 
-The following changes since commit 7ad0e386d46e9edff64705ab25337ad9130baf63:
+btw. as Eric pointed out already (and according to brief look at Table 212 ... 
+or am I missing something), the baudrate setting looks suspicious. What setting 
+do you use in U-Boot (I believe you use U-Boot by seeing "bootargs=").
 
-  OMAP2+: defconfig: disable CPUfreq (2010-09-29 10:39:02 -0700)
+Also, what serial port do you use in U-Boot ? (grep UART 
+include/configs/yourboard.h ; grep BAUD include/configs/yourboard.h)
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 control_mcbsp_fix_2.6.37
+Also, what U-Boot do you use (and from where) ?
 
-Paul Walmsley (10):
-      OMAP2+: Kconfig: disallow builds for boards that don't use the currently-selected SoC
-      OMAP2420: CTRL: fix OMAP242X_CTRL_REGADDR macro
-      OMAP2420: clock: add MCBSP_CLKS node and clkdev aliases
-      OMAP2430: clock: add MCBSP_CLKS node and clkdev aliases
-      OMAP3xxx: clock: add clkdev aliases for McBSP fclk source switching
-      OMAP: McBSP: implement McBSP CLKR and FSR signal muxing via mach-omap2/mcbsp.c
-      OMAP: McBSP: implement functional clock switching via clock framework
-      OMAP: split plat-omap/common.c
-      OMAP: control: move plat-omap/control.h to mach-omap2/control.h
-      OMAP2+: clock: reduce the amount of standard debugging while disabling unused clocks
-
- arch/arm/mach-omap2/Kconfig                        |    6 +-
- arch/arm/mach-omap2/Makefile                       |    3 +-
- arch/arm/mach-omap2/board-3430sdp.c                |    2 +-
- arch/arm/mach-omap2/board-4430sdp.c                |    3 +-
- arch/arm/mach-omap2/board-am3517evm.c              |    2 +-
- arch/arm/mach-omap2/board-apollon.c                |    2 +-
- arch/arm/mach-omap2/board-cm-t3517.c               |    2 +-
- arch/arm/mach-omap2/board-generic.c                |   16 +-
- arch/arm/mach-omap2/board-h4.c                     |    2 +-
- arch/arm/mach-omap2/board-ldp.c                    |    2 +-
- arch/arm/mach-omap2/board-omap3logic.c             |    2 +-
- arch/arm/mach-omap2/board-omap4panda.c             |    4 +-
- arch/arm/mach-omap2/clock.c                        |    2 +-
- arch/arm/mach-omap2/clock2420_data.c               |   40 +++-
- arch/arm/mach-omap2/clock2430_data.c               |   64 ++++-
- arch/arm/mach-omap2/clock3xxx_data.c               |   12 +-
- arch/arm/mach-omap2/clock44xx_data.c               |    2 +-
- arch/arm/mach-omap2/common.c                       |  138 +++++++++
- arch/arm/mach-omap2/control.c                      |    3 +-
- .../include/plat => mach-omap2}/control.h          |   18 +-
- arch/arm/mach-omap2/cpuidle34xx.c                  |    2 +-
- arch/arm/mach-omap2/devices.c                      |    3 +-
- arch/arm/mach-omap2/hsmmc.c                        |    2 +-
- arch/arm/mach-omap2/id.c                           |    3 +-
- arch/arm/mach-omap2/mcbsp.c                        |   83 ++++++
- arch/arm/mach-omap2/mux.c                          |    8 +-
- arch/arm/mach-omap2/pm24xx.c                       |    2 +-
- arch/arm/mach-omap2/pm34xx.c                       |    2 +-
- arch/arm/mach-omap2/prcm.c                         |    2 +-
- arch/arm/mach-omap2/serial.c                       |    2 +-
- arch/arm/mach-omap2/sleep34xx.S                    |    2 +-
- arch/arm/mach-omap2/usb-fs.c                       |    6 +-
- arch/arm/plat-omap/32ksynctimer.c                  |  184 ++++++++++++
- arch/arm/plat-omap/Makefile                        |    2 +-
- arch/arm/plat-omap/clock.c                         |    5 +-
- arch/arm/plat-omap/common.c                        |  291 --------------------
- arch/arm/plat-omap/devices.c                       |    1 -
- arch/arm/plat-omap/include/plat/mcbsp.h            |   22 ++
- arch/arm/plat-omap/include/plat/omap24xx.h         |    2 +-
- arch/arm/plat-omap/mcbsp.c                         |    3 -
- arch/arm/plat-omap/sram.c                          |    3 -
- drivers/usb/gadget/omap_udc.c                      |   18 +-
- sound/soc/omap/omap-mcbsp.c                        |  119 ++------
- 43 files changed, 633 insertions(+), 459 deletions(-)
- create mode 100644 arch/arm/mach-omap2/common.c
- rename arch/arm/{plat-omap/include/plat => mach-omap2}/control.h (97%)
- create mode 100644 arch/arm/plat-omap/32ksynctimer.c
-
-
-- Paul
+Cheers
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
