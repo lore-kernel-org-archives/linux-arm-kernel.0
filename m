@@ -1,96 +1,32 @@
-From: sw.youn@samsung.com (Seungwhan Youn)
-Date: Mon,  4 Oct 2010 20:42:25 +0900
-Subject: [PATCH 3/10] ARM: S5PC100: Add SCLK_SPDIF clock
-In-Reply-To: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-Message-ID: <1286192545-18327-1-git-send-email-sw.youn@samsung.com>
+From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
+Date: Mon, 04 Oct 2010 14:07:32 +0200
+Subject: I.MX35 GPIO IRQ + Preempt -> Oops
+In-Reply-To: <4CA98B8C.4010106@eukrea.com>
+References: <4CA739B4.1020506@eukrea.com>	<20101003114103.GC32736@n2100.arm.linux.org.uk>	<4CA8A06B.3070103@eukrea.com>	<20101003162021.GD32736@n2100.arm.linux.org.uk>	<4CA8BA29.5060600@eukrea.com>	<20101004073920.GM28679@pengutronix.de>
+	<4CA98B8C.4010106@eukrea.com>
+Message-ID: <4CA9C384.2070208@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add SCLK_SPDIF clock to support source clock of S/PDIF
-on S5PC100.
+Hi Uwe,
 
-Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
----
- arch/arm/mach-s5pc100/clock.c |   59 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
+Le 04/10/2010 10:08, Eric B?nard a ?crit :
+ > Le 04/10/2010 09:39, Uwe Kleine-K?nig a ?crit :
+ >> On Sun, Oct 03, 2010 at 07:15:21PM +0200, Eric B?nard wrote:
+ >>> Le 03/10/2010 18:20, Russell King - ARM Linux a ?crit :
+ >>> the FIQ is used for the imx-ssi driver.
+ >>>
+ >>> It seems that removing the cpu_do_idle() call in
+ >>> plat-mxc/include/mach/system.h "fix" the problem.
+ >> hmmm
+ >>
+ >> Does deselecting imx-ssi "fixes" the problem, too?
+ >>
+ > not tested yet.
+ >
+same problem with audio layer (and thus FIQ) disabled.
 
-diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
-index 42b7138..306ae74 100644
---- a/arch/arm/mach-s5pc100/clock.c
-+++ b/arch/arm/mach-s5pc100/clock.c
-@@ -980,6 +980,64 @@ struct clksrc_sources clk_src_pwi = {
- 	.nr_sources	= ARRAY_SIZE(clk_src_pwi_list),
- };
- 
-+static struct clk *clk_sclk_spdif_list[] = {
-+	[0] = &clk_sclk_audio0.clk,
-+	[1] = &clk_sclk_audio1.clk,
-+	[2] = &clk_sclk_audio2.clk,
-+};
-+
-+struct clksrc_sources clk_src_sclk_spdif = {
-+	.sources	= clk_sclk_spdif_list,
-+	.nr_sources	= ARRAY_SIZE(clk_sclk_spdif_list),
-+};
-+
-+static int s5pc100_spdif_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	struct clk *pclk;
-+	int ret;
-+
-+	pclk = clk_get_parent(clk);
-+	if (IS_ERR(pclk))
-+		return -EINVAL;
-+
-+	ret = pclk->ops->set_rate(pclk, rate);
-+	clk_put(pclk);
-+
-+	return ret;
-+}
-+
-+static unsigned long s5pc100_spdif_get_rate(struct clk *clk)
-+{
-+	struct clk *pclk;
-+	int rate;
-+
-+	pclk = clk_get_parent(clk);
-+	if (IS_ERR(pclk))
-+		return -EINVAL;
-+
-+	rate = pclk->ops->get_rate(clk);
-+	clk_put(pclk);
-+
-+	return rate;
-+}
-+
-+static struct clk_ops s5pc100_sclk_spdif_ops = {
-+	.set_rate	= s5pc100_spdif_set_rate,
-+	.get_rate	= s5pc100_spdif_get_rate,
-+};
-+
-+static struct clksrc_clk clk_sclk_spdif = {
-+	.clk	= {
-+		.name		= "sclk_spdif",
-+		.id		= -1,
-+		.ctrlbit	= (1 << 11),
-+		.enable		= s5pc100_sclk1_ctrl,
-+		.ops		= &s5pc100_sclk_spdif_ops,
-+	},
-+	.sources = &clk_src_sclk_spdif,
-+	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 24, .size = 2 },
-+};
-+
- static struct clksrc_clk clksrcs[] = {
- 	{
- 		.clk	= {
-@@ -1185,6 +1243,7 @@ static struct clksrc_clk *sysclks[] = {
- 	&clk_sclk_audio0,
- 	&clk_sclk_audio1,
- 	&clk_sclk_audio2,
-+	&clk_sclk_spdif,
- };
- 
- void __init_or_cpufreq s5pc100_setup_clocks(void)
--- 
-1.6.2.5
+Also : same problem with Freescale's BSP (2.6.31 based) and same "fix" 
+(removing the WFI).
+
+Eric
