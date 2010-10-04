@@ -1,30 +1,45 @@
-From: nikai@nikai.net (Nicolas Kaiser)
-Date: Mon, 4 Oct 2010 12:39:47 +0200
-Subject: [PATCH 5/5] arm/davinci: remove duplicated include
-In-Reply-To: <20101004122436.7092868f@absol.kitzblitz>
-References: <20101004122436.7092868f@absol.kitzblitz>
-Message-ID: <20101004123947.1e89128f@absol.kitzblitz>
+From: peter.ujfalusi@nokia.com (Peter Ujfalusi)
+Date: Mon, 4 Oct 2010 13:42:32 +0300
+Subject: [PATCH v4 4/4] OMAP3: DMA: Errata i541: sDMA FIFO draining does
+	not finish
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA49@dbde02.ent.ti.com>
+References: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
+	<1286180294-32618-5-git-send-email-peter.ujfalusi@nokia.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA49@dbde02.ent.ti.com>
+Message-ID: <201010041342.33238.peter.ujfalusi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicated include.
+On Monday 04 October 2010 12:17:41 ext G, Manjunath Kondaiah wrote:
+> 
+> ...
+> 
+> > +	/* OMAP3 Errata i541: sDMA FIFO draining does not finish */
+> 
+> This logic is required for multiple erratas.
 
-Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
----
- arch/arm/mach-davinci/board-da850-evm.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+As Tony requested, I have added a variable for flags to handle the different 
+erratas. I even added a macro to check that the errata applies, so one can use:
+if (IS_DMA_ERRATA(DMA_ERRATA_XXXXX))
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index fdc2cc5..851cc45 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -26,7 +26,6 @@
- #include <linux/mtd/physmap.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/tps6507x.h>
--#include <linux/mfd/tps6507x.h>
- #include <linux/input/tps6507x-ts.h>
- 
- #include <asm/mach-types.h>
+> Can we have seperate
+> function for handling this logic. More details at:
+> https://patchwork.kernel.org/patch/126271/
+
+I see. That patch is for hwmod converted dma code, right?
+We need this fix without the hwmod to applied, and than backport it to earlier 
+kernel releases.
+
+> As I mentioned in other mail, if you are introducing this feature,
+> it is better to convert existing erratas also to use this feature.
+
+The upcoming hwmod conversion will take care of the cleanup.
+We _need_ these two small fixes ASAP, since it is fixing serious problem in 
+audio (and the same issue might bite other areas as well).
+It is not the intention of this series to clean up the arc/arm/plat-omap/dma.c.
+
+I have added the dma_errata variable, since Tony asked for it, but even that 
+addition is a bigger change than what I was planning to do here.
+
 -- 
-1.7.2.2
+P?ter
