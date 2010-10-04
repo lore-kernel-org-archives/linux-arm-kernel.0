@@ -1,73 +1,41 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 04 Oct 2010 13:36:52 +0200
-Subject: [PATCH v3 4/5] mfd: regulator: max8998: voltages and GPIOs defined
-	at platform data structure
-In-Reply-To: <1286186989.3148.19.camel@odin>
-References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-	<1285590747-32404-5-git-send-email-l.majewski@samsung.com>
-	<20100927184336.GK2560@sortiz-mobl> <1286026413.3125.27.camel@odin>
-	<20101004084646.4de3714d@lmajewski.digital.local>
-	<1286186989.3148.19.camel@odin>
-Message-ID: <20101004133652.2bfa061c@lmajewski.digital.local>
+From: sw.youn@samsung.com (Seungwhan Youn)
+Date: Mon,  4 Oct 2010 20:25:50 +0900
+Subject: [PATCH 0/10] Add S/PDIF common driver for Samsung SoCs
+Message-ID: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 04 Oct 2010 11:09:49 +0100
-Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-
-> On Mon, 2010-10-04 at 08:46 +0200, Lukasz Majewski wrote:
-> > On Sat, 02 Oct 2010 14:33:33 +0100
-> > Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> > 
-> > > On Mon, 2010-09-27 at 20:43 +0200, Samuel Ortiz wrote:
-> > > > Hi Lukasz,
-> > > > 
-> > > > On Mon, Sep 27, 2010 at 02:32:26PM +0200, Lukasz Majewski wrote:
-> > > > > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > > Fine with me:
-> > > > Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-> > > > 
-> > > 
-> > > Lukasz, this is not applying against the regulator next tree.
-> > > Can you redo and add Mark and Samuels Acks.
-> > > 
-> > > Thanks
-> > > 
-> > > Liam
-> > 
-> > Hi Liam,
-> > 
-> > I've fetched the newest voltage-2.6/for-next and merge it with
-> > newest mfd-2.6/for next. After that all patches are applying and
-> > kernel is building without errors.
-> > 
-> > The problem with this patch series is that it "touches" two
-> > repositories: voltage-2.6 and mfd-2.6. 
-> > 
-> > I'm a bit confused how such situation should be resolved, since it
-> > involves two separate repositories (and two maintainers to
-> > cooperate).
-> > 
-> 
-> You should only base your patches on one tree for upstreaming and
-> since this series mostly touches regulator it's best base against the
-> regulator tree.
-> 
-> Liam
-
 Hi,
 
-So what is your opinion of solving this issue?
+This patch-set is for new S/PDIF common driver that supports S/PDIF
+PCM audio on S5PC100, S5PC110 and S5PV210.
 
-Those patches require simultaneous update of voltage-2.6 and mfd-2.6
-trees. Especially changes for voltage-2.6 won't work without
-modification of mfd-2.6 tree.
+This patch-set is based on two different branches that :-
+ o ASoC patches are based on Mark Brown's git branch 'for-next'
+   (commit id - 135e44aaa47c22b66c8d2acb54da1106a6c17598)
+ o ARM patches are based on Kukjin Kim's git branch 'for-next'
+   (commit id - a9d09cac7485062c599ee8f341bb0c5ccc2cc9d6)
 
--- 
-Best regards,
+Based on these patches S/PDIF driver supports followings :-
+ o Playback supports {32, 44.1, 48 and 96}kHz sampling rates.
+ o Playback supports 16-bit Little-endian PCM format.
 
-Lukasz Majewski
+This patch-set contains followings :-
+ o To Kukjin Kim and Ben Dooks,
+  - [PATCH 1/10] ARM: S5PC100: Add S/PDIF platform device
+  - [PATCH 2/10] ARM: S5PC100: Modify SCLK_AUDIO{0,1,2} clock as
+    sysclks
+  - [PATCH 3/10] ARM: S5PC100: Add SCLK_SPDIF clock
+  - [PATCH 4/10] ARM: S5PV210: Add S/PDIF platform device
+  - [PATCH 5/10] ARM: S5PV210: Add SCLK_SPDIF clock
+  - [PATCH 6/10] ARM: S5PV210: Add audio clocks as sysclk
+  - [PATCH 7/10] ARM: S5PV210: Fix wrong EPLL rate getting on
+    setup clocks
+  - [PATCH 8/10] ARM: S5PV210: Add EPLL clock operations
+ o To Jassi Brar, Mark Brown and Liam Girdwood,
+  - [PATCH 9/10] ASoC: SAMSUNG: Add S/PDIF CPU driver
+  - [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for S/PDIF PCM audio
 
-Samsung Poland R&D Center
-Platform Group
+
+Best Regards,
+Claude(Seungwhan Youn)
