@@ -1,183 +1,159 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Mon, 4 Oct 2010 14:49:21 +0300
-Subject: [PATCH] ARM: imx: Add iram allocator functions
-In-Reply-To: <1285966279-27719-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1285966279-27719-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101004114921.GB2529@matterhorn.lan>
+From: sw.youn@samsung.com (Seungwhan Youn)
+Date: Mon,  4 Oct 2010 20:31:59 +0900
+Subject: [PATCH 1/10] ARM: S5PC100: Add S/PDIF platform device
+In-Reply-To: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <1286191919-22356-1-git-send-email-sw.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Oct 01, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Add iram allocation functions using GENERIC_ALLOCATOR. The
-> allocation size is 4KB multiples to guarantee alignment. The
-> idea for these functions is for i.MX platforms to use them
-> to dynamically allocate IRAM usage.
-> 
-> Applies on 2.6.36-rc6
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/plat-mxc/Kconfig                   |    5 ++
->  arch/arm/plat-mxc/Makefile                  |    1 +
->  arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
->  arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
->  4 files changed, 103 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
->  create mode 100644 arch/arm/plat-mxc/iram.c
-> 
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index 6785db4..283d5bc 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -57,6 +57,11 @@ source "arch/arm/mach-mx5/Kconfig"
->  
->  endmenu
->  
-> +config IRAM_ALLOC
-> +	bool
+This patch add S/PDIF platform device to support S/PDIF PCM audio
+on S5PC100.
 
-If it is a bool, shouldn't it need a description entry so it shows up in the
-menuconfig?
+Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
+---
+ arch/arm/mach-s5pc100/dev-audio.c          |   54 ++++++++++++++++++++++++++++
+ arch/arm/mach-s5pc100/include/mach/map.h   |    2 +
+ arch/arm/mach-s5pc100/mach-smdkc100.c      |    4 ++
+ arch/arm/plat-samsung/include/plat/audio.h |    9 +++++
+ arch/arm/plat-samsung/include/plat/devs.h  |    1 +
+ 5 files changed, 70 insertions(+), 0 deletions(-)
 
-It can't be disabled currently.
-
-> +	default y
-> +	select GENERIC_ALLOCATOR
-> +
->  config MXC_IRQ_PRIOR
->  	bool "Use IRQ priority"
->  	help
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index 78d405e..35cf07b 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
->  
->  obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
->  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-> +obj-$(CONFIG_IRAM_ALLOC) += iram.o
->  obj-$(CONFIG_MXC_PWM)  += pwm.o
->  obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
->  obj-$(CONFIG_MXC_ULPI) += ulpi.o
-> diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-mxc/include/mach/iram_alloc.h
-> new file mode 100644
-> index 0000000..12881aa
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
-> @@ -0,0 +1,35 @@
-> +/*
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#ifdef CONFIG_IRAM_ALLOC
-> +int __init iram_init(unsigned long base, unsigned long size);
-> +void *iram_alloc(unsigned int size, unsigned long *dma_addr);
-> +void iram_free(unsigned long dma_addr, unsigned int size);
-> +#else
-> +static inline int __init iram_init(unsigned long base, unsigned long size)
-> +{
-> +	return -ENOMEM;
-> +}
-> +static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-> +{
-> +	return NULL;
-
-Return for a void function
-
-> +static inline void iram_free(unsigned long base, unsigned long size) {}
-> +#endif
-> +
-> diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
-> new file mode 100644
-> index 0000000..3d2a391
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/iram.c
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/genalloc.h>
-> +
-> +static unsigned long iram_phys_base;
-> +static __iomem void *iram_virt_base;
-> +static struct gen_pool *iram_pool;
-> +
-> +#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
-> +
-> +void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-> +{
-> +	if (!iram_pool)
-> +		return NULL;
-> +
-> +	*dma_addr = gen_pool_alloc(iram_pool, size);
-> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
-> +	return iram_phys_to_virt(*dma_addr);
-> +}
-> +EXPORT_SYMBOL(iram_alloc);
-> +
-> +void iram_free(unsigned long addr, unsigned int size)
-> +{
-> +	if (!iram_pool)
-> +		return;
-> +
-> +	gen_pool_free(iram_pool, addr, size);
-> +}
-> +EXPORT_SYMBOL(iram_free);
-> +
-> +int __init iram_init(unsigned long base, unsigned long size)
-> +{
-> +	iram_phys_base = base;
-> +
-> +	iram_pool = gen_pool_create(12, -1);
-> +	gen_pool_add(iram_pool, base, size, -1);
-> +	iram_virt_base = ioremap(iram_phys_base, size);
-> +
-> +	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
-> +	return 0;
-> +}
-> -- 
-> 1.6.0.4
-> 
-> 
-
+diff --git a/arch/arm/mach-s5pc100/dev-audio.c b/arch/arm/mach-s5pc100/dev-audio.c
+index a699ed6..9f7b17a 100644
+--- a/arch/arm/mach-s5pc100/dev-audio.c
++++ b/arch/arm/mach-s5pc100/dev-audio.c
+@@ -285,3 +285,57 @@ struct platform_device s5pc100_device_ac97 = {
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 	},
+ };
++
++/* S/PDIF Controller platform_device */
++static int s5pc100_spdif_cfg_gpd(struct platform_device *pdev)
++{
++	s3c_gpio_cfgpin_range(S5PC100_GPD(5), 2, S3C_GPIO_SFN(3));
++
++	return 0;
++}
++
++static int s5pc100_spdif_cfg_gpg3(struct platform_device *pdev)
++{
++	s3c_gpio_cfgpin_range(S5PC100_GPG3(5), 2, S3C_GPIO_SFN(3));
++
++	return 0;
++}
++
++static struct resource s5pc100_spdif_resource[] = {
++	[0] = {
++		.start	= S5PC100_PA_SPDIF,
++		.end	= S5PC100_PA_SPDIF + 0x100 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= DMACH_SPDIF,
++		.end	= DMACH_SPDIF,
++		.flags	= IORESOURCE_DMA,
++	},
++};
++
++static struct s3c_audio_pdata s5p_spdif_pdata = {
++	.cfg_gpio = s5pc100_spdif_cfg_gpd,
++};
++
++static u64 s5pc100_spdif_dmamask = DMA_BIT_MASK(32);
++
++struct platform_device s5pc100_device_spdif = {
++	.name		= "samsung-spdif",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s5pc100_spdif_resource),
++	.resource	= s5pc100_spdif_resource,
++	.dev = {
++		.platform_data = &s5p_spdif_pdata,
++		.dma_mask = &s5pc100_spdif_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
++
++void __init s5pc100_spdif_setup_gpio(int gpio)
++{
++	if (gpio == S5PC100_SPDIF_GPD)
++		s5p_spdif_pdata.cfg_gpio = s5pc100_spdif_cfg_gpd;
++	else
++		s5p_spdif_pdata.cfg_gpio = s5pc100_spdif_cfg_gpg3;
++}
+diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
+index 8751ef4..32e9cab 100644
+--- a/arch/arm/mach-s5pc100/include/mach/map.h
++++ b/arch/arm/mach-s5pc100/include/mach/map.h
+@@ -110,6 +110,8 @@
+ #define S5PC100_PA_PCM0		0xF2400000
+ #define S5PC100_PA_PCM1		0xF2500000
+ 
++#define S5PC100_PA_SPDIF	0xF2600000
++
+ #define S5PC100_PA_TSADC	(0xF3000000)
+ 
+ /* KEYPAD */
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index 020c3f9..994a1e1 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -47,6 +47,7 @@
+ #include <plat/adc.h>
+ #include <plat/keypad.h>
+ #include <plat/ts.h>
++#include <plat/audio.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define SMDKC100_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -196,6 +197,7 @@ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&s5p_device_fimc0,
+ 	&s5p_device_fimc1,
+ 	&s5p_device_fimc2,
++	&s5pc100_device_spdif,
+ };
+ 
+ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+@@ -226,6 +228,8 @@ static void __init smdkc100_machine_init(void)
+ 
+ 	samsung_keypad_set_platdata(&smdkc100_keypad_data);
+ 
++	s5pc100_spdif_setup_gpio(S5PC100_SPDIF_GPD);
++
+ 	/* LCD init */
+ 	gpio_request(S5PC100_GPD(0), "GPD");
+ 	gpio_request(S5PC100_GPH0(6), "GPH0");
+diff --git a/arch/arm/plat-samsung/include/plat/audio.h b/arch/arm/plat-samsung/include/plat/audio.h
+index e32f9ed..7712ff6 100644
+--- a/arch/arm/plat-samsung/include/plat/audio.h
++++ b/arch/arm/plat-samsung/include/plat/audio.h
+@@ -16,6 +16,15 @@
+ #define S3C64XX_AC97_GPE  1
+ extern void s3c64xx_ac97_setup_gpio(int);
+ 
++/*
++ * The machine init code calls s5p*_spdif_setup_gpio with
++ * one of these defines in order to select appropriate bank
++ * of GPIO for S/PDIF pins
++ */
++#define S5PC100_SPDIF_GPD  0
++#define S5PC100_SPDIF_GPG3 1
++extern void s5pc100_spdif_setup_gpio(int);
++
+ /**
+  * struct s3c_audio_pdata - common platform data for audio device drivers
+  * @cfg_gpio: Callback function to setup mux'ed pins in I2S/PCM/AC97 mode
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index 7d448e1..a1c3b93 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -106,6 +106,7 @@ extern struct platform_device s5pc100_device_pcm1;
+ extern struct platform_device s5pc100_device_iis0;
+ extern struct platform_device s5pc100_device_iis1;
+ extern struct platform_device s5pc100_device_iis2;
++extern struct platform_device s5pc100_device_spdif;
+ 
+ extern struct platform_device samsung_device_keypad;
+ 
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+1.6.2.5
