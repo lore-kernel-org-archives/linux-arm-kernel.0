@@ -1,92 +1,59 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 04 Oct 2010 18:09:36 +0100
-Subject: [PATCH 08/10] ARM: hotplug cpu: ensure that __enable_mmu is identity
-	mapped
-Message-ID: <E1P2oXg-00020g-EB@rmk-PC.arm.linux.org.uk>
+Date: Mon, 04 Oct 2010 18:09:27 +0100
+Subject: [PATCH 04/10] ARM: cleanup boot cpu calling __mmap_switched
+Message-ID: <E1P2oXX-00020Q-V2@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__enable_mmu is required to be executed in an identity mapped region
-to ensure that variances in CPUs do not cause a crash.  We currently
-achieve this by assuming that it will be co-located with
-__create_page_tables.  With hotplug CPU support, this assumption
-becomes invalid.  Implement a better solution which ensures that
-it will be appropriately mapped no matter where it is placed.
+This allows us to relocate __mmap_switched and associated data away
+from the head section.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/head.S |   33 ++++++++++++++++++++++++---------
- 1 files changed, 24 insertions(+), 9 deletions(-)
+ arch/arm/kernel/head-common.S |    3 +--
+ arch/arm/kernel/head.S        |    3 ++-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 6ad24d2..9f473ef 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -18,7 +18,6 @@
+ 	.align	2
+ 	.type	__switch_data, %object
+ __switch_data:
+-	.long	__mmap_switched
+ 	.long	__data_loc			@ r4
+ 	.long	_data				@ r5
+ 	.long	__bss_start			@ r6
+@@ -39,7 +38,7 @@ __switch_data:
+  *  r9  = processor ID
+  */
+ __mmap_switched:
+-	adr	r3, __switch_data + 4
++	adr	r3, __switch_data
+ 
+ 	ldmia	r3!, {r4, r5, r6, r7}
+ 	cmp	r4, r5				@ Copy data segment if needed
 diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index aa6ab9d..17414e2 100644
+index eb62bf9..aa6ab9d 100644
 --- a/arch/arm/kernel/head.S
 +++ b/arch/arm/kernel/head.S
-@@ -201,6 +201,7 @@ __turn_mmu_on:
- 	mov	r3, r3
- 	mov	r3, r13
- 	mov	pc, r3
-+__enable_mmu_end:
- ENDPROC(__turn_mmu_on)
- 
- 
-@@ -214,7 +215,7 @@ ENDPROC(__turn_mmu_on)
-  * r10 = procinfo
-  *
-  * Returns:
-- *  r0, r3, r6, r7 corrupted
-+ *  r0, r3, r5-r7 corrupted
-  *  r4 = physical page table address
-  */
- __create_page_tables:
-@@ -236,20 +237,30 @@ __create_page_tables:
- 	ldr	r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags
- 
- 	/*
--	 * Create identity mapping for first MB of kernel to
--	 * cater for the MMU enable.  This identity mapping
--	 * will be removed by paging_init().  We use our current program
--	 * counter to determine corresponding section base address.
-+	 * Create identity mapping to cater for __enable_mmu.
-+	 * This identity mapping will be removed by paging_init().
+@@ -95,13 +95,14 @@ ENTRY(stext)
+ 	 * above.  On return, the CPU will be ready for the MMU to be
+ 	 * turned on, and r0 will hold the CPU control register value.
  	 */
--	mov	r6, pc
--	mov	r6, r6, lsr #20			@ start of kernel section
--	orr	r3, r7, r6, lsl #20		@ flags + kernel base
--	str	r3, [r4, r6, lsl #2]		@ identity mapping
-+	adr	r0, __enable_mmu_loc
-+	ldmia	r0, {r3, r5, r6}
-+	sub	r0, r0, r3			@ virt->phys offset
-+	add	r5, r5, r0			@ phys __enable_mmu
-+	add	r6, r6, r0			@ phys __enable_mmu_end
-+	mov	r5, r5, lsr #20
-+	mov	r6, r6, lsr #20
-+
-+1:	orr	r3, r7, r5, lsl #20		@ flags + kernel base
-+	str	r3, [r4, r5, lsl #2]		@ identity mapping
-+	teq	r5, r6
-+	addne	r5, r5, #1			@ next section
-+	bne	1b
+-	ldr	r13, __switch_data		@ address to jump to after
++	ldr	r13, =__mmap_switched		@ address to jump to after
+ 						@ mmu has been enabled
+ 	adr	lr, BSYM(__enable_mmu)		@ return (PIC) address
+  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+  THUMB(	mov	pc, r12				)
+ ENDPROC(stext)
++	.ltorg
  
- 	/*
- 	 * Now setup the pagetables for our kernel direct
- 	 * mapped region.
- 	 */
-+	mov	r3, pc
-+	mov	r3, r3, lsr #20
-+	orr	r3, r7, r3, lsl #20
- 	add	r0, r4,  #(KERNEL_START & 0xff000000) >> 18
- 	str	r3, [r0, #(KERNEL_START & 0x00f00000) >> 18]!
- 	ldr	r6, =(KERNEL_END - 1)
-@@ -333,5 +344,9 @@ __create_page_tables:
- 	mov	pc, lr
- ENDPROC(__create_page_tables)
- 	.ltorg
-+__enable_mmu_loc:
-+	.long	.
-+	.long	__enable_mmu
-+	.long	__enable_mmu_end
- 
- #include "head-common.S"
+ #if defined(CONFIG_SMP)
+ ENTRY(secondary_startup)
 -- 
 1.6.2.5
