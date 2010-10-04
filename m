@@ -1,37 +1,46 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 04 Oct 2010 07:50:35 -0700
-Subject: [PATCH 5/5] arm/davinci: remove duplicated include
-In-Reply-To: <20101004123947.1e89128f@absol.kitzblitz> (Nicolas Kaiser's
-	message of "Mon, 4 Oct 2010 12:39:47 +0200")
-References: <20101004122436.7092868f@absol.kitzblitz>
-	<20101004123947.1e89128f@absol.kitzblitz>
-Message-ID: <87fwwm3tc4.fsf@deeprootsystems.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 04 Oct 2010 18:54:24 +0400
+Subject: [PATCH] ulpi: add i.MX25 & 35 internal PHY ID
+In-Reply-To: <1286195012-18999-1-git-send-email-eric@eukrea.com>
+References: <1286195012-18999-1-git-send-email-eric@eukrea.com>
+Message-ID: <4CA9EAA0.2060608@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Kaiser <nikai@nikai.net> writes:
+Hello.
 
-> Remove duplicated include.
->
-> Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
+Eric B?nard wrote:
 
-Applied, thanks.  Queuing for 2.6.37.
+> without this patch, the initialization of the OTG port in host mode
+> fails with :
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> mxc-ehci mxc-ehci.0: initializing i.MX USB Controller
+> ULPI transceiver vendor/product ID 0x0000/0x0000
+> ULPI ID does not match any known transceiver.
+> mxc-ehci mxc-ehci.0: unable to init transceiver, probably missing
 
-Kevin
-
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
 > ---
->  arch/arm/mach-davinci/board-da850-evm.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index fdc2cc5..851cc45 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -26,7 +26,6 @@
->  #include <linux/mtd/physmap.h>
->  #include <linux/regulator/machine.h>
->  #include <linux/regulator/tps6507x.h>
-> -#include <linux/mfd/tps6507x.h>
->  #include <linux/input/tps6507x-ts.h>
->  
->  #include <asm/mach-types.h>
+>  drivers/usb/otg/ulpi.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+
+    You should have CC'ed linux-usb at vger.kernel.org.
+
+> diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
+> index ccc8195..e802e44 100644
+> --- a/drivers/usb/otg/ulpi.c
+> +++ b/drivers/usb/otg/ulpi.c
+> @@ -34,7 +34,10 @@
+>  /* ULPI hardcoded IDs, used for probing */
+>  static unsigned int ulpi_ids[] = {
+>  	ULPI_ID(0x04cc, 0x1504),	/* NXP ISP1504 */
+> -	ULPI_ID(0x0424, 0x0006),        /* SMSC USB3319 */
+> +	ULPI_ID(0x0424, 0x0006),	/* SMSC USB3319 */
+> +#if (defined(CONFIG_ARCH_MX25) || defined(CONFIG_ARCH_MX35))
+> +	ULPI_ID(0x0000, 0x0000),	/* i.MX25 & i.MX35 internal PHY */
+> +#endif
+
+    I don't know why this table is at all used in the first place. IMO, checking 
+for the vendor/device ID serves no purpose...
+
+WBR, Sergei
