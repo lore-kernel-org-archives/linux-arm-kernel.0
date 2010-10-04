@@ -1,159 +1,130 @@
 From: sw.youn@samsung.com (Seungwhan Youn)
-Date: Mon,  4 Oct 2010 20:31:59 +0900
-Subject: [PATCH 1/10] ARM: S5PC100: Add S/PDIF platform device
+Date: Mon,  4 Oct 2010 20:39:16 +0900
+Subject: [PATCH 2/10] ARM: S5PC100: Modify SCLK_AUDIO{0,1,2} clock as sysclks
 In-Reply-To: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
 References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-Message-ID: <1286191919-22356-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <1286192356-17997-1-git-send-email-sw.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add S/PDIF platform device to support S/PDIF PCM audio
-on S5PC100.
+This patch modify SCLK_AUDIO{0,1,2} to be initial as sysclks
+on boot-time.
 
 Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
 ---
- arch/arm/mach-s5pc100/dev-audio.c          |   54 ++++++++++++++++++++++++++++
- arch/arm/mach-s5pc100/include/mach/map.h   |    2 +
- arch/arm/mach-s5pc100/mach-smdkc100.c      |    4 ++
- arch/arm/plat-samsung/include/plat/audio.h |    9 +++++
- arch/arm/plat-samsung/include/plat/devs.h  |    1 +
- 5 files changed, 70 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pc100/clock.c |   72 ++++++++++++++++++++++-------------------
+ 1 files changed, 39 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-s5pc100/dev-audio.c b/arch/arm/mach-s5pc100/dev-audio.c
-index a699ed6..9f7b17a 100644
---- a/arch/arm/mach-s5pc100/dev-audio.c
-+++ b/arch/arm/mach-s5pc100/dev-audio.c
-@@ -285,3 +285,57 @@ struct platform_device s5pc100_device_ac97 = {
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
- 	},
- };
-+
-+/* S/PDIF Controller platform_device */
-+static int s5pc100_spdif_cfg_gpd(struct platform_device *pdev)
-+{
-+	s3c_gpio_cfgpin_range(S5PC100_GPD(5), 2, S3C_GPIO_SFN(3));
-+
-+	return 0;
-+}
-+
-+static int s5pc100_spdif_cfg_gpg3(struct platform_device *pdev)
-+{
-+	s3c_gpio_cfgpin_range(S5PC100_GPG3(5), 2, S3C_GPIO_SFN(3));
-+
-+	return 0;
-+}
-+
-+static struct resource s5pc100_spdif_resource[] = {
-+	[0] = {
-+		.start	= S5PC100_PA_SPDIF,
-+		.end	= S5PC100_PA_SPDIF + 0x100 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= DMACH_SPDIF,
-+		.end	= DMACH_SPDIF,
-+		.flags	= IORESOURCE_DMA,
-+	},
-+};
-+
-+static struct s3c_audio_pdata s5p_spdif_pdata = {
-+	.cfg_gpio = s5pc100_spdif_cfg_gpd,
-+};
-+
-+static u64 s5pc100_spdif_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device s5pc100_device_spdif = {
-+	.name		= "samsung-spdif",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s5pc100_spdif_resource),
-+	.resource	= s5pc100_spdif_resource,
-+	.dev = {
-+		.platform_data = &s5p_spdif_pdata,
-+		.dma_mask = &s5pc100_spdif_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+	},
-+};
-+
-+void __init s5pc100_spdif_setup_gpio(int gpio)
-+{
-+	if (gpio == S5PC100_SPDIF_GPD)
-+		s5p_spdif_pdata.cfg_gpio = s5pc100_spdif_cfg_gpd;
-+	else
-+		s5p_spdif_pdata.cfg_gpio = s5pc100_spdif_cfg_gpg3;
-+}
-diff --git a/arch/arm/mach-s5pc100/include/mach/map.h b/arch/arm/mach-s5pc100/include/mach/map.h
-index 8751ef4..32e9cab 100644
---- a/arch/arm/mach-s5pc100/include/mach/map.h
-+++ b/arch/arm/mach-s5pc100/include/mach/map.h
-@@ -110,6 +110,8 @@
- #define S5PC100_PA_PCM0		0xF2400000
- #define S5PC100_PA_PCM1		0xF2500000
- 
-+#define S5PC100_PA_SPDIF	0xF2600000
-+
- #define S5PC100_PA_TSADC	(0xF3000000)
- 
- /* KEYPAD */
-diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
-index 020c3f9..994a1e1 100644
---- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-+++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-@@ -47,6 +47,7 @@
- #include <plat/adc.h>
- #include <plat/keypad.h>
- #include <plat/ts.h>
-+#include <plat/audio.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define SMDKC100_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -196,6 +197,7 @@ static struct platform_device *smdkc100_devices[] __initdata = {
- 	&s5p_device_fimc0,
- 	&s5p_device_fimc1,
- 	&s5p_device_fimc2,
-+	&s5pc100_device_spdif,
+diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+index 084abd1..42b7138 100644
+--- a/arch/arm/mach-s5pc100/clock.c
++++ b/arch/arm/mach-s5pc100/clock.c
+@@ -848,6 +848,18 @@ struct clksrc_sources clk_src_group3 = {
+ 	.nr_sources	= ARRAY_SIZE(clk_src_group3_list),
  };
  
- static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
-@@ -226,6 +228,8 @@ static void __init smdkc100_machine_init(void)
- 
- 	samsung_keypad_set_platdata(&smdkc100_keypad_data);
- 
-+	s5pc100_spdif_setup_gpio(S5PC100_SPDIF_GPD);
++static struct clksrc_clk clk_sclk_audio0 = {
++	.clk	= {
++		.name		= "sclk_audio",
++		.id		= 0,
++		.ctrlbit	= (1 << 8),
++		.enable		= s5pc100_sclk1_ctrl,
++	},
++	.sources = &clk_src_group3,
++	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 3 },
++	.reg_div = { .reg = S5P_CLK_DIV4, .shift = 12, .size = 4 },
++};
 +
- 	/* LCD init */
- 	gpio_request(S5PC100_GPD(0), "GPD");
- 	gpio_request(S5PC100_GPH0(6), "GPH0");
-diff --git a/arch/arm/plat-samsung/include/plat/audio.h b/arch/arm/plat-samsung/include/plat/audio.h
-index e32f9ed..7712ff6 100644
---- a/arch/arm/plat-samsung/include/plat/audio.h
-+++ b/arch/arm/plat-samsung/include/plat/audio.h
-@@ -16,6 +16,15 @@
- #define S3C64XX_AC97_GPE  1
- extern void s3c64xx_ac97_setup_gpio(int);
+ static struct clk *clk_src_group4_list[] = {
+ 	[0] = &clk_mout_epll.clk,
+ 	[1] = &clk_div_mpll.clk,
+@@ -862,6 +874,18 @@ struct clksrc_sources clk_src_group4 = {
+ 	.nr_sources	= ARRAY_SIZE(clk_src_group4_list),
+ };
  
-+/*
-+ * The machine init code calls s5p*_spdif_setup_gpio with
-+ * one of these defines in order to select appropriate bank
-+ * of GPIO for S/PDIF pins
-+ */
-+#define S5PC100_SPDIF_GPD  0
-+#define S5PC100_SPDIF_GPG3 1
-+extern void s5pc100_spdif_setup_gpio(int);
++static struct clksrc_clk clk_sclk_audio1 = {
++	.clk	= {
++		.name		= "sclk_audio",
++		.id		= 1,
++		.ctrlbit	= (1 << 9),
++		.enable		= s5pc100_sclk1_ctrl,
++	},
++	.sources = &clk_src_group4,
++	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 3 },
++	.reg_div = { .reg = S5P_CLK_DIV4, .shift = 16, .size = 4 },
++};
 +
- /**
-  * struct s3c_audio_pdata - common platform data for audio device drivers
-  * @cfg_gpio: Callback function to setup mux'ed pins in I2S/PCM/AC97 mode
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 7d448e1..a1c3b93 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -106,6 +106,7 @@ extern struct platform_device s5pc100_device_pcm1;
- extern struct platform_device s5pc100_device_iis0;
- extern struct platform_device s5pc100_device_iis1;
- extern struct platform_device s5pc100_device_iis2;
-+extern struct platform_device s5pc100_device_spdif;
+ static struct clk *clk_src_group5_list[] = {
+ 	[0] = &clk_mout_epll.clk,
+ 	[1] = &clk_div_mpll.clk,
+@@ -875,6 +899,18 @@ struct clksrc_sources clk_src_group5 = {
+ 	.nr_sources	= ARRAY_SIZE(clk_src_group5_list),
+ };
  
- extern struct platform_device samsung_device_keypad;
++static struct clksrc_clk clk_sclk_audio2 = {
++	.clk	= {
++		.name		= "sclk_audio",
++		.id		= 2,
++		.ctrlbit	= (1 << 10),
++		.enable		= s5pc100_sclk1_ctrl,
++	},
++	.sources = &clk_src_group5,
++	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 3 },
++	.reg_div = { .reg = S5P_CLK_DIV4, .shift = 20, .size = 4 },
++};
++
+ static struct clk *clk_src_group6_list[] = {
+ 	[0] = &s5p_clk_27m,
+ 	[1] = &clk_vclk54m,
+@@ -1001,39 +1037,6 @@ static struct clksrc_clk clksrcs[] = {
+ 		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 28, .size = 2 },
+ 	}, {
+ 		.clk	= {
+-			.name		= "sclk_audio",
+-			.id		= 0,
+-			.ctrlbit	= (1 << 8),
+-			.enable		= s5pc100_sclk1_ctrl,
+-
+-		},
+-		.sources = &clk_src_group3,
+-		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 3 },
+-		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 12, .size = 4 },
+-	}, {
+-		.clk	= {
+-			.name		= "sclk_audio",
+-			.id		= 1,
+-			.ctrlbit	= (1 << 9),
+-			.enable		= s5pc100_sclk1_ctrl,
+-
+-		},
+-		.sources = &clk_src_group4,
+-		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 3 },
+-		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 16, .size = 4 },
+-	}, {
+-		.clk	= {
+-			.name		= "sclk_audio",
+-			.id		= 2,
+-			.ctrlbit	= (1 << 10),
+-			.enable		= s5pc100_sclk1_ctrl,
+-
+-		},
+-		.sources = &clk_src_group5,
+-		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 3 },
+-		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 20, .size = 4 },
+-	}, {
+-		.clk	= {
+ 			.name		= "sclk_lcd",
+ 			.id		= -1,
+ 			.ctrlbit	= (1 << 0),
+@@ -1179,6 +1182,9 @@ static struct clksrc_clk *sysclks[] = {
+ 	&clk_div_pclkd1,
+ 	&clk_div_cam,
+ 	&clk_div_hdmi,
++	&clk_sclk_audio0,
++	&clk_sclk_audio1,
++	&clk_sclk_audio2,
+ };
  
+ void __init_or_cpufreq s5pc100_setup_clocks(void)
 -- 
 1.6.2.5
