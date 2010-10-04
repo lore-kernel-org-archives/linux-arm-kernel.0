@@ -1,40 +1,30 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 5 Oct 2010 00:45:27 +0200
-Subject: [PATCH v5] power: introduce library for device-specific OPPs
-In-Reply-To: <201010050036.23179.rjw@sisk.pl>
-References: <1285933174-24053-1-git-send-email-nm@ti.com>
-	<201010050036.23179.rjw@sisk.pl>
-Message-ID: <201010050045.27969.rjw@sisk.pl>
+From: a.zummo@towertech.it (Alessandro Zummo)
+Date: Tue, 5 Oct 2010 00:52:45 +0200
+Subject: [PATCH V2 16/69] rtc: Adding support for spear rtc
+In-Reply-To: <643f3f9afff0492c92a8cb7ed47a30f666326bc4.1285933331.git.viresh.kumar@st.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>
+	<643f3f9afff0492c92a8cb7ed47a30f666326bc4.1285933331.git.viresh.kumar@st.com>
+Message-ID: <20101005005245.23e6ef80@linux.lan.towertech.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 05, 2010, Rafael J. Wysocki wrote:
-> On Friday, October 01, 2010, Nishanth Menon wrote:
-...
-> > +int opp_init_cpufreq_table(struct device *dev,
-> > +			    struct cpufreq_frequency_table **table)
-> > +{
-> > +	struct device_opp *dev_opp;
-> > +	struct opp *opp;
-> > +	struct cpufreq_frequency_table *freq_table;
-> > +	int i = 0;
-> > +
-> > +	rcu_read_lock();
-> 
-> I would pretend I'm an updater here and acquire dev_opp_list_lock instead.
-> 
-> > +	dev_opp = find_device_opp(dev);
-> > +	if (IS_ERR(dev_opp)) {
-> > +		rcu_read_unlock();
-> 
-> So that won't be necessary.
+On Fri,  1 Oct 2010 17:25:36 +0530
+Viresh KUMAR <viresh.kumar@st.com> wrote:
 
-Or rather the lock will have to be dropped here instead.
+> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> 
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 
-> > +		pr_warning("Unable to find device\n");
-> > +		return PTR_ERR(dev_opp);
-> > +	}
-> > +
+ nack. you don't need the ioctl op. please do not send
+ 69+ irrelevant patches to the rtc mailing list.
 
-Thanks,
-Rafael
+
+-- 
+
+ Best regards,
+
+ Alessandro Zummo,
+  Tower Technologies - Torino, Italy
+
+  http://www.towertech.it
