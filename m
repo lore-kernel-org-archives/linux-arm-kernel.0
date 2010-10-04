@@ -1,96 +1,33 @@
 From: vkuzmichev@mvista.com (vkuzmichev at mvista.com)
-Date: Mon,  4 Oct 2010 13:45:37 +0400
-Subject: [PATCH 1/4] ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
-In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <1286185540-19569-2-git-send-email-vkuzmichev@mvista.com>
+Date: Mon,  4 Oct 2010 13:45:36 +0400
+Subject: [PATCH 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
+Message-ID: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vitaly Kuzmichev <vkuzmichev@mvista.com>
 
-Although upstream commit "98af057 ARM: 6126/1: ARM mpcore_wdt: fix
-build failure and other fixes" resolved long standing mpcore_wdt
-driver build problems, it introduced an error in the relationship
-between the MPcore watchdog timer clock rate and mpcore_margin,
-"MPcore timer margin in seconds", such that watchdog timeouts are now
-arbitrary rather than the number of seconds specified by mpcore_margin.
-This change restores mpcore_wdt_keepalive() to its equivalent
-implementation prior to commit 98af057 such that watchdog timeouts now
-occur as specified by mpcore_margin.
-The variable 'mpcore_timer_rate' which caused that build failure was
-replaced by 'twd_timer_rate'. Adding exported function to obtain
-twd_timer_rate value in mpcore_wdt driver.
-A build error will not occur because MPCORE_WATCHDOG needed to build
-'mpcore_wdt' depends on HAVE_ARM_TWD needed to build 'smp_twd'.
+The series of patches fixes various bugs in ARM MPCORE watchdog setup.
+They also introduce some changes in common SMP_TWD timer setup code.
+The PATCH 1/4 adds an exported function to obtain calibrated timer rate
+in mpcore_wdt. However, this solution might be unacceptable, so we may
+discuss another 2 variants:
+ 1) use clock framework
+   This may require to fix all MPCORE boards clock implementations.
+ 2) copy calibration loop to mpcore_wdt
+   However, this increases boot time.
 
-Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
----
- arch/arm/include/asm/smp_twd.h |    1 +
- arch/arm/kernel/smp_twd.c      |    6 ++++++
- drivers/watchdog/mpcore_wdt.c  |   11 ++++++++---
- 3 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index 634f357..c6328d8 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -25,5 +25,6 @@ extern void __iomem *twd_base;
- void twd_timer_stop(void);
- int twd_timer_ack(void);
- void twd_timer_setup(struct clock_event_device *);
-+unsigned long twd_get_timer_rate(void);
- 
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 35882fb..7bc1173 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -160,3 +160,9 @@ void twd_timer_stop(void)
- 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
- }
- #endif
-+
-+unsigned long twd_get_timer_rate(void)
-+{
-+	return twd_timer_rate;
-+}
-+EXPORT_SYMBOL(twd_get_timer_rate);
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index b8ec7ac..1bd3529 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -47,6 +47,11 @@ struct mpcore_wdt {
- static struct platform_device *mpcore_wdt_dev;
- static DEFINE_SPINLOCK(wdt_lock);
- 
-+static unsigned long mpcore_wdt_rate;
-+module_param_named(rate, mpcore_wdt_rate, ulong, 0);
-+MODULE_PARM_DESC(rate,
-+	"MPcore watchdog timer rate in Hz. (default=0 - autodetect)");
-+
- #define TIMER_MARGIN	60
- static int mpcore_margin = TIMER_MARGIN;
- module_param(mpcore_margin, int, 0);
-@@ -99,9 +104,7 @@ static void mpcore_wdt_keepalive(struct mpcore_wdt *wdt)
- 
- 	spin_lock(&wdt_lock);
- 	/* Assume prescale is set to 256 */
--	count =  __raw_readl(wdt->base + TWD_WDOG_COUNTER);
--	count = (0xFFFFFFFFU - count) * (HZ / 5);
--	count = (count / 256) * mpcore_margin;
-+	count = (mpcore_wdt_rate / 256) * mpcore_margin;
- 
- 	/* Reload the counter */
- 	writel(count + wdt->perturb, wdt->base + TWD_WDOG_LOAD);
-@@ -434,6 +437,8 @@ static int __init mpcore_wdt_init(void)
- 		printk(KERN_INFO "mpcore_margin value must be 0 < mpcore_margin < 65536, using %d\n",
- 			TIMER_MARGIN);
- 	}
-+	if (!mpcore_wdt_rate)
-+		mpcore_wdt_rate = twd_get_timer_rate();
- 
- 	printk(banner, mpcore_noboot, mpcore_margin, nowayout);
- 
+Vitaly Kuzmichev (4):
+  ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
+  ARM: smp_twd: Fix typo in twd_timer_rate printout
+  ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+  ARM: mpcore_wdt: Fix timer mode setup
+
+ arch/arm/include/asm/smp_twd.h |    7 +++++++
+ arch/arm/kernel/smp_twd.c      |    8 +++++++-
+ drivers/watchdog/mpcore_wdt.c  |   29 +++++++++++++++++++++--------
+ 3 files changed, 35 insertions(+), 9 deletions(-)
+
 -- 
 1.7.2.2
