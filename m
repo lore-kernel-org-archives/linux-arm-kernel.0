@@ -1,27 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Oct 2010 09:57:42 -0700
-Subject: [PATCH v4 0/4] OMAP2/3: DMA: FIFO drain errata fixes
-In-Reply-To: <201010041133.37450.peter.ujfalusi@nokia.com>
-References: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
-	<201010041129.16662.peter.ujfalusi@nokia.com>
-	<201010041133.37450.peter.ujfalusi@nokia.com>
-Message-ID: <20101004165742.GT3117@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 04 Oct 2010 18:09:21 +0100
+Subject: [PATCH 01/10] ARM: no need for nommu to jump through the hoops that
+	mmu does
+Message-ID: <E1P2oXR-00020E-FV@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@nokia.com> [101004 01:26]:
-> On Monday 04 October 2010 11:29:16 ext Peter Ujfalusi wrote:
-> > Hello,
-> > 
-> > Will resend, since
-> 
-> I'll wait for comments on v4 series, and I'll send the v5 later today after the 
-> comments to reduce the noise.
+nommu can jump directly to __mmap_switched without the absolute
+address branching which the mmuful kernel does.
 
-Looks like we should have the minimal two patches to queue as fixes
-for v2.6.36, then queue the errata flag changes for the upcoming
-merge window.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/head-nommu.S |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 573b803..814ce1a 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -48,8 +48,6 @@ ENTRY(stext)
+ 	movs	r8, r5				@ invalid machine (r5=0)?
+ 	beq	__error_a			@ yes, error 'a'
+ 
+-	ldr	r13, __switch_data		@ address to jump to after
+-						@ the initialization is done
+ 	adr	lr, BSYM(__after_proc_init)	@ return (PIC) address
+  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+@@ -87,8 +85,7 @@ __after_proc_init:
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ #endif /* CONFIG_CPU_CP15 */
+ 
+-	mov	r3, r13
+-	mov	pc, r3				@ clear the BSS and jump
++	b	__mmap_switched			@ clear the BSS and jump
+ 						@ to start_kernel
+ ENDPROC(__after_proc_init)
+ 	.ltorg
+-- 
+1.6.2.5
