@@ -1,49 +1,85 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 4 Oct 2010 13:32:17 -0600 (MDT)
-Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
-References: <20101001213119.1408.65395.stgit@twilight.localdomain>
-	<20101001213532.1408.55832.stgit@twilight.localdomain>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3C6@dbde02.ent.ti.com>
-	<20101004065624.GD2559@legolas.emea.dhcp.ti.com>
-	<20101004070040.GE2559@legolas.emea.dhcp.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1010041327040.13816@utopia.booyaka.com>
+Date: Mon, 4 Oct 2010 13:40:32 -0600 (MDT)
+Subject: [GIT PULL v2] OMAP: SCM/McBSP/clock: branch integration patches for
+	2.6.37
+In-Reply-To: <alpine.DEB.2.00.1010022010190.22941@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1010022010190.22941@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1010041339330.13816@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Oct 2010, Shilimkar, Santosh wrote:
 
-> > -----Original Message-----
-> > From: Balbi, Felipe
-> > Sent: Monday, October 04, 2010 12:31 PM
-> > 
-> > On Mon, Oct 04, 2010 at 01:56:24AM -0500, Balbi, Felipe wrote:
-> > >
-> > >I still have that sitting on my gitorious tree. The patch is attached
-> > >to this mail. I compile tested (only) for omap3_defconfig, it probably
-> > >needs to start using pm_runtime functions at some point and probably
-> > >move to drivers/clocksource instead of arch/arm/plat-omap.
-> > >
-> > >patch is also available at [1]
-> > >
-> > >[1] git://gitorious.org/usb/usb.git clksource
-> > 
-> > I made a few changes to make checkpatch.pl --strict happy. Attached
-> > 
-> Good !!
-> This patch addresses splitting as well as multi-omap builds and probably
-> also a better candidate in case we need to convert sync timer to hwmod
-> driver.
-> 
-> Paul, what's your take?
+Hi Tony,
 
-It's great that this is getting cleaned up but it's too late for 2.6.37.  
-We stop taking new code after -rc6 comes out so we can try to get all of 
-the changes integrated with each other and fix any bugs.
+here's the updated pull request for this branch, with comments integrated.
 
-The best thing for you and Felipe to do is to convert the driver to use 
-hwmod data and pm_runtime and test on more platforms, then post it to the 
-list after 2.6.37 comes out.
+The following changes since commit 7ad0e386d46e9edff64705ab25337ad9130baf63:
+
+  OMAP2+: defconfig: disable CPUfreq (2010-09-29 10:39:02 -0700)
+
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 control_mcbsp_fix_2.6.37
+
+Paul Walmsley (10):
+      OMAP2+: Kconfig: disallow builds for boards that don't use the currently-selected SoC
+      OMAP2420: CTRL: fix OMAP242X_CTRL_REGADDR macro
+      OMAP2420: clock: add MCBSP_CLKS node and clkdev aliases
+      OMAP2430: clock: add MCBSP_CLKS node and clkdev aliases
+      OMAP3xxx: clock: add clkdev aliases for McBSP fclk source switching
+      OMAP: McBSP: implement McBSP CLKR and FSR signal muxing via mach-omap2/mcbsp.c
+      OMAP: McBSP: implement functional clock switching via clock framework
+      OMAP: split plat-omap/common.c
+      OMAP: control: move plat-omap/control.h to mach-omap2/control.h
+      OMAP2+: clock: reduce the amount of standard debugging while disabling unused clocks
+
+ arch/arm/mach-omap2/Kconfig                        |    6 +-
+ arch/arm/mach-omap2/Makefile                       |    3 +-
+ arch/arm/mach-omap2/board-3430sdp.c                |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c                |    3 +-
+ arch/arm/mach-omap2/board-am3517evm.c              |    2 +-
+ arch/arm/mach-omap2/board-apollon.c                |    2 +-
+ arch/arm/mach-omap2/board-cm-t3517.c               |    2 +-
+ arch/arm/mach-omap2/board-generic.c                |   16 +-
+ arch/arm/mach-omap2/board-h4.c                     |    2 +-
+ arch/arm/mach-omap2/board-ldp.c                    |    2 +-
+ arch/arm/mach-omap2/board-omap3logic.c             |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c             |    4 +-
+ arch/arm/mach-omap2/clock.c                        |    2 +-
+ arch/arm/mach-omap2/clock2420_data.c               |   40 +++-
+ arch/arm/mach-omap2/clock2430_data.c               |   64 ++++-
+ arch/arm/mach-omap2/clock3xxx_data.c               |   12 +-
+ arch/arm/mach-omap2/clock44xx_data.c               |    2 +-
+ arch/arm/mach-omap2/common.c                       |  137 +++++++++
+ arch/arm/mach-omap2/control.c                      |    3 +-
+ .../include/plat => mach-omap2}/control.h          |   18 +-
+ arch/arm/mach-omap2/cpuidle34xx.c                  |    2 +-
+ arch/arm/mach-omap2/devices.c                      |    3 +-
+ arch/arm/mach-omap2/hsmmc.c                        |    2 +-
+ arch/arm/mach-omap2/id.c                           |    3 +-
+ arch/arm/mach-omap2/mcbsp.c                        |   83 ++++++
+ arch/arm/mach-omap2/mux.c                          |    8 +-
+ arch/arm/mach-omap2/pm24xx.c                       |    2 +-
+ arch/arm/mach-omap2/pm34xx.c                       |    2 +-
+ arch/arm/mach-omap2/prcm.c                         |    2 +-
+ arch/arm/mach-omap2/serial.c                       |    2 +-
+ arch/arm/mach-omap2/sleep34xx.S                    |    2 +-
+ arch/arm/mach-omap2/usb-fs.c                       |    6 +-
+ arch/arm/plat-omap/Makefile                        |    2 +-
+ arch/arm/plat-omap/clock.c                         |    5 +-
+ arch/arm/plat-omap/common.c                        |  291 --------------------
+ arch/arm/plat-omap/counter_32k.c                   |  183 ++++++++++++
+ arch/arm/plat-omap/devices.c                       |    1 -
+ arch/arm/plat-omap/include/plat/mcbsp.h            |   22 ++
+ arch/arm/plat-omap/include/plat/omap24xx.h         |    2 +-
+ arch/arm/plat-omap/mcbsp.c                         |    3 -
+ arch/arm/plat-omap/sram.c                          |    3 -
+ drivers/usb/gadget/omap_udc.c                      |   18 +-
+ sound/soc/omap/omap-mcbsp.c                        |  119 ++------
+ 43 files changed, 631 insertions(+), 459 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/common.c
+ rename arch/arm/{plat-omap/include/plat => mach-omap2}/control.h (97%)
+ create mode 100644 arch/arm/plat-omap/counter_32k.c
+
+
 
 - Paul
