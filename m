@@ -1,80 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 Oct 2010 07:42:23 +0200
-Subject: [PATCH v3] ARM: S5PC110: add support for S6E63M0 LCD controller on
-	Goni board
-In-Reply-To: <014801cb621e$3edd42e0$bc97c8a0$%kim@samsung.com>
-References: <005b01cb5ee0$2d266f90$87734eb0$%kim@samsung.com>
-	<1285679744-21621-1-git-send-email-m.szyprowski@samsung.com>
-	<014801cb621e$3edd42e0$bc97c8a0$%kim@samsung.com>
-Message-ID: <011e01cb6386$f0487900$d0d96b00$%szyprowski@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 3 Oct 2010 23:45:28 -0600 (MDT)
+Subject: [PATCH 01/10] OMAP2+: Kconfig: disallow builds for boards that
+	don't use the currently-selected SoC
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE2FA@dbde02.ent.ti.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213445.1408.96821.stgit@twilight.localdomain>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE2FA@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1010032343250.13816@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 4 Oct 2010, Varadarajan, Charulatha wrote:
 
-On Saturday, October 02, 2010 12:41 PM Kukjin Kim wrote:
+>  
+> 
+> > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org 
+> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> > Sent: Saturday, October 02, 2010 3:05 AM
+> > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Cc: Tony Lindgren
+> > Subject: [PATCH 01/10] OMAP2+: Kconfig: disallow builds for 
+> > boards that don't use the currently-selected SoC
 
-> Marek Szyprowski wrote:
-> >
-> > Add required platform definitions for S6E63M0 LCD controller on Samsung
-> > Goni board.
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >
-> > Changes since v2:
-> > - removed defines for lcd pin names
-> >
-> >  arch/arm/mach-s5pv210/mach-goni.c |   66
-> > +++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 66 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-> b/arch/arm/mach-s5pv210/mach-
-> > goni.c
-> > index b0ae208..ac6ebab 100644
-> > --- a/arch/arm/mach-s5pv210/mach-goni.c
-> > +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> 
-> (snip)
-> 
-> > +static struct lcd_platform_data s6e63m0_platform_data = {
-> > +	.reset			= reset_lcd,
-> > +	.power_on		= lcd_power_on,
-> > +	.lcd_enabled		= 0,
-> > +	.reset_delay		= 120,	/* 120ms */
-> > +	.power_on_delay		= 25,	/* 25ms */
-> > +	.power_off_delay	= 200,	/* 200ms */
-> > +};
-> > +
-> > +#define LCD_BUS_NUM	3
-> > +static struct spi_board_info spi_board_info[] __initdata = {
-> > +	{
-> > +		.modalias	= "s6e63m0",
-> > +		.platform_data	= &goni_lcd_platform_data,
-> 
-> Happened following build error.
-> arch/arm/mach-s5pv210/mach-goni.c:153: error: 'goni_lcd_platform_data'
-> undeclared here (not in a function)
-> 
-> should be 's6e63m0_platform_data'?..let me know your preferred name.
-> Will apply with changing it.
+...
 
-goni_lcd_platform_data is ihmo more appropriate. I'm sorry again for a problem,
-looks that I mixed something up and I've sent a patch before final cleaning.
-
-> > +		.max_speed_hz	= 1200000,
-> > +		.bus_num	= LCD_BUS_NUM,
-> > +		.chip_select	= 0,
-> > +		.mode		= SPI_MODE_3,
-> > +		.controller_data = (void *)S5PV210_MP01(1), /* DISPLAY_CS */
-> > +	},
-> > +};
+> > +++ b/arch/arm/mach-omap2/board-generic.c
+> > @@ -48,10 +48,22 @@ static void __init omap_generic_init(void)
+> >  
+> >  static void __init omap_generic_map_io(void)
+> >  {
+> > -	omap2_set_globals_242x(); /* should be 242x, 243x, or 343x */
+> > -	omap242x_map_common_io();
+> > +	if (cpu_is_omap242x()) {
+> > +		omap2_set_globals_242x();
+> > +		omap242x_map_common_io();
+> > +	} else if (cpu_is_omap242x()) {
 > 
-> (snip)
+> Is this intended for 242x() or 243x()?
+> 
+> > +		omap2_set_globals_243x();
+> > +		omap243x_map_common_io();
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+That's for 243x().  Thanks, updated that in the branch that's posted on 
+git.pwsan.com.
+
+
+- Paul
