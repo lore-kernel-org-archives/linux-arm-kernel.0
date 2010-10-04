@@ -1,71 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 4 Oct 2010 22:22:50 +0100
-Subject: [PATCH 6/6] ARM: l2x0: Optimise the range based operations
-In-Reply-To: <1283846243-11600-7-git-send-email-santosh.shilimkar@ti.com>
-References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-5-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-6-git-send-email-santosh.shilimkar@ti.com>
-	<1283846243-11600-7-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20101004212250.GD25241@n2100.arm.linux.org.uk>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 05 Oct 2010 09:30:22 +1100
+Subject: multiple linux-next OMAP3 build errors
+In-Reply-To: <1286173747.2358.4.camel@tubuntu.research.nokia.com>
+References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
+	<1286173747.2358.4.camel@tubuntu.research.nokia.com>
+Message-ID: <1286231422.2463.316.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 07, 2010 at 01:27:23PM +0530, Santosh Shilimkar wrote:
-> For the big buffers which are in excess of cache size, the maintaince
-> operations by PA are very slow. For such buffers the maintainace
-> operations can be speeded up by using the WAY based method.
+On Mon, 2010-10-04 at 09:29 +0300, Tomi Valkeinen wrote:
+> >   CC      drivers/video/omap2/vram.o
+> > drivers/video/omap2/vram.c: In function
+> 'omap_vram_reserve_sdram_memblock':
+> > drivers/video/omap2/vram.c:568: error: implicit declaration of
+> > function 'memblock_region_is_memory'
+> 
+> Benjamin, your patch "memblock/arm: Use memblock_region_is_memory()
+> for
+> omap fb" in linux-next seems to be broken. I believe the called
+> function
+> should be memblock_is_region_memory, not memblock_region_is_memory?
 
-This causes my Versatile Express to corrupt MMC transfers.  Reverting
-both this and the 'Determine cache size' patches makes it work again.
+I suspect either I didn't push my latest version before it got merged or
+Yinghai didn't pull the right one, since I'm pretty sure I test built
+it, but in any case, you're probably right :-)
 
-(Note that just reverting this one doesn't result in a working situation.)
+I'm not in control of this patch series at the moment however. Ingo and
+Yinghai are. Yinghai, care to fix that up ? I'm currently travelling on
+holidays and won't be able to do much until later next week.
 
-Good boot:
-
-L310 cache controller enabled                                                   
-l2x0: 8 ways, CACHE_ID 0x410000c3, AUX_CTRL 0x02460000                          
-...
-mmci-pl18x mb:mmci: mmc0: MMCI rev 0 cfg 00 at 0x0000000010005000 irq 41,42     
-aaci-pl041 mb:aaci: ARM AC'97 Interface at 0x0000000010004000, irq 43, fifo 512 
-ALSA device list:                                                               
-  #0: ARM AC'97 Interface at 0x0000000010004000, irq 43                         
-TCP cubic registered                                                            
-mmc0: host does not support reading read-only switch. assuming write-enable.    
-mmc0: new SD card at address e624                                               
-mmcblk0: mmc0:e624 SD02G 1.89 GiB                                               
-NET: Registered protocol family 17                                              
-VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 0         
- mmcblk0: p1                                                                    
-Initalizing network drop monitor service                                        
-Waiting 5sec before mounting root device...                                     
-port 1 high speed                                                               
-
-Bad boot (with just 'Determine cache size' patch applied):
-
-L310 cache controller enabled                                                   
-l2x0: 8 ways, CACHE_ID 0x410000c3, AUX_CTRL 0x02460000, Cache size: 512 KB      
-...
-mmci-pl18x mb:mmci: mmc0: MMCI rev 0 cfg 00 at 0x0000000010005000 irq 41,42     
-aaci-pl041 mb:aaci: ARM AC'97 Interface at 0x0000000010004000, irq 43, fifo 512 
-ALSA device list:                                                               
-  #0: ARM AC'97 Interface at 0x0000000010004000, irq 43                         
-mmc0: host does not support reading read-only switch. assuming write-enable.    
-mmc0: new SD card at address e624                                               
-mmcblk0: mmc0:e624 SD02G 1.89 GiB                                               
-TCP cubic registered                                                            
-NET: Registered protocol family 17                                              
-mmcblk0: retrying using single block read                                       
-VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 0         
-mmcblk0: error -5 transferring data, sector 0, nr 8, card status 0x900          
-Initalizing network drop monitor service                                        
-<random garbage>
-mmcblk0: error -5 transferring data, sector 1, nr 7, card status 0x900
-end_request: I/O error, dev mmcblk0, sector 1                                   
-Buffer I/O error on device mmcblk0, logical block 0                             
-port 1 high speed                                                               
-
--5 is -EIO, which is a FIFO overrun error, so somehow these changes are
-causing the CPU or bus accesses to be slower.
+Cheers,
+Ben.
