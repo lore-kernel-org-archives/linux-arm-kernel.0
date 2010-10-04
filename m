@@ -1,28 +1,30 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 4 Oct 2010 11:28:35 -0700
-Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C98C@dbde02.ent.ti.com>
-References: <1285069770-4261-1-git-send-email-manjugk@ti.com>
-	<1285076060.14206.3.camel@chotu>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402785A3478@dbde02.ent.ti.com>
-	<20100921162658.GA2310@core.coreip.homeip.net>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C98C@dbde02.ent.ti.com>
-Message-ID: <20101004182834.GE8321@core.coreip.homeip.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Oct 2010 19:34:50 +0100
+Subject: [PATCH 02/10] ARM: hotplug cpu: setup 1:1 map for entire
+	kernel image for secondary CPUs
+In-Reply-To: <alpine.LFD.2.00.1010041417470.3107@xanadu.home>
+References: <E1P2oXT-00020I-MY@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1010041417470.3107@xanadu.home>
+Message-ID: <20101004183450.GA25241@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 04, 2010 at 01:32:29PM +0530, G, Manjunath Kondaiah wrote:
-> Dmitry,
-> As agreed, can you push this patch?
-> https://patchwork.kernel.org/patch/197442/
+On Mon, Oct 04, 2010 at 02:20:47PM -0400, Nicolas Pitre wrote:
+> On Mon, 4 Oct 2010, Russell King - ARM Linux wrote:
 > 
+> > +static inline void identity_mapping_add(pgd_t *pgd, unsigned long start,
+> > +	unsigned long end)
+> > +{
+> > +	unsigned long addr, prot;
+> > +	pmd_t *pmd;
+> > +
+> > +	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE;
+> > +	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+> > +		prot |= PMD_BIT4;
+> 
+> Is there any SMP capable implementation where the above test is 
+> useful?
 
-Manjunath,
-
-It is queued for 2.6.37 (take a peek at 'next' branch of my tree) - I do
-not believe that the failure is critical enough for .36.
-
-Thanks.
-
--- 
-Dmitry
+Probably not, but if someone decides to clean that up (and copy it
+into arch/arm/mm/mmu.c for setup_mm_for_reboot()) I'd rather it be
+there.
