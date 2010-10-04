@@ -1,61 +1,33 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Mon, 4 Oct 2010 12:50:19 +0300
-Subject: [PATCH v4 1/4] omap: dma: Fix buffering disable bit setting for
-	omap24xx
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA39@dbde02.ent.ti.com>
-References: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
-	<1286180294-32618-2-git-send-email-peter.ujfalusi@nokia.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA39@dbde02.ent.ti.com>
-Message-ID: <20101004125019.98228ee3.jhnikula@gmail.com>
+From: vkuzmichev@mvista.com (vkuzmichev at mvista.com)
+Date: Mon,  4 Oct 2010 13:45:38 +0400
+Subject: [PATCH 2/4] ARM: smp_twd: Fix typo in twd_timer_rate printout
+In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <1286185540-19569-3-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Oct 2010 14:44:28 +0530
-"G, Manjunath Kondaiah" <manjugk@ti.com> wrote:
+From: Vitaly Kuzmichev <vkuzmichev@mvista.com>
 
-> 
-> 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org 
-> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Peter Ujfalusi
-> > Sent: Monday, October 04, 2010 1:48 PM
-> > To: Tony Lindgren
-> > Cc: linux-omap at vger.kernel.org; Jarkko Nikula; 
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: [PATCH v4 1/4] omap: dma: Fix buffering disable bit 
-> > setting for omap24xx
-> > 
-> > From: ext Jarkko Nikula <jhnikula@gmail.com>
-> > 
-> > An errata workaround for omap24xx is not setting the 
-> > buffering disable bit
-> > 25 what is the purpose but channel enable bit 7 instead.
-> 
-> ...
-> 
-> > diff --git a/arch/arm/plat-omap/dma.c 
-> > b/arch/arm/plat-omap/dma.c index ec7eddf..6914ccf 100644
-> > --- a/arch/arm/plat-omap/dma.c
-> > +++ b/arch/arm/plat-omap/dma.c
-> > @@ -999,8 +999,9 @@ void omap_start_dma(int lch)
-> >  	 * Errata: On ES2.0 BUFFERING disable must be set.
-> >  	 * This will always fail on ES1.0
-> >  	 */
-> 
-> Sorry, I didn't catch this with earlier patch.
-> 
-> Looks like wrong comment. only on 2430ES1.0 and for all omap2420, 
-> buffer disable should be set. 
-> I feel below description will be useful to the reader:
-> "Errata: Inter Frame DMA buffering issue(All OMAP2420 and OMAP2430ES1.0):
-> DMA will wrongly buffer elements if packing and bursting is enabled.
-> This might result in data gets stalled in FIFO at the end of the block.
-> Workaround: DMA channels must have BUFFERING_DISABLED bit set to guarantee
-> no data will stay in the DMA FIFO in case inter frame buffering occurs.
-> 
-Ok, no problem. I'll add this to the next version. This is good to get
-documented.
+To get hundredths of MHz the rate needs to be divided by 10'000.
 
+Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+---
+ arch/arm/kernel/smp_twd.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 7bc1173..931b0e3 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -114,7 +114,7 @@ static void __cpuinit twd_calibrate_rate(void)
+ 		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+ 
+ 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+-			(twd_timer_rate / 100000) % 100);
++			(twd_timer_rate / 10000) % 100);
+ 	}
+ 
+ 	load = twd_timer_rate / HZ;
 -- 
-Jarkko
+1.7.2.2
