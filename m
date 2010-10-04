@@ -1,120 +1,127 @@
-From: Jiri.Pinkava@vscht.cz (=?ISO-8859-2?Q?Ji=F8=ED_Pinkava?=)
-Date: Mon, 4 Oct 2010 02:32:08 +0200
-Subject: [PATCH 6/6] n35: Add LCD backlight regulation
-In-Reply-To: <4CA92044.9010902@vscht.cz>
-References: <4CA91E6F.3010704@vscht.cz> <4CA91EDA.80009@vscht.cz>
-	<4CA91F05.3040602@vscht.cz> <4CA91F4F.8080204@vscht.cz>
-	<4CA91FF7.7020908@vscht.cz> <4CA92044.9010902@vscht.cz>
-Message-ID: <4CA92088.4060806@vscht.cz>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Mon, 4 Oct 2010 09:51:29 +0530
+Subject: [PATCH 01/10] OMAP2+: Kconfig: disallow builds for boards that
+	don't	use the currently-selected SoC
+In-Reply-To: <20101001213445.1408.96821.stgit@twilight.localdomain>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213445.1408.96821.stgit@twilight.localdomain>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE2FA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ 
 
-Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
----
-  arch/arm/mach-s3c2410/mach-n30.c |   71 
-++++++++++++++++++++++++++++++++++++++
-  1 files changed, 71 insertions(+), 0 deletions(-)
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Saturday, October 02, 2010 3:05 AM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Tony Lindgren
+> Subject: [PATCH 01/10] OMAP2+: Kconfig: disallow builds for 
+> boards that don't use the currently-selected SoC
+> 
+> Currently, if, for example, CONFIG_ARCH_OMAP2420 is not 
+> selected, OMAP2420
+> board files can still be included in the build.  This results 
+> in link errors:
+> 
+> arch/arm/mach-omap2/built-in.o: In function `omap_generic_map_io':
+> .../arch/arm/mach-omap2/board-generic.c:51: undefined 
+> reference to `omap2_set_globals_242x'
+> arch/arm/mach-omap2/built-in.o: In function `omap_h4_init':
+> .../arch/arm/mach-omap2/board-h4.c:330: undefined reference 
+> to `omap2420_mux_init'
+> arch/arm/mach-omap2/built-in.o: In function `omap_h4_map_io':
+> .../arch/arm/mach-omap2/board-h4.c:373: undefined reference 
+> to `omap2_set_globals_242x'
+> arch/arm/mach-omap2/built-in.o: In function `omap_apollon_init':
+> .../arch/arm/mach-omap2/board-apollon.c:325: undefined 
+> reference to `omap2420_mux_init'
+> arch/arm/mach-omap2/built-in.o: In function `omap_apollon_map_io':
+> .../arch/arm/mach-omap2/board-apollon.c:353: undefined 
+> reference to `omap2_set_globals_242x'
+> make: *** [.tmp_vmlinux1] Error 1
+> 
+> Fix this by making the boards depend on the Kconfig option for the
+> specific SoC that they use.
+> 
+> Also, while here, fix the mach-omap2/board-generic.c file to 
+> remove the
+> dependency on OMAP2420.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig         |    6 +++---
+>  arch/arm/mach-omap2/board-generic.c |   16 ++++++++++++++--
+>  2 files changed, 17 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 1c4b237..7f740bd 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -101,20 +101,20 @@ config MACH_OMAP2_TUSB6010
+>  
+>  config MACH_OMAP_H4
+>  	bool "OMAP 2420 H4 board"
+> -	depends on ARCH_OMAP2
+> +	depends on ARCH_OMAP2420
+>  	default y
+>  	select OMAP_PACKAGE_ZAF
+>  	select OMAP_DEBUG_DEVICES
+>  
+>  config MACH_OMAP_APOLLON
+>  	bool "OMAP 2420 Apollon board"
+> -	depends on ARCH_OMAP2
+> +	depends on ARCH_OMAP2420
+>  	default y
+>  	select OMAP_PACKAGE_ZAC
+>  
+>  config MACH_OMAP_2430SDP
+>  	bool "OMAP 2430 SDP board"
+> -	depends on ARCH_OMAP2
+> +	depends on ARCH_OMAP2430
+>  	default y
+>  	select OMAP_PACKAGE_ZAC
+>  
+> diff --git a/arch/arm/mach-omap2/board-generic.c 
+> b/arch/arm/mach-omap2/board-generic.c
+> index 3482b99..c7ec3f3 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -48,10 +48,22 @@ static void __init omap_generic_init(void)
+>  
+>  static void __init omap_generic_map_io(void)
+>  {
+> -	omap2_set_globals_242x(); /* should be 242x, 243x, or 343x */
+> -	omap242x_map_common_io();
+> +	if (cpu_is_omap242x()) {
+> +		omap2_set_globals_242x();
+> +		omap242x_map_common_io();
+> +	} else if (cpu_is_omap242x()) {
 
-diff --git a/arch/arm/mach-s3c2410/mach-n30.c 
-b/arch/arm/mach-s3c2410/mach-n30.c
-index be5235d..4199143 100644
---- a/arch/arm/mach-s3c2410/mach-n30.c
-+++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -23,6 +23,7 @@
-  #include <linux/input.h>
-  #include <linux/interrupt.h>
-  #include <linux/platform_device.h>
-+#include <linux/pwm_backlight.h>
-  #include <linux/serial_core.h>
-  #include <linux/timer.h>
-  #include <linux/io.h>
-@@ -369,6 +370,74 @@ static struct s3c2410fb_mach_info n30_fb_info 
-__initdata = {
-  	.lpcsel		= 0x06,
-  };
+Is this intended for 242x() or 243x()?
 
-+static int n35_backlight_init(struct device *dev)
-+{
-+	int ret;
-+
-+	ret = gpio_request(S3C2410_GPB(0), "Backlight PWM output");
-+	if (ret)
-+		goto request_gpb0_fail;
-+	ret = gpio_request(S3C2410_GPB(1), "Backlight power");
-+	if (ret)
-+		goto request_gpb1_fail;
-+
-+	/* set GPB0 as output of PWM timer */
-+	gpio_set_value(S3C2410_GPB(0), 0);
-+	s3c_gpio_setpull(S3C2410_GPB(0), S3C_GPIO_PULL_DOWN);
-+	s3c_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
-+
-+	/* backlight power */
-+	ret = gpio_direction_output(S3C2410_GPB(1), 1);
-+	if (ret)
-+		goto direction_gpb1_fail;
-+	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
-+
-+	return 0;
-+
-+direction_gpb1_fail:
-+	gpio_free(S3C2410_GPB(1));
-+request_gpb1_fail:
-+	gpio_free(S3C2410_GPB(0));
-+request_gpb0_fail:
-+	return ret;
-+}
-+
-+static int n35_backlight_notify(struct device *dev, int brightness)
-+{
-+	/* power off backlight, values less than 14 are useless */
-+	gpio_set_value(S3C2410_GPB(1), brightness > 14 ? 1 : 0);
-+	return (brightness > 14 ? brightness : 0);
-+}
-+
-+static void n35_backlight_exit(struct device *dev)
-+{
-+	gpio_direction_output(S3C2410_GPB(0), 0);
-+	gpio_free(S3C2410_GPB(0));
-+
-+	gpio_set_value(S3C2410_GPB(1), 0);
-+	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
-+	gpio_free(S3C2410_GPB(1));
-+}
-+
-+static struct platform_pwm_backlight_data backlight_data = {
-+	.pwm_id         = 0,
-+	.max_brightness = 100,
-+	.dft_brightness = 50,
-+	.pwm_period_ns  = 3*1000*1000,
-+	.init           = n35_backlight_init,
-+	.notify         = n35_backlight_notify,
-+	.exit           = n35_backlight_exit,
-+};
-+
-+static struct platform_device n35_backlight = {
-+	.name = "pwm-backlight",
-+	.dev  = {
-+		.parent = &s3c_device_timer[0].dev,
-+		.platform_data = &backlight_data,
-+	},
-+	.id   = -1,
-+};
-+
-  static void n30_sdi_set_power(unsigned char power_mode, unsigned short 
-vdd)
-  {
-  	switch (power_mode) {
-@@ -416,6 +485,8 @@ static struct platform_device *n35_devices[] 
-__initdata = {
-  	&s3c_device_sdi,
-  	&s3c_device_adc,
-  	&s3c_device_ts,
-+	&s3c_device_timer[0],
-+	&n35_backlight,
-  	&n35_button_device,
-  	&n35_blue_led,
-  	&n35_warning_led,
--- 
-1.7.3.1
+> +		omap2_set_globals_243x();
+> +		omap243x_map_common_io();
+> +	} else if (cpu_is_omap34xx()) {
+> +		omap2_set_globals_3xxx();
+> +		omap34xx_map_common_io();
+> +	} else if (cpu_is_omap44xx()) {
+> +		omap2_set_globals_443x();
+> +		omap44xx_map_common_io();
+> +	}
+>  }
+>  
+> +/* XXX This machine entry name should be updated */
+>  MACHINE_START(OMAP_GENERIC, "Generic OMAP24xx")
+>  	/* Maintainer: Paul Mundt <paul.mundt@nokia.com> */
+>  	.phys_io	= 0x48000000,
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe 
+> linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
