@@ -1,210 +1,73 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 Oct 2010 13:03:44 +0200
-Subject: [PATCH 1/5] ARM: S5PV310: Add HSMMC support and SDHCI
-	configuration
-In-Reply-To: <1284626223-18944-2-git-send-email-jeongbae.seo@samsung.com>
-References: <1284626223-18944-1-git-send-email-jeongbae.seo@samsung.com>
-	<1284626223-18944-2-git-send-email-jeongbae.seo@samsung.com>
-Message-ID: <012d01cb63b3$d26bb140$774313c0$%szyprowski@samsung.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 04 Oct 2010 13:36:52 +0200
+Subject: [PATCH v3 4/5] mfd: regulator: max8998: voltages and GPIOs defined
+	at platform data structure
+In-Reply-To: <1286186989.3148.19.camel@odin>
+References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
+	<1285590747-32404-5-git-send-email-l.majewski@samsung.com>
+	<20100927184336.GK2560@sortiz-mobl> <1286026413.3125.27.camel@odin>
+	<20101004084646.4de3714d@lmajewski.digital.local>
+	<1286186989.3148.19.camel@odin>
+Message-ID: <20101004133652.2bfa061c@lmajewski.digital.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 04 Oct 2010 11:09:49 +0100
+Liam Girdwood <lrg@slimlogic.co.uk> wrote:
 
-On Thursday, September 16, 2010 10:37 AM Jeongbae Seo wrote:
-
-> From: Hyuk Lee <hyuk1.lee@samsung.com>
+> On Mon, 2010-10-04 at 08:46 +0200, Lukasz Majewski wrote:
+> > On Sat, 02 Oct 2010 14:33:33 +0100
+> > Liam Girdwood <lrg@slimlogic.co.uk> wrote:
+> > 
+> > > On Mon, 2010-09-27 at 20:43 +0200, Samuel Ortiz wrote:
+> > > > Hi Lukasz,
+> > > > 
+> > > > On Mon, Sep 27, 2010 at 02:32:26PM +0200, Lukasz Majewski wrote:
+> > > > > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> > > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > > Fine with me:
+> > > > Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+> > > > 
+> > > 
+> > > Lukasz, this is not applying against the regulator next tree.
+> > > Can you redo and add Mark and Samuels Acks.
+> > > 
+> > > Thanks
+> > > 
+> > > Liam
+> > 
+> > Hi Liam,
+> > 
+> > I've fetched the newest voltage-2.6/for-next and merge it with
+> > newest mfd-2.6/for next. After that all patches are applying and
+> > kernel is building without errors.
+> > 
+> > The problem with this patch series is that it "touches" two
+> > repositories: voltage-2.6 and mfd-2.6. 
+> > 
+> > I'm a bit confused how such situation should be resolved, since it
+> > involves two separate repositories (and two maintainers to
+> > cooperate).
+> > 
 > 
-> This patch adds to support HSMMC for S5PV310 and S5PC210 and setup for
-> HSMMC host controller and also related GPIO.
-> At most 4 channel can be used at the same time.
-> A user can configure SDHCI data bus as 8bit or 4bit.
+> You should only base your patches on one tree for upstreaming and
+> since this series mostly touches regulator it's best base against the
+> regulator tree.
 > 
-> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Kconfig            |   39 ++++++++
->  arch/arm/mach-s5pv310/Makefile           |    2 +
->  arch/arm/mach-s5pv310/setup-sdhci-gpio.c |  156 ++++++++++++++++++++++++++++++
->  arch/arm/mach-s5pv310/setup-sdhci.c      |   69 +++++++++++++
->  4 files changed, 266 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv310/setup-sdhci-gpio.c
->  create mode 100644 arch/arm/mach-s5pv310/setup-sdhci.c
-> 
+> Liam
 
-<snip>
+Hi,
 
-> diff --git a/arch/arm/mach-s5pv310/setup-sdhci-gpio.c b/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-> new file mode 100644
-> index 0000000..8db8c81
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-> @@ -0,0 +1,156 @@
-> +/* linux/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
-> + *
-> + * S5PV310 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/gpio.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/mmc/card.h>
-> +
-> +#include <plat/gpio-cfg.h>
-> +#include <plat/regs-sdhci.h>
-> +#include <plat/sdhci.h>
-> +
-> +void s5pv310_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-> +{
-> +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> +	unsigned int gpio;
-> +
-> +	/* Set all the necessary GPK0[0:1] pins to special-function 2 */
-> +	for (gpio = S5PV310_GPK0(0); gpio < S5PV310_GPK0(2); gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +	}
-> +
-> +	switch (width) {
-> +	case 8:
-> +		for (gpio = S5PV310_GPK1(3); gpio <= S5PV310_GPK1(6); gpio++) {
-> +			/* Data pin GPK1[3:6] to special-funtion 3 */
-> +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-> +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +
-> +			/* Setup Drive Strength */
-> +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> +		}
-> +	case 4:
-> +		for (gpio = S5PV310_GPK0(3); gpio <= S5PV310_GPK0(6); gpio++) {
-> +			/* Data pin GPK0[3:6] to special-funtion 2 */
-> +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +
-> +			/* Setup Drive Strength */
-> +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> +		}
-> +	default:
-> +		break;
-> +	}
-> +
-> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> +		s3c_gpio_cfgpin(S5PV310_GPK0(2), S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(S5PV310_GPK0(2), S3C_GPIO_PULL_UP);
-> +	}
-> +}
-> +
-> +void s5pv310_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-> +{
-> +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> +	unsigned int gpio;
-> +
-> +	/* Set all the necessary GPK1[0:1] pins to special-function 2 */
-> +	for (gpio = S5PV310_GPK1(0); gpio < S5PV310_GPK1(2); gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +	}
-> +
-> +	for (gpio = S5PV310_GPK1(3); gpio <= S5PV310_GPK1(6); gpio++) {
-> +		/* Data pin GPK1[3:6] to special-function 2 */
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +
-> +		/* Setup Drive Strength */
-> +		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> +	}
-> +
-> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> +		s3c_gpio_cfgpin(S5PV310_GPK1(2), S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(S5PV310_GPK1(2), S3C_GPIO_PULL_UP);
-> +	}
-> +}
-> +
-> +void s5pv310_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
-> +{
-> +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> +	unsigned int gpio;
-> +
-> +	/* Set all the necessary GPK2[0:1] pins to special-function 2 */
-> +	for (gpio = S5PV310_GPK2(0); gpio < S5PV310_GPK2(2); gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+So what is your opinion of solving this issue?
 
-Lack of "s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4)" here causes problems with 
-Universal C210 and external SD-card. IMHO driver strength should be set for all MMC
-pins, not only for data pins like below (and do this for all MMC blocks of course). 
+Those patches require simultaneous update of voltage-2.6 and mfd-2.6
+trees. Especially changes for voltage-2.6 won't work without
+modification of mfd-2.6 tree.
 
-> +	}
-> +
-> +	switch (width) {
-> +	case 8:
-> +		for (gpio = S5PV310_GPK3(3); gpio <= S5PV310_GPK3(6); gpio++) {
-> +			/* Data pin GPK3[3:6] to special-function 3 */
-> +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-> +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +
-> +			/* Setup Drive Strength */
-> +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> +		}
-> +	case 4:
-> +		for (gpio = S5PV310_GPK2(3); gpio <= S5PV310_GPK2(6); gpio++) {
-> +			/* Data pin GPK2[3:6] to special-function 2 */
-> +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +
-> +			/* Setup Drive Strength */
-> +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> +		}
-> +	default:
-> +		break;
-> +	}
-> +
-> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> +		s3c_gpio_cfgpin(S5PV310_GPK2(2), S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(S5PV310_GPK2(2), S3C_GPIO_PULL_UP);
-> +	}
-> +}
-> +
-> +void s5pv310_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
-> +{
-> +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> +	unsigned int gpio;
-> +
-> +	/* Set all the necessary GPK3[0:1] pins to special-function 2 */
-> +	for (gpio = S5PV310_GPK3(0); gpio < S5PV310_GPK3(2); gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> +	}
-> +
-> +	for (gpio = S5PV310_GPK3(3); gpio <= S5PV310_GPK3(6); gpio++) {
-> +		/* Data pin GPK3[3:6] to special-function 2 */
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> +
-> +		/* Setup Drive Strength */
-> +		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> +	}
-> +
-> +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> +		s3c_gpio_cfgpin(S5PV310_GPK3(2), S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(S5PV310_GPK3(2), S3C_GPIO_PULL_UP);
-> +	}
-> +}
+-- 
+Best regards,
 
-<snip>
+Lukasz Majewski
 
-Best regards
---
-Marek Szyprowski
 Samsung Poland R&D Center
+Platform Group
