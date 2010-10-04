@@ -1,75 +1,38 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 4 Oct 2010 16:34:01 +0530
-Subject: [PATCH v4 4/4] OMAP3: DMA: Errata i541: sDMA FIFO draining does
-	not finish
-In-Reply-To: <201010041342.33238.peter.ujfalusi@nokia.com>
-References: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
-	<1286180294-32618-5-git-send-email-peter.ujfalusi@nokia.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA49@dbde02.ent.ti.com>
-	<201010041342.33238.peter.ujfalusi@nokia.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CB67@dbde02.ent.ti.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Mon, 4 Oct 2010 16:34:06 +0530
+Subject: multiple linux-next OMAP3 build errors
+In-Reply-To: <1286173747.2358.4.camel@tubuntu.research.nokia.com>
+References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
+	<1286173747.2358.4.camel@tubuntu.research.nokia.com>
+Message-ID: <AANLkTi=-xu5D6g+15AHtwWrUBjFfqEATkU+e=NXa8gAF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 4, 2010 at 11:59 AM, Tomi Valkeinen
+<tomi.valkeinen@nokia.com> wrote:
+> Hi,
+>
+> On Fri, 2010-10-01 at 17:57 +0200, ext Grazvydas Ignotas wrote:
+>> hi,
+>>
+>> I've been building linux-next for a while now and keep getting these
+>> build errors, just posting them here in case not all are known. Not
+>> familiar enough with that code to send patches unfortunately.
+>
+>> ? CC ? ? ?drivers/video/omap2/vram.o
+>> drivers/video/omap2/vram.c: In function 'omap_vram_reserve_sdram_memblock':
+>> drivers/video/omap2/vram.c:568: error: implicit declaration of
+>> function 'memblock_region_is_memory'
+>
+> Benjamin, your patch "memblock/arm: Use memblock_region_is_memory() for
+> omap fb" in linux-next seems to be broken. I believe the called function
+> should be memblock_is_region_memory, not memblock_region_is_memory?
+>
 
+I've posted this patch [1] for this. Could one of you please pick up,
+or fold into
+the original patch if it hasn't yet reached mainline?
 
-> -----Original Message-----
-> From: Peter Ujfalusi [mailto:peter.ujfalusi at nokia.com] 
-> Sent: Monday, October 04, 2010 4:13 PM
-> To: G, Manjunath Kondaiah
-> Cc: Tony Lindgren; linux-omap at vger.kernel.org; Jarkko Nikula; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v4 4/4] OMAP3: DMA: Errata i541: sDMA 
-> FIFO draining does not finish
-> 
-> On Monday 04 October 2010 12:17:41 ext G, Manjunath Kondaiah wrote:
-> > 
-> > ...
-> > 
-> > > +	/* OMAP3 Errata i541: sDMA FIFO draining does not finish */
-> > 
-> > This logic is required for multiple erratas.
-> 
-> As Tony requested, I have added a variable for flags to 
-> handle the different erratas. I even added a macro to check 
-> that the errata applies, so one can use:
-> if (IS_DMA_ERRATA(DMA_ERRATA_XXXXX))
-> 
-> > Can we have seperate
-> > function for handling this logic. More details at:
-> > https://patchwork.kernel.org/patch/126271/
-> 
-> I see. That patch is for hwmod converted dma code, right?
-> We need this fix without the hwmod to applied, and than 
-> backport it to earlier kernel releases.
-> 
-> > As I mentioned in other mail, if you are introducing this 
-> feature, it 
-> > is better to convert existing erratas also to use this feature.
-> 
-> The upcoming hwmod conversion will take care of the cleanup.
+- Anand
 
-If this is the case, not sure about intention of having dma_errata only
-for these two erratas since all the erratas are not handled.
-
-All the erratas will get cleaned up and errata handling feature
-will be introduced along with dma hwmod changes.
-
-If feel v3 version is better so that I can use these changes along 
-dma hwmod.
-
-It is upto Tony to decide.
-
-> We _need_ these two small fixes ASAP, since it is fixing 
-> serious problem in audio (and the same issue might bite other 
-> areas as well).
-> It is not the intention of this series to clean up the 
-> arc/arm/plat-omap/dma.c.
-
-Tony, 
-How about having v3 series + review comments fixed(except comments
-related errata handling). Errata handling will be done as part dma
-hwmod. I am waiting for these patches so that I can rebase these
-patches in DMA hwmod.
-
--Manjunath
+[1] https://patchwork.kernel.org/patch/224902/
