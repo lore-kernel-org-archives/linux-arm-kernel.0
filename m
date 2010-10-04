@@ -1,28 +1,51 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Mon, 04 Oct 2010 09:29:07 +0300
-Subject: multiple linux-next OMAP3 build errors
-In-Reply-To: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
-References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
-Message-ID: <1286173747.2358.4.camel@tubuntu.research.nokia.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 04 Oct 2010 08:46:46 +0200
+Subject: [PATCH v3 4/5] mfd: regulator: max8998: voltages and GPIOs defined
+	at platform data structure
+In-Reply-To: <1286026413.3125.27.camel@odin>
+References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
+	<1285590747-32404-5-git-send-email-l.majewski@samsung.com>
+	<20100927184336.GK2560@sortiz-mobl> <1286026413.3125.27.camel@odin>
+Message-ID: <20101004084646.4de3714d@lmajewski.digital.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 02 Oct 2010 14:33:33 +0100
+Liam Girdwood <lrg@slimlogic.co.uk> wrote:
 
-On Fri, 2010-10-01 at 17:57 +0200, ext Grazvydas Ignotas wrote:
-> hi,
+> On Mon, 2010-09-27 at 20:43 +0200, Samuel Ortiz wrote:
+> > Hi Lukasz,
+> > 
+> > On Mon, Sep 27, 2010 at 02:32:26PM +0200, Lukasz Majewski wrote:
+> > > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Fine with me:
+> > Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+> > 
 > 
-> I've been building linux-next for a while now and keep getting these
-> build errors, just posting them here in case not all are known. Not
-> familiar enough with that code to send patches unfortunately.
+> Lukasz, this is not applying against the regulator next tree.
+> Can you redo and add Mark and Samuels Acks.
+> 
+> Thanks
+> 
+> Liam
 
->   CC      drivers/video/omap2/vram.o
-> drivers/video/omap2/vram.c: In function 'omap_vram_reserve_sdram_memblock':
-> drivers/video/omap2/vram.c:568: error: implicit declaration of
-> function 'memblock_region_is_memory'
+Hi Liam,
 
-Benjamin, your patch "memblock/arm: Use memblock_region_is_memory() for
-omap fb" in linux-next seems to be broken. I believe the called function
-should be memblock_is_region_memory, not memblock_region_is_memory?
+I've fetched the newest voltage-2.6/for-next and merge it with newest
+mfd-2.6/for next. After that all patches are applying and kernel is
+building without errors.
 
- Tomi
+The problem with this patch series is that it "touches" two
+repositories: voltage-2.6 and mfd-2.6. 
+
+I'm a bit confused how such situation should be resolved, since it
+involves two separate repositories (and two maintainers to cooperate).
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung Poland R0d5c1f412cf166c0cd87b0f6eb7fed70a2&D Center
+Platform Group
