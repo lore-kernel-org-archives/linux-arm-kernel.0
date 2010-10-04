@@ -1,33 +1,44 @@
 From: vkuzmichev@mvista.com (vkuzmichev at mvista.com)
-Date: Mon,  4 Oct 2010 13:45:36 +0400
-Subject: [PATCH 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
-Message-ID: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+Date: Mon,  4 Oct 2010 13:45:39 +0400
+Subject: [PATCH 3/4] ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <1286185540-19569-4-git-send-email-vkuzmichev@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vitaly Kuzmichev <vkuzmichev@mvista.com>
 
-The series of patches fixes various bugs in ARM MPCORE watchdog setup.
-They also introduce some changes in common SMP_TWD timer setup code.
-The PATCH 1/4 adds an exported function to obtain calibrated timer rate
-in mpcore_wdt. However, this solution might be unacceptable, so we may
-discuss another 2 variants:
- 1) use clock framework
-   This may require to fix all MPCORE boards clock implementations.
- 2) copy calibration loop to mpcore_wdt
-   However, this increases boot time.
+According to the include/linux/watchdog.h WDIOC_SETOPTIONS is
+classified as 'read from device' ioctl call:
+  #define WDIOC_SETOPTIONS        _IOR(WATCHDOG_IOCTL_BASE, 4, int)
 
+However, the driver 'mpcore_wdt' performs 'copy_from_user' only if
+_IOC_WRITE is set, thus the local variable 'uarg' which is used in
+WDIOC_SETOPTIONS handling remains uninitialized.
 
-Vitaly Kuzmichev (4):
-  ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
-  ARM: smp_twd: Fix typo in twd_timer_rate printout
-  ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
-  ARM: mpcore_wdt: Fix timer mode setup
+The proper way to fix this is to bind WDIOC_SETOPTIONS to _IOW,
+but this will break compatibility.
+So adding additional condition for performing 'copy_from_user'.
 
- arch/arm/include/asm/smp_twd.h |    7 +++++++
- arch/arm/kernel/smp_twd.c      |    8 +++++++-
- drivers/watchdog/mpcore_wdt.c  |   29 +++++++++++++++++++++--------
- 3 files changed, 35 insertions(+), 9 deletions(-)
+Signed-off-by: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+---
+ drivers/watchdog/mpcore_wdt.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
+diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
+index 1bd3529..6d3ac06 100644
+--- a/drivers/watchdog/mpcore_wdt.c
++++ b/drivers/watchdog/mpcore_wdt.c
+@@ -238,7 +238,8 @@ static long mpcore_wdt_ioctl(struct file *file, unsigned int cmd,
+ 	if (_IOC_DIR(cmd) && _IOC_SIZE(cmd) > sizeof(uarg))
+ 		return -ENOTTY;
+ 
+-	if (_IOC_DIR(cmd) & _IOC_WRITE) {
++	if (_IOC_DIR(cmd) & _IOC_WRITE
++			|| cmd == WDIOC_SETOPTIONS) {
+ 		ret = copy_from_user(&uarg, (void __user *)arg, _IOC_SIZE(cmd));
+ 		if (ret)
+ 			return -EFAULT;
 -- 
 1.7.2.2
