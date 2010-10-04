@@ -1,81 +1,66 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 5 Oct 2010 08:44:21 +0900
-Subject: [PATCH 5/7] ARM: S5PC210: I2C0/1 devices support on Universal
-	board
-In-Reply-To: <20100930044844.GA16913@july>
-References: <20100930044844.GA16913@july>
-Message-ID: <AANLkTim+qMLSTmJNhFinc835BNp43qfMRc9TO4qk4yXb@mail.gmail.com>
+Date: Tue, 5 Oct 2010 08:45:47 +0900
+Subject: [PATCH 0/7] ARM: S5PC210: I2C devices support and Universal board
+	updates
+In-Reply-To: <20100930044814.GA16892@july>
+References: <20100930044814.GA16892@july>
+Message-ID: <AANLkTiknkbts6AtiBpqceSDqEXsE9E+qpMKJx2fzygB6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
+Hi,
+
+I think we made some conclusion. first apply the current style and
+improve it later for consistency.
+
+Thank you,
+Kyungmin Park
 
 On Thu, Sep 30, 2010 at 1:48 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
+> The following changes since commit aff078a9da27e0effb2a149834089e5788943d4b:
+> ?Marek Szyprowski (1):
+> ? ? ? ?ARM: S5PV210: Enable USB HSOTG gadget build
 >
-> Camera devices use the I2C0 and Gyro uese the I2C1 on universal board.
+> Kyungmin Park (7):
+> ? ? ?ARM: S5PC210: Universal OneNAND support
+> ? ? ?ARM: S5PC110: Fix wrong interrupt I2C2 number
+> ? ? ?ARM: Samsung: Use the correct I2C2 interrupt
+> ? ? ?ARM: S5PC210: I2C1/2 support
+> ? ? ?ARM: S5PC210: I2C0/1 devices support on Universal board
+> ? ? ?ARM: S5PC210: Define the more I2C{3,4,5,6,7} address & interrupt
+> ? ? ?ARM: S5PC210: I2C{3, 4, 5, 6, 7} device support
 >
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ? ? ? | ? ?2 ++
-> ?arch/arm/mach-s5pv310/mach-universal_c210.c | ? 14 ++++++++++++++
-> ?2 files changed, 16 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index 178eab9..c207426 100644
-> --- a/arch/arm/mach-s5pv310/Kconfig
-> +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -41,6 +41,8 @@ config MACH_UNIVERSAL_C210
-> ? ? ? ?bool "Mobile UNIVERSAL_C210 Board"
-> ? ? ? ?select CPU_S5PV310
-> ? ? ? ?select S5P_DEV_ONENAND
-> + ? ? ? select S3C_DEV_I2C1
-> + ? ? ? select S5PV310_SETUP_I2C1
-> ? ? ? ?help
-> ? ? ? ? ?Machine support for Samsung Mobile Universal S5PC210 Reference
-> ? ? ? ? ?Board. S5PC210(MCP) is one of package option of S5PV310
-> diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-> index e169849..deffeb1 100644
-> --- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-> +++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-> @@ -10,6 +10,7 @@
-> ?#include <linux/platform_device.h>
-> ?#include <linux/serial_core.h>
-> ?#include <linux/input.h>
-> +#include <linux/i2c.h>
-> ?#include <linux/gpio_keys.h>
-> ?#include <linux/gpio.h>
->
-> @@ -116,6 +117,16 @@ static struct platform_device universal_gpio_keys = {
-> ? ? ? ?},
-> ?};
->
-> +/* I2C0 */
-> +static struct i2c_board_info i2c0_devs[] __initdata = {
-> + ? ? ? /* Camera, To be updated */
-> +};
-> +
-> +/* I2C1 */
-> +static struct i2c_board_info i2c1_devs[] __initdata = {
-> + ? ? ? /* Gyro, To be updated */
-> +};
-> +
-> ?static struct platform_device *universal_devices[] __initdata = {
-> ? ? ? ?&universal_gpio_keys,
-> ? ? ? ?&s5p_device_onenand,
-> @@ -134,6 +145,9 @@ static void __init universal_machine_init(void)
-> ? ? ? ?l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
-> ?#endif
->
-> + ? ? ? i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
-> + ? ? ? i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
-> +
-> ? ? ? ?/* Last */
-> ? ? ? ?platform_add_devices(universal_devices, ARRAY_SIZE(universal_devices));
-> ?}
-> --
-> 1.5.3.3
->
+> ?arch/arm/mach-s5pv210/include/mach/irqs.h ? | ? ?4 +-
+> ?arch/arm/mach-s5pv310/Kconfig ? ? ? ? ? ? ? | ? 18 +++++++
+> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? ? ?| ? ?5 ++
+> ?arch/arm/mach-s5pv310/include/mach/irqs.h ? | ? ?7 +++
+> ?arch/arm/mach-s5pv310/include/mach/map.h ? ?| ? 11 ++++-
+> ?arch/arm/mach-s5pv310/mach-universal_c210.c | ? 16 ++++++
+> ?arch/arm/mach-s5pv310/setup-i2c3.c ? ? ? ? ?| ? 25 ++++++++++
+> ?arch/arm/mach-s5pv310/setup-i2c4.c ? ? ? ? ?| ? 25 ++++++++++
+> ?arch/arm/mach-s5pv310/setup-i2c5.c ? ? ? ? ?| ? 25 ++++++++++
+> ?arch/arm/mach-s5pv310/setup-i2c6.c ? ? ? ? ?| ? 25 ++++++++++
+> ?arch/arm/mach-s5pv310/setup-i2c7.c ? ? ? ? ?| ? 25 ++++++++++
+> ?arch/arm/plat-s5p/Kconfig ? ? ? ? ? ? ? ? ? | ? 25 ++++++++++
+> ?arch/arm/plat-s5p/Makefile ? ? ? ? ? ? ? ? ?| ? ?5 ++
+> ?arch/arm/plat-s5p/dev-i2c3.c ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++++++
+> ?arch/arm/plat-s5p/dev-i2c4.c ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++++++
+> ?arch/arm/plat-s5p/dev-i2c5.c ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++++++
+> ?arch/arm/plat-s5p/dev-i2c6.c ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++++++
+> ?arch/arm/plat-s5p/dev-i2c7.c ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++++++
+> ?arch/arm/plat-samsung/dev-i2c2.c ? ? ? ? ? ?| ? ?4 +-
+> ?arch/arm/plat-samsung/include/plat/iic.h ? ?| ? ?5 ++
+> ?20 files changed, 554 insertions(+), 6 deletions(-)
+> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
+> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
+> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
+> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
+> ?create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
+> ?create mode 100644 arch/arm/plat-s5p/dev-i2c3.c
+> ?create mode 100644 arch/arm/plat-s5p/dev-i2c4.c
+> ?create mode 100644 arch/arm/plat-s5p/dev-i2c5.c
+> ?create mode 100644 arch/arm/plat-s5p/dev-i2c6.c
+> ?create mode 100644 arch/arm/plat-s5p/dev-i2c7.c
 >
 > _______________________________________________
 > linux-arm-kernel mailing list
