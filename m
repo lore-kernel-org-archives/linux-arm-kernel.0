@@ -1,63 +1,34 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 4 Oct 2010 12:58:42 +0530
-Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
-In-Reply-To: <20101004070040.GE2559@legolas.emea.dhcp.ti.com>
-References: <20101001213119.1408.65395.stgit@twilight.localdomain>
-	<20101001213532.1408.55832.stgit@twilight.localdomain>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3C6@dbde02.ent.ti.com>
-	<20101004065624.GD2559@legolas.emea.dhcp.ti.com>
-	<20101004070040.GE2559@legolas.emea.dhcp.ti.com>
-Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
+From: s.neumann@raumfeld.com (Sven Neumann)
+Date: Mon, 04 Oct 2010 09:30:35 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+Message-ID: <1286177435.2140.5.camel@sven>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Balbi, Felipe
-> Sent: Monday, October 04, 2010 12:31 PM
-> To: Balbi, Felipe
-> Cc: Shilimkar, Santosh; Paul Walmsley; linux-omap at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 08/10] OMAP: split plat-omap/common.c
-> 
-> On Mon, Oct 04, 2010 at 01:56:24AM -0500, Balbi, Felipe wrote:
-> >On Mon, Oct 04, 2010 at 12:34:48AM -0500, Shilimkar, Santosh wrote:
-> >>Felipe,
-> >>
-> >>> -----Original Message-----
-> >>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> >>> owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> >>> Sent: Saturday, October 02, 2010 3:06 AM
-> >>> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> >>> Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
-> >>>
-> >>> Split plat-omap/common.c into three pieces:
-> >>>
-> >>> 1. the 32KiHz sync timer and clocksource code, which now lives in
-> >>>    plat-omap/32ksynctimer.c;
-> >>>
-> >>I remember you have converted the 32k sync time code to a platform
-> driver.
-> >>That was also addressing the multi-omap build and was removing all
-> >>the compile time switches.
-> >>Do you plan to rebase it and post it again ?
-> >
-> >I still have that sitting on my gitorious tree. The patch is attached
-> >to this mail. I compile tested (only) for omap3_defconfig, it probably
-> >needs to start using pm_runtime functions at some point and probably
-> >move to drivers/clocksource instead of arch/arm/plat-omap.
-> >
-> >patch is also available at [1]
-> >
-> >[1] git://gitorious.org/usb/usb.git clksource
-> 
-> I made a few changes to make checkpatch.pl --strict happy. Attached
-> 
-Good !!
-This patch addresses splitting as well as multi-omap builds and probably
-also a better candidate in case we need to convert sync timer to hwmod
-driver.
+Hi,
 
-Paul, what's your take?
+we are running an embedded system here based on the PXA300 platform.
+Suspend/resume used to work well so far. However after upgrading the
+kernel from 2.6.34.7 to 2.6.35.6, we get the following error when trying
+to suspend the system:
+
+# echo "mem" > "/sys/power/state"
+[ 5647.295953] PM: Syncing filesystems ... done.
+[ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
+[ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+[ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
+[ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
+[ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
+[ 5647.367082] PM: Some devices failed to suspend
+
 
 Regards,
-Santosh
+Sven
+
+
+-- 
+Sven Neumann
+Head of Software Development
+
+RAUMFELD GmbH | Reichenberger Str. 124 | 10999 Berlin | Germany
+Tel: +49.30.340.60.98.0 | Fax: +49.30.340.60.98.99 | s.neumann at raumfeld.com
