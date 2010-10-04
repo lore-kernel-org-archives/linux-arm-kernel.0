@@ -1,52 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Oct 2010 11:27:00 -0700
-Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE554@dbde02.ent.ti.com>
-References: <20101001213119.1408.65395.stgit@twilight.localdomain>
-	<20101001213532.1408.55832.stgit@twilight.localdomain>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3D3@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1010032359220.13816@utopia.booyaka.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE554@dbde02.ent.ti.com>
-Message-ID: <20101004182700.GZ3117@atomide.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 4 Oct 2010 11:28:35 -0700
+Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C98C@dbde02.ent.ti.com>
+References: <1285069770-4261-1-git-send-email-manjugk@ti.com>
+	<1285076060.14206.3.camel@chotu>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402785A3478@dbde02.ent.ti.com>
+	<20100921162658.GA2310@core.coreip.homeip.net>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C98C@dbde02.ent.ti.com>
+Message-ID: <20101004182834.GE8321@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Varadarajan, Charulatha <charu@ti.com> [101004 01:20]:
-> Paul,
+On Mon, Oct 04, 2010 at 01:32:29PM +0530, G, Manjunath Kondaiah wrote:
+> Dmitry,
+> As agreed, can you push this patch?
+> https://patchwork.kernel.org/patch/197442/
 > 
-> <<snip>>
-> 
-> > 
-> > > > +static int __init omap_init_clocksource_32k(void)
-> > > > +{
-> > > > +	static char err[] __initdata = KERN_ERR
-> > > > +			"%s: can't register clocksource!\n";
-> > > > +
-> > > > +	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-> > > > +		struct clk *sync_32k_ick;
-> > > > +
-> > > > +		if (cpu_is_omap16xx())
-> > >
-> > > Avoid cpu_is* checks in plat-omap.
-> > 
-> > OK, I'll bite.  Why?
-> 
-> I think this is being looked for all the new code introduced
-> in plat-omap layer for the following reasons:
-> Adding cpu-is-* checks makes code unmaintainable going fwd.
-> plat-omap layer needs to handle common code for all omap platforms.
-> 
-> This was raised for GPIO driver because of which, there was a
-> requirement to clean-up the gpio driver.
-> 
-> Is this stand changed? Are cpu_is* checks allowed in plat-omap?
 
-We should only need to do cpu_is* checks in arch/arm/mach-omap2,
-and only in few places during the init.
+Manjunath,
 
-However, this patch series moves around the existing code to
-avoid having oma2plus specific code be in plat-omap.
+It is queued for 2.6.37 (take a peek at 'next' branch of my tree) - I do
+not believe that the failure is critical enough for .36.
 
-Again, further patches can be done easily on this.
+Thanks.
 
-Tony
+-- 
+Dmitry
