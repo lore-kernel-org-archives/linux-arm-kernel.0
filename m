@@ -1,36 +1,54 @@
-From: eric@eukrea.com (=?UTF-8?B?RXJpYyBCw6luYXJk?=)
-Date: Mon, 04 Oct 2010 10:08:44 +0200
-Subject: I.MX35 GPIO IRQ + Preempt -> Oops
-In-Reply-To: <20101004073920.GM28679@pengutronix.de>
-References: <4CA739B4.1020506@eukrea.com>
-	<20101003114103.GC32736@n2100.arm.linux.org.uk>
-	<4CA8A06B.3070103@eukrea.com>
-	<20101003162021.GD32736@n2100.arm.linux.org.uk>
-	<4CA8BA29.5060600@eukrea.com>
-	<20101004073920.GM28679@pengutronix.de>
-Message-ID: <4CA98B8C.4010106@eukrea.com>
+From: peter.ujfalusi@nokia.com (Peter Ujfalusi)
+Date: Mon,  4 Oct 2010 11:18:12 +0300
+Subject: [PATCH v4 2/4] OMAP: DMA: Introduce errata handling variable,
+	and macro
+In-Reply-To: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
+References: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
+Message-ID: <1286180294-32618-3-git-send-email-peter.ujfalusi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Use flags for errata handling.
 
-Le 04/10/2010 09:39, Uwe Kleine-K?nig a ?crit :
-> On Sun, Oct 03, 2010 at 07:15:21PM +0200, Eric B?nard wrote:
->> Le 03/10/2010 18:20, Russell King - ARM Linux a ?crit :
->> the FIQ is used for the imx-ssi driver.
->>
->> It seems that removing the cpu_do_idle() call in
->> plat-mxc/include/mach/system.h "fix" the problem.
-> hmmm
->
-> Does deselecting imx-ssi "fixes" the problem, too?
->
-not tested yet.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
+---
+ arch/arm/plat-omap/dma.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-> Do you have traffic on the ssi unit when the problem occurs?
->
-no but looking at the errata (and the i.MX31's one which is very 
-similar) it's not clearly mentionned that the FIQ has to be used in 
-order to trigger the problem (they talk of FIQ/IRQ).
-
-Eric
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 6914ccf..ae0ff64 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -146,6 +146,10 @@ static const u8 omap1_dma_irq[OMAP1_LOGICAL_DMA_CH_COUNT] = {
+ 	INT_1610_DMA_CH14, INT_1610_DMA_CH15, INT_DMA_LCD
+ };
+ 
++/* Errata handling */
++static u16 dma_errata;
++#define IS_DMA_ERRATA(id)	(dma_errata & (id))
++
+ static inline void disable_lnk(int lch);
+ static void omap_disable_channel_irq(int lch);
+ static inline void omap_enable_channel_irq(int lch);
+@@ -2042,6 +2046,10 @@ void omap_dma_global_context_restore(void)
+ 
+ /*----------------------------------------------------------------------------*/
+ 
++static void dma_errata_configure(void)
++{
++}
++
+ static int __init omap_init_dma(void)
+ {
+ 	unsigned long base;
+@@ -2064,6 +2072,8 @@ static int __init omap_init_dma(void)
+ 		return -ENODEV;
+ 	}
+ 
++	dma_errata_configure();
++
+ 	omap_dma_base = ioremap(base, SZ_4K);
+ 	BUG_ON(!omap_dma_base);
+ 
+-- 
+1.7.3
