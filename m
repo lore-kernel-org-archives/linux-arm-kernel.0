@@ -1,33 +1,320 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 05 Oct 2010 09:30:22 +1100
-Subject: multiple linux-next OMAP3 build errors
-In-Reply-To: <1286173747.2358.4.camel@tubuntu.research.nokia.com>
-References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>
-	<1286173747.2358.4.camel@tubuntu.research.nokia.com>
-Message-ID: <1286231422.2463.316.camel@pasglop>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 5 Oct 2010 00:36:22 +0200
+Subject: [PATCH v5] power: introduce library for device-specific OPPs
+In-Reply-To: <1285933174-24053-1-git-send-email-nm@ti.com>
+References: <1285933174-24053-1-git-send-email-nm@ti.com>
+Message-ID: <201010050036.23179.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-10-04 at 09:29 +0300, Tomi Valkeinen wrote:
-> >   CC      drivers/video/omap2/vram.o
-> > drivers/video/omap2/vram.c: In function
-> 'omap_vram_reserve_sdram_memblock':
-> > drivers/video/omap2/vram.c:568: error: implicit declaration of
-> > function 'memblock_region_is_memory'
+On Friday, October 01, 2010, Nishanth Menon wrote:
+> SoCs have a standard set of tuples consisting of frequency and
+> voltage pairs that the device will support per voltage domain. These
+> are called Operating Performance Points or OPPs. The actual
+> definitions of OPP varies over silicon versions. For a specific domain,
+> we can have a set of {frequency, voltage} pairs. As the kernel boots
+> and more information is available, a default set of these are activated
+> based on the precise nature of device. Further on operation, based on
+> conditions prevailing in the system (such as temperature), some OPP
+> availability may be temporarily controlled by the SoC frameworks.
 > 
-> Benjamin, your patch "memblock/arm: Use memblock_region_is_memory()
-> for
-> omap fb" in linux-next seems to be broken. I believe the called
-> function
-> should be memblock_is_region_memory, not memblock_region_is_memory?
+> To implement an OPP, some sort of power management support is necessary
+> hence this library depends on CONFIG_PM.
 
-I suspect either I didn't push my latest version before it got merged or
-Yinghai didn't pull the right one, since I'm pretty sure I test built
-it, but in any case, you're probably right :-)
+Well, I still have some comments.
 
-I'm not in control of this patch series at the moment however. Ingo and
-Yinghai are. Yinghai, care to fix that up ? I'm currently travelling on
-holidays and won't be able to do much until later next week.
+...
+> +/**
+> + * opp_add()  - Add an OPP table from a table definitions
+> + * @dev:	device for which we do this operation
+> + * @freq:	Frequency in Hz for this OPP
+> + * @u_volt:	Voltage in uVolts for this OPP
+> + *
+> + * This function adds an opp definition to the opp list and returns status.
+> + * The opp is made available by default and it can be controlled using
+> + * opp_enable/disable functions.
+> + *
+> + * Locking: The internal device_opp and opp structures are RCU protected.
+> + * Hence this function internally uses RCU and mutex locks to keep the
+> + * integrity of the internal data structures. Callers should ensure that
+> + * this function is *NOT* called under RCU protection or in contexts where
+> + * mutex cannot be locked.
 
-Cheers,
-Ben.
+I'm not really sure why so many mutexes are needed here.  I don't think you
+need a separate mutex in every struct device_opp object.  I'd just use
+dev_opp_list_lock for everything.
+
+> + */
+> +int opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+> +{
+> +	struct device_opp *dev_opp = NULL;
+> +	struct opp *opp, *new_opp;
+> +	struct list_head *head;
+> +
+> +	/* allocate new OPP node */
+> +	new_opp = kzalloc(sizeof(struct opp), GFP_KERNEL);
+> +	if (!new_opp) {
+> +		pr_warning("Unable to allocate new opp node\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* Check for existing list for 'dev' */
+> +	rcu_read_lock();
+
+If you acquire dev_opp_list_lock here, you won't need the rcu_read_lock(),
+because every other updater will block on dev_opp_list_lock until you're done.
+
+> +	dev_opp = find_device_opp(dev);
+> +	rcu_read_unlock();
+> +	if (!dev_opp) {
+
+Now you can drop dev_opp_list_lock temporarily, because the allocation doesn't
+need synchronization.
+
+> +		/* Allocate a new device OPP table */
+> +		dev_opp = kzalloc(sizeof(struct device_opp), GFP_KERNEL);
+> +		if (!dev_opp) {
+> +			kfree(new_opp);
+> +			pr_warning("Unable to allocate device structure\n");
+> +			return -ENOMEM;
+> +		}
+> +
+> +		dev_opp->dev = dev;
+> +		INIT_LIST_HEAD(&dev_opp->opp_list);
+> +		mutex_init(&dev_opp->lock);
+> +
+
+Reacquire dev_opp_list_lock at this point and hold it to the end of the routine.
+
+> +		/* Secure the device list modification */
+> +		mutex_lock(&dev_opp_list_lock);
+
+This won't be necessary any more.
+
+> +		list_add_rcu(&dev_opp->node, &dev_opp_list);
+
+Of course, this is still needed.
+
+> +		mutex_unlock(&dev_opp_list_lock);
+
+Not necessary.
+
+> +	}
+> +
+> +	/* populate the opp table */
+> +	new_opp->dev_opp = dev_opp;
+> +	new_opp->rate = freq;
+> +	new_opp->u_volt = u_volt;
+> +	new_opp->available = true;
+> +
+> +	/* make the dev_opp modification safe */
+> +	mutex_lock(&dev_opp->lock);
+
+That's not necessary.
+
+> +
+> +	rcu_read_lock();
+
+Ditto.
+
+> +	/* Insert new OPP in order of increasing frequency */
+> +	head = &dev_opp->opp_list;
+> +	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
+> +		if (new_opp->rate < opp->rate)
+> +			break;
+> +		else
+> +			head = &opp->node;
+> +	}
+> +	rcu_read_unlock();
+
+Ditto.
+
+> +	list_add_rcu(&new_opp->node, head);
+> +	mutex_unlock(&dev_opp->lock);
+
+Now release dev_opp_list_lock instead.
+
+And remember to call synchronize_rcu() when you're done.
+
+> +	return 0;
+> +}
+> +
+> +/**
+> + * opp_set_availability() - helper to set the availability of an opp
+> + * @dev:		device for which we do this operation
+> + * @freq:		OPP frequency to modify availability
+> + * @availability_req:	availability status requested for this opp
+> + *
+> + * Set the availability of an OPP with an RCU operation, opp_{enable,disable}
+> + * share a common logic which is isolated here.
+> + *
+> + * Returns -EINVAL for bad pointers, -ENOMEM if no memory available for the
+> + * copy operation, returns 0 if no modifcation was done OR modification was
+> + * successful.
+> + *
+> + * Locking: The internal device_opp and opp structures are RCU protected.
+> + * Hence this function internally uses RCU and mutex locks to keep the
+> + * integrity of the internal data structures. Callers should ensure that
+> + * this function is *NOT* called under RCU protection or in contexts where
+> + * mutex locking or synchronize_rcu() blocking calls cannot be used.
+> + */
+> +static int opp_set_availability(struct device *dev, unsigned long freq,
+> +		bool availability_req)
+> +{
+> +	struct device_opp *tmp_dev_opp, *dev_opp = NULL;
+> +	struct opp *new_opp, *tmp_opp, *opp = ERR_PTR(-ENODEV);
+> +	int r = 0;
+> +
+> +	/* keep the node allocated */
+> +	new_opp = kmalloc(sizeof(struct opp), GFP_KERNEL);
+> +	if (!new_opp) {
+> +		pr_warning("Unable to allocate opp\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	rcu_read_lock();
+
+Acquire dev_opp_list_lock instead.
+
+> +
+> +	/* Find the device_opp */
+> +	list_for_each_entry_rcu(tmp_dev_opp, &dev_opp_list, node) {
+
+You can use a normal list_for_each_entry here, because it's under the lock.
+
+> +		if (dev == tmp_dev_opp->dev) {
+> +			dev_opp = tmp_dev_opp;
+> +			break;
+> +		}
+> +	}
+> +	dev_opp = find_device_opp(dev);
+
+Hmm.  I wonder why this is necessary?
+
+> +	if (IS_ERR(dev_opp)) {
+> +		r = PTR_ERR(dev_opp);
+> +		pr_warning("Unable to find device\n");
+> +		goto err;
+> +	}
+> +
+> +	/* Do we have the frequency? */
+> +	list_for_each_entry_rcu(tmp_opp, &dev_opp->opp_list, node) {
+
+Use list_for_each_entry here too.
+
+> +		if (tmp_opp->rate == freq) {
+> +			opp = tmp_opp;
+> +			break;
+> +		}
+> +	}
+> +	if (IS_ERR(opp)) {
+> +		r = PTR_ERR(opp);
+> +		goto err;
+> +	}
+> +
+> +	mutex_lock(&opp->dev_opp->lock);
+
+And that won't be necessary any more.
+
+> +	tmp_opp = rcu_dereference(opp);
+
+Ditto (we're an updater, not a reader).
+
+> +	/* Is update really needed? */
+> +	if (tmp_opp->available == availability_req)
+> +		goto out1;
+> +	/* copy the old data over */
+> +	*new_opp = *tmp_opp;
+> +	rcu_read_unlock();
+
+Not necessary.
+
+> +	/* plug in new node */
+> +	new_opp->available = availability_req;
+> +	list_replace_rcu(&opp->node, &new_opp->node);
+> +	mutex_unlock(&opp->dev_opp->lock);
+
+Now unlock dev_opp_list_lock instead.
+
+> +	synchronize_rcu();
+> +
+
+And rework the exit code below accordingly.
+
+> +	/* clean up old opp */
+> +	new_opp = opp;
+> +	goto out;
+> +
+> +out1:
+> +	mutex_unlock(&opp->dev_opp->lock);
+> +err:
+> +	rcu_read_unlock();
+> +out:
+> +	kfree(new_opp);
+> +	return r;
+> +}
+> +
+...
+> +int opp_init_cpufreq_table(struct device *dev,
+> +			    struct cpufreq_frequency_table **table)
+> +{
+> +	struct device_opp *dev_opp;
+> +	struct opp *opp;
+> +	struct cpufreq_frequency_table *freq_table;
+> +	int i = 0;
+> +
+> +	rcu_read_lock();
+
+I would pretend I'm an updater here and acquire dev_opp_list_lock instead.
+
+> +	dev_opp = find_device_opp(dev);
+> +	if (IS_ERR(dev_opp)) {
+> +		rcu_read_unlock();
+
+So that won't be necessary.
+
+> +		pr_warning("Unable to find device\n");
+> +		return PTR_ERR(dev_opp);
+> +	}
+> +
+
+Now, you can sleep with the mutex held, so GFP_KERNEL may be used below.
+
+> +	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) *
+> +			     (opp_get_opp_count(dev) + 1), GFP_ATOMIC);
+> +	if (!freq_table) {
+> +		rcu_read_unlock();
+
+Drop dev_opp_list_lock instead.
+
+> +		pr_warning("Failed to allocate frequency table\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
+
+That may be list_for_each_entry() now.
+
+> +		if (opp->available) {
+> +			freq_table[i].index = i;
+> +			freq_table[i].frequency = opp->rate / 1000;
+> +			i++;
+> +		}
+> +	}
+> +	rcu_read_unlock();
+
+Drop dev_opp_list_lock instead.
+
+> +
+> +	freq_table[i].index = i;
+> +	freq_table[i].frequency = CPUFREQ_TABLE_END;
+> +
+> +	*table = &freq_table[0];
+> +
+> +	return 0;
+> +}
+
+I think I didn't confuse anything, but surely Paul will fix me if I did. :-)
+
+Thanks,
+Rafael
