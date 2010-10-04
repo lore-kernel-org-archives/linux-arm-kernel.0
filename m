@@ -1,59 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 04 Oct 2010 18:09:27 +0100
-Subject: [PATCH 04/10] ARM: cleanup boot cpu calling __mmap_switched
-Message-ID: <E1P2oXX-00020Q-V2@rmk-PC.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Oct 2010 11:21:23 -0700
+Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213532.1408.55832.stgit@twilight.localdomain>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3C6@dbde02.ent.ti.com>
+	<20101004065624.GD2559@legolas.emea.dhcp.ti.com>
+	<20101004070040.GE2559@legolas.emea.dhcp.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
+Message-ID: <20101004182122.GY3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows us to relocate __mmap_switched and associated data away
-from the head section.
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [101004 00:20]:
+> > >
+> > >[1] git://gitorious.org/usb/usb.git clksource
+> > 
+> > I made a few changes to make checkpatch.pl --strict happy. Attached
+> > 
+> Good !!
+> This patch addresses splitting as well as multi-omap builds and probably
+> also a better candidate in case we need to convert sync timer to hwmod
+> driver.
+> 
+> Paul, what's your take?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/head-common.S |    3 +--
- arch/arm/kernel/head.S        |    3 ++-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+I think we need to first merge Paul's series to fix the omap1
+compile issue and the ASoC module compile issue.
 
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 6ad24d2..9f473ef 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -18,7 +18,6 @@
- 	.align	2
- 	.type	__switch_data, %object
- __switch_data:
--	.long	__mmap_switched
- 	.long	__data_loc			@ r4
- 	.long	_data				@ r5
- 	.long	__bss_start			@ r6
-@@ -39,7 +38,7 @@ __switch_data:
-  *  r9  = processor ID
-  */
- __mmap_switched:
--	adr	r3, __switch_data + 4
-+	adr	r3, __switch_data
- 
- 	ldmia	r3!, {r4, r5, r6, r7}
- 	cmp	r4, r5				@ Copy data segment if needed
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index eb62bf9..aa6ab9d 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -95,13 +95,14 @@ ENTRY(stext)
- 	 * above.  On return, the CPU will be ready for the MMU to be
- 	 * turned on, and r0 will hold the CPU control register value.
- 	 */
--	ldr	r13, __switch_data		@ address to jump to after
-+	ldr	r13, =__mmap_switched		@ address to jump to after
- 						@ mmu has been enabled
- 	adr	lr, BSYM(__enable_mmu)		@ return (PIC) address
-  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
-  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
-  THUMB(	mov	pc, r12				)
- ENDPROC(stext)
-+	.ltorg
- 
- #if defined(CONFIG_SMP)
- ENTRY(secondary_startup)
--- 
-1.6.2.5
+The other changes should be trivial to rebase on top of that.
+
+Regards,
+
+Tony
