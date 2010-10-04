@@ -1,40 +1,33 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 5 Oct 2010 00:22:51 +0530
-Subject: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
-In-Reply-To: <20101004182834.GE8321@core.coreip.homeip.net>
-References: <1285069770-4261-1-git-send-email-manjugk@ti.com>
-	<1285076060.14206.3.camel@chotu>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402785A3478@dbde02.ent.ti.com>
-	<20100921162658.GA2310@core.coreip.homeip.net>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90C98C@dbde02.ent.ti.com>
-	<20101004182834.GE8321@core.coreip.homeip.net>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CD8A@dbde02.ent.ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 4 Oct 2010 13:15:25 -0600 (MDT)
+Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
+In-Reply-To: <4CA999AA.4030608@ti.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213532.1408.55832.stgit@twilight.localdomain>
+	<4CA999AA.4030608@ti.com>
+Message-ID: <alpine.DEB.2.00.1010041314170.13816@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 4 Oct 2010, Cousson, Benoit wrote:
 
-
-
-> -----Original Message-----
-> From: Dmitry Torokhov [mailto:dmitry.torokhov at gmail.com] 
-> Sent: Monday, October 04, 2010 11:59 PM
-> To: G, Manjunath Kondaiah
-> Cc: Ameya Palande; linux-omap at vger.kernel.org; 
-> linux-input at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Tony Lindgren
-> Subject: Re: [PATCH v2] OMAP3: Keypad: Fix failure exit path in probe
+> > --- /dev/null
+> > +++ b/arch/arm/plat-omap/32ksynctimer.c
+> > @@ -0,0 +1,184 @@
+> > +/*
+> > + * linux/arch/arm/plat-omap/clocksource.c
 > 
-> On Mon, Oct 04, 2010 at 01:32:29PM +0530, G, Manjunath Kondaiah wrote:
-> > Dmitry,
-> > As agreed, can you push this patch?
-> > https://patchwork.kernel.org/patch/197442/
-> > 
-> 
-> Manjunath,
-> 
-> It is queued for 2.6.37 (take a peek at 'next' branch of my 
-> tree) - I do not believe that the failure is critical enough for .36.
+> What name do you want to use? 32ksynctimer.c or clocksource.c?
 
-Thanks for queuing this patch for 2.6.37
+Thanks, that's a bug.
 
--Manjunath
+> If this file is dedicated for the 32k sync timer, maybe we should now use the
+> new OMAP4 name: "counter_32k".
+> 
+> Noboby knows what the sync stand for, and at the end this is just a 32k
+> counter. Hence the new name :-)
+
+Yep, let's use counter_32k.c.
+
+
+- Paul
