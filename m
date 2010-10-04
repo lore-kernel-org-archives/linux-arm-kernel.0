@@ -1,143 +1,638 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 04 Oct 2010 11:22:05 +0200
-Subject: [PATCH RESEND] ARM: S5PC110: GONI: Add support for QT602240 TS driver
-In-Reply-To: <1283764347-460-7-git-send-email-m.szyprowski@samsung.com>
-References: <1283764347-460-7-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1286184125-14319-1-git-send-email-m.szyprowski@samsung.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 4 Oct 2010 15:05:53 +0530
+Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
+In-Reply-To: <4CA999AA.4030608@ti.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213532.1408.55832.stgit@twilight.localdomain>
+	<4CA999AA.4030608@ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB035E6BF0FD@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required platform definitions for QT602240 touchscreen on I2C2 bus.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Cousson, Benoit
+> Sent: Monday, October 04, 2010 2:39 PM
+> To: Paul Walmsley
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 08/10] OMAP: split plat-omap/common.c
+>
+> Hi Paul,
+>
+> On 10/1/2010 11:35 PM, Paul Walmsley wrote:
+> > Split plat-omap/common.c into three pieces:
+> >
+> > 1. the 32KiHz sync timer and clocksource code, which now lives in
+> >     plat-omap/32ksynctimer.c;
+> >
+> > 2. the OMAP2+ common code, which has been moved to mach-omap2/common.c;
+> >
+> > 3. and the remainder of the OMAP-wide common code, which includes the
+> >     deprecated ATAGs code and a deprecated video RAM reservation
+> function.
+> >
+> > The primary motivation for doing this is to move the OMAP2+-specific
+> parts
+> > into an OMAP2+-specific file, so that build breakage related to the
+> > System Control Module code can be resolved.
+> >
+> > Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> > ---
+>
+> <...>
+>
+> > diff --git a/arch/arm/plat-omap/32ksynctimer.c b/arch/arm/plat-
+> omap/32ksynctimer.c
+> > new file mode 100644
+> > index 0000000..b7f458c
+> > --- /dev/null
+> > +++ b/arch/arm/plat-omap/32ksynctimer.c
+> > @@ -0,0 +1,184 @@
+> > +/*
+> > + * linux/arch/arm/plat-omap/clocksource.c
+>
+> What name do you want to use? 32ksynctimer.c or clocksource.c?
+>
+> If this file is dedicated for the 32k sync timer, maybe we should now
+> use the new OMAP4 name: "counter_32k".
+>
+> Noboby knows what the sync stand for, and at the end this is just a 32k
+> counter. Hence the new name :-)
+One of the points to be kept in mind while naming is that we are able to relate our driver easily to the hardware device. In this regard the TRM terms this module as 32-kHz Synchronized Timer. Therefore we should be careful in our naming. With regard to the meaning of the word here is the extract from the TRM.
 
-Hello,
+OMAP4430 ES2.0 TRM
+...
+The sync logic ensures the read transaction correctness by synchronizing the counter register read access on 32KSYNCNT_ICLK because the 32KSYNCNT_ICLK clock signal is completely asynchronous with S32KSYNCNT_FCLK.
+...
 
-This is just a resend of the previous version rebased onto the latest
-kgene/for-next branch.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
-
----
- arch/arm/mach-s5pv210/Kconfig     |    3 ++
- arch/arm/mach-s5pv210/mach-goni.c |   54 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index af2a813..0509fd5 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -73,6 +73,7 @@ config MACH_AQUILA
- config MACH_GONI
- 	bool "GONI"
- 	select CPU_S5PV210
-+	select S5P_GPIO_INT
- 	select S3C_DEV_FB
- 	select S5P_DEV_FIMC0
- 	select S5P_DEV_FIMC1
-@@ -80,10 +81,12 @@ config MACH_GONI
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
-+	select S3C_DEV_I2C2
- 	select S3C_DEV_USB_HSOTG
- 	select S5P_DEV_ONENAND
- 	select SAMSUNG_DEV_KEYPAD
- 	select S5PV210_SETUP_FB_24BPP
-+	select S5PV210_SETUP_I2C2
- 	select S5PV210_SETUP_KEYPAD
- 	select S5PV210_SETUP_SDHCI
- 	help
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 30ad59f..aa20875 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -15,6 +15,7 @@
- #include <linux/fb.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
-+#include <linux/i2c/qt602240_ts.h>
- #include <linux/mfd/max8998.h>
- #include <linux/regulator/fixed.h>
- #include <linux/gpio_keys.h>
-@@ -135,6 +136,51 @@ static struct samsung_keypad_platdata keypad_data __initdata = {
- 	.cols		= 3,
- };
- 
-+/* TSP */
-+static struct qt602240_platform_data qt602240_platform_data = {
-+	.x_line		= 17,
-+	.y_line		= 11,
-+	.x_size		= 800,
-+	.y_size		= 480,
-+	.blen		= 0x21,
-+	.threshold	= 0x28,
-+	.voltage	= 2800000,              /* 2.8V */
-+	.orient		= QT602240_DIAGONAL,
-+};
-+
-+static struct s3c2410_platform_i2c i2c2_data __initdata = {
-+	.flags		= 0,
-+	.bus_num	= 2,
-+	.slave_addr	= 0x10,
-+	.frequency	= 400 * 1000,
-+	.sda_delay	= 100,
-+};
-+
-+static struct i2c_board_info i2c2_devs[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("qt602240_ts", 0x4a),
-+		.platform_data = &qt602240_platform_data,
-+	},
-+};
-+
-+static void __init goni_tsp_init(void)
-+{
-+	int gpio;
-+
-+	gpio = S5PV210_GPJ1(3);		/* XMSMADDR_11 */
-+	gpio_request(gpio, "TSP_LDO_ON");
-+	gpio_direction_output(gpio, 1);
-+	gpio_export(gpio, 0);
-+
-+	gpio = S5PV210_GPJ0(5);		/* XMSMADDR_5 */
-+	gpio_request(gpio, "TSP_INT");
-+
-+	s5p_register_gpio_interrupt(gpio);
-+	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+	i2c2_devs[0].irq = gpio_to_irq(gpio);
-+}
-+
- /* MAX8998 regulators */
- #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
- 
-@@ -524,6 +570,7 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&s3c_device_hsmmc2,
- 	&s3c_device_usb_hsotg,
- 	&samsung_device_keypad,
-+	&s3c_device_i2c2,
- };
- 
- static void __init goni_map_io(void)
-@@ -535,6 +582,13 @@ static void __init goni_map_io(void)
- 
- static void __init goni_machine_init(void)
- {
-+	/* TSP: call before I2C 2 registeration */
-+	goni_tsp_init();
-+
-+	/* I2C2 */
-+	s3c_i2c2_set_platdata(&i2c2_data);
-+	i2c_register_board_info(2, i2c2_devs, ARRAY_SIZE(i2c2_devs));
-+
- 	/* PMIC */
- 	goni_pmic_init();
- 	i2c_register_board_info(AP_I2C_GPIO_PMIC_BUS_4, i2c_gpio_pmic_devs,
--- 
-1.7.1.569.g6f426
+>
+> Benoit
+>
+> > + *
+> > + * OMAP clocksource-related code
+> > + *
+> > + * Copyright (C) 2009 Texas Instruments
+> > + * Copyright (C) 2010 Nokia Corporation
+> > + * Tony Lindgren<tony@atomide.com>
+> > + * Added OMAP4 support - Santosh Shilimkar<santosh.shilimkar@ti.com>
+> > + * Paul Walmsley
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#include<linux/kernel.h>
+> > +#include<linux/init.h>
+> > +#include<linux/clk.h>
+> > +#include<linux/io.h>
+> > +
+> > +#include<plat/common.h>
+> > +#include<plat/board.h>
+> > +
+> > +#include<plat/clock.h>
+> > +
+> > +
+> > +/*
+> > + * 32KHz clocksource ... always available, on pretty most chips except
+> > + * OMAP 730 and 1510.  Other timers could be used as clocksources, with
+> > + * higher resolution in free-running counter modes (e.g. 12 MHz xtal),
+> > + * but systems won't necessarily want to spend resources that way.
+> > + */
+> > +
+> > +#define OMAP16XX_TIMER_32K_SYNCHRONIZED                0xfffbc410
+> > +
+> > +#if !(defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP15XX))
+> > +
+> > +#include<linux/clocksource.h>
+> > +
+> > +/*
+> > + * offset_32k holds the init time counter value. It is then subtracted
+> > + * from every counter read to achieve a counter that counts time from
+> the
+> > + * kernel boot (needed for sched_clock()).
+> > + */
+> > +static u32 offset_32k __read_mostly;
+> > +
+> > +#ifdef CONFIG_ARCH_OMAP16XX
+> > +static cycle_t omap16xx_32k_read(struct clocksource *cs)
+> > +{
+> > +       return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
+> > +}
+> > +#else
+> > +#define omap16xx_32k_read      NULL
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARCH_OMAP2420
+> > +static cycle_t omap2420_32k_read(struct clocksource *cs)
+> > +{
+> > +       return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
+> > +}
+> > +#else
+> > +#define omap2420_32k_read      NULL
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARCH_OMAP2430
+> > +static cycle_t omap2430_32k_read(struct clocksource *cs)
+> > +{
+> > +       return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
+> > +}
+> > +#else
+> > +#define omap2430_32k_read      NULL
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARCH_OMAP3
+> > +static cycle_t omap34xx_32k_read(struct clocksource *cs)
+> > +{
+> > +       return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
+> > +}
+> > +#else
+> > +#define omap34xx_32k_read      NULL
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARCH_OMAP4
+> > +static cycle_t omap44xx_32k_read(struct clocksource *cs)
+> > +{
+> > +       return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
+> > +}
+> > +#else
+> > +#define omap44xx_32k_read      NULL
+> > +#endif
+> > +
+> > +/*
+> > + * Kernel assumes that sched_clock can be called early but may not have
+> > + * things ready yet.
+> > + */
+> > +static cycle_t omap_32k_read_dummy(struct clocksource *cs)
+> > +{
+> > +       return 0;
+> > +}
+> > +
+> > +static struct clocksource clocksource_32k = {
+> > +       .name           = "32k_counter",
+> > +       .rating         = 250,
+> > +       .read           = omap_32k_read_dummy,
+> > +       .mask           = CLOCKSOURCE_MASK(32),
+> > +       .shift          = 10,
+> > +       .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+> > +};
+> > +
+> > +/*
+> > + * Returns current time from boot in nsecs. It's OK for this to wrap
+> > + * around for now, as it's just a relative time stamp.
+> > + */
+> > +unsigned long long sched_clock(void)
+> > +{
+> > +       return
+> clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
+> > +                                 clocksource_32k.mult,
+> clocksource_32k.shift);
+> > +}
+> > +
+> > +/**
+> > + * read_persistent_clock -  Return time from a persistent clock.
+> > + *
+> > + * Reads the time from a source which isn't disabled during PM, the
+> > + * 32k sync timer.  Convert the cycles elapsed since last read into
+> > + * nsecs and adds to a monotonically increasing timespec.
+> > + */
+> > +static struct timespec persistent_ts;
+> > +static cycles_t cycles, last_cycles;
+> > +void read_persistent_clock(struct timespec *ts)
+> > +{
+> > +       unsigned long long nsecs;
+> > +       cycles_t delta;
+> > +       struct timespec *tsp =&persistent_ts;
+> > +
+> > +       last_cycles = cycles;
+> > +       cycles = clocksource_32k.read(&clocksource_32k);
+> > +       delta = cycles - last_cycles;
+> > +
+> > +       nsecs = clocksource_cyc2ns(delta,
+> > +                                  clocksource_32k.mult,
+> clocksource_32k.shift);
+> > +
+> > +       timespec_add_ns(tsp, nsecs);
+> > +       *ts = *tsp;
+> > +}
+> > +
+> > +static int __init omap_init_clocksource_32k(void)
+> > +{
+> > +       static char err[] __initdata = KERN_ERR
+> > +                       "%s: can't register clocksource!\n";
+> > +
+> > +       if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+> > +               struct clk *sync_32k_ick;
+> > +
+> > +               if (cpu_is_omap16xx())
+> > +                       clocksource_32k.read = omap16xx_32k_read;
+> > +               else if (cpu_is_omap2420())
+> > +                       clocksource_32k.read = omap2420_32k_read;
+> > +               else if (cpu_is_omap2430())
+> > +                       clocksource_32k.read = omap2430_32k_read;
+> > +               else if (cpu_is_omap34xx())
+> > +                       clocksource_32k.read = omap34xx_32k_read;
+> > +               else if (cpu_is_omap44xx())
+> > +                       clocksource_32k.read = omap44xx_32k_read;
+> > +               else
+> > +                       return -ENODEV;
+> > +
+> > +               sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> > +               if (sync_32k_ick)
+> > +                       clk_enable(sync_32k_ick);
+> > +
+> > +               clocksource_32k.mult = clocksource_hz2mult(32768,
+> > +                                           clocksource_32k.shift);
+> > +
+> > +               offset_32k = clocksource_32k.read(&clocksource_32k);
+> > +
+> > +               if (clocksource_register(&clocksource_32k))
+> > +                       printk(err, clocksource_32k.name);
+> > +       }
+> > +       return 0;
+> > +}
+> > +arch_initcall(omap_init_clocksource_32k);
+> > +
+> > +#endif /* !(defined(CONFIG_ARCH_OMAP730) ||
+> defined(CONFIG_ARCH_OMAP15XX)) */
+> > +
+> > diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+> > index 2a15191..32a5959 100644
+> > --- a/arch/arm/plat-omap/Makefile
+> > +++ b/arch/arm/plat-omap/Makefile
+> > @@ -4,7 +4,7 @@
+> >
+> >   # Common support
+> >   obj-y := common.o sram.o clock.o devices.o dma.o mux.o gpio.o \
+> > -        usb.o fb.o io.o
+> > +        usb.o fb.o io.o 32ksynctimer.o
+> >   obj-m :=
+> >   obj-n :=
+> >   obj-  :=
+> > diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+> > index 9200ea7..221a675 100644
+> > --- a/arch/arm/plat-omap/common.c
+> > +++ b/arch/arm/plat-omap/common.c
+> > @@ -11,38 +11,15 @@
+> >    * it under the terms of the GNU General Public License version 2 as
+> >    * published by the Free Software Foundation.
+> >    */
+> > -#include<linux/module.h>
+> >   #include<linux/kernel.h>
+> >   #include<linux/init.h>
+> > -#include<linux/delay.h>
+> > -#include<linux/console.h>
+> > -#include<linux/serial.h>
+> > -#include<linux/tty.h>
+> > -#include<linux/serial_8250.h>
+> > -#include<linux/serial_reg.h>
+> > -#include<linux/clk.h>
+> >   #include<linux/io.h>
+> >   #include<linux/omapfb.h>
+> >
+> > -#include<mach/hardware.h>
+> > -#include<asm/system.h>
+> > -#include<asm/pgtable.h>
+> > -#include<asm/mach/map.h>
+> > -#include<asm/setup.h>
+> > -
+> >   #include<plat/common.h>
+> >   #include<plat/board.h>
+> > -#include<plat/control.h>
+> > -#include<plat/mux.h>
+> > -#include<plat/fpga.h>
+> > -#include<plat/serial.h>
+> >   #include<plat/vram.h>
+> >
+> > -#include<plat/clock.h>
+> > -
+> > -#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+> > -# include "../mach-omap2/sdrc.h"
+> > -#endif
+> >
+> >   #define NO_LENGTH_CHECK 0xffffffff
+> >
+> > @@ -88,271 +65,3 @@ void __init omap_reserve(void)
+> >          omapfb_reserve_sdram_memblock();
+> >          omap_vram_reserve_sdram_memblock();
+> >   }
+> > -
+> > -/*
+> > - * 32KHz clocksource ... always available, on pretty most chips except
+> > - * OMAP 730 and 1510.  Other timers could be used as clocksources, with
+> > - * higher resolution in free-running counter modes (e.g. 12 MHz xtal),
+> > - * but systems won't necessarily want to spend resources that way.
+> > - */
+> > -
+> > -#define OMAP16XX_TIMER_32K_SYNCHRONIZED                0xfffbc410
+> > -
+> > -#if !(defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP15XX))
+> > -
+> > -#include<linux/clocksource.h>
+> > -
+> > -/*
+> > - * offset_32k holds the init time counter value. It is then subtracted
+> > - * from every counter read to achieve a counter that counts time from
+> the
+> > - * kernel boot (needed for sched_clock()).
+> > - */
+> > -static u32 offset_32k __read_mostly;
+> > -
+> > -#ifdef CONFIG_ARCH_OMAP16XX
+> > -static cycle_t omap16xx_32k_read(struct clocksource *cs)
+> > -{
+> > -       return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
+> > -}
+> > -#else
+> > -#define omap16xx_32k_read      NULL
+> > -#endif
+> > -
+> > -#ifdef CONFIG_ARCH_OMAP2420
+> > -static cycle_t omap2420_32k_read(struct clocksource *cs)
+> > -{
+> > -       return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
+> > -}
+> > -#else
+> > -#define omap2420_32k_read      NULL
+> > -#endif
+> > -
+> > -#ifdef CONFIG_ARCH_OMAP2430
+> > -static cycle_t omap2430_32k_read(struct clocksource *cs)
+> > -{
+> > -       return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
+> > -}
+> > -#else
+> > -#define omap2430_32k_read      NULL
+> > -#endif
+> > -
+> > -#ifdef CONFIG_ARCH_OMAP3
+> > -static cycle_t omap34xx_32k_read(struct clocksource *cs)
+> > -{
+> > -       return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
+> > -}
+> > -#else
+> > -#define omap34xx_32k_read      NULL
+> > -#endif
+> > -
+> > -#ifdef CONFIG_ARCH_OMAP4
+> > -static cycle_t omap44xx_32k_read(struct clocksource *cs)
+> > -{
+> > -       return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
+> > -}
+> > -#else
+> > -#define omap44xx_32k_read      NULL
+> > -#endif
+> > -
+> > -/*
+> > - * Kernel assumes that sched_clock can be called early but may not have
+> > - * things ready yet.
+> > - */
+> > -static cycle_t omap_32k_read_dummy(struct clocksource *cs)
+> > -{
+> > -       return 0;
+> > -}
+> > -
+> > -static struct clocksource clocksource_32k = {
+> > -       .name           = "32k_counter",
+> > -       .rating         = 250,
+> > -       .read           = omap_32k_read_dummy,
+> > -       .mask           = CLOCKSOURCE_MASK(32),
+> > -       .shift          = 10,
+> > -       .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+> > -};
+> > -
+> > -/*
+> > - * Returns current time from boot in nsecs. It's OK for this to wrap
+> > - * around for now, as it's just a relative time stamp.
+> > - */
+> > -unsigned long long sched_clock(void)
+> > -{
+> > -       return
+> clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
+> > -                                 clocksource_32k.mult,
+> clocksource_32k.shift);
+> > -}
+> > -
+> > -/**
+> > - * read_persistent_clock -  Return time from a persistent clock.
+> > - *
+> > - * Reads the time from a source which isn't disabled during PM, the
+> > - * 32k sync timer.  Convert the cycles elapsed since last read into
+> > - * nsecs and adds to a monotonically increasing timespec.
+> > - */
+> > -static struct timespec persistent_ts;
+> > -static cycles_t cycles, last_cycles;
+> > -void read_persistent_clock(struct timespec *ts)
+> > -{
+> > -       unsigned long long nsecs;
+> > -       cycles_t delta;
+> > -       struct timespec *tsp =&persistent_ts;
+> > -
+> > -       last_cycles = cycles;
+> > -       cycles = clocksource_32k.read(&clocksource_32k);
+> > -       delta = cycles - last_cycles;
+> > -
+> > -       nsecs = clocksource_cyc2ns(delta,
+> > -                                  clocksource_32k.mult,
+> clocksource_32k.shift);
+> > -
+> > -       timespec_add_ns(tsp, nsecs);
+> > -       *ts = *tsp;
+> > -}
+> > -
+> > -static int __init omap_init_clocksource_32k(void)
+> > -{
+> > -       static char err[] __initdata = KERN_ERR
+> > -                       "%s: can't register clocksource!\n";
+> > -
+> > -       if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+> > -               struct clk *sync_32k_ick;
+> > -
+> > -               if (cpu_is_omap16xx())
+> > -                       clocksource_32k.read = omap16xx_32k_read;
+> > -               else if (cpu_is_omap2420())
+> > -                       clocksource_32k.read = omap2420_32k_read;
+> > -               else if (cpu_is_omap2430())
+> > -                       clocksource_32k.read = omap2430_32k_read;
+> > -               else if (cpu_is_omap34xx())
+> > -                       clocksource_32k.read = omap34xx_32k_read;
+> > -               else if (cpu_is_omap44xx())
+> > -                       clocksource_32k.read = omap44xx_32k_read;
+> > -               else
+> > -                       return -ENODEV;
+> > -
+> > -               sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+> > -               if (sync_32k_ick)
+> > -                       clk_enable(sync_32k_ick);
+> > -
+> > -               clocksource_32k.mult = clocksource_hz2mult(32768,
+> > -                                           clocksource_32k.shift);
+> > -
+> > -               offset_32k = clocksource_32k.read(&clocksource_32k);
+> > -
+> > -               if (clocksource_register(&clocksource_32k))
+> > -                       printk(err, clocksource_32k.name);
+> > -       }
+> > -       return 0;
+> > -}
+> > -arch_initcall(omap_init_clocksource_32k);
+> > -
+> > -#endif /* !(defined(CONFIG_ARCH_OMAP730) ||
+> defined(CONFIG_ARCH_OMAP15XX)) */
+> > -
+> > -/* Global address base setup code */
+> > -
+> > -#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+> > -
+> > -static void __init __omap2_set_globals(struct omap_globals
+> *omap2_globals)
+> > -{
+> > -       omap2_set_globals_tap(omap2_globals);
+> > -       omap2_set_globals_sdrc(omap2_globals);
+> > -       omap2_set_globals_control(omap2_globals);
+> > -       omap2_set_globals_prcm(omap2_globals);
+> > -       omap2_set_globals_uart(omap2_globals);
+> > -}
+> > -
+> > -#endif
+> > -
+> > -#if defined(CONFIG_ARCH_OMAP2420)
+> > -
+> > -static struct omap_globals omap242x_globals = {
+> > -       .class  = OMAP242X_CLASS,
+> > -       .tap    = OMAP2_L4_IO_ADDRESS(0x48014000),
+> > -       .sdrc   = OMAP2420_SDRC_BASE,
+> > -       .sms    = OMAP2420_SMS_BASE,
+> > -       .ctrl   = OMAP242X_CTRL_BASE,
+> > -       .prm    = OMAP2420_PRM_BASE,
+> > -       .cm     = OMAP2420_CM_BASE,
+> > -       .uart1_phys     = OMAP2_UART1_BASE,
+> > -       .uart2_phys     = OMAP2_UART2_BASE,
+> > -       .uart3_phys     = OMAP2_UART3_BASE,
+> > -};
+> > -
+> > -void __init omap2_set_globals_242x(void)
+> > -{
+> > -       __omap2_set_globals(&omap242x_globals);
+> > -}
+> > -#endif
+> > -
+> > -#if defined(CONFIG_ARCH_OMAP2430)
+> > -
+> > -static struct omap_globals omap243x_globals = {
+> > -       .class  = OMAP243X_CLASS,
+> > -       .tap    = OMAP2_L4_IO_ADDRESS(0x4900a000),
+> > -       .sdrc   = OMAP243X_SDRC_BASE,
+> > -       .sms    = OMAP243X_SMS_BASE,
+> > -       .ctrl   = OMAP243X_CTRL_BASE,
+> > -       .prm    = OMAP2430_PRM_BASE,
+> > -       .cm     = OMAP2430_CM_BASE,
+> > -       .uart1_phys     = OMAP2_UART1_BASE,
+> > -       .uart2_phys     = OMAP2_UART2_BASE,
+> > -       .uart3_phys     = OMAP2_UART3_BASE,
+> > -};
+> > -
+> > -void __init omap2_set_globals_243x(void)
+> > -{
+> > -       __omap2_set_globals(&omap243x_globals);
+> > -}
+> > -#endif
+> > -
+> > -#if defined(CONFIG_ARCH_OMAP3)
+> > -
+> > -static struct omap_globals omap3_globals = {
+> > -       .class  = OMAP343X_CLASS,
+> > -       .tap    = OMAP2_L4_IO_ADDRESS(0x4830A000),
+> > -       .sdrc   = OMAP343X_SDRC_BASE,
+> > -       .sms    = OMAP343X_SMS_BASE,
+> > -       .ctrl   = OMAP343X_CTRL_BASE,
+> > -       .prm    = OMAP3430_PRM_BASE,
+> > -       .cm     = OMAP3430_CM_BASE,
+> > -       .uart1_phys     = OMAP3_UART1_BASE,
+> > -       .uart2_phys     = OMAP3_UART2_BASE,
+> > -       .uart3_phys     = OMAP3_UART3_BASE,
+> > -       .uart4_phys     = OMAP3_UART4_BASE,     /* Only on 3630 */
+> > -};
+> > -
+> > -void __init omap2_set_globals_3xxx(void)
+> > -{
+> > -       __omap2_set_globals(&omap3_globals);
+> > -}
+> > -
+> > -void __init omap3_map_io(void)
+> > -{
+> > -       omap2_set_globals_3xxx();
+> > -       omap34xx_map_common_io();
+> > -}
+> > -#endif
+> > -
+> > -#if defined(CONFIG_ARCH_OMAP4)
+> > -static struct omap_globals omap4_globals = {
+> > -       .class  = OMAP443X_CLASS,
+> > -       .tap    = OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+> > -       .ctrl   = OMAP443X_SCM_BASE,
+> > -       .ctrl_pad       = OMAP443X_CTRL_BASE,
+> > -       .prm    = OMAP4430_PRM_BASE,
+> > -       .cm     = OMAP4430_CM_BASE,
+> > -       .cm2    = OMAP4430_CM2_BASE,
+> > -       .uart1_phys     = OMAP4_UART1_BASE,
+> > -       .uart2_phys     = OMAP4_UART2_BASE,
+> > -       .uart3_phys     = OMAP4_UART3_BASE,
+> > -       .uart4_phys     = OMAP4_UART4_BASE,
+> > -};
+> > -
+> > -void __init omap2_set_globals_443x(void)
+> > -{
+> > -       omap2_set_globals_tap(&omap4_globals);
+> > -       omap2_set_globals_control(&omap4_globals);
+> > -       omap2_set_globals_prcm(&omap4_globals);
+> > -       omap2_set_globals_uart(&omap4_globals);
+> > -}
+> > -#endif
+> > -
+> > diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
+> > index d1920be..78162a0 100644
+> > --- a/arch/arm/plat-omap/devices.c
+> > +++ b/arch/arm/plat-omap/devices.c
+> > @@ -21,7 +21,6 @@
+> >   #include<asm/mach/map.h>
+> >
+> >   #include<plat/tc.h>
+> > -#include<plat/control.h>
+> >   #include<plat/board.h>
+> >   #include<plat/mmc.h>
+> >   #include<mach/gpio.h>
+> > diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+> > index 33ee6b8..d971aeb 100644
+> > --- a/arch/arm/plat-omap/sram.c
+> > +++ b/arch/arm/plat-omap/sram.c
+> > @@ -30,8 +30,6 @@
+> >   #include<plat/cpu.h>
+> >   #include<plat/vram.h>
+> >
+> > -#include<plat/control.h>
+> > -
+> >   #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+> >   # include "../mach-omap2/prm.h"
+> >   # include "../mach-omap2/cm.h"
+> > @@ -68,7 +66,6 @@
+> >   #define OMAP34XX_VA_WRITEPERM0         OMAP2_L3_IO_ADDRESS(0x68012858)
+> >   #define OMAP34XX_VA_ADDR_MATCH2
+> OMAP2_L3_IO_ADDRESS(0x68012880)
+> >   #define OMAP34XX_VA_SMS_RG_ATT0
+> OMAP2_L3_IO_ADDRESS(0x6C000048)
+> > -#define OMAP34XX_VA_CONTROL_STAT       OMAP2_L4_IO_ADDRESS(0x480022F0)
+> >
+> >   #define GP_DEVICE              0x300
+> >
+> >
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
