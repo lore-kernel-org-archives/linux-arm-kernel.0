@@ -1,550 +1,787 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Mon, 04 Oct 2010 12:25:35 -0700
-Subject: [PATCH 03/10] ARM: hotplug cpu: Keep processor information,
-	startup code & __lookup_processor_type
-In-Reply-To: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
-References: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
-Message-ID: <4CAA2A2F.7010901@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 4 Oct 2010 13:26:29 -0600 (MDT)
+Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
+In-Reply-To: <alpine.DEB.2.00.1010041314170.13816@utopia.booyaka.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213532.1408.55832.stgit@twilight.localdomain>
+	<4CA999AA.4030608@ti.com>
+	<alpine.DEB.2.00.1010041314170.13816@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1010041324200.13816@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> When hotplug CPU is enabled, we need to keep the list of supported CPUs,
-> their setup functions, and __lookup_processor_type in place so that we
-> can find and initialize secondary CPUs.  Move these into the __CPUINIT
-> section.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/head-common.S |   81 +++++++++++++++++++++++------------------
->  arch/arm/kernel/vmlinux.lds.S |   24 +++++++++----
->  arch/arm/mm/proc-arm1020e.S   |    2 +-
->  arch/arm/mm/proc-arm1022.S    |    2 +-
->  arch/arm/mm/proc-arm1026.S    |    2 +-
->  arch/arm/mm/proc-arm6_7.S     |    2 +-
->  arch/arm/mm/proc-arm720.S     |    2 +-
->  arch/arm/mm/proc-arm740.S     |    2 +-
->  arch/arm/mm/proc-arm7tdmi.S   |    2 +-
->  arch/arm/mm/proc-arm920.S     |    2 +-
->  arch/arm/mm/proc-arm922.S     |    2 +-
->  arch/arm/mm/proc-arm925.S     |    2 +-
->  arch/arm/mm/proc-arm926.S     |    2 +-
->  arch/arm/mm/proc-arm940.S     |    2 +-
->  arch/arm/mm/proc-arm946.S     |    2 +-
->  arch/arm/mm/proc-arm9tdmi.S   |    2 +-
->  arch/arm/mm/proc-fa526.S      |    2 +-
->  arch/arm/mm/proc-feroceon.S   |    2 +-
->  arch/arm/mm/proc-mohawk.S     |    2 +-
->  arch/arm/mm/proc-sa110.S      |    2 +-
->  arch/arm/mm/proc-sa1100.S     |    2 +-
->  arch/arm/mm/proc-v6.S         |    6 +++-
->  arch/arm/mm/proc-v7.S         |    6 +++-
->  arch/arm/mm/proc-xsc3.S       |    2 +-
->  arch/arm/mm/proc-xscale.S     |    2 +-
->  25 files changed, 93 insertions(+), 66 deletions(-)
->
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index b9505aa..6ad24d2 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -145,45 +145,14 @@ ENDPROC(__error)
->  
->  
->  /*
-> - * Read processor ID register (CP#15, CR0), and look up in the linker-built
-> - * supported processor list.  Note that we can't use the absolute addresses
-> - * for the __proc_info lists since we aren't running with the MMU on
-> - * (and therefore, we are not in the correct address space).  We have to
-> - * calculate the offset.
-> - *
-> - *	r9 = cpuid
-> - * Returns:
-> - *	r3, r4, r6 corrupted
-> - *	r5 = proc_info pointer in physical address space
-> - *	r9 = cpuid (preserved)
-> - */
-> -__lookup_processor_type:
-> -	adr	r3, 3f
-> -	ldmia	r3, {r5 - r7}
-> -	add	r3, r3, #8
-> -	sub	r3, r3, r7			@ get offset between virt&phys
-> -	add	r5, r5, r3			@ convert virt addresses to
-> -	add	r6, r6, r3			@ physical address space
-> -1:	ldmia	r5, {r3, r4}			@ value, mask
-> -	and	r4, r4, r9			@ mask wanted bits
-> -	teq	r3, r4
-> -	beq	2f
-> -	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
-> -	cmp	r5, r6
-> -	blo	1b
-> -	mov	r5, #0				@ unknown processor
-> -2:	mov	pc, lr
-> -ENDPROC(__lookup_processor_type)
-> -
-> -/*
-> - * This provides a C-API version of the above function.
-> + * This provides a C-API version of __lookup_processor_type
->   */
->  ENTRY(lookup_processor_type)
-> -	stmfd	sp!, {r4 - r7, r9, lr}
-> +	stmfd	sp!, {r4 - r6, r9, lr}
->  	mov	r9, r0
->  	bl	__lookup_processor_type
->  	mov	r0, r5
-> -	ldmfd	sp!, {r4 - r7, r9, pc}
-> +	ldmfd	sp!, {r4 - r6, r9, pc}
->  ENDPROC(lookup_processor_type)
->  
->  /*
-> @@ -191,8 +160,6 @@ ENDPROC(lookup_processor_type)
->   * more information about the __proc_info and __arch_info structures.
->   */
->  	.align	2
-> -3:	.long	__proc_info_begin
-> -	.long	__proc_info_end
->  4:	.long	.
->  	.long	__arch_info_begin
->  	.long	__arch_info_end
-> @@ -265,3 +232,45 @@ __vet_atags:
->  1:	mov	r2, #0
->  	mov	pc, lr
->  ENDPROC(__vet_atags)
-> +
-> +/*
-> + * Read processor ID register (CP#15, CR0), and look up in the linker-built
-> + * supported processor list.  Note that we can't use the absolute addresses
-> + * for the __proc_info lists since we aren't running with the MMU on
-> + * (and therefore, we are not in the correct address space).  We have to
-> + * calculate the offset.
-> + *
-> + *	r9 = cpuid
-> + * Returns:
-> + *	r3, r4, r6 corrupted
-> + *	r5 = proc_info pointer in physical address space
-> + *	r9 = cpuid (preserved)
-> + */
-> +	__CPUINIT
-> +__lookup_processor_type:
-> +	adr	r3, __lookup_processor_type_data
-> +	ldmia	r3, {r4 - r6}
-> +	sub	r3, r3, r4			@ get offset between virt&phys
-> +	add	r5, r5, r3			@ convert virt addresses to
-> +	add	r6, r6, r3			@ physical address space
-> +1:	ldmia	r5, {r3, r4}			@ value, mask
-> +	and	r4, r4, r9			@ mask wanted bits
-> +	teq	r3, r4
-> +	beq	2f
-> +	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
-> +	cmp	r5, r6
-> +	blo	1b
-> +	mov	r5, #0				@ unknown processor
-> +2:	mov	pc, lr
-> +ENDPROC(__lookup_processor_type)
-> +
-> +/*
-> + * Look in <asm/procinfo.h> for information about the __proc_info structure.
-> + */
-> +	.align	2
-> +	.type	__lookup_processor_type_data, %object
-> +__lookup_processor_type_data:
-> +	.long	.
-> +	.long	__proc_info_begin
-> +	.long	__proc_info_end
-> +	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index b16c079..1630524 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -8,6 +8,19 @@
->  #include <asm/memory.h>
->  #include <asm/page.h>
->  	
-> +#define PROC_INFO							\
-> +	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-> +	*(.proc.info.init)						\
-> +	VMLINUX_SYMBOL(__proc_info_end) = .;
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +#define ARM_CPU_DISCARD(x)
-> +#define ARM_CPU_KEEP(x)		x
-> +#else
-> +#define ARM_CPU_DISCARD(x)	x
-> +#define ARM_CPU_KEEP(x)
-> +#endif
-> +
->  OUTPUT_ARCH(arm)
->  ENTRY(stext)
->  
-> @@ -31,9 +44,7 @@ SECTIONS
->  			HEAD_TEXT
->  			INIT_TEXT
->  		_einittext = .;
-> -		__proc_info_begin = .;
-> -			*(.proc.info.init)
-> -		__proc_info_end = .;
-> +		ARM_CPU_DISCARD(PROC_INFO)
->  		__arch_info_begin = .;
->  			*(.arch.info.init)
->  		__arch_info_end = .;
-> @@ -68,10 +79,8 @@ SECTIONS
->  	/DISCARD/ : {
->  		*(.ARM.exidx.exit.text)
->  		*(.ARM.extab.exit.text)
-> -#ifndef CONFIG_HOTPLUG_CPU
-> -		*(.ARM.exidx.cpuexit.text)
-> -		*(.ARM.extab.cpuexit.text)
-> -#endif
-> +		ARM_CPU_DISCARD(*(.ARM.exidx.cpuexit.text))
-> +		ARM_CPU_DISCARD(*(.ARM.extab.cpuexit.text))
->  #ifndef CONFIG_HOTPLUG
->  		*(.ARM.exidx.devexit.text)
->  		*(.ARM.extab.devexit.text)
-> @@ -100,6 +109,7 @@ SECTIONS
->  			*(.glue_7)
->  			*(.glue_7t)
->  		*(.got)			/* Global offset table		*/
-> +			ARM_CPU_KEEP(PROC_INFO)
->  	}
->  
->  	RO_DATA(PAGE_SIZE)
-> diff --git a/arch/arm/mm/proc-arm1020e.S b/arch/arm/mm/proc-arm1020e.S
-> index 1a511e7..afc06b9 100644
-> --- a/arch/arm/mm/proc-arm1020e.S
-> +++ b/arch/arm/mm/proc-arm1020e.S
-> @@ -412,7 +412,7 @@ ENTRY(cpu_arm1020e_set_pte_ext)
->  #endif /* CONFIG_MMU */
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm1020e_setup, #function
->  __arm1020e_setup:
-> diff --git a/arch/arm/mm/proc-arm1022.S b/arch/arm/mm/proc-arm1022.S
-> index 1ffa4eb..8915e0b 100644
-> --- a/arch/arm/mm/proc-arm1022.S
-> +++ b/arch/arm/mm/proc-arm1022.S
-> @@ -394,7 +394,7 @@ ENTRY(cpu_arm1022_set_pte_ext)
->  #endif /* CONFIG_MMU */
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm1022_setup, #function
->  __arm1022_setup:
-> diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
-> index 5697c34..ff446c5 100644
-> --- a/arch/arm/mm/proc-arm1026.S
-> +++ b/arch/arm/mm/proc-arm1026.S
-> @@ -384,7 +384,7 @@ ENTRY(cpu_arm1026_set_pte_ext)
->  	mov	pc, lr
->  
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm1026_setup, #function
->  __arm1026_setup:
-> diff --git a/arch/arm/mm/proc-arm6_7.S b/arch/arm/mm/proc-arm6_7.S
-> index 64e0b32..6a7be18 100644
-> --- a/arch/arm/mm/proc-arm6_7.S
-> +++ b/arch/arm/mm/proc-arm6_7.S
-> @@ -238,7 +238,7 @@ ENTRY(cpu_arm7_reset)
->  		mcr	p15, 0, r1, c1, c0, 0		@ turn off MMU etc
->  		mov	pc, r0
->  
-> -		__INIT
-> +		__CPUINIT
->  
->  		.type	__arm6_setup, #function
->  __arm6_setup:	mov	r0, #0
-> diff --git a/arch/arm/mm/proc-arm720.S b/arch/arm/mm/proc-arm720.S
-> index 9d96824..c285395 100644
-> --- a/arch/arm/mm/proc-arm720.S
-> +++ b/arch/arm/mm/proc-arm720.S
-> @@ -113,7 +113,7 @@ ENTRY(cpu_arm720_reset)
->  		mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
->  		mov	pc, r0
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm710_setup, #function
->  __arm710_setup:
-> diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
-> index 6c1a9ab..38b27dc 100644
-> --- a/arch/arm/mm/proc-arm740.S
-> +++ b/arch/arm/mm/proc-arm740.S
-> @@ -55,7 +55,7 @@ ENTRY(cpu_arm740_reset)
->  	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
->  	mov	pc, r0
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm740_setup, #function
->  __arm740_setup:
-> diff --git a/arch/arm/mm/proc-arm7tdmi.S b/arch/arm/mm/proc-arm7tdmi.S
-> index 6a850db..0c9786d 100644
-> --- a/arch/arm/mm/proc-arm7tdmi.S
-> +++ b/arch/arm/mm/proc-arm7tdmi.S
-> @@ -46,7 +46,7 @@ ENTRY(cpu_arm7tdmi_proc_fin)
->  ENTRY(cpu_arm7tdmi_reset)
->  		mov	pc, r0
->  
-> -		__INIT
-> +		__CPUINIT
->  
->  		.type	__arm7tdmi_setup, #function
->  __arm7tdmi_setup:
-> diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
-> index 86f80aa..fecf570 100644
-> --- a/arch/arm/mm/proc-arm920.S
-> +++ b/arch/arm/mm/proc-arm920.S
-> @@ -375,7 +375,7 @@ ENTRY(cpu_arm920_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm920_setup, #function
->  __arm920_setup:
-> diff --git a/arch/arm/mm/proc-arm922.S b/arch/arm/mm/proc-arm922.S
-> index f76ce9b..e3cbf87 100644
-> --- a/arch/arm/mm/proc-arm922.S
-> +++ b/arch/arm/mm/proc-arm922.S
-> @@ -379,7 +379,7 @@ ENTRY(cpu_arm922_set_pte_ext)
->  #endif /* CONFIG_MMU */
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm922_setup, #function
->  __arm922_setup:
-> diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-> index 657bd3f..572424c 100644
-> --- a/arch/arm/mm/proc-arm925.S
-> +++ b/arch/arm/mm/proc-arm925.S
-> @@ -428,7 +428,7 @@ ENTRY(cpu_arm925_set_pte_ext)
->  #endif /* CONFIG_MMU */
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm925_setup, #function
->  __arm925_setup:
-> diff --git a/arch/arm/mm/proc-arm926.S b/arch/arm/mm/proc-arm926.S
-> index 73f1f3c..63d168b 100644
-> --- a/arch/arm/mm/proc-arm926.S
-> +++ b/arch/arm/mm/proc-arm926.S
-> @@ -389,7 +389,7 @@ ENTRY(cpu_arm926_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm926_setup, #function
->  __arm926_setup:
-> diff --git a/arch/arm/mm/proc-arm940.S b/arch/arm/mm/proc-arm940.S
-> index fffb061..f6a6282 100644
-> --- a/arch/arm/mm/proc-arm940.S
-> +++ b/arch/arm/mm/proc-arm940.S
-> @@ -264,7 +264,7 @@ ENTRY(arm940_cache_fns)
->  	.long	arm940_dma_unmap_area
->  	.long	arm940_dma_flush_range
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm940_setup, #function
->  __arm940_setup:
-> diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
-> index 249a605..ea2e7f2 100644
-> --- a/arch/arm/mm/proc-arm946.S
-> +++ b/arch/arm/mm/proc-arm946.S
-> @@ -317,7 +317,7 @@ ENTRY(cpu_arm946_dcache_clean_area)
->  	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__arm946_setup, #function
->  __arm946_setup:
-> diff --git a/arch/arm/mm/proc-arm9tdmi.S b/arch/arm/mm/proc-arm9tdmi.S
-> index db47566..db67e31 100644
-> --- a/arch/arm/mm/proc-arm9tdmi.S
-> +++ b/arch/arm/mm/proc-arm9tdmi.S
-> @@ -46,7 +46,7 @@ ENTRY(cpu_arm9tdmi_proc_fin)
->  ENTRY(cpu_arm9tdmi_reset)
->  		mov	pc, r0
->  
-> -		__INIT
-> +		__CPUINIT
->  
->  		.type	__arm9tdmi_setup, #function
->  __arm9tdmi_setup:
-> diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
-> index 7803fdf..7c9ad62 100644
-> --- a/arch/arm/mm/proc-fa526.S
-> +++ b/arch/arm/mm/proc-fa526.S
-> @@ -134,7 +134,7 @@ ENTRY(cpu_fa526_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__fa526_setup, #function
->  __fa526_setup:
-> diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-> index b304d01..578da69 100644
-> --- a/arch/arm/mm/proc-feroceon.S
-> +++ b/arch/arm/mm/proc-feroceon.S
-> @@ -494,7 +494,7 @@ ENTRY(cpu_feroceon_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__feroceon_setup, #function
->  __feroceon_setup:
-> diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
-> index 5f6892f..4458ee6 100644
-> --- a/arch/arm/mm/proc-mohawk.S
-> +++ b/arch/arm/mm/proc-mohawk.S
-> @@ -338,7 +338,7 @@ ENTRY(cpu_mohawk_set_pte_ext)
->  	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__mohawk_setup, #function
->  __mohawk_setup:
-> diff --git a/arch/arm/mm/proc-sa110.S b/arch/arm/mm/proc-sa110.S
-> index a201eb0..5aa8d59 100644
-> --- a/arch/arm/mm/proc-sa110.S
-> +++ b/arch/arm/mm/proc-sa110.S
-> @@ -156,7 +156,7 @@ ENTRY(cpu_sa110_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__sa110_setup, #function
->  __sa110_setup:
-> diff --git a/arch/arm/mm/proc-sa1100.S b/arch/arm/mm/proc-sa1100.S
-> index 7ddc480..2ac4e6f 100644
-> --- a/arch/arm/mm/proc-sa1100.S
-> +++ b/arch/arm/mm/proc-sa1100.S
-> @@ -169,7 +169,7 @@ ENTRY(cpu_sa1100_set_pte_ext)
->  #endif
->  	mov	pc, lr
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__sa1100_setup, #function
->  __sa1100_setup:
-> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-> index 22aac85..037d1a4 100644
-> --- a/arch/arm/mm/proc-v6.S
-> +++ b/arch/arm/mm/proc-v6.S
-> @@ -137,7 +137,7 @@ cpu_pj4_name:
->  
->  	.align
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  /*
->   *	__v6_setup
-> @@ -192,6 +192,8 @@ __v6_setup:
->  v6_crval:
->  	crval	clear=0x01e0fb7f, mmuset=0x00c0387d, ucset=0x00c0187c
->  
-> +	__INITDATA
-> +
->  	.type	v6_processor_functions, #object
->  ENTRY(v6_processor_functions)
->  	.word	v6_early_abort
-> @@ -205,6 +207,8 @@ ENTRY(v6_processor_functions)
->  	.word	cpu_v6_set_pte_ext
->  	.size	v6_processor_functions, . - v6_processor_functions
->  
-> +	.section ".rodata"
-> +
->  	.type	cpu_arch_name, #object
->  cpu_arch_name:
->  	.asciz	"armv6"
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 6a8506d..cd15adb 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -169,7 +169,7 @@ cpu_v7_name:
->  	.ascii	"ARMv7 Processor"
->  	.align
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  /*
->   *	__v7_setup
-> @@ -297,6 +297,8 @@ v7_crval:
->  __v7_setup_stack:
->  	.space	4 * 11				@ 11 registers
->  
-> +	__INITDATA
-> +
->  	.type	v7_processor_functions, #object
->  ENTRY(v7_processor_functions)
->  	.word	v7_early_abort
-> @@ -310,6 +312,8 @@ ENTRY(v7_processor_functions)
->  	.word	cpu_v7_set_pte_ext
->  	.size	v7_processor_functions, . - v7_processor_functions
->  
-> +	.section ".rodata"
-> +
->  	.type	cpu_arch_name, #object
->  cpu_arch_name:
->  	.asciz	"armv7"
-> diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-> index 361a51e..cad07e4 100644
-> --- a/arch/arm/mm/proc-xsc3.S
-> +++ b/arch/arm/mm/proc-xsc3.S
-> @@ -404,7 +404,7 @@ ENTRY(cpu_xsc3_set_pte_ext)
->  
->  	.align
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__xsc3_setup, #function
->  __xsc3_setup:
-> diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-> index 1407597..cb245ed 100644
-> --- a/arch/arm/mm/proc-xscale.S
-> +++ b/arch/arm/mm/proc-xscale.S
-> @@ -506,7 +506,7 @@ ENTRY(cpu_xscale_set_pte_ext)
->  
->  	.align
->  
-> -	__INIT
-> +	__CPUINIT
->  
->  	.type	__xscale_setup, #function
->  __xscale_setup:
->   
-Any reason you skipped proc-arm1020.S?
+On Mon, 4 Oct 2010, Paul Walmsley wrote:
 
+> On Mon, 4 Oct 2010, Cousson, Benoit wrote:
+> 
+> > > --- /dev/null
+> > > +++ b/arch/arm/plat-omap/32ksynctimer.c
+> > > @@ -0,0 +1,184 @@
+> > > +/*
+> > > + * linux/arch/arm/plat-omap/clocksource.c
+> > 
+> > What name do you want to use? 32ksynctimer.c or clocksource.c?
+> 
+> Thanks, that's a bug.
+> 
+> > If this file is dedicated for the 32k sync timer, maybe we should now use the
+> > new OMAP4 name: "counter_32k".
+> > 
+> > Noboby knows what the sync stand for, and at the end this is just a 32k
+> > counter. Hence the new name :-)
+> 
+> Yep, let's use counter_32k.c.
+
+Here's the updated patch:
+
+
+- Paul
+
+>From 38a26f5b30116df2f0f82acdae3b0a5f8aa25ac7 Mon Sep 17 00:00:00 2001
+From: Paul Walmsley <paul@pwsan.com>
+Date: Fri, 1 Oct 2010 15:46:44 -0600
+Subject: [PATCH] OMAP: split plat-omap/common.c
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Split plat-omap/common.c into three pieces:
+
+1. the 32KiHz sync timer and clocksource code, which now lives in
+   plat-omap/counter_32k.c;
+
+2. the OMAP2+ common code, which has been moved to mach-omap2/common.c;
+
+3. and the remainder of the OMAP-wide common code, which includes the
+   deprecated ATAGs code and a deprecated video RAM reservation function.
+
+The primary motivation for doing this is to move the OMAP2+-specific parts
+into an OMAP2+-specific file, so that build breakage related to the
+System Control Module code can be resolved.
+
+Beno?t Cousson <b-cousson@ti.com> suggested a new filename and found
+some bugs in the counter_32k.c comments - thanks Beno?t.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+---
+ arch/arm/mach-omap2/Makefile     |    3 +-
+ arch/arm/mach-omap2/common.c     |  137 ++++++++++++++++++
+ arch/arm/plat-omap/Makefile      |    2 +-
+ arch/arm/plat-omap/common.c      |  291 --------------------------------------
+ arch/arm/plat-omap/counter_32k.c |  183 ++++++++++++++++++++++++
+ arch/arm/plat-omap/devices.c     |    1 -
+ arch/arm/plat-omap/sram.c        |    3 -
+ 7 files changed, 323 insertions(+), 297 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/common.c
+ create mode 100644 arch/arm/plat-omap/counter_32k.c
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 9edacb0..d543533 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -3,7 +3,8 @@
+ #
+ 
+ # Common support
+-obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o pm.o
++obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o pm.o \
++	 common.o
+ 
+ omap-2-3-common				= irq.o sdrc.o prm2xxx_3xxx.o
+ hwmod-common				= omap_hwmod.o \
+diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+new file mode 100644
+index 0000000..d613738
+--- /dev/null
++++ b/arch/arm/mach-omap2/common.c
+@@ -0,0 +1,137 @@
++/*
++ * linux/arch/arm/mach-omap2/common.c
++ *
++ * Code common to all OMAP2+ machines.
++ *
++ * Copyright (C) 2009 Texas Instruments
++ * Copyright (C) 2010 Nokia Corporation
++ * Tony Lindgren <tony@atomide.com>
++ * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++
++#include <plat/common.h>
++#include <plat/board.h>
++#include <plat/control.h>
++#include <plat/mux.h>
++
++#include <plat/clock.h>
++
++#include "sdrc.h"
++
++/* Global address base setup code */
++
++#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
++
++static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
++{
++	omap2_set_globals_tap(omap2_globals);
++	omap2_set_globals_sdrc(omap2_globals);
++	omap2_set_globals_control(omap2_globals);
++	omap2_set_globals_prcm(omap2_globals);
++	omap2_set_globals_uart(omap2_globals);
++}
++
++#endif
++
++#if defined(CONFIG_ARCH_OMAP2420)
++
++static struct omap_globals omap242x_globals = {
++	.class	= OMAP242X_CLASS,
++	.tap	= OMAP2_L4_IO_ADDRESS(0x48014000),
++	.sdrc	= OMAP2420_SDRC_BASE,
++	.sms	= OMAP2420_SMS_BASE,
++	.ctrl	= OMAP242X_CTRL_BASE,
++	.prm	= OMAP2420_PRM_BASE,
++	.cm	= OMAP2420_CM_BASE,
++	.uart1_phys	= OMAP2_UART1_BASE,
++	.uart2_phys	= OMAP2_UART2_BASE,
++	.uart3_phys	= OMAP2_UART3_BASE,
++};
++
++void __init omap2_set_globals_242x(void)
++{
++	__omap2_set_globals(&omap242x_globals);
++}
++#endif
++
++#if defined(CONFIG_ARCH_OMAP2430)
++
++static struct omap_globals omap243x_globals = {
++	.class	= OMAP243X_CLASS,
++	.tap	= OMAP2_L4_IO_ADDRESS(0x4900a000),
++	.sdrc	= OMAP243X_SDRC_BASE,
++	.sms	= OMAP243X_SMS_BASE,
++	.ctrl	= OMAP243X_CTRL_BASE,
++	.prm	= OMAP2430_PRM_BASE,
++	.cm	= OMAP2430_CM_BASE,
++	.uart1_phys	= OMAP2_UART1_BASE,
++	.uart2_phys	= OMAP2_UART2_BASE,
++	.uart3_phys	= OMAP2_UART3_BASE,
++};
++
++void __init omap2_set_globals_243x(void)
++{
++	__omap2_set_globals(&omap243x_globals);
++}
++#endif
++
++#if defined(CONFIG_ARCH_OMAP3)
++
++static struct omap_globals omap3_globals = {
++	.class	= OMAP343X_CLASS,
++	.tap	= OMAP2_L4_IO_ADDRESS(0x4830A000),
++	.sdrc	= OMAP343X_SDRC_BASE,
++	.sms	= OMAP343X_SMS_BASE,
++	.ctrl	= OMAP343X_CTRL_BASE,
++	.prm	= OMAP3430_PRM_BASE,
++	.cm	= OMAP3430_CM_BASE,
++	.uart1_phys	= OMAP3_UART1_BASE,
++	.uart2_phys	= OMAP3_UART2_BASE,
++	.uart3_phys	= OMAP3_UART3_BASE,
++	.uart4_phys	= OMAP3_UART4_BASE,	/* Only on 3630 */
++};
++
++void __init omap2_set_globals_3xxx(void)
++{
++	__omap2_set_globals(&omap3_globals);
++}
++
++void __init omap3_map_io(void)
++{
++	omap2_set_globals_3xxx();
++	omap34xx_map_common_io();
++}
++#endif
++
++#if defined(CONFIG_ARCH_OMAP4)
++static struct omap_globals omap4_globals = {
++	.class	= OMAP443X_CLASS,
++	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
++	.ctrl	= OMAP443X_SCM_BASE,
++	.ctrl_pad	= OMAP443X_CTRL_BASE,
++	.prm	= OMAP4430_PRM_BASE,
++	.cm	= OMAP4430_CM_BASE,
++	.cm2	= OMAP4430_CM2_BASE,
++	.uart1_phys	= OMAP4_UART1_BASE,
++	.uart2_phys	= OMAP4_UART2_BASE,
++	.uart3_phys	= OMAP4_UART3_BASE,
++	.uart4_phys	= OMAP4_UART4_BASE,
++};
++
++void __init omap2_set_globals_443x(void)
++{
++	omap2_set_globals_tap(&omap4_globals);
++	omap2_set_globals_control(&omap4_globals);
++	omap2_set_globals_prcm(&omap4_globals);
++	omap2_set_globals_uart(&omap4_globals);
++}
++#endif
++
+diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+index 2a15191..a4a1285 100644
+--- a/arch/arm/plat-omap/Makefile
++++ b/arch/arm/plat-omap/Makefile
+@@ -4,7 +4,7 @@
+ 
+ # Common support
+ obj-y := common.o sram.o clock.o devices.o dma.o mux.o gpio.o \
+-	 usb.o fb.o io.o
++	 usb.o fb.o io.o counter_32k.o
+ obj-m :=
+ obj-n :=
+ obj-  :=
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index 9200ea7..221a675 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -11,38 +11,15 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/delay.h>
+-#include <linux/console.h>
+-#include <linux/serial.h>
+-#include <linux/tty.h>
+-#include <linux/serial_8250.h>
+-#include <linux/serial_reg.h>
+-#include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/omapfb.h>
+ 
+-#include <mach/hardware.h>
+-#include <asm/system.h>
+-#include <asm/pgtable.h>
+-#include <asm/mach/map.h>
+-#include <asm/setup.h>
+-
+ #include <plat/common.h>
+ #include <plat/board.h>
+-#include <plat/control.h>
+-#include <plat/mux.h>
+-#include <plat/fpga.h>
+-#include <plat/serial.h>
+ #include <plat/vram.h>
+ 
+-#include <plat/clock.h>
+-
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+-# include "../mach-omap2/sdrc.h"
+-#endif
+ 
+ #define NO_LENGTH_CHECK 0xffffffff
+ 
+@@ -88,271 +65,3 @@ void __init omap_reserve(void)
+ 	omapfb_reserve_sdram_memblock();
+ 	omap_vram_reserve_sdram_memblock();
+ }
+-
+-/*
+- * 32KHz clocksource ... always available, on pretty most chips except
+- * OMAP 730 and 1510.  Other timers could be used as clocksources, with
+- * higher resolution in free-running counter modes (e.g. 12 MHz xtal),
+- * but systems won't necessarily want to spend resources that way.
+- */
+-
+-#define OMAP16XX_TIMER_32K_SYNCHRONIZED		0xfffbc410
+-
+-#if !(defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP15XX))
+-
+-#include <linux/clocksource.h>
+-
+-/*
+- * offset_32k holds the init time counter value. It is then subtracted
+- * from every counter read to achieve a counter that counts time from the
+- * kernel boot (needed for sched_clock()).
+- */
+-static u32 offset_32k __read_mostly;
+-
+-#ifdef CONFIG_ARCH_OMAP16XX
+-static cycle_t omap16xx_32k_read(struct clocksource *cs)
+-{
+-	return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
+-}
+-#else
+-#define omap16xx_32k_read	NULL
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP2420
+-static cycle_t omap2420_32k_read(struct clocksource *cs)
+-{
+-	return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
+-}
+-#else
+-#define omap2420_32k_read	NULL
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP2430
+-static cycle_t omap2430_32k_read(struct clocksource *cs)
+-{
+-	return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
+-}
+-#else
+-#define omap2430_32k_read	NULL
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP3
+-static cycle_t omap34xx_32k_read(struct clocksource *cs)
+-{
+-	return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
+-}
+-#else
+-#define omap34xx_32k_read	NULL
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP4
+-static cycle_t omap44xx_32k_read(struct clocksource *cs)
+-{
+-	return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
+-}
+-#else
+-#define omap44xx_32k_read	NULL
+-#endif
+-
+-/*
+- * Kernel assumes that sched_clock can be called early but may not have
+- * things ready yet.
+- */
+-static cycle_t omap_32k_read_dummy(struct clocksource *cs)
+-{
+-	return 0;
+-}
+-
+-static struct clocksource clocksource_32k = {
+-	.name		= "32k_counter",
+-	.rating		= 250,
+-	.read		= omap_32k_read_dummy,
+-	.mask		= CLOCKSOURCE_MASK(32),
+-	.shift		= 10,
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-/*
+- * Returns current time from boot in nsecs. It's OK for this to wrap
+- * around for now, as it's just a relative time stamp.
+- */
+-unsigned long long sched_clock(void)
+-{
+-	return clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
+-				  clocksource_32k.mult, clocksource_32k.shift);
+-}
+-
+-/**
+- * read_persistent_clock -  Return time from a persistent clock.
+- *
+- * Reads the time from a source which isn't disabled during PM, the
+- * 32k sync timer.  Convert the cycles elapsed since last read into
+- * nsecs and adds to a monotonically increasing timespec.
+- */
+-static struct timespec persistent_ts;
+-static cycles_t cycles, last_cycles;
+-void read_persistent_clock(struct timespec *ts)
+-{
+-	unsigned long long nsecs;
+-	cycles_t delta;
+-	struct timespec *tsp = &persistent_ts;
+-
+-	last_cycles = cycles;
+-	cycles = clocksource_32k.read(&clocksource_32k);
+-	delta = cycles - last_cycles;
+-
+-	nsecs = clocksource_cyc2ns(delta,
+-				   clocksource_32k.mult, clocksource_32k.shift);
+-
+-	timespec_add_ns(tsp, nsecs);
+-	*ts = *tsp;
+-}
+-
+-static int __init omap_init_clocksource_32k(void)
+-{
+-	static char err[] __initdata = KERN_ERR
+-			"%s: can't register clocksource!\n";
+-
+-	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+-		struct clk *sync_32k_ick;
+-
+-		if (cpu_is_omap16xx())
+-			clocksource_32k.read = omap16xx_32k_read;
+-		else if (cpu_is_omap2420())
+-			clocksource_32k.read = omap2420_32k_read;
+-		else if (cpu_is_omap2430())
+-			clocksource_32k.read = omap2430_32k_read;
+-		else if (cpu_is_omap34xx())
+-			clocksource_32k.read = omap34xx_32k_read;
+-		else if (cpu_is_omap44xx())
+-			clocksource_32k.read = omap44xx_32k_read;
+-		else
+-			return -ENODEV;
+-
+-		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+-		if (sync_32k_ick)
+-			clk_enable(sync_32k_ick);
+-
+-		clocksource_32k.mult = clocksource_hz2mult(32768,
+-					    clocksource_32k.shift);
+-
+-		offset_32k = clocksource_32k.read(&clocksource_32k);
+-
+-		if (clocksource_register(&clocksource_32k))
+-			printk(err, clocksource_32k.name);
+-	}
+-	return 0;
+-}
+-arch_initcall(omap_init_clocksource_32k);
+-
+-#endif	/* !(defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP15XX)) */
+-
+-/* Global address base setup code */
+-
+-#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+-
+-static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
+-{
+-	omap2_set_globals_tap(omap2_globals);
+-	omap2_set_globals_sdrc(omap2_globals);
+-	omap2_set_globals_control(omap2_globals);
+-	omap2_set_globals_prcm(omap2_globals);
+-	omap2_set_globals_uart(omap2_globals);
+-}
+-
+-#endif
+-
+-#if defined(CONFIG_ARCH_OMAP2420)
+-
+-static struct omap_globals omap242x_globals = {
+-	.class	= OMAP242X_CLASS,
+-	.tap	= OMAP2_L4_IO_ADDRESS(0x48014000),
+-	.sdrc	= OMAP2420_SDRC_BASE,
+-	.sms	= OMAP2420_SMS_BASE,
+-	.ctrl	= OMAP242X_CTRL_BASE,
+-	.prm	= OMAP2420_PRM_BASE,
+-	.cm	= OMAP2420_CM_BASE,
+-	.uart1_phys	= OMAP2_UART1_BASE,
+-	.uart2_phys	= OMAP2_UART2_BASE,
+-	.uart3_phys	= OMAP2_UART3_BASE,
+-};
+-
+-void __init omap2_set_globals_242x(void)
+-{
+-	__omap2_set_globals(&omap242x_globals);
+-}
+-#endif
+-
+-#if defined(CONFIG_ARCH_OMAP2430)
+-
+-static struct omap_globals omap243x_globals = {
+-	.class	= OMAP243X_CLASS,
+-	.tap	= OMAP2_L4_IO_ADDRESS(0x4900a000),
+-	.sdrc	= OMAP243X_SDRC_BASE,
+-	.sms	= OMAP243X_SMS_BASE,
+-	.ctrl	= OMAP243X_CTRL_BASE,
+-	.prm	= OMAP2430_PRM_BASE,
+-	.cm	= OMAP2430_CM_BASE,
+-	.uart1_phys	= OMAP2_UART1_BASE,
+-	.uart2_phys	= OMAP2_UART2_BASE,
+-	.uart3_phys	= OMAP2_UART3_BASE,
+-};
+-
+-void __init omap2_set_globals_243x(void)
+-{
+-	__omap2_set_globals(&omap243x_globals);
+-}
+-#endif
+-
+-#if defined(CONFIG_ARCH_OMAP3)
+-
+-static struct omap_globals omap3_globals = {
+-	.class	= OMAP343X_CLASS,
+-	.tap	= OMAP2_L4_IO_ADDRESS(0x4830A000),
+-	.sdrc	= OMAP343X_SDRC_BASE,
+-	.sms	= OMAP343X_SMS_BASE,
+-	.ctrl	= OMAP343X_CTRL_BASE,
+-	.prm	= OMAP3430_PRM_BASE,
+-	.cm	= OMAP3430_CM_BASE,
+-	.uart1_phys	= OMAP3_UART1_BASE,
+-	.uart2_phys	= OMAP3_UART2_BASE,
+-	.uart3_phys	= OMAP3_UART3_BASE,
+-	.uart4_phys	= OMAP3_UART4_BASE,	/* Only on 3630 */
+-};
+-
+-void __init omap2_set_globals_3xxx(void)
+-{
+-	__omap2_set_globals(&omap3_globals);
+-}
+-
+-void __init omap3_map_io(void)
+-{
+-	omap2_set_globals_3xxx();
+-	omap34xx_map_common_io();
+-}
+-#endif
+-
+-#if defined(CONFIG_ARCH_OMAP4)
+-static struct omap_globals omap4_globals = {
+-	.class	= OMAP443X_CLASS,
+-	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+-	.ctrl	= OMAP443X_SCM_BASE,
+-	.ctrl_pad	= OMAP443X_CTRL_BASE,
+-	.prm	= OMAP4430_PRM_BASE,
+-	.cm	= OMAP4430_CM_BASE,
+-	.cm2	= OMAP4430_CM2_BASE,
+-	.uart1_phys	= OMAP4_UART1_BASE,
+-	.uart2_phys	= OMAP4_UART2_BASE,
+-	.uart3_phys	= OMAP4_UART3_BASE,
+-	.uart4_phys	= OMAP4_UART4_BASE,
+-};
+-
+-void __init omap2_set_globals_443x(void)
+-{
+-	omap2_set_globals_tap(&omap4_globals);
+-	omap2_set_globals_control(&omap4_globals);
+-	omap2_set_globals_prcm(&omap4_globals);
+-	omap2_set_globals_uart(&omap4_globals);
+-}
+-#endif
+-
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+new file mode 100644
+index 0000000..155fe43
+--- /dev/null
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -0,0 +1,183 @@
++/*
++ * OMAP 32ksynctimer/counter_32k-related code
++ *
++ * Copyright (C) 2009 Texas Instruments
++ * Copyright (C) 2010 Nokia Corporation
++ * Tony Lindgren <tony@atomide.com>
++ * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * NOTE: This timer is not the same timer as the old OMAP1 MPU timer.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++
++#include <plat/common.h>
++#include <plat/board.h>
++
++#include <plat/clock.h>
++
++
++/*
++ * 32KHz clocksource ... always available, on pretty most chips except
++ * OMAP 730 and 1510.  Other timers could be used as clocksources, with
++ * higher resolution in free-running counter modes (e.g. 12 MHz xtal),
++ * but systems won't necessarily want to spend resources that way.
++ */
++
++#define OMAP16XX_TIMER_32K_SYNCHRONIZED		0xfffbc410
++
++#if !(defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP15XX))
++
++#include <linux/clocksource.h>
++
++/*
++ * offset_32k holds the init time counter value. It is then subtracted
++ * from every counter read to achieve a counter that counts time from the
++ * kernel boot (needed for sched_clock()).
++ */
++static u32 offset_32k __read_mostly;
++
++#ifdef CONFIG_ARCH_OMAP16XX
++static cycle_t omap16xx_32k_read(struct clocksource *cs)
++{
++	return omap_readl(OMAP16XX_TIMER_32K_SYNCHRONIZED) - offset_32k;
++}
++#else
++#define omap16xx_32k_read	NULL
++#endif
++
++#ifdef CONFIG_ARCH_OMAP2420
++static cycle_t omap2420_32k_read(struct clocksource *cs)
++{
++	return omap_readl(OMAP2420_32KSYNCT_BASE + 0x10) - offset_32k;
++}
++#else
++#define omap2420_32k_read	NULL
++#endif
++
++#ifdef CONFIG_ARCH_OMAP2430
++static cycle_t omap2430_32k_read(struct clocksource *cs)
++{
++	return omap_readl(OMAP2430_32KSYNCT_BASE + 0x10) - offset_32k;
++}
++#else
++#define omap2430_32k_read	NULL
++#endif
++
++#ifdef CONFIG_ARCH_OMAP3
++static cycle_t omap34xx_32k_read(struct clocksource *cs)
++{
++	return omap_readl(OMAP3430_32KSYNCT_BASE + 0x10) - offset_32k;
++}
++#else
++#define omap34xx_32k_read	NULL
++#endif
++
++#ifdef CONFIG_ARCH_OMAP4
++static cycle_t omap44xx_32k_read(struct clocksource *cs)
++{
++	return omap_readl(OMAP4430_32KSYNCT_BASE + 0x10) - offset_32k;
++}
++#else
++#define omap44xx_32k_read	NULL
++#endif
++
++/*
++ * Kernel assumes that sched_clock can be called early but may not have
++ * things ready yet.
++ */
++static cycle_t omap_32k_read_dummy(struct clocksource *cs)
++{
++	return 0;
++}
++
++static struct clocksource clocksource_32k = {
++	.name		= "32k_counter",
++	.rating		= 250,
++	.read		= omap_32k_read_dummy,
++	.mask		= CLOCKSOURCE_MASK(32),
++	.shift		= 10,
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++/*
++ * Returns current time from boot in nsecs. It's OK for this to wrap
++ * around for now, as it's just a relative time stamp.
++ */
++unsigned long long sched_clock(void)
++{
++	return clocksource_cyc2ns(clocksource_32k.read(&clocksource_32k),
++				  clocksource_32k.mult, clocksource_32k.shift);
++}
++
++/**
++ * read_persistent_clock -  Return time from a persistent clock.
++ *
++ * Reads the time from a source which isn't disabled during PM, the
++ * 32k sync timer.  Convert the cycles elapsed since last read into
++ * nsecs and adds to a monotonically increasing timespec.
++ */
++static struct timespec persistent_ts;
++static cycles_t cycles, last_cycles;
++void read_persistent_clock(struct timespec *ts)
++{
++	unsigned long long nsecs;
++	cycles_t delta;
++	struct timespec *tsp = &persistent_ts;
++
++	last_cycles = cycles;
++	cycles = clocksource_32k.read(&clocksource_32k);
++	delta = cycles - last_cycles;
++
++	nsecs = clocksource_cyc2ns(delta,
++				   clocksource_32k.mult, clocksource_32k.shift);
++
++	timespec_add_ns(tsp, nsecs);
++	*ts = *tsp;
++}
++
++static int __init omap_init_clocksource_32k(void)
++{
++	static char err[] __initdata = KERN_ERR
++			"%s: can't register clocksource!\n";
++
++	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
++		struct clk *sync_32k_ick;
++
++		if (cpu_is_omap16xx())
++			clocksource_32k.read = omap16xx_32k_read;
++		else if (cpu_is_omap2420())
++			clocksource_32k.read = omap2420_32k_read;
++		else if (cpu_is_omap2430())
++			clocksource_32k.read = omap2430_32k_read;
++		else if (cpu_is_omap34xx())
++			clocksource_32k.read = omap34xx_32k_read;
++		else if (cpu_is_omap44xx())
++			clocksource_32k.read = omap44xx_32k_read;
++		else
++			return -ENODEV;
++
++		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
++		if (sync_32k_ick)
++			clk_enable(sync_32k_ick);
++
++		clocksource_32k.mult = clocksource_hz2mult(32768,
++					    clocksource_32k.shift);
++
++		offset_32k = clocksource_32k.read(&clocksource_32k);
++
++		if (clocksource_register(&clocksource_32k))
++			printk(err, clocksource_32k.name);
++	}
++	return 0;
++}
++arch_initcall(omap_init_clocksource_32k);
++
++#endif	/* !(defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP15XX)) */
++
+diff --git a/arch/arm/plat-omap/devices.c b/arch/arm/plat-omap/devices.c
+index d1920be..78162a0 100644
+--- a/arch/arm/plat-omap/devices.c
++++ b/arch/arm/plat-omap/devices.c
+@@ -21,7 +21,6 @@
+ #include <asm/mach/map.h>
+ 
+ #include <plat/tc.h>
+-#include <plat/control.h>
+ #include <plat/board.h>
+ #include <plat/mmc.h>
+ #include <mach/gpio.h>
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 98c86ff..79ce946 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -30,8 +30,6 @@
+ #include <plat/cpu.h>
+ #include <plat/vram.h>
+ 
+-#include <plat/control.h>
+-
+ #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ # include "../mach-omap2/prm.h"
+ # include "../mach-omap2/cm.h"
+@@ -68,7 +66,6 @@
+ #define OMAP34XX_VA_WRITEPERM0		OMAP2_L3_IO_ADDRESS(0x68012858)
+ #define OMAP34XX_VA_ADDR_MATCH2		OMAP2_L3_IO_ADDRESS(0x68012880)
+ #define OMAP34XX_VA_SMS_RG_ATT0		OMAP2_L3_IO_ADDRESS(0x6C000048)
+-#define OMAP34XX_VA_CONTROL_STAT	OMAP2_L4_IO_ADDRESS(0x480022F0)
+ 
+ #define GP_DEVICE		0x300
+ 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
