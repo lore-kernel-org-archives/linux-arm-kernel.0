@@ -1,45 +1,75 @@
-From: peter.ujfalusi@nokia.com (Peter Ujfalusi)
-Date: Mon, 4 Oct 2010 13:42:32 +0300
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Mon, 4 Oct 2010 16:34:01 +0530
 Subject: [PATCH v4 4/4] OMAP3: DMA: Errata i541: sDMA FIFO draining does
 	not finish
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA49@dbde02.ent.ti.com>
+In-Reply-To: <201010041342.33238.peter.ujfalusi@nokia.com>
 References: <1286180294-32618-1-git-send-email-peter.ujfalusi@nokia.com>
 	<1286180294-32618-5-git-send-email-peter.ujfalusi@nokia.com>
 	<E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CA49@dbde02.ent.ti.com>
-Message-ID: <201010041342.33238.peter.ujfalusi@nokia.com>
+	<201010041342.33238.peter.ujfalusi@nokia.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB90CB67@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 04 October 2010 12:17:41 ext G, Manjunath Kondaiah wrote:
+
+
+> -----Original Message-----
+> From: Peter Ujfalusi [mailto:peter.ujfalusi at nokia.com] 
+> Sent: Monday, October 04, 2010 4:13 PM
+> To: G, Manjunath Kondaiah
+> Cc: Tony Lindgren; linux-omap at vger.kernel.org; Jarkko Nikula; 
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 4/4] OMAP3: DMA: Errata i541: sDMA 
+> FIFO draining does not finish
 > 
-> ...
+> On Monday 04 October 2010 12:17:41 ext G, Manjunath Kondaiah wrote:
+> > 
+> > ...
+> > 
+> > > +	/* OMAP3 Errata i541: sDMA FIFO draining does not finish */
+> > 
+> > This logic is required for multiple erratas.
 > 
-> > +	/* OMAP3 Errata i541: sDMA FIFO draining does not finish */
+> As Tony requested, I have added a variable for flags to 
+> handle the different erratas. I even added a macro to check 
+> that the errata applies, so one can use:
+> if (IS_DMA_ERRATA(DMA_ERRATA_XXXXX))
 > 
-> This logic is required for multiple erratas.
+> > Can we have seperate
+> > function for handling this logic. More details at:
+> > https://patchwork.kernel.org/patch/126271/
+> 
+> I see. That patch is for hwmod converted dma code, right?
+> We need this fix without the hwmod to applied, and than 
+> backport it to earlier kernel releases.
+> 
+> > As I mentioned in other mail, if you are introducing this 
+> feature, it 
+> > is better to convert existing erratas also to use this feature.
+> 
+> The upcoming hwmod conversion will take care of the cleanup.
 
-As Tony requested, I have added a variable for flags to handle the different 
-erratas. I even added a macro to check that the errata applies, so one can use:
-if (IS_DMA_ERRATA(DMA_ERRATA_XXXXX))
+If this is the case, not sure about intention of having dma_errata only
+for these two erratas since all the erratas are not handled.
 
-> Can we have seperate
-> function for handling this logic. More details at:
-> https://patchwork.kernel.org/patch/126271/
+All the erratas will get cleaned up and errata handling feature
+will be introduced along with dma hwmod changes.
 
-I see. That patch is for hwmod converted dma code, right?
-We need this fix without the hwmod to applied, and than backport it to earlier 
-kernel releases.
+If feel v3 version is better so that I can use these changes along 
+dma hwmod.
 
-> As I mentioned in other mail, if you are introducing this feature,
-> it is better to convert existing erratas also to use this feature.
+It is upto Tony to decide.
 
-The upcoming hwmod conversion will take care of the cleanup.
-We _need_ these two small fixes ASAP, since it is fixing serious problem in 
-audio (and the same issue might bite other areas as well).
-It is not the intention of this series to clean up the arc/arm/plat-omap/dma.c.
+> We _need_ these two small fixes ASAP, since it is fixing 
+> serious problem in audio (and the same issue might bite other 
+> areas as well).
+> It is not the intention of this series to clean up the 
+> arc/arm/plat-omap/dma.c.
 
-I have added the dma_errata variable, since Tony asked for it, but even that 
-addition is a bigger change than what I was planning to do here.
+Tony, 
+How about having v3 series + review comments fixed(except comments
+related errata handling). Errata handling will be done as part dma
+hwmod. I am waiting for these patches so that I can rebase these
+patches in DMA hwmod.
 
--- 
-P?ter
+-Manjunath
