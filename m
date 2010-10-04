@@ -1,49 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 3 Oct 2010 23:45:28 -0600 (MDT)
-Subject: [PATCH 01/10] OMAP2+: Kconfig: disallow builds for boards that
-	don't use the currently-selected SoC
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE2FA@dbde02.ent.ti.com>
-References: <20101001213119.1408.65395.stgit@twilight.localdomain>
-	<20101001213445.1408.96821.stgit@twilight.localdomain>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE2FA@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1010032343250.13816@utopia.booyaka.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 4 Oct 2010 11:31:05 +0530
+Subject: [PATCH V2 62/69] ST SPEAr: Appending spear3** with global
+	structures
+In-Reply-To: <AANLkTi=xNoG2T1Q2JqB7TH+O7AjW++UnSt1Q85VgPbzp@mail.gmail.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>	<f4787f6021bf3a8c009595749894332c05e656df.1285933332.git.viresh.kumar@st.com>
+	<AANLkTi=xNoG2T1Q2JqB7TH+O7AjW++UnSt1Q85VgPbzp@mail.gmail.com>
+Message-ID: <4CA96DA1.7040301@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Oct 2010, Varadarajan, Charulatha wrote:
-
->  
+On 10/01/2010 09:51 PM, viresh kumar wrote:
+> Hello everybody,
 > 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org 
-> > [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> > Sent: Saturday, October 02, 2010 3:05 AM
-> > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Cc: Tony Lindgren
-> > Subject: [PATCH 01/10] OMAP2+: Kconfig: disallow builds for 
-> > boards that don't use the currently-selected SoC
-
-...
-
-> > +++ b/arch/arm/mach-omap2/board-generic.c
-> > @@ -48,10 +48,22 @@ static void __init omap_generic_init(void)
-> >  
-> >  static void __init omap_generic_map_io(void)
-> >  {
-> > -	omap2_set_globals_242x(); /* should be 242x, 243x, or 343x */
-> > -	omap242x_map_common_io();
-> > +	if (cpu_is_omap242x()) {
-> > +		omap2_set_globals_242x();
-> > +		omap242x_map_common_io();
-> > +	} else if (cpu_is_omap242x()) {
+> I have used an latest patch on git for sending this patch series. I
+> think there is some bug
+> there, due to which all of you have received some mails which are not
+> intended for all of you.
+> There was a bugfix in git which enables to send mail to "recipients
+> mentioned in TO field", of patch
+> itself.
 > 
-> Is this intended for 242x() or 243x()?
+> After creating patches (with git format-patch ---), i have added To
+> and CC lists in patches.
+> But when i sent patches the TO field was carried away in later patches
+> too. So due to this
+> all patches send after rtc patches have following recipients added:
+> rtc-linux at googlegroups.com,
+> a.zummo at towertech.it. Similarly for other patches too.
 > 
-> > +		omap2_set_globals_243x();
-> > +		omap243x_map_common_io();
 
-That's for 243x().  Thanks, updated that in the branch that's posted on 
-git.pwsan.com.
+Hello,
 
+Should i resend my patches (with correct list of people in To:)??
 
-- Paul
+-- 
+viresh
