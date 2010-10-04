@@ -1,35 +1,52 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 4 Oct 2010 11:21:23 -0700
+Date: Mon, 4 Oct 2010 11:27:00 -0700
 Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
-In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFE554@dbde02.ent.ti.com>
 References: <20101001213119.1408.65395.stgit@twilight.localdomain>
 	<20101001213532.1408.55832.stgit@twilight.localdomain>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3C6@dbde02.ent.ti.com>
-	<20101004065624.GD2559@legolas.emea.dhcp.ti.com>
-	<20101004070040.GE2559@legolas.emea.dhcp.ti.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
-Message-ID: <20101004182122.GY3117@atomide.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3D3@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1010032359220.13816@utopia.booyaka.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE554@dbde02.ent.ti.com>
+Message-ID: <20101004182700.GZ3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [101004 00:20]:
-> > >
-> > >[1] git://gitorious.org/usb/usb.git clksource
-> > 
-> > I made a few changes to make checkpatch.pl --strict happy. Attached
-> > 
-> Good !!
-> This patch addresses splitting as well as multi-omap builds and probably
-> also a better candidate in case we need to convert sync timer to hwmod
-> driver.
+* Varadarajan, Charulatha <charu@ti.com> [101004 01:20]:
+> Paul,
 > 
-> Paul, what's your take?
+> <<snip>>
+> 
+> > 
+> > > > +static int __init omap_init_clocksource_32k(void)
+> > > > +{
+> > > > +	static char err[] __initdata = KERN_ERR
+> > > > +			"%s: can't register clocksource!\n";
+> > > > +
+> > > > +	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+> > > > +		struct clk *sync_32k_ick;
+> > > > +
+> > > > +		if (cpu_is_omap16xx())
+> > >
+> > > Avoid cpu_is* checks in plat-omap.
+> > 
+> > OK, I'll bite.  Why?
+> 
+> I think this is being looked for all the new code introduced
+> in plat-omap layer for the following reasons:
+> Adding cpu-is-* checks makes code unmaintainable going fwd.
+> plat-omap layer needs to handle common code for all omap platforms.
+> 
+> This was raised for GPIO driver because of which, there was a
+> requirement to clean-up the gpio driver.
+> 
+> Is this stand changed? Are cpu_is* checks allowed in plat-omap?
 
-I think we need to first merge Paul's series to fix the omap1
-compile issue and the ASoC module compile issue.
+We should only need to do cpu_is* checks in arch/arm/mach-omap2,
+and only in few places during the init.
 
-The other changes should be trivial to rebase on top of that.
+However, this patch series moves around the existing code to
+avoid having oma2plus specific code be in plat-omap.
 
-Regards,
+Again, further patches can be done easily on this.
 
 Tony
