@@ -1,167 +1,70 @@
-From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Tue,  5 Oct 2010 16:15:20 +0200
-Subject: [PATCHv4 4/6] omap3: Fix handling some GPIO's for WLAN-BT combo on
-	IGEP v2.
-In-Reply-To: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
-References: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1286288122-16834-5-git-send-email-eballetbo@gmail.com>
+From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
+Date: Tue, 5 Oct 2010 16:28:19 +0200
+Subject: [PATCHv3 1/6] omap3: Add external VBUS power switch and
+	overcurrent detect on IGEP v2 board.
+In-Reply-To: <20101005103516.GC12614@esdhcp036161.research.nokia.com>
+References: <1285967349-32767-1-git-send-email-eballetbo@gmail.com>
+	<1285967349-32767-2-git-send-email-eballetbo@gmail.com>
+	<20101002080427.GC14377@esdhcp036161.research.nokia.com>
+	<AANLkTin0FBudq5saFhcuonrzK2LqU0UueiN_-C=B0N0j@mail.gmail.com>
+	<20101005103516.GC12614@esdhcp036161.research.nokia.com>
+Message-ID: <AANLkTimVsAiqH2Mk3rW6ub5pNjWen9U3xFVvyKBKo4pa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GPIO's used by WLAN-BT combo on IGEP v2 depends on hardware
-revision. This patch handles these GPIO's.
+Hello,
 
-  ----------------------------------------------------------
- |       Hw Rev.       | WIFI_NPD | WIFI_NRESET | BT_NRESET |
-  ----------------------------------------------------------
- |  B                  | gpio94  |   gpio95    |     -      |
- |  B/C (B-compatible) | gpio94  |   gpio95    |  gpio137   |
- |  C                  | gpio138 |   gpio139   |  gpio137   |
-  ----------------------------------------------------------
+2010/10/5 David Cohen <david.cohen@nokia.com>:
+> On Sat, Oct 02, 2010 at 12:12:32PM +0200, ext Enric Balletb? i Serra wrote:
+>> 2010/10/2 David Cohen <david.cohen@nokia.com>:
+>> > Hi,
+>> >
+>> > On Fri, Oct 01, 2010 at 11:09:04PM +0200, ext Enric Balletbo i Serra wrote:
+>> >> GPIO for various devices are missing from the board initialization.
+>> >> This patch adds support for the VBUS and over current gpios. ?Without this
+>> >> patch, input/outputs from these two sources are ignored.
+>> >>
+>> >> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+>> >> ---
+>> >> ?arch/arm/mach-omap2/board-igep0020.c | ? 16 ++++++++++++++++
+>> >> ?1 files changed, 16 insertions(+), 0 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+>> >> index 175f043..07dbdb7 100644
+>> >> --- a/arch/arm/mach-omap2/board-igep0020.c
+>> >> +++ b/arch/arm/mach-omap2/board-igep0020.c
+>> >> @@ -274,6 +274,22 @@ static int igep2_twl_gpio_setup(struct device *dev,
+>> >> ? ? ? igep2_vmmc1_supply.dev = mmc[0].dev;
+>> >> ? ? ? igep2_vmmc2_supply.dev = mmc[1].dev;
+>> >>
+>> >> + ? ? /*
+>> >> + ? ? ?* REVISIT: need ehci-omap hooks for external VBUS
+>> >> + ? ? ?* power switch and overcurrent detect
+>> >> + ? ? ?*/
+>> >> + ? ? if ((gpio_request(gpio + 1, "GPIO_EHCI_NOC") < 0) ||
+>> >> + ? ? ? ? (gpio_direction_input(gpio + 1) < 0))
+>> >> + ? ? ? ? ? ? pr_err("IGEP2: Could not obtain gpio for EHCI NOC");
+>> >
+>> > Shouldb't you return error if it can't request the GPIO?
+>>
+>> I'm not sure what happens if I return and error, I see only prints a
+>> debug message. Maybe the twl4030-gpio maintainer can explain if I need
+>> return and error or not.
+>>
+>> Other omap boards just don't check the gpio_request call and always
+>> return 0. I don't consider this a critical error so maybe should be
+>> better replace the pr_err with a pr_warning.
+>
+> I checked some board files and it seems they're not verifying gpio_request()
+> results most of the times. But if you check board-omap3pandor.c, it's
+> been done in a better way.
+>
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   96 ++++++++++++++++++++++++----------
- 1 files changed, 69 insertions(+), 27 deletions(-)
+I think so, looks a better way. I'll introduce this in a future patch,
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 5510f95..ddc740a 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -38,22 +38,28 @@
- #define IGEP2_SMSC911X_CS       5
- #define IGEP2_SMSC911X_GPIO     176
- #define IGEP2_GPIO_USBH_NRESET  24
--#define IGEP2_GPIO_LED0_GREEN 	26
--#define IGEP2_GPIO_LED0_RED 	27
--#define IGEP2_GPIO_LED1_RED   	28
--#define IGEP2_GPIO_DVI_PUP	170
--#define IGEP2_GPIO_WIFI_NPD 	94
--#define IGEP2_GPIO_WIFI_NRESET 	95
-+#define IGEP2_GPIO_LED0_GREEN   26
-+#define IGEP2_GPIO_LED0_RED     27
-+#define IGEP2_GPIO_LED1_RED     28
-+#define IGEP2_GPIO_DVI_PUP      170
-+
-+#define IGEP2_RB_GPIO_WIFI_NPD     94
-+#define IGEP2_RB_GPIO_WIFI_NRESET  95
-+#define IGEP2_RB_GPIO_BT_NRESET    137
-+#define IGEP2_RC_GPIO_WIFI_NPD     138
-+#define IGEP2_RC_GPIO_WIFI_NRESET  139
-+#define IGEP2_RC_GPIO_BT_NRESET    137
- 
- /*
-  * IGEP2 Hardware Revision Table
-  *
-- *  --------------------------
-- * | Id. | Hw Rev. | HW0 (28) |
-- *  --------------------------
-- * |  0  |   B/C   |   high   |
-- * |  1  |   C     |   low    |
-- *  --------------------------
-+ *  --------------------------------------------------------------------------
-+ * | Id. | Hw Rev.            | HW0 (28) | WIFI_NPD | WIFI_NRESET | BT_NRESET |
-+ *  --------------------------------------------------------------------------
-+ * |  0  | B                  |   high   |  gpio94  |   gpio95    |     -     |
-+ * |  0  | B/C (B-compatible) |   high   |  gpio94  |   gpio95    |  gpio137  |
-+ * |  1  | C                  |   low    |  gpio138 |   gpio139   |  gpio137  |
-+ *  --------------------------------------------------------------------------
-  */
- 
- #define IGEP2_BOARD_HWREV_B	0
-@@ -295,12 +301,14 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
- 	},
-+#if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
- 	{
- 		.mmc		= 2,
- 		.wires		= 4,
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
- 	},
-+#endif
- 	{}      /* Terminator */
- };
- 
-@@ -577,6 +585,50 @@ static struct omap_board_mux board_mux[] __initdata = {
- #define board_mux	NULL
- #endif
- 
-+#if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
-+
-+static void __init igep2_wlan_bt_init(void)
-+{
-+	unsigned npd, wreset, btreset;
-+
-+	/* GPIO's for WLAN-BT combo depends on hardware revision */
-+	if (hwrev == IGEP2_BOARD_HWREV_B) {
-+		npd = IGEP2_RB_GPIO_WIFI_NPD;
-+		wreset = IGEP2_RB_GPIO_WIFI_NRESET;
-+		btreset = IGEP2_RB_GPIO_BT_NRESET;
-+	} else if (hwrev == IGEP2_BOARD_HWREV_C) {
-+		npd = IGEP2_RC_GPIO_WIFI_NPD;
-+		wreset = IGEP2_RC_GPIO_WIFI_NRESET;
-+		btreset = IGEP2_RC_GPIO_BT_NRESET;
-+	} else
-+		return;
-+
-+	/* Set GPIO's for  WLAN-BT combo module */
-+	if ((gpio_request(npd, "GPIO_WIFI_NPD") == 0) &&
-+	    (gpio_direction_output(npd, 1) == 0)) {
-+		gpio_export(npd, 0);
-+	} else
-+		pr_warning("IGEP2: Could not obtain gpio GPIO_WIFI_NPD\n");
-+
-+	if ((gpio_request(wreset, "GPIO_WIFI_NRESET") == 0) &&
-+	    (gpio_direction_output(wreset, 1) == 0)) {
-+		gpio_export(wreset, 0);
-+		gpio_set_value(wreset, 0);
-+		udelay(10);
-+		gpio_set_value(wreset, 1);
-+	} else
-+		pr_warning("IGEP2: Could not obtain gpio GPIO_WIFI_NRESET\n");
-+
-+	if ((gpio_request(btreset, "GPIO_BT_NRESET") == 0) &&
-+	    (gpio_direction_output(btreset, 1) == 0)) {
-+		gpio_export(btreset, 0);
-+	} else
-+		pr_warning("IGEP2: Could not obtain gpio GPIO_BT_NRESET\n");
-+}
-+#else
-+static inline void __init igep2_wlan_bt_init(void) { }
-+#endif
-+
- static void __init igep2_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-@@ -595,22 +647,12 @@ static void __init igep2_init(void)
- 	igep2_display_init();
- 	igep2_init_smsc911x();
- 
--	/* GPIO W-LAN + Bluetooth combo module */
--	if ((gpio_request(IGEP2_GPIO_WIFI_NPD, "GPIO_WIFI_NPD") == 0) &&
--	    (gpio_direction_output(IGEP2_GPIO_WIFI_NPD, 1) == 0)) {
--		gpio_export(IGEP2_GPIO_WIFI_NPD, 0);
--/* 		gpio_set_value(IGEP2_GPIO_WIFI_NPD, 0); */
--	} else
--		pr_warning("IGEP v2: Could not obtain gpio GPIO_WIFI_NPD\n");
-+	/*
-+	 * WLAN-BT combo module from MuRata wich has a Marvell WLAN
-+	 * (88W8686) + CSR Bluetooth chipset. Uses SDIO interface.
-+	 */
-+	igep2_wlan_bt_init();
- 
--	if ((gpio_request(IGEP2_GPIO_WIFI_NRESET, "GPIO_WIFI_NRESET") == 0) &&
--	    (gpio_direction_output(IGEP2_GPIO_WIFI_NRESET, 1) == 0)) {
--		gpio_export(IGEP2_GPIO_WIFI_NRESET, 0);
--		gpio_set_value(IGEP2_GPIO_WIFI_NRESET, 0);
--		udelay(10);
--		gpio_set_value(IGEP2_GPIO_WIFI_NRESET, 1);
--	} else
--		pr_warning("IGEP v2: Could not obtain gpio GPIO_WIFI_NRESET\n");
- }
- 
- MACHINE_START(IGEP0020, "IGEP v2 board")
--- 
-1.7.0.4
+There are many GPIO's in board-igep* so I think should be better
+introduce these changes in a new patch. Thanks for you comments.
+
+Best regards,
+
+  Enric
