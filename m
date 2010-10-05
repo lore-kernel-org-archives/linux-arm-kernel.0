@@ -1,38 +1,65 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Tue, 05 Oct 2010 11:13:32 +0200
-Subject: I.MX35 GPIO IRQ + Preempt -> Oops
-In-Reply-To: <4CAAD39C.2010103@eukrea.com>
-References: <4CA739B4.1020506@eukrea.com>	<4CA98B8C.4010106@eukrea.com>	<4CA9C384.2070208@eukrea.com>	<201010051606.24617.marc@cpdesign.com.au>
-	<4CAAD39C.2010103@eukrea.com>
-Message-ID: <4CAAEC3C.90506@eukrea.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 05 Oct 2010 18:23:19 +0900
+Subject: [PATCH 1/7] ARM: S5PC210: Universal OneNAND support
+In-Reply-To: <20100930044822.GA16897@july>
+References: <20100930044822.GA16897@july>
+Message-ID: <003001cb646f$0f492370$2ddb6a50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> OneNAND device support for Universal board.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/Kconfig               |    1 +
+>  arch/arm/mach-s5pv310/mach-universal_c210.c |    2 ++
+>  2 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+> index 9941852..178eab9 100644
+> --- a/arch/arm/mach-s5pv310/Kconfig
+> +++ b/arch/arm/mach-s5pv310/Kconfig
+> @@ -40,6 +40,7 @@ config MACH_SMDKC210
+>  config MACH_UNIVERSAL_C210
+>  	bool "Mobile UNIVERSAL_C210 Board"
+>  	select CPU_S5PV310
+> +	select S5P_DEV_ONENAND
+>  	help
+>  	  Machine support for Samsung Mobile Universal S5PC210 Reference
+>  	  Board. S5PC210(MCP) is one of package option of S5PV310
+> diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-
+> s5pv310/mach-universal_c210.c
+> index b57efae..e169849 100644
+> --- a/arch/arm/mach-s5pv310/mach-universal_c210.c
+> +++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+> @@ -20,6 +20,7 @@
+>  #include <plat/regs-serial.h>
+>  #include <plat/s5pv310.h>
+>  #include <plat/cpu.h>
+> +#include <plat/devs.h>
+> 
+>  #include <mach/map.h>
+> 
+> @@ -117,6 +118,7 @@ static struct platform_device universal_gpio_keys = {
+> 
+>  static struct platform_device *universal_devices[] __initdata = {
+>  	&universal_gpio_keys,
+> +	&s5p_device_onenand,
+>  };
+> 
+>  static void __init universal_map_io(void)
+> --
 
-Le 05/10/2010 09:28, Eric B?nard a ?crit :
-> Hi Marc,
->
-> Le 05/10/2010 07:06, Marc Reilly a ?crit :
->> For what it's worth...
->>
->>> Also : same problem with Freescale's BSP (2.6.31 based) and same "fix"
->>> (removing the WFI).
->>
->> My kernel won't even boot up (although I don't usually get a kernel
->> oops, only
->> very occasionally) unless i pass the jtag=on parameter (or nohlt for non
->> freescale kernel). It just freezes.
->>
->> I think both of those workarounds effectively bypass the cpu_do_idle()
->> call.
->>
-> exactly and it seems the workaround existed in the past in Freescale's
-> kernel ( TLSbo65953 is the errata number for i.MX31 ) :
-> http://svn.buglabs.net/svn/!source/9783/bug/trunk/bug-linux-2.6.27.2/arch/arm/mach-mx3/mxc_pm.c#359
->
-this workaround seems to fix the problem (Freescale's support just sent 
-me a very similar one). And vs removing cpu_do_idle, this saves ~ 1/2 W 
-when there is no intensive usage of the CPU.
+Ok...will apply.
 
-Eric
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
