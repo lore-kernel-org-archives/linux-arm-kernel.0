@@ -1,101 +1,48 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 5 Oct 2010 16:04:36 +0200
-Subject: [PATCH 1/2] gic: Add functions to save and restore gic state
-In-Reply-To: <1285901335-26354-1-git-send-email-ccross@android.com>
-References: <1285901335-26354-1-git-send-email-ccross@android.com>
-Message-ID: <4CAB3074.5010106@stericsson.com>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Tue,  5 Oct 2010 16:15:17 +0200
+Subject: [PATCHv4 1/6] omap3: Add external VBUS power switch and overcurrent
+	detect on IGEP v2 board.
+In-Reply-To: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
+References: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
+Message-ID: <1286288122-16834-2-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross wrote:
+GPIO for various devices are missing from the board initialization.
+This patch adds support for the VBUS and over current gpios.  Without this
+patch, input/outputs from these two sources are ignored.
 
-> on systems with idle states which power-gate the logic including
-> the gic, such as tegra, the gic distributor needs to be shut down
-> and restored on entry and exit from the architecture idle code
+Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+---
+ arch/arm/mach-omap2/board-igep0020.c |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
-Nice!
-
-> +
-> +#ifdef CONFIG_PM
-> +void gic_dist_save(unsigned int gic_nr)
-> +{
-> +	unsigned int max_irq = gic_data[gic_nr].max_irq;
-> +	void __iomem *dist_base = gic_data[gic_nr].dist_base;
-> +	int i;
-> +
-> +	if (gic_nr >= MAX_GIC_NR)
-> +		BUG();
-> +
-> +	_gic_dist_exit(gic_nr);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
-> +		gic_data[gic_nr].saved_conf[i] =
-> +			readl(dist_base + GIC_DIST_CONFIG + i * 4);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-> +		gic_data[gic_nr].saved_pri[i] =
-> +			readl(dist_base + GIC_DIST_PRI + i * 4);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-> +		gic_data[gic_nr].saved_target[i] =
-> +			readl(dist_base + GIC_DIST_TARGET + i * 4);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
-> +		gic_data[gic_nr].saved_enable[i] =
-> +			readl(dist_base + GIC_DIST_ENABLE_SET + i * 4);
-> +}
-> +
-> +void gic_dist_restore(unsigned int gic_nr)
-> +{
-> +	unsigned int max_irq;
-> +	unsigned int i;
-> +	void __iomem *dist_base;
-> +	void __iomem *cpu_base;
-> +
-> +	if (gic_nr >= MAX_GIC_NR)
-> +		BUG();
-> +
-> +	_gic_dist_init(gic_nr);
-> +
-> +	max_irq = gic_data[gic_nr].max_irq;
-> +	dist_base = gic_data[gic_nr].dist_base;
-> +	cpu_base = gic_data[gic_nr].cpu_base;
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
-> +		writel(gic_data[gic_nr].saved_conf[i],
-> +			dist_base + GIC_DIST_CONFIG + i * 4);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-> +		writel(gic_data[gic_nr].saved_pri[i],
-> +			dist_base + GIC_DIST_PRI + i * 4);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
-> +		writel(gic_data[gic_nr].saved_target[i],
-> +			dist_base + GIC_DIST_TARGET + i * 4);
-> +
-> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
-> +		writel(gic_data[gic_nr].saved_enable[i],
-> +			dist_base + GIC_DIST_ENABLE_SET + i * 4);
-> +
-> +	writel(1, dist_base + GIC_DIST_CTRL);
-> +	writel(0xf0, cpu_base + GIC_CPU_PRIMASK);
-> +	writel(1, cpu_base + GIC_CPU_CTRL);
-> +}
-> +#endif
-
-For gic_dist_save()/gic_dist_restore() can you write some
-comment to each function about the implicit semantics for
-calling them?
-
-If I *guess* correctly gic_dist_save() must be called in
-something like a platform idle function after disabling all
-IRQs but before sleeping, conversely gic_dist_restort()
-must be called after sleeping but before re-enabling the
-IRQs.
-
-Apart from that it looks good to me so with this
-simple comment-fix it's:
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 175f043..07dbdb7 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -274,6 +274,22 @@ static int igep2_twl_gpio_setup(struct device *dev,
+ 	igep2_vmmc1_supply.dev = mmc[0].dev;
+ 	igep2_vmmc2_supply.dev = mmc[1].dev;
+ 
++	/*
++	 * REVISIT: need ehci-omap hooks for external VBUS
++	 * power switch and overcurrent detect
++	 */
++	if ((gpio_request(gpio + 1, "GPIO_EHCI_NOC") < 0) ||
++	    (gpio_direction_input(gpio + 1) < 0))
++		pr_err("IGEP2: Could not obtain gpio for EHCI NOC");
++
++	/*
++	 * TWL4030_GPIO_MAX + 0 == ledA, GPIO_USBH_CPEN
++	 * (out, active low)
++	 */
++	if ((gpio_request(gpio + TWL4030_GPIO_MAX, "GPIO_USBH_CPEN") < 0) ||
++	    (gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0) < 0))
++		pr_err("IGEP2: Could not obtain gpio for USBH_CPEN");
++
+ 	return 0;
+ };
+ 
+-- 
+1.7.0.4
