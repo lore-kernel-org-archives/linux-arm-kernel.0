@@ -1,45 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 5 Oct 2010 03:57:02 -0600 (MDT)
-Subject: [PATCH 07/10] OMAP: McBSP: implement functional clock switching
-	via clock framework
-In-Reply-To: <201010051135.36436.peter.ujfalusi@nokia.com>
-References: <20101001213119.1408.65395.stgit@twilight.localdomain>
-	<20101001213531.1408.87922.stgit@twilight.localdomain>
-	<201010051135.36436.peter.ujfalusi@nokia.com>
-Message-ID: <alpine.DEB.2.00.1010050349450.13816@utopia.booyaka.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 5 Oct 2010 12:06:49 +0200
+Subject: [PATCH 4/4] dmaengine: Add Freescale i.MX1/21/27 DMA driver
+In-Reply-To: <AANLkTikaAuBe=ef3vnt_xV0At4ZQbNsD4rFqtLF4R+0+@mail.gmail.com>
+References: <1285854995-6569-1-git-send-email-s.hauer@pengutronix.de>
+	<1285854995-6569-5-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTikaAuBe=ef3vnt_xV0At4ZQbNsD4rFqtLF4R+0+@mail.gmail.com>
+Message-ID: <20101005100649.GL28242@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
+Hi Javier,
 
-On Tue, 5 Oct 2010, Peter Ujfalusi wrote:
+On Tue, Oct 05, 2010 at 09:45:10AM +0200, javier Martin wrote:
+> Hi Sascha,
+> 
+> 
+> +
+> > +struct imxdma_channel {
+> > +       struct imxdma_engine            *imxdma;
+> > +       unsigned int                    channel;
+> > +       unsigned int                    imxdma_channel;
+> > +
+> > +       enum dma_data_direction         direction;
+> > +       enum dma_slave_buswidth         word_size;
+> > +       dma_addr_t                      bd_phys;
+> > +       unsigned long                   flags;
+> > +       dma_addr_t                      per_address;
+> > +       u32                             watermark_level;
+> > +       struct dma_chan                 chan;
+> > +       spinlock_t                      lock;
+> > +       struct dma_async_tx_descriptor  desc;
+> > +       dma_cookie_t                    last_completed;
+> > +       enum dma_status                 status;
+> > +       int                             dma_request;
+> > +       struct scatterlist              *sg_list;
+> > +};
+> > +
+> > +#define MAX_DMA_CHANNELS 8
+> >
+> 
+>  i.MX27 has 16 DMA channels. Maybe an #ifdef would solve the issue.
 
-> What is the fclk source by default.
-> What I mean is that most of the machine drivers are not calling the 
-> snd_soc_dai_set_sysclk for the cpu_dai.
-> It has been by default to prcm_fclk (core_96 or per_96).
-> Is this still the case after this series?
+This is by intention. I want to reserve 8 channels for the old driver
+and the remaining 8 for the dmaengine driver. This way we can have both
+in the tree and use both drivers parallel. This can be changed to the
+real value once the old driver is gone.
 
-These patches shouldn't cause any change in behavior in this regard.  So 
-if the ASoC machine driver does not explicitly tell it which clock to use, 
-it will use whatever the bootloader or board file configured.  If the 
-bootloader or board file didn't configure anything, probably it will use 
-the chip's default reset setting, which for CONTROL_DEVCONF0.MCBSP1_CLKS 
-on 34xx, should be the 96MHz "prcm_fclk"[1].
-
-In other words, the clock framework won't change the parent clock unless 
-the code explicitly tells it to do so, as in the case of the OMAP3 Pandora 
-ASoC machine driver.
-
-> Do we need to go through the ASoC machine drivers, and need to select 
-> explicitly the prcm_fclk from now on?
-
-It is a wise thing to do, since one never knows what the bootloader will 
-do.  Probably also wise to explicitly set the CLKR/FSR muxes also.
-
-best regards,
+Sascha
 
 
-- Paul
-
-1. OMAP34xx TRM rev. ZH, Table 7-79, "CONTROL_DEVCONF0"
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
