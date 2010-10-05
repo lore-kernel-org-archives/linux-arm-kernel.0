@@ -1,84 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Oct 2010 20:33:09 +0200
-Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953 and
-	ENGcm09472
-In-Reply-To: <1286280012-19809-1-git-send-email-eric@eukrea.com>
-References: <20101005094510.GJ28242@pengutronix.de>
-	<1286280012-19809-1-git-send-email-eric@eukrea.com>
-Message-ID: <20101005183308.GX11737@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 5 Oct 2010 11:40:17 -0700
+Subject: [PATCH 00/10] OMAP: SCM/McBSP/clock: branch integration
+	patches for 2.6.37
+In-Reply-To: <20101005155242.20900538.jhnikula@gmail.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101005155242.20900538.jhnikula@gmail.com>
+Message-ID: <20101005184017.GP3117@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eric,
-
-On Tue, Oct 05, 2010 at 02:00:12PM +0200, Eric B?nard wrote:
-> Without this exiting WFI can result in cache corruption.
-> Code taken from Freescale's 2.6.27 BSP and tested on i.MX35
+* Jarkko Nikula <jhnikula@gmail.com> [101005 05:43]:
+> On Fri, 01 Oct 2010 15:34:45 -0600
+> Paul Walmsley <paul@pwsan.com> wrote:
 > 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
-> v2 : use cpu_ismx3x() and add comments.
+> > mach-omap2 (as the SCM only exists on OMAP2+ systems).  The McBSP
+> > parent fclk and signal muxing changes have received only light
+> > testing, so any help from OMAP ASoc experts here is appreciated.
+> > 
+> Looks good to me. I pointed out one bug but as these are already in
+> linux-omap I sent a fix for it and two minor cleanups [1].
 > 
->  arch/arm/plat-mxc/include/mach/system.h |   32 ++++++++++++++++++++++++++++--
->  1 files changed, 29 insertions(+), 3 deletions(-)
+> > Paul Walmsley (10):
+> >       OMAP2+: Kconfig: disallow builds for boards that don't use the currently-selected SoC
+> >       OMAP2420: CTRL: fix OMAP242X_CTRL_REGADDR macro
+> >       OMAP2420: clock: add MCBSP_CLKS node and clkdev aliases
+> >       OMAP2430: clock: add MCBSP_CLKS node and clkdev aliases
+> >       OMAP3xxx: clock: add clkdev aliases for McBSP fclk source switching
+> >       OMAP: McBSP: implement McBSP CLKR and FSR signal muxing via mach-omap2/mcbsp.c
+> >       OMAP: McBSP: implement functional clock switching via clock framework
+> >       OMAP: split plat-omap/common.c
+> >       OMAP: control: move plat-omap/control.h to mach-omap2/control.h
+> >       OMAP2+: clock: reduce the amount of standard debugging while disabling unused clocks
+> > 
+> Patches 3-5 are doing the right thing AFAIK the OMAP clock framework.
 > 
-> diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
-> index 4acd114..70e66d3 100644
-> --- a/arch/arm/plat-mxc/include/mach/system.h
-> +++ b/arch/arm/plat-mxc/include/mach/system.h
-> @@ -1,7 +1,7 @@
->  /*
->   *  Copyright (C) 1999 ARM Limited
->   *  Copyright (C) 2000 Deep Blue Solutions Ltd
-> - *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -28,8 +28,34 @@ static inline void arch_idle(void)
->  		mxc91231_prepare_idle();
->  	}
->  #endif
-> -
-> -	cpu_do_idle();
-> +	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
-> +	if (cpu_is_mx31() || cpu_is_mx35()) {
-> +		unsigned long reg = 0;
-> +		__asm__ __volatile__(
-> +			/* disable I and D cache */
-> +			"mrc p15, 0, %0, c1, c0, 0\n"
-> +			"bic %0, %0, #0x00001000\n"
-> +			"bic %0, %0, #0x00000004\n"
-> +			"mcr p15, 0, %0, c1, c0, 0\n"
-> +			/* invalidate I cache */
-> +			"mov %0, #0\n"
-> +			"mcr p15, 0, %0, c7, c5, 0\n"
-> +			/* clear and invalidate D cache */
-> +			"mov %0, #0\n"
-mcr doesn't change the value of %0, does it?  Then there's no need to
-set it to 0 once more.
+> For patches 6-7 you could have my ack.
+> Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+> 
+> As they are touching also sound/soc/omap/omap-mcbsp.c, an ack from Mark
+> and Liam are needed. Links to patches 6 and 7 below and my fixes on top
+> of them [1].
+> 
+> http://marc.info/?l=linux-omap&m=128596931117788&w=2
+> http://marc.info/?l=linux-omap&m=128596931417805&w=2
 
-> +			"mcr p15, 0, %0, c7, c14, 0\n"
-> +			/* WFI */
-> +			"mov %0, #0\n"
-ditto
+Sorry, I've already merged them as they fixed code that did not compile.
 
-> +			"mcr p15, 0, %0, c7, c0, 4\n"
-> +			"nop\n" "nop\n" "nop\n" "nop\n"
-> +			"nop\n" "nop\n" "nop\n"
-> +			/* enable I and D cache */
-> +			"mrc p15, 0, %0, c1, c0, 0\n"
-If you spend two registers there is no need to reread this register.
+Let me know if you guys want me to rebuild those parts of omap-for-linus
+to add the acks.
 
-> +			"orr %0, %0, #0x00001000\n"
-> +			"orr %0, %0, #0x00000004\n"
-> +			"mcr p15, 0, %0, c1, c0, 0\n"
-> +			:: "r" (reg));
-... and the s/:: "/: "=/ as I suggested earlier.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
