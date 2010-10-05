@@ -1,58 +1,170 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Tue, 05 Oct 2010 21:31:27 +0200
-Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953
-	and	ENGcm09472
-In-Reply-To: <20101005183308.GX11737@pengutronix.de>
-References: <20101005094510.GJ28242@pengutronix.de>	<1286280012-19809-1-git-send-email-eric@eukrea.com>
-	<20101005183308.GX11737@pengutronix.de>
-Message-ID: <4CAB7D0F.9020600@eukrea.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 5 Oct 2010 14:41:55 -0500
+Subject: [PATCHv3] ARM: imx: Add iram allocator functions
+Message-ID: <1286307715-12276-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Le 05/10/2010 20:33, Uwe Kleine-K?nig a ?crit :
->> +			/* invalidate I cache */
->> +			"mov %0, #0\n"
->> +			"mcr p15, 0, %0, c7, c5, 0\n"
->> +			/* clear and invalidate D cache */
->> +			"mov %0, #0\n"
-> mcr doesn't change the value of %0, does it?  Then there's no need to
-> set it to 0 once more.
->
->> +			"mcr p15, 0, %0, c7, c14, 0\n"
->> +			/* WFI */
->> +			"mov %0, #0\n"
-> ditto
->
->> +			"mcr p15, 0, %0, c7, c0, 4\n"
->> +			"nop\n" "nop\n" "nop\n" "nop\n"
->> +			"nop\n" "nop\n" "nop\n"
->> +			/* enable I and D cache */
->> +			"mrc p15, 0, %0, c1, c0, 0\n"
-> If you spend two registers there is no need to reread this register.
->
->> +			"orr %0, %0, #0x00001000\n"
->> +			"orr %0, %0, #0x00000004\n"
->> +			"mcr p15, 0, %0, c1, c0, 0\n"
->> +			:: "r" (reg));
-> ... and the s/:: "/: "=/ as I suggested earlier.
->
-well, this code comes from Freescale and if everything was perfect it 
-wouldn't be necessary as this is an errata fix so I'm not sure this can 
-be considered as a code to optimize.
+Add iram allocation functions using GENERIC_ALLOCATOR. The
+allocation size is 4KB multiples to guarantee alignment. The
+idea for these functions is for i.MX platforms to use them
+to dynamically allocate IRAM usage.
 
-Moreover it follows exactly what is suggested in the workaround 
-described on page 8 of this PDF : 
-http://cache.freescale.com/files/32bit/doc/errata/MCIMX31CE.pdf so I'm 
-not sure we should modify it.
+Applies on 2.6.36-rc6
 
-The other function they sent me had even more duplicated lines than this 
-one so it's difficult to know what is necessary and what isn't.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
+---
+ arch/arm/plat-mxc/Kconfig                   |    9 ++++
+ arch/arm/plat-mxc/Makefile                  |    1 +
+ arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
+ arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
+ 4 files changed, 107 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
+ create mode 100644 arch/arm/plat-mxc/iram.c
 
-I can test it with your suggestions but the extra mov & mrc may be there 
-to add instructions cycle between each mcr to be sure the workaround 
-does its job.
-
-Best regards,
-Eric
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index 6785db4..e6de0df 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -57,6 +57,15 @@ source "arch/arm/mach-mx5/Kconfig"
+ 
+ endmenu
+ 
++config IRAM_ALLOC
++	bool "Enable IRAM allocator"
++	select GENERIC_ALLOCATOR
++	help
++	  Select this to have access to generic IRAM allocation functions that
++	  use the GENERIC_ALLOCATOR.  The allocation size is 4KB multiples to 
++	  guarantee alignment. The idea for these functions is for i.MX platforms
++	  to use them to dynamically allocate IRAM usage.
++
+ config MXC_IRQ_PRIOR
+ 	bool "Use IRQ priority"
+ 	help
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 78d405e..35cf07b 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
++obj-$(CONFIG_IRAM_ALLOC) += iram.o
+ obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+new file mode 100644
+index 0000000..12881aa
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#ifdef CONFIG_IRAM_ALLOC
++int __init iram_init(unsigned long base, unsigned long size);
++void *iram_alloc(unsigned int size, unsigned long *dma_addr);
++void iram_free(unsigned long dma_addr, unsigned int size);
++#else
++static inline int __init iram_init(unsigned long base, unsigned long size)
++{
++	return -ENOMEM;
++}
++static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
++{
++	return NULL;
++}
++static inline void iram_free(unsigned long base, unsigned long size) {}
++#endif
++
+diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
+new file mode 100644
+index 0000000..d59fe75
+--- /dev/null
++++ b/arch/arm/plat-mxc/iram.c
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/genalloc.h>
++
++static unsigned long iram_phys_base;
++static __iomem void *iram_virt_base;
++static struct gen_pool *iram_pool;
++
++#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
++
++void *iram_alloc(unsigned int size, unsigned long *dma_addr)
++{
++	if (!iram_pool)
++		return NULL;
++
++	*dma_addr = gen_pool_alloc(iram_pool, size);
++	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
++	return iram_phys_to_virt(*dma_addr);
++}
++EXPORT_SYMBOL(iram_alloc);
++
++void iram_free(unsigned long addr, unsigned int size)
++{
++	if (!iram_pool)
++		return;
++
++	gen_pool_free(iram_pool, addr, size);
++}
++EXPORT_SYMBOL(iram_free);
++
++int __init iram_init(unsigned long base, unsigned long size)
++{
++	iram_phys_base = base;
++
++	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
++	gen_pool_add(iram_pool, base, size, -1);
++	iram_virt_base = ioremap(iram_phys_base, size);
++
++	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
++	return 0;
++}
+-- 
+1.6.0.4
