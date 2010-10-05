@@ -1,135 +1,52 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 05 Oct 2010 16:16:09 -0700
-Subject: [PATCH 4/4] dmaengine: Add Freescale i.MX1/21/27 DMA driver
-In-Reply-To: <1285854995-6569-5-git-send-email-s.hauer@pengutronix.de>
-References: <1285854995-6569-1-git-send-email-s.hauer@pengutronix.de>
-	<1285854995-6569-5-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4CABB1B9.4080002@intel.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 6 Oct 2010 08:23:30 +0900
+Subject: [PATCH 1/2] ARM: S3C64XX: Add suspend support
+In-Reply-To: <1fa4a7a39d9fd48b8329e1a1077a65adb96475b5.1286319272.git.mcuelenaere@gmail.com>
+References: <cover.1286319272.git.mcuelenaere@gmail.com>
+	<1fa4a7a39d9fd48b8329e1a1077a65adb96475b5.1286319272.git.mcuelenaere@gmail.com>
+Message-ID: <AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/30/2010 6:56 AM, Sascha Hauer wrote:
-> This driver is currently implemented as a user to the old i.MX
-> DMA API. This allows us to convert each user of the old API to
-> the dmaengine API one by one. Once this is done the old DMA
-> driver can be merged into the i.MX dmaengine driver.
+Hi,
+
+I agree your approach, put the common features in common place.
+but Samsung maintainers insist put these at each machine file at current time.
+
+So move this to the each machines for their tastes.
+
+Thank you,
+Kyungmin Park
+
+On Wed, Oct 6, 2010 at 8:09 AM, Maurus Cuelenaere <mcuelenaere@gmail.com> wrote:
+> The only missing thing for SoC-wide suspend support, is a call to s3c_pm_init,
+> so add that. This was tested on a S3C6410 SmartQ 7.
 >
-> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+> Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 > ---
->   drivers/dma/Kconfig   |    8 +
->   drivers/dma/Makefile  |    1 +
->   drivers/dma/imx-dma.c |  426 +++++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 435 insertions(+), 0 deletions(-)
->   create mode 100644 drivers/dma/imx-dma.c
-[..]
-> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> new file mode 100644
-> index 0000000..6ef82ba
-> --- /dev/null
-> +++ b/drivers/dma/imx-dma.c
-> @@ -0,0 +1,426 @@
-> +/*
-> + * drivers/dma/imx-dma.c
-> + *
-> + * This file contains a driver for the Freescale i.MX DMA engine
-> + * found on i.MX1/21/27
-> + *
-> + * Copyright 2010 Sascha Hauer, Pengutronix<s.hauer@pengutronix.de>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include<linux/init.h>
-> +#include<linux/types.h>
-> +#include<linux/mm.h>
-> +#include<linux/interrupt.h>
-> +#include<linux/spinlock.h>
-> +#include<linux/device.h>
-> +#include<linux/dma-mapping.h>
-> +#include<linux/slab.h>
-> +#include<linux/platform_device.h>
-> +#include<linux/dmaengine.h>
+> ?arch/arm/mach-s3c64xx/pm.c | ? ?3 +++
+> ?1 files changed, 3 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index 79412f7..db292c9 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -187,6 +187,9 @@ static int s3c64xx_pm_init(void)
+> ? ? ? ?pm_cpu_prep = s3c64xx_pm_prepare;
+> ? ? ? ?pm_cpu_sleep = s3c64xx_cpu_suspend;
+> ? ? ? ?pm_uart_udivslot = 1;
 > +
-> +#include<asm/irq.h>
-> +#include<mach/dma-v1.h>
-> +#include<mach/hardware.h>
+> + ? ? ? s3c_pm_init();
 > +
-> +struct imxdma_channel {
-> +       struct imxdma_engine            *imxdma;
-> +       unsigned int                    channel;
-> +       unsigned int                    imxdma_channel;
-> +
-> +       enum dma_data_direction         direction;
-
-Why does the channel have a direction isn't that a function of the 
-transaction?  It's also unused.
-
-> +       enum dma_slave_buswidth         word_size;
-> +       dma_addr_t                      bd_phys;
-
-unused?
-
-> +       unsigned long                   flags;
-
-unused?
-
-> +       dma_addr_t                      per_address;
-> +       u32                             watermark_level;
-> +       struct dma_chan                 chan;
-> +       spinlock_t                      lock;
-> +       struct dma_async_tx_descriptor  desc;
-> +       dma_cookie_t                    last_completed;
-> +       enum dma_status                 status;
-> +       int                             dma_request;
-> +       struct scatterlist              *sg_list;
-> +};
-> +
-> +#define MAX_DMA_CHANNELS 8
-> +
-> +struct imxdma_engine {
-> +       struct device                   *dev;
-> +       struct dma_device               dma_device;
-> +       struct imxdma_channel           channel[MAX_DMA_CHANNELS];
-> +};
-> +
-> +static struct imxdma_channel *to_imxdma_chan(struct dma_chan *chan)
-> +{
-> +       return container_of(chan, struct imxdma_channel, chan);
-> +}
-> +
-> +static void imxdma_handle(struct imxdma_channel *imxdmac)
-> +{
-> +       if (imxdmac->desc.callback)
-> +               imxdmac->desc.callback(imxdmac->desc.callback_param);
-> +       imxdmac->last_completed = imxdmac->desc.cookie;
-> +}
-> +
-> +static void imxdma_irq_handler(int channel, void *data)
-> +{
-> +       struct imxdma_channel *imxdmac = data;
-> +printk("%s\n", __func__);
-
-Debug leftover?
-
-> +       imxdmac->status = DMA_SUCCESS;
-> +       imxdma_handle(imxdmac);
-> +}
-> +
-> +static void imxdma_err_handler(int channel, void *data, int error)
-> +{
-> +       struct imxdma_channel *imxdmac = data;
-> +printk("%s 0x%08x\n", __func__, error);
-> +dump_stack();
-
-If you want to keep this I think it is better as a
-
-WARN(1, "%s 0x%08x\n", __func__, error)
-
-...assuming that errors are rare.
-
---
-Dan
+> ? ? ? ?return 0;
+> ?}
+>
+> --
+> 1.7.2.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
