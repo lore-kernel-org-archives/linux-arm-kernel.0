@@ -1,87 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 05 Oct 2010 18:26:42 +0900
-Subject: [PATCH 5/7] ARM: S5PC210: I2C0/1 devices support on Universal
-	board
-In-Reply-To: <20100930044844.GA16913@july>
-References: <20100930044844.GA16913@july>
-Message-ID: <003101cb646f$6e1cf4d0$4a56de70$%kim@samsung.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 5 Oct 2010 15:11:13 +0530
+Subject: [PATCH v5 1/3] omap: dma: Fix buffering disable bit setting for
+	omap24xx
+In-Reply-To: <1286261141-1039-2-git-send-email-peter.ujfalusi@nokia.com>
+References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
+	<1286261141-1039-2-git-send-email-peter.ujfalusi@nokia.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB9FE7F9@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Camera devices use the I2C0 and Gyro uese the I2C1 on universal board.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Kconfig               |    2 ++
->  arch/arm/mach-s5pv310/mach-universal_c210.c |   14 ++++++++++++++
->  2 files changed, 16 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index 178eab9..c207426 100644
-> --- a/arch/arm/mach-s5pv310/Kconfig
-> +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -41,6 +41,8 @@ config MACH_UNIVERSAL_C210
->  	bool "Mobile UNIVERSAL_C210 Board"
->  	select CPU_S5PV310
->  	select S5P_DEV_ONENAND
-> +	select S3C_DEV_I2C1
-> +	select S5PV310_SETUP_I2C1
->  	help
->  	  Machine support for Samsung Mobile Universal S5PC210 Reference
->  	  Board. S5PC210(MCP) is one of package option of S5PV310
-> diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-
-> s5pv310/mach-universal_c210.c
-> index e169849..deffeb1 100644
-> --- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-> +++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-> @@ -10,6 +10,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/serial_core.h>
->  #include <linux/input.h>
-> +#include <linux/i2c.h>
->  #include <linux/gpio_keys.h>
->  #include <linux/gpio.h>
-> 
-> @@ -116,6 +117,16 @@ static struct platform_device universal_gpio_keys = {
->  	},
->  };
-> 
-> +/* I2C0 */
-> +static struct i2c_board_info i2c0_devs[] __initdata = {
-> +	/* Camera, To be updated */
-> +};
-> +
-> +/* I2C1 */
-> +static struct i2c_board_info i2c1_devs[] __initdata = {
-> +	/* Gyro, To be updated */
-> +};
-> +
->  static struct platform_device *universal_devices[] __initdata = {
->  	&universal_gpio_keys,
->  	&s5p_device_onenand,
-> @@ -134,6 +145,9 @@ static void __init universal_machine_init(void)
->  	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
->  #endif
-> 
-> +	i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
-> +	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
-> +
->  	/* Last */
->  	platform_add_devices(universal_devices,
-> ARRAY_SIZE(universal_devices));
->  }
-> --
 
-Ok...will apply.
 
-Thanks.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Peter Ujfalusi
+> Sent: Tuesday, October 05, 2010 12:16 PM
+> To: Tony Lindgren
+> Cc: linux-omap at vger.kernel.org; Jarkko Nikula; 
+> linux-arm-kernel at lists.infradead.org; Russell King
+> Subject: [PATCH v5 1/3] omap: dma: Fix buffering disable bit 
+> setting for omap24xx
+> 
+> From: Jarkko Nikula <jhnikula@gmail.com>
+...
+>  
+>  	/*
+> -	 * Errata: On ES2.0 BUFFERING disable must be set.
+> -	 * This will always fail on ES1.0
+> +	 * Errata: Inter Frame DMA buffering issue (All OMAP2420 and
+> +	 * OMAP2430ES1.0): DMA will wrongly buffer elements if 
+> packing and
+> +	 * bursting is enabled. This might result in data gets 
+> stalled in
+> +	 * FIFO at the end of the block.
+> +	 * Workaround: DMA channels must have 
+> BUFFERING_DISABLED bit set to
+> +	 * guarantee no data will stay in the DMA FIFO in case 
+> inter frame
+> +	 * buffering occurs.
+>  	 */
+> -	if (cpu_is_omap24xx())
+> -		l |= OMAP_DMA_CCR_EN;
+> +	if (cpu_is_omap2420() ||
+> +	    (cpu_is_omap2430() && (omap_type() == OMAP2430_REV_ES1_0)))
+> +		l |= OMAP_DMA_CCR_BUFFERING_DISABLE;
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Acked-by: G, Manjunath Kondaiah <manjugk@ti.com>
+
+-Manjunath
