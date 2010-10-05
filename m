@@ -1,35 +1,42 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 5 Oct 2010 21:55:51 +0200
-Subject: [PATCHv3] ARM: imx: Add iram allocator functions
-In-Reply-To: <1286307715-12276-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1286307715-12276-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <AANLkTim+WNx1B860AgHeP_X2u7HRC3=40j3FKgAg_BXf@mail.gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 05 Oct 2010 22:00:02 +0200
+Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953
+	and	ENGcm09472
+In-Reply-To: <20101005194659.GY11737@pengutronix.de>
+References: <20101005094510.GJ28242@pengutronix.de>
+	<1286280012-19809-1-git-send-email-eric@eukrea.com>
+	<20101005183308.GX11737@pengutronix.de>
+	<4CAB7D0F.9020600@eukrea.com>
+	<20101005194659.GY11737@pengutronix.de>
+Message-ID: <4CAB83C2.3040301@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/5  <Dinh.Nguyen@freescale.com>:
+Hi Uwe,
 
-> Add iram allocation functions using GENERIC_ALLOCATOR. The
-> allocation size is 4KB multiples to guarantee alignment. The
-> idea for these functions is for i.MX platforms to use them
-> to dynamically allocate IRAM usage.
+Le 05/10/2010 21:46, Uwe Kleine-K?nig a ?crit :
+> hmm, it's a copy of the code suggested there, yes.  The text before the
+> example doesn't suggest that timing is an issue for the work around.  I
+> interpret it that everything is fine when the caches are off before
+> executing the wfi instruction.  But OK, it wouldn't be the first time
+> hardware documentation isn't exact to the point.
+>
+Well the doc says there is an other workaround (setting CPU freq = AHB 
+freq, waiting clock to switch, WFI, restore original CPU freq) doesn't 
+work for me and support seems not very confident with this other 
+workaround as they immediatl directed me to this one ...
 
-Neither here...
+> Hmm, when the caches are off before entering wfi, does that mean that
+> all interrupt (and fiq) handlers run with the caches off, too?  That's
+> very bad, isn't it?
+>
+If I understand well, this case happens only when they run after WFI 
+which means cpuidle was called (and thus CPU activity was null for a 
+certain amount of time, which explains why it's easier to reproduce the 
+problem with tslib than with qtdemo which takes 100% CPU and don't let 
+cpuidle to execute very often).
 
-> +config IRAM_ALLOC
-> + ? ? ? bool "Enable IRAM allocator"
-> + ? ? ? select GENERIC_ALLOCATOR
-> + ? ? ? help
-> + ? ? ? ? Select this to have access to generic IRAM allocation functions that
-> + ? ? ? ? use the GENERIC_ALLOCATOR. ?The allocation size is 4KB multiples to
-> + ? ? ? ? guarantee alignment. The idea for these functions is for i.MX platforms
-> + ? ? ? ? to use them to dynamically allocate IRAM usage.
+That may seems bad, but I find this solution better than having an oops 
+after a few IRQs which makes the CPU unusable for real life applications :-)
 
-Nor here is is explained what an IRAM is.
-
-What is it? Is this yet another fancy name for on-chip-memory?
-
-And why I? = Initial? Interrupt? ...?
-
-Yours,
-Linus Walleij
+Eric
