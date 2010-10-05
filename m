@@ -1,85 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue,  5 Oct 2010 11:06:38 +0900
-Subject: [PATCH 4/4] ARM: S5P: Cleanup the S5P SoCs' VA address mapping
-In-Reply-To: <1286244398-9333-1-git-send-email-kgene.kim@samsung.com>
-References: <1286244398-9333-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1286244398-9333-5-git-send-email-kgene.kim@samsung.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 5 Oct 2010 09:07:47 +0530
+Subject: [PATCH V2 16/69] rtc: Adding support for spear rtc
+In-Reply-To: <20101005005245.23e6ef80@linux.lan.towertech.it>
+References: <cover.1285933331.git.viresh.kumar@st.com>	<643f3f9afff0492c92a8cb7ed47a30f666326bc4.1285933331.git.viresh.kumar@st.com>
+	<20101005005245.23e6ef80@linux.lan.towertech.it>
+Message-ID: <4CAA9D8B.6090706@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basically S5P SoCs use the Samsung common VA address mapping where
-plat-samsung and use plat-s5p's mapping also. The later is a little
-mess. So this patch cleans it up.
+On 10/05/2010 04:22 AM, Alessandro Zummo wrote:
+> please do not send 69+ irrelevant patches to the rtc mailing list.
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/plat-s5p/include/plat/map-s5p.h |   40 +++++++++++++++--------------
- 1 files changed, 21 insertions(+), 19 deletions(-)
+Alessandro,
 
-diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-index c833f3f..ec96a19 100644
---- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-+++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-@@ -13,27 +13,35 @@
- #ifndef __ASM_PLAT_MAP_S5P_H
- #define __ASM_PLAT_MAP_S5P_H __FILE__
- 
--#define S5P_VA_CHIPID		S3C_ADDR(0x00700000)
--#define S5P_VA_GPIO		S3C_ADDR(0x00500000)
--#define S5P_VA_SYSTIMER		S3C_ADDR(0x01200000)
--#define S5P_VA_SROMC		S3C_ADDR(0x01100000)
--#define S5P_VA_SYSRAM		S3C_ADDR(0x01180000)
--#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02000000)
--#define S5P_VA_DMC0		S3C_ADDR(0x00A00000)
--#define S5P_VA_DMC1		S3C_ADDR(0x00A80000)
--
--#define S5P_VA_COMBINER_BASE	S3C_ADDR(0x00600000)
-+#define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
-+#define S5P_VA_CMU		S3C_ADDR(0x02100000)
-+#define S5P_VA_GPIO		S3C_ADDR(0x02200000)
-+
-+#define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
-+#define S5P_VA_DMC0		S3C_ADDR(0x02440000)
-+#define S5P_VA_DMC1		S3C_ADDR(0x02480000)
-+#define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
-+
-+#define S5P_VA_SYSTIMER		S3C_ADDR(0x02500000)
-+#define S5P_VA_L2CC		S3C_ADDR(0x02600000)
-+
-+#define S5P_VA_COMBINER_BASE	S3C_ADDR(0x02700000)
- #define S5P_VA_COMBINER(x)	(S5P_VA_COMBINER_BASE + ((x) >> 2) * 0x10)
- 
--#define S5P_VA_COREPERI_BASE	S3C_ADDR(0x00800000)
-+#define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
- #define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
- #define S5P_VA_SCU		S5P_VA_COREPERI(0x0)
- #define S5P_VA_GIC_CPU		S5P_VA_COREPERI(0x100)
- #define S5P_VA_TWD		S5P_VA_COREPERI(0x600)
- #define S5P_VA_GIC_DIST		S5P_VA_COREPERI(0x1000)
- 
--#define S5P_VA_L2CC		S3C_ADDR(0x00900000)
--#define S5P_VA_CMU		S3C_ADDR(0x00920000)
-+#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02900000)
-+
-+#define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
-+#define VA_VIC0			VA_VIC(0)
-+#define VA_VIC1			VA_VIC(1)
-+#define VA_VIC2			VA_VIC(2)
-+#define VA_VIC3			VA_VIC(3)
- 
- #define S5P_VA_UART(x)		(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
- #define S5P_VA_UART0		S5P_VA_UART(0)
-@@ -45,10 +53,4 @@
- #define S3C_UART_OFFSET		(0x400)
- #endif
- 
--#define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
--#define VA_VIC0			VA_VIC(0)
--#define VA_VIC1			VA_VIC(1)
--#define VA_VIC2			VA_VIC(2)
--#define VA_VIC3			VA_VIC(3)
--
- #endif /* __ASM_PLAT_MAP_S5P_H */
+I have already replied to Patch62/69 for this issue.
+
+I have used an latest patch on git for sending this patch series. I
+think there is some bug
+there, due to which all of you have received some mails which are not
+intended for all of you.
+There was a bugfix in git which enables to send mail to "recipients
+mentioned in TO field", of patch
+itself.
+
+After creating patches (with git format-patch ---), i have added To
+and CC lists in patches.
+But when i sent patches the TO field was carried away in later patches
+too. So due to this
+all patches send after rtc patches have following recipients added:
+rtc-linux at googlegroups.com,
+a.zummo at towertech.it. Similarly for other patches too.
+
+Once again sorry for this.
+
+
 -- 
-1.6.2.5
+viresh
