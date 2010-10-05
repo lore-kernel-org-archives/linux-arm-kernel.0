@@ -1,38 +1,209 @@
-From: claude.youn@gmail.com (Seungwhan Youn)
-Date: Tue, 5 Oct 2010 16:39:11 +0900
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
-	S/PDIF PCM audio
-In-Reply-To: <AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
-	<20101004224159.GA4972@opensource.wolfsonmicro.com>
-	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
-	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-	<20101005044304.GA26509@opensource.wolfsonmicro.com>
-	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
-	<20101005055937.GA19989@opensource.wolfsonmicro.com>
-	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
-Message-ID: <AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 5 Oct 2010 09:44:23 +0200
+Subject: [PATCH] ARM: imx: Add iram allocator functions
+In-Reply-To: <1286237007-8463-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1286237007-8463-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20101005074423.GI11737@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> I hope you noticed that this clock hierarchy is a _very_ board specific thing.
->>> We can easily place SoCs' shared stuff in arch/arm/plat-samsung (or similar)
->>> Any suggestions, where do we place code shared by SMDK-boards ?
->>
->> plat-samsung would probably be fine for that also - create a file called
->> common-smdk or something. ?Some other things have gone for a plat-smdk
->> style approach too, though I'm not sure how tasteful I find that
->> personally.
-> Even though I would personally like to have EPLL control for a device
-> in machine specific manner as part of its driver, I accept your opinion.
->
-> Claude, let us create one arch/arm/plat-samsung/smdk.c to do common
-> stuff for SMKDs like EPLL control. What do you think ?
+On Mon, Oct 04, 2010 at 07:03:27PM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> Add iram allocation functions using GENERIC_ALLOCATOR. The
+> allocation size is 4KB multiples to guarantee alignment. The
+> idea for these functions is for i.MX platforms to use them
+> to dynamically allocate IRAM usage.
+> 
+> Applies on 2.6.36-rc6
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
+> ---
+>  arch/arm/plat-mxc/Kconfig                   |   10 ++++
+>  arch/arm/plat-mxc/Makefile                  |    1 +
+>  arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
+>  arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
+>  4 files changed, 108 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
+>  create mode 100644 arch/arm/plat-mxc/iram.c
+> 
+> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> index 6785db4..5e4ff93 100644
+> --- a/arch/arm/plat-mxc/Kconfig
+> +++ b/arch/arm/plat-mxc/Kconfig
+> @@ -57,6 +57,16 @@ source "arch/arm/mach-mx5/Kconfig"
+>  
+>  endmenu
+>  
+> +config IRAM_ALLOC
+> +	bool "Enable IRAM allocator"
+> +	default y
+The iram allocator isn't useful taken alone, no?  So I suggest to make
+it 
+> +	select GENERIC_ALLOCATOR
+> +	help
+> +	  Select this to have access to generic IRAM allocation functions that
+> +	  use the GENERIC_ALLOCATOR.  The allocation size is 4KB multiples to 
+> +	  guarantee alignment. The idea for these functions is for i.MX platforms
+> +	  to use them to dynamically allocate IRAM usage.
+> +
+>  config MXC_IRQ_PRIOR
+>  	bool "Use IRQ priority"
+>  	help
+> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> index 78d405e..35cf07b 100644
+> --- a/arch/arm/plat-mxc/Makefile
+> +++ b/arch/arm/plat-mxc/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
+>  
+>  obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+>  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+> +obj-$(CONFIG_IRAM_ALLOC) += iram.o
+>  obj-$(CONFIG_MXC_PWM)  += pwm.o
+>  obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
+>  obj-$(CONFIG_MXC_ULPI) += ulpi.o
+> diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+> new file mode 100644
+> index 0000000..12881aa
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+I'd prefer include/mach/iram.h here
 
-Actually if we add this file on plat-samsung, board-init will be
-separated two-part, one is machine(board) specific and other is all
-smdk specific. So, If it doesn't make confusion to other guys who
-wants to add settings for their features on board-init, it looks good
-to me. But I think that we also have to listen Mr. Ben Dooks and Mr.
-Kukjin Kim's opinion about this before we get a conclusion.
+> @@ -0,0 +1,35 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +
+> +#ifdef CONFIG_IRAM_ALLOC
+> +int __init iram_init(unsigned long base, unsigned long size);
+> +void *iram_alloc(unsigned int size, unsigned long *dma_addr);
+> +void iram_free(unsigned long dma_addr, unsigned int size);
+> +#else
+> +static inline int __init iram_init(unsigned long base, unsigned long size)
+> +{
+> +	return -ENOMEM;
+I suggest to add an #include to assert ENOMEM is #defined.
+
+> +}
+> +static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
+> +{
+> +	return NULL;
+> +}
+> +static inline void iram_free(unsigned long base, unsigned long size) {}
+> +#endif
+> +
+please remove the trailing newline.  I'd add some new lines around the
+cpp lines, though.
+
+> diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
+> new file mode 100644
+> index 0000000..3d2a391
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/iram.c
+> @@ -0,0 +1,62 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+Why do you need linux/module.h?  Maybe linux/init.h is enough?
+
+> +#include <linux/spinlock.h>
+This can simply go, can't it?
+
+> +#include <linux/genalloc.h>
+> +
+> +static unsigned long iram_phys_base;
+> +static __iomem void *iram_virt_base;
+I assume it doesn't make any difference for gcc, but using
+
+	static void __iomem *iram_virt_base
+
+seems to be the more usual form.
+
+> +static struct gen_pool *iram_pool;
+> +
+> +#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
+Can you make this a static inline please?
+
+> +
+> +void *iram_alloc(unsigned int size, unsigned long *dma_addr)
+> +{
+> +	if (!iram_pool)
+> +		return NULL;
+> +
+> +	*dma_addr = gen_pool_alloc(iram_pool, size);
+> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
+> +	return iram_phys_to_virt(*dma_addr);
+if iram_virt_base is __iomem, the return value of iram_alloc should be
+__iomem, too, no?
+
+> +}
+> +EXPORT_SYMBOL(iram_alloc);
+> +
+> +void iram_free(unsigned long addr, unsigned int size)
+> +{
+> +	if (!iram_pool)
+> +		return;
+> +
+> +	gen_pool_free(iram_pool, addr, size);
+> +}
+> +EXPORT_SYMBOL(iram_free);
+> +
+> +int __init iram_init(unsigned long base, unsigned long size)
+> +{
+> +	iram_phys_base = base;
+> +
+> +	iram_pool = gen_pool_create(12, -1);
+	if (!iram_pool)
+		...
+
+> +	gen_pool_add(iram_pool, base, size, -1);
+> +	iram_virt_base = ioremap(iram_phys_base, size);
+These two can fail, too.
+
+> +	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
+> +	return 0;
+> +}
+iram_init isn't called yet.  I assume calls to it should be added to the
+cpu init routines (later)?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
