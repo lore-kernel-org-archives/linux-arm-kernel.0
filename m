@@ -1,47 +1,110 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 5 Oct 2010 10:21:30 +0200
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <4CAACA63.6090202@compulab.co.il>
-References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
-	<20100909094120.GB1988@rakim.wolfsonmicro.main>
-	<4CAACA63.6090202@compulab.co.il>
-Message-ID: <201010051021.30496.marek.vasut@gmail.com>
+From: peter.ujfalusi@nokia.com (Peter Ujfalusi)
+Date: Tue, 5 Oct 2010 11:35:36 +0300
+Subject: [PATCH 07/10] OMAP: McBSP: implement functional clock switching
+	via clock framework
+In-Reply-To: <20101001213531.1408.87922.stgit@twilight.localdomain>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213531.1408.87922.stgit@twilight.localdomain>
+Message-ID: <201010051135.36436.peter.ujfalusi@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne ?t 5. ??jna 2010 08:49:07 Igor Grinberg napsal(a):
->  On 09/09/10 12:41, Mark Brown wrote:
-> > On Thu, Sep 09, 2010 at 10:27:17AM +0200, Marek Vasut wrote:
-> >> Dne ?t 7. z??? 2010 14:53:35 Mark Brown napsal(a):
-> >>> From a regulator API usage point of view a separate implementation of
-> >>> the same thing was nacked - there are regulator API facilties for
-> >>> hiding missing regulators from drivers when needed to get systems
-> >>> going, unless the device genuinely can cope without supplies it should
-> >>> be relying on those.
+Hello,
+
+I have only one question...
+
+On Saturday 02 October 2010 00:35:32 ext Paul Walmsley wrote:
+...
+
+> +/* McBSP CLKS source switching function */
+> +
+> +int omap2_mcbsp_set_clks_src(u8 id, u8 fck_src_id)
+> +{
+> +	struct omap_mcbsp *mcbsp;
+> +	struct clk *fck_src;
+> +	char *fck_src_name;
+> +	int r;
+> +
+> +	if (!omap_mcbsp_check_valid_id(id)) {
+> +		pr_err("%s: Invalid id (%d)\n", __func__, id + 1);
+> +		return -EINVAL;
+> +	}
+> +	mcbsp = id_to_mcbsp_ptr(id);
+> +
+> +	if (fck_src_id == MCBSP_CLKS_PAD_SRC)
+> +		fck_src_name = "pad_fck";
+> +	else if (fck_src_id == MCBSP_CLKS_PRCM_SRC)
+> +		fck_src_name = "prcm_fck";
+> +	else
+> +		return -EINVAL;
+> +
+> +	fck_src = clk_get(mcbsp->dev, fck_src_name);
+> +	if (IS_ERR_OR_NULL(fck_src)) {
+> +		pr_err("omap-mcbsp: %s: could not clk_get() %s\n", "clks",
+> +		       fck_src_name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	clk_disable(mcbsp->fclk);
+> +
+> +	r = clk_set_parent(mcbsp->fclk, fck_src);
+> +	if (IS_ERR_VALUE(r)) {
+> +		pr_err("omap-mcbsp: %s: could not clk_set_parent() to %s\n",
+> +		       "clks", fck_src_name);
+> +		clk_put(fck_src);
+> +		return -EINVAL;
+> +	}
+> +
+> +	clk_enable(mcbsp->fclk);
+> +
+> +	clk_put(fck_src);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(omap2_mcbsp_set_clks_src);
+
+...
+
+>  static int omap_mcbsp_dai_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
+>  					 int clk_id, unsigned int freq,
+>  					 int dir)
+>  {
+>  	struct omap_mcbsp_data *mcbsp_data = to_mcbsp(cpu_dai->private_data);
+>  	struct omap_mcbsp_reg_cfg *regs = &mcbsp_data->regs;
+> -	struct omap_mcbsp_platform_data *pdata = cpu_dai->dev->platform_data;
+>  	int err = 0;
 > 
-> I actually, don't see why ads7846 is strictly relying on the regulator
-> and I don't understand, why ads7846 driver has to bail out if the regulator
-> is not found? Why shouldn't the driver try to continue?
-> I think it should bail out only in case communicating with the device
-> failed.
-
-Well, I can't but agree ... it's unnecessary crud indeed.
+>  	/* The McBSP signal muxing functions are only available on McBSP1 */
+> @@ -685,8 +630,20 @@ static int omap_mcbsp_dai_set_dai_sysclk(struct
+> snd_soc_dai *cpu_dai, regs->srgr2	|= CLKSM;
+>  		break;
+>  	case OMAP_MCBSP_SYSCLK_CLKS_FCLK:
+> +		if (cpu_class_is_omap1()) {
+> +			err = -EINVAL;
+> +			break;
+> +		}
+> +		err = omap2_mcbsp_set_clks_src(mcbsp_data->bus_id,
+> +					       MCBSP_CLKS_PRCM_SRC);
+> +		break;
+>  	case OMAP_MCBSP_SYSCLK_CLKS_EXT:
+> -		err = omap_mcbsp_dai_set_clks_src(mcbsp_data, clk_id);
+> +		if (cpu_class_is_omap1()) {
+> +			err = 0;
+> +			break;
+> +		}
+> +		err = omap2_mcbsp_set_clks_src(mcbsp_data->bus_id,
+> +					       MCBSP_CLKS_PAD_SRC);
+>  		break;
 > 
-> >> Maybe these platforms should have been fixed prior to applying the patch
-> >> adding regulator goo into ads7846 driver then. What's the way to go now
-> >> then ?
-> > 
-> > Fix the platforms and use the dummy regulators to keep them going until
-> > that happens.  It's trivial to do the hookup in the platforms.
-> 
-> You want each platform, that does not have a special regulated power supply
-> for the ads7846, to define a dummy regulator just to cope with that
-> artificial dependency of the device driver?
+>  	case OMAP_MCBSP_SYSCLK_CLKX_EXT:
 
-You can enable some option in the regulator stuff that automagically shoves in a 
-dummy regulator, but it's still additional crud.
+What is the fclk source by default.
+What I mean is that most of the machine drivers are not calling the 
+snd_soc_dai_set_sysclk for the cpu_dai.
+It has been by default to prcm_fclk (core_96 or per_96).
+Is this still the case after this series?
+Do we need to go through the ASoC machine drivers, and need to select explicitly 
+the prcm_fclk from now on?
 
-> I think it is a waste and big code duplication in each platform
-> that does not have that special regulator.
-
-Indeed
+-- 
+P?ter
