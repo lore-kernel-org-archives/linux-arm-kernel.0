@@ -1,94 +1,49 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Tue, 5 Oct 2010 09:49:19 -0700
-Subject: [PATCH] ARM: imx: Add iram allocator functions
-In-Reply-To: <20101005075551.GJ11737@pengutronix.de>
-References: <1286237007-8463-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101005074423.GI11737@pengutronix.de>
-	<20101005075551.GJ11737@pengutronix.de>
-Message-ID: <86A0E76937111F4C92FABEC0A2098851050F1387@az33exm21>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 5 Oct 2010 09:54:28 -0700
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver
+	for S/PDIF PCM audio
+In-Reply-To: <AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
+	<20101004224159.GA4972@opensource.wolfsonmicro.com>
+	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
+	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
+	<20101005044304.GA26509@opensource.wolfsonmicro.com>
+	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+	<20101005055937.GA19989@opensource.wolfsonmicro.com>
+	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+Message-ID: <20101005165427.GB20555@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 05, 2010 at 04:09:47PM +0900, Jassi Brar wrote:
+> On Tue, Oct 5, 2010 at 2:59 PM, Mark Brown
 
+> > Well, there's two approaches the driver can take: one is to change the
+> > EPLL to deliver the clock rates which allow maximum flexibility, the
+> > other is to constrain the clock rates offered to applications based on
+> > the frequencies that can be generated from the current EPLL setup.
 
-> -----Original Message-----
-> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
-> Sent: Tuesday, October 05, 2010 2:56 AM
-> To: Nguyen Dinh-R00091
-> Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com;
-> s.hauer at pengutronix.de; grant.likely at secretlab.ca;
-> valentin.longchamp at epfl.ch; daniel at caiaq.de; Zhang Lily-R58066;
-> r.schwebel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de
-> Subject: Re: [PATCH] ARM: imx: Add iram allocator functions
-> 
-> On Tue, Oct 05, 2010 at 09:44:23AM +0200, Uwe Kleine-K?nig wrote:
-> > On Mon, Oct 04, 2010 at 07:03:27PM -0500, Dinh.Nguyen at freescale.com
-> wrote:
-> > > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> > >
-> > > Add iram allocation functions using GENERIC_ALLOCATOR. The
-> > > allocation size is 4KB multiples to guarantee alignment. The
-> > > idea for these functions is for i.MX platforms to use them
-> > > to dynamically allocate IRAM usage.
-> > >
-> > > Applies on 2.6.36-rc6
-> > >
-> > > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> > > Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
-> > > ---
-> > >  arch/arm/plat-mxc/Kconfig                   |   10 ++++
-> > >  arch/arm/plat-mxc/Makefile                  |    1 +
-> > >  arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
-> > >  arch/arm/plat-mxc/iram.c                    |   62
-> +++++++++++++++++++++++++++
-> > >  4 files changed, 108 insertions(+), 0 deletions(-)
-> > >  create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
-> > >  create mode 100644 arch/arm/plat-mxc/iram.c
-> > >
-> > > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> > > index 6785db4..5e4ff93 100644
-> > > --- a/arch/arm/plat-mxc/Kconfig
-> > > +++ b/arch/arm/plat-mxc/Kconfig
-> > > @@ -57,6 +57,16 @@ source "arch/arm/mach-mx5/Kconfig"
-> > >
-> > >  endmenu
-> > >
-> > > +config IRAM_ALLOC
-> > > +	bool "Enable IRAM allocator"
-> > > +	default y
-> > The iram allocator isn't useful taken alone, no?  So I suggest to make
-> > it
-> Hmm.  It seems I forgot to finish this sentence, sorry.
-> 
-> Unless IRAM_ALLOC is an optional feature for new features to come I'd
-> not make it user selectible, but let the new features select IRAM_ALLOC.
-> If it's optional I wonder if "default y" should really be done.
-> 
-> Maybe better call the symbol just IRAM?
+> For SMDKs(our reference platform) I would like to change EPLL in order
+> to be able to verify accuracy and provide all capabilities of the controllers.
 
-IRAM should be in almost all SoCs, but it will be dependent on various drivers to make use of the IRAM. I think not making it user selectable and add IRAM_ALLOC to defconfigs where IRAM_ALLOC is needed makes sense. For example, the reason I am adding IRAM_ALLOC is to support MX51 suspend code. The MX51 suspend code needs to be run from IRAM. I think also IRAM_ALLOC is more descriptive symbol.
+That's why I'm saying provide an option to turn this behaviour on - I
+agree that it's useful to be able to show the feature, I just think it's
+going to catch users out if they're not warned that it's happening
+somehow.
 
-> 
-> > > +	iram_pool = gen_pool_create(12, -1);
-> > 	if (!iram_pool)
-> > 		...
-> After rereading the commit log I wondered where the 4 KB are enforced.
-> Maybe do
-> 
-> 	s/12/PAGE_SHIFT/
-> 
-> to make it more obvious?
+> >> (our priority is accuracy of each IP's functioning rather than having
+> >> all parts of
+> >> SMDK playing nice with each other on such h/w design issues)
 
-I'm unclear about your comment. Should I add a comment of something like this?
-/* 12^2 will create a 4KB granularity. */
+> > That'd be the problem, kind of - it does mean people can get burned when
+> > they pick up the BSP code and use it as a reference for their systems.
 
-> 
-> Best regards
-> Uwe
-> 
-> --
-> Pengutronix e.K.                           | Uwe Kleine-K?nig
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
+> I expect people to replace/modify/inspect board specific code before they
+> run the BSP on their systems. IMO reference platforms are not good for
+> integrated-testing.
+
+To be fair the users doing this the individual drivers do look OK by
+themselves - there's only a problem when it comes to system integration
+and that's not going to be obvious unless someone has reviewed the
+drivers while understanding the clock tree for the chip as a whole.
