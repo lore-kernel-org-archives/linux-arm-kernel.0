@@ -1,47 +1,48 @@
-From: jc.lee@samsung.com (Jaecheol Lee)
-Date: Tue,  5 Oct 2010 21:28:56 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix on default of s3c24xx_uart_devs
-Message-ID: <1286281736-29821-1-git-send-email-jc.lee@samsung.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Tue, 5 Oct 2010 15:52:42 +0300
+Subject: [PATCH 00/10] OMAP: SCM/McBSP/clock: branch integration patches
+	for 2.6.37
+In-Reply-To: <20101001213119.1408.65395.stgit@twilight.localdomain>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+Message-ID: <20101005155242.20900538.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds default dev->bus, platform_bus_type of s3c24xx_uart_devs.
-If there is no default dev->bus, we cannot get the proper clock 'id' from
-clk_get() in the console_initcall().
-This problem occurs when only defined 'uclk1' as uart clock.
+On Fri, 01 Oct 2010 15:34:45 -0600
+Paul Walmsley <paul@pwsan.com> wrote:
 
-Reported-by: Jongpill Lee <boyko.lee@samsung.com>
-Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
----
- arch/arm/plat-samsung/dev-uart.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> mach-omap2 (as the SCM only exists on OMAP2+ systems).  The McBSP
+> parent fclk and signal muxing changes have received only light
+> testing, so any help from OMAP ASoc experts here is appreciated.
+> 
+Looks good to me. I pointed out one bug but as these are already in
+linux-omap I sent a fix for it and two minor cleanups [1].
 
-diff --git a/arch/arm/plat-samsung/dev-uart.c b/arch/arm/plat-samsung/dev-uart.c
-index 3776cd9..519e1bc 100644
---- a/arch/arm/plat-samsung/dev-uart.c
-+++ b/arch/arm/plat-samsung/dev-uart.c
-@@ -19,18 +19,22 @@
- 
- static struct platform_device s3c24xx_uart_device0 = {
- 	.id		= 0,
-+	.dev		= { .bus = &platform_bus_type },
- };
- 
- static struct platform_device s3c24xx_uart_device1 = {
- 	.id		= 1,
-+	.dev		= { .bus = &platform_bus_type },
- };
- 
- static struct platform_device s3c24xx_uart_device2 = {
- 	.id		= 2,
-+	.dev		= { .bus = &platform_bus_type },
- };
- 
- static struct platform_device s3c24xx_uart_device3 = {
- 	.id		= 3,
-+	.dev		= { .bus = &platform_bus_type },
- };
- 
- struct platform_device *s3c24xx_uart_src[4] = {
+> Paul Walmsley (10):
+>       OMAP2+: Kconfig: disallow builds for boards that don't use the currently-selected SoC
+>       OMAP2420: CTRL: fix OMAP242X_CTRL_REGADDR macro
+>       OMAP2420: clock: add MCBSP_CLKS node and clkdev aliases
+>       OMAP2430: clock: add MCBSP_CLKS node and clkdev aliases
+>       OMAP3xxx: clock: add clkdev aliases for McBSP fclk source switching
+>       OMAP: McBSP: implement McBSP CLKR and FSR signal muxing via mach-omap2/mcbsp.c
+>       OMAP: McBSP: implement functional clock switching via clock framework
+>       OMAP: split plat-omap/common.c
+>       OMAP: control: move plat-omap/control.h to mach-omap2/control.h
+>       OMAP2+: clock: reduce the amount of standard debugging while disabling unused clocks
+> 
+Patches 3-5 are doing the right thing AFAIK the OMAP clock framework.
+
+For patches 6-7 you could have my ack.
+Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+
+As they are touching also sound/soc/omap/omap-mcbsp.c, an ack from Mark
+and Liam are needed. Links to patches 6 and 7 below and my fixes on top
+of them [1].
+
+http://marc.info/?l=linux-omap&m=128596931117788&w=2
+http://marc.info/?l=linux-omap&m=128596931417805&w=2
+
+
 -- 
-1.6.2.5
+Jarkko
+1. http://marc.info/?l=linux-omap&m=128628175107214&w=2
