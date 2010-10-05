@@ -1,57 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 5 Oct 2010 16:03:44 -0500
-Subject: [PATCH v5] power: introduce library for device-specific OPPs
-In-Reply-To: <8739skpdo9.fsf@deeprootsystems.com>
-References: <1285933174-24053-1-git-send-email-nm@ti.com>	<201010050036.23179.rjw@sisk.pl>
-	<4CAB228C.7030902@ti.com>	<201010052244.11403.rjw@sisk.pl>
-	<8739skpdo9.fsf@deeprootsystems.com>
-Message-ID: <4CAB92B0.2030707@ti.com>
+From: ashwinc@codeaurora.org (Ashwin Chaugule)
+Date: Tue, 05 Oct 2010 17:05:55 -0400
+Subject: [RFC] [PATCH] XCHGADD ARM implementation
+Message-ID: <4CAB9333.50400@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman had written, on 10/05/2010 03:50 PM, the following:
-> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
-> 
->> On Tuesday, October 05, 2010, Nishanth Menon wrote:
->>> Rafael J. Wysocki had written, on 10/04/2010 05:36 PM, the following:
->>>> On Friday, October 01, 2010, Nishanth Menon wrote:
-> 
-> [...]
-> 
->>>> I'm not really sure why so many mutexes are needed here.  I don't think you
->>>> need a separate mutex in every struct device_opp object.  I'd just use
->>>> dev_opp_list_lock for everything.
->>> I did consider using  dev_opp_list_lock to lock everything *but* here is 
->>> the contention:
->>>
->>> dev_opp_list_lock locks modification for addition of domains device. 
->>> This operation happens usually during init stage.
->>>
->>> each domain device has multiple opps, new opps can be added, but the 
->>> more often usage will probably be opp_enable and disable. domain are 
->>> usually modifiable independent of each other - device_opp->lock provides 
->>> device level lock allowing for each domain device opp list to be 
->>> modified independent of each other. e.g. on thermal overage we may 
->>> choose to lower mpu domain while a coprocessor driver in parallel might 
->>> choose to disable co-processor domain in parallel.
->>>
->>> Wondering why you'd like a single lock for all domains and restrict 
->>> parallelization?
->> Because of the simplicity, mostly.  If there's only a relatively short period
->> when the lock will be contended for, that still is not too bad and it's much
->> easier to get the synchronization right with just one lock for starters.
-> 
-> FWIW, I agree with Rafael
-> 
-> These are not going be highly contended locks, and the lock durations
-> are very short, so simplifying the locking is a big win for readability.
-> 
-> Kevin
-Fair enough. we can relook if the lock becomes a contended lock in the 
-future. I do agree that simplifying the locking will benefit 
-readability. Will post a v6 with a singular lock and updated 
-documentation for the same.
+The following patch is the ARM implementation for RWSEM_XCHGADD_ALGORITHM.
+Based on David's rwsem benchmark from http://lwn.net/Articles/89191/ ,
+I see a consistent 5-6% increase in the number of reads and writes taken as
+compared to RWSEM_GENERIC_SPINLOCK on a dual core ARMv7. So far I have tested
 
--- 
-Regards,
-Nishanth Menon
+
+numrd=1 numwr=1 numdg=1 do_sched=1
+
+numrd=10 numwr=10 numdg=1 do_sched=1
+
+numrd=20 numwr=20 numdg=1 do_sched=1
+
+
+Can anyone else help to test this patch on other ARM systems ?
+
+Cheers,
+Ashwin
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Optimzed-ARM-RWSEM-algorithm.patch
+Type: text/x-patch
+Size: 5928 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101005/12e3b202/attachment.bin>
