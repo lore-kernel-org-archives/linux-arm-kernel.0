@@ -1,38 +1,45 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 5 Oct 2010 09:07:47 +0530
-Subject: [PATCH V2 16/69] rtc: Adding support for spear rtc
-In-Reply-To: <20101005005245.23e6ef80@linux.lan.towertech.it>
-References: <cover.1285933331.git.viresh.kumar@st.com>	<643f3f9afff0492c92a8cb7ed47a30f666326bc4.1285933331.git.viresh.kumar@st.com>
-	<20101005005245.23e6ef80@linux.lan.towertech.it>
-Message-ID: <4CAA9D8B.6090706@st.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 5 Oct 2010 13:06:25 +0900
+Subject: [PATCH 1/4] ARM: SAMSUNG: Move the start address of Samsung SoCs'
+	VA space
+In-Reply-To: <1286244398-9333-2-git-send-email-kgene.kim@samsung.com>
+References: <1286244398-9333-1-git-send-email-kgene.kim@samsung.com>
+	<1286244398-9333-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <AANLkTikfjiKunxZdWwbUi3cbj-20U=Fb1sO8j+Hcr8iy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2010 04:22 AM, Alessandro Zummo wrote:
-> please do not send 69+ irrelevant patches to the rtc mailing list.
+On Tue, Oct 5, 2010 at 11:06 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This patch moves the start address of Samsung SoCs' VA space so that
+> can use more vmalloc()/ioremap() space. Of course need to change the
+> VMALLOC_END for it.
+> Actually Samsung SoCs' VA space (free for platform use area) becomes
+> 80MiB with this patch, it's enough.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> ---
+> ?arch/arm/plat-samsung/include/plat/map-base.h | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/include/plat/map-base.h b/arch/arm/plat-samsung/include/plat/map-base.h
+> index 250be31..86f66be 100644
+> --- a/arch/arm/plat-samsung/include/plat/map-base.h
+> +++ b/arch/arm/plat-samsung/include/plat/map-base.h
+> @@ -14,7 +14,7 @@
+> ?#ifndef __ASM_PLAT_MAP_H
+> ?#define __ASM_PLAT_MAP_H __FILE__
+>
+> -/* Fit all our registers in at 0xF4000000 upwards, trying to use as
+> +/* Fit all our registers in at 0xFA000000 upwards, trying to use as
+> ?* little of the VA space as possible so vmalloc and friends have a
+> ?* better chance of getting memory.
+> ?*
+> @@ -22,7 +22,7 @@
+> ?* an single MOVS instruction (ie, only 8 bits of set data)
+> ?*/
+>
+> -#define S3C_ADDR_BASE ?(0xF4000000)
+> +#define S3C_ADDR_BASE ?(0xFA000000)
 
-Alessandro,
-
-I have already replied to Patch62/69 for this issue.
-
-I have used an latest patch on git for sending this patch series. I
-think there is some bug
-there, due to which all of you have received some mails which are not
-intended for all of you.
-There was a bugfix in git which enables to send mail to "recipients
-mentioned in TO field", of patch
-itself.
-
-After creating patches (with git format-patch ---), i have added To
-and CC lists in patches.
-But when i sent patches the TO field was carried away in later patches
-too. So due to this
-all patches send after rtc patches have following recipients added:
-rtc-linux at googlegroups.com,
-a.zummo at towertech.it. Similarly for other patches too.
-
-Once again sorry for this.
-
-
--- 
-viresh
+maybe you could drop the brackets from the address value
