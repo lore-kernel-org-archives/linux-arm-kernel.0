@@ -1,66 +1,101 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 05 Oct 2010 15:32:31 +0200
-Subject: [PATCH] ARM: SAMSUNG: Fix on default of s3c24xx_uart_devs
-In-Reply-To: <1286281736-29821-1-git-send-email-jc.lee@samsung.com>
-References: <1286281736-29821-1-git-send-email-jc.lee@samsung.com>
-Message-ID: <014301cb6491$c649ec40$52ddc4c0$%szyprowski@samsung.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 5 Oct 2010 16:04:36 +0200
+Subject: [PATCH 1/2] gic: Add functions to save and restore gic state
+In-Reply-To: <1285901335-26354-1-git-send-email-ccross@android.com>
+References: <1285901335-26354-1-git-send-email-ccross@android.com>
+Message-ID: <4CAB3074.5010106@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Colin Cross wrote:
 
-On Tuesday, October 05, 2010 2:29 PM Jaecheol Lee wrote:
+> on systems with idle states which power-gate the logic including
+> the gic, such as tegra, the gic distributor needs to be shut down
+> and restored on entry and exit from the architecture idle code
 
-> This patch adds default dev->bus, platform_bus_type of s3c24xx_uart_devs.
-> If there is no default dev->bus, we cannot get the proper clock 'id' from
-> clk_get() in the console_initcall().
-> This problem occurs when only defined 'uclk1' as uart clock.
-> 
-> Reported-by: Jongpill Lee <boyko.lee@samsung.com>
-> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
-> ---
->  arch/arm/plat-samsung/dev-uart.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/dev-uart.c b/arch/arm/plat-samsung/dev-uart.c
-> index 3776cd9..519e1bc 100644
-> --- a/arch/arm/plat-samsung/dev-uart.c
-> +++ b/arch/arm/plat-samsung/dev-uart.c
-> @@ -19,18 +19,22 @@
-> 
->  static struct platform_device s3c24xx_uart_device0 = {
->  	.id		= 0,
-> +	.dev		= { .bus = &platform_bus_type },
->  };
-> 
->  static struct platform_device s3c24xx_uart_device1 = {
->  	.id		= 1,
-> +	.dev		= { .bus = &platform_bus_type },
->  };
-> 
->  static struct platform_device s3c24xx_uart_device2 = {
->  	.id		= 2,
-> +	.dev		= { .bus = &platform_bus_type },
->  };
-> 
->  static struct platform_device s3c24xx_uart_device3 = {
->  	.id		= 3,
-> +	.dev		= { .bus = &platform_bus_type },
->  };
-> 
->  struct platform_device *s3c24xx_uart_src[4] = {
+Nice!
 
-I've ran into the same problem and I considered the same approach to solve
-this issue. However I found that such solution is an ugly hack rather a real
-fix or workaround. Nobody can grant that platform device framework would
-accept registering a device with .bus already set in the future version
-of the kernel. This might also cause other strange problems in the future.
+> +
+> +#ifdef CONFIG_PM
+> +void gic_dist_save(unsigned int gic_nr)
+> +{
+> +	unsigned int max_irq = gic_data[gic_nr].max_irq;
+> +	void __iomem *dist_base = gic_data[gic_nr].dist_base;
+> +	int i;
+> +
+> +	if (gic_nr >= MAX_GIC_NR)
+> +		BUG();
+> +
+> +	_gic_dist_exit(gic_nr);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
+> +		gic_data[gic_nr].saved_conf[i] =
+> +			readl(dist_base + GIC_DIST_CONFIG + i * 4);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
+> +		gic_data[gic_nr].saved_pri[i] =
+> +			readl(dist_base + GIC_DIST_PRI + i * 4);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
+> +		gic_data[gic_nr].saved_target[i] =
+> +			readl(dist_base + GIC_DIST_TARGET + i * 4);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
+> +		gic_data[gic_nr].saved_enable[i] =
+> +			readl(dist_base + GIC_DIST_ENABLE_SET + i * 4);
+> +}
+> +
+> +void gic_dist_restore(unsigned int gic_nr)
+> +{
+> +	unsigned int max_irq;
+> +	unsigned int i;
+> +	void __iomem *dist_base;
+> +	void __iomem *cpu_base;
+> +
+> +	if (gic_nr >= MAX_GIC_NR)
+> +		BUG();
+> +
+> +	_gic_dist_init(gic_nr);
+> +
+> +	max_irq = gic_data[gic_nr].max_irq;
+> +	dist_base = gic_data[gic_nr].dist_base;
+> +	cpu_base = gic_data[gic_nr].cpu_base;
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 16); i++)
+> +		writel(gic_data[gic_nr].saved_conf[i],
+> +			dist_base + GIC_DIST_CONFIG + i * 4);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
+> +		writel(gic_data[gic_nr].saved_pri[i],
+> +			dist_base + GIC_DIST_PRI + i * 4);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 4); i++)
+> +		writel(gic_data[gic_nr].saved_target[i],
+> +			dist_base + GIC_DIST_TARGET + i * 4);
+> +
+> +	for (i = 0; i < DIV_ROUND_UP(max_irq, 32); i++)
+> +		writel(gic_data[gic_nr].saved_enable[i],
+> +			dist_base + GIC_DIST_ENABLE_SET + i * 4);
+> +
+> +	writel(1, dist_base + GIC_DIST_CTRL);
+> +	writel(0xf0, cpu_base + GIC_CPU_PRIMASK);
+> +	writel(1, cpu_base + GIC_CPU_CTRL);
+> +}
+> +#endif
 
-My proposition for a real workaround is in the patch named "[PATCH] ARM:
-Samsung: add a workaround for get_clock() for serial driver" 
-(see http://www.spinics.net/lists/linux-samsung-soc/msg03050.html ).
+For gic_dist_save()/gic_dist_restore() can you write some
+comment to each function about the implicit semantics for
+calling them?
 
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+If I *guess* correctly gic_dist_save() must be called in
+something like a platform idle function after disabling all
+IRQs but before sleeping, conversely gic_dist_restort()
+must be called after sleeping but before re-enabling the
+IRQs.
+
+Apart from that it looks good to me so with this
+simple comment-fix it's:
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Yours,
+Linus Walleij
