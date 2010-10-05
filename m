@@ -1,89 +1,94 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue,  5 Oct 2010 18:51:40 +0200
-Subject: [PATCH] cpuimx25 & cpuimx35: fix OTG port registration in host mode
-In-Reply-To: <4CAB494F.2060704@eukrea.com>
-References: <4CAB494F.2060704@eukrea.com>
-Message-ID: <1286297500-21077-1-git-send-email-eric@eukrea.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Tue, 5 Oct 2010 09:49:19 -0700
+Subject: [PATCH] ARM: imx: Add iram allocator functions
+In-Reply-To: <20101005075551.GJ11737@pengutronix.de>
+References: <1286237007-8463-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20101005074423.GI11737@pengutronix.de>
+	<20101005075551.GJ11737@pengutronix.de>
+Message-ID: <86A0E76937111F4C92FABEC0A2098851050F1387@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the PHY is UTMI so don't create an ULPI viewpoint.
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/mach-mx25/mach-cpuimx25.c |   14 ++++----------
- arch/arm/mach-mx3/mach-cpuimx35.c  |   14 ++++----------
- 2 files changed, 8 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/mach-cpuimx25.c b/arch/arm/mach-mx25/mach-cpuimx25.c
-index e064bb3..c530c8a 100644
---- a/arch/arm/mach-mx25/mach-cpuimx25.c
-+++ b/arch/arm/mach-mx25/mach-cpuimx25.c
-@@ -41,7 +41,6 @@
- #include <mach/mxc_nand.h>
- #include <mach/imxfb.h>
- #include <mach/mxc_ehci.h>
--#include <mach/ulpi.h>
- #include <mach/iomux-mx25.h>
- 
- #include "devices-imx25.h"
-@@ -135,18 +134,13 @@ static void __init eukrea_cpuimx25_init(void)
- 				ARRAY_SIZE(eukrea_cpuimx25_i2c_devices));
- 	imx25_add_imx_i2c0(&eukrea_cpuimx25_i2c0_data);
- 
--#if defined(CONFIG_USB_ULPI)
--	if (otg_mode_host) {
--		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
--
-+	if (otg_mode_host)
- 		mxc_register_device(&mxc_otg, &otg_pdata);
--	}
--	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
--#endif
--	if (!otg_mode_host)
-+	else
- 		mxc_register_device(&otg_udc_device, &otg_device_pdata);
- 
-+	mxc_register_device(&mxc_usbh2, &usbh2_pdata);
-+
- #ifdef CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD
- 	eukrea_mbimxsd25_baseboard_init();
- #endif
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index d16bec8..8ba5321 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -44,7 +44,6 @@
- #include <mach/iomux-mx35.h>
- #include <mach/mxc_nand.h>
- #include <mach/mxc_ehci.h>
--#include <mach/ulpi.h>
- 
- #include "devices-imx35.h"
- #include "devices.h"
-@@ -168,18 +167,13 @@ static void __init mxc_board_init(void)
- 			ARRAY_SIZE(eukrea_cpuimx35_i2c_devices));
- 	imx35_add_imx_i2c0(&eukrea_cpuimx35_i2c0_data);
- 
--#if defined(CONFIG_USB_ULPI)
--	if (otg_mode_host) {
--		otg_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
--
-+	if (otg_mode_host)
- 		mxc_register_device(&mxc_otg_host, &otg_pdata);
--	}
--	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
--#endif
--	if (!otg_mode_host)
-+	else
- 		mxc_register_device(&mxc_otg_udc_device, &otg_device_pdata);
- 
-+	mxc_register_device(&mxc_usbh1, &usbh1_pdata);
-+
- #ifdef CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD
- 	eukrea_mbimxsd35_baseboard_init();
- #endif
--- 
-1.7.0.4
+> -----Original Message-----
+> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+> Sent: Tuesday, October 05, 2010 2:56 AM
+> To: Nguyen Dinh-R00091
+> Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com;
+> s.hauer at pengutronix.de; grant.likely at secretlab.ca;
+> valentin.longchamp at epfl.ch; daniel at caiaq.de; Zhang Lily-R58066;
+> r.schwebel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de
+> Subject: Re: [PATCH] ARM: imx: Add iram allocator functions
+> 
+> On Tue, Oct 05, 2010 at 09:44:23AM +0200, Uwe Kleine-K?nig wrote:
+> > On Mon, Oct 04, 2010 at 07:03:27PM -0500, Dinh.Nguyen at freescale.com
+> wrote:
+> > > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> > >
+> > > Add iram allocation functions using GENERIC_ALLOCATOR. The
+> > > allocation size is 4KB multiples to guarantee alignment. The
+> > > idea for these functions is for i.MX platforms to use them
+> > > to dynamically allocate IRAM usage.
+> > >
+> > > Applies on 2.6.36-rc6
+> > >
+> > > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> > > Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
+> > > ---
+> > >  arch/arm/plat-mxc/Kconfig                   |   10 ++++
+> > >  arch/arm/plat-mxc/Makefile                  |    1 +
+> > >  arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
+> > >  arch/arm/plat-mxc/iram.c                    |   62
+> +++++++++++++++++++++++++++
+> > >  4 files changed, 108 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
+> > >  create mode 100644 arch/arm/plat-mxc/iram.c
+> > >
+> > > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> > > index 6785db4..5e4ff93 100644
+> > > --- a/arch/arm/plat-mxc/Kconfig
+> > > +++ b/arch/arm/plat-mxc/Kconfig
+> > > @@ -57,6 +57,16 @@ source "arch/arm/mach-mx5/Kconfig"
+> > >
+> > >  endmenu
+> > >
+> > > +config IRAM_ALLOC
+> > > +	bool "Enable IRAM allocator"
+> > > +	default y
+> > The iram allocator isn't useful taken alone, no?  So I suggest to make
+> > it
+> Hmm.  It seems I forgot to finish this sentence, sorry.
+> 
+> Unless IRAM_ALLOC is an optional feature for new features to come I'd
+> not make it user selectible, but let the new features select IRAM_ALLOC.
+> If it's optional I wonder if "default y" should really be done.
+> 
+> Maybe better call the symbol just IRAM?
+
+IRAM should be in almost all SoCs, but it will be dependent on various drivers to make use of the IRAM. I think not making it user selectable and add IRAM_ALLOC to defconfigs where IRAM_ALLOC is needed makes sense. For example, the reason I am adding IRAM_ALLOC is to support MX51 suspend code. The MX51 suspend code needs to be run from IRAM. I think also IRAM_ALLOC is more descriptive symbol.
+
+> 
+> > > +	iram_pool = gen_pool_create(12, -1);
+> > 	if (!iram_pool)
+> > 		...
+> After rereading the commit log I wondered where the 4 KB are enforced.
+> Maybe do
+> 
+> 	s/12/PAGE_SHIFT/
+> 
+> to make it more obvious?
+
+I'm unclear about your comment. Should I add a comment of something like this?
+/* 12^2 will create a 4KB granularity. */
+
+> 
+> Best regards
+> Uwe
+> 
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
