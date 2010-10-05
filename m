@@ -1,56 +1,60 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Oct 2010 12:06:49 +0200
-Subject: [PATCH 4/4] dmaengine: Add Freescale i.MX1/21/27 DMA driver
-In-Reply-To: <AANLkTikaAuBe=ef3vnt_xV0At4ZQbNsD4rFqtLF4R+0+@mail.gmail.com>
-References: <1285854995-6569-1-git-send-email-s.hauer@pengutronix.de>
-	<1285854995-6569-5-git-send-email-s.hauer@pengutronix.de>
-	<AANLkTikaAuBe=ef3vnt_xV0At4ZQbNsD4rFqtLF4R+0+@mail.gmail.com>
-Message-ID: <20101005100649.GL28242@pengutronix.de>
+From: david.cohen@nokia.com (David Cohen)
+Date: Tue, 5 Oct 2010 13:35:16 +0300
+Subject: [PATCHv3 1/6] omap3: Add external VBUS power switch and
+	overcurrent detect on IGEP v2 board.
+In-Reply-To: <AANLkTin0FBudq5saFhcuonrzK2LqU0UueiN_-C=B0N0j@mail.gmail.com>
+References: <1285967349-32767-1-git-send-email-eballetbo@gmail.com>
+	<1285967349-32767-2-git-send-email-eballetbo@gmail.com>
+	<20101002080427.GC14377@esdhcp036161.research.nokia.com>
+	<AANLkTin0FBudq5saFhcuonrzK2LqU0UueiN_-C=B0N0j@mail.gmail.com>
+Message-ID: <20101005103516.GC12614@esdhcp036161.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On Tue, Oct 05, 2010 at 09:45:10AM +0200, javier Martin wrote:
-> Hi Sascha,
-> 
-> 
-> +
-> > +struct imxdma_channel {
-> > +       struct imxdma_engine            *imxdma;
-> > +       unsigned int                    channel;
-> > +       unsigned int                    imxdma_channel;
-> > +
-> > +       enum dma_data_direction         direction;
-> > +       enum dma_slave_buswidth         word_size;
-> > +       dma_addr_t                      bd_phys;
-> > +       unsigned long                   flags;
-> > +       dma_addr_t                      per_address;
-> > +       u32                             watermark_level;
-> > +       struct dma_chan                 chan;
-> > +       spinlock_t                      lock;
-> > +       struct dma_async_tx_descriptor  desc;
-> > +       dma_cookie_t                    last_completed;
-> > +       enum dma_status                 status;
-> > +       int                             dma_request;
-> > +       struct scatterlist              *sg_list;
-> > +};
-> > +
-> > +#define MAX_DMA_CHANNELS 8
+On Sat, Oct 02, 2010 at 12:12:32PM +0200, ext Enric Balletb? i Serra wrote:
+> 2010/10/2 David Cohen <david.cohen@nokia.com>:
+> > Hi,
 > >
+> > On Fri, Oct 01, 2010 at 11:09:04PM +0200, ext Enric Balletbo i Serra wrote:
+> >> GPIO for various devices are missing from the board initialization.
+> >> This patch adds support for the VBUS and over current gpios. ?Without this
+> >> patch, input/outputs from these two sources are ignored.
+> >>
+> >> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> >> ---
+> >> ?arch/arm/mach-omap2/board-igep0020.c | ? 16 ++++++++++++++++
+> >> ?1 files changed, 16 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+> >> index 175f043..07dbdb7 100644
+> >> --- a/arch/arm/mach-omap2/board-igep0020.c
+> >> +++ b/arch/arm/mach-omap2/board-igep0020.c
+> >> @@ -274,6 +274,22 @@ static int igep2_twl_gpio_setup(struct device *dev,
+> >> ? ? ? igep2_vmmc1_supply.dev = mmc[0].dev;
+> >> ? ? ? igep2_vmmc2_supply.dev = mmc[1].dev;
+> >>
+> >> + ? ? /*
+> >> + ? ? ?* REVISIT: need ehci-omap hooks for external VBUS
+> >> + ? ? ?* power switch and overcurrent detect
+> >> + ? ? ?*/
+> >> + ? ? if ((gpio_request(gpio + 1, "GPIO_EHCI_NOC") < 0) ||
+> >> + ? ? ? ? (gpio_direction_input(gpio + 1) < 0))
+> >> + ? ? ? ? ? ? pr_err("IGEP2: Could not obtain gpio for EHCI NOC");
+> >
+> > Shouldb't you return error if it can't request the GPIO?
 > 
->  i.MX27 has 16 DMA channels. Maybe an #ifdef would solve the issue.
+> I'm not sure what happens if I return and error, I see only prints a
+> debug message. Maybe the twl4030-gpio maintainer can explain if I need
+> return and error or not.
+> 
+> Other omap boards just don't check the gpio_request call and always
+> return 0. I don't consider this a critical error so maybe should be
+> better replace the pr_err with a pr_warning.
 
-This is by intention. I want to reserve 8 channels for the old driver
-and the remaining 8 for the dmaengine driver. This way we can have both
-in the tree and use both drivers parallel. This can be changed to the
-real value once the old driver is gone.
+I checked some board files and it seems they're not verifying gpio_request()
+results most of the times. But if you check board-omap3pandor.c, it's
+been done in a better way.
 
-Sascha
+Br,
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+David
