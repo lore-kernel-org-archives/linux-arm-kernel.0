@@ -1,65 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 05 Oct 2010 18:23:19 +0900
-Subject: [PATCH 1/7] ARM: S5PC210: Universal OneNAND support
-In-Reply-To: <20100930044822.GA16897@july>
-References: <20100930044822.GA16897@july>
-Message-ID: <003001cb646f$0f492370$2ddb6a50$%kim@samsung.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Tue,  5 Oct 2010 11:25:39 +0200
+Subject: [PATCH/RFC] i.MX31 and i.MX35 : fix errate TLSbo65953 and ENGcm09472
+In-Reply-To: <4CAAD39C.2010103@eukrea.com>
+References: <4CAAD39C.2010103@eukrea.com>
+Message-ID: <1286270739-18270-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> OneNAND device support for Universal board.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Kconfig               |    1 +
->  arch/arm/mach-s5pv310/mach-universal_c210.c |    2 ++
->  2 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index 9941852..178eab9 100644
-> --- a/arch/arm/mach-s5pv310/Kconfig
-> +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -40,6 +40,7 @@ config MACH_SMDKC210
->  config MACH_UNIVERSAL_C210
->  	bool "Mobile UNIVERSAL_C210 Board"
->  	select CPU_S5PV310
-> +	select S5P_DEV_ONENAND
->  	help
->  	  Machine support for Samsung Mobile Universal S5PC210 Reference
->  	  Board. S5PC210(MCP) is one of package option of S5PV310
-> diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-
-> s5pv310/mach-universal_c210.c
-> index b57efae..e169849 100644
-> --- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-> +++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-> @@ -20,6 +20,7 @@
->  #include <plat/regs-serial.h>
->  #include <plat/s5pv310.h>
->  #include <plat/cpu.h>
-> +#include <plat/devs.h>
-> 
->  #include <mach/map.h>
-> 
-> @@ -117,6 +118,7 @@ static struct platform_device universal_gpio_keys = {
-> 
->  static struct platform_device *universal_devices[] __initdata = {
->  	&universal_gpio_keys,
-> +	&s5p_device_onenand,
->  };
-> 
->  static void __init universal_map_io(void)
-> --
+Without this exiting WFI can result in cache corruption.
+Code taken from Freescale's 2.6.27 BSP and tested on i.MX35
 
-Ok...will apply.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/plat-mxc/include/mach/system.h |   26 ++++++++++++++++++++++++--
+ 1 files changed, 24 insertions(+), 2 deletions(-)
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
+index 4acd114..1661b29 100644
+--- a/arch/arm/plat-mxc/include/mach/system.h
++++ b/arch/arm/plat-mxc/include/mach/system.h
+@@ -1,7 +1,7 @@
+ /*
+  *  Copyright (C) 1999 ARM Limited
+  *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -22,14 +22,36 @@
+ 
+ static inline void arch_idle(void)
+ {
++#if (defined (CONFIG_ARCH_MX35) || defined (CONFIG_ARCH_MX31))
++	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
++	unsigned long reg = 0;
++	__asm__ __volatile__(
++		"mrc p15, 0, %0, c1, c0, 0\n"
++		"bic %0, %0, #0x00001000\n"
++		"bic %0, %0, #0x00000004\n"
++		"mcr p15, 0, %0, c1, c0, 0\n"
++		"mov %0, #0\n"
++		"mcr p15, 0, %0, c7, c5, 0\n"
++		"mov %0, #0\n"
++		"mcr p15, 0, %0, c7, c14, 0\n"
++		"mov %0, #0\n"
++		"mcr p15, 0, %0, c7, c0, 4\n"
++		"nop\n" "nop\n" "nop\n" "nop\n"
++		"nop\n" "nop\n" "nop\n"
++		"mrc p15, 0, %0, c1, c0, 0\n"
++		"orr %0, %0, #0x00001000\n"
++		"orr %0, %0, #0x00000004\n"
++		"mcr p15, 0, %0, c1, c0, 0\n"
++		:: "r" (reg));
++#else
+ #ifdef CONFIG_ARCH_MXC91231
+ 	if (cpu_is_mxc91231()) {
+ 		/* Need this to set DSM low-power mode */
+ 		mxc91231_prepare_idle();
+ 	}
+ #endif
+-
+ 	cpu_do_idle();
++#endif
+ }
+ 
+ void arch_reset(char mode, const char *cmd);
+-- 
+1.7.0.4
