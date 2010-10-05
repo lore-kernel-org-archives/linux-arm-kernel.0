@@ -1,53 +1,99 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 4 Oct 2010 21:43:05 -0700
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver
-	for S/PDIF PCM audio
-In-Reply-To: <AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
-	<20101004224159.GA4972@opensource.wolfsonmicro.com>
-	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
-	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-Message-ID: <20101005044304.GA26509@opensource.wolfsonmicro.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 5 Oct 2010 10:24:37 +0530
+Subject: [PATCH 6/6] ARM: l2x0: Optimise the range based operations
+In-Reply-To: <20101004212250.GD25241@n2100.arm.linux.org.uk>
+References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-5-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-6-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-7-git-send-email-santosh.shilimkar@ti.com>
+	<20101004212250.GD25241@n2100.arm.linux.org.uk>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFEA29@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 05, 2010 at 11:19:35AM +0900, Jassi Brar wrote:
-> On Tue, Oct 5, 2010 at 10:10 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> > On Tue, Oct 5, 2010 at 7:42 AM, Mark Brown
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, October 05, 2010 2:53 AM
+> To: Shilimkar, Santosh
+> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+> tglx at linutronix.de; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 6/6] ARM: l2x0: Optimise the range based operations
+> 
+> On Tue, Sep 07, 2010 at 01:27:23PM +0530, Santosh Shilimkar wrote:
+> > For the big buffers which are in excess of cache size, the maintaince
+> > operations by PA are very slow. For such buffers the maintainace
+> > operations can be speeded up by using the WAY based method.
+> 
+> This causes my Versatile Express to corrupt MMC transfers.  Reverting
+> both this and the 'Determine cache size' patches makes it work again.
+>
+> (Note that just reverting this one doesn't result in a working situation.)
+> 
+Mostly MMC buffers are smaller than 512KB so the optimization won't
+even be invoked.
 
-> >> I'd expect this to be with the other clock configuration code under
-> >> arch/arm, especially as it's involving the EPLL which can have fairly
-> >> wide usage - it seems better to make sure people working with other,
-> >> non-audio, bits of the system are aware of the EPLL usage.
+> Good boot:
+> 
+> L310 cache controller enabled
+> l2x0: 8 ways, CACHE_ID 0x410000c3, AUX_CTRL 0x02460000
+> ...
+> mmci-pl18x mb:mmci: mmc0: MMCI rev 0 cfg 00 at 0x0000000010005000 irq
+> 41,42
+> aaci-pl041 mb:aaci: ARM AC'97 Interface at 0x0000000010004000, irq 43,
+> fifo 512
+> ALSA device list:
+>   #0: ARM AC'97 Interface at 0x0000000010004000, irq 43
+> TCP cubic registered
+> mmc0: host does not support reading read-only switch. assuming write-
+> enable.
+> mmc0: new SD card at address e624
+> mmcblk0: mmc0:e624 SD02G 1.89 GiB
+> NET: Registered protocol family 17
+> VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 0
+>  mmcblk0: p1
+> Initalizing network drop monitor service
+> Waiting 5sec before mounting root device...
+> port 1 high speed
+> 
+> Bad boot (with just 'Determine cache size' patch applied):
+> 
+> L310 cache controller enabled
+> l2x0: 8 ways, CACHE_ID 0x410000c3, AUX_CTRL 0x02460000, Cache size: 512 KB
+> ...
+> mmci-pl18x mb:mmci: mmc0: MMCI rev 0 cfg 00 at 0x0000000010005000 irq
+> 41,42
+> aaci-pl041 mb:aaci: ARM AC'97 Interface at 0x0000000010004000, irq 43,
+> fifo 512
+> ALSA device list:
+>   #0: ARM AC'97 Interface at 0x0000000010004000, irq 43
+> mmc0: host does not support reading read-only switch. assuming write-
+> enable.
+> mmc0: new SD card at address e624
+> mmcblk0: mmc0:e624 SD02G 1.89 GiB
+> TCP cubic registered
+> NET: Registered protocol family 17
+> mmcblk0: retrying using single block read
+> VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 0
+> mmcblk0: error -5 transferring data, sector 0, nr 8, card status 0x900
+> Initalizing network drop monitor service
+> <random garbage>
+> mmcblk0: error -5 transferring data, sector 1, nr 7, card status 0x900
+> end_request: I/O error, dev mmcblk0, sector 1
+> Buffer I/O error on device mmcblk0, logical block 0
+> port 1 high speed
+> 
+> -5 is -EIO, which is a FIFO overrun error, so somehow these changes are
+> causing the CPU or bus accesses to be slower.
+I don't see the problem on OMAP MMC.
+May be some how additional check is making these operations 
+touch slower which lead to the under run.
 
-> > But that would have made us have EPLL manipulation in two places -
-> > one in arch/arm/mach/board-init and other in ASoC Machine driver because
-> > we would need to change the source clock's rate in runtime(using
-> > callback pointers
-> > for the purpose seemed too over the top).
-> > If ASoC doesn't change EPLL, it doesn't matter to other devices, if it
-> > does there
-> > is currently no means for other drivers to know about it. So, we might just
-> > as well move the EPLL related code to ASoC machine driver.
+Will have a look at it again. May for this merge window you can
+drop 'Optimise the range based operations' and ''Determine cache size'
+patches.
 
-The reason I'm concerned about this is that I've had actual problems
-with users of your out of tree BSPs getting confused by similar code
-there.  Thinking about it some more it's not so much the fact that
-the code is spread out as the fact that the the EPLL is so widely used
-within the system that having one driver change it can easily disrupt
-another subsystem in surprising ways.
-
-Since the clock API currently doesn't have a good way of resolving this
-perhaps a config option or something which masks the EPLL behaviour
-controllable and leaves it alone by default?  That would show people how
-to use this chip feature without affecting the other subsystems so
-non-obviously.
-
-> Btw, another important reason is that having EPLL manipulation in board-int
-> would result in code-duplication on other SMDK platforms as most have the
-> same clock routing options available in h/w and we want to use the same ASoC
-> machine driver for SoCs whenever possible.
-
-This doesn't seem such a big deal - you could create a shared file for
-the code under arch/arm.
+Regards,
+Santosh
