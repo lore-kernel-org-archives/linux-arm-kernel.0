@@ -1,30 +1,38 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Tue, 05 Oct 2010 09:28:28 +0200
-Subject: I.MX35 GPIO IRQ + Preempt -> Oops
-In-Reply-To: <201010051606.24617.marc@cpdesign.com.au>
-References: <4CA739B4.1020506@eukrea.com>
-	<4CA98B8C.4010106@eukrea.com>	<4CA9C384.2070208@eukrea.com>
-	<201010051606.24617.marc@cpdesign.com.au>
-Message-ID: <4CAAD39C.2010103@eukrea.com>
+From: claude.youn@gmail.com (Seungwhan Youn)
+Date: Tue, 5 Oct 2010 16:39:11 +0900
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
+	S/PDIF PCM audio
+In-Reply-To: <AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
+	<20101004224159.GA4972@opensource.wolfsonmicro.com>
+	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
+	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
+	<20101005044304.GA26509@opensource.wolfsonmicro.com>
+	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+	<20101005055937.GA19989@opensource.wolfsonmicro.com>
+	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+Message-ID: <AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+>>> I hope you noticed that this clock hierarchy is a _very_ board specific thing.
+>>> We can easily place SoCs' shared stuff in arch/arm/plat-samsung (or similar)
+>>> Any suggestions, where do we place code shared by SMDK-boards ?
+>>
+>> plat-samsung would probably be fine for that also - create a file called
+>> common-smdk or something. ?Some other things have gone for a plat-smdk
+>> style approach too, though I'm not sure how tasteful I find that
+>> personally.
+> Even though I would personally like to have EPLL control for a device
+> in machine specific manner as part of its driver, I accept your opinion.
+>
+> Claude, let us create one arch/arm/plat-samsung/smdk.c to do common
+> stuff for SMKDs like EPLL control. What do you think ?
 
-Le 05/10/2010 07:06, Marc Reilly a ?crit :
-> For what it's worth...
->
->> Also : same problem with Freescale's BSP (2.6.31 based) and same "fix"
->> (removing the WFI).
->
-> My kernel won't even boot up (although I don't usually get a kernel oops, only
-> very occasionally) unless i pass the jtag=on parameter (or nohlt for non
-> freescale kernel). It just freezes.
->
-> I think both of those workarounds effectively bypass the cpu_do_idle() call.
->
-exactly and it seems the workaround existed in the past in Freescale's 
-kernel ( TLSbo65953 is the errata number for i.MX31 ) :
-http://svn.buglabs.net/svn/!source/9783/bug/trunk/bug-linux-2.6.27.2/arch/arm/mach-mx3/mxc_pm.c#359
-
-Eric
+Actually if we add this file on plat-samsung, board-init will be
+separated two-part, one is machine(board) specific and other is all
+smdk specific. So, If it doesn't make confusion to other guys who
+wants to add settings for their features on board-init, it looks good
+to me. But I think that we also have to listen Mr. Ben Dooks and Mr.
+Kukjin Kim's opinion about this before we get a conclusion.
