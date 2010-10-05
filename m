@@ -1,60 +1,43 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Tue, 5 Oct 2010 07:42:25 +0200
-Subject: [PATCH] ulpi: add i.MX25 & 35 internal PHY ID
-In-Reply-To: <4CA9EF97.5040908@compulab.co.il>
-References: <1286195012-18999-1-git-send-email-eric@eukrea.com>
-	<4CA9EAA0.2060608@ru.mvista.com> <4CA9EF97.5040908@compulab.co.il>
-Message-ID: <20101005054225.GK7159@buzzloop.caiaq.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 4 Oct 2010 22:59:37 -0700
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver
+	for S/PDIF PCM audio
+In-Reply-To: <AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
+	<20101004224159.GA4972@opensource.wolfsonmicro.com>
+	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
+	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
+	<20101005044304.GA26509@opensource.wolfsonmicro.com>
+	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+Message-ID: <20101005055937.GA19989@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 04, 2010 at 05:15:35PM +0200, Igor Grinberg wrote:
->  On 10/04/10 16:54, Sergei Shtylyov wrote:
-> > Hello.
-> >
-> > Eric B?nard wrote:
-> >
-> >> without this patch, the initialization of the OTG port in host mode
-> >> fails with :
-> >> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> >> mxc-ehci mxc-ehci.0: initializing i.MX USB Controller
-> >> ULPI transceiver vendor/product ID 0x0000/0x0000
-> >> ULPI ID does not match any known transceiver.
-> >> mxc-ehci mxc-ehci.0: unable to init transceiver, probably missing
-> >
-> >> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> >> ---
-> >>  drivers/usb/otg/ulpi.c |    5 ++++-
-> >>  1 files changed, 4 insertions(+), 1 deletions(-)
-> >
-> >    You should have CC'ed linux-usb at vger.kernel.org.
-> >
-> >> diff --git a/drivers/usb/otg/ulpi.c b/drivers/usb/otg/ulpi.c
-> >> index ccc8195..e802e44 100644
-> >> --- a/drivers/usb/otg/ulpi.c
-> >> +++ b/drivers/usb/otg/ulpi.c
-> >> @@ -34,7 +34,10 @@
-> >>  /* ULPI hardcoded IDs, used for probing */
-> >>  static unsigned int ulpi_ids[] = {
-> >>      ULPI_ID(0x04cc, 0x1504),    /* NXP ISP1504 */
-> >> -    ULPI_ID(0x0424, 0x0006),        /* SMSC USB3319 */
-> >> +    ULPI_ID(0x0424, 0x0006),    /* SMSC USB3319 */
-> >> +#if (defined(CONFIG_ARCH_MX25) || defined(CONFIG_ARCH_MX35))
-> >> +    ULPI_ID(0x0000, 0x0000),    /* i.MX25 & i.MX35 internal PHY */
-> >> +#endif
-> >
-> >    I don't know why this table is at all used in the first place. IMO, checking for the vendor/device ID serves no purpose...
-> 
-> Well, it was there in first place, when Daniel merged this.
-> May be it was taken from Sascha.
-> I think its purpose to check if there is a ulpi transceiver out there,
-> although, ulpi defines a special scratch register for testing purposes.
+On Tue, Oct 05, 2010 at 02:39:00PM +0900, Jassi Brar wrote:
 
-Correct, its primary purpose was to see whether the ULPI low-level
-communication works at all, and to bail out when it doesn't.
+> Yes we can have a kconfig entry for 'Controllable EPLL' but that seems
+> orthogonal to ASoC because, for SMDKs, we choose to produce
+> accurate signals hence need to manipulate EPLL. The only point is
+> where to do it.
 
-I wasn't aware of that scratch register. If we don't need that table any
-more, feel free to drop it.
+Well, there's two approaches the driver can take: one is to change the
+EPLL to deliver the clock rates which allow maximum flexibility, the
+other is to constrain the clock rates offered to applications based on
+the frequencies that can be generated from the current EPLL setup.
 
-Thanks,
-Daniel
+> (our priority is accuracy of each IP's functioning rather than having
+> all parts of
+> SMDK playing nice with each other on such h/w design issues)
+
+That'd be the problem, kind of - it does mean people can get burned when
+they pick up the BSP code and use it as a reference for their systems.
+
+> I hope you noticed that this clock hierarchy is a _very_ board specific thing.
+> We can easily place SoCs' shared stuff in arch/arm/plat-samsung (or similar)
+> Any suggestions, where do we place code shared by SMDK-boards ?
+
+plat-samsung would probably be fine for that also - create a file called
+common-smdk or something.  Some other things have gone for a plat-smdk
+style approach too, though I'm not sure how tasteful I find that
+personally.
