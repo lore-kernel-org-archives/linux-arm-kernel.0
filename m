@@ -1,50 +1,57 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Tue, 05 Oct 2010 22:27:23 +0200
-Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953
-	and	ENGcm09472
-In-Reply-To: <20101005200414.GA11737@pengutronix.de>
-References: <20101005094510.GJ28242@pengutronix.de>
-	<1286280012-19809-1-git-send-email-eric@eukrea.com>
-	<20101005183308.GX11737@pengutronix.de>
-	<4CAB7D0F.9020600@eukrea.com>
-	<20101005194659.GY11737@pengutronix.de>
-	<4CAB83C2.3040301@eukrea.com>
-	<20101005200414.GA11737@pengutronix.de>
-Message-ID: <4CAB8A2B.7020306@eukrea.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 5 Oct 2010 13:42:41 -0700
+Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
+In-Reply-To: <20101005203508.7df590db@lxorguk.ukuu.org.uk>
+References: <4C862EB3.4080006@compulab.co.il>
+	<20100907125335.GD25830@sirena.org.uk>
+	<201009091027.18176.marek.vasut@gmail.com>
+	<20100909094120.GB1988@rakim.wolfsonmicro.main>
+	<4CAACA63.6090202@compulab.co.il>
+	<20101005161608.GD19730@core.coreip.homeip.net>
+	<20101005164037.GA20555@opensource.wolfsonmicro.com>
+	<20101005180703.GD21399@core.coreip.homeip.net>
+	<20101005185942.GA22808@opensource.wolfsonmicro.com>
+	<20101005203508.7df590db@lxorguk.ukuu.org.uk>
+Message-ID: <20101005204241.GB23315@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, Oct 05, 2010 at 08:35:08PM +0100, Alan Cox wrote:
 
-Le 05/10/2010 22:04, Uwe Kleine-K?nig a ?crit :
->> That may seems bad, but I find this solution better than having an oops
->> after a few IRQs which makes the CPU unusable for real life applications
->> :-)
-> Ack, but it makes me think if the caches should be enabled in the irq
-> entry point, too.
+> > If the board doesn't use regulators you can just disable the regulator
+> > API at which point it compiles out into stubs which report success -
+> > this has been the case from day one.  There's only an issue if the board
+> > has a regulator configuration which is partially visible to software.
 
-If I understand well the following link, you are right.
+> Which is quite likely on anything complex and means that hardcoding
+> regulator assumptions is bad.
 
-Adding checks to enable cache at the IRQ entry point will execute 
-aditional code at each interrupt which may have more cost than executing 
-one ISR after WFI without cache (I may be totally wrong here).
+When I say "partially visible" I mean where we can't say what's there -
+we can cope fine with stuff that isn't software controllable.  The issue
+is that we can't automatically discover the system configuration.
 
-More details here (click c7, Cache Operations Register > The Wait For 
-Interrupt operation in the left menu) :
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0211h/I1014942.html
+> I actually see two ways of attacking that, one is that the dummy
+> regulator *and* the compiled in regulator system have a standard
+> regulator value that can be passed which means "report success, move
+> along nothing to see" that could be passed into drivers, the other is to
+> not stick the stuff in drivers.
 
-which says :
+> I suspect the former may be cleaner ?
 
-MCR p15,0,<Rd>,c7,c0,4               ; Wait For Interrupt
+I'm afraid I'm having a hard time parsing what you're saying here (what
+would a "regulator value" be?), but I suspect that you're trying to
+suggest something fairly close to what is already implemented.
 
-This puts the processor into a low-power state and stops it executing 
-following instructions until an interrupt, an imprecise external abort, 
-or a debug request occurs, regardless of whether the interrupts or 
-external imprecise aborts are disabled by the masks in the CPSR. When an 
-interrupt does occur, the MCR instruction completes. If interrupts are 
-enabled, the IRQ or FIQ handler is entered as normal. The return link in 
-r14_irq or r14_fiq contains the address of the MCR instruction plus 8, 
-so that the normal instruction used for interrupt return (SUBS 
-PC,R14,#4) returns to the instruction following the MCR.
+The model the regulator API has is that neither the driver for the
+regulator nor the driver for the consumer should know anything about the
+particular board, with the consumers just requesting the supplies the
+device has.  A separate piece of board-specific configuration code
+provides a table mapping the physical regulators in the system to the
+supplies on the individual chips.  There is an option, currently Kconfig
+only, which causes the regulator API to provide a do-nothing dummy
+regulator if an attempt is made to request a supply that doesn't exist.
+I *think* this dummy regulator corresponds to what you're suggesting
+above but like I say I'm having a hard time parsing it.
 
-Eric
+If the regulator API is compiled out then any attempt to get, enable or
+disable a regulator just unconditionally reports success.
