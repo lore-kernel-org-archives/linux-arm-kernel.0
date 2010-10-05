@@ -1,10 +1,10 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue,  5 Oct 2010 11:06:36 +0900
-Subject: [PATCH 2/4] ARM: S3C: Change VMALLOC_END to use more
+Date: Tue,  5 Oct 2010 11:06:37 +0900
+Subject: [PATCH 3/4] ARM: S5P: Change VMALLOC_END to use more
 	vmalloc()/ioremap() area
 In-Reply-To: <1286244398-9333-1-git-send-email-kgene.kim@samsung.com>
 References: <1286244398-9333-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1286244398-9333-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1286244398-9333-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,15 +15,29 @@ from at 0xE0000000 to 0xFA000000 (the start of Samsung SoCs' VA space)
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-s3c2410/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-s3c24a0/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-s3c64xx/include/mach/vmalloc.h |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-s5p6442/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5p64x0/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5pc100/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5pv210/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s5pv310/include/mach/vmalloc.h |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/vmalloc.h b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
-index 54297eb..4093bc9 100644
---- a/arch/arm/mach-s3c2410/include/mach/vmalloc.h
-+++ b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+diff --git a/arch/arm/mach-s5p6442/include/mach/vmalloc.h b/arch/arm/mach-s5p6442/include/mach/vmalloc.h
+index f5c83f0..a337ba2 100644
+--- a/arch/arm/mach-s5p6442/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5p6442/include/mach/vmalloc.h
+@@ -12,6 +12,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	0xE0000000UL
++#define VMALLOC_END	0xFA000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s5p64x0/include/mach/vmalloc.h b/arch/arm/mach-s5p64x0/include/mach/vmalloc.h
+index 97a9df3..3371d93 100644
+--- a/arch/arm/mach-s5p64x0/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5p64x0/include/mach/vmalloc.h
 @@ -15,6 +15,6 @@
  #ifndef __ASM_ARCH_VMALLOC_H
  #define __ASM_ARCH_VMALLOC_H
@@ -32,10 +46,10 @@ index 54297eb..4093bc9 100644
 +#define VMALLOC_END	0xFA000000UL
  
  #endif /* __ASM_ARCH_VMALLOC_H */
-diff --git a/arch/arm/mach-s3c24a0/include/mach/vmalloc.h b/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
-index 9146568..29d0002 100644
---- a/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
-+++ b/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
+diff --git a/arch/arm/mach-s5pc100/include/mach/vmalloc.h b/arch/arm/mach-s5pc100/include/mach/vmalloc.h
+index be9df79..6218c55 100644
+--- a/arch/arm/mach-s5pc100/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5pc100/include/mach/vmalloc.h
 @@ -12,6 +12,6 @@
  #ifndef __ASM_ARCH_VMALLOC_H
  #define __ASM_ARCH_VMALLOC_H
@@ -44,15 +58,27 @@ index 9146568..29d0002 100644
 +#define VMALLOC_END	0xFA000000UL
  
  #endif /* __ASM_ARCH_VMALLOC_H */
-diff --git a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
-index bc0e913..0df9597 100644
---- a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
-@@ -15,6 +15,6 @@
+diff --git a/arch/arm/mach-s5pv210/include/mach/vmalloc.h b/arch/arm/mach-s5pv210/include/mach/vmalloc.h
+index df9a288..6507a4b 100644
+--- a/arch/arm/mach-s5pv210/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5pv210/include/mach/vmalloc.h
+@@ -17,6 +17,6 @@
  #ifndef __ASM_ARCH_VMALLOC_H
- #define __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H __FILE__
  
--#define VMALLOC_END	0xE0000000UL
+-#define VMALLOC_END	(0xE0000000UL)
++#define VMALLOC_END	0xFA000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s5pv310/include/mach/vmalloc.h b/arch/arm/mach-s5pv310/include/mach/vmalloc.h
+index 256f221..2f10840 100644
+--- a/arch/arm/mach-s5pv310/include/mach/vmalloc.h
++++ b/arch/arm/mach-s5pv310/include/mach/vmalloc.h
+@@ -17,6 +17,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H __FILE__
+ 
+-#define VMALLOC_END	(0xF0000000UL)
 +#define VMALLOC_END	0xFA000000UL
  
  #endif /* __ASM_ARCH_VMALLOC_H */
