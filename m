@@ -1,79 +1,27 @@
 From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Tue,  5 Oct 2010 16:15:21 +0200
-Subject: [PATCHv4 5/6] omap3: Add i2c eeprom driver to read EDID on IGEP v2.
-In-Reply-To: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
-References: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1286288122-16834-6-git-send-email-eballetbo@gmail.com>
+Date: Tue,  5 Oct 2010 16:15:16 +0200
+Subject: [PATCHv4 0/6] omap3: Various fixes and improvements for IGEP v2 board.
+Message-ID: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i2c eeprom driver to access monitor EDID binary information
-from user space, something that is required by 'decode-edid' and
-'parse-edid'.
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   33 ++++++++++++++++++++++++---------
- 1 files changed, 24 insertions(+), 9 deletions(-)
+Hello,
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index ddc740a..aa7b8bd 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -541,7 +541,7 @@ static struct twl4030_platform_data igep2_twldata = {
- 
- };
- 
--static struct i2c_board_info __initdata igep2_i2c_boardinfo[] = {
-+static struct i2c_board_info __initdata igep2_i2c1_boardinfo[] = {
- 	{
- 		I2C_BOARD_INFO("twl4030", 0x48),
- 		.flags		= I2C_CLIENT_WAKE,
-@@ -550,14 +550,29 @@ static struct i2c_board_info __initdata igep2_i2c_boardinfo[] = {
- 	},
- };
- 
--static int __init igep2_i2c_init(void)
-+static struct i2c_board_info __initdata igep2_i2c3_boardinfo[] = {
-+	{
-+		I2C_BOARD_INFO("eeprom", 0x50),
-+	},
-+};
-+
-+static void __init igep2_i2c_init(void)
- {
--	omap_register_i2c_bus(1, 2600, igep2_i2c_boardinfo,
--			ARRAY_SIZE(igep2_i2c_boardinfo));
--	/* Bus 3 is attached to the DVI port where devices like the pico DLP
--	 * projector don't work reliably with 400kHz */
--	omap_register_i2c_bus(3, 100, NULL, 0);
--	return 0;
-+	int ret;
-+
-+	ret = omap_register_i2c_bus(1, 2600, igep2_i2c1_boardinfo,
-+		ARRAY_SIZE(igep2_i2c1_boardinfo));
-+	if (ret)
-+		pr_warning("IGEP2: Could not register I2C1 bus (%d)\n", ret);
-+
-+	/*
-+	 * Bus 3 is attached to the DVI port where devices like the pico DLP
-+	 * projector don't work reliably with 400kHz
-+	 */
-+	ret = omap_register_i2c_bus(3, 100, igep2_i2c3_boardinfo,
-+		ARRAY_SIZE(igep2_i2c3_boardinfo));
-+	if (ret)
-+		pr_warning("IGEP2: Could not register I2C3 bus (%d)\n", ret);
- }
- 
- static struct omap_musb_board_data musb_board_data = {
-@@ -635,7 +650,7 @@ static void __init igep2_init(void)
- 
- 	/* Get IGEP2 hardware revision */
- 	igep2_get_revision();
--
-+	/* Register I2C busses and drivers */
- 	igep2_i2c_init();
- 	platform_add_devices(igep2_devices, ARRAY_SIZE(igep2_devices));
- 	omap_serial_init();
--- 
-1.7.0.4
+This is the version 4 of patch series to fix and improve the IGEP v2 board support.
+
+Thanks for all your comments.
+
+CHANGES
+ - since v3:
+   - [3/6] fix igep2_get_revision function
+   - [3/6] fix typo - Unknow
+   - [5/6] check for return value omap_register_i2c_bus 
+ - since v2:
+   - [1/6] check the result value of gpio_request and gpio_direction_*
+   - [2/6] align the igep2_gpio_leds with tabs.
+   - cc linux-arm-kernel
+
+Kind regards,
+
+ Enric
