@@ -1,34 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Oct 2010 15:52:24 -0700
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <AANLkTimTW6v3N9aRA0h15SWXbBc_W0dhpf5rEeqBqGbf@mail.gmail.com>
-References: <20100907125335.GD25830@sirena.org.uk>
-	<201009091027.18176.marek.vasut@gmail.com>
-	<20100909094120.GB1988@rakim.wolfsonmicro.main>
-	<4CAACA63.6090202@compulab.co.il>
-	<20101005161608.GD19730@core.coreip.homeip.net>
-	<20101005164037.GA20555@opensource.wolfsonmicro.com>
-	<20101005180703.GD21399@core.coreip.homeip.net>
-	<20101005185942.GA22808@opensource.wolfsonmicro.com>
-	<20101005203508.7df590db@lxorguk.ukuu.org.uk>
-	<AANLkTimTW6v3N9aRA0h15SWXbBc_W0dhpf5rEeqBqGbf@mail.gmail.com>
-Message-ID: <20101005225223.GC23315@opensource.wolfsonmicro.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Wed,  6 Oct 2010 01:09:49 +0200
+Subject: [PATCH 0/2] ARM: S3C64XX: SmartQ: add suspend support
+Message-ID: <cover.1286319272.git.mcuelenaere@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 12:09:39AM +0200, Linus Walleij wrote:
+These patches add suspend support to the SmartQ (and other S3C64XX) boards.
 
-> This wrapper function will accept non-existing regulators and
-> not treat them as errors. Consumers will have to NULL-check their
-> regulators.
+Currently the LCD needs re-initializing when waking up, otherwise it'll just
+display a WSOD.
 
-No, this is actively unhelpful.  If consumers can null check their
-regulators then they can just as well do an IS_ERR() check and if we
-just eat null pointers like this then the API doesn't degrade gracefully
-when it can't implement things - for example, your regulator_set_voltage() 
-will report success when it fails to set a voltage which is going to
-upset any consumer that thinks it did actually change the current
-voltage.
+This was tested on a SmartQ 7.
 
-The existing dummy regulator support already does all this in a manner
-which is much less invasive for the core.
+Maurus Cuelenaere (2):
+  ARM: S3C64XX: Add suspend support
+  ARM: S3C64XX: Add wakeup sources to SmartQ boards
+
+ arch/arm/mach-s3c64xx/mach-smartq5.c |    1 +
+ arch/arm/mach-s3c64xx/mach-smartq7.c |    1 +
+ arch/arm/mach-s3c64xx/pm.c           |    3 +++
+ 3 files changed, 5 insertions(+), 0 deletions(-)
+
+-- 
+1.7.2.3
