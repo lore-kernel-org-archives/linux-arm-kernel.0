@@ -1,70 +1,79 @@
-From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
-Date: Tue, 5 Oct 2010 16:28:19 +0200
-Subject: [PATCHv3 1/6] omap3: Add external VBUS power switch and
-	overcurrent detect on IGEP v2 board.
-In-Reply-To: <20101005103516.GC12614@esdhcp036161.research.nokia.com>
-References: <1285967349-32767-1-git-send-email-eballetbo@gmail.com>
-	<1285967349-32767-2-git-send-email-eballetbo@gmail.com>
-	<20101002080427.GC14377@esdhcp036161.research.nokia.com>
-	<AANLkTin0FBudq5saFhcuonrzK2LqU0UueiN_-C=B0N0j@mail.gmail.com>
-	<20101005103516.GC12614@esdhcp036161.research.nokia.com>
-Message-ID: <AANLkTimVsAiqH2Mk3rW6ub5pNjWen9U3xFVvyKBKo4pa@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Tue,  5 Oct 2010 16:15:22 +0200
+Subject: [PATCHv4 6/6] omap3: Remove VMMC2 regulator on IGEP v2.
+In-Reply-To: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
+References: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
+Message-ID: <1286288122-16834-7-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+VMMC2 regulator is configured but it's not used for the IGEP v2, so
+remove this regulator from board.
 
-2010/10/5 David Cohen <david.cohen@nokia.com>:
-> On Sat, Oct 02, 2010 at 12:12:32PM +0200, ext Enric Balletb? i Serra wrote:
->> 2010/10/2 David Cohen <david.cohen@nokia.com>:
->> > Hi,
->> >
->> > On Fri, Oct 01, 2010 at 11:09:04PM +0200, ext Enric Balletbo i Serra wrote:
->> >> GPIO for various devices are missing from the board initialization.
->> >> This patch adds support for the VBUS and over current gpios. ?Without this
->> >> patch, input/outputs from these two sources are ignored.
->> >>
->> >> Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
->> >> ---
->> >> ?arch/arm/mach-omap2/board-igep0020.c | ? 16 ++++++++++++++++
->> >> ?1 files changed, 16 insertions(+), 0 deletions(-)
->> >>
->> >> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
->> >> index 175f043..07dbdb7 100644
->> >> --- a/arch/arm/mach-omap2/board-igep0020.c
->> >> +++ b/arch/arm/mach-omap2/board-igep0020.c
->> >> @@ -274,6 +274,22 @@ static int igep2_twl_gpio_setup(struct device *dev,
->> >> ? ? ? igep2_vmmc1_supply.dev = mmc[0].dev;
->> >> ? ? ? igep2_vmmc2_supply.dev = mmc[1].dev;
->> >>
->> >> + ? ? /*
->> >> + ? ? ?* REVISIT: need ehci-omap hooks for external VBUS
->> >> + ? ? ?* power switch and overcurrent detect
->> >> + ? ? ?*/
->> >> + ? ? if ((gpio_request(gpio + 1, "GPIO_EHCI_NOC") < 0) ||
->> >> + ? ? ? ? (gpio_direction_input(gpio + 1) < 0))
->> >> + ? ? ? ? ? ? pr_err("IGEP2: Could not obtain gpio for EHCI NOC");
->> >
->> > Shouldb't you return error if it can't request the GPIO?
->>
->> I'm not sure what happens if I return and error, I see only prints a
->> debug message. Maybe the twl4030-gpio maintainer can explain if I need
->> return and error or not.
->>
->> Other omap boards just don't check the gpio_request call and always
->> return 0. I don't consider this a critical error so maybe should be
->> better replace the pr_err with a pr_warning.
->
-> I checked some board files and it seems they're not verifying gpio_request()
-> results most of the times. But if you check board-omap3pandor.c, it's
-> been done in a better way.
->
+Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+---
+ arch/arm/mach-omap2/board-igep0020.c |   26 +++-----------------------
+ 1 files changed, 3 insertions(+), 23 deletions(-)
 
-I think so, looks a better way. I'll introduce this in a future patch,
-
-There are many GPIO's in board-igep* so I think should be better
-introduce these changes in a new patch. Thanks for you comments.
-
-Best regards,
-
-  Enric
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index aa7b8bd..2774265 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -260,10 +260,6 @@ static struct regulator_consumer_supply igep2_vmmc1_supply = {
+ 	.supply		= "vmmc",
+ };
+ 
+-static struct regulator_consumer_supply igep2_vmmc2_supply = {
+-	.supply		= "vmmc",
+-};
+-
+ /* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
+ static struct regulator_init_data igep2_vmmc1 = {
+ 	.constraints = {
+@@ -279,21 +275,6 @@ static struct regulator_init_data igep2_vmmc1 = {
+ 	.consumer_supplies      = &igep2_vmmc1_supply,
+ };
+ 
+-/* VMMC2 for OMAP VDD_MMC2 (i/o) and MMC2 WIFI */
+-static struct regulator_init_data igep2_vmmc2 = {
+-	.constraints = {
+-		.min_uV			= 1850000,
+-		.max_uV			= 3150000,
+-		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+-					| REGULATOR_MODE_STANDBY,
+-		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+-					| REGULATOR_CHANGE_MODE
+-					| REGULATOR_CHANGE_STATUS,
+-	},
+-	.num_consumer_supplies  = 1,
+-	.consumer_supplies      = &igep2_vmmc2_supply,
+-};
+-
+ static struct omap2_hsmmc_info mmc[] = {
+ 	{
+ 		.mmc		= 1,
+@@ -390,11 +371,11 @@ static int igep2_twl_gpio_setup(struct device *dev,
+ 	mmc[0].gpio_cd = gpio + 0;
+ 	omap2_hsmmc_init(mmc);
+ 
+-	/* link regulators to MMC adapters ... we "know" the
++	/*
++	 * link regulators to MMC adapters ... we "know" the
+ 	 * regulators will be set up only *after* we return.
+-	*/
++	 */
+ 	igep2_vmmc1_supply.dev = mmc[0].dev;
+-	igep2_vmmc2_supply.dev = mmc[1].dev;
+ 
+ 	/*
+ 	 * REVISIT: need ehci-omap hooks for external VBUS
+@@ -536,7 +517,6 @@ static struct twl4030_platform_data igep2_twldata = {
+ 	.codec		= &igep2_codec_data,
+ 	.gpio		= &igep2_twl4030_gpio_pdata,
+ 	.vmmc1          = &igep2_vmmc1,
+-	.vmmc2		= &igep2_vmmc2,
+ 	.vpll2		= &igep2_vpll2,
+ 
+ };
+-- 
+1.7.0.4
