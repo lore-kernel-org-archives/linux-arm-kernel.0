@@ -1,66 +1,30 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 5 Oct 2010 16:09:47 +0900
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
-	S/PDIF PCM audio
-In-Reply-To: <20101005055937.GA19989@opensource.wolfsonmicro.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
-	<20101004224159.GA4972@opensource.wolfsonmicro.com>
-	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
-	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-	<20101005044304.GA26509@opensource.wolfsonmicro.com>
-	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
-	<20101005055937.GA19989@opensource.wolfsonmicro.com>
-Message-ID: <AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 05 Oct 2010 09:28:28 +0200
+Subject: I.MX35 GPIO IRQ + Preempt -> Oops
+In-Reply-To: <201010051606.24617.marc@cpdesign.com.au>
+References: <4CA739B4.1020506@eukrea.com>
+	<4CA98B8C.4010106@eukrea.com>	<4CA9C384.2070208@eukrea.com>
+	<201010051606.24617.marc@cpdesign.com.au>
+Message-ID: <4CAAD39C.2010103@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 5, 2010 at 2:59 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Oct 05, 2010 at 02:39:00PM +0900, Jassi Brar wrote:
+Hi Marc,
+
+Le 05/10/2010 07:06, Marc Reilly a ?crit :
+> For what it's worth...
 >
->> Yes we can have a kconfig entry for 'Controllable EPLL' but that seems
->> orthogonal to ASoC because, for SMDKs, we choose to produce
->> accurate signals hence need to manipulate EPLL. The only point is
->> where to do it.
+>> Also : same problem with Freescale's BSP (2.6.31 based) and same "fix"
+>> (removing the WFI).
 >
-> Well, there's two approaches the driver can take: one is to change the
-> EPLL to deliver the clock rates which allow maximum flexibility, the
-> other is to constrain the clock rates offered to applications based on
-> the frequencies that can be generated from the current EPLL setup.
-For SMDKs(our reference platform) I would like to change EPLL in order
-to be able to verify accuracy and provide all capabilities of the controllers.
-For a final product, it would make sense to fix the EPLL to one optimal value
-according to the type of h/w and s/w components(ex PA can be configured
-to 48KHz after making sure EPLL can also be used to generate suitable
-clocks for the SPI devices on board)
-
->> (our priority is accuracy of each IP's functioning rather than having
->> all parts of
->> SMDK playing nice with each other on such h/w design issues)
+> My kernel won't even boot up (although I don't usually get a kernel oops, only
+> very occasionally) unless i pass the jtag=on parameter (or nohlt for non
+> freescale kernel). It just freezes.
 >
-> That'd be the problem, kind of - it does mean people can get burned when
-> they pick up the BSP code and use it as a reference for their systems.
-I expect people to replace/modify/inspect board specific code before they
-run the BSP on their systems. IMO reference platforms are not good for
-integrated-testing.
-Meanwhile, we should make sure the SoC specific stuff supports and is
-tested with
-as many configurations as are possible on SMDKs.
-
->> I hope you noticed that this clock hierarchy is a _very_ board specific thing.
->> We can easily place SoCs' shared stuff in arch/arm/plat-samsung (or similar)
->> Any suggestions, where do we place code shared by SMDK-boards ?
+> I think both of those workarounds effectively bypass the cpu_do_idle() call.
 >
-> plat-samsung would probably be fine for that also - create a file called
-> common-smdk or something. ?Some other things have gone for a plat-smdk
-> style approach too, though I'm not sure how tasteful I find that
-> personally.
-Even though I would personally like to have EPLL control for a device
-in machine specific manner as part of its driver, I accept your opinion.
+exactly and it seems the workaround existed in the past in Freescale's 
+kernel ( TLSbo65953 is the errata number for i.MX31 ) :
+http://svn.buglabs.net/svn/!source/9783/bug/trunk/bug-linux-2.6.27.2/arch/arm/mach-mx3/mxc_pm.c#359
 
-Claude, let us create one arch/arm/plat-samsung/smdk.c to do common
-stuff for SMKDs like EPLL control. What do you think ?
-
-
-Thanks.
+Eric
