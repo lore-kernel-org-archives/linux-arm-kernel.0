@@ -1,50 +1,41 @@
-From: jeongbae.seo@samsung.com (Jeongbae Seo)
-Date: Tue, 05 Oct 2010 15:46:51 +0900
-Subject: [PATCH 2/5] ARM: S5PV310: Add HSMMC support into S5PV310 and
-	S5PC210
-In-Reply-To: <012c01cb63b3$b7053a20$250fae60$%szyprowski@samsung.com>
-References: <1284626223-18944-1-git-send-email-jeongbae.seo@samsung.com>
-	<1284626223-18944-3-git-send-email-jeongbae.seo@samsung.com>
-	<012c01cb63b3$b7053a20$250fae60$%szyprowski@samsung.com>
-Message-ID: <001201cb6459$1b3c1360$51b43a20$%seo@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 05 Oct 2010 08:49:07 +0200
+Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
+In-Reply-To: <20100909094120.GB1988@rakim.wolfsonmicro.main>
+References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
+	<4C862EB3.4080006@compulab.co.il>
+	<20100907125335.GD25830@sirena.org.uk>
+	<201009091027.18176.marek.vasut@gmail.com>
+	<20100909094120.GB1988@rakim.wolfsonmicro.main>
+Message-ID: <4CAACA63.6090202@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> Hello,
-> 
-> I'm sorry for a late replay, I've just noticed this patch and have some
-> comments.
-> 
-> On Thursday, September 16, 2010 10:37 AM Jeongbae Seo wrote:
-> 
-> > From: Hyuk Lee <hyuk1.lee@samsung.com>
-> >
-> > This patch adds to use of HSMMC on S5PV310 and S5PC210.
-> > The HSMMC platform data like card detect, data bus width
-> > and capability is configured.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> > ---
-> >  arch/arm/mach-s5pv310/cpu.c                |    7 +++
-> >  arch/arm/mach-s5pv310/mach-smdkc210.c      |   50
-> ++++++++++++++++++++++++
-> >  arch/arm/mach-s5pv310/mach-smdkv310.c      |   50
-> ++++++++++++++++++++++++
-> >  arch/arm/plat-samsung/include/plat/sdhci.h |   57
-> ++++++++++++++++++++++++++++
-> >  4 files changed, 164 insertions(+), 0 deletions(-)
-> 
-> IMHO, changes to arch/arm/mach-s5pv310/{cpu.c, include/plat/sdhci.h}
-> should be separated from changes to board specific changes
-> (arch/arm/mach-s5pv310/mach-smdk*.c), so this patch should be split
-> into 2 separate patches.
+ On 09/09/10 12:41, Mark Brown wrote:
+> On Thu, Sep 09, 2010 at 10:27:17AM +0200, Marek Vasut wrote:
+>> Dne ?t 7. z??? 2010 14:53:35 Mark Brown napsal(a):
+>>> From a regulator API usage point of view a separate implementation of
+>>> the same thing was nacked - there are regulator API facilties for hiding
+>>> missing regulators from drivers when needed to get systems going, unless
+>>> the device genuinely can cope without supplies it should be relying on
+>>> those.
 
-Hi, Marek
+I actually, don't see why ads7846 is strictly relying on the regulator
+and I don't understand, why ads7846 driver has to bail out if the regulator
+is not found? Why shouldn't the driver try to continue?
+I think it should bail out only in case communicating with the device failed.
 
-Okay, I'll make it as two patches.
-Thanks for your comments.
+>> Maybe these platforms should have been fixed prior to applying the patch adding 
+>> regulator goo into ads7846 driver then. What's the way to go now then ?
+> Fix the platforms and use the dummy regulators to keep them going until
+> that happens.  It's trivial to do the hookup in the platforms.
 
-Best Regards
-Jeongbae Seo
+You want each platform, that does not have a special regulated power supply
+for the ads7846, to define a dummy regulator just to cope with that artificial
+dependency of the device driver?
+I think it is a waste and big code duplication in each platform
+that does not have that special regulator.
+
+-- 
+Regards,
+Igor.
