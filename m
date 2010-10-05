@@ -1,89 +1,39 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Mon, 04 Oct 2010 15:43:46 -0700
-Subject: multiple linux-next OMAP3 build errors
-In-Reply-To: <1286231422.2463.316.camel@pasglop>
-References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>	
-	<1286173747.2358.4.camel@tubuntu.research.nokia.com>
-	<1286231422.2463.316.camel@pasglop>
-Message-ID: <4CAA58A2.6060707@kernel.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 5 Oct 2010 10:10:55 +0900
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
+	S/PDIF PCM audio
+In-Reply-To: <20101004224159.GA4972@opensource.wolfsonmicro.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
+	<20101004224159.GA4972@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2010 03:30 PM, Benjamin Herrenschmidt wrote:
-> On Mon, 2010-10-04 at 09:29 +0300, Tomi Valkeinen wrote:
->>>   CC      drivers/video/omap2/vram.o
->>> drivers/video/omap2/vram.c: In function
->> 'omap_vram_reserve_sdram_memblock':
->>> drivers/video/omap2/vram.c:568: error: implicit declaration of
->>> function 'memblock_region_is_memory'
->>
->> Benjamin, your patch "memblock/arm: Use memblock_region_is_memory()
->> for
->> omap fb" in linux-next seems to be broken. I believe the called
->> function
->> should be memblock_is_region_memory, not memblock_region_is_memory?
-> 
-> I suspect either I didn't push my latest version before it got merged or
-> Yinghai didn't pull the right one, since I'm pretty sure I test built
-> it, but in any case, you're probably right :-)
-> 
-> I'm not in control of this patch series at the moment however. Ingo and
-> Yinghai are. Yinghai, care to fix that up ? I'm currently travelling on
-> holidays and won't be able to do much until later next week.
+On Tue, Oct 5, 2010 at 7:42 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Oct 04, 2010 at 09:16:23PM +0900, Seungwhan Youn wrote:
+>
+>> +/* Audio clock settings are belonged to board specific part. Every
+>> + * board can set audio source clock setting which is matched with H/W
+>> + * like this function-'set_audio_clock_heirachy'.
+>> + */
+>> +static int set_audio_clock_heirachy(struct platform_device *pdev)
+>> +{
+>
+> I'd expect this to be with the other clock configuration code under
+> arch/arm, especially as it's involving the EPLL which can have fairly
+> wide usage - it seems better to make sure people working with other,
+> non-audio, bits of the system are aware of the EPLL usage.
 
-Peter or Ingo,
-
-Please replace
-
-commit dbe3039e64b1dd4cf26f782d45b524f85b444ad4
-
-in -tip core/memblock
-
-with following patch, that fixes the typo.
-
-Thanks
-
-Yinghai Lu
-
-[PATCH -v2] memblock/arm: Use memblock_is_region_memory() for omap fb
-    
-Instead of the deprecated memblock_find()
-    
-Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-
-diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
-index 05bf228..441af2b 100644
---- a/arch/arm/plat-omap/fb.c
-+++ b/arch/arm/plat-omap/fb.c
-@@ -173,11 +173,7 @@ static int check_fbmem_region(int region_idx, struct omapfb_mem_region *rg,
- 
- static int valid_sdram(unsigned long addr, unsigned long size)
- {
--	struct memblock_region res;
--
--	res.base = addr;
--	res.size = size;
--	return !memblock_find(&res) && res.base == addr && res.size == size;
-+	return memblock_is_region_memory(addr, size);
- }
- 
- static int reserve_sdram(unsigned long addr, unsigned long size)
-diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
-index 0f2532b..34514a8 100644
---- a/drivers/video/omap2/vram.c
-+++ b/drivers/video/omap2/vram.c
-@@ -554,12 +554,8 @@ void __init omap_vram_reserve_sdram_memblock(void)
- 	size = PAGE_ALIGN(size);
- 
- 	if (paddr) {
--		struct memblock_region res;
--
--		res.base = paddr;
--		res.size = size;
--		if ((paddr & ~PAGE_MASK) || memblock_find(&res) ||
--		    res.base != paddr || res.size != size) {
-+		if ((paddr & ~PAGE_MASK) ||
-+		    !memblock_is_region_memory(paddr, size)) {
- 			pr_err("Illegal SDRAM region for VRAM\n");
- 			return;
- 		}
+Please let me explain on Claude's behalf.
+That is the first option that crossed my mind as well.
+But that would have made us have EPLL manipulation in two places -
+one in arch/arm/mach/board-init and other in ASoC Machine driver because
+we would need to change the source clock's rate in runtime(using
+callback pointers
+for the purpose seemed too over the top).
+If ASoC doesn't change EPLL, it doesn't matter to other devices, if it
+does there
+is currently no means for other drivers to know about it. So, we might just
+as well move the EPLL related code to ASoC machine driver.
