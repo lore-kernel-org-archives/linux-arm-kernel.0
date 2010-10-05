@@ -1,45 +1,64 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 5 Oct 2010 13:06:25 +0900
-Subject: [PATCH 1/4] ARM: SAMSUNG: Move the start address of Samsung SoCs'
-	VA space
-In-Reply-To: <1286244398-9333-2-git-send-email-kgene.kim@samsung.com>
-References: <1286244398-9333-1-git-send-email-kgene.kim@samsung.com>
-	<1286244398-9333-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTikfjiKunxZdWwbUi3cbj-20U=Fb1sO8j+Hcr8iy@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 5 Oct 2010 10:07:52 +0530
+Subject: [PATCH 08/10] OMAP: split plat-omap/common.c
+In-Reply-To: <alpine.DEB.2.00.1010041327040.13816@utopia.booyaka.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101001213532.1408.55832.stgit@twilight.localdomain>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE3C6@dbde02.ent.ti.com>
+	<20101004065624.GD2559@legolas.emea.dhcp.ti.com>
+	<20101004070040.GE2559@legolas.emea.dhcp.ti.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE4D9@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1010041327040.13816@utopia.booyaka.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFEA07@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 5, 2010 at 11:06 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> This patch moves the start address of Samsung SoCs' VA space so that
-> can use more vmalloc()/ioremap() space. Of course need to change the
-> VMALLOC_END for it.
-> Actually Samsung SoCs' VA space (free for platform use area) becomes
-> 80MiB with this patch, it's enough.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Tuesday, October 05, 2010 1:02 AM
+> To: Shilimkar, Santosh
+> Cc: Balbi, Felipe; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH 08/10] OMAP: split plat-omap/common.c
+> 
+> On Mon, 4 Oct 2010, Shilimkar, Santosh wrote:
+> 
+> > > -----Original Message-----
+> > > From: Balbi, Felipe
+> > > Sent: Monday, October 04, 2010 12:31 PM
+> > >
+> > > On Mon, Oct 04, 2010 at 01:56:24AM -0500, Balbi, Felipe wrote:
+> > > >
+> > > >I still have that sitting on my gitorious tree. The patch is attached
+> > > >to this mail. I compile tested (only) for omap3_defconfig, it
+> probably
+> > > >needs to start using pm_runtime functions at some point and probably
+> > > >move to drivers/clocksource instead of arch/arm/plat-omap.
+> > > >
+> > > >patch is also available at [1]
+> > > >
+> > > >[1] git://gitorious.org/usb/usb.git clksource
+> > >
+> > > I made a few changes to make checkpatch.pl --strict happy. Attached
+> > >
+> > Good !!
+> > This patch addresses splitting as well as multi-omap builds and probably
+> > also a better candidate in case we need to convert sync timer to hwmod
+> > driver.
+> >
+> > Paul, what's your take?
+> 
+> It's great that this is getting cleaned up but it's too late for 2.6.37.
+> We stop taking new code after -rc6 comes out so we can try to get all of
+> the changes integrated with each other and fix any bugs.
 >
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
-> ?arch/arm/plat-samsung/include/plat/map-base.h | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/include/plat/map-base.h b/arch/arm/plat-samsung/include/plat/map-base.h
-> index 250be31..86f66be 100644
-> --- a/arch/arm/plat-samsung/include/plat/map-base.h
-> +++ b/arch/arm/plat-samsung/include/plat/map-base.h
-> @@ -14,7 +14,7 @@
-> ?#ifndef __ASM_PLAT_MAP_H
-> ?#define __ASM_PLAT_MAP_H __FILE__
->
-> -/* Fit all our registers in at 0xF4000000 upwards, trying to use as
-> +/* Fit all our registers in at 0xFA000000 upwards, trying to use as
-> ?* little of the VA space as possible so vmalloc and friends have a
-> ?* better chance of getting memory.
-> ?*
-> @@ -22,7 +22,7 @@
-> ?* an single MOVS instruction (ie, only 8 bits of set data)
-> ?*/
->
-> -#define S3C_ADDR_BASE ?(0xF4000000)
-> +#define S3C_ADDR_BASE ?(0xFA000000)
+The patch was lying on the list for quite some time but didn't get much
+attention before.
+ 
+> The best thing for you and Felipe to do is to convert the driver to use
+> hwmod data and pm_runtime and test on more platforms, then post it to the
+> list after 2.6.37 comes out.
+Probably this make sense.  
 
-maybe you could drop the brackets from the address value
+Regards,
+Santosh
