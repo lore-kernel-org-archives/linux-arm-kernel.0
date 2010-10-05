@@ -1,215 +1,58 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 5 Oct 2010 12:22:25 -0700
-Subject: [PATCHv2 1/7] pwm: Add pwm core driver
-In-Reply-To: <1286280002-1636-2-git-send-email-arun.murthy@stericsson.com>
-References: <1286280002-1636-1-git-send-email-arun.murthy@stericsson.com>
-	<1286280002-1636-2-git-send-email-arun.murthy@stericsson.com>
-Message-ID: <20101005122225.6dda30ff.akpm@linux-foundation.org>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 05 Oct 2010 21:31:27 +0200
+Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953
+	and	ENGcm09472
+In-Reply-To: <20101005183308.GX11737@pengutronix.de>
+References: <20101005094510.GJ28242@pengutronix.de>	<1286280012-19809-1-git-send-email-eric@eukrea.com>
+	<20101005183308.GX11737@pengutronix.de>
+Message-ID: <4CAB7D0F.9020600@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Oct 2010 17:29:56 +0530
-Arun Murthy <arun.murthy@stericsson.com> wrote:
+Hi Uwe,
 
-> The existing pwm based led and backlight driver makes use of the
-> pwm(include/linux/pwm.h). So all the board specific pwm drivers will
-> be exposing the same set of function name as in include/linux/pwm.h.
-> Consder a platform with multi Soc or having more than one pwm module, in
-> such a case, there exists more than one pwm driver for a platform. Each
-> of these pwm drivers export the same set of function and hence leads to
-> re-declaration build error.
-> 
-> In order to overcome this issue all the pwm drivers must register to
-> some core pwm driver with function pointers for pwm operations (i.e
-> pwm_config, pwm_enable, pwm_disable).
-> 
-> The clients of pwm device will have to call pwm_request, wherein
-> they will get the pointer to struct pwm_ops. This structure include
-> function pointers for pwm_config, pwm_enable and pwm_disable.
-> 
-
-Have we worked out who will be merging this work, if it gets merged?
-
+Le 05/10/2010 20:33, Uwe Kleine-K?nig a ?crit :
+>> +			/* invalidate I cache */
+>> +			"mov %0, #0\n"
+>> +			"mcr p15, 0, %0, c7, c5, 0\n"
+>> +			/* clear and invalidate D cache */
+>> +			"mov %0, #0\n"
+> mcr doesn't change the value of %0, does it?  Then there's no need to
+> set it to 0 once more.
 >
-> ...
+>> +			"mcr p15, 0, %0, c7, c14, 0\n"
+>> +			/* WFI */
+>> +			"mov %0, #0\n"
+> ditto
 >
-> +struct pwm_dev_info {
-> +	struct pwm_device *pwm_dev;
-> +	struct list_head list;
-> +};
-> +static struct pwm_dev_info *di;
-
-We could just do
-
-	static struct pwm_dev_info {
-		...
-	} *di;
-
-> +DECLARE_RWSEM(pwm_list_lock);
-
-This can/should be static.
-
-> +void __deprecated pwm_free(struct pwm_device *pwm)
-> +{
-> +}
-
-Why are we adding a new function and already deprecating it?
-
-Probably this was already addressed in earlier review, but I'm asking
-again, because there's no comment explaining the reasons.  Lesson
-learned, please add a comment.
-
-Oh, I see that pwm_free() already exists.  This patch adds a new copy
-and doesn't remove the old function.  Does this all actually work?
-
-It still needs a comment explaining why it's deprecated.
-
-> +int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> +{
-> +	if (!pwm->pops)
-> +		-EFAULT;
-> +	return pwm->pops->pwm_config(pwm, duty_ns, period_ns);
-> +}
-> +EXPORT_SYMBOL(pwm_config);
-> +
-> +int pwm_enable(struct pwm_device *pwm)
-> +{
-> +	if (!pwm->pops)
-> +		-EFAULT;
-> +	return pwm->pops->pwm_enable(pwm);
-> +}
-> +EXPORT_SYMBOL(pwm_enable);
-> +
-> +void pwm_disable(struct pwm_device *pwm)
-> +{
-> +	if (!pwm->pops)
-> +		-EFAULT;
-> +	pwm->pops->pwm_disable(pwm);
-> +}
-> +EXPORT_SYMBOL(pwm_disable);
-> +
-> +int pwm_device_register(struct pwm_device *pwm_dev)
-> +{
-> +	struct pwm_dev_info *pwm;
-> +
-> +	down_write(&pwm_list_lock);
-> +	pwm = kzalloc(sizeof(struct pwm_dev_info), GFP_KERNEL);
-> +	if (!pwm) {
-> +		up_write(&pwm_list_lock);
-> +		return -ENOMEM;
-> +	}
-
-The allocation attempt can be moved outside the lock, making the code
-faster, cleaner and shorter.
-
-> +	pwm->pwm_dev = pwm_dev;
-> +	list_add_tail(&pwm->list, &di->list);
-> +	up_write(&pwm_list_lock);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(pwm_device_register);
-> +
-> +int pwm_device_unregister(struct pwm_device *pwm_dev)
-> +{
-> +	struct pwm_dev_info *tmp;
-> +	struct list_head *pos, *tmp_lst;
-> +
-> +	down_write(&pwm_list_lock);
-> +	list_for_each_safe(pos, tmp_lst, &di->list) {
-> +		tmp = list_entry(pos, struct pwm_dev_info, list);
-> +		if (tmp->pwm_dev == pwm_dev) {
-> +			list_del(pos);
-> +			kfree(tmp);
-> +			up_write(&pwm_list_lock);
-> +			return 0;
-> +		}
-> +	}
-> +	up_write(&pwm_list_lock);
-> +	return -ENOENT;
-> +}
-> +EXPORT_SYMBOL(pwm_device_unregister);
-> +
-> +struct pwm_device *pwm_request(int pwm_id, const char *name)
-> +{
-> +	struct pwm_dev_info *pwm;
-> +	struct list_head *pos;
-> +
-> +	down_read(&pwm_list_lock);
-> +	list_for_each(pos, &di->list) {
-> +		pwm = list_entry(pos, struct pwm_dev_info, list);
-> +		if ((!strcmp(pwm->pwm_dev->pops->name, name)) &&
-> +				(pwm->pwm_dev->pwm_id == pwm_id)) {
-> +			up_read(&pwm_list_lock);
-> +			return pwm->pwm_dev;
-> +		}
-> +	}
-> +	up_read(&pwm_list_lock);
-> +	return ERR_PTR(-ENOENT);
-> +}
-> +EXPORT_SYMBOL(pwm_request);
-
-We have a new kernel-wide exported-to-modules formal API.  We prefer
-that such things be fully documented, please.  kerneldoc is a suitable
-way but please avoid falling into the kerneldoc trap of filling out
-fields with obvious boilerplate and not actually telling people
-anything interesting or useful.
-
-> +static int __init pwm_init(void)
-> +{
-> +	struct pwm_dev_info *pwm;
-> +
-> +	pwm = kzalloc(sizeof(struct pwm_dev_info), GFP_KERNEL);
-> +	if (!pwm)
-> +		return -ENOMEM;
-> +	INIT_LIST_HEAD(&pwm->list);
-> +	di = pwm;
-> +	return 0;
-> +}
-
-OK, this looks wrong.
-
-AFACIT you've created a dummy pwm_dev_info as a singleton, kernel-wide
-anchor for a list of all pwm_dev_info's.  So this "anchor" pwm_dev_info
-never actually gets used for anything.
-
-The way to do this is to remove `di' altogether and instead use a
-singleton, kernel-wide list_head as the anchor for all the
-dynamically-allocated pwm_dev_info's.
-
-> +subsys_initcall(pwm_init);
-> +
-> +static void __exit pwm_exit(void)
-> +{
-> +	kfree(di);
-> +}
-> +
-> +module_exit(pwm_exit);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Arun R Murthy");
-> +MODULE_ALIAS("core:pwm");
-> +MODULE_DESCRIPTION("Core pwm driver");
-> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-> index 7c77575..6e7da1f 100644
-> --- a/include/linux/pwm.h
-> +++ b/include/linux/pwm.h
-> @@ -3,6 +3,13 @@
->  
->  struct pwm_device;
->  
-> +struct pwm_ops {
-> +	int (*pwm_config)(struct pwm_device *pwm, int duty_ns, int period_ns);
-> +	int (*pwm_enable)(struct pwm_device *pwm);
-> +	int (*pwm_disable)(struct pwm_device *pwm);
-> +	char *name;
-> +};
-
-This also should be documented.
-
+>> +			"mcr p15, 0, %0, c7, c0, 4\n"
+>> +			"nop\n" "nop\n" "nop\n" "nop\n"
+>> +			"nop\n" "nop\n" "nop\n"
+>> +			/* enable I and D cache */
+>> +			"mrc p15, 0, %0, c1, c0, 0\n"
+> If you spend two registers there is no need to reread this register.
 >
-> ...
+>> +			"orr %0, %0, #0x00001000\n"
+>> +			"orr %0, %0, #0x00000004\n"
+>> +			"mcr p15, 0, %0, c1, c0, 0\n"
+>> +			:: "r" (reg));
+> ... and the s/:: "/: "=/ as I suggested earlier.
 >
+well, this code comes from Freescale and if everything was perfect it 
+wouldn't be necessary as this is an errata fix so I'm not sure this can 
+be considered as a code to optimize.
 
-I suggest that you work on Kevin's comments before making any code
-changes though.
+Moreover it follows exactly what is suggested in the workaround 
+described on page 8 of this PDF : 
+http://cache.freescale.com/files/32bit/doc/errata/MCIMX31CE.pdf so I'm 
+not sure we should modify it.
+
+The other function they sent me had even more duplicated lines than this 
+one so it's difficult to know what is necessary and what isn't.
+
+I can test it with your suggestions but the extra mov & mrc may be there 
+to add instructions cycle between each mcr to be sure the workaround 
+does its job.
+
+Best regards,
+Eric
