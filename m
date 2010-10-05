@@ -1,86 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 5 Oct 2010 11:45:10 +0200
-Subject: [PATCH/RFC] i.MX31 and i.MX35 : fix errate TLSbo65953 and
-	ENGcm09472
-In-Reply-To: <1286270739-18270-1-git-send-email-eric@eukrea.com>
-References: <4CAAD39C.2010103@eukrea.com>
-	<1286270739-18270-1-git-send-email-eric@eukrea.com>
-Message-ID: <20101005094510.GJ28242@pengutronix.de>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 5 Oct 2010 15:25:05 +0530
+Subject: [PATCH v5 0/3] OMAP2/3: DMA: FIFO drain errata fixes
+In-Reply-To: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
+References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DB9FE819@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On Tue, Oct 05, 2010 at 11:25:39AM +0200, Eric B?nard wrote:
-> Without this exiting WFI can result in cache corruption.
-> Code taken from Freescale's 2.6.27 BSP and tested on i.MX35
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  arch/arm/plat-mxc/include/mach/system.h |   26 ++++++++++++++++++++++++--
->  1 files changed, 24 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
-> index 4acd114..1661b29 100644
-> --- a/arch/arm/plat-mxc/include/mach/system.h
-> +++ b/arch/arm/plat-mxc/include/mach/system.h
-> @@ -1,7 +1,7 @@
->  /*
->   *  Copyright (C) 1999 ARM Limited
->   *  Copyright (C) 2000 Deep Blue Solutions Ltd
-> - *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -22,14 +22,36 @@
->  
->  static inline void arch_idle(void)
->  {
-> +#if (defined (CONFIG_ARCH_MX35) || defined (CONFIG_ARCH_MX31))
 
-Please use cpu_is_mx31() || cpu_is_mx35() instead.
-
-> +	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
-> +	unsigned long reg = 0;
-> +	__asm__ __volatile__(
-> +		"mrc p15, 0, %0, c1, c0, 0\n"
-> +		"bic %0, %0, #0x00001000\n"
-> +		"bic %0, %0, #0x00000004\n"
-> +		"mcr p15, 0, %0, c1, c0, 0\n"
-> +		"mov %0, #0\n"
-> +		"mcr p15, 0, %0, c7, c5, 0\n"
-> +		"mov %0, #0\n"
-> +		"mcr p15, 0, %0, c7, c14, 0\n"
-> +		"mov %0, #0\n"
-> +		"mcr p15, 0, %0, c7, c0, 4\n"
-> +		"nop\n" "nop\n" "nop\n" "nop\n"
-> +		"nop\n" "nop\n" "nop\n"
-> +		"mrc p15, 0, %0, c1, c0, 0\n"
-> +		"orr %0, %0, #0x00001000\n"
-> +		"orr %0, %0, #0x00000004\n"
-> +		"mcr p15, 0, %0, c1, c0, 0\n"
-> +		:: "r" (reg));
-> +#else
->  #ifdef CONFIG_ARCH_MXC91231
->  	if (cpu_is_mxc91231()) {
->  		/* Need this to set DSM low-power mode */
->  		mxc91231_prepare_idle();
->  	}
->  #endif
-> -
->  	cpu_do_idle();
-> +#endif
->  }
->  
->  void arch_reset(char mode, const char *cmd);
-> -- 
-> 1.7.0.4
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Peter Ujfalusi
+> Sent: Tuesday, October 05, 2010 12:16 PM
+> To: Tony Lindgren
+> Cc: linux-omap at vger.kernel.org; Jarkko Nikula; 
+> linux-arm-kernel at lists.infradead.org; Russell King
+> Subject: [PATCH v5 0/3] OMAP2/3: DMA: FIFO drain errata fixes
 > 
+> Hello,
 > 
+> This v5 series is based on the v3.
+> The first two patch is the actual fix for the original 
+> problems without any major change in the code (only handling 
+> the corresponding erratas in the legacy way).
+> The third patch in the series is optional, and it is 
+> implementing (in one patch) the errata handling via flags. 
+> This patch converts all errata cases to use the introduced 
+> dma_errata variable via macros.
+> 
+> Tony: the first two patch need to go for 2.6.36, and if it is 
+> possible it shall be backported to .33, .34, and .35 as well.
+> The final patch in this series is optional, if you feel like 
+> you can take it 
+NAK
+>(or drop it). 
+ACK
+>AFAIK the upcoming hwmod 
+> changes to dma code will also have similar feature to handle 
+> the erratas.
+> I'm not sure what is the schedule for the hwmod conversion of dma...
+v2 version of dma hwmod patches already exists in LOML which is 
+already covering errata handling feature. I can rebase 1/3 and 2/3 
+patches into dma hwmod errata handling.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+v3 dma hwmod version will be posted soon once these fixes are rebased
+and tested on all applicable omap's.
+
+IOW, the errata handling feature comes along with all applicable erratas
+ported with dma v3 hwmod series instead of having your patch 3/3 which is 
+partially implemented.
+
+-Manjunath
