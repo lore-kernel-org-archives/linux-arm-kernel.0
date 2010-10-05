@@ -1,237 +1,66 @@
-From: jeongbae.seo@samsung.com (Jeongbae Seo)
-Date: Tue, 05 Oct 2010 15:58:26 +0900
-Subject: [PATCH 1/5] ARM: S5PV310: Add HSMMC support and SDHCI
-	configuration
-In-Reply-To: <012d01cb63b3$d26bb140$774313c0$%szyprowski@samsung.com>
-References: <1284626223-18944-1-git-send-email-jeongbae.seo@samsung.com>
-	<1284626223-18944-2-git-send-email-jeongbae.seo@samsung.com>
-	<012d01cb63b3$d26bb140$774313c0$%szyprowski@samsung.com>
-Message-ID: <001301cb645a$ba594d40$2f0be7c0$%seo@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 5 Oct 2010 16:09:47 +0900
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
+	S/PDIF PCM audio
+In-Reply-To: <20101005055937.GA19989@opensource.wolfsonmicro.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
+	<20101004224159.GA4972@opensource.wolfsonmicro.com>
+	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
+	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
+	<20101005044304.GA26509@opensource.wolfsonmicro.com>
+	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+	<20101005055937.GA19989@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> Hello,
-> 
-> On Thursday, September 16, 2010 10:37 AM Jeongbae Seo wrote:
-> 
-> > From: Hyuk Lee <hyuk1.lee@samsung.com>
-> >
-> > This patch adds to support HSMMC for S5PV310 and S5PC210 and setup for
-> > HSMMC host controller and also related GPIO.
-> > At most 4 channel can be used at the same time.
-> > A user can configure SDHCI data bus as 8bit or 4bit.
-> >
-> > Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> > Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> > ---
-> >  arch/arm/mach-s5pv310/Kconfig            |   39 ++++++++
-> >  arch/arm/mach-s5pv310/Makefile           |    2 +
-> >  arch/arm/mach-s5pv310/setup-sdhci-gpio.c |  156
-> ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-s5pv310/setup-sdhci.c      |   69 +++++++++++++
-> >  4 files changed, 266 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-> >  create mode 100644 arch/arm/mach-s5pv310/setup-sdhci.c
-> >
-> 
-> <snip>
-> 
-> > diff --git a/arch/arm/mach-s5pv310/setup-sdhci-gpio.c b/arch/arm/mach-
-> s5pv310/setup-sdhci-gpio.c
-> > new file mode 100644
-> > index 0000000..8db8c81
-> > --- /dev/null
-> > +++ b/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-> > @@ -0,0 +1,156 @@
-> > +/* linux/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-> > + *
-> > + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com/
-> > + *
-> > + * S5PV310 - Helper functions for setting up SDHCI device(s) GPIO
-> (HSMMC)
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > +*/
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/types.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/io.h>
-> > +#include <linux/gpio.h>
-> > +#include <linux/mmc/host.h>
-> > +#include <linux/mmc/card.h>
-> > +
-> > +#include <plat/gpio-cfg.h>
-> > +#include <plat/regs-sdhci.h>
-> > +#include <plat/sdhci.h>
-> > +
-> > +void s5pv310_setup_sdhci0_cfg_gpio(struct platform_device *dev, int
-> width)
-> > +{
-> > +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> > +	unsigned int gpio;
-> > +
-> > +	/* Set all the necessary GPK0[0:1] pins to special-function 2 */
-> > +	for (gpio = S5PV310_GPK0(0); gpio < S5PV310_GPK0(2); gpio++) {
-> > +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> > +	}
-> > +
-> > +	switch (width) {
-> > +	case 8:
-> > +		for (gpio = S5PV310_GPK1(3); gpio <= S5PV310_GPK1(6);
-gpio++)
-> {
-> > +			/* Data pin GPK1[3:6] to special-funtion 3 */
-> > +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-> > +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> > +
-> > +			/* Setup Drive Strength */
-> > +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> > +		}
-> > +	case 4:
-> > +		for (gpio = S5PV310_GPK0(3); gpio <= S5PV310_GPK0(6);
-gpio++)
-> {
-> > +			/* Data pin GPK0[3:6] to special-funtion 2 */
-> > +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> > +
-> > +			/* Setup Drive Strength */
-> > +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> > +		}
-> > +	default:
-> > +		break;
-> > +	}
-> > +
-> > +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> > +		s3c_gpio_cfgpin(S5PV310_GPK0(2), S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(S5PV310_GPK0(2), S3C_GPIO_PULL_UP);
-> > +	}
-> > +}
-> > +
-> > +void s5pv310_setup_sdhci1_cfg_gpio(struct platform_device *dev, int
-> width)
-> > +{
-> > +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> > +	unsigned int gpio;
-> > +
-> > +	/* Set all the necessary GPK1[0:1] pins to special-function 2 */
-> > +	for (gpio = S5PV310_GPK1(0); gpio < S5PV310_GPK1(2); gpio++) {
-> > +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> > +	}
-> > +
-> > +	for (gpio = S5PV310_GPK1(3); gpio <= S5PV310_GPK1(6); gpio++) {
-> > +		/* Data pin GPK1[3:6] to special-function 2 */
-> > +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> > +
-> > +		/* Setup Drive Strength */
-> > +		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> > +	}
-> > +
-> > +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> > +		s3c_gpio_cfgpin(S5PV310_GPK1(2), S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(S5PV310_GPK1(2), S3C_GPIO_PULL_UP);
-> > +	}
-> > +}
-> > +
-> > +void s5pv310_setup_sdhci2_cfg_gpio(struct platform_device *dev, int
-> width)
-> > +{
-> > +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> > +	unsigned int gpio;
-> > +
-> > +	/* Set all the necessary GPK2[0:1] pins to special-function 2 */
-> > +	for (gpio = S5PV310_GPK2(0); gpio < S5PV310_GPK2(2); gpio++) {
-> > +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> 
-> Lack of "s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4)" here causes
-> problems with
-> Universal C210 and external SD-card. IMHO driver strength should be set
-> for all MMC
-> pins, not only for data pins like below (and do this for all MMC blocks of
-> course).
+On Tue, Oct 5, 2010 at 2:59 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Oct 05, 2010 at 02:39:00PM +0900, Jassi Brar wrote:
+>
+>> Yes we can have a kconfig entry for 'Controllable EPLL' but that seems
+>> orthogonal to ASoC because, for SMDKs, we choose to produce
+>> accurate signals hence need to manipulate EPLL. The only point is
+>> where to do it.
+>
+> Well, there's two approaches the driver can take: one is to change the
+> EPLL to deliver the clock rates which allow maximum flexibility, the
+> other is to constrain the clock rates offered to applications based on
+> the frequencies that can be generated from the current EPLL setup.
+For SMDKs(our reference platform) I would like to change EPLL in order
+to be able to verify accuracy and provide all capabilities of the controllers.
+For a final product, it would make sense to fix the EPLL to one optimal value
+according to the type of h/w and s/w components(ex PA can be configured
+to 48KHz after making sure EPLL can also be used to generate suitable
+clocks for the SPI devices on board)
 
-Okay, if a problem can be occurred owing to the lack of driver strength,
-we'd better set all MMC with driver strength. I will re-make it and thanks
-for your comment.
+>> (our priority is accuracy of each IP's functioning rather than having
+>> all parts of
+>> SMDK playing nice with each other on such h/w design issues)
+>
+> That'd be the problem, kind of - it does mean people can get burned when
+> they pick up the BSP code and use it as a reference for their systems.
+I expect people to replace/modify/inspect board specific code before they
+run the BSP on their systems. IMO reference platforms are not good for
+integrated-testing.
+Meanwhile, we should make sure the SoC specific stuff supports and is
+tested with
+as many configurations as are possible on SMDKs.
 
-Best Regards
-Jeongbae Seo
+>> I hope you noticed that this clock hierarchy is a _very_ board specific thing.
+>> We can easily place SoCs' shared stuff in arch/arm/plat-samsung (or similar)
+>> Any suggestions, where do we place code shared by SMDK-boards ?
+>
+> plat-samsung would probably be fine for that also - create a file called
+> common-smdk or something. ?Some other things have gone for a plat-smdk
+> style approach too, though I'm not sure how tasteful I find that
+> personally.
+Even though I would personally like to have EPLL control for a device
+in machine specific manner as part of its driver, I accept your opinion.
 
-> > +	}
-> > +
-> > +	switch (width) {
-> > +	case 8:
-> > +		for (gpio = S5PV310_GPK3(3); gpio <= S5PV310_GPK3(6);
-gpio++)
-> {
-> > +			/* Data pin GPK3[3:6] to special-function 3 */
-> > +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-> > +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> > +
-> > +			/* Setup Drive Strength */
-> > +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> > +		}
-> > +	case 4:
-> > +		for (gpio = S5PV310_GPK2(3); gpio <= S5PV310_GPK2(6);
-gpio++)
-> {
-> > +			/* Data pin GPK2[3:6] to special-function 2 */
-> > +			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> > +
-> > +			/* Setup Drive Strength */
-> > +			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> > +		}
-> > +	default:
-> > +		break;
-> > +	}
-> > +
-> > +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> > +		s3c_gpio_cfgpin(S5PV310_GPK2(2), S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(S5PV310_GPK2(2), S3C_GPIO_PULL_UP);
-> > +	}
-> > +}
-> > +
-> > +void s5pv310_setup_sdhci3_cfg_gpio(struct platform_device *dev, int
-> width)
-> > +{
-> > +	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-> > +	unsigned int gpio;
-> > +
-> > +	/* Set all the necessary GPK3[0:1] pins to special-function 2 */
-> > +	for (gpio = S5PV310_GPK3(0); gpio < S5PV310_GPK3(2); gpio++) {
-> > +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-> > +	}
-> > +
-> > +	for (gpio = S5PV310_GPK3(3); gpio <= S5PV310_GPK3(6); gpio++) {
-> > +		/* Data pin GPK3[3:6] to special-function 2 */
-> > +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-> > +
-> > +		/* Setup Drive Strength */
-> > +		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-> > +	}
-> > +
-> > +	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-> > +		s3c_gpio_cfgpin(S5PV310_GPK3(2), S3C_GPIO_SFN(2));
-> > +		s3c_gpio_setpull(S5PV310_GPK3(2), S3C_GPIO_PULL_UP);
-> > +	}
-> > +}
-> 
-> <snip>
-> 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
+Claude, let us create one arch/arm/plat-samsung/smdk.c to do common
+stuff for SMKDs like EPLL control. What do you think ?
+
+
+Thanks.
