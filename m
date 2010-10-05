@@ -1,44 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 5 Oct 2010 09:40:38 -0700
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <20101005161608.GD19730@core.coreip.homeip.net>
-References: <1280560182-7071-1-git-send-email-marek.vasut@gmail.com>
-	<4C862EB3.4080006@compulab.co.il>
-	<20100907125335.GD25830@sirena.org.uk>
-	<201009091027.18176.marek.vasut@gmail.com>
-	<20100909094120.GB1988@rakim.wolfsonmicro.main>
-	<4CAACA63.6090202@compulab.co.il>
-	<20101005161608.GD19730@core.coreip.homeip.net>
-Message-ID: <20101005164037.GA20555@opensource.wolfsonmicro.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 05 Oct 2010 18:48:35 +0200
+Subject: [PATCH/RFC] i.MX31 and i.MX35 : fix errate TLSbo65953
+	and	ENGcm09472
+In-Reply-To: <20101005162920.GT11737@pengutronix.de>
+References: <4CAAD39C.2010103@eukrea.com>	<1286270739-18270-1-git-send-email-eric@eukrea.com>
+	<20101005162920.GT11737@pengutronix.de>
+Message-ID: <4CAB56E3.8000402@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 05, 2010 at 09:16:08AM -0700, Dmitry Torokhov wrote:
-> On Tue, Oct 05, 2010 at 08:49:07AM +0200, Igor Grinberg wrote:
+Hi Uwe,
 
-> > You want each platform, that does not have a special regulated power supply
-> > for the ads7846, to define a dummy regulator just to cope with that artificial
-> > dependency of the device driver?
-> > I think it is a waste and big code duplication in each platform
-> > that does not have that special regulator.
+Le 05/10/2010 18:29, Uwe Kleine-K?nig a ?crit :
+> No.  When we start to have multi-soc support for imx and a kernel for
+> both mx35 and mxc91231 is compiled mxc91231_prepare_idle isn't called
+> anymore for mxc91231.  Ah, and cpu_do_idle isn't called anymore at all.
+>
+isn't that patch better ?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/027983.html
 
-It's a pretty good fit for most current systems - with current hardware
-you will normally have some software control for the vast majority of
-the regulators on the board if you have regulator control at all since
-that's the way PMICs have gone.  Having a complete map of the regulator
-usage in the system is useful since it allows us to do optimisations
-like powering down idle regulators much more readily.
-
-> I tend to agree, however I think that original patch that simply ignored
-> failures from regulator_get() is not the best option either. Can we have
-> a flag in platform data indicating that the board does not employ a
-> regulator? Then we could retain the hard failure in cases when we expect
-> regulator to be present while allowing to continue on boards that do not
-> have it.
-
-I really don't think it's a good idea to add this code to every single
-regulator using driver - this seems like an enormous waste of time and
-code complexity cost.  I have suggested several times that we should
-extend the dummy regulator mode so that boards can enable it from code
-as well as users enable it from Kconfig, I'm not sure why everyone is so
-keen on bodging this in drivers.
+Eric
