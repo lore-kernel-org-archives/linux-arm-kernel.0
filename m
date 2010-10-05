@@ -1,78 +1,71 @@
-From: arun.murthy@stericsson.com (Arun Murthy)
-Date: Tue, 5 Oct 2010 17:29:55 +0530
-Subject: [PATCHv2 0/7] PWM core driver for pwm based led and backlight driver
-Message-ID: <1286280002-1636-1-git-send-email-arun.murthy@stericsson.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Tue,  5 Oct 2010 14:00:12 +0200
+Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953 and ENGcm09472
+In-Reply-To: <20101005094510.GJ28242@pengutronix.de>
+References: <20101005094510.GJ28242@pengutronix.de>
+Message-ID: <1286280012-19809-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM core driver for pwm based led and backlight driver.
-The intention of the pwm core driver is not to break the build if two or more
-pwm drivers are enabled.
-Align the existing pwm drivers to make use of the pwm core driver
+Without this exiting WFI can result in cache corruption.
+Code taken from Freescale's 2.6.27 BSP and tested on i.MX35
 
-Arun Murthy (7):
-  pwm: Add pwm core driver
-  backlight:pwm: add an element 'name' to platform data
-  leds: pwm: add a new element 'name' to platform data
-  pwm: Align existing pwm drivers with pwm-core driver
-  platform: Update the pwm based led and backlight platform data
-  pwm: move existing pwm driver to drivers/pwm
-  pwm: Modify backlight and led Kconfig aligning to pwm core
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+v2 : use cpu_ismx3x() and add comments.
 
- arch/arm/mach-pxa/cm-x300.c               |    1 +
- arch/arm/mach-pxa/colibri-pxa270-income.c |    1 +
- arch/arm/mach-pxa/ezx.c                   |    1 +
- arch/arm/mach-pxa/hx4700.c                |    1 +
- arch/arm/mach-pxa/lpd270.c                |    1 +
- arch/arm/mach-pxa/magician.c              |    1 +
- arch/arm/mach-pxa/mainstone.c             |    1 +
- arch/arm/mach-pxa/mioa701.c               |    1 +
- arch/arm/mach-pxa/palm27x.c               |    1 +
- arch/arm/mach-pxa/palmtc.c                |    1 +
- arch/arm/mach-pxa/palmte2.c               |    1 +
- arch/arm/mach-pxa/pcm990-baseboard.c      |    1 +
- arch/arm/mach-pxa/raumfeld.c              |    1 +
- arch/arm/mach-pxa/tavorevb.c              |    2 +
- arch/arm/mach-pxa/viper.c                 |    1 +
- arch/arm/mach-pxa/z2.c                    |    2 +
- arch/arm/mach-pxa/zylonite.c              |    1 +
- arch/arm/mach-s3c2410/mach-h1940.c        |    1 +
- arch/arm/mach-s3c2440/mach-rx1950.c       |    1 +
- arch/arm/mach-s3c64xx/mach-hmt.c          |    1 +
- arch/arm/mach-s3c64xx/mach-smartq.c       |    1 +
- arch/arm/plat-mxc/pwm.c                   |  166 +++++++++------------
- arch/arm/plat-pxa/pwm.c                   |  210 ++++++++++++--------------
- arch/arm/plat-samsung/pwm.c               |  235 +++++++++++++----------------
- arch/mips/jz4740/pwm.c                    |    2 +-
- drivers/Kconfig                           |    2 +
- drivers/Makefile                          |    1 +
- drivers/leds/Kconfig                      |    2 +-
- drivers/leds/leds-pwm.c                   |    4 +-
- drivers/mfd/Kconfig                       |    9 -
- drivers/mfd/Makefile                      |    1 -
- drivers/mfd/twl-core.c                    |   13 ++
- drivers/mfd/twl6030-pwm.c                 |  163 --------------------
- drivers/misc/Kconfig                      |    9 -
- drivers/misc/Makefile                     |    1 -
- drivers/misc/ab8500-pwm.c                 |  168 --------------------
- drivers/pwm/Kconfig                       |   35 +++++
- drivers/pwm/Makefile                      |    4 +
- drivers/pwm/pwm-ab8500.c                  |  157 +++++++++++++++++++
- drivers/pwm/pwm-core.c                    |  130 ++++++++++++++++
- drivers/pwm/pwm-twl6040.c                 |  196 ++++++++++++++++++++++++
- drivers/video/backlight/Kconfig           |    2 +-
- drivers/video/backlight/pwm_bl.c          |    4 +-
- include/linux/leds_pwm.h                  |    3 +-
- include/linux/pwm.h                       |   31 ++++-
- include/linux/pwm_backlight.h             |    1 +
- 46 files changed, 876 insertions(+), 696 deletions(-)
- delete mode 100644 drivers/mfd/twl6030-pwm.c
- delete mode 100644 drivers/misc/ab8500-pwm.c
- create mode 100644 drivers/pwm/Kconfig
- create mode 100644 drivers/pwm/Makefile
- create mode 100644 drivers/pwm/pwm-ab8500.c
- create mode 100644 drivers/pwm/pwm-core.c
- create mode 100644 drivers/pwm/pwm-twl6040.c
+ arch/arm/plat-mxc/include/mach/system.h |   32 ++++++++++++++++++++++++++++--
+ 1 files changed, 29 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
+index 4acd114..70e66d3 100644
+--- a/arch/arm/plat-mxc/include/mach/system.h
++++ b/arch/arm/plat-mxc/include/mach/system.h
+@@ -1,7 +1,7 @@
+ /*
+  *  Copyright (C) 1999 ARM Limited
+  *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -28,8 +28,34 @@ static inline void arch_idle(void)
+ 		mxc91231_prepare_idle();
+ 	}
+ #endif
+-
+-	cpu_do_idle();
++	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
++	if (cpu_is_mx31() || cpu_is_mx35()) {
++		unsigned long reg = 0;
++		__asm__ __volatile__(
++			/* disable I and D cache */
++			"mrc p15, 0, %0, c1, c0, 0\n"
++			"bic %0, %0, #0x00001000\n"
++			"bic %0, %0, #0x00000004\n"
++			"mcr p15, 0, %0, c1, c0, 0\n"
++			/* invalidate I cache */
++			"mov %0, #0\n"
++			"mcr p15, 0, %0, c7, c5, 0\n"
++			/* clear and invalidate D cache */
++			"mov %0, #0\n"
++			"mcr p15, 0, %0, c7, c14, 0\n"
++			/* WFI */
++			"mov %0, #0\n"
++			"mcr p15, 0, %0, c7, c0, 4\n"
++			"nop\n" "nop\n" "nop\n" "nop\n"
++			"nop\n" "nop\n" "nop\n"
++			/* enable I and D cache */
++			"mrc p15, 0, %0, c1, c0, 0\n"
++			"orr %0, %0, #0x00001000\n"
++			"orr %0, %0, #0x00000004\n"
++			"mcr p15, 0, %0, c1, c0, 0\n"
++			:: "r" (reg));
++	} else
++		cpu_do_idle();
+ }
+ 
+ void arch_reset(char mode, const char *cmd);
 -- 
-1.7.2.dirty
+1.7.0.4
