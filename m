@@ -1,226 +1,167 @@
 From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Tue,  5 Oct 2010 16:15:18 +0200
-Subject: [PATCHv4 2/6] omap3: fix and improve the LED handling on IGEP v2
-	board.
+Date: Tue,  5 Oct 2010 16:15:20 +0200
+Subject: [PATCHv4 4/6] omap3: Fix handling some GPIO's for WLAN-BT combo on
+	IGEP v2.
 In-Reply-To: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
 References: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1286288122-16834-3-git-send-email-eballetbo@gmail.com>
+Message-ID: <1286288122-16834-5-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IGEP v2 board has four leds, this patch allows control all
-of these LEDs using the LED class if CONFIG_LEDS_GPIO is selected
-or using the General Purpose Input/Output (GPIO) interface if
-CONFIG_LEDS_GPIO is not selected.
+Some GPIO's used by WLAN-BT combo on IGEP v2 depends on hardware
+revision. This patch handles these GPIO's.
+
+  ----------------------------------------------------------
+ |       Hw Rev.       | WIFI_NPD | WIFI_NRESET | BT_NRESET |
+  ----------------------------------------------------------
+ |  B                  | gpio94  |   gpio95    |     -      |
+ |  B/C (B-compatible) | gpio94  |   gpio95    |  gpio137   |
+ |  C                  | gpio138 |   gpio139   |  gpio137   |
+  ----------------------------------------------------------
 
 Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 ---
- arch/arm/mach-omap2/board-igep0020.c |  156 +++++++++++++++++++---------------
- 1 files changed, 87 insertions(+), 69 deletions(-)
+ arch/arm/mach-omap2/board-igep0020.c |   96 ++++++++++++++++++++++++----------
+ 1 files changed, 69 insertions(+), 27 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 07dbdb7..83a30ce 100644
+index 5510f95..ddc740a 100644
 --- a/arch/arm/mach-omap2/board-igep0020.c
 +++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -261,6 +261,77 @@ static struct omap2_hsmmc_info mmc[] = {
+@@ -38,22 +38,28 @@
+ #define IGEP2_SMSC911X_CS       5
+ #define IGEP2_SMSC911X_GPIO     176
+ #define IGEP2_GPIO_USBH_NRESET  24
+-#define IGEP2_GPIO_LED0_GREEN 	26
+-#define IGEP2_GPIO_LED0_RED 	27
+-#define IGEP2_GPIO_LED1_RED   	28
+-#define IGEP2_GPIO_DVI_PUP	170
+-#define IGEP2_GPIO_WIFI_NPD 	94
+-#define IGEP2_GPIO_WIFI_NRESET 	95
++#define IGEP2_GPIO_LED0_GREEN   26
++#define IGEP2_GPIO_LED0_RED     27
++#define IGEP2_GPIO_LED1_RED     28
++#define IGEP2_GPIO_DVI_PUP      170
++
++#define IGEP2_RB_GPIO_WIFI_NPD     94
++#define IGEP2_RB_GPIO_WIFI_NRESET  95
++#define IGEP2_RB_GPIO_BT_NRESET    137
++#define IGEP2_RC_GPIO_WIFI_NPD     138
++#define IGEP2_RC_GPIO_WIFI_NRESET  139
++#define IGEP2_RC_GPIO_BT_NRESET    137
+ 
+ /*
+  * IGEP2 Hardware Revision Table
+  *
+- *  --------------------------
+- * | Id. | Hw Rev. | HW0 (28) |
+- *  --------------------------
+- * |  0  |   B/C   |   high   |
+- * |  1  |   C     |   low    |
+- *  --------------------------
++ *  --------------------------------------------------------------------------
++ * | Id. | Hw Rev.            | HW0 (28) | WIFI_NPD | WIFI_NRESET | BT_NRESET |
++ *  --------------------------------------------------------------------------
++ * |  0  | B                  |   high   |  gpio94  |   gpio95    |     -     |
++ * |  0  | B/C (B-compatible) |   high   |  gpio94  |   gpio95    |  gpio137  |
++ * |  1  | C                  |   low    |  gpio138 |   gpio139   |  gpio137  |
++ *  --------------------------------------------------------------------------
+  */
+ 
+ #define IGEP2_BOARD_HWREV_B	0
+@@ -295,12 +301,14 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+ 	},
++#if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
+ 	{
+ 		.mmc		= 2,
+ 		.wires		= 4,
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+ 	},
++#endif
  	{}      /* Terminator */
  };
  
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+#include <linux/leds.h>
+@@ -577,6 +585,50 @@ static struct omap_board_mux board_mux[] __initdata = {
+ #define board_mux	NULL
+ #endif
+ 
++#if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
 +
-+static struct gpio_led igep2_gpio_leds[] = {
-+	[0] = {
-+		.name			= "gpio-led:red:d0",
-+		.gpio			= IGEP2_GPIO_LED0_RED,
-+		.default_trigger	= "default-off"
-+	},
-+	[1] = {
-+		.name			= "gpio-led:green:d0",
-+		.gpio			= IGEP2_GPIO_LED0_GREEN,
-+		.default_trigger	= "default-off",
-+	},
-+	[2] = {
-+		.name			= "gpio-led:red:d1",
-+		.gpio			= IGEP2_GPIO_LED1_RED,
-+		.default_trigger	= "default-off",
-+	},
-+	[3] = {
-+		.name			= "gpio-led:green:d1",
-+		.default_trigger	= "heartbeat",
-+		.gpio			= -EINVAL, /* gets replaced */
-+	},
-+};
-+
-+static struct gpio_led_platform_data igep2_led_pdata = {
-+	.leds           = igep2_gpio_leds,
-+	.num_leds       = ARRAY_SIZE(igep2_gpio_leds),
-+};
-+
-+static struct platform_device igep2_led_device = {
-+	 .name   = "leds-gpio",
-+	 .id     = -1,
-+	 .dev    = {
-+		 .platform_data  =  &igep2_led_pdata,
-+	},
-+};
-+
-+static void __init igep2_leds_init(void)
++static void __init igep2_wlan_bt_init(void)
 +{
-+	platform_device_register(&igep2_led_device);
-+}
++	unsigned npd, wreset, btreset;
 +
++	/* GPIO's for WLAN-BT combo depends on hardware revision */
++	if (hwrev == IGEP2_BOARD_HWREV_B) {
++		npd = IGEP2_RB_GPIO_WIFI_NPD;
++		wreset = IGEP2_RB_GPIO_WIFI_NRESET;
++		btreset = IGEP2_RB_GPIO_BT_NRESET;
++	} else if (hwrev == IGEP2_BOARD_HWREV_C) {
++		npd = IGEP2_RC_GPIO_WIFI_NPD;
++		wreset = IGEP2_RC_GPIO_WIFI_NRESET;
++		btreset = IGEP2_RC_GPIO_BT_NRESET;
++	} else
++		return;
++
++	/* Set GPIO's for  WLAN-BT combo module */
++	if ((gpio_request(npd, "GPIO_WIFI_NPD") == 0) &&
++	    (gpio_direction_output(npd, 1) == 0)) {
++		gpio_export(npd, 0);
++	} else
++		pr_warning("IGEP2: Could not obtain gpio GPIO_WIFI_NPD\n");
++
++	if ((gpio_request(wreset, "GPIO_WIFI_NRESET") == 0) &&
++	    (gpio_direction_output(wreset, 1) == 0)) {
++		gpio_export(wreset, 0);
++		gpio_set_value(wreset, 0);
++		udelay(10);
++		gpio_set_value(wreset, 1);
++	} else
++		pr_warning("IGEP2: Could not obtain gpio GPIO_WIFI_NRESET\n");
++
++	if ((gpio_request(btreset, "GPIO_BT_NRESET") == 0) &&
++	    (gpio_direction_output(btreset, 1) == 0)) {
++		gpio_export(btreset, 0);
++	} else
++		pr_warning("IGEP2: Could not obtain gpio GPIO_BT_NRESET\n");
++}
 +#else
-+static inline void igep2_leds_init(void)
-+{
-+	if ((gpio_request(IGEP2_GPIO_LED0_RED, "gpio-led:red:d0") == 0) &&
-+	    (gpio_direction_output(IGEP2_GPIO_LED0_RED, 1) == 0)) {
-+		gpio_export(IGEP2_GPIO_LED0_RED, 0);
-+		gpio_set_value(IGEP2_GPIO_LED0_RED, 0);
-+	} else
-+		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED0_RED\n");
-+
-+	if ((gpio_request(IGEP2_GPIO_LED0_GREEN, "gpio-led:green:d0") == 0) &&
-+	    (gpio_direction_output(IGEP2_GPIO_LED0_GREEN, 1) == 0)) {
-+		gpio_export(IGEP2_GPIO_LED0_GREEN, 0);
-+		gpio_set_value(IGEP2_GPIO_LED0_GREEN, 0);
-+	} else
-+		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED0_GREEN\n");
-+
-+	if ((gpio_request(IGEP2_GPIO_LED1_RED, "gpio-led:red:d1") == 0) &&
-+	    (gpio_direction_output(IGEP2_GPIO_LED1_RED, 1) == 0)) {
-+		gpio_export(IGEP2_GPIO_LED1_RED, 0);
-+		gpio_set_value(IGEP2_GPIO_LED1_RED, 0);
-+	} else
-+		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED1_RED\n");
-+
-+}
++static inline void __init igep2_wlan_bt_init(void) { }
 +#endif
 +
- static int igep2_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
+ static void __init igep2_init(void)
  {
-@@ -290,14 +361,26 @@ static int igep2_twl_gpio_setup(struct device *dev,
- 	    (gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0) < 0))
- 		pr_err("IGEP2: Could not obtain gpio for USBH_CPEN");
- 
-+	/* TWL4030_GPIO_MAX + 1 == ledB (out, active low LED) */
-+#if !defined(CONFIG_LEDS_GPIO) && !defined(CONFIG_LEDS_GPIO_MODULE)
-+	if ((gpio_request(gpio+TWL4030_GPIO_MAX+1, "gpio-led:green:d1") == 0)
-+	    && (gpio_direction_output(gpio + TWL4030_GPIO_MAX + 1, 1) == 0)) {
-+		gpio_export(gpio + TWL4030_GPIO_MAX + 1, 0);
-+		gpio_set_value(gpio + TWL4030_GPIO_MAX + 1, 0);
-+	} else
-+		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED1_GREEN\n");
-+#else
-+	igep2_gpio_leds[3].gpio = gpio + TWL4030_GPIO_MAX + 1;
-+#endif
-+
- 	return 0;
- };
- 
--static struct twl4030_gpio_platform_data igep2_gpio_data = {
-+static struct twl4030_gpio_platform_data igep2_twl4030_gpio_pdata = {
- 	.gpio_base	= OMAP_MAX_GPIO_LINES,
- 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
- 	.irq_end	= TWL4030_GPIO_IRQ_END,
--	.use_leds	= false,
-+	.use_leds	= true,
- 	.setup		= igep2_twl_gpio_setup,
- };
- 
-@@ -371,47 +454,6 @@ static void __init igep2_display_init(void)
- 		pr_err("IGEP v2: Could not obtain gpio GPIO_DVI_PUP\n");
- }
- 
--#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
--#include <linux/leds.h>
--
--static struct gpio_led igep2_gpio_leds[] = {
--	{
--		.name = "led0:red",
--		.gpio = IGEP2_GPIO_LED0_RED,
--	},
--	{
--		.name = "led0:green",
--		.default_trigger = "heartbeat",
--		.gpio = IGEP2_GPIO_LED0_GREEN,
--	},
--	{
--		.name = "led1:red",
--		.gpio = IGEP2_GPIO_LED1_RED,
--	},
--};
--
--static struct gpio_led_platform_data igep2_led_pdata = {
--	.leds           = igep2_gpio_leds,
--	.num_leds       = ARRAY_SIZE(igep2_gpio_leds),
--};
--
--static struct platform_device igep2_led_device = {
--	 .name   = "leds-gpio",
--	 .id     = -1,
--	 .dev    = {
--		 .platform_data  =  &igep2_led_pdata,
--	},
--};
--
--static void __init igep2_init_led(void)
--{
--	platform_device_register(&igep2_led_device);
--}
--
--#else
--static inline void igep2_init_led(void) {}
--#endif
--
- static struct platform_device *igep2_devices[] __initdata = {
- 	&igep2_dss_device,
- };
-@@ -441,7 +483,7 @@ static struct twl4030_platform_data igep2_twldata = {
- 	/* platform_data for children goes here */
- 	.usb		= &igep2_usb_data,
- 	.codec		= &igep2_codec_data,
--	.gpio		= &igep2_gpio_data,
-+	.gpio		= &igep2_twl4030_gpio_pdata,
- 	.vmmc1          = &igep2_vmmc1,
- 	.vmmc2		= &igep2_vmmc2,
- 	.vpll2		= &igep2_vpll2,
-@@ -502,34 +544,10 @@ static void __init igep2_init(void)
- 	usb_ehci_init(&ehci_pdata);
- 
- 	igep2_flash_init();
--	igep2_init_led();
-+	igep2_leds_init();
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+@@ -595,22 +647,12 @@ static void __init igep2_init(void)
  	igep2_display_init();
  	igep2_init_smsc911x();
  
--	/* GPIO userspace leds */
--#if !defined(CONFIG_LEDS_GPIO) && !defined(CONFIG_LEDS_GPIO_MODULE)
--	if ((gpio_request(IGEP2_GPIO_LED0_RED, "led0:red") == 0) &&
--	    (gpio_direction_output(IGEP2_GPIO_LED0_RED, 1) == 0)) {
--		gpio_export(IGEP2_GPIO_LED0_RED, 0);
--		gpio_set_value(IGEP2_GPIO_LED0_RED, 0);
+-	/* GPIO W-LAN + Bluetooth combo module */
+-	if ((gpio_request(IGEP2_GPIO_WIFI_NPD, "GPIO_WIFI_NPD") == 0) &&
+-	    (gpio_direction_output(IGEP2_GPIO_WIFI_NPD, 1) == 0)) {
+-		gpio_export(IGEP2_GPIO_WIFI_NPD, 0);
+-/* 		gpio_set_value(IGEP2_GPIO_WIFI_NPD, 0); */
 -	} else
--		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED0_RED\n");
--
--	if ((gpio_request(IGEP2_GPIO_LED0_GREEN, "led0:green") == 0) &&
--	    (gpio_direction_output(IGEP2_GPIO_LED0_GREEN, 1) == 0)) {
--		gpio_export(IGEP2_GPIO_LED0_GREEN, 0);
--		gpio_set_value(IGEP2_GPIO_LED0_GREEN, 0);
+-		pr_warning("IGEP v2: Could not obtain gpio GPIO_WIFI_NPD\n");
++	/*
++	 * WLAN-BT combo module from MuRata wich has a Marvell WLAN
++	 * (88W8686) + CSR Bluetooth chipset. Uses SDIO interface.
++	 */
++	igep2_wlan_bt_init();
+ 
+-	if ((gpio_request(IGEP2_GPIO_WIFI_NRESET, "GPIO_WIFI_NRESET") == 0) &&
+-	    (gpio_direction_output(IGEP2_GPIO_WIFI_NRESET, 1) == 0)) {
+-		gpio_export(IGEP2_GPIO_WIFI_NRESET, 0);
+-		gpio_set_value(IGEP2_GPIO_WIFI_NRESET, 0);
+-		udelay(10);
+-		gpio_set_value(IGEP2_GPIO_WIFI_NRESET, 1);
 -	} else
--		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED0_GREEN\n");
--
--	if ((gpio_request(IGEP2_GPIO_LED1_RED, "led1:red") == 0) &&
--	    (gpio_direction_output(IGEP2_GPIO_LED1_RED, 1) == 0)) {
--		gpio_export(IGEP2_GPIO_LED1_RED, 0);
--		gpio_set_value(IGEP2_GPIO_LED1_RED, 0);
--	} else
--		pr_warning("IGEP v2: Could not obtain gpio GPIO_LED1_RED\n");
--#endif
--
- 	/* GPIO W-LAN + Bluetooth combo module */
- 	if ((gpio_request(IGEP2_GPIO_WIFI_NPD, "GPIO_WIFI_NPD") == 0) &&
- 	    (gpio_direction_output(IGEP2_GPIO_WIFI_NPD, 1) == 0)) {
+-		pr_warning("IGEP v2: Could not obtain gpio GPIO_WIFI_NRESET\n");
+ }
+ 
+ MACHINE_START(IGEP0020, "IGEP v2 board")
 -- 
 1.7.0.4
