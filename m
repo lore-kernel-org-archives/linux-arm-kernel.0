@@ -1,25 +1,35 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Wed, 06 Oct 2010 01:27:21 +0200
-Subject: [PATCH 1/2] ARM: S3C64XX: Add suspend support
-In-Reply-To: <AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
-References: <cover.1286319272.git.mcuelenaere@gmail.com>	<1fa4a7a39d9fd48b8329e1a1077a65adb96475b5.1286319272.git.mcuelenaere@gmail.com>
-	<AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
-Message-ID: <4CABB459.6070209@gmail.com>
+Date: Wed,  6 Oct 2010 01:30:50 +0200
+Subject: [PATCH] ARM: SAMSUNG: Fix warning 's3c_pm_show_resume_irqs' defined
+	but not used
+Message-ID: <4cabb531.cf7d0e0a.19d7.08b2@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 06-10-10 01:23, Kyungmin Park schreef:
-> Hi,
->
-> I agree your approach, put the common features in common place.
-> but Samsung maintainers insist put these at each machine file at current time.
->
-> So move this to the each machines for their tastes.
-I did it that way first, but then wondered why this wasn't done for all boards.
+s3c_pm_show_resume_irqs() is used by some s3c_pm_arch_show_resume_irqs()
+implementations, which get included through mach/pm-core.h. Add __maybe_unused
+to silence warnings when it isn't used (e.g. on S3C64XX platforms).
 
-When looking at some S3C24XX boards, you'll see that these need changes to the
-bootloader to support suspend; but IIRC this isn't needed for S3C64XX so I think
-this can be safely enabled for all S3C64XX boards?
+Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
+---
+ arch/arm/plat-samsung/pm.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 27cfca5..ad6dd63 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -214,8 +214,9 @@ void s3c_pm_do_restore_core(struct sleep_save *ptr, int count)
+  *
+  * print any IRQs asserted at resume time (ie, we woke from)
+ */
+-static void s3c_pm_show_resume_irqs(int start, unsigned long which,
+-				    unsigned long mask)
++static void __maybe_unused s3c_pm_show_resume_irqs(int start,
++						   unsigned long which,
++						   unsigned long mask)
+ {
+ 	int i;
+ 
 -- 
-Maurus Cuelenaere
+1.7.2.3
