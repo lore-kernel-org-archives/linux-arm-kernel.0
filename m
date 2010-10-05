@@ -1,195 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 5 Oct 2010 22:22:39 +0200
-Subject: [PATCHv3] ARM: imx: Add iram allocator functions
-In-Reply-To: <1286307715-12276-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1286307715-12276-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101005202239.GB11737@pengutronix.de>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 05 Oct 2010 22:27:23 +0200
+Subject: [PATCH v2] i.MX31 and i.MX35 : fix errate TLSbo65953
+	and	ENGcm09472
+In-Reply-To: <20101005200414.GA11737@pengutronix.de>
+References: <20101005094510.GJ28242@pengutronix.de>
+	<1286280012-19809-1-git-send-email-eric@eukrea.com>
+	<20101005183308.GX11737@pengutronix.de>
+	<4CAB7D0F.9020600@eukrea.com>
+	<20101005194659.GY11737@pengutronix.de>
+	<4CAB83C2.3040301@eukrea.com>
+	<20101005200414.GA11737@pengutronix.de>
+Message-ID: <4CAB8A2B.7020306@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Uwe,
 
-On Tue, Oct 05, 2010 at 02:41:55PM -0500, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Add iram allocation functions using GENERIC_ALLOCATOR. The
-> allocation size is 4KB multiples to guarantee alignment. The
-> idea for these functions is for i.MX platforms to use them
-> to dynamically allocate IRAM usage.
-> 
-> Applies on 2.6.36-rc6
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
-> ---
->  arch/arm/plat-mxc/Kconfig                   |    9 ++++
->  arch/arm/plat-mxc/Makefile                  |    1 +
->  arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
->  arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
->  4 files changed, 107 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
->  create mode 100644 arch/arm/plat-mxc/iram.c
-> 
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index 6785db4..e6de0df 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -57,6 +57,15 @@ source "arch/arm/mach-mx5/Kconfig"
->  
->  endmenu
->  
-> +config IRAM_ALLOC
-> +	bool "Enable IRAM allocator"
-> +	select GENERIC_ALLOCATOR
-> +	help
-> +	  Select this to have access to generic IRAM allocation functions that
-> +	  use the GENERIC_ALLOCATOR.  The allocation size is 4KB multiples to 
-> +	  guarantee alignment. The idea for these functions is for i.MX platforms
-> +	  to use them to dynamically allocate IRAM usage.
-> +
-I thought you didn't want to have that user selectible?
+Le 05/10/2010 22:04, Uwe Kleine-K?nig a ?crit :
+>> That may seems bad, but I find this solution better than having an oops
+>> after a few IRQs which makes the CPU unusable for real life applications
+>> :-)
+> Ack, but it makes me think if the caches should be enabled in the irq
+> entry point, too.
 
->  config MXC_IRQ_PRIOR
->  	bool "Use IRQ priority"
->  	help
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index 78d405e..35cf07b 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
->  
->  obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
->  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-> +obj-$(CONFIG_IRAM_ALLOC) += iram.o
->  obj-$(CONFIG_MXC_PWM)  += pwm.o
->  obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
->  obj-$(CONFIG_MXC_ULPI) += ulpi.o
-> diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-mxc/include/mach/iram_alloc.h
-> new file mode 100644
-> index 0000000..12881aa
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
-> @@ -0,0 +1,35 @@
-> +/*
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#ifdef CONFIG_IRAM_ALLOC
-> +int __init iram_init(unsigned long base, unsigned long size);
-> +void *iram_alloc(unsigned int size, unsigned long *dma_addr);
-> +void iram_free(unsigned long dma_addr, unsigned int size);
-> +#else
-> +static inline int __init iram_init(unsigned long base, unsigned long size)
-> +{
-> +	return -ENOMEM;
-> +}
-> +static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-> +{
-> +	return NULL;
-> +}
-> +static inline void iram_free(unsigned long base, unsigned long size) {}
-> +#endif
-> +
-please remove trailing newlines
+If I understand well the following link, you are right.
 
-> diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
-> new file mode 100644
-> index 0000000..d59fe75
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/iram.c
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-> + * MA 02110-1301, USA.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/spinlock.h>
-Hmm, I have a d?j? vu, and that's already the second time in this mail.
-IIRC I asked you to remove spinlock.h and use linux/init.h insteadof
-linux/module.h.
+Adding checks to enable cache at the IRQ entry point will execute 
+aditional code at each interrupt which may have more cost than executing 
+one ISR after WFI without cache (I may be totally wrong here).
 
-> +#include <linux/genalloc.h>
-> +
-> +static unsigned long iram_phys_base;
-> +static __iomem void *iram_virt_base;
-> +static struct gen_pool *iram_pool;
-> +
-> +#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
-> +
-> +void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-> +{
-> +	if (!iram_pool)
-> +		return NULL;
-> +
-> +	*dma_addr = gen_pool_alloc(iram_pool, size);
-> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
-> +	return iram_phys_to_virt(*dma_addr);
-> +}
-> +EXPORT_SYMBOL(iram_alloc);
-> +
-> +void iram_free(unsigned long addr, unsigned int size)
-> +{
-> +	if (!iram_pool)
-> +		return;
-> +
-> +	gen_pool_free(iram_pool, addr, size);
-> +}
-> +EXPORT_SYMBOL(iram_free);
-> +
-> +int __init iram_init(unsigned long base, unsigned long size)
-> +{
-> +	iram_phys_base = base;
-> +
-> +	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
-> +	gen_pool_add(iram_pool, base, size, -1);
-> +	iram_virt_base = ioremap(iram_phys_base, size);
-> +
-> +	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
-> +	return 0;
-> +}
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+More details here (click c7, Cache Operations Register > The Wait For 
+Interrupt operation in the left menu) :
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0211h/I1014942.html
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+which says :
+
+MCR p15,0,<Rd>,c7,c0,4               ; Wait For Interrupt
+
+This puts the processor into a low-power state and stops it executing 
+following instructions until an interrupt, an imprecise external abort, 
+or a debug request occurs, regardless of whether the interrupts or 
+external imprecise aborts are disabled by the masks in the CPSR. When an 
+interrupt does occur, the MCR instruction completes. If interrupts are 
+enabled, the IRQ or FIQ handler is entered as normal. The return link in 
+r14_irq or r14_fiq contains the address of the MCR instruction plus 8, 
+so that the normal instruction used for interrupt return (SUBS 
+PC,R14,#4) returns to the instruction following the MCR.
+
+Eric
