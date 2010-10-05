@@ -1,48 +1,79 @@
 From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Tue,  5 Oct 2010 16:15:17 +0200
-Subject: [PATCHv4 1/6] omap3: Add external VBUS power switch and overcurrent
-	detect on IGEP v2 board.
+Date: Tue,  5 Oct 2010 16:15:21 +0200
+Subject: [PATCHv4 5/6] omap3: Add i2c eeprom driver to read EDID on IGEP v2.
 In-Reply-To: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
 References: <1286288122-16834-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1286288122-16834-2-git-send-email-eballetbo@gmail.com>
+Message-ID: <1286288122-16834-6-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO for various devices are missing from the board initialization.
-This patch adds support for the VBUS and over current gpios.  Without this
-patch, input/outputs from these two sources are ignored.
+Add i2c eeprom driver to access monitor EDID binary information
+from user space, something that is required by 'decode-edid' and
+'parse-edid'.
 
 Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 ---
- arch/arm/mach-omap2/board-igep0020.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-igep0020.c |   33 ++++++++++++++++++++++++---------
+ 1 files changed, 24 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 175f043..07dbdb7 100644
+index ddc740a..aa7b8bd 100644
 --- a/arch/arm/mach-omap2/board-igep0020.c
 +++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -274,6 +274,22 @@ static int igep2_twl_gpio_setup(struct device *dev,
- 	igep2_vmmc1_supply.dev = mmc[0].dev;
- 	igep2_vmmc2_supply.dev = mmc[1].dev;
+@@ -541,7 +541,7 @@ static struct twl4030_platform_data igep2_twldata = {
  
-+	/*
-+	 * REVISIT: need ehci-omap hooks for external VBUS
-+	 * power switch and overcurrent detect
-+	 */
-+	if ((gpio_request(gpio + 1, "GPIO_EHCI_NOC") < 0) ||
-+	    (gpio_direction_input(gpio + 1) < 0))
-+		pr_err("IGEP2: Could not obtain gpio for EHCI NOC");
-+
-+	/*
-+	 * TWL4030_GPIO_MAX + 0 == ledA, GPIO_USBH_CPEN
-+	 * (out, active low)
-+	 */
-+	if ((gpio_request(gpio + TWL4030_GPIO_MAX, "GPIO_USBH_CPEN") < 0) ||
-+	    (gpio_direction_output(gpio + TWL4030_GPIO_MAX, 0) < 0))
-+		pr_err("IGEP2: Could not obtain gpio for USBH_CPEN");
-+
- 	return 0;
  };
  
+-static struct i2c_board_info __initdata igep2_i2c_boardinfo[] = {
++static struct i2c_board_info __initdata igep2_i2c1_boardinfo[] = {
+ 	{
+ 		I2C_BOARD_INFO("twl4030", 0x48),
+ 		.flags		= I2C_CLIENT_WAKE,
+@@ -550,14 +550,29 @@ static struct i2c_board_info __initdata igep2_i2c_boardinfo[] = {
+ 	},
+ };
+ 
+-static int __init igep2_i2c_init(void)
++static struct i2c_board_info __initdata igep2_i2c3_boardinfo[] = {
++	{
++		I2C_BOARD_INFO("eeprom", 0x50),
++	},
++};
++
++static void __init igep2_i2c_init(void)
+ {
+-	omap_register_i2c_bus(1, 2600, igep2_i2c_boardinfo,
+-			ARRAY_SIZE(igep2_i2c_boardinfo));
+-	/* Bus 3 is attached to the DVI port where devices like the pico DLP
+-	 * projector don't work reliably with 400kHz */
+-	omap_register_i2c_bus(3, 100, NULL, 0);
+-	return 0;
++	int ret;
++
++	ret = omap_register_i2c_bus(1, 2600, igep2_i2c1_boardinfo,
++		ARRAY_SIZE(igep2_i2c1_boardinfo));
++	if (ret)
++		pr_warning("IGEP2: Could not register I2C1 bus (%d)\n", ret);
++
++	/*
++	 * Bus 3 is attached to the DVI port where devices like the pico DLP
++	 * projector don't work reliably with 400kHz
++	 */
++	ret = omap_register_i2c_bus(3, 100, igep2_i2c3_boardinfo,
++		ARRAY_SIZE(igep2_i2c3_boardinfo));
++	if (ret)
++		pr_warning("IGEP2: Could not register I2C3 bus (%d)\n", ret);
+ }
+ 
+ static struct omap_musb_board_data musb_board_data = {
+@@ -635,7 +650,7 @@ static void __init igep2_init(void)
+ 
+ 	/* Get IGEP2 hardware revision */
+ 	igep2_get_revision();
+-
++	/* Register I2C busses and drivers */
+ 	igep2_i2c_init();
+ 	platform_add_devices(igep2_devices, ARRAY_SIZE(igep2_devices));
+ 	omap_serial_init();
 -- 
 1.7.0.4
