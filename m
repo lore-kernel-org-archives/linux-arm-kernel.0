@@ -1,70 +1,87 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue,  5 Oct 2010 11:25:39 +0200
-Subject: [PATCH/RFC] i.MX31 and i.MX35 : fix errate TLSbo65953 and ENGcm09472
-In-Reply-To: <4CAAD39C.2010103@eukrea.com>
-References: <4CAAD39C.2010103@eukrea.com>
-Message-ID: <1286270739-18270-1-git-send-email-eric@eukrea.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 05 Oct 2010 18:26:42 +0900
+Subject: [PATCH 5/7] ARM: S5PC210: I2C0/1 devices support on Universal
+	board
+In-Reply-To: <20100930044844.GA16913@july>
+References: <20100930044844.GA16913@july>
+Message-ID: <003101cb646f$6e1cf4d0$4a56de70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this exiting WFI can result in cache corruption.
-Code taken from Freescale's 2.6.27 BSP and tested on i.MX35
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Camera devices use the I2C0 and Gyro uese the I2C1 on universal board.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/Kconfig               |    2 ++
+>  arch/arm/mach-s5pv310/mach-universal_c210.c |   14 ++++++++++++++
+>  2 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
+> index 178eab9..c207426 100644
+> --- a/arch/arm/mach-s5pv310/Kconfig
+> +++ b/arch/arm/mach-s5pv310/Kconfig
+> @@ -41,6 +41,8 @@ config MACH_UNIVERSAL_C210
+>  	bool "Mobile UNIVERSAL_C210 Board"
+>  	select CPU_S5PV310
+>  	select S5P_DEV_ONENAND
+> +	select S3C_DEV_I2C1
+> +	select S5PV310_SETUP_I2C1
+>  	help
+>  	  Machine support for Samsung Mobile Universal S5PC210 Reference
+>  	  Board. S5PC210(MCP) is one of package option of S5PV310
+> diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-
+> s5pv310/mach-universal_c210.c
+> index e169849..deffeb1 100644
+> --- a/arch/arm/mach-s5pv310/mach-universal_c210.c
+> +++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/input.h>
+> +#include <linux/i2c.h>
+>  #include <linux/gpio_keys.h>
+>  #include <linux/gpio.h>
+> 
+> @@ -116,6 +117,16 @@ static struct platform_device universal_gpio_keys = {
+>  	},
+>  };
+> 
+> +/* I2C0 */
+> +static struct i2c_board_info i2c0_devs[] __initdata = {
+> +	/* Camera, To be updated */
+> +};
+> +
+> +/* I2C1 */
+> +static struct i2c_board_info i2c1_devs[] __initdata = {
+> +	/* Gyro, To be updated */
+> +};
+> +
+>  static struct platform_device *universal_devices[] __initdata = {
+>  	&universal_gpio_keys,
+>  	&s5p_device_onenand,
+> @@ -134,6 +145,9 @@ static void __init universal_machine_init(void)
+>  	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
+>  #endif
+> 
+> +	i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
+> +	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
+> +
+>  	/* Last */
+>  	platform_add_devices(universal_devices,
+> ARRAY_SIZE(universal_devices));
+>  }
+> --
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/plat-mxc/include/mach/system.h |   26 ++++++++++++++++++++++++--
- 1 files changed, 24 insertions(+), 2 deletions(-)
+Ok...will apply.
 
-diff --git a/arch/arm/plat-mxc/include/mach/system.h b/arch/arm/plat-mxc/include/mach/system.h
-index 4acd114..1661b29 100644
---- a/arch/arm/plat-mxc/include/mach/system.h
-+++ b/arch/arm/plat-mxc/include/mach/system.h
-@@ -1,7 +1,7 @@
- /*
-  *  Copyright (C) 1999 ARM Limited
-  *  Copyright (C) 2000 Deep Blue Solutions Ltd
-- *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *  Copyright 2004-2008 Freescale Semiconductor, Inc. All Rights Reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -22,14 +22,36 @@
- 
- static inline void arch_idle(void)
- {
-+#if (defined (CONFIG_ARCH_MX35) || defined (CONFIG_ARCH_MX31))
-+	/* fix i.MX31 errata TLSbo65953 and i.MX35 errata ENGcm09472 */
-+	unsigned long reg = 0;
-+	__asm__ __volatile__(
-+		"mrc p15, 0, %0, c1, c0, 0\n"
-+		"bic %0, %0, #0x00001000\n"
-+		"bic %0, %0, #0x00000004\n"
-+		"mcr p15, 0, %0, c1, c0, 0\n"
-+		"mov %0, #0\n"
-+		"mcr p15, 0, %0, c7, c5, 0\n"
-+		"mov %0, #0\n"
-+		"mcr p15, 0, %0, c7, c14, 0\n"
-+		"mov %0, #0\n"
-+		"mcr p15, 0, %0, c7, c0, 4\n"
-+		"nop\n" "nop\n" "nop\n" "nop\n"
-+		"nop\n" "nop\n" "nop\n"
-+		"mrc p15, 0, %0, c1, c0, 0\n"
-+		"orr %0, %0, #0x00001000\n"
-+		"orr %0, %0, #0x00000004\n"
-+		"mcr p15, 0, %0, c1, c0, 0\n"
-+		:: "r" (reg));
-+#else
- #ifdef CONFIG_ARCH_MXC91231
- 	if (cpu_is_mxc91231()) {
- 		/* Need this to set DSM low-power mode */
- 		mxc91231_prepare_idle();
- 	}
- #endif
--
- 	cpu_do_idle();
-+#endif
- }
- 
- void arch_reset(char mode, const char *cmd);
--- 
-1.7.0.4
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
