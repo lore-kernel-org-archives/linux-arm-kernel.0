@@ -1,342 +1,517 @@
-From: jeongbae.seo@samsung.com (Jeongbae Seo)
-Date: Wed,  6 Oct 2010 15:00:44 +0900
-Subject: [PATCH V2 1/3] ARM: S5PV310: Add support HSMMC and SDHCI configuration
-In-Reply-To: <1286344846-21244-1-git-send-email-jeongbae.seo@samsung.com>
-References: <1286344846-21244-1-git-send-email-jeongbae.seo@samsung.com>
-Message-ID: <1286344846-21244-2-git-send-email-jeongbae.seo@samsung.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 5 Oct 2010 23:16:52 -0700
+Subject: [PATCH V2 21/69] Keyboard: Adding support for spear-keyboard
+In-Reply-To: <4CABF3E0.8010909@st.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>
+	<584e4ecc7883807e1fae0e6c53b2837954935e53.1285933331.git.viresh.kumar@st.com>
+	<20101005154737.GA19730@core.coreip.homeip.net>
+	<4CABF3E0.8010909@st.com>
+Message-ID: <20101006061652.GA14609@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hyuk Lee <hyuk1.lee@samsung.com>
+On Wed, Oct 06, 2010 at 09:28:24AM +0530, viresh kumar wrote:
+> On 10/05/2010 09:17 PM, Dmitry Torokhov wrote:
+> > As discussed previously I'd like to see the driver using as much of
+> > matrix_keypad infrastructure as practical and also to see the initial
+> > keypad copied into the spear_kbd structure to ensure that the board code
+> > could be made const and bind/rebind of the device would restore the
+> > original keymap.
+> > 
+> 
+> Dmitry,
+> 
+> As suggested in V1, we have used KEY() macro from matrix_keypad.h file.
+> Also we are allocating memory for keymap in driver itself in probe.
+> Then we are copying keymap in from plat data. This makes it restore to
+> original keymap on every bind/rebind of device.
+> 
+> Is there anything else we need to do??
+> 
 
-This patch adds support HSMMC for S5PV310 and S5PC210 and
-setup for HSMMC host controller and also related GPIO.
-At most 4 channel can be used at the same time.
-A user can configure SDHCI data bus as 8bit or 4bit.
+Viresh,
 
-Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
----
-Changes since v1:
-- Added drive strength handling in each SDMMC channel
+Sorry, did not look far enough in the patch and missed the separate
+allocation. But do you really want to allocate it separately? I think
+the following patch simplifies and speeds up things at the expense of
+slightly larger keymap structure.
 
- arch/arm/mach-s5pv310/Kconfig            |   39 ++++++++
- arch/arm/mach-s5pv310/Makefile           |    2 +
- arch/arm/mach-s5pv310/setup-sdhci-gpio.c |  152 ++++++++++++++++++++++++++++++
- arch/arm/mach-s5pv310/setup-sdhci.c      |   69 ++++++++++++++
- 4 files changed, 262 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/setup-sdhci-gpio.c
- create mode 100644 arch/arm/mach-s5pv310/setup-sdhci.c
+There are also fixes for proper __devinit/__devexit markups, locking of
+open/close vs suspend/resume, keymap can be changed from userspace via
+EVIOCSKEYCODE and bunch of other changes.
 
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index 9941852..8cb3dc5 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -24,6 +24,17 @@ config S5PV310_SETUP_I2C2
- 	help
- 	  Common setup code for i2c bus 2.
- 
-+config S5PV310_SETUP_SDHCI
-+	bool
-+	select S5PV310_SETUP_SDHCI_GPIO
-+	help
-+	  Internal helper functions for S5PV310 based SDHCI systems.
-+
-+config S5PV310_SETUP_SDHCI_GPIO
-+	bool
-+	help
-+	  Common setup code for SDHCI gpio.
-+
- # machine support
- 
- menu "S5PC210 Machines"
-@@ -33,6 +44,11 @@ config MACH_SMDKC210
- 	select CPU_S5PV310
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C_DEV_HSMMC2
-+	select S3C_DEV_HSMMC3
-+	select S5PV310_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung SMDKC210
- 	  S5PC210(MCP) is one of package option of S5PV310
-@@ -53,9 +69,32 @@ config MACH_SMDKV310
- 	select CPU_S5PV310
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C_DEV_HSMMC2
-+	select S3C_DEV_HSMMC3
-+	select S5PV310_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung SMDKV310
- 
- endmenu
- 
-+comment "Configuration for HSMMC bus width"
-+
-+menu "Use 8-bit bus width"
-+
-+config S5PV310_SDHCI_CH0_8BIT
-+	bool "Channel 0 with 8-bit bus"
-+	help
-+	  Support HSMMC Channel 0 8-bit bus.
-+	  If selected, Channel 1 is disabled.
-+
-+config S5PV310_SDHCI_CH2_8BIT
-+	bool "Channel 2 with 8-bit bus"
-+	help
-+	  Support HSMMC Channel 2 8-bit bus.
-+	  If selected, Channel 3 is disabled.
-+
-+endmenu
-+
- endif
-diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-index d17c8c7..a2fdc06 100644
---- a/arch/arm/mach-s5pv310/Makefile
-+++ b/arch/arm/mach-s5pv310/Makefile
-@@ -30,3 +30,5 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
- 
- obj-$(CONFIG_S5PV310_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PV310_SETUP_I2C2)	+= setup-i2c2.o
-+obj-$(CONFIG_S5PV310_SETUP_SDHCI)	+= setup-sdhci.o
-+obj-$(CONFIG_S5PV310_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-diff --git a/arch/arm/mach-s5pv310/setup-sdhci-gpio.c b/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-new file mode 100644
-index 0000000..86d38cc
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-@@ -0,0 +1,152 @@
-+/* linux/arch/arm/mach-s5pv310/setup-sdhci-gpio.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV310 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
-+
-+#include <plat/gpio-cfg.h>
-+#include <plat/regs-sdhci.h>
-+#include <plat/sdhci.h>
-+
-+void s5pv310_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPK0[0:1] pins to special-function 2 */
-+	for (gpio = S5PV310_GPK0(0); gpio < S5PV310_GPK0(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	switch (width) {
-+	case 8:
-+		for (gpio = S5PV310_GPK1(3); gpio <= S5PV310_GPK1(6); gpio++) {
-+			/* Data pin GPK1[3:6] to special-funtion 3 */
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+		}
-+	case 4:
-+		for (gpio = S5PV310_GPK0(3); gpio <= S5PV310_GPK0(6); gpio++) {
-+			/* Data pin GPK0[3:6] to special-funtion 2 */
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+		}
-+	default:
-+		break;
-+	}
-+
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_cfgpin(S5PV310_GPK0(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(S5PV310_GPK0(2), S3C_GPIO_PULL_UP);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+}
-+
-+void s5pv310_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPK1[0:1] pins to special-function 2 */
-+	for (gpio = S5PV310_GPK1(0); gpio < S5PV310_GPK1(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PV310_GPK1(3); gpio <= S5PV310_GPK1(6); gpio++) {
-+		/* Data pin GPK1[3:6] to special-function 2 */
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_cfgpin(S5PV310_GPK1(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(S5PV310_GPK1(2), S3C_GPIO_PULL_UP);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+}
-+
-+void s5pv310_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPK2[0:1] pins to special-function 2 */
-+	for (gpio = S5PV310_GPK2(0); gpio < S5PV310_GPK2(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	switch (width) {
-+	case 8:
-+		for (gpio = S5PV310_GPK3(3); gpio <= S5PV310_GPK3(6); gpio++) {
-+			/* Data pin GPK3[3:6] to special-function 3 */
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+		}
-+	case 4:
-+		for (gpio = S5PV310_GPK2(3); gpio <= S5PV310_GPK2(6); gpio++) {
-+			/* Data pin GPK2[3:6] to special-function 2 */
-+			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+		}
-+	default:
-+		break;
-+	}
-+
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_cfgpin(S5PV310_GPK2(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(S5PV310_GPK2(2), S3C_GPIO_PULL_UP);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+}
-+
-+void s5pv310_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+	unsigned int gpio;
-+
-+	/* Set all the necessary GPK3[0:1] pins to special-function 2 */
-+	for (gpio = S5PV310_GPK3(0); gpio < S5PV310_GPK3(2); gpio++) {
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	for (gpio = S5PV310_GPK3(3); gpio <= S5PV310_GPK3(6); gpio++) {
-+		/* Data pin GPK3[3:6] to special-function 2 */
-+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_cfgpin(S5PV310_GPK3(2), S3C_GPIO_SFN(2));
-+		s3c_gpio_setpull(S5PV310_GPK3(2), S3C_GPIO_PULL_UP);
-+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
-+	}
-+}
-diff --git a/arch/arm/mach-s5pv310/setup-sdhci.c b/arch/arm/mach-s5pv310/setup-sdhci.c
-new file mode 100644
-index 0000000..db8358f
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/setup-sdhci.c
-@@ -0,0 +1,69 @@
-+/* linux/arch/arm/mach-s5pv310/setup-sdhci.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5PV310 - Helper functions for settign up SDHCI device(s) (HSMMC)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#include <linux/mmc/card.h>
-+#include <linux/mmc/host.h>
-+
-+#include <plat/regs-sdhci.h>
-+
-+/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
-+
-+char *s5pv310_hsmmc_clksrcs[4] = {
-+	[0] = NULL,
-+	[1] = NULL,
-+	[2] = "sclk_mmc",	/* mmc_bus */
-+	[3] = NULL,
-+};
-+
-+void s5pv310_setup_sdhci_cfg_card(struct platform_device *dev, void __iomem *r,
-+				  struct mmc_ios *ios, struct mmc_card *card)
-+{
-+	u32 ctrl2, ctrl3;
-+
-+	/* don't need to alter anything acording to card-type */
-+
-+	ctrl2 = readl(r + S3C_SDHCI_CONTROL2);
-+
-+	/* select base clock source to HCLK */
-+
-+	ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-+
-+	/*
-+	 * clear async mode, enable conflict mask, rx feedback ctrl, SD
-+	 * clk hold and no use debounce count
-+	 */
-+
-+	ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-+		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-+		  S3C_SDHCI_CTRL2_ENFBCLKRX |
-+		  S3C_SDHCI_CTRL2_DFCNT_NONE |
-+		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
-+
-+	/* Tx and Rx feedback clock delay control */
-+
-+	if (ios->clock < 25 * 1000000)
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL3 |
-+			 S3C_SDHCI_CTRL3_FCSEL2 |
-+			 S3C_SDHCI_CTRL3_FCSEL1 |
-+			 S3C_SDHCI_CTRL3_FCSEL0);
-+	else
-+		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
-+
-+	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-+	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
-+}
+Thanks.
+
 -- 
-1.6.2.5
+Dmitry
+
+
+Input: spear-kbd - assorted changes
+
+Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+---
+
+ arch/arm/plat-spear/include/plat/keyboard.h |    3 
+ drivers/input/keyboard/spear-keyboard.c     |  311 +++++++++++++--------------
+ 2 files changed, 149 insertions(+), 165 deletions(-)
+
+
+diff --git a/arch/arm/plat-spear/include/plat/keyboard.h b/arch/arm/plat-spear/include/plat/keyboard.h
+index 29448bc..bc4e5a6 100644
+--- a/arch/arm/plat-spear/include/plat/keyboard.h
++++ b/arch/arm/plat-spear/include/plat/keyboard.h
+@@ -130,8 +130,7 @@ int name[] = {\
+  * keymaps to drivers that implement keyboards.
+  */
+ struct kbd_platform_data {
+-	int *keymap;
+-	unsigned int keymapsize;
++	const struct matrix_keymap_data *keymap;
+ 	bool rep;
+ };
+ 
+diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+index 4830e11..d34bb70 100644
+--- a/drivers/input/keyboard/spear-keyboard.c
++++ b/drivers/input/keyboard/spear-keyboard.c
+@@ -1,6 +1,4 @@
+ /*
+- * drivers/input/keyboard/keyboard-spear.c
+- *
+  * SPEAr Keyboard Driver
+  * Based on omap-keypad driver
+  *
+@@ -27,7 +25,7 @@
+ #include <linux/types.h>
+ #include <plat/keyboard.h>
+ 
+-/* Keyboard Regsiters */
++/* Keyboard Registers */
+ #define MODE_REG	0x00	/* 16 bit reg */
+ #define STATUS_REG	0x0C	/* 2 bit reg */
+ #define DATA_REG	0x10	/* 8 bit reg */
+@@ -55,60 +53,42 @@
+ 
+ struct spear_kbd {
+ 	struct input_dev *input;
+-	void __iomem *io_base;		/* Keyboard Base Address */
++	struct resource *res;
++	void __iomem *io_base;
+ 	struct clk *clk;
+-	u8 last_key ;
+-	u8 last_event;
+-	int *keymap;
+-	int keymapsize;
++	unsigned int irq;
++	unsigned short last_key;
++	unsigned short keycodes[256];
+ };
+-/* TODO: Need to optimize this function */
+-static inline int get_key_value(struct spear_kbd *dev, int row, int col)
+-{
+-	int i, key;
+-
+-	key = KEY(row, col, 0);
+-	for (i = 0; i < dev->keymapsize; i++)
+-		if ((dev->keymap[i] & KEY_MASK) == key)
+-			return dev->keymap[i] & KEY_VALUE;
+-	return -ENOKEY;
+-}
+ 
+ static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
+ {
+-	struct spear_kbd *dev = dev_id;
+-	int key;
+-	u8 sts, val = 0;
+-
+-	sts = readb(dev->io_base + STATUS_REG);
+-	if (sts & DATA_AVAIL) {
+-		/* following reads active (row, col) pair */
+-		val = readb(dev->io_base + DATA_REG);
+-		key = get_key_value(dev, (val & ROW_MASK)>>ROW_SHIFT, (val
+-					& COLUMN_MASK));
+-
+-		/* valid key press event */
+-		if (key >= 0) {
+-			if (dev->last_event == 1) {
+-				/* check if we missed a release event */
+-				input_report_key(dev->input, dev->last_key,
+-						!dev->last_event);
+-			}
+-			/* notify key press */
+-			dev->last_event = 1;
+-			dev->last_key = key;
+-			input_report_key(dev->input, key, dev->last_event);
+-		} else {
+-			/* notify key release */
+-			dev->last_event = 0;
+-			input_report_key(dev->input, dev->last_key,
+-					dev->last_event);
+-		}
+-	} else
++	struct spear_kbd *kbd = dev_id;
++	struct input_dev *input = kbd->input;
++	unsigned int key;
++	u8 sts, val;
++
++	sts = readb(kbd->io_base + STATUS_REG);
++	if (sts & DATA_AVAIL)
+ 		return IRQ_NONE;
+ 
++	if (kbd->last_key != KEY_RESERVED) {
++		input_report_key(input, kbd->last_key, 0);
++		kbd->last_key = KEY_RESERVED;
++	}
++
++	/* following reads active (row, col) pair */
++	val = readb(kbd->io_base + DATA_REG);
++	key = kbd->keycodes[val];
++
++	input_event(input, EV_MSC, MSC_SCAN, val);
++	input_report_key(input, key, 1);
++	input_sync(input);
++
++	kbd->last_key = key;
++
+ 	/* clear interrupt */
+-	writeb(0, dev->io_base + STATUS_REG);
++	writeb(0, kbd->io_base + STATUS_REG);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -116,8 +96,20 @@ static irqreturn_t spear_kbd_interrupt(int irq, void *dev_id)
+ static int spear_kbd_open(struct input_dev *dev)
+ {
+ 	struct spear_kbd *kbd = input_get_drvdata(dev);
++	int error;
+ 	u16 val;
+ 
++	kbd->last_key = KEY_RESERVED;
++
++	error = clk_enable(kbd->clk);
++	if (error)
++		return error;
++
++	/* program keyboard */
++	val = SCAN_RATE_80 | MODE_KEYBOARD | PCLK_FREQ_MSK;
++	writew(val, kbd->io_base + MODE_REG);
++	writeb(1, kbd->io_base + STATUS_REG);
++
+ 	/* start key scan */
+ 	val = readw(kbd->io_base + MODE_REG);
+ 	val |= START_SCAN;
+@@ -135,165 +127,148 @@ static void spear_kbd_close(struct input_dev *dev)
+ 	val = readw(kbd->io_base + MODE_REG);
+ 	val &= ~START_SCAN;
+ 	writew(val, kbd->io_base + MODE_REG);
++
++	clk_disable(kbd->clk);
++
++	kbd->last_key = KEY_RESERVED;
+ }
+ 
+-static int __init spear_kbd_probe(struct platform_device *pdev)
++static int __devinit spear_kbd_probe(struct platform_device *pdev)
+ {
++	const struct kbd_platform_data *pdata = pdev->dev.platform_data;
++	const struct matrix_keymap_data *keymap;
+ 	struct spear_kbd *kbd;
+-	struct kbd_platform_data *pdata = pdev->dev.platform_data;
++	struct input_dev *input_dev;
+ 	struct resource *res;
+-	int i, ret, irq, size;
+-	u16 val = 0;
++	int irq;
++	int error;
+ 
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "Invalid platform data\n");
+ 		return -EINVAL;
+ 	}
+ 
++	keymap = pdata->keymap;
++	if (!keymap) {
++		dev_err(&pdev->dev, "no keymap defined\n");
++		return -EINVAL;
++	}
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "no keyboard resource defined\n");
+ 		return -EBUSY;
+ 	}
+ 
+-	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
+-		dev_err(&pdev->dev, "keyboard region already claimed\n");
+-		return -EBUSY;
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "not able to get irq for the device\n");
++		return irq;
+ 	}
+ 
+ 	kbd = kzalloc(sizeof(*kbd), GFP_KERNEL);
+-	if (!kbd) {
++	input_dev = input_allocate_device();
++	if (!kbd || !input_dev) {
+ 		dev_err(&pdev->dev, "out of memory\n");
+-		ret = -ENOMEM;
+-		goto err_release_mem_region;
++		error = -ENOMEM;
++		goto err_free_mem;
+ 	}
+ 
+-	kbd->clk = clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(kbd->clk)) {
+-		ret = PTR_ERR(kbd->clk);
+-		goto err_kfree;
++	kbd->input = input_dev;
++	kbd->irq = irq;
++	kbd->res = request_mem_region(res->start, resource_size(res),
++				      pdev->name);
++	if (!kbd->res) {
++		dev_err(&pdev->dev, "keyboard region already claimed\n");
++		error = -EBUSY;
++		goto err_free_mem;
+ 	}
+ 
+-	ret = clk_enable(kbd->clk);
+-	if (ret < 0)
+-		goto err_clk_put;
+-
+-	platform_set_drvdata(pdev, kbd);
+-	kbd->keymapsize = pdata->keymapsize;
+-	size = kbd->keymapsize * sizeof(*pdata->keymap);
+-	kbd->keymap = kmalloc(size, GFP_KERNEL);
+-	if (!kbd->keymap)
+-		goto err_clear_plat_data;
+-
+-	memcpy(kbd->keymap, pdata->keymap, size);
+-
+ 	kbd->io_base = ioremap(res->start, resource_size(res));
+ 	if (!kbd->io_base) {
+-		dev_err(&pdev->dev, "ioremap fail for kbd_region\n");
+-		ret = -ENOMEM;
+-		goto err_kfree_keymap;
+-	}
+-
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0) {
+-		dev_err(&pdev->dev, "not able to get irq for the device\n");
+-		ret = irq;
+-		goto err_iounmap;
++		dev_err(&pdev->dev, "ioremap failed for kbd_region\n");
++		error = -ENOMEM;
++		goto err_release_mem_region;
+ 	}
+ 
+-	kbd->input = input_allocate_device();
+-	if (!kbd->input) {
+-		ret = -ENOMEM;
+-		dev_err(&pdev->dev, "input device allocation fail\n");
++	kbd->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(kbd->clk)) {
++		error = PTR_ERR(kbd->clk);
+ 		goto err_iounmap;
+ 	}
+ 
++	input_dev->name = "Spear Keyboard";
++	input_dev->phys = "keyboard/input0";
++	input_dev->dev.parent = &pdev->dev;
++	input_dev->id.bustype = BUS_HOST;
++	input_dev->id.vendor = 0x0001;
++	input_dev->id.product = 0x0001;
++	input_dev->id.version = 0x0100;
++	input_dev->open = spear_kbd_open;
++	input_dev->close = spear_kbd_close;
++
++	__set_bit(EV_KEY, input_dev->evbit);
+ 	if (pdata->rep)
+-		__set_bit(EV_REP, kbd->input->evbit);
+-
+-	/* setup input device */
+-	__set_bit(EV_KEY, kbd->input->evbit);
+-
+-	for (i = 0; i < kbd->keymapsize; i++)
+-		__set_bit(kbd->keymap[i] & KEY_MAX, kbd->input->keybit);
+-
+-	kbd->input->name = "keyboard";
+-	kbd->input->phys = "keyboard/input0";
+-	kbd->input->dev.parent = &pdev->dev;
+-	kbd->input->id.bustype = BUS_HOST;
+-	kbd->input->id.vendor = 0x0001;
+-	kbd->input->id.product = 0x0001;
+-	kbd->input->id.version = 0x0100;
+-	kbd->input->open = spear_kbd_open;
+-	kbd->input->close = spear_kbd_close;
+-	input_set_drvdata(kbd->input, kbd);
+-
+-	ret = input_register_device(kbd->input);
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "Unable to register keyboard device\n");
+-		goto err_free_dev;
+-	}
++		__set_bit(EV_REP, input_dev->evbit);
++	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+ 
+-	/* program keyboard */
+-	val |= SCAN_RATE_80 | MODE_KEYBOARD | PCLK_FREQ_MSK;
+-	writew(val, kbd->io_base + MODE_REG);
++	input_dev->keycode = kbd->keycodes;
++	input_dev->keycodesize = sizeof(kbd->keycodes[0]);
++	input_dev->keycodemax = ARRAY_SIZE(kbd->keycodes);
+ 
+-	writeb(1, kbd->io_base + STATUS_REG);
++	matrix_keypad_build_keymap(keymap, ROW_SHIFT,
++			input_dev->keycode, input_dev->keybit);
+ 
+-	device_init_wakeup(&pdev->dev, 1);
++	input_set_drvdata(input_dev, kbd);
++
++	/* ensure device is shut off */
++	spear_kbd_close(input_dev);
+ 
+-	ret = request_irq(irq, spear_kbd_interrupt, 0, "keyboard",
+-			kbd);
+-	if (ret) {
++	error = request_irq(irq, spear_kbd_interrupt, 0, "keyboard", kbd);
++	if (error) {
+ 		dev_err(&pdev->dev, "request_irq fail\n");
+-		goto err_unregister_dev;
++		goto err_put_clk;
++	}
++
++	error = input_register_device(input_dev);
++	if (error) {
++		dev_err(&pdev->dev, "Unable to register keyboard device\n");
++		goto err_free_irq;
+ 	}
+ 
++	device_init_wakeup(&pdev->dev, 1);
++	platform_set_drvdata(pdev, kbd);
++
+ 	return 0;
+ 
+-err_unregister_dev:
+-	input_unregister_device(kbd->input);
+-	goto err_iounmap;
+-err_free_dev:
+-	input_free_device(kbd->input);
++err_free_irq:
++	free_irq(kbd->irq, kbd);
++err_put_clk:
++	clk_put(kbd->clk);
+ err_iounmap:
+ 	iounmap(kbd->io_base);
+-err_kfree_keymap:
+-	kfree(kbd->keymap);
+-err_clear_plat_data:
+-	platform_set_drvdata(pdev, NULL);
+-	clk_disable(kbd->clk);
+-err_clk_put:
+-	clk_put(kbd->clk);
+-err_kfree:
+-	kfree(kbd);
+ err_release_mem_region:
+ 	release_mem_region(res->start, resource_size(res));
++err_free_mem:
++	input_free_device(input_dev);
++	kfree(kbd);
+ 
+-	return ret;
++	return error;
+ }
+ 
+-static int spear_kbd_remove(struct platform_device *pdev)
++static int __devexit spear_kbd_remove(struct platform_device *pdev)
+ {
+ 	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+-	struct resource *res;
+-	int irq;
+ 
+-	irq = platform_get_irq(pdev, 0);
+-	free_irq(irq, pdev);
+-
+-	/* unregister input device */
++	free_irq(kbd->irq, kbd);
+ 	input_unregister_device(kbd->input);
+-
+-	iounmap(kbd->io_base);
+-	kfree(kbd->keymap);
+-	platform_set_drvdata(pdev, NULL);
+-	clk_disable(kbd->clk);
+ 	clk_put(kbd->clk);
++	iounmap(kbd->io_base);
++	release_mem_region(kbd->res->start, resource_size(kbd->res));
+ 	kfree(kbd);
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res)
+-		release_mem_region(res->start, resource_size(res));
++
++	device_init_wakeup(&pdev->dev, 1);
++	platform_set_drvdata(pdev, NULL);
+ 
+ 	return 0;
+ }
+@@ -303,12 +278,17 @@ static int spear_kbd_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+-	int irq;
++	struct input_dev *input_dev = kbd->input;
++
++	mutex_lock(&input_dev->mutex);
++
++	if (input_dev->users)
++		clk_enable(kbd->clk);
+ 
+-	irq = platform_get_irq(pdev, 0);
+-	clk_disable(kbd->clk);
+ 	if (device_may_wakeup(&pdev->dev))
+-		enable_irq_wake(irq);
++		enable_irq_wake(kbd->irq);
++
++	mutex_unlock(&input_dev->mutex);
+ 
+ 	return 0;
+ }
+@@ -317,12 +297,17 @@ static int spear_kbd_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+-	int irq;
++	struct input_dev *input_dev = kbd->input;
++
++	mutex_lock(&input_dev->mutex);
+ 
+-	irq = platform_get_irq(pdev, 0);
+ 	if (device_may_wakeup(&pdev->dev))
+-		disable_irq_wake(irq);
+-	clk_enable(kbd->clk);
++		disable_irq_wake(kbd->irq);
++
++	if (input_dev->users)
++		clk_enable(kbd->clk);
++
++	mutex_unlock(&input_dev->mutex);
+ 
+ 	return 0;
+ }
+@@ -335,7 +320,7 @@ static const struct dev_pm_ops spear_kbd_pm_ops = {
+ 
+ static struct platform_driver spear_kbd_driver = {
+ 	.probe		= spear_kbd_probe,
+-	.remove		= spear_kbd_remove,
++	.remove		= __devexit_p(spear_kbd_remove),
+ 	.driver		= {
+ 		.name	= "keyboard",
+ 		.owner	= THIS_MODULE,
+@@ -345,7 +330,7 @@ static struct platform_driver spear_kbd_driver = {
+ 	},
+ };
+ 
+-static int __devinit spear_kbd_init(void)
++static int __init spear_kbd_init(void)
+ {
+ 	return platform_driver_register(&spear_kbd_driver);
+ }
