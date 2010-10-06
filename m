@@ -1,55 +1,34 @@
-From: shiraz.linux.kernel@gmail.com (shiraz hashim)
-Date: Wed, 6 Oct 2010 14:18:37 +0530
-Subject: PL310 and QoS logic
-In-Reply-To: <4C56D9DC.9010008@st.com>
-References: <4C56D9DC.9010008@st.com>
-Message-ID: <AANLkTi=tbFt9TyRL2oTDvgJu9BAxsc=mrpApCCMuQdrd@mail.gmail.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Wed,  6 Oct 2010 10:53:50 +0200
+Subject: [PATCH for 2.6.36 2/2] cpuimx27: fix i2c bus selection
+In-Reply-To: <1286355230-15530-1-git-send-email-eric@eukrea.com>
+References: <1286355230-15530-1-git-send-email-eric@eukrea.com>
+Message-ID: <1286355230-15530-2-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell, Catalin,
+Recent clean of i.MX devices registration changed the i2C bus number
+selected for our platform (Freescale start peripheral ID at 1, kernel
+now start it at 0 so i.MX27's i2c 1 is kernel's i2c 0).
+Without this fix, i2c is unusable on this platform.
 
-On Mon, Aug 2, 2010 at 8:14 PM, Armando VISCONTI
-<armando.visconti@st.com> wrote:
-> Catalin, All,
->
-> I work on the SPEAr1300 SoC, which is a device based on Cortex A9 MP (r1p1)
-> and
-> is using a PL310 L2 cache controller.
->
-> We are using the Linux version 2.6.35 and we have also ported some patches
-> coming
-> from you.
->
-> Even with this latest version of kernel we are not able to make the L2 cache
-> working.
-> It looks like that we are having a problem particularly when using it in
-> combination
-> with MP.
->
-> Just to add a very important information, the situation looks to clearly
-> stabilize
-> when ?we set the bit9 of PL310 Auxiliary Control Register to '1'. THis bit
-> is reserved,
-> and ARM support told us to avoid setting it.
->
-> In fact, this bit when set seems to disable a ?QoS logic whose purpose is to
-> avoid issues
-> for which one core is not able to release a semaphore because the other core
-> is
-> continuously trying to take it. So, this QoS logic has been introduce inside
-> the
-> PL310 to set a kind of priority (a QoS).
->
-> Strangely enough this issue looks exactly what we are seeing.
-> It explains all of our observations.
->
-> So, it seems that for us writing this bit9 to '1' has the effect of
-> enabling (and not disabling) the QoS logic.
->
-> Have you ever heard an issue like that?
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/mach-imx/mach-cpuimx27.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Any help on this.
-
-regards
-Shiraz
+diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
+index 339150a..6830afd 100644
+--- a/arch/arm/mach-imx/mach-cpuimx27.c
++++ b/arch/arm/mach-imx/mach-cpuimx27.c
+@@ -259,7 +259,7 @@ static void __init eukrea_cpuimx27_init(void)
+ 	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
+ 				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
+ 
+-	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
++	imx27_add_i2c_imx0(&cpuimx27_i2c1_data);
+ 
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 
+-- 
+1.7.0.4
