@@ -1,35 +1,33 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Oct 2010 15:07:04 +0200
-Subject: [PATCH for 2.6.36 2/2] cpuimx27: fix i2c bus selection
-In-Reply-To: <1286355230-15530-2-git-send-email-eric@eukrea.com>
+Date: Wed, 6 Oct 2010 15:05:28 +0200
+Subject: [PATCH for 2.6.36 1/2] cpuimx27: fix compile when ULPI is selected
+In-Reply-To: <1286355230-15530-1-git-send-email-eric@eukrea.com>
 References: <1286355230-15530-1-git-send-email-eric@eukrea.com>
-	<1286355230-15530-2-git-send-email-eric@eukrea.com>
-Message-ID: <20101006130704.GJ29673@pengutronix.de>
+Message-ID: <20101006130528.GI29673@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 10:53:50AM +0200, Eric B?nard wrote:
-> Recent clean of i.MX devices registration changed the i2C bus number
-> selected for our platform (Freescale start peripheral ID at 1, kernel
-> now start it at 0 so i.MX27's i2c 1 is kernel's i2c 0).
-> Without this fix, i2c is unusable on this platform.
+On Wed, Oct 06, 2010 at 10:53:49AM +0200, Eric B?nard wrote:
+> without this patch we get :
+> arch/arm/mach-imx/built-in.o: In function `eukrea_cpuimx27_init':
+> eukrea_mbimx27-baseboard.c:(.init.text+0x44c): undefined reference to `mxc_ulpi_access_ops'
 > 
 > Signed-off-by: Eric B?nard <eric@eukrea.com>
 > ---
->  arch/arm/mach-imx/mach-cpuimx27.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-imx/Kconfig |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-> index 339150a..6830afd 100644
-> --- a/arch/arm/mach-imx/mach-cpuimx27.c
-> +++ b/arch/arm/mach-imx/mach-cpuimx27.c
-> @@ -259,7 +259,7 @@ static void __init eukrea_cpuimx27_init(void)
->  	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
->  				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
->  
-> -	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
-> +	imx27_add_i2c_imx0(&cpuimx27_i2c1_data);
-This doesn't fit on Sascha's current tree.  Can you please rebase it?
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index c5c0369..6348017 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -122,6 +122,8 @@ config MACH_CPUIMX27
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_MXC_NAND
+> +	select IMX_HAVE_PLATFORM_SPI_IMX
+> +	select MXC_ULPI if USB_ULPI
+the spi part is not related to the commit log?
 
 Best regards
 Uwe
