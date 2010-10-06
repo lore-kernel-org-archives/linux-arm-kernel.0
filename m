@@ -1,87 +1,26 @@
 From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 15:33:09 +0200
-Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
-	init/exit
-In-Reply-To: <74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+Date: Wed, 6 Oct 2010 14:41:05 +0200
+Subject: [PATCH 3/7] ARM: oprofile: Rename op_arm to oprofile_perf
+In-Reply-To: <094e8a33da82ce840f77fd1f7646391c08205b6e.1286222593.git.matt@console-pimps.org>
 References: <cover.1286222593.git.matt@console-pimps.org>
-	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
-Message-ID: <20101006133309.GP13563@erda.amd.com>
+	<094e8a33da82ce840f77fd1f7646391c08205b6e.1286222593.git.matt@console-pimps.org>
+Message-ID: <20101006124105.GN13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.10.10 16:44:22, Matt Fleming wrote:
-> In preparation for moving the majority of this oprofile code into an
-> architecture-neutral place separate the architecture-independent code
-> into oprofile_perf_init() and oprofile_perf_exit().
+On 04.10.10 16:44:21, Matt Fleming wrote:
+> In preparation for moving the generic functions out of this file, give
+> the functions more general names (e.g. remove "arm" from the names).
 > 
 > Signed-off-by: Matt Fleming <matt@console-pimps.org>
 > Tested-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/oprofile/common.c |   17 ++++++++++++++---
->  1 files changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index 86df75f..e4cd332 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -327,7 +327,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
->  		tail = user_backtrace(tail);
->  }
->  
-> -int __init oprofile_arch_init(struct oprofile_operations *ops)
-> +int __init oprofile_perf_init(struct oprofile_operations *ops)
->  {
->  	int cpu, ret = 0;
->  
-> @@ -365,7 +365,6 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->  		}
->  	}
->  
-> -	ops->backtrace		= arm_backtrace;
->  	ops->create_files	= oprofile_perf_create_files;
->  	ops->setup		= oprofile_perf_setup;
->  	ops->start		= oprofile_perf_start;
-> @@ -388,7 +387,14 @@ out:
->  	return ret;
->  }
->  
-> -void __exit oprofile_arch_exit(void)
-> +int __init oprofile_arch_init(struct oprofile_operations *ops)
-> +{
+>  arch/arm/oprofile/common.c |   68 ++++++++++++++++++++++----------------------
+>  1 files changed, 34 insertions(+), 34 deletions(-)
 
-We should do here a:
-
-	memset(ops, 0, sizeof(*ops));
-
-Otherwise it looks good.
+This patch looks good.
 
 -Robert
-
-> +	ops->backtrace		= arm_backtrace;
-> +
-> +	return oprofile_perf_init(ops);
-> +}
-> +
-> +void __exit oprofile_perf_exit(void)
->  {
->  	int cpu, id;
->  	struct perf_event *event;
-> @@ -406,6 +412,11 @@ void __exit oprofile_arch_exit(void)
->  	kfree(counter_config);
->  	exit_driverfs();
->  }
-> +
-> +void __exit oprofile_arch_exit(void)
-> +{
-> +	oprofile_perf_exit();
-> +}
->  #else
->  int __init oprofile_arch_init(struct oprofile_operations *ops)
->  {
-> -- 
-> 1.7.1
-> 
-> 
 
 -- 
 Advanced Micro Devices, Inc.
