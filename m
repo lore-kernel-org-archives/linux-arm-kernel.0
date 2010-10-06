@@ -1,82 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 6 Oct 2010 08:14:47 -0700
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <AANLkTi=+xGpqSrhPB_nLqJd_E0DzLdeb4AaQQQqP04h3@mail.gmail.com>
-References: <20100909094120.GB1988@rakim.wolfsonmicro.main>
-	<4CAACA63.6090202@compulab.co.il>
-	<20101005161608.GD19730@core.coreip.homeip.net>
-	<20101005164037.GA20555@opensource.wolfsonmicro.com>
-	<20101005180703.GD21399@core.coreip.homeip.net>
-	<20101005185942.GA22808@opensource.wolfsonmicro.com>
-	<20101005203508.7df590db@lxorguk.ukuu.org.uk>
-	<AANLkTimTW6v3N9aRA0h15SWXbBc_W0dhpf5rEeqBqGbf@mail.gmail.com>
-	<20101005225223.GC23315@opensource.wolfsonmicro.com>
-	<AANLkTi=+xGpqSrhPB_nLqJd_E0DzLdeb4AaQQQqP04h3@mail.gmail.com>
-Message-ID: <20101006151446.GA2803@opensource.wolfsonmicro.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 6 Oct 2010 23:06:24 +0800
+Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
+In-Reply-To: <AANLkTinm+bJduJ+46eUb8TA_v644Ui6j+zeBUKegofY7@mail.gmail.com>
+References: <20101006071731.28048.89938.sendpatchset@t400s>
+	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
+	<AANLkTinm+bJduJ+46eUb8TA_v644Ui6j+zeBUKegofY7@mail.gmail.com>
+Message-ID: <AANLkTimD=-W3Mfdhvdj_1EHWA9jCY8KMBvsC-COfEPpX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 10:01:10AM +0200, Linus Walleij wrote:
-> 2010/10/6 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+On Wed, Oct 6, 2010 at 10:58 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Oct 6, 2010 at 7:06 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> ARM: Dynamic IRQ demux support
+>>>
+>>> [PATCH 01/08] ARM: Move entry-header.S to asm/
+>>> [PATCH 02/08] ARM: Move macros from entry-armv.S
+>>> [PATCH 03/08] ARM: Make alignment_trap macro self-contained
+>>> [PATCH 04/08] ARM: Convert __irq_svc and __usr_svc to macros
+>>> [PATCH 05/08] ARM: Move the unwind header to entry-header.S
+>>> [PATCH 06/08] ARM: Add setup_irq_stubs() function
+>>> [PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
+>>> [PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
+>>>
+>>
+>> Hi Magnus,
+>>
+>> Just FYI, I had a patch months ago for this:
+>>
+>> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
+>>
+>> Do you think that's a simpler way to go?
+>
+> Speaking of which, what is the status of your patch? ?I see you
+> reposted it on July 13, but I haven't seen any further feedback.
+>
 
-> > No, this is actively unhelpful. ?If consumers can null check their
-> > regulators then they can just as well do an IS_ERR() check
+I should have posted it in Russell's patch tracking system, yet not
+merged in last cycle.
 
-> .. and wrap all enable/disable/ etc into conditional statements
-> that depend on whether we could locate a regulator or not.
+Russell?
 
-This is a totally different use case to that being discussed in this
-thread - the use case being discussed in this thread is for things like
-core power supplies which are critical to the operation of the device.
-The expected error handling if these supplies are missing would be to
-abort.
-
-For users that can reasonably do optional supplies I'd expect that there
-would be other code which also needs to be conditional which relies on
-some action having being taken on the regulator and would also need to
-be bypassed so it'd be a bit surprising if things didn't get caught up
-in a bigger conditional block.
-
-> I think what Alan requested is that it be made more seamless.
-
-I'm fairly sure he's talking about the use case above, though I'm not
-100% sure how familiar with the API Alan is.  Note also that the way
-you've done this with things returning success for nonexistant supplies
-means that things are less seamless than they might be.
-
-> > The existing dummy regulator support already does all this in a manner
-> > which is much less invasive for the core.
-
-> Correct me if I'm wrong but the dummy regulators are something
-> different which appear when you choose to compile out regulator
-> support altogether.
-
-No, they're a feature of the compiled in regulator API (which happen to
-behave in the same manner as the stubs you get if the API is disbled).
-
-> This was not what Alan was asking about I believe, the usecase
-> to addressed is partial regulator support, where regulator framework
-> *is* compiled in, but a driver *may* not get a regulator from the
-> framework.
-
-He's looking for something that can be used for supplies that are
-critical to device operation on random devices on the board, something
-that says that all unconfigured supplies are actually provided by
-non-specific fixed voltage regulators.  This is different from the case
-where some supplies may be missing because they really are not present
-(in that the supplies are there, we've just not told the system how
-they're provided).  Alan and Marek need boards to be able to say that
-every device on the board has a supply even if it's not explicitly
-configured while you want to be able to more easily ignore failures with
-specific supplies.
-
-> If I read your answer right, your stance is that the regulator
-> framework shall not help out in situations like this, instead
-> the driver shall recognice -ENODEV from regulator_get() and
-> avoid doing any regulator calls after that. Is this correct?
-
-Pretty much for your use case, though if enough things like MMC have
-cases where supplies truly can just be omitted with no effect on the
-operation of the system at all then I guess a consumer initiated way to
-request a dummy could be in order.  I'd worry that people will just end
-up randomly using it for all supplies, though.
+> g.
+>
