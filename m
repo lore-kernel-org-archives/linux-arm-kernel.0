@@ -1,174 +1,72 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 14:27:36 +0200
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-Message-ID: <20101006122736.GL13563@erda.amd.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Oct 2010 13:15:58 +0200
+Subject: [PATCH] cpufreq for freescale mx51
+In-Reply-To: <AANLkTin7N8g1KdkyJ5ZsaKp=vUfvrffzvK8j+Z78bU0P@mail.gmail.com>
+References: <1286279904-4378-1-git-send-email-yong.shen@linaro.org>
+	<201010051425.06523.arnd@arndb.de>
+	<AANLkTin7N8g1KdkyJ5ZsaKp=vUfvrffzvK8j+Z78bU0P@mail.gmail.com>
+Message-ID: <201010061315.58771.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.10.10 16:44:20, Matt Fleming wrote:
-> Introduce perf_pmu_name() helper function that returns the name of the
-> pmu. This gives us a generic way to get the name of a pmu regardless of
-> how an architecture identifies it internally, e.g. ARM uses an id
-> whereas SH currently uses a string.
+On Wednesday 06 October 2010, Yong Shen wrote:
+> Hi Arnd,
 > 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> ---
->  arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
->  arch/arm/oprofile/common.c   |   22 +---------------------
->  arch/sh/kernel/perf_event.c  |   14 ++++++++++++++
->  include/linux/perf_event.h   |    1 +
->  kernel/perf_event.c          |    5 +++++
->  5 files changed, 44 insertions(+), 21 deletions(-)
+> Really appreciate your valuable comments. Most of them are accepted. I have
+> different option about two comments.
+> 1.
 > 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index ef3bc33..3bff24d 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -123,6 +123,29 @@ armpmu_get_max_events(void)
->  }
->  EXPORT_SYMBOL_GPL(armpmu_get_max_events);
->  
-> +const char *perf_pmu_name(void)
-> +{
-> +	enum arm_perf_pmu_ids id = armpmu_get_pmu_id();
-> +
-> +	switch (id) {
-> +	case ARM_PERF_PMU_ID_XSCALE1:
-> +		return "arm/xscale1";
-> +	case ARM_PERF_PMU_ID_XSCALE2:
-> +		return "arm/xscale2";
-> +	case ARM_PERF_PMU_ID_V6:
-> +		return "arm/armv6";
-> +	case ARM_PERF_PMU_ID_V6MP:
-> +		return "arm/mpcore";
-> +	case ARM_PERF_PMU_ID_CA8:
-> +		return "arm/armv7";
-> +	case ARM_PERF_PMU_ID_CA9:
-> +		return "arm/armv7-ca9";
-> +	default:
-> +		return NULL;
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(perf_pmu_name);
-> +
->  int perf_num_counters(void)
->  {
->  	return armpmu_get_max_events();
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index 23f18a0..cb224ee 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -155,26 +155,6 @@ static void op_perf_stop(void)
->  }
->  
->  
-> -static char *op_name_from_perf_id(enum arm_perf_pmu_ids id)
-> -{
-> -	switch (id) {
-> -	case ARM_PERF_PMU_ID_XSCALE1:
-> -		return "arm/xscale1";
-> -	case ARM_PERF_PMU_ID_XSCALE2:
-> -		return "arm/xscale2";
-> -	case ARM_PERF_PMU_ID_V6:
-> -		return "arm/armv6";
-> -	case ARM_PERF_PMU_ID_V6MP:
-> -		return "arm/mpcore";
-> -	case ARM_PERF_PMU_ID_CA8:
-> -		return "arm/armv7";
-> -	case ARM_PERF_PMU_ID_CA9:
-> -		return "arm/armv7-ca9";
-> -	default:
-> -		return NULL;
-> -	}
-> -}
+> > It would be better to make this code a proper device driver,
+> > probably a platform_driver unless you have a way to probe
+> > the presence of the registers on another bus.
+> >
+> > Making it a driver that registers to a bus lets you separate
+> > the probing from the implementation, and gives you a structure
+> > to add your private variables to.
+> >
+> cpufreq is supposed to be registered using cpufreq_register_driver directly,
+> so no other platform data is needed. You can also find out other cpufreq
+> driver is designed this way, like omap cpufreq driver.
 
-I don't like moving this oprofile names out to perf. These strings
-don't have much to do with the pmu names and are hints for the
-oprofile daemon to detect the pmu type with no other use. Of course
-this is more human readable than an enum or so, but it is of no worth
-other than oprofile. So it should be kept inside oprofile.
+Ok, it is indeed different from what I thought.
 
-> -
->  static int op_arm_create_files(struct super_block *sb, struct dentry *root)
->  {
->  	unsigned int i;
-> @@ -391,7 +371,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->  	ops->start		= op_arm_start;
->  	ops->stop		= op_arm_stop;
->  	ops->shutdown		= op_arm_stop;
-> -	ops->cpu_type		= op_name_from_perf_id(armpmu_get_pmu_id());
-> +	ops->cpu_type		= perf_pmu_name();
->  
->  	if (!ops->cpu_type)
->  		ret = -ENODEV;
-> diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
-> index 2cb9ad5..e065a1d 100644
-> --- a/arch/sh/kernel/perf_event.c
-> +++ b/arch/sh/kernel/perf_event.c
-> @@ -59,6 +59,20 @@ static inline int sh_pmu_initialized(void)
->  	return !!sh_pmu;
->  }
->  
-> +const char *perf_pmu_name(void)
-> +{
-> +	if (!sh_pmu)
-> +		return NULL;
-> +
-> +	if (!strcmp(sh_pmu->name, "SH7750"))
-> +		return "sh/sh7750";
-> +	if (!strcmp(sh_pmu->name, "SH-4A"))
-> +		return "sh/sh4a";
-> +
-> +	return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(perf_pmu_name);
+My thought was that you have resources that need to be attached
+to a device which then can get matched to a device_driver.
 
-I rather want use here the solution we discussed earlier, simply
-including <asm/perf_event.h> and then access sh_pmu->name directly
-from oprofile.
+However, this is not how it works with the generic clock framework.
+The device that you are controlling is not a random platform
+device but the actual CPU, which has a node in the device tree
+already (/sys/devices/system/cpu/*) and that gets controlled by
+the generic cpufreq layer, while the resources are tied to the
+struct clk that you are controlling.
 
--Robert
+So if anything, the clk is what needs to be a platform device,
+not an artificial cpufreq device. You are only adding another
+clock to the clock-mx51.c file and you are consistent with the
+existing clocks in there, so I'm not asking you to change anything
+here.
 
-> +
->  int perf_num_counters(void)
->  {
->  	if (!sh_pmu)
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 1a02192..33f08da 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -850,6 +850,7 @@ extern int perf_max_events;
->  extern const struct pmu *hw_perf_event_init(struct perf_event *event);
->  
->  extern int perf_num_counters(void);
-> +extern const char *perf_pmu_name(void);
->  extern void perf_event_task_sched_in(struct task_struct *task);
->  extern void perf_event_task_sched_out(struct task_struct *task, struct task_struct *next);
->  extern void perf_event_task_tick(struct task_struct *task);
-> diff --git a/kernel/perf_event.c b/kernel/perf_event.c
-> index db5b560..fc51268 100644
-> --- a/kernel/perf_event.c
-> +++ b/kernel/perf_event.c
-> @@ -85,6 +85,11 @@ void __weak hw_perf_enable(void)		{ barrier(); }
->  
->  void __weak perf_event_print_debug(void)	{ }
->  
-> +extern __weak const char *perf_pmu_name(void)
-> +{
-> +	return "pmu";
-> +}
-> +
->  static DEFINE_PER_CPU(int, perf_disable_count);
->  
->  void perf_disable(void)
-> -- 
-> 1.7.1
+I wonder however if we can create a common cpufreq driver that
+would work for all platforms that just need to call clk_set_rate
+in the end and can operate from platform specific tables otherwise.
+About half the cpufreq drivers in arm seem to be a variation of
+this already, so we might be able to make the clock framework
+good enough for this.
+
+> 2.
 > 
-> 
+> > Don't use __raw_readl but readl/ioread32, which have more well-defined
+> > behaviour.
+> >
+> I think __raw_readl is ok here, since in the platform related code, we know
+> the register layout and length, this is more efficient. Also this is
+> extensively used in arch/arm/.
 
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+I still disagree, but it's not important. IMHO most of the uses of
+__raw_readl should be converted to readl or readl_relaxed if you are
+worried about efficiency.
+
+The main difference between __raw_readl and readl_relaxed is that the
+endianess is well-defined on readl_relaxed.
+
+	Arnd
