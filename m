@@ -1,73 +1,420 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 06 Oct 2010 16:17:31 +0900
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-Message-ID: <20101006071731.28048.89938.sendpatchset@t400s>
+Date: Wed, 06 Oct 2010 16:17:40 +0900
+Subject: [PATCH 01/08] ARM: Move entry-header.S to asm/
+In-Reply-To: <20101006071731.28048.89938.sendpatchset@t400s>
+References: <20101006071731.28048.89938.sendpatchset@t400s>
+Message-ID: <20101006071740.28048.45621.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: Dynamic IRQ demux support 
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/08] ARM: Move entry-header.S to asm/
-[PATCH 02/08] ARM: Move macros from entry-armv.S
-[PATCH 03/08] ARM: Make alignment_trap macro self-contained
-[PATCH 04/08] ARM: Convert __irq_svc and __usr_svc to macros
-[PATCH 05/08] ARM: Move the unwind header to entry-header.S
-[PATCH 06/08] ARM: Add setup_irq_stubs() function
-[PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
-[PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
+This patch moves the file arch/arm/kernel/entry-header.S
+to arch/arm/include/asm/entry-header.S. The reason for
+this move is to allow per-mach assembly IRQ demux code.
 
-These patches break out the IRQ demux code from entry-armv.S to
-allow multiple IRQ demux instances to coexist. A registration 
-function is also added that allows per-mach/plat code to chose
-which IRQ demux instance to register at runtime.
-
-Useful to support the upcoming single-kernel-binary-on-multiple-machines
-_and_ for future SH-Mobile hardware support which will need to tie in
-the GIC in the demux code for some processors.
-
-The existing kernel behaviour remains unchanged as long as the kconfig
-option CONFIG_DEFAULT_IRQ_DEMUX is set to Y.
-
-A single IRQ demuxer instance (on UP) is written like this:
-
-+#include <asm/entry-header.S>
-+
-+       .macro  get_irqnr_preamble, base, tmp
-[blah]
-+       .endm
-+
-+       .macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
-[bleh]
-+       .endm
-+
-+       __irq_svc shmobile_common
-+       __irq_usr shmobile_common
-
-The per-mach IRQ setup code then registers whatever demuxing functions
-it requires using:
-
-+       setup_irq_stubs(__irq_usr_shmobile_common, __irq_svc_shmobile_common);
-
-To strip down memory usage the kconfig option CONFIG_DEFAULT_IRQ_DEMUX
-may be set to N to remove the default IRQ demux code. Most macros in
-entry-macro.S will then become unused.
-
-The macros disable_fiq and arch_ret_to_user are kept as-is for now.
+The #includes in entry-armv.S and entry-common.S are 
+updated to reflect the new file location. The actual code
+logic is untouched by this patch.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- arch/arm/Kconfig                                  |    4 
- arch/arm/include/asm/entry-header.S               |  417 ++++++++++++++++++++-
- arch/arm/include/asm/traps.h                      |    1 
- arch/arm/kernel/entry-armv.S                      |  239 ------------
- arch/arm/kernel/entry-common.S                    |    4 
- arch/arm/kernel/entry-header.S                    |  181 ---------
- arch/arm/kernel/traps.c                           |   14 
- arch/arm/mach-shmobile/Makefile                   |    1 
- arch/arm/mach-shmobile/entry-irq-common.S         |   38 +
- arch/arm/mach-shmobile/include/mach/common.h      |    1 
- arch/arm/mach-shmobile/include/mach/entry-macro.S |   17 
- arch/arm/mach-shmobile/intc-sh7367.c              |    4 
- arch/arm/mach-shmobile/intc-sh7372.c              |    4 
- arch/arm/mach-shmobile/intc-sh7377.c              |    4 
- 14 files changed, 506 insertions(+), 423 deletions(-)
+
+ arch/arm/include/asm/entry-header.S |  181 +++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/entry-armv.S        |    3 
+ arch/arm/kernel/entry-common.S      |    3 
+ arch/arm/kernel/entry-header.S      |  181 -----------------------------------
+ 4 files changed, 183 insertions(+), 185 deletions(-)
+
+--- /dev/null
++++ work/arch/arm/include/asm/entry-header.S	2010-09-16 17:22:01.000000000 +0900
+@@ -0,0 +1,181 @@
++#include <linux/init.h>
++#include <linux/linkage.h>
++
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/errno.h>
++#include <asm/thread_info.h>
++
++@ Bad Abort numbers
++@ -----------------
++@
++#define BAD_PREFETCH	0
++#define BAD_DATA	1
++#define BAD_ADDREXCPTN	2
++#define BAD_IRQ		3
++#define BAD_UNDEFINSTR	4
++
++@
++@ Most of the stack format comes from struct pt_regs, but with
++@ the addition of 8 bytes for storing syscall args 5 and 6.
++@ This _must_ remain a multiple of 8 for EABI.
++@
++#define S_OFF		8
++
++/* 
++ * The SWI code relies on the fact that R0 is at the bottom of the stack
++ * (due to slow/fast restore user regs).
++ */
++#if S_R0 != 0
++#error "Please fix"
++#endif
++
++	.macro	zero_fp
++#ifdef CONFIG_FRAME_POINTER
++	mov	fp, #0
++#endif
++	.endm
++
++	.macro	alignment_trap, rtemp
++#ifdef CONFIG_ALIGNMENT_TRAP
++	ldr	\rtemp, .LCcralign
++	ldr	\rtemp, [\rtemp]
++	mcr	p15, 0, \rtemp, c1, c0
++#endif
++	.endm
++
++	@
++	@ Store/load the USER SP and LR registers by switching to the SYS
++	@ mode. Useful in Thumb-2 mode where "stm/ldm rd, {sp, lr}^" is not
++	@ available. Should only be called from SVC mode
++	@
++	.macro	store_user_sp_lr, rd, rtemp, offset = 0
++	mrs	\rtemp, cpsr
++	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
++	msr	cpsr_c, \rtemp			@ switch to the SYS mode
++
++	str	sp, [\rd, #\offset]		@ save sp_usr
++	str	lr, [\rd, #\offset + 4]		@ save lr_usr
++
++	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
++	msr	cpsr_c, \rtemp			@ switch back to the SVC mode
++	.endm
++
++	.macro	load_user_sp_lr, rd, rtemp, offset = 0
++	mrs	\rtemp, cpsr
++	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
++	msr	cpsr_c, \rtemp			@ switch to the SYS mode
++
++	ldr	sp, [\rd, #\offset]		@ load sp_usr
++	ldr	lr, [\rd, #\offset + 4]		@ load lr_usr
++
++	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
++	msr	cpsr_c, \rtemp			@ switch back to the SVC mode
++	.endm
++
++#ifndef CONFIG_THUMB2_KERNEL
++	.macro	svc_exit, rpsr
++	msr	spsr_cxsf, \rpsr
++#if defined(CONFIG_CPU_32v6K)
++	clrex					@ clear the exclusive monitor
++	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
++#elif defined (CONFIG_CPU_V6)
++	ldr	r0, [sp]
++	strex	r1, r2, [sp]			@ clear the exclusive monitor
++	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
++#else
++	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
++#endif
++	.endm
++
++	.macro	restore_user_regs, fast = 0, offset = 0
++	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
++	ldr	lr, [sp, #\offset + S_PC]!	@ get pc
++	msr	spsr_cxsf, r1			@ save in spsr_svc
++#if defined(CONFIG_CPU_32v6K)
++	clrex					@ clear the exclusive monitor
++#elif defined (CONFIG_CPU_V6)
++	strex	r1, r2, [sp]			@ clear the exclusive monitor
++#endif
++	.if	\fast
++	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
++	.else
++	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
++	.endif
++	mov	r0, r0				@ ARMv5T and earlier require a nop
++						@ after ldm {}^
++	add	sp, sp, #S_FRAME_SIZE - S_PC
++	movs	pc, lr				@ return & move spsr_svc into cpsr
++	.endm
++
++	.macro	get_thread_info, rd
++	mov	\rd, sp, lsr #13
++	mov	\rd, \rd, lsl #13
++	.endm
++
++	@
++	@ 32-bit wide "mov pc, reg"
++	@
++	.macro	movw_pc, reg
++	mov	pc, \reg
++	.endm
++#else	/* CONFIG_THUMB2_KERNEL */
++	.macro	svc_exit, rpsr
++	clrex					@ clear the exclusive monitor
++	ldr	r0, [sp, #S_SP]			@ top of the stack
++	ldr	r1, [sp, #S_PC]			@ return address
++	tst	r0, #4				@ orig stack 8-byte aligned?
++	stmdb	r0, {r1, \rpsr}			@ rfe context
++	ldmia	sp, {r0 - r12}
++	ldr	lr, [sp, #S_LR]
++	addeq	sp, sp, #S_FRAME_SIZE - 8	@ aligned
++	addne	sp, sp, #S_FRAME_SIZE - 4	@ not aligned
++	rfeia	sp!
++	.endm
++
++	.macro	restore_user_regs, fast = 0, offset = 0
++	clrex					@ clear the exclusive monitor
++	mov	r2, sp
++	load_user_sp_lr r2, r3, \offset + S_SP	@ calling sp, lr
++	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
++	ldr	lr, [sp, #\offset + S_PC]	@ get pc
++	add	sp, sp, #\offset + S_SP
++	msr	spsr_cxsf, r1			@ save in spsr_svc
++	.if	\fast
++	ldmdb	sp, {r1 - r12}			@ get calling r1 - r12
++	.else
++	ldmdb	sp, {r0 - r12}			@ get calling r0 - r12
++	.endif
++	add	sp, sp, #S_FRAME_SIZE - S_SP
++	movs	pc, lr				@ return & move spsr_svc into cpsr
++	.endm
++
++	.macro	get_thread_info, rd
++	mov	\rd, sp
++	lsr	\rd, \rd, #13
++	mov	\rd, \rd, lsl #13
++	.endm
++
++	@
++	@ 32-bit wide "mov pc, reg"
++	@
++	.macro	movw_pc, reg
++	mov	pc, \reg
++	nop
++	.endm
++#endif	/* !CONFIG_THUMB2_KERNEL */
++
++/*
++ * These are the registers used in the syscall handler, and allow us to
++ * have in theory up to 7 arguments to a function - r0 to r6.
++ *
++ * r7 is reserved for the system call number for thumb mode.
++ *
++ * Note that tbl == why is intentional.
++ *
++ * We must set at least "tsk" and "why" when calling ret_with_reschedule.
++ */
++scno	.req	r7		@ syscall number
++tbl	.req	r8		@ syscall table pointer
++why	.req	r8		@ Linux syscall (!= 0)
++tsk	.req	r9		@ current thread_info
+--- 0001/arch/arm/kernel/entry-armv.S
++++ work/arch/arm/kernel/entry-armv.S	2010-10-05 20:03:00.000000000 +0900
+@@ -23,8 +23,7 @@
+ #include <asm/unwind.h>
+ #include <asm/unistd.h>
+ #include <asm/tls.h>
+-
+-#include "entry-header.S"
++#include <asm/entry-header.S>
+ 
+ /*
+  * Interrupt handling.  Preserves r7, r8, r9
+--- 0001/arch/arm/kernel/entry-common.S
++++ work/arch/arm/kernel/entry-common.S	2010-10-05 20:03:14.000000000 +0900
+@@ -12,8 +12,7 @@
+ #include <asm/ftrace.h>
+ #include <mach/entry-macro.S>
+ #include <asm/unwind.h>
+-
+-#include "entry-header.S"
++#include <asm/entry-header.S>
+ 
+ 
+ 	.align	5
+--- 0001/arch/arm/kernel/entry-header.S
++++ /dev/null	2010-09-30 18:32:39.608254290 +0900
+@@ -1,181 +0,0 @@
+-#include <linux/init.h>
+-#include <linux/linkage.h>
+-
+-#include <asm/assembler.h>
+-#include <asm/asm-offsets.h>
+-#include <asm/errno.h>
+-#include <asm/thread_info.h>
+-
+-@ Bad Abort numbers
+-@ -----------------
+-@
+-#define BAD_PREFETCH	0
+-#define BAD_DATA	1
+-#define BAD_ADDREXCPTN	2
+-#define BAD_IRQ		3
+-#define BAD_UNDEFINSTR	4
+-
+-@
+-@ Most of the stack format comes from struct pt_regs, but with
+-@ the addition of 8 bytes for storing syscall args 5 and 6.
+-@ This _must_ remain a multiple of 8 for EABI.
+-@
+-#define S_OFF		8
+-
+-/* 
+- * The SWI code relies on the fact that R0 is at the bottom of the stack
+- * (due to slow/fast restore user regs).
+- */
+-#if S_R0 != 0
+-#error "Please fix"
+-#endif
+-
+-	.macro	zero_fp
+-#ifdef CONFIG_FRAME_POINTER
+-	mov	fp, #0
+-#endif
+-	.endm
+-
+-	.macro	alignment_trap, rtemp
+-#ifdef CONFIG_ALIGNMENT_TRAP
+-	ldr	\rtemp, .LCcralign
+-	ldr	\rtemp, [\rtemp]
+-	mcr	p15, 0, \rtemp, c1, c0
+-#endif
+-	.endm
+-
+-	@
+-	@ Store/load the USER SP and LR registers by switching to the SYS
+-	@ mode. Useful in Thumb-2 mode where "stm/ldm rd, {sp, lr}^" is not
+-	@ available. Should only be called from SVC mode
+-	@
+-	.macro	store_user_sp_lr, rd, rtemp, offset = 0
+-	mrs	\rtemp, cpsr
+-	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
+-	msr	cpsr_c, \rtemp			@ switch to the SYS mode
+-
+-	str	sp, [\rd, #\offset]		@ save sp_usr
+-	str	lr, [\rd, #\offset + 4]		@ save lr_usr
+-
+-	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
+-	msr	cpsr_c, \rtemp			@ switch back to the SVC mode
+-	.endm
+-
+-	.macro	load_user_sp_lr, rd, rtemp, offset = 0
+-	mrs	\rtemp, cpsr
+-	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
+-	msr	cpsr_c, \rtemp			@ switch to the SYS mode
+-
+-	ldr	sp, [\rd, #\offset]		@ load sp_usr
+-	ldr	lr, [\rd, #\offset + 4]		@ load lr_usr
+-
+-	eor	\rtemp, \rtemp, #(SVC_MODE ^ SYSTEM_MODE)
+-	msr	cpsr_c, \rtemp			@ switch back to the SVC mode
+-	.endm
+-
+-#ifndef CONFIG_THUMB2_KERNEL
+-	.macro	svc_exit, rpsr
+-	msr	spsr_cxsf, \rpsr
+-#if defined(CONFIG_CPU_32v6K)
+-	clrex					@ clear the exclusive monitor
+-	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
+-#elif defined (CONFIG_CPU_V6)
+-	ldr	r0, [sp]
+-	strex	r1, r2, [sp]			@ clear the exclusive monitor
+-	ldmib	sp, {r1 - pc}^			@ load r1 - pc, cpsr
+-#else
+-	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
+-#endif
+-	.endm
+-
+-	.macro	restore_user_regs, fast = 0, offset = 0
+-	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+-	ldr	lr, [sp, #\offset + S_PC]!	@ get pc
+-	msr	spsr_cxsf, r1			@ save in spsr_svc
+-#if defined(CONFIG_CPU_32v6K)
+-	clrex					@ clear the exclusive monitor
+-#elif defined (CONFIG_CPU_V6)
+-	strex	r1, r2, [sp]			@ clear the exclusive monitor
+-#endif
+-	.if	\fast
+-	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
+-	.else
+-	ldmdb	sp, {r0 - lr}^			@ get calling r0 - lr
+-	.endif
+-	mov	r0, r0				@ ARMv5T and earlier require a nop
+-						@ after ldm {}^
+-	add	sp, sp, #S_FRAME_SIZE - S_PC
+-	movs	pc, lr				@ return & move spsr_svc into cpsr
+-	.endm
+-
+-	.macro	get_thread_info, rd
+-	mov	\rd, sp, lsr #13
+-	mov	\rd, \rd, lsl #13
+-	.endm
+-
+-	@
+-	@ 32-bit wide "mov pc, reg"
+-	@
+-	.macro	movw_pc, reg
+-	mov	pc, \reg
+-	.endm
+-#else	/* CONFIG_THUMB2_KERNEL */
+-	.macro	svc_exit, rpsr
+-	clrex					@ clear the exclusive monitor
+-	ldr	r0, [sp, #S_SP]			@ top of the stack
+-	ldr	r1, [sp, #S_PC]			@ return address
+-	tst	r0, #4				@ orig stack 8-byte aligned?
+-	stmdb	r0, {r1, \rpsr}			@ rfe context
+-	ldmia	sp, {r0 - r12}
+-	ldr	lr, [sp, #S_LR]
+-	addeq	sp, sp, #S_FRAME_SIZE - 8	@ aligned
+-	addne	sp, sp, #S_FRAME_SIZE - 4	@ not aligned
+-	rfeia	sp!
+-	.endm
+-
+-	.macro	restore_user_regs, fast = 0, offset = 0
+-	clrex					@ clear the exclusive monitor
+-	mov	r2, sp
+-	load_user_sp_lr r2, r3, \offset + S_SP	@ calling sp, lr
+-	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+-	ldr	lr, [sp, #\offset + S_PC]	@ get pc
+-	add	sp, sp, #\offset + S_SP
+-	msr	spsr_cxsf, r1			@ save in spsr_svc
+-	.if	\fast
+-	ldmdb	sp, {r1 - r12}			@ get calling r1 - r12
+-	.else
+-	ldmdb	sp, {r0 - r12}			@ get calling r0 - r12
+-	.endif
+-	add	sp, sp, #S_FRAME_SIZE - S_SP
+-	movs	pc, lr				@ return & move spsr_svc into cpsr
+-	.endm
+-
+-	.macro	get_thread_info, rd
+-	mov	\rd, sp
+-	lsr	\rd, \rd, #13
+-	mov	\rd, \rd, lsl #13
+-	.endm
+-
+-	@
+-	@ 32-bit wide "mov pc, reg"
+-	@
+-	.macro	movw_pc, reg
+-	mov	pc, \reg
+-	nop
+-	.endm
+-#endif	/* !CONFIG_THUMB2_KERNEL */
+-
+-/*
+- * These are the registers used in the syscall handler, and allow us to
+- * have in theory up to 7 arguments to a function - r0 to r6.
+- *
+- * r7 is reserved for the system call number for thumb mode.
+- *
+- * Note that tbl == why is intentional.
+- *
+- * We must set at least "tsk" and "why" when calling ret_with_reschedule.
+- */
+-scno	.req	r7		@ syscall number
+-tbl	.req	r8		@ syscall table pointer
+-why	.req	r8		@ Linux syscall (!= 0)
+-tsk	.req	r9		@ current thread_info
