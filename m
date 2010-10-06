@@ -1,97 +1,77 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 16:49:21 +0200
-Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
-	init/exit
-In-Reply-To: <20101006133309.GP13563@erda.amd.com>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
-	<20101006133309.GP13563@erda.amd.com>
-Message-ID: <20101006144921.GQ13563@erda.amd.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 06 Oct 2010 06:48:06 -0700
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <alpine.LFD.2.00.1010052246380.3107@xanadu.home>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
+Message-ID: <1286372886.22265.63.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.10 15:33:09, Robert Richter wrote:
-> On 04.10.10 16:44:22, Matt Fleming wrote:
-> > In preparation for moving the majority of this oprofile code into an
-> > architecture-neutral place separate the architecture-independent code
-> > into oprofile_perf_init() and oprofile_perf_exit().
-> > 
-> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> > Tested-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/oprofile/common.c |   17 ++++++++++++++---
-> >  1 files changed, 14 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index 86df75f..e4cd332 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -327,7 +327,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
-> >  		tail = user_backtrace(tail);
-> >  }
-> >  
-> > -int __init oprofile_arch_init(struct oprofile_operations *ops)
-> > +int __init oprofile_perf_init(struct oprofile_operations *ops)
-> >  {
-> >  	int cpu, ret = 0;
-> >  
-> > @@ -365,7 +365,6 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-> >  		}
-> >  	}
-> >  
-> > -	ops->backtrace		= arm_backtrace;
-> >  	ops->create_files	= oprofile_perf_create_files;
-> >  	ops->setup		= oprofile_perf_setup;
-> >  	ops->start		= oprofile_perf_start;
-> > @@ -388,7 +387,14 @@ out:
-> >  	return ret;
-> >  }
-> >  
-> > -void __exit oprofile_arch_exit(void)
-> > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+On Tue, 2010-10-05 at 22:55 -0400, Nicolas Pitre wrote:
+> On Tue, 5 Oct 2010, Daniel Walker wrote:
+> 
+> > +#if !defined(CONFIG_CPU_V7)
+> > +static inline char
+> > +__dcc_getchar(void)
 > > +{
-> 
-> We should do here a:
-> 
-> 	memset(ops, 0, sizeof(*ops));
-
-Matt,
-
-an alternative would be to move this to oprofile_perf_init() and
-modify ops->backtrace afterwards, but then we will lose the function's
-tail call. Not sure that is better. Paul, what do you think?
-
--Robert
-
-> 
-> Otherwise it looks good.
-> 
-> -Robert
-> 
-> > +	ops->backtrace		= arm_backtrace;
+> > +	char __c;
 > > +
-> > +	return oprofile_perf_init(ops);
+> > +	asm("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> > +		: "=r" (__c) : : "cc");
+> > +
+> > +	return __c;
 > > +}
-> > +
-> > +void __exit oprofile_perf_exit(void)
-> >  {
-> >  	int cpu, id;
-> >  	struct perf_event *event;
-> > @@ -406,6 +412,11 @@ void __exit oprofile_arch_exit(void)
-> >  	kfree(counter_config);
-> >  	exit_driverfs();
-> >  }
-> > +
-> > +void __exit oprofile_arch_exit(void)
+> > +#else
+> > +static inline char
+> > +__dcc_getchar(void)
 > > +{
-> > +	oprofile_perf_exit();
+> > +	char __c;
+> > +
+> > +	asm(
+> > +	"get_wait:	mrc p14, 0, pc, c0, c1, 0                   \n\
+> > +			bne get_wait                                    \n\
+> > +			mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> > +		: "=r" (__c) : : "cc");
+> > +
+> > +	return __c;
 > > +}
-> >  #else
-> >  int __init oprofile_arch_init(struct oprofile_operations *ops)
-> >  {
-> > -- 
-> > 1.7.1
+> > +#endif
+> > +
+> > +#if !defined(CONFIG_CPU_V7)
+> > +static inline void
+> > +__dcc_putchar(char c)
+> > +{
+> > +	asm("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+> > +		: /* no output register */
+> > +		: "r" (c) : "cc");
+> > +}
+> > +#else
+> > +static inline void
+> > +__dcc_putchar(char c)
+> > +{
+> > +	asm(
+> > +	"put_wait:	mrc p14, 0, pc, c0, c1, 0                   \n\
+> > +			bcs put_wait                                \n\
+> > +			mcr p14, 0, %0, c0, c5, 0                   "
+> > +	: : "r" (c) : "cc");
+> > +}
+> > +#endif
+> 
+> Please move the #ifdef conditionals inside the respective functions so 
+> to have only one function pair with the various alternatives embedded 
+> into them.
+
+My typical clean up policy is do to the inverse of what your suggesting.
+Mainly because that's the method that I see used extensive in generic
+parts of the kernel.
+
+>From my perspective there are pluses an minuses to both. Your method
+reduces lines, and duplication. My method makes the code easier to read.
+
+Daniel
 
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
