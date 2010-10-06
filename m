@@ -1,56 +1,60 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Wed,  6 Oct 2010 00:42:54 -0700
-Subject: [PATCH 15/20 v2] msm: add msm8x60_surf machine
+Date: Wed,  6 Oct 2010 00:42:56 -0700
+Subject: [PATCH 17/20 v2] msm: add MSM8x60 FFA support
 In-Reply-To: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
 References: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1286350979-19328-16-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1286350979-19328-18-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Muckle <smuckle@codeaurora.org>
+From: Gregory Bean <gbean@codeaurora.org>
 
-Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
+The MSM8X60 FFA contains different components than the MSM8X60 SURF,
+and therefore requires a different ARCH type and machine ID.
+
+Signed-off-by: Gregory Bean <gbean@codeaurora.org>
 ---
- arch/arm/mach-msm/Kconfig         |    8 +++++++-
+ arch/arm/mach-msm/Kconfig         |    9 ++++++++-
  arch/arm/mach-msm/board-msm8x60.c |    7 +++++++
- 2 files changed, 14 insertions(+), 1 deletions(-)
+ 2 files changed, 15 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index bc50a92..910db2e 100644
+index d5076eb..e469217 100644
 --- a/arch/arm/mach-msm/Kconfig
 +++ b/arch/arm/mach-msm/Kconfig
-@@ -38,7 +38,7 @@ config ARCH_MSM8X60
+@@ -38,7 +38,8 @@ config ARCH_MSM8X60
  	select ARM_GIC
  	select CPU_V7
  	select MSM_V2_TLMM
--	select MACH_MSM8X60_RUMI3 if (!MACH_MSM8X60_RUMI3)
-+	select MACH_MSM8X60_SURF if (!MACH_MSM8X60_RUMI3)
+-	select MACH_MSM8X60_SURF if (!MACH_MSM8X60_RUMI3 && !MACH_MSM8X60_SIM)
++	select MACH_MSM8X60_SURF if (!MACH_MSM8X60_RUMI3 && !MACH_MSM8X60_SIM \
++				  && !MACH_MSM8X60_FFA)
  
  endchoice
  
-@@ -97,6 +97,12 @@ config MACH_MSM8X60_RUMI3
+@@ -109,6 +110,12 @@ config MACH_MSM8X60_SIM
  	help
- 	  Support for the Qualcomm MSM8x60 RUMI3 emulator.
+ 	  Support for the Qualcomm MSM8x60 simulator.
  
-+config MACH_MSM8X60_SURF
++config MACH_MSM8X60_FFA
 +	depends on ARCH_MSM8X60
-+	bool "MSM8x60 SURF"
++	bool "MSM8x60 FFA"
 +	help
-+	  Support for the Qualcomm MSM8x60 SURF eval board.
++	  Support for the Qualcomm MSM8x60 FFA eval board.
 +
  endmenu
  
  config MSM_DEBUG_UART
 diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index 70087ca..a8a4d8d 100644
+index 95b0e36..7486a68 100644
 --- a/arch/arm/mach-msm/board-msm8x60.c
 +++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -76,3 +76,10 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+@@ -91,3 +91,10 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
  	.init_machine = msm8x60_init,
  	.timer = &msm_timer,
  MACHINE_END
 +
-+MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
++MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
 +	.map_io = msm8x60_map_io,
 +	.init_irq = msm8x60_init_irq,
 +	.init_machine = msm8x60_init,
