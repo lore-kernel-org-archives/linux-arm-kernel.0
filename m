@@ -1,20 +1,21 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 06 Oct 2010 23:25:11 +0100
-Subject: [PATCH 0/6] - Acer n35 fixes and features
-In-Reply-To: <4CA91E6F.3010704@vscht.cz>
-References: <4CA91E6F.3010704@vscht.cz>
-Message-ID: <4CACF747.9010601@fluff.org>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Thu, 07 Oct 2010 00:27:58 +0200
+Subject: [PATCH 1/2] ARM: S3C64XX: Add suspend support
+In-Reply-To: <4CACF6B8.9030304@fluff.org>
+References: <cover.1286319272.git.mcuelenaere@gmail.com>	<1fa4a7a39d9fd48b8329e1a1077a65adb96475b5.1286319272.git.mcuelenaere@gmail.com>
+	<AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
+	<4CACF6B8.9030304@fluff.org>
+Message-ID: <4CACF7EE.8090605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/10 01:23, Ji?? Pinkava wrote:
-> This series fix some minor bugs on Acer n35 and add new features:
-> 
->   * fix invalid key codes (typing error)
->   * Replace hardcoded numbers by named constants in UART configuration
->   * Fix MMC power management
->   * Add touchscreen support
->   * Add LCD backlight regulation
+ Op 07-10-10 00:22, Ben Dooks schreef:
+> I would still prefer each machine that can do pm to call s3c_pm_init()
+> in their setup code to ensure that we don't enable pm on a machine with
+> possibly incomplete support (especially as PM can be one of the more
+> difficult things to debug).
 
-first pass looks ok, will try and ensure they're in a branch in the
-next day or so.
+Ok, will resend this with the call only added to mach-smartq.c
+
+-- 
+Maurus Cuelenaere
