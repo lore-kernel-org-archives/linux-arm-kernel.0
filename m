@@ -1,59 +1,34 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 06 Oct 2010 06:44:29 -0700
-Subject: [PATCH 3/3] [ARM] Implement a timer based __delay() loop
-In-Reply-To: <4CABEECF.9080009@codeaurora.org>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-	<1285644827-6846-4-git-send-email-sboyd@codeaurora.org>
-	<1286300338.18791.26.camel@c-dwalke-linux.qualcomm.com>
-	<4CABEECF.9080009@codeaurora.org>
-Message-ID: <1286372669.22265.59.camel@m0nster>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 6 Oct 2010 22:41:31 +0900
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <20101006133309.GP13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+	<20101006133309.GP13563@erda.amd.com>
+Message-ID: <20101006134130.GB29273@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-10-05 at 20:36 -0700, Stephen Boyd wrote:
-> On 10/05/2010 10:38 AM, Daniel Walker wrote:
-> >>  
-> >> +#ifdef ARCH_HAS_READ_CURRENT_TIMER
-> >> +/*
-> >> + * Assuming read_current_timer() is monotonically increasing
-> >> + * across calls.
-> > You should add more comments here. You assuming that it's monotonic over
-> > a 2000us (2ms) period .. I'm not sure this is a good assumption this
-> > timer may not be monotonically increasing all the time, what happens
-> > then?
+On Wed, Oct 06, 2010 at 03:33:09PM +0200, Robert Richter wrote:
+> On 04.10.10 16:44:22, Matt Fleming wrote:
+> > @@ -388,7 +387,14 @@ out:
+> >  	return ret;
+> >  }
+> >  
+> > -void __exit oprofile_arch_exit(void)
+> > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+> > +{
 > 
-> Ok I'll add that it shouldn't wrap more than once within 2000us (or
-> should I say 5ms since mdelay uses udelay?). Is that what you're saying
-> by it not being monotonically increasing? If a timer isn't increasing
-> the tick count it's broken and this call will loop forever. If the timer
-> wraps, we'll be safe due to unsigned maths as long as it wraps only once.
-
-I was saying it could be near wrapping when this process starts, then
-wrap in the middle. The unsigned math thing should work I think, but add
-a comment .. Your basically saying it's OK if it wraps, but the comment
-says it needs to be "monotonically increasing" which actually doesn't
-appear to be true. It needs to not wrap twice during this process.
-
-> >> +void read_current_timer_delay_loop(unsigned long loops)
-> >> +{
-> >> +	unsigned long bclock, now;
-> >> +
-> >> +	read_current_timer(&bclock);
-> >> +	do {
-> >> +		read_current_timer(&now);
-> >> +	} while ((now - bclock) < loops);
-> > Have you looked at time_before()/time_after() ?
+> We should do here a:
 > 
-> Nope. Wouldn't that require an addition though to make it work? I'd
-> rather just leave it like it is.
+> 	memset(ops, 0, sizeof(*ops));
+> 
+> Otherwise it looks good.
+> 
+What kind of crap interface is oprofile peddling, seriously?
 
-I'm not saying you should change it, I'm saying look at those macro's to
-make sure your doing thinks correctly.
-
-Daniel
-
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+You expect every single architecture to clear this structure that gets
+passed in from the oprofile code without having any idea if there are
+defaults assigned or not, instead of just having the oprofile code clear
+it out before passing it along?
