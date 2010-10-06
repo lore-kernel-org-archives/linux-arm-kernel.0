@@ -1,115 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 06 Oct 2010 11:30:43 -0700
-Subject: [PATCH 1/3] [ARM] Translate delay.S into (mostly) C
-In-Reply-To: <alpine.LFD.2.00.1010061024220.3107@xanadu.home>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-	<1285644827-6846-2-git-send-email-sboyd@codeaurora.org>
-	<1286299355.18791.11.camel@c-dwalke-linux.qualcomm.com>
-	<4CABEECB.4030301@codeaurora.org>
-	<alpine.LFD.2.00.1010061024220.3107@xanadu.home>
-Message-ID: <4CACC053.2090509@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 6 Oct 2010 12:23:17 -0600
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <20101006145903.GR13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+	<20101006133309.GP13563@erda.amd.com>
+	<20101006144921.GQ13563@erda.amd.com>
+	<20101006145311.GA3754@linux-sh.org>
+	<20101006145903.GR13563@erda.amd.com>
+Message-ID: <AANLkTikGQe99k_fK5pZtkn-ht9jgC0guDkn28dSedjUo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 10/06/2010 07:26 AM, Nicolas Pitre wrote:
->> Ok.
+On Wed, Oct 6, 2010 at 8:59 AM, Robert Richter <robert.richter@amd.com> wrote:
+> On 06.10.10 10:53:11, Paul Mundt wrote:
+>> On Wed, Oct 06, 2010 at 04:49:21PM +0200, Robert Richter wrote:
+>> > On 06.10.10 15:33:09, Robert Richter wrote:
+>> > > On 04.10.10 16:44:22, Matt Fleming wrote:
+>> > > > -void __exit oprofile_arch_exit(void)
+>> > > > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+>> > > > +{
+>> > >
+>> > > We should do here a:
+>> > >
+>> > > ? memset(ops, 0, sizeof(*ops));
+>> >
+>> > Matt,
+>> >
+>> > an alternative would be to move this to oprofile_perf_init() and
+>> > modify ops->backtrace afterwards, but then we will lose the function's
+>> > tail call. Not sure that is better. Paul, what do you think?
+>> >
+>> I'm a bit confused as to why we just don't do:
 >>
->> $ size vmlinux.orig
->>    text    data     bss     dec     hex filename
->> 6533503  530232 1228296 8292031  7e86bf vmlinux.orig
->> $ size vmlinux.new
->>    text    data     bss     dec     hex filename
->> 6533607  530232 1228296 8292135  7e8727 vmlinux.new
+>> ---
+>>
+>> diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
+>> index b336cd9..76d97a5 100644
+>> --- a/drivers/oprofile/oprof.c
+>> +++ b/drivers/oprofile/oprof.c
+>> @@ -252,6 +252,8 @@ static int __init oprofile_init(void)
+>> ?{
+>> ? ? ? int err;
+>>
+>> + ? ? memset(&oprofile_ops, 0, sizeof(struct oprofile_operations));
+>> +
 >
-> If you modified only one source file then I'd suggest you run 'size' 
-> only on the affected .o file instead.
+> Yes, this looks much better. Thanks Paul.
 
-Ok.
+oprofile_ops is allocated in bss and so is already zeroed.  No need to
+do it explicitly.
 
-$ size delay.o.orig
-   text    data     bss     dec     hex filename
-     56       0       0      56      38 delay.o.orig
-$ size delay.o.new
-   text    data     bss     dec     hex filename
-    192       0       0     192      c0 delay.o.new
-
-Perhaps I should mark __delay and __const_udelay as noinline?
-
-$ size delay.o.noinline
-   text    data     bss     dec     hex filename
-    144       0       0     144      90 delay.o.noinline
-
-Now we get backwards branching.
-
-$ objdump -d delay.o.noinline
-
-Disassembly of section .text:
-
-00000000 <__delay>:
-   0:   e2500001        subs    r0, r0, #1      ; 0x1
-   4:   8afffffd        bhi     0 <__delay>
-   8:   e12fff1e        bx      lr
-
-0000000c <__const_udelay>:
-   c:   e59f3018        ldr     r3, [pc, #24]   ; 2c <__const_udelay+0x20>
-  10:   e1a00720        lsr     r0, r0, #14
-  14:   e5933000        ldr     r3, [r3]
-  18:   e1a03523        lsr     r3, r3, #10
-  1c:   e0000093        mul     r0, r3, r0
-  20:   e1b00320        lsrs    r0, r0, #6
-  24:   012fff1e        bxeq    lr
-  28:   eafffffe        b       0 <__delay>
-  2c:   00000000        .word   0x00000000
-
-00000030 <__udelay>:
-  30:   e59f3004        ldr     r3, [pc, #4]    ; 3c <__udelay+0xc>
-  34:   e0000093        mul     r0, r3, r0
-  38:   eafffffe        b       c <__const_udelay>
-  3c:   0001a36e        .word   0x0001a36e
-
-Is there some way to force GCC to do what I want (interleave the
-functions)? It seems happy to inline them and then optimize the register
-usage and instruction ordering. Perhaps that is OK though and we're
-wasting our time trying to be conservative in code size.
-
-$ objdump -d delay.o.new
-
-Disassembly of section .text:
-
-00000000 <__delay>:
-   0:   e2500001        subs    r0, r0, #1      ; 0x1
-   4:   8afffffd        bhi     0 <__delay>
-   8:   e12fff1e        bx      lr
-
-0000000c <__const_udelay>:
-   c:   e59f3020        ldr     r3, [pc, #32]   ; 34 <__const_udelay+0x28>
-  10:   e1a00720        lsr     r0, r0, #14
-  14:   e5933000        ldr     r3, [r3]
-  18:   e1a03523        lsr     r3, r3, #10
-  1c:   e0000093        mul     r0, r3, r0
-  20:   e1b00320        lsrs    r0, r0, #6
-  24:   012fff1e        bxeq    lr
-  28:   e2500001        subs    r0, r0, #1      ; 0x1
-  2c:   8afffffd        bhi     28 <__const_udelay+0x1c>
-  30:   e12fff1e        bx      lr
-  34:   00000000        .word   0x00000000
-
-00000038 <__udelay>:
-  38:   e59f3028        ldr     r3, [pc, #40]   ; 68 <__udelay+0x30>
-  3c:   e59f2028        ldr     r2, [pc, #40]   ; 6c <__udelay+0x34>
-  40:   e0030093        mul     r3, r3, r0
-  44:   e5922000        ldr     r2, [r2]
-  48:   e1a02522        lsr     r2, r2, #10
-  4c:   e1a03723        lsr     r3, r3, #14
-  50:   e0030392        mul     r3, r2, r3
-  54:   e1b03323        lsrs    r3, r3, #6
-  58:   012fff1e        bxeq    lr
-  5c:   e2533001        subs    r3, r3, #1      ; 0x1
-  60:   8afffffd        bhi     5c <__udelay+0x24>
-  64:   e12fff1e        bx      lr
-  68:   0001a36e        .word   0x0001a36e
-  6c:   00000000        .word   0x00000000
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+g.
