@@ -1,89 +1,143 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Wed,  6 Oct 2010 00:42:40 -0700
-Subject: [PATCH 01/20 v2] msm: create config option for proc-comm
+Date: Wed,  6 Oct 2010 00:42:41 -0700
+Subject: [PATCH 02/20 v2] msm: io: MSM8X60 io support
 In-Reply-To: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
 References: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1286350979-19328-2-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1286350979-19328-3-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steve Muckle <smuckle@codeaurora.org>
 
-Some builds may not support the proc-comm interface with
-the baseband processor.
+MSM8X60 has different IO mappings than previous MSMs.
 
 Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
 ---
- arch/arm/mach-msm/Kconfig  |    7 +++++++
- arch/arm/mach-msm/Makefile |    7 ++-----
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/mach-msm/include/mach/io.h             |    1 +
+ arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |   57 +++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/msm_iomap.h      |    4 ++
+ arch/arm/mach-msm/io.c                          |   15 ++++++
+ 4 files changed, 77 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 47264a7..90f9b17 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -10,6 +10,7 @@ config ARCH_MSM7X00A
- 	select MSM_SMD
- 	select MSM_SMD_PKG3
- 	select CPU_V6
-+	select MSM_PROC_COMM
+diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
+index c35b29f..7386e73 100644
+--- a/arch/arm/mach-msm/include/mach/io.h
++++ b/arch/arm/mach-msm/include/mach/io.h
+@@ -28,6 +28,7 @@ void __iomem *__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int m
  
- config ARCH_MSM7X30
- 	bool "MSM7x30"
-@@ -18,6 +19,7 @@ config ARCH_MSM7X30
- 	select MSM_VIC
- 	select CPU_V7
- 	select MSM_REMOTE_SPINLOCK_DEKKERS
-+	select MSM_PROC_COMM
+ void msm_map_qsd8x50_io(void);
+ void msm_map_msm7x30_io(void);
++void msm_map_msm8x60_io(void);
  
- config ARCH_QSD8X50
- 	bool "QSD8X50"
-@@ -26,6 +28,8 @@ config ARCH_QSD8X50
- 	select MSM_VIC
- 	select CPU_V7
- 	select MSM_REMOTE_SPINLOCK_LDREX
-+	select MSM_PROC_COMM
+ extern unsigned int msm_shared_ram_phys;
+ 
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+new file mode 100644
+index 0000000..1f1822b
+--- /dev/null
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+@@ -0,0 +1,57 @@
++/*
++ * Copyright (C) 2007 Google, Inc.
++ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
++ * Author: Brian Swetland <swetland@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ *
++ * The MSM peripherals are spread all over across 768MB of physical
++ * space, which makes just having a simple IO_ADDRESS macro to slide
++ * them into the right virtual location rough.  Instead, we will
++ * provide a master phys->virt mapping for peripherals here.
++ *
++ */
 +
- endchoice
- 
- config MSM_SOC_REV_A
-@@ -103,6 +107,9 @@ endchoice
- config MSM_SMD_PKG3
- 	bool
- 
-+config MSM_PROC_COMM
-+	bool
++#ifndef __ASM_ARCH_MSM_IOMAP_8X60_H
++#define __ASM_ARCH_MSM_IOMAP_8X60_H
 +
- config MSM_SMD
- 	bool
++/* Physical base address and size of peripherals.
++ * Ordered by the virtual base addresses they will be mapped at.
++ *
++ * MSM_VIC_BASE must be an value that can be loaded via a "mov"
++ * instruction, otherwise entry-macro.S will not compile.
++ *
++ * If you add or remove entries here, you'll want to edit the
++ * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
++ * changes.
++ *
++ */
++
++#define MSM_QGIC_DIST_BASE	IOMEM(0xF0000000)
++#define MSM_QGIC_DIST_PHYS	0x02080000
++#define MSM_QGIC_DIST_SIZE	SZ_4K
++
++#define MSM_QGIC_CPU_BASE	IOMEM(0xF0001000)
++#define MSM_QGIC_CPU_PHYS	0x02081000
++#define MSM_QGIC_CPU_SIZE	SZ_4K
++
++#define MSM_ACC_BASE		IOMEM(0xF0002000)
++#define MSM_ACC_PHYS		0x02001000
++#define MSM_ACC_SIZE		SZ_4K
++
++#define MSM_GCC_BASE		IOMEM(0xF0003000)
++#define MSM_GCC_PHYS		0x02082000
++#define MSM_GCC_SIZE		SZ_4K
++
++#define MSM_SHARED_RAM_BASE	IOMEM(0xF0100000)
++#define MSM_SHARED_RAM_SIZE	SZ_1M
++
++#endif
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
+index e6b1821..8e24dd8 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
+@@ -47,8 +47,12 @@
+ #include "msm_iomap-7x30.h"
+ #elif defined(CONFIG_ARCH_QSD8X50)
+ #include "msm_iomap-8x50.h"
++#elif defined(CONFIG_ARCH_MSM8X60)
++#include "msm_iomap-8x60.h"
+ #else
+ #include "msm_iomap-7x00.h"
+ #endif
  
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 7046106..6105d4f 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -1,9 +1,5 @@
--obj-y += proc_comm.o
- obj-y += io.o idle.o timer.o dma.o
--obj-y += vreg.o
- obj-y += acpuclock-arm11.o
--obj-y += clock.o clock-pcom.o
--obj-y += gpio.o
++
++
+ #endif
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 1c05060..d36b610 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -100,6 +100,21 @@ void __init msm_map_qsd8x50_io(void)
+ }
+ #endif /* CONFIG_ARCH_QSD8X50 */
  
- ifdef CONFIG_MSM_VIC
- obj-y += irq-vic.o
-@@ -11,10 +7,11 @@ else
- obj-y += irq.o
- endif
- 
-+obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
-+obj-$(CONFIG_MSM_PROC_COMM) += clock.o gpio.c
- obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
- obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
- obj-$(CONFIG_MSM_SMD) += last_radio_log.o
--
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
- obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
++#ifdef CONFIG_ARCH_MSM8X60
++static struct map_desc msm8x60_io_desc[] __initdata = {
++	MSM_DEVICE(QGIC_DIST),
++	MSM_DEVICE(QGIC_CPU),
++	MSM_DEVICE(TMR),
++	MSM_DEVICE(ACC),
++	MSM_DEVICE(GCC),
++};
++
++void __init msm_map_msm8x60_io(void)
++{
++	iotable_init(msm8x60_io_desc, ARRAY_SIZE(msm8x60_io_desc));
++}
++#endif /* CONFIG_ARCH_MSM8X60 */
++
+ #ifdef CONFIG_ARCH_MSM7X30
+ static struct map_desc msm7x30_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
 -- 
 1.7.2.1
 
