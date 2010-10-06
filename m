@@ -1,75 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Oct 2010 11:47:12 -0400 (EDT)
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <1286379197.22265.95.camel@m0nster>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
-	<1286372886.22265.63.camel@m0nster>
-	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
-	<1286376581.22265.85.camel@m0nster>
-	<alpine.LFD.2.00.1010061109110.3107@xanadu.home>
-	<1286379197.22265.95.camel@m0nster>
-Message-ID: <alpine.LFD.2.00.1010061144560.3107@xanadu.home>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Oct 2010 00:46:13 +0900
+Subject: [PATCH 2/7] perf: New helper function for pmu name
+In-Reply-To: <20101006153710.GS13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
+	<20101006122736.GL13563@erda.amd.com>
+	<20101006123950.GA29118@linux-sh.org>
+	<20101006131825.GO13563@erda.amd.com>
+	<20101006133041.GA29273@linux-sh.org>
+	<20101006141347.GA32376@linux-sh.org>
+	<20101006153710.GS13563@erda.amd.com>
+Message-ID: <20101006154613.GA10220@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Oct 2010, Daniel Walker wrote:
-
-> On Wed, 2010-10-06 at 11:21 -0400, Nicolas Pitre wrote:
+On Wed, Oct 06, 2010 at 05:37:10PM +0200, Robert Richter wrote:
+> On 06.10.10 10:13:47, Paul Mundt wrote:
+> > if there were a generic perf to oprofile pmu name mangler that did this
 > 
-> > static inline char
-> > __dcc_getchar(void)
-> > {
-> >      char __c;
-> > 
-> > #if !defined(CONFIG_CPU_V7)
-> >      asm("mrc p14, 0, %0, c0, c5, 0  @ read comms data reg"
-> >              : "=r" (__c) : : "cc");
-> > #else
-> >      asm(
-> >      "get_wait:      mrc p14, 0, pc, c0, c1, 0                       \n\
-> >                      bne get_wait                                    \n\
-> >                      mrc p14, 0, %0, c0, c5, 0       @ read comms data reg"
-> >              : "=r" (__c) : : "cc");
-> > #endif
-> > 
-> >      return __c;
-> > }
-> > 
-> > static inline void
-> > __dcc_putchar(char c)
-> > {
-> > #if !defined(CONFIG_CPU_V7)
-> >      asm("mcr p14, 0, %0, c0, c5, 0  @ write a char"
-> >              : /* no output register */
-> >              : "r" (c) : "cc");
-> > #else
-> >      asm(
-> >      "put_wait:      mrc p14, 0, pc, c0, c1, 0                   \n\
-> >                      bcs put_wait                                \n\
-> >                      mcr p14, 0, %0, c0, c5, 0                   "
-> >      : : "r" (c) : "cc");
-> > #endif
-> > }
-> > 
-> > To me the above is easier to read.  Not a big deal since the functions 
-> > are rather small, but still an improvement.  Searching for __dcc_putchar 
-> > would produce a single hit, and if the prototype has to change it is 
-> > done in only one place, etc.
+> Or, do you mean here to derive an oprofile name from the pmu string in
+> a generic way? I was suggesting this for SH when commenting on version
+> 3 of this patch set. We dropped this idea to keep changes simple for
+> this initial patch set, because it was much easier to implement it
+> with strcmp() and the pmu strings are not expected to be changed for
+> sh in the near future.
 > 
-> It makes the internals of the function much more busy. There's more
-> stuff that could be executing that you have to think about while
-> reviewing the function.
+Yes, this is what I meant, so it seems we basically have a consensus
+after all.
 
-I still stand by my opinion that the above is better.  Feel free to 
-ignore me.
-
-> > BTW the cc clobber in the asm for __dcc_putchar() is unneeded.
+> So, can't we use op_name_from_perf_name() from [PATCH -v3 6/6] for SH
+> here and implement a perf_pmu_name() function for sh that is part of
+> perf's generic interface? 
 > 
-> Without it caused a crash in __dcc_getchar() ..
+As long as perf_pmu_name() is generically provided and we just have
+architecture overrides as necessary, then this is fine. If
+perf_pmu_name() is __weak then we can provide an override in the SH code
+that returns the PMU name without issue, and we don't have to expose
+sh_pmu generically, so this is the solution I prefer.
 
-It is the wrong fix nevertheless.  And in this case it isn't a question 
-of opinion.
+That is assuming that perf folks are ok with a generic perf_pmu_name()
+anyways!
 
+Once that is provided, we can simply have the oprofile wrapper provide a
+generic op_name_from_perf_name() that does the arch/perf_pmu_name()
+string contstruction for the oprofile case, and then start killing off
+the special cases.
 
-Nicolas
+> Later we can add a generic function for sh ...
+> 
+> > it would cover almost all of the ARM cases already, the SH strings I'm
+> > happy to convert to work this way, and a good chunk of the PowerPC PMUs
+> > would work fine, too. PowerPC already has an oprofile CPU string in its
+> > CPU spec, so this would be even more trivial to wire up there if such a
+> > generic interface were to exist.
+> > 
+> > This would just leave x86 as the odd one out, but I suppose if x86 were
+> > to move to the oprofile perf wrapper in the future then a bit of id to
+> > name mangling as an override wouldn't be too much work.
+> 
+> ... and also other architectures on top of these patches.
+> 
+That sounds like a plan to me.
