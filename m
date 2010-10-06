@@ -1,31 +1,34 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 06 Oct 2010 12:35:43 -0700
-Subject: [PATCH 1/3] [ARM] Translate delay.S into (mostly) C
-In-Reply-To: <4CACC053.2090509@codeaurora.org>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-	<1285644827-6846-2-git-send-email-sboyd@codeaurora.org>
-	<1286299355.18791.11.camel@c-dwalke-linux.qualcomm.com>
-	<4CABEECB.4030301@codeaurora.org>
-	<alpine.LFD.2.00.1010061024220.3107@xanadu.home>
-	<4CACC053.2090509@codeaurora.org>
-Message-ID: <1286393743.22265.129.camel@m0nster>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 6 Oct 2010 20:45:07 +0100
+Subject: [PATCH 6/7] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <20101006183549.GW13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<db62cbe463d5bce89196d6456ad386129ce0022a.1286222593.git.matt@console-pimps.org>
+	<20101006183549.GW13563@erda.amd.com>
+Message-ID: <20101006194507.GA30419@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-06 at 11:30 -0700, Stephen Boyd wrote:
-> Is there some way to force GCC to do what I want (interleave the
-> functions)? It seems happy to inline them and then optimize the
-> register
-> usage and instruction ordering. Perhaps that is OK though and we're
-> wasting our time trying to be conservative in code size. 
+On Wed, Oct 06, 2010 at 08:35:49PM +0200, Robert Richter wrote:
+> On 04.10.10 16:44:24, Matt Fleming wrote:
+> > Now that we've got a generic perf-events based oprofile backend we might
+> > as well make use of it seeing as SH doesn't do anything special with its
+> > oprofile backend. Also introduce a new CONFIG_HW_PERF_EVENTS symbol so
+> > that we can fallback to using the timer interrupt for oprofile if the
+> > CPU doesn't support perf events.
+> > 
+> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> > ---
+> >  arch/sh/Kconfig            |   13 +++++
+> >  arch/sh/oprofile/Makefile  |    4 ++
+> >  arch/sh/oprofile/common.c  |  109 ++++---------------------------------------
+> >  arch/sh/oprofile/op_impl.h |   33 -------------
+> >  4 files changed, 28 insertions(+), 131 deletions(-)
+> >  delete mode 100644 arch/sh/oprofile/op_impl.h
+> 
+> This patch looks good.
+> 
+> We might merge it with patch 7/7.
 
-Is it possible to do all this in assembly ? Can't you have the default
-implementation using this assembly with different function names, then
-just set the assembly function names in C code someplace?
-
-Daniel
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+This patch was broken out for Paul's benefit to ease review. If he's
+happy for me to merge this with 7/7 then that's fine with me.
