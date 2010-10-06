@@ -1,34 +1,25 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 6 Oct 2010 22:41:31 +0900
-Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
-	init/exit
-In-Reply-To: <20101006133309.GP13563@erda.amd.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 06 Oct 2010 15:41:32 +0200
+Subject: [PATCH 1/7] perf: Add helper function to return number of counters
+In-Reply-To: <20101006121410.GK13563@erda.amd.com>
 References: <cover.1286222593.git.matt@console-pimps.org>
-	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
-	<20101006133309.GP13563@erda.amd.com>
-Message-ID: <20101006134130.GB29273@linux-sh.org>
+	<c4eb88b09da564fe093cc6571ed747971425e69a.1286222593.git.matt@console-pimps.org>
+	<20101006121410.GK13563@erda.amd.com>
+Message-ID: <1286372492.2144.181.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 03:33:09PM +0200, Robert Richter wrote:
-> On 04.10.10 16:44:22, Matt Fleming wrote:
-> > @@ -388,7 +387,14 @@ out:
-> >  	return ret;
-> >  }
-> >  
-> > -void __exit oprofile_arch_exit(void)
-> > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+On Wed, 2010-10-06 at 14:14 +0200, Robert Richter wrote:
+> > +int perf_num_counters(void)
 > > +{
+> > +     return armpmu_get_max_events();
+> > +}
+> > +EXPORT_SYMBOL_GPL(perf_num_counters);
 > 
-> We should do here a:
+> Peter,
 > 
-> 	memset(ops, 0, sizeof(*ops));
-> 
-> Otherwise it looks good.
-> 
-What kind of crap interface is oprofile peddling, seriously?
+> can you please ack this interface? 
 
-You expect every single architecture to clear this structure that gets
-passed in from the oprofile code without having any idea if there are
-defaults assigned or not, instead of just having the oprofile code clear
-it out before passing it along?
+It does seem like the best way forward for this, so
+
+Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
