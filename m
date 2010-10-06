@@ -1,74 +1,49 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Oct 2010 11:21:24 -0400 (EDT)
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <1286376581.22265.85.camel@m0nster>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
-	<1286372886.22265.63.camel@m0nster>
-	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
-	<1286376581.22265.85.camel@m0nster>
-Message-ID: <alpine.LFD.2.00.1010061109110.3107@xanadu.home>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Wed, 06 Oct 2010 16:08:07 +0100
+Subject: [PATCH 00/10] OMAP: SCM/McBSP/clock: branch integration
+	patches for 2.6.37
+In-Reply-To: <20101006144807.GB2913@atomide.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101005155242.20900538.jhnikula@gmail.com>
+	<20101005184017.GP3117@atomide.com>
+	<201010060842.21260.peter.ujfalusi@nokia.com>
+	<20101006144807.GB2913@atomide.com>
+Message-ID: <1286377687.5662.24.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Oct 2010, Daniel Walker wrote:
-
-> On Wed, 2010-10-06 at 10:22 -0400, Nicolas Pitre wrote:
-> > On Wed, 6 Oct 2010, Daniel Walker wrote:
+On Wed, 2010-10-06 at 07:48 -0700, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@nokia.com> [101005 22:33]:
+> > On Tuesday 05 October 2010 21:40:17 ext Tony Lindgren wrote:
 > > 
-> > > From my perspective there are pluses an minuses to both. Your method
-> > > reduces lines, and duplication. My method makes the code easier to read.
+> > ...
 > > 
-> > I disagree.  In reviewing your patch I had to go back and forth between 
-> > the different versions just to figure out what was actually different to 
-> > justify this #ifdef in the first place.  If the #ifdef..#endif was 
-> > surrounding only the different inline asm statements then the difference 
-> > would have been more obvious.
+> > > > For patches 6-7 you could have my ack.
+> > > > Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+> > > > 
+> > > > As they are touching also sound/soc/omap/omap-mcbsp.c, an ack from Mark
+> > > > and Liam are needed. Links to patches 6 and 7 below and my fixes on top
+> > > > of them [1].
+> > > > 
+> > > > http://marc.info/?l=linux-omap&m=128596931117788&w=2
+> > > > http://marc.info/?l=linux-omap&m=128596931417805&w=2
+> > > 
+> > > Sorry, I've already merged them as they fixed code that did not compile.
+> > > 
+> > > Let me know if you guys want me to rebuild those parts of omap-for-linus
+> > > to add the acks.
+> > 
+> > If you decide to rebuild, than you can add my (for patch 6-7):
+> > Acked-by: Peter Ujfalusi <peter.ujfalusi@nokia.com> 
 > 
-> You would have had to go back and forth either way , wouldn't you? In
-> this case the functions are actually totally different.
+> OK, let's do that then we should still have some time left before the
+> merge window.
+> 
+> Mark & Liam, care to ack as well?
+> 
 
-static inline char
-__dcc_getchar(void)
-{
-     char __c;
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
 
-#if !defined(CONFIG_CPU_V7)
-     asm("mrc p14, 0, %0, c0, c5, 0  @ read comms data reg"
-             : "=r" (__c) : : "cc");
-#else
-     asm(
-     "get_wait:      mrc p14, 0, pc, c0, c1, 0                       \n\
-                     bne get_wait                                    \n\
-                     mrc p14, 0, %0, c0, c5, 0       @ read comms data reg"
-             : "=r" (__c) : : "cc");
-#endif
+Thanks
 
-     return __c;
-}
-
-static inline void
-__dcc_putchar(char c)
-{
-#if !defined(CONFIG_CPU_V7)
-     asm("mcr p14, 0, %0, c0, c5, 0  @ write a char"
-             : /* no output register */
-             : "r" (c) : "cc");
-#else
-     asm(
-     "put_wait:      mrc p14, 0, pc, c0, c1, 0                   \n\
-                     bcs put_wait                                \n\
-                     mcr p14, 0, %0, c0, c5, 0                   "
-     : : "r" (c) : "cc");
-#endif
-}
-
-To me the above is easier to read.  Not a big deal since the functions 
-are rather small, but still an improvement.  Searching for __dcc_putchar 
-would produce a single hit, and if the prototype has to change it is 
-done in only one place, etc.
-
-BTW the cc clobber in the asm for __dcc_putchar() is unneeded.
-
-
-Nicolas
+Liam
