@@ -1,61 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Oct 2010 09:26:34 -0600
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-In-Reply-To: <AANLkTim10exCZChSNq-jYHcxff3myp8oGkytpYd3=8Vt@mail.gmail.com>
-References: <20101006071731.28048.89938.sendpatchset@t400s>
-	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-	<AANLkTinm+bJduJ+46eUb8TA_v644Ui6j+zeBUKegofY7@mail.gmail.com>
-	<AANLkTimD=-W3Mfdhvdj_1EHWA9jCY8KMBvsC-COfEPpX@mail.gmail.com>
-	<AANLkTim10exCZChSNq-jYHcxff3myp8oGkytpYd3=8Vt@mail.gmail.com>
-Message-ID: <AANLkTi=qmY2gUFwK8-kK2sf7WL-tmRjVgGgowWR0yYHC@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 06 Oct 2010 11:21:24 -0400 (EDT)
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <1286376581.22265.85.camel@m0nster>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
+	<1286372886.22265.63.camel@m0nster>
+	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
+	<1286376581.22265.85.camel@m0nster>
+Message-ID: <alpine.LFD.2.00.1010061109110.3107@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 6, 2010 at 9:11 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Wed, Oct 6, 2010 at 11:06 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> On Wed, Oct 6, 2010 at 10:58 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> On Wed, Oct 6, 2010 at 7:06 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>>> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>>> ARM: Dynamic IRQ demux support
->>>>>
->>>>> [PATCH 01/08] ARM: Move entry-header.S to asm/
->>>>> [PATCH 02/08] ARM: Move macros from entry-armv.S
->>>>> [PATCH 03/08] ARM: Make alignment_trap macro self-contained
->>>>> [PATCH 04/08] ARM: Convert __irq_svc and __usr_svc to macros
->>>>> [PATCH 05/08] ARM: Move the unwind header to entry-header.S
->>>>> [PATCH 06/08] ARM: Add setup_irq_stubs() function
->>>>> [PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
->>>>> [PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
->>>>>
->>>>
->>>> Hi Magnus,
->>>>
->>>> Just FYI, I had a patch months ago for this:
->>>>
->>>> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
->>>>
->>>> Do you think that's a simpler way to go?
->>>
->>> Speaking of which, what is the status of your patch? ?I see you
->>> reposted it on July 13, but I haven't seen any further feedback.
->>>
->>
->> I should have posted it in Russell's patch tracking system, yet not
->> merged in last cycle.
->>
->> Russell?
->
-> Got his wrong email address, now corrected and post again.
+On Wed, 6 Oct 2010, Daniel Walker wrote:
 
-If you don't mind, please cc me when you repost.
+> On Wed, 2010-10-06 at 10:22 -0400, Nicolas Pitre wrote:
+> > On Wed, 6 Oct 2010, Daniel Walker wrote:
+> > 
+> > > From my perspective there are pluses an minuses to both. Your method
+> > > reduces lines, and duplication. My method makes the code easier to read.
+> > 
+> > I disagree.  In reviewing your patch I had to go back and forth between 
+> > the different versions just to figure out what was actually different to 
+> > justify this #ifdef in the first place.  If the #ifdef..#endif was 
+> > surrounding only the different inline asm statements then the difference 
+> > would have been more obvious.
+> 
+> You would have had to go back and forth either way , wouldn't you? In
+> this case the functions are actually totally different.
 
-Thanks,
-g.
+static inline char
+__dcc_getchar(void)
+{
+     char __c;
 
->
+#if !defined(CONFIG_CPU_V7)
+     asm("mrc p14, 0, %0, c0, c5, 0  @ read comms data reg"
+             : "=r" (__c) : : "cc");
+#else
+     asm(
+     "get_wait:      mrc p14, 0, pc, c0, c1, 0                       \n\
+                     bne get_wait                                    \n\
+                     mrc p14, 0, %0, c0, c5, 0       @ read comms data reg"
+             : "=r" (__c) : : "cc");
+#endif
+
+     return __c;
+}
+
+static inline void
+__dcc_putchar(char c)
+{
+#if !defined(CONFIG_CPU_V7)
+     asm("mcr p14, 0, %0, c0, c5, 0  @ write a char"
+             : /* no output register */
+             : "r" (c) : "cc");
+#else
+     asm(
+     "put_wait:      mrc p14, 0, pc, c0, c1, 0                   \n\
+                     bcs put_wait                                \n\
+                     mcr p14, 0, %0, c0, c5, 0                   "
+     : : "r" (c) : "cc");
+#endif
+}
+
+To me the above is easier to read.  Not a big deal since the functions 
+are rather small, but still an improvement.  Searching for __dcc_putchar 
+would produce a single hit, and if the prototype has to change it is 
+done in only one place, etc.
+
+BTW the cc clobber in the asm for __dcc_putchar() is unneeded.
 
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Nicolas
