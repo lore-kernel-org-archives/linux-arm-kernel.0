@@ -1,177 +1,49 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Wed, 6 Oct 2010 11:48:02 -0500
-Subject: [PATCHv4] ARM: imx: Add iram allocator functions
-Message-ID: <1286383682-26506-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: ww-ml@gmx.de (Wolfgang Wegner)
+Date: Wed, 6 Oct 2010 18:45:43 +0200
+Subject: Kirkwood DMA engine transfer to PCI memory space?
+In-Reply-To: <AANLkTi=P6d_Acg49+dMubCvarHednH-so7b1Msapec5m@mail.gmail.com>
+References: <20101006093134.GA32436@debian-wegner1.datadisplay.de>
+	<AANLkTi=P6d_Acg49+dMubCvarHednH-so7b1Msapec5m@mail.gmail.com>
+Message-ID: <20101006164543.GA11519@debian-wegner1.datadisplay.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Hi Saeed,
 
-Add IRAM(Internal RAM) allocation functions using GENERIC_ALLOCATOR.
-The allocation size is 4KB multiples to guarantee alignment. The
-idea for these functions is for i.MX platforms to use them
-to dynamically allocate IRAM usage.
+On Wed, Oct 06, 2010 at 06:27:14PM +0200, saeed bishara wrote:
+> The XOR DMA engine has "address decoding windows"  that determines
+> where to route transactions issued by the xor. the kernel configs only
+> dram windows, you need to open windows for PCI. this ad-hoc code (not
+> tested) my help:
+> 
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -1274,6 +1274,15 @@ mv_xor_conf_mbus_windows(struct
+> mv_xor_shared_private *msp,
+>                 win_enable |= (1 << i);
+>                 win_enable |= 3 << (16 + (2 * i));
+>         }
+> +       /* set window 4 for pcie 0 */
+> +       i = 4;
+> +        writel((KIRKWOOD_PCIE_MEM_PHYS_BASE & 0xffff0000) |
+> +              (ATTR_PCIE_MEM << 8) |
+> +               TARGET_PCIE, base + WINDOW_BASE(i));
+> +        writel((KIRKWOOD_PCIE_MEM_SIZE - 1) & 0xffff0000, base +
+> WINDOW_SIZE(i));
+> +
+> +       win_enable |= (1 << i);
+> +        win_enable |= 3 << (16 + (2 * i));
 
-Applies on 2.6.36-rc6
+thank you for this code!
+It looks more sane than my dirty hack, so when we have our FPGA
+burst problems solved, this could be the solution.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
----
- arch/arm/plat-mxc/Kconfig             |    4 ++
- arch/arm/plat-mxc/Makefile            |    1 +
- arch/arm/plat-mxc/include/mach/iram.h |   37 ++++++++++++++++
- arch/arm/plat-mxc/iram.c              |   74 +++++++++++++++++++++++++++++++++
- 4 files changed, 116 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/iram.h
- create mode 100644 arch/arm/plat-mxc/iram.c
+Somehow I did not see the window setting@first glance, and
+the address error was silently ignored in the code, so it took
+me some printk's to figure out what was going wrong.
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 6785db4..0e99bb4 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -110,4 +110,8 @@ config ARCH_MXC_AUDMUX_V1
- config ARCH_MXC_AUDMUX_V2
- 	bool
- 
-+config IRAM_ALLOC
-+	bool
-+	select GENERIC_ALLOCATOR
-+
- endif
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 78d405e..35cf07b 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
- 
- obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-+obj-$(CONFIG_IRAM_ALLOC) += iram.o
- obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
-diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
-new file mode 100644
-index 0000000..351dacd
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/iram.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+#include <linux/errno.h>
-+
-+#ifdef CONFIG_IRAM_ALLOC
-+int __init iram_init(unsigned long base, unsigned long size);
-+void *iram_alloc(unsigned int size, unsigned long *dma_addr);
-+void iram_free(unsigned long dma_addr, unsigned int size);
-+#else
-+static inline int __init iram_init(unsigned long base, unsigned long size)
-+{
-+	return -ENOMEM;
-+}
-+
-+static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
-+{
-+	return NULL;
-+}
-+
-+static inline void iram_free(unsigned long base, unsigned long size) {}
-+#endif
-diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
-new file mode 100644
-index 0000000..25c9e73
---- /dev/null
-+++ b/arch/arm/plat-mxc/iram.c
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/spinlock.h>
-+#include <linux/genalloc.h>
-+
-+static unsigned long iram_phys_base;
-+static void __iomem *iram_virt_base;
-+static struct gen_pool *iram_pool;
-+
-+static inline unsigned long iram_phys_to_virt(unsigned long p)
-+{
-+	p = (unsigned long)iram_virt_base + (p - iram_phys_base);
-+	return p;
-+}
-+
-+void __iomem*iram_alloc(unsigned int size, unsigned long *dma_addr)
-+{
-+	if (!iram_pool)
-+		return NULL;
-+
-+	*dma_addr = gen_pool_alloc(iram_pool, size);
-+	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
-+	if (!dma_addr)
-+		return NULL;
-+	return iram_phys_to_virt(*dma_addr);
-+}
-+EXPORT_SYMBOL(iram_alloc);
-+
-+void iram_free(unsigned long addr, unsigned int size)
-+{
-+	if (!iram_pool)
-+		return;
-+
-+	gen_pool_free(iram_pool, addr, size);
-+}
-+EXPORT_SYMBOL(iram_free);
-+
-+int __init iram_init(unsigned long base, unsigned long size)
-+{
-+	iram_phys_base = base;
-+
-+	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
-+	if (!iram_pool)
-+		return -ENOMEM;
-+
-+	gen_pool_add(iram_pool, base, size, -1);
-+	iram_virt_base = ioremap(iram_phys_base, size);
-+	if (!iram_virt_base)
-+		return -EIO;
-+
-+	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
-+	return 0;
-+}
--- 
-1.6.0.4
+Now I have to figure out how to make use of DMA to speed up
+our framebuffer...
+
+Best regards,
+Wolfgang
