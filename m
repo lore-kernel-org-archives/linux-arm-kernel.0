@@ -1,40 +1,67 @@
-From: amit.kucheria@verdurent.com (Amit Kucheria)
-Date: Wed, 6 Oct 2010 10:46:48 +0300
-Subject: Remove unused default configurations
-In-Reply-To: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-Message-ID: <AANLkTi==1Rj2W8QPuiZdoGHCZ5Q0dJ-_j0xogURQ6nPt@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Wed, 6 Oct 2010 10:01:10 +0200
+Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
+In-Reply-To: <20101005225223.GC23315@opensource.wolfsonmicro.com>
+References: <20100907125335.GD25830@sirena.org.uk>
+	<201009091027.18176.marek.vasut@gmail.com>
+	<20100909094120.GB1988@rakim.wolfsonmicro.main>
+	<4CAACA63.6090202@compulab.co.il>
+	<20101005161608.GD19730@core.coreip.homeip.net>
+	<20101005164037.GA20555@opensource.wolfsonmicro.com>
+	<20101005180703.GD21399@core.coreip.homeip.net>
+	<20101005185942.GA22808@opensource.wolfsonmicro.com>
+	<20101005203508.7df590db@lxorguk.ukuu.org.uk>
+	<AANLkTimTW6v3N9aRA0h15SWXbBc_W0dhpf5rEeqBqGbf@mail.gmail.com>
+	<20101005225223.GC23315@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTi=+xGpqSrhPB_nLqJd_E0DzLdeb4AaQQQqP04h3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 13, 2010 at 6:13 PM, Vincent Sanders <vince@kyllikki.org> wrote:
->
-> Several default configurations have failed to build for the entire
-> 2.6.36 cycle. There are several causes to these faliures. The exact
-> issues can be tracked on http://armlinux.simtec.co.uk/kautobuild/
->
-> Obviously the maintainers are not using these default configurations
-> because if they were they would have fixed the build issues by now.
->
-> As Linus has made it very clear the number of default configurations
-> must be reduced as much as possible I have come up with the following
-> series which will remove these nine unused configurations. This will
-> reduce our build coverage by ten machines as all but one are a single
-> config per machine.
->
-> ?msm_defconfig ? ? ? ? ? ? ? | ? 72 ------------------
-> ?mx1_defconfig ? ? ? ? ? ? ? | ? 90 -----------------------
-> ?mx51_defconfig ? ? ? ? ? ? ?| ?171 --------------------------------------------
+2010/10/6 Mark Brown <broonie@opensource.wolfsonmicro.com>:
 
-Could we please keep mx51?
-
-I'll attempt to fix the problems.
-
-> ?n8x0_defconfig ? ? ? ? ? ? ?| ? 94 ------------------------
-> ?omap_generic_2420_defconfig | ? 37 ---------
-> ?pxa3xx_defconfig ? ? ? ? ? ?| ?134 ----------------------------------
-> ?qil-a9260_defconfig ? ? ? ? | ?115 -----------------------------
-> ?usb-a9260_defconfig ? ? ? ? | ?106 ---------------------------
-> ?usb-a9263_defconfig ? ? ? ? | ?106 ---------------------------
-> ?9 files changed, 925 deletions(-)
+> On Wed, Oct 06, 2010 at 12:09:39AM +0200, Linus Walleij wrote:
 >
+>> This wrapper function will accept non-existing regulators and
+>> not treat them as errors. Consumers will have to NULL-check their
+>> regulators.
+>
+> No, this is actively unhelpful. ?If consumers can null check their
+> regulators then they can just as well do an IS_ERR() check
+
+.. and wrap all enable/disable/ etc into conditional statements
+that depend on whether we could locate a regulator or not.
+
+And yes, this is what I'm already doing in drivers like
+drivers/mmc/host/mmci.c, where I check for the regulator
+holder in the mmci state struct to be NULL (another way
+would be to have a boolean .has_regulator but you get the
+idea).
+
+I think what Alan requested is that it be made more seamless.
+The patches try to make regulator support less hairy in these
+cases, a non-existing regulator will be a NULL pointer (no error
+and the runtime functions will act as the compile-time stubs.
+
+> The existing dummy regulator support already does all this in a manner
+> which is much less invasive for the core.
+
+Correct me if I'm wrong but the dummy regulators are something
+different which appear when you choose to compile out regulator
+support altogether.
+
+This was not what Alan was asking about I believe, the usecase
+to addressed is partial regulator support, where regulator framework
+*is* compiled in, but a driver *may* not get a regulator from the
+framework.
+
+The patch makes the runtime functions with partial regulator
+support for a NULL regulator behave exactly like the
+compile-time stubs.
+
+If I read your answer right, your stance is that the regulator
+framework shall not help out in situations like this, instead
+the driver shall recognice -ENODEV from regulator_get() and
+avoid doing any regulator calls after that. Is this correct?
+
+Yours,
+Linus Walleij
