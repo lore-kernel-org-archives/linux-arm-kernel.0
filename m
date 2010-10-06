@@ -1,67 +1,27 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 6 Oct 2010 10:01:10 +0200
-Subject: [PATCH v2] Input: Make ADS7846 independent on regulator
-In-Reply-To: <20101005225223.GC23315@opensource.wolfsonmicro.com>
-References: <20100907125335.GD25830@sirena.org.uk>
-	<201009091027.18176.marek.vasut@gmail.com>
-	<20100909094120.GB1988@rakim.wolfsonmicro.main>
-	<4CAACA63.6090202@compulab.co.il>
-	<20101005161608.GD19730@core.coreip.homeip.net>
-	<20101005164037.GA20555@opensource.wolfsonmicro.com>
-	<20101005180703.GD21399@core.coreip.homeip.net>
-	<20101005185942.GA22808@opensource.wolfsonmicro.com>
-	<20101005203508.7df590db@lxorguk.ukuu.org.uk>
-	<AANLkTimTW6v3N9aRA0h15SWXbBc_W0dhpf5rEeqBqGbf@mail.gmail.com>
-	<20101005225223.GC23315@opensource.wolfsonmicro.com>
-Message-ID: <AANLkTi=+xGpqSrhPB_nLqJd_E0DzLdeb4AaQQQqP04h3@mail.gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 06 Oct 2010 10:19:21 +0200
+Subject: MX3: compile breakage with next
+In-Reply-To: <Pine.LNX.4.64.1010060857280.9687@axis700.grange>
+References: <Pine.LNX.4.64.1010060857280.9687@axis700.grange>
+Message-ID: <4CAC3109.1020000@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/6 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+Hi Guennadi,
 
-> On Wed, Oct 06, 2010 at 12:09:39AM +0200, Linus Walleij wrote:
->
->> This wrapper function will accept non-existing regulators and
->> not treat them as errors. Consumers will have to NULL-check their
->> regulators.
->
-> No, this is actively unhelpful. ?If consumers can null check their
-> regulators then they can just as well do an IS_ERR() check
+Le 06/10/2010 09:13, Guennadi Liakhovetski a ?crit :
+ > Trying to build an i.MX31 kernel with yesterday's next, getting this:
+ >
+ >    CC      arch/arm/kernel/setup.o
+ > /tmp/cc20jofu.s: Assembler messages:
+ > /tmp/cc20jofu.s:131: Error: selected processor does not support ARM 
+mode `isb'
+ > make[1]: *** [arch/arm/kernel/setup.o] Error 1
+ > make: *** [arch/arm/kernel] Error 2
+ >
+ > Is it known? Any fix yet?
+ >
+please see here as this seems to be the same problem :
+http://www.spinics.net/lists/arm-kernel/msg100625.html
 
-.. and wrap all enable/disable/ etc into conditional statements
-that depend on whether we could locate a regulator or not.
-
-And yes, this is what I'm already doing in drivers like
-drivers/mmc/host/mmci.c, where I check for the regulator
-holder in the mmci state struct to be NULL (another way
-would be to have a boolean .has_regulator but you get the
-idea).
-
-I think what Alan requested is that it be made more seamless.
-The patches try to make regulator support less hairy in these
-cases, a non-existing regulator will be a NULL pointer (no error
-and the runtime functions will act as the compile-time stubs.
-
-> The existing dummy regulator support already does all this in a manner
-> which is much less invasive for the core.
-
-Correct me if I'm wrong but the dummy regulators are something
-different which appear when you choose to compile out regulator
-support altogether.
-
-This was not what Alan was asking about I believe, the usecase
-to addressed is partial regulator support, where regulator framework
-*is* compiled in, but a driver *may* not get a regulator from the
-framework.
-
-The patch makes the runtime functions with partial regulator
-support for a NULL regulator behave exactly like the
-compile-time stubs.
-
-If I read your answer right, your stance is that the regulator
-framework shall not help out in situations like this, instead
-the driver shall recognice -ENODEV from regulator_get() and
-avoid doing any regulator calls after that. Is this correct?
-
-Yours,
-Linus Walleij
+Eric
