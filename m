@@ -1,54 +1,48 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Wed, 6 Oct 2010 15:09:29 +1000
-Subject: [PATCH 01/10] ARM: no need for nommu to jump through the hoops
-	that	mmu does
-In-Reply-To: <E1P2oXR-00020E-FV@rmk-PC.arm.linux.org.uk>
-References: <E1P2oXR-00020E-FV@rmk-PC.arm.linux.org.uk>
-Message-ID: <4CAC0489.90201@snapgear.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 6 Oct 2010 10:42:30 +0530
+Subject: [PATCH 6/6] ARM: l2x0: Optimise the range based operations
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030CDFEA29@dbde02.ent.ti.com>
+References: <1283846243-11600-1-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-2-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-3-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-4-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-5-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-6-git-send-email-santosh.shilimkar@ti.com>
+	<1283846243-11600-7-git-send-email-santosh.shilimkar@ti.com>
+	<20101004212250.GD25241@n2100.arm.linux.org.uk>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFEA29@dbde02.ent.ti.com>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CF13239@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/10 03:09, Russell King - ARM Linux wrote:
-> nommu can jump directly to __mmap_switched without the absolute
-> address branching which the mmuful kernel does.
->
-> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Shilimkar, Santosh
+> Sent: Tuesday, October 05, 2010 10:25 AM
+> To: Russell King - ARM Linux
+> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+> tglx at linutronix.de; linux-omap at vger.kernel.org
+> Subject: RE: [PATCH 6/6] ARM: l2x0: Optimise the range based operations
+> 
+[....]
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+> > mmcblk0: error -5 transferring data, sector 1, nr 7, card status 0x900
+> > end_request: I/O error, dev mmcblk0, sector 1
+> > Buffer I/O error on device mmcblk0, logical block 0
+> > port 1 high speed
+> >
+> > -5 is -EIO, which is a FIFO overrun error, so somehow these changes are
+> > causing the CPU or bus accesses to be slower.
+> I don't see the problem on OMAP MMC.
+> May be some how additional check is making these operations
+> touch slower which lead to the under run.
+> 
+> Will have a look at it again. May for this merge window you can
+> drop 'Optimise the range based operations' and 'Determine cache size'
+> patches.
+> 
+The Pl310 cache way size given in KB and 'Determine cache size' missed
+to include that. Have updated the git tree with refreshed patch. Here is
+the updated patch.. 
 
-
-
->   arch/arm/kernel/head-nommu.S |    5 +----
->   1 files changed, 1 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index 573b803..814ce1a 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -48,8 +48,6 @@ ENTRY(stext)
->   	movs	r8, r5				@ invalid machine (r5=0)?
->   	beq	__error_a			@ yes, error 'a'
->
-> -	ldr	r13, __switch_data		@ address to jump to after
-> -						@ the initialization is done
->   	adr	lr, BSYM(__after_proc_init)	@ return (PIC) address
->    ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
->    THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
-> @@ -87,8 +85,7 @@ __after_proc_init:
->   	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
->   #endif /* CONFIG_CPU_CP15 */
->
-> -	mov	r3, r13
-> -	mov	pc, r3				@ clear the BSS and jump
-> +	b	__mmap_switched			@ clear the BSS and jump
->   						@ to start_kernel
->   ENDPROC(__after_proc_init)
->   	.ltorg
-
-
--- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+----------------------
