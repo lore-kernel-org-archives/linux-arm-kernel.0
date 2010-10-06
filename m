@@ -1,34 +1,32 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 6 Oct 2010 20:45:07 +0100
-Subject: [PATCH 6/7] sh: oprofile: Use perf-events oprofile backend
-In-Reply-To: <20101006183549.GW13563@erda.amd.com>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<db62cbe463d5bce89196d6456ad386129ce0022a.1286222593.git.matt@console-pimps.org>
-	<20101006183549.GW13563@erda.amd.com>
-Message-ID: <20101006194507.GA30419@console-pimps.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 06 Oct 2010 12:45:40 -0700
+Subject: [PATCHv2 1/7] pwm: Add pwm core driver
+In-Reply-To: <F45880696056844FA6A73F415B568C6953571D4F05@EXDCVYMBSTM006.EQ1STM.local>
+	(Arun MURTHY's message of "Wed, 6 Oct 2010 06:03:28 +0200")
+References: <1286280002-1636-1-git-send-email-arun.murthy@stericsson.com>
+	<1286280002-1636-2-git-send-email-arun.murthy@stericsson.com>
+	<20101005122225.6dda30ff.akpm@linux-foundation.org>
+	<F45880696056844FA6A73F415B568C6953571D4F05@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <87ocb7jeaj.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 08:35:49PM +0200, Robert Richter wrote:
-> On 04.10.10 16:44:24, Matt Fleming wrote:
-> > Now that we've got a generic perf-events based oprofile backend we might
-> > as well make use of it seeing as SH doesn't do anything special with its
-> > oprofile backend. Also introduce a new CONFIG_HW_PERF_EVENTS symbol so
-> > that we can fallback to using the timer interrupt for oprofile if the
-> > CPU doesn't support perf events.
-> > 
-> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> > ---
-> >  arch/sh/Kconfig            |   13 +++++
-> >  arch/sh/oprofile/Makefile  |    4 ++
-> >  arch/sh/oprofile/common.c  |  109 ++++---------------------------------------
-> >  arch/sh/oprofile/op_impl.h |   33 -------------
-> >  4 files changed, 28 insertions(+), 131 deletions(-)
-> >  delete mode 100644 arch/sh/oprofile/op_impl.h
-> 
-> This patch looks good.
-> 
-> We might merge it with patch 7/7.
+Arun MURTHY <arun.murthy@stericsson.com> writes:
 
-This patch was broken out for Paul's benefit to ease review. If he's
-happy for me to merge this with 7/7 then that's fine with me.
+[...]
+
+>> 
+>> I suggest that you work on Kevin's comments before making any code
+>> changes though.
+>
+> This pwm driver also supports the Davinci pwm driver as suggested by
+> Kelvin.
+
+My concern isn't whether it supports davinci or not.  Adapting existing
+drivers is the easy part.
+
+My concern is that there are now two proposals for a generic PWM
+framework, and I would prefer to see that those projects are aligned
+before anything merges.
+
+Kevin
