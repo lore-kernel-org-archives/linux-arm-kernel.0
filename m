@@ -1,76 +1,207 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Oct 2010 10:48:49 -0700
-Subject: [PATCH] OMAP2: PM: check UART status before trying to idle
-In-Reply-To: <1286380338-4072-1-git-send-email-khilman@deeprootsystems.com>
-References: <1286380338-4072-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20101006174849.GC2913@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 6 Oct 2010 20:10:54 +0200
+Subject: [PATCHv4] ARM: imx: Add iram allocator functions
+In-Reply-To: <1286383682-26506-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1286383682-26506-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20101006181054.GL29673@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [101006 08:43]:
-> As is done on OMAP3, check omap_uart_can_sleep() as one of the
-> pre-conditions for entering the idle loop.  Without this check,
-> entering idle introduces large latencies on active UARTs, and is
-> especially noticable on serial console.
+Hello,
+
+On Wed, Oct 06, 2010 at 11:48:02AM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Add IRAM(Internal RAM) allocation functions using GENERIC_ALLOCATOR.
+> The allocation size is 4KB multiples to guarantee alignment. The
+> idea for these functions is for i.MX platforms to use them
+> to dynamically allocate IRAM usage.
+> 
+> Applies on 2.6.36-rc6
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
 > ---
-> Tony, this fixes the UART lag when using the serial console on n8x0.
-> With this, the UARTs will not idle until their sleep timeouts are
-> activated, and they're disabled by default.
+>  arch/arm/plat-mxc/Kconfig             |    4 ++
+>  arch/arm/plat-mxc/Makefile            |    1 +
+>  arch/arm/plat-mxc/include/mach/iram.h |   37 ++++++++++++++++
+>  arch/arm/plat-mxc/iram.c              |   74 +++++++++++++++++++++++++++++++++
+>  4 files changed, 116 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/include/mach/iram.h
+>  create mode 100644 arch/arm/plat-mxc/iram.c
 > 
-> There's an additional bug I'm still looking into as to why UART3
-> does not trigger wakeup from idle on 2420, but that is only triggered
-> after enabling UART timeouts.
-> 
->  arch/arm/mach-omap2/pm24xx.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-> index c1bceec..a40457d 100644
-> --- a/arch/arm/mach-omap2/pm24xx.c
-> +++ b/arch/arm/mach-omap2/pm24xx.c
-> @@ -245,6 +245,8 @@ static int omap2_can_sleep(void)
->  {
->  	if (omap2_fclks_active())
->  		return 0;
-> +	if (!omap_uart_can_sleep())
-> +		return 0;
->  	if (osc_ck->usecount > 1)
->  		return 0;
->  	if (omap_dma_running())
+> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> index 6785db4..0e99bb4 100644
+> --- a/arch/arm/plat-mxc/Kconfig
+> +++ b/arch/arm/plat-mxc/Kconfig
+> @@ -110,4 +110,8 @@ config ARCH_MXC_AUDMUX_V1
+>  config ARCH_MXC_AUDMUX_V2
+>  	bool
+>  
+> +config IRAM_ALLOC
+> +	bool
+> +	select GENERIC_ALLOCATOR
+> +
+>  endif
+> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> index 78d405e..35cf07b 100644
+> --- a/arch/arm/plat-mxc/Makefile
+> +++ b/arch/arm/plat-mxc/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
+>  
+>  obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+>  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+> +obj-$(CONFIG_IRAM_ALLOC) += iram.o
+If you really prefer IRAM_ALLOC over IRAM, why call your source iram.c?
 
-Thanks, I'll add that to omap-for-linus. Also the following change
-is needed for the n8x0 boards that use the kernel cmdline only.
+>  obj-$(CONFIG_MXC_PWM)  += pwm.o
+>  obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
+>  obj-$(CONFIG_MXC_ULPI) += ulpi.o
+> diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
+> new file mode 100644
+> index 0000000..351dacd
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/include/mach/iram.h
+> @@ -0,0 +1,37 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +#include <linux/errno.h>
+> +
+> +#ifdef CONFIG_IRAM_ALLOC
 
-Regards,
+> +int __init iram_init(unsigned long base, unsigned long size);
+> +void *iram_alloc(unsigned int size, unsigned long *dma_addr);
+> +void iram_free(unsigned long dma_addr, unsigned int size);
 
-Tony
+> +#else
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 5 Oct 2010 10:09:03 -0700
-Subject: [PATCH] omap: Update omap2plus_defconfig to use ttyO instead ttyS
+> +static inline int __init iram_init(unsigned long base, unsigned long size)
+> +{
+> +	return -ENOMEM;
+> +}
+> +
+> +static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
+> +{
+> +	return NULL;
+> +}
+> +
+> +static inline void iram_free(unsigned long base, unsigned long size) {}
 
-With the omap-serial the device has changed from ttyS to ttyO as
-the system may have both omap-serial and 8250 ports.
+> +#endif
+Can you please add newlines around the cpp stuff?
 
-Note that systems using omap-serial need to be updated to use ttyO[012]
-instead of ttyS[012] in the bootloader, CONFIG_CMDLINE, /etc/inittab,
-and the root file system with mknod. Also you may need to add ttyO[012]
-to /etc/securetty.
+> diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
+> new file mode 100644
+> index 0000000..25c9e73
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/iram.c
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/errno.h>
+> +#include <linux/init.h>
+linux/init.h isn't enough (contrary to what I guessed in an earlier
+mail).  EXPORT_SYMBOL is defined in linux/module.h.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+> +#include <linux/spinlock.h>
+> +#include <linux/genalloc.h>
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 7deec89..ccedde1 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -63,7 +63,7 @@ CONFIG_AEABI=y
- CONFIG_LEDS=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyS2,115200"
-+CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
- CONFIG_KEXEC=y
- CONFIG_FPE_NWFPE=y
- CONFIG_VFP=y
+#include <mach/iram.h>, then you can remove the #include of linux/errno.h.
+This should fix some sparse warnings.
+
+> +
+> +static unsigned long iram_phys_base;
+> +static void __iomem *iram_virt_base;
+> +static struct gen_pool *iram_pool;
+> +
+> +static inline unsigned long iram_phys_to_virt(unsigned long p)
+> +{
+> +	p = (unsigned long)iram_virt_base + (p - iram_phys_base);
+> +	return p;
+iram_phys_to_virt should return a value of type (void __iomem *), not
+unsigned long.
+
+> +}
+> +
+> +void __iomem*iram_alloc(unsigned int size, unsigned long *dma_addr)
+> +{
+> +	if (!iram_pool)
+> +		return NULL;
+> +
+> +	*dma_addr = gen_pool_alloc(iram_pool, size);
+> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
+> +	if (!dma_addr)
+> +		return NULL;
+> +	return iram_phys_to_virt(*dma_addr);
+> +}
+> +EXPORT_SYMBOL(iram_alloc);
+> +
+> +void iram_free(unsigned long addr, unsigned int size)
+> +{
+> +	if (!iram_pool)
+> +		return;
+> +
+> +	gen_pool_free(iram_pool, addr, size);
+> +}
+> +EXPORT_SYMBOL(iram_free);
+> +
+> +int __init iram_init(unsigned long base, unsigned long size)
+> +{
+> +	iram_phys_base = base;
+> +
+> +	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
+> +	if (!iram_pool)
+> +		return -ENOMEM;
+> +
+> +	gen_pool_add(iram_pool, base, size, -1);
+> +	iram_virt_base = ioremap(iram_phys_base, size);
+> +	if (!iram_virt_base)
+> +		return -EIO;
+> +
+> +	pr_info("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
+Is this message interesting enough to deserve a pr_info?  I'd make it
+pr_debug.
+
+> +	return 0;
+> +}
+> -- 
+> 1.6.0.4
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
