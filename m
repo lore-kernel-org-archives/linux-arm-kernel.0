@@ -1,21 +1,51 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 07 Oct 2010 00:27:58 +0200
-Subject: [PATCH 1/2] ARM: S3C64XX: Add suspend support
-In-Reply-To: <4CACF6B8.9030304@fluff.org>
-References: <cover.1286319272.git.mcuelenaere@gmail.com>	<1fa4a7a39d9fd48b8329e1a1077a65adb96475b5.1286319272.git.mcuelenaere@gmail.com>
-	<AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
-	<4CACF6B8.9030304@fluff.org>
-Message-ID: <4CACF7EE.8090605@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 6 Oct 2010 23:33:58 +0100
+Subject: [PATCH] ARM: Check for is_smp for tlb_ops and cache_ops boardcast
+In-Reply-To: <20101006144414.GA2913@atomide.com>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100906180346.GC20849@atomide.com>
+	<20100908030951.GH22507@atomide.com>
+	<20100908031214.GI22507@atomide.com>
+	<20101005221952.GV3117@atomide.com>
+	<20101005223310.GA14065@n2100.arm.linux.org.uk>
+	<20101006144414.GA2913@atomide.com>
+Message-ID: <20101006223358.GA7581@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Op 07-10-10 00:22, Ben Dooks schreef:
-> I would still prefer each machine that can do pm to call s3c_pm_init()
-> in their setup code to ensure that we don't enable pm on a machine with
-> possibly incomplete support (especially as PM can be one of the more
-> difficult things to debug).
+On Wed, Oct 06, 2010 at 07:44:14AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [101005 15:24]:
+> > On Tue, Oct 05, 2010 at 03:19:52PM -0700, Tony Lindgren wrote:
+> > > * Tony Lindgren <tony@atomide.com> [100907 20:04]:
+> > > > This should not be needed when running on UP systems.
+> > > > 
+> > > > Additionally we will also get an undefined instruction on ARM cores
+> > > > without the extended CPUID registers with CONFIG_SMP_ON_UP.
+> > > > 
+> > > > Also, we can now remove the is_smp() test from mmu.c.
+> > > 
+> > > Just FYI, I've updated this one more time with to use cpus_empty
+> > > instead of !smp_on_up() here as well.
+> > 
+> > What's the rationale?
+> 
+> With CPU hotplug if the other SMP cores are unplugged for PM or
+> other reasons, no need to do the broadcast.
 
-Ok, will resend this with the call only added to mach-smartq.c
+Yes, but why this expensive test when the smp_on_up() is much cheaper?
 
--- 
-Maurus Cuelenaere
+smp_call_function_many() already takes care of the "no other CPUs"
+case, which is used by on_each_cpu_mask() and on_each_cpu(), which
+means these functions won't broadcast the operations to other CPUs
+when they're offline.
+
+In any case, if you think that we broadcast every operation to all
+CPUs, you're mistaken - TLB and cache ops are broadcast to only
+those CPUs which the thread is running on, or in the case of non-MM
+specific, to all online CPUs.
+
+So the only thing we have to worry about is "is there an ID register
+available" which is covered by the is_smp() test.  Checking the CPU
+mask is far more expensive and imho ends up needlessly adding to the
+complexity.
