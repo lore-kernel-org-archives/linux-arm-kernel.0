@@ -1,40 +1,36 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Wed, 06 Oct 2010 15:22:04 +0200
-Subject: [PATCH for 2.6.36 2/2] cpuimx27: fix i2c bus selection
-In-Reply-To: <20101006130704.GJ29673@pengutronix.de>
-References: <1286355230-15530-1-git-send-email-eric@eukrea.com>
-	<1286355230-15530-2-git-send-email-eric@eukrea.com>
-	<20101006130704.GJ29673@pengutronix.de>
-Message-ID: <4CAC77FC.6080908@eukrea.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Oct 2010 07:44:14 -0700
+Subject: [PATCH] ARM: Check for is_smp for tlb_ops and cache_ops boardcast
+In-Reply-To: <20101005223310.GA14065@n2100.arm.linux.org.uk>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100906180346.GC20849@atomide.com>
+	<20100908030951.GH22507@atomide.com>
+	<20100908031214.GI22507@atomide.com>
+	<20101005221952.GV3117@atomide.com>
+	<20101005223310.GA14065@n2100.arm.linux.org.uk>
+Message-ID: <20101006144414.GA2913@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [101005 15:24]:
+> On Tue, Oct 05, 2010 at 03:19:52PM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [100907 20:04]:
+> > > This should not be needed when running on UP systems.
+> > > 
+> > > Additionally we will also get an undefined instruction on ARM cores
+> > > without the extended CPUID registers with CONFIG_SMP_ON_UP.
+> > > 
+> > > Also, we can now remove the is_smp() test from mmu.c.
+> > 
+> > Just FYI, I've updated this one more time with to use cpus_empty
+> > instead of !smp_on_up() here as well.
+> 
+> What's the rationale?
 
-Le 06/10/2010 15:07, Uwe Kleine-K?nig a ?crit :
-> On Wed, Oct 06, 2010 at 10:53:50AM +0200, Eric B?nard wrote:
->> Recent clean of i.MX devices registration changed the i2C bus number
->> selected for our platform (Freescale start peripheral ID at 1, kernel
->> now start it at 0 so i.MX27's i2c 1 is kernel's i2c 0).
->> Without this fix, i2c is unusable on this platform.
->>
->> Signed-off-by: Eric B?nard<eric@eukrea.com>
->> ---
->>   arch/arm/mach-imx/mach-cpuimx27.c |    2 +-
->>   1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
->> index 339150a..6830afd 100644
->> --- a/arch/arm/mach-imx/mach-cpuimx27.c
->> +++ b/arch/arm/mach-imx/mach-cpuimx27.c
->> @@ -259,7 +259,7 @@ static void __init eukrea_cpuimx27_init(void)
->>   	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
->>   				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
->>
->> -	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
->> +	imx27_add_i2c_imx0(&cpuimx27_i2c1_data);
-> This doesn't fit on Sascha's current tree.  Can you please rebase it?
->
-against which branch ?
+With CPU hotplug if the other SMP cores are unplugged for PM or
+other reasons, no need to do the broadcast.
 
-Eric
+Regards,
+
+Tony
