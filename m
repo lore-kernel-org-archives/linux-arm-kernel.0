@@ -1,81 +1,54 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Tue, 05 Oct 2010 21:28:10 -0700
-Subject: multiple linux-next OMAP3 build errors
-In-Reply-To: <4CAA58A2.6060707@kernel.org>
-References: <AANLkTim9v1Y2o9QebYcJkh+QLVQq9fFOFE5P+OoyUHXa@mail.gmail.com>	
-	<1286173747.2358.4.camel@tubuntu.research.nokia.com>
-	<1286231422.2463.316.camel@pasglop> <4CAA58A2.6060707@kernel.org>
-Message-ID: <4CABFADA.9020305@kernel.org>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Wed, 6 Oct 2010 15:09:29 +1000
+Subject: [PATCH 01/10] ARM: no need for nommu to jump through the hoops
+	that	mmu does
+In-Reply-To: <E1P2oXR-00020E-FV@rmk-PC.arm.linux.org.uk>
+References: <E1P2oXR-00020E-FV@rmk-PC.arm.linux.org.uk>
+Message-ID: <4CAC0489.90201@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2010 03:43 PM, Yinghai Lu wrote:
-> On 10/04/2010 03:30 PM, Benjamin Herrenschmidt wrote:
->> On Mon, 2010-10-04 at 09:29 +0300, Tomi Valkeinen wrote:
->>>>   CC      drivers/video/omap2/vram.o
->>>> drivers/video/omap2/vram.c: In function
->>> 'omap_vram_reserve_sdram_memblock':
->>>> drivers/video/omap2/vram.c:568: error: implicit declaration of
->>>> function 'memblock_region_is_memory'
->>>
->>> Benjamin, your patch "memblock/arm: Use memblock_region_is_memory()
->>> for
->>> omap fb" in linux-next seems to be broken. I believe the called
->>> function
->>> should be memblock_is_region_memory, not memblock_region_is_memory?
->>
->> I suspect either I didn't push my latest version before it got merged or
->> Yinghai didn't pull the right one, since I'm pretty sure I test built
->> it, but in any case, you're probably right :-)
->>
->> I'm not in control of this patch series at the moment however. Ingo and
->> Yinghai are. Yinghai, care to fix that up ? I'm currently travelling on
->> holidays and won't be able to do much until later next week.
-> 
+On 05/10/10 03:09, Russell King - ARM Linux wrote:
+> nommu can jump directly to __mmap_switched without the absolute
+> address branching which the mmuful kernel does.
+>
+> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
 
-Please check delta patch for core/memblock.
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 
-Yinghai
 
-[PATCH] memblock/arm: Fix typo with memblock_region_is_memory()
 
-Fix typo in
-| commit dbe3039e64b1dd4cf26f782d45b524f85b444ad4
-| [PATCH -v2] memblock/arm: Use memblock_region_is_memory() for omap fb
+>   arch/arm/kernel/head-nommu.S |    5 +----
+>   1 files changed, 1 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index 573b803..814ce1a 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -48,8 +48,6 @@ ENTRY(stext)
+>   	movs	r8, r5				@ invalid machine (r5=0)?
+>   	beq	__error_a			@ yes, error 'a'
+>
+> -	ldr	r13, __switch_data		@ address to jump to after
+> -						@ the initialization is done
+>   	adr	lr, BSYM(__after_proc_init)	@ return (PIC) address
+>    ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+>    THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+> @@ -87,8 +85,7 @@ __after_proc_init:
+>   	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+>   #endif /* CONFIG_CPU_CP15 */
+>
+> -	mov	r3, r13
+> -	mov	pc, r3				@ clear the BSS and jump
+> +	b	__mmap_switched			@ clear the BSS and jump
+>   						@ to start_kernel
+>   ENDPROC(__after_proc_init)
+>   	.ltorg
 
-should be memblock_is_region_memory().
 
-Reported-by: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-Signed-off-by: Yinghai Lu <yinghai@kernel.org>
-
----
- arch/arm/plat-omap/fb.c    |    2 +-
- drivers/video/omap2/vram.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-Index: linux-2.6/arch/arm/plat-omap/fb.c
-===================================================================
---- linux-2.6.orig/arch/arm/plat-omap/fb.c
-+++ linux-2.6/arch/arm/plat-omap/fb.c
-@@ -173,7 +173,7 @@ static int check_fbmem_region(int region
- 
- static int valid_sdram(unsigned long addr, unsigned long size)
- {
--	return memblock_region_is_memory(addr, size);
-+	return memblock_is_region_memory(addr, size);
- }
- 
- static int reserve_sdram(unsigned long addr, unsigned long size)
-Index: linux-2.6/drivers/video/omap2/vram.c
-===================================================================
---- linux-2.6.orig/drivers/video/omap2/vram.c
-+++ linux-2.6/drivers/video/omap2/vram.c
-@@ -555,7 +555,7 @@ void __init omap_vram_reserve_sdram_memb
- 
- 	if (paddr) {
- 		if ((paddr & ~PAGE_MASK) ||
--		    !memblock_region_is_memory(paddr, size)) {
-+		    !memblock_is_region_memory(paddr, size)) {
- 			pr_err("Illegal SDRAM region for VRAM\n");
- 			return;
- 		}
+-- 
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
