@@ -1,41 +1,52 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 06 Oct 2010 12:22:21 -0400 (EDT)
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <1286380480.22265.109.camel@m0nster>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
-	<1286372886.22265.63.camel@m0nster>
-	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
-	<1286376581.22265.85.camel@m0nster>
-	<alpine.LFD.2.00.1010061109110.3107@xanadu.home>
-	<1286379197.22265.95.camel@m0nster>
-	<alpine.LFD.2.00.1010061144560.3107@xanadu.home>
-	<1286380480.22265.109.camel@m0nster>
-Message-ID: <alpine.LFD.2.00.1010061207090.3107@xanadu.home>
+From: arun.murthy@stericsson.com (Arun Murthy)
+Date: Wed, 6 Oct 2010 21:29:14 +0530
+Subject: [PATCHv3 3/7] leds: pwm: add a new element 'name' to platform data
+In-Reply-To: <1286380758-14063-1-git-send-email-arun.murthy@stericsson.com>
+References: <1286380758-14063-1-git-send-email-arun.murthy@stericsson.com>
+Message-ID: <1286380758-14063-4-git-send-email-arun.murthy@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 Oct 2010, Daniel Walker wrote:
+A new element 'name' is added to pwm led platform data structure.
+This is required to identify the pwm device.
 
-> On Wed, 2010-10-06 at 11:47 -0400, Nicolas Pitre wrote:
-> 
-> > It is the wrong fix nevertheless.  And in this case it isn't a question 
-> > of opinion.
-> 
-> I'm not saying your wrong, I'm sure you know more about it than I do. I
-> was just letting you know why I added it .
+Signed-off-by: Arun Murthy <arun.murthy@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ drivers/leds/leds-pwm.c  |    4 +++-
+ include/linux/leds_pwm.h |    3 ++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-Sure.  However it is best to _understand_ why such things may apparently 
-fix things.  In this case it would have been by accident, and the code 
-could be broken again with a different gcc version.
-
-Adding "cc" in the clobber list is needed only when the asm code is 
-modifying the condition flags.
-
-I'd suggest you look at the disassembly difference with and without it. 
-My guess is that the whole thing gets optimized away as there is no 
-dependencies to be dependent on, in which case the proper fix would be 
-to mark it with "volatile".
-
-
-Nicolas
+diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+index da3fa8d..8da2be6 100644
+--- a/drivers/leds/leds-pwm.c
++++ b/drivers/leds/leds-pwm.c
+@@ -66,8 +66,10 @@ static int led_pwm_probe(struct platform_device *pdev)
+ 		cur_led = &pdata->leds[i];
+ 		led_dat = &leds_data[i];
+ 
++		if (!pdata->name)
++			pdata->name = cur_led->name;
+ 		led_dat->pwm = pwm_request(cur_led->pwm_id,
+-				cur_led->name);
++				pdata->name);
+ 		if (IS_ERR(led_dat->pwm)) {
+ 			dev_err(&pdev->dev, "unable to request PWM %d\n",
+ 					cur_led->pwm_id);
+diff --git a/include/linux/leds_pwm.h b/include/linux/leds_pwm.h
+index 33a0711..dbc925a 100644
+--- a/include/linux/leds_pwm.h
++++ b/include/linux/leds_pwm.h
+@@ -14,8 +14,9 @@ struct led_pwm {
+ };
+ 
+ struct led_pwm_platform_data {
+-	int			num_leds;
++	int		num_leds;
+ 	struct led_pwm	*leds;
++	char		*name;
+ };
+ 
+ #endif
+-- 
+1.7.2.dirty
