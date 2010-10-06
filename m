@@ -1,56 +1,38 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 21:22:35 +0200
-Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
-	init/exit
-In-Reply-To: <AANLkTin579dqJsdtpesJ0erWP3Pgi39XHQs46xMAGJDW@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Oct 2010 03:38:02 +0900
+Subject: [PATCH 2/7] perf: New helper function for pmu name
+In-Reply-To: <20101006181548.GU13563@erda.amd.com>
 References: <cover.1286222593.git.matt@console-pimps.org>
-	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
-	<20101006133309.GP13563@erda.amd.com>
-	<20101006144921.GQ13563@erda.amd.com>
-	<20101006145311.GA3754@linux-sh.org>
-	<20101006145903.GR13563@erda.amd.com>
-	<AANLkTikGQe99k_fK5pZtkn-ht9jgC0guDkn28dSedjUo@mail.gmail.com>
-	<20101006184407.GY13563@erda.amd.com>
-	<AANLkTin579dqJsdtpesJ0erWP3Pgi39XHQs46xMAGJDW@mail.gmail.com>
-Message-ID: <20101006192235.GA13563@erda.amd.com>
+	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
+	<20101006181548.GU13563@erda.amd.com>
+Message-ID: <20101006183801.GA13879@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.10 14:58:06, Grant Likely wrote:
-> On Wed, Oct 6, 2010 at 12:44 PM, Robert Richter <robert.richter@amd.com> wrote:
-> > On 06.10.10 14:23:17, Grant Likely wrote:
-> >> >> diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
-> >> >> index b336cd9..76d97a5 100644
-> >> >> --- a/drivers/oprofile/oprof.c
-> >> >> +++ b/drivers/oprofile/oprof.c
-> >> >> @@ -252,6 +252,8 @@ static int __init oprofile_init(void)
-> >> >> ?{
-> >> >> ? ? ? int err;
-> >> >>
-> >> >> + ? ? memset(&oprofile_ops, 0, sizeof(struct oprofile_operations));
-> >> >> +
-> >> >
-> >> > Yes, this looks much better. Thanks Paul.
-> >>
-> >> oprofile_ops is allocated in bss and so is already zeroed. ?No need to
-> >> do it explicitly.
-> >
-> > Before oprofile_arch_init() it isn't necessarily needed, but we should
-> > definitely add it before oprofile_timer_init(). For code readability I
-> > would rather tend to let the first in too.
+On Wed, Oct 06, 2010 at 08:15:48PM +0200, Robert Richter wrote:
+> On 04.10.10 16:44:20, Matt Fleming wrote:
+> > Introduce perf_pmu_name() helper function that returns the name of the
+> > pmu. This gives us a generic way to get the name of a pmu regardless of
+> > how an architecture identifies it internally, e.g. ARM uses an id
+> > whereas SH currently uses a string.
+> > 
 > 
-> ?  Sorry, I don't understand what you're trying to say.  Because
-> oprofile_ops is statically allocated in bss; it will be zeroed before
-> *any* of the init hooks is called.
-
-The first call to oprofile_arch_init() might leave a dirty struct, but
-as Paul just pointed out the function is aware of it and cleans up the
-struct during init where necessary. The backtrace callback setup will
-be reused if arch init fails (seems to be an ugly hack). So it is
-better not to zero the struct then and keep everything unchanged.
-
--Robert
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+> Matt,
+> 
+> as an outcome of the discussion we have had in this thread I think we
+> agree on the following:
+> 
+> We extend the generic perf interface with perf_pmu_name() implenting a
+> default with the __weak attribute.  On sh we override this function
+> and will use it for perf/oprofile string translation. This will be
+> implemented in the oprofile function op_name_from_perf_name().
+> 
+> Later we implement a generic oprofile function that derives the
+> cpu_type from perf_pmu_name() in a generic way and add other
+> architectures. Thus, we will drop the ARM changes with this patch set.
+> 
+> Paul,
+> 
+> please correct me if I am wrong with the above.
+> 
+That all sounds fine to me, thanks for summarizing!
