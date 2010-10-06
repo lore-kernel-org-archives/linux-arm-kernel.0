@@ -1,43 +1,45 @@
 From: x0132446@ti.com (David Anders)
-Date: Wed,  6 Oct 2010 16:20:19 -0500
-Subject: [PATCH 3/4] omap4: pandaboard: Adding card detect support for MMC1
+Date: Wed,  6 Oct 2010 16:20:17 -0500
+Subject: [PATCH 1/4] omap4: pandaboard: remove unused hsmmc definition
 In-Reply-To: <1286400020-1010-1-git-send-email-x0132446@ti.com>
 References: <1286400020-1010-1-git-send-email-x0132446@ti.com>
-Message-ID: <1286400020-1010-4-git-send-email-x0132446@ti.com>
+Message-ID: <1286400020-1010-2-git-send-email-x0132446@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding card detect callback function and card detect configuration
-function for MMC1 Controller.
+remove the second hsmmc definition as it is only used on the
+expansion header of the PandaBoard and can be mux for other
+functions.
 
 Signed-off-by: David Anders <x0132446@ti.com>
 Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
 ---
-
-patch depends on https://patchwork.kernel.org/patch/189952/
-
- arch/arm/mach-omap2/board-omap4panda.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-omap4panda.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 697c0bd..94e819c 100644
+index 96f5bbb..093d13b 100644
 --- a/arch/arm/mach-omap2/board-omap4panda.c
 +++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -77,9 +77,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
- 	struct omap_mmc_platform_data *pdata = dev->platform_data;
+@@ -67,10 +67,6 @@ static struct regulator_consumer_supply omap4_panda_vmmc_supply[] = {
+ 		.supply = "vmmc",
+ 		.dev_name = "mmci-omap-hs.0",
+ 	},
+-	{
+-		.supply = "vmmc",
+-		.dev_name = "mmci-omap-hs.1",
+-	},
+ };
  
- 	/* Setting MMC1 Card detect Irq */
--	if (pdev->id == 0)
-+	if (pdev->id == 0) {
-+		ret = twl6030_mmc_card_detect_config();
-+		if (ret)
-+			pr_err("Failed configuring MMC1 card detect\n");
- 		pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
- 						MMCDETECT_INTR_OFFSET;
-+		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
-+	}
- 	return ret;
- }
+ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+@@ -156,7 +152,7 @@ static struct regulator_init_data omap4_panda_vmmc = {
+ 					| REGULATOR_CHANGE_MODE
+ 					| REGULATOR_CHANGE_STATUS,
+ 	},
+-	.num_consumer_supplies  = 2,
++	.num_consumer_supplies  = 1,
+ 	.consumer_supplies      = omap4_panda_vmmc_supply,
+ };
  
 -- 
 1.7.0.4
