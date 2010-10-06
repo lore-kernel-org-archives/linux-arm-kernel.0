@@ -1,143 +1,85 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Wed,  6 Oct 2010 00:42:41 -0700
-Subject: [PATCH 02/20 v2] msm: io: MSM8X60 io support
+Date: Wed,  6 Oct 2010 00:42:42 -0700
+Subject: [PATCH 03/20 v2] msm: initial irq definitions for MSM8X60
 In-Reply-To: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
 References: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1286350979-19328-3-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1286350979-19328-4-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steve Muckle <smuckle@codeaurora.org>
 
-MSM8X60 has different IO mappings than previous MSMs.
+IRQ assignments are different for MSM8X60 than other existing MSMs.
 
 Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
 ---
- arch/arm/mach-msm/include/mach/io.h             |    1 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |   57 +++++++++++++++++++++++
- arch/arm/mach-msm/include/mach/msm_iomap.h      |    4 ++
- arch/arm/mach-msm/io.c                          |   15 ++++++
- 4 files changed, 77 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+ arch/arm/mach-msm/include/mach/irqs-8x60.h |   43 ++++++++++++++++++++++++++++
+ arch/arm/mach-msm/include/mach/irqs.h      |    2 +
+ 2 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/include/mach/irqs-8x60.h
 
-diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
-index c35b29f..7386e73 100644
---- a/arch/arm/mach-msm/include/mach/io.h
-+++ b/arch/arm/mach-msm/include/mach/io.h
-@@ -28,6 +28,7 @@ void __iomem *__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int m
- 
- void msm_map_qsd8x50_io(void);
- void msm_map_msm7x30_io(void);
-+void msm_map_msm8x60_io(void);
- 
- extern unsigned int msm_shared_ram_phys;
- 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
+diff --git a/arch/arm/mach-msm/include/mach/irqs-8x60.h b/arch/arm/mach-msm/include/mach/irqs-8x60.h
 new file mode 100644
-index 0000000..1f1822b
+index 0000000..9fae253
 --- /dev/null
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (C) 2007 Google, Inc.
-+ * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-+ * Author: Brian Swetland <swetland@google.com>
++++ b/arch/arm/mach-msm/include/mach/irqs-8x60.h
+@@ -0,0 +1,43 @@
++/* Copyright (c) 2010 Code Aurora Forum. All rights reserved.
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *       notice, this list of conditions and the following disclaimer in the
++ *       documentation and/or other materials provided with the distribution.
++ *     * Neither the name of Code Aurora nor
++ *       the names of its contributors may be used to endorse or promote
++ *       products derived from this software without specific prior written
++ *       permission.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ *
-+ * The MSM peripherals are spread all over across 768MB of physical
-+ * space, which makes just having a simple IO_ADDRESS macro to slide
-+ * them into the right virtual location rough.  Instead, we will
-+ * provide a master phys->virt mapping for peripherals here.
-+ *
-+ */
-+
-+#ifndef __ASM_ARCH_MSM_IOMAP_8X60_H
-+#define __ASM_ARCH_MSM_IOMAP_8X60_H
-+
-+/* Physical base address and size of peripherals.
-+ * Ordered by the virtual base addresses they will be mapped at.
-+ *
-+ * MSM_VIC_BASE must be an value that can be loaded via a "mov"
-+ * instruction, otherwise entry-macro.S will not compile.
-+ *
-+ * If you add or remove entries here, you'll want to edit the
-+ * msm_io_desc array in arch/arm/mach-msm/io.c to reflect your
-+ * changes.
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
++ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
++ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
++ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
++ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 + *
 + */
 +
-+#define MSM_QGIC_DIST_BASE	IOMEM(0xF0000000)
-+#define MSM_QGIC_DIST_PHYS	0x02080000
-+#define MSM_QGIC_DIST_SIZE	SZ_4K
++#ifndef __ASM_ARCH_MSM_IRQS_8X60_H
++#define __ASM_ARCH_MSM_IRQS_8X60_H
 +
-+#define MSM_QGIC_CPU_BASE	IOMEM(0xF0001000)
-+#define MSM_QGIC_CPU_PHYS	0x02081000
-+#define MSM_QGIC_CPU_SIZE	SZ_4K
++/* MSM ACPU Interrupt Numbers */
 +
-+#define MSM_ACC_BASE		IOMEM(0xF0002000)
-+#define MSM_ACC_PHYS		0x02001000
-+#define MSM_ACC_SIZE		SZ_4K
++/* 0-15:  STI/SGI (software triggered/generated interrupts)
++ * 16-31: PPI (private peripheral interrupts)
++ * 32+:   SPI (shared peripheral interrupts)
++ */
 +
-+#define MSM_GCC_BASE		IOMEM(0xF0003000)
-+#define MSM_GCC_PHYS		0x02082000
-+#define MSM_GCC_SIZE		SZ_4K
-+
-+#define MSM_SHARED_RAM_BASE	IOMEM(0xF0100000)
-+#define MSM_SHARED_RAM_SIZE	SZ_1M
++#define NR_GPIO_IRQS 173
++#define NR_MSM_IRQS 256
++#define NR_BOARD_IRQS 0
 +
 +#endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
-index e6b1821..8e24dd8 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
-@@ -47,8 +47,12 @@
- #include "msm_iomap-7x30.h"
+diff --git a/arch/arm/mach-msm/include/mach/irqs.h b/arch/arm/mach-msm/include/mach/irqs.h
+index 164d355..8679a45 100644
+--- a/arch/arm/mach-msm/include/mach/irqs.h
++++ b/arch/arm/mach-msm/include/mach/irqs.h
+@@ -24,6 +24,8 @@
  #elif defined(CONFIG_ARCH_QSD8X50)
- #include "msm_iomap-8x50.h"
+ #include "irqs-8x50.h"
+ #include "sirc.h"
 +#elif defined(CONFIG_ARCH_MSM8X60)
-+#include "msm_iomap-8x60.h"
++#include "irqs-8x60.h"
+ #elif defined(CONFIG_ARCH_MSM_ARM11)
+ #include "irqs-7x00.h"
  #else
- #include "msm_iomap-7x00.h"
- #endif
- 
-+
-+
- #endif
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index 1c05060..d36b610 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -100,6 +100,21 @@ void __init msm_map_qsd8x50_io(void)
- }
- #endif /* CONFIG_ARCH_QSD8X50 */
- 
-+#ifdef CONFIG_ARCH_MSM8X60
-+static struct map_desc msm8x60_io_desc[] __initdata = {
-+	MSM_DEVICE(QGIC_DIST),
-+	MSM_DEVICE(QGIC_CPU),
-+	MSM_DEVICE(TMR),
-+	MSM_DEVICE(ACC),
-+	MSM_DEVICE(GCC),
-+};
-+
-+void __init msm_map_msm8x60_io(void)
-+{
-+	iotable_init(msm8x60_io_desc, ARRAY_SIZE(msm8x60_io_desc));
-+}
-+#endif /* CONFIG_ARCH_MSM8X60 */
-+
- #ifdef CONFIG_ARCH_MSM7X30
- static struct map_desc msm7x30_io_desc[] __initdata = {
- 	MSM_DEVICE(VIC),
 -- 
 1.7.2.1
 
