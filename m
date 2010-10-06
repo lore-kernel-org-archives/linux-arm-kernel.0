@@ -1,91 +1,40 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Wed, 06 Oct 2010 11:46:49 +0100
-Subject: [PATCH v3 4/5] mfd: regulator: max8998: voltages and GPIOs
-	defined at platform data structure
-In-Reply-To: <015e01cb6524$de617cb0$9b247610$%szyprowski@samsung.com>
-References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
-	<1285590747-32404-5-git-send-email-l.majewski@samsung.com>
-	<20100927184336.GK2560@sortiz-mobl> <1286026413.3125.27.camel@odin>
-	<20101004084646.4de3714d@lmajewski.digital.local>
-	<1286186989.3148.19.camel@odin>
-	<015e01cb6524$de617cb0$9b247610$%szyprowski@samsung.com>
-Message-ID: <1286362009.5662.9.camel@odin>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 06 Oct 2010 15:22:04 +0200
+Subject: [PATCH for 2.6.36 2/2] cpuimx27: fix i2c bus selection
+In-Reply-To: <20101006130704.GJ29673@pengutronix.de>
+References: <1286355230-15530-1-git-send-email-eric@eukrea.com>
+	<1286355230-15530-2-git-send-email-eric@eukrea.com>
+	<20101006130704.GJ29673@pengutronix.de>
+Message-ID: <4CAC77FC.6080908@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-06 at 09:05 +0200, Marek Szyprowski wrote:
-> Hello,
-> 
-> On Monday, October 04, 2010 12:10 PM Liam Girdwood wrote:
-> 
-> > On Mon, 2010-10-04 at 08:46 +0200, Lukasz Majewski wrote:
-> > > On Sat, 02 Oct 2010 14:33:33 +0100
-> > > Liam Girdwood <lrg@slimlogic.co.uk> wrote:
-> > >
-> > > > On Mon, 2010-09-27 at 20:43 +0200, Samuel Ortiz wrote:
-> > > > > Hi Lukasz,
-> > > > >
-> > > > > On Mon, Sep 27, 2010 at 02:32:26PM +0200, Lukasz Majewski wrote:
-> > > > > > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > > > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > > > Fine with me:
-> > > > > Acked-by: Samuel Ortiz <sameo@linux.intel.com>
-> > > > >
-> > > >
-> > > > Lukasz, this is not applying against the regulator next tree.
-> > > > Can you redo and add Mark and Samuels Acks.
-> > > >
-> > > > Thanks
-> > > >
-> > > > Liam
-> > >
-> > > Hi Liam,
-> > >
-> > > I've fetched the newest voltage-2.6/for-next and merge it with newest
-> > > mfd-2.6/for next. After that all patches are applying and kernel is
-> > > building without errors.
-> > >
-> > > The problem with this patch series is that it "touches" two
-> > > repositories: voltage-2.6 and mfd-2.6.
-> > >
-> > > I'm a bit confused how such situation should be resolved, since it
-> > > involves two separate repositories (and two maintainers to cooperate).
-> > >
-> > You should only base your patches on one tree for upstreaming and since
-> > this series mostly touches regulator it's best base against the
-> > regulator tree.
-> 
-> Liam, the problem is the fact that there are 4 patches for max8998 mfd driver
-> already merged to mfd-next tree: 40d5c1f412cf166c0cd87b0f6eb7fed70a2b9e05,
-> 128f9848ed5d3b09dc8f6f5cdc19eed48b879ccf, ec2465481c6da42766046cd2307edc46908d645b
-> and be9be9dcf14947fc6ad99e5df0eb3d6e09aaedca. At least the first two are required
-> for the patches that has been prepared by Lukasz. Removing the dependency on these
-> 2 commits from Lukasz's patches is pointless, because such version will conflict
-> with these patches from mfd-next tree.
-> 
-> I'm a bit confused how this case should be handled. I see two solutions:
-> 1. importing these 4 max8998 patches from mfd-next to regulator-next tree 
->    (cherry-picking from mfd-next to regulator-next or git pull the whole tree)
-> 2. splitting patches for 2 different sets (one set for mfd tree, second for
->    regulator tree)
-> 
-> The second option has a serious drawback however. Regulator part from Lukasz's
-> patches will not even compile until the mfd part has been merged.
-> 
-> Liam, Samuel, could you both comment on this issue?
-> 
+Hi Uwe,
 
-Ok, so we have a build dependency on mfd. Could this not have been
-(re)stated by Lukasz during the conversation about the upstream path.
+Le 06/10/2010 15:07, Uwe Kleine-K?nig a ?crit :
+> On Wed, Oct 06, 2010 at 10:53:50AM +0200, Eric B?nard wrote:
+>> Recent clean of i.MX devices registration changed the i2C bus number
+>> selected for our platform (Freescale start peripheral ID at 1, kernel
+>> now start it at 0 so i.MX27's i2c 1 is kernel's i2c 0).
+>> Without this fix, i2c is unusable on this platform.
+>>
+>> Signed-off-by: Eric B?nard<eric@eukrea.com>
+>> ---
+>>   arch/arm/mach-imx/mach-cpuimx27.c |    2 +-
+>>   1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
+>> index 339150a..6830afd 100644
+>> --- a/arch/arm/mach-imx/mach-cpuimx27.c
+>> +++ b/arch/arm/mach-imx/mach-cpuimx27.c
+>> @@ -259,7 +259,7 @@ static void __init eukrea_cpuimx27_init(void)
+>>   	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
+>>   				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
+>>
+>> -	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
+>> +	imx27_add_i2c_imx0(&cpuimx27_i2c1_data);
+> This doesn't fit on Sascha's current tree.  Can you please rebase it?
+>
+against which branch ?
 
-Samuel, could you please take this via mfd ? You have my
-
-Signed-off-by: Liam Girdwood <lrg@slimlogic.co.uk>
-
-Thanks
-
-Liam
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Eric
