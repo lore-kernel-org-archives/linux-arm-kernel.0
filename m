@@ -1,44 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 05 Oct 2010 20:36:47 -0700
-Subject: [PATCH 3/3] [ARM] Implement a timer based __delay() loop
-In-Reply-To: <1286300338.18791.26.camel@c-dwalke-linux.qualcomm.com>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>	
-	<1285644827-6846-4-git-send-email-sboyd@codeaurora.org>
-	<1286300338.18791.26.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4CABEECF.9080009@codeaurora.org>
+From: arun.murthy@stericsson.com (Arun MURTHY)
+Date: Wed, 6 Oct 2010 05:46:02 +0200
+Subject: [PATCHv2 0/7] PWM core driver for pwm based led and backlight
+	driver
+In-Reply-To: <87wrpwu1cw.fsf@deeprootsystems.com>
+References: <1286280002-1636-1-git-send-email-arun.murthy@stericsson.com>
+	<87wrpwu1cw.fsf@deeprootsystems.com>
+Message-ID: <F45880696056844FA6A73F415B568C6953571D4EFD@EXDCVYMBSTM006.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 10/05/2010 10:38 AM, Daniel Walker wrote:
->>  
->> +#ifdef ARCH_HAS_READ_CURRENT_TIMER
->> +/*
->> + * Assuming read_current_timer() is monotonically increasing
->> + * across calls.
-> You should add more comments here. You assuming that it's monotonic over
-> a 2000us (2ms) period .. I'm not sure this is a good assumption this
-> timer may not be monotonically increasing all the time, what happens
-> then?
+> Arun Murthy <arun.murthy@stericsson.com> writes:
+> 
+> > PWM core driver for pwm based led and backlight driver.
+> > The intention of the pwm core driver is not to break the build if two
+> or more
+> > pwm drivers are enabled.
+> > Align the existing pwm drivers to make use of the pwm core driver
+> 
+> Hi Arun,
+> 
+> Because you have Bill Gatliff on Cc, I'm guessing you've already looked
+> at his RFC for a generic PWM framework?
+> 
+> There's recently been a proposal on DaVinci that is similar to yours
+> that enables multiple PWM drivers, but it would be nice to have a
+> common
+> framework for this, and what Bill has proposed seems to be a good
+> solution.
+> 
+Thanks for the information. This patch set of implementing pwm core driver
+is aligned with the one in Davinci. Davinci pwm devices can make use of this
+core driver framework.
 
-Ok I'll add that it shouldn't wrap more than once within 2000us (or
-should I say 5ms since mdelay uses udelay?). Is that what you're saying
-by it not being monotonically increasing? If a timer isn't increasing
-the tick count it's broken and this call will loop forever. If the timer
-wraps, we'll be safe due to unsigned maths as long as it wraps only once.
-
->> +void read_current_timer_delay_loop(unsigned long loops)
->> +{
->> +	unsigned long bclock, now;
->> +
->> +	read_current_timer(&bclock);
->> +	do {
->> +		read_current_timer(&now);
->> +	} while ((now - bclock) < loops);
-> Have you looked at time_before()/time_after() ?
-
-Nope. Wouldn't that require an addition though to make it work? I'd
-rather just leave it like it is.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks and Regards,
+Arun R Murthy
+-------------
