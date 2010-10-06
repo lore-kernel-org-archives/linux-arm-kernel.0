@@ -1,36 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Oct 2010 07:44:14 -0700
-Subject: [PATCH] ARM: Check for is_smp for tlb_ops and cache_ops boardcast
-In-Reply-To: <20101005223310.GA14065@n2100.arm.linux.org.uk>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100906180346.GC20849@atomide.com>
-	<20100908030951.GH22507@atomide.com>
-	<20100908031214.GI22507@atomide.com>
-	<20101005221952.GV3117@atomide.com>
-	<20101005223310.GA14065@n2100.arm.linux.org.uk>
-Message-ID: <20101006144414.GA2913@atomide.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Oct 2010 06:03:18 +0900
+Subject: [PATCH 6/7] sh: oprofile: Use perf-events oprofile backend
+In-Reply-To: <20101006194507.GA30419@console-pimps.org>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<db62cbe463d5bce89196d6456ad386129ce0022a.1286222593.git.matt@console-pimps.org>
+	<20101006183549.GW13563@erda.amd.com>
+	<20101006194507.GA30419@console-pimps.org>
+Message-ID: <20101006210317.GA7294@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101005 15:24]:
-> On Tue, Oct 05, 2010 at 03:19:52PM -0700, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [100907 20:04]:
-> > > This should not be needed when running on UP systems.
+On Wed, Oct 06, 2010 at 08:45:07PM +0100, Matt Fleming wrote:
+> On Wed, Oct 06, 2010 at 08:35:49PM +0200, Robert Richter wrote:
+> > On 04.10.10 16:44:24, Matt Fleming wrote:
+> > > Now that we've got a generic perf-events based oprofile backend we might
+> > > as well make use of it seeing as SH doesn't do anything special with its
+> > > oprofile backend. Also introduce a new CONFIG_HW_PERF_EVENTS symbol so
+> > > that we can fallback to using the timer interrupt for oprofile if the
+> > > CPU doesn't support perf events.
 > > > 
-> > > Additionally we will also get an undefined instruction on ARM cores
-> > > without the extended CPUID registers with CONFIG_SMP_ON_UP.
-> > > 
-> > > Also, we can now remove the is_smp() test from mmu.c.
+> > > Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> > > ---
+> > >  arch/sh/Kconfig            |   13 +++++
+> > >  arch/sh/oprofile/Makefile  |    4 ++
+> > >  arch/sh/oprofile/common.c  |  109 ++++---------------------------------------
+> > >  arch/sh/oprofile/op_impl.h |   33 -------------
+> > >  4 files changed, 28 insertions(+), 131 deletions(-)
+> > >  delete mode 100644 arch/sh/oprofile/op_impl.h
 > > 
-> > Just FYI, I've updated this one more time with to use cpus_empty
-> > instead of !smp_on_up() here as well.
+> > This patch looks good.
+> > 
+> > We might merge it with patch 7/7.
 > 
-> What's the rationale?
+> This patch was broken out for Paul's benefit to ease review. If he's
+> happy for me to merge this with 7/7 then that's fine with me.
 
-With CPU hotplug if the other SMP cores are unplugged for PM or
-other reasons, no need to do the broadcast.
-
-Regards,
-
-Tony
+Yes, no objections from me.
