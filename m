@@ -1,53 +1,48 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 14:35:21 +0200
-Subject: [PATCH 1/7] perf: Add helper function to return number of counters
-In-Reply-To: <20101006121410.GK13563@erda.amd.com>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<c4eb88b09da564fe093cc6571ed747971425e69a.1286222593.git.matt@console-pimps.org>
-	<20101006121410.GK13563@erda.amd.com>
-Message-ID: <20101006123521.GM13563@erda.amd.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 6 Oct 2010 15:27:35 +0200
+Subject: [PATCH for 2.6.36 2/2] cpuimx27: fix i2c bus selection
+In-Reply-To: <20101006130704.GJ29673@pengutronix.de>
+References: <1286355230-15530-1-git-send-email-eric@eukrea.com>
+	<1286355230-15530-2-git-send-email-eric@eukrea.com>
+	<20101006130704.GJ29673@pengutronix.de>
+Message-ID: <20101006132735.GA12415@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.10 14:14:10, Robert Richter wrote:
-> On 04.10.10 16:44:19, Matt Fleming wrote:
-> > The number of counters for the registered pmu is needed in a few places
-> > so provide a helper function that returns this number.
+On Wed, Oct 06, 2010 at 03:07:04PM +0200, Uwe Kleine-K?nig wrote:
+> On Wed, Oct 06, 2010 at 10:53:50AM +0200, Eric B?nard wrote:
+> > Recent clean of i.MX devices registration changed the i2C bus number
+> > selected for our platform (Freescale start peripheral ID at 1, kernel
+> > now start it at 0 so i.MX27's i2c 1 is kernel's i2c 0).
+> > Without this fix, i2c is unusable on this platform.
 > > 
-> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> > Tested-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Eric B?nard <eric@eukrea.com>
 > > ---
-> >  arch/arm/kernel/perf_event.c |    6 ++++++
-> >  arch/arm/oprofile/common.c   |   31 ++++++++++++++++++-------------
-> >  arch/sh/kernel/perf_event.c  |    9 +++++++++
-> >  include/linux/perf_event.h   |    1 +
-> >  4 files changed, 34 insertions(+), 13 deletions(-)
-
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index d660cb8..23f18a0 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -43,7 +43,7 @@ static DEFINE_MUTEX(op_arm_mutex);
+> >  arch/arm/mach-imx/mach-cpuimx27.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
+> > index 339150a..6830afd 100644
+> > --- a/arch/arm/mach-imx/mach-cpuimx27.c
+> > +++ b/arch/arm/mach-imx/mach-cpuimx27.c
+> > @@ -259,7 +259,7 @@ static void __init eukrea_cpuimx27_init(void)
+> >  	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
+> >  				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
 > >  
-> >  static struct op_counter_config *counter_config;
-> >  static struct perf_event **perf_events[nr_cpumask_bits];
-> > -static int perf_num_counters;
-> > +static int perf_nr_counters;
+> > -	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
+> > +	imx27_add_i2c_imx0(&cpuimx27_i2c1_data);
+> This doesn't fit on Sascha's current tree.  Can you please rebase it?
+I need to be more precise here:  It doesn't fit Sascha's for-2.6.37
+branch.  If you want it to go in before .36, then it's obviously OK.
 
-Matt,
+Maybe you want to add the offending commit to the log (it's
+c69871597dd173af2d7615429c0ee6aa10fae42b).  And you can add my
 
-as we will have one more version with this patch set, please use
-num_counters instead of perf_nr_counters. The same name is used also
-for x86.
+	Acked-and-blame-taken-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thanks,
-
--Robert
-
-> >  
-> >  /*
-> >   * Overflow callback for oprofile.
+Best regards and sorry for that,
+Uwe
 
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
