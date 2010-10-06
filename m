@@ -1,73 +1,70 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 17:37:10 +0200
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <20101006141347.GA32376@linux-sh.org>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-	<20101006122736.GL13563@erda.amd.com>
-	<20101006123950.GA29118@linux-sh.org>
-	<20101006131825.GO13563@erda.amd.com>
-	<20101006133041.GA29273@linux-sh.org>
-	<20101006141347.GA32376@linux-sh.org>
-Message-ID: <20101006153710.GS13563@erda.amd.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 06 Oct 2010 08:33:17 -0700
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <alpine.LFD.2.00.1010061109110.3107@xanadu.home>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
+	<1286372886.22265.63.camel@m0nster>
+	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
+	<1286376581.22265.85.camel@m0nster>
+	<alpine.LFD.2.00.1010061109110.3107@xanadu.home>
+Message-ID: <1286379197.22265.95.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.10 10:13:47, Paul Mundt wrote:
-> On Wed, Oct 06, 2010 at 10:30:41PM +0900, Paul Mundt wrote:
-> > On Wed, Oct 06, 2010 at 03:18:25PM +0200, Robert Richter wrote:
-> > > I am not against adding the pmu name to the perf API. But the oprofile
-> > > cpu_type strings are oprofile centric esp. for the userland. So these
-> > > strings will remain part of oprofile. Also I don't think we want to
-> > > polute the perf pmu names with it.
-> > > 
-> > And those architectures that have opted to use different strings for perf
-> > events are free to mangle them however they want for the oprofile case.
-> > It doesn't change the fact that strings are still being managed by all of
-> > the architectures. The perf PMU names aren't presently locked in to an
-> > ABI, whereas the oprofile strings are, so it seems fairly straightforward
-> > to develop standard mangling rules for preventing an oprofile-facing
-> > string, or to simply reuse the strings verbatim.
-> > 
-> So to add a bit of context here, I was just looking at the oprofile
-> tools. The naming format here is one of:
+On Wed, 2010-10-06 at 11:21 -0400, Nicolas Pitre wrote:
+
+> static inline char
+> __dcc_getchar(void)
+> {
+>      char __c;
 > 
-> 	<arch>/<pmu>
-
-Do you really want the oprofile name scheme move to perf?
-
+> #if !defined(CONFIG_CPU_V7)
+>      asm("mrc p14, 0, %0, c0, c5, 0  @ read comms data reg"
+>              : "=r" (__c) : : "cc");
+> #else
+>      asm(
+>      "get_wait:      mrc p14, 0, pc, c0, c1, 0                       \n\
+>                      bne get_wait                                    \n\
+>                      mrc p14, 0, %0, c0, c5, 0       @ read comms data reg"
+>              : "=r" (__c) : : "cc");
+> #endif
 > 
-> if there were a generic perf to oprofile pmu name mangler that did this
-
-Or, do you mean here to derive an oprofile name from the pmu string in
-a generic way? I was suggesting this for SH when commenting on version
-3 of this patch set. We dropped this idea to keep changes simple for
-this initial patch set, because it was much easier to implement it
-with strcmp() and the pmu strings are not expected to be changed for
-sh in the near future.
-
-So, can't we use op_name_from_perf_name() from [PATCH -v3 6/6] for SH
-here and implement a perf_pmu_name() function for sh that is part of
-perf's generic interface? 
-
-Later we can add a generic function for sh ...
-
-> it would cover almost all of the ARM cases already, the SH strings I'm
-> happy to convert to work this way, and a good chunk of the PowerPC PMUs
-> would work fine, too. PowerPC already has an oprofile CPU string in its
-> CPU spec, so this would be even more trivial to wire up there if such a
-> generic interface were to exist.
+>      return __c;
+> }
 > 
-> This would just leave x86 as the odd one out, but I suppose if x86 were
-> to move to the oprofile perf wrapper in the future then a bit of id to
-> name mangling as an override wouldn't be too much work.
+> static inline void
+> __dcc_putchar(char c)
+> {
+> #if !defined(CONFIG_CPU_V7)
+>      asm("mcr p14, 0, %0, c0, c5, 0  @ write a char"
+>              : /* no output register */
+>              : "r" (c) : "cc");
+> #else
+>      asm(
+>      "put_wait:      mrc p14, 0, pc, c0, c1, 0                   \n\
+>                      bcs put_wait                                \n\
+>                      mcr p14, 0, %0, c0, c5, 0                   "
+>      : : "r" (c) : "cc");
+> #endif
+> }
+> 
+> To me the above is easier to read.  Not a big deal since the functions 
+> are rather small, but still an improvement.  Searching for __dcc_putchar 
+> would produce a single hit, and if the prototype has to change it is 
+> done in only one place, etc.
 
-... and also other architectures on top of these patches.
+It makes the internals of the function much more busy. There's more
+stuff that could be executing that you have to think about while
+reviewing the function.
 
-Thanks,
+> BTW the cc clobber in the asm for __dcc_putchar() is unneeded.
 
--Robert
+Without it caused a crash in __dcc_getchar() ..
+
+Daniel
 
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
