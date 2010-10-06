@@ -1,17 +1,43 @@
 From: x0132446@ti.com (David Anders)
-Date: Wed,  6 Oct 2010 16:20:16 -0500
-Subject: [PATCH 0/4] omap4: pandaboard: machine cleanups
-Message-ID: <1286400020-1010-1-git-send-email-x0132446@ti.com>
+Date: Wed,  6 Oct 2010 16:20:19 -0500
+Subject: [PATCH 3/4] omap4: pandaboard: Adding card detect support for MMC1
+In-Reply-To: <1286400020-1010-1-git-send-email-x0132446@ti.com>
+References: <1286400020-1010-1-git-send-email-x0132446@ti.com>
+Message-ID: <1286400020-1010-4-git-send-email-x0132446@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PandaBoard machine file related cleanups.
+Adding card detect callback function and card detect configuration
+function for MMC1 Controller.
 
-David Anders (4):
-  omap4: pandaboard: remove unused hsmmc definition
-  omap4: pandaboard: Fix the init if CONFIG_MMC_OMAP_HS is not set
-  omap4: pandaboard: Adding card detect support for MMC1
-  omap4: pandaboard: enable the ehci port on pandaboard
+Signed-off-by: David Anders <x0132446@ti.com>
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+---
 
- arch/arm/mach-omap2/board-omap4panda.c |   76 +++++++++++++++++++++++++++++---
- 1 files changed, 69 insertions(+), 7 deletions(-)
+patch depends on https://patchwork.kernel.org/patch/189952/
+
+ arch/arm/mach-omap2/board-omap4panda.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 697c0bd..94e819c 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -77,9 +77,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+ 	struct omap_mmc_platform_data *pdata = dev->platform_data;
+ 
+ 	/* Setting MMC1 Card detect Irq */
+-	if (pdev->id == 0)
++	if (pdev->id == 0) {
++		ret = twl6030_mmc_card_detect_config();
++		if (ret)
++			pr_err("Failed configuring MMC1 card detect\n");
+ 		pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
+ 						MMCDETECT_INTR_OFFSET;
++		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
++	}
+ 	return ret;
+ }
+ 
+-- 
+1.7.0.4
