@@ -1,199 +1,76 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 20:15:48 +0200
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-Message-ID: <20101006181548.GU13563@erda.amd.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Oct 2010 10:48:49 -0700
+Subject: [PATCH] OMAP2: PM: check UART status before trying to idle
+In-Reply-To: <1286380338-4072-1-git-send-email-khilman@deeprootsystems.com>
+References: <1286380338-4072-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <20101006174849.GC2913@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.10.10 16:44:20, Matt Fleming wrote:
-> Introduce perf_pmu_name() helper function that returns the name of the
-> pmu. This gives us a generic way to get the name of a pmu regardless of
-> how an architecture identifies it internally, e.g. ARM uses an id
-> whereas SH currently uses a string.
+* Kevin Hilman <khilman@deeprootsystems.com> [101006 08:43]:
+> As is done on OMAP3, check omap_uart_can_sleep() as one of the
+> pre-conditions for entering the idle loop.  Without this check,
+> entering idle introduces large latencies on active UARTs, and is
+> especially noticable on serial console.
 > 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 > ---
->  arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
->  arch/arm/oprofile/common.c   |   22 +---------------------
->  arch/sh/kernel/perf_event.c  |   14 ++++++++++++++
->  include/linux/perf_event.h   |    1 +
->  kernel/perf_event.c          |    5 +++++
->  5 files changed, 44 insertions(+), 21 deletions(-)
+> Tony, this fixes the UART lag when using the serial console on n8x0.
+> With this, the UARTs will not idle until their sleep timeouts are
+> activated, and they're disabled by default.
 > 
-
-Matt,
-
-as an outcome of the discussion we have had in this thread I think we
-agree on the following:
-
-We extend the generic perf interface with perf_pmu_name() implenting a
-default with the __weak attribute.  On sh we override this function
-and will use it for perf/oprofile string translation. This will be
-implemented in the oprofile function op_name_from_perf_name().
-
-Later we implement a generic oprofile function that derives the
-cpu_type from perf_pmu_name() in a generic way and add other
-architectures. Thus, we will drop the ARM changes with this patch set.
-
-Paul,
-
-please correct me if I am wrong with the above.
-
-Peter,
-
-please ack the perf_pmu_name() interface introduced below.
-
-See also my comments below. If there are any other objections, please
-let me know.
-
-Thanks,
-
--Robert
-
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index ef3bc33..3bff24d 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -123,6 +123,29 @@ armpmu_get_max_events(void)
->  }
->  EXPORT_SYMBOL_GPL(armpmu_get_max_events);
->  
-> +const char *perf_pmu_name(void)
-> +{
-> +	enum arm_perf_pmu_ids id = armpmu_get_pmu_id();
-> +
-> +	switch (id) {
-> +	case ARM_PERF_PMU_ID_XSCALE1:
-> +		return "arm/xscale1";
-> +	case ARM_PERF_PMU_ID_XSCALE2:
-> +		return "arm/xscale2";
-> +	case ARM_PERF_PMU_ID_V6:
-> +		return "arm/armv6";
-> +	case ARM_PERF_PMU_ID_V6MP:
-> +		return "arm/mpcore";
-> +	case ARM_PERF_PMU_ID_CA8:
-> +		return "arm/armv7";
-> +	case ARM_PERF_PMU_ID_CA9:
-> +		return "arm/armv7-ca9";
-> +	default:
-> +		return NULL;
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(perf_pmu_name);
-> +
->  int perf_num_counters(void)
->  {
->  	return armpmu_get_max_events();
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index 23f18a0..cb224ee 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -155,26 +155,6 @@ static void op_perf_stop(void)
->  }
->  
->  
-> -static char *op_name_from_perf_id(enum arm_perf_pmu_ids id)
-> -{
-> -	switch (id) {
-> -	case ARM_PERF_PMU_ID_XSCALE1:
-> -		return "arm/xscale1";
-> -	case ARM_PERF_PMU_ID_XSCALE2:
-> -		return "arm/xscale2";
-> -	case ARM_PERF_PMU_ID_V6:
-> -		return "arm/armv6";
-> -	case ARM_PERF_PMU_ID_V6MP:
-> -		return "arm/mpcore";
-> -	case ARM_PERF_PMU_ID_CA8:
-> -		return "arm/armv7";
-> -	case ARM_PERF_PMU_ID_CA9:
-> -		return "arm/armv7-ca9";
-> -	default:
-> -		return NULL;
-> -	}
-> -}
-> -
->  static int op_arm_create_files(struct super_block *sb, struct dentry *root)
->  {
->  	unsigned int i;
-> @@ -391,7 +371,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
->  	ops->start		= op_arm_start;
->  	ops->stop		= op_arm_stop;
->  	ops->shutdown		= op_arm_stop;
-> -	ops->cpu_type		= op_name_from_perf_id(armpmu_get_pmu_id());
-> +	ops->cpu_type		= perf_pmu_name();
-
-Please drop all arm changes in this patch. We will do the change after
-a generic patch for perf/oprofile string translation is available.
-
->  
->  	if (!ops->cpu_type)
->  		ret = -ENODEV;
-> diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
-> index 2cb9ad5..e065a1d 100644
-> --- a/arch/sh/kernel/perf_event.c
-> +++ b/arch/sh/kernel/perf_event.c
-> @@ -59,6 +59,20 @@ static inline int sh_pmu_initialized(void)
->  	return !!sh_pmu;
->  }
->  
-> +const char *perf_pmu_name(void)
-> +{
-> +	if (!sh_pmu)
-> +		return NULL;
-> +
-> +	if (!strcmp(sh_pmu->name, "SH7750"))
-> +		return "sh/sh7750";
-> +	if (!strcmp(sh_pmu->name, "SH-4A"))
-> +		return "sh/sh4a";
-> +
-> +	return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(perf_pmu_name);
-
-The implementation should be moved to function
-op_name_from_perf_name() in sh oprofile code. perf_pmu_name() should
-simply return sh_pmu->name.
-
-> +
->  int perf_num_counters(void)
->  {
->  	if (!sh_pmu)
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 1a02192..33f08da 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -850,6 +850,7 @@ extern int perf_max_events;
->  extern const struct pmu *hw_perf_event_init(struct perf_event *event);
->  
->  extern int perf_num_counters(void);
-> +extern const char *perf_pmu_name(void);
->  extern void perf_event_task_sched_in(struct task_struct *task);
->  extern void perf_event_task_sched_out(struct task_struct *task, struct task_struct *next);
->  extern void perf_event_task_tick(struct task_struct *task);
-> diff --git a/kernel/perf_event.c b/kernel/perf_event.c
-> index db5b560..fc51268 100644
-> --- a/kernel/perf_event.c
-> +++ b/kernel/perf_event.c
-> @@ -85,6 +85,11 @@ void __weak hw_perf_enable(void)		{ barrier(); }
->  
->  void __weak perf_event_print_debug(void)	{ }
->  
-> +extern __weak const char *perf_pmu_name(void)
-> +{
-> +	return "pmu";
-> +}
-> +
->  static DEFINE_PER_CPU(int, perf_disable_count);
->  
->  void perf_disable(void)
-> -- 
-> 1.7.1
+> There's an additional bug I'm still looking into as to why UART3
+> does not trigger wakeup from idle on 2420, but that is only triggered
+> after enabling UART timeouts.
 > 
+>  arch/arm/mach-omap2/pm24xx.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
+> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+> index c1bceec..a40457d 100644
+> --- a/arch/arm/mach-omap2/pm24xx.c
+> +++ b/arch/arm/mach-omap2/pm24xx.c
+> @@ -245,6 +245,8 @@ static int omap2_can_sleep(void)
+>  {
+>  	if (omap2_fclks_active())
+>  		return 0;
+> +	if (!omap_uart_can_sleep())
+> +		return 0;
+>  	if (osc_ck->usecount > 1)
+>  		return 0;
+>  	if (omap_dma_running())
 
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Thanks, I'll add that to omap-for-linus. Also the following change
+is needed for the n8x0 boards that use the kernel cmdline only.
+
+Regards,
+
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 5 Oct 2010 10:09:03 -0700
+Subject: [PATCH] omap: Update omap2plus_defconfig to use ttyO instead ttyS
+
+With the omap-serial the device has changed from ttyS to ttyO as
+the system may have both omap-serial and 8250 ports.
+
+Note that systems using omap-serial need to be updated to use ttyO[012]
+instead of ttyS[012] in the bootloader, CONFIG_CMDLINE, /etc/inittab,
+and the root file system with mknod. Also you may need to add ttyO[012]
+to /etc/securetty.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 7deec89..ccedde1 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -63,7 +63,7 @@ CONFIG_AEABI=y
+ CONFIG_LEDS=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyS2,115200"
++CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
+ CONFIG_KEXEC=y
+ CONFIG_FPE_NWFPE=y
+ CONFIG_VFP=y
