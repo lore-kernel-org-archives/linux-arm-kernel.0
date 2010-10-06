@@ -1,48 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Oct 2010 15:27:35 +0200
-Subject: [PATCH for 2.6.36 2/2] cpuimx27: fix i2c bus selection
-In-Reply-To: <20101006130704.GJ29673@pengutronix.de>
-References: <1286355230-15530-1-git-send-email-eric@eukrea.com>
-	<1286355230-15530-2-git-send-email-eric@eukrea.com>
-	<20101006130704.GJ29673@pengutronix.de>
-Message-ID: <20101006132735.GA12415@pengutronix.de>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 6 Oct 2010 23:53:11 +0900
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <20101006144921.GQ13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+	<20101006133309.GP13563@erda.amd.com>
+	<20101006144921.GQ13563@erda.amd.com>
+Message-ID: <20101006145311.GA3754@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 03:07:04PM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, Oct 06, 2010 at 10:53:50AM +0200, Eric B?nard wrote:
-> > Recent clean of i.MX devices registration changed the i2C bus number
-> > selected for our platform (Freescale start peripheral ID at 1, kernel
-> > now start it at 0 so i.MX27's i2c 1 is kernel's i2c 0).
-> > Without this fix, i2c is unusable on this platform.
+On Wed, Oct 06, 2010 at 04:49:21PM +0200, Robert Richter wrote:
+> On 06.10.10 15:33:09, Robert Richter wrote:
+> > On 04.10.10 16:44:22, Matt Fleming wrote:
+> > > -void __exit oprofile_arch_exit(void)
+> > > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+> > > +{
 > > 
-> > Signed-off-by: Eric B?nard <eric@eukrea.com>
-> > ---
-> >  arch/arm/mach-imx/mach-cpuimx27.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > We should do here a:
 > > 
-> > diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-> > index 339150a..6830afd 100644
-> > --- a/arch/arm/mach-imx/mach-cpuimx27.c
-> > +++ b/arch/arm/mach-imx/mach-cpuimx27.c
-> > @@ -259,7 +259,7 @@ static void __init eukrea_cpuimx27_init(void)
-> >  	i2c_register_board_info(0, eukrea_cpuimx27_i2c_devices,
-> >  				ARRAY_SIZE(eukrea_cpuimx27_i2c_devices));
-> >  
-> > -	imx27_add_i2c_imx1(&cpuimx27_i2c1_data);
-> > +	imx27_add_i2c_imx0(&cpuimx27_i2c1_data);
-> This doesn't fit on Sascha's current tree.  Can you please rebase it?
-I need to be more precise here:  It doesn't fit Sascha's for-2.6.37
-branch.  If you want it to go in before .36, then it's obviously OK.
+> > 	memset(ops, 0, sizeof(*ops));
+> 
+> Matt,
+> 
+> an alternative would be to move this to oprofile_perf_init() and
+> modify ops->backtrace afterwards, but then we will lose the function's
+> tail call. Not sure that is better. Paul, what do you think?
+> 
+I'm a bit confused as to why we just don't do:
 
-Maybe you want to add the offending commit to the log (it's
-c69871597dd173af2d7615429c0ee6aa10fae42b).  And you can add my
+---
 
-	Acked-and-blame-taken-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-Best regards and sorry for that,
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
+index b336cd9..76d97a5 100644
+--- a/drivers/oprofile/oprof.c
++++ b/drivers/oprofile/oprof.c
+@@ -252,6 +252,8 @@ static int __init oprofile_init(void)
+ {
+ 	int err;
+ 
++	memset(&oprofile_ops, 0, sizeof(struct oprofile_operations));
++
+ 	err = oprofile_arch_init(&oprofile_ops);
+ 	if (err < 0 || timer) {
+ 		printk(KERN_INFO "oprofile: using timer interrupt.\n");
