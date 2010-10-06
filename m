@@ -1,42 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 6 Oct 2010 15:03:38 +0200
-Subject: Remove unused default configurations
-In-Reply-To: <AANLkTi==1Rj2W8QPuiZdoGHCZ5Q0dJ-_j0xogURQ6nPt@mail.gmail.com>
-References: <1284390832-7181-1-git-send-email-vince@kyllikki.org>
-	<AANLkTi==1Rj2W8QPuiZdoGHCZ5Q0dJ-_j0xogURQ6nPt@mail.gmail.com>
-Message-ID: <20101006130338.GH29673@pengutronix.de>
+From: robert.richter@amd.com (Robert Richter)
+Date: Wed, 6 Oct 2010 15:33:09 +0200
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+Message-ID: <20101006133309.GP13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 10:46:48AM +0300, Amit Kucheria wrote:
-> On Mon, Sep 13, 2010 at 6:13 PM, Vincent Sanders <vince@kyllikki.org> wrote:
-> >
-> > Several default configurations have failed to build for the entire
-> > 2.6.36 cycle. There are several causes to these faliures. The exact
-> > issues can be tracked on http://armlinux.simtec.co.uk/kautobuild/
-> >
-> > Obviously the maintainers are not using these default configurations
-> > because if they were they would have fixed the build issues by now.
-> >
-> > As Linus has made it very clear the number of default configurations
-> > must be reduced as much as possible I have come up with the following
-> > series which will remove these nine unused configurations. This will
-> > reduce our build coverage by ten machines as all but one are a single
-> > config per machine.
-> >
-> > ?msm_defconfig ? ? ? ? ? ? ? | ? 72 ------------------
-> > ?mx1_defconfig ? ? ? ? ? ? ? | ? 90 -----------------------
-> > ?mx51_defconfig ? ? ? ? ? ? ?| ?171 --------------------------------------------
+On 04.10.10 16:44:22, Matt Fleming wrote:
+> In preparation for moving the majority of this oprofile code into an
+> architecture-neutral place separate the architecture-independent code
+> into oprofile_perf_init() and oprofile_perf_exit().
 > 
-> Could we please keep mx51?
+> Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/oprofile/common.c |   17 ++++++++++++++---
+>  1 files changed, 14 insertions(+), 3 deletions(-)
 > 
-> I'll attempt to fix the problems.
-No need to hurry, the problems are already solved in Linus' and Sascha's
-trees. :-)
+> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> index 86df75f..e4cd332 100644
+> --- a/arch/arm/oprofile/common.c
+> +++ b/arch/arm/oprofile/common.c
+> @@ -327,7 +327,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
+>  		tail = user_backtrace(tail);
+>  }
+>  
+> -int __init oprofile_arch_init(struct oprofile_operations *ops)
+> +int __init oprofile_perf_init(struct oprofile_operations *ops)
+>  {
+>  	int cpu, ret = 0;
+>  
+> @@ -365,7 +365,6 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+>  		}
+>  	}
+>  
+> -	ops->backtrace		= arm_backtrace;
+>  	ops->create_files	= oprofile_perf_create_files;
+>  	ops->setup		= oprofile_perf_setup;
+>  	ops->start		= oprofile_perf_start;
+> @@ -388,7 +387,14 @@ out:
+>  	return ret;
+>  }
+>  
+> -void __exit oprofile_arch_exit(void)
+> +int __init oprofile_arch_init(struct oprofile_operations *ops)
+> +{
 
-Best regards
-Uwe
+We should do here a:
+
+	memset(ops, 0, sizeof(*ops));
+
+Otherwise it looks good.
+
+-Robert
+
+> +	ops->backtrace		= arm_backtrace;
+> +
+> +	return oprofile_perf_init(ops);
+> +}
+> +
+> +void __exit oprofile_perf_exit(void)
+>  {
+>  	int cpu, id;
+>  	struct perf_event *event;
+> @@ -406,6 +412,11 @@ void __exit oprofile_arch_exit(void)
+>  	kfree(counter_config);
+>  	exit_driverfs();
+>  }
+> +
+> +void __exit oprofile_arch_exit(void)
+> +{
+> +	oprofile_perf_exit();
+> +}
+>  #else
+>  int __init oprofile_arch_init(struct oprofile_operations *ops)
+>  {
+> -- 
+> 1.7.1
+> 
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Advanced Micro Devices, Inc.
+Operating System Research Center
