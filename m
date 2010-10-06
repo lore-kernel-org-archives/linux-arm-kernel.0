@@ -1,94 +1,65 @@
 From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Wed,  6 Oct 2010 00:42:48 -0700
-Subject: [PATCH 09/20 v2] msm: clock: add dummy clock driver
+Date: Wed,  6 Oct 2010 00:42:47 -0700
+Subject: [PATCH 08/20 v2] msm: 8x60: gic initialization fixup for RUMI
 In-Reply-To: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
 References: <1286350979-19328-1-git-send-email-johlstei@codeaurora.org>
-Message-ID: <1286350979-19328-10-git-send-email-johlstei@codeaurora.org>
+Message-ID: <1286350979-19328-9-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Need to add this until real clock support for 8x60 goes in, or else some
-drivers won't compile.
+From: Steve Muckle <smuckle@codeaurora.org>
 
-Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+On RUMI platform STIs are not enabled by default, contrary to the
+GIC spec. The bits for STIs in the enable/enable clear registers
+are also RW instead of RO. STIs need to be enabled at initialization
+time.
+
+Signed-off-by: Steve Muckle <smuckle@codeaurora.org>
 ---
- arch/arm/mach-msm/Makefile      |    1 +
- arch/arm/mach-msm/clock-dummy.c |   54 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/clock-dummy.c
+ arch/arm/mach-msm/board-msm8x60.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 4995d77..f7df564 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -7,6 +7,7 @@ else
- obj-y += irq.o
- endif
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index d30ead1..e7feb99 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -19,6 +19,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
  
-+obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o
- obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
- obj-$(CONFIG_MSM_PROC_COMM) += clock.o gpio.c
- obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
-diff --git a/arch/arm/mach-msm/clock-dummy.c b/arch/arm/mach-msm/clock-dummy.c
-new file mode 100644
-index 0000000..1250d22
---- /dev/null
-+++ b/arch/arm/mach-msm/clock-dummy.c
-@@ -0,0 +1,54 @@
-+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-+ * 02110-1301, USA.
-+ *
-+ */
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -41,9 +42,28 @@ static void __init msm8x60_map_io(void)
+ 
+ static void __init msm8x60_init_irq(void)
+ {
++	unsigned int i;
 +
-+struct clk *clk_get(struct device *dev, const char *id)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
-+EXPORT_SYMBOL(clk_get);
+ 	gic_dist_init(0, MSM_QGIC_DIST_BASE, 1);
+ 	gic_cpu_base_addr = (void *)MSM_QGIC_CPU_BASE;
+ 	gic_cpu_init(0, MSM_QGIC_CPU_BASE);
 +
-+int clk_enable(struct clk *clk)
-+{
-+	return -ENOENT;
-+}
-+EXPORT_SYMBOL(clk_enable);
++	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
++	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
 +
-+void clk_disable(struct clk *clk)
-+{
-+}
-+EXPORT_SYMBOL(clk_disable);
++	/* RUMI does not adhere to GIC spec by enabling STIs by default.
++	 * Enable/clear is supposed to be RO for STIs, but is RW on RUMI.
++	 */
++	writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
 +
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	return -ENOENT;
-+}
-+EXPORT_SYMBOL(clk_set_rate);
-+
-+void clk_put(struct clk *clk)
-+{
-+}
-+EXPORT_SYMBOL(clk_put);
++	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
++	 * as they are configured as level, which does not play nice with
++	 * handle_percpu_irq.
++	 */
++	for (i = GIC_PPI_START; i < GIC_SPI_START; i++) {
++		if (i != AVS_SVICINT && i != AVS_SVICINTSWDONE)
++			set_irq_handler(i, handle_percpu_irq);
++	}
+ }
+ 
+ static void __init msm8x60_init(void)
 -- 
 1.7.2.1
 
