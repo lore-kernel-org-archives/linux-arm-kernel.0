@@ -1,83 +1,196 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 06 Oct 2010 16:18:29 +0900
-Subject: [PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
+Date: Wed, 06 Oct 2010 16:18:37 +0900
+Subject: [PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
 In-Reply-To: <20101006071731.28048.89938.sendpatchset@t400s>
 References: <20101006071731.28048.89938.sendpatchset@t400s>
-Message-ID: <20101006071829.28048.45307.sendpatchset@t400s>
+Message-ID: <20101006071837.28048.58439.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add a CONFIG_DEFAULT_IRQ_DEMUX to allow removing the
-default IRQ demuxer from the ARM kernel. This will
-reduce the memory footprint and also remove the need
-for some of the macros in entry-macro.S.
+This patch adds Dynamic IRQ demux support to the
+SH-Mobile line of processors. The actual demux code
+is implemented in entry-irq-common.S and each INTC
+implementation is responsible for registering the
+shared demux code using setup_irq_stubs().
 
-In the case of CONFIG_DEFAULT_IRQ_DEMUX=n the default
-IRQ demux code is omitted from the kernel and the per-
-mach/plat demux code must then be registered using the
-function setup_irq_stubs(). CONFIG_DEFAULT_IRQ_DEMUX=y
-keeps the default IRQ demuxer code as-is in the kernel.
+Future processors will add a new a IRQ demux instance
+and register that from the INTC implementation for
+that particular processor.
+
+Tested on sh7372 and AP4EVB.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/Kconfig             |    3 +++
- arch/arm/kernel/entry-armv.S |   13 +++++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig                                  |    1 
+ arch/arm/mach-shmobile/Makefile                   |    1 
+ arch/arm/mach-shmobile/entry-irq-common.S         |   38 +++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h      |    1 
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |   17 ---------
+ arch/arm/mach-shmobile/intc-sh7367.c              |    4 ++
+ arch/arm/mach-shmobile/intc-sh7372.c              |    4 ++
+ arch/arm/mach-shmobile/intc-sh7377.c              |    4 ++
+ 8 files changed, 53 insertions(+), 17 deletions(-)
 
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig	2010-10-05 20:36:45.000000000 +0900
-@@ -1337,6 +1337,9 @@ config SPARSE_IRQ
- 	  number of off-chip IRQs will want to treat this as
+--- 0008/arch/arm/Kconfig
++++ work/arch/arm/Kconfig	2010-10-06 14:43:07.000000000 +0900
+@@ -1377,6 +1377,7 @@ config SPARSE_IRQ
  	  experimental until they have been independently verified.
  
-+config DEFAULT_IRQ_DEMUX
-+	def_bool y
-+
+ config DEFAULT_IRQ_DEMUX
++	default n if ARCH_SHMOBILE
+ 	def_bool y
+ 
  source "mm/Kconfig"
+--- 0001/arch/arm/mach-shmobile/Makefile
++++ work/arch/arm/mach-shmobile/Makefile	2010-10-06 14:36:27.000000000 +0900
+@@ -4,6 +4,7 @@
  
- config FORCE_MAX_ZONEORDER
---- 0009/arch/arm/kernel/entry-armv.S
-+++ work/arch/arm/kernel/entry-armv.S	2010-10-05 20:34:16.000000000 +0900
-@@ -128,8 +128,9 @@ __dabt_svc:
-  UNWIND(.fnend		)
- ENDPROC(__dabt_svc)
+ # Common objects
+ obj-y				:= timer.o console.o clock.o pm_runtime.o
++obj-y				+= entry-irq-common.o
  
-+#ifdef CONFIG_DEFAULT_IRQ_DEMUX
- 	__irq_svc	default
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
+--- /dev/null
++++ work/arch/arm/mach-shmobile/entry-irq-common.S	2010-10-06 14:38:29.000000000 +0900
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2010 Magnus Damm
++ * Copyright (C) 2008 Renesas Solutions Corp.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++#include <mach/hardware.h>
++#include <mach/irqs.h>
++#include <asm/entry-header.S>
++
++	.macro  get_irqnr_preamble, base, tmp
++	ldr     \base, =INTFLGA
++	.endm
++
++	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
++	ldr     \irqnr, [\base]
++	cmp	\irqnr, #0
++	beq	1000f
++	/* intevt to irq number */
++	lsr	\irqnr, \irqnr, #0x5
++	subs	\irqnr, \irqnr, #16
++
++1000:
++	.endm
++
++	__irq_svc shmobile_common
++	__irq_usr shmobile_common
+--- 0001/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2010-10-06 14:39:29.000000000 +0900
+@@ -5,6 +5,7 @@ extern struct sys_timer shmobile_timer;
+ extern void shmobile_setup_console(void);
+ struct clk;
+ extern int clk_init(void);
++extern char __irq_usr_shmobile_common[], __irq_svc_shmobile_common[];
+ 
+ extern void sh7367_init_irq(void);
+ extern void sh7367_add_early_devices(void);
+--- 0001/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ work/arch/arm/mach-shmobile/include/mach/entry-macro.S	2010-10-06 14:38:01.000000000 +0900
+@@ -14,26 +14,9 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
+ 
+ 	.macro  disable_fiq
+ 	.endm
+ 
+-	.macro  get_irqnr_preamble, base, tmp
+-	ldr     \base, =INTFLGA
+-	.endm
 -
-+#endif
- 	.align	5
- __und_svc:
- #ifdef CONFIG_KPROBES
-@@ -258,8 +259,9 @@ __dabt_usr:
-  UNWIND(.fnend		)
- ENDPROC(__dabt_usr)
- 
-+#ifdef CONFIG_DEFAULT_IRQ_DEMUX
- 	__irq_usr	default
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
 -
-+#endif
- 	.align	5
- __und_usr:
- 	usr_entry
-@@ -885,10 +887,17 @@ __stubs_start:
+-	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	ldr     \irqnr, [\base]
+-	cmp	\irqnr, #0
+-	beq	1000f
+-	/* intevt to irq number */
+-	lsr	\irqnr, \irqnr, #0x5
+-	subs	\irqnr, \irqnr, #16
+-
+-1000:
+-	.endm
+--- 0001/arch/arm/mach-shmobile/intc-sh7367.c
++++ work/arch/arm/mach-shmobile/intc-sh7367.c	2010-10-06 14:44:20.000000000 +0900
+@@ -24,6 +24,8 @@
+ #include <linux/sh_intc.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/traps.h>
++#include <mach/common.h>
  
- 	.globl	__stubs_irq
- __stubs_irq:
-+#ifdef CONFIG_DEFAULT_IRQ_DEMUX
- 	.long	__irq_usr_default		@  0  (USR_26 / USR_32)
- 	.long	__irq_invalid			@  1  (FIQ_26 / FIQ_32)
- 	.long	__irq_invalid			@  2  (IRQ_26 / IRQ_32)
- 	.long	__irq_svc_default		@  3  (SVC_26 / SVC_32)
-+#else
-+	.long	__irq_invalid			@  0  (USR_26 / USR_32)
-+	.long	__irq_invalid			@  1  (FIQ_26 / FIQ_32)
-+	.long	__irq_invalid			@  2  (IRQ_26 / IRQ_32)
-+	.long	__irq_invalid			@  3  (SVC_26 / SVC_32)
-+#endif
- 	.long	__irq_invalid			@  4
- 	.long	__irq_invalid			@  5
- 	.long	__irq_invalid			@  6
+ enum {
+ 	UNUSED_INTCA = 0,
+@@ -431,6 +433,8 @@ void __init sh7367_init_irq(void)
+ {
+ 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+ 
++	setup_irq_stubs(__irq_usr_shmobile_common, __irq_svc_shmobile_common);
++
+ 	register_intc_controller(&intca_desc);
+ 	register_intc_controller(&intcs_desc);
+ 
+--- 0001/arch/arm/mach-shmobile/intc-sh7372.c
++++ work/arch/arm/mach-shmobile/intc-sh7372.c	2010-10-06 14:44:09.000000000 +0900
+@@ -24,6 +24,8 @@
+ #include <linux/sh_intc.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/traps.h>
++#include <mach/common.h>
+ 
+ enum {
+ 	UNUSED_INTCA = 0,
+@@ -580,6 +582,8 @@ void __init sh7372_init_irq(void)
+ {
+ 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+ 
++	setup_irq_stubs(__irq_usr_shmobile_common, __irq_svc_shmobile_common);
++
+ 	register_intc_controller(&intca_desc);
+ 	register_intc_controller(&intcs_desc);
+ 
+--- 0001/arch/arm/mach-shmobile/intc-sh7377.c
++++ work/arch/arm/mach-shmobile/intc-sh7377.c	2010-10-06 14:44:28.000000000 +0900
+@@ -24,6 +24,8 @@
+ #include <linux/sh_intc.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/traps.h>
++#include <mach/common.h>
+ 
+ enum {
+ 	UNUSED_INTCA = 0,
+@@ -637,6 +639,8 @@ void __init sh7377_init_irq(void)
+ {
+ 	void __iomem *intevtsa = ioremap_nocache(INTEVTSA, PAGE_SIZE);
+ 
++	setup_irq_stubs(__irq_usr_shmobile_common, __irq_svc_shmobile_common);
++
+ 	register_intc_controller(&intca_desc);
+ 	register_intc_controller(&intcs_desc);
+ 
