@@ -1,49 +1,62 @@
-From: ww-ml@gmx.de (Wolfgang Wegner)
-Date: Wed, 6 Oct 2010 18:45:43 +0200
-Subject: Kirkwood DMA engine transfer to PCI memory space?
-In-Reply-To: <AANLkTi=P6d_Acg49+dMubCvarHednH-so7b1Msapec5m@mail.gmail.com>
-References: <20101006093134.GA32436@debian-wegner1.datadisplay.de>
-	<AANLkTi=P6d_Acg49+dMubCvarHednH-so7b1Msapec5m@mail.gmail.com>
-Message-ID: <20101006164543.GA11519@debian-wegner1.datadisplay.de>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 06 Oct 2010 09:40:43 -0700
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <alpine.LFD.2.00.1010061207090.3107@xanadu.home>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
+	<1286372886.22265.63.camel@m0nster>
+	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
+	<1286376581.22265.85.camel@m0nster>
+	<alpine.LFD.2.00.1010061109110.3107@xanadu.home>
+	<1286379197.22265.95.camel@m0nster>
+	<alpine.LFD.2.00.1010061144560.3107@xanadu.home>
+	<1286380480.22265.109.camel@m0nster>
+	<alpine.LFD.2.00.1010061207090.3107@xanadu.home>
+Message-ID: <1286383243.22265.124.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saeed,
-
-On Wed, Oct 06, 2010 at 06:27:14PM +0200, saeed bishara wrote:
-> The XOR DMA engine has "address decoding windows"  that determines
-> where to route transactions issued by the xor. the kernel configs only
-> dram windows, you need to open windows for PCI. this ad-hoc code (not
-> tested) my help:
+On Wed, 2010-10-06 at 12:22 -0400, Nicolas Pitre wrote:
+> On Wed, 6 Oct 2010, Daniel Walker wrote:
 > 
-> --- a/drivers/dma/mv_xor.c
-> +++ b/drivers/dma/mv_xor.c
-> @@ -1274,6 +1274,15 @@ mv_xor_conf_mbus_windows(struct
-> mv_xor_shared_private *msp,
->                 win_enable |= (1 << i);
->                 win_enable |= 3 << (16 + (2 * i));
->         }
-> +       /* set window 4 for pcie 0 */
-> +       i = 4;
-> +        writel((KIRKWOOD_PCIE_MEM_PHYS_BASE & 0xffff0000) |
-> +              (ATTR_PCIE_MEM << 8) |
-> +               TARGET_PCIE, base + WINDOW_BASE(i));
-> +        writel((KIRKWOOD_PCIE_MEM_SIZE - 1) & 0xffff0000, base +
-> WINDOW_SIZE(i));
-> +
-> +       win_enable |= (1 << i);
-> +        win_enable |= 3 << (16 + (2 * i));
+> > On Wed, 2010-10-06 at 11:47 -0400, Nicolas Pitre wrote:
+> > 
+> > > It is the wrong fix nevertheless.  And in this case it isn't a question 
+> > > of opinion.
+> > 
+> > I'm not saying your wrong, I'm sure you know more about it than I do. I
+> > was just letting you know why I added it .
+> 
+> Sure.  However it is best to _understand_ why such things may apparently 
+> fix things.  In this case it would have been by accident, and the code 
+> could be broken again with a different gcc version.
+> 
+> Adding "cc" in the clobber list is needed only when the asm code is 
+> modifying the condition flags.
+> 
+> I'd suggest you look at the disassembly difference with and without it. 
+> My guess is that the whole thing gets optimized away as there is no 
+> dependencies to be dependent on, in which case the proper fix would be 
+> to mark it with "volatile".
 
-thank you for this code!
-It looks more sane than my dirty hack, so when we have our FPGA
-burst problems solved, this could be the solution.
+Are you saying it's not needed for either the __dcc_putchar or
+__dcc_getchar ?
 
-Somehow I did not see the window setting@first glance, and
-the address error was silently ignored in the code, so it took
-me some printk's to figure out what was going wrong.
+With __dcc_getchar() Jeff O. (who is CC'd) discovered that the assembly
+was setup in a way that assumed the condition bits were not touched, but
+since they did get touched we ended up missing a branch in dcc_rx_chars
+for checking if "tty" is set. Since we're branching in the assembly I'm
+assuming we must be setting condition bits with the mrc instruction. 
 
-Now I have to figure out how to make use of DMA to speed up
-our framebuffer...
+So for __dcc_getchar it seems like it for sure is need .. 
 
-Best regards,
-Wolfgang
+For  __dcc_putchar I add "cc" also because again we're branching, so I'm
+assuming we're also setting condition bits.
+
+Daniel
+
+
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
