@@ -1,62 +1,22 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 06 Oct 2010 09:40:43 -0700
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <alpine.LFD.2.00.1010061207090.3107@xanadu.home>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<alpine.LFD.2.00.1010052246380.3107@xanadu.home>
-	<1286372886.22265.63.camel@m0nster>
-	<alpine.LFD.2.00.1010061016280.3107@xanadu.home>
-	<1286376581.22265.85.camel@m0nster>
-	<alpine.LFD.2.00.1010061109110.3107@xanadu.home>
-	<1286379197.22265.95.camel@m0nster>
-	<alpine.LFD.2.00.1010061144560.3107@xanadu.home>
-	<1286380480.22265.109.camel@m0nster>
-	<alpine.LFD.2.00.1010061207090.3107@xanadu.home>
-Message-ID: <1286383243.22265.124.camel@m0nster>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 6 Oct 2010 09:33:15 -0700
+Subject: [PATCH 00/10] OMAP: SCM/McBSP/clock: branch integration
+	patches for 2.6.37
+In-Reply-To: <20101006144807.GB2913@atomide.com>
+References: <20101001213119.1408.65395.stgit@twilight.localdomain>
+	<20101005155242.20900538.jhnikula@gmail.com>
+	<20101005184017.GP3117@atomide.com>
+	<201010060842.21260.peter.ujfalusi@nokia.com>
+	<20101006144807.GB2913@atomide.com>
+Message-ID: <20101006163314.GF2803@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-06 at 12:22 -0400, Nicolas Pitre wrote:
-> On Wed, 6 Oct 2010, Daniel Walker wrote:
-> 
-> > On Wed, 2010-10-06 at 11:47 -0400, Nicolas Pitre wrote:
-> > 
-> > > It is the wrong fix nevertheless.  And in this case it isn't a question 
-> > > of opinion.
-> > 
-> > I'm not saying your wrong, I'm sure you know more about it than I do. I
-> > was just letting you know why I added it .
-> 
-> Sure.  However it is best to _understand_ why such things may apparently 
-> fix things.  In this case it would have been by accident, and the code 
-> could be broken again with a different gcc version.
-> 
-> Adding "cc" in the clobber list is needed only when the asm code is 
-> modifying the condition flags.
-> 
-> I'd suggest you look at the disassembly difference with and without it. 
-> My guess is that the whole thing gets optimized away as there is no 
-> dependencies to be dependent on, in which case the proper fix would be 
-> to mark it with "volatile".
+On Wed, Oct 06, 2010 at 07:48:07AM -0700, Tony Lindgren wrote:
 
-Are you saying it's not needed for either the __dcc_putchar or
-__dcc_getchar ?
+> OK, let's do that then we should still have some time left before the
+> merge window.
 
-With __dcc_getchar() Jeff O. (who is CC'd) discovered that the assembly
-was setup in a way that assumed the condition bits were not touched, but
-since they did get touched we ended up missing a branch in dcc_rx_chars
-for checking if "tty" is set. Since we're branching in the assembly I'm
-assuming we must be setting condition bits with the mrc instruction. 
+> Mark & Liam, care to ack as well?
 
-So for __dcc_getchar it seems like it for sure is need .. 
-
-For  __dcc_putchar I add "cc" also because again we're branching, so I'm
-assuming we're also setting condition bits.
-
-Daniel
-
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
