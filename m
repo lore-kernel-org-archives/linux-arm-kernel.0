@@ -1,36 +1,53 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 6 Oct 2010 08:58:34 -0600
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-In-Reply-To: <AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-References: <20101006071731.28048.89938.sendpatchset@t400s>
-	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-Message-ID: <AANLkTinm+bJduJ+46eUb8TA_v644Ui6j+zeBUKegofY7@mail.gmail.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Wed, 6 Oct 2010 14:35:21 +0200
+Subject: [PATCH 1/7] perf: Add helper function to return number of counters
+In-Reply-To: <20101006121410.GK13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<c4eb88b09da564fe093cc6571ed747971425e69a.1286222593.git.matt@console-pimps.org>
+	<20101006121410.GK13563@erda.amd.com>
+Message-ID: <20101006123521.GM13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 6, 2010 at 7:06 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> ARM: Dynamic IRQ demux support
->>
->> [PATCH 01/08] ARM: Move entry-header.S to asm/
->> [PATCH 02/08] ARM: Move macros from entry-armv.S
->> [PATCH 03/08] ARM: Make alignment_trap macro self-contained
->> [PATCH 04/08] ARM: Convert __irq_svc and __usr_svc to macros
->> [PATCH 05/08] ARM: Move the unwind header to entry-header.S
->> [PATCH 06/08] ARM: Add setup_irq_stubs() function
->> [PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
->> [PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
->>
->
-> Hi Magnus,
->
-> Just FYI, I had a patch months ago for this:
->
-> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
->
-> Do you think that's a simpler way to go?
+On 06.10.10 14:14:10, Robert Richter wrote:
+> On 04.10.10 16:44:19, Matt Fleming wrote:
+> > The number of counters for the registered pmu is needed in a few places
+> > so provide a helper function that returns this number.
+> > 
+> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> > Tested-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/kernel/perf_event.c |    6 ++++++
+> >  arch/arm/oprofile/common.c   |   31 ++++++++++++++++++-------------
+> >  arch/sh/kernel/perf_event.c  |    9 +++++++++
+> >  include/linux/perf_event.h   |    1 +
+> >  4 files changed, 34 insertions(+), 13 deletions(-)
 
-Speaking of which, what is the status of your patch?  I see you
-reposted it on July 13, but I haven't seen any further feedback.
+> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> > index d660cb8..23f18a0 100644
+> > --- a/arch/arm/oprofile/common.c
+> > +++ b/arch/arm/oprofile/common.c
+> > @@ -43,7 +43,7 @@ static DEFINE_MUTEX(op_arm_mutex);
+> >  
+> >  static struct op_counter_config *counter_config;
+> >  static struct perf_event **perf_events[nr_cpumask_bits];
+> > -static int perf_num_counters;
+> > +static int perf_nr_counters;
 
-g.
+Matt,
+
+as we will have one more version with this patch set, please use
+num_counters instead of perf_nr_counters. The same name is used also
+for x86.
+
+Thanks,
+
+-Robert
+
+> >  
+> >  /*
+> >   * Overflow callback for oprofile.
+
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
