@@ -1,43 +1,97 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  6 Oct 2010 12:00:19 +0200
-Subject: [PATCH 3/3] ARM: mx3/cpuimx35: mark otg_pdata and usbh1_pdata as
-	maybe unused
-In-Reply-To: <1286359219-5869-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1286359219-5869-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1286359219-5869-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: robert.richter@amd.com (Robert Richter)
+Date: Wed, 6 Oct 2010 16:49:21 +0200
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <20101006133309.GP13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+	<20101006133309.GP13563@erda.amd.com>
+Message-ID: <20101006144921.GQ13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes
+On 06.10.10 15:33:09, Robert Richter wrote:
+> On 04.10.10 16:44:22, Matt Fleming wrote:
+> > In preparation for moving the majority of this oprofile code into an
+> > architecture-neutral place separate the architecture-independent code
+> > into oprofile_perf_init() and oprofile_perf_exit().
+> > 
+> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
+> > Tested-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/oprofile/common.c |   17 ++++++++++++++---
+> >  1 files changed, 14 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> > index 86df75f..e4cd332 100644
+> > --- a/arch/arm/oprofile/common.c
+> > +++ b/arch/arm/oprofile/common.c
+> > @@ -327,7 +327,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
+> >  		tail = user_backtrace(tail);
+> >  }
+> >  
+> > -int __init oprofile_arch_init(struct oprofile_operations *ops)
+> > +int __init oprofile_perf_init(struct oprofile_operations *ops)
+> >  {
+> >  	int cpu, ret = 0;
+> >  
+> > @@ -365,7 +365,6 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+> >  		}
+> >  	}
+> >  
+> > -	ops->backtrace		= arm_backtrace;
+> >  	ops->create_files	= oprofile_perf_create_files;
+> >  	ops->setup		= oprofile_perf_setup;
+> >  	ops->start		= oprofile_perf_start;
+> > @@ -388,7 +387,14 @@ out:
+> >  	return ret;
+> >  }
+> >  
+> > -void __exit oprofile_arch_exit(void)
+> > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+> > +{
+> 
+> We should do here a:
+> 
+> 	memset(ops, 0, sizeof(*ops));
 
-	arch/arm/mach-mx3/mach-cpuimx35.c:143: warning: 'otg_pdata' defined but not used
-	arch/arm/mach-mx3/mach-cpuimx35.c:148: warning: 'usbh1_pdata' defined but not used
+Matt,
 
-when USB_ULPI is not selected.
+an alternative would be to move this to oprofile_perf_init() and
+modify ops->backtrace afterwards, but then we will lose the function's
+tail call. Not sure that is better. Paul, what do you think?
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-mx3/mach-cpuimx35.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+-Robert
 
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index fb4d140..16916c9 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -140,12 +140,12 @@ eukrea_cpuimx35_nand_board_info __initconst = {
- 	.flash_bbt	= 1,
- };
- 
--static struct mxc_usbh_platform_data otg_pdata = {
-+static struct mxc_usbh_platform_data __maybe_unused otg_pdata = {
- 	.portsc	= MXC_EHCI_MODE_UTMI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
- };
- 
--static struct mxc_usbh_platform_data usbh1_pdata = {
-+static struct mxc_usbh_platform_data __maybe_unused usbh1_pdata = {
- 	.portsc	= MXC_EHCI_MODE_SERIAL,
- 	.flags	= MXC_EHCI_INTERFACE_SINGLE_UNI | MXC_EHCI_INTERNAL_PHY |
- 		  MXC_EHCI_IPPUE_DOWN,
+> 
+> Otherwise it looks good.
+> 
+> -Robert
+> 
+> > +	ops->backtrace		= arm_backtrace;
+> > +
+> > +	return oprofile_perf_init(ops);
+> > +}
+> > +
+> > +void __exit oprofile_perf_exit(void)
+> >  {
+> >  	int cpu, id;
+> >  	struct perf_event *event;
+> > @@ -406,6 +412,11 @@ void __exit oprofile_arch_exit(void)
+> >  	kfree(counter_config);
+> >  	exit_driverfs();
+> >  }
+> > +
+> > +void __exit oprofile_arch_exit(void)
+> > +{
+> > +	oprofile_perf_exit();
+> > +}
+> >  #else
+> >  int __init oprofile_arch_init(struct oprofile_operations *ops)
+> >  {
+> > -- 
+> > 1.7.1
+
 -- 
-1.7.2.3
+Advanced Micro Devices, Inc.
+Operating System Research Center
