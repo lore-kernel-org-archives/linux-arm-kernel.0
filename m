@@ -1,56 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 6 Oct 2010 12:57:57 -0600 (MDT)
-Subject: [PATCH 00/10] OMAP: SCM/McBSP/clock: branch integration patches
-	for 2.6.37
-In-Reply-To: <1286377687.5662.24.camel@odin>
-References: <20101001213119.1408.65395.stgit@twilight.localdomain>
-	<20101005155242.20900538.jhnikula@gmail.com>
-	<20101005184017.GP3117@atomide.com>
-	<201010060842.21260.peter.ujfalusi@nokia.com>
-	<20101006144807.GB2913@atomide.com> <1286377687.5662.24.camel@odin>
-Message-ID: <alpine.DEB.2.00.1010061255260.13816@utopia.booyaka.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Oct 2010 03:50:57 +0900
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <20101006184407.GY13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+	<20101006133309.GP13563@erda.amd.com>
+	<20101006144921.GQ13563@erda.amd.com>
+	<20101006145311.GA3754@linux-sh.org>
+	<20101006145903.GR13563@erda.amd.com>
+	<AANLkTikGQe99k_fK5pZtkn-ht9jgC0guDkn28dSedjUo@mail.gmail.com>
+	<20101006184407.GY13563@erda.amd.com>
+Message-ID: <20101006185057.GB13879@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
-On Wed, 6 Oct 2010, Liam Girdwood wrote:
-
-> On Wed, 2010-10-06 at 07:48 -0700, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@nokia.com> [101005 22:33]:
-> > > On Tuesday 05 October 2010 21:40:17 ext Tony Lindgren wrote:
-> > > 
-> > > ...
-> > > 
-> > > > > For patches 6-7 you could have my ack.
-> > > > > Acked-by: Jarkko Nikula <jhnikula@gmail.com>
-> > > > > 
-> > > > > As they are touching also sound/soc/omap/omap-mcbsp.c, an ack from Mark
-> > > > > and Liam are needed. Links to patches 6 and 7 below and my fixes on top
-> > > > > of them [1].
-> > > > > 
-> > > > > http://marc.info/?l=linux-omap&m=128596931117788&w=2
-> > > > > http://marc.info/?l=linux-omap&m=128596931417805&w=2
-> > > > 
-> > > > Sorry, I've already merged them as they fixed code that did not compile.
-> > > > 
-> > > > Let me know if you guys want me to rebuild those parts of omap-for-linus
-> > > > to add the acks.
-> > > 
-> > > If you decide to rebuild, than you can add my (for patch 6-7):
-> > > Acked-by: Peter Ujfalusi <peter.ujfalusi@nokia.com> 
+On Wed, Oct 06, 2010 at 08:44:07PM +0200, Robert Richter wrote:
+> On 06.10.10 14:23:17, Grant Likely wrote:
+> > >> diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
+> > >> index b336cd9..76d97a5 100644
+> > >> --- a/drivers/oprofile/oprof.c
+> > >> +++ b/drivers/oprofile/oprof.c
+> > >> @@ -252,6 +252,8 @@ static int __init oprofile_init(void)
+> > >> ?{
+> > >> ? ? ? int err;
+> > >>
+> > >> + ? ? memset(&oprofile_ops, 0, sizeof(struct oprofile_operations));
+> > >> +
+> > >
+> > > Yes, this looks much better. Thanks Paul.
 > > 
-> > OK, let's do that then we should still have some time left before the
-> > merge window.
-> > 
-> > Mark & Liam, care to ack as well?
-> > 
+> > oprofile_ops is allocated in bss and so is already zeroed.  No need to
+> > do it explicitly.
 > 
-> Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+> Before oprofile_arch_init() it isn't necessarily needed, but we should
+> definitely add it before oprofile_timer_init(). For code readability I
+> would rather tend to let the first in too.
+> 
+No, it was intentionally not added in between because architectures could
+set a backtrace op even if they had no actual counter information to plug
+in. oprofile_timer_init() is pretty careful to clear out all of the
+unused fields manually, while leaving the backtrace setting untouched.
 
-Okay, acks from Liam, Mark, Peter, and Jarkko have been added to patches 6 
-and 7.  Also, acks from Peter have been added to Jarkko's three patches.  
-Jarkko's three patches have been added on to the original ten.  Will send 
-out an updated pull request shortly.
-
-
-- Paul
+sh, ia64, and s390 all depend on this behaviour.
