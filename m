@@ -1,54 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 06 Oct 2010 15:34:47 +0900
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
-	S/PDIF PCM audio
-In-Reply-To: <AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
-	<20101004224159.GA4972@opensource.wolfsonmicro.com>
-	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
-	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-	<20101005044304.GA26509@opensource.wolfsonmicro.com>
-	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
-	<20101005055937.GA19989@opensource.wolfsonmicro.com>
-	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
-	<AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
-Message-ID: <00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Wed, 6 Oct 2010 08:35:25 +0200
+Subject: [PATCH/RFC] i.MX31 and i.MX35 : fix errate TLSbo65953 and
+	ENGcm09472
+In-Reply-To: <20101005162920.GT11737@pengutronix.de>
+References: <4CAAD39C.2010103@eukrea.com>
+	<1286270739-18270-1-git-send-email-eric@eukrea.com>
+	<20101005162920.GT11737@pengutronix.de>
+Message-ID: <20101006063525.GS7159@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwhan Youn wrote:
+On Tue, Oct 05, 2010 at 06:29:20PM +0200, Uwe Kleine-K?nig wrote:
+> On Tue, Oct 05, 2010 at 11:25:39AM +0200, Eric B?nard wrote:
+> > +#else
+> >  #ifdef CONFIG_ARCH_MXC91231
+> >  	if (cpu_is_mxc91231()) {
+> >  		/* Need this to set DSM low-power mode */
+> >  		mxc91231_prepare_idle();
+> >  	}
+> >  #endif
+> > -
+> >  	cpu_do_idle();
+> > +#endif
+> No.  When we start to have multi-soc support for imx and a kernel for
+> both mx35 and mxc91231 is compiled mxc91231_prepare_idle isn't called
+> anymore for mxc91231.  Ah, and cpu_do_idle isn't called anymore at all.
 > 
-> >>> I hope you noticed that this clock hierarchy is a _very_ board specific thing.
-> >>> We can easily place SoCs' shared stuff in arch/arm/plat-samsung (or similar)
-> >>> Any suggestions, where do we place code shared by SMDK-boards ?
-> >>
-> >> plat-samsung would probably be fine for that also - create a file called
-> >> common-smdk or something.  Some other things have gone for a plat-smdk
-> >> style approach too, though I'm not sure how tasteful I find that
-> >> personally.
-> > Even though I would personally like to have EPLL control for a device
-> > in machine specific manner as part of its driver, I accept your opinion.
-> >
-> > Claude, let us create one arch/arm/plat-samsung/smdk.c to do common
-> > stuff for SMKDs like EPLL control. What do you think ?
+> This needs to read:
 > 
-> Actually if we add this file on plat-samsung, board-init will be
-> separated two-part, one is machine(board) specific and other is all
-> smdk specific. So, If it doesn't make confusion to other guys who
-> wants to add settings for their features on board-init, it looks good
-> to me. But I think that we also have to listen Mr. Ben Dooks and Mr.
-> Kukjin Kim's opinion about this before we get a conclusion.
+> 	#if defined (CONFIG_ARCH_MX31) || defined (CONFIG_ARCH_MX35)
+> 		if (cpu_is_mx31() || cpu_is_mx35()) {
+> 			unsigned long reg = 0;
+> 			__asm__ __volatile__(...);
 
-Hi all,
+A "return" statement here would save you the else branch and
+subsequently, one indentation level, right?
 
-I think, basically it'd better if could control clock stuff in each driver for it when need it such as clk_get, clk_enable and so on.
-Actually there is no policy/protection for EPLL usage in plat-samsung or plat-s5p now and need to sort out other similar case for it also....so in my opinion, right now to proceed with the current style is helpful to me and will consider it in the future.
+Also, I wonder whether the check for CONFIG_ARCH_MX3[15] is actually
+needed at all, as cpu_is_mx3x() will default to 0 at compile time in
+case those #defines are not set.
 
-Thanks.
+> 		} else
+> 	#endif
+> 		{
+> 		
+> #ifdef CONFIG_ARCH_MXC91231
+> 			if (cpu_is_mxc91231()) {
+> 				/* Need this to set DSM low-power mode */
+> 				mxc91231_prepare_idle();
+> 			}
+> #endif
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+In this case, though, they seem mandatory due to the symbol
+mxc91231_prepare_idle would be undefined otherwise.
+
+
+Daniel
