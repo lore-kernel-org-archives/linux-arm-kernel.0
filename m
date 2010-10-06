@@ -1,110 +1,65 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 06 Oct 2010 06:38:33 -0700
-Subject: [PATCH 1/3] [ARM] Translate delay.S into (mostly) C
-In-Reply-To: <4CABEECB.4030301@codeaurora.org>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-	<1285644827-6846-2-git-send-email-sboyd@codeaurora.org>
-	<1286299355.18791.11.camel@c-dwalke-linux.qualcomm.com>
-	<4CABEECB.4030301@codeaurora.org>
-Message-ID: <1286372313.22265.54.camel@m0nster>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Wed, 6 Oct 2010 22:30:41 +0900
+Subject: [PATCH 2/7] perf: New helper function for pmu name
+In-Reply-To: <20101006131825.GO13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
+	<20101006122736.GL13563@erda.amd.com>
+	<20101006123950.GA29118@linux-sh.org>
+	<20101006131825.GO13563@erda.amd.com>
+Message-ID: <20101006133041.GA29273@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-10-05 at 20:36 -0700, Stephen Boyd wrote:
-> On 10/05/2010 10:22 AM, Daniel Walker wrote:
-> > You shouldn't really reference this series in this comment. You have to
-> > look at this as a changeset comment. So you really want to describe what
-> > this change is doing not what the over all series is doing.
-> >
-> > It would be better to say something like,
-> >
-> > "We're implementing this in C to give us further flexibility in allowing
-> > overrides."
-> >
-> > But don't references "next patch" or "this series" , but you can do that
-> > in the intro email.
-> >
+On Wed, Oct 06, 2010 at 03:18:25PM +0200, Robert Richter wrote:
+> I don't want to be the perf_pmu_name() discussion a show stopper for
+> this patch set. We don't have a generic perf interface available now
+> that allows us to detect the pmu type for sh cpus. I also don't see a
+> name string as a final solution for pmu detection. So it will be more
+> than just adding perf_pmu_name().
 > 
-> Why not? This is a common thing to do when multiple patches are related
-> to one topic. Doing a git log and searching for "next patch" shows
-> others doing the same.
+Whether you see it as a show stopper or not is not the issue, I will not
+expose sh_pmu generically. Nor do I imagine that the x86 people or any
+other architecture wishing to tie in to the oprofile wrapper are
+interested in doing the equivalent there. We have a registration
+interface to do, and I will not provide oprofile-specific workarounds
+for it hidden in the arch code.
 
-I would not say it's common .. I don't recall seeing many other series
-which do this. You shouldn't do it because the patch description doesn't
-stand on it own. What if this patch is accepted in isolation, and the
-others rejected would your description make sense? Also people don't
-always look at a "series" in git history, sometimes you only look at one
-commit so saying "next patch" or "this series" can be confusing.
-
-You can have an intro email where you can describe the whole series,
-including what your intending for each patch to do.
-
-> >>
-> >>  $ scripts/bloat-o-meter vmlinux.orig vmlinux.new
-> >>  add/remove: 0/0 grow/shrink: 2/0 up/down: 12/0 (12)
-> >>  function                                     old     new   delta
-> >>  __udelay                                      48      56      +8
-> >>  __const_udelay                                40      44      +4
-> >
-> > I think the "size" command might be better for this type of stuff. It
-> > should give you the same output (or similar).. It's just used more
-> > frequently. 
+> Until then, as we currently would only need the name for SH, I don't
+> see something wrong here to include architectural interfaces from
+> <asm/perf_event.h> directly by architectural code until a general
+> solution is available.  If you run a 'git grep include..asm/perf' this
+> is common for other architectures.
 > 
-> Ok.
-> 
-> $ size vmlinux.orig
->    text    data     bss     dec     hex filename
-> 6533503  530232 1228296 8292031  7e86bf vmlinux.orig
-> $ size vmlinux.new
->    text    data     bss     dec     hex filename
-> 6533607  530232 1228296 8292135  7e8727 vmlinux.new
-> 
-> I should mention GCC decided to inline __delay() into __udelay() and
-> __const_udelay() and also decided to inline __const_udelay() into
-> __delay() meaning we lost the function interleaving the assembly file
-> had. I'll make a note of that and sorry for being misleading.
-> 
-> > Is this an -Os kernel, or -O2 ?
-> 
-> -Os.
-> 
-> >> +/*
-> >> + * 0 <= xloops <= 0x7fffff06
-> >> + * loops_per_jiffy <= 0x01ffffff (max. 3355 bogomips)
-> >
-> > As long as your doing a re-write may as well add some real text here,
-> > and for the others.
-> 
-> Any suggestions on what to add? I hoped the original comments would be
-> good enough already considering the code is unchanged.
+This is nonsense. Every architecture that needs to support the oprofile
+userspace tools needs to support the string interface. At the same time,
+everyone supporting hardware perf events in the kernel today already has
+a string to pmu mapping somewhere in their data structures. This can
+easily be exposed generically, and platforms that have special mangling
+they need to do before exposing the string to oprofile can do so if the
+need to.
 
-you might want to say what the purpose of the function is ..
-
-> >> + */
-> >> +void __const_udelay(unsigned long xloops)
-> >> +{
-> >> +	unsigned long lpj;
-> >> +	unsigned long loops;
-> >> +
-> >> +	xloops >>= 14;			/* max = 0x01ffffff */
-> >> +	lpj = loops_per_jiffy >> 10;	/* max = 0x0001ffff */
-> >> +	loops = lpj * xloops;		/* max = 0x00007fff */
-> >> +	loops >>= 6;			/* max = 2^32-1 */
-> >> +
-> >> +	if (loops)
-> >> +		__delay(loops);
-> >
-> > likely/unlikely ?
+> I am not against adding the pmu name to the perf API. But the oprofile
+> cpu_type strings are oprofile centric esp. for the userland. So these
+> strings will remain part of oprofile. Also I don't think we want to
+> polute the perf pmu names with it.
 > 
-> likely. Although I'm doubtful on how much it will help considering the
-> assembly and the code are equivalent already for this part of the code.
+And those architectures that have opted to use different strings for perf
+events are free to mangle them however they want for the oprofile case.
+It doesn't change the fact that strings are still being managed by all of
+the architectures. The perf PMU names aren't presently locked in to an
+ABI, whereas the oprofile strings are, so it seems fairly straightforward
+to develop standard mangling rules for preventing an oprofile-facing
+string, or to simply reuse the strings verbatim.
 
-I don't know, shouldn't hurt tho.
-
-Daniel
-
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+> > sh_pmu is created for use solely by the perf events code, we are not
+> > going to have oprofile poking around in data structures it has no place
+> > knowing anything about when 99% of everything else it is doing is already
+> > abstracted cleanly through the perf events interfaces. Likewise for
+> > special oprofile-specific APIs.
+> 
+> So, I am also fine with implementing a generic perf_pmu_name() for sh
+> and then derive the oprofile cpu_type string from it in the oprofile
+> code.
+> 
+Again, this is unacceptable.
