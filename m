@@ -1,43 +1,63 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Oct 2010 17:00:23 -0700
-Subject: [PATCH] ARM: Fix HWCAP_TLS flag for ARM11MPCore/Cortex-A9
-Message-ID: <20101007000022.GD4859@atomide.com>
+Date: Wed, 6 Oct 2010 16:07:24 -0700
+Subject: [PATCH] ARM: Check for is_smp for tlb_ops and cache_ops boardcast
+In-Reply-To: <20101006223358.GA7581@n2100.arm.linux.org.uk>
+References: <20100817104414.19061.38999.stgit@baageli.muru.com>
+	<20100906104413.GD20903@n2100.arm.linux.org.uk>
+	<20100906180346.GC20849@atomide.com>
+	<20100908030951.GH22507@atomide.com>
+	<20100908031214.GI22507@atomide.com>
+	<20101005221952.GV3117@atomide.com>
+	<20101005223310.GA14065@n2100.arm.linux.org.uk>
+	<20101006144414.GA2913@atomide.com>
+	<20101006223358.GA7581@n2100.arm.linux.org.uk>
+Message-ID: <20101006230724.GC4859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 14eff1812679c76564b775aa95cdd378965f6cfb added proper
-detection for ARM11MPCore/Cortex-A9 instead of detecting them
-as ARMv7. However, it was missing the HWCAP_TLS flags.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [101006 15:25]:
+> On Wed, Oct 06, 2010 at 07:44:14AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101005 15:24]:
+> > > On Tue, Oct 05, 2010 at 03:19:52PM -0700, Tony Lindgren wrote:
+> > > > * Tony Lindgren <tony@atomide.com> [100907 20:04]:
+> > > > > This should not be needed when running on UP systems.
+> > > > > 
+> > > > > Additionally we will also get an undefined instruction on ARM cores
+> > > > > without the extended CPUID registers with CONFIG_SMP_ON_UP.
+> > > > > 
+> > > > > Also, we can now remove the is_smp() test from mmu.c.
+> > > > 
+> > > > Just FYI, I've updated this one more time with to use cpus_empty
+> > > > instead of !smp_on_up() here as well.
+> > > 
+> > > What's the rationale?
+> > 
+> > With CPU hotplug if the other SMP cores are unplugged for PM or
+> > other reasons, no need to do the broadcast.
+> 
+> Yes, but why this expensive test when the smp_on_up() is much cheaper?
+> 
+> smp_call_function_many() already takes care of the "no other CPUs"
+> case, which is used by on_each_cpu_mask() and on_each_cpu(), which
+> means these functions won't broadcast the operations to other CPUs
+> when they're offline.
+> 
+> In any case, if you think that we broadcast every operation to all
+> CPUs, you're mistaken - TLB and cache ops are broadcast to only
+> those CPUs which the thread is running on, or in the case of non-MM
+> specific, to all online CPUs.
 
-HWCAP_TLS is needed if support for earlier ARMv6 is compiled
-into the same kernel. Without HWCAP_TLS flags the userspace
-won't work unless nosmp is specified:
+OK thanks, that's what I was missing.
+ 
+> So the only thing we have to worry about is "is there an ID register
+> available" which is covered by the is_smp() test.  Checking the CPU
+> mask is far more expensive and imho ends up needlessly adding to the
+> complexity.
 
-Kernel panic - not syncing: Attempted to kill init!
-CPU0: stopping
-<c005d5e4>] (unwind_backtrace+0x0/0xec) from [<c004c2f8>] (do_IPI+0xfc/0x184)
-<c004c2f8>] (do_IPI+0xfc/0x184) from [<c03f25bc>] (__irq_svc+0x9c/0x160)
-Exception stack(0xc0565f80 to 0xc0565fc8)
-5f80: 00000001 c05772a0 00000000 00003a61 c0564000 c05cf500 c003603c c0578600
-5fa0: 80033ef0 410fc091 0000001f 00000000 00000000 c0565fc8 c00b91f8 c0057cb4
-5fc0: 20000013 ffffffff
-[<c03f25bc>] (__irq_svc+0x9c/0x160) from [<c0057cb4>] (default_idle+0x30/0x38)
-[<c0057cb4>] (default_idle+0x30/0x38) from [<c005829c>] (cpu_idle+0x9c/0xf8)
-[<c005829c>] (cpu_idle+0x9c/0xf8) from [<c0008d48>] (start_kernel+0x2a4/0x300)
-[<c0008d48>] (start_kernel+0x2a4/0x300) from [<80008084>] (0x80008084)
+OK. In that case, the patch to use is the previous one:
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6429/1
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index df422fe..8370960 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -372,7 +372,7 @@ __v7_ca9mp_proc_info:
- 	b	__v7_ca9mp_setup
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
--	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
- 	.long	cpu_v7_name
- 	.long	v7_processor_functions
- 	.long	v7wbi_tlb_fns
+Regards,
+
+Tony
