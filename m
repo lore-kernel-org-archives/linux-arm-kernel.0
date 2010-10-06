@@ -1,40 +1,25 @@
-From: x0132446@ti.com (David Anders)
-Date: Wed,  6 Oct 2010 16:20:18 -0500
-Subject: [PATCH 2/4] omap4: pandaboard: Fix the init if CONFIG_MMC_OMAP_HS is
-	not set
-In-Reply-To: <1286400020-1010-1-git-send-email-x0132446@ti.com>
-References: <1286400020-1010-1-git-send-email-x0132446@ti.com>
-Message-ID: <1286400020-1010-3-git-send-email-x0132446@ti.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Wed, 06 Oct 2010 23:22:48 +0100
+Subject: [PATCH 1/2] ARM: S3C64XX: Add suspend support
+In-Reply-To: <AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
+References: <cover.1286319272.git.mcuelenaere@gmail.com>	<1fa4a7a39d9fd48b8329e1a1077a65adb96475b5.1286319272.git.mcuelenaere@gmail.com>
+	<AANLkTi=CH6BJZDYsCHXmcYAVuu-LTsqjKXUVGnBAikiN@mail.gmail.com>
+Message-ID: <4CACF6B8.9030304@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid possible crash if CONFIG_MMC_OMAP_HS is not set.
+On 06/10/10 00:23, Kyungmin Park wrote:
+> Hi,
+> 
+> I agree your approach, put the common features in common place.
+> but Samsung maintainers insist put these at each machine file at current time.
 
-Signed-off-by: David Anders <x0132446@ti.com>
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
----
- arch/arm/mach-omap2/board-omap4panda.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+This is just an init call, the actuall implementation is common to the
+core. We did it this was as it was not clear if _all_ machines under
+the architecture could do this by default, or would need extra code in
+their mach implementation, or in a driver elsewhere.
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 093d13b..697c0bd 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -85,7 +85,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
- 
- static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
- {
--	struct omap_mmc_platform_data *pdata = dev->platform_data;
-+	struct omap_mmc_platform_data *pdata;
-+
-+	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
-+	if (!dev) {
-+		pr_err("Failed omap4_twl6030_hsmmc_set_late_init\n");
-+		return;
-+	}
-+	pdata = dev->platform_data;
- 
- 	pdata->init =	omap4_twl6030_hsmmc_late_init;
- }
--- 
-1.7.0.4
+I would still prefer each machine that can do pm to call s3c_pm_init()
+in their setup code to ensure that we don't enable pm on a machine with
+possibly incomplete support (especially as PM can be one of the more
+difficult things to debug).
