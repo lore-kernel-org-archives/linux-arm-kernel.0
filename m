@@ -1,67 +1,91 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 6 Oct 2010 15:18:25 +0200
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <20101006123950.GA29118@linux-sh.org>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-	<20101006122736.GL13563@erda.amd.com>
-	<20101006123950.GA29118@linux-sh.org>
-Message-ID: <20101006131825.GO13563@erda.amd.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 6 Oct 2010 21:06:23 +0800
+Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
+In-Reply-To: <20101006071731.28048.89938.sendpatchset@t400s>
+References: <20101006071731.28048.89938.sendpatchset@t400s>
+Message-ID: <AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Peter)
+On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> ARM: Dynamic IRQ demux support
+>
+> [PATCH 01/08] ARM: Move entry-header.S to asm/
+> [PATCH 02/08] ARM: Move macros from entry-armv.S
+> [PATCH 03/08] ARM: Make alignment_trap macro self-contained
+> [PATCH 04/08] ARM: Convert __irq_svc and __usr_svc to macros
+> [PATCH 05/08] ARM: Move the unwind header to entry-header.S
+> [PATCH 06/08] ARM: Add setup_irq_stubs() function
+> [PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
+> [PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
+>
 
-On 06.10.10 08:39:50, Paul Mundt wrote:
-> On Wed, Oct 06, 2010 at 02:27:36PM +0200, Robert Richter wrote:
-> > On 04.10.10 16:44:20, Matt Fleming wrote:
-> > > Introduce perf_pmu_name() helper function that returns the name of the
-> > > pmu. This gives us a generic way to get the name of a pmu regardless of
-> > > how an architecture identifies it internally, e.g. ARM uses an id
-> > > whereas SH currently uses a string.
-> > 
-> > I rather want use here the solution we discussed earlier, simply
-> > including <asm/perf_event.h> and then access sh_pmu->name directly
-> > from oprofile.
-> > 
-> No. Exposing sh_pmu generically is unacceptable. This is already
+Hi Magnus,
 
-I don't want to be the perf_pmu_name() discussion a show stopper for
-this patch set. We don't have a generic perf interface available now
-that allows us to detect the pmu type for sh cpus. I also don't see a
-name string as a final solution for pmu detection. So it will be more
-than just adding perf_pmu_name().
+Just FYI, I had a patch months ago for this:
 
-Until then, as we currently would only need the name for SH, I don't
-see something wrong here to include architectural interfaces from
-<asm/perf_event.h> directly by architectural code until a general
-solution is available.  If you run a 'git grep include..asm/perf' this
-is common for other architectures.
+http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
 
-> centrally managed through perf, and if oprofile needs any additional
-> information then it needs to get that through the perf layer. We already
-> have the situation that effectively every architecture with perf support
-> implements a name string already, so making this part of the perf API
-> hardly seems like that big of a stretch. If the perf people are violently
-> opposed to this, then of course we can look at alternatives.
+Do you think that's a simpler way to go?
 
-I am not against adding the pmu name to the perf API. But the oprofile
-cpu_type strings are oprofile centric esp. for the userland. So these
-strings will remain part of oprofile. Also I don't think we want to
-polute the perf pmu names with it.
-
-> sh_pmu is created for use solely by the perf events code, we are not
-> going to have oprofile poking around in data structures it has no place
-> knowing anything about when 99% of everything else it is doing is already
-> abstracted cleanly through the perf events interfaces. Likewise for
-> special oprofile-specific APIs.
-
-So, I am also fine with implementing a generic perf_pmu_name() for sh
-and then derive the oprofile cpu_type string from it in the oprofile
-code.
-
--Robert
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+> These patches break out the IRQ demux code from entry-armv.S to
+> allow multiple IRQ demux instances to coexist. A registration
+> function is also added that allows per-mach/plat code to chose
+> which IRQ demux instance to register at runtime.
+>
+> Useful to support the upcoming single-kernel-binary-on-multiple-machines
+> _and_ for future SH-Mobile hardware support which will need to tie in
+> the GIC in the demux code for some processors.
+>
+> The existing kernel behaviour remains unchanged as long as the kconfig
+> option CONFIG_DEFAULT_IRQ_DEMUX is set to Y.
+>
+> A single IRQ demuxer instance (on UP) is written like this:
+>
+> +#include <asm/entry-header.S>
+> +
+> + ? ? ? .macro ?get_irqnr_preamble, base, tmp
+> [blah]
+> + ? ? ? .endm
+> +
+> + ? ? ? .macro ?get_irqnr_and_base, irqnr, irqstat, base, tmp
+> [bleh]
+> + ? ? ? .endm
+> +
+> + ? ? ? __irq_svc shmobile_common
+> + ? ? ? __irq_usr shmobile_common
+>
+> The per-mach IRQ setup code then registers whatever demuxing functions
+> it requires using:
+>
+> + ? ? ? setup_irq_stubs(__irq_usr_shmobile_common, __irq_svc_shmobile_common);
+>
+> To strip down memory usage the kconfig option CONFIG_DEFAULT_IRQ_DEMUX
+> may be set to N to remove the default IRQ demux code. Most macros in
+> entry-macro.S will then become unused.
+>
+> The macros disable_fiq and arch_ret_to_user are kept as-is for now.
+>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?4
+> ?arch/arm/include/asm/entry-header.S ? ? ? ? ? ? ? | ?417 ++++++++++++++++++++-
+> ?arch/arm/include/asm/traps.h ? ? ? ? ? ? ? ? ? ? ?| ? ?1
+> ?arch/arm/kernel/entry-armv.S ? ? ? ? ? ? ? ? ? ? ?| ?239 ------------
+> ?arch/arm/kernel/entry-common.S ? ? ? ? ? ? ? ? ? ?| ? ?4
+> ?arch/arm/kernel/entry-header.S ? ? ? ? ? ? ? ? ? ?| ?181 ---------
+> ?arch/arm/kernel/traps.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 14
+> ?arch/arm/mach-shmobile/Makefile ? ? ? ? ? ? ? ? ? | ? ?1
+> ?arch/arm/mach-shmobile/entry-irq-common.S ? ? ? ? | ? 38 +
+> ?arch/arm/mach-shmobile/include/mach/common.h ? ? ?| ? ?1
+> ?arch/arm/mach-shmobile/include/mach/entry-macro.S | ? 17
+> ?arch/arm/mach-shmobile/intc-sh7367.c ? ? ? ? ? ? ?| ? ?4
+> ?arch/arm/mach-shmobile/intc-sh7372.c ? ? ? ? ? ? ?| ? ?4
+> ?arch/arm/mach-shmobile/intc-sh7377.c ? ? ? ? ? ? ?| ? ?4
+> ?14 files changed, 506 insertions(+), 423 deletions(-)
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
