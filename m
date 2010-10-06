@@ -1,44 +1,59 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 6 Oct 2010 23:13:47 +0900
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <20101006133041.GA29273@linux-sh.org>
-References: <cover.1286222593.git.matt@console-pimps.org>
-	<59a8e68894a2e755232189abbe9b1a3b892e309c.1286222593.git.matt@console-pimps.org>
-	<20101006122736.GL13563@erda.amd.com>
-	<20101006123950.GA29118@linux-sh.org>
-	<20101006131825.GO13563@erda.amd.com>
-	<20101006133041.GA29273@linux-sh.org>
-Message-ID: <20101006141347.GA32376@linux-sh.org>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 06 Oct 2010 06:44:29 -0700
+Subject: [PATCH 3/3] [ARM] Implement a timer based __delay() loop
+In-Reply-To: <4CABEECF.9080009@codeaurora.org>
+References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
+	<1285644827-6846-4-git-send-email-sboyd@codeaurora.org>
+	<1286300338.18791.26.camel@c-dwalke-linux.qualcomm.com>
+	<4CABEECF.9080009@codeaurora.org>
+Message-ID: <1286372669.22265.59.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 06, 2010 at 10:30:41PM +0900, Paul Mundt wrote:
-> On Wed, Oct 06, 2010 at 03:18:25PM +0200, Robert Richter wrote:
-> > I am not against adding the pmu name to the perf API. But the oprofile
-> > cpu_type strings are oprofile centric esp. for the userland. So these
-> > strings will remain part of oprofile. Also I don't think we want to
-> > polute the perf pmu names with it.
-> > 
-> And those architectures that have opted to use different strings for perf
-> events are free to mangle them however they want for the oprofile case.
-> It doesn't change the fact that strings are still being managed by all of
-> the architectures. The perf PMU names aren't presently locked in to an
-> ABI, whereas the oprofile strings are, so it seems fairly straightforward
-> to develop standard mangling rules for preventing an oprofile-facing
-> string, or to simply reuse the strings verbatim.
+On Tue, 2010-10-05 at 20:36 -0700, Stephen Boyd wrote:
+> On 10/05/2010 10:38 AM, Daniel Walker wrote:
+> >>  
+> >> +#ifdef ARCH_HAS_READ_CURRENT_TIMER
+> >> +/*
+> >> + * Assuming read_current_timer() is monotonically increasing
+> >> + * across calls.
+> > You should add more comments here. You assuming that it's monotonic over
+> > a 2000us (2ms) period .. I'm not sure this is a good assumption this
+> > timer may not be monotonically increasing all the time, what happens
+> > then?
 > 
-So to add a bit of context here, I was just looking at the oprofile
-tools. The naming format here is one of:
+> Ok I'll add that it shouldn't wrap more than once within 2000us (or
+> should I say 5ms since mdelay uses udelay?). Is that what you're saying
+> by it not being monotonically increasing? If a timer isn't increasing
+> the tick count it's broken and this call will loop forever. If the timer
+> wraps, we'll be safe due to unsigned maths as long as it wraps only once.
 
-	<arch>/<pmu>
+I was saying it could be near wrapping when this process starts, then
+wrap in the middle. The unsigned math thing should work I think, but add
+a comment .. Your basically saying it's OK if it wraps, but the comment
+says it needs to be "monotonically increasing" which actually doesn't
+appear to be true. It needs to not wrap twice during this process.
 
-if there were a generic perf to oprofile pmu name mangler that did this
-it would cover almost all of the ARM cases already, the SH strings I'm
-happy to convert to work this way, and a good chunk of the PowerPC PMUs
-would work fine, too. PowerPC already has an oprofile CPU string in its
-CPU spec, so this would be even more trivial to wire up there if such a
-generic interface were to exist.
+> >> +void read_current_timer_delay_loop(unsigned long loops)
+> >> +{
+> >> +	unsigned long bclock, now;
+> >> +
+> >> +	read_current_timer(&bclock);
+> >> +	do {
+> >> +		read_current_timer(&now);
+> >> +	} while ((now - bclock) < loops);
+> > Have you looked at time_before()/time_after() ?
+> 
+> Nope. Wouldn't that require an addition though to make it work? I'd
+> rather just leave it like it is.
 
-This would just leave x86 as the odd one out, but I suppose if x86 were
-to move to the oprofile perf wrapper in the future then a bit of id to
-name mangling as an override wouldn't be too much work.
+I'm not saying you should change it, I'm saying look at those macro's to
+make sure your doing thinks correctly.
+
+Daniel
+
+
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
