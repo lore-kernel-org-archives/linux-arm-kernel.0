@@ -1,49 +1,183 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Wed, 6 Oct 2010 11:20:15 -0500
-Subject: [PATCHv3 0/7] PWM core driver for pwm based led and backlight
-	driver
-In-Reply-To: <1286380758-14063-1-git-send-email-arun.murthy@stericsson.com>
-References: <1286380758-14063-1-git-send-email-arun.murthy@stericsson.com>
-Message-ID: <AANLkTi=5yrcBPqbtDYRsnXTvhmBaYFemNu04P5ZnzJVM@mail.gmail.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Wed, 6 Oct 2010 09:04:45 -0700
+Subject: [PATCHv3] ARM: imx: Add iram allocator functions
+In-Reply-To: <20101005202239.GB11737@pengutronix.de>
+References: <1286307715-12276-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20101005202239.GB11737@pengutronix.de>
+Message-ID: <86A0E76937111F4C92FABEC0A2098851050F1654@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arun:
+Hi,
 
-On Wed, Oct 6, 2010 at 10:59 AM, Arun Murthy <arun.murthy@stericsson.com> wrote:
-> PWM core driver for pwm based led and backlight driver.
+>-----Original Message-----
+From: linux-kernel-owner@vger.kernel.org [mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Uwe
+>Kleine-K?nig
+>Sent: Tuesday, October 05, 2010 3:23 PM
+>To: Nguyen Dinh-R00091
+>Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com; s.hauer at pengutronix.de;
+>grant.likely at secretlab.ca; valentin.longchamp at epfl.ch; daniel at caiaq.de; Zhang Lily-R58066;
+>r.schwebel at pengutronix.de; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCHv3] ARM: imx: Add iram allocator functions
+>
+>Hello,
+>
+>On Tue, Oct 05, 2010 at 02:41:55PM -0500, Dinh.Nguyen at freescale.com wrote:
+>> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>>
+>> Add iram allocation functions using GENERIC_ALLOCATOR. The
+>> allocation size is 4KB multiples to guarantee alignment. The
+>> idea for these functions is for i.MX platforms to use them
+>> to dynamically allocate IRAM usage.
+>>
+>> Applies on 2.6.36-rc6
+>>
+>> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>> Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
+>> ---
+>>  arch/arm/plat-mxc/Kconfig                   |    9 ++++
+>>  arch/arm/plat-mxc/Makefile                  |    1 +
+>>  arch/arm/plat-mxc/include/mach/iram_alloc.h |   35 +++++++++++++++
+>>  arch/arm/plat-mxc/iram.c                    |   62 +++++++++++++++++++++++++++
+>>  4 files changed, 107 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/plat-mxc/include/mach/iram_alloc.h
+>>  create mode 100644 arch/arm/plat-mxc/iram.c
+>>
+>> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+>> index 6785db4..e6de0df 100644
+>> --- a/arch/arm/plat-mxc/Kconfig
+>> +++ b/arch/arm/plat-mxc/Kconfig
+>> @@ -57,6 +57,15 @@ source "arch/arm/mach-mx5/Kconfig"
+>>
+>>  endmenu
+>>
+>> +config IRAM_ALLOC
+>> +	bool "Enable IRAM allocator"
+>> +	select GENERIC_ALLOCATOR
+>> +	help
+>> +	  Select this to have access to generic IRAM allocation functions that
+>> +	  use the GENERIC_ALLOCATOR.  The allocation size is 4KB multiples to
+>> +	  guarantee alignment. The idea for these functions is for i.MX platforms
+>> +	  to use them to dynamically allocate IRAM usage.
+>> +
+>I thought you didn't want to have that user selectible?
+>
+>>  config MXC_IRQ_PRIOR
+>>  	bool "Use IRQ priority"
+>>  	help
+>> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+>> index 78d405e..35cf07b 100644
+>> --- a/arch/arm/plat-mxc/Makefile
+>> +++ b/arch/arm/plat-mxc/Makefile
+>> @@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
+>>
+>>  obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+>>  obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+>> +obj-$(CONFIG_IRAM_ALLOC) += iram.o
+>>  obj-$(CONFIG_MXC_PWM)  += pwm.o
+>>  obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
+>>  obj-$(CONFIG_MXC_ULPI) += ulpi.o
+>> diff --git a/arch/arm/plat-mxc/include/mach/iram_alloc.h b/arch/arm/plat-
+>mxc/include/mach/iram_alloc.h
+>> new file mode 100644
+>> index 0000000..12881aa
+>> --- /dev/null
+>> +++ b/arch/arm/plat-mxc/include/mach/iram_alloc.h
+>> @@ -0,0 +1,35 @@
+>> +/*
+>> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version 2
+>> + * of the License, or (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, write to the Free Software
+>> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+>> + * MA 02110-1301, USA.
+>> + */
+>> +
+>> +#ifdef CONFIG_IRAM_ALLOC
+>> +int __init iram_init(unsigned long base, unsigned long size);
+>> +void *iram_alloc(unsigned int size, unsigned long *dma_addr);
+>> +void iram_free(unsigned long dma_addr, unsigned int size);
+>> +#else
+>> +static inline int __init iram_init(unsigned long base, unsigned long size)
+>> +{
+>> +	return -ENOMEM;
+>> +}
+>> +static inline void *iram_alloc(unsigned int size, unsigned long *dma_addr)
+>> +{
+>> +	return NULL;
+>> +}
+>> +static inline void iram_free(unsigned long base, unsigned long size) {}
+>> +#endif
+>> +
+>please remove trailing newlines
+Will fix in PATCHv4
 
-With all due respect, it looks like you have reinvented portions of my
-RFC for a comprehensive PWM API that has been floating around on
-linux-embedded for over a year--- with an update coming in the last
-two weeks or so.  Why?
+>
+>> diff --git a/arch/arm/plat-mxc/iram.c b/arch/arm/plat-mxc/iram.c
+>> new file mode 100644
+>> index 0000000..d59fe75
+>> --- /dev/null
+>> +++ b/arch/arm/plat-mxc/iram.c
+>> @@ -0,0 +1,62 @@
+>> +/*
+>> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version 2
+>> + * of the License, or (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, write to the Free Software
+>> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+>> + * MA 02110-1301, USA.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/spinlock.h>
+>Hmm, I have a d?j? vu, and that's already the second time in this mail.
+>IIRC I asked you to remove spinlock.h and use linux/init.h insteadof
+>linux/module.h.
 
-To make matters worse, when I posted my original code I was told to
-move the whole discussion to linux-embedded, because as a
-cross-platform API proposal that's where it belongs.  I encourage you
-do likewise.
+I apologize for missing this comment on the previous review. It appears that I need to include linux/spinlock.h, otherwise I get a compile error.
 
-I have a terse email style, so I just want to be clear that I'm not
-mad or anything.  Honest!  I'm just disappointed that you've invested
-so much hard work in traveling down the same path I came over a year
-ago.  Bummer for everyone.
+include/linux/genalloc.h:16: error: expected specifier-qualifier-list before 'rwlock_t'
+include/linux/genalloc.h:25: error: expected specifier-qualifier-list before 'spinlock_t'
 
-Can we not combine our efforts?  I haven't reviewed all of your
-patches yet, but you are clearly ahead of me in specific ARM platform
-support.  On the other hand, I think my code is more refined in many
-other areas.  I also have Blackfin, PowerPC, and Cirrus (ARM) support,
-though some of the code is from contributors who are holding it until
-I proffer my final code.
-
-
-What do you think?  Just let me know privately by email, or over on
-linux-embedded.
-
-
-Thanks!
-
-
-b.g.
--- 
-Bill Gatliff
-bgat at billgatliff.com
+>
+>> +#include <linux/genalloc.h>
+>> +
+>> +static unsigned long iram_phys_base;
+>> +static __iomem void *iram_virt_base;
+>> +static struct gen_pool *iram_pool;
+>> +
+>> +#define iram_phys_to_virt(p) (iram_virt_base + ((p) - iram_phys_base))
+>> +
+>> +void *iram_alloc(unsigned int size, unsigned long *dma_addr)
+>> +{
+>> +	if (!iram_pool)
+>> +		return NULL;
+>> +
+>> +	*dma_addr = gen_pool_alloc(iram_pool, size);
+>> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
+>> +	return iram_phys_to_virt(*dma_addr);
+>> +}
+>> +EXPORT_SYMBOL(iram_alloc);
+>> +
