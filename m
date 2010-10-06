@@ -1,45 +1,55 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 6 Oct 2010 23:06:24 +0800
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-In-Reply-To: <AANLkTinm+bJduJ+46eUb8TA_v644Ui6j+zeBUKegofY7@mail.gmail.com>
-References: <20101006071731.28048.89938.sendpatchset@t400s>
-	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-	<AANLkTinm+bJduJ+46eUb8TA_v644Ui6j+zeBUKegofY7@mail.gmail.com>
-Message-ID: <AANLkTimD=-W3Mfdhvdj_1EHWA9jCY8KMBvsC-COfEPpX@mail.gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Thu, 7 Oct 2010 00:00:35 +0900
+Subject: [PATCH 4/7] ARM: oprofile: Move non-ARM code into separate
+	init/exit
+In-Reply-To: <20101006145903.GR13563@erda.amd.com>
+References: <cover.1286222593.git.matt@console-pimps.org>
+	<74092b0d162aafc21e408033cec6146e227363b5.1286222593.git.matt@console-pimps.org>
+	<20101006133309.GP13563@erda.amd.com>
+	<20101006144921.GQ13563@erda.amd.com>
+	<20101006145311.GA3754@linux-sh.org>
+	<20101006145903.GR13563@erda.amd.com>
+Message-ID: <20101006150035.GB3754@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 6, 2010 at 10:58 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Oct 6, 2010 at 7:06 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>> ARM: Dynamic IRQ demux support
->>>
->>> [PATCH 01/08] ARM: Move entry-header.S to asm/
->>> [PATCH 02/08] ARM: Move macros from entry-armv.S
->>> [PATCH 03/08] ARM: Make alignment_trap macro self-contained
->>> [PATCH 04/08] ARM: Convert __irq_svc and __usr_svc to macros
->>> [PATCH 05/08] ARM: Move the unwind header to entry-header.S
->>> [PATCH 06/08] ARM: Add setup_irq_stubs() function
->>> [PATCH 07/08] ARM: Add CONFIG_DEFAULT_IRQ_DEMUX
->>> [PATCH 08/08] ARM: Dynamic IRQ demux for SH-Mobile
->>>
->>
->> Hi Magnus,
->>
->> Just FYI, I had a patch months ago for this:
->>
->> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
->>
->> Do you think that's a simpler way to go?
->
-> Speaking of which, what is the status of your patch? ?I see you
-> reposted it on July 13, but I haven't seen any further feedback.
->
+On Wed, Oct 06, 2010 at 04:59:03PM +0200, Robert Richter wrote:
+> On 06.10.10 10:53:11, Paul Mundt wrote:
+> > On Wed, Oct 06, 2010 at 04:49:21PM +0200, Robert Richter wrote:
+> > > On 06.10.10 15:33:09, Robert Richter wrote:
+> > > > On 04.10.10 16:44:22, Matt Fleming wrote:
+> > > > > -void __exit oprofile_arch_exit(void)
+> > > > > +int __init oprofile_arch_init(struct oprofile_operations *ops)
+> > > > > +{
+> > > > 
+> > > > We should do here a:
+> > > > 
+> > > > 	memset(ops, 0, sizeof(*ops));
+> > > 
+> > > Matt,
+> > > 
+> > > an alternative would be to move this to oprofile_perf_init() and
+> > > modify ops->backtrace afterwards, but then we will lose the function's
+> > > tail call. Not sure that is better. Paul, what do you think?
+> > > 
+> > I'm a bit confused as to why we just don't do:
+> > 
+> > ---
+> > 
+> > diff --git a/drivers/oprofile/oprof.c b/drivers/oprofile/oprof.c
+> > index b336cd9..76d97a5 100644
+> > --- a/drivers/oprofile/oprof.c
+> > +++ b/drivers/oprofile/oprof.c
+> > @@ -252,6 +252,8 @@ static int __init oprofile_init(void)
+> >  {
+> >  	int err;
+> >  
+> > +	memset(&oprofile_ops, 0, sizeof(struct oprofile_operations));
+> > +
+> 
+> Yes, this looks much better. Thanks Paul.
+> 
+> 
+In which case, if you want to take it:
 
-I should have posted it in Russell's patch tracking system, yet not
-merged in last cycle.
-
-Russell?
-
-> g.
->
+Signed-off-by: Paul Mundt <lethal@linux-sh.org>
