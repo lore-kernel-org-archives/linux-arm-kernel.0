@@ -1,56 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 06 Oct 2010 17:22:16 +0900
-Subject: [PATCH V2 1/3] ARM: S5PV310: Add support HSMMC and SDHCI
-	configuration
-In-Reply-To: <1286344846-21244-2-git-send-email-jeongbae.seo@samsung.com>
-References: <1286344846-21244-1-git-send-email-jeongbae.seo@samsung.com>
-	<1286344846-21244-2-git-send-email-jeongbae.seo@samsung.com>
-Message-ID: <000b01cb652f$ab6125d0$02237170$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 6 Oct 2010 10:24:22 +0200
+Subject: [PATCH 4/4] dmaengine: Add Freescale i.MX1/21/27 DMA driver
+In-Reply-To: <4CABB1B9.4080002@intel.com>
+References: <1285854995-6569-1-git-send-email-s.hauer@pengutronix.de>
+	<1285854995-6569-5-git-send-email-s.hauer@pengutronix.de>
+	<4CABB1B9.4080002@intel.com>
+Message-ID: <20101006082422.GT28242@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeongbae Seo wrote:
-> 
-> From: Hyuk Lee <hyuk1.lee@samsung.com>
-> 
-> This patch adds support HSMMC for S5PV310 and S5PC210 and
-> setup for HSMMC host controller and also related GPIO.
-> At most 4 channel can be used at the same time.
-> A user can configure SDHCI data bus as 8bit or 4bit.
-> 
-> Signed-off-by: Hyuk Lee <hyuk1.lee@samsung.com>
-> Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-> ---
+On Tue, Oct 05, 2010 at 04:16:09PM -0700, Dan Williams wrote:
+>> +       unsigned int                    channel;
+>> +       unsigned int                    imxdma_channel;
+>> +
+>> +       enum dma_data_direction         direction;
+>
+> Why does the channel have a direction isn't that a function of the  
+> transaction?  It's also unused.
+>
+>> +       enum dma_slave_buswidth         word_size;
+>> +       dma_addr_t                      bd_phys;
+>
+> unused?
+>
+>> +       unsigned long                   flags;
+>
+> unused?
 
-(snip)
+Sorry, it seems I was a bit too fast posting it. I'll send an updated
+version.
 
-> +	/* Set all the necessary GPK0[0:1] pins to special-function 2 */
-> +	for (gpio = S5PV310_GPK0(0); gpio < S5PV310_GPK0(2); gpio++) {
-> +		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-> +		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+Sascha
 
-Hi
 
-Maybe as you know, above lines can be changed like below.
-
-s3c_gpio_cfgrange_nopull(S5PV310_GPK0(0), 2, S3C_GPIO_SFN(2));
-
-Of course regarding gpio update patches are not pulled in my for-next yet,
-because under reviewing in ML now.
-But I think, you can do it against dev/gpio-update.
-
-Anyway could you please make additional patch for it?
-It would be nice if you could do it :-)
-
-Others ok to me...but I will sort out regarding sdhci gpio configuration in
-future time.
-
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
