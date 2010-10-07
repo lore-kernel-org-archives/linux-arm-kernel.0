@@ -1,42 +1,43 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 7 Oct 2010 01:55:13 +0200
-Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
-In-Reply-To: <1286177435.2140.5.camel@sven>
-References: <1286177435.2140.5.camel@sven>
-Message-ID: <20101006235513.GY7159@buzzloop.caiaq.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Oct 2010 17:00:23 -0700
+Subject: [PATCH] ARM: Fix HWCAP_TLS flag for ARM11MPCore/Cortex-A9
+Message-ID: <20101007000022.GD4859@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 04, 2010 at 09:30:35AM +0200, Sven Neumann wrote:
-> we are running an embedded system here based on the PXA300 platform.
-> Suspend/resume used to work well so far. However after upgrading the
-> kernel from 2.6.34.7 to 2.6.35.6, we get the following error when trying
-> to suspend the system:
-> 
-> # echo "mem" > "/sys/power/state"
-> [ 5647.295953] PM: Syncing filesystems ... done.
-> [ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
-> [ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-> [ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
-> [ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
-> [ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
-> [ 5647.367082] PM: Some devices failed to suspend
+Commit 14eff1812679c76564b775aa95cdd378965f6cfb added proper
+detection for ARM11MPCore/Cortex-A9 instead of detecting them
+as ARMv7. However, it was missing the HWCAP_TLS flags.
 
-We've bisected this effect down to commit 152e1d5920 ("PM: Prevent
-waiting forever on asynchronous resume after failing suspend").
-Suspending our PXA3xx based system breaks with this patch.
+HWCAP_TLS is needed if support for earlier ARMv6 is compiled
+into the same kernel. Without HWCAP_TLS flags the userspace
+won't work unless nosmp is specified:
 
-I tried to understand what's going wrong, but I didn't follow the
-discussion about this logic, so I would rather like to pass it back to
-the originating people.
+Kernel panic - not syncing: Attempted to kill init!
+CPU0: stopping
+<c005d5e4>] (unwind_backtrace+0x0/0xec) from [<c004c2f8>] (do_IPI+0xfc/0x184)
+<c004c2f8>] (do_IPI+0xfc/0x184) from [<c03f25bc>] (__irq_svc+0x9c/0x160)
+Exception stack(0xc0565f80 to 0xc0565fc8)
+5f80: 00000001 c05772a0 00000000 00003a61 c0564000 c05cf500 c003603c c0578600
+5fa0: 80033ef0 410fc091 0000001f 00000000 00000000 c0565fc8 c00b91f8 c0057cb4
+5fc0: 20000013 ffffffff
+[<c03f25bc>] (__irq_svc+0x9c/0x160) from [<c0057cb4>] (default_idle+0x30/0x38)
+[<c0057cb4>] (default_idle+0x30/0x38) from [<c005829c>] (cpu_idle+0x9c/0xf8)
+[<c005829c>] (cpu_idle+0x9c/0xf8) from [<c0008d48>] (start_kernel+0x2a4/0x300)
+[<c0008d48>] (start_kernel+0x2a4/0x300) from [<80008084>] (0x80008084)
 
-I can only guess that the problem here is the somewhat tricky handling
-around mmc_sdio_suspend(), which returns -ENODEV (-38) in case a
-particular function of a card can not be suspended. The SDIO core would
-have simply removed the card in this case normally, but the PM core
-seems to interfere now, stopping the whole suspend procedure.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Can anyone shed some light on this?
-
-Thanks,
-Daniel
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index df422fe..8370960 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -372,7 +372,7 @@ __v7_ca9mp_proc_info:
+ 	b	__v7_ca9mp_setup
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
++	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+ 	.long	cpu_v7_name
+ 	.long	v7_processor_functions
+ 	.long	v7wbi_tlb_fns
