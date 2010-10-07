@@ -1,41 +1,34 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Thu, 7 Oct 2010 10:22:13 +0200
-Subject: [PATCHv4] ARM: imx: Add iram allocator functions
-In-Reply-To: <1286383682-26506-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1286383682-26506-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <19629.33589.158235.949280@ipc1.ka-ro>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu,  7 Oct 2010 17:20:08 +0900
+Subject: [PATCH 3/3] rtc: rtc-s3c: Add rtc_valid_tm in s3c_rtc_gettime()
+In-Reply-To: <1286439608-22722-1-git-send-email-kgene.kim@samsung.com>
+References: <1286439608-22722-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1286439608-22722-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds "rtc_valid_tm" in s3c_rtc_gettime()
+as per Wan ZongShun's suggestion.
 
-[...]
-> +void __iomem*iram_alloc(unsigned int size, unsigned long *dma_addr)
-> +{
-> +	if (!iram_pool)
-> +		return NULL;
-> +
-> +	*dma_addr = gen_pool_alloc(iram_pool, size);
-> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
-why not:
-| +	pr_debug("iram alloc - %dB at 0x08lx\n", size, *dma_addr);
+Suggested-by: Wan ZongShun <mcuos.com@gmail.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ drivers/rtc/rtc-s3c.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> +	if (!dma_addr)
->
-This will never be true (unless someone passes a NULL pointer as
-dma_addr).
-| +	if (!*dma_addr)
-was obviously meant here.
-
-
-Lothar Wa?mann
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index 125c50a..7d55a2c 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -185,7 +185,7 @@ static int s3c_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
+ 	rtc_tm->tm_year += 100;
+ 	rtc_tm->tm_mon -= 1;
+ 
+-	return 0;
++	return rtc_valid_tm(rtc_tm);
+ }
+ 
+ static int s3c_rtc_settime(struct device *dev, struct rtc_time *tm)
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.6.2.5
