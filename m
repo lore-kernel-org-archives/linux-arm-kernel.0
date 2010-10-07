@@ -1,103 +1,38 @@
-From: jongsun.han@samsung.com (Jongsun Han)
-Date: Thu,  7 Oct 2010 20:24:57 +0900
-Subject: [PATCH 2/3] ARM: S5PV310: Add the definition for external interrupt
-In-Reply-To: <1286450698-12029-1-git-send-email-jongsun.han@samsung.com>
-References: <1286450698-12029-1-git-send-email-jongsun.han@samsung.com>
-Message-ID: <1286450698-12029-3-git-send-email-jongsun.han@samsung.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu, 7 Oct 2010 14:45:02 +0300
+Subject: [PATCH] cpufreq for freescale mx51
+In-Reply-To: <AANLkTimP9SHDtktO6jr3MTp2DnKLJOuaEfCFxRBD4kDA@mail.gmail.com>
+References: <1286429788-1955-1-git-send-email-yong.shen@linaro.org>
+	<1286429788-1955-2-git-send-email-yong.shen@linaro.org>
+	<20101007080358.GH2457@matterhorn.lan>
+	<AANLkTimP9SHDtktO6jr3MTp2DnKLJOuaEfCFxRBD4kDA@mail.gmail.com>
+Message-ID: <AANLkTi=_8E4o=F4hkuGq-ewr-6qaXawyTBwZvUcaGin5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the definition for both IRQs and GPIO registers for external
-interrupt.
+On Thu, Oct 7, 2010 at 2:33 PM, Yong Shen <yong.shen@linaro.org> wrote:
+>
+>> > ?# Object file lists.
+>> > -obj-y ? := cpu.o mm.o clock-mx51.o devices.o
+>> > +obj-y ? := cpu.o mm.o clock-mx51.o devices.o cpu_wp-mx51.o
+>>
+>> By hardcoding cpu_wp-mx51 here, you are making the assumption that even if
+>> cpufreq is turned off, you'll still need the entire WP table to set the
+>> cpu frequency. Why can't this be handled transparently in the clock code?
+>> If
+>> the clock code does the calculations, every board doesn't need to first
+>> setup
+>> calls to get_cpu_wp.
+>>
+>
+> It has history. Not only cpufreq needs this? table, other freescale drivers
+> also need it, like dvfs and busfreq drivers. So it is better to be there. I
+> do agree clock should do its calculation by itself.
+> Agree about the rest.
 
-Signed-off-by: Jongsun Han <jongsun.han@samsung.com>
----
- arch/arm/mach-s5pv310/include/mach/irqs.h      |   26 +++++++++++++++-
- arch/arm/mach-s5pv310/include/mach/regs-gpio.h |   37 ++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-gpio.h
+Let's modify that history and do it the correct way then :)
 
-diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-s5pv310/include/mach/irqs.h
-index e81332f..9faea58 100644
---- a/arch/arm/mach-s5pv310/include/mach/irqs.h
-+++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
-@@ -78,10 +78,32 @@
- 
- #define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
- 
-+#define IRQ_EINT4		COMBINER_IRQ(37, 0)
-+#define IRQ_EINT5		COMBINER_IRQ(37, 1)
-+#define IRQ_EINT6		COMBINER_IRQ(37, 2)
-+#define IRQ_EINT7		COMBINER_IRQ(37, 3)
-+#define IRQ_EINT8		COMBINER_IRQ(38, 0)
-+
-+#define IRQ_EINT9		COMBINER_IRQ(38, 1)
-+#define IRQ_EINT10		COMBINER_IRQ(38, 2)
-+#define IRQ_EINT11		COMBINER_IRQ(38, 3)
-+#define IRQ_EINT12		COMBINER_IRQ(38, 4)
-+#define IRQ_EINT13		COMBINER_IRQ(38, 5)
-+#define IRQ_EINT14		COMBINER_IRQ(38, 6)
-+#define IRQ_EINT15		COMBINER_IRQ(38, 7)
-+
-+#define IRQ_EINT16_31		COMBINER_IRQ(39, 0)
-+
-+#define IRQ_EINT_BASE		(IRQ_EINT16_31 + 1)
-+
- /* Set the default NR_IRQS */
-+#define NR_IRQS			(IRQ_EINT_BASE + 32)
-+
-+#define EINT_NUMBER(x)		((x) + IRQ_EINT_BASE)
- 
--#define NR_IRQS			COMBINER_IRQ(MAX_COMBINER_NR, 0)
-+#define S5P_EINT_BASE1		EINT_NUMBER(0)
-+#define S5P_EINT_BASE2		EINT_NUMBER(16)
- 
--#define MAX_COMBINER_NR		39
-+#define MAX_COMBINER_NR		40
- 
- #endif /* __ASM_ARCH_IRQS_H */
-diff --git a/arch/arm/mach-s5pv310/include/mach/regs-gpio.h b/arch/arm/mach-s5pv310/include/mach/regs-gpio.h
-new file mode 100644
-index 0000000..4fddb12
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/include/mach/regs-gpio.h
-@@ -0,0 +1,37 @@
-+/* linux/arch/arm/mach-s5pv310/include/mach/regs-gpio.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * S5PV310 - GPIO (including EINT) register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_REGS_GPIO_H
-+#define __ASM_ARCH_REGS_GPIO_H __FILE__
-+
-+#include <mach/map.h>
-+
-+#define S5PV310_EINT40CON		(S5P_VA_GPIO2 + 0xE00)
-+#define S5P_EINT_CON(x)			(S5PV310_EINT40CON + ((x) * 0x4))
-+
-+#define S5PV310_EINT40FLTCON0		(S5P_VA_GPIO2 + 0xE80)
-+#define S5P_EINT_FLTCON(x)		(S5PV310_EINT40FLTCON0 + ((x) * 0x4))
-+
-+#define S5PV310_EINT40MASK		(S5P_VA_GPIO2 + 0xF00)
-+#define S5P_EINT_MASK(x)		(S5PV310_EINT40MASK + ((x) * 0x4))
-+
-+#define S5PV310_EINT40PEND		(S5P_VA_GPIO2 + 0xF40)
-+#define S5P_EINT_PEND(x)		(S5PV310_EINT40PEND + ((x) * 0x4))
-+
-+#define EINT_MODE			S3C_GPIO_SFN(0xf)
-+
-+#define EINT_GPIO_0(x)			S5PV310_GPX0(x)
-+#define EINT_GPIO_1(x)			S5PV310_GPX1(x)
-+#define EINT_GPIO_2(x)			S5PV310_GPX2(x)
-+#define EINT_GPIO_3(x)			S5PV310_GPX3(x)
-+
-+#endif /* __ASM_ARCH_REGS_GPIO_H */
--- 
-1.6.3.3
+When we come to the dvfs and bus drivers we'll fix them too.
+
+Regards,
+Amit
