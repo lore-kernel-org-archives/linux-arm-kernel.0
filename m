@@ -1,36 +1,35 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 7 Oct 2010 07:17:08 -0500
-Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
-	read/write
-In-Reply-To: <1285063280-4057-10-git-send-email-manjugk@ti.com>
-References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
-	<1285063280-4057-10-git-send-email-manjugk@ti.com>
-Message-ID: <7A436F7769CA33409C6B44B358BFFF0C014F74831E@dlee02.ent.ti.com>
+From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
+Date: Thu, 7 Oct 2010 09:26:34 -0300
+Subject: Segmentation fault when using ping6
+Message-ID: <4CADBC7A.6060908@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of G, Manjunath Kondaiah
-> Sent: Tuesday, September 21, 2010 5:01 AM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-mtd at lists.infradead.org
-> Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
-> read/write
-> 
-> Following sparse warnings exists due to use of writel/w and readl/w
-> functions.
-> 
-> This patch fixes the sparse warnings by converting readl/w functions usage
-> into
-> __raw_readl/__raw_readw functions.
+I'm having a "segmentation fault" problem when using ping6.
 
-Apologies on bringing up an old topic here -> Is'nt it better to fix readl/w or writel/w than replacing it with __raw_readl/w etc?
+When testing on ARM9 platforms (i.MX25 and i.MX27), it returns the error:
 
+root at freescale ~$ ping6 ::1
+PING ::1 (::1): 56 data bytes
+Segmentation fault
 
+When testing on ARM11 and ARM Cortex A8 platforms (i.MX31 and i.MX51), 
+it works:
 
-Regards,
-Nishanth Menon
+root at freescale ~$ ping6 ::1
+PING ::1 (::1): 56 data bytes
+64 bytes from ::1: seq=0 ttl=64 time=0.331 ms
+64 bytes from ::1: seq=1 ttl=64 time=0.214 ms
+64 bytes from ::1: seq=2 ttl=64 time=0.176 ms
+64 bytes from ::1: seq=3 ttl=64 time=0.155 ms
 
-[...]
+On all cases, I'm using Linux Kernel 2.6.35 (from Mainline) and Busybox 
+1.15.0
+
+Does anybody have any idea?
+
+Thanks in advance,
+
+Rogerio Pimentel
