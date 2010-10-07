@@ -1,40 +1,50 @@
-From: x0132446@ti.com (David Anders)
-Date: Thu,  7 Oct 2010 14:36:29 -0500
-Subject: [PATCH 2/3] omap4: pandaboard: Fix the init if CONFIG_MMC_OMAP_HS is
-	not set
-In-Reply-To: <1286480190-20632-1-git-send-email-x0132446@ti.com>
-References: <1286480190-20632-1-git-send-email-x0132446@ti.com>
-Message-ID: <1286480190-20632-3-git-send-email-x0132446@ti.com>
+From: al@alarsen.net (Anders Larsen)
+Date: Thu, 7 Oct 2010 21:44:15 +0200
+Subject: AT91: Fix power-saving in idle-mode on 926T processors
+Message-ID: <20101007194415.GA24709@alarsen.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid possible crash if CONFIG_MMC_OMAP_HS is not set.
+According to Atmel, their 926T processors (AT91 post RM9200) requires
+'Wait for Interrupt' mode be entered right after disabling the processor clock
+in order to minimise current consumption when idle, so do both provided we're
+not running on a 920T (an RM9200).
 
-Signed-off-by: David Anders <x0132446@ti.com>
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Furthermore, get rid of the #ifndef CONFIG_DEBUG_KERNEL, since arch_idle()
+can be turned off completely with the kernel parameter 'nohlt'.
+
+Signed-off-by: Anders Larsen <al@alarsen.net>
+Cc: Andrew Victor <avictor.za@gmail.com>
 ---
- arch/arm/mach-omap2/board-omap4panda.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+KernelVersion: 2.6.35
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index dc16884..9327ad4 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -116,7 +116,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+ arch/arm/mach-at91/include/mach/system.h |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-at91/include/mach/system.h b/arch/arm/mach-at91/include/mach/system.h
+index c80e090..ee8db15 100644
+--- a/arch/arm/mach-at91/include/mach/system.h
++++ b/arch/arm/mach-at91/include/mach/system.h
+@@ -28,17 +28,16 @@
  
- static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
+ static inline void arch_idle(void)
  {
--	struct omap_mmc_platform_data *pdata = dev->platform_data;
-+	struct omap_mmc_platform_data *pdata;
-+
-+	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
-+	if (!dev) {
-+		pr_err("Failed omap4_twl6030_hsmmc_set_late_init\n");
-+		return;
-+	}
-+	pdata = dev->platform_data;
- 
- 	pdata->init =	omap4_twl6030_hsmmc_late_init;
- }
+-#ifndef CONFIG_DEBUG_KERNEL
+ 	/*
+ 	 * Disable the processor clock.  The processor will be automatically
+ 	 * re-enabled by an interrupt or by a reset.
+ 	 */
+ 	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-#else
++#ifndef CONFIG_CPU_ARM920T
+ 	/*
+ 	 * Set the processor (CP15) into 'Wait for Interrupt' mode.
+-	 * Unlike disabling the processor clock via the PMC (above)
+-	 *  this allows the processor to be woken via JTAG.
++	 * Post-RM9200 processors need this in conjunction with the above
++	 * to save power when idle.
+ 	 */
+ 	cpu_do_idle();
+ #endif
 -- 
 1.7.0.4
