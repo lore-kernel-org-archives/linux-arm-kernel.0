@@ -1,53 +1,51 @@
-From: claude.youn@gmail.com (Seungwhan Youn)
-Date: Thu, 7 Oct 2010 10:33:50 +0900
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
-	S/PDIF PCM audio
-In-Reply-To: <00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-	<1286194583-19937-1-git-send-email-sw.youn@samsung.com>
-	<20101004224159.GA4972@opensource.wolfsonmicro.com>
-	<AANLkTi=FHGw+qzL507K546vr8zEZgXBP3Mk=O__Rpd4H@mail.gmail.com>
-	<AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-	<20101005044304.GA26509@opensource.wolfsonmicro.com>
-	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
-	<20101005055937.GA19989@opensource.wolfsonmicro.com>
-	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
-	<AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
-	<00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
-Message-ID: <AANLkTikf4CAWm49Q_AfcfiQDBQUVcE_BC-a_4F7d8xOz@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 07 Oct 2010 10:35:22 +0900
+Subject: [PATCH 2/7] ARM: S5PC110: Fix wrong interrupt I2C2 number
+In-Reply-To: <20100930044827.GA16901@july>
+References: <20100930044827.GA16901@july>
+Message-ID: <004401cb65bf$ec00b7a0$c40226e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maintainers,
+Kyungmin Park wrote:
+> 
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> It's I2C2 interrupt number instead of CAN0.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/include/mach/irqs.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-
+> s5pv210/include/mach/irqs.h
+> index cdb8ae4..5ab1833 100644
+> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
+> @@ -55,8 +55,8 @@
+>  #define IRQ_SPI1		S5P_IRQ_VIC1(16)
+>  #define IRQ_SPI2		S5P_IRQ_VIC1(17)
+>  #define IRQ_IRDA		S5P_IRQ_VIC1(18)
+> -#define IRQ_CAN0		S5P_IRQ_VIC1(19)
+> -#define IRQ_CAN1		S5P_IRQ_VIC1(20)
+> +#define IRQ_IIC2		S5P_IRQ_VIC1(19)
+> +#define IRQ_I2C_HDMI_PHY	S5P_IRQ_VIC1(20)
+>  #define IRQ_HSIRX		S5P_IRQ_VIC1(21)
+>  #define IRQ_HSITX		S5P_IRQ_VIC1(22)
+>  #define IRQ_UHOST		S5P_IRQ_VIC1(23)
+> --
 
->> >> plat-samsung would probably be fine for that also - create a file called
->> >> common-smdk or something. ?Some other things have gone for a plat-smdk
->> >> style approach too, though I'm not sure how tasteful I find that
->> >> personally.
->> > Even though I would personally like to have EPLL control for a device
->> > in machine specific manner as part of its driver, I accept your opinion.
->> >
->> > Claude, let us create one arch/arm/plat-samsung/smdk.c to do common
->> > stuff for SMKDs like EPLL control. What do you think ?
->>
->> Actually if we add this file on plat-samsung, board-init will be
->> separated two-part, one is machine(board) specific and other is all
->> smdk specific. So, If it doesn't make confusion to other guys who
->> wants to add settings for their features on board-init, it looks good
->> to me. But I think that we also have to listen Mr. Ben Dooks and Mr.
->> Kukjin Kim's opinion about this before we get a conclusion.
->
-> Hi all,
->
-> I think, basically it'd better if could control clock stuff in each driver for it when need it such as clk_get, clk_enable and so on.
-> Actually there is no policy/protection for EPLL usage in plat-samsung or plat-s5p now and need to sort out other similar case for it also....so in my opinion, right now to proceed with the current style is helpful to me and will consider it in the future.
->
+Please refer to my other comments.
 
-I wander to know that this is a last discussion, or more, and also
-know about finial decision. Of course, if we didn't get reached to the
-conclusion, we can talk more.
+Hmm...I think, no need to change to IRQ_I2C_HDMI_PHY...in here.
+If required, we can do it later...and how about IRQ_IIC_HDMI_PHY like other
+IRQ_IIC?
 
-Can you give me a hand to finish this? :-)
+Thanks.
 
-with Best Regards,
-Claude
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
