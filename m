@@ -1,60 +1,168 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Thu,  7 Oct 2010 16:35:40 +0200
-Subject: [PATCH] leds: leds-ns2: fix private driver data storage
-Message-ID: <1286462140-16253-1-git-send-email-simon@sequanux.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 07 Oct 2010 16:43:59 +0200
+Subject: [PATCH 1/4 v3] V4L/DVB: s5p-fimc: Register definition cleanup
+In-Reply-To: <1286462642-28211-1-git-send-email-s.nawrocki@samsung.com>
+References: <1286462642-28211-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1286462642-28211-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <sguinot@lacie.com>
+Add MIPI CSI format definitions, prepare DMA address
+definitions for interlaced input frame mode.
 
-dev_set_drvdata() can't be used to set the driver private data pointer.
-This would overwrite the led classdev object previously registered by
-led_classdev_register().
-
-Note that despite this mistake, the driver work fine because led_dat and
-led_dat->cdev are at the same memory address.
-
-Signed-off-by: Simon Guinot <sguinot@lacie.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/leds/leds-ns2.c |    9 ++++++---
- 1 files changed, 6 insertions(+), 3 deletions(-)
+ drivers/media/video/s5p-fimc/fimc-reg.c  |    6 +-
+ drivers/media/video/s5p-fimc/regs-fimc.h |   61 ++++++++++++-----------------
+ 2 files changed, 28 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
-index 350eb34..f77d48d 100644
---- a/drivers/leds/leds-ns2.c
-+++ b/drivers/leds/leds-ns2.c
-@@ -141,10 +141,12 @@ static ssize_t ns2_led_sata_store(struct device *dev,
- 				  struct device_attribute *attr,
- 				  const char *buff, size_t count)
- {
-+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-+	struct ns2_led_data *led_dat =
-+		container_of(led_cdev, struct ns2_led_data, cdev);
- 	int ret;
- 	unsigned long enable;
- 	enum ns2_led_modes mode;
--	struct ns2_led_data *led_dat = dev_get_drvdata(dev);
+diff --git a/drivers/media/video/s5p-fimc/fimc-reg.c b/drivers/media/video/s5p-fimc/fimc-reg.c
+index 5570f1c..70f29c5 100644
+--- a/drivers/media/video/s5p-fimc/fimc-reg.c
++++ b/drivers/media/video/s5p-fimc/fimc-reg.c
+@@ -507,9 +507,9 @@ void fimc_hw_set_input_addr(struct fimc_dev *dev, struct fimc_addr *paddr)
+ 	cfg |= S5P_CIREAL_ISIZE_ADDR_CH_DIS;
+ 	writel(cfg, dev->regs + S5P_CIREAL_ISIZE);
  
- 	ret = strict_strtoul(buff, 10, &enable);
- 	if (ret < 0)
-@@ -172,7 +174,9 @@ static ssize_t ns2_led_sata_store(struct device *dev,
- static ssize_t ns2_led_sata_show(struct device *dev,
- 				 struct device_attribute *attr, char *buf)
- {
--	struct ns2_led_data *led_dat = dev_get_drvdata(dev);
-+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-+	struct ns2_led_data *led_dat =
-+		container_of(led_cdev, struct ns2_led_data, cdev);
+-	writel(paddr->y, dev->regs + S5P_CIIYSA0);
+-	writel(paddr->cb, dev->regs + S5P_CIICBSA0);
+-	writel(paddr->cr, dev->regs + S5P_CIICRSA0);
++	writel(paddr->y, dev->regs + S5P_CIIYSA(0));
++	writel(paddr->cb, dev->regs + S5P_CIICBSA(0));
++	writel(paddr->cr, dev->regs + S5P_CIICRSA(0));
  
- 	return sprintf(buf, "%d\n", led_dat->sata);
- }
-@@ -234,7 +238,6 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
- 	if (ret < 0)
- 		goto err_free_slow;
+ 	cfg &= ~S5P_CIREAL_ISIZE_ADDR_CH_DIS;
+ 	writel(cfg, dev->regs + S5P_CIREAL_ISIZE);
+diff --git a/drivers/media/video/s5p-fimc/regs-fimc.h b/drivers/media/video/s5p-fimc/regs-fimc.h
+index a3cfe82..9e83315 100644
+--- a/drivers/media/video/s5p-fimc/regs-fimc.h
++++ b/drivers/media/video/s5p-fimc/regs-fimc.h
+@@ -11,10 +11,6 @@
+ #ifndef REGS_FIMC_H_
+ #define REGS_FIMC_H_
  
--	dev_set_drvdata(led_dat->cdev.dev, led_dat);
- 	ret = device_create_file(led_dat->cdev.dev, &dev_attr_sata);
- 	if (ret < 0)
- 		goto err_free_cdev;
+-#define S5P_CIOYSA(__x)			(0x18 + (__x) * 4)
+-#define S5P_CIOCBSA(__x)		(0x28 + (__x) * 4)
+-#define S5P_CIOCRSA(__x)		(0x38 + (__x) * 4)
+-
+ /* Input source format */
+ #define S5P_CISRCFMT			0x00
+ #define S5P_CISRCFMT_ITU601_8BIT	(1 << 31)
+@@ -28,22 +24,21 @@
+ 
+ /* Window offset */
+ #define S5P_CIWDOFST			0x04
+-#define S5P_CIWDOFST_WINOFSEN		(1 << 31)
++#define S5P_CIWDOFST_OFF_EN		(1 << 31)
+ #define S5P_CIWDOFST_CLROVFIY		(1 << 30)
+ #define S5P_CIWDOFST_CLROVRLB		(1 << 29)
+-#define S5P_CIWDOFST_WINHOROFST_MASK	(0x7ff << 16)
++#define S5P_CIWDOFST_HOROFF_MASK	(0x7ff << 16)
+ #define S5P_CIWDOFST_CLROVFICB		(1 << 15)
+ #define S5P_CIWDOFST_CLROVFICR		(1 << 14)
+-#define S5P_CIWDOFST_WINHOROFST(x)	((x) << 16)
+-#define S5P_CIWDOFST_WINVEROFST(x)	((x) << 0)
+-#define S5P_CIWDOFST_WINVEROFST_MASK	(0xfff << 0)
++#define S5P_CIWDOFST_HOROFF(x)		((x) << 16)
++#define S5P_CIWDOFST_VEROFF(x)		((x) << 0)
++#define S5P_CIWDOFST_VEROFF_MASK	(0xfff << 0)
+ 
+ /* Global control */
+ #define S5P_CIGCTRL			0x08
+ #define S5P_CIGCTRL_SWRST		(1 << 31)
+ #define S5P_CIGCTRL_CAMRST_A		(1 << 30)
+ #define S5P_CIGCTRL_SELCAM_ITU_A	(1 << 29)
+-#define S5P_CIGCTRL_SELCAM_ITU_MASK	(1 << 29)
+ #define S5P_CIGCTRL_TESTPAT_NORMAL	(0 << 27)
+ #define S5P_CIGCTRL_TESTPAT_COLOR_BAR	(1 << 27)
+ #define S5P_CIGCTRL_TESTPAT_HOR_INC	(2 << 27)
+@@ -61,6 +56,8 @@
+ #define S5P_CIGCTRL_SHDW_DISABLE	(1 << 12)
+ #define S5P_CIGCTRL_SELCAM_MIPI_A	(1 << 7)
+ #define S5P_CIGCTRL_CAMIF_SELWB		(1 << 6)
++/* 0 - ITU601; 1 - ITU709 */
++#define S5P_CIGCTRL_CSC_ITU601_709	(1 << 5)
+ #define S5P_CIGCTRL_INVPOLHSYNC		(1 << 4)
+ #define S5P_CIGCTRL_SELCAM_MIPI		(1 << 3)
+ #define S5P_CIGCTRL_INTERLACE		(1 << 0)
+@@ -72,23 +69,10 @@
+ #define S5P_CIWDOFST2_HOROFF(x)		((x) << 16)
+ #define S5P_CIWDOFST2_VEROFF(x)		((x) << 0)
+ 
+-/* Output DMA Y plane start address */
+-#define S5P_CIOYSA1			0x18
+-#define S5P_CIOYSA2			0x1c
+-#define S5P_CIOYSA3			0x20
+-#define S5P_CIOYSA4			0x24
+-
+-/* Output DMA Cb plane start address */
+-#define S5P_CIOCBSA1			0x28
+-#define S5P_CIOCBSA2			0x2c
+-#define S5P_CIOCBSA3			0x30
+-#define S5P_CIOCBSA4			0x34
+-
+-/* Output DMA Cr plane start address */
+-#define S5P_CIOCRSA1			0x38
+-#define S5P_CIOCRSA2			0x3c
+-#define S5P_CIOCRSA3			0x40
+-#define S5P_CIOCRSA4			0x44
++/* Output DMA Y/Cb/Cr plane start addresses */
++#define S5P_CIOYSA(n)			(0x18 + (n) * 4)
++#define S5P_CIOCBSA(n)			(0x28 + (n) * 4)
++#define S5P_CIOCRSA(n)			(0x38 + (n) * 4)
+ 
+ /* Target image format */
+ #define S5P_CITRGFMT			0x48
+@@ -168,6 +152,8 @@
+ #define S5P_CISTATUS_OVFICB		(1 << 30)
+ #define S5P_CISTATUS_OVFICR		(1 << 29)
+ #define S5P_CISTATUS_VSYNC		(1 << 28)
++#define S5P_CISTATUS_FRAMECNT_MASK	(3 << 26)
++#define S5P_CISTATUS_FRAMECNT_SHIFT	26
+ #define S5P_CISTATUS_WINOFF_EN		(1 << 25)
+ #define S5P_CISTATUS_IMGCPT_EN		(1 << 22)
+ #define S5P_CISTATUS_IMGCPT_SCEN	(1 << 21)
+@@ -206,10 +192,10 @@
+ #define S5P_CIIMGEFF_PAT_CB(x)		((x) << 13)
+ #define S5P_CIIMGEFF_PAT_CR(x)		((x) << 0)
+ 
+-/* Input DMA Y/Cb/Cr plane start address 0 */
+-#define S5P_CIIYSA0			0xd4
+-#define S5P_CIICBSA0			0xd8
+-#define S5P_CIICRSA0			0xdc
++/* Input DMA Y/Cb/Cr plane start address 0/1 */
++#define S5P_CIIYSA(n)			(0xd4 + (n) * 0x70)
++#define S5P_CIICBSA(n)			(0xd8 + (n) * 0x70)
++#define S5P_CIICRSA(n)			(0xdc + (n) * 0x70)
+ 
+ /* Real input DMA image size */
+ #define S5P_CIREAL_ISIZE		0xf8
+@@ -250,11 +236,6 @@
+ #define S5P_MSCTRL_ENVID		(1 << 0)
+ #define S5P_MSCTRL_FRAME_COUNT(x)	((x) << 24)
+ 
+-/* Input DMA Y/Cb/Cr plane start address 1 */
+-#define S5P_CIIYSA1			0x144
+-#define S5P_CIICBSA1			0x148
+-#define S5P_CIICRSA1			0x14c
+-
+ /* Output DMA Y/Cb/Cr offset */
+ #define S5P_CIOYOFF			0x168
+ #define S5P_CIOCBOFF			0x16c
+@@ -289,5 +270,13 @@
+ 
+ /* MIPI CSI image format */
+ #define S5P_CSIIMGFMT			0x194
++#define S5P_CSIIMGFMT_YCBCR422_8BIT	0x1e
++#define S5P_CSIIMGFMT_RAW8		0x2a
++#define S5P_CSIIMGFMT_RAW10		0x2b
++#define S5P_CSIIMGFMT_RAW12		0x2c
++#define S5P_CSIIMGFMT_USER1		0x30
++#define S5P_CSIIMGFMT_USER2		0x31
++#define S5P_CSIIMGFMT_USER3		0x32
++#define S5P_CSIIMGFMT_USER4		0x33
+ 
+ #endif /* REGS_FIMC_H_ */
 -- 
-1.6.3.1
+1.7.3.1
