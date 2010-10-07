@@ -1,63 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Oct 2010 16:07:24 -0700
-Subject: [PATCH] ARM: Check for is_smp for tlb_ops and cache_ops boardcast
-In-Reply-To: <20101006223358.GA7581@n2100.arm.linux.org.uk>
-References: <20100817104414.19061.38999.stgit@baageli.muru.com>
-	<20100906104413.GD20903@n2100.arm.linux.org.uk>
-	<20100906180346.GC20849@atomide.com>
-	<20100908030951.GH22507@atomide.com>
-	<20100908031214.GI22507@atomide.com>
-	<20101005221952.GV3117@atomide.com>
-	<20101005223310.GA14065@n2100.arm.linux.org.uk>
-	<20101006144414.GA2913@atomide.com>
-	<20101006223358.GA7581@n2100.arm.linux.org.uk>
-Message-ID: <20101006230724.GC4859@atomide.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 7 Oct 2010 02:18:41 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <20101006235513.GY7159@buzzloop.caiaq.de>
+References: <1286177435.2140.5.camel@sven>
+	<20101006235513.GY7159@buzzloop.caiaq.de>
+Message-ID: <201010070218.41944.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101006 15:25]:
-> On Wed, Oct 06, 2010 at 07:44:14AM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [101005 15:24]:
-> > > On Tue, Oct 05, 2010 at 03:19:52PM -0700, Tony Lindgren wrote:
-> > > > * Tony Lindgren <tony@atomide.com> [100907 20:04]:
-> > > > > This should not be needed when running on UP systems.
-> > > > > 
-> > > > > Additionally we will also get an undefined instruction on ARM cores
-> > > > > without the extended CPUID registers with CONFIG_SMP_ON_UP.
-> > > > > 
-> > > > > Also, we can now remove the is_smp() test from mmu.c.
-> > > > 
-> > > > Just FYI, I've updated this one more time with to use cpus_empty
-> > > > instead of !smp_on_up() here as well.
-> > > 
-> > > What's the rationale?
+On Thursday, October 07, 2010, Daniel Mack wrote:
+> On Mon, Oct 04, 2010 at 09:30:35AM +0200, Sven Neumann wrote:
+> > we are running an embedded system here based on the PXA300 platform.
+> > Suspend/resume used to work well so far. However after upgrading the
+> > kernel from 2.6.34.7 to 2.6.35.6, we get the following error when trying
+> > to suspend the system:
 > > 
-> > With CPU hotplug if the other SMP cores are unplugged for PM or
-> > other reasons, no need to do the broadcast.
+> > # echo "mem" > "/sys/power/state"
+> > [ 5647.295953] PM: Syncing filesystems ... done.
+> > [ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
+> > [ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+> > [ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
+> > [ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
+> > [ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
+> > [ 5647.367082] PM: Some devices failed to suspend
 > 
-> Yes, but why this expensive test when the smp_on_up() is much cheaper?
+> We've bisected this effect down to commit 152e1d5920 ("PM: Prevent
+> waiting forever on asynchronous resume after failing suspend").
+> Suspending our PXA3xx based system breaks with this patch.
 > 
-> smp_call_function_many() already takes care of the "no other CPUs"
-> case, which is used by on_each_cpu_mask() and on_each_cpu(), which
-> means these functions won't broadcast the operations to other CPUs
-> when they're offline.
+> I tried to understand what's going wrong, but I didn't follow the
+> discussion about this logic, so I would rather like to pass it back to
+> the originating people.
 > 
-> In any case, if you think that we broadcast every operation to all
-> CPUs, you're mistaken - TLB and cache ops are broadcast to only
-> those CPUs which the thread is running on, or in the case of non-MM
-> specific, to all online CPUs.
+> I can only guess that the problem here is the somewhat tricky handling
+> around mmc_sdio_suspend(), which returns -ENODEV (-38) in case a
+> particular function of a card can not be suspended. The SDIO core would
+> have simply removed the card in this case normally, but the PM core
+> seems to interfere now, stopping the whole suspend procedure.
+> 
+> Can anyone shed some light on this?
 
-OK thanks, that's what I was missing.
- 
-> So the only thing we have to worry about is "is there an ID register
-> available" which is covered by the is_smp() test.  Checking the CPU
-> mask is far more expensive and imho ends up needlessly adding to the
-> complexity.
+I wonder what happens if you echo 0 to /sys/power/pm_async ?
 
-OK. In that case, the patch to use is the previous one:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6429/1
-
-Regards,
-
-Tony
+Rafael
