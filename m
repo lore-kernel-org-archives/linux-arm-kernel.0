@@ -1,81 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 07 Oct 2010 10:12:04 -0700
-Subject: [PATCH] davinci: Implement sched_clock()
-In-Reply-To: <1286354335-31819-1-git-send-email-Andreas.Gaer@baslerweb.com>
-	(Andreas Gaer's message of "Wed, 6 Oct 2010 10:38:55 +0200")
-References: <1286354335-31819-1-git-send-email-Andreas.Gaer@baslerweb.com>
-Message-ID: <87pqvm9bbv.fsf@deeprootsystems.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 7 Oct 2010 12:13:10 -0500
+Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
+In-Reply-To: <201010071601.04597.laurent.pinchart@ideasonboard.com>
+References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
+	<201010070940.14208.laurent.pinchart@ideasonboard.com>
+	<20101007083242.GB14554@n2100.arm.linux.org.uk>
+	<201010071601.04597.laurent.pinchart@ideasonboard.com>
+Message-ID: <4CADFFA6.50202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas.Gaer at baslerweb.com writes:
-
-> From: Andreas Gaeer <Andreas.Gaer@baslerweb.com>
+On 10/7/2010 9:01 AM, Laurent Pinchart wrote:
+> On Thursday 07 October 2010 10:32:42 Russell King - ARM Linux wrote:
+>>
+>> ARMv6 and above don't like having multiple mappings with different
+>> memory type/shareability/cache attributes.  It's architecturally
+>> forbidden.
+>>
+>> So if you want non-cacheable memory and you want to be architecturally
+>> compliant, you have to exclude it from the kernel's direct-mapped
+>> memory mapping.
 >
-> Overwrite the default implementation of sched_clock that is based on
-> jiffies by something more precise. This improves timestamps in ftrace.
-> Implementation is copied from OMAP platform code.
->
-> Signed-off-by: Andreas Gaeer <Andreas.Gaer@baslerweb.com>
+> That's why Omar's patch uses 'mem=' to exclude system memory from the kernel
+> mappings. That's not ideal though, as that memory will be wasted forever,
+> hence my comments regarding whether a non-cacheable mapping was really
+> required.
 
-Thanks, applying to davinci git.  
+it is not ideal to waste that memory, but strictly speaking old bootmem 
+does the same, as no one will be touching that memory. i.e. you compile 
+bridge as a module but you never insmod it, the reserved bootmem space 
+is there for bridge anyway; same for bootargs tweaking, if you need 
+dspbridge and are going to use it then you set aside some memory for it.
 
-Will queue for 2.6.38 (it's a bit too late for 2.6.37 as Linus only
-wants real regression fixes after -rc6.)
+What might be a pain for end-user, is to have drivers that need to do 
+tweaking to bootargs to work; but right now that is a requirement, until 
+a better solution is found/created.
 
-Kevin
+Regards,
 
-> ---
->  arch/arm/mach-davinci/time.c |   24 +++++++++++++++++++++++-
->  1 files changed, 23 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-> index 0f21c36..5d1eea0 100644
-> --- a/arch/arm/mach-davinci/time.c
-> +++ b/arch/arm/mach-davinci/time.c
-> @@ -272,15 +272,36 @@ static cycle_t read_cycles(struct clocksource *cs)
->  	return (cycles_t)timer32_read(t);
->  }
->  
-> +/*
-> + * Kernel assumes that sched_clock can be called early but may not have
-> + * things ready yet.
-> + */
-> +static cycle_t read_dummy(struct clocksource *cs)
-> +{
-> +	return 0;
-> +}
-> +
-> +
->  static struct clocksource clocksource_davinci = {
->  	.rating		= 300,
-> -	.read		= read_cycles,
-> +	.read		= read_dummy,
->  	.mask		= CLOCKSOURCE_MASK(32),
->  	.shift		= 24,
->  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
->  };
->  
->  /*
-> + * Overwrite weak default sched_clock with something more precise
-> + */
-> +unsigned long long notrace sched_clock(void)
-> +{
-> +	const cycle_t cyc = clocksource_davinci.read(&clocksource_davinci);
-> +
-> +	return clocksource_cyc2ns(cyc, clocksource_davinci.mult,
-> +				clocksource_davinci.shift);
-> +}
-> +
-> +/*
->   * clockevent
->   */
->  static int davinci_set_next_event(unsigned long cycles,
-> @@ -377,6 +398,7 @@ static void __init davinci_timer_init(void)
->  	davinci_clock_tick_rate = clk_get_rate(timer_clk);
->  
->  	/* setup clocksource */
-> +	clocksource_davinci.read = read_cycles;
->  	clocksource_davinci.name = id_to_name[clocksource_id];
->  	clocksource_davinci.mult =
->  		clocksource_khz2mult(davinci_clock_tick_rate/1000,
+Omar
