@@ -1,49 +1,81 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Thu, 7 Oct 2010 12:01:31 -0500
-Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
-In-Reply-To: <201010070940.14208.laurent.pinchart@ideasonboard.com>
-References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
-	<201010070940.14208.laurent.pinchart@ideasonboard.com>
-Message-ID: <4CADFCEB.4030008@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 07 Oct 2010 10:12:04 -0700
+Subject: [PATCH] davinci: Implement sched_clock()
+In-Reply-To: <1286354335-31819-1-git-send-email-Andreas.Gaer@baslerweb.com>
+	(Andreas Gaer's message of "Wed, 6 Oct 2010 10:38:55 +0200")
+References: <1286354335-31819-1-git-send-email-Andreas.Gaer@baslerweb.com>
+Message-ID: <87pqvm9bbv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/7/2010 2:40 AM, Laurent Pinchart wrote:
-> Hi Omar,
+Andreas.Gaer at baslerweb.com writes:
+
+> From: Andreas Gaeer <Andreas.Gaer@baslerweb.com>
 >
-> On Thursday 07 October 2010 07:45:36 Omar Ramirez Luna wrote:
->> tidspbridge driver uses a block of memory denominated SHared Memory
->> to store info&  communicate with DSP, this SHM needs to be physically
->> contiguous and non-cacheable,
+> Overwrite the default implementation of sched_clock that is based on
+> jiffies by something more precise. This improves timestamps in ftrace.
+> Implementation is copied from OMAP platform code.
 >
-> There are non-cacheable mappings, but there's no such thing as non-cacheable
-> memory. Does the MPU mapping for that SHM block really needs to be non-
-> cacheable,
+> Signed-off-by: Andreas Gaeer <Andreas.Gaer@baslerweb.com>
 
-yes
+Thanks, applying to davinci git.  
 
-> your could you instead flush the cache after writing to it
-> (performance issues might be involved, I don't know the details about that SHM
-> usage) ?
+Will queue for 2.6.38 (it's a bit too late for 2.6.37 as Linus only
+wants real regression fixes after -rc6.)
 
-You can do that too, but it will involve more changes to dsp side, and 
-yes performance might be an issue too.
+Kevin
 
-The so called "shared memory" is used between arm tidspbridge and the 
-DSP, they exchange communication structures/streams/messages/parameters 
-needed on both sides for its correct functionality (this is an eagle-eye 
-view of the SHM, for more info if interested check page 32 of the 
-overview pdf[1]).
-
-tidspbridge could have the changes made for flushing the SHM every time 
-it writes into it, a flag could be used to prevent both of them (ARM & 
-DSP) flushing at the same time if needed, but I don't know how feasible 
-would be making those changes in the dsp code.
-
-Regards,
-
-Omar
-
----
-[1] 
-https://gforge.ti.com/gf/download/docmanfileversion/17/674/OMAP3430_Bridge_overview.pdf
+> ---
+>  arch/arm/mach-davinci/time.c |   24 +++++++++++++++++++++++-
+>  1 files changed, 23 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 0f21c36..5d1eea0 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -272,15 +272,36 @@ static cycle_t read_cycles(struct clocksource *cs)
+>  	return (cycles_t)timer32_read(t);
+>  }
+>  
+> +/*
+> + * Kernel assumes that sched_clock can be called early but may not have
+> + * things ready yet.
+> + */
+> +static cycle_t read_dummy(struct clocksource *cs)
+> +{
+> +	return 0;
+> +}
+> +
+> +
+>  static struct clocksource clocksource_davinci = {
+>  	.rating		= 300,
+> -	.read		= read_cycles,
+> +	.read		= read_dummy,
+>  	.mask		= CLOCKSOURCE_MASK(32),
+>  	.shift		= 24,
+>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>  };
+>  
+>  /*
+> + * Overwrite weak default sched_clock with something more precise
+> + */
+> +unsigned long long notrace sched_clock(void)
+> +{
+> +	const cycle_t cyc = clocksource_davinci.read(&clocksource_davinci);
+> +
+> +	return clocksource_cyc2ns(cyc, clocksource_davinci.mult,
+> +				clocksource_davinci.shift);
+> +}
+> +
+> +/*
+>   * clockevent
+>   */
+>  static int davinci_set_next_event(unsigned long cycles,
+> @@ -377,6 +398,7 @@ static void __init davinci_timer_init(void)
+>  	davinci_clock_tick_rate = clk_get_rate(timer_clk);
+>  
+>  	/* setup clocksource */
+> +	clocksource_davinci.read = read_cycles;
+>  	clocksource_davinci.name = id_to_name[clocksource_id];
+>  	clocksource_davinci.mult =
+>  		clocksource_khz2mult(davinci_clock_tick_rate/1000,
