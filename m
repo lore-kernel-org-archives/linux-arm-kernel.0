@@ -1,33 +1,28 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu,  7 Oct 2010 03:57:16 +0300
-Subject: [PATCH 0/3] mxc: mx51: Add support for efikamx nettop
-Message-ID: <cover.1286412080.git.amit.kucheria@linaro.org>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Wed, 6 Oct 2010 18:04:23 -0700 (PDT)
+Subject: [PATCH 1/3] ARM: imx: fix/define clocks and create devices for
+	imx dma
+In-Reply-To: <1286359219-5869-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <625327.65828.qm@web51005.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches add basic support for the Genesi EfikaMX nettop[1].
-Serial port and OTG is enabled for now. Ethernet hangs off of OTG.
+Hi Uwe,
 
-The new machine name has been agreed with Russell[2].
+--- On Wed, 10/6/10, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+
+> +#if defined(CONFIG_ARCH_MX35)
+> +??? if (cpu_is_mx35())
+> +??? ??? ret = imx_add_imx_sdma(&imx35_imx_sdma_data);
+> +??? else
+
+Shouldn't you check the MX35 silicon version like you did for MX31?
+
+If not checked this would fail for the old MX35 silicon. I understand that MX31 has mx31_revision() function, but there is no mx35_revision() currently.
 
 Regards,
-Amit
 
-[1] http://www.genesi-usa.com/
-[2] http://www.spinics.net/lists/arm-kernel/msg98960.html
+Fabio Estevam
 
 
-Amit Kucheria (3):
-  mx51: add support for genesi efikamx nettop
-  mx51: efikamx: add otg support
-  mx51: Move OTG initialisation for all boards to a single file
-
- arch/arm/mach-mx5/Kconfig              |    7 ++
- arch/arm/mach-mx5/Makefile             |    3 +-
- arch/arm/mach-mx5/board-cpuimx51.c     |   25 +--------
- arch/arm/mach-mx5/board-mx51_babbage.c |   25 +--------
- arch/arm/mach-mx5/board-mx51_efikamx.c |  100 ++++++++++++++++++++++++++++++++
- arch/arm/mach-mx5/usb.c                |   40 +++++++++++++
- 6 files changed, 151 insertions(+), 49 deletions(-)
- create mode 100644 arch/arm/mach-mx5/board-mx51_efikamx.c
- create mode 100644 arch/arm/mach-mx5/usb.c
+      
