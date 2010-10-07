@@ -1,32 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 7 Oct 2010 11:42:46 -0300
-Subject: linux hang on i.mx35 board, a sdma problem?
-In-Reply-To: <201010071623.54903.alexander.stein@systec-electronic.com>
-References: <201010071623.54903.alexander.stein@systec-electronic.com>
-Message-ID: <AANLkTinCV62zrsiU51Vzz+eSKpS4E8BD2M6StnzWmrkK@mail.gmail.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Thu,  7 Oct 2010 16:35:40 +0200
+Subject: [PATCH] leds: leds-ns2: fix private driver data storage
+Message-ID: <1286462140-16253-1-git-send-email-simon@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+From: Simon Guinot <sguinot@lacie.com>
 
-On Thu, Oct 7, 2010 at 11:23 AM, Alexander Stein
-<alexander.stein@systec-electronic.com> wrote:
-> Hello,
->
-> I'm currently developing on an i.mx35 board (http://www.ic-
-> board.de/product_info.php?info=p159_ICnova-i-MX353-OEM.html) (I use the
-> mx35_pdk config for linux kernel)
-> and noticed a strange behavior. If I run it while openocd is attached to JTAG
-> linux stops/seem to stop during boot after initializing FEC. But if I stop the
-> execution and attach gdb I can see it loops inside default_idle. After
-> removing the fec driver the same goes until the first few chars printed from
-> busybox init (run from initramfs).
-> If I don't attach openocd to JTAG, the system boots fine, but I cannot attach
-> openocd to the running linux system.
+dev_set_drvdata() can't be used to set the driver private data pointer.
+This would overwrite the led classdev object previously registered by
+led_classdev_register().
 
-Pass 'nohlt' in your kernel command line when you boot Linix with the
-JTAG cable connected.
+Note that despite this mistake, the driver work fine because led_dat and
+led_dat->cdev are at the same memory address.
 
-Regards,
+Signed-off-by: Simon Guinot <sguinot@lacie.com>
+---
+ drivers/leds/leds-ns2.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-Fabio Estevam
+diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
+index 350eb34..f77d48d 100644
+--- a/drivers/leds/leds-ns2.c
++++ b/drivers/leds/leds-ns2.c
+@@ -141,10 +141,12 @@ static ssize_t ns2_led_sata_store(struct device *dev,
+ 				  struct device_attribute *attr,
+ 				  const char *buff, size_t count)
+ {
++	struct led_classdev *led_cdev = dev_get_drvdata(dev);
++	struct ns2_led_data *led_dat =
++		container_of(led_cdev, struct ns2_led_data, cdev);
+ 	int ret;
+ 	unsigned long enable;
+ 	enum ns2_led_modes mode;
+-	struct ns2_led_data *led_dat = dev_get_drvdata(dev);
+ 
+ 	ret = strict_strtoul(buff, 10, &enable);
+ 	if (ret < 0)
+@@ -172,7 +174,9 @@ static ssize_t ns2_led_sata_store(struct device *dev,
+ static ssize_t ns2_led_sata_show(struct device *dev,
+ 				 struct device_attribute *attr, char *buf)
+ {
+-	struct ns2_led_data *led_dat = dev_get_drvdata(dev);
++	struct led_classdev *led_cdev = dev_get_drvdata(dev);
++	struct ns2_led_data *led_dat =
++		container_of(led_cdev, struct ns2_led_data, cdev);
+ 
+ 	return sprintf(buf, "%d\n", led_dat->sata);
+ }
+@@ -234,7 +238,6 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
+ 	if (ret < 0)
+ 		goto err_free_slow;
+ 
+-	dev_set_drvdata(led_dat->cdev.dev, led_dat);
+ 	ret = device_create_file(led_dat->cdev.dev, &dev_attr_sata);
+ 	if (ret < 0)
+ 		goto err_free_cdev;
+-- 
+1.6.3.1
