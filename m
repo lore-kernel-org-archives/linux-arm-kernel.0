@@ -1,41 +1,48 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Thu, 7 Oct 2010 12:13:10 -0500
-Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
-In-Reply-To: <201010071601.04597.laurent.pinchart@ideasonboard.com>
-References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
-	<201010070940.14208.laurent.pinchart@ideasonboard.com>
-	<20101007083242.GB14554@n2100.arm.linux.org.uk>
-	<201010071601.04597.laurent.pinchart@ideasonboard.com>
-Message-ID: <4CADFFA6.50202@ti.com>
+From: vimal.newwork@gmail.com (Vimal Singh)
+Date: Thu, 7 Oct 2010 23:05:10 +0530
+Subject: [PATCH v3] OMAP: NAND: Fix static declaration warning
+In-Reply-To: <1286315819-5906-1-git-send-email-manjugk@ti.com>
+References: <1286315819-5906-1-git-send-email-manjugk@ti.com>
+Message-ID: <AANLkTin-rjxxDpiN9V5CinWr4cCqH1QB=cEH+huEcxYv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/7/2010 9:01 AM, Laurent Pinchart wrote:
-> On Thursday 07 October 2010 10:32:42 Russell King - ARM Linux wrote:
->>
->> ARMv6 and above don't like having multiple mappings with different
->> memory type/shareability/cache attributes.  It's architecturally
->> forbidden.
->>
->> So if you want non-cacheable memory and you want to be architecturally
->> compliant, you have to exclude it from the kernel's direct-mapped
->> memory mapping.
+On Wed, Oct 6, 2010 at 3:26 AM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
+> This patch fixes sparse warning for static declaration of variable "use_dma"
 >
-> That's why Omar's patch uses 'mem=' to exclude system memory from the kernel
-> mappings. That's not ideal though, as that memory will be wasted forever,
-> hence my comments regarding whether a non-cacheable mapping was really
-> required.
+> drivers/mtd/nand/omap2.c:114:11: warning: symbol 'use_dma' was not declared. Should it be static?
+>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mtd at lists.infradead.org
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> ---
+> Changes since v1:
+> ?- no logical changes, patch seperated from series based Tony's suggestion.
+>
+> ?drivers/mtd/nand/omap2.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 133d515..439e80d 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -111,11 +111,11 @@ static int use_dma = 1;
+> ?module_param(use_dma, bool, 0);
+> ?MODULE_PARM_DESC(use_dma, "enable/disable use of DMA");
+> ?#else
+> -const int use_dma;
+> +static const int use_dma;
+> ?#endif
+> ?#else
+> ?const int use_prefetch;
+> -const int use_dma;
+> +static const int use_dma;
 
-it is not ideal to waste that memory, but strictly speaking old bootmem 
-does the same, as no one will be touching that memory. i.e. you compile 
-bridge as a module but you never insmod it, the reserved bootmem space 
-is there for bridge anyway; same for bootargs tweaking, if you need 
-dspbridge and are going to use it then you set aside some memory for it.
+I did not understand, why did it not pointed same error for 'const int
+use_prefetch'?
 
-What might be a pain for end-user, is to have drivers that need to do 
-tweaking to bootargs to work; but right now that is a requirement, until 
-a better solution is found/created.
-
+-- 
 Regards,
-
-Omar
+Vimal Singh
