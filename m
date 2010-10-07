@@ -1,25 +1,33 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 06 Oct 2010 18:00:04 -0700
-Subject: [PATCH] ARM: Fix HWCAP_TLS flag for ARM11MPCore/Cortex-A9
-In-Reply-To: <20101007000022.GD4859@atomide.com>
-References: <20101007000022.GD4859@atomide.com>
-Message-ID: <1286413204.22265.149.camel@m0nster>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu,  7 Oct 2010 03:57:16 +0300
+Subject: [PATCH 0/3] mxc: mx51: Add support for efikamx nettop
+Message-ID: <cover.1286412080.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-06 at 17:00 -0700, Tony Lindgren wrote:
+The following patches add basic support for the Genesi EfikaMX nettop[1].
+Serial port and OTG is enabled for now. Ethernet hangs off of OTG.
 
-> -	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-> +	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+The new machine name has been agreed with Russell[2].
+
+Regards,
+Amit
+
+[1] http://www.genesi-usa.com/
+[2] http://www.spinics.net/lists/arm-kernel/msg98960.html
 
 
-Thanks for catching this.. I have no idea how this happened, I must have
-somehow been using a pre July 5th kernel when I made the patch.. Maybe a
-forgotten bisect or something.
+Amit Kucheria (3):
+  mx51: add support for genesi efikamx nettop
+  mx51: efikamx: add otg support
+  mx51: Move OTG initialisation for all boards to a single file
 
-Daniel
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+ arch/arm/mach-mx5/Kconfig              |    7 ++
+ arch/arm/mach-mx5/Makefile             |    3 +-
+ arch/arm/mach-mx5/board-cpuimx51.c     |   25 +--------
+ arch/arm/mach-mx5/board-mx51_babbage.c |   25 +--------
+ arch/arm/mach-mx5/board-mx51_efikamx.c |  100 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-mx5/usb.c                |   40 +++++++++++++
+ 6 files changed, 151 insertions(+), 49 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/board-mx51_efikamx.c
+ create mode 100644 arch/arm/mach-mx5/usb.c
