@@ -1,65 +1,62 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 7 Oct 2010 14:50:13 -0500
-Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
-	read/write
-In-Reply-To: <20101007185630.GA26435@n2100.arm.linux.org.uk>
-References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
-	<1285063280-4057-10-git-send-email-manjugk@ti.com>
-	<7A436F7769CA33409C6B44B358BFFF0C014F74831E@dlee02.ent.ti.com>
-	<20101007185630.GA26435@n2100.arm.linux.org.uk>
-Message-ID: <4CAE2475.4090607@ti.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 7 Oct 2010 23:23:05 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <1286463808.797.10.camel@bender>
+References: <1286177435.2140.5.camel@sven> <201010070218.41944.rjw@sisk.pl>
+	<1286463808.797.10.camel@bender>
+Message-ID: <201010072323.05218.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux had written, on 10/07/2010 01:56 PM, the following:
-> On Thu, Oct 07, 2010 at 07:17:08AM -0500, Menon, Nishanth wrote:
->>> -----Original Message-----
->>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->>> owner at vger.kernel.org] On Behalf Of G, Manjunath Kondaiah
->>> Sent: Tuesday, September 21, 2010 5:01 AM
->>> To: linux-omap at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org; linux-mtd at lists.infradead.org
->>> Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
->>> read/write
->>>
->>> Following sparse warnings exists due to use of writel/w and readl/w
->>> functions.
->>>
->>> This patch fixes the sparse warnings by converting readl/w functions usage
->>> into
->>> __raw_readl/__raw_readw functions.
->> Apologies on bringing up an old topic here -> Is'nt it better to fix
->> readl/w or writel/w than replacing it with __raw_readl/w etc?
+On Thursday, October 07, 2010, Sven Neumann wrote:
+> Hi,
 > 
-> No.  If you're getting sparse warnings its because _you_ are using
-> readl/writel wrongly.
+> On Thu, 2010-10-07 at 02:18 +0200, Rafael J. Wysocki wrote:
 > 
-> They take a void __iomem pointer, not a u32, unsigned long, int, or
-> even a void pointer.
-void __iomem *p;
-...
+> > On Thursday, October 07, 2010, Daniel Mack wrote:
+> > > On Mon, Oct 04, 2010 at 09:30:35AM +0200, Sven Neumann wrote:
+> > > > we are running an embedded system here based on the PXA300 platform.
+> > > > Suspend/resume used to work well so far. However after upgrading the
+> > > > kernel from 2.6.34.7 to 2.6.35.6, we get the following error when trying
+> > > > to suspend the system:
+> > > > 
+> > > > # echo "mem" > "/sys/power/state"
+> > > > [ 5647.295953] PM: Syncing filesystems ... done.
+> > > > [ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
+> > > > [ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+> > > > [ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
+> > > > [ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
+> > > > [ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
+> > > > [ 5647.367082] PM: Some devices failed to suspend
+> > > 
+> > > We've bisected this effect down to commit 152e1d5920 ("PM: Prevent
+> > > waiting forever on asynchronous resume after failing suspend").
+> > > Suspending our PXA3xx based system breaks with this patch.
+> > > 
+> > > I tried to understand what's going wrong, but I didn't follow the
+> > > discussion about this logic, so I would rather like to pass it back to
+> > > the originating people.
+> > > 
+> > > I can only guess that the problem here is the somewhat tricky handling
+> > > around mmc_sdio_suspend(), which returns -ENODEV (-38) in case a
+> > > particular function of a card can not be suspended. The SDIO core would
+> > > have simply removed the card in this case normally, but the PM core
+> > > seems to interfere now, stopping the whole suspend procedure.
+> > > 
+> > > Can anyone shed some light on this?
+> > 
+> > I wonder what happens if you echo 0 to /sys/power/pm_async ?
+> 
+> Nothing happens. The problem persists (tested with 2.6.36-rc7). What
+> would you expect to happen?
 
-readl(p);
+Exactly that. :-)
 
-unrolls to:
-({ u32 __v = ({ u32 __v = (( __u32)(__le32)(( __le32) ((void)0, 
-*(volatile unsigned int *)((p))))); __v; }); __asm__ __volatile__ ("mcr 
-p15,
-, %0, c7, c10, 5" : : "r" (0) : "memory"); __v; });
+Commit 152e1d5920 should not affect the non-async case (I'd be surprised if
+it did really) and things should work with /sys/power/pm_async = 0 anyway.
 
-({ u32 __v = ({ u32 __v
+Please try check if you can reproduce with commt 152e1d5920 reverted and
+/sys/power/pm_async = 0.  If you can, that's a driver bug.
 
-seems to be the obvious cause of sparse warnings such as that attempted 
-to be fixed in [1]
-
-  warning: symbol '__v' shadows an earlier one
-
-my comment being that by moving {read,write}[wlb] to __raw versions dont 
-solve the real issue of namespace here. fix should be in 
-arch/arm/include/asm/io.h IMHO. so that there are no overlaps as this.
-
-[1]http://marc.info/?l=linux-omap&m=128506333803725&w=2
-
--- 
-Regards,
-Nishanth Menon
+Thanks,
+Rafael
