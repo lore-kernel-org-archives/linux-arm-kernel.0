@@ -1,31 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 6 Oct 2010 20:12:44 -0700
-Subject: [PATCH 2/2] ASoC: EDB93xx machine sound driver
-In-Reply-To: <4CAD1952.9030702@bluewatersys.com>
-References: <4CAD16A5.1090501@bluewatersys.com>
-	<4CAD1952.9030702@bluewatersys.com>
-Message-ID: <20101007031243.GA32312@opensource.wolfsonmicro.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 7 Oct 2010 07:32:03 +0200
+Subject: Segmentation fault when using ping6
+In-Reply-To: <4CACDBB1.9050305@freescale.com>
+References: <4CACDBB1.9050305@freescale.com>
+Message-ID: <20101007053202.GA27250@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 07, 2010 at 01:50:26PM +1300, Ryan Mallon wrote:
+Hi Rogerio,
 
-> +	ret = gpio_request(EP93XX_GPIO_LINE_EGPIO6, "CS4271 SFRM1 Disable");
-> +	if (ret)
-> +		return ret;
-> +	ret = gpio_direction_output(EP93XX_GPIO_LINE_EGPIO6, 0);
-> +	if (ret)
-> +		goto free_EGPIO6;
-> +
-> +	ret = gpio_request(EP93XX_GPIO_LINE_EGPIO1, "CS4271 Reset");
-> +	if (ret)
-> +		goto free_EGPIO6;
-> +	ret = gpio_direction_output(EP93XX_GPIO_LINE_EGPIO1, 1);
-> +	if (ret)
-> +		goto free_EGPIO1;
+On Wed, Oct 06, 2010 at 05:27:29PM -0300, Rogerio Pimentel wrote:
+> I'm having a "segmentation fault" problem when using ping6.
+> 
+> When testing on ARM9 platforms (i.MX25 and i.MX27), it returns the error:
+> 
+> root at freescale ~$ ping6 ::1
+> PING ::1 (::1): 56 data bytes
+> Segmentation fault
+> 
+> When testing on ARM11 and ARM Cortex A8 platforms (i.MX31 and
+> i.MX51), it works:
+> 
+> root at freescale ~$ ping6 ::1
+> PING ::1 (::1): 56 data bytes
+> 64 bytes from ::1: seq=0 ttl=64 time=0.331 ms
+> 64 bytes from ::1: seq=1 ttl=64 time=0.214 ms
+> 64 bytes from ::1: seq=2 ttl=64 time=0.176 ms
+> 64 bytes from ::1: seq=3 ttl=64 time=0.155 ms
+> 
+> On all cases, I'm using Linux Kernel 2.6.35 (from Mainline) and
+> Busybox 1.15.0
+> 
+> Does anybody have any idea?
 
-It'd seem to make sense for these to be handled by the CODEC driver,
-using platform data to supply the GPIOs so that their management can be
-integrated with the CODEC flow?
+This seems to be a Busybox related issue. I'd suggests you to try the latest 
+version of Busybox (1.17.2), and if the problem persists, ask at the Busybox 
+mailing list. Don't forget to add strace output to your message.
 
-Otherwise this looks good.
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
