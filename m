@@ -1,32 +1,36 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 07 Oct 2010 14:58:33 -0700
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <20101007212707.GI7558@atomide.com>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<20101007212707.GI7558@atomide.com>
-Message-ID: <1286488713.23836.112.camel@c-dwalke-linux.qualcomm.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 08 Oct 2010 10:59:31 +1300
+Subject: [PATCH 1/2] ASoC: Add CS4271 codec support
+In-Reply-To: <4CAE3FAC.6010508@freescale.com>
+References: <4CAD16A5.1090501@bluewatersys.com>
+	<4CAE3FAC.6010508@freescale.com>
+Message-ID: <4CAE42C3.4070204@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-10-07 at 14:27 -0700, Tony Lindgren wrote:
+On 10/08/2010 10:46 AM, Timur Tabi wrote:
+> Ryan Mallon wrote:
+>> + * For setups with variable MCLKs, pass 0 as 'freq' argument. This will cause
+>> + * theoretically possible sample rates to be enabled. Call it again with a
+>> + * proper value set one the external clock is set (most probably you would do
+>> + * that from a machine's driver 'hw_param' hook.
+> 
+> If you're going to copy/paste parts of my driver verbatim into yours, you should
+> put something like this in the comments:
+> 
+> 	Based on the CS4270 driver by Timur Tabi <timur@freescale.com>
+> 
 
-> Can you please pass the read and write functions to the driver
-> in platform_data? We are already booting kernels with both
-> ARMv6 and 7 compiled in.
+Thanks. CC'ed Alexander, the driver author, who I stupidly left of the
+reply list.
 
-What kind of situation did you want to use it in ? I was thinking about
-how arm could have these functions in a header file, that way we
-wouldn't duplicate in multiple places.
-
-> Also, as it's a driver, other architectures may want to use it too.
-
-I'm not sure if this model fits other architectures tho. They may not
-have the same read/write/status sorts of stuff. Atleast I don't know
-enough about other architectures jtags .
-
-Daniel
+~Ryan
 
 -- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
