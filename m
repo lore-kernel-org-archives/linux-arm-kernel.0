@@ -1,146 +1,54 @@
-From: kostyas@compulab.co.il (Konstantin Sinyuk)
-Date: Thu,  7 Oct 2010 09:36:25 +0200
-Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
-Message-ID: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 7 Oct 2010 09:40:12 +0200
+Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
+In-Reply-To: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
+References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <201010070940.14208.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Konstantin Sinyuk <kostyas@compulab.co.il>
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
- arch/arm/mach-dove/Kconfig   |    6 +++
- arch/arm/mach-dove/Makefile  |    1 +
- arch/arm/mach-dove/cm-a510.c |   96 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 103 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-dove/cm-a510.c
+Hi Omar,
 
-diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-index 3b9a32a..a4ed390 100644
---- a/arch/arm/mach-dove/Kconfig
-+++ b/arch/arm/mach-dove/Kconfig
-@@ -9,6 +9,12 @@ config MACH_DOVE_DB
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell DB-MV88AP510 Development Board.
+On Thursday 07 October 2010 07:45:36 Omar Ramirez Luna wrote:
+> tidspbridge driver uses a block of memory denominated SHared Memory
+> to store info & communicate with DSP, this SHM needs to be physically
+> contiguous and non-cacheable,
 
-+ config MACH_CM_A510
-+	bool "CompuLab CM-A510 Board"
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  CompuLab CM-A510 Board.
-+
- endmenu
+There are non-cacheable mappings, but there's no such thing as non-cacheable 
+memory. Does the MPU mapping for that SHM block really needs to be non-
+cacheable, your could you instead flush the cache after writing to it 
+(performance issues might be involved, I don't know the details about that SHM 
+usage) ?
 
- endif
-diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-index 7ab3be5..f74f549 100644
---- a/arch/arm/mach-dove/Makefile
-+++ b/arch/arm/mach-dove/Makefile
-@@ -1,3 +1,4 @@
- obj-y				+= common.o addr-map.o irq.o pcie.o
+> to achieve the latter the driver ioremaps
+> the memory reserved to be SHM, this will trigger a warning if the
+> memory is under kernel control (because it creates another set of
+> mapping attributes, for the same memory area).
+> 
+> For now this can be avoided if a portion of memory (6MB) is left out
+> of kernel control (using bootarg attribute mem=) where tidspbridge
+> driver can make use of the memory and ioremap it without above
+> restriction.
+> 
+> Parameter has precedence over memblock allocator for shared memory.
+> 
+> i.e.: on a system with 256MB
+> 
+> set 'bootargs mem=250M ...'
+> 
+> cat /proc/iomem
+> ...
+> 80000000-8f9fffff : System RAM
+> 
+> So driver needs to be installed with:
+> 
+> insmod bridgedriver.ko phys_mempool_base=0x8FA00000
+> 
+> Same rationale applies for the menuconfig option.
+> 
+> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 
- obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
-+obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
-diff --git a/arch/arm/mach-dove/cm-a510.c b/arch/arm/mach-dove/cm-a510.c
-new file mode 100644
-index 0000000..321c961
---- /dev/null
-+++ b/arch/arm/mach-dove/cm-a510.c
-@@ -0,0 +1,96 @@
-+/*
-+ * arch/arm/mach-dove/cm-a510.c
-+ *
-+ * Copyright (C) 2010 CompuLab, Ltd.
-+ * Konstantin Sinyuk <kostyas@compulab.co.il>
-+ *
-+ * Based on Marvell DB-MV88AP510-BP Development Board Setup
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/ata_platform.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/flash.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+#include <mach/dove.h>
-+
-+#include "common.h"
-+
-+static struct mv643xx_eth_platform_data cm_a510_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR_DEFAULT,
-+};
-+
-+static struct mv_sata_platform_data cm_a510_sata_data = {
-+	.n_ports        = 1,
-+};
-+
-+/*
-+ * SPI Devices:
-+ * SPI0: 1M Flash Winbond w25q32bv
-+ */
-+static const struct flash_platform_data cm_a510_spi_flash_data = {
-+	.type		= "w25q32bv",
-+};
-+
-+static struct spi_board_info __initdata cm_a510_spi_flash_info[] = {
-+	{
-+		.modalias       = "m25p80",
-+		.platform_data  = &cm_a510_spi_flash_data,
-+		.irq            = -1,
-+		.max_speed_hz   = 20000000,
-+		.bus_num        = 0,
-+		.chip_select    = 0,
-+	},
-+};
-+
-+static int __init cm_a510_pci_init(void)
-+{
-+	if (machine_is_cm_a510())
-+		dove_pcie_init(1, 1);
-+
-+	return 0;
-+}
-+
-+subsys_initcall(cm_a510_pci_init);
-+
-+/* Board Init */
-+static void __init cm_a510_init(void)
-+{
-+	/*
-+	 * Basic Dove setup. Needs to be called early.
-+	 */
-+	dove_init();
-+
-+	dove_ge00_init(&cm_a510_ge00_data);
-+	dove_ehci0_init();
-+	dove_ehci1_init();
-+	dove_sata_init(&cm_a510_sata_data);
-+	dove_sdio0_init();
-+	dove_sdio1_init();
-+	dove_spi0_init();
-+	dove_spi1_init();
-+	dove_uart0_init();
-+	dove_uart1_init();
-+	dove_i2c_init();
-+	spi_register_board_info(cm_a510_spi_flash_info,
-+				ARRAY_SIZE(cm_a510_spi_flash_info));
-+}
-+
-+MACHINE_START(CM_A510, "Compulab CM-A510 Board")
-+	.phys_io	= DOVE_SB_REGS_PHYS_BASE,
-+	.io_pg_offst	= ((DOVE_SB_REGS_VIRT_BASE) >> 18) & 0xfffc,
-+	.boot_params	= 0x00000100,
-+	.init_machine	= cm_a510_init,
-+	.map_io		= dove_map_io,
-+	.init_irq	= dove_init_irq,
-+	.timer		= &dove_timer,
-+MACHINE_END
---
-1.7.0.4
+-- 
+Regards,
+
+Laurent Pinchart
