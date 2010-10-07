@@ -1,49 +1,31 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 7 Oct 2010 16:01:02 +0200
-Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
-In-Reply-To: <20101007083242.GB14554@n2100.arm.linux.org.uk>
-References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
-	<201010070940.14208.laurent.pinchart@ideasonboard.com>
-	<20101007083242.GB14554@n2100.arm.linux.org.uk>
-Message-ID: <201010071601.04597.laurent.pinchart@ideasonboard.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Thu, 7 Oct 2010 16:23:29 +0200
+Subject: linux hang on i.mx35 board, a sdma problem?
+Message-ID: <201010071623.54903.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
+Hello,
 
-On Thursday 07 October 2010 10:32:42 Russell King - ARM Linux wrote:
-> On Thu, Oct 07, 2010 at 09:40:12AM +0200, Laurent Pinchart wrote:
-> > Hi Omar,
-> > 
-> > On Thursday 07 October 2010 07:45:36 Omar Ramirez Luna wrote:
-> > > tidspbridge driver uses a block of memory denominated SHared Memory
-> > > to store info & communicate with DSP, this SHM needs to be physically
-> > > contiguous and non-cacheable,
-> > 
-> > There are non-cacheable mappings, but there's no such thing as
-> > non-cacheable memory. Does the MPU mapping for that SHM block really
-> > needs to be non- cacheable, your could you instead flush the cache after
-> > writing to it (performance issues might be involved, I don't know the
-> > details about that SHM usage) ?
-> 
-> ARMv6 and above don't like having multiple mappings with different
-> memory type/shareability/cache attributes.  It's architecturally
-> forbidden.
-> 
-> So if you want non-cacheable memory and you want to be architecturally
-> compliant, you have to exclude it from the kernel's direct-mapped
-> memory mapping.
+I'm currently developing on an i.mx35 board (http://www.ic-
+board.de/product_info.php?info=p159_ICnova-i-MX353-OEM.html) (I use the 
+mx35_pdk config for linux kernel)
+and noticed a strange behavior. If I run it while openocd is attached to JTAG 
+linux stops/seem to stop during boot after initializing FEC. But if I stop the 
+execution and attach gdb I can see it loops inside default_idle. After 
+removing the fec driver the same goes until the first few chars printed from 
+busybox init (run from initramfs).
+If I don't attach openocd to JTAG, the system boots fine, but I cannot attach 
+openocd to the running linux system.
+I have to admit I removed the DMA device drivers, because otherwise linux 
+doesn't seem to start at all.
+Is this problem related to the sdma unit? I read something from the manual 
+sdma can be blocked from jtag access, maybe this breaks the chain.
+If not, what could be the cause, that the system is not starting properly, but 
+the idle loop is executed?
 
-That's why Omar's patch uses 'mem=' to exclude system memory from the kernel 
-mappings. That's not ideal though, as that memory will be wasted forever, 
-hence my comments regarding whether a non-cacheable mapping was really 
-required.
+Best regards,
+Alexander
 
-Do we have an infrastructure, or even an embryo thereof, to remove pages from 
-the kernel's direct-mapped memory mapping at runtime ? The use of super pages 
-probably complicates the matter.
-
--- 
-Regards,
-
-Laurent Pinchart
+PS: I tested eariler on the BSP (2.6.34) from in-circuit, but the test above 
+is using linux-2.6.36-rc7.
