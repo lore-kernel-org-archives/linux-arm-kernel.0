@@ -1,62 +1,68 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 7 Oct 2010 23:23:05 +0200
-Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
-In-Reply-To: <1286463808.797.10.camel@bender>
-References: <1286177435.2140.5.camel@sven> <201010070218.41944.rjw@sisk.pl>
-	<1286463808.797.10.camel@bender>
-Message-ID: <201010072323.05218.rjw@sisk.pl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Oct 2010 14:27:07 -0700
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20101007212707.GI7558@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 07, 2010, Sven Neumann wrote:
-> Hi,
-> 
-> On Thu, 2010-10-07 at 02:18 +0200, Rafael J. Wysocki wrote:
-> 
-> > On Thursday, October 07, 2010, Daniel Mack wrote:
-> > > On Mon, Oct 04, 2010 at 09:30:35AM +0200, Sven Neumann wrote:
-> > > > we are running an embedded system here based on the PXA300 platform.
-> > > > Suspend/resume used to work well so far. However after upgrading the
-> > > > kernel from 2.6.34.7 to 2.6.35.6, we get the following error when trying
-> > > > to suspend the system:
-> > > > 
-> > > > # echo "mem" > "/sys/power/state"
-> > > > [ 5647.295953] PM: Syncing filesystems ... done.
-> > > > [ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
-> > > > [ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-> > > > [ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
-> > > > [ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
-> > > > [ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
-> > > > [ 5647.367082] PM: Some devices failed to suspend
-> > > 
-> > > We've bisected this effect down to commit 152e1d5920 ("PM: Prevent
-> > > waiting forever on asynchronous resume after failing suspend").
-> > > Suspending our PXA3xx based system breaks with this patch.
-> > > 
-> > > I tried to understand what's going wrong, but I didn't follow the
-> > > discussion about this logic, so I would rather like to pass it back to
-> > > the originating people.
-> > > 
-> > > I can only guess that the problem here is the somewhat tricky handling
-> > > around mmc_sdio_suspend(), which returns -ENODEV (-38) in case a
-> > > particular function of a card can not be suspended. The SDIO core would
-> > > have simply removed the card in this case normally, but the PM core
-> > > seems to interfere now, stopping the whole suspend procedure.
-> > > 
-> > > Can anyone shed some light on this?
-> > 
-> > I wonder what happens if you echo 0 to /sys/power/pm_async ?
-> 
-> Nothing happens. The problem persists (tested with 2.6.36-rc7). What
-> would you expect to happen?
+Hi,
 
-Exactly that. :-)
+* Daniel Walker <dwalker@codeaurora.org> [101005 11:59]:
+> +#if !defined(CONFIG_CPU_V7)
+> +static inline char
+> +__dcc_getchar(void)
+> +{
+> +	char __c;
+> +
+> +	asm("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> +		: "=r" (__c) : : "cc");
+> +
+> +	return __c;
+> +}
+> +#else
+> +static inline char
+> +__dcc_getchar(void)
+> +{
+> +	char __c;
+> +
+> +	asm(
+> +	"get_wait:	mrc p14, 0, pc, c0, c1, 0                   \n\
+> +			bne get_wait                                    \n\
+> +			mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> +		: "=r" (__c) : : "cc");
+> +
+> +	return __c;
+> +}
+> +#endif
+> +
+> +#if !defined(CONFIG_CPU_V7)
+> +static inline void
+> +__dcc_putchar(char c)
+> +{
+> +	asm("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+> +		: /* no output register */
+> +		: "r" (c) : "cc");
+> +}
+> +#else
+> +static inline void
+> +__dcc_putchar(char c)
+> +{
+> +	asm(
+> +	"put_wait:	mrc p14, 0, pc, c0, c1, 0                   \n\
+> +			bcs put_wait                                \n\
+> +			mcr p14, 0, %0, c0, c5, 0                   "
+> +	: : "r" (c) : "cc");
+> +}
+> +#endif
 
-Commit 152e1d5920 should not affect the non-async case (I'd be surprised if
-it did really) and things should work with /sys/power/pm_async = 0 anyway.
+Can you please pass the read and write functions to the driver
+in platform_data? We are already booting kernels with both
+ARMv6 and 7 compiled in.
 
-Please try check if you can reproduce with commt 152e1d5920 reverted and
-/sys/power/pm_async = 0.  If you can, that's a driver bug.
+Also, as it's a driver, other architectures may want to use it too.
 
-Thanks,
-Rafael
+Regards,
+
+Tony
