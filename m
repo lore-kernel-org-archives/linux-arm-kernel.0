@@ -1,87 +1,146 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 7 Oct 2010 09:30:28 +0200
-Subject: [PATCH] cpufreq for freescale mx51
-In-Reply-To: <AANLkTi=fh4_19QhB8ArTfiigbPOQSejB=gLPMiEmyXjP@mail.gmail.com>
-References: <1285738417-1638-1-git-send-email-yong.shen@linaro.org>
-	<20100930104817.GC2526@matterhorn.lan>
-	<20101006095111.GV28242@pengutronix.de>
-	<AANLkTi=fh4_19QhB8ArTfiigbPOQSejB=gLPMiEmyXjP@mail.gmail.com>
-Message-ID: <20101007073027.GY28242@pengutronix.de>
+From: kostyas@compulab.co.il (Konstantin Sinyuk)
+Date: Thu,  7 Oct 2010 09:36:25 +0200
+Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
+Message-ID: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 07, 2010 at 11:36:07AM +0800, Yong Shen wrote:
-> Hi Sascha,
-> 
-> Thanks for your thorough comments.
-> I have already received comments from Arnd before yours arrived. So some of
-> the commends you two provided are common.
-> I acknowledge most of your opinions, except for two, I have some
-> explanations.
-> 
-> > > +    */
-> > > > +   reg = __raw_readl(MXC_CCM_CACRR);
-> > > > +   reg &= ~MXC_CCM_CACRR_ARM_PODF_MASK;
-> > > > +   reg |= cpu_wp_tbl[wp].cpu_podf << MXC_CCM_CACRR_ARM_PODF_OFFSET;
-> > > > +   __raw_writel(reg, MXC_CCM_CACRR);
-> >
-> > We have a simple divider here. Why do we need a reference to struct
-> > cpu_wp then? This code could look much simpler.
-> >
-> > (side note: I'm aware that the original Freescale code is also able
-> > to change the cpu frequency using the pll instead of the divider, but is
-> > this really necessary?)
-> >
-> Using wp_tbl is because that it also contains information like regulator
-> voltage.
+Signed-off-by: Konstantin Sinyuk <kostyas@compulab.co.il>
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/mach-dove/Kconfig   |    6 +++
+ arch/arm/mach-dove/Makefile  |    1 +
+ arch/arm/mach-dove/cm-a510.c |   96 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-dove/cm-a510.c
 
-The clock code does not handle the regulators, not even in the fsl
-kernel.
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index 3b9a32a..a4ed390 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -9,6 +9,12 @@ config MACH_DOVE_DB
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell DB-MV88AP510 Development Board.
 
-> Since the regulator driver for imx51 have not been upstreamed, you
-> don't see any regulator operation here. Also, like you mentioned, there are
-> two ways to change cpufreq, by post divider or pll change. And post divider
-> change is a simpler way and also the only way for babbage, since cpu freq
-> and ddr freq are all root from the same pll on babbage and they will
-> interfere each other.
++ config MACH_CM_A510
++	bool "CompuLab CM-A510 Board"
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  CompuLab CM-A510 Board.
++
+ endmenu
 
-I understand what you have to do, but the way you did really looks
-strange. You introduce get_cpu_wp() to get the complete array of
-workpoints. In the cpufreq driver you have this complete array, pick
-the desired workpoint, pass the frequency to the clock layer which in
-turn calls get_cpu_wp() to get the array and loop around it to get
-the workpoint from the frequency again. Addionally you maintain a
-pointer to what the clock code thinks the current workpoint is.
+ endif
+diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+index 7ab3be5..f74f549 100644
+--- a/arch/arm/mach-dove/Makefile
++++ b/arch/arm/mach-dove/Makefile
+@@ -1,3 +1,4 @@
+ obj-y				+= common.o addr-map.o irq.o pcie.o
 
-How about making the clock code agnostic of such workpoints and
-calculate the pll values and dividers for a given frequency based
-on the frequency. If that's to complicated you could maintain
-a table in the clock code. If that's not flexible enough you could
-pass a pointer to this table to mx51_clocks_init. This array could
-carry information relevant only to the clock code and only relevant
-to the i.MX51, In the fsl kernel struct cpu_wp is a catch-all struct
-for all i.MXs. The i.MX51 uses the pdf/mfi/mfd/mfn/cpu_podf fields,
-the i.MX35 uses the pll_reg and pdr0_reg fields and who knows what
-the next i.MX needs.
-
-> 
-> > > +static struct cpufreq_frequency_table imx_freq_table[4];
-> >
-> > Three frequencies should be enough for everyone, right? This should be
-> > dynamically allocated like in other cpufreq drivers.
-> >
-> 
-> Yes, we only support 3 work points, which is for sure. Actually, we only
-> support 2 points on most mx51 chips. I supposed it is ok to use static array
-> here.
-
-Please just add dynamic allocation, then we are safe for any potential
-future use.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
++obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
+diff --git a/arch/arm/mach-dove/cm-a510.c b/arch/arm/mach-dove/cm-a510.c
+new file mode 100644
+index 0000000..321c961
+--- /dev/null
++++ b/arch/arm/mach-dove/cm-a510.c
+@@ -0,0 +1,96 @@
++/*
++ * arch/arm/mach-dove/cm-a510.c
++ *
++ * Copyright (C) 2010 CompuLab, Ltd.
++ * Konstantin Sinyuk <kostyas@compulab.co.il>
++ *
++ * Based on Marvell DB-MV88AP510-BP Development Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/flash.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++#include <mach/dove.h>
++
++#include "common.h"
++
++static struct mv643xx_eth_platform_data cm_a510_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR_DEFAULT,
++};
++
++static struct mv_sata_platform_data cm_a510_sata_data = {
++	.n_ports        = 1,
++};
++
++/*
++ * SPI Devices:
++ * SPI0: 1M Flash Winbond w25q32bv
++ */
++static const struct flash_platform_data cm_a510_spi_flash_data = {
++	.type		= "w25q32bv",
++};
++
++static struct spi_board_info __initdata cm_a510_spi_flash_info[] = {
++	{
++		.modalias       = "m25p80",
++		.platform_data  = &cm_a510_spi_flash_data,
++		.irq            = -1,
++		.max_speed_hz   = 20000000,
++		.bus_num        = 0,
++		.chip_select    = 0,
++	},
++};
++
++static int __init cm_a510_pci_init(void)
++{
++	if (machine_is_cm_a510())
++		dove_pcie_init(1, 1);
++
++	return 0;
++}
++
++subsys_initcall(cm_a510_pci_init);
++
++/* Board Init */
++static void __init cm_a510_init(void)
++{
++	/*
++	 * Basic Dove setup. Needs to be called early.
++	 */
++	dove_init();
++
++	dove_ge00_init(&cm_a510_ge00_data);
++	dove_ehci0_init();
++	dove_ehci1_init();
++	dove_sata_init(&cm_a510_sata_data);
++	dove_sdio0_init();
++	dove_sdio1_init();
++	dove_spi0_init();
++	dove_spi1_init();
++	dove_uart0_init();
++	dove_uart1_init();
++	dove_i2c_init();
++	spi_register_board_info(cm_a510_spi_flash_info,
++				ARRAY_SIZE(cm_a510_spi_flash_info));
++}
++
++MACHINE_START(CM_A510, "Compulab CM-A510 Board")
++	.phys_io	= DOVE_SB_REGS_PHYS_BASE,
++	.io_pg_offst	= ((DOVE_SB_REGS_VIRT_BASE) >> 18) & 0xfffc,
++	.boot_params	= 0x00000100,
++	.init_machine	= cm_a510_init,
++	.map_io		= dove_map_io,
++	.init_irq	= dove_init_irq,
++	.timer		= &dove_timer,
++MACHINE_END
+--
+1.7.0.4
