@@ -1,54 +1,39 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 7 Oct 2010 17:15:15 -0500
-Subject: [PATCH] power: introduce library for device-specific OPPs
-In-Reply-To: <87fwwh7isu.fsf@deeprootsystems.com>
-References: <1286357180-21565-1-git-send-email-nm@ti.com>
-	<201010072354.57011.rjw@sisk.pl>
-	<7A436F7769CA33409C6B44B358BFFF0C014F748B07@dlee02.ent.ti.com>
-	<87fwwh7isu.fsf@deeprootsystems.com>
-Message-ID: <7A436F7769CA33409C6B44B358BFFF0C014F748B1A@dlee02.ent.ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 7 Oct 2010 15:56:12 -0700
+Subject: [PATCH] ARM: imx serial driver: fix resume
+In-Reply-To: <1286384236-4241-1-git-send-email-daniel@caiaq.de>
+References: <1286384236-4241-1-git-send-email-daniel@caiaq.de>
+Message-ID: <20101007155612.b8f690fd.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at deeprootsystems.com]
-> Sent: Thursday, October 07, 2010 5:14 PM
-> To: Menon, Nishanth
-> Cc: Rafael J. Wysocki; linux-pm; lkml; l-o; l-a; Paul
-> Subject: Re: [PATCH] power: introduce library for device-specific OPPs
-> 
-[...]
-> >> > +static int opp_set_availability(struct device *dev, unsigned long
-> freq,
-> >> > +		bool availability_req)
-> >> > +{
-> >> > +	struct device_opp *tmp_dev_opp, *dev_opp = NULL;
-> >> > +	struct opp *new_opp, *tmp_opp, *opp = ERR_PTR(-ENODEV);
-> >> > +	int r = 0;
-> >> > +
-> >> > +	/* keep the node allocated */
-> >> > +	new_opp = kmalloc(sizeof(struct opp), GFP_KERNEL);
-> >> > +	if (!new_opp) {
-> >> > +		pr_warning("Unable to allocate opp\n");
-> >>
-> >> Please add an identification string to the messages, something like
-> >> "OPP: Unable to allocat object\n" (and similarly in the other messages).
-> >> That would help to find the source of a message in case there's any
-> >> problem.
-> >
-> > pr_fmt has been reformatted for this. The actual message which will
-> appear
-> > is as follows:
-> > opp_set_availability: Unable to allocate opp
-> >
-> > is'nt that good enough considering that all functions are opp_ prefixed?
-> > I can modify pr_fmt to add "OPP:" but I kinda think it is redundant. But
-> I
-> > have no strong opinions on that and look forward to your recommendations.
-> 
-> Even more informative would be to use dev_warn() and include the func.
-> That way we'll even know which device has the problem.
-Ack. Thanks. Yeah, this is better.. will do the change.
+On Wed,  6 Oct 2010 18:57:16 +0200
+Daniel Mack <daniel@caiaq.de> wrote:
 
-Regards,
-Nishanth Menon
+> From: Volker Ernst <volker.ernst@txtr.com>
+> 
+> I just came across a bug in the IMX31 serial driver which is still
+> present in the newest kernels and which prevents successful
+> resume-operation for the IMX31 serial ports.
+> 
+> What happens is that in "drivers/serial/imx.c" on resume function
+> "serial_imx_resume" gets called. This function in turn calls
+> "uart_resume_port" (in the generic serial driver "serial_core.c"),
+> which in turn calls "imx_start_tx" in "imx.c" (in case the SIO-port
+> was really suspended) which in turn calls "imx_transmit_buffer".
+> 
+> However calling "imx_transmit_buffer" with an empty TX-fifo (as is
+> usually the case) will result in the serial port starting to transmit
+> (actually the old [already sent] tx-buffer), as there is no check if
+> the tx-buffer is empty before starting to feed tx-fifo-data to the
+> serial port hardware.
+> 
+> Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
+> Cc: Daniel Mack <daniel@caiaq.de>
+
+This should have been Signed-off-by:, as you were on the patch delivery
+path.
+
+I made that change to my copy of the patch, thanks.
+
+> Cc: Andy Green <andy@warmcat.com>
