@@ -1,38 +1,64 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 07 Oct 2010 14:36:30 +0200
-Subject: Segmentation fault when using ping6
-In-Reply-To: <4CADBC7A.6060908@freescale.com>
-References: <4CADBC7A.6060908@freescale.com>
-Message-ID: <1286454990.2912.153.camel@edumazet-laptop>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 07 Oct 2010 14:46:38 +0200
+Subject: [PATCH v2]  ARM: S5PC210: I2C devices updates
+Message-ID: <1286455601-25360-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi 07 octobre 2010 ? 09:26 -0300, Rogerio Pimentel a ?crit :
-> Hi,
-> 
-> I'm having a "segmentation fault" problem when using ping6.
-> 
-> When testing on ARM9 platforms (i.MX25 and i.MX27), it returns the error:
-> 
-> root at freescale ~$ ping6 ::1
-> PING ::1 (::1): 56 data bytes
-> Segmentation fault
-> 
-> When testing on ARM11 and ARM Cortex A8 platforms (i.MX31 and i.MX51), 
-> it works:
-> 
-> root at freescale ~$ ping6 ::1
-> PING ::1 (::1): 56 data bytes
-> 64 bytes from ::1: seq=0 ttl=64 time=0.331 ms
-> 64 bytes from ::1: seq=1 ttl=64 time=0.214 ms
-> 64 bytes from ::1: seq=2 ttl=64 time=0.176 ms
-> 64 bytes from ::1: seq=3 ttl=64 time=0.155 ms
-> 
-> On all cases, I'm using Linux Kernel 2.6.35 (from Mainline) and Busybox 
-> 1.15.0
-> 
-> Does anybody have any idea?
+Hello,
 
-Do you have something displayed on console ? ( dmesg output )
+This is an updated version of I2C patches posted by Kyungmin Park in
+'[PATCH 0/7] ARM: S5PC210: I2C devices support and Universal board
+updates' thread.
 
-gdb could tell you where segmentation takes place.
+All issues related to i2c device definitions reported by Kukjin Kim have
+been fixed. We also merged some of the patches together to avoid build
+breaks.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
+
+---
+
+Patch summary:
+
+Kyungmin Park (3):
+  ARM: S5PC110: Fix wrong interrupt I2C2 and I2C3 number
+  ARM: S5PC210: Define address & interrupt for all I2C blocks
+  ARM: S5PC210: add I2C{3, 4, 5, 6, 7} device support
+
+ arch/arm/mach-s5pv210/include/mach/irqs.h |    4 +-
+ arch/arm/mach-s5pv310/Kconfig             |   25 +++++++++++
+ arch/arm/mach-s5pv310/Makefile            |    5 ++
+ arch/arm/mach-s5pv310/include/mach/irqs.h |    7 +++
+ arch/arm/mach-s5pv310/include/mach/map.h  |   11 ++++-
+ arch/arm/mach-s5pv310/setup-i2c3.c        |   25 +++++++++++
+ arch/arm/mach-s5pv310/setup-i2c4.c        |   25 +++++++++++
+ arch/arm/mach-s5pv310/setup-i2c5.c        |   25 +++++++++++
+ arch/arm/mach-s5pv310/setup-i2c6.c        |   25 +++++++++++
+ arch/arm/mach-s5pv310/setup-i2c7.c        |   25 +++++++++++
+ arch/arm/plat-samsung/Kconfig             |   25 +++++++++++
+ arch/arm/plat-samsung/Makefile            |    5 ++
+ arch/arm/plat-samsung/dev-i2c2.c          |    4 +-
+ arch/arm/plat-samsung/dev-i2c3.c          |   68 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/dev-i2c4.c          |   68 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/dev-i2c5.c          |   68 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/dev-i2c6.c          |   68 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/dev-i2c7.c          |   68 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/iic.h  |    5 ++
+ 19 files changed, 550 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
+ create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
+ create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
+ create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
+ create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
+ create mode 100644 arch/arm/plat-samsung/dev-i2c3.c
+ create mode 100644 arch/arm/plat-samsung/dev-i2c4.c
+ create mode 100644 arch/arm/plat-samsung/dev-i2c5.c
+ create mode 100644 arch/arm/plat-samsung/dev-i2c6.c
+ create mode 100644 arch/arm/plat-samsung/dev-i2c7.c
+
+-- 
+1.7.1.569.g6f426
