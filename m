@@ -1,42 +1,54 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 07 Oct 2010 15:15:23 +0400
-Subject: [PATCH 2/4] omap4: pandaboard: Fix the init if CONFIG_MMC_OMAP_HS
-	is	not set
-In-Reply-To: <1286400020-1010-3-git-send-email-x0132446@ti.com>
-References: <1286400020-1010-1-git-send-email-x0132446@ti.com>
-	<1286400020-1010-3-git-send-email-x0132446@ti.com>
-Message-ID: <4CADABCB.6060906@ru.mvista.com>
+Date: Thu, 07 Oct 2010 15:22:21 +0400
+Subject: [PATCH 2/3] mx51: efikamx: add otg support
+In-Reply-To: <34d3df3c6ce621e58c17b38ffc23eb180b64a781.1286412080.git.amit.kucheria@linaro.org>
+References: <cover.1286412080.git.amit.kucheria@linaro.org>
+	<34d3df3c6ce621e58c17b38ffc23eb180b64a781.1286412080.git.amit.kucheria@linaro.org>
+Message-ID: <4CADAD6D.4000008@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 07-10-2010 1:20, David Anders wrote:
+On 07-10-2010 4:58, Amit Kucheria wrote:
 
-> Avoid possible crash if CONFIG_MMC_OMAP_HS is not set.
+> Ethernet hangs off OTG
 
-> Signed-off-by: David Anders<x0132446@ti.com>
-> Signed-off-by: Anand Gadiyar<gadiyar@ti.com>
+    Hm, what?
+
+> Signed-off-by: Amit Kucheria<amit.kucheria@linaro.org>
 [...]
 
-> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> index 093d13b..697c0bd 100644
-> --- a/arch/arm/mach-omap2/board-omap4panda.c
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> @@ -85,7 +85,14 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> index 4c921fc..b00502a 100644
+> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> @@ -37,6 +37,8 @@
+>   #include "devices-imx51.h"
+>   #include "devices.h"
 >
->   static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
->   {
-> -	struct omap_mmc_platform_data *pdata = dev->platform_data;
-> +	struct omap_mmc_platform_data *pdata;
+> +#define	MX51_USB_PLL_DIV_24_MHZ	0x01
 > +
-> +	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
+>   static struct pad_desc mx51efikamx_pads[] = {
+>   	/* UART1 */
+>   	MX51_PAD_UART1_RXD__UART1_RXD,
+> @@ -63,10 +65,38 @@ static inline void mxc_init_imx_uart(void)
+>   }
+>   #endif /* SERIAL_IMX */
+>
+> +/* This function is board specific as the bit mask for the plldiv will also
+> + * be different for other Freescale SoCs, thus a common bitmask is not
+> + * possible and cannot get place in /plat-mxc/ehci.c.
+> + */
+> +static int initialize_otg_port(struct platform_device *pdev)
+> +{
+> +	u32 v;
+> +	void __iomem *usb_base;
+> +	void __iomem *usbother_base;
 
-    s/null/NULL/?
+    Insert an empty line here please.
 
-> +	if (!dev) {
-> +		pr_err("Failed omap4_twl6030_hsmmc_set_late_init\n");
-
-    pr_err("Failed %s\n", __func__);
+> +	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
+> +	usbother_base = (void __iomem *)(usb_base + MX5_USBOTHER_REGS_OFFSET);
 
 WBR, Sergei
