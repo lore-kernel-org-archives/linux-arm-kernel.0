@@ -1,71 +1,49 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 7 Oct 2010 09:04:28 -0400
-Subject: Segmentation fault when using ping6
-In-Reply-To: <4CADBC7A.6060908@freescale.com>
-References: <4CADBC7A.6060908@freescale.com>
-Message-ID: <20101007130428.GA22471@mvista.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 7 Oct 2010 16:01:02 +0200
+Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
+In-Reply-To: <20101007083242.GB14554@n2100.arm.linux.org.uk>
+References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
+	<201010070940.14208.laurent.pinchart@ideasonboard.com>
+	<20101007083242.GB14554@n2100.arm.linux.org.uk>
+Message-ID: <201010071601.04597.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 07, 2010 at 09:26:34AM -0300, Rogerio Pimentel wrote:
-> Hi,
-> 
-> I'm having a "segmentation fault" problem when using ping6.
-> 
-> When testing on ARM9 platforms (i.MX25 and i.MX27), it returns the error:
-> 
-> root at freescale ~$ ping6 ::1
-> PING ::1 (::1): 56 data bytes
-> Segmentation fault
-> 
-> When testing on ARM11 and ARM Cortex A8 platforms (i.MX31 and
-> i.MX51), it works:
-> 
-> root at freescale ~$ ping6 ::1
-> PING ::1 (::1): 56 data bytes
-> 64 bytes from ::1: seq=0 ttl=64 time=0.331 ms
-> 64 bytes from ::1: seq=1 ttl=64 time=0.214 ms
-> 64 bytes from ::1: seq=2 ttl=64 time=0.176 ms
-> 64 bytes from ::1: seq=3 ttl=64 time=0.155 ms
-> 
-> On all cases, I'm using Linux Kernel 2.6.35 (from Mainline) and
-> Busybox 1.15.0
-> 
-> Does anybody have any idea?
+Hi Russell
 
-Random guess is that you may be using a userland tuned for ARMv6 or later
-but trying to run that on <ARMv6 machines.
+On Thursday 07 October 2010 10:32:42 Russell King - ARM Linux wrote:
+> On Thu, Oct 07, 2010 at 09:40:12AM +0200, Laurent Pinchart wrote:
+> > Hi Omar,
+> > 
+> > On Thursday 07 October 2010 07:45:36 Omar Ramirez Luna wrote:
+> > > tidspbridge driver uses a block of memory denominated SHared Memory
+> > > to store info & communicate with DSP, this SHM needs to be physically
+> > > contiguous and non-cacheable,
+> > 
+> > There are non-cacheable mappings, but there's no such thing as
+> > non-cacheable memory. Does the MPU mapping for that SHM block really
+> > needs to be non- cacheable, your could you instead flush the cache after
+> > writing to it (performance issues might be involved, I don't know the
+> > details about that SHM usage) ?
+> 
+> ARMv6 and above don't like having multiple mappings with different
+> memory type/shareability/cache attributes.  It's architecturally
+> forbidden.
+> 
+> So if you want non-cacheable memory and you want to be architecturally
+> compliant, you have to exclude it from the kernel's direct-mapped
+> memory mapping.
 
-You can enable this to see what's going wrong:
+That's why Omar's patch uses 'mem=' to exclude system memory from the kernel 
+mappings. That's not ideal though, as that memory will be wasted forever, 
+hence my comments regarding whether a non-cacheable mapping was really 
+required.
 
-config DEBUG_USER
-        bool "Verbose user fault messages"
-        help
-          When a user program crashes due to an exception, the kernel can
-          print a brief message explaining what the problem was. This is
-          sometimes helpful for debugging but serves no purpose on a
-          production system. Most people should say N here.
+Do we have an infrastructure, or even an embryo thereof, to remove pages from 
+the kernel's direct-mapped memory mapping at runtime ? The use of super pages 
+probably complicates the matter.
 
-          In addition, you need to pass user_debug=N on the kernel command
-          line to enable this feature.  N consists of the sum of:
-
-              1 - undefined instruction events
-              2 - system calls
-              4 - invalid data aborts
-              8 - SIGSEGV faults
-             16 - SIGBUS faults
-
---
+-- 
 Regards,
-George
 
-> 
-> Thanks in advance,
-> 
-> Rogerio Pimentel
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Laurent Pinchart
