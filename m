@@ -1,51 +1,49 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu,  7 Oct 2010 12:44:22 +0300
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-Message-ID: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Thu, 07 Oct 2010 18:49:44 +0900
+Subject: [PATCH v2 0/6] ARM: S5PV210: Add support S5PV210/S5PC110 CPUFREQ
+In-Reply-To: <1284962695-8542-1-git-send-email-sbkim73@samsung.com>
+References: <1284962695-8542-1-git-send-email-sbkim73@samsung.com>
+Message-ID: <004001cb6605$01ff4f90$05fdeeb0$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many drivers are broken, and there's no alternative in sight. Such a big
-change should stay as a warning for now, and only later should it
-actually fail.
+Hi all,
+I know that there is another S5PV210 CPUFREQ patch from Mr. Ham.
+But, That patchset seems to have unclear part.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-August/023626.htm
+l
+The part of 'CONFIG_PM' is unclear and still have PM support part.
+So, I think that this patch is more suitable for S5PV210/S5PC110 CPUFREQ in
+the mainline.
+because this patch implemented basic pm functionality and already tested on
+smdkv210 board.
 
-The drivers are not doing something correct, we get it, but for now it's
-better to allow them to work (they do 99% of the time anyway) rather
-than to force everyone to revert this patch in their internal trees
-until there's a solution. A slightly broken functionality is better than
-no functionality at all.
+Thanks and regards,
+S.B. Kim
 
-A warning lets people know that what they are doing is not right, and
-they should fix it.
-
-Cc: Han Jonghun <jonghun79.han@gmail.com>
-Cc: Hemant Pedanekar <hemantp@ti.com>
-Cc: Arnd Hannemann <arnd@arndnet.de>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
----
- arch/arm/mm/ioremap.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
-
-For issues related to this:
-http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
-http://article.gmane.org/gmane.linux.ports.sh.devel/8560
-http://www.spinics.net/lists/linux-fbdev/msg01745.html
-http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/22271
-
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index ab50627..ccff7da 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -204,8 +204,7 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	/*
- 	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
- 	 */
--	if (WARN_ON(pfn_valid(pfn)))
--		return NULL;
-+	WARN_ON(pfn_valid(pfn));
- 
- 	type = get_mem_type(mtype);
- 	if (!type)
--- 
-1.7.3.1.2.g7fe2b
+> on Monday, September 20, 2010 3:05 PM, Sangbeom Kim <sbkim73@samsung.com>
+wrote:
+> 
+> This patch adds CPUFREQ for S5PV210/S5PC110.
+> 
+> Changes since v1:
+> 
+> - Added MOUT_DMC0 and SCLK_DMC0 for checking the dmc0 clock in CPUFREQ
+> driver.
+> - Removed hardcoding of DRAM refresh counter.
+> - Added to calculate refresh counter function based on DRAM operation
+freq.
+> 
+> [PATCH v2 1/6] ARM: S5PV210: Add DMC map_desc table for supporting DMC
+> access
+> [PATCH v2 2/6] ARM: S5PV210: Add struct clk_ops for clk_fout_apll
+> [PATCH v2 3/6] ARM: S5PV210: Add MOUT_DMC0 and SCLK_DMC0 clocks
+> [PATCH v2 4/6] ARM: S5PV210: Add Register definition for CMU
+> [PATCH v2 5/6] ARM: S5PV210: Add support CPUFREQ
+> [PATCH v2 6/6] ARM: S5PV210: Update Kconfig and Makefile for supporting
+> CPUFREQ driver
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
