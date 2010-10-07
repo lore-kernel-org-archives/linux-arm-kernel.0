@@ -1,30 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 7 Oct 2010 20:07:00 +0100
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 7 Oct 2010 14:16:49 -0500
 Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
-In-Reply-To: <201010071601.04597.laurent.pinchart@ideasonboard.com>
-References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
-	<201010070940.14208.laurent.pinchart@ideasonboard.com>
-	<20101007083242.GB14554@n2100.arm.linux.org.uk>
-	<201010071601.04597.laurent.pinchart@ideasonboard.com>
-Message-ID: <20101007190700.GB26435@n2100.arm.linux.org.uk>
+In-Reply-To: <AANLkTim8H0ibSucP3Nq=q19t0QY0pvijim1kOZSbygY1@mail.gmail.com>
+References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>	<201010070940.14208.laurent.pinchart@ideasonboard.com>	<4CADFCEB.4030008@ti.com>
+	<AANLkTim8H0ibSucP3Nq=q19t0QY0pvijim1kOZSbygY1@mail.gmail.com>
+Message-ID: <4CAE1CA1.4050006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 07, 2010 at 04:01:02PM +0200, Laurent Pinchart wrote:
-> Do we have an infrastructure, or even an embryo thereof, to remove pages from 
-> the kernel's direct-mapped memory mapping at runtime ? The use of super pages 
-> probably complicates the matter.
+On 10/7/2010 1:22 PM, Felipe Contreras wrote:
+...
+>
+> Note that the "shared memory" described in the document you share has
+> nothing to do with the SHM pool. AFAIK that memory is used for other
+> things, like MMU PTEs, and storing the base image and socket-nodes,
+> thus it needs to be contiguous.
 
-No, and yes, using section mappings/supersection mappings further
-complicates the issue because these are duplicated across all
-processes in the system.
+hmmm, no. it is the same memory. i.e.: we propagate the current opp 
+through the shared memory so the dsp can read it if it went to sleep, 
+with the proper offset you can read that variable starting from the 
+mempool base address.
 
-Even if you did walk all processes in the system, if your system is SMP
-without h/w TLB broadcasting, you'd need to IPI the other CPUs and wait
-for the IPI to complete - which you can not do if you're trying to
-allocate non-cacheable memory from IRQ context.
+"storing the base image and socket-nodes" symbols is also donde in the 
+shared memory but this is done in different sections of the SHM.
 
-We _could_ reduce TASK_SIZE to be slightly below 2GB, which then means
-we can split the page tables in hardware, but I don't think its safe to
-assume that the kernel will always use the init_mm page table to lookup
-the >2GB page table entries.
+>
+> Right now allocating contiguous memory can only be done with memblock
+> (bootmem), but in the future it could be done with CMA/VCMM. But the
+> cacheability is a separate issue.
+
+yes
+
+>
+> I don't see any problem flushing the SHM area when needed, which
+> probably has performance implications when mmaping/unmapping buffers,
+> at which point you need to flush bigger memory areas anyway, so that's
+> not an issue.
+
+well, you would have to flush when loading the base image, or allocating 
+a socket node, but also minor flushes for opp propagation, SHM messages 
+to DSP, chnl params, those are the ones I can quickly think of.
+
+>
+> Anyway, we will not know for sure until we try... Right?
+
+yes we can try, at least we now for sure arm side can be done.
+
+Regards,
+
+omar
