@@ -1,64 +1,90 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 7 Oct 2010 20:00:31 +0200
-Subject: [PATCH v2] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <1286454549-19690-1-git-send-email-felipe.contreras@gmail.com>
-References: <20101007115156.GE27250@jasper.tkos.co.il>
-	<1286454549-19690-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <20101007180031.GT29673@pengutronix.de>
+Date: Thu, 7 Oct 2010 20:21:37 +0200
+Subject: [PATCH] i.MX35: Add mx35_revision function to query the
+	silicon revision
+In-Reply-To: <20101007091413.GD28242@pengutronix.de>
+References: <20101007091413.GD28242@pengutronix.de>
+Message-ID: <20101007182137.GU29673@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hallo Sascha,
 
-On Thu, Oct 07, 2010 at 03:29:09PM +0300, Felipe Contreras wrote:
-> Many drivers are broken, and there's no alternative in sight. Such a big
-> change should stay as a warning for now, and only later should it
-> actually fail.
-> 
-> The drivers are not doing something correct, we get it, but for now it's
-> better to allow them to work (they do 99% of the time anyway) rather
-> than to force everyone to revert this patch in their internal trees
-> until there's a solution. A slightly broken functionality is better than
-> no functionality at all.
-> 
-> A warning lets people know that what they are doing is not right, and
-> they should fix it.
-> 
-> Cc: Han Jonghun <jonghun79.han@gmail.com>
-> Cc: Hemant Pedanekar <hemantp@ti.com>
-> Cc: Arnd Hannemann <arnd@arndnet.de>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Cc: Omar Ramirez Luna <omar.ramirez@ti.com>
-> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
-> ---
->  arch/arm/mm/ioremap.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
-> 
-> For issues related to this:
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
-> http://article.gmane.org/gmane.linux.ports.sh.devel/8560
-> http://www.spinics.net/lists/linux-fbdev/msg01745.html
-> http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/22271
-> 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index ab50627..a168673 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -202,10 +202,9 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->  		return NULL;
->  
->  	/*
-> -	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-> +	 * This causes problems with ARMv6+. Will be disallowed soon.
-maybe specify soon as "before 2.6.37"?
-
-Other than that, Acked-by: Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de>
-because there is no other solution to make it into the kernel before
-.36.
+I put you patch in my (still private) tree and suggest the following on
+top of the two.  If you're OK I'd squash the hunks into the respective
+patches and send them to you.
 
 Best regards
 Uwe
+
+diff --git a/arch/arm/mach-mx3/cpu.c b/arch/arm/mach-mx3/cpu.c
+index 161dfff..2872863 100644
+--- a/arch/arm/mach-mx3/cpu.c
++++ b/arch/arm/mach-mx3/cpu.c
+@@ -73,11 +73,11 @@ void __init mx35_read_cpu_rev(void)
+ 	rev = readl(rom + MX35_ROM_SI_REV);
+ 	switch (rev) {
+ 	case 0x1:
+-		mx35_cpu_rev = MX35_CHIP_REV_1_0;
++		mx35_cpu_rev = MX3x_CHIP_REV_1_0;
+ 		srev = "1.0";
+ 		break;
+ 	case 0x2:
+-		mx35_cpu_rev = MX35_CHIP_REV_2_0;
++		mx35_cpu_rev = MX3x_CHIP_REV_2_0;
+ 		srev = "2.0";
+ 		break;
+ 	}
+@@ -86,4 +86,3 @@ void __init mx35_read_cpu_rev(void)
+ 
+ 	iounmap(rom);
+ }
+-
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+index 95f35c8..02d9890 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+@@ -50,8 +50,8 @@ struct imx_imx_sdma_data imx31_imx_sdma_data __initdata =
+ #endif /* ifdef CONFIG_ARCH_MX31 */
+ 
+ #ifdef CONFIG_ARCH_MX35
+-const struct imx_imx_sdma_data imx35_imx_sdma_data __initconst =
+-	imx_imx_sdma_data_entry_single(MX35, 2, "imx35", 2);
++struct imx_imx_sdma_data imx35_imx_sdma_data __initdata =
++	imx_imx_sdma_data_entry_single(MX35, 2, "imx35", 0);
+ #endif /* ifdef CONFIG_ARCH_MX35 */
+ 
+ #ifdef CONFIG_ARCH_MX51
+@@ -108,9 +108,10 @@ static int __init imxXX_add_imx_dma(void)
+ #endif
+ 
+ #if defined(CONFIG_ARCH_MX35)
+-	if (cpu_is_mx35())
++	if (cpu_is_mx35()) {
++		imx35_imx_sdma_data.pdata.to_version = mx35_revision() >> 4;
+ 		ret = imx_add_imx_sdma(&imx35_imx_sdma_data);
+-	else
++	} else
+ #endif
+ 
+ #if defined(CONFIG_ARCH_MX51)
+diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
+index f740455..b651ee4 100644
+--- a/arch/arm/plat-mxc/include/mach/mx35.h
++++ b/arch/arm/plat-mxc/include/mach/mx35.h
+@@ -188,11 +188,7 @@
+ 
+ #define MX35_PROD_SIGNATURE		0x1	/* For MX31 */
+ 
+-/* silicon revisions specific to i.MX35 */
+-#define MX35_CHIP_REV_1_0		0x1
+-#define MX35_CHIP_REV_2_0		0x2
+-
+-#define MX35_SYSTEM_REV_MIN		MX35_CHIP_REV_1_0
++#define MX35_SYSTEM_REV_MIN		MX3x_CHIP_REV_1_0
+ #define MX35_SYSTEM_REV_NUM		3
+ 
+ #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
