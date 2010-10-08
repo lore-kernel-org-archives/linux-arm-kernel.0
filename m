@@ -1,106 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Oct 2010 14:49:53 -0700
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <alpine.LFD.2.00.1010081654190.3107@xanadu.home>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<20101007212707.GI7558@atomide.com>
-	<alpine.LFD.2.00.1010072121530.3107@xanadu.home>
-	<20101008203221.GM7558@atomide.com>
-	<alpine.LFD.2.00.1010081654190.3107@xanadu.home>
-Message-ID: <20101008214953.GR7558@atomide.com>
+Date: Fri, 8 Oct 2010 15:17:46 -0700
+Subject: [PATCH v5 0/3] OMAP2/3: DMA: FIFO drain errata fixes
+In-Reply-To: <20101005181525.GL3117@atomide.com>
+References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
+	<20101005181525.GL3117@atomide.com>
+Message-ID: <20101008221746.GS7558@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [101008 14:16]:
-> On Fri, 8 Oct 2010, Tony Lindgren wrote:
-> 
-> > * Nicolas Pitre <nico@fluxnic.net> [101007 18:16]:
-> > > On Thu, 7 Oct 2010, Tony Lindgren wrote:
-> > > > 
-> > > > Can you please pass the read and write functions to the driver
-> > > > in platform_data? We are already booting kernels with both
-> > > > ARMv6 and 7 compiled in.
-> > > 
-> > > No.  This has nothing to do with platform as this can be determined 
-> > > within the driver itself.  Would be much better to simply determine 
-> > > which flavor to use at driver init time and assign two function pointers.
+* Tony Lindgren <tony@atomide.com> [101005 11:07]:
+> * Peter Ujfalusi <peter.ujfalusi@nokia.com> [101004 23:37]:
+> > Hello,
 > > 
-> > In the long run some platform init code is needed for powering
-> > up the JTAG interface and take care of pin multiplexing etc.
-> 
-> Really?  That would be really strange and rather different from all the 
-> JTAG setups I've seen where the power-up of the interface is done 
-> externally i.e. controlled by the JTAG dongle.
-
-Well on omaps JTAG is powered by the EMU powerdomain. The docs say
-it's software controllable or "automatically on JTAG plug detection".
-So yeah JTAG power may be automatic.
-
-But the pin selection is board specific. Some boards may need to use
-the JTAG pins for GPIO etc.
- 
-> > Also, isn't DCC (Debug Communications Channel) a JTAG standard?
-> 
-> No.
-> 
-> > At least the following does not say anything about DCC being ARM 
-> > specific:
+> > This v5 series is based on the v3.
+> > The first two patch is the actual fix for the original problems without any
+> > major change in the code (only handling the corresponding erratas in the legacy
+> > way).
+> > The third patch in the series is optional, and it is implementing (in one patch)
+> > the errata handling via flags. This patch converts all errata cases to use the
+> > introduced dma_errata variable via macros.
 > > 
-> > http://en.wikipedia.org/wiki/Joint_Test_Action_Group
+> > Tony: the first two patch need to go for 2.6.36, and if it is possible it shall
+> > be backported to .33, .34, and .35 as well.
 > 
-> So called DCC may be part of an extension built on top of JTAG which is 
-> not "standardized".  Each vendor implements their own extensions, which 
-> may or may not include something that can be described as DCC.  The JTAG 
-> standard concerns itself with only the basic stuff in the full stack.  
-> You may have a look at OpenOCD to see how wildly different the debugging 
-> interfaces implemented on top of JTAG are.
-> 
-> Furthermore, the DCC access from within the target are implementation 
-> specific.  In this case, it is a particular ARM coprocessor access, 
-> which as the patch shows is not even the same across all ARM versions.  
-> And that's valid only for those ARM flavors that implement the 
-> EmbeddedICE or CoreSight.  On XScale, the debug facility built on top of 
-> the JTAG interface is completely different from the ARM Ltd one, relying 
-> mostly on software support injected in a special i-cache.  In that case, 
-> the notion of a DCC would be implemented in software instead of relying 
-> on a specific hardware register, multiplexed with other messages sent 
-> over the JTAG interface.
+> OK, I'll the first two into omap-fixes.
 
-Thanks for the info. Hmm, there seems to a section for XScale
-in arch/arm/kernel/debug.S for elif defined(CONFIG_CPU_XSCALE) for
-CONFIG_DEBUG_ICEDCC:
+Guys, as we're so late into getting 2.6.36 tagged, I'm thinking about just
+queueing these for 2.6.37 for the following reasons:
 
-#elif defined(CONFIG_CPU_XSCALE)
+- The 24xx patch is a fix for commit c12abc0 that's was merged over a
+  year ago. We've lived with it for over a year now. What difference does
+  extra few more months make if we have it in 2.6.37 instead of 2.6.36?
 
-		.macro	addruart, rx, tmp
-		.endm
+- The second 34xx fix seems to happen only when disabling DMA on the fly.
+  Again, we've had support for 34xx in the mainline kernel for a few
+  years, and we're not seeing unrecoverable issues with MMC or USB or
+  any other code calling omap_dma_stop().
 
-		.macro	senduart, rd, rx
-		mcr	p14, 0, \rd, c8, c0, 0
-		.endm
+Sure these fix major issues with the DMA, but are these really critical
+for 2.6.36?
 
-		.macro	busyuart, rd, rx
-1001:
-		mrc	p14, 0, \rx, c14, c0, 0
-		tst	\rx, #0x10000000
-		beq	1001b
-		.endm
+So if you really want me to argue for merging these into 2.6.36, please let
+me know some oops causing cases or data corruption that happens without
+these patches.
 
-		.macro	waituart, rd, rx
-		mov	\rd, #0x10000000
-1001:
-		subs	\rd, \rd, #1
-		bmi	1002f
-		mrc	p14, 0, \rx, c14, c0, 0
-		tst	\rx, #0x10000000
-		bne	1001b
-1002:
-		.endm
-
-#else
-
-Is that broken for XScale then?
-
-Regards,
+Cheers,
 
 Tony
