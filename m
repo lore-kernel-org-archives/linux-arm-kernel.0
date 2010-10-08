@@ -1,53 +1,190 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 08 Oct 2010 10:50:32 +0200
-Subject: [PATCH v4 0/4] Add support for camera capture in s5p-fimc driver
-Message-ID: <1286527837-4980-1-git-send-email-s.nawrocki@samsung.com>
+Date: Fri, 08 Oct 2010 10:50:35 +0200
+Subject: [PATCH 3/5 v4] V4L/DVB: s5p-fimc: Fix 90/270 deg rotation errors
+In-Reply-To: <1286527837-4980-1-git-send-email-s.nawrocki@samsung.com>
+References: <1286527837-4980-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1286527837-4980-4-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Due to errorneous swapping of image dimensions the rotation
+control was not handled properly in subsequent calls.
 
-here is a fourth version of patches adding camera capture capability
-to the s5p-fimc driver. It contains minor changes to adhere to patch
-submitting rules. 
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/media/video/s5p-fimc/fimc-core.c |   15 ++---
+ drivers/media/video/s5p-fimc/fimc-reg.c  |  101 +++++++++++++++---------------
+ 2 files changed, 57 insertions(+), 59 deletions(-)
 
-Changes since v1:
-- entirely removed plat-samsung/include/plat/fimc.h header so there is no
-  platform code dependency
-- improved s/try_fmt ioctl and introduced common ioctl handlers for mem2mem 
-  and capture node where it's reasonable
-- register definition changes merged with previous commit   
-  [3/8] v4l: s5p-fimc: Register definition cleanup
-
-Changes since v2:
-- improved s/g/crop(cap) handling in capture node
-- added passing of v4l controls to the sensor subdevice
-
-Changes since v3:
-- changed summary of patch [4/4] to adhere to patch submitting guidelines
-- patch "V4L/DVB: s5p-fimc: M2M driver cleanup.." split to 2 separate
-  commits - 2/5 and 3/5 in this series
-
-The patch series contains:
-
-[PATCH 1/5] V4L/DVB: s5p-fimc: Register definition cleanup
-[PATCH 2/5] V4L/DVB: s5p-fimc: mem2mem driver refactoring and cleanup
-[PATCH 3/5] V4L/DVB: s5p-fimc: Fix 90/270 deg rotation errors
-[PATCH 4/5] V4L/DVB: s5p-fimc: Do not lock both capture and output buffer queue in s_fmt
-[PATCH 5/5] V4L/DVB: s5p-fimc: Add camera capture support
-
-It has been rebased onto linuxtv/staging-2.6.37 branch at
-git://linuxtv.org/media_tree.git with 2 bugfix patches:
-
-v4l: s5p-fimc: Fix 3-planar formats handling and pixel offset error on S5PV210 SoCs
-v4l: s5p-fimc: Fix return value on probe() failure
-
-also applied.
-
-Regards,
-Sylwester
-
---
-Sylwester Nawrocki
-Linux Platform Group
-Samsung Poland R&D Center
+diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
+index fccab13..27379a6 100644
+--- a/drivers/media/video/s5p-fimc/fimc-core.c
++++ b/drivers/media/video/s5p-fimc/fimc-core.c
+@@ -207,8 +207,13 @@ static int fimc_set_scaler_info(struct fimc_ctx *ctx)
+ 	int tx, ty, sx, sy;
+ 	int ret;
+ 
+-	tx = d_frame->width;
+-	ty = d_frame->height;
++	if (ctx->rotation == 90 || ctx->rotation == 270) {
++		ty = d_frame->width;
++		tx = d_frame->height;
++	} else {
++		tx = d_frame->width;
++		ty = d_frame->height;
++	}
+ 	if (tx <= 0 || ty <= 0) {
+ 		v4l2_err(&ctx->fimc_dev->m2m.v4l2_dev,
+ 			"invalid target size: %d x %d", tx, ty);
+@@ -429,12 +434,6 @@ static int fimc_prepare_config(struct fimc_ctx *ctx, u32 flags)
+ 	d_frame = &ctx->d_frame;
+ 
+ 	if (flags & FIMC_PARAMS) {
+-		if ((ctx->out_path == FIMC_DMA) &&
+-			(ctx->rotation == 90 || ctx->rotation == 270)) {
+-			swap(d_frame->f_width, d_frame->f_height);
+-			swap(d_frame->width, d_frame->height);
+-		}
+-
+ 		/* Prepare the DMA offset ratios for scaler. */
+ 		fimc_prepare_dma_offset(ctx, &ctx->s_frame);
+ 		fimc_prepare_dma_offset(ctx, &ctx->d_frame);
+diff --git a/drivers/media/video/s5p-fimc/fimc-reg.c b/drivers/media/video/s5p-fimc/fimc-reg.c
+index 94e98d4..95adc84 100644
+--- a/drivers/media/video/s5p-fimc/fimc-reg.c
++++ b/drivers/media/video/s5p-fimc/fimc-reg.c
+@@ -34,44 +34,6 @@ void fimc_hw_reset(struct fimc_dev *dev)
+ 	cfg = readl(dev->regs + S5P_CIGCTRL);
+ 	cfg &= ~S5P_CIGCTRL_SWRST;
+ 	writel(cfg, dev->regs + S5P_CIGCTRL);
+-
+-}
+-
+-void fimc_hw_set_rotation(struct fimc_ctx *ctx)
+-{
+-	u32 cfg, flip;
+-	struct fimc_dev *dev = ctx->fimc_dev;
+-
+-	cfg = readl(dev->regs + S5P_CITRGFMT);
+-	cfg &= ~(S5P_CITRGFMT_INROT90 | S5P_CITRGFMT_OUTROT90);
+-
+-	flip = readl(dev->regs + S5P_MSCTRL);
+-	flip &= ~S5P_MSCTRL_FLIP_MASK;
+-
+-	/*
+-	 * The input and output rotator cannot work simultaneously.
+-	 * Use the output rotator in output DMA mode or the input rotator
+-	 * in direct fifo output mode.
+-	 */
+-	if (ctx->rotation == 90 || ctx->rotation == 270) {
+-		if (ctx->out_path == FIMC_LCDFIFO) {
+-			cfg |= S5P_CITRGFMT_INROT90;
+-			if (ctx->rotation == 270)
+-				flip |= S5P_MSCTRL_FLIP_180;
+-		} else {
+-			cfg |= S5P_CITRGFMT_OUTROT90;
+-			if (ctx->rotation == 270)
+-				cfg |= S5P_CITRGFMT_FLIP_180;
+-		}
+-	} else if (ctx->rotation == 180) {
+-		if (ctx->out_path == FIMC_LCDFIFO)
+-			flip |= S5P_MSCTRL_FLIP_180;
+-		else
+-			cfg |= S5P_CITRGFMT_FLIP_180;
+-	}
+-	if (ctx->rotation == 180 || ctx->rotation == 270)
+-		writel(flip, dev->regs + S5P_MSCTRL);
+-	writel(cfg, dev->regs + S5P_CITRGFMT);
+ }
+ 
+ static u32 fimc_hw_get_in_flip(u32 ctx_flip)
+@@ -114,6 +76,46 @@ static u32 fimc_hw_get_target_flip(u32 ctx_flip)
+ 	return flip;
+ }
+ 
++void fimc_hw_set_rotation(struct fimc_ctx *ctx)
++{
++	u32 cfg, flip;
++	struct fimc_dev *dev = ctx->fimc_dev;
++
++	cfg = readl(dev->regs + S5P_CITRGFMT);
++	cfg &= ~(S5P_CITRGFMT_INROT90 | S5P_CITRGFMT_OUTROT90 |
++		  S5P_CITRGFMT_FLIP_180);
++
++	flip = readl(dev->regs + S5P_MSCTRL);
++	flip &= ~S5P_MSCTRL_FLIP_MASK;
++
++	/*
++	 * The input and output rotator cannot work simultaneously.
++	 * Use the output rotator in output DMA mode or the input rotator
++	 * in direct fifo output mode.
++	 */
++	if (ctx->rotation == 90 || ctx->rotation == 270) {
++		if (ctx->out_path == FIMC_LCDFIFO) {
++			cfg |= S5P_CITRGFMT_INROT90;
++			if (ctx->rotation == 270)
++				flip |= S5P_MSCTRL_FLIP_180;
++		} else {
++			cfg |= S5P_CITRGFMT_OUTROT90;
++			if (ctx->rotation == 270)
++				cfg |= S5P_CITRGFMT_FLIP_180;
++		}
++	} else if (ctx->rotation == 180) {
++		if (ctx->out_path == FIMC_LCDFIFO)
++			flip |= S5P_MSCTRL_FLIP_180;
++		else
++			cfg |= S5P_CITRGFMT_FLIP_180;
++	}
++	if (ctx->rotation == 180 || ctx->rotation == 270)
++		writel(flip, dev->regs + S5P_MSCTRL);
++
++	cfg |= fimc_hw_get_target_flip(ctx->flip);
++	writel(cfg, dev->regs + S5P_CITRGFMT);
++}
++
+ void fimc_hw_set_target_format(struct fimc_ctx *ctx)
+ {
+ 	u32 cfg;
+@@ -149,13 +151,15 @@ void fimc_hw_set_target_format(struct fimc_ctx *ctx)
+ 		break;
+ 	}
+ 
+-	cfg |= S5P_CITRGFMT_HSIZE(frame->width);
+-	cfg |= S5P_CITRGFMT_VSIZE(frame->height);
++	if (ctx->rotation == 90 || ctx->rotation == 270) {
++		cfg |= S5P_CITRGFMT_HSIZE(frame->height);
++		cfg |= S5P_CITRGFMT_VSIZE(frame->width);
++	} else {
+ 
+-	if (ctx->rotation == 0) {
+-		cfg &= ~S5P_CITRGFMT_FLIP_MASK;
+-		cfg |= fimc_hw_get_target_flip(ctx->flip);
++		cfg |= S5P_CITRGFMT_HSIZE(frame->width);
++		cfg |= S5P_CITRGFMT_VSIZE(frame->height);
+ 	}
++
+ 	writel(cfg, dev->regs + S5P_CITRGFMT);
+ 
+ 	cfg = readl(dev->regs + S5P_CITAREA) & ~S5P_CITAREA_MASK;
+@@ -167,15 +171,10 @@ static void fimc_hw_set_out_dma_size(struct fimc_ctx *ctx)
+ {
+ 	struct fimc_dev *dev = ctx->fimc_dev;
+ 	struct fimc_frame *frame = &ctx->d_frame;
+-	u32 cfg = 0;
++	u32 cfg;
+ 
+-	if (ctx->rotation == 90 || ctx->rotation == 270) {
+-		cfg |= S5P_ORIG_SIZE_HOR(frame->f_height);
+-		cfg |= S5P_ORIG_SIZE_VER(frame->f_width);
+-	} else {
+-		cfg |= S5P_ORIG_SIZE_HOR(frame->f_width);
+-		cfg |= S5P_ORIG_SIZE_VER(frame->f_height);
+-	}
++	cfg = S5P_ORIG_SIZE_HOR(frame->f_width);
++	cfg |= S5P_ORIG_SIZE_VER(frame->f_height);
+ 	writel(cfg, dev->regs + S5P_ORGOSIZE);
+ }
+ 
+-- 
+1.7.3.1
