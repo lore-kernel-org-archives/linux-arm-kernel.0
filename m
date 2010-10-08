@@ -1,26 +1,41 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 8 Oct 2010 11:20:24 +0300
-Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
-In-Reply-To: <4CAE1CA1.4050006@ti.com>
-References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>
-	<201010070940.14208.laurent.pinchart@ideasonboard.com>
-	<4CADFCEB.4030008@ti.com>
-	<AANLkTim8H0ibSucP3Nq=q19t0QY0pvijim1kOZSbygY1@mail.gmail.com>
-	<4CAE1CA1.4050006@ti.com>
-Message-ID: <AANLkTikHMewD94ZBb9P4AF9oM2ZfnpA-yjO67Dx2Lg9r@mail.gmail.com>
+From: s.neumann@raumfeld.com (Sven Neumann)
+Date: Fri, 08 Oct 2010 10:23:17 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <201010072323.05218.rjw@sisk.pl>
+References: <1286177435.2140.5.camel@sven> <201010070218.41944.rjw@sisk.pl>
+	<1286463808.797.10.camel@bender>  <201010072323.05218.rjw@sisk.pl>
+Message-ID: <1286526197.4493.19.camel@sven>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 7, 2010 at 10:16 PM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
-> On 10/7/2010 1:22 PM, Felipe Contreras wrote:
->> Anyway, we will not know for sure until we try... Right?
->
-> yes we can try, at least we now for sure arm side can be done.
+On Thu, 2010-10-07 at 23:23 +0200, Rafael J. Wysocki wrote:
 
-The only thing that changes is the cacheability of the ARM side
-memory, so of course only the ARM side matters. The DSP side will
-continue to do what it's doing and would not notice any difference if
-the memory is flushed, or is non-cacheable.
+> > > I wonder what happens if you echo 0 to /sys/power/pm_async ?
+> > 
+> > Nothing happens. The problem persists (tested with 2.6.36-rc7). What
+> > would you expect to happen?
+> 
+> Exactly that. :-)
+> 
+> Commit 152e1d5920 should not affect the non-async case (I'd be surprised if
+> it did really) and things should work with /sys/power/pm_async = 0 anyway.
+> 
+> Please try check if you can reproduce with commt 152e1d5920 reverted and
+> /sys/power/pm_async = 0.  If you can, that's a driver bug.
 
--- 
-Felipe Contreras
+Ok, for the record, here's what I tried. I have rebooted between tests
+to make sure there's no state pulled in from the previous test:
+
+ 2.6.36-rc7, no changes,      pm_async 1 :  suspend fails
+ 2.6.36-rc7, no changes,      pm_async 0 :  suspend fails
+
+ 2.6.36-rc7, 152e1d reverted, pm_async 1 :  suspend works
+ 2.6.36-rc7, 152e1d reverted, pm_async 0 :  suspend fails
+
+ 2.6.34.7, no changes,        pm_async 1 :  suspend works
+ 2.6.34.7, no changes,        pm_async 0 :  suspend works
+
+I am not sure how this should be interpreted.
+
+
+Sven
