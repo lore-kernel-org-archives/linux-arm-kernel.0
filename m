@@ -1,50 +1,144 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Fri, 8 Oct 2010 11:54:56 +0200
-Subject: [PATCH] ARM: iomux-mx51: Add AUD5 pinmux definitions
-In-Reply-To: <1286530791-23105-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1286530791-23105-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <19630.60016.791128.856262@ipc1.ka-ro>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 08 Oct 2010 18:57:52 +0900
+Subject: [PATCH 2/10] ARM: S5PC100: Modify SCLK_AUDIO{0,1,2} clock as
+	sysclks
+In-Reply-To: <1286192356-17997-1-git-send-email-sw.youn@samsung.com>
+References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
+	<1286192356-17997-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <001801cb66cf$50855590$f19000b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig writes:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
+Seungwhan Youn wrote:
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> This patch modify SCLK_AUDIO{0,1,2} to be initial as sysclks
+> on boot-time.
+> 
+> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
 > ---
->  arch/arm/plat-mxc/include/mach/iomux-mx51.h |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s5pc100/clock.c |   72
+++++++++++++++++++++++-------------------
+>  1 files changed, 39 insertions(+), 33 deletions(-)
 > 
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> index 633650d..0d89854 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> @@ -334,11 +334,17 @@ typedef enum iomux_config {
->  #define MX51_PAD_DISP2_DAT14__DISP2_DAT14       IOMUX_PAD(0x794, 0x38C, 0, 0x0,   0, NO_PAD_CTRL)
->  #define MX51_PAD_DISP2_DAT15__DISP2_DAT15       IOMUX_PAD(0x798, 0x390, 0, 0x0,   0, NO_PAD_CTRL)
->  #define MX51_PAD_SD1_CMD__SD1_CMD               IOMUX_PAD(0x79C, 0x394, 0, 0x0,   0, NO_PAD_CTRL)
-> +#define MX51_PAD_SD1_CMD__AUD5_RXFS             IOMUX_PAD(0x79C, 0x394, 1, 0x8e0, 1, NO_PAD_CTRL)
->  #define MX51_PAD_SD1_CLK__SD1_CLK               IOMUX_PAD(0x7A0, 0x398, 0, 0x0,   0, NO_PAD_CTRL)
-> +#define MX51_PAD_SD1_CLK__AUD5_RXC              IOMUX_PAD(0x7A0, 0x398, 1, 0x8dc, 1, NO_PAD_CTRL)
->  #define MX51_PAD_SD1_DATA0__SD1_DATA0           IOMUX_PAD(0x7A4, 0x39C, 0, 0x0,   0, NO_PAD_CTRL)
-> +#define MX51_PAD_SD1_DATA0__AUD5_TXD            IOMUX_PAD(0x7A4, 0x39C, 1, 0x8d8, 1, NO_PAD_CTRL)
-                                                                                     ^
-The input mux setting should be '2' here:
-| Instance: audmux, In Pin: p5_input_db_amx
-|00: Selecting Pad: EIM_D16 for Mode: ALT7.
-|01: Selecting Pad: EIM_CS2 for Mode: ALT6.
-|10: Selecting Pad: SD1_DATA0 for Mode: ALT1.
+> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+> index 084abd1..42b7138 100644
+> --- a/arch/arm/mach-s5pc100/clock.c
+> +++ b/arch/arm/mach-s5pc100/clock.c
+> @@ -848,6 +848,18 @@ struct clksrc_sources clk_src_group3 = {
+>  	.nr_sources	= ARRAY_SIZE(clk_src_group3_list),
+>  };
+> 
+> +static struct clksrc_clk clk_sclk_audio0 = {
+> +	.clk	= {
+> +		.name		= "sclk_audio",
+> +		.id		= 0,
+> +		.ctrlbit	= (1 << 8),
+> +		.enable		= s5pc100_sclk1_ctrl,
+> +	},
+> +	.sources = &clk_src_group3,
+> +	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 3 },
+> +	.reg_div = { .reg = S5P_CLK_DIV4, .shift = 12, .size = 4 },
+> +};
+> +
+>  static struct clk *clk_src_group4_list[] = {
+>  	[0] = &clk_mout_epll.clk,
+>  	[1] = &clk_div_mpll.clk,
+> @@ -862,6 +874,18 @@ struct clksrc_sources clk_src_group4 = {
+>  	.nr_sources	= ARRAY_SIZE(clk_src_group4_list),
+>  };
+> 
+> +static struct clksrc_clk clk_sclk_audio1 = {
+> +	.clk	= {
+> +		.name		= "sclk_audio",
+> +		.id		= 1,
+> +		.ctrlbit	= (1 << 9),
+> +		.enable		= s5pc100_sclk1_ctrl,
+> +	},
+> +	.sources = &clk_src_group4,
+> +	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 3 },
+> +	.reg_div = { .reg = S5P_CLK_DIV4, .shift = 16, .size = 4 },
+> +};
+> +
+>  static struct clk *clk_src_group5_list[] = {
+>  	[0] = &clk_mout_epll.clk,
+>  	[1] = &clk_div_mpll.clk,
+> @@ -875,6 +899,18 @@ struct clksrc_sources clk_src_group5 = {
+>  	.nr_sources	= ARRAY_SIZE(clk_src_group5_list),
+>  };
+> 
+> +static struct clksrc_clk clk_sclk_audio2 = {
+> +	.clk	= {
+> +		.name		= "sclk_audio",
+> +		.id		= 2,
+> +		.ctrlbit	= (1 << 10),
+> +		.enable		= s5pc100_sclk1_ctrl,
+> +	},
+> +	.sources = &clk_src_group5,
+> +	.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 3 },
+> +	.reg_div = { .reg = S5P_CLK_DIV4, .shift = 20, .size = 4 },
+> +};
+> +
+>  static struct clk *clk_src_group6_list[] = {
+>  	[0] = &s5p_clk_27m,
+>  	[1] = &clk_vclk54m,
+> @@ -1001,39 +1037,6 @@ static struct clksrc_clk clksrcs[] = {
+>  		.reg_src = { .reg = S5P_CLK_SRC2, .shift = 28, .size = 2 },
+>  	}, {
+>  		.clk	= {
+> -			.name		= "sclk_audio",
+> -			.id		= 0,
+> -			.ctrlbit	= (1 << 8),
+> -			.enable		= s5pc100_sclk1_ctrl,
+> -
+> -		},
+> -		.sources = &clk_src_group3,
+> -		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 12, .size = 3 },
+> -		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 12, .size = 4 },
+> -	}, {
+> -		.clk	= {
+> -			.name		= "sclk_audio",
+> -			.id		= 1,
+> -			.ctrlbit	= (1 << 9),
+> -			.enable		= s5pc100_sclk1_ctrl,
+> -
+> -		},
+> -		.sources = &clk_src_group4,
+> -		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 16, .size = 3 },
+> -		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 16, .size = 4 },
+> -	}, {
+> -		.clk	= {
+> -			.name		= "sclk_audio",
+> -			.id		= 2,
+> -			.ctrlbit	= (1 << 10),
+> -			.enable		= s5pc100_sclk1_ctrl,
+> -
+> -		},
+> -		.sources = &clk_src_group5,
+> -		.reg_src = { .reg = S5P_CLK_SRC3, .shift = 20, .size = 3 },
+> -		.reg_div = { .reg = S5P_CLK_DIV4, .shift = 20, .size = 4 },
+> -	}, {
+> -		.clk	= {
+>  			.name		= "sclk_lcd",
+>  			.id		= -1,
+>  			.ctrlbit	= (1 << 0),
+> @@ -1179,6 +1182,9 @@ static struct clksrc_clk *sysclks[] = {
+>  	&clk_div_pclkd1,
+>  	&clk_div_cam,
+>  	&clk_div_hdmi,
+> +	&clk_sclk_audio0,
+> +	&clk_sclk_audio1,
+> +	&clk_sclk_audio2,
+>  };
+> 
+>  void __init_or_cpufreq s5pc100_setup_clocks(void)
+> --
 
+Ok...will apply.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Thanks.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
