@@ -1,66 +1,93 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 8 Oct 2010 11:16:40 +0200
-Subject: [PATCH] ARM: imx serial driver: fix resume
-In-Reply-To: <1286384236-4241-1-git-send-email-daniel@caiaq.de>
-References: <1286384236-4241-1-git-send-email-daniel@caiaq.de>
-Message-ID: <20101008091640.GD29673@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  8 Oct 2010 11:24:01 +0200
+Subject: [PATCH 7/6] spi/imx: Support different fifo sizes
+In-Reply-To: <20100902143908.GK14214@pengutronix.de>
+References: <20100902143908.GK14214@pengutronix.de>
+Message-ID: <1286529841-20800-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Daniel (and Volker),
+From: David Jander <david@protonic.nl>
 
-On Wed, Oct 06, 2010 at 06:57:16PM +0200, Daniel Mack wrote:
-> From: Volker Ernst <volker.ernst@txtr.com>
-> 
-> I just came across a bug in the IMX31 serial driver which is still
-> present in the newest kernels and which prevents successful
-> resume-operation for the IMX31 serial ports.
-> 
-> What happens is that in "drivers/serial/imx.c" on resume function
-> "serial_imx_resume" gets called. This function in turn calls
-> "uart_resume_port" (in the generic serial driver "serial_core.c"),
-> which in turn calls "imx_start_tx" in "imx.c" (in case the SIO-port
-> was really suspended) which in turn calls "imx_transmit_buffer".
-> 
-> However calling "imx_transmit_buffer" with an empty TX-fifo (as is
-> usually the case) will result in the serial port starting to transmit
-> (actually the old [already sent] tx-buffer), as there is no check if
-> the tx-buffer is empty before starting to feed tx-fifo-data to the
-> serial port hardware.
-> 
-> Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
-> Cc: Daniel Mack <daniel@caiaq.de>
-> Cc: Andy Green <andy@warmcat.com>
-> ---
-> 
-> Volker did all the work on this, he just doesn't want to push his great
-> contributions upstream, so I do it for him :)
-> 
-> 
->  drivers/serial/imx.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
-> index 66ecc7a..0170119 100644
-> --- a/drivers/serial/imx.c
-> +++ b/drivers/serial/imx.c
-> @@ -328,13 +328,13 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
->  	struct circ_buf *xmit = &sport->port.state->xmit;
->  
->  	while (!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
-> +		if (uart_circ_empty(xmit))
-> +			break;
-As readl is a hardware access and uart_circ_empty "only" needs RAM, I
-wonder if using
+The i.MX51 ECSPI has a fifo size of 64 entries instead of 8 entries as
+found on the other cspi bus devices.
 
-	while (!uart_circ_empty(xmit) &&
-		!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
+Cc: Jason Wang <jason77.wang@gmail.com>
+Signed-off-by: David Jander <david@protonic.nl>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-would be a tad smarter.
+this patch depends on patches already acked by Grant Likely and sitting
+in Sascha Hauer's imx-for-2.6.37 branch.
 
 Best regards
 Uwe
 
+ drivers/spi/spi_imx.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 6bab2cf..55a38e2 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -77,6 +77,7 @@ struct spi_imx_devtype_data {
+ 	void (*trigger)(struct spi_imx_data *);
+ 	int (*rx_available)(struct spi_imx_data *);
+ 	void (*reset)(struct spi_imx_data *);
++	unsigned int fifosize;
+ };
+ 
+ struct spi_imx_data {
+@@ -541,6 +542,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+ 		.trigger = mx1_trigger,
+ 		.rx_available = mx1_rx_available,
+ 		.reset = mx1_reset,
++		.fifosize = 8,
+ 	},
+ #endif
+ #ifdef CONFIG_SPI_IMX_VER_0_0
+@@ -550,6 +552,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+ 		.trigger = mx27_trigger,
+ 		.rx_available = mx27_rx_available,
+ 		.reset = spi_imx0_0_reset,
++		.fifosize = 8,
+ 	},
+ #endif
+ #ifdef CONFIG_SPI_IMX_VER_0_4
+@@ -559,6 +562,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+ 		.trigger = mx31_trigger,
+ 		.rx_available = mx31_rx_available,
+ 		.reset = spi_imx0_4_reset,
++		.fifosize = 8,
+ 	},
+ #endif
+ #ifdef CONFIG_SPI_IMX_VER_0_7
+@@ -568,6 +572,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+ 		.trigger = mx31_trigger,
+ 		.rx_available = mx31_rx_available,
+ 		.reset = spi_imx0_4_reset,
++		.fifosize = 8,
+ 	},
+ #endif
+ #ifdef CONFIG_SPI_IMX_VER_2_3
+@@ -577,6 +582,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+ 		.trigger = spi_imx2_3_trigger,
+ 		.rx_available = spi_imx2_3_rx_available,
+ 		.reset = spi_imx2_3_reset,
++		.fifosize = 64,
+ 	},
+ #endif
+ };
+@@ -596,7 +602,7 @@ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
+ 
+ static void spi_imx_push(struct spi_imx_data *spi_imx)
+ {
+-	while (spi_imx->txfifo < 8) {
++	while (spi_imx->txfifo < spi_imx->devtype_data.fifosize) {
+ 		if (!spi_imx->count)
+ 			break;
+ 		spi_imx->tx(spi_imx);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.3
