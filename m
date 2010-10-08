@@ -1,7 +1,7 @@
 From: moon9124@samsung.com (Daein Moon)
-Date: Fri, 08 Oct 2010 15:02:17 +0900
-Subject: No subject
-Message-ID: <000201cb66ae$5caa04e0$15fe0ea0$@com>
+Date: Fri, 08 Oct 2010 15:07:57 +0900
+Subject: missing definition of 's3c_gpio_getpull' function in 'plat-samsung'
+Message-ID: <000301cb66af$276b8960$76429c20$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
