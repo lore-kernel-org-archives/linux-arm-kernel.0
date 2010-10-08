@@ -1,215 +1,180 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 08 Oct 2010 09:36:40 -0400 (EDT)
-Subject: [PATCH v2] ARM: Introduce patching of phys_to_virt and vice versa
-In-Reply-To: <AANLkTimKt+y6sLi85dYJs2G3Uke3gzpWAJ9PCKO4R3-E@mail.gmail.com>
-References: <AANLkTimKt+y6sLi85dYJs2G3Uke3gzpWAJ9PCKO4R3-E@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1010080934220.3107@xanadu.home>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Fri, 8 Oct 2010 08:42:13 -0500
+Subject: [PATCHv6] ARM: imx: Add iram allocator functions
+Message-ID: <1286545333-30323-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Oct 2010, Eric Miao wrote:
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-> ** In this v2 version, the __volatile__ keyword of the patch stub assembly is
-> removed. That prevents gcc from doing a good optimization. The test build
-                  ^^^
+Add IRAM(Internal RAM) allocation functions using GENERIC_ALLOCATOR.
+The allocation size is 4KB multiples to guarantee alignment. The
+idea for these functions is for i.MX platforms to use them
+to dynamically allocate IRAM usage.
 
-You mean "prevented".
+Applies on 2.6.36-rc7
 
-> result showed an acceptable optimized code generation.
-> 
-> In most cases, the delta between PHYS_OFFSET and PAGE_OFFSET is normally
-> 16MiB aligned, which means the difference can be handled by a simple ADD
-> or SUB instruction with an immediate shift operand in ARM.  This will be
-> a bit more efficient and generic when PHYS_OFFSET goes run-time.
-> 
-> This idea can be made generic to allow conversions more than phys_to_virt
-> and virt_to_phys. A stub instruction is inserted where applicable, and it
-> has a form of 'add rn, rd, #imm', where the lowest 8-bit of #imm is used
-> to identify the type of patching.  Currently, only two types are defined,
-> but could be expanded in my POV to definitions like __io(), __mem_pci()
-> and so on. A __patch_table section is introduced to include the addresses
-> of all these stub instructions.
-> 
-> There are several places for improvement:
-> 
-> 1. constant parameters which can be optimized by the compiler now needs
->    one additional instruction (although the optimization is neither
->    possible when PHYS_OFFSET goes a variable)
-> 
-> 2. flush_cache_all() when patching done is brute but simple enough here,
->    provided it's done only once during startup.
-> 
-> 3. thumb2 can be supported in a same way, but will leave that for future
->    enhancement.
-> 
-> The general idea comes from Nicolas Pitre, and is drafted at
->     https://wiki.ubuntu.com/Specs/ARMSingleKernel
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@canonical.com>
-> Signed-off-by: Eric Miao <eric.miao@canonical.com>
-> ---
->  arch/arm/Kconfig              |   10 ++++++++
->  arch/arm/include/asm/memory.h |   32 ++++++++++++++++++++++++++
->  arch/arm/kernel/setup.c       |   50 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/vmlinux.lds.S |    4 +++
->  4 files changed, 96 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 553b7cf..5c856d9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -187,6 +187,16 @@ config VECTORS_BASE
->  	help
->  	  The base address of exception vectors.
-> 
-> +config ARM_PATCH_PHYS_VIRT
-> +	def_bool n
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Reviewed-by: Amit Kucheria <amit.kucheria@canonical.com>
+---
+ arch/arm/plat-mxc/Kconfig             |    4 ++
+ arch/arm/plat-mxc/Makefile            |    1 +
+ arch/arm/plat-mxc/include/mach/iram.h |   41 ++++++++++++++++++
+ arch/arm/plat-mxc/iram_alloc.c        |   73 +++++++++++++++++++++++++++++++++
+ 4 files changed, 119 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/iram.h
+ create mode 100644 arch/arm/plat-mxc/iram_alloc.c
 
-No need for this as the default is already n.
-
-> +	help
-> +	  Note this is only for non-XIP and non-Thumb2 kernels. And there
-> +	  is CPU support which needs to read data in order to writeback
-> +	  dirty entries in the cache. (e.g. StrongARM, ebsa110, footbridge,
-> +	  rpc, sa1100, and shark). The mappings in the above cases do not
-> +	  exist before paging_init() has completed. Thus this option does
-> +	  not support these CPUs at this moment.
-> +
->  source "init/Kconfig"
-> 
->  source "kernel/Kconfig.freezer"
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 23c2e8e..9cf6d3f 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -182,6 +182,37 @@
->   */
->  #define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
-> 
-> +#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
-> +
-> +#define PATCH_TYPE_PHYS_TO_VIRT		(0)
-> +#define PATCH_TYPE_VIRT_TO_PHYS		(1)
-> +
-> +#define __patch_stub(from,to,type)			\
-> +	__asm__(					\
-> +	"1:	add	%0, %1, %2\n"			\
-> +	"\n"						\
-> +	"	.pushsection __patch_table,\"a\"\n"	\
-> +	"	.long	1b\n"				\
-> +	"	.popsection\n"				\
-> +	: "=r" (to)					\
-> +	: "r" (from), "I" (type))
-> +
-> +static inline unsigned long virt_to_phys(void *x)
-> +{
-> +	unsigned long t;
-> +
-> +	__patch_stub(x, t, PATCH_TYPE_VIRT_TO_PHYS);
-> +	return t;
-> +}
-> +
-> +static inline void *phys_to_virt(unsigned long x)
-> +{
-> +	void *t;
-> +
-> +	__patch_stub(x, t, PATCH_TYPE_PHYS_TO_VIRT);
-> +	return t;
-> +}
-> +#else
->  /*
->   * These are *only* valid on the kernel direct mapped RAM memory.
->   * Note: Drivers should NOT use these.  They are the wrong
-> @@ -197,6 +228,7 @@ static inline void *phys_to_virt(unsigned long x)
->  {
->  	return (void *)(__phys_to_virt((unsigned long)(x)));
->  }
-> +#endif
-> 
->  /*
->   * Drivers should NOT use these either.
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index d5231ae..6d024ad 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -764,12 +764,62 @@ static void __init squash_mem_tags(struct tag *tag)
->  			tag->hdr.tag = ATAG_NONE;
->  }
-> 
-> +#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
-> +
-> +#define PATCH_INSTR_ADD		(0x00800000)
-> +#define PATCH_INSTR_SUB		(0x00400000)
-> +
-> +#define PATCH_STUB_MASK		(0xffe000ff)
-> +#define PATCH_STUB_PHYS_TO_VIRT	(0xe2800000 | PATCH_TYPE_PHYS_TO_VIRT)
-> +#define PATCH_STUB_VIRT_TO_PHYS	(0xe2800000 | PATCH_TYPE_VIRT_TO_PHYS)
-> +
-> +/* patch_phys_virt - patch the stub instructions with the delta between
-> + * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
-> + * can be expressed by an immediate shifter operand. The stub instruction
-> + * has a form of 'add rd, rn, #imm', where the lowest 8-bit of #imm is
-> + * used to identify the type of patching.
-> + */
-> +static void __init patch_phys_virt(void)
-> +{
-> +	extern unsigned int *__patch_table_begin, *__patch_table_end;
-> +	unsigned int **p;
-> +	unsigned int imm, instr[2];
-> +
-> +	if (PHYS_OFFSET & 0x00ffffff)
-> +		panic("Physical memory start is not 16MiB aligned\n");
-> +
-> +	if (likely(PHYS_OFFSET < PAGE_OFFSET)) {
-> +		imm = 0x400 | ((PAGE_OFFSET >> 24) - (PHYS_OFFSET >> 24));
-> +		instr[0] = PATCH_INSTR_ADD | imm;
-> +		instr[1] = PATCH_INSTR_SUB | imm;
-> +	} else {
-> +		imm = 0x400 | ((PHYS_OFFSET >> 24) - (PAGE_OFFSET >> 24));
-> +		instr[0] = PATCH_INSTR_SUB | imm;
-> +		instr[1] = PATCH_INSTR_ADD | imm;
-> +	}
-> +
-> +	for (p = &__patch_table_begin; p < &__patch_table_end; p++) {
-> +		unsigned int *inptr = *p;
-> +
-> +		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_PHYS_TO_VIRT)
-> +			*inptr = (*inptr & ~0x00e00fff) | instr[0];
-> +		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_VIRT_TO_PHYS)
-> +			*inptr = (*inptr & ~0x00e00fff) | instr[1];
-> +	}
-> +	flush_cache_all();
-> +}
-> +#else
-> +static inline void patch_phys_virt(void) {}
-> +#endif
-> +
->  void __init setup_arch(char **cmdline_p)
->  {
->  	struct tag *tags = (struct tag *)&init_tags;
->  	struct machine_desc *mdesc;
->  	char *from = default_command_line;
-> 
-> +	patch_phys_virt();
-> +
->  	unwind_init();
-> 
->  	setup_processor();
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index b16c079..c48c754 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -41,6 +41,10 @@ SECTIONS
->  			*(.taglist.init)
->  		__tagtable_end = .;
-> 
-> +		__patch_table_begin = .;
-> +			*(__patch_table)
-> +		__patch_table_end = .;
-> +
->  		INIT_SETUP(16)
-> 
->  		INIT_CALLS
-> -- 
-> 1.7.0.4
-> 
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index 6785db4..0e99bb4 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -110,4 +110,8 @@ config ARCH_MXC_AUDMUX_V1
+ config ARCH_MXC_AUDMUX_V2
+ 	bool
+ 
++config IRAM_ALLOC
++	bool
++	select GENERIC_ALLOCATOR
++
+ endif
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 78d405e..1ddfb13 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_MXC_TZIC) += tzic.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
++obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
+ obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_USB_EHCI_MXC) += ehci.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
+new file mode 100644
+index 0000000..022690c
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/iram.h
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++#include <linux/errno.h>
++
++#ifdef CONFIG_IRAM_ALLOC
++
++int __init iram_init(unsigned long base, unsigned long size);
++void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr);
++void iram_free(unsigned long dma_addr, unsigned int size);
++
++#else
++
++static inline int __init iram_init(unsigned long base, unsigned long size)
++{
++	return -ENOMEM;
++}
++
++static inline void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
++{
++	return NULL;
++}
++
++static inline void iram_free(unsigned long base, unsigned long size) {}
++
++#endif
+diff --git a/arch/arm/plat-mxc/iram_alloc.c b/arch/arm/plat-mxc/iram_alloc.c
+new file mode 100644
+index 0000000..3d70b7c
+--- /dev/null
++++ b/arch/arm/plat-mxc/iram_alloc.c
+@@ -0,0 +1,73 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
++ */
++
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++#include <linux/genalloc.h>
++#include <mach/iram.h>
++
++static unsigned long iram_phys_base;
++static void __iomem *iram_virt_base;
++static struct gen_pool *iram_pool;
++
++static inline void __iomem *iram_phys_to_virt(unsigned long p)
++{
++	return iram_virt_base + (p - iram_phys_base);
++}
++
++void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
++{
++	if (!iram_pool)
++		return NULL;
++
++	*dma_addr = gen_pool_alloc(iram_pool, size);
++	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
++	if (!*dma_addr)
++		return NULL;
++	return iram_phys_to_virt(*dma_addr);
++}
++EXPORT_SYMBOL(iram_alloc);
++
++void iram_free(unsigned long addr, unsigned int size)
++{
++	if (!iram_pool)
++		return;
++
++	gen_pool_free(iram_pool, addr, size);
++}
++EXPORT_SYMBOL(iram_free);
++
++int __init iram_init(unsigned long base, unsigned long size)
++{
++	iram_phys_base = base;
++
++	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
++	if (!iram_pool)
++		return -ENOMEM;
++
++	gen_pool_add(iram_pool, base, size, -1);
++	iram_virt_base = ioremap(iram_phys_base, size);
++	if (!iram_virt_base)
++		return -EIO;
++
++	pr_debug("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
++	return 0;
++}
+-- 
+1.6.0.4
