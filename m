@@ -1,30 +1,33 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri, 8 Oct 2010 12:31:14 -0500
-Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
-In-Reply-To: <AANLkTikHMewD94ZBb9P4AF9oM2ZfnpA-yjO67Dx2Lg9r@mail.gmail.com>
-References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>	<201010070940.14208.laurent.pinchart@ideasonboard.com>	<4CADFCEB.4030008@ti.com>	<AANLkTim8H0ibSucP3Nq=q19t0QY0pvijim1kOZSbygY1@mail.gmail.com>	<4CAE1CA1.4050006@ti.com>
-	<AANLkTikHMewD94ZBb9P4AF9oM2ZfnpA-yjO67Dx2Lg9r@mail.gmail.com>
-Message-ID: <4CAF5562.9060107@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Oct 2010 10:36:15 -0700
+Subject: [PATCH v4] ARM: Fix sparse warnings due to variables conflicts.
+In-Reply-To: <4CAF014D.7000909@ti.com>
+References: <1286517186-29934-1-git-send-email-sourav.poddar@ti.com>
+	<4CAF014D.7000909@ti.com>
+Message-ID: <20101008173615.GJ7558@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/8/2010 3:20 AM, Felipe Contreras wrote:
-> On Thu, Oct 7, 2010 at 10:16 PM, Omar Ramirez Luna<omar.ramirez@ti.com>  wrote:
->> On 10/7/2010 1:22 PM, Felipe Contreras wrote:
->>> Anyway, we will not know for sure until we try... Right?
->>
->> yes we can try, at least we now for sure arm side can be done.
->
-> The only thing that changes is the cacheability of the ARM side
-> memory, so of course only the ARM side matters. The DSP side will
-> continue to do what it's doing and would not notice any difference if
-> the memory is flushed, or is non-cacheable.
->
+* Nishanth Menon <nm@ti.com> [101008 04:24]:
+> Poddar, Sourav had written, on 10/08/2010 12:53 AM, the following:
+> >Fix the sparse warnings generated due to conflicts in variables used in readl/writel.
+> >
+> >
+> >drivers/net/smc91x.c:312:8: warning: symbol '__v' shadows an earlier one
+> >drivers/net/smc91x.c:312:8: originally declared here
+> >
+> >With this change, about 200 sparse warnings are fixed.
+> The commit message could be a little more detailed.
+> see http://marc.info/?l=linux-omap&m=128648102511076&w=2
+> 
+> also should $subject say ARM: io: fix namespace conflict
+> to better reflect the fix? sparse warnings are just an indication IMHO
 
-Please find my reply for the previous mail:
+BTW, also dropping the "OMAP: Convert write/read functions to raw read/write".
 
-http://marc.info/?l=linux-omap&m=128655845213913&w=2
+That patch does not compute, and also ends up leaving files with
+__raw_readw followed by writew..
 
 Regards,
 
-Omar
+Tony
