@@ -1,39 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 08 Oct 2010 15:51:10 +0200
-Subject: AT91: Fix power-saving in idle-mode on 926T processors
-In-Reply-To: <20101008122918.GA30252@game.jcrosoft.org>
-References: <20101007194415.GA24709@alarsen.net>
-	<20101008122918.GA30252@game.jcrosoft.org>
-Message-ID: <4CAF21CE.5000901@atmel.com>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Fri, 8 Oct 2010 15:53:31 +0200
+Subject: [PATCHv6] ARM: imx: Add iram allocator functions
+In-Reply-To: <1286545333-30323-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1286545333-30323-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <19631.8795.122477.334402@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi,
 
-Le 08/10/2010 14:29, Jean-Christophe PLAGNIOL-VILLARD :
-> On 21:44 Thu 07 Oct     , Anders Larsen wrote:
->> According to Atmel, their 926T processors (AT91 post RM9200) requires
->> 'Wait for Interrupt' mode be entered right after disabling the processor clock
->> in order to minimise current consumption when idle, so do both provided we're
->> not running on a 920T (an RM9200).
->>
->> Furthermore, get rid of the #ifndef CONFIG_DEBUG_KERNEL, since arch_idle()
->> can be turned off completely with the kernel parameter 'nohlt'.
->>
->> Signed-off-by: Anders Larsen <al@alarsen.net>
->> Cc: Andrew Victor <avictor.za@gmail.com>
-> please rebase against this branch
-> 
-> git://github.com/at91linux/linux-2.6-at91.git branch for-rmk
+Dinh.Nguyen at freescale.com writes:
+[...]
+> +void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
+> +{
+> +	if (!iram_pool)
+> +		return NULL;
+> +
+> +	*dma_addr = gen_pool_alloc(iram_pool, size);
+> +	pr_debug("iram alloc - %dB at 0x%p\n", size, (void *)*dma_addr);
+                                                  ^^^^^^^^
+Is there any reason to insist on this silly type cast instead of using
+the format string that fits the data type?
 
-This patch seems already in your "master" branch
-(5c189208b606a85b4e97109af70d59f10a42fdfd).
 
-Do you want me to rebase this patch or do you mange merging with "AT91:
-fix use of clock disable on idle for AT91x40 devices"
-(cb809b1a5ebffca8cf0314b788919989e8e4ab5f) ?
-already in your "devel" and "devel-stable" branches?
-
-Best regards,
+Lothar Wa?mann
 -- 
-Nicolas Ferre
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
