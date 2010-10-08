@@ -1,85 +1,17 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 8 Oct 2010 15:09:46 +0800
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-In-Reply-To: <AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
-References: <20101006071731.28048.89938.sendpatchset@t400s>
-	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-	<AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
-Message-ID: <AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  8 Oct 2010 09:34:47 +0200
+Subject: [PATCH 0/3] sdma/dma resources
+In-Reply-To: <20101008064500.GL28242@pengutronix.de>
+References: <20101008064500.GL28242@pengutronix.de>
+Message-ID: <1286523290-25321-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 7, 2010 at 2:39 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> Hi Eric,
->
-> On Wed, Oct 6, 2010 at 10:06 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>> ARM: Dynamic IRQ demux support
->
->> Just FYI, I had a patch months ago for this:
->>
->> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
->>
->> Do you think that's a simpler way to go?
->
-> Thanks for the pointer. I wasn't aware of your patch, but the fact
-> that both of us came up with similar solutions to the same problem
-> clearly shows that there is a need for this feature.
->
-> Your patch is much less intrusive compared to what i came up with. I
-> like the simplicity. I guess it is natural that the simplicity comes
-> with a bit of overhead. I'm thinking of the extra branches and
-> whatever potential cache misses coming from the code and callback
-> being located in different cache lines compared to the rest of the
-> code in __irq_svc and __irq_usr.
->
-> My patches keeps the handlers in the same cache lines as before, but
-> this comes with the cost of more serious rearrangement of the code.
-> Also, my alignment_trap patch may decrease performance, not sure how
-> to deal with that in a good way.
+Hello Sascha,
 
-Yeah, I was thinking of the performance degradation at that time as well.
-What worried me most is actually the long jump. However, we do have
-a long jump to asm_do_IRQ anyway.
+you have to drop "ARM: imx: fix/define clocks and create devices for imx dma"
+(currently dcdb3b1cf9b327cf91e) from your tree to be able to apply these
+on top of your imx-for-2.6.37 branch.
 
-And the optimizations like get_irqnr_preamble and get_irqnr_and_base
-can be carried out in C code as well, or if that's tricky enough, inline
-assembly code can also help.
-
->
-> I don't mind so much which patch that gets merged, but I'm a little
-> bit concerned about code duplication. My patch moves macros into a
-> header file that each demux instance can make use of to minimize the
-> amount of duplicated code. I'm not sure how you are planning on
-> implementing each demux instance. If possible I'd like to see the
-> irq_handler macro in a header file somewhere so we don't have to
-> duplicate that code.
-
-Machines will have to specify their IRQ demux handler, which could be
-same among a group of machines which share common demux code, and
-thus duplication can be avoided.
-
->
-> On top of that I'd also like to break out the GIC demux code and put
-> it in a central location, but that's a separate issue.
-
-I think we can make a common function call for all the IRQ demux handler
-for GIC then.
-
->
-> Any thoughts? Shall I try to move the irq_handler macro to some header file?
->
-
-Your patch is excellent, I don't mind either which gets in. What I'm a
-bit concerned is the effort to keep up with the mostly optimized code.
-I was thinking of a bit (not that much significant I guess) performance loss
-when multiple IRQ demux handler is required for the sake of simplicity
-and less intrusiveness, while still able to use the original optimized path
-when that's not required (i.e. turning CONFIG_.... off).
-
-Thoughts?
-
-> Thanks,
->
-> / magnus
->
+Best regards
+Uwe
