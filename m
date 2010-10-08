@@ -1,43 +1,88 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 08 Oct 2010 20:53:57 +0200
-Subject: unrecognized/unsupported machine ID
-In-Reply-To: <4CAF6397.50403@gmail.com> (Tuomas Vainikka's message of "Fri\,
-	08 Oct 2010 21\:31\:51 +0300")
-References: <4CAF6397.50403@gmail.com>
-Message-ID: <87vd5czfay.fsf@lechat.rtp-net.org>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 8 Oct 2010 22:37:10 +0300
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tuomas Vainikka <tvainikk@gmail.com> writes:
-
-> Hello,
-
-Hi,
+On Fri, Oct 8, 2010 at 8:53 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 08, 2010 at 12:32:35PM +0300, Felipe Contreras wrote:
+>> I think when _you_ remove functionality from the architecture, you
+>> should provide a mechanism that drivers can migrate to. Since there's
+>> nothing like that, not even a guideline, you are breaking the drivers
+>> willingly, and expecting other people to fix a difficult problem that
+>> you yourself have no idea how to fix properly.
 >
-> I compiled linux 2.6.35.7 stable release from kernel.org, loaded it to
-> RedBoot and got this:
+> We can either wait for people to complain about silent data corruption
+> or we can be compliant with the architecture specification. ?Which is
+> better - to avoid data corruption and be correct, or allow a system to
+> become flakey and corrupt people's data.
+
+The data corruption would happen only on the memory areas that are
+doubly mapped, right? So the misbehavior would only be visible on the
+driver. Then what is better? A driver that works 99% of the time, or a
+driver that doesn't work at all?
+
+Besides, there are many ARMv6 and ARMv7 devices that are already
+shipping with this "wrong" ioremap() and I don't see them blowing up,
+so I presume whatever issue is caused by this cannot be so drastic as
+to not allow anybody doing this ever from the exact point you found
+the issue.
+
+Do you have a test that provides numbers on how often do issues popup,
+and under which situations?
+
+> What I care about is system correctness and people's data - having
+> multiple mappings with different attributes is documented in very clear
+> terms as being 'unpredictable' and therefore it isn't permissible to
+> allow the practice that worked with previous processors (inherently
+> due to their cache architecture) to continue forward onto processors
+> with a different cache architecture.
+
+Of course, it shouldn't be permissible, but you shouldn't just disable
+features from one release to the next, each time you find out they are
+not proper; there should be some grace period, specially if there's no
+alternative.
+
+> As already discussed, it's nigh on impossible to unmap the existing
+> direct mapped region (read the previous discussions about why this is)
+> - which is precisely why there is no direct alternative solution.
 >
-> EM-7210 (RAM mode) 2005-12-22
-> == Executing boot script in 5.000 seconds - enter ^C to abort
-> ^C
-> RedBoot> load -v -r -b 0x01008000 -m tftp zImage-20101005
-> /
-> Raw file loaded 0x01008000-0x011e7187, assumed entry at 0x01008000
-> RedBoot> exec
-> Using base address 0x01008000 and length 0x001df188
-> Uncompressing Linux... done, booting the kernel.
+> The only possible solution is to exclude some memory at boot time from
+> the system direct map so that it never appears in the direct map, and
+> use ioremap on _that_. ?Another possible alternative is to use highmem,
+> obtain highmem pages (making sure that it doesn't fall back to lowmem)
+> and remap them using interfaces such as vmap.
 >
-> Error: unrecognized/unsupported machine ID (r1 = 0x00000147).
+> So there are solutions to the problem, but it seems that _no one_ is
+> willing to discuss it other than "we want our old way back".
 
-default redboot is using the wrong machine id (iirc iq31244 machine id)
-so you have to use things like devio to modify r1 register before
-booting the kernel. I use a script doing roughly that :
+People have been discussing them, but you can't expect a perfect
+solution to pop up within one release cycle, specially when people
+have real issues to deal with.
 
-(
-  devio 'wl 0xe3a01c04,4' 'wl 0xe38110bc,4'
-  cat arch/arm/boot/zImage
-) > arch/arm/boot/zImage.ss4000e
+Be realistic, what is going to happen is that people are going to give
+up on having their drivers working on .26, revert the patch, and since
+the drivers are already not working, the fix can wait, right? Maybe
+after .27, or some other time, a seasoned developer would have time to
+get this fixed properly, or they are going to come with workarounds
+like manually reserving memory with mem= bootarg:
+http://article.gmane.org/gmane.linux.ports.arm.omap/44516
 
-And then, use the zImage.ss4000e.
+> If you want the old way back, apply pressure to silicon vendors and
+> ARM Ltd to change the architecture to lift this restriction - which
+> will probably mean doing away with aggressive speculative prefetching
+> so that it's possible to predict what will be in the cache at any
+> point in time.
 
-Arnaud
+Nobody is asking for the old way back, what is being asked is a *grace
+period*, have a warning right now, then disable completely later on.
+
+-- 
+Felipe Contreras
