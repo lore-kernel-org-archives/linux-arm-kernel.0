@@ -1,51 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 08 Oct 2010 14:55:21 +0900
-Subject: [GIT PULL] Samsung fixes for 2.6.36
-Message-ID: <00e101cb66ad$6788e030$369aa090$%kim@samsung.com>
+From: moon9124@samsung.com (Daein Moon)
+Date: Fri, 08 Oct 2010 15:02:17 +0900
+Subject: No subject
+Message-ID: <000201cb66ae$5caa04e0$15fe0ea0$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Ben Dooks and Kukjin,
 
-Please pull Samsung fixes from:
+I found an issue about s3c_gpio_getpull API.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
+The 'plat-samsung' provides 's3c_gpio_setpull' and 's3c_gpio_getpull'
+to set and get pull-{none|up|down} of GPIO. But there is no
+'s3c_gpio_getpull' definition in 'arch/arm/plat-samsung/gpio-config.c',
+and there is only declaration in the corresponding header file.
 
-These things are for bug fix on 2.6.36.
-If any problems, please let me know.
+'s3c_gpio_getpull' isn't supported/used. So if providing this api, its
+definition should be inserted.
 
-Thanks.
+Otherwise, code that is used to provide s3c_gpio_getpull including
+following code should be removed.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+arch/arm/plat-samsung/include/plat/gpio-cfg.h:
+	extern s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin);
+
+arch/arm/mach-{s3c*|s5p*}/gpiolib.c:
+        .get_pull       = s3c_gpio_getpull_updown,
 
 
-The following changes since commit cb655d0f3d57c23db51b981648e452988c0223f9:
+What do you think about that?
 
-  Linux 2.6.36-rc7 (2010-10-06 13:39:52 -0700)
-
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-s5p-fixes-for-linus
-
-Kukjin Kim (1):
-      ARM: SAMSUNG: Fix build warnings because of unused codes
-
-Marek Szyprowski (1):
-      ARM: SAMSUNG: Add a workaround for get_clock() for serial driver
-
-SeungChull Suh (1):
-      ARM: S5P: Bug fix on errors of build with CONFIG_PREEMPT_NONE
-
- arch/arm/mach-s5p6440/cpu.c   |    1 +
- arch/arm/mach-s5p6442/cpu.c   |    1 +
- arch/arm/mach-s5pc100/cpu.c   |    1 +
- arch/arm/mach-s5pv210/clock.c |    5 -----
- arch/arm/mach-s5pv210/cpu.c   |    1 +
- arch/arm/plat-samsung/adc.c   |    1 -
- arch/arm/plat-samsung/clock.c |   27 ++++++++++++++++++++++++++-
- 7 files changed, 30 insertions(+), 7 deletions(-)
+Best Regards,
+Daein Moon
