@@ -1,139 +1,203 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  8 Oct 2010 09:34:49 +0200
-Subject: [PATCH 2/3] ARM: mx35: Add mx35_revision function to query the
-	silicon revision
-In-Reply-To: <20101008064500.GL28242@pengutronix.de>
-References: <20101008064500.GL28242@pengutronix.de>
-Message-ID: <1286523290-25321-3-git-send-email-u.kleine-koenig@pengutronix.de>
+From: eric.miao@canonical.com (Eric Miao)
+Date: Fri, 8 Oct 2010 15:36:35 +0800
+Subject: [PATCH v2] ARM: Introduce patching of phys_to_virt and vice versa
+Message-ID: <AANLkTimKt+y6sLi85dYJs2G3Uke3gzpWAJ9PCKO4R3-E@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+** In this v2 version, the __volatile__ keyword of the patch stub assembly is
+removed. That prevents gcc from doing a good optimization. The test build
+result showed an acceptable optimized code generation.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+In most cases, the delta between PHYS_OFFSET and PAGE_OFFSET is normally
+16MiB aligned, which means the difference can be handled by a simple ADD
+or SUB instruction with an immediate shift operand in ARM.  This will be
+a bit more efficient and generic when PHYS_OFFSET goes run-time.
+
+This idea can be made generic to allow conversions more than phys_to_virt
+and virt_to_phys. A stub instruction is inserted where applicable, and it
+has a form of 'add rn, rd, #imm', where the lowest 8-bit of #imm is used
+to identify the type of patching.  Currently, only two types are defined,
+but could be expanded in my POV to definitions like __io(), __mem_pci()
+and so on. A __patch_table section is introduced to include the addresses
+of all these stub instructions.
+
+There are several places for improvement:
+
+1. constant parameters which can be optimized by the compiler now needs
+   one additional instruction (although the optimization is neither
+   possible when PHYS_OFFSET goes a variable)
+
+2. flush_cache_all() when patching done is brute but simple enough here,
+   provided it's done only once during startup.
+
+3. thumb2 can be supported in a same way, but will leave that for future
+   enhancement.
+
+The general idea comes from Nicolas Pitre, and is drafted at
+    https://wiki.ubuntu.com/Specs/ARMSingleKernel
+
+Signed-off-by: Nicolas Pitre <nicolas.pitre@canonical.com>
+Signed-off-by: Eric Miao <eric.miao@canonical.com>
 ---
- arch/arm/mach-mx3/clock-imx35.c       |    2 ++
- arch/arm/mach-mx3/cpu.c               |   31 +++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mx35.h |   19 +++++--------------
- arch/arm/plat-mxc/include/mach/mx3x.h |   10 +++++++++-
- 4 files changed, 47 insertions(+), 15 deletions(-)
+ arch/arm/Kconfig              |   10 ++++++++
+ arch/arm/include/asm/memory.h |   32 ++++++++++++++++++++++++++
+ arch/arm/kernel/setup.c       |   50 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/vmlinux.lds.S |    4 +++
+ 4 files changed, 96 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index 708c2b3..d59ff70 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -535,6 +535,8 @@ int __init mx35_clocks_init()
- 	__raw_writel(cgr2, CCM_BASE + CCM_CGR2);
- 	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
- 
-+	mx35_read_cpu_rev();
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 553b7cf..5c856d9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -187,6 +187,16 @@ config VECTORS_BASE
+ 	help
+ 	  The base address of exception vectors.
+
++config ARM_PATCH_PHYS_VIRT
++	def_bool n
++	help
++	  Note this is only for non-XIP and non-Thumb2 kernels. And there
++	  is CPU support which needs to read data in order to writeback
++	  dirty entries in the cache. (e.g. StrongARM, ebsa110, footbridge,
++	  rpc, sa1100, and shark). The mappings in the above cases do not
++	  exist before paging_init() has completed. Thus this option does
++	  not support these CPUs at this moment.
 +
- #ifdef CONFIG_MXC_USE_EPIT
- 	epit_timer_init(&epit1_clk,
- 			MX35_IO_ADDRESS(MX35_EPIT1_BASE_ADDR), MX35_INT_EPIT1);
-diff --git a/arch/arm/mach-mx3/cpu.c b/arch/arm/mach-mx3/cpu.c
-index 47b0573..8c6eb5e 100644
---- a/arch/arm/mach-mx3/cpu.c
-+++ b/arch/arm/mach-mx3/cpu.c
-@@ -55,3 +55,34 @@ void __init mx31_read_cpu_rev(void)
- 
- 	printk(KERN_WARNING "Unknown CPU identifier. srev = %02x\n", srev);
- }
+ source "init/Kconfig"
+
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 23c2e8e..9cf6d3f 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -182,6 +182,37 @@
+  */
+ #define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
+
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
 +
-+unsigned int mx35_cpu_rev;
-+EXPORT_SYMBOL(mx35_cpu_rev);
++#define PATCH_TYPE_PHYS_TO_VIRT		(0)
++#define PATCH_TYPE_VIRT_TO_PHYS		(1)
 +
-+#define MX35_ROM_SI_REV		0x40
++#define __patch_stub(from,to,type)			\
++	__asm__(					\
++	"1:	add	%0, %1, %2\n"			\
++	"\n"						\
++	"	.pushsection __patch_table,\"a\"\n"	\
++	"	.long	1b\n"				\
++	"	.popsection\n"				\
++	: "=r" (to)					\
++	: "r" (from), "I" (type))
 +
-+void __init mx35_read_cpu_rev(void)
++static inline unsigned long virt_to_phys(void *x)
 +{
-+	void __iomem *rom = ioremap(MX35_IROM_BASE_ADDR, MX35_IROM_SIZE);
-+	u32 rev;
-+	char *srev = "unknown";
++	unsigned long t;
 +
-+	if (!rom)
-+		return;
++	__patch_stub(x, t, PATCH_TYPE_VIRT_TO_PHYS);
++	return t;
++}
 +
-+	rev = readl(rom + MX35_ROM_SI_REV);
-+	switch (rev) {
-+	case 0x1:
-+		mx35_cpu_rev = MX3x_CHIP_REV_1_0;
-+		srev = "1.0";
-+		break;
-+	case 0x2:
-+		mx35_cpu_rev = MX3x_CHIP_REV_2_0;
-+		srev = "2.0";
-+		break;
++static inline void *phys_to_virt(unsigned long x)
++{
++	void *t;
++
++	__patch_stub(x, t, PATCH_TYPE_PHYS_TO_VIRT);
++	return t;
++}
++#else
+ /*
+  * These are *only* valid on the kernel direct mapped RAM memory.
+  * Note: Drivers should NOT use these.  They are the wrong
+@@ -197,6 +228,7 @@ static inline void *phys_to_virt(unsigned long x)
+ {
+ 	return (void *)(__phys_to_virt((unsigned long)(x)));
+ }
++#endif
+
+ /*
+  * Drivers should NOT use these either.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d5231ae..6d024ad 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -764,12 +764,62 @@ static void __init squash_mem_tags(struct tag *tag)
+ 			tag->hdr.tag = ATAG_NONE;
+ }
+
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
++
++#define PATCH_INSTR_ADD		(0x00800000)
++#define PATCH_INSTR_SUB		(0x00400000)
++
++#define PATCH_STUB_MASK		(0xffe000ff)
++#define PATCH_STUB_PHYS_TO_VIRT	(0xe2800000 | PATCH_TYPE_PHYS_TO_VIRT)
++#define PATCH_STUB_VIRT_TO_PHYS	(0xe2800000 | PATCH_TYPE_VIRT_TO_PHYS)
++
++/* patch_phys_virt - patch the stub instructions with the delta between
++ * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
++ * can be expressed by an immediate shifter operand. The stub instruction
++ * has a form of 'add rd, rn, #imm', where the lowest 8-bit of #imm is
++ * used to identify the type of patching.
++ */
++static void __init patch_phys_virt(void)
++{
++	extern unsigned int *__patch_table_begin, *__patch_table_end;
++	unsigned int **p;
++	unsigned int imm, instr[2];
++
++	if (PHYS_OFFSET & 0x00ffffff)
++		panic("Physical memory start is not 16MiB aligned\n");
++
++	if (likely(PHYS_OFFSET < PAGE_OFFSET)) {
++		imm = 0x400 | ((PAGE_OFFSET >> 24) - (PHYS_OFFSET >> 24));
++		instr[0] = PATCH_INSTR_ADD | imm;
++		instr[1] = PATCH_INSTR_SUB | imm;
++	} else {
++		imm = 0x400 | ((PHYS_OFFSET >> 24) - (PAGE_OFFSET >> 24));
++		instr[0] = PATCH_INSTR_SUB | imm;
++		instr[1] = PATCH_INSTR_ADD | imm;
 +	}
 +
-+	printk(KERN_INFO "CPU identified as i.MX35, silicon rev %s\n", srev);
++	for (p = &__patch_table_begin; p < &__patch_table_end; p++) {
++		unsigned int *inptr = *p;
 +
-+	iounmap(rom);
++		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_PHYS_TO_VIRT)
++			*inptr = (*inptr & ~0x00e00fff) | instr[0];
++		if ((*inptr & PATCH_STUB_MASK) == PATCH_STUB_VIRT_TO_PHYS)
++			*inptr = (*inptr & ~0x00e00fff) | instr[1];
++	}
++	flush_cache_all();
 +}
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index 9f0a1ee..b651ee4 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -1,5 +1,9 @@
- #ifndef __MACH_MX35_H__
- #define __MACH_MX35_H__
++#else
++static inline void patch_phys_virt(void) {}
++#endif
 +
-+#define MX35_IROM_BASE_ADDR		0x0
-+#define MX35_IROM_SIZE			SZ_16K
-+
- /*
-  * IRAM
-  */
-@@ -184,20 +188,7 @@
- 
- #define MX35_PROD_SIGNATURE		0x1	/* For MX31 */
- 
--/* silicon revisions specific to i.MX31 */
--#define MX35_CHIP_REV_1_0		0x10
--#define MX35_CHIP_REV_1_1		0x11
--#define MX35_CHIP_REV_1_2		0x12
--#define MX35_CHIP_REV_1_3		0x13
--#define MX35_CHIP_REV_2_0		0x20
--#define MX35_CHIP_REV_2_1		0x21
--#define MX35_CHIP_REV_2_2		0x22
--#define MX35_CHIP_REV_2_3		0x23
--#define MX35_CHIP_REV_3_0		0x30
--#define MX35_CHIP_REV_3_1		0x31
--#define MX35_CHIP_REV_3_2		0x32
--
--#define MX35_SYSTEM_REV_MIN		MX35_CHIP_REV_1_0
-+#define MX35_SYSTEM_REV_MIN		MX3x_CHIP_REV_1_0
- #define MX35_SYSTEM_REV_NUM		3
- 
- #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
-diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-index d41ad68..d1bd26d 100644
---- a/arch/arm/plat-mxc/include/mach/mx3x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-@@ -240,7 +240,7 @@
- 
- #define MX3x_PROD_SIGNATURE		0x1	/* For MX31 */
- 
--/* silicon revisions specific to i.MX31 */
-+/* silicon revisions specific to i.MX31 and i.MX35 */
- #define MX3x_CHIP_REV_1_0		0x10
- #define MX3x_CHIP_REV_1_1		0x11
- #define MX3x_CHIP_REV_1_2		0x12
-@@ -267,6 +267,14 @@ static inline int mx31_revision(void)
+ void __init setup_arch(char **cmdline_p)
  {
- 	return mx31_cpu_rev;
- }
+ 	struct tag *tags = (struct tag *)&init_tags;
+ 	struct machine_desc *mdesc;
+ 	char *from = default_command_line;
+
++	patch_phys_virt();
 +
-+extern unsigned int mx35_cpu_rev;
-+extern void mx35_read_cpu_rev(void);
+ 	unwind_init();
+
+ 	setup_processor();
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index b16c079..c48c754 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -41,6 +41,10 @@ SECTIONS
+ 			*(.taglist.init)
+ 		__tagtable_end = .;
+
++		__patch_table_begin = .;
++			*(__patch_table)
++		__patch_table_end = .;
 +
-+static inline int mx35_revision(void)
-+{
-+	return mx35_cpu_rev;
-+}
- #endif
- 
- #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+ 		INIT_SETUP(16)
+
+ 		INIT_CALLS
 -- 
-1.7.2.3
+1.7.0.4
