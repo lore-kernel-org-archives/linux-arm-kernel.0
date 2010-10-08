@@ -1,49 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Oct 2010 15:17:46 -0700
-Subject: [PATCH v5 0/3] OMAP2/3: DMA: FIFO drain errata fixes
-In-Reply-To: <20101005181525.GL3117@atomide.com>
-References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
-	<20101005181525.GL3117@atomide.com>
-Message-ID: <20101008221746.GS7558@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Oct 2010 00:04:51 +0100
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+Message-ID: <20101008230451.GB10975@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [101005 11:07]:
-> * Peter Ujfalusi <peter.ujfalusi@nokia.com> [101004 23:37]:
-> > Hello,
-> > 
-> > This v5 series is based on the v3.
-> > The first two patch is the actual fix for the original problems without any
-> > major change in the code (only handling the corresponding erratas in the legacy
-> > way).
-> > The third patch in the series is optional, and it is implementing (in one patch)
-> > the errata handling via flags. This patch converts all errata cases to use the
-> > introduced dma_errata variable via macros.
-> > 
-> > Tony: the first two patch need to go for 2.6.36, and if it is possible it shall
-> > be backported to .33, .34, and .35 as well.
-> 
-> OK, I'll the first two into omap-fixes.
+On Fri, Oct 08, 2010 at 10:37:10PM +0300, Felipe Contreras wrote:
+> People have been discussing them, but you can't expect a perfect
+> solution to pop up within one release cycle, specially when people
+> have real issues to deal with.
 
-Guys, as we're so late into getting 2.6.36 tagged, I'm thinking about just
-queueing these for 2.6.37 for the following reasons:
+Two release cycles.  It was queued for the previous release, was posted
+to the mailing list, was de-queued, and then re-added for the last merge
+window.
 
-- The 24xx patch is a fix for commit c12abc0 that's was merged over a
-  year ago. We've lived with it for over a year now. What difference does
-  extra few more months make if we have it in 2.6.37 instead of 2.6.36?
+That's not no warning - that's almost six months.
 
-- The second 34xx fix seems to happen only when disabling DMA on the fly.
-  Again, we've had support for 34xx in the mainline kernel for a few
-  years, and we're not seeing unrecoverable issues with MMC or USB or
-  any other code calling omap_dma_stop().
+http://lists.arm.linux.org.uk/lurker/message/20100408.094818.d6854bd5.en.html
 
-Sure these fix major issues with the DMA, but are these really critical
-for 2.6.36?
+So what you're telling me is that in six months, not one driver has been
+touched to address this issue?  So, if no one in that time has done any
+work on this, then what use is it going to be making the kernel issue
+a warning instead?
 
-So if you really want me to argue for merging these into 2.6.36, please let
-me know some oops causing cases or data corruption that happens without
-these patches.
-
-Cheers,
-
-Tony
+So, since this has been known about for six months to the day, I completely
+fail to see how making this a warning instead will create the necessary
+motivation for the issue to be addressed.
