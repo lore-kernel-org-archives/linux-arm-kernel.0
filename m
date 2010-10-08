@@ -1,37 +1,24 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri,  8 Oct 2010 17:46:20 +0900
-Subject: [PATCH RESEND 1/2] sdhci-s3c: Add support additional host capabilities
-In-Reply-To: <1286527581-24903-1-git-send-email-kgene.kim@samsung.com>
-References: <1286527581-24903-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1286527581-24903-2-git-send-email-kgene.kim@samsung.com>
+Date: Fri,  8 Oct 2010 17:46:19 +0900
+Subject: [PATCH 0/2] sdhci-s3c: Add support S5PV310/S5PC210 HSMMC
+Message-ID: <1286527581-24903-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeongbae Seo <jeongbae.seo@samsung.com>
+This patch adds support S5PV310/S5PC210 HSMMC and additional host capabilities.
+HSMMC of S5PV310 does not have internal clock divider so need to update for it.
 
-This patch adds to support additional host capabilities like SD/MMC high speed, SDHCI bus width and
-etc.
+Changes since v2:
+- Changed clock control method to overriding from using quirk
+- This patch is referred from that of Jaehoon Chung's support non-standard clock setting
 
-Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/mmc/host/sdhci-s3c.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Changes since v1:
+- Separated to each topic
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index aacb862..a7710f5 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -427,6 +427,10 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	/* HSMMC on Samsung SoCs uses SDCLK as timeout clock */
- 	host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
- 
-+	/* It supports additional host capabilities if needed */
-+	if (pdata->host_caps)
-+		host->mmc->caps |= pdata->host_caps;
-+
- 	ret = sdhci_add_host(host);
- 	if (ret) {
- 		dev_err(dev, "sdhci_add_host() failed\n");
--- 
-1.6.2.5
+NOTE:
+- This patch depends on following.
+  [PATCH 4/5] ARM: SAMSUNG : Add clock types into platform data
+
+This includes following.
+[PATCH RESEND 1/2] sdhci-s3c: Add support additional host capabilities
+[PATCH V3 2/2] sdhci-s3c: Add support no internal clock divider in host controller
