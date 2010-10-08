@@ -1,103 +1,78 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 8 Oct 2010 10:39:02 -0600
-Subject: [PATCH 7/6] spi/imx: Support different fifo sizes
-In-Reply-To: <1286529841-20800-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20100902143908.GK14214@pengutronix.de>
-	<1286529841-20800-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20101008163902.GB3863@angua.secretlab.ca>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Fri, 8 Oct 2010 12:20:21 -0500
+Subject: [RFC] tidspbridge: use a parameter to allocate shared memory
+In-Reply-To: <AANLkTikRWdw8NQinHmco6dp+XtEr5mr_7H8OBU6+FcB0@mail.gmail.com>
+References: <1286430336-20204-1-git-send-email-omar.ramirez@ti.com>	<201010070940.14208.laurent.pinchart@ideasonboard.com>	<4CADFCEB.4030008@ti.com>	<AANLkTim8H0ibSucP3Nq=q19t0QY0pvijim1kOZSbygY1@mail.gmail.com>	<4CAE1CA1.4050006@ti.com>
+	<AANLkTikRWdw8NQinHmco6dp+XtEr5mr_7H8OBU6+FcB0@mail.gmail.com>
+Message-ID: <4CAF52D5.9040007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 08, 2010 at 11:24:01AM +0200, Uwe Kleine-K?nig wrote:
-> From: David Jander <david@protonic.nl>
-> 
-> The i.MX51 ECSPI has a fifo size of 64 entries instead of 8 entries as
-> found on the other cspi bus devices.
-> 
-> Cc: Jason Wang <jason77.wang@gmail.com>
-> Signed-off-by: David Jander <david@protonic.nl>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On 10/8/2010 3:18 AM, Felipe Contreras wrote:
+> On Thu, Oct 7, 2010 at 10:16 PM, Omar Ramirez Luna<omar.ramirez@ti.com>  wrote:
+>> On 10/7/2010 1:22 PM, Felipe Contreras wrote:
+>> ...
+>>>
+>>> Note that the "shared memory" described in the document you share has
+>>> nothing to do with the SHM pool. AFAIK that memory is used for other
+>>> things, like MMU PTEs, and storing the base image and socket-nodes,
+>>> thus it needs to be contiguous.
+>>
+>> hmmm, no. it is the same memory. i.e.: we propagate the current opp through
+>> the shared memory so the dsp can read it if it went to sleep, with the
+>> proper offset you can read that variable starting from the mempool base
+>> address.
+>
+> The document mentions "shared memory" for buffer passing, normal
+> memory is used for that, scattered, even user-space memory, not the
+> SHM contiguous area.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+"streaming" (meaning dsp stream) buffers are passed through the SHM 
+(check page 9). The regular "big" buffers are passed through old DMM 
+(page 14) which is exactly as you describe it; but that SHM portion is 
+referring to stream buffers.
 
-Please merge via Sascha's branch that already has the other patches.
+>
+>>> I don't see any problem flushing the SHM area when needed, which
+>>> probably has performance implications when mmaping/unmapping buffers,
+>>> at which point you need to flush bigger memory areas anyway, so that's
+>>> not an issue.
+>>
+>> well, you would have to flush when loading the base image, or allocating a
+>> socket node, but also minor flushes for opp propagation, SHM messages to
+>> DSP, chnl params, those are the ones I can quickly think of.
+>
+> All those happen when you send buffers to the DSP, and when you do
+> that you need to flush the buffer memory area, which is a much heavier
+> operation. Except maybe the opp propagation, but that would require at
+> most one page to be flushed, not a big deal I think, besides, it would
+> be better if that specific area is handled differently than the rest
+> of the SHM, so that we can allocate it with dma_alloc_coherent().
 
-g.
+Yes, on top of the regular buffer flush, you need to flush the specific 
+parts of the shared memory that the dsp is going to read, meaning: you 
+send a buffer to the dsp, then send the MBX interrupt, to let it know 
+there is a SHM message, DSP is going to read that SHM message from the 
+SHM memory.
 
-> ---
-> Hello,
-> 
-> this patch depends on patches already acked by Grant Likely and sitting
-> in Sascha Hauer's imx-for-2.6.37 branch.
-> 
-> Best regards
-> Uwe
-> 
->  drivers/spi/spi_imx.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-> index 6bab2cf..55a38e2 100644
-> --- a/drivers/spi/spi_imx.c
-> +++ b/drivers/spi/spi_imx.c
-> @@ -77,6 +77,7 @@ struct spi_imx_devtype_data {
->  	void (*trigger)(struct spi_imx_data *);
->  	int (*rx_available)(struct spi_imx_data *);
->  	void (*reset)(struct spi_imx_data *);
-> +	unsigned int fifosize;
->  };
->  
->  struct spi_imx_data {
-> @@ -541,6 +542,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
->  		.trigger = mx1_trigger,
->  		.rx_available = mx1_rx_available,
->  		.reset = mx1_reset,
-> +		.fifosize = 8,
->  	},
->  #endif
->  #ifdef CONFIG_SPI_IMX_VER_0_0
-> @@ -550,6 +552,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
->  		.trigger = mx27_trigger,
->  		.rx_available = mx27_rx_available,
->  		.reset = spi_imx0_0_reset,
-> +		.fifosize = 8,
->  	},
->  #endif
->  #ifdef CONFIG_SPI_IMX_VER_0_4
-> @@ -559,6 +562,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
->  		.trigger = mx31_trigger,
->  		.rx_available = mx31_rx_available,
->  		.reset = spi_imx0_4_reset,
-> +		.fifosize = 8,
->  	},
->  #endif
->  #ifdef CONFIG_SPI_IMX_VER_0_7
-> @@ -568,6 +572,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
->  		.trigger = mx31_trigger,
->  		.rx_available = mx31_rx_available,
->  		.reset = spi_imx0_4_reset,
-> +		.fifosize = 8,
->  	},
->  #endif
->  #ifdef CONFIG_SPI_IMX_VER_2_3
-> @@ -577,6 +582,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
->  		.trigger = spi_imx2_3_trigger,
->  		.rx_available = spi_imx2_3_rx_available,
->  		.reset = spi_imx2_3_reset,
-> +		.fifosize = 64,
->  	},
->  #endif
->  };
-> @@ -596,7 +602,7 @@ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
->  
->  static void spi_imx_push(struct spi_imx_data *spi_imx)
->  {
-> -	while (spi_imx->txfifo < 8) {
-> +	while (spi_imx->txfifo < spi_imx->devtype_data.fifosize) {
->  		if (!spi_imx->count)
->  			break;
->  		spi_imx->tx(spi_imx);
-> -- 
-> 1.7.2.3
-> 
+You also need to invalidate if the dsp is going to write, so the next 
+time you read there is no mismatch in the data, meaning: DSP sends a SHM 
+message to slot 1, but you already read slot 1 from a previous 
+transaction so contents might be still in cache, so you need to 
+invalidate that memory and read again the new SHM message.
+
+Now to know when to read/write you need to have 2 flags per operation, 
+one to know if you have new messages and other to know if you are 
+reading/writing any message (all in SHM), which are there right now for 
+this specific case; but if flushing the SHM, now you will need flags for 
+knowing if the first two have been already flushed... and then 2 for 
+these two... and so on. So in the end a better locking mechanism would 
+be needed for both ARM and DSP which is not based on memory which may or 
+may not have the latest contents (going the cacheable route).
+
+As I have been saying, we can try this changes in the ARM tidspbridge 
+because we _freely_ see what is going on, but in the DSP we can't.
+
+Regards,
+
+Omar
