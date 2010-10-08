@@ -1,46 +1,72 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 07 Oct 2010 21:12:03 -0400 (EDT)
-Subject: [PATCH 1/3] [ARM] Translate delay.S into (mostly) C
-In-Reply-To: <4CAE619A.2050302@codeaurora.org>
-References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
-	<1285644827-6846-2-git-send-email-sboyd@codeaurora.org>
-	<1286299355.18791.11.camel@c-dwalke-linux.qualcomm.com>
-	<4CABEECB.4030301@codeaurora.org>
-	<alpine.LFD.2.00.1010061024220.3107@xanadu.home>
-	<4CACC053.2090509@codeaurora.org> <1286393743.22265.129.camel@m0nster>
-	<alpine.LFD.2.00.1010061553350.3107@xanadu.home>
-	<4CAE619A.2050302@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1010072107560.3107@xanadu.home>
+Date: Thu, 07 Oct 2010 21:25:06 -0400 (EDT)
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <20101007212707.GI7558@atomide.com>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<20101007212707.GI7558@atomide.com>
+Message-ID: <alpine.LFD.2.00.1010072121530.3107@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Oct 2010, Stephen Boyd wrote:
+On Thu, 7 Oct 2010, Tony Lindgren wrote:
 
-> Why doesn't any other architecture use assembly for their lpj code? They
-> may use headers with assembly in them or C code with assembly in them,
-> but they don't write all of the delay code in assembly and rely on
-> function interleaving. This leads me to believe other arches aren't
-> concerned about compiler optimizations breaking lpj cmdline parameters,
-> so why should ARM be concerned?
+> Hi,
 > 
-> I tested the theory out and scaled down the CPU frequency to 19.2 MHz
-> and then called calibrate_delay(). Before and after applying this series
-> I got the same results.
+> * Daniel Walker <dwalker@codeaurora.org> [101005 11:59]:
+> > +#if !defined(CONFIG_CPU_V7)
+> > +static inline char
+> > +__dcc_getchar(void)
+> > +{
+> > +	char __c;
+> > +
+> > +	asm("mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> > +		: "=r" (__c) : : "cc");
+> > +
+> > +	return __c;
+> > +}
+> > +#else
+> > +static inline char
+> > +__dcc_getchar(void)
+> > +{
+> > +	char __c;
+> > +
+> > +	asm(
+> > +	"get_wait:	mrc p14, 0, pc, c0, c1, 0                   \n\
+> > +			bne get_wait                                    \n\
+> > +			mrc p14, 0, %0, c0, c5, 0	@ read comms data reg"
+> > +		: "=r" (__c) : : "cc");
+> > +
+> > +	return __c;
+> > +}
+> > +#endif
+> > +
+> > +#if !defined(CONFIG_CPU_V7)
+> > +static inline void
+> > +__dcc_putchar(char c)
+> > +{
+> > +	asm("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+> > +		: /* no output register */
+> > +		: "r" (c) : "cc");
+> > +}
+> > +#else
+> > +static inline void
+> > +__dcc_putchar(char c)
+> > +{
+> > +	asm(
+> > +	"put_wait:	mrc p14, 0, pc, c0, c1, 0                   \n\
+> > +			bcs put_wait                                \n\
+> > +			mcr p14, 0, %0, c0, c5, 0                   "
+> > +	: : "r" (c) : "cc");
+> > +}
+> > +#endif
 > 
-> Calibrating delay loop... 12.67 BogoMIPS (lpj=63360)
-> 
-> Jumping up to 1.2 GHz and calling calibrate_delay() gives me the same
-> before and after
-> 
-> Calibrating delay loop... 792.98 BogoMIPS (lpj=3964928)
+> Can you please pass the read and write functions to the driver
+> in platform_data? We are already booting kernels with both
+> ARMv6 and 7 compiled in.
 
-OK, fair enough.
-
-> I don't have access to a machine capable of running slower than 19.2
-> MHz. Maybe machines running in the KHz range would experience differences?
-
-Don't worry, I doubt any ARM processor capable of running Linux ever was 
-that slow.
+No.  This has nothing to do with platform as this can be determined 
+within the driver itself.  Would be much better to simply determine 
+which flavor to use at driver init time and assign two function pointers.
 
 
 Nicolas
