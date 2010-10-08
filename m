@@ -1,80 +1,103 @@
-From: pgsellmann@portner-elektronik.at (Peter Gsellmann)
-Date: Fri, 08 Oct 2010 17:10:44 +0200
-Subject: [PATCH] ARM: AT91: add board support for Pcontrol_G20
-In-Reply-To: <20101008123407.GB30252@game.jcrosoft.org>
-References: <1286466086.4306.41.camel@aspire.localdomain>
-	<20101008123407.GB30252@game.jcrosoft.org>
-Message-ID: <1286550644.21584.34.camel@aspire.localdomain>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 8 Oct 2010 10:39:02 -0600
+Subject: [PATCH 7/6] spi/imx: Support different fifo sizes
+In-Reply-To: <1286529841-20800-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100902143908.GK14214@pengutronix.de>
+	<1286529841-20800-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20101008163902.GB3863@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 08.10.2010, 14:34 +0200 schrieb Jean-Christophe
-PLAGNIOL-VILLARD: 
-> On 17:41 Thu 07 Oct     , Peter Gsellmann wrote:
-> > Added target is a carrier board for Stamp9G20 with additional
-> > peripherals and memories. Configuration is mostly copied from there.
-> > Added Code is only active if CONFIG_MACH_PCONTROL_G20=y
-> > 
-> > Signed-off-by: Peter Gsellmann <pgsellmann@portner-elektronik.at>
-> > ---
-> >  arch/arm/configs/pcontrol_g20_defconfig | 1721 +++++++++++++++++++++++++++++++
-> please use savedefconfig
-ok. didnt realize until now this useful target
+On Fri, Oct 08, 2010 at 11:24:01AM +0200, Uwe Kleine-K?nig wrote:
+> From: David Jander <david@protonic.nl>
+> 
+> The i.MX51 ECSPI has a fifo size of 64 entries instead of 8 entries as
+> found on the other cspi bus devices.
+> 
+> Cc: Jason Wang <jason77.wang@gmail.com>
+> Signed-off-by: David Jander <david@protonic.nl>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-> > +config MACH_PCONTROL_G20
-> > +	bool "PControl G20 CPU module"
-> > +	help
-> > +	  Select this if you are using taskit's Stamp9G20 CPU module on this
-> > +	  carrier board.
-> > +
-> what is the difference with stamg9g20?
-As the stamp9g20 itself is little more than cpu+nandflash+sdram all the
-needed peripherals, buffers and hardware drivers for my purpose
-(building automation) are on my carrier board, which itself is a plug-in
-card. Other boards using stamp9g20 may have an entire different set of
-peripherals, incompatible to mine.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> > +/*
-> > + * NAND flash 512MiB 1,8V 8-bit, sector size 128 KiB
-> > + */
-> > +static struct atmel_nand_data __initdata nand_data = {
-> > +	.ale		= 21,
-> > +	.cle		= 22,
-> > +	.rdy_pin	= AT91_PIN_PC13,
-> > +	.enable_pin	= AT91_PIN_PC14,
-> > +	.bus_width_16	= 0,
-> non need it's 0 by default
-ok.
+Please merge via Sascha's branch that already has the other patches.
 
-> > +/*
-> > + * I2C devices: eeprom and phy/switch
-> > + */
-> > +static struct i2c_board_info __initdata pcontrol_g20_i2c_devices[] = {
-> > +        {
-> > +                I2C_BOARD_INFO("24c64", 0x50)	/* D7 address width=2, 8KiB */
-> > +        }, {
-> > +                I2C_BOARD_INFO("lan9303", 0x0a)	/* D8 address width=1, byte has 32 bits! */
-> > +        },
-> > +};
-> whitespace please fix it
-ok. work in progress, also wrapping the long lines
+g.
 
-> > +/*
-> > + * LEDs
-> > + */
-> > +static struct gpio_led pcontrol_g20_leds[] = {
-> > +	{
-> > +		.name			= "LED1",	/* red  H5 */
-> is it no better to give a better namei for the leds?
-I dont know what is the best name for a led. I could use the name from
-the schematic (H5) which is random or the readable text nearby the led
-(Alarm) which could contain spaces and/or german characters.
-Are there any recommendations?
-
-
-I will recreate and resubmit the patch on monday.
-
-> best Regards,
-> J.
-thanks for review,
-Peter
+> ---
+> Hello,
+> 
+> this patch depends on patches already acked by Grant Likely and sitting
+> in Sascha Hauer's imx-for-2.6.37 branch.
+> 
+> Best regards
+> Uwe
+> 
+>  drivers/spi/spi_imx.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+> index 6bab2cf..55a38e2 100644
+> --- a/drivers/spi/spi_imx.c
+> +++ b/drivers/spi/spi_imx.c
+> @@ -77,6 +77,7 @@ struct spi_imx_devtype_data {
+>  	void (*trigger)(struct spi_imx_data *);
+>  	int (*rx_available)(struct spi_imx_data *);
+>  	void (*reset)(struct spi_imx_data *);
+> +	unsigned int fifosize;
+>  };
+>  
+>  struct spi_imx_data {
+> @@ -541,6 +542,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+>  		.trigger = mx1_trigger,
+>  		.rx_available = mx1_rx_available,
+>  		.reset = mx1_reset,
+> +		.fifosize = 8,
+>  	},
+>  #endif
+>  #ifdef CONFIG_SPI_IMX_VER_0_0
+> @@ -550,6 +552,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+>  		.trigger = mx27_trigger,
+>  		.rx_available = mx27_rx_available,
+>  		.reset = spi_imx0_0_reset,
+> +		.fifosize = 8,
+>  	},
+>  #endif
+>  #ifdef CONFIG_SPI_IMX_VER_0_4
+> @@ -559,6 +562,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+>  		.trigger = mx31_trigger,
+>  		.rx_available = mx31_rx_available,
+>  		.reset = spi_imx0_4_reset,
+> +		.fifosize = 8,
+>  	},
+>  #endif
+>  #ifdef CONFIG_SPI_IMX_VER_0_7
+> @@ -568,6 +572,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+>  		.trigger = mx31_trigger,
+>  		.rx_available = mx31_rx_available,
+>  		.reset = spi_imx0_4_reset,
+> +		.fifosize = 8,
+>  	},
+>  #endif
+>  #ifdef CONFIG_SPI_IMX_VER_2_3
+> @@ -577,6 +582,7 @@ static struct spi_imx_devtype_data spi_imx_devtype_data[] __devinitdata = {
+>  		.trigger = spi_imx2_3_trigger,
+>  		.rx_available = spi_imx2_3_rx_available,
+>  		.reset = spi_imx2_3_reset,
+> +		.fifosize = 64,
+>  	},
+>  #endif
+>  };
+> @@ -596,7 +602,7 @@ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
+>  
+>  static void spi_imx_push(struct spi_imx_data *spi_imx)
+>  {
+> -	while (spi_imx->txfifo < 8) {
+> +	while (spi_imx->txfifo < spi_imx->devtype_data.fifosize) {
+>  		if (!spi_imx->count)
+>  			break;
+>  		spi_imx->tx(spi_imx);
+> -- 
+> 1.7.2.3
+> 
