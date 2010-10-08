@@ -1,38 +1,49 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 8 Oct 2010 12:58:03 -0700
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101007192245.GC26435@n2100.arm.linux.org.uk>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-Message-ID: <20101008125803.e5bc7306.akpm@linux-foundation.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 8 Oct 2010 22:08:25 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <1286526197.4493.19.camel@sven>
+References: <1286177435.2140.5.camel@sven> <201010072323.05218.rjw@sisk.pl>
+	<1286526197.4493.19.camel@sven>
+Message-ID: <201010082208.25767.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Oct 2010 20:22:45 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
-> On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
-> > Many drivers are broken, and there's no alternative in sight. Such a big
-> > change should stay as a warning for now, and only later should it
-> > actually fail.
-> > 
-> > The drivers are not doing something correct, we get it, but for now it's
-> > better to allow them to work (they do 99% of the time anyway) rather
-> > than to force everyone to revert this patch in their internal trees
-> > until there's a solution. A slightly broken functionality is better than
-> > no functionality at all.
-> > 
-> > A warning lets people know that what they are doing is not right, and
-> > they should fix it.
+On Friday, October 08, 2010, Sven Neumann wrote:
+> On Thu, 2010-10-07 at 23:23 +0200, Rafael J. Wysocki wrote:
 > 
-> So what are _you_ going to do to fix these drivers?  Continue reverting
-> this patch?  Or are you just going to ignore the issue entirely?
+> > > > I wonder what happens if you echo 0 to /sys/power/pm_async ?
+> > > 
+> > > Nothing happens. The problem persists (tested with 2.6.36-rc7). What
+> > > would you expect to happen?
+> > 
+> > Exactly that. :-)
+> > 
+> > Commit 152e1d5920 should not affect the non-async case (I'd be surprised if
+> > it did really) and things should work with /sys/power/pm_async = 0 anyway.
+> > 
+> > Please try check if you can reproduce with commt 152e1d5920 reverted and
+> > /sys/power/pm_async = 0.  If you can, that's a driver bug.
 > 
-> Unless people can come up with a plan to fix their drivers using ioremap
-> on system RAM thereby violating the architecture specification, I'm
-> _not_ going to apply this patch.
+> Ok, for the record, here's what I tried. I have rebooted between tests
+> to make sure there's no state pulled in from the previous test:
+> 
+>  2.6.36-rc7, no changes,      pm_async 1 :  suspend fails
+>  2.6.36-rc7, no changes,      pm_async 0 :  suspend fails
+> 
+>  2.6.36-rc7, 152e1d reverted, pm_async 1 :  suspend works
+>  2.6.36-rc7, 152e1d reverted, pm_async 0 :  suspend fails
+> 
+>  2.6.34.7, no changes,        pm_async 1 :  suspend works
+>  2.6.34.7, no changes,        pm_async 0 :  suspend works
+> 
+> I am not sure how this should be interpreted.
 
-We *do* have a plan: as of 2.6.36, the kernel will emit a WARN_ON trace
-when a driver does this.  Offending code will be discovered, developers
-will get bug reports from worried users, etc.  This is usually pretty
-effective.
+There is a problem with the pxa2xx-mci.0 suspend that has been introduced
+some time after 2.6.34, but it is not related to commit 152e1d5920.  The
+problem was not visible with pm_async=1 because of the very bug fixed by
+commit 152e1d5920.
+
+Please see if the problem is there in 2.6.35 (please test with pm_async=0).
+
+Thanks,
+Rafael
