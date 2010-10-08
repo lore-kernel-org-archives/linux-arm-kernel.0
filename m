@@ -1,88 +1,38 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Fri, 8 Oct 2010 22:37:10 +0300
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 8 Oct 2010 12:58:03 -0700
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+In-Reply-To: <20101007192245.GC26435@n2100.arm.linux.org.uk>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+Message-ID: <20101008125803.e5bc7306.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 8, 2010 at 8:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 08, 2010 at 12:32:35PM +0300, Felipe Contreras wrote:
->> I think when _you_ remove functionality from the architecture, you
->> should provide a mechanism that drivers can migrate to. Since there's
->> nothing like that, not even a guideline, you are breaking the drivers
->> willingly, and expecting other people to fix a difficult problem that
->> you yourself have no idea how to fix properly.
->
-> We can either wait for people to complain about silent data corruption
-> or we can be compliant with the architecture specification. ?Which is
-> better - to avoid data corruption and be correct, or allow a system to
-> become flakey and corrupt people's data.
+On Thu, 7 Oct 2010 20:22:45 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-The data corruption would happen only on the memory areas that are
-doubly mapped, right? So the misbehavior would only be visible on the
-driver. Then what is better? A driver that works 99% of the time, or a
-driver that doesn't work at all?
+> On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
+> > Many drivers are broken, and there's no alternative in sight. Such a big
+> > change should stay as a warning for now, and only later should it
+> > actually fail.
+> > 
+> > The drivers are not doing something correct, we get it, but for now it's
+> > better to allow them to work (they do 99% of the time anyway) rather
+> > than to force everyone to revert this patch in their internal trees
+> > until there's a solution. A slightly broken functionality is better than
+> > no functionality at all.
+> > 
+> > A warning lets people know that what they are doing is not right, and
+> > they should fix it.
+> 
+> So what are _you_ going to do to fix these drivers?  Continue reverting
+> this patch?  Or are you just going to ignore the issue entirely?
+> 
+> Unless people can come up with a plan to fix their drivers using ioremap
+> on system RAM thereby violating the architecture specification, I'm
+> _not_ going to apply this patch.
 
-Besides, there are many ARMv6 and ARMv7 devices that are already
-shipping with this "wrong" ioremap() and I don't see them blowing up,
-so I presume whatever issue is caused by this cannot be so drastic as
-to not allow anybody doing this ever from the exact point you found
-the issue.
-
-Do you have a test that provides numbers on how often do issues popup,
-and under which situations?
-
-> What I care about is system correctness and people's data - having
-> multiple mappings with different attributes is documented in very clear
-> terms as being 'unpredictable' and therefore it isn't permissible to
-> allow the practice that worked with previous processors (inherently
-> due to their cache architecture) to continue forward onto processors
-> with a different cache architecture.
-
-Of course, it shouldn't be permissible, but you shouldn't just disable
-features from one release to the next, each time you find out they are
-not proper; there should be some grace period, specially if there's no
-alternative.
-
-> As already discussed, it's nigh on impossible to unmap the existing
-> direct mapped region (read the previous discussions about why this is)
-> - which is precisely why there is no direct alternative solution.
->
-> The only possible solution is to exclude some memory at boot time from
-> the system direct map so that it never appears in the direct map, and
-> use ioremap on _that_. ?Another possible alternative is to use highmem,
-> obtain highmem pages (making sure that it doesn't fall back to lowmem)
-> and remap them using interfaces such as vmap.
->
-> So there are solutions to the problem, but it seems that _no one_ is
-> willing to discuss it other than "we want our old way back".
-
-People have been discussing them, but you can't expect a perfect
-solution to pop up within one release cycle, specially when people
-have real issues to deal with.
-
-Be realistic, what is going to happen is that people are going to give
-up on having their drivers working on .26, revert the patch, and since
-the drivers are already not working, the fix can wait, right? Maybe
-after .27, or some other time, a seasoned developer would have time to
-get this fixed properly, or they are going to come with workarounds
-like manually reserving memory with mem= bootarg:
-http://article.gmane.org/gmane.linux.ports.arm.omap/44516
-
-> If you want the old way back, apply pressure to silicon vendors and
-> ARM Ltd to change the architecture to lift this restriction - which
-> will probably mean doing away with aggressive speculative prefetching
-> so that it's possible to predict what will be in the cache at any
-> point in time.
-
-Nobody is asking for the old way back, what is being asked is a *grace
-period*, have a warning right now, then disable completely later on.
-
--- 
-Felipe Contreras
+We *do* have a plan: as of 2.6.36, the kernel will emit a WARN_ON trace
+when a driver does this.  Offending code will be discovered, developers
+will get bug reports from worried users, etc.  This is usually pretty
+effective.
