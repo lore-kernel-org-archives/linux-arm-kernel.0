@@ -1,100 +1,85 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 8 Oct 2010 09:02:47 +0200
-Subject: [PATCH 2/2] MMCI: add SDIO support for ST Variants
-Message-ID: <1286521367-11824-1-git-send-email-linus.walleij@stericsson.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 8 Oct 2010 15:09:46 +0800
+Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
+In-Reply-To: <AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
+References: <20101006071731.28048.89938.sendpatchset@t400s>
+	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
+	<AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
+Message-ID: <AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds some minor variant data and trickery to enable SDIO
-on the ST Micro variants of MMCI/PL180.
+On Thu, Oct 7, 2010 at 2:39 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> Hi Eric,
+>
+> On Wed, Oct 6, 2010 at 10:06 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> ARM: Dynamic IRQ demux support
+>
+>> Just FYI, I had a patch months ago for this:
+>>
+>> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
+>>
+>> Do you think that's a simpler way to go?
+>
+> Thanks for the pointer. I wasn't aware of your patch, but the fact
+> that both of us came up with similar solutions to the same problem
+> clearly shows that there is a need for this feature.
+>
+> Your patch is much less intrusive compared to what i came up with. I
+> like the simplicity. I guess it is natural that the simplicity comes
+> with a bit of overhead. I'm thinking of the extra branches and
+> whatever potential cache misses coming from the code and callback
+> being located in different cache lines compared to the rest of the
+> code in __irq_svc and __irq_usr.
+>
+> My patches keeps the handlers in the same cache lines as before, but
+> this comes with the cost of more serious rearrangement of the code.
+> Also, my alignment_trap patch may decrease performance, not sure how
+> to deal with that in a good way.
 
-Signed-off-by: Marcin Mielczarczyk <marcin.mielczarczyk@tieto.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/host/mmci.c |   36 +++++++++++++++++++++++++++++++++++-
- 1 files changed, 35 insertions(+), 1 deletions(-)
+Yeah, I was thinking of the performance degradation at that time as well.
+What worried me most is actually the long jump. However, we do have
+a long jump to asm_do_IRQ anyway.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 09bcce7..cd9414b 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -19,6 +19,7 @@
- #include <linux/highmem.h>
- #include <linux/log2.h>
- #include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
-@@ -54,6 +55,7 @@ struct variant_data {
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
- 	bool			singleirq;
-+	bool			sdio;
- };
- 
- static struct variant_data variant_arm = {
-@@ -67,6 +69,7 @@ static struct variant_data variant_u300 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg_enable		= 1 << 13, /* HWFCEN */
- 	.datalength_bits	= 16,
-+	.sdio			= true,
- };
- 
- static struct variant_data variant_ux500 = {
-@@ -76,6 +79,7 @@ static struct variant_data variant_ux500 = {
- 	.clkreg_enable		= 1 << 14, /* HWFCEN */
- 	.datalength_bits	= 24,
- 	.singleirq		= true,
-+	.sdio			= true,
- };
- 
- /*
-@@ -217,6 +221,11 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
- 	}
- 
-+	/* The ST Micro variants has a special bit to enable SDIO */
-+	if (variant->sdio && host->mmc->card)
-+		if (mmc_card_sdio(host->mmc->card))
-+			datactrl |= MCI_ST_DPSM_SDIOEN;
-+
- 	writel(datactrl, base + MMCIDATACTRL);
- 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
- 	mmci_set_mask1(host, irqmask);
-@@ -415,7 +424,32 @@ static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int rem
- 			 variant->fifosize : variant->fifohalfsize;
- 		count = min(remain, maxcnt);
- 
--		writesl(base + MMCIFIFO, ptr, count >> 2);
-+		/*
-+		 * The ST Micro variant for SDIO transfer sizes
-+		 * less then 8 bytes should have clock H/W flow
-+		 * control disabled.
-+		 */
-+		if (variant->sdio &&
-+		    mmc_card_sdio(host->mmc->card)) {
-+			if (count < 8)
-+				writel(readl(host->base + MMCICLOCK) &
-+					~variant->clkreg_enable,
-+					host->base + MMCICLOCK);
-+			else
-+				writel(readl(host->base + MMCICLOCK) |
-+					variant->clkreg_enable,
-+					host->base + MMCICLOCK);
-+		}
-+
-+		/*
-+		 * SDIO especially may want to send something that is
-+		 * not divisible by 4 (as opposed to card sectors
-+		 * etc), and the FIFO only accept full 32-bit writes.
-+		 * So compensate by adding +3 on the count, a single
-+		 * byte become a 32bit write, 7 bytes will be two
-+		 * 32bit writes etc.
-+		 */
-+		writesl(base + MMCIFIFO, ptr, (count + 3) >> 2);
- 
- 		ptr += count;
- 		remain -= count;
--- 
-1.6.3.3
+And the optimizations like get_irqnr_preamble and get_irqnr_and_base
+can be carried out in C code as well, or if that's tricky enough, inline
+assembly code can also help.
+
+>
+> I don't mind so much which patch that gets merged, but I'm a little
+> bit concerned about code duplication. My patch moves macros into a
+> header file that each demux instance can make use of to minimize the
+> amount of duplicated code. I'm not sure how you are planning on
+> implementing each demux instance. If possible I'd like to see the
+> irq_handler macro in a header file somewhere so we don't have to
+> duplicate that code.
+
+Machines will have to specify their IRQ demux handler, which could be
+same among a group of machines which share common demux code, and
+thus duplication can be avoided.
+
+>
+> On top of that I'd also like to break out the GIC demux code and put
+> it in a central location, but that's a separate issue.
+
+I think we can make a common function call for all the IRQ demux handler
+for GIC then.
+
+>
+> Any thoughts? Shall I try to move the irq_handler macro to some header file?
+>
+
+Your patch is excellent, I don't mind either which gets in. What I'm a
+bit concerned is the effort to keep up with the mostly optimized code.
+I was thinking of a bit (not that much significant I guess) performance loss
+when multiple IRQ demux handler is required for the sake of simplicity
+and less intrusiveness, while still able to use the original optimized path
+when that's not required (i.e. turning CONFIG_.... off).
+
+Thoughts?
+
+> Thanks,
+>
+> / magnus
+>
