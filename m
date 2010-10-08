@@ -1,49 +1,85 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 8 Oct 2010 22:08:25 +0200
-Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
-In-Reply-To: <1286526197.4493.19.camel@sven>
-References: <1286177435.2140.5.camel@sven> <201010072323.05218.rjw@sisk.pl>
-	<1286526197.4493.19.camel@sven>
-Message-ID: <201010082208.25767.rjw@sisk.pl>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 08 Oct 2010 13:12:58 -0700
+Subject: [PATCH v2 01/10] OMAP: mach-omap2: Fix incorrect assignment
+	warnings
+In-Reply-To: <1285063280-4057-2-git-send-email-manjugk@ti.com> (Manjunath
+	Kondaiah G.'s message of "Tue, 21 Sep 2010 15:31:11 +0530")
+References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
+	<1285063280-4057-2-git-send-email-manjugk@ti.com>
+Message-ID: <878w28v3xx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 08, 2010, Sven Neumann wrote:
-> On Thu, 2010-10-07 at 23:23 +0200, Rafael J. Wysocki wrote:
-> 
-> > > > I wonder what happens if you echo 0 to /sys/power/pm_async ?
-> > > 
-> > > Nothing happens. The problem persists (tested with 2.6.36-rc7). What
-> > > would you expect to happen?
-> > 
-> > Exactly that. :-)
-> > 
-> > Commit 152e1d5920 should not affect the non-async case (I'd be surprised if
-> > it did really) and things should work with /sys/power/pm_async = 0 anyway.
-> > 
-> > Please try check if you can reproduce with commt 152e1d5920 reverted and
-> > /sys/power/pm_async = 0.  If you can, that's a driver bug.
-> 
-> Ok, for the record, here's what I tried. I have rebooted between tests
-> to make sure there's no state pulled in from the previous test:
-> 
->  2.6.36-rc7, no changes,      pm_async 1 :  suspend fails
->  2.6.36-rc7, no changes,      pm_async 0 :  suspend fails
-> 
->  2.6.36-rc7, 152e1d reverted, pm_async 1 :  suspend works
->  2.6.36-rc7, 152e1d reverted, pm_async 0 :  suspend fails
-> 
->  2.6.34.7, no changes,        pm_async 1 :  suspend works
->  2.6.34.7, no changes,        pm_async 0 :  suspend works
-> 
-> I am not sure how this should be interpreted.
+"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 
-There is a problem with the pxa2xx-mci.0 suspend that has been introduced
-some time after 2.6.34, but it is not related to commit 152e1d5920.  The
-problem was not visible with pm_async=1 because of the very bug fixed by
-commit 152e1d5920.
+> This patch fixes below sparse warnings for incorrect assignments.
 
-Please see if the problem is there in 2.6.35 (please test with pm_async=0).
+As pointed out by Jean, this patch fixed some sparse warnings, but also
+broke some things, specifically off mode.
 
-Thanks,
-Rafael
+In the future, *please* be sure to test the code paths that are being
+changed.  This patch changed some code that is only exercised during
+off-mode, but was clearly not tested with off mode enabled.
+
+As background for why this broke functionality, keep this in mind:
+
+ 	void *a = NULL;
+	u32 *b = NULL;
+
+a + 1 = 1
+b + 1 = 4
+
+IOW, you cannot simply replace a 'u32 *' by a 'void *' without checking
+and fixing any pointer arithmetic.
+
+[...]
+
+> diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+> index a8d20ee..7405936 100644
+> --- a/arch/arm/mach-omap2/control.c
+> +++ b/arch/arm/mach-omap2/control.c
+> @@ -190,7 +190,7 @@ void omap_ctrl_writel(u32 val, u16 offset)
+>  void omap3_clear_scratchpad_contents(void)
+>  {
+>  	u32 max_offset = OMAP343X_SCRATCHPAD_ROM_OFFSET;
+> -	u32 *v_addr;
+> +	void __iomem *v_addr;
+>  	u32 offset = 0;
+>  	v_addr = OMAP2_L4_IO_ADDRESS(OMAP343X_SCRATCHPAD_ROM);
+>  	if (prm_read_mod_reg(OMAP3430_GR_MOD, OMAP3_PRM_RSTST_OFFSET) &
+
+Interestingly, this one not only fixed the sparse warning but also fixed
+a bug. :) Before this change, only every 4th entry of the scratchpad was
+zeroed.
+
+> @@ -206,7 +206,7 @@ void omap3_clear_scratchpad_contents(void)
+>  /* Populate the scratchpad structure with restore structure */
+>  void omap3_save_scratchpad_contents(void)
+>  {
+> -	void * __iomem scratchpad_address;
+> +	void  __iomem *scratchpad_address;
+>  	u32 arm_context_addr;
+>  	struct omap3_scratchpad scratchpad_contents;
+>  	struct omap3_scratchpad_prcm_block prcm_block_contents;
+
+This one is fine.
+
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 7b03426..4af19a6 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -316,7 +316,7 @@ static void restore_control_register(u32 val)
+>  /* Function to restore the table entry that was modified for enabling MMU */
+>  static void restore_table_entry(void)
+>  {
+> -	u32 *scratchpad_address;
+> +	void __iomem *scratchpad_address;
+>  	u32 previous_value, control_reg_value;
+>  	u32 *address;
+
+This one changes the result of any 'scratchpad_address + foo'.  
+
+So, if this is changed from u32 to void, all the offsets used when
+adding to the base need to be changed as well.
+
+Kevin
