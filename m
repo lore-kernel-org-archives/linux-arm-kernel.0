@@ -1,128 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri,  8 Oct 2010 08:41:14 +0900
-Subject: [PATCH 1/6] rtc: rtc-s3c: Fix access unit from byte to word on RTCCON
-In-Reply-To: <1286494879-2932-1-git-send-email-kgene.kim@samsung.com>
-References: <1286494879-2932-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1286494879-2932-2-git-send-email-kgene.kim@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 07 Oct 2010 17:11:06 -0700
+Subject: [PATCH 1/3] [ARM] Translate delay.S into (mostly) C
+In-Reply-To: <alpine.LFD.2.00.1010061553350.3107@xanadu.home>
+References: <1285644827-6846-1-git-send-email-sboyd@codeaurora.org>
+	<1285644827-6846-2-git-send-email-sboyd@codeaurora.org>
+	<1286299355.18791.11.camel@c-dwalke-linux.qualcomm.com>
+	<4CABEECB.4030301@codeaurora.org>
+	<alpine.LFD.2.00.1010061024220.3107@xanadu.home>
+	<4CACC053.2090509@codeaurora.org>
+	<1286393743.22265.129.camel@m0nster>
+	<alpine.LFD.2.00.1010061553350.3107@xanadu.home>
+Message-ID: <4CAE619A.2050302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Changhwan Youn <chaos.youn@samsung.com>
+ On 10/06/2010 01:05 PM, Nicolas Pitre wrote:
+> You could use the noinline qualifier from <linux/compiler.h> with those 
+> functions you don't want inlined.
+>
 
-S3C2410_RTCCON of TYPE_S3C64XX RTC should be read/written by
-readw and writew, because TYPE_S3C64XX RTC uses bit 8 and 9.
-And TYPE_S3C2410 RTC also can access it by readw and writew.
+That won't help me for the interleaving behavior though.
 
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-[atul.dahiya at samsung.com: tested on smdk2416]
-Tested-by: Atul Dahiya <atul.dahiya@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- drivers/rtc/rtc-s3c.c |   36 ++++++++++++++++++------------------
- 1 files changed, 18 insertions(+), 18 deletions(-)
+>> Is it possible to do all this in assembly ? Can't you have the default
+>> implementation using this assembly with different function names, then
+>> just set the assembly function names in C code someplace?
+> That weould be my preference too.  Being in assembly means that this 
+> code is unlikely to change with different optimization levels and/or gcc 
+> versions which would otherwise require different calibration values. 
+> Relying on stable calibration is necessary for the lpj kernel cmdline 
+> parameter to have some meaning.
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index f57a87f..4a0b875 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -100,7 +100,7 @@ static int s3c_rtc_setpie(struct device *dev, int enabled)
- 	spin_lock_irq(&s3c_rtc_pie_lock);
- 
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
--		tmp = readb(s3c_rtc_base + S3C2410_RTCCON);
-+		tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
- 		tmp &= ~S3C64XX_RTCCON_TICEN;
- 
- 		if (enabled)
-@@ -318,7 +318,7 @@ static int s3c_rtc_proc(struct device *dev, struct seq_file *seq)
- 	unsigned int ticnt;
- 
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
--		ticnt = readb(s3c_rtc_base + S3C2410_RTCCON);
-+		ticnt = readw(s3c_rtc_base + S3C2410_RTCCON);
- 		ticnt &= S3C64XX_RTCCON_TICEN;
- 	} else {
- 		ticnt = readb(s3c_rtc_base + S3C2410_TICNT);
-@@ -391,11 +391,11 @@ static void s3c_rtc_enable(struct platform_device *pdev, int en)
- 		return;
- 
- 	if (!en) {
--		tmp = readb(base + S3C2410_RTCCON);
-+		tmp = readw(base + S3C2410_RTCCON);
- 		if (s3c_rtc_cpu_type == TYPE_S3C64XX)
- 			tmp &= ~S3C64XX_RTCCON_TICEN;
- 		tmp &= ~S3C2410_RTCCON_RTCEN;
--		writeb(tmp, base + S3C2410_RTCCON);
-+		writew(tmp, base + S3C2410_RTCCON);
- 
- 		if (s3c_rtc_cpu_type == TYPE_S3C2410) {
- 			tmp = readb(base + S3C2410_TICNT);
-@@ -405,25 +405,25 @@ static void s3c_rtc_enable(struct platform_device *pdev, int en)
- 	} else {
- 		/* re-enable the device, and check it is ok */
- 
--		if ((readb(base+S3C2410_RTCCON) & S3C2410_RTCCON_RTCEN) == 0){
-+		if ((readw(base+S3C2410_RTCCON) & S3C2410_RTCCON_RTCEN) == 0){
- 			dev_info(&pdev->dev, "rtc disabled, re-enabling\n");
- 
--			tmp = readb(base + S3C2410_RTCCON);
--			writeb(tmp|S3C2410_RTCCON_RTCEN, base+S3C2410_RTCCON);
-+			tmp = readw(base + S3C2410_RTCCON);
-+			writew(tmp|S3C2410_RTCCON_RTCEN, base+S3C2410_RTCCON);
- 		}
- 
--		if ((readb(base + S3C2410_RTCCON) & S3C2410_RTCCON_CNTSEL)){
-+		if ((readw(base + S3C2410_RTCCON) & S3C2410_RTCCON_CNTSEL)){
- 			dev_info(&pdev->dev, "removing RTCCON_CNTSEL\n");
- 
--			tmp = readb(base + S3C2410_RTCCON);
--			writeb(tmp& ~S3C2410_RTCCON_CNTSEL, base+S3C2410_RTCCON);
-+			tmp = readw(base + S3C2410_RTCCON);
-+			writew(tmp& ~S3C2410_RTCCON_CNTSEL, base+S3C2410_RTCCON);
- 		}
- 
--		if ((readb(base + S3C2410_RTCCON) & S3C2410_RTCCON_CLKRST)){
-+		if ((readw(base + S3C2410_RTCCON) & S3C2410_RTCCON_CLKRST)){
- 			dev_info(&pdev->dev, "removing RTCCON_CLKRST\n");
- 
--			tmp = readb(base + S3C2410_RTCCON);
--			writeb(tmp & ~S3C2410_RTCCON_CLKRST, base+S3C2410_RTCCON);
-+			tmp = readw(base + S3C2410_RTCCON);
-+			writew(tmp & ~S3C2410_RTCCON_CLKRST, base+S3C2410_RTCCON);
- 		}
- 	}
- }
-@@ -514,8 +514,8 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- 
- 	s3c_rtc_enable(pdev, 1);
- 
-- 	pr_debug("s3c2410_rtc: RTCCON=%02x\n",
--		 readb(s3c_rtc_base + S3C2410_RTCCON));
-+	pr_debug("s3c2410_rtc: RTCCON=%02x\n",
-+		 readw(s3c_rtc_base + S3C2410_RTCCON));
- 
- 	device_init_wakeup(&pdev->dev, 1);
- 
-@@ -578,7 +578,7 @@ static int s3c_rtc_suspend(struct platform_device *pdev, pm_message_t state)
- 	/* save TICNT for anyone using periodic interrupts */
- 	ticnt_save = readb(s3c_rtc_base + S3C2410_TICNT);
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
--		ticnt_en_save = readb(s3c_rtc_base + S3C2410_RTCCON);
-+		ticnt_en_save = readw(s3c_rtc_base + S3C2410_RTCCON);
- 		ticnt_en_save &= S3C64XX_RTCCON_TICEN;
- 	}
- 	s3c_rtc_enable(pdev, 0);
-@@ -596,8 +596,8 @@ static int s3c_rtc_resume(struct platform_device *pdev)
- 	s3c_rtc_enable(pdev, 1);
- 	writeb(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX && ticnt_en_save) {
--		tmp = readb(s3c_rtc_base + S3C2410_RTCCON);
--		writeb(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
-+		tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
-+		writew(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
- 	}
- 
- 	if (device_may_wakeup(&pdev->dev))
+Why doesn't any other architecture use assembly for their lpj code? They
+may use headers with assembly in them or C code with assembly in them,
+but they don't write all of the delay code in assembly and rely on
+function interleaving. This leads me to believe other arches aren't
+concerned about compiler optimizations breaking lpj cmdline parameters,
+so why should ARM be concerned?
+
+I tested the theory out and scaled down the CPU frequency to 19.2 MHz
+and then called calibrate_delay(). Before and after applying this series
+I got the same results.
+
+Calibrating delay loop... 12.67 BogoMIPS (lpj=63360)
+
+Jumping up to 1.2 GHz and calling calibrate_delay() gives me the same
+before and after
+
+Calibrating delay loop... 792.98 BogoMIPS (lpj=3964928)
+
+I don't have access to a machine capable of running slower than 19.2
+MHz. Maybe machines running in the KHz range would experience differences?
+
 -- 
-1.6.2.5
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
