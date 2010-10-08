@@ -1,43 +1,83 @@
-From: claude.youn@gmail.com (Seungwhan Youn)
-Date: Fri, 8 Oct 2010 19:55:27 +0900
-Subject: [PATCH 7/10] ARM: S5PV210: Fix wrong EPLL rate getting on setup
-	clocks
-In-Reply-To: <001e01cb66d4$c178a400$4469ec00$%kim@samsung.com>
-References: <1286191550-22197-1-git-send-email-sw.youn@samsung.com>
-	<1286193919-19830-1-git-send-email-sw.youn@samsung.com>
-	<001e01cb66d4$c178a400$4469ec00$%kim@samsung.com>
-Message-ID: <AANLkTim4epO5cmoGw9ub1ERgHxruvoC+dFLP=k6aYms9@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 8 Oct 2010 06:32:29 -0500
+Subject: [PATCH v4] ARM: Fix sparse warnings due to variables conflicts.
+In-Reply-To: <1286517186-29934-1-git-send-email-sourav.poddar@ti.com>
+References: <1286517186-29934-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <4CAF014D.7000909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 8, 2010 at 7:37 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Seungwhan Youn wrote:
->>
->> This patch fix wrong EPLL getting on setup clocks on S5PV210.
->>
->> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv210/clock.c ? ? ? ? ? ? ? ? ? | ? ?3 ++-
->> ?arch/arm/mach-s5pv210/include/mach/regs-clock.h | ? ?3 ++-
->> ?2 files changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
->> index 3f3b7ba..bcbe7e9 100644
->> --- a/arch/arm/mach-s5pv210/clock.c
->> +++ b/arch/arm/mach-s5pv210/clock.c
->> @@ -1040,7 +1040,8 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
->>
->> ? ? ? apll = s5p_get_pll45xx(xtal, __raw_readl(S5P_APLL_CON), pll_4508);
->> ? ? ? mpll = s5p_get_pll45xx(xtal, __raw_readl(S5P_MPLL_CON), pll_4502);
->> - ? ? epll = s5p_get_pll45xx(xtal, __raw_readl(S5P_EPLL_CON), pll_4500);
->> + ? ? epll = s5p_get_pll90xx(xtal, __raw_readl(S5P_EPLL_CON0),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_readl(S5P_EPLL_CON1));
->
-> Maybe you wanted to implement fractional PLL 4600B...not used 90xx in there.
-> So need to update plat/pll.h to epll of s5pv210.
->
+Poddar, Sourav had written, on 10/08/2010 12:53 AM, the following:
+> Fix the sparse warnings generated due to conflicts in variables used in readl/writel.
+> 
+> 
+> drivers/net/smc91x.c:312:8: warning: symbol '__v' shadows an earlier one
+> drivers/net/smc91x.c:312:8: originally declared here
+> 
+> With this change, about 200 sparse warnings are fixed.
+The commit message could be a little more detailed.
+see http://marc.info/?l=linux-omap&m=128648102511076&w=2
 
-Okay, I'll fix it and add PLL_4600B also.
+also should $subject say ARM: io: fix namespace conflict
+to better reflect the fix? sparse warnings are just an indication IMHO
 
-Thanks,
-Claude
+> 
+> 
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Charulatha V <charu@ti.com>
+> ---
+>  arch/arm/include/asm/io.h |   22 +++++++++++-----------
+>  1 files changed, 11 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 1261b1f..2daecb6 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -131,11 +131,11 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
+>  #define outl(v,p)		__raw_writel((__force __u32) \
+>  					cpu_to_le32(v),__io(p))
+>  
+> -#define inb(p)	({ __u8 __v = __raw_readb(__io(p)); __v; })
+> -#define inw(p)	({ __u16 __v = le16_to_cpu((__force __le16) \
+> -			__raw_readw(__io(p))); __v; })
+> -#define inl(p)	({ __u32 __v = le32_to_cpu((__force __le32) \
+> -			__raw_readl(__io(p))); __v; })
+> +#define inb(p)	({ __u8 __inbv = __raw_readb(__io(p)); __inbv; })
+> +#define inw(p)	({ __u16 __inwv = le16_to_cpu((__force __le16) \
+> +			__raw_readw(__io(p))); __inwv; })
+> +#define inl(p)	({ __u32 __inlv = le32_to_cpu((__force __le32) \
+> +			__raw_readl(__io(p))); __inlv; })
+>  
+>  #define outsb(p,d,l)		__raw_writesb(__io(p),d,l)
+>  #define outsw(p,d,l)		__raw_writesw(__io(p),d,l)
+> @@ -200,9 +200,9 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>  #define __iowmb()		do { } while (0)
+>  #endif
+>  
+> -#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
+> -#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
+> -#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+> +#define readb(c)		({ u8  __readbv = readb_relaxed(c); __iormb(); __readbv; })
+> +#define readw(c)		({ u16 __readwv = readw_relaxed(c); __iormb(); __readwv; })
+> +#define readl(c)		({ u32 __readlv = readl_relaxed(c); __iormb(); __readlv; })
+>  
+>  #define writeb(v,c)		({ __iowmb(); writeb_relaxed(v,c); })
+>  #define writew(v,c)		({ __iowmb(); writew_relaxed(v,c); })
+> @@ -258,9 +258,9 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>   * io{read,write}{8,16,32} macros
+>   */
+>  #ifndef ioread8
+> -#define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
+> -#define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })
+> -#define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
+> +#define ioread8(p)	({ unsigned int __ioread8v = __raw_readb(p); __iormb(); __ioread8v; })
+> +#define ioread16(p)	({ unsigned int __ioread16v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __ioread16v; })
+> +#define ioread32(p)	({ unsigned int __ioread32v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __ioread32v; })
+>  
+>  #define iowrite8(v,p)	({ __iowmb(); (void)__raw_writeb(v, p); })
+>  #define iowrite16(v,p)	({ __iowmb(); (void)__raw_writew((__force __u16)cpu_to_le16(v), p); })
+
+
+-- 
+Regards,
+Nishanth Menon
