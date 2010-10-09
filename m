@@ -1,76 +1,122 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 9 Oct 2010 19:18:56 +0300
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Oct 2010 17:45:17 +0100
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101009143709.GB25564@n2100.arm.linux.org.uk>
+In-Reply-To: <AANLkTi=Sv35ipSGzSoJMjdoNU-Qee9csviPL3yMSM3uf@mail.gmail.com>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101009092127.GB20975@n2100.arm.linux.org.uk>
-	<AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
-	<201010091311.26335.arnd@arndb.de>
-	<AANLkTikdxSQD+9UY70PtCPMgnrovx-dWjrrPJ0AZyG4X@mail.gmail.com>
-	<AANLkTi=37SCuwwze4KS_yOdmi8bvJP_OexHaYLw-AXfJ@mail.gmail.com>
-	<20101009143709.GB25564@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin-OpKVK+a=WPQFoPwCO7aJ4yTjqjw3EmGeBRBs@mail.gmail.com>
+	<20101009135210.GA25564@n2100.arm.linux.org.uk>
+	<AANLkTi=Sv35ipSGzSoJMjdoNU-Qee9csviPL3yMSM3uf@mail.gmail.com>
+Message-ID: <20101009164517.GA28183@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 9, 2010 at 5:37 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Oct 09, 2010 at 03:10:57PM +0300, Felipe Contreras wrote:
->> On Sat, Oct 9, 2010 at 2:43 PM, Dave Airlie <airlied@gmail.com> wrote:
->> >> The few drivers that may be hit by this are typically in drivers/staging
->> >> exactly because issues like this have not been fixed yet.
->> >>
->> >> We should probably just fix the non-staging drivers that are hit by
->> >> this now and declare the issue done.
->> >>
->> >> When you say that "many drivers broken", can you list the ones you know
->> >> about? It would probably help resolve this the right way.
->> >
->> > I'm guessing some closed source graphics drivers for ARM do all kinds
->> > of wrong crap, and Nokia use them a lot, and nobody wants to tell the
->> > closed vendors to change their drivers because it costs money.
->>
->> You are over simplifying things.
->>
->> ?1) The code is open[1]
->> ?2) the decision comes from TI, Nokia can only do so much before shipping
->
-> Well -
->
-> 1. TI had been complaining last December about vmalloc() creating mappings
-> ? with different shared-ness attributes causing problems with OMAP.
->
-> 2. May 10, TI on the three-weekly conference call were warned about this
-> ? change to ioremap with system RAM - and this was noted in the minutes
-> ? and circulated. ?It was brought up again on June 21st, and yet again
-> ? on August 2nd.
->
-> So, the major players in the OMAP community were repeatedly made plainly
-> aware of this change and some were aware of the problems caused by
-> violating these kinds of restrictions.
+On Sat, Oct 09, 2010 at 07:07:01PM +0300, Felipe Contreras wrote:
+> On Sat, Oct 9, 2010 at 4:52 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
+> >> For issues related to this:
+> >> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
+> >
+> > This one nicely shows some of the problems which can occur with the
+> > memory type attributes - and this is not attributable to ioremap().
+> >
+> > ioremap() is used to map devices. ?It creates device memory type mappings.
+> > If what you're mapping doesn't support device memory type mappings, then
+> > accesses via an ioremap()'d region isn't going to work - as this guy is
+> > observing.
+> >
+> > That's not because ioremap() is doing something wrong. ?It's doing what
+> > it's meant to do. ?The use is wrong, and is completely unrelated to the
+> > issue you've raised.
+> 
+> Ok, I was confused by Catalin's comment which does point to ioremap()
+> on normal RAM:
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/84504
 
-My point was that Nokia was not the main entity to blame.
+Me too - it doesn't appear to relate to the specified problem.  You
+don't want to map RAM as device nor strongly ordered, and we still
+don't know what this "MMR" is.
 
-But anyway, I'm not too fond of secret meetings, the issues should be
-discussed publicly.
+> >> http://article.gmane.org/gmane.linux.ports.sh.devel/8560
+> >
+> > This one we know about, and as I've already said, it ends up with three
+> > aliasing mappings each with different attributes thusly:
+> >
+> > ? ? ? ?cpu = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
+> > ? ? ? ?dma_declare_coherent_memory(dev, dma, dma, size, DMA_MEMORY_MAP);
+> > ? ? ? ? ? ? ? ?==> ioremap(dma, size);
+> > ? ? ? ?...
+> > ? ? ? ?dma_alloc_coherent(dev, ...);
+> >
+> > This wasn't spotted in the review of sh-mobile code because it's not part
+> > of the sh-mobile code base, but some of the generic sh architecture code.
+> > sh-mobile went into the kernel on March 12th, so it does pre-date the
+> > change to ioremap, and is therefore technically a regression.
+> >
+> > However, as can be seen from the link above, it's been known about since
+> > 8th August - two months ago. ?The problem has been discussed, and we had
+> > a good solution which would work. ?But then an oar got thrown in which
+> > basically resulted in that solution being rejected - on the basis that
+> > "it's an established API and it must work".
+> 
+> I don't see anyone rejecting any solution there. Where is anybody
+> saying "it's an established API and it must work"?
 
-> You tell me - if I've raised the issue on the mailing list to which OMAP
-> people are aware of (and note that there was a reply from OMAP folk in
-> the inital thread), if I've raised it several times with TI in conference
-> calls which include the major players, and still OMAP drivers are doing
-> things wrongly.
->
-> You can lead the horse to water but you can not make it drink. ?At some
-> point it either drinks or dies. ?In this case, it seems death is the
-> favoured option as the warnings have been repeatedly ignored.
+In a follow-on thread.
 
-TI is not the owner of their drivers; the community is. I don't see
-any mail from you on the linux-omap mailing list warning about
-ioremap() changing behavior, nor do I think that would have been
-enough warning, for OMAP, SH, or anybody else that might be affected.
+http://lists.arm.linux.org.uk/lurker/thread/20100820.200530.9bd67b3a.en.html
 
-All you are being asked is to make *one* release where the warning is
-enabled but the behavior is not changed.
+> > Well, this usage of the API doesn't work on x86!
+> >
+> > The result - progress on the issue hit a brick wall and is unable to
+> > proceed because of personal viewpoints conflicting with reality.
+> 
+> Can you concentrate on the patch at hand?
+> http://article.gmane.org/gmane.linux.kernel/1045670
+> 
+> This doesn't break anything, nor prevents anyone coming up with solutions.
 
--- 
-Felipe Contreras
+and provides no motivation to fix anything either.
+
+> >> http://www.spinics.net/lists/linux-fbdev/msg01745.html
+> >
+> > External user? ?Unreviewed code? ?You can't seriously be suggesting
+> > that we should care about code we haven't seen which is sitting
+> > externally to the kernel tree, and this is a valid reason to hold
+> > off on changes to the kernel.
+> 
+> It's a plus, not the main reason to apply this patch. However,
+> progress is not held by any means, people can still fix their drivers,
+> generic solutions can still be proposed and worked on... This patch
+> doesn't hurt anybody.
+> 
+> You haven't answered my question: what is so horrible about warning
+> only on .36, and disallowing on .37?
+
+My objection is one of methodology.
+
+It's been known for six months that this change was going to be made.
+It was discussed at the time it was proposed, and omapfb was raised as
+a concern by OMAP people.
+
+Most of the relevant parties (except sh-mobile as it wasn't obvious)
+had been told.  The patch went in about three months ago.  Only now is
+a major fuss being made over it.
+
+If precisely nothing has happened in six months, inspite of my (repeated)
+warnings that this change will hit mainline, then what hope is there that
+giving a further three month grace in any form will be respected to get
+drivers into shape?  If people can't get the idea with six months of
+warning, then what is the use of adding such a restriction when no one
+takes any notice of it anyway?
+
+There's two ways to deal with no progress inspite of repeated warnings -
+you either drop the issue, forget it ever existed and let people find the
+resulting problems, or you force the issue.
+
+I chose the latter, and yes, I expected that people will complain.  It
+gets the issue _far_ higher in peoples sights than adding silly WARN_ON
+stuff which all too easily gets ignored.  If email messages and verbal
+discussions get ignored, what hope is there for a one-line kernel message
+amongst 75 lines of kernel spew?
+
+I doubt that a WARN_ON will result in any progress on the issue.
