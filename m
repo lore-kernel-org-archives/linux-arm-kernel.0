@@ -1,122 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Oct 2010 17:45:17 +0100
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 09 Oct 2010 13:38:33 -0400 (EDT)
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <AANLkTi=Sv35ipSGzSoJMjdoNU-Qee9csviPL3yMSM3uf@mail.gmail.com>
+In-Reply-To: <AANLkTi=BvXROFEnzYykoUQNbU05Q=mWoV3t7qKDk7+vL@mail.gmail.com>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101009135210.GA25564@n2100.arm.linux.org.uk>
-	<AANLkTi=Sv35ipSGzSoJMjdoNU-Qee9csviPL3yMSM3uf@mail.gmail.com>
-Message-ID: <20101009164517.GA28183@n2100.arm.linux.org.uk>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<20101008231926.GA28235@kroah.com>
+	<alpine.LFD.2.00.1010082242390.3107@xanadu.home>
+	<AANLkTi=BvXROFEnzYykoUQNbU05Q=mWoV3t7qKDk7+vL@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1010091125190.20826@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 09, 2010 at 07:07:01PM +0300, Felipe Contreras wrote:
-> On Sat, Oct 9, 2010 at 4:52 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
-> >> For issues related to this:
-> >> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
+On Sat, 9 Oct 2010, Felipe Contreras wrote:
+
+> On Sat, Oct 9, 2010 at 6:36 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Fri, 8 Oct 2010, Greg KH wrote:
+> >> Wait, let me get this straight:
+> >> ? - drivers used to work on 2.6.35
 > >
-> > This one nicely shows some of the problems which can occur with the
-> > memory type attributes - and this is not attributable to ioremap().
-> >
-> > ioremap() is used to map devices. ?It creates device memory type mappings.
-> > If what you're mapping doesn't support device memory type mappings, then
-> > accesses via an ioremap()'d region isn't going to work - as this guy is
-> > observing.
-> >
-> > That's not because ioremap() is doing something wrong. ?It's doing what
-> > it's meant to do. ?The use is wrong, and is completely unrelated to the
-> > issue you've raised.
+> > Possibly on pre ARMv6 only. ?On ARMv6 and above, the discussed behavior
+> > _never_ worked. ?It is fundamental to the CPU design.
 > 
-> Ok, I was confused by Catalin's comment which does point to ioremap()
-> on normal RAM:
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/84504
+> That's not true, drivers on ARMv6 and above do work.
 
-Me too - it doesn't appear to relate to the specified problem.  You
-don't want to map RAM as device nor strongly ordered, and we still
-don't know what this "MMR" is.
+So you want to fool yourself?  Fine.  This is your problem.
 
-> >> http://article.gmane.org/gmane.linux.ports.sh.devel/8560
+> I still wonder how exactly to trigger the issue, and how often does 
+> this happen, because I've never seen it.
+
+It's not because you don't see it right away that this is not happening.
+
+> I trust the experts that it is an issue, but I don't agree that
+> drivers that are currently working on ARMv6+ should be broken on
+> purpose right away.
+
+They are not working *reliably*.  Get that notion out of your mind.
+
+> >> ? - some ARM core code changed in .36-rc to fix this iomem problem that
+> >> ? ? you found
 > >
-> > This one we know about, and as I've already said, it ends up with three
-> > aliasing mappings each with different attributes thusly:
-> >
-> > ? ? ? ?cpu = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
-> > ? ? ? ?dma_declare_coherent_memory(dev, dma, dma, size, DMA_MEMORY_MAP);
-> > ? ? ? ? ? ? ? ?==> ioremap(dma, size);
-> > ? ? ? ?...
-> > ? ? ? ?dma_alloc_coherent(dev, ...);
-> >
-> > This wasn't spotted in the review of sh-mobile code because it's not part
-> > of the sh-mobile code base, but some of the generic sh architecture code.
-> > sh-mobile went into the kernel on March 12th, so it does pre-date the
-> > change to ioremap, and is therefore technically a regression.
-> >
-> > However, as can be seen from the link above, it's been known about since
-> > 8th August - two months ago. ?The problem has been discussed, and we had
-> > a good solution which would work. ?But then an oar got thrown in which
-> > basically resulted in that solution being rejected - on the basis that
-> > "it's an established API and it must work".
+> > Nothing was fixed. ?There is nothing to fix. ?Simply that a wrong driver
+> > assumption about the hardware capability was prohibited by the API.
 > 
-> I don't see anyone rejecting any solution there. Where is anybody
-> saying "it's an established API and it must work"?
+> Not exactly. There is supposedly a problem on ARMv6+, there must be a
+> mechanism to avoid this problem, all drivers should migrate to that,
+> or a different on, so that we have a sane API.
 
-In a follow-on thread.
+Exact.  So please put the necessary effort to 1) understand the issue 
+which was clearly explained in details by RMK already, or simply read 
+the ARM Architecture Reference Manual for yourself, so that you 
+understand the issue and stop asking for unreasonable things, and 2) do 
+invest some time to fix your code that never worked properly in the 
+first place.
 
-http://lists.arm.linux.org.uk/lurker/thread/20100820.200530.9bd67b3a.en.html
+> > There is no API change. ?Simply an API misuse. ?Granted, on pre ARMv6
+> > this usage used to work, but on ARMv6 and above this never was supported
+> > at all by the hardware. ?The fact that the software has let it through
+> > was a gross mistake, period.
+> 
+> No. It worked just fine, now it's doesn't, that's a change in API
+> behavior, which is also part of the API. It might not be ideal, or
+> proper, but it does work.
 
-> > Well, this usage of the API doesn't work on x86!
+Look, if you can't be brought to reason and common sense this will be my 
+last reply to you.
+
+What would you say if someone suggested to turn the spinlocks into 
+no-ops in a SMP kernel with full preemption configured in?  Let's say 
+that person has done that because the lock validator was complaining and 
+removing the locks made the warnings as well as the deadlock go away?  
+And that person is claiming that the driver now works just fine (or 
+appears to work) and no issue what so ever has been observed?  Because 
+that's exactly what you're asking for right now.  Except that in this 
+case you are willing to ignore a hardware race instead of a software 
+one.
+
+> >> ? - drivers break when run as the api stops returning valid addresses
 > >
-> > The result - progress on the issue hit a brick wall and is unable to
-> > proceed because of personal viewpoints conflicting with reality.
+> > Such drivers on ARMv6 should *never* have worked in the first place.
+> > When they did "work", they corrupted memory.
 > 
-> Can you concentrate on the patch at hand?
-> http://article.gmane.org/gmane.linux.kernel/1045670
-> 
-> This doesn't break anything, nor prevents anyone coming up with solutions.
+> They corrupted their own memory, right? And on _very_ rare occasions I
+> presume, since I've never seen it.
 
-and provides no motivation to fix anything either.
+Not their own memory, but *ANY* random memory.  You could corrupt your 
+filesystem, have bugs in totally unrelated drivers, and so in ways that 
+are totally unpredictable and unreproducible.  Is that the kind of 
+system you want to debug?  If you have customers, is that the kind of 
+products you want to sell them?
 
-> >> http://www.spinics.net/lists/linux-fbdev/msg01745.html
+> If so, there's no damage in letting
+> them work at least one more release (2.6.36).
+
+On what basis can you dare make such a foolish claim?  Only on your 
+limited testing and own observations?  Do you have some insider 
+knowledge of the ARM architecture that would give us confidence in 
+ignoring written documentation about this very issue?  What about those 
+people besides you who did experience problems before?
+
+If you want that, then do it in your own tree, oh and let me remember to 
+ignore any future request for help from you.  But the mainline tree has 
+to be proper regardless of the inconvenience that may cause you, 
+_especially_ when data integrity is at stake.
+
+> >> ? - no known way is around to fix the broken drivers
 > >
-> > External user? ?Unreviewed code? ?You can't seriously be suggesting
-> > that we should care about code we haven't seen which is sitting
-> > externally to the kernel tree, and this is a valid reason to hold
-> > off on changes to the kernel.
+> > That's B/s. ?As Russell said, there are known solutions that were
+> > proposed at least six months ago.
 > 
-> It's a plus, not the main reason to apply this patch. However,
-> progress is not held by any means, people can still fix their drivers,
-> generic solutions can still be proposed and worked on... This patch
-> doesn't hurt anybody.
-> 
-> You haven't answered my question: what is so horrible about warning
-> only on .36, and disallowing on .37?
+> You seriously think most people out there know how to "set aside some
+> RAM at boot time"?
 
-My objection is one of methodology.
+Indeed I do.  That is not rocket science.  You can easily figure it 
+yourself too.
 
-It's been known for six months that this change was going to be made.
-It was discussed at the time it was proposed, and omapfb was raised as
-a concern by OMAP people.
+> I don't, otherwise the drivers would be fixed by now.
 
-Most of the relevant parties (except sh-mobile as it wasn't obvious)
-had been told.  The patch went in about three months ago.  Only now is
-a major fuss being made over it.
+And that's why you want me to accept your argument for restoring a 
+broken behavior?
 
-If precisely nothing has happened in six months, inspite of my (repeated)
-warnings that this change will hit mainline, then what hope is there that
-giving a further three month grace in any form will be respected to get
-drivers into shape?  If people can't get the idea with six months of
-warning, then what is the use of adding such a restriction when no one
-takes any notice of it anyway?
+Go do your homework and fix your code.
 
-There's two ways to deal with no progress inspite of repeated warnings -
-you either drop the issue, forget it ever existed and let people find the
-resulting problems, or you force the issue.
 
-I chose the latter, and yes, I expected that people will complain.  It
-gets the issue _far_ higher in peoples sights than adding silly WARN_ON
-stuff which all too easily gets ignored.  If email messages and verbal
-discussions get ignored, what hope is there for a one-line kernel message
-amongst 75 lines of kernel spew?
-
-I doubt that a WARN_ON will result in any progress on the issue.
+Nicolas
