@@ -1,5 +1,5 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 8 Oct 2010 17:00:46 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Oct 2010 01:10:52 +0100
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
 In-Reply-To: <20101008234448.GD10975@n2100.arm.linux.org.uk>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
@@ -10,43 +10,11 @@ References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 	<20101008230451.GB10975@n2100.arm.linux.org.uk>
 	<20101008232539.GA28697@kroah.com>
 	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-Message-ID: <20101009000046.GA30616@kroah.com>
+Message-ID: <20101009001052.GA14675@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Oct 09, 2010 at 12:44:48AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Oct 08, 2010 at 04:25:39PM -0700, Greg KH wrote:
-> > I doubt that people even noticed that this was a problem.
-> 
-> So what you're telling me is that ARM SoC people don't read the
-> ARM kernel mailing list?  I might as well stop posting patches
-> if no one's paying attention then! :-P
-> 
-> Reality is that it was discussed, and I did propose solutions at
-> the time.
-
-Heh, fair enough
-
-> > Unless you throw a run-time warning at them, or even better, break the
-> > build of their drivers, they will not notice.
-> > 
-> > Also, how can we fix this in a driver, what is the proper steps to do
-> > so?
-> 
-> On April 23rd:
-> | I think a viable safe solution is to set aside some RAM at boot (which
-> | the kernel doesn't manage at all) and then use ioremap on that; that
-> | approach will still work with this patch in place.
-> 
-> On April 30th when discussing the omapfb driver:
-> | There's really one option for this - in the machine's fixup handler, you
-> | can walk the meminfo array and kick out some memory from that.  This will
-> | prevent the kernel mapping that memory and make pfn_valid() fail for that
-> | memory range.  Another advantage of this is that it won't break when we
-> | switch to LMB.
-
-Ah, but no drivers have been fixed in any of these ways yet?
-
 > So, as I say, there's been six months.  It was discussed.  But still
 > we find that the drivers haven't been touched and now we're complaining
 > that drivers are breaking.
@@ -63,13 +31,50 @@ Ah, but no drivers have been fixed in any of these ways yet?
 > want the ioremap-on-system-RAM to just work, and then we'll hit this
 > exact same issue again in three months time.
 
-But you can't expect that you make this change, and not fix up the
-drivers, and people would be happy, right?  The rule for API changes
-like this, or anything, is that the person making the change fixes the
-other drivers, and that seems to be the issue here.
+There is another solution to this which will be architecturally compliant
+- as we can detect system ram ioremaps, we can force them to have the
+same memory type, sharability and cache attributes as the existing
+mappings rather than merely failing them.  But this is not what drivers
+want.
 
-Any pointers to patches where people have fixed up the drivers?
+The reason they play the ioremap-system-RAM game is to get around the
+DMA coherence issues - rather than using the DMA API, because that
+suffers from being incapable of dealing with large contiguous chunks
+of memory.
 
-thanks,
+Anyway, to fill other observers in, the issue here is:
+- ARMv6 and above have weak memory ordering models.
 
-greg k-h
+- ARMv6 and above can speculatively prefetch from any region which has
+  a 'normal memory' type.  As further hardware revisions are released,
+  the speculative prefetch becomes progressively more aggressive.
+
+- multiple mappings of the same physical address region with differing
+  memory type (strongly ordered, device, normal memory) becomes
+  unpredictable.  The memory type partly defines which reads/writes are
+  allowed to bypass other reads/writes.  Unpredictable here means that
+  there is no guarantee whether the access performed via the mapping
+  you've created will be done as per the memory type specified in that
+  mapping.
+
+- multiple mappings of the same physical address region with differing
+  sharability attributes have been observed to cause systems to crash/hang,
+  but fall under the 'unpredictable' behaviour - which basically means
+  you don't know if the coherence hardware will be involved in the
+  access.
+
+- multiple mappings of the same physical address region with differing
+  cache attributes is also unpredictable - you can't guarantee whether
+  the access will be performed using the cache attributes through the
+  mapping you're performing the access through.
+
+In the case of system memory, this is normally mapped as 'normal memory'
+with write-back cache.  On uniprocessor systems, this is mapped as
+non-shared memory.
+
+ioremap() creates 'device' type mappings, which are marked as shared
+(some devices, the shared-ness is used as another address bit!)
+
+So, permitting ioremap of system RAM violates all three - which means
+there is no guarantee of ordering, sharedness or cache behaviour via
+mappings which alias with differing attributes.
