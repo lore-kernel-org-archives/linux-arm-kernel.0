@@ -1,129 +1,140 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 9 Oct 2010 18:18:34 +0800
-Subject: [GIT PULL] pxa patches for next
-Message-ID: <AANLkTikAz-tazXLBia-e_eqt23kz74dCrcCkfO+ftU6f@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 9 Oct 2010 13:28:19 +0300
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101009092127.GB20975@n2100.arm.linux.org.uk>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
+	<20101009092127.GB20975@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cb655d0f3d57c23db51b981648e452988c0223f9:
-  Linus Torvalds (1):
-        Linux 2.6.36-rc7
+On Sat, Oct 9, 2010 at 12:21 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Oct 09, 2010 at 03:56:23AM +0300, Felipe Contreras wrote:
+>> 2010/10/9 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > On Fri, Oct 08, 2010 at 04:25:39PM -0700, Greg KH wrote:
+>> >> Also, how can we fix this in a driver, what is the proper steps to do
+>> >> so?
+>> >
+>> > On April 23rd:
+>> > | I think a viable safe solution is to set aside some RAM at boot (which
+>> > | the kernel doesn't manage at all) and then use ioremap on that; that
+>> > | approach will still work with this patch in place.
+>> >
+>> > On April 30th when discussing the omapfb driver:
+>> > | There's really one option for this - in the machine's fixup handler, you
+>> > | can walk the meminfo array and kick out some memory from that. ?This will
+>> > | prevent the kernel mapping that memory and make pfn_valid() fail for that
+>> > | memory range. ?Another advantage of this is that it won't break when we
+>> > | switch to LMB.
+>>
+>> These are not solutions, these are pointers to find the solutions.
+>>
+>> How do you set aside some RAM at boot for that? Is there anything like
+>> memblock to do that? Or do you expect to set aside some memory with
+>> mem=X, and manually specify the address in the .config?
+>
+> Which bit of "walk the meminfo array and kick out some memory from that"
+> says "use memblock" or "use mem=X" ?
+>
+> static unsigned long reserve_mem(struct meminfo *mi, unsigned long size)
+> {
+> ? ? ? ?unsigned long addr = ~0;
+> ? ? ? ?int i;
+>
+> ? ? ? ?for (i = mi->nr_banks - 1; i >= 0; i--)
+> ? ? ? ? ? ? ? ?if (mi->bank[i].size >= size) {
+> ? ? ? ? ? ? ? ? ? ? ? ?mi->bank[i].size -= size;
+> ? ? ? ? ? ? ? ? ? ? ? ?addr = mi->bank[i].start + mi->bank[i].size;
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ?return addr;
+> }
+>
+> static void __init my_fixup(struct machine_desc *desc, struct tag *tags,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ?char **cmdline, struct meminfo *mi)
+> {
+> ? ? ? ?omapfb_buffer_phys = reserve_mem(mi, 32*1048576);
+> ? ? ? ?if (omapfb_buffer_phys == ~0)
+> ? ? ? ? ? ? ? ?pr_warn("Unable to allocate omapfb buffer\n");
+> }
+>
+> Then later:
+>
+> ? ? ? ?omapfb_buffer = ioremap(omapfb_buffer_phys, 32*1048576);
+>
+> That's a damned simple and direct implementation of exactly what I
+> described, and results in something which is much more architecturally
+> correct than what's going on today.
 
-are available in the git repository at:
+This is only for omapfb, isn't it? Or is this a generic solution?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+If it's a generic solution can we put this into arch/arm/mm? What is
+simple and direct for you is something that would take a long long
+time for other people to come with (if ever).
 
-Haojian Zhuang (7):
-      ARM: pxa: encode IRQ number into .nr_irqs
-      ARM: pxa168fb: add .remove function
-      ARM: pxa: append tavorevb3 support
-      ARM: mmp: support sparse irq
-      ARM: pxa: reduce the scope of get_clk_frequency_khz()
-      ARM: pxa: reduce the scope of get_memclk_frequency_10khz()
-      ARM: mmp: update cpuid of pxa168 and pxa910
+>> > Unfortunately, what I fear is that nothing will happen because people
+>> > want the ioremap-on-system-RAM to just work, and then we'll hit this
+>> > exact same issue again in three months time.
+>>
+>> Nobody has ever said, or suggested anything like that.
+>>
+>> What people want is:
+>> 1) A solution in place
+>> 2) Time to implement that solution in their drivers
+>
+> Six months, and by your own emails, everyone reverting the change rather
+> than fixing producing their drivers. ?That says it all about what kind
+> of attitude driver writers have towards architectural issues.
+>
+> If they've been reverting the change, then they _do_ know about the issue,
+> so why have there been _zero_ patches from these people who are reverting
+> the change? ?Maybe you should be asking these people why they haven't done
+> any work to fix the drivers when one of the solutions starts off as about
+> 15 lines of code.
 
-Igor Grinberg (3):
-      ARM: pxa: add U2D controller and ULPI driver for pxa3xx
-      ARM: ohci-pxa27x: enable OHCI over U2DC for pxa3xx
-      ARM: pxa/cm-x300: enable USB host port2
+No, I said people _will_ revert the patch. I'm pretty sure the vast
+majority of people haven't even realized this change yet.
 
-Marek Vasut (2):
-      ARM: pxa: fix pxa3xx-u2d crash when ULPI not used
-      ARM: pxa/balloon3: Disperse MFP config
+What you should have done IMO is only warn first. This would have had
+no problem getting into 2.6.35, as it doesn't break anything, then
+most people would have noticed this by now.
 
-Mark F. Brown (11):
-      ARM: pxa168: added framebuffer support code
-      ARM: pxa168/aspenite: added initial support for TPO TD043MTEA1 LCD
-      ARM: pxa: moved pxa27x_keypad.h to platform pxa directory
-      ARM: pxa168: added keypad support
-      ARM: pxa168: added wake clear register support for APMU
-      ARM: pxa27x_keypad: added wakeup event handler for keypad interrupts
-      ARM: pxa168: added keypad wake clear event support for platform
-      ARM: pxa168/aspenite: add board support for keypad
-      ARM: pxa168: added support for Teton BGA platform
-      ARM: pxa168/teton bga: added keypad support
-      ARM: pxa168/teton bga: add board support for i2c and rtc-ds1337
+Also, what do you think is the right attitude? Do you think *all*
+driver writers should follow each and every patch on the mailing list
+or always try release candidates? Even if they all did (some do),
+there's no generic solution, so they all are scratching their heads
+about how to solve this. It might be crystal clear for you how such
+generic solution could be implemented, or perhaps how some of these
+drivers can be fixed individually, if so, why don't you come with a
+proposal to mitigate the pain of fixing such drivers.
 
- MAINTAINERS                                        |    5 +
- arch/arm/Kconfig                                   |    2 +
- arch/arm/mach-mmp/Kconfig                          |    7 +
- arch/arm/mach-mmp/Makefile                         |    1 +
- arch/arm/mach-mmp/aspenite.c                       |   90 +++++
- arch/arm/mach-mmp/common.c                         |   10 +
- arch/arm/mach-mmp/flint.c                          |    4 +
- arch/arm/mach-mmp/include/mach/cputype.h           |   49 ++-
- arch/arm/mach-mmp/include/mach/irqs.h              |    4 +-
- arch/arm/mach-mmp/include/mach/mfp-pxa168.h        |    7 +
- arch/arm/mach-mmp/include/mach/pxa168.h            |   20 +
- arch/arm/mach-mmp/include/mach/regs-apmu.h         |   12 +
- arch/arm/mach-mmp/include/mach/teton_bga.h         |   27 ++
- arch/arm/mach-mmp/jasper.c                         |    5 +-
- arch/arm/mach-mmp/pxa168.c                         |   16 +
- arch/arm/mach-mmp/teton_bga.c                      |   91 +++++
- arch/arm/mach-mmp/ttc_dkb.c                        |    4 +
- arch/arm/mach-pxa/Kconfig                          |   27 +-
- arch/arm/mach-pxa/Makefile                         |    3 +-
- arch/arm/mach-pxa/balloon3.c                       |  105 ++++--
- arch/arm/mach-pxa/cm-x2xx.c                        |    4 +
- arch/arm/mach-pxa/cm-x300.c                        |   77 ++++
- arch/arm/mach-pxa/cpufreq-pxa3xx.c                 |    5 +-
- arch/arm/mach-pxa/devices.c                        |   30 ++-
- arch/arm/mach-pxa/devices.h                        |    1 +
- arch/arm/mach-pxa/em-x270.c                        |    2 +-
- arch/arm/mach-pxa/eseries.c                        |    7 +
- arch/arm/mach-pxa/ezx.c                            |   10 +-
- arch/arm/mach-pxa/generic.c                        |    6 +-
- arch/arm/mach-pxa/generic.h                        |    2 -
- arch/arm/mach-pxa/hx4700.c                         |    1 +
- arch/arm/mach-pxa/include/mach/balloon3.h          |    2 +
- arch/arm/mach-pxa/include/mach/eseries-irq.h       |    1 +
- arch/arm/mach-pxa/include/mach/hx4700.h            |    1 +
- arch/arm/mach-pxa/include/mach/irqs.h              |   42 +--
- arch/arm/mach-pxa/include/mach/littleton.h         |    2 +
- arch/arm/mach-pxa/include/mach/lpd270.h            |    1 +
- arch/arm/mach-pxa/include/mach/lubbock.h           |    3 +
- arch/arm/mach-pxa/include/mach/magician.h          |    2 +
- arch/arm/mach-pxa/include/mach/mainstone.h         |    2 +
- arch/arm/mach-pxa/include/mach/mfp-pxa930.h        |    7 +
- arch/arm/mach-pxa/include/mach/pcm027.h            |    2 +
- arch/arm/mach-pxa/include/mach/poodle.h            |    2 +
- arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h        |   35 ++
- arch/arm/mach-pxa/include/mach/tosa.h              |    1 +
- arch/arm/mach-pxa/include/mach/zeus.h              |    2 +
- arch/arm/mach-pxa/include/mach/zylonite.h          |    2 +
- arch/arm/mach-pxa/littleton.c                      |    3 +-
- arch/arm/mach-pxa/lpd270.c                         |    1 +
- arch/arm/mach-pxa/lubbock.c                        |    3 +-
- arch/arm/mach-pxa/magician.c                       |    1 +
- arch/arm/mach-pxa/mainstone.c                      |    3 +-
- arch/arm/mach-pxa/mioa701.c                        |    2 +-
- arch/arm/mach-pxa/palmld.c                         |    2 +-
- arch/arm/mach-pxa/palmt5.c                         |    2 +-
- arch/arm/mach-pxa/palmtreo.c                       |    2 +-
- arch/arm/mach-pxa/palmtx.c                         |    2 +-
- arch/arm/mach-pxa/palmz72.c                        |    2 +-
- arch/arm/mach-pxa/pcm027.c                         |    1 +
- arch/arm/mach-pxa/poodle.c                         |    1 +
- arch/arm/mach-pxa/pxa3xx-ulpi.c                    |  400 ++++++++++++++++++++
- arch/arm/mach-pxa/pxa3xx.c                         |   19 +-
- arch/arm/mach-pxa/pxa930.c                         |    2 +-
- arch/arm/mach-pxa/stargate2.c                      |    3 +
- arch/arm/mach-pxa/tavorevb.c                       |    2 +-
- arch/arm/mach-pxa/tavorevb3.c                      |  136 +++++++
- arch/arm/mach-pxa/tosa.c                           |    1 +
- arch/arm/mach-pxa/z2.c                             |    2 +-
- arch/arm/mach-pxa/zeus.c                           |    1 +
- arch/arm/mach-pxa/zylonite.c                       |    3 +-
- .../mach => plat-pxa/include/plat}/pxa27x_keypad.h |   10 +
- drivers/input/keyboard/Kconfig                     |    2 +-
- drivers/input/keyboard/pxa27x_keypad.c             |   12 +-
- drivers/usb/host/ohci-pxa27x.c                     |    7 +
- drivers/video/pxa168fb.c                           |   47 +++
- 75 files changed, 1252 insertions(+), 161 deletions(-)
- create mode 100644 arch/arm/mach-mmp/include/mach/teton_bga.h
- create mode 100644 arch/arm/mach-mmp/teton_bga.c
- create mode 100644 arch/arm/mach-pxa/include/mach/pxa3xx-u2d.h
- create mode 100644 arch/arm/mach-pxa/pxa3xx-ulpi.c
- create mode 100644 arch/arm/mach-pxa/tavorevb3.c
- rename arch/arm/{mach-pxa/include/mach =>
-plat-pxa/include/plat}/pxa27x_keypad.h (83%)
+If you don't have time to write such a generic solution, that's fine,
+that's why my proposal is to only warn for now.
+
+I think saying "hey, it turns out you were using the API wrongly, I am
+officially totally breaking you all, and I'm not bothering with
+providing an example of what you should be doing instead, also, you
+should follow all the patches in linux-arm-kernel, and try the release
+candidates, because you should expect to get broken at any time" is
+the wrong attitude.
+
+>> And since you did, let me say what I fear: that many more people will
+>> find drivers totally broken on 2.6.36.
+>
+> I've reverted the change, so now you can go back to violating the
+> requirements of the architecture and have your data silently corrupted.
+
+This is unreasonable, we need the warning at least on one release.
+
+-- 
+Felipe Contreras
