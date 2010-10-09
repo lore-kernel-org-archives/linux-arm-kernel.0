@@ -1,91 +1,75 @@
-From: linz@li-pro.net (Stephan Linz)
-Date: Sat, 9 Oct 2010 01:55:25 +0200
-Subject: [PATCH v4 0/4] LogicPD minimal board support for LV_SOM and
-	Torpedo
-In-Reply-To: <20100928171908.GE3117@atomide.com>
-References: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
-	<20100928171908.GE3117@atomide.com>
-Message-ID: <201010090155.25932.linz@li-pro.net>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 8 Oct 2010 17:00:46 -0700
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101008234448.GD10975@n2100.arm.linux.org.uk>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+Message-ID: <20101009000046.GA30616@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-Hi Tim,
+On Sat, Oct 09, 2010 at 12:44:48AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 08, 2010 at 04:25:39PM -0700, Greg KH wrote:
+> > I doubt that people even noticed that this was a problem.
+> 
+> So what you're telling me is that ARM SoC people don't read the
+> ARM kernel mailing list?  I might as well stop posting patches
+> if no one's paying attention then! :-P
+> 
+> Reality is that it was discussed, and I did propose solutions at
+> the time.
 
-nice to see my patches here on the Linux mailinglists. I have not been working 
-on it for a long time. Tim, how we can work together? Are you working for 
-LogicPD?
+Heh, fair enough
 
+> > Unless you throw a run-time warning at them, or even better, break the
+> > build of their drivers, they will not notice.
+> > 
+> > Also, how can we fix this in a driver, what is the proper steps to do
+> > so?
+> 
+> On April 23rd:
+> | I think a viable safe solution is to set aside some RAM at boot (which
+> | the kernel doesn't manage at all) and then use ioremap on that; that
+> | approach will still work with this patch in place.
+> 
+> On April 30th when discussing the omapfb driver:
+> | There's really one option for this - in the machine's fixup handler, you
+> | can walk the meminfo array and kick out some memory from that.  This will
+> | prevent the kernel mapping that memory and make pfn_valid() fail for that
+> | memory range.  Another advantage of this is that it won't break when we
+> | switch to LMB.
 
-Bye,
-Stephan
+Ah, but no drivers have been fixed in any of these ways yet?
 
-Am Dienstag, 28. September 2010, um 19:19:09 schrieb Tony Lindgren:
-> * Tim Nordell <tim.nordell@logicpd.com> [100927 08:57]:
-> > This was tested (and based) against 2.6.36-rc5
-> >
-> > Difference from patch v3 1/4:
-> >  - Merged DEBUG_LL support patch (patch v3 5/5) into first patch
-> >  - Added "select OMAP_PACKAGE_CBB" into Kconfig for both boards
-> >
-> > Tim Nordell (4):
-> >   Adding LogicPD OMAP3 board support
-> >   ARM: OMAP3LOGIC: Adding SDMMC support
-> >   ARM: OMAP3: Add generic smsc911x support when connected to GPMC
-> >   ARM: OMAP3LOGIC: Added SMSC Ethernet board support
-> >
-> >  arch/arm/mach-omap2/Kconfig                     |   20 ++
-> >  arch/arm/mach-omap2/Makefile                    |    7 +
-> >  arch/arm/mach-omap2/board-omap3logic.c          |  244
-> > +++++++++++++++++++++++ arch/arm/mach-omap2/gpmc-smsc911x.c             |
-> >  113 +++++++++++ arch/arm/plat-omap/include/plat/gpmc-smsc911x.h |   35
-> > ++++
-> >  arch/arm/plat-omap/include/plat/uncompress.h    |    2 +
-> >  6 files changed, 421 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-omap2/board-omap3logic.c
-> >  create mode 100644 arch/arm/mach-omap2/gpmc-smsc911x.c
-> >  create mode 100644 arch/arm/plat-omap/include/plat/gpmc-smsc911x.h
->
-> Thanks, queuing all of them for the upcoming merge window.
-> I've updated the MMC related patch with the following to
-> keep it compiling with the MMC related platform init changes.
->
-> Regards,
->
-> Tony
->
-> --- a/arch/arm/mach-omap2/board-omap3logic.c
-> +++ b/arch/arm/mach-omap2/board-omap3logic.c
-> @@ -26,6 +26,7 @@
->  #include <linux/regulator/machine.h>
->
->  #include <linux/i2c/twl.h>
-> +#include <linux/mmc/host.h>
->
->  #include <mach/hardware.h>
->  #include <asm/mach-types.h>
-> @@ -112,7 +113,7 @@ static struct omap2_hsmmc_info __initdata
-> board_mmc_info[] = { {
->  		.name		= "external",
->  		.mmc		= 1,
-> -		.wires		= 4,
-> +		.caps		= MMC_CAP_4_BIT_DATA,
->  		.gpio_cd	= -EINVAL,
->  		.gpio_wp	= -EINVAL,
->  	},
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> So, as I say, there's been six months.  It was discussed.  But still
+> we find that the drivers haven't been touched and now we're complaining
+> that drivers are breaking.
+> 
+> If it hadn't been discussed, if solutions hadn't been proposed, then
+> yes, it would be right to revert it out-right.  But that's not what
+> happened.
+> 
+> If we have to have another three months (or so), this time with a warning,
+> then so be it, but let's make it plainly clear that it _will_ _definitely_
+> be changing, and that drivers _will_ break unless they are fixed.
+> 
+> Unfortunately, what I fear is that nothing will happen because people
+> want the ioremap-on-system-RAM to just work, and then we'll hit this
+> exact same issue again in three months time.
 
+But you can't expect that you make this change, and not fix up the
+drivers, and people would be happy, right?  The rule for API changes
+like this, or anything, is that the person making the change fixes the
+other drivers, and that seems to be the issue here.
 
--- 
-Viele Gr??e,
-Stephan Linz
-______________________________________________________________________________
-OpenDCC: http://www.li-pro.net/opendcc.phtml
-PC/M: http://www.li-pro.net/pcm.phtml
-CDK4AVR: http://cdk4avr.sourceforge.net/
-CDK4NIOS: http://cdk4nios.sourceforge.net/
-CDK4MSP: http://cdk4msp.sourceforge.net/
-CPM4L: http://download.opensuse.org/repositories/home:/rexut:/CPM4L
+Any pointers to patches where people have fixed up the drivers?
+
+thanks,
+
+greg k-h
