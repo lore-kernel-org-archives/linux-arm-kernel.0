@@ -1,81 +1,61 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 10 Oct 2010 00:59:20 +0200
-Subject: [PATCH v7] power: introduce library for device-specific OPPs
-In-Reply-To: <1286506969-20651-1-git-send-email-nm@ti.com>
-References: <[PATCH] power: introduce library for device-specific OPPs>
-	<1286506969-20651-1-git-send-email-nm@ti.com>
-Message-ID: <201010100059.20964.rjw@sisk.pl>
+From: s.neumann@raumfeld.com (Sven Neumann)
+Date: Sun, 10 Oct 2010 01:20:34 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
+References: <1286177435.2140.5.camel@sven> <201010072323.05218.rjw@sisk.pl>
+	<1286526197.4493.19.camel@sven> <201010082208.25767.rjw@sisk.pl>
+	<AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
+Message-ID: <1286666434.26689.3.camel@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 08, 2010, Nishanth Menon wrote:
-> SoCs have a standard set of tuples consisting of frequency and
-> voltage pairs that the device will support per voltage domain. These
-> are called Operating Performance Points or OPPs. The actual
-> definitions of OPP varies over silicon versions. For a specific domain,
-> we can have a set of {frequency, voltage} pairs. As the kernel boots
-> and more information is available, a default set of these are activated
-> based on the precise nature of device. Further on operation, based on
-> conditions prevailing in the system (such as temperature), some OPP
-> availability may be temporarily controlled by the SoC frameworks.
+On Sat, 2010-10-09 at 03:07 +0200, Ohad Ben-Cohen wrote:
+> On Fri, Oct 8, 2010 at 10:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > There is a problem with the pxa2xx-mci.0 suspend that has been introduced
+> > some time after 2.6.34, but it is not related to commit 152e1d5920.
 > 
-> To implement an OPP, some sort of power management support is necessary
-> hence this library depends on CONFIG_PM.
+> Sven, what type of card do you have in that slot ? is it SDIO ? what's
+> the function driver ?
 > 
-> Contributions include:
-> Sanjeev Premi for the initial concept:
-> 	http://patchwork.kernel.org/patch/50998/
-> Kevin Hilman for converting original design to device-based
-> Kevin Hilman and Paul Walmsey for cleaning up many of the function
-> abstractions, improvements and data structure handling
-> Romit Dasgupta for using enums instead of opp pointers
-> Thara Gopinath, Eduardo Valentin and Vishwanath BS for fixes and
-> cleanups.
-> Linus Walleij for recommending this layer be made generic for usage
-> in other architectures beyond OMAP and ARM.
-> Mark Brown, Andrew Morton, Rafael J Wysocki, Paul E McKenney for valuable
-> improvements.
+> I have a hunch about this, but it may be a wild guess as I don't know
+> what's your setup exactly.
 > 
-> Discussions and comments from:
-> http://marc.info/?l=linux-omap&m=126033945313269&w=2
-> http://marc.info/?l=linux-omap&m=125482970102327&w=2
-> http://marc.info/?t=125809247500002&r=1&w=2
-> http://marc.info/?l=linux-omap&m=126025973426007&w=2
-> http://marc.info/?t=128152609200064&r=1&w=2
-> http://marc.info/?t=128468723000002&r=1&w=2
-> incorporated.
+> Anyway, can you please try this and see if anything changes ?
 > 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Madhusudhan Chikkature Rajashekar <madhu.cr@ti.com>
-> Cc: Phil Carmody <ext-phil.2.carmody@nokia.com>
-> Cc: Roberto Granados Dorado <x0095451@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Sergio Alberto Aguirre Rodriguez <saaguirre@ti.com>
-> Cc: Tero Kristo <Tero.Kristo@nokia.com>
-> Cc: Eduardo Valentin <eduardo.valentin@nokia.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Sanjeev Premi <premi@ti.com>
-> Cc: Thara Gopinath <thara@ti.com>
-> Cc: Vishwanath BS <vishwanath.bs@ti.com>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index c94565d..515ff39 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+>         if (host->bus_ops && !host->bus_dead) {
+>                 if (host->bus_ops->suspend)
+>                         err = host->bus_ops->suspend(host);
+> +               if (err == -ENOSYS || !host->bus_ops->resume) {
+> +                       /*
+> +                        * We simply "remove" the card in this case.
+> +                        * It will be redetected on resume.
+> +                        */
+> +                       if (host->bus_ops->remove)
+> +                               host->bus_ops->remove(host);
+> +                       mmc_claim_host(host);
+> +                       mmc_detach_bus(host);
+> +                       mmc_release_host(host);
+> +                       host->pm_flags = 0;
+> +                       err = 0;
+> +               }
+>         }
+>         mmc_bus_put(host);
 > 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> The reason I'm asking this is because it seems like commit
+> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related
+> to mmc/sd card insert/removal during suspend/resume" has broken
+> suspending SDIO function drivers which don't have a suspend handler
+> (or do have one, but for some reason it returns -ENOSYS, like
+> libertas_sdio's does).
 
-OK
+That is exactly our setup (libertas over sdio). I will try your patch as
+soon as I get to the office on Monday morning and report back.
 
-Your error messages are a bit inconsistent (e.g. some of them print the
-error code while others don't), but I guess I can fix that up.
-
-Still, to apply the patch I need a copyright notice for the doc too.
-
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-
-Kevin, your sign-off here means you endorse the patch as the maintainer.
-Is that correct?
 
 Thanks,
-Rafael
+Sven
