@@ -1,983 +1,825 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 10 Oct 2010 00:39:19 +0200
-Subject: [PATCH 01/13] ARM: pxa: Introduce pxa[23]xx_map_io
-Message-ID: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
+Date: Sun, 10 Oct 2010 00:39:20 +0200
+Subject: [PATCH 02/13] ARM: pxa: Access SMEMC via virtual addresses
+In-Reply-To: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
+References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1286663971-15634-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces pxa2xx_map_io() and pxa3xx_map_io() to distinguish between
-PXA2xx and PXA3xx memory mapping.
+This is important because on PXA3xx, the physical mapping of SMEMC registers
+differs from the one on PXA2xx. In order to get PCMCIA working on both PXA2xx
+and PXA320, the PCMCIA driver was adjusted accordingly as well.
 
-Also, fixup for platforms broken after introducing pxa2xx_map_io() and
-pxa3xx_map_io() is included.
+Also, various places in the kernel had to be patched to use
+__raw_read/__raw_write.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/balloon3.c       |    2 +-
- arch/arm/mach-pxa/capc7117.c       |    2 +-
- arch/arm/mach-pxa/cm-x2xx.c        |    4 +-
- arch/arm/mach-pxa/cm-x300.c        |    2 +-
- arch/arm/mach-pxa/colibri-pxa270.c |    4 +-
- arch/arm/mach-pxa/colibri-pxa300.c |    2 +-
- arch/arm/mach-pxa/colibri-pxa320.c |    2 +-
- arch/arm/mach-pxa/corgi.c          |    6 ++--
- arch/arm/mach-pxa/csb726.c         |    2 +-
- arch/arm/mach-pxa/em-x270.c        |    4 +-
- arch/arm/mach-pxa/eseries.c        |   12 +++++-----
- arch/arm/mach-pxa/ezx.c            |   12 +++++-----
- arch/arm/mach-pxa/generic.c        |   37 ++++++++++++++++++++++++++++-------
- arch/arm/mach-pxa/generic.h        |    3 +-
- arch/arm/mach-pxa/gumstix.c        |    2 +-
- arch/arm/mach-pxa/h5000.c          |    2 +-
- arch/arm/mach-pxa/himalaya.c       |    2 +-
- arch/arm/mach-pxa/hx4700.c         |    2 +-
- arch/arm/mach-pxa/icontrol.c       |    2 +-
- arch/arm/mach-pxa/idp.c            |    2 +-
- arch/arm/mach-pxa/littleton.c      |    2 +-
- arch/arm/mach-pxa/lpd270.c         |    2 +-
- arch/arm/mach-pxa/lubbock.c        |    2 +-
- arch/arm/mach-pxa/magician.c       |    2 +-
- arch/arm/mach-pxa/mainstone.c      |    2 +-
- arch/arm/mach-pxa/mioa701.c        |    2 +-
- arch/arm/mach-pxa/mp900.c          |    2 +-
- arch/arm/mach-pxa/palmld.c         |    2 +-
- arch/arm/mach-pxa/palmt5.c         |    2 +-
- arch/arm/mach-pxa/palmtc.c         |    2 +-
- arch/arm/mach-pxa/palmte2.c        |    2 +-
- arch/arm/mach-pxa/palmtreo.c       |    4 +-
- arch/arm/mach-pxa/palmtx.c         |    2 +-
- arch/arm/mach-pxa/palmz72.c        |    2 +-
- arch/arm/mach-pxa/pcm027.c         |    2 +-
- arch/arm/mach-pxa/poodle.c         |    2 +-
- arch/arm/mach-pxa/raumfeld.c       |    6 ++--
- arch/arm/mach-pxa/saar.c           |    2 +-
- arch/arm/mach-pxa/spitz.c          |   12 ++++++----
- arch/arm/mach-pxa/stargate2.c      |    4 +-
- arch/arm/mach-pxa/tavorevb.c       |    2 +-
- arch/arm/mach-pxa/tavorevb3.c      |    2 +-
- arch/arm/mach-pxa/tosa.c           |    2 +-
- arch/arm/mach-pxa/trizeps4.c       |    2 +-
- arch/arm/mach-pxa/viper.c          |    2 +-
- arch/arm/mach-pxa/vpac270.c        |    2 +-
- arch/arm/mach-pxa/xcep.c           |    2 +-
- arch/arm/mach-pxa/z2.c             |    2 +-
- arch/arm/mach-pxa/zeus.c           |    2 +-
- arch/arm/mach-pxa/zylonite.c       |    2 +-
- 50 files changed, 104 insertions(+), 80 deletions(-)
+ arch/arm/mach-pxa/cm-x2xx.c                  |   13 +++--
+ arch/arm/mach-pxa/cpufreq-pxa2xx.c           |   10 ++--
+ arch/arm/mach-pxa/csb726.c                   |    7 ++-
+ arch/arm/mach-pxa/generic.c                  |    9 ++--
+ arch/arm/mach-pxa/h5000.c                    |    9 ++--
+ arch/arm/mach-pxa/include/mach/pxa-smemc.h   |   74 ++++++++++++++++++++++++++
+ arch/arm/mach-pxa/include/mach/pxa2xx-regs.h |   55 -------------------
+ arch/arm/mach-pxa/lpd270.c                   |    3 +-
+ arch/arm/mach-pxa/lubbock.c                  |    3 +-
+ arch/arm/mach-pxa/mainstone.c                |    5 +-
+ arch/arm/mach-pxa/pxa27x.c                   |    6 ++-
+ arch/arm/mach-pxa/sleep.S                    |    2 +-
+ arch/arm/mach-pxa/smemc.c                    |   51 ++++++------------
+ arch/arm/mach-pxa/stargate2.c                |    3 +-
+ arch/arm/mach-pxa/tosa.c                     |    7 ++-
+ arch/arm/mach-pxa/trizeps4.c                 |    3 +-
+ arch/arm/mach-pxa/xcep.c                     |    5 +-
+ arch/arm/mach-pxa/zeus.c                     |    5 +-
+ drivers/pcmcia/pxa2xx_base.c                 |   65 +++++++++++++++-------
+ 19 files changed, 189 insertions(+), 146 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pxa-smemc.h
 
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index 79d0f6c..309bf27 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -802,7 +802,7 @@ static struct map_desc balloon3_io_desc[] __initdata = {
- 
- static void __init balloon3_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(balloon3_io_desc, ARRAY_SIZE(balloon3_io_desc));
- }
- 
-diff --git a/arch/arm/mach-pxa/capc7117.c b/arch/arm/mach-pxa/capc7117.c
-index aae5446..4ef5e7a 100644
---- a/arch/arm/mach-pxa/capc7117.c
-+++ b/arch/arm/mach-pxa/capc7117.c
-@@ -151,7 +151,7 @@ MACHINE_START(CAPC7117,
- 	.phys_io = 0x40000000,
- 	.boot_params = 0xa0000100,
- 	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io = pxa_map_io,
-+	.map_io = pxa3xx_map_io,
- 	.init_irq = pxa3xx_init_irq,
- 	.timer = &pxa_timer,
- 	.init_machine = capc7117_init
 diff --git a/arch/arm/mach-pxa/cm-x2xx.c b/arch/arm/mach-pxa/cm-x2xx.c
-index ad40e7b..c698836 100644
+index c698836..2823466 100644
 --- a/arch/arm/mach-pxa/cm-x2xx.c
 +++ b/arch/arm/mach-pxa/cm-x2xx.c
-@@ -500,7 +500,7 @@ static struct map_desc cmx2xx_io_desc[] __initdata = {
- 
- static void __init cmx2xx_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(cmx2xx_io_desc, ARRAY_SIZE(cmx2xx_io_desc));
- 
- 	it8152_base_address = CMX2XX_IT8152_VIRT;
-@@ -508,7 +508,7 @@ static void __init cmx2xx_map_io(void)
- #else
- static void __init cmx2xx_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- }
- #endif
- 
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index 8e0b562..9ded46c 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -859,7 +859,7 @@ MACHINE_START(CM_X300, "CM-X300 module")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= cm_x300_init,
-diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-index 98673ac..b02784d 100644
---- a/arch/arm/mach-pxa/colibri-pxa270.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270.c
-@@ -211,7 +211,7 @@ MACHINE_START(COLIBRI, "Toradex Colibri PXA270")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= COLIBRI_SDRAM_BASE + 0x100,
- 	.init_machine	= colibri_pxa270_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -221,7 +221,7 @@ MACHINE_START(INCOME, "Income s.r.o. SH-Dmaster PXA270 SBC")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
- 	.init_machine	= colibri_pxa270_income_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/colibri-pxa300.c b/arch/arm/mach-pxa/colibri-pxa300.c
-index 40b6ac2..2b6532b 100644
---- a/arch/arm/mach-pxa/colibri-pxa300.c
-+++ b/arch/arm/mach-pxa/colibri-pxa300.c
-@@ -190,7 +190,7 @@ MACHINE_START(COLIBRI300, "Toradex Colibri PXA300")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= COLIBRI_SDRAM_BASE + 0x100,
- 	.init_machine	= colibri_pxa300_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
-index 99e850d..aafb49a 100644
---- a/arch/arm/mach-pxa/colibri-pxa320.c
-+++ b/arch/arm/mach-pxa/colibri-pxa320.c
-@@ -259,7 +259,7 @@ MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= COLIBRI_SDRAM_BASE + 0x100,
- 	.init_machine	= colibri_pxa320_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 3fb0fc0..4fad783 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -723,7 +723,7 @@ MACHINE_START(CORGI, "SHARP Corgi")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= fixup_corgi,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.init_machine	= corgi_init,
- 	.timer		= &pxa_timer,
-@@ -735,7 +735,7 @@ MACHINE_START(SHEPHERD, "SHARP Shepherd")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= fixup_corgi,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.init_machine	= corgi_init,
- 	.timer		= &pxa_timer,
-@@ -747,7 +747,7 @@ MACHINE_START(HUSKY, "SHARP Husky")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= fixup_corgi,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.init_machine	= corgi_init,
- 	.timer		= &pxa_timer,
-diff --git a/arch/arm/mach-pxa/csb726.c b/arch/arm/mach-pxa/csb726.c
-index 91fd4fe..dab9d92 100644
---- a/arch/arm/mach-pxa/csb726.c
-+++ b/arch/arm/mach-pxa/csb726.c
-@@ -275,7 +275,7 @@ MACHINE_START(CSB726, "Cogent CSB726")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.init_irq       = pxa27x_init_irq,
- 	.init_machine   = csb726_init,
- 	.timer          = &pxa_timer,
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index 51286a7..b4625b9 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -1303,7 +1303,7 @@ MACHINE_START(EM_X270, "Compulab EM-X270")
- 	.boot_params	= 0xa0000100,
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= em_x270_init,
-@@ -1313,7 +1313,7 @@ MACHINE_START(EXEDA, "Compulab eXeda")
- 	.boot_params	= 0xa0000100,
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= em_x270_init,
-diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-index 4971ce1..ae15eab 100644
---- a/arch/arm/mach-pxa/eseries.c
-+++ b/arch/arm/mach-pxa/eseries.c
-@@ -183,7 +183,7 @@ MACHINE_START(E330, "Toshiba e330")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= ESERIES_NR_IRQS,
- 	.init_irq	= pxa25x_init_irq,
- 	.fixup		= eseries_fixup,
-@@ -234,7 +234,7 @@ MACHINE_START(E350, "Toshiba e350")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= ESERIES_NR_IRQS,
- 	.init_irq	= pxa25x_init_irq,
- 	.fixup		= eseries_fixup,
-@@ -358,7 +358,7 @@ MACHINE_START(E400, "Toshiba e400")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= ESERIES_NR_IRQS,
- 	.init_irq	= pxa25x_init_irq,
- 	.fixup		= eseries_fixup,
-@@ -548,7 +548,7 @@ MACHINE_START(E740, "Toshiba e740")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= ESERIES_NR_IRQS,
- 	.init_irq	= pxa25x_init_irq,
- 	.fixup		= eseries_fixup,
-@@ -741,7 +741,7 @@ MACHINE_START(E750, "Toshiba e750")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= ESERIES_NR_IRQS,
- 	.init_irq	= pxa25x_init_irq,
- 	.fixup		= eseries_fixup,
-@@ -938,7 +938,7 @@ MACHINE_START(E800, "Toshiba e800")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= ESERIES_NR_IRQS,
- 	.init_irq	= pxa25x_init_irq,
- 	.fixup		= eseries_fixup,
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index f997e84..91310ab 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -801,7 +801,7 @@ MACHINE_START(EZX_A780, "Motorola EZX A780")
- 	.phys_io        = 0x40000000,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= EZX_NR_IRQS,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-@@ -868,7 +868,7 @@ MACHINE_START(EZX_E680, "Motorola EZX E680")
- 	.phys_io        = 0x40000000,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= EZX_NR_IRQS,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-@@ -935,7 +935,7 @@ MACHINE_START(EZX_A1200, "Motorola EZX A1200")
- 	.phys_io        = 0x40000000,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= EZX_NR_IRQS,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-@@ -1128,7 +1128,7 @@ MACHINE_START(EZX_A910, "Motorola EZX A910")
- 	.phys_io        = 0x40000000,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= EZX_NR_IRQS,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-@@ -1195,7 +1195,7 @@ MACHINE_START(EZX_E6, "Motorola EZX E6")
- 	.phys_io        = 0x40000000,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= EZX_NR_IRQS,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-@@ -1236,7 +1236,7 @@ MACHINE_START(EZX_E2, "Motorola EZX E2")
- 	.phys_io        = 0x40000000,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= EZX_NR_IRQS,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index 6451e9c..971f994 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -91,17 +91,12 @@ EXPORT_SYMBOL(get_memclk_frequency_10khz);
-  * Note 2: virtual 0xfffe0000-0xffffffff is reserved for the vector table
-  *         and cache flush area.
-  */
--static struct map_desc standard_io_desc[] __initdata = {
-+static struct map_desc common_io_desc[] __initdata = {
-   	{	/* Devs */
- 		.virtual	=  0xf2000000,
- 		.pfn		= __phys_to_pfn(0x40000000),
- 		.length		= 0x02000000,
- 		.type		= MT_DEVICE
--	}, {	/* Mem Ctl */
--		.virtual	=  0xf6000000,
--		.pfn		= __phys_to_pfn(0x48000000),
--		.length		= 0x00200000,
--		.type		= MT_DEVICE
- 	}, {	/* Camera */
- 		.virtual	=  0xfa000000,
- 		.pfn		= __phys_to_pfn(0x50000000),
-@@ -120,8 +115,34 @@ static struct map_desc standard_io_desc[] __initdata = {
- 	}
- };
- 
--void __init pxa_map_io(void)
-+static struct map_desc pxa2xx_io_desc[] __initdata = {
-+	{	/* Mem Ctl */
-+		.virtual	=  0xf6000000,
-+		.pfn		= __phys_to_pfn(0x48000000),
-+		.length		= 0x00200000,
-+		.type		= MT_DEVICE
-+	}
-+};
-+
-+static struct map_desc pxa3xx_io_desc[] __initdata = {
-+	{	/* Mem Ctl */
-+		.virtual	=  0xf6000000,
-+		.pfn		= __phys_to_pfn(0x4a000000),
-+		.length		= 0x00200000,
-+		.type		= MT_DEVICE
-+	}
-+};
-+
-+void __init pxa2xx_map_io(void)
-+{
-+	iotable_init(common_io_desc, ARRAY_SIZE(common_io_desc));
-+	iotable_init(pxa2xx_io_desc, ARRAY_SIZE(pxa2xx_io_desc));
-+	get_clk_frequency_khz(1);
-+}
-+
-+void __init pxa3xx_map_io(void)
- {
--	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
-+	iotable_init(common_io_desc, ARRAY_SIZE(common_io_desc));
-+	iotable_init(pxa3xx_io_desc, ARRAY_SIZE(pxa3xx_io_desc));
- 	get_clk_frequency_khz(1);
- }
-diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
-index 4b1ad27..4667232 100644
---- a/arch/arm/mach-pxa/generic.h
-+++ b/arch/arm/mach-pxa/generic.h
-@@ -20,7 +20,8 @@ extern void __init pxa26x_init_irq(void);
- #endif
- extern void __init pxa27x_init_irq(void);
- extern void __init pxa3xx_init_irq(void);
--extern void __init pxa_map_io(void);
-+extern void __init pxa2xx_map_io(void);
-+extern void __init pxa3xx_map_io(void);
- 
- extern unsigned int get_clk_frequency_khz(int info);
- 
-diff --git a/arch/arm/mach-pxa/gumstix.c b/arch/arm/mach-pxa/gumstix.c
-index 96c3451..3482351 100644
---- a/arch/arm/mach-pxa/gumstix.c
-+++ b/arch/arm/mach-pxa/gumstix.c
-@@ -227,7 +227,7 @@ MACHINE_START(GUMSTIX, "Gumstix")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100, /* match u-boot bi_boot_params */
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= gumstix_init,
-diff --git a/arch/arm/mach-pxa/h5000.c b/arch/arm/mach-pxa/h5000.c
-index c1cab08..9048066 100644
---- a/arch/arm/mach-pxa/h5000.c
-+++ b/arch/arm/mach-pxa/h5000.c
-@@ -204,7 +204,7 @@ MACHINE_START(H5400, "HP iPAQ H5000")
- 	.phys_io = 0x40000000,
- 	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params = 0xa0000100,
--	.map_io = pxa_map_io,
-+	.map_io = pxa2xx_map_io,
- 	.init_irq = pxa25x_init_irq,
- 	.timer = &pxa_timer,
- 	.init_machine = h5000_init,
-diff --git a/arch/arm/mach-pxa/himalaya.c b/arch/arm/mach-pxa/himalaya.c
-index f9a2e4b..6460afe 100644
---- a/arch/arm/mach-pxa/himalaya.c
-+++ b/arch/arm/mach-pxa/himalaya.c
-@@ -162,7 +162,7 @@ MACHINE_START(HIMALAYA, "HTC Himalaya")
- 	.phys_io = 0x40000000,
- 	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params = 0xa0000100,
--	.map_io = pxa_map_io,
-+	.map_io = pxa2xx_map_io,
- 	.init_irq = pxa25x_init_irq,
- 	.init_machine = himalaya_init,
- 	.timer = &pxa_timer,
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 10104f1..0d73d77 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -873,7 +873,7 @@ MACHINE_START(H4700, "HP iPAQ HX4700")
- 	.phys_io      = 0x40000000,
- 	.io_pg_offst  = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params  = 0xa0000100,
--	.map_io       = pxa_map_io,
-+	.map_io       = pxa2xx_map_io,
- 	.nr_irqs      = HX4700_NR_IRQS,
- 	.init_irq     = pxa27x_init_irq,
- 	.init_machine = hx4700_init,
-diff --git a/arch/arm/mach-pxa/icontrol.c b/arch/arm/mach-pxa/icontrol.c
-index 5ccb0ce..9525976 100644
---- a/arch/arm/mach-pxa/icontrol.c
-+++ b/arch/arm/mach-pxa/icontrol.c
-@@ -194,7 +194,7 @@ MACHINE_START(ICONTROL, "iControl/SafeTcam boards using Embedian MXM-8x10 CoM")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= icontrol_init
-diff --git a/arch/arm/mach-pxa/idp.c b/arch/arm/mach-pxa/idp.c
-index bc78c4d..80920be 100644
---- a/arch/arm/mach-pxa/idp.c
-+++ b/arch/arm/mach-pxa/idp.c
-@@ -187,7 +187,7 @@ static struct map_desc idp_io_desc[] __initdata = {
- 
- static void __init idp_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(idp_io_desc, ARRAY_SIZE(idp_io_desc));
- }
- 
-diff --git a/arch/arm/mach-pxa/littleton.c b/arch/arm/mach-pxa/littleton.c
-index eb58506..9fa46fc 100644
---- a/arch/arm/mach-pxa/littleton.c
-+++ b/arch/arm/mach-pxa/littleton.c
-@@ -440,7 +440,7 @@ MACHINE_START(LITTLETON, "Marvell Form Factor Development Platform (aka Littleto
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.nr_irqs	= LITTLETON_NR_IRQS,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
-diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
-index fc9502e..f1685cc 100644
---- a/arch/arm/mach-pxa/lpd270.c
-+++ b/arch/arm/mach-pxa/lpd270.c
-@@ -495,7 +495,7 @@ static struct map_desc lpd270_io_desc[] __initdata = {
- 
- static void __init lpd270_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(lpd270_io_desc, ARRAY_SIZE(lpd270_io_desc));
- 
- 	/* for use I SRAM as framebuffer.  */
-diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
-index 1956c23..e73fc1d 100644
---- a/arch/arm/mach-pxa/lubbock.c
-+++ b/arch/arm/mach-pxa/lubbock.c
-@@ -549,7 +549,7 @@ static struct map_desc lubbock_io_desc[] __initdata = {
- 
- static void __init lubbock_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(lubbock_io_desc, ARRAY_SIZE(lubbock_io_desc));
- 
- 	PCFR |= PCFR_OPDE;
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 42a0c2b..3da95c1 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -767,7 +767,7 @@ MACHINE_START(MAGICIAN, "HTC Magician")
- 	.phys_io = 0x40000000,
- 	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params = 0xa0000100,
--	.map_io = pxa_map_io,
-+	.map_io = pxa2xx_map_io,
- 	.nr_irqs = MAGICIAN_NR_IRQS,
- 	.init_irq = pxa27x_init_irq,
- 	.init_machine = magician_init,
-diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
-index 126dca1..12f5e9e 100644
---- a/arch/arm/mach-pxa/mainstone.c
-+++ b/arch/arm/mach-pxa/mainstone.c
-@@ -614,7 +614,7 @@ static struct map_desc mainstone_io_desc[] __initdata = {
- 
- static void __init mainstone_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(mainstone_io_desc, ARRAY_SIZE(mainstone_io_desc));
- 
-  	/*	for use I SRAM as framebuffer.	*/
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index ffb3f5a..29fb0fd 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -822,7 +822,7 @@ MACHINE_START(MIOA701, "MIO A701")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= &pxa_map_io,
-+	.map_io		= &pxa2xx_map_io,
- 	.init_irq	= &pxa27x_init_irq,
- 	.init_machine	= mioa701_machine_init,
- 	.timer		= &pxa_timer,
-diff --git a/arch/arm/mach-pxa/mp900.c b/arch/arm/mach-pxa/mp900.c
-index 6d45039..2a8f2fa 100644
---- a/arch/arm/mach-pxa/mp900.c
-+++ b/arch/arm/mach-pxa/mp900.c
-@@ -96,7 +96,7 @@ MACHINE_START(NEC_MP900, "MobilePro900/C")
- 	.boot_params	= 0xa0220100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.timer		= &pxa_timer,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.init_machine	= mp900c_init,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/palmld.c b/arch/arm/mach-pxa/palmld.c
-index 3ff0c4a..2a07d65 100644
---- a/arch/arm/mach-pxa/palmld.c
-+++ b/arch/arm/mach-pxa/palmld.c
-@@ -313,7 +313,7 @@ static struct map_desc palmld_io_desc[] __initdata = {
- 
- static void __init palmld_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(palmld_io_desc, ARRAY_SIZE(palmld_io_desc));
- }
- 
-diff --git a/arch/arm/mach-pxa/palmt5.c b/arch/arm/mach-pxa/palmt5.c
-index 5b9f766..16e166d 100644
---- a/arch/arm/mach-pxa/palmt5.c
-+++ b/arch/arm/mach-pxa/palmt5.c
-@@ -205,7 +205,7 @@ MACHINE_START(PALMT5, "Palm Tungsten|T5")
- 	.phys_io	= PALMT5_PHYS_IO_START,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.reserve	= palmt5_reserve,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
-diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index ce1104d..b64ed70 100644
---- a/arch/arm/mach-pxa/palmtc.c
-+++ b/arch/arm/mach-pxa/palmtc.c
-@@ -415,7 +415,7 @@ MACHINE_START(PALMTC, "Palm Tungsten|C")
- 	.phys_io	= 0x40000000,
- 	.boot_params 	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= palmtc_init
-diff --git a/arch/arm/mach-pxa/palmte2.c b/arch/arm/mach-pxa/palmte2.c
-index 93c11a0..30ff350 100644
---- a/arch/arm/mach-pxa/palmte2.c
-+++ b/arch/arm/mach-pxa/palmte2.c
-@@ -376,7 +376,7 @@ MACHINE_START(PALMTE2, "Palm Tungsten|E2")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= palmte2_init
-diff --git a/arch/arm/mach-pxa/palmtreo.c b/arch/arm/mach-pxa/palmtreo.c
-index f685a60..daa6992 100644
---- a/arch/arm/mach-pxa/palmtreo.c
-+++ b/arch/arm/mach-pxa/palmtreo.c
-@@ -444,7 +444,7 @@ MACHINE_START(TREO680, "Palm Treo 680")
- 	.phys_io        = TREO_PHYS_IO_START,
- 	.io_pg_offst    = io_p2v(0x40000000),
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.reserve	= treo_reserve,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-@@ -455,7 +455,7 @@ MACHINE_START(CENTRO, "Palm Centro 685")
- 	.phys_io        = TREO_PHYS_IO_START,
- 	.io_pg_offst    = io_p2v(0x40000000),
- 	.boot_params    = 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.reserve	= treo_reserve,
- 	.init_irq       = pxa27x_init_irq,
- 	.timer          = &pxa_timer,
-diff --git a/arch/arm/mach-pxa/palmtx.c b/arch/arm/mach-pxa/palmtx.c
-index 89a3792..5beab29 100644
---- a/arch/arm/mach-pxa/palmtx.c
-+++ b/arch/arm/mach-pxa/palmtx.c
-@@ -333,7 +333,7 @@ static struct map_desc palmtx_io_desc[] __initdata = {
- 
- static void __init palmtx_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 	iotable_init(palmtx_io_desc, ARRAY_SIZE(palmtx_io_desc));
- }
- 
-diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
-index 38f4425..efab229 100644
---- a/arch/arm/mach-pxa/palmz72.c
-+++ b/arch/arm/mach-pxa/palmz72.c
-@@ -282,7 +282,7 @@ MACHINE_START(PALMZ72, "Palm Zire72")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= io_p2v(0x40000000),
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= palmz72_init
-diff --git a/arch/arm/mach-pxa/pcm027.c b/arch/arm/mach-pxa/pcm027.c
-index 90b08ba..992b850 100644
---- a/arch/arm/mach-pxa/pcm027.c
-+++ b/arch/arm/mach-pxa/pcm027.c
-@@ -244,7 +244,7 @@ static void __init pcm027_init(void)
- 
- static void __init pcm027_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 
- 	/* initialize sleep mode regs (wake-up sources, etc) */
- 	PGSR0 = 0x01308000;
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index c04e025..824f529 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -468,7 +468,7 @@ MACHINE_START(POODLE, "SHARP Poodle")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= fixup_poodle,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.nr_irqs	= POODLE_NR_IRQS,	/* 4 for LoCoMo */
- 	.init_irq	= pxa25x_init_irq,
- 	.timer		= &pxa_timer,
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 67e04f4..2920144 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -1087,7 +1087,7 @@ MACHINE_START(RAUMFELD_RC, "Raumfeld Controller")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= RAUMFELD_SDRAM_BASE + 0x100,
- 	.init_machine	= raumfeld_controller_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -1099,7 +1099,7 @@ MACHINE_START(RAUMFELD_CONNECTOR, "Raumfeld Connector")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= RAUMFELD_SDRAM_BASE + 0x100,
- 	.init_machine	= raumfeld_connector_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-@@ -1111,7 +1111,7 @@ MACHINE_START(RAUMFELD_SPEAKER, "Raumfeld Speaker")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= RAUMFELD_SDRAM_BASE + 0x100,
- 	.init_machine	= raumfeld_speaker_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
-index 115b6f2..a2c9d28 100644
---- a/arch/arm/mach-pxa/saar.c
-+++ b/arch/arm/mach-pxa/saar.c
-@@ -599,7 +599,7 @@ MACHINE_START(SAAR, "PXA930 Handheld Platform (aka SAAR)")
- 	.phys_io        = 0x40000000,
- 	.boot_params    = 0xa0000100,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa3xx_map_io,
- 	.init_irq       = pxa3xx_init_irq,
- 	.timer          = &pxa_timer,
- 	.init_machine   = saar_init,
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 1cd99cb..3fa9c02 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -27,6 +27,7 @@
- #include <linux/mtd/sharpsl.h>
- #include <linux/input/matrix_keypad.h>
- #include <linux/regulator/machine.h>
-+#include <linux/io.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -44,6 +45,7 @@
- #include <mach/pxa2xx_spi.h>
- #include <mach/spitz.h>
- #include <mach/sharpsl_pm.h>
+@@ -24,6 +24,7 @@
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/audio.h>
+ #include <mach/pxafb.h>
 +#include <mach/pxa-smemc.h>
  
+ #include <asm/hardware/it8152.h>
+ 
+@@ -392,9 +393,9 @@ static int cmx2xx_suspend(struct sys_device *dev, pm_message_t state)
+ 	cmx2xx_pci_suspend();
+ 
+ 	/* save MSC registers */
+-	sleep_save_msc[0] = MSC0;
+-	sleep_save_msc[1] = MSC1;
+-	sleep_save_msc[2] = MSC2;
++	sleep_save_msc[0] = __raw_readl(MSC0);
++	sleep_save_msc[1] = __raw_readl(MSC1);
++	sleep_save_msc[2] = __raw_readl(MSC2);
+ 
+ 	/* setup power saving mode registers */
+ 	PCFR = 0x0;
+@@ -416,9 +417,9 @@ static int cmx2xx_resume(struct sys_device *dev)
+ 	cmx2xx_pci_resume();
+ 
+ 	/* restore MSC registers */
+-	MSC0 = sleep_save_msc[0];
+-	MSC1 = sleep_save_msc[1];
+-	MSC2 = sleep_save_msc[2];
++	__raw_writel(sleep_save_msc[0], MSC0);
++	__raw_writel(sleep_save_msc[1], MSC1);
++	__raw_writel(sleep_save_msc[2], MSC2);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+index 58093d9..1af67ad 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+@@ -38,8 +38,10 @@
+ #include <linux/cpufreq.h>
+ #include <linux/err.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/io.h>
+ 
+ #include <mach/pxa2xx-regs.h>
++#include <mach/pxa-smemc.h>
+ 
+ #ifdef DEBUG
+ static unsigned int freq_debug;
+@@ -242,7 +244,7 @@ static void pxa27x_guess_max_freq(void)
+ 
+ static void init_sdram_rows(void)
+ {
+-	uint32_t mdcnfg = MDCNFG;
++	uint32_t mdcnfg = __raw_readl(MDCNFG);
+ 	unsigned int drac2 = 0, drac0 = 0;
+ 
+ 	if (mdcnfg & (MDCNFG_DE2 | MDCNFG_DE3))
+@@ -331,8 +333,8 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+ 	 * we need to preset the smaller DRI before the change.	 If we're
+ 	 * speeding up we need to set the larger DRI value after the change.
+ 	 */
+-	preset_mdrefr = postset_mdrefr = MDREFR;
+-	if ((MDREFR & MDREFR_DRI_MASK) > mdrefr_dri(new_freq_mem)) {
++	preset_mdrefr = postset_mdrefr = __raw_readl(MDREFR);
++	if ((__raw_readl(MDREFR) & MDREFR_DRI_MASK) > mdrefr_dri(new_freq_mem)) {
+ 		preset_mdrefr = (preset_mdrefr & ~MDREFR_DRI_MASK);
+ 		preset_mdrefr |= mdrefr_dri(new_freq_mem);
+ 	}
+@@ -370,7 +372,7 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+ 3:		nop							\n\
+ 	  "
+ 		     : "=&r" (unused)
+-		     : "r" (&MDREFR), "r" (cclkcfg),
++		     : "r" (MDREFR), "r" (cclkcfg),
+ 		       "r" (preset_mdrefr), "r" (postset_mdrefr)
+ 		     : "r4", "r5");
+ 	local_irq_restore(flags);
+diff --git a/arch/arm/mach-pxa/csb726.c b/arch/arm/mach-pxa/csb726.c
+index dab9d92..317adbd 100644
+--- a/arch/arm/mach-pxa/csb726.c
++++ b/arch/arm/mach-pxa/csb726.c
+@@ -27,6 +27,7 @@
+ #include <mach/ohci.h>
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/audio.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -255,9 +256,9 @@ static struct platform_device *devices[] __initdata = {
+ static void __init csb726_init(void)
+ {
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(csb726_pin_config));
+-/*	MSC1 = 0x7ffc3ffc; *//* LAN9215/EXP_CS */
+-/*	MSC2 = 0x06697ff4; *//* none/SM501 */
+-	MSC2 = (MSC2 & ~0xffff) | 0x7ff4; /* SM501 */
++/*	__raw_writel(0x7ffc3ffc, MSC1); *//* LAN9215/EXP_CS */
++/*	__raw_writel(0x06697ff4, MSC2); *//* none/SM501 */
++	__raw_writel((__raw_readl(MSC2) & ~0xffff) | 0x7ff4, MSC2); /* SM501 */
+ 
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_btuart_info(NULL);
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 971f994..6d621bb 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -28,6 +28,7 @@
+ 
+ #include <mach/reset.h>
+ #include <mach/gpio.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -117,8 +118,8 @@ static struct map_desc common_io_desc[] __initdata = {
+ 
+ static struct map_desc pxa2xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+-		.virtual	=  0xf6000000,
+-		.pfn		= __phys_to_pfn(0x48000000),
++		.virtual	=  PXA_SMEMC_VIRT,
++		.pfn		= __phys_to_pfn(PXA2XX_SMEMC_BASE),
+ 		.length		= 0x00200000,
+ 		.type		= MT_DEVICE
+ 	}
+@@ -126,8 +127,8 @@ static struct map_desc pxa2xx_io_desc[] __initdata = {
+ 
+ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+-		.virtual	=  0xf6000000,
+-		.pfn		= __phys_to_pfn(0x4a000000),
++		.virtual	=  PXA_SMEMC_VIRT,
++		.pfn		= __phys_to_pfn(PXA3XX_SMEMC_BASE),
+ 		.length		= 0x00200000,
+ 		.type		= MT_DEVICE
+ 	}
+diff --git a/arch/arm/mach-pxa/h5000.c b/arch/arm/mach-pxa/h5000.c
+index 9048066..3f69fce 100644
+--- a/arch/arm/mach-pxa/h5000.c
++++ b/arch/arm/mach-pxa/h5000.c
+@@ -32,6 +32,7 @@
+ #include <mach/pxa25x.h>
+ #include <mach/h5000.h>
+ #include <mach/udc.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -172,11 +173,11 @@ static unsigned long h5000_pin_config[] __initdata = {
+ 
+ static void fix_msc(void)
+ {
+-	MSC0 = 0x129c24f2;
+-	MSC1 = 0x7ff424fa;
+-	MSC2 = 0x7ff47ff4;
++	__raw_writel(0x129c24f2, MSC0);
++	__raw_writel(0x7ff424fa, MSC1);
++	__raw_writel(0x7ff47ff4, MSC2);
+ 
+-	MDREFR |= 0x02080000;
++	__raw_writel(__raw_readl(MDREFR) | 0x02080000, MDREFR);
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-pxa/include/mach/pxa-smemc.h b/arch/arm/mach-pxa/include/mach/pxa-smemc.h
+new file mode 100644
+index 0000000..e3b270b
+--- /dev/null
++++ b/arch/arm/mach-pxa/include/mach/pxa-smemc.h
+@@ -0,0 +1,74 @@
++/*
++ * Static memory controller register definitions for PXA CPUs
++ *
++ * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __PXA_SMEMC_REGS_H
++#define __PXA_SMEMC_REGS_H
++
++#define	PXA2XX_SMEMC_BASE	0x48000000
++#define	PXA3XX_SMEMC_BASE	0x4a000000
++#define	PXA_SMEMC_VIRT		0xf6000000
++
++#define MDCNFG		(PXA_SMEMC_VIRT + 0x00)  /* SDRAM Configuration Register 0 */
++#define MDREFR		(PXA_SMEMC_VIRT + 0x04)  /* SDRAM Refresh Control Register */
++#define MSC0		(PXA_SMEMC_VIRT + 0x08)  /* Static Memory Control Register 0 */
++#define MSC1		(PXA_SMEMC_VIRT + 0x0C)  /* Static Memory Control Register 1 */
++#define MSC2		(PXA_SMEMC_VIRT + 0x10)  /* Static Memory Control Register 2 */
++#define MECR		(PXA_SMEMC_VIRT + 0x14)  /* Expansion Memory (PCMCIA/Compact Flash) Bus Configuration */
++#define SXLCR		(PXA_SMEMC_VIRT + 0x18)  /* LCR value to be written to SDRAM-Timing Synchronous Flash */
++#define SXCNFG		(PXA_SMEMC_VIRT + 0x1C)  /* Synchronous Static Memory Control Register */
++#define SXMRS		(PXA_SMEMC_VIRT + 0x24)  /* MRS value to be written to Synchronous Flash or SMROM */
++#define MCMEM0		(PXA_SMEMC_VIRT + 0x28)  /* Card interface Common Memory Space Socket 0 Timing */
++#define MCMEM1		(PXA_SMEMC_VIRT + 0x2C)  /* Card interface Common Memory Space Socket 1 Timing */
++#define MCATT0		(PXA_SMEMC_VIRT + 0x30)  /* Card interface Attribute Space Socket 0 Timing Configuration */
++#define MCATT1		(PXA_SMEMC_VIRT + 0x34)  /* Card interface Attribute Space Socket 1 Timing Configuration */
++#define MCIO0		(PXA_SMEMC_VIRT + 0x38)  /* Card interface I/O Space Socket 0 Timing Configuration */
++#define MCIO1		(PXA_SMEMC_VIRT + 0x3C)  /* Card interface I/O Space Socket 1 Timing Configuration */
++#define MDMRS		(PXA_SMEMC_VIRT + 0x40)  /* MRS value to be written to SDRAM */
++#define BOOT_DEF	(PXA_SMEMC_VIRT + 0x44)  /* Read-Only Boot-Time Register. Contains BOOT_SEL and PKG_SEL */
++#define MEMCLKCFG	(PXA_SMEMC_VIRT + 0x68)	/* Clock Configuration */
++#define CSADRCFG0	(PXA_SMEMC_VIRT + 0x80)	/* Address Configuration Register for CS0 */
++#define CSADRCFG1	(PXA_SMEMC_VIRT + 0x84)	/* Address Configuration Register for CS1 */
++#define CSADRCFG2	(PXA_SMEMC_VIRT + 0x88)	/* Address Configuration Register for CS2 */
++#define CSADRCFG3	(PXA_SMEMC_VIRT + 0x8C)	/* Address Configuration Register for CS3 */
++
++/*
++ * More handy macros for PCMCIA
++ *
++ * Arg is socket number
++ */
++#define MCMEM(s)	(PXA_SMEMC_VIRT + 0x28 + ((s)<<2))  /* Card interface Common Memory Space Socket s Timing */
++#define MCATT(s)	(PXA_SMEMC_VIRT + 0x30 + ((s)<<2))  /* Card interface Attribute Space Socket s Timing Configuration */
++#define MCIO(s)		(PXA_SMEMC_VIRT + 0x38 + ((s)<<2))  /* Card interface I/O Space Socket s Timing Configuration */
++
++/* MECR register defines */
++#define MECR_NOS	(1 << 0)	/* Number Of Sockets: 0 -> 1 sock, 1 -> 2 sock */
++#define MECR_CIT	(1 << 1)	/* Card Is There: 0 -> no card, 1 -> card inserted */
++
++#define MDCNFG_DE0	(1 << 0)	/* SDRAM Bank 0 Enable */
++#define MDCNFG_DE1	(1 << 1)	/* SDRAM Bank 1 Enable */
++#define MDCNFG_DE2	(1 << 16)	/* SDRAM Bank 2 Enable */
++#define MDCNFG_DE3	(1 << 17)	/* SDRAM Bank 3 Enable */
++
++#define MDREFR_K0DB4	(1 << 29)	/* SDCLK0 Divide by 4 Control/Status */
++#define MDREFR_K2FREE	(1 << 25)	/* SDRAM Free-Running Control */
++#define MDREFR_K1FREE	(1 << 24)	/* SDRAM Free-Running Control */
++#define MDREFR_K0FREE	(1 << 23)	/* SDRAM Free-Running Control */
++#define MDREFR_SLFRSH	(1 << 22)	/* SDRAM Self-Refresh Control/Status */
++#define MDREFR_APD	(1 << 20)	/* SDRAM/SSRAM Auto-Power-Down Enable */
++#define MDREFR_K2DB2	(1 << 19)	/* SDCLK2 Divide by 2 Control/Status */
++#define MDREFR_K2RUN	(1 << 18)	/* SDCLK2 Run Control/Status */
++#define MDREFR_K1DB2	(1 << 17)	/* SDCLK1 Divide by 2 Control/Status */
++#define MDREFR_K1RUN	(1 << 16)	/* SDCLK1 Run Control/Status */
++#define MDREFR_E1PIN	(1 << 15)	/* SDCKE1 Level Control/Status */
++#define MDREFR_K0DB2	(1 << 14)	/* SDCLK0 Divide by 2 Control/Status */
++#define MDREFR_K0RUN	(1 << 13)	/* SDCLK0 Run Control/Status */
++#define MDREFR_E0PIN	(1 << 12)	/* SDCKE0 Level Control/Status */
++
++#endif
+diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
+index 4fcddd9..b98f236 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
++++ b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
+@@ -28,61 +28,6 @@
+ #define PXA_CS5_PHYS	0x14000000
+ 
+ /*
+- * Memory controller
+- */
+-
+-#define MDCNFG		__REG(0x48000000)  /* SDRAM Configuration Register 0 */
+-#define MDREFR		__REG(0x48000004)  /* SDRAM Refresh Control Register */
+-#define MSC0		__REG(0x48000008)  /* Static Memory Control Register 0 */
+-#define MSC1		__REG(0x4800000C)  /* Static Memory Control Register 1 */
+-#define MSC2		__REG(0x48000010)  /* Static Memory Control Register 2 */
+-#define MECR		__REG(0x48000014)  /* Expansion Memory (PCMCIA/Compact Flash) Bus Configuration */
+-#define SXLCR		__REG(0x48000018)  /* LCR value to be written to SDRAM-Timing Synchronous Flash */
+-#define SXCNFG		__REG(0x4800001C)  /* Synchronous Static Memory Control Register */
+-#define SXMRS		__REG(0x48000024)  /* MRS value to be written to Synchronous Flash or SMROM */
+-#define MCMEM0		__REG(0x48000028)  /* Card interface Common Memory Space Socket 0 Timing */
+-#define MCMEM1		__REG(0x4800002C)  /* Card interface Common Memory Space Socket 1 Timing */
+-#define MCATT0		__REG(0x48000030)  /* Card interface Attribute Space Socket 0 Timing Configuration */
+-#define MCATT1		__REG(0x48000034)  /* Card interface Attribute Space Socket 1 Timing Configuration */
+-#define MCIO0		__REG(0x48000038)  /* Card interface I/O Space Socket 0 Timing Configuration */
+-#define MCIO1		__REG(0x4800003C)  /* Card interface I/O Space Socket 1 Timing Configuration */
+-#define MDMRS		__REG(0x48000040)  /* MRS value to be written to SDRAM */
+-#define BOOT_DEF	__REG(0x48000044)  /* Read-Only Boot-Time Register. Contains BOOT_SEL and PKG_SEL */
+-
+-/*
+- * More handy macros for PCMCIA
+- *
+- * Arg is socket number
+- */
+-#define MCMEM(s)	__REG2(0x48000028, (s)<<2 )  /* Card interface Common Memory Space Socket s Timing */
+-#define MCATT(s)	__REG2(0x48000030, (s)<<2 )  /* Card interface Attribute Space Socket s Timing Configuration */
+-#define MCIO(s)		__REG2(0x48000038, (s)<<2 )  /* Card interface I/O Space Socket s Timing Configuration */
+-
+-/* MECR register defines */
+-#define MECR_NOS	(1 << 0)	/* Number Of Sockets: 0 -> 1 sock, 1 -> 2 sock */
+-#define MECR_CIT	(1 << 1)	/* Card Is There: 0 -> no card, 1 -> card inserted */
+-
+-#define MDCNFG_DE0	(1 << 0)	/* SDRAM Bank 0 Enable */
+-#define MDCNFG_DE1	(1 << 1)	/* SDRAM Bank 1 Enable */
+-#define MDCNFG_DE2	(1 << 16)	/* SDRAM Bank 2 Enable */
+-#define MDCNFG_DE3	(1 << 17)	/* SDRAM Bank 3 Enable */
+-
+-#define MDREFR_K0DB4	(1 << 29)	/* SDCLK0 Divide by 4 Control/Status */
+-#define MDREFR_K2FREE	(1 << 25)	/* SDRAM Free-Running Control */
+-#define MDREFR_K1FREE	(1 << 24)	/* SDRAM Free-Running Control */
+-#define MDREFR_K0FREE	(1 << 23)	/* SDRAM Free-Running Control */
+-#define MDREFR_SLFRSH	(1 << 22)	/* SDRAM Self-Refresh Control/Status */
+-#define MDREFR_APD	(1 << 20)	/* SDRAM/SSRAM Auto-Power-Down Enable */
+-#define MDREFR_K2DB2	(1 << 19)	/* SDCLK2 Divide by 2 Control/Status */
+-#define MDREFR_K2RUN	(1 << 18)	/* SDCLK2 Run Control/Status */
+-#define MDREFR_K1DB2	(1 << 17)	/* SDCLK1 Divide by 2 Control/Status */
+-#define MDREFR_K1RUN	(1 << 16)	/* SDCLK1 Run Control/Status */
+-#define MDREFR_E1PIN	(1 << 15)	/* SDCKE1 Level Control/Status */
+-#define MDREFR_K0DB2	(1 << 14)	/* SDCLK0 Divide by 2 Control/Status */
+-#define MDREFR_K0RUN	(1 << 13)	/* SDCLK0 Run Control/Status */
+-#define MDREFR_E0PIN	(1 << 12)	/* SDCKE0 Level Control/Status */
+-
+-/*
+  * Power Manager
+  */
+ 
+diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
+index f1685cc..40a219a 100644
+--- a/arch/arm/mach-pxa/lpd270.c
++++ b/arch/arm/mach-pxa/lpd270.c
+@@ -46,6 +46,7 @@
+ #include <mach/mmc.h>
+ #include <mach/irda.h>
+ #include <mach/ohci.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -463,7 +464,7 @@ static void __init lpd270_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+ 
+-	lpd270_flash_data[0].width = (BOOT_DEF & 1) ? 2 : 4;
++	lpd270_flash_data[0].width = (__raw_readl(BOOT_DEF) & 1) ? 2 : 4;
+ 	lpd270_flash_data[1].width = 4;
+ 
+ 	/*
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index e73fc1d..e16450e 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -50,6 +50,7 @@
+ #include <mach/pxafb.h>
+ #include <mach/mmc.h>
+ #include <mach/pm.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "clock.h"
+@@ -525,7 +526,7 @@ static void __init lubbock_init(void)
+ 	pxa_set_ac97_info(NULL);
+ 
+ 	lubbock_flash_data[0].width = lubbock_flash_data[1].width =
+-		(BOOT_DEF & 1) ? 2 : 4;
++		(__raw_readl(BOOT_DEF) & 1) ? 2 : 4;
+ 	/* Compensate for the nROMBT switch which swaps the flash banks */
+ 	printk(KERN_NOTICE "Lubbock configured to boot from %s (bank %d)\n",
+ 	       flashboot?"Flash":"ROM", flashboot);
+diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
+index 12f5e9e..f3ea1d7 100644
+--- a/arch/arm/mach-pxa/mainstone.c
++++ b/arch/arm/mach-pxa/mainstone.c
+@@ -41,7 +41,7 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/flash.h>
+ 
+-#include <plat/pxa27x.h>
++#include <mach/pxa27x.h>
+ #include <mach/gpio.h>
+ #include <mach/mainstone.h>
+ #include <mach/audio.h>
+@@ -51,6 +51,7 @@
+ #include <mach/irda.h>
+ #include <mach/ohci.h>
+ #include <plat/pxa27x_keypad.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -565,7 +566,7 @@ static void __init mainstone_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+ 
+-	mst_flash_data[0].width = (BOOT_DEF & 1) ? 2 : 4;
++	mst_flash_data[0].width = (__raw_readl(BOOT_DEF) & 1) ? 2 : 4;
+ 	mst_flash_data[1].width = 4;
+ 
+ 	/* Compensate for SW7 which swaps the flash banks */
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 12e5b9f..b1b01e6 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -17,6 +17,7 @@
+ #include <linux/suspend.h>
+ #include <linux/platform_device.h>
+ #include <linux/sysdev.h>
++#include <linux/io.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+@@ -27,6 +28,7 @@
+ #include <mach/ohci.h>
+ #include <mach/pm.h>
+ #include <mach/dma.h>
++#include <mach/pxa-smemc.h>
  #include <plat/i2c.h>
  
-@@ -930,8 +932,8 @@ static void spitz_poweroff(void)
- static void spitz_restart(char mode, const char *cmd)
- {
- 	/* Bootloader magic for a reboot */
--	if ((MSC0 & 0xffff0000) == 0x7ff00000)
--		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
-+	if ((__raw_readl(MSC0) & 0xffff0000) == 0x7ff00000)
-+		__raw_writel((__raw_readl(MSC0) & 0xffff) | 0x7ee00000, MSC0);
+ #include "generic.h"
+@@ -254,7 +256,7 @@ enum {
  
- 	spitz_poweroff();
+ void pxa27x_cpu_pm_save(unsigned long *sleep_save)
+ {
+-	SAVE(MDREFR);
++	sleep_save[SLEEP_SAVE_MDREFR] = __raw_readl(MDREFR);
+ 	SAVE(PCFR);
+ 
+ 	SAVE(CKEN);
+@@ -263,7 +265,7 @@ void pxa27x_cpu_pm_save(unsigned long *sleep_save)
+ 
+ void pxa27x_cpu_pm_restore(unsigned long *sleep_save)
+ {
+-	RESTORE(MDREFR);
++	__raw_writel(sleep_save[SLEEP_SAVE_MDREFR], MDREFR);
+ 	RESTORE(PCFR);
+ 
+ 	PSSR = PSSR_RDH | PSSR_PH;
+diff --git a/arch/arm/mach-pxa/sleep.S b/arch/arm/mach-pxa/sleep.S
+index 52c30b0..227df3a 100644
+--- a/arch/arm/mach-pxa/sleep.S
++++ b/arch/arm/mach-pxa/sleep.S
+@@ -14,7 +14,7 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ #include <mach/hardware.h>
+-
++#include <mach/pxa-smemc.h>
+ #include <mach/pxa2xx-regs.h>
+ 
+ #define MDREFR_KDIV	0x200a4000	// all banks
+diff --git a/arch/arm/mach-pxa/smemc.c b/arch/arm/mach-pxa/smemc.c
+index d6f6904..91edda8 100644
+--- a/arch/arm/mach-pxa/smemc.c
++++ b/arch/arm/mach-pxa/smemc.c
+@@ -9,50 +9,37 @@
+ #include <linux/sysdev.h>
+ 
+ #include <mach/hardware.h>
+-
+-#define SMEMC_PHYS_BASE	(0x4A000000)
+-#define SMEMC_PHYS_SIZE	(0x90)
+-
+-#define MSC0		(0x08)	/* Static Memory Controller Register 0 */
+-#define MSC1		(0x0C)	/* Static Memory Controller Register 1 */
+-#define SXCNFG		(0x1C)	/* Synchronous Static Memory Control Register */
+-#define MEMCLKCFG	(0x68)	/* Clock Configuration */
+-#define CSADRCFG0	(0x80)	/* Address Configuration Register for CS0 */
+-#define CSADRCFG1	(0x84)	/* Address Configuration Register for CS1 */
+-#define CSADRCFG2	(0x88)	/* Address Configuration Register for CS2 */
+-#define CSADRCFG3	(0x8C)	/* Address Configuration Register for CS3 */
++#include <mach/pxa-smemc.h>
+ 
+ #ifdef CONFIG_PM
+-static void __iomem *smemc_mmio_base;
+-
+ static unsigned long msc[2];
+ static unsigned long sxcnfg, memclkcfg;
+ static unsigned long csadrcfg[4];
+ 
+ static int pxa3xx_smemc_suspend(struct sys_device *dev, pm_message_t state)
+ {
+-	msc[0] = __raw_readl(smemc_mmio_base + MSC0);
+-	msc[1] = __raw_readl(smemc_mmio_base + MSC1);
+-	sxcnfg = __raw_readl(smemc_mmio_base + SXCNFG);
+-	memclkcfg = __raw_readl(smemc_mmio_base + MEMCLKCFG);
+-	csadrcfg[0] = __raw_readl(smemc_mmio_base + CSADRCFG0);
+-	csadrcfg[1] = __raw_readl(smemc_mmio_base + CSADRCFG1);
+-	csadrcfg[2] = __raw_readl(smemc_mmio_base + CSADRCFG2);
+-	csadrcfg[3] = __raw_readl(smemc_mmio_base + CSADRCFG3);
++	msc[0] = __raw_readl(MSC0);
++	msc[1] = __raw_readl(MSC1);
++	sxcnfg = __raw_readl(SXCNFG);
++	memclkcfg = __raw_readl(MEMCLKCFG);
++	csadrcfg[0] = __raw_readl(CSADRCFG0);
++	csadrcfg[1] = __raw_readl(CSADRCFG1);
++	csadrcfg[2] = __raw_readl(CSADRCFG2);
++	csadrcfg[3] = __raw_readl(CSADRCFG3);
+ 
+ 	return 0;
  }
-@@ -982,7 +984,7 @@ MACHINE_START(SPITZ, "SHARP Spitz")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= spitz_fixup,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.init_machine	= spitz_init,
- 	.timer		= &pxa_timer,
-@@ -994,7 +996,7 @@ MACHINE_START(BORZOI, "SHARP Borzoi")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= spitz_fixup,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.init_machine	= spitz_init,
- 	.timer		= &pxa_timer,
-@@ -1006,7 +1008,7 @@ MACHINE_START(AKITA, "SHARP Akita")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup		= spitz_fixup,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.init_machine	= spitz_init,
- 	.timer		= &pxa_timer,
+ 
+ static int pxa3xx_smemc_resume(struct sys_device *dev)
+ {
+-	__raw_writel(msc[0], smemc_mmio_base + MSC0);
+-	__raw_writel(msc[1], smemc_mmio_base + MSC1);
+-	__raw_writel(sxcnfg, smemc_mmio_base + SXCNFG);
+-	__raw_writel(memclkcfg, smemc_mmio_base + MEMCLKCFG);
+-	__raw_writel(csadrcfg[0], smemc_mmio_base + CSADRCFG0);
+-	__raw_writel(csadrcfg[1], smemc_mmio_base + CSADRCFG1);
+-	__raw_writel(csadrcfg[2], smemc_mmio_base + CSADRCFG2);
+-	__raw_writel(csadrcfg[3], smemc_mmio_base + CSADRCFG3);
++	__raw_writel(msc[0], MSC0);
++	__raw_writel(msc[1], MSC1);
++	__raw_writel(sxcnfg, SXCNFG);
++	__raw_writel(memclkcfg, MEMCLKCFG);
++	__raw_writel(csadrcfg[0], CSADRCFG0);
++	__raw_writel(csadrcfg[1], CSADRCFG1);
++	__raw_writel(csadrcfg[2], CSADRCFG2);
++	__raw_writel(csadrcfg[3], CSADRCFG3);
+ 
+ 	return 0;
+ }
+@@ -73,10 +60,6 @@ static int __init smemc_init(void)
+ 	int ret = 0;
+ 
+ 	if (cpu_is_pxa3xx()) {
+-		smemc_mmio_base = ioremap(SMEMC_PHYS_BASE, SMEMC_PHYS_SIZE);
+-		if (smemc_mmio_base == NULL)
+-			return -ENODEV;
+-
+ 		ret = sysdev_class_register(&smemc_sysclass);
+ 		if (ret)
+ 			return ret;
 diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index 62de073..2f45af4 100644
+index 2f45af4..61af9a0 100644
 --- a/arch/arm/mach-pxa/stargate2.c
 +++ b/arch/arm/mach-pxa/stargate2.c
-@@ -1000,7 +1000,7 @@ static void __init stargate2_init(void)
- MACHINE_START(INTELMOTE2, "IMOTE 2")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= imote2_init,
-@@ -1012,7 +1012,7 @@ MACHINE_END
- MACHINE_START(STARGATE2, "Stargate 2")
- 	.phys_io = 0x40000000,
- 	.io_pg_offst = (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io = pxa_map_io,
-+	.map_io = pxa2xx_map_io,
- 	.nr_irqs = STARGATE_NR_IRQS,
- 	.init_irq = pxa27x_init_irq,
- 	.timer = &pxa_timer,
-diff --git a/arch/arm/mach-pxa/tavorevb.c b/arch/arm/mach-pxa/tavorevb.c
-index 0f440c9..edade46 100644
---- a/arch/arm/mach-pxa/tavorevb.c
-+++ b/arch/arm/mach-pxa/tavorevb.c
-@@ -492,7 +492,7 @@ MACHINE_START(TAVOREVB, "PXA930 Evaluation Board (aka TavorEVB)")
- 	.phys_io        = 0x40000000,
- 	.boot_params    = 0xa0000100,
- 	.io_pg_offst    = (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa3xx_map_io,
- 	.init_irq       = pxa3xx_init_irq,
- 	.timer          = &pxa_timer,
- 	.init_machine   = tavorevb_init,
-diff --git a/arch/arm/mach-pxa/tavorevb3.c b/arch/arm/mach-pxa/tavorevb3.c
-index 5eeba64..551e6a4 100644
---- a/arch/arm/mach-pxa/tavorevb3.c
-+++ b/arch/arm/mach-pxa/tavorevb3.c
-@@ -128,7 +128,7 @@ static void __init evb3_init(void)
- MACHINE_START(TAVOREVB3, "PXA950 Evaluation Board (aka TavorEVB3)")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa3xx_map_io,
- 	.nr_irqs	= TAVOREVB3_NR_IRQS,
- 	.init_irq       = pxa3xx_init_irq,
- 	.timer          = &pxa_timer,
+@@ -48,6 +48,7 @@
+ #include <mach/udc.h>
+ #include <mach/pxa2xx_spi.h>
+ #include <mach/pxa27x-udc.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/da903x.h>
+@@ -976,7 +977,7 @@ static void __init stargate2_init(void)
+ {
+ 	/* This is probably a board specific hack as this must be set
+ 	   prior to connecting the MFP stuff up. */
+-	MECR &= ~MECR_NOS;
++	__raw_writel(__raw_readl(MECR) & ~MECR_NOS, MECR);
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(stargate2_pin_config));
+ 
 diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 3a06e98..86b6c7a 100644
+index 86b6c7a..1fe9e98 100644
 --- a/arch/arm/mach-pxa/tosa.c
 +++ b/arch/arm/mach-pxa/tosa.c
-@@ -955,7 +955,7 @@ MACHINE_START(TOSA, "SHARP Tosa")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.fixup          = fixup_tosa,
--	.map_io         = pxa_map_io,
-+	.map_io         = pxa2xx_map_io,
- 	.nr_irqs	= TOSA_NR_IRQS,
- 	.init_irq       = pxa25x_init_irq,
- 	.init_machine   = tosa_init,
+@@ -46,6 +46,7 @@
+ #include <mach/tosa_bt.h>
+ #include <mach/pxa2xx_spi.h>
+ #include <mach/audio.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <mach/tosa.h>
+@@ -893,9 +894,11 @@ static void tosa_poweroff(void)
+ 
+ static void tosa_restart(char mode, const char *cmd)
+ {
++	uint32_t msc0 = __raw_readl(MSC0);
++
+ 	/* Bootloader magic for a reboot */
+-	if((MSC0 & 0xffff0000) == 0x7ff00000)
+-		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
++	if((msc0 & 0xffff0000) == 0x7ff00000)
++		__raw_writel((msc0 & 0xffff) | 0x7ee00000, MSC0);
+ 
+ 	tosa_poweroff();
+ }
 diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-index 0acff17..d4ecc25 100644
+index d4ecc25..881f77d 100644
 --- a/arch/arm/mach-pxa/trizeps4.c
 +++ b/arch/arm/mach-pxa/trizeps4.c
-@@ -539,7 +539,7 @@ static void __init trizeps4_init(void)
+@@ -47,6 +47,7 @@
+ #include <mach/mmc.h>
+ #include <mach/irda.h>
+ #include <mach/ohci.h>
++#include <mach/pxa-smemc.h>
+ #include <plat/i2c.h>
  
- static void __init trizeps4_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
+ #include "generic.h"
+@@ -542,7 +543,7 @@ static void __init trizeps4_map_io(void)
+ 	pxa2xx_map_io();
  	iotable_init(trizeps4_io_desc, ARRAY_SIZE(trizeps4_io_desc));
  
- 	if ((MSC0 & 0x8) && (BOOT_DEF & 0x1)) {
-diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
-index e90114a..8015405 100644
---- a/arch/arm/mach-pxa/viper.c
-+++ b/arch/arm/mach-pxa/viper.c
-@@ -983,7 +983,7 @@ static struct map_desc viper_io_desc[] __initdata = {
- 
- static void __init viper_map_io(void)
- {
--	pxa_map_io();
-+	pxa2xx_map_io();
- 
- 	iotable_init(viper_io_desc, ARRAY_SIZE(viper_io_desc));
- 
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index 37d6173..07c35eb 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -721,7 +721,7 @@ MACHINE_START(VPAC270, "Voipac PXA270")
- 	.phys_io	= 0x40000000,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= vpac270_init
+-	if ((MSC0 & 0x8) && (BOOT_DEF & 0x1)) {
++	if ((__raw_readl(MSC0) & 0x8) && (__raw_readl(BOOT_DEF) & 0x1)) {
+ 		/* if flash is 16 bit wide its a Trizeps4 WL */
+ 		__machine_arch_type = MACH_TYPE_TRIZEPS4WL;
+ 		trizeps4_flash_data[0].width = 2;
 diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
-index d3b4e3f..649e74b 100644
+index 649e74b..bd8a38f 100644
 --- a/arch/arm/mach-pxa/xcep.c
 +++ b/arch/arm/mach-pxa/xcep.c
-@@ -185,7 +185,7 @@ MACHINE_START(XCEP, "Iskratel XCEP")
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
- 	.boot_params	= 0xa0000100,
- 	.init_machine	= xcep_init,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa25x_init_irq,
- 	.timer		= &pxa_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 8c44bc4..02bf4e5 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -706,7 +706,7 @@ MACHINE_START(ZIPIT2, "Zipit Z2")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa2xx_map_io,
- 	.init_irq	= pxa27x_init_irq,
- 	.timer		= &pxa_timer,
- 	.init_machine	= z2_init,
+@@ -31,6 +31,7 @@
+ #include <mach/hardware.h>
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/mfp-pxa25x.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -172,9 +173,9 @@ static void __init xcep_init(void)
+ 
+ 	/* See Intel XScale Developer's Guide for details */
+ 	/* Set RDF and RDN to appropriate values (chip select 3 (smc91x)) */
+-	MSC1 = (MSC1 & 0xffff) | 0xD5540000;
++	__raw_writel((__raw_readl(MSC1) & 0xffff) | 0xD5540000, MSC1);
+ 	/* Set RDF and RDN to appropriate values (chip select 5 (fpga)) */
+-	MSC2 = (MSC2 & 0xffff) | 0x72A00000;
++	__raw_writel((__raw_readl(MSC2) & 0xffff) | 0x72A00000, MSC2);
+ 
+ 	platform_add_devices(ARRAY_AND_SIZE(devices));
+ 	pxa_set_i2c_info(&xcep_i2c_platform_data);
 diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index 9da2b62..96a064f 100644
+index 96a064f..cf410ba 100644
 --- a/arch/arm/mach-pxa/zeus.c
 +++ b/arch/arm/mach-pxa/zeus.c
-@@ -883,7 +883,7 @@ static struct map_desc zeus_io_desc[] __initdata = {
+@@ -47,6 +47,7 @@
+ #include <mach/audio.h>
+ #include <mach/arcom-pcmcia.h>
+ #include <mach/zeus.h>
++#include <mach/pxa-smemc.h>
  
- static void __init zeus_map_io(void)
+ #include "generic.h"
+ 
+@@ -828,8 +829,8 @@ static void __init zeus_init(void)
+ 	pr_info("Zeus CPLD V%dI%d\n", (system_rev & 0xf0) >> 4, (system_rev & 0x0f));
+ 
+ 	/* Fix timings for dm9000s (CS1/CS2)*/
+-	MSC0 = (MSC0 & 0xffff) | (dm9000_msc << 16);
+-	MSC1 = (MSC1 & 0xffff0000) | dm9000_msc;
++	__raw_writel((MSC0 & 0xffff) | (dm9000_msc << 16), MSC0);
++	__raw_writel((MSC1 & 0xffff0000) | dm9000_msc, MSC1);
+ 
+ 	pm_power_off = zeus_power_off;
+ 	zeus_setup_apm();
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index ae07b4d..65a8b6f 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -26,6 +26,7 @@
+ #include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
++#include <mach/pxa-smemc.h>
+ #include <asm/io.h>
+ #include <asm/irq.h>
+ #include <asm/system.h>
+@@ -116,37 +117,49 @@ static inline u_int pxa2xx_pcmcia_cmd_time(u_int mem_clk_10khz,
+ 
+ static int pxa2xx_pcmcia_set_mcmem( int sock, int speed, int clock )
  {
--	pxa_map_io();
-+	pxa2xx_map_io();
+-	MCMEM(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
++
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
  
- 	iotable_init(zeus_io_desc, ARRAY_SIZE(zeus_io_desc));
++	__raw_writel(val, MCMEM(sock));
++
+ 	return 0;
+ }
  
-diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
-index 69df3ed..908eed4 100644
---- a/arch/arm/mach-pxa/zylonite.c
-+++ b/arch/arm/mach-pxa/zylonite.c
-@@ -414,7 +414,7 @@ MACHINE_START(ZYLONITE, "PXA3xx Platform Development Kit (aka Zylonite)")
- 	.phys_io	= 0x40000000,
- 	.boot_params	= 0xa0000100,
- 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
--	.map_io		= pxa_map_io,
-+	.map_io		= pxa3xx_map_io,
- 	.nr_irqs	= ZYLONITE_NR_IRQS,
- 	.init_irq	= pxa3xx_init_irq,
- 	.timer		= &pxa_timer,
+ static int pxa2xx_pcmcia_set_mcio( int sock, int speed, int clock )
+ {
+-	MCIO(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
++
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	__raw_writel(val, MCIO(sock));
++
+ 	return 0;
+ }
+ 
+ static int pxa2xx_pcmcia_set_mcatt( int sock, int speed, int clock )
+ {
+-	MCATT(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
++
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	__raw_writel(val, MCATT(sock));
++
+ 	return 0;
+ }
+ 
+@@ -205,19 +218,18 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ static void pxa2xx_configure_sockets(struct device *dev)
+ {
+ 	struct pcmcia_low_level *ops = dev->platform_data;
+-
+ 	/*
+ 	 * We have at least one socket, so set MECR:CIT
+ 	 * (Card Is There)
+ 	 */
+-	MECR |= MECR_CIT;
++	uint32_t mecr = MECR_CIT;
+ 
+ 	/* Set MECR:NOS (Number Of Sockets) */
+ 	if ((ops->first + ops->nr) > 1 ||
+ 	    machine_is_viper() || machine_is_arcom_zeus())
+-		MECR |= MECR_NOS;
+-	else
+-		MECR &= ~MECR_NOS;
++		mecr |= MECR_NOS;
++
++	__raw_writel(mecr, MECR);
+ }
+ 
+ static const char *skt_names[] = {
+@@ -272,14 +284,24 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 	struct soc_pcmcia_socket *skt;
+ 
+ 	ops = (struct pcmcia_low_level *)dev->dev.platform_data;
+-	if (!ops)
+-		return -ENODEV;
++	if (!ops) {
++		ret = -ENODEV;
++		goto err0;
++	}
++
++	if (cpu_is_pxa320() && ops->nr > 1) {
++		dev_err(&dev->dev, "pxa320 supports only one pcmcia slot");
++		ret = -EINVAL;
++		goto err0;
++	}
+ 
+ 	pxa2xx_drv_pcmcia_ops(ops);
+ 
+ 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+-	if (!sinfo)
+-		return -ENOMEM;
++	if (!sinfo) {
++		ret = -ENOMEM;
++		goto err0;
++	}
+ 
+ 	sinfo->nskt = ops->nr;
+ 
+@@ -295,18 +317,19 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 
+ 		ret = pxa2xx_drv_pcmcia_add_one(skt);
+ 		if (ret)
+-			break;
++			goto err1;
+ 	}
+ 
+-	if (ret) {
+-		while (--i >= 0)
+-			soc_pcmcia_remove_one(&sinfo->skt[i]);
+-		kfree(sinfo);
+-	} else {
+-		pxa2xx_configure_sockets(&dev->dev);
+-		dev_set_drvdata(&dev->dev, sinfo);
+-	}
++	pxa2xx_configure_sockets(&dev->dev);
++	dev_set_drvdata(&dev->dev, sinfo);
+ 
++	return 0;
++
++err1:
++	while (--i >= 0)
++		soc_pcmcia_remove_one(&sinfo->skt[i]);
++	kfree(sinfo);
++err0:
+ 	return ret;
+ }
+ 
 -- 
 1.7.1
