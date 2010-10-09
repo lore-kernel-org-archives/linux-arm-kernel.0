@@ -1,61 +1,84 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Sat,  9 Oct 2010 20:31:20 +0530
-Subject: [PATCH] amba: add name based matching
-Message-ID: <1286636480-27454-1-git-send-email-rabin.vincent@stericsson.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 9 Oct 2010 19:07:01 +0300
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101009135210.GA25564@n2100.arm.linux.org.uk>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101009135210.GA25564@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=Sv35ipSGzSoJMjdoNU-Qee9csviPL3yMSM3uf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some peripherals on the DBx500 family of SoCs have changes in their
-functionality and registers between different variants in the family but
-retain the same AMBA peripheral ID, making it impossible to distinguish
-between them in AMBA drivers with the current AMBA id_table.
+On Sat, Oct 9, 2010 at 4:52 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
+>> For issues related to this:
+>> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
+>
+> This one nicely shows some of the problems which can occur with the
+> memory type attributes - and this is not attributable to ioremap().
+>
+> ioremap() is used to map devices. ?It creates device memory type mappings.
+> If what you're mapping doesn't support device memory type mappings, then
+> accesses via an ioremap()'d region isn't going to work - as this guy is
+> observing.
+>
+> That's not because ioremap() is doing something wrong. ?It's doing what
+> it's meant to do. ?The use is wrong, and is completely unrelated to the
+> issue you've raised.
 
-To support this, add a name parameter to the amba_device and the amba_id
-and allow name based matching as a second level filter after the
-periphid match.
+Ok, I was confused by Catalin's comment which does point to ioremap()
+on normal RAM:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/84504
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
- drivers/amba/bus.c       |    6 ++++++
- include/linux/amba/bus.h |    2 ++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+>> http://article.gmane.org/gmane.linux.ports.sh.devel/8560
+>
+> This one we know about, and as I've already said, it ends up with three
+> aliasing mappings each with different attributes thusly:
+>
+> ? ? ? ?cpu = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
+> ? ? ? ?dma_declare_coherent_memory(dev, dma, dma, size, DMA_MEMORY_MAP);
+> ? ? ? ? ? ? ? ?==> ioremap(dma, size);
+> ? ? ? ?...
+> ? ? ? ?dma_alloc_coherent(dev, ...);
+>
+> This wasn't spotted in the review of sh-mobile code because it's not part
+> of the sh-mobile code base, but some of the generic sh architecture code.
+> sh-mobile went into the kernel on March 12th, so it does pre-date the
+> change to ioremap, and is therefore technically a regression.
+>
+> However, as can be seen from the link above, it's been known about since
+> 8th August - two months ago. ?The problem has been discussed, and we had
+> a good solution which would work. ?But then an oar got thrown in which
+> basically resulted in that solution being rejected - on the basis that
+> "it's an established API and it must work".
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index d31590e..926121a 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -28,6 +28,12 @@ amba_lookup(struct amba_id *table, struct amba_device *dev)
- 
- 	while (table->mask) {
- 		ret = (dev->periphid & table->mask) == table->id;
-+		if (ret && (table->name || dev->name)) {
-+			if (table->name && dev->name)
-+				ret = strcmp(dev->name, table->name) == 0;
-+			else
-+				ret = 0;
-+		}
- 		if (ret)
- 			break;
- 		table++;
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index b0c1740..61ec94a 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -29,12 +29,14 @@ struct amba_device {
- 	struct clk		*pclk;
- 	u64			dma_mask;
- 	unsigned int		periphid;
-+	const char		*name;
- 	unsigned int		irq[AMBA_NR_IRQS];
- };
- 
- struct amba_id {
- 	unsigned int		id;
- 	unsigned int		mask;
-+	const char		*name;
- 	void			*data;
- };
- 
+I don't see anyone rejecting any solution there. Where is anybody
+saying "it's an established API and it must work"?
+
+> Well, this usage of the API doesn't work on x86!
+>
+> The result - progress on the issue hit a brick wall and is unable to
+> proceed because of personal viewpoints conflicting with reality.
+
+Can you concentrate on the patch at hand?
+http://article.gmane.org/gmane.linux.kernel/1045670
+
+This doesn't break anything, nor prevents anyone coming up with solutions.
+
+>> http://www.spinics.net/lists/linux-fbdev/msg01745.html
+>
+> External user? ?Unreviewed code? ?You can't seriously be suggesting
+> that we should care about code we haven't seen which is sitting
+> externally to the kernel tree, and this is a valid reason to hold
+> off on changes to the kernel.
+
+It's a plus, not the main reason to apply this patch. However,
+progress is not held by any means, people can still fix their drivers,
+generic solutions can still be proposed and worked on... This patch
+doesn't hurt anybody.
+
+You haven't answered my question: what is so horrible about warning
+only on .36, and disallowing on .37?
+
 -- 
-1.7.1
+Felipe Contreras
