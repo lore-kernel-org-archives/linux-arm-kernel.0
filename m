@@ -1,58 +1,37 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Sat, 9 Oct 2010 11:32:43 +0100
-Subject: [PATCH 5/7] ARM: oprofile: Move non-ARM code into separate
-	init/exit
-In-Reply-To: <20101009012647.GM13563@erda.amd.com>
-References: <cover.1286584677.git.matt@console-pimps.org>
-	<0de9eda11dbfe9c21348da07b57f04f35cd9effc.1286584677.git.matt@console-pimps.org>
-	<20101009012647.GM13563@erda.amd.com>
-Message-ID: <20101009103242.GA17466@console-pimps.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 9 Oct 2010 13:11:26 +0200
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101009092127.GB20975@n2100.arm.linux.org.uk>
+	<AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
+Message-ID: <201010091311.26335.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 09, 2010 at 03:26:47AM +0200, Robert Richter wrote:
-> On 08.10.10 20:46:20, Matt Fleming wrote:
-> > In preparation for moving the majority of this oprofile code into an
-> > architecture-neutral place separate the architecture-independent code
-> > into oprofile_perf_init() and oprofile_perf_exit().
-> > 
-> > Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> > Tested-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/oprofile/common.c |   27 +++++++++++++++++++--------
-> >  1 files changed, 19 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index fd6e323..8718311 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -349,7 +349,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
-> >  		tail = user_backtrace(tail);
-> >  }
-> >  
-> > -int __init oprofile_arch_init(struct oprofile_operations *ops)
-> > +int __init oprofile_perf_init(struct oprofile_operations *ops)
-> >  {
-> >  	int cpu, ret = 0;
-> >  
-> > @@ -387,12 +387,11 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
-> >  		}
-> >  	}
-> >  
-> > -	ops->backtrace		= arm_backtrace;
-> > -	ops->create_files	= op_arm_create_files;
-> > -	ops->setup		= op_arm_setup;
-> > -	ops->start		= op_arm_start;
-> > -	ops->stop		= op_arm_stop;
-> > -	ops->shutdown		= op_arm_stop;
-> > +	ops->create_files	= oprofile_perf_create_files;
-> > +	ops->setup		= oprofile_perf_setup;
-> > +	ops->start		= oprofile_perf_start;
-> > +	ops->stop		= oprofile_perf_stop;
-> > +	ops->shutdown		= oprofile_perf_stop;
-> 
-> There is a compile breakage caused by patch #4. Will move the renames
-> to patch #4 when applying the patch.
+On Saturday 09 October 2010 12:28:19 Felipe Contreras wrote:
+> Also, what do you think is the right attitude? Do you think all
+> driver writers should follow each and every patch on the mailing list
+> or always try release candidates? Even if they all did (some do),
+> there's no generic solution, so they all are scratching their heads
+> about how to solve this. It might be crystal clear for you how such
+> generic solution could be implemented, or perhaps how some of these
+> drivers can be fixed individually, if so, why don't you come with a
+> proposal to mitigate the pain of fixing such drivers.
 
-Sorry, I don't know how this happened. These renames were originally in
-patch #4 but seem to have moved into #5 when I was reshuffling stuff.
+Please put this into perspective, it's not like this was ever a
+normal thing to do, and drivers doing an ioremap on kernel memory
+would typically not make it through a review. I've looked through
+the ARM specific drivers that do ioremap and practically all of
+them just map their MMIO registers as they should.
+
+The few drivers that may be hit by this are typically in drivers/staging
+exactly because issues like this have not been fixed yet.
+
+We should probably just fix the non-staging drivers that are hit by
+this now and declare the issue done.
+
+When you say that "many drivers broken", can you list the ones you know
+about? It would probably help resolve this the right way.
+
+	Arnd
