@@ -1,35 +1,142 @@
 From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Sat, 09 Oct 2010 17:49:39 +0300
-Subject: [PATCH 0/2] S3C64XX: Fix 48M clock enable
-Message-ID: <20101009143307.30918.15164.stgit@localhost.localdomain>
+Date: Sat, 09 Oct 2010 17:49:47 +0300
+Subject: [PATCH 1/2] ARM: S3C64XX: Fix USB and 48M clock enable procedure
+In-Reply-To: <20101009143307.30918.15164.stgit@localhost.localdomain>
+References: <20101009143307.30918.15164.stgit@localhost.localdomain>
+Message-ID: <20101009144947.30918.20608.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable 48M clock USB PHY must be initialized since 48M
-is output of USB PHY PLL.
-So fix a problem where other devices requiring 48M clock will
-not work unless USB OTG driver is enabled.
-is_osc was removed from OTG drivers platform data and implemented
-as separate function s3c6400_clk_xusbxti_is_osc which should be
-called from machine_init. Currently there is no in-kernel users
-of it.
+48M clock is output from USB PHY PLL. To enable 48M clock
+we must initialize USB PHY.
 
-This fix is only for S3C64xx family, but I am sure something
-similar will be needed for S5P family. I have started the work
-but I am unable to finnish it since I only have datasheet for
-S5PC100. Maybe Samsung guys could help me with this..?
-However current patches doesn't break S5P since it is not
-using s3c-hsotg driver (yet?).
-
+Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
 ---
 
-Paulius Zaleckas (2):
-      USB: s3-hsotg: Remove PHY initialization code and use CLK API
-      ARM: S3C64XX: Fix USB and 48M clock enable procedure
+ arch/arm/mach-s3c64xx/clock.c              |   67 +++++++++++++++++++++++++---
+ arch/arm/plat-samsung/include/plat/clock.h |    2 +
+ 2 files changed, 63 insertions(+), 6 deletions(-)
 
-
- arch/arm/mach-s3c64xx/clock.c               |   67 ++++++++++++++++++-
- arch/arm/plat-samsung/include/plat/clock.h  |    2 +
- arch/arm/plat-samsung/include/plat/udc-hs.h |    2 -
- drivers/usb/gadget/s3c-hsotg.c              |   94 +++++----------------------
- 4 files changed, 79 insertions(+), 86 deletions(-)
+diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+index 7e03f0a..3817ae5 100644
+--- a/arch/arm/mach-s3c64xx/clock.c
++++ b/arch/arm/mach-s3c64xx/clock.c
+@@ -19,6 +19,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/delay.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+@@ -32,6 +33,7 @@
+ #include <plat/cpu-freq.h>
+ #include <plat/clock.h>
+ #include <plat/clock-clksrc.h>
++#include <plat/regs-usb-hsotg-phy.h>
+ 
+ /* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
+  * ext_xtal_mux for want of an actual name from the manual.
+@@ -61,7 +63,20 @@ struct clk clk_27m = {
+ 	.rate		= 27000000,
+ };
+ 
+-static int clk_48m_ctrl(struct clk *clk, int enable)
++void __init s3c64xx_clk_xusbxti_is_osc(int is_osc)
++{
++	u32 val;
++
++	/* no need to protect since it will be called from machine init */
++	val = __raw_readl(S3C_PHYCLK);
++	if (is_osc)
++		val |= S3C_PHYCLK_EXT_OSC;
++	else
++		val &= ~S3C_PHYCLK_EXT_OSC;
++	__raw_writel(val, S3C_PHYCLK);
++}
++
++static int clk_xusbxti_ctrl(struct clk *clk, int enable)
+ {
+ 	unsigned long flags;
+ 	u32 val;
+@@ -76,22 +91,62 @@ static int clk_48m_ctrl(struct clk *clk, int enable)
+ 		val &= ~S3C64XX_OTHERS_USBMASK;
+ 
+ 	__raw_writel(val, S3C64XX_OTHERS);
++
++	val = __raw_readl(S3C_PHYPWR);
++	if (enable)
++		val &= ~(SRC_PHYPWR_OTG_DISABLE | SRC_PHYPWR_ANALOG_POWERDOWN |
++			 SRC_PHYPWR_FORCE_SUSPEND);
++	else
++		val |= (SRC_PHYPWR_OTG_DISABLE | SRC_PHYPWR_ANALOG_POWERDOWN |
++			SRC_PHYPWR_FORCE_SUSPEND);
++	__raw_writel(val, S3C_PHYPWR);
++	mdelay(1);
++
++	if (enable) {
++		val = __raw_readl(S3C_PHYCLK);
++
++		val &= ~S3C_PHYCLK_CLKSEL_MASK;
++
++		switch (clk->rate) {
++		case 12*MHZ:
++			val |= S3C_PHYCLK_CLKSEL_12M;
++			break;
++		case 24*MHZ:
++			val |= S3C_PHYCLK_CLKSEL_24M;
++			break;
++		default:
++			pr_err("Invalid USB PHY external clock frequency: %lu\n",
++			       clk->rate);
++		case 48*MHZ:
++			/* default reference clock */
++			break;
++		}
++
++		__raw_writel(val | S3C_PHYCLK_CLK_FORCE, S3C_PHYCLK);
++
++		/* issue a full set of resets to the otg and core */
++		__raw_writel(S3C_RSTCON_PHY, S3C_RSTCON);
++		udelay(20);	/* at-least 10uS */
++		__raw_writel(0, S3C_RSTCON);
++	}
++
+ 	local_irq_restore(flags);
+ 
+ 	return 0;
+ }
+ 
+-struct clk clk_48m = {
+-	.name		= "clk_48m",
++struct clk clk_xusbxti = {
++	.name		= "xusbxti",
+ 	.id		= -1,
+ 	.rate		= 48000000,
+-	.enable		= clk_48m_ctrl,
++	.enable		= clk_xusbxti_ctrl,
+ };
+ 
+-struct clk clk_xusbxti = {
+-	.name		= "xusbxti",
++struct clk clk_48m = {
++	.name		= "clk_48m",
+ 	.id		= -1,
+ 	.rate		= 48000000,
++	.parent		= &clk_xusbxti,
+ };
+ 
+ static int inline s3c64xx_gate(void __iomem *reg,
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index 0fbcd0e..08e5a86 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -76,6 +76,8 @@ extern struct clk clk_27m;
+ extern struct clk clk_48m;
+ extern struct clk clk_xusbxti;
+ 
++extern void s3c64xx_clk_xusbxti_is_osc(int is_osc);
++
+ extern int clk_default_setrate(struct clk *clk, unsigned long rate);
+ extern struct clk_ops clk_ops_def_setrate;
+ 
