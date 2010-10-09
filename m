@@ -1,44 +1,75 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 10 Oct 2010 00:39:29 +0200
-Subject: [PATCH 11/13] ARM: pxa: Pass GPIO offset to ucb1400-gpio on PalmTC
+Date: Sun, 10 Oct 2010 00:39:30 +0200
+Subject: [PATCH 12/13] ARM: pxa: Add gpio-leds and vibrator support to PalmTC
 In-Reply-To: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
 References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1286663971-15634-11-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1286663971-15634-12-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/palmtc.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/palmtc.c |   41 +++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 41 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index 2576e63..8fbd8e0 100644
+index 8fbd8e0..c299a97 100644
 --- a/arch/arm/mach-pxa/palmtc.c
 +++ b/arch/arm/mach-pxa/palmtc.c
-@@ -367,6 +367,14 @@ static inline void palmtc_udc_init(void) {}
-  ******************************************************************************/
- #if	defined(CONFIG_TOUCHSCREEN_UCB1400) || \
- 	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
-+static struct ucb1400_pdata palmtc_ucb1400_pdata = {
-+	.gpio_offset	= PALMTC_UCB1400_GPIO_OFFSET,
-+};
-+
-+static pxa2xx_audio_ops_t palmtc_ac97_pdata = {
-+	.codec_pdata	= { &palmtc_ucb1400_pdata, },
-+};
-+
- static struct platform_device palmtc_ucb1400_device = {
- 	.name	= "ucb1400_core",
- 	.id	= -1,
-@@ -374,7 +382,7 @@ static struct platform_device palmtc_ucb1400_device = {
+@@ -390,6 +390,46 @@ static inline void palmtc_ts_init(void) {}
+ #endif
  
- static void __init palmtc_ts_init(void)
- {
--	pxa_set_ac97_info(NULL);
-+	pxa_set_ac97_info(&palmtc_ac97_pdata);
- 	platform_device_register(&palmtc_ucb1400_device);
- }
- #else
+ /******************************************************************************
++ * LEDs
++ ******************************************************************************/
++#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
++struct gpio_led palmtc_gpio_leds[] = {
++{
++	.name			= "palmtc:green:user",
++	.default_trigger	= "none",
++	.gpio			= GPIO_NR_PALMTC_LED_POWER,
++	.active_low		= 1,
++}, {
++	.name			= "palmtc:vibra:vibra",
++	.default_trigger	= "none",
++	.gpio			= GPIO_NR_PALMTC_VIBRA_POWER,
++	.active_low		= 1,
++}
++
++};
++
++static struct gpio_led_platform_data palmtc_gpio_led_info = {
++	.leds		= palmtc_gpio_leds,
++	.num_leds	= ARRAY_SIZE(palmtc_gpio_leds),
++};
++
++static struct platform_device palmtc_leds = {
++	.name	= "leds-gpio",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &palmtc_gpio_led_info,
++	}
++};
++
++static void __init palmtc_leds_init(void)
++{
++	platform_device_register(&palmtc_leds);
++}
++#else
++static inline void palmtc_leds_init(void) {}
++#endif
++
++/******************************************************************************
+  * NOR Flash
+  ******************************************************************************/
+ #if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+@@ -502,6 +542,7 @@ static void __init palmtc_init(void)
+ 	palmtc_ts_init();
+ 	palmtc_nor_init();
+ 	palmtc_lcd_init();
++	palmtc_leds_init();
+ };
+ 
+ MACHINE_START(PALMTC, "Palm Tungsten|C")
 -- 
 1.7.1
