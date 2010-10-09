@@ -1,26 +1,22 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 9 Oct 2010 13:44:44 +0200
+From: hch@infradead.org (Christoph Hellwig)
+Date: Sat, 9 Oct 2010 07:55:51 -0400
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <201010091311.26335.arnd@arndb.de>
+In-Reply-To: <AANLkTikdxSQD+9UY70PtCPMgnrovx-dWjrrPJ0AZyG4X@mail.gmail.com>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 	<20101009092127.GB20975@n2100.arm.linux.org.uk>
 	<AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
 	<201010091311.26335.arnd@arndb.de>
-Message-ID: <20101009114444.GL29673@pengutronix.de>
+	<AANLkTikdxSQD+9UY70PtCPMgnrovx-dWjrrPJ0AZyG4X@mail.gmail.com>
+Message-ID: <20101009115551.GA19947@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Oct 09, 2010 at 09:43:50PM +1000, Dave Airlie wrote:
+> I'm guessing some closed source graphics drivers for ARM do all kinds
+> of wrong crap, and Nokia use them a lot, and nobody wants to tell the
+> closed vendors to change their drivers because it costs money.
 
-On Sat, Oct 09, 2010 at 01:11:26PM +0200, Arnd Bergmann wrote:
-> When you say that "many drivers broken", can you list the ones you know
-> about? It would probably help resolve this the right way.
-I know about the camera stuff on mx3/pcm037.  See
-pcm037_camera_alloc_dma in arch/arm/mach-mx3/mach-pcm037.c.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+In which case Russell's message to tell them to sodd off is exactly the
+right thing to do.  I've never figured out why Felipe cars so much, but
+if he's one of the users of utterly buggy binary drivers that would
+explain his weird actions here.
