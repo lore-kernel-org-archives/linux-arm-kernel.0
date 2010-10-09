@@ -1,39 +1,62 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 9 Oct 2010 15:17:59 +0300
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 9 Oct 2010 14:52:11 +0100
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101009115551.GA19947@infradead.org>
+In-Reply-To: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101009092127.GB20975@n2100.arm.linux.org.uk>
-	<AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
-	<201010091311.26335.arnd@arndb.de>
-	<AANLkTikdxSQD+9UY70PtCPMgnrovx-dWjrrPJ0AZyG4X@mail.gmail.com>
-	<20101009115551.GA19947@infradead.org>
-Message-ID: <AANLkTincxhVc86YFevg1nN7KYjgWjWBpb1i4gcq-bB1y@mail.gmail.com>
+Message-ID: <20101009135210.GA25564@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 9, 2010 at 2:55 PM, Christoph Hellwig <hch@infradead.org> wrote:
-> On Sat, Oct 09, 2010 at 09:43:50PM +1000, Dave Airlie wrote:
->> I'm guessing some closed source graphics drivers for ARM do all kinds
->> of wrong crap, and Nokia use them a lot, and nobody wants to tell the
->> closed vendors to change their drivers because it costs money.
->
-> In which case Russell's message to tell them to sodd off is exactly the
-> right thing to do. ?I've never figured out why Felipe cars so much, but
-> if he's one of the users of utterly buggy binary drivers that would
-> explain his weird actions here.
+On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
+> For issues related to this:
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
 
-If you mean PVR SGX, no, I don't use it myself, and it's not a binary
-driver, the code is open:
-http://meego.gitorious.org/meego-os-base/kernel-source/trees/master/patches
+This one nicely shows some of the problems which can occur with the
+memory type attributes - and this is not attributable to ioremap().
 
-The one I use is tidspbridge which is in staging.
+ioremap() is used to map devices.  It creates device memory type mappings.
+If what you're mapping doesn't support device memory type mappings, then
+accesses via an ioremap()'d region isn't going to work - as this guy is
+observing.
 
-But that's not relevant, what is relevant is that is that the API was
-broken without a warning grace period in final releases. "Good"
-drivers are broken, I suspect many that haven't made into mainline yet
-will receive a bad surprise. Making this only a warning on .36 doesn't
-hurt anybody, does it?
+That's not because ioremap() is doing something wrong.  It's doing what
+it's meant to do.  The use is wrong, and is completely unrelated to the
+issue you've raised.
 
--- 
-Felipe Contreras
+> http://article.gmane.org/gmane.linux.ports.sh.devel/8560
+
+This one we know about, and as I've already said, it ends up with three
+aliasing mappings each with different attributes thusly:
+
+	cpu = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
+	dma_declare_coherent_memory(dev, dma, dma, size, DMA_MEMORY_MAP);
+		==> ioremap(dma, size);
+	...
+	dma_alloc_coherent(dev, ...);
+
+This wasn't spotted in the review of sh-mobile code because it's not part
+of the sh-mobile code base, but some of the generic sh architecture code.
+sh-mobile went into the kernel on March 12th, so it does pre-date the
+change to ioremap, and is therefore technically a regression.
+
+However, as can be seen from the link above, it's been known about since
+8th August - two months ago.  The problem has been discussed, and we had
+a good solution which would work.  But then an oar got thrown in which
+basically resulted in that solution being rejected - on the basis that
+"it's an established API and it must work".
+
+Well, this usage of the API doesn't work on x86!
+
+The result - progress on the issue hit a brick wall and is unable to
+proceed because of personal viewpoints conflicting with reality.
+
+> http://www.spinics.net/lists/linux-fbdev/msg01745.html
+
+External user?  Unreviewed code?  You can't seriously be suggesting
+that we should care about code we haven't seen which is sitting
+externally to the kernel tree, and this is a valid reason to hold
+off on changes to the kernel.
+
+> http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/22271
+
+"No file".
