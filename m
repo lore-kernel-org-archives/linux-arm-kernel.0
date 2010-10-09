@@ -1,161 +1,49 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 9 Oct 2010 23:16:01 +0300
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <alpine.LFD.2.00.1010091125190.20826@xanadu.home>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<20101008231926.GA28235@kroah.com>
-	<alpine.LFD.2.00.1010082242390.3107@xanadu.home>
-	<AANLkTi=BvXROFEnzYykoUQNbU05Q=mWoV3t7qKDk7+vL@mail.gmail.com>
-	<alpine.LFD.2.00.1010091125190.20826@xanadu.home>
-Message-ID: <AANLkTi=CAxoKPRvctz5pwN9ACNLM5BbP=u5PocN6Nb+i@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Sat,  9 Oct 2010 23:09:45 +0200
+Subject: [PATCH v2] ARM: iomux-mx51: Add AUD5 pinmux definitions
+In-Reply-To: <19630.60016.791128.856262@ipc1.ka-ro>
+References: <19630.60016.791128.856262@ipc1.ka-ro>
+Message-ID: <1286658585-5757-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 9, 2010 at 8:38 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Sat, 9 Oct 2010, Felipe Contreras wrote:
->> On Sat, Oct 9, 2010 at 6:36 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> > On Fri, 8 Oct 2010, Greg KH wrote:
->> >> Wait, let me get this straight:
->> >> ? - drivers used to work on 2.6.35
->> >
->> > Possibly on pre ARMv6 only. ?On ARMv6 and above, the discussed behavior
->> > _never_ worked. ?It is fundamental to the CPU design.
->>
->> That's not true, drivers on ARMv6 and above do work.
->
-> So you want to fool yourself? ?Fine. ?This is your problem.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-You are playing with the definition of "work". For me, and millions of
-people out there, the drivers do work.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello Lother,
 
-I'm not saying they are working flawlessly, nor that they shouldn't be
-fixed, just that they mostly work, at least better than in 2.6.36-rc6.
+thanks for catching the wrong definition.  I wonder why this wasn't
+noticed here ...
 
->> I still wonder how exactly to trigger the issue, and how often does
->> this happen, because I've never seen it.
->
-> It's not because you don't see it right away that this is not happening.
+Best regards
+Uwe
 
-I know that, but still, I've asked for a test to trigger this bad
-behavior, but I haven't seen any. So how often, and how bad this issue
-really is remains a mystery to me.
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-Again, I'm not saying the issue is not there.
-
->> >> ? - some ARM core code changed in .36-rc to fix this iomem problem that
->> >> ? ? you found
->> >
->> > Nothing was fixed. ?There is nothing to fix. ?Simply that a wrong driver
->> > assumption about the hardware capability was prohibited by the API.
->>
->> Not exactly. There is supposedly a problem on ARMv6+, there must be a
->> mechanism to avoid this problem, all drivers should migrate to that,
->> or a different on, so that we have a sane API.
->
-> Exact. ?So please put the necessary effort to 1) understand the issue
-> which was clearly explained in details by RMK already, or simply read
-> the ARM Architecture Reference Manual for yourself, so that you
-> understand the issue and stop asking for unreasonable things, and 2) do
-> invest some time to fix your code that never worked properly in the
-> first place.
-
-_I_ don't have any code that uses ioremap() that way.
-
-However, I'm looking at code that uses memblock. Wouldn't extending
-memblock to specify the mapping of the memory areas be a sensible
-generic mechanism?
-
->> > There is no API change. ?Simply an API misuse. ?Granted, on pre ARMv6
->> > this usage used to work, but on ARMv6 and above this never was supported
->> > at all by the hardware. ?The fact that the software has let it through
->> > was a gross mistake, period.
->>
->> No. It worked just fine, now it's doesn't, that's a change in API
->> behavior, which is also part of the API. It might not be ideal, or
->> proper, but it does work.
->
-> Look, if you can't be brought to reason and common sense this will be my
-> last reply to you.
->
-> What would you say if someone suggested to turn the spinlocks into
-> no-ops in a SMP kernel with full preemption configured in? ?Let's say
-> that person has done that because the lock validator was complaining and
-> removing the locks made the warnings as well as the deadlock go away?
-> And that person is claiming that the driver now works just fine (or
-> appears to work) and no issue what so ever has been observed? ?Because
-> that's exactly what you're asking for right now. ?Except that in this
-> case you are willing to ignore a hardware race instead of a software
-> one.
-
-Nonsense. That is turning good behavior into bad behavior. Find a
-better example that turns bad behavior into good behavior, breaks the
-API at run-time, and there isn't a single release that shows a warning
-to alert users of the impending breakage.
-
->> >> ? - drivers break when run as the api stops returning valid addresses
->> >
->> > Such drivers on ARMv6 should *never* have worked in the first place.
->> > When they did "work", they corrupted memory.
->>
->> They corrupted their own memory, right? And on _very_ rare occasions I
->> presume, since I've never seen it.
->
-> Not their own memory, but *ANY* random memory. ?You could corrupt your
-> filesystem, have bugs in totally unrelated drivers, and so in ways that
-> are totally unpredictable and unreproducible. ?Is that the kind of
-> system you want to debug? ?If you have customers, is that the kind of
-> products you want to sell them?
-
-I haven't seen anyone claim that. I guess i'll have to read the TRM,
-but of course, a test that reproduces this would help.
-
->> If so, there's no damage in letting
->> them work at least one more release (2.6.36).
->
-> On what basis can you dare make such a foolish claim? ?Only on your
-> limited testing and own observations? ?Do you have some insider
-> knowledge of the ARM architecture that would give us confidence in
-> ignoring written documentation about this very issue? ?What about those
-> people besides you who did experience problems before?
-
-Machines don't explode with .35, right?
-
-If you think this behavior is horrible, then this change should be
-pushed to all the stable trees, shouldn't it?
-
-> If you want that, then do it in your own tree, oh and let me remember to
-> ignore any future request for help from you. ?But the mainline tree has
-> to be proper regardless of the inconvenience that may cause you,
-> _especially_ when data integrity is at stake.
-
-Perhaps, if the issue is as critical as you say.
-
->> >> ? - no known way is around to fix the broken drivers
->> >
->> > That's B/s. ?As Russell said, there are known solutions that were
->> > proposed at least six months ago.
->>
->> You seriously think most people out there know how to "set aside some
->> RAM at boot time"?
->
-> Indeed I do. ?That is not rocket science. ?You can easily figure it
-> yourself too.
-
-That's exactly what I'm trying right now.
-
->> I don't, otherwise the drivers would be fixed by now.
->
-> And that's why you want me to accept your argument for restoring a
-> broken behavior?
-
-*Temporarily*, at least one release.
-
-> Go do your homework and fix your code.
-
-Not _my_ code.
-
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index 633650d..5160f10 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -334,11 +334,17 @@ typedef enum iomux_config {
+ #define MX51_PAD_DISP2_DAT14__DISP2_DAT14       IOMUX_PAD(0x794, 0x38C, 0, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_DISP2_DAT15__DISP2_DAT15       IOMUX_PAD(0x798, 0x390, 0, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_SD1_CMD__SD1_CMD               IOMUX_PAD(0x79C, 0x394, 0, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_SD1_CMD__AUD5_RXFS             IOMUX_PAD(0x79C, 0x394, 1, 0x8e0, 1, NO_PAD_CTRL)
+ #define MX51_PAD_SD1_CLK__SD1_CLK               IOMUX_PAD(0x7A0, 0x398, 0, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_SD1_CLK__AUD5_RXC              IOMUX_PAD(0x7A0, 0x398, 1, 0x8dc, 1, NO_PAD_CTRL)
+ #define MX51_PAD_SD1_DATA0__SD1_DATA0           IOMUX_PAD(0x7A4, 0x39C, 0, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_SD1_DATA0__AUD5_TXD            IOMUX_PAD(0x7A4, 0x39C, 1, 0x8d8, 2, NO_PAD_CTRL)
+ #define MX51_PAD_SD1_DATA1__SD1_DATA1           IOMUX_PAD(0x7A8, 0x3A0, 0, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_SD1_DATA1__AUD5_RXD            IOMUX_PAD(0x7A8, 0x3A0, 1, 0x8d4, 2, NO_PAD_CTRL)
+ #define MX51_PAD_SD1_DATA2__SD1_DATA2           IOMUX_PAD(0x7AC, 0x3A4, 0, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_SD1_DATA2__AUD5_TXC            IOMUX_PAD(0x7AC, 0x3A4, 1, 0x8e4, 2, NO_PAD_CTRL)
+ #define MX51_PAD_SD1_DATA3__SD1_DATA3           IOMUX_PAD(0x7B0, 0x3A8, 0, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_SD1_DATA3__AUD5_TXFS           IOMUX_PAD(0x7B0, 0x3A8, 1, 0x8e8, 2, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_0__GPIO_1_0		IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_GPIO_1_1__GPIO_1_1		IOMUX_PAD(0x7B8, 0x3B0, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_SD2_CMD__SD2_CMD               IOMUX_PAD(0x7BC, 0x3B4, 0, 0x0,   0, NO_PAD_CTRL)
 -- 
-Felipe Contreras
+1.7.2.3
