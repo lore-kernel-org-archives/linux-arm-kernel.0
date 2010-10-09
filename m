@@ -1,29 +1,42 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 9 Oct 2010 23:20:50 +0530
-Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
-In-Reply-To: <20100306201849.GD13262@n2100.arm.linux.org.uk>
-References: <4B91A39F.8050502@am.sony.com>
-	<20100306201849.GD13262@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=apGYBSSr4RK+ZZievacJRcOxrwW_o_hz85P0h@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sat, 9 Oct 2010 20:59:15 +0200 (CEST)
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <201010091643.25065.arnd@arndb.de>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<201010091311.26335.arnd@arndb.de>
+	<AANLkTimDd10oj=rruYcB=qTaWWMAJvSCQAJNi+nQqzp7@mail.gmail.com>
+	<201010091643.25065.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.64.1010092049030.648@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 7, 2010 at 1:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Mar 05, 2010 at 04:36:47PM -0800, Tim Bird wrote:
->> IRQENTRY_TEXT was added to vmlinux.lds.S (to eliminate
->> a compiler error on kernel/trace/trace_functions_graph.c),
->> although no routines were marked as __irq_entry.
->
-> Well, ARM already places the assembly exception text in its own separate
-> section for other reasons. ?We can't place it in two sections.
->
-> What is __irq_entry used for? ?Just the low level assembly or C functions?
+On Sat, 9 Oct 2010, Arnd Bergmann wrote:
 
-It's used just for the C entry functions for interrupts: asm_do_IRQ()
-and the IPI and local timer functions.
+> On Saturday 09 October 2010 13:59:45 Felipe Contreras wrote:
+> > I know of tidspbridge, in my original mail I listed some links, one
+> > which mentions: sh_mobile_ceu_camera, maybe i.MX31 users of the
+> > mx3_camera driver: pcm037 and mx31moboard.
+> >
+> > http://article.gmane.org/gmane.linux.ports.sh.devel/8560
+> 
+> sh_mobile_ceu_camera looks fine on mainline. It only remaps
+> the mmio registers, so no problem there. No arm platform even
+> declares the device, so the report must be with an external tree.
+> 
+> The mx3_camera driver also looks fine, there is only one ioremap
+> in there, which is completely sane.
 
-AFAICS __exception seems to be used only for is_exception_text().  If
-that's the case, would it be OK to just place those functions in
-__irq_entry if ftrace is built and have is_exception_text() check that
-section too?
+Arnd, the drivers are fine, they just use the videobuf-dma-contig.c 
+driver, which calls dma_alloc_coherent(). But the platforms, that use 
+those drivers reserve that memory from system RAM dma_alloc_coherent(NULL, 
+...) and dma_declare_coherent_memory(), and this is what breaks currently. 
+As Felipe and Uwe in another mail in this thread mention, there are 
+currently two platforms in the mainline, that do this. mx1, mx2, omap1 and 
+mach-shmobile platforms are potentially affected too.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
