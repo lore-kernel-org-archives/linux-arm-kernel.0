@@ -1,62 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 Oct 2010 14:52:11 +0100
+Date: Sat, 9 Oct 2010 15:37:09 +0100
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+In-Reply-To: <AANLkTi=37SCuwwze4KS_yOdmi8bvJP_OexHaYLw-AXfJ@mail.gmail.com>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <20101009135210.GA25564@n2100.arm.linux.org.uk>
+	<20101009092127.GB20975@n2100.arm.linux.org.uk>
+	<AANLkTimtdV8THgnQL1RxaqLzCUwO27AZSMPi=UtgpML7@mail.gmail.com>
+	<201010091311.26335.arnd@arndb.de>
+	<AANLkTikdxSQD+9UY70PtCPMgnrovx-dWjrrPJ0AZyG4X@mail.gmail.com>
+	<AANLkTi=37SCuwwze4KS_yOdmi8bvJP_OexHaYLw-AXfJ@mail.gmail.com>
+Message-ID: <20101009143709.GB25564@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
-> For issues related to this:
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
+On Sat, Oct 09, 2010 at 03:10:57PM +0300, Felipe Contreras wrote:
+> On Sat, Oct 9, 2010 at 2:43 PM, Dave Airlie <airlied@gmail.com> wrote:
+> >> The few drivers that may be hit by this are typically in drivers/staging
+> >> exactly because issues like this have not been fixed yet.
+> >>
+> >> We should probably just fix the non-staging drivers that are hit by
+> >> this now and declare the issue done.
+> >>
+> >> When you say that "many drivers broken", can you list the ones you know
+> >> about? It would probably help resolve this the right way.
+> >
+> > I'm guessing some closed source graphics drivers for ARM do all kinds
+> > of wrong crap, and Nokia use them a lot, and nobody wants to tell the
+> > closed vendors to change their drivers because it costs money.
+> 
+> You are over simplifying things.
+> 
+>  1) The code is open[1]
+>  2) the decision comes from TI, Nokia can only do so much before shipping
 
-This one nicely shows some of the problems which can occur with the
-memory type attributes - and this is not attributable to ioremap().
+Well -
 
-ioremap() is used to map devices.  It creates device memory type mappings.
-If what you're mapping doesn't support device memory type mappings, then
-accesses via an ioremap()'d region isn't going to work - as this guy is
-observing.
+1. TI had been complaining last December about vmalloc() creating mappings
+   with different shared-ness attributes causing problems with OMAP.
 
-That's not because ioremap() is doing something wrong.  It's doing what
-it's meant to do.  The use is wrong, and is completely unrelated to the
-issue you've raised.
+2. May 10, TI on the three-weekly conference call were warned about this
+   change to ioremap with system RAM - and this was noted in the minutes
+   and circulated.  It was brought up again on June 21st, and yet again
+   on August 2nd.
 
-> http://article.gmane.org/gmane.linux.ports.sh.devel/8560
+So, the major players in the OMAP community were repeatedly made plainly
+aware of this change and some were aware of the problems caused by
+violating these kinds of restrictions.
 
-This one we know about, and as I've already said, it ends up with three
-aliasing mappings each with different attributes thusly:
+You tell me - if I've raised the issue on the mailing list to which OMAP
+people are aware of (and note that there was a reply from OMAP folk in
+the inital thread), if I've raised it several times with TI in conference
+calls which include the major players, and still OMAP drivers are doing
+things wrongly.
 
-	cpu = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
-	dma_declare_coherent_memory(dev, dma, dma, size, DMA_MEMORY_MAP);
-		==> ioremap(dma, size);
-	...
-	dma_alloc_coherent(dev, ...);
-
-This wasn't spotted in the review of sh-mobile code because it's not part
-of the sh-mobile code base, but some of the generic sh architecture code.
-sh-mobile went into the kernel on March 12th, so it does pre-date the
-change to ioremap, and is therefore technically a regression.
-
-However, as can be seen from the link above, it's been known about since
-8th August - two months ago.  The problem has been discussed, and we had
-a good solution which would work.  But then an oar got thrown in which
-basically resulted in that solution being rejected - on the basis that
-"it's an established API and it must work".
-
-Well, this usage of the API doesn't work on x86!
-
-The result - progress on the issue hit a brick wall and is unable to
-proceed because of personal viewpoints conflicting with reality.
-
-> http://www.spinics.net/lists/linux-fbdev/msg01745.html
-
-External user?  Unreviewed code?  You can't seriously be suggesting
-that we should care about code we haven't seen which is sitting
-externally to the kernel tree, and this is a valid reason to hold
-off on changes to the kernel.
-
-> http://article.gmane.org/gmane.linux.drivers.video-input-infrastructure/22271
-
-"No file".
+You can lead the horse to water but you can not make it drink.  At some
+point it either drinks or dies.  In this case, it seems death is the
+favoured option as the warnings have been repeatedly ignored.
