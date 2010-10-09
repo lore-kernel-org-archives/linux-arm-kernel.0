@@ -1,29 +1,81 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 10 Oct 2010 00:39:31 +0200
-Subject: [PATCH 13/13] ARM: pxa: Fix pxa2xx-flash section mismatch
-In-Reply-To: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
-References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1286663971-15634-13-git-send-email-marek.vasut@gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 10 Oct 2010 00:59:20 +0200
+Subject: [PATCH v7] power: introduce library for device-specific OPPs
+In-Reply-To: <1286506969-20651-1-git-send-email-nm@ti.com>
+References: <[PATCH] power: introduce library for device-specific OPPs>
+	<1286506969-20651-1-git-send-email-nm@ti.com>
+Message-ID: <201010100059.20964.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- drivers/mtd/maps/pxa2xx-flash.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Friday, October 08, 2010, Nishanth Menon wrote:
+> SoCs have a standard set of tuples consisting of frequency and
+> voltage pairs that the device will support per voltage domain. These
+> are called Operating Performance Points or OPPs. The actual
+> definitions of OPP varies over silicon versions. For a specific domain,
+> we can have a set of {frequency, voltage} pairs. As the kernel boots
+> and more information is available, a default set of these are activated
+> based on the precise nature of device. Further on operation, based on
+> conditions prevailing in the system (such as temperature), some OPP
+> availability may be temporarily controlled by the SoC frameworks.
+> 
+> To implement an OPP, some sort of power management support is necessary
+> hence this library depends on CONFIG_PM.
+> 
+> Contributions include:
+> Sanjeev Premi for the initial concept:
+> 	http://patchwork.kernel.org/patch/50998/
+> Kevin Hilman for converting original design to device-based
+> Kevin Hilman and Paul Walmsey for cleaning up many of the function
+> abstractions, improvements and data structure handling
+> Romit Dasgupta for using enums instead of opp pointers
+> Thara Gopinath, Eduardo Valentin and Vishwanath BS for fixes and
+> cleanups.
+> Linus Walleij for recommending this layer be made generic for usage
+> in other architectures beyond OMAP and ARM.
+> Mark Brown, Andrew Morton, Rafael J Wysocki, Paul E McKenney for valuable
+> improvements.
+> 
+> Discussions and comments from:
+> http://marc.info/?l=linux-omap&m=126033945313269&w=2
+> http://marc.info/?l=linux-omap&m=125482970102327&w=2
+> http://marc.info/?t=125809247500002&r=1&w=2
+> http://marc.info/?l=linux-omap&m=126025973426007&w=2
+> http://marc.info/?t=128152609200064&r=1&w=2
+> http://marc.info/?t=128468723000002&r=1&w=2
+> incorporated.
+> 
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Madhusudhan Chikkature Rajashekar <madhu.cr@ti.com>
+> Cc: Phil Carmody <ext-phil.2.carmody@nokia.com>
+> Cc: Roberto Granados Dorado <x0095451@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Sergio Alberto Aguirre Rodriguez <saaguirre@ti.com>
+> Cc: Tero Kristo <Tero.Kristo@nokia.com>
+> Cc: Eduardo Valentin <eduardo.valentin@nokia.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Sanjeev Premi <premi@ti.com>
+> Cc: Thara Gopinath <thara@ti.com>
+> Cc: Vishwanath BS <vishwanath.bs@ti.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index dd90880..d8ae634 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
- static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
- 
- 
--static int __init pxa2xx_flash_probe(struct platform_device *pdev)
-+static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
- {
- 	struct flash_platform_data *flash = pdev->dev.platform_data;
- 	struct pxa2xx_flash_info *info;
--- 
-1.7.1
+OK
+
+Your error messages are a bit inconsistent (e.g. some of them print the
+error code while others don't), but I guess I can fix that up.
+
+Still, to apply the patch I need a copyright notice for the doc too.
+
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+
+Kevin, your sign-off here means you endorse the patch as the maintainer.
+Is that correct?
+
+Thanks,
+Rafael
