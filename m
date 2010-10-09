@@ -1,31 +1,29 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 9 Oct 2010 23:13:24 +0530
+Date: Sat, 9 Oct 2010 23:20:50 +0530
 Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
-In-Reply-To: <4B91A25E.5030707@am.sony.com>
-References: <4B91A25E.5030707@am.sony.com>
-Message-ID: <AANLkTi=ULuo8upL9W2dCbn26G_i+moEO2EofBxy_fceU@mail.gmail.com>
+In-Reply-To: <20100306201849.GD13262@n2100.arm.linux.org.uk>
+References: <4B91A39F.8050502@am.sony.com>
+	<20100306201849.GD13262@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=apGYBSSr4RK+ZZievacJRcOxrwW_o_hz85P0h@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
-
-On Sat, Mar 6, 2010 at 6:01 AM, Tim Bird <tim.bird@am.sony.com> wrote:
-> Add ftrace function-graph tracer support for ARM.
+On Sun, Mar 7, 2010 at 1:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Mar 05, 2010 at 04:36:47PM -0800, Tim Bird wrote:
+>> IRQENTRY_TEXT was added to vmlinux.lds.S (to eliminate
+>> a compiler error on kernel/trace/trace_functions_graph.c),
+>> although no routines were marked as __irq_entry.
 >
-> This includes adding code in mcount to check for
-> (and call) a registered function graph trace entry
-> routine, and adding code to support a return
-> trampoline, to catch the function exit.
+> Well, ARM already places the assembly exception text in its own separate
+> section for other reasons. ?We can't place it in two sections.
 >
-> IRQENTRY_TEXT was added to vmlinux.lds.S (to eliminate
-> a compiler error on kernel/trace/trace_functions_graph.c),
-> although no routines were marked as __irq_entry.
->
-> Signed-off-by: Tim Bird <tim.bird@am.sony.com>
+> What is __irq_entry used for? ?Just the low level assembly or C functions?
 
-What happened to this?  Do you intend to post a new version of these
-patches?  If not, I'd like to post a series which updates this to
-current kernels and also adds support for the graph tracer + dynamic
-ftrace combo on ARM based on the recent ARM dynamic ftrace support.
+It's used just for the C entry functions for interrupts: asm_do_IRQ()
+and the IPI and local timer functions.
 
-Rabin
+AFAICS __exception seems to be used only for is_exception_text().  If
+that's the case, would it be OK to just place those functions in
+__irq_entry if ftrace is built and have is_exception_text() check that
+section too?
