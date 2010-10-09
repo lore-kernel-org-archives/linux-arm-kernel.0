@@ -1,83 +1,60 @@
 From: matt@console-pimps.org (Matt Fleming)
-Date: Sat,  9 Oct 2010 01:46:15 +0100
-Subject: [PATCH V5 0/7] Generalise ARM perf-events backend for oprofile
-Message-ID: <cover.1286584677.git.matt@console-pimps.org>
+Date: Sat,  9 Oct 2010 01:46:18 +0100
+Subject: [PATCH 3/7] oprofile: Make op_name_from_perf_id() global
+In-Reply-To: <cover.1286584677.git.matt@console-pimps.org>
+References: <cover.1286584677.git.matt@console-pimps.org>
+Message-ID: <7b803da1bb48b15e29c966ff925cfb21f9015e6c.1286584677.git.matt@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The perf-events backend for OProfile that Will Deacon wrote in
-8c1fc96f6fd1f361428ba805103af0d0eee65179 ("ARM: 6072/1: oprofile: use
-perf-events framework as backend") is of use to more architectures
-than just ARM. Move the code into drivers/oprofile/ so that SH can use
-it instead of the nearly identical copy of its OProfile code.
+Make op_name_from_perf_id() global so that we have a way for each
+architecture to construct an oprofile name for op->cpu_type. We need to
+remove the argument from the function prototype so that we can hide all
+implementation details inside the function.
 
-The benefit of the backend is that it becomes necessary to only
-maintain one copy of the PMU accessor functions for each architecture,
-with bug fixes and new features benefiting both OProfile and perf.
+Signed-off-by: Matt Fleming <matt@console-pimps.org>
+---
+ arch/arm/oprofile/common.c |    6 ++++--
+ include/linux/oprofile.h   |    4 ++++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-Note that I haven't been able to test these patches on an ARM board to
-see if I've caused any regressions. If anyone else could do that I'd
-appreciate it. Though, I have been able to compile this version of the
-series.
-
-This patch series is based on,
-
-    git://git.kernel.org/pub/scm/linux/kernel/git/rric/oprofile.git core
-
-These patches can also be found at,
-
-    git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/sh-2.6.git perf-oprofile
-
-
-Robert, I haven't rebased this work on your oprofile updates for
-2.6.37. If you need me to do that, just shout. If you have any comments
-I'll respin this ASAP but it's probably ready for merging now.
-
-
-Changes from v4:
- - SH is the only arch that doesn't default perf_pmu_name()
- - Changed perf_nr_counters to num_counters
+diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+index 1e971a7..4f67cfa 100644
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -155,8 +155,10 @@ static void op_perf_stop(void)
+ }
  
-Changes from v3:
- - New perf_pmu_name() function
- - Sprinkled an EXPORT_SYMBOL_GPL()
- - Don't repeatedly call perf_num_counters()
- - Change name of oprofile_driver to "oprofile-perf"
- - Hard overwrite the oprofile_operations in oprofile_perf_init()
- - Dropped the patch that made oprofile depend on HW_PERF_EVENTS for ARM
-
-Changes from v2:
- - Rebased against Robert's oprofile core branch
- - Moved even more of the ARM code into the generic oprofile code
- - Broke the patches up into more logical steps
-
-Changes from v1:
- - Prefix the new functons with "oprofile_" instead of "op_".
- - Fix ARM compilation errors
- - Move all the oprofile-perf logic into oprofile_perf.c
- - Include cleanup patch from Will
-
-Matt Fleming (7):
-  perf: Add helper function to return number of counters
-  perf: New helper function for pmu name
-  oprofile: Make op_name_from_perf_id() global
-  ARM: oprofile: Rename op_arm to oprofile_perf
-  ARM: oprofile: Move non-ARM code into separate init/exit
-  oprofile: Abstract the perf-events backend
-  sh: oprofile: Use perf-events oprofile backend
-
- arch/arm/kernel/perf_event.c     |    6 +
- arch/arm/oprofile/Makefile       |    4 +
- arch/arm/oprofile/common.c       |  309 +-----------------------------------
- arch/sh/Kconfig                  |   13 ++
- arch/sh/kernel/perf_event.c      |   18 ++
- arch/sh/oprofile/Makefile        |    4 +
- arch/sh/oprofile/common.c        |  115 +++-----------
- arch/sh/oprofile/op_impl.h       |   33 ----
- drivers/oprofile/oprofile_perf.c |  326 ++++++++++++++++++++++++++++++++++++++
- include/linux/oprofile.h         |    7 +
- include/linux/perf_event.h       |    2 +
- kernel/perf_event.c              |    5 +
- 12 files changed, 412 insertions(+), 430 deletions(-)
- delete mode 100644 arch/sh/oprofile/op_impl.h
- create mode 100644 drivers/oprofile/oprofile_perf.c
+ 
+-static char *op_name_from_perf_id(enum arm_perf_pmu_ids id)
++char *op_name_from_perf_id(void)
+ {
++	enum arm_perf_pmu_ids id = armpmu_get_pmu_id();
++
+ 	switch (id) {
+ 	case ARM_PERF_PMU_ID_XSCALE1:
+ 		return "arm/xscale1";
+@@ -391,7 +393,7 @@ int __init oprofile_arch_init(struct oprofile_operations *ops)
+ 	ops->start		= op_arm_start;
+ 	ops->stop		= op_arm_stop;
+ 	ops->shutdown		= op_arm_stop;
+-	ops->cpu_type		= op_name_from_perf_id(armpmu_get_pmu_id());
++	ops->cpu_type		= op_name_from_perf_id();
+ 
+ 	if (!ops->cpu_type)
+ 		ret = -ENODEV;
+diff --git a/include/linux/oprofile.h b/include/linux/oprofile.h
+index 5171639..1574d4a 100644
+--- a/include/linux/oprofile.h
++++ b/include/linux/oprofile.h
+@@ -185,4 +185,8 @@ int oprofile_add_data(struct op_entry *entry, unsigned long val);
+ int oprofile_add_data64(struct op_entry *entry, u64 val);
+ int oprofile_write_commit(struct op_entry *entry);
+ 
++#ifdef CONFIG_PERF_EVENTS
++char *op_name_from_perf_id(void);
++#endif /* CONFIG_PERF_EVENTS */
++
+ #endif /* OPROFILE_H */
+-- 
+1.7.1
