@@ -1,38 +1,52 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 10 Oct 2010 17:07:44 +0300
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <496565EC904933469F292DDA3F1663E602F471C1BF@dlee06.ent.ti.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
-	<8F7AF80515AF0D4D93307E594F3CB40E5F6A365B@dlee03.ent.ti.com>
-	<AANLkTimD_MRbuTnBMPzAKPTmrDwjLkLVmr9bTSNROb5L@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234006B4C@dbde02.ent.ti.com>
-	<AANLkTinZqx2nFuoYoCYpD4+PG7_J=ACLBxAwOvpVm4c9@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593023412B2C1@dbde02.ent.ti.com>
-	<496565EC904933469F292DDA3F1663E602F471C1BF@dlee06.ent.ti.com>
-Message-ID: <AANLkTim=1dXg8O_q-RLZEjrVvN+Bb2DV1N1jwNjVBw3a@mail.gmail.com>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Sun, 10 Oct 2010 19:53:51 +0530
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101009164517.GA28183@n2100.arm.linux.org.uk>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101009135210.GA25564@n2100.arm.linux.org.uk>
+	<AANLkTi=Sv35ipSGzSoJMjdoNU-Qee9csviPL3yMSM3uf@mail.gmail.com>
+	<20101009164517.GA28183@n2100.arm.linux.org.uk>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B0356711C7F@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 6, 2010 at 3:14 AM, Guzman Lugo, Fernando
-<fernando.lugo@ti.com> wrote:
-> Can I know the status of this patch?
->
-> This patch is needed now that tidspbridge has migrated to use
-> Iommu moudle.
->
-> Will this patch be merged?
+Russell King - ARM Linux wrote on Saturday, October 09, 2010 10:15 PM:
 
-This patch hasn't even been sent yet. I expected somebody else to try
-it and do so.
+> On Sat, Oct 09, 2010 at 07:07:01PM +0300, Felipe Contreras wrote:
+>> On Sat, Oct 9, 2010 at 4:52 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Thu, Oct 07, 2010 at 12:44:22PM +0300, Felipe Contreras wrote:
+>>>> For issues related to this:
+>>>> http://article.gmane.org/gmane.linux.ports.arm.kernel/84454
+>>> 
+>>> This one nicely shows some of the problems which can occur with the
+>>> memory type attributes - and this is not attributable to ioremap().
+>>> 
+>>> ioremap() is used to map devices. ?It creates device memory type mappings.
+>>> If what you're mapping doesn't support device memory type mappings, then
+>>> accesses via an ioremap()'d region isn't going to work - as this guy is
+>>> observing. 
+>>> 
+>>> That's not because ioremap() is doing something wrong. It's doing what
+>>> it's meant to do. ?The use is wrong, and is completely unrelated to the
+>>> issue you've raised.
+>> 
+>> Ok, I was confused by Catalin's comment which does point to ioremap() on
+>> normal RAM: http://article.gmane.org/gmane.linux.ports.arm.kernel/84504
+> 
+> Me too - it doesn't appear to relate to the specified problem.  You
+> don't want to map RAM as device nor strongly ordered, and we still
+> don't know what this "MMR" is.
+> 
 
-Anyway, I'm now trying iommu myself and will send this patch when I
-get the dsp working.
+Just to add, the issue I faced was a different issue and more to do with
+specific access requirement for particular memory mapped region and what memory
+types could be used for defining mappings of the region (or passed as ioremap
+parameter). To summarize, I needed to use type=MT_STRONGLY_ORDERED to make access
+to the peripheral registers work, which, unfortunately is not available in the
+kernel.
 
--- 
-Felipe Contreras
+(BTW, I had referred MMR as memory mapped registers of the concerned peripheral.)
+
+-
+Hemant
