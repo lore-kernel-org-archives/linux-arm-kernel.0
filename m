@@ -1,92 +1,69 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Thu, 7 Oct 2010 20:00:10 +0800
-Subject: [PATCH] cpufreq for freescale mx51
-In-Reply-To: <20101007073027.GY28242@pengutronix.de>
-References: <1285738417-1638-1-git-send-email-yong.shen@linaro.org>
-	<20100930104817.GC2526@matterhorn.lan>
-	<20101006095111.GV28242@pengutronix.de>
-	<AANLkTi=fh4_19QhB8ArTfiigbPOQSejB=gLPMiEmyXjP@mail.gmail.com>
-	<20101007073027.GY28242@pengutronix.de>
-Message-ID: <AANLkTimzYX0ftJkzKwcfofw=O+BZFtZwZpEGVvr6heDX@mail.gmail.com>
+From: mcuelenaere@gmail.com (Maurus Cuelenaere)
+Date: Sun, 10 Oct 2010 21:39:22 +0200
+Subject: [PATCH 1/2] ARM: S3C64XX: Fix USB and 48M clock enable procedure
+In-Reply-To: <20101009144947.30918.20608.stgit@localhost.localdomain>
+References: <20101009143307.30918.15164.stgit@localhost.localdomain>
+	<20101009144947.30918.20608.stgit@localhost.localdomain>
+Message-ID: <4CB2166A.8040408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Using wp_tbl is because that it also contains information like regulator
-> > voltage.
->
-> The clock code does not handle the regulators, not even in the fsl
-> kernel.
->
-I did not mean to say clock code will handle regulators. I mean this table
-also contains such information which may be needed in other freescale
-drivers, like dvfs and busfreq.
 
->
->
-> Since the regulator driver for imx51 have not been upstreamed, you
-> > don't see any regulator operation here. Also, like you mentioned, there
-> are
-> > two ways to change cpufreq, by post divider or pll change. And post
-> divider
-> > change is a simpler way and also the only way for babbage, since cpu freq
-> > and ddr freq are all root from the same pll on babbage and they will
-> > interfere each other.
->
-> I understand what you have to do, but the way you did really looks
-> strange. You introduce get_cpu_wp() to get the complete array of
-> workpoints. In the cpufreq driver you have this complete array, pick
-> the desired workpoint, pass the frequency to the clock layer which in
-> turn calls get_cpu_wp() to get the array and loop around it to get
-> the workpoint from the frequency again. Addionally you maintain a
-> pointer to what the clock code thinks the current workpoint is.
->
-> How about making the clock code agnostic of such workpoints and
-> calculate the pll values and dividers for a given frequency based
-> on the frequency. If that's to complicated you could maintain
-> a table in the clock code. If that's not flexible enough you could
-> pass a pointer to this table to mx51_clocks_init. This array could
-> carry information relevant only to the clock code and only relevant
-> to the i.MX51, In the fsl kernel struct cpu_wp is a catch-all struct
-> for all i.MXs. The i.MX51 uses the pdf/mfi/mfd/mfn/cpu_podf fields,
-> the i.MX35 uses the pll_reg and pdr0_reg fields and who knows what
-> the next i.MX needs.
->
 
-I strongly agree with you about this, and it is better to letter clock
-calculate by itself.
+Op 09-10-10 16:49, Paulius Zaleckas schreef:
+> 48M clock is output from USB PHY PLL. To enable 48M clock
+> we must initialize USB PHY.
+> 
+> Signed-off-by: Paulius Zaleckas <paulius.zaleckas-Re5JQEeQqe8AvxtiuMwx3w@public.gmane.org>
+> ---
+> 
+>  arch/arm/mach-s3c64xx/clock.c              |   67 +++++++++++++++++++++++++---
+>  arch/arm/plat-samsung/include/plat/clock.h |    2 +
+>  2 files changed, 63 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+> index 7e03f0a..3817ae5 100644
+> --- a/arch/arm/mach-s3c64xx/clock.c
+> +++ b/arch/arm/mach-s3c64xx/clock.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> +#include <linux/delay.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/map.h>
+> @@ -32,6 +33,7 @@
+>  #include <plat/cpu-freq.h>
+>  #include <plat/clock.h>
+>  #include <plat/clock-clksrc.h>
+> +#include <plat/regs-usb-hsotg-phy.h>
+>  
+>  /* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
+>   * ext_xtal_mux for want of an actual name from the manual.
+> @@ -61,7 +63,20 @@ struct clk clk_27m = {
+>  	.rate		= 27000000,
+>  };
+>  
+> -static int clk_48m_ctrl(struct clk *clk, int enable)
+> +void __init s3c64xx_clk_xusbxti_is_osc(int is_osc)
+> +{
 
->
->
->
-> > > > +static struct cpufreq_frequency_table imx_freq_table[4];
-> > >
-> > > Three frequencies should be enough for everyone, right? This should be
-> > > dynamically allocated like in other cpufreq drivers.
-> > >
-> >
-> > Yes, we only support 3 work points, which is for sure. Actually, we only
-> > support 2 points on most mx51 chips. I supposed it is ok to use static
-> array
-> > here.
->
-> Please just add dynamic allocation, then we are safe for any potential
-> future use.
->
-> Ok! sorry for misunderstanding.
+..._is_osc() seems to indicate that this functions returns something, which it
+doesn't.
 
-Here, I am not trying to find excuse for the cpufreq driver designer which
-is my colleague, however the truth is that since in our company the schedule
-is tight for all the tasks, that's why we always code with the first rough
-idea in the head, and having less time to think about the flexibility and
-other good conventions in programming. You can see that even freescale code
-upstreaming is done by people out of freescale, because of we lacking of
-resource.
-Therefore, I would say we did not mean to have some short-sight design, we
-also want to achieve a better life of coding like you guys are doing, which
-is my direct feeling while I am in Linaro. :)
-Thanks for comments.
+s3c64xx_clk_xusbxti_set_osc(int is_osc) seems more appropriate IMHO.
 
-Yong
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101007/62053234/attachment-0001.html>
+> +	u32 val;
+> +
+> +	/* no need to protect since it will be called from machine init */
+> +	val = __raw_readl(S3C_PHYCLK);
+> +	if (is_osc)
+> +		val |= S3C_PHYCLK_EXT_OSC;
+> +	else
+> +		val &= ~S3C_PHYCLK_EXT_OSC;
+> +	__raw_writel(val, S3C_PHYCLK);
+> +}
+
+-- 
+Maurus Cuelenaere
