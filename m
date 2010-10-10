@@ -1,22 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 10 Oct 2010 21:44:05 +0200
-Subject: [PATCH] arch: arm/imx: fix memory init in imx_dma_request()
-In-Reply-To: <1286731703-17775-1-git-send-email-segooon@gmail.com>
-References: <1286731703-17775-1-git-send-email-segooon@gmail.com>
-Message-ID: <20101010194405.GS29673@pengutronix.de>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Mon, 11 Oct 2010 01:47:56 +0530
+Subject: [PATCH 2/3] omap: dsp: fix ioremap() usage
+In-Reply-To: <1286732440-28644-3-git-send-email-felipe.contreras@gmail.com>
+References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
+	<1286732440-28644-3-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302342AE533@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 10, 2010 at 09:28:23PM +0400, Vasiliy Kulikov wrote:
-> imx_dma_request() didn't fill struct pointed by imxdma with zeroes
-> as it passed sizeof(pointer), not sizeof(struct) to memset().
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Felipe 
+> Contreras
+> Sent: Sunday, October 10, 2010 11:11 PM
+> To: linux-arm; linux-omap; Greg KH
+> Cc: Ramirez Luna, Omar; Russell King; Felipe Contreras
+> Subject: [PATCH 2/3] omap: dsp: fix ioremap() usage
 > 
-> Signed-off-by: Vasiliy Kulikov <segooon@gmail.com>
-Acked-and-tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> On commit 309caa9 doing ioremap() became forbidden due tue 
+> architectural
+> limitations. Only a single mapping is allowed now, so the mempool must
+> not be part of the memory managed by the kernel.
+> 
+> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+> ---
+>  arch/arm/plat-omap/common.c              |   43 
+> +++++++++++++++++++++++++++--
+>  arch/arm/plat-omap/devices.c             |   30 ---------------------
+>  arch/arm/plat-omap/include/plat/common.h |    3 +-
+>  arch/arm/plat-omap/include/plat/dsp.h    |    6 ----
+>  4 files changed, 42 insertions(+), 40 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+> index 57205a4..3fee3ca 100644
+> --- a/arch/arm/plat-omap/common.c
+> +++ b/arch/arm/plat-omap/common.c
+> @@ -37,7 +37,6 @@
+>  #include <plat/fpga.h>
+>  #include <plat/serial.h>
+>  #include <plat/vram.h>
+> -#include <plat/dsp.h>
+>  
+>  #include <plat/clock.h>
+>  
+> @@ -84,11 +83,49 @@ const void *omap_get_var_config(u16 tag, 
+> size_t *len)
+>  }
+>  EXPORT_SYMBOL(omap_get_var_config);
+>  
+> -void __init omap_reserve(void)
+> +#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
 
-Thanks
-Uwe
+[sp] I do understand that dspbridge is the only driver accessing dsp in
+     the linux-omap; but there are other known drivers - which would need
+     this feature.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+     Can we use a more generic config option viz. CONFIG_RESERVE_DSPMEM
+     (or something similar) so that code is easily (re)usable.
+
+~sanjeev
+
+[snip]...[snip]
+> +
+> 
