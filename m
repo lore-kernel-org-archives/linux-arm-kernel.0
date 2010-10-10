@@ -1,39 +1,33 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 10 Oct 2010 23:39:33 +0300
-Subject: [PATCH 2/3] omap: dsp: fix ioremap() usage
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302342AE533@dbde02.ent.ti.com>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-	<1286732440-28644-3-git-send-email-felipe.contreras@gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302342AE533@dbde02.ent.ti.com>
-Message-ID: <AANLkTim8HHT3BQSVSZx_2yBo6SZFj+XR-XYrjNZg+ntW@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 11 Oct 2010 03:36:03 +0530
+Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
+In-Reply-To: <20101009193757.GB28183@n2100.arm.linux.org.uk>
+References: <4B91A39F.8050502@am.sony.com>
+	<20100306201849.GD13262@n2100.arm.linux.org.uk>
+	<AANLkTi=apGYBSSr4RK+ZZievacJRcOxrwW_o_hz85P0h@mail.gmail.com>
+	<20101009193757.GB28183@n2100.arm.linux.org.uk>
+Message-ID: <20101010220603.GA2723@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Oct 09, 2010 at 08:37:57PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Oct 09, 2010 at 11:20:50PM +0530, Rabin Vincent wrote:
+> > It's used just for the C entry functions for interrupts: asm_do_IRQ()
+> > and the IPI and local timer functions.
+> > 
+> > AFAICS __exception seems to be used only for is_exception_text().  If
+> > that's the case, would it be OK to just place those functions in
+> > __irq_entry if ftrace is built and have is_exception_text() check that
+> > section too?
+> 
+> No.  is_exception_text() is used to detect those functions which have
+> a specific stack layout - which is that there's a pt_regs struct on the
+> stack.  Grouping other functions into that violates the expectation.
 
-Please remove the chunks you are not replying to.
-
-On Sun, Oct 10, 2010 at 11:17 PM, Premi, Sanjeev <premi@ti.com> wrote:
->> -void __init omap_reserve(void)
->> +#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
->
-> [sp] I do understand that dspbridge is the only driver accessing dsp in
-> ? ? the linux-omap; but there are other known drivers - which would need
-> ? ? this feature.
-
-Are you talking about linux-omap the tree? If so, no, the tidspbridge
-is part of staging, not linux-omap.
-
-If you are trying to say there are other DSP drivers intended for
-OMAP, then I guess you are referring to dsp-link, which uses it's own
-tricks for contiguous memory allocation (CMEM).
-
-So, who and how would benefit from this?
-
-> ? ? Can we use a more generic config option viz. CONFIG_RESERVE_DSPMEM
-> ? ? (or something similar) so that code is easily (re)usable.
-
-How about CONFIG_OMAP_DSP, and CONFIG_OMAP_DSP_RESERVE_SIZE?
-
--- 
-Felipe Contreras
+I'm not sure I follow.  These functions (asm_do_IRQ(), do_IPI(), and
+do_local_timer()) will be the only ones in __irq_entry. iow, __irq_entry
+will contain nothing else except these functions.  So we woudn't be
+grouping other functions; it's just that some of the __exception
+functions would be moved to the new section so that __exception and
+__irq_entry combined will contain the functions with the specific stack
+layout (and only those functions).
