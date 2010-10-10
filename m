@@ -1,567 +1,150 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 10 Oct 2010 20:10:41 +0300
-Subject: [PATCHv2 2/4] ASoC: add ep93xx AC97 audio driver
+Date: Sun, 10 Oct 2010 20:10:43 +0300
+Subject: [PATCHv2 4/4] ASoC: ep93xx: add Simplemachines Sim.One AC97 audio
+	support
 In-Reply-To: <cover.1286729843.git.mika.westerberg@iki.fi>
 References: <cover.1286729843.git.mika.westerberg@iki.fi>
-Message-ID: <7888980ca312c48a3a3ff85a184f0dfe9b0bb27d.1286729843.git.mika.westerberg@iki.fi>
+Message-ID: <40ef3fcc1c040d4432c0d2fec26d210ce888737d.1286729843.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for AC97 controllers found in Cirrus Logic EP93xx family SoCs.
+Add AC97 audio support for Simplemachines Sim.One board.
 
 Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 ---
- sound/soc/ep93xx/Kconfig       |    8 +-
- sound/soc/ep93xx/Makefile      |    2 +
- sound/soc/ep93xx/ep93xx-ac97.c |  476 ++++++++++++++++++++++++++++++++++++++++
- sound/soc/ep93xx/ep93xx-ac97.h |   17 ++
- 4 files changed, 502 insertions(+), 1 deletions(-)
- create mode 100644 sound/soc/ep93xx/ep93xx-ac97.c
- create mode 100644 sound/soc/ep93xx/ep93xx-ac97.h
+ arch/arm/mach-ep93xx/simone.c |    1 +
+ sound/soc/ep93xx/Kconfig      |    9 +++++
+ sound/soc/ep93xx/Makefile     |    2 +
+ sound/soc/ep93xx/simone.c     |   80 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 92 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/ep93xx/simone.c
 
+diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+index 5dded58..f5f81f9 100644
+--- a/arch/arm/mach-ep93xx/simone.c
++++ b/arch/arm/mach-ep93xx/simone.c
+@@ -61,6 +61,7 @@ static void __init simone_init_machine(void)
+ 	ep93xx_register_fb(&simone_fb_info);
+ 	ep93xx_register_i2c(&simone_i2c_gpio_data, simone_i2c_board_info,
+ 			    ARRAY_SIZE(simone_i2c_board_info));
++	ep93xx_register_ac97();
+ }
+ 
+ MACHINE_START(SIM_ONE, "Simplemachines Sim.One Board")
 diff --git a/sound/soc/ep93xx/Kconfig b/sound/soc/ep93xx/Kconfig
-index f617f56..4a9d236 100644
+index 4a9d236..4aa6087 100644
 --- a/sound/soc/ep93xx/Kconfig
 +++ b/sound/soc/ep93xx/Kconfig
-@@ -3,11 +3,17 @@ config SND_EP93XX_SOC
- 	depends on ARCH_EP93XX && SND_SOC
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
--	  the EP93xx I2S interface.
-+	  the EP93xx I2S or AC97 interfaces.
- 
- config SND_EP93XX_SOC_I2S
- 	tristate
- 
-+config SND_EP93XX_SOC_AC97
-+	tristate
-+	select AC97_BUS
-+	select SND_AC97_CODEC
-+	select SND_SOC_AC97_BUS
+@@ -22,3 +22,12 @@ config SND_EP93XX_SOC_SNAPPERCL15
+         help
+           Say Y or M here if you want to add support for I2S audio on the
+           Bluewater Systems Snapper CL15 module.
 +
- config SND_EP93XX_SOC_SNAPPERCL15
-         tristate "SoC Audio support for Bluewater Systems Snapper CL15 module"
-         depends on SND_EP93XX_SOC && MACH_SNAPPER_CL15
++config SND_EP93XX_SOC_SIMONE
++	tristate "SoC Audio support for Simplemachines Sim.One board"
++	depends on SND_EP93XX_SOC && MACH_SIM_ONE
++	select SND_EP93XX_SOC_AC97
++	select SND_SOC_AC97_CODEC
++	help
++	  Say Y or M here if you want to add support for AC97 audio on the
++	  Simplemachines Sim.One board.
 diff --git a/sound/soc/ep93xx/Makefile b/sound/soc/ep93xx/Makefile
-index 272e60f..ac06e00 100644
+index ac06e00..8e7977f 100644
 --- a/sound/soc/ep93xx/Makefile
 +++ b/sound/soc/ep93xx/Makefile
-@@ -1,9 +1,11 @@
- # EP93xx Platform Support
- snd-soc-ep93xx-objs				:= ep93xx-pcm.o
- snd-soc-ep93xx-i2s-objs	 			:= ep93xx-i2s.o
-+snd-soc-ep93xx-ac97-objs 			:= ep93xx-ac97.o
- 
- obj-$(CONFIG_SND_EP93XX_SOC)			+= snd-soc-ep93xx.o
- obj-$(CONFIG_SND_EP93XX_SOC_I2S)		+= snd-soc-ep93xx-i2s.o
-+obj-$(CONFIG_SND_EP93XX_SOC_AC97)		+= snd-soc-ep93xx-ac97.o
+@@ -9,5 +9,7 @@ obj-$(CONFIG_SND_EP93XX_SOC_AC97)		+= snd-soc-ep93xx-ac97.o
  
  # EP93XX Machine Support
  snd-soc-snappercl15-objs			:= snappercl15.o
-diff --git a/sound/soc/ep93xx/ep93xx-ac97.c b/sound/soc/ep93xx/ep93xx-ac97.c
++snd-soc-simone-objs				:= simone.o
+ 
+ obj-$(CONFIG_SND_EP93XX_SOC_SNAPPERCL15)	+= snd-soc-snappercl15.o
++obj-$(CONFIG_SND_EP93XX_SOC_SIMONE)		+= snd-soc-simone.o
+diff --git a/sound/soc/ep93xx/simone.c b/sound/soc/ep93xx/simone.c
 new file mode 100644
-index 0000000..0340ed6
+index 0000000..ed189c1
 --- /dev/null
-+++ b/sound/soc/ep93xx/ep93xx-ac97.c
-@@ -0,0 +1,476 @@
++++ b/sound/soc/ep93xx/simone.c
+@@ -0,0 +1,80 @@
 +/*
-+ * ASoC driver for Cirrus Logic EP93xx AC97 controller.
++ * simone.c -- ASoC audio for Simplemachines Sim.One board
 + *
 + * Copyright (c) 2010 Mika Westerberg
 + *
-+ * Based on s3c-ac97 ASoC driver by Jaswinder Singh.
++ * Based on snappercl15 machine driver by Ryan Mallon.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/delay.h>
-+#include <linux/io.h>
 +#include <linux/init.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/slab.h>
 +
 +#include <sound/core.h>
-+#include <sound/ac97_codec.h>
++#include <sound/pcm.h>
 +#include <sound/soc.h>
 +
-+#include <mach/dma.h>
++#include <asm/mach-types.h>
++#include <mach/hardware.h>
++
++#include "../codecs/ac97.h"
 +#include "ep93xx-pcm.h"
 +#include "ep93xx-ac97.h"
 +
-+/*
-+ * Per channel (1-4) registers.
-+ */
-+#define AC97CH(n)		(((n) - 1) * 0x20)
-+
-+#define AC97DR(n)		(AC97CH(n) + 0x0000)
-+
-+#define AC97RXCR(n)		(AC97CH(n) + 0x0004)
-+#define AC97RXCR_REN		BIT(0)
-+#define AC97RXCR_RX3		BIT(3)
-+#define AC97RXCR_RX4		BIT(4)
-+#define AC97RXCR_CM		BIT(15)
-+
-+#define AC97TXCR(n)		(AC97CH(n) + 0x0008)
-+#define AC97TXCR_TEN		BIT(0)
-+#define AC97TXCR_TX3		BIT(3)
-+#define AC97TXCR_TX4		BIT(4)
-+#define AC97TXCR_CM		BIT(15)
-+
-+#define AC97SR(n)		(AC97CH(n) + 0x000c)
-+#define AC97SR_TXFE		BIT(1)
-+#define AC97SR_TXUE		BIT(6)
-+
-+#define AC97RISR(n)		(AC97CH(n) + 0x0010)
-+#define AC97ISR(n)		(AC97CH(n) + 0x0014)
-+#define AC97IE(n)		(AC97CH(n) + 0x0018)
-+
-+/*
-+ * Global AC97 controller registers.
-+ */
-+#define AC97S1DATA		0x0080
-+#define AC97S2DATA		0x0084
-+#define AC97S12DATA		0x0088
-+
-+#define AC97RGIS		0x008c
-+#define AC97GIS			0x0090
-+#define AC97IM			0x0094
-+/*
-+ * Common bits for RGIS, GIS and IM registers.
-+ */
-+#define AC97_SLOT2RXVALID	BIT(1)
-+#define AC97_CODECREADY		BIT(5)
-+#define AC97_SLOT2TXCOMPLETE	BIT(6)
-+
-+#define AC97EOI			0x0098
-+#define AC97EOI_WINT		BIT(0)
-+#define AC97EOI_CODECREADY	BIT(1)
-+
-+#define AC97GCR			0x009c
-+#define AC97GCR_AC97IFE		BIT(0)
-+
-+#define AC97RESET		0x00a0
-+#define AC97RESET_TIMEDRESET	BIT(0)
-+
-+#define AC97SYNC		0x00a4
-+#define AC97SYNC_TIMEDSYNC	BIT(0)
-+
-+#define AC97_TIMEOUT		msecs_to_jiffies(5)
-+
-+/**
-+ * struct ep93xx_ac97_info - EP93xx AC97 controller info structure
-+ * @lock: mutex serializing access to the bus (slot 1 & 2 ops)
-+ * @dev: pointer to the platform device dev structure
-+ * @mem: physical memory resource for the registers
-+ * @regs: mapped AC97 controller registers
-+ * @irq: AC97 interrupt number
-+ * @done: bus ops wait here for an interrupt
-+ */
-+struct ep93xx_ac97_info {
-+	struct mutex		lock;
-+	struct device		*dev;
-+	struct resource		*mem;
-+	void __iomem		*regs;
-+	int			irq;
-+	struct completion	done;
++static struct snd_soc_dai_link simone_dai = {
++	.name		= "AC97",
++	.stream_name	= "AC97 HiFi",
++	.cpu_dai	= &ep93xx_ac97_dai,
++	.codec_dai	= &ac97_dai,
 +};
 +
-+/* currently ALSA only supports a single AC97 device */
-+static struct ep93xx_ac97_info *ep93xx_ac97_info;
-+
-+static struct ep93xx_pcm_dma_params ep93xx_ac97_pcm_out = {
-+	.name		= "ac97-pcm-out",
-+	.dma_port	= EP93XX_DMA_M2P_PORT_AAC1,
++static struct snd_soc_card snd_soc_simone = {
++	.name		= "Sim.One",
++	.platform	= &ep93xx_soc_platform,
++	.dai_link	= &simone_dai,
++	.num_links	= 1,
 +};
 +
-+static struct ep93xx_pcm_dma_params ep93xx_ac97_pcm_in = {
-+	.name		= "ac97-pcm-in",
-+	.dma_port	= EP93XX_DMA_M2P_PORT_AAC1,
++static struct snd_soc_device simone_snd_devdata = {
++	.card = &snd_soc_simone,
++	.codec_dev = &soc_codec_dev_ac97,
 +};
 +
-+static inline unsigned ep93xx_ac97_read_reg(struct ep93xx_ac97_info *info,
-+					    unsigned reg)
++static struct platform_device *simone_snd_device;
++
++static int __init simone_init(void)
 +{
-+	return __raw_readl(info->regs + reg);
-+}
-+
-+static inline void ep93xx_ac97_write_reg(struct ep93xx_ac97_info *info,
-+					 unsigned reg, unsigned val)
-+{
-+	__raw_writel(val, info->regs + reg);
-+}
-+
-+static unsigned short ep93xx_ac97_read(struct snd_ac97 *ac97,
-+				       unsigned short reg)
-+{
-+	struct ep93xx_ac97_info *info = ep93xx_ac97_info;
-+	unsigned short val;
-+
-+	mutex_lock(&info->lock);
-+
-+	INIT_COMPLETION(info->done);
-+
-+	ep93xx_ac97_write_reg(info, AC97S1DATA, reg);
-+	ep93xx_ac97_write_reg(info, AC97IM, AC97_SLOT2RXVALID);
-+	if (!wait_for_completion_timeout(&info->done, AC97_TIMEOUT)) {
-+		dev_warn(info->dev, "timeout reading register %x\n", reg);
-+		mutex_unlock(&info->lock);
-+		return -1;
-+	}
-+	val = (unsigned short)ep93xx_ac97_read_reg(info, AC97S2DATA);
-+
-+	mutex_unlock(&info->lock);
-+	return val;
-+}
-+
-+static void ep93xx_ac97_write(struct snd_ac97 *ac97,
-+			      unsigned short reg,
-+			      unsigned short val)
-+{
-+	struct ep93xx_ac97_info *info = ep93xx_ac97_info;
-+
-+	mutex_lock(&info->lock);
-+
-+	INIT_COMPLETION(info->done);
-+
-+	/*
-+	 * Writes to the codec need to be done so that slot 2 is filled in
-+	 * before slot 1.
-+	 */
-+	ep93xx_ac97_write_reg(info, AC97S2DATA, val);
-+	ep93xx_ac97_write_reg(info, AC97S1DATA, reg);
-+
-+	ep93xx_ac97_write_reg(info, AC97IM, AC97_SLOT2TXCOMPLETE);
-+	if (!wait_for_completion_timeout(&info->done, AC97_TIMEOUT))
-+		dev_warn(info->dev, "timeout writing register %x\n", reg);
-+
-+	mutex_unlock(&info->lock);
-+}
-+
-+static void ep93xx_ac97_warm_reset(struct snd_ac97 *ac97)
-+{
-+	struct ep93xx_ac97_info *info = ep93xx_ac97_info;
-+
-+	mutex_lock(&info->lock);
-+
-+	INIT_COMPLETION(info->done);
-+	/*
-+	 * We are assuming that before this functions gets called, the codec
-+	 * BIT_CLK is stopped by forcing the codec into powerdown mode. We can
-+	 * control the SYNC signal directly via AC97SYNC register. Using
-+	 * TIMEDSYNC the controller will keep the SYNC high > 1us.
-+	 */
-+	ep93xx_ac97_write_reg(info, AC97SYNC, AC97SYNC_TIMEDSYNC);
-+	ep93xx_ac97_write_reg(info, AC97IM, AC97_CODECREADY);
-+	if (!wait_for_completion_timeout(&info->done, AC97_TIMEOUT))
-+		dev_warn(info->dev, "codec warm reset timeout\n");
-+
-+	mutex_unlock(&info->lock);
-+}
-+
-+static void ep93xx_ac97_cold_reset(struct snd_ac97 *ac97)
-+{
-+	struct ep93xx_ac97_info *info = ep93xx_ac97_info;
-+
-+	mutex_lock(&info->lock);
-+
-+	INIT_COMPLETION(info->done);
-+	/*
-+	 * For doing cold reset, we disable the AC97 controller interface, clear
-+	 * WINT and CODECREADY bits, and finally enable the interface again.
-+	 */
-+	ep93xx_ac97_write_reg(info, AC97GCR, 0);
-+	ep93xx_ac97_write_reg(info, AC97EOI, AC97EOI_CODECREADY | AC97EOI_WINT);
-+	ep93xx_ac97_write_reg(info, AC97GCR, AC97GCR_AC97IFE);
-+
-+	/*
-+	 * Now, assert the reset and wait for the codec to become ready.
-+	 */
-+	ep93xx_ac97_write_reg(info, AC97RESET, AC97RESET_TIMEDRESET);
-+	ep93xx_ac97_write_reg(info, AC97IM, AC97_CODECREADY);
-+	if (!wait_for_completion_timeout(&info->done, AC97_TIMEOUT))
-+		dev_warn(info->dev, "codec cold reset timeout\n");
-+
-+	/*
-+	 * Give the codec some time to come fully out from the reset. This way
-+	 * we ensure that the subsequent reads/writes will work.
-+	 */
-+	usleep_range(5000, 10000);
-+
-+	mutex_unlock(&info->lock);
-+}
-+
-+static irqreturn_t ep93xx_ac97_interrupt(int irq, void *dev_id)
-+{
-+	struct ep93xx_ac97_info *info = dev_id;
-+	unsigned status, mask;
-+
-+	/*
-+	 * Just mask out the interrupt and wake up the waiting thread.
-+	 * Interrupts are cleared via reading/writing to slot 1 & 2 registers by
-+	 * the waiting thread.
-+	 */
-+	status = ep93xx_ac97_read_reg(info, AC97GIS);
-+	mask = ep93xx_ac97_read_reg(info, AC97IM);
-+	mask &= ~status;
-+	ep93xx_ac97_write_reg(info, AC97IM, mask);
-+
-+	complete(&info->done);
-+	return IRQ_HANDLED;
-+}
-+
-+struct snd_ac97_bus_ops soc_ac97_ops = {
-+	.read		= ep93xx_ac97_read,
-+	.write		= ep93xx_ac97_write,
-+	.reset		= ep93xx_ac97_cold_reset,
-+	.warm_reset	= ep93xx_ac97_warm_reset,
-+};
-+EXPORT_SYMBOL_GPL(soc_ac97_ops);
-+
-+static int ep93xx_ac97_trigger(struct snd_pcm_substream *substream,
-+			       int cmd, struct snd_soc_dai *dai)
-+{
-+	struct ep93xx_ac97_info *info = dai->private_data;
-+	unsigned v = 0;
-+
-+	switch (cmd) {
-+	case SNDRV_PCM_TRIGGER_START:
-+	case SNDRV_PCM_TRIGGER_RESUME:
-+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+			/*
-+			 * Enable compact mode, TX slots 3 & 4, and the TX FIFO
-+			 * itself.
-+			 */
-+			v |= AC97TXCR_CM;
-+			v |= AC97TXCR_TX3 | AC97TXCR_TX4;
-+			v |= AC97TXCR_TEN;
-+			ep93xx_ac97_write_reg(info, AC97TXCR(1), v);
-+		} else {
-+			/*
-+			 * Enable compact mode, RX slots 3 & 4, and the RX FIFO
-+			 * itself.
-+			 */
-+			v |= AC97RXCR_CM;
-+			v |= AC97RXCR_RX3 | AC97RXCR_RX4;
-+			v |= AC97RXCR_REN;
-+			ep93xx_ac97_write_reg(info, AC97RXCR(1), v);
-+		}
-+		break;
-+
-+	case SNDRV_PCM_TRIGGER_STOP:
-+	case SNDRV_PCM_TRIGGER_SUSPEND:
-+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+			/*
-+			 * As per Cirrus EP93xx errata described below:
-+			 *
-+			 * http://www.cirrus.com/en/pubs/errata/ER667E2B.pdf
-+			 *
-+			 * we will wait for the TX FIFO to be empty before
-+			 * clearing the TEN bit.
-+			 */
-+			unsigned long timeout = jiffies + AC97_TIMEOUT;
-+
-+			do {
-+				v = ep93xx_ac97_read_reg(info, AC97SR(1));
-+				if (time_after(jiffies, timeout)) {
-+					dev_warn(info->dev, "TX timeout\n");
-+					break;
-+				}
-+			} while (!(v & (AC97SR_TXFE | AC97SR_TXUE)));
-+
-+			/* disable the TX FIFO */
-+			ep93xx_ac97_write_reg(info, AC97TXCR(1), 0);
-+		} else {
-+			/* disable the RX FIFO */
-+			ep93xx_ac97_write_reg(info, AC97RXCR(1), 0);
-+		}
-+		break;
-+
-+	default:
-+		dev_warn(info->dev, "unknown command %d\n", cmd);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int ep93xx_ac97_startup(struct snd_pcm_substream *substream,
-+			       struct snd_soc_dai *dai)
-+{
-+	struct ep93xx_pcm_dma_params *dma_data;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		dma_data = &ep93xx_ac97_pcm_out;
-+	else
-+		dma_data = &ep93xx_ac97_pcm_in;
-+
-+	snd_soc_dai_set_dma_data(dai, substream, dma_data);
-+	return 0;
-+}
-+
-+static struct snd_soc_dai_ops ep93xx_ac97_dai_ops = {
-+	.startup	= ep93xx_ac97_startup,
-+	.trigger	= ep93xx_ac97_trigger,
-+};
-+
-+struct snd_soc_dai ep93xx_ac97_dai = {
-+	.name		= "ep93xx-ac97",
-+	.id		= 0,
-+	.ac97_control	= 1,
-+	.playback	= {
-+		.stream_name	= "AC97 Playback",
-+		.channels_min	= 2,
-+		.channels_max	= 2,
-+		.rates		= SNDRV_PCM_RATE_8000_48000,
-+		.formats	= SNDRV_PCM_FMTBIT_S16_LE,
-+	},
-+	.capture	= {
-+		.stream_name	= "AC97 Capture",
-+		.channels_min	= 2,
-+		.channels_max	= 2,
-+		.rates		= SNDRV_PCM_RATE_8000_48000,
-+		.formats	= SNDRV_PCM_FMTBIT_S16_LE,
-+	},
-+	.ops			= &ep93xx_ac97_dai_ops,
-+};
-+EXPORT_SYMBOL_GPL(ep93xx_ac97_dai);
-+
-+static int __devinit ep93xx_ac97_probe(struct platform_device *pdev)
-+{
-+	struct ep93xx_ac97_info *info;
 +	int ret;
 +
-+	info = kzalloc(sizeof(struct ep93xx_ac97_info), GFP_KERNEL);
-+	if (!info)
++	if (!machine_is_sim_one())
++		return -ENODEV;
++
++	simone_snd_device = platform_device_alloc("soc-audio", -1);
++	if (!simone_snd_device)
 +		return -ENOMEM;
 +
-+	mutex_init(&info->lock);
-+	init_completion(&info->done);
-+	info->dev = &pdev->dev;
++	platform_set_drvdata(simone_snd_device, &simone_snd_devdata);
++	simone_snd_devdata.dev = &simone_snd_device->dev;
 +
-+	info->mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!info->mem) {
-+		ret = -ENXIO;
-+		goto fail_free_info;
-+	}
-+
-+	info->irq = platform_get_irq(pdev, 0);
-+	if (!info->irq) {
-+		ret = -ENXIO;
-+		goto fail_free_info;
-+	}
-+
-+	if (!request_mem_region(info->mem->start, resource_size(info->mem),
-+				pdev->name)) {
-+		ret = -EBUSY;
-+		goto fail_free_info;
-+	}
-+
-+	info->regs = ioremap(info->mem->start, resource_size(info->mem));
-+	if (!info->regs) {
-+		ret = -ENOMEM;
-+		goto fail_release_mem;
-+	}
-+
-+	ret = request_irq(info->irq, ep93xx_ac97_interrupt, IRQF_TRIGGER_HIGH,
-+			  pdev->name, info);
++	ret = platform_device_add(simone_snd_device);
 +	if (ret)
-+		goto fail_unmap_mem;
-+
-+	ep93xx_ac97_dai.dev = &pdev->dev;
-+	ep93xx_ac97_dai.private_data = info;
-+	ep93xx_ac97_info = info;
-+
-+	platform_set_drvdata(pdev, info);
-+
-+	ret = snd_soc_register_dai(&ep93xx_ac97_dai);
-+	if (ret)
-+		goto fail_free_irq;
-+
-+	return 0;
-+
-+fail_free_irq:
-+	platform_set_drvdata(pdev, NULL);
-+	free_irq(info->irq, info);
-+fail_unmap_mem:
-+	iounmap(info->regs);
-+fail_release_mem:
-+	release_mem_region(info->mem->start, resource_size(info->mem));
-+fail_free_info:
-+	kfree(info);
++		platform_device_put(simone_snd_device);
 +
 +	return ret;
 +}
 +
-+static int __devexit ep93xx_ac97_remove(struct platform_device *pdev)
++static void __exit simone_exit(void)
 +{
-+	struct ep93xx_ac97_info	*info = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_dai(&ep93xx_ac97_dai);
-+
-+	/* disable the AC97 controller */
-+	ep93xx_ac97_write_reg(info, AC97GCR, 0);
-+
-+	free_irq(info->irq, info);
-+	iounmap(info->regs);
-+	release_mem_region(info->mem->start, resource_size(info->mem));
-+	platform_set_drvdata(pdev, NULL);
-+	kfree(info);
-+
-+	return 0;
++	platform_device_unregister(simone_snd_device);
 +}
 +
-+static struct platform_driver ep93xx_ac97_driver = {
-+	.probe	= ep93xx_ac97_probe,
-+	.remove	= __devexit_p(ep93xx_ac97_remove),
-+	.driver = {
-+		.name = "ep93xx-ac97",
-+		.owner = THIS_MODULE,
-+	},
-+};
++module_init(simone_init);
++module_exit(simone_exit);
 +
-+static int __init ep93xx_ac97_init(void)
-+{
-+	return platform_driver_register(&ep93xx_ac97_driver);
-+}
-+
-+static void __exit ep93xx_ac97_exit(void)
-+{
-+	platform_driver_unregister(&ep93xx_ac97_driver);
-+}
-+
-+module_init(ep93xx_ac97_init);
-+module_exit(ep93xx_ac97_exit);
-+
-+MODULE_DESCRIPTION("EP93xx AC97 ASoC Driver");
++MODULE_DESCRIPTION("ALSA SoC Simplemachines Sim.One");
 +MODULE_AUTHOR("Mika Westerberg <mika.westerberg@iki.fi>");
 +MODULE_LICENSE("GPL");
-diff --git a/sound/soc/ep93xx/ep93xx-ac97.h b/sound/soc/ep93xx/ep93xx-ac97.h
-new file mode 100644
-index 0000000..684c1bb
---- /dev/null
-+++ b/sound/soc/ep93xx/ep93xx-ac97.h
-@@ -0,0 +1,17 @@
-+/*
-+ * sound/soc/ep93xx/ep93xx-ac97.h
-+ * EP93xx AC97 controller driver
-+ *
-+ * Copyright (c) 2010 Mika Westerberg
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _EP93XX_SND_SOC_AC97_H
-+#define _EP93XX_SND_SOC_AC97_H
-+
-+extern struct snd_soc_dai ep93xx_ac97_dai;
-+
-+#endif /* _EP93XX_SND_SOC_AC97_H */
 -- 
 1.5.6.5
