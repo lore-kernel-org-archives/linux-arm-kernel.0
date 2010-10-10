@@ -1,55 +1,59 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 10 Oct 2010 05:20:22 +0300
-Subject: [PATCH] arm: mm: allow boards to fiddle with meminfo
-Message-ID: <1286677222-17898-1-git-send-email-felipe.contreras@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 10 Oct 2010 00:31:18 -0600
+Subject: [PATCH v4] spi: add spi_tegra driver
+In-Reply-To: <AANLkTimonLa1mUVSHR=QnR48HPtAZ5BW3BsVsg7MWALy@mail.gmail.com>
+References: <1282771395-21684-1-git-send-email-konkers@android.com>
+	<1283379393-14831-1-git-send-email-konkers@android.com>
+	<AANLkTimonLa1mUVSHR=QnR48HPtAZ5BW3BsVsg7MWALy@mail.gmail.com>
+Message-ID: <AANLkTini_PA3J+R4gEP4DzFpcAxHhdmDbcXxOtj2h81O@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So that they can reserve some memory.
+On Thu, Sep 2, 2010 at 8:22 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Sep 1, 2010 at 4:16 PM, Erik Gilling <konkers@android.com> wrote:
+>> v2 changes:
+>> ?from Thierry Reding:
+>> ? ?* add "select TEGRA_SYSTEM_DMA" to Kconfig
+>> ?from Grant Likely:
+>> ? ?* add oneline description to header
+>> ? ?* inline references to DRIVER_NAME
+>> ? ?* inline references to BUSY_TIMEOUT
+>> ? ?* open coded bytes_per_word()
+>> ? ?* spi_readl/writel -> spi_tegra_readl/writel
+>> ? ?* move transfer validation to spi_tegra_transfer
+>> ? ?* don't request_mem_region iomem as platform bus does that for us
+>> ? ?* __exit -> __devexit
+>>
+>> v3 changes:
+>> ?from Russell King:
+>> ? ?* put request_mem_region back int
+>> ?from Grant Likely:
+>> ? ?* remove #undef DEBUG
+>> ? ?* add SLINK_ to register bit defines
+>> ? ?* remove unused bytes_per_word
+>> ? ?* make spi_tegra_readl/writel static linine
+>> ? ?* various refactoring for clarity
+>> ? ?* mark err if BSY bit is not cleared after 1000 retries
+>> ? ?* move spinlock to protect setting of RDY bit
+>> ? ?* subsys_initcall -> module_init
+>>
+>> v3 changes:
+>> ?from Grant Likely:
+>> ? ?* update spi_tegra to use PTR_ERRless dma API
+>>
+>> Signed-off-by: Erik Gilling <konkers@android.com>
+>> Cc: Thierry Reding <thierry.reding@avionic-design.de>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>
+> Hi Erik,
+>
+> Go ahead and add my Acked-by line and merge this via the tegra tree to
+> avoid ordering issues. ?I also have a few more minor comments below.
 
-Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
----
- arch/arm/include/asm/mach/arch.h |    2 +-
- arch/arm/mm/init.c               |    7 ++++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
+Hi Erik,
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 8a0dd18..408e4d5 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -38,7 +38,7 @@ struct machine_desc {
- 	void			(*fixup)(struct machine_desc *,
- 					 struct tag *, char **,
- 					 struct meminfo *);
--	void			(*reserve)(void);/* reserve mem blocks	*/
-+	void			(*reserve)(struct meminfo *);/* reserve mem blocks	*/
- 	void			(*map_io)(void);/* IO mapping function	*/
- 	void			(*init_irq)(void);
- 	struct sys_timer	*timer;		/* system tick timer	*/
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 7185b00..4b5c117 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- 	int i;
- 
- 	memblock_init();
--	for (i = 0; i < mi->nr_banks; i++)
--		memblock_add(mi->bank[i].start, mi->bank[i].size);
- 
- 	/* Register the kernel text, kernel data and initrd with memblock. */
- #ifdef CONFIG_XIP_KERNEL
-@@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- 
- 	/* reserve any platform specific memblock areas */
- 	if (mdesc->reserve)
--		mdesc->reserve();
-+		mdesc->reserve(mi);
-+
-+	for (i = 0; i < mi->nr_banks; i++)
-+		memblock_add(mi->bank[i].start, mi->bank[i].size);
- 
- 	memblock_analyze();
- 	memblock_dump_all();
--- 
-1.7.3.1.2.g7fe2b
+What's the status on this one?  I've not seen it show up in the
+for-next branch of the android tegra tree.
+
+g.
