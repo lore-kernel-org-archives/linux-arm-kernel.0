@@ -1,32 +1,28 @@
-From: segooon@gmail.com (Vasiliy Kulikov)
-Date: Sun, 10 Oct 2010 21:28:23 +0400
-Subject: [PATCH] arch: arm/imx: fix memory init in imx_dma_request()
-Message-ID: <1286731703-17775-1-git-send-email-segooon@gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sun, 10 Oct 2010 20:40:37 +0300
+Subject: [PATCH 0/3] staging: tidspbridge: fix ioremap() usage
+Message-ID: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx_dma_request() didn't fill struct pointed by imxdma with zeroes
-as it passed sizeof(pointer), not sizeof(struct) to memset().
+Now we truly reserve the memory so that the kernel doesn't map it.
 
-Signed-off-by: Vasiliy Kulikov <segooon@gmail.com>
----
- I cannot compile this driver, so it is not tested.
+Unfortunately, the ARM architecture code doesn't provide a good way to do this,
+so I had to modify it a bit.
 
- arch/arm/mach-imx/dma-v1.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Felipe Contreras (3):
+  arm: mm: allow boards to fiddle with meminfo
+  omap: dsp: fix ioremap() usage
+  staging: tidspbridge: remove memory consistency from TODO list
 
-diff --git a/arch/arm/mach-imx/dma-v1.c b/arch/arm/mach-imx/dma-v1.c
-index 3e8c47c..b5cc027 100644
---- a/arch/arm/mach-imx/dma-v1.c
-+++ b/arch/arm/mach-imx/dma-v1.c
-@@ -699,7 +699,7 @@ int imx_dma_request(int channel, const char *name)
- 		local_irq_restore(flags);
- 		return -EBUSY;
- 	}
--	memset(imxdma, 0, sizeof(imxdma));
-+	memset(imxdma, 0, sizeof(*imxdma));
- 	imxdma->name = name;
- 	local_irq_restore(flags); /* request_irq() can block */
- 
+ arch/arm/include/asm/mach/arch.h         |    2 +-
+ arch/arm/mm/init.c                       |    7 +++--
+ arch/arm/plat-omap/common.c              |   43 +++++++++++++++++++++++++++--
+ arch/arm/plat-omap/devices.c             |   30 ---------------------
+ arch/arm/plat-omap/include/plat/common.h |    3 +-
+ arch/arm/plat-omap/include/plat/dsp.h    |    6 ----
+ drivers/staging/tidspbridge/TODO         |    1 -
+ 7 files changed, 47 insertions(+), 45 deletions(-)
+
 -- 
-1.7.0.4
+1.7.3.1.2.g7fe2b
