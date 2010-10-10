@@ -1,59 +1,64 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 10 Oct 2010 00:31:18 -0600
-Subject: [PATCH v4] spi: add spi_tegra driver
-In-Reply-To: <AANLkTimonLa1mUVSHR=QnR48HPtAZ5BW3BsVsg7MWALy@mail.gmail.com>
-References: <1282771395-21684-1-git-send-email-konkers@android.com>
-	<1283379393-14831-1-git-send-email-konkers@android.com>
-	<AANLkTimonLa1mUVSHR=QnR48HPtAZ5BW3BsVsg7MWALy@mail.gmail.com>
-Message-ID: <AANLkTini_PA3J+R4gEP4DzFpcAxHhdmDbcXxOtj2h81O@mail.gmail.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Sun, 10 Oct 2010 08:46:45 +0200
+Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
+In-Reply-To: <AANLkTinVMczTFaQNyYinHdFzo1pzi2+SGHzrwikYCZFa@mail.gmail.com>
+References: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
+	<AANLkTinVMczTFaQNyYinHdFzo1pzi2+SGHzrwikYCZFa@mail.gmail.com>
+Message-ID: <4CB16155.6090002@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 2, 2010 at 8:22 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Sep 1, 2010 at 4:16 PM, Erik Gilling <konkers@android.com> wrote:
->> v2 changes:
->> ?from Thierry Reding:
->> ? ?* add "select TEGRA_SYSTEM_DMA" to Kconfig
->> ?from Grant Likely:
->> ? ?* add oneline description to header
->> ? ?* inline references to DRIVER_NAME
->> ? ?* inline references to BUSY_TIMEOUT
->> ? ?* open coded bytes_per_word()
->> ? ?* spi_readl/writel -> spi_tegra_readl/writel
->> ? ?* move transfer validation to spi_tegra_transfer
->> ? ?* don't request_mem_region iomem as platform bus does that for us
->> ? ?* __exit -> __devexit
->>
->> v3 changes:
->> ?from Russell King:
->> ? ?* put request_mem_region back int
->> ?from Grant Likely:
->> ? ?* remove #undef DEBUG
->> ? ?* add SLINK_ to register bit defines
->> ? ?* remove unused bytes_per_word
->> ? ?* make spi_tegra_readl/writel static linine
->> ? ?* various refactoring for clarity
->> ? ?* mark err if BSY bit is not cleared after 1000 retries
->> ? ?* move spinlock to protect setting of RDY bit
->> ? ?* subsys_initcall -> module_init
->>
->> v3 changes:
->> ?from Grant Likely:
->> ? ?* update spi_tegra to use PTR_ERRless dma API
->>
->> Signed-off-by: Erik Gilling <konkers@android.com>
->> Cc: Thierry Reding <thierry.reding@avionic-design.de>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Russell King <linux@arm.linux.org.uk>
->
-> Hi Erik,
->
-> Go ahead and add my Acked-by line and merge this via the tegra tree to
-> avoid ordering issues. ?I also have a few more minor comments below.
+saeed bishara wrote:
+> On Thu, Oct 7, 2010 at 9:36 AM, Konstantin Sinyuk
+> <kostyas@compulab.co.il> wrote:
+>> Signed-off-by: Konstantin Sinyuk <kostyas@compulab.co.il>
+>> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>> ---
 
-Hi Erik,
+[ snip ]
 
-What's the status on this one?  I've not seen it show up in the
-for-next branch of the android tegra tree.
+>> +/* Board Init */
+>> +static void __init cm_a510_init(void)
+>> +{
+>> +       /*
+>> +        * Basic Dove setup. Needs to be called early.
+>> +        */
+>> +       dove_init();
+>> +
+>> +       dove_ge00_init(&cm_a510_ge00_data);
+>> +       dove_ehci0_init();
+>> +       dove_ehci1_init();
+>> +       dove_sata_init(&cm_a510_sata_data);
+>> +       dove_sdio0_init();
+>> +       dove_sdio1_init();
+>> +       dove_spi0_init();
+>> +       dove_spi1_init();
+>> +       dove_uart0_init();
+>> +       dove_uart1_init();
+>> +       dove_i2c_init();
+>> +       spi_register_board_info(cm_a510_spi_flash_info,
+>> +                               ARRAY_SIZE(cm_a510_spi_flash_info));
+> Konstantin, are you sure your board has all the above interfaces?
+> other than that the patch looks fine to me.
 
-g.
+Our board indeed has all the above interfaces. Moreover, it uses other Dove 
+interfaces that haven't yet hit the mainline.
+
+>> +}
+>> +
+>> +MACHINE_START(CM_A510, "Compulab CM-A510 Board")
+>> +       .phys_io        = DOVE_SB_REGS_PHYS_BASE,
+>> +       .io_pg_offst    = ((DOVE_SB_REGS_VIRT_BASE) >> 18) & 0xfffc,
+>> +       .boot_params    = 0x00000100,
+>> +       .init_machine   = cm_a510_init,
+>> +       .map_io         = dove_map_io,
+>> +       .init_irq       = dove_init_irq,
+>> +       .timer          = &dove_timer,
+>> +MACHINE_END
+>> --
+>> 1.7.0.4
+
+
+-- 
+Sincerely yours,
+Mike.
