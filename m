@@ -1,38 +1,55 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 10 Oct 2010 04:05:03 +0200
-Subject: [PATCH 13/13] ARM: pxa: Fix pxa2xx-flash section mismatch
-In-Reply-To: <AANLkTikA8-sbPbGtPbTOhyJv1CR20MHZRbvtJyh2yfkS@mail.gmail.com>
-References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
-	<1286663971-15634-13-git-send-email-marek.vasut@gmail.com>
-	<AANLkTikA8-sbPbGtPbTOhyJv1CR20MHZRbvtJyh2yfkS@mail.gmail.com>
-Message-ID: <201010100405.03881.marek.vasut@gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sun, 10 Oct 2010 05:20:22 +0300
+Subject: [PATCH] arm: mm: allow boards to fiddle with meminfo
+Message-ID: <1286677222-17898-1-git-send-email-felipe.contreras@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Ne 10. ??jna 2010 02:32:42 Haojian Zhuang napsal(a):
-> On Sun, Oct 10, 2010 at 6:39 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> >  drivers/mtd/maps/pxa2xx-flash.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/maps/pxa2xx-flash.c
-> > b/drivers/mtd/maps/pxa2xx-flash.c index dd90880..d8ae634 100644
-> > --- a/drivers/mtd/maps/pxa2xx-flash.c
-> > +++ b/drivers/mtd/maps/pxa2xx-flash.c
-> > @@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
-> >  static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
-> > 
-> > 
-> > -static int __init pxa2xx_flash_probe(struct platform_device *pdev)
-> > +static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
-> >  {
-> >        struct flash_platform_data *flash = pdev->dev.platform_data;
-> >        struct pxa2xx_flash_info *info;
-> > --
-> > 1.7.1
-> 
-> Acked.
+So that they can reserve some memory.
 
-Can you please send me a formal acked-by line for the patches you acked ? Thanks 
-and sorry for the bugging :)
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+---
+ arch/arm/include/asm/mach/arch.h |    2 +-
+ arch/arm/mm/init.c               |    7 ++++---
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 8a0dd18..408e4d5 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -38,7 +38,7 @@ struct machine_desc {
+ 	void			(*fixup)(struct machine_desc *,
+ 					 struct tag *, char **,
+ 					 struct meminfo *);
+-	void			(*reserve)(void);/* reserve mem blocks	*/
++	void			(*reserve)(struct meminfo *);/* reserve mem blocks	*/
+ 	void			(*map_io)(void);/* IO mapping function	*/
+ 	void			(*init_irq)(void);
+ 	struct sys_timer	*timer;		/* system tick timer	*/
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 7185b00..4b5c117 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+ 	int i;
+ 
+ 	memblock_init();
+-	for (i = 0; i < mi->nr_banks; i++)
+-		memblock_add(mi->bank[i].start, mi->bank[i].size);
+ 
+ 	/* Register the kernel text, kernel data and initrd with memblock. */
+ #ifdef CONFIG_XIP_KERNEL
+@@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+ 
+ 	/* reserve any platform specific memblock areas */
+ 	if (mdesc->reserve)
+-		mdesc->reserve();
++		mdesc->reserve(mi);
++
++	for (i = 0; i < mi->nr_banks; i++)
++		memblock_add(mi->bank[i].start, mi->bank[i].size);
+ 
+ 	memblock_analyze();
+ 	memblock_dump_all();
+-- 
+1.7.3.1.2.g7fe2b
