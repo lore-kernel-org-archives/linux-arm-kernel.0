@@ -1,85 +1,123 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 10 Oct 2010 04:52:36 +0300
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101009092127.GB20975@n2100.arm.linux.org.uk>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
-	<20101009092127.GB20975@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 10 Oct 2010 04:03:21 +0200
+Subject: [PATCH 02/13] ARM: pxa: Access SMEMC via virtual addresses
+In-Reply-To: <AANLkTikPa+5gp13mLdFYhvcwGdXuPU4th_9CxdFsoC4u@mail.gmail.com>
+References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
+	<1286663971-15634-2-git-send-email-marek.vasut@gmail.com>
+	<AANLkTikPa+5gp13mLdFYhvcwGdXuPU4th_9CxdFsoC4u@mail.gmail.com>
+Message-ID: <201010100403.22064.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 9, 2010 at 12:21 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> static unsigned long reserve_mem(struct meminfo *mi, unsigned long size)
-> {
-> ? ? ? ?unsigned long addr = ~0;
-> ? ? ? ?int i;
->
-> ? ? ? ?for (i = mi->nr_banks - 1; i >= 0; i--)
-> ? ? ? ? ? ? ? ?if (mi->bank[i].size >= size) {
-> ? ? ? ? ? ? ? ? ? ? ? ?mi->bank[i].size -= size;
-> ? ? ? ? ? ? ? ? ? ? ? ?addr = mi->bank[i].start + mi->bank[i].size;
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?}
->
-> ? ? ? ?return addr;
-> }
->
-> static void __init my_fixup(struct machine_desc *desc, struct tag *tags,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ?char **cmdline, struct meminfo *mi)
-> {
-> ? ? ? ?omapfb_buffer_phys = reserve_mem(mi, 32*1048576);
-> ? ? ? ?if (omapfb_buffer_phys == ~0)
-> ? ? ? ? ? ? ? ?pr_warn("Unable to allocate omapfb buffer\n");
-> }
->
-> Then later:
->
-> ? ? ? ?omapfb_buffer = ioremap(omapfb_buffer_phys, 32*1048576);
->
-> That's a damned simple and direct implementation of exactly what I
-> described, and results in something which is much more architecturally
-> correct than what's going on today.
+Dne Ne 10. ??jna 2010 02:31:24 Haojian Zhuang napsal(a):
+> On Sun, Oct 10, 2010 at 6:39 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > This is important because on PXA3xx, the physical mapping of SMEMC
+> > registers differs from the one on PXA2xx. In order to get PCMCIA working
+> > on both PXA2xx and PXA320, the PCMCIA driver was adjusted accordingly as
+> > well.
+> > 
+> > Also, various places in the kernel had to be patched to use
+> > __raw_read/__raw_write.
+> > 
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > ---
 
-I tried this, it doesn't work.
+[SNIP]
+> > @@ -205,19 +218,18 @@ pxa2xx_pcmcia_frequency_change(struct
+> > soc_pcmcia_socket *skt, static void pxa2xx_configure_sockets(struct
+> > device *dev)
+> >  {
+> >        struct pcmcia_low_level *ops = dev->platform_data;
+> > -
+> >        /*
+> >         * We have at least one socket, so set MECR:CIT
+> >         * (Card Is There)
+> >         */
+> > -       MECR |= MECR_CIT;
+> > +       uint32_t mecr = MECR_CIT;
+> > 
+> >        /* Set MECR:NOS (Number Of Sockets) */
+> >        if ((ops->first + ops->nr) > 1 ||
+> >            machine_is_viper() || machine_is_arcom_zeus())
+> > -               MECR |= MECR_NOS;
+> > -       else
+> > -               MECR &= ~MECR_NOS;
+> > +               mecr |= MECR_NOS;
+> > +
+> > +       __raw_writel(mecr, MECR);
+> 
+> In original, it only wants MECR |= MECR_NOS. But now, it becomes MECR
+> = MECR_NOS. The meaning is changed.
 
-At the time 'fixup' is called, 'meminfo' is empty; the tags haven't
-been parsed. So my solution is to move the memblock_add() after
-'reserve', and pass 'meminfo' as an argument:
+The meaning is actually still the same, check the datasheet.
 
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi,
-struct machine_desc *mdesc)
-        int i;
+I admit the logic has changed a bit though.
 
-        memblock_init();
--       for (i = 0; i < mi->nr_banks; i++)
--               memblock_add(mi->bank[i].start, mi->bank[i].size);
+Are you fine with having it this way ?
 
-        /* Register the kernel text, kernel data and initrd with memblock. */
- #ifdef CONFIG_XIP_KERNEL
-@@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi,
-struct machine_desc *mdesc)
-
-        /* reserve any platform specific memblock areas */
-        if (mdesc->reserve)
--               mdesc->reserve();
-+               mdesc->reserve(mi);
-+
-+       for (i = 0; i < mi->nr_banks; i++)
-+               memblock_add(mi->bank[i].start, mi->bank[i].size);
-
-        memblock_analyze();
-        memblock_dump_all();
-
--- 
-Felipe Contreras
+Cheers
+> 
+> >  }
+> > 
+> >  static const char *skt_names[] = {
+> > @@ -272,14 +284,24 @@ static int pxa2xx_drv_pcmcia_probe(struct
+> > platform_device *dev) struct soc_pcmcia_socket *skt;
+> > 
+> >        ops = (struct pcmcia_low_level *)dev->dev.platform_data;
+> > -       if (!ops)
+> > -               return -ENODEV;
+> > +       if (!ops) {
+> > +               ret = -ENODEV;
+> > +               goto err0;
+> > +       }
+> > +
+> > +       if (cpu_is_pxa320() && ops->nr > 1) {
+> > +               dev_err(&dev->dev, "pxa320 supports only one pcmcia
+> > slot"); +               ret = -EINVAL;
+> > +               goto err0;
+> > +       }
+> > 
+> >        pxa2xx_drv_pcmcia_ops(ops);
+> > 
+> >        sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+> > -       if (!sinfo)
+> > -               return -ENOMEM;
+> > +       if (!sinfo) {
+> > +               ret = -ENOMEM;
+> > +               goto err0;
+> > +       }
+> > 
+> >        sinfo->nskt = ops->nr;
+> > 
+> > @@ -295,18 +317,19 @@ static int pxa2xx_drv_pcmcia_probe(struct
+> > platform_device *dev)
+> > 
+> >                ret = pxa2xx_drv_pcmcia_add_one(skt);
+> >                if (ret)
+> > -                       break;
+> > +                       goto err1;
+> >        }
+> > 
+> > -       if (ret) {
+> > -               while (--i >= 0)
+> > -                       soc_pcmcia_remove_one(&sinfo->skt[i]);
+> > -               kfree(sinfo);
+> > -       } else {
+> > -               pxa2xx_configure_sockets(&dev->dev);
+> > -               dev_set_drvdata(&dev->dev, sinfo);
+> > -       }
+> > +       pxa2xx_configure_sockets(&dev->dev);
+> > +       dev_set_drvdata(&dev->dev, sinfo);
+> > 
+> > +       return 0;
+> > +
+> > +err1:
+> > +       while (--i >= 0)
+> > +               soc_pcmcia_remove_one(&sinfo->skt[i]);
+> > +       kfree(sinfo);
+> > +err0:
+> >        return ret;
+> >  }
+> > 
+> > --
+> > 1.7.1
