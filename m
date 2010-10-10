@@ -1,32 +1,62 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 10 Oct 2010 20:40:40 +0300
-Subject: [PATCH 3/3] staging: tidspbridge: remove memory consistency from TODO
-	list
-In-Reply-To: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <1286732440-28644-4-git-send-email-felipe.contreras@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 10 Oct 2010 20:16:44 +0200
+Subject: [PATCH 01/13] ARM: pxa: Introduce pxa[23]xx_map_io
+In-Reply-To: <4CB16D75.7030707@compulab.co.il>
+References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
+	<4CB16D75.7030707@compulab.co.il>
+Message-ID: <201010102016.44962.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mempool area is not handled by the kernel any more.
+Dne Ne 10. ??jna 2010 09:38:29 Igor Grinberg napsal(a):
+>  Hi Marek,
+> 
+> On 10/10/10 00:39, Marek Vasut wrote:
+> > This patch introduces pxa2xx_map_io() and pxa3xx_map_io() to distinguish
+> > between PXA2xx and PXA3xx memory mapping.
+> > 
+> > Also, fixup for platforms broken after introducing pxa2xx_map_io() and
+> > pxa3xx_map_io() is included.
+> > 
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > ---
+> > diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> > index 1cd99cb..3fa9c02 100644
+> > --- a/arch/arm/mach-pxa/spitz.c
+> > +++ b/arch/arm/mach-pxa/spitz.c
+> > @@ -27,6 +27,7 @@
+> > 
+> >  #include <linux/mtd/sharpsl.h>
+> >  #include <linux/input/matrix_keypad.h>
+> >  #include <linux/regulator/machine.h>
+> > 
+> > +#include <linux/io.h>
+> > 
+> >  #include <asm/setup.h>
+> >  #include <asm/mach-types.h>
+> > 
+> > @@ -44,6 +45,7 @@
+> > 
+> >  #include <mach/pxa2xx_spi.h>
+> >  #include <mach/spitz.h>
+> >  #include <mach/sharpsl_pm.h>
+> > 
+> > +#include <mach/pxa-smemc.h>
+> > 
+> >  #include <plat/i2c.h>
+> > 
+> > @@ -930,8 +932,8 @@ static void spitz_poweroff(void)
+> > 
+> >  static void spitz_restart(char mode, const char *cmd)
+> >  {
+> >  
+> >  	/* Bootloader magic for a reboot */
+> > 
+> > -	if ((MSC0 & 0xffff0000) == 0x7ff00000)
+> > -		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
+> > +	if ((__raw_readl(MSC0) & 0xffff0000) == 0x7ff00000)
+> > +		__raw_writel((__raw_readl(MSC0) & 0xffff) | 0x7ee00000, MSC0);
+> 
+> I believe, this is not related to the subject...
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
----
- drivers/staging/tidspbridge/TODO |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/staging/tidspbridge/TODO b/drivers/staging/tidspbridge/TODO
-index 187363f..54f4a29 100644
---- a/drivers/staging/tidspbridge/TODO
-+++ b/drivers/staging/tidspbridge/TODO
-@@ -13,7 +13,6 @@
- * Audit and clean up header files folder
- * Use kernel coding style
- * checkpatch.pl fixes
--* allocate ext_mem_pool from consistent memory instead of using ioremap
- 
- Please send any patches to Greg Kroah-Hartman <greg@kroah.com>
- and Omar Ramirez Luna <omar.ramirez@ti.com>.
--- 
-1.7.3.1.2.g7fe2b
+Thanks a lot, I got this fixed in my tree, will send a v2.
