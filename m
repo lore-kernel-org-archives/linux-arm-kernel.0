@@ -1,73 +1,74 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sun, 10 Oct 2010 22:37:51 +0300
-Subject: [PATCH 1/3] arm: mm: allow boards to fiddle with meminfo
-In-Reply-To: <20101010190308.GA15906@n2100.arm.linux.org.uk>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-	<1286732440-28644-2-git-send-email-felipe.contreras@gmail.com>
-	<20101010190308.GA15906@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikoub1K3HOP=bs0moCk1vYD8gPEu7DCvrUnMATi@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 11 Oct 2010 08:39:25 +1300
+Subject: [PATCH 3/4] ARM: ep93xx: add AC97 platform support
+In-Reply-To: <d63475d15634d7ffa4c4167cbead782a5aa1cfc9.1286707213.git.mika.westerberg@iki.fi>
+References: <cover.1286707213.git.mika.westerberg@iki.fi>
+	<d63475d15634d7ffa4c4167cbead782a5aa1cfc9.1286707213.git.mika.westerberg@iki.fi>
+Message-ID: <4CB2166D.5080706@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 10, 2010 at 10:03 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Oct 10, 2010 at 08:40:38PM +0300, Felipe Contreras wrote:
->> So that they can reserve some memory.
->>
->> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
->> ---
->> ?arch/arm/include/asm/mach/arch.h | ? ?2 +-
->> ?arch/arm/mm/init.c ? ? ? ? ? ? ? | ? ?7 ++++---
->> ?2 files changed, 5 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
->> index 8a0dd18..408e4d5 100644
->> --- a/arch/arm/include/asm/mach/arch.h
->> +++ b/arch/arm/include/asm/mach/arch.h
->> @@ -38,7 +38,7 @@ struct machine_desc {
->> ? ? ? void ? ? ? ? ? ? ? ? ? ?(*fixup)(struct machine_desc *,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct tag *, char **,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct meminfo *);
->> - ? ? void ? ? ? ? ? ? ? ? ? ?(*reserve)(void);/* reserve mem blocks ?*/
->> + ? ? void ? ? ? ? ? ? ? ? ? ?(*reserve)(struct meminfo *);/* reserve mem blocks ? ? ?*/
->> ? ? ? void ? ? ? ? ? ? ? ? ? ?(*map_io)(void);/* IO mapping function ?*/
->> ? ? ? void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
->> ? ? ? struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 7185b00..4b5c117 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
->> ? ? ? int i;
->>
->> ? ? ? memblock_init();
->> - ? ? for (i = 0; i < mi->nr_banks; i++)
->> - ? ? ? ? ? ? memblock_add(mi->bank[i].start, mi->bank[i].size);
->>
->> ? ? ? /* Register the kernel text, kernel data and initrd with memblock. */
->> ?#ifdef CONFIG_XIP_KERNEL
->> @@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
->>
->> ? ? ? /* reserve any platform specific memblock areas */
->> ? ? ? if (mdesc->reserve)
->> - ? ? ? ? ? ? mdesc->reserve();
->> + ? ? ? ? ? ? mdesc->reserve(mi);
->> +
->> + ? ? for (i = 0; i < mi->nr_banks; i++)
->> + ? ? ? ? ? ? memblock_add(mi->bank[i].start, mi->bank[i].size);
->
-> It is not a good idea to change the ordering here, as we'll now be
-> adding the memory blocks _after_ we've started to make reservations
-> into memblock.
->
-> At least the omapfb code wants there to be memory present in memblock
-> when ->reserve is called.
+On 10/10/2010 11:54 PM, Mika Westerberg wrote:
+> Add platform support for the EP93xx AC97 controller driver.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> ---
+>  arch/arm/mach-ep93xx/core.c                     |   32 +++++++++++++++++++++++
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    1 +
+>  arch/arm/mach-ep93xx/include/mach/platform.h    |    1 +
+>  3 files changed, 34 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 4cb55d3..6f514c4 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -826,6 +826,38 @@ void ep93xx_i2s_release(void)
+>  }
+>  EXPORT_SYMBOL(ep93xx_i2s_release);
+>  
+> +/*************************************************************************
+> + * EP93xx AC97 audio peripheral handling
+> + *************************************************************************/
+> +static struct resource ep93xx_ac97_resources[] = {
+> +	{
+> +		.start	= EP93XX_AAC_PHYS_BASE,
+> +		.end	= EP93XX_AAC_PHYS_BASE + 0xb0 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start	= IRQ_EP93XX_AACINTR,
+> +		.end	= IRQ_EP93XX_AACINTR,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ep93xx_ac97_device = {
+> +	.name		= "ep93xx-ac97",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(ep93xx_ac97_resources),
+> +	.resource	= ep93xx_ac97_resources,
+> +};
+> +
+> +void __init ep93xx_register_ac97(void)
+> +{
+> +	/*
+> +	 * Make sure that the AC97 pins are not used by I2S.
+> +	 */
+> +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONAC97);
+> +	platform_device_register(&ep93xx_ac97_device);
+> +}
 
-True. I initially added a new callback called reserve_mem(), but I
-thought it would be nicer to avoid adding a new function almost
-identical to an existing one.
+The other ep93xx device support functions do this with acquire/release
+functions. However, it is quite unlikely that a board will ever need to
+switch from i2s to ac97 audio at runtime. Will see what Hartley thinks.
 
-Anyway, what is your suggestion? Can you come up with something else?
+~Ryan
 
 -- 
-Felipe Contreras
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
