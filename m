@@ -1,62 +1,61 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 10 Oct 2010 20:16:44 +0200
-Subject: [PATCH 01/13] ARM: pxa: Introduce pxa[23]xx_map_io
-In-Reply-To: <4CB16D75.7030707@compulab.co.il>
-References: <1286663971-15634-1-git-send-email-marek.vasut@gmail.com>
-	<4CB16D75.7030707@compulab.co.il>
-Message-ID: <201010102016.44962.marek.vasut@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 10 Oct 2010 20:03:08 +0100
+Subject: [PATCH 1/3] arm: mm: allow boards to fiddle with meminfo
+In-Reply-To: <1286732440-28644-2-git-send-email-felipe.contreras@gmail.com>
+References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
+	<1286732440-28644-2-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <20101010190308.GA15906@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne Ne 10. ??jna 2010 09:38:29 Igor Grinberg napsal(a):
->  Hi Marek,
+On Sun, Oct 10, 2010 at 08:40:38PM +0300, Felipe Contreras wrote:
+> So that they can reserve some memory.
 > 
-> On 10/10/10 00:39, Marek Vasut wrote:
-> > This patch introduces pxa2xx_map_io() and pxa3xx_map_io() to distinguish
-> > between PXA2xx and PXA3xx memory mapping.
-> > 
-> > Also, fixup for platforms broken after introducing pxa2xx_map_io() and
-> > pxa3xx_map_io() is included.
-> > 
-> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > ---
-> > diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> > index 1cd99cb..3fa9c02 100644
-> > --- a/arch/arm/mach-pxa/spitz.c
-> > +++ b/arch/arm/mach-pxa/spitz.c
-> > @@ -27,6 +27,7 @@
-> > 
-> >  #include <linux/mtd/sharpsl.h>
-> >  #include <linux/input/matrix_keypad.h>
-> >  #include <linux/regulator/machine.h>
-> > 
-> > +#include <linux/io.h>
-> > 
-> >  #include <asm/setup.h>
-> >  #include <asm/mach-types.h>
-> > 
-> > @@ -44,6 +45,7 @@
-> > 
-> >  #include <mach/pxa2xx_spi.h>
-> >  #include <mach/spitz.h>
-> >  #include <mach/sharpsl_pm.h>
-> > 
-> > +#include <mach/pxa-smemc.h>
-> > 
-> >  #include <plat/i2c.h>
-> > 
-> > @@ -930,8 +932,8 @@ static void spitz_poweroff(void)
-> > 
-> >  static void spitz_restart(char mode, const char *cmd)
-> >  {
-> >  
-> >  	/* Bootloader magic for a reboot */
-> > 
-> > -	if ((MSC0 & 0xffff0000) == 0x7ff00000)
-> > -		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
-> > +	if ((__raw_readl(MSC0) & 0xffff0000) == 0x7ff00000)
-> > +		__raw_writel((__raw_readl(MSC0) & 0xffff) | 0x7ee00000, MSC0);
+> Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
+> ---
+>  arch/arm/include/asm/mach/arch.h |    2 +-
+>  arch/arm/mm/init.c               |    7 ++++---
+>  2 files changed, 5 insertions(+), 4 deletions(-)
 > 
-> I believe, this is not related to the subject...
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 8a0dd18..408e4d5 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -38,7 +38,7 @@ struct machine_desc {
+>  	void			(*fixup)(struct machine_desc *,
+>  					 struct tag *, char **,
+>  					 struct meminfo *);
+> -	void			(*reserve)(void);/* reserve mem blocks	*/
+> +	void			(*reserve)(struct meminfo *);/* reserve mem blocks	*/
+>  	void			(*map_io)(void);/* IO mapping function	*/
+>  	void			(*init_irq)(void);
+>  	struct sys_timer	*timer;		/* system tick timer	*/
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 7185b00..4b5c117 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+>  	int i;
+>  
+>  	memblock_init();
+> -	for (i = 0; i < mi->nr_banks; i++)
+> -		memblock_add(mi->bank[i].start, mi->bank[i].size);
+>  
+>  	/* Register the kernel text, kernel data and initrd with memblock. */
+>  #ifdef CONFIG_XIP_KERNEL
+> @@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+>  
+>  	/* reserve any platform specific memblock areas */
+>  	if (mdesc->reserve)
+> -		mdesc->reserve();
+> +		mdesc->reserve(mi);
+> +
+> +	for (i = 0; i < mi->nr_banks; i++)
+> +		memblock_add(mi->bank[i].start, mi->bank[i].size);
 
-Thanks a lot, I got this fixed in my tree, will send a v2.
+It is not a good idea to change the ordering here, as we'll now be
+adding the memory blocks _after_ we've started to make reservations
+into memblock.
+
+At least the omapfb code wants there to be memory present in memblock
+when ->reserve is called.
