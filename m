@@ -1,63 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Oct 2010 13:54:38 +0100
-Subject: Own syscall implementation
-In-Reply-To: <AANLkTinkx11iDEh2HAagdaER9yShQKmh1oSbMgRHMyyo@mail.gmail.com>
-References: <AANLkTinkx11iDEh2HAagdaER9yShQKmh1oSbMgRHMyyo@mail.gmail.com>
-Message-ID: <20101011125438.GE27153@n2100.arm.linux.org.uk>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 11 Oct 2010 16:00:26 +0300
+Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+In-Reply-To: <20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
+References: <1286790830-13505-1-git-send-email-felipe.contreras@gmail.com>
+	<1286790830-13505-2-git-send-email-felipe.contreras@gmail.com>
+	<20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTikEC9yJuAZPr25+8F7Cggce3qO2b5aCz-7cQPd9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 02:52:04PM +0300, Oleg Kutkov wrote:
-> Hello.
-> 
-> My name is Oleg and i'm newbie in a arm-kernel.
-> I doing experiments with kernel and trying to add my own syscall.
-> What i'm done:
-> 1. Added somewhere this code:
-> 
-> asmlinkage long sys_mycall(int call, unsigned long __user *args);
-> 
-> SYSCALL_DEFINE2(mycall, int, call, unsigned long __user *, args)
-> {
->       unsigned long a[6];
-> 
->    if (err = copy_from_user(a, args, nargs[call])) {
->        return -EFAULT;
->    }
-> 
->        ///some cool work///
-> }
+On Mon, Oct 11, 2010 at 3:28 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: ext Felipe Contreras <felipe.contreras@gmail.com>
+> Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+> Date: Mon, 11 Oct 2010 11:53:49 +0200
+>
+>> From: Felipe Contreras <felipe.contreras@nokia.com>
+>>
+>> It seems dsp-link will do this, and tidspbridge too at some point, but
+>> right now it's not possible to select CONFIG_MPU_BRIDGE_IOMMU.
+>
+> Why does it have to be selectable?
 
+You mean why is it desirable to turn it off? Right now there's a mess
+of tidspbridge branches, some work, some don't, some have migrated to
+iommu, some don't. In mainline all this, plus the status on dsp-link,
+should be irrelevant, a configuration solves all the issues.
 
-That's fine, except that there's no bounds checking for the value of
-'call', which if it were negative or a large positive number would
-overflow the nargs array.  You're also not propagating the error back.
+Once the iommu migration works (haven't managed to get it working
+myself), and it has been merged into mainline, then we can think about
+enabling it unconditionally. In the meantime, enabling unconditionally
+would break the tidspbridge that is in staging (mainline).
 
-> 2. Added to calls.S my function (but i'm not really understand what this :( )
-> 
-> .long sys_mycall
+> Please Cc: linux-arm-kernel at lists.infradead.org too.
 
-You don't say what kernel version.
+Will do, after you reply the above.
 
-> 3. And finally define in unistd.h:
-> 
-> #define __NR_mycall                    (__NR_SYSCALL_BASE+312)
-
-As 312 is already taken (we're now up to 369), and you're using .long, I
-can only assume this is quite an old kernel...  Modern kernels use CALL()
-in calls.S to ensure that the number of syscalls are properly counted.
-
-Note that this is a problem to people adding random new syscalls - they'll
-get in the way of future additions to the kernel, and in some cases, glibc
-probes for support for syscalls by trying to call them.
-
-So it's really not a good idea to create new syscalls for production code.
-It's usually safer to write something like a char device driver and use
-the read/write/ioctl methods instead.
-
-> Everything is good, but when some one calls me from userspace - i
-> receiving garbage in args and copy_from_user is failed to copy data...
-
-Have you checked the value of 'call' and nargs[call] ?  Note that
-copy_from_user() takes the number of _bytes_ to copy, not the number
-of arguments.
+-- 
+Felipe Contreras
