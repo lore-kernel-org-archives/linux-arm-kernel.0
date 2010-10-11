@@ -1,40 +1,82 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 11 Oct 2010 17:08:23 +0300
-Subject: [PATCH 3/3] mx51: Move OTG initialisation for all boards to a
-	single file
-In-Reply-To: <20101011131009.GY28242@pengutronix.de>
-References: <cover.1286412080.git.amit.kucheria@linaro.org>
-	<2306a14fec6647b68a4aee1743a75d040ec141b1.1286412080.git.amit.kucheria@linaro.org>
-	<20101007074853.GZ28242@pengutronix.de>
-	<AANLkTimVo8uLHq4zCskBU4C_nWYiw89BxUw2FM_p3qhQ@mail.gmail.com>
-	<20101011131009.GY28242@pengutronix.de>
-Message-ID: <AANLkTinKirn9LQ9EoZWULUJ90U2rw=Qx60=q5f8C_9Hs@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Oct 2010 16:21:01 +0200
+Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
+In-Reply-To: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1286806866-19258-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 4:10 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->>
->> Do you think something like this will be better? It looks even more
->> scattered to me, the usb configuration information is scattered across
->> platform_data and phy_data.
->
-> My problem is not that it's scattered around platform_data and phy_data,
-> but that it's not possible to add proper i.MX51 support without
-> introducing a initialize_otg_port which wont' be flexible enough for
-> future boards.
->
->>
->> Or did you want to get rid of platform_data->init too from the driver?
->
-> No, I think we can't do this without breaking at least some boards. I
-> found out that on some boards we have to configure the iomux pins and
-> the rest of the USB hardware in a short time frame, otherwise we get
-> ULPI errors.
->
-> Sascha
+We need to carry some information per host, e.g. the clock. Add a
+structure for it and initialize it in the generic part. Also improve
+the check for a parent.
 
-So are the original patches(v2) to consolidate initialize_otg_port()
-and introduce efikamx board support acceptable?
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Richard R?jfors <richard.rojfors.ext@mocean-labs.com>
+---
 
-(I want to ensure I don't miss the next merge window, because Debian
-wants to use these machines as their build machines)
+Changes since last version:
+
+* Improved detection of a "real" parent device
+
+ drivers/mmc/host/sdhci-pltfm.c |   10 +++++++---
+ drivers/mmc/host/sdhci-pltfm.h |    7 +++++++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index 4f126de..730fdf5 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+ 	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
+ 	struct resource *iomem;
+ 	int ret;
+ 
+@@ -71,16 +72,19 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Invalid iomem size. You may "
+ 			"experience problems.\n");
+ 
+-	if (pdev->dev.parent)
+-		host = sdhci_alloc_host(pdev->dev.parent, 0);
++	/* Some PCI-based MFD need the parent here */
++	if (pdev->dev.parent != &platform_bus)
++		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
+ 	else
+-		host = sdhci_alloc_host(&pdev->dev, 0);
++		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
+ 
+ 	if (IS_ERR(host)) {
+ 		ret = PTR_ERR(host);
+ 		goto err;
+ 	}
+ 
++	pltfm_host = sdhci_priv(host);
++
+ 	host->hw_name = "platform";
+ 	if (pdata && pdata->ops)
+ 		host->ops = pdata->ops;
+diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+index 900f329..93a0319 100644
+--- a/drivers/mmc/host/sdhci-pltfm.h
++++ b/drivers/mmc/host/sdhci-pltfm.h
+@@ -11,8 +11,15 @@
+ #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
+ #define _DRIVERS_MMC_SDHCI_PLTFM_H
+ 
++#include <linux/clk.h>
++#include <linux/types.h>
+ #include <linux/sdhci-pltfm.h>
+ 
++struct sdhci_pltfm_host {
++	struct clk *clk;
++	u32 scratchpad; /* to handle quirks across io-accessor calls */
++};
++
+ extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+ 
+ #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
+-- 
+1.7.1
