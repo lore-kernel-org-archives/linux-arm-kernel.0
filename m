@@ -1,117 +1,57 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 11 Oct 2010 15:03:58 +0300
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <1286796187.19739.52.camel@e102109-lin.cambridge.arm.com>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<20101009000046.GA30616@kroah.com>
-	<20101009002546.GB14675@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
-	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
-	<1286796187.19739.52.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <AANLkTinHZ-w6=0RvVp39MnvpRC7RW1CYNSbzi2f1OvaQ@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 11 Oct 2010 14:12:07 +0200
+Subject: [PATCH] mxc/gpio: make _set_value work with values != 0/1
+In-Reply-To: <1286798345-32647-1-git-send-email-jacmet@sunsite.dk>
+References: <1286798345-32647-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <4CB2FF17.1020803@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 2:23 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Mon, 2010-10-11 at 11:39 +0100, Felipe Contreras wrote:
->> On Mon, Oct 11, 2010 at 1:05 PM, Catalin Marinas
->> <catalin.marinas@arm.com> wrote:
->> > We could be a bit more flexible as a temporary solution. But that's a
->> > hack and doesn't guarantee the attributes that the driver requested. If
->> > the driver would use writel/readl, that's not too bad since we pushed
->> > explicit barriers in these macros.
->> >
->> > It would need to be improved to invalidate the corresponding cache lines
->> > (using the DMA API?) but it would look even worse.
->> >
->> >
->> > diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
->> > index 6bdf42c..082bbd0 100644
->> > --- a/arch/arm/mm/ioremap.c
->> > +++ b/arch/arm/mm/ioremap.c
->> > @@ -204,10 +204,13 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->> > ?#endif
->> >
->> > ? ? ? ?/*
->> > - ? ? ? ?* Don't allow RAM to be mapped - this causes problems with ARMv6+
->> > + ? ? ? ?* Don't allow RAM to be mapped as Device memory - this causes
->> > + ? ? ? ?* problems with ARMv6+
->> > ? ? ? ? */
->> > ? ? ? ?if (WARN_ON(pfn_valid(pfn)))
->> > - ? ? ? ? ? ? ? return NULL;
->> > + ? ? ? ? ? ? ? if (__LINUX_ARM_ARCH__ >= 6 &&
->> > + ? ? ? ? ? ? ? ? ? (mtype != MT_DEVICE_CACHED || mtype != MT_DEVICE_WC))
->> > + ? ? ? ? ? ? ? ? ? ? ? mtype = MT_DEVICE_WC;
->> >
->> > ? ? ? ?type = get_mem_type(mtype);
->> > ? ? ? ?if (!type)
->>
->> I will try that, but from what I can see this might still break some
->> drivers, right?
->
-> Probably, it depends on how drivers use the memory returned by ioremap
-> and the assumptions they make about the memory type (strict ordering,
-> write buffers, speculation). I think such memory should be used via the
-> I/O accessors and not directly, so you get the benefit of explicit
-> memory barriers. If not, you have to cope with the loss of attributes
-> because of the WC mapping.
->
-> But as it has been said (and it's my opinion as well), the drivers are
-> broken and are misusing the ioremap API.
+On 10/11/2010 01:59 PM, Peter Korsgaard wrote:
+> Documentation/gpio.txt specifies that the value argument to
+> gpio_set_value() should be handled as a boolean (E.G. != 0 is high),
+> so use the same logic as in _set_direction().
+> 
+> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+> ---
+>  arch/arm/plat-mxc/gpio.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 57ec4a8..e226801 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -234,8 +234,13 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  	u32 l;
+>  	unsigned long flags;
+>  
+> +
+>  	spin_lock_irqsave(&port->lock, flags);
+> -	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
 
-Indeed, that is understood by everyone.
+what about using "!!value" instead of just "value".
 
-But what I think should happen on .36 is that the warning is on, and
-the behavior doesn't change compared to .35. Your patch is changing
-the behavior as you say in hacky way, which might have unintended
-consequences in the affected drivers, I don't think that's ideal,
-although it's better than breaking them completely.
+> +	l = __raw_readl(reg);
+> +	if (value)
+> +		l |= 1 << offset;
+> +	else
+> +		l &= ~(1 << offset);
+>  	__raw_writel(l, reg);
+>  	spin_unlock_irqrestore(&port->lock, flags);
+>  }
 
->> Anyway, I'm reading the TRM and I can't find any mention of this.
->> Catalin, can you point out where is this mentioned, and also, can you
->> confirm if this would affect only the memory that has the double
->> mapping, or it can corrupt other memory as well?
->
-> That's in the ARM ARM (Architecture Reference Manual), not a TRM.
->
-> You never know what "unpredictable" means and this is specific to the
-> processor implementation, not the ARM ARM. You should not mix different
-> memory types for the same page.
-
-Certainly, but saying corruption _will_ happen elsewhere is not
-correct, there is no empirical evidence for that, although
-theoretically it might happen.
-
-Considering that, and the fact that .35 is not considered to be
-horribly broken (or any of the previous releases), then having one
-more releases with this broken behavior as a grace period wouldn't
-hurt anybody.
-
-> Back in 2006 there was a discussion for a set of palliative measures in
-> hardware (initially until the OSes are fixed) and these allow the same
-> memory type but with different cacheability attributes (e.g. Normal
-> Non-cacheable vs Normal Cacheable) given that care is taken in software
-> wrt stale cache lines and speculation (but at least you don't get random
-> corruption somewhere else). They would need to have the same
-> shareability attributes though.
->
-> With the hack above, MT_DEVICE_WC is actually Normal Non-cacheable
-> memory. It needs cache flushing but it's not worse than the original
-> ioremap allowing this. The driver may not work as expected though.
-
-I see, but are you saying that if the shareability is not the same,
-then corruption elsewhere might actually happen? Or it would happen
-most likely on the affected region? If it's the former, then I agree
-that your patch should be used instead.
+cheers, Marc
 
 -- 
-Felipe Contreras
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101011/2c692258/attachment.sig>
