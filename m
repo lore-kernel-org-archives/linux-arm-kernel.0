@@ -1,48 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Oct 2010 11:52:16 +0100
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
-References: <20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<20101009000046.GA30616@kroah.com>
-	<20101009002546.GB14675@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
-	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
-Message-ID: <20101011105216.GD27153@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Oct 2010 12:55:20 +0200
+Subject: [PATCH 0/3] add resources for SD/MMC on i.MX3
+Message-ID: <1286794523-26607-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 01:39:13PM +0300, Felipe Contreras wrote:
-> Anyway, I'm reading the TRM and I can't find any mention of this.
-> Catalin, can you point out where is this mentioned, and also, can you
-> confirm if this would affect only the memory that has the double
-> mapping, or it can corrupt other memory as well?
+Patches were tested on a Phytec phyCORE-i.MX35. They are based on Sascha's
+branch 'imx-for-2.6.37'.
 
-Page A3-31:
+Wolfram Sang (3):
+  arm: imx: add generic esdhc device
+  arm: imx35: add esdhc-device to MX35-platform
+  arm: pcm043: add esdhc-device to boardconfig
 
-  If the same memory locations are marked as having different cacheability
-  attributes, for example by the use of aliases in a virtual to physical
-  address mapping, behavior is UNPREDICTABLE.
-
-Page A3-36:
-
-  Behavior is UNPREDICTABLE if the same memory location:
-   ? is marked as Shareable Normal and Non-shareable Normal
-   ? is marked as having different memory types (Normal, Device, or Strongly-
-     ordered)
-   ? is marked as having different cacheability attributes
-   ? is marked as being Shareable Device and Non-shareable Device memory.
-
-  Such memory marking contradictions can occur, for example, by the use of
-  aliases in a virtual to physical address mapping.
-
-And from the glossary:
-
-  UNPREDICTABLE Means the behavior cannot be relied upon. UNPREDICTABLE
-  behavior must not represent security holes. UNPREDICTABLE behavior must
-  not halt or hang the processor, or any parts of the system. UNPREDICTABLE
-  behavior must not be documented or promoted as having a defined effect.
+ arch/arm/mach-mx3/Kconfig                       |    1 +
+ arch/arm/mach-mx3/clock-imx35.c                 |    6 ++--
+ arch/arm/mach-mx3/devices-imx35.h               |    7 +++++
+ arch/arm/mach-mx3/mach-pcm043.c                 |    8 ++++++
+ arch/arm/plat-mxc/devices/Kconfig               |    3 ++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-esdhc.c      |   31 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |    6 ++++
+ arch/arm/plat-mxc/include/mach/esdhc.h          |   16 ++++++++++++
+ arch/arm/plat-mxc/include/mach/mx35.h           |    3 ++
+ 10 files changed, 79 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-esdhc.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/esdhc.h
