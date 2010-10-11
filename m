@@ -1,298 +1,852 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 11 Oct 2010 02:20:21 +0200
-Subject: [PATCH 03/14 RESEND] ARM: pxa: Toradex Colibri PXA270 CF support
+Date: Mon, 11 Oct 2010 02:20:20 +0200
+Subject: [PATCH 02/14 v2] ARM: pxa: Access SMEMC via virtual addresses
 In-Reply-To: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
 References: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1286756432-5873-3-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1286756432-5873-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver also contains structures to eventually support PXA320. This is
-planned to be added in a later patch.
+This is important because on PXA3xx, the physical mapping of SMEMC registers
+differs from the one on PXA2xx. In order to get PCMCIA working on both PXA2xx
+and PXA320, the PCMCIA driver was adjusted accordingly as well.
+
+Also, various places in the kernel had to be patched to use
+__raw_read/__raw_write.
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-pxa/colibri-pxa270-evalboard.c |   18 ++
- drivers/pcmcia/Kconfig                       |    2 +-
- drivers/pcmcia/Makefile                      |    1 +
- drivers/pcmcia/pxa2xx_colibri.c              |  214 ++++++++++++++++++++++++++
- 4 files changed, 234 insertions(+), 1 deletions(-)
- create mode 100644 drivers/pcmcia/pxa2xx_colibri.c
+v2: Move code here from previous patch. The code was the __raw_readl() section
+that by mistake resided in previous patch.
 
-diff --git a/arch/arm/mach-pxa/colibri-pxa270-evalboard.c b/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-index 0f3b632..6177ff5 100644
---- a/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-@@ -51,6 +51,24 @@ static mfp_cfg_t colibri_pxa270_evalboard_pin_config[] __initdata = {
- 	GPIO89_USBH1_PEN,
- 	GPIO119_USBH2_PWR,
- 	GPIO120_USBH2_PEN,
-+
-+	/* PCMCIA */
-+	GPIO85_nPCE_1,
-+	GPIO54_nPCE_2,
-+	GPIO55_nPREG,
-+	GPIO50_nPIOR,
-+	GPIO51_nPIOW,
-+	GPIO49_nPWE,
-+	GPIO48_nPOE,
-+	GPIO57_nIOIS16,
-+	GPIO56_nPWAIT,
-+	GPIO104_PSKTSEL,
-+	GPIO53_GPIO,	/* RESET */
-+	GPIO83_GPIO,	/* BVD1 */
-+	GPIO82_GPIO,	/* BVD2 */
-+	GPIO1_GPIO,	/* READY */
-+	GPIO84_GPIO,	/* DETECT */
-+	GPIO107_GPIO,	/* PPEN */
- };
+ arch/arm/mach-pxa/cm-x2xx.c                  |   13 +++--
+ arch/arm/mach-pxa/cpufreq-pxa2xx.c           |   10 ++--
+ arch/arm/mach-pxa/csb726.c                   |    7 ++-
+ arch/arm/mach-pxa/generic.c                  |    9 ++--
+ arch/arm/mach-pxa/h5000.c                    |    9 ++--
+ arch/arm/mach-pxa/include/mach/pxa-smemc.h   |   74 ++++++++++++++++++++++++++
+ arch/arm/mach-pxa/include/mach/pxa2xx-regs.h |   55 -------------------
+ arch/arm/mach-pxa/lpd270.c                   |    3 +-
+ arch/arm/mach-pxa/lubbock.c                  |    3 +-
+ arch/arm/mach-pxa/mainstone.c                |    5 +-
+ arch/arm/mach-pxa/pxa27x.c                   |    6 ++-
+ arch/arm/mach-pxa/sleep.S                    |    2 +-
+ arch/arm/mach-pxa/smemc.c                    |   51 ++++++------------
+ arch/arm/mach-pxa/spitz.c                    |    5 +-
+ arch/arm/mach-pxa/stargate2.c                |    3 +-
+ arch/arm/mach-pxa/tosa.c                     |    7 ++-
+ arch/arm/mach-pxa/trizeps4.c                 |    3 +-
+ arch/arm/mach-pxa/xcep.c                     |    5 +-
+ arch/arm/mach-pxa/zeus.c                     |    5 +-
+ drivers/pcmcia/pxa2xx_base.c                 |   65 +++++++++++++++-------
+ 20 files changed, 192 insertions(+), 148 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/include/mach/pxa-smemc.h
+
+diff --git a/arch/arm/mach-pxa/cm-x2xx.c b/arch/arm/mach-pxa/cm-x2xx.c
+index c698836..2823466 100644
+--- a/arch/arm/mach-pxa/cm-x2xx.c
++++ b/arch/arm/mach-pxa/cm-x2xx.c
+@@ -24,6 +24,7 @@
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/audio.h>
+ #include <mach/pxafb.h>
++#include <mach/pxa-smemc.h>
  
- /******************************************************************************
-diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index c80a7a6..e9acf03 100644
---- a/drivers/pcmcia/Kconfig
-+++ b/drivers/pcmcia/Kconfig
-@@ -215,7 +215,7 @@ config PCMCIA_PXA2XX
- 	depends on (ARCH_LUBBOCK || MACH_MAINSTONE || PXA_SHARPSL \
- 		    || MACH_ARMCORE || ARCH_PXA_PALM || TRIZEPS_PCMCIA \
- 		    || ARCOM_PCMCIA || ARCH_PXA_ESERIES || MACH_STARGATE2 \
--		    || MACH_VPAC270 || MACH_BALLOON3)
-+		    || MACH_VPAC270 || MACH_BALLOON3 || MACH_COLIBRI)
- 	select PCMCIA_SOC_COMMON
- 	help
- 	  Say Y here to include support for the PXA2xx PCMCIA controller
-diff --git a/drivers/pcmcia/Makefile b/drivers/pcmcia/Makefile
-index 8d9386a..2fee7ef 100644
---- a/drivers/pcmcia/Makefile
-+++ b/drivers/pcmcia/Makefile
-@@ -70,6 +70,7 @@ pxa2xx-obj-$(CONFIG_MACH_E740)			+= pxa2xx_e740.o
- pxa2xx-obj-$(CONFIG_MACH_STARGATE2)		+= pxa2xx_stargate2.o
- pxa2xx-obj-$(CONFIG_MACH_VPAC270)		+= pxa2xx_vpac270.o
- pxa2xx-obj-$(CONFIG_MACH_BALLOON3)		+= pxa2xx_balloon3.o
-+pxa2xx-obj-$(CONFIG_MACH_COLIBRI)		+= pxa2xx_colibri.o
+ #include <asm/hardware/it8152.h>
  
- obj-$(CONFIG_PCMCIA_PXA2XX)			+= pxa2xx_base.o $(pxa2xx-obj-y)
+@@ -392,9 +393,9 @@ static int cmx2xx_suspend(struct sys_device *dev, pm_message_t state)
+ 	cmx2xx_pci_suspend();
  
-diff --git a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
+ 	/* save MSC registers */
+-	sleep_save_msc[0] = MSC0;
+-	sleep_save_msc[1] = MSC1;
+-	sleep_save_msc[2] = MSC2;
++	sleep_save_msc[0] = __raw_readl(MSC0);
++	sleep_save_msc[1] = __raw_readl(MSC1);
++	sleep_save_msc[2] = __raw_readl(MSC2);
+ 
+ 	/* setup power saving mode registers */
+ 	PCFR = 0x0;
+@@ -416,9 +417,9 @@ static int cmx2xx_resume(struct sys_device *dev)
+ 	cmx2xx_pci_resume();
+ 
+ 	/* restore MSC registers */
+-	MSC0 = sleep_save_msc[0];
+-	MSC1 = sleep_save_msc[1];
+-	MSC2 = sleep_save_msc[2];
++	__raw_writel(sleep_save_msc[0], MSC0);
++	__raw_writel(sleep_save_msc[1], MSC1);
++	__raw_writel(sleep_save_msc[2], MSC2);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa2xx.c b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+index 58093d9..1af67ad 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa2xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa2xx.c
+@@ -38,8 +38,10 @@
+ #include <linux/cpufreq.h>
+ #include <linux/err.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/io.h>
+ 
+ #include <mach/pxa2xx-regs.h>
++#include <mach/pxa-smemc.h>
+ 
+ #ifdef DEBUG
+ static unsigned int freq_debug;
+@@ -242,7 +244,7 @@ static void pxa27x_guess_max_freq(void)
+ 
+ static void init_sdram_rows(void)
+ {
+-	uint32_t mdcnfg = MDCNFG;
++	uint32_t mdcnfg = __raw_readl(MDCNFG);
+ 	unsigned int drac2 = 0, drac0 = 0;
+ 
+ 	if (mdcnfg & (MDCNFG_DE2 | MDCNFG_DE3))
+@@ -331,8 +333,8 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+ 	 * we need to preset the smaller DRI before the change.	 If we're
+ 	 * speeding up we need to set the larger DRI value after the change.
+ 	 */
+-	preset_mdrefr = postset_mdrefr = MDREFR;
+-	if ((MDREFR & MDREFR_DRI_MASK) > mdrefr_dri(new_freq_mem)) {
++	preset_mdrefr = postset_mdrefr = __raw_readl(MDREFR);
++	if ((__raw_readl(MDREFR) & MDREFR_DRI_MASK) > mdrefr_dri(new_freq_mem)) {
+ 		preset_mdrefr = (preset_mdrefr & ~MDREFR_DRI_MASK);
+ 		preset_mdrefr |= mdrefr_dri(new_freq_mem);
+ 	}
+@@ -370,7 +372,7 @@ static int pxa_set_target(struct cpufreq_policy *policy,
+ 3:		nop							\n\
+ 	  "
+ 		     : "=&r" (unused)
+-		     : "r" (&MDREFR), "r" (cclkcfg),
++		     : "r" (MDREFR), "r" (cclkcfg),
+ 		       "r" (preset_mdrefr), "r" (postset_mdrefr)
+ 		     : "r4", "r5");
+ 	local_irq_restore(flags);
+diff --git a/arch/arm/mach-pxa/csb726.c b/arch/arm/mach-pxa/csb726.c
+index dab9d92..317adbd 100644
+--- a/arch/arm/mach-pxa/csb726.c
++++ b/arch/arm/mach-pxa/csb726.c
+@@ -27,6 +27,7 @@
+ #include <mach/ohci.h>
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/audio.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -255,9 +256,9 @@ static struct platform_device *devices[] __initdata = {
+ static void __init csb726_init(void)
+ {
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(csb726_pin_config));
+-/*	MSC1 = 0x7ffc3ffc; *//* LAN9215/EXP_CS */
+-/*	MSC2 = 0x06697ff4; *//* none/SM501 */
+-	MSC2 = (MSC2 & ~0xffff) | 0x7ff4; /* SM501 */
++/*	__raw_writel(0x7ffc3ffc, MSC1); *//* LAN9215/EXP_CS */
++/*	__raw_writel(0x06697ff4, MSC2); *//* none/SM501 */
++	__raw_writel((__raw_readl(MSC2) & ~0xffff) | 0x7ff4, MSC2); /* SM501 */
+ 
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_btuart_info(NULL);
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 971f994..6d621bb 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -28,6 +28,7 @@
+ 
+ #include <mach/reset.h>
+ #include <mach/gpio.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -117,8 +118,8 @@ static struct map_desc common_io_desc[] __initdata = {
+ 
+ static struct map_desc pxa2xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+-		.virtual	=  0xf6000000,
+-		.pfn		= __phys_to_pfn(0x48000000),
++		.virtual	=  PXA_SMEMC_VIRT,
++		.pfn		= __phys_to_pfn(PXA2XX_SMEMC_BASE),
+ 		.length		= 0x00200000,
+ 		.type		= MT_DEVICE
+ 	}
+@@ -126,8 +127,8 @@ static struct map_desc pxa2xx_io_desc[] __initdata = {
+ 
+ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+-		.virtual	=  0xf6000000,
+-		.pfn		= __phys_to_pfn(0x4a000000),
++		.virtual	=  PXA_SMEMC_VIRT,
++		.pfn		= __phys_to_pfn(PXA3XX_SMEMC_BASE),
+ 		.length		= 0x00200000,
+ 		.type		= MT_DEVICE
+ 	}
+diff --git a/arch/arm/mach-pxa/h5000.c b/arch/arm/mach-pxa/h5000.c
+index 9048066..3f69fce 100644
+--- a/arch/arm/mach-pxa/h5000.c
++++ b/arch/arm/mach-pxa/h5000.c
+@@ -32,6 +32,7 @@
+ #include <mach/pxa25x.h>
+ #include <mach/h5000.h>
+ #include <mach/udc.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -172,11 +173,11 @@ static unsigned long h5000_pin_config[] __initdata = {
+ 
+ static void fix_msc(void)
+ {
+-	MSC0 = 0x129c24f2;
+-	MSC1 = 0x7ff424fa;
+-	MSC2 = 0x7ff47ff4;
++	__raw_writel(0x129c24f2, MSC0);
++	__raw_writel(0x7ff424fa, MSC1);
++	__raw_writel(0x7ff47ff4, MSC2);
+ 
+-	MDREFR |= 0x02080000;
++	__raw_writel(__raw_readl(MDREFR) | 0x02080000, MDREFR);
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-pxa/include/mach/pxa-smemc.h b/arch/arm/mach-pxa/include/mach/pxa-smemc.h
 new file mode 100644
-index 0000000..4ed876c
+index 0000000..e3b270b
 --- /dev/null
-+++ b/drivers/pcmcia/pxa2xx_colibri.c
-@@ -0,0 +1,214 @@
++++ b/arch/arm/mach-pxa/include/mach/pxa-smemc.h
+@@ -0,0 +1,74 @@
 +/*
-+ * linux/drivers/pcmcia/pxa2xx_colibri.c
-+ *
-+ * Driver for Toradex Colibri PXA270 CF socket
++ * Static memory controller register definitions for PXA CPUs
 + *
 + * Copyright (C) 2010 Marek Vasut <marek.vasut@gmail.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ *
 + */
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
++#ifndef __PXA_SMEMC_REGS_H
++#define __PXA_SMEMC_REGS_H
 +
-+#include <asm/mach-types.h>
++#define	PXA2XX_SMEMC_BASE	0x48000000
++#define	PXA3XX_SMEMC_BASE	0x4a000000
++#define	PXA_SMEMC_VIRT		0xf6000000
 +
-+#include "soc_common.h"
++#define MDCNFG		(PXA_SMEMC_VIRT + 0x00)  /* SDRAM Configuration Register 0 */
++#define MDREFR		(PXA_SMEMC_VIRT + 0x04)  /* SDRAM Refresh Control Register */
++#define MSC0		(PXA_SMEMC_VIRT + 0x08)  /* Static Memory Control Register 0 */
++#define MSC1		(PXA_SMEMC_VIRT + 0x0C)  /* Static Memory Control Register 1 */
++#define MSC2		(PXA_SMEMC_VIRT + 0x10)  /* Static Memory Control Register 2 */
++#define MECR		(PXA_SMEMC_VIRT + 0x14)  /* Expansion Memory (PCMCIA/Compact Flash) Bus Configuration */
++#define SXLCR		(PXA_SMEMC_VIRT + 0x18)  /* LCR value to be written to SDRAM-Timing Synchronous Flash */
++#define SXCNFG		(PXA_SMEMC_VIRT + 0x1C)  /* Synchronous Static Memory Control Register */
++#define SXMRS		(PXA_SMEMC_VIRT + 0x24)  /* MRS value to be written to Synchronous Flash or SMROM */
++#define MCMEM0		(PXA_SMEMC_VIRT + 0x28)  /* Card interface Common Memory Space Socket 0 Timing */
++#define MCMEM1		(PXA_SMEMC_VIRT + 0x2C)  /* Card interface Common Memory Space Socket 1 Timing */
++#define MCATT0		(PXA_SMEMC_VIRT + 0x30)  /* Card interface Attribute Space Socket 0 Timing Configuration */
++#define MCATT1		(PXA_SMEMC_VIRT + 0x34)  /* Card interface Attribute Space Socket 1 Timing Configuration */
++#define MCIO0		(PXA_SMEMC_VIRT + 0x38)  /* Card interface I/O Space Socket 0 Timing Configuration */
++#define MCIO1		(PXA_SMEMC_VIRT + 0x3C)  /* Card interface I/O Space Socket 1 Timing Configuration */
++#define MDMRS		(PXA_SMEMC_VIRT + 0x40)  /* MRS value to be written to SDRAM */
++#define BOOT_DEF	(PXA_SMEMC_VIRT + 0x44)  /* Read-Only Boot-Time Register. Contains BOOT_SEL and PKG_SEL */
++#define MEMCLKCFG	(PXA_SMEMC_VIRT + 0x68)	/* Clock Configuration */
++#define CSADRCFG0	(PXA_SMEMC_VIRT + 0x80)	/* Address Configuration Register for CS0 */
++#define CSADRCFG1	(PXA_SMEMC_VIRT + 0x84)	/* Address Configuration Register for CS1 */
++#define CSADRCFG2	(PXA_SMEMC_VIRT + 0x88)	/* Address Configuration Register for CS2 */
++#define CSADRCFG3	(PXA_SMEMC_VIRT + 0x8C)	/* Address Configuration Register for CS3 */
 +
-+#define	COLIBRI270_RESET_GPIO	53
-+#define	COLIBRI270_PPEN_GPIO	107
-+#define	COLIBRI270_BVD1_GPIO	83
-+#define	COLIBRI270_BVD2_GPIO	82
-+#define	COLIBRI270_DETECT_GPIO	84
-+#define	COLIBRI270_READY_GPIO	1
++/*
++ * More handy macros for PCMCIA
++ *
++ * Arg is socket number
++ */
++#define MCMEM(s)	(PXA_SMEMC_VIRT + 0x28 + ((s)<<2))  /* Card interface Common Memory Space Socket s Timing */
++#define MCATT(s)	(PXA_SMEMC_VIRT + 0x30 + ((s)<<2))  /* Card interface Attribute Space Socket s Timing Configuration */
++#define MCIO(s)		(PXA_SMEMC_VIRT + 0x38 + ((s)<<2))  /* Card interface I/O Space Socket s Timing Configuration */
 +
-+static struct {
-+	int	reset_gpio;
-+	int	ppen_gpio;
-+	int	bvd1_gpio;
-+	int	bvd2_gpio;
-+	int	detect_gpio;
-+	int	ready_gpio;
-+} colibri_pcmcia_gpio;
++/* MECR register defines */
++#define MECR_NOS	(1 << 0)	/* Number Of Sockets: 0 -> 1 sock, 1 -> 2 sock */
++#define MECR_CIT	(1 << 1)	/* Card Is There: 0 -> no card, 1 -> card inserted */
 +
-+static struct pcmcia_irqs colibri_irqs[] = {
-+	{
-+		.sock = 0,
-+		.str  = "PCMCIA CD"
-+	},
-+};
++#define MDCNFG_DE0	(1 << 0)	/* SDRAM Bank 0 Enable */
++#define MDCNFG_DE1	(1 << 1)	/* SDRAM Bank 1 Enable */
++#define MDCNFG_DE2	(1 << 16)	/* SDRAM Bank 2 Enable */
++#define MDCNFG_DE3	(1 << 17)	/* SDRAM Bank 3 Enable */
 +
-+static int colibri_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
-+{
-+	int ret;
++#define MDREFR_K0DB4	(1 << 29)	/* SDCLK0 Divide by 4 Control/Status */
++#define MDREFR_K2FREE	(1 << 25)	/* SDRAM Free-Running Control */
++#define MDREFR_K1FREE	(1 << 24)	/* SDRAM Free-Running Control */
++#define MDREFR_K0FREE	(1 << 23)	/* SDRAM Free-Running Control */
++#define MDREFR_SLFRSH	(1 << 22)	/* SDRAM Self-Refresh Control/Status */
++#define MDREFR_APD	(1 << 20)	/* SDRAM/SSRAM Auto-Power-Down Enable */
++#define MDREFR_K2DB2	(1 << 19)	/* SDCLK2 Divide by 2 Control/Status */
++#define MDREFR_K2RUN	(1 << 18)	/* SDCLK2 Run Control/Status */
++#define MDREFR_K1DB2	(1 << 17)	/* SDCLK1 Divide by 2 Control/Status */
++#define MDREFR_K1RUN	(1 << 16)	/* SDCLK1 Run Control/Status */
++#define MDREFR_E1PIN	(1 << 15)	/* SDCKE1 Level Control/Status */
++#define MDREFR_K0DB2	(1 << 14)	/* SDCLK0 Divide by 2 Control/Status */
++#define MDREFR_K0RUN	(1 << 13)	/* SDCLK0 Run Control/Status */
++#define MDREFR_E0PIN	(1 << 12)	/* SDCKE0 Level Control/Status */
 +
-+	ret = gpio_request(colibri_pcmcia_gpio.detect_gpio, "DETECT");
-+	if (ret)
-+		goto err1;
-+	ret = gpio_direction_input(colibri_pcmcia_gpio.detect_gpio);
-+	if (ret)
-+		goto err2;
++#endif
+diff --git a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
+index 4fcddd9..b98f236 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
++++ b/arch/arm/mach-pxa/include/mach/pxa2xx-regs.h
+@@ -28,61 +28,6 @@
+ #define PXA_CS5_PHYS	0x14000000
+ 
+ /*
+- * Memory controller
+- */
+-
+-#define MDCNFG		__REG(0x48000000)  /* SDRAM Configuration Register 0 */
+-#define MDREFR		__REG(0x48000004)  /* SDRAM Refresh Control Register */
+-#define MSC0		__REG(0x48000008)  /* Static Memory Control Register 0 */
+-#define MSC1		__REG(0x4800000C)  /* Static Memory Control Register 1 */
+-#define MSC2		__REG(0x48000010)  /* Static Memory Control Register 2 */
+-#define MECR		__REG(0x48000014)  /* Expansion Memory (PCMCIA/Compact Flash) Bus Configuration */
+-#define SXLCR		__REG(0x48000018)  /* LCR value to be written to SDRAM-Timing Synchronous Flash */
+-#define SXCNFG		__REG(0x4800001C)  /* Synchronous Static Memory Control Register */
+-#define SXMRS		__REG(0x48000024)  /* MRS value to be written to Synchronous Flash or SMROM */
+-#define MCMEM0		__REG(0x48000028)  /* Card interface Common Memory Space Socket 0 Timing */
+-#define MCMEM1		__REG(0x4800002C)  /* Card interface Common Memory Space Socket 1 Timing */
+-#define MCATT0		__REG(0x48000030)  /* Card interface Attribute Space Socket 0 Timing Configuration */
+-#define MCATT1		__REG(0x48000034)  /* Card interface Attribute Space Socket 1 Timing Configuration */
+-#define MCIO0		__REG(0x48000038)  /* Card interface I/O Space Socket 0 Timing Configuration */
+-#define MCIO1		__REG(0x4800003C)  /* Card interface I/O Space Socket 1 Timing Configuration */
+-#define MDMRS		__REG(0x48000040)  /* MRS value to be written to SDRAM */
+-#define BOOT_DEF	__REG(0x48000044)  /* Read-Only Boot-Time Register. Contains BOOT_SEL and PKG_SEL */
+-
+-/*
+- * More handy macros for PCMCIA
+- *
+- * Arg is socket number
+- */
+-#define MCMEM(s)	__REG2(0x48000028, (s)<<2 )  /* Card interface Common Memory Space Socket s Timing */
+-#define MCATT(s)	__REG2(0x48000030, (s)<<2 )  /* Card interface Attribute Space Socket s Timing Configuration */
+-#define MCIO(s)		__REG2(0x48000038, (s)<<2 )  /* Card interface I/O Space Socket s Timing Configuration */
+-
+-/* MECR register defines */
+-#define MECR_NOS	(1 << 0)	/* Number Of Sockets: 0 -> 1 sock, 1 -> 2 sock */
+-#define MECR_CIT	(1 << 1)	/* Card Is There: 0 -> no card, 1 -> card inserted */
+-
+-#define MDCNFG_DE0	(1 << 0)	/* SDRAM Bank 0 Enable */
+-#define MDCNFG_DE1	(1 << 1)	/* SDRAM Bank 1 Enable */
+-#define MDCNFG_DE2	(1 << 16)	/* SDRAM Bank 2 Enable */
+-#define MDCNFG_DE3	(1 << 17)	/* SDRAM Bank 3 Enable */
+-
+-#define MDREFR_K0DB4	(1 << 29)	/* SDCLK0 Divide by 4 Control/Status */
+-#define MDREFR_K2FREE	(1 << 25)	/* SDRAM Free-Running Control */
+-#define MDREFR_K1FREE	(1 << 24)	/* SDRAM Free-Running Control */
+-#define MDREFR_K0FREE	(1 << 23)	/* SDRAM Free-Running Control */
+-#define MDREFR_SLFRSH	(1 << 22)	/* SDRAM Self-Refresh Control/Status */
+-#define MDREFR_APD	(1 << 20)	/* SDRAM/SSRAM Auto-Power-Down Enable */
+-#define MDREFR_K2DB2	(1 << 19)	/* SDCLK2 Divide by 2 Control/Status */
+-#define MDREFR_K2RUN	(1 << 18)	/* SDCLK2 Run Control/Status */
+-#define MDREFR_K1DB2	(1 << 17)	/* SDCLK1 Divide by 2 Control/Status */
+-#define MDREFR_K1RUN	(1 << 16)	/* SDCLK1 Run Control/Status */
+-#define MDREFR_E1PIN	(1 << 15)	/* SDCKE1 Level Control/Status */
+-#define MDREFR_K0DB2	(1 << 14)	/* SDCLK0 Divide by 2 Control/Status */
+-#define MDREFR_K0RUN	(1 << 13)	/* SDCLK0 Run Control/Status */
+-#define MDREFR_E0PIN	(1 << 12)	/* SDCKE0 Level Control/Status */
+-
+-/*
+  * Power Manager
+  */
+ 
+diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
+index f1685cc..40a219a 100644
+--- a/arch/arm/mach-pxa/lpd270.c
++++ b/arch/arm/mach-pxa/lpd270.c
+@@ -46,6 +46,7 @@
+ #include <mach/mmc.h>
+ #include <mach/irda.h>
+ #include <mach/ohci.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -463,7 +464,7 @@ static void __init lpd270_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+ 
+-	lpd270_flash_data[0].width = (BOOT_DEF & 1) ? 2 : 4;
++	lpd270_flash_data[0].width = (__raw_readl(BOOT_DEF) & 1) ? 2 : 4;
+ 	lpd270_flash_data[1].width = 4;
+ 
+ 	/*
+diff --git a/arch/arm/mach-pxa/lubbock.c b/arch/arm/mach-pxa/lubbock.c
+index e73fc1d..e16450e 100644
+--- a/arch/arm/mach-pxa/lubbock.c
++++ b/arch/arm/mach-pxa/lubbock.c
+@@ -50,6 +50,7 @@
+ #include <mach/pxafb.h>
+ #include <mach/mmc.h>
+ #include <mach/pm.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "clock.h"
+@@ -525,7 +526,7 @@ static void __init lubbock_init(void)
+ 	pxa_set_ac97_info(NULL);
+ 
+ 	lubbock_flash_data[0].width = lubbock_flash_data[1].width =
+-		(BOOT_DEF & 1) ? 2 : 4;
++		(__raw_readl(BOOT_DEF) & 1) ? 2 : 4;
+ 	/* Compensate for the nROMBT switch which swaps the flash banks */
+ 	printk(KERN_NOTICE "Lubbock configured to boot from %s (bank %d)\n",
+ 	       flashboot?"Flash":"ROM", flashboot);
+diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
+index 12f5e9e..f3ea1d7 100644
+--- a/arch/arm/mach-pxa/mainstone.c
++++ b/arch/arm/mach-pxa/mainstone.c
+@@ -41,7 +41,7 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/flash.h>
+ 
+-#include <plat/pxa27x.h>
++#include <mach/pxa27x.h>
+ #include <mach/gpio.h>
+ #include <mach/mainstone.h>
+ #include <mach/audio.h>
+@@ -51,6 +51,7 @@
+ #include <mach/irda.h>
+ #include <mach/ohci.h>
+ #include <plat/pxa27x_keypad.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ #include "devices.h"
+@@ -565,7 +566,7 @@ static void __init mainstone_init(void)
+ 	pxa_set_btuart_info(NULL);
+ 	pxa_set_stuart_info(NULL);
+ 
+-	mst_flash_data[0].width = (BOOT_DEF & 1) ? 2 : 4;
++	mst_flash_data[0].width = (__raw_readl(BOOT_DEF) & 1) ? 2 : 4;
+ 	mst_flash_data[1].width = 4;
+ 
+ 	/* Compensate for SW7 which swaps the flash banks */
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 12e5b9f..b1b01e6 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -17,6 +17,7 @@
+ #include <linux/suspend.h>
+ #include <linux/platform_device.h>
+ #include <linux/sysdev.h>
++#include <linux/io.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+@@ -27,6 +28,7 @@
+ #include <mach/ohci.h>
+ #include <mach/pm.h>
+ #include <mach/dma.h>
++#include <mach/pxa-smemc.h>
+ #include <plat/i2c.h>
+ 
+ #include "generic.h"
+@@ -254,7 +256,7 @@ enum {
+ 
+ void pxa27x_cpu_pm_save(unsigned long *sleep_save)
+ {
+-	SAVE(MDREFR);
++	sleep_save[SLEEP_SAVE_MDREFR] = __raw_readl(MDREFR);
+ 	SAVE(PCFR);
+ 
+ 	SAVE(CKEN);
+@@ -263,7 +265,7 @@ void pxa27x_cpu_pm_save(unsigned long *sleep_save)
+ 
+ void pxa27x_cpu_pm_restore(unsigned long *sleep_save)
+ {
+-	RESTORE(MDREFR);
++	__raw_writel(sleep_save[SLEEP_SAVE_MDREFR], MDREFR);
+ 	RESTORE(PCFR);
+ 
+ 	PSSR = PSSR_RDH | PSSR_PH;
+diff --git a/arch/arm/mach-pxa/sleep.S b/arch/arm/mach-pxa/sleep.S
+index 52c30b0..227df3a 100644
+--- a/arch/arm/mach-pxa/sleep.S
++++ b/arch/arm/mach-pxa/sleep.S
+@@ -14,7 +14,7 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ #include <mach/hardware.h>
+-
++#include <mach/pxa-smemc.h>
+ #include <mach/pxa2xx-regs.h>
+ 
+ #define MDREFR_KDIV	0x200a4000	// all banks
+diff --git a/arch/arm/mach-pxa/smemc.c b/arch/arm/mach-pxa/smemc.c
+index d6f6904..91edda8 100644
+--- a/arch/arm/mach-pxa/smemc.c
++++ b/arch/arm/mach-pxa/smemc.c
+@@ -9,50 +9,37 @@
+ #include <linux/sysdev.h>
+ 
+ #include <mach/hardware.h>
+-
+-#define SMEMC_PHYS_BASE	(0x4A000000)
+-#define SMEMC_PHYS_SIZE	(0x90)
+-
+-#define MSC0		(0x08)	/* Static Memory Controller Register 0 */
+-#define MSC1		(0x0C)	/* Static Memory Controller Register 1 */
+-#define SXCNFG		(0x1C)	/* Synchronous Static Memory Control Register */
+-#define MEMCLKCFG	(0x68)	/* Clock Configuration */
+-#define CSADRCFG0	(0x80)	/* Address Configuration Register for CS0 */
+-#define CSADRCFG1	(0x84)	/* Address Configuration Register for CS1 */
+-#define CSADRCFG2	(0x88)	/* Address Configuration Register for CS2 */
+-#define CSADRCFG3	(0x8C)	/* Address Configuration Register for CS3 */
++#include <mach/pxa-smemc.h>
+ 
+ #ifdef CONFIG_PM
+-static void __iomem *smemc_mmio_base;
+-
+ static unsigned long msc[2];
+ static unsigned long sxcnfg, memclkcfg;
+ static unsigned long csadrcfg[4];
+ 
+ static int pxa3xx_smemc_suspend(struct sys_device *dev, pm_message_t state)
+ {
+-	msc[0] = __raw_readl(smemc_mmio_base + MSC0);
+-	msc[1] = __raw_readl(smemc_mmio_base + MSC1);
+-	sxcnfg = __raw_readl(smemc_mmio_base + SXCNFG);
+-	memclkcfg = __raw_readl(smemc_mmio_base + MEMCLKCFG);
+-	csadrcfg[0] = __raw_readl(smemc_mmio_base + CSADRCFG0);
+-	csadrcfg[1] = __raw_readl(smemc_mmio_base + CSADRCFG1);
+-	csadrcfg[2] = __raw_readl(smemc_mmio_base + CSADRCFG2);
+-	csadrcfg[3] = __raw_readl(smemc_mmio_base + CSADRCFG3);
++	msc[0] = __raw_readl(MSC0);
++	msc[1] = __raw_readl(MSC1);
++	sxcnfg = __raw_readl(SXCNFG);
++	memclkcfg = __raw_readl(MEMCLKCFG);
++	csadrcfg[0] = __raw_readl(CSADRCFG0);
++	csadrcfg[1] = __raw_readl(CSADRCFG1);
++	csadrcfg[2] = __raw_readl(CSADRCFG2);
++	csadrcfg[3] = __raw_readl(CSADRCFG3);
+ 
+ 	return 0;
+ }
+ 
+ static int pxa3xx_smemc_resume(struct sys_device *dev)
+ {
+-	__raw_writel(msc[0], smemc_mmio_base + MSC0);
+-	__raw_writel(msc[1], smemc_mmio_base + MSC1);
+-	__raw_writel(sxcnfg, smemc_mmio_base + SXCNFG);
+-	__raw_writel(memclkcfg, smemc_mmio_base + MEMCLKCFG);
+-	__raw_writel(csadrcfg[0], smemc_mmio_base + CSADRCFG0);
+-	__raw_writel(csadrcfg[1], smemc_mmio_base + CSADRCFG1);
+-	__raw_writel(csadrcfg[2], smemc_mmio_base + CSADRCFG2);
+-	__raw_writel(csadrcfg[3], smemc_mmio_base + CSADRCFG3);
++	__raw_writel(msc[0], MSC0);
++	__raw_writel(msc[1], MSC1);
++	__raw_writel(sxcnfg, SXCNFG);
++	__raw_writel(memclkcfg, MEMCLKCFG);
++	__raw_writel(csadrcfg[0], CSADRCFG0);
++	__raw_writel(csadrcfg[1], CSADRCFG1);
++	__raw_writel(csadrcfg[2], CSADRCFG2);
++	__raw_writel(csadrcfg[3], CSADRCFG3);
+ 
+ 	return 0;
+ }
+@@ -73,10 +60,6 @@ static int __init smemc_init(void)
+ 	int ret = 0;
+ 
+ 	if (cpu_is_pxa3xx()) {
+-		smemc_mmio_base = ioremap(SMEMC_PHYS_BASE, SMEMC_PHYS_SIZE);
+-		if (smemc_mmio_base == NULL)
+-			return -ENODEV;
+-
+ 		ret = sysdev_class_register(&smemc_sysclass);
+ 		if (ret)
+ 			return ret;
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 8caaa86..3fa9c02 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -45,6 +45,7 @@
+ #include <mach/pxa2xx_spi.h>
+ #include <mach/spitz.h>
+ #include <mach/sharpsl_pm.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include <plat/i2c.h>
+ 
+@@ -931,8 +932,8 @@ static void spitz_poweroff(void)
+ static void spitz_restart(char mode, const char *cmd)
+ {
+ 	/* Bootloader magic for a reboot */
+-	if ((MSC0 & 0xffff0000) == 0x7ff00000)
+-		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
++	if ((__raw_readl(MSC0) & 0xffff0000) == 0x7ff00000)
++		__raw_writel((__raw_readl(MSC0) & 0xffff) | 0x7ee00000, MSC0);
+ 
+ 	spitz_poweroff();
+ }
+diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
+index 2f45af4..61af9a0 100644
+--- a/arch/arm/mach-pxa/stargate2.c
++++ b/arch/arm/mach-pxa/stargate2.c
+@@ -48,6 +48,7 @@
+ #include <mach/udc.h>
+ #include <mach/pxa2xx_spi.h>
+ #include <mach/pxa27x-udc.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/da903x.h>
+@@ -976,7 +977,7 @@ static void __init stargate2_init(void)
+ {
+ 	/* This is probably a board specific hack as this must be set
+ 	   prior to connecting the MFP stuff up. */
+-	MECR &= ~MECR_NOS;
++	__raw_writel(__raw_readl(MECR) & ~MECR_NOS, MECR);
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(stargate2_pin_config));
+ 
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index 86b6c7a..1fe9e98 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -46,6 +46,7 @@
+ #include <mach/tosa_bt.h>
+ #include <mach/pxa2xx_spi.h>
+ #include <mach/audio.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <mach/tosa.h>
+@@ -893,9 +894,11 @@ static void tosa_poweroff(void)
+ 
+ static void tosa_restart(char mode, const char *cmd)
+ {
++	uint32_t msc0 = __raw_readl(MSC0);
 +
-+	ret = gpio_request(colibri_pcmcia_gpio.ready_gpio, "READY");
-+	if (ret)
-+		goto err2;
-+	ret = gpio_direction_input(colibri_pcmcia_gpio.ready_gpio);
-+	if (ret)
-+		goto err3;
+ 	/* Bootloader magic for a reboot */
+-	if((MSC0 & 0xffff0000) == 0x7ff00000)
+-		MSC0 = (MSC0 & 0xffff) | 0x7ee00000;
++	if((msc0 & 0xffff0000) == 0x7ff00000)
++		__raw_writel((msc0 & 0xffff) | 0x7ee00000, MSC0);
+ 
+ 	tosa_poweroff();
+ }
+diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
+index d4ecc25..881f77d 100644
+--- a/arch/arm/mach-pxa/trizeps4.c
++++ b/arch/arm/mach-pxa/trizeps4.c
+@@ -47,6 +47,7 @@
+ #include <mach/mmc.h>
+ #include <mach/irda.h>
+ #include <mach/ohci.h>
++#include <mach/pxa-smemc.h>
+ #include <plat/i2c.h>
+ 
+ #include "generic.h"
+@@ -542,7 +543,7 @@ static void __init trizeps4_map_io(void)
+ 	pxa2xx_map_io();
+ 	iotable_init(trizeps4_io_desc, ARRAY_SIZE(trizeps4_io_desc));
+ 
+-	if ((MSC0 & 0x8) && (BOOT_DEF & 0x1)) {
++	if ((__raw_readl(MSC0) & 0x8) && (__raw_readl(BOOT_DEF) & 0x1)) {
+ 		/* if flash is 16 bit wide its a Trizeps4 WL */
+ 		__machine_arch_type = MACH_TYPE_TRIZEPS4WL;
+ 		trizeps4_flash_data[0].width = 2;
+diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
+index 649e74b..bd8a38f 100644
+--- a/arch/arm/mach-pxa/xcep.c
++++ b/arch/arm/mach-pxa/xcep.c
+@@ -31,6 +31,7 @@
+ #include <mach/hardware.h>
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/mfp-pxa25x.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -172,9 +173,9 @@ static void __init xcep_init(void)
+ 
+ 	/* See Intel XScale Developer's Guide for details */
+ 	/* Set RDF and RDN to appropriate values (chip select 3 (smc91x)) */
+-	MSC1 = (MSC1 & 0xffff) | 0xD5540000;
++	__raw_writel((__raw_readl(MSC1) & 0xffff) | 0xD5540000, MSC1);
+ 	/* Set RDF and RDN to appropriate values (chip select 5 (fpga)) */
+-	MSC2 = (MSC2 & 0xffff) | 0x72A00000;
++	__raw_writel((__raw_readl(MSC2) & 0xffff) | 0x72A00000, MSC2);
+ 
+ 	platform_add_devices(ARRAY_AND_SIZE(devices));
+ 	pxa_set_i2c_info(&xcep_i2c_platform_data);
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index 96a064f..cf410ba 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -47,6 +47,7 @@
+ #include <mach/audio.h>
+ #include <mach/arcom-pcmcia.h>
+ #include <mach/zeus.h>
++#include <mach/pxa-smemc.h>
+ 
+ #include "generic.h"
+ 
+@@ -828,8 +829,8 @@ static void __init zeus_init(void)
+ 	pr_info("Zeus CPLD V%dI%d\n", (system_rev & 0xf0) >> 4, (system_rev & 0x0f));
+ 
+ 	/* Fix timings for dm9000s (CS1/CS2)*/
+-	MSC0 = (MSC0 & 0xffff) | (dm9000_msc << 16);
+-	MSC1 = (MSC1 & 0xffff0000) | dm9000_msc;
++	__raw_writel((MSC0 & 0xffff) | (dm9000_msc << 16), MSC0);
++	__raw_writel((MSC1 & 0xffff0000) | dm9000_msc, MSC1);
+ 
+ 	pm_power_off = zeus_power_off;
+ 	zeus_setup_apm();
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index ae07b4d..65a8b6f 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -26,6 +26,7 @@
+ #include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
++#include <mach/pxa-smemc.h>
+ #include <asm/io.h>
+ #include <asm/irq.h>
+ #include <asm/system.h>
+@@ -116,37 +117,49 @@ static inline u_int pxa2xx_pcmcia_cmd_time(u_int mem_clk_10khz,
+ 
+ static int pxa2xx_pcmcia_set_mcmem( int sock, int speed, int clock )
+ {
+-	MCMEM(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
 +
-+	ret = gpio_request(colibri_pcmcia_gpio.bvd1_gpio, "BVD1");
-+	if (ret)
-+		goto err3;
-+	ret = gpio_direction_input(colibri_pcmcia_gpio.bvd1_gpio);
-+	if (ret)
-+		goto err4;
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	__raw_writel(val, MCMEM(sock));
 +
-+	ret = gpio_request(colibri_pcmcia_gpio.bvd2_gpio, "BVD2");
-+	if (ret)
-+		goto err4;
-+	ret = gpio_direction_input(colibri_pcmcia_gpio.bvd2_gpio);
-+	if (ret)
-+		goto err5;
+ 	return 0;
+ }
+ 
+ static int pxa2xx_pcmcia_set_mcio( int sock, int speed, int clock )
+ {
+-	MCIO(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
 +
-+	ret = gpio_request(colibri_pcmcia_gpio.ppen_gpio, "PPEN");
-+	if (ret)
-+		goto err5;
-+	ret = gpio_direction_output(colibri_pcmcia_gpio.ppen_gpio, 0);
-+	if (ret)
-+		goto err6;
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	__raw_writel(val, MCIO(sock));
 +
-+	ret = gpio_request(colibri_pcmcia_gpio.reset_gpio, "RESET");
-+	if (ret)
-+		goto err6;
-+	ret = gpio_direction_output(colibri_pcmcia_gpio.reset_gpio, 1);
-+	if (ret)
-+		goto err7;
+ 	return 0;
+ }
+ 
+ static int pxa2xx_pcmcia_set_mcatt( int sock, int speed, int clock )
+ {
+-	MCATT(sock) = ((pxa2xx_mcxx_setup(speed, clock)
++	uint32_t val;
 +
-+	colibri_irqs[0].irq = gpio_to_irq(colibri_pcmcia_gpio.detect_gpio);
-+	skt->socket.pci_irq = gpio_to_irq(colibri_pcmcia_gpio.ready_gpio);
++	val = ((pxa2xx_mcxx_setup(speed, clock)
+ 		& MCXX_SETUP_MASK) << MCXX_SETUP_SHIFT)
+ 		| ((pxa2xx_mcxx_asst(speed, clock)
+ 		& MCXX_ASST_MASK) << MCXX_ASST_SHIFT)
+ 		| ((pxa2xx_mcxx_hold(speed, clock)
+ 		& MCXX_HOLD_MASK) << MCXX_HOLD_SHIFT);
+ 
++	__raw_writel(val, MCATT(sock));
 +
-+	return soc_pcmcia_request_irqs(skt, colibri_irqs,
-+					ARRAY_SIZE(colibri_irqs));
+ 	return 0;
+ }
+ 
+@@ -205,19 +218,18 @@ pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ static void pxa2xx_configure_sockets(struct device *dev)
+ {
+ 	struct pcmcia_low_level *ops = dev->platform_data;
+-
+ 	/*
+ 	 * We have at least one socket, so set MECR:CIT
+ 	 * (Card Is There)
+ 	 */
+-	MECR |= MECR_CIT;
++	uint32_t mecr = MECR_CIT;
+ 
+ 	/* Set MECR:NOS (Number Of Sockets) */
+ 	if ((ops->first + ops->nr) > 1 ||
+ 	    machine_is_viper() || machine_is_arcom_zeus())
+-		MECR |= MECR_NOS;
+-	else
+-		MECR &= ~MECR_NOS;
++		mecr |= MECR_NOS;
 +
-+err7:
-+	gpio_free(colibri_pcmcia_gpio.detect_gpio);
-+err6:
-+	gpio_free(colibri_pcmcia_gpio.ready_gpio);
-+err5:
-+	gpio_free(colibri_pcmcia_gpio.bvd1_gpio);
-+err4:
-+	gpio_free(colibri_pcmcia_gpio.bvd2_gpio);
-+err3:
-+	gpio_free(colibri_pcmcia_gpio.reset_gpio);
-+err2:
-+	gpio_free(colibri_pcmcia_gpio.ppen_gpio);
-+err1:
-+	return ret;
-+}
-+
-+static void colibri_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
-+{
-+	gpio_free(colibri_pcmcia_gpio.detect_gpio);
-+	gpio_free(colibri_pcmcia_gpio.ready_gpio);
-+	gpio_free(colibri_pcmcia_gpio.bvd1_gpio);
-+	gpio_free(colibri_pcmcia_gpio.bvd2_gpio);
-+	gpio_free(colibri_pcmcia_gpio.reset_gpio);
-+	gpio_free(colibri_pcmcia_gpio.ppen_gpio);
-+}
-+
-+static void colibri_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
-+					struct pcmcia_state *state)
-+{
-+
-+	state->detect = !!gpio_get_value(colibri_pcmcia_gpio.detect_gpio);
-+	state->ready  = !!gpio_get_value(colibri_pcmcia_gpio.ready_gpio);
-+	state->bvd1   = !!gpio_get_value(colibri_pcmcia_gpio.bvd1_gpio);
-+	state->bvd2   = !!gpio_get_value(colibri_pcmcia_gpio.bvd2_gpio);
-+	state->wrprot = 0;
-+	state->vs_3v  = 1;
-+	state->vs_Xv  = 0;
-+}
-+
-+static int
-+colibri_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
-+				const socket_state_t *state)
-+{
-+	gpio_set_value(colibri_pcmcia_gpio.ppen_gpio,
-+			!(state->Vcc == 33 && state->Vpp < 50));
-+	gpio_set_value(colibri_pcmcia_gpio.reset_gpio, state->flags & SS_RESET);
-+	return 0;
-+}
-+
-+static void colibri_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
-+{
-+}
-+
-+static void colibri_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
-+{
-+}
-+
-+static struct pcmcia_low_level colibri_pcmcia_ops = {
-+	.owner			= THIS_MODULE,
-+
-+	.first			= 0,
-+	.nr			= 1,
-+
-+	.hw_init		= colibri_pcmcia_hw_init,
-+	.hw_shutdown		= colibri_pcmcia_hw_shutdown,
-+
-+	.socket_state		= colibri_pcmcia_socket_state,
-+	.configure_socket	= colibri_pcmcia_configure_socket,
-+
-+	.socket_init		= colibri_pcmcia_socket_init,
-+	.socket_suspend		= colibri_pcmcia_socket_suspend,
-+};
-+
-+static struct platform_device *colibri_pcmcia_device;
-+
-+static int __init colibri_pcmcia_init(void)
-+{
-+	int ret;
-+
-+	colibri_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
-+	if (!colibri_pcmcia_device)
-+		return -ENOMEM;
-+
-+	/* Colibri PXA270 */
-+	if (machine_is_colibri()) {
-+		colibri_pcmcia_gpio.reset_gpio	= COLIBRI270_RESET_GPIO;
-+		colibri_pcmcia_gpio.ppen_gpio	= COLIBRI270_PPEN_GPIO;
-+		colibri_pcmcia_gpio.bvd1_gpio	= COLIBRI270_BVD1_GPIO;
-+		colibri_pcmcia_gpio.bvd2_gpio	= COLIBRI270_BVD2_GPIO;
-+		colibri_pcmcia_gpio.detect_gpio	= COLIBRI270_DETECT_GPIO;
-+		colibri_pcmcia_gpio.ready_gpio	= COLIBRI270_READY_GPIO;
++	__raw_writel(mecr, MECR);
+ }
+ 
+ static const char *skt_names[] = {
+@@ -272,14 +284,24 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 	struct soc_pcmcia_socket *skt;
+ 
+ 	ops = (struct pcmcia_low_level *)dev->dev.platform_data;
+-	if (!ops)
+-		return -ENODEV;
++	if (!ops) {
++		ret = -ENODEV;
++		goto err0;
 +	}
 +
-+	ret = platform_device_add_data(colibri_pcmcia_device,
-+		&colibri_pcmcia_ops, sizeof(colibri_pcmcia_ops));
++	if (cpu_is_pxa320() && ops->nr > 1) {
++		dev_err(&dev->dev, "pxa320 supports only one pcmcia slot");
++		ret = -EINVAL;
++		goto err0;
++	}
+ 
+ 	pxa2xx_drv_pcmcia_ops(ops);
+ 
+ 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+-	if (!sinfo)
+-		return -ENOMEM;
++	if (!sinfo) {
++		ret = -ENOMEM;
++		goto err0;
++	}
+ 
+ 	sinfo->nskt = ops->nr;
+ 
+@@ -295,18 +317,19 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 
+ 		ret = pxa2xx_drv_pcmcia_add_one(skt);
+ 		if (ret)
+-			break;
++			goto err1;
+ 	}
+ 
+-	if (ret) {
+-		while (--i >= 0)
+-			soc_pcmcia_remove_one(&sinfo->skt[i]);
+-		kfree(sinfo);
+-	} else {
+-		pxa2xx_configure_sockets(&dev->dev);
+-		dev_set_drvdata(&dev->dev, sinfo);
+-	}
++	pxa2xx_configure_sockets(&dev->dev);
++	dev_set_drvdata(&dev->dev, sinfo);
+ 
++	return 0;
 +
-+	if (!ret)
-+		ret = platform_device_add(colibri_pcmcia_device);
-+
-+	if (ret)
-+		platform_device_put(colibri_pcmcia_device);
-+
-+	return ret;
-+}
-+
-+static void __exit colibri_pcmcia_exit(void)
-+{
-+	platform_device_unregister(colibri_pcmcia_device);
-+}
-+
-+module_init(colibri_pcmcia_init);
-+module_exit(colibri_pcmcia_exit);
-+
-+MODULE_AUTHOR("Marek Vasut <marek.vasut@gmail.com>");
-+MODULE_DESCRIPTION("PCMCIA support for Toradex Colibri PXA270");
-+MODULE_ALIAS("platform:pxa2xx-pcmcia");
-+MODULE_LICENSE("GPL");
++err1:
++	while (--i >= 0)
++		soc_pcmcia_remove_one(&sinfo->skt[i]);
++	kfree(sinfo);
++err0:
+ 	return ret;
+ }
+ 
 -- 
 1.7.1
