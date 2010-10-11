@@ -1,35 +1,64 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 12 Oct 2010 00:08:16 +0200
-Subject: [PATCH v7] power: introduce library for device-specific OPPs
-In-Reply-To: <4CB32675.1090205@ti.com>
-References: <[PATCH] power: introduce library for device-specific OPPs>
-	<201010100059.20964.rjw@sisk.pl> <4CB32675.1090205@ti.com>
-Message-ID: <201010120008.16388.rjw@sisk.pl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 12 Oct 2010 07:54:34 +0900
+Subject: [PATCH V3] ARM: S5PV310: Add I2C channel 3, 4, 5, 6,
+	and 7 device support
+In-Reply-To: <1286784948-27094-1-git-send-email-m.szyprowski@samsung.com>
+References: <1286455601-25360-4-git-send-email-m.szyprowski@samsung.com>
+	<1286784948-27094-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <00ec01cb6997$48fe3ab0$dafab010$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 11, 2010, Nishanth Menon wrote:
-> Rafael J. Wysocki had written, on 10/09/2010 05:59 PM, the following:
-> [...]
-> >>
-> >> Signed-off-by: Nishanth Menon <nm@ti.com>
-> > 
-> > OK
-> > 
-> > Your error messages are a bit inconsistent (e.g. some of them print the
-> > error code while others don't), but I guess I can fix that up.
-> Thanks a bunch.
-> > 
-> > Still, to apply the patch I need a copyright notice for the doc too.
-> oops..
-> (C) 2009-2010 Nishanth Menon <nm@ti.com>, Texas Instruments Incorporated
-> Does this help?
+Marek Szyprowski wrote:
+> 
+> S5PV310 and S5PC210 support more I2C devices than previous SoCs.
+> Add the device support code for them.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> 
+> Changes since V2:
+> - removed some s5p reference leftovers from V1
+> - adapted setup-i2cX.c to use s3c_gpio_cfgall_range()
+> - added missing entries in plat-samsung/include/plat/devs.h
+> - added missing 'select HAVE_S3C2410_I2C' in KConfig
+> 
+Hi, Marek
 
-Yes, it does.
+Thanks for your update.
 
-> or would you like me to post a v8 as well?
+(snip)
 
-That shouldn't be necessary.
+> +void s3c_i2c4_cfg_gpio(struct platform_device *dev)
+> +{
+> +	s3c_gpio_cfgall_range(S5PV310_GPB(2), 2,
+> +			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
 
-Thanks,
-Rafael
+Following is from your previous patch.
+
+void s3c_i2c4_cfg_gpio(struct platform_device *dev)
+{
+	s3c_gpio_cfgpin(S5PV310_GPB(0), S3C_GPIO_SFN(3));
+	s3c_gpio_setpull(S5PV310_GPB(0), S3C_GPIO_PULL_UP);
+	s3c_gpio_cfgpin(S5PV310_GPB(1), S3C_GPIO_SFN(3));
+	s3c_gpio_setpull(S5PV310_GPB(1), S3C_GPIO_PULL_UP);
+}
+
+So...should be...
+s3c_gpio_cfgall_range(S5PV310_GPB(0), 2, S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+
+will fix it myself :-)
+
+(snip)
+
+others, ok to me...will apply.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
