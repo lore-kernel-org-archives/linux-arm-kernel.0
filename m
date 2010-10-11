@@ -1,35 +1,57 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 11 Oct 2010 15:17:21 +0300
-Subject: [PATCH 2/4] ASoC: add ep93xx AC97 audio driver
-In-Reply-To: <20101011104335.GC9231@rakim.wolfsonmicro.main>
-References: <cover.1286707213.git.mika.westerberg@iki.fi>
-	<b0202066df3bb9732fbecca627d0149165905a95.1286707213.git.mika.westerberg@iki.fi>
-	<20101011094717.GA9231@rakim.wolfsonmicro.main>
-	<20101011100742.GE27142@gw.healthdatacare.com>
-	<20101011104335.GC9231@rakim.wolfsonmicro.main>
-Message-ID: <20101011121721.GG27142@gw.healthdatacare.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 11 Oct 2010 14:17:46 +0200
+Subject: [PATCH] mxc/gpio: make _set_value work with values != 0/1
+In-Reply-To: <1286798345-32647-1-git-send-email-jacmet@sunsite.dk>
+References: <1286798345-32647-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <20101011121745.GA12849@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 11:43:36AM +0100, Mark Brown wrote:
+Hi Peter,
+
+On Mon, Oct 11, 2010 at 01:59:05PM +0200, Peter Korsgaard wrote:
+> Documentation/gpio.txt specifies that the value argument to
+> gpio_set_value() should be handled as a boolean (E.G. != 0 is high),
+> so use the same logic as in _set_direction().
 > 
-> You're doing INIT_COMPLETION every single time you use it - is that
-> really required?
-
-Ah, now I get it.
-
-It seems that while I only use complete() there is no need for
-calling INIT_COMPLETION() everytime. Will remove from the next
-version.
-
-> > Yeah, sorry about that. I had the impression that using the latest
-> > mainline would be right thing to do :( I will base the next version
-> > against that tree pointed by Jassi.
+> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+> ---
+>  arch/arm/plat-mxc/gpio.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
 > 
-> Latest mainline means you're missing any changes that are ready for the
-> next merge window, once code has gone to Linus it's bugfix only outside
-> of the merge window so actual development happens in -next.
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 57ec4a8..e226801 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -234,8 +234,13 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  	u32 l;
+>  	unsigned long flags;
+>  
+> +
 
-Understood, thanks.
+Unneeded empty line.
 
-MW
+>  	spin_lock_irqsave(&port->lock, flags);
+> -	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
+> +	l = __raw_readl(reg);
+> +	if (value)
+> +		l |= 1 << offset;
+> +	else
+> +		l &= ~(1 << offset);
+
+Alternative shorter version:
+
+l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
+
+baruch
+
+>  	__raw_writel(l, reg);
+>  	spin_unlock_irqrestore(&port->lock, flags);
+>  }
+> -- 
+> 1.7.1
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
