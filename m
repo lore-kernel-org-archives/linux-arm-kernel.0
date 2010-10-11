@@ -1,29 +1,34 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 11 Oct 2010 02:20:31 +0200
-Subject: [PATCH 13/14 RESEND] ARM: pxa: Fix pxa2xx-flash section mismatch
+Date: Mon, 11 Oct 2010 02:20:32 +0200
+Subject: [PATCH 14/14 RESEND] Remove __devinitdata from tc6393xb_mmc_resources
 In-Reply-To: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
 References: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1286756432-5873-13-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1286756432-5873-14-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This static struct resource tc6393xb_mmc_resources[] is used in resume function,
+therefore the data can not be wiped.
+
+Also, this causes a section mismatch.
+
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/mtd/maps/pxa2xx-flash.c |    2 +-
+ drivers/mfd/tc6393xb.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index dd90880..d8ae634 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
- static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
+diff --git a/drivers/mfd/tc6393xb.c b/drivers/mfd/tc6393xb.c
+index ef6c42c..1ea80d8 100644
+--- a/drivers/mfd/tc6393xb.c
++++ b/drivers/mfd/tc6393xb.c
+@@ -155,7 +155,7 @@ static struct resource __devinitdata tc6393xb_nand_resources[] = {
+ 	},
+ };
  
- 
--static int __init pxa2xx_flash_probe(struct platform_device *pdev)
-+static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
- {
- 	struct flash_platform_data *flash = pdev->dev.platform_data;
- 	struct pxa2xx_flash_info *info;
+-static struct resource __devinitdata tc6393xb_mmc_resources[] = {
++static struct resource tc6393xb_mmc_resources[] = {
+ 	{
+ 		.start	= 0x800,
+ 		.end	= 0x9ff,
 -- 
 1.7.1
