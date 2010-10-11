@@ -1,80 +1,71 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 11 Oct 2010 13:06:54 +0200
-Subject: [PATCH 7/7] sh: oprofile: Use perf-events oprofile backend
-In-Reply-To: <a0c83396f5fb8a29baff3daf43d29b2e601511ff.1286584677.git.matt@console-pimps.org>
-References: <cover.1286584677.git.matt@console-pimps.org>
-	<a0c83396f5fb8a29baff3daf43d29b2e601511ff.1286584677.git.matt@console-pimps.org>
-Message-ID: <20101011110654.GR13563@erda.amd.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Oct 2010 13:07:58 +0200
+Subject: [PATCH 4/6] mmc: sdhci_pltfm: pass more data on custom init-call
+In-Reply-To: <20100930094202.GA581@oksana.dev.rtsoft.ru>
+References: <1285790884-3516-1-git-send-email-w.sang@pengutronix.de>
+	<1285790884-3516-5-git-send-email-w.sang@pengutronix.de>
+	<19620.19198.88841.623775@ipc1.ka-ro>
+	<20100930094202.GA581@oksana.dev.rtsoft.ru>
+Message-ID: <20101011110758.GE6028@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.10 20:46:22, Matt Fleming wrote:
-> Now that we've got a generic perf-events based oprofile backend we might
-> as well make use of it seeing as SH doesn't do anything special with its
-> oprofile backend. Also introduce a new CONFIG_HW_PERF_EVENTS symbol so
-> that we can fallback to using the timer interrupt for oprofile if the
-> CPU doesn't support perf events.
+On Thu, Sep 30, 2010 at 01:42:02PM +0400, Anton Vorontsov wrote:
+> On Thu, Sep 30, 2010 at 10:31:58AM +0200, Lothar Wa?mann wrote:
+> > > The custom init call may need more data to perform its job, so we pass
+> > > it a pointer to pdata, too. Also, always use the platform_id specific
+> > > data even if platform_data is present. Doing that, platform_data can
+> > > additionally be parsed by init() for board-specific information (via
+> > > sdhci->mmc->parent).
+> > > 
+> > Why not a pointer to the platform_device itself? Then the callback
+> > function would have even more information (e.g. platform_device ID)
+> > and could easily get at the platform_data too.
 > 
-> Also, to avoid a section mismatch warning we need to annotate
-> oprofile_arch_exit() with an __exit marker.
+> dev->platform_data may not be there. There are two ways to pass
+> the "platform data" to the sdhci-pltfm driver:
 > 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> Acked-by: Paul Mundt <lethal@linux-sh.org>
-> ---
->  arch/sh/Kconfig            |   13 +++++
->  arch/sh/oprofile/Makefile  |    4 ++
->  arch/sh/oprofile/common.c  |  115 +++++++++-----------------------------------
->  arch/sh/oprofile/op_impl.h |   33 -------------
->  4 files changed, 40 insertions(+), 125 deletions(-)
->  delete mode 100644 arch/sh/oprofile/op_impl.h
+> a) via dev->platform_data
+> b) via platform_device_id->driver_data
 
-> -static int op_sh_create_files(struct super_block *sb, struct dentry *root)
-> +char *op_name_from_perf_id(void)
->  {
-> -	int i, ret = 0;
-> +	const char *pmu;
-> +	char buf[20];
-> +	int size;
->  
-> -	for (i = 0; i < model->num_counters; i++) {
-> -		struct dentry *dir;
-> -		char buf[4];
-> +	pmu = perf_pmu_name();
-> +	if (!pmu)
-> +		return NULL;
->  
-> -		snprintf(buf, sizeof(buf), "%d", i);
-> -		dir = oprofilefs_mkdir(sb, root, buf);
-> +	size = snprintf(buf, sizeof(buf), "sh/%s", pmu);
+or c) both :)
 
-Matt and Paul,
+which is the reason for the current implementation.
+platform_device_id->driver_data may still need additional information
+from the board (e.g. a write protect pin from board pcm043) while the
+larger part of the driver_data-extensions are still generic (e.g. to
+imx-esdhc).
 
-are those (upper case) cpu_type strings already supported by the
-oprofile userland?
-
--Robert
-
-> +	if (size > -1 && size < sizeof(buf))
-> +		return buf;
->  
-> -		ret |= oprofilefs_create_ulong(sb, dir, "enabled", &ctr[i].enabled);
-> -		ret |= oprofilefs_create_ulong(sb, dir, "event", &ctr[i].event);
-> -		ret |= oprofilefs_create_ulong(sb, dir, "kernel", &ctr[i].kernel);
-> -		ret |= oprofilefs_create_ulong(sb, dir, "user", &ctr[i].user);
-> -
-> -		if (model->create_files)
-> -			ret |= model->create_files(sb, dir);
-> -		else
-> -			ret |= oprofilefs_create_ulong(sb, dir, "count", &ctr[i].count);
-> -
-> -		/* Dummy entries */
-> -		ret |= oprofilefs_create_ulong(sb, dir, "unit_mask", &ctr[i].unit_mask);
-> -	}
-> -
-> -	return ret;
-> +	return NULL;
->  }
+> 
+> Technically, we can do something like this in the probe():
+> 
+> if (!pdev->dev.platform_data)
+> 	pdev->dev.platform_data = platform_device_id->driver_data;
+> 
+> pdata->init(dev);
+> 
+> Note, in this case we must also NULLify platform_data it at remove(),
+> as platform_device_release() will try to free statically allocated
+> memory.
+> 
+> Thanks,
+> 
+> -- 
+> Anton Vorontsov
+> email: cbouatmailru at gmail.com
+> irc://irc.freenode.net/bd2
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101011/f3816841/attachment.sig>
