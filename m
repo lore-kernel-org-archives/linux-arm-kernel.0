@@ -1,74 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Oct 2010 16:02:18 +0200
-Subject: [PATCH 3/3] staging: tidspbridge: remove memory consistency from
-	TODO list
-In-Reply-To: <AANLkTikq80dM_93k2byPXDexzz3J+g3Wiva3ieBbXmmf@mail.gmail.com>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-	<201010111240.25759.arnd@arndb.de>
-	<AANLkTikq80dM_93k2byPXDexzz3J+g3Wiva3ieBbXmmf@mail.gmail.com>
-Message-ID: <201010111602.18950.arnd@arndb.de>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Mon, 11 Oct 2010 17:08:23 +0300
+Subject: [PATCH 3/3] mx51: Move OTG initialisation for all boards to a
+	single file
+In-Reply-To: <20101011131009.GY28242@pengutronix.de>
+References: <cover.1286412080.git.amit.kucheria@linaro.org>
+	<2306a14fec6647b68a4aee1743a75d040ec141b1.1286412080.git.amit.kucheria@linaro.org>
+	<20101007074853.GZ28242@pengutronix.de>
+	<AANLkTimVo8uLHq4zCskBU4C_nWYiw89BxUw2FM_p3qhQ@mail.gmail.com>
+	<20101011131009.GY28242@pengutronix.de>
+Message-ID: <AANLkTinKirn9LQ9EoZWULUJ90U2rw=Qx60=q5f8C_9Hs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 October 2010, Felipe Contreras wrote:
-> On Mon, Oct 11, 2010 at 1:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Sunday 10 October 2010, Felipe Contreras wrote:
-> >> The mempool area is not handled by the kernel any more.
-> >
-> > But tidspbridge still uses ioremap to set up the mapping for RAM,
-> > even though it now is outside of the kernel linar mapping.
-> 
-> Which is what ioremap() complained about, and how Russell King
-> suggested to solve the issue.
+On Mon, Oct 11, 2010 at 4:10 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>>
+>> Do you think something like this will be better? It looks even more
+>> scattered to me, the usb configuration information is scattered across
+>> platform_data and phy_data.
+>
+> My problem is not that it's scattered around platform_data and phy_data,
+> but that it's not possible to add proper i.MX51 support without
+> introducing a initialize_otg_port which wont' be flexible enough for
+> future boards.
+>
+>>
+>> Or did you want to get rid of platform_data->init too from the driver?
+>
+> No, I think we can't do this without breaking at least some boards. I
+> found out that on some boards we have to configure the iomux pins and
+> the rest of the USB hardware in a short time frame, otherwise we get
+> ULPI errors.
+>
+> Sascha
 
-You are right that this is what Russell asked about, having a single
-mapping for memory means that you avoid the problems that the warning
-was put there for and you no longer risk memory corruption. That
-is good and the changes you did are the important ones.
+So are the original patches(v2) to consolidate initialize_otg_port()
+and introduce efikamx board support acceptable?
 
-What I'm arguing is that you still don't use the interface in the
-way it's designed and things might break again in the future.
-For instance, I've seen platforms where readl/writel is not a pointer
-dereference but a hypercall or goes through an indirect index/data
-register pair. I hope we don't ever get something like this on ARM,
-but it would still be good to write the code in a more robust way
-that doesn't mix __iomem tokens with kernel pointers.
-
-> > You should really only use ioremap on MMIO registers, nothing
-> > else. These registers are marked as __iomem pointers and can only
-> > be passed into functions that talk to the hardware like iowrite32
-> > or writel, but not used like memory.
-> 
-> From what I can see parts of this memory are also used for readl/writel.
-
-In that case, it's worse than I thought ;-)
-
-If you use readl(), it needs to be an __iomem pointer, if you use it
-by direct dereferences, it must not be __iomem.
-
-Obviously, you need to use ioremap to target the device registers,
-but I don't see how it could make sense for a communication area
-in memory.
-
-> > Please have a look at "sparse", which will warn about address space
-> > violations among other things. The tidspbridge driver is full of them,
-> > and you should fix the code that sparse warns about, which will
-> > also show you all the places where ioremap is used incorrectly.
-> 
-> In one of my branches I moved ioremap() to arch/arm/mach-omap2/dsp.c
-> and if I use sparse there, it gives no warning.
-
-I don't see how moving the code around would get rid of an address
-space warning, unless you play dirty tricks like using __force
-casts or passing pointers around as integers.
-
-> I would prefer to map the memory some other way and make it
-> non-cacheable, but I don't know any other way. Then, if readl/writel
-> are still needed, only ioremap() that area. And finally, and
-> hopefully, do cache flushes instead of requiring consistent memory.
-
-Yes, that sounds reasonable. Can you use a chunk of regular kernel
-memory with dma_map_single/dma_sync_single_for_{cpu,device} for this,
-like normal drivers do?
-
-	Arnd
+(I want to ensure I don't miss the next merge window, because Debian
+wants to use these machines as their build machines)
