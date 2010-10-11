@@ -1,33 +1,20 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
-Date: Mon, 11 Oct 2010 14:33:33 +0530
-Subject: [PATCH] ux500: The platform is not just based on early drop silicon
-	version.
-Message-ID: <1286787813-31381-1-git-send-email-srinidhi.kasagar@stericsson.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 11 Oct 2010 17:05:22 +0800
+Subject: [PATCH 02/14 v2] ARM: pxa: Access SMEMC via virtual addresses
+In-Reply-To: <1286756432-5873-2-git-send-email-marek.vasut@gmail.com>
+References: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
+	<1286756432-5873-2-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTinPrnQWDYcuTJq5Rmmq0vO1DNGfYw34r_EDDPQZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Kconfig text accordingly.
-
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-ux500/Kconfig |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 6625e5b..b48cd4e 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -21,9 +21,7 @@ config MACH_U8500_MOP
- 	bool "U8500 Development platform"
- 	select UX500_SOC_DB8500
- 	help
--	  Include support for mop500 development platform
--	  based on U8500 architecture. The platform is based
--	  on early drop silicon version of 8500.
-+	  Include support for the mop500 development platform.
- 
- config MACH_U5500
- 	bool "U5500 Development platform"
--- 
-1.6.3.3
+On Mon, Oct 11, 2010 at 8:20 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> This is important because on PXA3xx, the physical mapping of SMEMC registers
+> differs from the one on PXA2xx. In order to get PCMCIA working on both PXA2xx
+> and PXA320, the PCMCIA driver was adjusted accordingly as well.
+>
+> Also, various places in the kernel had to be patched to use
+> __raw_read/__raw_write.
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
