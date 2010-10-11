@@ -1,98 +1,117 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 11 Oct 2010 10:35:08 +0200
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
-References: <20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
-	<20101009092127.GB20975@n2100.arm.linux.org.uk>
-	<AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
-Message-ID: <20101011083508.GW29673@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 11 Oct 2010 10:45:07 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <1286785900.3101.9.camel@sven>
+References: <1286177435.2140.5.camel@sven> <201010072323.05218.rjw@sisk.pl>
+	<1286526197.4493.19.camel@sven> <201010082208.25767.rjw@sisk.pl>
+	<AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
+	<1286785900.3101.9.camel@sven>
+Message-ID: <AANLkTinf-8jeaV6GZ2+pQ2FztrXDv7QhEn3brPN3osBT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
- 
-On Sun, Oct 10, 2010 at 04:52:36AM +0300, Felipe Contreras wrote:
-> On Sat, Oct 9, 2010 at 12:21 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > static unsigned long reserve_mem(struct meminfo *mi, unsigned long size)
-> > {
-> > ? ? ? ?unsigned long addr = ~0;
-> > ? ? ? ?int i;
-> >
-> > ? ? ? ?for (i = mi->nr_banks - 1; i >= 0; i--)
-> > ? ? ? ? ? ? ? ?if (mi->bank[i].size >= size) {
-> > ? ? ? ? ? ? ? ? ? ? ? ?mi->bank[i].size -= size;
-> > ? ? ? ? ? ? ? ? ? ? ? ?addr = mi->bank[i].start + mi->bank[i].size;
-> > ? ? ? ? ? ? ? ? ? ? ? ?break;
-> > ? ? ? ? ? ? ? ?}
-> >
-> > ? ? ? ?return addr;
-> > }
-> >
-> > static void __init my_fixup(struct machine_desc *desc, struct tag *tags,
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ?char **cmdline, struct meminfo *mi)
-> > {
-> > ? ? ? ?omapfb_buffer_phys = reserve_mem(mi, 32*1048576);
-> > ? ? ? ?if (omapfb_buffer_phys == ~0)
-> > ? ? ? ? ? ? ? ?pr_warn("Unable to allocate omapfb buffer\n");
-> > }
-> >
-> > Then later:
-> >
-> > ? ? ? ?omapfb_buffer = ioremap(omapfb_buffer_phys, 32*1048576);
-> >
-> > That's a damned simple and direct implementation of exactly what I
-> > described, and results in something which is much more architecturally
-> > correct than what's going on today.
-> 
-> I tried this, it doesn't work.
-Ack, didn't work.  I tried it for arch/arm/mach-mx3/mach-pcm037.c.
+On Mon, Oct 11, 2010 at 10:31 AM, Sven Neumann <s.neumann@raumfeld.com> wrote:
+> On Sat, 2010-10-09 at 03:07 +0200, Ohad Ben-Cohen wrote:
+>> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+>> index c94565d..515ff39 100644
+>> --- a/drivers/mmc/core/core.c
+>> +++ b/drivers/mmc/core/core.c
+>> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+>> ? ? ? ? if (host->bus_ops && !host->bus_dead) {
+>> ? ? ? ? ? ? ? ? if (host->bus_ops->suspend)
+>> ? ? ? ? ? ? ? ? ? ? ? ? err = host->bus_ops->suspend(host);
+>> + ? ? ? ? ? ? ? if (err == -ENOSYS || !host->bus_ops->resume) {
+>> + ? ? ? ? ? ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ? ? ? ? ? ?* We simply "remove" the card in this case.
+>> + ? ? ? ? ? ? ? ? ? ? ? ?* It will be redetected on resume.
+>> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? ? ? ? ? ? if (host->bus_ops->remove)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->bus_ops->remove(host);
+>> + ? ? ? ? ? ? ? ? ? ? ? mmc_claim_host(host);
+>> + ? ? ? ? ? ? ? ? ? ? ? mmc_detach_bus(host);
+>> + ? ? ? ? ? ? ? ? ? ? ? mmc_release_host(host);
+>> + ? ? ? ? ? ? ? ? ? ? ? host->pm_flags = 0;
+>> + ? ? ? ? ? ? ? ? ? ? ? err = 0;
+>> + ? ? ? ? ? ? ? }
+>> ? ? ? ? }
+>> ? ? ? ? mmc_bus_put(host);
+>>
+>> The reason I'm asking this is because it seems like commit
+>> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related
+>> to mmc/sd card insert/removal during suspend/resume" has broken
+>> suspending SDIO function drivers which don't have a suspend handler
+>> (or do have one, but for some reason it returns -ENOSYS, like
+>> libertas_sdio's does).
+>
+> Yes, this patch fixes the problem. Tested with v2.6.35-rc7. With above
+> patch applied, suspend (and resume!) work again with and without
+> pm_async=0.
+>
+> Thanks a lot to all of you for your help with this problem.
 
-> 
-> At the time 'fixup' is called, 'meminfo' is empty; the tags haven't
-> been parsed. So my solution is to move the memblock_add() after
-> 'reserve', and pass 'meminfo' as an argument:
-> 
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi,
-> struct machine_desc *mdesc)
->         int i;
-> 
->         memblock_init();
-> -       for (i = 0; i < mi->nr_banks; i++)
-> -               memblock_add(mi->bank[i].start, mi->bank[i].size);
-> 
->         /* Register the kernel text, kernel data and initrd with memblock. */
->  #ifdef CONFIG_XIP_KERNEL
-> @@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi,
-> struct machine_desc *mdesc)
-> 
->         /* reserve any platform specific memblock areas */
->         if (mdesc->reserve)
-> -               mdesc->reserve();
-> +               mdesc->reserve(mi);
-> +
-> +       for (i = 0; i < mi->nr_banks; i++)
-> +               memblock_add(mi->bank[i].start, mi->bank[i].size);
-> 
->         memblock_analyze();
->         memblock_dump_all();
-Alternatively when calling fixup only after parse_tags in setup_arch()
-it worked.  But I guess this change is not for discussion.
-OTOH I wonder why fixup gets passed meminfo.  It's not very useful if
-it's not yet filled.
+Thanks a lot for testing this Sven !
 
-Best regards
-Uwe
+It is completely fixing the regression, but I must say the end result
+is not very beautiful. We may eventually still use it, at least as an
+interim solution, but I'd at least like to explain what's going on
+here.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Patch 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs
+related to mmc/sd card insert/removal during suspend/resume" (which
+was introduced in 2.6.36 and backported to stable kernels) moved the
+card remove/insert mechanism out of the suspend/resume path and into
+mmc_pm_notify (which uses pm notifiers; needed in order to let user
+space sync the card upon removal).
+
+It broke (part of) SDIO suspend because SDIO relied on
+mmc_suspend_host() to remove the card, and squash the error, in case
+-ENOSYS is returned from the bus suspend handler (mmc_sdio_suspend()
+in this case).
+
+mmc_sdio_suspend() is using this whenever one of the card's SDIO
+function drivers does not have suspend/resume handlers - in that case
+it is agreed to force removal of the entire card.
+
+So the trivial thing to do here was to bring back that part of
+mmc_suspend_host(), which was removed by
+4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e.
+
+The reason I said the end result is not too beautiful is because now
+we have two places in the mmc suspend execution path that can remove
+the card: mmc_pm_notify and mmc_suspend_host, where the second is
+probably useful only for SDIO. The card re-insertion, btw, will only
+take place in mmc_pm_notify, and be used by all scenarios (so it's
+becoming asymmetric for SDIO).
+
+To use mmc_pm_notify's card-removal code also for SDIO, we need to
+check there if all the SDIO functions have suspend handlers. That
+would probably make us add a new bus_ops handler (something like
+host->bus_ops->remove_card_on_suspend ?).
+
+It's starting to be a bit complicated though, and I'm not sure it
+would make the code a lot more readable.
+
+And, it would still not work for drivers like libertas sdio, which do
+have a suspend hander, but sometimes let it return -ENOSYS, expecting
+the MMC core to remove the card and squash the error. For those cases,
+we still need the old card-removal logic in mmc_suspend_host().
+
+Btw, it makes me wonder: does libertas_sdio really needs this
+functionality ? When MMC_PM_KEEP_POWER is not needed, why can't
+libertas_sdio just return 0 (and as a result the card will be powered
+off, but not removed) ?
+
+To sum up, I think we can begin with taking this patch, at least as an
+interim solution, and take the discussion of making the whole thing
+more elegant to linux-mmc.
+
+If that's agreed, I'll send that patch again with a decent commit
+message, so we can take it to 2.6.36 and stable kernels.
+
+>
+>
+> Regards,
+> Sven
+>
+>
+>
