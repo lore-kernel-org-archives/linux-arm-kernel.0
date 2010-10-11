@@ -1,33 +1,44 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 11 Oct 2010 18:28:37 +0200
-Subject: [PATCH] mx51: add resources for SD/MMC on i.MX51
-In-Reply-To: <1286813142-14936-1-git-send-email-eric@eukrea.com>
-References: <1286813142-14936-1-git-send-email-eric@eukrea.com>
-Message-ID: <20101011162837.GA476@pengutronix.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 11 Oct 2010 17:32:55 +0100
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20101011163255.GA21335@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 06:05:42PM +0200, Eric B?nard wrote:
-> the attached patch allows SD to work on i.MX51 with Wolfram's drivers
-> Tested on i.MX51.
-> 
-> From: Richard Zhu <r65037@freescale.com>
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
+Hi Wolfram,
 
-Hmm, Uwe had some (valid IMHO) comments about this patch which have not all
-been addressed so far. Richard, are you still working on this?
+On Mon, Oct 11, 2010 at 04:21:00PM +0200, Wolfram Sang wrote:
+> Wolfram Sang (6):
+>   mmc: sdhci-pltfm: Add structure for host-specific data
+>   mmc: sdhci-pltfm: move .h-file into apropriate subdir
+>   mmc: sdhci: introduce private get_ro
+>   mmc: sdhci_pltfm: pass more data on custom init-call
+>   mmc: sdhci-of-esdhc: factor out common stuff
+>   mmc: sdhci-pltfm: add pltfm-driver for imx35/51
 
-Regards,
+Mind fixing up the >80 char lines in the last two patches?  It's just:
 
-   Wolfram
+WARNING: line over 80 characters
+#79: FILE: drivers/mmc/host/sdhci-esdhc.h:54:
++	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
+
+WARNING: line over 80 characters
+#99: FILE: drivers/mmc/host/sdhci-esdhc.h:74:
++		  (div << ESDHC_DIVIDER_SHIFT) | (pre_div << ESDHC_PREDIV_SHIFT));
+
+
+WARNING: line over 80 characters
+#86: FILE: drivers/mmc/host/sdhci-esdhc-imx.c:24:
++static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, int reg)
+
+WARNING: line over 80 characters
+#164: FILE: drivers/mmc/host/sdhci-esdhc-imx.c:102:
++static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
+
+Thanks,
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101011/a0c2ff0c/attachment.sig>
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
