@@ -1,7 +1,7 @@
-From: mail@pawelmoll.com (Pawel Moll)
-Date: Mon, 11 Oct 2010 12:01:50 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Oct 2010 12:03:38 +0100
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
+In-Reply-To: <b7d9a97c0eda73281b49c9a7744f5569@cox.rootnode.net>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 	<20101007192245.GC26435@n2100.arm.linux.org.uk>
 	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
@@ -14,16 +14,17 @@ References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 	<20101009002546.GB14675@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
 	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <b7d9a97c0eda73281b49c9a7744f5569@cox.rootnode.net>
+	<b7d9a97c0eda73281b49c9a7744f5569@cox.rootnode.net>
+Message-ID: <1286795018.19739.32.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 2010-10-11 at 12:01 +0100, Pawel Moll wrote:
+> > +                 (mtype != MT_DEVICE_CACHED || mtype != MT_DEVICE_WC))
+> 
+> Em, am I wrong or this expression _always_ evaluates as 1? ;-)
 
-> +		    (mtype != MT_DEVICE_CACHED || mtype != MT_DEVICE_WC))
+Should be '&&'. Thanks.
 
-Em, am I wrong or this expression _always_ evaluates as 1? ;-)
-
-Cheers!
-
-Pawe?
+-- 
+Catalin
