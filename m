@@ -1,64 +1,98 @@
-From: s.neumann@raumfeld.com (Sven Neumann)
-Date: Mon, 11 Oct 2010 10:31:40 +0200
-Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
-In-Reply-To: <AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
-References: <1286177435.2140.5.camel@sven> <201010072323.05218.rjw@sisk.pl>
-	<1286526197.4493.19.camel@sven> <201010082208.25767.rjw@sisk.pl>
-	<AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
-Message-ID: <1286785900.3101.9.camel@sven>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Oct 2010 10:35:08 +0200
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
+References: <20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
+	<20101009092127.GB20975@n2100.arm.linux.org.uk>
+	<AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
+Message-ID: <20101011083508.GW29673@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-10-09 at 03:07 +0200, Ohad Ben-Cohen wrote:
-> On Fri, Oct 8, 2010 at 10:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > There is a problem with the pxa2xx-mci.0 suspend that has been introduced
-> > some time after 2.6.34, but it is not related to commit 152e1d5920.
+Hello,
+ 
+On Sun, Oct 10, 2010 at 04:52:36AM +0300, Felipe Contreras wrote:
+> On Sat, Oct 9, 2010 at 12:21 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > static unsigned long reserve_mem(struct meminfo *mi, unsigned long size)
+> > {
+> > ? ? ? ?unsigned long addr = ~0;
+> > ? ? ? ?int i;
+> >
+> > ? ? ? ?for (i = mi->nr_banks - 1; i >= 0; i--)
+> > ? ? ? ? ? ? ? ?if (mi->bank[i].size >= size) {
+> > ? ? ? ? ? ? ? ? ? ? ? ?mi->bank[i].size -= size;
+> > ? ? ? ? ? ? ? ? ? ? ? ?addr = mi->bank[i].start + mi->bank[i].size;
+> > ? ? ? ? ? ? ? ? ? ? ? ?break;
+> > ? ? ? ? ? ? ? ?}
+> >
+> > ? ? ? ?return addr;
+> > }
+> >
+> > static void __init my_fixup(struct machine_desc *desc, struct tag *tags,
+> > ? ? ? ? ? ? ? ? ? ? ? ? ? ?char **cmdline, struct meminfo *mi)
+> > {
+> > ? ? ? ?omapfb_buffer_phys = reserve_mem(mi, 32*1048576);
+> > ? ? ? ?if (omapfb_buffer_phys == ~0)
+> > ? ? ? ? ? ? ? ?pr_warn("Unable to allocate omapfb buffer\n");
+> > }
+> >
+> > Then later:
+> >
+> > ? ? ? ?omapfb_buffer = ioremap(omapfb_buffer_phys, 32*1048576);
+> >
+> > That's a damned simple and direct implementation of exactly what I
+> > described, and results in something which is much more architecturally
+> > correct than what's going on today.
 > 
-> Sven, what type of card do you have in that slot ? is it SDIO ? what's
-> the function driver ?
-> 
-> I have a hunch about this, but it may be a wild guess as I don't know
-> what's your setup exactly.
-> 
-> Anyway, can you please try this and see if anything changes ?
-> 
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index c94565d..515ff39 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
->         if (host->bus_ops && !host->bus_dead) {
->                 if (host->bus_ops->suspend)
->                         err = host->bus_ops->suspend(host);
-> +               if (err == -ENOSYS || !host->bus_ops->resume) {
-> +                       /*
-> +                        * We simply "remove" the card in this case.
-> +                        * It will be redetected on resume.
-> +                        */
-> +                       if (host->bus_ops->remove)
-> +                               host->bus_ops->remove(host);
-> +                       mmc_claim_host(host);
-> +                       mmc_detach_bus(host);
-> +                       mmc_release_host(host);
-> +                       host->pm_flags = 0;
-> +                       err = 0;
-> +               }
->         }
->         mmc_bus_put(host);
-> 
-> The reason I'm asking this is because it seems like commit
-> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related
-> to mmc/sd card insert/removal during suspend/resume" has broken
-> suspending SDIO function drivers which don't have a suspend handler
-> (or do have one, but for some reason it returns -ENOSYS, like
-> libertas_sdio's does).
+> I tried this, it doesn't work.
+Ack, didn't work.  I tried it for arch/arm/mach-mx3/mach-pcm037.c.
 
-Yes, this patch fixes the problem. Tested with v2.6.35-rc7. With above
-patch applied, suspend (and resume!) work again with and without
-pm_async=0.
+> 
+> At the time 'fixup' is called, 'meminfo' is empty; the tags haven't
+> been parsed. So my solution is to move the memblock_add() after
+> 'reserve', and pass 'meminfo' as an argument:
+> 
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -272,8 +272,6 @@ void __init arm_memblock_init(struct meminfo *mi,
+> struct machine_desc *mdesc)
+>         int i;
+> 
+>         memblock_init();
+> -       for (i = 0; i < mi->nr_banks; i++)
+> -               memblock_add(mi->bank[i].start, mi->bank[i].size);
+> 
+>         /* Register the kernel text, kernel data and initrd with memblock. */
+>  #ifdef CONFIG_XIP_KERNEL
+> @@ -295,7 +293,10 @@ void __init arm_memblock_init(struct meminfo *mi,
+> struct machine_desc *mdesc)
+> 
+>         /* reserve any platform specific memblock areas */
+>         if (mdesc->reserve)
+> -               mdesc->reserve();
+> +               mdesc->reserve(mi);
+> +
+> +       for (i = 0; i < mi->nr_banks; i++)
+> +               memblock_add(mi->bank[i].start, mi->bank[i].size);
+> 
+>         memblock_analyze();
+>         memblock_dump_all();
+Alternatively when calling fixup only after parse_tags in setup_arch()
+it worked.  But I guess this change is not for discussion.
+OTOH I wonder why fixup gets passed meminfo.  It's not very useful if
+it's not yet filled.
 
-Thanks a lot to all of you for your help with this problem.
+Best regards
+Uwe
 
-
-Regards,
-Sven
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
