@@ -1,50 +1,37 @@
 From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 11 Oct 2010 22:05:38 +0300
-Subject: [PATCH 2/3] omap: dsp: fix ioremap() usage
-In-Reply-To: <496565EC904933469F292DDA3F1663E602F47B2BCD@dlee06.ent.ti.com>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-	<1286732440-28644-3-git-send-email-felipe.contreras@gmail.com>
-	<496565EC904933469F292DDA3F1663E602F47B2BCD@dlee06.ent.ti.com>
-Message-ID: <AANLkTinMhMJhTYoG7TRPUtb8DkTc8hCyH+GWEfKFD80d@mail.gmail.com>
+Date: Mon, 11 Oct 2010 22:13:33 +0300
+Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+In-Reply-To: <496565EC904933469F292DDA3F1663E602F47B2C14@dlee06.ent.ti.com>
+References: <1286790830-13505-1-git-send-email-felipe.contreras@gmail.com>
+	<1286790830-13505-2-git-send-email-felipe.contreras@gmail.com>
+	<20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
+	<AANLkTikEC9yJuAZPr25+8F7Cggce3qO2b5aCz-7cQPd9@mail.gmail.com>
+	<496565EC904933469F292DDA3F1663E602F47B2C14@dlee06.ent.ti.com>
+Message-ID: <AANLkTinFRnT9UrNfppG-P26DmfNPv413wBu39utMxred@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 6:15 PM, Guzman Lugo, Fernando
+On Mon, Oct 11, 2010 at 6:54 PM, Guzman Lugo, Fernando
 <fernando.lugo@ti.com> wrote:
->> +#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
->> +
->> +static phys_addr_t omap_dsp_mempool_base;
->> +
->> +static void __init omap_dsp_reserve_mem(struct meminfo *mi) {
->> + ? ? phys_addr_t size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
->> + ? ? phys_addr_t addr = ~0;
->> + ? ? int i;
->> +
->> + ? ? if (!size)
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? for (i = mi->nr_banks - 1; i >= 0; i--)
->> + ? ? ? ? ? ? if (mi->bank[i].size >= size) {
->> + ? ? ? ? ? ? ? ? ? ? mi->bank[i].size -= size;
->> + ? ? ? ? ? ? ? ? ? ? addr = mi->bank[i].start + mi->bank[i].size;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? }
+>> Once the iommu migration works (haven't managed to get it
+>> working myself), and it has been merged into mainline, then
+>> we can think about enabling it unconditionally. In the
+>> meantime, enabling unconditionally would break the
+>> tidspbridge that is in staging (mainline).
 >
-> Missing {} in "for" lopp. Even tough you are checking for success inside
-> For loop why check again outside? And also not need to define addr.
-> What do you think about this:
+> What is the problem enabling unconditionally?
+>
+> The iva2 iommu does not start working until you call iommu_get.
+> So if for some reason you are using the dspbridge with custom
+> Iommu implementation it should not cause any collision with
+> Iommu module.
 
-It comes directly from Russell's code:
-http://article.gmane.org/gmane.linux.kernel/1046606
+Read the code below (omap_iommu_init), the resources are registered so
+nobody else can use them. This caused problems multiple times inside
+Nokia, which is what motivated to write the patch in the first
+place[1].
 
-But I do prefer to add the braces. Your proposed patch is ok, although
-I prefer to have the important code at the end of the function, and
-the error check before that.
-
-Anyway, Russell has come with a different approach, so I have to try
-that instead.
-
-Cheers.
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/58302/focus=58305
 
 -- 
 Felipe Contreras
