@@ -1,142 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 11 Oct 2010 14:47:56 +0900
-Subject: [PATCH v4 2/2] sdhci-s3c: Add support no internal clock divider in
-	host controller
-Message-ID: <1286776076-24970-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 11 Oct 2010 16:23:11 +0900
+Subject: [PATCH v2]  ARM: S5PC210: I2C devices updates
+In-Reply-To: <1286455601-25360-1-git-send-email-m.szyprowski@samsung.com>
+References: <1286455601-25360-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <009101cb6915$2c89f720$859de560$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeongbae Seo <jeongbae.seo@samsung.com>
+Marek Szyprowski wrote:
+> 
+> Hello,
+> 
+> This is an updated version of I2C patches posted by Kyungmin Park in
+> '[PATCH 0/7] ARM: S5PC210: I2C devices support and Universal board
+> updates' thread.
+> 
+> All issues related to i2c device definitions reported by Kukjin Kim have
+> been fixed. We also merged some of the patches together to avoid build
+> breaks.
+> 
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> 
+> ---
+> 
+> Patch summary:
+> 
+> Kyungmin Park (3):
+>   ARM: S5PC110: Fix wrong interrupt I2C2 and I2C3 number
+>   ARM: S5PC210: Define address & interrupt for all I2C blocks
+>   ARM: S5PC210: add I2C{3, 4, 5, 6, 7} device support
+> 
+>  arch/arm/mach-s5pv210/include/mach/irqs.h |    4 +-
+>  arch/arm/mach-s5pv310/Kconfig             |   25 +++++++++++
+>  arch/arm/mach-s5pv310/Makefile            |    5 ++
+>  arch/arm/mach-s5pv310/include/mach/irqs.h |    7 +++
+>  arch/arm/mach-s5pv310/include/mach/map.h  |   11 ++++-
+>  arch/arm/mach-s5pv310/setup-i2c3.c        |   25 +++++++++++
+>  arch/arm/mach-s5pv310/setup-i2c4.c        |   25 +++++++++++
+>  arch/arm/mach-s5pv310/setup-i2c5.c        |   25 +++++++++++
+>  arch/arm/mach-s5pv310/setup-i2c6.c        |   25 +++++++++++
+>  arch/arm/mach-s5pv310/setup-i2c7.c        |   25 +++++++++++
+>  arch/arm/plat-samsung/Kconfig             |   25 +++++++++++
+>  arch/arm/plat-samsung/Makefile            |    5 ++
+>  arch/arm/plat-samsung/dev-i2c2.c          |    4 +-
+>  arch/arm/plat-samsung/dev-i2c3.c          |   68
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/dev-i2c4.c          |   68
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/dev-i2c5.c          |   68
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/dev-i2c6.c          |   68
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/dev-i2c7.c          |   68
+> +++++++++++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/iic.h  |    5 ++
+>  19 files changed, 550 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c3.c
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c4.c
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c5.c
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c6.c
+>  create mode 100644 arch/arm/mach-s5pv310/setup-i2c7.c
+>  create mode 100644 arch/arm/plat-samsung/dev-i2c3.c
+>  create mode 100644 arch/arm/plat-samsung/dev-i2c4.c
+>  create mode 100644 arch/arm/plat-samsung/dev-i2c5.c
+>  create mode 100644 arch/arm/plat-samsung/dev-i2c6.c
+>  create mode 100644 arch/arm/plat-samsung/dev-i2c7.c
+> 
+> --
 
-This patch adds to support no internal clock divider in SDHCI.
-The external clock divider can be used to make a proper clock
-because SDHCI doesn't support internal clock divider by itself.
+Ok...will apply...but we need to sort out this next time.
+And need to change C100 IRQ names...will submit it myself.
 
-If external clock divider type is selected, some functions related
-with clock control will be overridened by other functions.
+Thanks.
 
-The current clock control index is added to let you know which
-clock bus is used for SDHCI when using overriding functions.
-
-The checking functions is added into sdhci_s3c_consider_clock,
-because clock divider step is different from that of host controller.
-
-Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-Changes since v3:
-- Modified comparision condition as per Kyungmin Park's suggestion
-
-Changes since v2:
-- Changed clock control method to overriding from using quirk
-- This patch is referred from that of Jaehoon Chung's support non-standard clock setting
-
-Changes since v1:
-- Separated to each topic
-
-NOTE :
-- This patch depends on following.
-  [PATCH 4/5] ARM: SAMSUNG : Add clock types into platform data
-
- drivers/mmc/host/sdhci-s3c.c |   62 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 62 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index a7710f5..e7208f6 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -130,6 +130,15 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
- 	if (!clksrc)
- 		return UINT_MAX;
- 
-+	/*
-+	 * Clock divider's step is different as 1 from that of host controller
-+	 * when 'clk_type' is S3C_SDHCI_CLK_DIV_EXTERNAL.
-+	 */
-+	if (ourhost->pdata->clk_type == S3C_SDHCI_CLK_DIV_EXTERNAL) {
-+		rate = clk_round_rate(clksrc, wanted);
-+		return wanted - rate;
-+	}
-+
- 	rate = clk_get_rate(clksrc);
- 
- 	for (div = 1; div < 256; div *= 2) {
-@@ -232,6 +241,42 @@ static unsigned int sdhci_s3c_get_min_clock(struct sdhci_host *host)
- 	return min;
- }
- 
-+/* sdhci_cmu_get_max_clk - callback to get maximum clock frequency.*/
-+static unsigned int sdhci_cmu_get_max_clock(struct sdhci_host *host)
-+{
-+	struct sdhci_s3c *ourhost = to_s3c(host);
-+
-+	return clk_round_rate(ourhost->clk_bus[ourhost->cur_clk], UINT_MAX);
-+}
-+
-+/* sdhci_cmu_get_min_clock - callback to get minimal supported clock value. */
-+static unsigned int sdhci_cmu_get_min_clock(struct sdhci_host *host)
-+{
-+	struct sdhci_s3c *ourhost = to_s3c(host);
-+
-+	/*
-+	 * initial clock can be in the frequency range of
-+	 * 100KHz-400KHz, so we set it as max value.
-+	 */
-+	return clk_round_rate(ourhost->clk_bus[ourhost->cur_clk], 400000);
-+}
-+
-+/* sdhci_cmu_set_clock - callback on clock change.*/
-+static void sdhci_cmu_set_clock(struct sdhci_host *host, unsigned int clock)
-+{
-+	struct sdhci_s3c *ourhost = to_s3c(host);
-+
-+	/* don't bother if the clock is going off */
-+	if (clock == 0)
-+		return;
-+
-+	sdhci_s3c_set_clock(host, clock);
-+
-+	clk_set_rate(ourhost->clk_bus[ourhost->cur_clk], clock);
-+
-+	host->clock = clock;
-+}
-+
- static struct sdhci_ops sdhci_s3c_ops = {
- 	.get_max_clock		= sdhci_s3c_get_max_clk,
- 	.set_clock		= sdhci_s3c_set_clock,
-@@ -361,6 +406,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 
- 		clks++;
- 		sc->clk_bus[ptr] = clk;
-+
-+		/*
-+		 * save current clock index to know which clock bus
-+		 * is used later in overriding functions.
-+		 */
-+		sc->cur_clk = ptr;
-+
- 		clk_enable(clk);
- 
- 		dev_info(dev, "clock source %d: %s (%ld Hz)\n",
-@@ -427,6 +479,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	/* HSMMC on Samsung SoCs uses SDCLK as timeout clock */
- 	host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
- 
-+	/*
-+	 * If controller does not have internal clock divider,
-+	 * we can use overriding functions instead of default.
-+	 */
-+	if (pdata->clk_type) {
-+		sdhci_s3c_ops.set_clock = sdhci_cmu_set_clock;
-+		sdhci_s3c_ops.get_min_clock = sdhci_cmu_get_min_clock;
-+		sdhci_s3c_ops.get_max_clock = sdhci_cmu_get_max_clock;
-+	}
-+
- 	/* It supports additional host capabilities if needed */
- 	if (pdata->host_caps)
- 		host->mmc->caps |= pdata->host_caps;
--- 
-1.6.2.5
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
