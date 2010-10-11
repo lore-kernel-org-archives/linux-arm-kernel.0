@@ -1,33 +1,33 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 11 Oct 2010 22:45:55 +0530
-Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
-In-Reply-To: <20101011082535.GA26355@n2100.arm.linux.org.uk>
-References: <4B91A39F.8050502@am.sony.com>
-	<20100306201849.GD13262@n2100.arm.linux.org.uk>
-	<AANLkTi=apGYBSSr4RK+ZZievacJRcOxrwW_o_hz85P0h@mail.gmail.com>
-	<20101009193757.GB28183@n2100.arm.linux.org.uk>
-	<20101010220603.GA2723@debian>
-	<20101011082535.GA26355@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=33EUPFLzTr3zRHL1+CEm7JpqU18cFzzmpbAsG@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Oct 2010 10:30:23 -0700
+Subject: [PATCH v4 0/4] LogicPD minimal board support for LV_SOM and
+	Torpedo
+In-Reply-To: <4CAFB747.5020606@logicpd.com>
+References: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
+	<20100928171908.GE3117@atomide.com>
+	<201010090155.25932.linz@li-pro.net> <4CAFB747.5020606@logicpd.com>
+Message-ID: <20101011173023.GB25462@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 1:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> And now to go back to the original question I asked: What is __irq_entry
-> used for?
+* Tim Nordell <tim.nordell@logicpd.com> [101008 17:20]:
+> Hi Stephan,
+> 
+> I do indeed work for LogicPD.  I was asked to take over the patch
+> submission process from Jacob Tanenbaum from early August (I don't know
+> if you saw those patches), and hence I was the last one to submit
+> patches off to the community.
+> 
+> On 10/08/10 18:55, Stephan Linz wrote:
+> > 
+> > nice to see my patches here on the Linux mailinglists. I have not been working 
+> > on it for a long time.
 
-It's used to identify when we're inside the interrupt handling path.
-Depending upon the tracing options ("funcgraph-irqs"), this can be
-excluded from the trace output.
+Uhh, so whose patches are these originally?
 
-> If it's to identify those functions which can't be traced through because
-> of the stack layout, that's true of all __exception marked functions -
-> so we might as well make the linker symbols for irqentry alias the
-> exception text symbols.
->
-> I see nothing special of just the three functions you mention that warrant
-> them being handled separately by ftrace.
+We have them now queued with Tim Nordell as the author. Please let me know
+ASAP if you want me to change that.
 
-See above.  The funcgraph-irqs option is supposed to only affect the
-interrupt handling path, not all exception handling.
+Regards,
+
+Tony
