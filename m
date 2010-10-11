@@ -1,46 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 11 Oct 2010 14:54:31 +0200
-Subject: [PATCH] mxc/gpio: make _set_value work with values != 0/1
-In-Reply-To: <877hhoopzm.fsf@macbook.be.48ers.dk>
-References: <1286798345-32647-1-git-send-email-jacmet@sunsite.dk>
-	<20101011121745.GA12849@jasper.tkos.co.il>
-	<87bp70or4r.fsf@macbook.be.48ers.dk>
-	<20101011123903.GU28242@pengutronix.de>
-	<877hhoopzm.fsf@macbook.be.48ers.dk>
-Message-ID: <20101011125431.GX28242@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Oct 2010 13:54:38 +0100
+Subject: Own syscall implementation
+In-Reply-To: <AANLkTinkx11iDEh2HAagdaER9yShQKmh1oSbMgRHMyyo@mail.gmail.com>
+References: <AANLkTinkx11iDEh2HAagdaER9yShQKmh1oSbMgRHMyyo@mail.gmail.com>
+Message-ID: <20101011125438.GE27153@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 02:47:41PM +0200, Peter Korsgaard wrote:
-> >>>>> "Sascha" == Sascha Hauer <s.hauer@pengutronix.de> writes:
+On Mon, Oct 11, 2010 at 02:52:04PM +0300, Oleg Kutkov wrote:
+> Hello.
 > 
-> Hi,
+> My name is Oleg and i'm newbie in a arm-kernel.
+> I doing experiments with kernel and trying to add my own syscall.
+> What i'm done:
+> 1. Added somewhere this code:
 > 
->  Baruch> Alternative shorter version:
->  Baruch> l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
+> asmlinkage long sys_mycall(int call, unsigned long __user *args);
 > 
->  Sascha> This is shorter but I find this significantly harder to read and I bet
->  Sascha> the compiler generates the same code from both versions.
+> SYSCALL_DEFINE2(mycall, int, call, unsigned long __user *, args)
+> {
+>       unsigned long a[6];
 > 
-> Agreed.
+>    if (err = copy_from_user(a, args, nargs[call])) {
+>        return -EFAULT;
+>    }
 > 
->  >> Well, what do you know - I seem to be outnumbered ;)
->  >> 
->  >> Sasha, do you want the !! version instead? Then I'll resend.
-> 
->  Sascha> I like the !! version. The only problem with this is that people tend
->  Sascha> to try to remove the !! as it looks like a noop at first sight.
-> 
-> So what then? Do you want me to change to !!, resend with the extra
-> empty line removed or just let you remove the line when you apply it?
+>        ///some cool work///
+> }
 
-If noone replies with '!! totally sucks' within 2 minutes just send a
-patch which changes it to !! and removes the extra empty line.
 
-Sascha
+That's fine, except that there's no bounds checking for the value of
+'call', which if it were negative or a large positive number would
+overflow the nargs array.  You're also not propagating the error back.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 2. Added to calls.S my function (but i'm not really understand what this :( )
+> 
+> .long sys_mycall
+
+You don't say what kernel version.
+
+> 3. And finally define in unistd.h:
+> 
+> #define __NR_mycall                    (__NR_SYSCALL_BASE+312)
+
+As 312 is already taken (we're now up to 369), and you're using .long, I
+can only assume this is quite an old kernel...  Modern kernels use CALL()
+in calls.S to ensure that the number of syscalls are properly counted.
+
+Note that this is a problem to people adding random new syscalls - they'll
+get in the way of future additions to the kernel, and in some cases, glibc
+probes for support for syscalls by trying to call them.
+
+So it's really not a good idea to create new syscalls for production code.
+It's usually safer to write something like a char device driver and use
+the read/write/ioctl methods instead.
+
+> Everything is good, but when some one calls me from userspace - i
+> receiving garbage in args and copy_from_user is failed to copy data...
+
+Have you checked the value of 'call' and nargs[call] ?  Note that
+copy_from_user() takes the number of _bytes_ to copy, not the number
+of arguments.
