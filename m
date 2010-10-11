@@ -1,85 +1,52 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Mon, 11 Oct 2010 11:18:10 +0200
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <a72a7968f5e3f64a26875457a7451b34f896f5ae.1286584677.git.matt@console-pimps.org>
-References: <cover.1286584677.git.matt@console-pimps.org>
-	<a72a7968f5e3f64a26875457a7451b34f896f5ae.1286584677.git.matt@console-pimps.org>
-Message-ID: <20101011091809.GQ13563@erda.amd.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Oct 2010 11:24:24 +0200
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101011090212.GA27153@n2100.arm.linux.org.uk>
+References: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
+	<20101009092127.GB20975@n2100.arm.linux.org.uk>
+	<AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
+	<20101011083508.GW29673@pengutronix.de>
+	<20101011090212.GA27153@n2100.arm.linux.org.uk>
+Message-ID: <20101011092424.GX29673@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.10 20:46:17, Matt Fleming wrote:
-> Introduce perf_pmu_name() helper function that returns the name of the
-> pmu. This gives us a generic way to get the name of a pmu regardless of
-> how an architecture identifies it internally.
+On Mon, Oct 11, 2010 at 10:02:12AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 11, 2010 at 10:35:08AM +0200, Uwe Kleine-K?nig wrote:
+> > Alternatively when calling fixup only after parse_tags in setup_arch()
+> > it worked.  But I guess this change is not for discussion.
+> > OTOH I wonder why fixup gets passed meminfo.  It's not very useful if
+> > it's not yet filled.
 > 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-
-Peter, I need your ack here.
-
-Thanks,
-
--Robert
-
-> ---
->  arch/sh/kernel/perf_event.c |    9 +++++++++
->  include/linux/perf_event.h  |    1 +
->  kernel/perf_event.c         |    5 +++++
->  3 files changed, 15 insertions(+), 0 deletions(-)
+> Because, rather than pass in ATAGs or set the memory on the command line,
+> they instead wanted to hard-code it in C - something which still happens
+> today:
 > 
-> diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
-> index 2cb9ad5..55fe89b 100644
-> --- a/arch/sh/kernel/perf_event.c
-> +++ b/arch/sh/kernel/perf_event.c
-> @@ -59,6 +59,15 @@ static inline int sh_pmu_initialized(void)
->  	return !!sh_pmu;
->  }
->  
-> +const char *perf_pmu_name(void)
-> +{
-> +	if (!sh_pmu)
-> +		return NULL;
-> +
-> +	return sh_pmu->name;
-> +}
-> +EXPORT_SYMBOL_GPL(perf_pmu_name);
-> +
->  int perf_num_counters(void)
->  {
->  	if (!sh_pmu)
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 1a02192..33f08da 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -850,6 +850,7 @@ extern int perf_max_events;
->  extern const struct pmu *hw_perf_event_init(struct perf_event *event);
->  
->  extern int perf_num_counters(void);
-> +extern const char *perf_pmu_name(void);
->  extern void perf_event_task_sched_in(struct task_struct *task);
->  extern void perf_event_task_sched_out(struct task_struct *task, struct task_struct *next);
->  extern void perf_event_task_tick(struct task_struct *task);
-> diff --git a/kernel/perf_event.c b/kernel/perf_event.c
-> index db5b560..fc51268 100644
-> --- a/kernel/perf_event.c
-> +++ b/kernel/perf_event.c
-> @@ -85,6 +85,11 @@ void __weak hw_perf_enable(void)		{ barrier(); }
->  
->  void __weak perf_event_print_debug(void)	{ }
->  
-> +extern __weak const char *perf_pmu_name(void)
-> +{
-> +	return "pmu";
-> +}
-> +
->  static DEFINE_PER_CPU(int, perf_disable_count);
->  
->  void perf_disable(void)
-> -- 
-> 1.7.1
+> arch/arm/mach-msm/board-halibut.c
+> arch/arm/mach-msm/board-mahimahi.c
+> arch/arm/mach-msm/board-sapphire.c
+> arch/arm/mach-msm/board-trout.c
+> arch/arm/mach-pxa/eseries.c
+> arch/arm/mach-pxa/spitz.c
+> arch/arm/mach-s3c2412/mach-smdk2413.c
+> arch/arm/mach-s3c2412/mach-vstms.c
+> arch/arm/mach-tegra/board-harmony.c
 > 
-> 
+> This is part of the on-going pain of poor quality boot loaders.
+Yep, so (at least regarding the memory layout) the name "fixup" is
+wrong, it's more "initializ"ish.
+
+So what now?  Do the memory reservation in mdesc->reserve as Felipe
+suggested?
+
+Best regards
+Uwe
 
 -- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
