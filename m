@@ -1,46 +1,54 @@
-From: tim.nordell@logicpd.com (Tim Nordell)
-Date: Mon, 11 Oct 2010 12:45:57 -0500
-Subject: [PATCH v4 0/4] LogicPD minimal board support for LV_SOM and
-	Torpedo
-In-Reply-To: <20101011173023.GB25462@atomide.com>
-References: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
-	<20100928171908.GE3117@atomide.com>
-	<201010090155.25932.linz@li-pro.net> <4CAFB747.5020606@logicpd.com>
-	<20101011173023.GB25462@atomide.com>
-Message-ID: <4CB34D55.6060007@logicpd.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 11 Oct 2010 19:33:00 +0100
+Subject: [PATCH v2 5/6] mmc: sdhci-of-esdhc: factor out common stuff
+In-Reply-To: <1286817032-21219-1-git-send-email-w.sang@pengutronix.de>
+References: <1286806866-19258-6-git-send-email-w.sang@pengutronix.de>
+	<1286817032-21219-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20101011183300.GC21335@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 10/11/10 12:30, Tony Lindgren wrote:
-> * Tim Nordell <tim.nordell@logicpd.com> [101008 17:20]:
->> Hi Stephan,
->>
->> I do indeed work for LogicPD.  I was asked to take over the patch
->> submission process from Jacob Tanenbaum from early August (I don't know
->> if you saw those patches), and hence I was the last one to submit
->> patches off to the community.
->>
->> On 10/08/10 18:55, Stephan Linz wrote:
->>> nice to see my patches here on the Linux mailinglists. I have not been working 
->>> on it for a long time.
-> Uhh, so whose patches are these originally?
->
-> We have them now queued with Tim Nordell as the author. Please let me know
-> ASAP if you want me to change that.
->
-> Regards,
->
-> Tony
+Hi Wolfram,
 
-The history for those patches, for me, originated with Jacob Tanenbaum's
-patchset.  I was taking over for him as he was going back to school.  I
-did some misc. changes for further submission, but I was not the
-original author.  I don't know Stephan's involvement - however, in the
-source files he's attributed credit in the header, as well as one of my
-coworkers so presumably there was some involvement on both ends.  I
-recognize some of the code as coming from our kernel release, so likely
-it was a hybrid originally between Stephan, Peter, and Jacob.
+On Mon, Oct 11, 2010 at 07:10:32PM +0200, Wolfram Sang wrote:
+> +static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
+> +{
+> +	int pre_div = 2;
+> +	int div = 1;
+> +	u32 temp;
+> +
+> +	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> +	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
+> +		| ESDHC_CLOCK_MASK);
+> +	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> +
+> +	if (clock == 0)
+> +		goto out;
+> +
+> +	while (host->max_clk / pre_div / 16 > clock && pre_div < 256)
+> +		pre_div *= 2;
+> +
+> +	while (host->max_clk / pre_div / div > clock && div < 16)
+> +		div++;
+> +
+> +	dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
+> +		clock, host->max_clk / pre_div / div);
+> +
+> +	pre_div >>= 1;
+> +	div--;
+> +
+> +	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> +	temp |= (ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
+> +		| (div << ESDHC_DIVIDER_SHIFT)
+> +		| (pre_div << ESDHC_PREDIV_SHIFT));
+> +	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+> +	mdelay(100);
 
-That's about the extent that I know.
+This isn't directly related to this patchset (the code was there 
+beforehand), but it would be nice to rework the mdelay(100).
 
-- Tim
+Thanks,
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
