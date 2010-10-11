@@ -1,28 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Oct 2010 12:40:25 +0200
-Subject: [PATCH 3/3] staging: tidspbridge: remove memory consistency from
-	TODO list
-In-Reply-To: <1286732440-28644-4-git-send-email-felipe.contreras@gmail.com>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-	<1286732440-28644-4-git-send-email-felipe.contreras@gmail.com>
-Message-ID: <201010111240.25759.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 11 Oct 2010 11:43:36 +0100
+Subject: [PATCH 2/4] ASoC: add ep93xx AC97 audio driver
+In-Reply-To: <20101011100742.GE27142@gw.healthdatacare.com>
+References: <cover.1286707213.git.mika.westerberg@iki.fi>
+	<b0202066df3bb9732fbecca627d0149165905a95.1286707213.git.mika.westerberg@iki.fi>
+	<20101011094717.GA9231@rakim.wolfsonmicro.main>
+	<20101011100742.GE27142@gw.healthdatacare.com>
+Message-ID: <20101011104335.GC9231@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 10 October 2010, Felipe Contreras wrote:
-> The mempool area is not handled by the kernel any more.
+On Mon, Oct 11, 2010 at 01:07:42PM +0300, Mika Westerberg wrote:
+> On Mon, Oct 11, 2010 at 10:47:18AM +0100, Mark Brown wrote:
+> > On Sun, Oct 10, 2010 at 01:54:10PM +0300, Mika Westerberg wrote:
 
-But tidspbridge still uses ioremap to set up the mapping for RAM,
-even though it now is outside of the kernel linar mapping.
+> > > +	mutex_lock(&info->lock);
 
-You should really only use ioremap on MMIO registers, nothing
-else. These registers are marked as __iomem pointers and can only
-be passed into functions that talk to the hardware like iowrite32
-or writel, but not used like memory.
+> > > +	INIT_COMPLETION(info->done);
 
-Please have a look at "sparse", which will warn about address space
-violations among other things. The tidspbridge driver is full of them,
-and you should fix the code that sparse warns about, which will
-also show you all the places where ioremap is used incorrectly.
+> > Do you really need to do this on every single register I/O?
 
-	Arnd
+> Sorry, didn't quite understand you. Do you mean that should I take
+> the mutex and init the completion or wait for an interrupt?
+
+You're doing INIT_COMPLETION every single time you use it - is that
+really required?
+
+> Yeah, sorry about that. I had the impression that using the latest
+> mainline would be right thing to do :( I will base the next version
+> against that tree pointed by Jassi.
+
+Latest mainline means you're missing any changes that are ready for the
+next merge window, once code has gone to Linus it's bugfix only outside
+of the merge window so actual development happens in -next.
