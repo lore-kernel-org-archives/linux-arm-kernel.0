@@ -1,64 +1,115 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 11 Oct 2010 12:55:22 +0200
-Subject: [PATCH 2/3] arm: imx35: add esdhc-device to MX35-platform
+Date: Mon, 11 Oct 2010 12:55:21 +0200
+Subject: [PATCH 1/3] arm: imx: add generic esdhc device
 In-Reply-To: <1286794523-26607-1-git-send-email-w.sang@pengutronix.de>
 References: <1286794523-26607-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1286794523-26607-3-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1286794523-26607-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- arch/arm/mach-mx3/clock-imx35.c       |    6 +++---
- arch/arm/mach-mx3/devices-imx35.h     |    7 +++++++
- arch/arm/plat-mxc/include/mach/mx35.h |    3 +++
- 3 files changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/plat-mxc/devices/Kconfig               |    3 ++
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-esdhc.c      |   31 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |    6 ++++
+ arch/arm/plat-mxc/include/mach/esdhc.h          |   16 ++++++++++++
+ 5 files changed, 57 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/devices/platform-esdhc.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/esdhc.h
 
-diff --git a/arch/arm/mach-mx3/clock-imx35.c b/arch/arm/mach-mx3/clock-imx35.c
-index dcabed0..255732c 100644
---- a/arch/arm/mach-mx3/clock-imx35.c
-+++ b/arch/arm/mach-mx3/clock-imx35.c
-@@ -459,9 +459,9 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("imx-epit.0", NULL, epit1_clk)
- 	_REGISTER_CLOCK("imx-epit.1", NULL, epit2_clk)
- 	_REGISTER_CLOCK(NULL, "esai", esai_clk)
--	_REGISTER_CLOCK(NULL, "sdhc", esdhc1_clk)
--	_REGISTER_CLOCK(NULL, "sdhc", esdhc2_clk)
--	_REGISTER_CLOCK(NULL, "sdhc", esdhc3_clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
-+	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_clk)
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK(NULL, "gpio", gpio1_clk)
- 	_REGISTER_CLOCK(NULL, "gpio", gpio2_clk)
-diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
-index 786e7ad..509b346 100644
---- a/arch/arm/mach-mx3/devices-imx35.h
-+++ b/arch/arm/mach-mx3/devices-imx35.h
-@@ -45,3 +45,10 @@ extern const struct imx_spi_imx_data imx35_cspi_data[] __initconst;
- 	imx_add_spi_imx(&imx35_cspi_data[id], pdata)
- #define imx35_add_spi_imx0(pdata)	imx35_add_cspi(0, pdata)
- #define imx35_add_spi_imx1(pdata)	imx35_add_cspi(1, pdata)
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index 938817e..4047994 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -1,3 +1,6 @@
++config IMX_HAVE_PLATFORM_ESDHC
++	bool
 +
-+#define imx35_add_esdhc0(pdata)	\
-+	imx_add_esdhc(0, MX35_ESDHC1_BASE_ADDR, SZ_16K, MX35_INT_MMC_SDHC1, pdata)
-+#define imx35_add_esdhc1(pdata)	\
-+	imx_add_esdhc(1, MX35_ESDHC2_BASE_ADDR, SZ_16K, MX35_INT_MMC_SDHC2, pdata)
-+#define imx35_add_esdhc2(pdata)	\
-+	imx_add_esdhc(2, MX35_ESDHC3_BASE_ADDR, SZ_16K, MX35_INT_MMC_SDHC3, pdata)
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index 9f0a1ee..5a1c621 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -52,6 +52,9 @@
- #define MX35_GPIO3_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xa4000)
- #define MX35_SCC_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xac000)
- #define MX35_RNGA_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xb0000)
-+#define MX35_ESDHC1_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xb4000)
-+#define MX35_ESDHC2_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xb8000)
-+#define MX35_ESDHC3_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xbc000)
- #define MX35_IPU_CTRL_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xc0000)
- #define MX35_AUDMUX_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xc4000)
- #define MX35_GPIO1_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xcc000)
+ config IMX_HAVE_PLATFORM_FEC
+ 	bool
+ 	default y if ARCH_MX25 || SOC_IMX27 || ARCH_MX35 || ARCH_MX51
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 821fd10..0a3c1f0 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -1,3 +1,4 @@
++obj-$(CONFIG_IMX_HAVE_PLATFORM_ESDHC) += platform-esdhc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+ obj-y += platform-imx-dma.o
+diff --git a/arch/arm/plat-mxc/devices/platform-esdhc.c b/arch/arm/plat-mxc/devices/platform-esdhc.c
+new file mode 100644
+index 0000000..68db2a2
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-esdhc.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2010 Pengutronix, Wolfram Sang <w.sang@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++
++#include <mach/devices-common.h>
++#include <mach/esdhc.h>
++
++struct platform_device *__init imx_add_esdhc(int id,
++		resource_size_t iobase, resource_size_t iosize,
++		resource_size_t irq,
++		const struct esdhc_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = iobase,
++			.end = iobase + iosize - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = irq,
++			.end = irq,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device("sdhci-esdhc-imx", id, res,
++			ARRAY_SIZE(res), pdata, sizeof(*pdata));
++}
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 85740e9..0498978 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -106,3 +106,9 @@ struct imx_spi_imx_data {
+ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata);
++
++#include <mach/esdhc.h>
++struct platform_device *__init imx_add_esdhc(int id,
++		resource_size_t iobase, resource_size_t iosize,
++		resource_size_t irq,
++		const struct esdhc_platform_data *pdata);
+diff --git a/arch/arm/plat-mxc/include/mach/esdhc.h b/arch/arm/plat-mxc/include/mach/esdhc.h
+new file mode 100644
+index 0000000..a48a9aa
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/esdhc.h
+@@ -0,0 +1,16 @@
++/*
++ * Copyright 2010 Wolfram Sang <w.sang@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; version 2
++ * of the License.
++ */
++
++#ifndef __ASM_ARCH_IMX_ESDHC_H
++#define __ASM_ARCH_IMX_ESDHC_H
++
++struct esdhc_platform_data {
++	unsigned int wp_gpio;	/* write protect pin */
++};
++#endif /* __ASM_ARCH_IMX_ESDHC_H */
 -- 
 1.7.1
