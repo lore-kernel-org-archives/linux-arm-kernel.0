@@ -1,46 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Oct 2010 09:25:35 +0100
-Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
-In-Reply-To: <20101010220603.GA2723@debian>
-References: <4B91A39F.8050502@am.sony.com>
-	<20100306201849.GD13262@n2100.arm.linux.org.uk>
-	<AANLkTi=apGYBSSr4RK+ZZievacJRcOxrwW_o_hz85P0h@mail.gmail.com>
-	<20101009193757.GB28183@n2100.arm.linux.org.uk>
-	<20101010220603.GA2723@debian>
-Message-ID: <20101011082535.GA26355@n2100.arm.linux.org.uk>
+From: s.neumann@raumfeld.com (Sven Neumann)
+Date: Mon, 11 Oct 2010 10:31:40 +0200
+Subject: 2.6.35.6 fails to suspend (pxa2xx-mci.0)
+In-Reply-To: <AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
+References: <1286177435.2140.5.camel@sven> <201010072323.05218.rjw@sisk.pl>
+	<1286526197.4493.19.camel@sven> <201010082208.25767.rjw@sisk.pl>
+	<AANLkTinSmPpswdHaZnP2rN688Wu1=-2Y2RBzC4+1qTpM@mail.gmail.com>
+Message-ID: <1286785900.3101.9.camel@sven>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 03:36:03AM +0530, Rabin Vincent wrote:
-> On Sat, Oct 09, 2010 at 08:37:57PM +0100, Russell King - ARM Linux wrote:
-> > On Sat, Oct 09, 2010 at 11:20:50PM +0530, Rabin Vincent wrote:
-> > > It's used just for the C entry functions for interrupts: asm_do_IRQ()
-> > > and the IPI and local timer functions.
-> > > 
-> > > AFAICS __exception seems to be used only for is_exception_text().  If
-> > > that's the case, would it be OK to just place those functions in
-> > > __irq_entry if ftrace is built and have is_exception_text() check that
-> > > section too?
-> > 
-> > No.  is_exception_text() is used to detect those functions which have
-> > a specific stack layout - which is that there's a pt_regs struct on the
-> > stack.  Grouping other functions into that violates the expectation.
+On Sat, 2010-10-09 at 03:07 +0200, Ohad Ben-Cohen wrote:
+> On Fri, Oct 8, 2010 at 10:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > There is a problem with the pxa2xx-mci.0 suspend that has been introduced
+> > some time after 2.6.34, but it is not related to commit 152e1d5920.
 > 
-> I'm not sure I follow.  These functions (asm_do_IRQ(), do_IPI(), and
-> do_local_timer()) will be the only ones in __irq_entry. iow, __irq_entry
-> will contain nothing else except these functions.  So we woudn't be
-> grouping other functions; it's just that some of the __exception
-> functions would be moved to the new section so that __exception and
-> __irq_entry combined will contain the functions with the specific stack
-> layout (and only those functions).
+> Sven, what type of card do you have in that slot ? is it SDIO ? what's
+> the function driver ?
+> 
+> I have a hunch about this, but it may be a wild guess as I don't know
+> what's your setup exactly.
+> 
+> Anyway, can you please try this and see if anything changes ?
+> 
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index c94565d..515ff39 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+>         if (host->bus_ops && !host->bus_dead) {
+>                 if (host->bus_ops->suspend)
+>                         err = host->bus_ops->suspend(host);
+> +               if (err == -ENOSYS || !host->bus_ops->resume) {
+> +                       /*
+> +                        * We simply "remove" the card in this case.
+> +                        * It will be redetected on resume.
+> +                        */
+> +                       if (host->bus_ops->remove)
+> +                               host->bus_ops->remove(host);
+> +                       mmc_claim_host(host);
+> +                       mmc_detach_bus(host);
+> +                       mmc_release_host(host);
+> +                       host->pm_flags = 0;
+> +                       err = 0;
+> +               }
+>         }
+>         mmc_bus_put(host);
+> 
+> The reason I'm asking this is because it seems like commit
+> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related
+> to mmc/sd card insert/removal during suspend/resume" has broken
+> suspending SDIO function drivers which don't have a suspend handler
+> (or do have one, but for some reason it returns -ENOSYS, like
+> libertas_sdio's does).
 
-And now to go back to the original question I asked: What is __irq_entry
-used for?
+Yes, this patch fixes the problem. Tested with v2.6.35-rc7. With above
+patch applied, suspend (and resume!) work again with and without
+pm_async=0.
 
-If it's to identify those functions which can't be traced through because
-of the stack layout, that's true of all __exception marked functions -
-so we might as well make the linker symbols for irqentry alias the
-exception text symbols.
+Thanks a lot to all of you for your help with this problem.
 
-I see nothing special of just the three functions you mention that warrant
-them being handled separately by ftrace.
+
+Regards,
+Sven
