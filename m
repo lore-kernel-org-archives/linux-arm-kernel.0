@@ -1,41 +1,51 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 11 Oct 2010 13:10:48 +0200
-Subject: [PATCHv2] mmci: work with only one irq
-In-Reply-To: <20101011094404.GB27153@n2100.arm.linux.org.uk>
-References: <1277198267-10860-12-git-send-email-rabin.vincent@stericsson.com>
-	<1286755601-25664-1-git-send-email-rabin.vincent@stericsson.com>
-	<20101011094404.GB27153@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=YYqVat9XF2_jhTs4spcBYx+n+7DGFKm47hXkY@mail.gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Mon, 11 Oct 2010 14:16:54 +0300
+Subject: [PATCH 3/3] staging: tidspbridge: remove memory consistency from
+	TODO list
+In-Reply-To: <201010111240.25759.arnd@arndb.de>
+References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
+	<1286732440-28644-4-git-send-email-felipe.contreras@gmail.com>
+	<201010111240.25759.arnd@arndb.de>
+Message-ID: <AANLkTikq80dM_93k2byPXDexzz3J+g3Wiva3ieBbXmmf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/11 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Oct 11, 2010 at 05:36:41AM +0530, Rabin Vincent wrote:
->> @@ -276,6 +292,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->> ? ? ? if (status & MCI_DATAEND) {
->> ? ? ? ? ? ? ? mmci_stop_data(host);
->>
->> + ? ? ? ? ? ? /* MCI_DATABLOCKEND not used with single irq */
->> + ? ? ? ? ? ? if (host->singleirq && !data->error)
->> + ? ? ? ? ? ? ? ? ? ? host->data_xfered = data->blksz * data->blocks;
->> +
+On Mon, Oct 11, 2010 at 1:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 10 October 2010, Felipe Contreras wrote:
+>> The mempool area is not handled by the kernel any more.
 >
-> I'm uneasy about this. ?If we don't get datablockend interrupts, then
-> when there's an error we don't know how much data was transferred, and
-> with big requests, we're going to have a very long time spent retrying
-> block by block.
+> But tidspbridge still uses ioremap to set up the mapping for RAM,
+> even though it now is outside of the kernel linar mapping.
 
-This one should probably remain a ux500-specific flag, unlike the single
-IRQ flag, this is something else.
+Which is what ioremap() complained about, and how Russell King
+suggested to solve the issue.
 
-AFAICT the DBCKEND signal is simply not routed in the ux500
-(probably neither on the Nomadik) variant, so we can't wait for it.
+> You should really only use ioremap on MMIO registers, nothing
+> else. These registers are marked as __iomem pointers and can only
+> be passed into functions that talk to the hardware like iowrite32
+> or writel, but not used like memory.
 
-On the U300 on the other hand, it is routed and available, if and
-only if you're using PIO mode. (However it can arrive *after* the
-DATAEND signal, which the other pending patch takes care of).
 
-During DMA this signal is disfunct also in U300...
+>From bogus@does.not.exist.com  Sat Oct  9 07:11:57 2010
+From: bogus@does.not.exist.com ()
+Date: Sat, 09 Oct 2010 11:11:57 -0000
+Subject: No subject
+Message-ID: <mailman.1.1286795819.18522.linux-arm-kernel@lists.infradead.org>
 
-Yours,
-Linus Walleij
+> Please have a look at "sparse", which will warn about address space
+> violations among other things. The tidspbridge driver is full of them,
+> and you should fix the code that sparse warns about, which will
+> also show you all the places where ioremap is used incorrectly.
+
+In one of my branches I moved ioremap() to arch/arm/mach-omap2/dsp.c
+and if I use sparse there, it gives no warning.
+
+I would prefer to map the memory some other way and make it
+non-cacheable, but I don't know any other way. Then, if readl/writel
+are still needed, only ioremap() that area. And finally, and
+hopefully, do cache flushes instead of requiring consistent memory.
+
+Cheers.
+
+-- 
+Felipe Contreras
