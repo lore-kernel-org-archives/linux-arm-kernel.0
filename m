@@ -1,80 +1,74 @@
-From: elenbert@gmail.com (Oleg Kutkov)
-Date: Mon, 11 Oct 2010 16:49:49 +0300
-Subject: Own syscall implementation
-In-Reply-To: <20101011125438.GE27153@n2100.arm.linux.org.uk>
-References: <AANLkTinkx11iDEh2HAagdaER9yShQKmh1oSbMgRHMyyo@mail.gmail.com>
-	<20101011125438.GE27153@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikKyYfABS0SJUrxEckoW7XakUq1Ln8puv5vus5s@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Oct 2010 16:02:18 +0200
+Subject: [PATCH 3/3] staging: tidspbridge: remove memory consistency from
+	TODO list
+In-Reply-To: <AANLkTikq80dM_93k2byPXDexzz3J+g3Wiva3ieBbXmmf@mail.gmail.com>
+References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
+	<201010111240.25759.arnd@arndb.de>
+	<AANLkTikq80dM_93k2byPXDexzz3J+g3Wiva3ieBbXmmf@mail.gmail.com>
+Message-ID: <201010111602.18950.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you for answer.
-Sorry, now i made some changes due to actual kernel version
+On Monday 11 October 2010, Felipe Contreras wrote:
+> On Mon, Oct 11, 2010 at 1:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sunday 10 October 2010, Felipe Contreras wrote:
+> >> The mempool area is not handled by the kernel any more.
+> >
+> > But tidspbridge still uses ioremap to set up the mapping for RAM,
+> > even though it now is outside of the kernel linar mapping.
+> 
+> Which is what ioremap() complained about, and how Russell King
+> suggested to solve the issue.
 
-2010/10/11 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> That's fine, except that there's no bounds checking for the value of
-> 'call', which if it were negative or a large positive number would
-> overflow the nargs array. ?You're also not propagating the error back.
->
+You are right that this is what Russell asked about, having a single
+mapping for memory means that you avoid the problems that the warning
+was put there for and you no longer risk memory corruption. That
+is good and the changes you did are the important ones.
 
-asmlinkage long sys_mycall(int call, unsigned long __user *args);
+What I'm arguing is that you still don't use the interface in the
+way it's designed and things might break again in the future.
+For instance, I've seen platforms where readl/writel is not a pointer
+dereference but a hypercall or goes through an indirect index/data
+register pair. I hope we don't ever get something like this on ARM,
+but it would still be good to write the code in a more robust way
+that doesn't mix __iomem tokens with kernel pointers.
 
-SYSCALL_DEFINE2(mycall, int, call, unsigned long __user *, args)
-{
-  unsigned long a[6];
-  int err;
+> > You should really only use ioremap on MMIO registers, nothing
+> > else. These registers are marked as __iomem pointers and can only
+> > be passed into functions that talk to the hardware like iowrite32
+> > or writel, but not used like memory.
+> 
+> From what I can see parts of this memory are also used for readl/writel.
 
-  if (call < 1 || call > SYS_ACCEPT4) {
-       return -EINVAL;
-  }
+In that case, it's worse than I thought ;-)
 
-  if (err = copy_from_user(a, args, nargs[call])) {
-      return -EFAULT;
-  }
+If you use readl(), it needs to be an __iomem pointer, if you use it
+by direct dereferences, it must not be __iomem.
 
-  switch (call) {
-     case 0: /*some work*/ break;
-     case 1: /*some work*/ break;
-     default: break;
-  }
+Obviously, you need to use ioremap to target the device registers,
+but I don't see how it could make sense for a communication area
+in memory.
 
-  return err;
-}
+> > Please have a look at "sparse", which will warn about address space
+> > violations among other things. The tidspbridge driver is full of them,
+> > and you should fix the code that sparse warns about, which will
+> > also show you all the places where ioremap is used incorrectly.
+> 
+> In one of my branches I moved ioremap() to arch/arm/mach-omap2/dsp.c
+> and if I use sparse there, it gives no warning.
 
-> You don't say what kernel version.
+I don't see how moving the code around would get rid of an address
+space warning, unless you play dirty tricks like using __force
+casts or passing pointers around as integers.
 
-My kernel version is 2.6.29
+> I would prefer to map the memory some other way and make it
+> non-cacheable, but I don't know any other way. Then, if readl/writel
+> are still needed, only ioremap() that area. And finally, and
+> hopefully, do cache flushes instead of requiring consistent memory.
 
-> As 312 is already taken (we're now up to 369), and you're using .long, I
-> can only assume this is quite an old kernel... ?Modern kernels use CALL()
-> in calls.S to ensure that the number of syscalls are properly counted.
+Yes, that sounds reasonable. Can you use a chunk of regular kernel
+memory with dma_map_single/dma_sync_single_for_{cpu,device} for this,
+like normal drivers do?
 
-call.S:
-
-CALL(sys_mycall)
-
-> So it's really not a good idea to create new syscalls for production code.
-> It's usually safer to write something like a char device driver and use
-> the read/write/ioctl methods instead.
-
-I understood. I just want to understand "how it works"
-
-> Have you checked the value of 'call' and nargs[call] ? ?Note that
-> copy_from_user() takes the number of _bytes_ to copy, not the number
-> of arguments.
->
-
-Yes, i checked "call", as i show in code before. nargs i found in
-net/socket.c and it defined as:
-#define AL(x) ((x) * sizeof(unsigned long))
-static const unsigned char nargs[19]={
-	AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
-	AL(3),AL(3),AL(4),AL(4),AL(4),AL(6),
-	AL(6),AL(2),AL(5),AL(5),AL(3),AL(3),
-	AL(4)
-};
-
-I looking on SYSCALL_DEFINE2(socketcall, int, call, unsigned long
-__user *, args) and here is: if (copy_from_user(a, args,
-nargs[call])).
-I used that just as an example that i found..
+	Arnd
