@@ -1,64 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Oct 2010 07:54:34 +0900
-Subject: [PATCH V3] ARM: S5PV310: Add I2C channel 3, 4, 5, 6,
-	and 7 device support
-In-Reply-To: <1286784948-27094-1-git-send-email-m.szyprowski@samsung.com>
-References: <1286455601-25360-4-git-send-email-m.szyprowski@samsung.com>
-	<1286784948-27094-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <00ec01cb6997$48fe3ab0$dafab010$%kim@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 11 Oct 2010 18:53:43 -0400 (EDT)
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <1286800232.19739.96.camel@e102109-lin.cambridge.arm.com>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<20101009000046.GA30616@kroah.com>
+	<20101009002546.GB14675@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
+	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
+	<1286796187.19739.52.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinHZ-w6=0RvVp39MnvpRC7RW1CYNSbzi2f1OvaQ@mail.gmail.com>
+	<1286800232.19739.96.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1010111842130.2764@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> S5PV310 and S5PC210 support more I2C devices than previous SoCs.
-> Add the device support code for them.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> 
-> Changes since V2:
-> - removed some s5p reference leftovers from V1
-> - adapted setup-i2cX.c to use s3c_gpio_cfgall_range()
-> - added missing entries in plat-samsung/include/plat/devs.h
-> - added missing 'select HAVE_S3C2410_I2C' in KConfig
-> 
-Hi, Marek
+On Mon, 11 Oct 2010, Catalin Marinas wrote:
 
-Thanks for your update.
+> It may be just theoretical but architecture licensees implement the
+> hardware according to the ARM ARM. If it says "unpredictable", they
+> don't need to care much about this scenario as it is not allowed in
+> software and the hardware can be further optimised (well, I think
+> "unpredictable" doesn't allow hardware deadlocking or security
+> implications, so the memory corruption cannot be that random, possibly
+> just restricted to that memory range). It is probably ok on current
+> hardware but I cannot guarantee, you would have to check on a
+> case-by-case basis (CPU implementation).
 
-(snip)
+I've seen real designs where "security implications" was interpreted 
+rather liberally by the hardware people, and not exactly in the same way 
+as software people do.
 
-> +void s3c_i2c4_cfg_gpio(struct platform_device *dev)
-> +{
-> +	s3c_gpio_cfgall_range(S5PV310_GPB(2), 2,
-> +			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
 
-Following is from your previous patch.
-
-void s3c_i2c4_cfg_gpio(struct platform_device *dev)
-{
-	s3c_gpio_cfgpin(S5PV310_GPB(0), S3C_GPIO_SFN(3));
-	s3c_gpio_setpull(S5PV310_GPB(0), S3C_GPIO_PULL_UP);
-	s3c_gpio_cfgpin(S5PV310_GPB(1), S3C_GPIO_SFN(3));
-	s3c_gpio_setpull(S5PV310_GPB(1), S3C_GPIO_PULL_UP);
-}
-
-So...should be...
-s3c_gpio_cfgall_range(S5PV310_GPB(0), 2, S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
-
-will fix it myself :-)
-
-(snip)
-
-others, ok to me...will apply.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Nicolas
