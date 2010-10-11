@@ -1,30 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 11 Oct 2010 15:37:32 +0800
-Subject: [GIT PULL] Introduce patching of phys_to_virt and vice versa
-Message-ID: <AANLkTikpt0=hzZBO0oZtibGnY5NJm4AFQQ8edMDYevKn@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 11 Oct 2010 10:38:16 +0300
+Subject: [alsa-devel] [PATCH 4/4] ASoC: ep93xx: add Simplemachines
+	Sim.One AC97 audio support
+In-Reply-To: <AANLkTi=PAp8pQeVM=GWYVVeKnf2-f+YG2bdSuu5QZH87@mail.gmail.com>
+References: <cover.1286707213.git.mika.westerberg@iki.fi>
+	<cbadad77a7e11b27fedd9e92fe05322291ca1377.1286707213.git.mika.westerberg@iki.fi>
+	<AANLkTi=PAp8pQeVM=GWYVVeKnf2-f+YG2bdSuu5QZH87@mail.gmail.com>
+Message-ID: <20101011073816.GC27142@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Mon, Oct 11, 2010 at 09:22:51AM +0900, Jassi Brar wrote:
+> On Sun, Oct 10, 2010 at 7:54 PM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> 
+> > +
+> > +static struct snd_soc_dai_link simone_dai = {
+> > + ? ? ? .name ? ? ? ? ? = "AC97",
+> > + ? ? ? .stream_name ? ?= "AC97 HiFi",
+> > + ? ? ? .cpu_dai ? ? ? ?= &ep93xx_ac97_dai,
+> > + ? ? ? .codec_dai ? ? ?= &ac97_dai,
+> > +};
+> ASoC no longer works on cpu and codec_dai. You need to only
+> provide the name of the dais... ASoC does string matching to
+> link appropriate dais in a link.
+> 
+> You might want to give another thorough look to all of your drivers
+> under the new ASoC.
 
-If you are OK with this patch, please help pull. Or let me know if you
-want me to
-put this into your tracking system.
+Thanks.
 
-The following changes since commit cb655d0f3d57c23db51b981648e452988c0223f9:
-  Linus Torvalds (1):
-        Linux 2.6.36-rc7
+Which tree/branch should I use for preparing the driver to work
+with the new ASoC? Is it the official
+git://git.alsa-project.org/alsa-kernel tree or something else?
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git
-phys_to_virt
-
-Eric Miao (1):
-      ARM: Introduce patching of phys_to_virt and vice versa
-
- arch/arm/Kconfig              |   10 ++++++++
- arch/arm/include/asm/memory.h |   32 ++++++++++++++++++++++++++
- arch/arm/kernel/setup.c       |   50 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/vmlinux.lds.S |    4 +++
- 4 files changed, 96 insertions(+), 0 deletions(-)
+Regards,
+MW
