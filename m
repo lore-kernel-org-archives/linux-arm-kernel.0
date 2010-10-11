@@ -1,33 +1,33 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 11 Oct 2010 15:02:06 +0200
-Subject: [PATCHv2] mxc/gpio: make _set_value work with values != 0/1
-Message-ID: <1286802126-11981-1-git-send-email-jacmet@sunsite.dk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 11 Oct 2010 15:04:53 +0200
+Subject: [PATCH] mx25/clocks: match esdhc-clocks to platform device
+Message-ID: <1286802293-18075-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation/gpio.txt specifies that the value argument to
-gpio_set_value() should be handled as a boolean (E.G. != 0 is high),
-so use the same logic as in _set_direction().
+So the correct clock will be taken for each of the two independent
+controllers.
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Eric B?nard <eric@eukrea.com>
 ---
- Use !! form, get rid of extra line
+ arch/arm/mach-mx25/clock.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/plat-mxc/gpio.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 57ec4a8..9d38da0 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -235,7 +235,7 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&port->lock, flags);
--	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
-+	l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
- 	__raw_writel(l, reg);
- 	spin_unlock_irqrestore(&port->lock, flags);
- }
+diff --git a/arch/arm/mach-mx25/clock.c b/arch/arm/mach-mx25/clock.c
+index 25f37a9..2179713 100644
+--- a/arch/arm/mach-mx25/clock.c
++++ b/arch/arm/mach-mx25/clock.c
+@@ -299,8 +299,8 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("imx-wdt.0", NULL, wdt_clk)
+ 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+-	_REGISTER_CLOCK(NULL, "sdhc", esdhc1_clk)
+-	_REGISTER_CLOCK(NULL, "sdhc", esdhc2_clk)
++	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
++	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
+ 	_REGISTER_CLOCK("mx2-camera.0", NULL, csi_clk)
+ 	_REGISTER_CLOCK(NULL, "audmux", audmux_clk)
+ 	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
 -- 
 1.7.1
