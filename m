@@ -1,178 +1,80 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Oct 2010 15:44:26 +0200
-Subject: [PATCH 1/5 v4] V4L/DVB: s5p-fimc: Register definition cleanup
-In-Reply-To: <000701cb6902$8449ef00$8cddcd00$%park@samsung.com>
-References: <1286527837-4980-1-git-send-email-s.nawrocki@samsung.com>
-	<1286527837-4980-2-git-send-email-s.nawrocki@samsung.com>
-	<000701cb6902$8449ef00$8cddcd00$%park@samsung.com>
-Message-ID: <4CB314BA.7070803@samsung.com>
+From: elenbert@gmail.com (Oleg Kutkov)
+Date: Mon, 11 Oct 2010 16:49:49 +0300
+Subject: Own syscall implementation
+In-Reply-To: <20101011125438.GE27153@n2100.arm.linux.org.uk>
+References: <AANLkTinkx11iDEh2HAagdaER9yShQKmh1oSbMgRHMyyo@mail.gmail.com>
+	<20101011125438.GE27153@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikKyYfABS0SJUrxEckoW7XakUq1Ln8puv5vus5s@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Seuni,
+Thank you for answer.
+Sorry, now i made some changes due to actual kernel version
 
-thanks for you review!
+2010/10/11 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> That's fine, except that there's no bounds checking for the value of
+> 'call', which if it were negative or a large positive number would
+> overflow the nargs array. ?You're also not propagating the error back.
+>
 
-On 10/11/2010 07:09 AM, ??? wrote:
-> Sewoon Park wrote:
-> 
->> Add MIPI CSI format definitions, prepare DMA address
->> definitions for interlaced input frame mode.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  drivers/media/video/s5p-fimc/fimc-reg.c  |    6 +-
->>  drivers/media/video/s5p-fimc/regs-fimc.h |   61 ++++++++++++-------------
-> -
->> ---
->>  2 files changed, 28 insertions(+), 39 deletions(-)
->>
->> diff --git a/drivers/media/video/s5p-fimc/fimc-reg.c
->> b/drivers/media/video/s5p-fimc/fimc-reg.c
->> index 5570f1c..70f29c5 100644
->> --- a/drivers/media/video/s5p-fimc/fimc-reg.c
->> +++ b/drivers/media/video/s5p-fimc/fimc-reg.c
->> @@ -507,9 +507,9 @@ void fimc_hw_set_input_addr(struct fimc_dev *dev,
->> struct fimc_addr *paddr)
->>  	cfg |= S5P_CIREAL_ISIZE_ADDR_CH_DIS;
->>  	writel(cfg, dev->regs + S5P_CIREAL_ISIZE);
->>
->> -	writel(paddr->y, dev->regs + S5P_CIIYSA0);
->> -	writel(paddr->cb, dev->regs + S5P_CIICBSA0);
->> -	writel(paddr->cr, dev->regs + S5P_CIICRSA0);
->> +	writel(paddr->y, dev->regs + S5P_CIIYSA(0));
->> +	writel(paddr->cb, dev->regs + S5P_CIICBSA(0));
->> +	writel(paddr->cr, dev->regs + S5P_CIICRSA(0));
->>
->>  	cfg &= ~S5P_CIREAL_ISIZE_ADDR_CH_DIS;
->>  	writel(cfg, dev->regs + S5P_CIREAL_ISIZE);
->> diff --git a/drivers/media/video/s5p-fimc/regs-fimc.h
->> b/drivers/media/video/s5p-fimc/regs-fimc.h
->> index a3cfe82..9e83315 100644
->> --- a/drivers/media/video/s5p-fimc/regs-fimc.h
->> +++ b/drivers/media/video/s5p-fimc/regs-fimc.h
->> @@ -11,10 +11,6 @@
->>  #ifndef REGS_FIMC_H_
->>  #define REGS_FIMC_H_
->>
->> -#define S5P_CIOYSA(__x)			(0x18 + (__x) * 4)
->> -#define S5P_CIOCBSA(__x)		(0x28 + (__x) * 4)
->> -#define S5P_CIOCRSA(__x)		(0x38 + (__x) * 4)
->> -
->>  /* Input source format */
->>  #define S5P_CISRCFMT			0x00
->>  #define S5P_CISRCFMT_ITU601_8BIT	(1 << 31)
->> @@ -28,22 +24,21 @@
->>
->>  /* Window offset */
->>  #define S5P_CIWDOFST			0x04
->> -#define S5P_CIWDOFST_WINOFSEN		(1 << 31)
->> +#define S5P_CIWDOFST_OFF_EN		(1 << 31)
->>  #define S5P_CIWDOFST_CLROVFIY		(1 << 30)
->>  #define S5P_CIWDOFST_CLROVRLB		(1 << 29)
->> -#define S5P_CIWDOFST_WINHOROFST_MASK	(0x7ff << 16)
->> +#define S5P_CIWDOFST_HOROFF_MASK	(0x7ff << 16)
->>  #define S5P_CIWDOFST_CLROVFICB		(1 << 15)
->>  #define S5P_CIWDOFST_CLROVFICR		(1 << 14)
->> -#define S5P_CIWDOFST_WINHOROFST(x)	((x) << 16)
->> -#define S5P_CIWDOFST_WINVEROFST(x)	((x) << 0)
->> -#define S5P_CIWDOFST_WINVEROFST_MASK	(0xfff << 0)
->> +#define S5P_CIWDOFST_HOROFF(x)		((x) << 16)
->> +#define S5P_CIWDOFST_VEROFF(x)		((x) << 0)
->> +#define S5P_CIWDOFST_VEROFF_MASK	(0xfff << 0)
->>
->>  /* Global control */
->>  #define S5P_CIGCTRL			0x08
->>  #define S5P_CIGCTRL_SWRST		(1 << 31)
->>  #define S5P_CIGCTRL_CAMRST_A		(1 << 30)
->>  #define S5P_CIGCTRL_SELCAM_ITU_A	(1 << 29)
->> -#define S5P_CIGCTRL_SELCAM_ITU_MASK	(1 << 29)
->>  #define S5P_CIGCTRL_TESTPAT_NORMAL	(0 << 27)
->>  #define S5P_CIGCTRL_TESTPAT_COLOR_BAR	(1 << 27)
->>  #define S5P_CIGCTRL_TESTPAT_HOR_INC	(2 << 27)
->> @@ -61,6 +56,8 @@
->>  #define S5P_CIGCTRL_SHDW_DISABLE	(1 << 12)
->>  #define S5P_CIGCTRL_SELCAM_MIPI_A	(1 << 7)
->>  #define S5P_CIGCTRL_CAMIF_SELWB		(1 << 6)
->> +/* 0 - ITU601; 1 - ITU709 */
->> +#define S5P_CIGCTRL_CSC_ITU601_709	(1 << 5)
->>  #define S5P_CIGCTRL_INVPOLHSYNC		(1 << 4)
->>  #define S5P_CIGCTRL_SELCAM_MIPI		(1 << 3)
->>  #define S5P_CIGCTRL_INTERLACE		(1 << 0)
->> @@ -72,23 +69,10 @@
->>  #define S5P_CIWDOFST2_HOROFF(x)		((x) << 16)
->>  #define S5P_CIWDOFST2_VEROFF(x)		((x) << 0)
->>
->> -/* Output DMA Y plane start address */
->> -#define S5P_CIOYSA1			0x18
->> -#define S5P_CIOYSA2			0x1c
->> -#define S5P_CIOYSA3			0x20
->> -#define S5P_CIOYSA4			0x24
->> -
->> -/* Output DMA Cb plane start address */
->> -#define S5P_CIOCBSA1			0x28
->> -#define S5P_CIOCBSA2			0x2c
->> -#define S5P_CIOCBSA3			0x30
->> -#define S5P_CIOCBSA4			0x34
->> -
->> -/* Output DMA Cr plane start address */
->> -#define S5P_CIOCRSA1			0x38
->> -#define S5P_CIOCRSA2			0x3c
->> -#define S5P_CIOCRSA3			0x40
->> -#define S5P_CIOCRSA4			0x44
->> +/* Output DMA Y/Cb/Cr plane start addresses */
->> +#define S5P_CIOYSA(n)			(0x18 + (n) * 4)
->> +#define S5P_CIOCBSA(n)			(0x28 + (n) * 4)
->> +#define S5P_CIOCRSA(n)			(0x38 + (n) * 4)
->>
-> As you know, S5P series have S5PC210 also.
-> Then,
-> Why don't you add S5PC210's 32 registers for Output DMA start address some
-> other time?
-> For the next, the better approach would be to do something like:
-> 
-> #define S5P_CIOYSA1	0x18	/* Y 1st frame start address for output DMA
-> */
-> #define S5P_CIOYSA5 0x200 /* Y 5th frame start address for output DMA */
-> #define S5P_CIOYSA(n) \
->         (((n) < 4) ?     \
->          (S5P_CIOYSA1  + (n) * 4) : (S5P_CIOYSA5  + ((n) - 4) * 4))
+asmlinkage long sys_mycall(int call, unsigned long __user *args);
 
-Thanks for pointing this out. I was aware of that and was going to handle
-S5PC210 (S5PV310) wariant in another separate patch.
-Your proposal looks OK but I am still working on how to use the extended
-capabilities of S5PC210 and for now I decided to just mask out the additional
-registers at offset 0x200 and above. This is for backward compatibility
-and also I do not see much advantage from using all 32 registers just
-an overhead of setting them up. So for now let us leave the CIO*SA(n)
-definition as is and after I work out a relevant output DMA usage scheme
-I will change it, possibly in the way you suggested.
+SYSCALL_DEFINE2(mycall, int, call, unsigned long __user *, args)
+{
+  unsigned long a[6];
+  int err;
 
-Regards,
-Sylwester
+  if (call < 1 || call > SYS_ACCEPT4) {
+       return -EINVAL;
+  }
 
-> 
-[snip]
-> 
-> 
-> I will review another patches soon.
+  if (err = copy_from_user(a, args, nargs[call])) {
+      return -EFAULT;
+  }
 
-> Thanks.
-> 
-> Best regards,
-> Seuni.
-> --
-> Sewoon Park <seuni.park@samsung.com>, Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+  switch (call) {
+     case 0: /*some work*/ break;
+     case 1: /*some work*/ break;
+     default: break;
+  }
 
--- 
-Sylwester Nawrocki
-Linux Platform Group
-Samsung Poland R&D Center
+  return err;
+}
+
+> You don't say what kernel version.
+
+My kernel version is 2.6.29
+
+> As 312 is already taken (we're now up to 369), and you're using .long, I
+> can only assume this is quite an old kernel... ?Modern kernels use CALL()
+> in calls.S to ensure that the number of syscalls are properly counted.
+
+call.S:
+
+CALL(sys_mycall)
+
+> So it's really not a good idea to create new syscalls for production code.
+> It's usually safer to write something like a char device driver and use
+> the read/write/ioctl methods instead.
+
+I understood. I just want to understand "how it works"
+
+> Have you checked the value of 'call' and nargs[call] ? ?Note that
+> copy_from_user() takes the number of _bytes_ to copy, not the number
+> of arguments.
+>
+
+Yes, i checked "call", as i show in code before. nargs i found in
+net/socket.c and it defined as:
+#define AL(x) ((x) * sizeof(unsigned long))
+static const unsigned char nargs[19]={
+	AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
+	AL(3),AL(3),AL(4),AL(4),AL(4),AL(6),
+	AL(6),AL(2),AL(5),AL(5),AL(3),AL(3),
+	AL(4)
+};
+
+I looking on SYSCALL_DEFINE2(socketcall, int, call, unsigned long
+__user *, args) and here is: if (copy_from_user(a, args,
+nargs[call])).
+I used that just as an example that i found..
