@@ -1,73 +1,85 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 11 Oct 2010 17:14:53 +0800
-Subject: [PATCH 01/14 v2] ARM: pxa: Introduce pxa[23]xx_map_io
-In-Reply-To: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
-References: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTi=Rh7HBue1w-i7VodkRw8JJBXhYnOghMLee7hGE@mail.gmail.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Mon, 11 Oct 2010 11:18:10 +0200
+Subject: [PATCH 2/7] perf: New helper function for pmu name
+In-Reply-To: <a72a7968f5e3f64a26875457a7451b34f896f5ae.1286584677.git.matt@console-pimps.org>
+References: <cover.1286584677.git.matt@console-pimps.org>
+	<a72a7968f5e3f64a26875457a7451b34f896f5ae.1286584677.git.matt@console-pimps.org>
+Message-ID: <20101011091809.GQ13563@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 8:20 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> This patch introduces pxa2xx_map_io() and pxa3xx_map_io() to distinguish between
-> PXA2xx and PXA3xx memory mapping.
->
-> Also, fixup for platforms broken after introducing pxa2xx_map_io() and
-> pxa3xx_map_io() is included.
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> v2: Fix spitz.c containing code from patch 02/14. Thanks, Igor.
->
-> ?arch/arm/mach-pxa/balloon3.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/capc7117.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/cm-x2xx.c ? ? ? ?| ? ?4 +-
-> ?arch/arm/mach-pxa/cm-x300.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/colibri-pxa270.c | ? ?4 +-
-> ?arch/arm/mach-pxa/colibri-pxa300.c | ? ?2 +-
-> ?arch/arm/mach-pxa/colibri-pxa320.c | ? ?2 +-
-> ?arch/arm/mach-pxa/corgi.c ? ? ? ? ?| ? ?6 ++--
-> ?arch/arm/mach-pxa/csb726.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/em-x270.c ? ? ? ?| ? ?4 +-
-> ?arch/arm/mach-pxa/eseries.c ? ? ? ?| ? 12 +++++-----
-> ?arch/arm/mach-pxa/ezx.c ? ? ? ? ? ?| ? 12 +++++-----
-> ?arch/arm/mach-pxa/generic.c ? ? ? ?| ? 37 ++++++++++++++++++++++++++++-------
-> ?arch/arm/mach-pxa/generic.h ? ? ? ?| ? ?3 +-
-> ?arch/arm/mach-pxa/gumstix.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/h5000.c ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/himalaya.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/hx4700.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/icontrol.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/idp.c ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/littleton.c ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/lpd270.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/lubbock.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/magician.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/mainstone.c ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/mioa701.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/mp900.c ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/palmld.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/palmt5.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/palmtc.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/palmte2.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/palmtreo.c ? ? ? | ? ?4 +-
-> ?arch/arm/mach-pxa/palmtx.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/palmz72.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/pcm027.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/poodle.c ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/raumfeld.c ? ? ? | ? ?6 ++--
-> ?arch/arm/mach-pxa/saar.c ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/spitz.c ? ? ? ? ?| ? ?7 +++--
-> ?arch/arm/mach-pxa/stargate2.c ? ? ?| ? ?4 +-
-> ?arch/arm/mach-pxa/tavorevb.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/tavorevb3.c ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/tosa.c ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/trizeps4.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/viper.c ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/vpac270.c ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/xcep.c ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/z2.c ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/zeus.c ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/zylonite.c ? ? ? | ? ?2 +-
-> ?50 files changed, 101 insertions(+), 78 deletions(-)
+On 08.10.10 20:46:17, Matt Fleming wrote:
+> Introduce perf_pmu_name() helper function that returns the name of the
+> pmu. This gives us a generic way to get the name of a pmu regardless of
+> how an architecture identifies it internally.
+> 
+> Signed-off-by: Matt Fleming <matt@console-pimps.org>
 
-Acked.
+Peter, I need your ack here.
+
+Thanks,
+
+-Robert
+
+> ---
+>  arch/sh/kernel/perf_event.c |    9 +++++++++
+>  include/linux/perf_event.h  |    1 +
+>  kernel/perf_event.c         |    5 +++++
+>  3 files changed, 15 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/sh/kernel/perf_event.c b/arch/sh/kernel/perf_event.c
+> index 2cb9ad5..55fe89b 100644
+> --- a/arch/sh/kernel/perf_event.c
+> +++ b/arch/sh/kernel/perf_event.c
+> @@ -59,6 +59,15 @@ static inline int sh_pmu_initialized(void)
+>  	return !!sh_pmu;
+>  }
+>  
+> +const char *perf_pmu_name(void)
+> +{
+> +	if (!sh_pmu)
+> +		return NULL;
+> +
+> +	return sh_pmu->name;
+> +}
+> +EXPORT_SYMBOL_GPL(perf_pmu_name);
+> +
+>  int perf_num_counters(void)
+>  {
+>  	if (!sh_pmu)
+> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+> index 1a02192..33f08da 100644
+> --- a/include/linux/perf_event.h
+> +++ b/include/linux/perf_event.h
+> @@ -850,6 +850,7 @@ extern int perf_max_events;
+>  extern const struct pmu *hw_perf_event_init(struct perf_event *event);
+>  
+>  extern int perf_num_counters(void);
+> +extern const char *perf_pmu_name(void);
+>  extern void perf_event_task_sched_in(struct task_struct *task);
+>  extern void perf_event_task_sched_out(struct task_struct *task, struct task_struct *next);
+>  extern void perf_event_task_tick(struct task_struct *task);
+> diff --git a/kernel/perf_event.c b/kernel/perf_event.c
+> index db5b560..fc51268 100644
+> --- a/kernel/perf_event.c
+> +++ b/kernel/perf_event.c
+> @@ -85,6 +85,11 @@ void __weak hw_perf_enable(void)		{ barrier(); }
+>  
+>  void __weak perf_event_print_debug(void)	{ }
+>  
+> +extern __weak const char *perf_pmu_name(void)
+> +{
+> +	return "pmu";
+> +}
+> +
+>  static DEFINE_PER_CPU(int, perf_disable_count);
+>  
+>  void perf_disable(void)
+> -- 
+> 1.7.1
+> 
+> 
+
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
