@@ -1,39 +1,33 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 11 Oct 2010 16:00:26 +0300
-Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
-In-Reply-To: <20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
-References: <1286790830-13505-1-git-send-email-felipe.contreras@gmail.com>
-	<1286790830-13505-2-git-send-email-felipe.contreras@gmail.com>
-	<20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
-Message-ID: <AANLkTikEC9yJuAZPr25+8F7Cggce3qO2b5aCz-7cQPd9@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Mon, 11 Oct 2010 15:02:06 +0200
+Subject: [PATCHv2] mxc/gpio: make _set_value work with values != 0/1
+Message-ID: <1286802126-11981-1-git-send-email-jacmet@sunsite.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 3:28 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
-> From: ext Felipe Contreras <felipe.contreras@gmail.com>
-> Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
-> Date: Mon, 11 Oct 2010 11:53:49 +0200
->
->> From: Felipe Contreras <felipe.contreras@nokia.com>
->>
->> It seems dsp-link will do this, and tidspbridge too at some point, but
->> right now it's not possible to select CONFIG_MPU_BRIDGE_IOMMU.
->
-> Why does it have to be selectable?
+Documentation/gpio.txt specifies that the value argument to
+gpio_set_value() should be handled as a boolean (E.G. != 0 is high),
+so use the same logic as in _set_direction().
 
-You mean why is it desirable to turn it off? Right now there's a mess
-of tidspbridge branches, some work, some don't, some have migrated to
-iommu, some don't. In mainline all this, plus the status on dsp-link,
-should be irrelevant, a configuration solves all the issues.
+Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+---
+ Use !! form, get rid of extra line
 
-Once the iommu migration works (haven't managed to get it working
-myself), and it has been merged into mainline, then we can think about
-enabling it unconditionally. In the meantime, enabling unconditionally
-would break the tidspbridge that is in staging (mainline).
+ arch/arm/plat-mxc/gpio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> Please Cc: linux-arm-kernel at lists.infradead.org too.
-
-Will do, after you reply the above.
-
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 57ec4a8..9d38da0 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -235,7 +235,7 @@ static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&port->lock, flags);
+-	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
++	l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
+ 	__raw_writel(l, reg);
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ }
 -- 
-Felipe Contreras
+1.7.1
