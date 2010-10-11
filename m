@@ -1,38 +1,34 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 11 Oct 2010 16:46:29 +0900
-Subject: [alsa-devel] [PATCH 4/4] ASoC: ep93xx: add Simplemachines Sim.One
-	AC97 audio support
-In-Reply-To: <20101011073816.GC27142@gw.healthdatacare.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 11 Oct 2010 10:47:31 +0300
+Subject: [PATCH 3/4] ARM: ep93xx: add AC97 platform support
+In-Reply-To: <4CB2166D.5080706@bluewatersys.com>
 References: <cover.1286707213.git.mika.westerberg@iki.fi>
-	<cbadad77a7e11b27fedd9e92fe05322291ca1377.1286707213.git.mika.westerberg@iki.fi>
-	<AANLkTi=PAp8pQeVM=GWYVVeKnf2-f+YG2bdSuu5QZH87@mail.gmail.com>
-	<20101011073816.GC27142@gw.healthdatacare.com>
-Message-ID: <AANLkTinWdma1673ayrnvwzPgD9M51YZRF60rad8CnU-y@mail.gmail.com>
+	<d63475d15634d7ffa4c4167cbead782a5aa1cfc9.1286707213.git.mika.westerberg@iki.fi>
+	<4CB2166D.5080706@bluewatersys.com>
+Message-ID: <20101011074731.GD27142@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 4:38 PM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> On Mon, Oct 11, 2010 at 09:22:51AM +0900, Jassi Brar wrote:
->> On Sun, Oct 10, 2010 at 7:54 PM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
->>
->> > +
->> > +static struct snd_soc_dai_link simone_dai = {
->> > + ? ? ? .name ? ? ? ? ? = "AC97",
->> > + ? ? ? .stream_name ? ?= "AC97 HiFi",
->> > + ? ? ? .cpu_dai ? ? ? ?= &ep93xx_ac97_dai,
->> > + ? ? ? .codec_dai ? ? ?= &ac97_dai,
->> > +};
->> ASoC no longer works on cpu and codec_dai. You need to only
->> provide the name of the dais... ASoC does string matching to
->> link appropriate dais in a link.
->>
->> You might want to give another thorough look to all of your drivers
->> under the new ASoC.
->
-> Thanks.
->
-> Which tree/branch should I use for preparing the driver to work
-> with the new ASoC? Is it the official
-> git://git.alsa-project.org/alsa-kernel tree or something else?
+On Mon, Oct 11, 2010 at 08:39:25AM +1300, Ryan Mallon wrote:
+> On 10/10/2010 11:54 PM, Mika Westerberg wrote:
+> > +
+> > +void __init ep93xx_register_ac97(void)
+> > +{
+> > +	/*
+> > +	 * Make sure that the AC97 pins are not used by I2S.
+> > +	 */
+> > +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONAC97);
+> > +	platform_device_register(&ep93xx_ac97_device);
+> > +}
+> 
+> The other ep93xx device support functions do this with acquire/release
+> functions. However, it is quite unlikely that a board will ever need to
+> switch from i2s to ac97 audio at runtime. Will see what Hartley thinks.
 
-http://git.kernel.org/?p=linux/kernel/git/broonie/sound-2.6.git;a=shortlog;h=refs/heads/for-2.6.37
+There is really no other option where to connect the AC97 codec.
+In cases where both are needed, one needs to mux I2S to the SSP
+pins. So not sure whether it makes sense to make the switch work
+at runtime.
+
+Thanks,
+MW
