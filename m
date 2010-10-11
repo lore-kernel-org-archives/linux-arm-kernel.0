@@ -1,174 +1,46 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 11 Oct 2010 17:22:59 +0900
-Subject: [PATCH v2 0/6] ARM: S5PV210: Add support S5PV210/S5PC110 CPUFREQ
-In-Reply-To: <003d01cb691a$eb71c8c0$c2555a40$@com>
-References: <1284962695-8542-1-git-send-email-sbkim73@samsung.com>
-	<004001cb6605$01ff4f90$05fdeeb0$@com>
-	<001501cb66ce$9dc54b40$d94fe1c0$%kim@samsung.com>
-	<AANLkTikJL+94qODxkQGxzEPj0SCS3BA4=XQozJSHCpyR@mail.gmail.com>
-	<003d01cb691a$eb71c8c0$c2555a40$@com>
-Message-ID: <AANLkTi=pQWw2rZ0ujQ5frkJR30Vz-WDfQEYDX4y6kPa9@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Oct 2010 09:25:35 +0100
+Subject: [PATCH 2/2] ftrace - add ftrace function_graph support on ARM
+In-Reply-To: <20101010220603.GA2723@debian>
+References: <4B91A39F.8050502@am.sony.com>
+	<20100306201849.GD13262@n2100.arm.linux.org.uk>
+	<AANLkTi=apGYBSSr4RK+ZZievacJRcOxrwW_o_hz85P0h@mail.gmail.com>
+	<20101009193757.GB28183@n2100.arm.linux.org.uk>
+	<20101010220603.GA2723@debian>
+Message-ID: <20101011082535.GA26355@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 5:04 PM, Sangbeom Kim <sbkim73@samsung.com> wrote:
-> On Monday, Oct 11, 2010 9:12 AM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
->>
->> Hello,
->>
->> On Fri, Oct 8, 2010 at 6:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Sangbeom Kim wrote:
->> >>
->> >> Hi all,
->> >> I know that there is another S5PV210 CPUFREQ patch from Mr. Ham.
->> >> But, That patchset seems to have unclear part.
->> >>
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-
->> August/023626.htm
->> >> l
->> >> The part of 'CONFIG_PM' is unclear and still have PM support part.
->> >> So, I think that this patch is more suitable for S5PV210/S5PC110
->> CPUFREQ
->> > in
->> >> the mainline.
->> >> because this patch implemented basic pm functionality and already
->> tested
->> > on
->> >> smdkv210 board.
->> >>
->> > Hi,
->> >
->> > So...I'd like to merge this for this merge window.
->> >
->> > Mr. Ham, how do you think?
->> > If any problems or opinions, please let me know.
->>
->>
->> You can go ahead as long as this patch include features that the
->> another addresses.
->>
->>
->> Anyway, the part that is under "CONFIG_PM" is intended to block
->> frequency changing while PM is doing something. For example, when the
->> system enters a sleep, if CPUFREQ somehow enters "100MHz/0.95V" just
->> before the sleep and wakes up, the voltage may stay at 0.95V (PMIC is
->> not turned off during sleep) while the frequency is reset to 800MHz
->> (by the bootloader), which requires, let's say, 1.1V. Such
->> inconsistency may lead to system hang and we have observed such cases
->> a few times. I intended to refuse any CPUFREQ requests at the
->> /mach-s5pv210/cpufreq.c when PM seems to start.
->>
->
-> We knew already that issue,
-> So we have a plan to implement with other solution.
-> (using regulator suspend feature)
->
->> It may seem that such feature is not needed if the voltage is not
->> optimized, however, CPUFREQ is useless if the voltage stays at 1.2V
->> and if the voltage changes properly according to the frequency, such
->> feature is required anyway.
->
-> Currently, there is no max8698 regulator driver on mainline.
-> After submission that driver, we can add voltage scaling feature.
->
-> Both issues have dependency on regulator driver.
+On Mon, Oct 11, 2010 at 03:36:03AM +0530, Rabin Vincent wrote:
+> On Sat, Oct 09, 2010 at 08:37:57PM +0100, Russell King - ARM Linux wrote:
+> > On Sat, Oct 09, 2010 at 11:20:50PM +0530, Rabin Vincent wrote:
+> > > It's used just for the C entry functions for interrupts: asm_do_IRQ()
+> > > and the IPI and local timer functions.
+> > > 
+> > > AFAICS __exception seems to be used only for is_exception_text().  If
+> > > that's the case, would it be OK to just place those functions in
+> > > __irq_entry if ftrace is built and have is_exception_text() check that
+> > > section too?
+> > 
+> > No.  is_exception_text() is used to detect those functions which have
+> > a specific stack layout - which is that there's a pt_regs struct on the
+> > stack.  Grouping other functions into that violates the expectation.
+> 
+> I'm not sure I follow.  These functions (asm_do_IRQ(), do_IPI(), and
+> do_local_timer()) will be the only ones in __irq_entry. iow, __irq_entry
+> will contain nothing else except these functions.  So we woudn't be
+> grouping other functions; it's just that some of the __exception
+> functions would be moved to the new section so that __exception and
+> __irq_entry combined will contain the functions with the specific stack
+> layout (and only those functions).
 
-Nope. it does not need to depend on any regulator drivers. We can
-simply stop changing frequency (or hold at a specific frequency) after
-suspend-to-mem is called. (probably at ".begin" stage). This depends
-on PM, but does NOT depend on REGULATOR.
+And now to go back to the original question I asked: What is __irq_entry
+used for?
 
-The approach in the removed patch was to set a flag at the .begin PM
-ops and deflag it at .end PM ops and let target function of CPUFREQ to
-read the flag to decide whether to accept the frequency change request
-and to set at the default frequency (i.e., 800MHz) when .begin ops is
-called and restore the frequency when .end ops is called.
+If it's to identify those functions which can't be traced through because
+of the stack layout, that's true of all __exception marked functions -
+so we might as well make the linker symbols for irqentry alias the
+exception text symbols.
 
-
->
->>
->>
->> ps. Anyway, such feature is also not included in my patch, either. :(
->> (tried to included, but the code was excluded at the patch patching
->> the patch.)
->>
->> >
->> > Thanks.
->> >
->> > Best regards,
->> > Kgene.
->> > --
->> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> > SW Solution Development Team, Samsung Electronics Co., Ltd.
->> >
->> >> Thanks and regards,
->> >> S.B. Kim
->> >>
->> >> > on Monday, September 20, 2010 3:05 PM, Sangbeom Kim
->> >> <sbkim73@samsung.com>
->> >> wrote:
->> >> >
->> >> > This patch adds CPUFREQ for S5PV210/S5PC110.
->> >> >
->> >> > Changes since v1:
->> >> >
->> >> > - Added MOUT_DMC0 and SCLK_DMC0 for checking the dmc0 clock in
->> >> CPUFREQ
->> >> > driver.
->> >> > - Removed hardcoding of DRAM refresh counter.
->> >> > - Added to calculate refresh counter function based on DRAM operation
->> >> freq.
->> >> >
->> >> > [PATCH v2 1/6] ARM: S5PV210: Add DMC map_desc table for supporting
->> DMC
->> >> > access
->> >> > [PATCH v2 2/6] ARM: S5PV210: Add struct clk_ops for clk_fout_apll
->> >> > [PATCH v2 3/6] ARM: S5PV210: Add MOUT_DMC0 and SCLK_DMC0 clocks
->> >> > [PATCH v2 4/6] ARM: S5PV210: Add Register definition for CMU
->> >> > [PATCH v2 5/6] ARM: S5PV210: Add support CPUFREQ
->> >> > [PATCH v2 6/6] ARM: S5PV210: Update Kconfig and Makefile for
->> supporting
->> >> > CPUFREQ driver
->> >> > --
->> >> > To unsubscribe from this list: send the line "unsubscribe linux-
->> samsung-
->> >> > soc" in
->> >> > the body of a message to majordomo at vger.kernel.org
->> >> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> >
->>
->>
->>
->> --
->> MyungJoo Ham (???), Ph.D.
->> Mobile Software Platform Lab,
->> Digital Media and Communications (DMC) Business
->> Samsung Electronics
->> cell: 82-10-6714-2858
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
-
--- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+I see nothing special of just the three functions you mention that warrant
+them being handled separately by ftrace.
