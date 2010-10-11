@@ -1,51 +1,92 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Mon, 11 Oct 2010 14:16:54 +0300
-Subject: [PATCH 3/3] staging: tidspbridge: remove memory consistency from
-	TODO list
-In-Reply-To: <201010111240.25759.arnd@arndb.de>
-References: <1286732440-28644-1-git-send-email-felipe.contreras@gmail.com>
-	<1286732440-28644-4-git-send-email-felipe.contreras@gmail.com>
-	<201010111240.25759.arnd@arndb.de>
-Message-ID: <AANLkTikq80dM_93k2byPXDexzz3J+g3Wiva3ieBbXmmf@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 Oct 2010 12:23:07 +0100
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<20101009000046.GA30616@kroah.com>
+	<20101009002546.GB14675@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
+	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
+Message-ID: <1286796187.19739.52.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 1:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 10 October 2010, Felipe Contreras wrote:
->> The mempool area is not handled by the kernel any more.
->
-> But tidspbridge still uses ioremap to set up the mapping for RAM,
-> even though it now is outside of the kernel linar mapping.
+On Mon, 2010-10-11 at 11:39 +0100, Felipe Contreras wrote:
+> On Mon, Oct 11, 2010 at 1:05 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > We could be a bit more flexible as a temporary solution. But that's a
+> > hack and doesn't guarantee the attributes that the driver requested. If
+> > the driver would use writel/readl, that's not too bad since we pushed
+> > explicit barriers in these macros.
+> >
+> > It would need to be improved to invalidate the corresponding cache lines
+> > (using the DMA API?) but it would look even worse.
+> >
+> >
+> > diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> > index 6bdf42c..082bbd0 100644
+> > --- a/arch/arm/mm/ioremap.c
+> > +++ b/arch/arm/mm/ioremap.c
+> > @@ -204,10 +204,13 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+> >  #endif
+> >
+> >        /*
+> > -        * Don't allow RAM to be mapped - this causes problems with ARMv6+
+> > +        * Don't allow RAM to be mapped as Device memory - this causes
+> > +        * problems with ARMv6+
+> >         */
+> >        if (WARN_ON(pfn_valid(pfn)))
+> > -               return NULL;
+> > +               if (__LINUX_ARM_ARCH__ >= 6 &&
+> > +                   (mtype != MT_DEVICE_CACHED || mtype != MT_DEVICE_WC))
+> > +                       mtype = MT_DEVICE_WC;
+> >
+> >        type = get_mem_type(mtype);
+> >        if (!type)
+> 
+> I will try that, but from what I can see this might still break some
+> drivers, right? 
 
-Which is what ioremap() complained about, and how Russell King
-suggested to solve the issue.
+Probably, it depends on how drivers use the memory returned by ioremap
+and the assumptions they make about the memory type (strict ordering,
+write buffers, speculation). I think such memory should be used via the
+I/O accessors and not directly, so you get the benefit of explicit
+memory barriers. If not, you have to cope with the loss of attributes
+because of the WC mapping.
 
-> You should really only use ioremap on MMIO registers, nothing
-> else. These registers are marked as __iomem pointers and can only
-> be passed into functions that talk to the hardware like iowrite32
-> or writel, but not used like memory.
+But as it has been said (and it's my opinion as well), the drivers are
+broken and are misusing the ioremap API.
 
+> Anyway, I'm reading the TRM and I can't find any mention of this.
+> Catalin, can you point out where is this mentioned, and also, can you
+> confirm if this would affect only the memory that has the double
+> mapping, or it can corrupt other memory as well?
 
->From bogus@does.not.exist.com  Sat Oct  9 07:11:57 2010
-From: bogus@does.not.exist.com ()
-Date: Sat, 09 Oct 2010 11:11:57 -0000
-Subject: No subject
-Message-ID: <mailman.1.1286795819.18522.linux-arm-kernel@lists.infradead.org>
+That's in the ARM ARM (Architecture Reference Manual), not a TRM.
 
-> Please have a look at "sparse", which will warn about address space
-> violations among other things. The tidspbridge driver is full of them,
-> and you should fix the code that sparse warns about, which will
-> also show you all the places where ioremap is used incorrectly.
+You never know what "unpredictable" means and this is specific to the
+processor implementation, not the ARM ARM. You should not mix different
+memory types for the same page.
 
-In one of my branches I moved ioremap() to arch/arm/mach-omap2/dsp.c
-and if I use sparse there, it gives no warning.
+Back in 2006 there was a discussion for a set of palliative measures in
+hardware (initially until the OSes are fixed) and these allow the same
+memory type but with different cacheability attributes (e.g. Normal
+Non-cacheable vs Normal Cacheable) given that care is taken in software
+wrt stale cache lines and speculation (but at least you don't get random
+corruption somewhere else). They would need to have the same
+shareability attributes though.
 
-I would prefer to map the memory some other way and make it
-non-cacheable, but I don't know any other way. Then, if readl/writel
-are still needed, only ioremap() that area. And finally, and
-hopefully, do cache flushes instead of requiring consistent memory.
-
-Cheers.
+With the hack above, MT_DEVICE_WC is actually Normal Non-cacheable
+memory. It needs cache flushing but it's not worse than the original
+ioremap allowing this. The driver may not work as expected though.
 
 -- 
-Felipe Contreras
+Catalin
