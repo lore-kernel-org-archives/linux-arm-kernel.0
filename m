@@ -1,102 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 11 Oct 2010 11:05:44 +0100
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <alpine.LFD.2.00.1010082210150.3107@xanadu.home>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<20101009000046.GA30616@kroah.com>
-	<20101009002546.GB14675@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
-Message-ID: <1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 11 Oct 2010 13:07:42 +0300
+Subject: [PATCH 2/4] ASoC: add ep93xx AC97 audio driver
+In-Reply-To: <20101011094717.GA9231@rakim.wolfsonmicro.main>
+References: <cover.1286707213.git.mika.westerberg@iki.fi>
+	<b0202066df3bb9732fbecca627d0149165905a95.1286707213.git.mika.westerberg@iki.fi>
+	<20101011094717.GA9231@rakim.wolfsonmicro.main>
+Message-ID: <20101011100742.GE27142@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2010-10-09 at 03:41 +0100, Nicolas Pitre wrote:
-> On Sat, 9 Oct 2010, Russell King - ARM Linux wrote:
+On Mon, Oct 11, 2010 at 10:47:18AM +0100, Mark Brown wrote:
+> On Sun, Oct 10, 2010 at 01:54:10PM +0300, Mika Westerberg wrote:
 > 
-> > On Fri, Oct 08, 2010 at 05:00:46PM -0700, Greg KH wrote:
-> > > But you can't expect that you make this change, and not fix up the
-> > > drivers, and people would be happy, right?  The rule for API changes
-> > > like this, or anything, is that the person making the change fixes the
-> > > other drivers, and that seems to be the issue here.
-> >
-> > Let's entirely revert the change and wait for people's data to be
-> > corrupted then.  I don't have the time nor the motivation to work
-> > through crap driver code to fix up these unreliable games which are
-> > already illegal on platforms such as x86.
-> >
-> > If people want their system to be unpredictable, then let's carry on
-> > giving them the rope to hang themselves in that manner.
-> >
-> > > Any pointers to patches where people have fixed up the drivers?
-> >
-> > Despite the discussion, I'm unaware of anyone really taking the issue
-> > seriously and producing any patches during the last six months.
-> >
-> > So, I say sod it, let's revert the change.
+> > +	mutex_lock(&info->lock);
+> > +
+> > +	INIT_COMPLETION(info->done);
 > 
-> I think that the real issue here is to avoid breaking those drivers
-> which were using this legitimately.  So what about this compromize
-> instead:
+> Do you really need to do this on every single register I/O?
+
+Sorry, didn't quite understand you. Do you mean that should I take
+the mutex and init the completion or wait for an interrupt?
+
 > 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 99627d3..4f071e4 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -201,6 +201,15 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
->         if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
->                 return NULL;
+> > +	ep93xx_ac97_write_reg(info, AC97S1DATA, reg);
+> > +	ep93xx_ac97_write_reg(info, AC97IM, AC97_SLOT2RXVALID);
+> > +	if (!wait_for_completion_timeout(&info->done, AC97_TIMEOUT)) {
+> > +		dev_warn(info->dev, "timeout reading register %x\n", reg);
+> > +		mutex_unlock(&info->lock);
+> > +		return -1;
 > 
-> +       /*
-> +        * Warn if RAM is mapped to discourage this usage. Let's forbid it
-> +        * outright on ARMv6+ where this became architecturally undefined
-> +        * in theory and causes memory corruption in practice.
-> +        */
-> +       if (WARN_ON(pfn_valid(pfn)))
-> +               if (__LINUX_ARM_ARCH__ >= 6)
-> +                       return NULL;
-> +
->         type = get_mem_type(mtype);
->         if (!type)
->                 return NULL;
+> Return a real error code.
 
-We could be a bit more flexible as a temporary solution. But that's a
-hack and doesn't guarantee the attributes that the driver requested. If
-the driver would use writel/readl, that's not too bad since we pushed
-explicit barriers in these macros.
+Ok, will do.
 
-It would need to be improved to invalidate the corresponding cache lines
-(using the DMA API?) but it would look even worse.
+> 
+> > +module_init(ep93xx_ac97_init);
+> > +module_exit(ep93xx_ac97_exit);
+> 
+> Put these next to the functions they're referencing.
 
+Ok.
 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 6bdf42c..082bbd0 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -204,10 +204,13 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- #endif
- 
- 	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 * Don't allow RAM to be mapped as Device memory - this causes
-+	 * problems with ARMv6+
- 	 */
- 	if (WARN_ON(pfn_valid(pfn)))
--		return NULL;
-+		if (__LINUX_ARM_ARCH__ >= 6 &&
-+		    (mtype != MT_DEVICE_CACHED || mtype != MT_DEVICE_WC))
-+			mtype = MT_DEVICE_WC;
- 
- 	type = get_mem_type(mtype);
- 	if (!type)
+> 
+> > +#ifndef _EP93XX_SND_SOC_AC97_H
+> > +#define _EP93XX_SND_SOC_AC97_H
+> > +
+> > +extern struct snd_soc_dai ep93xx_ac97_dai;
+> > +
+> > +#endif /* _EP93XX_SND_SOC_AC97_H */
+> 
+> This is not needed with current ASoC.  Are you sure you've tested with
+> current code?  You should always submit against the development version
+> of the subsystem you're working with for any new drivers - for ASoC
+> Jassi already pointed you at the tree, and you can in the general case
+> also look at -next.
 
+Yeah, sorry about that. I had the impression that using the latest
+mainline would be right thing to do :( I will base the next version
+against that tree pointed by Jassi.
 
-
--- 
-Catalin
+Thanks for the comments,
+MW
