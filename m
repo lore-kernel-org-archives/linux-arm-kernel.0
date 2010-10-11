@@ -1,402 +1,273 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 11 Oct 2010 02:20:24 +0200
-Subject: [PATCH 06/14 RESEND] ARM: pxa: Rename Colibri evalboard
+Date: Mon, 11 Oct 2010 02:20:26 +0200
+Subject: [PATCH 08/14 RESEND] ARM: pxa: Modularize Palm Tungsten|C
 In-Reply-To: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
 References: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1286756432-5873-6-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1286756432-5873-8-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename colibri-pxa270-evalboard to colibri-evalboard as this board is used with
-all Colibri modules.
-
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Daniel Mack <daniel@caiaq.de>
 ---
- arch/arm/mach-pxa/Kconfig                    |    2 +-
- arch/arm/mach-pxa/Makefile                   |    2 +-
- arch/arm/mach-pxa/colibri-evalboard.c        |  121 ++++++++++++++++++++++++++
- arch/arm/mach-pxa/colibri-pxa270-evalboard.c |  121 --------------------------
- arch/arm/mach-pxa/colibri-pxa270.c           |    6 +-
- arch/arm/mach-pxa/colibri-pxa300.c           |    4 +-
- arch/arm/mach-pxa/colibri-pxa320.c           |    4 +-
- arch/arm/mach-pxa/include/mach/colibri.h     |    8 +-
- 8 files changed, 134 insertions(+), 134 deletions(-)
- create mode 100644 arch/arm/mach-pxa/colibri-evalboard.c
- delete mode 100644 arch/arm/mach-pxa/colibri-pxa270-evalboard.c
+ arch/arm/mach-pxa/palmtc.c |  147 ++++++++++++++++++++++++++++++++++---------
+ 1 files changed, 116 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index b44d613..e0ac5aa 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -249,7 +249,7 @@ config MACH_COLIBRI320
- 	select PXA3xx
- 	select CPU_PXA320
+diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+index b64ed70..2576e63 100644
+--- a/arch/arm/mach-pxa/palmtc.c
++++ b/arch/arm/mach-pxa/palmtc.c
+@@ -25,6 +25,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/mtd/physmap.h>
++#include <linux/usb/gpio_vbus.h>
  
--config MACH_COLIBRI_PXA270_EVALBOARD
-+config MACH_COLIBRI_EVALBOARD
- 	bool "Toradex Colibri Evaluation Carrier Board support"
- 	depends on MACH_COLIBRI || MACH_COLIBRI300 || MACH_COLIBRI320
- 
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index e2f89c2..3197756 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -60,7 +60,7 @@ obj-$(CONFIG_MACH_LOGICPD_PXA270)	+= lpd270.o
- obj-$(CONFIG_MACH_PCM027)		+= pcm027.o
- obj-$(CONFIG_MACH_PCM990_BASEBOARD)	+= pcm990-baseboard.o
- obj-$(CONFIG_MACH_COLIBRI)			+= colibri-pxa270.o
--obj-$(CONFIG_MACH_COLIBRI_PXA270_EVALBOARD)	+= colibri-pxa270-evalboard.o
-+obj-$(CONFIG_MACH_COLIBRI_EVALBOARD)	+= colibri-evalboard.o
- obj-$(CONFIG_MACH_COLIBRI_PXA270_INCOME)	+= colibri-pxa270-income.o
- obj-$(CONFIG_MACH_COLIBRI300)	+= colibri-pxa3xx.o colibri-pxa300.o
- obj-$(CONFIG_MACH_COLIBRI320)	+= colibri-pxa3xx.o colibri-pxa320.o
-diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
-new file mode 100644
-index 0000000..6b2c800
---- /dev/null
-+++ b/arch/arm/mach-pxa/colibri-evalboard.c
-@@ -0,0 +1,121 @@
-+/*
-+ *  linux/arch/arm/mach-pxa/colibri-evalboard.c
-+ *
-+ *  Support for Toradex Colibri Evaluation Carrier Board
-+ *  Daniel Mack <daniel@caiaq.de>
-+ *  Marek Vasut <marek.vasut@gmail.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/sysdev.h>
-+#include <linux/interrupt.h>
-+#include <linux/gpio.h>
-+#include <asm/mach-types.h>
-+#include <mach/hardware.h>
-+#include <asm/mach/arch.h>
-+#include <linux/i2c.h>
-+
-+#include <mach/pxa27x.h>
-+#include <mach/colibri.h>
-+#include <mach/mmc.h>
-+#include <mach/ohci.h>
-+#include <mach/pxa27x-udc.h>
-+
-+#include <plat/i2c.h>
-+
-+#include "generic.h"
-+#include "devices.h"
-+
-+/******************************************************************************
-+ * SD/MMC card controller
-+ ******************************************************************************/
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -116,6 +117,7 @@ static unsigned long palmtc_pin_config[] __initdata = {
+ /******************************************************************************
+  * SD/MMC card controller
+  ******************************************************************************/
 +#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
-+static struct pxamci_platform_data colibri_mci_platform_data = {
-+	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
-+	.gpio_power		= -1,
-+	.gpio_card_ro		= -1,
-+	.detect_delay_ms	= 200,
-+};
-+
-+static void __init colibri_mmc_init(void)
+ static struct pxamci_platform_data palmtc_mci_platform_data = {
+ 	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
+ 	.gpio_power		= GPIO_NR_PALMTC_SD_POWER,
+@@ -124,9 +126,18 @@ static struct pxamci_platform_data palmtc_mci_platform_data = {
+ 	.detect_delay_ms	= 200,
+ };
+ 
++static void __init palmtc_mmc_init(void)
 +{
-+	if (machine_is_colibri())	/* PXA270 Colibri */
-+		colibri_mci_platform_data.gpio_card_detect =
-+			GPIO0_COLIBRI_PXA270_SD_DETECT;
-+	if (machine_is_colibri300())	/* PXA300 Colibri */
-+		colibri_mci_platform_data.gpio_card_detect =
-+			GPIO39_COLIBRI_PXA300_SD_DETECT;
-+	else				/* PXA320 Colibri */
-+		colibri_mci_platform_data.gpio_card_detect =
-+			GPIO28_COLIBRI_PXA320_SD_DETECT;
-+
-+	pxa_set_mci_info(&colibri_mci_platform_data);
++	pxa_set_mci_info(&palmtc_mci_platform_data);
 +}
 +#else
-+static inline void colibri_mmc_init(void) {}
++static inline void palmtc_mmc_init(void) {}
 +#endif
 +
-+/******************************************************************************
-+ * USB Host
-+ ******************************************************************************/
-+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-+static int colibri_ohci_init(struct device *dev)
+ /******************************************************************************
+  * GPIO keys
+  ******************************************************************************/
++#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+ static struct gpio_keys_button palmtc_pxa_buttons[] = {
+ 	{KEY_F8, GPIO_NR_PALMTC_HOTSYNC_BUTTON, 1, "HotSync Button", EV_KEY, 1},
+ };
+@@ -144,9 +155,18 @@ static struct platform_device palmtc_pxa_keys = {
+ 	},
+ };
+ 
++static void __init palmtc_keys_init(void)
 +{
-+	UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
-+	return 0;
-+}
-+
-+static struct pxaohci_platform_data colibri_ohci_info = {
-+	.port_mode	= PMM_PERPORT_MODE,
-+	.flags		= ENABLE_PORT1 |
-+			  POWER_CONTROL_LOW | POWER_SENSE_LOW,
-+	.init		= colibri_ohci_init,
-+};
-+
-+static void __init colibri_uhc_init(void)
-+{
-+	/* Colibri PXA270 has two usb ports, TBA for 320 */
-+	if (machine_is_colibri())
-+		colibri_ohci_info.flags	|= ENABLE_PORT2;
-+
-+	pxa_set_ohci_info(&colibri_ohci_info);
++	platform_device_register(&palmtc_pxa_keys);
 +}
 +#else
-+static inline void colibri_uhc_init(void) {}
++static inline void palmtc_keys_init(void) {}
 +#endif
 +
-+/******************************************************************************
-+ * I2C RTC
-+ ******************************************************************************/
-+#if defined(CONFIG_RTC_DRV_DS1307) || defined(CONFIG_RTC_DRV_DS1307_MODULE)
-+static struct i2c_board_info __initdata colibri_i2c_devs[] = {
-+	{
-+		I2C_BOARD_INFO("m41t00", 0x68),
+ /******************************************************************************
+  * Backlight
+  ******************************************************************************/
++#if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
+ static int palmtc_backlight_init(struct device *dev)
+ {
+ 	int ret;
+@@ -196,17 +216,35 @@ static struct platform_device palmtc_backlight = {
+ 	},
+ };
+ 
++static void __init palmtc_pwm_init(void)
++{
++	platform_device_register(&palmtc_backlight);
++}
++#else
++static inline void palmtc_pwm_init(void) {}
++#endif
++
+ /******************************************************************************
+  * IrDA
+  ******************************************************************************/
++#if defined(CONFIG_IRDA) || defined(CONFIG_IRDA_MODULE)
+ static struct pxaficp_platform_data palmtc_ficp_platform_data = {
+ 	.gpio_pwdown		= GPIO_NR_PALMTC_IR_DISABLE,
+ 	.transceiver_cap	= IR_SIRMODE | IR_OFF,
+ };
+ 
++static void __init palmtc_irda_init(void)
++{
++	pxa_set_ficp_info(&palmtc_ficp_platform_data);
++}
++#else
++static inline void palmtc_irda_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Keyboard
+  ******************************************************************************/
++#if defined(CONFIG_KEYBOARD_MATRIX) || defined(CONFIG_KEYBOARD_MATRIX_MODULE)
+ static const uint32_t palmtc_matrix_keys[] = {
+ 	KEY(0, 0, KEY_F1),
+ 	KEY(0, 1, KEY_X),
+@@ -290,27 +328,63 @@ static struct platform_device palmtc_keyboard = {
+ 		.platform_data = &palmtc_keypad_platform_data,
+ 	},
+ };
++static void __init palmtc_mkp_init(void)
++{
++	platform_device_register(&palmtc_keyboard);
++}
++#else
++static inline void palmtc_mkp_init(void) {}
++#endif
+ 
+ /******************************************************************************
+  * UDC
+  ******************************************************************************/
+-static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
++#if defined(CONFIG_USB_GADGET_PXA25X)||defined(CONFIG_USB_GADGET_PXA25X_MODULE)
++static struct gpio_vbus_mach_info palmtc_udc_info = {
+ 	.gpio_vbus		= GPIO_NR_PALMTC_USB_DETECT_N,
+ 	.gpio_vbus_inverted	= 1,
+ 	.gpio_pullup		= GPIO_NR_PALMTC_USB_POWER,
+ };
+ 
++static struct platform_device palmtc_gpio_vbus = {
++	.name	= "gpio-vbus",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &palmtc_udc_info,
 +	},
 +};
 +
-+static void __init colibri_rtc_init(void)
++static void __init palmtc_udc_init(void)
 +{
-+	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(colibri_i2c_devs));
-+}
++	platform_device_register(&palmtc_gpio_vbus);
++};
 +#else
-+static inline void colibri_rtc_init(void) {}
++static inline void palmtc_udc_init(void) {}
 +#endif
 +
-+void __init colibri_evalboard_init(void)
-+{
-+	pxa_set_ffuart_info(NULL);
-+	pxa_set_btuart_info(NULL);
-+	pxa_set_stuart_info(NULL);
-+
-+	colibri_mmc_init();
-+	colibri_uhc_init();
-+	colibri_rtc_init();
-+}
-diff --git a/arch/arm/mach-pxa/colibri-pxa270-evalboard.c b/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-deleted file mode 100644
-index 7f27aec..0000000
---- a/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-+++ /dev/null
-@@ -1,121 +0,0 @@
--/*
-- *  linux/arch/arm/mach-pxa/colibri-pxa270-evalboard.c
-- *
-- *  Support for Toradex PXA270 based Colibri Evaluation Carrier Board
-- *  Daniel Mack <daniel@caiaq.de>
-- *  Marek Vasut <marek.vasut@gmail.com>
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- */
--
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/sysdev.h>
--#include <linux/interrupt.h>
--#include <linux/gpio.h>
--#include <asm/mach-types.h>
--#include <mach/hardware.h>
--#include <asm/mach/arch.h>
--#include <linux/i2c.h>
--
--#include <mach/pxa27x.h>
--#include <mach/colibri.h>
--#include <mach/mmc.h>
--#include <mach/ohci.h>
--#include <mach/pxa27x-udc.h>
--
--#include <plat/i2c.h>
--
--#include "generic.h"
--#include "devices.h"
--
--/******************************************************************************
-- * SD/MMC card controller
-- ******************************************************************************/
--#if defined(CONFIG_MMC_PXA) || defined(CONFIG_MMC_PXA_MODULE)
--static struct pxamci_platform_data colibri_pxa270_mci_platform_data = {
--	.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34,
--	.gpio_power		= -1,
--	.gpio_card_ro		= -1,
--	.detect_delay_ms	= 200,
--};
--
--static void __init colibri_pxa270_mmc_init(void)
--{
--	if (machine_is_colibri())	/* PXA270 Colibri */
--		colibri_pxa270_mci_platform_data.gpio_card_detect =
--			GPIO0_COLIBRI_PXA270_SD_DETECT;
--	if (machine_is_colibri300())	/* PXA300 Colibri */
--		colibri_pxa270_mci_platform_data.gpio_card_detect =
--			GPIO39_COLIBRI_PXA300_SD_DETECT;
--	else				/* PXA320 Colibri */
--		colibri_pxa270_mci_platform_data.gpio_card_detect =
--			GPIO28_COLIBRI_PXA320_SD_DETECT;
--
--	pxa_set_mci_info(&colibri_pxa270_mci_platform_data);
--}
--#else
--static inline void colibri_pxa270_mmc_init(void) {}
--#endif
--
--/******************************************************************************
-- * USB Host
-- ******************************************************************************/
--#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
--static int colibri_pxa270_ohci_init(struct device *dev)
--{
--	UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
--	return 0;
--}
--
--static struct pxaohci_platform_data colibri_pxa270_ohci_info = {
--	.port_mode	= PMM_PERPORT_MODE,
--	.flags		= ENABLE_PORT1 |
--			  POWER_CONTROL_LOW | POWER_SENSE_LOW,
--	.init		= colibri_pxa270_ohci_init,
--};
--
--static void __init colibri_pxa270_uhc_init(void)
--{
--	/* Colibri PXA270 has two usb ports, TBA for 320 */
--	if (machine_is_colibri())
--		colibri_pxa270_ohci_info.flags	|= ENABLE_PORT2;
--
--	pxa_set_ohci_info(&colibri_pxa270_ohci_info);
--}
--#else
--static inline void colibri_pxa270_uhc_init(void) {}
--#endif
--
--/******************************************************************************
-- * I2C RTC
-- ******************************************************************************/
--#if defined(CONFIG_RTC_DRV_DS1307) || defined(CONFIG_RTC_DRV_DS1307_MODULE)
--static struct i2c_board_info __initdata colibri_pxa270_i2c_devs[] = {
--	{
--		I2C_BOARD_INFO("m41t00", 0x68),
--	},
--};
--
--static void __init colibri_pxa270_rtc_init(void)
--{
--	pxa_set_i2c_info(NULL);
--	i2c_register_board_info(0, ARRAY_AND_SIZE(colibri_pxa270_i2c_devs));
--}
--#else
--static inline void colibri_pxa270_rtc_init(void) {}
--#endif
--
--void __init colibri_pxa270_evalboard_init(void)
--{
--	pxa_set_ffuart_info(NULL);
--	pxa_set_btuart_info(NULL);
--	pxa_set_stuart_info(NULL);
--
--	colibri_pxa270_mmc_init();
--	colibri_pxa270_uhc_init();
--	colibri_pxa270_rtc_init();
--}
-diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-index bab2545..7edd963 100644
---- a/arch/arm/mach-pxa/colibri-pxa270.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270.c
-@@ -35,7 +35,7 @@
  /******************************************************************************
-  * Evaluation board MFP
+  * Touchscreen / Battery / GPIO-extender
   ******************************************************************************/
--#ifdef	 CONFIG_MACH_COLIBRI_PXA270_EVALBOARD
-+#ifdef	 CONFIG_MACH_COLIBRI_EVALBOARD
- static mfp_cfg_t colibri_pxa270_evalboard_pin_config[] __initdata = {
- 	/* MMC */
- 	GPIO32_MMC_CLK,
-@@ -281,10 +281,10 @@ static void __init colibri_pxa270_init(void)
- 	colibri_pxa270_tsc_init();
- 
- 	switch (colibri_pxa270_baseboard) {
--	case COLIBRI_PXA270_EVALBOARD:
-+	case COLIBRI_EVALBOARD:
- 		pxa2xx_mfp_config(ARRAY_AND_SIZE(
- 			colibri_pxa270_evalboard_pin_config));
--		colibri_pxa270_evalboard_init();
-+		colibri_evalboard_init();
- 		break;
- 	case COLIBRI_PXA270_INCOME:
- 		pxa2xx_mfp_config(ARRAY_AND_SIZE(income_pin_config));
-diff --git a/arch/arm/mach-pxa/colibri-pxa300.c b/arch/arm/mach-pxa/colibri-pxa300.c
-index bd9da55..39c5c39 100644
---- a/arch/arm/mach-pxa/colibri-pxa300.c
-+++ b/arch/arm/mach-pxa/colibri-pxa300.c
-@@ -32,7 +32,7 @@
- #include "devices.h"
- 
- 
--#ifdef CONFIG_MACH_COLIBRI_PXA270_EVALBOARD
-+#ifdef CONFIG_MACH_COLIBRI_EVALBOARD
- static mfp_cfg_t colibri_pxa300_evalboard_pin_config[] __initdata = {
- 	/* MMC */
- 	GPIO7_MMC1_CLK,
-@@ -173,7 +173,7 @@ void __init colibri_pxa300_init(void)
- 
- 	/* Evalboard init */
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa300_evalboard_pin_config));
--	colibri_pxa270_evalboard_init();
-+	colibri_evalboard_init();
- }
- 
- MACHINE_START(COLIBRI300, "Toradex Colibri PXA300")
-diff --git a/arch/arm/mach-pxa/colibri-pxa320.c b/arch/arm/mach-pxa/colibri-pxa320.c
-index 1c64e00..07f32c6 100644
---- a/arch/arm/mach-pxa/colibri-pxa320.c
-+++ b/arch/arm/mach-pxa/colibri-pxa320.c
-@@ -35,7 +35,7 @@
- #include "generic.h"
- #include "devices.h"
- 
--#ifdef	CONFIG_MACH_COLIBRI_PXA270_EVALBOARD
-+#ifdef	CONFIG_MACH_COLIBRI_EVALBOARD
- static mfp_cfg_t colibri_pxa320_evalboard_pin_config[] __initdata = {
- 	/* MMC */
- 	GPIO22_MMC1_CLK,
-@@ -229,7 +229,7 @@ void __init colibri_pxa320_init(void)
- 
- 	/* Evalboard init */
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(colibri_pxa320_evalboard_pin_config));
--	colibri_pxa270_evalboard_init();
-+	colibri_evalboard_init();
- }
- 
- MACHINE_START(COLIBRI320, "Toradex Colibri PXA320")
-diff --git a/arch/arm/mach-pxa/include/mach/colibri.h b/arch/arm/mach-pxa/include/mach/colibri.h
-index 63a948a..388a96f 100644
---- a/arch/arm/mach-pxa/include/mach/colibri.h
-+++ b/arch/arm/mach-pxa/include/mach/colibri.h
-@@ -9,14 +9,14 @@
-  */
- 
- enum {
--	COLIBRI_PXA270_EVALBOARD = 0,
-+	COLIBRI_EVALBOARD = 0,
- 	COLIBRI_PXA270_INCOME,
+-static struct platform_device palmtc_ucb1400_core = {
++#if	defined(CONFIG_TOUCHSCREEN_UCB1400) || \
++	defined(CONFIG_TOUCHSCREEN_UCB1400_MODULE)
++static struct platform_device palmtc_ucb1400_device = {
+ 	.name	= "ucb1400_core",
+ 	.id	= -1,
  };
  
--#if defined(CONFIG_MACH_COLIBRI_PXA270_EVALBOARD)
--extern void colibri_pxa270_evalboard_init(void);
-+#if defined(CONFIG_MACH_COLIBRI_EVALBOARD)
-+extern void colibri_evalboard_init(void);
- #else
--static inline void colibri_pxa270_evalboard_init(void) {}
-+static inline void colibri_evalboard_init(void) {}
- #endif
++static void __init palmtc_ts_init(void)
++{
++	pxa_set_ac97_info(NULL);
++	platform_device_register(&palmtc_ucb1400_device);
++}
++#else
++static inline void palmtc_ts_init(void) {}
++#endif
++
+ /******************************************************************************
+  * NOR Flash
+  ******************************************************************************/
++#if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
+ static struct resource palmtc_flash_resource = {
+ 	.start	= PXA_CS0_PHYS,
+ 	.end	= PXA_CS0_PHYS + SZ_16M - 1,
+@@ -356,24 +430,33 @@ static struct platform_device palmtc_flash = {
+ 	},
+ };
  
- #if defined(CONFIG_MACH_COLIBRI_PXA270_INCOME)
++static void __init palmtc_nor_init(void)
++{
++	platform_device_register(&palmtc_flash);
++}
++#else
++static inline void palmtc_nor_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Framebuffer
+  ******************************************************************************/
++#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
+ static struct pxafb_mode_info palmtc_lcd_modes[] = {
+-{
+-	.pixclock	= 115384,
+-	.xres		= 320,
+-	.yres		= 320,
+-	.bpp		= 16,
+-
+-	.left_margin	= 27,
+-	.right_margin	= 7,
+-	.upper_margin	= 7,
+-	.lower_margin	= 8,
+-
+-	.hsync_len	= 6,
+-	.vsync_len	= 1,
+-},
++	{
++		.pixclock	= 115384,
++		.xres		= 320,
++		.yres		= 320,
++		.bpp		= 16,
++
++		.left_margin	= 27,
++		.right_margin	= 7,
++		.upper_margin	= 7,
++		.lower_margin	= 8,
++
++		.hsync_len	= 6,
++		.vsync_len	= 1,
++	},
+ };
+ 
+ static struct pxafb_mach_info palmtc_lcd_screen = {
+@@ -382,17 +465,17 @@ static struct pxafb_mach_info palmtc_lcd_screen = {
+ 	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
+ };
+ 
++static void __init palmtc_lcd_init(void)
++{
++	set_pxa_fb_info(&palmtc_lcd_screen);
++}
++#else
++static inline void palmtc_lcd_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Machine init
+  ******************************************************************************/
+-static struct platform_device *devices[] __initdata = {
+-	&palmtc_backlight,
+-	&palmtc_ucb1400_core,
+-	&palmtc_keyboard,
+-	&palmtc_pxa_keys,
+-	&palmtc_flash,
+-};
+-
+ static void __init palmtc_init(void)
+ {
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmtc_pin_config));
+@@ -402,13 +485,15 @@ static void __init palmtc_init(void)
+ 	pxa_set_stuart_info(NULL);
+ 	pxa_set_hwuart_info(NULL);
+ 
+-	set_pxa_fb_info(&palmtc_lcd_screen);
+-	pxa_set_mci_info(&palmtc_mci_platform_data);
+-	pxa_set_udc_info(&palmtc_udc_info);
+-	pxa_set_ac97_info(NULL);
+-	pxa_set_ficp_info(&palmtc_ficp_platform_data);
+-
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
++	palmtc_mmc_init();
++	palmtc_keys_init();
++	palmtc_pwm_init();
++	palmtc_irda_init();
++	palmtc_mkp_init();
++	palmtc_udc_init();
++	palmtc_ts_init();
++	palmtc_nor_init();
++	palmtc_lcd_init();
+ };
+ 
+ MACHINE_START(PALMTC, "Palm Tungsten|C")
 -- 
 1.7.1
