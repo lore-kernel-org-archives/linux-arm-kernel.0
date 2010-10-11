@@ -1,24 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Oct 2010 10:44:04 +0100
-Subject: [PATCHv2] mmci: work with only one irq
-In-Reply-To: <1286755601-25664-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1277198267-10860-12-git-send-email-rabin.vincent@stericsson.com>
-	<1286755601-25664-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <20101011094404.GB27153@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 11 Oct 2010 10:47:18 +0100
+Subject: [PATCH 2/4] ASoC: add ep93xx AC97 audio driver
+In-Reply-To: <b0202066df3bb9732fbecca627d0149165905a95.1286707213.git.mika.westerberg@iki.fi>
+References: <cover.1286707213.git.mika.westerberg@iki.fi>
+	<b0202066df3bb9732fbecca627d0149165905a95.1286707213.git.mika.westerberg@iki.fi>
+Message-ID: <20101011094717.GA9231@rakim.wolfsonmicro.main>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 05:36:41AM +0530, Rabin Vincent wrote:
-> @@ -276,6 +292,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->  	if (status & MCI_DATAEND) {
->  		mmci_stop_data(host);
->  
-> +		/* MCI_DATABLOCKEND not used with single irq */
-> +		if (host->singleirq && !data->error)
-> +			host->data_xfered = data->blksz * data->blocks;
-> +
+On Sun, Oct 10, 2010 at 01:54:10PM +0300, Mika Westerberg wrote:
 
-I'm uneasy about this.  If we don't get datablockend interrupts, then
-when there's an error we don't know how much data was transferred, and
-with big requests, we're going to have a very long time spent retrying
-block by block.
+> +	mutex_lock(&info->lock);
+> +
+> +	INIT_COMPLETION(info->done);
+
+Do you really need to do this on every single register I/O?
+
+> +	ep93xx_ac97_write_reg(info, AC97S1DATA, reg);
+> +	ep93xx_ac97_write_reg(info, AC97IM, AC97_SLOT2RXVALID);
+> +	if (!wait_for_completion_timeout(&info->done, AC97_TIMEOUT)) {
+> +		dev_warn(info->dev, "timeout reading register %x\n", reg);
+> +		mutex_unlock(&info->lock);
+> +		return -1;
+
+Return a real error code.
+
+> +module_init(ep93xx_ac97_init);
+> +module_exit(ep93xx_ac97_exit);
+
+Put these next to the functions they're referencing.
+
+> +#ifndef _EP93XX_SND_SOC_AC97_H
+> +#define _EP93XX_SND_SOC_AC97_H
+> +
+> +extern struct snd_soc_dai ep93xx_ac97_dai;
+> +
+> +#endif /* _EP93XX_SND_SOC_AC97_H */
+
+This is not needed with current ASoC.  Are you sure you've tested with
+current code?  You should always submit against the development version
+of the subsystem you're working with for any new drivers - for ASoC
+Jassi already pointed you at the tree, and you can in the general case
+also look at -next.
