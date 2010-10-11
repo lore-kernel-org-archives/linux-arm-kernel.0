@@ -1,34 +1,28 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 11 Oct 2010 18:44:59 +0200
-Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
-In-Reply-To: <20101011163255.GA21335@void.printf.net>
-References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
-	<20101011163255.GA21335@void.printf.net>
-Message-ID: <20101011164459.GB476@pengutronix.de>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Mon, 11 Oct 2010 18:55:38 +0200
+Subject: [PATCH] mx51: add resources for SD/MMC on i.MX51
+In-Reply-To: <20101011162837.GA476@pengutronix.de>
+References: <1286813142-14936-1-git-send-email-eric@eukrea.com>
+	<20101011162837.GA476@pengutronix.de>
+Message-ID: <4CB3418A.3020809@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Wolfram,
 
-> > Wolfram Sang (6):
-> >   mmc: sdhci-pltfm: Add structure for host-specific data
-> >   mmc: sdhci-pltfm: move .h-file into apropriate subdir
-> >   mmc: sdhci: introduce private get_ro
-> >   mmc: sdhci_pltfm: pass more data on custom init-call
-> >   mmc: sdhci-of-esdhc: factor out common stuff
-> >   mmc: sdhci-pltfm: add pltfm-driver for imx35/51
-> 
-> Mind fixing up the >80 char lines in the last two patches?  It's just:
+Le 11/10/2010 18:28, Wolfram Sang a ?crit :
+> On Mon, Oct 11, 2010 at 06:05:42PM +0200, Eric B?nard wrote:
+>> the attached patch allows SD to work on i.MX51 with Wolfram's drivers
+>> Tested on i.MX51.
+>>
+>> From: Richard Zhu<r65037@freescale.com>
+>> Signed-off-by: Eric B?nard<eric@eukrea.com>
+>
+> Hmm, Uwe had some (valid IMHO) comments about this patch which have not all
+> been addressed so far. Richard, are you still working on this?
+>
+OK, is this this review
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-September/027269.html 
+? If yes, I can submit a fixed patch asap.
 
-Sigh, I don't think it will help the readability of the code, but if it can't
-be helped...
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101011/10b93013/attachment.sig>
+Eric
