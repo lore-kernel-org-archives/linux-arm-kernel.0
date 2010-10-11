@@ -1,25 +1,66 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 12 Oct 2010 00:31:39 +0900
-Subject: [PATCH 2/7] perf: New helper function for pmu name
-In-Reply-To: <a72a7968f5e3f64a26875457a7451b34f896f5ae.1286584677.git.matt@console-pimps.org>
-References: <cover.1286584677.git.matt@console-pimps.org>
-	<a72a7968f5e3f64a26875457a7451b34f896f5ae.1286584677.git.matt@console-pimps.org>
-Message-ID: <20101011153139.GA12338@linux-sh.org>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Mon, 11 Oct 2010 10:54:23 -0500
+Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+In-Reply-To: <AANLkTikEC9yJuAZPr25+8F7Cggce3qO2b5aCz-7cQPd9@mail.gmail.com>
+References: <1286790830-13505-1-git-send-email-felipe.contreras@gmail.com>
+	<1286790830-13505-2-git-send-email-felipe.contreras@gmail.com>
+	<20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
+	<AANLkTikEC9yJuAZPr25+8F7Cggce3qO2b5aCz-7cQPd9@mail.gmail.com>
+Message-ID: <496565EC904933469F292DDA3F1663E602F47B2C14@dlee06.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 09, 2010 at 01:46:17AM +0100, Matt Fleming wrote:
-> Introduce perf_pmu_name() helper function that returns the name of the
-> pmu. This gives us a generic way to get the name of a pmu regardless of
-> how an architecture identifies it internally.
-> 
-> Signed-off-by: Matt Fleming <matt@console-pimps.org>
-> ---
->  arch/sh/kernel/perf_event.c |    9 +++++++++
->  include/linux/perf_event.h  |    1 +
->  kernel/perf_event.c         |    5 +++++
->  3 files changed, 15 insertions(+), 0 deletions(-)
-> 
-This part is obviously fine with me, too.
+ 
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+> -----Original Message-----
+> From: Felipe Contreras [mailto:felipe.contreras at gmail.com] 
+> Sent: Monday, October 11, 2010 8:00 AM
+> To: Hiroshi DOYU
+> Cc: linux-omap at vger.kernel.org; greg at kroah.com; 
+> felipe.contreras at nokia.com; Guzman Lugo, Fernando; Marathe, 
+> Yogesh; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+> 
+> On Mon, Oct 11, 2010 at 3:28 PM, Hiroshi DOYU 
+> <Hiroshi.DOYU@nokia.com> wrote:
+> > From: ext Felipe Contreras <felipe.contreras@gmail.com>
+> > Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+> > Date: Mon, 11 Oct 2010 11:53:49 +0200
+> >
+> >> From: Felipe Contreras <felipe.contreras@nokia.com>
+> >>
+> >> It seems dsp-link will do this, and tidspbridge too at some point, 
+> >> but right now it's not possible to select CONFIG_MPU_BRIDGE_IOMMU.
+> >
+> > Why does it have to be selectable?
+> 
+> You mean why is it desirable to turn it off? Right now 
+> there's a mess of tidspbridge branches, some work, some 
+> don't, some have migrated to iommu, some don't. In mainline 
+> all this, plus the status on dsp-link, should be irrelevant, 
+> a configuration solves all the issues.
+> 
+> Once the iommu migration works (haven't managed to get it 
+> working myself), and it has been merged into mainline, then 
+> we can think about enabling it unconditionally. In the 
+> meantime, enabling unconditionally would break the 
+> tidspbridge that is in staging (mainline).
+
+What is the problem enabling unconditionally?
+
+The iva2 iommu does not start working until you call iommu_get.
+So if for some reason you are using the dspbridge with custom
+Iommu implementation it should not cause any collision with
+Iommu module.
+
+Regards,
+Fernando.
+
+> 
+> > Please Cc: linux-arm-kernel at lists.infradead.org too.
+> 
+> Will do, after you reply the above.
+> 
+> --
+> Felipe Contreras
+> 
