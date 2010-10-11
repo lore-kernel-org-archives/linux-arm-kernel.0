@@ -1,68 +1,35 @@
-From: konkers@android.com (Erik Gilling)
-Date: Mon, 11 Oct 2010 14:01:33 -0700
-Subject: [PATCH v4] spi: add spi_tegra driver
-In-Reply-To: <AANLkTini_PA3J+R4gEP4DzFpcAxHhdmDbcXxOtj2h81O@mail.gmail.com>
-References: <1282771395-21684-1-git-send-email-konkers@android.com>
-	<1283379393-14831-1-git-send-email-konkers@android.com>
-	<AANLkTimonLa1mUVSHR=QnR48HPtAZ5BW3BsVsg7MWALy@mail.gmail.com>
-	<AANLkTini_PA3J+R4gEP4DzFpcAxHhdmDbcXxOtj2h81O@mail.gmail.com>
-Message-ID: <AANLkTi=m-Omf4BApb=edTveOBbc6q5uYQdHMB1T=qmY6@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 12 Oct 2010 00:08:16 +0200
+Subject: [PATCH v7] power: introduce library for device-specific OPPs
+In-Reply-To: <4CB32675.1090205@ti.com>
+References: <[PATCH] power: introduce library for device-specific OPPs>
+	<201010100059.20964.rjw@sisk.pl> <4CB32675.1090205@ti.com>
+Message-ID: <201010120008.16388.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
-    Sorry.  Fell off my radar.   I'll push it this week.
+On Monday, October 11, 2010, Nishanth Menon wrote:
+> Rafael J. Wysocki had written, on 10/09/2010 05:59 PM, the following:
+> [...]
+> >>
+> >> Signed-off-by: Nishanth Menon <nm@ti.com>
+> > 
+> > OK
+> > 
+> > Your error messages are a bit inconsistent (e.g. some of them print the
+> > error code while others don't), but I guess I can fix that up.
+> Thanks a bunch.
+> > 
+> > Still, to apply the patch I need a copyright notice for the doc too.
+> oops..
+> (C) 2009-2010 Nishanth Menon <nm@ti.com>, Texas Instruments Incorporated
+> Does this help?
 
-Cheers,
-    Erik
+Yes, it does.
 
-On Sat, Oct 9, 2010 at 11:31 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, Sep 2, 2010 at 8:22 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Wed, Sep 1, 2010 at 4:16 PM, Erik Gilling <konkers@android.com> wrote:
->>> v2 changes:
->>> ?from Thierry Reding:
->>> ? ?* add "select TEGRA_SYSTEM_DMA" to Kconfig
->>> ?from Grant Likely:
->>> ? ?* add oneline description to header
->>> ? ?* inline references to DRIVER_NAME
->>> ? ?* inline references to BUSY_TIMEOUT
->>> ? ?* open coded bytes_per_word()
->>> ? ?* spi_readl/writel -> spi_tegra_readl/writel
->>> ? ?* move transfer validation to spi_tegra_transfer
->>> ? ?* don't request_mem_region iomem as platform bus does that for us
->>> ? ?* __exit -> __devexit
->>>
->>> v3 changes:
->>> ?from Russell King:
->>> ? ?* put request_mem_region back int
->>> ?from Grant Likely:
->>> ? ?* remove #undef DEBUG
->>> ? ?* add SLINK_ to register bit defines
->>> ? ?* remove unused bytes_per_word
->>> ? ?* make spi_tegra_readl/writel static linine
->>> ? ?* various refactoring for clarity
->>> ? ?* mark err if BSY bit is not cleared after 1000 retries
->>> ? ?* move spinlock to protect setting of RDY bit
->>> ? ?* subsys_initcall -> module_init
->>>
->>> v3 changes:
->>> ?from Grant Likely:
->>> ? ?* update spi_tegra to use PTR_ERRless dma API
->>>
->>> Signed-off-by: Erik Gilling <konkers@android.com>
->>> Cc: Thierry Reding <thierry.reding@avionic-design.de>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>
->> Hi Erik,
->>
->> Go ahead and add my Acked-by line and merge this via the tegra tree to
->> avoid ordering issues. ?I also have a few more minor comments below.
->
-> Hi Erik,
->
-> What's the status on this one? ?I've not seen it show up in the
-> for-next branch of the android tegra tree.
->
-> g.
->
+> or would you like me to post a v8 as well?
+
+That shouldn't be necessary.
+
+Thanks,
+Rafael
