@@ -1,39 +1,62 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 11 Oct 2010 14:23:00 +0200
-Subject: [PATCH] mxc/gpio: make _set_value work with values != 0/1
-In-Reply-To: <20101011121745.GA12849@jasper.tkos.co.il> (Baruch Siach's
-	message of "Mon, 11 Oct 2010 14:17:46 +0200")
-References: <1286798345-32647-1-git-send-email-jacmet@sunsite.dk>
-	<20101011121745.GA12849@jasper.tkos.co.il>
-Message-ID: <87bp70or4r.fsf@macbook.be.48ers.dk>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Mon, 11 Oct 2010 15:28:22 +0300 (EEST)
+Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+In-Reply-To: <1286790830-13505-2-git-send-email-felipe.contreras@gmail.com>
+References: <1286790830-13505-1-git-send-email-felipe.contreras@gmail.com>
+	<1286790830-13505-2-git-send-email-felipe.contreras@gmail.com>
+Message-ID: <20101011.152822.226794892.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Baruch" == Baruch Siach <baruch@tkos.co.il> writes:
+From: ext Felipe Contreras <felipe.contreras@gmail.com>
+Subject: [PATCH 1/2] omap: iommu: make iva2 iommu selectable
+Date: Mon, 11 Oct 2010 11:53:49 +0200
 
-Hi,
+> From: Felipe Contreras <felipe.contreras@nokia.com>
+> 
+> It seems dsp-link will do this, and tidspbridge too at some point, but
+> right now it's not possible to select CONFIG_MPU_BRIDGE_IOMMU.
 
- >> +
+Why does it have to be selectable?
 
- Baruch> Unneeded empty line.
+Please Cc: linux-arm-kernel at lists.infradead.org too.
 
-Yeah, just noticed as well.
-
- >> spin_lock_irqsave(&port->lock, flags);
- >> -	l = (__raw_readl(reg) & (~(1 << offset))) | (value << offset);
- >> +	l = __raw_readl(reg);
- >> +	if (value)
- >> +		l |= 1 << offset;
- >> +	else
- >> +		l &= ~(1 << offset);
-
- Baruch> Alternative shorter version:
-
- Baruch> l = (__raw_readl(reg) & (~(1 << offset))) | (!!value << offset);
-
-Well, what do you know - I seem to be outnumbered ;)
-
-Sasha, do you want the !! version instead? Then I'll resend.
-
--- 
-Bye, Peter Korsgaard
+> 
+> Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
+> Cc: Yogesh Marathe <yogesh_marathe@ti.com>
+> Signed-off-by: Felipe Contreras <felipe.contreras@nokia.com>
+> ---
+>  arch/arm/mach-omap2/omap-iommu.c |    2 +-
+>  arch/arm/plat-omap/Kconfig       |    3 +++
+>  2 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+> index f5a1aad..adc0904 100644
+> --- a/arch/arm/mach-omap2/omap-iommu.c
+> +++ b/arch/arm/mach-omap2/omap-iommu.c
+> @@ -35,7 +35,7 @@ static struct iommu_device omap3_devices[] = {
+>  			.clk_name = "cam_ick",
+>  		},
+>  	},
+> -#if defined(CONFIG_MPU_BRIDGE_IOMMU)
+> +#if defined(CONFIG_OMAP_IOMMU_IVA2)
+>  	{
+>  		.base = 0x5d000000,
+>  		.irq = 28,
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index e39a417..e0b41b6 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -109,6 +109,9 @@ config OMAP_IOMMU_DEBUG
+>  
+>           Say N unless you know you need this.
+>  
+> +config OMAP_IOMMU_IVA2
+> +	bool
+> +
+>  choice
+>  	prompt "System timer"
+>  	default OMAP_32K_TIMER if !ARCH_OMAP15XX
+> -- 
+> 1.7.3.1.2.g7fe2b
+> 
