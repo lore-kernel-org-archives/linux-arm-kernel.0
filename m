@@ -1,34 +1,145 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 11 Oct 2010 10:47:31 +0300
-Subject: [PATCH 3/4] ARM: ep93xx: add AC97 platform support
-In-Reply-To: <4CB2166D.5080706@bluewatersys.com>
-References: <cover.1286707213.git.mika.westerberg@iki.fi>
-	<d63475d15634d7ffa4c4167cbead782a5aa1cfc9.1286707213.git.mika.westerberg@iki.fi>
-	<4CB2166D.5080706@bluewatersys.com>
-Message-ID: <20101011074731.GD27142@gw.healthdatacare.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 11 Oct 2010 16:50:00 +0900
+Subject: [PATCH v5 2/2] sdhci-s3c: Add support no internal clock divider in
+	host controller
+Message-ID: <1286783400-7277-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 08:39:25AM +1300, Ryan Mallon wrote:
-> On 10/10/2010 11:54 PM, Mika Westerberg wrote:
-> > +
-> > +void __init ep93xx_register_ac97(void)
-> > +{
-> > +	/*
-> > +	 * Make sure that the AC97 pins are not used by I2S.
-> > +	 */
-> > +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONAC97);
-> > +	platform_device_register(&ep93xx_ac97_device);
-> > +}
-> 
-> The other ep93xx device support functions do this with acquire/release
-> functions. However, it is quite unlikely that a board will ever need to
-> switch from i2s to ac97 audio at runtime. Will see what Hartley thinks.
+From: Jeongbae Seo <jeongbae.seo@samsung.com>
 
-There is really no other option where to connect the AC97 codec.
-In cases where both are needed, one needs to mux I2S to the SSP
-pins. So not sure whether it makes sense to make the switch work
-at runtime.
+This patch adds to support no internal clock divider in SDHCI.
+The external clock divider can be used to make a proper clock
+because SDHCI doesn't support internal clock divider by itself.
 
-Thanks,
-MW
+If external clock divider type is selected, some functions related
+with clock control will be overridened by other functions.
+
+The current clock control index is added to let you know which
+clock bus is used for SDHCI when using overriding functions.
+
+The checking functions is added into sdhci_s3c_consider_clock,
+because clock divider step is different from that of host controller.
+
+Signed-off-by: Jeongbae Seo <jeongbae.seo@samsung.com>
+Cc: Jaehoon Chung <jh80.chung@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v4:
+- Added missing change
+
+Changes since v3:
+- Modified comparision condition as per Kyungmin Park's suggestion
+
+Changes since v2:
+- Changed clock control method to overriding from using quirk
+- This patch is referred from that of Jaehoon Chung's support non-standard clock setting
+
+Changes since v1:
+- Separated to each topic
+
+NOTE :
+- This patch depends on following.
+  [PATCH 4/5] ARM: SAMSUNG : Add clock types into platform data
+
+ drivers/mmc/host/sdhci-s3c.c |   62 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index a7710f5..e7208f6 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -130,6 +130,15 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
+ 	if (!clksrc)
+ 		return UINT_MAX;
+ 
++	/*
++	 * Clock divider's step is different as 1 from that of host controller
++	 * when 'clk_type' is S3C_SDHCI_CLK_DIV_EXTERNAL.
++	 */
++	if (ourhost->pdata->clk_type == S3C_SDHCI_CLK_DIV_EXTERNAL) {
++		rate = clk_round_rate(clksrc, wanted);
++		return wanted - rate;
++	}
++
+ 	rate = clk_get_rate(clksrc);
+ 
+ 	for (div = 1; div < 256; div *= 2) {
+@@ -232,6 +241,42 @@ static unsigned int sdhci_s3c_get_min_clock(struct sdhci_host *host)
+ 	return min;
+ }
+ 
++/* sdhci_cmu_get_max_clk - callback to get maximum clock frequency.*/
++static unsigned int sdhci_cmu_get_max_clock(struct sdhci_host *host)
++{
++	struct sdhci_s3c *ourhost = to_s3c(host);
++
++	return clk_round_rate(ourhost->clk_bus[ourhost->cur_clk], UINT_MAX);
++}
++
++/* sdhci_cmu_get_min_clock - callback to get minimal supported clock value. */
++static unsigned int sdhci_cmu_get_min_clock(struct sdhci_host *host)
++{
++	struct sdhci_s3c *ourhost = to_s3c(host);
++
++	/*
++	 * initial clock can be in the frequency range of
++	 * 100KHz-400KHz, so we set it as max value.
++	 */
++	return clk_round_rate(ourhost->clk_bus[ourhost->cur_clk], 400000);
++}
++
++/* sdhci_cmu_set_clock - callback on clock change.*/
++static void sdhci_cmu_set_clock(struct sdhci_host *host, unsigned int clock)
++{
++	struct sdhci_s3c *ourhost = to_s3c(host);
++
++	/* don't bother if the clock is going off */
++	if (clock == 0)
++		return;
++
++	sdhci_s3c_set_clock(host, clock);
++
++	clk_set_rate(ourhost->clk_bus[ourhost->cur_clk], clock);
++
++	host->clock = clock;
++}
++
+ static struct sdhci_ops sdhci_s3c_ops = {
+ 	.get_max_clock		= sdhci_s3c_get_max_clk,
+ 	.set_clock		= sdhci_s3c_set_clock,
+@@ -361,6 +406,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 
+ 		clks++;
+ 		sc->clk_bus[ptr] = clk;
++
++		/*
++		 * save current clock index to know which clock bus
++		 * is used later in overriding functions.
++		 */
++		sc->cur_clk = ptr;
++
+ 		clk_enable(clk);
+ 
+ 		dev_info(dev, "clock source %d: %s (%ld Hz)\n",
+@@ -427,6 +479,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 	/* HSMMC on Samsung SoCs uses SDCLK as timeout clock */
+ 	host->quirks |= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
+ 
++	/*
++	 * If controller does not have internal clock divider,
++	 * we can use overriding functions instead of default.
++	 */
++	if (pdata->clk_type == S3C_SDHCI_CLK_DIV_EXTERNAL) {
++		sdhci_s3c_ops.set_clock = sdhci_cmu_set_clock;
++		sdhci_s3c_ops.get_min_clock = sdhci_cmu_get_min_clock;
++		sdhci_s3c_ops.get_max_clock = sdhci_cmu_get_max_clock;
++	}
++
+ 	/* It supports additional host capabilities if needed */
+ 	if (pdata->host_caps)
+ 		host->mmc->caps |= pdata->host_caps;
+-- 
+1.6.2.5
