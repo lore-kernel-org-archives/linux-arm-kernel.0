@@ -1,38 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 11 Oct 2010 11:47:38 +0100
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver
-	for S/PDIF PCM audio
-In-Reply-To: <AANLkTindvBBOyWwkbwUo+oG31r8xSgCLbjuDNgvTNY_Q@mail.gmail.com>
-References: <AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-	<20101005044304.GA26509@opensource.wolfsonmicro.com>
-	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
-	<20101005055937.GA19989@opensource.wolfsonmicro.com>
-	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
-	<AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
-	<00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
-	<AANLkTikf4CAWm49Q_AfcfiQDBQUVcE_BC-a_4F7d8xOz@mail.gmail.com>
-	<AANLkTinPXcjHcaM1puzz00Sfhob9Y-X4HGDDVGMTqhH5@mail.gmail.com>
-	<AANLkTindvBBOyWwkbwUo+oG31r8xSgCLbjuDNgvTNY_Q@mail.gmail.com>
-Message-ID: <20101011104737.GB16777@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Oct 2010 11:52:16 +0100
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
+References: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<20101009000046.GA30616@kroah.com>
+	<20101009002546.GB14675@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
+	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
+Message-ID: <20101011105216.GD27153@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 09, 2010 at 10:52:26AM +0900, Jassi Brar wrote:
-> On Fri, Oct 8, 2010 at 6:07 PM, Seungwhan Youn <claude.youn@gmail.com> wrote:
+On Mon, Oct 11, 2010 at 01:39:13PM +0300, Felipe Contreras wrote:
+> Anyway, I'm reading the TRM and I can't find any mention of this.
+> Catalin, can you point out where is this mentioned, and also, can you
+> confirm if this would affect only the memory that has the double
+> mapping, or it can corrupt other memory as well?
 
-> > Now, I'm almost finished 2nd patch for submit except this audio clock
-> > setting. For now, I can only think that remove audio clock setting
-> > from this machine code, and add audio clock settings in arch later(may
-> > be after arch/arm/plat-samsung get EPLL policy as Mr. Kukjin said).
+Page A3-31:
 
-> > Is this okay?
+  If the same memory locations are marked as having different cacheability
+  attributes, for example by the use of aliases in a virtual to physical
+  address mapping, behavior is UNPREDICTABLE.
 
-> IMO neither of the method is much better than the other.
+Page A3-36:
 
-> If neither of the maintainers relent, maybe drop the clock setting altogether
-> and mark the machine driver 'BROKEN' until the EPLL management is fixed?
+  Behavior is UNPREDICTABLE if the same memory location:
+   ? is marked as Shareable Normal and Non-shareable Normal
+   ? is marked as having different memory types (Normal, Device, or Strongly-
+     ordered)
+   ? is marked as having different cacheability attributes
+   ? is marked as being Shareable Device and Non-shareable Device memory.
 
-I'm OK with having the code in the driver, I just want something there
-that makes it more discoverable that it's there like a config option.
-Having the driver log loudly when it reconfigures the EPLL would
-probably also cover it.
+  Such memory marking contradictions can occur, for example, by the use of
+  aliases in a virtual to physical address mapping.
+
+And from the glossary:
+
+  UNPREDICTABLE Means the behavior cannot be relied upon. UNPREDICTABLE
+  behavior must not represent security holes. UNPREDICTABLE behavior must
+  not halt or hang the processor, or any parts of the system. UNPREDICTABLE
+  behavior must not be documented or promoted as having a defined effect.
