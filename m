@@ -1,62 +1,56 @@
-From: yogesh_marathe@ti.com (Marathe, Yogesh)
-Date: Mon, 11 Oct 2010 10:40:29 +0530
-Subject: [PATCH 05/11] omap3: Remove non-existent config option
-In-Reply-To: <AANLkTim=1dXg8O_q-RLZEjrVvN+Bb2DV1N1jwNjVBw3a@mail.gmail.com>
-References: <20100924014938.10325.35279.stgit@baageli.muru.com>
-	<20100924015056.10325.95854.stgit@baageli.muru.com>
-	<AANLkTik+Qgn5dYd+p_PvEUQFhcwQ2NVxW-fhEdurO6s+@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59301F70753CB@dbde02.ent.ti.com>
-	<AANLkTinF=iV8p=jmg-YntCpX_BHmavLD3gu2LhhBFRq6@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233C361B4@dbde02.ent.ti.com>
-	<AANLkTim9Y3i7M9Jjo6RZs7zMNVZUkFm1P7P=h0y2J=Nj@mail.gmail.com>
-	<8F7AF80515AF0D4D93307E594F3CB40E5F6A365B@dlee03.ent.ti.com>
-	<AANLkTimD_MRbuTnBMPzAKPTmrDwjLkLVmr9bTSNROb5L@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930234006B4C@dbde02.ent.ti.com>
-	<AANLkTinZqx2nFuoYoCYpD4+PG7_J=ACLBxAwOvpVm4c9@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593023412B2C1@dbde02.ent.ti.com>
-	<496565EC904933469F292DDA3F1663E602F471C1BF@dlee06.ent.ti.com>
-	<AANLkTim=1dXg8O_q-RLZEjrVvN+Bb2DV1N1jwNjVBw3a@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302342AE66C@dbde02.ent.ti.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Mon, 11 Oct 2010 11:15:53 +0530
+Subject: [PATCH v4] ARM: Fix sparse warnings due to variables conflicts.
+In-Reply-To: <20101008232237.GC10975@n2100.arm.linux.org.uk>
+References: <1286517186-29934-1-git-send-email-sourav.poddar@ti.com>
+	<4CAF014D.7000909@ti.com>
+	<20101008232237.GC10975@n2100.arm.linux.org.uk>
+Message-ID: <EAF47CD23C76F840A9E7FCE10091EFAB030CFC4DEB@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ 
 
 > -----Original Message-----
-> From: Felipe Contreras [mailto:felipe.contreras at gmail.com]
-> Sent: Sunday, October 10, 2010 7:38 PM
-> To: Guzman Lugo, Fernando
-> Cc: Marathe, Yogesh; Kanigeri, Hari; Premi, Sanjeev; Tony Lindgren;
-> linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 05/11] omap3: Remove non-existent config
-> option
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+> Sent: Saturday, October 09, 2010 4:53 AM
+> To: Menon, Nishanth
+> Cc: Poddar, Sourav; G, Manjunath Kondaiah; 
+> linux-omap at vger.kernel.org; Shilimkar, Santosh; 
+> linux-arm-kernel at lists.infradead.org; Varadarajan, Charulatha
+> Subject: Re: [PATCH v4] ARM: Fix sparse warnings due to 
+> variables conflicts.
 > 
-> On Wed, Oct 6, 2010 at 3:14 AM, Guzman Lugo, Fernando
-> <fernando.lugo@ti.com> wrote:
-> > Can I know the status of this patch?
+> On Fri, Oct 08, 2010 at 06:32:29AM -0500, Nishanth Menon wrote:
+> > Poddar, Sourav had written, on 10/08/2010 12:53 AM, the following:
+> >> Fix the sparse warnings generated due to conflicts in 
+> variables used in readl/writel.
+> >>
+> >>
+> >> drivers/net/smc91x.c:312:8: warning: symbol '__v' shadows 
+> an earlier one
+> >> drivers/net/smc91x.c:312:8: originally declared here
+> >>
+> >> With this change, about 200 sparse warnings are fixed.
+> > The commit message could be a little more detailed.
+> > see http://marc.info/?l=linux-omap&m=128648102511076&w=2
 > >
-> > This patch is needed now that tidspbridge has migrated to use
-> > Iommu moudle.
-> >
-> > Will this patch be merged?
+> > also should $subject say ARM: io: fix namespace conflict
+> > to better reflect the fix? sparse warnings are just an 
+> indication IMHO
+
+That sounds more appropriate. Thanks.
+
 > 
-> This patch hasn't even been sent yet. I expected somebody else to try
-> it and do so.
+> afaics, this patch will cause checkpatch to issue warnings 
+> due to lines
+> over 80 characters.
 
-Felipe,
+Okay. The patch was not touching the coding style of how the
+macros were defined earlier. Anyways, would fix the warnings
+and send the patch asap.
 
-I think Fernando is talking about the patch that I had sent at the
-beginning. I had replied Fernando saying it is under discussion as
-you were looking at other iommu patches.
-
-If we have agreed upon having CONFIG_OMAP_IOMMU_IVA2 available 
-"by default" I have no problem to try your patch else the original patch 
-that I had sent should be reconsidered.
-
-Regards,
-Yogesh.
- 
-> Anyway, I'm now trying iommu myself and will send this patch when I
-> get the dsp working.
 > 
-> --
-> Felipe Contreras
+> I can't check that because I don't have the original patch via the
+> linux-arm-kernel mailing list.
+> 
