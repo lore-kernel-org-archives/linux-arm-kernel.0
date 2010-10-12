@@ -1,30 +1,43 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 13 Oct 2010 00:06:23 +0200
-Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
-In-Reply-To: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
-	(Wolfram Sang's message of "Mon\, 11 Oct 2010 16\:21\:00 +0200")
-References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <87aamjxe00.fsf@lechat.rtp-net.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 13 Oct 2010 01:25:14 +0200
+Subject: [PATCH v7] power: introduce library for device-specific OPPs
+In-Reply-To: <201010120008.16388.rjw@sisk.pl>
+References: <[PATCH] power: introduce library for device-specific OPPs>
+	<4CB32675.1090205@ti.com> <201010120008.16388.rjw@sisk.pl>
+Message-ID: <201010130125.14604.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <w.sang@pengutronix.de> writes:
+On Tuesday, October 12, 2010, Rafael J. Wysocki wrote:
+> On Monday, October 11, 2010, Nishanth Menon wrote:
+> > Rafael J. Wysocki had written, on 10/09/2010 05:59 PM, the following:
+> > [...]
+> > >>
+> > >> Signed-off-by: Nishanth Menon <nm@ti.com>
+> > > 
+> > > OK
+> > > 
+> > > Your error messages are a bit inconsistent (e.g. some of them print the
+> > > error code while others don't), but I guess I can fix that up.
+> > Thanks a bunch.
+> > > 
+> > > Still, to apply the patch I need a copyright notice for the doc too.
+> > oops..
+> > (C) 2009-2010 Nishanth Menon <nm@ti.com>, Texas Instruments Incorporated
+> > Does this help?
+> 
+> Yes, it does.
+> 
+> > or would you like me to post a v8 as well?
+> 
+> That shouldn't be necessary.
 
-Hi,
+The patch has been applied to suspend-2.6/linux-next at:
 
-> Here is the hopefully final (famous last words) version of my patch series. The
-> first four are still updates/improvements for sdhci and sdhci-pltfm and are of
-> generic interest, too. Thanks to Eric for the tests on MX25/35. Looking forward
-> to comments/applied-to-mmc-next-messages ;)
->
-> The series is based on mmc-next as of today and also available at
->
-> 	git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
+http://git.kernel.org/?p=linux/kernel/git/rafael/suspend-2.6.git;a=commit;h=56149b574181d98aedf97f1f2d91d05ab261db41
 
-I've tried it on a efika mx (to2 version) and I've a problem with the
-write-protect. It's on a GPIO and I don't see any way to configure the
-esdhc-imx driver to use it. Any idea on how it should be done ?
+with minor changes around the error messages.  Please double check if everything
+is correct.
 
-
-thanks,
-Arnaud
+Thanks,
+Rafael
