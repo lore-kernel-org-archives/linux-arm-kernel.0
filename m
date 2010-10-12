@@ -1,77 +1,100 @@
-From: naveen.maillist@gmail.com (Naveen Atmakuri)
-Date: Mon, 11 Oct 2010 11:31:36 +0530
-Subject: Linux kernel 2.6.28.10 failes when tried to mount JFFS filesystem
-Message-ID: <AANLkTinYBNT0FtpYhq4J6BhJLs5TO3ZSRi1RSh71JzZZ@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Tue, 12 Oct 2010 15:11:51 +0800
+Subject: [PATCHv2] cpufreq for freescale mx51
+In-Reply-To: <AANLkTimzYX0ftJkzKwcfofw=O+BZFtZwZpEGVvr6heDX@mail.gmail.com>
+References: <1285738417-1638-1-git-send-email-yong.shen@linaro.org>
+	<20100930104817.GC2526@matterhorn.lan>
+	<20101006095111.GV28242@pengutronix.de>
+	<AANLkTi=fh4_19QhB8ArTfiigbPOQSejB=gLPMiEmyXjP@mail.gmail.com>
+	<20101007073027.GY28242@pengutronix.de>
+	<AANLkTimzYX0ftJkzKwcfofw=O+BZFtZwZpEGVvr6heDX@mail.gmail.com>
+Message-ID: <AANLkTimDzt+Z-FFq_tMuL7qjm5LNRBObV6E48pi28WWf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi All,
+Does anybody have more comments on [PATCHv2] ?
 
-I am trying to boot Linux kernel 2.6.28.10 kernel on a board which is based
-on ARM Cortex-A9. The tool chain that I am using is "Sourcery G++ Lite
-2008q3-72". When I tried to mount the JFFS2 filesystem, kernel crash occurs.
-Here is the dump of the crash.
+On Thu, Oct 7, 2010 at 8:00 PM, Yong Shen <yong.shen@linaro.org> wrote:
 
-#########################################################################################################
-*VFS: Mounted root (jffs2 filesystem).
-Freeing init memory: 96K
-ARM Profiler Enabled
-Unable to handle kernel paging request at virtual address 56bbe50f
-pgd = c0004000
-[56bbe50f] *pgd=00000000
-Internal error: Oops: 805 [#1] SMP
-Modules linked in:
-CPU: 0    Not tainted  (2.6.28.10-arm2-0.1.5 #8)
-PC is at free_block+0x68/0x13c
-LR is at drain_array+0xa0/0xe0
-pc : [<c0084440>]    lr : [<c00845b4>]    psr: 00000093
-sp : c7869f48  ip : c7861000  fp : 00000000
-r10: 0000000b  r9 : c7805e74  r8 : 00000000
-r7 : c7800cc0  r6 : 00000000  r5 : c7861cc0  r4 : c7802aa0
-r3 : 21b81a61  r2 : 56bbe50f  r1 : c0426c20  r0 : 00000016
-Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 0000404a  DAC: 00000017
-Process events/0 (pid: 15, stack limit = 0xc7868268)
-Stack: (0xc7869f48 to 0xc786a000)
-9f40:                   c7805e74 0000000b c7805e60 c7802aa0 c7800cc0
-00000000
-9f60: 00000000 c00845b4 c7802aa0 c7800cc0 00000000 c7868000 c0442d78
-c008476c
-9f80: 00000000 c0442d78 c781a820 c0442d78 c7868000 c0084724 c781a824
-c0046df4
-9fa0: c781a82c c7869fc8 c781a824 c781a820 00000000 c0046f30 00000000
-00000000
-9fc0: c785b680 c004a8e0 c7869fc8 c7869fc8 00000000 c781a820 c0046e88
-00000000
-9fe0: 00000000 c004a610 00000000 00000000 00000000 c0021bf8 00000000
-00000000
-[<c0084440>] (free_block+0x68/0x13c) from [<c00845b4>]
-(drain_array+0xa0/0xe0)
-[<c00845b4>] (drain_array+0xa0/0xe0) from [<c008476c>]
-(cache_reap+0x48/0x124)
-[<c008476c>] (cache_reap+0x48/0x124) from [<c0046df4>]
-(run_workqueue+0xa8/0x13c
-)
-[<c0046df4>] (run_workqueue+0xa8/0x13c) from [<c0046f30>]
-(worker_thread+0xa8/0x
-bc)
-[<c0046f30>] (worker_thread+0xa8/0xbc) from [<c004a610>] (kthread+0x4c/0x78)
-[<c004a610>] (kthread+0x4c/0x78) from [<c0021bf8>]
-(kernel_thread_exit+0x0/0x8)
-Code: e591c01c e7974100 e59c2004 e59c3000 (e5823000)
----[ end trace fd4f70abfa740a4c ]---
-JFFS2 warning: (240) jffs2_do_read_inode_internal: Truncating ino #1539 to
-15188
- bytes failed because it only had 3516 bytes to start with!*
-#############################################################################################################
-
-It seems like the funtion "kernel_thread_exit" is causing the crash. But I
-couldnot understand why this is happening. With the same kernel when I tried
-to mount the NFS filesystem it works fine. Could anybody help me resolving
-this issue?
-
-Thanks in Advance,
--Naveen.
+>
+> > Using wp_tbl is because that it also contains information like regulator
+>> > voltage.
+>>
+>> The clock code does not handle the regulators, not even in the fsl
+>> kernel.
+>>
+> I did not mean to say clock code will handle regulators. I mean this table
+> also contains such information which may be needed in other freescale
+> drivers, like dvfs and busfreq.
+>
+>>
+>>
+> > Since the regulator driver for imx51 have not been upstreamed, you
+>> > don't see any regulator operation here. Also, like you mentioned, there
+>> are
+>> > two ways to change cpufreq, by post divider or pll change. And post
+>> divider
+>> > change is a simpler way and also the only way for babbage, since cpu
+>> freq
+>> > and ddr freq are all root from the same pll on babbage and they will
+>> > interfere each other.
+>>
+>> I understand what you have to do, but the way you did really looks
+>> strange. You introduce get_cpu_wp() to get the complete array of
+>> workpoints. In the cpufreq driver you have this complete array, pick
+>> the desired workpoint, pass the frequency to the clock layer which in
+>> turn calls get_cpu_wp() to get the array and loop around it to get
+>> the workpoint from the frequency again. Addionally you maintain a
+>> pointer to what the clock code thinks the current workpoint is.
+>>
+>> How about making the clock code agnostic of such workpoints and
+>> calculate the pll values and dividers for a given frequency based
+>> on the frequency. If that's to complicated you could maintain
+>> a table in the clock code. If that's not flexible enough you could
+>> pass a pointer to this table to mx51_clocks_init. This array could
+>> carry information relevant only to the clock code and only relevant
+>> to the i.MX51, In the fsl kernel struct cpu_wp is a catch-all struct
+>> for all i.MXs. The i.MX51 uses the pdf/mfi/mfd/mfn/cpu_podf fields,
+>> the i.MX35 uses the pll_reg and pdr0_reg fields and who knows what
+>> the next i.MX needs.
+>>
+>
+> I strongly agree with you about this, and it is better to letter clock
+> calculate by itself.
+>
+>>
+>>
+> >
+>> > > > +static struct cpufreq_frequency_table imx_freq_table[4];
+>> > >
+>> > > Three frequencies should be enough for everyone, right? This should be
+>> > > dynamically allocated like in other cpufreq drivers.
+>> > >
+>> >
+>> > Yes, we only support 3 work points, which is for sure. Actually, we only
+>> > support 2 points on most mx51 chips. I supposed it is ok to use static
+>> array
+>> > here.
+>>
+>> Please just add dynamic allocation, then we are safe for any potential
+>> future use.
+>>
+>> Ok! sorry for misunderstanding.
+>
+> Here, I am not trying to find excuse for the cpufreq driver designer which
+> is my colleague, however the truth is that since in our company the schedule
+> is tight for all the tasks, that's why we always code with the first rough
+> idea in the head, and having less time to think about the flexibility and
+> other good conventions in programming. You can see that even freescale code
+> upstreaming is done by people out of freescale, because of we lacking of
+> resource.
+> Therefore, I would say we did not mean to have some short-sight design, we
+> also want to achieve a better life of coding like you guys are doing, which
+> is my direct feeling while I am in Linaro. :)
+> Thanks for comments.
+>
+> Yong
+>
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101011/7efe36e9/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101012/c5d94aa6/attachment-0001.html>
