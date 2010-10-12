@@ -1,42 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 11 Oct 2010 23:20:19 -0400 (EDT)
-Subject: Git pull request: Kirkwood updates for next merge window
-Message-ID: <alpine.LFD.2.00.1010112314010.2764@xanadu.home>
+From: claude.youn@gmail.com (Seungwhan Youn)
+Date: Tue, 12 Oct 2010 12:25:03 +0900
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
+	S/PDIF PCM audio
+In-Reply-To: <AANLkTi=NrEm8XHWbD6UxrxxAeCtTrdwr9_KYNSBv5+nm@mail.gmail.com>
+References: <AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
+	<20101005044304.GA26509@opensource.wolfsonmicro.com>
+	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+	<20101005055937.GA19989@opensource.wolfsonmicro.com>
+	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+	<AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
+	<00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
+	<AANLkTikf4CAWm49Q_AfcfiQDBQUVcE_BC-a_4F7d8xOz@mail.gmail.com>
+	<AANLkTinPXcjHcaM1puzz00Sfhob9Y-X4HGDDVGMTqhH5@mail.gmail.com>
+	<AANLkTindvBBOyWwkbwUo+oG31r8xSgCLbjuDNgvTNY_Q@mail.gmail.com>
+	<20101011104737.GB16777@sirena.org.uk>
+	<AANLkTi=NrEm8XHWbD6UxrxxAeCtTrdwr9_KYNSBv5+nm@mail.gmail.com>
+Message-ID: <AANLkTimp0WB+vweX8-pMVZZeHN6nD401TtkJyNthCEO5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, please pull:
+>> I'm OK with having the code in the driver, I just want something there
+>> that makes it more discoverable that it's there like a config option.
+>> Having the driver log loudly when it reconfigures the EPLL would
+>> probably also cover it.
+>
+> Thanks. Yes, we should print warning upon changing EPLL.
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git
-
-This contains a few updates to Kirkwood supported targets.
-
-Eric Cooper (1):
-      [ARM] Kirkwood: support for Seagate DockStar
-
-Simon Guinot (5):
-      [ARM] Kirkwood: add LaCie d2 Network v2 support
-      [ARM] Kirkwood: remove duplicated code in LaCie setup files
-      leds: leds-ns2: fix private driver data storage
-      leds: add LED driver for Big Network series LEDs
-      [ARM] Kirkwood: add LED support for netxbig_v2 boards
-
-Tanmay Upadhyay (1):
-      [ARM] OpenRD: Enable SD/UART selection for serial port 1
-
- arch/arm/configs/kirkwood_defconfig                |    1 +
- arch/arm/mach-kirkwood/Kconfig                     |   12 +
- arch/arm/mach-kirkwood/Makefile                    |   12 +-
- arch/arm/mach-kirkwood/d2net_v2-setup.c            |  231 +++++++
- arch/arm/mach-kirkwood/dockstar-setup.c            |  112 ++++
- arch/arm/mach-kirkwood/include/mach/leds-netxbig.h |   55 ++
- arch/arm/mach-kirkwood/lacie_v2-common.c           |  127 ++++
- arch/arm/mach-kirkwood/lacie_v2-common.h           |   18 +
- arch/arm/mach-kirkwood/netspace_v2-setup.c         |  122 +----
- arch/arm/mach-kirkwood/netxbig_v2-setup.c          |  269 ++++----
- arch/arm/mach-kirkwood/openrd-setup.c              |  101 +++-
- drivers/leds/Kconfig                               |   11 +-
- drivers/leds/Makefile                              |    1 +
- drivers/leds/leds-netxbig.c                        |  449 ++++++++++++++
- drivers/leds/leds-ns2.c                            |    9 +-
- 15 files changed, 1277 insertions(+), 253 deletions(-)
+Okay, I'll fix this also and will re-submit today. :-)
