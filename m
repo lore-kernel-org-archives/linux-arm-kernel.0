@@ -1,36 +1,63 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 12 Oct 2010 14:16:23 +0530
-Subject: [PATCH] amba: add name based matching
-In-Reply-To: <20101012082449.GA14109@n2100.arm.linux.org.uk>
-References: <1286636480-27454-1-git-send-email-rabin.vincent@stericsson.com>
-	<20101012082449.GA14109@n2100.arm.linux.org.uk>
-Message-ID: <20101012084623.GA20407@bnru01.bnr.st.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 12 Oct 2010 10:50:52 +0200
+Subject: [PATCH 2/2] mx51: add resources for SD/MMC on i.MX51
+In-Reply-To: <20101012081804.GD29673@pengutronix.de>
+References: <20101011170405.GC476@pengutronix.de>
+	<1286868685-7825-2-git-send-email-eric@eukrea.com>
+	<20101012081804.GD29673@pengutronix.de>
+Message-ID: <4CB4216C.8010200@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 12, 2010 at 10:24:49 +0200, Russell King - ARM Linux wrote:
-> On Sat, Oct 09, 2010 at 08:31:20PM +0530, Rabin Vincent wrote:
-> > Some peripherals on the DBx500 family of SoCs have changes in their
-> > functionality and registers between different variants in the family but
-> > retain the same AMBA peripheral ID, making it impossible to distinguish
-> > between them in AMBA drivers with the current AMBA id_table.
-> > 
-> > To support this, add a name parameter to the amba_device and the amba_id
-> > and allow name based matching as a second level filter after the
-> > periphid match.
-> 
-> I am really not very happy with this without an explaination of the kinds
-> of differences there are.
+Hi Uwe,
 
-For example:
+Le 12/10/2010 10:18, Uwe Kleine-K?nig a ?crit :
+> On Tue, Oct 12, 2010 at 09:31:25AM +0200, Eric B?nard wrote:
+>> the attached patch allows SD to work on i.MX51 with Wolfram's drivers
+>> Tested on i.MX51.
+>>
+>> Based on original patch from: Richard Zhu<r65037@freescale.com>
+>> Signed-off-by: Eric B?nard<eric@eukrea.com>
+>> ---
+>>   arch/arm/mach-mx5/clock-mx51.c              |  102 ++++++++++++++++++++++++++-
+>>   arch/arm/mach-mx5/devices-imx51.h           |    9 +++
+>>   arch/arm/plat-mxc/include/mach/iomux-mx51.h |   45 ++++++++----
+>>   3 files changed, 140 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
+>> index 7deb683..9e8b268 100644
+>> --- a/arch/arm/mach-mx5/clock-mx51.c
+>> +++ b/arch/arm/mach-mx5/clock-mx51.c
+>> @@ -41,6 +41,34 @@ static struct clk usboh3_clk;
+>>
+>>   #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
+>>
+>> +static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
+>> +{
+> I asked for a comment here.  E.g. valid ranges of pre and post and the
+> task solved here (I assume it's "Find pre and post with pre * post =
+> div"?).
+>
+will try to write something.
+Richard : do you have a comment in mind for this function ?
 
- - The PL180 derivate has the ID 0x00480180 on both DB8500v1 and
-   DB8500v2, but the DB8500v2 version moves the BLOCKSIZE in the
-   DATACTRL register from a power of two at bits 7:4 to a normal value
-   at bits 30:16.  The bits 7:4 become reserved in DB8500v2.
+ >> +		}
+ >> +		*post = (div + *pre - 1) / *pre;
+ > 		*post = DIV_ROUND_UP(div, *pre);
+ >
+ > I don't know if DIV_ROUND_UP is sensible, maybe use DIV_ROUND_CLOSEST?
+ > I'd look into that when the comment above is in place.
+ >
+if you have an opinion before, this would be great to avoid a n+1 
+version of this patch ;-)
 
- - The PL022 derivate has the ID 0x00080023 on DB8500 and DB5500, but
-   the DB5500 version has the "Loopback enable" bit, while the DB8500
-   version doesn't.
+>> -#define DEFINE_CLOCK1(name, i, er, es, pfx, p, s)	\
+>> +#define DEFINE_CLOCK_CCGR(name, i, er, es, pfx, p, s)	\
+> This is IMHO a good idea, but it should go in a seperate patch.  These
+> clock changes are very sensible and so a working bisection is important
+> here.
+>
+there is no clock change here only a define rename to avoid having 
+DEFINE_CLOCK1, DEFINE_CLOCK2 ... is a separate patch really needed ?
 
-Rabin
+Eric
