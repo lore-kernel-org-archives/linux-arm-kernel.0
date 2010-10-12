@@ -1,29 +1,49 @@
-From: claude.youn@gmail.com (Seungwhan Youn)
-Date: Tue, 12 Oct 2010 12:25:03 +0900
-Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
-	S/PDIF PCM audio
-In-Reply-To: <AANLkTi=NrEm8XHWbD6UxrxxAeCtTrdwr9_KYNSBv5+nm@mail.gmail.com>
-References: <AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
-	<20101005044304.GA26509@opensource.wolfsonmicro.com>
-	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
-	<20101005055937.GA19989@opensource.wolfsonmicro.com>
-	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
-	<AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
-	<00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
-	<AANLkTikf4CAWm49Q_AfcfiQDBQUVcE_BC-a_4F7d8xOz@mail.gmail.com>
-	<AANLkTinPXcjHcaM1puzz00Sfhob9Y-X4HGDDVGMTqhH5@mail.gmail.com>
-	<AANLkTindvBBOyWwkbwUo+oG31r8xSgCLbjuDNgvTNY_Q@mail.gmail.com>
-	<20101011104737.GB16777@sirena.org.uk>
-	<AANLkTi=NrEm8XHWbD6UxrxxAeCtTrdwr9_KYNSBv5+nm@mail.gmail.com>
-Message-ID: <AANLkTimp0WB+vweX8-pMVZZeHN6nD401TtkJyNthCEO5@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 12 Oct 2010 12:37:30 +0900
+Subject: [PATCH v5 2/2] sdhci-s3c: Add support no internal clock	divider in
+	host controller
+In-Reply-To: <20101012025946.GA8534@void.printf.net>
+References: <1286783400-7277-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTinC850pde5Diuz5U40RCDGR1DeQzTAfLUHWm0rB@mail.gmail.com>
+	<20101012025946.GA8534@void.printf.net>
+Message-ID: <011101cb69be$ceda5930$6c8f0b90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I'm OK with having the code in the driver, I just want something there
->> that makes it more discoverable that it's there like a config option.
->> Having the driver log loudly when it reconfigures the EPLL would
->> probably also cover it.
->
-> Thanks. Yes, we should print warning upon changing EPLL.
+Chris Ball wrote:
+> 
+> Hi Kyungmin,
+> 
+> On Tue, Oct 12, 2010 at 11:53:35AM +0900, Kyungmin Park wrote:
+> > Hi Chris,
+> >
+> > we make a conclusion use this patch. Can you merge it for 2.6.37?
+> >
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> I don't feel that I can, because Ben Dooks is listed as the maintainer
+> for this driver and the patch does not have his ACK.
+> 
+> I don't know what to do about this; I've already tried asking Ben
+> whether he intends to continue maintaining sdhci-s3c, with no reply.
+> 
 
-Okay, I'll fix this also and will re-submit today. :-)
+Hi Chris,
+
+Yeah, you're right. The sdhci-s3c's maintainer is Ben Dooks. So if get a his
+ack, it's best. But if you're ok this, in my opinion, you can merge this.
+And as I'm a maintainer of Samsung stuff with Ben Dooks, I already merged
+regarding patches, such as sdhci-s3c platform handling into my tree for 37
+merge window.
+...
+
+Ben, could you please check this patch?...this is ok to me for Samsung
+HSMMC...if any opinions, please kindly let us know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
