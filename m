@@ -1,187 +1,95 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Tue, 12 Oct 2010 22:40:21 +0300
-Subject: [PATCH RFC/RFT] ARM: S5P: Fix USB and 48M clock enable procedure
-Message-ID: <20101012194021.11514.12704.stgit@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Oct 2010 14:01:50 -0700
+Subject: [PATCH v4 0/4] LogicPD minimal board support for LV_SOM and
+	Torpedo
+In-Reply-To: <201010122120.26977.linz@li-pro.net>
+References: <1285603550-6382-1-git-send-email-tim.nordell@logicpd.com>
+	<4CB34D55.6060007@logicpd.com>
+	<AANLkTikK6QAwj_T67NQAhVDT2T+D3tbBbOt9vDyme6N=@mail.gmail.com>
+	<201010122120.26977.linz@li-pro.net>
+Message-ID: <20101012210150.GA25462@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Paulius Zaleckas <paulius.zaleckas@gmail.com>
----
+* Stephan Linz <linz@li-pro.net> [101012 12:11]:
+> Am Montag, 11. Oktober 2010, um 20:40:51 schrieb Ashwin Bihari:
+> > On Mon, Oct 11, 2010 at 1:45 PM, Tim Nordell <tim.nordell@logicpd.com> 
+> wrote:
+> > >  On 10/11/10 12:30, Tony Lindgren wrote:
+> > >> Uhh, so whose patches are these originally?
+> > >>
+> > >> We have them now queued with Tim Nordell as the author. Please let me
+> > >> know ASAP if you want me to change that.
+> 
+> Hi Tony,
+> 
+> No, I don't want to change anything. Only the LogicPD employees should be 
+> named inside the pathes as far as the patches are not a direct pull from my 
+> own devel tree on Gitorious. Ashwin has done a good explanation of the 
+> situation.
 
- arch/arm/mach-s5p6440/clock.c              |   23 -------
- arch/arm/plat-s5p/clock.c                  |   86 ++++++++++++++++++++++++++++
- arch/arm/plat-s5p/include/plat/s5p-clock.h |    1 
- 3 files changed, 86 insertions(+), 24 deletions(-)
+OK, thanks everybody, keeping the commits as they are.
 
-diff --git a/arch/arm/mach-s5p6440/clock.c b/arch/arm/mach-s5p6440/clock.c
-index ca6e48d..5a5b245 100644
---- a/arch/arm/mach-s5p6440/clock.c
-+++ b/arch/arm/mach-s5p6440/clock.c
-@@ -295,27 +295,6 @@ static struct clksrc_clk clk_pclk_low = {
- 	.reg_div = { .reg = S5P_CLK_DIV3, .shift = 12, .size = 4 },
- };
- 
--int s5p6440_clk48m_ctrl(struct clk *clk, int enable)
--{
--	unsigned long flags;
--	u32 val;
--
--	/* can't rely on clock lock, this register has other usages */
--	local_irq_save(flags);
--
--	val = __raw_readl(S5P_OTHERS);
--	if (enable)
--		val |= S5P_OTHERS_USB_SIG_MASK;
--	else
--		val &= ~S5P_OTHERS_USB_SIG_MASK;
--
--	__raw_writel(val, S5P_OTHERS);
--
--	local_irq_restore(flags);
--
--	return 0;
--}
--
- static int s5p6440_pclk_ctrl(struct clk *clk, int enable)
- {
- 	return s5p_gatectrl(S5P_CLK_GATE_PCLK, clk, enable);
-@@ -769,8 +748,6 @@ void __init_or_cpufreq s5p6440_setup_clocks(void)
- 	clk_fout_epll.enable = s5p6440_epll_enable;
- 	clk_fout_epll.ops = &s5p6440_epll_ops;
- 
--	clk_48m.enable = s5p6440_clk48m_ctrl;
--
- 	xtal_clk = clk_get(NULL, "ext_xtal");
- 	BUG_ON(IS_ERR(xtal_clk));
- 
-diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
-index b5e2552..337ced6 100644
---- a/arch/arm/plat-s5p/clock.c
-+++ b/arch/arm/plat-s5p/clock.c
-@@ -19,11 +19,16 @@
- #include <linux/clk.h>
- #include <linux/sysdev.h>
- #include <linux/io.h>
-+#include <linux/delay.h>
- #include <asm/div64.h>
- 
-+#include <mach/map.h>
-+#include <mach/regs-clock.h>
-+
- #include <plat/clock.h>
- #include <plat/clock-clksrc.h>
- #include <plat/s5p-clock.h>
-+#include <plat/regs-usb-hsotg-phy.h>
- 
- /* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
-  * clk_ext_xtal_mux.
-@@ -33,9 +38,89 @@ struct clk clk_ext_xtal_mux = {
- 	.id		= -1,
- };
- 
-+#ifdef S3C_VA_USB_HSPHY
-+void __init s5p_clk_xusbxti_is_osc(int is_osc)
-+{
-+	u32 val;
-+
-+	/* no need to protect since it will be called from machine init */
-+	val = __raw_readl(S3C_PHYCLK);
-+	if (is_osc)
-+		val |= S3C_PHYCLK_EXT_OSC;
-+	else
-+		val &= ~S3C_PHYCLK_EXT_OSC;
-+	__raw_writel(val, S3C_PHYCLK);
-+}
-+
-+static int clk_xusbxti_ctrl(struct clk *clk, int enable)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	/* can't rely on clock lock, this register has other usages */
-+	local_irq_save(flags);
-+
-+#if defined(S5P_OTHERS) && defined(S5P_OTHERS_USB_SIG_MASK)
-+	val = __raw_readl(S5P_OTHERS);
-+	if (enable)
-+		val |= S5P_OTHERS_USB_SIG_MASK;
-+	else
-+		val &= ~S5P_OTHERS_USB_SIG_MASK;
-+
-+	__raw_writel(val, S5P_OTHERS);
-+#endif
-+
-+	val = __raw_readl(S3C_PHYPWR);
-+	if (enable)
-+		val &= ~(SRC_PHYPWR_OTG_DISABLE | SRC_PHYPWR_ANALOG_POWERDOWN |
-+			 SRC_PHYPWR_FORCE_SUSPEND);
-+	else
-+		val |= (SRC_PHYPWR_OTG_DISABLE | SRC_PHYPWR_ANALOG_POWERDOWN |
-+			SRC_PHYPWR_FORCE_SUSPEND);
-+	__raw_writel(val, S3C_PHYPWR);
-+	mdelay(1);
-+
-+	if (enable) {
-+		val = __raw_readl(S3C_PHYCLK);
-+
-+		val &= ~S3C_PHYCLK_CLKSEL_MASK;
-+
-+		switch (clk->rate) {
-+		case 12000000:
-+			val |= S3C_PHYCLK_CLKSEL_12M;
-+			break;
-+		case 24000000:
-+			val |= S3C_PHYCLK_CLKSEL_24M;
-+			break;
-+		default:
-+			pr_err("Invalid USB PHY external clock frequency: %lu\n",
-+			       clk->rate);
-+		case 48000000:
-+			/* default reference clock */
-+			break;
-+		}
-+
-+		__raw_writel(val | S3C_PHYCLK_CLK_FORCE, S3C_PHYCLK);
-+
-+		/* issue a full set of resets to the otg and core */
-+		__raw_writel(S3C_RSTCON_PHY, S3C_RSTCON);
-+		udelay(20);	/* at-least 10uS */
-+		__raw_writel(0, S3C_RSTCON);
-+	}
-+
-+	local_irq_restore(flags);
-+
-+	return 0;
-+}
-+#else
-+#define clk_xusbxti_ctrl NULL
-+#endif /* S3C_VA_USB_HSPHY */
-+
- struct clk clk_xusbxti = {
- 	.name		= "xusbxti",
- 	.id		= -1,
-+	.rate		= 48000000,
-+	.enable		= clk_xusbxti_ctrl,
- };
- 
- struct clk s5p_clk_27m = {
-@@ -49,6 +134,7 @@ struct clk clk_48m = {
- 	.name		= "clk_48m",
- 	.id		= -1,
- 	.rate		= 48000000,
-+	.parent		= &clk_xusbxti,
- };
- 
- /* APLL clock output
-diff --git a/arch/arm/plat-s5p/include/plat/s5p-clock.h b/arch/arm/plat-s5p/include/plat/s5p-clock.h
-index 09418b1..1c9266d 100644
---- a/arch/arm/plat-s5p/include/plat/s5p-clock.h
-+++ b/arch/arm/plat-s5p/include/plat/s5p-clock.h
-@@ -38,7 +38,6 @@ extern struct clksrc_sources clk_src_apll;
- extern struct clksrc_sources clk_src_mpll;
- extern struct clksrc_sources clk_src_epll;
- 
--extern int s5p6440_clk48m_ctrl(struct clk *clk, int enable);
- extern int s5p_gatectrl(void __iomem *reg, struct clk *clk, int enable);
- 
- #endif /* __ASM_PLAT_S5P_CLOCK_H */
+Regards,
+
+Tony
+
+> 
+> 
+> - Stephan
+> 
+> 
+> > >>
+> > >> Regards,
+> > >>
+> > >> Tony
+> > >
+> > > The history for those patches, for me, originated with Jacob Tanenbaum's
+> > > patchset.  I was taking over for him as he was going back to school.  I
+> > > did some misc. changes for further submission, but I was not the
+> > > original author.  I don't know Stephan's involvement - however, in the
+> > > source files he's attributed credit in the header, as well as one of my
+> > > coworkers so presumably there was some involvement on both ends.  I
+> > > recognize some of the code as coming from our kernel release, so likely
+> > > it was a hybrid originally between Stephan, Peter, and Jacob.
+> > >
+> > > That's about the extent that I know.
+> > >
+> > > - Tim
+> >
+> > Tony,
+> >
+> > LogicPD engineers did the initial porting and then Stephan Linz
+> > re-started the work on the, then recent, 2.6.32 Kernel using our BSP
+> > as a starting point. He was kind enough to send those LogicPD and we
+> > began putting it together against the latest Linux Kernel for
+> > inclusion and that was done by Jacob over the summer and finished off
+> > by Tim.
+> >
+> > Stephan Linz is credited in the patch and Peter Barada (another
+> > LogicPD employee) is listed as the maintainer though his part (along
+> > with me) in getting these specific patches out have been more behind
+> > the scenes. So having the names listed as they are now is OK.
+> >
+> > In the upcoming months we will be pushing out additional support for
+> > the LogicPD's boards and it will most likely come up a variety of
+> > LogicPD engineers depending on our workload..
+> >
+> > Thanks
+> > -- Ashwin
+> 
+> 
+> -- 
+> Viele Gr??e,
+> Stephan Linz
+> ______________________________________________________________________________
+> OpenDCC: http://www.li-pro.net/opendcc.phtml
+> PC/M: http://www.li-pro.net/pcm.phtml
+> CDK4AVR: http://cdk4avr.sourceforge.net/
+> CDK4NIOS: http://cdk4nios.sourceforge.net/
+> CDK4MSP: http://cdk4msp.sourceforge.net/
+> CPM4L: http://download.opensuse.org/repositories/home:/rexut:/CPM4L
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
