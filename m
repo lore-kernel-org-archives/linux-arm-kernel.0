@@ -1,119 +1,43 @@
-From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Tue, 12 Oct 2010 12:16:10 +0200
-Subject: [PATCH] omap3: various code improvements for IGEP v2 board.
-Message-ID: <1286878570-1973-1-git-send-email-eballetbo@gmail.com>
+From: sjur.brandeland@stericsson.com (Sjur Braendeland)
+Date: Tue, 12 Oct 2010 13:10:17 +0200
+Subject: [RFC arm-kernel 0/4] caif-u5500: CAIF shared memory/mailbox driver
+Message-ID: <1286881821-2916-1-git-send-email-sjur.brandeland@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comments of this post also apply to IGEP v2 board (thanks Laurent)
+From: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
 
-  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg36402.html
+This patch-set introduces the CAIF protocol driver for shared memory
+over mailbox for u5500.
 
-Changes are:
+It implements the driver for transporting CAIF frames between the DB5500
+modem portion and host side for the u5500 architecture.
 
-  - Set onenand_setup to NULL instead of adding a no-op function.
-  - On igep2_flash_init() function:
-    - Use 'for' loop instead 'while' loop.
-    - No need to initialize ret to 0, we're assigning it right after.
-    - No need to check for onenandcs < GPMC_CS_NUM here, it will always be true.
-  - omap_board_config_size is implicitly initialized to 0 in
-    plat-omap/common.c, get_config() won't dereference omap_board_config,
-    so we can remove the empty igep2_config array.
+The patches depends on the patch-set "U5500 mailbox driver and
+modem irq handler" submitted on the linux-arm-kernel list by Stefan Nilsson.
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6417/1
 
-Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
- arch/arm/mach-omap2/board-igep0020.c |   39 ++++++++++++---------------------
- 1 files changed, 14 insertions(+), 25 deletions(-)
+These patches applies cleanly on latest linux-next git, but depends on
+the U5500 mailbox driver for compilation.
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 152f757..ddcfd06 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -136,16 +136,10 @@ static struct mtd_partition igep2_onenand_partitions[] = {
- 	},
- };
- 
--static int igep2_onenand_setup(void __iomem *onenand_base, int freq)
--{
--       /* nothing is required to be setup for onenand as of now */
--       return 0;
--}
--
- static struct omap_onenand_platform_data igep2_onenand_data = {
- 	.parts = igep2_onenand_partitions,
- 	.nr_parts = ARRAY_SIZE(igep2_onenand_partitions),
--	.onenand_setup = igep2_onenand_setup,
-+	.onenand_setup = NULL,
- 	.dma_channel	= -1,	/* disable DMA in OMAP OneNAND driver */
- };
- 
-@@ -159,35 +153,35 @@ static struct platform_device igep2_onenand_device = {
- 
- static void __init igep2_flash_init(void)
- {
--	u8		cs = 0;
--	u8		onenandcs = GPMC_CS_NUM + 1;
-+	u8 cs = 0;
-+	u8 onenandcs = GPMC_CS_NUM + 1;
- 
--	while (cs < GPMC_CS_NUM) {
--		u32 ret = 0;
-+	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
-+		u32 ret;
- 		ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
- 
- 		/* Check if NAND/oneNAND is configured */
- 		if ((ret & 0xC00) == 0x800)
- 			/* NAND found */
--			pr_err("IGEP v2: Unsupported NAND found\n");
-+			pr_err("IGEP2: Unsupported NAND found\n");
- 		else {
- 			ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
-+
- 			if ((ret & 0x3F) == (ONENAND_MAP >> 24))
--				/* ONENAND found */
-+				/* OneNAND found */
- 				onenandcs = cs;
- 		}
--		cs++;
- 	}
-+
- 	if (onenandcs > GPMC_CS_NUM) {
--		pr_err("IGEP v2: Unable to find configuration in GPMC\n");
-+		pr_err("IGEP2: Unable to find configuration in GPMC\n");
- 		return;
- 	}
- 
--	if (onenandcs < GPMC_CS_NUM) {
--		igep2_onenand_data.cs = onenandcs;
--		if (platform_device_register(&igep2_onenand_device) < 0)
--			pr_err("IGEP v2: Unable to register OneNAND device\n");
--	}
-+	igep2_onenand_data.cs = onenandcs;
-+
-+	if (platform_device_register(&igep2_onenand_device) < 0)
-+		pr_err("IGEP2: Unable to register OneNAND device\n");
- }
- 
- #else
-@@ -254,9 +248,6 @@ static inline void __init igep2_init_smsc911x(void)
- static inline void __init igep2_init_smsc911x(void) { }
- #endif
- 
--static struct omap_board_config_kernel igep2_config[] __initdata = {
--};
--
- static struct regulator_consumer_supply igep2_vmmc1_supply = {
- 	.supply		= "vmmc",
- };
-@@ -493,8 +484,6 @@ static struct platform_device *igep2_devices[] __initdata = {
- 
- static void __init igep2_init_irq(void)
- {
--	omap_board_config = igep2_config;
--	omap_board_config_size = ARRAY_SIZE(igep2_config);
- 	omap2_init_common_hw(m65kxxxxam_sdrc_params, m65kxxxxam_sdrc_params);
- 	omap_init_irq();
- 	omap_gpio_init();
--- 
-1.7.1
+Please note that the size and address of the shared memory are specified as module
+parameters: shm_total_size, shm_start.
+
+Regards,
+Sjur Braendeland
+
+Amarnath Revanna (4):
+  caif-u5500: Adding shared memory include
+  caif-u5500: CAIF shared memory transport protocol
+  caif-u5500: CAIF shared memory mailbox interface
+  caif-u5500: Build config for CAIF shared mem driver
+
+ drivers/net/caif/Kconfig          |    7 +
+ drivers/net/caif/Makefile         |    4 +
+ drivers/net/caif/caif_shm_u5500.c |  129 ++++++
+ drivers/net/caif/caif_shmcore.c   |  792 +++++++++++++++++++++++++++++++++++++
+ include/net/caif/caif_shm.h       |   26 ++
+ 5 files changed, 958 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/net/caif/caif_shm_u5500.c
+ create mode 100644 drivers/net/caif/caif_shmcore.c
+ create mode 100644 include/net/caif/caif_shm.h
