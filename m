@@ -1,76 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Oct 2010 11:32:25 +0200
-Subject: [PATCH 2/2] mx51: add resources for SD/MMC on i.MX51
-In-Reply-To: <4CB4216C.8010200@eukrea.com>
-References: <20101011170405.GC476@pengutronix.de>
-	<1286868685-7825-2-git-send-email-eric@eukrea.com>
-	<20101012081804.GD29673@pengutronix.de>
-	<4CB4216C.8010200@eukrea.com>
-Message-ID: <20101012093225.GF29673@pengutronix.de>
+From: thomas.nemeth@betatech.fr (Thomas Nemeth)
+Date: Tue, 12 Oct 2010 11:59:56 +0200
+Subject: mx31: external abort on non-linefetch (debugging suspend to RAM)
+Message-ID: <201010121159.57222.thomas.nemeth@betatech.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On Tue, Oct 12, 2010 at 10:50:52AM +0200, Eric B?nard wrote:
-> Le 12/10/2010 10:18, Uwe Kleine-K?nig a ?crit :
->> On Tue, Oct 12, 2010 at 09:31:25AM +0200, Eric B?nard wrote:
->>> the attached patch allows SD to work on i.MX51 with Wolfram's drivers
->>> Tested on i.MX51.
->>>
->>> Based on original patch from: Richard Zhu<r65037@freescale.com>
->>> Signed-off-by: Eric B?nard<eric@eukrea.com>
->>> ---
->>>   arch/arm/mach-mx5/clock-mx51.c              |  102 ++++++++++++++++++++++++++-
->>>   arch/arm/mach-mx5/devices-imx51.h           |    9 +++
->>>   arch/arm/plat-mxc/include/mach/iomux-mx51.h |   45 ++++++++----
->>>   3 files changed, 140 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
->>> index 7deb683..9e8b268 100644
->>> --- a/arch/arm/mach-mx5/clock-mx51.c
->>> +++ b/arch/arm/mach-mx5/clock-mx51.c
->>> @@ -41,6 +41,34 @@ static struct clk usboh3_clk;
->>>
->>>   #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
->>>
->>> +static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
->>> +{
->> I asked for a comment here.  E.g. valid ranges of pre and post and the
->> task solved here (I assume it's "Find pre and post with pre * post =
->> div"?).
->>
-> will try to write something.
-> Richard : do you have a comment in mind for this function ?
->
-> >> +		}
-> >> +		*post = (div + *pre - 1) / *pre;
-> > 		*post = DIV_ROUND_UP(div, *pre);
-> >
-> > I don't know if DIV_ROUND_UP is sensible, maybe use DIV_ROUND_CLOSEST?
-> > I'd look into that when the comment above is in place.
-> >
-> if you have an opinion before, this would be great to avoid a n+1  
-> version of this patch ;-)
-I'm lazy.  To analyse this I need to know how pre and post are used.  I
-assume you (and/or Richard) already know that so I'm not keen to search
-this info in the reference manuals.  See it as a quality test for the
-comment I asked for :-)
+    Hi!
 
->>> -#define DEFINE_CLOCK1(name, i, er, es, pfx, p, s)	\
->>> +#define DEFINE_CLOCK_CCGR(name, i, er, es, pfx, p, s)	\
->> This is IMHO a good idea, but it should go in a seperate patch.  These
->> clock changes are very sensible and so a working bisection is important
->> here.
->>
-> there is no clock change here only a define rename to avoid having  
-> DEFINE_CLOCK1, DEFINE_CLOCK2 ... is a separate patch really needed ?
-Yep, please do.  I don't hope your patch breaks anything, but if it
-does, it's easier to find out the actual breakage if there is no noise
-in the patch.
+    I've already posted a message some time ago about handling suspend
+    to RAM for iMX31 processors. I added a pm.c file I extracted from
+    the old 2.6.22 freescale-provided kernel to make it up-to-date and
+    also used the one Andy Green showed me.
 
-Uwe
+    However, whatever I try, the CPU still does not want to wake up
+    after beeing put into State Retention mode. Apart from the muxing,
+    our CPU board is very much like the mx31ads board with several
+    resources added.
+
+    There is a new symptom today. A long time ago I made a little
+    program usefull to quickly dump some registers. It only does a
+    simple mmap on /dev/mem with adjusted pages sizes and offsets and I
+    used to use it everywhere, on several processors. Using it on the
+    2.6.22 and the ADS works fine to dump the CCMR register. But using
+    it on our new board gives this :
+
+# insight -D ./iMX31-regs.defs -R CCMR
+Unhandled fault: external abort on non-linefetch (0x008) at 0x40000000
+Bus error
+
+    For those wanting to have a look at my program, I can send the
+    tarball by mail.
+
+    On the MX31ADS the result is the following one :
+mx31# ./insight -D iMX31-regs.defs -R CCMR
+CCMR: 0x074B097D
+  FIELD            HEX              BIN DEC.
+  FPME      :        1                1 (1)
+  PRCS      :        2               10 (2)
+  MPE       :        1                1 (1)
+  SBYCS     :        1                1 (1)
+  ROMW      :        3               11 (3)
+  MDS       :        0                0 (0)
+  SPE       :        1                1 (1)
+  UPE       :        0                0 (0)
+  WAMO      :        0                0 (0)
+  FIRS      :        1                1 (1)
+  reserved  :        0                0 (0)
+  LPM       :        0                0 (0)
+  RAMW      :        3               11 (3)
+  SSI1S     :        2               10 (2)
+  reserved  :        0                0 (0)
+  SSI2S     :        2               10 (2)
+  reserved  :        0                0 (0)
+  PERCS     :        1                1 (1)
+  CSCS      :        1                1 (1)
+  FPMF      :        1                1 (1)
+  WBEN      :        0                0 (0)
+  VSTBY     :        0                0 (0)
+  L2PG      :        0                0 (0)
+  reserved  :        0                0 (0)
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Nemeth - Ing?nieur d'?tudes en Informatique Industrielle
+? ? ? ? ? ? ? ? Industrial Computing Software Designer
+BETAtech - 15, rue Apollo, Z.A. de Montredon, 31240, L'Union.
+05 34 30 40 00 (standard) ?/ ?05 34 30 40 09 (ligne directe)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101012/4154b591/attachment.sig>
