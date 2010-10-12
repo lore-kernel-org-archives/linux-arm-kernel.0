@@ -1,76 +1,119 @@
-From: thomas.nemeth@betatech.fr (Thomas Nemeth)
-Date: Tue, 12 Oct 2010 11:59:56 +0200
-Subject: mx31: external abort on non-linefetch (debugging suspend to RAM)
-Message-ID: <201010121159.57222.thomas.nemeth@betatech.fr>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Tue, 12 Oct 2010 12:16:10 +0200
+Subject: [PATCH] omap3: various code improvements for IGEP v2 board.
+Message-ID: <1286878570-1973-1-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The comments of this post also apply to IGEP v2 board (thanks Laurent)
 
-    Hi!
+  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg36402.html
 
-    I've already posted a message some time ago about handling suspend
-    to RAM for iMX31 processors. I added a pm.c file I extracted from
-    the old 2.6.22 freescale-provided kernel to make it up-to-date and
-    also used the one Andy Green showed me.
+Changes are:
 
-    However, whatever I try, the CPU still does not want to wake up
-    after beeing put into State Retention mode. Apart from the muxing,
-    our CPU board is very much like the mx31ads board with several
-    resources added.
+  - Set onenand_setup to NULL instead of adding a no-op function.
+  - On igep2_flash_init() function:
+    - Use 'for' loop instead 'while' loop.
+    - No need to initialize ret to 0, we're assigning it right after.
+    - No need to check for onenandcs < GPMC_CS_NUM here, it will always be true.
+  - omap_board_config_size is implicitly initialized to 0 in
+    plat-omap/common.c, get_config() won't dereference omap_board_config,
+    so we can remove the empty igep2_config array.
 
-    There is a new symptom today. A long time ago I made a little
-    program usefull to quickly dump some registers. It only does a
-    simple mmap on /dev/mem with adjusted pages sizes and offsets and I
-    used to use it everywhere, on several processors. Using it on the
-    2.6.22 and the ADS works fine to dump the CCMR register. But using
-    it on our new board gives this :
+Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+---
+ arch/arm/mach-omap2/board-igep0020.c |   39 ++++++++++++---------------------
+ 1 files changed, 14 insertions(+), 25 deletions(-)
 
-# insight -D ./iMX31-regs.defs -R CCMR
-Unhandled fault: external abort on non-linefetch (0x008) at 0x40000000
-Bus error
-
-    For those wanting to have a look at my program, I can send the
-    tarball by mail.
-
-    On the MX31ADS the result is the following one :
-mx31# ./insight -D iMX31-regs.defs -R CCMR
-CCMR: 0x074B097D
-  FIELD            HEX              BIN DEC.
-  FPME      :        1                1 (1)
-  PRCS      :        2               10 (2)
-  MPE       :        1                1 (1)
-  SBYCS     :        1                1 (1)
-  ROMW      :        3               11 (3)
-  MDS       :        0                0 (0)
-  SPE       :        1                1 (1)
-  UPE       :        0                0 (0)
-  WAMO      :        0                0 (0)
-  FIRS      :        1                1 (1)
-  reserved  :        0                0 (0)
-  LPM       :        0                0 (0)
-  RAMW      :        3               11 (3)
-  SSI1S     :        2               10 (2)
-  reserved  :        0                0 (0)
-  SSI2S     :        2               10 (2)
-  reserved  :        0                0 (0)
-  PERCS     :        1                1 (1)
-  CSCS      :        1                1 (1)
-  FPMF      :        1                1 (1)
-  WBEN      :        0                0 (0)
-  VSTBY     :        0                0 (0)
-  L2PG      :        0                0 (0)
-  reserved  :        0                0 (0)
-
-
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 152f757..ddcfd06 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -136,16 +136,10 @@ static struct mtd_partition igep2_onenand_partitions[] = {
+ 	},
+ };
+ 
+-static int igep2_onenand_setup(void __iomem *onenand_base, int freq)
+-{
+-       /* nothing is required to be setup for onenand as of now */
+-       return 0;
+-}
+-
+ static struct omap_onenand_platform_data igep2_onenand_data = {
+ 	.parts = igep2_onenand_partitions,
+ 	.nr_parts = ARRAY_SIZE(igep2_onenand_partitions),
+-	.onenand_setup = igep2_onenand_setup,
++	.onenand_setup = NULL,
+ 	.dma_channel	= -1,	/* disable DMA in OMAP OneNAND driver */
+ };
+ 
+@@ -159,35 +153,35 @@ static struct platform_device igep2_onenand_device = {
+ 
+ static void __init igep2_flash_init(void)
+ {
+-	u8		cs = 0;
+-	u8		onenandcs = GPMC_CS_NUM + 1;
++	u8 cs = 0;
++	u8 onenandcs = GPMC_CS_NUM + 1;
+ 
+-	while (cs < GPMC_CS_NUM) {
+-		u32 ret = 0;
++	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
++		u32 ret;
+ 		ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+ 
+ 		/* Check if NAND/oneNAND is configured */
+ 		if ((ret & 0xC00) == 0x800)
+ 			/* NAND found */
+-			pr_err("IGEP v2: Unsupported NAND found\n");
++			pr_err("IGEP2: Unsupported NAND found\n");
+ 		else {
+ 			ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
++
+ 			if ((ret & 0x3F) == (ONENAND_MAP >> 24))
+-				/* ONENAND found */
++				/* OneNAND found */
+ 				onenandcs = cs;
+ 		}
+-		cs++;
+ 	}
++
+ 	if (onenandcs > GPMC_CS_NUM) {
+-		pr_err("IGEP v2: Unable to find configuration in GPMC\n");
++		pr_err("IGEP2: Unable to find configuration in GPMC\n");
+ 		return;
+ 	}
+ 
+-	if (onenandcs < GPMC_CS_NUM) {
+-		igep2_onenand_data.cs = onenandcs;
+-		if (platform_device_register(&igep2_onenand_device) < 0)
+-			pr_err("IGEP v2: Unable to register OneNAND device\n");
+-	}
++	igep2_onenand_data.cs = onenandcs;
++
++	if (platform_device_register(&igep2_onenand_device) < 0)
++		pr_err("IGEP2: Unable to register OneNAND device\n");
+ }
+ 
+ #else
+@@ -254,9 +248,6 @@ static inline void __init igep2_init_smsc911x(void)
+ static inline void __init igep2_init_smsc911x(void) { }
+ #endif
+ 
+-static struct omap_board_config_kernel igep2_config[] __initdata = {
+-};
+-
+ static struct regulator_consumer_supply igep2_vmmc1_supply = {
+ 	.supply		= "vmmc",
+ };
+@@ -493,8 +484,6 @@ static struct platform_device *igep2_devices[] __initdata = {
+ 
+ static void __init igep2_init_irq(void)
+ {
+-	omap_board_config = igep2_config;
+-	omap_board_config_size = ARRAY_SIZE(igep2_config);
+ 	omap2_init_common_hw(m65kxxxxam_sdrc_params, m65kxxxxam_sdrc_params);
+ 	omap_init_irq();
+ 	omap_gpio_init();
 -- 
-Thomas Nemeth - Ing?nieur d'?tudes en Informatique Industrielle
-? ? ? ? ? ? ? ? Industrial Computing Software Designer
-BETAtech - 15, rue Apollo, Z.A. de Montredon, 31240, L'Union.
-05 34 30 40 00 (standard) ?/ ?05 34 30 40 09 (ligne directe)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 189 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101012/4154b591/attachment.sig>
+1.7.1
