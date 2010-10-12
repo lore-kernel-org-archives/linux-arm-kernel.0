@@ -1,234 +1,116 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Tue, 12 Oct 2010 16:58:25 +0200
-Subject: [PATCH v3] imx-esdhc: update devices registration
-In-Reply-To: <20101012130435.GN29673@pengutronix.de>
-References: <20101012130435.GN29673@pengutronix.de>
-Message-ID: <1286895505-9325-1-git-send-email-eric@eukrea.com>
+Date: Tue, 12 Oct 2010 17:01:16 +0200
+Subject: [PATCH 2/2] cpuimx51: update board support
+In-Reply-To: <1286895676-9407-1-git-send-email-eric@eukrea.com>
+References: <1286895676-9407-1-git-send-email-eric@eukrea.com>
+Message-ID: <1286895676-9407-2-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on i.MX25 and i.MX35 and i.MX51
+add NAND, SDHC
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
-v3 : remove generic bits from the structure
-v2 : remove SSI3 fixes which leaked in previous patch
- arch/arm/mach-mx25/devices-imx25.h              |    9 ++--
- arch/arm/mach-mx3/devices-imx35.h               |   12 +++---
- arch/arm/mach-mx5/devices-imx51.h               |   11 +---
- arch/arm/plat-mxc/devices/platform-esdhc.c      |   56 +++++++++++++++++++---
- arch/arm/plat-mxc/include/mach/devices-common.h |   12 ++++-
- arch/arm/plat-mxc/include/mach/mx25.h           |    4 +-
- arch/arm/plat-mxc/include/mach/mx35.h           |    6 +-
- arch/arm/plat-mxc/include/mach/mx51.h           |    8 ++--
- 8 files changed, 80 insertions(+), 38 deletions(-)
+ arch/arm/mach-mx5/Kconfig                    |    3 +++
+ arch/arm/mach-mx5/board-cpuimx51.c           |    9 +++++++++
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |   23 ++++++++++++++++++++++-
+ 3 files changed, 34 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx25/devices-imx25.h b/arch/arm/mach-mx25/devices-imx25.h
-index 733aaee..4e7b280 100644
---- a/arch/arm/mach-mx25/devices-imx25.h
-+++ b/arch/arm/mach-mx25/devices-imx25.h
-@@ -49,7 +49,8 @@ extern const struct imx_spi_imx_data imx25_spi_imx_data[] __initconst;
- #define imx25_add_spi_imx1(pdata)	imx25_add_spi_imx(1, pdata)
- #define imx25_add_spi_imx2(pdata)	imx25_add_spi_imx(2, pdata)
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 254b891..a2df9ac 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -31,6 +31,8 @@ config MACH_EUKREA_CPUIMX51
+ 	bool "Support Eukrea CPUIMX51 module"
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_MXC_NAND
++	select IMX_HAVE_PLATFORM_SPI_IMX
+ 	help
+ 	  Include support for Eukrea CPUIMX51 platform. This includes
+ 	  specific configurations for the module and its peripherals.
+@@ -43,6 +45,7 @@ choice
+ config MACH_EUKREA_MBIMX51_BASEBOARD
+ 	prompt "Eukrea MBIMX51 development board"
+ 	bool
++	select IMX_HAVE_PLATFORM_ESDHC
+ 	help
+ 	  This adds board specific devices that can be found on Eukrea's
+ 	  MBIMX51 evaluation board.
+diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+index 61f0510..378f532 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51.c
++++ b/arch/arm/mach-mx5/board-cpuimx51.c
+@@ -146,6 +146,13 @@ static struct pad_desc eukrea_cpuimx51_pads[] = {
+ 	MX51_PAD_USBH1_STP__USBH1_STP,
+ };
  
--#define imx25_add_esdhc0(pdata)	\
--	imx_add_esdhc(0, MX25_ESDHC1_BASE_ADDR, SZ_16K, MX25_INT_MMC_SDHC1, pdata)
--#define imx25_add_esdhc1(pdata)	\
--	imx_add_esdhc(1, MX25_ESDHC2_BASE_ADDR, SZ_16K, MX25_INT_MMC_SDHC2, pdata)
-+extern const struct imx_esdhc_imx_data imx25_esdhc_data[] __initconst;
-+#define imx25_add_esdhc(id, pdata)	\
-+	imx_add_esdhc(&imx25_esdhc_data[id], pdata)
-+#define imx25_add_esdhc0(pdata)		imx25_add_esdhc(0, pdata)
-+#define imx25_add_esdhc1(pdata)		imx25_add_esdhc(1, pdata)
-diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
-index 509b346..e4ef168 100644
---- a/arch/arm/mach-mx3/devices-imx35.h
-+++ b/arch/arm/mach-mx3/devices-imx35.h
-@@ -46,9 +46,9 @@ extern const struct imx_spi_imx_data imx35_cspi_data[] __initconst;
- #define imx35_add_spi_imx0(pdata)	imx35_add_cspi(0, pdata)
- #define imx35_add_spi_imx1(pdata)	imx35_add_cspi(1, pdata)
- 
--#define imx35_add_esdhc0(pdata)	\
--	imx_add_esdhc(0, MX35_ESDHC1_BASE_ADDR, SZ_16K, MX35_INT_MMC_SDHC1, pdata)
--#define imx35_add_esdhc1(pdata)	\
--	imx_add_esdhc(1, MX35_ESDHC2_BASE_ADDR, SZ_16K, MX35_INT_MMC_SDHC2, pdata)
--#define imx35_add_esdhc2(pdata)	\
--	imx_add_esdhc(2, MX35_ESDHC3_BASE_ADDR, SZ_16K, MX35_INT_MMC_SDHC3, pdata)
-+extern const struct imx_esdhc_imx_data imx35_esdhc_data[] __initconst;
-+#define imx35_add_esdhc(id, pdata)	\
-+	imx_add_esdhc(&imx35_esdhc_data[id], pdata)
-+#define imx35_add_esdhc0(pdata)		imx35_add_esdhc(0, pdata)
-+#define imx35_add_esdhc1(pdata)		imx35_add_esdhc(1, pdata)
-+#define imx35_add_esdhc2(pdata)		imx35_add_esdhc(2, pdata)
-diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-index 547432d..5cc910e 100644
---- a/arch/arm/mach-mx5/devices-imx51.h
-+++ b/arch/arm/mach-mx5/devices-imx51.h
-@@ -37,11 +37,6 @@ extern const struct imx_spi_imx_data imx51_ecspi_data[] __initconst;
- #define imx51_add_ecspi(id, pdata)	\
- 	imx_add_spi_imx(&imx51_ecspi_data[id], pdata)
- 
--#define imx51_add_esdhc0(pdata)	\
--	imx_add_esdhc(0, MX51_MMC_SDHC1_BASE_ADDR, SZ_16K, MX51_MXC_INT_MMC_SDHC1, pdata)
--#define imx51_add_esdhc1(pdata)	\
--	imx_add_esdhc(1, MX51_MMC_SDHC2_BASE_ADDR, SZ_16K, MX51_MXC_INT_MMC_SDHC2, pdata)
--#define imx51_add_esdhc2(pdata)	\
--	imx_add_esdhc(2, MX51_MMC_SDHC3_BASE_ADDR, SZ_16K, MX51_MXC_INT_MMC_SDHC3, pdata)
--#define imx51_add_esdhc3(pdata)	\
--	imx_add_esdhc(3, MX51_MMC_SDHC4_BASE_ADDR, SZ_16K, MX51_MXC_INT_MMC_SDHC4, pdata)
-+extern const struct imx_esdhc_imx_data imx51_esdhc_data[] __initconst;
-+#define imx51_add_esdhc(id, pdata)	\
-+	imx_add_esdhc(&imx51_esdhc_data[id], pdata)
-diff --git a/arch/arm/plat-mxc/devices/platform-esdhc.c b/arch/arm/plat-mxc/devices/platform-esdhc.c
-index 68db2a2..4fc37e4 100644
---- a/arch/arm/plat-mxc/devices/platform-esdhc.c
-+++ b/arch/arm/plat-mxc/devices/platform-esdhc.c
-@@ -6,26 +6,66 @@
-  * Free Software Foundation.
-  */
- 
-+#include <mach/hardware.h>
- #include <mach/devices-common.h>
- #include <mach/esdhc.h>
- 
--struct platform_device *__init imx_add_esdhc(int id,
--		resource_size_t iobase, resource_size_t iosize,
--		resource_size_t irq,
-+#define imx_esdhc_imx_data_entry_single(soc, _id, hwid) \
-+	{								\
-+		.id = _id,						\
-+		.iobase = soc ## _MMC_SDHC ## hwid ## _BASE_ADDR,	\
-+		.irq = soc ## _INT_MMC_SDHC ## hwid,			\
-+	}
-+
-+#define imx_esdhc_imx_data_entry(soc, id, hwid)	\
-+	[id] = imx_esdhc_imx_data_entry_single(soc, id, hwid)
-+
-+#ifdef CONFIG_ARCH_MX25
-+const struct imx_esdhc_imx_data imx25_esdhc_data[] __initconst = {
-+#define imx25_esdhc_data_entry(_id, _hwid)				\
-+	imx_esdhc_imx_data_entry(MX25, _id, _hwid)
-+	imx25_esdhc_data_entry(0, 1),
-+	imx25_esdhc_data_entry(1, 2),
++static const struct mxc_nand_platform_data
++		eukrea_cpuimx51_nand_board_info __initconst = {
++	.width		= 1,
++	.hw_ecc		= 1,
++	.flash_bbt	= 1,
 +};
-+#endif /* ifdef CONFIG_ARCH_MX25 */
 +
-+#ifdef CONFIG_ARCH_MX35
-+const struct imx_esdhc_imx_data imx35_esdhc_data[] __initconst = {
-+#define imx35_esdhc_data_entry(_id, _hwid)                           \
-+	imx_esdhc_imx_data_entry(MX35, _id, _hwid)
-+	imx35_esdhc_data_entry(0, 1),
-+	imx35_esdhc_data_entry(1, 2),
-+	imx35_esdhc_data_entry(2, 3),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX35 */
-+
-+#ifdef CONFIG_ARCH_MX51
-+const struct imx_esdhc_imx_data imx51_esdhc_data[] __initconst = {
-+#define imx51_esdhc_data_entry(_id, _hwid)				\
-+	imx_esdhc_imx_data_entry(MX51, _id, _hwid)
-+	imx51_esdhc_data_entry(0, 1),
-+	imx51_esdhc_data_entry(1, 2),
-+	imx51_esdhc_data_entry(2, 3),
-+	imx51_esdhc_data_entry(3, 4),
-+};
-+#endif /* ifdef CONFIG_ARCH_MX51 */
-+
-+struct platform_device *__init imx_add_esdhc(
-+		const struct imx_esdhc_imx_data *data,
- 		const struct esdhc_platform_data *pdata)
- {
- 	struct resource res[] = {
- 		{
--			.start = iobase,
--			.end = iobase + iosize - 1,
-+			.start = data->iobase,
-+			.end = data->iobase + SZ_16K - 1,
- 			.flags = IORESOURCE_MEM,
- 		}, {
--			.start = irq,
--			.end = irq,
-+			.start = data->irq,
-+			.end = data->irq,
- 			.flags = IORESOURCE_IRQ,
- 		},
- 	};
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -239,6 +246,8 @@ static void __init eukrea_cpuimx51_init(void)
+ 					ARRAY_SIZE(eukrea_cpuimx51_pads));
  
--	return imx_add_platform_device("sdhci-esdhc-imx", id, res,
-+	return imx_add_platform_device("sdhci-esdhc-imx", data->id, res,
- 			ARRAY_SIZE(res), pdata, sizeof(*pdata));
+ 	imx51_add_imx_uart(0, &uart_pdata);
++	imx51_add_mxc_nand(&eukrea_cpuimx51_nand_board_info);
++
+ 	gpio_request(CPUIMX51_QUARTA_GPIO, "quarta_irq");
+ 	gpio_direction_input(CPUIMX51_QUARTA_GPIO);
+ 	gpio_free(CPUIMX51_QUARTA_GPIO);
+diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+index d0e417c..a2e6e8c 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+@@ -113,6 +113,22 @@ static struct pad_desc mbimx51_pads[] = {
+ 	MX51_PAD_KEY_COL1__KEY_COL1,
+ 	MX51_PAD_KEY_COL2__KEY_COL2,
+ 	MX51_PAD_KEY_COL3__KEY_COL3,
++
++	/* SD 1 */
++	MX51_PAD_SD1_CMD__SD1_CMD,
++	MX51_PAD_SD1_CLK__SD1_CLK,
++	MX51_PAD_SD1_DATA0__SD1_DATA0,
++	MX51_PAD_SD1_DATA1__SD1_DATA1,
++	MX51_PAD_SD1_DATA2__SD1_DATA2,
++	MX51_PAD_SD1_DATA3__SD1_DATA3,
++
++	/* SD 2 */
++	MX51_PAD_SD2_CMD__SD2_CMD,
++	MX51_PAD_SD2_CLK__SD2_CLK,
++	MX51_PAD_SD2_DATA0__SD2_DATA0,
++	MX51_PAD_SD2_DATA1__SD2_DATA1,
++	MX51_PAD_SD2_DATA2__SD2_DATA2,
++	MX51_PAD_SD2_DATA3__SD2_DATA3,
+ };
+ 
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+@@ -159,9 +175,11 @@ struct tsc2007_platform_data tsc2007_data = {
+ 
+ static struct i2c_board_info mbimx51_i2c_devices[] = {
+ 	{
+-		I2C_BOARD_INFO("tsc2007", 0x48),
++		I2C_BOARD_INFO("tsc2007", 0x49),
+ 		.irq  = MBIMX51_TSC2007_IRQ,
+ 		.platform_data = &tsc2007_data,
++	}, {
++		I2C_BOARD_INFO("tlv320aic23", 0x1a),
+ 	},
+ };
+ 
+@@ -198,4 +216,7 @@ void __init eukrea_mbimx51_baseboard_init(void)
+ 	set_irq_type(MBIMX51_TSC2007_IRQ, IRQF_TRIGGER_FALLING);
+ 	i2c_register_board_info(1, mbimx51_i2c_devices,
+ 				ARRAY_SIZE(mbimx51_i2c_devices));
++
++	imx51_add_esdhc(0, NULL);
++	imx51_add_esdhc(1, NULL);
  }
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 0498978..ca1f922 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -108,7 +108,13 @@ struct platform_device *__init imx_add_spi_imx(
- 		const struct spi_imx_master *pdata);
- 
- #include <mach/esdhc.h>
--struct platform_device *__init imx_add_esdhc(int id,
--		resource_size_t iobase, resource_size_t iosize,
--		resource_size_t irq,
-+struct imx_esdhc_imx_data {
-+	const char *devid;
-+	int id;
-+	resource_size_t iobase;
-+	resource_size_t iosize;
-+	resource_size_t irq;
-+};
-+struct platform_device *__init imx_add_esdhc(
-+		const struct imx_esdhc_imx_data *data,
- 		const struct esdhc_platform_data *pdata);
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 153dd1b..31d9c4c 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -50,8 +50,8 @@
- #define MX25_SSI1_BASE_ADDR		0x50034000
- #define MX25_NFC_BASE_ADDR		0xbb000000
- #define MX25_DRYICE_BASE_ADDR		0x53ffc000
--#define MX25_ESDHC1_BASE_ADDR		0x53fb4000
--#define MX25_ESDHC2_BASE_ADDR		0x53fb8000
-+#define MX25_MMC_SDHC1_BASE_ADDR	0x53fb4000
-+#define MX25_MMC_SDHC2_BASE_ADDR	0x53fb8000
- #define MX25_LCDC_BASE_ADDR		0x53fbc000
- #define MX25_KPP_BASE_ADDR		0x43fa8000
- #define MX25_OTG_BASE_ADDR		0x53ff4000
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index cb071b7..6f113fc 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -53,9 +53,9 @@
- #define MX35_GPIO3_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xa4000)
- #define MX35_SCC_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xac000)
- #define MX35_RNGA_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xb0000)
--#define MX35_ESDHC1_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xb4000)
--#define MX35_ESDHC2_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xb8000)
--#define MX35_ESDHC3_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xbc000)
-+#define MX35_MMC_SDHC1_BASE_ADDR		(MX35_AIPS2_BASE_ADDR + 0xb4000)
-+#define MX35_MMC_SDHC2_BASE_ADDR		(MX35_AIPS2_BASE_ADDR + 0xb8000)
-+#define MX35_MMC_SDHC3_BASE_ADDR		(MX35_AIPS2_BASE_ADDR + 0xbc000)
- #define MX35_IPU_CTRL_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xc0000)
- #define MX35_AUDMUX_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xc4000)
- #define MX35_GPIO1_BASE_ADDR			(MX35_AIPS2_BASE_ADDR + 0xcc000)
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index c54b5c3..7927f61 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -280,10 +280,10 @@
-  */
- #define MX51_MXC_INT_BASE		0
- #define MX51_MXC_INT_RESV0		0
--#define MX51_MXC_INT_MMC_SDHC1		1
--#define MX51_MXC_INT_MMC_SDHC2		2
--#define MX51_MXC_INT_MMC_SDHC3		3
--#define MX51_MXC_INT_MMC_SDHC4		4
-+#define MX51_INT_MMC_SDHC1		1
-+#define MX51_INT_MMC_SDHC2		2
-+#define MX51_INT_MMC_SDHC3		3
-+#define MX51_INT_MMC_SDHC4		4
- #define MX51_MXC_INT_RESV5		5
- #define MX51_INT_SDMA			6
- #define MX51_MXC_INT_IOMUX		7
 -- 
 1.7.0.4
