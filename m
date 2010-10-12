@@ -1,41 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 12 Oct 2010 14:55:22 +0200
-Subject: [PATCH 0/2 v2] S3C64XX: Fix 48M clock enable
-In-Reply-To: <20101012123945.16469.2779.stgit@localhost.localdomain>
-References: <20101012123945.16469.2779.stgit@localhost.localdomain>
-Message-ID: <005701cb6a0c$be774370$3b65ca50$%szyprowski@samsung.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Tue, 12 Oct 2010 14:57:46 +0200
+Subject: [PATCH 1/3] imx-esdhc: update devices registration
+In-Reply-To: <20101012123312.GK29673@pengutronix.de>
+References: <1286886237-29014-1-git-send-email-eric@eukrea.com>
+	<20101012123312.GK29673@pengutronix.de>
+Message-ID: <4CB45B4A.5090003@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Uwe,
 
-On Tuesday, October 12, 2010 2:41 PM Paulius Zaleckas wrote:
+Le 12/10/2010 14:33, Uwe Kleine-K?nig a ?crit :
+>> +#ifdef CONFIG_ARCH_MX51
+>> +const struct imx_esdhc_imx_data imx51_esdhc_data[] __initconst = {
+>> +#define imx51_esdhc_data_entry(_id, _hwid)				\
+>> +	imx_esdhc_imx_data_entry(MX51, MMC_SDHC, "sdhci-esdhc-imx", _id, _hwid, SZ_16K)
+>> +	imx51_esdhc_data_entry(0, 1),
+>> +	imx51_esdhc_data_entry(1, 2),
+>> +	imx51_esdhc_data_entry(2, 3),
+>> +	imx51_esdhc_data_entry(3, 4),
+>> +};
+>> +#endif /* ifdef CONFIG_ARCH_MX51 */
+> Hmmm, I think it's sensible to use the config struct only for data that
+> is actually different for the different socs.  That is MMC_SDHC,
+> "sdhci-esdhc-imx" and SZ_16K doesn't need to be part of the data.
+>
+keeping it like this will allow to handle the case of future i.MX socs 
+which may need special (like for spi for example) for new revisions of 
+the esdhc IP.
 
-> To enable 48M clock USB PHY must be initialized since 48M
-> is output of USB PHY PLL.
-> So fix a problem where other devices requiring 48M clock will
-> not work unless USB OTG driver is enabled.
-> is_osc was removed from OTG drivers platform data and implemented
-> as separate function s3c6400_clk_xusbxti_is_osc which should be
-> called from machine_init. Currently there is no in-kernel users
-> of it.
-> 
-> This fix is only for S3C64xx family, but I am sure something
-> similar will be needed for S5P family. I have started the work
-> but I am unable to finnish it since I only have datasheet for
-> S5PC100. Maybe Samsung guys could help me with this..?
-> However current patches doesn't break S5P since it is not
-> using s3c-hsotg driver (yet?).
+>> +#define MX51_SSI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe8000)
+> This is unrelated, no?
+>
+fixed in V2.
 
-There are patches that enables the driver on S5PC110/S5PV210 series
-on kgene/for-next tree. Please note that at least Samsung Goni and
-Samsung Aquila uses external oscillator to supply usb clock. Please
-refer to:
-
-http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=commit;h=e5e044e637228be8bdf033c0772f9e5926269ae0
-http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=commit;h=a33bc34103b4fc4eca13cdd61f2579857797bbf7
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Eric
