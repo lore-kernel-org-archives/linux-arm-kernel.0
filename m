@@ -1,10 +1,10 @@
 From: sw.youn@samsung.com (Seungwhan Youn)
-Date: Tue, 12 Oct 2010 20:37:00 +0900
+Date: Tue, 12 Oct 2010 20:36:19 +0900
 Subject: [PATCH v2 2/6] ARM: S5PV210: Fix wrong EPLL rate getting on setup
 	clocks
-In-Reply-To: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
-References: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
-Message-ID: <1286883420-27716-1-git-send-email-sw.youn@samsung.com>
+In-Reply-To: <방식인 유럽형 이동전화(GSM)와 CDMA를 모두 지원하는 듀얼모드 아이폰을 생산할 것”이라고 보도했다.>
+References: <방식인 유럽형 이동전화(GSM)와 CDMA를 모두 지원하는 듀얼모드 아이폰을 생산할 것”이라고 보도했다.>
+Message-ID: <1286883379-27688-1-git-send-email-sw.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
