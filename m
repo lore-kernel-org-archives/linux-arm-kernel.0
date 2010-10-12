@@ -1,65 +1,46 @@
-From: jc.lee@samsung.com (Jaecheol Lee)
-Date: Tue, 12 Oct 2010 09:39:40 +0900
-Subject: [PATCH] ARM: SAMSUNG: Bug fix spin_lock recursion in clk_enable() and
-	clk_disable()
-Message-ID: <1286843980-23684-1-git-send-email-jc.lee@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 12 Oct 2010 10:27:33 +0900
+Subject: [alsa-devel] [PATCH 10/10] ASoC: SAMSUNG: Add Machine driver for
+	S/PDIF PCM audio
+In-Reply-To: <20101011104737.GB16777@sirena.org.uk>
+References: <AANLkTincwL_nQAmu7Dcmht0FV43BiN7OoecE_60QJhS2@mail.gmail.com>
+	<20101005044304.GA26509@opensource.wolfsonmicro.com>
+	<AANLkTi=x_fi5HTBBmMUv8YTxSdbgcnJ=ZbacJQj6rcgf@mail.gmail.com>
+	<20101005055937.GA19989@opensource.wolfsonmicro.com>
+	<AANLkTimi1t5S2XWdUFzaPttD4Hywm0SLt5CvR1YnVOjj@mail.gmail.com>
+	<AANLkTin4skx+aiL2FXwWO1ekKqT2YWDd3SM1H5WnGkhC@mail.gmail.com>
+	<00c401cb6520$9484ef90$bd8eceb0$%kim@samsung.com>
+	<AANLkTikf4CAWm49Q_AfcfiQDBQUVcE_BC-a_4F7d8xOz@mail.gmail.com>
+	<AANLkTinPXcjHcaM1puzz00Sfhob9Y-X4HGDDVGMTqhH5@mail.gmail.com>
+	<AANLkTindvBBOyWwkbwUo+oG31r8xSgCLbjuDNgvTNY_Q@mail.gmail.com>
+	<20101011104737.GB16777@sirena.org.uk>
+Message-ID: <AANLkTi=NrEm8XHWbD6UxrxxAeCtTrdwr9_KYNSBv5+nm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Minho Ban <mhban@samsung.com>
+On Mon, Oct 11, 2010 at 7:47 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Sat, Oct 09, 2010 at 10:52:26AM +0900, Jassi Brar wrote:
+>> On Fri, Oct 8, 2010 at 6:07 PM, Seungwhan Youn <claude.youn@gmail.com> wrote:
+>
+>> > Now, I'm almost finished 2nd patch for submit except this audio clock
+>> > setting. For now, I can only think that remove audio clock setting
+>> > from this machine code, and add audio clock settings in arch later(may
+>> > be after arch/arm/plat-samsung get EPLL policy as Mr. Kukjin said).
+>
+>> > Is this okay?
+>
+>> IMO neither of the method is much better than the other.
+>
+>> If neither of the maintainers relent, maybe drop the clock setting altogether
+>> and mark the machine driver 'BROKEN' until the EPLL management is fixed?
+>
+> I'm OK with having the code in the driver, I just want something there
+> that makes it more discoverable that it's there like a config option.
+> Having the driver log loudly when it reconfigures the EPLL would
+> probably also cover it.
 
-The clk_enable() and clk_disable() can be used process and ISR either.
-So spin_lock_irqsave should be used instead.
-
-Signed-off-by: Minho Ban <mhban@samsung.com>
-Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
----
- arch/arm/plat-samsung/clock.c |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index e8d20b0..2a991a5 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -138,31 +138,35 @@ void clk_put(struct clk *clk)
- 
- int clk_enable(struct clk *clk)
- {
-+	unsigned long flags;
-+
- 	if (IS_ERR(clk) || clk == NULL)
- 		return -EINVAL;
- 
- 	clk_enable(clk->parent);
- 
--	spin_lock(&clocks_lock);
-+	spin_lock_irqsave(&clocks_lock, flags);
- 
- 	if ((clk->usage++) == 0)
- 		(clk->enable)(clk, 1);
- 
--	spin_unlock(&clocks_lock);
-+	spin_unlock_irqrestore(&clocks_lock, flags);
- 	return 0;
- }
- 
- void clk_disable(struct clk *clk)
- {
-+	unsigned long flags;
-+
- 	if (IS_ERR(clk) || clk == NULL)
- 		return;
- 
--	spin_lock(&clocks_lock);
-+	spin_lock_irqsave(&clocks_lock, flags);
- 
- 	if ((--clk->usage) == 0)
- 		(clk->enable)(clk, 0);
- 
--	spin_unlock(&clocks_lock);
-+	spin_unlock_irqrestore(&clocks_lock, flags);
- 	clk_disable(clk->parent);
- }
- 
--- 
-1.6.2.5
+Thanks. Yes, we should print warning upon changing EPLL.
+Even better would be to have some sane EPLL(clocks in general)
+management policy in place. Perhaps, after I am done with Samsung ASoC overhaul,
+I'll take it up if others parameters favor.
