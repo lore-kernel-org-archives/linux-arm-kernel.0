@@ -1,63 +1,52 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Tue, 12 Oct 2010 10:50:52 +0200
-Subject: [PATCH 2/2] mx51: add resources for SD/MMC on i.MX51
-In-Reply-To: <20101012081804.GD29673@pengutronix.de>
-References: <20101011170405.GC476@pengutronix.de>
-	<1286868685-7825-2-git-send-email-eric@eukrea.com>
-	<20101012081804.GD29673@pengutronix.de>
-Message-ID: <4CB4216C.8010200@eukrea.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 12 Oct 2010 11:58:39 +0300
+Subject: Machine name/id change request
+In-Reply-To: <20100920155806.GA5177@n2100.arm.linux.org.uk>
+References: <AANLkTikm78_dj03xxaHMi10V+_B9B_8FRg1kRbL2OPBK@mail.gmail.com>
+	<20100920154441.GG30793@n2100.arm.linux.org.uk>
+	<AANLkTinBw_NJj=BcAOq5BzPGqrO8FW7fzmUVK8TGH7A7@mail.gmail.com>
+	<20100920155806.GA5177@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin6zJQxOLBuGkYgNp3nLT4viN1bDcLiryUim18h@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-Le 12/10/2010 10:18, Uwe Kleine-K?nig a ?crit :
-> On Tue, Oct 12, 2010 at 09:31:25AM +0200, Eric B?nard wrote:
->> the attached patch allows SD to work on i.MX51 with Wolfram's drivers
->> Tested on i.MX51.
+On Mon, Sep 20, 2010 at 6:58 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 20, 2010 at 06:48:54PM +0300, Amit Kucheria wrote:
+>> On Mon, Sep 20, 2010 at 6:44 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Mon, Sep 20, 2010 at 10:32:51AM -0500, Matt Sealey wrote:
+>> >> Hello,
+>> >>
+>> >> Is it possible for us to change a machine name/id in the database and
+>> >> future kernels?
+>> >>
+>> >> We have two systems originally designed by Pegatron and registered
+>> >> under their codenames, but for now retailing and marketed under the
+>> >> "Efika MX" brand. We would like to change the id data for
+>> >>
+>> >> id 2336, originally MX51_LANGE51 but changed to MX51_EFIKAMX (mx51_efikamx etc.)
+>> >> id 2370, originally MX51_KUNLUN but changed to MX51_EFIKASB (mx51_efikasb etc.)
+>> >
+>> > As they're not in mainline then we can. ?Bear in mind that kernels
+>> > which contain this code using the old identifiers will break when
+>> > someone decides to download a new copy of the file after the change.
+>> >
+>> > Updated.
+>> >
+>> > Is Sean Hsieh still responsible for these?
 >>
->> Based on original patch from: Richard Zhu<r65037@freescale.com>
->> Signed-off-by: Eric B?nard<eric@eukrea.com>
->> ---
->>   arch/arm/mach-mx5/clock-mx51.c              |  102 ++++++++++++++++++++++++++-
->>   arch/arm/mach-mx5/devices-imx51.h           |    9 +++
->>   arch/arm/plat-mxc/include/mach/iomux-mx51.h |   45 ++++++++----
->>   3 files changed, 140 insertions(+), 16 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/clock-mx51.c b/arch/arm/mach-mx5/clock-mx51.c
->> index 7deb683..9e8b268 100644
->> --- a/arch/arm/mach-mx5/clock-mx51.c
->> +++ b/arch/arm/mach-mx5/clock-mx51.c
->> @@ -41,6 +41,34 @@ static struct clk usboh3_clk;
->>
->>   #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
->>
->> +static void __calc_pre_post_dividers(u32 div, u32 *pre, u32 *post)
->> +{
-> I asked for a comment here.  E.g. valid ranges of pre and post and the
-> task solved here (I assume it's "Find pre and post with pre * post =
-> div"?).
+>> You can add my name there since I'll be submitting the board files.
 >
-will try to write something.
-Richard : do you have a comment in mind for this function ?
-
- >> +		}
- >> +		*post = (div + *pre - 1) / *pre;
- > 		*post = DIV_ROUND_UP(div, *pre);
- >
- > I don't know if DIV_ROUND_UP is sensible, maybe use DIV_ROUND_CLOSEST?
- > I'd look into that when the comment above is in place.
- >
-if you have an opinion before, this would be great to avoid a n+1 
-version of this patch ;-)
-
->> -#define DEFINE_CLOCK1(name, i, er, es, pfx, p, s)	\
->> +#define DEFINE_CLOCK_CCGR(name, i, er, es, pfx, p, s)	\
-> This is IMHO a good idea, but it should go in a seperate patch.  These
-> clock changes are very sensible and so a working bisection is important
-> here.
+> Remind me to fix it up when you submit something to the patch system/
+> machine registry. ?Neither Matt nor yourself currently appears in
+> the existing list of people...
 >
-there is no clock change here only a define rename to avoid having 
-DEFINE_CLOCK1, DEFINE_CLOCK2 ... is a separate patch really needed ?
 
-Eric
+Russell,
+
+Sascha has now accepted patches to enable the machine (EFIKAMX) in his
+imx tree. Could you please add me to the list as maintainer?
+
+Regards,
+Amit
