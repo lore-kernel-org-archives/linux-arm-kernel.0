@@ -1,39 +1,32 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 12 Oct 2010 12:25:38 +0530
-Subject: [PATCH V2 00/69] Updating SPEAr Support
-In-Reply-To: <cover.1285933331.git.viresh.kumar@st.com>
-References: <cover.1285933331.git.viresh.kumar@st.com>
-Message-ID: <4CB4066A.80007@st.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Tue, 12 Oct 2010 16:16:03 +0900
+Subject: [PATCH] ARM: S5PV310: Update MAX_COMBINER_NR
+Message-ID: <1286867763-21515-1-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2010 05:25 PM, Viresh KUMAR wrote:
-> Following set of patches:
-> - updates SPEAr3xx, 6xx support
-> - Adds support for SPEAr13xx
-> - Removes Multiple defconfigs per machine family
-> 
-> Changes since V1:
-> - sev definitions moved to system.h and removed from spear and omap archs
-> - bug fix added in system controller file sp810.h
-> - Review Comments incorporated
-> - Driver and machine support are divided into separate patches
-> - Nand Driver is removed from patch list as it is already floated by Linus
->   Walleij.
-> - Few later patches of SPEAr13xx Patches are merged with initial patches of
->   SPEAr13xx
-> - Smaller Defconfigs are used instead of large.
-> - Clock renaming & minor corrections are moved to clock specific patches from
->   peripheral machine support patches.
-> - Removed Commented code related to SPI
-> - [PATCH] Incrementing the ecc_pos array to contain 128 char - is removed from
->   list
-> - Board specific code is moved to *evb.c files from machine files for EMI NOR
-> - replaced readl with __raw_readl in uncompress.h in plat-spear/include/plat/
+From: Jongpill Lee <boyko.lee@samsung.com>
 
-Russell,
+This patch updates MAX_COMBINER_NR from 39 to 40 because
+S5PV310 need 39th combiner for including EINT16_31.
 
-Are there open points in these v2 patches or are they fine?
+Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+---
+ arch/arm/mach-s5pv310/include/mach/irqs.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-s5pv310/include/mach/irqs.h
+index b2acc62..f301af7 100644
+--- a/arch/arm/mach-s5pv310/include/mach/irqs.h
++++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+@@ -89,6 +89,6 @@
+ 
+ #define NR_IRQS			COMBINER_IRQ(MAX_COMBINER_NR, 0)
+ 
+-#define MAX_COMBINER_NR		39
++#define MAX_COMBINER_NR		40
+ 
+ #endif /* __ASM_ARCH_IRQS_H */
 -- 
-viresh
+1.6.2.5
