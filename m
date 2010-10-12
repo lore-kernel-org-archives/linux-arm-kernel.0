@@ -1,49 +1,61 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 12 Oct 2010 12:37:30 +0900
-Subject: [PATCH v5 2/2] sdhci-s3c: Add support no internal clock	divider in
-	host controller
-In-Reply-To: <20101012025946.GA8534@void.printf.net>
-References: <1286783400-7277-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTinC850pde5Diuz5U40RCDGR1DeQzTAfLUHWm0rB@mail.gmail.com>
-	<20101012025946.GA8534@void.printf.net>
-Message-ID: <011101cb69be$ceda5930$6c8f0b90$%kim@samsung.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 12 Oct 2010 12:49:32 +0900
+Subject: [patch 2/2] ARM: mach-shmobile: Add zboot support for SuperH
+	Mobile ARM
+In-Reply-To: <20101008075917.137584753@vergenet.net>
+References: <20101008075726.236142425@vergenet.net>
+	<20101008075917.137584753@vergenet.net>
+Message-ID: <AANLkTimhAMpYHSjcrEQEfaDrZ=vGj+S00aYet-_bFhQv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris Ball wrote:
-> 
-> Hi Kyungmin,
-> 
-> On Tue, Oct 12, 2010 at 11:53:35AM +0900, Kyungmin Park wrote:
-> > Hi Chris,
-> >
-> > we make a conclusion use this patch. Can you merge it for 2.6.37?
-> >
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> I don't feel that I can, because Ben Dooks is listed as the maintainer
-> for this driver and the patch does not have his ACK.
-> 
-> I don't know what to do about this; I've already tried asking Ben
-> whether he intends to continue maintaining sdhci-s3c, with no reply.
-> 
+On Fri, Oct 8, 2010 at 4:57 PM, Simon Horman <horms@verge.net.au> wrote:
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> When COFNIG_ZBOOT_ROM is selected, the resulting zImage file will be small
+> boot loader and may be burned to rom or flash.
+>
+> This is the board-specific portion of this patch-set.
+>
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
 
-Hi Chris,
+Hey Simon,
 
-Yeah, you're right. The sdhci-s3c's maintainer is Ben Dooks. So if get a his
-ack, it's best. But if you're ok this, in my opinion, you can merge this.
-And as I'm a maintainer of Samsung stuff with Ben Dooks, I already merged
-regarding patches, such as sdhci-s3c platform handling into my tree for 37
-merge window.
-...
+Thanks for your work on this!
 
-Ben, could you please check this patch?...this is ok to me for Samsung
-HSMMC...if any opinions, please kindly let us know.
+> +static void __init
+> +fixup_ap4evb(struct machine_desc *desc, struct tag *tag,
+> + ? ? ? ? ? ?char **cmdline, struct meminfo *mi)
+> +{
+> +#ifdef CONFIG_ZBOOT_ROM
+> + ? ? ? /*
+> + ? ? ? ?* below settings are needed when zboot
+> + ? ? ? ?*/
+> + ? ? ? tag->hdr.tag ? ? ? ? ? ?= ATAG_CORE;
+> + ? ? ? tag->hdr.size ? ? ? ? ? = tag_size(tag_core);
+> + ? ? ? tag->u.core.flags ? ? ? = 0;
+> + ? ? ? tag->u.core.pagesize ? ?= 0;
+> + ? ? ? tag->u.core.rootdev ? ? = 0;
+> +
+> + ? ? ? tag ? ? ? ? ? ? ? ? ? ? = tag_next(tag);
+> + ? ? ? tag->hdr.tag ? ? ? ? ? ?= ATAG_MEM;
+> + ? ? ? tag->hdr.size ? ? ? ? ? = tag_size(tag_mem32);
+> + ? ? ? tag->u.mem.size ? ? ? ? = CONFIG_MEMORY_SIZE;
+> + ? ? ? tag->u.mem.start ? ? ? ?= CONFIG_MEMORY_START;
+> +
+> + ? ? ? tag ? ? ? ? ? ? ? ? ? ? = tag_next(tag);
+> + ? ? ? tag->hdr.tag ? ? ? ? ? ?= ATAG_NONE;
+> + ? ? ? tag->hdr.size ? ? ? ? ? = 0;
+> +#endif
 
-Thanks.
+Hm, I wonder if this part can be rearranged. Perhaps I'm
+misunderstanding, but I would really really prefer if the memory
+information could be passed from the romImage header instead of adding
+fixups in the board specific code. This code looks like a workaround
+for not passing information properly. We probably want to pass other
+parameters anyway, so it shouldn't be any big issue.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers,
+
+/ magnus
