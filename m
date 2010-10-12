@@ -1,9 +1,10 @@
 From: sjur.brandeland@stericsson.com (Sjur Braendeland)
-Date: Tue, 12 Oct 2010 13:10:20 +0200
-Subject: [RFC arm-kernel 3/4] caif-u5500: CAIF shared memory mailbox interface
+Date: Tue, 12 Oct 2010 13:10:21 +0200
+Subject: [RFC arm-kernel 4/4] caif-u5500: Build config for CAIF shared mem
+	driver
 In-Reply-To: <1286881821-2916-1-git-send-email-sjur.brandeland@stericsson.com>
 References: <1286881821-2916-1-git-send-email-sjur.brandeland@stericsson.com>
-Message-ID: <1286881821-2916-4-git-send-email-sjur.brandeland@stericsson.com>
+Message-ID: <1286881821-2916-5-git-send-email-sjur.brandeland@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,144 +12,36 @@ From: Amarnath Revanna <amarnath.bangalore.revanna@stericsson.com>
 
 Signed-off-by: Sjur Br?ndeland <sjur.brandeland@stericsson.com>
 ---
- drivers/net/caif/caif_shm_u5500.c |  129 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 129 insertions(+), 0 deletions(-)
- create mode 100644 drivers/net/caif/caif_shm_u5500.c
+ drivers/net/caif/Kconfig  |    7 +++++++
+ drivers/net/caif/Makefile |    4 ++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/net/caif/caif_shm_u5500.c b/drivers/net/caif/caif_shm_u5500.c
-new file mode 100644
-index 0000000..7c1f7b9
---- /dev/null
-+++ b/drivers/net/caif/caif_shm_u5500.c
-@@ -0,0 +1,129 @@
-+/*
-+ * Copyright (C) ST-Ericsson AB 2010
-+ * Contact: Sjur Brendeland / sjur.brandeland at stericsson.com
-+ * Author:  Amarnath Revanna / amarnath.bangalore.revanna at stericsson.com
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
+diff --git a/drivers/net/caif/Kconfig b/drivers/net/caif/Kconfig
+index 75bfc3a..09ed3f4 100644
+--- a/drivers/net/caif/Kconfig
++++ b/drivers/net/caif/Kconfig
+@@ -31,3 +31,10 @@ config CAIF_SPI_SYNC
+ 	Putting the next command and length in the start of the frame can
+ 	help to synchronize to the next transfer in case of over or under-runs.
+ 	This option also needs to be enabled on the modem.
 +
-+#define pr_fmt(fmt) KBUILD_MODNAME ":%s(): " fmt, __func__
++config CAIF_SHM
++	tristate "CAIF shared memory protocol driver"
++	depends on CAIF && U5500_MBOX
++	default n
++	---help---
++	The CAIF shared memory protocol driver for the STE UX5500 platform.
+diff --git a/drivers/net/caif/Makefile b/drivers/net/caif/Makefile
+index 3a11d61..b38d987 100644
+--- a/drivers/net/caif/Makefile
++++ b/drivers/net/caif/Makefile
+@@ -8,3 +8,7 @@ obj-$(CONFIG_CAIF_TTY) += caif_serial.o
+ # SPI slave physical interfaces module
+ cfspi_slave-objs := caif_spi.o caif_spi_slave.o
+ obj-$(CONFIG_CAIF_SPI_SLAVE) += cfspi_slave.o
 +
-+#include <linux/version.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/netdevice.h>
-+#include <mach/mbox.h>
-+#include <net/caif/caif_shm.h>
-+
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("CAIF Shared Memory protocol driver");
-+
-+#define MAX_SHM_INSTANCES	1
-+
-+enum {
-+	MBX_ACC0,
-+	MBX_ACC1,
-+	MBX_DSP
-+};
-+
-+static struct shmdev_layer shmdev_lyr[MAX_SHM_INSTANCES];
-+
-+static unsigned int shm_start;
-+static unsigned int shm_size;
-+
-+module_param(shm_size, uint  , 0440);
-+MODULE_PARM_DESC(shm_total_size, "Start of SHM shared memory");
-+
-+module_param(shm_start, uint  , 0440);
-+MODULE_PARM_DESC(shm_total_start, "Total Size of SHM shared memory");
-+
-+static int shmdev_send_msg(u32 dev_id, u32 mbx_msg)
-+{
-+	/* Always block until msg is written successfully */
-+	mbox_send(shmdev_lyr[dev_id].hmbx, mbx_msg, true);
-+	return 0;
-+}
-+
-+static int shmdev_mbx_setup(void *pshmdrv_cb, struct shmdev_layer *pshm_dev,
-+							 void *pshm_drv)
-+{
-+	/*
-+	 * For UX5500, we have only 1 SHM instance which uses MBX0
-+	 * for communication with the peer modem
-+	 */
-+	pshm_dev->hmbx = mbox_setup(MBX_ACC0, pshmdrv_cb, pshm_drv);
-+
-+	if (!pshm_dev->hmbx)
-+		return -ENODEV;
-+	else
-+		return 0;
-+}
-+
-+static int __init caif_shmdev_init(void)
-+{
-+	int i, result;
-+
-+	/* Loop is currently overkill, there is only one instance */
-+	for (i = 0; i < MAX_SHM_INSTANCES; i++) {
-+
-+		shmdev_lyr[i].shm_base_addr = shm_start;
-+		shmdev_lyr[i].shm_total_sz = shm_size;
-+
-+		if (((char *)shmdev_lyr[i].shm_base_addr == NULL)
-+			       || (shmdev_lyr[i].shm_total_sz <= 0))	{
-+			pr_warn("ERROR,"
-+				"Shared memory Address and/or Size incorrect"
-+				", Bailing out ...\n");
-+			result = -EINVAL;
-+			goto clean;
-+		}
-+
-+		pr_info("SHM AREA (instance %d) STARTS"
-+			" AT %p\n", i, (char *)shmdev_lyr[i].shm_base_addr);
-+
-+		shmdev_lyr[i].shm_id = i;
-+		shmdev_lyr[i].pshmdev_mbxsend = shmdev_send_msg;
-+		shmdev_lyr[i].pshmdev_mbxsetup = shmdev_mbx_setup;
-+
-+		/*
-+		 * Finally, CAIF core module is called with details in place:
-+		 * 1. SHM base address
-+		 * 2. SHM size
-+		 * 3. MBX handle
-+		 */
-+		result = caif_shmcore_probe(&shmdev_lyr[i]);
-+		if (result) {
-+			pr_warn("ERROR[%d],"
-+				"Could not probe SHM core (instance %d)"
-+				" Bailing out ...\n", result, i);
-+			goto clean;
-+		}
-+	}
-+
-+	return 0;
-+
-+clean:
-+	/*
-+	 * For now, we assume that even if one instance of SHM fails, we bail
-+	 * out of the driver support completely. For this, we need to release
-+	 * any memory allocated and unregister any instance of SHM net device.
-+	 */
-+	for (i = 0; i < MAX_SHM_INSTANCES; i++) {
-+		if (shmdev_lyr[i].pshm_netdev)
-+			unregister_netdev(shmdev_lyr[i].pshm_netdev);
-+	}
-+	return result;
-+}
-+
-+static void __exit caif_shmdev_exit(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < MAX_SHM_INSTANCES; i++) {
-+		caif_shmcore_remove(shmdev_lyr[i].pshm_netdev);
-+		kfree((void *)shmdev_lyr[i].shm_base_addr);
-+	}
-+
-+}
-+
-+module_init(caif_shmdev_init);
-+module_exit(caif_shmdev_exit);
++# Shared memory
++caif_shm-objs := caif_shmcore.o caif_shm_u5500.o
++obj-$(CONFIG_CAIF_SHM) += caif_shm.o
 -- 
 1.7.0.4
