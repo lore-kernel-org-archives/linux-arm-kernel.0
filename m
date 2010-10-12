@@ -1,49 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Oct 2010 15:04:35 +0200
-Subject: [PATCH 1/3] imx-esdhc: update devices registration
-In-Reply-To: <4CB45B4A.5090003@eukrea.com>
-References: <1286886237-29014-1-git-send-email-eric@eukrea.com>
-	<20101012123312.GK29673@pengutronix.de>
-	<4CB45B4A.5090003@eukrea.com>
-Message-ID: <20101012130435.GN29673@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 12 Oct 2010 16:06:23 +0300
+Subject: [PATCH] omap3: various code improvements for IGEP v2 board.
+In-Reply-To: <1286878570-1973-1-git-send-email-eballetbo@gmail.com>
+References: <1286878570-1973-1-git-send-email-eballetbo@gmail.com>
+Message-ID: <20101012130623.GP2965@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Eric,
-On Tue, Oct 12, 2010 at 02:57:46PM +0200, Eric B?nard wrote:
-> Hi Uwe,
+On Tue, Oct 12, 2010 at 05:16:10AM -0500, Enric Balletbo i Serra wrote:
+>The comments of this post also apply to IGEP v2 board (thanks Laurent)
 >
-> Le 12/10/2010 14:33, Uwe Kleine-K?nig a ?crit :
->>> +#ifdef CONFIG_ARCH_MX51
->>> +const struct imx_esdhc_imx_data imx51_esdhc_data[] __initconst = {
->>> +#define imx51_esdhc_data_entry(_id, _hwid)				\
->>> +	imx_esdhc_imx_data_entry(MX51, MMC_SDHC, "sdhci-esdhc-imx", _id, _hwid, SZ_16K)
->>> +	imx51_esdhc_data_entry(0, 1),
->>> +	imx51_esdhc_data_entry(1, 2),
->>> +	imx51_esdhc_data_entry(2, 3),
->>> +	imx51_esdhc_data_entry(3, 4),
->>> +};
->>> +#endif /* ifdef CONFIG_ARCH_MX51 */
->> Hmmm, I think it's sensible to use the config struct only for data that
->> is actually different for the different socs.  That is MMC_SDHC,
->> "sdhci-esdhc-imx" and SZ_16K doesn't need to be part of the data.
->>
-> keeping it like this will allow to handle the case of future i.MX socs  
-> which may need special (like for spi for example) for new revisions of  
-> the esdhc IP.
-OK, the "danger" is real as we're talking about Freescale here.  Still I
-think if that happens we only have to touch a single file and so I
-prefer to have it as simple as possible as long as possible.
+>  http://www.mail-archive.com/linux-omap at vger.kernel.org/msg36402.html
+>
+>Changes are:
+>
+>  - Set onenand_setup to NULL instead of adding a no-op function.
+>  - On igep2_flash_init() function:
+>    - Use 'for' loop instead 'while' loop.
+>    - No need to initialize ret to 0, we're assigning it right after.
+>    - No need to check for onenandcs < GPMC_CS_NUM here, it will always be true.
+>  - omap_board_config_size is implicitly initialized to 0 in
+>    plat-omap/common.c, get_config() won't dereference omap_board_config,
+>    so we can remove the empty igep2_config array.
 
->>> +#define MX51_SSI3_BASE_ADDR		(MX51_AIPS2_BASE_ADDR + 0xe8000)
->> This is unrelated, no?
->>
-> fixed in V2.
-Yep, just saw that after I hit the send button :-)
+you should probably split this patch in a series.
 
-Best regards
-Uwe
+>Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+>---
+> arch/arm/mach-omap2/board-igep0020.c |   39 ++++++++++++---------------------
+> 1 files changed, 14 insertions(+), 25 deletions(-)
+>
+>diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+>index 152f757..ddcfd06 100644
+>--- a/arch/arm/mach-omap2/board-igep0020.c
+>+++ b/arch/arm/mach-omap2/board-igep0020.c
+>@@ -136,16 +136,10 @@ static struct mtd_partition igep2_onenand_partitions[] = {
+> 	},
+> };
+>
+>-static int igep2_onenand_setup(void __iomem *onenand_base, int freq)
+>-{
+>-       /* nothing is required to be setup for onenand as of now */
+>-       return 0;
+>-}
+>-
+> static struct omap_onenand_platform_data igep2_onenand_data = {
+> 	.parts = igep2_onenand_partitions,
+> 	.nr_parts = ARRAY_SIZE(igep2_onenand_partitions),
+>-	.onenand_setup = igep2_onenand_setup,
+>+	.onenand_setup = NULL,
+
+static variable. Just remove the line ;-)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+balbi
