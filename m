@@ -1,35 +1,30 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 12 Oct 2010 14:37:00 -0700
-Subject: [PATCH v5 2/2] sdhci-s3c: Add support no internal clock divider
-	in host controller
-In-Reply-To: <20101012025946.GA8534@void.printf.net>
-References: <1286783400-7277-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTinC850pde5Diuz5U40RCDGR1DeQzTAfLUHWm0rB@mail.gmail.com>
-	<20101012025946.GA8534@void.printf.net>
-Message-ID: <20101012143700.93ea1812.akpm@linux-foundation.org>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 13 Oct 2010 00:06:23 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+	(Wolfram Sang's message of "Mon\, 11 Oct 2010 16\:21\:00 +0200")
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <87aamjxe00.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Oct 2010 03:59:46 +0100
-Chris Ball <cjb@laptop.org> wrote:
+Wolfram Sang <w.sang@pengutronix.de> writes:
 
-> Hi Kyungmin,
-> 
-> On Tue, Oct 12, 2010 at 11:53:35AM +0900, Kyungmin Park wrote:
-> > Hi Chris,
-> > 
-> > we make a conclusion use this patch. Can you merge it for 2.6.37?
-> > 
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> I don't feel that I can, because Ben Dooks is listed as the maintainer
-> for this driver and the patch does not have his ACK.
-> 
-> I don't know what to do about this; I've already tried asking Ben
-> whether he intends to continue maintaining sdhci-s3c, with no reply.
-> 
+Hi,
 
-People get busy and take vacations and change roles, etc.
+> Here is the hopefully final (famous last words) version of my patch series. The
+> first four are still updates/improvements for sdhci and sdhci-pltfm and are of
+> generic interest, too. Thanks to Eric for the tests on MX25/35. Looking forward
+> to comments/applied-to-mmc-next-messages ;)
+>
+> The series is based on mmc-next as of today and also available at
+>
+> 	git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
 
-Sometimes, the best you can do is to make everyone aware of what's
-going on and then simply proceed on your own.
+I've tried it on a efika mx (to2 version) and I've a problem with the
+write-protect. It's on a GPIO and I don't see any way to configure the
+esdhc-imx driver to use it. Any idea on how it should be done ?
+
+
+thanks,
+Arnaud
