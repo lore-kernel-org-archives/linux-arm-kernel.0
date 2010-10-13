@@ -1,27 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 13 Oct 2010 09:09:02 +0100
-Subject: [PATCH v2 4/6] ARM: S5P: Add EPLL rate change warning
-In-Reply-To: <002301cb6aac$12a05e10$37e11a30$%kim@samsung.com>
-References: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
-	<1286883983-27790-1-git-send-email-sw.youn@samsung.com>
-	<002301cb6aac$12a05e10$37e11a30$%kim@samsung.com>
-Message-ID: <20101013080902.GA6424@rakim.wolfsonmicro.main>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 13 Oct 2010 17:14:37 +0900
+Subject: [PATCH 1/2] S3C64XX: Ensure samsung_keypad_cfg_gpio() is
+	prototyped
+In-Reply-To: <1286904195-1534-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1286904195-1534-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <002701cb6aae$af084680$0d18d380$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 13, 2010 at 04:55:55PM +0900, Kukjin Kim wrote:
-> Seungwhan Youn wrote:
+Mark Brown wrote:
+> 
+> Since it's exported we should make sure we're using the prototype
+> others see.
+> 
+Hi Mark,
 
-> > This patch adds warning about changing EPLL rate to notice that other
-> > driver that controls H/W, which is using EPLL, will has unknown effects
-> > by this EPLL rate change.
+Hmm...I'm not sure that we need really this. Of course, it can be helpful.
+But if so, we have to apply this policy/rule to all of ours...but I think we
+don't need it now.
 
-> > +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-> > +			clk->rate, rate);
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/setup-keypad.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/setup-keypad.c b/arch/arm/mach-
+> s3c64xx/setup-keypad.c
+> index d1fd722..f8ed0d2 100644
+> --- a/arch/arm/mach-s3c64xx/setup-keypad.c
+> +++ b/arch/arm/mach-s3c64xx/setup-keypad.c
+> @@ -12,6 +12,7 @@
+> 
+>  #include <linux/gpio.h>
+>  #include <plat/gpio-cfg.h>
+> +#include <plat/keypad.h>
+> 
+>  void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
+>  {
+> --
 
-> Do we really need KERN_WARNING here?
-> How about just KERN_INFO?...In my opinion, to change EPLL value seems to be
-> nearer 'information' message more than 'warning'.
+Thanks.
 
-Personally I don't think it really makes much odds so long as the
-message is displayed on the console by default.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
