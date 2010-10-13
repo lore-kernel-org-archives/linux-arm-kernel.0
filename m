@@ -1,79 +1,32 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Wed, 13 Oct 2010 09:34:10 -0700
-Subject: [lm-sensors] [PATCH 4/5] hwmon: DNS323 rev C1 fan support
-In-Reply-To: <20101013115951.GA5649@kw.sim.vm.gnt>
-References: <1274525694.1931.142.camel@pasglop>
-	<20101013115951.GA5649@kw.sim.vm.gnt>
-Message-ID: <1286987650.9690.175.camel@groeck-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Oct 2010 19:44:53 +0200
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <1286986623.28336.3.camel@c-dwalke-linux.qualcomm.com>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<201010131721.39623.arnd@arndb.de>
+	<1286986623.28336.3.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <201010131944.54135.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-13 at 07:59 -0400, Simon Guinot wrote:
-> Hi Benjamin,
+On Wednesday 13 October 2010 18:17:03 Daniel Walker wrote:
+> > I think you would be much better off making it a "hvc" driver, where
+> > you just need to provide a read character and write character function
+> > and an optional interrupt handler but otherwise have the common hvc
+> > code take care of polling the hardware and talking to the tty layer.
 > 
-> What is the status for the DNS323 fan support ?
-> Have this patch been merged yet ?
-> 
-The most recent version I found on the web (dated June 13) has problems
-with error detection and reporting, and fails to remove sysfs files in
-some error conditions. So I would be surprised if it was merged, unless
-there is a more recent version which I missed.
+> I don't know what the "hvc" driver is "Hypervisor Virtual Console"
+> maybe?
 
-On a side note, there are several versions of the patch on the web, none
-indicating what has changed between versions. Would be great to have
-such data attached to the various patch versions.
+Yes, it originally was used only on hypervisors that had simple
+read/write type consoles, but has now turned into a generic facility
+that is used by a number of consoles that don't look like classic
+serial ports.
 
-> I am currently looking to add hwmon support for the GPIO fan found
-> on Network Space Max v2 boards. Obviously, some attributes are shared
-> with the DNS323 fan. Maybe there is some room for a generic GPIO fan
-> driver ?
-> 
-> Platform data could provide the board specific GPIO pinout and a speed
-> conversion array (rpm from/to GPIO value). Here is a proposal for this
-> platform data interface:
-> 
-> struct gpio_fan {
->         const char      *name;
->         unsigned        gpio;
->         unsigned        active_low;
-> };
-> 
-> struct gpio_fan_speed {
->         int value;
->         int rpm;
-> };
-> 
-> struct gpio_fan_platform_data {
->         struct gpio_fan         *alarm; /* fan alarm GPIO. */
->         struct gpio_fan         *ctrl;  /* fan control GPIOs. */
->         int                     num_ctrl;
->         /*
->          * Speed conversion array: rpm from/to GPIO bit field.
->          * This array _must_ be sorted in ascending rpm order.
->          */
->         struct gpio_fan_speed   *speed;
->         int                     num_speed;
-> };
-> 
-> Based on this informations the GPIO fan driver could perform the
-> speed conversions (pwm, rpm, GPIO value) and then provide a hwmon
-> interface.
-> 
-Sounds like a good idea to me.
+> Can you give any sort of example driver which does what you
+> suggesting?
 
-Couple of comments.
+Look at drivers/char/hvc_tile.c for the simplest case or
+drivers/char/hvc_vio.c for one that uses interrupts.
 
-Personally, I prefer to see num_XXX variables before the actual objects,
-but maybe that is just a personal preference. 
-
-I am not sure what one would do with "active_low". Would that be used
-for the alarm ?
-
-Adding a "fault" object might make sense.
-
-It seems that bit write order is missing. Since it is not always the
-same, as the proposed dns323 driver indicates, that might be a tricky
-problem to solve. You would have to come up with an at least somewhat
-generic solution for that.
-
-Guenter
+	Arnd
