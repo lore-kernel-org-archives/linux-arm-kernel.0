@@ -1,91 +1,51 @@
-From: Jiri.Pinkava@vscht.cz (Jiri.Pinkava at vscht.cz)
-Date: Wed, 13 Oct 2010 09:56:19 +0200
-Subject: [PATCH 3/6] n30: Clean up UARTs configuration
-In-Reply-To: <4CA91E6F.3010704@vscht.cz>
-References: <4CA91E6F.3010704@vscht.cz>
-Message-ID: <1286956582-15586-3-git-send-email-jiri.pinkava@vscht.cz>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 13 Oct 2010 16:55:55 +0900
+Subject: [PATCH v2 4/6] ARM: S5P: Add EPLL rate change warning
+In-Reply-To: <1286883983-27790-1-git-send-email-sw.youn@samsung.com>
+References: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
+	<1286883983-27790-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <002301cb6aac$12a05e10$37e11a30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just replace numeric constatns with macros in style used in other platforms.
-Define missing macros for UART register configuration.
+Seungwhan Youn wrote:
+> 
+> This patch adds warning about changing EPLL rate to notice that other
+> driver that controls H/W, which is using EPLL, will has unknown effects
+> by this EPLL rate change.
+> 
+> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
+> ---
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c |    3 +++
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c |    3 +++
+>  arch/arm/mach-s5pc100/clock.c         |    3 +++
+>  arch/arm/mach-s5pv210/clock.c         |    3 +++
+>  4 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-
+> s5p64x0/clock-s5p6440.c
+> index 1e3f517..0b539d5 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> @@ -79,6 +79,9 @@ static int s5p6440_epll_set_rate(struct clk *clk,
+unsigned long
+> rate)
+>  	__raw_writel(epll_con, S5P_EPLL_CON);
+>  	__raw_writel(epll_con_k, S5P_EPLL_CON_K);
+> 
+> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
+> +			clk->rate, rate);
 
+Do we really need KERN_WARNING here?
+How about just KERN_INFO?...In my opinion, to change EPLL value seems to be
+nearer 'information' message more than 'warning'.
 
-Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
----
- arch/arm/mach-s3c2410/mach-n30.c                 |   28 +++++++++++++++-------
- arch/arm/plat-samsung/include/plat/regs-serial.h |    3 ++
- 2 files changed, 22 insertions(+), 9 deletions(-)
+(others, same)
 
-diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index abbb9b5..895e1e9a 100644
---- a/arch/arm/mach-s3c2410/mach-n30.c
-+++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -55,32 +55,42 @@ static struct map_desc n30_iodesc[] __initdata = {
- 	/* nothing here yet */
- };
- 
-+#define UCON	(S3C2410_UCON_DEFAULT | \
-+		 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define ULCON	(S3C2410_LCON_CS8 | \
-+		 S3C2410_LCON_PNONE)
-+
-+#define UFCON	(S3C2410_UFCON_FIFOMODE | \
-+		 S3C2410_UFCON_RXTRIG8 | \
-+		 S3C2410_UFCON_TXTRIG4)
-+
- static struct s3c2410_uartcfg n30_uartcfgs[] = {
- 	/* Normal serial port */
- 	[0] = {
- 		.hwport	     = 0,
- 		.flags	     = 0,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
- 	},
- 	/* IR port */
- 	[1] = {
- 		.hwport	     = 1,
- 		.flags	     = 0,
- 		.uart_flags  = UPF_CONS_FLOW,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x43,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON | S3C2410_LCON_IRM,
-+		.ufcon	     = UFCON,
- 	},
- 	/* On the N30 the bluetooth controller is connected here.
- 	 * On the N35 and variants the GPS receiver is connected here. */
- 	[2] = {
- 		.hwport	     = 2,
- 		.flags	     = 0,
--		.ucon	     = 0x2c5,
--		.ulcon	     = 0x03,
--		.ufcon	     = 0x51,
-+		.ucon	     = UCON,
-+		.ulcon	     = ULCON,
-+		.ufcon	     = UFCON,
- 	},
- };
- 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h b/arch/arm/plat-samsung/include/plat/regs-serial.h
-index 788837e..c64beca 100644
---- a/arch/arm/plat-samsung/include/plat/regs-serial.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
-@@ -114,6 +114,9 @@
- 
- #define S3C2410_UFCON_FIFOMODE	  (1<<0)
- #define S3C2410_UFCON_TXTRIG0	  (0<<6)
-+#define S3C2410_UFCON_TXTRIG4	  (1<<6)
-+#define S3C2410_UFCON_TXTRIG8	  (2<<6)
-+#define S3C2410_UFCON_TXTRIG12	  (3<<6)
- #define S3C2410_UFCON_RXTRIG8	  (1<<4)
- #define S3C2410_UFCON_RXTRIG12	  (2<<4)
- 
--- 
-1.7.3.1
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
