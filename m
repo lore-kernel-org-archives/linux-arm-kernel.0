@@ -1,48 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 13 Oct 2010 17:14:37 +0900
-Subject: [PATCH 1/2] S3C64XX: Ensure samsung_keypad_cfg_gpio() is
-	prototyped
-In-Reply-To: <1286904195-1534-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1286904195-1534-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <002701cb6aae$af084680$0d18d380$%kim@samsung.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 13 Oct 2010 10:15:04 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <87aamjxe00.fsf@lechat.rtp-net.org>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+	<87aamjxe00.fsf@lechat.rtp-net.org>
+Message-ID: <4CB56A88.2040101@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> Since it's exported we should make sure we're using the prototype
-> others see.
-> 
-Hi Mark,
+Hi,
 
-Hmm...I'm not sure that we need really this. Of course, it can be helpful.
-But if so, we have to apply this policy/rule to all of ours...but I think we
-don't need it now.
+Le 13/10/2010 00:06, Arnaud Patard (Rtp) a ?crit :
+> Wolfram Sang<w.sang@pengutronix.de>  writes:
+>> Here is the hopefully final (famous last words) version of my patch series. The
+>> first four are still updates/improvements for sdhci and sdhci-pltfm and are of
+>> generic interest, too. Thanks to Eric for the tests on MX25/35. Looking forward
+>> to comments/applied-to-mmc-next-messages ;)
+>>
+>> The series is based on mmc-next as of today and also available at
+>>
+>> 	git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
+>
+> I've tried it on a efika mx (to2 version) and I've a problem with the
+> write-protect. It's on a GPIO and I don't see any way to configure the
+> esdhc-imx driver to use it. Any idea on how it should be done ?
+>
+it's actually not yet supported by the driver. There is a wp_gpio in
+struct esdhc_platform_data (arch/arm/plat-mxc/include/mach/esdhc.h)
+but it's not yet used by the driver.
+Also card detect using a GPIO is not implemented and card detect if 
+actually done by polling.
 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/setup-keypad.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/setup-keypad.c b/arch/arm/mach-
-> s3c64xx/setup-keypad.c
-> index d1fd722..f8ed0d2 100644
-> --- a/arch/arm/mach-s3c64xx/setup-keypad.c
-> +++ b/arch/arm/mach-s3c64xx/setup-keypad.c
-> @@ -12,6 +12,7 @@
-> 
->  #include <linux/gpio.h>
->  #include <plat/gpio-cfg.h>
-> +#include <plat/keypad.h>
-> 
->  void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
->  {
-> --
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Eric
