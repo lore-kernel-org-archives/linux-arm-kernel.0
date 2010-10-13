@@ -1,83 +1,38 @@
-From: sw.youn@samsung.com (Seungwhan Youn)
-Date: Wed, 13 Oct 2010 18:51:08 +0900
-Subject: [PATCH v3 4/6] ARM: S5P: Add EPLL rate change warning
-Message-ID: <1286963468-17469-1-git-send-email-sw.youn@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 13 Oct 2010 12:06:32 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D557C@zch01exm22.fsl.freescale.net>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+	<87aamjxe00.fsf@lechat.rtp-net.org> <4CB56A88.2040101@eukrea.com>
+	<20101013082930.GA11286@pengutronix.de>
+	<8762x6xx00.fsf@lechat.rtp-net.org>
+	<A88EF4D64D8447468743DC1503C0B6CA0D557C@zch01exm22.fsl.freescale.net>
+Message-ID: <20101013100632.GC11286@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds warning about changing EPLL rate to notice that other
-driver that controls H/W, which is using EPLL, will has unknown effects
-by this EPLL rate change.
+Hi Richard,
 
-Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
----
-This patch is re-worked to avoid conflict with previous re-worked patch(
-[PATCH v3 1/6] ARM: S5P: Reduce duplicated EPLL control codes).
+great to have you back! Did you have the chance to test my latest
+patch-series? And can you help Eric with the comments for the
+clock-calculation on MX51?
 
-This patch also depends on previous v1 and v2 petch-set which was accepted,
-and depends on re-workd patch v3 1/6.
---
- arch/arm/mach-s5p64x0/clock-s5p6440.c |    3 +++
- arch/arm/mach-s5p64x0/clock-s5p6450.c |    3 +++
- arch/arm/mach-s5pc100/clock.c         |    3 +++
- arch/arm/mach-s5pv210/clock.c         |    3 +++
- 4 files changed, 12 insertions(+), 0 deletions(-)
+> I can't access the external git repos because of the firewall.:(.
 
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index cfccdff..0d728d3 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -79,6 +79,9 @@ static int s5p6440_epll_set_rate(struct clk *clk, unsigned long rate)
- 	__raw_writel(epll_con, S5P64X0_EPLL_CON);
- 	__raw_writel(epll_con_k, S5P64X0_EPLL_CON_K);
- 
-+	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-+			clk->rate, rate);
-+
- 	clk->rate = rate;
- 
- 	return 0;
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index f1498d3..1b9b0f9 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -80,6 +80,9 @@ static int s5p6450_epll_set_rate(struct clk *clk, unsigned long rate)
- 	__raw_writel(epll_con, S5P64X0_EPLL_CON);
- 	__raw_writel(epll_con_k, S5P64X0_EPLL_CON_K);
- 
-+	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-+			clk->rate, rate);
-+
- 	clk->rate = rate;
- 
- 	return 0;
-diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
-index 42c2636..9e192a0 100644
---- a/arch/arm/mach-s5pc100/clock.c
-+++ b/arch/arm/mach-s5pc100/clock.c
-@@ -323,6 +323,9 @@ static int s5pc100_epll_set_rate(struct clk *clk, unsigned long rate)
- 
- 	__raw_writel(epll_con, S5P_EPLL_CON);
- 
-+	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-+			clk->rate, rate);
-+
- 	clk->rate = rate;
- 
- 	return 0;
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index fdfadac..25eb839 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -1066,6 +1066,9 @@ static int s5pv210_epll_set_rate(struct clk *clk, unsigned long rate)
- 	__raw_writel(epll_con, S5P_EPLL_CON);
- 	__raw_writel(epll_con_k, S5P_EPLL_CON1);
- 
-+	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-+			clk->rate, rate);
-+
- 	clk->rate = rate;
- 
- 	return 0;
+Ouch! I hope you already complained ;) At least my repo should be
+accessible via HTTP by the way...
+
+Regards,
+
+   Wolfram
+
 -- 
-1.6.2.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101013/bcf36423/attachment.sig>
