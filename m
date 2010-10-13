@@ -1,43 +1,94 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 13 Oct 2010 15:10:15 +0900
-Subject: [alsa-devel] [PATCH v2 0/6] Add S/PDIF common driver for Samsung
-	SoCs
-In-Reply-To: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
-References: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
-Message-ID: <AANLkTimb-a=nTNZ9Ebr0U9wQ-KwJd7OOhTbOB+PZ+ToJ@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 13 Oct 2010 09:31:56 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <1286788315.3101.11.camel@sven>
+References: <1286788315.3101.11.camel@sven>
+Message-ID: <1286955116-22793-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 12, 2010 at 8:19 PM, Seungwhan Youn <sw.youn@samsung.com> wrote:
-> Hi,
->
-> This patch-set is a 2nd version for new S/PDIF common driver that supports
-> S/PDIF PCM audio on S5PC100, S5PC110 and S5PV210.
->
-> This patch-set is based on two different branches that :-
-> ?o ARM patches are based on Kukjin Kim's git branch 'for-next'
-> ? (commit id - 64dcc6aef86593e478cf297a8508e55b54cceaf8)
-> ?o ASoC patches are based on Mark Brown's git branch 'for-next'
-> ? (commit id - fe3e2e7ff2da41bd7a985c4c206e05a95ebe7a6b)
->
-> This patch-set updates followings from the 1st submit :-
-> ?o Add EPLL enable and get_rate function as common EPLL function
-> ?o Add EPLL rate change warning
-> ?o Fix S/PDIF's audio clock divider set dynamically at CPU driver
-> ?o Move S/PDIF specific register macros and structure into CPU driver
->
-> This patch-set contains followings :-
-> ?o To Kukjin Kim and Ben Dooks,
-> ?- [PATCH v2 1/6] ARM: S5P: Reduce duplicated EPLL control codes
-> ?- [PATCH v2 2/6] ARM: S5PV210: Fix wrong EPLL rate getting on setup clocks
-> ?- [PATCH v2 3/6] ARM: S5PV210: Add EPLL clock operations
-> ?- [PATCH v2 4/6] ARM: S5P: Add EPLL rate change warning
-> ?o To Jassi Brar, Mark Brown and Liam Girdwood,
-> ?- [PATCH v2 5/6] ASoC: SAMSUNG: Add S/PDIF CPU driver
-> ?- [PATCH v2 6/6] ASoC: SAMSUNG: Add Machine driver for S/PDIF PCM audio
+Fix SDIO suspend/resume regression introduced by
+4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related to
+mmc/sd card insert/removal during suspend/resume":
 
-Though we need to also provide iecset control support, maybe later as
-incremental patches.
+[ 5647.295953] PM: Syncing filesystems ... done.
+[ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
+[ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+[ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
+[ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
+[ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
+[ 5647.367082] PM: Some devices failed to suspend
 
-All
-Acked-by: Jassi Brar <jassi.brar@samsung.com>
+4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e moved the card removal/insertion
+mechanism out of MMC's suspend/resume path and into pm notifiers
+(mmc_pm_notify), and that broke SDIO's expectation that mmc_suspend_host()
+will remove the card, and squash the error, in case -ENOSYS is returned
+from the bus suspend handler (mmc_sdio_suspend() in this case).
+
+mmc_sdio_suspend() is using this whenever at least one of the card's SDIO
+function drivers does not have suspend/resume handlers - in that case
+it is agreed to force removal of the entire card.
+
+This patch fixes this regression by trivially bringing back that part of
+mmc_suspend_host(), which was removed by 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e.
+
+Reported-and-tested-by: Sven Neumann <s.neumann@raumfeld.com>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Maxim Levitsky <maximlevitsky@gmail.com>
+Cc: <stable@kernel.org>
+--
+
+It may still be desired to further clean this area up by using the card
+removal mechanism in mmc_pm_notify() for SDIO as well.
+
+To use mmc_pm_notify's card-removal code also for SDIO, we need it
+to check if all the SDIO functions have suspend handlers. That
+would probably make us add a new bus_ops handler (something like
+host->bus_ops->remove_card_on_suspend ?).
+
+It's starting to get a bit complicated though, and I'm not sure it
+would make the code a lot more readable.
+
+In addition, this would still not work for drivers like libertas sdio,
+which do have a suspend handler, but sometimes let it return -ENOSYS,
+expecting mmc_suspend_host() to remove the card and squash the error.
+For those cases, we still need the old card-removal logic in mmc_suspend_host().
+
+This brings up a question whether libertas_sdio really needs this
+functionality; When MMC_PM_KEEP_POWER is not needed, can't it just return 0
+(and as a result the card will be powered down, but not removed) ?
+
+Until we have an agreement on this, I suggest we at least fix the
+regression with this patch.
+
+Thanks Sven Neumann for reporting and testing the issue and this patch.
+
+ drivers/mmc/core/core.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index c94565d..515ff39 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+ 	if (host->bus_ops && !host->bus_dead) {
+ 		if (host->bus_ops->suspend)
+ 			err = host->bus_ops->suspend(host);
++		if (err == -ENOSYS || !host->bus_ops->resume) {
++			/*
++			 * We simply "remove" the card in this case.
++			 * It will be redetected on resume.
++			 */
++			if (host->bus_ops->remove)
++				host->bus_ops->remove(host);
++			mmc_claim_host(host);
++			mmc_detach_bus(host);
++			mmc_release_host(host);
++			host->pm_flags = 0;
++			err = 0;
++		}
+ 	}
+ 	mmc_bus_put(host);
+ 
+-- 
+1.7.0.4
