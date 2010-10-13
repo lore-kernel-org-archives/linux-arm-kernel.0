@@ -1,26 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 13 Oct 2010 01:49:53 -0700
-Subject: [PATCH 1/2] S3C64XX: Ensure samsung_keypad_cfg_gpio() is
-	prototyped
-In-Reply-To: <003101cb6ab3$753ca4f0$5fb5eed0$%kim@samsung.com>
-References: <1286904195-1534-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<002701cb6aae$af084680$0d18d380$%kim@samsung.com>
-	<20101013081954.GC6424@rakim.wolfsonmicro.main>
-	<003101cb6ab3$753ca4f0$5fb5eed0$%kim@samsung.com>
-Message-ID: <20101013084952.GB29239@opensource.wolfsonmicro.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 13 Oct 2010 10:55:39 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+	<AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
+Message-ID: <AANLkTimTSPU3pzDscG3TSaqs45Q=eGEaqiDmk9AYyuY_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 13, 2010 at 05:48:48PM +0900, Kukjin Kim wrote:
+Hi Vitaly,
 
-> You mean following?
-> arch/arm/mach-s3c64xx/setup-keypad.c:16:6: warning: symbol
-> 'samsung_keypad_cfg_gpio' was not declared. Should it be static?
+On Wed, Oct 13, 2010 at 9:54 AM, Vitaly Wool <vitalywool@gmail.com> wrote:
+> what about moving this logic to sdio bus_ops as this seems to be
+> completely specific to sdio right now?
 
-Yup, that's the one.
+I actually prefer not to have any SDIO-specific logic of that kind at
+all, and instead, to use the logic we already have in mmc_pm_notify
+for all types of MMC buses.
 
-> I didn't check sparse :-(
-> Ok...Ben seems to be busy now...so will apply in my tree.
-> And I will also fix it our Samsung stuff.
+I resent this patch in the hope of stimulating this discussion, since
+it seemed to have stalled since the last message:
 
-Thanks!
+http://lkml.org/lkml/2010/10/11/70
+
+It seems to work ;)
+
+Thanks,
+Ohad.
