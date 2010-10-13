@@ -1,34 +1,43 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 13 Oct 2010 07:15:07 +0200
-Subject: [PATCH] ARM: add PrimeCell generic DMA to PL011
-In-Reply-To: <20101012193048.GA25259@n2100.arm.linux.org.uk>
-References: <1286357526-5570-1-git-send-email-linus.walleij@stericsson.com>
-	<20101012193048.GA25259@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinA-hVJeL_Q6c9jQHtBa0ieAy_h9VNS2gayZdSE@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 13 Oct 2010 15:10:15 +0900
+Subject: [alsa-devel] [PATCH v2 0/6] Add S/PDIF common driver for Samsung
+	SoCs
+In-Reply-To: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
+References: <1286882399-27595-1-git-send-email-sw.youn@samsung.com>
+Message-ID: <AANLkTimb-a=nTNZ9Ebr0U9wQ-KwJd7OOhTbOB+PZ+ToJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/12 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Tue, Oct 12, 2010 at 8:19 PM, Seungwhan Youn <sw.youn@samsung.com> wrote:
+> Hi,
+>
+> This patch-set is a 2nd version for new S/PDIF common driver that supports
+> S/PDIF PCM audio on S5PC100, S5PC110 and S5PV210.
+>
+> This patch-set is based on two different branches that :-
+> ?o ARM patches are based on Kukjin Kim's git branch 'for-next'
+> ? (commit id - 64dcc6aef86593e478cf297a8508e55b54cceaf8)
+> ?o ASoC patches are based on Mark Brown's git branch 'for-next'
+> ? (commit id - fe3e2e7ff2da41bd7a985c4c206e05a95ebe7a6b)
+>
+> This patch-set updates followings from the 1st submit :-
+> ?o Add EPLL enable and get_rate function as common EPLL function
+> ?o Add EPLL rate change warning
+> ?o Fix S/PDIF's audio clock divider set dynamically at CPU driver
+> ?o Move S/PDIF specific register macros and structure into CPU driver
+>
+> This patch-set contains followings :-
+> ?o To Kukjin Kim and Ben Dooks,
+> ?- [PATCH v2 1/6] ARM: S5P: Reduce duplicated EPLL control codes
+> ?- [PATCH v2 2/6] ARM: S5PV210: Fix wrong EPLL rate getting on setup clocks
+> ?- [PATCH v2 3/6] ARM: S5PV210: Add EPLL clock operations
+> ?- [PATCH v2 4/6] ARM: S5P: Add EPLL rate change warning
+> ?o To Jassi Brar, Mark Brown and Liam Girdwood,
+> ?- [PATCH v2 5/6] ASoC: SAMSUNG: Add S/PDIF CPU driver
+> ?- [PATCH v2 6/6] ASoC: SAMSUNG: Add Machine driver for S/PDIF PCM audio
 
-> Unless you can assure me that there will be no breakage through these
-> patches without having their dependencies merged first, I think these
-> will have to wait another cycle...
+Though we need to also provide iecset control support, maybe later as
+incremental patches.
 
-It's OK Russell I have all patience in the world :-)
-
-We ended up in a bit of cross-subsystem hell and such things
-happen.
-
-We'll have the PL08x driver and other necessary bits in by 2.6.37 and
-then we can perhaps look at these just after that merge window.
-Then the PL022 that is not in as wide use as the others and which is
-still marked experimental is merged, so we'll use that thing as a
-guninea pig, if it doesn't blow up it's probably safe to merge the
-others as well.
-
-If we then merge them and they seem to work my plan is to move the
-DMA channel assignments for the drivers into the struct amba_device
-as the final step.
-
-Yours,
-Linus Walleij
+All
+Acked-by: Jassi Brar <jassi.brar@samsung.com>
