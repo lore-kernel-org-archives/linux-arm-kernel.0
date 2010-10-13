@@ -1,105 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 14 Oct 2010 07:57:25 +0900
-Subject: [PATCH v3 4/6] ARM: S5P: Add EPLL rate change warning
-In-Reply-To: <1286963468-17469-1-git-send-email-sw.youn@samsung.com>
-References: <1286963468-17469-1-git-send-email-sw.youn@samsung.com>
-Message-ID: <003401cb6b2a$0267d9f0$07378dd0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Oct 2010 00:26:04 +0100
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <alpine.LFD.2.00.1010131831470.2764@xanadu.home>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<201010132145.30550.arnd@arndb.de>
+	<1286999522.28336.15.camel@c-dwalke-linux.qualcomm.com>
+	<201010132210.17061.arnd@arndb.de>
+	<1287001466.28336.31.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1010131638360.2764@xanadu.home>
+	<1287002975.28336.44.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1010131831470.2764@xanadu.home>
+Message-ID: <20101013232604.GA13146@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwhan Youn wrote:
-> 
-> This patch adds warning about changing EPLL rate to notice that other
-> driver that controls H/W, which is using EPLL, will has unknown effects
-> by this EPLL rate change.
-> 
-> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
-> ---
-> This patch is re-worked to avoid conflict with previous re-worked patch(
-> [PATCH v3 1/6] ARM: S5P: Reduce duplicated EPLL control codes).
-> 
-> This patch also depends on previous v1 and v2 petch-set which was
-accepted,
-> and depends on re-workd patch v3 1/6.
-> --
->  arch/arm/mach-s5p64x0/clock-s5p6440.c |    3 +++
->  arch/arm/mach-s5p64x0/clock-s5p6450.c |    3 +++
->  arch/arm/mach-s5pc100/clock.c         |    3 +++
->  arch/arm/mach-s5pv210/clock.c         |    3 +++
->  4 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-
-> s5p64x0/clock-s5p6440.c
-> index cfccdff..0d728d3 100644
-> --- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-> +++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-> @@ -79,6 +79,9 @@ static int s5p6440_epll_set_rate(struct clk *clk,
-unsigned long
-> rate)
->  	__raw_writel(epll_con, S5P64X0_EPLL_CON);
->  	__raw_writel(epll_con_k, S5P64X0_EPLL_CON_K);
-> 
-> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-> +			clk->rate, rate);
-> +
->  	clk->rate = rate;
-> 
->  	return 0;
-> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-
-> s5p64x0/clock-s5p6450.c
-> index f1498d3..1b9b0f9 100644
-> --- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-> +++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-> @@ -80,6 +80,9 @@ static int s5p6450_epll_set_rate(struct clk *clk,
-unsigned long
-> rate)
->  	__raw_writel(epll_con, S5P64X0_EPLL_CON);
->  	__raw_writel(epll_con_k, S5P64X0_EPLL_CON_K);
-> 
-> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-> +			clk->rate, rate);
-> +
->  	clk->rate = rate;
-> 
->  	return 0;
-> diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
-> index 42c2636..9e192a0 100644
-> --- a/arch/arm/mach-s5pc100/clock.c
-> +++ b/arch/arm/mach-s5pc100/clock.c
-> @@ -323,6 +323,9 @@ static int s5pc100_epll_set_rate(struct clk *clk,
-unsigned
-> long rate)
-> 
->  	__raw_writel(epll_con, S5P_EPLL_CON);
-> 
-> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-> +			clk->rate, rate);
-> +
->  	clk->rate = rate;
-> 
->  	return 0;
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index fdfadac..25eb839 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -1066,6 +1066,9 @@ static int s5pv210_epll_set_rate(struct clk *clk,
-unsigned
-> long rate)
->  	__raw_writel(epll_con, S5P_EPLL_CON);
->  	__raw_writel(epll_con_k, S5P_EPLL_CON1);
-> 
-> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-> +			clk->rate, rate);
-> +
->  	clk->rate = rate;
-> 
->  	return 0;
-> --
+On Wed, Oct 13, 2010 at 06:51:52PM -0400, Nicolas Pitre wrote:
+> 3) All serial drivers could have migrated to a uniform device node 
+>    namespace when RMK revamped support for serial devices, with dynamic 
+>    allocation just like everything else.
 
-Thanks for your rebase.
+Wrong.  There was no dynamic allocation, because the layer above did
+not support it.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>  Unlike for IDE disks, this 
+>    didn't happen unfortunately because some people couldn't get over a 
+>    possible device name change (I wonder how they survived the 
+>    transition to libata).
+
+I was not, and still am firmly of the opinion that my decision was
+the right one to reject your "approach" to forcefully unifying the
+serial devices.  It was more of a hack, introducing multiple
+special cases for the old 8250-style ports to make it half sort of
+work.
+
+Until the tty layer gets fixed so that it doesn't need to be told
+that there will be N tty ports attached to D tty driver at the point
+in time when D is registered with the tty subsystem, my opinion on
+this isn't going to change.  This is why your patches needed to
+special case the 8250 driver - so it could register the right number
+of 'ttyS' ports.
+
+And to prove the point that my decision was right, the way support
+for ttyS port space has gone, there's been an overwhelming desire
+to reduce the number of ttyS ports down to the bare minimum - for
+common setups to four at the most.  That'll require yet more special
+casing to make your idea work.
+
+The big difference between this and SCSI is that SCSI was built from
+day one separate the functional drivers from the backing hardware
+drivers - which is great when there's an adhered to standard protocol
+which everyone follows.  Again, that's not really the case with serial.
+SCSI has also had from day one the ability to dynamically register
+and unregister hosts and disks in any order, expanding on the fly with
+no problem.  That's certainly not the case with the tty subsystem.
+
+Get over it.  Comparing tty with SCSI is absurdly stupid when they're
+vastly different beasts.
