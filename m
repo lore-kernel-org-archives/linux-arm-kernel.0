@@ -1,118 +1,230 @@
 From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Wed, 13 Oct 2010 21:15:43 +0900
-Subject: [PATCH 1/2] ARM: S5PV310: Add support SROMC
+Date: Wed, 13 Oct 2010 21:15:44 +0900
+Subject: [PATCH 2/2] ARM: S5PV310: Support ethernet for SMDKV310 and SMDKC210
 In-Reply-To: <1286972144-763-1-git-send-email-sbkim73@samsung.com>
 References: <1286972144-763-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1286972144-763-2-git-send-email-sbkim73@samsung.com>
+Message-ID: <1286972144-763-3-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daein Moon <moon9124@samsung.com>
 
-This patch adds support SROMC for S5PV310 and S5PC210.
+This patch adds to support ethernet for SMDKV310 and SMDKC210 board.
+  - define smc911x resources
+  - define configurations of smc911x platform data
+  - define platform device "smsc911x"
+  - initialize srom controller for lan9215 chip
 
 Signed-off-by: Daein Moon <moon9124@samsung.com>
 Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 ---
- arch/arm/mach-s5pv310/cpu.c                    |    5 ++
- arch/arm/mach-s5pv310/include/mach/map.h       |    4 ++
- arch/arm/mach-s5pv310/include/mach/regs-srom.h |   50 ++++++++++++++++++++++++
- 3 files changed, 59 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-srom.h
+ arch/arm/mach-s5pv310/mach-smdkc210.c |   61 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv310/mach-smdkv310.c |   61 +++++++++++++++++++++++++++++++++
+ 2 files changed, 122 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-index ffed262..873783a 100644
---- a/arch/arm/mach-s5pv310/cpu.c
-+++ b/arch/arm/mach-s5pv310/cpu.c
-@@ -81,6 +81,11 @@ static struct map_desc s5pv310_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(S3C_PA_UART),
- 		.length		= SZ_512K,
- 		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_SROMC,
-+		.pfn		= __phys_to_pfn(S5PV310_PA_SROMC),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
- 	},
+diff --git a/arch/arm/mach-s5pv310/mach-smdkc210.c b/arch/arm/mach-s5pv310/mach-smdkc210.c
+index d2cf694..14aca19 100644
+--- a/arch/arm/mach-s5pv310/mach-smdkc210.c
++++ b/arch/arm/mach-s5pv310/mach-smdkc210.c
+@@ -12,6 +12,8 @@
+ #include <linux/gpio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/platform_device.h>
++#include <linux/smsc911x.h>
++#include <linux/io.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -24,6 +26,7 @@
+ #include <plat/sdhci.h>
+ 
+ #include <mach/map.h>
++#include <mach/regs-srom.h>
+ 
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define SMDKC210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -106,6 +109,37 @@ static struct s3c_sdhci_platdata smdkc210_hsmmc3_pdata __initdata = {
+ 	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
  };
  
-diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
-index 1429510..37294f1 100644
---- a/arch/arm/mach-s5pv310/include/mach/map.h
-+++ b/arch/arm/mach-s5pv310/include/mach/map.h
-@@ -25,6 +25,8 @@
++static struct resource smdkc210_smsc911x_resources[] = {
++	[0] = {
++		.start	= S5PV310_PA_SROM_BANK(1),
++		.end	= S5PV310_PA_SROM_BANK(1) + SZ_64K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_EINT(5),
++		.end	= IRQ_EINT(5),
++		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_LOW,
++	},
++};
++
++static struct smsc911x_platform_config smsc9215_config = {
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++	.mac		= {0x00, 0x80, 0x00, 0x23, 0x45, 0x67},
++};
++
++static struct platform_device smdkc210_smsc911x = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(smdkc210_smsc911x_resources),
++	.resource	= smdkc210_smsc911x_resources,
++	.dev		= {
++		.platform_data  = &smsc9215_config,
++	},
++};
++
+ static struct platform_device *smdkc210_devices[] __initdata = {
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+@@ -113,8 +147,33 @@ static struct platform_device *smdkc210_devices[] __initdata = {
+ 	&s3c_device_hsmmc3,
+ 	&s3c_device_rtc,
+ 	&s3c_device_wdt,
++	&smdkc210_smsc911x,
+ };
  
- #define S5PV310_PA_SYSRAM		(0x02025000)
++static void __init smdkc210_smsc911x_init(void)
++{
++	u32 cs1;
++
++	/* configure nCS1 width to 16 bits */
++	cs1 = __raw_readl(S5PV310_SROM_BW) &
++		    ~(S5PV310_SROM_BW__CS_MASK <<
++				    S5PV310_SROM_BW__NCS1__SHIFT);
++	cs1 |= ((1 << S5PV310_SROM_BW__DATAWIDTH__SHIFT) |
++		(1 << S5PV310_SROM_BW__WAITENABLE__SHIFT) |
++		(1 << S5PV310_SROM_BW__BYTEENABLE__SHIFT)) <<
++		S5PV310_SROM_BW__NCS1__SHIFT;
++	__raw_writel(cs1, S5PV310_SROM_BW);
++
++	/* set timing for nCS1 suitable for ethernet chip */
++	__raw_writel((0x1 << S5PV310_SROM_BCX__PMC__SHIFT) |
++		     (0x9 << S5PV310_SROM_BCX__TACP__SHIFT) |
++		     (0xc << S5PV310_SROM_BCX__TCAH__SHIFT) |
++		     (0x1 << S5PV310_SROM_BCX__TCOH__SHIFT) |
++		     (0x6 << S5PV310_SROM_BCX__TACC__SHIFT) |
++		     (0x1 << S5PV310_SROM_BCX__TCOS__SHIFT) |
++		     (0x1 << S5PV310_SROM_BCX__TACS__SHIFT), S5PV310_SROM_BC1);
++}
++
+ static void __init smdkc210_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -124,6 +183,8 @@ static void __init smdkc210_map_io(void)
  
-+#define S5PV310_PA_SROM_BANK(x)		(0x04000000 + ((x) * 0x01000000))
+ static void __init smdkc210_machine_init(void)
+ {
++	smdkc210_smsc911x_init();
 +
- #define S5PC210_PA_ONENAND		(0x0C000000)
- #define S5P_PA_ONENAND			S5PC210_PA_ONENAND
+ 	s3c_sdhci0_set_platdata(&smdkc210_hsmmc0_pdata);
+ 	s3c_sdhci1_set_platdata(&smdkc210_hsmmc1_pdata);
+ 	s3c_sdhci2_set_platdata(&smdkc210_hsmmc2_pdata);
+diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
+index 10f8056..cd648d5 100644
+--- a/arch/arm/mach-s5pv310/mach-smdkv310.c
++++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
+@@ -12,6 +12,8 @@
+ #include <linux/gpio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/platform_device.h>
++#include <linux/smsc911x.h>
++#include <linux/io.h>
  
-@@ -58,6 +60,8 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -24,6 +26,7 @@
+ #include <plat/sdhci.h>
  
- #define S5PV310_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
+ #include <mach/map.h>
++#include <mach/regs-srom.h>
  
-+#define S5PV310_PA_SROMC		(0x12570000)
-+
- #define S5PV310_PA_UART			(0x13800000)
+ /* Following are default values for UCON, ULCON and UFCON UART registers */
+ #define SMDKV310_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+@@ -106,6 +109,37 @@ static struct s3c_sdhci_platdata smdkv310_hsmmc3_pdata __initdata = {
+ 	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
  
- #define S5P_PA_UART(x)			(S5PV310_PA_UART + ((x) * S3C_UART_OFFSET))
-diff --git a/arch/arm/mach-s5pv310/include/mach/regs-srom.h b/arch/arm/mach-s5pv310/include/mach/regs-srom.h
-new file mode 100644
-index 0000000..1898b3e
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/include/mach/regs-srom.h
-@@ -0,0 +1,50 @@
-+/* linux/arch/arm/mach-s5pv310/include/mach/regs-srom.h
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * S5PV310 - SROMC register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++static struct resource smdkv310_smsc911x_resources[] = {
++	[0] = {
++		.start	= S5PV310_PA_SROM_BANK(1),
++		.end	= S5PV310_PA_SROM_BANK(1) + SZ_64K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_EINT(5),
++		.end	= IRQ_EINT(5),
++		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_LOW,
++	},
++};
 +
-+#ifndef __ASM_ARCH_REGS_SROM_H
-+#define __ASM_ARCH_REGS_SROM_H __FILE__
++static struct smsc911x_platform_config smsc9215_config = {
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++	.mac		= {0x00, 0x80, 0x00, 0x23, 0x45, 0x67},
++};
 +
-+#include <mach/map.h>
++static struct platform_device smdkv310_smsc911x = {
++	.name		= "smsc911x",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(smdkv310_smsc911x_resources),
++	.resource	= smdkv310_smsc911x_resources,
++	.dev		= {
++		.platform_data  = &smsc9215_config,
++	},
++};
 +
-+#define S5PV310_SROMREG(x)	(S5P_VA_SROMC + (x))
+ static struct platform_device *smdkv310_devices[] __initdata = {
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+@@ -113,8 +147,33 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+ 	&s3c_device_hsmmc3,
+ 	&s3c_device_rtc,
+ 	&s3c_device_wdt,
++	&smdkv310_smsc911x,
+ };
+ 
++static void __init smdkv310_smsc911x_init(void)
++{
++	u32 cs1;
 +
-+#define S5PV310_SROM_BW		S5PV310_SROMREG(0x0)
-+#define S5PV310_SROM_BC0	S5PV310_SROMREG(0x4)
-+#define S5PV310_SROM_BC1	S5PV310_SROMREG(0x8)
-+#define S5PV310_SROM_BC2	S5PV310_SROMREG(0xc)
-+#define S5PV310_SROM_BC3	S5PV310_SROMREG(0x10)
++	/* configure nCS1 width to 16 bits */
++	cs1 = __raw_readl(S5PV310_SROM_BW) &
++		    ~(S5PV310_SROM_BW__CS_MASK <<
++				    S5PV310_SROM_BW__NCS1__SHIFT);
++	cs1 |= ((1 << S5PV310_SROM_BW__DATAWIDTH__SHIFT) |
++		(1 << S5PV310_SROM_BW__WAITENABLE__SHIFT) |
++		(1 << S5PV310_SROM_BW__BYTEENABLE__SHIFT)) <<
++		S5PV310_SROM_BW__NCS1__SHIFT;
++	__raw_writel(cs1, S5PV310_SROM_BW);
 +
-+/* one register BW holds 4 x 4-bit packed settings for NCS0 - NCS3 */
++	/* set timing for nCS1 suitable for ethernet chip */
++	__raw_writel((0x1 << S5PV310_SROM_BCX__PMC__SHIFT) |
++		     (0x9 << S5PV310_SROM_BCX__TACP__SHIFT) |
++		     (0xc << S5PV310_SROM_BCX__TCAH__SHIFT) |
++		     (0x1 << S5PV310_SROM_BCX__TCOH__SHIFT) |
++		     (0x6 << S5PV310_SROM_BCX__TACC__SHIFT) |
++		     (0x1 << S5PV310_SROM_BCX__TCOS__SHIFT) |
++		     (0x1 << S5PV310_SROM_BCX__TACS__SHIFT), S5PV310_SROM_BC1);
++}
 +
-+#define S5PV310_SROM_BW__DATAWIDTH__SHIFT	0
-+#define S5PV310_SROM_BW__ADDRMODE__SHIFT	1
-+#define S5PV310_SROM_BW__WAITENABLE__SHIFT	2
-+#define S5PV310_SROM_BW__BYTEENABLE__SHIFT	3
+ static void __init smdkv310_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -124,6 +183,8 @@ static void __init smdkv310_map_io(void)
+ 
+ static void __init smdkv310_machine_init(void)
+ {
++	smdkv310_smsc911x_init();
 +
-+#define S5PV310_SROM_BW__CS_MASK		0xf
-+
-+#define S5PV310_SROM_BW__NCS0__SHIFT		0
-+#define S5PV310_SROM_BW__NCS1__SHIFT		4
-+#define S5PV310_SROM_BW__NCS2__SHIFT		8
-+#define S5PV310_SROM_BW__NCS3__SHIFT		12
-+
-+/* applies to same to BCS0 - BCS3 */
-+
-+#define S5PV310_SROM_BCX__PMC__SHIFT		0
-+#define S5PV310_SROM_BCX__TACP__SHIFT		4
-+#define S5PV310_SROM_BCX__TCAH__SHIFT		8
-+#define S5PV310_SROM_BCX__TCOH__SHIFT		12
-+#define S5PV310_SROM_BCX__TACC__SHIFT		16
-+#define S5PV310_SROM_BCX__TCOS__SHIFT		24
-+#define S5PV310_SROM_BCX__TACS__SHIFT		28
-+
-+#endif /* __ASM_ARCH_REGS_SROM_H */
+ 	s3c_sdhci0_set_platdata(&smdkv310_hsmmc0_pdata);
+ 	s3c_sdhci1_set_platdata(&smdkv310_hsmmc1_pdata);
+ 	s3c_sdhci2_set_platdata(&smdkv310_hsmmc2_pdata);
 -- 
 1.6.2.5
