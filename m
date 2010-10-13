@@ -1,24 +1,26 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 13 Oct 2010 15:15:15 +0200
-Subject: [PATCH v3] ARM: AT91: add board support for Pcontrol_G20
-In-Reply-To: <1286792568.7800.19.camel@aspire.localdomain>
-References: <1286466086.4306.41.camel@aspire.localdomain>
-	<20101008123407.GB30252@game.jcrosoft.org>
-	<1286550644.21584.34.camel@aspire.localdomain>
-	<1286787761.7800.11.camel@aspire.localdomain>
-	<1286792568.7800.19.camel@aspire.localdomain>
-Message-ID: <20101013131515.GC11087@game.jcrosoft.org>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Wed, 13 Oct 2010 18:53:08 +0530
+Subject: linux-next: omap2plus_defconfig does not build
+Message-ID: <a36d6a1047d959af6ea65cd7edacf6a8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:22 Mon 11 Oct     , Peter Gsellmann wrote:
-> Board is a carrier board for Stamp9G20, with additional peripherals
-> for a building automation system
-> 
-> V3: now with makedefconfig, no complaints from scripts/checkpatch.pl
-the patch is broken by your mailler
+Building omap2plus_defconfig (which enables support for
+OMAP2420/2430/OMAP3
+and OMAP4 in one image), I get the following build error.
 
-Can u resend it
+  CC      arch/arm/kernel/swp_emulate.o
+/tmp/ccg979qz.s: Assembler messages:
+/tmp/ccg979qz.s:343: Error: selected processor does not support ARM mode
+`ldrexb r6,[r5]'
+/tmp/ccg979qz.s:344: Error: selected processor does not support ARM mode
+`strexb r1,r3,[r5]'
+make[1]: *** [arch/arm/kernel/swp_emulate.o] Error 1
+make: *** [arch/arm/kernel] Error 2
 
-Best Regards,
-J.
+I'm using CodeSourcery's 2010q1-202 toolchain based on gcc 4.4.1.
+
+I haven't been following the lists closely the last few days, so I'm not
+sure if this is a known issue. Just reporting it for now.
+
+- Anand
