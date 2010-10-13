@@ -1,94 +1,158 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 13 Oct 2010 09:31:56 +0200
-Subject: [PATCH] sdio: fix suspend/resume regression
-In-Reply-To: <1286788315.3101.11.camel@sven>
-References: <1286788315.3101.11.camel@sven>
-Message-ID: <1286955116-22793-1-git-send-email-ohad@wizery.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 13 Oct 2010 09:41:14 +0200
+Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
+In-Reply-To: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
+References: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
+Message-ID: <4CB5629A.8040306@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix SDIO suspend/resume regression introduced by
-4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related to
-mmc/sd card insert/removal during suspend/resume":
+Hi Russell,
+Shell we send it to your patch system?
 
-[ 5647.295953] PM: Syncing filesystems ... done.
-[ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
-[ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-[ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
-[ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
-[ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
-[ 5647.367082] PM: Some devices failed to suspend
+Konstantin Sinyuk wrote:
+> Signed-off-by: Konstantin Sinyuk <kostyas@compulab.co.il>
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> ---
+>  arch/arm/mach-dove/Kconfig   |    6 +++
+>  arch/arm/mach-dove/Makefile  |    1 +
+>  arch/arm/mach-dove/cm-a510.c |   96 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 103 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-dove/cm-a510.c
+> 
+> diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+> index 3b9a32a..a4ed390 100644
+> --- a/arch/arm/mach-dove/Kconfig
+> +++ b/arch/arm/mach-dove/Kconfig
+> @@ -9,6 +9,12 @@ config MACH_DOVE_DB
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell DB-MV88AP510 Development Board.
+> 
+> + config MACH_CM_A510
+> +	bool "CompuLab CM-A510 Board"
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  CompuLab CM-A510 Board.
+> +
+>  endmenu
+> 
+>  endif
+> diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+> index 7ab3be5..f74f549 100644
+> --- a/arch/arm/mach-dove/Makefile
+> +++ b/arch/arm/mach-dove/Makefile
+> @@ -1,3 +1,4 @@
+>  obj-y				+= common.o addr-map.o irq.o pcie.o
+> 
+>  obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
+> +obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
+> diff --git a/arch/arm/mach-dove/cm-a510.c b/arch/arm/mach-dove/cm-a510.c
+> new file mode 100644
+> index 0000000..321c961
+> --- /dev/null
+> +++ b/arch/arm/mach-dove/cm-a510.c
+> @@ -0,0 +1,96 @@
+> +/*
+> + * arch/arm/mach-dove/cm-a510.c
+> + *
+> + * Copyright (C) 2010 CompuLab, Ltd.
+> + * Konstantin Sinyuk <kostyas@compulab.co.il>
+> + *
+> + * Based on Marvell DB-MV88AP510-BP Development Board Setup
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/ata_platform.h>
+> +#include <linux/mv643xx_eth.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/spi/flash.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +
+> +#include <mach/dove.h>
+> +
+> +#include "common.h"
+> +
+> +static struct mv643xx_eth_platform_data cm_a510_ge00_data = {
+> +	.phy_addr	= MV643XX_ETH_PHY_ADDR_DEFAULT,
+> +};
+> +
+> +static struct mv_sata_platform_data cm_a510_sata_data = {
+> +	.n_ports        = 1,
+> +};
+> +
+> +/*
+> + * SPI Devices:
+> + * SPI0: 1M Flash Winbond w25q32bv
+> + */
+> +static const struct flash_platform_data cm_a510_spi_flash_data = {
+> +	.type		= "w25q32bv",
+> +};
+> +
+> +static struct spi_board_info __initdata cm_a510_spi_flash_info[] = {
+> +	{
+> +		.modalias       = "m25p80",
+> +		.platform_data  = &cm_a510_spi_flash_data,
+> +		.irq            = -1,
+> +		.max_speed_hz   = 20000000,
+> +		.bus_num        = 0,
+> +		.chip_select    = 0,
+> +	},
+> +};
+> +
+> +static int __init cm_a510_pci_init(void)
+> +{
+> +	if (machine_is_cm_a510())
+> +		dove_pcie_init(1, 1);
+> +
+> +	return 0;
+> +}
+> +
+> +subsys_initcall(cm_a510_pci_init);
+> +
+> +/* Board Init */
+> +static void __init cm_a510_init(void)
+> +{
+> +	/*
+> +	 * Basic Dove setup. Needs to be called early.
+> +	 */
+> +	dove_init();
+> +
+> +	dove_ge00_init(&cm_a510_ge00_data);
+> +	dove_ehci0_init();
+> +	dove_ehci1_init();
+> +	dove_sata_init(&cm_a510_sata_data);
+> +	dove_sdio0_init();
+> +	dove_sdio1_init();
+> +	dove_spi0_init();
+> +	dove_spi1_init();
+> +	dove_uart0_init();
+> +	dove_uart1_init();
+> +	dove_i2c_init();
+> +	spi_register_board_info(cm_a510_spi_flash_info,
+> +				ARRAY_SIZE(cm_a510_spi_flash_info));
+> +}
+> +
+> +MACHINE_START(CM_A510, "Compulab CM-A510 Board")
+> +	.phys_io	= DOVE_SB_REGS_PHYS_BASE,
+> +	.io_pg_offst	= ((DOVE_SB_REGS_VIRT_BASE) >> 18) & 0xfffc,
+> +	.boot_params	= 0x00000100,
+> +	.init_machine	= cm_a510_init,
+> +	.map_io		= dove_map_io,
+> +	.init_irq	= dove_init_irq,
+> +	.timer		= &dove_timer,
+> +MACHINE_END
+> --
+> 1.7.0.4
+> 
 
-4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e moved the card removal/insertion
-mechanism out of MMC's suspend/resume path and into pm notifiers
-(mmc_pm_notify), and that broke SDIO's expectation that mmc_suspend_host()
-will remove the card, and squash the error, in case -ENOSYS is returned
-from the bus suspend handler (mmc_sdio_suspend() in this case).
 
-mmc_sdio_suspend() is using this whenever at least one of the card's SDIO
-function drivers does not have suspend/resume handlers - in that case
-it is agreed to force removal of the entire card.
-
-This patch fixes this regression by trivially bringing back that part of
-mmc_suspend_host(), which was removed by 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e.
-
-Reported-and-tested-by: Sven Neumann <s.neumann@raumfeld.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Maxim Levitsky <maximlevitsky@gmail.com>
-Cc: <stable@kernel.org>
---
-
-It may still be desired to further clean this area up by using the card
-removal mechanism in mmc_pm_notify() for SDIO as well.
-
-To use mmc_pm_notify's card-removal code also for SDIO, we need it
-to check if all the SDIO functions have suspend handlers. That
-would probably make us add a new bus_ops handler (something like
-host->bus_ops->remove_card_on_suspend ?).
-
-It's starting to get a bit complicated though, and I'm not sure it
-would make the code a lot more readable.
-
-In addition, this would still not work for drivers like libertas sdio,
-which do have a suspend handler, but sometimes let it return -ENOSYS,
-expecting mmc_suspend_host() to remove the card and squash the error.
-For those cases, we still need the old card-removal logic in mmc_suspend_host().
-
-This brings up a question whether libertas_sdio really needs this
-functionality; When MMC_PM_KEEP_POWER is not needed, can't it just return 0
-(and as a result the card will be powered down, but not removed) ?
-
-Until we have an agreement on this, I suggest we at least fix the
-regression with this patch.
-
-Thanks Sven Neumann for reporting and testing the issue and this patch.
-
- drivers/mmc/core/core.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index c94565d..515ff39 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
- 	if (host->bus_ops && !host->bus_dead) {
- 		if (host->bus_ops->suspend)
- 			err = host->bus_ops->suspend(host);
-+		if (err == -ENOSYS || !host->bus_ops->resume) {
-+			/*
-+			 * We simply "remove" the card in this case.
-+			 * It will be redetected on resume.
-+			 */
-+			if (host->bus_ops->remove)
-+				host->bus_ops->remove(host);
-+			mmc_claim_host(host);
-+			mmc_detach_bus(host);
-+			mmc_release_host(host);
-+			host->pm_flags = 0;
-+			err = 0;
-+		}
- 	}
- 	mmc_bus_put(host);
- 
 -- 
-1.7.0.4
+Sincerely yours,
+Mike.
