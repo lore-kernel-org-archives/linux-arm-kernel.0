@@ -1,158 +1,27 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 13 Oct 2010 09:41:14 +0200
-Subject: [PATCH] [ARM] dove: add support for CM-A510 machine.
-In-Reply-To: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
-References: <1286436985-24224-1-git-send-email-kostyas@compulab.co.il>
-Message-ID: <4CB5629A.8040306@compulab.co.il>
+From: Jiri.Pinkava@vscht.cz (=?UTF-8?B?SmnFmcOtIFBpbmthdmE=?=)
+Date: Wed, 13 Oct 2010 09:49:40 +0200
+Subject: [PATCH 1/6] n35: fix key codes and types
+In-Reply-To: <4CB24E60.5060103@fluff.org>
+References: <4CA91E6F.3010704@vscht.cz> <4CA91EDA.80009@vscht.cz>
+	<4CB24E60.5060103@fluff.org>
+Message-ID: <4CB56494.1090300@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-Shell we send it to your patch system?
 
-Konstantin Sinyuk wrote:
-> Signed-off-by: Konstantin Sinyuk <kostyas@compulab.co.il>
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
->  arch/arm/mach-dove/Kconfig   |    6 +++
->  arch/arm/mach-dove/Makefile  |    1 +
->  arch/arm/mach-dove/cm-a510.c |   96 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 103 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-dove/cm-a510.c
-> 
-> diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-> index 3b9a32a..a4ed390 100644
-> --- a/arch/arm/mach-dove/Kconfig
-> +++ b/arch/arm/mach-dove/Kconfig
-> @@ -9,6 +9,12 @@ config MACH_DOVE_DB
->  	  Say 'Y' here if you want your kernel to support the
->  	  Marvell DB-MV88AP510 Development Board.
-> 
-> + config MACH_CM_A510
-> +	bool "CompuLab CM-A510 Board"
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the
-> +	  CompuLab CM-A510 Board.
-> +
->  endmenu
-> 
->  endif
-> diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-> index 7ab3be5..f74f549 100644
-> --- a/arch/arm/mach-dove/Makefile
-> +++ b/arch/arm/mach-dove/Makefile
-> @@ -1,3 +1,4 @@
->  obj-y				+= common.o addr-map.o irq.o pcie.o
-> 
->  obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
-> +obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
-> diff --git a/arch/arm/mach-dove/cm-a510.c b/arch/arm/mach-dove/cm-a510.c
-> new file mode 100644
-> index 0000000..321c961
-> --- /dev/null
-> +++ b/arch/arm/mach-dove/cm-a510.c
-> @@ -0,0 +1,96 @@
-> +/*
-> + * arch/arm/mach-dove/cm-a510.c
-> + *
-> + * Copyright (C) 2010 CompuLab, Ltd.
-> + * Konstantin Sinyuk <kostyas@compulab.co.il>
-> + *
-> + * Based on Marvell DB-MV88AP510-BP Development Board Setup
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/ata_platform.h>
-> +#include <linux/mv643xx_eth.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/spi/flash.h>
-> +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +
-> +#include <mach/dove.h>
-> +
-> +#include "common.h"
-> +
-> +static struct mv643xx_eth_platform_data cm_a510_ge00_data = {
-> +	.phy_addr	= MV643XX_ETH_PHY_ADDR_DEFAULT,
-> +};
-> +
-> +static struct mv_sata_platform_data cm_a510_sata_data = {
-> +	.n_ports        = 1,
-> +};
-> +
-> +/*
-> + * SPI Devices:
-> + * SPI0: 1M Flash Winbond w25q32bv
-> + */
-> +static const struct flash_platform_data cm_a510_spi_flash_data = {
-> +	.type		= "w25q32bv",
-> +};
-> +
-> +static struct spi_board_info __initdata cm_a510_spi_flash_info[] = {
-> +	{
-> +		.modalias       = "m25p80",
-> +		.platform_data  = &cm_a510_spi_flash_data,
-> +		.irq            = -1,
-> +		.max_speed_hz   = 20000000,
-> +		.bus_num        = 0,
-> +		.chip_select    = 0,
-> +	},
-> +};
-> +
-> +static int __init cm_a510_pci_init(void)
-> +{
-> +	if (machine_is_cm_a510())
-> +		dove_pcie_init(1, 1);
-> +
-> +	return 0;
-> +}
-> +
-> +subsys_initcall(cm_a510_pci_init);
-> +
-> +/* Board Init */
-> +static void __init cm_a510_init(void)
-> +{
-> +	/*
-> +	 * Basic Dove setup. Needs to be called early.
-> +	 */
-> +	dove_init();
-> +
-> +	dove_ge00_init(&cm_a510_ge00_data);
-> +	dove_ehci0_init();
-> +	dove_ehci1_init();
-> +	dove_sata_init(&cm_a510_sata_data);
-> +	dove_sdio0_init();
-> +	dove_sdio1_init();
-> +	dove_spi0_init();
-> +	dove_spi1_init();
-> +	dove_uart0_init();
-> +	dove_uart1_init();
-> +	dove_i2c_init();
-> +	spi_register_board_info(cm_a510_spi_flash_info,
-> +				ARRAY_SIZE(cm_a510_spi_flash_info));
-> +}
-> +
-> +MACHINE_START(CM_A510, "Compulab CM-A510 Board")
-> +	.phys_io	= DOVE_SB_REGS_PHYS_BASE,
-> +	.io_pg_offst	= ((DOVE_SB_REGS_VIRT_BASE) >> 18) & 0xfffc,
-> +	.boot_params	= 0x00000100,
-> +	.init_machine	= cm_a510_init,
-> +	.map_io		= dove_map_io,
-> +	.init_irq	= dove_init_irq,
-> +	.timer		= &dove_timer,
-> +MACHINE_END
-> --
-> 1.7.0.4
-> 
+Dne 11.10.2010 01:38, Ben Dooks napsal(a):
+> On 04/10/10 01:24, Ji?? Pinkava wrote:
+>
+> A non-empty description would be helpful.
+>
+>> Signed-off-by: Jiri Pinkava<jiri.pinkava@vscht.cz>
+>
+> Hi, this doesn't apply to latest linux git.
 
+It is against latest linux git no extra pre-requisities, may be 
+something messed up by my email client, resending with more comments and 
+with git sedn-email.
 
--- 
-Sincerely yours,
-Mike.
+>
+> Is there something this depends on, or does it need
+> to be re-done?
