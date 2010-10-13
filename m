@@ -1,96 +1,143 @@
 From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Wed, 13 Oct 2010 09:10:27 +0900
-Subject: [PATCH 4/4] ARM: S3C2416: Add support for USB 2.0 High-Speed gadget
-	controller
+Date: Wed, 13 Oct 2010 09:10:25 +0900
+Subject: [PATCH 2/4] ARM: S3C24XX: Add plaform device definition for USB
+	High-Speed gadget controller.
 In-Reply-To: <1286928627-22824-1-git-send-email-sbkim73@samsung.com>
 References: <1286928627-22824-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <1286928627-22824-5-git-send-email-sbkim73@samsung.com>
+Message-ID: <1286928627-22824-3-git-send-email-sbkim73@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-Add support for USB 2.0 High-Speed gadget controller driver for Samsung's
-S3C2416 processor.
+S3C2416, S3C2443 and S3C2450 includes a USB High-Speed Gadget controller module.
+This patch adds the following for supporting this controller.
+
+1. Definition for USB High-Speed controller base address.
+2. Platform device instantiation.
+3. Declaration for platform data structure.
+4. Functionality to setup platform data for the controller.
 
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 ---
- arch/arm/mach-s3c2416/mach-smdk2416.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/map.h  |    4 +++
+ arch/arm/plat-s3c24xx/devs.c              |   41 +++++++++++++++++++++++++++++
+ arch/arm/plat-s3c24xx/include/plat/udc.h  |   17 ++++++++++++
+ arch/arm/plat-samsung/include/plat/devs.h |    1 +
+ 4 files changed, 63 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c2416/mach-smdk2416.c
-index 5fc3f67..429e720 100644
---- a/arch/arm/mach-s3c2416/mach-smdk2416.c
-+++ b/arch/arm/mach-s3c2416/mach-smdk2416.c
-@@ -23,6 +23,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/gpio.h>
- #include <linux/fb.h>
-+#include <linux/delay.h>
+diff --git a/arch/arm/mach-s3c2410/include/mach/map.h b/arch/arm/mach-s3c2410/include/mach/map.h
+index cd3983a..0c6667f 100644
+--- a/arch/arm/mach-s3c2410/include/mach/map.h
++++ b/arch/arm/mach-s3c2410/include/mach/map.h
+@@ -21,6 +21,10 @@
+ /* USB host controller */
+ #define S3C2410_PA_USBHOST (0x49000000)
+ 
++/* S3C2416/S3C2443/S3C2450 High-Speed USB Gadget */
++#define S3C2416_PA_HSUDC	(0x49800000)
++#define S3C2416_SZ_HSUDC	(SZ_4K)
++
+ /* DMA controller */
+ #define S3C2410_PA_DMA	   (0x4B000000)
+ #define S3C24XX_SZ_DMA	   SZ_1M
+diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
+index 452e184..481d9c9 100644
+--- a/arch/arm/plat-s3c24xx/devs.c
++++ b/arch/arm/plat-s3c24xx/devs.c
+@@ -22,6 +22,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/string.h>
++#include <linux/dma-mapping.h>
  
  #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
-@@ -35,6 +36,7 @@
- #include <plat/regs-serial.h>
- #include <mach/regs-gpio.h>
- #include <mach/regs-lcd.h>
-+#include <mach/regs-s3c2443-clock.h>
- 
- #include <mach/idle.h>
- #include <mach/leds-gpio.h>
-@@ -46,6 +48,7 @@
- #include <plat/devs.h>
- #include <plat/cpu.h>
- #include <plat/nand.h>
-+#include <plat/udc.h>
-
- #include <plat/regs-fb-v4.h>
- #include <plat/fb.h>
-@@ -113,6 +116,27 @@ static struct s3c2410_uartcfg smdk2416_uartcfgs[] __initdata = {
+@@ -234,6 +235,46 @@ void __init s3c24xx_udc_set_platdata(struct s3c2410_udc_mach_info *pd)
  	}
- };
+ }
  
-+void smdk2416_hsudc_gpio_init(void)
-+{
-+	s3c_gpio_setpull(S3C2410_GPH(14), S3C_GPIO_PULL_UP);
-+	s3c_gpio_setpull(S3C2410_GPF(2), S3C_GPIO_PULL_NONE);
-+	s3c_gpio_cfgpin(S3C2410_GPH(14), S3C_GPIO_SFN(1));
-+	s3c2410_modify_misccr(S3C2416_MISCCR_SEL_SUSPND, 0);
-+}
-+
-+void smdk2416_hsudc_gpio_uninit(void)
-+{
-+	s3c2410_modify_misccr(S3C2416_MISCCR_SEL_SUSPND, 1);
-+	s3c_gpio_setpull(S3C2410_GPH(14), S3C_GPIO_PULL_NONE);
-+	s3c_gpio_cfgpin(S3C2410_GPH(14), S3C_GPIO_SFN(0));
-+}
-+
-+struct s3c24xx_hsudc_platdata smdk2416_hsudc_platdata = {
-+	.epnum = 9,
-+	.gpio_init = smdk2416_hsudc_gpio_init,
-+	.gpio_uninit = smdk2416_hsudc_gpio_uninit,
++/* USB High Speed 2.0 Device (Gadget) */
++static struct resource s3c_hsudc_resource[] = {
++	[0] = {
++		.start	= S3C2416_PA_HSUDC,
++		.end	= S3C2416_PA_HSUDC + S3C2416_SZ_HSUDC - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= IRQ_USBD,
++		.end	= IRQ_USBD,
++		.flags	= IORESOURCE_IRQ,
++	}
 +};
 +
- struct s3c_fb_pd_win smdk2416_fb_win[] = {
- 	[0] = {
- 		/* think this is the same as the smdk6410 */
-@@ -166,6 +190,7 @@ static struct platform_device *smdk2416_devices[] __initdata = {
- 	&s3c_device_i2c0,
- 	&s3c_device_hsmmc0,
- 	&s3c_device_hsmmc1,
-+	&s3c_device_usb_hsudc,
- };
- 
- static void __init smdk2416_map_io(void)
-@@ -180,6 +205,8 @@ static void __init smdk2416_machine_init(void)
- 	s3c_i2c0_set_platdata(NULL);
- 	s3c_fb_set_platdata(&smdk2416_fb_platdata);
- 
-+	s3c24xx_hsudc_set_platdata(&smdk2416_hsudc_platdata);
++static u64 s3c_hsudc_dmamask = DMA_BIT_MASK(32);
 +
- 	gpio_request(S3C2410_GPB(4), "USBHost Power");
- 	gpio_direction_output(S3C2410_GPB(4), 1);
++struct platform_device s3c_device_usb_hsudc = {
++	.name		= "s3c-hsudc",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s3c_hsudc_resource),
++	.resource	= s3c_hsudc_resource,
++	.dev		= {
++		.dma_mask		= &s3c_hsudc_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++void __init s3c24xx_hsudc_set_platdata(struct s3c24xx_hsudc_platdata *pd)
++{
++	struct s3c24xx_hsudc_platdata *npd;
++
++	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
++	if (npd) {
++		memcpy(npd, pd, sizeof(*npd));
++		s3c_device_usb_hsudc.dev.platform_data = npd;
++	} else {
++		printk(KERN_ERR "no memory for udc platform data\n");
++	}
++}
++
+ /* IIS */
  
+ static struct resource s3c_iis_resource[] = {
+diff --git a/arch/arm/plat-s3c24xx/include/plat/udc.h b/arch/arm/plat-s3c24xx/include/plat/udc.h
+index 546bb40..a3fc1be 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/udc.h
++++ b/arch/arm/plat-s3c24xx/include/plat/udc.h
+@@ -33,4 +33,21 @@ struct s3c2410_udc_mach_info {
+ 
+ extern void __init s3c24xx_udc_set_platdata(struct s3c2410_udc_mach_info *);
+ 
++/**
++ * s3c24xx_hsudc_platdata - Platform data for USB High-Speed gadget controller.
++ * @epnum: Number of endpoints to be instantiated by the controller driver.
++ * @gpio_init: Platform specific USB related GPIO initialization.
++ * @gpio_uninit: Platform specific USB releted GPIO uninitialzation.
++ *
++ * Representation of platform data for the S3C24XX USB 2.0 High Speed gadget
++ * controllers.
++ */
++struct s3c24xx_hsudc_platdata {
++	unsigned int	epnum;
++	void		(*gpio_init)(void);
++	void		(*gpio_uninit)(void);
++};
++
++extern void __init s3c24xx_hsudc_set_platdata(struct s3c24xx_hsudc_platdata *pd);
++
+ #endif /* __ASM_ARM_ARCH_UDC_H */
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index 7d448e1..8221859 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -78,6 +78,7 @@ extern struct platform_device s3c64xx_device_onenand1;
+ extern struct platform_device s5p_device_onenand;
+ 
+ extern struct platform_device s3c_device_usbgadget;
++extern struct platform_device s3c_device_usb_hsudc;
+ extern struct platform_device s3c_device_usb_hsotg;
+ 
+ extern struct platform_device s5pv210_device_ac97;
 -- 
 1.6.6.rc2
