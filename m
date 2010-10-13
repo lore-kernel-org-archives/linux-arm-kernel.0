@@ -1,81 +1,79 @@
-From: ian@opensource.wolfsonmicro.com (Ian Lartey)
-Date: Wed, 13 Oct 2010 17:32:14 +0100
-Subject: [PATCH 2/2] Adding cs89x0, standard ethernet driver for iMX31
-	platform.
-In-Reply-To: <20101013161115.GC21498@pengutronix.de>
-References: <1285861655-6513-1-git-send-email-ian@opensource.wolfsonmicro.com>
-	<1285861655-6513-2-git-send-email-ian@opensource.wolfsonmicro.com>
-	<20100930182313.GT29811@pengutronix.de>
-	<1285929996.1864.11438.camel@Tapajos>
-	<20101001124918.GM784@pengutronix.de>
-	<1286983514.1799.8974.camel@Tapajos>
-	<20101013161115.GC21498@pengutronix.de>
-Message-ID: <1286987534.1799.8985.camel@Tapajos>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Wed, 13 Oct 2010 09:34:10 -0700
+Subject: [lm-sensors] [PATCH 4/5] hwmon: DNS323 rev C1 fan support
+In-Reply-To: <20101013115951.GA5649@kw.sim.vm.gnt>
+References: <1274525694.1931.142.camel@pasglop>
+	<20101013115951.GA5649@kw.sim.vm.gnt>
+Message-ID: <1286987650.9690.175.camel@groeck-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-13 at 18:11 +0200, Uwe Kleine-K?nig wrote:
-> Hi Ian,
+On Wed, 2010-10-13 at 07:59 -0400, Simon Guinot wrote:
+> Hi Benjamin,
 > 
-> On Wed, Oct 13, 2010 at 04:25:13PM +0100, Ian Lartey wrote:
-> > On Fri, 2010-10-01 at 14:49 +0200, Uwe Kleine-K?nig wrote:
-> > > On Fri, Oct 01, 2010 at 11:46:36AM +0100, Ian Lartey wrote:
-> > > > On Thu, 2010-09-30 at 20:23 +0200, Uwe Kleine-K?nig wrote:
-> > > > > On Thu, Sep 30, 2010 at 04:47:35PM +0100, Ian Lartey wrote:
-> > > > > > Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
-> > > > > > ---
-> > > > > >  arch/arm/configs/mx3_defconfig |    2 ++
-> > > > > >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-> > > > > > index 161f907..b0b3409 100644
-> > > > > > --- a/arch/arm/configs/mx3_defconfig
-> > > > > > +++ b/arch/arm/configs/mx3_defconfig
-> > > > > > @@ -68,6 +68,8 @@ CONFIG_NET_ETHERNET=y
-> > > > > >  CONFIG_SMSC911X=y
-> > > > > >  CONFIG_DNET=y
-> > > > > >  CONFIG_FEC=y
-> > > > > > +CONFIG_CS89x0=y
-> > > > > > +CONFIG_CS89x0_NONISA_IRQ=y
-> > > > > >  # CONFIG_NETDEV_1000 is not set
-> > > > > >  # CONFIG_NETDEV_10000 is not set
-> > > > > >  # CONFIG_INPUT is not set
-> > > > > This change is bad for two reasons:
-> > > > > 
-> > > > >  - I just tested a kernel with CONFIG_CS89x0=y on a Phytec Phycore
-> > > > >    pcm043 using your updated defconfig and it barfs:
-> > > > > 
-> > > > > 	[.....]
-> > > > 
-> > > > Ouch, I'll see if I can correct that. (Needs to be done before I can add
-> > > > the config file change). Uwe I don't have another i.MX3 (apart from the
-> > > > i.MV31ADS) would you be able to test further changes for me please to
-> > > > help catch this kind of thing ?
-> > > I'm not sure if I have access to an mx31ads, but we have several i.MX
-> > > machines in our lab.  And I'm willing to give my comments to a general
-> > > cs89x0 cleanup.  (This drivers was one of the first things I saw when I
-> > > started kernel development.  Back then I gave up trying to understand
-> > > it. :-)  So maybe if you don't come around fixing it I might have some
-> > > energy to do it now with more knowledge about the kernel in general and
-> > > having seen *much* ugly code.
-> > 
-> > I've had a look round but I cannot get a handle on fixing the issue.
-> no time or no clue?
-
-A bit of both, but I think no-clue takes priority in this case!
+> What is the status for the DNS323 fan support ?
+> Have this patch been merged yet ?
 > 
-> > I only have an i.mx31ads that failure doesn't occur, sorry I hope you
-> > have more success than me.
-> I put in on my todo list, but I don't expect to get that done soon.
+The most recent version I found on the web (dated June 13) has problems
+with error detection and reporting, and fails to remove sysfs files in
+some error conditions. So I would be surprised if it was merged, unless
+there is a more recent version which I missed.
 
-OK.
+On a side note, there are several versions of the patch on the web, none
+indicating what has changed between versions. Would be great to have
+such data attached to the various patch versions.
 
+> I am currently looking to add hwmon support for the GPIO fan found
+> on Network Space Max v2 boards. Obviously, some attributes are shared
+> with the DNS323 fan. Maybe there is some room for a generic GPIO fan
+> driver ?
 > 
-> > For now I'll resubmit PATCH 1/2 with the changes to  board-mx31ads.h and
-> > board-mx31ads.c but I'll not resubmit this patch to mx3_defconfig so
-> > nobody will get it by default.
-> > 
-> > Does this seem OK to you ?
-> OK
+> Platform data could provide the board specific GPIO pinout and a speed
+> conversion array (rpm from/to GPIO value). Here is a proposal for this
+> platform data interface:
+> 
+> struct gpio_fan {
+>         const char      *name;
+>         unsigned        gpio;
+>         unsigned        active_low;
+> };
+> 
+> struct gpio_fan_speed {
+>         int value;
+>         int rpm;
+> };
+> 
+> struct gpio_fan_platform_data {
+>         struct gpio_fan         *alarm; /* fan alarm GPIO. */
+>         struct gpio_fan         *ctrl;  /* fan control GPIOs. */
+>         int                     num_ctrl;
+>         /*
+>          * Speed conversion array: rpm from/to GPIO bit field.
+>          * This array _must_ be sorted in ascending rpm order.
+>          */
+>         struct gpio_fan_speed   *speed;
+>         int                     num_speed;
+> };
+> 
+> Based on this informations the GPIO fan driver could perform the
+> speed conversions (pwm, rpm, GPIO value) and then provide a hwmon
+> interface.
+> 
+Sounds like a good idea to me.
 
-Ian.
+Couple of comments.
+
+Personally, I prefer to see num_XXX variables before the actual objects,
+but maybe that is just a personal preference. 
+
+I am not sure what one would do with "active_low". Would that be used
+for the alarm ?
+
+Adding a "fault" object might make sense.
+
+It seems that bit write order is missing. Since it is not always the
+same, as the proposed dns323 driver indicates, that might be a tricky
+problem to solve. You would have to come up with an at least somewhat
+generic solution for that.
+
+Guenter
