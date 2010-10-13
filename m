@@ -1,46 +1,31 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 13 Oct 2010 11:08:35 -0700
-Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
-In-Reply-To: <201010131944.54135.arnd@arndb.de>
-References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
-	<201010131721.39623.arnd@arndb.de>
-	<1286986623.28336.3.camel@c-dwalke-linux.qualcomm.com>
-	<201010131944.54135.arnd@arndb.de>
-Message-ID: <1286993315.28336.10.camel@c-dwalke-linux.qualcomm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 13 Oct 2010 20:36:43 +0100
+Subject: [PATCH 2.6.36] S3C64XX: Fix special function for IISv4 port
+Message-ID: <1286998603-20401-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-13 at 19:44 +0200, Arnd Bergmann wrote:
-> On Wednesday 13 October 2010 18:17:03 Daniel Walker wrote:
-> > > I think you would be much better off making it a "hvc" driver, where
-> > > you just need to provide a read character and write character function
-> > > and an optional interrupt handler but otherwise have the common hvc
-> > > code take care of polling the hardware and talking to the tty layer.
-> > 
-> > I don't know what the "hvc" driver is "Hypervisor Virtual Console"
-> > maybe?
-> 
-> Yes, it originally was used only on hypervisors that had simple
-> read/write type consoles, but has now turned into a generic facility
-> that is used by a number of consoles that don't look like classic
-> serial ports.
-> 
-> > Can you give any sort of example driver which does what you
-> > suggesting?
-> 
-> Look at drivers/char/hvc_tile.c for the simplest case or
-> drivers/char/hvc_vio.c for one that uses interrupts.
+When converting to use s3c_gpio_cfgpin_range() the function for the
+IISv4 block appears to have been typoed as 4 (the keypad) rather than
+5 as it should be.
 
-I found it independently actually .. It looks like there's at least two
-problems. This jtag driver has a status register which flags when RX is
-available, and TX is possible. I'm not sure this status register fits
-into the model. The other thing is that we have a ttyJ registered for
-this driver, and it would be nice to use that over something like ttyHVC
-(I'm not sure if that name is correct, just a guess).
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/dev-audio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Daniel
-
+diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+index e53764e..76426a3 100644
+--- a/arch/arm/mach-s3c64xx/dev-audio.c
++++ b/arch/arm/mach-s3c64xx/dev-audio.c
+@@ -49,7 +49,7 @@ static int s3c64xx_i2sv4_cfg_gpio(struct platform_device *pdev)
+ 	s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+ 	s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+ 	s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+-	s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(4));
++	s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+ 
+ 	return 0;
+ }
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
