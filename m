@@ -1,27 +1,44 @@
-From: Jiri.Pinkava@vscht.cz (=?UTF-8?B?SmnFmcOtIFBpbmthdmE=?=)
-Date: Wed, 13 Oct 2010 09:49:40 +0200
-Subject: [PATCH 1/6] n35: fix key codes and types
-In-Reply-To: <4CB24E60.5060103@fluff.org>
-References: <4CA91E6F.3010704@vscht.cz> <4CA91EDA.80009@vscht.cz>
-	<4CB24E60.5060103@fluff.org>
-Message-ID: <4CB56494.1090300@vscht.cz>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Wed, 13 Oct 2010 09:54:29 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <1286955116-22793-1-git-send-email-ohad@wizery.com>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+Message-ID: <AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ohad,
 
-Dne 11.10.2010 01:38, Ben Dooks napsal(a):
-> On 04/10/10 01:24, Ji?? Pinkava wrote:
->
-> A non-empty description would be helpful.
->
->> Signed-off-by: Jiri Pinkava<jiri.pinkava@vscht.cz>
->
-> Hi, this doesn't apply to latest linux git.
+On Wed, Oct 13, 2010 at 9:31 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
 
-It is against latest linux git no extra pre-requisities, may be 
-something messed up by my email client, resending with more comments and 
-with git sedn-email.
-
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index c94565d..515ff39 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+> ? ? ? ?if (host->bus_ops && !host->bus_dead) {
+> ? ? ? ? ? ? ? ?if (host->bus_ops->suspend)
+> ? ? ? ? ? ? ? ? ? ? ? ?err = host->bus_ops->suspend(host);
+> + ? ? ? ? ? ? ? if (err == -ENOSYS || !host->bus_ops->resume) {
+> + ? ? ? ? ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ? ? ? ? ?* We simply "remove" the card in this case.
+> + ? ? ? ? ? ? ? ? ? ? ? ?* It will be redetected on resume.
+> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? if (host->bus_ops->remove)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->bus_ops->remove(host);
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_claim_host(host);
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_detach_bus(host);
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_release_host(host);
+> + ? ? ? ? ? ? ? ? ? ? ? host->pm_flags = 0;
+> + ? ? ? ? ? ? ? ? ? ? ? err = 0;
+> + ? ? ? ? ? ? ? }
+> ? ? ? ?}
+> ? ? ? ?mmc_bus_put(host);
 >
-> Is there something this depends on, or does it need
-> to be re-done?
+
+what about moving this logic to sdio bus_ops as this seems to be
+completely specific to sdio right now?
+
+Thanks,
+   Vitaly
