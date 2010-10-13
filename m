@@ -1,61 +1,43 @@
-From: EXT-Eugeny.Kuznetsov@nokia.com (Evgeny Kuznetsov)
-Date: Wed, 13 Oct 2010 14:04:50 +0400
-Subject: [PATCHv2 1/1] omap: Ptr "isr_reg" tracked as NULL was dereferenced
-In-Reply-To: <cover.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
-References: <cover.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
-Message-ID: <7bb69801f49283c3bde78aa008c15308ac8a5fbf.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+From: r65037@freescale.com (Zhu Richard-R65037)
+Date: Wed, 13 Oct 2010 18:13:25 +0800
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <4CB58565.5020806@eukrea.com>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+	<87aamjxe00.fsf@lechat.rtp-net.org> <4CB56A88.2040101@eukrea.com>
+	<20101013082930.GA11286@pengutronix.de>
+	<8762x6xx00.fsf@lechat.rtp-net.org>
+	<A88EF4D64D8447468743DC1503C0B6CA0D557C@zch01exm22.fsl.freescale.net>
+	<20101013100632.GC11286@pengutronix.de>
+	<4CB58565.5020806@eukrea.com>
+Message-ID: <A88EF4D64D8447468743DC1503C0B6CA0D557D@zch01exm22.fsl.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Evgeny Kuznetsov <ext-eugeny.kuznetsov@nokia.com>
+Hi Wolfram&Eric:
+I take one day leave yesterday for one examination that had been booked a few days ago,
+ and missed Eric's patches, so regretful.
 
-Value of "isr_reg" pointer is depend on configuration and GPIO method.
-Potentially it may have NULL value and it is dereferenced later
-in code. If pointer is NULL there is some kernel issue.
-Warning and exit from function are added in this case.
-Also compilation check is added for correct architecture
-configuration.
+Best Regards
+Richard Zhu
 
-Signed-off-by: Evgeny Kuznetsov <EXT-Eugeny.Kuznetsov@nokia.com>
----
- arch/arm/plat-omap/gpio.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index c05c653..d04913c 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1318,6 +1318,23 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	if (bank->method == METHOD_GPIO_44XX)
- 		isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
- #endif
-+
-+#if !defined(CONFIG_ARCH_OMAP1) &&		\
-+		!defined(CONFIG_ARCH_OMAP15XX) &&	\
-+		!defined(CONFIG_ARCH_OMAP16XX) &&	\
-+		!defined(CONFIG_ARCH_OMAP730) &&	\
-+		!defined(CONFIG_ARCH_OMAP850) &&	\
-+		!defined(CONFIG_ARCH_OMAP2) &&	\
-+		!defined(CONFIG_ARCH_OMAP3) &&	\
-+		!defined(CONFIG_ARCH_OMAP4)
-+	
-+#error "Incorrect arch configuration"
-+	
-+#endif
-+	
-+	if (WARN_ON(!isr_reg))
-+		goto exit;
-+
- 	while(1) {
- 		u32 isr_saved, level_mask = 0;
- 		u32 enabled;
-@@ -1377,6 +1394,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	configured, we must unmask the bank interrupt only after
- 	handler(s) are executed in order to avoid spurious bank
- 	interrupt */
-+exit:
- 	if (!unmasked)
- 		desc->chip->unmask(irq);
- 
--- 
-1.6.3.3
+
+> -----Original Message-----
+> From: Eric B?nard [mailto:eric at eukrea.com]
+> Sent: Wednesday, October 13, 2010 6:10 PM
+> To: Wolfram Sang
+> Cc: Zhu Richard-R65037; Arnaud Patard; linux-mmc at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 0/6] SD/MMC driver for MX25/35/51
+> 
+> Hi Wolfram,
+> 
+> Le 13/10/2010 12:06, Wolfram Sang a ?crit :
+> > great to have you back! Did you have the chance to test my latest
+> > patch-series? And can you help Eric with the comments for the
+> > clock-calculation on MX51?
+> >
+> that's solved in the latest version of the patch (and the max value
+> checks in the function were improved at the same time).
+> 
+> Eric
