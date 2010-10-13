@@ -1,112 +1,91 @@
 From: Jiri.Pinkava@vscht.cz (Jiri.Pinkava at vscht.cz)
-Date: Wed, 13 Oct 2010 09:56:22 +0200
-Subject: [PATCH 6/6] n35: Add LCD backlight regulation on Acer n35
+Date: Wed, 13 Oct 2010 09:56:19 +0200
+Subject: [PATCH 3/6] n30: Clean up UARTs configuration
 In-Reply-To: <4CA91E6F.3010704@vscht.cz>
 References: <4CA91E6F.3010704@vscht.cz>
-Message-ID: <1286956582-15586-6-git-send-email-jiri.pinkava@vscht.cz>
+Message-ID: <1286956582-15586-3-git-send-email-jiri.pinkava@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Just replace numeric constatns with macros in style used in other platforms.
+Define missing macros for UART register configuration.
+
+
 Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
 ---
- arch/arm/mach-s3c2410/mach-n30.c |   71 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 71 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/mach-n30.c                 |   28 +++++++++++++++-------
+ arch/arm/plat-samsung/include/plat/regs-serial.h |    3 ++
+ 2 files changed, 22 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
-index be5235d..4199143 100644
+index abbb9b5..895e1e9a 100644
 --- a/arch/arm/mach-s3c2410/mach-n30.c
 +++ b/arch/arm/mach-s3c2410/mach-n30.c
-@@ -23,6 +23,7 @@
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-+#include <linux/pwm_backlight.h>
- #include <linux/serial_core.h>
- #include <linux/timer.h>
- #include <linux/io.h>
-@@ -369,6 +370,74 @@ static struct s3c2410fb_mach_info n30_fb_info __initdata = {
- 	.lpcsel		= 0x06,
+@@ -55,32 +55,42 @@ static struct map_desc n30_iodesc[] __initdata = {
+ 	/* nothing here yet */
  };
  
-+static int n35_backlight_init(struct device *dev)
-+{
-+	int ret;
++#define UCON	(S3C2410_UCON_DEFAULT | \
++		 S3C2443_UCON_RXERR_IRQEN)
 +
-+	ret = gpio_request(S3C2410_GPB(0), "Backlight PWM output");
-+	if (ret)
-+		goto request_gpb0_fail;
-+	ret = gpio_request(S3C2410_GPB(1), "Backlight power");
-+	if (ret)
-+		goto request_gpb1_fail;
++#define ULCON	(S3C2410_LCON_CS8 | \
++		 S3C2410_LCON_PNONE)
 +
-+	/* set GPB0 as output of PWM timer */
-+	gpio_set_value(S3C2410_GPB(0), 0);
-+	s3c_gpio_setpull(S3C2410_GPB(0), S3C_GPIO_PULL_DOWN);
-+	s3c_gpio_cfgpin(S3C2410_GPB(0), S3C2410_GPB0_TOUT0);
++#define UFCON	(S3C2410_UFCON_FIFOMODE | \
++		 S3C2410_UFCON_RXTRIG8 | \
++		 S3C2410_UFCON_TXTRIG4)
 +
-+	/* backlight power */
-+	ret = gpio_direction_output(S3C2410_GPB(1), 1);
-+	if (ret)
-+		goto direction_gpb1_fail;
-+	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
-+
-+	return 0;
-+
-+direction_gpb1_fail:
-+	gpio_free(S3C2410_GPB(1));
-+request_gpb1_fail:
-+	gpio_free(S3C2410_GPB(0));
-+request_gpb0_fail:
-+	return ret;
-+}
-+
-+static int n35_backlight_notify(struct device *dev, int brightness)
-+{
-+	/* power off backlight, values less than 14 are useless */
-+	gpio_set_value(S3C2410_GPB(1), brightness > 14 ? 1 : 0);
-+	return (brightness > 14 ? brightness : 0);
-+}
-+
-+static void n35_backlight_exit(struct device *dev)
-+{
-+	gpio_direction_output(S3C2410_GPB(0), 0);
-+	gpio_free(S3C2410_GPB(0));
-+
-+	gpio_set_value(S3C2410_GPB(1), 0);
-+	s3c_gpio_setpull(S3C2410_GPB(1), S3C_GPIO_PULL_UP);
-+	gpio_free(S3C2410_GPB(1));
-+}
-+
-+static struct platform_pwm_backlight_data backlight_data = {
-+	.pwm_id         = 0,
-+	.max_brightness = 100,
-+	.dft_brightness = 50,
-+	.pwm_period_ns  = 3*1000*1000,
-+	.init           = n35_backlight_init,
-+	.notify         = n35_backlight_notify,
-+	.exit           = n35_backlight_exit,
-+};
-+
-+static struct platform_device n35_backlight = {
-+	.name = "pwm-backlight",
-+	.dev  = {
-+		.parent = &s3c_device_timer[0].dev,
-+		.platform_data = &backlight_data,
-+	},
-+	.id   = -1,
-+};
-+
- static void n30_sdi_set_power(unsigned char power_mode, unsigned short vdd)
- {
- 	switch (power_mode) {
-@@ -416,6 +485,8 @@ static struct platform_device *n35_devices[] __initdata = {
- 	&s3c_device_sdi,
- 	&s3c_device_adc,
- 	&s3c_device_ts,
-+	&s3c_device_timer[0],
-+	&n35_backlight,
- 	&n35_button_device,
- 	&n35_blue_led,
- 	&n35_warning_led,
+ static struct s3c2410_uartcfg n30_uartcfgs[] = {
+ 	/* Normal serial port */
+ 	[0] = {
+ 		.hwport	     = 0,
+ 		.flags	     = 0,
+-		.ucon	     = 0x2c5,
+-		.ulcon	     = 0x03,
+-		.ufcon	     = 0x51,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON,
++		.ufcon	     = UFCON,
+ 	},
+ 	/* IR port */
+ 	[1] = {
+ 		.hwport	     = 1,
+ 		.flags	     = 0,
+ 		.uart_flags  = UPF_CONS_FLOW,
+-		.ucon	     = 0x2c5,
+-		.ulcon	     = 0x43,
+-		.ufcon	     = 0x51,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON | S3C2410_LCON_IRM,
++		.ufcon	     = UFCON,
+ 	},
+ 	/* On the N30 the bluetooth controller is connected here.
+ 	 * On the N35 and variants the GPS receiver is connected here. */
+ 	[2] = {
+ 		.hwport	     = 2,
+ 		.flags	     = 0,
+-		.ucon	     = 0x2c5,
+-		.ulcon	     = 0x03,
+-		.ufcon	     = 0x51,
++		.ucon	     = UCON,
++		.ulcon	     = ULCON,
++		.ufcon	     = UFCON,
+ 	},
+ };
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/regs-serial.h b/arch/arm/plat-samsung/include/plat/regs-serial.h
+index 788837e..c64beca 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-serial.h
++++ b/arch/arm/plat-samsung/include/plat/regs-serial.h
+@@ -114,6 +114,9 @@
+ 
+ #define S3C2410_UFCON_FIFOMODE	  (1<<0)
+ #define S3C2410_UFCON_TXTRIG0	  (0<<6)
++#define S3C2410_UFCON_TXTRIG4	  (1<<6)
++#define S3C2410_UFCON_TXTRIG8	  (2<<6)
++#define S3C2410_UFCON_TXTRIG12	  (3<<6)
+ #define S3C2410_UFCON_RXTRIG8	  (1<<4)
+ #define S3C2410_UFCON_RXTRIG12	  (2<<4)
+ 
 -- 
 1.7.3.1
