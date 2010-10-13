@@ -1,60 +1,119 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 13 Oct 2010 11:59:51 +0000
-Subject: [PATCH 4/5] hwmon: DNS323 rev C1 fan support
-In-Reply-To: <1274525694.1931.142.camel@pasglop>
-References: <1274525694.1931.142.camel@pasglop>
-Message-ID: <20101013115951.GA5649@kw.sim.vm.gnt>
+From: EXT-Eugeny.Kuznetsov@nokia.com (Evgeny Kuznetsov)
+Date: Wed, 13 Oct 2010 16:09:18 +0400
+Subject: [PATCHv2 1/1] omap: Ptr "isr_reg" tracked as NULL was dereferenced
+In-Reply-To: <EAF47CD23C76F840A9E7FCE10091EFAB030D099B87@dbde02.ent.ti.com>
+References: <cover.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+	<7bb69801f49283c3bde78aa008c15308ac8a5fbf.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D099AFD@dbde02.ent.ti.com>
+	<1286970199.12782.28.camel@ekuznets-lx-nokia>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D099B87@dbde02.ent.ti.com>
+Message-ID: <1286971758.12782.35.camel@ekuznets-lx-nokia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
-
-What is the status for the DNS323 fan support ?
-Have this patch been merged yet ?
-
-I am currently looking to add hwmon support for the GPIO fan found
-on Network Space Max v2 boards. Obviously, some attributes are shared
-with the DNS323 fan. Maybe there is some room for a generic GPIO fan
-driver ?
-
-Platform data could provide the board specific GPIO pinout and a speed
-conversion array (rpm from/to GPIO value). Here is a proposal for this
-platform data interface:
-
-struct gpio_fan {
-        const char      *name;
-        unsigned        gpio;
-        unsigned        active_low;
-};
-
-struct gpio_fan_speed {
-        int value;
-        int rpm;
-};
-
-struct gpio_fan_platform_data {
-        struct gpio_fan         *alarm; /* fan alarm GPIO. */
-        struct gpio_fan         *ctrl;  /* fan control GPIOs. */
-        int                     num_ctrl;
-        /*
-         * Speed conversion array: rpm from/to GPIO bit field.
-         * This array _must_ be sorted in ascending rpm order.
-         */
-        struct gpio_fan_speed   *speed;
-        int                     num_speed;
-};
-
-Based on this informations the GPIO fan driver could perform the
-speed conversions (pwm, rpm, GPIO value) and then provide a hwmon
-interface.
-
-Thanks for advice.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101013/4327f1b5/attachment.sig>
+On Wed, 2010-10-13 at 17:20 +0530, ext Varadarajan, Charulatha wrote:
+> 
+> <<snip>>
+> 
+> > > >
+> > > > From: Evgeny Kuznetsov <ext-eugeny.kuznetsov@nokia.com>
+> > > >
+> > > > Value of "isr_reg" pointer is depend on configuration and GPIO method.
+> > > > Potentially it may have NULL value and it is dereferenced later
+> > > > in code. If pointer is NULL there is some kernel issue.
+> > >
+> > > Can you elaborate?
+> > "isr_reg" should not be NULL. But if it is NULL then there is kernel
+> > bug. And WARN_ON() used to show it.
+> > I did not see this bug, this is potentially may happen.
+> > >
+> > > > Warning and exit from function are added in this case.
+> > > > Also compilation check is added for correct architecture
+> > > > configuration.
+> > > >
+> > > > Signed-off-by: Evgeny Kuznetsov <EXT-Eugeny.Kuznetsov@nokia.com>
+> > > > ---
+> > > >  arch/arm/plat-omap/gpio.c |   18 ++++++++++++++++++
+> > > >  1 files changed, 18 insertions(+), 0 deletions(-)
+> > > >
+> > > > diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+> > > > index c05c653..d04913c 100644
+> > > > --- a/arch/arm/plat-omap/gpio.c
+> > > > +++ b/arch/arm/plat-omap/gpio.c
+> > > > @@ -1318,6 +1318,23 @@ static void gpio_irq_handler(unsigned int irq,
+> > > > struct irq_desc *desc)
+> > > >  	if (bank->method == METHOD_GPIO_44XX)
+> > > >  		isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
+> > > >  #endif
+> > > > +
+> > > > +#if !defined(CONFIG_ARCH_OMAP1) &&		\
+> > > > +		!defined(CONFIG_ARCH_OMAP15XX) &&	\
+> > > > +		!defined(CONFIG_ARCH_OMAP16XX) &&	\
+> > > > +		!defined(CONFIG_ARCH_OMAP730) &&	\
+> > > > +		!defined(CONFIG_ARCH_OMAP850) &&	\
+> > > > +		!defined(CONFIG_ARCH_OMAP2) &&	\
+> > > > +		!defined(CONFIG_ARCH_OMAP3) &&	\
+> > > > +		!defined(CONFIG_ARCH_OMAP4)
+> > > > +
+> > > > +#error "Incorrect arch configuration"
+> > >
+> > > This is not required. If the architecture is not one of the above
+> > > mentioned, gpio_irq_handler() will not be used/called at all.
+> > This could be removed.
+> > 
+> > > Also all the possible gpio methods for a given OMAP architecture are
+> > > already considered with "#ifdef"s and (bank->method) checks in
+> > > gpio_irq_handler().
+> > It is not cover all cased, e.g. for OMAP4 arch:
+> > ....
+> > 	#if defined(CONFIG_ARCH_OMAP4)
+> > 		if (bank->method == METHOD_GPIO_44XX)
+> > 			isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
+> > 	#endif
+> > .....
+> > 
+> > If (bank->method != METHOD_GPIO_44XX) then isr_reg will be NULL.
+> > This should not happen, but potentially may have place.
+> 
+> When would it fail? If it is CONFIG_ARCH_OMAP4, the gpio method can
+> only be METHOD_GPIO_44XX. Else if it is for some other OMAP architecture,
+> the gpio_method is similarly taken care. So this cannot happen.
+This is similar check as e.g. in _enable_gpio_irqbank() there default
+case for bank->methos switch is WARN_ON(1).
+Just to warn in case.
+> 
+> > 
+> > >
+> > > > +
+> > > > +#endif
+> > > > +
+> > > > +	if (WARN_ON(!isr_reg))
+> > > > +		goto exit;
+> > >
+> > > For the above mentioned reason, this isr_reg would be non-NULL. Have
+> > > you observed this error anytime?
+> > I did not see this bug, this is potentially may happen.
+> > >
+> > > Also, the omap-gpio code has similar code spread all over and has to be
+> > > anyway cleaned-up. Is there any reason why gpio_irq_handler() alone is
+> > > addressed in this patch?
+> > Here "isr_reg" is used later in code and may cause oops if it is NULL.
+> > >
+> > > > +
+> > > >  	while(1) {
+> > > >  		u32 isr_saved, level_mask = 0;
+> > > >  		u32 enabled;
+> > > > @@ -1377,6 +1394,7 @@ static void gpio_irq_handler(unsigned int irq,
+> > > > struct irq_desc *desc)
+> > > >  	configured, we must unmask the bank interrupt only after
+> > > >  	handler(s) are executed in order to avoid spurious bank
+> > > >  	interrupt */
+> > > > +exit:
+> > > >  	if (!unmasked)
+> > > >  		desc->chip->unmask(irq);
+> > > >
+> > > > --
+> > > > 1.6.3.3
+> > >
+> > 
+> 
