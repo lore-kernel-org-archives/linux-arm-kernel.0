@@ -1,49 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 13 Oct 2010 16:00:55 -0400 (EDT)
-Subject: [PATCH] sdio: fix suspend/resume regression
-In-Reply-To: <AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
-References: <1286788315.3101.11.camel@sven>
-	<1286955116-22793-1-git-send-email-ohad@wizery.com>
-	<AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1010131559580.2764@xanadu.home>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Wed, 13 Oct 2010 13:00:55 -0700
+Subject: [PATCH] serial: DCC(JTAG) serial and console emulation support
+In-Reply-To: <alpine.LFD.2.00.1010131551390.2764@xanadu.home>
+References: <1286305668-19987-1-git-send-email-dwalker@codeaurora.org>
+	<201010131721.39623.arnd@arndb.de>
+	<1286986623.28336.3.camel@c-dwalke-linux.qualcomm.com>
+	<201010131944.54135.arnd@arndb.de>
+	<1286993315.28336.10.camel@c-dwalke-linux.qualcomm.com>
+	<alpine.LFD.2.00.1010131551390.2764@xanadu.home>
+Message-ID: <1287000055.28336.19.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Oct 2010, Vitaly Wool wrote:
-
-> Hi Ohad,
+On Wed, 2010-10-13 at 15:55 -0400, Nicolas Pitre wrote:
+> > I found it independently actually .. It looks like there's at least two
+> > problems. This jtag driver has a status register which flags when RX is
+> > available, and TX is possible. I'm not sure this status register fits
+> > into the model. The other thing is that we have a ttyJ registered for
+> > this driver, and it would be nice to use that over something like ttyHVC
+> > (I'm not sure if that name is correct, just a guess).
 > 
-> On Wed, Oct 13, 2010 at 9:31 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> 
-> > diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> > index c94565d..515ff39 100644
-> > --- a/drivers/mmc/core/core.c
-> > +++ b/drivers/mmc/core/core.c
-> > @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
-> > ? ? ? ?if (host->bus_ops && !host->bus_dead) {
-> > ? ? ? ? ? ? ? ?if (host->bus_ops->suspend)
-> > ? ? ? ? ? ? ? ? ? ? ? ?err = host->bus_ops->suspend(host);
-> > + ? ? ? ? ? ? ? if (err == -ENOSYS || !host->bus_ops->resume) {
-> > + ? ? ? ? ? ? ? ? ? ? ? /*
-> > + ? ? ? ? ? ? ? ? ? ? ? ?* We simply "remove" the card in this case.
-> > + ? ? ? ? ? ? ? ? ? ? ? ?* It will be redetected on resume.
-> > + ? ? ? ? ? ? ? ? ? ? ? ?*/
-> > + ? ? ? ? ? ? ? ? ? ? ? if (host->bus_ops->remove)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->bus_ops->remove(host);
-> > + ? ? ? ? ? ? ? ? ? ? ? mmc_claim_host(host);
-> > + ? ? ? ? ? ? ? ? ? ? ? mmc_detach_bus(host);
-> > + ? ? ? ? ? ? ? ? ? ? ? mmc_release_host(host);
-> > + ? ? ? ? ? ? ? ? ? ? ? host->pm_flags = 0;
-> > + ? ? ? ? ? ? ? ? ? ? ? err = 0;
-> > + ? ? ? ? ? ? ? }
-> > ? ? ? ?}
-> > ? ? ? ?mmc_bus_put(host);
-> >
-> 
-> what about moving this logic to sdio bus_ops as this seems to be
-> completely specific to sdio right now?
+> Really?  Is there a compelling reason to perpetuate this serial device 
+> namespace fragmentation nonsense?  Your initial patch even had a config 
+> option to hijack /dev/ttyS0 because of that.
 
-It doesn't have to.
+I'm not sure how to interpret what your saying .. Are you saying we
+should use /dev/hvcX or shouldn't ? the reason I want to use ttyJ is
+because it was assigned specifically for jtags which, to me, makes
+things a lot less confusing.
 
+Daniel
 
-Nicolas
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
