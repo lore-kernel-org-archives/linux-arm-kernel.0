@@ -1,62 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 13 Oct 2010 11:03:57 +0200
-Subject: [PATCH] serial/imx: check that the buffer is non-empty before sending
-	it out
-In-Reply-To: <20101008091640.GD29673@pengutronix.de>
-References: <20101008091640.GD29673@pengutronix.de>
-Message-ID: <1286960637-11600-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Wed, 13 Oct 2010 11:06:51 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <AANLkTimTSPU3pzDscG3TSaqs45Q=eGEaqiDmk9AYyuY_@mail.gmail.com>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+	<AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
+	<AANLkTimTSPU3pzDscG3TSaqs45Q=eGEaqiDmk9AYyuY_@mail.gmail.com>
+Message-ID: <AANLkTi=oM6bzga1HffOxZ6_T7yjSNi5RTCZtTFd4r=7j@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Volker Ernst <volker.ernst@txtr.com>
+On Wed, Oct 13, 2010 at 10:55 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Vitaly,
+>
+> On Wed, Oct 13, 2010 at 9:54 AM, Vitaly Wool <vitalywool@gmail.com> wrote:
+>> what about moving this logic to sdio bus_ops as this seems to be
+>> completely specific to sdio right now?
+>
+> I actually prefer not to have any SDIO-specific logic of that kind at
+> all, and instead, to use the logic we already have in mmc_pm_notify
+> for all types of MMC buses.
 
-The .start_tx callback (imx_start_tx here) isn't only called when the
-buffer is non-empty.  E.g. after resume or when handshaking is enabled
-and the other side starts to signal being ready.
+I don't really see the point. Instead of having SDIO-specific handling
+in the SDIO specific code, we're trying to address SDIO specific
+corner cases elsewhere. What's the rationale?
 
-So check for an empty puffer already before sending the first character.
-This prevents sending out stale (or uninitialised) data.
-
-Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
-Signed-off-by: Daniel Mack <daniel@caiaq.de>
-Cc: Andy Green <andy@warmcat.com>
-[ukl: reword commit log, put check in while condition]
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-as I didn't sent a patch, here comes my current version.  Don't know if
-it makes it easier to test for you ...
-
-I faked Daniel's SoB as Andrew said he did, compressed the changelog a
-bit and put the check in the while condition as I suggested.
-
-Best regards
-Uwe
-
- drivers/serial/imx.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
-index 66ecc7a..dfcf4b1 100644
---- a/drivers/serial/imx.c
-+++ b/drivers/serial/imx.c
-@@ -327,14 +327,13 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
- {
- 	struct circ_buf *xmit = &sport->port.state->xmit;
- 
--	while (!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
-+	while (!uart_circ_empty(xmit) &&
-+			!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
- 		/* send xmit->buf[xmit->tail]
- 		 * out the port here */
- 		writel(xmit->buf[xmit->tail], sport->port.membase + URTX0);
- 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
- 		sport->port.icount.tx++;
--		if (uart_circ_empty(xmit))
--			break;
- 	}
- 
- 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
--- 
-1.7.2.3
+Thanks,
+   Vitaly
