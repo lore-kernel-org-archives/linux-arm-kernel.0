@@ -1,44 +1,50 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Wed, 13 Oct 2010 09:54:29 +0200
-Subject: [PATCH] sdio: fix suspend/resume regression
-In-Reply-To: <1286955116-22793-1-git-send-email-ohad@wizery.com>
-References: <1286788315.3101.11.camel@sven>
-	<1286955116-22793-1-git-send-email-ohad@wizery.com>
-Message-ID: <AANLkTiki_Sky6pry+vWAoTtJ5ctVUpawAH6iRYV6L-+z@mail.gmail.com>
+From: Jiri.Pinkava@vscht.cz (Jiri.Pinkava at vscht.cz)
+Date: Wed, 13 Oct 2010 09:56:17 +0200
+Subject: [PATCH 1/6] n35: fix key codes
+In-Reply-To: <4CA91E6F.3010704@vscht.cz>
+References: <4CA91E6F.3010704@vscht.cz>
+Message-ID: <1286956582-15586-1-git-send-email-jiri.pinkava@vscht.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Power is ordinary button, marking as type EV_POWER is incorrect.
 
-On Wed, Oct 13, 2010 at 9:31 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+About KEY_DOWN, someone just copied the code and forgot to asociate proper
+keycodes. (Descriptions are correct, keycodes are not.)
 
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index c94565d..515ff39 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
-> ? ? ? ?if (host->bus_ops && !host->bus_dead) {
-> ? ? ? ? ? ? ? ?if (host->bus_ops->suspend)
-> ? ? ? ? ? ? ? ? ? ? ? ?err = host->bus_ops->suspend(host);
-> + ? ? ? ? ? ? ? if (err == -ENOSYS || !host->bus_ops->resume) {
-> + ? ? ? ? ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ? ? ? ? ?* We simply "remove" the card in this case.
-> + ? ? ? ? ? ? ? ? ? ? ? ?* It will be redetected on resume.
-> + ? ? ? ? ? ? ? ? ? ? ? ?*/
-> + ? ? ? ? ? ? ? ? ? ? ? if (host->bus_ops->remove)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? host->bus_ops->remove(host);
-> + ? ? ? ? ? ? ? ? ? ? ? mmc_claim_host(host);
-> + ? ? ? ? ? ? ? ? ? ? ? mmc_detach_bus(host);
-> + ? ? ? ? ? ? ? ? ? ? ? mmc_release_host(host);
-> + ? ? ? ? ? ? ? ? ? ? ? host->pm_flags = 0;
-> + ? ? ? ? ? ? ? ? ? ? ? err = 0;
-> + ? ? ? ? ? ? ? }
-> ? ? ? ?}
-> ? ? ? ?mmc_bus_put(host);
->
 
-what about moving this logic to sdio bus_ops as this seems to be
-completely specific to sdio right now?
+Signed-off-by: Jiri Pinkava <jiri.pinkava@vscht.cz>
+---
+ arch/arm/mach-s3c2410/mach-n30.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-Thanks,
-   Vitaly
+diff --git a/arch/arm/mach-s3c2410/mach-n30.c b/arch/arm/mach-s3c2410/mach-n30.c
+index 41f299d..e732619 100644
+--- a/arch/arm/mach-s3c2410/mach-n30.c
++++ b/arch/arm/mach-s3c2410/mach-n30.c
+@@ -174,7 +174,6 @@ static struct gpio_keys_button n35_buttons[] = {
+ 	{
+ 		.gpio		= S3C2410_GPF(0),
+ 		.code		= KEY_POWER,
+-		.type		= EV_PWR,
+ 		.desc		= "Power",
+ 		.active_low	= 0,
+ 		.wakeup		= 1,
+@@ -193,13 +192,13 @@ static struct gpio_keys_button n35_buttons[] = {
+ 	},
+ 	{
+ 		.gpio		= S3C2410_GPG(6),
+-		.code		= KEY_DOWN,
++		.code		= KEY_LEFT,
+ 		.desc		= "Joystick Left",
+ 		.active_low	= 0,
+ 	},
+ 	{
+ 		.gpio		= S3C2410_GPG(5),
+-		.code		= KEY_DOWN,
++		.code		= KEY_RIGHT,
+ 		.desc		= "Joystick Right",
+ 		.active_low	= 0,
+ 	},
+-- 
+1.7.3.1
