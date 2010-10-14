@@ -1,20 +1,24 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 14 Oct 2010 11:56:45 +0200
-Subject: [PATCH] mach-cpuimx27: workaround USB PHY detection problem
-Message-ID: <1287050205-15026-1-git-send-email-eric@eukrea.com>
+Date: Thu, 14 Oct 2010 12:07:19 +0200
+Subject: [PATCH v2] mach-cpuimx27: workaround USB PHY detection problem
+In-Reply-To: <1287050205-15026-1-git-send-email-eric@eukrea.com>
+References: <1287050205-15026-1-git-send-email-eric@eukrea.com>
+Message-ID: <1287050839-15175-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
- arch/arm/mach-imx/mach-cpuimx27.c |   58 +++++++++++++++++++++++++++---------
- 1 files changed, 43 insertions(+), 15 deletions(-)
+v2 : should run checkpatch before sending v1 patch ;-)
+
+ arch/arm/mach-imx/mach-cpuimx27.c |   60 +++++++++++++++++++++++++++---------
+ 1 files changed, 45 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index ea62afa..f740582 100644
+index ea62afa..5d40c27 100644
 --- a/arch/arm/mach-imx/mach-cpuimx27.c
 +++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -215,13 +215,56 @@ static struct platform_device serial_device = {
+@@ -215,13 +215,58 @@ static struct platform_device serial_device = {
  };
  #endif
  
@@ -43,14 +47,16 @@ index ea62afa..f740582 100644
 + * special init sequence which workarounds USBH2 USB PHY detection problems
 + * when both H2 and OTG port are configured as hosts
 + */
-+static int usbh2_phy_init(struct platform_device *pdev) {
++static int usbh2_phy_init(struct platform_device *pdev)
++{
 +	uint32_t temp;
 +
 +	if (otg_mode_host) {
 +		/* configure USBCTRL */
 +		temp = readl(MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x600);
 +		temp &= ~((3 << 21) | 1);
-+		temp |= (1 << 5) | (1 << 16) | (1 << 19) | (1 << 11)| (1 << 20);
++		temp |= (1 << 5) | (1 << 16) | (1 << 19)
++				 | (1 << 11) | (1 << 20);
 +		writel(temp, MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x600);
 +
 +		/* configure PORTSC1 */
@@ -71,7 +77,7 @@ index ea62afa..f740582 100644
  	.portsc	= MXC_EHCI_MODE_ULPI,
  	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
  };
-@@ -232,21 +275,6 @@ static struct fsl_usb2_platform_data otg_device_pdata = {
+@@ -232,21 +277,6 @@ static struct fsl_usb2_platform_data otg_device_pdata = {
  	.phy_mode       = FSL_USB2_PHY_ULPI,
  };
  
