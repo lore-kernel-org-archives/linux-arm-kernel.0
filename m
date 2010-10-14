@@ -1,38 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 14 Oct 2010 08:30:01 +0200
-Subject: mx35pdk lan911x support
-In-Reply-To: <AANLkTi=aTdbj8bjo3i1wRxG03rbh=kUwLTYPvTESLqpT@mail.gmail.com>
-References: <AANLkTi=aTdbj8bjo3i1wRxG03rbh=kUwLTYPvTESLqpT@mail.gmail.com>
-Message-ID: <20101014063001.GA6747@pengutronix.de>
+From: thomas.nemeth@betatech.fr (Thomas Nemeth)
+Date: Thu, 14 Oct 2010 09:59:20 +0200
+Subject: mx31: external abort on non-linefetch (debugging suspend to RAM)
+In-Reply-To: <AANLkTins2JeaetXfA37WgzH2He8hd2z2fKxrMkfxK4HQ@mail.gmail.com>
+References: <201010121159.57222.thomas.nemeth@betatech.fr>
+	<AANLkTins2JeaetXfA37WgzH2He8hd2z2fKxrMkfxK4HQ@mail.gmail.com>
+Message-ID: <201010140959.20713.thomas.nemeth@betatech.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Xiao (hoping this is the part of your name corresponding to your
-first name),
+Le jeudi 14 octobre 2010, Xinyu Chen a ?crit?:
+> On Tue, Oct 12, 2010 at 5:59 PM, Thomas Nemeth
+>
+> <thomas.nemeth@betatech.fr> wrote:
+> > # insight -D ./iMX31-regs.defs -R CCMR
+> > Unhandled fault: external abort on non-linefetch (0x008) at
+> > 0x40000000 Bus error
+> >
+> > ? ?On the MX31ADS the result is the following one :
+> > mx31# ./insight -D iMX31-regs.defs -R CCMR
+> > CCMR: 0x074B097D
+>
+> Hi Thomas
 
-On Thu, Oct 14, 2010 at 12:06:25AM -0400, xiao jiang wrote:
-> I saw the mach-mx35_3ds.c  are come from you, so  I think you are the right
-> person to answer my queston, :).
-It was me, who renamed the file and touched it a few times when cleaning
-up and reorganising things for the i.MX machines.  Initially it was
-Fabio Estevam who brought the machine into mainline.
+    Hi !
 
-I suggest you ask on the linux-arm-kernel mailing (added to Cc:).
 
-> I tried the newest kernel(2.6.36.rc7) to boot mx35pdk board, and selected
-> lan911x  not fec as the ethernet port,
-> but I failed boot it because the ethernet problem.
-> 
-> My question is for mx35pdk the kernel support boot from lan911x?
-I lost my crystal ball and will only find it next week.  So I'm unable
-to see the exact cause of the error.  You might want to follow up with
-the kernel boot log and your adaptions to mach-mx35_3ds.c.  You seem not
-to have an original 3ds machine, so I'd suggest you register your own
-machine type for it.
+> The exception is caused by you accessing the 0x40000000 which has
+> been remapped as peripheral port memory in bootloader.
 
-Best regards
-Uwe
+    I'll have a look at 0x40000000 mapping in uboot. However, CCMR
+    is located at 0x53F80000 and that's what I ask mmap to remap.
+    How can a map request of 0x53F80000 trying to access 0x40000000 ?
 
+    Is it a symptom that can explain my problems with suspend-to-ram ?
+
+
+> As it's mapped, you can not access it by non privileged user.
+
+    You mean "from user land" (instead of "from kernel space") ?
+
+
+> Please check the c15, c2, 4 coprocessor register settings in
+> bootloader.
+>
+> Thanks!
+
+    Thanks to you :)
+
+
+Thomas.
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Nemeth - Ing?nieur d'?tudes en Informatique Industrielle
+? ? ? ? ? ? ? ? Industrial Computing Software Designer
+BETAtech - 15, rue Apollo, Z.A. de Montredon, 31240, L'Union.
+05 34 30 40 00 (standard) ?/ ?05 34 30 40 09 (ligne directe)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 189 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101014/6978eccc/attachment.sig>
