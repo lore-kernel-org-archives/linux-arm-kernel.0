@@ -1,98 +1,103 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 14 Oct 2010 10:57:43 +0900
-Subject: [PATCH v2 2/2] ARM: S5PV210: Add init code of audio to Goni and Auqila
-	board
-Message-ID: <4CB66397.3090505@samsung.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 14 Oct 2010 03:24:40 +0100
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <1286955116-22793-1-git-send-email-ohad@wizery.com>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+Message-ID: <20101014022440.GD3553@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ohad,
 
-This patch add initialization code of audio and I2S platform drivers
-to Goni and Aquila board.
+On Wed, Oct 13, 2010 at 09:31:56AM +0200, Ohad Ben-Cohen wrote:
+> Fix SDIO suspend/resume regression introduced by
+> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related to
+> mmc/sd card insert/removal during suspend/resume":
+> 
+> [ 5647.295953] PM: Syncing filesystems ... done.
+> [ 5647.318792] Freezing user space processes ... (elapsed 0.01 seconds) done.
+> [ 5647.337048] Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+> [ 5647.356915] Suspending console(s) (use no_console_suspend to debug)
+> [ 5647.366651] pm_op(): platform_pm_suspend+0x0/0x5c returns -38
+> [ 5647.366671] PM: Device pxa2xx-mci.0 failed to suspend: error -38
+> [ 5647.367082] PM: Some devices failed to suspend
+> 
+> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e moved the card removal/insertion
+> mechanism out of MMC's suspend/resume path and into pm notifiers
+> (mmc_pm_notify), and that broke SDIO's expectation that mmc_suspend_host()
+> will remove the card, and squash the error, in case -ENOSYS is returned
+> from the bus suspend handler (mmc_sdio_suspend() in this case).
+> 
+> mmc_sdio_suspend() is using this whenever at least one of the card's SDIO
+> function drivers does not have suspend/resume handlers - in that case
+> it is agreed to force removal of the entire card.
+> 
+> This patch fixes this regression by trivially bringing back that part of
+> mmc_suspend_host(), which was removed by 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e.
+> 
+> Reported-and-tested-by: Sven Neumann <s.neumann@raumfeld.com>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Maxim Levitsky <maximlevitsky@gmail.com>
+> Cc: <stable@kernel.org>
+> --
+> 
+> It may still be desired to further clean this area up by using the card
+> removal mechanism in mmc_pm_notify() for SDIO as well.
+> 
+> To use mmc_pm_notify's card-removal code also for SDIO, we need it
+> to check if all the SDIO functions have suspend handlers. That
+> would probably make us add a new bus_ops handler (something like
+> host->bus_ops->remove_card_on_suspend ?).
+> 
+> It's starting to get a bit complicated though, and I'm not sure it
+> would make the code a lot more readable.
+> 
+> In addition, this would still not work for drivers like libertas sdio,
+> which do have a suspend handler, but sometimes let it return -ENOSYS,
+> expecting mmc_suspend_host() to remove the card and squash the error.
+> For those cases, we still need the old card-removal logic in mmc_suspend_host().
+> 
+> This brings up a question whether libertas_sdio really needs this
+> functionality; When MMC_PM_KEEP_POWER is not needed, can't it just return 0
+> (and as a result the card will be powered down, but not removed) ?
+> 
+> Until we have an agreement on this, I suggest we at least fix the
+> regression with this patch.
+> 
+> Thanks Sven Neumann for reporting and testing the issue and this patch.
+> 
+>  drivers/mmc/core/core.c |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index c94565d..515ff39 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+>  	if (host->bus_ops && !host->bus_dead) {
+>  		if (host->bus_ops->suspend)
+>  			err = host->bus_ops->suspend(host);
+> +		if (err == -ENOSYS || !host->bus_ops->resume) {
+> +			/*
+> +			 * We simply "remove" the card in this case.
+> +			 * It will be redetected on resume.
+> +			 */
+> +			if (host->bus_ops->remove)
+> +				host->bus_ops->remove(host);
+> +			mmc_claim_host(host);
+> +			mmc_detach_bus(host);
+> +			mmc_release_host(host);
+> +			host->pm_flags = 0;
+> +			err = 0;
+> +		}
+>  	}
+>  	mmc_bus_put(host);
+>  
+> -- 
 
-Signed-off-by : Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by : Joonyoung Shim <jy0922.shim@samsung.com>
-Signed-off-by : Kyungmin Park <kyungmin.park@samsung.com>
-Reviewed-by : Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s5pv210/mach-aquila.c |   24 ++++++++++++++++++++++++
- arch/arm/mach-s5pv210/mach-goni.c   |   11 +++++++++++
- 2 files changed, 35 insertions(+), 0 deletions(-)
+Thanks very much, I've applied this to mmc-next with Nicolas' ACK.
 
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 0663ec4..a232937 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -507,8 +507,31 @@ static struct platform_device *aquila_devices[] __initdata = {
- 	&s5p_device_fimc0,
- 	&s5p_device_fimc1,
- 	&s5p_device_fimc2,
-+	&s5pv210_device_iis0,
- };
- 
-+static void __init aquila_sound_init(void)
-+{
-+	unsigned int gpio;
-+
-+	/* CODEC_XTAL_EN 
-+	 *
-+	 * The Aquila board have a oscillator which provide main clock
-+	 * to WM8994 codec. The oscillator provide 24MHz clock to WM8994
-+	 * clock. Set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
-+	 * */
-+	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
-+	gpio_request(gpio, "CODEC_XTAL_EN");
-+	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
-+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-+
-+	/* Ths main clock of WM8994 codec uses the output of CLKOUT pin.
-+	 * The CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS) 
-+	 * because it needs 24MHz clock to operate WM8994 codec.
-+	 */
-+	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
-+}
-+
- static void __init aquila_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -530,6 +553,7 @@ static void __init aquila_machine_init(void)
- 	s3c_fimc_setname(2, "s5p-fimc");
- 
- 	/* SOUND */
-+	aquila_sound_init();
- 	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
- 			ARRAY_SIZE(i2c_gpio5_devs));
- 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index df5c2d1..63855c5 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -488,8 +488,18 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&s3c_device_hsmmc0,
- 	&s3c_device_hsmmc1,
- 	&s3c_device_hsmmc2,
-+	&s5pv210_device_iis0,
- };
- 
-+static void __init goni_sound_init(void)
-+{
-+	/* Ths main clock of WM8994 codec uses the output of CLKOUT pin.
-+	 * The CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS) 
-+	 * because it needs 24MHz clock to operate WM8994 codec.
-+	 */
-+	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
-+}
-+
- static void __init goni_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -507,6 +517,7 @@ static void __init goni_machine_init(void)
- 	goni_setup_sdhci();
- 
- 	/* SOUND */
-+	goni_sound_init();
- 	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
- 			ARRAY_SIZE(i2c_gpio5_devs));
- 
 -- 
-1.7.0.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
