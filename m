@@ -1,68 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Oct 2010 18:18:27 +0100
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <AANLkTinsQVvoxeNGO6ToyKnFTdA=GfjdoY2yEQ3adHVA@mail.gmail.com>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<20101009000046.GA30616@kroah.com>
-	<20101009002546.GB14675@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010082210150.3107@xanadu.home>
-	<1286791544.19739.31.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinMuKDpbL9ka61QhUFJfze_HWWHxjUbAqbz2_vi@mail.gmail.com>
-	<1286796187.19739.52.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinHZ-w6=0RvVp39MnvpRC7RW1CYNSbzi2f1OvaQ@mail.gmail.com>
-	<1286800232.19739.96.camel@e102109-lin.cambridge.arm.com>
-	<AANLkTinsQVvoxeNGO6ToyKnFTdA=GfjdoY2yEQ3adHVA@mail.gmail.com>
-Message-ID: <1287076707.8749.12.camel@e102109-lin.cambridge.arm.com>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Thu, 14 Oct 2010 22:59:57 +0530
+Subject: [PATCH RFC] arm: genirq: fix boot on arm platforms
+Message-ID: <1287077397-21781-1-git-send-email-gadiyar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-10-14 at 16:02 +0100, Felipe Contreras wrote:
-> On Mon, Oct 11, 2010 at 3:30 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > Well, even if you allow Device memory via ioremap in Linux and the
-> > hardware behaviour is not "unpredictable", it is not guaranteed to act
-> > as a Device memory. You get speculative accesses via the Normal alias
-> > and you may also get dirty cache lines evicted at random from the Normal
-> > mapping (unless you invalidated the cache before). The dirty eviction is
-> > valid even for pre-ARMv6 processors.
-> 
-> I'm not familiar with device memory, but anyway, IIUC you are saying
-> the normal mapping (original) might not work as expected... That's ok,
-> because the only alias that uses after the ioremap() is the second
-> one.
+Commit b683de2b3 in linux-next as of 20101014 (genirq: Query
+arch for number of early descriptors) seems to have broken
+bootup on several ARM boards - my beagleboard gives the
+following dump with earlyprintk.
 
-No, I say that the Device memory that you are using may not work as
-expected (i.e. Device memory). The other Normal mapping may be fine but
-you don't care about it anyway.
+NR_IRQS:402
+Unable to handle kernel NULL pointer dereference at virtual address 00000028
+pgd = c0004000
+[00000028] *pgd=00000000
+Internal error: Oops: 5 [#1]
+last sysfs file:
+Modules linked in:
+CPU: 0    Not tainted  (2.6.36-rc7-next-20101014-linux-next-20101012+ #40)
+PC is at init_IRQ+0x14/0x48
+LR is at start_kernel+0x150/0x2c0
+pc : [<c000b474>]    lr : [<c0008944>]    psr: 800001d3
+sp : c0927fd0  ip : 000008d0  fp : 00000000
+r10: 00000000  r9 : 411fc083  r8 : 8002ca24
+r7 : c092a80c  r6 : c0439c44  r5 : c0439c48  r4 : c0979ac0
+r3 : 00000001  r2 : 00000000  r1 : 00000001  r0 : 00000000
+Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c5387f  Table: 80004019  DAC: 00000015
+Process swapper (pid: 0, stack limit = 0xc09262f0)
+Stack: (0xc0927fd0 to 0xc0928000)
+7fc0:                                     00000192 c0008944 c00085bc 00000000
+7fe0: 00000000 c0439c48 00000000 10c5387d c0979c5c 80008034 00000000 00000000
+[<c000b474>] (init_IRQ+0x14/0x48) from [<c0008944>] (start_kernel+0x150/0x2c0)
+[<c0008944>] (start_kernel+0x150/0x2c0) from [<80008034>] (0x80008034)
+Code: e3a03000 ea000004 e3a02000 e2833001 (e5921028)
+---[ end trace 1b75b31a2719ed1c ]---
+Kernel panic - not syncing: Attempted to kill the idle task!
 
-> > It may be just theoretical but architecture licensees implement the
-> > hardware according to the ARM ARM. If it says "unpredictable", they
-> > don't need to care much about this scenario as it is not allowed in
-> > software and the hardware can be further optimised (well, I think
-> > "unpredictable" doesn't allow hardware deadlocking or security
-> > implications, so the memory corruption cannot be that random, possibly
-> > just restricted to that memory range). It is probably ok on current
-> > hardware but I cannot guarantee, you would have to check on a
-> > case-by-case basis (CPU implementation).
-> 
-> Exactly, so it's not the end of the world if this is still allowed one
-> more release.
+We seem to be using desc->status without assigning desc to
+anything. Fix this by adding back the code that was originally
+there.
 
-Would there be any incentive for driver maintainers to fix the drivers
-after one more release? AFAICT, this is a violation of the ioremap API
-already.
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@elte.hu>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+I'm not 100% sure this is the correct fix. I'm just reporting
+that this small change allows me to boot again.
 
-But I don't have a strong opinion, only that if we allow ioremap for one
-more cycle it would at least be better to use the ioremap_wc() hack I
-posted to avoid memory type aliasing (cacheability attributes aliasing
-would still be present but that's not that bad).
+Apologies if some of you get this twice - a typo in git-send-email
+caused the mail to bounce from some accounts, so I'm resending.
 
--- 
-Catalin
+ arch/arm/kernel/irq.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+Index: mainline/arch/arm/kernel/irq.c
+===================================================================
+--- mainline.orig/arch/arm/kernel/irq.c
++++ mainline/arch/arm/kernel/irq.c
+@@ -157,8 +157,10 @@ void __init init_IRQ(void)
+ 	struct irq_desc *desc;
+ 	int irq;
+ 
+-	for (irq = 0; irq < nr_irqs; irq++)
++	for (irq = 0; irq < nr_irqs; irq++) {
++		desc = irq_to_desc_alloc_node(irq, 0);
+ 		desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE;
++	}
+ 
+ 	init_arch_irq();
+ }
