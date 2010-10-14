@@ -1,10 +1,10 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 14 Oct 2010 14:23:42 +0900
-Subject: [PATCH V2 2/2] ARM: S5PV310: Add support GPIOlib
-In-Reply-To: <1286868876-3748-3-git-send-email-sbkim73@samsung.com>
+Date: Thu, 14 Oct 2010 14:24:10 +0900
+Subject: [PATCH V2 1/2] ARM: S5P: Add initial map for GPIO2 and GPIO3
+In-Reply-To: <1286868876-3748-2-git-send-email-sbkim73@samsung.com>
 References: <1286868876-3748-1-git-send-email-sbkim73@samsung.com>
-	<1286868876-3748-3-git-send-email-sbkim73@samsung.com>
-Message-ID: <006501cb6b5f$f9bd29a0$ed377ce0$%kim@samsung.com>
+	<1286868876-3748-2-git-send-email-sbkim73@samsung.com>
+Message-ID: <006601cb6b60$0a0e4190$1e2ac4b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,36 +12,65 @@ Sangbeom Kim wrote:
 > 
 > From: Jongpill Lee <boyko.lee@samsung.com>
 > 
-> This patch adds GPIOlib support for S5PV310 and S5PC210.
+> This patch adds initial map for GPIO2 and GPIO3.
+> S5PV310/S5PC210 has separated GPIO1, GPIO2 and GPIO3.
 > 
 > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 > ---
-> NOTE:
-> This patch used mapped VA IO as GPIO virtual address.
-> because firstly other Samsung SoC's GPIO used same method.
-> and I think that  it's better to keep the same method.
-> And ioremap also can be used for it.
-> But in the GPIO, there is no need to allocate VA area dynamically.
-> because GPIO can be used in any drivers anytime so it can't iounmap GPIO
-> VA area.
+> Changes since v1:
+> - Rebased on latest for-next from Kukjin Kim's git tree
+> - Added S5P_VA_GPIO1 according to S5PV310_PA_GPIO1
 > 
-Ok...
-
-(snip)
-
->  #define MAX_COMBINER_NR		40
+>  arch/arm/mach-s5pv310/cpu.c              |   12 +++++++++++-
+>  arch/arm/plat-s5p/include/plat/map-s5p.h |    3 +++
+>  2 files changed, 14 insertions(+), 1 deletions(-)
 > 
-> +#define S5P_IRQ_EINT_BASE	COMBINER_IRQ(MAX_COMBINER_NR, 0)
-> +
-> +#define S5P_EINT_BASE1		(S5P_IRQ_EINT_BASE + 0)
-> +#define S5P_EINT_BASE2		(S5P_IRQ_EINT_BASE + 16)
-> +
+> diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
+> index 3345cf6..ffed262 100644
+> --- a/arch/arm/mach-s5pv310/cpu.c
+> +++ b/arch/arm/mach-s5pv310/cpu.c
+> @@ -57,11 +57,21 @@ static struct map_desc s5pv310_iodesc[] __initdata = {
+>  		.length		= SZ_4K,
+>  		.type		= MT_DEVICE,
+>  	}, {
+> -		.virtual	= (unsigned long)S5P_VA_GPIO,
+> +		.virtual	= (unsigned long)S5P_VA_GPIO1,
+>  		.pfn		= __phys_to_pfn(S5PV310_PA_GPIO1),
+>  		.length		= SZ_4K,
+>  		.type		= MT_DEVICE,
+>  	}, {
+> +		.virtual	= (unsigned long)S5P_VA_GPIO2,
+> +		.pfn		= __phys_to_pfn(S5PV310_PA_GPIO2),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+> +	}, {
+> +		.virtual	= (unsigned long)S5P_VA_GPIO3,
+> +		.pfn		= __phys_to_pfn(S5PV310_PA_GPIO3),
+> +		.length		= SZ_256K,
+> +		.type		= MT_DEVICE,
+> +	}, {
+>  		.virtual	= (unsigned long)S5P_VA_DMC0,
+>  		.pfn		= __phys_to_pfn(S5PV310_PA_DMC0),
+>  		.length		= SZ_4K,
+> diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-
+> s5p/include/plat/map-s5p.h
+> index ec96a19..fef353d 100644
+> --- a/arch/arm/plat-s5p/include/plat/map-s5p.h
+> +++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
+> @@ -16,6 +16,9 @@
+>  #define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
+>  #define S5P_VA_CMU		S3C_ADDR(0x02100000)
+>  #define S5P_VA_GPIO		S3C_ADDR(0x02200000)
+> +#define S5P_VA_GPIO1		S5P_VA_GPIO
+> +#define S5P_VA_GPIO2		S3C_ADDR(0x02240000)
+> +#define S5P_VA_GPIO3		S3C_ADDR(0x02280000)
+> 
+>  #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
+>  #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
+> --
 
-Hmm...
-If you want to add external interrupt, should be changed NR_IRQS too.
-
-Will apply with fixing NR_IRQS.
+Looks ok to me...will apply.
 
 Thanks.
 
