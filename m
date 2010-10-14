@@ -1,100 +1,73 @@
-From: ian@opensource.wolfsonmicro.com (Ian Lartey)
-Date: Thu, 14 Oct 2010 12:07:33 +0100
-Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31 ADS board
-Message-ID: <1287054453.1799.8991.camel@Tapajos>
+From: daniel@caiaq.de (Daniel Mack)
+Date: Thu, 14 Oct 2010 13:27:35 +0200
+Subject: [PATCH] serial/imx: check that the buffer is non-empty before
+	sending it out
+In-Reply-To: <1286960637-11600-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20101008091640.GD29673@pengutronix.de>
+	<1286960637-11600-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20101014112735.GK10432@buzzloop.caiaq.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is only a partial revert of "ARM: mx3/mx31ads: fold board
-header in its only user"
-[commit ccfa7c269843001077df02d98918c6c9bde91395)]
+On Wed, Oct 13, 2010 at 11:03:57AM +0200, Uwe Kleine-K?nig wrote:
+> From: Volker Ernst <volker.ernst@txtr.com>
+> 
+> The .start_tx callback (imx_start_tx here) isn't only called when the
+> buffer is non-empty.  E.g. after resume or when handshaking is enabled
+> and the other side starts to signal being ready.
+> 
+> So check for an empty puffer already before sending the first character.
+> This prevents sending out stale (or uninitialised) data.
+> 
+> Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
+> Signed-off-by: Daniel Mack <daniel@caiaq.de>
+> Cc: Andy Green <andy@warmcat.com>
+> [ukl: reword commit log, put check in while condition]
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> as I didn't sent a patch, here comes my current version.  Don't know if
+> it makes it easier to test for you ...
+> 
+> I faked Daniel's SoB as Andrew said he did, compressed the changelog a
+> bit and put the check in the while condition as I suggested.
 
-As some of the the board defines are also used in the cs89x0
-ethernet driver by the i.MX31 ADS.
+FWIW, that looks good to me. Thanks for finishing the work :)
 
-Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
----
- arch/arm/mach-mx3/mach-mx31ads.c               |    7 +----
- arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ++++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
 
-diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
-index 94b3e7c..18a226b 100644
---- a/arch/arm/mach-mx3/mach-mx31ads.c
-+++ b/arch/arm/mach-mx3/mach-mx31ads.c
-@@ -22,13 +22,13 @@
- #include <linux/i2c.h>
- #include <linux/irq.h>
- 
--#include <mach/hardware.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <asm/memory.h>
- #include <asm/mach/map.h>
- #include <mach/common.h>
-+#include <mach/board-mx31ads.h>
- #include <mach/iomux-mx3.h>
- 
- #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
-@@ -40,10 +40,6 @@
- #include "devices-imx31.h"
- #include "devices.h"
- 
--/* Base address of PBC controller */
--#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
--/* Offsets for the PBC Controller register */
--
- /* PBC Board interrupt status register */
- #define PBC_INTSTATUS           0x000016
- 
-@@ -67,7 +63,6 @@
- #define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
- #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
- 
--#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
- #define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
- 
- #define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
-diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-new file mode 100644
-index 0000000..94b60dd
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
-+
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
-+#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
-+
-+#include <mach/hardware.h>
-+
-+/*
-+ * These symbols are used by drivers/net/cs89x0.c.
-+ * This is ugly as hell, but we have to provide them until
-+ * someone fixed the driver.
-+ */
-+
-+/* Base address of PBC controller */
-+#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
-+/* Offsets for the PBC Controller register */
-+
-+/* Ethernet Controller IO base address */
-+#define PBC_CS8900A_IOBASE      0x020000
-+
-+#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
-+
-+#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
-+
-+#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
--- 
-1.7.0.4
+Daniel
+
+
+>  drivers/serial/imx.c |    5 ++---
+>  1 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
+> index 66ecc7a..dfcf4b1 100644
+> --- a/drivers/serial/imx.c
+> +++ b/drivers/serial/imx.c
+> @@ -327,14 +327,13 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
+>  {
+>  	struct circ_buf *xmit = &sport->port.state->xmit;
+>  
+> -	while (!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
+> +	while (!uart_circ_empty(xmit) &&
+> +			!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
+>  		/* send xmit->buf[xmit->tail]
+>  		 * out the port here */
+>  		writel(xmit->buf[xmit->tail], sport->port.membase + URTX0);
+>  		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+>  		sport->port.icount.tx++;
+> -		if (uart_circ_empty(xmit))
+> -			break;
+>  	}
+>  
+>  	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+> -- 
+> 1.7.2.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
