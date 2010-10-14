@@ -1,73 +1,82 @@
-From: daniel@caiaq.de (Daniel Mack)
-Date: Thu, 14 Oct 2010 13:27:35 +0200
-Subject: [PATCH] serial/imx: check that the buffer is non-empty before
-	sending it out
-In-Reply-To: <1286960637-11600-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20101008091640.GD29673@pengutronix.de>
-	<1286960637-11600-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20101014112735.GK10432@buzzloop.caiaq.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 14 Oct 2010 15:13:02 +0200
+Subject: mx35pdk lan911x support
+In-Reply-To: <AANLkTi=MfssV4a9ynu77BckbOQcc5ngo4Dxw8-=LJdtV@mail.gmail.com>
+References: <AANLkTi=aTdbj8bjo3i1wRxG03rbh=kUwLTYPvTESLqpT@mail.gmail.com>
+	<20101014063001.GA6747@pengutronix.de>
+	<AANLkTikDp1NQaZ+dJk=pKSC29BokKVw-_82=m9QDQC14@mail.gmail.com>
+	<AANLkTi=MfssV4a9ynu77BckbOQcc5ngo4Dxw8-=LJdtV@mail.gmail.com>
+Message-ID: <20101014131302.GD6747@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 13, 2010 at 11:03:57AM +0200, Uwe Kleine-K?nig wrote:
-> From: Volker Ernst <volker.ernst@txtr.com>
-> 
-> The .start_tx callback (imx_start_tx here) isn't only called when the
-> buffer is non-empty.  E.g. after resume or when handshaking is enabled
-> and the other side starts to signal being ready.
-> 
-> So check for an empty puffer already before sending the first character.
-> This prevents sending out stale (or uninitialised) data.
-> 
-> Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
-> Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> Cc: Andy Green <andy@warmcat.com>
-> [ukl: reword commit log, put check in while condition]
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> as I didn't sent a patch, here comes my current version.  Don't know if
-> it makes it easier to test for you ...
-> 
-> I faked Daniel's SoB as Andrew said he did, compressed the changelog a
-> bit and put the check in the while condition as I suggested.
+Hello,
 
-FWIW, that looks good to me. Thanks for finishing the work :)
-
-
-Daniel
-
-
->  drivers/serial/imx.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+On Thu, Oct 14, 2010 at 09:05:39PM +0800, xiao jiang wrote:
+> Hi,
+> 2010/10/14 Fabio Estevam <festevam@gmail.com>
 > 
-> diff --git a/drivers/serial/imx.c b/drivers/serial/imx.c
-> index 66ecc7a..dfcf4b1 100644
-> --- a/drivers/serial/imx.c
-> +++ b/drivers/serial/imx.c
-> @@ -327,14 +327,13 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
+> > Hi Xiao Jiang,
+> >
+> > 2010/10/14 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > > Hello Xiao (hoping this is the part of your name corresponding to your
+> > > first name),
+> > >
+> > > On Thu, Oct 14, 2010 at 12:06:25AM -0400, xiao jiang wrote:
+> > >> I saw the mach-mx35_3ds.c  are come from you, so  I think you are the
+> > right
+> > >> person to answer my queston, :).
+> > > It was me, who renamed the file and touched it a few times when cleaning
+> > > up and reorganising things for the i.MX machines.  Initially it was
+> > > Fabio Estevam who brought the machine into mainline.
+> >
+> > I suggest you to look at MX51 3stack board or MX31 3stack boards, as
+> > they have support for LAN9217 controller.
+> >
+> >
+> Uwe,
+> I forgot to subscribe the list, now it is ok after done it.:)
+> 
+> Fabio,
+> Thanks for your hint, I can boot the kernel thru lan9217 now, only a few
+> lines added.
+> 
+> diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c
+> b/arch/arm/mach-mx3/mach-mx35_3ds.c
+> index 1c30d72..7e30a4e 100644
+> --- a/arch/arm/mach-mx3/mach-mx35_3ds.c
+> +++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+> @@ -35,6 +35,7 @@
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx35.h>
+> +#include <mach/3ds_debugboard.h>
+> 
+>  #include "devices-imx35.h"
+>  #include "devices.h"
+> @@ -86,6 +87,7 @@ static struct fsl_usb2_platform_data usb_pdata = {
+>  /*
+>   * Board specific initialization.
+>   */
+> +#define EXPIO_PARENT_INT 65
+>  static void __init mxc_board_init(void)
 >  {
->  	struct circ_buf *xmit = &sport->port.state->xmit;
->  
-> -	while (!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
-> +	while (!uart_circ_empty(xmit) &&
-> +			!(readl(sport->port.membase + UTS) & UTS_TXFULL)) {
->  		/* send xmit->buf[xmit->tail]
->  		 * out the port here */
->  		writel(xmit->buf[xmit->tail], sport->port.membase + URTX0);
->  		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
->  		sport->port.icount.tx++;
-> -		if (uart_circ_empty(xmit))
-> -			break;
->  	}
->  
->  	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-> -- 
-> 1.7.2.3
+>         mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads,
+> ARRAY_SIZE(mx35pdk_pads));
+> @@ -95,6 +97,10 @@ static void __init mxc_board_init(void)
+>         imx35_add_imx_uart0(&uart_pdata);
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>         mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+> +
+> +       if (!mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+> +               printk(KERN_WARNING "Init of the debugboard failed, all "
+> +                       "devices on the board are unusable.\n");
+If you intend this patch to go mainline please use pr_warn instead of
+printk(KERN_WARNING ...).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
