@@ -1,794 +1,235 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Oct 2010 18:10:51 +0200
-Subject: [PATCH 1/7] arm/versatile: move pci code to plat-versatile
+Date: Thu, 14 Oct 2010 18:10:53 +0200
+Subject: [PATCH 3/7] arm/versatile: enable PCI I/O space
 In-Reply-To: <1287072657-32477-1-git-send-email-arnd@arndb.de>
 References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
-Message-ID: <1287072657-32477-2-git-send-email-arnd@arndb.de>
+Message-ID: <1287072657-32477-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xilinx PCI macro is used on both versatile-pb and
-realview-eb, so we should move the implementation to place
-where it can be shared.
+I/O space handling on the versatile platform is currently
+broken in multiple ways. Most importantly, the ports do
+not get mapped into the virtual address space at all.
+
+Also, there is some amount of confusion between PCI I/O
+space and other statically mapped MMIO registers in the
+platform code:
+
+* The __io_address() macro that is used to access the
+  platform register maps to the same __io macro that gets
+  used for I/O space.
+
+* The IO_SPACE_LIMIT is set to a value that is much larger
+  than the total available space.
+
+* The I/O resource of the PCI bus is set to the physical
+  address of the mapping, which is way outside of the
+  actual I/O space limit as well as the address range that
+  gets decoded by traditional PCI cards.
+
+* No attempt is made to stay outside of the ISA port range
+  that some device drivers try access.
+
+* No resource gets requested as a child of ioport_resource,
+  but an IORESOURCE_IO type mapping gets requested
+  as a child of iomem_resource.
+
+This patch attempts to correct all of the above. This makes
+it possible to use virtio-pci based virtual devices as well
+as actual PCI cards including those with legacy ISA port
+ranges like VGA.
+
+Some of the issues seem to be duplicated on other platforms.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig                     |    5 +
- arch/arm/mach-versatile/Makefile     |    1 -
- arch/arm/mach-versatile/pci.c        |  361 ----------------------------------
- arch/arm/plat-versatile/Makefile     |    1 +
- arch/arm/plat-versatile/xilinx-pci.c |  361 ++++++++++++++++++++++++++++++++++
- 5 files changed, 367 insertions(+), 362 deletions(-)
- delete mode 100644 arch/arm/mach-versatile/pci.c
- create mode 100644 arch/arm/plat-versatile/xilinx-pci.c
+ arch/arm/mach-versatile/core.c                  |   19 +++----------------
+ arch/arm/mach-versatile/include/mach/hardware.h |   15 +++++++--------
+ arch/arm/mach-versatile/include/mach/io.h       |    6 ++++--
+ arch/arm/mach-versatile/include/mach/platform.h |    4 +++-
+ arch/arm/mach-versatile/versatile_pb.c          |    4 ++--
+ arch/arm/plat-versatile/xilinx-pci.c            |   19 +++++++++++++++++--
+ 6 files changed, 36 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b8f976a..5bf08c7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1172,6 +1172,11 @@ config PCI_HOST_ITE8152
- 	default y
- 	select DMABOUNCE
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index e38acb0..b03a6d5 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -201,26 +201,13 @@ static struct map_desc versatile_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(VERSATILE_PCI_CFG_BASE),
+ 		.length		= VERSATILE_PCI_CFG_BASE_SIZE,
+ 		.type		= MT_DEVICE
+-	},
+-#if 0
+- 	{
+-		.virtual	=  VERSATILE_PCI_VIRT_MEM_BASE0,
+-		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE0),
+-		.length		= SZ_16M,
+-		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	=  VERSATILE_PCI_VIRT_MEM_BASE1,
+-		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE1),
+-		.length		= SZ_16M,
+-		.type		= MT_DEVICE
+-	}, {
+-		.virtual	=  VERSATILE_PCI_VIRT_MEM_BASE2,
+-		.pfn		= __phys_to_pfn(VERSATILE_PCI_MEM_BASE2),
+-		.length		= SZ_16M,
++		.virtual	=  (unsigned long)PCIO_BASE,
++		.pfn		= __phys_to_pfn(VERSATILE_PCI_IO_BASE),
++		.length		= IO_SPACE_LIMIT,
+ 		.type		= MT_DEVICE
+ 	},
+ #endif
+-#endif
+ };
  
-+config PCI_HOST_XILINX
-+	bool
-+	depends on PCI && (ARCH_VERSATILE_PB || MACH_REALVIEW_EB || MACH_REALVIEW_PB1176)
-+	default y
+ void __init versatile_map_io(void)
+diff --git a/arch/arm/mach-versatile/include/mach/hardware.h b/arch/arm/mach-versatile/include/mach/hardware.h
+index b5e75bb..59b7716 100644
+--- a/arch/arm/mach-versatile/include/mach/hardware.h
++++ b/arch/arm/mach-versatile/include/mach/hardware.h
+@@ -24,21 +24,20 @@
+ 
+ #include <asm/sizes.h>
+ 
++/* macro to get at MMIO space when running virtually */
++#define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
++#define __io_address(n)		((void __iomem *)(IO_ADDRESS(n)))
 +
- source "drivers/pci/Kconfig"
+ /*
+  * PCI space virtual addresses
+  */
+ #define VERSATILE_PCI_VIRT_BASE		(void __iomem *)0xe8000000ul
+ #define VERSATILE_PCI_CFG_VIRT_BASE	(void __iomem *)0xe9000000ul
++#define VERSATILE_PCI_IO_VIRT_BASE	(void __iomem *)PCIO_BASE
  
- source "drivers/pcmcia/Kconfig"
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 97cf4d8..191b65b 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -5,4 +5,3 @@
- obj-y					:= core.o
- obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
--obj-$(CONFIG_PCI)			+= pci.o
-diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-deleted file mode 100644
-index 13c7e5f..0000000
---- a/arch/arm/mach-versatile/pci.c
-+++ /dev/null
-@@ -1,361 +0,0 @@
--/*
-- *  linux/arch/arm/mach-versatile/pci.c
-- *
-- * (C) Copyright Koninklijke Philips Electronics NV 2004. All rights reserved.
-- * You can redistribute and/or modify this software under the terms of version 2
-- * of the GNU General Public License as published by the Free Software Foundation.
-- * THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED
-- * WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- * Koninklijke Philips Electronics nor its subsidiaries is obligated to provide any support for this software.
-- *
-- * ARM Versatile PCI driver.
-- *
-- * 14/04/2005 Initial version, colin.king at philips.com
-- *
-- */
--#include <linux/kernel.h>
--#include <linux/pci.h>
--#include <linux/ioport.h>
--#include <linux/interrupt.h>
--#include <linux/spinlock.h>
--#include <linux/init.h>
--#include <linux/io.h>
+-/* CIK guesswork */
+-#define PCIBIOS_MIN_IO			0x44000000
+-#define PCIBIOS_MIN_MEM			0x50000000
++#define PCIBIOS_MIN_IO			0x00001000
++#define PCIBIOS_MIN_MEM			0x00000000
+ 
+ #define pcibios_assign_all_busses()     1
+ 
+-/* macro to get at IO space when running virtually */
+-#define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
 -
--#include <mach/hardware.h>
--#include <asm/irq.h>
--#include <asm/system.h>
--#include <asm/mach/pci.h>
+-#define __io_address(n)		__io(IO_ADDRESS(n))
 -
--/*
-- * these spaces are mapped using the following base registers:
-- *
-- * Usage Local Bus Memory         Base/Map registers used
-- *
-- * Mem   50000000 - 5FFFFFFF      LB_BASE0/LB_MAP0,  non prefetch
-- * Mem   60000000 - 6FFFFFFF      LB_BASE1/LB_MAP1,  prefetch
-- * IO    44000000 - 4FFFFFFF      LB_BASE2/LB_MAP2,  IO
-- * Cfg   42000000 - 42FFFFFF	  PCI config
-- *
-- */
--#define __IO_ADDRESS(n) ((void __iomem *)(unsigned long)IO_ADDRESS(n))
--#define SYS_PCICTL		__IO_ADDRESS(VERSATILE_SYS_PCICTL)
--#define PCI_IMAP0		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x0)
--#define PCI_IMAP1		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x4)
--#define PCI_IMAP2		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x8)
--#define PCI_SMAP0		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x10)
--#define PCI_SMAP1		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x14)
--#define PCI_SMAP2		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x18)
--#define PCI_SELFID		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0xc)
--
--#define DEVICE_ID_OFFSET		0x00
--#define CSR_OFFSET			0x04
--#define CLASS_ID_OFFSET			0x08
--
--#define VP_PCI_DEVICE_ID		0x030010ee
--#define VP_PCI_CLASS_ID			0x0b400000
--
--static unsigned long pci_slot_ignore = 0;
--
--static int __init versatile_pci_slot_ignore(char *str)
--{
--	int retval;
--	int slot;
--
--	while ((retval = get_option(&str,&slot))) {
--		if ((slot < 0) || (slot > 31)) {
--			printk("Illegal slot value: %d\n",slot);
--		} else {
--			pci_slot_ignore |= (1 << slot);
--		}
--	}
--	return 1;
--}
--
--__setup("pci_slot_ignore=", versatile_pci_slot_ignore);
--
--
--static void __iomem *__pci_addr(struct pci_bus *bus,
--				unsigned int devfn, int offset)
--{
--	unsigned int busnr = bus->number;
--
--	/*
--	 * Trap out illegal values
--	 */
--	if (offset > 255)
--		BUG();
--	if (busnr > 255)
--		BUG();
--	if (devfn > 255)
--		BUG();
--
--	return VERSATILE_PCI_CFG_VIRT_BASE + ((busnr << 16) |
--		(PCI_SLOT(devfn) << 11) | (PCI_FUNC(devfn) << 8) | offset);
--}
--
--static int versatile_read_config(struct pci_bus *bus, unsigned int devfn, int where,
--				 int size, u32 *val)
--{
--	void __iomem *addr = __pci_addr(bus, devfn, where & ~3);
--	u32 v;
--	int slot = PCI_SLOT(devfn);
--
--	if (pci_slot_ignore & (1 << slot)) {
--		/* Ignore this slot */
--		switch (size) {
--		case 1:
--			v = 0xff;
--			break;
--		case 2:
--			v = 0xffff;
--			break;
--		default:
--			v = 0xffffffff;
--		}
--	} else {
--		switch (size) {
--		case 1:
--			v = __raw_readl(addr);
--			if (where & 2) v >>= 16;
--			if (where & 1) v >>= 8;
-- 			v &= 0xff;
--			break;
--
--		case 2:
--			v = __raw_readl(addr);
--			if (where & 2) v >>= 16;
-- 			v &= 0xffff;
--			break;
--
--		default:
--			v = __raw_readl(addr);
--			break;
--		}
--	}
--
--	*val = v;
--	return PCIBIOS_SUCCESSFUL;
--}
--
--static int versatile_write_config(struct pci_bus *bus, unsigned int devfn, int where,
--				  int size, u32 val)
--{
--	void __iomem *addr = __pci_addr(bus, devfn, where);
--	int slot = PCI_SLOT(devfn);
--
--	if (pci_slot_ignore & (1 << slot)) {
--		return PCIBIOS_SUCCESSFUL;
--	}
--
--	switch (size) {
--	case 1:
--		__raw_writeb((u8)val, addr);
--		break;
--
--	case 2:
--		__raw_writew((u16)val, addr);
--		break;
--
--	case 4:
--		__raw_writel(val, addr);
--		break;
--	}
--
--	return PCIBIOS_SUCCESSFUL;
--}
--
--static struct pci_ops pci_versatile_ops = {
--	.read	= versatile_read_config,
--	.write	= versatile_write_config,
--};
--
--static struct resource io_mem = {
--	.name	= "PCI I/O space",
--	.start	= VERSATILE_PCI_MEM_BASE0,
--	.end	= VERSATILE_PCI_MEM_BASE0+VERSATILE_PCI_MEM_BASE0_SIZE-1,
--	.flags	= IORESOURCE_IO,
--};
--
--static struct resource non_mem = {
--	.name	= "PCI non-prefetchable",
--	.start	= VERSATILE_PCI_MEM_BASE1,
--	.end	= VERSATILE_PCI_MEM_BASE1+VERSATILE_PCI_MEM_BASE1_SIZE-1,
--	.flags	= IORESOURCE_MEM,
--};
--
--static struct resource pre_mem = {
--	.name	= "PCI prefetchable",
--	.start	= VERSATILE_PCI_MEM_BASE2,
--	.end	= VERSATILE_PCI_MEM_BASE2+VERSATILE_PCI_MEM_BASE2_SIZE-1,
--	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
--};
--
--static int __init pci_versatile_setup_resources(struct resource **resource)
--{
--	int ret = 0;
--
--	ret = request_resource(&iomem_resource, &io_mem);
--	if (ret) {
--		printk(KERN_ERR "PCI: unable to allocate I/O "
--		       "memory region (%d)\n", ret);
--		goto out;
--	}
--	ret = request_resource(&iomem_resource, &non_mem);
--	if (ret) {
--		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
--		       "memory region (%d)\n", ret);
--		goto release_io_mem;
--	}
--	ret = request_resource(&iomem_resource, &pre_mem);
--	if (ret) {
--		printk(KERN_ERR "PCI: unable to allocate prefetchable "
--		       "memory region (%d)\n", ret);
--		goto release_non_mem;
--	}
--
--	/*
--	 * bus->resource[0] is the IO resource for this bus
--	 * bus->resource[1] is the mem resource for this bus
--	 * bus->resource[2] is the prefetch mem resource for this bus
--	 */
--	resource[0] = &io_mem;
--	resource[1] = &non_mem;
--	resource[2] = &pre_mem;
--
--	goto out;
--
-- release_non_mem:
--	release_resource(&non_mem);
-- release_io_mem:
--	release_resource(&io_mem);
-- out:
--	return ret;
--}
--
--int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
--{
--	int ret = 0;
--        int i;
--        int myslot = -1;
--	unsigned long val;
--	void __iomem *local_pci_cfg_base;
--
--	val = __raw_readl(SYS_PCICTL);
--	if (!(val & 1)) {
--		printk("Not plugged into PCI backplane!\n");
--		ret = -EIO;
--		goto out;
--	}
--
--	if (nr == 0) {
--		sys->mem_offset = 0;
--		ret = pci_versatile_setup_resources(sys->resource);
--		if (ret < 0) {
--			printk("pci_versatile_setup: resources... oops?\n");
--			goto out;
--		}
--	} else {
--		printk("pci_versatile_setup: resources... nr == 0??\n");
--		goto out;
--	}
--
--	/*
--	 *  We need to discover the PCI core first to configure itself
--	 *  before the main PCI probing is performed
--	 */
--	for (i=0; i<32; i++)
--		if ((__raw_readl(VERSATILE_PCI_VIRT_BASE+(i<<11)+DEVICE_ID_OFFSET) == VP_PCI_DEVICE_ID) &&
--		    (__raw_readl(VERSATILE_PCI_VIRT_BASE+(i<<11)+CLASS_ID_OFFSET) == VP_PCI_CLASS_ID)) {
--			myslot = i;
--			break;
--		}
--
--	if (myslot == -1) {
--		printk("Cannot find PCI core!\n");
--		ret = -EIO;
--		goto out;
--	}
--
--	printk("PCI core found (slot %d)\n",myslot);
--
--	__raw_writel(myslot, PCI_SELFID);
--	local_pci_cfg_base = VERSATILE_PCI_CFG_VIRT_BASE + (myslot << 11);
--
--	val = __raw_readl(local_pci_cfg_base + CSR_OFFSET);
--	val |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
--	__raw_writel(val, local_pci_cfg_base + CSR_OFFSET);
--
--	/*
--	 * Configure the PCI inbound memory windows to be 1:1 mapped to SDRAM
--	 */
--	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_0);
--	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_1);
--	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_2);
--
--	/*
--	 * Do not to map Versatile FPGA PCI device into memory space
--	 */
--	pci_slot_ignore |= (1 << myslot);
--	ret = 1;
--
-- out:
--	return ret;
--}
--
--
--struct pci_bus * __init pci_versatile_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	return pci_scan_bus(sys->busnr, &pci_versatile_ops, sys);
--}
--
--void __init pci_versatile_preinit(void)
--{
--	__raw_writel(VERSATILE_PCI_MEM_BASE0 >> 28, PCI_IMAP0);
--	__raw_writel(VERSATILE_PCI_MEM_BASE1 >> 28, PCI_IMAP1);
--	__raw_writel(VERSATILE_PCI_MEM_BASE2 >> 28, PCI_IMAP2);
--
--	__raw_writel(PHYS_OFFSET >> 28, PCI_SMAP0);
--	__raw_writel(PHYS_OFFSET >> 28, PCI_SMAP1);
--	__raw_writel(PHYS_OFFSET >> 28, PCI_SMAP2);
--
--	__raw_writel(1, SYS_PCICTL);
--}
--
--/*
-- * map the specified device/slot/pin to an IRQ.   Different backplanes may need to modify this.
-- */
--static int __init versatile_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
--{
--	int irq;
--	int devslot = PCI_SLOT(dev->devfn);
--
--	/* slot,  pin,	irq
--	 *  24     1     27
--	 *  25     1     28
--	 *  26     1     29
--	 *  27     1     30
--	 */
--	irq = 27 + ((slot + pin - 1) & 3);
--
--	printk("PCI map irq: slot %d, pin %d, devslot %d, irq: %d\n",slot,pin,devslot,irq);
--
--	return irq;
--}
--
--static struct hw_pci versatile_pci __initdata = {
--	.swizzle		= NULL,
--	.map_irq		= versatile_map_irq,
--	.nr_controllers		= 1,
--	.setup			= pci_versatile_setup,
--	.scan			= pci_versatile_scan_bus,
--	.preinit		= pci_versatile_preinit,
--};
--
--static int __init versatile_pci_init(void)
--{
--	pci_common_init(&versatile_pci);
--	return 0;
--}
--
--subsys_initcall(versatile_pci_init);
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 5cf88e8..de870b7 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -6,3 +6,4 @@ ifeq ($(CONFIG_LEDS_CLASS),y)
- obj-$(CONFIG_ARCH_REALVIEW) += leds.o
- obj-$(CONFIG_ARCH_VERSATILE) += leds.o
- endif
-+obj-$(CONFIG_PCI_HOST_XILINX) += xilinx-pci.o
+ #endif
+diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
+index f067c14..07f3aaf 100644
+--- a/arch/arm/mach-versatile/include/mach/io.h
++++ b/arch/arm/mach-versatile/include/mach/io.h
+@@ -20,9 +20,11 @@
+ #ifndef __ASM_ARM_ARCH_IO_H
+ #define __ASM_ARM_ARCH_IO_H
+ 
+-#define IO_SPACE_LIMIT 0xffffffff
++#define PCIO_BASE	(void __iomem *)0xeb000000ul
++#define PCIO_SIZE	0x00100000ul
++#define IO_SPACE_LIMIT  (PCIO_SIZE - 1)
+ 
+-#define __io(a)		__typesafe_io(a)
++#define __io(a)		((a) + PCIO_BASE)
+ #define __mem_pci(a)	(a)
+ 
+ #endif
+diff --git a/arch/arm/mach-versatile/include/mach/platform.h b/arch/arm/mach-versatile/include/mach/platform.h
+index ec08740..efb5328 100644
+--- a/arch/arm/mach-versatile/include/mach/platform.h
++++ b/arch/arm/mach-versatile/include/mach/platform.h
+@@ -231,12 +231,14 @@
+ /* PCI space */
+ #define VERSATILE_PCI_BASE             0x41000000	/* PCI Interface */
+ #define VERSATILE_PCI_CFG_BASE	       0x42000000
++#define VERSATILE_PCI_IO_BASE	       0x43000000
+ #define VERSATILE_PCI_MEM_BASE0        0x44000000
+ #define VERSATILE_PCI_MEM_BASE1        0x50000000
+ #define VERSATILE_PCI_MEM_BASE2        0x60000000
+ /* Sizes of above maps */
+ #define VERSATILE_PCI_BASE_SIZE	       0x01000000
+-#define VERSATILE_PCI_CFG_BASE_SIZE    0x02000000
++#define VERSATILE_PCI_CFG_BASE_SIZE    0x01000000
++#define VERSATILE_PCI_IO_BASE_SIZE     0x01000000
+ #define VERSATILE_PCI_MEM_BASE0_SIZE   0x0c000000	/* 32Mb */
+ #define VERSATILE_PCI_MEM_BASE1_SIZE   0x10000000	/* 256Mb */
+ #define VERSATILE_PCI_MEM_BASE2_SIZE   0x10000000	/* 256Mb */
+diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
+index 4e5e1c7..0f39fde 100644
+--- a/arch/arm/mach-versatile/versatile_pb.c
++++ b/arch/arm/mach-versatile/versatile_pb.c
+@@ -113,7 +113,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ static struct xilinx_pci_data versatile_pci_io = {
+ 	.base		= VERSATILE_PCI_VIRT_BASE,
+ 	.cfg_base	= VERSATILE_PCI_CFG_VIRT_BASE,
+-	.io_base	= NULL,
++	.io_base	= PCIO_BASE,
+ 	.sys_pcictl	= __IO_ADDRESS(VERSATILE_SYS_PCICTL),
+ 	.core_base	= __IO_ADDRESS(VERSATILE_PCI_CORE_BASE),
+ 	.base_irq	= 27,
+@@ -137,7 +137,7 @@ static struct xilinx_pci_data versatile_pci_io = {
+ 			.name	= "PCI unused",
+ 			.start	= VERSATILE_PCI_MEM_BASE0,
+ 			.end	= VERSATILE_PCI_MEM_BASE0+VERSATILE_PCI_MEM_BASE0_SIZE-1,
+-			.flags	= IORESOURCE_IO,
++			.flags	= IORESOURCE_MEM,
+ 		}, {
+ 			.name	= "PCI non-prefetchable",
+ 			.start	= VERSATILE_PCI_MEM_BASE1,
 diff --git a/arch/arm/plat-versatile/xilinx-pci.c b/arch/arm/plat-versatile/xilinx-pci.c
-new file mode 100644
-index 0000000..13c7e5f
---- /dev/null
+index 28d1d7d..425604a 100644
+--- a/arch/arm/plat-versatile/xilinx-pci.c
 +++ b/arch/arm/plat-versatile/xilinx-pci.c
-@@ -0,0 +1,361 @@
-+/*
-+ *  linux/arch/arm/mach-versatile/pci.c
-+ *
-+ * (C) Copyright Koninklijke Philips Electronics NV 2004. All rights reserved.
-+ * You can redistribute and/or modify this software under the terms of version 2
-+ * of the GNU General Public License as published by the Free Software Foundation.
-+ * THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY; WITHOUT EVEN THE IMPLIED
-+ * WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ * Koninklijke Philips Electronics nor its subsidiaries is obligated to provide any support for this software.
-+ *
-+ * ARM Versatile PCI driver.
-+ *
-+ * 14/04/2005 Initial version, colin.king at philips.com
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/pci.h>
-+#include <linux/ioport.h>
-+#include <linux/interrupt.h>
-+#include <linux/spinlock.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/irq.h>
-+#include <asm/system.h>
-+#include <asm/mach/pci.h>
-+
-+/*
-+ * these spaces are mapped using the following base registers:
-+ *
-+ * Usage Local Bus Memory         Base/Map registers used
-+ *
-+ * Mem   50000000 - 5FFFFFFF      LB_BASE0/LB_MAP0,  non prefetch
-+ * Mem   60000000 - 6FFFFFFF      LB_BASE1/LB_MAP1,  prefetch
-+ * IO    44000000 - 4FFFFFFF      LB_BASE2/LB_MAP2,  IO
-+ * Cfg   42000000 - 42FFFFFF	  PCI config
-+ *
-+ */
-+#define __IO_ADDRESS(n) ((void __iomem *)(unsigned long)IO_ADDRESS(n))
-+#define SYS_PCICTL		__IO_ADDRESS(VERSATILE_SYS_PCICTL)
-+#define PCI_IMAP0		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x0)
-+#define PCI_IMAP1		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x4)
-+#define PCI_IMAP2		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x8)
-+#define PCI_SMAP0		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x10)
-+#define PCI_SMAP1		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x14)
-+#define PCI_SMAP2		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0x18)
-+#define PCI_SELFID		__IO_ADDRESS(VERSATILE_PCI_CORE_BASE+0xc)
-+
-+#define DEVICE_ID_OFFSET		0x00
-+#define CSR_OFFSET			0x04
-+#define CLASS_ID_OFFSET			0x08
-+
-+#define VP_PCI_DEVICE_ID		0x030010ee
-+#define VP_PCI_CLASS_ID			0x0b400000
-+
-+static unsigned long pci_slot_ignore = 0;
-+
-+static int __init versatile_pci_slot_ignore(char *str)
-+{
-+	int retval;
-+	int slot;
-+
-+	while ((retval = get_option(&str,&slot))) {
-+		if ((slot < 0) || (slot > 31)) {
-+			printk("Illegal slot value: %d\n",slot);
-+		} else {
-+			pci_slot_ignore |= (1 << slot);
-+		}
-+	}
-+	return 1;
-+}
-+
-+__setup("pci_slot_ignore=", versatile_pci_slot_ignore);
-+
-+
-+static void __iomem *__pci_addr(struct pci_bus *bus,
-+				unsigned int devfn, int offset)
-+{
-+	unsigned int busnr = bus->number;
-+
-+	/*
-+	 * Trap out illegal values
-+	 */
-+	if (offset > 255)
-+		BUG();
-+	if (busnr > 255)
-+		BUG();
-+	if (devfn > 255)
-+		BUG();
-+
-+	return VERSATILE_PCI_CFG_VIRT_BASE + ((busnr << 16) |
-+		(PCI_SLOT(devfn) << 11) | (PCI_FUNC(devfn) << 8) | offset);
-+}
-+
-+static int versatile_read_config(struct pci_bus *bus, unsigned int devfn, int where,
-+				 int size, u32 *val)
-+{
-+	void __iomem *addr = __pci_addr(bus, devfn, where & ~3);
-+	u32 v;
-+	int slot = PCI_SLOT(devfn);
-+
-+	if (pci_slot_ignore & (1 << slot)) {
-+		/* Ignore this slot */
-+		switch (size) {
-+		case 1:
-+			v = 0xff;
-+			break;
-+		case 2:
-+			v = 0xffff;
-+			break;
-+		default:
-+			v = 0xffffffff;
-+		}
-+	} else {
-+		switch (size) {
-+		case 1:
-+			v = __raw_readl(addr);
-+			if (where & 2) v >>= 16;
-+			if (where & 1) v >>= 8;
-+ 			v &= 0xff;
-+			break;
-+
-+		case 2:
-+			v = __raw_readl(addr);
-+			if (where & 2) v >>= 16;
-+ 			v &= 0xffff;
-+			break;
-+
-+		default:
-+			v = __raw_readl(addr);
-+			break;
-+		}
-+	}
-+
-+	*val = v;
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static int versatile_write_config(struct pci_bus *bus, unsigned int devfn, int where,
-+				  int size, u32 val)
-+{
-+	void __iomem *addr = __pci_addr(bus, devfn, where);
-+	int slot = PCI_SLOT(devfn);
-+
-+	if (pci_slot_ignore & (1 << slot)) {
-+		return PCIBIOS_SUCCESSFUL;
-+	}
-+
-+	switch (size) {
-+	case 1:
-+		__raw_writeb((u8)val, addr);
-+		break;
-+
-+	case 2:
-+		__raw_writew((u16)val, addr);
-+		break;
-+
-+	case 4:
-+		__raw_writel(val, addr);
-+		break;
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static struct pci_ops pci_versatile_ops = {
-+	.read	= versatile_read_config,
-+	.write	= versatile_write_config,
-+};
-+
-+static struct resource io_mem = {
-+	.name	= "PCI I/O space",
-+	.start	= VERSATILE_PCI_MEM_BASE0,
-+	.end	= VERSATILE_PCI_MEM_BASE0+VERSATILE_PCI_MEM_BASE0_SIZE-1,
+@@ -164,11 +164,25 @@ static struct pci_ops pci_xilinx_ops = {
+ 	.write	= xilinx_write_config,
+ };
+ 
++static struct resource io_port = {
++	.name	= "PCI",
++	.start	= 0,
++	.end	= IO_SPACE_LIMIT,
 +	.flags	= IORESOURCE_IO,
 +};
 +
-+static struct resource non_mem = {
-+	.name	= "PCI non-prefetchable",
-+	.start	= VERSATILE_PCI_MEM_BASE1,
-+	.end	= VERSATILE_PCI_MEM_BASE1+VERSATILE_PCI_MEM_BASE1_SIZE-1,
-+	.flags	= IORESOURCE_MEM,
-+};
-+
-+static struct resource pre_mem = {
-+	.name	= "PCI prefetchable",
-+	.start	= VERSATILE_PCI_MEM_BASE2,
-+	.end	= VERSATILE_PCI_MEM_BASE2+VERSATILE_PCI_MEM_BASE2_SIZE-1,
-+	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
-+};
-+
-+static int __init pci_versatile_setup_resources(struct resource **resource)
-+{
-+	int ret = 0;
-+
-+	ret = request_resource(&iomem_resource, &io_mem);
+ static int __init pci_xilinx_setup_resources(struct resource **resource)
+ {
+ 	int ret = 0;
+ 	int i;
+ 
++	ret = request_resource(&ioport_resource, &io_port);
 +	if (ret) {
 +		printk(KERN_ERR "PCI: unable to allocate I/O "
-+		       "memory region (%d)\n", ret);
-+		goto out;
-+	}
-+	ret = request_resource(&iomem_resource, &non_mem);
-+	if (ret) {
-+		printk(KERN_ERR "PCI: unable to allocate non-prefetchable "
-+		       "memory region (%d)\n", ret);
-+		goto release_io_mem;
-+	}
-+	ret = request_resource(&iomem_resource, &pre_mem);
-+	if (ret) {
-+		printk(KERN_ERR "PCI: unable to allocate prefetchable "
-+		       "memory region (%d)\n", ret);
-+		goto release_non_mem;
-+	}
-+
-+	/*
-+	 * bus->resource[0] is the IO resource for this bus
-+	 * bus->resource[1] is the mem resource for this bus
-+	 * bus->resource[2] is the prefetch mem resource for this bus
-+	 */
-+	resource[0] = &io_mem;
-+	resource[1] = &non_mem;
-+	resource[2] = &pre_mem;
-+
-+	goto out;
-+
-+ release_non_mem:
-+	release_resource(&non_mem);
-+ release_io_mem:
-+	release_resource(&io_mem);
-+ out:
-+	return ret;
-+}
-+
-+int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
-+{
-+	int ret = 0;
-+        int i;
-+        int myslot = -1;
-+	unsigned long val;
-+	void __iomem *local_pci_cfg_base;
-+
-+	val = __raw_readl(SYS_PCICTL);
-+	if (!(val & 1)) {
-+		printk("Not plugged into PCI backplane!\n");
-+		ret = -EIO;
++		       "port region (%d)\n", ret);
 +		goto out;
 +	}
 +
-+	if (nr == 0) {
-+		sys->mem_offset = 0;
-+		ret = pci_versatile_setup_resources(sys->resource);
-+		if (ret < 0) {
-+			printk("pci_versatile_setup: resources... oops?\n");
-+			goto out;
-+		}
-+	} else {
-+		printk("pci_versatile_setup: resources... nr == 0??\n");
-+		goto out;
-+	}
-+
-+	/*
-+	 *  We need to discover the PCI core first to configure itself
-+	 *  before the main PCI probing is performed
-+	 */
-+	for (i=0; i<32; i++)
-+		if ((__raw_readl(VERSATILE_PCI_VIRT_BASE+(i<<11)+DEVICE_ID_OFFSET) == VP_PCI_DEVICE_ID) &&
-+		    (__raw_readl(VERSATILE_PCI_VIRT_BASE+(i<<11)+CLASS_ID_OFFSET) == VP_PCI_CLASS_ID)) {
-+			myslot = i;
-+			break;
-+		}
-+
-+	if (myslot == -1) {
-+		printk("Cannot find PCI core!\n");
-+		ret = -EIO;
-+		goto out;
-+	}
-+
-+	printk("PCI core found (slot %d)\n",myslot);
-+
-+	__raw_writel(myslot, PCI_SELFID);
-+	local_pci_cfg_base = VERSATILE_PCI_CFG_VIRT_BASE + (myslot << 11);
-+
-+	val = __raw_readl(local_pci_cfg_base + CSR_OFFSET);
-+	val |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
-+	__raw_writel(val, local_pci_cfg_base + CSR_OFFSET);
-+
-+	/*
-+	 * Configure the PCI inbound memory windows to be 1:1 mapped to SDRAM
-+	 */
-+	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_0);
-+	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_1);
-+	__raw_writel(PHYS_OFFSET, local_pci_cfg_base + PCI_BASE_ADDRESS_2);
-+
-+	/*
-+	 * Do not to map Versatile FPGA PCI device into memory space
-+	 */
-+	pci_slot_ignore |= (1 << myslot);
-+	ret = 1;
-+
-+ out:
-+	return ret;
-+}
-+
-+
-+struct pci_bus * __init pci_versatile_scan_bus(int nr, struct pci_sys_data *sys)
-+{
-+	return pci_scan_bus(sys->busnr, &pci_versatile_ops, sys);
-+}
-+
-+void __init pci_versatile_preinit(void)
-+{
-+	__raw_writel(VERSATILE_PCI_MEM_BASE0 >> 28, PCI_IMAP0);
-+	__raw_writel(VERSATILE_PCI_MEM_BASE1 >> 28, PCI_IMAP1);
-+	__raw_writel(VERSATILE_PCI_MEM_BASE2 >> 28, PCI_IMAP2);
-+
-+	__raw_writel(PHYS_OFFSET >> 28, PCI_SMAP0);
-+	__raw_writel(PHYS_OFFSET >> 28, PCI_SMAP1);
-+	__raw_writel(PHYS_OFFSET >> 28, PCI_SMAP2);
-+
-+	__raw_writel(1, SYS_PCICTL);
-+}
-+
-+/*
-+ * map the specified device/slot/pin to an IRQ.   Different backplanes may need to modify this.
-+ */
-+static int __init versatile_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-+{
-+	int irq;
-+	int devslot = PCI_SLOT(dev->devfn);
-+
-+	/* slot,  pin,	irq
-+	 *  24     1     27
-+	 *  25     1     28
-+	 *  26     1     29
-+	 *  27     1     30
-+	 */
-+	irq = 27 + ((slot + pin - 1) & 3);
-+
-+	printk("PCI map irq: slot %d, pin %d, devslot %d, irq: %d\n",slot,pin,devslot,irq);
-+
-+	return irq;
-+}
-+
-+static struct hw_pci versatile_pci __initdata = {
-+	.swizzle		= NULL,
-+	.map_irq		= versatile_map_irq,
-+	.nr_controllers		= 1,
-+	.setup			= pci_versatile_setup,
-+	.scan			= pci_versatile_scan_bus,
-+	.preinit		= pci_versatile_preinit,
-+};
-+
-+static int __init versatile_pci_init(void)
-+{
-+	pci_common_init(&versatile_pci);
-+	return 0;
-+}
-+
-+subsys_initcall(versatile_pci_init);
+ 	for (i = 0; i < 3; i++) {
+ 		ret = request_resource(&iomem_resource,
+ 					&xilinx_pci->mem_spaces[i]);
+@@ -183,7 +197,7 @@ static int __init pci_xilinx_setup_resources(struct resource **resource)
+ 	 * bus->resource[1] is the mem resource for this bus
+ 	 * bus->resource[2] is the prefetch mem resource for this bus
+ 	 */
+-	resource[0] = &xilinx_pci->mem_spaces[0];
++	resource[0] = &io_port;
+ 	resource[1] = &xilinx_pci->mem_spaces[1];
+ 	resource[2] = &xilinx_pci->mem_spaces[2];
+ 	goto out;
+@@ -194,6 +208,8 @@ static int __init pci_xilinx_setup_resources(struct resource **resource)
+ 		release_resource(&xilinx_pci->mem_spaces[1]);
+ 	case 1:
+ 		release_resource(&xilinx_pci->mem_spaces[0]);
++	case 0:
++		release_resource(&io_port);
+ 		break;
+ 	}
+  out:
+@@ -335,4 +351,3 @@ int __init xilinx_pci_init(struct xilinx_pci_data *x)
+ 	pci_common_init(&xilinx_hw_pci);
+ 	return 0;
+ }
+-
 -- 
 1.7.1
