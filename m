@@ -1,28 +1,96 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 14 Oct 2010 06:49:26 +0200
-Subject: [PATCH] sdio: fix suspend/resume regression
-In-Reply-To: <20101014022440.GD3553@void.printf.net>
-References: <1286788315.3101.11.camel@sven>
-	<1286955116-22793-1-git-send-email-ohad@wizery.com>
-	<20101014022440.GD3553@void.printf.net>
-Message-ID: <AANLkTiki-Xdw+mWfv2WhMFMrNP-E-nPXbp8LM0FaAfw+@mail.gmail.com>
+From: muddogxp@gmail.com (Xinyu Chen)
+Date: Thu, 14 Oct 2010 12:58:51 +0800
+Subject: mx31: external abort on non-linefetch (debugging suspend to RAM)
+In-Reply-To: <201010121159.57222.thomas.nemeth@betatech.fr>
+References: <201010121159.57222.thomas.nemeth@betatech.fr>
+Message-ID: <AANLkTins2JeaetXfA37WgzH2He8hd2z2fKxrMkfxK4HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Tue, Oct 12, 2010 at 5:59 PM, Thomas Nemeth
+<thomas.nemeth@betatech.fr> wrote:
+>
+> ? ?Hi!
+>
+> ? ?I've already posted a message some time ago about handling suspend
+> ? ?to RAM for iMX31 processors. I added a pm.c file I extracted from
+> ? ?the old 2.6.22 freescale-provided kernel to make it up-to-date and
+> ? ?also used the one Andy Green showed me.
+>
+> ? ?However, whatever I try, the CPU still does not want to wake up
+> ? ?after beeing put into State Retention mode. Apart from the muxing,
+> ? ?our CPU board is very much like the mx31ads board with several
+> ? ?resources added.
+>
+> ? ?There is a new symptom today. A long time ago I made a little
+> ? ?program usefull to quickly dump some registers. It only does a
+> ? ?simple mmap on /dev/mem with adjusted pages sizes and offsets and I
+> ? ?used to use it everywhere, on several processors. Using it on the
+> ? ?2.6.22 and the ADS works fine to dump the CCMR register. But using
+> ? ?it on our new board gives this :
+>
+> # insight -D ./iMX31-regs.defs -R CCMR
+> Unhandled fault: external abort on non-linefetch (0x008) at 0x40000000
+> Bus error
+>
+> ? ?For those wanting to have a look at my program, I can send the
+> ? ?tarball by mail.
+>
+> ? ?On the MX31ADS the result is the following one :
+> mx31# ./insight -D iMX31-regs.defs -R CCMR
+> CCMR: 0x074B097D
+> ?FIELD ? ? ? ? ? ?HEX ? ? ? ? ? ? ?BIN DEC.
+> ?FPME ? ? ?: ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?PRCS ? ? ?: ? ? ? ?2 ? ? ? ? ? ? ? 10 (2)
+> ?MPE ? ? ? : ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?SBYCS ? ? : ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?ROMW ? ? ?: ? ? ? ?3 ? ? ? ? ? ? ? 11 (3)
+> ?MDS ? ? ? : ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?SPE ? ? ? : ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?UPE ? ? ? : ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?WAMO ? ? ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?FIRS ? ? ?: ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?reserved ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?LPM ? ? ? : ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?RAMW ? ? ?: ? ? ? ?3 ? ? ? ? ? ? ? 11 (3)
+> ?SSI1S ? ? : ? ? ? ?2 ? ? ? ? ? ? ? 10 (2)
+> ?reserved ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?SSI2S ? ? : ? ? ? ?2 ? ? ? ? ? ? ? 10 (2)
+> ?reserved ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?PERCS ? ? : ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?CSCS ? ? ?: ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?FPMF ? ? ?: ? ? ? ?1 ? ? ? ? ? ? ? ?1 (1)
+> ?WBEN ? ? ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?VSTBY ? ? : ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?L2PG ? ? ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+> ?reserved ?: ? ? ? ?0 ? ? ? ? ? ? ? ?0 (0)
+>
+>
+> --
+> Thomas Nemeth - Ing?nieur d'?tudes en Informatique Industrielle
+> ? ? ? ? ? ? ? ? Industrial Computing Software Designer
+> BETAtech - 15, rue Apollo, Z.A. de Montredon, 31240, L'Union.
+> 05 34 30 40 00 (standard) ?/ ?05 34 30 40 09 (ligne directe)
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
 
-On Thu, Oct 14, 2010 at 4:24 AM, Chris Ball <cjb@laptop.org> wrote:
-> On Wed, Oct 13, 2010 at 09:31:56AM +0200, Ohad Ben-Cohen wrote:
->> Fix SDIO suspend/resume regression introduced by
->> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related to
->> mmc/sd card insert/removal during suspend/resume":
+Hi Thomas
 
-> Thanks very much, I've applied this to mmc-next with Nicolas' ACK.
+The exception is caused by you accessing the 0x40000000 which has been
+remapped as peripheral port memory in bootloader. As it's mapped, you
+can not access it by non privileged user.
+Please check the c15, c2, 4 coprocessor register settings in bootloader.
 
-Thanks a lot, Chris.
+Thanks!
 
-Btw, you might want to consider this as a 2.6.36 material, since it
-fixes a regression introduced in this cycle.
+-- 
+Best Regards
+Xinyu Chen
 
-Thanks,
-Ohad.
+Freescale Semiconductor
+MAD Linux BSP Team
