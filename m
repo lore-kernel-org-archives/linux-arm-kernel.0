@@ -1,129 +1,65 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 15 Oct 2010 01:00:05 +0200
-Subject: [PATCH 5/5] mx51: update defconfig
-In-Reply-To: <1287097205-18595-1-git-send-email-eric@eukrea.com>
-References: <1287097205-18595-1-git-send-email-eric@eukrea.com>
-Message-ID: <1287097205-18595-5-git-send-email-eric@eukrea.com>
+From: jongsun.han@samsung.com (Jongsun Han)
+Date: Fri, 15 Oct 2010 08:55:03 +0900
+Subject: [PATCH V2 2/2] ARM: S5PV310: Add support GPIOlib
+In-Reply-To: <006501cb6b5f$f9bd29a0$ed377ce0$%kim@samsung.com>
+References: <1286868876-3748-1-git-send-email-sbkim73@samsung.com>
+	<1286868876-3748-3-git-send-email-sbkim73@samsung.com>
+	<006501cb6b5f$f9bd29a0$ed377ce0$%kim@samsung.com>
+Message-ID: <00e201cb6bfb$38aaebc0$aa00c340$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/configs/mx51_defconfig |   50 ++++++++++++++++++++++++++++++++------
- 1 files changed, 42 insertions(+), 8 deletions(-)
+Sangbeom Kim wrote:
+> >
+> > From: Jongpill Lee <boyko.lee@samsung.com>
+> >
+> > This patch adds GPIOlib support for S5PV310 and S5PC210.
+> >
+> > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+> > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> > ---
+> > NOTE:
+> > This patch used mapped VA IO as GPIO virtual address.
+> > because firstly other Samsung SoC's GPIO used same method.
+> > and I think that  it's better to keep the same method.
+> > And ioremap also can be used for it.
+> > But in the GPIO, there is no need to allocate VA area dynamically.
+> > because GPIO can be used in any drivers anytime so it can't iounmap GPIO
+> > VA area.
+> >
+> Ok...
+> 
+> (snip)
+> 
+> >  #define MAX_COMBINER_NR		40
+> >
+> > +#define S5P_IRQ_EINT_BASE	COMBINER_IRQ(MAX_COMBINER_NR, 0)
+> > +
+> > +#define S5P_EINT_BASE1		(S5P_IRQ_EINT_BASE + 0)
+> > +#define S5P_EINT_BASE2		(S5P_IRQ_EINT_BASE + 16)
+> > +
+> 
+> Hmm...
+> If you want to add external interrupt, should be changed NR_IRQS too.
+> 
+> Will apply with fixing NR_IRQS.
+> 
 
-diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-index 163cfee..de3e459 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -17,6 +17,12 @@ CONFIG_ARCH_MX5=y
- CONFIG_MACH_MX51_BABBAGE=y
- CONFIG_MACH_MX51_3DS=y
- CONFIG_MACH_EUKREA_CPUIMX51=y
-+CONFIG_MACH_EUKREA_CPUIMX51SD=y
-+CONFIG_MACH_MX51_EFIKAMX=y
-+CONFIG_ARM_ERRATA_430973=y
-+CONFIG_ARM_ERRATA_458693=y
-+CONFIG_ARM_ERRATA_460075=y
-+CONFIG_ARM_ERRATA_743622=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT_VOLUNTARY=y
-@@ -41,9 +47,21 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_INET_XFRM_MODE_BEET is not set
- # CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
-+CONFIG_CAN=y
-+CONFIG_CAN_RAW=y
-+CONFIG_CAN_BCM=y
-+CONFIG_CAN_DEV=y
-+CONFIG_CAN_MCP251X=y
- # CONFIG_WIRELESS is not set
- # CONFIG_STANDALONE is not set
- CONFIG_CONNECTOR=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CONCAT=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_MXC=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
-@@ -83,8 +101,12 @@ CONFIG_INPUT_FF_MEMLESS=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_EVBUG=m
-+CONFIG_KEYBOARD_MATRIX=y
-+CONFIG_KEYBOARD_IMX=y
- CONFIG_MOUSE_PS2=m
- CONFIG_MOUSE_PS2_ELANTECH=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_SERIO_SERPORT=m
- CONFIG_VT_HW_CONSOLE_BINDING=y
- # CONFIG_DEVKMEM is not set
-@@ -94,24 +116,36 @@ CONFIG_SERIAL_IMX_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
--CONFIG_I2C_CHARDEV=m
-+CONFIG_I2C_CHARDEV=y
- # CONFIG_I2C_HELPER_AUTO is not set
--CONFIG_I2C_ALGOBIT=m
- CONFIG_I2C_ALGOPCF=m
- CONFIG_I2C_ALGOPCA=m
-+CONFIG_I2C_GPIO=y
-+CONFIG_I2C_IMX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
--# CONFIG_HID_SUPPORT is not set
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_ETH=y
-+CONFIG_USB_ULPI=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_MMC=y
--CONFIG_MMC_BLOCK=m
--CONFIG_MMC_SDHCI=m
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=m
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_PCF8563=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
-@@ -136,6 +170,8 @@ CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_CONFIGFS_FS=m
-+CONFIG_UBIFS_FS=y
-+CONFIG_UBIFS_FS_XATTR=y
- CONFIG_NFS_FS=y
- CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
-@@ -158,8 +194,6 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_SECURITYFS=y
--CONFIG_CRYPTO_DEFLATE=y
--CONFIG_CRYPTO_LZO=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- # CONFIG_CRYPTO_HW is not set
- CONFIG_CRC_CCITT=m
--- 
-1.7.0.4
+It seems that S5P_IRQ_EINT_BASE has wrong definition.
+S5P_IRQ_EINT_BASE has to be COMBINER_IRQ(MAX_COMBINER_NR - 1, 0).
+
+Thanks.
+
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
