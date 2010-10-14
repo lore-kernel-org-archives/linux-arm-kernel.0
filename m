@@ -1,89 +1,159 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 14 Oct 2010 17:49:07 +0300
-Subject: [PATCH v3 2/3] ARM: ep93xx: add AC97 platform support
+Date: Thu, 14 Oct 2010 17:49:08 +0300
+Subject: [PATCH v3 3/3] ASoC: ep93xx: add Simplemachines Sim.One AC97 audio
+	support
 In-Reply-To: <cover.1287066937.git.mika.westerberg@iki.fi>
 References: <cover.1287066937.git.mika.westerberg@iki.fi>
-Message-ID: <14a8c7ea0482375fa32a022ea7e318ea4feae6f1.1287066937.git.mika.westerberg@iki.fi>
+Message-ID: <a0a4850aa3947982f0de84299eb130597bf6a538.1287066937.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add platform support for the EP93xx AC97 controller driver.
+Add AC97 audio support for Simplemachines Sim.One board.
 
 Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 ---
- arch/arm/mach-ep93xx/core.c                     |   34 +++++++++++++++++++++++
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    1 +
- arch/arm/mach-ep93xx/include/mach/platform.h    |    1 +
- 3 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/mach-ep93xx/simone.c |    1 +
+ sound/soc/ep93xx/Kconfig      |    9 ++++
+ sound/soc/ep93xx/Makefile     |    2 +
+ sound/soc/ep93xx/simone.c     |   89 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 101 insertions(+), 0 deletions(-)
+ create mode 100644 sound/soc/ep93xx/simone.c
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 1990e22..ffdf87b 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -832,6 +832,40 @@ void ep93xx_i2s_release(void)
+diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+index 5dded58..f5f81f9 100644
+--- a/arch/arm/mach-ep93xx/simone.c
++++ b/arch/arm/mach-ep93xx/simone.c
+@@ -61,6 +61,7 @@ static void __init simone_init_machine(void)
+ 	ep93xx_register_fb(&simone_fb_info);
+ 	ep93xx_register_i2c(&simone_i2c_gpio_data, simone_i2c_board_info,
+ 			    ARRAY_SIZE(simone_i2c_board_info));
++	ep93xx_register_ac97();
  }
- EXPORT_SYMBOL(ep93xx_i2s_release);
  
-+/*************************************************************************
-+ * EP93xx AC97 audio peripheral handling
-+ *************************************************************************/
-+static struct resource ep93xx_ac97_resources[] = {
-+	{
-+		.start	= EP93XX_AAC_PHYS_BASE,
-+		.end	= EP93XX_AAC_PHYS_BASE + 0xb0 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_EP93XX_AACINTR,
-+		.end	= IRQ_EP93XX_AACINTR,
-+		.flags	= IORESOURCE_IRQ,
-+	},
+ MACHINE_START(SIM_ONE, "Simplemachines Sim.One Board")
+diff --git a/sound/soc/ep93xx/Kconfig b/sound/soc/ep93xx/Kconfig
+index 108e5ff..5742904 100644
+--- a/sound/soc/ep93xx/Kconfig
++++ b/sound/soc/ep93xx/Kconfig
+@@ -21,3 +21,12 @@ config SND_EP93XX_SOC_SNAPPERCL15
+         help
+           Say Y or M here if you want to add support for I2S audio on the
+           Bluewater Systems Snapper CL15 module.
++
++config SND_EP93XX_SOC_SIMONE
++	tristate "SoC Audio support for Simplemachines Sim.One board"
++	depends on SND_EP93XX_SOC && MACH_SIM_ONE
++	select SND_EP93XX_SOC_AC97
++	select SND_SOC_AC97_CODEC
++	help
++	  Say Y or M here if you want to add support for AC97 audio on the
++	  Simplemachines Sim.One board.
+diff --git a/sound/soc/ep93xx/Makefile b/sound/soc/ep93xx/Makefile
+index ac06e00..8e7977f 100644
+--- a/sound/soc/ep93xx/Makefile
++++ b/sound/soc/ep93xx/Makefile
+@@ -9,5 +9,7 @@ obj-$(CONFIG_SND_EP93XX_SOC_AC97)		+= snd-soc-ep93xx-ac97.o
+ 
+ # EP93XX Machine Support
+ snd-soc-snappercl15-objs			:= snappercl15.o
++snd-soc-simone-objs				:= simone.o
+ 
+ obj-$(CONFIG_SND_EP93XX_SOC_SNAPPERCL15)	+= snd-soc-snappercl15.o
++obj-$(CONFIG_SND_EP93XX_SOC_SIMONE)		+= snd-soc-simone.o
+diff --git a/sound/soc/ep93xx/simone.c b/sound/soc/ep93xx/simone.c
+new file mode 100644
+index 0000000..4b0d199
+--- /dev/null
++++ b/sound/soc/ep93xx/simone.c
+@@ -0,0 +1,89 @@
++/*
++ * simone.c -- ASoC audio for Simplemachines Sim.One board
++ *
++ * Copyright (c) 2010 Mika Westerberg
++ *
++ * Based on snappercl15 machine driver by Ryan Mallon.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++
++#include <asm/mach-types.h>
++#include <mach/hardware.h>
++
++#include "ep93xx-pcm.h"
++
++static struct snd_soc_dai_link simone_dai = {
++	.name		= "AC97",
++	.stream_name	= "AC97 HiFi",
++	.cpu_dai_name	= "ep93xx-ac97",
++	.codec_dai_name	= "ac97-hifi",
++	.codec_name	= "ac97-codec",
++	.platform_name	= "ep93xx-pcm-audio",
 +};
 +
-+static struct platform_device ep93xx_ac97_device = {
-+	.name		= "ep93xx-ac97",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(ep93xx_ac97_resources),
-+	.resource	= ep93xx_ac97_resources,
++static struct snd_soc_card snd_soc_simone = {
++	.name		= "Sim.One",
++	.dai_link	= &simone_dai,
++	.num_links	= 1,
 +};
 +
-+void __init ep93xx_register_ac97(void)
++static struct platform_device *simone_snd_ac97_device;
++static struct platform_device *simone_snd_device;
++
++static int __init simone_init(void)
 +{
-+	/*
-+	 * Make sure that the AC97 pins are not used by I2S.
-+	 */
-+	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONAC97);
++	int ret;
 +
-+	platform_device_register(&ep93xx_ac97_device);
-+	platform_device_register(&ep93xx_pcm_device);
++	if (!machine_is_sim_one())
++		return -ENODEV;
++
++	simone_snd_ac97_device = platform_device_alloc("ac97-codec", -1);
++	if (!simone_snd_ac97_device)
++		return -ENOMEM;
++
++	ret = platform_device_add(simone_snd_ac97_device);
++	if (ret)
++		goto fail;
++
++	simone_snd_device = platform_device_alloc("soc-audio", -1);
++	if (!simone_snd_device) {
++		ret = -ENOMEM;
++		goto fail;
++	}
++
++	platform_set_drvdata(simone_snd_device, &snd_soc_simone);
++	ret = platform_device_add(simone_snd_device);
++	if (ret) {
++		platform_device_put(simone_snd_device);
++		goto fail;
++	}
++
++	return ret;
++
++fail:
++	platform_device_put(simone_snd_ac97_device);
++	return ret;
 +}
++module_init(simone_init);
 +
- extern void ep93xx_gpio_init(void);
- 
- void __init ep93xx_init_devices(void)
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index c54b3e5..9ac4d10 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -105,6 +105,7 @@
- #define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
- #define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
- 
-+#define EP93XX_AAC_PHYS_BASE		EP93XX_APB_PHYS(0x00080000)
- #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
- 
- #define EP93XX_SPI_PHYS_BASE		EP93XX_APB_PHYS(0x000a0000)
-diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
-index 3330b36..5066045 100644
---- a/arch/arm/mach-ep93xx/include/mach/platform.h
-+++ b/arch/arm/mach-ep93xx/include/mach/platform.h
-@@ -61,6 +61,7 @@ void ep93xx_keypad_release_gpio(struct platform_device *pdev);
- void ep93xx_register_i2s(void);
- int ep93xx_i2s_acquire(unsigned i2s_pins, unsigned i2s_config);
- void ep93xx_i2s_release(void);
-+void ep93xx_register_ac97(void);
- 
- void ep93xx_init_devices(void);
- extern struct sys_timer ep93xx_timer;
++static void __exit simone_exit(void)
++{
++	platform_device_unregister(simone_snd_device);
++	platform_device_unregister(simone_snd_ac97_device);
++}
++module_exit(simone_exit);
++
++MODULE_DESCRIPTION("ALSA SoC Simplemachines Sim.One");
++MODULE_AUTHOR("Mika Westerberg <mika.westerberg@iki.fi>");
++MODULE_LICENSE("GPL");
 -- 
 1.5.6.5
