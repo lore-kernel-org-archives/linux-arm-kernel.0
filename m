@@ -1,110 +1,100 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 14 Oct 2010 19:50:28 +0900
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-In-Reply-To: <AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
-References: <20101006071731.28048.89938.sendpatchset@t400s>
-	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-	<AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
-	<AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
-Message-ID: <AANLkTikRTNKb=EkYOa_8K3jv2Y8ZpwRJAhka=fhLqZY_@mail.gmail.com>
+From: ian@opensource.wolfsonmicro.com (Ian Lartey)
+Date: Thu, 14 Oct 2010 12:07:33 +0100
+Subject: [PATCH] Fixing ethernet driver compilation error for i.MX31 ADS board
+Message-ID: <1287054453.1799.8991.camel@Tapajos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 8, 2010 at 4:09 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Thu, Oct 7, 2010 at 2:39 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> On Wed, Oct 6, 2010 at 10:06 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
->>> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>> ARM: Dynamic IRQ demux support
->>
->>> Just FYI, I had a patch months ago for this:
->>>
->>> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
->>>
->>> Do you think that's a simpler way to go?
->>
->> Thanks for the pointer. I wasn't aware of your patch, but the fact
->> that both of us came up with similar solutions to the same problem
->> clearly shows that there is a need for this feature.
->>
->> Your patch is much less intrusive compared to what i came up with. I
->> like the simplicity. I guess it is natural that the simplicity comes
->> with a bit of overhead. I'm thinking of the extra branches and
->> whatever potential cache misses coming from the code and callback
->> being located in different cache lines compared to the rest of the
->> code in __irq_svc and __irq_usr.
->>
->> My patches keeps the handlers in the same cache lines as before, but
->> this comes with the cost of more serious rearrangement of the code.
->> Also, my alignment_trap patch may decrease performance, not sure how
->> to deal with that in a good way.
->
-> Yeah, I was thinking of the performance degradation at that time as well.
-> What worried me most is actually the long jump. However, we do have
-> a long jump to asm_do_IRQ anyway.
->
-> And the optimizations like get_irqnr_preamble and get_irqnr_and_base
-> can be carried out in C code as well, or if that's tricky enough, inline
-> assembly code can also help.
+This is only a partial revert of "ARM: mx3/mx31ads: fold board
+header in its only user"
+[commit ccfa7c269843001077df02d98918c6c9bde91395)]
 
-Sure, I agree.
+As some of the the board defines are also used in the cs89x0
+ethernet driver by the i.MX31 ADS.
 
->> I don't mind so much which patch that gets merged, but I'm a little
->> bit concerned about code duplication. My patch moves macros into a
->> header file that each demux instance can make use of to minimize the
->> amount of duplicated code. I'm not sure how you are planning on
->> implementing each demux instance. If possible I'd like to see the
->> irq_handler macro in a header file somewhere so we don't have to
->> duplicate that code.
->
-> Machines will have to specify their IRQ demux handler, which could be
-> same among a group of machines which share common demux code, and
-> thus duplication can be avoided.
+Signed-off-by: Ian Lartey <ian@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-mx3/mach-mx31ads.c               |    7 +----
+ arch/arm/plat-mxc/include/mach/board-mx31ads.h |   33 ++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
 
-Right, I agree. I'm thinking of SMP-specific interrupts for IPIs and
-local timers that most likely want to be shared across multiple
-machines. I can for instance imagine a wide range of Cortex-A9 based
-SoCs that all need to deal with SMP interrupts.
-
->> On top of that I'd also like to break out the GIC demux code and put
->> it in a central location, but that's a separate issue.
->
-> I think we can make a common function call for all the IRQ demux handler
-> for GIC then.
-
-Sure, as long as we can point out the SoC-specific base address then
-we should be ok.
-
->> Any thoughts? Shall I try to move the irq_handler macro to some header file?
->>
->
-> Your patch is excellent, I don't mind either which gets in. What I'm a
-> bit concerned is the effort to keep up with the mostly optimized code.
-> I was thinking of a bit (not that much significant I guess) performance loss
-> when multiple IRQ demux handler is required for the sake of simplicity
-> and less intrusiveness, while still able to use the original optimized path
-> when that's not required (i.e. turning CONFIG_.... off).
->
-> Thoughts?
-
-I feel that the current abstraction with the macros in entry-macros.S
-is pretty nice and familiar. I think your solution with abstracting at
-the irq_handler level is simple from the mach-programmers point of
-view, but it does come with some performance penalty. I'm also not so
-sure how to deal with the code duplication. Like you say, the code
-could be shared between machines, but exactly how I don't know.
-
-Did you hear anything back from Russell? If he's ok with your patch
-then problem solved. Perhaps it's already in the tracker? =)
-
-If not, how about picking out the best part of our patches? I think my
-main benefit is the performance - hooking in the per-mach handlers
-below the vector_stub comes with little or no additional cost. Your
-strength is the simplicity and the nice use of the machine_desc.
-Perhaps we can put the __irq_usr and __irq_svc callbacks in struct
-machine_desc?
-
-Does anyone else care? =)
-
-Cheers,
-
-/ magnus
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index 94b3e7c..18a226b 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -22,13 +22,13 @@
+ #include <linux/i2c.h>
+ #include <linux/irq.h>
+ 
+-#include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <asm/memory.h>
+ #include <asm/mach/map.h>
+ #include <mach/common.h>
++#include <mach/board-mx31ads.h>
+ #include <mach/iomux-mx3.h>
+ 
+ #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+@@ -40,10 +40,6 @@
+ #include "devices-imx31.h"
+ #include "devices.h"
+ 
+-/* Base address of PBC controller */
+-#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
+-/* Offsets for the PBC Controller register */
+-
+ /* PBC Board interrupt status register */
+ #define PBC_INTSTATUS           0x000016
+ 
+@@ -67,7 +63,6 @@
+ #define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
+ #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
+ 
+-#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+ #define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
+ 
+ #define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
+diff --git a/arch/arm/plat-mxc/include/mach/board-mx31ads.h b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+new file mode 100644
+index 0000000..94b60dd
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/board-mx31ads.h
+@@ -0,0 +1,33 @@
++/*
++ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++#define __ASM_ARCH_MXC_BOARD_MX31ADS_H__
++
++#include <mach/hardware.h>
++
++/*
++ * These symbols are used by drivers/net/cs89x0.c.
++ * This is ugly as hell, but we have to provide them until
++ * someone fixed the driver.
++ */
++
++/* Base address of PBC controller */
++#define PBC_BASE_ADDRESS        MX31_CS4_BASE_ADDR_VIRT
++/* Offsets for the PBC Controller register */
++
++/* Ethernet Controller IO base address */
++#define PBC_CS8900A_IOBASE      0x020000
++
++#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
++
++#define EXPIO_INT_ENET_INT	(MXC_EXP_IO_BASE + 8)
++
++#endif /* __ASM_ARCH_MXC_BOARD_MX31ADS_H__ */
+-- 
+1.7.0.4
