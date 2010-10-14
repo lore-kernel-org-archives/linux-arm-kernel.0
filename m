@@ -1,27 +1,24 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 15 Oct 2010 08:56:18 +1300
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 14 Oct 2010 16:46:58 -0500
 Subject: [PATCH v3 2/3] ARM: ep93xx: add AC97 platform support
 In-Reply-To: <14a8c7ea0482375fa32a022ea7e318ea4feae6f1.1287066937.git.mika.westerberg@iki.fi>
 References: <cover.1287066937.git.mika.westerberg@iki.fi>
 	<14a8c7ea0482375fa32a022ea7e318ea4feae6f1.1287066937.git.mika.westerberg@iki.fi>
-Message-ID: <4CB76062.3020904@bluewatersys.com>
+Message-ID: <0D753D10438DA54287A00B02708426976450C42B0E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2010 03:49 AM, Mika Westerberg wrote:
+On Thursday, October 14, 2010 7:49 AM, Mika Westerberg wrote:
+>
 > Add platform support for the EP93xx AC97 controller driver.
-> 
+>
 > Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 > ---
 >  arch/arm/mach-ep93xx/core.c                     |   34 +++++++++++++++++++++++
 >  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    1 +
 >  arch/arm/mach-ep93xx/include/mach/platform.h    |    1 +
 >  3 files changed, 36 insertions(+), 0 deletions(-)
-
-Looks good.
-
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
-
+>
 > diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
 > index 1990e22..ffdf87b 100644
 > --- a/arch/arm/mach-ep93xx/core.c
@@ -37,6 +34,12 @@ Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 > +	{
 > +		.start	= EP93XX_AAC_PHYS_BASE,
 > +		.end	= EP93XX_AAC_PHYS_BASE + 0xb0 - 1,
+
+The last register in the AC97 peripheral is AC97GCIS at offset 0xa8.  So the
+end address should be:
+
+	.end	= EP93XX_AAC_PHYS_BASE + 0xac - 1,
+
 > +		.flags	= IORESOURCE_MEM,
 > +	},
 > +	{
@@ -59,6 +62,16 @@ Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 > +	 * Make sure that the AC97 pins are not used by I2S.
 > +	 */
 > +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONAC97);
+
+This is fine for now.
+
+Eventually some thought should go into a proper iomux to prevent
+loading drivers with conflicting pin requirements.  Currently, depending
+on the configuration, this could break if a user should try to use the
+ac97 and i2s audio at the same time (I2SONAC97 mode).  But, the same
+problem already exists if a user tries using spi and i2s audio (I2SONSSP
+mode).
+
 > +
 > +	platform_device_register(&ep93xx_ac97_device);
 > +	platform_device_register(&ep93xx_pcm_device);
@@ -92,12 +105,6 @@ Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 >  void ep93xx_init_devices(void);
 >  extern struct sys_timer ep93xx_timer;
 
+Other than the end resource this all looks fine.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
