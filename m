@@ -1,103 +1,110 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Thu, 14 Oct 2010 12:07:19 +0200
-Subject: [PATCH v2] mach-cpuimx27: workaround USB PHY detection problem
-In-Reply-To: <1287050205-15026-1-git-send-email-eric@eukrea.com>
-References: <1287050205-15026-1-git-send-email-eric@eukrea.com>
-Message-ID: <1287050839-15175-1-git-send-email-eric@eukrea.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 14 Oct 2010 19:50:28 +0900
+Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
+In-Reply-To: <AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
+References: <20101006071731.28048.89938.sendpatchset@t400s>
+	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
+	<AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
+	<AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
+Message-ID: <AANLkTikRTNKb=EkYOa_8K3jv2Y8ZpwRJAhka=fhLqZY_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
-v2 : should run checkpatch before sending v1 patch ;-)
+On Fri, Oct 8, 2010 at 4:09 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Thu, Oct 7, 2010 at 2:39 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> On Wed, Oct 6, 2010 at 10:06 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+>>> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>>> ARM: Dynamic IRQ demux support
+>>
+>>> Just FYI, I had a patch months ago for this:
+>>>
+>>> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
+>>>
+>>> Do you think that's a simpler way to go?
+>>
+>> Thanks for the pointer. I wasn't aware of your patch, but the fact
+>> that both of us came up with similar solutions to the same problem
+>> clearly shows that there is a need for this feature.
+>>
+>> Your patch is much less intrusive compared to what i came up with. I
+>> like the simplicity. I guess it is natural that the simplicity comes
+>> with a bit of overhead. I'm thinking of the extra branches and
+>> whatever potential cache misses coming from the code and callback
+>> being located in different cache lines compared to the rest of the
+>> code in __irq_svc and __irq_usr.
+>>
+>> My patches keeps the handlers in the same cache lines as before, but
+>> this comes with the cost of more serious rearrangement of the code.
+>> Also, my alignment_trap patch may decrease performance, not sure how
+>> to deal with that in a good way.
+>
+> Yeah, I was thinking of the performance degradation at that time as well.
+> What worried me most is actually the long jump. However, we do have
+> a long jump to asm_do_IRQ anyway.
+>
+> And the optimizations like get_irqnr_preamble and get_irqnr_and_base
+> can be carried out in C code as well, or if that's tricky enough, inline
+> assembly code can also help.
 
- arch/arm/mach-imx/mach-cpuimx27.c |   60 +++++++++++++++++++++++++++---------
- 1 files changed, 45 insertions(+), 15 deletions(-)
+Sure, I agree.
 
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index ea62afa..5d40c27 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -215,13 +215,58 @@ static struct platform_device serial_device = {
- };
- #endif
- 
-+static int otg_mode_host;
-+
-+static int __init eukrea_cpuimx27_otg_mode(char *options)
-+{
-+	if (!strcmp(options, "host"))
-+		otg_mode_host = 1;
-+	else if (!strcmp(options, "device"))
-+		otg_mode_host = 0;
-+	else
-+		pr_info("otg_mode neither \"host\" nor \"device\". "
-+			"Defaulting to device\n");
-+	return 0;
-+}
-+__setup("otg_mode=", eukrea_cpuimx27_otg_mode);
-+
- #if defined(CONFIG_USB_ULPI)
- static struct mxc_usbh_platform_data otg_pdata = {
- 	.portsc	= MXC_EHCI_MODE_ULPI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
- };
- 
-+/*
-+ * special init sequence which workarounds USBH2 USB PHY detection problems
-+ * when both H2 and OTG port are configured as hosts
-+ */
-+static int usbh2_phy_init(struct platform_device *pdev)
-+{
-+	uint32_t temp;
-+
-+	if (otg_mode_host) {
-+		/* configure USBCTRL */
-+		temp = readl(MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x600);
-+		temp &= ~((3 << 21) | 1);
-+		temp |= (1 << 5) | (1 << 16) | (1 << 19)
-+				 | (1 << 11) | (1 << 20);
-+		writel(temp, MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x600);
-+
-+		/* configure PORTSC1 */
-+		temp = 2 << 30;
-+		writel(temp, MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x584);
-+
-+		/* reset controller */
-+		temp = readl(MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x540);
-+		temp |= 0x02;
-+		writel(temp, MX27_IO_ADDRESS(MX27_OTG_BASE_ADDR) + 0x540);
-+	}
-+
-+	return 0;
-+}
-+
- static struct mxc_usbh_platform_data usbh2_pdata = {
-+	.init = usbh2_phy_init,
- 	.portsc	= MXC_EHCI_MODE_ULPI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
- };
-@@ -232,21 +277,6 @@ static struct fsl_usb2_platform_data otg_device_pdata = {
- 	.phy_mode       = FSL_USB2_PHY_ULPI,
- };
- 
--static int otg_mode_host;
--
--static int __init eukrea_cpuimx27_otg_mode(char *options)
--{
--	if (!strcmp(options, "host"))
--		otg_mode_host = 1;
--	else if (!strcmp(options, "device"))
--		otg_mode_host = 0;
--	else
--		pr_info("otg_mode neither \"host\" nor \"device\". "
--			"Defaulting to device\n");
--	return 0;
--}
--__setup("otg_mode=", eukrea_cpuimx27_otg_mode);
--
- static void __init eukrea_cpuimx27_init(void)
- {
- 	mxc_gpio_setup_multiple_pins(eukrea_cpuimx27_pins,
--- 
-1.7.0.4
+>> I don't mind so much which patch that gets merged, but I'm a little
+>> bit concerned about code duplication. My patch moves macros into a
+>> header file that each demux instance can make use of to minimize the
+>> amount of duplicated code. I'm not sure how you are planning on
+>> implementing each demux instance. If possible I'd like to see the
+>> irq_handler macro in a header file somewhere so we don't have to
+>> duplicate that code.
+>
+> Machines will have to specify their IRQ demux handler, which could be
+> same among a group of machines which share common demux code, and
+> thus duplication can be avoided.
+
+Right, I agree. I'm thinking of SMP-specific interrupts for IPIs and
+local timers that most likely want to be shared across multiple
+machines. I can for instance imagine a wide range of Cortex-A9 based
+SoCs that all need to deal with SMP interrupts.
+
+>> On top of that I'd also like to break out the GIC demux code and put
+>> it in a central location, but that's a separate issue.
+>
+> I think we can make a common function call for all the IRQ demux handler
+> for GIC then.
+
+Sure, as long as we can point out the SoC-specific base address then
+we should be ok.
+
+>> Any thoughts? Shall I try to move the irq_handler macro to some header file?
+>>
+>
+> Your patch is excellent, I don't mind either which gets in. What I'm a
+> bit concerned is the effort to keep up with the mostly optimized code.
+> I was thinking of a bit (not that much significant I guess) performance loss
+> when multiple IRQ demux handler is required for the sake of simplicity
+> and less intrusiveness, while still able to use the original optimized path
+> when that's not required (i.e. turning CONFIG_.... off).
+>
+> Thoughts?
+
+I feel that the current abstraction with the macros in entry-macros.S
+is pretty nice and familiar. I think your solution with abstracting at
+the irq_handler level is simple from the mach-programmers point of
+view, but it does come with some performance penalty. I'm also not so
+sure how to deal with the code duplication. Like you say, the code
+could be shared between machines, but exactly how I don't know.
+
+Did you hear anything back from Russell? If he's ok with your patch
+then problem solved. Perhaps it's already in the tracker? =)
+
+If not, how about picking out the best part of our patches? I think my
+main benefit is the performance - hooking in the per-mach handlers
+below the vector_stub comes with little or no additional cost. Your
+strength is the simplicity and the nice use of the machine_desc.
+Perhaps we can put the __irq_usr and __irq_svc callbacks in struct
+machine_desc?
+
+Does anyone else care? =)
+
+Cheers,
+
+/ magnus
