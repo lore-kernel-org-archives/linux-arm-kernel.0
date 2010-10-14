@@ -1,63 +1,370 @@
-From: thomas.nemeth@betatech.fr (Thomas Nemeth)
-Date: Thu, 14 Oct 2010 09:59:20 +0200
-Subject: mx31: external abort on non-linefetch (debugging suspend to RAM)
-In-Reply-To: <AANLkTins2JeaetXfA37WgzH2He8hd2z2fKxrMkfxK4HQ@mail.gmail.com>
-References: <201010121159.57222.thomas.nemeth@betatech.fr>
-	<AANLkTins2JeaetXfA37WgzH2He8hd2z2fKxrMkfxK4HQ@mail.gmail.com>
-Message-ID: <201010140959.20713.thomas.nemeth@betatech.fr>
+From: stanleymiao@gmail.com (stanleymiao at gmail.com)
+Date: Thu, 14 Oct 2010 16:38:08 +0800
+Subject: [PATCH 2/3] Add hardware timer support for Mindspeed Comcerto
+	platflorm
+In-Reply-To: <1287045489-1133-2-git-send-email-stanleymiao@gmail.com>
+References: <1287045489-1133-1-git-send-email-stanleymiao@gmail.com>
+	<1287045489-1133-2-git-send-email-stanleymiao@gmail.com>
+Message-ID: <1287045489-1133-3-git-send-email-stanleymiao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi 14 octobre 2010, Xinyu Chen a ?crit?:
-> On Tue, Oct 12, 2010 at 5:59 PM, Thomas Nemeth
->
-> <thomas.nemeth@betatech.fr> wrote:
-> > # insight -D ./iMX31-regs.defs -R CCMR
-> > Unhandled fault: external abort on non-linefetch (0x008) at
-> > 0x40000000 Bus error
-> >
-> > ? ?On the MX31ADS the result is the following one :
-> > mx31# ./insight -D iMX31-regs.defs -R CCMR
-> > CCMR: 0x074B097D
->
-> Hi Thomas
+From: Stanley.Miao <stanley.miao@windriver.com>
 
-    Hi !
+Add hardware timer support for Comcerto platflorm. Timer0 is used by MSP
+and timer2 is used by fpp, so we choose timer1 for clockevent and timer3 for
+clocksource.
 
+Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
+---
+ arch/arm/mach-comcerto/Makefile                    |    2 +-
+ .../arm/mach-comcerto/include/mach/comcerto-1000.h |    3 +
+ .../include/mach/comcerto-1000/timer.h             |   62 ++++++
+ arch/arm/mach-comcerto/include/mach/system.h       |    3 +
+ arch/arm/mach-comcerto/time.c                      |  227 ++++++++++++++++++++
+ 5 files changed, 296 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-comcerto/include/mach/comcerto-1000/timer.h
+ create mode 100644 arch/arm/mach-comcerto/time.c
 
-> The exception is caused by you accessing the 0x40000000 which has
-> been remapped as peripheral port memory in bootloader.
-
-    I'll have a look at 0x40000000 mapping in uboot. However, CCMR
-    is located at 0x53F80000 and that's what I ask mmap to remap.
-    How can a map request of 0x53F80000 trying to access 0x40000000 ?
-
-    Is it a symptom that can explain my problems with suspend-to-ram ?
-
-
-> As it's mapped, you can not access it by non privileged user.
-
-    You mean "from user land" (instead of "from kernel space") ?
-
-
-> Please check the c15, c2, 4 coprocessor register settings in
-> bootloader.
->
-> Thanks!
-
-    Thanks to you :)
-
-
-Thomas.
+diff --git a/arch/arm/mach-comcerto/Makefile b/arch/arm/mach-comcerto/Makefile
+index 70aac61..c514d20 100644
+--- a/arch/arm/mach-comcerto/Makefile
++++ b/arch/arm/mach-comcerto/Makefile
+@@ -4,7 +4,7 @@
+ 
+ # Object file lists.
+ 
+-obj-y :=
++obj-y := time.o
+ 
+ obj-$(CONFIG_ARCH_M83XXX)			+= comcerto-1000.o
+ obj-$(CONFIG_EVM_C1KMFCN_EVM)			+= board-c1kmfcn_evm.o
+diff --git a/arch/arm/mach-comcerto/include/mach/comcerto-1000.h b/arch/arm/mach-comcerto/include/mach/comcerto-1000.h
+index f48ae34..10086c4 100644
+--- a/arch/arm/mach-comcerto/include/mach/comcerto-1000.h
++++ b/arch/arm/mach-comcerto/include/mach/comcerto-1000.h
+@@ -88,4 +88,7 @@
+ #define APB_VADDR_BASE			0xfc000000	/* VA of IO on APB bus */
+ 
+ #define APB_VADDR(x)            ((x) - COMCERTO_AHB_APB_BASE + APB_VADDR_BASE)
++
++#include <mach/comcerto-1000/timer.h>
++
+ #endif
+diff --git a/arch/arm/mach-comcerto/include/mach/comcerto-1000/timer.h b/arch/arm/mach-comcerto/include/mach/comcerto-1000/timer.h
+new file mode 100644
+index 0000000..5372e37
+--- /dev/null
++++ b/arch/arm/mach-comcerto/include/mach/comcerto-1000/timer.h
+@@ -0,0 +1,62 @@
++/*
++ *  arch/arm/mach-comcerto/include/mach/comcerto-1000/timer.h
++ *
++ *  Copyright (C) 2004-2008 Mindspeed Technologies, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __TIMER_H__
++#define __TIMER_H__
++
++/* Comcerto Timers  */
++#define COMCERTO_TIMER0_HIGH_BOUND          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x00)
++#define COMCERTO_TIMER0_CURRENT_COUNT       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x04)
++#define COMCERTO_TIMER1_HIGH_BOUND          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x08)
++#define COMCERTO_TIMER1_CURRENT_COUNT       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x0C)
++#define COMCERTO_TIMER1_LOW_BOUND           APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x0C)
++#define COMCERTO_TIMER2_LOW_BOUND           APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x10)
++#define COMCERTO_TIMER2_HIGH_BOUND          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x14)
++#define COMCERTO_TIMER2_CTRL                APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x18)
++#define COMCERTO_TIMER2_CURRENT_COUNT       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x1C)
++#define COMCERTO_TIMER3_LOW_BOUND           APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x20)
++#define COMCERTO_TIMER3_HIGH_BOUND          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x24)
++#define COMCERTO_TIMER3_CTRL                APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x28)
++#define COMCERTO_TIMER3_CURRENT_COUNT       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x2C)
++#define COMCERTO_TIMER4_HIGH_BOUND          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x30)
++#define COMCERTO_TIMER4_CURRENT_COUNT       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x34)
++#define COMCERTO_TIMER5_LOW_BOUND           APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x38)
++#define COMCERTO_TIMER5_HIGH_BOUND          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x3C)
++#define COMCERTO_TIMER5_CURRENT_COUNT       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x40)
++#define COMCERTO_TIMER5_CTRL                APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x44)
++#define COMCERTO_TIMER_IRQ_MASK             APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x48)
++#define COMCERTO_TIMER_STATUS               APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x50)
++#define COMCERTO_TIMER_STATUS_CLR           APB_VADDR(COMCERTO_APB_TIMER_BASE + 0x50)
++#define COMCERTO_TIMER_WDT_HIGH_BOUND       APB_VADDR(COMCERTO_APB_TIMER_BASE + 0xD0)
++#define COMCERTO_TIMER_WDT_CONTROL          APB_VADDR(COMCERTO_APB_TIMER_BASE + 0xD4)
++#define COMCERTO_TIMER_WDT_CURRENT_COUNT    APB_VADDR(COMCERTO_APB_TIMER_BASE + 0xD8)
++
++#define COMCERTO_TIMER_WDT_CONTROL_TIMER_ENABLE		(1 << 0)
++
++/* COMCERTO_TIMER_IRQ_MASK */
++#define COMCERTO_TIMER0     0x01
++#define COMCERTO_TIMER1     0x02
++#define COMCERTO_TIMER2     0x04
++#define COMCERTO_TIMER3     0x08
++#define COMCERTO_TIMER4     0x10
++#define COMCERTO_TIMER5     0x20
++#define COMCERTO_ALL        0xFF
++#define COMCERTO_TIMER_CSP  (COMCERTO_TIMER1 | COMCERTO_TIMER2 | COMCERTO_TIMER3 | COMCERTO_TIMER4 | COMCERTO_TIMER5)
++#endif
+diff --git a/arch/arm/mach-comcerto/include/mach/system.h b/arch/arm/mach-comcerto/include/mach/system.h
+index 364cc7e..d24914d 100644
+--- a/arch/arm/mach-comcerto/include/mach/system.h
++++ b/arch/arm/mach-comcerto/include/mach/system.h
+@@ -34,6 +34,9 @@ static inline void arch_idle(void)
+ 
+ static inline void arch_reset(char mode, const char *cmd)
+ {
++	/* use watch dog timer to reset the board */
++	__raw_writel(0x1, COMCERTO_TIMER_WDT_CONTROL);
++	__raw_writel(0x1, COMCERTO_TIMER_WDT_HIGH_BOUND);
+ }
+ 
+ #endif /* __ASM_ARCH_SYSTEM_H */
+diff --git a/arch/arm/mach-comcerto/time.c b/arch/arm/mach-comcerto/time.c
+new file mode 100644
+index 0000000..40e3515
+--- /dev/null
++++ b/arch/arm/mach-comcerto/time.c
+@@ -0,0 +1,227 @@
++/*
++ * linux/arch/arm/mach-comcerto/time.c
++ *
++ * Copyright (C) 2008 Mindspeed Technologies, Inc.
++ * Copyright (c) 2010 Wind River Systems, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ * See the GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/irq.h>
++#include <linux/err.h>
++
++#include <mach/hardware.h>
++#include <asm/mach/time.h>
++
++#define TID_CLOCKEVENT	1
++#define TID_CLOCKSOURCE	3
++
++static DEFINE_SPINLOCK(timer_lock);
++
++struct comcerto_gptimer {
++	char *name;
++	unsigned long id; /* maybe not needed */
++	unsigned long mask;
++	unsigned long hbound;
++	unsigned long lbound;
++	unsigned long count;
++};
++
++static void gptimer_enable(struct comcerto_gptimer *gptimer)
++{
++	unsigned long flags;
++	unsigned long irq_mask;
++
++	spin_lock_irqsave(&timer_lock, flags);
++	irq_mask = __raw_readl(COMCERTO_TIMER_IRQ_MASK);
++	irq_mask |= gptimer->mask;
++	__raw_writel(irq_mask, COMCERTO_TIMER_IRQ_MASK);
++	spin_unlock_irqrestore(&timer_lock, flags);
++}
++
++static void gptimer_disable(struct comcerto_gptimer *gptimer)
++{
++	unsigned long flags;
++	unsigned long irq_mask;
++
++	spin_lock_irqsave(&timer_lock, flags);
++	irq_mask = __raw_readl(COMCERTO_TIMER_IRQ_MASK);
++	irq_mask &= ~gptimer->mask;
++	__raw_writel(irq_mask, COMCERTO_TIMER_IRQ_MASK);
++	spin_unlock_irqrestore(&timer_lock, flags);
++}
++
++static struct comcerto_gptimer timers[] = {
++	[TID_CLOCKEVENT] = {
++		.name	= "timer1",
++		.id	= TID_CLOCKEVENT,
++		.mask	= COMCERTO_TIMER1,
++		.hbound	= COMCERTO_TIMER1_HIGH_BOUND,
++		.lbound = COMCERTO_TIMER1_LOW_BOUND,
++		.count = COMCERTO_TIMER1_CURRENT_COUNT,
++	},
++	[TID_CLOCKSOURCE] = {
++		.name	= "timer3",
++		.id	= TID_CLOCKSOURCE,
++		.mask	= COMCERTO_TIMER3,
++		.hbound	= COMCERTO_TIMER3_HIGH_BOUND,
++		.lbound = COMCERTO_TIMER3_LOW_BOUND,
++		.count = COMCERTO_TIMER3_CURRENT_COUNT,
++	},
++};
++
++static void gptimer_set_bound(struct comcerto_gptimer *gptimer,
++					unsigned low, unsigned high)
++{
++	__raw_writel(high, gptimer->hbound);
++	/* __raw_writel(low, gptimer->lbound); */
++}
++
++static void gptimer_clear_status(struct comcerto_gptimer *gptimer)
++{
++	__raw_writel(gptimer->mask, COMCERTO_TIMER_STATUS_CLR);
++}
++
++static unsigned long gptimer_get_current_count(struct comcerto_gptimer *timer)
++{
++	return __raw_readl(timer->count);
++}
++
++static int comcerto_set_next_event(unsigned long cycles,
++					struct clock_event_device *evt)
++{
++	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
++
++	if (evt->mode == CLOCK_EVT_MODE_ONESHOT)
++		gptimer_enable(t);
++	return 0;
++}
++
++static void comcerto_set_mode(enum clock_event_mode mode,
++				struct clock_event_device *evt)
++{
++	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
++
++	if (mode != CLOCK_EVT_MODE_PERIODIC)
++		gptimer_disable(t);
++	else
++		gptimer_enable(t);
++}
++
++static struct clock_event_device clockevent = {
++	.name           = "clockevent",
++	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.rating         = 200,
++	.shift          = 24,
++	.set_mode       = comcerto_set_mode,
++	.set_next_event = comcerto_set_next_event,
++};
++
++static cycle_t comcerto_timer3_read(struct clocksource *cs)
++{
++	return (cycle_t)gptimer_get_current_count(&timers[TID_CLOCKSOURCE]);
++}
++
++static struct clocksource clocksource = {
++	.name   = "clocksource",
++	.rating = 200,
++	.read   = comcerto_timer3_read,
++	.mask   = CLOCKSOURCE_MASK(32),
++	.shift  = 24,
++	.flags  = CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static void __init comcerto_clocksource_init(void)
++{
++	struct comcerto_gptimer *t = &timers[TID_CLOCKSOURCE];
++
++	gptimer_set_bound(t, 0, 0xffffffff);
++	clocksource.mult = clocksource_hz2mult(COMCERTO_DEFAULTAHBCLK, clocksource.shift);
++	if (clocksource_register(&clocksource))
++		printk(KERN_ERR "%s: can't register clocksource!\n", clocksource.name);
++}
++
++static irqreturn_t comcerto_timer1_interrupt(int irq, void *dev_id)
++{
++	u32 status;
++	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
++	struct clock_event_device *dev = &clockevent;
++
++	status = __raw_readl(COMCERTO_TIMER_STATUS) & __raw_readl(COMCERTO_TIMER_IRQ_MASK);
++
++	/* timer1 expired */
++	if (status & t->mask) {
++		/* we need to disable interrupt to simulate ONESHOT mode,
++		 * do it before clearing the interrupt to avoid race */
++		if (dev->mode != CLOCK_EVT_MODE_PERIODIC)
++			gptimer_disable(t);
++
++		gptimer_clear_status(t);
++		dev->event_handler(dev);
++
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static struct irqaction comcerto_timer1_irq = {
++	.name           = "timer1",
++	.flags          = IRQF_DISABLED | IRQF_TIMER,
++	.handler        = comcerto_timer1_interrupt,
++};
++
++static void __init comcerto_clockevents_init(void)
++{
++	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
++
++	clockevent.mult = div_sc(COMCERTO_DEFAULTAHBCLK, NSEC_PER_SEC, clockevent.shift);
++	clockevent.max_delta_ns = clockevent_delta2ns(0x3fffffff, &clockevent);
++	clockevent.min_delta_ns = clockevent_delta2ns(1, &clockevent);
++	clockevent.cpumask = cpumask_of(0);
++	clockevents_register_device(&clockevent);
++
++	/* Clear all the timers except timer0  */
++	__raw_writel(COMCERTO_TIMER_CSP, COMCERTO_TIMER_STATUS);
++
++	/* Register interrupt handler for interrupt on IRQ_TIMERB*/
++	setup_irq(IRQ_TIMER1, &comcerto_timer1_irq);
++
++	/* Set and enable the system timer */
++	gptimer_set_bound(t, 0, COMCERTO_DEFAULTAHBCLK * 1000000 / HZ);
++}
++
++static void __init comcerto_timer_init(void)
++{
++	/*
++	 * DO NOT MODIFY THE CONFIGURATION OF TIMER0
++	 * It is used by the MSP
++	 * For C1000 FPP will be using TIMER2
++	 */
++
++	comcerto_clocksource_init();
++	comcerto_clockevents_init();
++}
++
++struct sys_timer comcerto_timer = {
++	.init           = comcerto_timer_init,
++};
 -- 
-Thomas Nemeth - Ing?nieur d'?tudes en Informatique Industrielle
-? ? ? ? ? ? ? ? Industrial Computing Software Designer
-BETAtech - 15, rue Apollo, Z.A. de Montredon, 31240, L'Union.
-05 34 30 40 00 (standard) ?/ ?05 34 30 40 09 (ligne directe)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 189 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101014/6978eccc/attachment.sig>
+1.5.4.3
