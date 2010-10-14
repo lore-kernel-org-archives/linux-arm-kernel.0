@@ -1,44 +1,103 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 14 Oct 2010 11:47:53 -0700
-Subject: [PATCH] serial/imx: check that the buffer is non-empty before
-	sending it out
-In-Reply-To: <20101014112735.GK10432@buzzloop.caiaq.de>
-References: <20101008091640.GD29673@pengutronix.de>
-	<1286960637-11600-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20101014112735.GK10432@buzzloop.caiaq.de>
-Message-ID: <20101014184752.GB17096@kroah.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Fri, 15 Oct 2010 08:56:18 +1300
+Subject: [PATCH v3 2/3] ARM: ep93xx: add AC97 platform support
+In-Reply-To: <14a8c7ea0482375fa32a022ea7e318ea4feae6f1.1287066937.git.mika.westerberg@iki.fi>
+References: <cover.1287066937.git.mika.westerberg@iki.fi>
+	<14a8c7ea0482375fa32a022ea7e318ea4feae6f1.1287066937.git.mika.westerberg@iki.fi>
+Message-ID: <4CB76062.3020904@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 14, 2010 at 01:27:35PM +0200, Daniel Mack wrote:
-> On Wed, Oct 13, 2010 at 11:03:57AM +0200, Uwe Kleine-K?nig wrote:
-> > From: Volker Ernst <volker.ernst@txtr.com>
-> > 
-> > The .start_tx callback (imx_start_tx here) isn't only called when the
-> > buffer is non-empty.  E.g. after resume or when handshaking is enabled
-> > and the other side starts to signal being ready.
-> > 
-> > So check for an empty puffer already before sending the first character.
-> > This prevents sending out stale (or uninitialised) data.
-> > 
-> > Signed-off-by: Volker Ernst <volker.ernst@txtr.com>
-> > Signed-off-by: Daniel Mack <daniel@caiaq.de>
-> > Cc: Andy Green <andy@warmcat.com>
-> > [ukl: reword commit log, put check in while condition]
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > as I didn't sent a patch, here comes my current version.  Don't know if
-> > it makes it easier to test for you ...
-> > 
-> > I faked Daniel's SoB as Andrew said he did, compressed the changelog a
-> > bit and put the check in the while condition as I suggested.
+On 10/15/2010 03:49 AM, Mika Westerberg wrote:
+> Add platform support for the EP93xx AC97 controller driver.
 > 
-> FWIW, that looks good to me. Thanks for finishing the work :)
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> ---
+>  arch/arm/mach-ep93xx/core.c                     |   34 +++++++++++++++++++++++
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    1 +
+>  arch/arm/mach-ep93xx/include/mach/platform.h    |    1 +
+>  3 files changed, 36 insertions(+), 0 deletions(-)
 
-Nice, I've replaced the original patch in my tree with this one.
+Looks good.
 
-thanks,
+Acked-by: Ryan Mallon <ryan@bluewatersys.com>
 
-greg k-h
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index 1990e22..ffdf87b 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -832,6 +832,40 @@ void ep93xx_i2s_release(void)
+>  }
+>  EXPORT_SYMBOL(ep93xx_i2s_release);
+>  
+> +/*************************************************************************
+> + * EP93xx AC97 audio peripheral handling
+> + *************************************************************************/
+> +static struct resource ep93xx_ac97_resources[] = {
+> +	{
+> +		.start	= EP93XX_AAC_PHYS_BASE,
+> +		.end	= EP93XX_AAC_PHYS_BASE + 0xb0 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start	= IRQ_EP93XX_AACINTR,
+> +		.end	= IRQ_EP93XX_AACINTR,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ep93xx_ac97_device = {
+> +	.name		= "ep93xx-ac97",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(ep93xx_ac97_resources),
+> +	.resource	= ep93xx_ac97_resources,
+> +};
+> +
+> +void __init ep93xx_register_ac97(void)
+> +{
+> +	/*
+> +	 * Make sure that the AC97 pins are not used by I2S.
+> +	 */
+> +	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_I2SONAC97);
+> +
+> +	platform_device_register(&ep93xx_ac97_device);
+> +	platform_device_register(&ep93xx_pcm_device);
+> +}
+> +
+>  extern void ep93xx_gpio_init(void);
+>  
+>  void __init ep93xx_init_devices(void)
+> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> index c54b3e5..9ac4d10 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> @@ -105,6 +105,7 @@
+>  #define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
+>  #define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
+>  
+> +#define EP93XX_AAC_PHYS_BASE		EP93XX_APB_PHYS(0x00080000)
+>  #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
+>  
+>  #define EP93XX_SPI_PHYS_BASE		EP93XX_APB_PHYS(0x000a0000)
+> diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+> index 3330b36..5066045 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/platform.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+> @@ -61,6 +61,7 @@ void ep93xx_keypad_release_gpio(struct platform_device *pdev);
+>  void ep93xx_register_i2s(void);
+>  int ep93xx_i2s_acquire(unsigned i2s_pins, unsigned i2s_config);
+>  void ep93xx_i2s_release(void);
+> +void ep93xx_register_ac97(void);
+>  
+>  void ep93xx_init_devices(void);
+>  extern struct sys_timer ep93xx_timer;
+
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
