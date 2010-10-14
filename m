@@ -1,332 +1,117 @@
-From: tanzilli@acmesystems.it (Sergio Tanzilli)
-Date: Thu, 14 Oct 2010 02:06:26 +0200
-Subject: [PATCH] Acme Systems FOX Board G20 board files
-Message-ID: <1287014786-25543-1-git-send-email-tanzilli@acmesystems.it>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 14 Oct 2010 09:32:32 +0900
+Subject: [PATCH 2/3] ARM: S5PV210: Add init code of audio to Goni and
+	Aquila board
+In-Reply-To: <4CA5623B.5030405@samsung.com>
+References: <4CA5623B.5030405@samsung.com>
+Message-ID: <003701cb6b37$4c106fb0$e4314f10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/mach-at91/Kconfig        |    7 +
- arch/arm/mach-at91/Makefile       |    2 +
- arch/arm/mach-at91/board-foxg20.c |  279 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 288 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-at91/board-foxg20.c
+Chanwoo Choi wrote:
+> 
+> This patch add initializtion code of audio and I2S platform drivers
+> to Goni and Aquila board.
+> 
+> Signed-off-by : Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by : Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by : Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/mach-aquila.c |   24 ++++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/mach-goni.c   |   11 +++++++++++
+>  2 files changed, 35 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-
+> aquila.c
+> index 0663ec4..92dad41 100644
+> --- a/arch/arm/mach-s5pv210/mach-aquila.c
+> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
+> @@ -507,8 +507,31 @@ static struct platform_device *aquila_devices[] __initdata
+> = {
+>  	&s5p_device_fimc0,
+>  	&s5p_device_fimc1,
+>  	&s5p_device_fimc2,
+> +	&s5pv210_device_iis0,
+>  };
+> 
+> +static void __init aquila_sound_init(void)
+> +{
+> +	unsigned int gpio;
+> +
+> +	/* CODEC_XTAL_EN
+> +	 *
+> +	 * The Aquila board have a oscillator which provide main clock
+> +	 * to WM8994 codec. The oscillator provide 24MHz clock to WM8994
+> +	 * clock. Set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
+> +	 * */
+> +	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
+> +	gpio_request(gpio, "CODEC_XTAL_EN");
+> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
+> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> +
+> +	/* Ths main clock of WM8994 codec uses the output of CLKOUT pin.
+> +	 * The CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS)
+> +	 * because it needs 24MHz clock to operate WM8994 codec.
+> +	 */
+> +	writel(readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+> +}
+> +
+>  static void __init aquila_map_io(void)
+>  {
+>  	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> @@ -530,6 +553,7 @@ static void __init aquila_machine_init(void)
+>  	s3c_fimc_setname(2, "s5p-fimc");
+> 
+>  	/* SOUND */
+> +	aquila_sound_init();
+>  	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
+>  			ARRAY_SIZE(i2c_gpio5_devs));
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index df5c2d1..d3bab85 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -488,8 +488,18 @@ static struct platform_device *goni_devices[] __initdata =
+> {
+>  	&s3c_device_hsmmc0,
+>  	&s3c_device_hsmmc1,
+>  	&s3c_device_hsmmc2,
+> +	&s5pv210_device_iis0,
+>  };
+> 
+> +static void __init goni_sound_init(void)
+> +{
+> +	/* Ths main clock of WM8994 codec uses the output of CLKOUT pin.
+> +	 * The CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS)
+> +	 * because it needs 24MHz clock to operate WM8994 codec.
+> +	 */
+> +	writel(readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
+> +}
+> +
+>  static void __init goni_map_io(void)
+>  {
+>  	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> @@ -507,6 +517,7 @@ static void __init goni_machine_init(void)
+>  	goni_setup_sdhci();
+> 
+>  	/* SOUND */
+> +	goni_sound_init();
+>  	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
+>  			ARRAY_SIZE(i2c_gpio5_devs));
+> 
+> --
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 939bccd..35def97 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -364,6 +364,13 @@ config MACH_STAMP9G20
- 	  evaluation board.
- 	  <http://www.taskit.de/en/>
- 
-+config MACH_FOXG20
-+	bool "Acme Systems srl FOX Board G20"
-+	depends on ARCH_AT91SAM9G20
-+	help
-+	  Select this if you are using Acme Systems
-+	  FOX Board G20 <http://www.acmesystems.it>
-+
- endif
- 
- if (ARCH_AT91SAM9260 || ARCH_AT91SAM9G20)
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index ca2ac00..686bc6d 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -65,6 +65,8 @@ obj-$(CONFIG_MACH_AT91SAM9G20EK_2MMC) += board-sam9g20ek-2slot-mmc.o
- obj-$(CONFIG_MACH_CPU9G20)	+= board-cpu9krea.o
- obj-$(CONFIG_MACH_STAMP9G20)	+= board-stamp9g20.o
- obj-$(CONFIG_MACH_PORTUXG20)	+= board-stamp9g20.o
-+obj-$(CONFIG_MACH_FOXG20)	+= board-foxg20.o
-+
- 
- # AT91SAM9260/AT91SAM9G20 board-specific support
- obj-$(CONFIG_MACH_SNAPPER_9260)	+= board-snapper9260.o
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-new file mode 100644
-index 0000000..f6179c2
---- /dev/null
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -0,0 +1,279 @@
-+/*
-+ *  Copyright (C) 2005 SAN People
-+ *  Copyright (C) 2008 Atmel
-+ *  Copyright (C) 2010 Lee McLoughlin - lee at lmmrtech.com
-+ *  Copyright (C) 2010 Sergio Tanzilli - tanzilli at acmesystems.it
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/at73c213.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
-+#include <linux/clk.h>
-+#include <linux/w1-gpio.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/setup.h>
-+#include <asm/mach-types.h>
-+#include <asm/irq.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/irq.h>
-+
-+#include <mach/board.h>
-+#include <mach/gpio.h>
-+#include <mach/at91sam9_smc.h>
-+
-+#include "sam9_smc.h"
-+#include "generic.h"
-+
-+/*
-+ * The FOX Board G20 hardware comes as the "Netus G20" board with
-+ * just the cpu, ram, dataflash and two header connectors.
-+ * This is plugged into the FOX Board which provides the ethernet,
-+ * usb, rtc, leds, switch, ...
-+ *
-+ * For more info visit: http://www.acmesystems.it/foxg20
-+ */
-+
-+
-+static void __init foxg20_map_io(void)
-+{
-+	/* Initialize processor: 18.432 MHz crystal */
-+	at91sam9260_initialize(18432000);
-+
-+	/* DBGU on ttyS0. (Rx & Tx only) */
-+	at91_register_uart(0, 0, 0);
-+
-+	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
-+	at91_register_uart(AT91SAM9260_ID_US0, 1,
-+				ATMEL_UART_CTS
-+				| ATMEL_UART_RTS
-+				| ATMEL_UART_DTR
-+				| ATMEL_UART_DSR
-+				| ATMEL_UART_DCD
-+				| ATMEL_UART_RI);
-+
-+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US1, 2,
-+		ATMEL_UART_CTS
-+		| ATMEL_UART_RTS);
-+
-+	/* USART2 on ttyS3. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US2, 3, 0);
-+
-+	/* USART3 on ttyS4. (Rx, Tx, RTS, CTS) */
-+	at91_register_uart(AT91SAM9260_ID_US3, 4,
-+		ATMEL_UART_CTS
-+		| ATMEL_UART_RTS);
-+
-+	/* USART4 on ttyS5. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-+
-+	/* USART5 on ttyS6. (Rx & Tx only) */
-+	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
-+
-+	/* set serial console to ttyS0 (ie, DBGU) */
-+	at91_set_serial_console(0);
-+
-+	/* Set the internal pull-up resistor on DRXD */
-+	at91_set_A_periph(AT91_PIN_PB14, 1);
-+
-+}
-+
-+static void __init foxg20_init_irq(void)
-+{
-+	at91sam9260_init_interrupts(NULL);
-+}
-+
-+
-+/*
-+ * USB Host port
-+ */
-+static struct at91_usbh_data __initdata foxg20_usbh_data = {
-+	.ports		= 2,
-+};
-+
-+/*
-+ * USB Device port
-+ */
-+static struct at91_udc_data __initdata foxg20_udc_data = {
-+	.vbus_pin	= AT91_PIN_PC6,
-+	.pullup_pin	= 0,		/* pull-up driven by UDC */
-+};
-+
-+
-+/*
-+ * SPI devices.
-+ */
-+static struct spi_board_info foxg20_spi_devices[] = {
-+#if !defined(CONFIG_MMC_AT91)
-+	{
-+		.modalias	= "mtd_dataflash",
-+		.chip_select	= 1,
-+		.max_speed_hz	= 15 * 1000 * 1000,
-+		.bus_num	= 0,
-+	},
-+#endif
-+};
-+
-+
-+/*
-+ * MACB Ethernet device
-+ */
-+static struct at91_eth_data __initdata foxg20_macb_data = {
-+	.phy_irq_pin	= AT91_PIN_PA7,
-+	.is_rmii	= 1,
-+};
-+
-+
-+
-+
-+/*
-+ * MCI (SD/MMC)
-+ * det_pin, wp_pin and vcc_pin are not connected
-+ */
-+static struct at91_mmc_data __initdata foxg20_mmc_data = {
-+	.slot_b		= 1,
-+	.wire4		= 1,
-+};
-+
-+
-+/*
-+ * LEDs
-+ */
-+static struct gpio_led foxg20_leds[] = {
-+	{	/* user led, red */
-+		.name			= "user_led",
-+		.gpio			= AT91_PIN_PC7,
-+		.active_low		= 0,
-+		.default_trigger	= "heartbeat",
-+	},
-+};
-+
-+
-+/*
-+ * GPIO Buttons
-+ */
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+static struct gpio_keys_button foxg20_buttons[] = {
-+	{
-+		.gpio		= AT91_PIN_PC4,
-+		.code		= BTN_1,
-+		.desc		= "Button 1",
-+		.active_low	= 1,
-+		.wakeup		= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data foxg20_button_data = {
-+	.buttons	= foxg20_buttons,
-+	.nbuttons	= ARRAY_SIZE(foxg20_buttons),
-+};
-+
-+static struct platform_device foxg20_button_device = {
-+	.name		= "gpio-keys",
-+	.id		= -1,
-+	.num_resources	= 0,
-+	.dev		= {
-+		.platform_data	= &foxg20_button_data,
-+	}
-+};
-+
-+static void __init foxg20_add_device_buttons(void)
-+{
-+	at91_set_gpio_input(AT91_PIN_PC4, 1);	/* btn1 */
-+	at91_set_deglitch(AT91_PIN_PC4, 1);
-+
-+	platform_device_register(&foxg20_button_device);
-+}
-+#else
-+static void __init foxg20_add_device_buttons(void) {}
-+#endif
-+
-+
-+#if defined(CONFIG_W1_MASTER_GPIO) || defined(CONFIG_W1_MASTER_GPIO_MODULE)
-+static struct w1_gpio_platform_data w1_gpio_pdata = {
-+	/* If you choose to use a pin other than PB16 it needs to be 3.3V */
-+	.pin		= AT91_PIN_PB16,
-+	.is_open_drain  = 1,
-+};
-+
-+static struct platform_device w1_device = {
-+	.name                   = "w1-gpio",
-+	.id                     = -1,
-+	.dev.platform_data      = &w1_gpio_pdata,
-+};
-+
-+static void __init at91_add_device_w1(void)
-+{
-+	at91_set_GPIO_periph(w1_gpio_pdata.pin, 1);
-+	at91_set_multi_drive(w1_gpio_pdata.pin, 1);
-+	platform_device_register(&w1_device);
-+}
-+
-+#endif
-+
-+
-+static struct i2c_board_info __initdata foxg20_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("24c512", 0x50),
-+	},
-+};
-+
-+
-+static void __init foxg20_board_init(void)
-+{
-+	/* Serial */
-+	at91_add_device_serial();
-+	/* USB Host */
-+	at91_add_device_usbh(&foxg20_usbh_data);
-+	/* USB Device */
-+	at91_add_device_udc(&foxg20_udc_data);
-+	/* SPI */
-+	at91_add_device_spi(foxg20_spi_devices, ARRAY_SIZE(foxg20_spi_devices));
-+	/* Ethernet */
-+	at91_add_device_eth(&foxg20_macb_data);
-+	/* MMC */
-+	at91_add_device_mmc(0, &foxg20_mmc_data);
-+	/* I2C */
-+	at91_add_device_i2c(foxg20_i2c_devices, ARRAY_SIZE(foxg20_i2c_devices));
-+	/* LEDs */
-+	at91_gpio_leds(foxg20_leds, ARRAY_SIZE(foxg20_leds));
-+	/* Push Buttons */
-+	foxg20_add_device_buttons();
-+#if defined(CONFIG_W1_MASTER_GPIO) || defined(CONFIG_W1_MASTER_GPIO_MODULE)
-+	at91_add_device_w1();
-+#endif
-+}
-+
-+MACHINE_START(FOXG20, "Acme Systems srl FOX Board G20")
-+	/* Maintainer: Sergio Tanzilli */
-+	.phys_io	= AT91_BASE_SYS,
-+	.io_pg_offst	= (AT91_VA_BASE_SYS >> 18) & 0xfffc,
-+	.boot_params	= AT91_SDRAM_BASE + 0x100,
-+	.timer		= &at91sam926x_timer,
-+	.map_io		= foxg20_map_io,
-+	.init_irq	= foxg20_init_irq,
-+	.init_machine	= foxg20_board_init,
-+MACHINE_END
--- 
-1.7.0.4
+Hi Chanwoo,
+
+I missed your first patch "[PATCH 1/3] ARM: S5P210: Add i2c information to Goni and Aquila board" in my mailbox. Could you please re-send it?
+
+And I prefer __raw_writel() than writel() here, because according to page table setting, the memory type of the area you want to access is shared device. No need memory barrier when you are accessing shared device type of memory.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
