@@ -1,22 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Oct 2010 16:14:51 +0100
-Subject: [PATCH v4] ARM: AT91: add board support for Pcontrol_G20
-In-Reply-To: <4CB71813.6060601@atmel.com>
-References: <1286466086.4306.41.camel@aspire.localdomain>
-	<20101008123407.GB30252@game.jcrosoft.org>
-	<1286550644.21584.34.camel@aspire.localdomain>
-	<1286787761.7800.11.camel@aspire.localdomain>
-	<1286792568.7800.19.camel@aspire.localdomain>
-	<20101013131515.GC11087@game.jcrosoft.org>
-	<1286979531.7165.9.camel@aspire.localdomain>
-	<4CB71813.6060601@atmel.com>
-Message-ID: <20101014151451.GB23434@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 14 Oct 2010 17:28:12 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <alpine.LFD.2.00.1010131602590.2764@xanadu.home>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+	<alpine.LFD.2.00.1010131602590.2764@xanadu.home>
+Message-ID: <AANLkTikex9BvozcfY8EDJ0EHepKR+gSOEyYyppZVCLx_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 14, 2010 at 04:47:47PM +0200, Nicolas Ferre wrote:
-> > diff --git a/arch/arm/configs/pcontrol_g20_defconfig b/arch/arm/configs/pcontrol_g20_defconfig
-> > new file mode 100644
+On Wed, Oct 13, 2010 at 10:08 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> It could, but then there has to be extra code in the resume handler to
+> cope with the fact that the card was powered off.
 
-Is it really necessary to have another platform specific defconfig rather
-than grouping it together with other similar platforms?
+Good point.
+
+It's much better the way it is now.
+
+Thanks,
+Ohad.
