@@ -1,126 +1,98 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 14 Oct 2010 10:57:42 +0900
-Subject: [PATCH v2 1/2] ARM: S5PV210: Add i2c information to Goni and Aquila
+Date: Thu, 14 Oct 2010 10:57:43 +0900
+Subject: [PATCH v2 2/2] ARM: S5PV210: Add init code of audio to Goni and Auqila
 	board
-Message-ID: <4CB66396.8010004@samsung.com>
+Message-ID: <4CB66397.3090505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This patch the I2C board information for the WM8994 used in the Goni/Aquila
-as audio codec and adds the I2C platform drivers.
+This patch add initialization code of audio and I2S platform drivers
+to Goni and Aquila board.
 
 Signed-off-by : Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by : Joonyoung Shim <jy0922.shim@samsung.com>
 Signed-off-by : Kyungmin Park <kyungmin.park@samsung.com>
+Reviewed-by : Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s5pv210/mach-aquila.c |   27 +++++++++++++++++++++++++++
- arch/arm/mach-s5pv210/mach-goni.c   |   27 +++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pv210/mach-aquila.c |   24 ++++++++++++++++++++++++
+ arch/arm/mach-s5pv210/mach-goni.c   |   11 +++++++++++
+ 2 files changed, 35 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index 0dda801..0663ec4 100644
+index 0663ec4..a232937 100644
 --- a/arch/arm/mach-s5pv210/mach-aquila.c
 +++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -404,6 +404,28 @@ static struct i2c_board_info i2c_gpio_pmic_devs[] __initdata = {
- #endif
- };
- 
-+/* GPIO I2C AP 1.8V */
-+#define AP_I2C_GPIO_BUS_5	5
-+static struct i2c_gpio_platform_data aquila_i2c_gpio5_data = {
-+	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
-+	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
-+};
-+
-+static struct platform_device aquila_i2c_gpio5 = {
-+	.name		= "i2c-gpio",
-+	.id		= AP_I2C_GPIO_BUS_5,
-+	.dev		= {
-+		.platform_data	= &aquila_i2c_gpio5_data,
-+	},
-+};
-+
-+static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
-+	{
-+		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
-+		I2C_BOARD_INFO("wm8994", 0x1a),
-+	},
-+};
-+
- /* PMIC Power button */
- static struct gpio_keys_button aquila_gpio_keys_table[] = {
- 	{
-@@ -475,6 +497,7 @@ static void aquila_setup_sdhci(void)
- 
- static struct platform_device *aquila_devices[] __initdata = {
- 	&aquila_i2c_gpio_pmic,
-+	&aquila_i2c_gpio5,
- 	&aquila_device_gpiokeys,
- 	&s3c_device_fb,
- 	&s5pc110_device_onenand,
-@@ -506,6 +529,10 @@ static void __init aquila_machine_init(void)
- 	s3c_fimc_setname(1, "s5p-fimc");
- 	s3c_fimc_setname(2, "s5p-fimc");
- 
-+	/* SOUND */
-+	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
-+			ARRAY_SIZE(i2c_gpio5_devs));
-+
- 	/* FB */
- 	s3c_fb_set_platdata(&aquila_lcd_pdata);
- 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 53754d7..df5c2d1 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -385,6 +385,28 @@ static struct i2c_board_info i2c_gpio_pmic_devs[] __initdata = {
- #endif
- };
- 
-+/* GPIO I2C AP 1.8V */
-+#define AP_I2C_GPIO_BUS_5	5
-+static struct i2c_gpio_platform_data goni_i2c_gpio5_data = {
-+	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
-+	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
-+};
-+
-+static struct platform_device goni_i2c_gpio5 = {
-+	.name		= "i2c-gpio",
-+	.id		= AP_I2C_GPIO_BUS_5,
-+	.dev		= {
-+		.platform_data	= &goni_i2c_gpio5_data,
-+	},
-+};
-+
-+static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
-+	{
-+		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
-+		I2C_BOARD_INFO("wm8994", 0x1a),
-+	},
-+};
-+
- /* PMIC Power button */
- static struct gpio_keys_button goni_gpio_keys_table[] = {
- 	{
-@@ -458,6 +480,7 @@ static struct platform_device *goni_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s5pc110_device_onenand,
- 	&goni_i2c_gpio_pmic,
-+	&goni_i2c_gpio5,
- 	&goni_device_gpiokeys,
+@@ -507,8 +507,31 @@ static struct platform_device *aquila_devices[] __initdata = {
  	&s5p_device_fimc0,
  	&s5p_device_fimc1,
-@@ -483,6 +506,10 @@ static void __init goni_machine_init(void)
- 	/* SDHCI */
+ 	&s5p_device_fimc2,
++	&s5pv210_device_iis0,
+ };
+ 
++static void __init aquila_sound_init(void)
++{
++	unsigned int gpio;
++
++	/* CODEC_XTAL_EN 
++	 *
++	 * The Aquila board have a oscillator which provide main clock
++	 * to WM8994 codec. The oscillator provide 24MHz clock to WM8994
++	 * clock. Set gpio setting of "CODEC_XTAL_EN" to enable a oscillator.
++	 * */
++	gpio = S5PV210_GPH3(2);		/* XEINT_26 */
++	gpio_request(gpio, "CODEC_XTAL_EN");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_OUTPUT);
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	/* Ths main clock of WM8994 codec uses the output of CLKOUT pin.
++	 * The CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS) 
++	 * because it needs 24MHz clock to operate WM8994 codec.
++	 */
++	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
++}
++
+ static void __init aquila_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -530,6 +553,7 @@ static void __init aquila_machine_init(void)
+ 	s3c_fimc_setname(2, "s5p-fimc");
+ 
+ 	/* SOUND */
++	aquila_sound_init();
+ 	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
+ 			ARRAY_SIZE(i2c_gpio5_devs));
+ 
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index df5c2d1..63855c5 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -488,8 +488,18 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_hsmmc2,
++	&s5pv210_device_iis0,
+ };
+ 
++static void __init goni_sound_init(void)
++{
++	/* Ths main clock of WM8994 codec uses the output of CLKOUT pin.
++	 * The CLKOUT[9:8] set to 0x3(XUSBXTI) of 0xE010E000(OTHERS) 
++	 * because it needs 24MHz clock to operate WM8994 codec.
++	 */
++	__raw_writel(__raw_readl(S5P_OTHERS) | (0x3 << 8), S5P_OTHERS);
++}
++
+ static void __init goni_map_io(void)
+ {
+ 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+@@ -507,6 +517,7 @@ static void __init goni_machine_init(void)
  	goni_setup_sdhci();
  
-+	/* SOUND */
-+	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
-+			ARRAY_SIZE(i2c_gpio5_devs));
-+
- 	/* FB */
- 	s3c_fb_set_platdata(&goni_lcd_pdata);
+ 	/* SOUND */
++	goni_sound_init();
+ 	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
+ 			ARRAY_SIZE(i2c_gpio5_devs));
  
 -- 
 1.7.0.4
