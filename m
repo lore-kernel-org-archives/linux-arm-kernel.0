@@ -1,76 +1,139 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 14 Oct 2010 14:24:10 +0900
-Subject: [PATCH V2 1/2] ARM: S5P: Add initial map for GPIO2 and GPIO3
-In-Reply-To: <1286868876-3748-2-git-send-email-sbkim73@samsung.com>
-References: <1286868876-3748-1-git-send-email-sbkim73@samsung.com>
-	<1286868876-3748-2-git-send-email-sbkim73@samsung.com>
-Message-ID: <006601cb6b60$0a0e4190$1e2ac4b0$%kim@samsung.com>
+Date: Thu, 14 Oct 2010 14:28:56 +0900
+Subject: [PATCH v2 1/2] ARM: S5PV210: Add i2c information to Goni and
+	Aquila board
+In-Reply-To: <4CB66396.8010004@samsung.com>
+References: <4CB66396.8010004@samsung.com>
+Message-ID: <006701cb6b60$b3cead50$1b6c07f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sangbeom Kim wrote:
+Chanwoo Choi wrote:
 > 
-> From: Jongpill Lee <boyko.lee@samsung.com>
+> This patch the I2C board information for the WM8994 used in the Goni/Aquila
+> as audio codec and adds the I2C platform drivers.
 > 
-> This patch adds initial map for GPIO2 and GPIO3.
-> S5PV310/S5PC210 has separated GPIO1, GPIO2 and GPIO3.
-> 
-> Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> Signed-off-by : Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by : Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by : Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> Changes since v1:
-> - Rebased on latest for-next from Kukjin Kim's git tree
-> - Added S5P_VA_GPIO1 according to S5PV310_PA_GPIO1
+>  arch/arm/mach-s5pv210/mach-aquila.c |   27
+> +++++++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/mach-goni.c   |   27
+> +++++++++++++++++++++++++++
+>  2 files changed, 54 insertions(+), 0 deletions(-)
 > 
->  arch/arm/mach-s5pv310/cpu.c              |   12 +++++++++++-
->  arch/arm/plat-s5p/include/plat/map-s5p.h |    3 +++
->  2 files changed, 14 insertions(+), 1 deletions(-)
+> diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-
+> aquila.c
+> index 0dda801..0663ec4 100644
+> --- a/arch/arm/mach-s5pv210/mach-aquila.c
+> +++ b/arch/arm/mach-s5pv210/mach-aquila.c
+> @@ -404,6 +404,28 @@ static struct i2c_board_info i2c_gpio_pmic_devs[]
+> __initdata = {
+>  #endif
+>  };
 > 
-> diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-> index 3345cf6..ffed262 100644
-> --- a/arch/arm/mach-s5pv310/cpu.c
-> +++ b/arch/arm/mach-s5pv310/cpu.c
-> @@ -57,11 +57,21 @@ static struct map_desc s5pv310_iodesc[] __initdata = {
->  		.length		= SZ_4K,
->  		.type		= MT_DEVICE,
->  	}, {
-> -		.virtual	= (unsigned long)S5P_VA_GPIO,
-> +		.virtual	= (unsigned long)S5P_VA_GPIO1,
->  		.pfn		= __phys_to_pfn(S5PV310_PA_GPIO1),
->  		.length		= SZ_4K,
->  		.type		= MT_DEVICE,
->  	}, {
-> +		.virtual	= (unsigned long)S5P_VA_GPIO2,
-> +		.pfn		= __phys_to_pfn(S5PV310_PA_GPIO2),
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE,
-> +	}, {
-> +		.virtual	= (unsigned long)S5P_VA_GPIO3,
-> +		.pfn		= __phys_to_pfn(S5PV310_PA_GPIO3),
-> +		.length		= SZ_256K,
-> +		.type		= MT_DEVICE,
-> +	}, {
->  		.virtual	= (unsigned long)S5P_VA_DMC0,
->  		.pfn		= __phys_to_pfn(S5PV310_PA_DMC0),
->  		.length		= SZ_4K,
-> diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-
-> s5p/include/plat/map-s5p.h
-> index ec96a19..fef353d 100644
-> --- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-> +++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-> @@ -16,6 +16,9 @@
->  #define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
->  #define S5P_VA_CMU		S3C_ADDR(0x02100000)
->  #define S5P_VA_GPIO		S3C_ADDR(0x02200000)
-> +#define S5P_VA_GPIO1		S5P_VA_GPIO
-> +#define S5P_VA_GPIO2		S3C_ADDR(0x02240000)
-> +#define S5P_VA_GPIO3		S3C_ADDR(0x02280000)
+> +/* GPIO I2C AP 1.8V */
+> +#define AP_I2C_GPIO_BUS_5	5
+> +static struct i2c_gpio_platform_data aquila_i2c_gpio5_data = {
+> +	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
+> +	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
+> +};
+> +
+> +static struct platform_device aquila_i2c_gpio5 = {
+> +	.name		= "i2c-gpio",
+> +	.id		= AP_I2C_GPIO_BUS_5,
+> +	.dev		= {
+> +		.platform_data	= &aquila_i2c_gpio5_data,
+> +	},
+> +};
+> +
+> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
+> +	{
+> +		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
+> +		I2C_BOARD_INFO("wm8994", 0x1a),
+> +	},
+> +};
+> +
+>  /* PMIC Power button */
+>  static struct gpio_keys_button aquila_gpio_keys_table[] = {
+>  	{
+> @@ -475,6 +497,7 @@ static void aquila_setup_sdhci(void)
 > 
->  #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
->  #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
+>  static struct platform_device *aquila_devices[] __initdata = {
+>  	&aquila_i2c_gpio_pmic,
+> +	&aquila_i2c_gpio5,
+>  	&aquila_device_gpiokeys,
+>  	&s3c_device_fb,
+>  	&s5pc110_device_onenand,
+> @@ -506,6 +529,10 @@ static void __init aquila_machine_init(void)
+>  	s3c_fimc_setname(1, "s5p-fimc");
+>  	s3c_fimc_setname(2, "s5p-fimc");
+> 
+> +	/* SOUND */
+> +	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
+> +			ARRAY_SIZE(i2c_gpio5_devs));
+> +
+>  	/* FB */
+>  	s3c_fb_set_platdata(&aquila_lcd_pdata);
+> 
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index 53754d7..df5c2d1 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -385,6 +385,28 @@ static struct i2c_board_info i2c_gpio_pmic_devs[]
+> __initdata = {
+>  #endif
+>  };
+> 
+> +/* GPIO I2C AP 1.8V */
+> +#define AP_I2C_GPIO_BUS_5	5
+> +static struct i2c_gpio_platform_data goni_i2c_gpio5_data = {
+> +	.sda_pin	= S5PV210_MP05(3),	/* XM0ADDR_11 */
+> +	.scl_pin	= S5PV210_MP05(2),	/* XM0ADDR_10 */
+> +};
+> +
+> +static struct platform_device goni_i2c_gpio5 = {
+> +	.name		= "i2c-gpio",
+> +	.id		= AP_I2C_GPIO_BUS_5,
+> +	.dev		= {
+> +		.platform_data	= &goni_i2c_gpio5_data,
+> +	},
+> +};
+> +
+> +static struct i2c_board_info i2c_gpio5_devs[] __initdata = {
+> +	{
+> +		/* CS/ADDR = low 0x34 (FYI: high = 0x36) */
+> +		I2C_BOARD_INFO("wm8994", 0x1a),
+> +	},
+> +};
+> +
+>  /* PMIC Power button */
+>  static struct gpio_keys_button goni_gpio_keys_table[] = {
+>  	{
+> @@ -458,6 +480,7 @@ static struct platform_device *goni_devices[] __initdata = {
+>  	&s3c_device_fb,
+>  	&s5pc110_device_onenand,
+>  	&goni_i2c_gpio_pmic,
+> +	&goni_i2c_gpio5,
+>  	&goni_device_gpiokeys,
+>  	&s5p_device_fimc0,
+>  	&s5p_device_fimc1,
+> @@ -483,6 +506,10 @@ static void __init goni_machine_init(void)
+>  	/* SDHCI */
+>  	goni_setup_sdhci();
+> 
+> +	/* SOUND */
+> +	i2c_register_board_info(AP_I2C_GPIO_BUS_5, i2c_gpio5_devs,
+> +			ARRAY_SIZE(i2c_gpio5_devs));
+> +
+>  	/* FB */
+>  	s3c_fb_set_platdata(&goni_lcd_pdata);
+> 
 > --
 
-Looks ok to me...will apply.
+Ok...will apply.
 
 Thanks.
 
