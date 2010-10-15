@@ -1,36 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Oct 2010 21:14:53 +0100
-Subject: [PATCH .36-rc8] arm: mm: allow, but warn, when issuing
-	ioremap() on RAM
-In-Reply-To: <AANLkTinmAy13niqRKrray1Gk4hkr19tA2gWwYbfnFoh7@mail.gmail.com>
-References: <1287152120-7201-1-git-send-email-felipe.contreras@gmail.com>
-	<1287153021.27165.6.camel@e102109-lin.cambridge.arm.com>
-	<20101015194255.GA12981@n2100.arm.linux.org.uk>
-	<AANLkTinmAy13niqRKrray1Gk4hkr19tA2gWwYbfnFoh7@mail.gmail.com>
-Message-ID: <20101015201453.GB12981@n2100.arm.linux.org.uk>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Fri, 15 Oct 2010 15:18:27 -0500
+Subject: [PATCH 1/2] ARM: imx: Add wake functionality to GPIO
+Message-ID: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 15, 2010 at 11:00:40PM +0300, Felipe Contreras wrote:
-> On Fri, Oct 15, 2010 at 10:42 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > As soon as the first ARM merge hits during the merge window, I'll be
-> > restoring the 'always fail' behaviour.
-> 
-> Ok, are you going to merge also your patch to use memblock for the
-> initialization? Many drivers could certainly use that to fix the
-> issue.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-There's a lot of work going on with memblock in x86-land which impacts
-ARM and means major conflicts for that patch - I think first we'll have
-to deal with the fallout from that (iow, finding out what's been broken
-by this activity and fix that), and then I'll have to re-do my patch from
-the beginning.
+Add function definition for irq_chip.set_wake to enable GPIO to
+wake-up the system.
 
-Technically, following the rules, that means it has to miss this merge
-window - so it looks like it's going to take another six months to solve
-this issue (three months to get the memblock patch in, and another three
-months for driver fixes to find their way through.)
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/plat-mxc/gpio.c              |   35 +++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/gpio.h |    3 ++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
 
-I find these timescales (12 months) rather unacceptable to fix a problem
-such as this.  Makes me wonder why I even bother trying.
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 57ec4a8..7647ba3 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -20,9 +20,11 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
++#include <mach/gpio.h>
+ #include <mach/hardware.h>
+ #include <asm-generic/bug.h>
+ 
+@@ -201,11 +203,44 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ 	}
+ }
+ 
++/*
++ * Set interrupt number "irq" in the GPIO as a wake-up source.
++ * While system is running, all registered GPIO interrupts need to have
++ * wake-up enabled. When system is suspended, only selected GPIO interrupts
++ * need to have wake-up enabled.
++ * @param  irq          interrupt source number
++ * @param  enable       enable as wake-up if equal to non-zero
++ * @return       This function returns 0 on success.
++ */
++static int gpio_set_wake_irq(u32 irq, u32 enable)
++{
++	u32 gpio = irq_to_gpio(irq);
++	u32 gpio_idx = gpio & 0x1F;
++	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
++
++	if (enable) {
++		port->suspend_wakeup |= (1 << gpio_idx);
++		if (port->irq_high && (gpio_idx >= 16))
++			enable_irq_wake(port->irq_high);
++		else
++			enable_irq_wake(port->irq);
++	} else {
++		port->suspend_wakeup &= ~(1 << gpio_idx);
++		if (port->irq_high && (gpio_idx >= 16))
++			disable_irq_wake(port->irq_high);
++		else
++			disable_irq_wake(port->irq);
++	}
++
++	return 0;
++}
++
+ static struct irq_chip gpio_irq_chip = {
+ 	.ack = gpio_ack_irq,
+ 	.mask = gpio_mask_irq,
+ 	.unmask = gpio_unmask_irq,
+ 	.set_type = gpio_set_irq_type,
++	.set_wake = gpio_set_wake_irq,
+ };
+ 
+ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index af33b74..dba3768 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -39,6 +39,9 @@ struct mxc_gpio_port {
+ 	struct gpio_chip chip;
+ 	u32 both_edges;
+ 	spinlock_t lock;
++	u32 suspend_wakeup;
++	u32 saved_wakeup;
++
+ };
+ 
+ int mxc_gpio_init(struct mxc_gpio_port*, int);
+-- 
+1.6.0.4
