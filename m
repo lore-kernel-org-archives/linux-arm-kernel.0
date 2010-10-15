@@ -1,76 +1,77 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Oct 2010 12:21:01 +0200
-Subject: [PATCH 3/6] mmc: sdhci: introduce private get_ro
+Date: Fri, 15 Oct 2010 12:20:59 +0200
+Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
 In-Reply-To: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
 References: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1287138064-21385-4-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1287138064-21385-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some controllers handle their write-protection differently. Introduce a
-callback to be able to handle it, ensuring the same locking takes place
-for it. Rename the status variable to make it more obvious why the read
-from the registers needs to be inverted.
+We need to carry some information per host, e.g. the clock. Add a
+structure for it and initialize it in the generic part. Also improve
+the check for a parent.
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Tested-by : Eric B?nard <eric@eukrea.com>
+Cc: Richard R?jfors <richard.rojfors.ext@mocean-labs.com>
 ---
+ drivers/mmc/host/sdhci-pltfm.c |   10 +++++++---
+ drivers/mmc/host/sdhci-pltfm.h |    7 +++++++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-Changes since last version:
-
-rename the variable to make usage of '!' more obvious
-
- drivers/mmc/host/sdhci.c |   15 +++++++++------
- drivers/mmc/host/sdhci.h |    1 +
- 2 files changed, 10 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 9cb60ba..782c0ee 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1223,22 +1223,25 @@ static int sdhci_get_ro(struct mmc_host *mmc)
- {
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index 4f126de..730fdf5 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
  	struct sdhci_host *host;
- 	unsigned long flags;
--	int present;
-+	int is_readonly;
++	struct sdhci_pltfm_host *pltfm_host;
+ 	struct resource *iomem;
+ 	int ret;
  
- 	host = mmc_priv(mmc);
+@@ -71,16 +72,19 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Invalid iomem size. You may "
+ 			"experience problems.\n");
  
- 	spin_lock_irqsave(&host->lock, flags);
- 
- 	if (host->flags & SDHCI_DEVICE_DEAD)
--		present = 0;
-+		is_readonly = 0;
-+	else if (host->ops->get_ro)
-+		is_readonly = host->ops->get_ro(host);
+-	if (pdev->dev.parent)
+-		host = sdhci_alloc_host(pdev->dev.parent, 0);
++	/* Some PCI-based MFD need the parent here */
++	if (pdev->dev.parent != &platform_bus)
++		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
  	else
--		present = sdhci_readl(host, SDHCI_PRESENT_STATE);
-+		is_readonly = !(sdhci_readl(host, SDHCI_PRESENT_STATE)
-+				& SDHCI_WRITE_PROTECT);
+-		host = sdhci_alloc_host(&pdev->dev, 0);
++		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
  
- 	spin_unlock_irqrestore(&host->lock, flags);
+ 	if (IS_ERR(host)) {
+ 		ret = PTR_ERR(host);
+ 		goto err;
+ 	}
  
--	if (host->quirks & SDHCI_QUIRK_INVERTED_WRITE_PROTECT)
--		return !!(present & SDHCI_WRITE_PROTECT);
--	return !(present & SDHCI_WRITE_PROTECT);
-+	/* This quirk needs to be replaced by a callback-function later */
-+	return host->quirks & SDHCI_QUIRK_INVERTED_WRITE_PROTECT ?
-+		!is_readonly : is_readonly;
- }
++	pltfm_host = sdhci_priv(host);
++
+ 	host->hw_name = "platform";
+ 	if (pdata && pdata->ops)
+ 		host->ops = pdata->ops;
+diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
+index 900f329..93a0319 100644
+--- a/drivers/mmc/host/sdhci-pltfm.h
++++ b/drivers/mmc/host/sdhci-pltfm.h
+@@ -11,8 +11,15 @@
+ #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
+ #define _DRIVERS_MMC_SDHCI_PLTFM_H
  
- static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index bfcd611..b7b8a3b 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -214,6 +214,7 @@ struct sdhci_ops {
- 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
- 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
- 					     u8 power_mode);
-+	unsigned int    (*get_ro)(struct sdhci_host *host);
- };
++#include <linux/clk.h>
++#include <linux/types.h>
+ #include <linux/sdhci-pltfm.h>
  
- #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
++struct sdhci_pltfm_host {
++	struct clk *clk;
++	u32 scratchpad; /* to handle quirks across io-accessor calls */
++};
++
+ extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
+ 
+ #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
 -- 
 1.7.1
