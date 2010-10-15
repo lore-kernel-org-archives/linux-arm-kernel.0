@@ -1,65 +1,197 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Oct 2010 09:07:31 +0200
-Subject: [PATCH 1/5] mach-pcm037_eet: fix compile errors
-In-Reply-To: <1287097205-18595-1-git-send-email-eric@eukrea.com>
+Date: Fri, 15 Oct 2010 09:22:54 +0200
+Subject: [PATCH 2/5] mx25: add defconfig
+In-Reply-To: <1287097205-18595-2-git-send-email-eric@eukrea.com>
 References: <1287097205-18595-1-git-send-email-eric@eukrea.com>
-Message-ID: <20101015070731.GF6747@pengutronix.de>
+	<1287097205-18595-2-git-send-email-eric@eukrea.com>
+Message-ID: <20101015072254.GG6747@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Oct 15, 2010 at 01:00:01AM +0200, Eric B?nard wrote:
-> this patch fix the following errors :
-> arch/arm/mach-mx3/mach-pcm037_eet.c:62: error: implicit declaration of function 'MXC_SPI_CS'
-> arch/arm/mach-mx3/mach-pcm037_eet.c:185: error: implicit declaration of function 'imx35_add_spi_imx0'
-> 
-> from the Kconfig pcm037 is i.MX31 based and not i.MX35 so replace
-> imx35_add_spi_imx0 by imx31_add_spi_imx0
-Grrr, sorry.
-
-Can you please add a reference to
-a4dc013570e08ec4947b10fa78080da767b30527 in the commit log?
-
-> 
+On Fri, Oct 15, 2010 at 01:00:02AM +0200, Eric B?nard wrote:
 > Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  arch/arm/mach-mx3/mach-pcm037_eet.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx3/mach-pcm037_eet.c b/arch/arm/mach-mx3/mach-pcm037_eet.c
-> index c8b9821..2ee5d09 100644
-> --- a/arch/arm/mach-mx3/mach-pcm037_eet.c
-> +++ b/arch/arm/mach-mx3/mach-pcm037_eet.c
-> @@ -14,11 +14,13 @@
->  
->  #include <mach/common.h>
->  #include <mach/iomux-mx3.h>
-> +#include <mach/spi.h>
-This is not needed as devices-imx31.h includes devices-common.h which in
-turn includes mach/spi.h.
+I'd like to see mx25 in a defconfig, too.  In case RMK subjects
+that adding a defconfig isn't sensible, I think the best bet we have is
+merging mx3 and mx25 into mach-imx and working to allow compiling a
+kernel that supports these two in a single kernel.  (mx3 and mx25 share
+PHYS_OFFSET, so this is easier than the other merges.)
 
->  
->  #include <asm/mach-types.h>
->  
->  #include "pcm037.h"
->  #include "devices.h"
-> +#include "devices-imx31.h"
->  
->  static unsigned int pcm037_eet_pins[] = {
->  	/* Reserve and hardwire GPIO 57 high - S6E63D6 chipselect */
-> @@ -181,7 +183,7 @@ static int eet_init_devices(void)
->  	/* SPI */
->  	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
->  #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
-> -	imx35_add_spi_imx0(&pcm037_spi1_pdata);
-> +	imx31_add_spi_imx0(&pcm037_spi1_pdata);
->  #endif
->  
->  	platform_device_register(&pcm037_gpio_keys_device);
-Other than that the change is OK.
-
+Best regards
 Uwe
+
+> ---
+>  arch/arm/configs/mx25_defconfig |  159 +++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 159 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/configs/mx25_defconfig
+> 
+> diff --git a/arch/arm/configs/mx25_defconfig b/arch/arm/configs/mx25_defconfig
+> new file mode 100644
+> index 0000000..25aa600
+> --- /dev/null
+> +++ b/arch/arm/configs/mx25_defconfig
+> @@ -0,0 +1,159 @@
+> +CONFIG_EXPERIMENTAL=y
+> +CONFIG_SYSVIPC=y
+> +CONFIG_IKCONFIG=y
+> +CONFIG_IKCONFIG_PROC=y
+> +CONFIG_LOG_BUF_SHIFT=14
+> +CONFIG_SYSFS_DEPRECATED_V2=y
+> +CONFIG_EMBEDDED=y
+> +CONFIG_SLAB=y
+> +CONFIG_MODULES=y
+> +CONFIG_MODULE_UNLOAD=y
+> +CONFIG_MODULE_FORCE_UNLOAD=y
+> +CONFIG_MODVERSIONS=y
+> +# CONFIG_BLK_DEV_BSG is not set
+> +CONFIG_DEFAULT_NOOP=y
+> +CONFIG_ARCH_MXC=y
+> +CONFIG_ARCH_MX25=y
+> +CONFIG_MACH_MX25_3DS=y
+> +CONFIG_MACH_EUKREA_CPUIMX25=y
+> +CONFIG_MXC_IRQ_PRIOR=y
+> +CONFIG_MXC_PWM=y
+> +CONFIG_MXC_DEBUG_BOARD=y
+> +CONFIG_NO_HZ=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_PREEMPT=y
+> +CONFIG_AEABI=y
+> +CONFIG_ZBOOT_ROM_TEXT=0x0
+> +CONFIG_ZBOOT_ROM_BSS=0x0
+> +CONFIG_CMDLINE="noinitrd console=ttymxc0,115200 root=/dev/mtdblock2 rw ip=off"
+Do you really want this?
+
+> +CONFIG_NET=y
+> +CONFIG_PACKET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+> +# CONFIG_INET_XFRM_MODE_BEET is not set
+> +# CONFIG_INET_LRO is not set
+> +# CONFIG_INET_DIAG is not set
+> +# CONFIG_IPV6 is not set
+> +CONFIG_CAN=y
+> +CONFIG_CAN_RAW=y
+> +CONFIG_CAN_BCM=y
+> +CONFIG_CAN_VCAN=y
+> +CONFIG_CAN_DEV=y
+> +CONFIG_CAN_CALC_BITTIMING=y
+> +CONFIG_CAN_FLEXCAN=y
+> +CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_MTD=y
+> +CONFIG_MTD_PARTITIONS=y
+> +CONFIG_MTD_CMDLINE_PARTS=y
+> +CONFIG_MTD_CHAR=y
+> +CONFIG_MTD_BLOCK=y
+> +CONFIG_MTD_CFI=y
+> +CONFIG_MTD_PHYSMAP=y
+> +CONFIG_MTD_NAND=y
+> +CONFIG_MTD_NAND_MXC=y
+> +CONFIG_MTD_UBI=y
+> +# CONFIG_BLK_DEV is not set
+> +# CONFIG_MISC_DEVICES is not set
+> +CONFIG_SCSI=y
+> +CONFIG_BLK_DEV_SD=y
+> +CONFIG_CHR_DEV_SG=y
+> +CONFIG_SCSI_MULTI_LUN=y
+> +# CONFIG_SCSI_LOWLEVEL is not set
+> +CONFIG_NETDEVICES=y
+> +CONFIG_SMSC_PHY=y
+> +CONFIG_NET_ETHERNET=y
+> +CONFIG_MII=y
+> +CONFIG_FEC=y
+> +# CONFIG_NETDEV_1000 is not set
+> +# CONFIG_NETDEV_10000 is not set
+> +CONFIG_INPUT_EVDEV=y
+> +# CONFIG_KEYBOARD_ATKBD is not set
+> +CONFIG_KEYBOARD_GPIO=y
+> +# CONFIG_INPUT_MOUSE is not set
+> +CONFIG_INPUT_TOUCHSCREEN=y
+> +CONFIG_TOUCHSCREEN_TSC2007=y
+> +# CONFIG_SERIO is not set
+> +# CONFIG_VT is not set
+> +CONFIG_SERIAL_IMX=y
+> +CONFIG_SERIAL_IMX_CONSOLE=y
+> +# CONFIG_LEGACY_PTYS is not set
+> +# CONFIG_HW_RANDOM is not set
+> +CONFIG_I2C=y
+> +CONFIG_I2C_CHARDEV=y
+> +CONFIG_I2C_IMX=y
+> +CONFIG_GPIO_SYSFS=y
+> +# CONFIG_HWMON is not set
+> +# CONFIG_MFD_SUPPORT is not set
+> +CONFIG_MEDIA_SUPPORT=y
+> +CONFIG_VIDEO_DEV=y
+> +# CONFIG_VIDEO_ALLOW_V4L1 is not set
+> +# CONFIG_VIDEO_IR_I2C is not set
+> +CONFIG_SOC_CAMERA=y
+> +CONFIG_SOC_CAMERA_PLATFORM=y
+> +# CONFIG_RADIO_ADAPTERS is not set
+> +CONFIG_FB=y
+> +CONFIG_FB_IMX=y
+> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> +CONFIG_LCD_CLASS_DEVICE=y
+> +CONFIG_LCD_PLATFORM=m
+> +CONFIG_BACKLIGHT_CLASS_DEVICE=y
+> +CONFIG_LOGO=y
+> +CONFIG_SOUND=y
+> +CONFIG_SND=y
+> +CONFIG_SND_SEQUENCER=y
+> +CONFIG_SND_MIXER_OSS=y
+> +CONFIG_SND_PCM_OSS=y
+> +CONFIG_SND_SEQUENCER_OSS=y
+> +CONFIG_SND_HRTIMER=y
+> +# CONFIG_SND_DRIVERS is not set
+> +# CONFIG_SND_ARM is not set
+> +CONFIG_SND_SOC=y
+> +CONFIG_SND_IMX_SOC=y
+> +CONFIG_SND_SOC_EUKREA_TLV320=y
+> +CONFIG_USB=y
+> +CONFIG_USB_DEVICEFS=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_EHCI_MXC=y
+> +CONFIG_USB_STORAGE=y
+> +CONFIG_USB_GADGET=y
+> +CONFIG_USB_ETH=y
+> +CONFIG_MMC=y
+> +CONFIG_MMC_SDHCI=y
+> +CONFIG_MMC_SDHCI_PLTFM=y
+> +CONFIG_MMC_SDHCI_ESDHC_IMX=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_TIMER=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+> +CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+> +CONFIG_LEDS_TRIGGER_GPIO=y
+> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+> +CONFIG_RTC_CLASS=y
+> +CONFIG_RTC_DRV_PCF8563=y
+> +CONFIG_DMADEVICES=y
+> +CONFIG_EXT3_FS=y
+> +# CONFIG_DNOTIFY is not set
+> +CONFIG_AUTOFS4_FS=y
+> +CONFIG_MSDOS_FS=y
+> +CONFIG_VFAT_FS=y
+> +CONFIG_TMPFS=y
+> +CONFIG_JFFS2_FS=y
+> +CONFIG_UBIFS_FS=y
+> +CONFIG_NFS_FS=y
+> +CONFIG_NFS_V3=y
+> +CONFIG_NFS_V4=y
+> +CONFIG_ROOT_NFS=y
+> +CONFIG_PARTITION_ADVANCED=y
+> +CONFIG_NLS_CODEPAGE_437=y
+> +CONFIG_NLS_ISO8859_1=y
+> +# CONFIG_ENABLE_WARN_DEPRECATED is not set
+> +# CONFIG_ENABLE_MUST_CHECK is not set
+> +# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+> +CONFIG_SYSCTL_SYSCALL_CHECK=y
+> +# CONFIG_CRYPTO_ANSI_CPRNG is not set
+> -- 
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
