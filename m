@@ -1,29 +1,73 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 15 Oct 2010 03:50:16 +0200
-Subject: [PATCH v4] ARM: AT91: add board support for Pcontrol_G20
-In-Reply-To: <20101014151451.GB23434@n2100.arm.linux.org.uk>
-References: <1286466086.4306.41.camel@aspire.localdomain>
-	<20101008123407.GB30252@game.jcrosoft.org>
-	<1286550644.21584.34.camel@aspire.localdomain>
-	<1286787761.7800.11.camel@aspire.localdomain>
-	<1286792568.7800.19.camel@aspire.localdomain>
-	<20101013131515.GC11087@game.jcrosoft.org>
-	<1286979531.7165.9.camel@aspire.localdomain>
-	<4CB71813.6060601@atmel.com>
-	<20101014151451.GB23434@n2100.arm.linux.org.uk>
-Message-ID: <20101015015016.GD11087@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 15 Oct 2010 10:57:34 +0900
+Subject: [PATCH V2 2/2] ARM: S5PV310: Add support GPIOlib
+In-Reply-To: <00e201cb6bfb$38aaebc0$aa00c340$%han@samsung.com>
+References: <1286868876-3748-1-git-send-email-sbkim73@samsung.com>
+	<1286868876-3748-3-git-send-email-sbkim73@samsung.com>
+	<006501cb6b5f$f9bd29a0$ed377ce0$%kim@samsung.com>
+	<00e201cb6bfb$38aaebc0$aa00c340$%han@samsung.com>
+Message-ID: <001901cb6c0c$579aa0f0$06cfe2d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:14 Thu 14 Oct     , Russell King - ARM Linux wrote:
-> On Thu, Oct 14, 2010 at 04:47:47PM +0200, Nicolas Ferre wrote:
-> > > diff --git a/arch/arm/configs/pcontrol_g20_defconfig b/arch/arm/configs/pcontrol_g20_defconfig
-> > > new file mode 100644
+Jongsun Han wrote:
 > 
-> Is it really necessary to have another platform specific defconfig rather
-> than grouping it together with other similar platforms?
-I'm working on it to merge the cpu and boards together hope to finish it
-before the end of the merge window
+> Sangbeom Kim wrote:
+> > >
+> > > From: Jongpill Lee <boyko.lee@samsung.com>
+> > >
+> > > This patch adds GPIOlib support for S5PV310 and S5PC210.
+> > >
+> > > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
+> > > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> > > ---
+> > > NOTE:
+> > > This patch used mapped VA IO as GPIO virtual address.
+> > > because firstly other Samsung SoC's GPIO used same method.
+> > > and I think that  it's better to keep the same method.
+> > > And ioremap also can be used for it.
+> > > But in the GPIO, there is no need to allocate VA area dynamically.
+> > > because GPIO can be used in any drivers anytime so it can't iounmap
+GPIO
+> > > VA area.
+> > >
+> > Ok...
+> >
+> > (snip)
+> >
+> > >  #define MAX_COMBINER_NR		40
+> > >
+> > > +#define S5P_IRQ_EINT_BASE
+> 	COMBINER_IRQ(MAX_COMBINER_NR, 0)
+> > > +
+> > > +#define S5P_EINT_BASE1		(S5P_IRQ_EINT_BASE + 0)
+> > > +#define S5P_EINT_BASE2		(S5P_IRQ_EINT_BASE + 16)
+> > > +
+> >
+> > Hmm...
+> > If you want to add external interrupt, should be changed NR_IRQS too.
+> >
+> > Will apply with fixing NR_IRQS.
+> >
+> 
+> It seems that S5P_IRQ_EINT_BASE has wrong definition.
 
-Best Regards,
-J.
+I think...No!
+
+> S5P_IRQ_EINT_BASE has to be COMBINER_IRQ(MAX_COMBINER_NR - 1, 0).
+> 
+Maybe you mean COMBINER_IRQ(MAX_COMBINER_NR - 1, 1)...because IRQ_EINT16_31
+is COMBINER_IRQ(39, 0)
+Anyway in my opinion, each COMBINER_GROUP(x) can has 8 combined interrupts
+even though actually just used only 1.
+
+Therefore, to use next COMBINER_GROUP, so that COMBINER_GROUP(39) can use 8
+interrupts like others is better.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
