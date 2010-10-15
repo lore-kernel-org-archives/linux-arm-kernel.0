@@ -1,79 +1,66 @@
-From: moon9124@samsung.com (Daein Moon)
-Date: Fri, 15 Oct 2010 15:37:39 +0900
-Subject: [PATCH 1/2] ARM: S5PV310: Add support SROMC
-In-Reply-To: <00e301cb6ad7$3842b5c0$a8c82140$%szyprowski@samsung.com>
-References: <1286972144-763-1-git-send-email-sbkim73@samsung.com>
-	<1286972144-763-2-git-send-email-sbkim73@samsung.com>
-	<00e301cb6ad7$3842b5c0$a8c82140$%szyprowski@samsung.com>
-Message-ID: <007c01cb6c33$7653dad0$62fb9070$@com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 15 Oct 2010 09:07:31 +0200
+Subject: [PATCH 1/5] mach-pcm037_eet: fix compile errors
+In-Reply-To: <1287097205-18595-1-git-send-email-eric@eukrea.com>
+References: <1287097205-18595-1-git-send-email-eric@eukrea.com>
+Message-ID: <20101015070731.GF6747@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> Hello,
-> 
-> On Wednesday, October 13, 2010 2:16 PM Sangbeom Kim wrote:
-> 
-> > From: Daein Moon <moon9124@samsung.com>
-> >
-> > This patch adds support SROMC for S5PV310 and S5PC210.
-> >
-> > Signed-off-by: Daein Moon <moon9124@samsung.com>
-> > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> > ---
-> >  arch/arm/mach-s5pv310/cpu.c                    |    5 ++
-> >  arch/arm/mach-s5pv310/include/mach/map.h       |    4 ++
-> >  arch/arm/mach-s5pv310/include/mach/regs-srom.h |   50
-> ++++++++++++++++++++++++
-> >  3 files changed, 59 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-srom.h
-> >
-> > diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-> > index ffed262..873783a 100644
-> > --- a/arch/arm/mach-s5pv310/cpu.c
-> > +++ b/arch/arm/mach-s5pv310/cpu.c
-> > @@ -81,6 +81,11 @@ static struct map_desc s5pv310_iodesc[] __initdata =
-> {
-> >  		.pfn		= __phys_to_pfn(S3C_PA_UART),
-> >  		.length		= SZ_512K,
-> >  		.type		= MT_DEVICE,
-> > +	}, {
-> > +		.virtual	= (unsigned long)S5P_VA_SROMC,
-> > +		.pfn		= __phys_to_pfn(S5PV310_PA_SROMC),
-> > +		.length		= SZ_4K,
-> > +		.type		= MT_DEVICE,
-> >  	},
-> >  };
-> 
-> Do You really need to make a permanent mapping for the SROMC area? Cannot
-the
-> setup code in the mach-smdk*.c call ioremap(S5PV310_PA_SROMC) and put the
-address it
-> got to the ethernet device? This area will be probably useless for boards
-other than
-> SMDK.
-> 
-Hi,
+Hello,
 
-It seems to be useless because only ethernet device uses the SROM interface.
-Will this mapping be ready for devices that will use the SROM interface in
-boards
-other than SMDK?
+On Fri, Oct 15, 2010 at 01:00:01AM +0200, Eric B?nard wrote:
+> this patch fix the following errors :
+> arch/arm/mach-mx3/mach-pcm037_eet.c:62: error: implicit declaration of function 'MXC_SPI_CS'
+> arch/arm/mach-mx3/mach-pcm037_eet.c:185: error: implicit declaration of function 'imx35_add_spi_imx0'
+> 
+> from the Kconfig pcm037 is i.MX31 based and not i.MX35 so replace
+> imx35_add_spi_imx0 by imx31_add_spi_imx0
+Grrr, sorry.
 
-Best regards,
-Daein Moon
+Can you please add a reference to
+a4dc013570e08ec4947b10fa78080da767b30527 in the commit log?
 
-> <snip>
 > 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> ---
+>  arch/arm/mach-mx3/mach-pcm037_eet.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
 > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm/mach-mx3/mach-pcm037_eet.c b/arch/arm/mach-mx3/mach-pcm037_eet.c
+> index c8b9821..2ee5d09 100644
+> --- a/arch/arm/mach-mx3/mach-pcm037_eet.c
+> +++ b/arch/arm/mach-mx3/mach-pcm037_eet.c
+> @@ -14,11 +14,13 @@
+>  
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx3.h>
+> +#include <mach/spi.h>
+This is not needed as devices-imx31.h includes devices-common.h which in
+turn includes mach/spi.h.
+
+>  
+>  #include <asm/mach-types.h>
+>  
+>  #include "pcm037.h"
+>  #include "devices.h"
+> +#include "devices-imx31.h"
+>  
+>  static unsigned int pcm037_eet_pins[] = {
+>  	/* Reserve and hardwire GPIO 57 high - S6E63D6 chipselect */
+> @@ -181,7 +183,7 @@ static int eet_init_devices(void)
+>  	/* SPI */
+>  	spi_register_board_info(pcm037_spi_dev, ARRAY_SIZE(pcm037_spi_dev));
+>  #if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
+> -	imx35_add_spi_imx0(&pcm037_spi1_pdata);
+> +	imx31_add_spi_imx0(&pcm037_spi1_pdata);
+>  #endif
+>  
+>  	platform_device_register(&pcm037_gpio_keys_device);
+Other than that the change is OK.
+
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
