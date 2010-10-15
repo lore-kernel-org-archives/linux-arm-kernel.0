@@ -1,22 +1,22 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Fri, 15 Oct 2010 15:39:54 +0200
-Subject: [PATCH] eukrea_mbimxsd-baseboard: Pass the correct GPIO to
-	gpio_free
-In-Reply-To: <56183.25914.qm@web51002.mail.re2.yahoo.com>
-References: <56183.25914.qm@web51002.mail.re2.yahoo.com>
-Message-ID: <4CB859AA.50304@eukrea.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Oct 2010 15:40:07 +0200
+Subject: iwmmxt signal frame handling
+In-Reply-To: <AANLkTik3Brb-XbL1GkteVs_g9J3HtYsZMQogh+KR0LB0@mail.gmail.com>
+References: <201010141609.10889.arnd@arndb.de>
+	<AANLkTimHyhLRZwR-FRtciu+0sGYYFkAh4WfLCWwu59JA@mail.gmail.com>
+	<AANLkTik3Brb-XbL1GkteVs_g9J3HtYsZMQogh+KR0LB0@mail.gmail.com>
+Message-ID: <201010151540.07982.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Friday 15 October 2010 15:32:04 Eric Miao wrote:
+> > Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> >
+> 
+> This also passes the internal iwmmxt test, Haojian please add your
+> Tested-by please.
 
-Le 14/10/2010 17:38, Fabio Estevam a ?crit :
-> Pass the correct GPIO to gpio_free
->
-> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
->
-Acked-by: Eric B?nard <eric@eukrea.com>
+Can you also confirm that the previous behaviour is broken?
+If it is, the patch is probably a candidate for the stable trees.
 
-Thanks !
-
-Eric
+	Arnd
