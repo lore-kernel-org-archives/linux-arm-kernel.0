@@ -1,52 +1,47 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Thu, 14 Oct 2010 21:13:25 -0500
-Subject: [PATCH 4/7] omap:mailbox-send message in process context
+Date: Thu, 14 Oct 2010 21:13:24 -0500
+Subject: [PATCH 3/7] omap:mailbox-fix checkpatch warnings
 In-Reply-To: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
 References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1287108808-32119-4-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Schedule the Tasklet to send only when mailbox fifo is full, else
-send the message in the Process context. This would avoid
-needless scheduling of Tasklet for every message transfer
+Fix the checkpatch warnings observed in mailbox module
 
 Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
 ---
- arch/arm/plat-omap/mailbox.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/mailbox.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index ed960c1..a4170c7 100644
+index 9ce3570..ed960c1 100644
 --- a/arch/arm/plat-omap/mailbox.c
 +++ b/arch/arm/plat-omap/mailbox.c
-@@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
- 	struct omap_mbox_queue *mq = mbox->txq;
- 	int ret = 0, len;
+@@ -279,11 +279,11 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
  
--	spin_lock(&mq->lock);
-+	spin_lock_bh(&mq->lock);
+ 	return 0;
  
- 	if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
- 		ret = -ENOMEM;
- 		goto out;
- 	}
+- fail_alloc_rxq:
++fail_alloc_rxq:
+ 	mbox_queue_free(mbox->txq);
+- fail_alloc_txq:
++fail_alloc_txq:
+ 	free_irq(mbox->irq, mbox);
+- fail_request_irq:
++fail_request_irq:
+ 	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
  
-+	if (!__mbox_poll_for_space(mbox)) {
-+		mbox_fifo_write(mbox, msg);
-+		goto out;
-+	}
-+
- 	len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
- 	WARN_ON(len != sizeof(msg));
+@@ -394,7 +394,8 @@ static int __init omap_mbox_init(void)
  
- 	tasklet_schedule(&mbox->txq->tasklet);
+ 	/* kfifo size sanity check: alignment and minimal size */
+ 	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
+-	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size, sizeof(mbox_msg_t));
++	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
++						sizeof(mbox_msg_t));
  
- out:
--	spin_unlock(&mq->lock);
-+	spin_unlock_bh(&mq->lock);
- 	return ret;
+ 	return 0;
  }
- EXPORT_SYMBOL(omap_mbox_msg_send);
 -- 
 1.7.0
