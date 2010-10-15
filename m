@@ -1,137 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Oct 2010 09:27:12 +0200
-Subject: [PATCH 3/5] mx27: update defconfig
-In-Reply-To: <1287097205-18595-3-git-send-email-eric@eukrea.com>
-References: <1287097205-18595-1-git-send-email-eric@eukrea.com>
-	<1287097205-18595-3-git-send-email-eric@eukrea.com>
-Message-ID: <20101015072712.GH6747@pengutronix.de>
+From: jgq516@gmail.com (jgq516 at gmail.com)
+Date: Fri, 15 Oct 2010 16:00:33 +0800
+Subject: [PATCH 1/1] Mx35pdk: enable debug board support
+Message-ID: <1287129633-9244-1-git-send-email-jgq516@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 15, 2010 at 01:00:03AM +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
-OK in general, though I would prefer a more verbose commit log about
-what you (or others) changed and why.
+From: Xiao Jiang <jgq516@gmail.com>
 
-Best regards
-Uwe
+Add debug board support, then kernel can boot from lan9217 ethernet.
 
->  arch/arm/configs/mx27_defconfig |   60 ++++++++++++++++++++++++++++++++++----
->  1 files changed, 53 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
-> index 813cfb3..9623f42 100644
-> --- a/arch/arm/configs/mx27_defconfig
-> +++ b/arch/arm/configs/mx27_defconfig
-> @@ -72,6 +72,10 @@ CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_MXC=y
->  CONFIG_MTD_UBI=y
->  CONFIG_EEPROM_AT24=y
-> +CONFIG_SCSI=y
-> +CONFIG_BLK_DEV_SD=y
-> +CONFIG_SCSI_MULTI_LUN=y
-> +# CONFIG_SCSI_LOWLEVEL is not set
->  CONFIG_NETDEVICES=y
->  CONFIG_NET_ETHERNET=y
->  CONFIG_FEC=y
-> @@ -79,12 +83,12 @@ CONFIG_FEC=y
->  # CONFIG_NETDEV_10000 is not set
->  # CONFIG_INPUT_MOUSEDEV is not set
->  CONFIG_INPUT_EVDEV=y
-> -# CONFIG_INPUT_KEYBOARD is not set
-> +CONFIG_KEYBOARD_IMX=y
->  # CONFIG_INPUT_MOUSE is not set
->  CONFIG_INPUT_TOUCHSCREEN=y
-> -CONFIG_TOUCHSCREEN_ADS7846=m
-> -# CONFIG_SERIO is not set
-> -CONFIG_SERIAL_8250=m
-> +CONFIG_TOUCHSCREEN_ADS7846=y
-> +CONFIG_SERIAL_8250=y
-> +CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_SERIAL_IMX=y
->  CONFIG_SERIAL_IMX_CONSOLE=y
->  # CONFIG_LEGACY_PTYS is not set
-> @@ -94,21 +98,64 @@ CONFIG_I2C_CHARDEV=y
->  CONFIG_I2C_IMX=y
->  CONFIG_SPI=y
->  CONFIG_SPI_IMX=y
-> +CONFIG_GPIO_SYSFS=y
->  CONFIG_W1=y
->  CONFIG_W1_MASTER_MXC=y
->  CONFIG_W1_SLAVE_THERM=y
->  # CONFIG_HWMON is not set
-> +CONFIG_WATCHDOG=y
-> +CONFIG_IMX2_WDT=y
-> +CONFIG_MEDIA_SUPPORT=y
-> +CONFIG_VIDEO_DEV=y
-> +CONFIG_SOC_CAMERA=y
-> +CONFIG_SOC_CAMERA_MT9M001=y
-> +CONFIG_SOC_CAMERA_MT9M111=y
-> +CONFIG_SOC_CAMERA_MT9T031=y
-> +CONFIG_SOC_CAMERA_MT9T112=y
-> +CONFIG_SOC_CAMERA_MT9V022=y
-> +CONFIG_SOC_CAMERA_RJ54N1=y
-> +CONFIG_SOC_CAMERA_TW9910=y
-> +CONFIG_SOC_CAMERA_PLATFORM=y
-> +CONFIG_SOC_CAMERA_OV772X=y
-> +CONFIG_SOC_CAMERA_OV9640=y
-> +CONFIG_VIDEO_MX2=y
-> +# CONFIG_RADIO_ADAPTERS is not set
->  CONFIG_FB=y
->  CONFIG_FB_IMX=y
->  CONFIG_FRAMEBUFFER_CONSOLE=y
->  CONFIG_FONTS=y
->  CONFIG_FONT_8x8=y
-> -# CONFIG_HID_SUPPORT is not set
-> -CONFIG_USB=m
-> +CONFIG_SOUND=y
-> +CONFIG_SND=y
-> +CONFIG_SND_SEQUENCER=y
-> +CONFIG_SND_MIXER_OSS=y
-> +CONFIG_SND_PCM_OSS=y
-> +CONFIG_SND_SEQUENCER_OSS=y
-> +# CONFIG_SND_DRIVERS is not set
-> +# CONFIG_SND_ARM is not set
-> +# CONFIG_SND_SPI is not set
-> +# CONFIG_SND_USB is not set
-> +CONFIG_SND_SOC=y
-> +CONFIG_SND_IMX_SOC=y
-> +CONFIG_SND_SOC_PHYCORE_AC97=y
-> +CONFIG_SND_SOC_EUKREA_TLV320=y
-> +# CONFIG_USB_HID is not set
-> +CONFIG_USB=y
->  # CONFIG_USB_DEVICE_CLASS is not set
-> +CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_EHCI_MXC=y
-> +CONFIG_USB_STORAGE=y
-> +CONFIG_USB_GADGET=y
-> +CONFIG_USB_ETH=y
->  CONFIG_USB_ULPI=y
-> +CONFIG_NOP_USB_XCEIV=y
->  CONFIG_MMC=y
->  CONFIG_MMC_MXC=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_PCF8563=y
->  # CONFIG_DNOTIFY is not set
-> @@ -119,7 +166,6 @@ CONFIG_UBIFS_FS=y
->  CONFIG_NFS_FS=y
->  CONFIG_NFS_V3=y
->  CONFIG_ROOT_NFS=y
-> -CONFIG_NLS=y
->  CONFIG_NLS_CODEPAGE_437=m
->  CONFIG_NLS_CODEPAGE_850=m
->  CONFIG_NLS_ISO8859_1=y
-> -- 
-> 1.7.0.4
-> 
-> 
+Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+---
+ arch/arm/mach-mx3/mach-mx35_3ds.c          |    9 +++++++++
+ arch/arm/plat-mxc/include/mach/iomux-mx3.h |    4 ++++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
+index 1c30d72..78e0657 100644
+--- a/arch/arm/mach-mx3/mach-mx35_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+@@ -34,11 +34,16 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
++#include <mach/iomux-mx3.h>
+ #include <mach/iomux-mx35.h>
++#include <mach/3ds_debugboard.h>
+ 
+ #include "devices-imx35.h"
+ #include "devices.h"
+ 
++#define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX35_PIN_GPIO1_1)
++
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -95,6 +100,10 @@ static void __init mxc_board_init(void)
+ 	imx35_add_imx_uart0(&uart_pdata);
+ 
+ 	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++
++	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
++		pr_warn("Init of the debugboard failed, all "
++			"devices on the board are unusable.\n");
+ }
+ 
+ static void __init mx35pdk_timer_init(void)
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+index cbaed29..c686d2a 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
+@@ -170,6 +170,10 @@ int mxc_iomux_mode(unsigned int pin_mode);
+  * value is constructed based on the rules described above.
+  */
+ 
++enum iomux_mx35_pins {
++	MX35_PIN_GPIO1_1	= IOMUX_PIN(1,   338),
++};
++
+ enum iomux_pins {
+ 	MX31_PIN_TTM_PAD	= IOMUX_PIN(0xff,   0),
+ 	MX31_PIN_CSPI3_SPI_RDY	= IOMUX_PIN(0xff,   1),
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.3
