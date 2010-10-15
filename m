@@ -1,68 +1,76 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 15 Oct 2010 10:57:34 +0900
-Subject: [PATCH V2 2/2] ARM: S5PV310: Add support GPIOlib
-In-Reply-To: <00e201cb6bfb$38aaebc0$aa00c340$%han@samsung.com>
-References: <1286868876-3748-1-git-send-email-sbkim73@samsung.com>
-	<1286868876-3748-3-git-send-email-sbkim73@samsung.com>
-	<006501cb6b5f$f9bd29a0$ed377ce0$%kim@samsung.com>
-	<00e201cb6bfb$38aaebc0$aa00c340$%han@samsung.com>
-Message-ID: <001901cb6c0c$579aa0f0$06cfe2d0$%kim@samsung.com>
+Date: Fri, 15 Oct 2010 10:58:20 +0900
+Subject: [PATCH 2/3] ARM: S5PV310: Add the definition for external
+	interrupt
+In-Reply-To: <1286450698-12029-3-git-send-email-jongsun.han@samsung.com>
+References: <1286450698-12029-1-git-send-email-jongsun.han@samsung.com>
+	<1286450698-12029-3-git-send-email-jongsun.han@samsung.com>
+Message-ID: <001a01cb6c0c$735b4600$5a11d200$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Jongsun Han wrote:
 > 
-> Sangbeom Kim wrote:
-> > >
-> > > From: Jongpill Lee <boyko.lee@samsung.com>
-> > >
-> > > This patch adds GPIOlib support for S5PV310 and S5PC210.
-> > >
-> > > Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
-> > > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> > > ---
-> > > NOTE:
-> > > This patch used mapped VA IO as GPIO virtual address.
-> > > because firstly other Samsung SoC's GPIO used same method.
-> > > and I think that  it's better to keep the same method.
-> > > And ioremap also can be used for it.
-> > > But in the GPIO, there is no need to allocate VA area dynamically.
-> > > because GPIO can be used in any drivers anytime so it can't iounmap
-GPIO
-> > > VA area.
-> > >
-> > Ok...
-> >
-> > (snip)
-> >
-> > >  #define MAX_COMBINER_NR		40
-> > >
-> > > +#define S5P_IRQ_EINT_BASE
+> This patch add the definition for both IRQs and GPIO registers for
+external
+> interrupt.
+> 
+> Signed-off-by: Jongsun Han <jongsun.han@samsung.com>
+> ---
+>  arch/arm/mach-s5pv310/include/mach/irqs.h      |   26 +++++++++++++++-
+>  arch/arm/mach-s5pv310/include/mach/regs-gpio.h |   37
+> ++++++++++++++++++++++++
+>  2 files changed, 61 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-gpio.h
+> 
+> diff --git a/arch/arm/mach-s5pv310/include/mach/irqs.h b/arch/arm/mach-
+> s5pv310/include/mach/irqs.h
+> index e81332f..9faea58 100644
+> --- a/arch/arm/mach-s5pv310/include/mach/irqs.h
+> +++ b/arch/arm/mach-s5pv310/include/mach/irqs.h
+> @@ -78,10 +78,32 @@
+> 
+>  #define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
+> 
+> +#define IRQ_EINT4		COMBINER_IRQ(37, 0)
+> +#define IRQ_EINT5		COMBINER_IRQ(37, 1)
+> +#define IRQ_EINT6		COMBINER_IRQ(37, 2)
+> +#define IRQ_EINT7		COMBINER_IRQ(37, 3)
+> +#define IRQ_EINT8		COMBINER_IRQ(38, 0)
+> +
+> +#define IRQ_EINT9		COMBINER_IRQ(38, 1)
+> +#define IRQ_EINT10		COMBINER_IRQ(38, 2)
+> +#define IRQ_EINT11		COMBINER_IRQ(38, 3)
+> +#define IRQ_EINT12		COMBINER_IRQ(38, 4)
+> +#define IRQ_EINT13		COMBINER_IRQ(38, 5)
+> +#define IRQ_EINT14		COMBINER_IRQ(38, 6)
+> +#define IRQ_EINT15		COMBINER_IRQ(38, 7)
+> +
+> +#define IRQ_EINT16_31		COMBINER_IRQ(39, 0)
+> +
+> +#define IRQ_EINT_BASE		(IRQ_EINT16_31 + 1)
+> +
+>  /* Set the default NR_IRQS */
+> +#define NR_IRQS			(IRQ_EINT_BASE + 32)
+> +
+> +#define EINT_NUMBER(x)		((x) + IRQ_EINT_BASE)
+> 
+> -#define NR_IRQS
 > 	COMBINER_IRQ(MAX_COMBINER_NR, 0)
-> > > +
-> > > +#define S5P_EINT_BASE1		(S5P_IRQ_EINT_BASE + 0)
-> > > +#define S5P_EINT_BASE2		(S5P_IRQ_EINT_BASE + 16)
-> > > +
-> >
-> > Hmm...
-> > If you want to add external interrupt, should be changed NR_IRQS too.
-> >
-> > Will apply with fixing NR_IRQS.
-> >
+> +#define S5P_EINT_BASE1		EINT_NUMBER(0)
+> +#define S5P_EINT_BASE2		EINT_NUMBER(16)
 > 
-> It seems that S5P_IRQ_EINT_BASE has wrong definition.
+No need to add EINT_NUMBER(x) macro?
 
-I think...No!
+#define S5P_EINT_BASE1	(IRQ_EINT_BASE + 0)
+#define S5P_EINT_BASE1	(IRQ_EINT_BASE + 16)
 
-> S5P_IRQ_EINT_BASE has to be COMBINER_IRQ(MAX_COMBINER_NR - 1, 0).
+> -#define MAX_COMBINER_NR		39
+> +#define MAX_COMBINER_NR		40
 > 
-Maybe you mean COMBINER_IRQ(MAX_COMBINER_NR - 1, 1)...because IRQ_EINT16_31
-is COMBINER_IRQ(39, 0)
-Anyway in my opinion, each COMBINER_GROUP(x) can has 8 combined interrupts
-even though actually just used only 1.
+>  #endif /* __ASM_ARCH_IRQS_H */
 
-Therefore, to use next COMBINER_GROUP, so that COMBINER_GROUP(39) can use 8
-interrupts like others is better.
+(snip)
 
 Thanks.
 
