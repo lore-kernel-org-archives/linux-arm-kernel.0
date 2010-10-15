@@ -1,56 +1,45 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Fri, 15 Oct 2010 23:09:46 +0200
-Subject: [PATCH 2/2] ARM: imx: Add POWER_KEY to mx51 babbage board
-In-Reply-To: <1287173908-25758-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1287173908-25758-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <4CB8C31A.3000000@eukrea.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 15 Oct 2010 23:20:41 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <20101015102534.GA4276@pengutronix.de> (Wolfram Sang's message of
+	"Fri\, 15 Oct 2010 12\:25\:34 +0200")
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+	<87aamjxe00.fsf@lechat.rtp-net.org> <4CB56A88.2040101@eukrea.com>
+	<20101013082930.GA11286@pengutronix.de>
+	<8762x6xx00.fsf@lechat.rtp-net.org>
+	<20101015102534.GA4276@pengutronix.de>
+Message-ID: <87fww7up92.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Wolfram Sang <w.sang@pengutronix.de> writes:
 
-Le 15/10/2010 22:18, Dinh.Nguyen at freescale.com a ?crit :
-> +/*!
-> + * Power Key interrupt handler.
-> + */
-> +static irqreturn_t power_key_int(int irq, void *dev_id)
-> +{
-> +	printk(KERN_INFO "PWR key pressed\n");
-> +	return 0;
-> +}
-> +
-> +/*!
-> + * Power Key initialization.
-> + */
-> +static int __init mxc_init_power_key(void)
-> +{
-> +	/* Set power key as wakeup resource */
-> +	int irq, ret;
-> +
-> +	/* power key */
-> +	ret = gpio_request(BABBAGE_POWER_KEY, "power-key");
-> +	if (ret) {
-> +		printk(KERN_ERR"failed to get BABBAGE_POWER_KEY: %d\n", ret);
-> +		return ret;
-> +	}
-> +	gpio_direction_input(BABBAGE_POWER_KEY);
-> +
-> +	irq = IOMUX_TO_IRQ(BABBAGE_POWER_KEY);
-> +	set_irq_type(irq, IRQF_TRIGGER_RISING);
-> +	ret = request_irq(irq, power_key_int, 0, "power-key", 0);
-> +	if (ret)
-> +		pr_info("register on-off key interrupt failed\n");
-> +	else
-> +		enable_irq_wake(irq);
-> +	return ret;
-> +}
-> +late_initcall(mxc_init_power_key);
-> +
-instead of doing this, you could use the gpio-keys driver which will configure 
-the IRQ as a wakeup source and also send keys to the input layer.
+Hi,
 
-You can have an example here :
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=blob;f=arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c;h=2b48f5190830c7cbe2f11676a628c55e1531c133;hb=imx-for-2.6.37#l98
+> On Wed, Oct 13, 2010 at 11:28:15AM +0200, Arnaud Patard wrote:
+>
+>> >> it's actually not yet supported by the driver. There is a wp_gpio in
+>> >> struct esdhc_platform_data (arch/arm/plat-mxc/include/mach/esdhc.h)
+>> >> but it's not yet used by the driver.
+>> >
+>> > It's all prepared. I finally will have a look into it today.
+>> 
+>> oh, great. I was thinking about doing it but I'll wait for your patches
+>> then. I'm sure I need support for WP on GPIO but I may also need support
+>> for CD on GPIO so I'll be happy to test any patch you have.
+>
+> Just to keep you updated: Got a bit distracted again but I hope to
+> finish it on Saturday. Looks like a patch for the gpiolib is also
+> needed...
 
-Eric
+ok. Take your time. It turns out that the infos I had were a bit
+misleading. I've been told the mmc driver was using some gpios and the
+gpios are GPIO_1_0/1_1 and GPIO_1_7/1_8... which are in fact the esdhc1
+and esdhc2 CD and WP. 
+
+This means :
+- with proper iomux configuration, WP detection is working fine
+- I should still be able to test WP on GPIO
+
+Thanks,
+Arnaud
