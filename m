@@ -1,140 +1,79 @@
-From: EXT-Eugeny.Kuznetsov@nokia.com (Evgeny Kuznetsov)
-Date: Fri, 15 Oct 2010 10:16:18 +0400
-Subject: [PATCHv2 1/1] omap: Ptr "isr_reg" tracked as NULL was dereferenced
-In-Reply-To: <1286971758.12782.35.camel@ekuznets-lx-nokia>
-References: <cover.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
-	<7bb69801f49283c3bde78aa008c15308ac8a5fbf.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D099AFD@dbde02.ent.ti.com>
-	<1286970199.12782.28.camel@ekuznets-lx-nokia>
-	<EAF47CD23C76F840A9E7FCE10091EFAB030D099B87@dbde02.ent.ti.com>
-	<1286971758.12782.35.camel@ekuznets-lx-nokia>
-Message-ID: <1287123378.12782.49.camel@ekuznets-lx-nokia>
+From: moon9124@samsung.com (Daein Moon)
+Date: Fri, 15 Oct 2010 15:37:39 +0900
+Subject: [PATCH 1/2] ARM: S5PV310: Add support SROMC
+In-Reply-To: <00e301cb6ad7$3842b5c0$a8c82140$%szyprowski@samsung.com>
+References: <1286972144-763-1-git-send-email-sbkim73@samsung.com>
+	<1286972144-763-2-git-send-email-sbkim73@samsung.com>
+	<00e301cb6ad7$3842b5c0$a8c82140$%szyprowski@samsung.com>
+Message-ID: <007c01cb6c33$7653dad0$62fb9070$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-13 at 16:09 +0400, Evgeny Kuznetsov wrote:
-> On Wed, 2010-10-13 at 17:20 +0530, ext Varadarajan, Charulatha wrote:
-> > 
-> > <<snip>>
-> > 
-> > > > >
-> > > > > From: Evgeny Kuznetsov <ext-eugeny.kuznetsov@nokia.com>
-> > > > >
-> > > > > Value of "isr_reg" pointer is depend on configuration and GPIO method.
-> > > > > Potentially it may have NULL value and it is dereferenced later
-> > > > > in code. If pointer is NULL there is some kernel issue.
-> > > >
-> > > > Can you elaborate?
-> > > "isr_reg" should not be NULL. But if it is NULL then there is kernel
-> > > bug. And WARN_ON() used to show it.
-> > > I did not see this bug, this is potentially may happen.
-> > > >
-> > > > > Warning and exit from function are added in this case.
-> > > > > Also compilation check is added for correct architecture
-> > > > > configuration.
-> > > > >
-> > > > > Signed-off-by: Evgeny Kuznetsov <EXT-Eugeny.Kuznetsov@nokia.com>
-> > > > > ---
-> > > > >  arch/arm/plat-omap/gpio.c |   18 ++++++++++++++++++
-> > > > >  1 files changed, 18 insertions(+), 0 deletions(-)
-> > > > >
-> > > > > diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-> > > > > index c05c653..d04913c 100644
-> > > > > --- a/arch/arm/plat-omap/gpio.c
-> > > > > +++ b/arch/arm/plat-omap/gpio.c
-> > > > > @@ -1318,6 +1318,23 @@ static void gpio_irq_handler(unsigned int irq,
-> > > > > struct irq_desc *desc)
-> > > > >  	if (bank->method == METHOD_GPIO_44XX)
-> > > > >  		isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
-> > > > >  #endif
-> > > > > +
-> > > > > +#if !defined(CONFIG_ARCH_OMAP1) &&		\
-> > > > > +		!defined(CONFIG_ARCH_OMAP15XX) &&	\
-> > > > > +		!defined(CONFIG_ARCH_OMAP16XX) &&	\
-> > > > > +		!defined(CONFIG_ARCH_OMAP730) &&	\
-> > > > > +		!defined(CONFIG_ARCH_OMAP850) &&	\
-> > > > > +		!defined(CONFIG_ARCH_OMAP2) &&	\
-> > > > > +		!defined(CONFIG_ARCH_OMAP3) &&	\
-> > > > > +		!defined(CONFIG_ARCH_OMAP4)
-> > > > > +
-> > > > > +#error "Incorrect arch configuration"
-> > > >
-> > > > This is not required. If the architecture is not one of the above
-> > > > mentioned, gpio_irq_handler() will not be used/called at all.
-> > > This could be removed.
-> > > 
-> > > > Also all the possible gpio methods for a given OMAP architecture are
-> > > > already considered with "#ifdef"s and (bank->method) checks in
-> > > > gpio_irq_handler().
-> > > It is not cover all cased, e.g. for OMAP4 arch:
-> > > ....
-> > > 	#if defined(CONFIG_ARCH_OMAP4)
-> > > 		if (bank->method == METHOD_GPIO_44XX)
-> > > 			isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
-> > > 	#endif
-> > > .....
-> > > 
-> > > If (bank->method != METHOD_GPIO_44XX) then isr_reg will be NULL.
-> > > This should not happen, but potentially may have place.
-> > 
-> > When would it fail? If it is CONFIG_ARCH_OMAP4, the gpio method can
-> > only be METHOD_GPIO_44XX. Else if it is for some other OMAP architecture,
-> > the gpio_method is similarly taken care. So this cannot happen.
-> This is similar check as e.g. in _enable_gpio_irqbank() there default
-> case for bank->methos switch is WARN_ON(1).
-> Just to warn in case.
-Hi Tony,
-
-It is not a bug fix, it is just check to prevent potential issues. Used
-to warn in case of bug and prevent kernel oops. Check added only here
-(not all gpio code cleanup) since here it could cause kernel opps.
-
-Would you apply patch if I will leave only if condition section in
-patch?
-
-	if (WARN_ON(!isr_reg))
-		goto exit;
-
-If yes, I'll resend v3 patch.
-
-Thanks,
-Regards,
-Evgeny
-
-> > 
-> > > 
-> > > >
-> > > > > +
-> > > > > +#endif
-> > > > > +
-> > > > > +	if (WARN_ON(!isr_reg))
-> > > > > +		goto exit;
-> > > >
-> > > > For the above mentioned reason, this isr_reg would be non-NULL. Have
-> > > > you observed this error anytime?
-> > > I did not see this bug, this is potentially may happen.
-> > > >
-> > > > Also, the omap-gpio code has similar code spread all over and has to be
-> > > > anyway cleaned-up. Is there any reason why gpio_irq_handler() alone is
-> > > > addressed in this patch?
-> > > Here "isr_reg" is used later in code and may cause oops if it is NULL.
-> > > >
-> > > > > +
-> > > > >  	while(1) {
-> > > > >  		u32 isr_saved, level_mask = 0;
-> > > > >  		u32 enabled;
-> > > > > @@ -1377,6 +1394,7 @@ static void gpio_irq_handler(unsigned int irq,
-> > > > > struct irq_desc *desc)
-> > > > >  	configured, we must unmask the bank interrupt only after
-> > > > >  	handler(s) are executed in order to avoid spurious bank
-> > > > >  	interrupt */
-> > > > > +exit:
-> > > > >  	if (!unmasked)
-> > > > >  		desc->chip->unmask(irq);
-> > > > >
-> > > > > --
-> > > > > 1.6.3.3
-> > > >
-> > > 
-> > 
+Marek Szyprowski wrote:
 > 
+> Hello,
+> 
+> On Wednesday, October 13, 2010 2:16 PM Sangbeom Kim wrote:
+> 
+> > From: Daein Moon <moon9124@samsung.com>
+> >
+> > This patch adds support SROMC for S5PV310 and S5PC210.
+> >
+> > Signed-off-by: Daein Moon <moon9124@samsung.com>
+> > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pv310/cpu.c                    |    5 ++
+> >  arch/arm/mach-s5pv310/include/mach/map.h       |    4 ++
+> >  arch/arm/mach-s5pv310/include/mach/regs-srom.h |   50
+> ++++++++++++++++++++++++
+> >  3 files changed, 59 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-srom.h
+> >
+> > diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
+> > index ffed262..873783a 100644
+> > --- a/arch/arm/mach-s5pv310/cpu.c
+> > +++ b/arch/arm/mach-s5pv310/cpu.c
+> > @@ -81,6 +81,11 @@ static struct map_desc s5pv310_iodesc[] __initdata =
+> {
+> >  		.pfn		= __phys_to_pfn(S3C_PA_UART),
+> >  		.length		= SZ_512K,
+> >  		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= (unsigned long)S5P_VA_SROMC,
+> > +		.pfn		= __phys_to_pfn(S5PV310_PA_SROMC),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> >  	},
+> >  };
+> 
+> Do You really need to make a permanent mapping for the SROMC area? Cannot
+the
+> setup code in the mach-smdk*.c call ioremap(S5PV310_PA_SROMC) and put the
+address it
+> got to the ethernet device? This area will be probably useless for boards
+other than
+> SMDK.
+> 
+Hi,
+
+It seems to be useless because only ethernet device uses the SROM interface.
+Will this mapping be ready for devices that will use the SROM interface in
+boards
+other than SMDK?
+
+Best regards,
+Daein Moon
+
+> <snip>
+> 
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
