@@ -1,47 +1,48 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Thu, 14 Oct 2010 21:13:24 -0500
-Subject: [PATCH 3/7] omap:mailbox-fix checkpatch warnings
-In-Reply-To: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
-References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <1287108808-32119-4-git-send-email-h-kanigeri2@ti.com>
+Date: Thu, 14 Oct 2010 21:13:21 -0500
+Subject: [PATCH 0/7] omap:mailbox-enhancements and fixes
+Message-ID: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the checkpatch warnings observed in mailbox module
+My apologies for spamming linux omap.
+Resending again with the patch set copying correct linux arm mailing list.
+please ignore the previous patchsets.
+[http://www.spinics.net/lists/linux-omap/msg38782.html]
+[http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37214.html]
 
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
----
- arch/arm/plat-omap/mailbox.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+This patch set includes following mailbox enhancements and fixes.
+        
+- Fix in RX interrupt disable mechanism for OMAP4
+- Fix checkpatch warnings
+- Resolve multiple receiver problem in OMAP4 where there is
+  only one interrupt line shared between Ducati and Tesla.
+- Protect the Mailbox's internal callback function pointer from being
+  set directly by Users. Added option for multiple listeners on a
+  mailbox instance.
+- Send Mailbox message in Process context to avoid the latency
+  involved in scheduling Tasklet for every Mailbox message. Schedule
+  Tasklet only when the mailbox fifo is full
+- There is no explicit mailbox configuration register to enable mailbox
+  clocks. Define a dummy clock for mailbox to avoid addign cpu check for
+  omap4 in mailbox driver.
+- The patch from Fernando was sent to LO, but looks like it
+  didn't get merged, resending the patch after revising and rebasing.
+  https://patchwork.kernel.org/patch/105650/
 
-diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-index 9ce3570..ed960c1 100644
---- a/arch/arm/plat-omap/mailbox.c
-+++ b/arch/arm/plat-omap/mailbox.c
-@@ -279,11 +279,11 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
- 
- 	return 0;
- 
-- fail_alloc_rxq:
-+fail_alloc_rxq:
- 	mbox_queue_free(mbox->txq);
-- fail_alloc_txq:
-+fail_alloc_txq:
- 	free_irq(mbox->irq, mbox);
-- fail_request_irq:
-+fail_request_irq:
- 	if (mbox->ops->shutdown)
- 		mbox->ops->shutdown(mbox);
- 
-@@ -394,7 +394,8 @@ static int __init omap_mbox_init(void)
- 
- 	/* kfifo size sanity check: alignment and minimal size */
- 	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
--	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size, sizeof(mbox_msg_t));
-+	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
-+						sizeof(mbox_msg_t));
- 
- 	return 0;
- }
--- 
-1.7.0
+Fernando Guzman Lugo (1):
+  mailbox: change full flag per mailbox queue instead of global
+
+Hari Kanigeri (6):
+  omap:mailbox: fix rx interrupt disable in omap4
+  omap:mailbox-fix checkpatch warnings
+  omap:mailbox-send message in process context
+  omap:mailbox-resolve multiple receiver problem
+  omap:mailbox-add notification support for multiple readers
+  omap:clocks44x-add dummy clock for mailbox
+
+ arch/arm/mach-omap2/clock44xx_data.c      |    1 +
+ arch/arm/mach-omap2/mailbox.c             |    5 +-
+ arch/arm/plat-omap/include/plat/mailbox.h |   10 ++-
+ arch/arm/plat-omap/mailbox.c              |  148 +++++++++++++++++------------
+ 4 files changed, 98 insertions(+), 66 deletions(-)
