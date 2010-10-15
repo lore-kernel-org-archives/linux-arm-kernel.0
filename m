@@ -1,95 +1,117 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Fri, 15 Oct 2010 15:18:27 -0500
-Subject: [PATCH 1/2] ARM: imx: Add wake functionality to GPIO
-Message-ID: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Fri, 15 Oct 2010 15:18:28 -0500
+Subject: [PATCH 2/2] ARM: imx: Add POWER_KEY to mx51 babbage board
+In-Reply-To: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1287173908-25758-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Add function definition for irq_chip.set_wake to enable GPIO to
-wake-up the system.
+Add functionality for the power button on MX51 Babbage board.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/plat-mxc/gpio.c              |   35 +++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/gpio.h |    3 ++
- 2 files changed, 38 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/board-mx51_babbage.c      |   42 +++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |    4 ++-
+ 2 files changed, 45 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 57ec4a8..7647ba3 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -20,9 +20,11 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/irq.h>
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index 6e384d9..92f16ca 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -16,6 +16,8 @@
  #include <linux/gpio.h>
-+#include <mach/gpio.h>
- #include <mach/hardware.h>
- #include <asm-generic/bug.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
+ #include <linux/fsl_devices.h>
  
-@@ -201,11 +203,44 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- 	}
+ #include <mach/common.h>
+@@ -36,6 +38,7 @@
+ #define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
+ #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
+ #define BABBAGE_PHY_RESET (1*32 +5)	/* GPIO_2_5 */
++#define BABBAGE_POWER_KEY		(1*32 + 21)	/* GPIO_2_21 */
+ 
+ /* USB_CTRL_1 */
+ #define MX51_USB_CTRL_1_OFFSET			0x10
+@@ -93,6 +96,9 @@ static struct pad_desc mx51babbage_pads[] = {
+ 
+ 	/* USB HUB reset line*/
+ 	MX51_PAD_GPIO_1_7__GPIO_1_7,
++
++	/* Power Key */
++	MX51_PAD_EIM_A27__GPIO_2_21,
+ };
+ 
+ /* Serial ports */
+@@ -240,6 +246,42 @@ static int __init babbage_otg_mode(char *options)
  }
+ __setup("otg_mode=", babbage_otg_mode);
  
-+/*
-+ * Set interrupt number "irq" in the GPIO as a wake-up source.
-+ * While system is running, all registered GPIO interrupts need to have
-+ * wake-up enabled. When system is suspended, only selected GPIO interrupts
-+ * need to have wake-up enabled.
-+ * @param  irq          interrupt source number
-+ * @param  enable       enable as wake-up if equal to non-zero
-+ * @return       This function returns 0 on success.
++/*!
++ * Power Key interrupt handler.
 + */
-+static int gpio_set_wake_irq(u32 irq, u32 enable)
++static irqreturn_t power_key_int(int irq, void *dev_id)
 +{
-+	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio_idx = gpio & 0x1F;
-+	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
-+
-+	if (enable) {
-+		port->suspend_wakeup |= (1 << gpio_idx);
-+		if (port->irq_high && (gpio_idx >= 16))
-+			enable_irq_wake(port->irq_high);
-+		else
-+			enable_irq_wake(port->irq);
-+	} else {
-+		port->suspend_wakeup &= ~(1 << gpio_idx);
-+		if (port->irq_high && (gpio_idx >= 16))
-+			disable_irq_wake(port->irq_high);
-+		else
-+			disable_irq_wake(port->irq);
-+	}
-+
++	printk(KERN_INFO "PWR key pressed\n");
 +	return 0;
 +}
 +
- static struct irq_chip gpio_irq_chip = {
- 	.ack = gpio_ack_irq,
- 	.mask = gpio_mask_irq,
- 	.unmask = gpio_unmask_irq,
- 	.set_type = gpio_set_irq_type,
-+	.set_wake = gpio_set_wake_irq,
- };
- 
- static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
-diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-index af33b74..dba3768 100644
---- a/arch/arm/plat-mxc/include/mach/gpio.h
-+++ b/arch/arm/plat-mxc/include/mach/gpio.h
-@@ -39,6 +39,9 @@ struct mxc_gpio_port {
- 	struct gpio_chip chip;
- 	u32 both_edges;
- 	spinlock_t lock;
-+	u32 suspend_wakeup;
-+	u32 saved_wakeup;
++/*!
++ * Power Key initialization.
++ */
++static int __init mxc_init_power_key(void)
++{
++	/* Set power key as wakeup resource */
++	int irq, ret;
 +
- };
++	/* power key */
++	ret = gpio_request(BABBAGE_POWER_KEY, "power-key");
++	if (ret) {
++		printk(KERN_ERR"failed to get BABBAGE_POWER_KEY: %d\n", ret);
++		return ret;
++	}
++	gpio_direction_input(BABBAGE_POWER_KEY);
++
++	irq = IOMUX_TO_IRQ(BABBAGE_POWER_KEY);
++	set_irq_type(irq, IRQF_TRIGGER_RISING);
++	ret = request_irq(irq, power_key_int, 0, "power-key", 0);
++	if (ret)
++		pr_info("register on-off key interrupt failed\n");
++	else
++		enable_irq_wake(irq);
++	return ret;
++}
++late_initcall(mxc_init_power_key);
++
+ /*
+  * Board specific initialization.
+  */
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index 21bfa46..05f62a4 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -31,6 +31,8 @@ typedef enum iomux_config {
+ 	IOMUX_CONFIG_SION = 0x1 << 4,   /* LOOPBACK:MUX SION bit */
+ } iomux_pin_cfg_t;
  
- int mxc_gpio_init(struct mxc_gpio_port*, int);
++#define IOMUX_TO_IRQ(pin)	(MXC_GPIO_IRQ_START + pin)
++
+ /* Pad control groupings */
+ #define MX51_UART1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
+ 				PAD_CTL_DSE_HIGH)
+@@ -102,7 +104,7 @@ typedef enum iomux_config {
+ #define MX51_PAD_EIM_A24__GPIO_2_18             IOMUX_PAD(0x450, 0x0bc, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_A25__GPIO_2_19             IOMUX_PAD(0x454, 0x0c0, 1, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_A26__GPIO_2_20             IOMUX_PAD(0x458, 0x0c4, 1, 0x0,   0, NO_PAD_CTRL)
+-#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, NO_PAD_CTRL)
++#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, MX51_I2C_PAD_CTRL)
+ #define MX51_PAD_EIM_EB0__EIM_EB0               IOMUX_PAD(0x460, 0x0cc, 0, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_EB1__EIM_EB1               IOMUX_PAD(0x464, 0x0d0, 0, 0x0,   0, NO_PAD_CTRL)
+ #define MX51_PAD_EIM_EB2__GPIO_2_22             IOMUX_PAD(0x468, 0x0d4, 1, 0x0,   0, NO_PAD_CTRL)
 -- 
 1.6.0.4
