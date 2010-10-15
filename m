@@ -1,48 +1,79 @@
 From: h-kanigeri2@ti.com (Hari Kanigeri)
-Date: Thu, 14 Oct 2010 21:13:21 -0500
-Subject: [PATCH 0/7] omap:mailbox-enhancements and fixes
-Message-ID: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+Date: Thu, 14 Oct 2010 21:13:22 -0500
+Subject: [PATCH 1/7] mailbox: change full flag per mailbox queue instead of
+	global
+In-Reply-To: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <1287108808-32119-2-git-send-email-h-kanigeri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My apologies for spamming linux omap.
-Resending again with the patch set copying correct linux arm mailing list.
-please ignore the previous patchsets.
-[http://www.spinics.net/lists/linux-omap/msg38782.html]
-[http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37214.html]
+From: Fernando Guzman Lugo <x0095840@ti.com>
 
-This patch set includes following mailbox enhancements and fixes.
-        
-- Fix in RX interrupt disable mechanism for OMAP4
-- Fix checkpatch warnings
-- Resolve multiple receiver problem in OMAP4 where there is
-  only one interrupt line shared between Ducati and Tesla.
-- Protect the Mailbox's internal callback function pointer from being
-  set directly by Users. Added option for multiple listeners on a
-  mailbox instance.
-- Send Mailbox message in Process context to avoid the latency
-  involved in scheduling Tasklet for every Mailbox message. Schedule
-  Tasklet only when the mailbox fifo is full
-- There is no explicit mailbox configuration register to enable mailbox
-  clocks. Define a dummy clock for mailbox to avoid addign cpu check for
-  omap4 in mailbox driver.
-- The patch from Fernando was sent to LO, but looks like it
-  didn't get merged, resending the patch after revising and rebasing.
-  https://patchwork.kernel.org/patch/105650/
+As pointed by Ohad Ben-Cohen, the variable rq_full flag is a
+global variable, so if there are multiple mailbox users
+there will be conflics. Now there is a full flag per
+mailbox queue.
 
-Fernando Guzman Lugo (1):
-  mailbox: change full flag per mailbox queue instead of global
+Version 2:
+- Rebase to the latest.
+Version 3:
+- Remove spin_lock protection. When the full flag is
+true the interrupt for that mailbox is disabled. So there
+is no race condition if full flag is modified before
+calling omap_mbox_enable_irq.
 
-Hari Kanigeri (6):
-  omap:mailbox: fix rx interrupt disable in omap4
-  omap:mailbox-fix checkpatch warnings
-  omap:mailbox-send message in process context
-  omap:mailbox-resolve multiple receiver problem
-  omap:mailbox-add notification support for multiple readers
-  omap:clocks44x-add dummy clock for mailbox
+Reported-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+---
+ arch/arm/plat-omap/include/plat/mailbox.h |    1 +
+ arch/arm/plat-omap/mailbox.c              |    7 +++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
- arch/arm/mach-omap2/clock44xx_data.c      |    1 +
- arch/arm/mach-omap2/mailbox.c             |    5 +-
- arch/arm/plat-omap/include/plat/mailbox.h |   10 ++-
- arch/arm/plat-omap/mailbox.c              |  148 +++++++++++++++++------------
- 4 files changed, 98 insertions(+), 66 deletions(-)
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 9976565..13f2ef3 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -48,6 +48,7 @@ struct omap_mbox_queue {
+ 	struct tasklet_struct	tasklet;
+ 	int	(*callback)(void *);
+ 	struct omap_mbox	*mbox;
++	bool full;
+ };
+ 
+ struct omap_mbox {
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index d2fafb8..9ce3570 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -33,7 +33,6 @@
+ 
+ static struct workqueue_struct *mboxd;
+ static struct omap_mbox **mboxes;
+-static bool rq_full;
+ 
+ static int mbox_configured;
+ static DEFINE_MUTEX(mbox_configured_lock);
+@@ -148,6 +147,10 @@ static void mbox_rx_work(struct work_struct *work)
+ 
+ 		if (mq->callback)
+ 			mq->callback((void *)msg);
++		if (mq->full) {
++			mq->full = false;
++			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
++		}
+ 	}
+ }
+ 
+@@ -170,7 +173,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
+ 	while (!mbox_fifo_empty(mbox)) {
+ 		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+ 			omap_mbox_disable_irq(mbox, IRQ_RX);
+-			rq_full = true;
++			mq->full = true;
+ 			goto nomem;
+ 		}
+ 
+-- 
+1.7.0
