@@ -1,26 +1,53 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Fri, 15 Oct 2010 11:16:27 +0200
-Subject: [PATCH v4] imx-esdhc: update devices registration
-In-Reply-To: <20101015090105.GK6747@pengutronix.de>
-References: <20101012153155.GE4470@pengutronix.de>
-	<1286904825-6432-1-git-send-email-eric@eukrea.com>
-	<20101015090105.GK6747@pengutronix.de>
-Message-ID: <4CB81BEB.1000909@eukrea.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 15 Oct 2010 17:17:41 +0800
+Subject: iwmmxt signal frame handling
+In-Reply-To: <201010141609.10889.arnd@arndb.de>
+References: <201010141609.10889.arnd@arndb.de>
+Message-ID: <AANLkTimHyhLRZwR-FRtciu+0sGYYFkAh4WfLCWwu59JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-Le 15/10/2010 11:01, Uwe Kleine-K?nig a ?crit :
-> On Tue, Oct 12, 2010 at 07:33:45PM +0200, Eric B?nard wrote:
->> Tested on i.MX25 and i.MX35 and i.MX51
->>
->> Signed-off-by: Eric B?nard<eric@eukrea.com>
-> Looks good now, but the patch doesn't apply for me:
+On Thu, Oct 14, 2010 at 10:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Peter Maydell noticed during code review that the signal frame might
+> be written incorrectly for kernels with CONFIG_IWMMXT set running
+> processes without TIF_USING_IWMMXT, where the magic/size values
+> for the iwmmxt section of the frame are left uninitialized.
+> Instead of skipping this part of the frame, we should instead
+> write a valid header with zero data.
 >
-yes you need the i.MX51 part before. The process is :
-- add MX25 & MX35 SDHC support
-- add MX51 SDHC support
-- update the way SDHC is registered for MX25, MX35 and MX51.
+> This patch is compile-tested only since the problem was only
+> found in review and neither Peter nor myself have access to
+> IWMMXT capable hardware to test this on.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Reported-by: Peter Maydell <peter.maydell@linaro.org>
 
-Eric
+Looks OK to me as well.
+
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+
+>
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -154,7 +154,10 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe *frame)
+> ? ? ? ?kframe = (struct iwmmxt_sigframe *)((unsigned long)(kbuf + 8) & ~7);
+> ? ? ? ?kframe->magic = IWMMXT_MAGIC;
+> ? ? ? ?kframe->size = IWMMXT_STORAGE_SIZE;
+> - ? ? ? iwmmxt_task_copy(current_thread_info(), &kframe->storage);
+> + ? ? ? if (test_thread_flag(TIF_USING_IWMMXT))
+> + ? ? ? ? ? ? ? iwmmxt_task_copy(current_thread_info(), &kframe->storage);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? memset(&kframe->storage, 0, sizeof(kframe->storage));
+> ? ? ? ?return __copy_to_user(frame, kframe, sizeof(*frame));
+> ?}
+>
+> @@ -429,7 +432,7 @@ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
+> ? ? ? ? ? ? ? ?err |= preserve_crunch_context(&aux->crunch);
+> ?#endif
+> ?#ifdef CONFIG_IWMMXT
+> - ? ? ? if (err == 0 && test_thread_flag(TIF_USING_IWMMXT))
+> + ? ? ? if (err == 0)
+> ? ? ? ? ? ? ? ?err |= preserve_iwmmxt_context(&aux->iwmmxt);
+> ?#endif
+> ?#ifdef CONFIG_VFP
+>
