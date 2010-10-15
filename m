@@ -1,40 +1,31 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 15 Oct 2010 21:18:21 +0100
-Subject: [PATCH V5 0/6] SD/MMC driver for MX25/35/51
-In-Reply-To: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-References: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20101015201821.GB18898@void.printf.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Oct 2010 22:22:18 +0200
+Subject: iwmmxt signal frame handling
+In-Reply-To: <alpine.LFD.2.00.1010151426030.2764@xanadu.home>
+References: <201010141609.10889.arnd@arndb.de>
+	<201010151540.07982.arnd@arndb.de>
+	<alpine.LFD.2.00.1010151426030.2764@xanadu.home>
+Message-ID: <201010152222.18649.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Friday 15 October 2010 20:38:15 Nicolas Pitre wrote:
+> Hard to confirm.  The only way not to have TIF_USING_IWMMXT set is to 
+> use old pre-EABI binaries, which are relying on the kernel emulated FPA 
+> instructions for floating point, and nothing in those days might have 
+> cared about extensions to the ucontext layout at all, or even have used 
+> iwmmxt.  While this is a correctness fix, in practice this never 
+> mattered.
 
-On Fri, Oct 15, 2010 at 12:20:58PM +0200, Wolfram Sang wrote:
-> Another try. The driver seems to be known by now and used already :) Minor
-> fixes only:
-> 
-> 3/6: Rename a variable (found while working on write-protect-pin support)
-> 5/6: Tested the checkpatch fixes
-> 6/6: Added Kconfig dependencies
-> 
-> The series is based on mmc-next as of today and also available at
-> 
-> 	git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
-> 
-> Thanks,
-> 
->    Wolfram
-> 
-> Wolfram Sang (6):
->   mmc: sdhci-pltfm: Add structure for host-specific data
->   mmc: sdhci-pltfm: move .h-file into apropriate subdir
->   mmc: sdhci: introduce private get_ro
->   mmc: sdhci_pltfm: pass more data on custom init-call
->   mmc: sdhci-of-esdhc: factor out common stuff
->   mmc: sdhci-pltfm: add pltfm-driver for imx35/51
+Ok, good to know.
+ 
+> And we're talking about mixed ABI environments which existed many years 
+> ago, like prior the Git era.  Hardly a stable tree candidate.
 
-Thanks!  All pushed to mmc-next.
+Yes, that's pretty clear then. I had assumed the TIF flag meant that
+a particular process had been using IWMMXT, not that it was allowed
+to do them.
 
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Thanks for the explanation,
+
+	Arnd
