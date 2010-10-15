@@ -1,33 +1,57 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 15 Oct 2010 23:44:59 +0800
-Subject: [PATCH] arm/nuc900: disable hardware cursor setting
-Message-ID: <4CB876FB.3020508@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 15 Oct 2010 14:46:23 -0400 (EDT)
+Subject: iwmmxt signal frame handling
+In-Reply-To: <AANLkTinSJnjd9z4msto9j=gyOiuL2N4c7FOShB0fT1hA@mail.gmail.com>
+References: <201010141609.10889.arnd@arndb.de>
+	<AANLkTimHyhLRZwR-FRtciu+0sGYYFkAh4WfLCWwu59JA@mail.gmail.com>
+	<AANLkTik3Brb-XbL1GkteVs_g9J3HtYsZMQogh+KR0LB0@mail.gmail.com>
+	<201010151540.07982.arnd@arndb.de>
+	<AANLkTinSJnjd9z4msto9j=gyOiuL2N4c7FOShB0fT1hA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1010151440580.2764@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, 15 Oct 2010, Eric Miao wrote:
 
-Currently, the nuc900 lcd driver did not implement controlling
-hardware cursor function, so enabling it which results in penal upper left 64x64 
-part has been shown in black, so I disable it.
+> On Fri, Oct 15, 2010 at 9:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 15 October 2010 15:32:04 Eric Miao wrote:
+> >> > Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> >> >
+> >>
+> >> This also passes the internal iwmmxt test, Haojian please add your
+> >> Tested-by please.
+> >
+> > Can you also confirm that the previous behaviour is broken?
+> > If it is, the patch is probably a candidate for the stable trees.
+> >
+> 
+> I don't believe the previous behavior is going to cause any serious issue. The
+> magic/size are only saved/restored only for those processes with
+> TIF_USING_IWMMXT
+> flag set. Yet this patch does seem to improve from security perspective by
+> zero-ing the buffer.
+> 
+> BTW: I didn't look too much into the code, but it seems to me that the aux can
+> just be zero-ed in a whole?
 
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
----
-  arch/arm/mach-w90x900/dev.c |    2 +-
-  1 files changed, 1 insertions(+), 1 deletions(-)
+No.  Extensions to the ucontext layout are structured into:
 
-diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-index 5b0c38a..e1d262c 100644
---- a/arch/arm/mach-w90x900/dev.c
-+++ b/arch/arm/mach-w90x900/dev.c
-@@ -438,7 +438,7 @@ static struct nuc900fb_display nuc900_lcd_info[] = {
-  		.upper_margin	= 18,
-  		.lower_margin	= 4,
-  		.vsync_len	= 1,
--		.dccs		= 0x8e00041a,
-+		.dccs		= 0x0e00041a,
-  		.devctl		= 0x060800c0,
-  		.fbctrl		= 0x00a000a0,
-  		.scale		= 0x04000400,
--- 
-1.6.3.3
+	- magic number to identify the data
+
+	- size of the data
+
+	- the data itself
+
+and you may have multiple of those blocks together, with the last one 
+having a magic number of 0 to mark the end.
+
+What could be done instead is to avoid copying any iwmmxt context when 
+that is not available (i.e. when TIF_USING_IWMMXT is not set), but that 
+would make the code more complex as the ucontext structure couldn't be 
+used as is and some kind of dynamic storage woule be needed.  I really 
+doubt it is worth the trouble, especially since the only environment 
+where that would make a difference is with those old pre-EABI binaries 
+which don't care at all about those ucontext extensions anyway.
+
+
+Nicolas
