@@ -1,67 +1,140 @@
-From: arasv@magellan-technology.com (Aras Vaichas)
-Date: Fri, 15 Oct 2010 15:26:34 +1100
-Subject: cmpxchg() in recent kernels
-In-Reply-To: <4CB036B7.7000100@gai.ru>
-References: <4CB036B7.7000100@gai.ru>
-Message-ID: <AANLkTi=PeHQRibtU=jv69KVNWovtNsG3S11M0BLCnbRC@mail.gmail.com>
+From: EXT-Eugeny.Kuznetsov@nokia.com (Evgeny Kuznetsov)
+Date: Fri, 15 Oct 2010 10:16:18 +0400
+Subject: [PATCHv2 1/1] omap: Ptr "isr_reg" tracked as NULL was dereferenced
+In-Reply-To: <1286971758.12782.35.camel@ekuznets-lx-nokia>
+References: <cover.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+	<7bb69801f49283c3bde78aa008c15308ac8a5fbf.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D099AFD@dbde02.ent.ti.com>
+	<1286970199.12782.28.camel@ekuznets-lx-nokia>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D099B87@dbde02.ent.ti.com>
+	<1286971758.12782.35.camel@ekuznets-lx-nokia>
+Message-ID: <1287123378.12782.49.camel@ekuznets-lx-nokia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2010 20:32, Alex Sverdlin <alex@gai.ru> wrote:
->
-> Hello!
->
-> I've probably missed something, but how to compile recent kernels on ARM?
-> I've been using GCC 3.4.3 from Cirrus for my EP9302 boards up to 2.6.35.4
-> But 2.6.36-rc and upper won't compile anymore.
-> The problem is appearing in multiplatform code of cmpxchg() function.
-> First in kernel/pid.c (2.6.36-rc4 - 2.6.36-rc6)
-> Then 4 times in 2.6.36-rc7-next... atomic_cmpxchg compiles fine, and when I
-> replace cmpxhg with atomic_ version, everything compiles fine.
->
-> Here is output of make from 2.6.36-rc7-next:
-> ...
-> ?CHK ? ? include/generated/compile.h
-> ?UPD ? ? include/generated/compile.h
-> ?CC ? ? ?init/version.o
-> ?LD ? ? ?init/built-in.o
-> ?LD ? ? ?vmlinux
-> kernel/built-in.o: In function `alloc_pid':
-> elfcore.c:(.text+0x1c258): undefined reference to `wrong_size_cmpxchg'
-> net/built-in.o: In function `rt_bind_peer':
-> sysctl_net.c:(.text+0x3bb38): undefined reference to `wrong_size_cmpxchg'
-> net/built-in.o: In function `inet_add_protocol':
-> sysctl_net.c:(.text+0x3f4dc): undefined reference to `wrong_size_cmpxchg'
-> net/built-in.o: In function `inet_del_protocol':
-> sysctl_net.c:(.text+0x3f5a8): undefined reference to `wrong_size_cmpxchg'
-> net/built-in.o: In function `build_ehash_secret':
-> sysctl_net.c:(.text+0x6a034): undefined reference to `wrong_size_cmpxchg'
-> make[1]: *** [vmlinux] Error 1
-> ...
+On Wed, 2010-10-13 at 16:09 +0400, Evgeny Kuznetsov wrote:
+> On Wed, 2010-10-13 at 17:20 +0530, ext Varadarajan, Charulatha wrote:
+> > 
+> > <<snip>>
+> > 
+> > > > >
+> > > > > From: Evgeny Kuznetsov <ext-eugeny.kuznetsov@nokia.com>
+> > > > >
+> > > > > Value of "isr_reg" pointer is depend on configuration and GPIO method.
+> > > > > Potentially it may have NULL value and it is dereferenced later
+> > > > > in code. If pointer is NULL there is some kernel issue.
+> > > >
+> > > > Can you elaborate?
+> > > "isr_reg" should not be NULL. But if it is NULL then there is kernel
+> > > bug. And WARN_ON() used to show it.
+> > > I did not see this bug, this is potentially may happen.
+> > > >
+> > > > > Warning and exit from function are added in this case.
+> > > > > Also compilation check is added for correct architecture
+> > > > > configuration.
+> > > > >
+> > > > > Signed-off-by: Evgeny Kuznetsov <EXT-Eugeny.Kuznetsov@nokia.com>
+> > > > > ---
+> > > > >  arch/arm/plat-omap/gpio.c |   18 ++++++++++++++++++
+> > > > >  1 files changed, 18 insertions(+), 0 deletions(-)
+> > > > >
+> > > > > diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+> > > > > index c05c653..d04913c 100644
+> > > > > --- a/arch/arm/plat-omap/gpio.c
+> > > > > +++ b/arch/arm/plat-omap/gpio.c
+> > > > > @@ -1318,6 +1318,23 @@ static void gpio_irq_handler(unsigned int irq,
+> > > > > struct irq_desc *desc)
+> > > > >  	if (bank->method == METHOD_GPIO_44XX)
+> > > > >  		isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
+> > > > >  #endif
+> > > > > +
+> > > > > +#if !defined(CONFIG_ARCH_OMAP1) &&		\
+> > > > > +		!defined(CONFIG_ARCH_OMAP15XX) &&	\
+> > > > > +		!defined(CONFIG_ARCH_OMAP16XX) &&	\
+> > > > > +		!defined(CONFIG_ARCH_OMAP730) &&	\
+> > > > > +		!defined(CONFIG_ARCH_OMAP850) &&	\
+> > > > > +		!defined(CONFIG_ARCH_OMAP2) &&	\
+> > > > > +		!defined(CONFIG_ARCH_OMAP3) &&	\
+> > > > > +		!defined(CONFIG_ARCH_OMAP4)
+> > > > > +
+> > > > > +#error "Incorrect arch configuration"
+> > > >
+> > > > This is not required. If the architecture is not one of the above
+> > > > mentioned, gpio_irq_handler() will not be used/called at all.
+> > > This could be removed.
+> > > 
+> > > > Also all the possible gpio methods for a given OMAP architecture are
+> > > > already considered with "#ifdef"s and (bank->method) checks in
+> > > > gpio_irq_handler().
+> > > It is not cover all cased, e.g. for OMAP4 arch:
+> > > ....
+> > > 	#if defined(CONFIG_ARCH_OMAP4)
+> > > 		if (bank->method == METHOD_GPIO_44XX)
+> > > 			isr_reg = bank->base + OMAP4_GPIO_IRQSTATUS0;
+> > > 	#endif
+> > > .....
+> > > 
+> > > If (bank->method != METHOD_GPIO_44XX) then isr_reg will be NULL.
+> > > This should not happen, but potentially may have place.
+> > 
+> > When would it fail? If it is CONFIG_ARCH_OMAP4, the gpio method can
+> > only be METHOD_GPIO_44XX. Else if it is for some other OMAP architecture,
+> > the gpio_method is similarly taken care. So this cannot happen.
+> This is similar check as e.g. in _enable_gpio_irqbank() there default
+> case for bank->methos switch is WARN_ON(1).
+> Just to warn in case.
+Hi Tony,
 
-Sorry, no answer, but I can confirm that I am having the same problem as well.
-ARM AT91RM9200, 2.6.33.7 + at91 + rt
+It is not a bug fix, it is just check to prevent potential issues. Used
+to warn in case of bug and prevent kernel oops. Check added only here
+(not all gpio code cleanup) since here it could cause kernel opps.
 
-kernel/built-in.o: In function `__tasklet_hi_schedule':
-utsname_sysctl.c:(.text+0xca1c): undefined reference to `wrong_size_cmpxchg'
-kernel/built-in.o: In function `__tasklet_schedule':
-utsname_sysctl.c:(.text+0xcb7c): undefined reference to `wrong_size_cmpxchg'
-kernel/built-in.o: In function `__tasklet_action':
-utsname_sysctl.c:(.text+0xce4c): undefined reference to `wrong_size_cmpxchg'
-kernel/built-in.o: In function `sched_init_smp':
-utsname_sysctl.c:(.init.text+0xec): undefined reference to `____ilog2_NaN'
-make: *** [.tmp_vmlinux1] Error 1
+Would you apply patch if I will leave only if condition section in
+patch?
 
-also
+	if (WARN_ON(!isr_reg))
+		goto exit;
 
-kernel/built-in.o: In function `__tasklet_hi_schedule':
-slow-work.c:(.text+0xc86c): undefined reference to `wrong_size_cmpxchg'
-kernel/built-in.o: In function `__tasklet_schedule':
-slow-work.c:(.text+0xc9cc): undefined reference to `wrong_size_cmpxchg'
-kernel/built-in.o: In function `__tasklet_action':
-slow-work.c:(.text+0xcc9c): undefined reference to `wrong_size_cmpxchg'
-kernel/built-in.o: In function `sched_init_smp':
-slow-work.c:(.init.text+0xec): undefined reference to `____ilog2_NaN'
-make: *** [.tmp_vmlinux1] Error 1
+If yes, I'll resend v3 patch.
 
-Aras
+Thanks,
+Regards,
+Evgeny
+
+> > 
+> > > 
+> > > >
+> > > > > +
+> > > > > +#endif
+> > > > > +
+> > > > > +	if (WARN_ON(!isr_reg))
+> > > > > +		goto exit;
+> > > >
+> > > > For the above mentioned reason, this isr_reg would be non-NULL. Have
+> > > > you observed this error anytime?
+> > > I did not see this bug, this is potentially may happen.
+> > > >
+> > > > Also, the omap-gpio code has similar code spread all over and has to be
+> > > > anyway cleaned-up. Is there any reason why gpio_irq_handler() alone is
+> > > > addressed in this patch?
+> > > Here "isr_reg" is used later in code and may cause oops if it is NULL.
+> > > >
+> > > > > +
+> > > > >  	while(1) {
+> > > > >  		u32 isr_saved, level_mask = 0;
+> > > > >  		u32 enabled;
+> > > > > @@ -1377,6 +1394,7 @@ static void gpio_irq_handler(unsigned int irq,
+> > > > > struct irq_desc *desc)
+> > > > >  	configured, we must unmask the bank interrupt only after
+> > > > >  	handler(s) are executed in order to avoid spurious bank
+> > > > >  	interrupt */
+> > > > > +exit:
+> > > > >  	if (!unmasked)
+> > > > >  		desc->chip->unmask(irq);
+> > > > >
+> > > > > --
+> > > > > 1.6.3.3
+> > > >
+> > > 
+> > 
+> 
