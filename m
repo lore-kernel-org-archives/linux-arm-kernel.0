@@ -1,74 +1,47 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Oct 2010 12:21:02 +0200
-Subject: [PATCH 4/6] mmc: sdhci_pltfm: pass more data on custom init-call
-In-Reply-To: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-References: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1287138064-21385-5-git-send-email-w.sang@pengutronix.de>
+Date: Fri, 15 Oct 2010 12:20:58 +0200
+Subject: [PATCH V5 0/6] SD/MMC driver for MX25/35/51
+Message-ID: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The custom init call may need more data to perform its job, so we pass
-it a pointer to pdata, too. Also, always use the platform_id specific
-data even if platform_data is present. Doing that, platform_data can
-additionally be parsed by init() for board-specific information (via
-sdhci->mmc->parent).
+Another try. The driver seems to be known by now and used already :) Minor
+fixes only:
 
-(Note: the old behaviour was that you could override the platform_id
-specific data with your own. However, one can still do this by using the
-"sdhci" id instead of "sdhci-<something>".)
+3/6: Rename a variable (found while working on write-protect-pin support)
+5/6: Tested the checkpatch fixes
+6/6: Added Kconfig dependencies
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Tested-by : Eric B?nard <eric@eukrea.com>
----
- drivers/mmc/host/sdhci-pltfm.c  |    8 +++++---
- include/linux/mmc/sdhci-pltfm.h |    2 +-
- 2 files changed, 6 insertions(+), 4 deletions(-)
+The series is based on mmc-next as of today and also available at
 
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index 685202b..00e8a8a 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -52,15 +52,17 @@ static struct sdhci_ops sdhci_pltfm_ops = {
- 
- static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
- {
--	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
- 	const struct platform_device_id *platid = platform_get_device_id(pdev);
-+	struct sdhci_pltfm_data *pdata;
- 	struct sdhci_host *host;
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct resource *iomem;
- 	int ret;
- 
--	if (!pdata && platid && platid->driver_data)
-+	if (platid && platid->driver_data)
- 		pdata = (void *)platid->driver_data;
-+	else
-+		pdata = pdev->dev.platform_data;
- 
- 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!iomem) {
-@@ -109,7 +111,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
- 	}
- 
- 	if (pdata && pdata->init) {
--		ret = pdata->init(host);
-+		ret = pdata->init(host, pdata);
- 		if (ret)
- 			goto err_plat_init;
- 	}
-diff --git a/include/linux/mmc/sdhci-pltfm.h b/include/linux/mmc/sdhci-pltfm.h
-index 0239bd7..548d59d 100644
---- a/include/linux/mmc/sdhci-pltfm.h
-+++ b/include/linux/mmc/sdhci-pltfm.h
-@@ -28,7 +28,7 @@ struct sdhci_host;
- struct sdhci_pltfm_data {
- 	struct sdhci_ops *ops;
- 	unsigned int quirks;
--	int (*init)(struct sdhci_host *host);
-+	int (*init)(struct sdhci_host *host, struct sdhci_pltfm_data *pdata);
- 	void (*exit)(struct sdhci_host *host);
- };
- 
--- 
-1.7.1
+	git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
+
+Thanks,
+
+   Wolfram
+
+Wolfram Sang (6):
+  mmc: sdhci-pltfm: Add structure for host-specific data
+  mmc: sdhci-pltfm: move .h-file into apropriate subdir
+  mmc: sdhci: introduce private get_ro
+  mmc: sdhci_pltfm: pass more data on custom init-call
+  mmc: sdhci-of-esdhc: factor out common stuff
+  mmc: sdhci-pltfm: add pltfm-driver for imx35/51
+
+ drivers/mmc/host/Kconfig           |   10 +++
+ drivers/mmc/host/Makefile          |    1 +
+ drivers/mmc/host/sdhci-cns3xxx.c   |    2 +-
+ drivers/mmc/host/sdhci-esdhc-imx.c |  143 ++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/sdhci-esdhc.h     |   83 +++++++++++++++++++++
+ drivers/mmc/host/sdhci-of-esdhc.c  |   70 ++----------------
+ drivers/mmc/host/sdhci-pltfm.c     |   23 ++++--
+ drivers/mmc/host/sdhci-pltfm.h     |   10 ++-
+ drivers/mmc/host/sdhci.c           |   15 ++--
+ drivers/mmc/host/sdhci.h           |    1 +
+ include/linux/mmc/sdhci-pltfm.h    |   35 +++++++++
+ include/linux/sdhci-pltfm.h        |   35 ---------
+ 12 files changed, 316 insertions(+), 112 deletions(-)
+ create mode 100644 drivers/mmc/host/sdhci-esdhc-imx.c
+ create mode 100644 drivers/mmc/host/sdhci-esdhc.h
+ create mode 100644 include/linux/mmc/sdhci-pltfm.h
+ delete mode 100644 include/linux/sdhci-pltfm.h
