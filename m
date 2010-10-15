@@ -1,147 +1,38 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Oct 2010 12:21:00 +0200
-Subject: [PATCH 2/6] mmc: sdhci-pltfm: move .h-file into apropriate subdir
-In-Reply-To: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-References: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1287138064-21385-3-git-send-email-w.sang@pengutronix.de>
+Date: Fri, 15 Oct 2010 12:25:34 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <8762x6xx00.fsf@lechat.rtp-net.org>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
+	<87aamjxe00.fsf@lechat.rtp-net.org> <4CB56A88.2040101@eukrea.com>
+	<20101013082930.GA11286@pengutronix.de>
+	<8762x6xx00.fsf@lechat.rtp-net.org>
+Message-ID: <20101015102534.GA4276@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the mmc-directory.
+On Wed, Oct 13, 2010 at 11:28:15AM +0200, Arnaud Patard wrote:
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
-Tested-by : Eric B?nard <eric@eukrea.com>
----
- drivers/mmc/host/sdhci-cns3xxx.c |    2 +-
- drivers/mmc/host/sdhci-pltfm.c   |    2 +-
- drivers/mmc/host/sdhci-pltfm.h   |    2 +-
- include/linux/mmc/sdhci-pltfm.h  |   35 +++++++++++++++++++++++++++++++++++
- include/linux/sdhci-pltfm.h      |   35 -----------------------------------
- 5 files changed, 38 insertions(+), 38 deletions(-)
- create mode 100644 include/linux/mmc/sdhci-pltfm.h
- delete mode 100644 include/linux/sdhci-pltfm.h
+> >> it's actually not yet supported by the driver. There is a wp_gpio in
+> >> struct esdhc_platform_data (arch/arm/plat-mxc/include/mach/esdhc.h)
+> >> but it's not yet used by the driver.
+> >
+> > It's all prepared. I finally will have a look into it today.
+> 
+> oh, great. I was thinking about doing it but I'll wait for your patches
+> then. I'm sure I need support for WP on GPIO but I may also need support
+> for CD on GPIO so I'll be happy to test any patch you have.
 
-diff --git a/drivers/mmc/host/sdhci-cns3xxx.c b/drivers/mmc/host/sdhci-cns3xxx.c
-index b7050b3..9ebd1d7 100644
---- a/drivers/mmc/host/sdhci-cns3xxx.c
-+++ b/drivers/mmc/host/sdhci-cns3xxx.c
-@@ -15,7 +15,7 @@
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/mmc/host.h>
--#include <linux/sdhci-pltfm.h>
-+#include <linux/mmc/sdhci-pltfm.h>
- #include <mach/cns3xxx.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index 730fdf5..685202b 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -30,7 +30,7 @@
- #include <linux/mmc/host.h>
- 
- #include <linux/io.h>
--#include <linux/sdhci-pltfm.h>
-+#include <linux/mmc/sdhci-pltfm.h>
- 
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
-diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-index 93a0319..562b929 100644
---- a/drivers/mmc/host/sdhci-pltfm.h
-+++ b/drivers/mmc/host/sdhci-pltfm.h
-@@ -13,7 +13,7 @@
- 
- #include <linux/clk.h>
- #include <linux/types.h>
--#include <linux/sdhci-pltfm.h>
-+#include <linux/mmc/sdhci-pltfm.h>
- 
- struct sdhci_pltfm_host {
- 	struct clk *clk;
-diff --git a/include/linux/mmc/sdhci-pltfm.h b/include/linux/mmc/sdhci-pltfm.h
-new file mode 100644
-index 0000000..0239bd7
---- /dev/null
-+++ b/include/linux/mmc/sdhci-pltfm.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Platform data declarations for the sdhci-pltfm driver.
-+ *
-+ * Copyright (c) 2010 MontaVista Software, LLC.
-+ *
-+ * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or (at
-+ * your option) any later version.
-+ */
-+
-+#ifndef _SDHCI_PLTFM_H
-+#define _SDHCI_PLTFM_H
-+
-+struct sdhci_ops;
-+struct sdhci_host;
-+
-+/**
-+ * struct sdhci_pltfm_data - SDHCI platform-specific information & hooks
-+ * @ops: optional pointer to the platform-provided SDHCI ops
-+ * @quirks: optional SDHCI quirks
-+ * @init: optional hook that is called during device probe, before the
-+ *        driver tries to access any SDHCI registers
-+ * @exit: optional hook that is called during device removal
-+ */
-+struct sdhci_pltfm_data {
-+	struct sdhci_ops *ops;
-+	unsigned int quirks;
-+	int (*init)(struct sdhci_host *host);
-+	void (*exit)(struct sdhci_host *host);
-+};
-+
-+#endif /* _SDHCI_PLTFM_H */
-diff --git a/include/linux/sdhci-pltfm.h b/include/linux/sdhci-pltfm.h
-deleted file mode 100644
-index 0239bd7..0000000
---- a/include/linux/sdhci-pltfm.h
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Platform data declarations for the sdhci-pltfm driver.
-- *
-- * Copyright (c) 2010 MontaVista Software, LLC.
-- *
-- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or (at
-- * your option) any later version.
-- */
--
--#ifndef _SDHCI_PLTFM_H
--#define _SDHCI_PLTFM_H
--
--struct sdhci_ops;
--struct sdhci_host;
--
--/**
-- * struct sdhci_pltfm_data - SDHCI platform-specific information & hooks
-- * @ops: optional pointer to the platform-provided SDHCI ops
-- * @quirks: optional SDHCI quirks
-- * @init: optional hook that is called during device probe, before the
-- *        driver tries to access any SDHCI registers
-- * @exit: optional hook that is called during device removal
-- */
--struct sdhci_pltfm_data {
--	struct sdhci_ops *ops;
--	unsigned int quirks;
--	int (*init)(struct sdhci_host *host);
--	void (*exit)(struct sdhci_host *host);
--};
--
--#endif /* _SDHCI_PLTFM_H */
+Just to keep you updated: Got a bit distracted again but I hope to
+finish it on Saturday. Looks like a patch for the gpiolib is also
+needed...
+
 -- 
-1.7.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101015/e8fb7eaf/attachment.sig>
