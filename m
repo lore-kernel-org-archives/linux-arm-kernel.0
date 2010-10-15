@@ -1,133 +1,38 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Fri, 15 Oct 2010 19:12:29 +0300
-Subject: [PATCH RFC/RFT] ARM: S5P: Fix USB and 48M clock enable procedure
-In-Reply-To: <01de01cb6c68$5ede0bc0$1c9a2340$%kim@samsung.com>
-References: <20101012194021.11514.12704.stgit@localhost.localdomain>
-	<008001cb6b7e$ba952920$2fbf7b60$%kim@samsung.com>
-	<AANLkTimVh7hkWiZyK5f3+22EmNHSJcmMVb_tKYRQSGxN@mail.gmail.com>
-	<01de01cb6c68$5ede0bc0$1c9a2340$%kim@samsung.com>
-Message-ID: <4CB87D6D.6020303@gmail.com>
+From: avictor.za@gmail.com (avictor.za at gmail.com)
+Date: Fri, 15 Oct 2010 18:31:40 +0200
+Subject: [PATCH v4] ARM: AT91: add board support for Pcontrol_G20
+In-Reply-To: <20101015015016.GD11087@game.jcrosoft.org>
+References: <1286466086.4306.41.camel@aspire.localdomain>
+	<20101008123407.GB30252@game.jcrosoft.org>
+	<1286550644.21584.34.camel@aspire.localdomain>
+	<1286787761.7800.11.camel@aspire.localdomain>
+	<1286792568.7800.19.camel@aspire.localdomain>
+	<20101013131515.GC11087@game.jcrosoft.org>
+	<1286979531.7165.9.camel@aspire.localdomain>
+	<4CB71813.6060601@atmel.com>
+	<20101014151451.GB23434@n2100.arm.linux.org.uk>
+	<20101015015016.GD11087@game.jcrosoft.org>
+Message-ID: <AANLkTik8qZdU6o+ArBJkUGFNGaN2Ucmkj3kxKKudtRBE@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2010 03:56 PM, Kukjin Kim wrote:
-> Paulius Zaleckas wrote:
->>
->> On Thu, Oct 14, 2010 at 12:03 PM, Kukjin Kim<kgene.kim@samsung.com>
-> wrote:
->>> Paulius Zaleckas wrote:
->>>>
->>>> Signed-off-by: Paulius Zaleckas<paulius.zaleckas@gmail.com>
->>>> ---
->>>>
->>>>   arch/arm/mach-s5p6440/clock.c              |   23 -------
->>>>   arch/arm/plat-s5p/clock.c                  |   86
->>>> ++++++++++++++++++++++++++++
->>>>   arch/arm/plat-s5p/include/plat/s5p-clock.h |    1
->>>>   3 files changed, 86 insertions(+), 24 deletions(-)
->>>>
->>> Hi Paulius,
->>>
->>> There are some comments about your patches which includes previous
-> S3C64XX
->> patches.
->>>
->>> Basically your approach looks good trial and structure...but I'm not
-> sure
->> whether your approach can be used commonly on Samsung's all SoCs or not.
->>> Need to do more test on boards and I already informed your patches to
-> USB
->> engineers in my team, actually need to discuss about this.
->>>
->>> As a note, I know, 'xusbxti' clock is structure for external xtal which
-> is
->> used for generating USB clock on board... it depends on board condition,
->> because can be used 12/24/48Mhz on board. The clk_48m means generated
-> actual
->> USB clock, 48Mhz. So should be implemented enable function by using
-> clk_48m...
->>
->> I don't agree that enable should be for clk_48m. The reason is that
->> IMO it is possible
->> to enable 48m clock, but suspend the clock for USB device part (I am
->> not sure about this yet...).
-> 
-> Umm...please see below.
-> 
->            |\
-> xxti------|O|
->            |M|-----..System..-- HCLK -->  usb_device...
-> xusbxti---| |  |
->          | |/   |
->          |      |
->         (1)    (2)  -------------
->           ---------| USB OTG Phy | -->  clk_48M
->                     -------------
-> 
-> Firstly, 'xusbxti' can be used to system clock when selected by OM pin.
-> As I said, the rate of xusbxti can be 12/24/48Mhz and there is it on
-> board...usually is used 12Mhz or 24Mhz on SMDK board.
-> It means depends on board and always enabled, so no need following 'rate'
-> and 'enable' in your following patch.
-> 
->   struct clk clk_xusbxti = {
->   	.name		= "xusbxti",
->   	.id		= -1,
-> +	.rate		= 48000000,
-> +	.enable		= clk_xusbxti_ctrl,
->   };
-> 
->   struct clk s5p_clk_27m = {
-> @@ -49,6 +134,7 @@ struct clk clk_48m = {
->   	.name		= "clk_48m",
->   	.id		= -1,
->   	.rate		= 48000000,
-> +	.parent		=&clk_xusbxti,
->   };
-> 
-> According to above clock diagram, the parent of 'clk_48m' can be 'xxti' or
-> 'xusbxti', it is decided by SoC and OM pin. For example, there is line (1)
-> on S5P6440 so your patch is right, but there is line (2) on S5PC100 but
-> line (1) so it's wrong..the parent of clk_48m can be xxti by OM Pin.
-> 
-> It means the parent of clk_48m depends on SoC, can't define it in the plat-
-> s5p. And maybe as you know, in the S5PV210/S5PC110 case, need two clk_48m
-> structures for Host and Device...
-> 
-> So its clock structure has SoC(ARCH) dependency and it's difficult to merge
-> it into plat-s5p now.
+hi,
 
-I see... So maybe the best option is to define enable function not per
-platform, but per machine.
-
-Originally I was trying to solve bug where OHCI was not working on
-S3C6410. I discovered that I need to select different clock source for
-it or fix enable procedure for 48M. For S5P platform I have datasheet
-only for S5PC100 and yes you are right about clock structure there.
-
-> We need to re-think to implement it...and I and my team will sort out it.
-
-Looking forward!
-
+On Fri, Oct 15, 2010 at 3:50 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 16:14 Thu 14 Oct ? ? , Russell King - ARM Linux wrote:
+>> On Thu, Oct 14, 2010 at 04:47:47PM +0200, Nicolas Ferre wrote:
+>> > > diff --git a/arch/arm/configs/pcontrol_g20_defconfig b/arch/arm/configs/pcontrol_g20_defconfig
+>> > > new file mode 100644
 >>
->> If that is true than I think we will need one more clk for USB device:
->>
->>          /->clk_48m
->> xusbxti-|
->>          \->clk_usb_device
->>
-> Actually, it's different on each SoCs...
-> 
->>> Anyway let you know about the result of internal discussion soon, then
->> let's talk.
->>>
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim<kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> 
+>> Is it really necessary to have another platform specific defconfig rather
+>> than grouping it together with other similar platforms?
+> I'm working on it to merge the cpu and boards together hope to finish it
+> before the end of the merge window
+
+What's the point of having a board supported by the kernel, if you
+don't include a configuration file to actually make the board usable?
+
+
+Regards,
+  Andrew Victor
