@@ -1,77 +1,74 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 15 Oct 2010 12:20:59 +0200
-Subject: [PATCH 1/6] mmc: sdhci-pltfm: Add structure for host-specific data
+Date: Fri, 15 Oct 2010 12:21:02 +0200
+Subject: [PATCH 4/6] mmc: sdhci_pltfm: pass more data on custom init-call
 In-Reply-To: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
 References: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1287138064-21385-2-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1287138064-21385-5-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to carry some information per host, e.g. the clock. Add a
-structure for it and initialize it in the generic part. Also improve
-the check for a parent.
+The custom init call may need more data to perform its job, so we pass
+it a pointer to pdata, too. Also, always use the platform_id specific
+data even if platform_data is present. Doing that, platform_data can
+additionally be parsed by init() for board-specific information (via
+sdhci->mmc->parent).
+
+(Note: the old behaviour was that you could override the platform_id
+specific data with your own. However, one can still do this by using the
+"sdhci" id instead of "sdhci-<something>".)
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Richard R?jfors <richard.rojfors.ext@mocean-labs.com>
+Tested-by : Eric B?nard <eric@eukrea.com>
 ---
- drivers/mmc/host/sdhci-pltfm.c |   10 +++++++---
- drivers/mmc/host/sdhci-pltfm.h |    7 +++++++
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ drivers/mmc/host/sdhci-pltfm.c  |    8 +++++---
+ include/linux/mmc/sdhci-pltfm.h |    2 +-
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index 4f126de..730fdf5 100644
+index 685202b..00e8a8a 100644
 --- a/drivers/mmc/host/sdhci-pltfm.c
 +++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -55,6 +55,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
- 	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
+@@ -52,15 +52,17 @@ static struct sdhci_ops sdhci_pltfm_ops = {
+ 
+ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
+ {
+-	struct sdhci_pltfm_data *pdata = pdev->dev.platform_data;
  	const struct platform_device_id *platid = platform_get_device_id(pdev);
++	struct sdhci_pltfm_data *pdata;
  	struct sdhci_host *host;
-+	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_pltfm_host *pltfm_host;
  	struct resource *iomem;
  	int ret;
  
-@@ -71,16 +72,19 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Invalid iomem size. You may "
- 			"experience problems.\n");
+-	if (!pdata && platid && platid->driver_data)
++	if (platid && platid->driver_data)
+ 		pdata = (void *)platid->driver_data;
++	else
++		pdata = pdev->dev.platform_data;
  
--	if (pdev->dev.parent)
--		host = sdhci_alloc_host(pdev->dev.parent, 0);
-+	/* Some PCI-based MFD need the parent here */
-+	if (pdev->dev.parent != &platform_bus)
-+		host = sdhci_alloc_host(pdev->dev.parent, sizeof(*pltfm_host));
- 	else
--		host = sdhci_alloc_host(&pdev->dev, 0);
-+		host = sdhci_alloc_host(&pdev->dev, sizeof(*pltfm_host));
- 
- 	if (IS_ERR(host)) {
- 		ret = PTR_ERR(host);
- 		goto err;
+ 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!iomem) {
+@@ -109,7 +111,7 @@ static int __devinit sdhci_pltfm_probe(struct platform_device *pdev)
  	}
  
-+	pltfm_host = sdhci_priv(host);
-+
- 	host->hw_name = "platform";
- 	if (pdata && pdata->ops)
- 		host->ops = pdata->ops;
-diff --git a/drivers/mmc/host/sdhci-pltfm.h b/drivers/mmc/host/sdhci-pltfm.h
-index 900f329..93a0319 100644
---- a/drivers/mmc/host/sdhci-pltfm.h
-+++ b/drivers/mmc/host/sdhci-pltfm.h
-@@ -11,8 +11,15 @@
- #ifndef _DRIVERS_MMC_SDHCI_PLTFM_H
- #define _DRIVERS_MMC_SDHCI_PLTFM_H
+ 	if (pdata && pdata->init) {
+-		ret = pdata->init(host);
++		ret = pdata->init(host, pdata);
+ 		if (ret)
+ 			goto err_plat_init;
+ 	}
+diff --git a/include/linux/mmc/sdhci-pltfm.h b/include/linux/mmc/sdhci-pltfm.h
+index 0239bd7..548d59d 100644
+--- a/include/linux/mmc/sdhci-pltfm.h
++++ b/include/linux/mmc/sdhci-pltfm.h
+@@ -28,7 +28,7 @@ struct sdhci_host;
+ struct sdhci_pltfm_data {
+ 	struct sdhci_ops *ops;
+ 	unsigned int quirks;
+-	int (*init)(struct sdhci_host *host);
++	int (*init)(struct sdhci_host *host, struct sdhci_pltfm_data *pdata);
+ 	void (*exit)(struct sdhci_host *host);
+ };
  
-+#include <linux/clk.h>
-+#include <linux/types.h>
- #include <linux/sdhci-pltfm.h>
- 
-+struct sdhci_pltfm_host {
-+	struct clk *clk;
-+	u32 scratchpad; /* to handle quirks across io-accessor calls */
-+};
-+
- extern struct sdhci_pltfm_data sdhci_cns3xxx_pdata;
- 
- #endif /* _DRIVERS_MMC_SDHCI_PLTFM_H */
 -- 
 1.7.1
