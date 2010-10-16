@@ -1,116 +1,49 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sat, 16 Oct 2010 22:14:47 +0200
-Subject: [PATCH] ARM: expose RealView PB1176 ROM using physmap and map_rom
-Message-ID: <1287260087-12470-1-git-send-email-linus.walleij@stericsson.com>
+Date: Sat, 16 Oct 2010 22:52:58 +0200
+Subject: [PATCH 0/7] arm/versatile PCI support, second try
+In-Reply-To: <1287072657-32477-1-git-send-email-arnd@arndb.de>
+References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
+Message-ID: <AANLkTikc5Vc0Q0z4rE4raX7LTyB=LiE+YuzycMjsXUaM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This exposes the PB1176 ROM if you compile in the MTD physmap
-mapping and also the map_rom chiptype.
+2010/10/14 Arnd Bergmann <arnd@arndb.de>:
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-Compare this way of exposing the ROM to the previously posted
-method that used debugfs.
+> With lots of help and testing from Peter Maydell, I've completed
+> a second version of the PCI support for the versatile platform,
+> which works much better now on real hardware, although it does
+> not improve existing qemu setups.
 
-NB: doing it this way will require two new drivers to be
-compiled in to do something. (Nothing happens if either driver
-is missing.)
----
- arch/arm/mach-realview/include/mach/board-pb1176.h |    1 +
- arch/arm/mach-realview/realview_pb1176.c           |   45 ++++++++++++++++----
- 2 files changed, 38 insertions(+), 8 deletions(-)
+I've got nothing better to do tonite than playing with the PB1176
+board so tried this out...
 
-diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/include/mach/board-pb1176.h
-index 002ab5d..2a15fef 100644
---- a/arch/arm/mach-realview/include/mach/board-pb1176.h
-+++ b/arch/arm/mach-realview/include/mach/board-pb1176.h
-@@ -70,6 +70,7 @@
- 
- #define REALVIEW_DC1176_GIC_CPU_BASE		0x10120000 /* GIC CPU interface, on devchip */
- #define REALVIEW_DC1176_GIC_DIST_BASE		0x10121000 /* GIC distributor, on devchip */
-+#define REALVIEW_DC1176_ROM_BASE		0x10200000 /* 16KiB NRAM preudo-ROM, on devchip */
- #define REALVIEW_PB1176_GIC_CPU_BASE		0x10040000 /* GIC CPU interface, on FPGA */
- #define REALVIEW_PB1176_GIC_DIST_BASE		0x10041000 /* GIC distributor, on FPGA */
- #define REALVIEW_PB1176_L220_BASE		0x10110000 /* L220 registers */
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index d2be12e..2545160 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -26,6 +26,8 @@
- #include <linux/amba/pl061.h>
- #include <linux/amba/mmci.h>
- #include <linux/amba/pl022.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/mtd/partitions.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-@@ -225,22 +227,48 @@ static struct amba_device *amba_devs[] __initdata = {
-  * RealView PB1176 platform devices
-  */
- static struct resource realview_pb1176_flash_resources[] = {
--	[0] = {
-+	{
- 		.start		= REALVIEW_PB1176_FLASH_BASE,
- 		.end		= REALVIEW_PB1176_FLASH_BASE + REALVIEW_PB1176_FLASH_SIZE - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
--	[1] = {
-+#ifdef CONFIG_REALVIEW_PB1176_SECURE_FLASH
-+	{
- 		.start		= REALVIEW_PB1176_SEC_FLASH_BASE,
- 		.end		= REALVIEW_PB1176_SEC_FLASH_BASE + REALVIEW_PB1176_SEC_FLASH_SIZE - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
--};
--#ifdef CONFIG_REALVIEW_PB1176_SECURE_FLASH
--#define PB1176_FLASH_BLOCKS	2
--#else
--#define PB1176_FLASH_BLOCKS	1
- #endif
-+};
-+
-+static struct physmap_flash_data pb1176_rom_pdata = {
-+	.probe_type	= "map_rom",
-+	.width		= 4,
-+	.nr_parts	= 0,
-+};
-+
-+static struct resource pb1176_rom_resources[] = {
-+	/*
-+	 * This exposes the PB1176 DevChip ROM as an MTD ROM mapping.
-+	 * The reference manual states that this is actually a pseudo-ROM
-+	 * programmed in NVRAM.
-+	 */
-+	{
-+		.start		= REALVIEW_DC1176_ROM_BASE,
-+		.end		= REALVIEW_DC1176_ROM_BASE + SZ_16K - 1,
-+		.flags		= IORESOURCE_MEM,
-+	}
-+};
-+
-+static struct platform_device pb1176_rom_device = {
-+	.name		= "physmap-flash",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(pb1176_rom_resources),
-+	.resource	= pb1176_rom_resources,
-+	.dev = {
-+		.platform_data = &pb1176_rom_pdata,
-+	},
-+};
- 
- static struct resource realview_pb1176_smsc911x_resources[] = {
- 	[0] = {
-@@ -358,7 +386,8 @@ static void __init realview_pb1176_init(void)
- #endif
- 
- 	realview_flash_register(realview_pb1176_flash_resources,
--				PB1176_FLASH_BLOCKS);
-+				ARRAY_SIZE(realview_pb1176_flash_resources));
-+	platform_device_register(&pb1176_rom_device);
- 	realview_eth_register(NULL, realview_pb1176_smsc911x_resources);
- 	platform_device_register(&realview_i2c_device);
- 	realview_usb_register(realview_pb1176_isp1761_resources);
--- 
-1.6.3.3
+Some fixup is needed in 6/7, the EB patch because I get this:
+arch/arm/mach-realview/realview_eb.c:94: error:
+'REALVIEW_PCI_CORE_BASE' undeclared here (not in a function)
+arch/arm/mach-realview/realview_eb.c:110: error:
+'REALVIEW_PCI_IO_BASE' undeclared here (not in a function)
+arch/arm/mach-realview/realview_eb.c:111: error:
+'REALVIEW_PCI_IO_BASE_SIZE' undeclared here (not in a function)
+make[3]: *** [arch/arm/mach-realview/realview_eb.o] Error 1
+make[2]: *** [arch/arm/mach-realview] Error 2
+make[2]: *** Waiting for unfinished jobs....
+
+No these are indeed named
+REALVIEW_EB_PCI_CORE_BASE
+REALVIEW_EB_PCI_IO_BASE0
+etc...
+
+If I disable the EB support it compiles and boots. Nothing much
+else happens, not even if I enable PCI debugging. But I guess
+that's normal since I don't have any PCI enclosure expansion
+board for this card?
+
+The only visible change is that /sys/bus/pci now exists with no
+slots nor devices in it.
+
+But it's not causing any regressions for me so with a fix
+for the compile problem it's
+Tested-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Yours,
+Linus Walleij
