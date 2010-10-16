@@ -1,45 +1,41 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 15 Oct 2010 23:20:41 +0200
-Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
-In-Reply-To: <20101015102534.GA4276@pengutronix.de> (Wolfram Sang's message of
-	"Fri\, 15 Oct 2010 12\:25\:34 +0200")
-References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>
-	<87aamjxe00.fsf@lechat.rtp-net.org> <4CB56A88.2040101@eukrea.com>
-	<20101013082930.GA11286@pengutronix.de>
-	<8762x6xx00.fsf@lechat.rtp-net.org>
-	<20101015102534.GA4276@pengutronix.de>
-Message-ID: <87fww7up92.fsf@lechat.rtp-net.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sat, 16 Oct 2010 13:36:28 +1100
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+Message-ID: <1287196588.2370.1.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <w.sang@pengutronix.de> writes:
+On Fri, 2010-10-08 at 18:53 +0100, Russell King - ARM Linux wrote:
+> As already discussed, it's nigh on impossible to unmap the existing
+> direct mapped region (read the previous discussions about why this is)
+> - which is precisely why there is no direct alternative solution.
+> 
+> The only possible solution is to exclude some memory at boot time from
+> the system direct map so that it never appears in the direct map, and
+> use ioremap on _that_.  Another possible alternative is to use
+> highmem,
+> obtain highmem pages (making sure that it doesn't fall back to lowmem)
+> and remap them using interfaces such as vmap.
+> 
+> So there are solutions to the problem, but it seems that _no one_ is
+> willing to discuss it other than "we want our old way back".
+> 
+> If you want the old way back, apply pressure to silicon vendors and
+> ARM Ltd to change the architecture to lift this restriction - which
+> will probably mean doing away with aggressive speculative prefetching
+> so that it's possible to predict what will be in the cache at any
+> point in time. 
 
-Hi,
+Note that we have the exact same problem on powerpc. The only sane
+solution is that SoCs designed around such cores or versions of the
+architecture should be fully DMA coherent to avoid the need for funky
+mapping attributes. Anything else is garbage HW, but sadly, it looks
+like way too many idiots still find jobs as HW designers.
 
-> On Wed, Oct 13, 2010 at 11:28:15AM +0200, Arnaud Patard wrote:
->
->> >> it's actually not yet supported by the driver. There is a wp_gpio in
->> >> struct esdhc_platform_data (arch/arm/plat-mxc/include/mach/esdhc.h)
->> >> but it's not yet used by the driver.
->> >
->> > It's all prepared. I finally will have a look into it today.
->> 
->> oh, great. I was thinking about doing it but I'll wait for your patches
->> then. I'm sure I need support for WP on GPIO but I may also need support
->> for CD on GPIO so I'll be happy to test any patch you have.
->
-> Just to keep you updated: Got a bit distracted again but I hope to
-> finish it on Saturday. Looks like a patch for the gpiolib is also
-> needed...
-
-ok. Take your time. It turns out that the infos I had were a bit
-misleading. I've been told the mmc driver was using some gpios and the
-gpios are GPIO_1_0/1_1 and GPIO_1_7/1_8... which are in fact the esdhc1
-and esdhc2 CD and WP. 
-
-This means :
-- with proper iomux configuration, WP detection is working fine
-- I should still be able to test WP on GPIO
-
-Thanks,
-Arnaud
+Cheers,
+Ben.
