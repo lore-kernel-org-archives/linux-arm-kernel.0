@@ -1,44 +1,84 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Sat, 16 Oct 2010 12:43:42 +0300
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <1287196789.2370.3.camel@pasglop>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<20101009000046.GA30616@kroah.com>
-	<1287196789.2370.3.camel@pasglop>
-Message-ID: <AANLkTi=a4XOfOZ=cPey5eK2DXUY3eXo=b-rOUVKz1n2C@mail.gmail.com>
+From: awg@embtoolkit.org (Abdoulaye Walsimou Gaye)
+Date: Sat, 16 Oct 2010 13:55:51 +0200
+Subject: [PATCH RESEND V3 1/1] ARM: s3c2440: various fixes in Kconfig file
+Message-ID: <1287230152-5544-1-git-send-email-awg@embtoolkit.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/16 Benjamin Herrenschmidt <benh@kernel.crashing.org>:
-> On Fri, 2010-10-08 at 17:00 -0700, Greg KH wrote:
->>
->> But you can't expect that you make this change, and not fix up the
->> drivers, and people would be happy, right? ?The rule for API changes
->> like this, or anything, is that the person making the change fixes the
->> other drivers, and that seems to be the issue here.
->>
->> Any pointers to patches where people have fixed up the drivers?
->
-> Greg, this is true for normal API changes. In this case, this is silent
-> data corruption, I think Russell is absolutely right. That exact same
-> issues have been giving me nightmares on powerpc, mostly due to
-> (fortunately extremely rare) broken chipsets doing non coherent DMA on
-> processors that do not allow you architecturally to double map memory
-> with different attributes.
+* kconfig symbols defined in arch/arm/mach-s3c2440/Kconfig are only available
+  when ARCH_S3C2410 is selected, so no need to make some of them depend
+  on ARCH_S3C2410.
+* fix CPU_S3C24405B typo in "config S3C2440_DMA".
+* mini2440: remove unconditionally select of SND_S3C24XX_SOC_S3C24XX_UDA134X.
+Those fixes avoid the following warnings at make time:
 
-Yes, but the kernel could have a mechanism, like the constant memory
-allocator so that people can configure a certain amount of RAM, like
-CONFIG_CMA_RESERVE_SIZE, and then drivers could request blocks from
-there which are not mapped as kernel memory. The constant memory
-allocator could map them at the same time they are requested by
-drivers with different attributes.
+scripts/kconfig/qconf arch/arm/Kconfig
+warning: (MACH_MINI2440 && ARCH_S3C2410) selects SND_S3C24XX_SOC_S3C24XX_UDA134X
+which has unmet direct dependencies (SND_S3C24XX_SOC && ARCH_S3C2410)
+warning: (CPU_S3C2440 && ARCH_S3C2410 && S3C2410_DMA) selects S3C2440_DMA which 
+has unmet direct dependencies (ARCH_S3C2410 && CPU_S3C24405B)
+warning: (CPU_S3C2440 && ARCH_S3C2410 || CPU_S3C2442 && ARCH_S3C2410)
+selects CPU_S3C244X which has unmet direct dependencies (!ARCH_S3C2410)
 
+Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+---
+changes since v1:
+include warnings observed without this patch
+changes since v2:
+take into account comments from Ben about unconditional select of some kconfig
+symbols
+
+ arch/arm/mach-s3c2440/Kconfig |    7 ++-----
+ 1 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
+index cd8e7de..ff024a6 100644
+--- a/arch/arm/mach-s3c2440/Kconfig
++++ b/arch/arm/mach-s3c2440/Kconfig
+@@ -4,7 +4,6 @@
+ 
+ config CPU_S3C2440
+ 	bool
+-	depends on ARCH_S3C2410
+ 	select CPU_ARM920T
+ 	select S3C_GPIO_PULL_UP
+ 	select S3C2410_CLOCK
+@@ -18,7 +17,6 @@ config CPU_S3C2440
+ 
+ config CPU_S3C2442
+ 	bool
+-	depends on ARCH_S3C2410
+ 	select CPU_ARM920T
+ 	select S3C2410_CLOCK
+ 	select S3C2410_GPIO
+@@ -30,7 +28,7 @@ config CPU_S3C2442
+ 
+ config CPU_S3C244X
+ 	bool
+-	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
++	depends on CPU_S3C2440 || CPU_S3C2442
+ 	help
+ 	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
+ 
+@@ -72,7 +70,7 @@ config S3C2440_PLL_16934400
+ 
+ config S3C2440_DMA
+ 	bool
+-	depends on ARCH_S3C2410 && CPU_S3C24405B
++	depends on CPU_S3C2440
+ 	help
+ 	  Support for S3C2440 specific DMA code5A
+ 
+@@ -181,7 +179,6 @@ config MACH_MINI2440
+ 	select CPU_S3C2440
+ 	select EEPROM_AT24
+ 	select LEDS_TRIGGER_BACKLIGHT
+-	select SND_S3C24XX_SOC_S3C24XX_UDA134X
+ 	select S3C_DEV_NAND
+ 	select S3C_DEV_USB_HOST
+ 	help
 -- 
-Felipe Contreras
+1.7.0.4
