@@ -1,36 +1,51 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Sat, 16 Oct 2010 20:33:51 +0200
-Subject: [PATCH v2 2/5] mx25: add defconfig
-In-Reply-To: <1287137707-9548-2-git-send-email-eric@eukrea.com>
-References: <20101015070731.GF6747@pengutronix.de>
-	<1287137707-9548-2-git-send-email-eric@eukrea.com>
-Message-ID: <20101016183350.GB6225@tarshish>
+Date: Sat, 16 Oct 2010 20:49:20 +0200
+Subject: [PATCH 1/2] ARM: imx: Add wake functionality to GPIO
+In-Reply-To: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20101016184919.GC6225@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Dinh,
 
-On Fri, Oct 15, 2010 at 12:15:04PM +0200, Eric B?nard wrote:
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  arch/arm/configs/mx25_defconfig |  159 +++++++++++++++++++++++++++++++++++++++
->  1 files changed, 159 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/configs/mx25_defconfig
+On Fri, Oct 15, 2010 at 03:18:27PM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> diff --git a/arch/arm/configs/mx25_defconfig b/arch/arm/configs/mx25_defconfig
-> new file mode 100644
-> index 0000000..25aa600
-> --- /dev/null
-> +++ b/arch/arm/configs/mx25_defconfig
-> @@ -0,0 +1,159 @@
+> Add function definition for irq_chip.set_wake to enable GPIO to
+> wake-up the system.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/plat-mxc/gpio.c              |   35 +++++++++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/gpio.h |    3 ++
+>  2 files changed, 38 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 57ec4a8..7647ba3 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
 
 [snip]
 
-> +CONFIG_RTC_CLASS=y
-> +CONFIG_RTC_DRV_PCF8563=y
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h 
+> b/arch/arm/plat-mxc/include/mach/gpio.h
+> index af33b74..dba3768 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -39,6 +39,9 @@ struct mxc_gpio_port {
+>  	struct gpio_chip chip;
+>  	u32 both_edges;
+>  	spinlock_t lock;
+> +	u32 suspend_wakeup;
+> +	u32 saved_wakeup;
+> +
 
-Shouldn't we enable CONFIG_RTC_DRV_IMXDI as well? This is the on-chip DryIce 
-RTC.
+Unneeded blank line.
+
+>  };
+>  
+>  int mxc_gpio_init(struct mxc_gpio_port*, int);
 
 baruch
 
