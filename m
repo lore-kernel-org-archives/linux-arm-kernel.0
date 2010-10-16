@@ -1,114 +1,150 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 15 Oct 2010 21:53:35 -0600
-Subject: [PATCH 00/08] ARM: Dynamic IRQ demux support
-In-Reply-To: <AANLkTikRTNKb=EkYOa_8K3jv2Y8ZpwRJAhka=fhLqZY_@mail.gmail.com>
-References: <20101006071731.28048.89938.sendpatchset@t400s>
-	<AANLkTi=So8SAY+TRRP1xjxzoYGxZjk0PzLHDhR_qKGUc@mail.gmail.com>
-	<AANLkTimAjypE8jTEymyO-0FucXrT8voQ7jVxiZxHF==d@mail.gmail.com>
-	<AANLkTinM0JCKkps2XvEZgY5OcYQ-3ivMthmqixWwgzk0@mail.gmail.com>
-	<AANLkTikRTNKb=EkYOa_8K3jv2Y8ZpwRJAhka=fhLqZY_@mail.gmail.com>
-Message-ID: <20101016035335.GF21170@angua.secretlab.ca>
+From: andrea.gelmini@gelma.net (Andrea Gelmini)
+Date: Sat, 16 Oct 2010 11:00:05 +0200
+Subject: [PATCH 9/9] arch: arm: fixed typos
+Message-ID: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 14, 2010 at 07:50:28PM +0900, Magnus Damm wrote:
-> On Fri, Oct 8, 2010 at 4:09 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> > On Thu, Oct 7, 2010 at 2:39 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >> On Wed, Oct 6, 2010 at 10:06 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> >>> On Wed, Oct 6, 2010 at 3:17 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >>>> ARM: Dynamic IRQ demux support
-> >>
-> >>> Just FYI, I had a patch months ago for this:
-> >>>
-> >>> http://www.spinics.net/linux/lists/arm-kernel/msg92836.html
-> >>>
-> >>> Do you think that's a simpler way to go?
-> >>
-> >> Thanks for the pointer. I wasn't aware of your patch, but the fact
-> >> that both of us came up with similar solutions to the same problem
-> >> clearly shows that there is a need for this feature.
-> >>
-> >> Your patch is much less intrusive compared to what i came up with. I
-> >> like the simplicity. I guess it is natural that the simplicity comes
-> >> with a bit of overhead. I'm thinking of the extra branches and
-> >> whatever potential cache misses coming from the code and callback
-> >> being located in different cache lines compared to the rest of the
-> >> code in __irq_svc and __irq_usr.
-> >>
-> >> My patches keeps the handlers in the same cache lines as before, but
-> >> this comes with the cost of more serious rearrangement of the code.
-> >> Also, my alignment_trap patch may decrease performance, not sure how
-> >> to deal with that in a good way.
-> >
-> > Yeah, I was thinking of the performance degradation at that time as well.
-> > What worried me most is actually the long jump. However, we do have
-> > a long jump to asm_do_IRQ anyway.
-> >
-> > And the optimizations like get_irqnr_preamble and get_irqnr_and_base
-> > can be carried out in C code as well, or if that's tricky enough, inline
-> > assembly code can also help.
-> 
-> Sure, I agree.
-> 
-> >> I don't mind so much which patch that gets merged, but I'm a little
-> >> bit concerned about code duplication. My patch moves macros into a
-> >> header file that each demux instance can make use of to minimize the
-> >> amount of duplicated code. I'm not sure how you are planning on
-> >> implementing each demux instance. If possible I'd like to see the
-> >> irq_handler macro in a header file somewhere so we don't have to
-> >> duplicate that code.
-> >
-> > Machines will have to specify their IRQ demux handler, which could be
-> > same among a group of machines which share common demux code, and
-> > thus duplication can be avoided.
-> 
-> Right, I agree. I'm thinking of SMP-specific interrupts for IPIs and
-> local timers that most likely want to be shared across multiple
-> machines. I can for instance imagine a wide range of Cortex-A9 based
-> SoCs that all need to deal with SMP interrupts.
-> 
-> >> On top of that I'd also like to break out the GIC demux code and put
-> >> it in a central location, but that's a separate issue.
-> >
-> > I think we can make a common function call for all the IRQ demux handler
-> > for GIC then.
-> 
-> Sure, as long as we can point out the SoC-specific base address then
-> we should be ok.
-> 
-> >> Any thoughts? Shall I try to move the irq_handler macro to some header file?
-> >>
-> >
-> > Your patch is excellent, I don't mind either which gets in. What I'm a
-> > bit concerned is the effort to keep up with the mostly optimized code.
-> > I was thinking of a bit (not that much significant I guess) performance loss
-> > when multiple IRQ demux handler is required for the sake of simplicity
-> > and less intrusiveness, while still able to use the original optimized path
-> > when that's not required (i.e. turning CONFIG_.... off).
-> >
-> > Thoughts?
-> 
-> I feel that the current abstraction with the macros in entry-macros.S
-> is pretty nice and familiar. I think your solution with abstracting at
-> the irq_handler level is simple from the mach-programmers point of
-> view, but it does come with some performance penalty. I'm also not so
-> sure how to deal with the code duplication. Like you say, the code
-> could be shared between machines, but exactly how I don't know.
-> 
-> Did you hear anything back from Russell? If he's ok with your patch
-> then problem solved. Perhaps it's already in the tracker? =)
-> 
-> If not, how about picking out the best part of our patches? I think my
-> main benefit is the performance - hooking in the per-mach handlers
-> below the vector_stub comes with little or no additional cost. Your
-> strength is the simplicity and the nice use of the machine_desc.
-> Perhaps we can put the __irq_usr and __irq_svc callbacks in struct
-> machine_desc?
-> 
-> Does anyone else care? =)
+Intialize, configuation, wakup, Managment, addres
 
-I care, but I haven't been able to dig into the details.  The way
-things are going, I probably won't be able to either until after Linux
-Plumbers is over.
+Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+---
+ arch/arm/mach-bcmring/csp/chipc/chipcHw.c    |    2 +-
+ arch/arm/mach-bcmring/csp/tmr/tmrHw.c        |    2 +-
+ arch/arm/mach-bcmring/dma.c                  |    2 +-
+ arch/arm/mach-omap2/hsmmc.h                  |    2 +-
+ arch/arm/mach-omap2/pm34xx.c                 |    2 +-
+ arch/arm/mach-omap2/serial.c                 |    2 +-
+ arch/arm/mach-pxa/include/mach/pxa3xx-regs.h |    2 +-
+ arch/arm/mach-u300/include/mach/coh901318.h  |    2 +-
+ arch/arm/plat-omap/mcbsp.c                   |    4 ++--
+ 9 files changed, 10 insertions(+), 10 deletions(-)
 
-g.
+diff --git a/arch/arm/mach-bcmring/csp/chipc/chipcHw.c b/arch/arm/mach-bcmring/csp/chipc/chipcHw.c
+index b3a61d8..96273ff 100644
+--- a/arch/arm/mach-bcmring/csp/chipc/chipcHw.c
++++ b/arch/arm/mach-bcmring/csp/chipc/chipcHw.c
+@@ -757,7 +757,7 @@ static int chipcHw_divide(int num, int denom)
+ 		t = t << 1;
+ 	}
+ 
+-	/* Intialize the result */
++	/* Initialize the result */
+ 	r = 0;
+ 
+ 	do {
+diff --git a/arch/arm/mach-bcmring/csp/tmr/tmrHw.c b/arch/arm/mach-bcmring/csp/tmr/tmrHw.c
+index 5c1c9a0..16225e4 100644
+--- a/arch/arm/mach-bcmring/csp/tmr/tmrHw.c
++++ b/arch/arm/mach-bcmring/csp/tmr/tmrHw.c
+@@ -558,7 +558,7 @@ static int tmrHw_divide(int num, int denom)
+ 		t = t << 1;
+ 	}
+ 
+-	/* Intialize the result */
++	/* Initialize the result */
+ 	r = 0;
+ 
+ 	do {
+diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
+index 29c0a91..9105d16 100644
+--- a/arch/arm/mach-bcmring/dma.c
++++ b/arch/arm/mach-bcmring/dma.c
+@@ -671,7 +671,7 @@ static int ConfigChannel(DMA_Handle_t handle)
+ 
+ /****************************************************************************/
+ /**
+-*   Intializes all of the data structures associated with the DMA.
++*   Initializes all of the data structures associated with the DMA.
+ *   @return
+ *       >= 0    - Initialization was successfull.
+ *
+diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+index 1fe6f01..0f8a2e6 100644
+--- a/arch/arm/mach-omap2/hsmmc.h
++++ b/arch/arm/mach-omap2/hsmmc.h
+@@ -23,7 +23,7 @@ struct omap2_hsmmc_info {
+ 	char	*name;		/* or NULL for default */
+ 	struct device *dev;	/* returned: pointer to mmc adapter */
+ 	int	ocr_mask;	/* temporary HACK */
+-	/* Remux (pad configuation) when powering on/off */
++	/* Remux (pad configuration) when powering on/off */
+ 	void (*remux)(struct device *dev, int slot, int power_on);
+ 	/* init some special card */
+ 	void (*init_card)(struct mmc_card *card);
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 7b03426..abe2eb8 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -899,7 +899,7 @@ static void __init prcm_setup_regs(void)
+ 			     OMAP3430_GR_MOD,
+ 			     OMAP3_PRM_CLKSRC_CTRL_OFFSET);
+ 
+-	/* setup wakup source */
++	/* setup wakeup source */
+ 	prm_write_mod_reg(OMAP3430_EN_IO_MASK | OMAP3430_EN_GPIO1_MASK |
+ 			  OMAP3430_EN_GPT1_MASK | OMAP3430_EN_GPT12_MASK,
+ 			  WKUP_MOD, PM_WKEN);
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 566e991..ff79b9d 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -818,7 +818,7 @@ void __init omap_serial_init_port(int port)
+ }
+ 
+ /**
+- * omap_serial_init() - intialize all supported serial ports
++ * omap_serial_init() - initialize all supported serial ports
+  *
+  * Initializes all available UARTs as serial ports. Platforms
+  * can call this function when they want to have default behaviour
+diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+index e91d63c..b8aa447 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
++++ b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+@@ -47,7 +47,7 @@
+ #define PCMD(x)		__REG(0x40F50110 + ((x) << 2))
+ 
+ /*
+- * Slave Power Managment Unit
++ * Slave Power Management Unit
+  */
+ #define ASCR		__REG(0x40f40000)	/* Application Subsystem Power Status/Configuration */
+ #define ARSR		__REG(0x40f40004)	/* Application Subsystem Reset Status */
+diff --git a/arch/arm/mach-u300/include/mach/coh901318.h b/arch/arm/mach-u300/include/mach/coh901318.h
+index 193da2d..2013d2b 100644
+--- a/arch/arm/mach-u300/include/mach/coh901318.h
++++ b/arch/arm/mach-u300/include/mach/coh901318.h
+@@ -24,7 +24,7 @@
+  * @src_addr: transfer source address
+  * @dst_addr: transfer destination address
+  * @link_addr:  physical address to next lli
+- * @virt_link_addr: virtual addres of next lli (only used by pool_free)
++ * @virt_link_addr: virtual address of next lli (only used by pool_free)
+  * @phy_this: physical address of current lli (only used by pool_free)
+  */
+ struct coh901318_lli {
+diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+index 0c8612f..376259b 100644
+--- a/arch/arm/plat-omap/mcbsp.c
++++ b/arch/arm/plat-omap/mcbsp.c
+@@ -650,7 +650,7 @@ EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
+ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
+ {
+ 	/*
+-	 * Enable wakup behavior, smart idle and all wakeups
++	 * Enable wakeup behavior, smart idle and all wakeups
+ 	 * REVISIT: some wakeups may be unnecessary
+ 	 */
+ 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+@@ -674,7 +674,7 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
+ static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
+ {
+ 	/*
+-	 * Disable wakup behavior, smart idle and all wakeups
++	 * Disable wakeup behavior, smart idle and all wakeups
+ 	 */
+ 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+ 		u16 syscon;
+-- 
+1.7.3.1.181.g784b8
