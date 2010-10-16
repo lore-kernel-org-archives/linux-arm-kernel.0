@@ -1,84 +1,43 @@
 From: awg@embtoolkit.org (Abdoulaye Walsimou Gaye)
-Date: Sat, 16 Oct 2010 13:55:51 +0200
-Subject: [PATCH RESEND V3 1/1] ARM: s3c2440: various fixes in Kconfig file
-Message-ID: <1287230152-5544-1-git-send-email-awg@embtoolkit.org>
+Date: Sat, 16 Oct 2010 13:55:52 +0200
+Subject: [PATCH RESEND 2/2] ARM: s3c2440: fix boot failure introduced by
+	recent changes in gpiolib
+In-Reply-To: <1287230152-5544-1-git-send-email-awg@embtoolkit.org>
+References: <1287230152-5544-1-git-send-email-awg@embtoolkit.org>
+Message-ID: <1287230152-5544-2-git-send-email-awg@embtoolkit.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* kconfig symbols defined in arch/arm/mach-s3c2440/Kconfig are only available
-  when ARCH_S3C2410 is selected, so no need to make some of them depend
-  on ARCH_S3C2410.
-* fix CPU_S3C24405B typo in "config S3C2440_DMA".
-* mini2440: remove unconditionally select of SND_S3C24XX_SOC_S3C24XX_UDA134X.
-Those fixes avoid the following warnings at make time:
-
-scripts/kconfig/qconf arch/arm/Kconfig
-warning: (MACH_MINI2440 && ARCH_S3C2410) selects SND_S3C24XX_SOC_S3C24XX_UDA134X
-which has unmet direct dependencies (SND_S3C24XX_SOC && ARCH_S3C2410)
-warning: (CPU_S3C2440 && ARCH_S3C2410 && S3C2410_DMA) selects S3C2440_DMA which 
-has unmet direct dependencies (ARCH_S3C2410 && CPU_S3C24405B)
-warning: (CPU_S3C2440 && ARCH_S3C2410 || CPU_S3C2442 && ARCH_S3C2410)
-selects CPU_S3C244X which has unmet direct dependencies (!ARCH_S3C2410)
+Recent changes in s3c gpio break mini2440 board and may be others.
+The problem is that mach-mini2440.c: mini2440_init()
+(where we call s3c_gpio_setpull()) is called before s3c2440.c: s3c2440_init()
+(where we initialize s3c24xx_gpiocfg_default.set_pull function pointer).
+This causes dereferencing of NULL pointer at boot time and a kernel panic.
 
 Signed-off-by: Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
 
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-samsung-soc at vger.kernel.org
 ---
-changes since v1:
-include warnings observed without this patch
-changes since v2:
-take into account comments from Ben about unconditional select of some kconfig
-symbols
 
- arch/arm/mach-s3c2440/Kconfig |    7 ++-----
- 1 files changed, 2 insertions(+), 5 deletions(-)
+Issue reported 4 months ago[1] and since prevents boards to boot
+[1]: http://www.spinics.net/lists/arm-kernel/msg90151.html
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index cd8e7de..ff024a6 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -4,7 +4,6 @@
+ arch/arm/plat-s3c24xx/gpiolib.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
+index 4c0896f..ae9d3c2 100644
+--- a/arch/arm/plat-s3c24xx/gpiolib.c
++++ b/arch/arm/plat-s3c24xx/gpiolib.c
+@@ -87,6 +87,8 @@ static struct s3c_gpio_cfg s3c24xx_gpiocfg_banka = {
+ struct s3c_gpio_cfg s3c24xx_gpiocfg_default = {
+ 	.set_config	= s3c_gpio_setcfg_s3c24xx,
+ 	.get_config	= s3c_gpio_getcfg_s3c24xx,
++	.set_pull	= s3c_gpio_setpull_1up,
++	.get_pull	= s3c_gpio_getpull_1up,
+ };
  
- config CPU_S3C2440
- 	bool
--	depends on ARCH_S3C2410
- 	select CPU_ARM920T
- 	select S3C_GPIO_PULL_UP
- 	select S3C2410_CLOCK
-@@ -18,7 +17,6 @@ config CPU_S3C2440
- 
- config CPU_S3C2442
- 	bool
--	depends on ARCH_S3C2410
- 	select CPU_ARM920T
- 	select S3C2410_CLOCK
- 	select S3C2410_GPIO
-@@ -30,7 +28,7 @@ config CPU_S3C2442
- 
- config CPU_S3C244X
- 	bool
--	depends on ARCH_S3C2410 && (CPU_S3C2440 || CPU_S3C2442)
-+	depends on CPU_S3C2440 || CPU_S3C2442
- 	help
- 	  Support for S3C2440 and S3C2442 Samsung Mobile CPU based systems.
- 
-@@ -72,7 +70,7 @@ config S3C2440_PLL_16934400
- 
- config S3C2440_DMA
- 	bool
--	depends on ARCH_S3C2410 && CPU_S3C24405B
-+	depends on CPU_S3C2440
- 	help
- 	  Support for S3C2440 specific DMA code5A
- 
-@@ -181,7 +179,6 @@ config MACH_MINI2440
- 	select CPU_S3C2440
- 	select EEPROM_AT24
- 	select LEDS_TRIGGER_BACKLIGHT
--	select SND_S3C24XX_SOC_S3C24XX_UDA134X
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
- 	help
+ struct s3c_gpio_chip s3c24xx_gpios[] = {
 -- 
 1.7.0.4
