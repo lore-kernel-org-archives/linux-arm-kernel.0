@@ -1,150 +1,44 @@
-From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 16 Oct 2010 11:00:05 +0200
-Subject: [PATCH 9/9] arch: arm: fixed typos
-Message-ID: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Sat, 16 Oct 2010 12:43:42 +0300
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <1287196789.2370.3.camel@pasglop>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<20101009000046.GA30616@kroah.com>
+	<1287196789.2370.3.camel@pasglop>
+Message-ID: <AANLkTi=a4XOfOZ=cPey5eK2DXUY3eXo=b-rOUVKz1n2C@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Intialize, configuation, wakup, Managment, addres
+2010/10/16 Benjamin Herrenschmidt <benh@kernel.crashing.org>:
+> On Fri, 2010-10-08 at 17:00 -0700, Greg KH wrote:
+>>
+>> But you can't expect that you make this change, and not fix up the
+>> drivers, and people would be happy, right? ?The rule for API changes
+>> like this, or anything, is that the person making the change fixes the
+>> other drivers, and that seems to be the issue here.
+>>
+>> Any pointers to patches where people have fixed up the drivers?
+>
+> Greg, this is true for normal API changes. In this case, this is silent
+> data corruption, I think Russell is absolutely right. That exact same
+> issues have been giving me nightmares on powerpc, mostly due to
+> (fortunately extremely rare) broken chipsets doing non coherent DMA on
+> processors that do not allow you architecturally to double map memory
+> with different attributes.
 
-Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
----
- arch/arm/mach-bcmring/csp/chipc/chipcHw.c    |    2 +-
- arch/arm/mach-bcmring/csp/tmr/tmrHw.c        |    2 +-
- arch/arm/mach-bcmring/dma.c                  |    2 +-
- arch/arm/mach-omap2/hsmmc.h                  |    2 +-
- arch/arm/mach-omap2/pm34xx.c                 |    2 +-
- arch/arm/mach-omap2/serial.c                 |    2 +-
- arch/arm/mach-pxa/include/mach/pxa3xx-regs.h |    2 +-
- arch/arm/mach-u300/include/mach/coh901318.h  |    2 +-
- arch/arm/plat-omap/mcbsp.c                   |    4 ++--
- 9 files changed, 10 insertions(+), 10 deletions(-)
+Yes, but the kernel could have a mechanism, like the constant memory
+allocator so that people can configure a certain amount of RAM, like
+CONFIG_CMA_RESERVE_SIZE, and then drivers could request blocks from
+there which are not mapped as kernel memory. The constant memory
+allocator could map them at the same time they are requested by
+drivers with different attributes.
 
-diff --git a/arch/arm/mach-bcmring/csp/chipc/chipcHw.c b/arch/arm/mach-bcmring/csp/chipc/chipcHw.c
-index b3a61d8..96273ff 100644
---- a/arch/arm/mach-bcmring/csp/chipc/chipcHw.c
-+++ b/arch/arm/mach-bcmring/csp/chipc/chipcHw.c
-@@ -757,7 +757,7 @@ static int chipcHw_divide(int num, int denom)
- 		t = t << 1;
- 	}
- 
--	/* Intialize the result */
-+	/* Initialize the result */
- 	r = 0;
- 
- 	do {
-diff --git a/arch/arm/mach-bcmring/csp/tmr/tmrHw.c b/arch/arm/mach-bcmring/csp/tmr/tmrHw.c
-index 5c1c9a0..16225e4 100644
---- a/arch/arm/mach-bcmring/csp/tmr/tmrHw.c
-+++ b/arch/arm/mach-bcmring/csp/tmr/tmrHw.c
-@@ -558,7 +558,7 @@ static int tmrHw_divide(int num, int denom)
- 		t = t << 1;
- 	}
- 
--	/* Intialize the result */
-+	/* Initialize the result */
- 	r = 0;
- 
- 	do {
-diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
-index 29c0a91..9105d16 100644
---- a/arch/arm/mach-bcmring/dma.c
-+++ b/arch/arm/mach-bcmring/dma.c
-@@ -671,7 +671,7 @@ static int ConfigChannel(DMA_Handle_t handle)
- 
- /****************************************************************************/
- /**
--*   Intializes all of the data structures associated with the DMA.
-+*   Initializes all of the data structures associated with the DMA.
- *   @return
- *       >= 0    - Initialization was successfull.
- *
-diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-index 1fe6f01..0f8a2e6 100644
---- a/arch/arm/mach-omap2/hsmmc.h
-+++ b/arch/arm/mach-omap2/hsmmc.h
-@@ -23,7 +23,7 @@ struct omap2_hsmmc_info {
- 	char	*name;		/* or NULL for default */
- 	struct device *dev;	/* returned: pointer to mmc adapter */
- 	int	ocr_mask;	/* temporary HACK */
--	/* Remux (pad configuation) when powering on/off */
-+	/* Remux (pad configuration) when powering on/off */
- 	void (*remux)(struct device *dev, int slot, int power_on);
- 	/* init some special card */
- 	void (*init_card)(struct mmc_card *card);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 7b03426..abe2eb8 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -899,7 +899,7 @@ static void __init prcm_setup_regs(void)
- 			     OMAP3430_GR_MOD,
- 			     OMAP3_PRM_CLKSRC_CTRL_OFFSET);
- 
--	/* setup wakup source */
-+	/* setup wakeup source */
- 	prm_write_mod_reg(OMAP3430_EN_IO_MASK | OMAP3430_EN_GPIO1_MASK |
- 			  OMAP3430_EN_GPT1_MASK | OMAP3430_EN_GPT12_MASK,
- 			  WKUP_MOD, PM_WKEN);
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 566e991..ff79b9d 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -818,7 +818,7 @@ void __init omap_serial_init_port(int port)
- }
- 
- /**
-- * omap_serial_init() - intialize all supported serial ports
-+ * omap_serial_init() - initialize all supported serial ports
-  *
-  * Initializes all available UARTs as serial ports. Platforms
-  * can call this function when they want to have default behaviour
-diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
-index e91d63c..b8aa447 100644
---- a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
-@@ -47,7 +47,7 @@
- #define PCMD(x)		__REG(0x40F50110 + ((x) << 2))
- 
- /*
-- * Slave Power Managment Unit
-+ * Slave Power Management Unit
-  */
- #define ASCR		__REG(0x40f40000)	/* Application Subsystem Power Status/Configuration */
- #define ARSR		__REG(0x40f40004)	/* Application Subsystem Reset Status */
-diff --git a/arch/arm/mach-u300/include/mach/coh901318.h b/arch/arm/mach-u300/include/mach/coh901318.h
-index 193da2d..2013d2b 100644
---- a/arch/arm/mach-u300/include/mach/coh901318.h
-+++ b/arch/arm/mach-u300/include/mach/coh901318.h
-@@ -24,7 +24,7 @@
-  * @src_addr: transfer source address
-  * @dst_addr: transfer destination address
-  * @link_addr:  physical address to next lli
-- * @virt_link_addr: virtual addres of next lli (only used by pool_free)
-+ * @virt_link_addr: virtual address of next lli (only used by pool_free)
-  * @phy_this: physical address of current lli (only used by pool_free)
-  */
- struct coh901318_lli {
-diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index 0c8612f..376259b 100644
---- a/arch/arm/plat-omap/mcbsp.c
-+++ b/arch/arm/plat-omap/mcbsp.c
-@@ -650,7 +650,7 @@ EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
- static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
- {
- 	/*
--	 * Enable wakup behavior, smart idle and all wakeups
-+	 * Enable wakeup behavior, smart idle and all wakeups
- 	 * REVISIT: some wakeups may be unnecessary
- 	 */
- 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
-@@ -674,7 +674,7 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
- static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
- {
- 	/*
--	 * Disable wakup behavior, smart idle and all wakeups
-+	 * Disable wakeup behavior, smart idle and all wakeups
- 	 */
- 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
- 		u16 syscon;
 -- 
-1.7.3.1.181.g784b8
+Felipe Contreras
