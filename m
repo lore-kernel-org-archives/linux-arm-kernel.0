@@ -1,142 +1,84 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sat, 16 Oct 2010 20:06:38 +0200
-Subject: [PATCH 2/2] ARM: add a TCM memory test
-Message-ID: <1287252398-13356-1-git-send-email-linus.walleij@stericsson.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 16 Oct 2010 20:32:41 +0200 (CEST)
+Subject: [PATCH RFC] arm: genirq: fix boot on arm platforms
+In-Reply-To: <1287077397-21781-1-git-send-email-gadiyar@ti.com>
+References: <1287077397-21781-1-git-send-email-gadiyar@ti.com>
+Message-ID: <alpine.LFD.2.00.1010162029310.2496@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a simple test for the TCM memory, it will try to
-exercise it a bit by calling into it and reading/writing
-variables with canaries.
+On Thu, 14 Oct 2010, Anand Gadiyar wrote:
 
-Cc: Rickard Andersson <rickard.andersson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> Commit b683de2b3 in linux-next as of 20101014 (genirq: Query
+> arch for number of early descriptors) seems to have broken
+> bootup on several ARM boards - my beagleboard gives the
+> following dump with earlyprintk.
+> 
+> NR_IRQS:402
+> Unable to handle kernel NULL pointer dereference at virtual address 00000028
+> pgd = c0004000
+> [00000028] *pgd=00000000
+> Internal error: Oops: 5 [#1]
+> last sysfs file:
+> Modules linked in:
+> CPU: 0    Not tainted  (2.6.36-rc7-next-20101014-linux-next-20101012+ #40)
+> PC is at init_IRQ+0x14/0x48
+> LR is at start_kernel+0x150/0x2c0
+> pc : [<c000b474>]    lr : [<c0008944>]    psr: 800001d3
+> sp : c0927fd0  ip : 000008d0  fp : 00000000
+> r10: 00000000  r9 : 411fc083  r8 : 8002ca24
+> r7 : c092a80c  r6 : c0439c44  r5 : c0439c48  r4 : c0979ac0
+> r3 : 00000001  r2 : 00000000  r1 : 00000001  r0 : 00000000
+> Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+> Control: 10c5387f  Table: 80004019  DAC: 00000015
+> Process swapper (pid: 0, stack limit = 0xc09262f0)
+> Stack: (0xc0927fd0 to 0xc0928000)
+> 7fc0:                                     00000192 c0008944 c00085bc 00000000
+> 7fe0: 00000000 c0439c48 00000000 10c5387d c0979c5c 80008034 00000000 00000000
+> [<c000b474>] (init_IRQ+0x14/0x48) from [<c0008944>] (start_kernel+0x150/0x2c0)
+> [<c0008944>] (start_kernel+0x150/0x2c0) from [<80008034>] (0x80008034)
+> Code: e3a03000 ea000004 e3a02000 e2833001 (e5921028)
+> ---[ end trace 1b75b31a2719ed1c ]---
+> Kernel panic - not syncing: Attempted to kill the idle task!
+> 
+> We seem to be using desc->status without assigning desc to
+> anything. Fix this by adding back the code that was originally
+> there.
+
+Yeah, sorry. That was my fault. I applied a patch only half.
+
+Find below the missing chunk, which makes next boot on my ARM boards
+again.
+
+Thanks,
+
+	tglx
 ---
- arch/arm/Kconfig           |    9 +++++
- arch/arm/kernel/Makefile   |    1 +
- arch/arm/kernel/tcm-test.c |   82 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 92 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/tcm-test.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e749933..d7999f8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1019,6 +1019,15 @@ if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
+diff --git a/arch/arm/include/asm/hw_irq.h b/arch/arm/include/asm/hw_irq.h
+index 90831f6..5586b7c 100644
+--- a/arch/arm/include/asm/hw_irq.h
++++ b/arch/arm/include/asm/hw_irq.h
+@@ -24,4 +24,6 @@ void set_irq_flags(unsigned int irq, unsigned int flags);
+ #define IRQF_PROBE	(1 << 1)
+ #define IRQF_NOAUTOEN	(1 << 2)
  
-+config TCM_TEST
-+	bool "TCM testing module"
-+	depends on HAVE_TCM
-+	help
-+	  This enables a small testing module that execise the TCM
-+	  memory on the platform at startup to make sure it's working.
-+	  If you're really using the TCM it is a scarce resource so
-+	  this should only be selected for testing.
++#define ARCH_IRQ_INIT_FLAGS	(IRQ_NOREQUEST | IRQ_NOPROBE)
 +
- config ARM_ERRATA_411920
- 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
- 	depends on CPU_V6
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 078dd22..91af751 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -41,6 +41,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
- obj-$(CONFIG_KGDB)		+= kgdb.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
-+obj-$(CONFIG_TCM_TEST)		+= tcm-test.o
- obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
- obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
- obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
-diff --git a/arch/arm/kernel/tcm-test.c b/arch/arm/kernel/tcm-test.c
-new file mode 100644
-index 0000000..6fc7c61
---- /dev/null
-+++ b/arch/arm/kernel/tcm-test.c
-@@ -0,0 +1,82 @@
-+/*
-+ * Copyright (C) 2010 ST-Ericsson AB
-+ * License terms: GNU General Public License (GPL) version 2
-+ * TCM memory test
-+ *
-+ * Author: Linus Walleij <linus.walleij@stericsson.com>
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <asm/tcm.h>
-+
-+#define CANARY1 0xDEADBEEFU
-+#define CANARY2 0x2BADBABEU
-+#define CANARY3 0xCAFEBABEU
-+
-+/* Uninitialized data */
-+static u32 __tcmdata tcmvar;
-+/* Initialized data */
-+static u32 __tcmdata tcmassigned = CANARY2;
-+/* Constant */
-+static const u32 __tcmconst tcmconst = CANARY3;
-+
-+static void __tcmlocalfunc tcm_to_tcm(void)
-+{
-+	int i;
-+	for (i = 0; i < 100; i++)
-+		tcmvar ++;
-+}
-+
-+static void __tcmfunc hello_tcm(void)
-+{
-+	/* Some abstract code that runs in ITCM */
-+	int i;
-+	for (i = 0; i < 100; i++) {
-+		tcmvar ++;
-+	}
-+	tcm_to_tcm();
-+}
-+
-+static void __init test_tcm(void)
-+{
-+	u32 *tcmem;
-+	int i;
-+
-+	hello_tcm();
-+	pr_info("Hello TCM executed from ITCM RAM\n");
-+
-+	pr_info("TCM variable from testrun: %u @ %p\n", tcmvar, &tcmvar);
-+	BUG_ON(tcmvar != 200);
-+
-+	tcmvar = CANARY1;
-+	pr_info("TCM variable: 0x%x @ %p\n", tcmvar, &tcmvar);
-+	BUG_ON(tcmvar != CANARY1);
-+
-+	pr_info("TCM assigned variable: 0x%x @ %p\n", tcmassigned, &tcmassigned);
-+	BUG_ON(tcmassigned != CANARY2);
-+
-+	pr_info("TCM constant: 0x%x @ %p\n", tcmconst, &tcmconst);
-+	BUG_ON(tcmconst != CANARY3);
-+
-+	/* Allocate some TCM memory from the pool */
-+	tcmem = tcm_alloc(20);
-+	if (tcmem) {
-+		pr_info("TCM Allocated 20 bytes of TCM @ %p\n", tcmem);
-+		tcmem[0] = CANARY1;
-+		tcmem[1] = CANARY2;
-+		tcmem[2] = CANARY3;
-+		tcmem[3] = CANARY1;
-+		tcmem[4] = CANARY2;
-+		for (i = 0; i < 5; i++)
-+			pr_info("TCM tcmem[%d] = %08x\n", i, tcmem[i]);
-+		BUG_ON(tcmem[0] != CANARY1);
-+		BUG_ON(tcmem[1] != CANARY2);
-+		BUG_ON(tcmem[2] != CANARY3);
-+		BUG_ON(tcmem[3] != CANARY1);
-+		BUG_ON(tcmem[4] != CANARY2);
-+		tcm_free(tcmem, 20);
-+	}
-+}
-+
-+late_initcall(test_tcm);
--- 
-1.6.3.3
+ #endif
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 5456d11..36ad3be 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -154,12 +154,6 @@ void set_irq_flags(unsigned int irq, unsigned int iflags)
+ 
+ void __init init_IRQ(void)
+ {
+-	struct irq_desc *desc;
+-	int irq;
+-
+-	for (irq = 0; irq < nr_irqs; irq++)
+-		desc->status |= IRQ_NOREQUEST | IRQ_NOPROBE;
+-
+ 	init_arch_irq();
+ }
+ 
