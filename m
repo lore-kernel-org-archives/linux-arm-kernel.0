@@ -1,41 +1,35 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 16 Oct 2010 13:36:28 +1100
+Date: Sat, 16 Oct 2010 13:39:49 +1100
 Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+In-Reply-To: <20101009000046.GA30616@kroah.com>
 References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
 	<20101007192245.GC26435@n2100.arm.linux.org.uk>
 	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
 	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-Message-ID: <1287196588.2370.1.camel@pasglop>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<20101009000046.GA30616@kroah.com>
+Message-ID: <1287196789.2370.3.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2010-10-08 at 18:53 +0100, Russell King - ARM Linux wrote:
-> As already discussed, it's nigh on impossible to unmap the existing
-> direct mapped region (read the previous discussions about why this is)
-> - which is precisely why there is no direct alternative solution.
+On Fri, 2010-10-08 at 17:00 -0700, Greg KH wrote:
 > 
-> The only possible solution is to exclude some memory at boot time from
-> the system direct map so that it never appears in the direct map, and
-> use ioremap on _that_.  Another possible alternative is to use
-> highmem,
-> obtain highmem pages (making sure that it doesn't fall back to lowmem)
-> and remap them using interfaces such as vmap.
+> But you can't expect that you make this change, and not fix up the
+> drivers, and people would be happy, right?  The rule for API changes
+> like this, or anything, is that the person making the change fixes the
+> other drivers, and that seems to be the issue here.
 > 
-> So there are solutions to the problem, but it seems that _no one_ is
-> willing to discuss it other than "we want our old way back".
-> 
-> If you want the old way back, apply pressure to silicon vendors and
-> ARM Ltd to change the architecture to lift this restriction - which
-> will probably mean doing away with aggressive speculative prefetching
-> so that it's possible to predict what will be in the cache at any
-> point in time. 
+> Any pointers to patches where people have fixed up the drivers?
 
-Note that we have the exact same problem on powerpc. The only sane
-solution is that SoCs designed around such cores or versions of the
-architecture should be fully DMA coherent to avoid the need for funky
-mapping attributes. Anything else is garbage HW, but sadly, it looks
-like way too many idiots still find jobs as HW designers.
+Greg, this is true for normal API changes. In this case, this is silent
+data corruption, I think Russell is absolutely right. That exact same
+issues have been giving me nightmares on powerpc, mostly due to
+(fortunately extremely rare) broken chipsets doing non coherent DMA on
+processors that do not allow you architecturally to double map memory
+with different attributes.
 
 Cheers,
 Ben.
