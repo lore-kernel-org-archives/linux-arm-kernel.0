@@ -1,55 +1,116 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sat, 16 Oct 2010 20:49:20 +0200
-Subject: [PATCH 1/2] ARM: imx: Add wake functionality to GPIO
-In-Reply-To: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101016184919.GC6225@tarshish>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sat, 16 Oct 2010 22:14:47 +0200
+Subject: [PATCH] ARM: expose RealView PB1176 ROM using physmap and map_rom
+Message-ID: <1287260087-12470-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+This exposes the PB1176 ROM if you compile in the MTD physmap
+mapping and also the map_rom chiptype.
 
-On Fri, Oct 15, 2010 at 03:18:27PM -0500, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Add function definition for irq_chip.set_wake to enable GPIO to
-> wake-up the system.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/plat-mxc/gpio.c              |   35 +++++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/gpio.h |    3 ++
->  2 files changed, 38 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index 57ec4a8..7647ba3 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+Compare this way of exposing the ROM to the previously posted
+method that used debugfs.
 
-[snip]
+NB: doing it this way will require two new drivers to be
+compiled in to do something. (Nothing happens if either driver
+is missing.)
+---
+ arch/arm/mach-realview/include/mach/board-pb1176.h |    1 +
+ arch/arm/mach-realview/realview_pb1176.c           |   45 ++++++++++++++++----
+ 2 files changed, 38 insertions(+), 8 deletions(-)
 
-> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h 
-> b/arch/arm/plat-mxc/include/mach/gpio.h
-> index af33b74..dba3768 100644
-> --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> @@ -39,6 +39,9 @@ struct mxc_gpio_port {
->  	struct gpio_chip chip;
->  	u32 both_edges;
->  	spinlock_t lock;
-> +	u32 suspend_wakeup;
-> +	u32 saved_wakeup;
-> +
-
-Unneeded blank line.
-
->  };
->  
->  int mxc_gpio_init(struct mxc_gpio_port*, int);
-
-baruch
-
+diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/include/mach/board-pb1176.h
+index 002ab5d..2a15fef 100644
+--- a/arch/arm/mach-realview/include/mach/board-pb1176.h
++++ b/arch/arm/mach-realview/include/mach/board-pb1176.h
+@@ -70,6 +70,7 @@
+ 
+ #define REALVIEW_DC1176_GIC_CPU_BASE		0x10120000 /* GIC CPU interface, on devchip */
+ #define REALVIEW_DC1176_GIC_DIST_BASE		0x10121000 /* GIC distributor, on devchip */
++#define REALVIEW_DC1176_ROM_BASE		0x10200000 /* 16KiB NRAM preudo-ROM, on devchip */
+ #define REALVIEW_PB1176_GIC_CPU_BASE		0x10040000 /* GIC CPU interface, on FPGA */
+ #define REALVIEW_PB1176_GIC_DIST_BASE		0x10041000 /* GIC distributor, on FPGA */
+ #define REALVIEW_PB1176_L220_BASE		0x10110000 /* L220 registers */
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index d2be12e..2545160 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -26,6 +26,8 @@
+ #include <linux/amba/pl061.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/amba/pl022.h>
++#include <linux/mtd/physmap.h>
++#include <linux/mtd/partitions.h>
+ #include <linux/io.h>
+ 
+ #include <mach/hardware.h>
+@@ -225,22 +227,48 @@ static struct amba_device *amba_devs[] __initdata = {
+  * RealView PB1176 platform devices
+  */
+ static struct resource realview_pb1176_flash_resources[] = {
+-	[0] = {
++	{
+ 		.start		= REALVIEW_PB1176_FLASH_BASE,
+ 		.end		= REALVIEW_PB1176_FLASH_BASE + REALVIEW_PB1176_FLASH_SIZE - 1,
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+-	[1] = {
++#ifdef CONFIG_REALVIEW_PB1176_SECURE_FLASH
++	{
+ 		.start		= REALVIEW_PB1176_SEC_FLASH_BASE,
+ 		.end		= REALVIEW_PB1176_SEC_FLASH_BASE + REALVIEW_PB1176_SEC_FLASH_SIZE - 1,
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+-};
+-#ifdef CONFIG_REALVIEW_PB1176_SECURE_FLASH
+-#define PB1176_FLASH_BLOCKS	2
+-#else
+-#define PB1176_FLASH_BLOCKS	1
+ #endif
++};
++
++static struct physmap_flash_data pb1176_rom_pdata = {
++	.probe_type	= "map_rom",
++	.width		= 4,
++	.nr_parts	= 0,
++};
++
++static struct resource pb1176_rom_resources[] = {
++	/*
++	 * This exposes the PB1176 DevChip ROM as an MTD ROM mapping.
++	 * The reference manual states that this is actually a pseudo-ROM
++	 * programmed in NVRAM.
++	 */
++	{
++		.start		= REALVIEW_DC1176_ROM_BASE,
++		.end		= REALVIEW_DC1176_ROM_BASE + SZ_16K - 1,
++		.flags		= IORESOURCE_MEM,
++	}
++};
++
++static struct platform_device pb1176_rom_device = {
++	.name		= "physmap-flash",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(pb1176_rom_resources),
++	.resource	= pb1176_rom_resources,
++	.dev = {
++		.platform_data = &pb1176_rom_pdata,
++	},
++};
+ 
+ static struct resource realview_pb1176_smsc911x_resources[] = {
+ 	[0] = {
+@@ -358,7 +386,8 @@ static void __init realview_pb1176_init(void)
+ #endif
+ 
+ 	realview_flash_register(realview_pb1176_flash_resources,
+-				PB1176_FLASH_BLOCKS);
++				ARRAY_SIZE(realview_pb1176_flash_resources));
++	platform_device_register(&pb1176_rom_device);
+ 	realview_eth_register(NULL, realview_pb1176_smsc911x_resources);
+ 	platform_device_register(&realview_i2c_device);
+ 	realview_usb_register(realview_pb1176_isp1761_resources);
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.6.3.3
