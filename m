@@ -1,48 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 17 Oct 2010 13:33:36 +0100
-Subject: [PATCH .36-rc8] arm: mm: allow, but warn, when issuing
-	ioremap() on RAM
-In-Reply-To: <AANLkTimyEZp4ygmM7WeES3h5bixBNF2rY0x==x7SZ+GQ@mail.gmail.com>
-References: <1287152120-7201-1-git-send-email-felipe.contreras@gmail.com>
-	<1287153021.27165.6.camel@e102109-lin.cambridge.arm.com>
-	<20101015194255.GA12981@n2100.arm.linux.org.uk>
-	<AANLkTinmAy13niqRKrray1Gk4hkr19tA2gWwYbfnFoh7@mail.gmail.com>
-	<20101015201453.GB12981@n2100.arm.linux.org.uk>
-	<AANLkTimyEZp4ygmM7WeES3h5bixBNF2rY0x==x7SZ+GQ@mail.gmail.com>
-Message-ID: <20101017123336.GA24108@n2100.arm.linux.org.uk>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Sun, 17 Oct 2010 08:05:35 -0500
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <1287196588.2370.1.camel@pasglop>
+References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
+	<20101007192245.GC26435@n2100.arm.linux.org.uk>
+	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
+	<20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<1287196588.2370.1.camel@pasglop>
+Message-ID: <13B9B4C6EF24D648824FF11BE896716203D76F71F4@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 17, 2010 at 03:06:44PM +0300, Felipe Contreras wrote:
-> On Fri, Oct 15, 2010 at 11:14 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Oct 15, 2010 at 11:00:40PM +0300, Felipe Contreras wrote:
-> >> On Fri, Oct 15, 2010 at 10:42 PM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > As soon as the first ARM merge hits during the merge window, I'll be
-> >> > restoring the 'always fail' behaviour.
-> >>
-> >> Ok, are you going to merge also your patch to use memblock for the
-> >> initialization? Many drivers could certainly use that to fix the
-> >> issue.
-> >
-> > There's a lot of work going on with memblock in x86-land which impacts
-> > ARM and means major conflicts for that patch - I think first we'll have
-> > to deal with the fallout from that (iow, finding out what's been broken
-> > by this activity and fix that), and then I'll have to re-do my patch from
-> > the beginning.
-> >
-> > Technically, following the rules, that means it has to miss this merge
-> > window - so it looks like it's going to take another six months to solve
-> > this issue (three months to get the memblock patch in, and another three
-> > months for driver fixes to find their way through.)
-> 
-> I don't think that's a good idea. Drivers would not have a way to get
-> fixed, even for .37.
-> 
-> Are these x86 changes in some branch?
 
-Yes but I've no idea where they are, and neither do I know exactly what
-they are - they've never been copied to me or the ARM lists.  I'll just
-wait for them to appear via Linus' tree in this merge window, and as I
-said above, then fix the resulting breakage from them.
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Benjamin
+> Herrenschmidt
+
+> > If you want the old way back, apply pressure to silicon vendors and
+> > ARM Ltd to change the architecture to lift this restriction - which
+> > will probably mean doing away with aggressive speculative
+> prefetching
+> > so that it's possible to predict what will be in the cache at any
+> > point in time.
+>
+> Note that we have the exact same problem on powerpc. The only sane
+> solution is that SoCs designed around such cores or versions of the
+> architecture should be fully DMA coherent to avoid the need for funky
+> mapping attributes. Anything else is garbage HW, but sadly, it looks
+> like way too many idiots still find jobs as HW designers.
+
+ARM has always been a rawer (and cheaper) environment than many other CPU architectures. Until maybe this year coherency was never even an option provided in the hardware. The vast majority of the systems currently in mass production in 2010 and before don't have coherency.  The software has to handle all the details.
+
+Starting today and onwards coherency options will start to be seen in high end. It seems likely some of the old external IP won't be compliant and likely have bugs undercutting it.
+
+People from high ends like x86 and PPC have different expectations and problems. Your chip set nightmares are our standard in some areas. In my narrow experience PPC pioneered many techniques 15 years back which are now just coming into ARM. They are coming in at a much reduced power and cost footprint.
+
+Regards,
+Richard W.
