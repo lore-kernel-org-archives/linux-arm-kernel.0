@@ -1,93 +1,113 @@
-From: segooon@gmail.com (Vasiliy Kulikov)
-Date: Sun, 17 Oct 2010 18:51:37 +0400
-Subject: [PATCH] arm: mach-msm: fix error handling in msm_iommu_probe()
-Message-ID: <1287327097-9025-1-git-send-email-segooon@gmail.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Sun, 17 Oct 2010 15:40:21 +0000
+Subject: [lm-sensors] [PATCH 4/5] hwmon: DNS323 rev C1 fan support
+In-Reply-To: <1286987650.9690.175.camel@groeck-laptop>
+References: <1274525694.1931.142.camel@pasglop>
+	<20101013115951.GA5649@kw.sim.vm.gnt>
+	<1286987650.9690.175.camel@groeck-laptop>
+Message-ID: <20101017154021.GB29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msm_iommu_probe() didn't free mem_region and mapped IO.
-Also if request_mem_region() failed then error handling
-code dereferenced NULL pointer.
+Hi Guenter,
 
-Signed-off-by: Vasiliy Kulikov <segooon@gmail.com>
----
- arch/arm/mach-msm/iommu_dev.c |   22 +++++++++++++---------
- 1 files changed, 13 insertions(+), 9 deletions(-)
+Thanks for your comments.
 
-diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
-index c33ae78..9019cee 100644
---- a/arch/arm/mach-msm/iommu_dev.c
-+++ b/arch/arm/mach-msm/iommu_dev.c
-@@ -128,7 +128,7 @@ static void msm_iommu_reset(void __iomem *base)
- 
- static int msm_iommu_probe(struct platform_device *pdev)
- {
--	struct resource *r;
-+	struct resource *r, *r2;
- 	struct clk *iommu_clk;
- 	struct msm_iommu_drvdata *drvdata;
- 	struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data;
-@@ -183,27 +183,27 @@ static int msm_iommu_probe(struct platform_device *pdev)
- 
- 		len = r->end - r->start + 1;
- 
--		r = request_mem_region(r->start, len, r->name);
--		if (!r) {
-+		r2 = request_mem_region(r->start, len, r->name);
-+		if (!r2) {
- 			pr_err("Could not request memory region: "
- 			"start=%p, len=%d\n", (void *) r->start, len);
- 			ret = -EBUSY;
- 			goto fail;
- 		}
- 
--		regs_base = ioremap(r->start, len);
-+		regs_base = ioremap(r2->start, len);
- 
- 		if (!regs_base) {
- 			pr_err("Could not ioremap: start=%p, len=%d\n",
--				 (void *) r->start, len);
-+				 (void *) r2->start, len);
- 			ret = -EBUSY;
--			goto fail;
-+			goto fail_mem;
- 		}
- 
- 		irq = platform_get_irq_byname(pdev, "secure_irq");
- 		if (irq < 0) {
- 			ret = -ENODEV;
--			goto fail;
-+			goto fail_io;
- 		}
- 
- 		mb();
-@@ -211,14 +211,14 @@ static int msm_iommu_probe(struct platform_device *pdev)
- 		if (GET_IDR(regs_base) == 0) {
- 			pr_err("Invalid IDR value detected\n");
- 			ret = -ENODEV;
--			goto fail;
-+			goto fail_io;
- 		}
- 
- 		ret = request_irq(irq, msm_iommu_fault_handler, 0,
- 				"msm_iommu_secure_irpt_handler", drvdata);
- 		if (ret) {
- 			pr_err("Request IRQ %d failed with ret=%d\n", irq, ret);
--			goto fail;
-+			goto fail_io;
- 		}
- 
- 		msm_iommu_reset(regs_base);
-@@ -237,6 +237,10 @@ static int msm_iommu_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+fail_io:
-+	iounmap(regs_base);
-+fail_mem:
-+	release_mem_region(r->start, len);
- fail:
- 	kfree(drvdata);
- 	return ret;
--- 
-1.7.0.4
+On Wed, Oct 13, 2010 at 09:34:10AM -0700, Guenter Roeck wrote:
+> On Wed, 2010-10-13 at 07:59 -0400, Simon Guinot wrote:
+> > Hi Benjamin,
+> > 
+> > What is the status for the DNS323 fan support ?
+> > Have this patch been merged yet ?
+> > 
+> The most recent version I found on the web (dated June 13) has problems
+> with error detection and reporting, and fails to remove sysfs files in
+> some error conditions. So I would be surprised if it was merged, unless
+> there is a more recent version which I missed.
+> 
+> On a side note, there are several versions of the patch on the web, none
+> indicating what has changed between versions. Would be great to have
+> such data attached to the various patch versions.
+> 
+> > I am currently looking to add hwmon support for the GPIO fan found
+> > on Network Space Max v2 boards. Obviously, some attributes are shared
+> > with the DNS323 fan. Maybe there is some room for a generic GPIO fan
+> > driver ?
+> > 
+> > Platform data could provide the board specific GPIO pinout and a speed
+> > conversion array (rpm from/to GPIO value). Here is a proposal for this
+> > platform data interface:
+> > 
+> > struct gpio_fan {
+> >         const char      *name;
+> >         unsigned        gpio;
+> >         unsigned        active_low;
+> > };
+> > 
+> > struct gpio_fan_speed {
+> >         int value;
+> >         int rpm;
+> > };
+> > 
+> > struct gpio_fan_platform_data {
+> >         struct gpio_fan         *alarm; /* fan alarm GPIO. */
+> >         struct gpio_fan         *ctrl;  /* fan control GPIOs. */
+> >         int                     num_ctrl;
+> >         /*
+> >          * Speed conversion array: rpm from/to GPIO bit field.
+> >          * This array _must_ be sorted in ascending rpm order.
+> >          */
+> >         struct gpio_fan_speed   *speed;
+> >         int                     num_speed;
+> > };
+> > 
+> > Based on this informations the GPIO fan driver could perform the
+> > speed conversions (pwm, rpm, GPIO value) and then provide a hwmon
+> > interface.
+> > 
+> Sounds like a good idea to me.
+> 
+> Couple of comments.
+> 
+> Personally, I prefer to see num_XXX variables before the actual objects,
+> but maybe that is just a personal preference. 
+
+Ok.
+
+> 
+> I am not sure what one would do with "active_low". Would that be used
+> for the alarm ?
+
+Yes.
+
+> 
+> Adding a "fault" object might make sense.
+
+Yes.
+
+> 
+> It seems that bit write order is missing. Since it is not always the
+> same, as the proposed dns323 driver indicates, that might be a tricky
+> problem to solve. You would have to come up with an at least somewhat
+> generic solution for that.
+
+Prevent from writing illegal GPIO values during some transitional states
+is really a painful task. This workaround looks really due to a hardware
+specific limitation. A different GPIO fan hardware could provide
+different limitations. As an example, enabling a latch could be needed
+to set the fan speed...
+
+No one can predict all the possible hardware designs for a GPIO fan :)
+
+So, rather than dealing with the specific issues within the driver, we
+could simply allow board-setup code to override the "generic"
+{get,set}_fan_control functions.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101017/505faae0/attachment.sig>
