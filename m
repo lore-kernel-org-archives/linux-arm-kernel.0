@@ -1,39 +1,93 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Sun, 17 Oct 2010 08:05:35 -0500
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <1287196588.2370.1.camel@pasglop>
-References: <1286444662-16843-1-git-send-email-felipe.contreras@gmail.com>
-	<20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<1287196588.2370.1.camel@pasglop>
-Message-ID: <13B9B4C6EF24D648824FF11BE896716203D76F71F4@dlee02.ent.ti.com>
+From: segooon@gmail.com (Vasiliy Kulikov)
+Date: Sun, 17 Oct 2010 18:51:37 +0400
+Subject: [PATCH] arm: mach-msm: fix error handling in msm_iommu_probe()
+Message-ID: <1287327097-9025-1-git-send-email-segooon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+msm_iommu_probe() didn't free mem_region and mapped IO.
+Also if request_mem_region() failed then error handling
+code dereferenced NULL pointer.
 
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Benjamin
-> Herrenschmidt
+Signed-off-by: Vasiliy Kulikov <segooon@gmail.com>
+---
+ arch/arm/mach-msm/iommu_dev.c |   22 +++++++++++++---------
+ 1 files changed, 13 insertions(+), 9 deletions(-)
 
-> > If you want the old way back, apply pressure to silicon vendors and
-> > ARM Ltd to change the architecture to lift this restriction - which
-> > will probably mean doing away with aggressive speculative
-> prefetching
-> > so that it's possible to predict what will be in the cache at any
-> > point in time.
->
-> Note that we have the exact same problem on powerpc. The only sane
-> solution is that SoCs designed around such cores or versions of the
-> architecture should be fully DMA coherent to avoid the need for funky
-> mapping attributes. Anything else is garbage HW, but sadly, it looks
-> like way too many idiots still find jobs as HW designers.
-
-ARM has always been a rawer (and cheaper) environment than many other CPU architectures. Until maybe this year coherency was never even an option provided in the hardware. The vast majority of the systems currently in mass production in 2010 and before don't have coherency.  The software has to handle all the details.
-
-Starting today and onwards coherency options will start to be seen in high end. It seems likely some of the old external IP won't be compliant and likely have bugs undercutting it.
-
-People from high ends like x86 and PPC have different expectations and problems. Your chip set nightmares are our standard in some areas. In my narrow experience PPC pioneered many techniques 15 years back which are now just coming into ARM. They are coming in at a much reduced power and cost footprint.
-
-Regards,
-Richard W.
+diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
+index c33ae78..9019cee 100644
+--- a/arch/arm/mach-msm/iommu_dev.c
++++ b/arch/arm/mach-msm/iommu_dev.c
+@@ -128,7 +128,7 @@ static void msm_iommu_reset(void __iomem *base)
+ 
+ static int msm_iommu_probe(struct platform_device *pdev)
+ {
+-	struct resource *r;
++	struct resource *r, *r2;
+ 	struct clk *iommu_clk;
+ 	struct msm_iommu_drvdata *drvdata;
+ 	struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data;
+@@ -183,27 +183,27 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 
+ 		len = r->end - r->start + 1;
+ 
+-		r = request_mem_region(r->start, len, r->name);
+-		if (!r) {
++		r2 = request_mem_region(r->start, len, r->name);
++		if (!r2) {
+ 			pr_err("Could not request memory region: "
+ 			"start=%p, len=%d\n", (void *) r->start, len);
+ 			ret = -EBUSY;
+ 			goto fail;
+ 		}
+ 
+-		regs_base = ioremap(r->start, len);
++		regs_base = ioremap(r2->start, len);
+ 
+ 		if (!regs_base) {
+ 			pr_err("Could not ioremap: start=%p, len=%d\n",
+-				 (void *) r->start, len);
++				 (void *) r2->start, len);
+ 			ret = -EBUSY;
+-			goto fail;
++			goto fail_mem;
+ 		}
+ 
+ 		irq = platform_get_irq_byname(pdev, "secure_irq");
+ 		if (irq < 0) {
+ 			ret = -ENODEV;
+-			goto fail;
++			goto fail_io;
+ 		}
+ 
+ 		mb();
+@@ -211,14 +211,14 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 		if (GET_IDR(regs_base) == 0) {
+ 			pr_err("Invalid IDR value detected\n");
+ 			ret = -ENODEV;
+-			goto fail;
++			goto fail_io;
+ 		}
+ 
+ 		ret = request_irq(irq, msm_iommu_fault_handler, 0,
+ 				"msm_iommu_secure_irpt_handler", drvdata);
+ 		if (ret) {
+ 			pr_err("Request IRQ %d failed with ret=%d\n", irq, ret);
+-			goto fail;
++			goto fail_io;
+ 		}
+ 
+ 		msm_iommu_reset(regs_base);
+@@ -237,6 +237,10 @@ static int msm_iommu_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++fail_io:
++	iounmap(regs_base);
++fail_mem:
++	release_mem_region(r->start, len);
+ fail:
+ 	kfree(drvdata);
+ 	return ret;
+-- 
+1.7.0.4
