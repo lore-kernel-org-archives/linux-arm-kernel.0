@@ -1,87 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Oct 2010 22:29:26 +0900
-Subject: [PATCH 3/9] ARM: S3C64XX: add touchscreen support for
-	mach-real6410
-In-Reply-To: <20100929193322.25307.67196.stgit@darius-desktop>
-References: <20100929192354.25307.40197.stgit@darius-desktop>
-	<20100929193322.25307.67196.stgit@darius-desktop>
-Message-ID: <04a501cb6ec8$7e719a80$7b54cf80$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Oct 2010 14:35:02 +0100
+Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
+In-Reply-To: <1287406015.29097.1579.camel@twins>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287406015.29097.1579.camel@twins>
+Message-ID: <20101018133502.GA12449@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darius Augulis wrote:
+On Mon, Oct 18, 2010 at 02:46:55PM +0200, Peter Zijlstra wrote:
+> On Mon, 2010-10-18 at 09:44 +0200, Ohad Ben-Cohen wrote:
+> > OMAP4 introduces a Spinlock hardware module, which provides hardware
+> > assistance for synchronization and mutual exclusion between heterogeneous
+> > processors and those not operating under a single, shared operating system
+> > (e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP). 
 > 
-> Add touchscreen device support for mach-real6410
-> 
-> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/Kconfig         |    2 ++
->  arch/arm/mach-s3c64xx/mach-real6410.c |   11 +++++++++++
->  2 files changed, 13 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-> index e4aede1..b706b80 100644
-> --- a/arch/arm/mach-s3c64xx/Kconfig
-> +++ b/arch/arm/mach-s3c64xx/Kconfig
-> @@ -107,6 +107,8 @@ config MACH_REAL6410
->  	select S3C_DEV_FB
->  	select S3C64XX_SETUP_FB_24BPP
->  	select S3C_DEV_NAND
-> +	select SAMSUNG_DEV_ADC
-> +	select SAMSUNG_DEV_TS
->  	help
->  	  Machine support for the CoreWind REAL6410
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-
-> s3c64xx/mach-real6410.c
-> index 9fd943d..bad6990 100644
-> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-> @@ -36,11 +36,13 @@
->  #include <mach/regs-srom.h>
->  #include <mach/s3c6410.h>
-> 
-> +#include <plat/adc.h>
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
->  #include <plat/fb.h>
->  #include <plat/nand.h>
->  #include <plat/regs-serial.h>
-> +#include <plat/ts.h>
-> 
->  #include <video/platform_lcd.h>
-> 
-> @@ -191,6 +193,14 @@ static struct platform_device *real6410_devices[]
-> __initdata = {
->  	&s3c_device_hsmmc1,
->  	&s3c_device_fb,
->  	&s3c_device_nand,
-> +	&s3c_device_adc,
-> +	&s3c_device_ts,
-> +};
-> +
-> +static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
-> +	.delay			= 10000,
-> +	.presc			= 49,
-> +	.oversampling_shift	= 2,
->  };
-> 
->  static void __init real6410_map_io(void)
-> @@ -289,6 +299,7 @@ static void __init real6410_machine_init(void)
-> 
->  	s3c_fb_set_platdata(&real6410_lcd_pdata);
->  	s3c_nand_set_platdata(&real6410_nand_info);
-> +	s3c24xx_ts_set_platdata(&s3c_ts_platform);
-> 
->  	/* configure nCS1 width to 16 bits */
-> 
+> I just have to ask... was it really easier to build silicon than to
+> agree on a spinlock ABI?
 
-No need to add 's3c_adc_setname("s3c64xx-adc")' in mach-s3c64xx?
+I'm not really sure what point you're trying to make, but if you're
+suggesting that Linux's spinlock should be exposed to these other
+processors, you're completely off your rocker.
 
-Thanks.
+Doing so would set the kernels spinlock API in stone, which is really
+something you don't want to do.  Not only that, but it would mean that
+software written for the M3 and DSP would have to know about the GPL'd
+spinlock layout, and I suspect that would cause major licencing headaches.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+In any case, Linux's spinlock API (or more accurately, the ARM exclusive
+access instructions) relies upon hardware coherency support (a piece of
+hardware called an exclusive monitor) which isn't present on the M3 nor
+DSP processors.  So there's no way to ensure that updates from the M3
+and DSP are atomic wrt the A9 updates.
