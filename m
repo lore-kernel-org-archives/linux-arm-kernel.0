@@ -1,188 +1,121 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 18 Oct 2010 10:43:35 +0300
-Subject: [PATCH] EP93xx: Document DMA M2P API
-In-Reply-To: <4CBB99D5.6070009@bluewatersys.com>
-References: <4CBB99D5.6070009@bluewatersys.com>
-Message-ID: <20101018074335.GD4772@gw.healthdatacare.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 18 Oct 2010 09:44:32 +0200
+Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
+Message-ID: <1287387875-14168-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 18, 2010 at 01:50:29PM +1300, Ryan Mallon wrote:
-> Add documentation for the EP93xx DMA memory to peripheral/peripheral to
-> memory API.
+OMAP4 introduces a Spinlock hardware module, which provides hardware
+assistance for synchronization and mutual exclusion between heterogeneous
+processors and those not operating under a single, shared operating system
+(e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP).
 
-This is a good thing but I think that you might want to use standard
-kernel-doc style comments (see Documentation/kernel-doc-nano-HOWTO.txt)
-so that we can get nicely formatted document of the DMA API when
-'make *docs' is run.
+The intention of this hardware module is to allow remote processors,
+that have no alternative mechanism to accomplish synchronization and mutual
+exclusion operations, to share resources (such as memory and/or any other
+hardware resource).
 
-> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/include/mach/dma.h b/arch/arm/mach-ep93xx/include/mach/dma.h
-> index 3a5961d..66b1555 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/dma.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/dma.h
-> @@ -1,6 +1,11 @@
-> -/*
-> - * arch/arm/mach-ep93xx/include/mach/dma.h
-> - */
-> +/**
-> + * EP93xx DMA M2P memory to peripheral and peripheral to memory engine
+This patchset adds a new misc driver for this OMAP hwspinlock module.
 
-For this you need to use something like:
+Currently there are two users for this driver:
 
-/**
- * DOC: EP93xx DMA M2P memory to peripheral and peripheral to memory engine
- *
+1. Inter-Processor Communications: on OMAP4, cpu-intensive multimedia
+tasks are offloaded by the host to the remote M3 and/or C64x+ slave
+processors.
 
-...
+To achieve fast message-based communications, a minimal kernel support
+is needed to deliver messages arriving from a remote processor to the
+appropriate user process.
 
-> + *
-> + * DMA M2P channels are available for audio, UARTs and IrDA. See chapter 10 of
-> + * the EP93xx users guide for full details on the DMA M2P engine.
-> + * See sound/soc/ep93xx/ep93xx-pcm.c for an example use of the DMA M2P code.
-> + *
-> + */ 
->  
->  #ifndef __ASM_ARCH_DMA_H
->  #define __ASM_ARCH_DMA_H
-> @@ -8,12 +13,29 @@
->  #include <linux/list.h>
->  #include <linux/types.h>
->  
-> +/**
-> + * Information about a buffer to be transferred using the DMA M2P engine
+This communication is based on simple data structures that are shared between
+the remote processors, and access to it is synchronized using the hwspinlock
+module (to allow the remote processor to directly place new messages in this
+shared data structure).
 
-/**
- * struct ep93xx_dma_buffer - buffer to be transferred using the DMA M2P engine
+This OMAP IPC system, called Syslink, is being actively developed by TI and
+will be gradually submitted upstream.
 
-> + *
-> + * @list: Entry in DMA buffer list
-> + * @bus_addr: Physical address of the buffer
-> + * @size: Size of the buffer in bytes
-> + */
->  struct ep93xx_dma_buffer {
->  	struct list_head	list;
->  	u32			bus_addr;
->  	u16			size;
->  };
->  
-> +/**
-> + * Information about a DMA M2P client
-
-ditto
-
-> + *
-> + * @name: Unique name for this client
-> + * @flags: Client flags
-> + * @cookie: User data to pass to callback functions
-> + * @buffer_started: Non NULL function to call when a transfer is started
-> + * @buffer_finished: Non NULL function to call when a transfer is completed
-> + * @channel: Internal DMA M2P channel pointer. Do not modify
-> + */
->  struct ep93xx_dma_m2p_client {
->  	char			*name;
->  	u8			flags;
-> @@ -28,6 +50,9 @@ struct ep93xx_dma_m2p_client {
->  	void			*channel;
->  };
->  
-> +/**
-
-Don't use /** here as this is just a normal comment.
-
-> + * DMA M2P ports
-> + */
->  #define EP93XX_DMA_M2P_PORT_I2S1	0x00
->  #define EP93XX_DMA_M2P_PORT_I2S2	0x01
->  #define EP93XX_DMA_M2P_PORT_AAC1	0x02
-> @@ -39,18 +64,66 @@ struct ep93xx_dma_m2p_client {
->  #define EP93XX_DMA_M2P_PORT_UART3	0x08
->  #define EP93XX_DMA_M2P_PORT_IRDA	0x09
->  #define EP93XX_DMA_M2P_PORT_MASK	0x0f
-> -#define EP93XX_DMA_M2P_TX		0x00
-> -#define EP93XX_DMA_M2P_RX		0x10
-> -#define EP93XX_DMA_M2P_ABORT_ON_ERROR	0x20
-> -#define EP93XX_DMA_M2P_IGNORE_ERROR	0x40
-> -#define EP93XX_DMA_M2P_ERROR_MASK	0x60
->  
-> +/**
-
-ditto
-
-> + * DMA M2P client flags
-> + */
-> +#define EP93XX_DMA_M2P_TX		0x00	/* Memory to peripheral */
-> +#define EP93XX_DMA_M2P_RX		0x10	/* Peripheral to memory */
-> +
-> +/**
-
-ditto
-
-> + * DMA M2P client error handling flags. See the EP93xx users guide
-> + * documentation on the DMA M2P CONTROL register for more details
-> + */
-> +#define EP93XX_DMA_M2P_ABORT_ON_ERROR	0x20	/* Abort on peripheral error */
-> +#define EP93XX_DMA_M2P_IGNORE_ERROR	0x40	/* Ignore peripheral errors */
-> +#define EP93XX_DMA_M2P_ERROR_MASK	0x60	/* Mask of error bits */
-> +
-> +/**
-> + * Register a client with the DMA M2P subsystem. The DMA M2P subsystem
-
-/**
- * ep93xx_dma_m2p_client_register - register a client ..
+2. OMAP I2C driver: On some OMAP4 boards, the I2C bus is shared between
+the A9 and the M3, and the hwspinlock is used to synchronize access to it.
 
 
-Also you might want to put these function comments in the .c file (so they
-are as close the actual code as possible).
+Patches are against linux-omap-2.6 master, which is 2.6.36-rc8 plus
+2.6.37 omap material (needed for the omap specific patches in this set).
 
-Regards,
-MW
+Tested on OMAP4 blaze.
 
-> + * allocates a channel and an interrupt line for the DMA client.
-> + *
-> + * @m2p: Client information to register
-> + * returns 0 on success
-> + */
->  int  ep93xx_dma_m2p_client_register(struct ep93xx_dma_m2p_client *m2p);
-> +
-> +/**
-> + * Unregister a DMA M2P subsystem. Any transfers currently in progress will be
-> + * completed in hardware, but ignored in software.
-> + *
-> + * @m2p: Client to unregister
-> + */
->  void ep93xx_dma_m2p_client_unregister(struct ep93xx_dma_m2p_client *m2p);
-> +
-> +/**
-> + * Submit a DMA M2P transfer. If the current or next transfer positions are
-> + * free on the M2P client then the transfer is started immediately. If not,
-> + * the transfer is added to the list of pending transfers. This function must
-> + * not be called from the buffer_finished callback for an M2P channel.
-> + *
-> + * @m2p: DMA Client to submit the transfer on
-> + * @buf: DMA Buffer to submit
-> + */
->  void ep93xx_dma_m2p_submit(struct ep93xx_dma_m2p_client *m2p,
->  			   struct ep93xx_dma_buffer *buf);
-> +
-> +/**
-> + * Put a DMA transfer on the pending list for an M2P channel. This function
-> + * must only be called from the buffer_finished callback for an M2P channel.
-> + *
-> + * @m2p: DMA Client to submit the transfer on
-> + * @buf: DMA Buffer to submit 
-> + */
->  void ep93xx_dma_m2p_submit_recursive(struct ep93xx_dma_m2p_client *m2p,
->  				     struct ep93xx_dma_buffer *buf);
-> +
-> +/**
-> + * Flush all pending transfers on a DMA M2P client. Any transfers currently
-> + * in progress will be completed in hardware, but ignored in software.
-> + *
-> + * @m2p: DMA client to flush transfers on
-> + */
->  void ep93xx_dma_m2p_flush(struct ep93xx_dma_m2p_client *m2p);
->  
->  #endif /* __ASM_ARCH_DMA_H */
+Contributions
+=============
+
+Previous versions of this driver circulated in linux-omap several times,
+and received substantial attention and contribution from many developers
+(see [1][2][3][4][5][6]):
+
+Simon Que did the initial implementation and pushed several iterations
+Benoit Cousson provided extensive review, help, improvements and hwmod support
+Hari Kanigeri helped out when Simon was away
+Sanjeev Premi, Santosh Shilimkar and Nishanth Menon did lots of review
+
+I'd like to thank Benoit Cousson, Steve Krueger, Hari Kanigeri,
+Nourredine Hamoudi and Richard Woodruff for useful discussions about
+the OMAP Spinlock requirements and use-cases.
+
+Relevant linux-omap threads:
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/38755
+[2] http://thread.gmane.org/gmane.linux.ports.arm.omap/38917
+[3] http://thread.gmane.org/gmane.linux.ports.arm.omap/39187
+[4] http://thread.gmane.org/gmane.linux.ports.arm.omap/39365
+[5] http://thread.gmane.org/gmane.linux.ports.arm.omap/39815
+[6] http://thread.gmane.org/gmane.linux.ports.arm.omap/40901
+
+Changes since the last linux-omap iteration:
+
+1. Disable interrupts and preemption when the lock is taken.
+   This is required in order to minimize the period of time in which
+   the other core might be spinning on this lock, trying to take it.
+   Otherwise the other core will be polling the omap interconnect for
+   too long, which would prevent other transactions from being executed.
+   spin_trylock_irqsave is used to achieve this, with a dedicated spinlock
+   (per hwspinlock). This also makes the hwspinlock primitive SMP-safe (but
+   you shouldn't use this primitive to achieve synchronizations between
+   different contexts on the same local processor, of course).
+
+2. Add memory barriers
+   The hwspinlock is used to achieve mutual exclusion when accessing some
+   shared memory data. To guarantee that the memory operations, performed
+   inside the critical section, are not reordered by the processor outside
+   that critical section, we must use explicit memory barriers.
+
+3. Provide three different locking API: trylock, lock_timeout, and lock,
+   and implement them on top of each other (in that order). For the timeout
+   API, use a jiffies-based parameter, instead of number of attempts.
+
+4. Relax the OMAP interconnect between two subsequent lock() attempts,
+   as recommended by the hw spec.
+
+5. Move driver to drivers/misc, do some general cleanups and documentation
+
+6. Use runtime PM get/put API to couple the number of locks that have being
+   requested with the runtime PM's usage_count of the underlying device
+
+Benoit Cousson (1):
+  OMAP4: hwmod data: Add hwspinlock
+
+Simon Que (2):
+  drivers: misc: add omap_hwspinlock driver
+  omap: add hwspinlock device
+
+ Documentation/misc-devices/omap_hwspinlock.txt |  199 +++++++++
+ arch/arm/mach-omap2/Makefile                   |    1 +
+ arch/arm/mach-omap2/hwspinlock.c               |   67 +++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c     |   63 +++
+ drivers/misc/Kconfig                           |   10 +
+ drivers/misc/Makefile                          |    1 +
+ drivers/misc/omap_hwspinlock.c                 |  555 ++++++++++++++++++++++++
+ include/linux/omap_hwspinlock.h                |  108 +++++
+ 8 files changed, 1004 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/misc-devices/omap_hwspinlock.txt
+ create mode 100644 arch/arm/mach-omap2/hwspinlock.c
+ create mode 100644 drivers/misc/omap_hwspinlock.c
+ create mode 100644 include/linux/omap_hwspinlock.h
