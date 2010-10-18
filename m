@@ -1,32 +1,74 @@
-From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Mon, 18 Oct 2010 14:54:39 +0200
-Subject: [PATCH 9/9] arch: arm: fixed typos
-In-Reply-To: <20101018080644.GD12363@pengutronix.de>
-References: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
-	<20101018080644.GD12363@pengutronix.de>
-Message-ID: <AANLkTim8e-PuLa7aG+gPf4R-gPUPgdf5rbBN10YfaoAA@mail.gmail.com>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Mon, 18 Oct 2010 18:27:36 +0530
+Subject: [PATCH] arm: omap: complete removal of machine_desc.io_pg_offst and
+	.phys_io
+Message-ID: <1287406656-24133-1-git-send-email-gadiyar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+Commit 861bd81ee6 in linux-next as of 20101018 (arm: remove
+machine_desc.io_pg_offst and .phys_io) missed out on updating
+a few boards. This causes the build of omap2plus_defconfig
+to fail. Fix this.
 
-Hi Uwe,
-   thanks a lot for your answer.
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Eric Miao <eric.miao@canonical.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+I've not boot tested on these three boards, and am simply following
+what the original patch does.
 
-> [Adding trivial at kernel.org to Cc:]
+ arch/arm/mach-omap2/board-cm-t3517.c   |    2 --
+ arch/arm/mach-omap2/board-igep0030.c   |    2 --
+ arch/arm/mach-omap2/board-omap3logic.c |    4 ----
+ 3 files changed, 8 deletions(-)
 
-Wow! I didn't know trivial at kernel.org. Very interesting. Which is the policy to
-post? I can send simple fix without bothering anyone?
-
-> On Sat, Oct 16, 2010 at 11:00:05AM +0200, Andrea Gelmini wrote:
-> ? ? ? ?http://thread.gmane.org/gmane.linux.kernel/1030436/
-
-Interesting.
-
-> Don't know why they didn't appear in the trivial tree yet.
-
-I guess because the patches are not group by subsystem, maybe.
-Or is allowed to make single traversal-tree commit?
-
-Thanks a lot,
-Andrea
+Index: mainline/arch/arm/mach-omap2/board-cm-t3517.c
+===================================================================
+--- mainline.orig/arch/arm/mach-omap2/board-cm-t3517.c
++++ mainline/arch/arm/mach-omap2/board-cm-t3517.c
+@@ -283,8 +283,6 @@ static void __init cm_t3517_init(void)
+ }
+ 
+ MACHINE_START(CM_T3517, "Compulab CM-T3517")
+-	.phys_io	= 0x48000000,
+-	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= omap3_map_io,
+ 	.reserve        = omap_reserve,
+Index: mainline/arch/arm/mach-omap2/board-igep0030.c
+===================================================================
+--- mainline.orig/arch/arm/mach-omap2/board-igep0030.c
++++ mainline/arch/arm/mach-omap2/board-igep0030.c
+@@ -392,8 +392,6 @@ static void __init igep3_init(void)
+ }
+ 
+ MACHINE_START(IGEP0030, "IGEP OMAP3 module")
+-	.phys_io	= 0x48000000,
+-	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= omap3_map_io,
+ 	.init_irq	= igep3_init_irq,
+Index: mainline/arch/arm/mach-omap2/board-omap3logic.c
+===================================================================
+--- mainline.orig/arch/arm/mach-omap2/board-omap3logic.c
++++ mainline/arch/arm/mach-omap2/board-omap3logic.c
+@@ -225,8 +225,6 @@ static void __init omap3logic_init(void)
+ }
+ 
+ MACHINE_START(OMAP3_TORPEDO, "Logic OMAP3 Torpedo board")
+-	.phys_io	= 0x48000000,
+-	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= omap3_map_io,
+ 	.init_irq	= omap3logic_init_irq,
+@@ -235,8 +233,6 @@ MACHINE_START(OMAP3_TORPEDO, "Logic OMAP
+ MACHINE_END
+ 
+ MACHINE_START(OMAP3530_LV_SOM, "OMAP Logic 3530 LV SOM board")
+-	.phys_io	= 0x48000000,
+-	.io_pg_offst	= ((0xd8000000) >> 18) & 0xfffc,
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= omap3_map_io,
+ 	.init_irq	= omap3logic_init_irq,
