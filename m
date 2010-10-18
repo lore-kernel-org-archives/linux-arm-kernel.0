@@ -1,42 +1,40 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 18 Oct 2010 17:20:38 +0200
-Subject: [PATCH 1/7] arm/versatile: move pci code to plat-versatile
-In-Reply-To: <1287072657-32477-2-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Oct 2010 17:23:14 +0200
+Subject: [PATCH 0/7] arm/versatile PCI support, second try
+In-Reply-To: <000001cb6ea2$1b78ccd0$526a6670$@tuckley@arm.com>
 References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
-	<1287072657-32477-2-git-send-email-arnd@arndb.de>
-Message-ID: <AANLkTik4StWAGR2eygMTT48Vbv-pjUjTcACBOQBMas6j@mail.gmail.com>
+	<AANLkTikc5Vc0Q0z4rE4raX7LTyB=LiE+YuzycMjsXUaM@mail.gmail.com>
+	<000001cb6ea2$1b78ccd0$526a6670$@tuckley@arm.com>
+Message-ID: <201010181723.14462.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/14 Arnd Bergmann <arnd@arndb.de>:
+On Monday 18 October 2010, Colin Tuckley wrote:
+> > > With lots of help and testing from Peter Maydell, I've completed
+> > > a second version of the PCI support for the versatile platform,
+> > > which works much better now on real hardware, although it does
+> > > not improve existing qemu setups.
+> > 
+> > I've got nothing better to do tonite than playing with the PB1176
+> > board so tried this out...
+> 
+> Note that the PB1176 and EB are in mach-realview rather than mach-versatile
+> like the PB926. This complicates the PCI side of things since the other
+> boards in mach-realview have a different PCI implementation (via a NEC
+> custom Northbridge chip).
 
-> The Xilinx PCI macro is used on both versatile-pb and
-> realview-eb, so we should move the implementation to place
-> where it can be shared.
+Yes, I know that. All of them use plat-versatile though, which is where
+the common code sits.
 
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? | ? ?5 +
-> ?arch/arm/mach-versatile/Makefile ? ? | ? ?1 -
-> ?arch/arm/mach-versatile/pci.c ? ? ? ?| ?361 ----------------------------------
-> ?arch/arm/plat-versatile/Makefile ? ? | ? ?1 +
-> ?arch/arm/plat-versatile/xilinx-pci.c | ?361 ++++++++++++++++++++++++++++++++++
+All the code I added is either specific to the xilinx PCI implementation
+or specific to one of the boards (pb926, pb1176, eb).
 
-What about arch/arm/common?
+> I am just about to push the PCI code patches for these boards (PBA8,
+> PB11MPCore and PBX) to the list.
 
-PCI drivers seem like they could be useful for others than ARM reference
-designs too. Xilinx FPGAs are probably quite common anyway.
+I don't expect any conflicts besides my patch 5/7, which will get obsoleted
+by your patch. If you apply both series, we should be able to enable
+both Xilinx and NEC PCI support on mach-realview and have it work
+on all the boards.
 
-> (...)
-> +obj-$(CONFIG_PCI_HOST_XILINX) += xilinx-pci.o
-> diff --git a/arch/arm/plat-versatile/xilinx-pci.c b/arch/arm/plat-versatile/xilinx-pci.c
-> new file mode 100644
-> index 0000000..13c7e5f
-> --- /dev/null
-> +++ b/arch/arm/plat-versatile/xilinx-pci.c
-> @@ -0,0 +1,361 @@
-> +/*
-> + * ?linux/arch/arm/mach-versatile/pci.c
-
-Hm this file path seems inappropriate why not just delete it.
-
-Yours,
-Linus Walleij
+	Arnd
