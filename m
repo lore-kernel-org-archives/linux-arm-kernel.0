@@ -1,81 +1,50 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 18 Oct 2010 13:57:56 +0200
-Subject: [RFC 1/2] mmc: sdhci-esdhc-imx: add support for write protect on
-	custom GPIO
-Message-ID: <1287403077-519-1-git-send-email-w.sang@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Oct 2010 21:00:25 +0900
+Subject: [PATCH v2 2/4] ARM: S3C2416: Set name of the framebuffer device
+	only	if it present
+In-Reply-To: <1277220124-16225-3-git-send-email-jekhor@gmail.com>
+References: <1277220124-16225-1-git-send-email-jekhor@gmail.com>
+	<1277220124-16225-3-git-send-email-jekhor@gmail.com>
+Message-ID: <049401cb6ebc$0eb8cc10$2c2a6430$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+Yauhen Kharuzhy wrote:
+> 
+> Fix case when board doesn't have LCD connected and doesn't have
+> corresponding platform device compiled.
+> 
+> Signed-off-by: Yauhen Kharuzhy <jekhor@gmail.com>
+> ---
+>  arch/arm/mach-s3c2416/s3c2416.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-
+> s3c2416/s3c2416.c
+> index 35dabcc..355ab62 100644
+> --- a/arch/arm/mach-s3c2416/s3c2416.c
+> +++ b/arch/arm/mach-s3c2416/s3c2416.c
+> @@ -90,7 +90,9 @@ int __init s3c2416_init(void)
+>  	s3c_i2c0_setname("s3c2440-i2c");
+>  	s3c_i2c1_setname("s3c2440-i2c");
+> 
+> +#ifdef CONFIG_S3C_DEV_FB
+>  	s3c_device_fb.name = "s3c2443-fb";
+> +#endif
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 2e9cca1..afbac9a 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -15,8 +15,10 @@
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-+#include <linux/gpio.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdhci-pltfm.h>
-+#include <mach/esdhc.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -99,9 +101,21 @@ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
- 	return clk_get_rate(pltfm_host->clk) / 256 / 16;
- }
- 
-+static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
-+{
-+	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
-+
-+	if (boarddata)
-+		return gpio_get_value(boarddata->wp_gpio);
-+	else
-+		/* No GPIO -> always writable! */
-+		return 0;
-+}
-+
- static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
- 	struct clk *clk;
- 
- 	clk = clk_get(mmc_dev(host->mmc), NULL);
-@@ -112,12 +126,20 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 	clk_enable(clk);
- 	pltfm_host->clk = clk;
- 
-+	if (boarddata) {
-+		gpio_request(boarddata->wp_gpio, "SD_WP");
-+		gpio_direction_input(boarddata->wp_gpio);
-+	}
- 	return 0;
- }
- 
- static void esdhc_pltfm_exit(struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
-+
-+	if (boarddata)
-+		gpio_free(boarddata->wp_gpio);
- 
- 	clk_disable(pltfm_host->clk);
- 	clk_put(pltfm_host->clk);
-@@ -130,6 +152,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- 	.set_clock = esdhc_set_clock,
- 	.get_max_clock = esdhc_pltfm_get_max_clock,
- 	.get_min_clock = esdhc_pltfm_get_min_clock,
-+	.get_ro = esdhc_pltfm_get_ro,
- };
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--- 
-1.7.1
+Could you please use s3c_fb_setname() instead?
+There is in plat-samsung/include/plat/fb-core.h...
+
+> 
+>  	return sysdev_register(&s3c2416_sysdev);
+>  }
+> --
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
