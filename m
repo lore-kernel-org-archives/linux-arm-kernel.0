@@ -1,50 +1,58 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Mon, 18 Oct 2010 22:22:59 +0900
-Subject: [PATCH 04/22] arm: introduce little endian bitops
-In-Reply-To: <20101018092650.GC26183@n2100.arm.linux.org.uk>
-References: <1287135981-17604-1-git-send-email-akinobu.mita@gmail.com>
-	<1287135981-17604-5-git-send-email-akinobu.mita@gmail.com>
-	<20101018092650.GC26183@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=1w9uV81CagrE53xEYkMaFh_3cM_+ybctT2ng4@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 18 Oct 2010 15:19:47 +0200
+Subject: [PATCH 9/9] arch: arm: fixed typos
+In-Reply-To: <AANLkTim8e-PuLa7aG+gPf4R-gPUPgdf5rbBN10YfaoAA@mail.gmail.com>
+References: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
+	<20101018080644.GD12363@pengutronix.de>
+	<AANLkTim8e-PuLa7aG+gPf4R-gPUPgdf5rbBN10YfaoAA@mail.gmail.com>
+Message-ID: <20101018131946.GD12421@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Oct 15, 2010 at 06:46:03PM +0900, Akinobu Mita wrote:
->> Introduce little endian bit operations by renaming native ext2 bit
->> operations. The ext2 bit operations are kept by using little endian
->> bit operations until the conversions are finished.
->
-> Can you explain why we need another level of indirection rather than
-> using asm-generic/bitops/le.h, asm-generic/bitops/minix.h and
-> asm-generic/bitops/ext2-non-atomic.h ?
+Hi Andrea,
 
-Sorry for not CCing the cover letter of this patch series.
+On Mon, Oct 18, 2010 at 02:54:39PM +0200, Andrea Gelmini wrote:
+> 2010/10/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> 
+> Hi Uwe,
+>    thanks a lot for your answer.
+> 
+> > [Adding trivial at kernel.org to Cc:]
+> 
+> Wow! I didn't know trivial at kernel.org. Very interesting. Which is the policy to
+> post? I can send simple fix without bothering anyone?
 
-Currently there are no common little-endian bit operations for all
-architectures, although some architectures implicitly include
-asm-generic/bitops/le.h through asm-generic/bitops/minix-le.h or
-asm-generic/bitops/ext2-non-atomic.h.
+Quoting Documentation/SubmittingPatches:
 
-So some drivers (net/rds/cong.c and virt/kvm/kvm_main.c) need to
-include asm/bitops/le.h directly. When I tried to remove the
-direct inclusion of asm-generic/bitops/le.h by using ext2_*(),
-several people prefer another solution like this patch series does.
+For small patches you may want to CC the Trivial Patch Monkey
+trivial at kernel.org which collects "trivial" patches. Have a look
+into the MAINTAINERS file for its current manager.
+Trivial patches must qualify for one of the following rules:
+ Spelling fixes in documentation
+ Spelling fixes which could break grep(1)
+ Warning fixes (cluttering with useless warnings is bad)
+ Compilation fixes (only if they are actually correct)
+ Runtime fixes (only if they actually fix things)
+ Removing use of deprecated functions/macros (eg. check_region)
+ Contact detail and documentation fixes
+ Non-portable code replaced by portable code (even in arch-specific,
+ since people copy, as long as it's trivial)
+ Any fix by the author/maintainer of the file (ie. patch monkey
+ in re-transmission mode)
 
-This patch series introduces little-endian bit operations for
-all architectures and convert all ext2 non-atomic bit operations
-and minix bit operations to use little-endian bit operations.
-it enables to remove ext2 non-atomic and minix bit operations
-from asm/bitops.h. The reason they should be removed from
-asm/bitops.h is as follows:
+baruch
 
-For ext2 non-atomic bit operations, they are used for little-endian
-byte order bitmap access by some filesystems and modules.
-But using ext2_*() functions on a module other than ext2 filesystem
-makes someone feel strange.
+> > On Sat, Oct 16, 2010 at 11:00:05AM +0200, Andrea Gelmini wrote:
+> > ? ? ? ?http://thread.gmane.org/gmane.linux.kernel/1030436/
+> 
+> Interesting.
+> 
+> > Don't know why they didn't appear in the trivial tree yet.
+> 
+> I guess because the patches are not group by subsystem, maybe.
+> Or is allowed to make single traversal-tree commit?
 
-For minix bit operations, they are only used by minix filesystem
-and useless by other modules. Because byte order of inode and block
-bitmap is defferent on each architectures.
-
-There are several issues including arm part. So I'm now fixing them.
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
