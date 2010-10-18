@@ -1,111 +1,45 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 18 Oct 2010 09:44:35 +0200
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-Message-ID: <1287387875-14168-4-git-send-email-ohad@wizery.com>
+From: pgsellmann@portner-elektronik.at (Peter Gsellmann)
+Date: Mon, 18 Oct 2010 10:00:29 +0200
+Subject: [PATCH v4] ARM: AT91: add board support for Pcontrol_G20
+In-Reply-To: <AANLkTik8qZdU6o+ArBJkUGFNGaN2Ucmkj3kxKKudtRBE@mail.gmail.com>
+References: <1286466086.4306.41.camel@aspire.localdomain>
+	<20101008123407.GB30252@game.jcrosoft.org>
+	<1286550644.21584.34.camel@aspire.localdomain>
+	<1286787761.7800.11.camel@aspire.localdomain>
+	<1286792568.7800.19.camel@aspire.localdomain>
+	<20101013131515.GC11087@game.jcrosoft.org>
+	<1286979531.7165.9.camel@aspire.localdomain>
+	<4CB71813.6060601@atmel.com>
+	<20101014151451.GB23434@n2100.arm.linux.org.uk>
+	<20101015015016.GD11087@game.jcrosoft.org>
+	<AANLkTik8qZdU6o+ArBJkUGFNGaN2Ucmkj3kxKKudtRBE@mail.gmail.com>
+Message-ID: <1287388829.1450.21.camel@aspire.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Que <sque@ti.com>
+Am Freitag, den 15.10.2010, 18:31 +0200 schrieb avictor.za at gmail.com: 
+> hi,
+> 
+> On Fri, Oct 15, 2010 at 3:50 AM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 16:14 Thu 14 Oct     , Russell King - ARM Linux wrote:
+> >> On Thu, Oct 14, 2010 at 04:47:47PM +0200, Nicolas Ferre wrote:
+> >> > > diff --git a/arch/arm/configs/pcontrol_g20_defconfig b/arch/arm/configs/pcontrol_g20_defconfig
+> >> > > new file mode 100644
+> >>
+> >> Is it really necessary to have another platform specific defconfig rather
+> >> than grouping it together with other similar platforms?
+> > I'm working on it to merge the cpu and boards together hope to finish it
+> > before the end of the merge window
+> 
+> What's the point of having a board supported by the kernel, if you
+> don't include a configuration file to actually make the board usable?
+> 
+In this scenario, i (and all other board maintainers) have to test the
+merged defconfig on my board after the merge. 
+If it fails, i have either to maintain a private version of defconfig :-(
+or to checkin the needed changes which triggers the same task for (n-1)
+board maintainers.
 
-Build and register an hwspinlock platform device.
-
-Although only OMAP4 supports the hardware spinlock module (for now),
-it is still safe to run this initcall on all omaps, because hwmod lookup
-will simply fail on hwspinlock-less platforms.
-
-Signed-off-by: Simon Que <sque@ti.com>
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/mach-omap2/Makefile     |    1 +
- arch/arm/mach-omap2/hwspinlock.c |   67 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/hwspinlock.c
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 7352412..e55d1c5 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -190,3 +190,4 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
- 
- smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
- obj-y					+= $(smsc911x-m) $(smsc911x-y)
-+obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
-diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
-new file mode 100644
-index 0000000..641a6d4
---- /dev/null
-+++ b/arch/arm/mach-omap2/hwspinlock.c
-@@ -0,0 +1,67 @@
-+/*
-+ * OMAP hardware spinlock device initialization
-+ *
-+ * Copyright (C) 2010 Texas Instruments. All rights reserved.
-+ *
-+ * Contact: Simon Que <sque@ti.com>
-+ *          Hari Kanigeri <h-kanigeri2@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+
-+#include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
-+
-+struct omap_device_pm_latency omap_spinlock_latency[] = {
-+	{
-+		.deactivate_func = omap_device_idle_hwmods,
-+		.activate_func   = omap_device_enable_hwmods,
-+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-+	}
-+};
-+
-+int __init hwspinlocks_init(void)
-+{
-+	int retval = 0;
-+	struct omap_hwmod *oh;
-+	struct omap_device *od;
-+	const char *oh_name = "spinlock";
-+	const char *dev_name = "omap_hwspinlock";
-+
-+	/*
-+	 * Hwmod lookup will fail in case our platform doesn't support the
-+	 * hardware spinlock module, so it is safe to run this initcall
-+	 * on all omaps
-+	 */
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (oh == NULL)
-+		return -EINVAL;
-+
-+	od = omap_device_build(dev_name, 0, oh, NULL, 0,
-+				omap_spinlock_latency,
-+				ARRAY_SIZE(omap_spinlock_latency), false);
-+	if (IS_ERR(od)) {
-+		pr_err("Can't build omap_device for %s:%s\n", dev_name,
-+								oh_name);
-+		retval = PTR_ERR(od);
-+	}
-+
-+	return retval;
-+}
-+postcore_initcall(hwspinlocks_init);
--- 
-1.7.0.4
+Regards,
+Peter
