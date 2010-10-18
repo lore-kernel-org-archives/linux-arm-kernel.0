@@ -1,101 +1,51 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Fri, 15 Oct 2010 18:46:03 +0900
-Subject: [PATCH 04/22] arm: introduce little endian bitops
-In-Reply-To: <1287135981-17604-1-git-send-email-akinobu.mita@gmail.com>
-References: <1287135981-17604-1-git-send-email-akinobu.mita@gmail.com>
-Message-ID: <1287135981-17604-5-git-send-email-akinobu.mita@gmail.com>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Sun, 17 Oct 2010 18:37:50 -0700
+Subject: iwmmxt signal frame handling
+In-Reply-To: <AANLkTinSJnjd9z4msto9j=gyOiuL2N4c7FOShB0fT1hA@mail.gmail.com>
+References: <201010141609.10889.arnd@arndb.de>
+	<AANLkTimHyhLRZwR-FRtciu+0sGYYFkAh4WfLCWwu59JA@mail.gmail.com>
+	<AANLkTik3Brb-XbL1GkteVs_g9J3HtYsZMQogh+KR0LB0@mail.gmail.com>
+	<201010151540.07982.arnd@arndb.de>
+	<AANLkTinSJnjd9z4msto9j=gyOiuL2N4c7FOShB0fT1hA@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05984A27A8@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce little endian bit operations by renaming native ext2 bit
-operations. The ext2 bit operations are kept by using little endian
-bit operations until the conversions are finished.
 
-Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/include/asm/bitops.h |   46 +++++++++++++++++++++++++++++-----------
- 1 files changed, 33 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index 338ff19..d8af4af 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -303,41 +303,61 @@ static inline int fls(int x)
- #include <asm-generic/bitops/hweight.h>
- #include <asm-generic/bitops/lock.h>
- 
-+#define __set_le_bit(nr, p)			\
-+	__set_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define __clear_le_bit(nr, p)			\
-+	__clear_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define __test_and_set_le_bit(nr, p)			\
-+		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define test_and_set_le_bit(lock, nr, p)          \
-+		test_and_set_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define __test_and_clear_le_bit(nr, p)			\
-+		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define test_and_clear_le_bit(lock, nr, p)	\
-+		test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define test_le_bit(nr, p)			\
-+		test_bit(WORD_BITOFF_TO_LE(nr), (p))
-+#define find_first_zero_le_bit(p, sz)		\
-+		_find_first_zero_bit_le(p, sz)
-+#define find_next_zero_le_bit(p, sz, off)	\
-+		_find_next_zero_bit_le(p, sz, off)
-+#define find_next_le_bit(p, sz, off) \
-+		_find_next_bit_le(p, sz, off)
- /*
-  * Ext2 is defined to use little-endian byte ordering.
-  * These do not need to be atomic.
-  */
- #define ext2_set_bit(nr,p)			\
--		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		__test_and_set_le_bit(nr, (unsigned long *)(p))
- #define ext2_set_bit_atomic(lock,nr,p)          \
--                test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		test_and_set_le_bit(nr, (unsigned long *)(p))
- #define ext2_clear_bit(nr,p)			\
--		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		__test_and_clear_le_bit(nr, (unsigned long *)(p))
- #define ext2_clear_bit_atomic(lock,nr,p)        \
--                test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		test_and_clear_le_bit(nr, (unsigned long *)(p))
- #define ext2_test_bit(nr,p)			\
--		test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		test_le_bit(nr, (unsigned long *)(p))
- #define ext2_find_first_zero_bit(p,sz)		\
--		_find_first_zero_bit_le(p,sz)
-+		find_first_zero_le_bit((unsigned long *)(p), sz)
- #define ext2_find_next_zero_bit(p,sz,off)	\
--		_find_next_zero_bit_le(p,sz,off)
-+		find_next_zero_le_bit((unsigned long *)(p), sz, off)
- #define ext2_find_next_bit(p, sz, off) \
--		_find_next_bit_le(p, sz, off)
-+		find_next_le_bit((unsigned long *)(p), sz, off)
- 
- /*
-  * Minix is defined to use little-endian byte ordering.
-  * These do not need to be atomic.
-  */
- #define minix_set_bit(nr,p)			\
--		__set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		__set_le_bit(nr, (unsigned long *)(p))
- #define minix_test_bit(nr,p)			\
--		test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		test_le_bit(nr, (unsigned long *)(p))
- #define minix_test_and_set_bit(nr,p)		\
--		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		__test_and_set_le_bit(nr, (unsigned long *)(p))
- #define minix_test_and_clear_bit(nr,p)		\
--		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
-+		__test_and_clear_le_bit(nr, (unsigned long *)(p))
- #define minix_find_first_zero_bit(p,sz)		\
--		_find_first_zero_bit_le(p,sz)
-+		find_first_zero_le_bit((unsigned long *)(p), sz)
- 
- #endif /* __KERNEL__ */
- 
--- 
-1.7.1.231.gd0b16
+>-----Original Message-----
+>From: Eric Miao [mailto:eric.y.miao at gmail.com]
+>Sent: 2010?10?15? 11:19 PM
+>To: Arnd Bergmann
+>Cc: linux-arm-kernel at lists.infradead.org; Peter Maydell; Russell King; Haojian Zhuang
+>Subject: Re: iwmmxt signal frame handling
+>
+>On Fri, Oct 15, 2010 at 9:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Friday 15 October 2010 15:32:04 Eric Miao wrote:
+>>> > Acked-by: Eric Miao <eric.y.miao@gmail.com>
+>>> >
+>>>
+>>> This also passes the internal iwmmxt test, Haojian please add your
+>>> Tested-by please.
+>>
+>> Can you also confirm that the previous behaviour is broken?
+>> If it is, the patch is probably a candidate for the stable trees.
+>>
+>
+>I don't believe the previous behavior is going to cause any serious issue. The
+>magic/size are only saved/restored only for those processes with
+>TIF_USING_IWMMXT
+>flag set. Yet this patch does seem to improve from security perspective by
+>zero-ing the buffer.
+>
+>BTW: I didn't look too much into the code, but it seems to me that the aux can
+>just be zero-ed in a whole?
+>
+>
+
+Yes, the previous behavior doesn't cause serious issue on the testcases.
+
+You can add "Test-by: Haojian Zhuang <haojian.zhuang@marvell.com>".
+
+Thanks
+Haojian
