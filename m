@@ -1,47 +1,103 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 18 Oct 2010 15:43:37 +0200
-Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
-In-Reply-To: <20101018133502.GA12449@n2100.arm.linux.org.uk>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287406015.29097.1579.camel@twins>
-	<20101018133502.GA12449@n2100.arm.linux.org.uk>
-Message-ID: <1287409417.29097.1598.camel@twins>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Oct 2010 22:45:10 +0900
+Subject: [PATCH 3/9] ARM: S3C64XX: add touchscreen support for
+	mach-real6410
+In-Reply-To: <AANLkTin0zOj+PnTe8JKNRmyQ-gVvYZRcJwcA2Pu+P4h7@mail.gmail.com>
+References: <20100929192354.25307.40197.stgit@darius-desktop>
+	<20100929193322.25307.67196.stgit@darius-desktop>
+	<04a501cb6ec8$7e719a80$7b54cf80$%kim@samsung.com>
+	<AANLkTin0zOj+PnTe8JKNRmyQ-gVvYZRcJwcA2Pu+P4h7@mail.gmail.com>
+Message-ID: <04a701cb6eca$b0bd5b80$12381280$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-10-18 at 14:35 +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 18, 2010 at 02:46:55PM +0200, Peter Zijlstra wrote:
-> > On Mon, 2010-10-18 at 09:44 +0200, Ohad Ben-Cohen wrote:
-> > > OMAP4 introduces a Spinlock hardware module, which provides hardware
-> > > assistance for synchronization and mutual exclusion between heterogeneous
-> > > processors and those not operating under a single, shared operating system
-> > > (e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP). 
-> > 
-> > I just have to ask... was it really easier to build silicon than to
-> > agree on a spinlock ABI?
+Darius Augulis wrote:
 > 
-> I'm not really sure what point you're trying to make, but if you're
-> suggesting that Linux's spinlock should be exposed to these other
-> processors, you're completely off your rocker.
+> On Mon, Oct 18, 2010 at 4:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Darius Augulis wrote:
+> >>
+> >> Add touchscreen device support for mach-real6410
+> >>
+> >> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> >> ---
+> >> ?arch/arm/mach-s3c64xx/Kconfig ? ? ? ? | ? ?2 ++
+> >> ?arch/arm/mach-s3c64xx/mach-real6410.c | ? 11 +++++++++++
+> >> ?2 files changed, 13 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-s3c64xx/Kconfig
+b/arch/arm/mach-s3c64xx/Kconfig
+> >> index e4aede1..b706b80 100644
+> >> --- a/arch/arm/mach-s3c64xx/Kconfig
+> >> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> >> @@ -107,6 +107,8 @@ config MACH_REAL6410
+> >> ? ? ? select S3C_DEV_FB
+> >> ? ? ? select S3C64XX_SETUP_FB_24BPP
+> >> ? ? ? select S3C_DEV_NAND
+> >> + ? ? select SAMSUNG_DEV_ADC
+> >> + ? ? select SAMSUNG_DEV_TS
+> >> ? ? ? help
+> >> ? ? ? ? Machine support for the CoreWind REAL6410
+> >>
+> >> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-
+> >> s3c64xx/mach-real6410.c
+> >> index 9fd943d..bad6990 100644
+> >> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
+> >> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+> >> @@ -36,11 +36,13 @@
+> >> ?#include <mach/regs-srom.h>
+> >> ?#include <mach/s3c6410.h>
+> >>
+> >> +#include <plat/adc.h>
+> >> ?#include <plat/cpu.h>
+> >> ?#include <plat/devs.h>
+> >> ?#include <plat/fb.h>
+> >> ?#include <plat/nand.h>
+> >> ?#include <plat/regs-serial.h>
+> >> +#include <plat/ts.h>
+> >>
+> >> ?#include <video/platform_lcd.h>
+> >>
+> >> @@ -191,6 +193,14 @@ static struct platform_device *real6410_devices[]
+> >> __initdata = {
+> >> ? ? ? &s3c_device_hsmmc1,
+> >> ? ? ? &s3c_device_fb,
+> >> ? ? ? &s3c_device_nand,
+> >> + ? ? &s3c_device_adc,
+> >> + ? ? &s3c_device_ts,
+> >> +};
+> >> +
+> >> +static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+> >> + ? ? .delay ? ? ? ? ? ? ? ? ?= 10000,
+> >> + ? ? .presc ? ? ? ? ? ? ? ? ?= 49,
+> >> + ? ? .oversampling_shift ? ? = 2,
+> >> ?};
+> >>
+> >> ?static void __init real6410_map_io(void)
+> >> @@ -289,6 +299,7 @@ static void __init real6410_machine_init(void)
+> >>
+> >> ? ? ? s3c_fb_set_platdata(&real6410_lcd_pdata);
+> >> ? ? ? s3c_nand_set_platdata(&real6410_nand_info);
+> >> + ? ? s3c24xx_ts_set_platdata(&s3c_ts_platform);
+> >>
+> >> ? ? ? /* configure nCS1 width to 16 bits */
+> >>
+> >
+> > No need to add 's3c_adc_setname("s3c64xx-adc")' in mach-s3c64xx?
+> 
+> IMO no, because it's called from s3c6410_map_io() which is generic for
+> all s3c64xx boards.
+> This patch selects  SAMSUNG_DEV_ADC and this is enough.
+> btw, all patches are tested and all devices work ok.
+> 
+Oh, yes...I mis-typed to find it...
+Maybe I need sleeping, hehe ;-)
 
-Of course not, that would indeed be utterly silly, nor would it serve
-any purpose, the Linux kernel spinlocks are internal spinlocks and need
-not interact with anything out side of it.
+Will check to continue...your patches tomorrow morning.
 
-But for the purpose of communicating with a heterogeneous CPU/DSP it
-would make perfect sense to specify a spinlock ABI. Creating specific
-hardware just to serialise between these components seems like overkill.
+Thanks.
 
-> In any case, Linux's spinlock API (or more accurately, the ARM exclusive
-> access instructions) relies upon hardware coherency support (a piece of
-> hardware called an exclusive monitor) which isn't present on the M3 nor
-> DSP processors.  So there's no way to ensure that updates from the M3
-> and DSP are atomic wrt the A9 updates.
-
-Right, so the problem is that there simply is no way to do atomic memory
-access from these auxiliary processing units wrt the main CPU? Seeing as
-they operate on the same memory space, wouldn't it make sense to have
-them cache-coherent and thus provide atomicy guarantees through that?
-
-But that's water under the bridge, and your last paragraph does indeed
-answer my question.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
