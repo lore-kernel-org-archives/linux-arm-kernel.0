@@ -1,45 +1,27 @@
-From: pgsellmann@portner-elektronik.at (Peter Gsellmann)
-Date: Mon, 18 Oct 2010 10:00:29 +0200
-Subject: [PATCH v4] ARM: AT91: add board support for Pcontrol_G20
-In-Reply-To: <AANLkTik8qZdU6o+ArBJkUGFNGaN2Ucmkj3kxKKudtRBE@mail.gmail.com>
-References: <1286466086.4306.41.camel@aspire.localdomain>
-	<20101008123407.GB30252@game.jcrosoft.org>
-	<1286550644.21584.34.camel@aspire.localdomain>
-	<1286787761.7800.11.camel@aspire.localdomain>
-	<1286792568.7800.19.camel@aspire.localdomain>
-	<20101013131515.GC11087@game.jcrosoft.org>
-	<1286979531.7165.9.camel@aspire.localdomain>
-	<4CB71813.6060601@atmel.com>
-	<20101014151451.GB23434@n2100.arm.linux.org.uk>
-	<20101015015016.GD11087@game.jcrosoft.org>
-	<AANLkTik8qZdU6o+ArBJkUGFNGaN2Ucmkj3kxKKudtRBE@mail.gmail.com>
-Message-ID: <1287388829.1450.21.camel@aspire.localdomain>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 18 Oct 2010 10:06:44 +0200
+Subject: [PATCH 9/9] arch: arm: fixed typos
+In-Reply-To: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
+References: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
+Message-ID: <20101018080644.GD12363@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 15.10.2010, 18:31 +0200 schrieb avictor.za at gmail.com: 
-> hi,
-> 
-> On Fri, Oct 15, 2010 at 3:50 AM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 16:14 Thu 14 Oct     , Russell King - ARM Linux wrote:
-> >> On Thu, Oct 14, 2010 at 04:47:47PM +0200, Nicolas Ferre wrote:
-> >> > > diff --git a/arch/arm/configs/pcontrol_g20_defconfig b/arch/arm/configs/pcontrol_g20_defconfig
-> >> > > new file mode 100644
-> >>
-> >> Is it really necessary to have another platform specific defconfig rather
-> >> than grouping it together with other similar platforms?
-> > I'm working on it to merge the cpu and boards together hope to finish it
-> > before the end of the merge window
-> 
-> What's the point of having a board supported by the kernel, if you
-> don't include a configuration file to actually make the board usable?
-> 
-In this scenario, i (and all other board maintainers) have to test the
-merged defconfig on my board after the merge. 
-If it fails, i have either to maintain a private version of defconfig :-(
-or to checkin the needed changes which triggers the same task for (n-1)
-board maintainers.
+Hello,
 
-Regards,
-Peter
+[Adding trivial at kernel.org to Cc:]
+
+On Sat, Oct 16, 2010 at 11:00:05AM +0200, Andrea Gelmini wrote:
+> Intialize, configuation, wakup, Managment, addres
+I already fixed some of these in
+
+	http://thread.gmane.org/gmane.linux.kernel/1030436/
+
+Don't know why they didn't appear in the trivial tree yet.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
