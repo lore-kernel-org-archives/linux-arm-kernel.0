@@ -1,35 +1,56 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 18 Oct 2010 17:32:09 +0200
-Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
-In-Reply-To: <tnxeibnh67q.fsf@e102109-lin.cambridge.arm.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287406015.29097.1579.camel@twins>
-	<20101018133502.GA12449@n2100.arm.linux.org.uk>
-	<1287409417.29097.1598.camel@twins>
-	<tnxeibnh67q.fsf@e102109-lin.cambridge.arm.com>
-Message-ID: <1287415929.29097.1616.camel@twins>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Oct 2010 17:35:50 +0200
+Subject: [PATCH 1/7] arm/versatile: move pci code to plat-versatile
+In-Reply-To: <AANLkTik4StWAGR2eygMTT48Vbv-pjUjTcACBOQBMas6j@mail.gmail.com>
+References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
+	<1287072657-32477-2-git-send-email-arnd@arndb.de>
+	<AANLkTik4StWAGR2eygMTT48Vbv-pjUjTcACBOQBMas6j@mail.gmail.com>
+Message-ID: <201010181735.51248.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-10-18 at 16:27 +0100, Catalin Marinas wrote:
-> Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Mon, 2010-10-18 at 14:35 +0100, Russell King - ARM Linux wrote:
-> >> In any case, Linux's spinlock API (or more accurately, the ARM exclusive
-> >> access instructions) relies upon hardware coherency support (a piece of
-> >> hardware called an exclusive monitor) which isn't present on the M3 nor
-> >> DSP processors.  So there's no way to ensure that updates from the M3
-> >> and DSP are atomic wrt the A9 updates.
-> >
-> > Right, so the problem is that there simply is no way to do atomic memory
-> > access from these auxiliary processing units wrt the main CPU? Seeing as
-> > they operate on the same memory space, wouldn't it make sense to have
-> > them cache-coherent and thus provide atomicy guarantees through that?
+On Monday 18 October 2010, Linus Walleij wrote:
+> 2010/10/14 Arnd Bergmann <arnd@arndb.de>:
 > 
-> With cache coherency you may get atomicity of writes or reads but
-> usually not atomic modifications.
+> > The Xilinx PCI macro is used on both versatile-pb and
+> > realview-eb, so we should move the implementation to place
+> > where it can be shared.
+> 
+> >  arch/arm/Kconfig                     |    5 +
+> >  arch/arm/mach-versatile/Makefile     |    1 -
+> >  arch/arm/mach-versatile/pci.c        |  361 ----------------------------------
+> >  arch/arm/plat-versatile/Makefile     |    1 +
+> >  arch/arm/plat-versatile/xilinx-pci.c |  361 ++++++++++++++++++++++++++++++++++
+> 
+> What about arch/arm/common?
+> 
+> PCI drivers seem like they could be useful for others than ARM reference
+> designs too. Xilinx FPGAs are probably quite common anyway.
 
-Sure, but you can 'easily' extend your coherency protocols with support
-for things like ll/sc (or larger transactions).
+I don't care either way while we don't have any other users. Most likely
+a new platform using the same code would need some extra tweaks so we
+could just as well move it again then.
 
-Have ll bring the cacheline into exclusive state and tag it, then
-anything that demotes the cacheline will clear the tag and make sc fail.
+OTOH it may also be nice as a generic PCI implementation for qemu
+on other platforms which don't have their own PCI. If we ever get device
+tree support running, qemu could just define the PCI host on any platform
+and Linux can instantiate it from the dt.
+
+> > (...)
+> > +obj-$(CONFIG_PCI_HOST_XILINX) += xilinx-pci.o
+> > diff --git a/arch/arm/plat-versatile/xilinx-pci.c b/arch/arm/plat-versatile/xilinx-pci.c
+> > new file mode 100644
+> > index 0000000..13c7e5f
+> > --- /dev/null
+> > +++ b/arch/arm/plat-versatile/xilinx-pci.c
+> > @@ -0,0 +1,361 @@
+> > +/*
+> > + *  linux/arch/arm/mach-versatile/pci.c
+> 
+> Hm this file path seems inappropriate why not just delete it.
+
+Right, will do.
+
+Thanks,
+
+	Arnd
