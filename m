@@ -1,101 +1,60 @@
-From: jgq516@gmail.com (xiao jiang)
-Date: Fri, 15 Oct 2010 15:13:22 +0800
-Subject: mx35pdk lan911x support
-In-Reply-To: <20101014131302.GD6747@pengutronix.de>
-References: <AANLkTi=aTdbj8bjo3i1wRxG03rbh=kUwLTYPvTESLqpT@mail.gmail.com>
-	<20101014063001.GA6747@pengutronix.de>
-	<AANLkTikDp1NQaZ+dJk=pKSC29BokKVw-_82=m9QDQC14@mail.gmail.com>
-	<AANLkTi=MfssV4a9ynu77BckbOQcc5ngo4Dxw8-=LJdtV@mail.gmail.com>
-	<20101014131302.GD6747@pengutronix.de>
-Message-ID: <AANLkTik6RggTPHcJPdmNOQszq4f=QkaLe8irKeAACFWO@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Mon, 18 Oct 2010 13:43:43 +0800
+Subject: [PATCHv2] cpufreq for freescale mx51
+In-Reply-To: <20101013175424.GU28242@pengutronix.de>
+References: <1286525307-1934-1-git-send-email-yong.shen@linaro.org>
+	<1286525307-1934-2-git-send-email-yong.shen@linaro.org>
+	<20101013175424.GU28242@pengutronix.de>
+Message-ID: <AANLkTimprV8=cAD-CfiAgLTCFyj=wc7qMj0sPDCUpWDC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
-2010/10/14 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Sascha,
 
-> Hello,
->
-> On Thu, Oct 14, 2010 at 09:05:39PM +0800, xiao jiang wrote:
-> > Hi,
-> > 2010/10/14 Fabio Estevam <festevam@gmail.com>
+Thanks for your thorough review. I have two feedbacks to your commends.
+Sorry for delayed response, cause I had a hard time due to my computer crash
+and data loss.
+
+> diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+> > index 2d37785..83add9c 100644
+> > --- a/arch/arm/mach-mx5/cpu.c
+> > +++ b/arch/arm/mach-mx5/cpu.c
+> > @@ -22,6 +22,8 @@ static int cpu_silicon_rev = -1;
 > >
-> > > Hi Xiao Jiang,
-> > >
-> > > 2010/10/14 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > > > Hello Xiao (hoping this is the part of your name corresponding to
-> your
-> > > > first name),
-> > > >
-> > > > On Thu, Oct 14, 2010 at 12:06:25AM -0400, xiao jiang wrote:
-> > > >> I saw the mach-mx35_3ds.c  are come from you, so  I think you are
-> the
-> > > right
-> > > >> person to answer my queston, :).
-> > > > It was me, who renamed the file and touched it a few times when
-> cleaning
-> > > > up and reorganising things for the i.MX machines.  Initially it was
-> > > > Fabio Estevam who brought the machine into mainline.
-> > >
-> > > I suggest you to look at MX51 3stack board or MX31 3stack boards, as
-> > > they have support for LAN9217 controller.
-> > >
-> > >
-> > Uwe,
-> > I forgot to subscribe the list, now it is ok after done it.:)
+> >  #define SI_REV 0x48
 > >
-> > Fabio,
-> > Thanks for your hint, I can boot the kernel thru lan9217 now, only a few
-> > lines added.
-> >
-> > diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> > b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> > index 1c30d72..7e30a4e 100644
-> > --- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> > +++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> > @@ -35,6 +35,7 @@
-> >  #include <mach/hardware.h>
-> >  #include <mach/common.h>
-> >  #include <mach/iomux-mx35.h>
-> > +#include <mach/3ds_debugboard.h>
-> >
-> >  #include "devices-imx35.h"
-> >  #include "devices.h"
-> > @@ -86,6 +87,7 @@ static struct fsl_usb2_platform_data usb_pdata = {
-> >  /*
-> >   * Board specific initialization.
-> >   */
-> > +#define EXPIO_PARENT_INT 65
-> >  static void __init mxc_board_init(void)
-> >  {
-> >         mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads,
-> > ARRAY_SIZE(mx35pdk_pads));
-> > @@ -95,6 +97,10 @@ static void __init mxc_board_init(void)
-> >         imx35_add_imx_uart0(&uart_pdata);
-> >
-> >         mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+> > +struct cpu_wp *(*get_cpu_wp)(int *wp);
 > > +
-> > +       if (!mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-> > +               printk(KERN_WARNING "Init of the debugboard failed, all "
-> > +                       "devices on the board are unusable.\n");
-> If you intend this patch to go mainline please use pr_warn instead of
-> printk(KERN_WARNING ...).
 >
-> Ok, but I don't want to use hard-code for EXPIO_PARENT_INT, and found there
-is no related definition for MX35_GPIO1_1 pin, do I need to create it like
-MX31_PIN_GPIO1_1?
-
-Best Regards,
-Xiao Jiang
-
-
-> Best regards
-> Uwe
+> This is not needed.
 >
-> --
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> This is needed, otherwise it does not pass compile.
+
 >
+> > +             return ret;
+> > +     }
+> > +
+> > +     cpufreq_frequency_table_get_attr(imx_freq_table, policy->cpu);
+> > +     return 0;
+> > +}
+> > +
+> > +static int mxc_cpufreq_exit(struct cpufreq_policy *policy)
+> > +{
+> > +     cpufreq_frequency_table_put_attr(policy->cpu);
+> > +
+> > +     /* Reset CPU to 665MHz */
+> > +     set_cpu_freq(arm_normal_clk);
+>
+> arm_normal_clk is initialized to cpu_freq_khz_max * 1000 and never touched
+> again. It would be clearer here to remove arm_normal_clk and write
+> cpu_freq_khz_max * 1000 directly here. Then you can also remove the
+> comment which is wrong for most i.MXs, even for the i.MX51.
+>
+>
+Actually, this is arm_normal_clk is touched later in mxc_cpufreq_exit()
+fuction.
+
+Yong
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101015/c4c3ceb5/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101018/9e3e23a6/attachment-0001.html>
