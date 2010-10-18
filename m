@@ -1,40 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Oct 2010 17:23:14 +0200
-Subject: [PATCH 0/7] arm/versatile PCI support, second try
-In-Reply-To: <000001cb6ea2$1b78ccd0$526a6670$@tuckley@arm.com>
-References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
-	<AANLkTikc5Vc0Q0z4rE4raX7LTyB=LiE+YuzycMjsXUaM@mail.gmail.com>
-	<000001cb6ea2$1b78ccd0$526a6670$@tuckley@arm.com>
-Message-ID: <201010181723.14462.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Oct 2010 16:27:05 +0100
+Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
+In-Reply-To: <1287409417.29097.1598.camel@twins> (Peter Zijlstra's message of
+	"Mon, 18 Oct 2010 15:43:37 +0200")
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287406015.29097.1579.camel@twins>
+	<20101018133502.GA12449@n2100.arm.linux.org.uk>
+	<1287409417.29097.1598.camel@twins>
+Message-ID: <tnxeibnh67q.fsf@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 October 2010, Colin Tuckley wrote:
-> > > With lots of help and testing from Peter Maydell, I've completed
-> > > a second version of the PCI support for the versatile platform,
-> > > which works much better now on real hardware, although it does
-> > > not improve existing qemu setups.
-> > 
-> > I've got nothing better to do tonite than playing with the PB1176
-> > board so tried this out...
-> 
-> Note that the PB1176 and EB are in mach-realview rather than mach-versatile
-> like the PB926. This complicates the PCI side of things since the other
-> boards in mach-realview have a different PCI implementation (via a NEC
-> custom Northbridge chip).
+Peter Zijlstra <peterz@infradead.org> wrote:
+> On Mon, 2010-10-18 at 14:35 +0100, Russell King - ARM Linux wrote:
+>> In any case, Linux's spinlock API (or more accurately, the ARM exclusive
+>> access instructions) relies upon hardware coherency support (a piece of
+>> hardware called an exclusive monitor) which isn't present on the M3 nor
+>> DSP processors.  So there's no way to ensure that updates from the M3
+>> and DSP are atomic wrt the A9 updates.
+>
+> Right, so the problem is that there simply is no way to do atomic memory
+> access from these auxiliary processing units wrt the main CPU? Seeing as
+> they operate on the same memory space, wouldn't it make sense to have
+> them cache-coherent and thus provide atomicy guarantees through that?
 
-Yes, I know that. All of them use plat-versatile though, which is where
-the common code sits.
+With cache coherency you may get atomicity of writes or reads but
+usually not atomic modifications.
 
-All the code I added is either specific to the xilinx PCI implementation
-or specific to one of the boards (pb926, pb1176, eb).
-
-> I am just about to push the PCI code patches for these boards (PBA8,
-> PB11MPCore and PBX) to the list.
-
-I don't expect any conflicts besides my patch 5/7, which will get obsoleted
-by your patch. If you apply both series, we should be able to enable
-both Xilinx and NEC PCI support on mach-realview and have it work
-on all the boards.
-
-	Arnd
+-- 
+Catalin
