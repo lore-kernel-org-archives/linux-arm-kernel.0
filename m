@@ -1,29 +1,81 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Mon, 18 Oct 2010 13:51:04 +0200
-Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
-In-Reply-To: <20101018113836.GB15440@pengutronix.de>
-References: <20101013082930.GA11286@pengutronix.de>
-	<8762x6xx00.fsf@lechat.rtp-net.org>
-	<A88EF4D64D8447468743DC1503C0B6CA0D557C@zch01exm22.fsl.freescale.net>
-	<20101013100632.GC11286@pengutronix.de>
-	<4CB58565.5020806@eukrea.com>
-	<A88EF4D64D8447468743DC1503C0B6CA0D557D@zch01exm22.fsl.freescale.net>
-	<20101013102055.GD11286@pengutronix.de>
-	<20101015102729.GB4276@pengutronix.de>
-	<A88EF4D64D8447468743DC1503C0B6CA0D581A@zch01exm22.fsl.freescale.net>
-	<4CBC1528.40907@eukrea.com> <20101018113836.GB15440@pengutronix.de>
-Message-ID: <4CBC34A8.6020409@eukrea.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 18 Oct 2010 13:57:56 +0200
+Subject: [RFC 1/2] mmc: sdhci-esdhc-imx: add support for write protect on
+	custom GPIO
+Message-ID: <1287403077-519-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/10/2010 13:38, Wolfram Sang a ?crit :
->> you seems to be right, the attached patch seems to fix it (tested on our
->> board using a Linaro rootfs on a Transcend SDHC card and I didn't get
->> errors after applying this patch but I'm stopped by udev errors now with
->> this rootfs).
->
-> Is this needed on MX35, too?
->
-will test asap and send a formal patch once tested.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-Eric
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 2e9cca1..afbac9a 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -15,8 +15,10 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
++#include <linux/gpio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sdhci-pltfm.h>
++#include <mach/esdhc.h>
+ #include "sdhci.h"
+ #include "sdhci-pltfm.h"
+ #include "sdhci-esdhc.h"
+@@ -99,9 +101,21 @@ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
+ 	return clk_get_rate(pltfm_host->clk) / 256 / 16;
+ }
+ 
++static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
++{
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
++
++	if (boarddata)
++		return gpio_get_value(boarddata->wp_gpio);
++	else
++		/* No GPIO -> always writable! */
++		return 0;
++}
++
+ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
+ 	struct clk *clk;
+ 
+ 	clk = clk_get(mmc_dev(host->mmc), NULL);
+@@ -112,12 +126,20 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ 	clk_enable(clk);
+ 	pltfm_host->clk = clk;
+ 
++	if (boarddata) {
++		gpio_request(boarddata->wp_gpio, "SD_WP");
++		gpio_direction_input(boarddata->wp_gpio);
++	}
+ 	return 0;
+ }
+ 
+ static void esdhc_pltfm_exit(struct sdhci_host *host)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
++
++	if (boarddata)
++		gpio_free(boarddata->wp_gpio);
+ 
+ 	clk_disable(pltfm_host->clk);
+ 	clk_put(pltfm_host->clk);
+@@ -130,6 +152,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.set_clock = esdhc_set_clock,
+ 	.get_max_clock = esdhc_pltfm_get_max_clock,
+ 	.get_min_clock = esdhc_pltfm_get_min_clock,
++	.get_ro = esdhc_pltfm_get_ro,
+ };
+ 
+ struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+-- 
+1.7.1
