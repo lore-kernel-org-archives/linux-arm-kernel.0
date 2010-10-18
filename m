@@ -1,47 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 Oct 2010 14:45:22 -0700
-Subject: [PATCH] arm: omap: complete removal of
-	machine_desc.io_pg_offst and .phys_io
-In-Reply-To: <20101018142158.GG12449@n2100.arm.linux.org.uk>
-References: <1287406656-24133-1-git-send-email-gadiyar@ti.com>
-	<20101018141230.GD12449@n2100.arm.linux.org.uk>
-	<20101018142158.GG12449@n2100.arm.linux.org.uk>
-Message-ID: <20101018214522.GE13341@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Oct 2010 23:13:53 +0100
+Subject: [PATCH 2/3] arm: return both physical and virtual addresses
+	from addruart
+In-Reply-To: <1287439266.5588.64.camel@c-dwalke-linux.qualcomm.com>
+References: <1283303270.566757.315468531956.2.gpush@pororo>
+	<1287439266.5588.64.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20101018221353.GE20376@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101018 07:13]:
-> On Mon, Oct 18, 2010 at 03:12:30PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Oct 18, 2010 at 06:27:36PM +0530, Anand Gadiyar wrote:
-> > > Commit 861bd81ee6 in linux-next as of 20101018 (arm: remove
-> > > machine_desc.io_pg_offst and .phys_io) missed out on updating
-> > > a few boards. This causes the build of omap2plus_defconfig
-> > > to fail. Fix this.
-> > 
-> > Not quite true.  The patch merged into my tree eliminates io_pg_offst and
-> > phys_io for everything that is in my tree.
-> > 
-> > For new board support code which isn't in my tree, there is a problem -
-> > patches to it can't be applied to my tree.
-> > 
-> > However, applying these patches to the trees which have the new code in
-> > won't have the other changes related to the removal of io_pg_offst, and
-> > so the support code will subtly break until it's all merged together.
-> > 
-> > There's two solutions to this.  One is to wait merging new board code
-> > until after this merge window.  The other is to ensure that new board
-> > code is in _my_ tree before the io_pg_offst changes were submitted...
+On Mon, Oct 18, 2010 at 03:01:06PM -0700, Daniel Walker wrote:
+> On Wed, 2010-09-01 at 09:07 +0800, Jeremy Kerr wrote:
 > 
-> I'm going to drop the io_pg_offst patches for a couple of days.  If
-> this new board support can be sorted out to come into my tree in the
-> next 24 hours, then I'm sure we can get this fixed properly.
+> > ---
+> >  arch/arm/kernel/debug.S                             |   22 +-
+> >  arch/arm/mach-aaec2000/include/mach/debug-macro.S   |   10 
+> >  arch/arm/mach-at91/include/mach/debug-macro.S       |    8 
+> >  arch/arm/mach-clps711x/include/mach/debug-macro.S   |   12 -
+> >  arch/arm/mach-cns3xxx/include/mach/debug-macro.S    |   10 
+> >  arch/arm/mach-davinci/include/mach/debug-macro.S    |   46 ++--
+> >  arch/arm/mach-dove/include/mach/debug-macro.S       |   11 -
+> >  arch/arm/mach-ebsa110/include/mach/debug-macro.S    |    7 
+> >  arch/arm/mach-ep93xx/include/mach/debug-macro.S     |   11 -
+> >  arch/arm/mach-footbridge/include/mach/debug-macro.S |   22 --
+> >  arch/arm/mach-gemini/include/mach/debug-macro.S     |    8 
+> >  arch/arm/mach-h720x/include/mach/debug-macro.S      |   10 
+> >  arch/arm/mach-integrator/include/mach/debug-macro.S |   10 
+> >  arch/arm/mach-iop13xx/include/mach/debug-macro.S    |   16 -
+> >  arch/arm/mach-iop32x/include/mach/debug-macro.S     |    7 
+> >  arch/arm/mach-iop33x/include/mach/debug-macro.S     |   12 -
+> >  arch/arm/mach-ixp2000/include/mach/debug-macro.S    |   14 -
+> >  arch/arm/mach-ixp23xx/include/mach/debug-macro.S    |   11 -
+> >  arch/arm/mach-ixp4xx/include/mach/debug-macro.S     |   16 -
+> >  arch/arm/mach-kirkwood/include/mach/debug-macro.S   |   11 -
+> >  arch/arm/mach-ks8695/include/mach/debug-macro.S     |    8 
+> >  arch/arm/mach-l7200/include/mach/debug-macro.S      |   38 +++
+> >  arch/arm/mach-lh7a40x/include/mach/debug-macro.S    |   10 
+> >  arch/arm/mach-loki/include/mach/debug-macro.S       |   11 -
+> >  arch/arm/mach-mmp/include/mach/debug-macro.S        |   11 -
+> >  arch/arm/mach-msm/include/mach/debug-macro.S        |   10 
 > 
-> I don't think I can afford to hold the io_pg_offst patches for more
-> than 48 hours though, so Wednesday evening they'll be merged whatever.
+> Firstly, you should try to break this kind of patch up if you can.
 
-Go ahead, I'll patch up accordingly in the omap tree so it will all
-merge nicely in for-next and for the merge window.
+That's already been covered today with you.  You're not listening.
+It can not be split up.  It is one logical change.  Splitting it up
+will break the build for everything until the entire patch is merged.
 
-Regards,
+> Secondly, you need to CC all the effected sub-architecture maintainers.
+> It's not acceptable to assume that everyone effected will magically
+> stumble onto this patch and know you modifying their sub-architecture ..
 
-Tony
+Read the friggin subject line.  linux-arm-kernel is where generic changes
+get discussed all the time.  These changes will impact platform support.
+Sometimes that's not going to be obvious that it affects your platform.
+You need to be reading those changes.  Look at the subject line of each
+mail and decide whether it's something that you need to look at.
+
+In any case, it's not practical to copy a patch to 209 people - with
+some 8K of CC or To line.
+
+Why aren't you using this time which I've given you to resolve your
+problem?
