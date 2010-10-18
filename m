@@ -1,445 +1,278 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Oct 2010 22:20:16 +0100
-Subject: [PATCH 1/3] Add Mindspeed Comcerto platform support
-In-Reply-To: <1287045489-1133-2-git-send-email-stanleymiao@gmail.com>
+Date: Mon, 18 Oct 2010 22:24:33 +0100
+Subject: [PATCH 2/3] Add hardware timer support for Mindspeed Comcerto
+	platflorm
+In-Reply-To: <1287045489-1133-3-git-send-email-stanleymiao@gmail.com>
 References: <1287045489-1133-1-git-send-email-stanleymiao@gmail.com>
 	<1287045489-1133-2-git-send-email-stanleymiao@gmail.com>
-Message-ID: <20101018212016.GC20376@n2100.arm.linux.org.uk>
+	<1287045489-1133-3-git-send-email-stanleymiao@gmail.com>
+Message-ID: <20101018212433.GD20376@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 14, 2010 at 04:38:07PM +0800, stanleymiao at gmail.com wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 88c97bc..ca6ccf7 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -334,6 +334,15 @@ config ARCH_EP93XX
->  	help
->  	  This enables support for the Cirrus EP93xx series of CPUs.
->  
-> +config ARCH_COMCERTO
-> +	bool "Mindspeed Comcerto"
-> +	select ZONE_DMA
-> +	select CPU_V6
-> +	help
-> +	  This enables support for Mindspeed's Comcerto development boards.
-> +	  If you would like to build your kernel to run on one of these boards
-> +	  then you must say 'Y' here. Otherwise say 'N'
-> +
-
-#
-# The "ARM system type" choice list is ordered alphabetically by option
-# text.  Please add new entries in the option alphabetic order.
-#
-
-Erm...
-
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 59c1ce8..2daad67 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -141,6 +141,7 @@ machine-$(CONFIG_ARCH_INTEGRATOR)	:= integrator
->  machine-$(CONFIG_ARCH_IOP13XX)		:= iop13xx
->  machine-$(CONFIG_ARCH_IOP32X)		:= iop32x
->  machine-$(CONFIG_ARCH_IOP33X)		:= iop33x
-> +machine-$(CONFIG_ARCH_COMCERTO)	:= comcerto
-
-# Machine directory name.  This list is sorted alphanumerically
-# by CONFIG_* macro name.
-
-Erm...
-
-> diff --git a/arch/arm/mach-comcerto/Kconfig b/arch/arm/mach-comcerto/Kconfig
-> new file mode 100644
-> index 0000000..a61a31a
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/Kconfig
-> @@ -0,0 +1,32 @@
-> +if ARCH_COMCERTO
-> +
-> +menu "Comcerto Implementation Options"
-> +
-> +choice
-> +	prompt "Comcerto System Type"
-> +	default ARCH_M83XXX
-> +
-> +config ARCH_M83XXX
-> +	bool "M83xxx"
-> +	select GENERIC_TIME
-> +	select GENERIC_CLOCKEVENTS
-
-Everyone should be using GENERIC_TIME and GENERIC_CLOCKEVENTS for new
-code, so please move this to live with ARCH_COMCERTO.
-
-> diff --git a/arch/arm/mach-comcerto/board-c1kmfcn_evm.c b/arch/arm/mach-comcerto/board-c1kmfcn_evm.c
-> new file mode 100644
-> index 0000000..74a7da3
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/board-c1kmfcn_evm.c
-> @@ -0,0 +1,88 @@
-> +/*
-> + * linux/arch/arm/mach-comcerto/board-c1kmfcn_evm.c
-> + *
-> + *  Copyright (C) 2004,2008 Mindspeed Technologies, Inc.
-> + *  Copyright (c) 2010 Wind River Systems, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +#include <linux/sched.h>
-
-Are there more appropriate includes rather than this one?
-
-> +#include <linux/device.h>
-> +#include <linux/serial_8250.h>
-> +#include <asm/sizes.h>
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/io.h>
-
-linux/io.h
-
-> +#include <asm/mach/arch.h>
-> +#include <mach/hardware.h>
-> +
-> +/* --------------------------------------------------------------------
-> + *  Serial interface
-> + * -------------------------------------------------------------------- */
-> +static struct plat_serial8250_port comcerto_uart_data[] = {
-> +	{
-> +		.mapbase	= COMCERTO_APB_UART0_BASE,
-> +		.membase	= (void *)APB_VADDR(COMCERTO_APB_UART0_BASE),
-> +		.irq		= IRQ_UART0,
-> +		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-> +		.iotype		= UPIO_MEM,
-> +		.regshift	= 2,
-> +		.uartclk	= COMCERTO_DEFAULTAHBCLK * 1000000,
-> +	},
-> +	{
-> +		.flags		= 0,
-> +	},
-> +};
-> +
-> +static struct platform_device comcerto_uart = {
-> +	.name	= "serial8250",
-> +	.id	= PLAT8250_DEV_PLATFORM,
-> +	.dev	= {
-> +		.platform_data	= comcerto_uart_data,
-> +	},
-> +};
-> +
-> +static struct platform_device *comcerto_devices[] __initdata = {
-> +	&comcerto_uart,
-> +};
-> +
-> +/************************************************************************
-> + *  Machine definition
-> + *
-> + ************************************************************************/
-> +static void __init platform_map_io(void)
-> +{
-> +	device_map_io();
-> +}
-> +
-> +static void __init platform_irq_init(void)
-> +{
-> +}
-
-If there's no IRQs then how do you get timer interrupts?
-
-> +
-> +static void __init platform_init(void)
-> +{
-> +	platform_add_devices(comcerto_devices, ARRAY_SIZE(comcerto_devices));
-> +}
-> +
-> +MACHINE_START(COMCERTO, "Comcerto 1000 (Multifunction EVM)")
-> +	/* Mindspeed Technologies Inc. */
-> +	.phys_io	= COMCERTO_AHB_APB_BASE,
-> +	.io_pg_offst	= ((COMCERTO_AHB_APB_BASE) >> 18) & 0xfffc,
-> +	.boot_params	= COMCERTO_SDRAM_BASE + 0x100,
-> +	.map_io		= platform_map_io,
-> +	.init_irq	= platform_irq_init,
-> +	.init_machine	= platform_init,
-> +	.timer		= &comcerto_timer,
-> +MACHINE_END
-> diff --git a/arch/arm/mach-comcerto/comcerto-1000.c b/arch/arm/mach-comcerto/comcerto-1000.c
-> new file mode 100644
-> index 0000000..09032ea
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/comcerto-1000.c
-> @@ -0,0 +1,146 @@
-> +/*
-> + *  linux/arch/arm/mach-comcerto/comcerto-1000.c
-> + *
-> + *  Copyright (C) 2004,2008 Mindspeed Technologies, Inc.
-> + *  Copyright (c) 2010 Wind River Systems, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +#include <linux/sched.h>
-> +#include <linux/mm.h>
-> +#include <linux/init.h>
-> +#include <asm/setup.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/io.h>
-
-linux/io.h
-
-> +#include <asm/sizes.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/hardware.h>
-
-Most of the above looks like it was cut'n'pasted from the previous file.
-Do you really need all these includes?
-
-> diff --git a/arch/arm/mach-comcerto/include/mach/io.h b/arch/arm/mach-comcerto/include/mach/io.h
-> new file mode 100644
-> index 0000000..be3320f
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/include/mach/io.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + *  arch/arm/mach-comcerto/include/mach/io.h
-> + *
-> + *  Copyright (C) 2004,2005 Mindspeed Technologies, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +#ifndef __ASM_ARCH_COMCERTO1000_IO_H
-> +#define __ASM_ARCH_COMCERTO1000_IO_H
-> +
-> +#include <asm/io.h>
-
-Err no.  This is a recipe for disaster.  linux/io.h includes asm/io.h
-which includes mach/io.h.  If you want io definitions, include linux/io.h.
-Do not include asm/io.h or mach/io.h directly.
-
-> +
-> +#if !defined(CONFIG_PCI)
-> +
-> +#define __io(a)		((void __iomem *)(a))
-
-__typesafe_io() ?
-
-> +#define __mem_pci(a)	(a)
-> +
-> +#endif
-> +
-> +#endif /* __ASM_ARCH_COMCERTO1000_IO_H */
-> diff --git a/arch/arm/mach-comcerto/include/mach/memory.h b/arch/arm/mach-comcerto/include/mach/memory.h
-> new file mode 100644
-> index 0000000..6d42d06
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/include/mach/memory.h
-> @@ -0,0 +1,33 @@
-> +/*
-> + *  arch/arm/mach-comcerto/include/mach/memory.h
-> + *
-> + *  Copyright (C) 2006 Mindspeed Technologies, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +
-> +#ifndef __ASM_ARCH_MEMORY_H
-> +#define __ASM_ARCH_MEMORY_H
-> +
-> +#include <mach/hardware.h>
-> +
-> +#define PHYS_OFFSET		COMCERTO_SDRAM_BASE
-> +
-> +#define __virt_to_bus(x)	__virt_to_phys(x)
-> +#define __bus_to_virt(x)	__phys_to_virt(x)
-> +#define __pfn_to_bus(x)		__pfn_to_phys(x)
-> +#define __bus_to_pfn(x)		__phys_to_pfn(x)
-> +
-> +#endif
+On Thu, Oct 14, 2010 at 04:38:08PM +0800, stanleymiao at gmail.com wrote:
 > diff --git a/arch/arm/mach-comcerto/include/mach/system.h b/arch/arm/mach-comcerto/include/mach/system.h
-> new file mode 100644
-> index 0000000..364cc7e
-> --- /dev/null
+> index 364cc7e..d24914d 100644
+> --- a/arch/arm/mach-comcerto/include/mach/system.h
 > +++ b/arch/arm/mach-comcerto/include/mach/system.h
-> @@ -0,0 +1,39 @@
+> @@ -34,6 +34,9 @@ static inline void arch_idle(void)
+>  
+>  static inline void arch_reset(char mode, const char *cmd)
+>  {
+> +	/* use watch dog timer to reset the board */
+> +	__raw_writel(0x1, COMCERTO_TIMER_WDT_CONTROL);
+> +	__raw_writel(0x1, COMCERTO_TIMER_WDT_HIGH_BOUND);
+
+Ah, so this is why it has an io.h include in the previous patch.
+
+> diff --git a/arch/arm/mach-comcerto/time.c b/arch/arm/mach-comcerto/time.c
+> new file mode 100644
+> index 0000000..40e3515
+> --- /dev/null
+> +++ b/arch/arm/mach-comcerto/time.c
+> @@ -0,0 +1,227 @@
 > +/*
-> + *  arch/arm/mach-comcerto/include/mach/system.h
+> + * linux/arch/arm/mach-comcerto/time.c
 > + *
-> + *  Copyright (C) 2004,2005 Mindspeed Technologies, Inc.
+> + * Copyright (C) 2008 Mindspeed Technologies, Inc.
+> + * Copyright (c) 2010 Wind River Systems, Inc.
 > + *
 > + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + *
 > + * This program is distributed in the hope that it will be useful,
 > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+> + * See the GNU General Public License for more details.
 > + *
 > + * You should have received a copy of the GNU General Public License
 > + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 > + */
-> +#ifndef __ASM_ARCH_SYSTEM_H
-> +#define __ASM_ARCH_SYSTEM_H
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/types.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/irq.h>
+> +#include <linux/err.h>
 > +
 > +#include <mach/hardware.h>
-> +#include <asm/io.h>
+> +#include <asm/mach/time.h>
+> +
+> +#define TID_CLOCKEVENT	1
+> +#define TID_CLOCKSOURCE	3
+> +
+> +static DEFINE_SPINLOCK(timer_lock);
+> +
+> +struct comcerto_gptimer {
+> +	char *name;
 
-Nothing in this file needs asm/io.h, nor I suspect mach/hardware.h either.
+const?
+
+> +	unsigned long id; /* maybe not needed */
+> +	unsigned long mask;
+> +	unsigned long hbound;
+> +	unsigned long lbound;
+> +	unsigned long count;
+> +};
+> +
+> +static void gptimer_enable(struct comcerto_gptimer *gptimer)
+> +{
+> +	unsigned long flags;
+> +	unsigned long irq_mask;
+> +
+> +	spin_lock_irqsave(&timer_lock, flags);
+> +	irq_mask = __raw_readl(COMCERTO_TIMER_IRQ_MASK);
+> +	irq_mask |= gptimer->mask;
+> +	__raw_writel(irq_mask, COMCERTO_TIMER_IRQ_MASK);
+> +	spin_unlock_irqrestore(&timer_lock, flags);
+> +}
+> +
+> +static void gptimer_disable(struct comcerto_gptimer *gptimer)
+> +{
+> +	unsigned long flags;
+> +	unsigned long irq_mask;
+> +
+> +	spin_lock_irqsave(&timer_lock, flags);
+> +	irq_mask = __raw_readl(COMCERTO_TIMER_IRQ_MASK);
+> +	irq_mask &= ~gptimer->mask;
+> +	__raw_writel(irq_mask, COMCERTO_TIMER_IRQ_MASK);
+> +	spin_unlock_irqrestore(&timer_lock, flags);
+> +}
+> +
+> +static struct comcerto_gptimer timers[] = {
+> +	[TID_CLOCKEVENT] = {
+> +		.name	= "timer1",
+> +		.id	= TID_CLOCKEVENT,
+> +		.mask	= COMCERTO_TIMER1,
+> +		.hbound	= COMCERTO_TIMER1_HIGH_BOUND,
+> +		.lbound = COMCERTO_TIMER1_LOW_BOUND,
+> +		.count = COMCERTO_TIMER1_CURRENT_COUNT,
+> +	},
+> +	[TID_CLOCKSOURCE] = {
+> +		.name	= "timer3",
+> +		.id	= TID_CLOCKSOURCE,
+> +		.mask	= COMCERTO_TIMER3,
+> +		.hbound	= COMCERTO_TIMER3_HIGH_BOUND,
+> +		.lbound = COMCERTO_TIMER3_LOW_BOUND,
+> +		.count = COMCERTO_TIMER3_CURRENT_COUNT,
+> +	},
+> +};
+> +
+> +static void gptimer_set_bound(struct comcerto_gptimer *gptimer,
+> +					unsigned low, unsigned high)
+> +{
+> +	__raw_writel(high, gptimer->hbound);
+> +	/* __raw_writel(low, gptimer->lbound); */
+> +}
+> +
+> +static void gptimer_clear_status(struct comcerto_gptimer *gptimer)
+> +{
+> +	__raw_writel(gptimer->mask, COMCERTO_TIMER_STATUS_CLR);
+> +}
+> +
+> +static unsigned long gptimer_get_current_count(struct comcerto_gptimer *timer)
+> +{
+> +	return __raw_readl(timer->count);
+> +}
+> +
+> +static int comcerto_set_next_event(unsigned long cycles,
+> +					struct clock_event_device *evt)
+> +{
+> +	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
+> +
+> +	if (evt->mode == CLOCK_EVT_MODE_ONESHOT)
+> +		gptimer_enable(t);
+> +	return 0;
+> +}
+> +
+> +static void comcerto_set_mode(enum clock_event_mode mode,
+> +				struct clock_event_device *evt)
+> +{
+> +	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
+> +
+> +	if (mode != CLOCK_EVT_MODE_PERIODIC)
+> +		gptimer_disable(t);
+> +	else
+> +		gptimer_enable(t);
+> +}
+> +
+> +static struct clock_event_device clockevent = {
+> +	.name           = "clockevent",
+> +	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.rating         = 200,
+> +	.shift          = 24,
+> +	.set_mode       = comcerto_set_mode,
+> +	.set_next_event = comcerto_set_next_event,
+> +};
+> +
+> +static cycle_t comcerto_timer3_read(struct clocksource *cs)
+> +{
+> +	return (cycle_t)gptimer_get_current_count(&timers[TID_CLOCKSOURCE]);
+> +}
+> +
+> +static struct clocksource clocksource = {
+> +	.name   = "clocksource",
+> +	.rating = 200,
+> +	.read   = comcerto_timer3_read,
+> +	.mask   = CLOCKSOURCE_MASK(32),
+> +	.shift  = 24,
+> +	.flags  = CLOCK_SOURCE_IS_CONTINUOUS,
+> +};
+> +
+> +static void __init comcerto_clocksource_init(void)
+> +{
+> +	struct comcerto_gptimer *t = &timers[TID_CLOCKSOURCE];
+> +
+> +	gptimer_set_bound(t, 0, 0xffffffff);
+> +	clocksource.mult = clocksource_hz2mult(COMCERTO_DEFAULTAHBCLK, clocksource.shift);
+> +	if (clocksource_register(&clocksource))
+> +		printk(KERN_ERR "%s: can't register clocksource!\n", clocksource.name);
+> +}
+> +
+> +static irqreturn_t comcerto_timer1_interrupt(int irq, void *dev_id)
+> +{
+> +	u32 status;
+> +	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
+> +	struct clock_event_device *dev = &clockevent;
+> +
+> +	status = __raw_readl(COMCERTO_TIMER_STATUS) & __raw_readl(COMCERTO_TIMER_IRQ_MASK);
+> +
+> +	/* timer1 expired */
+> +	if (status & t->mask) {
+> +		/* we need to disable interrupt to simulate ONESHOT mode,
+> +		 * do it before clearing the interrupt to avoid race */
+> +		if (dev->mode != CLOCK_EVT_MODE_PERIODIC)
+> +			gptimer_disable(t);
+
+Err, the one-shot mode emulation support looks buggy and completely
+unnecessary.  Generally with clockevents, you tell it what the hardware
+supports and clockevents deals with it.  You shouldn't emulate modes
+that the hardware doesn't support - especially if you're going to ignore
+the 'cycles' from set_next_event().
 
 > +
-> +static inline void arch_idle(void)
-> +{
-> +	/*
-> +	 * This should do all the clock switching
-> +	 * and wait for interrupt tricks
-> +	 */
-> +	cpu_do_idle();
-> +}
+> +		gptimer_clear_status(t);
+> +		dev->event_handler(dev);
 > +
-> +static inline void arch_reset(char mode, const char *cmd)
-> +{
-> +}
-> +
-> +#endif /* __ASM_ARCH_SYSTEM_H */
-> diff --git a/arch/arm/mach-comcerto/include/mach/uncompress.h b/arch/arm/mach-comcerto/include/mach/uncompress.h
-> new file mode 100644
-> index 0000000..e3e6938
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/include/mach/uncompress.h
-> @@ -0,0 +1,58 @@
-> +/*
-> + *  arch/arm/mach-comcerto/include/mach/uncompress.h
-> + *
-> + *  Copyright (C) 2004,2008 Mindspeed Technologies, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +#ifndef __ASM_ARCH_UNCOMPRESS_H
-> +#define __ASM_ARCH_UNCOMPRESS_H
-> +
-> +#define UART_DR		(*(volatile unsigned long *)0x10090000)
-> +#define UART_LSR	(*(volatile unsigned long *)0x10090014)
-> +
-> +static inline void putc(int c)
-> +{
-> +	while (!(UART_LSR & 0x20))
-> +		barrier();
-> +
-> +	UART_DR = c;
-> +}
-> +
-> +static void flush(void)
-> +{
-> +}
-> +static inline void puts(const char *ptr)
-> +{
-> +	char c;
-> +
-> +	while ((c = *ptr++) != '\0') {
-> +		if (c == '\n')
-> +			putc('\r');
-> +		putc(c);
+> +		return IRQ_HANDLED;
 > +	}
 > +
-> +	flush();
-> +
+> +	return IRQ_NONE;
 > +}
 > +
-> +/*
-> + * nothing to do
-> + */
-> +#define arch_decomp_setup()
+> +static struct irqaction comcerto_timer1_irq = {
+> +	.name           = "timer1",
+> +	.flags          = IRQF_DISABLED | IRQF_TIMER,
+> +	.handler        = comcerto_timer1_interrupt,
+> +};
 > +
-> +#define arch_decomp_wdog()
+> +static void __init comcerto_clockevents_init(void)
+> +{
+> +	struct comcerto_gptimer *t = &timers[TID_CLOCKEVENT];
 > +
-> +#endif /* __ASM_ARCH_UNCOMPRESS_H */
-> diff --git a/arch/arm/mach-comcerto/include/mach/vmalloc.h b/arch/arm/mach-comcerto/include/mach/vmalloc.h
-> new file mode 100644
-> index 0000000..f807501
-> --- /dev/null
-> +++ b/arch/arm/mach-comcerto/include/mach/vmalloc.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + *  arch/arm/mach-comcerto/include/mach/vmalloc.h
-> + *
-> + *  Copyright (C) 2004,2005 Mindspeed Technologies, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
+> +	clockevent.mult = div_sc(COMCERTO_DEFAULTAHBCLK, NSEC_PER_SEC, clockevent.shift);
+> +	clockevent.max_delta_ns = clockevent_delta2ns(0x3fffffff, &clockevent);
+> +	clockevent.min_delta_ns = clockevent_delta2ns(1, &clockevent);
+> +	clockevent.cpumask = cpumask_of(0);
+> +	clockevents_register_device(&clockevent);
 > +
-> +#define VMALLOC_END       (0xF0000000)
-
-Should be typed to be unsigned long.
+> +	/* Clear all the timers except timer0  */
+> +	__raw_writel(COMCERTO_TIMER_CSP, COMCERTO_TIMER_STATUS);
+> +
+> +	/* Register interrupt handler for interrupt on IRQ_TIMERB*/
+> +	setup_irq(IRQ_TIMER1, &comcerto_timer1_irq);
+> +
+> +	/* Set and enable the system timer */
+> +	gptimer_set_bound(t, 0, COMCERTO_DEFAULTAHBCLK * 1000000 / HZ);
+> +}
+> +
+> +static void __init comcerto_timer_init(void)
+> +{
+> +	/*
+> +	 * DO NOT MODIFY THE CONFIGURATION OF TIMER0
+> +	 * It is used by the MSP
+> +	 * For C1000 FPP will be using TIMER2
+> +	 */
+> +
+> +	comcerto_clocksource_init();
+> +	comcerto_clockevents_init();
+> +}
+> +
+> +struct sys_timer comcerto_timer = {
+> +	.init           = comcerto_timer_init,
+> +};
+> -- 
+> 1.5.4.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
