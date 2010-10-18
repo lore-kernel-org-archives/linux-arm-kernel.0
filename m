@@ -1,124 +1,48 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Mon, 18 Oct 2010 11:35:31 -0500
-Subject: [PATCHv2 2/2] ARM: imx: Add gpio-keys to mx51 babbage board
-In-Reply-To: <1287419731-7885-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1287419731-7885-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <1287419731-7885-2-git-send-email-Dinh.Nguyen@freescale.com>
+From: mboards@prograde.net (Michael Cashwell)
+Date: Mon, 18 Oct 2010 13:38:49 -0400
+Subject: PXA270 Random Hangs at Low Core Freq
+Message-ID: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Greetings,
 
-Add functionality for the power button on MX51 Babbage board.
+I've been fighting inexplicable hangs on two different PXA270 designs running various kernels since early 2.6.28.x. The first board was custom (and of dubious integrity) but I'm currently seeing it on Gumstix Verdex PROs running 2.6.35.7.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/configs/mx51_defconfig             |    1 +
- arch/arm/mach-mx5/board-mx51_babbage.c      |   33 +++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |    4 ++-
- 3 files changed, 37 insertions(+), 1 deletions(-)
+At first I thought it was a problem with CPU-freq code itself hitting some unaddressed errata but I've eliminated that possibility. The hangs occur even if CPU-freq is disabled in the kernel config. All that's required in that case is for u-boot to run the kernel at a core frequency of 312MHz or lower. If it runs at 416MHz or higher no hangs occur. (With CPU-freq enabled the hangs only occur if speeds at or below 312MHz are allowed. With those commented out, no hangs.)
 
-diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-index a665ecb..f46f87e 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -81,6 +81,7 @@ CONFIG_FEC=y
- CONFIG_INPUT_FF_MEMLESS=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_GPIO=y
- CONFIG_INPUT_EVBUG=m
- CONFIG_MOUSE_PS2=m
- CONFIG_MOUSE_PS2_ELANTECH=y
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 6e384d9..0dded49 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -16,7 +16,11 @@
- #include <linux/gpio.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
- #include <linux/fsl_devices.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -36,6 +40,7 @@
- #define BABBAGE_USB_HUB_RESET	(0*32 + 7)	/* GPIO_1_7 */
- #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
- #define BABBAGE_PHY_RESET (1*32 +5)	/* GPIO_2_5 */
-+#define BABBAGE_POWER_KEY	(1*32 + 21)	/* GPIO_2_21 */
- 
- /* USB_CTRL_1 */
- #define MX51_USB_CTRL_1_OFFSET			0x10
-@@ -45,8 +50,33 @@
- #define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
- #define	MX51_USB_PLL_DIV_24_MHZ	0x02
- 
-+static struct gpio_keys_button babbage_buttons[] = {
-+	{
-+		.gpio		= BABBAGE_POWER_KEY,
-+		.code		= BTN_0,
-+		.desc		= "PWR",
-+		.active_low	= 1,
-+		.wakeup		= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data babbage_button_data = {
-+	.buttons	= babbage_buttons,
-+	.nbuttons	= ARRAY_SIZE(babbage_buttons),
-+};
-+
-+static struct platform_device babbage_button_device = {
-+	.name		= "gpio-keys",
-+	.id		= -1,
-+	.num_resources	= 0,
-+	.dev		= {
-+		.platform_data	= &babbage_button_data,
-+	}
-+};
-+
- static struct platform_device *devices[] __initdata = {
- 	&mxc_fec_device,
-+	&babbage_button_device,
- };
- 
- static struct pad_desc mx51babbage_pads[] = {
-@@ -93,6 +123,9 @@ static struct pad_desc mx51babbage_pads[] = {
- 
- 	/* USB HUB reset line*/
- 	MX51_PAD_GPIO_1_7__GPIO_1_7,
-+
-+	/* Power Key */
-+	MX51_PAD_EIM_A27__GPIO_2_21,
- };
- 
- /* Serial ports */
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index 21bfa46..05f62a4 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -31,6 +31,8 @@ typedef enum iomux_config {
- 	IOMUX_CONFIG_SION = 0x1 << 4,   /* LOOPBACK:MUX SION bit */
- } iomux_pin_cfg_t;
- 
-+#define IOMUX_TO_IRQ(pin)	(MXC_GPIO_IRQ_START + pin)
-+
- /* Pad control groupings */
- #define MX51_UART1_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
- 				PAD_CTL_DSE_HIGH)
-@@ -102,7 +104,7 @@ typedef enum iomux_config {
- #define MX51_PAD_EIM_A24__GPIO_2_18             IOMUX_PAD(0x450, 0x0bc, 1, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_A25__GPIO_2_19             IOMUX_PAD(0x454, 0x0c0, 1, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_A26__GPIO_2_20             IOMUX_PAD(0x458, 0x0c4, 1, 0x0,   0, NO_PAD_CTRL)
--#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, NO_PAD_CTRL)
-+#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, MX51_I2C_PAD_CTRL)
- #define MX51_PAD_EIM_EB0__EIM_EB0               IOMUX_PAD(0x460, 0x0cc, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_EB1__EIM_EB1               IOMUX_PAD(0x464, 0x0d0, 0, 0x0,   0, NO_PAD_CTRL)
- #define MX51_PAD_EIM_EB2__GPIO_2_22             IOMUX_PAD(0x468, 0x0d4, 1, 0x0,   0, NO_PAD_CTRL)
--- 
-1.6.0.4
+At low core frequencies I can trigger the hang every time by copying a several-MB file to a uSD card via the MMC interface. The copy command completes but a few seconds later (while the background processes write to the card) the CPU hangs.** However, the issue is not specific to uSD/MMC. Another developer told me he has seen hangs while receiving data through a UART connected via I2C.
+
+The hangs are hard (rendering JTAG inoperable) and since I have no hardware with the Embedded Trace Module exposed I have no way to gather a trace of execution up to the freeze.
+
+I'd like to solve the problem since the lower speeds are more power efficient but I'm somewhat stuck regarding how to debug it. I'd like to know if it's something I'm doing wrong so my first step is to ask the ARM-Linux community if anyone else has run recent kernels on a PXA270 system at core clock rates of 312MHz or less. (That's also a not so veiled plea for someone to perhaps do so if they have the hardware and a few spare cycles.)
+
+Thanks for any information.
+-Mike
+
+**: Here's a hang where I'd just started top while background threads were writing to the uSD card. top did its first pass and then everything froze. (Is the high rate of context switches and interrupts normal?)
+
+last pid:   389;  load avg:  0.13,  0.05,  0.01;  up 0+00:28:15        12:40:22
+27 processes: 1 running, 24 sleeping, 2 uninterruptable
+CPU states:  0.0% user,  0.0% nice, 31.1% system, 13.6% idle, 55.3% iowait
+Kernel: 30832 ctxsw, 16262 intr
+Memory: 32M used, 92M free, 244K buffers, 27M cached
+Swap: 
+ This terminal can only display 16 processes
+  PID USERNAME  THR PRI NICE  SIZE   RES   SHR STATE   TIME    CPU COMMAND
+  236 root        1  20    0    0K    0K    0K disk    0:00 28.43% mmcqd
+  389 root        1  20    0 2696K  804K  648K run     0:00  3.92% top
+  378 root        1  20    0    0K    0K    0K disk    0:00  1.96% flush-179:0
+    1 root        1  20    0 2784K  672K  588K sleep   0:00  0.00% init
+  119 root        1  20    0    0K    0K    0K sleep   0:00  0.00% rpciod/0
+  371 root        1  20    0 4208K 1592K 1340K sleep   0:00  0.00% sshd
+  369 root        1  20    0 2788K  716K  632K sleep   0:00  0.00% ash
+    4 root        1  20    0    0K    0K    0K sleep   0:00  0.00% events/0
+  128 root        1  20    0    0K    0K    0K sleep   0:00  0.00% nfsiod
+  251 root        1  20    0 2784K  460K  380K sleep   0:00  0.00% klogd
+  249 root        1  20    0 2784K  464K  396K sleep   0:00  0.00% syslogd
+    5 root        1  20    0    0K    0K    0K sleep   0:00  0.00% khelper
+  370 root        1  20    0 2784K  440K  376K sleep   0:00  0.00% busybox
+  103 root        1  20    0    0K    0K    0K sleep   0:00  0.00% kmmcd
+    2 root        1  20    0    0K    0K    0K sleep   0:00  0.00% kthreadd
+    3 root        1  20    0    0K    0K    0K sleep   0:00  0.00% ksoftirqd/0
