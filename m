@@ -1,28 +1,37 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 18 Oct 2010 19:13:07 +0100
-Subject: [PATCH 0/7] arm/versatile PCI support, second try
-In-Reply-To: <1287072657-32477-1-git-send-email-arnd@arndb.de>
-References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
-Message-ID: <AANLkTi=ZAPMAS-vw2RVAz28jdDtnTTobkxz4QTDTUeTQ@mail.gmail.com>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Mon, 18 Oct 2010 11:35:30 -0700
+Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
+In-Reply-To: <4CBC8B3B.8090201@free.fr>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<20101018160830.GB9033@ericsson.com> <4CBC8B3B.8090201@free.fr>
+Message-ID: <20101018183530.GA10070@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 October 2010 17:10, Arnd Bergmann <arnd@arndb.de> wrote:
-> With lots of help and testing from Peter Maydell, I've completed
-> a second version of the PCI support for the versatile platform,
-> which works much better now on real hardware, although it does
-> not improve existing qemu setups.
->
-> Please review and test.
+On Mon, Oct 18, 2010 at 02:00:27PM -0400, Chris Moore wrote:
+> 
+>   Hi,
+> 
+> Le 18/10/2010 18:08, Guenter Roeck a ?crit :
+> > On Sun, Oct 17, 2010 at 11:50:11AM -0400, Simon Guinot wrote:
+> >
+> >> +static void __set_fan_ctrl(struct gpio_fan_data *fan_data, int ctrl_val)
+> >> +{
+> >> +       int i;
+> >> +
+> >> +       for (i = 0; i<  fan_data->num_ctrl; i++) {
+> >> +               int value = !!(ctrl_val&  (1<<  i));
+> >> +
+> > 	value = (ctrl_val&  (1>>  i));
+> >      would be much simpler and easier to understand.
+> 
+> IMHO you mean:
+> 
+> 	value = (ctrl_val>>  i)&  1;
+> 
+yes...
 
-Confirmed that this patchset gives working PCI (tested with a
-sata_via PCI card and disk) on PB926, and working PCI except
-for busmaster DMA on PB1176 (same test setup, booting with
-libata.dma=0). (Without the patchset PCI doesn't work at all
-because the sata_via driver crashes the first time it tries an
-I/O access, so even without the 1176 busmastering it's a huge
-improvement over the existing situation.)
+thanks for the correction.
 
-Tested-by: Peter Maydell <peter.maydell@linaro.org>
-
--- PMM
+Guenter
