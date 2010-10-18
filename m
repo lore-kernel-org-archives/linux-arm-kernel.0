@@ -1,15 +1,16 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Oct 2010 23:13:53 +0100
-Subject: [PATCH 2/3] arm: return both physical and virtual addresses
-	from addruart
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 18 Oct 2010 18:30:19 -0400 (EDT)
+Subject: [PATCH 2/3] arm: return both physical and virtual addresses from
+	addruart
 In-Reply-To: <1287439266.5588.64.camel@c-dwalke-linux.qualcomm.com>
 References: <1283303270.566757.315468531956.2.gpush@pororo>
 	<1287439266.5588.64.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20101018221353.GE20376@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1010181817410.2764@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 18, 2010 at 03:01:06PM -0700, Daniel Walker wrote:
+On Mon, 18 Oct 2010, Daniel Walker wrote:
+
 > On Wed, 2010-09-01 at 09:07 +0800, Jeremy Kerr wrote:
 > 
 > > ---
@@ -42,22 +43,27 @@ On Mon, Oct 18, 2010 at 03:01:06PM -0700, Daniel Walker wrote:
 > 
 > Firstly, you should try to break this kind of patch up if you can.
 
-That's already been covered today with you.  You're not listening.
-It can not be split up.  It is one logical change.  Splitting it up
-will break the build for everything until the entire patch is merged.
+It was split as much as possible already.
 
 > Secondly, you need to CC all the effected sub-architecture maintainers.
+
+There are 367 different machines affected.  Please get real.  Sorry but 
+you are not more special than the others.  The MSM is only one of the 
+many subarchitectures that the core ARM code serves.
+
 > It's not acceptable to assume that everyone effected will magically
 > stumble onto this patch and know you modifying their sub-architecture ..
 
-Read the friggin subject line.  linux-arm-kernel is where generic changes
-get discussed all the time.  These changes will impact platform support.
-Sometimes that's not going to be obvious that it affects your platform.
-You need to be reading those changes.  Look at the subject line of each
-mail and decide whether it's something that you need to look at.
+This is precisely why RMK asked for those patches to be merged at the 
+end of his merge cycle.  Bypassing RMK for your own merge requests is 
+only going to cause you similar trouble in the future.
 
-In any case, it's not practical to copy a patch to 209 people - with
-some 8K of CC or To line.
+> Please do those things with future patches.
 
-Why aren't you using this time which I've given you to resolve your
-problem?
+I'm sorry Daniel, but you are not in a position to lecture people with 
+such language in this case.  You were told repeatedly so far about what 
+you should do right now.  Everyone involved did their best except you at 
+this point.
+
+
+Nicolas
