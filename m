@@ -1,54 +1,21 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Mon, 18 Oct 2010 13:50:34 -0700
-Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <20101018203610.GD29120@kw.sim.vm.gnt>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<20101018160830.GB9033@ericsson.com>
-	<20101018203610.GD29120@kw.sim.vm.gnt>
-Message-ID: <20101018205034.GA10473@ericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Oct 2010 22:11:19 +0100
+Subject: Last call for new machine support
+Message-ID: <20101018211119.GB20376@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 18, 2010 at 04:36:10PM -0400, Simon Guinot wrote:
-[ ... ]
+Tuesday evening my time (BST, so UTC+1h) is the last time I'm merging
+anything into my git tree.
 
-> > I don't really understand the value of supporting pwm attributes,
-> > since you have to convert those to rpm anyway. Why not just stick
-> > with fan1_input and fan1_target ? This would simplify the code a lot.
-> 
-> I don't know very well the hwmon API. I have simply been fooled by the
-> sysfs-interface document which claim that fan[1-*]_target only make
-> sense for a closed-loop fan. Moreover, I was expecting gpio-fan to be
-> compliant with the fancontrol shell script...
-> 
-> But anyway, you are right. I just don't want the pwm interface.
-> 
-If the fancontrol script doesn't support fanX_target, and a given fan 
-doesn't support pwm, it might make sense to update it. 
+With the upcoming change to the debug macro infrastructure, there are
+two options for people who have new board support code external to my
+tree:
 
-Jean, any comments ?
+1. Send me a pull request (based on Linus' tree not mine) by Tuesday.
 
-> > > +
-> > > +err_free_gpio:
-> > > +       for (i = i - 1; i >= 0; i--)
-> > > +               gpio_free(ctrl[i]);
-> > > +
-> > This misses the most recently allocated gpio pin if gpio_direction_output() failed.
-> 
-> The gpio is freed above while handling the gpio_direction_output() error.
-> 
-I missed that. Thatks for the clarification.
+2. Eat merge conflicts and build breakage for breakfast when my tree
+   merges into mainline.  ;)
 
-> > > +
-> > > +       dev_info(&pdev->dev, "GPIO fan initialized\n");
-> > > +
-> > Might be a good idea to add a notion of which fan was initialized.
-> > After all, there could be more than one.
-> 
-> dev_info() don't do it for me ? anyway, I will check this too.
-> 
-It probably does. Wonder what it actually shows. Can you check ?
-
-Thanks,
-Guenter
+No further complaints about this please - there's been plenty of warning
+about these debug macro changes.
