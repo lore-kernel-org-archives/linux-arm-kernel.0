@@ -1,78 +1,35 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Tue, 19 Oct 2010 00:09:25 +0100
-Subject: [PATCH] ARM: SAMSUNG: Bug fix spin_lock recursion in clk_enable()
-	and	clk_disable()
-In-Reply-To: <1286843980-23684-1-git-send-email-jc.lee@samsung.com>
-References: <1286843980-23684-1-git-send-email-jc.lee@samsung.com>
-Message-ID: <4CBCD3A5.5070701@fluff.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 Oct 2010 16:11:47 -0700
+Subject: [PATCHv2 1/1] omap: Ptr "isr_reg" tracked as NULL was dereferenced
+In-Reply-To: <1287123378.12782.49.camel@ekuznets-lx-nokia>
+References: <cover.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+	<7bb69801f49283c3bde78aa008c15308ac8a5fbf.1286961160.git.EXT-Eugeny.Kuznetsov@nokia.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D099AFD@dbde02.ent.ti.com>
+	<1286970199.12782.28.camel@ekuznets-lx-nokia>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030D099B87@dbde02.ent.ti.com>
+	<1286971758.12782.35.camel@ekuznets-lx-nokia>
+	<1287123378.12782.49.camel@ekuznets-lx-nokia>
+Message-ID: <20101018231147.GK13341@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/10 01:39, Jaecheol Lee wrote:
-> From: Minho Ban <mhban@samsung.com>
+* Evgeny Kuznetsov <EXT-Eugeny.Kuznetsov@nokia.com> [101014 23:11]:
+> On Wed, 2010-10-13 at 16:09 +0400, Evgeny Kuznetsov wrote:
+> > On Wed, 2010-10-13 at 17:20 +0530, ext Varadarajan, Charulatha wrote:
+> Hi Tony,
 > 
-> The clk_enable() and clk_disable() can be used process and ISR either.
-> So spin_lock_irqsave should be used instead.
+> It is not a bug fix, it is just check to prevent potential issues. Used
+> to warn in case of bug and prevent kernel oops. Check added only here
+> (not all gpio code cleanup) since here it could cause kernel opps.
 > 
-> Signed-off-by: Minho Ban <mhban@samsung.com>
-> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
-> ---
->  arch/arm/plat-samsung/clock.c |   12 ++++++++----
->  1 files changed, 8 insertions(+), 4 deletions(-)
+> Would you apply patch if I will leave only if condition section in
+> patch?
 > 
-> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> index e8d20b0..2a991a5 100644
-> --- a/arch/arm/plat-samsung/clock.c
-> +++ b/arch/arm/plat-samsung/clock.c
-> @@ -138,31 +138,35 @@ void clk_put(struct clk *clk)
->  
->  int clk_enable(struct clk *clk)
->  {
-> +	unsigned long flags;
-> +
->  	if (IS_ERR(clk) || clk == NULL)
->  		return -EINVAL;
->  
->  	clk_enable(clk->parent);
->  
-> -	spin_lock(&clocks_lock);
-> +	spin_lock_irqsave(&clocks_lock, flags);
->  
->  	if ((clk->usage++) == 0)
->  		(clk->enable)(clk, 1);
->  
-> -	spin_unlock(&clocks_lock);
-> +	spin_unlock_irqrestore(&clocks_lock, flags);
->  	return 0;
->  }
->  
->  void clk_disable(struct clk *clk)
->  {
-> +	unsigned long flags;
-> +
->  	if (IS_ERR(clk) || clk == NULL)
->  		return;
->  
-> -	spin_lock(&clocks_lock);
-> +	spin_lock_irqsave(&clocks_lock, flags);
->  
->  	if ((--clk->usage) == 0)
->  		(clk->enable)(clk, 0);
->  
-> -	spin_unlock(&clocks_lock);
-> +	spin_unlock_irqrestore(&clocks_lock, flags);
->  	clk_disable(clk->parent);
+> 	if (WARN_ON(!isr_reg))
+> 		goto exit;
+> 
+> If yes, I'll resend v3 patch.
 
-I'm not sure, but I don't belive that the clk_ api has
-ever been callable from non-sleepable contexts such as
-interrupt handlers.
+Sounds like a valid check to me.
 
-I would welcome RMK's response (or any other response)
-about this issue?
-
-Personally, given that some clk_ calls may sleep esp.
-for pll enables, I would prefer to see this patch
-dropped in favour of fixing the users.
-
--- 
-Ben
+Tony
