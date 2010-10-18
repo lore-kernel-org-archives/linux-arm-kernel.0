@@ -1,36 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Oct 2010 16:07:37 +0100
-Subject: [PATCH 04/22] arm: introduce little endian bitops
-In-Reply-To: <201010181645.13349.arnd@arndb.de>
-References: <1287135981-17604-1-git-send-email-akinobu.mita@gmail.com>
-	<AANLkTi=1w9uV81CagrE53xEYkMaFh_3cM_+ybctT2ng4@mail.gmail.com>
-	<20101018135616.GB12449@n2100.arm.linux.org.uk>
-	<201010181645.13349.arnd@arndb.de>
-Message-ID: <20101018150737.GI12449@n2100.arm.linux.org.uk>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 18 Oct 2010 17:08:53 +0200
+Subject: [PATCH 0/7] arm/versatile PCI support, second try
+In-Reply-To: <-1220762139438340023@unknownmsgid>
+References: <1287072657-32477-1-git-send-email-arnd@arndb.de>
+	<AANLkTikc5Vc0Q0z4rE4raX7LTyB=LiE+YuzycMjsXUaM@mail.gmail.com>
+	<-1220762139438340023@unknownmsgid>
+Message-ID: <AANLkTi=NhVXqs+_mtUf8LNQWMozOGjaPGmCcVmCZk9CD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 18, 2010 at 04:45:12PM +0200, Arnd Bergmann wrote:
-> Note that patches 20 and 22 of the series completely eliminate the
-> the minix and ext2 definitions, putting them into architecture independent
-> code in those two file systems where they belong.
+2010/10/18 Colin Tuckley <colin.tuckley@arm.com>:
 
-Good.
+> Note that the PB1176 and EB are in mach-realview rather than mach-versatile
+> like the PB926. This complicates the PCI side of things since the other
+> boards in mach-realview have a different PCI implementation (via a NEC
+> custom Northbridge chip).
 
-> Adding the new definitions in patch 4 is just a logical step before removing
-> the old definitions in the later patches while maintaining bisectability.
+Aha, then the platform data for these are all wrong... Arnd you'd better
+skip the EB and PB1176 platform data patches for now.
 
-In which case I don't have a problem with the series.
-
-> > What I'm trying to say is please don't make the existing mess of bitops
-> > any worse than it currently is.
-> 
-> The series currently adds 20 lines to the arm code (could be reduced to
-> 6 lines), but removes 26 lines which are essentially architecture
-> independent and shouldn't be there to start with. I'd call that the
-> opposite of making the mess worse.
-
-Right - if I could've seen the rest of the series, then maybe I'd have
-known that.  However, I seemed to have silently dropped off linux-arch
-back in April and only just noticed, which means I've missed rather a
-lot...
+Yours,
+Linus Walleij
