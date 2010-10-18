@@ -1,11 +1,15 @@
 From: wiesel25@googlemail.com (Wieslaw Prymka)
-Date: Mon, 18 Oct 2010 19:42:59 +0200
+Date: Mon, 18 Oct 2010 21:00:33 +0200
 Subject: Smargo Cardreader problem with QNAP-TS119(2.6.32-5-kirkwood)
-Message-ID: <AANLkTikK9bonWBXZ8XC+SP4VhzDSuY3B_w28Cmkupf=_@mail.gmail.com>
+In-Reply-To: <AANLkTi=R-wwH63HqV59bwzKcE50MyUtj+vGO8zmqQUBE@mail.gmail.com>
+References: <AANLkTi=R-wwH63HqV59bwzKcE50MyUtj+vGO8zmqQUBE@mail.gmail.com>
+Message-ID: <AANLkTi==qhLPBL_NScg7Mgvp3kwprJsOuG8oW7AX=78+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have a problem with Smargo Cardreader on my debian qnap-119
+Hello,
+
+ i have a problem with Smargo Cardreader on my debian qnap-119
 
 
 > [203924.885817] ftdi_sio 1-1.3:1.0: FTDI USB Serial Device converter
@@ -24,7 +28,7 @@ I think this is the problem:
 
 
 > 203924.917559] ftdi_sio ttyUSB0: Unable to read latency timer: -32
->
+
 
 
 the Smargo is attached on ttyUSB0, but ........
@@ -32,7 +36,7 @@ the Smargo is attached on ttyUSB0, but ........
 
 > 2010/10/18  8:00:45 r 41035470 ERROR opening device /dev/ttyUSB0
 > 2010/10/18  8:00:45 r 41035470 Cannot open device: /dev/ttyUSB0
->
+
 
 
 any idea ?
@@ -44,4 +48,4 @@ Best regards
 Wiesiek
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101018/c7ae0a2c/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101018/8511b798/attachment-0001.html>
