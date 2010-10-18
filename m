@@ -1,52 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Oct 2010 19:56:19 +0900
-Subject: [PATCH 2/2] ARM: S3C2416: Change S3C2416 NAND platform device name
-In-Reply-To: <1279495911-17346-3-git-send-email-sbkim73@samsung.com>
-References: <1279495911-17346-1-git-send-email-sbkim73@samsung.com>
-	<1279495911-17346-3-git-send-email-sbkim73@samsung.com>
-Message-ID: <048501cb6eb3$19f30770$4dd91650$%kim@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 18 Oct 2010 13:36:35 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D581A@zch01exm22.fsl.freescale.net>
+References: <4CB56A88.2040101@eukrea.com>
+	<20101013082930.GA11286@pengutronix.de>
+	<8762x6xx00.fsf@lechat.rtp-net.org>
+	<A88EF4D64D8447468743DC1503C0B6CA0D557C@zch01exm22.fsl.freescale.net>
+	<20101013100632.GC11286@pengutronix.de>
+	<4CB58565.5020806@eukrea.com>
+	<A88EF4D64D8447468743DC1503C0B6CA0D557D@zch01exm22.fsl.freescale.net>
+	<20101013102055.GD11286@pengutronix.de>
+	<20101015102729.GB4276@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0D581A@zch01exm22.fsl.freescale.net>
+Message-ID: <20101018113635.GA15440@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sangbeom Kim wrote:
-> 
-> From: Atul Dahiya <atul.dahiya@samsung.com>
-> 
-> This patch changes the platform device name from 's3c2416-nand' to
-> 's3c2412-nand' so that S3C2416 can reuse the nand functionality
-> available on S3C2412.
-> 
-> Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
-> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> ---
->  arch/arm/mach-s3c2416/s3c2416.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-
-> s3c2416/s3c2416.c
-> index bfe674f..6468b6c 100644
-> --- a/arch/arm/mach-s3c2416/s3c2416.c
-> +++ b/arch/arm/mach-s3c2416/s3c2416.c
-> @@ -100,7 +100,7 @@ void __init s3c2416_init_uarts(struct s3c2410_uartcfg
-> *cfg, int no)
->  {
->  	s3c24xx_init_uartdevs("s3c2440-uart", s3c2410_uart_resources, cfg,
-no);
-> 
-> -	s3c_nand_setname("s3c2416-nand");
-> +	s3c_nand_setname("s3c2412-nand");
->  }
-> 
->  /* s3c2416_map_io
-> --
-Ok...will apply.
+Hi Richard,
 
-Ben, if any problems, please let me know.
+On Mon, Oct 18, 2010 at 04:48:07PM +0800, Zhu Richard-R65037 wrote:
 
-Thanks.
+> The debug msg "mmc0: mmc_rescan: trying to init card at 400000 Hz..." are dumped out repeatedly.
+> ROOT: There are pr_info codes in the mmc_rescan func.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+There was already a patch on this list fixing it.
+
+> The other:
+> Encounter the Timeout and CRC error when the sandisk 4G SDHC card are used as the ROOTFS storage media
+> When I boot up the BBG board.
+> 
+> It seems that the "SDHCI_QUIRK_BROKEN_TIMEOUT_VAL" is mandatory required at my side when I did the tests
+>  on BBG3.0 board, and the i.MX51 board can support the "MULTI-BLOCK".
+
+Okay, this can be fixed...
+
+> BTW, I still can't fetch out the latest codes out, that means I still can't found the V5 patches, although I run
+> the git fetch and git rebase. :(
+
+My branch gets rebased because I can't mainline the driver with all my
+incremental improvements. Does just taking the branch and cherry-pick
+your additions work? (BTW meanwhile you can also just use mmc-next)
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101018/bd8ece60/attachment.sig>
