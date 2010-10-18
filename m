@@ -1,109 +1,188 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 18 Oct 2010 09:42:33 +0200
-Subject: [PATCH 1/2] ARM: imx: Add wake functionality to GPIO
-In-Reply-To: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1287173908-25758-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101018074233.GF28242@pengutronix.de>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 18 Oct 2010 10:43:35 +0300
+Subject: [PATCH] EP93xx: Document DMA M2P API
+In-Reply-To: <4CBB99D5.6070009@bluewatersys.com>
+References: <4CBB99D5.6070009@bluewatersys.com>
+Message-ID: <20101018074335.GD4772@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Oct 18, 2010 at 01:50:29PM +1300, Ryan Mallon wrote:
+> Add documentation for the EP93xx DMA memory to peripheral/peripheral to
+> memory API.
 
-On Fri, Oct 15, 2010 at 03:18:27PM -0500, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Add function definition for irq_chip.set_wake to enable GPIO to
-> wake-up the system.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+This is a good thing but I think that you might want to use standard
+kernel-doc style comments (see Documentation/kernel-doc-nano-HOWTO.txt)
+so that we can get nicely formatted document of the DMA API when
+'make *docs' is run.
+
+> Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 > ---
->  arch/arm/plat-mxc/gpio.c              |   35 +++++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/gpio.h |    3 ++
->  2 files changed, 38 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index 57ec4a8..7647ba3 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
-> @@ -20,9 +20,11 @@
->   */
+> diff --git a/arch/arm/mach-ep93xx/include/mach/dma.h b/arch/arm/mach-ep93xx/include/mach/dma.h
+> index 3a5961d..66b1555 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/dma.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/dma.h
+> @@ -1,6 +1,11 @@
+> -/*
+> - * arch/arm/mach-ep93xx/include/mach/dma.h
+> - */
+> +/**
+> + * EP93xx DMA M2P memory to peripheral and peripheral to memory engine
+
+For this you need to use something like:
+
+/**
+ * DOC: EP93xx DMA M2P memory to peripheral and peripheral to memory engine
+ *
+
+...
+
+> + *
+> + * DMA M2P channels are available for audio, UARTs and IrDA. See chapter 10 of
+> + * the EP93xx users guide for full details on the DMA M2P engine.
+> + * See sound/soc/ep93xx/ep93xx-pcm.c for an example use of the DMA M2P code.
+> + *
+> + */ 
 >  
->  #include <linux/init.h>
-> +#include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
->  #include <linux/gpio.h>
-> +#include <mach/gpio.h>
->  #include <mach/hardware.h>
->  #include <asm-generic/bug.h>
+>  #ifndef __ASM_ARCH_DMA_H
+>  #define __ASM_ARCH_DMA_H
+> @@ -8,12 +13,29 @@
+>  #include <linux/list.h>
+>  #include <linux/types.h>
 >  
-> @@ -201,11 +203,44 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  	}
->  }
->  
-> +/*
-> + * Set interrupt number "irq" in the GPIO as a wake-up source.
-> + * While system is running, all registered GPIO interrupts need to have
-> + * wake-up enabled. When system is suspended, only selected GPIO interrupts
-> + * need to have wake-up enabled.
-> + * @param  irq          interrupt source number
-> + * @param  enable       enable as wake-up if equal to non-zero
-> + * @return       This function returns 0 on success.
+> +/**
+> + * Information about a buffer to be transferred using the DMA M2P engine
+
+/**
+ * struct ep93xx_dma_buffer - buffer to be transferred using the DMA M2P engine
+
+> + *
+> + * @list: Entry in DMA buffer list
+> + * @bus_addr: Physical address of the buffer
+> + * @size: Size of the buffer in bytes
 > + */
-> +static int gpio_set_wake_irq(u32 irq, u32 enable)
-> +{
-> +	u32 gpio = irq_to_gpio(irq);
-> +	u32 gpio_idx = gpio & 0x1F;
-> +	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
-> +
-> +	if (enable) {
-> +		port->suspend_wakeup |= (1 << gpio_idx);
-> +		if (port->irq_high && (gpio_idx >= 16))
-> +			enable_irq_wake(port->irq_high);
-> +		else
-> +			enable_irq_wake(port->irq);
-> +	} else {
-> +		port->suspend_wakeup &= ~(1 << gpio_idx);
-> +		if (port->irq_high && (gpio_idx >= 16))
-> +			disable_irq_wake(port->irq_high);
-> +		else
-> +			disable_irq_wake(port->irq);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static struct irq_chip gpio_irq_chip = {
->  	.ack = gpio_ack_irq,
->  	.mask = gpio_mask_irq,
->  	.unmask = gpio_unmask_irq,
->  	.set_type = gpio_set_irq_type,
-> +	.set_wake = gpio_set_wake_irq,
+>  struct ep93xx_dma_buffer {
+>  	struct list_head	list;
+>  	u32			bus_addr;
+>  	u16			size;
 >  };
 >  
->  static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
-> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> index af33b74..dba3768 100644
-> --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> @@ -39,6 +39,9 @@ struct mxc_gpio_port {
->  	struct gpio_chip chip;
->  	u32 both_edges;
->  	spinlock_t lock;
-> +	u32 suspend_wakeup;
+> +/**
+> + * Information about a DMA M2P client
 
-This variable seems unused.
+ditto
 
-> +	u32 saved_wakeup;
-> +
+> + *
+> + * @name: Unique name for this client
+> + * @flags: Client flags
+> + * @cookie: User data to pass to callback functions
+> + * @buffer_started: Non NULL function to call when a transfer is started
+> + * @buffer_finished: Non NULL function to call when a transfer is completed
+> + * @channel: Internal DMA M2P channel pointer. Do not modify
+> + */
+>  struct ep93xx_dma_m2p_client {
+>  	char			*name;
+>  	u8			flags;
+> @@ -28,6 +50,9 @@ struct ep93xx_dma_m2p_client {
+>  	void			*channel;
 >  };
+>  
+> +/**
 
-Please remove that empty line.
+Don't use /** here as this is just a normal comment.
 
-Sascha
+> + * DMA M2P ports
+> + */
+>  #define EP93XX_DMA_M2P_PORT_I2S1	0x00
+>  #define EP93XX_DMA_M2P_PORT_I2S2	0x01
+>  #define EP93XX_DMA_M2P_PORT_AAC1	0x02
+> @@ -39,18 +64,66 @@ struct ep93xx_dma_m2p_client {
+>  #define EP93XX_DMA_M2P_PORT_UART3	0x08
+>  #define EP93XX_DMA_M2P_PORT_IRDA	0x09
+>  #define EP93XX_DMA_M2P_PORT_MASK	0x0f
+> -#define EP93XX_DMA_M2P_TX		0x00
+> -#define EP93XX_DMA_M2P_RX		0x10
+> -#define EP93XX_DMA_M2P_ABORT_ON_ERROR	0x20
+> -#define EP93XX_DMA_M2P_IGNORE_ERROR	0x40
+> -#define EP93XX_DMA_M2P_ERROR_MASK	0x60
+>  
+> +/**
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ditto
+
+> + * DMA M2P client flags
+> + */
+> +#define EP93XX_DMA_M2P_TX		0x00	/* Memory to peripheral */
+> +#define EP93XX_DMA_M2P_RX		0x10	/* Peripheral to memory */
+> +
+> +/**
+
+ditto
+
+> + * DMA M2P client error handling flags. See the EP93xx users guide
+> + * documentation on the DMA M2P CONTROL register for more details
+> + */
+> +#define EP93XX_DMA_M2P_ABORT_ON_ERROR	0x20	/* Abort on peripheral error */
+> +#define EP93XX_DMA_M2P_IGNORE_ERROR	0x40	/* Ignore peripheral errors */
+> +#define EP93XX_DMA_M2P_ERROR_MASK	0x60	/* Mask of error bits */
+> +
+> +/**
+> + * Register a client with the DMA M2P subsystem. The DMA M2P subsystem
+
+/**
+ * ep93xx_dma_m2p_client_register - register a client ..
+
+
+Also you might want to put these function comments in the .c file (so they
+are as close the actual code as possible).
+
+Regards,
+MW
+
+> + * allocates a channel and an interrupt line for the DMA client.
+> + *
+> + * @m2p: Client information to register
+> + * returns 0 on success
+> + */
+>  int  ep93xx_dma_m2p_client_register(struct ep93xx_dma_m2p_client *m2p);
+> +
+> +/**
+> + * Unregister a DMA M2P subsystem. Any transfers currently in progress will be
+> + * completed in hardware, but ignored in software.
+> + *
+> + * @m2p: Client to unregister
+> + */
+>  void ep93xx_dma_m2p_client_unregister(struct ep93xx_dma_m2p_client *m2p);
+> +
+> +/**
+> + * Submit a DMA M2P transfer. If the current or next transfer positions are
+> + * free on the M2P client then the transfer is started immediately. If not,
+> + * the transfer is added to the list of pending transfers. This function must
+> + * not be called from the buffer_finished callback for an M2P channel.
+> + *
+> + * @m2p: DMA Client to submit the transfer on
+> + * @buf: DMA Buffer to submit
+> + */
+>  void ep93xx_dma_m2p_submit(struct ep93xx_dma_m2p_client *m2p,
+>  			   struct ep93xx_dma_buffer *buf);
+> +
+> +/**
+> + * Put a DMA transfer on the pending list for an M2P channel. This function
+> + * must only be called from the buffer_finished callback for an M2P channel.
+> + *
+> + * @m2p: DMA Client to submit the transfer on
+> + * @buf: DMA Buffer to submit 
+> + */
+>  void ep93xx_dma_m2p_submit_recursive(struct ep93xx_dma_m2p_client *m2p,
+>  				     struct ep93xx_dma_buffer *buf);
+> +
+> +/**
+> + * Flush all pending transfers on a DMA M2P client. Any transfers currently
+> + * in progress will be completed in hardware, but ignored in software.
+> + *
+> + * @m2p: DMA client to flush transfers on
+> + */
+>  void ep93xx_dma_m2p_flush(struct ep93xx_dma_m2p_client *m2p);
+>  
+>  #endif /* __ASM_ARCH_DMA_H */
