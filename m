@@ -1,69 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 18 Oct 2010 11:31:21 +0200
-Subject: [PATCHv2] cpufreq for freescale mx51
-In-Reply-To: <AANLkTimEdhXiLoxyqi0cSpWZDzDX7dwqchg8MEErEzQ2@mail.gmail.com>
-References: <1286525307-1934-1-git-send-email-yong.shen@linaro.org>
-	<1286525307-1934-2-git-send-email-yong.shen@linaro.org>
-	<20101013175424.GU28242@pengutronix.de>
-	<AANLkTimprV8=cAD-CfiAgLTCFyj=wc7qMj0sPDCUpWDC@mail.gmail.com>
-	<20101018083106.GK28242@pengutronix.de>
-	<AANLkTimEdhXiLoxyqi0cSpWZDzDX7dwqchg8MEErEzQ2@mail.gmail.com>
-Message-ID: <20101018093121.GM28242@pengutronix.de>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Mon, 18 Oct 2010 11:36:40 +0200
+Subject: [PATCH 0/6] SD/MMC driver for MX25/35/51
+In-Reply-To: <A88EF4D64D8447468743DC1503C0B6CA0D581A@zch01exm22.fsl.freescale.net>
+References: <1286806866-19258-1-git-send-email-w.sang@pengutronix.de>	<87aamjxe00.fsf@lechat.rtp-net.org>
+	<4CB56A88.2040101@eukrea.com>	<20101013082930.GA11286@pengutronix.de>	<8762x6xx00.fsf@lechat.rtp-net.org>	<A88EF4D64D8447468743DC1503C0B6CA0D557C@zch01exm22.fsl.freescale.net>	<20101013100632.GC11286@pengutronix.de>	<4CB58565.5020806@eukrea.com>	<A88EF4D64D8447468743DC1503C0B6CA0D557D@zch01exm22.fsl.freescale.net>	<20101013102055.GD11286@pengutronix.de>	<20101015102729.GB4276@pengutronix.de>
+	<A88EF4D64D8447468743DC1503C0B6CA0D581A@zch01exm22.fsl.freescale.net>
+Message-ID: <4CBC1528.40907@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 18, 2010 at 05:08:14PM +0800, Yong Shen wrote:
-> Hi Sascha,
-> 
-> 
-> On Mon, Oct 18, 2010 at 4:31 PM, Sascha Hauer <s.hauer@pengutronix.de>wrote:
-> 
-> > Hi Yong,
-> >
-> > On Mon, Oct 18, 2010 at 01:43:43PM +0800, Yong Shen wrote:
-> > > Hi Sascha,
-> > >
-> > > Thanks for your thorough review. I have two feedbacks to your commends.
-> > > Sorry for delayed response, cause I had a hard time due to my computer
-> > crash
-> > > and data loss.
-> > >
-> > > > diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-> > > > > index 2d37785..83add9c 100644
-> > > > > --- a/arch/arm/mach-mx5/cpu.c
-> > > > > +++ b/arch/arm/mach-mx5/cpu.c
-> > > > > @@ -22,6 +22,8 @@ static int cpu_silicon_rev = -1;
-> > > > >
-> > > > >  #define SI_REV 0x48
-> > > > >
-> > > > > +struct cpu_wp *(*get_cpu_wp)(int *wp);
-> > > > > +
-> > > >
-> > > > This is not needed.
-> > > >
-> > > This is needed, otherwise it does not pass compile.
-> >
-> > This hunk is the only change to arch/arm/mach-mx5/cpu.c and get_cpu_wp
-> > is introduced with this patch, so how can this break compilation?
-> > Also, you should move this to a header file. Otherwise you risk of
-> > having multiple (and possibly different) declarations of the same
-> > function which can lead to hard to find bugs.
-> >
-> IMHO,  get_cpu_wp is definition rather than a declaration and without it
-> there will be errors in link phase. its declaration is in
-> arch/arm/plat-mxc/include/mach/mxc.h.
+Hi Richard,
 
-Of course, you are right, my bad. Isn't this function common to al
-i.MXs? In this case it should be somewhere in plat-mxc.
-Anyway, it seems very odd to me to provide a global function pointer
-which gets overwritten by the boards. For me it is more logical to
-provide a mxc_register_workpoints() function along with a
-mxc_for_each_workpoint() iterator.
+Le 18/10/2010 10:48, Zhu Richard-R65037 a ?crit :
+> I tested your serial patches with Eric's platform related codes on i.MX51 BBG3.0 board.
+> Two phenomena:
+> The debug msg "mmc0: mmc_rescan: trying to init card at 400000 Hz..." are dumped out repeatedly.
+> ROOT: There are pr_info codes in the mmc_rescan func.
+>
+fixed by this patch :
+http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commit;h=0ca6d53ec81a13263f6643372b2a5abf7818e8fa
 
-Sascha
+> The other:
+> Encounter the Timeout and CRC error when the sandisk 4G SDHC card are used as the ROOTFS storage media
+> When I boot up the BBG board.
+>
+> It seems that the "SDHCI_QUIRK_BROKEN_TIMEOUT_VAL" is mandatory required at my side when I did the tests
+>   on BBG3.0 board, and the i.MX51 board can support the "MULTI-BLOCK".
+>
+you seems to be right, the attached patch seems to fix it (tested on our board 
+using a Linaro rootfs on a Transcend SDHC card and I didn't get errors after 
+applying this patch but I'm stopped by udev errors now with this rootfs).
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c 
+b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 2e9cca1..e8f7048 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -134,7 +134,8 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+
+  struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+         .quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
+-                       | SDHCI_QUIRK_BROKEN_ADMA,
++                       | SDHCI_QUIRK_BROKEN_ADMA
++                       | SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+         /* ADMA has issues. Might be fixable */
+         /* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
+         .ops = &sdhci_esdhc_ops,
+
+
+> What's kinds of tests and environment you did at your side?
+>
+Environment : our i.MX515 based boards.
+Tests (until now) : mount + a few read/write.
+We have a nand flash on board so our rootfs is on it so I didn't test a rootfs 
+until this morning.
+
+Eric
