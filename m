@@ -1,144 +1,181 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 18 Oct 2010 16:16:43 -0700
-Subject: [GIT PULL] MSM changes for v2.6.37
-Message-ID: <1287443803.5588.128.camel@c-dwalke-linux.qualcomm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 19 Oct 2010 08:36:27 +0900
+Subject: Last call for new machine support
+In-Reply-To: <20101018211119.GB20376@n2100.arm.linux.org.uk>
+References: <20101018211119.GB20376@n2100.arm.linux.org.uk>
+Message-ID: <04d601cb6f1d$4dc32340$e94969c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell King - ARM Linux wrote:
+> 
+> Tuesday evening my time (BST, so UTC+1h) is the last time I'm merging
+> anything into my git tree.
+> 
+> With the upcoming change to the debug macro infrastructure, there are
+> two options for people who have new board support code external to my
+> tree:
+> 
+> 1. Send me a pull request (based on Linus' tree not mine) by Tuesday.
+> 
+> 2. Eat merge conflicts and build breakage for breakfast when my tree
+>    merges into mainline.  ;)
+> 
+> No further complaints about this please - there's been plenty of warning
+> about these debug macro changes.
+> 
+Hi Russell,
 
-Here is your pull request Russell. This has the patch which was part of
-the conflict in MSM, "msm: allow uart to be conditionally disabled"..
+There is new machine support code for -next in my tree.
+It changes ARCH_S5P6440(mach-s5p6440) to ARCH_S5P64X0(mach-s5p64x0) so that
+can support S5P6440 and S5P6450 SoCs.
 
-It's on top of v2.6.36-rc5, and it has one patch that is already in your
-tree. It's "GIC: Dont disable INT in ack callback" .
+As a note, I fixed its debug-macro.S according to your devel tree and
+'s5p64x0_defconfig' is just from s5p6440_defconfig..it means no new added
+defconfig :-)
+And I'm not sure whether need Stephen's following fix now.
 
-This pull request is exactly what I would send to Linus is the merge
-window was open.
+http://lkml.org/lkml/2010/10/17/224
 
-Daniel
 
----------------
+Please pull following from:
 
-The following changes since commit 846afbd1fe015e082c89d56dd42c484d896ef58e:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-rmk
 
-  GIC: Dont disable INT in ack callback (2010-10-06 08:39:53 -0700)
+
+Hmm...do I have an opportunity that request pull to you for -next yet? ;-)
+
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit cd07202cc8262e1669edff0d97715f3dd9260917
+
+  Linux 2.6.36-rc8
 
 are available in the git repository at:
-  git://codeaurora.org/quic/kernel/dwalker/linux-msm.git msm-core
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-rmk
 
-Abhijeet Dharmapurikar (2):
-      msm: irqs-8x60: interrupt map
-      msm: 8x60: setup correct handlers for private interrupts
+Abhilash Kesavan (1):
+      ARM: S5P64X0: Replace the 6440 system device class definition with
+64x0
 
-Daniel Walker (2):
-      msm: dma: add stub functions for dma features not yet present on 8x60
-      msm: allow uart to be conditionally disabled
+Atul Dahiya (1):
+      ARM: S5P64X0: Fix GPIO rbank support
 
-Gregory Bean (10):
-      msm: add gpiomux api for gpio multiplex & configuration.
-      msm: documentation: add gpiomux documentation.
-      msm: convert 8x50 to gpiomux.
-      msm: convert 7x30 to gpiomux.
-      msm: gpio: Remove tlmm routines obsoleted by gpiomux.
-      msm: Featurize gpiomux.
-      msm: add gpio driver for single-core SoCs.
-      msm: gpio: Add gpiomux calls to request and free.
-      msm: qsd8x50: enable ethernet.
-      msm: add MSM8x60 FFA support
+Kukjin Kim (15):
+      ARM: S5P: Move OneNAND device definitions in plat-s5p
+      ARM: S5P: Moves initial map for merging S5P64X0
+      ARM: S5P64X0: Update Kconfig and Makefile
+      ARM: S5P64X0: Add S5P64X0(S5P6440 and S5P6450) initialization support
+      ARM: S5P64X0: Update Clock for S5P6440 and S5P6450
+      ARM: S5P64X0: Update IRQ support
+      ARM: S5P64X0: Update Timer support
+      ARM: S5P64X0: Update Audio support
+      ARM: S5P64X0: Move DMA support for S5P64X0
+      ARM: S5P64X0: Add S5P6450 I2C support
+      ARM: S5P64X0: Move GPIO support files for merge S5P64X0
+      ARM: S5P64X0: Move SMDK6440 board file and Add SMDK6450 board file
+      ARM: S5P64X0: Add UART serial support for S5P6450
+      ARM: s5p64x0_defconfig: Update for support S5P6440 and S5P6450
+      ARM: S5PV310: Fix build error on GPIO map
 
-Jeff Ohlstein (4):
-      msm: timer: support 8x60 timers
-      msm: clock: add dummy clock driver
-      msm: add build support for msm8x60 target
-      msm: physical offset for MSM8X60
+Naveen Krishna Ch (1):
+      ARM: S5P64X0: FIX typo in the ADC device name
 
-Niranjana Vishwanathapura (2):
-      msm: smd: enable smd on msm7x30 target
-      msm: smd: enable smd on qsd8x50 target
+SeungChull Suh (1):
+      ARM: S5P64X0: Bug fix on errors of build with CONFIG_PREEMPT_NONE
 
-Stepan Moskovchenko (3):
-      msm: Add MSM IOMMU support
-      msm: Platform initialization for the IOMMU driver
-      msm: Platform data for msm8x60 IOMMUs
-
-Steve Muckle (8):
-      msm: create config option for proc-comm
-      msm: io: MSM8X60 io support
-      msm: initial irq definitions for MSM8X60
-      msm: MSM8X60 RUMI3 board support
-      msm: irq: rename existing entry-macro to entry-macro-vic
-      msm: 8x60: gic initialization fixup for RUMI
-      msm: add msm8x60_surf machine
-      msm: MSM8X60 simulator board support
-
- Documentation/arm/00-INDEX                        |    2 +
- Documentation/arm/msm/gpiomux.txt                 |  176 ++
- arch/arm/mach-msm/Kconfig                         |   55 +
- arch/arm/mach-msm/Makefile                        |   21 +-
- arch/arm/mach-msm/board-msm7x30.c                 |   22 +-
- arch/arm/mach-msm/board-msm8x60.c                 |  100 ++
- arch/arm/mach-msm/board-qsd8x50.c                 |   46 +-
- arch/arm/mach-msm/clock-dummy.c                   |   54 +
- arch/arm/mach-msm/devices-msm7x30.c               |    5 +
- arch/arm/mach-msm/devices-msm8x60-iommu.c         |  883 ++++++++++
- arch/arm/mach-msm/devices-qsd8x50.c               |    5 +
- arch/arm/mach-msm/gpio.c                          |  409 ++++-
- arch/arm/mach-msm/gpio_hw.h                       |  278 +++
- arch/arm/mach-msm/gpiomux-7x30.c                  |   38 +
- arch/arm/mach-msm/gpiomux-8x50.c                  |   28 +
- arch/arm/mach-msm/gpiomux-8x60.c                  |   19 +
- arch/arm/mach-msm/gpiomux-v1.c                    |   33 +
- arch/arm/mach-msm/gpiomux-v1.h                    |   67 +
- arch/arm/mach-msm/gpiomux-v2.c                    |   25 +
- arch/arm/mach-msm/gpiomux-v2.h                    |   61 +
- arch/arm/mach-msm/gpiomux.c                       |   96 ++
- arch/arm/mach-msm/gpiomux.h                       |  114 ++
- arch/arm/mach-msm/include/mach/board.h            |    2 +
- arch/arm/mach-msm/include/mach/debug-macro.S      |    2 +-
- arch/arm/mach-msm/include/mach/dma.h              |   10 +-
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   88 +
- arch/arm/mach-msm/include/mach/entry-macro-vic.S  |   37 +
- arch/arm/mach-msm/include/mach/entry-macro.S      |   43 +-
- arch/arm/mach-msm/include/mach/gpio.h             |  123 --
- arch/arm/mach-msm/include/mach/io.h               |    1 +
- arch/arm/mach-msm/include/mach/iommu.h            |  103 ++
- arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h    | 1871 +++++++++++++++++++++
- arch/arm/mach-msm/include/mach/irqs-8x60.h        |  253 +++
- arch/arm/mach-msm/include/mach/irqs.h             |    2 +
- arch/arm/mach-msm/include/mach/memory.h           |    2 +
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h   |  101 ++
- arch/arm/mach-msm/include/mach/msm_iomap.h        |    4 +
- arch/arm/mach-msm/include/mach/smp.h              |   39 +
- arch/arm/mach-msm/io.c                            |   15 +
- arch/arm/mach-msm/iommu.c                         |  597 +++++++
- arch/arm/mach-msm/iommu_dev.c                     |  374 ++++
- arch/arm/mach-msm/timer.c                         |   23 +-
- 42 files changed, 5977 insertions(+), 250 deletions(-)
- create mode 100644 Documentation/arm/msm/gpiomux.txt
- create mode 100644 arch/arm/mach-msm/board-msm8x60.c
- create mode 100644 arch/arm/mach-msm/clock-dummy.c
- create mode 100644 arch/arm/mach-msm/devices-msm8x60-iommu.c
- create mode 100644 arch/arm/mach-msm/gpio_hw.h
- create mode 100644 arch/arm/mach-msm/gpiomux-7x30.c
- create mode 100644 arch/arm/mach-msm/gpiomux-8x50.c
- create mode 100644 arch/arm/mach-msm/gpiomux-8x60.c
- create mode 100644 arch/arm/mach-msm/gpiomux-v1.c
- create mode 100644 arch/arm/mach-msm/gpiomux-v1.h
- create mode 100644 arch/arm/mach-msm/gpiomux-v2.c
- create mode 100644 arch/arm/mach-msm/gpiomux-v2.h
- create mode 100644 arch/arm/mach-msm/gpiomux.c
- create mode 100644 arch/arm/mach-msm/gpiomux.h
- create mode 100644 arch/arm/mach-msm/include/mach/entry-macro-qgic.S
- create mode 100644 arch/arm/mach-msm/include/mach/entry-macro-vic.S
- create mode 100644 arch/arm/mach-msm/include/mach/iommu.h
- create mode 100644 arch/arm/mach-msm/include/mach/iommu_hw-8xxx.h
- create mode 100644 arch/arm/mach-msm/include/mach/irqs-8x60.h
- create mode 100644 arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
- create mode 100644 arch/arm/mach-msm/include/mach/smp.h
- create mode 100644 arch/arm/mach-msm/iommu.c
- create mode 100644 arch/arm/mach-msm/iommu_dev.c
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+arch/arm/Kconfig                                   |   11 +-
+ arch/arm/Makefile                                  |    2 +-
+ .../{s5p6440_defconfig => s5p64x0_defconfig}       |    3 +-
+ arch/arm/mach-s5p6440/Kconfig                      |   33 -
+ arch/arm/mach-s5p6440/Makefile                     |   25 -
+ arch/arm/mach-s5p6440/clock.c                      |  846
+--------------------
+ arch/arm/mach-s5p6440/cpu.c                        |  117 ---
+ arch/arm/mach-s5p6440/dev-audio.c                  |  127 ---
+ arch/arm/mach-s5p6440/dev-spi.c                    |  176 ----
+ arch/arm/mach-s5p6440/include/mach/debug-macro.S   |   37 -
+ arch/arm/mach-s5p6440/include/mach/gpio.h          |   80 --
+ arch/arm/mach-s5p6440/include/mach/io.h            |   18 -
+ arch/arm/mach-s5p6440/include/mach/map.h           |   86 --
+ arch/arm/mach-s5p6440/include/mach/regs-clock.h    |  130 ---
+ arch/arm/mach-s5p6440/include/mach/spi-clocks.h    |   17 -
+ arch/arm/mach-s5p6440/include/mach/uncompress.h    |   24 -
+ arch/arm/mach-s5p6440/init.c                       |   52 --
+ arch/arm/mach-s5p6442/cpu.c                        |   27 +-
+ arch/arm/mach-s5p6442/include/mach/map.h           |    6 -
+ arch/arm/mach-s5p64x0/Kconfig                      |   57 ++
+ arch/arm/mach-s5p64x0/Makefile                     |   30 +
+ .../{mach-s5p6440 => mach-s5p64x0}/Makefile.boot   |    0
+ arch/arm/mach-s5p64x0/clock-s5p6440.c              |  626 +++++++++++++++
+ arch/arm/mach-s5p64x0/clock-s5p6450.c              |  655 +++++++++++++++
+ arch/arm/mach-s5p64x0/clock.c                      |  253 ++++++
+ arch/arm/mach-s5p64x0/cpu.c                        |  209 +++++
+ arch/arm/mach-s5p64x0/dev-audio.c                  |  164 ++++
+ arch/arm/mach-s5p64x0/dev-spi.c                    |  232 ++++++
+ arch/arm/{mach-s5p6440 => mach-s5p64x0}/dma.c      |   86 ++-
+ arch/arm/{mach-s5p6440 => mach-s5p64x0}/gpio.c     |  104 ++--
+ arch/arm/mach-s5p64x0/include/mach/debug-macro.S   |   33 +
+ .../include/mach/dma.h                             |    0
+ .../include/mach/entry-macro.S                     |    8 +-
+ arch/arm/mach-s5p64x0/include/mach/gpio.h          |  139 ++++
+ .../include/mach/hardware.h                        |    8 +-
+ arch/arm/mach-s5p64x0/include/mach/i2c.h           |   17 +
+ arch/arm/mach-s5p64x0/include/mach/io.h            |   25 +
+ .../include/mach/irqs.h                            |   48 +-
+ arch/arm/mach-s5p64x0/include/mach/map.h           |   83 ++
+ .../include/mach/memory.h                          |   12 +-
+ .../include/mach/pwm-clock.h                       |   10 +-
+ arch/arm/mach-s5p64x0/include/mach/regs-clock.h    |   63 ++
+ .../include/mach/regs-gpio.h                       |   28 +-
+ .../include/mach/regs-irq.h                        |    8 +-
+ arch/arm/mach-s5p64x0/include/mach/s5p64x0-clock.h |   46 ++
+ arch/arm/mach-s5p64x0/include/mach/spi-clocks.h    |   20 +
+ .../include/mach/system.h                          |    8 +-
+ .../include/mach/tick.h                            |   13 +-
+ .../include/mach/timex.h                           |    7 +-
+ arch/arm/mach-s5p64x0/include/mach/uncompress.h    |  212 +++++
+ .../include/mach/vmalloc.h                         |    5 +-
+ arch/arm/mach-s5p64x0/init.c                       |   73 ++
+.../{mach-s5p6440 => mach-s5p64x0}/mach-smdk6440.c |   87 ++-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |  182 +++++
+ .../{mach-s5p6440 => mach-s5p64x0}/setup-i2c0.c    |   24 +-
+ .../{mach-s5p6440 => mach-s5p64x0}/setup-i2c1.c    |   20 +-
+ arch/arm/mach-s5pc100/cpu.c                        |   25 +-
+ arch/arm/mach-s5pc100/include/mach/map.h           |   11 +-
+ arch/arm/mach-s5pv210/Kconfig                      |    9 +-
+ arch/arm/mach-s5pv210/Makefile                     |    1 -
+ arch/arm/mach-s5pv210/cpu.c                        |   22 +-
+ arch/arm/mach-s5pv210/include/mach/map.h           |   11 +-
+ arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+ arch/arm/mach-s5pv310/cpu.c                        |   26 +-
+ arch/arm/mach-s5pv310/include/mach/irqs.h          |    2 +
+ arch/arm/mach-s5pv310/include/mach/map.h           |    7 +-
+ arch/arm/plat-s5p/Kconfig                          |    9 +-
+ arch/arm/plat-s5p/Makefile                         |    1 +
+ arch/arm/plat-s5p/clock.c                          |   19 +
+ arch/arm/plat-s5p/cpu.c                            |   34 +-
+ arch/arm/{mach-s5pv210 => plat-s5p}/dev-onenand.c  |   28 +-
+ arch/arm/plat-s5p/dev-uart.c                       |   58 ++
+ arch/arm/plat-s5p/include/plat/pll.h               |    7 +
+ arch/arm/plat-s5p/include/plat/s5p-clock.h         |    8 +-
+ arch/arm/plat-s5p/include/plat/s5p6440.h           |    7 +-
+ arch/arm/plat-s5p/include/plat/s5p6450.h           |   36 +
+ arch/arm/plat-samsung/include/plat/cpu.h           |    2 +-
+ arch/arm/plat-samsung/include/plat/devs.h          |    7 +-
+ arch/arm/plat-samsung/include/plat/s3c-dma-pl330.h |   20 +
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h   |    2 +-
+ drivers/serial/Kconfig                             |    7 +-
+ drivers/serial/samsung.c                           |    2 +-
+ 83 files changed, 3729 insertions(+), 2048 deletions(-)
