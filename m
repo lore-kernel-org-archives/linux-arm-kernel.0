@@ -1,25 +1,51 @@
-From: stanleymiao@gmail.com (Stanley.Miao)
-Date: Mon, 18 Oct 2010 18:19:19 +0800
-Subject: Add Mindspeed Comcerto platform support
-In-Reply-To: <20101018081340.GA26183@n2100.arm.linux.org.uk>
-References: <1287045489-1133-1-git-send-email-stanleymiao@gmail.com>
-	<AANLkTikBGiDM_Mi_kUb0FiqVr282rMoqifB9rpUBB09V@mail.gmail.com>
-	<20101018081340.GA26183@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimjxpt8QR_v29h0C347izbPP-8tmguSPkD+PW9C@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Oct 2010 19:50:23 +0900
+Subject: [PATCH] ARM: S3C24XX: Fix nand partition table for s3c24XX
+In-Reply-To: <1279495515-17265-1-git-send-email-sbkim73@samsung.com>
+References: <1279495515-17265-1-git-send-email-sbkim73@samsung.com>
+Message-ID: <048301cb6eb2$45e264d0$d1a72e70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Oct 18, 2010 at 11:26:53AM +0800, Stanley.Miao wrote:
->> Hi, Russell,
->>
->> Any comments ? I have added these three patches to your patch tracking system.
->
-> Now that the debug-macro changes are in, my tree is now closed for the
-> upcoming merge window.
->
+Sangbeom Kim wrote:
+> 
+> From: Atul Dahiya <atul.dahiya@samsung.com>
+> 
+> This patch fixes the partition table as existing partition table have last
+> partition size fixed and can't utilize available memory proprly if size is
+> more than 64M.
+> 
+> Signed-off-by: Atul Dahiya <atul.dahiya@samsung.com>
+> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> ---
+>  arch/arm/plat-s3c24xx/common-smdk.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-s3c24xx/common-smdk.c b/arch/arm/plat-
+> s3c24xx/common-smdk.c
+> index 7b44d0c..bcc43f3 100644
+> --- a/arch/arm/plat-s3c24xx/common-smdk.c
+> +++ b/arch/arm/plat-s3c24xx/common-smdk.c
+> @@ -147,7 +147,7 @@ static struct mtd_partition smdk_default_nand_part[] =
+{
+>  	[7] = {
+>  		.name	= "S3C2410 flash partition 7",
+>  		.offset = SZ_1M * 48,
+> -		.size	= SZ_16M,
+> +		.size	= MTDPART_SIZ_FULL,
+>  	}
+>  };
+> 
+> --
 
-OK. I will re-send these patches based on linux-next.
+Maybe missed this...will apply.
+
+Ben, if any problems, please let me know.
 
 Thanks.
-Stanley.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
