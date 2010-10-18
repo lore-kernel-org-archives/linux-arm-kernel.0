@@ -1,102 +1,45 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Mon, 18 Oct 2010 12:32:13 -0700
-Subject: [PATCH] arm: mach-msm: fix error handling in msm_iommu_probe()
-In-Reply-To: <1287327097-9025-1-git-send-email-segooon@gmail.com>
-References: <1287327097-9025-1-git-send-email-segooon@gmail.com>
-Message-ID: <4CBCA0BD.7060609@codeaurora.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 19 Oct 2010 08:36:22 +1300
+Subject: [PATCH] EP93xx: Document DMA M2P API
+In-Reply-To: <20101018074335.GD4772@gw.healthdatacare.com>
+References: <4CBB99D5.6070009@bluewatersys.com>
+	<20101018074335.GD4772@gw.healthdatacare.com>
+Message-ID: <4CBCA1B6.1040303@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  On 10/17/2010 7:51 AM, Vasiliy Kulikov wrote:
-> msm_iommu_probe() didn't free mem_region and mapped IO.
-> Also if request_mem_region() failed then error handling
-> code dereferenced NULL pointer.
->
-> Signed-off-by: Vasiliy Kulikov<segooon@gmail.com>
-> ---
->   arch/arm/mach-msm/iommu_dev.c |   22 +++++++++++++---------
->   1 files changed, 13 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-msm/iommu_dev.c b/arch/arm/mach-msm/iommu_dev.c
-> index c33ae78..9019cee 100644
-> --- a/arch/arm/mach-msm/iommu_dev.c
-> +++ b/arch/arm/mach-msm/iommu_dev.c
-> @@ -128,7 +128,7 @@ static void msm_iommu_reset(void __iomem *base)
->
->   static int msm_iommu_probe(struct platform_device *pdev)
->   {
-> -	struct resource *r;
-> +	struct resource *r, *r2;
->   	struct clk *iommu_clk;
->   	struct msm_iommu_drvdata *drvdata;
->   	struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data;
-> @@ -183,27 +183,27 @@ static int msm_iommu_probe(struct platform_device *pdev)
->
->   		len = r->end - r->start + 1;
->
-> -		r = request_mem_region(r->start, len, r->name);
-> -		if (!r) {
-> +		r2 = request_mem_region(r->start, len, r->name);
-> +		if (!r2) {
->   			pr_err("Could not request memory region: "
->   			"start=%p, len=%d\n", (void *) r->start, len);
->   			ret = -EBUSY;
->   			goto fail;
->   		}
->
-> -		regs_base = ioremap(r->start, len);
-> +		regs_base = ioremap(r2->start, len);
->
->   		if (!regs_base) {
->   			pr_err("Could not ioremap: start=%p, len=%d\n",
-> -				 (void *) r->start, len);
-> +				 (void *) r2->start, len);
->   			ret = -EBUSY;
-> -			goto fail;
-> +			goto fail_mem;
->   		}
->
->   		irq = platform_get_irq_byname(pdev, "secure_irq");
->   		if (irq<  0) {
->   			ret = -ENODEV;
-> -			goto fail;
-> +			goto fail_io;
->   		}
->
->   		mb();
-> @@ -211,14 +211,14 @@ static int msm_iommu_probe(struct platform_device *pdev)
->   		if (GET_IDR(regs_base) == 0) {
->   			pr_err("Invalid IDR value detected\n");
->   			ret = -ENODEV;
-> -			goto fail;
-> +			goto fail_io;
->   		}
->
->   		ret = request_irq(irq, msm_iommu_fault_handler, 0,
->   				"msm_iommu_secure_irpt_handler", drvdata);
->   		if (ret) {
->   			pr_err("Request IRQ %d failed with ret=%d\n", irq, ret);
-> -			goto fail;
-> +			goto fail_io;
->   		}
->
->   		msm_iommu_reset(regs_base);
-> @@ -237,6 +237,10 @@ static int msm_iommu_probe(struct platform_device *pdev)
->
->   	return 0;
->
-> +fail_io:
-> +	iounmap(regs_base);
-> +fail_mem:
-> +	release_mem_region(r->start, len);
->   fail:
->   	kfree(drvdata);
->   	return ret;
+On 10/18/2010 08:43 PM, Mika Westerberg wrote:
+> On Mon, Oct 18, 2010 at 01:50:29PM +1300, Ryan Mallon wrote:
+>> Add documentation for the EP93xx DMA memory to peripheral/peripheral to
+>> memory API.
+> 
+> This is a good thing but I think that you might want to use standard
+> kernel-doc style comments (see Documentation/kernel-doc-nano-HOWTO.txt)
+> so that we can get nicely formatted document of the DMA API when
+> 'make *docs' is run.
 
-Tested on hardware. Looks good. Thanks!
+Ah, thanks. I didn't know there was documentation for kernel-doc :-). I
+had just been copying the way other subsystems were done. Will fix up
+and repost.
 
-Acked-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> 
+> /**
+>  * ep93xx_dma_m2p_client_register - register a client ..
+> 
+> 
+> Also you might want to put these function comments in the .c file (so they
+> are as close the actual code as possible).
+
+I prefer the comments in the header, since if the API documentation is
+good the user will never have to look at the C code.
+
+~Ryan
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
