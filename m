@@ -1,83 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Oct 2010 12:07:06 +0200
-Subject: [PATCHv3] cpufreq for freescale mx51
-In-Reply-To: <AANLkTik=UWF0PpAUKGE3KwmJbZNgxUj-8o6ouD+LYcSx@mail.gmail.com>
-References: <1287390105-3706-1-git-send-email-yong.shen@linaro.org>
-	<20101018101314.GA4395@pengutronix.de>
-	<AANLkTik=UWF0PpAUKGE3KwmJbZNgxUj-8o6ouD+LYcSx@mail.gmail.com>
-Message-ID: <20101019100706.GR28242@pengutronix.de>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Tue, 19 Oct 2010 15:48:39 +0530
+Subject: linux-next: omap2plus_defconfig not building
+Message-ID: <4CBD707F.6050204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 05:28:51PM +0800, Yong Shen wrote:
-> >
-> >
-> >
-> > > +#include <linux/kernel.h>
-> > > +
-> > > +static struct cpu_op mx51_cpu_op[] = {
-> > > +     {
-> > > +     .cpu_rate = 160000000,},
-> > > +     {
-> > > +     .cpu_rate = 800000000,},
-> > > +};
-> >
-> > Why did you remove the values between 800MHz and 160MHz? 400MHz and
-> > 200Mhz should work also, no?
-> >
-> > It proved that those operating points don't work well.
+Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7 
+processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file 
+gets compiled when the omap2plus_defconfig is built - the 
+omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one 
+image, and has CPU_V6 and CPU_V7 both enabled.
 
-ok
+When I attempt to build this configuration, I get the following build error:
 
-> > > +static struct cpu_op *cpu_op_tbl;
-> > > +
-> > > +static int set_cpu_freq(int freq)
-> > > +{
-> > > +     int ret = 0;
-> > > +     int org_cpu_rate;
-> > > +
-> > > +     org_cpu_rate = clk_get_rate(cpu_clk);
-> > > +     if (org_cpu_rate == freq)
-> > > +             return ret;
-> >
-> > You already checked this in mxc_set_target. Once is enough.
-> >
-> 
-> Well, this fucntion is not only used in mxc_set_target, so it is safer to
-> still keep checking here.
+   CC      arch/arm/kernel/swp_emulate.o
+/tmp/ccRIcFIf.s: Assembler messages:
+/tmp/ccRIcFIf.s:342: Error: selected processor does not support ARM mode 
+`ldrexb r6,[r5]'
+/tmp/ccRIcFIf.s:343: Error: selected processor does not support ARM mode 
+`strexb r1,r3,[r5]'
+make[1]: *** [arch/arm/kernel/swp_emulate.o] Error 1
+make: *** [arch/arm/kernel] Error 2
 
-Then you can skip the check in the calling function.
+I'm able to build when I disable ARCH_OMAP2 (and therefore CPU_V6),
+as also (as expected) when I disable CONFIG_SWP_EMULATE.
 
-> > > +
-> > > +static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
-> > > +{
-> > > +     int ret;
-> > > +     int i;
-> > > +
-> > > +     printk(KERN_INFO "i.MXC CPU frequency driver\n");
-> > > +
-> > > +     if (policy->cpu != 0)
-> > > +             return -EINVAL;
-> > > +
-> > > +     cpu_clk = clk_get(NULL, "cpu_clk");
-> > > +     if (IS_ERR(cpu_clk)) {
-> > > +             printk(KERN_ERR "%s: failed to get cpu clock\n", __func__);
-> > > +             return PTR_ERR(cpu_clk);
-> > > +     }
-> > > +
-> > > +     cpu_op_tbl = get_cpu_op(&cpu_op_nr);
-> >
-> > This will crash every board except the babbage board which happens to
-> > set this function pointer.
-> >
-> Add a checking here should avoid that.
+I'm using Codesourcery's 2010q1-202, based on gcc 4.4.1.
+I'm no ARM expert and I'm not even sure if this is an issue with the 
+toolchain I am using. Just reporting the problem.
 
-indeed
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Anand
