@@ -1,100 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Oct 2010 20:59:10 +0200
-Subject: [PATCHv3 2/2] ARM: imx: Add wake functionality to GPIO
-In-Reply-To: <1287513592-6655-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1287513592-6655-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1287513592-6655-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101019185910.GA28166@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Oct 2010 20:00:29 +0100
+Subject: Pull request for i.MX
+In-Reply-To: <20101019165004.GX28242@pengutronix.de>
+References: <20101019142153.GV28242@pengutronix.de>
+	<20101019165004.GX28242@pengutronix.de>
+Message-ID: <20101019190029.GC10325@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 01:39:52PM -0500, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On Tue, Oct 19, 2010 at 06:50:04PM +0200, Sascha Hauer wrote:
 > 
-> Add function definition for irq_chip.set_wake to enable GPIO to
-> wake-up the system.
+> Here's the updated pull request, without duplicated patches this
+> time
 > 
-> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
+> Sascha
 > 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/plat-mxc/gpio.c              |   34 +++++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
->  2 files changed, 35 insertions(+), 0 deletions(-)
+> The following changes since commit b9969f6525c9c00b042441acb0e1c0ee95560b63:
 > 
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index 9d38da0..e52c658 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
-> @@ -20,6 +20,7 @@
->   */
->  
->  #include <linux/init.h>
-> +#include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
->  #include <linux/gpio.h>
-> @@ -201,11 +202,44 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  	}
->  }
->  
-> +/*
-> + * Set interrupt number "irq" in the GPIO as a wake-up source.
-> + * While system is running, all registered GPIO interrupts need to have
-> + * wake-up enabled. When system is suspended, only selected GPIO interrupts
-> + * need to have wake-up enabled.
-> + * @param  irq          interrupt source number
-> + * @param  enable       enable as wake-up if equal to non-zero
-> + * @return       This function returns 0 on success.
-> + */
-> +static int gpio_set_wake_irq(u32 irq, u32 enable)
-> +{
-> +	u32 gpio = irq_to_gpio(irq);
-> +	u32 gpio_idx = gpio & 0x1F;
-> +	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
-> +
-> +	if (enable) {
-> +		port->suspend_wakeup |= (1 << gpio_idx);
-> +		if (port->irq_high && (gpio_idx >= 16))
-> +			enable_irq_wake(port->irq_high);
-> +		else
-> +			enable_irq_wake(port->irq);
-> +	} else {
-> +		port->suspend_wakeup &= ~(1 << gpio_idx);
-> +		if (port->irq_high && (gpio_idx >= 16))
-> +			disable_irq_wake(port->irq_high);
-> +		else
-> +			disable_irq_wake(port->irq);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static struct irq_chip gpio_irq_chip = {
->  	.ack = gpio_ack_irq,
->  	.mask = gpio_mask_irq,
->  	.unmask = gpio_unmask_irq,
->  	.set_type = gpio_set_irq_type,
-> +	.set_wake = gpio_set_wake_irq,
->  };
->  
->  static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
-> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> index af33b74..133150e 100644
-> --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> @@ -39,6 +39,7 @@ struct mxc_gpio_port {
->  	struct gpio_chip chip;
->  	u32 both_edges;
->  	spinlock_t lock;
-> +	u32 suspend_wakeup;
-This seems to be a write-only variable.  What is the intended purpose?
+>   Merge branch 'devel-stable' into devel (2010-10-18 22:34:52 +0100)
 
-Is this really enough to let the system wake from suspend?
+Errrrr, no, I'm about to re-merge devel-stable into devel...
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+What's the reason for basing it on my tree?  Could it be based on top
+of your previous pull request base, or alternatively Linus' tree?
