@@ -1,34 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Oct 2010 11:28:16 +0200
-Subject: [PATCH v3] TWL IRQ: Fix fucntion declaration warnings
-In-Reply-To: <20101019090613.GA2736@sortiz-mobl>
-References: <1286315819-5906-1-git-send-email-manjugk@ti.com>
-	<1286315819-5906-4-git-send-email-manjugk@ti.com>
-	<20101019090613.GA2736@sortiz-mobl>
-Message-ID: <20101019092816.GD11713@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 19 Oct 2010 01:52:52 -0700
+Subject: [alsa-devel] [PATCH 00/25] ASoC: Overhaul Samsung drivers
+In-Reply-To: <20101019110015.49dcb79b@anarsoul-laptop>
+References: <1287471805-17952-1-git-send-email-jassisinghbrar@gmail.com>
+	<053901cb6f5f$76b9dea0$642d9be0$%kim@samsung.com>
+	<20101019110015.49dcb79b@anarsoul-laptop>
+Message-ID: <20101019085252.GB10381@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 11:06:14AM +0200, Samuel Ortiz wrote:
-> Hi Manjunath,
-> 
-> On Wed, Oct 06, 2010 at 03:26:59AM +0530, G, Manjunath Kondaiah wrote:
-> > Fixes following sparse warnings for twl4030 and twl6030 irq files.
-> > 
-> > drivers/mfd/twl4030-irq.c:783:5: warning: symbol 'twl4030_init_irq' was not declared. Should it be static?
-> > drivers/mfd/twl4030-irq.c:863:5: warning: symbol 'twl4030_exit_irq' was not declared. Should it be static?
-> > drivers/mfd/twl4030-irq.c:873:5: warning: symbol 'twl4030_init_chip_irq' was not declared. Should it be static?
-> > 
-> > drivers/mfd/twl6030-irq.c:226:5: warning: symbol 'twl6030_init_irq' was not declared. Should it be static?
-> > drivers/mfd/twl6030-irq.c:290:5: warning: symbol 'twl6030_exit_irq' was not declared. Should it be static?
-> >
-> Patch applied, thanks.
-I didn't get the original patch, so I just now noticed the typo in the
-Subject.  You might want to do s/fucntion/function/
+On Tue, Oct 19, 2010 at 11:00:15AM +0300, Vasily khoruzhick wrote:
+> Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Best regards
-Uwe
+> > > I suggest the patches 13,14,16 & 17 go via Kgene's Tree, and the rest via
+> > > ASoC
+> > > tree due to tight dependencies.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> > Hmm...in my opinion, it would be better to me if could send arch/arm/ stuff
+> > to upstream via my tree even though there are dependencies.
+> > Mark, how do you think?
+
+> As for me, that's not a good idea. We'll get massive breakage during
+> 2.6.37 merge window then. Here's example: my sound-related changes to
+> machine files are merged through Ben's tree, but these changes aren't
+> in asoc tree, so Jassi is no aware of them, but now these changes are
+> outdated a bit due to device renaming. And this introduce compile
+> breakage.
+
+Since my primary development platforms are Samsung reference boards I'm
+especially unenthusiastic about anything which creates cross-tree
+issues.  My stock answer to things like this is that if we can't split
+things up so that dependencies are avoided then we should create a
+branch which can be pulled into both trees.
