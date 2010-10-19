@@ -1,28 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Oct 2010 19:44:33 +0100
-Subject: [patch 00/12] arm: raw_spinlock annotations
-In-Reply-To: <201010191726.45879.arnd@arndb.de>
-References: <20100217125328.791176536@linutronix.de>
-	<20101019143717.GH11713@pengutronix.de>
-	<201010191726.45879.arnd@arndb.de>
-Message-ID: <20101019184433.GA10325@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 Oct 2010 20:59:10 +0200
+Subject: [PATCHv3 2/2] ARM: imx: Add wake functionality to GPIO
+In-Reply-To: <1287513592-6655-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287513592-6655-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1287513592-6655-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20101019185910.GA28166@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 05:26:45PM +0200, Arnd Bergmann wrote:
-> On Tuesday 19 October 2010, Uwe Kleine-K?nig wrote:
-> > While cleaning up my repo I refound the patches and rebased them on top
-> > of today's Linus' tree and only needed to fix up the l2x0_lock patch as
-> > in the meantime a new usage hit mainline.
+On Tue, Oct 19, 2010 at 01:39:52PM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> The patches all look harmless, but none of them has any information on
-> why the particular locks need to be raw_spin_lock. Ideally a raw spinlock
-> should be the absolute exception, and IMHO should have a comment in front
-> of it why it is special.
+> Add function definition for irq_chip.set_wake to enable GPIO to
+> wake-up the system.
+> 
+> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> ---
+>  arch/arm/plat-mxc/gpio.c              |   34 +++++++++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+>  2 files changed, 35 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+> index 9d38da0..e52c658 100644
+> --- a/arch/arm/plat-mxc/gpio.c
+> +++ b/arch/arm/plat-mxc/gpio.c
+> @@ -20,6 +20,7 @@
+>   */
+>  
+>  #include <linux/init.h>
+> +#include <linux/interrupt.h>
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+>  #include <linux/gpio.h>
+> @@ -201,11 +202,44 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  	}
+>  }
+>  
+> +/*
+> + * Set interrupt number "irq" in the GPIO as a wake-up source.
+> + * While system is running, all registered GPIO interrupts need to have
+> + * wake-up enabled. When system is suspended, only selected GPIO interrupts
+> + * need to have wake-up enabled.
+> + * @param  irq          interrupt source number
+> + * @param  enable       enable as wake-up if equal to non-zero
+> + * @return       This function returns 0 on success.
+> + */
+> +static int gpio_set_wake_irq(u32 irq, u32 enable)
+> +{
+> +	u32 gpio = irq_to_gpio(irq);
+> +	u32 gpio_idx = gpio & 0x1F;
+> +	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
+> +
+> +	if (enable) {
+> +		port->suspend_wakeup |= (1 << gpio_idx);
+> +		if (port->irq_high && (gpio_idx >= 16))
+> +			enable_irq_wake(port->irq_high);
+> +		else
+> +			enable_irq_wake(port->irq);
+> +	} else {
+> +		port->suspend_wakeup &= ~(1 << gpio_idx);
+> +		if (port->irq_high && (gpio_idx >= 16))
+> +			disable_irq_wake(port->irq_high);
+> +		else
+> +			disable_irq_wake(port->irq);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static struct irq_chip gpio_irq_chip = {
+>  	.ack = gpio_ack_irq,
+>  	.mask = gpio_mask_irq,
+>  	.unmask = gpio_unmask_irq,
+>  	.set_type = gpio_set_irq_type,
+> +	.set_wake = gpio_set_wake_irq,
+>  };
+>  
+>  static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index af33b74..133150e 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -39,6 +39,7 @@ struct mxc_gpio_port {
+>  	struct gpio_chip chip;
+>  	u32 both_edges;
+>  	spinlock_t lock;
+> +	u32 suspend_wakeup;
+This seems to be a write-only variable.  What is the intended purpose?
 
-Or at least explained in the patch description.
+Is this really enough to let the system wake from suspend?
 
-For instance, can someone explain why the lock for leds and gpio stuff
-on Footbridge needs to be converted?  What is the original problem?
-More importantly, what is the criteria for using a raw spinlock instead
-of a normal spinlock?
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
