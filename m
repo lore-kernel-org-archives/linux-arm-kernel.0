@@ -1,29 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Oct 2010 15:49:15 -0700
-Subject: linux-next: omap2plus_defconfig not building
-In-Reply-To: <4CBD8BC2.3020000@ti.com>
-References: <4CBD707F.6050204@ti.com>
-	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
-	<4CBD8BC2.3020000@ti.com>
-Message-ID: <20101019224915.GD3038@atomide.com>
+From: andrea.gelmini@gelma.net (Andrea Gelmini)
+Date: Wed, 20 Oct 2010 00:54:33 +0200
+Subject: [PATCH 9/9] arch: arm: fixed typos
+In-Reply-To: <alpine.LNX.2.00.1010192224000.6879@pobox.suse.cz>
+References: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
+	<20101018080644.GD12363@pengutronix.de>
+	<alpine.LNX.2.00.1010192224000.6879@pobox.suse.cz>
+Message-ID: <AANLkTint_NDMD+r40jdRD71u0RSocqTBwSeLw2E4L_Nu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Anand Gadiyar <gadiyar@ti.com> [101019 05:06]:
-> On 10/19/2010 5:07 PM, Catalin Marinas wrote:
-> >On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
-> >>Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
-> >>processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
-> >>gets compiled when the omap2plus_defconfig is built - the
-> >>omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
-> >>image, and has CPU_V6 and CPU_V7 both enabled.
-> >
-> >This patch should fix it:
-> >
-> 
-> Yes, it does. I've not yet boot tested on omap2; will try
-> that out in a bit.
+2010/10/19 Jiri Kosina <jkosina@suse.cz>:
 
-Thanks that fixes it.
+Hi,
+   and thanks a lot for your reply.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> Could you please refresh it (and probably incorporate Andrea's changes as
+> well) and resend it to me?
+
+Well, I already merged all the patches. I don't care about credit, so
+they can be commit with Uwe name.
+But, some tree had already applied part of my patches.
+I guess it would be better to wait for the next push time to re-apply
+all of them.
+
+Thanks again,
+Andrea
