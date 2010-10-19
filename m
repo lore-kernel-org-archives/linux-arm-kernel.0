@@ -1,48 +1,38 @@
-From: grant.b.edwards@gmail.com (Grant Edwards)
-Date: Tue, 19 Oct 2010 17:22:32 +0000 (UTC)
-Subject: [PATCH] Documentation about RS485 serial communications
-References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4CBD8EE4.5040808@evidence.eu.com> <i9ka0s$4ua$1@dough.gmane.org>
-	<201010191727.53314.alexander.stein@systec-electronic.com>
-Message-ID: <i9kk4o$svc$1@dough.gmane.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Oct 2010 19:12:49 +0100
+Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
+In-Reply-To: <AANLkTikZAt-KWFF_MXxXGruia-=AieStQgird2XWgr6y@mail.gmail.com>
+References: <20101008175308.GA10975@n2100.arm.linux.org.uk>
+	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
+	<20101008230451.GB10975@n2100.arm.linux.org.uk>
+	<20101008232539.GA28697@kroah.com>
+	<20101008234448.GD10975@n2100.arm.linux.org.uk>
+	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
+	<20101009092127.GB20975@n2100.arm.linux.org.uk>
+	<AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
+	<20101011152516.GF27153@n2100.arm.linux.org.uk>
+	<AANLkTikZAt-KWFF_MXxXGruia-=AieStQgird2XWgr6y@mail.gmail.com>
+Message-ID: <20101019181249.GA9789@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2010-10-19, Alexander Stein <alexander.stein@systec-electronic.com> wrote:
-> On Tuesday 19 October 2010, 16:29:48 Grant Edwards wrote:
->> On 2010-10-19, Claudio Scordino <claudio@evidence.eu.com> wrote:
->> > +2. HARDWARE-RELATED CONSIDERATIONS
->> > +
->> > +   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working
->> > both +   as RS232 and RS485.
->> 
->> Pardon my curiosity, but I've looked at a few AT91 parts, and I've
->> never seen on with an internal transceiver -- nor does Google seem
->> able to find any.
->> 
->> Frankly, I'd be pretty surprised, since it would be very difficult
->> (fab-wise), to build a mircoprocessor with I/O cells capable of
->> withstanding the voltage levels specified in RS232.
->> 
->> Can you specify to which parts you're referring?
->
-> I doubt the AT91 do have an internal transceiver but it has a
-> dedicated pin feature (RTS or CTS or something) which can be used to
-> switch between RS232 and RS485 by setting a bit in the USART provided
-> the pin is connected properly.
+On Tue, Oct 19, 2010 at 01:13:36AM -0700, Colin Cross wrote:
+> If memblock_remove is used on the end of memory with this patch,
+> mem_init accesses off the end of the array of page structures because
+> of the discrepancy between memblock.memory and membank on the number
+> of the last pfn.   memblock.memory is used to determine the memory
+> zones in arm_bootmem_free, which eventually  is used to create the
+> array of page structures, but mem_init iterates over membank and calls
+> pfn_to_page on pfns up to bank_pfn_end.
+> 
+> Converting show_mem and mem_init to use memblock.memory fixes it:
 
-Yes, the AT91 UARTs do have a built-in half-duplex mode that will
-automatically control line direction by toggling RTS.
+I intentionally did not do this because it won't work.  membank
+information is purposely not coalesced together when you have full
+sparsemem regions - which may result in
 
-That can used to control external half-duplex hardware like an RS485
-transceiver or any RS232-connected half-duplex device like some
-modems.
+	pfn_to_page(pfn) != pfn_to_page(pfn + 1) - 1
 
-Though the Atmel docs refer to it as "RS485 mode" there is no RS485
-transceiver in the AT91 parts (AFAIK), and "RS485 mode" isn't specific
-to RS485 - it can be used with any external half-duplex hardware.
-
--- 
-Grant Edwards               grant.b.edwards        Yow! I Know A Joke!!
-                                  at               
-                              gmail.com            
+However, memblock information is coalesced, and so will cross these
+boundaries.  This means using memblock instead of membank will make
+things go pop.
