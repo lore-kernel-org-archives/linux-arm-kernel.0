@@ -1,99 +1,88 @@
-From: ccross@google.com (Colin Cross)
-Date: Tue, 19 Oct 2010 01:13:36 -0700
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <20101011152516.GF27153@n2100.arm.linux.org.uk>
-References: <20101007192245.GC26435@n2100.arm.linux.org.uk>
-	<AANLkTikQKY7pOobD+==uT5Cy0poT=O5wDMKtbVyJVNbO@mail.gmail.com>
-	<20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
-	<20101009092127.GB20975@n2100.arm.linux.org.uk>
-	<AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
-	<20101011152516.GF27153@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikZAt-KWFF_MXxXGruia-=AieStQgird2XWgr6y@mail.gmail.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Tue, 19 Oct 2010 08:36:56 +0000
+Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101019065221.GA12406@ericsson.com>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<20101018160830.GB9033@ericsson.com>
+	<20101018203610.GD29120@kw.sim.vm.gnt>
+	<20101019065221.GA12406@ericsson.com>
+Message-ID: <20101019083656.GE29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 11, 2010 at 8:25 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Oct 10, 2010 at 04:52:36AM +0300, Felipe Contreras wrote:
-> Here's a different approach which will work. ?This pushes ARM further
-> towards using memblock for everything relating to memory init (although
-> we still have the old membank stuff around.)
->
-> The advantage with this is that memblock is now used as the basis for
-> determining where memory is, setting up the maps, freeing memory into
-> the pools, etc.
->
-> What this also means is that this code in the ->reserve callback:
->
-> ? ? ? ?size = min(size, SZ_2M);
-> ? ? ? ?base = memblock_alloc(size, min(align, SZ_2M));
-> ? ? ? ?memblock_free(base, size);
-> ? ? ? ?memblock_remove(base, size);
->
-> will result in [base+size] being removed from the available memory,
-> using highmem if available, if not from lowmem and removing it from
-> the lowmem memory map - which is exactly the behaviour we want.
->
-> ?arch/arm/mm/init.c | ?160 +++++++++++++++++++++++++++++++++++-----------------
-> ?arch/arm/mm/mmu.c ?| ? 43 ++++++++------
-> ?mm/memblock.c ? ? ?| ? ?4 +
-> ?3 files changed, 138 insertions(+), 69 deletions(-)
+Hi Guenter,
 
-If memblock_remove is used on the end of memory with this patch,
-mem_init accesses off the end of the array of page structures because
-of the discrepancy between memblock.memory and membank on the number
-of the last pfn.   memblock.memory is used to determine the memory
-zones in arm_bootmem_free, which eventually  is used to create the
-array of page structures, but mem_init iterates over membank and calls
-pfn_to_page on pfns up to bank_pfn_end.
+On Mon, Oct 18, 2010 at 11:52:21PM -0700, Guenter Roeck wrote:
+> On Mon, Oct 18, 2010 at 04:36:10PM -0400, Simon Guinot wrote:
+> [ ... ]
+> > > I don't really understand the value of supporting pwm attributes,
+> > > since you have to convert those to rpm anyway. Why not just stick
+> > > with fan1_input and fan1_target ? This would simplify the code a lot.
+> > 
+> > I don't know very well the hwmon API. I have simply been fooled by the
+> > sysfs-interface document which claim that fan[1-*]_target only make
+> > sense for a closed-loop fan. Moreover, I was expecting gpio-fan to be
+> > compliant with the fancontrol shell script...
+> > 
+> > But anyway, you are right. I just don't want the pwm interface.
+> > 
+> Thinking more about this, another option might be to keep using
+> the pwm interface (for fancontrol), but simplify your code.
+> Your transitions are currently pwm -> rpm -> ctrl and vice versa.
+> However, direct conversion pwm -> ctrl should also be possible
+> and would be much simpler than the two-stage conversion.
+> 
+> To do that, you could map num_speed directly to the pwm range of (0..255).
+> Something like
+> 
+> 	pwm = DIV_ROUND_CLOSEST(speed_index * 255, num_speed - 1);
+> and
+> 	speed_index = pwm * (num_speed - 1) / 255;
+> 
+> Then use speed_index to get control value and rpm from the speed table.
+> 
+> Would that make sense ? You could then also provide fan1_target
+> for direct fan speed control.
 
-Converting show_mem and mem_init to use memblock.memory fixes it:
+Unfortunately, I believe this approximation is not possible. Take a look
+at the Network Space Max fan speed array:
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 52192f4..6c2b8a0 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -81,18 +81,16 @@ void show_mem(void)
- {
-        int free = 0, total = 0, reserved = 0;
-        int shared = 0, cached = 0, slab = 0, i;
--       struct meminfo * mi = &meminfo;
+/* Designed for fan 40x40x16: ADDA AD0412LB-D50 6000rpm at 12v */
+static struct gpio_fan_speed netspace_max_v2_fan_speed[] = {
+        {    0,  0 },
+        { 1500, 15 },
+        { 1700, 14 },
+        { 1800, 13 },
+        { 2100, 12 },
+        { 3100, 11 },
+        { 3300, 10 },
+        { 4300,  9 },
+        { 5500,  8 },
+};
 
-        printk("Mem-info:\n");
-        show_free_areas();
+The function rpm_speed(index) is really not linear. I am not sure about
+the resulting behaviour when this will be used by a userland fan control
+process...
 
--       for_each_bank (i, mi) {
--               struct membank *bank = &mi->bank[i];
-+       for (i = 0; i < memblock.memory.cnt; i++) {
-                unsigned int pfn1, pfn2;
-                struct page *page, *end;
+If the pwm interface must be exported, I think we have to respect the
+fan speed array. But as you said, maybe the work is rather on the
+fancontrol script side.
 
--               pfn1 = bank_pfn_start(bank);
--               pfn2 = bank_pfn_end(bank);
-+               pfn1 = memblock_start_pfn(&memblock.memory, i);
-+               pfn2 = memblock_end_pfn(&memblock.memory, i);
+As a first step, we could keep the heavy pwm interface. Once the
+fancontrol script (or something else) will be able to handle the rpm
+attributes, we will drop the pwm compatibility.
+Simply remove the gpio-fan pwm interface seems a good option too...
 
-                page = pfn_to_page(pfn1);
-                end  = pfn_to_page(pfn2 - 1) + 1;
-@@ -520,13 +518,12 @@ void __init mem_init(void)
+Both make sense for me. Let me know your favourite way.
 
-        reserved_pages = free_pages = 0;
+Thanks,
 
--       for_each_bank(i, &meminfo) {
--               struct membank *bank = &meminfo.bank[i];
-+       for (i = 0; i < memblock.memory.cnt; i++) {
-                unsigned int pfn1, pfn2;
-                struct page *page, *end;
-
--               pfn1 = bank_pfn_start(bank);
--               pfn2 = bank_pfn_end(bank);
-+               pfn1 = memblock_start_pfn(&memblock.memory, i);
-+               pfn2 = memblock_end_pfn(&memblock.memory, i);
-
-                page = pfn_to_page(pfn1);
-                end  = pfn_to_page(pfn2 - 1) + 1;
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101019/bb23fe5a/attachment-0001.sig>
