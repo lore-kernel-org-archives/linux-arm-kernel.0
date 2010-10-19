@@ -1,46 +1,39 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 19 Oct 2010 22:03:32 +0200 (CEST)
-Subject: [patch 00/12] arm: raw_spinlock annotations
-In-Reply-To: <20101019184433.GA10325@n2100.arm.linux.org.uk>
-References: <20100217125328.791176536@linutronix.de>
-	<20101019143717.GH11713@pengutronix.de>
-	<201010191726.45879.arnd@arndb.de>
-	<20101019184433.GA10325@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1010192158440.6815@localhost6.localdomain6>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 19 Oct 2010 22:04:30 +0200
+Subject: Pull request for i.MX
+In-Reply-To: <20101019190029.GC10325@n2100.arm.linux.org.uk>
+References: <20101019142153.GV28242@pengutronix.de>
+	<20101019165004.GX28242@pengutronix.de>
+	<20101019190029.GC10325@n2100.arm.linux.org.uk>
+Message-ID: <20101019200430.GY28242@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Oct 2010, Russell King - ARM Linux wrote:
-
-> On Tue, Oct 19, 2010 at 05:26:45PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 19 October 2010, Uwe Kleine-K?nig wrote:
-> > > While cleaning up my repo I refound the patches and rebased them on top
-> > > of today's Linus' tree and only needed to fix up the l2x0_lock patch as
-> > > in the meantime a new usage hit mainline.
+On Tue, Oct 19, 2010 at 08:00:29PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 19, 2010 at 06:50:04PM +0200, Sascha Hauer wrote:
 > > 
-> > The patches all look harmless, but none of them has any information on
-> > why the particular locks need to be raw_spin_lock. Ideally a raw spinlock
-> > should be the absolute exception, and IMHO should have a comment in front
-> > of it why it is special.
+> > Here's the updated pull request, without duplicated patches this
+> > time
+> > 
+> > Sascha
+> > 
+> > The following changes since commit b9969f6525c9c00b042441acb0e1c0ee95560b63:
+> > 
+> >   Merge branch 'devel-stable' into devel (2010-10-18 22:34:52 +0100)
 > 
-> Or at least explained in the patch description.
+> Errrrr, no, I'm about to re-merge devel-stable into devel...
 > 
-> For instance, can someone explain why the lock for leds and gpio stuff
-> on Footbridge needs to be converted?  What is the original problem?
-> More importantly, what is the criteria for using a raw spinlock instead
-> of a normal spinlock?
+> What's the reason for basing it on my tree?  Could it be based on top
+> of your previous pull request base, or alternatively Linus' tree?
 
-raw_spinlock is still a spinlock when PREEMPT_RT is enabled, mere
-spinlocks become magically "sleeping" spinlocks (aka. PI aware
-rtmutexes)
+It is on top of my last pull request and does not contain any patches of
+your tree. It's only that I chose your devel-stable branch as starting
+point for git request-pull. Sorry for confusion.
 
-Vs. the patches: IIRC, it was all fallout from running -rt, but that
-needs to be looked at case by case. Some of those are obvious as they
-are called deep down in atomic irq disabled code, but others might be
-just due to laziness reasons.
+Sascha
 
-There is no urgency to get them merged right now.
-
-Thanks,
-
-	tglx
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
