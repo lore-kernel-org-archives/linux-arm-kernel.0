@@ -1,97 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Oct 2010 18:50:04 +0200
-Subject: Pull request for i.MX
-In-Reply-To: <20101019142153.GV28242@pengutronix.de>
-References: <20101019142153.GV28242@pengutronix.de>
-Message-ID: <20101019165004.GX28242@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Oct 2010 14:54:00 -0200
+Subject: [PATCH 1/1] Mx35pdk: enable debug board support
+In-Reply-To: <AANLkTimqGRiP1QUtNdJuyQMN_bf+4R7dEn-LNd7bhAu4@mail.gmail.com>
+References: <1287129633-9244-1-git-send-email-jgq516@gmail.com>
+	<AANLkTikY=wBiJZ0NFKJKX-TTKRAj_LWmaxD-BpuPNYzL@mail.gmail.com>
+	<AANLkTi=jyQDNmGK1-VB_xOP8H4+jXNwS6oHgft90gGLW@mail.gmail.com>
+	<AANLkTim65XWxn_Mc59PXbiOOqUVMDNqeweU38y_3R7_X@mail.gmail.com>
+	<AANLkTi=upCD4iKhkvkzk7Kcb++OYR3pZTQw4i9fTEkFg@mail.gmail.com>
+	<AANLkTimqGRiP1QUtNdJuyQMN_bf+4R7dEn-LNd7bhAu4@mail.gmail.com>
+Message-ID: <AANLkTinD_LWiqh9Pc-jOsKArfBBLAYeExgfdNMb5CaAT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 19, 2010 at 1:59 PM, xiao jiang <jgq516@gmail.com> wrote:
+>
+>
+...
+>>
+> I don't think so, since **_PIN_** is expected for IOMUX_TO_IRQ, not
+> **_PAD_**, and I think kernel can't pass compile with
+> "IOMUX_TO_IRQ(MX35_PAD_GPIO1_1__GPIO1_1)"
 
-Here's the updated pull request, without duplicated patches this
-time
+Have you tried the same method as in MX51_3ds?
 
-Sascha
+#define EXPIO_PARENT_INT    (MXC_INTERNAL_IRQS + GPIO_PORTx + y)
 
-The following changes since commit b9969f6525c9c00b042441acb0e1c0ee95560b63:
+Regards,
 
-  Merge branch 'devel-stable' into devel (2010-10-18 22:34:52 +0100)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
-
-Dinh Nguyen (1):
-      ARM: imx: Add iram allocator functions
-
-Eric B?nard (15):
-      mx25: fix clock's calculation
-      mx25: fix compile error in platform-imx-dma.c
-      i.MX31 and i.MX35 : fix errate TLSbo65953 and ENGcm09472
-      cpuimx25 & cpuimx35: fix OTG port registration in host mode
-      eukrea_mbimxsd: add support for DVI displays
-      clock-mx51: factorize clk_set_parent and clk_get_rate
-      clock-mx51: rename CLOCK1 to CLOCK_CCGR for better readability
-      iomux-mx51: fix SD1 and SD2's iomux configuration
-      mx51: add resources for SD/MMC on i.MX51
-      imx-esdhc: update devices registration
-      iomux-mx51: fix GPIO_1_xx 's IOMUX configuration
-      mx5: add cpuimx51sd module and its baseboard
-      cpuimx51: update board support
-      mach-pcm037_eet: fix compile errors
-      cpuimx27: fix compile when ULPI is selected
-
-Fabio Estevam (1):
-      eukrea_mbimxsd-baseboard: Pass the correct GPIO to gpio_free
-
-Ian Lartey (1):
-      Fixing ethernet driver compilation error for i.MX31 ADS board
-
-Marc Kleine-Budde (1):
-      ARM: imx: add lost 3rd imx-i2c device for mx35
-
- arch/arm/mach-imx/Kconfig                          |    1 +
- arch/arm/mach-mx25/clock.c                         |    6 +-
- arch/arm/mach-mx25/devices-imx25.h                 |    7 +-
- arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c      |   34 ++-
- arch/arm/mach-mx25/mach-cpuimx25.c                 |   14 +-
- arch/arm/mach-mx3/devices-imx35.h                  |    9 +-
- arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c       |   42 +++-
- arch/arm/mach-mx3/mach-cpuimx35.c                  |   14 +-
- arch/arm/mach-mx3/mach-mx31ads.c                   |    7 +-
- arch/arm/mach-mx3/mach-pcm037_eet.c                |    3 +-
- arch/arm/mach-mx3/mach-pcm043.c                    |    2 +-
- arch/arm/mach-mx5/Kconfig                          |   28 ++
- arch/arm/mach-mx5/Makefile                         |    2 +
- arch/arm/mach-mx5/board-cpuimx51.c                 |    9 +
- arch/arm/mach-mx5/board-cpuimx51sd.c               |  333 ++++++++++++++++++++
- arch/arm/mach-mx5/clock-mx51.c                     |  244 +++++++++------
- arch/arm/mach-mx5/devices-imx51.h                  |    4 +
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c       |   23 ++-
- arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c       |  166 ++++++++++
- arch/arm/plat-mxc/Kconfig                          |    4 +
- arch/arm/plat-mxc/Makefile                         |    1 +
- arch/arm/plat-mxc/devices/platform-esdhc.c         |   56 +++-
- arch/arm/plat-mxc/devices/platform-imx-i2c.c       |    1 +
- arch/arm/plat-mxc/include/mach/board-mx31ads.h     |   33 ++
- arch/arm/plat-mxc/include/mach/devices-common.h    |   10 +-
- arch/arm/plat-mxc/include/mach/eukrea-baseboards.h |    5 +-
- arch/arm/plat-mxc/include/mach/iomux-mx51.h        |   59 +++--
- arch/arm/plat-mxc/include/mach/iram.h              |   41 +++
- arch/arm/plat-mxc/include/mach/mx25.h              |    6 +-
- arch/arm/plat-mxc/include/mach/mx35.h              |    6 +-
- arch/arm/plat-mxc/include/mach/mx51.h              |   16 +-
- arch/arm/plat-mxc/include/mach/system.h            |   32 ++-
- arch/arm/plat-mxc/include/mach/uncompress.h        |    1 +
- arch/arm/plat-mxc/iram_alloc.c                     |   73 +++++
- 34 files changed, 1102 insertions(+), 190 deletions(-)
- create mode 100644 arch/arm/mach-mx5/board-cpuimx51sd.c
- create mode 100644 arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
- create mode 100644 arch/arm/plat-mxc/include/mach/board-mx31ads.h
- create mode 100644 arch/arm/plat-mxc/include/mach/iram.h
- create mode 100644 arch/arm/plat-mxc/iram_alloc.c
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Fabio Estevam
