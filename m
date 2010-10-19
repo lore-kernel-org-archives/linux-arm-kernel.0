@@ -1,24 +1,83 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 19 Oct 2010 12:05:41 +0200
-Subject: [PATCH 1/5] Fix AT91SAM9G20 reset as per the errata in the data
-	sheet
-In-Reply-To: <20101015122902.GF11127@game.jcrosoft.org>
-References: <20100528153725.GA5102@axolotl.localnet>
-	<29a192a1f4f98dd05b72ed8eafe67bd6aadd8432.1287076894.git.nicolas.ferre@atmel.com>
-	<20101015122902.GF11127@game.jcrosoft.org>
-Message-ID: <4CBD6D75.4070908@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 19 Oct 2010 12:07:06 +0200
+Subject: [PATCHv3] cpufreq for freescale mx51
+In-Reply-To: <AANLkTik=UWF0PpAUKGE3KwmJbZNgxUj-8o6ouD+LYcSx@mail.gmail.com>
+References: <1287390105-3706-1-git-send-email-yong.shen@linaro.org>
+	<20101018101314.GA4395@pengutronix.de>
+	<AANLkTik=UWF0PpAUKGE3KwmJbZNgxUj-8o6ouD+LYcSx@mail.gmail.com>
+Message-ID: <20101019100706.GR28242@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/10/2010 14:29, Jean-Christophe PLAGNIOL-VILLARD :
->> +at91sam9g20_reset:	mov	r0, #0
->> +			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
-> do we really need to flush the I-cache again
+On Tue, Oct 19, 2010 at 05:28:51PM +0800, Yong Shen wrote:
+> >
+> >
+> >
+> > > +#include <linux/kernel.h>
+> > > +
+> > > +static struct cpu_op mx51_cpu_op[] = {
+> > > +     {
+> > > +     .cpu_rate = 160000000,},
+> > > +     {
+> > > +     .cpu_rate = 800000000,},
+> > > +};
+> >
+> > Why did you remove the values between 800MHz and 160MHz? 400MHz and
+> > 200Mhz should work also, no?
+> >
+> > It proved that those operating points don't work well.
 
-You are right, it is done in the calling function: arm_machine_restart().
+ok
 
-I will correct it in the patch series.
+> > > +static struct cpu_op *cpu_op_tbl;
+> > > +
+> > > +static int set_cpu_freq(int freq)
+> > > +{
+> > > +     int ret = 0;
+> > > +     int org_cpu_rate;
+> > > +
+> > > +     org_cpu_rate = clk_get_rate(cpu_clk);
+> > > +     if (org_cpu_rate == freq)
+> > > +             return ret;
+> >
+> > You already checked this in mxc_set_target. Once is enough.
+> >
+> 
+> Well, this fucntion is not only used in mxc_set_target, so it is safer to
+> still keep checking here.
 
-Best regards,
+Then you can skip the check in the calling function.
+
+> > > +
+> > > +static int __init mxc_cpufreq_init(struct cpufreq_policy *policy)
+> > > +{
+> > > +     int ret;
+> > > +     int i;
+> > > +
+> > > +     printk(KERN_INFO "i.MXC CPU frequency driver\n");
+> > > +
+> > > +     if (policy->cpu != 0)
+> > > +             return -EINVAL;
+> > > +
+> > > +     cpu_clk = clk_get(NULL, "cpu_clk");
+> > > +     if (IS_ERR(cpu_clk)) {
+> > > +             printk(KERN_ERR "%s: failed to get cpu clock\n", __func__);
+> > > +             return PTR_ERR(cpu_clk);
+> > > +     }
+> > > +
+> > > +     cpu_op_tbl = get_cpu_op(&cpu_op_nr);
+> >
+> > This will crash every board except the babbage board which happens to
+> > set this function pointer.
+> >
+> Add a checking here should avoid that.
+
+indeed
+
+Sascha
+
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
