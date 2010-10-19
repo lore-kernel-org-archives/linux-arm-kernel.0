@@ -1,56 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Oct 2010 20:21:32 +0100
-Subject: [PATCH] ARM: allow, but warn, when issuing ioremap() on RAM
-In-Reply-To: <AANLkTikZAt-KWFF_MXxXGruia-=AieStQgird2XWgr6y@mail.gmail.com>
-References: <20101008175308.GA10975@n2100.arm.linux.org.uk>
-	<AANLkTi=ERZjVDS=Q7aw1zA23KF68irUP3vvKLZw5meBU@mail.gmail.com>
-	<20101008230451.GB10975@n2100.arm.linux.org.uk>
-	<20101008232539.GA28697@kroah.com>
-	<20101008234448.GD10975@n2100.arm.linux.org.uk>
-	<AANLkTinhwORqdWU43yr1AXJGZm2zPKGG+Q9twruNs2aH@mail.gmail.com>
-	<20101009092127.GB20975@n2100.arm.linux.org.uk>
-	<AANLkTimQJLmDZPHtVJLCv9ZQgx_Yjh9=MOwOxMSAz4QX@mail.gmail.com>
-	<20101011152516.GF27153@n2100.arm.linux.org.uk>
-	<AANLkTikZAt-KWFF_MXxXGruia-=AieStQgird2XWgr6y@mail.gmail.com>
-Message-ID: <20101019192132.GD10325@n2100.arm.linux.org.uk>
+From: simon@sequanux.org (Simon Guinot)
+Date: Tue, 19 Oct 2010 19:30:43 +0000
+Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101019151512.GB13908@ericsson.com>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<20101018160830.GB9033@ericsson.com>
+	<20101018203610.GD29120@kw.sim.vm.gnt>
+	<20101019065221.GA12406@ericsson.com>
+	<20101019083656.GE29120@kw.sim.vm.gnt>
+	<20101019151512.GB13908@ericsson.com>
+Message-ID: <20101019193043.GH29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 01:13:36AM -0700, Colin Cross wrote:
-> On Mon, Oct 11, 2010 at 8:25 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sun, Oct 10, 2010 at 04:52:36AM +0300, Felipe Contreras wrote:
-> > Here's a different approach which will work. ?This pushes ARM further
-> > towards using memblock for everything relating to memory init (although
-> > we still have the old membank stuff around.)
-> >
-> > The advantage with this is that memblock is now used as the basis for
-> > determining where memory is, setting up the maps, freeing memory into
-> > the pools, etc.
-> >
-> > What this also means is that this code in the ->reserve callback:
-> >
-> > ? ? ? ?size = min(size, SZ_2M);
-> > ? ? ? ?base = memblock_alloc(size, min(align, SZ_2M));
-> > ? ? ? ?memblock_free(base, size);
-> > ? ? ? ?memblock_remove(base, size);
-> >
-> > will result in [base+size] being removed from the available memory,
-> > using highmem if available, if not from lowmem and removing it from
-> > the lowmem memory map - which is exactly the behaviour we want.
-> >
-> > ?arch/arm/mm/init.c | ?160 +++++++++++++++++++++++++++++++++++-----------------
-> > ?arch/arm/mm/mmu.c ?| ? 43 ++++++++------
-> > ?mm/memblock.c ? ? ?| ? ?4 +
-> > ?3 files changed, 138 insertions(+), 69 deletions(-)
-> 
-> If memblock_remove is used on the end of memory with this patch,
-> mem_init accesses off the end of the array of page structures because
-> of the discrepancy between memblock.memory and membank on the number
-> of the last pfn.   memblock.memory is used to determine the memory
-> zones in arm_bootmem_free, which eventually  is used to create the
-> array of page structures, but mem_init iterates over membank and calls
-> pfn_to_page on pfns up to bank_pfn_end.
+Hi Guenter,
 
-BTW, reverting the change to find_limits() should resolve this problem.
-Please confirm.
+On Tue, Oct 19, 2010 at 08:15:12AM -0700, Guenter Roeck wrote:
+> Hi Simon,
+> 
+> On Tue, Oct 19, 2010 at 04:36:56AM -0400, Simon Guinot wrote:
+> 
+> [ ... ]
+> 
+> > /* Designed for fan 40x40x16: ADDA AD0412LB-D50 6000rpm at 12v */
+> > static struct gpio_fan_speed netspace_max_v2_fan_speed[] = {
+> >         {    0,  0 },
+> >         { 1500, 15 },
+> >         { 1700, 14 },
+> >         { 1800, 13 },
+> >         { 2100, 12 },
+> >         { 3100, 11 },
+> >         { 3300, 10 },
+> >         { 4300,  9 },
+> >         { 5500,  8 },
+> > };
+> > 
+> > The function rpm_speed(index) is really not linear. I am not sure about
+> > the resulting behaviour when this will be used by a userland fan control
+> > process...
+> > 
+> > If the pwm interface must be exported, I think we have to respect the
+> > fan speed array. But as you said, maybe the work is rather on the
+> > fancontrol script side.
+> > 
+> Not sure if there is an expectation that the mapping pwm->speed has
+> to be linear. One might as well argue that steps should be equally
+> far apart to ensure that results are better predictable.
+> 
+> > As a first step, we could keep the heavy pwm interface. Once the
+> > fancontrol script (or something else) will be able to handle the rpm
+> > attributes, we will drop the pwm compatibility.
+> > Simply remove the gpio-fan pwm interface seems a good option too...
+> > 
+> I think we should keep the pwm interface after all. Changing fancontrol
+> is a possibility, but the change would take a while to make it upstream.
+
+Yes, I understand. I will probably look soon into fancontrol.
+Some of the cheapest LaCie board have a fan and no temperature sensors.
+The embedded system get a more or less accurate temperature from the
+hard drive sensor via SMART commands :)
+I'd like to have some userspace fan support for this boards too.
+
+> 
+> As for the actual code, I would prefer the simpler implementation, but I am willing 
+> to go with the complex one if you feel wtrongly about it. Only thing I would ask you
+> to do is to add an explanation of what is done and why.
+
+Looking at the pwm_to_rpm() and rpm_to_pwm() functions, I can't feel
+strongly a such implementation (but maybe wrongly).
+So... I have changed my mind. The simpler implementation make sense:
+the pwm value will simply map the speed index.
+Moreover it appear to be very usable from a userspace point.
+
+> 
+> Reminds me - you'll also have to provide Documentation/hwmon/gpio-fan.
+
+Ok.
+
+Thanks,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101019/ebed0881/attachment.sig>
