@@ -1,27 +1,63 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Tue, 19 Oct 2010 15:03:45 -0700
-Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <1287330612-11256-1-git-send-email-simon@sequanux.org>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-Message-ID: <1287525825.9690.313.camel@groeck-laptop>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Oct 2010 00:07:48 +0200 (CEST)
+Subject: [patch 00/12] arm: raw_spinlock annotations
+In-Reply-To: <201010192220.33738.arnd@arndb.de>
+References: <20100217125328.791176536@linutronix.de>
+	<20101019184433.GA10325@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1010192158440.6815@localhost6.localdomain6>
+	<201010192220.33738.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1010200006190.6815@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-one more comment ...
+On Tue, 19 Oct 2010, Arnd Bergmann wrote:
 
-On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-[ ... ]
-> +static int __devinit
-> +fan_alarm_init(struct gpio_fan_data *fan_data, struct gpio_fan_alarm *alarm)
-> +{
+> On Tuesday 19 October 2010 22:03:32 Thomas Gleixner wrote:
+> > On Tue, 19 Oct 2010, Russell King - ARM Linux wrote:
+> > 
+> > > On Tue, Oct 19, 2010 at 05:26:45PM +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 19 October 2010, Uwe Kleine-K?nig wrote:
+> > > > > While cleaning up my repo I refound the patches and rebased them on top
+> > > > > of today's Linus' tree and only needed to fix up the l2x0_lock patch as
+> > > > > in the meantime a new usage hit mainline.
+> > > > 
+> > > > The patches all look harmless, but none of them has any information on
+> > > > why the particular locks need to be raw_spin_lock. Ideally a raw spinlock
+> > > > should be the absolute exception, and IMHO should have a comment in front
+> > > > of it why it is special.
+> > > 
+> > > Or at least explained in the patch description.
+> > > 
+> > > For instance, can someone explain why the lock for leds and gpio stuff
+> > > on Footbridge needs to be converted?  What is the original problem?
+> > > More importantly, what is the criteria for using a raw spinlock instead
+> > > of a normal spinlock?
+> > 
+> > raw_spinlock is still a spinlock when PREEMPT_RT is enabled, mere
+> > spinlocks become magically "sleeping" spinlocks (aka. PI aware
+> > rtmutexes)
+> 
+> I think we all understood that part of the series description.
+> 
+> > Vs. the patches: IIRC, it was all fallout from running -rt, but that
+> > needs to be looked at case by case. Some of those are obvious as they
+> > are called deep down in atomic irq disabled code, but others might be
+> > just due to laziness reasons.
+> 
+> Not as obvious as you'd think. The explanation "called in atomic irq
+> disabled code" makes sense, but I hadn't thought of that before -- I had
+> expected all that code to use IRQ threads in case of PREEMPT_RT.
+> 
+> Requiring a comment there would probably eliminate the laziness issues,
+> adding a comment that you can't be bothered to do the right fix won't
+> help getting a patch merged, so ideally you'd end up with a better
+> solution getting merged.
 
-__devinit and __devexit can cause problems if this driver is built into
-the kernel, but the underlying i2c master driver is built as module.
-
-So please remove __devinit and __devexit.
+I know, that's why I'm not pressuring that issue. It needs work and
+looking at the code and context. That few lines can happily live in
+-rt for now. We have bigger fish to fry there.
 
 Thanks,
-Guenter
+
+	tglx
