@@ -1,45 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Oct 2010 16:37:17 +0200
-Subject: [patch 00/12] arm: raw_spinlock annotations
-In-Reply-To: <20100217125328.791176536@linutronix.de>
-References: <20100217125328.791176536@linutronix.de>
-Message-ID: <20101019143717.GH11713@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 19 Oct 2010 16:39:00 +0200
+Subject: [PATCH 05/12] ARM: Convert cpu_asid_lock to raw_spinlock
+In-Reply-To: <20101019143717.GH11713@pengutronix.de>
+References: <20101019143717.GH11713@pengutronix.de>
+Message-ID: <1287499147-13846-5-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Thomas Gleixner <tglx@linutronix.de>
 
-On Wed, Feb 17, 2010 at 01:19:56PM -0000, Thomas Gleixner wrote:
-> Preempt-RT converts spinlocks to sleeping spinlocks, but some
-> spinlocks need to be kept as real spinlocks. In 2.6.33 we merged the
-> spinlock namespace cleanup which allows us to annotate those
-> locks. The lock type is change to raw_spinlock which is the same as a
-> common spinlock in !RT kernels.
-> 
-> The following series is a collection of lock annotations from the
-> preempt-rt tree. Please merge into 2.6.34.
-Back then I imported these changes in my repo and found them now when
-cleaning it up.  I once tried to get them in[1], and Russell answered:
+cpu_asid_lock needs to be a real spinlock on preempt-rt. Convert it to
+a raw_spinlock. No change for !RT kernels.
 
-	Thomas asked me about a pull request for his patches, and I said
-	no because they're spread across many different mach-*
-	directories.  So this isn't helpful.
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mm/context.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-I don't understand that critism, as apart from "ARM: footbridge: Convert
-gpio and led locks to raw_spinlock" most patches (9) only touch a single
-file, the others only touch a single lock and fix all callers.  The
-footbridge patch admittedly is not that nice, but that's because the
-touched lock is used all across the tree.
-
-While cleaning up my repo I refound the patches and rebased them on top
-of today's Linus' tree and only needed to fix up the l2x0_lock patch as
-in the meantime a new usage hit mainline.
-
-Best regards
-Uwe
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/74675
-
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index b0ee9ba..f3a9336 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -16,7 +16,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/tlbflush.h>
+ 
+-static DEFINE_SPINLOCK(cpu_asid_lock);
++static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
+ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+ #ifdef CONFIG_SMP
+ DEFINE_PER_CPU(struct mm_struct *, current_mm);
+@@ -117,7 +117,7 @@ void __new_context(struct mm_struct *mm)
+ {
+ 	unsigned int asid;
+ 
+-	spin_lock(&cpu_asid_lock);
++	raw_spin_lock(&cpu_asid_lock);
+ #ifdef CONFIG_SMP
+ 	/*
+ 	 * Check the ASID again, in case the change was broadcast from
+@@ -125,7 +125,7 @@ void __new_context(struct mm_struct *mm)
+ 	 */
+ 	if (unlikely(((mm->context.id ^ cpu_last_asid) >> ASID_BITS) == 0)) {
+ 		cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
+-		spin_unlock(&cpu_asid_lock);
++		raw_spin_unlock(&cpu_asid_lock);
+ 		return;
+ 	}
+ #endif
+@@ -153,5 +153,5 @@ void __new_context(struct mm_struct *mm)
+ 	}
+ 
+ 	set_mm_context(mm, asid);
+-	spin_unlock(&cpu_asid_lock);
++	raw_spin_unlock(&cpu_asid_lock);
+ }
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.3
