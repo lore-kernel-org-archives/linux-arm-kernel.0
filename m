@@ -1,66 +1,41 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Oct 2010 09:50:25 -0500
-Subject: [PATCH v2] omap4: pandaboard: fix up mmc card detect logic
-Message-ID: <1287499825-24988-1-git-send-email-nm@ti.com>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Tue, 19 Oct 2010 07:52:20 -0700
+Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101019114636.GF29120@kw.sim.vm.gnt>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<20101018160830.GB9033@ericsson.com>
+	<20101018203610.GD29120@kw.sim.vm.gnt>
+	<20101018205034.GA10473@ericsson.com>
+	<20101019114636.GF29120@kw.sim.vm.gnt>
+Message-ID: <20101019145220.GA13908@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Menon, Nishanth <nm@ti.com>
+Hi Simon.
 
-For MMC1 Controller, card detect interrupt source is
-twl6030 which is non-gpio. The card detect call back function provides
-card present/absent status by reading MMC Control register present
-on twl6030. This functionality was introduced in mfd tree on
-track to kernel.org
+On Tue, Oct 19, 2010 at 07:46:36AM -0400, Simon Guinot wrote:
 
-Sync pandaboard to the same and make mmc work.
+> Hi Guenter,
+[ ... ]
+> > It probably does. Wonder what it actually shows. Can you check ?
+> 
+> If CONFIG_PRINTK is enabled, dev_info() end up in a dev_printk() call
+> with the level argument set to KERN_INFO.
+> The message format is:
+> ${driver_name} ${device_name}: ${message}
+> 
+> Note that the device id number is part of the device name. So, if two
+> gpio-fan devices are initialized, you will see:
+> 
+> gpio-fan gpio-fan.0: GPIO fan initialized
+> gpio-fan gpio-fan.1: GPIO fan initialized
+> 
+> For a single fan device, you will see:
+> 
+> gpio-fan gpio-fan: GPIO fan initialized
+> 
+Ok, guess that is all we can ask for.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Madhusudhan Chikkature <madhu.cr@ti.com>
-Cc: Adrian Hunter <adrian.hunter@nokia.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-
-Acked-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Tested-by: Jarkko Nikula <jhnikula@gmail.com>
-Acked-by: Madhusudhan Chikkature <madhu.cr@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
-v2: reposting to l-a, l-o
-Depends on 
-http://git.kernel.org/?p=linux/kernel/git/sameo/mfd-2.6.git;a=commitdiff;h=1bf5197061a4aec99e9fd4f92d4a543310f83585;hp=0c9b33e5a23e2053165c9e30ffff3b3a3cf1b2b8
-Discussion:
-http://marc.info/?t=128714921300007&r=1&w=2
-
- arch/arm/mach-omap2/board-omap4panda.c |   15 ++++++++++++---
- 1 files changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 702f2a6..1ecd0a6 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -160,10 +160,19 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
- 				struct platform_device, dev);
- 	struct omap_mmc_platform_data *pdata = dev->platform_data;
- 
-+	if (!pdata) {
-+		dev_err(dev, "%s: NULL platform data\n", __func__);
-+		return -EINVAL;
-+	}
- 	/* Setting MMC1 Card detect Irq */
--	if (pdev->id == 0)
--		pdata->slots[0].card_detect_irq = TWL6030_IRQ_BASE +
--						MMCDETECT_INTR_OFFSET;
-+	if (pdev->id == 0) {
-+		ret = twl6030_mmc_card_detect_config();
-+		 if (ret)
-+			dev_err(dev, "%s: Error card detect config(%d)\n",
-+				__func__, ret);
-+		 else
-+			pdata->slots[0].card_detect = twl6030_mmc_card_detect;
-+	}
- 	return ret;
- }
- 
--- 
-1.6.3.3
+Thanks,
+Guenter
