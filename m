@@ -1,47 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Oct 2010 22:58:27 +0200
-Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
-In-Reply-To: <AANLkTinNfERyi_bTWc7LOKR1uRLC3E612ubFKBLxWB1E@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 19 Oct 2010 23:02:37 +0200
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <87r5fmxghm.fsf@deeprootsystems.com>
 References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<AANLkTimDdPUjo+65vBL0PTQ3b=5NpeVT28XrdkYqx3Ex@mail.gmail.com>
-	<AANLkTinNfERyi_bTWc7LOKR1uRLC3E612ubFKBLxWB1E@mail.gmail.com>
-Message-ID: <201010192258.27988.arnd@arndb.de>
+	<1287387875-14168-4-git-send-email-ohad@wizery.com>
+	<87r5fmxghm.fsf@deeprootsystems.com>
+Message-ID: <AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 October 2010 22:43:34 Ohad Ben-Cohen wrote:
-> > Disabling irqs might be a concern as a source of RT latency.  It
-> > might be better to make the caller responsible for managing local spin
-> > locks and irq disable/enable.
-> 
-> This a coming from an hardware requirement, rather than a choice the
-> user should take.
-> 
-> If a hwspinlock is taken over a long period of time, its other user
-> (with which we try to achieve synchronization) might be polling the
-> OMAP interconnect for too long (trying to take the hwspinlock) and
-> thus preventing it to be used for other transactions.
+On Tue, Oct 19, 2010 at 7:03 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+>> +postcore_initcall(hwspinlocks_init);
+>
+> Any reason this needs to be a postcore_initcall? ?Are there users of
+> hwspinlocks this early in boot?
 
-This sounds exactly like any other spinlock.
+i2c-omap, which is subsys_initcall (the I2C bus is shared between the
+A9 and the M3 on some OMAP4 boards).
 
-> To prevent such lengthy polling on the interconnect, the hwspinlock
-> should only be used for very short period of times, with preemption
-> and interrupts disabled.
+And to allow early board code to reserve specific hwspinlock numbers
+for predefined use-cases, we probably want to be before arch_initcall.
 
-Interrupts disabled in general might go a bit too far -- they are also
-short and infrequent events unless you have seriously broken drivers.
-
-When running with CONFIG_PREEMPT, I would guess you actually want to
-turn the omap_hwspinlock into a sleeping operation, though that would
-require much extra work to implement. Disabling preemption while the
-hwspinlock is held is of course a correct implementation technically,
-but it might not be what someone enabling CONFIG_PREEMPT expects.
-
-> That's why we don't give users the choice whether to disable
-> interrupts or not - it's simply not a decision they should take.
-
-What about those cases where you already know that interrupts are
-disabled, e.g. while holding a regular spin_lock_irq or inside
-of an interrupt handler?
-
-	Arnd
+> The I2C  ?Probaly subsys or even device_initcall
+> is more appropriate here.
+>
+> I would've suspected that any users of hwspinlocks will be dependent on
+> drivers for the other cores (e.g. syslink) which would likely be
+> initialized much later.
+>
+> Kevin
+>
