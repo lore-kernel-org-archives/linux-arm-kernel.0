@@ -1,34 +1,40 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 19 Oct 2010 17:27:27 +0200
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <i9ka0s$4ua$1@dough.gmane.org>
-References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<4CBD8EE4.5040808@evidence.eu.com> <i9ka0s$4ua$1@dough.gmane.org>
-Message-ID: <201010191727.53314.alexander.stein@systec-electronic.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 19 Oct 2010 17:37:43 +0200
+Subject: Pull request for i.MX
+In-Reply-To: <20101019152031.GD2622@jasper.tkos.co.il>
+References: <20101019152031.GD2622@jasper.tkos.co.il>
+Message-ID: <20101019153743.GW28242@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 October 2010, 16:29:48 Grant Edwards wrote:
-> On 2010-10-19, Claudio Scordino <claudio@evidence.eu.com> wrote:
-> > +2. HARDWARE-RELATED CONSIDERATIONS
-> > +
-> > +   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working
-> > both +   as RS232 and RS485.
+On Tue, Oct 19, 2010 at 05:20:32PM +0200, Baruch Siach wrote:
+> >       cpuimx51: update board support
+> >       mach-pcm037_eet: fix compile errors
+> >       cpuimx27: fix compile when ULPI is selected
+> >       mx25: fix clock's calculation
+> >       mx25: fix compile error in platform-imx-dma.c
+> >       i.MX31 and i.MX35 : fix errate TLSbo65953 and ENGcm09472
+> >       cpuimx25 & cpuimx35: fix OTG port registration in host mode
+> >       eukrea_mbimxsd: add support for DVI displays
+> >       clock-mx51: factorize clk_set_parent and clk_get_rate
+> >       clock-mx51: rename CLOCK1 to CLOCK_CCGR for better readability
+> >       iomux-mx51: fix SD1 and SD2's iomux configuration
+> >       mx51: add resources for SD/MMC on i.MX51
+> >       imx-esdhc: update devices registration
+> >       iomux-mx51: fix GPIO_1_xx 's IOMUX configuration
+> >       mx5: add cpuimx51sd module and its baseboard
+> >       cpuimx51: update board support
 > 
-> Pardon my curiosity, but I've looked at a few AT91 parts, and I've
-> never seen on with an internal transceiver -- nor does Google seem
-> able to find any.
-> 
-> Frankly, I'd be pretty surprised, since it would be very difficult
-> (fab-wise), to build a mircoprocessor with I/O cells capable of
-> withstanding the voltage levels specified in RS232.
-> 
-> Can you specify to which parts you're referring?
+> For some reason the first 13 commits appear twice in this list. Is this 
+> intended?
 
-I doubt the AT91 do have an internal transceiver but it has a dedicated pin 
-feature (RTS or CTS or something) which can be used to switch between RS232 
-and RS485 by setting a bit in the USART provided the pin is connected 
-properly.
+Because I merged Uwes branch into mine. I'll fix this once I'm at home
 
-Regards,
-Alexander
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
