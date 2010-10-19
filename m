@@ -1,42 +1,93 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Wed, 20 Oct 2010 00:03:11 +0530
-Subject: linux-next: omap2plus_defconfig does not build
-In-Reply-To: <20101019171515.GB3038@atomide.com>
-References: <a36d6a1047d959af6ea65cd7edacf6a8@mail.gmail.com>
-	<20101019171515.GB3038@atomide.com>
-Message-ID: <AANLkTikGkpx8Pd9uPSyQus2FibyU=zUjxFkwJnofFO9q@mail.gmail.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 19 Oct 2010 13:39:52 -0500
+Subject: [PATCHv3 2/2] ARM: imx: Add wake functionality to GPIO
+In-Reply-To: <1287513592-6655-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287513592-6655-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1287513592-6655-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 10:45 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Anand Gadiyar <gadiyar@ti.com> [101013 06:14]:
->> Building omap2plus_defconfig (which enables support for
->> OMAP2420/2430/OMAP3
->> and OMAP4 in one image), I get the following build error.
->>
->> ? CC ? ? ?arch/arm/kernel/swp_emulate.o
->> /tmp/ccg979qz.s: Assembler messages:
->> /tmp/ccg979qz.s:343: Error: selected processor does not support ARM mode
->> `ldrexb r6,[r5]'
->> /tmp/ccg979qz.s:344: Error: selected processor does not support ARM mode
->> `strexb r1,r3,[r5]'
->> make[1]: *** [arch/arm/kernel/swp_emulate.o] Error 1
->> make: *** [arch/arm/kernel] Error 2
->>
->> I'm using CodeSourcery's 2010q1-202 toolchain based on gcc 4.4.1.
->>
->> I haven't been following the lists closely the last few days, so I'm not
->> sure if this is a known issue. Just reporting it for now.
->
-> This seems to be related to "ARM: Add SWP/SWPB emulation for ARMv7 processors (v5)"
-> where SWP_EMULATE is selected by default. For the omap2plus_defconfig in for-next
-> we now have CPU_V6 and CPU_V7 set with SMP and SMP_ON_UP.
->
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-I had forgotten I'd reported this earlier. I reported the build break
-again today, and Catalin provided this patch [1] which solves the
-build issue.
+Add function definition for irq_chip.set_wake to enable GPIO to
+wake-up the system.
 
-- Anand
+This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
 
-[1] http://marc.info/?t=128748412500003&r=1&w=2
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/plat-mxc/gpio.c              |   34 +++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/gpio.h |    1 +
+ 2 files changed, 35 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 9d38da0..e52c658 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -20,6 +20,7 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
+@@ -201,11 +202,44 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ 	}
+ }
+ 
++/*
++ * Set interrupt number "irq" in the GPIO as a wake-up source.
++ * While system is running, all registered GPIO interrupts need to have
++ * wake-up enabled. When system is suspended, only selected GPIO interrupts
++ * need to have wake-up enabled.
++ * @param  irq          interrupt source number
++ * @param  enable       enable as wake-up if equal to non-zero
++ * @return       This function returns 0 on success.
++ */
++static int gpio_set_wake_irq(u32 irq, u32 enable)
++{
++	u32 gpio = irq_to_gpio(irq);
++	u32 gpio_idx = gpio & 0x1F;
++	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
++
++	if (enable) {
++		port->suspend_wakeup |= (1 << gpio_idx);
++		if (port->irq_high && (gpio_idx >= 16))
++			enable_irq_wake(port->irq_high);
++		else
++			enable_irq_wake(port->irq);
++	} else {
++		port->suspend_wakeup &= ~(1 << gpio_idx);
++		if (port->irq_high && (gpio_idx >= 16))
++			disable_irq_wake(port->irq_high);
++		else
++			disable_irq_wake(port->irq);
++	}
++
++	return 0;
++}
++
+ static struct irq_chip gpio_irq_chip = {
+ 	.ack = gpio_ack_irq,
+ 	.mask = gpio_mask_irq,
+ 	.unmask = gpio_unmask_irq,
+ 	.set_type = gpio_set_irq_type,
++	.set_wake = gpio_set_wake_irq,
+ };
+ 
+ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+index af33b74..133150e 100644
+--- a/arch/arm/plat-mxc/include/mach/gpio.h
++++ b/arch/arm/plat-mxc/include/mach/gpio.h
+@@ -39,6 +39,7 @@ struct mxc_gpio_port {
+ 	struct gpio_chip chip;
+ 	u32 both_edges;
+ 	spinlock_t lock;
++	u32 suspend_wakeup;
+ };
+ 
+ int mxc_gpio_init(struct mxc_gpio_port*, int);
+-- 
+1.6.0.4
