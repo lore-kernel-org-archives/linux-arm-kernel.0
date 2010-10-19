@@ -1,63 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Oct 2010 00:07:48 +0200 (CEST)
-Subject: [patch 00/12] arm: raw_spinlock annotations
-In-Reply-To: <201010192220.33738.arnd@arndb.de>
-References: <20100217125328.791176536@linutronix.de>
-	<20101019184433.GA10325@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010192158440.6815@localhost6.localdomain6>
-	<201010192220.33738.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1010200006190.6815@localhost6.localdomain6>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Oct 2010 15:49:15 -0700
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <4CBD8BC2.3020000@ti.com>
+References: <4CBD707F.6050204@ti.com>
+	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+	<4CBD8BC2.3020000@ti.com>
+Message-ID: <20101019224915.GD3038@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Tue, 19 Oct 2010, Arnd Bergmann wrote:
-
-> On Tuesday 19 October 2010 22:03:32 Thomas Gleixner wrote:
-> > On Tue, 19 Oct 2010, Russell King - ARM Linux wrote:
-> > 
-> > > On Tue, Oct 19, 2010 at 05:26:45PM +0200, Arnd Bergmann wrote:
-> > > > On Tuesday 19 October 2010, Uwe Kleine-K?nig wrote:
-> > > > > While cleaning up my repo I refound the patches and rebased them on top
-> > > > > of today's Linus' tree and only needed to fix up the l2x0_lock patch as
-> > > > > in the meantime a new usage hit mainline.
-> > > > 
-> > > > The patches all look harmless, but none of them has any information on
-> > > > why the particular locks need to be raw_spin_lock. Ideally a raw spinlock
-> > > > should be the absolute exception, and IMHO should have a comment in front
-> > > > of it why it is special.
-> > > 
-> > > Or at least explained in the patch description.
-> > > 
-> > > For instance, can someone explain why the lock for leds and gpio stuff
-> > > on Footbridge needs to be converted?  What is the original problem?
-> > > More importantly, what is the criteria for using a raw spinlock instead
-> > > of a normal spinlock?
-> > 
-> > raw_spinlock is still a spinlock when PREEMPT_RT is enabled, mere
-> > spinlocks become magically "sleeping" spinlocks (aka. PI aware
-> > rtmutexes)
+* Anand Gadiyar <gadiyar@ti.com> [101019 05:06]:
+> On 10/19/2010 5:07 PM, Catalin Marinas wrote:
+> >On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
+> >>Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
+> >>processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
+> >>gets compiled when the omap2plus_defconfig is built - the
+> >>omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
+> >>image, and has CPU_V6 and CPU_V7 both enabled.
+> >
+> >This patch should fix it:
+> >
 > 
-> I think we all understood that part of the series description.
-> 
-> > Vs. the patches: IIRC, it was all fallout from running -rt, but that
-> > needs to be looked at case by case. Some of those are obvious as they
-> > are called deep down in atomic irq disabled code, but others might be
-> > just due to laziness reasons.
-> 
-> Not as obvious as you'd think. The explanation "called in atomic irq
-> disabled code" makes sense, but I hadn't thought of that before -- I had
-> expected all that code to use IRQ threads in case of PREEMPT_RT.
-> 
-> Requiring a comment there would probably eliminate the laziness issues,
-> adding a comment that you can't be bothered to do the right fix won't
-> help getting a patch merged, so ideally you'd end up with a better
-> solution getting merged.
+> Yes, it does. I've not yet boot tested on omap2; will try
+> that out in a bit.
 
-I know, that's why I'm not pressuring that issue. It needs work and
-looking at the code and context. That few lines can happily live in
--rt for now. We have bigger fish to fry there.
+Thanks that fixes it.
 
-Thanks,
-
-	tglx
+Acked-by: Tony Lindgren <tony@atomide.com>
