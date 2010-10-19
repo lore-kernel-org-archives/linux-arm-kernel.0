@@ -1,34 +1,38 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 19 Oct 2010 17:12:43 -0600
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 19 Oct 2010 16:31:30 -0700
+Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
+In-Reply-To: <1287387875-14168-1-git-send-email-ohad@wizery.com>
 References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-Message-ID: <AANLkTimTDCbLP+EeUeo35re0FrMvqV3ozU+v7DZXr_p3@mail.gmail.com>
+Message-ID: <1287531090.9245.139.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 3:02 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Tue, Oct 19, 2010 at 7:03 PM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->>> +postcore_initcall(hwspinlocks_init);
->>
->> Any reason this needs to be a postcore_initcall? ?Are there users of
->> hwspinlocks this early in boot?
->
-> i2c-omap, which is subsys_initcall (the I2C bus is shared between the
-> A9 and the M3 on some OMAP4 boards).
->
-> And to allow early board code to reserve specific hwspinlock numbers
-> for predefined use-cases, we probably want to be before arch_initcall.
+On Mon, 2010-10-18 at 09:44 +0200, Ohad Ben-Cohen wrote:
+> OMAP4 introduces a Spinlock hardware module, which provides hardware
+> assistance for synchronization and mutual exclusion between heterogeneous
+> processors and those not operating under a single, shared operating system
+> (e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP).
+> 
+> The intention of this hardware module is to allow remote processors,
+> that have no alternative mechanism to accomplish synchronization and mutual
+> exclusion operations, to share resources (such as memory and/or any other
+> hardware resource).
+> 
+> This patchset adds a new misc driver for this OMAP hwspinlock module.
 
-Man. this is getting ugly.  I think we need to discuss how to solve
-this at the Plumbers micro-conference. It kind of fits in with the
-whole embedded (ab)use of the device model topic anyway. Actually,
-this particular case isn't bad, but the moving of i2c and spi busses
-to an earlier initcall is just band-aiding the real problem of driver
-probe order dependencies.
+Does this code interface with some hardware unit (other than the other
+processors) to accomplish this locking ?
 
-g.
+The reason I ask is because MSM has similar code, and from what I can
+tell the MSM version has some structures in memory but that's all. It
+just operates on the structures in memory.
+
+It might be worth looking over the two implementation so we aren't both
+remaking the wheel.
+
+Daniel
+
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
