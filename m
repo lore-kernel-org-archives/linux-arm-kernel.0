@@ -1,35 +1,32 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 19 Oct 2010 04:29:50 +0200
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 19 Oct 2010 03:36:42 +0100
 Subject: [PATCH 5/6] mmc: sdhci-of-esdhc: factor out common stuff
-In-Reply-To: <20101018161355.GA21088@void.printf.net>
+In-Reply-To: <20101019022950.GC3485@pengutronix.de>
 References: <1287138064-21385-1-git-send-email-w.sang@pengutronix.de>
 	<1287138064-21385-6-git-send-email-w.sang@pengutronix.de>
 	<20101018161355.GA21088@void.printf.net>
-Message-ID: <20101019022950.GC3485@pengutronix.de>
+	<20101019022950.GC3485@pengutronix.de>
+Message-ID: <20101019023642.GA11777@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-> > -#define ESDHC_HOST_CONTROL_RES	0x05
-> > +#include "sdhci-esdhc.c"
+On Tue, Oct 19, 2010 at 04:29:50AM +0200, Wolfram Sang wrote:
+> > Stephen reports a -next build failure after this patch.  Presumably this
+> > should be sdhci-esdhc.h?  It's confusing that no-one else hit this.
 > 
-> Stephen reports a -next build failure after this patch.  Presumably this
-> should be sdhci-esdhc.h?  It's confusing that no-one else hit this.
+> Uh, ouch, one brown paper bag, please! Yeah, confusing, that is.
 
-Uh, ouch, one brown paper bag, please! Yeah, confusing, that is.
+Ah, not that confusing -- sdhci-of-esdhc.c essentially depends on PPC,
+and MMC_SDHCI_ESDHC_IMX depends on ARM, and I imagine we've only had
+testing on the latter.
 
-Regarding your patch:
+> Regarding your patch:
+> 
+> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Thanks.  When it comes time to send to Linus, I'll just roll this into
+your original [5/6].
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101019/ea6e72c6/attachment.sig>
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
