@@ -1,35 +1,26 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 19 Oct 2010 10:30:54 +0300
-Subject: [PATCH 1/2] arm: omap1: devices: need to return with a value
-In-Reply-To: <1287473455-25773-1-git-send-email-balbi@ti.com>
-References: <1287473455-25773-1-git-send-email-balbi@ti.com>
-Message-ID: <1287473455-25773-2-git-send-email-balbi@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 Oct 2010 09:54:10 +0200
+Subject: [PATCH 2/3] arm: return both physical and virtual addresses
+	from addruart
+In-Reply-To: <1287441854.5588.100.camel@c-dwalke-linux.qualcomm.com>
+References: <1283303270.566757.315468531956.2.gpush@pororo>
+	<1287439266.5588.64.camel@c-dwalke-linux.qualcomm.com>
+	<20101018221353.GE20376@n2100.arm.linux.org.uk>
+	<1287441854.5588.100.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20101019075410.GB11713@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the following warning:
+Hi Daniel,
 
-arch/arm/mach-omap1/devices.c: In function 'omap_init_wdt':
-arch/arm/mach-omap1/devices.c:298: warning: 'return' with
-no value, in function returning non-void
+> I can't look at the subject line and know that this patches is modifying
+> files in my tree.
+You could use procmail to sort patches that touch your code in a
+different mailbox (or copy if you prefer that).
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap1/devices.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Best regards
+Uwe
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index 63d68cf..a037aba 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -295,7 +295,7 @@ static struct platform_device omap_wdt_device = {
- static int __init omap_init_wdt(void)
- {
- 	if (!cpu_is_omap16xx())
--		return;
-+		return -ENODEV;
- 
- 	platform_device_register(&omap_wdt_device);
- 	return 0;
 -- 
-1.7.3.rc0.35.g8ac8c
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
