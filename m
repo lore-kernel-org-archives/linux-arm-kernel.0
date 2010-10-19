@@ -1,65 +1,106 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Oct 2010 11:47:24 +0900
-Subject: [PATCH 2/9 v2] ARM: S3C64XX: add nand support for mach-real6410
-In-Reply-To: <AANLkTinwBj2QtLdFMGDmqipJD9g1O9QzRUUZpCn=0q-z@mail.gmail.com>
-References: <20100929192354.25307.40197.stgit@darius-desktop>
-	<20100929193134.25307.65614.stgit@darius-desktop>
-	<04a401cb6ec7$b8291b00$287b5100$%kim@samsung.com>
-	<AANLkTinwBj2QtLdFMGDmqipJD9g1O9QzRUUZpCn=0q-z@mail.gmail.com>
-Message-ID: <04ef01cb6f37$f7733c80$e659b580$%kim@samsung.com>
+From: mhban@samsung.com (mhban)
+Date: Tue, 19 Oct 2010 11:55:53 +0900
+Subject: [PATCH] ARM: SAMSUNG: Bug fix spin_lock recursion in clk_enable()
+	and clk_disable()
+In-Reply-To: <AANLkTimWLcPGTYp+ShXzVu11TtzThj5O57rWxqOfZV=0@mail.gmail.com>
+References: <1286843980-23684-1-git-send-email-jc.lee@samsung.com>
+	<4CBCD3A5.5070701@fluff.org>
+	<AANLkTimWLcPGTYp+ShXzVu11TtzThj5O57rWxqOfZV=0@mail.gmail.com>
+Message-ID: <1287456953.19640.43.camel@puffmine-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darius Augulis wrote:
-> 
-> On Mon, Oct 18, 2010 at 4:23 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Darius Augulis wrote:
+On Tue, 2010-10-19 at 10:12 +0900, Jassi Brar wrote:
+> On Tue, Oct 19, 2010 at 8:09 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> > On 12/10/10 01:39, Jaecheol Lee wrote:
+> >> From: Minho Ban <mhban@samsung.com>
 > >>
-> >> Add nand device support and mtd partition table
-> >> for mach-real6410
+> >> The clk_enable() and clk_disable() can be used process and ISR either.
+> >> So spin_lock_irqsave should be used instead.
 > >>
-> >> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> >> Signed-off-by: Minho Ban <mhban@samsung.com>
+> >> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 > >> ---
+> >>  arch/arm/plat-samsung/clock.c |   12 ++++++++----
+> >>  1 files changed, 8 insertions(+), 4 deletions(-)
 > >>
-> >> Changelog since v1:
-> >> ?- Changed dependency on other patches
+> >> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+> >> index e8d20b0..2a991a5 100644
+> >> --- a/arch/arm/plat-samsung/clock.c
+> >> +++ b/arch/arm/plat-samsung/clock.c
+> >> @@ -138,31 +138,35 @@ void clk_put(struct clk *clk)
 > >>
-> >> ?arch/arm/mach-s3c64xx/Kconfig ? ? ? ? | ? ?1 +
-> >> ?arch/arm/mach-s3c64xx/mach-real6410.c | ? 40
-> >> +++++++++++++++++++++++++++++++++
-> >> ?2 files changed, 41 insertions(+), 0 deletions(-)
+> >>  int clk_enable(struct clk *clk)
+> >>  {
+> >> +     unsigned long flags;
+> >> +
+> >>       if (IS_ERR(clk) || clk == NULL)
+> >>               return -EINVAL;
 > >>
-
-(snip)
-
-> >> @@ -249,6 +288,7 @@ static void __init real6410_machine_init(void)
-> >> ? ? ? ? ? ? ? real6410_lcd_pdata.win[0]->win_mode.yres);
+> >>       clk_enable(clk->parent);
 > >>
-> >> ? ? ? s3c_fb_set_platdata(&real6410_lcd_pdata);
-> >> + ? ? s3c_nand_set_platdata(&real6410_nand_info);
+> >> -     spin_lock(&clocks_lock);
+> >> +     spin_lock_irqsave(&clocks_lock, flags);
 > >>
-> >> ? ? ? /* configure nCS1 width to 16 bits */
+> >>       if ((clk->usage++) == 0)
+> >>               (clk->enable)(clk, 1);
 > >>
-> > Where is 'END' of patch mark?
-> > maybe broken your patch file...?
+> >> -     spin_unlock(&clocks_lock);
+> >> +     spin_unlock_irqrestore(&clocks_lock, flags);
+> >>       return 0;
+> >>  }
+> >>
+> >>  void clk_disable(struct clk *clk)
+> >>  {
+> >> +     unsigned long flags;
+> >> +
+> >>       if (IS_ERR(clk) || clk == NULL)
+> >>               return;
+> >>
+> >> -     spin_lock(&clocks_lock);
+> >> +     spin_lock_irqsave(&clocks_lock, flags);
+> >>
+> >>       if ((--clk->usage) == 0)
+> >>               (clk->enable)(clk, 0);
+> >>
+> >> -     spin_unlock(&clocks_lock);
+> >> +     spin_unlock_irqrestore(&clocks_lock, flags);
+> >>       clk_disable(clk->parent);
+> >
+> > I'm not sure, but I don't belive that the clk_ api has
+> > ever been callable from non-sleepable contexts such as
+> > interrupt handlers.
+> >
+> > I would welcome RMK's response (or any other response)
+> > about this issue?
+> >
+> > Personally, given that some clk_ calls may sleep esp.
+> > for pll enables, I would prefer to see this patch
+> > dropped in favour of fixing the users.
 > 
-> Confused. What 'END' mark are you missing?
-> All patches are sent by stg mail, all apply fine, no conflict or other
-> messages from stgit.
-> Please explain what you mean.
+> I tend to agree.
+> I would like to know any such case where enabling/disabling of some
+> clock is so urgent as to require doing from ISR and not from a tasklet
+> scheduled from ISR.
+> Also let us not make it impossible in future to switch to common clock api
+> by Jeremy Kerr, that doesn't allow calls from IRQ context.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Generally, there is '--' mark and git version in the bottom of patch...
-If you make patch file using git-format-patch, maybe automatically add it.
+Hello,
 
-> 
-> p.s. checkpatch.pl also doesn't report any error.
-> 
-Yes...ok.
+Mostly you are right but it would require some explicit comment in clk.h
+(eg, clk_get/put) not to be confusing to the driver developer.
 
 Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards,
+Minho Ban
+
+-- 
+Minho Ban (mhban at samsung.com)
+Senior Engineer
+Platform R&D Team,  Mobile Comm.
+SAMSUNG ELECTRONICS Co.Ltd.
