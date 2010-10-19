@@ -1,93 +1,81 @@
-From: jgq516@gmail.com (xiao jiang)
-Date: Tue, 19 Oct 2010 09:50:07 +0800
-Subject: [PATCH 1/1] Mx35pdk: enable debug board support
-In-Reply-To: <AANLkTi=jyQDNmGK1-VB_xOP8H4+jXNwS6oHgft90gGLW@mail.gmail.com>
-References: <1287129633-9244-1-git-send-email-jgq516@gmail.com>
-	<AANLkTikY=wBiJZ0NFKJKX-TTKRAj_LWmaxD-BpuPNYzL@mail.gmail.com>
-	<AANLkTi=jyQDNmGK1-VB_xOP8H4+jXNwS6oHgft90gGLW@mail.gmail.com>
-Message-ID: <AANLkTim65XWxn_Mc59PXbiOOqUVMDNqeweU38y_3R7_X@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Tue, 19 Oct 2010 15:39:46 +0800
+Subject: [PATCHv3] cpufreq for freescale mx51
+In-Reply-To: <20101018100250.GB2562@matterhorn.lan>
+References: <1287390105-3706-1-git-send-email-yong.shen@linaro.org>
+	<20101018100250.GB2562@matterhorn.lan>
+Message-ID: <AANLkTikqQtmSxMqPAcv0prhuG=DK3tpR8Uf4V+sJpXWk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi amit,
 
-2010/10/19 Fabio Estevam <festevam@gmail.com>
+On Mon, Oct 18, 2010 at 6:02 PM, Amit Kucheria <amit.kucheria@linaro.org>wrote:
 
-> Hi Xiao,
+> Yong,
 >
-> 2010/10/18 xiao jiang <jgq516@gmail.com>:
-> > Hi Uwe & Fabio,
-> >
-> > 2010/10/15 <jgq516@gmail.com>
-> >>
-> >> From: Xiao Jiang <jgq516@gmail.com>
-> >>
-> >> Add debug board support, then kernel can boot from lan9217 ethernet.
-> >>
-> >> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
-> >> ---
-> >>  arch/arm/mach-mx3/mach-mx35_3ds.c          |    9 +++++++++
-> >>  arch/arm/plat-mxc/include/mach/iomux-mx3.h |    4 ++++
-> >>  2 files changed, 13 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> >> b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> >> index 1c30d72..78e0657 100644
-> >> --- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> >> +++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> >> @@ -34,11 +34,16 @@
-> >>
-> >>  #include <mach/hardware.h>
-> >>  #include <mach/common.h>
-> >> +#include <mach/irqs.h>
-> >> +#include <mach/iomux-mx3.h>
+> I get the following errors if I try to compile this with the Linaro
+> toolchain.
 >
-> You don't need to add this.
+> In file included from
 >
-> >>  #include <mach/iomux-mx35.h>
-> >> +#include <mach/3ds_debugboard.h>
-> >>
-> >>  #include "devices-imx35.h"
-> >>  #include "devices.h"
-> >>
-> >> +#define EXPIO_PARENT_INT       IOMUX_TO_IRQ(MX35_PIN_GPIO1_1)
+> /home/amit/work/sources/linux-amit-upstream.git/arch/arm/plat-mxc/include/mach/hardware.h:63:0,
+>                 from
 >
-> Why don't you use MX35_PAD_GPIO1_1__GPIO1_1 instead which is already
-> defined at:
-> arch/arm/plat-mxc/include/mach/iomux-mx35.h ?
+> /home/amit/work/sources/linux-amit-upstream.git/arch/arm/plat-mxc/devices/platform-fec.c:10:
 >
+> /home/amit/work/sources/linux-amit-upstream.git/arch/arm/plat-mxc/include/mach/mxc.h:139:2:
+>                 error: expected specifier-qualifier-list before ?u32?
 >
-> I tried to use  MX35_PAD_GPIO1_1__GPIO1_1, but there isn't function to
-transform to irq num, so I added
-the pin definition in iomux-mx3.h. Is there any function can transform the
-PAD to irq num?
+> Perhap following patch is required?
+>
+> diff --git a/arch/arm/plat-mxc/include/mach/hardware.h
+> b/arch/arm/plat-mxc/include/mach/hardware.h
+> index ebadf4a..c9587fd 100644
+> --- a/arch/arm/plat-mxc/include/mach/hardware.h
+> +++ b/arch/arm/plat-mxc/include/mach/hardware.h
+> @@ -21,6 +21,7 @@
+>  #define __ASM_ARCH_MXC_HARDWARE_H__
+>
+>   #include <asm/sizes.h>
+>   +#include <asm/types.h>
+>
+Although I did not meet this problem, I also think it is an issue.
 
-Only board-mx51_3ds.c & mach-mx31_3ds.c which called mxc_expio_init
-function,  and I followed the rule of mach-mx31_3ds.c. Is it ok to change
-style like mx51_3ds as follows?
-#define EXPIO_PARENT_INT        (MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
-
-Also, look at how MX31-3stack implemented the debug board support and
-> pass MXC_DEBUG_BOARD in the Kconfig.
 >
-> Got it, will add it
-
-> >
-> > Any comments? And I can't the sdma driver in arch/arm/plat-mxc/ which is
-> > used by lots of i.mx chips, is somebody planing to do it or
-> > it will going to mainline soon ?
+> > +     u32 pll_reg;
+> > +     u32 pll_rate;
+> > +     u32 cpu_rate;
+> > +     u32 pdr0_reg;
+> > +     u32 pdf;
+> > +     u32 mfi;
+> > +     u32 mfd;
+> > +     u32 mfn;
+> > +     u32 cpu_voltage;
+> > +     u32 cpu_podf;
+> > +};
+> > +
 >
-> Sascha submitted initial support patches for i.MX SDMA.
+> Get rid of all members of struct cpu_op except cpu_rate for now. We can
+> re-add it later.
 >
-> That is great!
-
-Thanks
-Xiao Jiang
-
-> Regards,
+> Also, I wonder if this struct and the external declaration should be moved
+> out to plat/mxc_cpufreq.h
 >
-> Fabio Estevam
+Maybe to mach/mxc.h which is the place for keeping platform related
+definitions.
+
+
+>
+> > +extern struct cpu_op *(*get_cpu_op)(int *op);
+> > +#endif
+> > +
+> >  #if defined(CONFIG_ARCH_MX3) || defined(CONFIG_ARCH_MX2)
+> >  /* These are deprecated, use mx[23][157]_setup_weimcs instead. */
+> >  #define CSCR_U(n) (IO_ADDRESS(WEIM_BASE_ADDR + n * 0x10))
+> > --
+> > 1.6.3.3
 >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101019/4503b7a5/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101019/e46aab58/attachment-0001.html>
