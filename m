@@ -1,9 +1,11 @@
-From: jassi.brar@samsung.com (Jassi Brar)
-Date: Tue, 19 Oct 2010 15:27:54 +0900
-Subject: [PATCH 01/26] ARM: S5PC100: Debug clock sources
-Message-ID: <1287469674-10425-1-git-send-email-jassi.brar@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 19 Oct 2010 15:42:24 +0900
+Subject: [PATCH] ARM: S5PC100: Debug clock sources
+Message-ID: <1287470544-26462-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Jassi Brar <jassi.brar@samsung.com>
 
 Audio, Keypad and ADC inherit PCLKD1 clock source.
 
