@@ -1,39 +1,46 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 19 Oct 2010 12:33:45 +0200
-Subject: [PATCH v3] TWL IRQ: Fix fucntion declaration warnings
-In-Reply-To: <20101019092816.GD11713@pengutronix.de>
-References: <1286315819-5906-1-git-send-email-manjugk@ti.com>
-	<1286315819-5906-4-git-send-email-manjugk@ti.com>
-	<20101019090613.GA2736@sortiz-mobl>
-	<20101019092816.GD11713@pengutronix.de>
-Message-ID: <20101019103344.GL2736@sortiz-mobl>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Oct 2010 12:37:35 +0100
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <4CBD707F.6050204@ti.com>
+References: <4CBD707F.6050204@ti.com>
+Message-ID: <1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
+> Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
+> processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
+> gets compiled when the omap2plus_defconfig is built - the
+> omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
+> image, and has CPU_V6 and CPU_V7 both enabled.
 
-On Tue, Oct 19, 2010 at 11:28:16AM +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Oct 19, 2010 at 11:06:14AM +0200, Samuel Ortiz wrote:
-> > Hi Manjunath,
-> > 
-> > On Wed, Oct 06, 2010 at 03:26:59AM +0530, G, Manjunath Kondaiah wrote:
-> > > Fixes following sparse warnings for twl4030 and twl6030 irq files.
-> > > 
-> > > drivers/mfd/twl4030-irq.c:783:5: warning: symbol 'twl4030_init_irq' was not declared. Should it be static?
-> > > drivers/mfd/twl4030-irq.c:863:5: warning: symbol 'twl4030_exit_irq' was not declared. Should it be static?
-> > > drivers/mfd/twl4030-irq.c:873:5: warning: symbol 'twl4030_init_chip_irq' was not declared. Should it be static?
-> > > 
-> > > drivers/mfd/twl6030-irq.c:226:5: warning: symbol 'twl6030_init_irq' was not declared. Should it be static?
-> > > drivers/mfd/twl6030-irq.c:290:5: warning: symbol 'twl6030_exit_irq' was not declared. Should it be static?
-> > >
-> > Patch applied, thanks.
-> I didn't get the original patch, so I just now noticed the typo in the
-> Subject.  You might want to do s/fucntion/function/
-Yes, I noticed as well and fixed it, thanks.
+This patch should fix it:
 
-Cheers,
-Samuel.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+ARM: Do not enable SWP emulation if CPU_V6 && CPU_V7
+
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+This option uses LDREXB/STREXB to emulate SWPB but these instructions
+are not supported on all the ARMv6 processors.
+
+Reported-by: Anand Gadiyar <gadiyar@ti.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Leif Lindholm <Leif.Lindholm@arm.com>
+---
+ arch/arm/mm/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 8493ed0..5195d61 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -638,7 +638,7 @@ config ARM_THUMBEE
+ 
+ config SWP_EMULATE
+ 	bool "Emulate SWP/SWPB instructions"
+-	depends on CPU_V7
++	depends on CPU_V7 && !CPU_V6
+ 	select HAVE_PROC_CPU if PROC_FS
+ 	default y if SMP
+ 	help
