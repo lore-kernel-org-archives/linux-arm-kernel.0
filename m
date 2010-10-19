@@ -1,7 +1,7 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 19 Oct 2010 16:15:00 +0900
-Subject: [PATCH 2/4] ARM: S5P6442: I2S: Upgrade platform device
-Message-ID: <1287472500-497-1-git-send-email-jassisinghbrar@gmail.com>
+Date: Tue, 19 Oct 2010 16:15:11 +0900
+Subject: [PATCH 3/4] ARM: S5PV210: I2S: Upgrade platform device
+Message-ID: <1287472511-529-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,52 +12,113 @@ to prepare them for new controller driver.
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s5p6442/dev-audio.c |   44 ++++++++++++++++++++++++++++++------
- 1 files changed, 36 insertions(+), 8 deletions(-)
+ arch/arm/mach-s5pv210/clock.c     |   10 +++---
+ arch/arm/mach-s5pv210/dev-audio.c |   64 ++++++++++++++++++++++++++----------
+ 2 files changed, 51 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-s5p6442/dev-audio.c b/arch/arm/mach-s5p6442/dev-audio.c
-index 1419442..b91463e 100644
---- a/arch/arm/mach-s5p6442/dev-audio.c
-+++ b/arch/arm/mach-s5p6442/dev-audio.c
-@@ -30,15 +30,13 @@ static int s5p6442_cfg_i2s(struct platform_device *pdev)
- 		s3c_gpio_cfgpin(S5P6442_GPC1(3), S3C_GPIO_SFN(2));
- 		s3c_gpio_cfgpin(S5P6442_GPC1(4), S3C_GPIO_SFN(2));
- 		break;
--
--	case -1:
-+	case 0:
- 		s3c_gpio_cfgpin(S5P6442_GPC0(0), S3C_GPIO_SFN(2));
- 		s3c_gpio_cfgpin(S5P6442_GPC0(1), S3C_GPIO_SFN(2));
- 		s3c_gpio_cfgpin(S5P6442_GPC0(2), S3C_GPIO_SFN(2));
- 		s3c_gpio_cfgpin(S5P6442_GPC0(3), S3C_GPIO_SFN(2));
- 		s3c_gpio_cfgpin(S5P6442_GPC0(4), S3C_GPIO_SFN(2));
- 		break;
--
- 	default:
- 		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
- 		return -EINVAL;
-@@ -47,8 +45,19 @@ static int s5p6442_cfg_i2s(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index af91fef..e5b8061 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -401,20 +401,20 @@ static struct clk init_clocks_disable[] = {
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1<<21),
+ 	}, {
+-		.name		= "i2s_v50",
++		.name		= "iis",
+ 		.id		= 0,
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1<<4),
+ 	}, {
+-		.name		= "i2s_v32",
+-		.id		= 0,
++		.name		= "iis",
++		.id		= 1,
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1 << 5),
+ 	}, {
+-		.name		= "i2s_v32",
+-		.id		= 1,
++		.name		= "iis",
++		.id		= 2,
+ 		.parent		= &clk_p,
+ 		.enable		= s5pv210_clk_ip3_ctrl,
+ 		.ctrlbit	= (1 << 6),
+diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
+index 6e60041..d5f5361 100644
+--- a/arch/arm/mach-s5pv210/dev-audio.c
++++ b/arch/arm/mach-s5pv210/dev-audio.c
+@@ -19,10 +19,24 @@
+ #include <mach/dma.h>
+ #include <mach/irqs.h>
  
--static struct s3c_audio_pdata s3c_i2s_pdata = {
-+static const char *rclksrc_v35[] = {
++static const char *rclksrc[] = {
 +	[0] = "busclk",
 +	[1] = "i2sclk",
 +};
 +
-+static struct s3c_audio_pdata i2sv35_pdata = {
- 	.cfg_gpio = s5p6442_cfg_i2s,
+ static int s5pv210_cfg_i2s(struct platform_device *pdev)
+ {
+ 	/* configure GPIO for i2s port */
+ 	switch (pdev->id) {
++	case 0:
++		s3c_gpio_cfgpin(S5PV210_GPI(0), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PV210_GPI(1), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PV210_GPI(2), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PV210_GPI(3), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PV210_GPI(4), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PV210_GPI(5), S3C_GPIO_SFN(2));
++		s3c_gpio_cfgpin(S5PV210_GPI(6), S3C_GPIO_SFN(2));
++		break;
+ 	case 1:
+ 		s3c_gpio_cfgpin(S5PV210_GPC0(0), S3C_GPIO_SFN(2));
+ 		s3c_gpio_cfgpin(S5PV210_GPC0(1), S3C_GPIO_SFN(2));
+@@ -30,7 +44,6 @@ static int s5pv210_cfg_i2s(struct platform_device *pdev)
+ 		s3c_gpio_cfgpin(S5PV210_GPC0(3), S3C_GPIO_SFN(2));
+ 		s3c_gpio_cfgpin(S5PV210_GPC0(4), S3C_GPIO_SFN(2));
+ 		break;
+-
+ 	case 2:
+ 		s3c_gpio_cfgpin(S5PV210_GPC1(0), S3C_GPIO_SFN(4));
+ 		s3c_gpio_cfgpin(S5PV210_GPC1(1), S3C_GPIO_SFN(4));
+@@ -38,17 +51,6 @@ static int s5pv210_cfg_i2s(struct platform_device *pdev)
+ 		s3c_gpio_cfgpin(S5PV210_GPC1(3), S3C_GPIO_SFN(4));
+ 		s3c_gpio_cfgpin(S5PV210_GPC1(4), S3C_GPIO_SFN(4));
+ 		break;
+-
+-	case -1:
+-		s3c_gpio_cfgpin(S5PV210_GPI(0), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5PV210_GPI(1), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5PV210_GPI(2), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5PV210_GPI(3), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5PV210_GPI(4), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5PV210_GPI(5), S3C_GPIO_SFN(2));
+-		s3c_gpio_cfgpin(S5PV210_GPI(6), S3C_GPIO_SFN(2));
+-		break;
+-
+ 	default:
+ 		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
+ 		return -EINVAL;
+@@ -57,8 +59,15 @@ static int s5pv210_cfg_i2s(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct s3c_audio_pdata s3c_i2s_pdata = {
++static struct s3c_audio_pdata i2sv5_pdata = {
+ 	.cfg_gpio = s5pv210_cfg_i2s,
 +	.type = {
 +		.i2s = {
-+			.quirks = QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR,
-+			.src_clk = rclksrc_v35,
++			.quriks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
++					 | QUIRK_NEED_RSTCLR,
++			.src_clk = rclksrc,
 +		},
 +	},
  };
  
- static struct resource s5p6442_iis0_resource[] = {
-@@ -67,15 +76,34 @@ static struct resource s5p6442_iis0_resource[] = {
+ static struct resource s5pv210_iis0_resource[] = {
+@@ -77,15 +86,34 @@ static struct resource s5pv210_iis0_resource[] = {
  		.end   = DMACH_I2S0_RX,
  		.flags = IORESOURCE_DMA,
  	},
@@ -68,26 +129,26 @@ index 1419442..b91463e 100644
 +	},
  };
  
- struct platform_device s5p6442_device_iis0 = {
+ struct platform_device s5pv210_device_iis0 = {
 -	.name		  = "samsung-i2s-v4",
 -	.id		  = -1,
 +	.name		  = "samsung-i2s",
 +	.id		  = 0,
- 	.num_resources	  = ARRAY_SIZE(s5p6442_iis0_resource),
- 	.resource	  = s5p6442_iis0_resource,
+ 	.num_resources	  = ARRAY_SIZE(s5pv210_iis0_resource),
+ 	.resource	  = s5pv210_iis0_resource,
  	.dev = {
 -		.platform_data = &s3c_i2s_pdata,
-+		.platform_data = &i2sv35_pdata,
++		.platform_data = &i2sv5_pdata,
 +	},
 +};
 +
 +static const char *rclksrc_v3[] = {
 +	[0] = "iis",
-+	[1] = "sclk_audio",
++	[1] = "audio-bus",
 +};
 +
 +static struct s3c_audio_pdata i2sv3_pdata = {
-+	.cfg_gpio = s5p6442_cfg_i2s,
++	.cfg_gpio = s5pv210_cfg_i2s,
 +	.type = {
 +		.i2s = {
 +			.src_clk = rclksrc_v3,
@@ -95,9 +156,18 @@ index 1419442..b91463e 100644
  	},
  };
  
-@@ -103,7 +131,7 @@ struct platform_device s5p6442_device_iis1 = {
- 	.num_resources	  = ARRAY_SIZE(s5p6442_iis1_resource),
- 	.resource	  = s5p6442_iis1_resource,
+@@ -113,7 +141,7 @@ struct platform_device s5pv210_device_iis1 = {
+ 	.num_resources	  = ARRAY_SIZE(s5pv210_iis1_resource),
+ 	.resource	  = s5pv210_iis1_resource,
+ 	.dev = {
+-		.platform_data = &s3c_i2s_pdata,
++		.platform_data = &i2sv3_pdata,
+ 	},
+ };
+ 
+@@ -141,7 +169,7 @@ struct platform_device s5pv210_device_iis2 = {
+ 	.num_resources	  = ARRAY_SIZE(s5pv210_iis2_resource),
+ 	.resource	  = s5pv210_iis2_resource,
  	.dev = {
 -		.platform_data = &s3c_i2s_pdata,
 +		.platform_data = &i2sv3_pdata,
