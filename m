@@ -1,53 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Oct 2010 22:20:32 +0200
-Subject: [patch 00/12] arm: raw_spinlock annotations
-In-Reply-To: <alpine.LFD.2.00.1010192158440.6815@localhost6.localdomain6>
-References: <20100217125328.791176536@linutronix.de>
-	<20101019184433.GA10325@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010192158440.6815@localhost6.localdomain6>
-Message-ID: <201010192220.33738.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 19 Oct 2010 22:18:57 +0200
+Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
+In-Reply-To: <20101019154627.GC4589@kroah.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287387875-14168-2-git-send-email-ohad@wizery.com>
+	<20101019154627.GC4589@kroah.com>
+Message-ID: <AANLkTi=TPNuDeEwqZzpSaz71rjghjg=6V0stFFcmpB+O@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 October 2010 22:03:32 Thomas Gleixner wrote:
-> On Tue, 19 Oct 2010, Russell King - ARM Linux wrote:
-> 
-> > On Tue, Oct 19, 2010 at 05:26:45PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 19 October 2010, Uwe Kleine-K?nig wrote:
-> > > > While cleaning up my repo I refound the patches and rebased them on top
-> > > > of today's Linus' tree and only needed to fix up the l2x0_lock patch as
-> > > > in the meantime a new usage hit mainline.
-> > > 
-> > > The patches all look harmless, but none of them has any information on
-> > > why the particular locks need to be raw_spin_lock. Ideally a raw spinlock
-> > > should be the absolute exception, and IMHO should have a comment in front
-> > > of it why it is special.
-> > 
-> > Or at least explained in the patch description.
-> > 
-> > For instance, can someone explain why the lock for leds and gpio stuff
-> > on Footbridge needs to be converted?  What is the original problem?
-> > More importantly, what is the criteria for using a raw spinlock instead
-> > of a normal spinlock?
-> 
-> raw_spinlock is still a spinlock when PREEMPT_RT is enabled, mere
-> spinlocks become magically "sleeping" spinlocks (aka. PI aware
-> rtmutexes)
+On Tue, Oct 19, 2010 at 5:46 PM, Greg KH <greg@kroah.com> wrote:
+> On Mon, Oct 18, 2010 at 09:44:33AM +0200, Ohad Ben-Cohen wrote:
+>> +#else /* !CONFIG_OMAP_HWSPINLOCK */
+>> +
+>> +static inline struct omap_hwspinlock *omap_hwspinlock_request(void)
+>> +{
+>> + ? ? return ERR_PTR(-ENOSYS);
+>> +}
+>
+> One note, do you really want to fail if this option isn't built into the
+> kernel, yet you have a driver that is asking for it? ?Shouldn't you
+> instead just silently succeed, and let the code path get compiled away?
+>
+> We did that for debugfs, after learning the pain that procfs had with
+> its api for "is not built". ?Doing it the way you are requires the user
+> to always test for -ENOSYS, when in reality, if that is returned,
+> there's nothing the driver can do about it, so it should just not worry
+> about it.
+>
+> Just something to think about.
 
-I think we all understood that part of the series description.
+Completely agree; if hwspinlock support is not needed, we better let
+its users run uninterruptedly. I'll change it.
 
-> Vs. the patches: IIRC, it was all fallout from running -rt, but that
-> needs to be looked at case by case. Some of those are obvious as they
-> are called deep down in atomic irq disabled code, but others might be
-> just due to laziness reasons.
+Thanks,
+Ohad.
 
-Not as obvious as you'd think. The explanation "called in atomic irq
-disabled code" makes sense, but I hadn't thought of that before -- I had
-expected all that code to use IRQ threads in case of PREEMPT_RT.
-
-Requiring a comment there would probably eliminate the laziness issues,
-adding a comment that you can't be bothered to do the right fix won't
-help getting a patch merged, so ideally you'd end up with a better
-solution getting merged.
-
-	Arnd
+>
+> thanks,
+>
+> greg k-h
+>
