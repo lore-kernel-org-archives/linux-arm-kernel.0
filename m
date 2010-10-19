@@ -1,30 +1,41 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 19 Oct 2010 11:06:14 +0200
-Subject: [PATCH v3] TWL IRQ: Fix fucntion declaration warnings
-In-Reply-To: <1286315819-5906-4-git-send-email-manjugk@ti.com>
-References: <1286315819-5906-1-git-send-email-manjugk@ti.com>
-	<1286315819-5906-4-git-send-email-manjugk@ti.com>
-Message-ID: <20101019090613.GA2736@sortiz-mobl>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 19 Oct 2010 10:22:29 +0100
+Subject: [PATCH v3 4/5] mfd: regulator: max8998: voltages and GPIOs
+	defined at platform data structure
+In-Reply-To: <20101018234711.GC16761@sortiz-mobl>
+References: <1285590747-32404-1-git-send-email-l.majewski@samsung.com>
+	<1285590747-32404-5-git-send-email-l.majewski@samsung.com>
+	<20100927184336.GK2560@sortiz-mobl> <1286026413.3125.27.camel@odin>
+	<20101004084646.4de3714d@lmajewski.digital.local>
+	<1286186989.3148.19.camel@odin>
+	<015e01cb6524$de617cb0$9b247610$%szyprowski@samsung.com>
+	<1286362009.5662.9.camel@odin>  <20101018234711.GC16761@sortiz-mobl>
+Message-ID: <1287480149.3272.53.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
-
-On Wed, Oct 06, 2010 at 03:26:59AM +0530, G, Manjunath Kondaiah wrote:
-> Fixes following sparse warnings for twl4030 and twl6030 irq files.
+On Tue, 2010-10-19 at 01:47 +0200, Samuel Ortiz wrote:
+> Hi Liam,
 > 
-> drivers/mfd/twl4030-irq.c:783:5: warning: symbol 'twl4030_init_irq' was not declared. Should it be static?
-> drivers/mfd/twl4030-irq.c:863:5: warning: symbol 'twl4030_exit_irq' was not declared. Should it be static?
-> drivers/mfd/twl4030-irq.c:873:5: warning: symbol 'twl4030_init_chip_irq' was not declared. Should it be static?
+> On Wed, Oct 06, 2010 at 11:46:49AM +0100, Liam Girdwood wrote:
+> > > Liam, Samuel, could you both comment on this issue?
+> > > 
+> > 
+> > Ok, so we have a build dependency on mfd. Could this not have been
+> > (re)stated by Lukasz during the conversation about the upstream path.
+> > 
+> > Samuel, could you please take this via mfd ? You have my
+> Sure, I've just pushed those 5 patches.
 > 
-> drivers/mfd/twl6030-irq.c:226:5: warning: symbol 'twl6030_init_irq' was not declared. Should it be static?
-> drivers/mfd/twl6030-irq.c:290:5: warning: symbol 'twl6030_exit_irq' was not declared. Should it be static?
->
-Patch applied, thanks.
+>  
+> > Signed-off-by: Liam Girdwood <lrg@slimlogic.co.uk>
+> I guess you meant Acked-by, right ?
+> 
 
-Cheers,
-Samuel.
+Yes. Thanks !
 
+Liam 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
