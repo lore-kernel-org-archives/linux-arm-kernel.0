@@ -1,31 +1,30 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Tue, 19 Oct 2010 22:25:09 +0200 (CEST)
-Subject: [PATCH 9/9] arch: arm: fixed typos
-In-Reply-To: <20101018080644.GD12363@pengutronix.de>
-References: <1287219606-20759-1-git-send-email-andrea.gelmini@gelma.net>
-	<20101018080644.GD12363@pengutronix.de>
-Message-ID: <alpine.LNX.2.00.1010192224000.6879@pobox.suse.cz>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 19 Oct 2010 15:32:23 -0400 (EDT)
+Subject: QNAP TS-209 broken by "orion/kirkwood: reset PCIe unit on boot"
+In-Reply-To: <20101019190533.GA11893@jirafa.cyrius.com>
+References: <20101019190533.GA11893@jirafa.cyrius.com>
+Message-ID: <alpine.LFD.2.00.1010191529100.2764@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Oct 2010, Uwe Kleine-K?nig wrote:
+On Tue, 19 Oct 2010, Martin Michlmayr wrote:
 
-> On Sat, Oct 16, 2010 at 11:00:05AM +0200, Andrea Gelmini wrote:
-> > Intialize, configuation, wakup, Managment, addres
-> I already fixed some of these in
+> I noticed that 2.6.36-rc no longer boots on my QNAP TS-209.  I get
+> some output but then the machine resets.
 > 
-> 	http://thread.gmane.org/gmane.linux.kernel/1030436/
-> 
-> Don't know why they didn't appear in the trivial tree yet.
+> I've bisected it down to the patch "orion/kirkwood: reset PCIe unit on
+> boot".  I remember this patch was controversial when it was proposed.
+> Looks like it breaks at least one orion5x machine.  Maybe the patch
+> should be reverted for now or only be called on kirkwood.
 
-Ah, now I see your patchset you sent me way back. It somehow slipped 
-through cracks, sorry.
+According to the log, you did agree with that patch at the time.
 
-Could you please refresh it (and probably incorporate Andrea's changes as 
-well) and resend it to me?
+Keeping it causes breakage.  Removing it causes breakage too.  So I'd 
+much prefer if a solution to solve both breakages was merged instead.
 
-Thanks,
+> I remember that Marvell was looking into this issue.  Saeed, have you
+> had a chance to investigate this more in the meantime?  See
+> http://marc.info/?l=linux-ide&m=124822863706181&w=2 for the original
+> problem.
 
--- 
-Jiri Kosina
-SUSE Labs, Novell Inc.
+Nicolas
