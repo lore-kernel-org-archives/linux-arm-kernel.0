@@ -1,167 +1,165 @@
-From: dennis.borgmann@googlemail.com (Dennis Borgmann)
-Date: Tue, 19 Oct 2010 16:26:30 +0200
-Subject: at91sam9g20 hangs at ohci-hcd
-Message-ID: <4CBDAA96.5060107@googlemail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 19 Oct 2010 16:28:17 +0200
+Subject: [PATCH 2/2] ARM: pxa: Update Balloon3 for new FPGA firmware
+In-Reply-To: <1287498497-11251-1-git-send-email-marek.vasut@gmail.com>
+References: <1287498497-11251-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1287498497-11251-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello linux-arm list!
+The new FPGA firmware in Balloon3 uses different methods to control it's bus
+control lines. In the new version, there are separate registers to set/clear
+bus control lines. This patch updates affected places.
 
-I am using an at91sam9g20-CPU on an "eddy-Board Version 2.5" from a
-company called "Systembase" - see http://www.embeddedmodule.com
+Affected are NAND and PCMCIA.
 
-I am booting my system via u-boot http://www.denx.de/wiki/U-Boot
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/balloon3.c              |   51 ++++++++++++++++------------
+ arch/arm/mach-pxa/include/mach/balloon3.h |    2 +
+ drivers/pcmcia/pxa2xx_balloon3.c          |   11 +++---
+ 3 files changed, 36 insertions(+), 28 deletions(-)
 
-The problem that I see is, that the kernel won't boot up to a login
-prompt, it simply hangs at the point, where it loads the USB driver
-'ohci-hcd'. The last output I get from the kernel booting messages are
-appended below at the end of this mail.
-
-After searching the internet for two days now, I have given up the idea
-to solve the problem on my own. The problem seems to be known to the
-linux community, as I can find a link on this:
-
-https://bugzilla.kernel.org/show_bug.cgi?id=11041
-
-People are talking about an endless loop involving modprobe at a certain
-point and the solution for them is to revert a previous commit to their
-code repository. This has been going on in 2008. Now, we have 2010 and I
-would suggest this problem being solved. But still I cannot get the
-board running.
-
-If I switch to an older release of the board - version 2.1, which
-contains an at91sam9260 - everything works fine. The problem appears
-with at91sam9g20.
-
-I am building my system with buildroot - http://buildroot.uclibc.org/ -
-, tried already several kernels (2.6.25.20, 2.6.27.54, 2.6.33.7 and
-2.6.34.3) but none of them worked. I also tried giving buildroot a
-kernel path from this webpage:
-
-http://maxim.org.za/at91_26.html
-
-For a first test, I chose version 2.6.33, which did not solve my problem
-either.
-
-The code seems to hang in ohci-at91.c (for example located here:
-linux-2.6.33.7/drivers/usb/host/ ) in function 'static void
-at91_start_hc(struct platform_device *pdev)' . It can get up to line 69
-( 'writel(0, &regs->control);' ), but this call does not return. I found
-this out by giving the code several printk's.
-
-There is no difference, if I compile the driver as module or directly
-into the kernel. Either it hangs on boot-time or it hangs, when I do
-'modprobe ohci-hcd'.
-
-I don't know any more things to do. Could you give me hint, where to
-search for my problem? It would be nice to be able to use kernel 2.6.34
-due to wireless demands.
-
-Kind regards from Germany,
-Dennis
-
-Here is the output of the kernel at boot-time until it hangs:
-
-[    0.000000] Initializing cgroup subsys
-cpuset
-[    0.000000] Linux version 2.6.33.7 (dborgmann at countach) (gcc version
-4.3.5 (0
-[    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ),
-cr=00053177
-[    0.000000] CPU: VIVT data cache, VIVT instruction
-cache
-[    0.000000] Machine: Atmel
-AT91SAM9260-EK
-[    0.000000] Memory policy: ECC disabled, Data cache
-writeback
-[    0.000000] Clocks: PLLA overclocked, 792
-MHz
-[    0.000000] Clocks: CPU 396 MHz, master 132 MHz, main 18.432
-MHz
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.
-Total pa8
-[    0.000000] Kernel command line: root=/dev/ram rw
-console=ttyS0,115200,mem=3
-[    0.000000] PID hash table entries: 128 (order: -3, 512
-bytes)
-[    0.000000] Dentry cache hash table entries: 4096 (order: 2, 16384
-bytes)
-[    0.000000] Inode-cache hash table entries: 2048 (order: 1, 8192
-bytes)
-[    0.000000] allocated 163840 bytes of
-page_cgroup
-[    0.000000] please try 'cgroup_disable=memory' option if you don't
-want memos
-[    0.000000] Memory: 32MB = 32MB
-total
-[    0.000000] Memory: 28332KB available (3108K code, 519K data, 112K
-init, 0K )
-[    0.000000] SLUB: Genslabs=11, HWalign=32, Order=0-3, MinObjects=0,
-CPUs=1, 1
-[    0.000000] Hierarchical RCU
-implementation.
-[    0.000000]
-NR_IRQS:192
-[    0.000000] AT91: 96 gpio irqs in 3
-banks
-[    0.000000] Console: colour dummy device
-80x30
-[    0.000000] console [ttyS0]
-enabled
-[    0.130000] Calibrating delay loop... 197.83 BogoMIPS
-(lpj=989184)
-[    0.340000] Mount-cache hash table entries:
-512
-[    0.340000] Initializing cgroup subsys
-ns
-[    0.350000] Initializing cgroup subsys
-cpuacct
-[    0.350000] Initializing cgroup subsys
-memory
-[    0.360000] Initializing cgroup subsys
-freezer
-[    0.360000] CPU: Testing write buffer coherency:
-ok
-[    0.380000] bio: create slab <bio-0> at
-0
-[    0.390000] SCSI subsystem
-initialized
-[    0.390000] usbcore: registered new interface driver
-usbfs
-[    0.400000] usbcore: registered new interface driver
-hub
-[    0.400000] usbcore: registered new device driver
-usb
-[    0.410000] Advanced Linux Sound Architecture Driver Version
-1.0.21.
-[    0.420000] Switching to clocksource
-pit
-[    0.430000] Slow work thread pool: Starting
-up
-[    0.440000] Slow work thread pool:
-Ready
-[    0.440000] FS-Cache:
-Loaded
-[    0.440000] CacheFiles:
-Loaded
-[    0.450000] NetWinder Floating Point Emulator V0.97 (double
-precision)
-[    0.470000] NTFS driver 2.1.29 [Flags:
-R/W].
-[    0.480000] ROMFS MTD (C) 2007 Red Hat,
-Inc.
-[    0.480000] msgmni has been set to
-55
-[    0.490000] io scheduler noop
-registered
-[    0.490000] io scheduler cfq registered
-(default)
-[    0.970000] atmel_usart.0: ttyS0 at MMIO 0xfefff200 (irq = 1) is a
-ATMEL_SERL
-[    0.980000] atmel_usart.1: ttyS1 at MMIO 0xfffb0000 (irq = 6) is a
-ATMEL_SERL
-[    0.990000] atmel_usart.2: ttyS2 at MMIO 0xfffb4000 (irq = 7) is a
-ATMEL_SERL
-[    1.010000] brd: module
-loaded
-[    1.010000] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+index f4142b0..235d957 100644
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -569,27 +569,29 @@ static inline void balloon3_i2c_init(void) {}
+  * NAND
+  ******************************************************************************/
+ #if defined(CONFIG_MTD_NAND_PLATFORM)||defined(CONFIG_MTD_NAND_PLATFORM_MODULE)
+-static uint16_t balloon3_ctl =
+-	BALLOON3_NAND_CONTROL_FLCE0 | BALLOON3_NAND_CONTROL_FLCE1 |
+-	BALLOON3_NAND_CONTROL_FLCE2 | BALLOON3_NAND_CONTROL_FLCE3 |
+-	BALLOON3_NAND_CONTROL_FLWP;
+-
+ static void balloon3_nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ {
+ 	struct nand_chip *this = mtd->priv;
++	uint8_t balloon3_ctl_set = 0, balloon3_ctl_clr = 0;
+ 
+ 	if (ctrl & NAND_CTRL_CHANGE) {
+ 		if (ctrl & NAND_CLE)
+-			balloon3_ctl |= BALLOON3_NAND_CONTROL_FLCLE;
++			balloon3_ctl_set |= BALLOON3_NAND_CONTROL_FLCLE;
+ 		else
+-			balloon3_ctl &= ~BALLOON3_NAND_CONTROL_FLCLE;
++			balloon3_ctl_clr |= BALLOON3_NAND_CONTROL_FLCLE;
+ 
+ 		if (ctrl & NAND_ALE)
+-			balloon3_ctl |= BALLOON3_NAND_CONTROL_FLALE;
++			balloon3_ctl_set |= BALLOON3_NAND_CONTROL_FLALE;
+ 		else
+-			balloon3_ctl &= ~BALLOON3_NAND_CONTROL_FLALE;
+-
+-		__raw_writel(balloon3_ctl, BALLOON3_NAND_CONTROL_REG);
++			balloon3_ctl_clr |= BALLOON3_NAND_CONTROL_FLALE;
++
++		if (balloon3_ctl_clr)
++			__raw_writel(balloon3_ctl_clr,
++				BALLOON3_NAND_CONTROL_REG);
++		if (balloon3_ctl_set)
++			__raw_writel(balloon3_ctl_set,
++				BALLOON3_NAND_CONTROL_REG |
++				BALLOON3_FPGA_SETnCLR);
+ 	}
+ 
+ 	if (cmd != NAND_CMD_NONE)
+@@ -601,15 +603,15 @@ static void balloon3_nand_select_chip(struct mtd_info *mtd, int chip)
+ 	if (chip < 0 || chip > 3)
+ 		return;
+ 
+-	balloon3_ctl |= BALLOON3_NAND_CONTROL_FLCE0 |
+-			BALLOON3_NAND_CONTROL_FLCE1 |
+-			BALLOON3_NAND_CONTROL_FLCE2 |
+-			BALLOON3_NAND_CONTROL_FLCE3;
++	/* Assert all nCE lines */
++	__raw_writew(
++		BALLOON3_NAND_CONTROL_FLCE0 | BALLOON3_NAND_CONTROL_FLCE1 |
++		BALLOON3_NAND_CONTROL_FLCE2 | BALLOON3_NAND_CONTROL_FLCE3,
++		BALLOON3_NAND_CONTROL_REG | BALLOON3_FPGA_SETnCLR);
+ 
+ 	/* Deassert correct nCE line */
+-	balloon3_ctl &= ~(BALLOON3_NAND_CONTROL_FLCE0 << chip);
+-
+-	__raw_writew(balloon3_ctl, BALLOON3_NAND_CONTROL_REG);
++	__raw_writew(BALLOON3_NAND_CONTROL_FLCE0 << chip,
++		BALLOON3_NAND_CONTROL_REG);
+ }
+ 
+ static int balloon3_nand_probe(struct platform_device *pdev)
+@@ -618,11 +620,12 @@ static int balloon3_nand_probe(struct platform_device *pdev)
+ 	uint16_t ver;
+ 	int ret;
+ 
+-	__raw_writew(BALLOON3_NAND_CONTROL2_16BIT, BALLOON3_NAND_CONTROL2_REG);
++	__raw_writew(BALLOON3_NAND_CONTROL2_16BIT,
++		BALLOON3_NAND_CONTROL2_REG | BALLOON3_FPGA_SETnCLR);
+ 
+ 	ver = __raw_readw(BALLOON3_FPGA_VER);
+-	if (ver > 0x0201)
+-		pr_warn("The FPGA code, version 0x%04x, is newer than rel-0.3. "
++	if (ver < 0x4f08)
++		pr_warn("The FPGA code, version 0x%04x, is too old. "
+ 			"NAND support might be broken in this version!", ver);
+ 
+ 	/* Power up the NAND chips */
+@@ -637,7 +640,11 @@ static int balloon3_nand_probe(struct platform_device *pdev)
+ 	gpio_set_value(BALLOON3_GPIO_RUN_NAND, 1);
+ 
+ 	/* Deassert all nCE lines and write protect line */
+-	__raw_writel(balloon3_ctl, BALLOON3_NAND_CONTROL_REG);
++	__raw_writel(
++		BALLOON3_NAND_CONTROL_FLCE0 | BALLOON3_NAND_CONTROL_FLCE1 |
++		BALLOON3_NAND_CONTROL_FLCE2 | BALLOON3_NAND_CONTROL_FLCE3 |
++		BALLOON3_NAND_CONTROL_FLWP,
++		BALLOON3_NAND_CONTROL_REG | BALLOON3_FPGA_SETnCLR);
+ 	return 0;
+ 
+ err2:
+diff --git a/arch/arm/mach-pxa/include/mach/balloon3.h b/arch/arm/mach-pxa/include/mach/balloon3.h
+index 3506da1..f6c81ea 100644
+--- a/arch/arm/mach-pxa/include/mach/balloon3.h
++++ b/arch/arm/mach-pxa/include/mach/balloon3.h
+@@ -26,6 +26,8 @@ enum balloon3_features {
+ #define BALLOON3_FPGA_VIRT	(0xf1000000)	/* as per balloon2 */
+ #define BALLOON3_FPGA_LENGTH	0x01000000
+ 
++#define	BALLOON3_FPGA_SETnCLR		(0x1000)
++
+ /* FPGA / CPLD registers for CF socket */
+ #define	BALLOON3_CF_STATUS_REG		(BALLOON3_FPGA_VIRT + 0x00e00008)
+ #define	BALLOON3_CF_CONTROL_REG		(BALLOON3_FPGA_VIRT + 0x00e00008)
+diff --git a/drivers/pcmcia/pxa2xx_balloon3.c b/drivers/pcmcia/pxa2xx_balloon3.c
+index dbbdd00..453c54c 100644
+--- a/drivers/pcmcia/pxa2xx_balloon3.c
++++ b/drivers/pcmcia/pxa2xx_balloon3.c
+@@ -39,12 +39,10 @@ static struct pcmcia_irqs irqs[] = {
+ static int balloon3_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ {
+ 	uint16_t ver;
+-	int ret;
+-	static void __iomem *fpga_ver;
+ 
+ 	ver = __raw_readw(BALLOON3_FPGA_VER);
+-	if (ver > 0x0201)
+-		pr_warn("The FPGA code, version 0x%04x, is newer than rel-0.3. "
++	if (ver < 0x4f08)
++		pr_warn("The FPGA code, version 0x%04x, is too old. "
+ 			"PCMCIA/CF support might be broken in this version!",
+ 			ver);
+ 
+@@ -97,8 +95,9 @@ static void balloon3_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+ static int balloon3_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
+ 				       const socket_state_t *state)
+ {
+-	__raw_writew((state->flags & SS_RESET) ? BALLOON3_CF_RESET : 0,
+-			BALLOON3_CF_CONTROL_REG);
++	__raw_writew(BALLOON3_CF_RESET, BALLOON3_CF_CONTROL_REG |
++			((state->flags & SS_RESET) ?
++			BALLOON3_FPGA_SETnCLR : 0));
+ 	return 0;
+ }
+ 
+-- 
+1.7.1
