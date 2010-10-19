@@ -1,45 +1,55 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Mon, 18 Oct 2010 23:52:21 -0700
-Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <20101018203610.GD29120@kw.sim.vm.gnt>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<20101018160830.GB9033@ericsson.com>
-	<20101018203610.GD29120@kw.sim.vm.gnt>
-Message-ID: <20101019065221.GA12406@ericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 19 Oct 2010 16:08:14 +0900
+Subject: [PATCH 5/9 v2] ARM: S3C64XX: add support for mach-mini6410
+In-Reply-To: <20100929193406.25307.33007.stgit@darius-desktop>
+References: <20100929192354.25307.40197.stgit@darius-desktop>
+	<20100929193406.25307.33007.stgit@darius-desktop>
+Message-ID: <052801cb6f5c$67216fb0$35644f10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 18, 2010 at 04:36:10PM -0400, Simon Guinot wrote:
-[ ... ]
-> > I don't really understand the value of supporting pwm attributes,
-> > since you have to convert those to rpm anyway. Why not just stick
-> > with fan1_input and fan1_target ? This would simplify the code a lot.
+Darius Augulis wrote:
 > 
-> I don't know very well the hwmon API. I have simply been fooled by the
-> sysfs-interface document which claim that fan[1-*]_target only make
-> sense for a closed-loop fan. Moreover, I was expecting gpio-fan to be
-> compliant with the fancontrol shell script...
+> Add support for mini6410 board from FriendlyARM
 > 
-> But anyway, you are right. I just don't want the pwm interface.
+> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+> ---
 > 
-Thinking more about this, another option might be to keep using
-the pwm interface (for fancontrol), but simplify your code.
-Your transitions are currently pwm -> rpm -> ctrl and vice versa.
-However, direct conversion pwm -> ctrl should also be possible
-and would be much simpler than the two-stage conversion.
+> Changelog since v1:
+>  - Ben's comments about coding style fixed
+> 
+>  arch/arm/mach-s3c64xx/Kconfig         |   10 ++
+>  arch/arm/mach-s3c64xx/Makefile        |    1
+>  arch/arm/mach-s3c64xx/mach-mini6410.c |  157
+> +++++++++++++++++++++++++++++++++
+>  3 files changed, 168 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s3c64xx/mach-mini6410.c
+> 
 
-To do that, you could map num_speed directly to the pwm range of (0..255).
-Something like
+(snip)
 
-	pwm = DIV_ROUND_CLOSEST(speed_index * 255, num_speed - 1);
-and
-	speed_index = pwm * (num_speed - 1) / 255;
+> +
+> +MACHINE_START(MINI6410, "MINI6410")
+> +	/* Maintainer: Darius Augulis <augulis.darius@gmail.com> */
+> +	.phys_io	= S3C_PA_UART & 0xfff00000,
+> +	.io_pg_offst	= (((u32)S3C_VA_UART) >> 18) & 0xfffc,
 
-Then use speed_index to get control value and rpm from the speed table.
+Now, we no need to add above two members since commit 861bd81ee62a0d6759144c22909a8a3938951656 ("arm: remove machine_desc.io_pg_offst and .phys_io") from the arm tree
 
-Would that make sense ? You could then also provide fan1_target
-for direct fan speed control.
+> +	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
+> +
+> +	.init_irq	= s3c6410_init_irq,
+> +	.map_io		= mini6410_map_io,
+> +	.init_machine	= mini6410_machine_init,
+> +	.timer		= &s3c24xx_timer,
+> +MACHINE_END
 
-Thanks,
-Guenter
+Others, looks ok.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
