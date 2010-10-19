@@ -1,62 +1,62 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 19 Oct 2010 15:03:05 +0300
-Subject: [PATCH 1/2] video: omap: vram: remove from normal memory
-In-Reply-To: <20101018225534.GH13341@atomide.com>
-References: <AANLkTik_6byuzkZ+mKunTi6HJTHu49C4XGebfTjCaEeE@mail.gmail.com>
-	<1287146784-5517-1-git-send-email-felipe.contreras@gmail.com>
-	<1287407452.6781.64.camel@tubuntu> <1287410618.6781.110.camel@tubuntu>
-	<20101018225534.GH13341@atomide.com>
-Message-ID: <1287489785.2216.10.camel@tubuntu>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Tue, 19 Oct 2010 17:44:58 +0530
+Subject: linux-next: omap2plus_defconfig not building
+In-Reply-To: <1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+References: <4CBD707F.6050204@ti.com>
+	<1287488255.18646.110.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <4CBD8BC2.3020000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2010-10-19 at 00:55 +0200, ext Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@nokia.com> [101018 06:55]:
-> > On Mon, 2010-10-18 at 16:10 +0300, Tomi Valkeinen wrote:
-> > > Hi,
-> > > 
-> > > On Fri, 2010-10-15 at 14:46 +0200, ext Felipe Contreras wrote:
-> > > > So that we can ioremap happily.
-> > > > 
-> > > > Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-> > > > Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
-> > > > ---
-> > > >  drivers/video/omap2/vram.c |    2 ++
-> > > >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/video/omap2/vram.c b/drivers/video/omap2/vram.c
-> > > > index f6fdc20..1a99777 100644
-> > > > --- a/drivers/video/omap2/vram.c
-> > > > +++ b/drivers/video/omap2/vram.c
-> > > > @@ -575,6 +575,8 @@ void __init omap_vram_reserve_sdram_memblock(void)
-> > > >  		}
-> > > >  	} else {
-> > > >  		paddr = memblock_alloc_base(size, PAGE_SIZE, MEMBLOCK_REAL_LIMIT);
-> > > > +		memblock_free(paddr, size);
-> > > > +		memblock_remove(paddr, size);
-> > > >  	}
-> > > >  
-> > > >  	omap_vram_add_region(paddr, size);
-> > > 
-> > > I tested this on OMAP3 SDP board, on top of my DSS2 tree. I can boot up
-> > > fine, but my test program crashes the kernel (dump below).
-> > > 
-> > > This crash doesn't happen if I have the "HACK: OMAP: DSS2: OMAPFB: use
-> > > phys_to_virt for RAM mappings" patch in (I removed that during testing
-> > > this patch).
-> > > 
-> > > I don't know yet what is crashing the kernel, but I'd guess it's the
-> > > fact that my test program reallocates the framebuffer memory with
-> > > OMAPFB_SETUP_MEM ioctl.
-> > 
-> > Ah, sorry, I was missing the patch from Russel which you mentioned in
-> > another mail (http://article.gmane.org/gmane.linux.kernel/1047146). With
-> > that patch included things seem to work.
-> 
-> Tomi, I assume you're queuing these? If so, for both:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On 10/19/2010 5:07 PM, Catalin Marinas wrote:
+> On Tue, 2010-10-19 at 11:18 +0100, Anand Gadiyar wrote:
+>> Commit ba1b9be5cd in linux-next (ARM: Add SWP/SWPB emulation for ARMv7
+>> processors (v5)) introduced arch/arm/kernel/swp_emulate.c. This file
+>> gets compiled when the omap2plus_defconfig is built - the
+>> omap2plus_defconfig builds OMAP2420, OMAP2430, OMAP3 and OMAP4 in one
+>> image, and has CPU_V6 and CPU_V7 both enabled.
+>
+> This patch should fix it:
+>
 
-Yes, I can queue them (when the required memblock stuff is in).
+Yes, it does. I've not yet boot tested on omap2; will try
+that out in a bit.
 
- Tomi
+OMAP3 and OMAP4 still don't boot on next if support for both are 
+compiled together, however that's a separate issue to debug.
+
+Thanks!
+
+- Anand
+
+
+>
+> ARM: Do not enable SWP emulation if CPU_V6&&  CPU_V7
+>
+> From: Catalin Marinas<catalin.marinas@arm.com>
+>
+> This option uses LDREXB/STREXB to emulate SWPB but these instructions
+> are not supported on all the ARMv6 processors.
+>
+> Reported-by: Anand Gadiyar<gadiyar@ti.com>
+> Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
+> Cc: Leif Lindholm<Leif.Lindholm@arm.com>
+> ---
+>   arch/arm/mm/Kconfig |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 8493ed0..5195d61 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -638,7 +638,7 @@ config ARM_THUMBEE
+>
+>   config SWP_EMULATE
+>   	bool "Emulate SWP/SWPB instructions"
+> -	depends on CPU_V7
+> +	depends on CPU_V7&&  !CPU_V6
+>   	select HAVE_PROC_CPU if PROC_FS
+>   	default y if SMP
+>   	help
+>
+>
