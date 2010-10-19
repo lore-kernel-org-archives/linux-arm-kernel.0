@@ -1,168 +1,196 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 19 Oct 2010 12:22:25 +0200
-Subject: [PATCH 1/3] mmci: work with only one irq
-Message-ID: <1287483745-28585-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 19 Oct 2010 12:22:34 +0200
+Subject: [PATCH 2/3] mmci: handle out-of-order IRQ events
+Message-ID: <1287483754-28859-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin.vincent@stericsson.com>
+On the U300 the MCI_DATAEND and MCI_DATABLOCKEND IRQs can arrive
+out-of-order. Replace an ugly #ifdef hack with a proper runtime
+solution which models what is really happening.
 
-The DBx500 variants have only one IRQ line hooked up.  Allow these (and
-any other implementations which choose to use only one irq) to work by
-directing the PIO interrupts also to the first IRQ line.
+In the U300 DMA mode and on all Ux500 models, the MCI_DATABLOCKEND
+flag isn't properly cleared in hardware following and ACK leading
+to all kind of weird behaviour when the flag is still up in
+subsequent interrupts, so we add two flags indicating the
+error and handle this runtime.
 
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Cc: Rabin Vincent <rabin.vincent@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
-This is an authorized respin of Rabins patch, it will now just
-handle the single-IRQ case without the fixups relating to how
-the DATAEND and BLOCKEND flags were being treated in the ux500
-hardware.
-
-The latter fixes have been folded into a follow-up patch that adds
-two bug flags for the way DATAEND and BLOCKEND is treated.
+This respin incorporates the related code from Rabins patch
+for Ux500 support.
 ---
- drivers/mmc/host/mmci.c |   50 ++++++++++++++++++++++++++++++++++++++--------
- drivers/mmc/host/mmci.h |    6 +++++
- 2 files changed, 47 insertions(+), 9 deletions(-)
+ drivers/mmc/host/mmci.c |   91 ++++++++++++++++++++++++++++++++++++++--------
+ drivers/mmc/host/mmci.h |    3 ++
+ 2 files changed, 78 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 87b4fc6..ed700a5 100644
+index ed700a5..1294a41 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -129,10 +129,26 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
- 	spin_lock(&host->lock);
- }
+@@ -45,6 +45,10 @@ static unsigned int fmax = 515633;
+  *	      is asserted (likewise for RX)
+  * @fifohalfsize: number of bytes that can be written when MCI_TXFIFOHALFEMPTY
+  *		  is asserted (likewise for RX)
++ * @broken_blockend: the MCI_DATABLOCKEND is broken on the hardware
++ *		and will not work at all.
++ * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
++ *		using DMA.
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
+@@ -52,6 +56,8 @@ struct variant_data {
+ 	unsigned int		datalength_bits;
+ 	unsigned int		fifosize;
+ 	unsigned int		fifohalfsize;
++	bool			broken_blockend;
++	bool			broken_blockend_dma;
+ };
  
-+static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
-+{
-+	void __iomem *base = host->base;
+ static struct variant_data variant_arm = {
+@@ -65,6 +71,7 @@ static struct variant_data variant_u300 = {
+ 	.fifohalfsize		= 8 * 4,
+ 	.clkreg_enable		= 1 << 13, /* HWFCEN */
+ 	.datalength_bits	= 16,
++	.broken_blockend_dma	= true,
+ };
+ 
+ static struct variant_data variant_ux500 = {
+@@ -73,6 +80,7 @@ static struct variant_data variant_ux500 = {
+ 	.clkreg			= MCI_CLK_ENABLE,
+ 	.clkreg_enable		= 1 << 14, /* HWFCEN */
+ 	.datalength_bits	= 24,
++	.broken_blockend	= true,
+ };
+ /*
+  * This must be called with host->lock held
+@@ -249,20 +257,9 @@ static void
+ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 	      unsigned int status)
+ {
+-	if (status & MCI_DATABLOCKEND) {
+-		host->data_xfered += data->blksz;
+-#ifdef CONFIG_ARCH_U300
+-		/*
+-		 * On the U300 some signal or other is
+-		 * badly routed so that a data write does
+-		 * not properly terminate with a MCI_DATAEND
+-		 * status flag. This quirk will make writes
+-		 * work again.
+-		 */
+-		if (data->flags & MMC_DATA_WRITE)
+-			status |= MCI_DATAEND;
+-#endif
+-	}
++	struct variant_data *variant = host->variant;
 +
-+	if (host->singleirq) {
-+		unsigned int mask0 = readl(base + MMCIMASK0);
++	/* First check for errors */
+ 	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
+ 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ (status %08x)\n", status);
+ 		if (status & MCI_DATACRCFAIL)
+@@ -271,7 +268,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 			data->error = -ETIMEDOUT;
+ 		else if (status & (MCI_TXUNDERRUN|MCI_RXOVERRUN))
+ 			data->error = -EIO;
+-		status |= MCI_DATAEND;
 +
-+		mask0 &= ~MCI_IRQ1MASK;
-+		mask0 |= mask;
++		/* Force-complete the transaction */
++		host->blockend = true;
++		host->dataend = true;
+ 
+ 		/*
+ 		 * We hit an error condition.  Ensure that any data
+@@ -289,9 +289,64 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 			local_irq_restore(flags);
+ 		}
+ 	}
+-	if (status & MCI_DATAEND) {
 +
-+		writel(mask0, base + MMCIMASK0);
++	/*
++	 * On ARM variants in PIO mode, MCI_DATABLOCKEND
++	 * is always sent first, and we increase the
++	 * transfered number of bytes for that IRQ. Then
++	 * MCI_DATAEND follows and we conclude the transaction.
++	 *
++	 * On the Ux500 single-IRQ variant MCI_DATABLOCKEND
++	 * doesn't seem to immediately clear from the status,
++	 * so we can't use it keep count when only one irq is
++	 * used because the irq will hit for other reasons, and
++	 * then the flag is still up. So we use the MCI_DATAEND
++	 * IRQ at the end of the entire transfer because
++	 * MCI_DATABLOCKEND is broken.
++	 *
++	 * In the U300, the IRQs can arrive out-of-order,
++	 * e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
++	 * so for this case we use the flags "blockend" and
++	 * "dataend" to make sure both IRQs have arrived before
++	 * concluding the transaction. (This does not apply
++	 * to the Ux500 which doesn't fire MCI_DATABLOCKEND
++	 * at all.) In DMA mode it suffers from the same problem
++	 * as the Ux500.
++	 */
++	if (status & MCI_DATABLOCKEND) {
++		/*
++		 * Just being a little over-cautious, we do not
++		 * use this progressive update if the hardware blockend
++		 * flag is unreliable: since it can stay high between
++		 * IRQs it will corrupt the transfer counter.
++		 */
++		if (!variant->broken_blockend)
++			host->data_xfered += data->blksz;
++		host->blockend = true;
 +	}
 +
-+	writel(mask, base + MMCIMASK1);
-+}
++	if (status & MCI_DATAEND)
++		host->dataend = true;
 +
- static void mmci_stop_data(struct mmci_host *host)
- {
- 	writel(0, host->base + MMCIDATACTRL);
--	writel(0, host->base + MMCIMASK1);
-+	mmci_set_mask1(host, 0);
- 	host->data = NULL;
- }
++	/*
++	 * On variants with broken blockend we shall only wait for dataend,
++	 * on others we must sync with the blockend signal since they can
++	 * appear out-of-order.
++	 */
++	if (host->dataend && (host->blockend || variant->broken_blockend)) {
+ 		mmci_stop_data(host);
  
-@@ -198,7 +214,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 
- 	writel(datactrl, base + MMCIDATACTRL);
- 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
--	writel(irqmask, base + MMCIMASK1);
-+	mmci_set_mask1(host, irqmask);
- }
- 
- static void
-@@ -437,7 +453,7 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
- 	 * "any data available" mode.
- 	 */
- 	if (status & MCI_RXACTIVE && host->size < variant->fifosize)
--		writel(MCI_RXDATAAVLBLMASK, base + MMCIMASK1);
-+		mmci_set_mask1(host, MCI_RXDATAAVLBLMASK);
- 
- 	/*
- 	 * If we run out of data, disable the data IRQs; this
-@@ -446,7 +462,7 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id)
- 	 * stops us racing with our data end IRQ.
- 	 */
- 	if (host->size == 0) {
--		writel(0, base + MMCIMASK1);
-+		mmci_set_mask1(host, 0);
- 		writel(readl(base + MMCIMASK0) | MCI_DATAENDMASK, base + MMCIMASK0);
++		/* Reset these flags */
++		host->blockend = false;
++		host->dataend = false;
++
++		/*
++		 * Variants with broken blockend flags need to handle the
++		 * end of the entire transfer here.
++		 */
++		if (variant->broken_blockend && !data->error)
++			host->data_xfered += data->blksz * data->blocks;
++
+ 		if (!data->stop) {
+ 			mmci_request_end(host, data->mrq);
+ 		} else {
+@@ -841,6 +896,10 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
  	}
  
-@@ -469,6 +485,14 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- 		struct mmc_data *data;
- 
- 		status = readl(host->base + MMCISTATUS);
+ 	mask = MCI_IRQENABLE;
++	/* Don't use the datablockend flag if it's broken */
++	if (variant->broken_blockend)
++		mask &= ~MCI_DATABLOCKEND;
 +
-+		if (host->singleirq) {
-+			if (status & readl(host->base + MMCIMASK1))
-+				mmci_pio_irq(irq, dev_id);
-+
-+			status &= ~MCI_IRQ1MASK;
-+		}
-+
- 		status &= readl(host->base + MMCIMASK0);
- 		writel(status, host->base + MMCICLEAR);
- 
-@@ -635,6 +659,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	struct variant_data *variant = id->data;
- 	struct mmci_host *host;
- 	struct mmc_host *mmc;
-+	unsigned int mask;
- 	int ret;
- 
- 	/* must have platform data */
-@@ -806,11 +831,17 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	if (ret)
- 		goto unmap;
- 
--	ret = request_irq(dev->irq[1], mmci_pio_irq, IRQF_SHARED, DRIVER_NAME " (pio)", host);
--	if (ret)
--		goto irq0_free;
-+	if (dev->irq[1] == NO_IRQ)
-+		host->singleirq = true;
-+	else {
-+		ret = request_irq(dev->irq[1], mmci_pio_irq, IRQF_SHARED,
-+				  DRIVER_NAME " (pio)", host);
-+		if (ret)
-+			goto irq0_free;
-+	}
- 
--	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-+	mask = MCI_IRQENABLE;
-+	writel(mask, host->base + MMCIMASK0);
+ 	writel(mask, host->base + MMCIMASK0);
  
  	amba_set_drvdata(dev, mmc);
- 
-@@ -864,7 +895,8 @@ static int __devexit mmci_remove(struct amba_device *dev)
- 		writel(0, host->base + MMCIDATACTRL);
- 
- 		free_irq(dev->irq[0], host);
--		free_irq(dev->irq[1], host);
-+		if (!host->singleirq)
-+			free_irq(dev->irq[1], host);
- 
- 		if (host->gpio_wp != -ENOSYS)
- 			gpio_free(host->gpio_wp);
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 4ae887f..b4e48bd 100644
+index b4e48bd..df06f01 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -139,6 +139,11 @@
- 	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
- 	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATABLOCKENDMASK)
+@@ -177,6 +177,9 @@ struct mmci_host {
+ 	struct timer_list	timer;
+ 	unsigned int		oldstat;
  
-+/* These interrupts are directed to IRQ1 when two IRQ lines are available */
-+#define MCI_IRQ1MASK \
-+	(MCI_RXFIFOHALFFULLMASK | MCI_RXDATAAVLBLMASK | \
-+	 MCI_TXFIFOHALFEMPTYMASK)
++	bool			blockend;
++	bool			dataend;
 +
- #define NR_SG		16
- 
- struct clk;
-@@ -154,6 +159,7 @@ struct mmci_host {
- 	int			gpio_cd;
- 	int			gpio_wp;
- 	int			gpio_cd_irq;
-+	bool			singleirq;
- 
- 	unsigned int		data_xfered;
- 
+ 	/* pio stuff */
+ 	struct sg_mapping_iter	sg_miter;
+ 	unsigned int		size;
 -- 
 1.7.2.3
