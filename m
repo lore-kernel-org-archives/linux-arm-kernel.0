@@ -1,52 +1,100 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 19 Oct 2010 16:39:02 +0200
-Subject: [PATCH 07/12] ARM: Convert v4 minicache_lock to raw_spinlock
+Date: Tue, 19 Oct 2010 16:38:58 +0200
+Subject: [PATCH 03/12] ARM: Convert die_lock and undef_lock to raw_spinlocks
 In-Reply-To: <20101019143717.GH11713@pengutronix.de>
 References: <20101019143717.GH11713@pengutronix.de>
-Message-ID: <1287499147-13846-7-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1287499147-13846-3-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Gleixner <tglx@linutronix.de>
 
-minicache_lock needs to be a real spinlock on preempt-rt. Convert it
-to a raw_spinlock. No change for !RT kernels.
+die_lock and undef_lock need to be real spinlocks on
+preempt-rt. Convert them to raw_spinlock. No change for !RT kernels.
+
+Make die_lock static while at it.
 
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mm/copypage-v4mc.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kernel/traps.c |   20 ++++++++++----------
+ 1 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
-index 598c51a..bb17acd 100644
---- a/arch/arm/mm/copypage-v4mc.c
-+++ b/arch/arm/mm/copypage-v4mc.c
-@@ -30,7 +30,7 @@
- #define minicache_pgprot __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | \
- 				  L_PTE_MT_MINICACHE)
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index cda78d5..eb9a240 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -257,7 +257,7 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
+ 	return ret;
+ }
  
--static DEFINE_SPINLOCK(minicache_lock);
-+static DEFINE_RAW_SPINLOCK(minicache_lock);
+-DEFINE_SPINLOCK(die_lock);
++static DEFINE_RAW_SPINLOCK(die_lock);
  
  /*
-  * ARMv4 mini-dcache optimised copy_user_highpage
-@@ -76,14 +76,14 @@ void v4_mc_copy_user_highpage(struct page *to, struct page *from,
- 	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
- 		__flush_dcache_page(page_mapping(from), from);
+  * This function is protected against re-entrancy.
+@@ -269,7 +269,7 @@ void die(const char *str, struct pt_regs *regs, int err)
  
--	spin_lock(&minicache_lock);
-+	raw_spin_lock(&minicache_lock);
+ 	oops_enter();
  
- 	set_pte_ext(TOP_PTE(0xffff8000), pfn_pte(page_to_pfn(from), minicache_pgprot), 0);
- 	flush_tlb_kernel_page(0xffff8000);
+-	spin_lock_irq(&die_lock);
++	raw_spin_lock_irq(&die_lock);
+ 	console_verbose();
+ 	bust_spinlocks(1);
+ 	ret = __die(str, err, thread, regs);
+@@ -279,7 +279,7 @@ void die(const char *str, struct pt_regs *regs, int err)
  
- 	mc_copy_user_page((void *)0xffff8000, kto);
+ 	bust_spinlocks(0);
+ 	add_taint(TAINT_DIE);
+-	spin_unlock_irq(&die_lock);
++	raw_spin_unlock_irq(&die_lock);
+ 	oops_exit();
  
--	spin_unlock(&minicache_lock);
-+	raw_spin_unlock(&minicache_lock);
+ 	if (in_interrupt())
+@@ -304,24 +304,24 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
+ }
  
- 	kunmap_atomic(kto, KM_USER1);
+ static LIST_HEAD(undef_hook);
+-static DEFINE_SPINLOCK(undef_lock);
++static DEFINE_RAW_SPINLOCK(undef_lock);
+ 
+ void register_undef_hook(struct undef_hook *hook)
+ {
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&undef_lock, flags);
++	raw_spin_lock_irqsave(&undef_lock, flags);
+ 	list_add(&hook->node, &undef_hook);
+-	spin_unlock_irqrestore(&undef_lock, flags);
++	raw_spin_unlock_irqrestore(&undef_lock, flags);
+ }
+ 
+ void unregister_undef_hook(struct undef_hook *hook)
+ {
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&undef_lock, flags);
++	raw_spin_lock_irqsave(&undef_lock, flags);
+ 	list_del(&hook->node);
+-	spin_unlock_irqrestore(&undef_lock, flags);
++	raw_spin_unlock_irqrestore(&undef_lock, flags);
+ }
+ 
+ static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
+@@ -330,12 +330,12 @@ static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
+ 	unsigned long flags;
+ 	int (*fn)(struct pt_regs *regs, unsigned int instr) = NULL;
+ 
+-	spin_lock_irqsave(&undef_lock, flags);
++	raw_spin_lock_irqsave(&undef_lock, flags);
+ 	list_for_each_entry(hook, &undef_hook, node)
+ 		if ((instr & hook->instr_mask) == hook->instr_val &&
+ 		    (regs->ARM_cpsr & hook->cpsr_mask) == hook->cpsr_val)
+ 			fn = hook->fn;
+-	spin_unlock_irqrestore(&undef_lock, flags);
++	raw_spin_unlock_irqrestore(&undef_lock, flags);
+ 
+ 	return fn ? fn(regs, instr) : 1;
  }
 -- 
 1.7.2.3
