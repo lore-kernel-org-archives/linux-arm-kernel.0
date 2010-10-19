@@ -1,109 +1,613 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Tue, 19 Oct 2010 16:30:25 -0500
-Subject: [patch 1/9] efikamx: read board id
-In-Reply-To: <20101019211507.GA28242@pengutronix.de>
-References: <20101019204253.162641893@rtp-net.org>
-	<20101019205251.082848683@rtp-net.org>
-	<20101019211507.GA28242@pengutronix.de>
-Message-ID: <AANLkTi=SbFy1eFzQ3XUGDjurme=stUSiqmTRVR=EtX5q@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 19 Oct 2010 14:47:25 -0700
+Subject: [PATCH V2 45/69] ST SPEAr: PCIE gadget suppport
+In-Reply-To: <c91308e26397dbe49f384c7d3cf168593e1fe8b0.1285933332.git.viresh.kumar@st.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>
+	<c91308e26397dbe49f384c7d3cf168593e1fe8b0.1285933332.git.viresh.kumar@st.com>
+Message-ID: <20101019144725.977297f5.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 4:15 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, Oct 19, 2010 at 10:42:54PM +0200, Arnaud Patard wrote:
->> read board id value from the GPIO3_16/17/11
->>
->>
->> +/* ? PCBID2 ?PCBID1 PCBID0 ?STATE
->> + ? ? 1 ? ? ? 1 ? ? ?1 ? ?ER1:rev1.1
->> + ? ? 1 ? ? ? 1 ? ? ?0 ? ?ER2:rev1.2
->> + ? ? 1 ? ? ? 0 ? ? ?1 ? ?ER3:rev1.3
->> + ? ? 1 ? ? ? 0 ? ? ?0 ? ?ER4:rev1.4
->> +*/
->> +static void __init mx51_efikamx_board_id(void)
->> +{
->> + ? ? int id;
->> +
->> + ? ? /* things are taking time to settle */
->> + ? ? msleep(500);
+On Fri,  1 Oct 2010 17:26:05 +0530
+Viresh KUMAR <viresh.kumar@st.com> wrote:
+
+> From: Pratyush Anand <pratyush.anand@st.com>
+> 
+> This is a configurable gadget. can be configured by sysfs interface. Any
+> IP available at PCIE bus can be programmed to be used by host
+> controller.It supoorts both INTX and MSI.
+> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
+> with size 0x1000
+> 
 >
-> Is it really necessary to delay the boot process such a long time?
-
-Yes. On older boards the PCBID pins are pulled high by IOMUX settings
-(a pulldown on the board on newer revisions will keep it down). IOMUX
-and GPIO stuff takes a little while to settle in, so if you do it
-immediately, it will return some freakish values based on random GPIO
-setup (it may be high, low, or none of the above at any point before
-the pad setting kicks in).
-
->> + ? ? gpio_request(EFIKAMX_PCBID0, "pcbid0");
->> + ? ? gpio_direction_input(EFIKAMX_PCBID0);
->> + ? ? gpio_request(EFIKAMX_PCBID1, "pcbid1");
->> + ? ? gpio_direction_input(EFIKAMX_PCBID1);
->> + ? ? gpio_request(EFIKAMX_PCBID2, "pcbid2");
->> + ? ? gpio_direction_input(EFIKAMX_PCBID2);
->> +
->> + ? ? id = gpio_get_value(EFIKAMX_PCBID0);
->> + ? ? id |= gpio_get_value(EFIKAMX_PCBID1) << 1;
->> + ? ? id |= gpio_get_value(EFIKAMX_PCBID2) << 2;
->> +
->> + ? ? switch (id) {
->> + ? ? case 7:
->> + ? ? ? ? ? ? system_rev = 0x11;
->> + ? ? ? ? ? ? break;
->> + ? ? case 6:
->> + ? ? ? ? ? ? system_rev = 0x12;
->> + ? ? ? ? ? ? break;
->> + ? ? case 5:
->> + ? ? ? ? ? ? system_rev = 0x13;
->> + ? ? ? ? ? ? break;
->> + ? ? case 4:
->> + ? ? ? ? ? ? system_rev = 0x14;
->> + ? ? ? ? ? ? break;
->> + ? ? default:
->> + ? ? ? ? ? ? system_rev = 0x10;
->> + ? ? ? ? ? ? break;
->> + ? ? }
->> +
->> + ? ? if ? ? ?((system_rev == 0x10)
+> ...
 >
-> Please replace the tab after 'if' with a space
+> +static void enable_dbi_access(struct pcie_app_reg *app_reg)
+
+app_reg should have the __iomem tag.
+
+> +{
+> +	/* Enable DBI access */
+> +	writel(readl(&app_reg->slv_armisc) | (1 << AXI_OP_DBI_ACCESS_ID),
+> +			&app_reg->slv_armisc);
+> +	writel(readl(&app_reg->slv_awmisc) | (1 << AXI_OP_DBI_ACCESS_ID),
+> +			&app_reg->slv_awmisc);
+> +
+> +}
+> +
+> +static void disable_dbi_access(struct pcie_app_reg *app_reg)
+
+ditto
+
+> +{
+> +	/* disable DBI access */
+> +	writel(readl(&app_reg->slv_armisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
+> +			&app_reg->slv_armisc);
+> +	writel(readl(&app_reg->slv_awmisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
+> +			&app_reg->slv_awmisc);
+> +
+> +}
+> +
+> +static void spear_dbi_read_reg(struct spear_pcie_gadget_config *config,
+> +		int where, int size, u32 *val)
+> +{
+> +	struct pcie_app_reg *app_reg
+> +		= (struct pcie_app_reg *) config->va_app_base;
+
+ditto
+
+> +	u32 va_address;
+> +
+> +	/* Enable DBI access */
+> +	enable_dbi_access(app_reg);
+> +
+> +	va_address = (u32)config->va_dbi_base + (where & ~0x3);
+> +
+> +	*val = readl(va_address);
+> +
+> +	if (size == 1)
+> +		*val = (*val >> (8 * (where & 3))) & 0xff;
+> +	else if (size == 2)
+> +		*val = (*val >> (8 * (where & 3))) & 0xffff;
+> +
+> +	/* Disable DBI access */
+> +	disable_dbi_access(app_reg);
+> +}
+> +
+> +static void spear_dbi_write_reg(struct spear_pcie_gadget_config *config,
+> +		int where, int size, u32 val)
+> +{
+> +	struct pcie_app_reg *app_reg
+> +		= (struct pcie_app_reg *) config->va_app_base;
+
+etc.
+
+> +	u32 va_address;
+> +
+> +	/* Enable DBI access */
+> +	enable_dbi_access(app_reg);
+> +
+> +	va_address = (u32)config->va_dbi_base + (where & ~0x3);
+> +
+> +	if (size == 4)
+> +		writel(val, va_address);
+> +	else if (size == 2)
+> +		writew(val, va_address + (where & 2));
+> +	else if (size == 1)
+> +		writeb(val, va_address + (where & 3));
+> +
+> +	/* Disable DBI access */
+> +	disable_dbi_access(app_reg);
+> +}
+> +
 >
->> + ? ? ? ? ? ? || (system_rev == 0x12)
->> + ? ? ? ? ? ? || (system_rev == 0x14)) {
->> + ? ? ? ? ? ? printk(KERN_WARNING
->> + ? ? ? ? ? ? ? ? ? ? "EfikaMX: Unsupported board revision 1.%u!\n",
->> + ? ? ? ? ? ? ? ? ? ? system_rev & 0xf);
->> + ? ? }
+> ...
 >
-> I know nothing about the versioning scheme, but what about 1.1? Is it
-> supported?
+> +/**
 
-The check is just a nicety; Genesi have only shipped 1.1 and 1.3
-boards to customers.
+This token is specifically used to introduce a kerneldoc comment, but
+this wasn't a kerneldoc comment.
 
-1.0 was the original "developer edition". Laurent Guerby and a few
-other people have these boards to make simple compile farms out of.
-Some stuff plain doesn't work, though (ethernet on USB DR port), so we
-track it as "unsupported" - if someone wants to fix it up with patches
-they may. Until then we warn in dmesg that this is a weird board
-revision so we can keep track and warn users not to "complain".
+> + * Tell if a device supports a given PCI capability.
+> + * Returns the address of the requested capability structure within the
+> + * device's PCI configuration space or 0 in case the device does not
+> + * support it. Possible values for @cap:
+> + *
+> + * %PCI_CAP_ID_PM	Power Management
+> + * %PCI_CAP_ID_AGP	Accelerated Graphics Port
+> + * %PCI_CAP_ID_VPD	Vital Product Data
+> + * %PCI_CAP_ID_SLOTID	Slot Identification
+> + * %PCI_CAP_ID_MSI	Message Signalled Interrupts
+> + * %PCI_CAP_ID_CHSWP	CompactPCI HotSwap
+> + * %PCI_CAP_ID_PCIX	PCI-X
+> + * %PCI_CAP_ID_EXP	PCI Express
+> + */
+>
+> ...
+>
+> +
+> +static ssize_t pcie_gadget_show_link(struct device *dev,
+> +		struct device_attribute *attr, char *buf)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	struct pcie_app_reg *app_reg =
+> +		(struct pcie_app_reg *)config->va_app_base;
 
-1.1 is the "TO2" original board on sale. They are useful, without
-NEON, as compile boxes or so.
+Check all the __iomems;
 
-1.2 was an internal build featuring most 90% of the features of 1.3,
-but with an i.MX515 TO2. They do exist: I have 4 or 5 sitting in my
-office. They're pointless to use though as TO2 boards don't have
-stable NEON and we didn't do a great deal of testing (1.3 was around
-the corner and had fixed a bunch of stuff).
+> +	if (readl(&app_reg->app_status_1) & ((u32)1 << XMLH_LINK_UP_ID))
+> +		return sprintf(buf, "UP");
+> +	else
+> +		return sprintf(buf, "DOWN");
+> +}
+> +
+> +static ssize_t pcie_gadget_store_link(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	struct pcie_app_reg *app_reg =
+> +		(struct pcie_app_reg *)config->va_app_base;
+> +	char link[10];
+> +
+> +	if (sscanf(buf, "%s", link) != 1)
 
-1.3 is the "TO3" board. We shipped it around April/May I think and
-customers were offered replacements.
+What happens if strlen(buf) >= 10?
 
-1.4 does not exist in production as of yet (and may not ever be) but
-the PCBID is planned already.
+> +		return -EINVAL;
+> +
+> +	if (!strcmp(link, "UP"))
+> +		writel(readl(&app_reg->app_ctrl_0) | (1 << APP_LTSSM_ENABLE_ID),
+> +			&app_reg->app_ctrl_0);
+> +	else
+> +		writel(readl(&app_reg->app_ctrl_0)
+> +				& ~(1 << APP_LTSSM_ENABLE_ID),
+> +				&app_reg->app_ctrl_0);
+> +	return count;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_int_type(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	char int_type[10];
+> +	u32 cap, vector, vec, flags;
+> +
+> +	if (sscanf(buf, "%s", int_type) != 1)
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+ditto
+
+> +		return -EINVAL;
+> +
+> +	if (!strcmp(int_type, "INTA"))
+> +		spear_dbi_write_reg(config, PCI_INTERRUPT_LINE, 1, 1);
+> +
+> +	else if (!strcmp(int_type, "MSI")) {
+> +		vector = config->requested_msi;
+> +		vec = 0;
+> +		while (vector > 1) {
+> +			vector /= 2;
+> +			vec++;
+> +		}
+> +		spear_dbi_write_reg(config, PCI_INTERRUPT_LINE, 1, 0);
+> +		cap = pci_find_own_capability(config, PCI_CAP_ID_MSI);
+> +		spear_dbi_read_reg(config, cap + PCI_MSI_FLAGS, 1, &flags);
+> +		flags &= ~PCI_MSI_FLAGS_QMASK;
+> +		flags |= vec << 1;
+> +		spear_dbi_write_reg(config, cap + PCI_MSI_FLAGS, 1, flags);
+> +	}
+
+No checking for unrecognised input?
+
+> +	strcpy(config->int_type, int_type);
+> +
+> +	return count;
+> +}
+> +
+> +static DEVICE_ATTR(int_type, S_IWUSR | S_IRUGO, pcie_gadget_show_int_type,
+> +		pcie_gadget_store_int_type);
+> +
+> +static ssize_t pcie_gadget_show_no_of_msi(struct device *dev,
+> +		struct device_attribute *attr, char *buf)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	struct pcie_app_reg *app_reg =
+> +		(struct pcie_app_reg *)config->va_app_base;
+
+__iomem
+
+> +	u32 cap, vector, vec, flags;
+> +
+> +	if ((readl(&app_reg->msg_status) & (1 << CFG_MSI_EN_ID))
+> +			!= (1 << CFG_MSI_EN_ID))
+> +		vector = 0;
+> +	else {
+> +		cap = pci_find_own_capability(config, PCI_CAP_ID_MSI);
+> +		spear_dbi_read_reg(config, cap + PCI_MSI_FLAGS, 1, &flags);
+> +		flags &= ~PCI_MSI_FLAGS_QSIZE;
+> +		vec = flags >> 4;
+> +		vector = 1;
+> +		while (vec--)
+> +			vector *= 2;
+> +	}
+> +	config->configured_msi = vector;
+> +
+> +	return sprintf(buf, "%u", vector);
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_inta(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	struct pcie_app_reg *app_reg =
+> +		(struct pcie_app_reg *)config->va_app_base;
+> +	int en;
+> +
+> +	if (sscanf(buf, "%d", &en) != 1)
+
+strict_strtoul() would be better.  It will reject input of the form "42foo".
+
+> +		return -EINVAL;
+> +
+> +	if (en)
+> +		writel(readl(&app_reg->app_ctrl_0) | (1 << SYS_INT_ID),
+> +				&app_reg->app_ctrl_0);
+> +	else
+> +		writel(readl(&app_reg->app_ctrl_0) & ~(1 << SYS_INT_ID),
+> +				&app_reg->app_ctrl_0);
+> +
+> +	return count;
+> +}
+> +
+> +static DEVICE_ATTR(inta, S_IWUSR, NULL, pcie_gadget_store_inta);
+> +
+> +static ssize_t pcie_gadget_store_send_msi(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	struct pcie_app_reg *app_reg =
+> +		(struct pcie_app_reg *)config->va_app_base;
+> +	int vector;
+> +	u32 ven_msi;
+> +
+> +	if (sscanf(buf, "%d", &vector) != 1)
+
+strict_strtoul().
+
+> +		return -EINVAL;
+> +
+> +	if (!config->configured_msi)
+> +		return -EINVAL;
+> +
+> +	if (vector >= config->configured_msi)
+> +		return -EINVAL;
+> +
+> +	ven_msi = readl(&app_reg->ven_msi_1);
+> +	ven_msi &= ~VEN_MSI_FUN_NUM_MASK;
+> +	ven_msi |= 0 << VEN_MSI_FUN_NUM_ID;
+> +	ven_msi &= ~VEN_MSI_TC_MASK;
+> +	ven_msi |= 0 << VEN_MSI_TC_ID;
+> +	ven_msi &= ~VEN_MSI_VECTOR_MASK;
+> +	ven_msi |= vector << VEN_MSI_VECTOR_ID;
+> +
+> +	/*generating interrupt for msi vector*/
+> +	ven_msi |= VEN_MSI_REQ_EN;
+> +	writel(ven_msi, &app_reg->ven_msi_1);
+> +	/*need to wait till this bit is cleared, it is not cleared
+> +	 * autometically[Bug RTL] TBD*/
+> +	udelay(1);
+> +	ven_msi &= ~VEN_MSI_REQ_EN;
+> +	writel(ven_msi, &app_reg->ven_msi_1);
+> +
+> +	return count;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_vendor_id(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	u32 id;
+> +
+> +	if (sscanf(buf, "%x", &id) != 1)
+
+strict_strtoul can be used here as well?
+
+> +		return -EINVAL;
+> +
+> +	spear_dbi_write_reg(config, PCI_VENDOR_ID, 2, id);
+> +
+> +	return count;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_device_id(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	u32 id;
+> +
+> +	if (sscanf(buf, "%x", &id) != 1)
+
+etc.
+
+> +		return -EINVAL;
+> +
+> +	spear_dbi_write_reg(config, PCI_DEVICE_ID, 2, id);
+> +
+> +	return count;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_bar0_size(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	u32 size, pos, pos1;
+> +	u32 no_of_bit = 0;
+> +
+> +	if (sscanf(buf, "%x", &size) != 1)
+
+etc.
+
+> +		return -EINVAL;
+> +	/* as per PCIE specs, min bar size supported is 128 bytes. But
+> +	 * our controller supports min as 256*/
+> +	if (size <= 0x100)
+> +		size = 0x100;
+> +	/* max bar size is 1MB*/
+> +	else if (size >= 0x100000)
+> +		size = 0x100000;
+> +	else {
+> +		pos = 0;
+> +		pos1 = 0;
+> +		while (pos < 21) {
+> +			pos = find_next_bit((unsigned long *)&size, 21, pos);
+> +			if (pos != 21)
+> +				pos1 = pos + 1;
+> +			pos++;
+> +			no_of_bit++;
+> +		}
+> +		if (no_of_bit == 2)
+> +			pos1--;
+> +
+> +		size = 1 << pos1;
+> +	}
+> +	config->bar0_size = size;
+> +	spear_dbi_write_reg(config, PCIE_BAR0_MASK_REG, 4, size - 1);
+> +
+> +	return count;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_show_bar0_address(struct device *dev,
+> +		struct device_attribute *attr, char *buf)
+> +{
+> +	struct spear_pcie_gadget_config *config = dev_get_drvdata(dev);
+> +	struct pcie_app_reg *app_reg =
+> +		(struct pcie_app_reg *)config->va_app_base;
+
+etc
+
+> +	u32 address = readl(&app_reg->pim0_mem_addr_start);
+> +
+> +	return sprintf(buf, "%x", address);
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_show_help(struct device *dev,
+> +		struct device_attribute *attr, char *buf)
+> +{
+> +	char text[] = "\t\tlink read->ltssm status\n \
+> +		link write->arg1 = UP to enable ltsmm DOWN to disable\n \
+> +		int_type read->type of supported interrupt\n \
+> +		int_type write->arg1 = interrupt type to be configured and\n \
+> +		can be INTA, MSI or NO_INT\n \
+> +		(select MSI only when you have programmed no_of_msi)\n \
+> +		no_of_msi read->zero if MSI is not enabled by host\n \
+> +		and positive value is the number of MSI vector granted\n \
+> +		no_of_msi write->arg1 = number of MSI vector needed\n \
+> +		inta write->arg1 = 1 to assert INTA and 0 to de-assert\n \
+> +		send_msi write->arg1 = MSI vector to be send\n \
+> +		vendor_id read->programmed vendor id (hex)\n\
+> +		vendor_id write->arg1 = vendor id(hex) to be programmed\n \
+> +		device_id read->programmed device id(hex)\n \
+> +		device_id write->arg1 = device id(hex) to be programmed\n \
+> +		bar0_size read->size of bar0 in hex\n \
+> +		bar0_size write->arg1= size of bar0 in hex\n \
+> +		(default bar0 size is 1000 (hex) bytes)\n \
+> +		bar0_address read->address of bar0 mapped area in hex\n \
+> +		bar0_address write->arg1 = address of bar0 mapped area in hex\n\
+> +		(default mapping of bar0 is SYSRAM1(E0800000)\n \
+> +		(always program bar size before bar address)\n \
+> +		(kernel might modify bar size and address to align)\n \
+> +		(read back bar size and address after writing to check)\n \
+> +		bar0_rw_offset read->offset of bar0 for which bar0_data \n \
+> +		will return value\n \
+> +		bar0_rw_offset write->arg1 = offset of bar0 for which\n \
+> +		bar0_data will write value\n \
+> +		bar0_data read->data at bar0_rw_offset\n \
+> +		bar0_data write->arg1 = data to be written at\n \
+> +		bar0_rw_offset\n";
+> +
+> +	int size = (sizeof(text) < PAGE_SIZE) ? sizeof(text) : PAGE_SIZE;
+> +
+> +	return snprintf(buf, size, "%s", text);
+> +}
+
+What the heck is this??
+
+> +static DEVICE_ATTR(help, S_IRUGO, pcie_gadget_show_help, NULL);
+> +
+> +static struct attribute *pcie_gadget_attributes[] = {
+> +	&dev_attr_link.attr,
+> +	&dev_attr_int_type.attr,
+> +	&dev_attr_no_of_msi.attr,
+> +	&dev_attr_inta.attr,
+> +	&dev_attr_send_msi.attr,
+> +	&dev_attr_vendor_id.attr,
+> +	&dev_attr_device_id.attr,
+> +	&dev_attr_bar0_size.attr,
+> +	&dev_attr_bar0_address.attr,
+> +	&dev_attr_bar0_rw_offset.attr,
+> +	&dev_attr_bar0_data.attr,
+> +	&dev_attr_help.attr,
+> +	NULL
+> +};
+> +
+>
+> ...
+>
+> +static int __devinit spear_pcie_gadget_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res0, *res1;
+> +	struct spear_pcie_gadget_config *config;
+> +	unsigned int status = 0;
+> +	int irq;
+> +	struct clk *clk;
+> +
+> +	/* get resource for application registers*/
+> +
+> +	res0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res0) {
+> +		dev_err(&pdev->dev, "no resource defined\n");
+> +		return -EBUSY;
+> +	}
+> +	if (!request_mem_region(res0->start, resource_size(res0),
+> +				pdev->name)) {
+> +		dev_err(&pdev->dev, "pcie gadget region already	claimed\n");
+> +		return -EBUSY;
+> +	}
+> +	/* get resource for dbi registers*/
+> +
+> +	res1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (!res1) {
+> +		dev_err(&pdev->dev, "no resource defined\n");
+> +		goto err_rel_res0;
+> +	}
+> +	if (!request_mem_region(res1->start, resource_size(res1),
+> +				pdev->name)) {
+> +		dev_err(&pdev->dev, "pcie gadget region already	claimed\n");
+> +		goto err_rel_res0;
+> +	}
+> +
+> +	config = kzalloc(sizeof(*config), GFP_KERNEL);
+> +	if (!config) {
+> +		dev_err(&pdev->dev, "out of memory\n");
+> +		status = -ENOMEM;
+> +		goto err_rel_res;
+> +	}
+> +
+> +	config->va_app_base = ioremap(res0->start, resource_size(res0));
+> +	if (!config->va_app_base) {
+> +		dev_err(&pdev->dev, "ioremap fail\n");
+> +		status = -ENOMEM;
+> +		goto err_kzalloc;
+> +	}
+> +
+> +	config->base = (void *)res1->start;
+
+Is that __iomem?
+
+> +	config->va_dbi_base = ioremap(res1->start, resource_size(res1));
+> +	if (!config->va_dbi_base) {
+> +		dev_err(&pdev->dev, "ioremap fail\n");
+> +		status = -ENOMEM;
+> +		goto err_iounmap_app;
+> +	}
+> +
+> +	dev_set_drvdata(&pdev->dev, config);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "no update irq?\n");
+> +		status = irq;
+> +		goto err_iounmap;
+> +	}
+> +
+> +	status = request_irq(irq, spear_pcie_gadget_irq, 0, pdev->name, NULL);
+> +	if (status) {
+> +		dev_err(&pdev->dev, "pcie gadget interrupt IRQ%d already \
+> +				claimed\n", irq);
+> +		goto err_get_irq;
+> +	}
+> +	/* Register sysfs hooks */
+> +	status = sysfs_create_group(&pdev->dev.kobj, &pcie_gadget_attr_group);
+> +	if (status)
+> +		goto err_irq;
+> +
+> +	/* init basic pcie application registers*/
+> +	/* do not enable clock if it is PCIE0.Ideally , all controller should
+> +	 * have been independent from others with respect to clock. But PCIE1
+> +	 * and 2 depends on PCIE0.So PCIE0 clk is provided during board init.*/
+> +	if (pdev->id == 1) {
+> +		/* Ideally CFG Clock should have been also enabled here. But
+> +		 * it is done currently during board init routne*/
+> +		clk = clk_get_sys("pcie1", NULL);
+> +		if (!clk) {
+> +			pr_err("%s:couldn't get clk for pcie1\n", __func__);
+> +			goto err_irq;
+> +		}
+> +		if (clk_enable(clk)) {
+> +			pr_err("%s:couldn't enable clk for pcie1\n", __func__);
+> +			goto err_irq;
+> +		}
+> +	} else if (pdev->id == 2) {
+> +		/* Ideally CFG Clock should have been also enabled here. But
+> +		 * it is done currently during board init routne*/
+> +		clk = clk_get_sys("pcie2", NULL);
+> +		if (!clk) {
+> +			pr_err("%s:couldn't get clk for pcie2\n", __func__);
+> +			goto err_irq;
+> +		}
+> +		if (clk_enable(clk)) {
+> +			pr_err("%s:couldn't enable clk for pcie2\n", __func__);
+> +			goto err_irq;
+> +		}
+> +	}
+> +	spear13xx_pcie_device_init(config);
+> +
+> +	return 0;
+> +err_irq:
+> +	free_irq(irq, NULL);
+> +err_get_irq:
+> +	dev_set_drvdata(&pdev->dev, NULL);
+> +err_iounmap:
+> +	iounmap(config->va_dbi_base);
+> +err_iounmap_app:
+> +	iounmap(config->va_app_base);
+> +err_kzalloc:
+> +	kfree(config);
+> +err_rel_res:
+> +	release_mem_region(res1->start, resource_size(res1));
+> +err_rel_res0:
+> +	release_mem_region(res0->start, resource_size(res0));
+> +	return status;
+> +}
+> +
+>
+> ...
+>
+
+The driver implements a large, complex userspace interface and afaict
+that interface wasn't documented anywhere. 
+
+But the interface is the most important part of the driver!  It should
+be documented in a permanent fashion so that reviewers can understand
+and review your proposed interface.  They will want to do that before
+even looking at the code.
