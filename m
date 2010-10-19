@@ -1,131 +1,214 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 19 Oct 2010 11:05:52 -0600
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <87r5fmxghm.fsf@deeprootsystems.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-Message-ID: <AANLkTikUJpMSzNecZyUPxEjY4p_aE-vf-VDUzkDksD3X@mail.gmail.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Tue, 19 Oct 2010 20:11:35 +0300
+Subject: [PATCH v2] ARM: S3C64XX: add support for mach-mini6410
+Message-ID: <20101019171009.11315.47694.stgit@darius-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 11:03 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Ohad Ben-Cohen <ohad@wizery.com> writes:
->
->> From: Simon Que <sque@ti.com>
->>
->> Build and register an hwspinlock platform device.
->>
->> Although only OMAP4 supports the hardware spinlock module (for now),
->> it is still safe to run this initcall on all omaps, because hwmod lookup
->> will simply fail on hwspinlock-less platforms.
->>
->> Signed-off-by: Simon Que <sque@ti.com>
->> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
->> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> ---
->> ?arch/arm/mach-omap2/Makefile ? ? | ? ?1 +
->> ?arch/arm/mach-omap2/hwspinlock.c | ? 67 ++++++++++++++++++++++++++++++++++++++
->> ?2 files changed, 68 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-omap2/hwspinlock.c
->>
->> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
->> index 7352412..e55d1c5 100644
->> --- a/arch/arm/mach-omap2/Makefile
->> +++ b/arch/arm/mach-omap2/Makefile
->> @@ -190,3 +190,4 @@ obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? += $(smc91x-m) $(smc91x-y)
->>
->> ?smsc911x-$(CONFIG_SMSC911X) ? ? ? ? ?:= gpmc-smsc911x.o
->> ?obj-y ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?+= $(smsc911x-m) $(smsc911x-y)
->> +obj-$(CONFIG_ARCH_OMAP4) ? ? ? ? ? ? += hwspinlock.o
->> diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
->> new file mode 100644
->> index 0000000..641a6d4
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/hwspinlock.c
->> @@ -0,0 +1,67 @@
->> +/*
->> + * OMAP hardware spinlock device initialization
->> + *
->> + * Copyright (C) 2010 Texas Instruments. All rights reserved.
->> + *
->> + * Contact: Simon Que <sque@ti.com>
->> + * ? ? ? ? ?Hari Kanigeri <h-kanigeri2@ti.com>
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License
->> + * version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful, but
->> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
->> + * General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software
->> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
->> + * 02110-1301 USA
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/err.h>
->> +
->> +#include <plat/omap_hwmod.h>
->> +#include <plat/omap_device.h>
->> +
->> +struct omap_device_pm_latency omap_spinlock_latency[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .deactivate_func = omap_device_idle_hwmods,
->> + ? ? ? ? ? ? .activate_func ? = omap_device_enable_hwmods,
->> + ? ? ? ? ? ? .flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
->> + ? ? }
->> +};
->> +
->> +int __init hwspinlocks_init(void)
->> +{
->> + ? ? int retval = 0;
->> + ? ? struct omap_hwmod *oh;
->> + ? ? struct omap_device *od;
->> + ? ? const char *oh_name = "spinlock";
->> + ? ? const char *dev_name = "omap_hwspinlock";
->> +
->> + ? ? /*
->> + ? ? ?* Hwmod lookup will fail in case our platform doesn't support the
->> + ? ? ?* hardware spinlock module, so it is safe to run this initcall
->> + ? ? ?* on all omaps
->> + ? ? ?*/
->> + ? ? oh = omap_hwmod_lookup(oh_name);
->> + ? ? if (oh == NULL)
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? od = omap_device_build(dev_name, 0, oh, NULL, 0,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_spinlock_latency,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(omap_spinlock_latency), false);
->> + ? ? if (IS_ERR(od)) {
->> + ? ? ? ? ? ? pr_err("Can't build omap_device for %s:%s\n", dev_name,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? oh_name);
->> + ? ? ? ? ? ? retval = PTR_ERR(od);
->> + ? ? }
->> +
->> + ? ? return retval;
->> +}
->> +postcore_initcall(hwspinlocks_init);
->
-> Any reason this needs to be a postcore_initcall? ?Are there users of
-> hwspinlocks this early in boot? ?Probaly subsys or even device_initcall
-> is more appropriate here.
->
-> I would've suspected that any users of hwspinlocks will be dependent on
-> drivers for the other cores (e.g. syslink) which would likely be
-> initialized much later.
+Add support for mini6410 board from FriendlyARM
 
-On that note, is there any reason why this file cannot be selected as a module?
+Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
+---
 
-g.
+Changelog since v1:
+ - Removed .phys_io and .io_pg_offst from MACHINE_START
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+ arch/arm/mach-s3c64xx/Kconfig         |   10 ++
+ arch/arm/mach-s3c64xx/Makefile        |    1 
+ arch/arm/mach-s3c64xx/mach-mini6410.c |  154 +++++++++++++++++++++++++++++++++
+ 3 files changed, 165 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s3c64xx/mach-mini6410.c
+
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index c05ae12..bbeb4ca 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -98,6 +98,16 @@ config MACH_ANW6410
+ 	help
+ 	  Machine support for the A&W6410
+ 
++config MACH_MINI6410
++	bool "MINI6410"
++	select CPU_S3C6410
++	select S3C_DEV_HSMMC
++	select S3C_DEV_HSMMC1
++	select S3C64XX_SETUP_SDHCI
++	select S3C_DEV_USB_HOST
++	help
++	  Machine support for the FriendlyARM MINI6410
++
+ config MACH_REAL6410
+ 	bool "REAL6410"
+ 	select CPU_S3C6410
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index 90221a2..4657363 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_MACH_ANW6410)	+= mach-anw6410.o
+ obj-$(CONFIG_MACH_SMDK6400)	+= mach-smdk6400.o
+ obj-$(CONFIG_MACH_SMDK6410)	+= mach-smdk6410.o
+ obj-$(CONFIG_MACH_REAL6410)     += mach-real6410.o
++obj-$(CONFIG_MACH_MINI6410)     += mach-mini6410.o
+ obj-$(CONFIG_MACH_NCP)		+= mach-ncp.o
+ obj-$(CONFIG_MACH_HMT)		+= mach-hmt.o
+ obj-$(CONFIG_MACH_SMARTQ)	+= mach-smartq.o
+diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+new file mode 100644
+index 0000000..3970125
+--- /dev/null
++++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+@@ -0,0 +1,154 @@
++/* linux/arch/arm/mach-s3c64xx/mach-mini6410.c
++ *
++ * Copyright 2010 Darius Augulis <augulis.darius@gmail.com>
++ * Copyright 2008 Openmoko, Inc.
++ * Copyright 2008 Simtec Electronics
++ *	Ben Dooks <ben@simtec.co.uk>
++ *	http://armlinux.simtec.co.uk/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++*/
++
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/gpio.h>
++#include <linux/kernel.h>
++#include <linux/list.h>
++#include <linux/dm9000.h>
++#include <linux/serial_core.h>
++#include <linux/types.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include <mach/map.h>
++#include <mach/regs-gpio.h>
++#include <mach/regs-srom.h>
++#include <mach/s3c6410.h>
++
++#include <plat/cpu.h>
++#include <plat/devs.h>
++#include <plat/regs-serial.h>
++
++#define UCON (S3C2410_UCON_DEFAULT | S3C2410_UCON_UCLK)
++#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
++#define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
++
++static struct s3c2410_uartcfg mini6410_uartcfgs[] __initdata = {
++	[0] = {
++		.hwport	= 0,
++		.flags	= 0,
++		.ucon	= UCON,
++		.ulcon	= ULCON,
++		.ufcon	= UFCON,
++	},
++	[1] = {
++		.hwport	= 1,
++		.flags	= 0,
++		.ucon	= UCON,
++		.ulcon	= ULCON,
++		.ufcon	= UFCON,
++	},
++	[2] = {
++		.hwport	= 2,
++		.flags	= 0,
++		.ucon	= UCON,
++		.ulcon	= ULCON,
++		.ufcon	= UFCON,
++	},
++	[3] = {
++		.hwport	= 3,
++		.flags	= 0,
++		.ucon	= UCON,
++		.ulcon	= ULCON,
++		.ufcon	= UFCON,
++	},
++};
++
++/* DM9000AEP 10/100 ethernet controller */
++
++static struct resource mini6410_dm9k_resource[] = {
++	[0] = {
++		.start	= S3C64XX_PA_XM0CSN1,
++		.end	= S3C64XX_PA_XM0CSN1 + 1,
++		.flags	= IORESOURCE_MEM
++	},
++	[1] = {
++		.start	= S3C64XX_PA_XM0CSN1 + 4,
++		.end	= S3C64XX_PA_XM0CSN1 + 5,
++		.flags	= IORESOURCE_MEM
++	},
++	[2] = {
++		.start	= S3C_EINT(7),
++		.end	= S3C_EINT(7),
++		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL
++	}
++};
++
++static struct dm9000_plat_data mini6410_dm9k_pdata = {
++	.flags		= (DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM),
++};
++
++static struct platform_device mini6410_device_eth = {
++	.name		= "dm9000",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(mini6410_dm9k_resource),
++	.resource	= mini6410_dm9k_resource,
++	.dev		= {
++		.platform_data	= &mini6410_dm9k_pdata,
++	},
++};
++
++static struct platform_device *mini6410_devices[] __initdata = {
++	&mini6410_device_eth,
++	&s3c_device_hsmmc0,
++	&s3c_device_hsmmc1,
++	&s3c_device_ohci,
++};
++
++static void __init mini6410_map_io(void)
++{
++	s3c64xx_init_io(NULL, 0);
++	s3c24xx_init_clocks(12000000);
++	s3c24xx_init_uarts(mini6410_uartcfgs, ARRAY_SIZE(mini6410_uartcfgs));
++}
++
++static void __init mini6410_machine_init(void)
++{
++	u32 cs1;
++
++	/* configure nCS1 width to 16 bits */
++
++	cs1 = __raw_readl(S3C64XX_SROM_BW) &
++		~(S3C64XX_SROM_BW__CS_MASK << S3C64XX_SROM_BW__NCS1__SHIFT);
++	cs1 |= ((1 << S3C64XX_SROM_BW__DATAWIDTH__SHIFT) |
++		(1 << S3C64XX_SROM_BW__WAITENABLE__SHIFT) |
++		(1 << S3C64XX_SROM_BW__BYTEENABLE__SHIFT)) <<
++			S3C64XX_SROM_BW__NCS1__SHIFT;
++	__raw_writel(cs1, S3C64XX_SROM_BW);
++
++	/* set timing for nCS1 suitable for ethernet chip */
++
++	__raw_writel((0 << S3C64XX_SROM_BCX__PMC__SHIFT) |
++		(6 << S3C64XX_SROM_BCX__TACP__SHIFT) |
++		(4 << S3C64XX_SROM_BCX__TCAH__SHIFT) |
++		(1 << S3C64XX_SROM_BCX__TCOH__SHIFT) |
++		(13 << S3C64XX_SROM_BCX__TACC__SHIFT) |
++		(4 << S3C64XX_SROM_BCX__TCOS__SHIFT) |
++		(0 << S3C64XX_SROM_BCX__TACS__SHIFT), S3C64XX_SROM_BC1);
++
++	platform_add_devices(mini6410_devices, ARRAY_SIZE(mini6410_devices));
++}
++
++MACHINE_START(MINI6410, "MINI6410")
++	/* Maintainer: Darius Augulis <augulis.darius@gmail.com> */
++	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
++	.init_irq	= s3c6410_init_irq,
++	.map_io		= mini6410_map_io,
++	.init_machine	= mini6410_machine_init,
++	.timer		= &s3c24xx_timer,
++MACHINE_END
