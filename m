@@ -1,40 +1,66 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 19 Oct 2010 14:48:03 -0700
-Subject: [PATCH V2 45/69] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <4CBD33B8.5030105@st.com>
-References: <cover.1285933331.git.viresh.kumar@st.com>
-	<c91308e26397dbe49f384c7d3cf168593e1fe8b0.1285933332.git.viresh.kumar@st.com>
-	<4CBD33B8.5030105@st.com>
-Message-ID: <20101019144803.96d59689.akpm@linux-foundation.org>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 19 Oct 2010 16:57:03 -0500
+Subject: [PATCH] ARM: imx: change mx51.h into mx5x.h
+Message-ID: <1287525423-22329-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Oct 2010 11:29:20 +0530
-viresh kumar <viresh.kumar@st.com> wrote:
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-> On 10/01/2010 05:26 PM, Viresh KUMAR wrote:
-> > From: Pratyush Anand <pratyush.anand@st.com>
-> > 
-> > This is a configurable gadget. can be configured by sysfs interface. Any
-> > IP available at PCIE bus can be programmed to be used by host
-> > controller.It supoorts both INTX and MSI.
-> > By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
-> > with size 0x1000
-> > 
-> > Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> > ---
-> >  drivers/misc/Kconfig                 |   10 +
-> >  drivers/misc/Makefile                |    1 +
-> >  drivers/misc/spear13xx_pcie_gadget.c |  888 ++++++++++++++++++++++++++++++++++
-> >  3 files changed, 899 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/misc/spear13xx_pcie_gadget.c
-> 
-> Andrew,
-> 
-> Any review comments on this patch??
-> 
+In preparation for submitting i.MX53 support, change mx51.h to
+mx5x.h so that mx5x.h can contain MX53 information as well.
 
-I looked.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/mach-mx5/devices-imx51.h                 |    2 +-
+ arch/arm/plat-mxc/include/mach/debug-macro.S      |    2 +-
+ arch/arm/plat-mxc/include/mach/hardware.h         |    2 +-
+ arch/arm/plat-mxc/include/mach/{mx51.h => mx5x.h} |    0
+ 4 files changed, 3 insertions(+), 3 deletions(-)
+ rename arch/arm/plat-mxc/include/mach/{mx51.h => mx5x.h} (100%)
 
-I'd suggest cc'ing the PCI list and maintainer on future versions.
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 5cc910e..f6abe2d 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -6,7 +6,7 @@
+  * the terms of the GNU General Public License version 2 as published by the
+  * Free Software Foundation.
+  */
+-#include <mach/mx51.h>
++#include <mach/mx5x.h>
+ #include <mach/devices-common.h>
+ 
+ extern const struct imx_fec_data imx51_fec_data __initconst;
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 2560640..ac8a2bf 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -49,7 +49,7 @@
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx51.h>
++#include <mach/mx5x.h>
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+ #define UART_VADDR	MX51_AIPS1_IO_ADDRESS(MX51_UART1_BASE_ADDR)
+ #endif
+diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+index ebadf4a..5a7395a 100644
+--- a/arch/arm/plat-mxc/include/mach/hardware.h
++++ b/arch/arm/plat-mxc/include/mach/hardware.h
+@@ -28,7 +28,7 @@
+ 	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0))
+ 
+ #ifdef CONFIG_ARCH_MX5
+-#include <mach/mx51.h>
++#include <mach/mx5x.h>
+ #endif
+ 
+ #ifdef CONFIG_ARCH_MX3
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx5x.h
+similarity index 100%
+rename from arch/arm/plat-mxc/include/mach/mx51.h
+rename to arch/arm/plat-mxc/include/mach/mx5x.h
+-- 
+1.6.0.4
