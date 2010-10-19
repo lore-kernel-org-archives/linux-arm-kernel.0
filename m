@@ -1,81 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Oct 2010 16:20:54 -0200
-Subject: [PATCH 1/1] Mx35pdk: enable debug board support
-In-Reply-To: <AANLkTinD_LWiqh9Pc-jOsKArfBBLAYeExgfdNMb5CaAT@mail.gmail.com>
-References: <1287129633-9244-1-git-send-email-jgq516@gmail.com>
-	<AANLkTikY=wBiJZ0NFKJKX-TTKRAj_LWmaxD-BpuPNYzL@mail.gmail.com>
-	<AANLkTi=jyQDNmGK1-VB_xOP8H4+jXNwS6oHgft90gGLW@mail.gmail.com>
-	<AANLkTim65XWxn_Mc59PXbiOOqUVMDNqeweU38y_3R7_X@mail.gmail.com>
-	<AANLkTi=upCD4iKhkvkzk7Kcb++OYR3pZTQw4i9fTEkFg@mail.gmail.com>
-	<AANLkTimqGRiP1QUtNdJuyQMN_bf+4R7dEn-LNd7bhAu4@mail.gmail.com>
-	<AANLkTinD_LWiqh9Pc-jOsKArfBBLAYeExgfdNMb5CaAT@mail.gmail.com>
-Message-ID: <AANLkTimJ_5ci9MnyxhUXemAc6YJGb2KXR2q-QX-MKEHo@mail.gmail.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Wed, 20 Oct 2010 00:03:11 +0530
+Subject: linux-next: omap2plus_defconfig does not build
+In-Reply-To: <20101019171515.GB3038@atomide.com>
+References: <a36d6a1047d959af6ea65cd7edacf6a8@mail.gmail.com>
+	<20101019171515.GB3038@atomide.com>
+Message-ID: <AANLkTikGkpx8Pd9uPSyQus2FibyU=zUjxFkwJnofFO9q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xiao,
-
-On Tue, Oct 19, 2010 at 2:54 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Oct 19, 2010 at 1:59 PM, xiao jiang <jgq516@gmail.com> wrote:
+On Tue, Oct 19, 2010 at 10:45 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Anand Gadiyar <gadiyar@ti.com> [101013 06:14]:
+>> Building omap2plus_defconfig (which enables support for
+>> OMAP2420/2430/OMAP3
+>> and OMAP4 in one image), I get the following build error.
 >>
+>> ? CC ? ? ?arch/arm/kernel/swp_emulate.o
+>> /tmp/ccg979qz.s: Assembler messages:
+>> /tmp/ccg979qz.s:343: Error: selected processor does not support ARM mode
+>> `ldrexb r6,[r5]'
+>> /tmp/ccg979qz.s:344: Error: selected processor does not support ARM mode
+>> `strexb r1,r3,[r5]'
+>> make[1]: *** [arch/arm/kernel/swp_emulate.o] Error 1
+>> make: *** [arch/arm/kernel] Error 2
 >>
-> ...
->>>
->> I don't think so, since **_PIN_** is expected for IOMUX_TO_IRQ, not
->> **_PAD_**, and I think kernel can't pass compile with
->> "IOMUX_TO_IRQ(MX35_PAD_GPIO1_1__GPIO1_1)"
+>> I'm using CodeSourcery's 2010q1-202 toolchain based on gcc 4.4.1.
+>>
+>> I haven't been following the lists closely the last few days, so I'm not
+>> sure if this is a known issue. Just reporting it for now.
 >
-> Have you tried the same method as in MX51_3ds?
->
-> #define EXPIO_PARENT_INT ? ?(MXC_INTERNAL_IRQS + GPIO_PORTx + y)
->
-> Regards,
->
-> Fabio Estevam
+> This seems to be related to "ARM: Add SWP/SWPB emulation for ARMv7 processors (v5)"
+> where SWP_EMULATE is selected by default. For the omap2plus_defconfig in for-next
+> we now have CPU_V6 and CPU_V7 set with SMP and SMP_ON_UP.
 >
 
-Please try the the patch below. Worked fine for me.
+I had forgotten I'd reported this earlier. I reported the build break
+again today, and Catalin provided this patch [1] which solves the
+build issue.
 
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 096fd33..9658e2d 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -143,6 +143,7 @@ config MACH_ARMADILLO5X0
- config MACH_MX35_3DS
- 	bool "Support MX35PDK platform"
- 	select ARCH_MX35
-+	select MXC_DEBUG_BOARD
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	default n
-diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c
-b/arch/arm/mach-mx3/mach-mx35_3ds.c
-index 91bb065..b7e6b9c 100644
---- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-@@ -39,10 +39,15 @@
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
- #include <mach/mxc_ehci.h>
-+#include <mach/3ds_debugboard.h>
-+#include <mach/irqs.h>
+- Anand
 
- #include "devices-imx35.h"
- #include "devices.h"
-
-+#define EXPIO_PARENT_INT       (MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
-+
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -140,6 +145,10 @@ static void __init mxc_board_init(void)
- 	mxc_register_device(&mxc_usbh1, &usb_host_pdata);
-
- 	imx35_add_mxc_nand(&mx35pdk_nand_board_info);
-+
-+	if (!mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+		printk(KERN_WARNING "Init of the debugboard failed, all "
-+				    "devices on the board are unusable.\n");
- }
-
- static void __init mx35pdk_timer_init(void)
+[1] http://marc.info/?t=128748412500003&r=1&w=2
