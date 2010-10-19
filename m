@@ -1,76 +1,60 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 19 Oct 2010 11:41:19 +0900
-Subject: [PATCH 4/9] ARM: S3C64XX: add USB host support for mach-real6410
-In-Reply-To: <AANLkTinWveichrhruhyphNfMaV05o2FgPJncejdDgfAo@mail.gmail.com>
+Date: Tue, 19 Oct 2010 11:47:24 +0900
+Subject: [PATCH 2/9 v2] ARM: S3C64XX: add nand support for mach-real6410
+In-Reply-To: <AANLkTinwBj2QtLdFMGDmqipJD9g1O9QzRUUZpCn=0q-z@mail.gmail.com>
 References: <20100929192354.25307.40197.stgit@darius-desktop>
-	<20100929193346.25307.75373.stgit@darius-desktop>
-	<04a601cb6ec9$db82dee0$92889ca0$%kim@samsung.com>
-	<AANLkTinWveichrhruhyphNfMaV05o2FgPJncejdDgfAo@mail.gmail.com>
-Message-ID: <04e801cb6f37$1eb23130$5c169390$%kim@samsung.com>
+	<20100929193134.25307.65614.stgit@darius-desktop>
+	<04a401cb6ec7$b8291b00$287b5100$%kim@samsung.com>
+	<AANLkTinwBj2QtLdFMGDmqipJD9g1O9QzRUUZpCn=0q-z@mail.gmail.com>
+Message-ID: <04ef01cb6f37$f7733c80$e659b580$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Darius Augulis wrote:
 > 
-> On Mon, Oct 18, 2010 at 4:39 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On Mon, Oct 18, 2010 at 4:23 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 > > Darius Augulis wrote:
 > >>
-> >> Add USB host device support for mach-real6410
+> >> Add nand device support and mtd partition table
+> >> for mach-real6410
 > >>
 > >> Signed-off-by: Darius Augulis <augulis.darius@gmail.com>
 > >> ---
-> >>  arch/arm/mach-s3c64xx/Kconfig         |    1 +
-> >>  arch/arm/mach-s3c64xx/mach-real6410.c |    1 +
-> >>  2 files changed, 2 insertions(+), 0 deletions(-)
 > >>
-> >> diff --git a/arch/arm/mach-s3c64xx/Kconfig
-b/arch/arm/mach-s3c64xx/Kconfig
-> >> index b706b80..c05ae12 100644
-> >> --- a/arch/arm/mach-s3c64xx/Kconfig
-> >> +++ b/arch/arm/mach-s3c64xx/Kconfig
-> >> @@ -109,6 +109,7 @@ config MACH_REAL6410
-> >>       select S3C_DEV_NAND
-> >>       select SAMSUNG_DEV_ADC
-> >>       select SAMSUNG_DEV_TS
-> >> +     select S3C_DEV_USB_HOST
-> >>       help
-> >>         Machine support for the CoreWind REAL6410
+> >> Changelog since v1:
+> >> ?- Changed dependency on other patches
 > >>
-> >> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-
-> >> s3c64xx/mach-real6410.c
-> >> index bad6990..00e7d7e 100644
-> >> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
-> >> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-> >> @@ -195,6 +195,7 @@ static struct platform_device *real6410_devices[]
-> >> __initdata = {
-> >>       &s3c_device_nand,
-> >>       &s3c_device_adc,
-> >>       &s3c_device_ts,
-> >> +     &s3c_device_ohci,
-> >>  };
+> >> ?arch/arm/mach-s3c64xx/Kconfig ? ? ? ? | ? ?1 +
+> >> ?arch/arm/mach-s3c64xx/mach-real6410.c | ? 40
+> >> +++++++++++++++++++++++++++++++++
+> >> ?2 files changed, 41 insertions(+), 0 deletions(-)
 > >>
-> >>  static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
-> >
-> > No need any gpio configuration for it?
+
+(snip)
+
+> >> @@ -249,6 +288,7 @@ static void __init real6410_machine_init(void)
+> >> ? ? ? ? ? ? ? real6410_lcd_pdata.win[0]->win_mode.yres);
+> >>
+> >> ? ? ? s3c_fb_set_platdata(&real6410_lcd_pdata);
+> >> + ? ? s3c_nand_set_platdata(&real6410_nand_info);
+> >>
+> >> ? ? ? /* configure nCS1 width to 16 bits */
+> >>
+> > Where is 'END' of patch mark?
+> > maybe broken your patch file...?
 > 
-> No, USB is powered by hardware at startup and does not need any other
-> gpio config.
+> Confused. What 'END' mark are you missing?
+> All patches are sent by stg mail, all apply fine, no conflict or other
+> messages from stgit.
+> Please explain what you mean.
+
+Generally, there is '--' mark and git version in the bottom of patch...
+If you make patch file using git-format-patch, maybe automatically add it.
+
 > 
-
-Hmm...firstly see below...
-
-+-----+        +------ UTMI -------- OTG Device
-| PHY |--------|
-+-----+        +--- Serial I/F 1 --- Host 1.1 (1port)
-
-+---------------+
-|USB Transceiver|-- Serial I/F 2 --- Host 1.1 (1port)
-+---------------+
-
-If you want to use only 1port Host 1.1 through Serial I/F2, your code is ok.
-but want to use 2-port Host 1.1, need to set configuration of PHY
-initialization and clock path for Serial I/F1.
-I meant that.
+> p.s. checkpatch.pl also doesn't report any error.
+> 
+Yes...ok.
 
 Thanks.
 
