@@ -1,34 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 19 Oct 2010 01:52:52 -0700
-Subject: [alsa-devel] [PATCH 00/25] ASoC: Overhaul Samsung drivers
-In-Reply-To: <20101019110015.49dcb79b@anarsoul-laptop>
-References: <1287471805-17952-1-git-send-email-jassisinghbrar@gmail.com>
-	<053901cb6f5f$76b9dea0$642d9be0$%kim@samsung.com>
-	<20101019110015.49dcb79b@anarsoul-laptop>
-Message-ID: <20101019085252.GB10381@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 19 Oct 2010 12:05:41 +0200
+Subject: [PATCH 1/5] Fix AT91SAM9G20 reset as per the errata in the data
+	sheet
+In-Reply-To: <20101015122902.GF11127@game.jcrosoft.org>
+References: <20100528153725.GA5102@axolotl.localnet>
+	<29a192a1f4f98dd05b72ed8eafe67bd6aadd8432.1287076894.git.nicolas.ferre@atmel.com>
+	<20101015122902.GF11127@game.jcrosoft.org>
+Message-ID: <4CBD6D75.4070908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 11:00:15AM +0300, Vasily khoruzhick wrote:
-> Kukjin Kim <kgene.kim@samsung.com> wrote:
+Le 15/10/2010 14:29, Jean-Christophe PLAGNIOL-VILLARD :
+>> +at91sam9g20_reset:	mov	r0, #0
+>> +			mcr	p15, 0, r0, c7, c5, 0	@ flush I-cache
+> do we really need to flush the I-cache again
 
-> > > I suggest the patches 13,14,16 & 17 go via Kgene's Tree, and the rest via
-> > > ASoC
-> > > tree due to tight dependencies.
+You are right, it is done in the calling function: arm_machine_restart().
 
-> > Hmm...in my opinion, it would be better to me if could send arch/arm/ stuff
-> > to upstream via my tree even though there are dependencies.
-> > Mark, how do you think?
+I will correct it in the patch series.
 
-> As for me, that's not a good idea. We'll get massive breakage during
-> 2.6.37 merge window then. Here's example: my sound-related changes to
-> machine files are merged through Ben's tree, but these changes aren't
-> in asoc tree, so Jassi is no aware of them, but now these changes are
-> outdated a bit due to device renaming. And this introduce compile
-> breakage.
-
-Since my primary development platforms are Samsung reference boards I'm
-especially unenthusiastic about anything which creates cross-tree
-issues.  My stock answer to things like this is that if we can't split
-things up so that dependencies are avoided then we should create a
-branch which can be pulled into both trees.
+Best regards,
+-- 
+Nicolas Ferre
