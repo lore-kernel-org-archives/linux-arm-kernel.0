@@ -1,60 +1,73 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 20 Oct 2010 16:09:22 +0200
+Date: Wed, 20 Oct 2010 16:38:32 +0200
 Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <AANLkTimTDCbLP+EeUeo35re0FrMvqV3ozU+v7DZXr_p3@mail.gmail.com>
+In-Reply-To: <87bp6pviwf.fsf@deeprootsystems.com>
 References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
 	<1287387875-14168-4-git-send-email-ohad@wizery.com>
 	<87r5fmxghm.fsf@deeprootsystems.com>
 	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<AANLkTimTDCbLP+EeUeo35re0FrMvqV3ozU+v7DZXr_p3@mail.gmail.com>
-Message-ID: <AANLkTikE_WtBJQOJDNFGcW_4fW+FPvTBCHfrKsaUgZZY@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+Message-ID: <AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 1:12 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Tue, Oct 19, 2010 at 3:02 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-...
->> i2c-omap, which is subsys_initcall (the I2C bus is shared between the
->> A9 and the M3 on some OMAP4 boards).
-...
-> Man. this is getting ugly. ?I think we need to discuss how to solve
-> this at the Plumbers micro-conference. It kind of fits in with the
-> whole embedded (ab)use of the device model topic anyway. Actually,
-> this particular case isn't bad, but the moving of i2c and spi busses
-> to an earlier initcall is just band-aiding the real problem of driver
-> probe order dependencies.
-
-+1
-
 On Wed, Oct 20, 2010 at 1:53 AM, Kevin Hilman
 <khilman@deeprootsystems.com> wrote:
-> Rather than moving towards having more drivers have to be built in (and
-> depend on their probe order) we need to be moving towards building all
-> these drivers as modules, including omap-i2c.
+>> And to allow early board code to reserve specific hwspinlock numbers
+>> for predefined use-cases, we probably want to be before arch_initcall.
+>
+> There's no reason for board code to have to do this at initcall time.
 
-+1
+If we want to have allow both allocations of predefined hwspinlocks
+with omap_hwspinlock_request_specific(int), and dynamic allocations
+(where we don't care about the specific instance of the hwspinlock we
+will get) with omap_hwspinlock_request(), we must ensure that the
+former _specific() API will never be called after the latter.
 
-This whole thing is a mess, and today it's being solved in the wrong,
-non-scalable and error-prone way.
+If we will allow drivers to call omap_hwspinlock_request() before all
+callers of omap_hwspinlock_request_specific() completed, then things
+will break (because drivers might start getting hwspinlocks that are
+predefined for dedicated use cases on the system).
 
-The question is whether we want to gate hwspinlock until this issue is solved ?
+So if we want the _specific API to work, we can only allow early board
+code to use it in order to reserve those predefined hwspinlocks before
+drivers get the chance to call omap_hwspinlock_request().
 
-On Wed, Oct 20, 2010 at 3:20 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
-> The issue of probe order still needs to be resolved for those of us who
-> do want all the drivers built into the kernel.
+The tempting alternative is not to provide the
+omap_hwspinlock_request_specific() API at all (which is something we
+discussed internally).
 
-What about doing something similar to the way suspend/resume and the
-device hierarchy interact ?
+Let's take the i2c-omap for example.
 
-device_resume waits for its parent to be resumed before waking up the
-device - this sounds similar to what ->probe() should do: wait for its
-device dependency to probe first (so in this case, i2c-omap should
-wait for hwspinlock).
+It sounds like it must have a predefined hwspinlock, but what if:
 
-Conversely, device_suspend waits for all its children to be suspended
-before continuing, which sounds just like what ->remove() should do
-(so again, in this case, the hwspinlock device should wait for all its
-users to be removed before bailing).
+1. It will use omap_hwspinlock_request() to dynamically allocate a hwspinlock
+2. Obviously, the hwspinlock id number must be communicated to the M3
+BIOS, so the i2c-omap will publish that id using a small shared memory
+entry that will be allocated for this sole purpose
+3. we will make sure that 1+2 completes before the remote processor is
+taken out of reset
 
-This is just a quick thought, I haven't even began to think of all the
-use cases and requirements.
+This does not require any smart IPC and it will allow us to get rid of
+the omap_hwspinlock_request_specific() API and its early-callers
+requirement.
+
+All we will be left to take care of is the order of the ->probe()
+execution (assuming we want both the i2c and the hwspinlock drivers to
+be device_initcall)
+
+>
+> This kind of thing needs to be done by platform_data function pointers,
+> as is done for every other driver that needs platform-specific driver
+> customization.
+
+Why would we need platform-specific function pointers here ? I'm not
+sure I'm following this one.
+
+Thanks,
+Ohad.
+
+
+>
+> Kevin
+>
