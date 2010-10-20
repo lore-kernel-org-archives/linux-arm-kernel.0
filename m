@@ -1,39 +1,46 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 20 Oct 2010 14:03:53 +0800
-Subject: [PATCH 3/5] rtc-pxa: remove unused TIMER_FREQ define
-In-Reply-To: <20101020045141.GZ12979@mail.wantstofly.org>
-References: <20101020045141.GZ12979@mail.wantstofly.org>
-Message-ID: <AANLkTikMskk+60Bj8pAav2kh6PZKGJ7o4HipDRobpLhN@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 20 Oct 2010 08:13:25 +0200
+Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
+In-Reply-To: <1287531090.9245.139.camel@c-dwalke-linux.qualcomm.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287531090.9245.139.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <AANLkTikPnm1NK1wGGzbOuNoCOnAcSp=RC8mTW2yx3u0s@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 12:51 PM, Lennert Buytenhek
-<buytenh@wantstofly.org> wrote:
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
+On Wed, Oct 20, 2010 at 1:31 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> On Mon, 2010-10-18 at 09:44 +0200, Ohad Ben-Cohen wrote:
+>> OMAP4 introduces a Spinlock hardware module, which provides hardware
+>> assistance for synchronization and mutual exclusion between heterogeneous
+>> processors and those not operating under a single, shared operating system
+>> (e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP).
+>>
+>> The intention of this hardware module is to allow remote processors,
+>> that have no alternative mechanism to accomplish synchronization and mutual
+>> exclusion operations, to share resources (such as memory and/or any other
+>> hardware resource).
+>>
+>> This patchset adds a new misc driver for this OMAP hwspinlock module.
+>
+> Does this code interface with some hardware unit (other than the other
+> processors) to accomplish this locking ?
 
-Acked-by: Eric Miao <eric.miao@canonical.com>
+Yes, it's a special-purpose hardware peripheral.
 
-> ---
-> ?drivers/rtc/rtc-pxa.c | ? ?1 -
-> ?1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
-> index 29e867a..486b72d 100644
-> --- a/drivers/rtc/rtc-pxa.c
-> +++ b/drivers/rtc/rtc-pxa.c
-> @@ -30,7 +30,6 @@
->
-> ?#include <mach/hardware.h>
->
-> -#define TIMER_FREQ ? ? ? ? ? ? CLOCK_TICK_RATE
-> ?#define RTC_DEF_DIVIDER ? ? ? ? ? ? ? ?(32768 - 1)
-> ?#define RTC_DEF_TRIM ? ? ? ? ? 0
-> ?#define MAXFREQ_PERIODIC ? ? ? 1000
-> --
-> 1.7.2.3
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> The reason I ask is because MSM has similar code, and from what I can
+> tell the MSM version has some structures in memory but that's all. It
+> just operates on the structures in memory.
+
+That's interesting.
+
+We did have thoughts of making this a generic framework, in the hope
+that it would be useful for other vendors too, but we didn't find
+additional users.
+
+> It might be worth looking over the two implementation so we aren't both
+> remaking the wheel.
+
+Indeed. Where is that MSM code ?
+
+Thanks,
+Ohad.
