@@ -1,52 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Oct 2010 11:21:35 +0100
-Subject: recent ARM Erratas 742231 & 742230 broken.
-In-Reply-To: <AANLkTim6LRZQhW6R83P0n70GdqEwFnFvb55KC8459KwY@mail.gmail.com>
-References: <AANLkTim6LRZQhW6R83P0n70GdqEwFnFvb55KC8459KwY@mail.gmail.com>
-Message-ID: <000401cb7040$930cf970$b926ec50$@deacon@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 20 Oct 2010 12:24:13 +0200
+Subject: [PATCH 1/2] Add the GPIO Write Protection Solution on i.MX51
+	BBG board
+In-Reply-To: <1287568828-22563-2-git-send-email-r65037@freescale.com>
+References: <1287568828-22563-1-git-send-email-r65037@freescale.com>
+	<1287568828-22563-2-git-send-email-r65037@freescale.com>
+Message-ID: <20101020102413.GE2691@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinidhi,
+Hi Richard,
 
-> Are the below ERRATAs (in linux-next) on Cortex-A9 have been tested with
-> booting in non secure mode?
+On Wed, Oct 20, 2010 at 06:00:27PM +0800, Richard Zhu wrote:
+> ---
+>  arch/arm/mach-mx5/board-mx51_babbage.c      |   16 ++++++++++++++--
+>  arch/arm/plat-mxc/include/mach/iomux-mx51.h |    8 +++++---
+>  2 files changed, 19 insertions(+), 5 deletions(-)
 > 
-> commit 9f05027c7cb3cfe56a31892bd83391138d41a667
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Tue Sep 14 09:51:43 2010 +0100
-> 
->     ARM: 6388/1: errata: DMB operation may be faulty
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index 476bfe4..5a69cda 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -34,6 +34,8 @@
+>  #include "devices-imx51.h"
+>  #include "devices.h"
+>  
+> +#define BABBAGE_SDHCI1_WP	(0*32 + 1)	/* GPIO_1_1 */
+> +#define BABBAGE_SDHCI2_WP	(0*32 + 5)	/* GPIO_1_5 */
 
-[...]
+Please mention in the subject of this patch that this "write protection" is 
+related to the SDHCI device.
 
-> commit a672e99b129e286df2e2697a1b603d82321117f3
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Tue Sep 14 09:53:02 2010 +0100
-> 
->     ARM: 6389/1: errata: incorrect hazard handling in the SCU may lead
-> to data corruption
+baruch
 
-[...]
-
-> 
-> What I see is that when I try to boot the system having this version
-> of Cortex-A9 I see
-> that the system does not boot at all. These diagnostic registers which seems
-> undocumented and unable to see what's going on. However the system boots if I
-> start from secure mode.
-
-The diagnostic register is only writable from secure mode so you'll need to
-look at what these patches do (they perform simple read-modify-writes) and
-incorporate that code into your secure software. You will then need to ensure
-that you don't have the workarounds enabled in the Kernel. Note that not
-all revisions of the A9 are affected by these problems so you might not
-need to implement both of the workarounds (the patches above check the MIDR).
-
-I doubt that your secure monitor exposes the diagnostic register through an
-SMC interface so you'll need to change the secure boot code to enable these
-workarounds when the system comes out of reset.
-
-I hope that helps,
-
-Will
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
