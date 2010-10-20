@@ -1,64 +1,26 @@
-From: jgq516@gmail.com (jgq516 at gmail.com)
-Date: Wed, 20 Oct 2010 17:34:43 +0800
-Subject: [PATCH v2 1/1] mx35pdk: add debug board support
-Message-ID: <1287567283-19488-1-git-send-email-jgq516@gmail.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 20 Oct 2010 12:41:54 +0300
+Subject: [patch 3/9] imx51: enhance/fix iomux configuration
+In-Reply-To: <4CBEB3D8.40900@eukrea.com>
+References: <20101019204253.162641893@rtp-net.org>
+	<20101019205254.232673283@rtp-net.org> <4CBEB3D8.40900@eukrea.com>
+Message-ID: <20101020094154.GI2562@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiao Jiang <jgq516@gmail.com>
+On 10 Oct 20, Eric B?nard wrote:
+> Hi Arnaud,
+> 
+> Le 19/10/2010 22:42, Arnaud Patard (Rtp) a ?crit :
+> > - ALT0 is used to set GPIO mode of GPIO_1_{2,3,4,5,6,7,8,9} but it's ALT1
+> for GPIO_1_{0,1}.
+> 
+> oops sorry forget my previous mail, in fact I think I broke
+> GPIO_1_{2,3,4,5,6,7,8,9} in a previous patch when fixing
+> GPIO_1_{0,1} :-(
+> Thanks for noticing and fixing this.
 
-Enable debug board support for mx35pdk. As suggested
-by Fabio, add MXC_DEBUG_BOARD config and redefinition
-EXPIO_PARENT_INT.
+I did wonder where they got flipped from Alt 0 to Alt 1 in the first place.
+Just noticed your patch in Sascha's tree.
 
-Signed-off-by: Xiao Jiang <jgq516@gmail.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx3/Kconfig         |    1 +
- arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
- 2 files changed, 9 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 85beece..cdf6ac5 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -139,6 +139,7 @@ config MACH_ARMADILLO5X0
- config MACH_MX35_3DS
- 	bool "Support MX35PDK platform"
- 	select ARCH_MX35
-+	select MXC_DEBUG_BOARD
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	default n
- 	help
-diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
-index 1c30d72..326b90a 100644
---- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-@@ -35,10 +35,14 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx35.h>
-+#include <mach/irqs.h>
-+#include <mach/3ds_debugboard.h>
- 
- #include "devices-imx35.h"
- #include "devices.h"
- 
-+#define EXPIO_PARENT_INT       (MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
-+
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -95,6 +99,10 @@ static void __init mxc_board_init(void)
- 	imx35_add_imx_uart0(&uart_pdata);
- 
- 	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
-+
-+	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+		pr_warn("Init of the debugboard failed, all "
-+			"devices on the board are unusable.\n");
- }
- 
- static void __init mx35pdk_timer_init(void)
--- 
-1.6.3.3
+/Amit
