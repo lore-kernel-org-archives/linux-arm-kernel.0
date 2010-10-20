@@ -1,58 +1,60 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Thu, 21 Oct 2010 02:54:42 +0400
-Subject: [PATCH 4/6] usb: Add support for VIA VT8500 and compatibles in
-	EHCI HCD
-In-Reply-To: <20101020224746.GA21385@suse.de>
-References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
-	<1287608139-21354-4-git-send-email-alchark@gmail.com>
-	<20101020211710.GB10006@suse.de>
-	<AANLkTikhuW8+bKi8CS59Byrv8XRE6iKCiegc3ZcyCJnW@mail.gmail.com>
-	<20101020224746.GA21385@suse.de>
-Message-ID: <AANLkTikr9EPozzUjwUTm48jPP68YNtQY0G1j4kfqm_1H@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 20 Oct 2010 16:19:03 -0700
+Subject: [PATCH] OMAP: UART: fix wakeup registers for OMAP24xx UART2
+Message-ID: <1287616743-23434-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/21 Greg KH <gregkh@suse.de>:
-> On Thu, Oct 21, 2010 at 02:41:54AM +0400, Alexey Charkov wrote:
->> 2010/10/21 Greg KH <gregkh@suse.de>:
->> > On Thu, Oct 21, 2010 at 12:55:36AM +0400, Alexey Charkov wrote:
->> >> VIA and WonderMedia Systems-on-Chip feature a standard EHCI host
->> >> controller. This adds necessary glue to use the standard driver
->> >> with these systems.
->> >>
->> >> Signed-off-by: Alexey Charkov <alchark@gmail.com>
->> >> ---
->> >>
->> >> Please review and state whether this could be acceptable for a merge
->> >> to mainline in the coming 2.6.37 window. If possible, I would deeply
->> >> appreciate a merge to a relevant git tree for integration prior to
->> >> asking Linus to pull the changes. I could rebase the code if needed,
->> >> currently this is against Linus' master branch.
->> >>
->> >> This patch relies on the basic architecture support for VT8500/WM8505
->> >> to be in place, as introduced by PATCH 1/6 in this series.
->> >
->> > Will this code fail to build without that patch?
->> >
->>
->> As all the additions are ifdef-ed, it won't unless somebody manually
->> defines CONFIG_ARCH_VT8500. But in that case the person should
->> probably know what (s)he is doing.
->
-> Ok, how about we wait for the core code to be accepted, and then have
-> you resend the drivers for submission?
->
-> Make sense?
->
+On OMAP24xx, UART2 WKEN and WKST registers are in PM_WKEN2_CORE and
+PM_WKST2_CORE respecitvely.  Fix the OMAP2 register init to use the
+correct registers on OMAP24xx.
 
-For me, it's perfectly fine. I was just a bit uncomfortable about
-submitting the core code with platform data for missing drivers, which
-take quite a sizeable part of that PATCH 1/6.
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+---
+Tony, this should probably squeeze in for 2.6.37 as well.
 
-> thanks,
->
-> greg k-h
->
+ arch/arm/mach-omap2/serial.c |   17 ++++++++++-------
+ 1 files changed, 10 insertions(+), 7 deletions(-)
 
-Best regards,
-Alexey
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index ba8a5cc..becf0e3 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -515,14 +515,8 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
+ 		uart->padconf = padconf;
+ 	} else if (cpu_is_omap24xx()) {
+ 		u32 wk_mask = 0;
++		u32 wk_en = PM_WKEN1, wk_st = PM_WKST1;
+ 
+-		if (cpu_is_omap2430()) {
+-			uart->wk_en = OMAP2430_PRM_REGADDR(CORE_MOD, PM_WKEN1);
+-			uart->wk_st = OMAP2430_PRM_REGADDR(CORE_MOD, PM_WKST1);
+-		} else if (cpu_is_omap2420()) {
+-			uart->wk_en = OMAP2420_PRM_REGADDR(CORE_MOD, PM_WKEN1);
+-			uart->wk_st = OMAP2420_PRM_REGADDR(CORE_MOD, PM_WKST1);
+-		}
+ 		switch (uart->num) {
+ 		case 0:
+ 			wk_mask = OMAP24XX_ST_UART1_MASK;
+@@ -531,10 +525,19 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
+ 			wk_mask = OMAP24XX_ST_UART2_MASK;
+ 			break;
+ 		case 2:
++			wk_en = OMAP24XX_PM_WKEN2;
++			wk_st = OMAP24XX_PM_WKST2;
+ 			wk_mask = OMAP24XX_ST_UART3_MASK;
+ 			break;
+ 		}
+ 		uart->wk_mask = wk_mask;
++		if (cpu_is_omap2430()) {
++			uart->wk_en = OMAP2430_PRM_REGADDR(CORE_MOD, wk_en);
++			uart->wk_st = OMAP2430_PRM_REGADDR(CORE_MOD, wk_st);
++		} else if (cpu_is_omap2420()) {
++			uart->wk_en = OMAP2420_PRM_REGADDR(CORE_MOD, wk_en);
++			uart->wk_st = OMAP2420_PRM_REGADDR(CORE_MOD, wk_st);
++		}
+ 	} else {
+ 		uart->wk_en = NULL;
+ 		uart->wk_st = NULL;
+-- 
+1.7.2.1
