@@ -1,16 +1,15 @@
 From: alchark@gmail.com (Alexey Charkov)
-Date: Thu, 21 Oct 2010 00:55:36 +0400
-Subject: [PATCH 4/6] usb: Add support for VIA VT8500 and compatibles in EHCI
-	HCD
+Date: Thu, 21 Oct 2010 00:55:37 +0400
+Subject: [PATCH 5/6] rtc: Add support for the RTC in VIA VT8500 and compatibles
 In-Reply-To: <1287608139-21354-1-git-send-email-alchark@gmail.com>
 References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
-Message-ID: <1287608139-21354-4-git-send-email-alchark@gmail.com>
+Message-ID: <1287608139-21354-5-git-send-email-alchark@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VIA and WonderMedia Systems-on-Chip feature a standard EHCI host
-controller. This adds necessary glue to use the standard driver
-with these systems.
+This adds a driver for the RTC devices in VIA and WonderMedia
+Systems-on-Chip. Alarm, 1Hz interrupts, reading and setting time
+are supported.
 
 Signed-off-by: Alexey Charkov <alchark@gmail.com>
 ---
@@ -32,52 +31,54 @@ http://gitorious.org/linux-on-via-vt8500/vt8500-kernel
 
 Relevant code may be pulled from a git tree in there.
 
- drivers/usb/Kconfig            |    1 +
- drivers/usb/host/ehci-hcd.c    |    5 +
- drivers/usb/host/ehci-vt8500.c |  173 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 179 insertions(+), 0 deletions(-)
- create mode 100644 drivers/usb/host/ehci-vt8500.c
+ drivers/rtc/Kconfig      |    7 +
+ drivers/rtc/Makefile     |    1 +
+ drivers/rtc/rtc-vt8500.c |  363 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 371 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/rtc/rtc-vt8500.c
 
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index 4aa00e6..6858637 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -65,6 +65,7 @@ config USB_ARCH_HAS_EHCI
- 	default y if ARCH_AT91SAM9G45
- 	default y if ARCH_MXC
- 	default y if ARCH_OMAP3
-+	default y if ARCH_VT8500
- 	default PCI
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 48ca713..b87a2f9 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -854,6 +854,13 @@ config RTC_DRV_PXA
+          This RTC driver uses PXA RTC registers available since pxa27x
+          series (RDxR, RYxR) instead of legacy RCNR, RTAR.
  
- # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 34a928d..2015b02 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1197,6 +1197,11 @@ MODULE_LICENSE ("GPL");
- #define	PLATFORM_DRIVER		ehci_atmel_driver
- #endif
- 
-+#ifdef CONFIG_ARCH_VT8500
-+#include "ehci-vt8500.c"
-+#define	PLATFORM_DRIVER		vt8500_ehci_driver
-+#endif
++config RTC_DRV_VT8500
++	tristate "VIA/WonderMedia 85xx SoC RTC"
++	depends on ARCH_VT8500
++	help
++	  If you say Y here you will get access to the real time clock
++	  built into your VIA VT8500 SoC or its relatives.
 +
- #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
-     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
-     !defined(XILINX_OF_PLATFORM_DRIVER)
-diff --git a/drivers/usb/host/ehci-vt8500.c b/drivers/usb/host/ehci-vt8500.c
+ 
+ config RTC_DRV_SUN4V
+ 	bool "SUN4V Hypervisor RTC"
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index 0f207b3..0c09922 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -95,6 +95,7 @@ obj-$(CONFIG_RTC_DRV_TWL4030)	+= rtc-twl.o
+ obj-$(CONFIG_RTC_DRV_TX4939)	+= rtc-tx4939.o
+ obj-$(CONFIG_RTC_DRV_V3020)	+= rtc-v3020.o
+ obj-$(CONFIG_RTC_DRV_VR41XX)	+= rtc-vr41xx.o
++obj-$(CONFIG_RTC_DRV_VT8500)	+= rtc-vt8500.o
+ obj-$(CONFIG_RTC_DRV_WM831X)	+= rtc-wm831x.o
+ obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
+ obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
+diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
 new file mode 100644
-index 0000000..7801c04
+index 0000000..7260c95
 --- /dev/null
-+++ b/drivers/usb/host/ehci-vt8500.c
-@@ -0,0 +1,173 @@
++++ b/drivers/rtc/rtc-vt8500.c
+@@ -0,0 +1,363 @@
 +/*
-+ * drivers/usb/host/ehci-vt8500.c
++ * drivers/rtc/rtc-vt8500.c
 + *
-+ * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
++ *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
 + *
-+ * Based on ehci-au1xxx.c
++ * Based on rtc-pxa.c
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -87,163 +88,353 @@ index 0000000..7801c04
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
 + */
 +
++#include <linux/module.h>
++#include <linux/rtc.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/bcd.h>
 +#include <linux/platform_device.h>
-+#include <mach/vt8500.h>
++#include <linux/slab.h>
 +
-+static int ehci_update_device(struct usb_hcd *hcd, struct usb_device *udev)
-+{
-+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-+	int rc = 0;
++/*
++ * Register definitions
++ */
++#define VT8500_RTC_TS		0x00	/* Time set */
++#define VT8500_RTC_DS		0x04	/* Date set */
++#define VT8500_RTC_AS		0x08	/* Alarm set */
++#define VT8500_RTC_CR		0x0c	/* Control */
++#define VT8500_RTC_TR		0x10	/* Time read */
++#define VT8500_RTC_DR		0x14	/* Date read */
++#define VT8500_RTC_WS		0x18	/* Write status */
++#define VT8500_RTC_CL		0x20	/* Calibration */
++#define VT8500_RTC_IS		0x24	/* Interrupt status */
++#define VT8500_RTC_ST		0x28	/* Status */
 +
-+	if (!udev->parent) /* udev is root hub itself, impossible */
-+		rc = -1;
-+	/* we only support lpm device connected to root hub yet */
-+	if (ehci->has_lpm && !udev->parent->parent) {
-+		rc = ehci_lpm_set_da(ehci, udev->devnum, udev->portnum);
-+		if (!rc)
-+			rc = ehci_lpm_check(ehci, udev->portnum);
-+	}
-+	return rc;
-+}
++#define INVALID_TIME_BIT	(1 << 31)
 +
-+static const struct hc_driver vt8500_ehci_hc_driver = {
-+	.description		= hcd_name,
-+	.product_desc		= "VT8500 EHCI",
-+	.hcd_priv_size		= sizeof(struct ehci_hcd),
++#define DATE_CENTURY_S		19
++#define DATE_YEAR_S		11
++#define DATE_YEAR_MASK		(0xff << DATE_YEAR_S)
++#define DATE_MONTH_S		6
++#define DATE_MONTH_MASK		(0x1f << DATE_MONTH_S)
++#define DATE_DAY_MASK		0x3f
 +
-+	/*
-+	 * generic hardware linkage
-+	 */
-+	.irq			= ehci_irq,
-+	.flags			= HCD_MEMORY | HCD_USB2,
++#define TIME_DOW_S		20
++#define TIME_DOW_MASK		(0x07 << TIME_DOW_S)
++#define TIME_HOUR_S		14
++#define TIME_HOUR_MASK		(0x3f << TIME_HOUR_S)
++#define TIME_MIN_S		7
++#define TIME_MIN_MASK		(0x7f << TIME_MIN_S)
++#define TIME_SEC_MASK		0x7f
 +
-+	/*
-+	 * basic lifecycle operations
-+	 */
-+	.reset			= ehci_init,
-+	.start			= ehci_run,
-+	.stop			= ehci_stop,
-+	.shutdown		= ehci_shutdown,
++#define ALARM_DAY_S		20
++#define ALARM_DAY_MASK		(0x3f << ALARM_DAY_S)
 +
-+	/*
-+	 * managing i/o requests and associated device resources
-+	 */
-+	.urb_enqueue		= ehci_urb_enqueue,
-+	.urb_dequeue		= ehci_urb_dequeue,
-+	.endpoint_disable	= ehci_endpoint_disable,
-+	.endpoint_reset		= ehci_endpoint_reset,
++#define ALARM_DAY_BIT		(1 << 29)
++#define ALARM_HOUR_BIT		(1 << 28)
++#define ALARM_MIN_BIT		(1 << 27)
++#define ALARM_SEC_BIT		(1 << 26)
 +
-+	/*
-+	 * scheduling support
-+	 */
-+	.get_frame_number	= ehci_get_frame,
++#define ALARM_ENABLE_MASK	(ALARM_DAY_BIT \
++				| ALARM_HOUR_BIT \
++				| ALARM_MIN_BIT \
++				| ALARM_SEC_BIT)
 +
-+	/*
-+	 * root hub support
-+	 */
-+	.hub_status_data	= ehci_hub_status_data,
-+	.hub_control		= ehci_hub_control,
-+	.bus_suspend		= ehci_bus_suspend,
-+	.bus_resume		= ehci_bus_resume,
-+	.relinquish_port	= ehci_relinquish_port,
-+	.port_handed_over	= ehci_port_handed_over,
-+
-+	/*
-+	 * call back when device connected and addressed
-+	 */
-+	.update_device =	ehci_update_device,
-+
-+	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
++struct vt8500_rtc {
++	void __iomem		*regbase;
++	int			irq_alarm;
++	int			irq_hz;
++	struct rtc_device	*rtc;
++	spinlock_t		lock;		/* Protects this structure */
++	struct rtc_time		rtc_alarm;
 +};
 +
-+static int vt8500_ehci_drv_probe(struct platform_device *pdev)
++static irqreturn_t vt8500_rtc_irq(int irq, void *dev_id)
 +{
-+	struct usb_hcd *hcd;
-+	struct ehci_hcd *ehci;
-+	struct resource *res;
++	struct platform_device *pdev = to_platform_device(dev_id);
++	struct vt8500_rtc *vt8500_rtc = platform_get_drvdata(pdev);
++	u32 isr;
++	unsigned long events = 0;
++
++	spin_lock(&vt8500_rtc->lock);
++
++	/* clear interrupt sources */
++	isr = readl(vt8500_rtc->regbase + VT8500_RTC_IS);
++	writel(isr, vt8500_rtc->regbase + VT8500_RTC_IS);
++
++	if (isr & 1)
++		events |= RTC_AF | RTC_IRQF;
++
++	/* Only second/minute interrupts are supported */
++	if (isr & 2)
++		events |= RTC_UF | RTC_IRQF;
++
++	rtc_update_irq(vt8500_rtc->rtc, 1, events);
++
++	spin_unlock(&vt8500_rtc->lock);
++	return IRQ_HANDLED;
++}
++
++static int vt8500_rtc_open(struct device *dev)
++{
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
 +	int ret;
 +
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	if (pdev->resource[1].flags != IORESOURCE_IRQ) {
-+		pr_debug("resource[1] is not IORESOURCE_IRQ");
-+		return -ENOMEM;
++	ret = request_irq(vt8500_rtc->irq_hz, vt8500_rtc_irq, IRQF_DISABLED,
++			  "rtc 1Hz", dev);
++	if (ret < 0) {
++		dev_err(dev, "can't get irq %i, err %d\n", vt8500_rtc->irq_hz,
++			ret);
++		goto err_irq_hz;
 +	}
-+	hcd = usb_create_hcd(&vt8500_ehci_hc_driver, &pdev->dev, "VT8500");
-+	if (!hcd)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	hcd->rsrc_start = res->start;
-+	hcd->rsrc_len = resource_size(res);
-+
-+	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-+		pr_debug("request_mem_region failed");
-+		ret = -EBUSY;
-+		goto err1;
++	ret = request_irq(vt8500_rtc->irq_alarm, vt8500_rtc_irq, IRQF_DISABLED,
++			  "rtc alarm", dev);
++	if (ret < 0) {
++		dev_err(dev, "can't get irq %i, err %d\n",
++			vt8500_rtc->irq_alarm, ret);
++		goto err_irq_alarm;
 +	}
++	return 0;
 +
-+	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-+	if (!hcd->regs) {
-+		pr_debug("ioremap failed");
-+		ret = -ENOMEM;
-+		goto err2;
-+	}
-+
-+	ehci = hcd_to_ehci(hcd);
-+	ehci->caps = hcd->regs;
-+	ehci->regs = hcd->regs + HC_LENGTH(readl(&ehci->caps->hc_capbase));
-+
-+	dbg_hcs_params(ehci, "reset");
-+	dbg_hcc_params(ehci, "reset");
-+
-+	/* cache this readonly data; minimize chip reads */
-+	ehci->hcs_params = readl(&ehci->caps->hcs_params);
-+
-+	ehci_port_power(ehci, 1);
-+
-+	ret = usb_add_hcd(hcd, pdev->resource[1].start,
-+			  IRQF_DISABLED | IRQF_SHARED);
-+	if (ret == 0) {
-+		platform_set_drvdata(pdev, hcd);
-+		return ret;
-+	}
-+
-+	iounmap(hcd->regs);
-+err2:
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+err1:
-+	usb_put_hcd(hcd);
++err_irq_alarm:
++	free_irq(vt8500_rtc->irq_hz, dev);
++err_irq_hz:
 +	return ret;
 +}
 +
-+static int vt8500_ehci_drv_remove(struct platform_device *pdev)
++static void vt8500_rtc_release(struct device *dev)
 +{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
 +
-+	usb_remove_hcd(hcd);
-+	iounmap(hcd->regs);
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+	usb_put_hcd(hcd);
-+	platform_set_drvdata(pdev, NULL);
++	spin_lock_irq(&vt8500_rtc->lock);
++	/* Disable alarm matching */
++	writel(0, vt8500_rtc->regbase + VT8500_RTC_IS);
++	spin_unlock_irq(&vt8500_rtc->lock);
++
++	free_irq(vt8500_rtc->irq_alarm, dev);
++	free_irq(vt8500_rtc->irq_hz, dev);
++}
++
++static int vt8500_rtc_read_time(struct device *dev, struct rtc_time *tm)
++{
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
++	u32 date, time;
++
++	date = readl(vt8500_rtc->regbase + VT8500_RTC_DR);
++	time = readl(vt8500_rtc->regbase + VT8500_RTC_TR);
++
++	tm->tm_sec = bcd2bin(time & TIME_SEC_MASK);
++	tm->tm_min = bcd2bin((time & TIME_MIN_MASK) >> TIME_MIN_S);
++	tm->tm_hour = bcd2bin((time & TIME_HOUR_MASK) >> TIME_HOUR_S);
++	tm->tm_mday = bcd2bin(date & DATE_DAY_MASK);
++	tm->tm_mon = bcd2bin((date & DATE_MONTH_MASK) >> DATE_MONTH_S);
++	tm->tm_year = bcd2bin((date & DATE_YEAR_MASK) >> DATE_YEAR_S);
++	tm->tm_wday = (time & TIME_DOW_MASK) >> TIME_DOW_S;
 +
 +	return 0;
 +}
 +
-+static struct platform_driver vt8500_ehci_driver = {
-+	.probe		= vt8500_ehci_drv_probe,
-+	.remove		= vt8500_ehci_drv_remove,
-+	.shutdown	= usb_hcd_platform_shutdown,
-+	.driver = {
-+		.name	= "vt8500-ehci",
-+		.owner	= THIS_MODULE,
++static int vt8500_rtc_set_time(struct device *dev, struct rtc_time *tm)
++{
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
++
++	writel((bin2bcd(tm->tm_year) << DATE_YEAR_S)
++		| (bin2bcd(tm->tm_mon) << DATE_MONTH_S)
++		| (bin2bcd(tm->tm_mday)),
++		vt8500_rtc->regbase + VT8500_RTC_DS);
++	writel((bin2bcd(tm->tm_wday) << TIME_DOW_S)
++		| (bin2bcd(tm->tm_hour) << TIME_HOUR_S)
++		| (bin2bcd(tm->tm_min) << TIME_MIN_S)
++		| (bin2bcd(tm->tm_sec)),
++		vt8500_rtc->regbase + VT8500_RTC_TS);
++
++	return 0;
++}
++
++static int vt8500_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
++	u32 isr, alarm;
++
++	alarm = readl(vt8500_rtc->regbase + VT8500_RTC_AS);
++	isr = readl(vt8500_rtc->regbase + VT8500_RTC_IS);
++
++	alrm->time.tm_mday = bcd2bin((alarm & ALARM_DAY_MASK) >> ALARM_DAY_S);
++	alrm->time.tm_hour = bcd2bin((alarm & TIME_HOUR_MASK) >> TIME_HOUR_S);
++	alrm->time.tm_min = bcd2bin((alarm & TIME_MIN_MASK) >> TIME_MIN_S);
++	alrm->time.tm_sec = bcd2bin((alarm & TIME_SEC_MASK));
++
++	alrm->enabled = (alarm & ALARM_ENABLE_MASK) ? 1 : 0;
++
++	alrm->pending = (isr & 1) ? 1 : 0;
++	return 0;
++}
++
++static int vt8500_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
++{
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
++
++	writel((alrm->enabled ? ALARM_ENABLE_MASK : 0)
++		| (bin2bcd(alrm->time.tm_mday) << ALARM_DAY_S)
++		| (bin2bcd(alrm->time.tm_hour) << TIME_HOUR_S)
++		| (bin2bcd(alrm->time.tm_min) << TIME_MIN_S)
++		| (bin2bcd(alrm->time.tm_sec)),
++		vt8500_rtc->regbase + VT8500_RTC_AS);
++
++	return 0;
++}
++
++static int vt8500_rtc_ioctl(struct device *dev, unsigned int cmd,
++		unsigned long arg)
++{
++	struct vt8500_rtc *vt8500_rtc = dev_get_drvdata(dev);
++	int ret = 0;
++	unsigned long tmp;
++
++	spin_lock_irq(&vt8500_rtc->lock);
++	switch (cmd) {
++	case RTC_AIE_OFF:
++		tmp = readl(vt8500_rtc->regbase + VT8500_RTC_AS);
++		writel(tmp & ~ALARM_ENABLE_MASK,
++		       vt8500_rtc->regbase + VT8500_RTC_AS);
++		break;
++	case RTC_AIE_ON:
++		tmp = readl(vt8500_rtc->regbase + VT8500_RTC_AS);
++		writel(tmp | ALARM_ENABLE_MASK,
++		       vt8500_rtc->regbase + VT8500_RTC_AS);
++		break;
++	case RTC_UIE_OFF:
++		tmp = readl(vt8500_rtc->regbase + VT8500_RTC_CR);
++		writel(tmp & ~(1 << 2),
++		       vt8500_rtc->regbase + VT8500_RTC_CR);
++		break;
++	case RTC_UIE_ON:
++		tmp = readl(vt8500_rtc->regbase + VT8500_RTC_CR);
++		writel(tmp | ((1 << 3) | (1 << 2)),
++		       vt8500_rtc->regbase + VT8500_RTC_CR);
++		break;
++	default:
++		ret = -ENOIOCTLCMD;
 +	}
++
++	spin_unlock_irq(&vt8500_rtc->lock);
++	return ret;
++}
++
++static const struct rtc_class_ops vt8500_rtc_ops = {
++	.open = vt8500_rtc_open,
++	.release = vt8500_rtc_release,
++	.ioctl = vt8500_rtc_ioctl,
++	.read_time = vt8500_rtc_read_time,
++	.set_time = vt8500_rtc_set_time,
++	.read_alarm = vt8500_rtc_read_alarm,
++	.set_alarm = vt8500_rtc_set_alarm,
 +};
 +
-+MODULE_ALIAS("platform:vt8500-ehci");
++static int __init vt8500_rtc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct vt8500_rtc *vt8500_rtc;
++	struct resource *res;
++	int ret;
++
++	vt8500_rtc = kzalloc(sizeof(struct vt8500_rtc), GFP_KERNEL);
++	if (!vt8500_rtc)
++		return -ENOMEM;
++
++	spin_lock_init(&vt8500_rtc->lock);
++	platform_set_drvdata(pdev, vt8500_rtc);
++
++	ret = -ENXIO;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(dev, "No I/O memory resource defined\n");
++		goto err_map;
++	}
++
++	vt8500_rtc->irq_alarm = platform_get_irq(pdev, 0);
++	if (vt8500_rtc->irq_alarm < 0) {
++		dev_err(dev, "No alarm IRQ resource defined\n");
++		goto err_map;
++	}
++
++	vt8500_rtc->irq_hz = platform_get_irq(pdev, 1);
++	if (vt8500_rtc->irq_hz < 0) {
++		dev_err(dev, "No 1Hz IRQ resource defined\n");
++		goto err_map;
++	}
++
++	ret = -ENOMEM;
++	vt8500_rtc->regbase = ioremap(res->start, resource_size(res));
++	if (!vt8500_rtc->regbase) {
++		dev_err(&pdev->dev, "Unable to map RTC I/O memory\n");
++		goto err_map;
++	}
++
++	/* Enable the second/minute interrupt generation and enable RTC */
++	writel((1 << 3) | (1 << 2) | 1, vt8500_rtc->regbase + VT8500_RTC_CR);
++
++	vt8500_rtc->rtc = rtc_device_register("vt8500-rtc", &pdev->dev,
++					      &vt8500_rtc_ops, THIS_MODULE);
++	ret = PTR_ERR(vt8500_rtc->rtc);
++	if (IS_ERR(vt8500_rtc->rtc)) {
++		dev_err(dev, "Failed to register RTC device -> %d\n", ret);
++		goto err_rtc_reg;
++	}
++
++	device_init_wakeup(dev, 1);
++
++	return 0;
++
++err_rtc_reg:
++	iounmap(vt8500_rtc->regbase);
++err_map:
++	kfree(vt8500_rtc);
++	return ret;
++}
++
++static int __exit vt8500_rtc_remove(struct platform_device *pdev)
++{
++	struct vt8500_rtc *vt8500_rtc = platform_get_drvdata(pdev);
++
++	rtc_device_unregister(vt8500_rtc->rtc);
++
++	spin_lock_irq(&vt8500_rtc->lock);
++	iounmap(vt8500_rtc->regbase);
++	spin_unlock_irq(&vt8500_rtc->lock);
++
++	kfree(vt8500_rtc);
++
++	return 0;
++}
++
++static struct platform_driver vt8500_rtc_driver = {
++	.probe		= vt8500_rtc_probe,
++	.remove		= __exit_p(vt8500_rtc_remove),
++	.driver		= {
++		.name	= "vt8500-rtc"
++	},
++};
++
++static int __init vt8500_rtc_init(void)
++{
++	return platform_driver_register(&vt8500_rtc_driver);
++}
++
++static void __exit vt8500_rtc_exit(void)
++{
++	platform_driver_unregister(&vt8500_rtc_driver);
++}
++
++module_init(vt8500_rtc_init);
++module_exit(vt8500_rtc_exit);
++
++MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com>");
++MODULE_DESCRIPTION("VIA VT8500 SoC Realtime Clock Driver (RTC)");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:vt8500-rtc");
 -- 
 1.7.3.1
