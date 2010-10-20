@@ -1,63 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Oct 2010 16:34:46 +0900
-Subject: [PATCH v2] ARM: S3C64XX: add support for mach-mini6410
-In-Reply-To: <4CBDD33B.5000007@gmail.com>
-References: <20101019171009.11315.47694.stgit@darius-desktop>
-	<4CBDD33B.5000007@gmail.com>
-Message-ID: <05c501cb7029$4734e510$d59eaf30$%kim@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 20 Oct 2010 09:36:36 +0200
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <i9kk4o$svc$1@dough.gmane.org>
+References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4CBD8EE4.5040808@evidence.eu.com>
+	<i9ka0s$4ua$1@dough.gmane.org>	<201010191727.53314.alexander.stein@systec-electronic.com>
+	<i9kk4o$svc$1@dough.gmane.org>
+Message-ID: <4CBE9C04.7000005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darius Augulis wrote:
+Le 19/10/2010 19:22, Grant Edwards :
+> On 2010-10-19, Alexander Stein <alexander.stein@systec-electronic.com> wrote:
+>> On Tuesday 19 October 2010, 16:29:48 Grant Edwards wrote:
+>>> On 2010-10-19, Claudio Scordino <claudio@evidence.eu.com> wrote:
+>>>> +2. HARDWARE-RELATED CONSIDERATIONS
+>>>> +
+>>>> +   Some CPUs (e.g., Atmel AT91) contain a transceiver capable of working
+>>>> both +   as RS232 and RS485.
+>>>
+>>> Pardon my curiosity, but I've looked at a few AT91 parts, and I've
+>>> never seen on with an internal transceiver -- nor does Google seem
+>>> able to find any.
+>>>
+>>> Frankly, I'd be pretty surprised, since it would be very difficult
+>>> (fab-wise), to build a mircoprocessor with I/O cells capable of
+>>> withstanding the voltage levels specified in RS232.
+>>>
+>>> Can you specify to which parts you're referring?
+>>
+>> I doubt the AT91 do have an internal transceiver but it has a
+>> dedicated pin feature (RTS or CTS or something) which can be used to
+>> switch between RS232 and RS485 by setting a bit in the USART provided
+>> the pin is connected properly.
 > 
-> Kukjin,
+> Yes, the AT91 UARTs do have a built-in half-duplex mode that will
+> automatically control line direction by toggling RTS.
 > 
-> please replace old patch in my previously sent series with this new one.
-> Other I think should be OK. Could you please add this series to your
-> tree? I'm afraid it's too late to have it in 2.3.37 even thought I sent
-> them early enough.
-> 
-Don't worry about that. :-)
+> That can used to control external half-duplex hardware like an RS485
+> transceiver or any RS232-connected half-duplex device like some
+> modems.
 
-> Thanks,
-> Darius
-> 
-> 
-> On 10/19/2010 08:11 PM, Darius Augulis wrote:
-> > Add support for mini6410 board from FriendlyARM
-> >
-> > Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
-> > ---
-> >
-> > Changelog since v1:
-> >   - Removed .phys_io and .io_pg_offst from MACHINE_START
-> >
+Yes, that is a vocabulary misuse to talk about "transceiver" but the
+idea of Claudio's documentation is that the USART can work in both full
+and half duplex and then can comply with RS-232 and RS-485 modes like
+you describe precisely in your post.
 
-(snip)
+> Though the Atmel docs refer to it as "RS485 mode" there is no RS485
+> transceiver in the AT91 parts (AFAIK), and "RS485 mode" isn't specific
+> to RS485 - it can be used with any external half-duplex hardware.
 
-> > +
-> > +MACHINE_START(MINI6410, "MINI6410")
-> > +	/* Maintainer: Darius Augulis<augulis.darius@gmail.com>  */
-> > +	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
-> > +	.init_irq	= s3c6410_init_irq,
-> > +	.map_io		= mini6410_map_io,
-> > +	.init_machine	= mini6410_machine_init,
-> > +	.timer		=&s3c24xx_timer,
-> > +MACHINE_END
+Yes, for sure you will have to use an external transceiver.
 
-Russell,
-
-I'm confusing about commit 861bd81ee62a0d6759144c22909a8a3938951656 ("arm:
-remove machine_desc.io_pg_offst and .phys_io") because couldn't find it in
-your -devel and -master.
-
-Anyway...should I remove .io_pg_offst and .phys_io of missed stuff from
-commit 861bd81 like this which will be merged in the -next in my tree?
-
-Thanks.
+Thanks for clarifications.
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Nicolas Ferre
