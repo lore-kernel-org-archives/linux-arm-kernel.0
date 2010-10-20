@@ -1,150 +1,124 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 20 Oct 2010 16:31:21 -0700
-Subject: [PATCH 1/3] OMAP: PM: formalize idle notifications
-Message-ID: <1287617483-24170-1-git-send-email-khilman@deeprootsystems.com>
+Date: Wed, 20 Oct 2010 16:31:22 -0700
+Subject: [PATCH 2/3] OMAP: INTC: use idle notifier for autoidle management
+In-Reply-To: <1287617483-24170-1-git-send-email-khilman@deeprootsystems.com>
+References: <1287617483-24170-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <1287617483-24170-2-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in the idle path, we have custom function calls into device
-code to handle device specific actions that need to be coordinated CPU
-idle transitions. Rather than continue this ad-hoc method of calling
-device code from the PM core, create a formal way for device/driver
-code to register for idle notifications.
-
-Idle notifications are done late in the idle path when interrupts are
-disabled, hence use atomic notifier chains.  These notifications will
-also be atomic with respect to CPU idle transitions.
+Move INTC autoidle management from custom hook to use the new idle
+notifier.
 
 Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm.c                 |   26 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/pm24xx.c             |    4 ++++
- arch/arm/mach-omap2/pm34xx.c             |    5 +++++
- arch/arm/plat-omap/include/plat/common.h |   11 +++++++++++
- 4 files changed, 46 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/irq.c              |   36 +++++++++++++++++++++----------
+ arch/arm/mach-omap2/pm34xx.c           |    3 --
+ arch/arm/plat-omap/include/plat/irqs.h |    2 -
+ 3 files changed, 24 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 59ca03b..343e8d6 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -13,6 +13,7 @@
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 32eeabe..cb51f74 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -14,10 +14,12 @@
  #include <linux/init.h>
+ #include <linux/interrupt.h>
  #include <linux/io.h>
- #include <linux/err.h>
 +#include <linux/notifier.h>
++
++#include <plat/common.h>
+ #include <mach/hardware.h>
+ #include <asm/mach/irq.h>
  
- #include <plat/omap-pm.h>
- #include <plat/omap_device.h>
-@@ -28,6 +29,31 @@ static struct device *iva_dev;
- static struct device *l3_dev;
- static struct device *dsp_dev;
+-
+ /* selected INTC register offsets */
  
-+/* idle notifications late in the idle path (atomic, interrupts disabled) */
-+static ATOMIC_NOTIFIER_HEAD(idle_notifier);
-+
-+void omap_idle_notifier_register(struct notifier_block *n)
+ #define INTC_REVISION		0x0000
+@@ -186,6 +188,24 @@ int omap_irq_pending(void)
+ 	return 0;
+ }
+ 
++static int omap3_intc_idle_notifier(struct notifier_block *n,
++				      unsigned long val,
++				      void *p)
 +{
-+	atomic_notifier_chain_register(&idle_notifier, n);
-+}
-+EXPORT_SYMBOL_GPL(omap_idle_notifier_register);
++	if (val == OMAP_IDLE_START)
++		/* Disable autoidle as it can stall interrupt controller */
++		intc_bank_write_reg(0, &irq_banks[0], INTC_SYSCONFIG);
++	else
++		/* Re-enable autoidle */
++		intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
 +
-+void omap_idle_notifier_unregister(struct notifier_block *n)
-+{
-+	atomic_notifier_chain_unregister(&idle_notifier, n);
-+}
-+EXPORT_SYMBOL_GPL(omap_idle_notifier_unregister);
-+
-+void omap_idle_notifier_start(void)
-+{
-+	atomic_notifier_call_chain(&idle_notifier, OMAP_IDLE_START, NULL);
-+}
-+
-+void omap_idle_notifier_end(void)
-+{
-+	atomic_notifier_call_chain(&idle_notifier, OMAP_IDLE_END, NULL);
++	return 0;
 +}
 +
- struct device *omap2_get_mpuss_device(void)
++static struct notifier_block omap3_intc_notifier = {
++	.notifier_call = omap3_intc_idle_notifier,
++};
++
+ void __init omap_init_irq(void)
  {
- 	WARN_ON_ONCE(!mpu_dev);
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index a40457d..cb1b333 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -108,6 +108,8 @@ static void omap2_enter_full_retention(void)
- 
- 	omap2_gpio_prepare_for_idle(PWRDM_POWER_RET);
- 
-+	omap_idle_notifier_start();
-+
- 	if (omap2_pm_debug) {
- 		omap2_pm_dump(0, 0, 0);
- 		getnstimeofday(&ts_preidle);
-@@ -140,6 +142,8 @@ no_sleep:
- 		tmp = timespec_to_ns(&ts_idle) * NSEC_PER_USEC;
- 		omap2_pm_dump(0, 1, tmp);
+ 	unsigned long nr_of_irqs = 0;
+@@ -224,6 +244,9 @@ void __init omap_init_irq(void)
+ 		set_irq_handler(i, handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID);
  	}
 +
-+	omap_idle_notifier_end();
- 	omap2_gpio_resume_after_idle();
++	if (cpu_is_omap34xx())
++		omap_idle_notifier_register(&omap3_intc_notifier);
+ }
  
- 	clk_enable(osc_ck);
+ #ifdef CONFIG_ARCH_OMAP3
+@@ -282,15 +305,4 @@ void omap3_intc_suspend(void)
+ 	omap_ack_irq(0);
+ }
+ 
+-void omap3_intc_prepare_idle(void)
+-{
+-	/* Disable autoidle as it can stall interrupt controller */
+-	intc_bank_write_reg(0, &irq_banks[0], INTC_SYSCONFIG);
+-}
+-
+-void omap3_intc_resume_idle(void)
+-{
+-	/* Re-enable autoidle */
+-	intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
+-}
+ #endif /* CONFIG_ARCH_OMAP3 */
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 75c0cd1..713bd04 100644
+index 713bd04..4674748 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -37,6 +37,7 @@
- #include <plat/prcm.h>
- #include <plat/gpmc.h>
- #include <plat/dma.h>
-+#include <plat/common.h>
- 
- #include <asm/tlbflush.h>
- 
-@@ -375,6 +376,8 @@ void omap_sram_idle(void)
- 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
- 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
- 
-+	omap_idle_notifier_start();
-+
- 	/* Enable IO-PAD and IO-CHAIN wakeups */
- 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
- 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
-@@ -471,6 +474,8 @@ void omap_sram_idle(void)
- 		omap3_disable_io_chain();
+@@ -407,8 +407,6 @@ void omap_sram_idle(void)
+ 		}
  	}
  
-+	omap_idle_notifier_end();
-+
- 	pwrdm_post_transition();
+-	omap3_intc_prepare_idle();
+-
+ 	/*
+ 	* On EMU/HS devices ROM code restores a SRDC value
+ 	* from scratchpad which has automatic self refresh on timeout
+@@ -454,7 +452,6 @@ void omap_sram_idle(void)
+ 					       OMAP3430_GR_MOD,
+ 					       OMAP3_PRM_VOLTCTRL_OFFSET);
+ 	}
+-	omap3_intc_resume_idle();
  
- 	omap2_clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
-diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-index a9d69a0..1ca32cf 100644
---- a/arch/arm/plat-omap/include/plat/common.h
-+++ b/arch/arm/plat-omap/include/plat/common.h
-@@ -27,6 +27,8 @@
- #ifndef __ARCH_ARM_MACH_OMAP_COMMON_H
- #define __ARCH_ARM_MACH_OMAP_COMMON_H
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+index 65e20a6..b87c211 100644
+--- a/arch/arm/plat-omap/include/plat/irqs.h
++++ b/arch/arm/plat-omap/include/plat/irqs.h
+@@ -424,8 +424,6 @@ extern int omap_irq_pending(void);
+ void omap_intc_save_context(void);
+ void omap_intc_restore_context(void);
+ void omap3_intc_suspend(void);
+-void omap3_intc_prepare_idle(void);
+-void omap3_intc_resume_idle(void);
+ #endif
  
-+#include <linux/notifier.h>
-+
- #include <plat/i2c.h>
- 
- struct sys_timer;
-@@ -95,4 +97,13 @@ extern struct device *omap2_get_iva_device(void);
- extern struct device *omap2_get_l3_device(void);
- extern struct device *omap4_get_dsp_device(void);
- 
-+#define OMAP_IDLE_START 1
-+#define OMAP_IDLE_END	2
-+
-+/* idle notifications late in the idle path (atomic, interrupts disabled) */
-+extern void omap_idle_notifier_register(struct notifier_block *n);
-+extern void omap_idle_notifier_unregister(struct notifier_block *n);
-+extern void omap_idle_notifier_start(void);
-+extern void omap_idle_notifier_end(void);
-+
- #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
+ #include <mach/hardware.h>
 -- 
 1.7.2.1
