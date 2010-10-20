@@ -1,48 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Oct 2010 11:12:05 +0200
-Subject: [PATCH 1/5] ARM: remove dependency of platform code on
-	CLOCK_TICK_RATE / LATCH defines
-In-Reply-To: <20101020045121.GX12979@mail.wantstofly.org>
-References: <20101020045121.GX12979@mail.wantstofly.org>
-Message-ID: <20101020091205.GK28166@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 20 Oct 2010 18:13:10 +0900
+Subject: [PATCH 4/4] ARM: S5PV310: Add audio platform devices
+In-Reply-To: <05cf01cb7031$b558df80$200a9e80$%kim@samsung.com>
+References: <1287472517-563-1-git-send-email-jassisinghbrar@gmail.com>
+	<05cf01cb7031$b558df80$200a9e80$%kim@samsung.com>
+Message-ID: <AANLkTikAbKgbEtT3O=9iFNiB6nXBhkx1XvvrmzbDAoax@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 06:51:21AM +0200, Lennert Buytenhek wrote:
-> One of the things preventing building an ARM multiplatform kernel
-> image is the fact that CLOCK_TICK_RATE (and as a consequence, LATCH)
-> is defined differently for each platform.
-> 
-> CLOCK_TICK_RATE is mostly unused beyond some usage in the various
-> ARM platform support code directories themselves (and a couple of
-> bogus uses elsewhere, such as in drivers/input/joystick/analog.c).
-> 
-> Therefore, for those ARM platforms that use their own definition
-> of CLOCK_TICK_RATE (for example, in their timer setup code), copy
-> the definition of CLOCK_TICK_RATE into the platform code, renaming
-> it to TICK_RATE in the process.
-> 
-> Also, for those ARM platforms that use the LATCH define (which is
-> derived from CLOCK_TICK_RATE), give them a private definition, named
-> TIMER_LATCH, based on the now locally defined TICK_RATE.
-> 
-> This gets rid of platform code dependencies on mach/timex.h's
-> CLOCK_TICK_RATE definition, and allows killing all mach/timex.h in
-> a subsequent patch.
-> 
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-> ---
->  arch/arm/common/time-acorn.c         |   15 +++++++++------
->  arch/arm/mach-aaec2000/core.c        |    9 ++++++---
->  arch/arm/mach-at91/at91rm9200_time.c |    8 +++++---
->  arch/arm/mach-at91/at91x40.c         |    3 ++-
-ah, this seems to handle the problem I just pointed out for a later
-patch in this series.  Maybe you can thread your patches next time?
-(E.g. by using git send-email)
+On Wed, Oct 20, 2010 at 5:35 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Thanks
-Uwe
+>> + ? ? /* configure GPIO for i2s port */
+>> + ? ? switch (pdev->id) {
+>> + ? ? case 0:
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(0), S3C_GPIO_SFN(2));
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(1), S3C_GPIO_SFN(2));
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(2), S3C_GPIO_SFN(2));
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(3), S3C_GPIO_SFN(2));
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(4), S3C_GPIO_SFN(2));
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(5), S3C_GPIO_SFN(2));
+>> + ? ? ? ? ? ? s3c_gpio_cfgpin(S5PV310_GPZ(6), S3C_GPIO_SFN(2));
+>
+> s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 7, S3C_GPIO_SFN(2));
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+OK
+
+>> +static struct resource s5pv310_iis0_resource[] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .start = S5PV310_PA_IIS0,
+> ? ? ? ? ? ? ? ? ? ? ?^
+>> + ? ? ? ? ? ? .end ? = S5PV310_PA_IIS0 + 0x100 - 1,
+> ? ? ? ? ? ? ? ? ? ?^^^
+>> + ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> ? ? ? ? ? ? ? ? ? ? ?^
+>
+> It would be better if you could use tab above like following.
+
+OK
+
+
+>> +
+>> +struct platform_device s5pv310_device_iis0 = {
+>> + ? ? .name ? ? ? ? ? ? = "samsung-i2s",
+>> + ? ? .id ? ? ? ? ? ? ? = 0,
+>> + ? ? .num_resources ? ?= ARRAY_SIZE(s5pv310_iis0_resource),
+>> + ? ? .resource ? ? ? ? = s5pv310_iis0_resource,
+>> + ? ? .dev = {
+>> + ? ? ? ? ? ? .platform_data = &i2sv5_pdata,
+>> + ? ? },
+>> +};
+>> +
+>
+> I'm thinking about the name of IIS/I2S...Hmm...
+
+I2S is more popular, but our manuals use both I2S and IIS.
+IIS is present in code mostly due to historical reason.
