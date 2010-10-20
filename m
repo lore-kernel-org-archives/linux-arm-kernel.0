@@ -1,84 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Oct 2010 17:35:06 +0900
-Subject: [PATCH 4/4] ARM: S5PV310: Add audio platform devices
-In-Reply-To: <1287472517-563-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1287472517-563-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <05cf01cb7031$b558df80$200a9e80$%kim@samsung.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Wed, 20 Oct 2010 08:48:26 +0000
+Subject: net{space,xbig} TCLK determination
+In-Reply-To: <20101020050820.GD12979@mail.wantstofly.org>
+References: <20101020050820.GD12979@mail.wantstofly.org>
+Message-ID: <20101020084826.GK29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
+Hi Lennert,
+
+On Wed, Oct 20, 2010 at 07:08:20AM +0200, Lennert Buytenhek wrote:
+> Hi,
 > 
-> From: Jassi Brar <jassi.brar@samsung.com>
+> The net{space,xbig} board support files have this:
 > 
-> Define platform devices for all audio devices found on S5PV310
+> 	static void netspace_v2_timer_init(void)
+> 	{
+> 		kirkwood_tclk = 166666667;
+> 		orion_time_init(IRQ_KIRKWOOD_BRIDGE, kirkwood_tclk);
+> 	}
 > 
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Makefile    |    1 +
->  arch/arm/mach-s5pv310/dev-audio.c |  356
-> +++++++++++++++++++++++++++++++++++++
->  2 files changed, 357 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv310/dev-audio.c
-> 
+> This is a pretty ugly hack -- if kirkwood_find_tclk() is not
+> determining the right TCLK on these boards, then that would be the
+> real bug, and it should be fixed there, and not by putting hacks
+> like these in board support files.
 
-(snip)
+In the Marvell LSP, TCLK detection is based on the Sample at Reset
+Register bit 21. There is no description about this bit usage in the
+Kirkwood functional specification document.
+The given result _seems_ to be correct for the boards on my desk, but
+I have no idea how this way is reliable...
 
-> +static int s5pv310_cfg_i2s(struct platform_device *pdev)
-> +{
-> +	/* configure GPIO for i2s port */
-> +	switch (pdev->id) {
-> +	case 0:
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(0), S3C_GPIO_SFN(2));
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(1), S3C_GPIO_SFN(2));
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(2), S3C_GPIO_SFN(2));
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(3), S3C_GPIO_SFN(2));
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(4), S3C_GPIO_SFN(2));
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(5), S3C_GPIO_SFN(2));
-> +		s3c_gpio_cfgpin(S5PV310_GPZ(6), S3C_GPIO_SFN(2));
+I simply don't have the needed platform knowledge to solve this issue.
+So, if you want me to fix kirkwood_find_tclk(), you will have to give
+more hints.
 
-s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 7, S3C_GPIO_SFN(2));
+The lacie_v2_timer_init() function is maybe a ugly hack but that is
+the only I found. My concern was to avoid breaking TCLK detection for
+other boards.
 
-(snip)
+Thanks,
 
-> +
-> +static struct resource s5pv310_iis0_resource[] = {
-> +	[0] = {
-> +		.start = S5PV310_PA_IIS0,
-                      ^
-> +		.end   = S5PV310_PA_IIS0 + 0x100 - 1,
-                    ^^^
-> +		.flags = IORESOURCE_MEM,
-                      ^
-
-It would be better if you could use tab above like following.
-
-		.start	= S5PV310_PA_IIS0,
-		.end	= S5PV310_PA_IIS0 + 0x100 - 1,
-		.flags	= IORESOURCE_MEM,
-
-(snip)
-
-> +
-> +struct platform_device s5pv310_device_iis0 = {
-> +	.name		  = "samsung-i2s",
-> +	.id		  = 0,
-> +	.num_resources	  = ARRAY_SIZE(s5pv310_iis0_resource),
-> +	.resource	  = s5pv310_iis0_resource,
-> +	.dev = {
-> +		.platform_data = &i2sv5_pdata,
-> +	},
-> +};
-> +
-
-I'm thinking about the name of IIS/I2S...Hmm...
-
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101020/a2471756/attachment.sig>
