@@ -1,84 +1,46 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 20 Oct 2010 15:32:56 +0300
-Subject: [patch 8/9] efikamx: add spi nor support
-In-Reply-To: <87wrpdax9y.fsf@lechat.rtp-net.org>
-References: <20101019204253.162641893@rtp-net.org>
-	<20101019205301.326830829@rtp-net.org>
-	<20101020112659.GK2562@matterhorn.lan>
-	<87wrpdax9y.fsf@lechat.rtp-net.org>
-Message-ID: <20101020123256.GN2562@matterhorn.lan>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 20 Oct 2010 15:00:22 +0200
+Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
+In-Reply-To: <8739s2xfuk.fsf@deeprootsystems.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287387875-14168-2-git-send-email-ohad@wizery.com>
+	<8739s2xfuk.fsf@deeprootsystems.com>
+Message-ID: <AANLkTinHOOPfke2dJrQ1=+vzsa=0BSQjkX5ai7mwpcF8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Oct 20, Arnaud Patard wrote:
-> Amit Kucheria <amit.kucheria@linaro.org> writes:
-> Hi,
-> 
-> > On 10 Oct 19, Arnaud Patard wrote:
-> >> On efikamx, uboot is stored on a nor spi flash. Add support for it
-> >> 
-> >> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> >> Index: linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c
-> >> ===================================================================
-> >> --- linux-2.6.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-16 14:21:24.000000000 +0200
-> >> +++ linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-16 15:34:12.000000000 +0200
-> >> @@ -24,6 +24,8 @@
-> >>  #include <linux/delay.h>
-> >>  #include <linux/io.h>
-> >>  #include <linux/fsl_devices.h>
-> >> +#include <linux/spi/flash.h>
-> >> +#include <linux/spi/spi.h>
-> >>  
-> >>  #include <mach/common.h>
-> >>  #include <mach/hardware.h>
-> >> @@ -52,6 +54,9 @@
-> >>  
-> >>  #define EFIKAMX_POWER_KEY	(1*32+31)
-> >>  
-> >> +#define EFIKAMX_SPI_CS0		(3*32+24)
-> >> +#define EFIKAMX_SPI_CS1		(3*32+25)
-> >
-> > It is just a style thing, but could you make this (3*32 + 24). Makes it
-> > easier on the eyes to read "4th gpio bank, 24th pin"
-> 
-> I've used X*32+Y without space in all patches. So, you prefer that I
-> change the other places too ?
+On Tue, Oct 19, 2010 at 7:16 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Ohad Ben-Cohen <ohad@wizery.com> writes:
+>
+>> From: Simon Que <sque@ti.com>
+>>
+>> Add driver for OMAP's Hardware Spinlock module.
+>>
+>> The OMAP Hardware Spinlock module, initially introduced in OMAP4,
+>> provides hardware assistance for synchronization between the
+>> multiple processors in the device (Cortex-A9, Cortex-M3 and
+>> C64x+ DSP).
+>
+...
 
-If you don't mind, yes.
+>> +config OMAP_HWSPINLOCK
+>> + ? ? bool "OMAP Hardware Spinlock module"
+>
+> Should be tristate
 
-> >
-> >>  /* the pci ids pin have pull up. they're driven low according to board id */
-> >>  #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
-> >>  #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
-> >> @@ -99,6 +104,14 @@
-> >>  
-> >>  	/* power key */
-> >>  	MX51_PAD_PWRKEY,
-> >> +
-> >> +	/* spi */
-> >> +	MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI,
-> >> +	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
-> >> +	MX51_PAD_CSPI1_SS0__GPIO_4_24,
-> >> +	MX51_PAD_CSPI1_SS1__GPIO_4_25,
-> >> +	MX51_PAD_CSPI1_RDY__ECSPI1_RDY,
-> >> +	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
-> >>  };
-> >>  
-> >>  /* Serial ports */
-> >> @@ -252,6 +265,47 @@
-> >>  	},
-> >>  };
-> >>  
-> >> +static struct mtd_partition mx51_efikamx_spi_nor_partitions[] = {
-> >> +	{
-> >> +	 .name = "u-boot",
-> >
-> > "bootloader" ?
-> 
-> I don't really mind if it's "u-boot" or "bootloader". It's just a name
-> after all. Will change to bootloader and if someone disagree, he'll have
-> to send a new patch imho.
+Agree,
 
-bootloader is a generic term, IMO.
+> so it can also be built as a module by default.
+>
+> e.g., when building multi-OMAP kernels, no reason or this to be
+> built-in. ?It can then be loaded as a module on OMAP4 only.
 
-/Amit
+But considering the current built-in use cases (i2c) we would then
+need to have the relevant MACH_OMAP4_* select OMAP_HWSPINLOCK (only on
+the OMAP4 machines on which the I2C bus is shared).
+
+
+>
+> Kevin
+>
