@@ -1,89 +1,79 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 20 Oct 2010 14:52:11 +0300
-Subject: [PATCH 2/2] babbage: esdhc device registration
-In-Reply-To: <1287566647-1322-1-git-send-email-shawn.gsc@gmail.com>
-References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
-	<1287566647-1322-1-git-send-email-shawn.gsc@gmail.com>
-Message-ID: <20101020115211.GM2562@matterhorn.lan>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 20 Oct 2010 14:01:13 +0200
+Subject: [patch 8/9] efikamx: add spi nor support
+In-Reply-To: <20101020112659.GK2562@matterhorn.lan> (Amit Kucheria's message
+	of "Wed\, 20 Oct 2010 14\:26\:59 +0300")
+References: <20101019204253.162641893@rtp-net.org>
+	<20101019205301.326830829@rtp-net.org>
+	<20101020112659.GK2562@matterhorn.lan>
+Message-ID: <87wrpdax9y.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Oct 20, Shawn Guo wrote:
-> This patch is based on Eric B?nard's bits below to add esdhc
-> device registration for babbage board.
-> 
->  - cpuimx51: update board support
->  - clock-mx51: factorize clk_set_parent and clk_get_rate
->  - imx-esdhc: update devices registration
+Amit Kucheria <amit.kucheria@linaro.org> writes:
+Hi,
 
-This is a description of Eric's patches, you don't require them in your patch
-description. Just noting in your 0/2 that this patchset depends on Eric's is
-ok.
+> On 10 Oct 19, Arnaud Patard wrote:
+>> On efikamx, uboot is stored on a nor spi flash. Add support for it
+>> 
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> Index: linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> ===================================================================
+>> --- linux-2.6.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-16 14:21:24.000000000 +0200
+>> +++ linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-16 15:34:12.000000000 +0200
+>> @@ -24,6 +24,8 @@
+>>  #include <linux/delay.h>
+>>  #include <linux/io.h>
+>>  #include <linux/fsl_devices.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>>  
+>>  #include <mach/common.h>
+>>  #include <mach/hardware.h>
+>> @@ -52,6 +54,9 @@
+>>  
+>>  #define EFIKAMX_POWER_KEY	(1*32+31)
+>>  
+>> +#define EFIKAMX_SPI_CS0		(3*32+24)
+>> +#define EFIKAMX_SPI_CS1		(3*32+25)
+>
+> It is just a style thing, but could you make this (3*32 + 24). Makes it
+> easier on the eyes to read "4th gpio bank, 24th pin"
 
-Your desciption can be
+I've used X*32+Y without space in all patches. So, you prefer that I
+change the other places too ?
 
-"Update babbage board support to register esdhc device"
+>
+>>  /* the pci ids pin have pull up. they're driven low according to board id */
+>>  #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
+>>  #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
+>> @@ -99,6 +104,14 @@
+>>  
+>>  	/* power key */
+>>  	MX51_PAD_PWRKEY,
+>> +
+>> +	/* spi */
+>> +	MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI,
+>> +	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
+>> +	MX51_PAD_CSPI1_SS0__GPIO_4_24,
+>> +	MX51_PAD_CSPI1_SS1__GPIO_4_25,
+>> +	MX51_PAD_CSPI1_RDY__ECSPI1_RDY,
+>> +	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
+>>  };
+>>  
+>>  /* Serial ports */
+>> @@ -252,6 +265,47 @@
+>>  	},
+>>  };
+>>  
+>> +static struct mtd_partition mx51_efikamx_spi_nor_partitions[] = {
+>> +	{
+>> +	 .name = "u-boot",
+>
+> "bootloader" ?
 
-> Signed-off-by: Shawn Guo <shawn.gsc@gmail.com>
+I don't really mind if it's "u-boot" or "bootloader". It's just a name
+after all. Will change to bootloader and if someone disagree, he'll have
+to send a new patch imho.
 
-Otherwise,
-Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
-
-
-> ---
->  arch/arm/mach-mx5/Kconfig              |    1 +
->  arch/arm/mach-mx5/board-mx51_babbage.c |   19 +++++++++++++++++++
->  2 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index a2df9ac..fe96cd2 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -13,6 +13,7 @@ config MACH_MX51_BABBAGE
->  	bool "Support MX51 BABBAGE platforms"
->  	select IMX_HAVE_PLATFORM_IMX_I2C
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_ESDHC
->  	help
->  	  Include support for MX51 Babbage platform, also known as MX51EVK in
->  	  u-boot. This includes specific configurations for the board and its
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 23ee4a4..39304b4 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -112,6 +112,22 @@ static struct pad_desc mx51babbage_pads[] = {
->  
->  	/* FEC PHY reset line */
->  	MX51_PAD_EIM_A20__GPIO_2_14,
-> +
-> +	/* SD 1 */
-> +	MX51_PAD_SD1_CMD__SD1_CMD,
-> +	MX51_PAD_SD1_CLK__SD1_CLK,
-> +	MX51_PAD_SD1_DATA0__SD1_DATA0,
-> +	MX51_PAD_SD1_DATA1__SD1_DATA1,
-> +	MX51_PAD_SD1_DATA2__SD1_DATA2,
-> +	MX51_PAD_SD1_DATA3__SD1_DATA3,
-> +
-> +	/* SD 2 */
-> +	MX51_PAD_SD2_CMD__SD2_CMD,
-> +	MX51_PAD_SD2_CLK__SD2_CLK,
-> +	MX51_PAD_SD2_DATA0__SD2_DATA0,
-> +	MX51_PAD_SD2_DATA1__SD2_DATA1,
-> +	MX51_PAD_SD2_DATA2__SD2_DATA2,
-> +	MX51_PAD_SD2_DATA3__SD2_DATA3,
->  };
->  
->  /* Serial ports */
-> @@ -304,6 +320,9 @@ static void __init mxc_board_init(void)
->  	/* setback USBH1_STP to be function */
->  	mxc_iomux_v3_setup_pad(&usbh1stp);
->  	babbage_usbhub_reset();
-> +
-> +	imx51_add_esdhc(0, NULL);
-> +	imx51_add_esdhc(1, NULL);
->  }
->  
->  static void __init mx51_babbage_timer_init(void)
-> -- 
-> 1.7.1
-> 
+Arnaud
