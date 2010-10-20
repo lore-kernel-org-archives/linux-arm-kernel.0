@@ -1,46 +1,46 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 20 Oct 2010 15:00:22 +0200
-Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
-In-Reply-To: <8739s2xfuk.fsf@deeprootsystems.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-2-git-send-email-ohad@wizery.com>
-	<8739s2xfuk.fsf@deeprootsystems.com>
-Message-ID: <AANLkTinHOOPfke2dJrQ1=+vzsa=0BSQjkX5ai7mwpcF8@mail.gmail.com>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Wed, 20 Oct 2010 14:02:48 +0100
+Subject: [PATCH 0/6] Add PCI support for ARM RealView boards
+Message-ID: <20101020125554.22199.78597.stgit@e102602-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 7:16 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Ohad Ben-Cohen <ohad@wizery.com> writes:
->
->> From: Simon Que <sque@ti.com>
->>
->> Add driver for OMAP's Hardware Spinlock module.
->>
->> The OMAP Hardware Spinlock module, initially introduced in OMAP4,
->> provides hardware assistance for synchronization between the
->> multiple processors in the device (Cortex-A9, Cortex-M3 and
->> C64x+ DSP).
->
-...
+The following series implements the PCI support for the
+ARM RealView NEC custom Northbridge based reference boards
+(PBA8, PB11MPCore and PBX).
 
->> +config OMAP_HWSPINLOCK
->> + ? ? bool "OMAP Hardware Spinlock module"
->
-> Should be tristate
+The boards have a PCIX root complex connected to PCI and
+PCIe bridges. Each board has 2 PCI slots and 2 PCIe slots.
 
-Agree,
+---
 
-> so it can also be built as a module by default.
->
-> e.g., when building multi-OMAP kernels, no reason or this to be
-> built-in. ?It can then be loaded as a module on OMAP4 only.
-
-But considering the current built-in use cases (i2c) we would then
-need to have the relevant MACH_OMAP4_* select OMAP_HWSPINLOCK (only on
-the OMAP4 machines on which the I2C bus is shared).
+Colin Tuckley (6):
+      ARM Realview PCIX build file changes
+      ARM Realview PCIX board file changes
+      ARM Realview PCIX IRQ include file changes
+      ARM Realview PCIX map include file changes
+      ARM: enable bridges in pci_common_init.
+      Realview PCIX support - add main support module code
 
 
->
-> Kevin
->
+ arch/arm/Kconfig                                   |    6 
+ arch/arm/kernel/bios32.c                           |    5 
+ arch/arm/mach-realview/Makefile                    |    6 
+ arch/arm/mach-realview/include/mach/board-pb11mp.h |   11 
+ arch/arm/mach-realview/include/mach/board-pba8.h   |   11 
+ arch/arm/mach-realview/include/mach/board-pbx.h    |   11 
+ arch/arm/mach-realview/include/mach/hardware.h     |   53 ++
+ arch/arm/mach-realview/include/mach/io.h           |   18 +
+ arch/arm/mach-realview/include/mach/irqs-pb11mp.h  |   11 
+ arch/arm/mach-realview/include/mach/irqs-pba8.h    |    7 
+ arch/arm/mach-realview/include/mach/irqs-pbx.h     |    7 
+ arch/arm/mach-realview/include/mach/platform.h     |   15 -
+ arch/arm/mach-realview/pcix.c                      |  538 ++++++++++++++++++++
+ arch/arm/mach-realview/realview_pb11mp.c           |   18 +
+ arch/arm/mach-realview/realview_pba8.c             |   16 -
+ arch/arm/mach-realview/realview_pbx.c              |   14 -
+ 16 files changed, 692 insertions(+), 55 deletions(-)
+ create mode 100755 arch/arm/mach-realview/pcix.c
+
+-- 
+Colin Tuckley
