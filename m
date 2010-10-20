@@ -1,56 +1,71 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 21 Oct 2010 00:43:45 +0200
-Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
-In-Reply-To: <201010192308.02018.arnd@arndb.de>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<201010191921.21007.arnd@arndb.de>
-	<AANLkTinXR7OcfTpA6cWhRGzceekD6KQgnxOLeBKXP3WB@mail.gmail.com>
-	<201010192308.02018.arnd@arndb.de>
-Message-ID: <AANLkTikz-_qhjygzek4tR0CtDLih3ZQyy1mPKnXAiOiV@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Oct 2010 07:44:45 +0900
+Subject: [PATCH v2] ARM: S3C64XX: add support for mach-mini6410
+References: <20101019171009.11315.47694.stgit@darius-desktop>
+	<4CBDD33B.5000007@gmail.com>
+Message-ID: <000001cb70a8$669af8c0$33d0ea40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 19, 2010 at 11:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Right. There are two more things to consider though:
->
-> If you know that interrupts are disabled, you may still want to avoid
-> having to save the interrupt flag to the stack, to save some cycles
-> saving and restoring it. I don't know how expensive that is on ARM,
-> some other architectures take an microseconds to restore the interrupt
-> enabled flag from a register.
+Kukjin wrote:
+> 
+> Darius Augulis wrote:
+> >
+> > Kukjin,
+> >
+> > please replace old patch in my previously sent series with this new one.
 
-To do this we need to introduce a new set of API which will not
-disable interrupts, and which should only be used when the caller
-knows that interrupts are already disabled.
+Ok.
 
-This will save some cycles, but my concern is that this API will be
-abused by drivers, and will eventually be used to take the hwspinlocks
-for lengthy period of times (which might even involve sleeping).
+> > Other I think should be OK. Could you please add this series to your
+> > tree? I'm afraid it's too late to have it in 2.3.37 even thought I sent
+> > them early enough.
+> >
+> Don't worry about that. :-)
+> 
+> > Thanks,
+> > Darius
+> >
+> >
+> > On 10/19/2010 08:11 PM, Darius Augulis wrote:
+> > > Add support for mini6410 board from FriendlyARM
+> > >
+> > > Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+> > > ---
+> > >
+> > > Changelog since v1:
+> > >   - Removed .phys_io and .io_pg_offst from MACHINE_START
+> > >
+> 
+> (snip)
+> 
+> > > +
+> > > +MACHINE_START(MINI6410, "MINI6410")
+> > > +	/* Maintainer: Darius Augulis<augulis.darius@gmail.com>  */
+> > > +	.boot_params	= S3C64XX_PA_SDRAM + 0x100,
+> > > +	.init_irq	= s3c6410_init_irq,
+> > > +	.map_io		= mini6410_map_io,
+> > > +	.init_machine	= mini6410_machine_init,
+> > > +	.timer		=&s3c24xx_timer,
+> > > +MACHINE_END
+> 
+> Russell,
+> 
+> I'm confusing about commit 861bd81ee62a0d6759144c22909a8a3938951656 ("arm:
+> remove machine_desc.io_pg_offst and .phys_io") because couldn't find it in
+> your -devel and -master.
+> 
+Just now, I found in your -devel.
 
-Given that the access to the L4 interconnect is anyway slow I also
-feel that the gain is negligible.
+> Anyway...should I remove .io_pg_offst and .phys_io of missed stuff from
+> commit 861bd81 like this which will be merged in the -next in my tree?
 
-Nevertheless, it's a viable way to squeeze some cycles.
+If required, will update.
 
-We don't have a use case in which we know the interrupts are already
-disabled, but when we will, we will consider adding such API.
+Thanks.
 
-> Even in the case where you know that interrupts are enabled, you may
-> want to avoid saving the interrupt flag to the stack, the simpler
-> API (one argument instead of two) gives less room for screwing up.
-
-This sounds like adding a set of API that resembles spin_{unlock,lock}_irq.
-
-My gut feeling here is that while this may be useful and simple at
-certain places, it is somewhat error prone; a driver which would
-erroneously use this at the wrong place will end up enabling
-interrupts where it really shouldn't.
-
-Don't you feel that proving a simple spin_lock_irqsave-like API is
-actually safer and less error prone ?
-
-I guess that is one of the reasons why spin_lock_irqsave is much more
-popular than spin_lock_irq - people just know it will never screw up.
-
-Thanks,
-Ohad.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
