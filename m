@@ -1,55 +1,50 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 20 Oct 2010 00:19:13 +0000
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Tue, 19 Oct 2010 17:50:26 -0700
 Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <1287525825.9690.313.camel@groeck-laptop>
+In-Reply-To: <20101020001913.GI29120@kw.sim.vm.gnt>
 References: <20101017154021.GB29120@kw.sim.vm.gnt>
 	<1287330612-11256-1-git-send-email-simon@sequanux.org>
 	<1287525825.9690.313.camel@groeck-laptop>
-Message-ID: <20101020001913.GI29120@kw.sim.vm.gnt>
+	<20101020001913.GI29120@kw.sim.vm.gnt>
+Message-ID: <1287535826.9690.358.camel@groeck-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Simon,
 
-On Tue, Oct 19, 2010 at 03:03:45PM -0700, Guenter Roeck wrote:
-> Hi Simon,
+On Tue, 2010-10-19 at 20:19 -0400, Simon Guinot wrote:
+> Hi Guenter,
 > 
-> one more comment ...
+> On Tue, Oct 19, 2010 at 03:03:45PM -0700, Guenter Roeck wrote:
+> > Hi Simon,
+> > 
+> > one more comment ...
+> > 
+> > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
+> > [ ... ]
+> > > +static int __devinit
+> > > +fan_alarm_init(struct gpio_fan_data *fan_data, struct gpio_fan_alarm *alarm)
+> > > +{
+> > 
+> > __devinit and __devexit can cause problems if this driver is built into
+> > the kernel, but the underlying i2c master driver is built as module.
 > 
-> On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-> [ ... ]
-> > +static int __devinit
-> > +fan_alarm_init(struct gpio_fan_data *fan_data, struct gpio_fan_alarm *alarm)
-> > +{
-> 
-> __devinit and __devexit can cause problems if this driver is built into
-> the kernel, but the underlying i2c master driver is built as module.
+> I am not sure I understand this. Are you talking about a I2C GPIO
+> expander ? or about the hwmon registration process ?
 
-I am not sure I understand this. Are you talking about a I2C GPIO
-expander ? or about the hwmon registration process ?
+Not related to I2C specifically, since you don't use I2C. No idea why I
+mentioned I2C, really. Probably because I had I2C in my mind.
 
-For the first case, no I2C mean no GPIOs and the gpio-fan initialization
-will fail (because no GPIO chip available). There is nothing wrong with
-freeing the useless init functions.
+Anyway, there are gpio drivers which can be loaded and unloaded. GPIO
+pin(s) on one of those could point to the gpio-fan driver. If gpio-fan
+is built into the kernel, but the underlying gpio driver is built as
+module, loading the gpio driver might cause the gpio-fan probe function
+to be called - but that function no longer exists if it is tagged as
+__devinit.
 
-For the second case, let me know...
+Browsing through the gpio code, it seems the problem doesn't really
+exist, since the above scenario does not happen (unless I am missing
+something, of course). Also, other drivers using gpio calls also use
+__devinit and __devexit. So just ignore what I said.
 
-Not really related, but there is too much __devinit and __devexit
-declarations in the first patch version. Thanks to the compiler, all
-this functions are inlined in the good place.
-
-> 
-> So please remove __devinit and __devexit.
-
-I will if you tell me why :)
-
-Thanks,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101020/f0e121e2/attachment.sig>
+Guenter
