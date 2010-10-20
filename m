@@ -1,25 +1,26 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 20 Oct 2010 07:08:20 +0200
-Subject: net{space,xbig} TCLK determination
-Message-ID: <20101020050820.GD12979@mail.wantstofly.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 20 Oct 2010 14:01:48 +0800
+Subject: [RFC, PATCH 0/5] unify definition of CLOCK_TICK_RATE across
+	different platforms
+In-Reply-To: <20101020045110.GW12979@mail.wantstofly.org>
+References: <20101020045110.GW12979@mail.wantstofly.org>
+Message-ID: <AANLkTi=WCAjAu0PGbtkXMQdX+FzXVZbwo60adhyT8sGb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 20, 2010 at 12:51 PM, Lennert Buytenhek
+<buytenh@wantstofly.org> wrote:
+> One of the things preventing building an ARM multiplatform kernel
+> image is the fact that CLOCK_TICK_RATE (and as a consequence, LATCH)
+> is defined differently for each ARM platform.
+>
+> The patches in this series:
+> - pull the per-platform CLOCK_TICK_RATE defines from <mach/timex.h>
+> ?into arch/arm/mach-foo/ (on those platforms that use the
+> ?CLOCK_TICK_RATE define and/or the LATCH define in their platform
+> ?support code);
+> - define CLOCK_TICK_RATE as a platform-independent value in <asm/timex.h>;
+> - get rid of all <mach/timex.h> include files.
+>
 
-The net{space,xbig} board support files have this:
-
-	static void netspace_v2_timer_init(void)
-	{
-		kirkwood_tclk = 166666667;
-		orion_time_init(IRQ_KIRKWOOD_BRIDGE, kirkwood_tclk);
-	}
-
-This is a pretty ugly hack -- if kirkwood_find_tclk() is not
-determining the right TCLK on these boards, then that would be the
-real bug, and it should be fixed there, and not by putting hacks
-like these in board support files.
-
-
-thanks,
-Lennert
+Excellent!
