@@ -1,51 +1,27 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 20 Oct 2010 08:48:26 +0000
-Subject: net{space,xbig} TCLK determination
-In-Reply-To: <20101020050820.GD12979@mail.wantstofly.org>
-References: <20101020050820.GD12979@mail.wantstofly.org>
-Message-ID: <20101020084826.GK29120@kw.sim.vm.gnt>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Wed, 20 Oct 2010 16:53:25 +0800
+Subject: [PATCH 0/2] babbage: support mmc device
+Message-ID: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lennert,
+The patches are to support mmc device on imx51 babbage board,
+based on Wolfram Sang's esdhc driver and Eric B?nard's device
+registration bits.
 
-On Wed, Oct 20, 2010 at 07:08:20AM +0200, Lennert Buytenhek wrote:
-> Hi,
-> 
-> The net{space,xbig} board support files have this:
-> 
-> 	static void netspace_v2_timer_init(void)
-> 	{
-> 		kirkwood_tclk = 166666667;
-> 		orion_time_init(IRQ_KIRKWOOD_BRIDGE, kirkwood_tclk);
-> 	}
-> 
-> This is a pretty ugly hack -- if kirkwood_find_tclk() is not
-> determining the right TCLK on these boards, then that would be the
-> real bug, and it should be fixed there, and not by putting hacks
-> like these in board support files.
+The patches were tested on babbage with Sascha's tree
 
-In the Marvell LSP, TCLK detection is based on the Sample at Reset
-Register bit 21. There is no description about this bit usage in the
-Kirkwood functional specification document.
-The given result _seems_ to be correct for the boards on my desk, but
-I have no idea how this way is reliable...
+ git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-2.6.37
 
-I simply don't have the needed platform knowledge to solve this issue.
-So, if you want me to fix kirkwood_find_tclk(), you will have to give
-more hints.
+merging mmc-next branch of cjb's tree below.
 
-The lacie_v2_timer_init() function is maybe a ugly hack but that is
-the only I found. My concern was to avoid breaking TCLK detection for
-other boards.
+ git://git.kernel.org/pub/scm/linux/kernel/git/cjb/mmc.git
 
-Thanks,
+Shawn Guo (2):
+ [PATCH 1/2] mmc: quirk fix for timeout problem
+ [PATCH 2/2] babbage: esdhc device registration
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101020/a2471756/attachment.sig>
+ arch/arm/mach-mx5/Kconfig              |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c |   19 +++++++++++++++++++
+ drivers/mmc/host/sdhci-esdhc-imx.c     |    3 ++-
+ 3 files changed, 22 insertions(+), 1 deletions(-)
