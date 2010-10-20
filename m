@@ -1,79 +1,82 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 20 Oct 2010 14:01:13 +0200
-Subject: [patch 8/9] efikamx: add spi nor support
-In-Reply-To: <20101020112659.GK2562@matterhorn.lan> (Amit Kucheria's message
-	of "Wed\, 20 Oct 2010 14\:26\:59 +0300")
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 Oct 2010 14:10:55 +0200
+Subject: [patch 3/9] imx51: enhance/fix iomux configuration
+In-Reply-To: <871v7lcgvl.fsf@lechat.rtp-net.org>
 References: <20101019204253.162641893@rtp-net.org>
-	<20101019205301.326830829@rtp-net.org>
-	<20101020112659.GK2562@matterhorn.lan>
-Message-ID: <87wrpdax9y.fsf@lechat.rtp-net.org>
+	<20101019205254.232673283@rtp-net.org>
+	<20101020100052.GM28166@pengutronix.de>
+	<871v7lcgvl.fsf@lechat.rtp-net.org>
+Message-ID: <20101020121055.GN28166@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Kucheria <amit.kucheria@linaro.org> writes:
-Hi,
+On Wed, Oct 20, 2010 at 12:12:30PM +0200, Arnaud Patard wrote:
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+> 
+> Hi,
+> 
+> > On Tue, Oct 19, 2010 at 10:42:56PM +0200, Arnaud Patard wrote:
+> >> - ALT0 is used to set GPIO mode of GPIO_1_{2,3,4,5,6,7,8,9} but it's ALT1
+> >> for GPIO_1_{0,1}.
+> >> - add definition to configure pads as ESDHC{1,2} WP and CD
+> >> 
+> >> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> >> Index: linux-2.6/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> >> ===================================================================
+> >> --- linux-2.6.orig/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-16 22:22:06.000000000 +0200
+> >> +++ linux-2.6/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-16 22:23:22.000000000 +0200
+> >> @@ -366,20 +366,24 @@
+> >>  							MX51_SDHCI_PAD_CTRL)
+> >>  #define MX51_PAD_SD2_DATA3__SD2_DATA3		IOMUX_PAD(0x7D0, 0x3C8, IOMUX_CONFIG_SION, 0x0, 0, \
+> >>  							MX51_SDHCI_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_0__ESDHC1_CD		IOMUX_PAD(0x7B4, 0x3AC, 0, 0x0,   0, MX51_I2C_PAD_CTRL)
+> > Is MX51_I2C_PAD_CTRL correct?  ditto for MX51_PAD_GPIO_1_1__ESDHC1_WP.
+> 
+> I was about to add something like MX51_ESDHC_PAD_CTRL but it turns out
+> that according to the original code I have, it would be the same thing
+> as I2C_PAD_CTRL.
+I'd prefer to have a seperate definition for that.  Using
+MX51_I2C_PAD_CTRL looks wrong even if it's correct.
+ 
+> >
+> >>  #define MX51_PAD_GPIO_1_0__GPIO_1_0		IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_1__ESDHC1_WP		IOMUX_PAD(0x7B8, 0x3B0, 0, 0x0,   0, MX51_I2C_PAD_CTRL)
+> >>  #define MX51_PAD_GPIO_1_1__GPIO_1_1		IOMUX_PAD(0x7B8, 0x3B0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >>  #define MX51_PAD_GPIO_1_2__I2C2_SCL		IOMUX_PAD(0x7D4, 0x3CC, (2 | IOMUX_CONFIG_SION), \
+> >>  							0x9b8,   3, MX51_I2C_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >>  #define MX51_PAD_GPIO_1_3__I2C2_SDA		IOMUX_PAD(0x7D8, 0x3D0, (2 | IOMUX_CONFIG_SION), \
+> >>  							0x9bc,   3, MX51_I2C_PAD_CTRL)
+> >>  #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> -#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_7__ESDHC2_WP		IOMUX_PAD(0x810, 0x3E4, 6, 0x0,   0, MX51_I2C_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_8__ESDHC2_CD		IOMUX_PAD(0x814, 0x3E8, 6, 0x0,   0, MX51_I2C_PAD_CTRL)
+> >> +#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> > Maybe make this in two patches?  One fix and one to add new definitions?
+> 
+> ok. makes sense. will split the patch.
+> 
+> Thanks,
+> Arnaud
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> On 10 Oct 19, Arnaud Patard wrote:
->> On efikamx, uboot is stored on a nor spi flash. Add support for it
->> 
->> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> Index: linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c
->> ===================================================================
->> --- linux-2.6.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-16 14:21:24.000000000 +0200
->> +++ linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-16 15:34:12.000000000 +0200
->> @@ -24,6 +24,8 @@
->>  #include <linux/delay.h>
->>  #include <linux/io.h>
->>  #include <linux/fsl_devices.h>
->> +#include <linux/spi/flash.h>
->> +#include <linux/spi/spi.h>
->>  
->>  #include <mach/common.h>
->>  #include <mach/hardware.h>
->> @@ -52,6 +54,9 @@
->>  
->>  #define EFIKAMX_POWER_KEY	(1*32+31)
->>  
->> +#define EFIKAMX_SPI_CS0		(3*32+24)
->> +#define EFIKAMX_SPI_CS1		(3*32+25)
->
-> It is just a style thing, but could you make this (3*32 + 24). Makes it
-> easier on the eyes to read "4th gpio bank, 24th pin"
-
-I've used X*32+Y without space in all patches. So, you prefer that I
-change the other places too ?
-
->
->>  /* the pci ids pin have pull up. they're driven low according to board id */
->>  #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
->>  #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
->> @@ -99,6 +104,14 @@
->>  
->>  	/* power key */
->>  	MX51_PAD_PWRKEY,
->> +
->> +	/* spi */
->> +	MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI,
->> +	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
->> +	MX51_PAD_CSPI1_SS0__GPIO_4_24,
->> +	MX51_PAD_CSPI1_SS1__GPIO_4_25,
->> +	MX51_PAD_CSPI1_RDY__ECSPI1_RDY,
->> +	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
->>  };
->>  
->>  /* Serial ports */
->> @@ -252,6 +265,47 @@
->>  	},
->>  };
->>  
->> +static struct mtd_partition mx51_efikamx_spi_nor_partitions[] = {
->> +	{
->> +	 .name = "u-boot",
->
-> "bootloader" ?
-
-I don't really mind if it's "u-boot" or "bootloader". It's just a name
-after all. Will change to bootloader and if someone disagree, he'll have
-to send a new patch imho.
-
-Arnaud
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
