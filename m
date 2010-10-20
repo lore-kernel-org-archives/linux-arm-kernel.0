@@ -1,101 +1,31 @@
-From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Wed, 20 Oct 2010 14:36:02 -0200
-Subject: [PATCH] MX27 3ds: Add SDHC1 support to mx27 3ds
-Message-ID: <4CBF1A72.70701@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 20 Oct 2010 14:31:38 -0200
+Subject: [PATCH] ARM: pcm043 micrell ksz8041nl phy support
+In-Reply-To: <201010201757.34531.tstone@iss.tu-darmstadt.de>
+References: <201010201757.34531.tstone@iss.tu-darmstadt.de>
+Message-ID: <AANLkTikpzT0LtzLBdzmXdBc0CcWJMYVNKMOF1cZe+_SV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SDHC1 support to MX27 3ds
+Hi Tim,
 
-Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+On Wed, Oct 20, 2010 at 1:57 PM, Tim Sander <tstone@iss.tu-darmstadt.de> wrote:
+> Hi
+>
+> This patch add the missing support for the phy used on the phytec pcm043 boards.
+> Please consider for mainline. Tested on pcm043 hardware.
+>
+> Best regards
+> Tim
+>
+> Signed-off-by: Tim Sander <tim.sander@hbm.com>
+>
+> ---
+> ?drivers/net/fec.c | ? 39 +++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 39 insertions(+), 0 deletions(-)
 
----
-  arch/arm/mach-imx/mach-mx27_3ds.c |   38 
-+++++++++++++++++++++++++++++++++++++
-  1 files changed, 38 insertions(+), 0 deletions(-)
+As your patch touches drivers/net/fec.c you need to copy netdev mailing list.
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c 
-b/arch/arm/mach-imx/mach-mx27_3ds.c
-index a69dba2..a02a00a 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -23,16 +23,20 @@
-  #include <linux/platform_device.h>
-  #include <linux/gpio.h>
-  #include <linux/input/matrix_keypad.h>
-+#include <linux/irq.h>
-  #include <asm/mach-types.h>
-  #include <asm/mach/arch.h>
-  #include <asm/mach/time.h>
-  #include <mach/hardware.h>
-  #include <mach/common.h>
-  #include <mach/iomux-mx27.h>
-+#include <mach/mmc.h>
+Regards,
 
-  #include "devices-imx27.h"
-  #include "devices.h"
-
-+#define SD1_EN_GPIO (GPIO_PORTB + 25)
-+
-  static const int mx27pdk_pins[] __initconst = {
-      /* UART1 */
-      PE12_PF_UART1_TXD,
-@@ -58,6 +62,14 @@ static const int mx27pdk_pins[] __initconst = {
-      PD15_AOUT_FEC_COL,
-      PD16_AIN_FEC_TX_ER,
-      PF23_AIN_FEC_TX_EN,
-+    /* SDHC1 */
-+    PE18_PF_SD1_D0,
-+    PE19_PF_SD1_D1,
-+    PE20_PF_SD1_D2,
-+    PE21_PF_SD1_D3,
-+    PE22_PF_SD1_CMD,
-+    PE23_PF_SD1_CLK,
-+    SD1_EN_GPIO | GPIO_GPIO | GPIO_OUT,
-  };
-
-  static const struct imxuart_platform_data uart_pdata __initconst = {
-@@ -85,13 +97,39 @@ static struct matrix_keymap_data 
-mx27_3ds_keymap_data = {
-      .keymap_size    = ARRAY_SIZE(mx27_3ds_keymap),
-  };
-
-+static int mx27_3ds_sdhc1_init(struct device *dev, irq_handler_t 
-detect_irq,
-+                void *data)
-+{
-+    return request_irq(IRQ_GPIOB(26), detect_irq, IRQF_TRIGGER_FALLING |
-+            IRQF_TRIGGER_RISING, "sdhc1-card-detect", data);
-+}
-+
-+static void mx27_3ds_sdhc1_exit(struct device *dev, void *data)
-+{
-+    free_irq(IRQ_GPIOB(26), data);
-+}
-+
-+static struct imxmmc_platform_data sdhc1_pdata = {
-+    .init = mx27_3ds_sdhc1_init,
-+    .exit = mx27_3ds_sdhc1_exit,
-+};
-+
-+static void mx27_3ds_sdhc1_enable_level_translator(void)
-+{
-+    /* Turn on TXB0108 OE pin */
-+    gpio_request(SD1_EN_GPIO, "sd1_enable");
-+    gpio_direction_output(SD1_EN_GPIO, 1);
-+}
-+
-  static void __init mx27pdk_init(void)
-  {
-      mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
-          "mx27pdk");
-+    mx27_3ds_sdhc1_enable_level_translator();
-      imx27_add_imx_uart0(&uart_pdata);
-      imx27_add_fec(NULL);
-      mxc_register_device(&imx_kpp_device, &mx27_3ds_keymap_data);
-+    mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
-  }
-
-  static void __init mx27pdk_timer_init(void)
--- 
-1.7.0.4
+Fabio Estevam
