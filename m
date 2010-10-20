@@ -1,52 +1,103 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 Oct 2010 15:09:03 +0200
-Subject: [PATCH] ARM: imx: change mx51.h into mx5x.h
-In-Reply-To: <20101020113550.GL2562@matterhorn.lan>
-References: <1287525423-22329-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101020090122.GH28166@pengutronix.de>
-	<20101020113550.GL2562@matterhorn.lan>
-Message-ID: <20101020130903.GA19834@pengutronix.de>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 20 Oct 2010 18:41:54 +0530
+Subject: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for MMC1
+In-Reply-To: <AANLkTikBcUZjMEAa1AuAdVohLkbVXki0nW4NpBOC-hJJ@mail.gmail.com>
+References: <9408.10.24.255.18.1285348400.squirrel@dbdmail.itg.ti.com>
+	<AANLkTi=YvtrfmUTc-YBAUjEXn1v3pPLmhb92J60AhU28@mail.gmail.com>
+	<AANLkTim5d6XP0nuJLF2DxDGP2DuBK5VUajd=YhXQnT2C@mail.gmail.com>
+	<AANLkTi=oX7CT8RF39kT-7niutF3PEeSeC1A_L5TcWuO4@mail.gmail.com>
+	<AANLkTim1H=qam8Sjbv_EUXGtf09TObTViYMiN17uMFQ1@mail.gmail.com>
+	<20101001112926.GC3064@sortiz-mobl>
+	<AANLkTims1qZ_X9F4rzkJE9Gat_pwWZxO2nPkRTpa6Cc5@mail.gmail.com>
+	<EAF47CD23C76F840A9E7FCE10091EFAB030CDFE0BB@dbde02.ent.ti.com>
+	<AANLkTikBcUZjMEAa1AuAdVohLkbVXki0nW4NpBOC-hJJ@mail.gmail.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB035EA828BC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Amit,
 
-On Wed, Oct 20, 2010 at 02:35:50PM +0300, Amit Kucheria wrote:
-> On 10 Oct 20, Uwe Kleine-K?nig wrote:
-> > Hello Dinh,
-> > 
-> > On Tue, Oct 19, 2010 at 04:57:03PM -0500, Dinh.Nguyen at freescale.com wrote:
-> > > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> > > 
-> > > In preparation for submitting i.MX53 support, change mx51.h to
-> > > mx5x.h so that mx5x.h can contain MX53 information as well.
-> > Last time I found time to clean up the imx ports I worked hard that e.g.
-> > mx27 machines only used MX27_ prefixed symbols, not the MX2x_ ones.  (I
-> > don't remember off-hand if I was done, so there might be a few users
-> > left.)
-> > 
-> > I'd prefer to just add an mx53.h instead.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of kishore kadiyala
+> Sent: Friday, October 01, 2010 8:15 PM
+> To: Varadarajan, Charulatha
+> Cc: Samuel Ortiz; linux-mmc at vger.kernel.org; linux-omap at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; tony at atomide.com; akpm at linux-
+> foundation.org; Chikkature Rajashekar, Madhusudhan;
+> adrian.hunter at nokia.com
+> Subject: Re: [PATCH v4 1/4] omap4 hsmmc: Adding card detect support for
+> MMC1
 > 
-> Perhaps this is a good time to ask the question - Why?
+> On Fri, Oct 1, 2010 at 8:11 PM, Varadarajan, Charulatha <charu@ti.com>
+> wrote:
+> >
+> > <<snip>>
+> >
+> >> >> >>>> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+> >> >> >>>> index 6de90bf..e64894c 100644
+> >> >> >>>> --- a/include/linux/i2c/twl.h
+> >> >> >>>> +++ b/include/linux/i2c/twl.h
+> >> >> >>>> @@ -141,6 +141,16 @@
+> >> >> >>>> ?#define TWL6030_CHARGER_CTRL_INT_MASK ?0x10
+> >> >> >>>> ?#define TWL6030_CHARGER_FAULT_INT_MASK ? ? ? ? 0x60
+> >> >> >>>>
+> >> >> >>>> +#define TWL6030_MMCCTRL ? ? ? ? ? ? ? ?0xEE
+> >> >> >>>> +#define VMMC_AUTO_OFF ? ? ? ? ? ? ? ? ?(0x1 << 3)
+> >> >> >>>> +#define SW_FC ? ? ? ? ? ? ? ? ? ? ? ? ?(0x1 << 2)
+> >> >> >>>> +#define STS_MMC ? ? ? ? ? ? ? ? ? ? ? ?0x1
+> >> >> >>>> +
+> >> >> >>>> +#define TWL6030_CFG_INPUT_PUPD3 ? ? ? ?0xF2
+> >> >> >>>> +#define MMC_PU ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 3)
+> >> >> >>>> +#define MMC_PD ? ? ? ? ? ? ? ? ? ? ? ? (0x1 << 2)
+> >> >> >>>> +
+> >> >> >>>> +
+> >> >> >>>>
+> >> >> >>>> ?#define TWL4030_CLASS_ID ? ? ? ? ? ? ? 0x4030
+> >> >> >>>> ?#define TWL6030_CLASS_ID ? ? ? ? ? ? ? 0x6030
+> >> >> >>>> @@ -173,6 +183,27 @@ int twl_i2c_read(u8 mod_no, u8
+> >> *value, u8 reg, unsigned num_bytes);
+> >> >> >>>> ?int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
+> >> >> >>>> ?int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+> >> >> >>>>
+> >> >> >>>> +/* Card detect Configuration for MMC1 Controller on OMAP4 */
+> >> >> >>>> +#ifdef CONFIG_TWL4030_CORE
+> >> >> >>>> +int twl6030_mmc_card_detect_config(void);
+> >> >> >>>> +#else
+> >> >> >>>> +static inline int twl6030_mmc_card_detect_config(void)
+> >> >> >>>> +{
+> >> >> >>>> + ? ? ? pr_debug("twl6030_mmc_card_detect_config not
+> >> supported\n");
+> >> >> >>>> + ? ? ? return 0;
+> >> >> >>>> +}
+> >> >> >>>> +#endif
+> >> >> >>>> +
+> >> >> >>>> +/* MMC1 Controller on OMAP4 uses Phoenix irq for
+> >> Card detect */
+> >> >> >>>> +#ifdef CONFIG_TWL4030_CORE
+> >> >> >>>> +int twl6030_mmc_card_detect(struct device *dev, int slot);
+> >> >> >>>> +#else
+> >> >> >>>> +static inline int twl6030_mmc_card_detect(struct
+> >> device *dev, int slot)
+> >> >> >>>> +{
+> >> >> >>>> + ? ? ? pr_debug("Call back twl6030_mmc_card_detect
+> >> not supported\n");
+> >
+> > Use dev_dbg() instead of pr_debug...
+> > Same comment applies across this patch series whereever pr_err/pr_debug
+> > APIs are used.
 > 
-> mx53.h will duplicate (almost) everything in mx51.h. And any fixes made to
-> mx51.h won't make it to mx53.h
-Yep, that's the pro side of having a single header file for both mx51
-and mx53.  On the negative side we have:
-
- - When changing mx5x.h you always have to check (now) two reference
-   manuals, later maybe more.
- - When Freescale decides to create a (say) mx56 that is totally
-   different, you can be happy not to have constants starting with MX5X.
-   (This happened to the MX2X constants when Freescale created mx25, not
-   to mention mx23 and mx28.)
-
-I admit that *now* it would be easier to just rename mx51.h to mx5x.h,
-but for the long run keeping mx51.h is better, I'm sure.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Couldn't get it  how it makes a difference ? could you explain
+One things which I can think of is dev_dbg() would contain the
+device name so that you know which device the error is associated with.
+-tarun
+> 
+> >
+> >> >> >>>> + ? ? ? return -EIO;
+> >> >> >>>> +}
+> >> >> >>>> +#endif
+> >
+> > <<snip>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
