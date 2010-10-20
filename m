@@ -1,50 +1,49 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 20 Oct 2010 12:00:59 +0200
-Subject: [PATCH 0/3] Add OMAP hardware spinlock misc driver
-In-Reply-To: <AANLkTikPnm1NK1wGGzbOuNoCOnAcSp=RC8mTW2yx3u0s@mail.gmail.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287531090.9245.139.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTikPnm1NK1wGGzbOuNoCOnAcSp=RC8mTW2yx3u0s@mail.gmail.com>
-Message-ID: <AANLkTimSL3UN6V45-+x7+wyT9Oz1Jfy+LesAUxMcPNqd@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 20 Oct 2010 12:05:54 +0200
+Subject: [PATCH v2 1/1] mx35pdk: add debug board support
+In-Reply-To: <1287567283-19488-1-git-send-email-jgq516@gmail.com>
+References: <1287567283-19488-1-git-send-email-jgq516@gmail.com>
+Message-ID: <20101020100553.GD2691@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resubmitting due to l-o being dropped from this discussion fork.
-Thanks Russell for catching this]
+Hi jgq516,
 
- On Wed, Oct 20, 2010 at 1:31 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> On Mon, 2010-10-18 at 09:44 +0200, Ohad Ben-Cohen wrote:
->> OMAP4 introduces a Spinlock hardware module, which provides hardware
->> assistance for synchronization and mutual exclusion between heterogeneous
->> processors and those not operating under a single, shared operating system
->> (e.g. OMAP4 has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP).
->>
->> The intention of this hardware module is to allow remote processors,
->> that have no alternative mechanism to accomplish synchronization and mutual
->> exclusion operations, to share resources (such as memory and/or any other
->> hardware resource).
->>
->> This patchset adds a new misc driver for this OMAP hwspinlock module.
->
-> Does this code interface with some hardware unit (other than the other
-> processors) to accomplish this locking ?
+On Wed, Oct 20, 2010 at 05:34:43PM +0800, jgq516 at gmail.com wrote:
+> From: Xiao Jiang <jgq516@gmail.com>
+> 
+> Enable debug board support for mx35pdk. As suggested
+> by Fabio, add MXC_DEBUG_BOARD config and redefinition
+> EXPIO_PARENT_INT.
+> 
+> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mx3/Kconfig         |    1 +
+>  arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+> index 85beece..cdf6ac5 100644
+> --- a/arch/arm/mach-mx3/Kconfig
+> +++ b/arch/arm/mach-mx3/Kconfig
 
- Yes, it's a special-purpose hardware peripheral.
+[snip]
 
-> The reason I ask is because MSM has similar code, and from what I can
-> tell the MSM version has some structures in memory but that's all. It
-> just operates on the structures in memory.
+> @@ -95,6 +99,10 @@ static void __init mxc_board_init(void)
+>  	imx35_add_imx_uart0(&uart_pdata);
+>  
+>  	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+> +
+> +	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+> +		pr_warn("Init of the debugboard failed, all "
+> +			"devices on the board are unusable.\n");
+                            ^^^^^
+You probably mean debugboard here. I'd change the wording.
 
- That's interesting.
+baruch
 
- We did have thoughts of making this a generic framework, in the hope
- that it would be useful for other vendors too, but we didn't find
- additional users.
-
-> It might be worth looking over the two implementation so we aren't both
-> remaking the wheel.
-
- Indeed. Where is that MSM code ?
-
- Thanks,
- Ohad.
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
