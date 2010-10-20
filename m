@@ -1,50 +1,42 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Tue, 19 Oct 2010 17:50:26 -0700
-Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <20101020001913.GI29120@kw.sim.vm.gnt>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<1287525825.9690.313.camel@groeck-laptop>
-	<20101020001913.GI29120@kw.sim.vm.gnt>
-Message-ID: <1287535826.9690.358.camel@groeck-laptop>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 20 Oct 2010 14:20:14 +1300
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <87bp6pviwf.fsf@deeprootsystems.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>	<1287387875-14168-4-git-send-email-ohad@wizery.com>	<87r5fmxghm.fsf@deeprootsystems.com>	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+Message-ID: <4CBE43CE.404@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, 2010-10-19 at 20:19 -0400, Simon Guinot wrote:
-> Hi Guenter,
+On 10/20/2010 12:53 PM, Kevin Hilman wrote:
+> Ohad Ben-Cohen <ohad@wizery.com> writes:
 > 
-> On Tue, Oct 19, 2010 at 03:03:45PM -0700, Guenter Roeck wrote:
-> > Hi Simon,
-> > 
-> > one more comment ...
-> > 
-> > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-> > [ ... ]
-> > > +static int __devinit
-> > > +fan_alarm_init(struct gpio_fan_data *fan_data, struct gpio_fan_alarm *alarm)
-> > > +{
-> > 
-> > __devinit and __devexit can cause problems if this driver is built into
-> > the kernel, but the underlying i2c master driver is built as module.
+>> On Tue, Oct 19, 2010 at 7:03 PM, Kevin Hilman
+>> <khilman@deeprootsystems.com> wrote:
+>>>> +postcore_initcall(hwspinlocks_init);
+>>>
+>>> Any reason this needs to be a postcore_initcall?  Are there users of
+>>> hwspinlocks this early in boot?
+>>
+>> i2c-omap, which is subsys_initcall (the I2C bus is shared between the
+>> A9 and the M3 on some OMAP4 boards).
 > 
-> I am not sure I understand this. Are you talking about a I2C GPIO
-> expander ? or about the hwmon registration process ?
+> Rather than moving towards having more drivers have to be built in (and
+> depend on their probe order) we need to be moving towards building all
+> these drivers as modules, including omap-i2c.
 
-Not related to I2C specifically, since you don't use I2C. No idea why I
-mentioned I2C, really. Probably because I had I2C in my mind.
+The issue of probe order still needs to be resolved for those of us who
+do want all the drivers built into the kernel. Everything comes out in
+the wash already if everything is built as modules by installing the
+modules in the correct order right?
 
-Anyway, there are gpio drivers which can be loaded and unloaded. GPIO
-pin(s) on one of those could point to the gpio-fan driver. If gpio-fan
-is built into the kernel, but the underlying gpio driver is built as
-module, loading the gpio driver might cause the gpio-fan probe function
-to be called - but that function no longer exists if it is tagged as
-__devinit.
+~Ryan
 
-Browsing through the gpio code, it seems the problem doesn't really
-exist, since the above scenario does not happen (unless I am missing
-something, of course). Also, other drivers using gpio calls also use
-__devinit and __devexit. So just ignore what I said.
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Guenter
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
