@@ -1,32 +1,24 @@
 From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 20 Oct 2010 10:13:17 +0200
-Subject: [patch 9/9] efikamx: add reset
-In-Reply-To: <636242.78053.qm@web51007.mail.re2.yahoo.com> (Fabio Estevam's
-	message of "Tue\, 19 Oct 2010 16\:51\:20 -0700 \(PDT\)")
-References: <636242.78053.qm@web51007.mail.re2.yahoo.com>
-Message-ID: <87vd4xcmea.fsf@lechat.rtp-net.org>
+Date: Wed, 20 Oct 2010 10:14:50 +0200
+Subject: [patch 3/9] imx51: enhance/fix iomux configuration
+In-Reply-To: <20101019210422.GZ28242@pengutronix.de> (Sascha Hauer's message
+	of "Tue\, 19 Oct 2010 23\:04\:22 +0200")
+References: <20101019204253.162641893@rtp-net.org>
+	<20101019205254.232673283@rtp-net.org>
+	<20101019210422.GZ28242@pengutronix.de>
+Message-ID: <87r5flcmbp.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam <fabioestevam@yahoo.com> writes:
-
-> Hi Arnaud,
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
 Hi,
->
-> --- On Tue, 10/19/10, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> ...
->> +void mx51_efikamx_reset(int mode, const char *cmd)
->> +{
->> +??? if (system_rev == 0x11)
->> +??? ???
->
-> Couldn't it be void mx51_efikamx_reset(void) instead?
->
-> 'mode' and 'cmd' are not being used.
 
-I took the same prototype as arch_reset() but I can remove it (and will
-do).
+ >
+> Some of these are used in 2/9, right? So this patch should be before
+> 2/9.
 
-Thanks,
+oh, yeah. sorry. I've reorder the series for some tests and manage to
+get this wrong. Will fix.
+
 Arnaud
