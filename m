@@ -1,82 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Oct 2010 23:28:45 +0200
-Subject: [PATCH 3/6] ARM Realview PCIX map include file changes
-In-Reply-To: <20101020130305.22199.2458.stgit@e102602-lin.cambridge.arm.com>
-References: <20101020125554.22199.78597.stgit@e102602-lin.cambridge.arm.com>
-	<20101020130305.22199.2458.stgit@e102602-lin.cambridge.arm.com>
-Message-ID: <201010202328.45993.arnd@arndb.de>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Thu, 21 Oct 2010 01:31:41 +0400
+Subject: [PATCH 2/6] serial: Add support for UART on VIA VT8500 and
+	compatibles
+In-Reply-To: <20101020211643.GA10006@suse.de>
+References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
+	<1287608139-21354-2-git-send-email-alchark@gmail.com>
+	<20101020211643.GA10006@suse.de>
+Message-ID: <AANLkTikGiYvXgLs5eRQ9ghmatccBQJSdS3qwEHZN_3NF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 October 2010 15:03:05 Colin Tuckley wrote:
-> This patch adds the memory map PCI support to the include
-> files for the Realview Northbridge based boards.
-> 
->  #include <asm/sizes.h>
-> +#include <asm/mach-types.h>
-> +
-> +/*
-> + * PCI space virtual addresses
-> + */
-> +#define REALVIEW_PCI_VIRT_BASE		0xF8000000
-> +#define REALVIEW_PCI_CFG_VIRT_BASE	0xF9000000
-> +#define PCIX_UNIT_BASE			0xF8000000
-> +#define REALVIEW_PCI_IO_VBASE		0xFA000000
+2010/10/21 Greg KH <gregkh@suse.de>:
+> On Thu, Oct 21, 2010 at 12:55:34AM +0400, Alexey Charkov wrote:
+>> This adds a driver for the serial ports found in VIA and WonderMedia
+>> Systems-on-Chip. Interrupt-driven FIFO operation is implemented.
+>> The hardware also supports pure register-based operation (which is
+>> slower) and DMA-based FIFO operation. As the FIFOs are only 16 bytes
+>> long, DMA operation is probably not worth the hassle.
+>>
+>> Signed-off-by: Alexey Charkov <alchark@gmail.com>
+>> ---
+>>
+>> Please review and state whether this could be acceptable for a merge
+>> to mainline in the coming 2.6.37 window.
+>
+> .37? ?Aren't you cutting it a bit close here? ?My trees unofficially
+> closed a few days or so ago for new stuff to go to .37, what kept this
+> from being sent previously?
+>
 
-Please use the correct type virt base definition, i.e. void __iomem *, so you can
-use readl/writel on them.
+In fact, I'm somewhat new to kernel development, and have not yet
+understood the good timings to do things properly. My view was that
+the merge window is when new stuff should be submitted, while
+everything in between is devoted to fixing breakage just introduced.
+So, I must have been wrong :)
 
-We should also coordinate this with the xilinx PCI patches that I sent.
-We are both using the same virtual base for the IO range (fa00000),
-but I named the macro differently (REALVIEW_PCI_IO_VIRT_BASE). I'm fine
-either way, but there is no point having two different names for the
-same thing.
+>> If possible, I would deeply appreciate a merge to a relevant git tree
+>> for integration prior to asking Linus to pull the changes. I could
+>> rebase the code if needed, currently this is against Linus' master
+>> branch.
+>>
+>> This patch relies on the basic architecture support for VT8500/WM8505
+>> to be in place, as introduced by PATCH 1/6 in this series.
+>
+> So it will just fail to build without that patch?
+>
 
-> +/*
-> + * PCI space physical addresses and sizes
-> + */
-> +#define REALVIEW_PB_PCI_BASE		0x90040000	/* PCI-X Unit base */
-> +#define REALVIEW_PB_PCI_BASE_SIZE	0x00010000	/* 4 Kb + 60Kb reserved */
-> +#define REALVIEW_PB_PCI_IO_BASE		0x90050000	/* IO Region on AHB */
-> +#define REALVIEW_PB_PCI_IO_SIZE		0x00010000	/* 64 Kb */
-> +#define REALVIEW_PB_PCI_IO_LIMIT       (REALVIEW_PB_PCI_IO_BASE + REALVIEW_PB_PCI_IO_SIZE - 1)
-> +#define REALVIEW_PB_PCI_MEM_BASE	0xA0000000	/* MEM Region on AHB */
-> +#define REALVIEW_PB_PCI_MEM_SIZE	0x20000000	/* 512 MB */
+It won't, and it should not even be selectable, as there is a Kconfig
+dependency on the relevant arch. It's just that it would be useless
+without the relevant arch support.
 
-The naming for these seems screwed up -- it does not apply to all realview pb.
-
-> +/*
-> + * These are needed so that generic pci code doesn't know about our
-> + * machine specific details.
-> + */
-> +#define PCIBIOS_MIN_IO		pcibios_min_io()
-> +#define PCIBIOS_MIN_MEM		pcibios_min_mem()
-
-PCIBIOS_MIN_IO should always just be 0x1000, PCIBIOS_MIN_MEM is generally
-ignored.
-
->  #define IO_SPACE_LIMIT 0xffffffff
-
-IO_SPACE_LIMIT is also wrong, it should not be larger than the space you have
-reserved at 0xFA000000, possibly just 0xffff, which is enough in practice.
-
-> +static inline void __iomem *__io(unsigned long addr)
-> +{
-> +#ifdef CONFIG_PCI
-> +	/* check for PCI I/O space */
-> +	if (addr >= REALVIEW_PB_PCI_IO_BASE && addr <= REALVIEW_PB_PCI_IO_LIMIT)
-> +		return (void __iomem *)((addr - REALVIEW_PB_PCI_IO_BASE) + REALVIEW_PCI_IO_VBASE);
-> +	else
-> +		return (void __iomem *)addr;
-> +#else
-> +	return (void __iomem *)addr;
-> +#endif
-> +}
-
-No need for the #ifdef here, if you don't have PCI, nobody will call __io anyway.
-
-Just make this
-
-#define __io(x) (REALVIEW_PCI_IO_VBASE + x)
-
-	Arnd
+> thanks,
+>
+> greg k-h
+>
