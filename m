@@ -1,33 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 Oct 2010 11:29:35 -0200
-Subject: [PATCH v2 1/1] mx35pdk: add debug board support
-In-Reply-To: <AANLkTin1Y8u9NEUEtp7r0=Bx8Gbq-d5KE2koKZREQ5jz@mail.gmail.com>
-References: <1287567283-19488-1-git-send-email-jgq516@gmail.com>
-	<AANLkTin1Y8u9NEUEtp7r0=Bx8Gbq-d5KE2koKZREQ5jz@mail.gmail.com>
-Message-ID: <AANLkTimkcvdMP83a8Z_1Scz435v6nnsHfn2bZt3-o8Wo@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 20 Oct 2010 22:33:42 +0900
+Subject: [PATCH] ARM: S3C24XX: Fix the S3C24XX_VA_GPIO mapping
+Message-ID: <1287581622-8335-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 11:17 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Xiao.
->
-> On Wed, Oct 20, 2010 at 7:34 AM, ?<jgq516@gmail.com> wrote:
-> ...
->> ? ? ? ?mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
->> +
->> + ? ? ? if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
->> + ? ? ? ? ? ? ? pr_warn("Init of the debugboard failed, all "
->> + ? ? ? ? ? ? ? ? ? ? ? "devices on the board are unusable.\n");
->
-> ?' if (!mxc_expio_init' ?should be used here as I mentioned previously.
->
-> mxc_expio_init returns 0 if succesful.
+This patch changes the S3C24XX_VA_GPIO for to fix following BUG.
+BUG: not creating mapping for 0x56000000 at 0x01000000 in user region
 
+It is due to commit 8fecfe9d(ARM: SAMSUNG: Move the start address of
+Samsung SoCs' VA space) which changes S3C_ADDR_BASE from 0xF4000000
+to 0xFA000000.
 
-Ops, sorry.  'if (mxc_expio_init'  check is correct.
+Reported-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ arch/arm/plat-s3c24xx/include/plat/map.h |   14 +++-----------
+ 1 files changed, 3 insertions(+), 11 deletions(-)
 
-So I think the only thing you need to address in v3 is the comment from Baruch.
-
-Thanks,
-
-Fabio Estevam
+diff --git a/arch/arm/plat-s3c24xx/include/plat/map.h b/arch/arm/plat-s3c24xx/include/plat/map.h
+index bd534d3..771491e 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/map.h
++++ b/arch/arm/plat-s3c24xx/include/plat/map.h
+@@ -61,17 +61,9 @@
+ 
+ /* GPIO ports */
+ 
+-/* the calculation for the VA of this must ensure that
+- * it is the same distance apart from the UART in the
+- * phsyical address space, as the initial mapping for the IO
+- * is done as a 1:1 mapping. This puts it (currently) at
+- * 0xFA800000, which is not in the way of any current mapping
+- * by the base system.
+-*/
+-
+-#define S3C2410_PA_GPIO	   (0x56000000)
+-#define S3C24XX_VA_GPIO	   ((S3C24XX_PA_GPIO - S3C24XX_PA_UART) + S3C24XX_VA_UART)
+-#define S3C24XX_SZ_GPIO	   SZ_1M
++#define S3C2410_PA_GPIO		(0x56000000)
++#define S3C24XX_VA_GPIO		S3C2410_ADDR(0x00F00000)
++#define S3C24XX_SZ_GPIO		SZ_1M
+ 
+ 
+ /* ISA style IO, for each machine to sort out mappings for, if it
+-- 
+1.6.2.5
