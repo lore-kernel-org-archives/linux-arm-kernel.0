@@ -1,78 +1,28 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 20 Oct 2010 07:59:31 +0000
-Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <1287535826.9690.358.camel@groeck-laptop>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<1287525825.9690.313.camel@groeck-laptop>
-	<20101020001913.GI29120@kw.sim.vm.gnt>
-	<1287535826.9690.358.camel@groeck-laptop>
-Message-ID: <20101020075931.GJ29120@kw.sim.vm.gnt>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 20 Oct 2010 10:00:14 +0200
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <i9kk4o$svc$1@dough.gmane.org>
+References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
+	<201010191727.53314.alexander.stein@systec-electronic.com>
+	<i9kk4o$svc$1@dough.gmane.org>
+Message-ID: <201010201000.14905.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-On Tue, Oct 19, 2010 at 05:50:26PM -0700, Guenter Roeck wrote:
-> Hi Simon,
+On Tuesday 19 October 2010, 19:22:32 Grant Edwards wrote:
+> Yes, the AT91 UARTs do have a built-in half-duplex mode that will
+> automatically control line direction by toggling RTS.
 > 
-> On Tue, 2010-10-19 at 20:19 -0400, Simon Guinot wrote:
-> > Hi Guenter,
-> > 
-> > On Tue, Oct 19, 2010 at 03:03:45PM -0700, Guenter Roeck wrote:
-> > > Hi Simon,
-> > > 
-> > > one more comment ...
-> > > 
-> > > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-> > > [ ... ]
-> > > > +static int __devinit
-> > > > +fan_alarm_init(struct gpio_fan_data *fan_data, struct gpio_fan_alarm *alarm)
-> > > > +{
-> > > 
-> > > __devinit and __devexit can cause problems if this driver is built into
-> > > the kernel, but the underlying i2c master driver is built as module.
-> > 
-> > I am not sure I understand this. Are you talking about a I2C GPIO
-> > expander ? or about the hwmon registration process ?
+> That can used to control external half-duplex hardware like an RS485
+> transceiver or any RS232-connected half-duplex device like some
+> modems.
 > 
-> Not related to I2C specifically, since you don't use I2C. No idea why I
-> mentioned I2C, really. Probably because I had I2C in my mind.
+> Though the Atmel docs refer to it as "RS485 mode" there is no RS485
+> transceiver in the AT91 parts (AFAIK), and "RS485 mode" isn't specific
+> to RS485 - it can be used with any external half-duplex hardware.
 
-gpio-fan could use I2C implicitly if the GPIOs are provided by a GPIO
-I2C expander.
+Out of curiosity, how can I add RS485 (or whatever) support for other serial 
+devices like e.g. i.mx serial? Is there some driver independent interface 
+which only gets filled in board configs like setting some GPIO pins?
 
-> 
-> Anyway, there are gpio drivers which can be loaded and unloaded. GPIO
-> pin(s) on one of those could point to the gpio-fan driver. If gpio-fan
-> is built into the kernel, but the underlying gpio driver is built as
-> module, loading the gpio driver might cause the gpio-fan probe function
-> to be called - but that function no longer exists if it is tagged as
-> __devinit.
-
-IMHO, the gpio-fan probe function will be called anyway if a "gpio-fan"
-platform device is available. If the needed GPIOs are not registered at
-this time, gpio_request() will fail and the gpio-fan probe function will
-exit.
-
-Later, even if the GPIOs are registered (via gpiochip_add()), this will
-not trigger a gpio-fan probe.
-
-> 
-> Browsing through the gpio code, it seems the problem doesn't really
-> exist, since the above scenario does not happen (unless I am missing
-> something, of course). Also, other drivers using gpio calls also use
-> __devinit and __devexit. So just ignore what I said.
-
-Ok.
-
-Thanks,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101020/62a4f0e4/attachment.sig>
+Alexander
