@@ -1,48 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 20 Oct 2010 22:33:42 +0900
-Subject: [PATCH] ARM: S3C24XX: Fix the S3C24XX_VA_GPIO mapping
-Message-ID: <1287581622-8335-1-git-send-email-kgene.kim@samsung.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 20 Oct 2010 16:09:22 +0200
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <AANLkTimTDCbLP+EeUeo35re0FrMvqV3ozU+v7DZXr_p3@mail.gmail.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287387875-14168-4-git-send-email-ohad@wizery.com>
+	<87r5fmxghm.fsf@deeprootsystems.com>
+	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<AANLkTimTDCbLP+EeUeo35re0FrMvqV3ozU+v7DZXr_p3@mail.gmail.com>
+Message-ID: <AANLkTikE_WtBJQOJDNFGcW_4fW+FPvTBCHfrKsaUgZZY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the S3C24XX_VA_GPIO for to fix following BUG.
-BUG: not creating mapping for 0x56000000 at 0x01000000 in user region
+On Wed, Oct 20, 2010 at 1:12 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Tue, Oct 19, 2010 at 3:02 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+...
+>> i2c-omap, which is subsys_initcall (the I2C bus is shared between the
+>> A9 and the M3 on some OMAP4 boards).
+...
+> Man. this is getting ugly. ?I think we need to discuss how to solve
+> this at the Plumbers micro-conference. It kind of fits in with the
+> whole embedded (ab)use of the device model topic anyway. Actually,
+> this particular case isn't bad, but the moving of i2c and spi busses
+> to an earlier initcall is just band-aiding the real problem of driver
+> probe order dependencies.
 
-It is due to commit 8fecfe9d(ARM: SAMSUNG: Move the start address of
-Samsung SoCs' VA space) which changes S3C_ADDR_BASE from 0xF4000000
-to 0xFA000000.
++1
 
-Reported-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/plat-s3c24xx/include/plat/map.h |   14 +++-----------
- 1 files changed, 3 insertions(+), 11 deletions(-)
+On Wed, Oct 20, 2010 at 1:53 AM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Rather than moving towards having more drivers have to be built in (and
+> depend on their probe order) we need to be moving towards building all
+> these drivers as modules, including omap-i2c.
 
-diff --git a/arch/arm/plat-s3c24xx/include/plat/map.h b/arch/arm/plat-s3c24xx/include/plat/map.h
-index bd534d3..771491e 100644
---- a/arch/arm/plat-s3c24xx/include/plat/map.h
-+++ b/arch/arm/plat-s3c24xx/include/plat/map.h
-@@ -61,17 +61,9 @@
- 
- /* GPIO ports */
- 
--/* the calculation for the VA of this must ensure that
-- * it is the same distance apart from the UART in the
-- * phsyical address space, as the initial mapping for the IO
-- * is done as a 1:1 mapping. This puts it (currently) at
-- * 0xFA800000, which is not in the way of any current mapping
-- * by the base system.
--*/
--
--#define S3C2410_PA_GPIO	   (0x56000000)
--#define S3C24XX_VA_GPIO	   ((S3C24XX_PA_GPIO - S3C24XX_PA_UART) + S3C24XX_VA_UART)
--#define S3C24XX_SZ_GPIO	   SZ_1M
-+#define S3C2410_PA_GPIO		(0x56000000)
-+#define S3C24XX_VA_GPIO		S3C2410_ADDR(0x00F00000)
-+#define S3C24XX_SZ_GPIO		SZ_1M
- 
- 
- /* ISA style IO, for each machine to sort out mappings for, if it
--- 
-1.6.2.5
++1
+
+This whole thing is a mess, and today it's being solved in the wrong,
+non-scalable and error-prone way.
+
+The question is whether we want to gate hwspinlock until this issue is solved ?
+
+On Wed, Oct 20, 2010 at 3:20 AM, Ryan Mallon <ryan@bluewatersys.com> wrote:
+> The issue of probe order still needs to be resolved for those of us who
+> do want all the drivers built into the kernel.
+
+What about doing something similar to the way suspend/resume and the
+device hierarchy interact ?
+
+device_resume waits for its parent to be resumed before waking up the
+device - this sounds similar to what ->probe() should do: wait for its
+device dependency to probe first (so in this case, i2c-omap should
+wait for hwspinlock).
+
+Conversely, device_suspend waits for all its children to be suspended
+before continuing, which sounds just like what ->remove() should do
+(so again, in this case, the hwspinlock device should wait for all its
+users to be removed before bailing).
+
+This is just a quick thought, I haven't even began to think of all the
+use cases and requirements.
