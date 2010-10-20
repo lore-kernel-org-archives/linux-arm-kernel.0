@@ -1,35 +1,87 @@
 From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Wed, 20 Oct 2010 14:02:59 +0100
-Subject: [PATCH 2/6] ARM: enable bridges in pci_common_init.
+Date: Wed, 20 Oct 2010 14:03:11 +0100
+Subject: [PATCH 4/6] ARM Realview PCIX IRQ include file changes
 In-Reply-To: <20101020125554.22199.78597.stgit@e102602-lin.cambridge.arm.com>
 References: <20101020125554.22199.78597.stgit@e102602-lin.cambridge.arm.com>
-Message-ID: <20101020130259.22199.47782.stgit@e102602-lin.cambridge.arm.com>
+Message-ID: <20101020130311.22199.41755.stgit@e102602-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a missing call to pci_enable_bridges() so that devices behind
-bridges get found by the pci bus scan.
+This patch adds the Interrupt definitions for the PCI
+support on the Realview boards.
 
-Signed-off-by: Chris Partington <chris.partington@arm.com>
+Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
 
- arch/arm/kernel/bios32.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-realview/include/mach/irqs-pb11mp.h |   11 +++++++++++
+ arch/arm/mach-realview/include/mach/irqs-pba8.h   |    7 ++++++-
+ arch/arm/mach-realview/include/mach/irqs-pbx.h    |    7 ++++++-
+ 3 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index c6273a3..d86fcd4 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -583,6 +583,11 @@ void __init pci_common_init(struct hw_pci *hw)
- 			 * Assign resources.
- 			 */
- 			pci_bus_assign_resources(bus);
-+
-+			/*
-+			 * Enable bridges
-+			 */
-+			pci_enable_bridges(bus);
- 		}
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h b/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
+index 34e255a..cd3e3e6 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
++++ b/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
+@@ -95,6 +95,17 @@
+ #define IRQ_PB11MP_TSPEN	(IRQ_PB11MP_GIC_START + 30)	/* Touchscreen pen */
+ #define IRQ_PB11MP_TSKPAD	(IRQ_PB11MP_GIC_START + 31)	/* Touchscreen keypad */
  
- 		/*
++/* These PCI/PCIe IRQ definitions are here as placeholders
++ * The PCI code actually calculates the irq used at runtime */
++#define IRQ_PB11MP_PCI0		(IRQ_PB11MP_GIC_START + 50)
++#define IRQ_PB11MP_PCI1		(IRQ_PB11MP_GIC_START + 51)
++#define IRQ_PB11MP_PCI2		(IRQ_PB11MP_GIC_START + 52)
++#define IRQ_PB11MP_PCI3		(IRQ_PB11MP_GIC_START + 53)
++#define IRQ_PB11MP_PCIE0	(IRQ_PB11MP_GIC_START + 54)
++#define IRQ_PB11MP_PCIE1	(IRQ_PB11MP_GIC_START + 55)
++#define IRQ_PB11MP_PCIE2	(IRQ_PB11MP_GIC_START + 56)
++#define IRQ_PB11MP_PCIE3	(IRQ_PB11MP_GIC_START + 57)
++
+ #define IRQ_PB11MP_SMC		-1
+ #define IRQ_PB11MP_SCTL		-1
+ 
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pba8.h b/arch/arm/mach-realview/include/mach/irqs-pba8.h
+index 4a88a4e..da6d583 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-pba8.h
++++ b/arch/arm/mach-realview/include/mach/irqs-pba8.h
+@@ -61,11 +61,16 @@
+ 
+ #define IRQ_PBA8_PMU		(IRQ_PBA8_GIC_START + 47)	/* Cortex-A8 PMU */
+ 
+-/* ... */
++/* These PCI/PCIe IRQ definitions are here as placeholders
++ * The PCI code actually calculates the irq used at runtime */
+ #define IRQ_PBA8_PCI0		(IRQ_PBA8_GIC_START + 50)
+ #define IRQ_PBA8_PCI1		(IRQ_PBA8_GIC_START + 51)
+ #define IRQ_PBA8_PCI2		(IRQ_PBA8_GIC_START + 52)
+ #define IRQ_PBA8_PCI3		(IRQ_PBA8_GIC_START + 53)
++#define IRQ_PBA8_PCIE0		(IRQ_PBA8_GIC_START + 54)
++#define IRQ_PBA8_PCIE1		(IRQ_PBA8_GIC_START + 55)
++#define IRQ_PBA8_PCIE2		(IRQ_PBA8_GIC_START + 56)
++#define IRQ_PBA8_PCIE3		(IRQ_PBA8_GIC_START + 57)
+ 
+ #define IRQ_PBA8_SMC		-1
+ #define IRQ_PBA8_SCTL		-1
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pbx.h b/arch/arm/mach-realview/include/mach/irqs-pbx.h
+index 206a300..f661702 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-pbx.h
++++ b/arch/arm/mach-realview/include/mach/irqs-pbx.h
+@@ -76,11 +76,16 @@
+ #define IRQ_PBX_PMU_CPU2        (IRQ_PBX_GIC_START + 46)
+ #define IRQ_PBX_PMU_CPU3        (IRQ_PBX_GIC_START + 47)
+ 
+-/* ... */
++/* These PCI/PCIe IRQ definitions are here as placeholders
++ * The PCI code actually calculates the irq used at runtime */
+ #define IRQ_PBX_PCI0		(IRQ_PBX_GIC_START + 50)
+ #define IRQ_PBX_PCI1		(IRQ_PBX_GIC_START + 51)
+ #define IRQ_PBX_PCI2		(IRQ_PBX_GIC_START + 52)
+ #define IRQ_PBX_PCI3		(IRQ_PBX_GIC_START + 53)
++#define IRQ_PBX_PCIE0		(IRQ_PBX_GIC_START + 54)
++#define IRQ_PBX_PCIE1		(IRQ_PBX_GIC_START + 55)
++#define IRQ_PBX_PCIE2		(IRQ_PBX_GIC_START + 56)
++#define IRQ_PBX_PCIE3		(IRQ_PBX_GIC_START + 57)
+ 
+ #define IRQ_PBX_SMC		-1
+ #define IRQ_PBX_SCTL		-1
