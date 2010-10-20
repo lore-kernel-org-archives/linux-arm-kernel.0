@@ -1,41 +1,87 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 20 Oct 2010 13:28:41 -0500
-Subject: [PATCH 5/5] ARM: remove per-platform timex.h include files
-In-Reply-To: <20101020045200.GB12979@mail.wantstofly.org>
-References: <20101020045200.GB12979@mail.wantstofly.org>
-Message-ID: <0D753D10438DA54287A00B02708426976450E993CC@AUSP01VMBX24.collaborationhost.net>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 20 Oct 2010 11:37:27 -0700
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+	(Ohad Ben-Cohen's message of "Wed, 20 Oct 2010 16:38:32 +0200")
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287387875-14168-4-git-send-email-ohad@wizery.com>
+	<87r5fmxghm.fsf@deeprootsystems.com>
+	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+Message-ID: <8739s0sobc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 19, 2010 9:52 PM, Lennert Buytenhek wrote:
+Ohad Ben-Cohen <ohad@wizery.com> writes:
+
+> On Wed, Oct 20, 2010 at 1:53 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>>> And to allow early board code to reserve specific hwspinlock numbers
+>>> for predefined use-cases, we probably want to be before arch_initcall.
+>>
+>> There's no reason for board code to have to do this at initcall time.
 >
-> As they are now redundant.
+> If we want to have allow both allocations of predefined hwspinlocks
+> with omap_hwspinlock_request_specific(int), and dynamic allocations
+> (where we don't care about the specific instance of the hwspinlock we
+> will get) with omap_hwspinlock_request(), we must ensure that the
+> former _specific() API will never be called after the latter.
 >
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-> ---
+> If we will allow drivers to call omap_hwspinlock_request() before all
+> callers of omap_hwspinlock_request_specific() completed, then things
+> will break (because drivers might start getting hwspinlocks that are
+> predefined for dedicated use cases on the system).
+>
+> So if we want the _specific API to work, we can only allow early board
+> code to use it in order to reserve those predefined hwspinlocks before
+> drivers get the chance to call omap_hwspinlock_request().
+>
+> The tempting alternative is not to provide the
+> omap_hwspinlock_request_specific() API at all (which is something we
+> discussed internally).
+>
+> Let's take the i2c-omap for example.
+>
+> It sounds like it must have a predefined hwspinlock, but what if:
+>
+> 1. It will use omap_hwspinlock_request() to dynamically allocate a hwspinlock
+> 2. Obviously, the hwspinlock id number must be communicated to the M3
+> BIOS, so the i2c-omap will publish that id using a small shared memory
+> entry that will be allocated for this sole purpose
+> 3. we will make sure that 1+2 completes before the remote processor is
+> taken out of reset
+>
+> This does not require any smart IPC and it will allow us to get rid of
+> the omap_hwspinlock_request_specific() API and its early-callers
+> requirement.
 
-[snip]
+Yes, that would indeed simplify things. 
 
->  arch/arm/mach-ep93xx/include/mach/timex.h     |    5 --
+> All we will be left to take care of is the order of the ->probe()
+> execution (assuming we want both the i2c and the hwspinlock drivers to
+> be device_initcall)
 
-[snip]
+I understand the dependency between i2c and hwspinlock for some
+platforms with a shared i2c bus.  Besides that being a broken hardware
+design, I can see the need for the i2c driver to take a hwspinlock for
+i2c xfers, but why does the i2c driver need to take the hwspinlock at
+probe time?  Presumably, this is before the remote cores are executing
+code.
 
->  delete mode 100644 arch/arm/mach-ep93xx/include/mach/timex.h
+>>
+>> This kind of thing needs to be done by platform_data function pointers,
+>> as is done for every other driver that needs platform-specific driver
+>> customization.
+>
+> Why would we need platform-specific function pointers here ? I'm not
+> sure I'm following this one.
 
-[snip]
+So that board code (built-in) does not call the hwspinlock driver
+(potentially a module.)
 
-> diff --git a/arch/arm/mach-ep93xx/include/mach/timex.h b/arch/arm/mach-ep93xx/include/mach/timex.h
-> deleted file mode 100644
-> index 6b3503b..0000000
-> --- a/arch/arm/mach-ep93xx/include/mach/timex.h
-> +++ /dev/null
-> @@ -1,5 +0,0 @@
-> -/*
-> - * arch/arm/mach-ep93xx/include/mach/timex.h
-> - */
-> -
-> -#define CLOCK_TICK_RATE		983040
+The way to solve this is to have platform_data with function pointers,
+so that when the driver's ->probe() is done, it can call cany custom
+hooks registered by the board code.
 
-For ep93xx.
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Kevin
