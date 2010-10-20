@@ -1,33 +1,31 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Wed, 20 Oct 2010 17:22:56 +0800
-Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
-In-Reply-To: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
-References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
-Message-ID: <1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 20 Oct 2010 11:26:05 +0200
+Subject: [patch 3/9] imx51: enhance/fix iomux configuration
+In-Reply-To: <4CBEB2F7.5020700@eukrea.com> ("Eric =?utf-8?Q?B=C3=A9nard=22?=
+	=?utf-8?Q?'s?= message of "Wed\, 20 Oct 2010 11\:14\:31 +0200")
+References: <20101019204253.162641893@rtp-net.org>
+	<20101019205254.232673283@rtp-net.org> <4CBEB2F7.5020700@eukrea.com>
+Message-ID: <87iq0xcj0y.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to fix timeout problem which was seen on babbage.
-Thanks Richard Zhu <r65037@freescale.com> for catching this.
+Eric B?nard <eric@eukrea.com> writes:
 
-Signed-off-by: Shawn Guo <shawn.gsc@gmail.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+> Hi Arnaud,
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 2e9cca1..e8f7048 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -134,7 +134,8 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
- 	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
--			| SDHCI_QUIRK_BROKEN_ADMA,
-+			| SDHCI_QUIRK_BROKEN_ADMA
-+			| SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
- 	/* ADMA has issues. Might be fixable */
- 	/* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
- 	.ops = &sdhci_esdhc_ops,
--- 
-1.7.1
+Hi,
+>
+> in this patch, you break configuration for all the GPIO_1_x here (the
+> correct lat mux for GPIO mode on pins GPIO_1_x is 1 and not 0).
+
+No. For instance, page 3447 of the MCIMX51RM.pdf thing :
+
+000: Select mux mode: ALT0 mux port: GPIO[8] of instance: gpio1.
+
+or page 3441 :
+
+000: Select mux mode: ALT0 mux port: GPIO[3] of instance: gpio1
+
+How is possible that 000b is equal to 1 ?
+
+Arnaud
