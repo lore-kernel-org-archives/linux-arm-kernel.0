@@ -1,38 +1,44 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 20 Oct 2010 21:53:02 +0200
-Subject: [patch 1/9] efikamx: read board id
-In-Reply-To: <20101020192641.GA6466@bee.dooz.org> (=?utf-8?Q?=22Lo=C3=AFc?=
-	Minier"'s message of "Wed\, 20 Oct 2010 21\:26\:41 +0200")
-References: <20101019204253.162641893@rtp-net.org>
-	<20101019205251.082848683@rtp-net.org>
-	<20101019211507.GA28242@pengutronix.de>
-	<AANLkTi=SbFy1eFzQ3XUGDjurme=stUSiqmTRVR=EtX5q@mail.gmail.com>
-	<20101020091654.GL28166@pengutronix.de>
-	<AANLkTimoLQKUjrTHv9xwd8TkGQ3inT_+4-hjfo+Tudj=@mail.gmail.com>
-	<20101020192641.GA6466@bee.dooz.org>
-Message-ID: <8739s0iqu9.fsf@lechat.rtp-net.org>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Wed, 20 Oct 2010 13:06:15 -0700
+Subject: [PATCH v2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101020191803.GB22100@n2100.arm.linux.org.uk>
+References: <1287592646-18109-1-git-send-email-sguinot@lacie.com>
+	<1287592646-18109-2-git-send-email-sguinot@lacie.com>
+	<20101020165933.GC22572@ericsson.com>
+	<20101020191803.GB22100@n2100.arm.linux.org.uk>
+Message-ID: <20101020200615.GA23045@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lo?c Minier <loic.minier@linaro.org> writes:
+On Wed, Oct 20, 2010 at 03:18:03PM -0400, Russell King - ARM Linux wrote:
+> On Wed, Oct 20, 2010 at 09:59:33AM -0700, Guenter Roeck wrote:
+> > On Wed, Oct 20, 2010 at 12:37:26PM -0400, Simon Guinot wrote:
+> > > This patch adds hwmon support for the GPIO connected fan.
+> > > 
+> > > Platform specific informations as GPIO pinout and speed conversion array
+> > > (rpm from/to GPIO value) are passed to the driver via platform_data.
+> > > 
+> > > Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> > 
+> > MicroSomething makes it really easy to be annoyed with them (folks, are you reading this ?).
+> > Mailer screwed up the patch again. We are making some noise to get this fixed,
+> > but that will take a while - the affected mail servers are hiding somewhere in Europe.
+> > 
+> > Unfortunately, none of the hwmon and linux-arm archives I am aware of makes
+> > patches available on the web (like patchwork does), so I can not get it from there
+> > either. Can you resend it to me as attachment, or give me a pointer where I can
+> > pick it up ?
+> 
+> http://lists.arm.linux.org.uk/lurker/message/20101020.163726.f0929cc0.en.html
+> 
+>  -> 'Message as email'
+> 
+> and you get an email-formatted chunk of text.  Lurker really is very cool
+> in this regard, it beats the crappy pipermail that's built into mailman
+> in many ways.  More people should use it.
 
-> On Wed, Oct 20, 2010, Matt Sealey wrote:
->> Uwe, there is no way to tell if the pads have settled, it is entirely
->> a hardware problem, just like when GPIOs are at random input states if
->> they are not connected to anything: in this case, first of all the
->> IOMUX pull downs and then the GPIO change to input takes longer than
->> you can safely do it and then immediately read the pins or board
->> version 1.1 and below will not ID correctly.
->
->  Is there a strong need to distinguish between all the PCB ids?  You
->  could use the TO2 versus TO3 information to decide between 1.1 and 1.3
->  PCBs and stop supporting the other (rare) boards?
+Excellent. 
 
-The TO2 and TO3 are very similar but there are important differencies :
-- different reset pin
-- mmc slot on mmc0 (esdhci1) vs mmc1 (esdhci2)
+Thanks!
 
-So you do need to know if you're either on TO2 or TO3 and you can't
-guess this info without looking at the board id pins.
-
-Arnaud
+Guenter
