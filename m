@@ -1,100 +1,33 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Wed, 20 Oct 2010 11:20:14 +0200
-Subject: [PATCH 5/5] ARM: remove per-platform timex.h include files
-In-Reply-To: <20101020090850.GJ28166@pengutronix.de>
-References: <20101020045200.GB12979@mail.wantstofly.org>
-	<20101020090850.GJ28166@pengutronix.de>
-Message-ID: <20101020092014.GB12979@mail.wantstofly.org>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Wed, 20 Oct 2010 17:22:56 +0800
+Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
+In-Reply-To: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
+References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
+Message-ID: <1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 11:08:50AM +0200, Uwe Kleine-K?nig wrote:
+This patch is to fix timeout problem which was seen on babbage.
+Thanks Richard Zhu <r65037@freescale.com> for catching this.
 
-> Hi Lennert,
+Signed-off-by: Shawn Guo <shawn.gsc@gmail.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Hi Uwe,
-
-
-> > As they are now redundant.
-> > 
-> > Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-> > ---
-> >  arch/arm/mach-aaec2000/include/mach/timex.h   |   18 -----
-> > [...]
-> > diff --git a/arch/arm/mach-at91/include/mach/timex.h b/arch/arm/mach-at91/include/mach/timex.h
-> > deleted file mode 100644
-> > index 05a6e8a..0000000
-> > --- a/arch/arm/mach-at91/include/mach/timex.h
-> > +++ /dev/null
-> > @@ -1,92 +0,0 @@
-> > -/*
-> > - * arch/arm/mach-at91/include/mach/timex.h
-> > - *
-> > - *  Copyright (C) 2003 SAN People
-> > - *
-> > - * This program is free software; you can redistribute it and/or modify
-> > - * it under the terms of the GNU General Public License as published by
-> > - * the Free Software Foundation; either version 2 of the License, or
-> > - * (at your option) any later version.
-> > - *
-> > - * This program is distributed in the hope that it will be useful,
-> > - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > - * GNU General Public License for more details.
-> > - *
-> > - * You should have received a copy of the GNU General Public License
-> > - * along with this program; if not, write to the Free Software
-> > - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> > - */
-> > -
-> > -#ifndef __ASM_ARCH_TIMEX_H
-> > -#define __ASM_ARCH_TIMEX_H
-> > -
-> > -#include <mach/hardware.h>
-> > -
-> > -#if defined(CONFIG_ARCH_AT91RM9200)
-> > -
-> > -#define CLOCK_TICK_RATE		(AT91_SLOW_CLOCK)
-> > -
-> > -#elif defined(CONFIG_ARCH_AT91SAM9260)
-> > -
-> > -#if defined(CONFIG_MACH_USB_A9260) || defined(CONFIG_MACH_QIL_A9260)
-> > -#define AT91SAM9_MASTER_CLOCK	90000000
-> > -#else
-> > -#define AT91SAM9_MASTER_CLOCK	99300000
-> > -#endif
->
-> I wonder if you checked that the defines you remove here are otherwise
-> unused?!  a quick grep showed for example that
-> arch/arm/mach-at91/at91x40.c includes mach/timex.h.
-
-Well, patch #1 in the series does this:
-
-
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index ad3ec85..e3dce6e 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -16,9 +16,10 @@
- #include <asm/mach/arch.h>
- #include <mach/at91x40.h>
- #include <mach/at91_st.h>
--#include <mach/timex.h>
- #include "generic.h"
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 2e9cca1..e8f7048 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -134,7 +134,8 @@ static struct sdhci_ops sdhci_esdhc_ops = {
  
-+#define AT91X40_MASTER_CLOCK   40000000
-+
- /*
-  * Export the clock functions for the AT91X40. Some external code common
-  * to all AT91 family parts relys on this, like the gpio and serial support.
-
-
-There's also AT91SAM9_MASTER_CLOCK, but that is not used anywhere in
-the tree.  And the use of LATCH in mach-at91/at91rm9200_time.c is also
-taken care of in patch #1.
-
-I'll try an at91 kernel build to confirm that this works as intended.
-
-
-thanks,
-Lennert
+ struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+ 	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
+-			| SDHCI_QUIRK_BROKEN_ADMA,
++			| SDHCI_QUIRK_BROKEN_ADMA
++			| SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+ 	/* ADMA has issues. Might be fixable */
+ 	/* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
+ 	.ops = &sdhci_esdhc_ops,
+-- 
+1.7.1
