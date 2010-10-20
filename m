@@ -1,73 +1,69 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 20 Oct 2010 16:38:32 +0200
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <87bp6pviwf.fsf@deeprootsystems.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-Message-ID: <AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 Oct 2010 16:55:32 +0200
+Subject: [PATCH v4] imx-esdhc: update devices registration
+In-Reply-To: <1286904825-6432-1-git-send-email-eric@eukrea.com>
+References: <20101012153155.GE4470@pengutronix.de>
+	<1286904825-6432-1-git-send-email-eric@eukrea.com>
+Message-ID: <20101020145532.GD19834@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 1:53 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
->> And to allow early board code to reserve specific hwspinlock numbers
->> for predefined use-cases, we probably want to be before arch_initcall.
->
-> There's no reason for board code to have to do this at initcall time.
+Hello Eric,
 
-If we want to have allow both allocations of predefined hwspinlocks
-with omap_hwspinlock_request_specific(int), and dynamic allocations
-(where we don't care about the specific instance of the hwspinlock we
-will get) with omap_hwspinlock_request(), we must ensure that the
-former _specific() API will never be called after the latter.
+On Tue, Oct 12, 2010 at 07:33:45PM +0200, Eric B?nard wrote:
+> Tested on i.MX25 and i.MX35 and i.MX51
+> 
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+This patch (or more exact: the version of this patch that Sascha picked
+up) breaks compiling mx3_defconfig.
 
-If we will allow drivers to call omap_hwspinlock_request() before all
-callers of omap_hwspinlock_request_specific() completed, then things
-will break (because drivers might start getting hwspinlocks that are
-predefined for dedicated use cases on the system).
+The minimal fix is
 
-So if we want the _specific API to work, we can only allow early board
-code to use it in order to reserve those predefined hwspinlocks before
-drivers get the chance to call omap_hwspinlock_request().
+diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
+index ff905cb..9d46b7e 100644
+--- a/arch/arm/plat-mxc/include/mach/mx35.h
++++ b/arch/arm/plat-mxc/include/mach/mx35.h
+@@ -197,8 +197,8 @@
+ /* these should go away */
+ #define MXC_FEC_BASE_ADDR MX35_FEC_BASE_ADDR
+ #define MXC_INT_OWIRE MX35_INT_OWIRE
+-#define MXC_INT_MMC_SDHC2 MX35_INT_MMC_SDHC2
++#define MXC_INT_MMC_SDHC2 MX35_INT_ESDHC2
+ #define MXC_INT_MMC_SDHC3 MX35_INT_MMC_SDHC3
+ #define MXC_INT_GPU2D MX35_INT_GPU2D
+ #define MXC_INT_ASRC MX35_INT_ASRC
+ #define MXC_INT_USBHS MX35_INT_USBHS
 
-The tempting alternative is not to provide the
-omap_hwspinlock_request_specific() API at all (which is something we
-discussed internally).
+But somehow this is still broken because arch/arm/mach-mx3/devices.c
+uses MXC_INT_MMC_SDHC1 and MXC_INT_MMC_SDHC2.  The former is defined as
 
-Let's take the i2c-omap for example.
+	#define MXC_INT_MMC_SDHC1 MX31_INT_MMC_SDHC1
+	#define MX31_INT_MMC_SDHC1      9
 
-It sounds like it must have a predefined hwspinlock, but what if:
+the latter as
 
-1. It will use omap_hwspinlock_request() to dynamically allocate a hwspinlock
-2. Obviously, the hwspinlock id number must be communicated to the M3
-BIOS, so the i2c-omap will publish that id using a small shared memory
-entry that will be allocated for this sole purpose
-3. we will make sure that 1+2 completes before the remote processor is
-taken out of reset
+	#define MXC_INT_MMC_SDHC2 MX35_INT_ESDHC2
+	#define MX35_INT_ESDHC2         8
 
-This does not require any smart IPC and it will allow us to get rid of
-the omap_hwspinlock_request_specific() API and its early-callers
-requirement.
+.  Moreover we have:
 
-All we will be left to take care of is the order of the ->probe()
-execution (assuming we want both the i2c and the hwspinlock drivers to
-be device_initcall)
+	#define MXC_INT_MMC_SDHC3 MX35_INT_ESDHC3
+	#define MX35_INT_ESDHC3         9
 
->
-> This kind of thing needs to be done by platform_data function pointers,
-> as is done for every other driver that needs platform-specific driver
-> customization.
+and note that arch/arm/mach-mx3/devices.c only defines mxcsdhc_device0
+and mxcsdhc_device1 in an #ifdef CONFIG_ARCH_MX31 block.  (So I guess
+that in an mx31 kernel the error is not, that MX35_INT_MMC_SDHC2 isn't
+defined but MXC_INT_MMC_SDHC2.)
 
-Why would we need platform-specific function pointers here ? I'm not
-sure I'm following this one.
+Ugly.
 
-Thanks,
-Ohad.
+The better fix would be to delete mxcsdhc_device[01] from
+arch/arm/mach-mx3/devices.c and convert all users to the new function.
+Volunteers?  Eric?
 
+Best regards
+Uwe
 
->
-> Kevin
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
