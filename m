@@ -1,26 +1,39 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 20 Oct 2010 14:01:48 +0800
-Subject: [RFC, PATCH 0/5] unify definition of CLOCK_TICK_RATE across
-	different platforms
-In-Reply-To: <20101020045110.GW12979@mail.wantstofly.org>
-References: <20101020045110.GW12979@mail.wantstofly.org>
-Message-ID: <AANLkTi=WCAjAu0PGbtkXMQdX+FzXVZbwo60adhyT8sGb@mail.gmail.com>
+Date: Wed, 20 Oct 2010 14:03:53 +0800
+Subject: [PATCH 3/5] rtc-pxa: remove unused TIMER_FREQ define
+In-Reply-To: <20101020045141.GZ12979@mail.wantstofly.org>
+References: <20101020045141.GZ12979@mail.wantstofly.org>
+Message-ID: <AANLkTikMskk+60Bj8pAav2kh6PZKGJ7o4HipDRobpLhN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Oct 20, 2010 at 12:51 PM, Lennert Buytenhek
 <buytenh@wantstofly.org> wrote:
-> One of the things preventing building an ARM multiplatform kernel
-> image is the fact that CLOCK_TICK_RATE (and as a consequence, LATCH)
-> is defined differently for each ARM platform.
->
-> The patches in this series:
-> - pull the per-platform CLOCK_TICK_RATE defines from <mach/timex.h>
-> ?into arch/arm/mach-foo/ (on those platforms that use the
-> ?CLOCK_TICK_RATE define and/or the LATCH define in their platform
-> ?support code);
-> - define CLOCK_TICK_RATE as a platform-independent value in <asm/timex.h>;
-> - get rid of all <mach/timex.h> include files.
->
+> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
 
-Excellent!
+Acked-by: Eric Miao <eric.miao@canonical.com>
+
+> ---
+> ?drivers/rtc/rtc-pxa.c | ? ?1 -
+> ?1 files changed, 0 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+> index 29e867a..486b72d 100644
+> --- a/drivers/rtc/rtc-pxa.c
+> +++ b/drivers/rtc/rtc-pxa.c
+> @@ -30,7 +30,6 @@
+>
+> ?#include <mach/hardware.h>
+>
+> -#define TIMER_FREQ ? ? ? ? ? ? CLOCK_TICK_RATE
+> ?#define RTC_DEF_DIVIDER ? ? ? ? ? ? ? ?(32768 - 1)
+> ?#define RTC_DEF_TRIM ? ? ? ? ? 0
+> ?#define MAXFREQ_PERIODIC ? ? ? 1000
+> --
+> 1.7.2.3
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
