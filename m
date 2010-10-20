@@ -1,74 +1,79 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 20 Oct 2010 12:26:08 -0500
-Subject: [patch 1/9] efikamx: read board id
-In-Reply-To: <20101020091654.GL28166@pengutronix.de>
+Date: Wed, 20 Oct 2010 12:36:56 -0500
+Subject: [patch 8/9] efikamx: add spi nor support
+In-Reply-To: <20101020112659.GK2562@matterhorn.lan>
 References: <20101019204253.162641893@rtp-net.org>
-	<20101019205251.082848683@rtp-net.org>
-	<20101019211507.GA28242@pengutronix.de>
-	<AANLkTi=SbFy1eFzQ3XUGDjurme=stUSiqmTRVR=EtX5q@mail.gmail.com>
-	<20101020091654.GL28166@pengutronix.de>
-Message-ID: <AANLkTimoLQKUjrTHv9xwd8TkGQ3inT_+4-hjfo+Tudj=@mail.gmail.com>
+	<20101019205301.326830829@rtp-net.org>
+	<20101020112659.GK2562@matterhorn.lan>
+Message-ID: <AANLkTi=a75BNTitznSU6QQ+5mSvwYicsftPvgMKWzZ-z@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe, there is no way to tell if the pads have settled, it is entirely
-a hardware problem, just like when GPIOs are at random input states if
-they are not connected to anything: in this case, first of all the
-IOMUX pull downs and then the GPIO change to input takes longer than
-you can safely do it and then immediately read the pins or board
-version 1.1 and below will not ID correctly.
+On Wed, Oct 20, 2010 at 6:26 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> On 10 Oct 19, Arnaud Patard wrote:
+>> On efikamx, uboot is stored on a nor spi flash. Add support for it
+>>
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> Index: linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> ===================================================================
+>> --- linux-2.6.orig/arch/arm/mach-mx5/board-mx51_efikamx.c ? ? 2010-10-16 14:21:24.000000000 +0200
+>> +++ linux-2.6/arch/arm/mach-mx5/board-mx51_efikamx.c ?2010-10-16 15:34:12.000000000 +0200
+>> @@ -24,6 +24,8 @@
+>> ?#include <linux/delay.h>
+>> ?#include <linux/io.h>
+>> ?#include <linux/fsl_devices.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>>
+>> ?#include <mach/common.h>
+>> ?#include <mach/hardware.h>
+>> @@ -52,6 +54,9 @@
+>>
+>> ?#define EFIKAMX_POWER_KEY ? ?(1*32+31)
+>>
+>> +#define EFIKAMX_SPI_CS0 ? ? ? ? ? ? ?(3*32+24)
+>> +#define EFIKAMX_SPI_CS1 ? ? ? ? ? ? ?(3*32+25)
+>
+> It is just a style thing, but could you make this (3*32 + 24). Makes it
+> easier on the eyes to read "4th gpio bank, 24th pin"
+
+Better yet:
+
+#define GPIO_BANK(n) ((n-1)*32)
+..
+#define EFIKAMX_SPI_CS0 (GPIO_BANK(4) + 24).
+
+It'll get compiled to a constant and is more readable, right? :D
+
+>> ?/* the pci ids pin have pull up. they're driven low according to board id */
+>> ?#define MX51_PAD_PCBID0 ? ? ?IOMUX_PAD(0x518, 0x130, 3, 0x0, ? 0, PAD_CTL_PUS_100K_UP)
+>> ?#define MX51_PAD_PCBID1 ? ? ?IOMUX_PAD(0x51C, 0x134, 3, 0x0, ? 0, PAD_CTL_PUS_100K_UP)
+>> @@ -99,6 +104,14 @@
+>>
+>> ? ? ? /* power key */
+>> ? ? ? MX51_PAD_PWRKEY,
+>> +
+>> + ? ? /* spi */
+>> + ? ? MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI,
+>> + ? ? MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
+>> + ? ? MX51_PAD_CSPI1_SS0__GPIO_4_24,
+>> + ? ? MX51_PAD_CSPI1_SS1__GPIO_4_25,
+>> + ? ? MX51_PAD_CSPI1_RDY__ECSPI1_RDY,
+>> + ? ? MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
+>> ?};
+>>
+>> ?/* Serial ports */
+>> @@ -252,6 +265,47 @@
+>> ? ? ? },
+>> ?};
+>>
+>> +static struct mtd_partition mx51_efikamx_spi_nor_partitions[] = {
+>> + ? ? {
+>> + ? ? ?.name = "u-boot",
+>
+> "bootloader" ?
+
+"firmware" :)
 
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
-
-
-
-2010/10/20 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hiho,
->
-> On Tue, Oct 19, 2010 at 04:30:25PM -0500, Matt Sealey wrote:
->> On Tue, Oct 19, 2010 at 4:15 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > On Tue, Oct 19, 2010 at 10:42:54PM +0200, Arnaud Patard wrote:
->> >> read board id value from the GPIO3_16/17/11
->> >>
->> >>
->> >> +/* ? PCBID2 ?PCBID1 PCBID0 ?STATE
->> >> + ? ? 1 ? ? ? 1 ? ? ?1 ? ?ER1:rev1.1
->> >> + ? ? 1 ? ? ? 1 ? ? ?0 ? ?ER2:rev1.2
->> >> + ? ? 1 ? ? ? 0 ? ? ?1 ? ?ER3:rev1.3
->> >> + ? ? 1 ? ? ? 0 ? ? ?0 ? ?ER4:rev1.4
->> >> +*/
->> >> +static void __init mx51_efikamx_board_id(void)
->> >> +{
->> >> + ? ? int id;
->> >> +
->> >> + ? ? /* things are taking time to settle */
->> >> + ? ? msleep(500);
->> >
->> > Is it really necessary to delay the boot process such a long time?
->>
->> Yes. On older boards the PCBID pins are pulled high by IOMUX settings
->> (a pulldown on the board on newer revisions will keep it down). IOMUX
->> and GPIO stuff takes a little while to settle in, so if you do it
->> immediately, it will return some freakish values based on random GPIO
->> setup (it may be high, low, or none of the above at any point before
->> the pad setting kicks in).
-> If the bootloader might configure the pins correctly, maybe something
-> like:
->
-> ? ? ? ?if (pins_are_not_yet_configured_correctly()) {
-> ? ? ? ? ? ? ? ?do_configure_them();
-> ? ? ? ? ? ? ? ?msleep(500);
-> ? ? ? ?}
->
-> ?
->
-> Best regards
-> Uwe
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+Matt
