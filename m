@@ -1,16 +1,24 @@
-From: tstone@iss.tu-darmstadt.de (Tim Sander)
-Date: Wed, 20 Oct 2010 18:36:35 +0200
-Subject: [PATCH] ARM: pcm043 micrell ksz8041nl phy support
-In-Reply-To: <AANLkTikpzT0LtzLBdzmXdBc0CcWJMYVNKMOF1cZe+_SV@mail.gmail.com>
-References: <201010201757.34531.tstone@iss.tu-darmstadt.de>
-	<AANLkTikpzT0LtzLBdzmXdBc0CcWJMYVNKMOF1cZe+_SV@mail.gmail.com>
-Message-ID: <201010201836.36275.tstone@iss.tu-darmstadt.de>
+From: sguinot@lacie.com (Simon Guinot)
+Date: Wed, 20 Oct 2010 18:37:25 +0200
+Subject: [PATCH v2] hwmon: add generic GPIO fan driver
+Message-ID: <1287592646-18109-1-git-send-email-sguinot@lacie.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio
-> As your patch touches drivers/net/fec.c you need to copy netdev mailing
-> list.
-Ah, thanks for that hint. I just realized i was working on an old git kernel 
-branch, so its for 2.6.33... Alas
-Tim
+Hi Guenter,
+
+Here is an updated version for the gpio-fan driver.
+
+v2 changes :
+
+- add support for sysfs attributes fan1_target, fan1_min and fan1_max
+- simplify the pwm interface
+- add power management support
+- fix interrupt handling (allow to share the fan alarm irq)
+- fix bugs mostly addressed during code review...
+
+Documentation is still missing.
+
+Thanks,
+
+Simon
