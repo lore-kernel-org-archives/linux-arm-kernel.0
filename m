@@ -1,23 +1,21 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 20 Oct 2010 09:19:24 +0530
-Subject: [PATCH V2 45/69] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <20101019144803.96d59689.akpm@linux-foundation.org>
-References: <cover.1285933331.git.viresh.kumar@st.com>	<c91308e26397dbe49f384c7d3cf168593e1fe8b0.1285933332.git.viresh.kumar@st.com>	<4CBD33B8.5030105@st.com>
-	<20101019144803.96d59689.akpm@linux-foundation.org>
-Message-ID: <4CBE66C4.7050905@st.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Wed, 20 Oct 2010 06:51:10 +0200
+Subject: [RFC, PATCH 0/5] unify definition of CLOCK_TICK_RATE across different
+	platforms
+Message-ID: <20101020045110.GW12979@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2010 03:18 AM, Andrew Morton wrote:
->> > Andrew,
->> > 
->> > Any review comments on this patch??
->> > 
-> I looked.
-> 
-> I'd suggest cc'ing the PCI list and maintainer on future versions.
+One of the things preventing building an ARM multiplatform kernel
+image is the fact that CLOCK_TICK_RATE (and as a consequence, LATCH)
+is defined differently for each ARM platform.
 
-Will do that.
+The patches in this series:
+- pull the per-platform CLOCK_TICK_RATE defines from <mach/timex.h>
+  into arch/arm/mach-foo/ (on those platforms that use the
+  CLOCK_TICK_RATE define and/or the LATCH define in their platform
+  support code);
+- define CLOCK_TICK_RATE as a platform-independent value in <asm/timex.h>;
+- get rid of all <mach/timex.h> include files.
 
-Thanks
-viresh
+Comments welcome!
