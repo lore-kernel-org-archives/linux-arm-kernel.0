@@ -1,33 +1,38 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 20 Oct 2010 13:30:10 -0700
-Subject: [RFC,
-	PATCH 0/5] unify definition of CLOCK_TICK_RATE across different
-	platforms
-In-Reply-To: <20101020045110.GW12979@mail.wantstofly.org> (Lennert Buytenhek's
-	message of "Wed, 20 Oct 2010 06:51:10 +0200")
-References: <20101020045110.GW12979@mail.wantstofly.org>
-Message-ID: <87y69sppyl.fsf@deeprootsystems.com>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Wed, 20 Oct 2010 13:42:32 -0700
+Subject: [PATCH v2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101020191005.GL29120@kw.sim.vm.gnt>
+References: <1287592646-18109-1-git-send-email-sguinot@lacie.com>
+	<1287592646-18109-2-git-send-email-sguinot@lacie.com>
+	<20101020165933.GC22572@ericsson.com>
+	<20101020191005.GL29120@kw.sim.vm.gnt>
+Message-ID: <20101020204232.GA23330@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lennert Buytenhek <buytenh@wantstofly.org> writes:
+On Wed, Oct 20, 2010 at 03:10:05PM -0400, Simon Guinot wrote:
+> On Wed, Oct 20, 2010 at 09:59:33AM -0700, Guenter Roeck wrote:
+> > On Wed, Oct 20, 2010 at 12:37:26PM -0400, Simon Guinot wrote:
+> > > This patch adds hwmon support for the GPIO connected fan.
+> > > 
+> > > Platform specific informations as GPIO pinout and speed conversion array
+> > > (rpm from/to GPIO value) are passed to the driver via platform_data.
+> > > 
+> > > Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> > 
+> > MicroSomething makes it really easy to be annoyed with them (folks, are you reading this ?).
+> > Mailer screwed up the patch again. We are making some noise to get this fixed,
+> > but that will take a while - the affected mail servers are hiding somewhere in Europe.
+> > 
+> > Unfortunately, none of the hwmon and linux-arm archives I am aware of makes
+> > patches available on the web (like patchwork does), so I can not get it from there
+> > either. Can you resend it to me as attachment, or give me a pointer where I can
+> > pick it up ?
+> 
+> You could use:
+> 
+> ftp://lacie-nas.org/kernel/patches/0001-hwmon-add-generic-GPIO-fan-driver.patch
+> 
+Got it, thanks.
 
-> One of the things preventing building an ARM multiplatform kernel
-> image is the fact that CLOCK_TICK_RATE (and as a consequence, LATCH)
-> is defined differently for each ARM platform.
->
-> The patches in this series:
-> - pull the per-platform CLOCK_TICK_RATE defines from <mach/timex.h>
->   into arch/arm/mach-foo/ (on those platforms that use the
->   CLOCK_TICK_RATE define and/or the LATCH define in their platform
->   support code);
-> - define CLOCK_TICK_RATE as a platform-independent value in <asm/timex.h>;
-> - get rid of all <mach/timex.h> include files.
->
-> Comments welcome!
-
-Excellent!
-
-For the davinci & OMAP changes:
-
-Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+Guenter
