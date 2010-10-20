@@ -1,45 +1,45 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 20 Oct 2010 19:56:03 +0100
-Subject: [PATCH] Documentation about RS485 serial communications
-In-Reply-To: <201010201000.14905.alexander.stein@systec-electronic.com>
-References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>
-	<201010191727.53314.alexander.stein@systec-electronic.com>
-	<i9kk4o$svc$1@dough.gmane.org>
-	<201010201000.14905.alexander.stein@systec-electronic.com>
-Message-ID: <20101020195603.70395f50@lxorguk.ukuu.org.uk>
+From: simon@sequanux.org (Simon Guinot)
+Date: Wed, 20 Oct 2010 19:10:05 +0000
+Subject: [PATCH v2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101020165933.GC22572@ericsson.com>
+References: <1287592646-18109-1-git-send-email-sguinot@lacie.com>
+	<1287592646-18109-2-git-send-email-sguinot@lacie.com>
+	<20101020165933.GC22572@ericsson.com>
+Message-ID: <20101020191005.GL29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Oct 2010 10:00:14 +0200
-Alexander Stein <alexander.stein@systec-electronic.com> wrote:
-
-> On Tuesday 19 October 2010, 19:22:32 Grant Edwards wrote:
-> > Yes, the AT91 UARTs do have a built-in half-duplex mode that will
-> > automatically control line direction by toggling RTS.
+On Wed, Oct 20, 2010 at 09:59:33AM -0700, Guenter Roeck wrote:
+> On Wed, Oct 20, 2010 at 12:37:26PM -0400, Simon Guinot wrote:
+> > This patch adds hwmon support for the GPIO connected fan.
 > > 
-> > That can used to control external half-duplex hardware like an RS485
-> > transceiver or any RS232-connected half-duplex device like some
-> > modems.
+> > Platform specific informations as GPIO pinout and speed conversion array
+> > (rpm from/to GPIO value) are passed to the driver via platform_data.
 > > 
-> > Though the Atmel docs refer to it as "RS485 mode" there is no RS485
-> > transceiver in the AT91 parts (AFAIK), and "RS485 mode" isn't specific
-> > to RS485 - it can be used with any external half-duplex hardware.
+> > Signed-off-by: Simon Guinot <sguinot@lacie.com>
 > 
-> Out of curiosity, how can I add RS485 (or whatever) support for other serial 
-> devices like e.g. i.mx serial? Is there some driver independent interface 
-> which only gets filled in board configs like setting some GPIO pins?
+> MicroSomething makes it really easy to be annoyed with them (folks, are you reading this ?).
+> Mailer screwed up the patch again. We are making some noise to get this fixed,
+> but that will take a while - the affected mail servers are hiding somewhere in Europe.
+> 
+> Unfortunately, none of the hwmon and linux-arm archives I am aware of makes
+> patches available on the web (like patchwork does), so I can not get it from there
+> either. Can you resend it to me as attachment, or give me a pointer where I can
+> pick it up ?
 
-Several devices support RS485 and the like
+You could use:
 
-There are two interfaces
+ftp://lacie-nas.org/kernel/patches/0001-hwmon-add-generic-GPIO-fan-driver.patch
 
-1.	termiox	which is used in the old Unix world for sync and
-other stuff on serial world. Linux now supports a bit of this interface
-and has the flags so we can grow it as needed. It covers one way flow
-control
+and in a unknown and variable delay:
 
-2.	TIOCGSRS485/TIOCSRS486 plus struct serial_rs485 which is Linux
-specific but also allows for pre/post send delays in hardware that some
-chips can do.
+git://lacie-nas.org/lacie-orion.git (gpio-fan)
 
-And nothing stops you supporting both interfaces when it makes sense
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101020/8e7fefc9/attachment.sig>
