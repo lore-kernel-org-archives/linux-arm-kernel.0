@@ -1,124 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 21 Oct 2010 22:49:38 +0200
-Subject: [PATCH] MX27 3ds: Add SDHC1 support to mx27 3ds
-In-Reply-To: <4CBF1A72.70701@freescale.com>
-References: <4CBF1A72.70701@freescale.com>
-Message-ID: <20101021204938.GC22139@pengutronix.de>
+From: napohybelskurwysynom2010@gmail.com (Zimny Lech)
+Date: Thu, 21 Oct 2010 22:52:54 +0200
+Subject: [RFC] Removal of dead code from arch/arm/*
+In-Reply-To: <20101021075401.GC22100@n2100.arm.linux.org.uk>
+References: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
+	<AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
+	<4CBF8BDB.7090907@gmail.com>
+	<20101021075401.GC22100@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikYtxiT+R3eb0N5U1hoDvaP=oevjWjUuAJ453p=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rogerio,
+2010/10/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Oct 21, 2010 at 02:39:55AM +0200, N.P.S. wrote:
+>> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+>> index 38c261f..fd30b75 100644
+>> --- a/arch/arm/kernel/time.c
+>> +++ b/arch/arm/kernel/time.c
+>> @@ -37,13 +37,9 @@
+>> ? */
+>> ?struct sys_timer *system_timer;
+>>
+>> -#if defined(CONFIG_RTC_DRV_CMOS) || defined(CONFIG_RTC_DRV_CMOS_MODULE)
+>> +#if defined(CONFIG_RTC_DRV_CMOS)
+>> ?/* this needs a better home */
+>> ?DEFINE_SPINLOCK(rtc_lock);
+>> -
+>> -#ifdef CONFIG_RTC_DRV_CMOS_MODULE
+>> -EXPORT_SYMBOL(rtc_lock);
+>> -#endif
+>> ?#endif ? ?/* pc-style 'CMOS' RTC support */
+>>
+>> ?/* change this if you have some constant time drift */
+>
+> This is wrong, and will break the build if rtc-cmos is built as a module.
+>
 
-On Wed, Oct 20, 2010 at 02:36:02PM -0200, Rogerio Pimentel wrote:
-> Add SDHC1 support to MX27 3ds
->
-> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
->
-> ---
->  arch/arm/mach-imx/mach-mx27_3ds.c |   38  
-> +++++++++++++++++++++++++++++++++++++
+Ok, I dropped this patch. Recreated tree can be found here
+git pull git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc2
 
-Your mailer breaks the lines. Otherwise the patch looks ok.
+I build tested it. Now should I send every patch for review to
+developers? Could you pull this tree to arm-next (2.6.38)?
 
-Sascha
-
->  1 files changed, 38 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c  
-> b/arch/arm/mach-imx/mach-mx27_3ds.c
-> index a69dba2..a02a00a 100644
-> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -23,16 +23,20 @@
->  #include <linux/platform_device.h>
->  #include <linux/gpio.h>
->  #include <linux/input/matrix_keypad.h>
-> +#include <linux/irq.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/time.h>
->  #include <mach/hardware.h>
->  #include <mach/common.h>
->  #include <mach/iomux-mx27.h>
-> +#include <mach/mmc.h>
->
->  #include "devices-imx27.h"
->  #include "devices.h"
->
-> +#define SD1_EN_GPIO (GPIO_PORTB + 25)
-> +
->  static const int mx27pdk_pins[] __initconst = {
->      /* UART1 */
->      PE12_PF_UART1_TXD,
-> @@ -58,6 +62,14 @@ static const int mx27pdk_pins[] __initconst = {
->      PD15_AOUT_FEC_COL,
->      PD16_AIN_FEC_TX_ER,
->      PF23_AIN_FEC_TX_EN,
-> +    /* SDHC1 */
-> +    PE18_PF_SD1_D0,
-> +    PE19_PF_SD1_D1,
-> +    PE20_PF_SD1_D2,
-> +    PE21_PF_SD1_D3,
-> +    PE22_PF_SD1_CMD,
-> +    PE23_PF_SD1_CLK,
-> +    SD1_EN_GPIO | GPIO_GPIO | GPIO_OUT,
->  };
->
->  static const struct imxuart_platform_data uart_pdata __initconst = {
-> @@ -85,13 +97,39 @@ static struct matrix_keymap_data  
-> mx27_3ds_keymap_data = {
->      .keymap_size    = ARRAY_SIZE(mx27_3ds_keymap),
->  };
->
-> +static int mx27_3ds_sdhc1_init(struct device *dev, irq_handler_t  
-> detect_irq,
-> +                void *data)
-> +{
-> +    return request_irq(IRQ_GPIOB(26), detect_irq, IRQF_TRIGGER_FALLING |
-> +            IRQF_TRIGGER_RISING, "sdhc1-card-detect", data);
-> +}
-> +
-> +static void mx27_3ds_sdhc1_exit(struct device *dev, void *data)
-> +{
-> +    free_irq(IRQ_GPIOB(26), data);
-> +}
-> +
-> +static struct imxmmc_platform_data sdhc1_pdata = {
-> +    .init = mx27_3ds_sdhc1_init,
-> +    .exit = mx27_3ds_sdhc1_exit,
-> +};
-> +
-> +static void mx27_3ds_sdhc1_enable_level_translator(void)
-> +{
-> +    /* Turn on TXB0108 OE pin */
-> +    gpio_request(SD1_EN_GPIO, "sd1_enable");
-> +    gpio_direction_output(SD1_EN_GPIO, 1);
-> +}
-> +
->  static void __init mx27pdk_init(void)
->  {
->      mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
->          "mx27pdk");
-> +    mx27_3ds_sdhc1_enable_level_translator();
->      imx27_add_imx_uart0(&uart_pdata);
->      imx27_add_fec(NULL);
->      mxc_register_device(&imx_kpp_device, &mx27_3ds_keymap_data);
-> +    mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
->  }
->
->  static void __init mx27pdk_timer_init(void)
-> -- 
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Regards,
+ZL
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Slawa!
+N.P.S.
+
+Les fleurs du mal unfold
+Comme les fleurs du mal
+Dark demons of my soul
+Un amour fatal
