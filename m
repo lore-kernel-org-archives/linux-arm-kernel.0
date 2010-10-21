@@ -1,84 +1,92 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Oct 2010 09:58:31 +0900
-Subject: [PATCH 3/5] ARM: S5P64X0: Set DMA clock disable as default
+Date: Thu, 21 Oct 2010 09:58:29 +0900
+Subject: [PATCH 1/5] ARM: S5P6442: Add DMA operation clock
 In-Reply-To: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
 References: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1287622713-1657-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1287622713-1657-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Seungwhan Youn <sw.youn@samsung.com>
 
-This patch modify to DMA operation clock into disable list for default
-clock setting.
+This patch adds DMA operation clock which is disabled as default.
 
 Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
 Acked-by: Jassi Brar <jassi.brar@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5p64x0/clock-s5p6440.c |   12 ++++++------
- arch/arm/mach-s5p64x0/clock-s5p6450.c |   12 ++++++------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/mach-s5p6442/clock.c                   |   28 +++++++++++++++++++++++
+ arch/arm/mach-s5p6442/include/mach/regs-clock.h |    1 +
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index 0d728d3..e4883dc 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -153,6 +153,12 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 8),
- 	}, {
+diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
+index dcd20f1..16d6e7e 100644
+--- a/arch/arm/mach-s5p6442/clock.c
++++ b/arch/arm/mach-s5p6442/clock.c
+@@ -192,6 +192,11 @@ static struct clk clk_pclkd1 = {
+ 	.parent		= &clk_hclkd1,
+ };
+ 
++int s5p6442_clk_ip0_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(S5P_CLKGATE_IP0, clk, enable);
++}
++
+ int s5p6442_clk_ip3_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
+@@ -335,6 +340,16 @@ void __init_or_cpufreq s5p6442_setup_clocks(void)
+ 	clk_pclkd1.rate = pclkd1;
+ }
+ 
++static struct clk init_clocks_disable[] = {
++	{
 +		.name		= "pdma",
 +		.id		= -1,
-+		.parent		= &clk_hclk_low.clk,
-+		.enable		= s5p64x0_hclk0_ctrl,
-+		.ctrlbit	= (1 << 12),
-+	}, {
- 		.name		= "hsmmc",
- 		.id		= 0,
- 		.parent		= &clk_hclk_low.clk,
-@@ -334,12 +340,6 @@ static struct clk init_clocks[] = {
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 21),
- 	}, {
--		.name		= "dma",
--		.id		= -1,
--		.parent		= &clk_hclk_low.clk,
--		.enable		= s5p64x0_hclk0_ctrl,
--		.ctrlbit	= (1 << 12),
--	}, {
- 		.name		= "uart",
- 		.id		= 0,
- 		.parent		= &clk_pclk_low.clk,
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index 1b9b0f9..7dbf3c9 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -189,6 +189,12 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 3),
- 	}, {
-+		.name		= "pdma",
-+		.id		= -1,
-+		.parent		= &clk_hclk_low.clk,
-+		.enable		= s5p64x0_hclk0_ctrl,
-+		.ctrlbit	= (1 << 12),
-+	}, {
- 		.name		= "hsmmc",
- 		.id		= 0,
- 		.parent		= &clk_hclk_low.clk,
-@@ -286,12 +292,6 @@ static struct clk init_clocks[] = {
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 21),
- 	}, {
--		.name		= "dma",
--		.id		= -1,
--		.parent		= &clk_hclk_low.clk,
--		.enable		= s5p64x0_hclk0_ctrl,
--		.ctrlbit	= (1 << 12),
--	}, {
- 		.name		= "uart",
- 		.id		= 0,
- 		.parent		= &clk_pclk_low.clk,
++		.parent		= &clk_pclkd1,
++		.enable		= s5p6442_clk_ip0_ctrl,
++		.ctrlbit	= (1 << 3),
++	},
++};
++
+ static struct clk init_clocks[] = {
+ 	{
+ 		.name		= "systimer",
+@@ -393,10 +408,23 @@ static struct clk *clks[] __initdata = {
+ 
+ void __init s5p6442_register_clocks(void)
+ {
++	struct clk *clkptr;
++	int i, ret;
++
+ 	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
+ 
+ 	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
+ 	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+ 
++	clkptr = init_clocks_disable;
++	for (i = 0; i < ARRAY_SIZE(init_clocks_disable); i++, clkptr++) {
++		ret = s3c24xx_register_clock(clkptr);
++		if (ret < 0) {
++			printk(KERN_ERR "Fail to register clock %s (%d)\n",
++					clkptr->name, ret);
++		} else
++			(clkptr->enable)(clkptr, 0);
++	}
++
+ 	s3c_pwmclk_init();
+ }
+diff --git a/arch/arm/mach-s5p6442/include/mach/regs-clock.h b/arch/arm/mach-s5p6442/include/mach/regs-clock.h
+index d8360b5..00828a3 100644
+--- a/arch/arm/mach-s5p6442/include/mach/regs-clock.h
++++ b/arch/arm/mach-s5p6442/include/mach/regs-clock.h
+@@ -46,6 +46,7 @@
+ #define S5P_CLK_DIV5		S5P_CLKREG(0x314)
+ #define S5P_CLK_DIV6		S5P_CLKREG(0x318)
+ 
++#define S5P_CLKGATE_IP0		S5P_CLKREG(0x460)
+ #define S5P_CLKGATE_IP3		S5P_CLKREG(0x46C)
+ 
+ /* CLK_OUT */
 -- 
 1.6.2.5
