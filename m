@@ -1,52 +1,19 @@
 From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Thu, 21 Oct 2010 09:53:18 +0200
-Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
-In-Reply-To: <1287647127-1434-1-git-send-email-simon@sequanux.org>
+Date: Thu, 21 Oct 2010 09:53:46 +0200
+Subject: [PATCH 2/2] [ARM] Kirkwood: fix timer initialization for LaCie
+	boards
+In-Reply-To: <1287647127-1434-2-git-send-email-simon@sequanux.org>
 References: <20101020085720.GA12979@mail.wantstofly.org>
 	<1287647127-1434-1-git-send-email-simon@sequanux.org>
-Message-ID: <20101021075318.GB22363@mail.wantstofly.org>
+	<1287647127-1434-2-git-send-email-simon@sequanux.org>
+Message-ID: <20101021075346.GC22363@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the patch title:
-
-> [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
-
-s/TLCK/TCLK/
-
-
-
-On Thu, Oct 21, 2010 at 09:45:26AM +0200, Simon Guinot wrote:
+On Thu, Oct 21, 2010 at 09:45:27AM +0200, Simon Guinot wrote:
 
 > From: Simon Guinot <sguinot@lacie.com>
 > 
-> According to the Marvell LSP, the Sample at Reset regiter bit 21 can be
-> used to detect TCLK on 6281 and 6282 devices.
-> 
-> This patch has only been tested on LaCie boards.
->
-> [snip]
->  
-> -	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
-> -					rev == MV88F6281_REV_A1)) ||
-> -	    (dev == MV88F6282_DEV_ID))
-> -		return 200000000;
-> +	if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
-> +		if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
-> +			return 200000000;
->  
->  	return 166666667;
->  }
+> Signed-off-by: Simon Guinot <sguinot@lacie.com>
 
-Can we not just make this:
-
-	if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
-		return 200000000;
-	else
-		return 166666667;
-
-(I don't have the necessary docs, Saeed might have to answer this one.)
-
-
-thanks,
-Lennert
+Acked-by: Lennert Buytenhek <buytenh@wantstofly.org>
