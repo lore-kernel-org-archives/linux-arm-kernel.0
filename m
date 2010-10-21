@@ -1,65 +1,174 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Thu, 21 Oct 2010 09:49:14 +0000
-Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
-In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009FD18F0B3F89@IL-MB01.marvell.com>
-References: <20101020085720.GA12979@mail.wantstofly.org>
-	<1287647127-1434-1-git-send-email-simon@sequanux.org>
-	<FCBE654890C0334289D0AD3AF4EF009FD18F0B3F89@IL-MB01.marvell.com>
-Message-ID: <20101021094914.GN29120@kw.sim.vm.gnt>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Thu, 21 Oct 2010 13:52:02 +0400
+Subject: [PATCH 1/6] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <201010211005.42866.arnd@arndb.de>
+References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
+	<201010211005.42866.arnd@arndb.de>
+Message-ID: <AANLkTin+BOEJUjaUB-fTXY+iTAa4wDthd+QhE-VuFGFW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 09:56:08AM +0200, Saeed Bishara wrote:
->  
-> 
-> >-----Original Message-----
-> >From: Simon Guinot [mailto:simon at sequanux.org] 
-> >Sent: Thursday, October 21, 2010 9:45 AM
-> >To: Lennert Buytenhek; Nicolas Pitre
-> >Cc: linux-arm-kernel at lists.infradead.org; Benoit Canet; Saeed 
-> >Bishara; Simon Guinot
-> >Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
-> >
-> >From: Simon Guinot <sguinot@lacie.com>
-> >
-> >According to the Marvell LSP, the Sample at Reset regiter bit 21 can be
-> >used to detect TCLK on 6281 and 6282 devices.
-> >
-> >This patch has only been tested on LaCie boards.
-> >
-> >Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> >---
-> > arch/arm/mach-kirkwood/common.c |    7 +++----
-> > 1 files changed, 3 insertions(+), 4 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-kirkwood/common.c 
-> >b/arch/arm/mach-kirkwood/common.c
-> >index 1c82d42..72bb76f 100644
-> >--- a/arch/arm/mach-kirkwood/common.c
-> >+++ b/arch/arm/mach-kirkwood/common.c
-> >@@ -854,10 +854,9 @@ int __init kirkwood_find_tclk(void)
-> > 
-> > 	kirkwood_pcie_id(&dev, &rev);
-> > 
-> >-	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
-> >-					rev == MV88F6281_REV_A1)) ||
-> >-	    (dev == MV88F6282_DEV_ID))
-> >-		return 200000000;
-> >+	if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
-> >+		if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
-> >+			return 200000000;
-> The flow is ok, but the code doesn't look correct, the & precedence is higher thatn >>.
+2010/10/21 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 20 October 2010 22:55:33 Alexey Charkov wrote:
+>
+>> Please review and state whether this could be acceptable for a merge
+>> to mainline in the coming 2.6.37 window. If possible, I would deeply
+>> appreciate a merge to a relevant git tree for integration prior to
+>> asking Linus to pull the changes. I could rebase the code if needed,
+>> currently this is against Linus' master branch.
+>
+> As Greg mentioned for his review of the serial drivers, it's too late
+> for 2.6.37. Fortunately that means you're really early for 2.6.38
+> and getting it in there should be easy.
+>
+> The code does look very good though overall.
+>
 
-Sorry for missing that. The compiler optimize in the way with and
-without parenthesis.
+Good to hear that, thanks!
 
-Thanks,
+>> +
+>> +choice
+>> + ? ? prompt "LCD panel size"
+>> + ? ? depends on (FB_VT8500 || FB_WM8505)
+>> + ? ? default WMT_PANEL_800X480
+>> +
+>> +config WMT_PANEL_800X480
+>> + ? ? bool "7-inch with 800x480 resolution"
+>> + ? ? help
+>> + ? ? ? These are found in most of the netbooks in generic cases, as
+>> + ? ? ? well as in Eken M001 tablets and possibly elsewhere.
+>> +
+>> +config WMT_PANEL_800X600
+>> + ? ? bool "8-inch with 800x600 resolution"
+>> + ? ? help
+>> + ? ? ? These are found in Eken M003 tablets and possibly elsewhere.
+>> +
+>> +config WMT_PANEL_1024X600
+>> + ? ? bool "10-inch with 1024x600 resolution"
+>> + ? ? help
+>> + ? ? ? These are found in Eken M006 tablets and possibly elsewhere.
+>> +
+>> +endchoice
+>
+> This should really be a run-time or at least boot-time option. If you
+> set the frame buffer size at compile time, I guess you can no longer
+> boot on a machine that uses a different size.
+>
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101021/d82303ea/attachment.sig>
+It could be, but then I'd have to parse kernel command line at the
+map_io stage. Is that fine? If yes, I could rework it to e.g. accept a
+default value via Kconfig and allow it to be overriden via a boot
+argument.
+
+And due to the fact that the framebuffer size calculation is tied to
+panel specification, it will boot in any case. The only problem that
+one could encounter would be suboptimal display (for example,
+offscreen pixmaps to become actually visible on screen if the panel is
+taller
+than expected, or some corruption in case it is wider).
+
+>> +#include <mach/vt8500.h>
+>> +#include "devices.h"
+>> +
+>> +static struct platform_device *devices[] __initdata = {
+>> + ? ? &vt8500_device_uart0,
+>> +#ifdef CONFIG_FB_VT8500
+>> + ? ? &vt8500_device_lcdc,
+>> +#endif
+>> +#ifdef CONFIG_USB_EHCI_HCD
+>> + ? ? &vt8500_device_ehci,
+>> +#endif
+>> +#ifdef CONFIG_FB_WMT_GE_ROPS
+>> + ? ? &vt8500_device_ge_rops,
+>> +#endif
+>> +#ifdef CONFIG_HAVE_PWM
+>> + ? ? &vt8500_device_pwm,
+>> +#endif
+>> +#ifdef CONFIG_BACKLIGHT_PWM
+>> + ? ? &vt8500_device_pwmbl,
+>> +#endif
+>> +#ifdef CONFIG_RTC_DRV_VT8500
+>> + ? ? &vt8500_device_rtc,
+>> +#endif
+>> +};
+>
+> This doesn't work if the drivers are built as loadable modules, right?
+> I wouldn't even make the definitions of the devices configuration dependent.
+> The idea of the device model is that you describe what you have in one
+> place and use that information to load the drivers for it.
+>
+
+But with loadable modules those symbols should still be defined as 'm'
+or something, shouldn't they? Anyway, I'll drop those conditions,
+thanks for pointing out.
+
+>> +#ifdef CONFIG_VTWM_VERSION_WM8505
+>> +extern struct platform_device vt8500_device_uart4;
+>> +extern struct platform_device vt8500_device_uart5;
+>> +#endif
+>> +
+>> +#ifdef CONFIG_FB_VT8500
+>> +extern struct platform_device vt8500_device_lcdc;
+>> +#endif
+>> +#ifdef CONFIG_FB_WM8505
+>> +extern struct platform_device vt8500_device_wm8505_fb;
+>> +#endif
+>> +
+>> +#ifdef CONFIG_USB_EHCI_HCD
+>> +extern struct platform_device vt8500_device_ehci;
+>> +#endif
+>> +
+>> +#ifdef CONFIG_FB_WMT_GE_ROPS
+>> +extern struct platform_device vt8500_device_ge_rops;
+>> +#endif
+>> +#ifdef CONFIG_HAVE_PWM
+>> +extern struct platform_device vt8500_device_pwm;
+>> +#endif
+>> +#ifdef CONFIG_BACKLIGHT_PWM
+>> +extern struct platform_device vt8500_device_pwmbl;
+>> +#endif
+>> +#ifdef CONFIG_RTC_DRV_VT8500
+>> +extern struct platform_device vt8500_device_rtc;
+>> +#endif
+>
+> The declarations never belong in an #ifdef, just make them
+> unconditional.
+>
+
+Ok, got it.
+
+>> +#ifndef __ASM_ARM_ARCH_IO_H
+>> +#define __ASM_ARM_ARCH_IO_H
+>> +
+>> +#define IO_SPACE_LIMIT 0xffffffff
+>> +
+>> +#define __io(a) ? ? ? ? ? ? ?__typesafe_io(a)
+>> +#define __mem_pci(a) (a)
+>> +
+>> +#endif
+>
+>
+> This won't work if you ever want to use the PCI on vt8505 with devices
+> that have I/O space mapping.
+>
+> You need to define IO_SPACE_LIMIT to the size of your I/O space and
+> make the __io macro offset the address with the start of that window.
+>
+
+The problem is that there is no documentation available for the PCI
+bus in these systems (if it is even implemented there).
+Vendor-provided sources do not really clarify it either, which you
+have commented about at:
+http://groups.google.com/group/vt8500-wm8505-linux-kernel/msg/97bf44bc5ea5d46a?
+
+With no possibilities to test this (as I don't know any of these
+devices to really use PCI with enumeration rather than just static
+platform-like definitions as in the vendor's kernel), I just can't
+imagine how this could be done any better.
+
+> ? ? ? ?Arnd
+>
+
+Thanks!
+Alexey
