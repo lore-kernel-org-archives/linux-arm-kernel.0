@@ -1,37 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 Oct 2010 20:44:18 +0200
-Subject: [PATCH 0/2] mx25_3ds & mx35_3ds: add mmc support
-In-Reply-To: <1287678225-11066-1-git-send-email-shawn.gsc@gmail.com>
-References: <1287678225-11066-1-git-send-email-shawn.gsc@gmail.com>
-Message-ID: <20101021184418.GW19834@pengutronix.de>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 21 Oct 2010 11:37:35 -0700
+Subject: [RFC PATCH] arm: msm: moved Kconfig machine entry into mach-msm
+Message-ID: <1287686255-18674-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Has anyone suggested this? It seems like it might reduce conflicts
+in the Kconfig file.
 
-On Fri, Oct 22, 2010 at 12:23:43AM +0800, Shawn Guo wrote:
-> The patch was tested on top of Uwe's build fix below. 
-> 
->  ARM: mx3: fix build failure concerning MXC_INT_MMC_SDHC2
-> 
-> Shawn Guo (3)
->  [PATCH 1/2] mx35_3ds: add mmc support
->  [PATCH 2/2] mx25_3ds: add mmc support
-Both look ok, Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
->  arch/arm/mach-mx25/Kconfig         |    1 +
->  arch/arm/mach-mx25/mach-mx25_3ds.c |   10 ++++++++++
->  arch/arm/mach-mx3/Kconfig          |    1 +
->  arch/arm/mach-mx3/mach-mx35_3ds.c  |    8 ++++++++
->  4 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+---
+ arch/arm/Kconfig               |   12 +-----------
+ arch/arm/mach-msm/Kconfig.base |   13 +++++++++++++
+ 2 files changed, 14 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/mach-msm/Kconfig.base
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 88c97bc..e256564 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -590,17 +590,7 @@ config ARCH_PXA
+ 	help
+ 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
+ 
+-config ARCH_MSM
+-	bool "Qualcomm MSM"
+-	select HAVE_CLK
+-	select GENERIC_CLOCKEVENTS
+-	select ARCH_REQUIRE_GPIOLIB
+-	help
+-	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+-	  apps processor of the MSM/QSD and depends on a shared memory
+-	  interface to the modem processor which runs the baseband
+-	  stack and controls some vital subsystems
+-	  (clock and power control, etc).
++source "arch/arm/mach-msm/Kconfig.base"
+ 
+ config ARCH_SHMOBILE
+ 	bool "Renesas SH-Mobile"
+diff --git a/arch/arm/mach-msm/Kconfig.base b/arch/arm/mach-msm/Kconfig.base
+new file mode 100644
+index 0000000..184ac66
+--- /dev/null
++++ b/arch/arm/mach-msm/Kconfig.base
+@@ -0,0 +1,13 @@
++
++config ARCH_MSM
++	bool "Qualcomm MSM"
++	select HAVE_CLK
++	select GENERIC_CLOCKEVENTS
++	select ARCH_REQUIRE_GPIOLIB
++	help
++	  Support for Qualcomm MSM/QSD based systems.  This runs on the
++	  apps processor of the MSM/QSD and depends on a shared memory
++	  interface to the modem processor which runs the baseband
++	  stack and controls some vital subsystems
++	  (clock and power control, etc).
++
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.0.4
