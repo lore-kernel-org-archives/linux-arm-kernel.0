@@ -1,96 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Oct 2010 16:30:01 +0900
-Subject: [PATCH V4 2/3] ARM: S5PV310: Remove L2 cache init in machine
-Message-ID: <1287646201-14183-1-git-send-email-kgene.kim@samsung.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Thu, 21 Oct 2010 09:45:26 +0200
+Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
+In-Reply-To: <20101020085720.GA12979@mail.wantstofly.org>
+References: <20101020085720.GA12979@mail.wantstofly.org>
+Message-ID: <1287647127-1434-1-git-send-email-simon@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+From: Simon Guinot <sguinot@lacie.com>
 
-Basically, need L2 cache initialize function in ARCH_S5PV310. So it would
-be better to move it into ARCH_S5PV310 common part. This patch removes L2
-cache initialization code at the each board file.
+According to the Marvell LSP, the Sample at Reset regiter bit 21 can be
+used to detect TCLK on 6281 and 6282 devices.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+This patch has only been tested on LaCie boards.
+
+Signed-off-by: Simon Guinot <sguinot@lacie.com>
 ---
-Changes since v3:
-- Removed useless header in each mach-xxx.c
+ arch/arm/mach-kirkwood/common.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
- arch/arm/mach-s5pv310/mach-smdkc210.c       |    5 -----
- arch/arm/mach-s5pv310/mach-smdkv310.c       |    5 -----
- arch/arm/mach-s5pv310/mach-universal_c210.c |    5 -----
- 3 files changed, 0 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-s5pv310/mach-smdkc210.c b/arch/arm/mach-s5pv310/mach-smdkc210.c
-index 93d537b..9f7f77d 100644
---- a/arch/arm/mach-s5pv310/mach-smdkc210.c
-+++ b/arch/arm/mach-s5pv310/mach-smdkc210.c
-@@ -15,7 +15,6 @@
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 1c82d42..72bb76f 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -854,10 +854,9 @@ int __init kirkwood_find_tclk(void)
  
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
--#include <asm/hardware/cache-l2x0.h>
+ 	kirkwood_pcie_id(&dev, &rev);
  
- #include <plat/regs-serial.h>
- #include <plat/s5pv310.h>
-@@ -129,10 +128,6 @@ static void __init smdkc210_machine_init(void)
- 	s3c_sdhci2_set_platdata(&smdkc210_hsmmc2_pdata);
- 	s3c_sdhci3_set_platdata(&smdkc210_hsmmc3_pdata);
+-	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
+-					rev == MV88F6281_REV_A1)) ||
+-	    (dev == MV88F6282_DEV_ID))
+-		return 200000000;
++	if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
++		if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
++			return 200000000;
  
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
--
- 	platform_add_devices(smdkc210_devices, ARRAY_SIZE(smdkc210_devices));
+ 	return 166666667;
  }
- 
-diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
-index 10f8056..e350a75 100644
---- a/arch/arm/mach-s5pv310/mach-smdkv310.c
-+++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
-@@ -15,7 +15,6 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
--#include <asm/hardware/cache-l2x0.h>
- 
- #include <plat/regs-serial.h>
- #include <plat/s5pv310.h>
-@@ -129,10 +128,6 @@ static void __init smdkv310_machine_init(void)
- 	s3c_sdhci2_set_platdata(&smdkv310_hsmmc2_pdata);
- 	s3c_sdhci3_set_platdata(&smdkv310_hsmmc3_pdata);
- 
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
--
- 	platform_add_devices(smdkv310_devices, ARRAY_SIZE(smdkv310_devices));
- }
- 
-diff --git a/arch/arm/mach-s5pv310/mach-universal_c210.c b/arch/arm/mach-s5pv310/mach-universal_c210.c
-index deffeb1..9ea7836 100644
---- a/arch/arm/mach-s5pv310/mach-universal_c210.c
-+++ b/arch/arm/mach-s5pv310/mach-universal_c210.c
-@@ -16,7 +16,6 @@
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
--#include <asm/hardware/cache-l2x0.h>
- 
- #include <plat/regs-serial.h>
- #include <plat/s5pv310.h>
-@@ -141,10 +140,6 @@ static void __init universal_map_io(void)
- 
- static void __init universal_machine_init(void)
- {
--#ifdef CONFIG_CACHE_L2X0
--	l2x0_init(S5P_VA_L2CC, 1 << 28, 0xffffffff);
--#endif
--
- 	i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
- 	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
- 
 -- 
-1.6.2.5
+1.6.3.1
