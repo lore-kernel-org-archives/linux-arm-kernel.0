@@ -1,129 +1,34 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 20 Oct 2010 16:58:52 -0700
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-	(Ohad Ben-Cohen's message of "Wed, 20 Oct 2010 21:21:05 +0200")
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
-	<8739s0sobc.fsf@deeprootsystems.com>
-	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-Message-ID: <877hhcl8lf.fsf@deeprootsystems.com>
+From: napohybelskurwysynom2010@gmail.com (Zimny Lech)
+Date: Thu, 21 Oct 2010 02:23:11 +0200
+Subject: [RFC] Removal of dead code from arch/arm/*
+Message-ID: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ohad Ben-Cohen <ohad@wizery.com> writes:
+Hi,
 
-> On Wed, Oct 20, 2010 at 8:37 PM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->>> Let's take the i2c-omap for example.
->>>
->>> It sounds like it must have a predefined hwspinlock, but what if:
->>>
->>> 1. It will use omap_hwspinlock_request() to dynamically allocate a hwspinlock
->>> 2. Obviously, the hwspinlock id number must be communicated to the M3
->>> BIOS, so the i2c-omap will publish that id using a small shared memory
->>> entry that will be allocated for this sole purpose
->>> 3. we will make sure that 1+2 completes before the remote processor is
->>> taken out of reset
->>>
->>> This does not require any smart IPC and it will allow us to get rid of
->>> the omap_hwspinlock_request_specific() API and its early-callers
->>> requirement.
->>
->> Yes, that would indeed simplify things.
->
-> Balaji, Nishant, are you OK with this ?
->
-> It means that the I2C driver will dynamically get a hwspinlock and
-> then it would need to announce the id of that hwspinlock before the M3
-> is taken out of reset.
->
-> It will help us get rid of static allocations that will never scale
-> nicely and static vs. dynamic allocation races.
->
->>
->>> All we will be left to take care of is the order of the ->probe()
->>> execution (assuming we want both the i2c and the hwspinlock drivers to
->>> be device_initcall)
->>
->> I understand the dependency between i2c and hwspinlock for some
->> platforms with a shared i2c bus. ?Besides that being a broken hardware
->> design, I can see the need for the i2c driver to take a hwspinlock for
->> i2c xfers, but why does the i2c driver need to take the hwspinlock at
->> probe time?
->
-> It doesn't; it just needs to reserve a hwspinlock, and for that, we
-> need the hwspinlock driver in place.
+I will begin testing this, I would like to know your opinion about this patches
+git pull git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc1
 
-OK
+ arch/arm/kernel/time.c                       |    6 +-
+ arch/arm/mach-omap1/board-sx1.c              |   27 -
+ arch/arm/mach-omap1/pm.c                     |    7 -
+ arch/arm/mach-s3c2410/include/mach/gpio.h    |    4 -
+ arch/arm/mach-s3c2443/mach-smdk2443.c        |    8 -
+ arch/arm/mach-sa1100/include/mach/SA-1101.h  |  925 --------------------------
+ arch/arm/mach-sa1100/include/mach/hardware.h |    4 -
+ arch/arm/mach-u300/clock.c                   |   91 ---
+ arch/arm/plat-mxc/include/mach/mx51.h        |    4 -
+ arch/m32r/kernel/time.c                      |    6 +-
+ drivers/acpi/proc.c                          |    2 +-
+ 11 files changed, 3 insertions(+), 1081 deletions(-)
 
->> ?Presumably, this is before the remote cores are executing
->> code.
->>
->>>>
->>>> This kind of thing needs to be done by platform_data function pointers,
->>>> as is done for every other driver that needs platform-specific driver
->>>> customization.
->>>
->>> Why would we need platform-specific function pointers here ? I'm not
->>> sure I'm following this one.
->>
->> So that board code (built-in) does not call the hwspinlock driver
->> (potentially a module.)
->>
->> The way to solve this is to have platform_data with function pointers,
->> so that when the driver's ->probe() is done, it can call cany custom
->> hooks registered by the board code.
->
-> Sorry, still not following.
->
-> Do you refer to the i2c driver calling the hwspinlcok_request function
-> at probe time via platform_data function pointers ?
 
-No, earlier in this discussion, in response to my question about users
-of this API early in boot, you said:
+-- 
+Slawa!
+N.P.S.
 
-> And to allow early board code to reserve specific hwspinlock numbers
-> for predefined use-cases, we probably want to be before arch_initcall.
-
-My suggestion to use platform_data + function pointers was to address
-the requesting of hwspinlocks in board/platform-specific code.
-
-If the _request_specific() API is removed, and board code no longer
-needs to call hwspinlock API, then this issue is moot.  However, if
-board code ever needs to call the hwspinlock API, then pdata func
-pointers are needed to handle both the case of late driver probe
-or driver built as a module.
-
-> With the previous _request_specific() allocation API, the important
-> issue to follow was the timing:  it had to be called before any driver
-> gets the chance to call the dynamic _request() API.
-> That's why we had to have early board code calling it. Obviously the
-> hwspinlock instance would then had to be delivered to the driver via
-> platform data.
->
-> But now, if we get rid of that static allocation method entirely,
-> i2c_omap can just call hwspinlock_request() on probe(), but again, no
-> pdata function pointers are involved because this API is
-> EXPORT_SYMBOL'ed.
-
-Agreed.  If you get rid of the _request_specific() API, then this is not
-needed in the board code and pdata function pointers should not be
-needed.
-
-So then, we're back to how to ensure probe order of hwspinlock vs
-i2c. :/
-
-I agree with others that this is a much broader problem, and should not
-hold up the hwspinlock driver, so for now, making hwspinlock have an
-initcall before subsys_initcall is OK with me.  Probably arch_initcall()
-is fine here.
-
-I suggest you add a comment in the code at the initcall point as to why
-it is using arch_initcall(), namely it has to load before i2c because...
-
-Kevin
+Les fleurs du mal unfold
+Comme les fleurs du mal
+Dark demons of my soul
+Un amour fatal
