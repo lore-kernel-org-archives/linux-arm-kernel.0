@@ -1,59 +1,64 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Thu, 21 Oct 2010 17:01:11 -0400
-Subject: [PATCH v3 10/12] backlight: add support for tps6116x controller
+Date: Thu, 21 Oct 2010 17:01:07 -0400
+Subject: [PATCH v3 06/12] regulator: add driver for tps6524x regulator
 In-Reply-To: <1287694873-12904-1-git-send-email-cyril@ti.com>
 References: <1287694873-12904-1-git-send-email-cyril@ti.com>
-Message-ID: <1287694873-12904-11-git-send-email-cyril@ti.com>
+Message-ID: <1287694873-12904-7-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS6116x is an EasyScale backlight controller device.  This driver supports
-TPS6116x devices connected on a single GPIO.
+TPS6524X provides three step-down converters and two general-purpose LDO
+voltage regulators.  This device is interfaced using SPI.
 
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- drivers/video/backlight/Kconfig    |    7 +
- drivers/video/backlight/Makefile   |    2 +-
- drivers/video/backlight/tps6116x.c |  340 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 348 insertions(+), 1 deletions(-)
- create mode 100644 drivers/video/backlight/tps6116x.c
+ drivers/regulator/Kconfig              |   10 +
+ drivers/regulator/Makefile             |    1 +
+ drivers/regulator/tps6524x-regulator.c |  692 ++++++++++++++++++++++++++++++++
+ 3 files changed, 703 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/regulator/tps6524x-regulator.c
 
-diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index e54a337..06e868e 100644
---- a/drivers/video/backlight/Kconfig
-+++ b/drivers/video/backlight/Kconfig
-@@ -307,6 +307,13 @@ config BACKLIGHT_PCF50633
- 	  If you have a backlight driven by a NXP PCF50633 MFD, say Y here to
- 	  enable its driver.
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 172951b..7875c2e 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -235,5 +235,15 @@ config REGULATOR_TPS6586X
+ 	help
+ 	  This driver supports TPS6586X voltage regulator chips.
  
-+config BACKLIGHT_TPS6116X
-+	tristate "TPS6116X LCD Backlight"
-+	depends on GENERIC_GPIO
++config REGULATOR_TPS6524X
++	tristate "TI TPS6524X Power regulators"
++	depends on TI_SSP
 +	help
-+	  This driver controls the LCD backlight level for EasyScale capable
-+	  SSP connected backlight controllers.
++	  This driver supports TPS6524X voltage regulator chips. TPS6524X
++	  provides three step-down converters and two general-purpose LDO
++	  voltage regulators.  This device is interfaced using a customized
++	  serial interface currently supported on the sequencer serial
++	  port controller.
 +
- endif # BACKLIGHT_CLASS_DEVICE
+ endif
  
- endif # BACKLIGHT_LCD_SUPPORT
-diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
-index 44c0f81..5d407c8 100644
---- a/drivers/video/backlight/Makefile
-+++ b/drivers/video/backlight/Makefile
-@@ -35,4 +35,4 @@ obj-$(CONFIG_BACKLIGHT_ADP5520)	+= adp5520_bl.o
- obj-$(CONFIG_BACKLIGHT_ADP8860)	+= adp8860_bl.o
- obj-$(CONFIG_BACKLIGHT_88PM860X) += 88pm860x_bl.o
- obj-$(CONFIG_BACKLIGHT_PCF50633)	+= pcf50633-backlight.o
--
-+obj-$(CONFIG_BACKLIGHT_TPS6116X)+= tps6116x.o
-diff --git a/drivers/video/backlight/tps6116x.c b/drivers/video/backlight/tps6116x.c
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 8285fd8..a8e5bc0 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -33,6 +33,7 @@ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+ 
+ obj-$(CONFIG_REGULATOR_TPS65023) += tps65023-regulator.o
+ obj-$(CONFIG_REGULATOR_TPS6507X) += tps6507x-regulator.o
++obj-$(CONFIG_REGULATOR_TPS6524X) += tps6524x-regulator.o
+ obj-$(CONFIG_REGULATOR_88PM8607) += 88pm8607.o
+ obj-$(CONFIG_REGULATOR_ISL6271A) += isl6271a-regulator.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
+diff --git a/drivers/regulator/tps6524x-regulator.c b/drivers/regulator/tps6524x-regulator.c
 new file mode 100644
-index 0000000..7a9f8ca
+index 0000000..6d6cc5e
 --- /dev/null
-+++ b/drivers/video/backlight/tps6116x.c
-@@ -0,0 +1,340 @@
++++ b/drivers/regulator/tps6524x-regulator.c
+@@ -0,0 +1,692 @@
 +/*
-+ * TPS6116X LCD Backlight Controller Driver
++ * Regulator driver for TPS6524x PMIC
 + *
 + * Copyright (C) 2010 Texas Instruments
 + *
@@ -68,329 +73,681 @@ index 0000000..7a9f8ca
 + */
 +
 +#include <linux/kernel.h>
-+#include <linux/fb.h>
++#include <linux/module.h>
 +#include <linux/err.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/backlight.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
++#include <linux/errno.h>
++#include <linux/slab.h>
++#include <linux/spi/spi.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/machine.h>
 +
-+#define TPS6116X_MAX_INTENSITY		31
-+#define TPS6116X_DEFAULT_INTENSITY	10
++#define REG_LDO_SET		0x0
++#define LDO_ILIM_MASK		1	/* 0 = 400-800, 1 = 900-1500 */
++#define LDO_VSEL_MASK		0x0f
++#define LDO2_ILIM_SHIFT		12
++#define LDO2_VSEL_SHIFT		4
++#define LDO1_ILIM_SHIFT		8
++#define LDO1_VSEL_SHIFT		0
 +
-+/* Easyscale timing w/ margin (usecs) */
-+#define T_POWER_SETTLE			2000
-+#define T_ES_DELAY			120
-+#define T_ES_DETECT			280
-+#define T_ES_WINDOW			(1000 - T_ES_DELAY - T_ES_DETECT)
-+#define T_START				3
-+#define T_EOS				3
-+#define T_INACTIVE			3
-+#define T_ACTIVE			(3 * T_INACTIVE)
++#define REG_BLOCK_EN		0x1
++#define BLOCK_MASK		1
++#define BLOCK_LDO1_SHIFT	0
++#define BLOCK_LDO2_SHIFT	1
++#define BLOCK_LCD_SHIFT		2
++#define BLOCK_USB_SHIFT		3
 +
-+#define CMD_SET				0x72
++#define REG_DCDC_SET		0x2
++#define DCDC_VDCDC_MASK		0x1f
++#define DCDC_VDCDC1_SHIFT	0
++#define DCDC_VDCDC2_SHIFT	5
++#define DCDC_VDCDC3_SHIFT	10
 +
-+struct tps6116x {
-+	struct ti_ssp_device		*handle;
-+	struct device			*dev;
-+	int				gpio, gpio_initialized;
-+	struct mutex			lock;
-+	int				intensity;
-+	int				power;
-+	struct backlight_properties	props;
-+	struct backlight_device		*bl;
-+	int				suspended:1;
-+	struct regulator		*regulator;
++#define REG_DCDC_EN		0x3
++#define DCDCDCDC_EN_MASK	0x1
++#define DCDCDCDC1_EN_SHIFT	0
++#define DCDCDCDC1_PG_MSK	BIT(1)
++#define DCDCDCDC2_EN_SHIFT	2
++#define DCDCDCDC2_PG_MSK	BIT(3)
++#define DCDCDCDC3_EN_SHIFT	4
++#define DCDCDCDC3_PG_MSK	BIT(5)
++
++#define REG_USB			0x4
++#define USB_ILIM_SHIFT		0
++#define USB_ILIM_MASK		0x3
++#define USB_TSD_SHIFT		2
++#define USB_TSD_MASK		0x3
++#define USB_TWARN_SHIFT		4
++#define USB_TWARN_MASK		0x3
++#define USB_IWARN_SD		BIT(6)
++#define USB_FAST_LOOP		BIT(7)
++
++#define REG_ALARM		0x5
++#define ALARM_LDO1		BIT(0)
++#define ALARM_DCDC1		BIT(1)
++#define ALARM_DCDC2		BIT(2)
++#define ALARM_DCDC3		BIT(3)
++#define ALARM_LDO2		BIT(4)
++#define ALARM_USB_WARN		BIT(5)
++#define ALARM_USB_ALARM		BIT(6)
++#define ALARM_LCD		BIT(9)
++#define ALARM_TEMP_WARM		BIT(10)
++#define ALARM_TEMP_HOT		BIT(11)
++#define ALARM_NRST		BIT(14)
++#define ALARM_POWERUP		BIT(15)
++
++#define REG_INT_ENABLE		0x6
++#define INT_LDO1		BIT(0)
++#define INT_DCDC1		BIT(1)
++#define INT_DCDC2		BIT(2)
++#define INT_DCDC3		BIT(3)
++#define INT_LDO2		BIT(4)
++#define INT_USB_WARN		BIT(5)
++#define INT_USB_ALARM		BIT(6)
++#define INT_LCD			BIT(9)
++#define INT_TEMP_WARM		BIT(10)
++#define INT_TEMP_HOT		BIT(11)
++#define INT_GLOBAL_EN		BIT(15)
++
++#define REG_INT_STATUS		0x7
++#define STATUS_LDO1		BIT(0)
++#define STATUS_DCDC1		BIT(1)
++#define STATUS_DCDC2		BIT(2)
++#define STATUS_DCDC3		BIT(3)
++#define STATUS_LDO2		BIT(4)
++#define STATUS_USB_WARN		BIT(5)
++#define STATUS_USB_ALARM	BIT(6)
++#define STATUS_LCD		BIT(9)
++#define STATUS_TEMP_WARM	BIT(10)
++#define STATUS_TEMP_HOT		BIT(11)
++
++#define REG_SOFTWARE_RESET	0xb
++#define REG_WRITE_ENABLE	0xd
++#define REG_REV_ID		0xf
++
++#define N_DCDC			3
++#define N_LDO			2
++#define N_SWITCH		2
++#define N_REGULATORS		(3 /* DCDC */ + \
++				 2 /* LDO */  + \
++				 2 /* switch */)
++
++#define FIXED_ILIMSEL		BIT(0)
++#define FIXED_VOLTAGE		BIT(1)
++
++#define CMD_READ(reg)		((reg) << 6)
++#define CMD_WRITE(reg)		(BIT(5) | (reg) << 6)
++#define STAT_CLK		BIT(3)
++#define STAT_WRITE		BIT(2)
++#define STAT_INVALID		BIT(1)
++#define STAT_WP			BIT(0)
++
++struct field {
++	int		reg;
++	int		shift;
++	int		mask;
 +};
 +
-+static int __set_power(struct tps6116x *hw, int power)
++struct supply_info {
++	const char	*name;
++	int		n_voltages;
++	const int	*voltages;
++	int		fixed_voltage;
++	int		n_ilimsels;
++	const int	*ilimsels;
++	int		fixed_ilimsel;
++	int		flags;
++	struct field	enable, voltage, ilimsel;
++};
++
++struct tps6524x {
++	struct device		*dev;
++	struct spi_device	*spi;
++	struct mutex		lock;
++	struct regulator_desc	desc[N_REGULATORS];
++	struct regulator_dev	*rdev[N_REGULATORS];
++};
++
++static int __read_reg(struct tps6524x *hw, int reg)
 +{
-+	unsigned long flags;
-+	int error;
++	int error = 0;
++	u16 cmd = CMD_READ(reg), in;
++	u8 status;
++	struct spi_message m;
++	struct spi_transfer t[3];
 +
-+	power = !!power;
-+	if (power == hw->power)
-+		return 0; /* nothing to do */
++	spi_message_init(&m);
++	memset(t, 0, sizeof(t));
 +
-+	/* disabling is simple... choke power */
-+	if (!power) {
-+		error = regulator_disable(hw->regulator);
-+		goto done;
-+	}
++	t[0].tx_buf = &cmd;
++	t[0].len = 2;
++	t[0].bits_per_word = 12;
++	spi_message_add_tail(&t[0], &m);
 +
-+	/* set ctrl pin init state for easyscale detection */
-+	gpio_set_value(hw->gpio, 0);
++	t[1].rx_buf = &in;
++	t[1].len = 2;
++	t[1].bits_per_word = 16;
++	spi_message_add_tail(&t[1], &m);
 +
-+	error = regulator_enable(hw->regulator);
++	t[2].rx_buf = &status;
++	t[2].len = 1;
++	t[2].bits_per_word = 4;
++	spi_message_add_tail(&t[2], &m);
++
++	error = spi_sync(hw->spi, &m);
 +	if (error < 0)
-+		goto done;
++		return error;
 +
-+	udelay(T_POWER_SETTLE);
++	dev_dbg(hw->dev, "read reg %d, data %x, status %x\n",
++		reg, in, status);
 +
-+	/*
-+	 * Now that the controller is powered up, we need to put it into 1-wire
-+	 * mode.  This is a timing sensitive operation, hence the irq disable.
-+	 * Ideally, this should happen rarely, and mostly@init, so disabling
-+	 * interrupts for the duration should not be a problem.
-+	 */
-+	local_irq_save(flags);
++	if (!(status & STAT_CLK) || (status & STAT_WRITE))
++		return -EIO;
 +
-+	gpio_set_value(hw->gpio, 1);
-+	udelay(T_ES_DELAY);
-+	gpio_set_value(hw->gpio, 0);
-+	udelay(T_ES_DETECT);
-+	gpio_set_value(hw->gpio, 1);
++	if (status & STAT_INVALID)
++		return -EINVAL;
 +
-+	local_irq_restore(flags);
++	return in;
++}
 +
-+done:
-+	if (error >= 0)
-+		hw->power = power;
++static int read_reg(struct tps6524x *hw, int reg)
++{
++	int ret;
++
++	mutex_lock(&hw->lock);
++	ret = __read_reg(hw, reg);
++	mutex_unlock(&hw->lock);
++
++	return ret;
++}
++
++static int __write_reg(struct tps6524x *hw, int reg, int val)
++{
++	int error = 0;
++	u16 cmd = CMD_WRITE(reg), out = val;
++	u8 status;
++	struct spi_message m;
++	struct spi_transfer t[3];
++
++	spi_message_init(&m);
++	memset(t, 0, sizeof(t));
++
++	t[0].tx_buf = &cmd;
++	t[0].len = 2;
++	t[0].bits_per_word = 12;
++	spi_message_add_tail(&t[0], &m);
++
++	t[1].tx_buf = &out;
++	t[1].len = 2;
++	t[1].bits_per_word = 16;
++	spi_message_add_tail(&t[1], &m);
++
++	t[2].rx_buf = &status;
++	t[2].len = 1;
++	t[2].bits_per_word = 4;
++	spi_message_add_tail(&t[2], &m);
++
++	error = spi_sync(hw->spi, &m);
++	if (error < 0)
++		return error;
++
++	dev_dbg(hw->dev, "wrote reg %d, data %x, status %x\n",
++		reg, out, status);
++
++	if (!(status & STAT_CLK) || !(status & STAT_WRITE))
++		return -EIO;
++
++	if (status & (STAT_INVALID | STAT_WP))
++		return -EINVAL;
 +
 +	return error;
 +}
 +
-+static void __write_byte(struct tps6116x *hw, u8 data)
++static int __rmw_reg(struct tps6524x *hw, int reg, int mask, int val)
 +{
-+	int bit;
++	int ret;
 +
-+	gpio_set_value(hw->gpio, 1);
-+	udelay(T_START);
++	ret = __read_reg(hw, reg);
++	if (ret < 0)
++		return ret;
 +
-+	for (bit = 0; bit < 8; bit++, data <<= 1) {
-+		int val = data & 0x80;
-+		int t_lo = val ? T_INACTIVE : T_ACTIVE;
-+		int t_hi = val ? T_ACTIVE : T_INACTIVE;
++	ret &= ~mask;
++	ret |= val;
 +
-+		gpio_set_value(hw->gpio, 0);
-+		udelay(t_lo);
-+		gpio_set_value(hw->gpio, 1);
-+		udelay(t_hi);
-+	}
++	ret = __write_reg(hw, reg, ret);
 +
-+	gpio_set_value(hw->gpio, 0);
-+	udelay(T_EOS);
-+	gpio_set_value(hw->gpio, 1);
++	return (ret < 0) ? ret : 0;
 +}
 +
-+static void __set_intensity(struct tps6116x *hw, int intensity)
++static int rmw_protect(struct tps6524x *hw, int reg, int mask, int val)
 +{
-+	unsigned long flags;
-+
-+	intensity = clamp(intensity, 0, TPS6116X_MAX_INTENSITY);
-+
-+	local_irq_save(flags);
-+	__write_byte(hw, CMD_SET);
-+	__write_byte(hw, intensity);
-+	local_irq_restore(flags);
-+}
-+
-+static int set_intensity(struct tps6116x *hw, int intensity)
-+{
-+	int error = 0;
-+
-+	if (intensity == hw->intensity)
-+		return 0;
++	int ret;
 +
 +	mutex_lock(&hw->lock);
 +
-+	if (!hw->gpio_initialized) {
-+		error = gpio_request_one(hw->gpio, GPIOF_DIR_OUT,
-+					 dev_name(hw->dev));
-+		if (error < 0)
-+			goto error;
-+		hw->gpio_initialized = 1;
++	ret = __write_reg(hw, REG_WRITE_ENABLE, 1);
++	if (ret) {
++		dev_err(hw->dev, "failed to set write enable\n");
++		goto error;
 +	}
 +
-+	error = __set_power(hw, intensity ? 1 : 0);
-+	if (error < 0)
++	ret = __rmw_reg(hw, reg, mask, val);
++	if (ret)
++		dev_err(hw->dev, "failed to rmw register %d\n", reg);
++
++	ret = __write_reg(hw, REG_WRITE_ENABLE, 0);
++	if (ret) {
++		dev_err(hw->dev, "failed to clear write enable\n");
 +		goto error;
++	}
 +
-+	if (intensity > 0)
-+		__set_intensity(hw, intensity);
-+
-+	hw->intensity = intensity;
 +error:
 +	mutex_unlock(&hw->lock);
 +
-+	return error;
++	return ret;
 +}
 +
-+static ssize_t intensity_show(struct device *dev,
-+			      struct device_attribute *attr, char *buf)
++static int read_field(struct tps6524x *hw, const struct field *field)
 +{
-+	struct tps6116x *hw = dev_get_drvdata(dev);
-+	ssize_t len = 0;
++	int tmp;
 +
-+	len += snprintf(buf+len, PAGE_SIZE-len, "%d\n", hw->intensity);
++	tmp = read_reg(hw, field->reg);
++	if (tmp < 0)
++		return tmp;
 +
-+	return len;
++	return (tmp >> field->shift) & field->mask;
 +}
 +
-+static ssize_t intensity_store(struct device *dev,
-+			       struct device_attribute *attr, const char *buf,
-+			       size_t count)
++static int write_field(struct tps6524x *hw, const struct field *field,
++		       int val)
 +{
-+	struct tps6116x *hw = dev_get_drvdata(dev);
-+	unsigned long intensity;
-+	int error;
++	if (val & ~field->mask)
++		return -EOVERFLOW;
 +
-+	error = strict_strtoul(buf, 10, &intensity);
-+	if (error < 0)
-+		return error;
-+
-+	error = set_intensity(hw, intensity);
-+	if (error < 0)
-+		return error;
-+
-+	return count;
++	return rmw_protect(hw, field->reg,
++				    field->mask << field->shift,
++				    val << field->shift);
 +}
 +
-+DEVICE_ATTR(intensity, S_IWUSR | S_IRUGO, intensity_show, intensity_store);
-+
-+static int get_brightness(struct backlight_device *bl)
-+{
-+	struct tps6116x *hw = bl_get_data(bl);
-+
-+	return hw->intensity;
-+}
-+
-+static int update_status(struct backlight_device *bl)
-+{
-+	struct tps6116x *hw = bl_get_data(bl);
-+	int intensity = bl->props.brightness;
-+
-+	if (hw->suspended)
-+		intensity = 0;
-+	if (bl->props.power != FB_BLANK_UNBLANK)
-+		intensity = 0;
-+	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
-+		intensity = 0;
-+
-+	return set_intensity(hw, intensity);
-+}
-+
-+static const struct backlight_ops tps6116x_backlight_ops = {
-+	.get_brightness	= get_brightness,
-+	.update_status	= update_status,
++static const int dcdc1_voltages[] = {
++	 800000,  825000,  850000,  875000,
++	 900000,  925000,  950000,  975000,
++	1000000, 1025000, 1050000, 1075000,
++	1100000, 1125000, 1150000, 1175000,
++	1200000, 1225000, 1250000, 1275000,
++	1300000, 1325000, 1350000, 1375000,
++	1400000, 1425000, 1450000, 1475000,
++	1500000, 1525000, 1550000, 1575000,
 +};
 +
-+static int __devinit tps6116x_probe(struct platform_device *pdev)
++static const int dcdc2_voltages[] = {
++	1400000, 1450000, 1500000, 1550000,
++	1600000, 1650000, 1700000, 1750000,
++	1800000, 1850000, 1900000, 1950000,
++	2000000, 2050000, 2100000, 2150000,
++	2200000, 2250000, 2300000, 2350000,
++	2400000, 2450000, 2500000, 2550000,
++	2600000, 2650000, 2700000, 2750000,
++	2800000, 2850000, 2900000, 2950000,
++};
++
++static const int dcdc3_voltages[] = {
++	2400000, 2450000, 2500000, 2550000, 2600000,
++	2650000, 2700000, 2750000, 2800000, 2850000,
++	2900000, 2950000, 3000000, 3050000, 3100000,
++	3150000, 3200000, 3250000, 3300000, 3350000,
++	3400000, 3450000, 3500000, 3550000, 3600000,
++};
++
++static const int ldo1_voltages[] = {
++	4300000, 4350000, 4400000, 4450000,
++	4500000, 4550000, 4600000, 4650000,
++	4700000, 4750000, 4800000, 4850000,
++	4900000, 4950000, 5000000, 5050000,
++};
++
++static const int ldo2_voltages[] = {
++	1100000, 1150000, 1200000, 1250000,
++	1300000, 1700000, 1750000, 1800000,
++	1850000, 1900000, 3150000, 3200000,
++	3250000, 3300000, 3350000, 3400000,
++};
++
++static const int ldo_ilimsel[] = {
++	400000, 1500000
++};
++
++static const int usb_ilimsel[] = {
++	200000, 400000, 800000, 1000000
++};
++
++#define __MK_FIELD(_reg, _mask, _shift) \
++	{ .reg = (_reg), .mask = (_mask), .shift = (_shift), }
++
++static const struct supply_info supply_info[N_REGULATORS] = {
++	{
++		.name		= "DCDC1",
++		.flags		= FIXED_ILIMSEL,
++		.n_voltages	= ARRAY_SIZE(dcdc1_voltages),
++		.voltages	= dcdc1_voltages,
++		.fixed_ilimsel	= 2400000,
++		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
++					     DCDCDCDC1_EN_SHIFT),
++		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
++					     DCDC_VDCDC1_SHIFT),
++	},
++	{
++		.name		= "DCDC2",
++		.flags		= FIXED_ILIMSEL,
++		.n_voltages	= ARRAY_SIZE(dcdc2_voltages),
++		.voltages	= dcdc2_voltages,
++		.fixed_ilimsel	= 1200000,
++		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
++					     DCDCDCDC2_EN_SHIFT),
++		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
++					     DCDC_VDCDC2_SHIFT),
++	},
++	{
++		.name		= "DCDC3",
++		.flags		= FIXED_ILIMSEL,
++		.n_voltages	= ARRAY_SIZE(dcdc3_voltages),
++		.voltages	= dcdc3_voltages,
++		.fixed_ilimsel	= 1200000,
++		.enable		= __MK_FIELD(REG_DCDC_EN, DCDCDCDC_EN_MASK,
++					DCDCDCDC3_EN_SHIFT),
++		.voltage	= __MK_FIELD(REG_DCDC_SET, DCDC_VDCDC_MASK,
++					     DCDC_VDCDC3_SHIFT),
++	},
++	{
++		.name		= "LDO1",
++		.n_voltages	= ARRAY_SIZE(ldo1_voltages),
++		.voltages	= ldo1_voltages,
++		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
++		.ilimsels	= ldo_ilimsel,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_LDO1_SHIFT),
++		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
++					     LDO1_VSEL_SHIFT),
++		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
++					     LDO1_ILIM_SHIFT),
++	},
++	{
++		.name		= "LDO2",
++		.n_voltages	= ARRAY_SIZE(ldo2_voltages),
++		.voltages	= ldo2_voltages,
++		.n_ilimsels	= ARRAY_SIZE(ldo_ilimsel),
++		.ilimsels	= ldo_ilimsel,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_LDO2_SHIFT),
++		.voltage	= __MK_FIELD(REG_LDO_SET, LDO_VSEL_MASK,
++					     LDO2_VSEL_SHIFT),
++		.ilimsel	= __MK_FIELD(REG_LDO_SET, LDO_ILIM_MASK,
++					     LDO2_ILIM_SHIFT),
++	},
++	{
++		.name		= "USB",
++		.flags		= FIXED_VOLTAGE,
++		.fixed_voltage	= 5000000,
++		.n_ilimsels	= ARRAY_SIZE(usb_ilimsel),
++		.ilimsels	= usb_ilimsel,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_USB_SHIFT),
++		.ilimsel	= __MK_FIELD(REG_USB, USB_ILIM_MASK,
++					     USB_ILIM_SHIFT),
++	},
++	{
++		.name		= "LCD",
++		.flags		= FIXED_VOLTAGE | FIXED_ILIMSEL,
++		.fixed_voltage	= 5000000,
++		.fixed_ilimsel	=  400000,
++		.enable		= __MK_FIELD(REG_BLOCK_EN, BLOCK_MASK,
++					     BLOCK_LCD_SHIFT),
++	},
++};
++
++static int list_voltage(struct regulator_dev *rdev, unsigned selector)
 +{
-+	struct tps6116x *hw;
-+	struct device *dev = &pdev->dev;
-+	struct backlight_properties props;
-+	int error;
++	const struct supply_info *info;
++	struct tps6524x *hw;
 +
-+	hw = kzalloc(sizeof(struct tps6116x), GFP_KERNEL);
-+	if (!hw) {
-+		error = -ENOMEM;
-+		dev_err(dev, "cannot allocate driver data\n");
-+		goto fail0;
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_VOLTAGE)
++		return selector ? -EINVAL : info->fixed_voltage;
++
++	if (selector < 0 || selector >= info->n_voltages)
++		return -EINVAL;
++
++	return info->voltages[selector];
++}
++
++static int set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int i;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_VOLTAGE)
++		return -EINVAL;
++
++	for (i = 0; i < info->n_voltages; i++)
++		if (min_uV <= info->voltages[i] &&
++		    max_uV >= info->voltages[i])
++			break;
++
++	if (i >= info->n_voltages)
++		return -EINVAL;
++
++	return write_field(hw, &info->voltage, i);
++}
++
++static int get_voltage(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int ret;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_VOLTAGE)
++		return info->fixed_voltage;
++
++	ret = read_field(hw, &info->voltage);
++	if (ret < 0)
++		return ret;
++	if (WARN_ON(ret >= info->n_voltages))
++		return -EIO;
++
++	return info->voltages[ret];
++}
++
++static int set_current_limit(struct regulator_dev *rdev, int min_uA,
++			     int max_uA)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int i;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_ILIMSEL)
++		return -EINVAL;
++
++	for (i = 0; i < info->n_ilimsels; i++)
++		if (min_uA <= info->ilimsels[i] &&
++		    max_uA >= info->ilimsels[i])
++			break;
++
++	if (i >= info->n_ilimsels)
++		return -EINVAL;
++
++	return write_field(hw, &info->ilimsel, i);
++}
++
++static int get_current_limit(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++	int ret;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	if (info->flags & FIXED_ILIMSEL)
++		return info->fixed_ilimsel;
++
++	ret = read_field(hw, &info->ilimsel);
++	if (ret < 0)
++		return ret;
++	if (WARN_ON(ret >= info->n_ilimsels))
++		return -EIO;
++
++	return info->ilimsels[ret];
++}
++
++static int enable_supply(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	return write_field(hw, &info->enable, 1);
++}
++
++static int disable_supply(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	return write_field(hw, &info->enable, 0);
++}
++
++static int is_supply_enabled(struct regulator_dev *rdev)
++{
++	const struct supply_info *info;
++	struct tps6524x *hw;
++
++	hw	= rdev_get_drvdata(rdev);
++	info	= &supply_info[rdev_get_id(rdev)];
++
++	return read_field(hw, &info->enable);
++}
++
++static struct regulator_ops regulator_ops = {
++	.is_enabled		= is_supply_enabled,
++	.enable			= enable_supply,
++	.disable		= disable_supply,
++	.get_voltage		= get_voltage,
++	.set_voltage		= set_voltage,
++	.list_voltage		= list_voltage,
++	.set_current_limit	= set_current_limit,
++	.get_current_limit	= get_current_limit,
++};
++
++static int __devexit pmic_remove(struct spi_device *spi)
++{
++	struct tps6524x *hw = spi_get_drvdata(spi);
++	int i;
++
++	if (!hw)
++		return 0;
++	for (i = 0; i < N_REGULATORS; i++) {
++		if (hw->rdev[i])
++			regulator_unregister(hw->rdev[i]);
++		hw->rdev[i] = NULL;
 +	}
-+	platform_set_drvdata(pdev, hw);
++	spi_set_drvdata(spi, NULL);
++	kfree(hw);
++	return 0;
++}
 +
-+	memset(hw, 0, sizeof(struct tps6116x));
-+	hw->gpio = (int)dev->platform_data;
++static int __devinit pmic_probe(struct spi_device *spi)
++{
++	struct tps6524x *hw;
++	struct device *dev = &spi->dev;
++	const struct supply_info *info = supply_info;
++	struct regulator_init_data *init_data;
++	int ret = 0, i;
++
++	init_data = dev->platform_data;
++	if (!init_data) {
++		dev_err(dev, "could not find regulator platform data\n");
++		return -EINVAL;
++	}
++
++	hw = kzalloc(sizeof(struct tps6524x), GFP_KERNEL);
++	if (!hw) {
++		dev_err(dev, "cannot allocate regulator private data\n");
++		return -ENOMEM;
++	}
++	spi_set_drvdata(spi, hw);
++
++	memset(hw, 0, sizeof(struct tps6524x));
 +	hw->dev = dev;
-+
++	hw->spi = spi_dev_get(spi);
 +	mutex_init(&hw->lock);
 +
-+	error = device_create_file(dev, &dev_attr_intensity);
-+	if (error < 0) {
-+		dev_err(dev, "cannot create device attributes\n");
-+		goto fail1;
++	for (i = 0; i < N_REGULATORS; i++, info++, init_data++) {
++		hw->desc[i].name	= info->name;
++		hw->desc[i].id		= i;
++		hw->desc[i].n_voltages	= info->n_voltages;
++		hw->desc[i].ops		= &regulator_ops;
++		hw->desc[i].type	= REGULATOR_VOLTAGE;
++		hw->desc[i].owner	= THIS_MODULE;
++
++		if (info->flags & FIXED_VOLTAGE)
++			hw->desc[i].n_voltages = 1;
++
++		hw->rdev[i] = regulator_register(&hw->desc[i], dev,
++						 init_data, hw);
++		if (IS_ERR(hw->rdev[i])) {
++			ret = PTR_ERR(hw->rdev[i]);
++			hw->rdev[i] = NULL;
++			goto fail;
++		}
 +	}
 +
-+	hw->regulator = regulator_get(dev, "vlcd");
-+	if (IS_ERR(hw->regulator)) {
-+		error = PTR_ERR(hw->regulator);
-+		dev_err(dev, "cannot claim regulator\n");
-+		goto fail2;
-+	}
-+
-+	memset(&props, 0, sizeof(props));
-+	props.max_brightness = TPS6116X_MAX_INTENSITY;
-+	props.brightness     = TPS6116X_DEFAULT_INTENSITY;
-+
-+	hw->bl = backlight_device_register("tps6116x", hw->dev, hw,
-+					   &tps6116x_backlight_ops, &props);
-+	if (IS_ERR(hw->bl)) {
-+		error = PTR_ERR(hw->bl);
-+		dev_err(dev, "backlight registration failed\n");
-+		goto fail3;
-+	}
-+
-+	dev_info(dev, "registered backlight controller\n");
 +	return 0;
 +
-+fail3:
-+	regulator_put(hw->regulator);
-+fail2:
-+	device_remove_file(dev, &dev_attr_intensity);
-+fail1:
-+	kfree(hw);
-+	platform_set_drvdata(pdev, NULL);
-+fail0:
-+	return error;
++fail:
++	pmic_remove(spi);
++	return ret;
 +}
 +
-+static int __devexit tps6116x_remove(struct platform_device *pdev)
-+{
-+	struct tps6116x *hw = platform_get_drvdata(pdev);
-+
-+	backlight_device_unregister(hw->bl);
-+	regulator_disable(hw->regulator);
-+	regulator_put(hw->regulator);
-+	device_remove_file(hw->dev, &dev_attr_intensity);
-+	kfree(hw);
-+	platform_set_drvdata(pdev, NULL);
-+	return 0;
-+}
-+
-+static int tps6116x_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct tps6116x *hw = platform_get_drvdata(pdev);
-+	hw->suspended = 1;
-+	update_status(hw->bl);
-+	return 0;
-+}
-+
-+static int tps6116x_resume(struct platform_device *pdev)
-+{
-+	struct tps6116x *hw = platform_get_drvdata(pdev);
-+	hw->suspended = 0;
-+	update_status(hw->bl);
-+	return 0;
-+}
-+
-+static struct platform_driver tps6116x_driver = {
-+	.probe		= tps6116x_probe,
-+	.remove		= __devexit_p(tps6116x_remove),
-+	.suspend	= tps6116x_suspend,
-+	.resume		= tps6116x_resume,
++static struct spi_driver pmic_driver = {
++	.probe		= pmic_probe,
++	.remove		= __devexit_p(pmic_remove),
 +	.driver		= {
-+		.name	= "tps6116x",
++		.name	= "tps6524x",
 +		.owner	= THIS_MODULE,
 +	},
 +};
 +
-+static int __init tps6116x_init(void)
++static int __init pmic_driver_init(void)
 +{
-+	return platform_driver_register(&tps6116x_driver);
++	return spi_register_driver(&pmic_driver);
 +}
-+module_init(tps6116x_init);
++subsys_initcall_sync(pmic_driver_init);
 +
-+static void __exit tps6116x_exit(void)
++static void __exit pmic_driver_exit(void)
 +{
-+	platform_driver_unregister(&tps6116x_driver);
++	spi_unregister_driver(&pmic_driver);
 +}
-+module_exit(tps6116x_exit);
++module_exit(pmic_driver_exit);
 +
-+MODULE_DESCRIPTION("SSP TPS6116X Driver");
++MODULE_DESCRIPTION("TPS6524X PMIC Driver");
 +MODULE_AUTHOR("Cyril Chemparathy");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:tps6116x");
++MODULE_ALIAS("spi:tps6524x");
 -- 
 1.7.0.4
