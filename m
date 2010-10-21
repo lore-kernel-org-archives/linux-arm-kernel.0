@@ -1,84 +1,32 @@
-From: rene.sapiens@ti.com (Sapiens, Rene)
-Date: Thu, 21 Oct 2010 14:03:50 -0500
-Subject: [PATCH 4/7] omap:mailbox-send message in process context
-In-Reply-To: <1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
-References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
-	<1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
-Message-ID: <D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 21 Oct 2010 21:05:25 +0200
+Subject: [PATCH] spi/pl022: fix erroneous platform data in U300
+Message-ID: <1287687925-27189-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
+This fixes an erroneous use of LSB first in the U300 machine, the
+PL022 used in U300 is a standard ARM core that doesn't support this
+bit so it should never have been set.
 
-On Thursday, October 14, 2010 9:13 PM Kanigeri, Hari wrote:
-> Schedule the Tasklet to send only when mailbox fifo is full, else
-> send the message in the Process context. This would avoid
-> needless scheduling of Tasklet for every message transfer
-> 
-> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
-> ---
->  arch/arm/plat-omap/mailbox.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
-> index ed960c1..a4170c7 100644
-> --- a/arch/arm/plat-omap/mailbox.c
-> +++ b/arch/arm/plat-omap/mailbox.c
-> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox,
->  	mbox_msg_t msg) struct omap_mbox_queue *mq = mbox->txq;
->  	int ret = 0, len;
-> 
-> -	spin_lock(&mq->lock);
-> +	spin_lock_bh(&mq->lock);
-> 
+Cc: Kevin Wells <wellsk40@gmail.com>OA
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-u300/spi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Please check if this scenario looks valid to you, as discussed and depicted
-with Fernando:
-
-Supposing that at this point the hw fifo is full and there are messages in
-the kfifo.
-
->  	if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
->  		ret = -ENOMEM;
->  		goto out;
->  	}
-> 
-
-We reach this point.
-
-In this scenario, the DSP or other Core reads a message from the mbox hw fifo.
-The next happens:
-1.- The not full interrupt is triggered to the MPU.
-2.- The mbox's ISR schedules the tasklet to write the message.
-3.- The ISR is left and returns to here (since we still have the bh lock the
-    tasklet won't run).
-
-> +	if (!__mbox_poll_for_space(mbox)) {\
-
-4.- We check for mbox_fifo_full and we have space. so the message is written.
-
-> +		mbox_fifo_write(mbox, msg);
-
-At this point it looks that the FIFO order is lost. We write this message
-before the ones in the kfifo.
-
-A solution for this could be checking if there are messages in the kfifo
-before trying to write directly to the hw fifo, if so, just continue
-scheduling the tasklet.
-
-> +		goto out;
-> +	}
-> +
->  	len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
->  	WARN_ON(len != sizeof(msg));
-> 
->  	tasklet_schedule(&mbox->txq->tasklet);
-> 
->  out:
-> -	spin_unlock(&mq->lock);
-> +	spin_unlock_bh(&mq->lock);
->  	return ret;
->  }
->  EXPORT_SYMBOL(omap_mbox_msg_send);
-> --
-> 1.7.0
+diff --git a/arch/arm/mach-u300/spi.c b/arch/arm/mach-u300/spi.c
+index 779abf7..5767208 100644
+--- a/arch/arm/mach-u300/spi.c
++++ b/arch/arm/mach-u300/spi.c
+@@ -67,7 +67,7 @@ static struct spi_board_info u300_spi_devices[] = {
+ 		.bus_num        = 0, /* Only one bus on this chip */
+ 		.chip_select    = 0,
+ 		/* Means SPI_CS_HIGH, change if e.g low CS */
+-		.mode           = SPI_MODE_1 | SPI_LSB_FIRST | SPI_LOOP,
++		.mode           = SPI_MODE_1 | SPI_LOOP,
+ 	},
+ #endif
+ };
+-- 
+1.6.3.3
