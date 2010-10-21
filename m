@@ -1,38 +1,43 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 21 Oct 2010 16:25:05 -0400 (EDT)
-Subject: QNAP TS-209 broken by "orion/kirkwood: reset PCIe unit on boot"
-In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009FD18F0B415F@IL-MB01.marvell.com>
-References: <20101019190533.GA11893@jirafa.cyrius.com>
-	<alpine.LFD.2.00.1010191529100.2764@xanadu.home>
-	<FCBE654890C0334289D0AD3AF4EF009FD18F0B415F@IL-MB01.marvell.com>
-Message-ID: <alpine.LFD.2.00.1010211608550.2764@xanadu.home>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Thu, 21 Oct 2010 13:26:38 -0700
+Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101021200710.GR29120@kw.sim.vm.gnt>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<20101018160830.GB9033@ericsson.com>
+	<20101021200710.GR29120@kw.sim.vm.gnt>
+Message-ID: <20101021202638.GA27794@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Oct 2010, Saeed Bishara wrote:
+Hi Simon,
 
-> >
-> >> I noticed that 2.6.36-rc no longer boots on my QNAP TS-209.  I get
-> >> some output but then the machine resets.
-> >> 
-> >> I've bisected it down to the patch "orion/kirkwood: reset PCIe unit on
-> >> boot".  I remember this patch was controversial when it was proposed.
-> >> Looks like it breaks at least one orion5x machine.  Maybe the patch
-> >> should be reverted for now or only be called on kirkwood.
-> >
-> >According to the log, you did agree with that patch at the time.
-> >
-> >Keeping it causes breakage.  Removing it causes breakage too.  So I'd 
-> >much prefer if a solution to solve both breakages was merged instead.
-> We couln't pinpoint the root cause of this issue, actually we failed to reproduce that issue.
-> Nico, I suggest to apply the orion_pcie_reset() only for the boards we the issue had been observed.
-> saeed
+On Thu, Oct 21, 2010 at 04:07:10PM -0400, Simon Guinot wrote:
+[ ... ]
 
-OK, so I did, and pushed the result to the Orion git tree 
-(git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git).
+> > > @@ -399,6 +399,15 @@ config SENSORS_GL520SM
+> > >           This driver can also be built as a module.  If so, the module
+> > >           will be called gl520sm.
+> > > 
+> > > +config SENSORS_GPIO_FAN
+> > > +       tristate "GPIO fan"
+> > > +       depends on GENERIC_GPIO
+> > > +       help
+> > > +         If you say yes here you get support for the GPIO connected fan.
+> > > +
+> > > +         This driver can also be built as a module.  If so, the module
+> > > +         will be called gpio-fan.
+> > > +
+> > 
+> > Can you move this up a bit, ahead of SENSORS_FSCHMD ? Trying to stay in sequence.
+> 
+> Ok. Let's try to figure out where is the right location :)
+> After SENSORS_GL520SM or not ?
+> 
 
-Can I have confirmation that 1) new breakages are gone, and 2) the 
-device where this reset did fix problems are still OK with this change?
+My brain must have told me that "G" comes before "F". Or so. ABCDEGF, isn't it ?
 
+After SENSORS_GL520SM. Sorry. Or whereever it fits in the alphabet,
+if I got that wrong again ;).
 
-Nicolas
+Guenter
