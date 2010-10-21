@@ -1,34 +1,27 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 21 Oct 2010 15:24:38 +0200
-Subject: [patch v2 07/10] efikamx: add support for power key
-In-Reply-To: <AANLkTimWHeibb47NfQ7UJoawi5QN2gt1FjpvKy0S82LH@mail.gmail.com>
-	(Fabio Estevam's message of "Thu\, 21 Oct 2010 11\:02\:02 -0200")
-References: <20101021103855.115653951@rtp-net.org>
-	<20101021104005.796793454@rtp-net.org>
-	<AANLkTimWHeibb47NfQ7UJoawi5QN2gt1FjpvKy0S82LH@mail.gmail.com>
-Message-ID: <87wrpbhe5l.fsf@lechat.rtp-net.org>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Thu, 21 Oct 2010 15:39:09 +0200
+Subject: QNAP TS-209 broken by "orion/kirkwood: reset PCIe unit on boot"
+In-Reply-To: <alpine.LFD.2.00.1010191529100.2764@xanadu.home>
+References: <20101019190533.GA11893@jirafa.cyrius.com>
+	<alpine.LFD.2.00.1010191529100.2764@xanadu.home>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009FD18F0B415F@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam <festevam@gmail.com> writes:
-
-> Hi Arnaud,
-
-Hi,
-
 >
-> On Thu, Oct 21, 2010 at 8:39 AM, Arnaud Patard
-> <arnaud.patard@rtp-net.org> wrote:
->> This patch adds support for power key button of the efika mx. It's connected
->> on ?GPIO 3 31.
+>> I noticed that 2.6.36-rc no longer boots on my QNAP TS-209.  I get
+>> some output but then the machine resets.
+>> 
+>> I've bisected it down to the patch "orion/kirkwood: reset 
+>PCIe unit on
+>> boot".  I remember this patch was controversial when it was proposed.
+>> Looks like it breaks at least one orion5x machine.  Maybe the patch
+>> should be reverted for now or only be called on kirkwood.
 >
-> Here you mention GPIO 3 31
+>According to the log, you did agree with that patch at the time.
 >
->> +#define EFIKAMX_POWER_KEY ? ? ?(1*32 + 31)
->
-> ,but here you define it as GPIO 2 31
-
-It's a typo in the patch description [ I wouldn't have sent the patch if
-it was not working :) ]. The reset is on 2 31.
-
-Arnaud
+>Keeping it causes breakage.  Removing it causes breakage too.  So I'd 
+>much prefer if a solution to solve both breakages was merged instead.
+We couln't pinpoint the root cause of this issue, actually we failed to reproduce that issue.
+Nico, I suggest to apply the orion_pcie_reset() only for the boards we the issue had been observed.
+saeed
