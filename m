@@ -1,43 +1,50 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Thu, 21 Oct 2010 13:26:38 -0700
-Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
-In-Reply-To: <20101021200710.GR29120@kw.sim.vm.gnt>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<20101018160830.GB9033@ericsson.com>
-	<20101021200710.GR29120@kw.sim.vm.gnt>
-Message-ID: <20101021202638.GA27794@ericsson.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Thu, 21 Oct 2010 22:28:49 +0200
+Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
+In-Reply-To: <AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
+References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>	<1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>	<20101020112741.GB10261@pengutronix.de>	<AANLkTinairUcKpTH2ePjbp3j7qdsmrPCeeWR_E+RSsPU@mail.gmail.com>	<alpine.LFD.2.00.1010211308340.2764@xanadu.home>
+	<AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
+Message-ID: <4CC0A281.1010202@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Thu, Oct 21, 2010 at 04:07:10PM -0400, Simon Guinot wrote:
-[ ... ]
+test protocol : booting a 2.6.36-rc8 kernel with a rootfs (ext3 formated, 
+generated with OpenEmbedded for armv5, loading and launching qtdemo 4.6.3) on 
+a 8GB ?SDHC  (uSD reformated after each board tests to trigger lot of 
+read/writes on the first init).
 
-> > > @@ -399,6 +399,15 @@ config SENSORS_GL520SM
-> > >           This driver can also be built as a module.  If so, the module
-> > >           will be called gl520sm.
-> > > 
-> > > +config SENSORS_GPIO_FAN
-> > > +       tristate "GPIO fan"
-> > > +       depends on GENERIC_GPIO
-> > > +       help
-> > > +         If you say yes here you get support for the GPIO connected fan.
-> > > +
-> > > +         This driver can also be built as a module.  If so, the module
-> > > +         will be called gpio-fan.
-> > > +
-> > 
-> > Can you move this up a bit, ahead of SENSORS_FSCHMD ? Trying to stay in sequence.
-> 
-> Ok. Let's try to figure out where is the right location :)
-> After SENSORS_GL520SM or not ?
-> 
+* on an i.MX357 (rev 2.1) without this patch leads to :
+mmcblk0: error -110 transferring data, sector 7347024, nr 8, card status 0xe00
+end_request: I/O error, dev mmcblk0, sector 7347025
 
-My brain must have told me that "G" comes before "F". Or so. ABCDEGF, isn't it ?
+Same card, same board, with the timeout quirk patch : boots fine without any 
+error.
 
-After SENSORS_GL520SM. Sorry. Or whereever it fits in the alphabet,
-if I got that wrong again ;).
+Reverted the patch: timeout errors came back.
 
-Guenter
+==> quirk timeout patch needed for the i.MX35
+
+* on an i.MX257 (tested twice) :
+Same kernel tree, same rootfs, same motherboard, same uSD, only the CPU module 
+change : no error without the patch (and no error with the patch also ;-).
+
+==> quirk timeout patch not needed for the i.MX25
+
+* on an i.MX515 :
+Same kernel tree, same rootfs, same motherboard, same uSD (re-formated), only 
+the CPU module change without this patch leads to :
+mmcblk0: error -84 transferring data, sector 1315598, nr 2, card status 0x900
+end_request: I/O error, dev mmcblk0, sector 1315598
+
+Same card, same board, with the timeout quirk patch : boots fine without any 
+error.
+
+Reverted the patch: timeout errors came back.
+
+==> quirk timeout patch needed for the i.MX51
+
+Updated patch follows.
+
+Eric
