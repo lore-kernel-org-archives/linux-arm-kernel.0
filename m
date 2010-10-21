@@ -1,48 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 Oct 2010 11:27:06 +0200
-Subject: [RFC] Removal of dead code from arch/arm/*
-In-Reply-To: <AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
-References: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
-	<AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
-Message-ID: <20101021092706.GI19834@pengutronix.de>
+From: simon@sequanux.org (Simon Guinot)
+Date: Thu, 21 Oct 2010 11:42:28 +0200
+Subject: [PATCH v2 1/2] [ARM] Kirkwood: enhance TCLK detection
+In-Reply-To: <20101020085720.GA12979@mail.wantstofly.org>
+References: <20101020085720.GA12979@mail.wantstofly.org>
+Message-ID: <1287654149-8743-1-git-send-email-simon@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 08:32:06AM +0800, Eric Miao wrote:
-> On Thu, Oct 21, 2010 at 8:23 AM, Zimny Lech
-> <napohybelskurwysynom2010@gmail.com> wrote:
-> > Hi,
-> >
-> > I will begin testing this, I would like to know your opinion about this patches
-> > git pull git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc1
-> 
-> Would be great if you can post the patches instead of letting people
-> figuring out
-> how to peek into your changes? (although a combination of "git remote add" +
-> "git fetch" + "git log <your remote branch>" can do the trick, not that straight
-> forward)
-<gitlesson>
+From: Simon Guinot <sguinot@lacie.com>
 
-Actually the easiest and AFAICT most unintrusive way to get this branch
-is:
+According to the Marvell LSP, the Sample at Reset regiter bit 21 can be
+used to detect TCLK on 6281 and 6282 devices.
 
-	~/linux-2.6$ git fetch git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc1
-	....
+This patch has only been tested on LaCie boards.
 
-	~/linux-2.6$ gitk origin/master..FETCH_HEAD
+Signed-off-by: Simon Guinot <sguinot@lacie.com>
+---
+ arch/arm/mach-kirkwood/common.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-This doesn't even create a branch and the objects are subject to garbage
-collection after the next fetch (i.e. when they aren't referenced by
-FETCH_HEAD anymore).
-
-And (as a small side note) you can combine git remote add + git fetch by
-passing -f to git remote add.
-
-</gitlesson>
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 1c82d42..ee99a5a 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -854,10 +854,9 @@ int __init kirkwood_find_tclk(void)
+ 
+ 	kirkwood_pcie_id(&dev, &rev);
+ 
+-	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
+-					rev == MV88F6281_REV_A1)) ||
+-	    (dev == MV88F6282_DEV_ID))
+-		return 200000000;
++	if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
++		if (((readl(SAMPLE_AT_RESET) >> 21) & 1) == 0)
++			return 200000000;
+ 
+ 	return 166666667;
+ }
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.6.3.1
