@@ -1,50 +1,33 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 21 Oct 2010 11:06:39 +0200
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930233F94602@dbde02.ent.ti.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
-	<8739s0sobc.fsf@deeprootsystems.com>
-	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930233F94602@dbde02.ent.ti.com>
-Message-ID: <AANLkTi=dfw==t+u1Ap26iwPHH9A2M-cEU0hs92Gxdkxc@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Thu, 21 Oct 2010 02:25:45 -0700
+Subject: [PATCH] msm: timer: Decrease shift on timer clocksource
+Message-ID: <1287653148-1103-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 10:36 AM, Kamoolkar, Mugdha <mugdha@ti.com> wrote:
->> <khilman@deeprootsystems.com> wrote:
->> > Yes, that would indeed simplify things.
->>
->> Balaji, Nishant, are you OK with this ?
->>
-> The problem with this approach is that the i2c driver would have to
-> sync up on the shared memory location that it uses to share the
-> information of the spinlock ID.
+The shift of 24 causes the shift and multiply operation to sometimes
+overflow, resulting in incorrect timer values and poor performance.
 
-I agree.
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+---
+ arch/arm/mach-msm/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-But we seem to have this sort of problem anyway:
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 7689848..950100f 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -137,7 +137,7 @@ static struct msm_clock msm_clocks[] = {
+ 			.rating         = 200,
+ 			.read           = msm_gpt_read,
+ 			.mask           = CLOCKSOURCE_MASK(32),
+-			.shift          = 24,
++			.shift          = 17,
+ 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+ 		},
+ 		.irq = {
+-- 
+1.7.3.1
 
-Since we are forbidden to take a hwspinlock over a lengthy period of
-time, i2c-omap can't really use it directly to achieve mutual
-exclusion over the entire i2c transfer (which is long and involved
-sleeping).
-
-It was suggested that i2c-omap would only use the hwspinlock to
-protect a shared memory entry which would indicate the owner of the
-i2c bus. Either that, or use something like Peterson's mutual
-exclusion algorithm which is entirely implemented in software.
-
-Both of the latter approaches involves sync'ing up on a shared memory
-location..  so it seems like i2c-omap anyway has to deal with this
-kind of pain, and having a predefined hwspinlock id number doesn't
-relieve it.
-
-What do you think ?
-
-Thanks,
-Ohad.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
