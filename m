@@ -1,53 +1,54 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 21 Oct 2010 23:25:46 +0100
-Subject: [PATCH] ARM: S3C24XX: Fix the S3C24XX_VA_GPIO mapping
-In-Reply-To: <1287581622-8335-1-git-send-email-kgene.kim@samsung.com>
-References: <1287581622-8335-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4CC0BDEA.8090407@fluff.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 21 Oct 2010 15:26:04 -0700
+Subject: [PATCH v3 00/12] tnetv107x ssp driver stack
+In-Reply-To: <1287694873-12904-1-git-send-email-cyril@ti.com> (Cyril
+	Chemparathy's message of "Thu, 21 Oct 2010 17:01:01 -0400")
+References: <1287694873-12904-1-git-send-email-cyril@ti.com>
+Message-ID: <87mxq7p4hv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/10 14:33, Kukjin Kim wrote:
-> This patch changes the S3C24XX_VA_GPIO for to fix following BUG.
-> BUG: not creating mapping for 0x56000000 at 0x01000000 in user region
-> 
-> It is due to commit 8fecfe9d(ARM: SAMSUNG: Move the start address of
-> Samsung SoCs' VA space) which changes S3C_ADDR_BASE from 0xF4000000
-> to 0xFA000000.
-> 
-> Reported-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
->  arch/arm/plat-s3c24xx/include/plat/map.h |   14 +++-----------
->  1 files changed, 3 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s3c24xx/include/plat/map.h b/arch/arm/plat-s3c24xx/include/plat/map.h
-> index bd534d3..771491e 100644
-> --- a/arch/arm/plat-s3c24xx/include/plat/map.h
-> +++ b/arch/arm/plat-s3c24xx/include/plat/map.h
-> @@ -61,17 +61,9 @@
->  
->  /* GPIO ports */
->  
-> -/* the calculation for the VA of this must ensure that
-> - * it is the same distance apart from the UART in the
-> - * phsyical address space, as the initial mapping for the IO
-> - * is done as a 1:1 mapping. This puts it (currently) at
-> - * 0xFA800000, which is not in the way of any current mapping
-> - * by the base system.
-> -*/
+Cyril Chemparathy <cyril@ti.com> writes:
 
-This comment is really important, and it is possible this will
-break some of the s3c24xx platforms duing the boot process as
-there can be problems during the changes of mmu when booting.
+> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
+> device.  It has a built-in programmable execution engine that can be programmed
+> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
 
-> -#define S3C2410_PA_GPIO	   (0x56000000)
-> -#define S3C24XX_VA_GPIO	   ((S3C24XX_PA_GPIO - S3C24XX_PA_UART) + S3C24XX_VA_UART)
-> -#define S3C24XX_SZ_GPIO	   SZ_1M
-> +#define S3C2410_PA_GPIO		(0x56000000)
-> +#define S3C24XX_VA_GPIO		S3C2410_ADDR(0x00F00000)
-> +#define S3C24XX_SZ_GPIO		SZ_1M
->  
->  
->  /* ISA style IO, for each machine to sort out mappings for, if it
+Andrew, looking for some advice here...
+
+This is a piece of davinci hardware, but introduces drivers in various
+subsystems.  I'm willing to merge this series via the davinci tree after
+getting acks from the various subsystem maintainers.  Is this an OK
+approach?  It seems best to me to merge this all together.
+
+We already have acks for the regulator and gpio driver parts, and the
+backlight driver has a clear owner in MAINTAINERS.  However, who should
+be doing the final review/ack of the drivers/misc and drivers/gpio
+changes is less clear to me.  
+
+Any advice appreciated,
+
+Thanks,
+
+Kevin
+
+>  arch/arm/mach-davinci/board-tnetv107x-evm.c    |  199 +++++++
+>  arch/arm/mach-davinci/devices-tnetv107x.c      |   25 +
+>  arch/arm/mach-davinci/include/mach/ti_ssp.h    |   98 ++++
+>  arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +
+>  arch/arm/mach-davinci/tnetv107x.c              |    2 +-
+>  drivers/gpio/Kconfig                           |   10 +
+>  drivers/gpio/Makefile                          |    1 +
+>  drivers/gpio/ti-ssp-gpio.c                     |  200 +++++++
+>  drivers/misc/Kconfig                           |   11 +
+>  drivers/misc/Makefile                          |    1 +
+>  drivers/misc/ti_ssp.c                          |  436 +++++++++++++++
+>  drivers/regulator/Kconfig                      |   10 +
+>  drivers/regulator/Makefile                     |    1 +
+>  drivers/regulator/tps6524x-regulator.c         |  692 ++++++++++++++++++++++++
+>  drivers/spi/Kconfig                            |    7 +
+>  drivers/spi/Makefile                           |    1 +
+>  drivers/spi/spi_ti_ssp.c                       |  397 ++++++++++++++
+>  drivers/video/backlight/Kconfig                |    7 +
+>  drivers/video/backlight/Makefile               |    2 +-
+>  drivers/video/backlight/tps6116x.c             |  340 ++++++++++++
