@@ -1,54 +1,72 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 21 Oct 2010 21:47:46 +0400
-Subject: [PATCH] ARM: SAMSUNG: Add the missed s3c_gpio_getpull() API
-In-Reply-To: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
-References: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4CC07CC2.50206@mvista.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Thu, 21 Oct 2010 20:07:10 +0000
+Subject: [PATCH 1/2] hwmon: add generic GPIO fan driver
+In-Reply-To: <20101018160830.GB9033@ericsson.com>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<20101018160830.GB9033@ericsson.com>
+Message-ID: <20101021200710.GR29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Guenter,
 
-On 21-10-2010 12:04, Kukjin Kim wrote:
+On Mon, Oct 18, 2010 at 09:08:30AM -0700, Guenter Roeck wrote:
+> On Sun, Oct 17, 2010 at 11:50:11AM -0400, Simon Guinot wrote:
+> > From: Simon Guinot <sguinot@lacie.com>
+> > 
+> > This patch adds hwmon support for the GPIO connected fan.
+> > 
+> > Platform specific informations as GPIO pinout and speed conversion array
+> > (rpm from/to GPIO value) are passed to the driver via platform_data.
+> > 
+> > Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> 
+> Hi Simon,
+> 
+> good start. Bunch of comments inline. Our mailer was nice enough to replace tabs
+> with blanks, thanks to our friends at MicroSomething, so I could not run the patch
+> through checkpatch.pl. Hope you did that.
+> 
+> > ---
+> >  drivers/hwmon/Kconfig    |    9 +
+> >  drivers/hwmon/Makefile   |    1 +
+> >  drivers/hwmon/gpio-fan.c |  508 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/gpio-fan.h |   43 ++++
+> >  4 files changed, 561 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/hwmon/gpio-fan.c
+> >  create mode 100644 include/linux/gpio-fan.h
+> > 
+> > diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> > index 4d4d09b..1dc57c1 100644
+> > --- a/drivers/hwmon/Kconfig
+> > +++ b/drivers/hwmon/Kconfig
+> > @@ -399,6 +399,15 @@ config SENSORS_GL520SM
+> >           This driver can also be built as a module.  If so, the module
+> >           will be called gl520sm.
+> > 
+> > +config SENSORS_GPIO_FAN
+> > +       tristate "GPIO fan"
+> > +       depends on GENERIC_GPIO
+> > +       help
+> > +         If you say yes here you get support for the GPIO connected fan.
+> > +
+> > +         This driver can also be built as a module.  If so, the module
+> > +         will be called gpio-fan.
+> > +
+> 
+> Can you move this up a bit, ahead of SENSORS_FSCHMD ? Trying to stay in sequence.
 
-> From: Daein Moon<moon9124@samsung.com>
+Ok. Let's try to figure out where is the right location :)
+After SENSORS_GL520SM or not ?
 
-> This patch adds the s3c_gpio_getpull() API that has been missed in the
-> plat-samsung/gpio-config.c and actullay there is its extern declaration
-> in plat/gpio-cfg.h.
+Thanks,
 
-> Signed-off-by: Daein Moon<moon9124@samsung.com>
-> Cc: Ben Dooks<ben-linux@fluff.org>
-> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> ---
-> NOTE:
-> - already issued about this
-
->   arch/arm/plat-samsung/gpio-config.c                |   19 +++++++++++++++++++
->   .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    6 ++++++
->   2 files changed, 25 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-> index 8a37211..b732b77 100644
-> --- a/arch/arm/plat-samsung/gpio-config.c
-> +++ b/arch/arm/plat-samsung/gpio-config.c
-[...]
-> diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-> index 3e21c75..c417f85 100644
-> --- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-> +++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-> @@ -42,6 +42,12 @@ static inline int s3c_gpio_do_setpull(struct s3c_gpio_chip *chip,
->   	return (chip->config->set_pull)(chip, off, pull);
->   }
->
-> +static inline unsigned s3c_gpio_do_getpull(struct s3c_gpio_chip *chip,
-> +					   unsigned int off)
-> +{
-> +	return (chip->config->get_pull)(chip, off);
-
-    Parens are not necessary here.
-
-> +}
-> +
-
-WBR, Sergei
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101021/8ce2d545/attachment.sig>
