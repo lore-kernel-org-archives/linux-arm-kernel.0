@@ -1,105 +1,70 @@
 From: jgq516@gmail.com (xiao jiang)
-Date: Wed, 20 Oct 2010 09:45:58 +0800
-Subject: [PATCH 1/1] Mx35pdk: enable debug board support
-In-Reply-To: <AANLkTimJ_5ci9MnyxhUXemAc6YJGb2KXR2q-QX-MKEHo@mail.gmail.com>
-References: <1287129633-9244-1-git-send-email-jgq516@gmail.com>
-	<AANLkTikY=wBiJZ0NFKJKX-TTKRAj_LWmaxD-BpuPNYzL@mail.gmail.com>
-	<AANLkTi=jyQDNmGK1-VB_xOP8H4+jXNwS6oHgft90gGLW@mail.gmail.com>
-	<AANLkTim65XWxn_Mc59PXbiOOqUVMDNqeweU38y_3R7_X@mail.gmail.com>
-	<AANLkTi=upCD4iKhkvkzk7Kcb++OYR3pZTQw4i9fTEkFg@mail.gmail.com>
-	<AANLkTimqGRiP1QUtNdJuyQMN_bf+4R7dEn-LNd7bhAu4@mail.gmail.com>
-	<AANLkTinD_LWiqh9Pc-jOsKArfBBLAYeExgfdNMb5CaAT@mail.gmail.com>
-	<AANLkTimJ_5ci9MnyxhUXemAc6YJGb2KXR2q-QX-MKEHo@mail.gmail.com>
-Message-ID: <AANLkTimdEhO9m7HW-TNxPaEVk85GDEThyn_DanJ_CZ+i@mail.gmail.com>
+Date: Thu, 21 Oct 2010 10:00:59 +0800
+Subject: [PATCH v2 1/1] mx35pdk: add debug board support
+In-Reply-To: <20101020100553.GD2691@jasper.tkos.co.il>
+References: <1287567283-19488-1-git-send-email-jgq516@gmail.com>
+	<20101020100553.GD2691@jasper.tkos.co.il>
+Message-ID: <AANLkTim4CsbV+jSbFGN+SEDQrwfCPhPKPB9zjd=XDVEp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Baruch,
 
-2010/10/20 Fabio Estevam <festevam@gmail.com>
+2010/10/20 Baruch Siach <baruch@tkos.co.il>
 
-> Xiao,
+> Hi jgq516,
 >
-> On Tue, Oct 19, 2010 at 2:54 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Tue, Oct 19, 2010 at 1:59 PM, xiao jiang <jgq516@gmail.com> wrote:
-> >>
-> >>
-> > ...
-> >>>
-> >> I don't think so, since **_PIN_** is expected for IOMUX_TO_IRQ, not
-> >> **_PAD_**, and I think kernel can't pass compile with
-> >> "IOMUX_TO_IRQ(MX35_PAD_GPIO1_1__GPIO1_1)"
+> On Wed, Oct 20, 2010 at 05:34:43PM +0800, jgq516 at gmail.com wrote:
+> > From: Xiao Jiang <jgq516@gmail.com>
 > >
-> > Have you tried the same method as in MX51_3ds?
+> > Enable debug board support for mx35pdk. As suggested
+> > by Fabio, add MXC_DEBUG_BOARD config and redefinition
+> > EXPIO_PARENT_INT.
 > >
-> > #define EXPIO_PARENT_INT    (MXC_INTERNAL_IRQS + GPIO_PORTx + y)
+> > Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> >  arch/arm/mach-mx3/Kconfig         |    1 +
+> >  arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
+> >  2 files changed, 9 insertions(+), 0 deletions(-)
 > >
-> > Regards,
+> > diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+> > index 85beece..cdf6ac5 100644
+> > --- a/arch/arm/mach-mx3/Kconfig
+> > +++ b/arch/arm/mach-mx3/Kconfig
+>
+> [snip]
+>
+> > @@ -95,6 +99,10 @@ static void __init mxc_board_init(void)
+> >       imx35_add_imx_uart0(&uart_pdata);
 > >
-> > Fabio Estevam
-> >
+> >       mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+> > +
+> > +     if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+> > +             pr_warn("Init of the debugboard failed, all "
+> > +                     "devices on the board are unusable.\n");
+>                             ^^^^^
+> You probably mean debugboard here. I'd change the wording.
 >
-> Please try the the patch below. Worked fine for me.
->
-The patch is ok for me too,  and  the definition of EXPIO_PARENT_INT is
-similar like mx51_3ds board
-as I had said before.
-But since mxc_expio_init() should be return *0* if the debug board is
-detected, We should use
-mxc_expio_init(**_BASE_ADDR, EXPIO_PARENT_INT) other than
-!mxc_expio_init(**_BASE_ADDR, EXPIO_PARENT_INT), right?  The same issue also
-existed in mach-mx31_3ds.c.
+> There are some devices in the debug board, such as lan9217 ethernet. If
+mxc_expio_init failed,
+then the lan9217 can't be use.
+BTW: In mach-mx5/board-mx51_3ds.c and mach-mx31_3ds.c, the warn messages are
+same.
+if (mxc_expio_init(MX51_CS5_BASE_ADDR,
+EXPIO_PARENT_INT))
 
-Thanks,
-Xiao Jiang
+                 printk(KERN_WARNING "Init of the debugboard failed, all "
+                                     "devices on the board are
+unusable.\n");
 
-
-
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-> index 096fd33..9658e2d 100644
-> --- a/arch/arm/mach-mx3/Kconfig
-> +++ b/arch/arm/mach-mx3/Kconfig
-> @@ -143,6 +143,7 @@ config MACH_ARMADILLO5X0
->  config MACH_MX35_3DS
->        bool "Support MX35PDK platform"
->        select ARCH_MX35
-> +       select MXC_DEBUG_BOARD
->        select IMX_HAVE_PLATFORM_IMX_UART
->        select IMX_HAVE_PLATFORM_MXC_NAND
->        default n
-> diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> index 91bb065..b7e6b9c 100644
-> --- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> @@ -39,10 +39,15 @@
->  #include <mach/common.h>
->  #include <mach/iomux-mx35.h>
->  #include <mach/mxc_ehci.h>
-> +#include <mach/3ds_debugboard.h>
-> +#include <mach/irqs.h>
+baruch
 >
->  #include "devices-imx35.h"
->  #include "devices.h"
->
-> +#define EXPIO_PARENT_INT       (MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
-> +
->  static const struct imxuart_platform_data uart_pdata __initconst = {
->        .flags = IMXUART_HAVE_RTSCTS,
->  };
-> @@ -140,6 +145,10 @@ static void __init mxc_board_init(void)
->        mxc_register_device(&mxc_usbh1, &usb_host_pdata);
->
->        imx35_add_mxc_nand(&mx35pdk_nand_board_info);
-> +
-> +       if (!mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-> +               printk(KERN_WARNING "Init of the debugboard failed, all "
-> +                                   "devices on the board are
-> unusable.\n");
->  }
->
->  static void __init mx35pdk_timer_init(void)
+> --
+>                                                     ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
 >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101020/52825fdd/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101021/f3d71487/attachment-0002.html>
