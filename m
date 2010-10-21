@@ -1,41 +1,37 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 21 Oct 2010 18:54:27 -0000
-Subject: [PATCH 3/4] ARM: S3C64XX: Add suspend support to SmartQ boards
+Date: Thu, 21 Oct 2010 18:54:30 -0000
+Subject: [PATCH 2/4] ARM: SAMSUNG: Fix warning 's3c_pm_show_resume_irqs'
+	defined but not used
 In-Reply-To: <cover.1287681256.git.mcuelenaere@gmail.com>
 References: <cover.1287681256.git.mcuelenaere@gmail.com>
-Message-ID: <d5c7378119eb72058fb2bae0999e0a886203adaf.1287681256.git.mcuelenaere@gmail.com>
+Message-ID: <f4d162aad052ed332cceb63be6f2d32dc3dfbdd7.1287681256.git.mcuelenaere@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only missing thing for suspend support on SmartQ boards, is a call to
-s3c_pm_init, so add that. This was tested on a S3C6410 SmartQ 7.
+s3c_pm_show_resume_irqs() is used by some s3c_pm_arch_show_resume_irqs()
+implementations, which get included through mach/pm-core.h. Add __maybe_unused
+to silence warnings when it isn't used (e.g. on S3C64XX platforms).
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- arch/arm/mach-s3c64xx/mach-smartq.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/pm.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index 3a9639b..0f59a5c 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -32,6 +32,7 @@
- #include <plat/iic.h>
- #include <plat/gpio-cfg.h>
- #include <plat/hwmon.h>
-+#include <plat/pm.h>
- #include <plat/regs-serial.h>
- #include <plat/udc-hs.h>
- #include <plat/usb-control.h>
-@@ -380,6 +381,9 @@ void __init smartq_map_io(void)
- 
- void __init smartq_machine_init(void)
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 27cfca5..ad6dd63 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -214,8 +214,9 @@ void s3c_pm_do_restore_core(struct sleep_save *ptr, int count)
+  *
+  * print any IRQs asserted at resume time (ie, we woke from)
+ */
+-static void s3c_pm_show_resume_irqs(int start, unsigned long which,
+-				    unsigned long mask)
++static void __maybe_unused s3c_pm_show_resume_irqs(int start,
++						   unsigned long which,
++						   unsigned long mask)
  {
-+	/* enable suspend support */
-+	s3c_pm_init();
-+
- 	s3c_i2c0_set_platdata(NULL);
- 	s3c_hwmon_set_platdata(&smartq_hwmon_pdata);
- 	s3c_sdhci1_set_platdata(&smartq_internal_hsmmc_pdata);
+ 	int i;
+ 
 -- 
 1.7.2.3
