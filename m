@@ -1,55 +1,79 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 21 Oct 2010 23:17:45 +0100
-Subject: [PATCH] ARM: SAMSUNG: Add the missed s3c_gpio_getpull() API
-In-Reply-To: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
-References: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4CC0BC09.5090803@fluff.org>
+Date: Thu, 21 Oct 2010 23:22:11 +0100
+Subject: [PATCH 1/5] ARM: S5P6442: Add DMA operation clock
+In-Reply-To: <1287622713-1657-2-git-send-email-kgene.kim@samsung.com>
+References: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
+	<1287622713-1657-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4CC0BD13.5060303@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/10 09:04, Kukjin Kim wrote:
-> From: Daein Moon <moon9124@samsung.com>
+On 21/10/10 01:58, Kukjin Kim wrote:
+> From: Seungwhan Youn <sw.youn@samsung.com>
 > 
-> This patch adds the s3c_gpio_getpull() API that has been missed in the
-> plat-samsung/gpio-config.c and actullay there is its extern declaration
-> in plat/gpio-cfg.h.
+> This patch adds DMA operation clock which is disabled as default.
 > 
-> Signed-off-by: Daein Moon <moon9124@samsung.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
+> Acked-by: Jassi Brar <jassi.brar@samsung.com>
 > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
-> NOTE:
-> - already issued about this
+>  arch/arm/mach-s5p6442/clock.c                   |   28 +++++++++++++++++++++++
+>  arch/arm/mach-s5p6442/include/mach/regs-clock.h |    1 +
+>  2 files changed, 29 insertions(+), 0 deletions(-)
 > 
->  arch/arm/plat-samsung/gpio-config.c                |   19 +++++++++++++++++++
->  .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    6 ++++++
->  2 files changed, 25 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-> index 8a37211..b732b77 100644
-> --- a/arch/arm/plat-samsung/gpio-config.c
-> +++ b/arch/arm/plat-samsung/gpio-config.c
-> @@ -111,6 +111,25 @@ int s3c_gpio_setpull(unsigned int pin, s3c_gpio_pull_t pull)
->  }
->  EXPORT_SYMBOL(s3c_gpio_setpull);
+> diff --git a/arch/arm/mach-s5p6442/clock.c b/arch/arm/mach-s5p6442/clock.c
+> index dcd20f1..16d6e7e 100644
+> --- a/arch/arm/mach-s5p6442/clock.c
+> +++ b/arch/arm/mach-s5p6442/clock.c
+> @@ -192,6 +192,11 @@ static struct clk clk_pclkd1 = {
+>  	.parent		= &clk_hclkd1,
+>  };
 >  
-> +s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin)
+> +int s5p6442_clk_ip0_ctrl(struct clk *clk, int enable)
 > +{
-> +	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-> +	unsigned long flags;
-> +	int offset;
-> +	u32 pup = 0;
-
-would the result of s3c_gpio_do_getpull() should be a s3c_gpio_pull_t?
-
-> +	if (chip) {
-> +		offset = pin - chip->chip.base;
-> +
-> +		s3c_gpio_lock(chip, flags);
-> +		pup = s3c_gpio_do_getpull(chip, offset);
-> +		s3c_gpio_unlock(chip, flags);
-> +	}
-> +
-> +	return (__force s3c_gpio_pull_t)pup;
+> +	return s5p_gatectrl(S5P_CLKGATE_IP0, clk, enable);
 > +}
-> +EXPORT_SYMBOL(s3c_gpio_getpull);
+> +
+>  int s5p6442_clk_ip3_ctrl(struct clk *clk, int enable)
+>  {
+>  	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
+> @@ -335,6 +340,16 @@ void __init_or_cpufreq s5p6442_setup_clocks(void)
+>  	clk_pclkd1.rate = pclkd1;
+>  }
+>  
+> +static struct clk init_clocks_disable[] = {
+> +	{
+> +		.name		= "pdma",
+> +		.id		= -1,
+> +		.parent		= &clk_pclkd1,
+> +		.enable		= s5p6442_clk_ip0_ctrl,
+> +		.ctrlbit	= (1 << 3),
+> +	},
+> +};
+> +
+>  static struct clk init_clocks[] = {
+>  	{
+>  		.name		= "systimer",
+> @@ -393,10 +408,23 @@ static struct clk *clks[] __initdata = {
+>  
+>  void __init s5p6442_register_clocks(void)
+>  {
+> +	struct clk *clkptr;
+> +	int i, ret;
+> +
+>  	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
+>  
+>  	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
+>  	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+>  
+> +	clkptr = init_clocks_disable;
+> +	for (i = 0; i < ARRAY_SIZE(init_clocks_disable); i++, clkptr++) {
+> +		ret = s3c24xx_register_clock(clkptr);
+> +		if (ret < 0) {
+> +			printk(KERN_ERR "Fail to register clock %s (%d)\n",
+> +					clkptr->name, ret);
+> +		} else
+> +			(clkptr->enable)(clkptr, 0);
+> +	}
+
+how about using s3c_register_clocks and then s3c_disable_clocks() ?
