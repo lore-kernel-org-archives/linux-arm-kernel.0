@@ -1,33 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Oct 2010 08:54:01 +0100
-Subject: [RFC] Removal of dead code from arch/arm/*
-In-Reply-To: <4CBF8BDB.7090907@gmail.com>
-References: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
-	<AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
-	<4CBF8BDB.7090907@gmail.com>
-Message-ID: <20101021075401.GC22100@n2100.arm.linux.org.uk>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Thu, 21 Oct 2010 09:56:08 +0200
+Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
+In-Reply-To: <1287647127-1434-1-git-send-email-simon@sequanux.org>
+References: <20101020085720.GA12979@mail.wantstofly.org>
+	<1287647127-1434-1-git-send-email-simon@sequanux.org>
+Message-ID: <FCBE654890C0334289D0AD3AF4EF009FD18F0B3F89@IL-MB01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 02:39:55AM +0200, N.P.S. wrote:
-> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-> index 38c261f..fd30b75 100644
-> --- a/arch/arm/kernel/time.c
-> +++ b/arch/arm/kernel/time.c
-> @@ -37,13 +37,9 @@
->   */
->  struct sys_timer *system_timer;
->
-> -#if defined(CONFIG_RTC_DRV_CMOS) || defined(CONFIG_RTC_DRV_CMOS_MODULE)
-> +#if defined(CONFIG_RTC_DRV_CMOS)
->  /* this needs a better home */
->  DEFINE_SPINLOCK(rtc_lock);
-> -
-> -#ifdef CONFIG_RTC_DRV_CMOS_MODULE
-> -EXPORT_SYMBOL(rtc_lock);
-> -#endif
->  #endif    /* pc-style 'CMOS' RTC support */
->
->  /* change this if you have some constant time drift */
+ 
 
-This is wrong, and will break the build if rtc-cmos is built as a module.
+>-----Original Message-----
+>From: Simon Guinot [mailto:simon at sequanux.org] 
+>Sent: Thursday, October 21, 2010 9:45 AM
+>To: Lennert Buytenhek; Nicolas Pitre
+>Cc: linux-arm-kernel at lists.infradead.org; Benoit Canet; Saeed 
+>Bishara; Simon Guinot
+>Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
+>
+>From: Simon Guinot <sguinot@lacie.com>
+>
+>According to the Marvell LSP, the Sample at Reset regiter bit 21 can be
+>used to detect TCLK on 6281 and 6282 devices.
+>
+>This patch has only been tested on LaCie boards.
+>
+>Signed-off-by: Simon Guinot <sguinot@lacie.com>
+>---
+> arch/arm/mach-kirkwood/common.c |    7 +++----
+> 1 files changed, 3 insertions(+), 4 deletions(-)
+>
+>diff --git a/arch/arm/mach-kirkwood/common.c 
+>b/arch/arm/mach-kirkwood/common.c
+>index 1c82d42..72bb76f 100644
+>--- a/arch/arm/mach-kirkwood/common.c
+>+++ b/arch/arm/mach-kirkwood/common.c
+>@@ -854,10 +854,9 @@ int __init kirkwood_find_tclk(void)
+> 
+> 	kirkwood_pcie_id(&dev, &rev);
+> 
+>-	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
+>-					rev == MV88F6281_REV_A1)) ||
+>-	    (dev == MV88F6282_DEV_ID))
+>-		return 200000000;
+>+	if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
+>+		if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
+>+			return 200000000;
+The flow is ok, but the code doesn't look correct, the & precedence is higher thatn >>.
+saeed
+> 
+> 	return 166666667;
+> }
+>-- 
+>1.6.3.1
+>
+>
