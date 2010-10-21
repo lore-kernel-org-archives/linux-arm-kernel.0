@@ -1,134 +1,28 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 21 Oct 2010 10:32:51 +0900
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 21 Oct 2010 10:45:42 +0900
 Subject: [PATCH 5/5] ARM: SAMSUNG: Add to enable/disable clock on S3C PL330
-In-Reply-To: <1287622713-1657-6-git-send-email-kgene.kim@samsung.com>
+In-Reply-To: <AANLkTi=ZTBuPBDL4MZ7MPn3Ha_cNhyShosyzn8q6QF3N@mail.gmail.com>
 References: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
 	<1287622713-1657-6-git-send-email-kgene.kim@samsung.com>
-Message-ID: <AANLkTi=ZTBuPBDL4MZ7MPn3Ha_cNhyShosyzn8q6QF3N@mail.gmail.com>
+	<AANLkTi=ZTBuPBDL4MZ7MPn3Ha_cNhyShosyzn8q6QF3N@mail.gmail.com>
+Message-ID: <AANLkTimbHbO77POKuu=3XAO6Cq7UaAjJ291hwQqKTcNW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 9:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Seungwhan Youn <sw.youn@samsung.com>
+On Thu, Oct 21, 2010 at 10:32 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Thu, Oct 21, 2010 at 9:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> From: Seungwhan Youn <sw.youn@samsung.com>
+>>
+>> This patch adds to enable/disable DMA operation clock on S3C-PL330
+>> DMA controller driver.
 >
-> This patch adds to enable/disable DMA operation clock on S3C-PL330
-> DMA controller driver.
+> The title and description seems to clock gating but actual code is
+> just enable at probe and disable at remove.
+>
+> Can you make it REAL clock gating, enable clock only when using?
 
-The title and description seems to clock gating but actual code is
-just enable at probe and disable at remove.
-
-Can you make it REAL clock gating, enable clock only when using?
-
-Thank you,
-Kyungmin Park
->
-> Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
-> Acked-by: Jassi Brar <jassi.brar@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?arch/arm/plat-samsung/s3c-pl330.c | ? 34 +++++++++++++++++++++++++++-------
-> ?1 files changed, 27 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/s3c-pl330.c b/arch/arm/plat-samsung/s3c-pl330.c
-> index a91305a..b4ff8d7 100644
-> --- a/arch/arm/plat-samsung/s3c-pl330.c
-> +++ b/arch/arm/plat-samsung/s3c-pl330.c
-> @@ -15,6 +15,8 @@
-> ?#include <linux/io.h>
-> ?#include <linux/slab.h>
-> ?#include <linux/platform_device.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
->
-> ?#include <asm/hardware/pl330.h>
->
-> @@ -27,6 +29,7 @@
-> ?* @node: To attach to the global list of DMACs.
-> ?* @pi: PL330 configuration info for the DMAC.
-> ?* @kmcache: Pool to quickly allocate xfers for all channels in the dmac.
-> + * @clk: Pointer of DMAC operation clock.
-> ?*/
-> ?struct s3c_pl330_dmac {
-> ? ? ? ?unsigned ? ? ? ? ? ? ? ?busy_chan;
-> @@ -34,6 +37,7 @@ struct s3c_pl330_dmac {
-> ? ? ? ?struct list_head ? ? ? ?node;
-> ? ? ? ?struct pl330_info ? ? ? *pi;
-> ? ? ? ?struct kmem_cache ? ? ? *kmcache;
-> + ? ? ? struct clk ? ? ? ? ? ? ?*clk;
-> ?};
->
-> ?/**
-> @@ -1072,16 +1076,25 @@ static int pl330_probe(struct platform_device *pdev)
-> ? ? ? ?if (ret)
-> ? ? ? ? ? ? ? ?goto probe_err4;
->
-> - ? ? ? ret = pl330_add(pl330_info);
-> - ? ? ? if (ret)
-> - ? ? ? ? ? ? ? goto probe_err5;
-> -
-> ? ? ? ?/* Allocate a new DMAC */
-> ? ? ? ?s3c_pl330_dmac = kmalloc(sizeof(*s3c_pl330_dmac), GFP_KERNEL);
-> ? ? ? ?if (!s3c_pl330_dmac) {
-> ? ? ? ? ? ? ? ?ret = -ENOMEM;
-> + ? ? ? ? ? ? ? goto probe_err5;
-> + ? ? ? }
-> +
-> + ? ? ? /* Get operation clock and enable it */
-> + ? ? ? s3c_pl330_dmac->clk = clk_get(&pdev->dev, "pdma");
-> + ? ? ? if (IS_ERR(s3c_pl330_dmac->clk)) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "Cannot get operation clock.\n");
-> + ? ? ? ? ? ? ? ret = -EINVAL;
-> ? ? ? ? ? ? ? ?goto probe_err6;
-> ? ? ? ?}
-> + ? ? ? clk_enable(s3c_pl330_dmac->clk);
-> +
-> + ? ? ? ret = pl330_add(pl330_info);
-> + ? ? ? if (ret)
-> + ? ? ? ? ? ? ? goto probe_err7;
->
-> ? ? ? ?/* Hook the info */
-> ? ? ? ?s3c_pl330_dmac->pi = pl330_info;
-> @@ -1094,7 +1107,7 @@ static int pl330_probe(struct platform_device *pdev)
->
-> ? ? ? ?if (!s3c_pl330_dmac->kmcache) {
-> ? ? ? ? ? ? ? ?ret = -ENOMEM;
-> - ? ? ? ? ? ? ? goto probe_err7;
-> + ? ? ? ? ? ? ? goto probe_err8;
-> ? ? ? ?}
->
-> ? ? ? ?/* Get the list of peripherals */
-> @@ -1120,10 +1133,13 @@ static int pl330_probe(struct platform_device *pdev)
->
-> ? ? ? ?return 0;
->
-> +probe_err8:
-> + ? ? ? pl330_del(pl330_info);
-> ?probe_err7:
-> - ? ? ? kfree(s3c_pl330_dmac);
-> + ? ? ? clk_disable(s3c_pl330_dmac->clk);
-> + ? ? ? clk_put(s3c_pl330_dmac->clk);
-> ?probe_err6:
-> - ? ? ? pl330_del(pl330_info);
-> + ? ? ? kfree(s3c_pl330_dmac);
-> ?probe_err5:
-> ? ? ? ?free_irq(irq, pl330_info);
-> ?probe_err4:
-> @@ -1188,6 +1204,10 @@ static int pl330_remove(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
->
-> + ? ? ? /* Disable operation clock */
-> + ? ? ? clk_disable(dmac->clk);
-> + ? ? ? clk_put(dmac->clk);
-> +
-> ? ? ? ?/* Remove the DMAC */
-> ? ? ? ?list_del(&dmac->node);
-> ? ? ? ?kfree(dmac);
-> --
-> 1.6.2.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Of course we can. But that will need some intrusive changes.
+Later, we'll implement that desirable feature.
+For now, many SoCs don't detect PL330 since the clocks are gated
+by default and we don't enable them in driver. So, this is just to get
+latest SoCs' PL330 working.
