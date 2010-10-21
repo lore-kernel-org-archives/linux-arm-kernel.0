@@ -1,119 +1,84 @@
-From: vishwanath.bs@ti.com (Sripathy, Vishwanath)
-Date: Thu, 21 Oct 2010 11:08:41 +0530
-Subject: [RFC/PATCH 2/2] OMAP3: CPUidle: trigger early idle notification
-	call chain
-In-Reply-To: <1287617926-24308-3-git-send-email-khilman@deeprootsystems.com>
-References: <1287617926-24308-1-git-send-email-khilman@deeprootsystems.com>
-	<1287617926-24308-3-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC356087034BBEBEBE@dbde02.ent.ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 21 Oct 2010 08:07:43 +0200
+Subject: [PATCH v2 1/1] mx35pdk: add debug board support
+In-Reply-To: <AANLkTimxOOxWD1tcneevcxcHzHMQLwmpC75krYLfCAut@mail.gmail.com>
+References: <1287567283-19488-1-git-send-email-jgq516@gmail.com>
+	<20101020100553.GD2691@jasper.tkos.co.il>
+	<AANLkTim4CsbV+jSbFGN+SEDQrwfCPhPKPB9zjd=XDVEp@mail.gmail.com>
+	<AANLkTimxOOxWD1tcneevcxcHzHMQLwmpC75krYLfCAut@mail.gmail.com>
+Message-ID: <20101021060743.GB13930@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+Hi xiao,
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Kevin Hilman
-> Sent: Thursday, October 21, 2010 5:09 AM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: [RFC/PATCH 2/2] OMAP3: CPUidle: trigger early idle notification call chain
-> 
-> During the early part of the CPUidle path (state selection by the
-> governer, checking for device activity, etc.) there is no (good)
-> reason to have interrupts disabled.
-> 
-> Therefore, enable interrupts early in the CPUidle path and then
-> trigger the "early" idle notifier call chain after device activity
-> checks and the next power states have been programmed.  Interrupts are
-> then (re)disabled after the final state is selected.
-> 
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |   27 ++++++++++++++++++++++++--
-> -
->  1 files changed, 24 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-
-> omap2/cpuidle34xx.c
-> index 0d50b45..8c57360 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -30,6 +30,7 @@
->  #include <plat/powerdomain.h>
->  #include <plat/clockdomain.h>
->  #include <plat/serial.h>
-> +#include <plat/common.h>
-> 
->  #include "pm.h"
->  #include "control.h"
-> @@ -128,12 +129,14 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
->  	/* Used to keep track of the total time in idle */
->  	getnstimeofday(&ts_preidle);
-> 
-> -	local_irq_disable();
-> -	local_fiq_disable();
-> -
->  	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
->  	pwrdm_set_next_pwrst(core_pd, core_state);
-> 
-> +	omap_early_idle_notifier_start();
-> +
-> +	local_irq_disable();
-> +	local_fiq_disable();
-> +
->  	if (omap_irq_pending() || need_resched())
->  		goto return_sleep_time;
-> 
-> @@ -157,6 +160,8 @@ return_sleep_time:
->  	local_irq_enable();
->  	local_fiq_enable();
-> 
-> +	omap_early_idle_notifier_end();
-It appears that idle notifiers (for restore path) are called after getnstimeofday is called which means time spent in idle callbacks are not accounted in cpuidle time. 
-Will it not impact the cpuidle c state prediction and latency computation?
+On Thu, Oct 21, 2010 at 10:08:02AM +0800, xiao jiang wrote:
+> 2010/10/21 xiao jiang <jgq516@gmail.com>
+> > 2010/10/20 Baruch Siach <baruch@tkos.co.il>
+> >> On Wed, Oct 20, 2010 at 05:34:43PM +0800, jgq516 at gmail.com wrote:
+> >> > From: Xiao Jiang <jgq516@gmail.com>
+> >> >
+> >> > Enable debug board support for mx35pdk. As suggested
+> >> > by Fabio, add MXC_DEBUG_BOARD config and redefinition
+> >> > EXPIO_PARENT_INT.
+> >> >
+> >> > Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+> >> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> >> > ---
+> >> >  arch/arm/mach-mx3/Kconfig         |    1 +
+> >> >  arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
+> >> >  2 files changed, 9 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+> >> > index 85beece..cdf6ac5 100644
+> >> > --- a/arch/arm/mach-mx3/Kconfig
+> >> > +++ b/arch/arm/mach-mx3/Kconfig
+> >>
+> >> [snip]
+> >>
+> >> > @@ -95,6 +99,10 @@ static void __init mxc_board_init(void)
+> >> >       imx35_add_imx_uart0(&uart_pdata);
+> >> >
+> >> >       mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+> >> > +
+> >> > +     if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+> >> > +             pr_warn("Init of the debugboard failed, all "
+> >> > +                     "devices on the board are unusable.\n");
+> >>                             ^^^^^
+> >> You probably mean debugboard here. I'd change the wording.
+> >>
+> >> There are some devices in the debug board, such as lan9217 ethernet. If
+> > mxc_expio_init failed,
+> > then the lan9217 can't be use.
 
-Regards
-Vishwa
+Of course. But this does not make devices on the main board unusable, isn't 
+it? The user might think that his whole system is unusable because of this 
+init failure.
 
-> +
->  	return ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * USEC_PER_SEC;
->  }
-> 
-> @@ -459,6 +464,21 @@ struct cpuidle_driver omap3_idle_driver = {
->  	.owner = 	THIS_MODULE,
->  };
-> 
-> +static int omap3_idle_prepare(struct cpuidle_device *dev)
-> +{
-> +	/*
-> +	 * Enable interrupts during the early part of the CPUidle path.
-> +	 * They are later (re)disabled when the final state is selected.
-> +	 *
-> +	 * The primary reason for this is to enable non-atomic idle
-> +	 * notifications to drivers that want to coordinate device
-> +	 * idle transitions with CPU idle transitions.
-> +	 */
-> +	local_irq_enable();
-> +
-> +	return 0;
-> +}
-> +
->  /**
->   * omap3_idle_init - Init routine for OMAP3 idle
->   *
-> @@ -482,6 +502,7 @@ int __init omap3_idle_init(void)
-> 
->  	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
-> 
-> +	dev->prepare = omap3_idle_prepare;
->  	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
->  		cx = &omap3_power_states[i];
->  		state = &dev->states[count];
-> --
-> 1.7.2.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > BTW: In mach-mx5/board-mx51_3ds.c and mach-mx31_3ds.c, the warn messages
+> > are same.
+> > if (mxc_expio_init(MX51_CS5_BASE_ADDR,
+> > EXPIO_PARENT_INT))
+> >
+> >                  printk(KERN_WARNING "Init of the debugboard failed, all "
+> >
+> >                                      "devices on the board are
+> > unusable.\n");
+> >
+> > Ooo, I pressed  the keyboard neglectfully[?], and you can see below
+> sentence in mach-mx31_3ds.c.
+> if (!mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
+>          printk(KERN_WARNING "Init of the debugboard failed, all "
+>                "devices on the board are unusable.\n");
+
+Then this wording should also change there. Adding Jason Wang to Cc.
+
+baruch
+
+> Thanks,
+> Xiao Jiang
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
