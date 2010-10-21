@@ -1,28 +1,30 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 21 Oct 2010 23:37:56 +0100
-Subject: [PATCH 0/4] USB: gadget: Add Samsung S3C24xx USB HS controller
-	driver
-In-Reply-To: <1286928627-22824-1-git-send-email-sbkim73@samsung.com>
-References: <1286928627-22824-1-git-send-email-sbkim73@samsung.com>
-Message-ID: <4CC0C0C4.8050308@fluff.org>
+Date: Thu, 21 Oct 2010 23:39:16 +0100
+Subject: [PATCH] ARM: SAMSUNG: Bug fix spin_lock recursion in	clk_enable()
+	and clk_disable()
+In-Reply-To: <20101019185751.GB10325@n2100.arm.linux.org.uk>
+References: <1286843980-23684-1-git-send-email-jc.lee@samsung.com>	<4CBCD3A5.5070701@fluff.org>
+	<20101019185751.GB10325@n2100.arm.linux.org.uk>
+Message-ID: <4CC0C114.8080602@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/10 01:10, Sangbeom Kim wrote:
-> The Samsung's S3C2416, S3C2443 and S3C2450 includes a USB High-Speed
-> device controller module. This driver enables support for USB high-speed
-> gadget functionality for the Samsung S3C24xx SoC's that include this
-> controller.
+On 19/10/10 19:57, Russell King - ARM Linux wrote:
+> On Tue, Oct 19, 2010 at 12:09:25AM +0100, Ben Dooks wrote:
+>> I'm not sure, but I don't belive that the clk_ api has
+>> ever been callable from non-sleepable contexts such as
+>> interrupt handlers.
+>>
+>> I would welcome RMK's response (or any other response)
+>> about this issue?
 > 
-> The patch series contains:
-> [PATCH 1/4] ARM: S3C2416: Add USB Phy register definitions
-> [PATCH 2/4] ARM: S3C24XX: Add plaform device definition for USB High-Speed gadget controller.
-> [PATCH 3/4] USB: Gadget: Add Samsung S3C24XX USB High-Speed controller driver
-> [PATCH 4/4] ARM: S3C2416: Add support for USB 2.0 High-Speed gadget controller
+> We have traditionally allowed it from non-sleepable contexts, mainly
+> because the platforms I've been using it with have had such simple
+> clock implementations that it's not worth artifically restricting it,
+> or the implementation only requires a few us delay after enabling a
+> clock.
 
-patch 3/4 needs a bit of work, otherwise looks ok.
-
-I'll look at applying the s3c24xx items in the next day or so.
+Some on chip PLLs can be 150-300uS to get running.
 
 -- 
 Ben
