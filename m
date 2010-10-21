@@ -1,22 +1,38 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 21 Oct 2010 11:19:35 +0900
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 21 Oct 2010 11:36:13 +0900
 Subject: [PATCH 5/5] ARM: SAMSUNG: Add to enable/disable clock on S3C PL330
-In-Reply-To: <AANLkTi=qmEHozO+1YtySkcmvr=QP973JtanQogqT82b4@mail.gmail.com>
+In-Reply-To: <AANLkTi=ZTBuPBDL4MZ7MPn3Ha_cNhyShosyzn8q6QF3N@mail.gmail.com>
 References: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
 	<1287622713-1657-6-git-send-email-kgene.kim@samsung.com>
 	<AANLkTi=ZTBuPBDL4MZ7MPn3Ha_cNhyShosyzn8q6QF3N@mail.gmail.com>
-	<AANLkTimbHbO77POKuu=3XAO6Cq7UaAjJ291hwQqKTcNW@mail.gmail.com>
-	<AANLkTinaDckVpJhadBcnhccdougyCG-FbXe23dh=_ep8@mail.gmail.com>
-	<AANLkTinYHSUP5AspWbzD8hfKJtEaFAfcUYC0sOPy+WKX@mail.gmail.com>
-	<AANLkTi=qmEHozO+1YtySkcmvr=QP973JtanQogqT82b4@mail.gmail.com>
-Message-ID: <AANLkTi=Q+GQN9RP=aCZ-Uav3FfEg1dPT04n=jywWLqjF@mail.gmail.com>
+Message-ID: <030201cb70c8$bc7f4aa0$357ddfe0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 11:12 AM, Kyungmin Park <kmpark@infradead.org> wrote:
+Kyungmin Park wrote:
+> 
+> On Thu, Oct 21, 2010 at 9:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > From: Seungwhan Youn <sw.youn@samsung.com>
+> >
+> > This patch adds to enable/disable DMA operation clock on S3C-PL330
+> > DMA controller driver.
+> 
+> The title and description seems to clock gating but actual code is
+> just enable at probe and disable at remove.
+> 
+> Can you make it REAL clock gating, enable clock only when using?
+> 
 
-> BTW, what's the id of mdma and which clock at c210?
+This is just to move DMA enable/disable clock into DMA driver(S3C PL330).
+So it would be better if we could discuss about what you said next time.
 
-MDMA is not yet supported in Samsung mainline.
-Any ID can be assigned as long as it doesn't conflict with other DMAs
-and resources correctly attached to it.
+Basically, I prefer most clocks should be registered as disabled, then if
+required enable, just should be controlled in each driver.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
