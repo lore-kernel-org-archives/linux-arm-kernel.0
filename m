@@ -1,40 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Oct 2010 11:04:28 +0200
-Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
-In-Reply-To: <AANLkTikz-_qhjygzek4tR0CtDLih3ZQyy1mPKnXAiOiV@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 21 Oct 2010 11:06:39 +0200
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930233F94602@dbde02.ent.ti.com>
 References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<201010192308.02018.arnd@arndb.de>
-	<AANLkTikz-_qhjygzek4tR0CtDLih3ZQyy1mPKnXAiOiV@mail.gmail.com>
-Message-ID: <201010211104.28555.arnd@arndb.de>
+	<1287387875-14168-4-git-send-email-ohad@wizery.com>
+	<87r5fmxghm.fsf@deeprootsystems.com>
+	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+	<8739s0sobc.fsf@deeprootsystems.com>
+	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930233F94602@dbde02.ent.ti.com>
+Message-ID: <AANLkTi=dfw==t+u1Ap26iwPHH9A2M-cEU0hs92Gxdkxc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 October 2010, Ohad Ben-Cohen wrote:
-> This sounds like adding a set of API that resembles spin_{unlock,lock}_irq.
-> 
-> My gut feeling here is that while this may be useful and simple at
-> certain places, it is somewhat error prone; a driver which would
-> erroneously use this at the wrong place will end up enabling
-> interrupts where it really shouldn't.
-> 
-> Don't you feel that proving a simple spin_lock_irqsave-like API is
-> actually safer and less error prone ?
-> 
-> I guess that is one of the reasons why spin_lock_irqsave is much more
-> popular than spin_lock_irq - people just know it will never screw up.
+On Thu, Oct 21, 2010 at 10:36 AM, Kamoolkar, Mugdha <mugdha@ti.com> wrote:
+>> <khilman@deeprootsystems.com> wrote:
+>> > Yes, that would indeed simplify things.
+>>
+>> Balaji, Nishant, are you OK with this ?
+>>
+> The problem with this approach is that the i2c driver would have to
+> sync up on the shared memory location that it uses to share the
+> information of the spinlock ID.
 
-People can screw that up in different ways, e.g.
+I agree.
 
-	spin_lock_irqsave(&lock_a, flags);
-	spin_lock_irqsave(&lock_b, flags); /* overwrites flags */
+But we seem to have this sort of problem anyway:
 
-	spin_lock_irqrestore(&lock_b, flags);
-	spin_lock_irqrestore(&lock_a, flags); /* still disabled! */
+Since we are forbidden to take a hwspinlock over a lengthy period of
+time, i2c-omap can't really use it directly to achieve mutual
+exclusion over the entire i2c transfer (which is long and involved
+sleeping).
 
-I use the presence of spin_lock_irqsave in driver code as an indication
-of whether the author had any clue about locking. Most experienced
-coders use the right version intuitively, while beginners often just
-use _irqsave because they didn't understand the API and they were told
-that using this is safe.
+It was suggested that i2c-omap would only use the hwspinlock to
+protect a shared memory entry which would indicate the owner of the
+i2c bus. Either that, or use something like Peterson's mutual
+exclusion algorithm which is entirely implemented in software.
 
-	Arnd
+Both of the latter approaches involves sync'ing up on a shared memory
+location..  so it seems like i2c-omap anyway has to deal with this
+kind of pain, and having a predefined hwspinlock id number doesn't
+relieve it.
+
+What do you think ?
+
+Thanks,
+Ohad.
