@@ -1,50 +1,70 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Thu, 21 Oct 2010 22:28:49 +0200
-Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
-In-Reply-To: <AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
-References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>	<1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>	<20101020112741.GB10261@pengutronix.de>	<AANLkTinairUcKpTH2ePjbp3j7qdsmrPCeeWR_E+RSsPU@mail.gmail.com>	<alpine.LFD.2.00.1010211308340.2764@xanadu.home>
-	<AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
-Message-ID: <4CC0A281.1010202@eukrea.com>
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Thu, 21 Oct 2010 15:49:10 -0500
+Subject: [PATCH 4/7] omap:mailbox-send message in process context
+In-Reply-To: <D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+	<1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
+	<D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
+Message-ID: <AANLkTi=6fPONRaFmqrWkq8mxZacMCM+9xN9HM9FZJdja@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Rene,
 
-test protocol : booting a 2.6.36-rc8 kernel with a rootfs (ext3 formated, 
-generated with OpenEmbedded for armv5, loading and launching qtdemo 4.6.3) on 
-a 8GB ?SDHC  (uSD reformated after each board tests to trigger lot of 
-read/writes on the first init).
+Thanks for your comment.
 
-* on an i.MX357 (rev 2.1) without this patch leads to :
-mmcblk0: error -110 transferring data, sector 7347024, nr 8, card status 0xe00
-end_request: I/O error, dev mmcblk0, sector 7347025
 
-Same card, same board, with the timeout quirk patch : boots fine without any 
-error.
+>> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox,
+>> ? ? ? mbox_msg_t msg) struct omap_mbox_queue *mq = mbox->txq;
+>> ? ? ? int ret = 0, len;
+>>
+>> - ? ? spin_lock(&mq->lock);
+>> + ? ? spin_lock_bh(&mq->lock);
+>>
+>
+> Please check if this scenario looks valid to you, as discussed and depicted
+> with Fernando:
+>
+> Supposing that at this point the hw fifo is full and there are messages in
+> the kfifo.
+>
+>> ? ? ? if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
+>> ? ? ? ? ? ? ? ret = -ENOMEM;
+>> ? ? ? ? ? ? ? goto out;
+>> ? ? ? }
+>>
+>
+> We reach this point.
+>
+> In this scenario, the DSP or other Core reads a message from the mbox hw fifo.
+> The next happens:
+> 1.- The not full interrupt is triggered to the MPU.
+> 2.- The mbox's ISR schedules the tasklet to write the message.
+> 3.- The ISR is left and returns to here (since we still have the bh lock the
+> ? ?tasklet won't run).
+>
+>> + ? ? if (!__mbox_poll_for_space(mbox)) {\
+>
+> 4.- We check for mbox_fifo_full and we have space. so the message is written.
+>
+>> + ? ? ? ? ? ? mbox_fifo_write(mbox, msg);
+>
+> At this point it looks that the FIFO order is lost. We write this message
+> before the ones in the kfifo.
+>
 
-Reverted the patch: timeout errors came back.
+Good point. I agree.
 
-==> quirk timeout patch needed for the i.MX35
+> A solution for this could be checking if there are messages in the kfifo
+> before trying to write directly to the hw fifo, if so, just continue
+> scheduling the tasklet.
 
-* on an i.MX257 (tested twice) :
-Same kernel tree, same rootfs, same motherboard, same uSD, only the CPU module 
-change : no error without the patch (and no error with the patch also ;-).
+A change something like this ?
 
-==> quirk timeout patch not needed for the i.MX25
+-       if (!__mbox_poll_for_space(mbox)) {
++       if (kfifo_is_empty() && !__mbox_poll_for_space(mbox)) {
+                mbox_fifo_write(mbox, msg);
 
-* on an i.MX515 :
-Same kernel tree, same rootfs, same motherboard, same uSD (re-formated), only 
-the CPU module change without this patch leads to :
-mmcblk0: error -84 transferring data, sector 1315598, nr 2, card status 0x900
-end_request: I/O error, dev mmcblk0, sector 1315598
-
-Same card, same board, with the timeout quirk patch : boots fine without any 
-error.
-
-Reverted the patch: timeout errors came back.
-
-==> quirk timeout patch needed for the i.MX51
-
-Updated patch follows.
-
-Eric
+Thank you,
+Best regards,
+Hari
