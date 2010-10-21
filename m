@@ -1,97 +1,63 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 21 Oct 2010 10:39:23 -0700
-Subject: [RFC/PATCH 2/2] OMAP3: CPUidle: trigger early idle notification
-	call chain
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC356087034BBEBEBE@dbde02.ent.ti.com>
-	(Vishwanath Sripathy's message of "Thu, 21 Oct 2010 11:08:41 +0530")
-References: <1287617926-24308-1-git-send-email-khilman@deeprootsystems.com>
-	<1287617926-24308-3-git-send-email-khilman@deeprootsystems.com>
-	<FCCFB4CDC6E5564B9182F639FC356087034BBEBEBE@dbde02.ent.ti.com>
-Message-ID: <87zku7zbqs.fsf@deeprootsystems.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 21 Oct 2010 10:25:34 -0700
+Subject: [PATCH V2 45/69] ST SPEAr: PCIE gadget suppport
+In-Reply-To: <0901B62280FF37468247D8348744254F449565AA97@EAPEX1MAIL1.st.com>
+References: <cover.1285933331.git.viresh.kumar@st.com>
+	<c91308e26397dbe49f384c7d3cf168593e1fe8b0.1285933332.git.viresh.kumar@st.com>
+	<20101019144725.977297f5.akpm@linux-foundation.org>
+	<0901B62280FF37468247D8348744254F449565AA97@EAPEX1MAIL1.st.com>
+Message-ID: <20101021102534.5845ac4a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Sripathy, Vishwanath" <vishwanath.bs@ti.com> writes:
+On Thu, 21 Oct 2010 22:18:28 +0800 Pratyush ANAND <pratyush.anand@st.com> wrote:
 
->> 
->> During the early part of the CPUidle path (state selection by the
->> governer, checking for device activity, etc.) there is no (good)
->> reason to have interrupts disabled.
->> 
->> Therefore, enable interrupts early in the CPUidle path and then
->> trigger the "early" idle notifier call chain after device activity
->> checks and the next power states have been programmed.  Interrupts are
->> then (re)disabled after the final state is selected.
->> 
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->> ---
->>  arch/arm/mach-omap2/cpuidle34xx.c |   27 ++++++++++++++++++++++++--
->> -
->>  1 files changed, 24 insertions(+), 3 deletions(-)
->> 
->>
->> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-
->> omap2/cpuidle34xx.c
->> index 0d50b45..8c57360 100644
->> --- a/arch/arm/mach-omap2/cpuidle34xx.c
->> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
->> @@ -30,6 +30,7 @@
->>  #include <plat/powerdomain.h>
->>  #include <plat/clockdomain.h>
->>  #include <plat/serial.h>
->> +#include <plat/common.h>
->> 
->>  #include "pm.h"
->>  #include "control.h"
->> @@ -128,12 +129,14 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
->>  	/* Used to keep track of the total time in idle */
->>  	getnstimeofday(&ts_preidle);
->> 
->> -	local_irq_disable();
->> -	local_fiq_disable();
->> -
->>  	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
->>  	pwrdm_set_next_pwrst(core_pd, core_state);
->> 
->> +	omap_early_idle_notifier_start();
->> +
->> +	local_irq_disable();
->> +	local_fiq_disable();
->> +
->>  	if (omap_irq_pending() || need_resched())
->>  		goto return_sleep_time;
->> 
->> @@ -157,6 +160,8 @@ return_sleep_time:
->>  	local_irq_enable();
->>  	local_fiq_enable();
->> 
->> +	omap_early_idle_notifier_end();
+> > > +static ssize_t pcie_gadget_show_help(struct device *dev,
+> > > +           struct device_attribute *attr, char *buf)
+> > > +{
+> > > +   char text[] = "\t\tlink read->ltssm status\n \
+> > > +           link write->arg1 = UP to enable ltsmm DOWN to disable\n \
+> > > +           int_type read->type of supported interrupt\n \
+> > > +           int_type write->arg1 = interrupt type to be configured and\n \
+> > > +           can be INTA, MSI or NO_INT\n \
+> > > +           (select MSI only when you have programmed no_of_msi)\n \
+> > > +           no_of_msi read->zero if MSI is not enabled by host\n \
+> > > +           and positive value is the number of MSI vector granted\n \
+> > > +           no_of_msi write->arg1 = number of MSI vector needed\n \
+> > > +           inta write->arg1 = 1 to assert INTA and 0 to de-assert\n \
+> > > +           send_msi write->arg1 = MSI vector to be send\n \
+> > > +           vendor_id read->programmed vendor id (hex)\n\
+> > > +           vendor_id write->arg1 = vendor id(hex) to be programmed\n \
+> > > +           device_id read->programmed device id(hex)\n \
+> > > +           device_id write->arg1 = device id(hex) to be programmed\n \
+> > > +           bar0_size read->size of bar0 in hex\n \
+> > > +           bar0_size write->arg1= size of bar0 in hex\n \
+> > > +           (default bar0 size is 1000 (hex) bytes)\n \
+> > > +           bar0_address read->address of bar0 mapped area in hex\n \
+> > > +           bar0_address write->arg1 = address of bar0 mapped area in
+> > hex\n\
+> > > +           (default mapping of bar0 is SYSRAM1(E0800000)\n \
+> > > +           (always program bar size before bar address)\n \
+> > > +           (kernel might modify bar size and address to align)\n \
+> > > +           (read back bar size and address after writing to check)\n \
+> > > +           bar0_rw_offset read->offset of bar0 for which bar0_data \n \
+> > > +           will return value\n \
+> > > +           bar0_rw_offset write->arg1 = offset of bar0 for which\n \
+> > > +           bar0_data will write value\n \
+> > > +           bar0_data read->data at bar0_rw_offset\n \
+> > > +           bar0_data write->arg1 = data to be written at\n \
+> > > +           bar0_rw_offset\n";
+> > > +
+> > > +   int size = (sizeof(text) < PAGE_SIZE) ? sizeof(text) : PAGE_SIZE;
+> > > +
+> > > +   return snprintf(buf, size, "%s", text);
+> > > +}
+> >
+> > What the heck is this??
+> >
+> 
+> This was just to provide help for different sysfs nodes. What could be the other
+> Way to do it? Should it be better to remove help node from here provide all the help
+> In a separate document?
 
-> It appears that idle notifiers (for restore path) are called after
-> getnstimeofday is called which means time spent in idle callbacks are
-> not accounted in cpuidle time.  Will it not impact the cpuidle c state
-> prediction and latency computation?
-
-You're right.
-
-The current patch includes the pre-idle notifiers, but not the post-idle
-notifiers.  We should either include both or exclude both in the timing
-but not do one or the other.
-
-I will post and updated version which includes both in the timing
-measurement.
-
-But you've hit on something that I'm not too crazy about, and that
-Rajendra raised earlier as well, and also why this series is still RFC.
-
-Not only does the CPUidle timing measurement now measure the idle
-callbacks, because interrupts are enabled, it will also measure any
-other interrupt processing and/or scheduling that might happend because
-of the notifiers.
-
-At LPC this year, we'll hopefully be discussing better ways to decouple
-CPU idle states and device idle states, and hopefully come up with some
-better options here.  Until then, I think this approach is a good
-compromise.
-
-Kevin
+Yes, documenting it externally would be more typical.
