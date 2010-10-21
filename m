@@ -1,82 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 21 Oct 2010 12:05:41 +0200
-Subject: [GITT PULL] AT91: second pull for 2.6.37 merge window
-In-Reply-To: <20101020191125.GA22100@n2100.arm.linux.org.uk>
-References: <4CBECD42.7070905@atmel.com>
-	<20101020191125.GA22100@n2100.arm.linux.org.uk>
-Message-ID: <4CC01075.8000401@atmel.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 21 Oct 2010 12:13:42 +0200
+Subject: [PATCH 1/3] drivers: misc: add omap_hwspinlock driver
+In-Reply-To: <201010211104.28555.arnd@arndb.de>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<201010192308.02018.arnd@arndb.de>
+	<AANLkTikz-_qhjygzek4tR0CtDLih3ZQyy1mPKnXAiOiV@mail.gmail.com>
+	<201010211104.28555.arnd@arndb.de>
+Message-ID: <AANLkTimWG_38hY2Xq=G7r42eP+zmA24Gaw4-hLVJstVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/10/2010 21:11, Russell King - ARM Linux :
-> Did you miss this?
-> 
-> | Tuesday evening my time (BST, so UTC+1h) is the last time I'm merging
-> | anything into my git tree.
-> | 
-> | With the upcoming change to the debug macro infrastructure, there are
-> | two options for people who have new board support code external to my
-> | tree:
-> | 
-> | 1. Send me a pull request (based on Linus' tree not mine) by Tuesday.
-> | 
-> | 2. Eat merge conflicts and build breakage for breakfast when my tree
-> |    merges into mainline.  ;)
-> | 
-> | No further complaints about this please - there's been plenty of warning
-> | about these debug macro changes.
+On Thu, Oct 21, 2010 at 11:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 21 October 2010, Ohad Ben-Cohen wrote:
+>> This sounds like adding a set of API that resembles spin_{unlock,lock}_irq.
+>>
+>> My gut feeling here is that while this may be useful and simple at
+>> certain places, it is somewhat error prone; a driver which would
+>> erroneously use this at the wrong place will end up enabling
+>> interrupts where it really shouldn't.
+>>
+>> Don't you feel that proving a simple spin_lock_irqsave-like API is
+>> actually safer and less error prone ?
+>>
+>> I guess that is one of the reasons why spin_lock_irqsave is much more
+>> popular than spin_lock_irq - people just know it will never screw up.
+>
+> People can screw that up in different ways, e.g.
 
-Well, no. I had chosen the second option - and I am quite confident with
-breakage as I think I have anticipated them...
+Sure...
 
-So, will you do another pull round during Linus' merge window? Reading
-your answer I suspect that you will not ;-)
+> I use the presence of spin_lock_irqsave in driver code as an indication
+> of whether the author had any clue about locking. Most experienced
+> coders use the right version intuitively, while beginners often just
+> use _irqsave because they didn't understand the API and they were told
+> that using this is safe.
 
-If not I will then directly send the pull request to Linus.
+Agree.
 
-Thanks, bye,
+I'll add the _irq pair of APIs, this will make the users' code
+cleaner. This is valuable especially since all of our current users
+have their interrupts enabled anyway.
 
-> On Wed, Oct 20, 2010 at 01:06:42PM +0200, Nicolas Ferre wrote:
->> Hi Russell,
->>
->> Could you please pull the following:
->>
->>   git://github.com/at91linux/linux-2.6-at91.git for_rmk_bis
->>
->> This contains second set of AT91 update for 2.6.37 
->> merge window. All has been discussed on the list. 
->> It is based on latest linus' git tree:
->> commit 51ea8a88aae425915b458bfe295f1f10a3d52781
->>
->> Nicolas Ferre (3):
->>       AT91: trivial: align comment of at91sam9g20_reset with one more tab
->>       AT91: reset routine cleanup, remove not needed icache flush
->>       AT91: reset: extend alternate reset procedure to several chips
->>
->> Peter Gsellmann (1):
->>       AT91: add board support for Pcontrol_G20
->>
->> Peter Horton (1):
->>       AT91: Fix AT91SAM9G20 reset as per the errata in the data sheet
->>
->>  arch/arm/configs/pcontrol_g20_defconfig |  175 +++++++++++++++++
->>  arch/arm/mach-at91/Kconfig              |    6 +
->>  arch/arm/mach-at91/Makefile             |   13 +-
->>  arch/arm/mach-at91/at91sam9260.c        |    7 +-
->>  arch/arm/mach-at91/at91sam9261.c        |    7 +-
->>  arch/arm/mach-at91/at91sam9263.c        |    7 +-
->>  arch/arm/mach-at91/at91sam9_alt_reset.S |   48 +++++
->>  arch/arm/mach-at91/at91sam9rl.c         |    7 +-
->>  arch/arm/mach-at91/board-pcontrol-g20.c |  322 +++++++++++++++++++++++++++++++
->>  arch/arm/mach-at91/generic.h            |    3 +
->>  10 files changed, 565 insertions(+), 30 deletions(-)
->>  create mode 100644 arch/arm/configs/pcontrol_g20_defconfig
->>  create mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
->>  create mode 100644 arch/arm/mach-at91/board-pcontrol-g20.c
->>
->> Thanks a lot, best regards,
->> -- 
->> Nicolas Ferre
->>
--- 
-Nicolas Ferre
+The change is also pretty trivial:
+
+* move the internal locking implementation to raw_ methods
+* the raw_ methods would save the current interrupt state only if
+given a placeholder
+* wrap those raw_ methods with the desired API (but only support the
+_irq and _irqsave flavors)
+
+Thanks,
+Ohad.
