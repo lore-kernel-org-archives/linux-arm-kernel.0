@@ -1,347 +1,301 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Thu, 21 Oct 2010 13:27:54 +0900
-Subject: [PATCH v2 2/4] ARM: S5PV310: Add platform device and helper functions
-	for FIMD
-Message-ID: <1287635274-4670-1-git-send-email-sbkim73@samsung.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 21 Oct 2010 13:58:07 +0900
+Subject: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
+In-Reply-To: <003301cb70d2$60ae4d70$220ae850$%han@samsung.com>
+References: <1287406528-15324-1-git-send-email-sbkim73@samsung.com>
+	<1287406528-15324-4-git-send-email-sbkim73@samsung.com>
+	<003001cb6f5e$5db43050$191c90f0$%szyprowski@samsung.com>
+	<003301cb70d2$60ae4d70$220ae850$%han@samsung.com>
+Message-ID: <010b01cb70dc$8d35cb20$a7a16160$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonghun Han <jonghun.han@samsung.com>
+Hello, Jonghun.
 
-This patch adds platform device s5p_device_fimd0 for S5PV310 FIMD0.
-S5PV310 has two FIMDs(FIMD0, FIMD1). FIMD1 will be added later.
-Some definitions used to enable S5PV310 FIMD0 are added.
+Below is my opinion.
 
-Signed-off-by: Jonghun Han <jonghun.han@samsung.com>
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
----
-Changes since v1:
-- moved to change plat/fb.h from 4th patch as per Marek's suggestion
+Have a good time :)
+> -----Original Message-----
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
+> owner at vger.kernel.org] On Behalf Of Jonghun Han
+> Sent: Thursday, October 21, 2010 12:45 PM
+> To: 'Marek Szyprowski'; 'Sangbeom Kim'; linux-arm-
+> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; linux-
+> fbdev at vger.kernel.org
+> Cc: akpm at linux-foundation.org; kgene.kim at samsung.com; ben-linux at fluff.org;
+> kyungmin.park at samsung.com
+> Subject: RE: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
+> 
+> 1AFAAVgAzADEAMAAgAEY
+> 	ASQBNAEQA
+> x-cr-puzzleid: {B7526269-A73C-412A-8DAE-B8EB603CF9D0}
+> 
+> 
+> Hi,
+> 
+> Marek Szyprowski wrote:
+> 
+> > -----Original Message-----
+> > From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
+> > Sent: Tuesday, October 19, 2010 4:22 PM
+> > To: 'Sangbeom Kim'; linux-arm-kernel at lists.infradead.org; linux-samsung-
+> > soc at vger.kernel.org; linux-fbdev at vger.kernel.org
+> > Cc: 'Jonghun Han'; akpm at linux-foundation.org; kgene.kim at samsung.com;
+> ben-
+> > linux at fluff.org; kyungmin.park at samsung.com
+> > Subject: RE: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
+> >
+> > 1AFAAVgAzADEAMAAgAEY
+> > 	ASQBNAEQA
+> > x-cr-puzzleid: {C4CCB40E-D5C6-4119-AA7C-BBBA7A1503E4}
+> >
+> > Hello,
+> >
+> > On Monday, October 18, 2010 2:55 PM Sangbeom Kim wrote:
+> >
+> > > From: Jonghun Han <jonghun.han@samsung.com>
+> > >
+> > > This patch adds s3c_fb_driverdata for S5PV310 FIMD0. The clk_type is
+> > added
+> > > to distinguish clock type in structure s3c_fb_variant and lcd_clk is
+> > added
+> > > in structure s3c_fb to calculate divider for lcd panel.
+> > > FIMD can handles two clocks. The one is for FIMD IP and the other is
+> for
+> > > LCD pixel clock. Before S5PV310 LCD pixel clock can be same with FIMD
+> IP
+> > > clock. From S5PV310 LCD pixel clock is separated from FIMD IP clock.
+> > >
+> > > Signed-off-by: Jonghun Han <jonghun.han@samsung.com>
+> > > Reviewed-by: Kukjin Kim <kgene.kim@samsung.com>
+> > > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> > > Cc: Ben Dooks <ben-linux@fluff.org>
+> > > ---
+> > > NOTE: This patch is only for FIMD0.
+> > > FIMD1 will be implemented later.
+> > >  drivers/video/Kconfig  |    2 +-
+> > >  drivers/video/s3c-fb.c |  128
+> > ++++++++++++++++++++++++++++++++++++++++++------
+> > >  2 files changed, 114 insertions(+), 16 deletions(-)
+> > >
+> 
+> [snip]
+> 
+> > >  	/* write the buffer address */
+> > > @@ -1286,8 +1292,10 @@ static int __devinit s3c_fb_probe(struct
+> > platform_device *pdev)
+> > >  	struct s3c_fb_platdata *pd;
+> > >  	struct s3c_fb *sfb;
+> > >  	struct resource *res;
+> > > +	struct clk *mout_mpll = NULL;
+> > >  	int win;
+> > >  	int ret = 0;
+> > > +	u32 rate = 134000000;
+> > >
+> > >  	fbdrv = (struct s3c_fb_driverdata *)platform_get_device_id(pdev)-
+> > >driver_data;
+> > >
+> > > @@ -1314,19 +1322,56 @@ static int __devinit s3c_fb_probe(struct
+> > platform_device *pdev)
+> > >  	sfb->pdata = pd;
+> > >  	sfb->variant = fbdrv->variant;
+> > >
+> > > -	sfb->bus_clk = clk_get(dev, "lcd");
+> > > -	if (IS_ERR(sfb->bus_clk)) {
+> > > -		dev_err(dev, "failed to get bus clock\n");
+> > > +	switch (sfb->variant.clk_type) {
+> > > +	case FIMD_CLK_TYPE0:
+> > > +		sfb->bus_clk = clk_get(dev, "lcd");
+> > > +		if (IS_ERR(sfb->bus_clk)) {
+> > > +			dev_err(dev, "failed to get bus clock\n");
+> > > +			goto err_sfb;
+> > > +		}
+> > > +
+> > > +		clk_enable(sfb->bus_clk);
+> > > +
+> > > +		sfb->lcd_clk = sfb->bus_clk;
+> > > +		break;
+> > > +
+> > > +	case FIMD_CLK_TYPE1:
+> > > +		sfb->bus_clk = clk_get(&pdev->dev, "fimd");
+> > > +		if (IS_ERR(sfb->bus_clk)) {
+> > > +			dev_err(&pdev->dev, "failed to get clock for
+> fimd\n");
+> > > +			goto err_sfb;
+> > > +		}
+> > > +		clk_enable(sfb->bus_clk);
+> > > +
+> > > +		sfb->lcd_clk = clk_get(&pdev->dev, "sclk_fimd");
+> > > +		if (IS_ERR(sfb->lcd_clk)) {
+> > > +			dev_err(&pdev->dev, "failed to get sclk for
+> fimd\n");
+> > > +			goto err_bus_clk;
+> > > +		}
+> > > +
+> > > +		mout_mpll = clk_get(&pdev->dev, "mout_mpll");
+> > > +		if (IS_ERR(mout_mpll)) {
+> > > +			dev_err(&pdev->dev, "failed to get mout_mpll\n");
+> > > +			goto err_lcd_clk;
+> > > +		}
+> > > +		clk_set_parent(sfb->lcd_clk, mout_mpll);
+> > > +		clk_put(mout_mpll);
+> >
+> > I don't think that the driver is the right place to change the parent of
+> > the sclk_fimd
+> > clock. It should be done in the boot loader or the board startup code.
+> >
+> 
+> As you know, there are two clock sources for LCD pixel clock.
+> s3c-fb only used 'lcd' clock as a parent of LCD pixel clock.
+> But from S5PV310 SCLK_FIMD is only used as a source of LCD pixel clock.
+> And SCLK_FIMD is only for FIMD. So the parent of the SCLK_FIMD can be
+> selected in the driver.
+> In my opinion it doesn't matter.
+> 
 
- arch/arm/mach-s5pv310/Kconfig                |    7 +++
- arch/arm/mach-s5pv310/Makefile               |    1 +
- arch/arm/mach-s5pv310/cpu.c                  |    3 +
- arch/arm/mach-s5pv310/include/mach/regs-fb.h |   21 ++++++++
- arch/arm/mach-s5pv310/setup-fimd0-24bpp.c    |   47 ++++++++++++++++++
- arch/arm/plat-s5p/Kconfig                    |    5 ++
- arch/arm/plat-s5p/Makefile                   |    1 +
- arch/arm/plat-s5p/dev-fimd0.c                |   67 ++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h    |    1 +
- arch/arm/plat-samsung/include/plat/fb-core.h |   15 ++++++
- arch/arm/plat-samsung/include/plat/fb.h      |   14 +++++
- 11 files changed, 182 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-fb.h
- create mode 100644 arch/arm/mach-s5pv310/setup-fimd0-24bpp.c
- create mode 100644 arch/arm/plat-s5p/dev-fimd0.c
+Parent clock is specific to machine
+because machines could have different type of lcd panel each other and
+any parent clocks for FIMD could be used according to the lcd panel.
+So for stable pixel clock setting, parent clock should be set
+at machine specific code and FIMD driver should preserve just clock gating.
 
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index 1150b36..696f300 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -14,6 +14,11 @@ config CPU_S5PV310
- 	help
- 	  Enable S5PV310 CPU support
- 
-+config S5PV310_SETUP_FIMD0_24BPP
-+	bool
-+	help
-+	  Common setup code for FIMD0 with an 24bpp RGB display helper.
-+
- config S5PV310_SETUP_I2C1
- 	bool
- 	help
-@@ -95,12 +100,14 @@ menu "S5PV310 Machines"
- config MACH_SMDKV310
- 	bool "SMDKV310"
- 	select CPU_S5PV310
-+	select S5P_DEV_FIMD0
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
- 	select S3C_DEV_HSMMC3
-+	select S5PV310_SETUP_FIMD0_24BPP
- 	select S5PV310_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung SMDKV310
-diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-index 97aba6d..58bb305 100644
---- a/arch/arm/mach-s5pv310/Makefile
-+++ b/arch/arm/mach-s5pv310/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
- 
- # device support
- 
-+obj-$(CONFIG_S5PV310_SETUP_FIMD0_24BPP)	+= setup-fimd0-24bpp.o
- obj-$(CONFIG_S5PV310_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PV310_SETUP_I2C2)	+= setup-i2c2.o
- obj-$(CONFIG_S5PV310_SETUP_I2C3)	+= setup-i2c3.o
-diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-index df00df0..f2817cd 100644
---- a/arch/arm/mach-s5pv310/cpu.c
-+++ b/arch/arm/mach-s5pv310/cpu.c
-@@ -18,6 +18,8 @@
- 
- #include <plat/cpu.h>
- #include <plat/clock.h>
-+#include <plat/devs.h>
-+#include <plat/fb-core.h>
- #include <plat/s5pv310.h>
- #include <plat/sdhci.h>
- 
-@@ -105,6 +107,7 @@ void __init s5pv310_map_io(void)
- 	s5pv310_default_sdhci1();
- 	s5pv310_default_sdhci2();
- 	s5pv310_default_sdhci3();
-+	s5p_fb_setname(0, "s5pv310-fb");	/* FIMD0 */
- }
- 
- void __init s5pv310_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s5pv310/include/mach/regs-fb.h b/arch/arm/mach-s5pv310/include/mach/regs-fb.h
-new file mode 100644
-index 0000000..f320105
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/include/mach/regs-fb.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright 2010 Ben Dooks <ben-linux@fluff.org>
-+ *
-+ * Dummy framebuffer to allow build for the moment.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef __ASM_ARCH_MACH_REGS_FB_H
-+#define __ASM_ARCH_MACH_REGS_FB_H __FILE__
-+
-+#include <plat/regs-fb-v4.h>
-+
-+static inline unsigned int s3c_fb_pal_reg(unsigned int window, int reg)
-+{
-+	return 0x2400 + (window * 256 * 4) + reg;
-+}
-+
-+#endif /* __ASM_ARCH_MACH_REGS_FB_H */
-diff --git a/arch/arm/mach-s5pv310/setup-fimd0-24bpp.c b/arch/arm/mach-s5pv310/setup-fimd0-24bpp.c
-new file mode 100644
-index 0000000..7160f85
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/setup-fimd0-24bpp.c
-@@ -0,0 +1,47 @@
-+/* linux/arch/arm/mach-s5pv310/setup-fimd0-24bpp.c
-+ *
-+ * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Base s5pv210 setup information for 24bpp LCD framebuffer
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/fb.h>
-+#include <linux/gpio.h>
-+
-+#include <plat/fb.h>
-+#include <plat/gpio-cfg.h>
-+
-+#include <mach/regs-clock.h>
-+#include <mach/regs-fb.h>
-+#include <mach/map.h>
-+
-+void s5pv310_fimd0_gpio_setup_24bpp(void)
-+{
-+	unsigned int reg = 0;
-+
-+	s3c_gpio_cfgrange_nopull(S5PV310_GPF0(0), 8, S3C_GPIO_SFN(2));
-+	s3c_gpio_cfgrange_nopull(S5PV310_GPF1(0), 8, S3C_GPIO_SFN(2));
-+	s3c_gpio_cfgrange_nopull(S5PV310_GPF2(0), 8, S3C_GPIO_SFN(2));
-+	s3c_gpio_cfgrange_nopull(S5PV310_GPF3(0), 4, S3C_GPIO_SFN(2));
-+
-+	/*
-+	 * Set DISPLAY_CONTROL register for Display path selection.
-+	 *
-+	 * DISPLAY_CONTROL[1:0]
-+	 * ---------------------
-+	 *  00 | MIE
-+	 *  01 | MDINE
-+	 *  10 | FIMD : selected
-+	 *  11 | FIMD
-+	 */
-+	reg = __raw_readl(S3C_VA_SYS + 0x0210);
-+	reg |= (1 << 1);
-+	__raw_writel(reg, S3C_VA_SYS + 0x0210);
-+}
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 65dbfa8..c4e0515 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -52,6 +52,11 @@ config S5P_DEV_FIMC2
- 	help
- 	  Compile in platform device definitions for FIMC controller 2
- 
-+config S5P_DEV_FIMD0
-+	bool
-+	help
-+	  Compile in platform device definitions for FIMD controller 0
-+
- config S5P_DEV_ONENAND
- 	bool
- 	help
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index de65238..149e413 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -27,4 +27,5 @@ obj-$(CONFIG_PM)		+= irq-pm.o
- obj-$(CONFIG_S5P_DEV_FIMC0)	+= dev-fimc0.o
- obj-$(CONFIG_S5P_DEV_FIMC1)	+= dev-fimc1.o
- obj-$(CONFIG_S5P_DEV_FIMC2)	+= dev-fimc2.o
-+obj-$(CONFIG_S5P_DEV_FIMD0)	+= dev-fimd0.o
- obj-$(CONFIG_S5P_DEV_ONENAND)	+= dev-onenand.o
-diff --git a/arch/arm/plat-s5p/dev-fimd0.c b/arch/arm/plat-s5p/dev-fimd0.c
-new file mode 100644
-index 0000000..81d460a
---- /dev/null
-+++ b/arch/arm/plat-s5p/dev-fimd0.c
-@@ -0,0 +1,67 @@
-+/* linux/arch/arm/plat-s5p/dev-fimd0.c
-+ *
-+ * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * Core file for Samsung Display Controller (FIMD) driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/string.h>
-+#include <linux/platform_device.h>
-+#include <linux/fb.h>
-+#include <linux/gfp.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <mach/irqs.h>
-+#include <mach/map.h>
-+
-+#include <plat/fb.h>
-+#include <plat/devs.h>
-+#include <plat/cpu.h>
-+
-+static struct resource s5p_fimd0_resource[] = {
-+	[0] = {
-+		.start	= S5P_PA_FIMD0,
-+		.end	= S5P_PA_FIMD0 + SZ_32K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_FIMD0_VSYNC,
-+		.end	= IRQ_FIMD0_VSYNC,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	[2] = {
-+		.start	= IRQ_FIMD0_FIFO,
-+		.end	= IRQ_FIMD0_FIFO,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	[3] = {
-+		.start	= IRQ_FIMD0_SYSTEM,
-+		.end	= IRQ_FIMD0_SYSTEM,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 fimd0_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device s5p_device_fimd0 = {
-+	.name		= "s5p-fb",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(s5p_fimd0_resource),
-+	.resource	= s5p_fimd0_resource,
-+	.dev		= {
-+		.dma_mask		= &fimd0_dmamask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
-+void __init s5p_fimd0_set_platdata(struct s3c_fb_platdata *pd)
-+{
-+	s3c_set_platdata(pd, sizeof(struct s3c_fb_platdata),
-+			 &s5p_device_fimd0);
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 16521cc..066b7aa 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -40,6 +40,7 @@ extern struct platform_device s3c64xx_device_ac97;
- extern struct platform_device s3c_device_ts;
- 
- extern struct platform_device s3c_device_fb;
-+extern struct platform_device s5p_device_fimd0;
- extern struct platform_device s3c_device_ohci;
- extern struct platform_device s3c_device_lcd;
- extern struct platform_device s3c_device_wdt;
-diff --git a/arch/arm/plat-samsung/include/plat/fb-core.h b/arch/arm/plat-samsung/include/plat/fb-core.h
-index bca383e..5be34f8 100644
---- a/arch/arm/plat-samsung/include/plat/fb-core.h
-+++ b/arch/arm/plat-samsung/include/plat/fb-core.h
-@@ -26,4 +26,19 @@ static inline void s3c_fb_setname(char *name)
- #endif
- }
- 
-+/* Re-define device name depending on support. */
-+static inline void s5p_fb_setname(int id, char *name)
-+{
-+	switch (id) {
-+#ifdef CONFIG_S5P_DEV_FIMD0
-+	case 0:
-+		s5p_device_fimd0.name = name;
-+		break;
-+#endif
-+	default:
-+		printk(KERN_ERR "%s: invalid device id(%d)\n", __func__, id);
-+		break;
-+	}
-+}
-+
- #endif /* __ASM_PLAT_FB_CORE_H */
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index cb3ca3a..67733b5 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -74,6 +74,14 @@ struct s3c_fb_platdata {
- extern void s3c_fb_set_platdata(struct s3c_fb_platdata *pd);
- 
- /**
-+ * s5p_fimd0_set_platdata() - Setup the FB device with platform data.
-+ * @pd: The platform data to set. The data is copied from the passed structure
-+ *      so the machine data can mark the data __initdata so that any unused
-+ *      machines will end up dumping their data at runtime.
-+ */
-+extern void s5p_fimd0_set_platdata(struct s3c_fb_platdata *pd);
-+
-+/**
-  * s3c64xx_fb_gpio_setup_24bpp() - S3C64XX setup function for 24bpp LCD
-  *
-  * Initialise the GPIO for an 24bpp LCD display on the RGB interface.
-@@ -94,4 +102,10 @@ extern void s5pc100_fb_gpio_setup_24bpp(void);
-  */
- extern void s5pv210_fb_gpio_setup_24bpp(void);
- 
-+/**
-+ * s5pv310_fimd0_gpio_setup_24bpp() - S5PV310/S5PC210 setup function for 24bpp LCD0
-+ *
-+ * Initialise the GPIO for an 24bpp LCD display on the RGB interface 0.
-+ */
-+extern void s5pv310_fimd0_gpio_setup_24bpp(void);
- #endif /* __PLAT_S3C_FB_H */
--- 
-1.6.2.5
+> 
+> > We should also be a bit more consistent on clock naming.
+> s3c6410..s5pv210
+> > used the 'lcd'
+> > clock name. Maybe you should also provide a patch to rename all these
+> > clocks to common
+> > name.
+> >
+> Please refer to the following diagram.
+> Before S5PV310 clk 'lcd' was used for FIMD IP core clock and source of the
+> LCD pixel clock.
+> But the mux used to select source of LCD pixel clock is removed.
+> So 'lcd' clock is only used for core clock of FIMD IP. It isn't used for
+> LCD
+> pixel clock.
+> As a result clock name was changed from lcd to fimd in the S5PV310
+> datasheet.
+> I agree to rearrange clock name later.
+> 
+> Before S5PV310
+>            ------------------------------------
+>                       dsys bus
+>            ----------------+-------------------
+>                            |
+>                            |1.clk 'lcd'
+>                            |
+>                            | FIMD block
+>                        +---+-----------+
+> 4.mout_mpll |\         |   |           |
+>     --------|m|        | +-+-+ +----+  |
+>             |u|-+      | |   +-+core|  |
+>             |x| |      | |     +----+  |
+>             |/  |      | | |\          |
+>                 |      | +-|m|  +---+  |
+>                 |      |   |u|--+div|  |
+>                 +------+---|x|  +---+  |
+>            2.SCLK_FIMD |   |/     |    |
+>                        |          |    |
+>                        +----------+----+
+>                                   |
+>            inside of SoC          |
+>            -----------------------+--------------------------
+>            outside of SoC         |
+>                                   | 3.LCD pixel clock
+>                                   |
+>                           +--------------+
+>                           | LCD module   |
+>                           +--------------+
+> 
+> 
+> S5PV310
+>            ------------------------------------
+>                       dsys bus
+>            ----------------+-------------------
+>                            |
+>                            |1.clk 'fimd'
+>                            |
+>                            | FIMD block
+>                        +---+-----------+
+> 4.mout_mpll |\         |   |           |
+>     --------|m|        |   |   +----+  |
+>             |u|-+      |   +---+core|  |
+>             |x| |      |       +----+  |
+>             |/  |      |               |
+>                 |      |        +---+  |
+>                 |      |     +--+div|  |
+>                 +------+-----+  +---+  |
+>            2.SCLK_FIMD |          |    |
+>                        |          |    |
+>                        +----------+----+
+>                                   |
+>            inside of SoC          |
+>            -----------------------+--------------------------
+>            outside of SoC         |
+>                                   | 3.LCD pixel clock
+>                                   |
+>                           +--------------+
+>                           | LCD module   |
+>                           +--------------+
+> 
+> > > +
+> > > +		clk_set_rate(sfb->lcd_clk, rate);
+> > > +		clk_enable(sfb->lcd_clk);
+> > > +		dev_dbg(&pdev->dev, "set fimd sclk rate to %d\n", rate);
+> > > +		break;
+> > > +
+> > > +	default:
+> > > +		dev_err(dev, "failed to enable clock for FIMD\n");
+> > >  		goto err_sfb;
+> > >  	}
+> > >
+> > > -	clk_enable(sfb->bus_clk);
+> > > -
+> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > >  	if (!res) {
+> > >  		dev_err(dev, "failed to find registers\n");
+> > >  		ret = -ENOENT;
+> > > -		goto err_clk;
+> > > +		goto err_lcd_clk;
+> > >  	}
+> > >
+> > >  	sfb->regs_res = request_mem_region(res->start, resource_size(res),
+> > > @@ -1334,7 +1379,7 @@ static int __devinit s3c_fb_probe(struct
+> > platform_device *pdev)
+> > >  	if (!sfb->regs_res) {
+> > >  		dev_err(dev, "failed to claim register region\n");
+> > >  		ret = -ENOENT;
+> > > -		goto err_clk;
+> > > +		goto err_lcd_clk;
+> > >  	}
+> > >
+> > >  	sfb->regs = ioremap(res->start, resource_size(res));
+> > > @@ -1413,9 +1458,15 @@ err_req_region:
+> > >  	release_resource(sfb->regs_res);
+> > >  	kfree(sfb->regs_res);
+> > >
+> > > -err_clk:
+> > > -	clk_disable(sfb->bus_clk);
+> > > -	clk_put(sfb->bus_clk);
+> > > +err_lcd_clk:
+> > > +	clk_disable(sfb->lcd_clk);
+> > > +	clk_put(sfb->lcd_clk);
+> > > +
+> > > +err_bus_clk:
+> > > +	if (sfb->variant.clk_type != FIMD_CLK_TYPE0) {
+> > > +		clk_disable(sfb->bus_clk);
+> > > +		clk_put(sfb->bus_clk);
+> > > +	}
+> > >
+> > >  err_sfb:
+> > >  	kfree(sfb);
+> [snip]
+> 
+> BRs,
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
