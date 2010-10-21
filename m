@@ -1,54 +1,77 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 21 Oct 2010 15:26:04 -0700
-Subject: [PATCH v3 00/12] tnetv107x ssp driver stack
-In-Reply-To: <1287694873-12904-1-git-send-email-cyril@ti.com> (Cyril
-	Chemparathy's message of "Thu, 21 Oct 2010 17:01:01 -0400")
-References: <1287694873-12904-1-git-send-email-cyril@ti.com>
-Message-ID: <87mxq7p4hv.fsf@deeprootsystems.com>
+From: rene.sapiens@ti.com (Sapiens, Rene)
+Date: Thu, 21 Oct 2010 17:30:13 -0500
+Subject: [PATCH 4/7] omap:mailbox-send message in process context
+In-Reply-To: <AANLkTi=6fPONRaFmqrWkq8mxZacMCM+9xN9HM9FZJdja@mail.gmail.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+	<1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
+	<D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
+	<AANLkTi=6fPONRaFmqrWkq8mxZacMCM+9xN9HM9FZJdja@mail.gmail.com>
+Message-ID: <D2943F03B81C9C458E44DFB213905E02010355C681@dlee04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyril Chemparathy <cyril@ti.com> writes:
+Hari,
 
-> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
-> device.  It has a built-in programmable execution engine that can be programmed
-> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
+On Thursday, October 21, 2010 3:49 PM Hari Kanigeri wrote:
+> Rene,
+> 
+> Thanks for your comment.
+> 
+> 
+>>> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox,
+>>> ? ? ? mbox_msg_t msg) struct omap_mbox_queue *mq = mbox->txq;
+>>> ? ? ? int ret = 0, len;
+>>> 
+>>> - ? ? spin_lock(&mq->lock);
+>>> + ? ? spin_lock_bh(&mq->lock);
+>>> 
+>> 
+>> Please check if this scenario looks valid to you, as discussed and depicted
+>> with Fernando:
+>> 
+>> Supposing that at this point the hw fifo is full and there are messages in
+>> the kfifo.
+>> 
+>>> ? ? ? if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
+>>> ? ? ? ? ? ? ? ret = -ENOMEM;
+>>> ? ? ? ? ? ? ? goto out;
+>>> ? ? ? }
+>>> 
+>> 
+>> We reach this point.
+>> 
+>> In this scenario, the DSP or other Core reads a message from the mbox hw
+>> fifo. The next happens:
+>> 1.- The not full interrupt is triggered to the MPU.
+>> 2.- The mbox's ISR schedules the tasklet to write the message.
+>> 3.- The ISR is left and returns to here (since we still have the bh lock
+>> the ? ?tasklet won't run).
+>> 
+>>> + ? ? if (!__mbox_poll_for_space(mbox)) {\
+>> 
+>> 4.- We check for mbox_fifo_full and we have space. so the message is
+>> written. 
+>> 
+>>> + ? ? ? ? ? ? mbox_fifo_write(mbox, msg);
+>> 
+>> At this point it looks that the FIFO order is lost. We write this message
+>> before the ones in the kfifo.
+>> 
+> 
+> Good point. I agree.
+> 
+>> A solution for this could be checking if there are messages in the kfifo
+>> before trying to write directly to the hw fifo, if so, just continue
+>> scheduling the tasklet.
+> 
+> A change something like this ?
+> 
+> -       if (!__mbox_poll_for_space(mbox)) {
+> +       if (kfifo_is_empty() && !__mbox_poll_for_space(mbox)) {
 
-Andrew, looking for some advice here...
+Yes, this looks good to me.
 
-This is a piece of davinci hardware, but introduces drivers in various
-subsystems.  I'm willing to merge this series via the davinci tree after
-getting acks from the various subsystem maintainers.  Is this an OK
-approach?  It seems best to me to merge this all together.
+>                 mbox_fifo_write(mbox, msg);
 
-We already have acks for the regulator and gpio driver parts, and the
-backlight driver has a clear owner in MAINTAINERS.  However, who should
-be doing the final review/ack of the drivers/misc and drivers/gpio
-changes is less clear to me.  
-
-Any advice appreciated,
-
-Thanks,
-
-Kevin
-
->  arch/arm/mach-davinci/board-tnetv107x-evm.c    |  199 +++++++
->  arch/arm/mach-davinci/devices-tnetv107x.c      |   25 +
->  arch/arm/mach-davinci/include/mach/ti_ssp.h    |   98 ++++
->  arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +
->  arch/arm/mach-davinci/tnetv107x.c              |    2 +-
->  drivers/gpio/Kconfig                           |   10 +
->  drivers/gpio/Makefile                          |    1 +
->  drivers/gpio/ti-ssp-gpio.c                     |  200 +++++++
->  drivers/misc/Kconfig                           |   11 +
->  drivers/misc/Makefile                          |    1 +
->  drivers/misc/ti_ssp.c                          |  436 +++++++++++++++
->  drivers/regulator/Kconfig                      |   10 +
->  drivers/regulator/Makefile                     |    1 +
->  drivers/regulator/tps6524x-regulator.c         |  692 ++++++++++++++++++++++++
->  drivers/spi/Kconfig                            |    7 +
->  drivers/spi/Makefile                           |    1 +
->  drivers/spi/spi_ti_ssp.c                       |  397 ++++++++++++++
->  drivers/video/backlight/Kconfig                |    7 +
->  drivers/video/backlight/Makefile               |    2 +-
->  drivers/video/backlight/tps6116x.c             |  340 ++++++++++++
+Regards,
+Rene
