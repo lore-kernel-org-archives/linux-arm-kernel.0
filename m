@@ -1,61 +1,50 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 21 Oct 2010 11:37:35 -0700
-Subject: [RFC PATCH] arm: msm: moved Kconfig machine entry into mach-msm
-Message-ID: <1287686255-18674-1-git-send-email-dwalker@codeaurora.org>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 22 Oct 2010 02:14:01 +0800
+Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
+In-Reply-To: <alpine.LFD.2.00.1010211308340.2764@xanadu.home>
+References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
+	<1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>
+	<20101020112741.GB10261@pengutronix.de>
+	<AANLkTinairUcKpTH2ePjbp3j7qdsmrPCeeWR_E+RSsPU@mail.gmail.com>
+	<alpine.LFD.2.00.1010211308340.2764@xanadu.home>
+Message-ID: <AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anyone suggested this? It seems like it might reduce conflicts
-in the Kconfig file.
+It also works fine on mx35_3ds without that timeout quirk.
 
-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
----
- arch/arm/Kconfig               |   12 +-----------
- arch/arm/mach-msm/Kconfig.base |   13 +++++++++++++
- 2 files changed, 14 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm/mach-msm/Kconfig.base
+My mx25_3ds gets something wrong.  Will try to fix it and test this tomorrow.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 88c97bc..e256564 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -590,17 +590,7 @@ config ARCH_PXA
- 	help
- 	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
- 
--config ARCH_MSM
--	bool "Qualcomm MSM"
--	select HAVE_CLK
--	select GENERIC_CLOCKEVENTS
--	select ARCH_REQUIRE_GPIOLIB
--	help
--	  Support for Qualcomm MSM/QSD based systems.  This runs on the
--	  apps processor of the MSM/QSD and depends on a shared memory
--	  interface to the modem processor which runs the baseband
--	  stack and controls some vital subsystems
--	  (clock and power control, etc).
-+source "arch/arm/mach-msm/Kconfig.base"
- 
- config ARCH_SHMOBILE
- 	bool "Renesas SH-Mobile"
-diff --git a/arch/arm/mach-msm/Kconfig.base b/arch/arm/mach-msm/Kconfig.base
-new file mode 100644
-index 0000000..184ac66
---- /dev/null
-+++ b/arch/arm/mach-msm/Kconfig.base
-@@ -0,0 +1,13 @@
-+
-+config ARCH_MSM
-+	bool "Qualcomm MSM"
-+	select HAVE_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select ARCH_REQUIRE_GPIOLIB
-+	help
-+	  Support for Qualcomm MSM/QSD based systems.  This runs on the
-+	  apps processor of the MSM/QSD and depends on a shared memory
-+	  interface to the modem processor which runs the baseband
-+	  stack and controls some vital subsystems
-+	  (clock and power control, etc).
-+
+
+On Fri, Oct 22, 2010 at 1:10 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Fri, 22 Oct 2010, Shawn Guo wrote:
+>
+>> Hi Wolfram,
+>>
+>> On Wed, Oct 20, 2010 at 7:27 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>> > On Wed, Oct 20, 2010 at 05:22:56PM +0800, Shawn Guo wrote:
+>> >> This patch is to fix timeout problem which was seen on babbage.
+>> >> Thanks Richard Zhu <r65037@freescale.com> for catching this.
+>> >>
+>> >> Signed-off-by: Shawn Guo <shawn.gsc@gmail.com>
+>> >
+>> > NACK. It is still untested if we need that quirk on MX25/35.
+>> > Eric wanted to send an updated patch next week.
+>> >
+>>
+>> I just tested the code change on mx35_3ds and mx25_3ds, and no problem
+>> was seen. ?I will send the patch for mmc support on mx35_3ds and
+>> mx25_3ds soon.
+>
+> The question is... is this quirk actually needed on those? ?Did you test
+> _without_ it?
+>
+>
+> Nicolas
+>
+
+
+
 -- 
-1.7.0.4
+Regards,
+Shawn
