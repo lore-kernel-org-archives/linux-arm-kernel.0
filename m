@@ -1,118 +1,95 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 21 Oct 2010 09:58:33 +0900
-Subject: [PATCH 5/5] ARM: SAMSUNG: Add to enable/disable clock on S3C PL330
+Date: Thu, 21 Oct 2010 09:58:32 +0900
+Subject: [PATCH 4/5] ARM: S5P: Reorder DMA platform device id
 In-Reply-To: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
 References: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1287622713-1657-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1287622713-1657-5-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Seungwhan Youn <sw.youn@samsung.com>
 
-This patch adds to enable/disable DMA operation clock on S3C-PL330
-DMA controller driver.
+This patch is matched-up DMA platform device id to it's clock id.
 
 Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
 Acked-by: Jassi Brar <jassi.brar@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-samsung/s3c-pl330.c |   34 +++++++++++++++++++++++++++-------
- 1 files changed, 27 insertions(+), 7 deletions(-)
+ arch/arm/mach-s5p6442/dma.c |    2 +-
+ arch/arm/mach-s5p64x0/dma.c |    2 +-
+ arch/arm/mach-s5pc100/dma.c |    4 ++--
+ arch/arm/mach-s5pv210/dma.c |    4 ++--
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/s3c-pl330.c b/arch/arm/plat-samsung/s3c-pl330.c
-index a91305a..b4ff8d7 100644
---- a/arch/arm/plat-samsung/s3c-pl330.c
-+++ b/arch/arm/plat-samsung/s3c-pl330.c
-@@ -15,6 +15,8 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
+diff --git a/arch/arm/mach-s5p6442/dma.c b/arch/arm/mach-s5p6442/dma.c
+index ad4f870..7dfb136 100644
+--- a/arch/arm/mach-s5p6442/dma.c
++++ b/arch/arm/mach-s5p6442/dma.c
+@@ -82,7 +82,7 @@ static struct s3c_pl330_platdata s5p6442_pdma_pdata = {
  
- #include <asm/hardware/pl330.h>
+ static struct platform_device s5p6442_device_pdma = {
+ 	.name		= "s3c-pl330",
+-	.id		= 1,
++	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s5p6442_pdma_resource),
+ 	.resource	= s5p6442_pdma_resource,
+ 	.dev		= {
+diff --git a/arch/arm/mach-s5p64x0/dma.c b/arch/arm/mach-s5p64x0/dma.c
+index 29a8c24..d7ad944 100644
+--- a/arch/arm/mach-s5p64x0/dma.c
++++ b/arch/arm/mach-s5p64x0/dma.c
+@@ -122,7 +122,7 @@ static struct s3c_pl330_platdata s5p6450_pdma_pdata = {
  
-@@ -27,6 +29,7 @@
-  * @node: To attach to the global list of DMACs.
-  * @pi: PL330 configuration info for the DMAC.
-  * @kmcache: Pool to quickly allocate xfers for all channels in the dmac.
-+ * @clk: Pointer of DMAC operation clock.
-  */
- struct s3c_pl330_dmac {
- 	unsigned		busy_chan;
-@@ -34,6 +37,7 @@ struct s3c_pl330_dmac {
- 	struct list_head	node;
- 	struct pl330_info	*pi;
- 	struct kmem_cache	*kmcache;
-+	struct clk		*clk;
- };
+ static struct platform_device s5p64x0_device_pdma = {
+ 	.name		= "s3c-pl330",
+-	.id		= 0,
++	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s5p64x0_pdma_resource),
+ 	.resource	= s5p64x0_pdma_resource,
+ 	.dev		= {
+diff --git a/arch/arm/mach-s5pc100/dma.c b/arch/arm/mach-s5pc100/dma.c
+index 0f55175..bf4cd0f 100644
+--- a/arch/arm/mach-s5pc100/dma.c
++++ b/arch/arm/mach-s5pc100/dma.c
+@@ -81,7 +81,7 @@ static struct s3c_pl330_platdata s5pc100_pdma0_pdata = {
  
- /**
-@@ -1072,16 +1076,25 @@ static int pl330_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto probe_err4;
+ static struct platform_device s5pc100_device_pdma0 = {
+ 	.name		= "s3c-pl330",
+-	.id		= 1,
++	.id		= 0,
+ 	.num_resources	= ARRAY_SIZE(s5pc100_pdma0_resource),
+ 	.resource	= s5pc100_pdma0_resource,
+ 	.dev		= {
+@@ -143,7 +143,7 @@ static struct s3c_pl330_platdata s5pc100_pdma1_pdata = {
  
--	ret = pl330_add(pl330_info);
--	if (ret)
--		goto probe_err5;
--
- 	/* Allocate a new DMAC */
- 	s3c_pl330_dmac = kmalloc(sizeof(*s3c_pl330_dmac), GFP_KERNEL);
- 	if (!s3c_pl330_dmac) {
- 		ret = -ENOMEM;
-+		goto probe_err5;
-+	}
-+
-+	/* Get operation clock and enable it */
-+	s3c_pl330_dmac->clk = clk_get(&pdev->dev, "pdma");
-+	if (IS_ERR(s3c_pl330_dmac->clk)) {
-+		dev_err(&pdev->dev, "Cannot get operation clock.\n");
-+		ret = -EINVAL;
- 		goto probe_err6;
- 	}
-+	clk_enable(s3c_pl330_dmac->clk);
-+
-+	ret = pl330_add(pl330_info);
-+	if (ret)
-+		goto probe_err7;
+ static struct platform_device s5pc100_device_pdma1 = {
+ 	.name		= "s3c-pl330",
+-	.id		= 2,
++	.id		= 1,
+ 	.num_resources	= ARRAY_SIZE(s5pc100_pdma1_resource),
+ 	.resource	= s5pc100_pdma1_resource,
+ 	.dev		= {
+diff --git a/arch/arm/mach-s5pv210/dma.c b/arch/arm/mach-s5pv210/dma.c
+index 778ad5f..497d343 100644
+--- a/arch/arm/mach-s5pv210/dma.c
++++ b/arch/arm/mach-s5pv210/dma.c
+@@ -82,7 +82,7 @@ static struct s3c_pl330_platdata s5pv210_pdma0_pdata = {
  
- 	/* Hook the info */
- 	s3c_pl330_dmac->pi = pl330_info;
-@@ -1094,7 +1107,7 @@ static int pl330_probe(struct platform_device *pdev)
+ static struct platform_device s5pv210_device_pdma0 = {
+ 	.name		= "s3c-pl330",
+-	.id		= 1,
++	.id		= 0,
+ 	.num_resources	= ARRAY_SIZE(s5pv210_pdma0_resource),
+ 	.resource	= s5pv210_pdma0_resource,
+ 	.dev		= {
+@@ -144,7 +144,7 @@ static struct s3c_pl330_platdata s5pv210_pdma1_pdata = {
  
- 	if (!s3c_pl330_dmac->kmcache) {
- 		ret = -ENOMEM;
--		goto probe_err7;
-+		goto probe_err8;
- 	}
- 
- 	/* Get the list of peripherals */
-@@ -1120,10 +1133,13 @@ static int pl330_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+probe_err8:
-+	pl330_del(pl330_info);
- probe_err7:
--	kfree(s3c_pl330_dmac);
-+	clk_disable(s3c_pl330_dmac->clk);
-+	clk_put(s3c_pl330_dmac->clk);
- probe_err6:
--	pl330_del(pl330_info);
-+	kfree(s3c_pl330_dmac);
- probe_err5:
- 	free_irq(irq, pl330_info);
- probe_err4:
-@@ -1188,6 +1204,10 @@ static int pl330_remove(struct platform_device *pdev)
- 		}
- 	}
- 
-+	/* Disable operation clock */
-+	clk_disable(dmac->clk);
-+	clk_put(dmac->clk);
-+
- 	/* Remove the DMAC */
- 	list_del(&dmac->node);
- 	kfree(dmac);
+ static struct platform_device s5pv210_device_pdma1 = {
+ 	.name		= "s3c-pl330",
+-	.id		= 2,
++	.id		= 1,
+ 	.num_resources	= ARRAY_SIZE(s5pv210_pdma1_resource),
+ 	.resource	= s5pv210_pdma1_resource,
+ 	.dev		= {
 -- 
 1.6.2.5
