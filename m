@@ -1,70 +1,124 @@
-From: hari.kanigeri@gmail.com (Hari Kanigeri)
-Date: Thu, 21 Oct 2010 15:49:10 -0500
-Subject: [PATCH 4/7] omap:mailbox-send message in process context
-In-Reply-To: <D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
-References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
-	<1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
-	<D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
-Message-ID: <AANLkTi=6fPONRaFmqrWkq8mxZacMCM+9xN9HM9FZJdja@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 21 Oct 2010 22:49:38 +0200
+Subject: [PATCH] MX27 3ds: Add SDHC1 support to mx27 3ds
+In-Reply-To: <4CBF1A72.70701@freescale.com>
+References: <4CBF1A72.70701@freescale.com>
+Message-ID: <20101021204938.GC22139@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rene,
+Hi Rogerio,
 
-Thanks for your comment.
+On Wed, Oct 20, 2010 at 02:36:02PM -0200, Rogerio Pimentel wrote:
+> Add SDHC1 support to MX27 3ds
+>
+> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+>
+> ---
+>  arch/arm/mach-imx/mach-mx27_3ds.c |   38  
+> +++++++++++++++++++++++++++++++++++++
 
+Your mailer breaks the lines. Otherwise the patch looks ok.
 
->> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox,
->> ? ? ? mbox_msg_t msg) struct omap_mbox_queue *mq = mbox->txq;
->> ? ? ? int ret = 0, len;
->>
->> - ? ? spin_lock(&mq->lock);
->> + ? ? spin_lock_bh(&mq->lock);
->>
+Sascha
+
+>  1 files changed, 38 insertions(+), 0 deletions(-)
 >
-> Please check if this scenario looks valid to you, as discussed and depicted
-> with Fernando:
+> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c  
+> b/arch/arm/mach-imx/mach-mx27_3ds.c
+> index a69dba2..a02a00a 100644
+> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+> @@ -23,16 +23,20 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/gpio.h>
+>  #include <linux/input/matrix_keypad.h>
+> +#include <linux/irq.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx27.h>
+> +#include <mach/mmc.h>
 >
-> Supposing that at this point the hw fifo is full and there are messages in
-> the kfifo.
+>  #include "devices-imx27.h"
+>  #include "devices.h"
 >
->> ? ? ? if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
->> ? ? ? ? ? ? ? ret = -ENOMEM;
->> ? ? ? ? ? ? ? goto out;
->> ? ? ? }
->>
+> +#define SD1_EN_GPIO (GPIO_PORTB + 25)
+> +
+>  static const int mx27pdk_pins[] __initconst = {
+>      /* UART1 */
+>      PE12_PF_UART1_TXD,
+> @@ -58,6 +62,14 @@ static const int mx27pdk_pins[] __initconst = {
+>      PD15_AOUT_FEC_COL,
+>      PD16_AIN_FEC_TX_ER,
+>      PF23_AIN_FEC_TX_EN,
+> +    /* SDHC1 */
+> +    PE18_PF_SD1_D0,
+> +    PE19_PF_SD1_D1,
+> +    PE20_PF_SD1_D2,
+> +    PE21_PF_SD1_D3,
+> +    PE22_PF_SD1_CMD,
+> +    PE23_PF_SD1_CLK,
+> +    SD1_EN_GPIO | GPIO_GPIO | GPIO_OUT,
+>  };
 >
-> We reach this point.
+>  static const struct imxuart_platform_data uart_pdata __initconst = {
+> @@ -85,13 +97,39 @@ static struct matrix_keymap_data  
+> mx27_3ds_keymap_data = {
+>      .keymap_size    = ARRAY_SIZE(mx27_3ds_keymap),
+>  };
 >
-> In this scenario, the DSP or other Core reads a message from the mbox hw fifo.
-> The next happens:
-> 1.- The not full interrupt is triggered to the MPU.
-> 2.- The mbox's ISR schedules the tasklet to write the message.
-> 3.- The ISR is left and returns to here (since we still have the bh lock the
-> ? ?tasklet won't run).
+> +static int mx27_3ds_sdhc1_init(struct device *dev, irq_handler_t  
+> detect_irq,
+> +                void *data)
+> +{
+> +    return request_irq(IRQ_GPIOB(26), detect_irq, IRQF_TRIGGER_FALLING |
+> +            IRQF_TRIGGER_RISING, "sdhc1-card-detect", data);
+> +}
+> +
+> +static void mx27_3ds_sdhc1_exit(struct device *dev, void *data)
+> +{
+> +    free_irq(IRQ_GPIOB(26), data);
+> +}
+> +
+> +static struct imxmmc_platform_data sdhc1_pdata = {
+> +    .init = mx27_3ds_sdhc1_init,
+> +    .exit = mx27_3ds_sdhc1_exit,
+> +};
+> +
+> +static void mx27_3ds_sdhc1_enable_level_translator(void)
+> +{
+> +    /* Turn on TXB0108 OE pin */
+> +    gpio_request(SD1_EN_GPIO, "sd1_enable");
+> +    gpio_direction_output(SD1_EN_GPIO, 1);
+> +}
+> +
+>  static void __init mx27pdk_init(void)
+>  {
+>      mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
+>          "mx27pdk");
+> +    mx27_3ds_sdhc1_enable_level_translator();
+>      imx27_add_imx_uart0(&uart_pdata);
+>      imx27_add_fec(NULL);
+>      mxc_register_device(&imx_kpp_device, &mx27_3ds_keymap_data);
+> +    mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
+>  }
 >
->> + ? ? if (!__mbox_poll_for_space(mbox)) {\
+>  static void __init mx27pdk_timer_init(void)
+> -- 
+> 1.7.0.4
 >
-> 4.- We check for mbox_fifo_full and we have space. so the message is written.
 >
->> + ? ? ? ? ? ? mbox_fifo_write(mbox, msg);
->
-> At this point it looks that the FIFO order is lost. We write this message
-> before the ones in the kfifo.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
 
-Good point. I agree.
-
-> A solution for this could be checking if there are messages in the kfifo
-> before trying to write directly to the hw fifo, if so, just continue
-> scheduling the tasklet.
-
-A change something like this ?
-
--       if (!__mbox_poll_for_space(mbox)) {
-+       if (kfifo_is_empty() && !__mbox_poll_for_space(mbox)) {
-                mbox_fifo_write(mbox, msg);
-
-Thank you,
-Best regards,
-Hari
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
