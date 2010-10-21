@@ -1,47 +1,31 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 21 Oct 2010 15:52:49 +0100
-Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
-In-Reply-To: <20101021141302.GA11912@void.printf.net>
-References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
-	<20101021141302.GA11912@void.printf.net>
-Message-ID: <20101021145249.GA13095@void.printf.net>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 22 Oct 2010 00:11:56 +0800
+Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
+In-Reply-To: <20101020112741.GB10261@pengutronix.de>
+References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
+	<1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>
+	<20101020112741.GB10261@pengutronix.de>
+Message-ID: <AANLkTinairUcKpTH2ePjbp3j7qdsmrPCeeWR_E+RSsPU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Wolfram,
 
-On Thu, Oct 21, 2010 at 03:13:02PM +0100, Chris Ball wrote:
-> On Mon, Oct 18, 2010 at 08:32:46AM -0400, zhangfei gao wrote:
-> > Update with comments from Matt and Eric.
-> > Test with sd and emmc.
-> > 
-> > >From e5dd554ed4d3488a83d9a4888d68d1d85482f747 Mon Sep 17 00:00:00 2001
-> > From: Zhangfei Gao <zhangfei.gao@marvell.com>
-> > Date: Mon, 20 Sep 2010 10:51:28 -0400
-> > Subject: [PATCH] mmc: add support of sdhci-pxa driver
-> > 
-> > 	Support Marvell PXA168/PXA910/MMP2 SD Host Controller
-> > 
-> > Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-> > ---
-> >  arch/arm/plat-pxa/include/plat/sdhci.h |   32 ++++
-> >  drivers/mmc/host/Kconfig               |   12 ++
-> >  drivers/mmc/host/Makefile              |    1 +
-> >  drivers/mmc/host/sdhci-pxa.c           |  259 ++++++++++++++++++++++++++++++++
-> >  4 files changed, 304 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/plat-pxa/include/plat/sdhci.h
-> >  create mode 100644 drivers/mmc/host/sdhci-pxa.c
-> 
-> I'll take the drivers/mmc/ hunks, but you should send the plat-pxa/
-> patch through the ARM tree.
+On Wed, Oct 20, 2010 at 7:27 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Wed, Oct 20, 2010 at 05:22:56PM +0800, Shawn Guo wrote:
+>> This patch is to fix timeout problem which was seen on babbage.
+>> Thanks Richard Zhu <r65037@freescale.com> for catching this.
+>>
+>> Signed-off-by: Shawn Guo <shawn.gsc@gmail.com>
+>
+> NACK. It is still untested if we need that quirk on MX25/35.
+> Eric wanted to send an updated patch next week.
+>
 
-Oh.  If we do that then the driver won't compile until everything's
-together, because it #includes <plat/sdhci.h>.  Haojian/Eric, what do
-you prefer here?  Should I take the arch/arm/ hunk via the MMC tree?
-(If so, please provide ACKs.)
-
-Thanks,
+I just tested the code change on mx35_3ds and mx25_3ds, and no problem
+was seen.  I will send the patch for mmc support on mx35_3ds and
+mx25_3ds soon.
 
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Regards,
+Shawn
