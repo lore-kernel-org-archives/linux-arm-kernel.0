@@ -1,301 +1,119 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 21 Oct 2010 13:58:07 +0900
-Subject: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
-In-Reply-To: <003301cb70d2$60ae4d70$220ae850$%han@samsung.com>
-References: <1287406528-15324-1-git-send-email-sbkim73@samsung.com>
-	<1287406528-15324-4-git-send-email-sbkim73@samsung.com>
-	<003001cb6f5e$5db43050$191c90f0$%szyprowski@samsung.com>
-	<003301cb70d2$60ae4d70$220ae850$%han@samsung.com>
-Message-ID: <010b01cb70dc$8d35cb20$a7a16160$%dae@samsung.com>
+From: vishwanath.bs@ti.com (Sripathy, Vishwanath)
+Date: Thu, 21 Oct 2010 11:08:41 +0530
+Subject: [RFC/PATCH 2/2] OMAP3: CPUidle: trigger early idle notification
+	call chain
+In-Reply-To: <1287617926-24308-3-git-send-email-khilman@deeprootsystems.com>
+References: <1287617926-24308-1-git-send-email-khilman@deeprootsystems.com>
+	<1287617926-24308-3-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC356087034BBEBEBE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Jonghun.
+Kevin,
 
-Below is my opinion.
-
-Have a good time :)
 > -----Original Message-----
-> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
-> owner at vger.kernel.org] On Behalf Of Jonghun Han
-> Sent: Thursday, October 21, 2010 12:45 PM
-> To: 'Marek Szyprowski'; 'Sangbeom Kim'; linux-arm-
-> kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; linux-
-> fbdev at vger.kernel.org
-> Cc: akpm at linux-foundation.org; kgene.kim at samsung.com; ben-linux at fluff.org;
-> kyungmin.park at samsung.com
-> Subject: RE: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Kevin Hilman
+> Sent: Thursday, October 21, 2010 5:09 AM
+> To: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: [RFC/PATCH 2/2] OMAP3: CPUidle: trigger early idle notification call chain
 > 
-> 1AFAAVgAzADEAMAAgAEY
-> 	ASQBNAEQA
-> x-cr-puzzleid: {B7526269-A73C-412A-8DAE-B8EB603CF9D0}
+> During the early part of the CPUidle path (state selection by the
+> governer, checking for device activity, etc.) there is no (good)
+> reason to have interrupts disabled.
 > 
+> Therefore, enable interrupts early in the CPUidle path and then
+> trigger the "early" idle notifier call chain after device activity
+> checks and the next power states have been programmed.  Interrupts are
+> then (re)disabled after the final state is selected.
 > 
-> Hi,
+> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> ---
+>  arch/arm/mach-omap2/cpuidle34xx.c |   27 ++++++++++++++++++++++++--
+> -
+>  1 files changed, 24 insertions(+), 3 deletions(-)
 > 
-> Marek Szyprowski wrote:
+> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-
+> omap2/cpuidle34xx.c
+> index 0d50b45..8c57360 100644
+> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> @@ -30,6 +30,7 @@
+>  #include <plat/powerdomain.h>
+>  #include <plat/clockdomain.h>
+>  #include <plat/serial.h>
+> +#include <plat/common.h>
 > 
-> > -----Original Message-----
-> > From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
-> > Sent: Tuesday, October 19, 2010 4:22 PM
-> > To: 'Sangbeom Kim'; linux-arm-kernel at lists.infradead.org; linux-samsung-
-> > soc at vger.kernel.org; linux-fbdev at vger.kernel.org
-> > Cc: 'Jonghun Han'; akpm at linux-foundation.org; kgene.kim at samsung.com;
-> ben-
-> > linux at fluff.org; kyungmin.park at samsung.com
-> > Subject: RE: [PATCH 3/4] s3c-fb: Add support S5PV310 FIMD
-> >
-> > 1AFAAVgAzADEAMAAgAEY
-> > 	ASQBNAEQA
-> > x-cr-puzzleid: {C4CCB40E-D5C6-4119-AA7C-BBBA7A1503E4}
-> >
-> > Hello,
-> >
-> > On Monday, October 18, 2010 2:55 PM Sangbeom Kim wrote:
-> >
-> > > From: Jonghun Han <jonghun.han@samsung.com>
-> > >
-> > > This patch adds s3c_fb_driverdata for S5PV310 FIMD0. The clk_type is
-> > added
-> > > to distinguish clock type in structure s3c_fb_variant and lcd_clk is
-> > added
-> > > in structure s3c_fb to calculate divider for lcd panel.
-> > > FIMD can handles two clocks. The one is for FIMD IP and the other is
-> for
-> > > LCD pixel clock. Before S5PV310 LCD pixel clock can be same with FIMD
-> IP
-> > > clock. From S5PV310 LCD pixel clock is separated from FIMD IP clock.
-> > >
-> > > Signed-off-by: Jonghun Han <jonghun.han@samsung.com>
-> > > Reviewed-by: Kukjin Kim <kgene.kim@samsung.com>
-> > > Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> > > Cc: Ben Dooks <ben-linux@fluff.org>
-> > > ---
-> > > NOTE: This patch is only for FIMD0.
-> > > FIMD1 will be implemented later.
-> > >  drivers/video/Kconfig  |    2 +-
-> > >  drivers/video/s3c-fb.c |  128
-> > ++++++++++++++++++++++++++++++++++++++++++------
-> > >  2 files changed, 114 insertions(+), 16 deletions(-)
-> > >
+>  #include "pm.h"
+>  #include "control.h"
+> @@ -128,12 +129,14 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
+>  	/* Used to keep track of the total time in idle */
+>  	getnstimeofday(&ts_preidle);
 > 
-> [snip]
+> -	local_irq_disable();
+> -	local_fiq_disable();
+> -
+>  	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
+>  	pwrdm_set_next_pwrst(core_pd, core_state);
 > 
-> > >  	/* write the buffer address */
-> > > @@ -1286,8 +1292,10 @@ static int __devinit s3c_fb_probe(struct
-> > platform_device *pdev)
-> > >  	struct s3c_fb_platdata *pd;
-> > >  	struct s3c_fb *sfb;
-> > >  	struct resource *res;
-> > > +	struct clk *mout_mpll = NULL;
-> > >  	int win;
-> > >  	int ret = 0;
-> > > +	u32 rate = 134000000;
-> > >
-> > >  	fbdrv = (struct s3c_fb_driverdata *)platform_get_device_id(pdev)-
-> > >driver_data;
-> > >
-> > > @@ -1314,19 +1322,56 @@ static int __devinit s3c_fb_probe(struct
-> > platform_device *pdev)
-> > >  	sfb->pdata = pd;
-> > >  	sfb->variant = fbdrv->variant;
-> > >
-> > > -	sfb->bus_clk = clk_get(dev, "lcd");
-> > > -	if (IS_ERR(sfb->bus_clk)) {
-> > > -		dev_err(dev, "failed to get bus clock\n");
-> > > +	switch (sfb->variant.clk_type) {
-> > > +	case FIMD_CLK_TYPE0:
-> > > +		sfb->bus_clk = clk_get(dev, "lcd");
-> > > +		if (IS_ERR(sfb->bus_clk)) {
-> > > +			dev_err(dev, "failed to get bus clock\n");
-> > > +			goto err_sfb;
-> > > +		}
-> > > +
-> > > +		clk_enable(sfb->bus_clk);
-> > > +
-> > > +		sfb->lcd_clk = sfb->bus_clk;
-> > > +		break;
-> > > +
-> > > +	case FIMD_CLK_TYPE1:
-> > > +		sfb->bus_clk = clk_get(&pdev->dev, "fimd");
-> > > +		if (IS_ERR(sfb->bus_clk)) {
-> > > +			dev_err(&pdev->dev, "failed to get clock for
-> fimd\n");
-> > > +			goto err_sfb;
-> > > +		}
-> > > +		clk_enable(sfb->bus_clk);
-> > > +
-> > > +		sfb->lcd_clk = clk_get(&pdev->dev, "sclk_fimd");
-> > > +		if (IS_ERR(sfb->lcd_clk)) {
-> > > +			dev_err(&pdev->dev, "failed to get sclk for
-> fimd\n");
-> > > +			goto err_bus_clk;
-> > > +		}
-> > > +
-> > > +		mout_mpll = clk_get(&pdev->dev, "mout_mpll");
-> > > +		if (IS_ERR(mout_mpll)) {
-> > > +			dev_err(&pdev->dev, "failed to get mout_mpll\n");
-> > > +			goto err_lcd_clk;
-> > > +		}
-> > > +		clk_set_parent(sfb->lcd_clk, mout_mpll);
-> > > +		clk_put(mout_mpll);
-> >
-> > I don't think that the driver is the right place to change the parent of
-> > the sclk_fimd
-> > clock. It should be done in the boot loader or the board startup code.
-> >
+> +	omap_early_idle_notifier_start();
+> +
+> +	local_irq_disable();
+> +	local_fiq_disable();
+> +
+>  	if (omap_irq_pending() || need_resched())
+>  		goto return_sleep_time;
 > 
-> As you know, there are two clock sources for LCD pixel clock.
-> s3c-fb only used 'lcd' clock as a parent of LCD pixel clock.
-> But from S5PV310 SCLK_FIMD is only used as a source of LCD pixel clock.
-> And SCLK_FIMD is only for FIMD. So the parent of the SCLK_FIMD can be
-> selected in the driver.
-> In my opinion it doesn't matter.
+> @@ -157,6 +160,8 @@ return_sleep_time:
+>  	local_irq_enable();
+>  	local_fiq_enable();
 > 
+> +	omap_early_idle_notifier_end();
+It appears that idle notifiers (for restore path) are called after getnstimeofday is called which means time spent in idle callbacks are not accounted in cpuidle time. 
+Will it not impact the cpuidle c state prediction and latency computation?
 
-Parent clock is specific to machine
-because machines could have different type of lcd panel each other and
-any parent clocks for FIMD could be used according to the lcd panel.
-So for stable pixel clock setting, parent clock should be set
-at machine specific code and FIMD driver should preserve just clock gating.
+Regards
+Vishwa
 
+> +
+>  	return ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * USEC_PER_SEC;
+>  }
 > 
-> > We should also be a bit more consistent on clock naming.
-> s3c6410..s5pv210
-> > used the 'lcd'
-> > clock name. Maybe you should also provide a patch to rename all these
-> > clocks to common
-> > name.
-> >
-> Please refer to the following diagram.
-> Before S5PV310 clk 'lcd' was used for FIMD IP core clock and source of the
-> LCD pixel clock.
-> But the mux used to select source of LCD pixel clock is removed.
-> So 'lcd' clock is only used for core clock of FIMD IP. It isn't used for
-> LCD
-> pixel clock.
-> As a result clock name was changed from lcd to fimd in the S5PV310
-> datasheet.
-> I agree to rearrange clock name later.
+> @@ -459,6 +464,21 @@ struct cpuidle_driver omap3_idle_driver = {
+>  	.owner = 	THIS_MODULE,
+>  };
 > 
-> Before S5PV310
->            ------------------------------------
->                       dsys bus
->            ----------------+-------------------
->                            |
->                            |1.clk 'lcd'
->                            |
->                            | FIMD block
->                        +---+-----------+
-> 4.mout_mpll |\         |   |           |
->     --------|m|        | +-+-+ +----+  |
->             |u|-+      | |   +-+core|  |
->             |x| |      | |     +----+  |
->             |/  |      | | |\          |
->                 |      | +-|m|  +---+  |
->                 |      |   |u|--+div|  |
->                 +------+---|x|  +---+  |
->            2.SCLK_FIMD |   |/     |    |
->                        |          |    |
->                        +----------+----+
->                                   |
->            inside of SoC          |
->            -----------------------+--------------------------
->            outside of SoC         |
->                                   | 3.LCD pixel clock
->                                   |
->                           +--------------+
->                           | LCD module   |
->                           +--------------+
+> +static int omap3_idle_prepare(struct cpuidle_device *dev)
+> +{
+> +	/*
+> +	 * Enable interrupts during the early part of the CPUidle path.
+> +	 * They are later (re)disabled when the final state is selected.
+> +	 *
+> +	 * The primary reason for this is to enable non-atomic idle
+> +	 * notifications to drivers that want to coordinate device
+> +	 * idle transitions with CPU idle transitions.
+> +	 */
+> +	local_irq_enable();
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * omap3_idle_init - Init routine for OMAP3 idle
+>   *
+> @@ -482,6 +502,7 @@ int __init omap3_idle_init(void)
 > 
+>  	dev = &per_cpu(omap3_idle_dev, smp_processor_id());
 > 
-> S5PV310
->            ------------------------------------
->                       dsys bus
->            ----------------+-------------------
->                            |
->                            |1.clk 'fimd'
->                            |
->                            | FIMD block
->                        +---+-----------+
-> 4.mout_mpll |\         |   |           |
->     --------|m|        |   |   +----+  |
->             |u|-+      |   +---+core|  |
->             |x| |      |       +----+  |
->             |/  |      |               |
->                 |      |        +---+  |
->                 |      |     +--+div|  |
->                 +------+-----+  +---+  |
->            2.SCLK_FIMD |          |    |
->                        |          |    |
->                        +----------+----+
->                                   |
->            inside of SoC          |
->            -----------------------+--------------------------
->            outside of SoC         |
->                                   | 3.LCD pixel clock
->                                   |
->                           +--------------+
->                           | LCD module   |
->                           +--------------+
-> 
-> > > +
-> > > +		clk_set_rate(sfb->lcd_clk, rate);
-> > > +		clk_enable(sfb->lcd_clk);
-> > > +		dev_dbg(&pdev->dev, "set fimd sclk rate to %d\n", rate);
-> > > +		break;
-> > > +
-> > > +	default:
-> > > +		dev_err(dev, "failed to enable clock for FIMD\n");
-> > >  		goto err_sfb;
-> > >  	}
-> > >
-> > > -	clk_enable(sfb->bus_clk);
-> > > -
-> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > >  	if (!res) {
-> > >  		dev_err(dev, "failed to find registers\n");
-> > >  		ret = -ENOENT;
-> > > -		goto err_clk;
-> > > +		goto err_lcd_clk;
-> > >  	}
-> > >
-> > >  	sfb->regs_res = request_mem_region(res->start, resource_size(res),
-> > > @@ -1334,7 +1379,7 @@ static int __devinit s3c_fb_probe(struct
-> > platform_device *pdev)
-> > >  	if (!sfb->regs_res) {
-> > >  		dev_err(dev, "failed to claim register region\n");
-> > >  		ret = -ENOENT;
-> > > -		goto err_clk;
-> > > +		goto err_lcd_clk;
-> > >  	}
-> > >
-> > >  	sfb->regs = ioremap(res->start, resource_size(res));
-> > > @@ -1413,9 +1458,15 @@ err_req_region:
-> > >  	release_resource(sfb->regs_res);
-> > >  	kfree(sfb->regs_res);
-> > >
-> > > -err_clk:
-> > > -	clk_disable(sfb->bus_clk);
-> > > -	clk_put(sfb->bus_clk);
-> > > +err_lcd_clk:
-> > > +	clk_disable(sfb->lcd_clk);
-> > > +	clk_put(sfb->lcd_clk);
-> > > +
-> > > +err_bus_clk:
-> > > +	if (sfb->variant.clk_type != FIMD_CLK_TYPE0) {
-> > > +		clk_disable(sfb->bus_clk);
-> > > +		clk_put(sfb->bus_clk);
-> > > +	}
-> > >
-> > >  err_sfb:
-> > >  	kfree(sfb);
-> [snip]
-> 
-> BRs,
-> 
+> +	dev->prepare = omap3_idle_prepare;
+>  	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
+>  		cx = &omap3_power_states[i];
+>  		state = &dev->states[count];
+> --
+> 1.7.2.1
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
