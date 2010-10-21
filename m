@@ -1,37 +1,31 @@
 From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 21 Oct 2010 18:54:30 -0000
-Subject: [PATCH 2/4] ARM: SAMSUNG: Fix warning 's3c_pm_show_resume_irqs'
-	defined but not used
+Date: Thu, 21 Oct 2010 18:54:32 -0000
+Subject: [PATCH 1/4] ARM: SAMSUNG: make SAMSUNG_PM_DEBUG select DEBUG_LL
 In-Reply-To: <cover.1287681256.git.mcuelenaere@gmail.com>
 References: <cover.1287681256.git.mcuelenaere@gmail.com>
-Message-ID: <f4d162aad052ed332cceb63be6f2d32dc3dfbdd7.1287681256.git.mcuelenaere@gmail.com>
+Message-ID: <abb98ea05ee7deeffcf69e5f0980a397c8a6b56e.1287681256.git.mcuelenaere@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c_pm_show_resume_irqs() is used by some s3c_pm_arch_show_resume_irqs()
-implementations, which get included through mach/pm-core.h. Add __maybe_unused
-to silence warnings when it isn't used (e.g. on S3C64XX platforms).
+When selecting SAMSUNG_PM_DEBUG, it complains about a missing printascii()
+function if you do not select DEBUG_LL, so make the former select the latter.
 
 Signed-off-by: Maurus Cuelenaere <mcuelenaere@gmail.com>
 ---
- arch/arm/plat-samsung/pm.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/plat-samsung/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index 27cfca5..ad6dd63 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -214,8 +214,9 @@ void s3c_pm_do_restore_core(struct sleep_save *ptr, int count)
-  *
-  * print any IRQs asserted at resume time (ie, we woke from)
- */
--static void s3c_pm_show_resume_irqs(int start, unsigned long which,
--				    unsigned long mask)
-+static void __maybe_unused s3c_pm_show_resume_irqs(int start,
-+						   unsigned long which,
-+						   unsigned long mask)
- {
- 	int i;
- 
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 7c0bde7..d5816e7 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -260,6 +260,7 @@ comment "Power management"
+ config SAMSUNG_PM_DEBUG
+ 	bool "S3C2410 PM Suspend debug"
+ 	depends on PM
++	select DEBUG_LL
+ 	help
+ 	  Say Y here if you want verbose debugging from the PM Suspend and
+ 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
 -- 
 1.7.2.3
