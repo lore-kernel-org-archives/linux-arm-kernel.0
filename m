@@ -1,67 +1,162 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 21 Oct 2010 15:59:02 -0700
-Subject: [PATCH v3 00/12] tnetv107x ssp driver stack
-In-Reply-To: <87mxq7p4hv.fsf@deeprootsystems.com>
+Date: Thu, 21 Oct 2010 16:12:24 -0700
+Subject: [PATCH v3 01/12] misc: add driver for sequencer serial port
+In-Reply-To: <1287694873-12904-2-git-send-email-cyril@ti.com>
 References: <1287694873-12904-1-git-send-email-cyril@ti.com>
-	<87mxq7p4hv.fsf@deeprootsystems.com>
-Message-ID: <20101021155902.b9702f72.akpm@linux-foundation.org>
+	<1287694873-12904-2-git-send-email-cyril@ti.com>
+Message-ID: <20101021161224.b4c0b623.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Oct 2010 15:26:04 -0700
-Kevin Hilman <khilman@deeprootsystems.com> wrote:
+On Thu, 21 Oct 2010 17:01:02 -0400
+Cyril Chemparathy <cyril@ti.com> wrote:
 
-> Cyril Chemparathy <cyril@ti.com> writes:
+> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
+> device.  It has a built-in programmable execution engine that can be programmed
+> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
 > 
-> > TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
-> > device.  It has a built-in programmable execution engine that can be programmed
-> > to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
+> This patch adds a driver for this controller device.  The driver does not
+> expose a user-land interface.  Protocol drivers built on top of this layer are
+> expected to remain in-kernel.
 > 
-> Andrew, looking for some advice here...
-> 
-> This is a piece of davinci hardware, but introduces drivers in various
-> subsystems.  I'm willing to merge this series via the davinci tree after
-> getting acks from the various subsystem maintainers.  Is this an OK
-> approach?  It seems best to me to merge this all together.
+>
+> ...
+>
+> +struct ti_ssp_dev_data {
+> +	const char	*dev_name;
+> +	unsigned long	iosel; /* see note below */
+> +	unsigned long	config;
+> +	const void	*pdata;
+> +	int		pdata_sz;
 
-Yes, that's the best approach.
 
-Some of the desired acks may not be forthcoming.  In which case the
-best you can do is to review the code yourself, make the maintainer(s)
-aware of what's going on and just go ahead and merge it.  If people are
-too busy to look at the code then so be it - we can't really permit
-that problem to permanently block new drivers.
+I suppose this really should have type size_t.  Also a better name is
+"pdata_size" - we prefer to avoid this random omission of vowels from
+kernel identifiers.  Just spell it out; it makes it easier to remember.
 
-> We already have acks for the regulator and gpio driver parts, and the
-> backlight driver has a clear owner in MAINTAINERS.  However, who should
-> be doing the final review/ack of the drivers/misc and drivers/gpio
-> changes is less clear to me.  
-> 
+> +};
+> +
+> +struct ti_ssp_data {
+> +	unsigned long		out_clock;
+> +	struct ti_ssp_dev_data	dev_data[2];
+> +};
+> +
+>
+> ...
+>
+> +config TI_SSP
+> +	depends on ARCH_DAVINCI_TNETV107X
+> +	tristate "Sequencer Serial Port support"
+> +	default y
 
-I'll go and have a look at drivers/misc/ti_ssp.c.
+Was `y' a good choice?
 
-> 
-> Thanks,
-> 
-> Kevin
-> 
-> >  arch/arm/mach-davinci/board-tnetv107x-evm.c    |  199 +++++++
-> >  arch/arm/mach-davinci/devices-tnetv107x.c      |   25 +
-> >  arch/arm/mach-davinci/include/mach/ti_ssp.h    |   98 ++++
-> >  arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +
-> >  arch/arm/mach-davinci/tnetv107x.c              |    2 +-
-> >  drivers/gpio/Kconfig                           |   10 +
-> >  drivers/gpio/Makefile                          |    1 +
-> >  drivers/gpio/ti-ssp-gpio.c                     |  200 +++++++
-> >  drivers/misc/Kconfig                           |   11 +
-> >  drivers/misc/Makefile                          |    1 +
-> >  drivers/misc/ti_ssp.c                          |  436 +++++++++++++++
-> >  drivers/regulator/Kconfig                      |   10 +
-> >  drivers/regulator/Makefile                     |    1 +
-> >  drivers/regulator/tps6524x-regulator.c         |  692 ++++++++++++++++++++++++
-> >  drivers/spi/Kconfig                            |    7 +
-> >  drivers/spi/Makefile                           |    1 +
-> >  drivers/spi/spi_ti_ssp.c                       |  397 ++++++++++++++
-> >  drivers/video/backlight/Kconfig                |    7 +
-> >  drivers/video/backlight/Makefile               |    2 +-
-> >  drivers/video/backlight/tps6116x.c             |  340 ++++++++++++
+> +	---help---
+> +	  Say Y here if you want support for the Sequencer Serial Port
+> +	  in a Texas Instruments TNETV107X SoC.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called ti_ssp.
+>
+> ...
+>
+> +#define dev2ssp(dev)	dev_get_drvdata(dev->parent)
+> +#define dev2port(dev)	(to_platform_device(dev)->id)
+
+These could be implemented as C funtions.  That's superior because of
+the typechecking.  At present dev2ssp() will happily compile and fail
+at runtime if passed anystructure which has a 'const struct device
+*parent'.
+
+> +/* Register Access Helpers */
+> +static inline u32 ssp_read(struct ti_ssp *ssp, int reg)
+> +{
+> +	return __raw_readl(ssp->regs + reg);
+> +}
+> +
+> +static inline void ssp_write(struct ti_ssp *ssp, int reg, u32 val)
+> +{
+> +	__raw_writel(val, ssp->regs + reg);
+> +}
+
+Why are the __raw functions used here?
+
+> +static inline void ssp_rmw(struct ti_ssp *ssp, int reg, u32 mask, u32 bits)
+> +{
+> +	u32 val = ssp_read(ssp, reg);
+> +	val &= ~mask;
+> +	val |= bits;
+> +	ssp_write(ssp, reg, val);
+> +}
+
+Locking?  Perhaps this function must be called under ssp->lock?  If so,
+that should be documented here and it appears that not all callsites
+actually do that correctly.
+
+>
+> ...
+>
+> +static int __set_iosel(struct ti_ssp *ssp, int port, u32 iosel)
+> +{
+> +	unsigned val;
+> +
+> +	/* IOSEL1 gets the least significant 16 bits */
+> +	val = ssp_read(ssp, REG_IOSEL_1);
+> +	val &= 0xffff << (port ? 0 : 16);
+> +	val |= (iosel & 0xffff) << (port ? 16 : 0);
+> +	ssp_write(ssp, REG_IOSEL_1, val);
+> +
+> +	/* IOSEL2 gets the most significant 16 bits */
+> +	val = ssp_read(ssp, REG_IOSEL_2);
+> +	val &= 0x0007 << (port ? 0 : 16);
+> +	val |= (iosel & 0x00070000) >> (port ? 0 : 16);
+> +	ssp_write(ssp, REG_IOSEL_2, val);
+
+More rmw's which need locking.  It should be documented please.  Both
+callers get it right this time.
+
+> +	return 0;
+> +}
+> +
+>
+> ...
+>
+> +int ti_ssp_run(struct device *dev, u32 pc, u32 input, u32 *output)
+> +{
+> +	struct ti_ssp *ssp = dev2ssp(dev);
+> +	int port = dev2port(dev);
+> +	int count;
+> +
+> +	if (pc & ~(0x3f))
+> +		return -EINVAL;
+> +
+> +	ssp_port_write(ssp, port, PORT_ADDR, input >> 16);
+> +	ssp_port_write(ssp, port, PORT_DATA, input & 0xffff);
+> +	ssp_port_rmw(ssp, port, PORT_CFG_1, 0x3f, pc);
+> +
+> +	ssp_port_set_bits(ssp, port, PORT_CFG_1, SSP_START);
+> +
+> +	for (count = 10000; count; count--) {
+> +		if ((ssp_port_read(ssp, port, PORT_CFG_1) & SSP_BUSY) == 0)
+> +			break;
+> +		udelay(1);
+> +	}
+> +
+> +	if (output) {
+> +		*(output) = (ssp_port_read(ssp, port, PORT_ADDR) << 16) |
+> +			    (ssp_port_read(ssp, port, PORT_DATA) &  0xffff);
+> +	}
+> +
+> +	if (!count) {
+> +		dev_err(ssp->dev, "timed out waiting for SSP operation\n");
+> +		return -EIO;
+> +	}
+
+There doesn't seem much point in writing to *output if the port_read()
+timed out?
+
+>
+> ...
+>
+
+That's all fairly minor stuff.  It looks Good Enough For Linux to me.
