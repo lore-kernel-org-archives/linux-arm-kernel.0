@@ -1,70 +1,123 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Thu, 21 Oct 2010 17:01:04 -0400
-Subject: [PATCH v3 03/12] davinci: add ssp config for tnetv107x evm board
+Date: Thu, 21 Oct 2010 17:01:08 -0400
+Subject: [PATCH v3 07/12] davinci: add tnetv107x evm regulators
 In-Reply-To: <1287694873-12904-1-git-send-email-cyril@ti.com>
 References: <1287694873-12904-1-git-send-email-cyril@ti.com>
-Message-ID: <1287694873-12904-4-git-send-email-cyril@ti.com>
+Message-ID: <1287694873-12904-8-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SSP configuration and pin muxing info for tnetv107x
-evm boards.
+This patch adds regulator and spi board info definitions for the tps6524x
+power management IC found on tnetv107x evm boards.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mach-davinci/board-tnetv107x-evm.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   85 +++++++++++++++++++++++++++
+ 1 files changed, 85 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index 5afa8fc..401ad26 100644
+index c37c5c6..d4c3d18 100644
 --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
 +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -33,6 +33,7 @@
- #include <mach/edma.h>
- #include <mach/mux.h>
- #include <mach/cp_intc.h>
-+#include <mach/ti_ssp.h>
- #include <mach/tnetv107x.h>
+@@ -26,6 +26,9 @@
+ #include <linux/input.h>
+ #include <linux/input/matrix_keypad.h>
+ #include <linux/spi/spi.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/consumer.h>
++#include <linux/regulator/driver.h>
  
- #define EVM_MMC_WP_GPIO		21
-@@ -99,6 +100,12 @@ static const short uart1_pins[] __initdata = {
- 	-1
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -257,7 +260,89 @@ static struct tnetv107x_device_info evm_device_info __initconst = {
+ 	.ssp_config		= &ssp_config,
  };
  
-+static const short ssp_pins[] __initdata = {
-+	TNETV107X_SSP0_0, TNETV107X_SSP0_1, TNETV107X_SSP0_2,
-+	TNETV107X_SSP1_0, TNETV107X_SSP1_1, TNETV107X_SSP1_2,
-+	TNETV107X_SSP1_3, -1
++static struct regulator_consumer_supply usb_consumers[] = {
++	REGULATOR_SUPPLY("vbus", "musb_hdrc.1"),
 +};
 +
- static struct mtd_partition nand_partitions[] = {
- 	/* bootloader (U-Boot, etc) in first 12 sectors */
- 	{
-@@ -196,17 +203,25 @@ static struct matrix_keypad_platform_data keypad_config = {
- 	.no_autorepeat	= 0,
- };
- 
-+static struct ti_ssp_data ssp_config = {
-+	.out_clock	= 250 * 1000,
-+	.dev_data	= {
++static struct regulator_consumer_supply lcd_consumers[] = {
++	REGULATOR_SUPPLY("vlcd", "tps6116x"),
++};
++
++static struct regulator_init_data regulators[] = {
++	{
++		.constraints		= {
++			.name		= "DCDC1",
++			.min_uV		= 1000000,
++			.max_uV		= 1000000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "DCDC2",
++			.min_uV		= 1800000,
++			.max_uV		= 1800000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "DCDC3",
++			.min_uV		= 3300000,
++			.max_uV		= 3300000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "LDO1",
++			.min_uV		= 4800000,
++			.max_uV		= 4800000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.constraints		= {
++			.name		= "LDO1",
++			.min_uV		= 3300000,
++			.max_uV		= 3300000,
++			.always_on	= 1,
++			.boot_on	= 1,
++		},
++	},
++	{
++		.num_consumer_supplies	= ARRAY_SIZE(usb_consumers),
++		.consumer_supplies	= usb_consumers,
++		.constraints		= {
++			.name		= "USB",
++			.min_uA		= 200000,
++			.max_uA		= 1000000,
++			.valid_ops_mask	= REGULATOR_CHANGE_CURRENT |
++					  REGULATOR_CHANGE_STATUS,
++		},
++	},
++	{
++		.num_consumer_supplies	= ARRAY_SIZE(lcd_consumers),
++		.consumer_supplies	= lcd_consumers,
++		.constraints		= {
++			.name		= "LCD",
++			.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++		},
 +	},
 +};
 +
- static struct tnetv107x_device_info evm_device_info __initconst = {
- 	.serial_config		= &serial_config,
- 	.mmc_config[1]		= &mmc_config,	/* controller 1 */
- 	.nand_config[0]		= &nand_config,	/* chip select 0 */
- 	.keypad_config		= &keypad_config,
-+	.ssp_config		= &ssp_config,
+ static struct spi_board_info spi_info[] __initconst = {
++	{
++		.modalias	= "tps6524x",
++		.bus_num	= 1,
++		.chip_select	= 0,
++		.mode		= SPI_MODE_0,
++		.platform_data	= regulators,
++	},
  };
  
  static __init void tnetv107x_evm_board_init(void)
- {
- 	davinci_cfg_reg_list(sdio1_pins);
- 	davinci_cfg_reg_list(uart1_pins);
-+	davinci_cfg_reg_list(ssp_pins);
- 
- 	tnetv107x_devices_init(&evm_device_info);
- }
 -- 
 1.7.0.4
