@@ -1,71 +1,69 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Thu, 21 Oct 2010 10:11:24 +0200
-Subject: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
-In-Reply-To: <20101021075318.GB22363@mail.wantstofly.org>
-References: <20101020085720.GA12979@mail.wantstofly.org>
-	<1287647127-1434-1-git-send-email-simon@sequanux.org>
-	<20101021075318.GB22363@mail.wantstofly.org>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009FD18F0B3FA2@IL-MB01.marvell.com>
+From: jgq516@gmail.com (jgq516 at gmail.com)
+Date: Thu, 21 Oct 2010 16:15:50 +0800
+Subject: [PATCH V3 1/1] mx35pdk: add debug board support
+Message-ID: <1287648950-25633-1-git-send-email-jgq516@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+From: Xiao Jiang <jgq516@gmail.com>
 
->-----Original Message-----
->From: Lennert Buytenhek [mailto:buytenh at wantstofly.org] 
->Sent: Thursday, October 21, 2010 9:53 AM
->To: Simon Guinot
->Cc: Nicolas Pitre; linux-arm-kernel at lists.infradead.org; 
->Benoit Canet; Saeed Bishara; Simon Guinot
->Subject: Re: [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
->
->In the patch title:
->
->> [PATCH 1/2] [ARM] Kirkwood: enhance TLCK detection
->
->s/TLCK/TCLK/
->
->
->
->On Thu, Oct 21, 2010 at 09:45:26AM +0200, Simon Guinot wrote:
->
->> From: Simon Guinot <sguinot@lacie.com>
->> 
->> According to the Marvell LSP, the Sample at Reset regiter 
->bit 21 can be
->> used to detect TCLK on 6281 and 6282 devices.
->> 
->> This patch has only been tested on LaCie boards.
->>
->> [snip]
->>  
->> -	if ((dev == MV88F6281_DEV_ID && (rev == MV88F6281_REV_A0 ||
->> -					rev == MV88F6281_REV_A1)) ||
->> -	    (dev == MV88F6282_DEV_ID))
->> -		return 200000000;
->> +	if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
->> +		if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
->> +			return 200000000;
->>  
->>  	return 166666667;
->>  }
->
->Can we not just make this:
->
->	if ((readl(SAMPLE_AT_RESET) >> 21 & 1) == 0)
->		return 200000000;
->	else
->		return 166666667;
->
->(I don't have the necessary docs, Saeed might have to answer this one.)
-Lennert, the docs and our reference code shows that the original code of Simor is correct,s o I suggest to do :
-	if ((dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID) && 
-		((readl(SAMPLE_AT_RESET) & BIT(21)) == 0))
-		return 200000000;
-	else
-		return 166666667;
->
->
->thanks,
->Lennert
->
+Enable debug board support for mx35pdk.
+
+Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Change since v2:
+- s/board/debugboard per Bacuch's comment.
+
+Change since v1:
+- Add MXC_DEBUG_BOARD in Kconfig per Fabio's comment.
+- Redefinition EXPIO_PARENT_INT per Fabio's comment.
+
+ arch/arm/mach-mx3/Kconfig         |    1 +
+ arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 85beece..cdf6ac5 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -139,6 +139,7 @@ config MACH_ARMADILLO5X0
+ config MACH_MX35_3DS
+ 	bool "Support MX35PDK platform"
+ 	select ARCH_MX35
++	select MXC_DEBUG_BOARD
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	default n
+ 	help
+diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
+index 1c30d72..eafe168 100644
+--- a/arch/arm/mach-mx3/mach-mx35_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+@@ -35,10 +35,14 @@
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ #include <mach/iomux-mx35.h>
++#include <mach/irqs.h>
++#include <mach/3ds_debugboard.h>
+ 
+ #include "devices-imx35.h"
+ #include "devices.h"
+ 
++#define EXPIO_PARENT_INT       (MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
++
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -95,6 +99,10 @@ static void __init mxc_board_init(void)
+ 	imx35_add_imx_uart0(&uart_pdata);
+ 
+ 	mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
++
++	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
++		pr_warn("Init of the debugboard failed, all "
++			"devices on the debugboard are unusable.\n");
+ }
+ 
+ static void __init mx35pdk_timer_init(void)
+-- 
+1.6.3.3
