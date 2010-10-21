@@ -1,40 +1,104 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 21 Oct 2010 16:26:19 +0200
-Subject: [patch v2 07/10] efikamx: add support for power key
-In-Reply-To: <87wrpbhe5l.fsf@lechat.rtp-net.org> (Arnaud Patard's message of
-	"Thu\, 21 Oct 2010 15\:24\:38 +0200")
-References: <20101021103855.115653951@rtp-net.org>
-	<20101021104005.796793454@rtp-net.org>
-	<AANLkTimWHeibb47NfQ7UJoawi5QN2gt1FjpvKy0S82LH@mail.gmail.com>
-	<87wrpbhe5l.fsf@lechat.rtp-net.org>
-Message-ID: <87sjzzhbas.fsf@lechat.rtp-net.org>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Thu, 21 Oct 2010 23:40:59 +0900
+Subject: [PATCH v2 04/22] arm: introduce little-endian bitops
+In-Reply-To: <1287672077-5797-1-git-send-email-akinobu.mita@gmail.com>
+References: <1287672077-5797-1-git-send-email-akinobu.mita@gmail.com>
+Message-ID: <1287672077-5797-5-git-send-email-akinobu.mita@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
+Introduce little-endian bit operations by renaming native ext2 bit
+operations. The ext2 bit operations are kept as wrapper macros using
+little-endian bit operations to maintain bisectability until the
+conversions are finished.
 
-> Fabio Estevam <festevam@gmail.com> writes:
->
->> Hi Arnaud,
->
-> Hi,
->
->>
->> On Thu, Oct 21, 2010 at 8:39 AM, Arnaud Patard
->> <arnaud.patard@rtp-net.org> wrote:
->>> This patch adds support for power key button of the efika mx. It's connected
->>> on ?GPIO 3 31.
->>
->> Here you mention GPIO 3 31
->>
->>> +#define EFIKAMX_POWER_KEY ? ? ?(1*32 + 31)
->>
->> ,but here you define it as GPIO 2 31
->
-> It's a typo in the patch description [ I wouldn't have sent the patch if
-> it was not working :) ]. The reset is on 2 31.
->
+Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+Change from v1: fix argument of test_and_{set,clear}_le_bit()
 
-oops. s/reset is on 2 31/power key is on 2 31/ sorry for the confusion :(
+ arch/arm/include/asm/bitops.h |   46 +++++++++++++++++++++++++++++-----------
+ 1 files changed, 33 insertions(+), 13 deletions(-)
 
-Arnaud
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index 338ff19..29adaca 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -303,41 +303,61 @@ static inline int fls(int x)
+ #include <asm-generic/bitops/hweight.h>
+ #include <asm-generic/bitops/lock.h>
+ 
++#define __set_le_bit(nr, p)			\
++	__set_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define __clear_le_bit(nr, p)			\
++	__clear_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define __test_and_set_le_bit(nr, p)			\
++		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define test_and_set_le_bit(nr, p)          \
++		test_and_set_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define __test_and_clear_le_bit(nr, p)			\
++		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define test_and_clear_le_bit(nr, p)	\
++		test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define test_le_bit(nr, p)			\
++		test_bit(WORD_BITOFF_TO_LE(nr), (p))
++#define find_first_zero_le_bit(p, sz)		\
++		_find_first_zero_bit_le(p, sz)
++#define find_next_zero_le_bit(p, sz, off)	\
++		_find_next_zero_bit_le(p, sz, off)
++#define find_next_le_bit(p, sz, off) \
++		_find_next_bit_le(p, sz, off)
+ /*
+  * Ext2 is defined to use little-endian byte ordering.
+  * These do not need to be atomic.
+  */
+ #define ext2_set_bit(nr,p)			\
+-		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_set_le_bit(nr, (unsigned long *)(p))
+ #define ext2_set_bit_atomic(lock,nr,p)          \
+-                test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_and_set_le_bit(nr, (unsigned long *)(p))
+ #define ext2_clear_bit(nr,p)			\
+-		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_clear_le_bit(nr, (unsigned long *)(p))
+ #define ext2_clear_bit_atomic(lock,nr,p)        \
+-                test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_and_clear_le_bit(nr, (unsigned long *)(p))
+ #define ext2_test_bit(nr,p)			\
+-		test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_le_bit(nr, (unsigned long *)(p))
+ #define ext2_find_first_zero_bit(p,sz)		\
+-		_find_first_zero_bit_le(p,sz)
++		find_first_zero_le_bit((unsigned long *)(p), sz)
+ #define ext2_find_next_zero_bit(p,sz,off)	\
+-		_find_next_zero_bit_le(p,sz,off)
++		find_next_zero_le_bit((unsigned long *)(p), sz, off)
+ #define ext2_find_next_bit(p, sz, off) \
+-		_find_next_bit_le(p, sz, off)
++		find_next_le_bit((unsigned long *)(p), sz, off)
+ 
+ /*
+  * Minix is defined to use little-endian byte ordering.
+  * These do not need to be atomic.
+  */
+ #define minix_set_bit(nr,p)			\
+-		__set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__set_le_bit(nr, (unsigned long *)(p))
+ #define minix_test_bit(nr,p)			\
+-		test_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		test_le_bit(nr, (unsigned long *)(p))
+ #define minix_test_and_set_bit(nr,p)		\
+-		__test_and_set_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_set_le_bit(nr, (unsigned long *)(p))
+ #define minix_test_and_clear_bit(nr,p)		\
+-		__test_and_clear_bit(WORD_BITOFF_TO_LE(nr), (unsigned long *)(p))
++		__test_and_clear_le_bit(nr, (unsigned long *)(p))
+ #define minix_find_first_zero_bit(p,sz)		\
+-		_find_first_zero_bit_le(p,sz)
++		find_first_zero_le_bit((unsigned long *)(p), sz)
+ 
+ #endif /* __KERNEL__ */
+ 
+-- 
+1.7.1.231.gd0b16
