@@ -1,53 +1,45 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 21 Oct 2010 14:19:22 -0700
-Subject: [PATCH v3 10/12] backlight: add support for tps6116x controller
-In-Reply-To: <1287694873-12904-11-git-send-email-cyril@ti.com>
-References: <1287694873-12904-1-git-send-email-cyril@ti.com>
-	<1287694873-12904-11-git-send-email-cyril@ti.com>
-Message-ID: <1287695962.15567.98.camel@Joe-Laptop>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 21 Oct 2010 23:20:27 +0200
+Subject: [PATCH 1/2] sdhci-esdhc-imx: fix timeout on i.MX's sdhci
+In-Reply-To: <4CC0A281.1010202@eukrea.com>
+References: <4CC0A281.1010202@eukrea.com>
+Message-ID: <1287696028-27854-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-10-21 at 17:01 -0400, Cyril Chemparathy wrote:
-> diff --git a/drivers/video/backlight/tps6116x.c b/drivers/video/backlight/tps6116x.c
+this patch fix timeout problems on i.MX's sdhci as suggested by
+Richard Zhu.
 
-just some trivia:
+Tested on :
+- i.MX257 : not needed
+- i.MX357 : needed
+- i.MX515 : needed
 
-> @@ -0,0 +1,340 @@
-[]
-> +struct tps6116x {
-> +	struct ti_ssp_device		*handle;
-> +	struct device			*dev;
-> +	int				gpio, gpio_initialized;
-> +	struct mutex			lock;
-> +	int				intensity;
-> +	int				power;
-> +	struct backlight_properties	props;
-> +	struct backlight_device		*bl;
-> +	int				suspended:1;
-> +	struct regulator		*regulator;
-> +};
+more details can be found here :
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029748.html
 
-Perhaps several of these should be bool.
-gpio_initialized, power, suspended
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Tested-by: Shawn Guo <shawn.gsc@gmail.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-[]
-
-> +static int __devinit tps6116x_probe(struct platform_device *pdev)
-> +{
-> +	struct tps6116x *hw;
-> +	struct device *dev = &pdev->dev;
-> +	struct backlight_properties props;
-> +	int error;
-> +
-> +	hw = kzalloc(sizeof(struct tps6116x), GFP_KERNEL);
-> +	if (!hw) {
-> +		error = -ENOMEM;
-> +		dev_err(dev, "cannot allocate driver data\n");
-> +		goto fail0;
-> +	}
-> +	platform_set_drvdata(pdev, hw);
-> +
-> +	memset(hw, 0, sizeof(struct tps6116x));
-
-Unnecessary memset.
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index afbac9a..11e1ae1 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -130,6 +130,12 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ 		gpio_request(boarddata->wp_gpio, "SD_WP");
+ 		gpio_direction_input(boarddata->wp_gpio);
+ 	}
++
++	if (cpu_is_mx35() || cpu_is_mx51()) {
++		dev_info(mmc_dev(host->mmc), "using broken timeout quirk\n");
++		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
++	}
++
+ 	return 0;
+ }
+ 
+-- 
+1.7.0.4
