@@ -1,26 +1,84 @@
-From: mcuelenaere@gmail.com (Maurus Cuelenaere)
-Date: Thu, 21 Oct 2010 19:14:16 +0200
-Subject: [PATCH 0/4] ARM: S3C64XX: SmartQ suspend support
-Message-ID: <cover.1287681256.git.mcuelenaere@gmail.com>
+From: rene.sapiens@ti.com (Sapiens, Rene)
+Date: Thu, 21 Oct 2010 14:03:50 -0500
+Subject: [PATCH 4/7] omap:mailbox-send message in process context
+In-Reply-To: <1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+	<1287108808-32119-5-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <D2943F03B81C9C458E44DFB213905E02010355C35E@dlee04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add suspend support to SmartQ boards, plus some S3C PM related
-cleanups.
+Hi Hari,
 
-Maurus Cuelenaere (4):
-  ARM: SAMSUNG: make SAMSUNG_PM_DEBUG select DEBUG_LL
-  ARM: SAMSUNG: Fix warning 's3c_pm_show_resume_irqs' defined but not
-    used
-  ARM: S3C64XX: Add suspend support to SmartQ boards
-  ARM: S3C64XX: Add wakeup sources to SmartQ boards
+On Thursday, October 14, 2010 9:13 PM Kanigeri, Hari wrote:
+> Schedule the Tasklet to send only when mailbox fifo is full, else
+> send the message in the Process context. This would avoid
+> needless scheduling of Tasklet for every message transfer
+> 
+> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+> ---
+>  arch/arm/plat-omap/mailbox.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+> index ed960c1..a4170c7 100644
+> --- a/arch/arm/plat-omap/mailbox.c
+> +++ b/arch/arm/plat-omap/mailbox.c
+> @@ -92,20 +92,25 @@ int omap_mbox_msg_send(struct omap_mbox *mbox,
+>  	mbox_msg_t msg) struct omap_mbox_queue *mq = mbox->txq;
+>  	int ret = 0, len;
+> 
+> -	spin_lock(&mq->lock);
+> +	spin_lock_bh(&mq->lock);
+> 
 
- arch/arm/mach-s3c64xx/mach-smartq.c  |    4 ++++
- arch/arm/mach-s3c64xx/mach-smartq5.c |    1 +
- arch/arm/mach-s3c64xx/mach-smartq7.c |    1 +
- arch/arm/plat-samsung/Kconfig        |    1 +
- arch/arm/plat-samsung/pm.c           |    5 +++--
- 5 files changed, 10 insertions(+), 2 deletions(-)
+Please check if this scenario looks valid to you, as discussed and depicted
+with Fernando:
 
--- 
-1.7.2.3
+Supposing that at this point the hw fifo is full and there are messages in
+the kfifo.
+
+>  	if (kfifo_avail(&mq->fifo) < sizeof(msg)) {
+>  		ret = -ENOMEM;
+>  		goto out;
+>  	}
+> 
+
+We reach this point.
+
+In this scenario, the DSP or other Core reads a message from the mbox hw fifo.
+The next happens:
+1.- The not full interrupt is triggered to the MPU.
+2.- The mbox's ISR schedules the tasklet to write the message.
+3.- The ISR is left and returns to here (since we still have the bh lock the
+    tasklet won't run).
+
+> +	if (!__mbox_poll_for_space(mbox)) {\
+
+4.- We check for mbox_fifo_full and we have space. so the message is written.
+
+> +		mbox_fifo_write(mbox, msg);
+
+At this point it looks that the FIFO order is lost. We write this message
+before the ones in the kfifo.
+
+A solution for this could be checking if there are messages in the kfifo
+before trying to write directly to the hw fifo, if so, just continue
+scheduling the tasklet.
+
+> +		goto out;
+> +	}
+> +
+>  	len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
+>  	WARN_ON(len != sizeof(msg));
+> 
+>  	tasklet_schedule(&mbox->txq->tasklet);
+> 
+>  out:
+> -	spin_unlock(&mq->lock);
+> +	spin_unlock_bh(&mq->lock);
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL(omap_mbox_msg_send);
+> --
+> 1.7.0
