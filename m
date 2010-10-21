@@ -1,53 +1,55 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Thu, 21 Oct 2010 15:16:13 -0700
-Subject: [lm-sensors] [PATCH v2] hwmon: add generic GPIO fan driver
-In-Reply-To: <20101021215928.GS29120@kw.sim.vm.gnt>
-References: <1287592646-18109-1-git-send-email-sguinot@lacie.com>
-	<1287592646-18109-2-git-send-email-sguinot@lacie.com>
-	<20101021064145.GA25095@ericsson.com>
-	<20101021140626.GQ29120@kw.sim.vm.gnt>
-	<20101021144346.GA26460@ericsson.com>
-	<20101021215928.GS29120@kw.sim.vm.gnt>
-Message-ID: <1287699373.9690.360.camel@groeck-laptop>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 21 Oct 2010 23:17:45 +0100
+Subject: [PATCH] ARM: SAMSUNG: Add the missed s3c_gpio_getpull() API
+In-Reply-To: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
+References: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4CC0BC09.5090803@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Thu, 2010-10-21 at 17:59 -0400, Simon Guinot wrote:
-> Hi Guenter,
+On 21/10/10 09:04, Kukjin Kim wrote:
+> From: Daein Moon <moon9124@samsung.com>
 > 
-> On Thu, Oct 21, 2010 at 07:43:46AM -0700, Guenter Roeck wrote:
-> > > > 
-> > > > The combination of DIV_ROUND_UP() and DIV_ROUND_CLOSEST() causes inconsistency.
-> > > > 
-> > > > Assume num_speed = 8, pwm is set to 128.
-> > > > 
-> > > > set: 128 * (8 - 1) / 255 = 3.513 ==> 4
-> > > > get: 4 * 255 / (8 - 1) = 145.7 ==> 146
-> > > > set: 146 * (8 - 1) / 255 = 4.007 ==> 5
-> > > > get: 5 * 255 / (8 - 1) = 182.142 ==> 182
-> > > > set: 182 * (8 - 1) / 255 = 4.996 ==> 5
-> > > > 
-> > > > Unless there is a really good reason to use DIV_ROUND_UP(), you might
-> > > > want to use DIV_ROUND_CLOSEST() instead.
-> > > 
-> > > This choice is coherent with the rpm interface one and the reason is the
-> > > same: start the fan even with a low value. In your example, 36 is first
-> > > speed threshold.
-> > > 
-> > Yes, but here it causes an inconsistency between setting and reporting.
-> > I don't expect the speed to change if I set the same value that was read.
-> > Exactly this happens if one writes 146 in my example. That is much worse
-> > than a potential startup problem, or the observation that pwm values below X 
-> > don't start the fan.
+> This patch adds the s3c_gpio_getpull() API that has been missed in the
+> plat-samsung/gpio-config.c and actullay there is its extern declaration
+> in plat/gpio-cfg.h.
 > 
-> Mmm. Convert a speed index into a low round pwm value (and not use
-> DIV_ROUND_CLOSEST() at all) fix the inconsistency too. If you agree,
-> I would prefer this option.
+> Signed-off-by: Daein Moon <moon9124@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> NOTE:
+> - already issued about this
+> 
+>  arch/arm/plat-samsung/gpio-config.c                |   19 +++++++++++++++++++
+>  .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    6 ++++++
+>  2 files changed, 25 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
+> index 8a37211..b732b77 100644
+> --- a/arch/arm/plat-samsung/gpio-config.c
+> +++ b/arch/arm/plat-samsung/gpio-config.c
+> @@ -111,6 +111,25 @@ int s3c_gpio_setpull(unsigned int pin, s3c_gpio_pull_t pull)
+>  }
+>  EXPORT_SYMBOL(s3c_gpio_setpull);
+>  
+> +s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin)
+> +{
+> +	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
+> +	unsigned long flags;
+> +	int offset;
+> +	u32 pup = 0;
 
-Ok if it works. I am mostly concerned about inconsistencies. 
+would the result of s3c_gpio_do_getpull() should be a s3c_gpio_pull_t?
 
-Not sure I understand what you mean with "low round pwm value", though.
-
-Guenter
+> +	if (chip) {
+> +		offset = pin - chip->chip.base;
+> +
+> +		s3c_gpio_lock(chip, flags);
+> +		pup = s3c_gpio_do_getpull(chip, offset);
+> +		s3c_gpio_unlock(chip, flags);
+> +	}
+> +
+> +	return (__force s3c_gpio_pull_t)pup;
+> +}
+> +EXPORT_SYMBOL(s3c_gpio_getpull);
