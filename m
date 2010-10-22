@@ -1,43 +1,86 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 22 Oct 2010 12:28:57 +0300
-Subject: [patch v2 00/10] efikamx support improvements - try 2
-In-Reply-To: <20101021103855.115653951@rtp-net.org>
-References: <20101021103855.115653951@rtp-net.org>
-Message-ID: <20101022092857.GF17631@matterhorn.lan>
+From: simon@sequanux.org (Simon Guinot)
+Date: Fri, 22 Oct 2010 11:29:18 +0200
+Subject: [PATCH] [ARM] Kirkwood: add fan support for Network Space Max v2
+In-Reply-To: <20101022043000.GA29632@ericsson.com>
+References: <20101022043000.GA29632@ericsson.com>
+Message-ID: <1287739758-26860-1-git-send-email-simon@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Oct 21, Arnaud Patard wrote:
-> 
-> Hi,
-> 
-> This patchset aims at improving current efikamx support. It adds support for :
-> - board id detection
-> - sdhc
-> - leds
-> - power button
-> - spi nor
-> - reset
-> 
-> I also had to fix/improve some imx51 iomux header so there are patches for
-> iomux-mx51.h.
-> 
-> v2:
-> - split iomux patch 3 into 2 patches
-> - reorder patches
-> - fix space comment
-> - fix Amit's comments
-> - decrease board id msleep
-> 
-> Arnaud
-> 
+From: Simon Guinot <sguinot@lacie.com>
 
-Please fix the typo in 07/10 description. Or perhaps Sascha will fix it while committing.
+Signed-off-by: Simon Guinot <sguinot@lacie.com>
+---
+ arch/arm/mach-kirkwood/netspace_v2-setup.c |   43 ++++++++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
 
-Also Dinh has added mx51_add_buttons() to platform code. 07/10 should be
-modified to use that. Search for "ARM: imx: Add gpio-keys to mx51 babbage
-board" on LAKML.
-
-After that, for the whole series, you can add,
-
-Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
+diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+index d26bf32..9e27115 100644
+--- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
++++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
+@@ -35,6 +35,7 @@
+ #include <linux/gpio.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/leds.h>
++#include <linux/gpio-fan.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+@@ -224,6 +225,46 @@ static struct platform_device netspace_v2_leds = {
+ };
+ 
+ /*****************************************************************************
++ * GPIO fan
++ ****************************************************************************/
++
++/* Designed for fan 40x40x16: ADDA AD0412LB-D50 6000rpm at 12v */
++static struct gpio_fan_speed netspace_max_v2_fan_speed[] = {
++	{    0,  0 },
++	{ 1500,	15 },
++	{ 1700,	14 },
++	{ 1800,	13 },
++	{ 2100,	12 },
++	{ 3100,	11 },
++	{ 3300,	10 },
++	{ 4300,	 9 },
++	{ 5500,	 8 },
++};
++
++static unsigned netspace_max_v2_fan_ctrl[] = { 22, 7, 33, 23 };
++
++static struct gpio_fan_alarm netspace_max_v2_fan_alarm = {
++	.gpio		= 25,
++	.active_low	= 1,
++};
++
++static struct gpio_fan_platform_data netspace_max_v2_fan_data = {
++	.num_ctrl	= ARRAY_SIZE(netspace_max_v2_fan_ctrl),
++	.ctrl		= netspace_max_v2_fan_ctrl,
++	.alarm		= &netspace_max_v2_fan_alarm,
++	.num_speed	= ARRAY_SIZE(netspace_max_v2_fan_speed),
++	.speed		= netspace_max_v2_fan_speed,
++};
++
++static struct platform_device netspace_max_v2_gpio_fan = {
++	.name	= "gpio-fan",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &netspace_max_v2_fan_data,
++	},
++};
++
++/*****************************************************************************
+  * Timer
+  ****************************************************************************/
+ 
+@@ -307,6 +348,8 @@ static void __init netspace_v2_init(void)
+ 	platform_device_register(&netspace_v2_leds);
+ 	platform_device_register(&netspace_v2_gpio_leds);
+ 	platform_device_register(&netspace_v2_gpio_buttons);
++	if (machine_is_netspace_max_v2())
++		platform_device_register(&netspace_max_v2_gpio_fan);
+ 
+ 	if (gpio_request(NETSPACE_V2_GPIO_POWER_OFF, "power-off") == 0 &&
+ 	    gpio_direction_output(NETSPACE_V2_GPIO_POWER_OFF, 0) == 0)
+-- 
+1.6.3.1
