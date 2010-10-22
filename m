@@ -1,24 +1,37 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Fri, 22 Oct 2010 09:38:45 +0300
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 22 Oct 2010 08:42:05 +0200
 Subject: [PATCH RESEND] ARM: fix spinlock recursion in adjust_pte()
-In-Reply-To: <20101022062825.GH6225@tarshish>
+In-Reply-To: <20101022063845.GI4772@gw.healthdatacare.com>
 References: <20101021164433.GH4772@gw.healthdatacare.com>
 	<1287680982-22971-1-git-send-email-mika.westerberg@iki.fi>
 	<20101022062825.GH6225@tarshish>
-Message-ID: <20101022063845.GI4772@gw.healthdatacare.com>
+	<20101022063845.GI4772@gw.healthdatacare.com>
+Message-ID: <20101022064205.GI6225@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 22, 2010 at 08:28:26AM +0200, Baruch Siach wrote:
-[...]
+Hi Mika,
+
+On Fri, Oct 22, 2010 at 09:38:45AM +0300, Mika Westerberg wrote:
+> On Fri, Oct 22, 2010 at 08:28:26AM +0200, Baruch Siach wrote:
+> [...]
+> > 
+> > Do you have any idea when was this bug introduced? Does it affect already 
+> > release kernels other than .36?
 > 
-> Do you have any idea when was this bug introduced? Does it affect already 
-> release kernels other than .36?
+> I've seen it at least on .35. The locking code itself was introduced
+> in commit:
+> 
+> 56dd47098abe (ARM: make_coherent: fix problems with highpte, part 1)
 
-I've seen it at least on .35. The locking code itself was introduced
-in commit:
+Which is present on .34-rc1. In this case adding stable at kernel.org to Cc would 
+be nice.
 
-56dd47098abe (ARM: make_coherent: fix problems with highpte, part 1)
+Thanks,
 
-Regards,
-MW
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
