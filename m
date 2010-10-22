@@ -1,127 +1,53 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Fri, 22 Oct 2010 17:52:26 +0400
-Subject: [PATCH 1/6] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <201010221102.12329.arnd@arndb.de>
-References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
-	<201010211401.53001.arnd@arndb.de>
-	<AANLkTimkLqrbX+536TD630xFy=y-PxEdksc4sA0gz6fU@mail.gmail.com>
-	<201010221102.12329.arnd@arndb.de>
-Message-ID: <AANLkTi=F2VA_3L9-49OQ=Bj1KaD2T58Ske2qvHFqirM9@mail.gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Fri, 22 Oct 2010 10:09:03 -0400
+Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
+In-Reply-To: <20101022110457.GA14136@void.printf.net>
+References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
+	<20101021141302.GA11912@void.printf.net>
+	<20101021145249.GA13095@void.printf.net>
+	<AANLkTik8=HXEG4h2toVf7ut8TGk04HMv1DR_BxoevOC0@mail.gmail.com>
+	<20101022095814.GA13073@void.printf.net>
+	<20101022110457.GA14136@void.printf.net>
+Message-ID: <AANLkTikg3-5whd65aZmK4sJSg+vvNke0fSkqSQJ1B5vf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/22 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 21 October 2010 23:08:39 Alexey Charkov wrote:
->> 2010/10/21 Arnd Bergmann <arnd@arndb.de>:
->> > On Thursday 21 October 2010, Alexey Charkov wrote:
->> > Parsing complex options in general is not ok, but something simpler
->> > probably is.
->> >
->> > Having a Kconfig selected default is probably a good idea. The most
->> > simple way to select this at boot time would be to have a list of
->> > possible resolutions and pass a table index.
->> >
->> > Would a __setup() call work for you?
->> >
->>
->> Should probably be fine. Will it be allowable to accept something like
->> "panel=800x480" and strncmp it against a list of recognized values,
->> fall back to a Kconfig default on failure and printk the
->> possibilities? Just expecting an obscure table index would not be too
->> user-friendly, imho.
+On Fri, Oct 22, 2010 at 7:04 AM, Chris Ball <cjb@laptop.org> wrote:
+> Hi,
 >
-> Sounds reasonable to me.
+> On Fri, Oct 22, 2010 at 10:58:14AM +0100, Chris Ball wrote:
+> [...]
+>> +#ifdef CONFIG_PM
+>> +static int sdhci_pxa_suspend(struct platform_device *dev)
+>> +{
+>> + ? ? struct sdhci_host *host = platform_get_drvdata(to_platform_device(dev));
+>> +
+>> + ? ? return sdhci_suspend_host(host, state);
+>> +}
+>> +
+>> +static int sdhci_pxa_resume(struct platform_device *dev)
+>> +{
 >
->> >> And due to the fact that the framebuffer size calculation is tied to
->> >> panel specification, it will boot in any case. The only problem that
->> >> one could encounter would be suboptimal display (for example,
->> >> offscreen pixmaps to become actually visible on screen if the panel is
->> >> taller
->> >> than expected, or some corruption in case it is wider).
->> >
->> > Another option might be to have a submenu with the possible resolutions
->> > you want to allow and size the frame buffer for the largest of those,
->> > but allow overriding the actual one at boot time.
->> >
->>
->> In this case display parameters could be parsed in the driver itself,
->> but quite some memory will be over-allocated in extreme cases without
->> any way to claim it back after boot. Having only 128MB of RAM, is it
->> really better?
+> These prototypes are not correct, leading to:
 >
-> Well, you could still build a specialized kernel with only support for
-> one resolution if you care about every byte.
+> ?CC [M] ?drivers/mmc/host/sdhci-pxa.o
+> drivers/mmc/host/sdhci-pxa.c: In function ?sdhci_pxa_suspend?:
+> drivers/mmc/host/sdhci-pxa.c:205: warning: initialization from incompatible pointer type
+> drivers/mmc/host/sdhci-pxa.c:207: error: ?state? undeclared (first use in this function)
+> drivers/mmc/host/sdhci-pxa.c:207: error: (Each undeclared identifier is reported only once
+> drivers/mmc/host/sdhci-pxa.c:207: error: for each function it appears in.)
+> drivers/mmc/host/sdhci-pxa.c: In function ?sdhci_pxa_resume?:
+> drivers/mmc/host/sdhci-pxa.c:212: warning: initialization from incompatible pointer type
+> drivers/mmc/host/sdhci-pxa.c: At top level:
+> drivers/mmc/host/sdhci-pxa.c:222: warning: initialization from incompatible pointer type
+> drivers/mmc/host/sdhci-pxa.c:223: warning: initialization from incompatible pointer type
+>
+> when compiled with CONFIG_PM=y.
+>
+> --
+> Chris Ball ? <cjb@laptop.org> ? <http://printf.net/>
+> One Laptop Per Child
 >
 
-If it is fine to accept an option like "panel=<value_from_a_list>" at
-map_io stage, then I'd rather go that way, and calculate the minimum
-required buffer size for the current configuration. Especially if we
-decide to make a unified image for different SoC revisions, as WM8505
-requires 32bpp framebuffer, while VT8500 requires it to be 4MB-aligned
-native-bpp.
-
->> Cleaned this up in the development repo, thanks. Only left #ifdef's
->> for the sections where respective register/interrupt definitions would
->> be unavailable due to compiling for a different SoC version, and
->> adjusted the conditions accordingly.
->
-> Ideally those should also be run-time decisions so you can build a
-> kernel that works on both. It's all __init code, so it won't eat
-> up any RAM afterwards.
->
-
-I thought about that, and it should be quite useful. However, register
-and interrupt definitions should then be converted into some indexed
-data structures instead of macros (as they differ between VT8500 and
-WM8505), and the correct index should be selectable at runtime.
-
-Is there any way to determine which mach type we are currently running
-at after early head.S initialization completes and before we could
-need to use any registers and/or interrupts? It could probably be done
-in machine-specific fixup functions, but I'm unsure whether this would
-be a correct way to go.
-
->> >> >> +#ifndef __ASM_ARM_ARCH_IO_H
->> >> >> +#define __ASM_ARM_ARCH_IO_H
->> >> >> +
->> >> >> +#define IO_SPACE_LIMIT 0xffffffff
->> >> >> +
->> >> >> +#define __io(a) ? ? ? ? ? ? ?__typesafe_io(a)
->> >> >> +#define __mem_pci(a) (a)
->> >> >> +
->> >> >> +#endif
->>
->> Ok, figuring out better values for the macros would be great!
->
-> For the IO_SPACE_LIMIT, just make it 0xffff
->
-> For __io, you need to find a place in your virtual address space
-> and map the real IO space.
->
-> According to the VIA source code, the physical I/O window is at
-> 0xd8000000, they also map it to the same address in virtual space
-> but you can have anywhere convienient.
->
-
-Are you sure about that? 0xd8000000 is the MMIO base, as far as I can
-tell (see register definitions in <mach/vt8500.h>). In earlier
-discussions you presumed [1] that IO could be at 0xc0000000, but I'm
-not sure how to verify that. If so, should it then look something like
-this:
-
-#define __io(a) ((void __iomem *)(((a) + 0xc0000000) +
-SOME_OFFSET_TO_VIRT_SPACE))
-
-?
-By the way, other boards except for footbridge, integrator, ebsa110
-and ixp4xx define IO_SPACE_LIMIT to be 0xffffffff. 0xffff seems more
-plausbile, though...
-
-> ? ? ? ?Arnd
->
-
-Thanks,
-Alexey
-
-[1] http://groups.google.com/group/vt8500-wm8505-linux-kernel/msg/97bf44bc5ea5d46a?
+Sorry, forgot open CONFIG_PM.
+Updated patch, thanks
