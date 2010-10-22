@@ -1,85 +1,217 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Oct 2010 17:42:47 +0100
-Subject: [PATCH 2/2] AT91: pm: make sure that r0 is 0 when dealing with
-	cache operations
-In-Reply-To: <86bb15f5a1aa3f21066ed13d7ee3f9f500d11087.1287767949.git.nicolas.ferre@atmel.com>
-References: <af311282c5a0076ec618be68facdd3ad98d509b8.1287767949.git.nicolas.ferre@atmel.com>
-	<86bb15f5a1aa3f21066ed13d7ee3f9f500d11087.1287767949.git.nicolas.ferre@atmel.com>
-Message-ID: <20101022164247.GB29119@n2100.arm.linux.org.uk>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Fri, 22 Oct 2010 09:32:00 -0700
+Subject: [PATCHv4 1/2] ARM: imx: Add gpio-keys to mx51 babbage board
+In-Reply-To: <20101021191018.GX19834@pengutronix.de>
+References: <1287687324-6101-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20101021191018.GX19834@pengutronix.de>
+Message-ID: <86A0E76937111F4C92FABEC0A2098851051D6045@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 22, 2010 at 07:29:00PM +0200, Nicolas Ferre wrote:
-> When using CP15 cache operations (c7), we make sure that Rd (r0)
-> is actually 0 as ARM 926 TRM is saying.
+Hi Uwe,
 
-Err, no.  From the GCC manual:
+>-----Original Message-----
+>From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+>Sent: Thursday, October 21, 2010 2:10 PM
+>To: Nguyen Dinh-R00091
+>Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk;
+>s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
+>bryan.wu at canonical.com; amit.kucheria at canonical.com; Zhang Lily-R58066
+>Subject: Re: [PATCHv4 1/2] ARM: imx: Add gpio-keys to mx51 babbage board
+>
+>On Thu, Oct 21, 2010 at 01:55:23PM -0500, Dinh.Nguyen at freescale.com wrote:
+>> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>>
+>> Add functionality for the power button on MX51 Babbage board.
+>>
+>> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
+>>
+>> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+>> ---
+>>  arch/arm/configs/mx51_defconfig                 |    1 +
+>>  arch/arm/mach-mx5/board-mx51_babbage.c          |   22 +++++++++++++++++
+>>  arch/arm/mach-mx5/devices-imx51.h               |    2 +
+>>  arch/arm/plat-mxc/devices/Kconfig               |    5 ++++
+>>  arch/arm/plat-mxc/devices/Makefile              |    1 +
+>>  arch/arm/plat-mxc/devices/platform-buttons.c    |   29 +++++++++++++++++++++++
+>>  arch/arm/plat-mxc/include/mach/devices-common.h |    4 +++
+>>  arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +-
+>>  8 files changed, 65 insertions(+), 1 deletions(-)
+>>  create mode 100644 arch/arm/plat-mxc/devices/platform-buttons.c
+>>
+>> diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+>> index 163cfee..5c7a872 100644
+>> --- a/arch/arm/configs/mx51_defconfig
+>> +++ b/arch/arm/configs/mx51_defconfig
+>> @@ -82,6 +82,7 @@ CONFIG_FEC=y
+>>  CONFIG_INPUT_FF_MEMLESS=m
+>>
+>>  /* USB_CTRL_1 */
+>>  #define MX51_USB_CTRL_1_OFFSET			0x10
+>> @@ -46,6 +49,21 @@
+>>  #define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
+>>  #define	MX51_USB_PLL_DIV_24_MHZ	0x02
+>>
+>> +static struct gpio_keys_button babbage_buttons[] = {
+>const?  (Maybe gpio_keys_platform_data has to be changed for that.)
+>> +	{
+>> +		.gpio		= BABBAGE_POWER_KEY,
+>> +		.code		= BTN_0,
+>> +		.desc		= "PWR",
+>> +		.active_low	= 1,
+>> +		.wakeup		= 1,
+>> +	},
+>> +};
+>> +
+>> +static struct gpio_keys_platform_data imx_button_data = {
+>const and __initconst please
+>
+>> +	.buttons	= babbage_buttons,
+>> +	.nbuttons	= ARRAY_SIZE(babbage_buttons),
+>> +};
+>> +
+>>  static struct pad_desc mx51babbage_pads[] = {
+>>  	/* UART1 */
+>>  	MX51_PAD_UART1_RXD__UART1_RXD,
+>> @@ -112,6 +130,9 @@ static struct pad_desc mx51babbage_pads[] = {
+>>
+>>  	/* FEC PHY reset line */
+>>  	MX51_PAD_EIM_A20__GPIO_2_14,
+>> +
+>> +	/* Power Key */
+>> +	MX51_PAD_EIM_A27__GPIO_2_21,
+>>  };
+>>
+>>  /* Serial ports */
+>> @@ -287,6 +308,7 @@ static void __init mxc_board_init(void)
+>>  	mxc_init_imx_uart();
+>>  	babbage_fec_reset();
+>>  	imx51_add_fec(NULL);
+>> +	imx51_add_buttons(&imx_button_data);
+>>
+>>  	imx51_add_imx_i2c(0, &babbage_i2c_data);
+>>  	imx51_add_imx_i2c(1, &babbage_i2c_data);
+>> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+>> index 5cc910e..a114d65 100644
+>> --- a/arch/arm/mach-mx5/devices-imx51.h
+>> +++ b/arch/arm/mach-mx5/devices-imx51.h
+>> @@ -9,6 +9,8 @@
+>>  #include <mach/mx51.h>
+>>  #include <mach/devices-common.h>
+>>
+>> +#define imx51_add_buttons(pdata) imx_add_buttons(pdata)
+>> +
+>>  extern const struct imx_fec_data imx51_fec_data __initconst;
+>>  #define imx51_add_fec(pdata)	\
+>>  	imx_add_fec(&imx51_fec_data, pdata)
+>> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+>> index 4047994..dbd688b 100644
+>> --- a/arch/arm/plat-mxc/devices/Kconfig
+>> +++ b/arch/arm/plat-mxc/devices/Kconfig
+>> @@ -23,3 +23,8 @@ config IMX_HAVE_PLATFORM_MXC_NAND
+>>
+>>  config IMX_HAVE_PLATFORM_SPI_IMX
+>>  	bool
+>> +
+>> +config IMX_HAVE_PLATFORM_GPIO_BUTTONS
+>> +	bool
+>> +	default y if ARCH_MX51
+>> +
+>> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+>> index 0a3c1f0..41008be 100644
+>> --- a/arch/arm/plat-mxc/devices/Makefile
+>> +++ b/arch/arm/plat-mxc/devices/Makefile
+>> @@ -7,3 +7,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
+>>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
+>>  obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
+>>  obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
+>> +obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_BUTTONS) += platform-buttons.o
+>> \ No newline at end of file
+>This file is supposed to be ordered alphabetically and to have a newline
+>at the end of file.
+>
+>> diff --git a/arch/arm/plat-mxc/devices/platform-buttons.c b/arch/arm/plat-mxc/devices/platform-
+>buttons.c
+>> new file mode 100644
+>> index 0000000..23ceed8
+>> --- /dev/null
+>> +++ b/arch/arm/plat-mxc/devices/platform-buttons.c
+>> @@ -0,0 +1,29 @@
+>> +/*
+>> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version 2
+>> + * of the License, or (at your option) any later version.
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, write to the Free Software
+>> + * Foundation, Inc., 51 Franklin Street, Fifth Floor,
+>> + * Boston, MA  02110-1301, USA.
+>> + */
+>> +#include <asm/sizes.h>
+>> +#include <mach/hardware.h>
+>> +#include <mach/devices-common.h>
+>> +
+>> +struct platform_device *__init imx_add_buttons(
+>I'd like to have that function named imx_add_gpio_keys to match the
+>device name (as good as possible).
+>
+>> +		const struct gpio_keys_platform_data *pdata)
+>> +{
+>> +
+>> +	return imx_add_platform_device("gpio-keys", -1, NULL,
+>> +		NULL, pdata, sizeof(*pdata));
+>> +
+>> +}
+>> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-
+>mxc/include/mach/devices-common.h
+>> index 86d7575..0b37d6d 100644
+>> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
+>> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+>> @@ -14,6 +14,10 @@ struct platform_device *imx_add_platform_device(const char *name, int id,
+>>  		const struct resource *res, unsigned int num_resources,
+>>  		const void *data, size_t size_data);
+>>
+>> +#include <linux/gpio_keys.h>
+>> +struct platform_device *__init imx_add_buttons(
+>> +		const struct gpio_keys_platform_data *pdata);
+>> +
+>>  #include <linux/fec.h>
+>>  struct imx_fec_data {
+>>  	resource_size_t iobase;
+>> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-
+>mx51.h
+>> index e46b1c2..7ae27e8 100644
+>> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+>> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+>> @@ -114,7 +114,7 @@ typedef enum iomux_config {
+>>  #define MX51_PAD_EIM_A24__GPIO_2_18             IOMUX_PAD(0x450, 0x0bc, 1, 0x0,   0, NO_PAD_CTRL)
+>>  #define MX51_PAD_EIM_A25__GPIO_2_19             IOMUX_PAD(0x454, 0x0c0, 1, 0x0,   0, NO_PAD_CTRL)
+>>  #define MX51_PAD_EIM_A26__GPIO_2_20             IOMUX_PAD(0x458, 0x0c4, 1, 0x0,   0, NO_PAD_CTRL)
+>> -#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, NO_PAD_CTRL)
+>> +#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0,
+>MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP)
+>Is this a generic change valid for all mx51 machines or only for the
+>babbage board?
 
-|    Note that even a volatile `asm' instruction can be moved in ways
-| that appear insignificant to the compiler, such as across jump
-| instructions.  You can't expect a sequence of volatile `asm'
-| instructions to remain perfectly consecutive.  If you want consecutive
-| output, use a single `asm'.  Also, GCC will perform some optimizations
-| across a volatile `asm' instruction; GCC does not "forget everything"
-| when it encounters a volatile `asm' instruction the way some other
-| compilers do.
+This is a change that is probably valid for all mx51 machines, but I have only tested on Babbage. 
 
-So:
+>
+>>  #define MX51_PAD_EIM_EB0__EIM_EB0               IOMUX_PAD(0x460, 0x0cc, 0, 0x0,   0, NO_PAD_CTRL)
+>>  #define MX51_PAD_EIM_EB1__EIM_EB1               IOMUX_PAD(0x464, 0x0d0, 0, 0x0,   0, NO_PAD_CTRL)
+>>  #define MX51_PAD_EIM_EB2__GPIO_2_22             IOMUX_PAD(0x468, 0x0d4, 1, 0x0,   0, NO_PAD_CTRL)
+>> --
+>> 1.6.0.4
+>
+>--
+>Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+>Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
-	asm volatile("foo");
-	asm volatile("bar");
-
-is not guaranteed to produce the following uninterrupted code sequence:
-
-	foo
-	bar
-
-The compiler is free to insert other instructions inbetween these two
-asm statements.
-
-It's also not permitted to modify registers without telling gcc that
-they've been modified.
-
-> +			asm("mov r0, #0");			/* clear r0 for CP15 accesses */
->  			asm("b 1f; .align 5; 1:");
->  			asm("mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
-
-That means the above is completely unacceptable.  It should be:
-
-	asm("mov r0, #0;"
-	"b 1f;"
-	".align 5;"
-	"1: mcr p15, 0, r0, c7, c10, 4" : : : "r0");
-
-
-
->  			saved_lpr = sdram_selfrefresh_enable();
-> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-> index 2c4424b..be081c9 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -21,7 +21,7 @@ static inline u32 sdram_selfrefresh_enable(void)
->  }
->  
->  #define sdram_selfrefresh_disable(saved_lpr)	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
-> -#define wait_for_interrupt_enable()		asm("mcr p15, 0, r0, c7, c0, 4")
-> +#define wait_for_interrupt_enable()		asm("mcr p15, 0, r0, c7, c0, 4") /* r0 is 0 here */
-
-No, r0 is not guaranteed to be zero here.  Use dsb() here instead which
-gets it right.
-
-
->  #elif defined(CONFIG_ARCH_AT91CAP9)
->  #include <mach/at91cap9_ddrsdr.h>
-> diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-> index b6b00a1..f7922a4 100644
-> --- a/arch/arm/mach-at91/pm_slowclock.S
-> +++ b/arch/arm/mach-at91/pm_slowclock.S
-> @@ -124,6 +124,7 @@ ENTRY(at91_slow_clock)
->  	ldr	r5, .at91_va_base_ramc1
->  
->  	/* Drain write buffer */
-> +	mov	r0, #0
->  	mcr	p15, 0, r0, c7, c10, 4
-
-This one being in asm code is fine.
+Thanks,
+Dinh
