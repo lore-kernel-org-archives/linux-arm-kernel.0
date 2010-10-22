@@ -1,54 +1,69 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 22 Oct 2010 10:01:52 +0200
-Subject: [PATCH RESEND] ARM: fix spinlock recursion in adjust_pte()
-In-Reply-To: <20101022070847.GJ4772@gw.healthdatacare.com>
-References: <20101021164433.GH4772@gw.healthdatacare.com>
-	<1287680982-22971-1-git-send-email-mika.westerberg@iki.fi>
-	<20101022062825.GH6225@tarshish>
-	<20101022063845.GI4772@gw.healthdatacare.com>
-	<20101022064205.GI6225@tarshish>
-	<20101022070847.GJ4772@gw.healthdatacare.com>
-Message-ID: <20101022080152.GJ6225@tarshish>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Oct 2010 17:05:32 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add the missed s3c_gpio_getpull() API
+In-Reply-To: <4CC07CC2.50206@mvista.com>
+References: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
+	<4CC07CC2.50206@mvista.com>
+Message-ID: <004901cb71bf$e8be50f0$ba3af2d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika,
-
-On Fri, Oct 22, 2010 at 10:08:47AM +0300, Mika Westerberg wrote:
-> On Fri, Oct 22, 2010 at 08:42:05AM +0200, Baruch Siach wrote:
-> > Hi Mika,
-> > 
-> > On Fri, Oct 22, 2010 at 09:38:45AM +0300, Mika Westerberg wrote:
-> > > On Fri, Oct 22, 2010 at 08:28:26AM +0200, Baruch Siach wrote:
-> > > [...]
-> > > > 
-> > > > Do you have any idea when was this bug introduced? Does it affect already 
-> > > > release kernels other than .36?
-> > > 
-> > > I've seen it at least on .35. The locking code itself was introduced
-> > > in commit:
-> > > 
-> > > 56dd47098abe (ARM: make_coherent: fix problems with highpte, part 1)
-> > 
-> > Which is present on .34-rc1. In this case adding stable at kernel.org to Cc would 
-> > be nice.
+Sergei Shtylyov wrote:
 > 
-> Ok, thanks.
+> Hello.
 > 
-> I'm not familiar with the stable rules and it wasn't immediately
-> clear from the Documentation/stable_kernel_rules.txt: should I resend
-> this patch with added 'Cc:' or is it enough just to add Cc into followup
-> mail?
+Hi,
 
-Patch with 'Cc: stable at kernel.org' line in its commit log is automatically 
-forwarded to the stable team once this patch hits Linus' tree. Since this 
-patch should go through Russell's tree, you can add this line when posting to 
-his patch tracker. I guess that adding some info in the commit log on the 
-history of this bug should help the stable team in the process.
+> On 21-10-2010 12:04, Kukjin Kim wrote:
+> 
+> > From: Daein Moon<moon9124@samsung.com>
+> 
+> > This patch adds the s3c_gpio_getpull() API that has been missed in the
+> > plat-samsung/gpio-config.c and actullay there is its extern declaration
+> > in plat/gpio-cfg.h.
+> 
+> > Signed-off-by: Daein Moon<moon9124@samsung.com>
+> > Cc: Ben Dooks<ben-linux@fluff.org>
+> > Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> > ---
+> > NOTE:
+> > - already issued about this
+> 
+> >   arch/arm/plat-samsung/gpio-config.c                |   19
+> +++++++++++++++++++
+> >   .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    6 ++++++
+> >   2 files changed, 25 insertions(+), 0 deletions(-)
+> 
+> > diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-
+> samsung/gpio-config.c
+> > index 8a37211..b732b77 100644
+> > --- a/arch/arm/plat-samsung/gpio-config.c
+> > +++ b/arch/arm/plat-samsung/gpio-config.c
+> [...]
+> > diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+> b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+> > index 3e21c75..c417f85 100644
+> > --- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+> > +++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
+> > @@ -42,6 +42,12 @@ static inline int s3c_gpio_do_setpull(struct
+> s3c_gpio_chip *chip,
+> >   	return (chip->config->set_pull)(chip, off, pull);
+> >   }
+> >
+> > +static inline unsigned s3c_gpio_do_getpull(struct s3c_gpio_chip *chip,
+> > +					   unsigned int off)
+> > +{
+> > +	return (chip->config->get_pull)(chip, off);
+> 
+>     Parens are not necessary here.
+> 
+Thanks for your pointing out :-)
+Will fix it.
 
-baruch
+Thanks.
 
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
