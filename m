@@ -1,86 +1,36 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Fri, 22 Oct 2010 11:29:18 +0200
-Subject: [PATCH] [ARM] Kirkwood: add fan support for Network Space Max v2
-In-Reply-To: <20101022043000.GA29632@ericsson.com>
-References: <20101022043000.GA29632@ericsson.com>
-Message-ID: <1287739758-26860-1-git-send-email-simon@sequanux.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 22 Oct 2010 07:56:33 -0200
+Subject: [PATCH v2] ARM: mx3: fix build failure concerning
+	MXC_INT_MMC_SDHC2
+In-Reply-To: <1287732052-6181-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <4CC098DB.6010406@eukrea.com>
+	<1287732052-6181-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <AANLkTi=d=zO5YEkmiHPd7_QEamCsJU6zvZ0eO3wn57m5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <sguinot@lacie.com>
+Hi Uwe,
 
-Signed-off-by: Simon Guinot <sguinot@lacie.com>
----
- arch/arm/mach-kirkwood/netspace_v2-setup.c |   43 ++++++++++++++++++++++++++++
- 1 files changed, 43 insertions(+), 0 deletions(-)
+On Fri, Oct 22, 2010 at 5:20 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Commit c074512 (imx-esdhc: update devices registration) renamed
+> MX35_INT_MMC_SDHC2 to MX35_INT_ESDHC2 which broke expansion of the
+> MXC_INT_MMC_SDHC2 macro.
+> As mxcsdhc_device1 (the only user of MXC_INT_MMC_SDHC2) is only used on
+> mx31 use the MX31 prefixed symbol to define its resources. ?Moreover to
+> reduce further confusion mxcsdhc_device0 is fixed accordingly and the MXC
+> prefixed symbols are removed.
+>
+> Tested-by: Eric B?nard <eric@eukrea.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> changes since v1:
+>
+> ?- add a missing word in commit log
+> ?- also remove MMC_SDHC[12]_BASE_ADDR
 
-diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-index d26bf32..9e27115 100644
---- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-@@ -35,6 +35,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/leds.h>
-+#include <linux/gpio-fan.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-@@ -224,6 +225,46 @@ static struct platform_device netspace_v2_leds = {
- };
- 
- /*****************************************************************************
-+ * GPIO fan
-+ ****************************************************************************/
-+
-+/* Designed for fan 40x40x16: ADDA AD0412LB-D50 6000rpm at 12v */
-+static struct gpio_fan_speed netspace_max_v2_fan_speed[] = {
-+	{    0,  0 },
-+	{ 1500,	15 },
-+	{ 1700,	14 },
-+	{ 1800,	13 },
-+	{ 2100,	12 },
-+	{ 3100,	11 },
-+	{ 3300,	10 },
-+	{ 4300,	 9 },
-+	{ 5500,	 8 },
-+};
-+
-+static unsigned netspace_max_v2_fan_ctrl[] = { 22, 7, 33, 23 };
-+
-+static struct gpio_fan_alarm netspace_max_v2_fan_alarm = {
-+	.gpio		= 25,
-+	.active_low	= 1,
-+};
-+
-+static struct gpio_fan_platform_data netspace_max_v2_fan_data = {
-+	.num_ctrl	= ARRAY_SIZE(netspace_max_v2_fan_ctrl),
-+	.ctrl		= netspace_max_v2_fan_ctrl,
-+	.alarm		= &netspace_max_v2_fan_alarm,
-+	.num_speed	= ARRAY_SIZE(netspace_max_v2_fan_speed),
-+	.speed		= netspace_max_v2_fan_speed,
-+};
-+
-+static struct platform_device netspace_max_v2_gpio_fan = {
-+	.name	= "gpio-fan",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &netspace_max_v2_fan_data,
-+	},
-+};
-+
-+/*****************************************************************************
-  * Timer
-  ****************************************************************************/
- 
-@@ -307,6 +348,8 @@ static void __init netspace_v2_init(void)
- 	platform_device_register(&netspace_v2_leds);
- 	platform_device_register(&netspace_v2_gpio_leds);
- 	platform_device_register(&netspace_v2_gpio_buttons);
-+	if (machine_is_netspace_max_v2())
-+		platform_device_register(&netspace_max_v2_gpio_fan);
- 
- 	if (gpio_request(NETSPACE_V2_GPIO_POWER_OFF, "power-off") == 0 &&
- 	    gpio_direction_output(NETSPACE_V2_GPIO_POWER_OFF, 0) == 0)
--- 
-1.6.3.1
+Your v1 version is already in Sascha's git tree now.
+
+Regards,
+
+Fabio Estevam
