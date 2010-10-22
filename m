@@ -1,54 +1,75 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 22 Oct 2010 13:21:29 +0800
-Subject: [PATCH 4/9] drivers/rtc: typo fix of faild to failed
-In-Reply-To: <4279ee540bfed9c40ba26698bfe7abddb8921ee4.1287724261.git.joe@perches.com>
-References: <cover.1287724261.git.joe@perches.com>
-	<4279ee540bfed9c40ba26698bfe7abddb8921ee4.1287724261.git.joe@perches.com>
-Message-ID: <AANLkTikG+n_Z4gY9i0gpVk5M+MHW46Tzg_xSnjVgih_e@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Oct 2010 14:22:13 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add the missed s3c_gpio_getpull() API
+In-Reply-To: <4CC0BC09.5090803@fluff.org>
+References: <1287648286-7202-1-git-send-email-kgene.kim@samsung.com>
+	<4CC0BC09.5090803@fluff.org>
+Message-ID: <002c01cb71a9$1789a720$469cf560$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Joe,
+Ben Dooks wrote:
+> 
+> On 21/10/10 09:04, Kukjin Kim wrote:
+> > From: Daein Moon <moon9124@samsung.com>
+> >
+> > This patch adds the s3c_gpio_getpull() API that has been missed in the
+> > plat-samsung/gpio-config.c and actullay there is its extern declaration
+> > in plat/gpio-cfg.h.
+> >
+> > Signed-off-by: Daein Moon <moon9124@samsung.com>
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > NOTE:
+> > - already issued about this
+> >
+> >  arch/arm/plat-samsung/gpio-config.c                |   19
+> +++++++++++++++++++
+> >  .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    6 ++++++
+> >  2 files changed, 25 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-
+> samsung/gpio-config.c
+> > index 8a37211..b732b77 100644
+> > --- a/arch/arm/plat-samsung/gpio-config.c
+> > +++ b/arch/arm/plat-samsung/gpio-config.c
+> > @@ -111,6 +111,25 @@ int s3c_gpio_setpull(unsigned int pin,
+s3c_gpio_pull_t
+> pull)
+> >  }
+> >  EXPORT_SYMBOL(s3c_gpio_setpull);
+> >
+> > +s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin)
+> > +{
+> > +	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
+> > +	unsigned long flags;
+> > +	int offset;
+> > +	u32 pup = 0;
+> 
+> would the result of s3c_gpio_do_getpull() should be a s3c_gpio_pull_t?
+> 
+Yes, righit.
 
-Thanks for your help.
+Mr. Moon,
+Could you please update your patch as per Ben's comment?
 
-2010/10/22 Joe Perches <joe@perches.com>:
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
-> ?drivers/rtc/rtc-nuc900.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
-> index 62de66a..ddb0857 100644
-> --- a/drivers/rtc/rtc-nuc900.c
-> +++ b/drivers/rtc/rtc-nuc900.c
-> @@ -274,7 +274,7 @@ static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
-> ? ? ? ?nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&nuc900_rtc_ops, THIS_MODULE);
-> ? ? ? ?if (IS_ERR(nuc900_rtc->rtcdev)) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "rtc device register faild\n");
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "rtc device register failed\n");
+> > +	if (chip) {
+> > +		offset = pin - chip->chip.base;
+> > +
+> > +		s3c_gpio_lock(chip, flags);
+> > +		pup = s3c_gpio_do_getpull(chip, offset);
+> > +		s3c_gpio_unlock(chip, flags);
+> > +	}
+> > +
+> > +	return (__force s3c_gpio_pull_t)pup;
+> > +}
+> > +EXPORT_SYMBOL(s3c_gpio_getpull);
 
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
+Thanks.
 
-> ? ? ? ? ? ? ? ?err = PTR_ERR(nuc900_rtc->rtcdev);
-> ? ? ? ? ? ? ? ?goto fail3;
-> ? ? ? ?}
-> --
-> 1.7.3.1.g432b3.dirty
->
->
-
-
-
--- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
