@@ -1,395 +1,52 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 22 Oct 2010 17:44:54 +0900
-Subject: [PATCHv2 6/6] ARM: S5PV310: Add audio platform devices
-In-Reply-To: <1287737094-23868-5-git-send-email-jassisinghbrar@gmail.com>
-References: <1287737094-23868-1-git-send-email-jassisinghbrar@gmail.com>
-	<1287737094-23868-2-git-send-email-jassisinghbrar@gmail.com>
-	<1287737094-23868-3-git-send-email-jassisinghbrar@gmail.com>
-	<1287737094-23868-4-git-send-email-jassisinghbrar@gmail.com>
-	<1287737094-23868-5-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <1287737094-23868-6-git-send-email-jassisinghbrar@gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 22 Oct 2010 16:44:07 +0800
+Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
+In-Reply-To: <20101021145249.GA13095@void.printf.net>
+References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
+	<20101021141302.GA11912@void.printf.net>
+	<20101021145249.GA13095@void.printf.net>
+Message-ID: <AANLkTik8=HXEG4h2toVf7ut8TGk04HMv1DR_BxoevOC0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jassi Brar <jassi.brar@samsung.com>
+On Thu, Oct 21, 2010 at 10:52 PM, Chris Ball <cjb@laptop.org> wrote:
+> Hi,
+>
+> On Thu, Oct 21, 2010 at 03:13:02PM +0100, Chris Ball wrote:
+>> On Mon, Oct 18, 2010 at 08:32:46AM -0400, zhangfei gao wrote:
+>> > Update with comments from Matt and Eric.
+>> > Test with sd and emmc.
+>> >
+>> > >From e5dd554ed4d3488a83d9a4888d68d1d85482f747 Mon Sep 17 00:00:00 2001
+>> > From: Zhangfei Gao <zhangfei.gao@marvell.com>
+>> > Date: Mon, 20 Sep 2010 10:51:28 -0400
+>> > Subject: [PATCH] mmc: add support of sdhci-pxa driver
+>> >
+>> > ? ? Support Marvell PXA168/PXA910/MMP2 SD Host Controller
+>> >
+>> > Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+>> > ---
+>> > ?arch/arm/plat-pxa/include/plat/sdhci.h | ? 32 ++++
+>> > ?drivers/mmc/host/Kconfig ? ? ? ? ? ? ? | ? 12 ++
+>> > ?drivers/mmc/host/Makefile ? ? ? ? ? ? ?| ? ?1 +
+>> > ?drivers/mmc/host/sdhci-pxa.c ? ? ? ? ? | ?259 ++++++++++++++++++++++++++++++++
+>> > ?4 files changed, 304 insertions(+), 0 deletions(-)
+>> > ?create mode 100644 arch/arm/plat-pxa/include/plat/sdhci.h
+>> > ?create mode 100644 drivers/mmc/host/sdhci-pxa.c
+>>
+>> I'll take the drivers/mmc/ hunks, but you should send the plat-pxa/
+>> patch through the ARM tree.
+>
+> Oh. ?If we do that then the driver won't compile until everything's
+> together, because it #includes <plat/sdhci.h>. ?Haojian/Eric, what do
+> you prefer here? ?Should I take the arch/arm/ hunk via the MMC tree?
+> (If so, please provide ACKs.)
+>
 
-Define platform devices for all audio devices found on S5PV310
+Acked-by: Haojian Zhuang.
 
-Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
----
- arch/arm/mach-s5pv310/dev-audio.c |  364 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 364 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv310/dev-audio.c
+I'm fine on this. Please merge it via the MMC tree.
 
-diff --git a/arch/arm/mach-s5pv310/dev-audio.c b/arch/arm/mach-s5pv310/dev-audio.c
-new file mode 100644
-index 0000000..d69050e
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/dev-audio.c
-@@ -0,0 +1,364 @@
-+/* linux/arch/arm/mach-s5pv310/dev-audio.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co. Ltd
-+ *	Jaswinder Singh <jassi.brar@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/gpio.h>
-+
-+#include <plat/gpio-cfg.h>
-+#include <plat/audio.h>
-+
-+#include <mach/map.h>
-+#include <mach/dma.h>
-+#include <mach/irqs.h>
-+
-+static const char *rclksrc[] = {
-+	[0] = "busclk",
-+	[1] = "i2sclk",
-+};
-+
-+static int s5pv310_cfg_i2s(struct platform_device *pdev)
-+{
-+	/* configure GPIO for i2s port */
-+	switch (pdev->id) {
-+	case 0:
-+		s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 7, S3C_GPIO_SFN(2));
-+		break;
-+	case 1:
-+		s3c_gpio_cfgpin_range(S5PV310_GPC0(0), 5, S3C_GPIO_SFN(2));
-+		break;
-+	case 2:
-+		s3c_gpio_cfgpin_range(S5PV310_GPC1(0), 5, S3C_GPIO_SFN(4));
-+		break;
-+	default:
-+		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct s3c_audio_pdata i2sv5_pdata = {
-+	.cfg_gpio = s5pv310_cfg_i2s,
-+	.type = {
-+		.i2s = {
-+			.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
-+					 | QUIRK_NEED_RSTCLR,
-+			.src_clk = rclksrc,
-+		},
-+	},
-+};
-+
-+static struct resource s5pv310_iis0_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_IIS0,
-+		.end   = S5PV310_PA_IIS0 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_I2S0_TX,
-+		.end   = DMACH_I2S0_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_I2S0_RX,
-+		.end   = DMACH_I2S0_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[3] = {
-+		.start = DMACH_I2S0S_TX,
-+		.end   = DMACH_I2S0S_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv310_device_iis0 = {
-+	.name		  = "samsung-i2s",
-+	.id		  = 0,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_iis0_resource),
-+	.resource	  = s5pv310_iis0_resource,
-+	.dev = {
-+		.platform_data = &i2sv5_pdata,
-+	},
-+};
-+
-+static const char *rclksrc_v3[] = {
-+	[0] = "sclk_i2s",
-+	[1] = "no_such_clock",
-+};
-+
-+static struct s3c_audio_pdata i2sv3_pdata = {
-+	.cfg_gpio = s5pv310_cfg_i2s,
-+	.type = {
-+		.i2s = {
-+			.quirks = QUIRK_NO_MUXPSR,
-+			.src_clk = rclksrc_v3,
-+		},
-+	},
-+};
-+
-+static struct resource s5pv310_iis1_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_IIS1,
-+		.end   = S5PV310_PA_IIS1 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_I2S1_TX,
-+		.end   = DMACH_I2S1_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_I2S1_RX,
-+		.end   = DMACH_I2S1_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv310_device_iis1 = {
-+	.name		  = "s3c64xx-iis",
-+	.id		  = 1,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_iis1_resource),
-+	.resource	  = s5pv310_iis1_resource,
-+	.dev = {
-+		.platform_data = &i2sv3_pdata,
-+	},
-+};
-+
-+static struct resource s5pv310_iis2_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_IIS2,
-+		.end   = S5PV310_PA_IIS2 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_I2S2_TX,
-+		.end   = DMACH_I2S2_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_I2S2_RX,
-+		.end   = DMACH_I2S2_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv310_device_iis2 = {
-+	.name		  = "s3c64xx-iis",
-+	.id		  = 2,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_iis2_resource),
-+	.resource	  = s5pv310_iis2_resource,
-+	.dev = {
-+		.platform_data = &i2sv3_pdata,
-+	},
-+};
-+
-+/* PCM Controller platform_devices */
-+
-+static int s5pv310_pcm_cfg_gpio(struct platform_device *pdev)
-+{
-+	switch (pdev->id) {
-+	case 0:
-+		s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 5, S3C_GPIO_SFN(3));
-+		break;
-+	case 1:
-+		s3c_gpio_cfgpin_range(S5PV310_GPC0(0), 5, S3C_GPIO_SFN(3));
-+		break;
-+	case 2:
-+		s3c_gpio_cfgpin_range(S5PV310_GPC1(0), 5, S3C_GPIO_SFN(3));
-+		break;
-+	default:
-+		printk(KERN_DEBUG "Invalid PCM Controller number!");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct s3c_audio_pdata s3c_pcm_pdata = {
-+	.cfg_gpio = s5pv310_pcm_cfg_gpio,
-+};
-+
-+static struct resource s5pv310_pcm0_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_PCM0,
-+		.end   = S5PV310_PA_PCM0 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_PCM0_TX,
-+		.end   = DMACH_PCM0_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_PCM0_RX,
-+		.end   = DMACH_PCM0_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv310_device_pcm0 = {
-+	.name		  = "samsung-pcm",
-+	.id		  = 0,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_pcm0_resource),
-+	.resource	  = s5pv310_pcm0_resource,
-+	.dev = {
-+		.platform_data = &s3c_pcm_pdata,
-+	},
-+};
-+
-+static struct resource s5pv310_pcm1_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_PCM1,
-+		.end   = S5PV310_PA_PCM1 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_PCM1_TX,
-+		.end   = DMACH_PCM1_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_PCM1_RX,
-+		.end   = DMACH_PCM1_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv310_device_pcm1 = {
-+	.name		  = "samsung-pcm",
-+	.id		  = 1,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_pcm1_resource),
-+	.resource	  = s5pv310_pcm1_resource,
-+	.dev = {
-+		.platform_data = &s3c_pcm_pdata,
-+	},
-+};
-+
-+static struct resource s5pv310_pcm2_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_PCM2,
-+		.end   = S5PV310_PA_PCM2 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_PCM2_TX,
-+		.end   = DMACH_PCM2_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_PCM2_RX,
-+		.end   = DMACH_PCM2_RX,
-+		.flags = IORESOURCE_DMA,
-+	},
-+};
-+
-+struct platform_device s5pv310_device_pcm2 = {
-+	.name		  = "samsung-pcm",
-+	.id		  = 2,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_pcm2_resource),
-+	.resource	  = s5pv310_pcm2_resource,
-+	.dev = {
-+		.platform_data = &s3c_pcm_pdata,
-+	},
-+};
-+
-+/* AC97 Controller platform devices */
-+
-+static int s5pv310_ac97_cfg_gpio(struct platform_device *pdev)
-+{
-+	return s3c_gpio_cfgpin_range(S5PV310_GPC0(0), 5, S3C_GPIO_SFN(4));
-+}
-+
-+static struct resource s5pv310_ac97_resource[] = {
-+	[0] = {
-+		.start = S5PV310_PA_AC97,
-+		.end   = S5PV310_PA_AC97 + 0x100 - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = DMACH_AC97_PCMOUT,
-+		.end   = DMACH_AC97_PCMOUT,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[2] = {
-+		.start = DMACH_AC97_PCMIN,
-+		.end   = DMACH_AC97_PCMIN,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[3] = {
-+		.start = DMACH_AC97_MICIN,
-+		.end   = DMACH_AC97_MICIN,
-+		.flags = IORESOURCE_DMA,
-+	},
-+	[4] = {
-+		.start = IRQ_AC97,
-+		.end   = IRQ_AC97,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct s3c_audio_pdata s3c_ac97_pdata = {
-+	.cfg_gpio = s5pv310_ac97_cfg_gpio,
-+};
-+
-+static u64 s5pv310_ac97_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device s5pv310_device_ac97 = {
-+	.name		  = "s3c-ac97",
-+	.id		  = -1,
-+	.num_resources	  = ARRAY_SIZE(s5pv310_ac97_resource),
-+	.resource	  = s5pv310_ac97_resource,
-+	.dev = {
-+		.platform_data = &s3c_ac97_pdata,
-+		.dma_mask = &s5pv310_ac97_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+	},
-+};
-+
-+/* S/PDIF Controller platform_device */
-+
-+static int s5pv310_spdif_cfg_gpio(struct platform_device *pdev)
-+{
-+	s3c_gpio_cfgpin_range(S5PV310_GPC1(0), 2, S3C_GPIO_SFN(3));
-+
-+	return 0;
-+}
-+
-+static struct resource s5pv310_spdif_resource[] = {
-+	[0] = {
-+		.start	= S5PV310_PA_SPDIF,
-+		.end	= S5PV310_PA_SPDIF + 0x100 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= DMACH_SPDIF,
-+		.end	= DMACH_SPDIF,
-+		.flags	= IORESOURCE_DMA,
-+	},
-+};
-+
-+static struct s3c_audio_pdata samsung_spdif_pdata = {
-+	.cfg_gpio = s5pv310_spdif_cfg_gpio,
-+};
-+
-+static u64 s5pv310_spdif_dmamask = DMA_BIT_MASK(32);
-+
-+struct platform_device s5pv310_device_spdif = {
-+	.name		= "samsung-spdif",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s5pv310_spdif_resource),
-+	.resource	= s5pv310_spdif_resource,
-+	.dev = {
-+		.platform_data = &samsung_spdif_pdata,
-+		.dma_mask = &s5pv310_spdif_dmamask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+	},
-+};
--- 
-1.6.2.5
+
+Thanks
+Haojian
