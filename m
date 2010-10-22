@@ -1,53 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Oct 2010 10:28:10 -0700
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <20101022170330.GC9445@angua.secretlab.ca>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
-	<8739s0sobc.fsf@deeprootsystems.com>
-	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-	<20101022165612.GF9149@atomide.com>
-	<20101022170330.GC9445@angua.secretlab.ca>
-Message-ID: <20101022172809.GB17595@atomide.com>
+From: nikai@nikai.net (Nicolas Kaiser)
+Date: Fri, 22 Oct 2010 19:29:53 +0200
+Subject: [PATCH] dma/coh901318: fix copy_to_user error path
+Message-ID: <20101022192953.1f67b10a@absol.kitzblitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [101022 09:54]:
-> On Fri, Oct 22, 2010 at 09:56:13AM -0700, Tony Lindgren wrote:
-> > * Ohad Ben-Cohen <ohad@wizery.com> [101020 12:12]:
-> > > On Wed, Oct 20, 2010 at 8:37 PM, Kevin Hilman
-> > > <khilman@deeprootsystems.com> wrote:
-> > > >> Let's take the i2c-omap for example.
-> > > >>
-> > > >> It sounds like it must have a predefined hwspinlock, but what if:
-> > > >>
-> > > >> 1. It will use omap_hwspinlock_request() to dynamically allocate a hwspinlock
-> > > >> 2. Obviously, the hwspinlock id number must be communicated to the M3
-> > > >> BIOS, so the i2c-omap will publish that id using a small shared memory
-> > > >> entry that will be allocated for this sole purpose
-> > > >> 3. we will make sure that 1+2 completes before the remote processor is
-> > > >> taken out of reset
-> > 
-> > Guys, let's try to come up with a generic interface for this instead of
-> > polluting the device drivers with more omap specific interfaces.
-> > 
-> > We really want to keep the drivers generic and platform independent.
-> > 
-> > Sure we still have some omap specific stuff in the drivers, like
-> > cpu_is_omapxxxx, and omap specific dma calls, but those will be going
-> > away.
-> > 
-> > Unless somebody has better ideas, I suggest we pass a lock function
-> > in the platform_data to the drivers that need it, and do the omap
-> > specific nasty stuff in the platform code.
-> 
-> For those of you going to plumbers, I'll put this on the embedded
-> microconference agenda when we're talking about common infrastructure.
+If copy_to_user fails, the assigned error code instantly gets
+overwritten, and the failure apparently ignored. Moreover,
+shouldn't the error code be -EFAULT instead of -EINVAL?
 
-Great, thanks.
+Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
+---
+ drivers/dma/coh901318.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-Tony
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index ae2b871..eac8867 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -140,8 +140,10 @@ static int coh901318_debugfs_read(struct file *file, char __user *buf,
+ 	if (count > dev_size - *f_pos)
+ 		count = dev_size - *f_pos;
+ 
+-	if (copy_to_user(buf, dev_buf + *f_pos, count))
+-		ret = -EINVAL;
++	if (copy_to_user(buf, dev_buf + *f_pos, count)) {
++		ret = -EFAULT;
++		goto out;
++	}
+ 	ret = count;
+ 	*f_pos += count;
+ 
+-- 
+1.7.2.2
