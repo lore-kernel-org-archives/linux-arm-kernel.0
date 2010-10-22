@@ -1,73 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Oct 2010 10:41:25 +0900
-Subject: [PATCH] ARM: S3C24XX: Fix the S3C24XX_VA_GPIO mapping
-In-Reply-To: <4CC0BDEA.8090407@fluff.org>
-References: <1287581622-8335-1-git-send-email-kgene.kim@samsung.com>
-	<4CC0BDEA.8090407@fluff.org>
-Message-ID: <007701cb718a$3f732f50$be598df0$%kim@samsung.com>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Thu, 21 Oct 2010 18:51:41 -0700
+Subject: [PATCH v3] hwmon: add generic GPIO fan driver
+In-Reply-To: <1287701059-2226-1-git-send-email-simon@sequanux.org>
+References: <20101021223555.GT29120@kw.sim.vm.gnt>
+	<1287701059-2226-1-git-send-email-simon@sequanux.org>
+Message-ID: <1287712301.9690.376.camel@groeck-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
+Hi Simon,
+
+On Thu, 2010-10-21 at 18:44 -0400, Simon Guinot wrote:
+> From: Simon Guinot <sguinot@lacie.com>
 > 
-> On 20/10/10 14:33, Kukjin Kim wrote:
-> > This patch changes the S3C24XX_VA_GPIO for to fix following BUG.
-> > BUG: not creating mapping for 0x56000000 at 0x01000000 in user region
-> >
-> > It is due to commit 8fecfe9d(ARM: SAMSUNG: Move the start address of
-> > Samsung SoCs' VA space) which changes S3C_ADDR_BASE from 0xF4000000
-> > to 0xFA000000.
-> >
-> > Reported-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: Ben Dooks <ben-linux@fluff.org>
-> > ---
-> >  arch/arm/plat-s3c24xx/include/plat/map.h |   14 +++-----------
-> >  1 files changed, 3 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-s3c24xx/include/plat/map.h b/arch/arm/plat-
-> s3c24xx/include/plat/map.h
-> > index bd534d3..771491e 100644
-> > --- a/arch/arm/plat-s3c24xx/include/plat/map.h
-> > +++ b/arch/arm/plat-s3c24xx/include/plat/map.h
-> > @@ -61,17 +61,9 @@
-> >
-> >  /* GPIO ports */
-> >
-> > -/* the calculation for the VA of this must ensure that
-> > - * it is the same distance apart from the UART in the
-> > - * phsyical address space, as the initial mapping for the IO
-> > - * is done as a 1:1 mapping. This puts it (currently) at
-> > - * 0xFA800000, which is not in the way of any current mapping
-> > - * by the base system.
-> > -*/
+> This patch adds hwmon support for the GPIO connected fan.
 > 
-> This comment is really important, and it is possible this will
-> break some of the s3c24xx platforms duing the boot process as
-> there can be problems during the changes of mmu when booting.
+I rephrased this to ".. for fans connected to GPIO pins."
+
+> Platform specific informations as GPIO pinout and speed conversion array
+> (rpm from/to GPIO value) are passed to the driver via platform_data.
 > 
-Hi Ben,
+> Signed-off-by: Simon Guinot <sguinot@lacie.com>
 
-I understand, thanks for your pointing out.
-Firstly, will drop this..and update other regarding patch.
+[ ... ]
+> +static int __devinit gpio_fan_probe(struct platform_device *pdev)
+> +{
+> +       int err = 0;
 
-I think, we need to sort VA mapping out later ;-)
+and this variable initialization is not needed.
 
-> > -#define S3C2410_PA_GPIO	   (0x56000000)
-> > -#define S3C24XX_VA_GPIO	   ((S3C24XX_PA_GPIO - S3C24XX_PA_UART) +
-> S3C24XX_VA_UART)
-> > -#define S3C24XX_SZ_GPIO	   SZ_1M
-> > +#define S3C2410_PA_GPIO		(0x56000000)
-> > +#define S3C24XX_VA_GPIO		S3C2410_ADDR(0x00F00000)
-> > +#define S3C24XX_SZ_GPIO		SZ_1M
-> >
-> >
-> >  /* ISA style IO, for each machine to sort out mappings for, if it
+Otherwise looks good. Applied with the above changed to my -next tree.
 
-Thanks.
+I'll let it rest there for a couple of days. Unless some unforeseen
+problems show up, it might just make it into .37.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks,
+Guenter
