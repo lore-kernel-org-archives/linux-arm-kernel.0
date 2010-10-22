@@ -1,103 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Oct 2010 16:48:24 +0200
-Subject: [PATCH 1/6] ARM: Add basic architecture support for
-	VIA/WonderMedia 85xx SoC's
-In-Reply-To: <AANLkTi=F2VA_3L9-49OQ=Bj1KaD2T58Ske2qvHFqirM9@mail.gmail.com>
-References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
-	<201010221102.12329.arnd@arndb.de>
-	<AANLkTi=F2VA_3L9-49OQ=Bj1KaD2T58Ske2qvHFqirM9@mail.gmail.com>
-Message-ID: <201010221648.25193.arnd@arndb.de>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Fri, 22 Oct 2010 17:15:12 +0200
+Subject: [RFC] Removal of dead code from arch/arm/*
+In-Reply-To: <AANLkTin8Eq4MfBdqEiY=uchBNPt-BW_LS-U8mpxwCD7A@mail.gmail.com>
+References: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
+	<AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
+	<4CBF8BDB.7090907@gmail.com>
+	<20101021075401.GC22100@n2100.arm.linux.org.uk>
+	<AANLkTikYtxiT+R3eb0N5U1hoDvaP=oevjWjUuAJ453p=@mail.gmail.com>
+	<AANLkTinvz7b7yQ-MP4rZHudNuD-0A+Ag7ut0=ZNaCvyV@mail.gmail.com>
+	<AANLkTik2qCGaMXV1bgs=FL121FwZe0fV946jm7LXqPrO@mail.gmail.com>
+	<AANLkTin8Eq4MfBdqEiY=uchBNPt-BW_LS-U8mpxwCD7A@mail.gmail.com>
+Message-ID: <AANLkTimg7VWPaJv-mnQGDPtiRSVz_+RjFavstqCMxAON@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 October 2010 15:52:26 Alexey Charkov wrote:
-> 2010/10/22 Arnd Bergmann <arnd@arndb.de>:
-> > On Thursday 21 October 2010 23:08:39 Alexey Charkov wrote:
+W dniu 22 pa?dziernika 2010 16:39 u?ytkownik Zimny Lech
+<napohybelskurwysynom2010@gmail.com> napisa?:
+> W dniu 22 pa?dziernika 2010 16:19 u?ytkownik Micha? Miros?aw
+> <mirqus@gmail.com> napisa?:
+>> 2010/10/22 Zimny Lech <napohybelskurwysynom2010@gmail.com>:
+>>> 2010/10/21 Zimny Lech <napohybelskurwysynom2010@gmail.com>:
+>>>> Ok, I dropped this patch. Recreated tree can be found here
+>>>> git pull git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc2
+>>> Sorry, I had to change the username, because some jerk denunciated me
+>>> on github ;)
+>>> git pull git://github.com/zimnylech/Linux-2.6-nps.git rodc2
+>>
+>> You should use your real name and less offensive email address while
+>> submitting patches. Unless you don't want to be taken seriously.
+>
+> Leszek Zimny is my _real_ name. What's wrong with my gmail username?
+> Does it affects quality of patch?
 
-> > Well, you could still build a specialized kernel with only support for
-> > one resolution if you care about every byte.
-> >
-> 
-> If it is fine to accept an option like "panel=<value_from_a_list>" at
-> map_io stage, then I'd rather go that way, and calculate the minimum
-> required buffer size for the current configuration. Especially if we
-> decide to make a unified image for different SoC revisions, as WM8505
-> requires 32bpp framebuffer, while VT8500 requires it to be 4MB-aligned
-> native-bpp.
+You might be a fan of Sapkowski's novels, and you might like to see
+how people confuse your name with Polish brewery's advertisement,
+sure. Still, it makes your mails look more like child's prank and not
+a serious work.
 
-sounds ok to me.
+BTW, you should know that Lech and Leszek are different names (even
+though Leszek is often used as diminutive of Lech).
 
-> >> Cleaned this up in the development repo, thanks. Only left #ifdef's
-> >> for the sections where respective register/interrupt definitions would
-> >> be unavailable due to compiling for a different SoC version, and
-> >> adjusted the conditions accordingly.
-> >
-> > Ideally those should also be run-time decisions so you can build a
-> > kernel that works on both. It's all __init code, so it won't eat
-> > up any RAM afterwards.
-> >
-> 
-> I thought about that, and it should be quite useful. However, register
-> and interrupt definitions should then be converted into some indexed
-> data structures instead of macros (as they differ between VT8500 and
-> WM8505), and the correct index should be selectable at runtime.
-
-Right.
-
-> Is there any way to determine which mach type we are currently running
-> at after early head.S initialization completes and before we could
-> need to use any registers and/or interrupts? It could probably be done
-> in machine-specific fixup functions, but I'm unsure whether this would
-> be a correct way to go.
-
-Normally you put the register areas into the resources for platform
-devices, which are board specific. The drivers then ioremap the resource
-and use offsets into those ranges.
-
-> > For the IO_SPACE_LIMIT, just make it 0xffff
-> >
-> > For __io, you need to find a place in your virtual address space
-> > and map the real IO space.
-> >
-> > According to the VIA source code, the physical I/O window is at
-> > 0xd8000000, they also map it to the same address in virtual space
-> > but you can have anywhere convienient.
-> >
-> 
-> Are you sure about that? 0xd8000000 is the MMIO base, as far as I can
-> tell (see register definitions in <mach/vt8500.h>). In earlier
-> discussions you presumed [1] that IO could be at 0xc0000000, but I'm
-> not sure how to verify that. If so, should it then look something like
-> this:
-> 
-> #define __io(a) ((void __iomem *)(((a) + 0xc0000000) +
-> SOME_OFFSET_TO_VIRT_SPACE))
-
-You are right, 0xd8000000 is certainly not the PCI I/O space, it is
-the SoC MMIO area.
-
-The comment in the original PCI code says
-
-        /*
-         * PCI Bridge Memory Map is between 0xC0000:0000 - 0xC3FF:FFFF(64MB)
-         * The first 64KB is allocated for the PCI I/O Space, except for the
-         * 0xCF8 - 0xCFF(8Bytes) for the PCI Configuration
-         * Others are reserved for the MemorySpace.
-         */
-
-So this should be mapped somewhere. Best map this in your map_desc
-at boot time to a fixed __iomem address.
- 
-> ?
-> By the way, other boards except for footbridge, integrator, ebsa110
-> and ixp4xx define IO_SPACE_LIMIT to be 0xffffffff. 0xffff seems more
-> plausbile, though...
-
-Yes, I have noticed that before and have thought about fixing them/
-If you don't have PCI or PCMCIA, it doesn't really matter. What some
-platforms do is to define the I/O port range to be 32 bit addressable
-and then have multiple PCI buses with long port numbers, relying on
-the bus to crop them to 16 bits again, but that breaks a few assumptions
-in other code.
-
-	Arnd
+Best Regards,
+Micha? Miros?aw
