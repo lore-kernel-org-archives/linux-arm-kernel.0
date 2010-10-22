@@ -1,155 +1,33 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Fri, 22 Oct 2010 11:58:16 -0700
-Subject: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
-In-Reply-To: <20101022182812.GA8554@pengutronix.de>
-References: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1287766575-4092-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101022182812.GA8554@pengutronix.de>
-Message-ID: <86A0E76937111F4C92FABEC0A2098851051D6090@az33exm21>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 22 Oct 2010 15:03:38 -0400
+Subject: [PATCH v3 01/12] misc: add driver for sequencer serial port
+In-Reply-To: <20101022152024.65e8f181@lxorguk.ukuu.org.uk>
+References: <1287694873-12904-1-git-send-email-cyril@ti.com>	<1287694873-12904-2-git-send-email-cyril@ti.com>
+	<20101022152024.65e8f181@lxorguk.ukuu.org.uk>
+Message-ID: <4CC1E00A.3010109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
->-----Original Message-----
->From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
->Sent: Friday, October 22, 2010 1:28 PM
->To: Nguyen Dinh-R00091
->Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk;
->s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
->bryan.wu at canonical.com; amit.kucheria at canonical.com
->Subject: Re: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
->
->On Fri, Oct 22, 2010 at 11:56:14AM -0500, Dinh.Nguyen at freescale.com wrote:
->> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On 10/22/2010 10:20 AM, Alan Cox wrote:
+> On Thu, 21 Oct 2010 17:01:02 -0400
+> Cyril Chemparathy <cyril@ti.com> wrote:
+> 
+>> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
+>> device.  It has a built-in programmable execution engine that can be programmed
+>> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
 >>
->> Add imx_add_gpio_keys function to add gpio-keys in plat-mxc
->>
->> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
->(This information isn't interesting once the patch is in git, so it can
->better go after the tripple-dash below.)
->
->> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->Patch 1 depends on this one, so you should swap their order.
->
->> ---
->>  arch/arm/plat-mxc/devices/Kconfig               |    4 +++
->>  arch/arm/plat-mxc/devices/Makefile              |    1 +
->>  arch/arm/plat-mxc/devices/platform-gpio_keys.c  |   27 +++++++++++++++++++++++
->>  arch/arm/plat-mxc/include/mach/devices-common.h |    4 +++
->>  arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +-
->>  5 files changed, 37 insertions(+), 1 deletions(-)
->>  create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_keys.c
->>
->> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
->> index 4047994..f4772e7 100644
->> --- a/arch/arm/plat-mxc/devices/Kconfig
->> +++ b/arch/arm/plat-mxc/devices/Kconfig
->> @@ -9,6 +9,10 @@ config IMX_HAVE_PLATFORM_FLEXCAN
->>  	select HAVE_CAN_FLEXCAN
->>  	bool
->>
->> +config IMX_HAVE_PLATFORM_GPIO_KEYS
->> +	bool
->> +	default y if ARCH_MX51
->> +
->>  config IMX_HAVE_PLATFORM_IMX_I2C
->>  	bool
->>
->> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
->> index 0a3c1f0..45aefeb 100644
->> --- a/arch/arm/plat-mxc/devices/Makefile
->> +++ b/arch/arm/plat-mxc/devices/Makefile
->> @@ -1,6 +1,7 @@
->>  obj-$(CONFIG_IMX_HAVE_PLATFORM_ESDHC) += platform-esdhc.o
->>  obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
->>  obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
->> +obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
->>  obj-y += platform-imx-dma.o
->>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
->>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
->> diff --git a/arch/arm/plat-mxc/devices/platform-gpio_keys.c b/arch/arm/plat-mxc/devices/platform-
->gpio_keys.c
->> new file mode 100644
->> index 0000000..1c53a53
->> --- /dev/null
->> +++ b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
->> @@ -0,0 +1,27 @@
->> +/*
->> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License
->> + * as published by the Free Software Foundation; either version 2
->> + * of the License, or (at your option) any later version.
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software
->> + * Foundation, Inc., 51 Franklin Street, Fifth Floor,
->> + * Boston, MA  02110-1301, USA.
->> + */
->> +#include <asm/sizes.h>
->> +#include <mach/hardware.h>
->> +#include <mach/devices-common.h>
->> +
->> +struct platform_device *__init imx_add_gpio_keys(
->> +		const struct gpio_keys_platform_data *pdata)
->> +{
->> +	return imx_add_platform_device("gpio-keys", -1, NULL,
->> +		 0, pdata, sizeof(*pdata));
->> +}
->> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-
->mxc/include/mach/devices-common.h
->> index 86d7575..8c6896f 100644
->> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
->> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
->> @@ -29,6 +29,10 @@ struct platform_device *__init imx_add_flexcan(int id,
->>  		resource_size_t irq,
->>  		const struct flexcan_platform_data *pdata);
->>
->> +#include <linux/gpio_keys.h>
->> +struct platform_device *__init imx_add_gpio_keys(
->> +		const struct gpio_keys_platform_data *pdata);
->> +
->>  #include <mach/i2c.h>
->>  struct imx_imx_i2c_data {
->>  	int id;
->> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-
->mx51.h
->> index e46b1c2..7ae27e8 100644
->> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
->> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
->> @@ -114,7 +114,7 @@ typedef enum iomux_config {
->>  #define MX51_PAD_EIM_A24__GPIO_2_18             IOMUX_PAD(0x450, 0x0bc, 1, 0x0,   0, NO_PAD_CTRL)
->>  #define MX51_PAD_EIM_A25__GPIO_2_19             IOMUX_PAD(0x454, 0x0c0, 1, 0x0,   0, NO_PAD_CTRL)
->>  #define MX51_PAD_EIM_A26__GPIO_2_20             IOMUX_PAD(0x458, 0x0c4, 1, 0x0,   0, NO_PAD_CTRL)
->> -#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, NO_PAD_CTRL)
->> +#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0,
->MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP)
->I share the concerns of Arnaud.  MX51_GPIO_PAD_CTRL looks OK,
->PAD_CTL_PUS_100K_UP does not.
+>> This patch adds a driver for this controller device.  The driver does not
+>> expose a user-land interface.  Protocol drivers built on top of this layer are
+>> expected to remain in-kernel.
+> 
+> I suspect the driver belongs with the mfd drivers not with drivers/misc ?
+> 
+> otherwise it looks very nice.
 
-How do you suggest I define this pin for Babbage board only? Do I add to iomux-mx51.h
-#define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0,MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP) ?
+Unlike MFDs, this device doesn't have cells with differing
+functionality.  Instead it has functionally identical ports that can
+operate in a variety of modes.  That said, does this still fit in with
+other MFD drivers?  If so, I don't see a problem with moving it there.
 
-Or do I define the pin in the board file with a 100K_UP? Like how eukrea_mbimxsd-baseboard.c did for MBIMXSD_GPIO_3_31?
-
->
->>  #define MX51_PAD_EIM_EB0__EIM_EB0               IOMUX_PAD(0x460, 0x0cc, 0, 0x0,   0, NO_PAD_CTRL)
->>  #define MX51_PAD_EIM_EB1__EIM_EB1               IOMUX_PAD(0x464, 0x0d0, 0, 0x0,   0, NO_PAD_CTRL)
->>  #define MX51_PAD_EIM_EB2__GPIO_2_22             IOMUX_PAD(0x468, 0x0d4, 1, 0x0,   0, NO_PAD_CTRL)
->
->Best regards
->Uwe
->
->--
->Pengutronix e.K.                           | Uwe Kleine-K?nig            |
->Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-
-Thanks for your review comments...
-
-Dinh
+Thanks
+Cyril.
