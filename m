@@ -1,30 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Oct 2010 21:16:31 +0200
-Subject: [PATCH] dma/coh901318: use simple_read_from_buffer
-In-Reply-To: <20101022203039.7b353056@absol.kitzblitz>
-References: <20101022192953.1f67b10a@absol.kitzblitz>
-	<201010221938.12591.arnd@arndb.de>
-	<20101022203039.7b353056@absol.kitzblitz>
-Message-ID: <201010222116.32069.arnd@arndb.de>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 22 Oct 2010 15:33:43 -0400
+Subject: [PATCH v3 01/12] misc: add driver for sequencer serial port
+In-Reply-To: <201010221448.17728.arnd@arndb.de>
+References: <1287694873-12904-1-git-send-email-cyril@ti.com>
+	<20101021161224.b4c0b623.akpm@linux-foundation.org>
+	<4CC18605.80007@ti.com> <201010221448.17728.arnd@arndb.de>
+Message-ID: <4CC1E717.7070707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 October 2010 20:30:39 Nicolas Kaiser wrote:
-> * Arnd Bergmann <arnd@arndb.de>:
-> > On Friday 22 October 2010 19:29:53 Nicolas Kaiser wrote:
-> > > If copy_to_user fails, the assigned error code instantly gets
-> > > overwritten, and the failure apparently ignored. Moreover,
-> > > shouldn't the error code be -EFAULT instead of -EINVAL?
-> > 
-> > Looks good, but it would be even better to just use
-> > simple_read_from_buffer in this function, which takes care of
-> > a lot the other complexities as well.
+On 10/22/2010 08:48 AM, Arnd Bergmann wrote:
+> On Friday 22 October 2010 14:39:33 Cyril Chemparathy wrote:
+>>>> +/* Register Access Helpers */
+>>>> +static inline u32 ssp_read(struct ti_ssp *ssp, int reg)
+>>>> +{
+>>>> +    return __raw_readl(ssp->regs + reg);
+>>>> +}
+>>>> +
+>>>> +static inline void ssp_write(struct ti_ssp *ssp, int reg, u32 val)
+>>>> +{
+>>>> +    __raw_writel(val, ssp->regs + reg);
+>>>> +}
+>>>
+>>> Why are the __raw functions used here?
+>>>
+>>
+>> These registers are to be accessed native endian at all times, and
+>> therefore the le32 conversion done otherwise is inappropriate.
 > 
-> Like this? (Sorry, untested.)
+> Won't that break on out-of-order CPUs that need the extra synchronization
+> done in readl/writel?
 > 
-> Signed-off-by: Nicolas Kaiser <nikai@nikai.net>
 
-Yes, exactly. For stable kernels, your smaller fix is probably good
-enough though and it's obviously correct.
+AFAICS, ioremap()ed space on ARMv6 should be strongly ordered.
 
-	Arnd
+>
+> ...
+>
+
+Thanks
+Cyril.
