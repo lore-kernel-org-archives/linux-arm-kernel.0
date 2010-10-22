@@ -1,109 +1,138 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 22 Oct 2010 19:57:03 +0200
-Subject: [PATCH 1/3] imx: make IMX_IO_ADDRESS assembly compatible
-In-Reply-To: <20100316103052.GB29005@pengutronix.de>
-References: <cover.1268721010.git.baruch@tkos.co.il>
-	<f5e757c320c6ba285c43f296013c2937ad8aa460.1268721011.git.baruch@tkos.co.il>
-	<20100316085212.GA29005@pengutronix.de>
-	<20100316094154.GA3642@jasper.tkos.co.il>
-	<20100316103052.GB29005@pengutronix.de>
-Message-ID: <20101022175702.GI19834@pengutronix.de>
+From: gregkh@suse.de (Greg Kroah-Hartman)
+Date: Fri, 22 Oct 2010 10:57:18 -0700
+Subject: [PATCH 132/141] USB: AM35x: Add musb support
+In-Reply-To: <20101022175102.GA13489@kroah.com>
+References: <20101022175102.GA13489@kroah.com>
+Message-ID: <1287770247-13755-132-git-send-email-gregkh@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Ajay Kumar Gupta <ajay.gupta@ti.com>
 
-On Tue, Mar 16, 2010 at 11:30:52AM +0100, Uwe Kleine-K?nig wrote:
-> > > > -#define IMX_IO_ADDRESS(addr, module)					\
-> > > > -	((void __force __iomem *)					\
-> > > > -	 (((unsigned long)((addr) - (module ## _BASE_ADDR)) < module ## _SIZE) ?\
-> > > > -	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0))
-> > > > +#ifdef __ASSEMBLER__
-> > > > +#define IOMEM(addr,base,size,virt)	((addr) - (base) + (virt))
-> > > > +#else
-> > > > +#define IOMEM(addr,base,size,virt)			\
-> > > > +	((void __force __iomem *)			\
-> > > > +	((unsigned long) ((addr) - (base)) < size) ?	\
-> > > > +	(addr) - (base) + (virt) : 0)
-> > > > +#endif
-> > > > +
-> > > > +#define IMX_IO_ADDRESS(addr, module)				\
-> > > > +	IOMEM(addr, module ## _BASE_ADDR, module ## _SIZE,	\
-> > > > +	module ## _BASE_ADDR_VIRT)
-> > > hmmm, the construct used to define MX27_IO_ADDRESS et al. does only work
-> > > without __ASSEMBLER__ anyhow, still I think it might be at least
-> > > surprising that e.g.
-> > > 
-> > > 	IOMEM(MX27_WDOG_BASE_ADDR, MX27_SAHB1_BASE_ADDR, MX27_SAHB1_SIZE, MX27_SAHB1_BASE_ADDR_VIRT)
-> > > 
-> > > evaluates to 0x84102000 if __ASSEMBLER__ is defined but 0 if not.
-> > > 
-> > > I tend to think we should use a different solution.
-> > > 
-> > > IMHO it would be great to have a macro that maps physical to virtual
-> > > addresses for both assembler and C.  E.g. ns9xxx has something like
-> > > that[1], other probably, too, but for imx it would be harder as the used
-> > > addresses differ and are spread over the whole address space.  Some time
-> > > ago I found a function that would do the task, but Sascha didn't agree
-> > > to use it because it involved too much magic.
-> > 
-> > So, what you actually suggest is to use the simple arithmetic IOMEM version 
-> > which is assembly compatible, and remove the C only ?: error checking, as is 
-> > being done in ns9xxx, right? Or are you suggesting to change the P2V mapping 
-> > of the entire i.MX platform so that this error checking is not needed?
-> We currently need the ?: construct for the definition of
-> MX.._IO_ADDRESS.   Maybe using it would work for assembler, too, as
-> there are only constants involved?
-> 
-> For reference:  The function I found back then is:
-> 
-> 	#define io_p2v(x)	(0xf4000000 + \
-> 				(((x) & 0x50000000) >> 8) + \
-> 				(((x) & 0x02000000) >> 4) + \
-> 				(((x) & 0x000fffff)))
-> 
-> This would introduce an injective mapping of the io space to
-> [0xf4000000;0xf47fffff] for mx1, mx21, mx25, mx27, mx31 and mx35.
-> (Skipping the chip select mappings that are (AFAIK unnecessarily)
-> currently used on some socs.):
-> 
->         mx1:            0x00200000 -> 0xf4000000
->         mx2[17]:        0x10000000 -> 0xf4100000
->                         0x80000000 -> 0xf4000000
->         mx21:           0xdf000000 -> 0xf4700000
->         mx27:           0xd8000000 -> 0xf4500000
->         mx3[15]:        0xb8000000 -> 0xf4100000
->         mx{25,31,35}:   0x68000000 -> 0xf4400000
->                         0x43f00000 -> 0xf4600000
->                         0x53f00000 -> 0xf4700000
-> 
-> The upside of this approach is that it just works in C and Assembler,
-> but it's ugly and the mapped sections are spread over
-> [0xf4000000;0xf47fffff] instead of being one after another as they are
-> now.  For mx51 this might need further adaption.
-> 
-> So in my order of preference the possibilities are:
-> 
->  1) IOMEM with ?: for Assembler, too
->  2) "my" io_p2v as above
->  3) IOMEM as you suggested
-> 
-> The nice thing about 1) (and 2)) is that we could just use
-> MX.._IO_ADDRESS in debug-macro.h.
-While trying to get rid of IMX_NEEDS_DEPRECATED_SYMBOLS I tried 1), but
-it seems it doesn't work (using a gcc 4.3.2 + binutils 2.19 toolchain). :-(
+AM35x has musb interface (version 1.8) and uses CPPI41 DMA engine.
+It has USB phy built inside the IP itself.
 
-So I tried if my function works for mx51, and it does.  Unfortunately it
-fails for mxc91231.  But I already have a different function that works
-on all mxc-SoCs.
+Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-omap at vger.kernel.org
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ arch/arm/mach-omap2/board-am3517evm.c |   30 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/usb-musb.c        |    4 ++++
+ arch/arm/plat-omap/include/plat/usb.h |   21 +++++++++++++++++++++
+ 3 files changed, 55 insertions(+), 0 deletions(-)
 
-I will create an RFC patch that introduces my suggestion in reply to
-this mail.  Would be nice to hear (or better read) your thoughts on
-that.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index 4d0f585..9ac9de6 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -375,6 +375,31 @@ static void __init am3517_evm_init_irq(void)
+ 	omap_gpio_init();
+ }
+ 
++static struct omap_musb_board_data musb_board_data = {
++	.interface_type         = MUSB_INTERFACE_ULPI,
++	.mode                   = MUSB_OTG,
++	.power                  = 500,
++};
++
++static __init void am3517_evm_musb_init(void)
++{
++	u32 devconf2;
++
++	/*
++	 * Set up USB clock/mode in the DEVCONF2 register.
++	 */
++	devconf2 = omap_ctrl_readl(AM35XX_CONTROL_DEVCONF2);
++
++	/* USB2.0 PHY reference clock is 13 MHz */
++	devconf2 &= ~(CONF2_REFFREQ | CONF2_OTGMODE | CONF2_PHY_GPIOMODE);
++	devconf2 |=  CONF2_REFFREQ_13MHZ | CONF2_SESENDEN | CONF2_VBDTCTEN
++			| CONF2_DATPOL;
++
++	omap_ctrl_writel(devconf2, AM35XX_CONTROL_DEVCONF2);
++
++	usb_musb_init(&musb_board_data);
++}
++
+ static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
+ 	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
+ #if defined(CONFIG_PANEL_SHARP_LQ043T1DG01) || \
+@@ -393,6 +418,8 @@ static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
+ 
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
++	/* USB OTG DRVVBUS offset = 0x212 */
++	OMAP3_MUX(SAD2D_MCAD23, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #else
+@@ -459,6 +486,9 @@ static void __init am3517_evm_init(void)
+ 				ARRAY_SIZE(am3517evm_i2c1_boardinfo));
+ 	/*Ethernet*/
+ 	am3517_evm_ethernet_init(&am3517_evm_emac_pdata);
++
++	/* MUSB */
++	am3517_evm_musb_init();
+ }
+ 
+ MACHINE_START(OMAP3517EVM, "OMAP3517/AM3517 EVM")
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 33a5cde..7260558 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -28,6 +28,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
++#include <mach/am35xx.h>
+ #include <plat/usb.h>
+ 
+ #ifdef CONFIG_USB_MUSB_SOC
+@@ -89,6 +90,9 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
+ {
+ 	if (cpu_is_omap243x()) {
+ 		musb_resources[0].start = OMAP243X_HS_BASE;
++	} else if (cpu_is_omap3517() || cpu_is_omap3505()) {
++		musb_resources[0].start = AM35XX_IPSS_USBOTGSS_BASE;
++		musb_resources[1].start = INT_35XX_USBOTG_IRQ;
+ 	} else if (cpu_is_omap34xx()) {
+ 		musb_resources[0].start = OMAP34XX_HSUSB_OTG_BASE;
+ 	} else if (cpu_is_omap44xx()) {
+diff --git a/arch/arm/plat-omap/include/plat/usb.h b/arch/arm/plat-omap/include/plat/usb.h
+index 2a9427c..9feddac 100644
+--- a/arch/arm/plat-omap/include/plat/usb.h
++++ b/arch/arm/plat-omap/include/plat/usb.h
+@@ -218,6 +218,27 @@ static inline omap2_usbfs_init(struct omap_usb_config *pdata)
+ #	define	USBT2TLL5PI		(1 << 17)
+ #	define	USB0PUENACTLOI		(1 << 16)
+ #	define	USBSTANDBYCTRL		(1 << 15)
++/* AM35x */
++/* USB 2.0 PHY Control */
++#define CONF2_PHY_GPIOMODE	(1 << 23)
++#define CONF2_OTGMODE		(3 << 14)
++#define CONF2_NO_OVERRIDE	(0 << 14)
++#define CONF2_FORCE_HOST	(1 << 14)
++#define CONF2_FORCE_DEVICE	(2 << 14)
++#define CONF2_FORCE_HOST_VBUS_LOW (3 << 14)
++#define CONF2_SESENDEN		(1 << 13)
++#define CONF2_VBDTCTEN		(1 << 12)
++#define CONF2_REFFREQ_24MHZ	(2 << 8)
++#define CONF2_REFFREQ_26MHZ	(7 << 8)
++#define CONF2_REFFREQ_13MHZ	(6 << 8)
++#define CONF2_REFFREQ		(0xf << 8)
++#define CONF2_PHYCLKGD		(1 << 7)
++#define CONF2_VBUSSENSE		(1 << 6)
++#define CONF2_PHY_PLLON		(1 << 5)
++#define CONF2_RESET		(1 << 4)
++#define CONF2_PHYPWRDN		(1 << 3)
++#define CONF2_OTGPWRDN		(1 << 2)
++#define CONF2_DATPOL		(1 << 1)
+ 
+ #if defined(CONFIG_ARCH_OMAP1) && defined(CONFIG_USB)
+ u32 omap1_usb0_init(unsigned nwires, unsigned is_device);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2
