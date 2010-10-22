@@ -1,72 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Oct 2010 11:51:08 -0700
-Subject: [PATCH] ARM: Fix data abort accessing proc_info from
-	__lookup_processor_type (Re: [PATCH 03/10] ARM: hotplug cpu: Keep
-	processor information, startup code & __lookup_processor_type)
-In-Reply-To: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
-References: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
-Message-ID: <20101022185108.GF17595@atomide.com>
+From: gregkh@suse.de (Greg KH)
+Date: Fri, 22 Oct 2010 11:50:51 -0700
+Subject: [017/103] oprofile, ARM: Release resources on failure
+In-Reply-To: <20101022185455.GA9114@kroah.com>
+Message-ID: <20101022185228.846056991@clark.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [101004 10:18]:
-> When hotplug CPU is enabled, we need to keep the list of supported CPUs,
-> their setup functions, and __lookup_processor_type in place so that we
-> can find and initialize secondary CPUs.  Move these into the __CPUINIT
-> section.
+2.6.35-stable review patch.  If anyone has any objections, please let us know.
 
-> +	__CPUINIT
-> +__lookup_processor_type:
-> +	adr	r3, __lookup_processor_type_data
-> +	ldmia	r3, {r4 - r6}
-> +	sub	r3, r3, r4			@ get offset between virt&phys
-> +	add	r5, r5, r3			@ convert virt addresses to
-> +	add	r6, r6, r3			@ physical address space
-> +1:	ldmia	r5, {r3, r4}			@ value, mask
-> +	and	r4, r4, r9			@ mask wanted bits
-> +	teq	r3, r4
-> +	beq	2f
-> +	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
-> +	cmp	r5, r6
-> +	blo	1b
-> +	mov	r5, #0				@ unknown processor
-> +2:	mov	pc, lr
-> +ENDPROC(__lookup_processor_type)
+------------------
 
-The ldmia r5 above can cause a data abort depending on the compiler
-pixies. This can happen if r5 address is unaligned. Here's a fix
-for that.
+From: Robert Richter <robert.richter@amd.com>
 
-Regards,
+commit 98d943b02f6f1b57787ff1aa6f34d019a407e3ee upstream.
 
-Tony
+This patch fixes a resource leak on failure, where the
+oprofilefs and some counters may not released properly.
 
+Signed-off-by: Robert Richter <robert.richter@amd.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+LKML-Reference: <20100929145225.GJ13563@erda.amd.com>
+Signed-off-by: Ingo Molnar <mingo@elte.hu>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 21 Oct 2010 19:00:41 -0700
-Subject: [PATCH] ARM: Fix data abort accessing proc_info from __lookup_processor_type
+---
+ arch/arm/oprofile/common.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Commit 5085f3ff458521045f7e43da62b8c30ea7df2e82 added better support for
-CONFIG_HOTPLUG_CPU by keeping proc_info around. However, depending on
-the Kconfig options selected, this can make the booting fail mysteriously
-early on.
-
-Turns out a data abort can happen in __lookup_processor in ldmia r5 {r3, r4}.
-When it happens the address loaded to r5 is not aligned. Fix the problem by
-aligning proc_info.
-
-Reported-by: Anand Gadiyar <gadiyar@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 1953e3d..a58b91d 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -114,6 +114,7 @@ SECTIONS
- 			*(.glue_7)
- 			*(.glue_7t)
- 		*(.got)			/* Global offset table		*/
-+			. = ALIGN(4);
- 			ARM_CPU_KEEP(PROC_INFO)
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -102,6 +102,7 @@ static int op_create_counter(int cpu, in
+ 	if (IS_ERR(pevent)) {
+ 		ret = PTR_ERR(pevent);
+ 	} else if (pevent->state != PERF_EVENT_STATE_ACTIVE) {
++		perf_event_release_kernel(pevent);
+ 		pr_warning("oprofile: failed to enable event %d "
+ 				"on CPU %d\n", event, cpu);
+ 		ret = -EBUSY;
+@@ -365,6 +366,7 @@ int __init oprofile_arch_init(struct opr
+ 	ret = init_driverfs();
+ 	if (ret) {
+ 		kfree(counter_config);
++		counter_config = NULL;
+ 		return ret;
  	}
  
+@@ -402,7 +404,6 @@ void oprofile_arch_exit(void)
+ 	struct perf_event *event;
+ 
+ 	if (*perf_events) {
+-		exit_driverfs();
+ 		for_each_possible_cpu(cpu) {
+ 			for (id = 0; id < perf_num_counters; ++id) {
+ 				event = perf_events[cpu][id];
+@@ -413,8 +414,10 @@ void oprofile_arch_exit(void)
+ 		}
+ 	}
+ 
+-	if (counter_config)
++	if (counter_config) {
+ 		kfree(counter_config);
++		exit_driverfs();
++	}
+ }
+ #else
+ int __init oprofile_arch_init(struct oprofile_operations *ops)
