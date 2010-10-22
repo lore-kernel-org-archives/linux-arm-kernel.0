@@ -1,77 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Oct 2010 17:01:14 +0900
-Subject: [PATCH v2] ARM: SAMSUNG: Add the missed s3c_gpio_getpull() API
-Message-ID: <1287734474-23938-1-git-send-email-kgene.kim@samsung.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Fri, 22 Oct 2010 08:27:12 +0000
+Subject: [PATCH 2/2] [ARM] Kirkwood: add fan support for Network Space
+	Max v2
+In-Reply-To: <alpine.LFD.2.00.1010212202400.2764@xanadu.home>
+References: <20101017154021.GB29120@kw.sim.vm.gnt>
+	<1287330612-11256-1-git-send-email-simon@sequanux.org>
+	<1287330612-11256-2-git-send-email-simon@sequanux.org>
+	<1287712396.9690.378.camel@groeck-laptop>
+	<alpine.LFD.2.00.1010212202400.2764@xanadu.home>
+Message-ID: <20101022082712.GU29120@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daein Moon <moon9124@samsung.com>
+Hi Nicolas,
 
-This patch adds the s3c_gpio_getpull() API that has been missed in the
-plat-samsung/gpio-config.c and actullay there is its extern declaration
-in plat/gpio-cfg.h.
+On Thu, Oct 21, 2010 at 10:08:01PM -0400, Nicolas Pitre wrote:
+> On Thu, 21 Oct 2010, Guenter Roeck wrote:
+> 
+> > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
+> > > From: Simon Guinot <sguinot@lacie.com>
+> > > 
+> > > Signed-off-by: Simon Guinot <sguinot@lacie.com>
+> > 
+> > Acked-by: Guenter Roeck <guenter.roeck@ericsson.com>
+> > 
+> > I assume this will get pushed through the ARM tree, right ?
+> 
+> Might be simpler if this is routed along the same path as the core code 
+> it relies upon to avoid dependency ordering issues.  There is nothing 
+> particularly ARM specific here anyway.
 
-Signed-off-by: Daein Moon <moon9124@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-NOTE:
-- already issued about this
+There is some changes, related to the netspace_v2-setup.c file, stagged
+in your Orion tree. At some point, a merge will be needed.
 
-Changes since v1:
-- Fixed return type of s3c_gpio_do_getpull()
-- Fixed coding style
-
- arch/arm/plat-samsung/gpio-config.c                |   19 +++++++++++++++++++
- .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    6 ++++++
- 2 files changed, 25 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/gpio-config.c b/arch/arm/plat-samsung/gpio-config.c
-index 8a37211..b732b77 100644
---- a/arch/arm/plat-samsung/gpio-config.c
-+++ b/arch/arm/plat-samsung/gpio-config.c
-@@ -111,6 +111,25 @@ int s3c_gpio_setpull(unsigned int pin, s3c_gpio_pull_t pull)
- }
- EXPORT_SYMBOL(s3c_gpio_setpull);
- 
-+s3c_gpio_pull_t s3c_gpio_getpull(unsigned int pin)
-+{
-+	struct s3c_gpio_chip *chip = s3c_gpiolib_getchip(pin);
-+	unsigned long flags;
-+	int offset;
-+	u32 pup = 0;
-+
-+	if (chip) {
-+		offset = pin - chip->chip.base;
-+
-+		s3c_gpio_lock(chip, flags);
-+		pup = s3c_gpio_do_getpull(chip, offset);
-+		s3c_gpio_unlock(chip, flags);
-+	}
-+
-+	return (__force s3c_gpio_pull_t)pup;
-+}
-+EXPORT_SYMBOL(s3c_gpio_getpull);
-+
- #ifdef CONFIG_S3C_GPIO_CFG_S3C24XX
- int s3c_gpio_setcfg_s3c24xx_a(struct s3c_gpio_chip *chip,
- 			      unsigned int off, unsigned int cfg)
-diff --git a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-index 3e21c75..c417f85 100644
---- a/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-+++ b/arch/arm/plat-samsung/include/plat/gpio-cfg-helpers.h
-@@ -42,6 +42,12 @@ static inline int s3c_gpio_do_setpull(struct s3c_gpio_chip *chip,
- 	return (chip->config->set_pull)(chip, off, pull);
- }
- 
-+static inline s3c_gpio_pull_t s3c_gpio_do_getpull(struct s3c_gpio_chip *chip,
-+						  unsigned int off)
-+{
-+	return chip->config->get_pull(chip, off);
-+}
-+
- /**
-  * s3c_gpio_setcfg_s3c24xx - S3C24XX style GPIO configuration.
-  * @chip: The gpio chip that is being configured.
--- 
-1.6.3.3
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/0fa7f33d/attachment-0001.sig>
