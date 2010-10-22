@@ -1,16 +1,29 @@
-From: vapier.adi@gmail.com (Mike Frysinger)
-Date: Fri, 22 Oct 2010 16:15:29 -0400
-Subject: [PATCH 0/9] Typo fixes of faild to failed
-In-Reply-To: <cover.1287724261.git.joe@perches.com>
-References: <cover.1287724261.git.joe@perches.com>
-Message-ID: <AANLkTi=qAAC6cFiR9iG9G0f9B+jOCSQfbi7xGUm43oAV@mail.gmail.com>
+From: mreimer@sdgsystems.com (Matt Reimer)
+Date: Fri, 22 Oct 2010 17:26:06 -0400
+Subject: [PATCH] pxafb: correct the vertical back porch macro
+Message-ID: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 22, 2010 at 01:17, Joe Perches wrote:
-> ?drivers/ata/pata_bf54x.c ? ? ? ? ? | ? ?2 +-
-> ?drivers/video/bf54x-lq043fb.c ? ? ?| ? ?6 +++---
-> ?drivers/video/bfin-t350mcqb-fb.c ? | ? ?2 +-
+Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back porch
+knob LCCR2[BFW] specifies the number of clock periods minus one, but the
+macro wasn't doing the subtraction.
+---
+ arch/arm/mach-pxa/include/mach/regs-lcd.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Acked-by: Mike Frysinger <vapier@gentoo.org>
--mike
+diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h b/arch/arm/mach-pxa/include/mach/regs-lcd.h
+index f82dcea..5074d18 100644
+--- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
++++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
+@@ -107,7 +107,7 @@
+ #define LCCR2_EndFrmDel(Tln)   ((Tln) << FShft (LCCR2_EFW))
+ 
+ #define LCCR2_BFW      Fld (8, 24)     /* Beginning-of-Frame line clock */
+-#define LCCR2_BegFrmDel(Tln)   ((Tln) << FShft (LCCR2_BFW))
++#define LCCR2_BegFrmDel(Tln)   (((Tln) - 1) << FShft (LCCR2_BFW))
+ 
+ #define LCCR3_API      (0xf << 16)     /* AC Bias pin trasitions per interrupt */
+ #define LCCR3_API_S    16
+-- 
+1.7.0.4
