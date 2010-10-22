@@ -1,121 +1,109 @@
-From: amit.kucheria@canonical.com (Amit Kucheria)
-Date: Fri, 22 Oct 2010 20:51:55 +0300
-Subject: [PATCHv5 1/3] ARM: mx5: Add gpio-keys to mx51 babbage board
-In-Reply-To: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101022175155.GH17631@matterhorn.lan>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 22 Oct 2010 19:57:03 +0200
+Subject: [PATCH 1/3] imx: make IMX_IO_ADDRESS assembly compatible
+In-Reply-To: <20100316103052.GB29005@pengutronix.de>
+References: <cover.1268721010.git.baruch@tkos.co.il>
+	<f5e757c320c6ba285c43f296013c2937ad8aa460.1268721011.git.baruch@tkos.co.il>
+	<20100316085212.GA29005@pengutronix.de>
+	<20100316094154.GA3642@jasper.tkos.co.il>
+	<20100316103052.GB29005@pengutronix.de>
+Message-ID: <20101022175702.GI19834@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the interest of bisectability, Patch 1 and 2 should've been reversed since
-imx51_add_gpio_keys() is only defined in patch 2.
+Hello,
 
-On 10 Oct 22, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On Tue, Mar 16, 2010 at 11:30:52AM +0100, Uwe Kleine-K?nig wrote:
+> > > > -#define IMX_IO_ADDRESS(addr, module)					\
+> > > > -	((void __force __iomem *)					\
+> > > > -	 (((unsigned long)((addr) - (module ## _BASE_ADDR)) < module ## _SIZE) ?\
+> > > > -	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0))
+> > > > +#ifdef __ASSEMBLER__
+> > > > +#define IOMEM(addr,base,size,virt)	((addr) - (base) + (virt))
+> > > > +#else
+> > > > +#define IOMEM(addr,base,size,virt)			\
+> > > > +	((void __force __iomem *)			\
+> > > > +	((unsigned long) ((addr) - (base)) < size) ?	\
+> > > > +	(addr) - (base) + (virt) : 0)
+> > > > +#endif
+> > > > +
+> > > > +#define IMX_IO_ADDRESS(addr, module)				\
+> > > > +	IOMEM(addr, module ## _BASE_ADDR, module ## _SIZE,	\
+> > > > +	module ## _BASE_ADDR_VIRT)
+> > > hmmm, the construct used to define MX27_IO_ADDRESS et al. does only work
+> > > without __ASSEMBLER__ anyhow, still I think it might be at least
+> > > surprising that e.g.
+> > > 
+> > > 	IOMEM(MX27_WDOG_BASE_ADDR, MX27_SAHB1_BASE_ADDR, MX27_SAHB1_SIZE, MX27_SAHB1_BASE_ADDR_VIRT)
+> > > 
+> > > evaluates to 0x84102000 if __ASSEMBLER__ is defined but 0 if not.
+> > > 
+> > > I tend to think we should use a different solution.
+> > > 
+> > > IMHO it would be great to have a macro that maps physical to virtual
+> > > addresses for both assembler and C.  E.g. ns9xxx has something like
+> > > that[1], other probably, too, but for imx it would be harder as the used
+> > > addresses differ and are spread over the whole address space.  Some time
+> > > ago I found a function that would do the task, but Sascha didn't agree
+> > > to use it because it involved too much magic.
+> > 
+> > So, what you actually suggest is to use the simple arithmetic IOMEM version 
+> > which is assembly compatible, and remove the C only ?: error checking, as is 
+> > being done in ns9xxx, right? Or are you suggesting to change the P2V mapping 
+> > of the entire i.MX platform so that this error checking is not needed?
+> We currently need the ?: construct for the definition of
+> MX.._IO_ADDRESS.   Maybe using it would work for assembler, too, as
+> there are only constants involved?
 > 
-> Add functionality for the power button on MX51 Babbage board.
+> For reference:  The function I found back then is:
 > 
-> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
+> 	#define io_p2v(x)	(0xf4000000 + \
+> 				(((x) & 0x50000000) >> 8) + \
+> 				(((x) & 0x02000000) >> 4) + \
+> 				(((x) & 0x000fffff)))
 > 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/configs/mx51_defconfig        |    1 +
->  arch/arm/mach-mx5/board-mx51_babbage.c |   22 ++++++++++++++++++++++
->  arch/arm/mach-mx5/devices-imx51.h      |    2 ++
->  3 files changed, 25 insertions(+), 0 deletions(-)
+> This would introduce an injective mapping of the io space to
+> [0xf4000000;0xf47fffff] for mx1, mx21, mx25, mx27, mx31 and mx35.
+> (Skipping the chip select mappings that are (AFAIK unnecessarily)
+> currently used on some socs.):
 > 
-> diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-> index 163cfee..5c7a872 100644
-> --- a/arch/arm/configs/mx51_defconfig
-> +++ b/arch/arm/configs/mx51_defconfig
-> @@ -82,6 +82,7 @@ CONFIG_FEC=y
->  CONFIG_INPUT_FF_MEMLESS=m
->  # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
->  CONFIG_INPUT_EVDEV=y
-> +CONFIG_KEYBOARD_GPIO=y
->  CONFIG_INPUT_EVBUG=m
->  CONFIG_MOUSE_PS2=m
->  CONFIG_MOUSE_PS2_ELANTECH=y
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 23ee4a4..8458852 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -18,6 +18,8 @@
->  #include <linux/io.h>
->  #include <linux/fsl_devices.h>
->  #include <linux/fec.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/input.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -37,6 +39,7 @@
->  #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
->  #define BABBAGE_PHY_RESET	(1*32 + 5)	/* GPIO_2_5 */
->  #define BABBAGE_FEC_PHY_RESET	(1*32 + 14)	/* GPIO_2_14 */
-> +#define BABBAGE_POWER_KEY	(1*32 + 21)	/* GPIO_2_21 */
->  
->  /* USB_CTRL_1 */
->  #define MX51_USB_CTRL_1_OFFSET			0x10
-> @@ -46,6 +49,21 @@
->  #define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
->  #define	MX51_USB_PLL_DIV_24_MHZ	0x02
->  
-> +static struct gpio_keys_button babbage_buttons[] = {
-> +	{
-> +		.gpio		= BABBAGE_POWER_KEY,
-> +		.code		= BTN_0,
-> +		.desc		= "PWR",
-> +		.active_low	= 1,
-> +		.wakeup		= 1,
-> +	},
-> +};
-> +
-> +static const struct gpio_keys_platform_data imx_button_data __initconst = {
-> +	.buttons	= babbage_buttons,
-> +	.nbuttons	= ARRAY_SIZE(babbage_buttons),
-> +};
-> +
->  static struct pad_desc mx51babbage_pads[] = {
->  	/* UART1 */
->  	MX51_PAD_UART1_RXD__UART1_RXD,
-> @@ -112,6 +130,9 @@ static struct pad_desc mx51babbage_pads[] = {
->  
->  	/* FEC PHY reset line */
->  	MX51_PAD_EIM_A20__GPIO_2_14,
-> +
-> +	/* Power Key */
-> +	MX51_PAD_EIM_A27__GPIO_2_21,
->  };
->  
->  /* Serial ports */
-> @@ -287,6 +308,7 @@ static void __init mxc_board_init(void)
->  	mxc_init_imx_uart();
->  	babbage_fec_reset();
->  	imx51_add_fec(NULL);
-> +	imx51_add_gpio_keys(&imx_button_data);
->  
->  	imx51_add_imx_i2c(0, &babbage_i2c_data);
->  	imx51_add_imx_i2c(1, &babbage_i2c_data);
-> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
-> index 5cc910e..8c50cb5 100644
-> --- a/arch/arm/mach-mx5/devices-imx51.h
-> +++ b/arch/arm/mach-mx5/devices-imx51.h
-> @@ -13,6 +13,8 @@ extern const struct imx_fec_data imx51_fec_data __initconst;
->  #define imx51_add_fec(pdata)	\
->  	imx_add_fec(&imx51_fec_data, pdata)
->  
-> +#define imx51_add_gpio_keys(pdata) imx_add_gpio_keys(pdata)
-> +
->  extern const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst;
->  #define imx51_add_imx_i2c(id, pdata)	\
->  	imx_add_imx_i2c(&imx51_imx_i2c_data[id], pdata)
-> -- 
-> 1.6.0.4
+>         mx1:            0x00200000 -> 0xf4000000
+>         mx2[17]:        0x10000000 -> 0xf4100000
+>                         0x80000000 -> 0xf4000000
+>         mx21:           0xdf000000 -> 0xf4700000
+>         mx27:           0xd8000000 -> 0xf4500000
+>         mx3[15]:        0xb8000000 -> 0xf4100000
+>         mx{25,31,35}:   0x68000000 -> 0xf4400000
+>                         0x43f00000 -> 0xf4600000
+>                         0x53f00000 -> 0xf4700000
 > 
+> The upside of this approach is that it just works in C and Assembler,
+> but it's ugly and the mapped sections are spread over
+> [0xf4000000;0xf47fffff] instead of being one after another as they are
+> now.  For mx51 this might need further adaption.
 > 
+> So in my order of preference the possibilities are:
+> 
+>  1) IOMEM with ?: for Assembler, too
+>  2) "my" io_p2v as above
+>  3) IOMEM as you suggested
+> 
+> The nice thing about 1) (and 2)) is that we could just use
+> MX.._IO_ADDRESS in debug-macro.h.
+While trying to get rid of IMX_NEEDS_DEPRECATED_SYMBOLS I tried 1), but
+it seems it doesn't work (using a gcc 4.3.2 + binutils 2.19 toolchain). :-(
+
+So I tried if my function works for mx51, and it does.  Unfortunately it
+fails for mxc91231.  But I already have a different function that works
+on all mxc-SoCs.
+
+I will create an RFC patch that introduces my suggestion in reply to
+this mail.  Would be nice to hear (or better read) your thoughts on
+that.
+
+Best regards
+Uwe
 
 -- 
-----------------------------------------------------------------------
-Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
-----------------------------------------------------------------------
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
