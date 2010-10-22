@@ -1,81 +1,16 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Fri, 22 Oct 2010 16:14:33 -0400
-Subject: [PATCH] ARM: Fix data abort accessing proc_info from
-	__lookup_processor_type
-	(Re: [PATCH 03/10] ARM: hotplug cpu: Keep processor information, startup
-	code & __lookup_processor_type)
-In-Reply-To: <20101022185108.GF17595@atomide.com>
-References: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
-	<20101022185108.GF17595@atomide.com>
-Message-ID: <4CC1F0A9.8050206@ti.com>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Fri, 22 Oct 2010 16:15:29 -0400
+Subject: [PATCH 0/9] Typo fixes of faild to failed
+In-Reply-To: <cover.1287724261.git.joe@perches.com>
+References: <cover.1287724261.git.joe@perches.com>
+Message-ID: <AANLkTi=qAAC6cFiR9iG9G0f9B+jOCSQfbi7xGUm43oAV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2010 2:51 PM, Tony Lindgren wrote:
-> * Russell King - ARM Linux<linux@arm.linux.org.uk>  [101004 10:18]:
->> When hotplug CPU is enabled, we need to keep the list of supported CPUs,
->> their setup functions, and __lookup_processor_type in place so that we
->> can find and initialize secondary CPUs.  Move these into the __CPUINIT
->> section.
->
->> +	__CPUINIT
->> +__lookup_processor_type:
->> +	adr	r3, __lookup_processor_type_data
->> +	ldmia	r3, {r4 - r6}
->> +	sub	r3, r3, r4			@ get offset between virt&phys
->> +	add	r5, r5, r3			@ convert virt addresses to
->> +	add	r6, r6, r3			@ physical address space
->> +1:	ldmia	r5, {r3, r4}			@ value, mask
->> +	and	r4, r4, r9			@ mask wanted bits
->> +	teq	r3, r4
->> +	beq	2f
->> +	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
->> +	cmp	r5, r6
->> +	blo	1b
->> +	mov	r5, #0				@ unknown processor
->> +2:	mov	pc, lr
->> +ENDPROC(__lookup_processor_type)
->
-> The ldmia r5 above can cause a data abort depending on the compiler
-> pixies. This can happen if r5 address is unaligned. Here's a fix
-> for that.
->
-> Regards,
->
-> Tony
->
->
-> From: Tony Lindgren<tony@atomide.com>
-> Date: Thu, 21 Oct 2010 19:00:41 -0700
-> Subject: [PATCH] ARM: Fix data abort accessing proc_info from __lookup_processor_type
->
-> Commit 5085f3ff458521045f7e43da62b8c30ea7df2e82 added better support for
-> CONFIG_HOTPLUG_CPU by keeping proc_info around. However, depending on
-> the Kconfig options selected, this can make the booting fail mysteriously
-> early on.
->
-> Turns out a data abort can happen in __lookup_processor in ldmia r5 {r3, r4}.
-> When it happens the address loaded to r5 is not aligned. Fix the problem by
-> aligning proc_info.
->
-> Reported-by: Anand Gadiyar<gadiyar@ti.com>
-> Signed-off-by: Tony Lindgren<tony@atomide.com>
+On Fri, Oct 22, 2010 at 01:17, Joe Perches wrote:
+> ?drivers/ata/pata_bf54x.c ? ? ? ? ? | ? ?2 +-
+> ?drivers/video/bf54x-lq043fb.c ? ? ?| ? ?6 +++---
+> ?drivers/video/bfin-t350mcqb-fb.c ? | ? ?2 +-
 
-Tested-by: Anand Gadiyar <gadiyar@ti.com>
-
-This patch lets linux-next as of 20101021 boot up on my OMAP4 boards.
-
-
->
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 1953e3d..a58b91d 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -114,6 +114,7 @@ SECTIONS
->   			*(.glue_7)
->   			*(.glue_7t)
->   		*(.got)			/* Global offset table		*/
-> +			. = ALIGN(4);
->   			ARM_CPU_KEEP(PROC_INFO)
->   	}
->
+Acked-by: Mike Frysinger <vapier@gentoo.org>
+-mike
