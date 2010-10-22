@@ -1,74 +1,129 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Oct 2010 11:07:50 -0700
-Subject: [PATCH] OMAP: UART: fix wakeup registers for OMAP24xx UART2
-In-Reply-To: <1287616743-23434-1-git-send-email-khilman@deeprootsystems.com>
-References: <1287616743-23434-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20101022180750.GE17595@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 22 Oct 2010 20:28:12 +0200
+Subject: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
+In-Reply-To: <1287766575-4092-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1287766575-4092-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20101022182812.GA8554@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [101020 16:10]:
-> On OMAP24xx, UART2 WKEN and WKST registers are in PM_WKEN2_CORE and
-> PM_WKST2_CORE respecitvely.  Fix the OMAP2 register init to use the
-> correct registers on OMAP24xx.
+On Fri, Oct 22, 2010 at 11:56:14AM -0500, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > 
-> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+> Add imx_add_gpio_keys function to add gpio-keys in plat-mxc
+> 
+> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
+(This information isn't interesting once the patch is in git, so it can
+better go after the tripple-dash below.)
+
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Patch 1 depends on this one, so you should swap their order.
+
 > ---
-> Tony, this should probably squeeze in for 2.6.37 as well.
-
-OK, adding into omap-for-linus.
-
-Regards,
-
-Tony
- 
->  arch/arm/mach-omap2/serial.c |   17 ++++++++++-------
->  1 files changed, 10 insertions(+), 7 deletions(-)
+>  arch/arm/plat-mxc/devices/Kconfig               |    4 +++
+>  arch/arm/plat-mxc/devices/Makefile              |    1 +
+>  arch/arm/plat-mxc/devices/platform-gpio_keys.c  |   27 +++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/devices-common.h |    4 +++
+>  arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +-
+>  5 files changed, 37 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_keys.c
 > 
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index ba8a5cc..becf0e3 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -515,14 +515,8 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
->  		uart->padconf = padconf;
->  	} else if (cpu_is_omap24xx()) {
->  		u32 wk_mask = 0;
-> +		u32 wk_en = PM_WKEN1, wk_st = PM_WKST1;
+> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+> index 4047994..f4772e7 100644
+> --- a/arch/arm/plat-mxc/devices/Kconfig
+> +++ b/arch/arm/plat-mxc/devices/Kconfig
+> @@ -9,6 +9,10 @@ config IMX_HAVE_PLATFORM_FLEXCAN
+>  	select HAVE_CAN_FLEXCAN
+>  	bool
 >  
-> -		if (cpu_is_omap2430()) {
-> -			uart->wk_en = OMAP2430_PRM_REGADDR(CORE_MOD, PM_WKEN1);
-> -			uart->wk_st = OMAP2430_PRM_REGADDR(CORE_MOD, PM_WKST1);
-> -		} else if (cpu_is_omap2420()) {
-> -			uart->wk_en = OMAP2420_PRM_REGADDR(CORE_MOD, PM_WKEN1);
-> -			uart->wk_st = OMAP2420_PRM_REGADDR(CORE_MOD, PM_WKST1);
-> -		}
->  		switch (uart->num) {
->  		case 0:
->  			wk_mask = OMAP24XX_ST_UART1_MASK;
-> @@ -531,10 +525,19 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
->  			wk_mask = OMAP24XX_ST_UART2_MASK;
->  			break;
->  		case 2:
-> +			wk_en = OMAP24XX_PM_WKEN2;
-> +			wk_st = OMAP24XX_PM_WKST2;
->  			wk_mask = OMAP24XX_ST_UART3_MASK;
->  			break;
->  		}
->  		uart->wk_mask = wk_mask;
-> +		if (cpu_is_omap2430()) {
-> +			uart->wk_en = OMAP2430_PRM_REGADDR(CORE_MOD, wk_en);
-> +			uart->wk_st = OMAP2430_PRM_REGADDR(CORE_MOD, wk_st);
-> +		} else if (cpu_is_omap2420()) {
-> +			uart->wk_en = OMAP2420_PRM_REGADDR(CORE_MOD, wk_en);
-> +			uart->wk_st = OMAP2420_PRM_REGADDR(CORE_MOD, wk_st);
-> +		}
->  	} else {
->  		uart->wk_en = NULL;
->  		uart->wk_st = NULL;
-> -- 
-> 1.7.2.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +config IMX_HAVE_PLATFORM_GPIO_KEYS
+> +	bool
+> +	default y if ARCH_MX51
+> +	
+>  config IMX_HAVE_PLATFORM_IMX_I2C
+>  	bool
+>  
+> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+> index 0a3c1f0..45aefeb 100644
+> --- a/arch/arm/plat-mxc/devices/Makefile
+> +++ b/arch/arm/plat-mxc/devices/Makefile
+> @@ -1,6 +1,7 @@
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_ESDHC) += platform-esdhc.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+> +obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
+>  obj-y += platform-imx-dma.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
+> diff --git a/arch/arm/plat-mxc/devices/platform-gpio_keys.c b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
+> new file mode 100644
+> index 0000000..1c53a53
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor,
+> + * Boston, MA  02110-1301, USA.
+> + */
+> +#include <asm/sizes.h>
+> +#include <mach/hardware.h>
+> +#include <mach/devices-common.h>
+> +
+> +struct platform_device *__init imx_add_gpio_keys(
+> +		const struct gpio_keys_platform_data *pdata)
+> +{
+> +	return imx_add_platform_device("gpio-keys", -1, NULL,
+> +		 0, pdata, sizeof(*pdata));
+> +}
+> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+> index 86d7575..8c6896f 100644
+> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
+> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+> @@ -29,6 +29,10 @@ struct platform_device *__init imx_add_flexcan(int id,
+>  		resource_size_t irq,
+>  		const struct flexcan_platform_data *pdata);
+>  
+> +#include <linux/gpio_keys.h>
+> +struct platform_device *__init imx_add_gpio_keys(
+> +		const struct gpio_keys_platform_data *pdata);
+> +
+>  #include <mach/i2c.h>
+>  struct imx_imx_i2c_data {
+>  	int id;
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> index e46b1c2..7ae27e8 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> @@ -114,7 +114,7 @@ typedef enum iomux_config {
+>  #define MX51_PAD_EIM_A24__GPIO_2_18             IOMUX_PAD(0x450, 0x0bc, 1, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_A25__GPIO_2_19             IOMUX_PAD(0x454, 0x0c0, 1, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_A26__GPIO_2_20             IOMUX_PAD(0x458, 0x0c4, 1, 0x0,   0, NO_PAD_CTRL)
+> -#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP)
+I share the concerns of Arnaud.  MX51_GPIO_PAD_CTRL looks OK,
+PAD_CTL_PUS_100K_UP does not.
+
+>  #define MX51_PAD_EIM_EB0__EIM_EB0               IOMUX_PAD(0x460, 0x0cc, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_EB1__EIM_EB1               IOMUX_PAD(0x464, 0x0d0, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_EB2__GPIO_2_22             IOMUX_PAD(0x468, 0x0d4, 1, 0x0,   0, NO_PAD_CTRL)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
