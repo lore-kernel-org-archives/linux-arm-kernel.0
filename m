@@ -1,75 +1,29 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Fri, 22 Oct 2010 12:39:41 +0800
-Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
-In-Reply-To: <4CC0A281.1010202@eukrea.com>
-References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
-	<1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>
-	<20101020112741.GB10261@pengutronix.de>
-	<AANLkTinairUcKpTH2ePjbp3j7qdsmrPCeeWR_E+RSsPU@mail.gmail.com>
-	<alpine.LFD.2.00.1010211308340.2764@xanadu.home>
-	<AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
-	<4CC0A281.1010202@eukrea.com>
-Message-ID: <AANLkTi=c+hQX+20WtNF60eHKbH6-=TE8CySsp=6wKm0d@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 21 Oct 2010 22:17:15 -0700
+Subject: [PATCH 4/9] drivers/rtc: typo fix of faild to failed
+In-Reply-To: <cover.1287724261.git.joe@perches.com>
+References: <cover.1287724261.git.joe@perches.com>
+Message-ID: <4279ee540bfed9c40ba26698bfe7abddb8921ee4.1287724261.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last night, I booted the system up with NFS, tested mmc
-mount/read/write, and did not see timeout error.  With Eric's result,
-I just did the test differently.  Writing an ext2 rootfs image on the
-card, booting the system from mmc directly, and timeout error is being
-seen on mx35_3ds.  As expected, the timeout quirk can fix it.
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ drivers/rtc/rtc-nuc900.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Sorry for the confusion.
-
-
-On Fri, Oct 22, 2010 at 4:28 AM, Eric B?nard <eric@eukrea.com> wrote:
-> Hi,
->
-> test protocol : booting a 2.6.36-rc8 kernel with a rootfs (ext3 formated,
-> generated with OpenEmbedded for armv5, loading and launching qtdemo 4.6.3)
-> on a 8GB ?DHC ?(uSD reformated after each board tests to trigger lot of
-> read/writes on the first init).
->
-> * on an i.MX357 (rev 2.1) without this patch leads to :
-> mmcblk0: error -110 transferring data, sector 7347024, nr 8, card status
-> 0xe00
-> end_request: I/O error, dev mmcblk0, sector 7347025
->
-> Same card, same board, with the timeout quirk patch : boots fine without any
-> error.
->
-> Reverted the patch: timeout errors came back.
->
-> ==> quirk timeout patch needed for the i.MX35
->
-> * on an i.MX257 (tested twice) :
-> Same kernel tree, same rootfs, same motherboard, same uSD, only the CPU
-> module change : no error without the patch (and no error with the patch also
-> ;-).
->
-> ==> quirk timeout patch not needed for the i.MX25
->
-> * on an i.MX515 :
-> Same kernel tree, same rootfs, same motherboard, same uSD (re-formated),
-> only the CPU module change without this patch leads to :
-> mmcblk0: error -84 transferring data, sector 1315598, nr 2, card status
-> 0x900
-> end_request: I/O error, dev mmcblk0, sector 1315598
->
-> Same card, same board, with the timeout quirk patch : boots fine without any
-> error.
->
-> Reverted the patch: timeout errors came back.
->
-> ==> quirk timeout patch needed for the i.MX51
->
-> Updated patch follows.
->
-> Eric
->
-
-
-
+diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+index 62de66a..ddb0857 100644
+--- a/drivers/rtc/rtc-nuc900.c
++++ b/drivers/rtc/rtc-nuc900.c
+@@ -274,7 +274,7 @@ static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
+ 	nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
+ 						&nuc900_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(nuc900_rtc->rtcdev)) {
+-		dev_err(&pdev->dev, "rtc device register faild\n");
++		dev_err(&pdev->dev, "rtc device register failed\n");
+ 		err = PTR_ERR(nuc900_rtc->rtcdev);
+ 		goto fail3;
+ 	}
 -- 
-Regards,
-Shawn
+1.7.3.1.g432b3.dirty
