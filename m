@@ -1,249 +1,82 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 22 Oct 2010 09:11:45 -0700
-Subject: [PATCH 3/3] OMAP: UART: use atomic idle notifiers
-In-Reply-To: <AANLkTinYhNAYpehKEshPz89uqcKy9K9hB2Q+a7N+EveJ@mail.gmail.com>
-	(Govindraj's message of "Fri, 22 Oct 2010 18:24:29 +0530")
-References: <1287617483-24170-1-git-send-email-khilman@deeprootsystems.com>
-	<1287617483-24170-3-git-send-email-khilman@deeprootsystems.com>
-	<AANLkTinYhNAYpehKEshPz89uqcKy9K9hB2Q+a7N+EveJ@mail.gmail.com>
-Message-ID: <871v7idx6m.fsf@deeprootsystems.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Oct 2010 19:28:58 +0200
+Subject: [PATCH 1/2] AT91: pm: use plain cpu_do_idle() for "wait for interrupt"
+Message-ID: <af311282c5a0076ec618be68facdd3ad98d509b8.1287767949.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Govindraj <govindraj.ti@gmail.com> writes:
+For power management at91_pm_enter() routine, use the cpu_do_idle() for a
+rock solid "wait for interrupt" implementation.
+For AT91SAM9 ARM 926 based chips, we can exceed the cache line length as
+we can access RAM even while in self-refresh mode.
+We keep plain access to CP15 for at91rm9200 as this feature is not
+available: instructions have to be in a single cache line.
 
-> Thanks Kevin,
->
-> works fine tested on 3630sdp/zoom3 board.
->
-> Tested-by: Govindraj.R <govindraj.raja@ti.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/pm.c |    6 ++++--
+ arch/arm/mach-at91/pm.h |    4 ++++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-Govindraj,  thanks for testing!
-
-Kevin
-
->
-> On Thu, Oct 21, 2010 at 5:01 AM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> Convert UART idle management routines from custom hooks in the core
->> idle path to use new idle notifiers.
->>
->> Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
->> ---
->> ?arch/arm/mach-omap2/pm24xx.c ? ? ? ? ? ? | ? ?9 +---
->> ?arch/arm/mach-omap2/pm34xx.c ? ? ? ? ? ? | ? ?8 ---
->> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? | ? 71 +++++++++++++++++++----------
->> ?arch/arm/plat-omap/include/plat/serial.h | ? ?2 -
->> ?4 files changed, 47 insertions(+), 43 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
->> index cb1b333..47644d2 100644
->> --- a/arch/arm/mach-omap2/pm24xx.c
->> +++ b/arch/arm/mach-omap2/pm24xx.c
->> @@ -40,6 +40,7 @@
->> ?#include <plat/sram.h>
->> ?#include <plat/dma.h>
->> ?#include <plat/board.h>
->> +#include <plat/common.h>
->>
->> ?#include "prm.h"
->> ?#include "prm-regbits-24xx.h"
->> @@ -120,19 +121,11 @@ static void omap2_enter_full_retention(void)
->> ? ? ? ?if (omap_irq_pending())
->> ? ? ? ? ? ? ? ?goto no_sleep;
->>
->> - ? ? ? omap_uart_prepare_idle(0);
->> - ? ? ? omap_uart_prepare_idle(1);
->> - ? ? ? omap_uart_prepare_idle(2);
->> -
->> ? ? ? ?/* Jump to SRAM suspend code */
->> ? ? ? ?omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
->> ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
->> ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_SDRC_REGADDR(SDRC_POWER));
->>
->> - ? ? ? omap_uart_resume_idle(2);
->> - ? ? ? omap_uart_resume_idle(1);
->> - ? ? ? omap_uart_resume_idle(0);
->> -
->> ?no_sleep:
->> ? ? ? ?if (omap2_pm_debug) {
->> ? ? ? ? ? ? ? ?unsigned long long tmp;
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index 4674748..eaed95d 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -390,8 +390,6 @@ void omap_sram_idle(void)
->>
->> ? ? ? ?/* PER */
->> ? ? ? ?if (per_next_state < PWRDM_POWER_ON) {
->> - ? ? ? ? ? ? ? omap_uart_prepare_idle(2);
->> - ? ? ? ? ? ? ? omap_uart_prepare_idle(3);
->> ? ? ? ? ? ? ? ?omap2_gpio_prepare_for_idle(per_next_state);
->> ? ? ? ? ? ? ? ?if (per_next_state == PWRDM_POWER_OFF)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap3_per_save_context();
->> @@ -399,8 +397,6 @@ void omap_sram_idle(void)
->>
->> ? ? ? ?/* CORE */
->> ? ? ? ?if (core_next_state < PWRDM_POWER_ON) {
->> - ? ? ? ? ? ? ? omap_uart_prepare_idle(0);
->> - ? ? ? ? ? ? ? omap_uart_prepare_idle(1);
->> ? ? ? ? ? ? ? ?if (core_next_state == PWRDM_POWER_OFF) {
->> ? ? ? ? ? ? ? ? ? ? ? ?omap3_core_save_context();
->> ? ? ? ? ? ? ? ? ? ? ? ?omap3_prcm_save_context();
->> @@ -445,8 +441,6 @@ void omap_sram_idle(void)
->> ? ? ? ? ? ? ? ? ? ? ? ?omap3_sram_restore_context();
->> ? ? ? ? ? ? ? ? ? ? ? ?omap2_sms_restore_context();
->> ? ? ? ? ? ? ? ?}
->> - ? ? ? ? ? ? ? omap_uart_resume_idle(0);
->> - ? ? ? ? ? ? ? omap_uart_resume_idle(1);
->> ? ? ? ? ? ? ? ?if (core_next_state == PWRDM_POWER_OFF)
->> ? ? ? ? ? ? ? ? ? ? ? ?prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP3430_GR_MOD,
->> @@ -459,8 +453,6 @@ void omap_sram_idle(void)
->> ? ? ? ? ? ? ? ?omap2_gpio_resume_after_idle();
->> ? ? ? ? ? ? ? ?if (per_prev_state == PWRDM_POWER_OFF)
->> ? ? ? ? ? ? ? ? ? ? ? ?omap3_per_restore_context();
->> - ? ? ? ? ? ? ? omap_uart_resume_idle(2);
->> - ? ? ? ? ? ? ? omap_uart_resume_idle(3);
->> ? ? ? ?}
->>
->> ? ? ? ?/* Disable IO-PAD and IO-CHAIN wakeup */
->> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->> index becf0e3..8a619ff 100644
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -73,6 +73,7 @@ struct omap_uart_state {
->> ? ? ? ?u32 padconf;
->> ? ? ? ?u32 dma_enabled;
->>
->> + ? ? ? struct powerdomain *pwrdm;
->> ? ? ? ?struct clk *ick;
->> ? ? ? ?struct clk *fck;
->> ? ? ? ?int clocked;
->> @@ -389,39 +390,31 @@ static void omap_uart_idle_timer(unsigned long data)
->> ? ? ? ?omap_uart_allow_sleep(uart);
->> ?}
->>
->> -void omap_uart_prepare_idle(int num)
->> +static void omap_uart_prepare_idle(struct omap_uart_state *uart)
->> ?{
->> - ? ? ? struct omap_uart_state *uart;
->> -
->> - ? ? ? list_for_each_entry(uart, &uart_list, node) {
->> - ? ? ? ? ? ? ? if (num == uart->num && uart->can_sleep) {
->> - ? ? ? ? ? ? ? ? ? ? ? omap_uart_disable_clocks(uart);
->> - ? ? ? ? ? ? ? ? ? ? ? return;
->> - ? ? ? ? ? ? ? }
->> - ? ? ? }
->> + ? ? ? if (uart->can_sleep &&
->> + ? ? ? ? ? pwrdm_read_next_pwrst(uart->pwrdm) < PWRDM_POWER_ON)
->> + ? ? ? ? ? ? ? omap_uart_disable_clocks(uart);
->> ?}
->>
->> -void omap_uart_resume_idle(int num)
->> +static void omap_uart_resume_idle(struct omap_uart_state *uart)
->> ?{
->> - ? ? ? struct omap_uart_state *uart;
->> + ? ? ? if (uart->can_sleep &&
->> + ? ? ? ? ? pwrdm_read_next_pwrst(uart->pwrdm) < PWRDM_POWER_ON) {
->> + ? ? ? ? ? ? ? omap_uart_enable_clocks(uart);
->>
->> - ? ? ? list_for_each_entry(uart, &uart_list, node) {
->> - ? ? ? ? ? ? ? if (num == uart->num) {
->> - ? ? ? ? ? ? ? ? ? ? ? omap_uart_enable_clocks(uart);
->> -
->> - ? ? ? ? ? ? ? ? ? ? ? /* Check for IO pad wakeup */
->> - ? ? ? ? ? ? ? ? ? ? ? if (cpu_is_omap34xx() && uart->padconf) {
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? u16 p = omap_ctrl_readw(uart->padconf);
->> -
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (p & OMAP3_PADCONF_WAKEUPEVENT0)
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? omap_uart_block_sleep(uart);
->> - ? ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? /* Check for IO pad wakeup */
->> + ? ? ? ? ? ? ? if (cpu_is_omap34xx() && uart->padconf) {
->> + ? ? ? ? ? ? ? ? ? ? ? u16 p = omap_ctrl_readw(uart->padconf);
->>
->> - ? ? ? ? ? ? ? ? ? ? ? /* Check for normal UART wakeup */
->> - ? ? ? ? ? ? ? ? ? ? ? if (__raw_readl(uart->wk_st) & uart->wk_mask)
->> + ? ? ? ? ? ? ? ? ? ? ? if (p & OMAP3_PADCONF_WAKEUPEVENT0)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_uart_block_sleep(uart);
->> - ? ? ? ? ? ? ? ? ? ? ? return;
->> ? ? ? ? ? ? ? ?}
->> +
->> + ? ? ? ? ? ? ? /* Check for normal UART wakeup */
->> + ? ? ? ? ? ? ? if (__raw_readl(uart->wk_st) & uart->wk_mask)
->> + ? ? ? ? ? ? ? ? ? ? ? omap_uart_block_sleep(uart);
->> + ? ? ? ? ? ? ? return;
->> ? ? ? ?}
->> ?}
->>
->> @@ -474,6 +467,27 @@ static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
->> ? ? ? ?return IRQ_NONE;
->> ?}
->>
->> +static int omap_uart_idle_notifier(struct notifier_block *n,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long val,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *p)
->> +{
->> + ? ? ? struct omap_uart_state *uart;
->> +
->> + ? ? ? if (val == OMAP_IDLE_START)
->> + ? ? ? ? ? ? ? list_for_each_entry(uart, &uart_list, node)
->> + ? ? ? ? ? ? ? ? ? ? ? omap_uart_prepare_idle(uart);
->> + ? ? ? else
->> + ? ? ? ? ? ? ? list_for_each_entry(uart, &uart_list, node)
->> + ? ? ? ? ? ? ? ? ? ? ? omap_uart_resume_idle(uart);
->> +
->> + ? ? ? return 0;
->> +}
->> +
->> +static bool omap_uart_notifier_enabled;
->> +static struct notifier_block omap_uart_notifier = {
->> + ? ? ? .notifier_call = omap_uart_idle_notifier,
->> +};
->> +
->> ?static void omap_uart_idle_init(struct omap_uart_state *uart)
->> ?{
->> ? ? ? ?int ret;
->> @@ -549,6 +563,11 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
->> ? ? ? ?ret = request_threaded_irq(uart->irq, NULL, omap_uart_interrupt,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_SHARED, "serial idle", (void *)uart);
->> ? ? ? ?WARN_ON(ret);
->> +
->> + ? ? ? if (!omap_uart_notifier_enabled) {
->> + ? ? ? ? ? ? ? omap_idle_notifier_register(&omap_uart_notifier);
->> + ? ? ? ? ? ? ? omap_uart_notifier_enabled = true;
->> + ? ? ? }
->> ?}
->>
->> ?void omap_uart_enable_irqs(int enable)
->> @@ -731,6 +750,8 @@ void __init omap_serial_init_port(int port)
->> ? ? ? ? ? ? ? ? ? ? ? ?break;
->>
->> ? ? ? ?oh = uart->oh;
->> + ? ? ? uart->pwrdm = omap_hwmod_get_pwrdm(oh);
->> + ? ? ? WARN_ON(!uart->pwrdm);
->> ? ? ? ?uart->dma_enabled = 0;
->> ?#ifndef CONFIG_SERIAL_OMAP
->> ? ? ? ?name = "serial8250";
->> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
->> index 19145f5..d3ee47b 100644
->> --- a/arch/arm/plat-omap/include/plat/serial.h
->> +++ b/arch/arm/plat-omap/include/plat/serial.h
->> @@ -99,8 +99,6 @@ extern void omap_serial_init_port(int port);
->> ?extern int omap_uart_can_sleep(void);
->> ?extern void omap_uart_check_wakeup(void);
->> ?extern void omap_uart_prepare_suspend(void);
->> -extern void omap_uart_prepare_idle(int num);
->> -extern void omap_uart_resume_idle(int num);
->> ?extern void omap_uart_enable_irqs(int enable);
->> ?#endif
->>
->> --
->> 1.7.2.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 6156689..87a31ba 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -258,16 +258,18 @@ static int at91_pm_enter(suspend_state_t state)
+ 			 * NOTE: the Wait-for-Interrupt instruction needs to be
+ 			 * in icache so no SDRAM accesses are needed until the
+ 			 * wakeup IRQ occurs and self-refresh is terminated.
++			 * For ARM 926 based chips, this requirement is weaker
++			 * as at91sam9 can access a RAM in self-refresh mode.
+ 			 */
+ 			asm("b 1f; .align 5; 1:");
+ 			asm("mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
+ 			saved_lpr = sdram_selfrefresh_enable();
+-			asm("mcr p15, 0, r0, c7, c0, 4");	/* wait for interrupt */
++			wait_for_interrupt_enable();
+ 			sdram_selfrefresh_disable(saved_lpr);
+ 			break;
+ 
+ 		case PM_SUSPEND_ON:
+-			asm("mcr p15, 0, r0, c7, c0, 4");	/* wait for interrupt */
++			cpu_do_idle();
+ 			break;
+ 
+ 		default:
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 8c87d0c..2c4424b 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -21,6 +21,7 @@ static inline u32 sdram_selfrefresh_enable(void)
+ }
+ 
+ #define sdram_selfrefresh_disable(saved_lpr)	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
++#define wait_for_interrupt_enable()		asm("mcr p15, 0, r0, c7, c0, 4")
+ 
+ #elif defined(CONFIG_ARCH_AT91CAP9)
+ #include <mach/at91cap9_ddrsdr.h>
+@@ -38,6 +39,7 @@ static inline u32 sdram_selfrefresh_enable(void)
+ }
+ 
+ #define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr)
++#define wait_for_interrupt_enable()		cpu_do_idle()
+ 
+ #elif defined(CONFIG_ARCH_AT91SAM9G45)
+ #include <mach/at91sam9_ddrsdr.h>
+@@ -74,6 +76,7 @@ static inline u32 sdram_selfrefresh_enable(void)
+ 		at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0); \
+ 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1); \
+ 	} while (0)
++#define wait_for_interrupt_enable()		cpu_do_idle()
+ 
+ #else
+ #include <mach/at91sam9_sdramc.h>
+@@ -98,5 +101,6 @@ static inline u32 sdram_selfrefresh_enable(void)
+ }
+ 
+ #define sdram_selfrefresh_disable(saved_lpr)	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr)
++#define wait_for_interrupt_enable()		cpu_do_idle()
+ 
+ #endif
+-- 
+1.7.3
