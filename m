@@ -1,186 +1,133 @@
 From: leiwen@marvell.com (Lei Wen)
-Date: Fri, 22 Oct 2010 18:14:39 +0800
-Subject: [PATCH V3 1/6] pxa3xx_nand: make scan procedure more clear
+Date: Fri, 22 Oct 2010 18:14:41 +0800
+Subject: [PATCH V3 3/6] pxa3xx_nand: discard wait_for_event, write_cmd,
+	__readid function
 In-Reply-To: <1287742484-4276-1-git-send-email-leiwen@marvell.com>
 References: <1287742484-4276-1-git-send-email-leiwen@marvell.com>
-Message-ID: <1287742484-4276-2-git-send-email-leiwen@marvell.com>
+Message-ID: <1287742484-4276-4-git-send-email-leiwen@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Since we have rework the irq process, we don't need additional
+delay in wait_for_event. Also write_cmd and __readid is also
+discarded for the same reason.
 
 Signed-off-by: Lei Wen <leiwen@marvell.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |   98 ++++++++++++++++++++++------------------
- 1 files changed, 54 insertions(+), 44 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c |   77 +---------------------------------------
+ 1 files changed, 1 insertions(+), 76 deletions(-)
 
 diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 17f8518..aff28dc 100644
+index dc24000..a7f623f 100644
 --- a/drivers/mtd/nand/pxa3xx_nand.c
 +++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -126,6 +126,7 @@ struct pxa3xx_nand_info {
- 	unsigned int 		buf_start;
- 	unsigned int		buf_count;
- 
-+	struct mtd_info         *mtd;
- 	/* DMA information */
- 	int			drcmr_dat;
- 	int			drcmr_cmd;
-@@ -1044,34 +1045,26 @@ static void pxa3xx_nand_init_mtd(struct mtd_info *mtd,
- 	this->chip_delay = 25;
+@@ -258,25 +258,6 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_info *info,
+ 	nand_writel(info, NDTR1CS0, ndtr1);
  }
  
--static int pxa3xx_nand_probe(struct platform_device *pdev)
-+static struct pxa3xx_nand_info *alloc_nand_resource(struct platform_device *pdev)
+-#define WAIT_EVENT_TIMEOUT	10
+-
+-static int wait_for_event(struct pxa3xx_nand_info *info, uint32_t event)
+-{
+-	int timeout = WAIT_EVENT_TIMEOUT;
+-	uint32_t ndsr;
+-
+-	while (timeout--) {
+-		ndsr = nand_readl(info, NDSR) & NDSR_MASK;
+-		if (ndsr & event) {
+-			nand_writel(info, NDSR, ndsr);
+-			return 0;
+-		}
+-		udelay(10);
+-	}
+-
+-	return -ETIMEDOUT;
+-}
+-
+ static void pxa3xx_set_datasize(struct pxa3xx_nand_info *info)
  {
--	struct pxa3xx_nand_platform_data *pdata;
-+	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
- 	struct pxa3xx_nand_info *info;
--	struct nand_chip *this;
- 	struct mtd_info *mtd;
- 	struct resource *r;
--	int ret = 0, irq;
+ 	int oob_enable = info->reg_ndcr & NDCR_SPARE_EN;
+@@ -414,35 +395,6 @@ static void disable_int(struct pxa3xx_nand_info *info, uint32_t int_mask)
+ 	nand_writel(info, NDCR, ndcr | int_mask);
+ }
+ 
+-/* NOTE: it is a must to set ND_RUN firstly, then write command buffer
+- * otherwise, it does not work
+- */
+-static int write_cmd(struct pxa3xx_nand_info *info)
+-{
+-	uint32_t ndcr;
 -
--	pdata = pdev->dev.platform_data;
+-	/* clear status bits and run */
+-	nand_writel(info, NDSR, NDSR_MASK);
 -
--	if (!pdata) {
--		dev_err(&pdev->dev, "no platform data defined\n");
--		return -ENODEV;
--	}
-+	int ret, irq;
- 
- 	mtd = kzalloc(sizeof(struct mtd_info) + sizeof(struct pxa3xx_nand_info),
- 			GFP_KERNEL);
- 	if (!mtd) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
--		return -ENOMEM;
-+		return NULL;
- 	}
- 
- 	info = (struct pxa3xx_nand_info *)(&mtd[1]);
- 	info->pdev = pdev;
- 
--	this = &info->nand_chip;
- 	mtd->priv = info;
-+	info->mtd = mtd;
- 	mtd->owner = THIS_MODULE;
- 
- 	info->clk = clk_get(&pdev->dev, NULL);
-@@ -1149,31 +1142,9 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
- 	}
- 
- 	pxa3xx_nand_init_mtd(mtd, info);
-+	platform_set_drvdata(pdev, info);
- 
--	platform_set_drvdata(pdev, mtd);
+-	ndcr = info->reg_ndcr;
 -
--	if (nand_scan(mtd, 1)) {
--		dev_err(&pdev->dev, "failed to scan nand\n");
--		ret = -ENXIO;
--		goto fail_free_irq;
+-	ndcr |= info->use_ecc ? NDCR_ECC_EN : 0;
+-	ndcr |= info->use_dma ? NDCR_DMA_EN : 0;
+-	ndcr |= NDCR_ND_RUN;
+-
+-	nand_writel(info, NDCR, ndcr);
+-
+-	if (wait_for_event(info, NDSR_WRCMDREQ)) {
+-		printk(KERN_ERR "timed out writing command\n");
+-		return -ETIMEDOUT;
 -	}
 -
--#ifdef CONFIG_MTD_PARTITIONS
--	if (mtd_has_cmdlinepart()) {
--		static const char *probes[] = { "cmdlinepart", NULL };
--		struct mtd_partition *parts;
--		int nr_parts;
--
--		nr_parts = parse_mtd_partitions(mtd, probes, &parts, 0);
--
--		if (nr_parts)
--			return add_mtd_partitions(mtd, parts, nr_parts);
--	}
--
--	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
--#else
+-	nand_writel(info, NDCB0, info->ndcb0);
+-	nand_writel(info, NDCB0, info->ndcb1);
+-	nand_writel(info, NDCB0, info->ndcb2);
 -	return 0;
--#endif
-+	return info;
- 
- fail_free_irq:
- 	free_irq(irq, info);
-@@ -1193,13 +1164,13 @@ fail_put_clk:
- 	clk_put(info->clk);
- fail_free_mtd:
- 	kfree(mtd);
--	return ret;
-+	return NULL;
- }
- 
- static int pxa3xx_nand_remove(struct platform_device *pdev)
+-}
+-
+ static void handle_data_pio(struct pxa3xx_nand_info *info)
  {
--	struct mtd_info *mtd = platform_get_drvdata(pdev);
--	struct pxa3xx_nand_info *info = mtd->priv;
-+	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-+	struct mtd_info *mtd = info->mtd;
- 	struct resource *r;
- 	int irq;
- 
-@@ -1230,11 +1201,50 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
+ 	switch (info->state) {
+@@ -789,33 +741,6 @@ static int pxa3xx_nand_ecc_correct(struct mtd_info *mtd,
  	return 0;
  }
  
-+static int pxa3xx_nand_probe(struct platform_device *pdev)
-+{
-+	struct pxa3xx_nand_platform_data *pdata;
-+	struct pxa3xx_nand_info *info;
-+
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "no platform data defined\n");
-+		return -ENODEV;
-+	}
-+
-+	info = alloc_nand_resource(pdev);
-+	if (info == NULL)
-+		return -ENOMEM;
-+
-+	if (nand_scan(info->mtd, 1)) {
-+		dev_err(&pdev->dev, "failed to scan nand\n");
-+		pxa3xx_nand_remove(pdev);
-+		return -ENODEV;
-+	}
-+
-+#ifdef CONFIG_MTD_PARTITIONS
-+	if (mtd_has_cmdlinepart()) {
-+		static const char *probes[] = { "cmdlinepart", NULL };
-+		struct mtd_partition *parts;
-+		int nr_parts;
-+
-+		nr_parts = parse_mtd_partitions(info->mtd, probes, &parts, 0);
-+
-+		if (nr_parts)
-+			return add_mtd_partitions(mtd, parts, nr_parts);
-+	}
-+
-+	return add_mtd_partitions(mtd, pdata->parts, pdata->nr_parts);
-+#else
-+	return 0;
-+#endif
-+}
-+
- #ifdef CONFIG_PM
- static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+-static int __readid(struct pxa3xx_nand_info *info, uint32_t *id)
+-{
+-	const struct pxa3xx_nand_cmdset *cmdset = info->cmdset;
+-	uint32_t ndcr;
+-	uint8_t  id_buff[8];
+-
+-	prepare_other_cmd(info, cmdset->read_id);
+-
+-	/* Send command */
+-	if (write_cmd(info))
+-		goto fail_timeout;
+-
+-	/* Wait for CMDDM(command done successfully) */
+-	if (wait_for_event(info, NDSR_RDDREQ))
+-		goto fail_timeout;
+-
+-	__raw_readsl(info->mmio_base + NDDB, id_buff, 2);
+-	*id = id_buff[0] | (id_buff[1] << 8);
+-	return 0;
+-
+-fail_timeout:
+-	ndcr = nand_readl(info, NDCR);
+-	nand_writel(info, NDCR, ndcr & ~NDCR_ND_RUN);
+-	udelay(10);
+-	return -ETIMEDOUT;
+-}
+-
+ static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+ 				    const struct pxa3xx_nand_flash *f)
  {
--	struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
--	struct pxa3xx_nand_info *info = mtd->priv;
-+	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-+	struct mtd_info *mtd = info->mtd;
+@@ -868,7 +793,7 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
  
- 	if (info->state != STATE_READY) {
- 		dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
-@@ -1246,8 +1256,8 @@ static int pxa3xx_nand_suspend(struct platform_device *pdev, pm_message_t state)
+ 	page_per_block = ndcr & NDCR_PG_PER_BLK ? 64 : 32;
+ 	info->page_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
+-	/* set info fields needed to __readid */
++	/* set info fields needed to read id */
+ 	info->read_id_bytes = (info->page_size == 2048) ? 4 : 2;
+ 	info->reg_ndcr = ndcr;
  
- static int pxa3xx_nand_resume(struct platform_device *pdev)
- {
--	struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
--	struct pxa3xx_nand_info *info = mtd->priv;
-+	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
-+	struct mtd_info *mtd = info->mtd;
- 
- 	nand_writel(info, NDTR0CS0, info->ndtr0cs0);
- 	nand_writel(info, NDTR1CS0, info->ndtr1cs0);
 -- 
 1.7.0.4
