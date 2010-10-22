@@ -1,97 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Oct 2010 14:20:13 +0900
-Subject: [PATCH 1/5] ARM: S5P6442: Add DMA operation clock
-In-Reply-To: <4CC0BD13.5060303@fluff.org>
-References: <1287622713-1657-1-git-send-email-kgene.kim@samsung.com>
-	<1287622713-1657-2-git-send-email-kgene.kim@samsung.com>
-	<4CC0BD13.5060303@fluff.org>
-Message-ID: <002b01cb71a8$cf8893f0$6e99bbd0$%kim@samsung.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 22 Oct 2010 13:21:29 +0800
+Subject: [PATCH 4/9] drivers/rtc: typo fix of faild to failed
+In-Reply-To: <4279ee540bfed9c40ba26698bfe7abddb8921ee4.1287724261.git.joe@perches.com>
+References: <cover.1287724261.git.joe@perches.com>
+	<4279ee540bfed9c40ba26698bfe7abddb8921ee4.1287724261.git.joe@perches.com>
+Message-ID: <AANLkTikG+n_Z4gY9i0gpVk5M+MHW46Tzg_xSnjVgih_e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks wrote:
-> 
-> On 21/10/10 01:58, Kukjin Kim wrote:
-> > From: Seungwhan Youn <sw.youn@samsung.com>
-> >
-> > This patch adds DMA operation clock which is disabled as default.
-> >
-> > Signed-off-by: Seungwhan Youn <sw.youn@samsung.com>
-> > Acked-by: Jassi Brar <jassi.brar@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  arch/arm/mach-s5p6442/clock.c                   |   28
-> +++++++++++++++++++++++
-> >  arch/arm/mach-s5p6442/include/mach/regs-clock.h |    1 +
-> >  2 files changed, 29 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-s5p6442/clock.c
-b/arch/arm/mach-s5p6442/clock.c
-> > index dcd20f1..16d6e7e 100644
-> > --- a/arch/arm/mach-s5p6442/clock.c
-> > +++ b/arch/arm/mach-s5p6442/clock.c
-> > @@ -192,6 +192,11 @@ static struct clk clk_pclkd1 = {
-> >  	.parent		= &clk_hclkd1,
-> >  };
-> >
-> > +int s5p6442_clk_ip0_ctrl(struct clk *clk, int enable)
-> > +{
-> > +	return s5p_gatectrl(S5P_CLKGATE_IP0, clk, enable);
-> > +}
-> > +
-> >  int s5p6442_clk_ip3_ctrl(struct clk *clk, int enable)
-> >  {
-> >  	return s5p_gatectrl(S5P_CLKGATE_IP3, clk, enable);
-> > @@ -335,6 +340,16 @@ void __init_or_cpufreq s5p6442_setup_clocks(void)
-> >  	clk_pclkd1.rate = pclkd1;
-> >  }
-> >
-> > +static struct clk init_clocks_disable[] = {
-> > +	{
-> > +		.name		= "pdma",
-> > +		.id		= -1,
-> > +		.parent		= &clk_pclkd1,
-> > +		.enable		= s5p6442_clk_ip0_ctrl,
-> > +		.ctrlbit	= (1 << 3),
-> > +	},
-> > +};
-> > +
-> >  static struct clk init_clocks[] = {
-> >  	{
-> >  		.name		= "systimer",
-> > @@ -393,10 +408,23 @@ static struct clk *clks[] __initdata = {
-> >
-> >  void __init s5p6442_register_clocks(void)
-> >  {
-> > +	struct clk *clkptr;
-> > +	int i, ret;
-> > +
-> >  	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
-> >
-> >  	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
-> >  	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
-> >
-> > +	clkptr = init_clocks_disable;
-> > +	for (i = 0; i < ARRAY_SIZE(init_clocks_disable); i++, clkptr++) {
-> > +		ret = s3c24xx_register_clock(clkptr);
-> > +		if (ret < 0) {
-> > +			printk(KERN_ERR "Fail to register clock %s (%d)\n",
-> > +					clkptr->name, ret);
-> > +		} else
-> > +			(clkptr->enable)(clkptr, 0);
-> > +	}
-> 
-> how about using s3c_register_clocks and then s3c_disable_clocks() ?
+Hi, Joe,
 
-Yeah, your suggestion is better to me also :-)
-But I think other Samsung SoCs need it too..so I'd like to apply this now
-then will update all regarding stuff for our Samsung SoCs soon..if you're
-ok.
+Thanks for your help.
 
-Thanks.
+2010/10/22 Joe Perches <joe@perches.com>:
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+> ?drivers/rtc/rtc-nuc900.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+> index 62de66a..ddb0857 100644
+> --- a/drivers/rtc/rtc-nuc900.c
+> +++ b/drivers/rtc/rtc-nuc900.c
+> @@ -274,7 +274,7 @@ static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?nuc900_rtc->rtcdev = rtc_device_register(pdev->name, &pdev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&nuc900_rtc_ops, THIS_MODULE);
+> ? ? ? ?if (IS_ERR(nuc900_rtc->rtcdev)) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "rtc device register faild\n");
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "rtc device register failed\n");
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Acked-by: Wan ZongShun <mcuos.com@gmail.com>
+
+> ? ? ? ? ? ? ? ?err = PTR_ERR(nuc900_rtc->rtcdev);
+> ? ? ? ? ? ? ? ?goto fail3;
+> ? ? ? ?}
+> --
+> 1.7.3.1.g432b3.dirty
+>
+>
+
+
+
+-- 
+*linux-arm-kernel mailing list
+mail addr:linux-arm-kernel at lists.infradead.org
+you can subscribe by:
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+* linux-arm-NUC900 mailing list
+mail addr:NUC900 at googlegroups.com
+main web: https://groups.google.com/group/NUC900
+you can subscribe it by sending me mail:
+mcuos.com at gmail.com
