@@ -1,40 +1,21 @@
 From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Fri, 22 Oct 2010 02:58:52 -0700
-Subject: [PATCH 2/2] [ARM] Kirkwood: add fan support for Network Space
-	Max v2
-In-Reply-To: <20101022082712.GU29120@kw.sim.vm.gnt>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<1287330612-11256-2-git-send-email-simon@sequanux.org>
-	<1287712396.9690.378.camel@groeck-laptop>
-	<alpine.LFD.2.00.1010212202400.2764@xanadu.home>
-	<20101022082712.GU29120@kw.sim.vm.gnt>
-Message-ID: <20101022095852.GA30634@ericsson.com>
+Date: Fri, 22 Oct 2010 02:59:51 -0700
+Subject: [PATCH] [ARM] Kirkwood: add fan support for Network Space Max v2
+In-Reply-To: <1287739758-26860-1-git-send-email-simon@sequanux.org>
+References: <20101022043000.GA29632@ericsson.com>
+	<1287739758-26860-1-git-send-email-simon@sequanux.org>
+Message-ID: <20101022095951.GB30634@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 22, 2010 at 04:27:12AM -0400, Simon Guinot wrote:
-> Hi Nicolas,
+On Fri, Oct 22, 2010 at 05:29:18AM -0400, Simon Guinot wrote:
+> From: Simon Guinot <sguinot@lacie.com>
 > 
-> On Thu, Oct 21, 2010 at 10:08:01PM -0400, Nicolas Pitre wrote:
-> > On Thu, 21 Oct 2010, Guenter Roeck wrote:
-> > 
-> > > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-> > > > From: Simon Guinot <sguinot@lacie.com>
-> > > > 
-> > > > Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> > > 
-> > > Acked-by: Guenter Roeck <guenter.roeck@ericsson.com>
-> > > 
-> > > I assume this will get pushed through the ARM tree, right ?
-> > 
-> > Might be simpler if this is routed along the same path as the core code 
-> > it relies upon to avoid dependency ordering issues.  There is nothing 
-> > particularly ARM specific here anyway.
-> 
-> There is some changes, related to the netspace_v2-setup.c file, stagged
-> in your Orion tree. At some point, a merge will be needed.
-> 
-We'll see if it causes any conflicts in the -next tree after I apply it.
+> Signed-off-by: Simon Guinot <sguinot@lacie.com>
+
+Applied, thanks.
+
+I'll let it sit in my next tree for a couple of days to see if there are any 
+resulting conflicts.
 
 Guenter
