@@ -1,61 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Oct 2010 15:21:40 +0900
-Subject: [PATCH V2 2/4] ARM: S3C: Change VMALLOC_END to use more
-	vmalloc()/ioremap() area
-Message-ID: <1287728500-12849-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 22 Oct 2010 15:21:33 +0900
+Subject: [PATCH V2 1/4] ARM: SAMSUNG: Move the start address of Samsung SoCs'
+	VA space
+Message-ID: <1287728493-12785-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes VMALLOC_END from 0xE0000000 to 0xF6000000, because
-some systems want to use more vmalloc()/ioremap() area and now don't use
-from at 0xE0000000 to 0xF6000000 (the start of Samsung SoCs' VA space)
+This patch moves the start address of Samsung SoCs' VA space so that
+can use more vmalloc()/ioremap() space. Of course need to change the
+VMALLOC_END for it.
 
 Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
 Changes since v1:
-- According to S3C_ADDR_BASE, fixed
+- Changes address to 0xF6000000 due to S3C24XX_VA_GPIO
 
- arch/arm/mach-s3c2410/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-s3c24a0/include/mach/vmalloc.h |    2 +-
- arch/arm/mach-s3c64xx/include/mach/vmalloc.h |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-samsung/include/plat/map-base.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/vmalloc.h b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
-index 54297eb..4093bc9 100644
---- a/arch/arm/mach-s3c2410/include/mach/vmalloc.h
-+++ b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
-@@ -15,6 +15,6 @@
- #ifndef __ASM_ARCH_VMALLOC_H
- #define __ASM_ARCH_VMALLOC_H
+diff --git a/arch/arm/plat-samsung/include/plat/map-base.h b/arch/arm/plat-samsung/include/plat/map-base.h
+index 250be31..86f66be 100644
+--- a/arch/arm/plat-samsung/include/plat/map-base.h
++++ b/arch/arm/plat-samsung/include/plat/map-base.h
+@@ -14,7 +14,7 @@
+ #ifndef __ASM_PLAT_MAP_H
+ #define __ASM_PLAT_MAP_H __FILE__
  
--#define VMALLOC_END	0xE0000000UL
-+#define VMALLOC_END	0xF6000000UL
+-/* Fit all our registers in at 0xF4000000 upwards, trying to use as
++/* Fit all our registers in at 0xF6000000 upwards, trying to use as
+  * little of the VA space as possible so vmalloc and friends have a
+  * better chance of getting memory.
+  *
+@@ -22,7 +22,7 @@
+  * an single MOVS instruction (ie, only 8 bits of set data)
+  */
  
- #endif /* __ASM_ARCH_VMALLOC_H */
-diff --git a/arch/arm/mach-s3c24a0/include/mach/vmalloc.h b/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
-index 9146568..29d0002 100644
---- a/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
-+++ b/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
-@@ -12,6 +12,6 @@
- #ifndef __ASM_ARCH_VMALLOC_H
- #define __ASM_ARCH_VMALLOC_H
+-#define S3C_ADDR_BASE	(0xF4000000)
++#define S3C_ADDR_BASE	0xF6000000
  
--#define VMALLOC_END	  (0xe0000000UL)
-+#define VMALLOC_END	0xF6000000UL
- 
- #endif /* __ASM_ARCH_VMALLOC_H */
-diff --git a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
-index bc0e913..0df9597 100644
---- a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
-@@ -15,6 +15,6 @@
- #ifndef __ASM_ARCH_VMALLOC_H
- #define __ASM_ARCH_VMALLOC_H
- 
--#define VMALLOC_END	0xE0000000UL
-+#define VMALLOC_END	0xF6000000UL
- 
- #endif /* __ASM_ARCH_VMALLOC_H */
+ #ifndef __ASSEMBLY__
+ #define S3C_ADDR(x)	((void __iomem __force *)S3C_ADDR_BASE + (x))
 -- 
 1.6.2.5
