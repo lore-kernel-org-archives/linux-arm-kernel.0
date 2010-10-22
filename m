@@ -1,76 +1,102 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 22 Oct 2010 09:52:30 +0300
-Subject: [PATCH] babbage: esdhc device registration
-In-Reply-To: <1287680120-11354-2-git-send-email-shawn.gsc@gmail.com>
-References: <1287680120-11354-1-git-send-email-shawn.gsc@gmail.com>
-	<1287680120-11354-2-git-send-email-shawn.gsc@gmail.com>
-Message-ID: <20101022065230.GA17631@matterhorn.lan>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Fri, 22 Oct 2010 10:02:35 +0300
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <4C9FE2C4.8070302@fluff.org>
+References: <20100923190212.18863.25678.stgit@darius-desktop>
+	<4C9BE577.4050504@fluff.org>
+	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+	<4C9CD3E0.6060000@gmail.com> <4C9FE2C4.8070302@fluff.org>
+Message-ID: <AANLkTikDyz5Jho+5T1vmZ9PL=ZxcXf8phQqrZaVxjgQJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 Oct 22, Shawn Guo wrote:
-> Update babbage board support to register esdhc device
-> 
-> Signed-off-by: Shawn Guo <shawn.gsc@gmail.com>
+Hi Ben, Kukjin,
 
-This looks OK.
+please don't forget to add this change to your tree for this merge window.
 
-Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
+Thanks,
+Darius
 
-> ---
->  arch/arm/mach-mx5/Kconfig              |    1 +
->  arch/arm/mach-mx5/board-mx51_babbage.c |   19 +++++++++++++++++++
->  2 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index a2df9ac..fe96cd2 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -13,6 +13,7 @@ config MACH_MX51_BABBAGE
->  	bool "Support MX51 BABBAGE platforms"
->  	select IMX_HAVE_PLATFORM_IMX_I2C
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_ESDHC
->  	help
->  	  Include support for MX51 Babbage platform, also known as MX51EVK in
->  	  u-boot. This includes specific configurations for the board and its
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 23ee4a4..39304b4 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -112,6 +112,22 @@ static struct pad_desc mx51babbage_pads[] = {
->  
->  	/* FEC PHY reset line */
->  	MX51_PAD_EIM_A20__GPIO_2_14,
-> +
-> +	/* SD 1 */
-> +	MX51_PAD_SD1_CMD__SD1_CMD,
-> +	MX51_PAD_SD1_CLK__SD1_CLK,
-> +	MX51_PAD_SD1_DATA0__SD1_DATA0,
-> +	MX51_PAD_SD1_DATA1__SD1_DATA1,
-> +	MX51_PAD_SD1_DATA2__SD1_DATA2,
-> +	MX51_PAD_SD1_DATA3__SD1_DATA3,
-> +
-> +	/* SD 2 */
-> +	MX51_PAD_SD2_CMD__SD2_CMD,
-> +	MX51_PAD_SD2_CLK__SD2_CLK,
-> +	MX51_PAD_SD2_DATA0__SD2_DATA0,
-> +	MX51_PAD_SD2_DATA1__SD2_DATA1,
-> +	MX51_PAD_SD2_DATA2__SD2_DATA2,
-> +	MX51_PAD_SD2_DATA3__SD2_DATA3,
->  };
->  
->  /* Serial ports */
-> @@ -304,6 +320,9 @@ static void __init mxc_board_init(void)
->  	/* setback USBH1_STP to be function */
->  	mxc_iomux_v3_setup_pad(&usbh1stp);
->  	babbage_usbhub_reset();
-> +
-> +	imx51_add_esdhc(0, NULL);
-> +	imx51_add_esdhc(1, NULL);
->  }
->  
->  static void __init mx51_babbage_timer_init(void)
-> -- 
-> 1.7.1
-> 
+On Mon, Sep 27, 2010 at 3:18 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On 24/09/10 17:37, Paulius Zaleckas wrote:
+>> On 09/24/2010 09:57 AM, Darius Augulis wrote:
+>>> Hi,
+>>>
+>>> On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks<ben-linux@fluff.org> ?wrote:
+>>>> On 23/09/10 20:15, Darius Augulis wrote:
+>>>>> Swap device and driver names in serial/samsung.c
+>>>>
+>>>> This is far too short, please see the notes below on trying
+>>>> to make this more informative.
+>>>>
+>>>>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+>>>>> ---
+>>>>>
+>>>>> This patch was submitted about 3 months ago, but still not merged.
+>>>>> There was another similar patch from Joonyoung Shim
+>>>>> <jy0922.shim@samsung.com> ?and was discussed here:
+>>>>> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+>>>>> Joonyoung Shim acked my patch and other people on ARM mailing list
+>>>>> acked it. The maintainer, Ben Dooks, still not responding for
+>>>>> a long time. Another maintainer, Kukjin Kim, refused to merge
+>>>>> it without Ben's review.
+>>>>> I would like to ask somebody pick up this bugfix.
+>>>>
+>>>> I belive last time this was brought up I asked about the affect
+>>>> this has on the userspace. The following issues would be helpful
+>>>> or essential to have noted in the header about the effect of this.
+>>>>
+>>>> - Does it change the /dev name of the device? if so I would thinl
+>>>> ? carefully about applying it, as it would be a change in the way
+>>>> ? that userspace sees the kernel.
+>>>
+>>> It does - now devices are named /dev/s3c2410_serial, and patch changes
+>>> its name to /dev/ttySAC
+>>>
+>>>>
+>>>> - Does it change the kernel output itself? A note on what diffeences
+>>>> ? can be seen in things like dmesg would be helpful.
+>>>
+>>> It does. Serial driver reports device names when probing, so there
+>>> will appear ttySACx instead of
+>>> s3c2410_serialx.
+>>>
+>>>>
+>>>> - Are there any other side effects
+>>>>
+>>>> - Why is this a bug? Maybe the previous points will explain what is
+>>>> ? going on, but if not, then a reasonably concise description of
+>>>> ? what is going on here.
+>>>
+>>> This is bug, because of several points:
+>>>
+>>> 1. Because it contradicts kernel documentation. Please read
+>>> Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
+>>> This should be enough to apply this patch.
+>>>
+>>> 2. Because s3c2410_serial isn't correct name for serial device node.
+>>> It's name of Samsung serial driver.
+>>>
+>>> 3. Because now almost all userspace systems workaround it by creating
+>>> symlink
+>>> /dev/ttySACx> ?/dev/s3c2410_serialx and only then put some getty on
+>>> created symlink, not on original device.
+>>> Systems which don't create this symlink, fail to boot at all, because
+>>> of wrong console name. Good example is Buildroot.
+>>
+>> I had similar issue with buildroot too, because in /etc/securetty it is
+>> defained as ttySAC0
+>>
+>> 4. For console in kernel boot command line you must enter console=ttySACx.
+>> Why it sould be different in userspace?
+>>
+>> For me it seems taht this bug was not noticed earlier, because most
+>> embedded
+>> systems were using static device nodes and ttySACx was used in these cases.
+>
+> As long as these are explained, then I'm reasonably happy for this to be
+> applied, as long as there are no other complaints.
+>
+> However, this is a big change, and I think it should await the next
+> merge window.
+>
