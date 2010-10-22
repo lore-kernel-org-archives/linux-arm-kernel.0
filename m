@@ -1,58 +1,59 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 22 Oct 2010 08:15:37 +0200
-Subject: [PATCH 1/2] sdhci-esdhc-imx: fix timeout on i.MX's sdhci
-In-Reply-To: <1287696028-27854-1-git-send-email-eric@eukrea.com>
+Date: Fri, 22 Oct 2010 08:18:03 +0200
+Subject: [PATCH 2/2] sdhci-esdhc-imx: enable QUIRK_NO_MULTIBLOCK only
+	for i.MX25 and i.MX35
+In-Reply-To: <1287696028-27854-2-git-send-email-eric@eukrea.com>
 References: <4CC0A281.1010202@eukrea.com>
-	<1287696028-27854-1-git-send-email-eric@eukrea.com>
-Message-ID: <20101022061537.GA5572@pengutronix.de>
+	<1287696028-27854-2-git-send-email-eric@eukrea.com>
+Message-ID: <20101022061803.GB5572@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 11:20:27PM +0200, Eric B?nard wrote:
-> this patch fix timeout problems on i.MX's sdhci as suggested by
-> Richard Zhu.
-> 
-> Tested on :
-> - i.MX257 : not needed
-> - i.MX357 : needed
-> - i.MX515 : needed
-> 
-> more details can be found here :
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029748.html
+On Thu, Oct 21, 2010 at 11:20:28PM +0200, Eric B?nard wrote:
+> only these CPU's errata list this bug.
+
+So, it was not directly tested?
+
 > 
 > Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Tested-by: Shawn Guo <shawn.gsc@gmail.com>
 > ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
+>  drivers/mmc/host/sdhci-esdhc-imx.c |   10 +++++++---
+>  1 files changed, 7 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index afbac9a..11e1ae1 100644
+> index 11e1ae1..4d67f58 100644
 > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -130,6 +130,12 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
->  		gpio_request(boarddata->wp_gpio, "SD_WP");
->  		gpio_direction_input(boarddata->wp_gpio);
+> @@ -136,6 +136,12 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+>  		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
 >  	}
-> +
-> +	if (cpu_is_mx35() || cpu_is_mx51()) {
-> +		dev_info(mmc_dev(host->mmc), "using broken timeout quirk\n");
+>  
+> +	/* fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
+> +	if (cpu_is_mx25() || cpu_is_mx35()) {
+> +		dev_info(mmc_dev(host->mmc), "using ENGcm07207 workaround\n");
 
-Please drop this line. The boot log is full enough IMO :)
+Same here, no printout please (or do you see a reason for it?)
 
-Other than that:
-
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-
-> +		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+> +		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
 > +	}
 > +
 >  	return 0;
 >  }
 >  
-> -- 
-> 1.7.0.4
-> 
+> @@ -162,10 +168,8 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+>  };
+>  
+>  struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+> -	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
+> -			| SDHCI_QUIRK_BROKEN_ADMA,
+> +	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
+>  	/* ADMA has issues. Might be fixable */
+> -	/* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
+>  	.ops = &sdhci_esdhc_ops,
+>  	.init = esdhc_pltfm_init,
+>  	.exit = esdhc_pltfm_exit,
+
+Other than that, looks good. Thanks.
 
 -- 
 Pengutronix e.K.                           | Wolfram Sang                |
@@ -63,4 +64,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 197 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/ed08e96b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/28acc0da/attachment.sig>
