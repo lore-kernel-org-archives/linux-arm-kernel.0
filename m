@@ -1,67 +1,61 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 22 Oct 2010 08:18:03 +0200
-Subject: [PATCH 2/2] sdhci-esdhc-imx: enable QUIRK_NO_MULTIBLOCK only
-	for i.MX25 and i.MX35
-In-Reply-To: <1287696028-27854-2-git-send-email-eric@eukrea.com>
-References: <4CC0A281.1010202@eukrea.com>
-	<1287696028-27854-2-git-send-email-eric@eukrea.com>
-Message-ID: <20101022061803.GB5572@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Oct 2010 15:21:40 +0900
+Subject: [PATCH V2 2/4] ARM: S3C: Change VMALLOC_END to use more
+	vmalloc()/ioremap() area
+Message-ID: <1287728500-12849-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 11:20:28PM +0200, Eric B?nard wrote:
-> only these CPU's errata list this bug.
+This patch changes VMALLOC_END from 0xE0000000 to 0xF6000000, because
+some systems want to use more vmalloc()/ioremap() area and now don't use
+from at 0xE0000000 to 0xF6000000 (the start of Samsung SoCs' VA space)
 
-So, it was not directly tested?
+Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v1:
+- According to S3C_ADDR_BASE, fixed
 
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   10 +++++++---
->  1 files changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 11e1ae1..4d67f58 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -136,6 +136,12 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
->  		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
->  	}
->  
-> +	/* fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
-> +	if (cpu_is_mx25() || cpu_is_mx35()) {
-> +		dev_info(mmc_dev(host->mmc), "using ENGcm07207 workaround\n");
+ arch/arm/mach-s3c2410/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s3c24a0/include/mach/vmalloc.h |    2 +-
+ arch/arm/mach-s3c64xx/include/mach/vmalloc.h |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Same here, no printout please (or do you see a reason for it?)
-
-> +		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -162,10 +168,8 @@ static struct sdhci_ops sdhci_esdhc_ops = {
->  };
->  
->  struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
-> -	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
-> -			| SDHCI_QUIRK_BROKEN_ADMA,
-> +	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
->  	/* ADMA has issues. Might be fixable */
-> -	/* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
->  	.ops = &sdhci_esdhc_ops,
->  	.init = esdhc_pltfm_init,
->  	.exit = esdhc_pltfm_exit,
-
-Other than that, looks good. Thanks.
-
+diff --git a/arch/arm/mach-s3c2410/include/mach/vmalloc.h b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+index 54297eb..4093bc9 100644
+--- a/arch/arm/mach-s3c2410/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c2410/include/mach/vmalloc.h
+@@ -15,6 +15,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	0xE0000000UL
++#define VMALLOC_END	0xF6000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s3c24a0/include/mach/vmalloc.h b/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
+index 9146568..29d0002 100644
+--- a/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c24a0/include/mach/vmalloc.h
+@@ -12,6 +12,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	  (0xe0000000UL)
++#define VMALLOC_END	0xF6000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
+diff --git a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+index bc0e913..0df9597 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
++++ b/arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+@@ -15,6 +15,6 @@
+ #ifndef __ASM_ARCH_VMALLOC_H
+ #define __ASM_ARCH_VMALLOC_H
+ 
+-#define VMALLOC_END	0xE0000000UL
++#define VMALLOC_END	0xF6000000UL
+ 
+ #endif /* __ASM_ARCH_VMALLOC_H */
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/28acc0da/attachment.sig>
+1.6.2.5
