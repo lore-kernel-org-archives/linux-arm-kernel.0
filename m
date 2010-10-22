@@ -1,33 +1,42 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 22 Oct 2010 15:03:38 -0400
-Subject: [PATCH v3 01/12] misc: add driver for sequencer serial port
-In-Reply-To: <20101022152024.65e8f181@lxorguk.ukuu.org.uk>
-References: <1287694873-12904-1-git-send-email-cyril@ti.com>	<1287694873-12904-2-git-send-email-cyril@ti.com>
-	<20101022152024.65e8f181@lxorguk.ukuu.org.uk>
-Message-ID: <4CC1E00A.3010109@ti.com>
+From: sjur.brandeland@stericsson.com (Sjur Braendeland)
+Date: Fri, 22 Oct 2010 21:03:51 +0200
+Subject: [PATCH 0/4] caif-u5500: CAIF shared memory/mailbox driver
+Message-ID: <1287774235-11151-1-git-send-email-sjur.brandeland@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2010 10:20 AM, Alan Cox wrote:
-> On Thu, 21 Oct 2010 17:01:02 -0400
-> Cyril Chemparathy <cyril@ti.com> wrote:
-> 
->> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
->> device.  It has a built-in programmable execution engine that can be programmed
->> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
->>
->> This patch adds a driver for this controller device.  The driver does not
->> expose a user-land interface.  Protocol drivers built on top of this layer are
->> expected to remain in-kernel.
-> 
-> I suspect the driver belongs with the mfd drivers not with drivers/misc ?
-> 
-> otherwise it looks very nice.
 
-Unlike MFDs, this device doesn't have cells with differing
-functionality.  Instead it has functionally identical ports that can
-operate in a variety of modes.  That said, does this still fit in with
-other MFD drivers?  If so, I don't see a problem with moving it there.
+This patch-set introduces the CAIF protocol driver for shared memory
+over mailbox for u5500.
 
-Thanks
-Cyril.
+It implements the driver for transporting CAIF frames between the DB5500
+modem portion and host side for the u5500 architecture.
+
+These patches depends on the patch-set "U5500 mailbox driver and
+modem irq handler" submitted on the linux-arm-kernel list,
+commit e81fcc97350755e021c85b816877ae292b8f28d0.
+
+They applies cleanly on latest net-next-2.6 and linux-next git,
+and depends on the CONFIG_U5500_MBX for compilation.
+
+Please note that the size and address of the shared memory are specified as
+module parameters: shm_total_size, shm_start.
+
+Regards,
+Sjur Braendeland
+
+Amarnath Revanna (4):
+  caif-u5500: Adding shared memory include
+  caif-u5500: CAIF shared memory transport protocol
+  caif-u5500: CAIF shared memory mailbox interface
+  caif-u5500: Build config for CAIF shared mem driver
+
+ drivers/net/caif/Kconfig          |    7 +
+ drivers/net/caif/Makefile         |    4 +
+ drivers/net/caif/caif_shm_u5500.c |  129 ++++++
+ drivers/net/caif/caif_shmcore.c   |  792 +++++++++++++++++++++++++++++++++++++
+ include/net/caif/caif_shm.h       |   26 ++
+ 5 files changed, 958 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/net/caif/caif_shm_u5500.c
+ create mode 100644 drivers/net/caif/caif_shmcore.c
+ create mode 100644 include/net/caif/caif_shm.h
