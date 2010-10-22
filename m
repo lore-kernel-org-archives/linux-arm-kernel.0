@@ -1,42 +1,51 @@
 From: sjur.brandeland@stericsson.com (Sjur Braendeland)
-Date: Fri, 22 Oct 2010 21:03:51 +0200
-Subject: [PATCH 0/4] caif-u5500: CAIF shared memory/mailbox driver
-Message-ID: <1287774235-11151-1-git-send-email-sjur.brandeland@stericsson.com>
+Date: Fri, 22 Oct 2010 21:03:52 +0200
+Subject: [PATCH 1/4] caif-u5500: Adding shared memory include
+In-Reply-To: <1287774235-11151-1-git-send-email-sjur.brandeland@stericsson.com>
+References: <1287774235-11151-1-git-send-email-sjur.brandeland@stericsson.com>
+Message-ID: <1287774235-11151-2-git-send-email-sjur.brandeland@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Amarnath Revanna <amarnath.bangalore.revanna@stericsson.com>
 
-This patch-set introduces the CAIF protocol driver for shared memory
-over mailbox for u5500.
-
-It implements the driver for transporting CAIF frames between the DB5500
-modem portion and host side for the u5500 architecture.
-
-These patches depends on the patch-set "U5500 mailbox driver and
-modem irq handler" submitted on the linux-arm-kernel list,
-commit e81fcc97350755e021c85b816877ae292b8f28d0.
-
-They applies cleanly on latest net-next-2.6 and linux-next git,
-and depends on the CONFIG_U5500_MBX for compilation.
-
-Please note that the size and address of the shared memory are specified as
-module parameters: shm_total_size, shm_start.
-
-Regards,
-Sjur Braendeland
-
-Amarnath Revanna (4):
-  caif-u5500: Adding shared memory include
-  caif-u5500: CAIF shared memory transport protocol
-  caif-u5500: CAIF shared memory mailbox interface
-  caif-u5500: Build config for CAIF shared mem driver
-
- drivers/net/caif/Kconfig          |    7 +
- drivers/net/caif/Makefile         |    4 +
- drivers/net/caif/caif_shm_u5500.c |  129 ++++++
- drivers/net/caif/caif_shmcore.c   |  792 +++++++++++++++++++++++++++++++++++++
- include/net/caif/caif_shm.h       |   26 ++
- 5 files changed, 958 insertions(+), 0 deletions(-)
- create mode 100644 drivers/net/caif/caif_shm_u5500.c
- create mode 100644 drivers/net/caif/caif_shmcore.c
+Signed-off-by: Sjur Braendeland <sjur.brandeland@stericsson.com>
+---
+ include/net/caif/caif_shm.h |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
  create mode 100644 include/net/caif/caif_shm.h
+
+diff --git a/include/net/caif/caif_shm.h b/include/net/caif/caif_shm.h
+new file mode 100644
+index 0000000..5bcce55
+--- /dev/null
++++ b/include/net/caif/caif_shm.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) ST-Ericsson AB 2010
++ * Contact: Sjur Brendeland / sjur.brandeland at stericsson.com
++ * Author: Amarnath Revanna / amarnath.bangalore.revanna at stericsson.com
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#ifndef CAIF_SHM_H_
++#define CAIF_SHM_H_
++
++struct shmdev_layer {
++	u32 shm_base_addr;
++	u32 shm_total_sz;
++	u32 shm_id;
++	u32 shm_loopback;
++	void *hmbx;
++	int (*pshmdev_mbxsend) (u32 shm_id, u32 mbx_msg);
++	int (*pshmdev_mbxsetup) (void *pshmdrv_cb,
++				struct shmdev_layer *pshm_dev, void *pshm_drv);
++	struct net_device *pshm_netdev;
++};
++
++extern int caif_shmcore_probe(struct shmdev_layer *pshm_dev);
++extern void caif_shmcore_remove(struct net_device *pshm_netdev);
++
++#endif
+-- 
+1.6.3.3
