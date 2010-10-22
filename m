@@ -1,36 +1,73 @@
-From: napohybelskurwysynom2010@gmail.com (Zimny Lech)
-Date: Fri, 22 Oct 2010 03:13:38 +0200
-Subject: [RFC] Removal of dead code from arch/arm/*
-In-Reply-To: <AANLkTikYtxiT+R3eb0N5U1hoDvaP=oevjWjUuAJ453p=@mail.gmail.com>
-References: <AANLkTim+vj_OAd22TdThuC-HSqUiDjguOHQWjyqFaq6N@mail.gmail.com>
-	<AANLkTi=Cpq2_vV2RGcoQhrqk8xpL59AvLFPzfvTBk5Xa@mail.gmail.com>
-	<4CBF8BDB.7090907@gmail.com>
-	<20101021075401.GC22100@n2100.arm.linux.org.uk>
-	<AANLkTikYtxiT+R3eb0N5U1hoDvaP=oevjWjUuAJ453p=@mail.gmail.com>
-Message-ID: <AANLkTinvz7b7yQ-MP4rZHudNuD-0A+Ag7ut0=ZNaCvyV@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Oct 2010 10:41:25 +0900
+Subject: [PATCH] ARM: S3C24XX: Fix the S3C24XX_VA_GPIO mapping
+In-Reply-To: <4CC0BDEA.8090407@fluff.org>
+References: <1287581622-8335-1-git-send-email-kgene.kim@samsung.com>
+	<4CC0BDEA.8090407@fluff.org>
+Message-ID: <007701cb718a$3f732f50$be598df0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/21 Zimny Lech <napohybelskurwysynom2010@gmail.com>:
-> Ok, I dropped this patch. Recreated tree can be found here
-> git pull git://github.com/napohybelskurwysynom2010/Linux-2.6-nps.git rodc2
+Ben Dooks wrote:
+> 
+> On 20/10/10 14:33, Kukjin Kim wrote:
+> > This patch changes the S3C24XX_VA_GPIO for to fix following BUG.
+> > BUG: not creating mapping for 0x56000000 at 0x01000000 in user region
+> >
+> > It is due to commit 8fecfe9d(ARM: SAMSUNG: Move the start address of
+> > Samsung SoCs' VA space) which changes S3C_ADDR_BASE from 0xF4000000
+> > to 0xFA000000.
+> >
+> > Reported-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > ---
+> >  arch/arm/plat-s3c24xx/include/plat/map.h |   14 +++-----------
+> >  1 files changed, 3 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-s3c24xx/include/plat/map.h b/arch/arm/plat-
+> s3c24xx/include/plat/map.h
+> > index bd534d3..771491e 100644
+> > --- a/arch/arm/plat-s3c24xx/include/plat/map.h
+> > +++ b/arch/arm/plat-s3c24xx/include/plat/map.h
+> > @@ -61,17 +61,9 @@
+> >
+> >  /* GPIO ports */
+> >
+> > -/* the calculation for the VA of this must ensure that
+> > - * it is the same distance apart from the UART in the
+> > - * phsyical address space, as the initial mapping for the IO
+> > - * is done as a 1:1 mapping. This puts it (currently) at
+> > - * 0xFA800000, which is not in the way of any current mapping
+> > - * by the base system.
+> > -*/
+> 
+> This comment is really important, and it is possible this will
+> break some of the s3c24xx platforms duing the boot process as
+> there can be problems during the changes of mmu when booting.
+> 
+Hi Ben,
 
-Sorry, I had to change the username, because some jerk denunciated me
-on github ;)
-git pull git://github.com/zimnylech/Linux-2.6-nps.git rodc2
+I understand, thanks for your pointing out.
+Firstly, will drop this..and update other regarding patch.
 
->
-> I build tested it. Now should I send every patch for review to
-> developers? Could you pull this tree to arm-next (2.6.38)?
->
+I think, we need to sort VA mapping out later ;-)
 
+> > -#define S3C2410_PA_GPIO	   (0x56000000)
+> > -#define S3C24XX_VA_GPIO	   ((S3C24XX_PA_GPIO - S3C24XX_PA_UART) +
+> S3C24XX_VA_UART)
+> > -#define S3C24XX_SZ_GPIO	   SZ_1M
+> > +#define S3C2410_PA_GPIO		(0x56000000)
+> > +#define S3C24XX_VA_GPIO		S3C2410_ADDR(0x00F00000)
+> > +#define S3C24XX_SZ_GPIO		SZ_1M
+> >
+> >
+> >  /* ISA style IO, for each machine to sort out mappings for, if it
 
+Thanks.
 
--- 
-Slawa!
-N.P.S.
-
-Les fleurs du mal unfold
-Comme les fleurs du mal
-Dark demons of my soul
-Un amour fatal
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
