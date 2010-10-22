@@ -1,44 +1,103 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 22 Oct 2010 10:46:18 +0200
-Subject: [PATCH v2 1/2] sdhci-esdhc-imx: fix timeout on i.MX's sdhci
-In-Reply-To: <20101022061803.GB5572@pengutronix.de>
-References: <20101022061803.GB5572@pengutronix.de>
-Message-ID: <1287737179-3956-1-git-send-email-eric@eukrea.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 22 Oct 2010 17:44:51 +0900
+Subject: [PATCHv2 3/6] ARM: S5P6442: I2S: Upgrade platform device
+In-Reply-To: <1287737094-23868-2-git-send-email-jassisinghbrar@gmail.com>
+References: <1287737094-23868-1-git-send-email-jassisinghbrar@gmail.com>
+	<1287737094-23868-2-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <1287737094-23868-3-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch fix timeout problems on i.MX's sdhci as suggested by
-Richard Zhu.
+From: Jassi Brar <jassi.brar@samsung.com>
 
-Tested on :
-- i.MX257 : not needed
-- i.MX357 : needed
-- i.MX515 : needed
+Add more information to I2S platform_devices in order
+to prepare them for new controller driver.
 
-more details can be found here :
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029748.html
-
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-Tested-by: Shawn Guo <shawn.gsc@gmail.com>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p6442/dev-audio.c |   42 +++++++++++++++++++++++++++++++-----
+ 1 files changed, 36 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index afbac9a..31256ad 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -130,6 +130,10 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 		gpio_request(boarddata->wp_gpio, "SD_WP");
- 		gpio_direction_input(boarddata->wp_gpio);
- 	}
-+
-+	if (cpu_is_mx35() || cpu_is_mx51())
-+		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
-+
+diff --git a/arch/arm/mach-s5p6442/dev-audio.c b/arch/arm/mach-s5p6442/dev-audio.c
+index 3462197..f70e2ef 100644
+--- a/arch/arm/mach-s5p6442/dev-audio.c
++++ b/arch/arm/mach-s5p6442/dev-audio.c
+@@ -29,7 +29,7 @@ static int s5p6442_cfg_i2s(struct platform_device *pdev)
+ 		base = S5P6442_GPC1(0);
+ 		break;
+ 
+-	case -1:
++	case 0:
+ 		base = S5P6442_GPC0(0);
+ 		break;
+ 
+@@ -42,8 +42,19 @@ static int s5p6442_cfg_i2s(struct platform_device *pdev)
  	return 0;
  }
  
+-static struct s3c_audio_pdata s3c_i2s_pdata = {
++static const char *rclksrc_v35[] = {
++	[0] = "busclk",
++	[1] = "i2sclk",
++};
++
++static struct s3c_audio_pdata i2sv35_pdata = {
+ 	.cfg_gpio = s5p6442_cfg_i2s,
++	.type = {
++		.i2s = {
++			.quirks = QUIRK_SEC_DAI | QUIRK_NEED_RSTCLR,
++			.src_clk = rclksrc_v35,
++		},
++	},
+ };
+ 
+ static struct resource s5p6442_iis0_resource[] = {
+@@ -62,15 +73,34 @@ static struct resource s5p6442_iis0_resource[] = {
+ 		.end   = DMACH_I2S0_RX,
+ 		.flags = IORESOURCE_DMA,
+ 	},
++	[3] = {
++		.start = DMACH_I2S0S_TX,
++		.end   = DMACH_I2S0S_TX,
++		.flags = IORESOURCE_DMA,
++	},
+ };
+ 
+ struct platform_device s5p6442_device_iis0 = {
+-	.name		  = "s3c64xx-iis-v4",
+-	.id		  = -1,
++	.name		  = "samsung-i2s",
++	.id		  = 0,
+ 	.num_resources	  = ARRAY_SIZE(s5p6442_iis0_resource),
+ 	.resource	  = s5p6442_iis0_resource,
+ 	.dev = {
+-		.platform_data = &s3c_i2s_pdata,
++		.platform_data = &i2sv35_pdata,
++	},
++};
++
++static const char *rclksrc_v3[] = {
++	[0] = "iis",
++	[1] = "sclk_audio",
++};
++
++static struct s3c_audio_pdata i2sv3_pdata = {
++	.cfg_gpio = s5p6442_cfg_i2s,
++	.type = {
++		.i2s = {
++			.src_clk = rclksrc_v3,
++		},
+ 	},
+ };
+ 
+@@ -98,7 +128,7 @@ struct platform_device s5p6442_device_iis1 = {
+ 	.num_resources	  = ARRAY_SIZE(s5p6442_iis1_resource),
+ 	.resource	  = s5p6442_iis1_resource,
+ 	.dev = {
+-		.platform_data = &s3c_i2s_pdata,
++		.platform_data = &i2sv3_pdata,
+ 	},
+ };
+ 
 -- 
-1.7.0.4
+1.6.2.5
