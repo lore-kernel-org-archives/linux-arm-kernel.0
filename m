@@ -1,32 +1,33 @@
-From: maximlevitsky@gmail.com (Maxim Levitsky)
-Date: Fri, 22 Oct 2010 02:25:11 +0200
-Subject: [PATCH] sdio: fix suspend/resume regression
-In-Reply-To: <alpine.LFD.2.00.1010211952110.2764@xanadu.home>
-References: <1286788315.3101.11.camel@sven>
-	<1286955116-22793-1-git-send-email-ohad@wizery.com>
-	<1287704855.12734.14.camel@maxim-laptop>
-	<alpine.LFD.2.00.1010211952110.2764@xanadu.home>
-Message-ID: <1287707111.12734.30.camel@maxim-laptop>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 22 Oct 2010 01:27:38 +0100
+Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
+In-Reply-To: <201010220220.10398.marek.vasut@gmail.com>
+References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
+	<20101021141302.GA11912@void.printf.net>
+	<20101021145249.GA13095@void.printf.net>
+	<201010220220.10398.marek.vasut@gmail.com>
+Message-ID: <20101022002738.GA688@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-10-21 at 19:55 -0400, Nicolas Pitre wrote:
-> On Fri, 22 Oct 2010, Maxim Levitsky wrote:
-> 
-> > So what happens if you set .suspend to NULL? instead of -ENOSYS return?
-> 
-> At run time, the driver may decide to handle the suspend request and 
-> return 0, or decide to simply return -ENOSYS if it doesn't want to 
-> bother with the suspend meaning that the card should be removed, or 
-> return another error code meaning that the suspend request must be 
-> aborted.
+Hi Marek,
 
-I am afraid that this is very hard to support.
-If .suspend would be called from pm notifier, it would create problems
-last time I checked.
-Or maybe it won't?
-I will test that again, as it might be very nice solution.
-I could even just call the mmc_suspend_host from the pm notifier.
+On Fri, Oct 22, 2010 at 02:20:10AM +0200, Marek Vasut wrote:
+> > > I'll take the drivers/mmc/ hunks, but you should send the plat-pxa/
+> > > patch through the ARM tree.
+> > 
+> > Oh.  If we do that then the driver won't compile until everything's
+> > together, because it #includes <plat/sdhci.h>.  Haojian/Eric, what do
+> > you prefer here?  Should I take the arch/arm/ hunk via the MMC tree?
+> > (If so, please provide ACKs.)
+> 
+> Hi, where can I find the whole driver so I can take a look? It didn't 
+> crash into linux-arm-kernel for some reason.
 
-Best regards,
-	Maxim Levitsky
+Here it is:
+
+http://thread.gmane.org/gmane.linux.kernel.mmc/4190
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
