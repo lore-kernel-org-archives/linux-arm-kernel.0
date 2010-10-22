@@ -1,24 +1,53 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 21 Oct 2010 19:57:45 -0400 (EDT)
-Subject: [PATCH] sdio: fix suspend/resume regression
-In-Reply-To: <1287704855.12734.14.camel@maxim-laptop>
-References: <1286788315.3101.11.camel@sven>
-	<1286955116-22793-1-git-send-email-ohad@wizery.com>
-	<1287704855.12734.14.camel@maxim-laptop>
-Message-ID: <alpine.LFD.2.00.1010211956010.2764@xanadu.home>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 22 Oct 2010 02:20:10 +0200
+Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
+In-Reply-To: <20101021145249.GA13095@void.printf.net>
+References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
+	<20101021141302.GA11912@void.printf.net>
+	<20101021145249.GA13095@void.printf.net>
+Message-ID: <201010220220.10398.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Oct 2010, Maxim Levitsky wrote:
-
-> This reintroduces the bug I fixed.
+Dne ?t 21. ??jna 2010 16:52:49 Chris Ball napsal(a):
+> Hi,
 > 
-> if the CONFIG_MMC_UNSAFE_RESUME isn't set (and that is default
-> unfortunately), the host->bus_ops->resume will be NULL (see core/mmc.c
-> mmc_ops), and therefore card will be removed, that will trigger a block
-> device removal, sync, and deadlock).
+> On Thu, Oct 21, 2010 at 03:13:02PM +0100, Chris Ball wrote:
+> > On Mon, Oct 18, 2010 at 08:32:46AM -0400, zhangfei gao wrote:
+> > > Update with comments from Matt and Eric.
+> > > Test with sd and emmc.
+> > > 
+> > > >From e5dd554ed4d3488a83d9a4888d68d1d85482f747 Mon Sep 17 00:00:00 2001
+> > > 
+> > > From: Zhangfei Gao <zhangfei.gao@marvell.com>
+> > > Date: Mon, 20 Sep 2010 10:51:28 -0400
+> > > Subject: [PATCH] mmc: add support of sdhci-pxa driver
+> > > 
+> > > 	Support Marvell PXA168/PXA910/MMP2 SD Host Controller
+> > > 
+> > > Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+> > > ---
+> > > 
+> > >  arch/arm/plat-pxa/include/plat/sdhci.h |   32 ++++
+> > >  drivers/mmc/host/Kconfig               |   12 ++
+> > >  drivers/mmc/host/Makefile              |    1 +
+> > >  drivers/mmc/host/sdhci-pxa.c           |  259
+> > >  ++++++++++++++++++++++++++++++++ 4 files changed, 304 insertions(+),
+> > >  0 deletions(-)
+> > >  create mode 100644 arch/arm/plat-pxa/include/plat/sdhci.h
+> > >  create mode 100644 drivers/mmc/host/sdhci-pxa.c
+> > 
+> > I'll take the drivers/mmc/ hunks, but you should send the plat-pxa/
+> > patch through the ARM tree.
+> 
+> Oh.  If we do that then the driver won't compile until everything's
+> together, because it #includes <plat/sdhci.h>.  Haojian/Eric, what do
+> you prefer here?  Should I take the arch/arm/ hunk via the MMC tree?
+> (If so, please provide ACKs.)
+> 
+> Thanks,
 
-Maybe mmc_ops should have a non NULL resume method then?
+Hi, where can I find the whole driver so I can take a look? It didn't crash into 
+linux-arm-kernel for some reason.
 
-
-Nicolas
+Thanks
