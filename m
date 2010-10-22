@@ -1,36 +1,75 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Thu, 21 Oct 2010 21:30:00 -0700
-Subject: [PATCH 2/2] [ARM] Kirkwood: add fan support for Network Space
-	Max v2
-In-Reply-To: <alpine.LFD.2.00.1010212202400.2764@xanadu.home>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<1287330612-11256-2-git-send-email-simon@sequanux.org>
-	<1287712396.9690.378.camel@groeck-laptop>
-	<alpine.LFD.2.00.1010212202400.2764@xanadu.home>
-Message-ID: <20101022043000.GA29632@ericsson.com>
+From: shawn.gsc@gmail.com (Shawn Guo)
+Date: Fri, 22 Oct 2010 12:39:41 +0800
+Subject: [PATCH 1/2] mmc: quirk fix for timeout problem
+In-Reply-To: <4CC0A281.1010202@eukrea.com>
+References: <1287564807-1645-1-git-send-email-shawn.gsc@gmail.com>
+	<1287566576-1224-1-git-send-email-shawn.gsc@gmail.com>
+	<20101020112741.GB10261@pengutronix.de>
+	<AANLkTinairUcKpTH2ePjbp3j7qdsmrPCeeWR_E+RSsPU@mail.gmail.com>
+	<alpine.LFD.2.00.1010211308340.2764@xanadu.home>
+	<AANLkTikokkVaAjA+b6f56Syv0h8odiN4koJTOaFW_Ebx@mail.gmail.com>
+	<4CC0A281.1010202@eukrea.com>
+Message-ID: <AANLkTi=c+hQX+20WtNF60eHKbH6-=TE8CySsp=6wKm0d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 10:08:01PM -0400, Nicolas Pitre wrote:
-> On Thu, 21 Oct 2010, Guenter Roeck wrote:
-> 
-> > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-> > > From: Simon Guinot <sguinot@lacie.com>
-> > > 
-> > > Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> > 
-> > Acked-by: Guenter Roeck <guenter.roeck@ericsson.com>
-> > 
-> > I assume this will get pushed through the ARM tree, right ?
-> 
-> Might be simpler if this is routed along the same path as the core code 
-> it relies upon to avoid dependency ordering issues.  There is nothing 
-> particularly ARM specific here anyway.
-> 
-Fine with me, as long as no one objects. Simon, can you reparent this
-on top of your patch v3 (or maybe on top of 2.6.36) and re-send it ?
-For some reason git refuses to apply it for me.
+Last night, I booted the system up with NFS, tested mmc
+mount/read/write, and did not see timeout error.  With Eric's result,
+I just did the test differently.  Writing an ext2 rootfs image on the
+card, booting the system from mmc directly, and timeout error is being
+seen on mx35_3ds.  As expected, the timeout quirk can fix it.
 
-Thanks,
-Guenter
+Sorry for the confusion.
+
+
+On Fri, Oct 22, 2010 at 4:28 AM, Eric B?nard <eric@eukrea.com> wrote:
+> Hi,
+>
+> test protocol : booting a 2.6.36-rc8 kernel with a rootfs (ext3 formated,
+> generated with OpenEmbedded for armv5, loading and launching qtdemo 4.6.3)
+> on a 8GB ?DHC ?(uSD reformated after each board tests to trigger lot of
+> read/writes on the first init).
+>
+> * on an i.MX357 (rev 2.1) without this patch leads to :
+> mmcblk0: error -110 transferring data, sector 7347024, nr 8, card status
+> 0xe00
+> end_request: I/O error, dev mmcblk0, sector 7347025
+>
+> Same card, same board, with the timeout quirk patch : boots fine without any
+> error.
+>
+> Reverted the patch: timeout errors came back.
+>
+> ==> quirk timeout patch needed for the i.MX35
+>
+> * on an i.MX257 (tested twice) :
+> Same kernel tree, same rootfs, same motherboard, same uSD, only the CPU
+> module change : no error without the patch (and no error with the patch also
+> ;-).
+>
+> ==> quirk timeout patch not needed for the i.MX25
+>
+> * on an i.MX515 :
+> Same kernel tree, same rootfs, same motherboard, same uSD (re-formated),
+> only the CPU module change without this patch leads to :
+> mmcblk0: error -84 transferring data, sector 1315598, nr 2, card status
+> 0x900
+> end_request: I/O error, dev mmcblk0, sector 1315598
+>
+> Same card, same board, with the timeout quirk patch : boots fine without any
+> error.
+>
+> Reverted the patch: timeout errors came back.
+>
+> ==> quirk timeout patch needed for the i.MX51
+>
+> Updated patch follows.
+>
+> Eric
+>
+
+
+
+-- 
+Regards,
+Shawn
