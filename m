@@ -1,46 +1,44 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 22 Oct 2010 10:46:19 +0200
-Subject: [PATCH v2 2/2] sdhci-esdhc-imx: enable QUIRK_NO_MULTIBLOCK only for
-	i.MX25 and i.MX35
+Date: Fri, 22 Oct 2010 10:46:18 +0200
+Subject: [PATCH v2 1/2] sdhci-esdhc-imx: fix timeout on i.MX's sdhci
 In-Reply-To: <20101022061803.GB5572@pengutronix.de>
 References: <20101022061803.GB5572@pengutronix.de>
-Message-ID: <1287737179-3956-2-git-send-email-eric@eukrea.com>
+Message-ID: <1287737179-3956-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-only these CPU's errata list this bug.
+this patch fix timeout problems on i.MX's sdhci as suggested by
+Richard Zhu.
+
+Tested on :
+- i.MX257 : not needed
+- i.MX357 : needed
+- i.MX515 : needed
+
+more details can be found here :
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029748.html
 
 Signed-off-by: Eric B?nard <eric@eukrea.com>
+Tested-by: Shawn Guo <shawn.gsc@gmail.com>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 31256ad..14d2836 100644
+index afbac9a..31256ad 100644
 --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -134,6 +134,10 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 	if (cpu_is_mx35() || cpu_is_mx51())
- 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
- 
-+	/* fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
-+	if (cpu_is_mx25() || cpu_is_mx35())
-+		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
+@@ -130,6 +130,10 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ 		gpio_request(boarddata->wp_gpio, "SD_WP");
+ 		gpio_direction_input(boarddata->wp_gpio);
+ 	}
++
++	if (cpu_is_mx35() || cpu_is_mx51())
++		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
 +
  	return 0;
  }
  
-@@ -160,10 +164,8 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- };
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_MULTIBLOCK
--			| SDHCI_QUIRK_BROKEN_ADMA,
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
- 	/* ADMA has issues. Might be fixable */
--	/* NO_MULTIBLOCK might be MX35 only (Errata: ENGcm07207) */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
- 	.exit = esdhc_pltfm_exit,
 -- 
 1.7.0.4
