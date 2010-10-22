@@ -1,29 +1,52 @@
-From: mreimer@sdgsystems.com (Matt Reimer)
-Date: Fri, 22 Oct 2010 17:26:06 -0400
-Subject: [PATCH] pxafb: correct the vertical back porch macro
-Message-ID: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 22 Oct 2010 15:00:22 -0700
+Subject: [PATCH 1/3] OMAP: PM: formalize idle notifications
+In-Reply-To: <20101022180553.GD17595@atomide.com> (Tony Lindgren's message of
+	"Fri, 22 Oct 2010 11:05:53 -0700")
+References: <1287617483-24170-1-git-send-email-khilman@deeprootsystems.com>
+	<20101022180553.GD17595@atomide.com>
+Message-ID: <8762wt7urt.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back porch
-knob LCCR2[BFW] specifies the number of clock periods minus one, but the
-macro wasn't doing the subtraction.
----
- arch/arm/mach-pxa/include/mach/regs-lcd.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Tony Lindgren <tony@atomide.com> writes:
 
-diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h b/arch/arm/mach-pxa/include/mach/regs-lcd.h
-index f82dcea..5074d18 100644
---- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
-+++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
-@@ -107,7 +107,7 @@
- #define LCCR2_EndFrmDel(Tln)   ((Tln) << FShft (LCCR2_EFW))
- 
- #define LCCR2_BFW      Fld (8, 24)     /* Beginning-of-Frame line clock */
--#define LCCR2_BegFrmDel(Tln)   ((Tln) << FShft (LCCR2_BFW))
-+#define LCCR2_BegFrmDel(Tln)   (((Tln) - 1) << FShft (LCCR2_BFW))
- 
- #define LCCR3_API      (0xf << 16)     /* AC Bias pin trasitions per interrupt */
- #define LCCR3_API_S    16
--- 
-1.7.0.4
+> * Kevin Hilman <khilman@deeprootsystems.com> [101020 16:22]:
+>> Currently in the idle path, we have custom function calls into device
+>> code to handle device specific actions that need to be coordinated CPU
+>> idle transitions. Rather than continue this ad-hoc method of calling
+>> device code from the PM core, create a formal way for device/driver
+>> code to register for idle notifications.
+>> 
+>> Idle notifications are done late in the idle path when interrupts are
+>> disabled, hence use atomic notifier chains.  These notifications will
+>> also be atomic with respect to CPU idle transitions.
+>
+> ...
+>
+>> +EXPORT_SYMBOL_GPL(omap_idle_notifier_register);
+>> +EXPORT_SYMBOL_GPL(omap_idle_notifier_unregister);
+>
+> Let's rather set this up as a generic framework to avoid adding
+> more omap specific frameworks to the drivers.
+
+Hmm, I thought I removed those EXPORT_SYMBOLs, just for that reason.  
+
+I actually don't really intend these to be used from drivers, but only
+from OMAP-specific device code.  We currently use these manly for errata
+purposes, but also for UART debug purposes, and only from device code
+currently.
+
+That being said, I did consider a generic framework for this (x86_64 has
+it's own idle notfiers as well), and this topic something already on the
+table for LPC PM miniconf.  However, at least for OMAP, the location of
+when the notifiers are triggered has to be in OMAP-specific code.  It
+cannot be in the ARM-generic idle path (like they do in x86_64.)
+
+The reason is because the idle notifiers have to be called *after* the
+OMAP-specific idle path has programmed the next power states for the
+various power domains.  That way, the idle notifiers can read the next
+power state regs and make decisons on what they need to do (or not to
+do) based on whether he power domain is going to RET, OFF, etc.
+
+Kevin
