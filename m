@@ -1,99 +1,127 @@
-From: rpimentel.silva@gmail.com (Rogerio Pimentel)
-Date: Fri, 22 Oct 2010 11:03:54 -0200
-Subject: [PATCH v2] MX27 3ds: Add SDHC1 support to mx27 3ds
-Message-ID: <AANLkTimUwquL=JEcVPCXpmP2L+x0YNquCOpB=iY7fFZ=@mail.gmail.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Fri, 22 Oct 2010 17:52:26 +0400
+Subject: [PATCH 1/6] ARM: Add basic architecture support for
+	VIA/WonderMedia 85xx SoC's
+In-Reply-To: <201010221102.12329.arnd@arndb.de>
+References: <1287608139-21354-1-git-send-email-alchark@gmail.com>
+	<201010211401.53001.arnd@arndb.de>
+	<AANLkTimkLqrbX+536TD630xFy=y-PxEdksc4sA0gz6fU@mail.gmail.com>
+	<201010221102.12329.arnd@arndb.de>
+Message-ID: <AANLkTi=F2VA_3L9-49OQ=Bj1KaD2T58Ske2qvHFqirM9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SDHC1 support to MX27 3ds
+2010/10/22 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 21 October 2010 23:08:39 Alexey Charkov wrote:
+>> 2010/10/21 Arnd Bergmann <arnd@arndb.de>:
+>> > On Thursday 21 October 2010, Alexey Charkov wrote:
+>> > Parsing complex options in general is not ok, but something simpler
+>> > probably is.
+>> >
+>> > Having a Kconfig selected default is probably a good idea. The most
+>> > simple way to select this at boot time would be to have a list of
+>> > possible resolutions and pass a table index.
+>> >
+>> > Would a __setup() call work for you?
+>> >
+>>
+>> Should probably be fine. Will it be allowable to accept something like
+>> "panel=800x480" and strncmp it against a list of recognized values,
+>> fall back to a Kconfig default on failure and printk the
+>> possibilities? Just expecting an obscure table index would not be too
+>> user-friendly, imho.
+>
+> Sounds reasonable to me.
+>
+>> >> And due to the fact that the framebuffer size calculation is tied to
+>> >> panel specification, it will boot in any case. The only problem that
+>> >> one could encounter would be suboptimal display (for example,
+>> >> offscreen pixmaps to become actually visible on screen if the panel is
+>> >> taller
+>> >> than expected, or some corruption in case it is wider).
+>> >
+>> > Another option might be to have a submenu with the possible resolutions
+>> > you want to allow and size the frame buffer for the largest of those,
+>> > but allow overriding the actual one at boot time.
+>> >
+>>
+>> In this case display parameters could be parsed in the driver itself,
+>> but quite some memory will be over-allocated in extreme cases without
+>> any way to claim it back after boot. Having only 128MB of RAM, is it
+>> really better?
+>
+> Well, you could still build a specialized kernel with only support for
+> one resolution if you care about every byte.
+>
 
-Signed-off-by: Rogerio Pimentel <rpimentel.silva@gmail.com>
+If it is fine to accept an option like "panel=<value_from_a_list>" at
+map_io stage, then I'd rather go that way, and calculate the minimum
+required buffer size for the current configuration. Especially if we
+decide to make a unified image for different SoC revisions, as WM8505
+requires 32bpp framebuffer, while VT8500 requires it to be 4MB-aligned
+native-bpp.
 
----
-Change since v1: Fix e-mailer like break as pointed by Sascha Hauer
- arch/arm/mach-imx/mach-mx27_3ds.c |   38 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 38 insertions(+), 0 deletions(-)
+>> Cleaned this up in the development repo, thanks. Only left #ifdef's
+>> for the sections where respective register/interrupt definitions would
+>> be unavailable due to compiling for a different SoC version, and
+>> adjusted the conditions accordingly.
+>
+> Ideally those should also be run-time decisions so you can build a
+> kernel that works on both. It's all __init code, so it won't eat
+> up any RAM afterwards.
+>
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c
-b/arch/arm/mach-imx/mach-mx27_3ds.c
-index a69dba2..a02a00a 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -23,16 +23,20 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/input/matrix_keypad.h>
-+#include <linux/irq.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx27.h>
-+#include <mach/mmc.h>
+I thought about that, and it should be quite useful. However, register
+and interrupt definitions should then be converted into some indexed
+data structures instead of macros (as they differ between VT8500 and
+WM8505), and the correct index should be selectable at runtime.
 
- #include "devices-imx27.h"
- #include "devices.h"
+Is there any way to determine which mach type we are currently running
+at after early head.S initialization completes and before we could
+need to use any registers and/or interrupts? It could probably be done
+in machine-specific fixup functions, but I'm unsure whether this would
+be a correct way to go.
 
-+#define SD1_EN_GPIO (GPIO_PORTB + 25)
-+
- static const int mx27pdk_pins[] __initconst = {
- 	/* UART1 */
- 	PE12_PF_UART1_TXD,
-@@ -58,6 +62,14 @@ static const int mx27pdk_pins[] __initconst = {
- 	PD15_AOUT_FEC_COL,
- 	PD16_AIN_FEC_TX_ER,
- 	PF23_AIN_FEC_TX_EN,
-+	/* SDHC1 */
-+	PE18_PF_SD1_D0,
-+	PE19_PF_SD1_D1,
-+	PE20_PF_SD1_D2,
-+	PE21_PF_SD1_D3,
-+	PE22_PF_SD1_CMD,
-+	PE23_PF_SD1_CLK,
-+	SD1_EN_GPIO | GPIO_GPIO | GPIO_OUT,
- };
+>> >> >> +#ifndef __ASM_ARM_ARCH_IO_H
+>> >> >> +#define __ASM_ARM_ARCH_IO_H
+>> >> >> +
+>> >> >> +#define IO_SPACE_LIMIT 0xffffffff
+>> >> >> +
+>> >> >> +#define __io(a) ? ? ? ? ? ? ?__typesafe_io(a)
+>> >> >> +#define __mem_pci(a) (a)
+>> >> >> +
+>> >> >> +#endif
+>>
+>> Ok, figuring out better values for the macros would be great!
+>
+> For the IO_SPACE_LIMIT, just make it 0xffff
+>
+> For __io, you need to find a place in your virtual address space
+> and map the real IO space.
+>
+> According to the VIA source code, the physical I/O window is at
+> 0xd8000000, they also map it to the same address in virtual space
+> but you can have anywhere convienient.
+>
 
- static const struct imxuart_platform_data uart_pdata __initconst = {
-@@ -85,13 +97,39 @@ static struct matrix_keymap_data mx27_3ds_keymap_data = {
- 	.keymap_size	= ARRAY_SIZE(mx27_3ds_keymap),
- };
+Are you sure about that? 0xd8000000 is the MMIO base, as far as I can
+tell (see register definitions in <mach/vt8500.h>). In earlier
+discussions you presumed [1] that IO could be at 0xc0000000, but I'm
+not sure how to verify that. If so, should it then look something like
+this:
 
-+static int mx27_3ds_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
-+				void *data)
-+{
-+	return request_irq(IRQ_GPIOB(26), detect_irq, IRQF_TRIGGER_FALLING |
-+			IRQF_TRIGGER_RISING, "sdhc1-card-detect", data);
-+}
-+
-+static void mx27_3ds_sdhc1_exit(struct device *dev, void *data)
-+{
-+	free_irq(IRQ_GPIOB(26), data);
-+}
-+
-+static struct imxmmc_platform_data sdhc1_pdata = {
-+	.init = mx27_3ds_sdhc1_init,
-+	.exit = mx27_3ds_sdhc1_exit,
-+};
-+
-+static void mx27_3ds_sdhc1_enable_level_translator(void)
-+{
-+	/* Turn on TXB0108 OE pin */
-+	gpio_request(SD1_EN_GPIO, "sd1_enable");
-+	gpio_direction_output(SD1_EN_GPIO, 1);
-+}
-+
- static void __init mx27pdk_init(void)
- {
- 	mxc_gpio_setup_multiple_pins(mx27pdk_pins, ARRAY_SIZE(mx27pdk_pins),
- 		"mx27pdk");
-+	mx27_3ds_sdhc1_enable_level_translator();
- 	imx27_add_imx_uart0(&uart_pdata);
- 	imx27_add_fec(NULL);
- 	mxc_register_device(&imx_kpp_device, &mx27_3ds_keymap_data);
-+	mxc_register_device(&mxc_sdhc_device0, &sdhc1_pdata);
- }
+#define __io(a) ((void __iomem *)(((a) + 0xc0000000) +
+SOME_OFFSET_TO_VIRT_SPACE))
 
- static void __init mx27pdk_timer_init(void)
--- 
-1.7.0.4
+?
+By the way, other boards except for footbridge, integrator, ebsa110
+and ixp4xx define IO_SPACE_LIMIT to be 0xffffffff. 0xffff seems more
+plausbile, though...
+
+> ? ? ? ?Arnd
+>
+
+Thanks,
+Alexey
+
+[1] http://groups.google.com/group/vt8500-wm8505-linux-kernel/msg/97bf44bc5ea5d46a?
