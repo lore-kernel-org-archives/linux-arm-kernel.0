@@ -1,52 +1,44 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 22 Oct 2010 15:00:22 -0700
-Subject: [PATCH 1/3] OMAP: PM: formalize idle notifications
-In-Reply-To: <20101022180553.GD17595@atomide.com> (Tony Lindgren's message of
-	"Fri, 22 Oct 2010 11:05:53 -0700")
-References: <1287617483-24170-1-git-send-email-khilman@deeprootsystems.com>
-	<20101022180553.GD17595@atomide.com>
-Message-ID: <8762wt7urt.fsf@deeprootsystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Oct 2010 23:46:12 +0100
+Subject: [PATCH v3 01/12] misc: add driver for sequencer serial port
+In-Reply-To: <4CC1E717.7070707@ti.com>
+References: <1287694873-12904-1-git-send-email-cyril@ti.com>
+	<20101021161224.b4c0b623.akpm@linux-foundation.org>
+	<4CC18605.80007@ti.com> <201010221448.17728.arnd@arndb.de>
+	<4CC1E717.7070707@ti.com>
+Message-ID: <20101022224612.GA6079@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Fri, Oct 22, 2010 at 03:33:43PM -0400, Cyril Chemparathy wrote:
+> On 10/22/2010 08:48 AM, Arnd Bergmann wrote:
+> > On Friday 22 October 2010 14:39:33 Cyril Chemparathy wrote:
+> >>>> +/* Register Access Helpers */
+> >>>> +static inline u32 ssp_read(struct ti_ssp *ssp, int reg)
+> >>>> +{
+> >>>> +    return __raw_readl(ssp->regs + reg);
+> >>>> +}
+> >>>> +
+> >>>> +static inline void ssp_write(struct ti_ssp *ssp, int reg, u32 val)
+> >>>> +{
+> >>>> +    __raw_writel(val, ssp->regs + reg);
+> >>>> +}
+> >>>
+> >>> Why are the __raw functions used here?
+> >>>
+> >>
+> >> These registers are to be accessed native endian at all times, and
+> >> therefore the le32 conversion done otherwise is inappropriate.
+> > 
+> > Won't that break on out-of-order CPUs that need the extra synchronization
+> > done in readl/writel?
+> > 
+> 
+> AFAICS, ioremap()ed space on ARMv6 should be strongly ordered.
 
-> * Kevin Hilman <khilman@deeprootsystems.com> [101020 16:22]:
->> Currently in the idle path, we have custom function calls into device
->> code to handle device specific actions that need to be coordinated CPU
->> idle transitions. Rather than continue this ad-hoc method of calling
->> device code from the PM core, create a formal way for device/driver
->> code to register for idle notifications.
->> 
->> Idle notifications are done late in the idle path when interrupts are
->> disabled, hence use atomic notifier chains.  These notifications will
->> also be atomic with respect to CPU idle transitions.
->
-> ...
->
->> +EXPORT_SYMBOL_GPL(omap_idle_notifier_register);
->> +EXPORT_SYMBOL_GPL(omap_idle_notifier_unregister);
->
-> Let's rather set this up as a generic framework to avoid adding
-> more omap specific frameworks to the drivers.
+No.  ioremap'd space is device memory on ARMv6 and above, which means
+if you care about the ordering of writes to device vs memory, you
+need barriers.
 
-Hmm, I thought I removed those EXPORT_SYMBOLs, just for that reason.  
-
-I actually don't really intend these to be used from drivers, but only
-from OMAP-specific device code.  We currently use these manly for errata
-purposes, but also for UART debug purposes, and only from device code
-currently.
-
-That being said, I did consider a generic framework for this (x86_64 has
-it's own idle notfiers as well), and this topic something already on the
-table for LPC PM miniconf.  However, at least for OMAP, the location of
-when the notifiers are triggered has to be in OMAP-specific code.  It
-cannot be in the ARM-generic idle path (like they do in x86_64.)
-
-The reason is because the idle notifiers have to be called *after* the
-OMAP-specific idle path has programmed the next power states for the
-various power domains.  That way, the idle notifiers can read the next
-power state regs and make decisons on what they need to do (or not to
-do) based on whether he power domain is going to RET, OFF, etc.
-
-Kevin
+Nevertheless, individual reads/writes to devices will be in program
+order, but writes may be delayed.
