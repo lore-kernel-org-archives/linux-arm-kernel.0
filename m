@@ -1,40 +1,57 @@
-From: radoslav.kolev@rnd.bg (Radoslav Kolev)
-Date: Fri, 22 Oct 2010 13:13:59 +0300
-Subject: imx: PWM module on mx35
-In-Reply-To: <AANLkTi=p1y9aAodOBu=kskGnXUu-fZ_snL+Y9R=5-Gck@mail.gmail.com>
-References: <1287700257.4822.29.camel@rado-desktop>
-	<AANLkTi=p1y9aAodOBu=kskGnXUu-fZ_snL+Y9R=5-Gck@mail.gmail.com>
-Message-ID: <1287742439.2441.0.camel@rado-desktop>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 22 Oct 2010 12:14:29 +0200
+Subject: [patch v2 00/10] efikamx support improvements - try 2
+In-Reply-To: <20101022092857.GF17631@matterhorn.lan> (Amit Kucheria's message
+	of "Fri, 22 Oct 2010 12:28:57 +0300")
+References: <20101021103855.115653951@rtp-net.org>
+	<20101022092857.GF17631@matterhorn.lan>
+Message-ID: <87eibibkl6.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-10-21 at 23:10 -0200, Fabio Estevam wrote:
-> Hi Radoslav,
-> 
-> On Thu, Oct 21, 2010 at 8:30 PM, Radoslav Kolev <radoslav.kolev@rnd.bg> wrote:
-> > Hello,
-> >
-> > I am trying to use the PWM module on a Freescale MX35 SOC but all writes
-> > to the PWM module registers seem to be ignored.
-> >
-> > I have found two issues reported as fixed in the changelog of
-> > Freescales's Linux BSP for the i.MX31ADS (with similar PWM module) at
-> > http://www.freescale.com/files/soft_dev_tools/doc/support_info/BSPIMX31ADSLTIB__RN.txt
-> >
-> > 851     Unable to write to PWM registers
-> > 1438    Cannot write to PWM registers
-> 
-> These patches fixed the MXC_CCM_CGR1 offset for the pwm_clk in the
-> Freescale kernel.
-> 
-> Another thing that was needed was to enable the PWM clock.
-> 
-> Please try the patch below.
-> 
+Amit Kucheria <amit.kucheria@linaro.org> writes:
 
-Thanks, Fabio!
+Hi,
 
-That solved the register writing problem.
+> On 10 Oct 21, Arnaud Patard wrote:
+>> 
+>> Hi,
+>> 
+>> This patchset aims at improving current efikamx support. It adds support for :
+>> - board id detection
+>> - sdhc
+>> - leds
+>> - power button
+>> - spi nor
+>> - reset
+>> 
+>> I also had to fix/improve some imx51 iomux header so there are patches for
+>> iomux-mx51.h.
+>> 
+>> v2:
+>> - split iomux patch 3 into 2 patches
+>> - reorder patches
+>> - fix space comment
+>> - fix Amit's comments
+>> - decrease board id msleep
+>> 
+>> Arnaud
+>> 
+>
+> Please fix the typo in 07/10 description. Or perhaps Sascha will fix it while committing.
+>
+> Also Dinh has added mx51_add_buttons() to platform code. 07/10 should be
+> modified to use that. Search for "ARM: imx: Add gpio-keys to mx51 babbage
+> board" on LAKML.
 
-Regards,
-Radoslav Kolev
+uh ? You mean that a patch sent with a subject containing 'mx51
+babbage' is containing changes which are generic for all imx51
+platforms ? that's rather counter-intuitive and unfortunate imho :(
+
+Moreover, from the archives, it's making what looks like babbage
+specific changes in iomux-mx51.h file as noted Uwe Kleine-Koenig. I'll
+wait then that all this stuff has been sorted and merged to send a new
+patchset.
+
+Thanks,
+Arnaud
