@@ -1,27 +1,40 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Fri, 22 Oct 2010 09:07:58 +0200
-Subject: [PATCH 2/2] sdhci-esdhc-imx: enable QUIRK_NO_MULTIBLOCK only
-	for i.MX25 and i.MX35
-In-Reply-To: <20101022061803.GB5572@pengutronix.de>
-References: <4CC0A281.1010202@eukrea.com>
-	<1287696028-27854-2-git-send-email-eric@eukrea.com>
-	<20101022061803.GB5572@pengutronix.de>
-Message-ID: <4CC1384E.4000403@eukrea.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri, 22 Oct 2010 10:08:47 +0300
+Subject: [PATCH RESEND] ARM: fix spinlock recursion in adjust_pte()
+In-Reply-To: <20101022064205.GI6225@tarshish>
+References: <20101021164433.GH4772@gw.healthdatacare.com>
+	<1287680982-22971-1-git-send-email-mika.westerberg@iki.fi>
+	<20101022062825.GH6225@tarshish>
+	<20101022063845.GI4772@gw.healthdatacare.com>
+	<20101022064205.GI6225@tarshish>
+Message-ID: <20101022070847.GJ4772@gw.healthdatacare.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Fri, Oct 22, 2010 at 08:42:05AM +0200, Baruch Siach wrote:
+> Hi Mika,
+> 
+> On Fri, Oct 22, 2010 at 09:38:45AM +0300, Mika Westerberg wrote:
+> > On Fri, Oct 22, 2010 at 08:28:26AM +0200, Baruch Siach wrote:
+> > [...]
+> > > 
+> > > Do you have any idea when was this bug introduced? Does it affect already 
+> > > release kernels other than .36?
+> > 
+> > I've seen it at least on .35. The locking code itself was introduced
+> > in commit:
+> > 
+> > 56dd47098abe (ARM: make_coherent: fix problems with highpte, part 1)
+> 
+> Which is present on .34-rc1. In this case adding stable at kernel.org to Cc would 
+> be nice.
 
-Le 22/10/2010 08:18, Wolfram Sang a ?crit :
-> On Thu, Oct 21, 2010 at 11:20:28PM +0200, Eric B?nard wrote:
->> only these CPU's errata list this bug.
->
-> So, it was not directly tested?
->
-While I was testing the other quirk, I tested this one on 25, 35 & 51, but I 
-can't trigger the bug on any of these CPU (without the quirk : the bug suppose 
-there is an error reading one block and that the MMC layer then sends CMD12 
-which can't stop the AHB transfer and thus the controler stays blocked. As I 
-didn't met an error to read a block, I wasn't able to trigger the bug.
+Ok, thanks.
 
-Eric
+I'm not familiar with the stable rules and it wasn't immediately
+clear from the Documentation/stable_kernel_rules.txt: should I resend
+this patch with added 'Cc:' or is it enough just to add Cc into followup
+mail?
+
+Thanks,
+MW
