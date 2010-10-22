@@ -1,94 +1,219 @@
-From: jgq516@gmail.com (xiao jiang)
-Date: Fri, 22 Oct 2010 18:38:58 +0800
-Subject: [PATCH V3 1/1] mx35pdk: add debug board support
-In-Reply-To: <1287648950-25633-1-git-send-email-jgq516@gmail.com>
-References: <1287648950-25633-1-git-send-email-jgq516@gmail.com>
-Message-ID: <AANLkTimQ6LcewOrZ8WXAeL7pnxu+ArKfNJQD4WgGwJZx@mail.gmail.com>
+From: amit.kucheria@canonical.com (Amit Kucheria)
+Date: Fri, 22 Oct 2010 13:47:51 +0300
+Subject: [PATCHv4 1/2] ARM: imx: Add gpio-keys to mx51 babbage board
+In-Reply-To: <1287687324-6101-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287687324-6101-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20101022104751.GG17631@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Dinh,
 
-Could you apply the patch in your tree, I have regenrated the patch based on
-for-rmk-next branch of your tree, pls check the attached patch.
+The platform code should be separated from the board-specific code.
 
-Thanks,
-Xiao Jiang
+Can you split this into two patches?
 
-2010/10/21 <jgq516@gmail.com>
+Regards,
+Amit
 
-> From: Xiao Jiang <jgq516@gmail.com>
->
-> Enable debug board support for mx35pdk.
->
-> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 10 Oct 21, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> Add functionality for the power button on MX51 Babbage board.
+> 
+> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > ---
-> Change since v2:
-> - s/board/debugboard per Bacuch's comment.
->
-> Change since v1:
-> - Add MXC_DEBUG_BOARD in Kconfig per Fabio's comment.
-> - Redefinition EXPIO_PARENT_INT per Fabio's comment.
->
->  arch/arm/mach-mx3/Kconfig         |    1 +
->  arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
->  2 files changed, 9 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-> index 85beece..cdf6ac5 100644
-> --- a/arch/arm/mach-mx3/Kconfig
-> +++ b/arch/arm/mach-mx3/Kconfig
-> @@ -139,6 +139,7 @@ config MACH_ARMADILLO5X0
->  config MACH_MX35_3DS
->        bool "Support MX35PDK platform"
->        select ARCH_MX35
-> +       select MXC_DEBUG_BOARD
->        select IMX_HAVE_PLATFORM_IMX_UART
->        default n
->        help
-> diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> index 1c30d72..eafe168 100644
-> --- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-> @@ -35,10 +35,14 @@
->  #include <mach/hardware.h>
+>  arch/arm/configs/mx51_defconfig                 |    1 +
+>  arch/arm/mach-mx5/board-mx51_babbage.c          |   22 +++++++++++++++++
+>  arch/arm/mach-mx5/devices-imx51.h               |    2 +
+>  arch/arm/plat-mxc/devices/Kconfig               |    5 ++++
+>  arch/arm/plat-mxc/devices/Makefile              |    1 +
+>  arch/arm/plat-mxc/devices/platform-buttons.c    |   29 +++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/devices-common.h |    4 +++
+>  arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +-
+>  8 files changed, 65 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/devices/platform-buttons.c
+> 
+> diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+> index 163cfee..5c7a872 100644
+> --- a/arch/arm/configs/mx51_defconfig
+> +++ b/arch/arm/configs/mx51_defconfig
+> @@ -82,6 +82,7 @@ CONFIG_FEC=y
+>  CONFIG_INPUT_FF_MEMLESS=m
+>  # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+>  CONFIG_INPUT_EVDEV=y
+> +CONFIG_KEYBOARD_GPIO=y
+>  CONFIG_INPUT_EVBUG=m
+>  CONFIG_MOUSE_PS2=m
+>  CONFIG_MOUSE_PS2_ELANTECH=y
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index 23ee4a4..f6ce0d6 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -18,6 +18,8 @@
+>  #include <linux/io.h>
+>  #include <linux/fsl_devices.h>
+>  #include <linux/fec.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/input.h>
+>  
 >  #include <mach/common.h>
->  #include <mach/iomux-mx35.h>
-> +#include <mach/irqs.h>
-> +#include <mach/3ds_debugboard.h>
->
->  #include "devices-imx35.h"
->  #include "devices.h"
->
-> +#define EXPIO_PARENT_INT       (MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
+>  #include <mach/hardware.h>
+> @@ -37,6 +39,7 @@
+>  #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
+>  #define BABBAGE_PHY_RESET	(1*32 + 5)	/* GPIO_2_5 */
+>  #define BABBAGE_FEC_PHY_RESET	(1*32 + 14)	/* GPIO_2_14 */
+> +#define BABBAGE_POWER_KEY	(1*32 + 21)	/* GPIO_2_21 */
+>  
+>  /* USB_CTRL_1 */
+>  #define MX51_USB_CTRL_1_OFFSET			0x10
+> @@ -46,6 +49,21 @@
+>  #define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
+>  #define	MX51_USB_PLL_DIV_24_MHZ	0x02
+>  
+> +static struct gpio_keys_button babbage_buttons[] = {
+> +	{
+> +		.gpio		= BABBAGE_POWER_KEY,
+> +		.code		= BTN_0,
+> +		.desc		= "PWR",
+> +		.active_low	= 1,
+> +		.wakeup		= 1,
+> +	},
+> +};
 > +
->  static const struct imxuart_platform_data uart_pdata __initconst = {
->        .flags = IMXUART_HAVE_RTSCTS,
+> +static struct gpio_keys_platform_data imx_button_data = {
+> +	.buttons	= babbage_buttons,
+> +	.nbuttons	= ARRAY_SIZE(babbage_buttons),
+> +};
+> +
+>  static struct pad_desc mx51babbage_pads[] = {
+>  	/* UART1 */
+>  	MX51_PAD_UART1_RXD__UART1_RXD,
+> @@ -112,6 +130,9 @@ static struct pad_desc mx51babbage_pads[] = {
+>  
+>  	/* FEC PHY reset line */
+>  	MX51_PAD_EIM_A20__GPIO_2_14,
+> +
+> +	/* Power Key */
+> +	MX51_PAD_EIM_A27__GPIO_2_21,
 >  };
-> @@ -95,6 +99,10 @@ static void __init mxc_board_init(void)
->        imx35_add_imx_uart0(&uart_pdata);
->
->        mxc_register_device(&mxc_otg_udc_device, &usb_pdata);
+>  
+>  /* Serial ports */
+> @@ -287,6 +308,7 @@ static void __init mxc_board_init(void)
+>  	mxc_init_imx_uart();
+>  	babbage_fec_reset();
+>  	imx51_add_fec(NULL);
+> +	imx51_add_buttons(&imx_button_data);
+>  
+>  	imx51_add_imx_i2c(0, &babbage_i2c_data);
+>  	imx51_add_imx_i2c(1, &babbage_i2c_data);
+> diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+> index 5cc910e..a114d65 100644
+> --- a/arch/arm/mach-mx5/devices-imx51.h
+> +++ b/arch/arm/mach-mx5/devices-imx51.h
+> @@ -9,6 +9,8 @@
+>  #include <mach/mx51.h>
+>  #include <mach/devices-common.h>
+>  
+> +#define imx51_add_buttons(pdata) imx_add_buttons(pdata)
 > +
-> +       if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
-> +               pr_warn("Init of the debugboard failed, all "
-> +                       "devices on the debugboard are unusable.\n");
->  }
->
->  static void __init mx35pdk_timer_init(void)
-> --
-> 1.6.3.3
->
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/863e0fe4/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mx35pdk-add-debug-board-support-based-rmk-next.patch
-Type: application/octet-stream
-Size: 1814 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/863e0fe4/attachment.obj>
+>  extern const struct imx_fec_data imx51_fec_data __initconst;
+>  #define imx51_add_fec(pdata)	\
+>  	imx_add_fec(&imx51_fec_data, pdata)
+> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+> index 4047994..dbd688b 100644
+> --- a/arch/arm/plat-mxc/devices/Kconfig
+> +++ b/arch/arm/plat-mxc/devices/Kconfig
+> @@ -23,3 +23,8 @@ config IMX_HAVE_PLATFORM_MXC_NAND
+>  
+>  config IMX_HAVE_PLATFORM_SPI_IMX
+>  	bool
+> +
+> +config IMX_HAVE_PLATFORM_GPIO_BUTTONS
+> +	bool
+> +	default y if ARCH_MX51
+> +
+> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+> index 0a3c1f0..41008be 100644
+> --- a/arch/arm/plat-mxc/devices/Makefile
+> +++ b/arch/arm/plat-mxc/devices/Makefile
+> @@ -7,3 +7,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_UART) += platform-imx-uart.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_NAND) += platform-mxc_nand.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
+> +obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_BUTTONS) += platform-buttons.o
+> \ No newline at end of file
+> diff --git a/arch/arm/plat-mxc/devices/platform-buttons.c b/arch/arm/plat-mxc/devices/platform-buttons.c
+> new file mode 100644
+> index 0000000..23ceed8
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/devices/platform-buttons.c
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor,
+> + * Boston, MA  02110-1301, USA.
+> + */
+> +#include <asm/sizes.h>
+> +#include <mach/hardware.h>
+> +#include <mach/devices-common.h>
+> +
+> +struct platform_device *__init imx_add_buttons(
+> +		const struct gpio_keys_platform_data *pdata)
+> +{
+> +
+> +	return imx_add_platform_device("gpio-keys", -1, NULL,
+> +		NULL, pdata, sizeof(*pdata));
+> +
+> +}
+> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+> index 86d7575..0b37d6d 100644
+> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
+> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+> @@ -14,6 +14,10 @@ struct platform_device *imx_add_platform_device(const char *name, int id,
+>  		const struct resource *res, unsigned int num_resources,
+>  		const void *data, size_t size_data);
+>  
+> +#include <linux/gpio_keys.h>
+> +struct platform_device *__init imx_add_buttons(
+> +		const struct gpio_keys_platform_data *pdata);
+> +
+>  #include <linux/fec.h>
+>  struct imx_fec_data {
+>  	resource_size_t iobase;
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> index e46b1c2..7ae27e8 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> @@ -114,7 +114,7 @@ typedef enum iomux_config {
+>  #define MX51_PAD_EIM_A24__GPIO_2_18             IOMUX_PAD(0x450, 0x0bc, 1, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_A25__GPIO_2_19             IOMUX_PAD(0x454, 0x0c0, 1, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_A26__GPIO_2_20             IOMUX_PAD(0x458, 0x0c4, 1, 0x0,   0, NO_PAD_CTRL)
+> -#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, NO_PAD_CTRL)
+> +#define MX51_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,   0, MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP)
+>  #define MX51_PAD_EIM_EB0__EIM_EB0               IOMUX_PAD(0x460, 0x0cc, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_EB1__EIM_EB1               IOMUX_PAD(0x464, 0x0d0, 0, 0x0,   0, NO_PAD_CTRL)
+>  #define MX51_PAD_EIM_EB2__GPIO_2_22             IOMUX_PAD(0x468, 0x0d4, 1, 0x0,   0, NO_PAD_CTRL)
+> -- 
+> 1.6.0.4
+> 
+> 
+
+-- 
+----------------------------------------------------------------------
+Amit Kucheria, Kernel Engineer || amit.kucheria at canonical.com
+----------------------------------------------------------------------
