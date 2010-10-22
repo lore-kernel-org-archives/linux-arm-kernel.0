@@ -1,38 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 22 Oct 2010 11:27:08 +0200
-Subject: [PATCH] imx: only select HAVE_CAN_FLEXCAN if CAN is enabled
-Message-ID: <1287739628-330-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Fri, 22 Oct 2010 12:28:57 +0300
+Subject: [patch v2 00/10] efikamx support improvements - try 2
+In-Reply-To: <20101021103855.115653951@rtp-net.org>
+References: <20101021103855.115653951@rtp-net.org>
+Message-ID: <20101022092857.GF17631@matterhorn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a warning
+On 10 Oct 21, Arnaud Patard wrote:
+> 
+> Hi,
+> 
+> This patchset aims at improving current efikamx support. It adds support for :
+> - board id detection
+> - sdhc
+> - leds
+> - power button
+> - spi nor
+> - reset
+> 
+> I also had to fix/improve some imx51 iomux header so there are patches for
+> iomux-mx51.h.
+> 
+> v2:
+> - split iomux patch 3 into 2 patches
+> - reorder patches
+> - fix space comment
+> - fix Amit's comments
+> - decrease board id msleep
+> 
+> Arnaud
+> 
 
-	warning: (IMX_HAVE_PLATFORM_FLEXCAN && ARCH_MXC) selects HAVE_CAN_FLEXCAN which has unmet direct dependencies (NET && CAN)
+Please fix the typo in 07/10 description. Or perhaps Sascha will fix it while committing.
 
-(The warning in general exists since
+Also Dinh has added mx51_add_buttons() to platform code. 07/10 should be
+modified to use that. Search for "ARM: imx: Add gpio-keys to mx51 babbage
+board" on LAKML.
 
-	246cf9c (kbuild: Warn on selecting symbols with unmet direct dependencies)
+After that, for the whole series, you can add,
 
-which was reverted between 71ebc01 and b1f7d6e.)
-
-Reported-and-introduced-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/plat-mxc/devices/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index 4047994..26e745b 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -6,7 +6,7 @@ config IMX_HAVE_PLATFORM_FEC
- 	default y if ARCH_MX25 || SOC_IMX27 || ARCH_MX35 || ARCH_MX51
- 
- config IMX_HAVE_PLATFORM_FLEXCAN
--	select HAVE_CAN_FLEXCAN
-+	select HAVE_CAN_FLEXCAN if CAN
- 	bool
- 
- config IMX_HAVE_PLATFORM_IMX_I2C
--- 
-1.7.2.3
+Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
