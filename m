@@ -1,50 +1,72 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 22 Oct 2010 14:50:11 -0400 (EDT)
-Subject: [PATCH 2/2] [ARM] Kirkwood: add fan support for Network Space Max
-	v2
-In-Reply-To: <1287772787.9690.397.camel@groeck-laptop>
-References: <20101017154021.GB29120@kw.sim.vm.gnt>
-	<1287330612-11256-1-git-send-email-simon@sequanux.org>
-	<1287330612-11256-2-git-send-email-simon@sequanux.org>
-	<1287712396.9690.378.camel@groeck-laptop>
-	<alpine.LFD.2.00.1010212202400.2764@xanadu.home>
-	<20101022082712.GU29120@kw.sim.vm.gnt>
-	<1287772787.9690.397.camel@groeck-laptop>
-Message-ID: <alpine.LFD.2.00.1010221449510.2764@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Oct 2010 11:51:08 -0700
+Subject: [PATCH] ARM: Fix data abort accessing proc_info from
+	__lookup_processor_type (Re: [PATCH 03/10] ARM: hotplug cpu: Keep
+	processor information, startup code & __lookup_processor_type)
+In-Reply-To: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
+References: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
+Message-ID: <20101022185108.GF17595@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Oct 2010, Guenter Roeck wrote:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [101004 10:18]:
+> When hotplug CPU is enabled, we need to keep the list of supported CPUs,
+> their setup functions, and __lookup_processor_type in place so that we
+> can find and initialize secondary CPUs.  Move these into the __CPUINIT
+> section.
 
-> On Fri, 2010-10-22 at 04:27 -0400, Simon Guinot wrote:
-> > Hi Nicolas,
-> > 
-> > On Thu, Oct 21, 2010 at 10:08:01PM -0400, Nicolas Pitre wrote:
-> > > On Thu, 21 Oct 2010, Guenter Roeck wrote:
-> > > 
-> > > > On Sun, 2010-10-17 at 11:50 -0400, Simon Guinot wrote:
-> > > > > From: Simon Guinot <sguinot@lacie.com>
-> > > > > 
-> > > > > Signed-off-by: Simon Guinot <sguinot@lacie.com>
-> > > > 
-> > > > Acked-by: Guenter Roeck <guenter.roeck@ericsson.com>
-> > > > 
-> > > > I assume this will get pushed through the ARM tree, right ?
-> > > 
-> > > Might be simpler if this is routed along the same path as the core code 
-> > > it relies upon to avoid dependency ordering issues.  There is nothing 
-> > > particularly ARM specific here anyway.
-> > 
-> > There is some changes, related to the netspace_v2-setup.c file, stagged
-> > in your Orion tree. At some point, a merge will be needed.
-> > 
-> I rebased to Linus' latest tree which had some changes in
-> netspace_v2-setup.c. We'll see if that solves the merge problem.
-> 
-> Nicolas, I assume I have your implied Ack for this commit. If not,
-> please let me know.
+> +	__CPUINIT
+> +__lookup_processor_type:
+> +	adr	r3, __lookup_processor_type_data
+> +	ldmia	r3, {r4 - r6}
+> +	sub	r3, r3, r4			@ get offset between virt&phys
+> +	add	r5, r5, r3			@ convert virt addresses to
+> +	add	r6, r6, r3			@ physical address space
+> +1:	ldmia	r5, {r3, r4}			@ value, mask
+> +	and	r4, r4, r9			@ mask wanted bits
+> +	teq	r3, r4
+> +	beq	2f
+> +	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
+> +	cmp	r5, r6
+> +	blo	1b
+> +	mov	r5, #0				@ unknown processor
+> +2:	mov	pc, lr
+> +ENDPROC(__lookup_processor_type)
 
-Yes, you do.
+The ldmia r5 above can cause a data abort depending on the compiler
+pixies. This can happen if r5 address is unaligned. Here's a fix
+for that.
+
+Regards,
+
+Tony
 
 
-Nicolas
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 21 Oct 2010 19:00:41 -0700
+Subject: [PATCH] ARM: Fix data abort accessing proc_info from __lookup_processor_type
+
+Commit 5085f3ff458521045f7e43da62b8c30ea7df2e82 added better support for
+CONFIG_HOTPLUG_CPU by keeping proc_info around. However, depending on
+the Kconfig options selected, this can make the booting fail mysteriously
+early on.
+
+Turns out a data abort can happen in __lookup_processor in ldmia r5 {r3, r4}.
+When it happens the address loaded to r5 is not aligned. Fix the problem by
+aligning proc_info.
+
+Reported-by: Anand Gadiyar <gadiyar@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 1953e3d..a58b91d 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -114,6 +114,7 @@ SECTIONS
+ 			*(.glue_7)
+ 			*(.glue_7t)
+ 		*(.got)			/* Global offset table		*/
++			. = ALIGN(4);
+ 			ARM_CPU_KEEP(PROC_INFO)
+ 	}
+ 
