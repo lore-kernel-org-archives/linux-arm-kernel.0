@@ -1,140 +1,68 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 23 Oct 2010 19:50:31 +0200
-Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
-In-Reply-To: <AANLkTi=RNDf-A98LN3AH=JdegHXKRjHvtGCDYtkJ5ADg@mail.gmail.com>
-References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
-	<201010231624.03293.marek.vasut@gmail.com>
-	<AANLkTi=RNDf-A98LN3AH=JdegHXKRjHvtGCDYtkJ5ADg@mail.gmail.com>
-Message-ID: <201010231950.31707.marek.vasut@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 23 Oct 2010 11:18:19 -0700
+Subject: [PATCH] ARM: Fix data abort accessing proc_info from
+	__lookup_processor_type (Re: [PATCH 03/10] ARM: hotplug cpu: Keep
+	processor information, startup code & __lookup_processor_type)
+In-Reply-To: <20101023083044.GA13009@n2100.arm.linux.org.uk>
+References: <E1P2oXV-00020M-QV@rmk-PC.arm.linux.org.uk>
+	<20101022185108.GF17595@atomide.com>
+	<20101023083044.GA13009@n2100.arm.linux.org.uk>
+Message-ID: <20101023181819.GB19376@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 23. ??jna 2010 18:47:10 zhangfei gao napsal(a):
-> On Sat, Oct 23, 2010 at 10:24 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> +/**********************************************************************
-> >> *** ****\ + *
-> >>         * + * Device probing/removal
-> >>              * + *
-> >>                   *
-> >> +\**********************************************************************
-> >> ** *****/ +
-> >> +static int __devinit sdhci_pxa_probe(struct platform_device *pdev)
-> >> +{
-> >> +     struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
-> >> +     struct device *dev = &pdev->dev;
-> >> +     struct sdhci_host *host = NULL;
-> >> +     struct resource *iomem = NULL;
-> >> +     struct sdhci_pxa *pxa = NULL;
-> >> +     int ret, irq;
-> >> +
-> >> +     irq = platform_get_irq(pdev, 0);
-> >> +     if (irq < 0) {
-> >> +             dev_err(dev, "no irq specified\n");
-> >> +             return irq;
-> >> +     }
-> >> +
-> >> +     iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> +     if (!iomem) {
-> >> +             dev_err(dev, "no memory specified\n");
-> >> +             return -ENOENT;
-> >> +     }
-> >> +
-> >> +     host = sdhci_alloc_host(&pdev->dev, sizeof(struct sdhci_pxa));
-> >> +     if (IS_ERR(host)) {
-> >> +             dev_err(dev, "failed to alloc host\n");
-> >> +             return PTR_ERR(host);
-> >> +     }
-> >> +
-> >> +     pxa = sdhci_priv(host);
-> >> +     pxa->host = host;
-> >> +     pxa->pdata = pdata;
-> >> +     pxa->clk_enable = 0;
-> >> +
-> >> +     pxa->clk = clk_get(dev, "PXA-SDHCLK");
-> >> +     if (IS_ERR(pxa->clk)) {
-> >> +             dev_err(dev, "failed to get io clock\n");
-> >> +             ret = PTR_ERR(pxa->clk);
-> >> +             goto out;
-> >> +     }
-> >> +
-> >> +     pxa->res = request_mem_region(iomem->start, resource_size(iomem),
-> >> +             mmc_hostname(host->mmc));
-> >> +     if (!pxa->res) {
-> >> +             dev_err(&pdev->dev, "cannot request region\n");
-> >> +             ret = -EBUSY;
-> >> +             goto out;
-> >> +     }
-> >> +
-> >> +     host->ioaddr = ioremap(iomem->start, resource_size(iomem));
-> >> +     if (!host->ioaddr) {
-> >> +             dev_err(&pdev->dev, "failed to remap registers\n");
-> >> +             ret = -ENOMEM;
-> >> +             goto out;
-> >> +     }
-> >> +
-> >> +     host->hw_name = "MMC";
-> >> +     host->ops = &sdhci_pxa_ops;
-> >> +     host->irq = irq;
-> >> +     host->quirks = SDHCI_QUIRK_BROKEN_ADMA |
-> >> SDHCI_QUIRK_BROKEN_TIMEOUT_VAL; +
-> > 
-> > Maybe check if these aren't already set in pdata and warn user ?
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [101023 01:21]:
+> On Fri, Oct 22, 2010 at 11:51:08AM -0700, Tony Lindgren wrote:
+> > diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> > index 1953e3d..a58b91d 100644
+> > --- a/arch/arm/kernel/vmlinux.lds.S
+> > +++ b/arch/arm/kernel/vmlinux.lds.S
+> > @@ -114,6 +114,7 @@ SECTIONS
+> >  			*(.glue_7)
+> >  			*(.glue_7t)
+> >  		*(.got)			/* Global offset table		*/
+> > +			. = ALIGN(4);
+> >  			ARM_CPU_KEEP(PROC_INFO)
 > 
-> Here pdata->quirks only provide specific quirk like
-> SDHCI_QUIRK_BROKEN_CARD_DETECTION for on-chip device, the common quirk
-> is provided above.
+> The got table should also be word aligned - but the kernel doesn't use
+> one.  In any case, it would be a good idea to place it before the .got.
 
-Right, but what if the user also provides such a quirk? It's unnecessary ... and 
-in case the quirk was removed from here later, it'd have to be removed from 
-user's code too ...
+OK, updated patch below.
 
-> In sdhci-s3c, host->quirks is modified here via pdata->cd_type, which
-> is also a good method.
-> Here we transfer SDHCI_QUIRK_BROKEN_CARD_DETECTION directly from pdata
-> since it already move to include folder.
-> 
-> >> +     if (pdata->quirks)
-> >> +             host->quirks |= pdata->quirks;
-> >> +
-> >> +     ret = sdhci_add_host(host);
-> >> +     if (ret) {
-> >> +             dev_err(&pdev->dev, "failed to add host\n");
-> >> +             goto out;
-> >> +     }
-> >> +
-> >> +     if (pxa->pdata->max_speed)
-> >> +             host->mmc->f_max = pxa->pdata->max_speed;
-> > 
-> > What happens otherwise ?
-> 
-> Otherwise, host->mmc->f_max = host->max_clk set in sdhci_add_host,
-> host->max_clk is 50M in 2.0 controller, and 200M in 3.0 controller, if
-> controller does not need to provide get_max_clock.
-> it's better add defalut value in else condition.
+By moving ARM_CPU_KEEP(PROC_INFO) around I've confirmed that it's
+happening at rodata.*. Do you want also another align before .glue_7
+as well?
 
-Thanks for clearing this
-> 
-> Thanks Marek for review.
-> 
-> >> +
-> >> +     platform_set_drvdata(pdev, host);
-> >> +
-> >> +     return 0;
-> >> +out:
-> >> +     if (host) {
-> >> +             clk_put(pxa->clk);
-> >> +             if (host->ioaddr)
-> >> +                     iounmap(host->ioaddr);
-> >> +             if (pxa->res)
-> >> +                     release_mem_region(pxa->res->start,
-> >> +                                     resource_size(pxa->res));
-> >> +             sdhci_free_host(host);
-> >> +     }
-> >> +
-> >> +     return ret;
-> >> +}
-> >> +
-> > 
-> > Thanks!
-> > 
-> > Cheers
+Regards,
+
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Fri, 22 Oct 2010 12:41:55 -0700
+Subject: [PATCH] ARM: Fix data abort accessing proc_info from __lookup_processor_type
+
+Commit 5085f3ff458521045f7e43da62b8c30ea7df2e82 added better support for
+CONFIG_HOTPLUG_CPU by keeping proc_info around. However, depending on
+the Kconfig options selected, this can make the booting fail mysteriously
+early on.
+
+Turns out a data abort can happen in __lookup_processor in ldmia r5 {r3, r4}.
+When it happens the address loaded to r5 is not aligned. Fix the problem by
+aligning proc_info.
+
+Reported-by: Anand Gadiyar <gadiyar@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Anand Gadiyar <gadiyar@ti.com>
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 1953e3d..cead889 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -113,6 +113,7 @@ SECTIONS
+ 			*(.rodata.*)
+ 			*(.glue_7)
+ 			*(.glue_7t)
++		. = ALIGN(4);
+ 		*(.got)			/* Global offset table		*/
+ 			ARM_CPU_KEEP(PROC_INFO)
+ 	}
