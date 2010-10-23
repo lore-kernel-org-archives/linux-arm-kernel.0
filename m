@@ -1,51 +1,44 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Sat, 23 Oct 2010 01:57:21 +0200
-Subject: [PATCH 1/2] sdhci-esdhc-imx: fix timeout on i.MX's sdhci
-In-Reply-To: <20101022231203.GA6502@void.printf.net>
-References: <20101022231203.GA6502@void.printf.net>
-Message-ID: <1287791842-706-1-git-send-email-eric@eukrea.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 23 Oct 2010 09:07:34 +0800
+Subject: [PATCH] pxafb: correct the vertical back porch macro
+In-Reply-To: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
+References: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
+Message-ID: <AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch fix timeout problems on i.MX's sdhci as suggested by
-Richard Zhu.
+On Sat, Oct 23, 2010 at 5:26 AM, Matt Reimer <mreimer@sdgsystems.com> wrote:
+> Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back porch
+> knob LCCR2[BFW] specifies the number of clock periods minus one, but the
+> macro wasn't doing the subtraction.
+> ---
+> ?arch/arm/mach-pxa/include/mach/regs-lcd.h | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h b/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> index f82dcea..5074d18 100644
+> --- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> +++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> @@ -107,7 +107,7 @@
+> ?#define LCCR2_EndFrmDel(Tln) ? ((Tln) << FShft (LCCR2_EFW))
+>
+> ?#define LCCR2_BFW ? ? ?Fld (8, 24) ? ? /* Beginning-of-Frame line clock */
+> -#define LCCR2_BegFrmDel(Tln) ? ((Tln) << FShft (LCCR2_BFW))
+> +#define LCCR2_BegFrmDel(Tln) ? (((Tln) - 1) << FShft (LCCR2_BFW))
 
-Tested on :
-- i.MX257 : not needed
-- i.MX357 : needed
-- i.MX515 : needed
+Nothing in the spec suggests that this minus 1 is necessary. Could you please
+double check?
 
-more details can be found here :
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/029748.html
-
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-Tested-by: Shawn Guo <shawn.gsc@gmail.com>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 2e9cca1..28e63ef 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -17,6 +17,7 @@
- #include <linux/clk.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdhci-pltfm.h>
-+#include <mach/hardware.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -112,6 +113,9 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 	clk_enable(clk);
- 	pltfm_host->clk = clk;
- 
-+	if (cpu_is_mx35() || cpu_is_mx51())
-+		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
-+
- 	return 0;
- }
- 
--- 
-1.7.0.4
+>
+> ?#define LCCR3_API ? ? ?(0xf << 16) ? ? /* AC Bias pin trasitions per interrupt */
+> ?#define LCCR3_API_S ? ?16
+> --
+> 1.7.0.4
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
