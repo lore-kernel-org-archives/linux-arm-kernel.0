@@ -1,55 +1,58 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 23 Oct 2010 16:18:38 +0200
-Subject: [PATCH] pxafb: correct the vertical back porch macro
-In-Reply-To: <AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
-References: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
-	<AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
-Message-ID: <201010231618.39191.marek.vasut@gmail.com>
+From: maximlevitsky@gmail.com (Maxim Levitsky)
+Date: Sat, 23 Oct 2010 16:18:50 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <AANLkTi=iC1uKyToEXrroOj+JxQ2mW97WRVEXjv+9oQEa@mail.gmail.com>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+	<1287704855.12734.14.camel@maxim-laptop>
+	<AANLkTi=iC1uKyToEXrroOj+JxQ2mW97WRVEXjv+9oQEa@mail.gmail.com>
+Message-ID: <1287843531.29752.10.camel@maxim-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne So 23. ??jna 2010 03:07:34 Eric Miao napsal(a):
-> On Sat, Oct 23, 2010 at 5:26 AM, Matt Reimer <mreimer@sdgsystems.com> wrote:
-> > Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back
-> > porch knob LCCR2[BFW] specifies the number of clock periods minus one,
-> > but the macro wasn't doing the subtraction.
-> > ---
-> >  arch/arm/mach-pxa/include/mach/regs-lcd.h |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h
-> > b/arch/arm/mach-pxa/include/mach/regs-lcd.h index f82dcea..5074d18
-> > 100644
-> > --- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
-> > +++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
-> > @@ -107,7 +107,7 @@
-> >  #define LCCR2_EndFrmDel(Tln)   ((Tln) << FShft (LCCR2_EFW))
-> > 
-> >  #define LCCR2_BFW      Fld (8, 24)     /* Beginning-of-Frame line clock
-> > */ -#define LCCR2_BegFrmDel(Tln)   ((Tln) << FShft (LCCR2_BFW))
-> > +#define LCCR2_BegFrmDel(Tln)   (((Tln) - 1) << FShft (LCCR2_BFW))
+On Sat, 2010-10-23 at 12:09 +0200, Ohad Ben-Cohen wrote:
+> Hi Maxim,
 > 
-> Nothing in the spec suggests that this minus 1 is necessary. Could you
-> please double check?
+> On Fri, Oct 22, 2010 at 1:47 AM, Maxim Levitsky <maximlevitsky@gmail.com> wrote:
+> > On Wed, 2010-10-13 at 09:31 +0200, Ohad Ben-Cohen wrote:
+> >> Fix SDIO suspend/resume regression introduced by
+> >> 4c2ef25fe0b847d2ae818f74758ddb0be1c27d8e "mmc: fix all hangs related to
+> >> mmc/sd card insert/removal during suspend/resume":
+> ...
+> >> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> >> index c94565d..515ff39 100644
+> >> --- a/drivers/mmc/core/core.c
+> >> +++ b/drivers/mmc/core/core.c
+> >> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+> >>       if (host->bus_ops && !host->bus_dead) {
+> >>               if (host->bus_ops->suspend)
+> >>                       err = host->bus_ops->suspend(host);
+> >> +             if (err == -ENOSYS || !host->bus_ops->resume) {
+> > This reintroduces the bug I fixed.
+> >
+> > if the CONFIG_MMC_UNSAFE_RESUME isn't set (and that is default
+> > unfortunately), the host->bus_ops->resume will be NULL (see core/mmc.c
+> > mmc_ops), and therefore card will be removed, that will trigger a block
+> > device removal, sync, and deadlock).
+> 
+> Have you reproduced this or is it just a general concern ?
+Only a general concern.
+> 
+> I'm asking this because if CONFIG_MMC_UNSAFE_RESUME isn't set, then
+> mmc_pm_notify() will remove the card and detach the bus.
+> 
+> As a result, host->bus_ops will be unset, and host->bus_dead will be set.
+> 
+> In this case, mmc_suspend_host() should skip the code you are concerned about.
+You are right here.
+There is a very unlikely case that suspend of sd/mmc card fails (with
+CONFIG_MMC_UNSAFE_RESUME set, and that will trigger the hang, but that
+currently isn't possible because both mmc_sd_suspend and mmc_suspend
+just return 0 unconditionally).
 
-It doesn't fit the settings in U-Boot or something ... it's a long known thing. I 
-remember in U-Boot, one had to actually subtract one in the LCD configuration 
-data structure so it'd be programmer correctly.
+Btw, two above functions are identical, so some refactoring won't hurt.
 
-> 
-> >  #define LCCR3_API      (0xf << 16)     /* AC Bias pin trasitions per
-> > interrupt */ #define LCCR3_API_S    16
-> > --
-> > 1.7.0.4
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+So sorry for noise (and bug).
+
+Best regards,
+	Maxim Levitsky
