@@ -1,80 +1,110 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Fri, 22 Oct 2010 19:43:00 -0700
-Subject: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
-In-Reply-To: <20101022194215.GB8554@pengutronix.de>
-References: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1287766575-4092-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101022182812.GA8554@pengutronix.de>
-	<86A0E76937111F4C92FABEC0A2098851051D6090@az33exm21>
-	<20101022194215.GB8554@pengutronix.de>
-Message-ID: <86A0E76937111F4C92FABEC0A2098851051D6116@az33exm21>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Fri, 22 Oct 2010 21:46:15 -0500
+Subject: [PATCHv6 2/3] ARM: mx5: Add gpio-keys to mx51 babbage board
+In-Reply-To: <1287801976-5324-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287801976-5324-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1287801976-5324-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
->-----Original Message-----
->From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
->Sent: Friday, October 22, 2010 2:42 PM
->To: Nguyen Dinh-R00091
->Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk;
->s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
->bryan.wu at canonical.com; amit.kucheria at canonical.com
->Subject: Re: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
->
->Hello Dinh,
->
->On Fri, Oct 22, 2010 at 11:58:16AM -0700, Nguyen Dinh-R00091 wrote:
->> >-----Original Message-----
->> >From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
->> >Sent: Friday, October 22, 2010 1:28 PM
->> >To: Nguyen Dinh-R00091
->> >Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux at arm.linux.org.uk;
->> >s.hauer at pengutronix.de; valentin.longchamp at epfl.ch; daniel at caiaq.de; grant.likely at secretlab.ca;
->> >bryan.wu at canonical.com; amit.kucheria at canonical.com
->> >Subject: Re: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
->> >
->> >On Fri, Oct 22, 2010 at 11:56:14AM -0500, Dinh.Nguyen at freescale.com wrote:
->> >> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->> >>
->> >> Add imx_add_gpio_keys function to add gpio-keys in plat-mxc
->> >>
->> >> This patch is based on Sascha Hauer's imx/linux-2.6 for-rmk tree.
->> >(This information isn't interesting once the patch is in git, so it can
->> >better go after the tripple-dash below.)
->> >
->> >> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->> >Patch 1 depends on this one, so you should swap their order.
->> >
->> >> ---
->> >I share the concerns of Arnaud.  MX51_GPIO_PAD_CTRL looks OK,
->> >PAD_CTL_PUS_100K_UP does not.
->>
->> How do you suggest I define this pin for Babbage board only? Do I add to iomux-mx51.h
->> #define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,
->0,MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP) ?
->>
->> Or do I define the pin in the board file with a 100K_UP? Like how eukrea_mbimxsd-baseboard.c did for
->MBIMXSD_GPIO_3_31?
->I'd suggest something local to your machine file.  Unfortunately I don't
->see an easy way to reuse the generic MX51_PAD_EIM_A27__GPIO_2_21 to
->define your local symbol.  So I think something like you wrote above
->should be fine.
->
->Too bad that
->
->	#define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21 (MX51_PAD_EIM_A27__GPIO_2_21 | PAD_CTL_PUS_100K_UP)
->
->doesn't work.
+Add functionality for the power button on MX51 Babbage board.
 
-Yes, I also wish I didn't have to redefine the pin just because of PAD setting change. I am going to send out another patch that basically sets the pad_desc.pad_ctrl=PAD_SETTING in mxc_init_board() function. I think it's a bit cleaner than having to redefine the pin.
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+---
+ arch/arm/configs/mx51_defconfig        |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c |   24 ++++++++++++++++++++++++
+ arch/arm/mach-mx5/devices-imx51.h      |    2 ++
+ 3 files changed, 27 insertions(+), 0 deletions(-)
 
->Best regards
->Uwe
->
->--
->Pengutronix e.K.                           | Uwe Kleine-K?nig            |
->Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-
-Thanks,
-Dinh
+diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+index 163cfee..5c7a872 100644
+--- a/arch/arm/configs/mx51_defconfig
++++ b/arch/arm/configs/mx51_defconfig
+@@ -82,6 +82,7 @@ CONFIG_FEC=y
+ CONFIG_INPUT_FF_MEMLESS=m
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
++CONFIG_KEYBOARD_GPIO=y
+ CONFIG_INPUT_EVBUG=m
+ CONFIG_MOUSE_PS2=m
+ CONFIG_MOUSE_PS2_ELANTECH=y
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index 23ee4a4..8c4fd92 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -18,6 +18,8 @@
+ #include <linux/io.h>
+ #include <linux/fsl_devices.h>
+ #include <linux/fec.h>
++#include <linux/gpio_keys.h>
++#include <linux/input.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -37,6 +39,7 @@
+ #define BABBAGE_USBH1_STP	(0*32 + 27)	/* GPIO_1_27 */
+ #define BABBAGE_PHY_RESET	(1*32 + 5)	/* GPIO_2_5 */
+ #define BABBAGE_FEC_PHY_RESET	(1*32 + 14)	/* GPIO_2_14 */
++#define BABBAGE_POWER_KEY	(1*32 + 21)	/* GPIO_2_21 */
+ 
+ /* USB_CTRL_1 */
+ #define MX51_USB_CTRL_1_OFFSET			0x10
+@@ -46,6 +49,21 @@
+ #define	MX51_USB_PLL_DIV_19_2_MHZ	0x01
+ #define	MX51_USB_PLL_DIV_24_MHZ	0x02
+ 
++static struct gpio_keys_button babbage_buttons[] = {
++	{
++		.gpio		= BABBAGE_POWER_KEY,
++		.code		= BTN_0,
++		.desc		= "PWR",
++		.active_low	= 1,
++		.wakeup		= 1,
++	},
++};
++
++static const struct gpio_keys_platform_data imx_button_data __initconst = {
++	.buttons	= babbage_buttons,
++	.nbuttons	= ARRAY_SIZE(babbage_buttons),
++};
++
+ static struct pad_desc mx51babbage_pads[] = {
+ 	/* UART1 */
+ 	MX51_PAD_UART1_RXD__UART1_RXD,
+@@ -281,6 +299,7 @@ __setup("otg_mode=", babbage_otg_mode);
+ static void __init mxc_board_init(void)
+ {
+ 	struct pad_desc usbh1stp = MX51_PAD_USBH1_STP__USBH1_STP;
++	struct pad_desc power_key = MX51_PAD_EIM_A27__GPIO_2_21
+ 
+ 	mxc_iomux_v3_setup_multiple_pads(mx51babbage_pads,
+ 					ARRAY_SIZE(mx51babbage_pads));
+@@ -288,6 +307,11 @@ static void __init mxc_board_init(void)
+ 	babbage_fec_reset();
+ 	imx51_add_fec(NULL);
+ 
++	/* Set the PAD settings for the pwr key. */
++	power_key.pad_ctrl = MX51_GPIO_PAD_CTRL_2;
++	mxc_iomux_v3_setup_pad(&power_key);
++	imx51_add_gpio_keys(&imx_button_data);
++
+ 	imx51_add_imx_i2c(0, &babbage_i2c_data);
+ 	imx51_add_imx_i2c(1, &babbage_i2c_data);
+ 	mxc_register_device(&mxc_hsi2c_device, &babbage_hsi2c_data);
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 5cc910e..8c50cb5 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -13,6 +13,8 @@ extern const struct imx_fec_data imx51_fec_data __initconst;
+ #define imx51_add_fec(pdata)	\
+ 	imx_add_fec(&imx51_fec_data, pdata)
+ 
++#define imx51_add_gpio_keys(pdata) imx_add_gpio_keys(pdata)
++
+ extern const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst;
+ #define imx51_add_imx_i2c(id, pdata)	\
+ 	imx_add_imx_i2c(&imx51_imx_i2c_data[id], pdata)
+-- 
+1.6.0.4
