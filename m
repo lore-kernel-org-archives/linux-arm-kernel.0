@@ -1,111 +1,55 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Sat, 23 Oct 2010 09:12:46 -0500
-Subject: [PATCHv7 1/3] ARM: imx: Add gpio-keys to plat-mxc
-Message-ID: <1287843168-18164-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 23 Oct 2010 16:18:38 +0200
+Subject: [PATCH] pxafb: correct the vertical back porch macro
+In-Reply-To: <AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
+References: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
+	<AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
+Message-ID: <201010231618.39191.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Dne So 23. ??jna 2010 03:07:34 Eric Miao napsal(a):
+> On Sat, Oct 23, 2010 at 5:26 AM, Matt Reimer <mreimer@sdgsystems.com> wrote:
+> > Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back
+> > porch knob LCCR2[BFW] specifies the number of clock periods minus one,
+> > but the macro wasn't doing the subtraction.
+> > ---
+> >  arch/arm/mach-pxa/include/mach/regs-lcd.h |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> > b/arch/arm/mach-pxa/include/mach/regs-lcd.h index f82dcea..5074d18
+> > 100644
+> > --- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> > +++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
+> > @@ -107,7 +107,7 @@
+> >  #define LCCR2_EndFrmDel(Tln)   ((Tln) << FShft (LCCR2_EFW))
+> > 
+> >  #define LCCR2_BFW      Fld (8, 24)     /* Beginning-of-Frame line clock
+> > */ -#define LCCR2_BegFrmDel(Tln)   ((Tln) << FShft (LCCR2_BFW))
+> > +#define LCCR2_BegFrmDel(Tln)   (((Tln) - 1) << FShft (LCCR2_BFW))
+> 
+> Nothing in the spec suggests that this minus 1 is necessary. Could you
+> please double check?
 
-Add imx_add_gpio_keys function to add gpio-keys in plat-mxc
+It doesn't fit the settings in U-Boot or something ... it's a long known thing. I 
+remember in U-Boot, one had to actually subtract one in the LCD configuration 
+data structure so it'd be programmer correctly.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/plat-mxc/devices/Kconfig               |    4 +++
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-gpio_keys.c  |   27 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |    4 +++
- arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +
- 5 files changed, 38 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_keys.c
-
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index 4047994..f4772e7 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -9,6 +9,10 @@ config IMX_HAVE_PLATFORM_FLEXCAN
- 	select HAVE_CAN_FLEXCAN
- 	bool
- 
-+config IMX_HAVE_PLATFORM_GPIO_KEYS
-+	bool
-+	default y if ARCH_MX51
-+	
- config IMX_HAVE_PLATFORM_IMX_I2C
- 	bool
- 
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index 0a3c1f0..45aefeb 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_IMX_HAVE_PLATFORM_ESDHC) += platform-esdhc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
- obj-y += platform-imx-dma.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
-diff --git a/arch/arm/plat-mxc/devices/platform-gpio_keys.c b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
-new file mode 100644
-index 0000000..1c53a53
---- /dev/null
-+++ b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-+ * Boston, MA  02110-1301, USA.
-+ */
-+#include <asm/sizes.h>
-+#include <mach/hardware.h>
-+#include <mach/devices-common.h>
-+
-+struct platform_device *__init imx_add_gpio_keys(
-+		const struct gpio_keys_platform_data *pdata)
-+{
-+	return imx_add_platform_device("gpio-keys", -1, NULL,
-+		 0, pdata, sizeof(*pdata));
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 86d7575..8c6896f 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -29,6 +29,10 @@ struct platform_device *__init imx_add_flexcan(int id,
- 		resource_size_t irq,
- 		const struct flexcan_platform_data *pdata);
- 
-+#include <linux/gpio_keys.h>
-+struct platform_device *__init imx_add_gpio_keys(
-+		const struct gpio_keys_platform_data *pdata);
-+
- #include <mach/i2c.h>
- struct imx_imx_i2c_data {
- 	int id;
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index e46b1c2..d7a41e9 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -45,6 +45,8 @@ typedef enum iomux_config {
- 				PAD_CTL_PKE | PAD_CTL_HYS)
- #define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
- 				PAD_CTL_SRE_FAST)
-+#define MX51_GPIO_PAD_CTRL_2	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
-+					PAD_CTL_PUS_100K_UP)
- #define MX51_ECSPI_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
- 				PAD_CTL_SRE_FAST)
- #define MX51_SDHCI_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PUS_47K_UP | \
--- 
-1.6.0.4
+> 
+> >  #define LCCR3_API      (0xf << 16)     /* AC Bias pin trasitions per
+> > interrupt */ #define LCCR3_API_S    16
+> > --
+> > 1.7.0.4
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
