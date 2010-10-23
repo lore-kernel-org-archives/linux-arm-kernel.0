@@ -1,43 +1,72 @@
 From: eballetbo@gmail.com (Enric Balletbo i Serra)
-Date: Sat, 23 Oct 2010 18:48:59 +0200
-Subject: [PATCHv2 2/3] omap3: IGEP v2: Remove igep2_config array.
+Date: Sat, 23 Oct 2010 18:49:00 +0200
+Subject: [PATCHv3 3/3] omap3: IGEP v2: Improve igep2_flash_init() function.
 In-Reply-To: <1287852540-4951-1-git-send-email-eballetbo@gmail.com>
 References: <1287852540-4951-1-git-send-email-eballetbo@gmail.com>
-Message-ID: <1287852540-4951-3-git-send-email-eballetbo@gmail.com>
+Message-ID: <1287852540-4951-4-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_board_config_size is implicitly initialized to 0 in
-plat-omap/common.c, get_config() won't dereference omap_board_config,
-so we can remove the empty igep2_config array.
+The changes are:
+  - Use 'for' loop instead 'while' loop.
+  - No need to initialize ret to 0, we're assigning it right after.
+  - No need to check for onenandcs < GPMC_CS_NUM here, it will always be true.
 
 Signed-off-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 ---
- arch/arm/mach-omap2/board-igep0020.c |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/board-igep0020.c |   23 +++++++++++------------
+ 1 files changed, 11 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 20b199f..42dcbf4 100644
+index 42dcbf4..fe76b59 100644
 --- a/arch/arm/mach-omap2/board-igep0020.c
 +++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -247,9 +247,6 @@ static inline void __init igep2_init_smsc911x(void)
- static inline void __init igep2_init_smsc911x(void) { }
- #endif
+@@ -152,35 +152,34 @@ static struct platform_device igep2_onenand_device = {
  
--static struct omap_board_config_kernel igep2_config[] __initdata = {
--};
--
- static struct regulator_consumer_supply igep2_vmmc1_supply = {
- 	.supply		= "vmmc",
- };
-@@ -486,8 +483,6 @@ static struct platform_device *igep2_devices[] __initdata = {
- 
- static void __init igep2_init_irq(void)
+ static void __init igep2_flash_init(void)
  {
--	omap_board_config = igep2_config;
--	omap_board_config_size = ARRAY_SIZE(igep2_config);
- 	omap2_init_common_hw(m65kxxxxam_sdrc_params, m65kxxxxam_sdrc_params);
- 	omap_init_irq();
- 	omap_gpio_init();
+-	u8		cs = 0;
+-	u8		onenandcs = GPMC_CS_NUM + 1;
++	u8 cs = 0;
++	u8 onenandcs = GPMC_CS_NUM + 1;
+ 
+-	while (cs < GPMC_CS_NUM) {
+-		u32 ret = 0;
++	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
++		u32 ret;
+ 		ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG1);
+ 
+ 		/* Check if NAND/oneNAND is configured */
+ 		if ((ret & 0xC00) == 0x800)
+ 			/* NAND found */
+-			pr_err("IGEP v2: Unsupported NAND found\n");
++			pr_err("IGEP2: Unsupported NAND found\n");
+ 		else {
+ 			ret = gpmc_cs_read_reg(cs, GPMC_CS_CONFIG7);
+ 			if ((ret & 0x3F) == (ONENAND_MAP >> 24))
+ 				/* ONENAND found */
+ 				onenandcs = cs;
+ 		}
+-		cs++;
+ 	}
++
+ 	if (onenandcs > GPMC_CS_NUM) {
+-		pr_err("IGEP v2: Unable to find configuration in GPMC\n");
++		pr_err("IGEP2: Unable to find configuration in GPMC\n");
+ 		return;
+ 	}
+ 
+-	if (onenandcs < GPMC_CS_NUM) {
+-		igep2_onenand_data.cs = onenandcs;
+-		if (platform_device_register(&igep2_onenand_device) < 0)
+-			pr_err("IGEP v2: Unable to register OneNAND device\n");
+-	}
++	igep2_onenand_data.cs = onenandcs;
++
++	if (platform_device_register(&igep2_onenand_device) < 0)
++		pr_err("IGEP2: Unable to register OneNAND device\n");
+ }
+ 
+ #else
 -- 
 1.7.1
