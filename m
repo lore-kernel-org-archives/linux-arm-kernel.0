@@ -1,111 +1,81 @@
 From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Fri, 22 Oct 2010 21:46:14 -0500
-Subject: [PATCHv6 1/3] ARM: imx: Add gpio-keys to plat-mxc
-Message-ID: <1287801976-5324-1-git-send-email-Dinh.Nguyen@freescale.com>
+Date: Fri, 22 Oct 2010 21:46:16 -0500
+Subject: [PATCHv6 3/3] ARM: imx: Add wake functionality to GPIO
+In-Reply-To: <1287801976-5324-2-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1287801976-5324-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1287801976-5324-2-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1287801976-5324-3-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Add imx_add_gpio_keys function to add gpio-keys in plat-mxc
+Add function definition for irq_chip.set_wake to enable GPIO to
+wake-up the system.
+
+This patch has been tested on a MX51 Babbage system that had suspend
+code implemented. The set_wake implementation is necessary for a
+GPIO to wake up a system from suspend.
 
 Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/plat-mxc/devices/Kconfig               |    4 +++
- arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-gpio_keys.c  |   27 +++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h |    4 +++
- arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +
- 5 files changed, 38 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_keys.c
+ arch/arm/plat-mxc/gpio.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
-index 4047994..f4772e7 100644
---- a/arch/arm/plat-mxc/devices/Kconfig
-+++ b/arch/arm/plat-mxc/devices/Kconfig
-@@ -9,6 +9,10 @@ config IMX_HAVE_PLATFORM_FLEXCAN
- 	select HAVE_CAN_FLEXCAN
- 	bool
+diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
+index 9d38da0..9c3e362 100644
+--- a/arch/arm/plat-mxc/gpio.c
++++ b/arch/arm/plat-mxc/gpio.c
+@@ -20,6 +20,7 @@
+  */
  
-+config IMX_HAVE_PLATFORM_GPIO_KEYS
-+	bool
-+	default y if ARCH_MX51
-+	
- config IMX_HAVE_PLATFORM_IMX_I2C
- 	bool
+ #include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
+@@ -201,11 +202,42 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ 	}
+ }
  
-diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
-index 0a3c1f0..45aefeb 100644
---- a/arch/arm/plat-mxc/devices/Makefile
-+++ b/arch/arm/plat-mxc/devices/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_IMX_HAVE_PLATFORM_ESDHC) += platform-esdhc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FEC) += platform-fec.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
-+obj-$(CONFIG_IMX_HAVE_PLATFORM_GPIO_KEYS) += platform-gpio_keys.o
- obj-y += platform-imx-dma.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_SSI) += platform-imx-ssi.o
-diff --git a/arch/arm/plat-mxc/devices/platform-gpio_keys.c b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
-new file mode 100644
-index 0000000..1c53a53
---- /dev/null
-+++ b/arch/arm/plat-mxc/devices/platform-gpio_keys.c
-@@ -0,0 +1,27 @@
 +/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-+ * Boston, MA  02110-1301, USA.
++ * Set interrupt number "irq" in the GPIO as a wake-up source.
++ * While system is running, all registered GPIO interrupts need to have
++ * wake-up enabled. When system is suspended, only selected GPIO interrupts
++ * need to have wake-up enabled.
++ * @param  irq          interrupt source number
++ * @param  enable       enable as wake-up if equal to non-zero
++ * @return       This function returns 0 on success.
 + */
-+#include <asm/sizes.h>
-+#include <mach/hardware.h>
-+#include <mach/devices-common.h>
-+
-+struct platform_device *__init imx_add_gpio_keys(
-+		const struct gpio_keys_platform_data *pdata)
++static int gpio_set_wake_irq(u32 irq, u32 enable)
 +{
-+	return imx_add_platform_device("gpio-keys", -1, NULL,
-+		 0, pdata, sizeof(*pdata));
-+}
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 86d7575..8c6896f 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -29,6 +29,10 @@ struct platform_device *__init imx_add_flexcan(int id,
- 		resource_size_t irq,
- 		const struct flexcan_platform_data *pdata);
- 
-+#include <linux/gpio_keys.h>
-+struct platform_device *__init imx_add_gpio_keys(
-+		const struct gpio_keys_platform_data *pdata);
++	u32 gpio = irq_to_gpio(irq);
++	u32 gpio_idx = gpio & 0x1F;
++	struct mxc_gpio_port *port = &mxc_gpio_ports[gpio / 32];
 +
- #include <mach/i2c.h>
- struct imx_imx_i2c_data {
- 	int id;
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index e46b1c2..d7a41e9 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -45,6 +45,8 @@ typedef enum iomux_config {
- 				PAD_CTL_PKE | PAD_CTL_HYS)
- #define MX51_GPIO_PAD_CTRL		(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
- 				PAD_CTL_SRE_FAST)
-+#define MX51_GPIO_PAD_CTRL_2	(PAD_CTL_SRE_FAST | PAD_CTL_DSE_HIGH | \
-+					PAD_CTL_PUS_100K_UP)
- #define MX51_ECSPI_PAD_CTRL	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
- 				PAD_CTL_SRE_FAST)
- #define MX51_SDHCI_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PUS_47K_UP | \
++	if (enable) {
++		if (port->irq_high && (gpio_idx >= 16))
++			enable_irq_wake(port->irq_high);
++		else
++			enable_irq_wake(port->irq);
++	} else {
++		if (port->irq_high && (gpio_idx >= 16))
++			disable_irq_wake(port->irq_high);
++		else
++			disable_irq_wake(port->irq);
++	}
++
++	return 0;
++}
++
+ static struct irq_chip gpio_irq_chip = {
+ 	.ack = gpio_ack_irq,
+ 	.mask = gpio_mask_irq,
+ 	.unmask = gpio_unmask_irq,
+ 	.set_type = gpio_set_irq_type,
++	.set_wake = gpio_set_wake_irq,
+ };
+ 
+ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
 -- 
 1.6.0.4
