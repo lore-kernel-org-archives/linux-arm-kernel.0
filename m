@@ -1,424 +1,50 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 23 Oct 2010 16:24:03 +0200
-Subject: [PATCH V3 1/1]MMC: add support of sdhci-pxa driver
-In-Reply-To: <AANLkTikg3-5whd65aZmK4sJSg+vvNke0fSkqSQJ1B5vf@mail.gmail.com>
-References: <AANLkTikivxhU6Lzxe0Xn9r9hOSPLwuySRkTdGif4F_xo@mail.gmail.com>
-	<20101022110457.GA14136@void.printf.net>
-	<AANLkTikg3-5whd65aZmK4sJSg+vvNke0fSkqSQJ1B5vf@mail.gmail.com>
-Message-ID: <201010231624.03293.marek.vasut@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 23 Oct 2010 16:44:00 +0200
+Subject: [PATCH] sdio: fix suspend/resume regression
+In-Reply-To: <1287843531.29752.10.camel@maxim-laptop>
+References: <1286788315.3101.11.camel@sven>
+	<1286955116-22793-1-git-send-email-ohad@wizery.com>
+	<1287704855.12734.14.camel@maxim-laptop>
+	<AANLkTi=iC1uKyToEXrroOj+JxQ2mW97WRVEXjv+9oQEa@mail.gmail.com>
+	<1287843531.29752.10.camel@maxim-laptop>
+Message-ID: <AANLkTikgrsyeZVEnce1ouCD2ehrYg7=w54MYCSLi5Ekp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 22. ??jna 2010 16:09:03 zhangfei gao napsal(a):
-> On Fri, Oct 22, 2010 at 7:04 AM, Chris Ball <cjb@laptop.org> wrote:
-> > Hi,
-> > 
-> > On Fri, Oct 22, 2010 at 10:58:14AM +0100, Chris Ball wrote:
-> > [...]
-> > 
-> >> +#ifdef CONFIG_PM
-> >> +static int sdhci_pxa_suspend(struct platform_device *dev)
-> >> +{
-> >> +     struct sdhci_host *host =
-> >> platform_get_drvdata(to_platform_device(dev)); +
-> >> +     return sdhci_suspend_host(host, state);
-> >> +}
-> >> +
-> >> +static int sdhci_pxa_resume(struct platform_device *dev)
-> >> +{
-> > 
-> > These prototypes are not correct, leading to:
-> > 
-> >  CC [M]  drivers/mmc/host/sdhci-pxa.o
-> > drivers/mmc/host/sdhci-pxa.c: In function ?sdhci_pxa_suspend?:
-> > drivers/mmc/host/sdhci-pxa.c:205: warning: initialization from
-> > incompatible pointer type drivers/mmc/host/sdhci-pxa.c:207: error:
-> > ?state? undeclared (first use in this function)
-> > drivers/mmc/host/sdhci-pxa.c:207: error: (Each undeclared identifier is
-> > reported only once drivers/mmc/host/sdhci-pxa.c:207: error: for each
-> > function it appears in.) drivers/mmc/host/sdhci-pxa.c: In function
-> > ?sdhci_pxa_resume?:
-> > drivers/mmc/host/sdhci-pxa.c:212: warning: initialization from
-> > incompatible pointer type drivers/mmc/host/sdhci-pxa.c: At top level:
-> > drivers/mmc/host/sdhci-pxa.c:222: warning: initialization from
-> > incompatible pointer type drivers/mmc/host/sdhci-pxa.c:223: warning:
-> > initialization from incompatible pointer type
-> > 
-> > when compiled with CONFIG_PM=y.
-> > 
-> > --
-> > Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> > One Laptop Per Child
-> 
-> Sorry, forgot open CONFIG_PM.
-> Updated patch, thanks
-> 
-> From 88e7f028433fe87b211bf3d75b54261979d0d176 Mon Sep 17 00:00:00 2001
-> From: Zhangfei Gao <zhangfei.gao@marvell.com>
-> Date: Mon, 20 Sep 2010 10:51:28 -0400
-> Subject: [PATCH] mmc: add support of sdhci-pxa driver
-> 
-> 	Support Marvell PXA168/PXA910/MMP2 SD Host Controller
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-> Acked-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> ---
->  arch/arm/plat-pxa/include/plat/sdhci.h |   32 ++++
->  drivers/mmc/host/Kconfig               |   12 ++
->  drivers/mmc/host/Makefile              |    1 +
->  drivers/mmc/host/sdhci-pxa.c           |  254
-> ++++++++++++++++++++++++++++++++ 4 files changed, 299 insertions(+), 0
-> deletions(-)
->  create mode 100644 arch/arm/plat-pxa/include/plat/sdhci.h
->  create mode 100644 drivers/mmc/host/sdhci-pxa.c
-> 
-> diff --git a/arch/arm/plat-pxa/include/plat/sdhci.h
-> b/arch/arm/plat-pxa/include/plat/sdhci.h
-> new file mode 100644
-> index 0000000..38e86ad
-> --- /dev/null
-> +++ b/arch/arm/plat-pxa/include/plat/sdhci.h
-> @@ -0,0 +1,32 @@
-> +/* linux/arch/arm/plat-pxa/include/plat/sdhci.h
-> + *
-> + * Copyright 2010 Marvell
-> + *	Zhangfei Gao <zhangfei.gao@marvell.com>
-> + *
-> + * PXA Platform - SDHCI platform data definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __PLAT_PXA_SDHCI_H
-> +#define __PLAT_PXA_SDHCI_H
-> +
-> +/* pxa specific flag */
-> +/* Require clock free running */
-> +#define	PXA_FLAG_DISABLE_CLOCK_GATING (1<<0)
-> +
-> +/**
-> + * struct pxa_sdhci_platdata() - Platform device data for PXA SDHCI
-> + * @max_speed: The maximum speed supported.
-> + * @quirks: quirks of specific device
-> + * @flags: flags for platfrom requirement
-> +*/
-> +struct sdhci_pxa_platdata {
-> +	unsigned int	max_speed;
-> +	unsigned int	quirks;
-> +	unsigned int	flags;
-> +};
-> +
-> +#endif /* __PLAT_PXA_SDHCI_H */
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index c9c2520..c387402 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -155,6 +155,18 @@ config MMC_SDHCI_S3C
-> 
->  	  If unsure, say N.
-> 
-> +config MMC_SDHCI_PXA
-> +	tristate "Marvell PXA168/PXA910/MMP2 SD Host Controller support"
-> +	depends on ARCH_PXA || ARCH_MMP
-> +	select MMC_SDHCI
-> +	select MMC_SDHCI_IO_ACCESSORS
-> +	help
-> +	  This selects the Marvell(R) PXA168/PXA910/MMP2 SD Host Controller.
-> +	  If you have a PXA168/PXA910/MMP2 platform with SD Host Controller and a
-> +	  card slot,say Y or M here.
-> +
-> +	  If unsure, say N.
-> +
->  config MMC_SDHCI_SPEAR
->  	tristate "SDHCI support on ST SPEAr platform"
->  	depends on MMC_SDHCI && PLAT_SPEAR
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index 6c4ac67..7b645ff 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_MMC_IMX)		+= imxmmc.o
->  obj-$(CONFIG_MMC_MXC)		+= mxcmmc.o
->  obj-$(CONFIG_MMC_SDHCI)		+= sdhci.o
->  obj-$(CONFIG_MMC_SDHCI_PCI)	+= sdhci-pci.o
-> +obj-$(CONFIG_MMC_SDHCI_PXA)	+= sdhci-pxa.o
->  obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
->  obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
->  obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
-> diff --git a/drivers/mmc/host/sdhci-pxa.c b/drivers/mmc/host/sdhci-pxa.c
-> new file mode 100644
-> index 0000000..abf208c
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-pxa.c
-> @@ -0,0 +1,254 @@
-> +/* linux/drivers/mmc/host/sdhci-pxa.c
-> + *
-> + * Copyright (C) 2010 Marvell International Ltd.
-> + *		Zhangfei Gao <zhangfei.gao@marvell.com>
-> + *		Kevin Wang <dwang4@marvell.com>
-> + *		Mingwei Wang <mwwang@marvell.com>
-> + *		Philip Rakity <prakity@marvell.com>
-> + *		Mark Brown <markb@marvell.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/* Supports:
-> + * SDHCI support for MMP2/PXA910/PXA168
-> + *
-> + * Refer sdhci-s3c.c
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/err.h>
-> +#include <plat/sdhci.h>
-> +#include "sdhci.h"
-> +
-> +#define DRIVER_NAME	"sdhci-pxa"
-> +
-> +#define SD_FIFO_PARAM		0x104
-> +#define DIS_PAD_SD_CLK_GATE	0x400
-> +
-> +struct sdhci_pxa {
-> +	struct sdhci_host		*host;
-> +	struct sdhci_pxa_platdata	*pdata;
-> +	struct clk			*clk;
-> +	struct resource			*res;
-> +
-> +	u8 clk_enable;
-> +};
-> +
-> +/*************************************************************************
-> ****\ + *                                                                  
->         * + * SDHCI core callbacks                                        
->              * + *                                                        
->                   *
-> +\************************************************************************
-> *****/ +static void set_clock(struct sdhci_host *host, unsigned int clock)
-> +{
-> +	struct sdhci_pxa *pxa = sdhci_priv(host);
-> +	u32 tmp = 0;
-> +
-> +	if (clock == 0) {
-> +		if (pxa->clk_enable) {
-> +			clk_disable(pxa->clk);
-> +			pxa->clk_enable = 0;
-> +		}
-> +	} else {
-> +		if (0 == pxa->clk_enable) {
-> +			if (pxa->pdata->flags
-> +					& PXA_FLAG_DISABLE_CLOCK_GATING) {
-> +				tmp = readl(host->ioaddr + SD_FIFO_PARAM);
-> +				tmp |= DIS_PAD_SD_CLK_GATE;
-> +				writel(tmp, host->ioaddr + SD_FIFO_PARAM);
-> +			}
-> +			clk_enable(pxa->clk);
-> +			pxa->clk_enable = 1;
-> +		}
-> +	}
-> +}
+On Sat, Oct 23, 2010 at 4:18 PM, Maxim Levitsky <maximlevitsky@gmail.com> wrote:
+> On Sat, 2010-10-23 at 12:09 +0200, Ohad Ben-Cohen wrote:
+...
+>> >> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+>> >> index c94565d..515ff39 100644
+>> >> --- a/drivers/mmc/core/core.c
+>> >> +++ b/drivers/mmc/core/core.c
+>> >> @@ -1682,6 +1682,19 @@ int mmc_suspend_host(struct mmc_host *host)
+>> >> ? ? ? if (host->bus_ops && !host->bus_dead) {
+>> >> ? ? ? ? ? ? ? if (host->bus_ops->suspend)
+>> >> ? ? ? ? ? ? ? ? ? ? ? err = host->bus_ops->suspend(host);
+>> >> + ? ? ? ? ? ? if (err == -ENOSYS || !host->bus_ops->resume) {
 
-Doesn't the clock framework have something like clk_is_already_enabled() 
-function ?
-> +
-> +static struct sdhci_ops sdhci_pxa_ops = {
-> +	.set_clock = set_clock,
-> +};
-> +
-> +/*************************************************************************
-> ****\ + *                                                                  
->         * + * Device probing/removal                                      
->              * + *                                                        
->                   *
-> +\************************************************************************
-> *****/ +
-> +static int __devinit sdhci_pxa_probe(struct platform_device *pdev)
-> +{
-> +	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
-> +	struct device *dev = &pdev->dev;
-> +	struct sdhci_host *host = NULL;
-> +	struct resource *iomem = NULL;
-> +	struct sdhci_pxa *pxa = NULL;
-> +	int ret, irq;
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_err(dev, "no irq specified\n");
-> +		return irq;
-> +	}
-> +
-> +	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!iomem) {
-> +		dev_err(dev, "no memory specified\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	host = sdhci_alloc_host(&pdev->dev, sizeof(struct sdhci_pxa));
-> +	if (IS_ERR(host)) {
-> +		dev_err(dev, "failed to alloc host\n");
-> +		return PTR_ERR(host);
-> +	}
-> +
-> +	pxa = sdhci_priv(host);
-> +	pxa->host = host;
-> +	pxa->pdata = pdata;
-> +	pxa->clk_enable = 0;
-> +
-> +	pxa->clk = clk_get(dev, "PXA-SDHCLK");
-> +	if (IS_ERR(pxa->clk)) {
-> +		dev_err(dev, "failed to get io clock\n");
-> +		ret = PTR_ERR(pxa->clk);
-> +		goto out;
-> +	}
-> +
-> +	pxa->res = request_mem_region(iomem->start, resource_size(iomem),
-> +		mmc_hostname(host->mmc));
-> +	if (!pxa->res) {
-> +		dev_err(&pdev->dev, "cannot request region\n");
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	host->ioaddr = ioremap(iomem->start, resource_size(iomem));
-> +	if (!host->ioaddr) {
-> +		dev_err(&pdev->dev, "failed to remap registers\n");
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
-> +
-> +	host->hw_name = "MMC";
-> +	host->ops = &sdhci_pxa_ops;
-> +	host->irq = irq;
-> +	host->quirks = SDHCI_QUIRK_BROKEN_ADMA | SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
-> +
+>> > This reintroduces the bug I fixed.
+...
+>> In this case, mmc_suspend_host() should skip the code you are concerned about.
 
-Maybe check if these aren't already set in pdata and warn user ?
+> You are right here.
+> There is a very unlikely case that suspend of sd/mmc card fails (with
+> CONFIG_MMC_UNSAFE_RESUME set, and that will trigger the hang, but that
+> currently isn't possible because both mmc_sd_suspend and mmc_suspend
+> just return 0 unconditionally).
 
-> +	if (pdata->quirks)
-> +		host->quirks |= pdata->quirks;
-> +
-> +	ret = sdhci_add_host(host);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to add host\n");
-> +		goto out;
-> +	}
-> +
-> +	if (pxa->pdata->max_speed)
-> +		host->mmc->f_max = pxa->pdata->max_speed;
+Please note that the card is removed only on -ENOSYS, which is not a
+random error that can happen. In this context, it's a deliberate
+request (from the underlying bus) to remove the card.
 
-What happens otherwise ?
+So even if mmc_{sd_}suspend will be changed to propagate an error code
+one day, it is unlikely that they will trigger this bug even if they
+fail.
 
-> +
-> +	platform_set_drvdata(pdev, host);
-> +
-> +	return 0;
-> +out:
-> +	if (host) {
-> +		clk_put(pxa->clk);
-> +		if (host->ioaddr)
-> +			iounmap(host->ioaddr);
-> +		if (pxa->res)
-> +			release_mem_region(pxa->res->start,
-> +					resource_size(pxa->res));
-> +		sdhci_free_host(host);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static int __devexit sdhci_pxa_remove(struct platform_device *pdev)
-> +{
-> +	struct sdhci_host *host = platform_get_drvdata(pdev);
-> +	struct sdhci_pxa *pxa = sdhci_priv(host);
-> +	int dead = 0;
-> +	u32 scratch;
-> +
-> +	if (host) {
-> +		scratch = readl(host->ioaddr + SDHCI_INT_STATUS);
-> +		if (scratch == (u32)-1)
-> +			dead = 1;
-> +
-> +		sdhci_remove_host(host, dead);
-> +
-> +		if (host->ioaddr)
-> +			iounmap(host->ioaddr);
-> +		if (pxa->res)
-> +			release_mem_region(pxa->res->start,
-> +					resource_size(pxa->res));
-> +		if (pxa->clk_enable) {
-> +			clk_disable(pxa->clk);
-> +			pxa->clk_enable = 0;
-> +		}
-> +		clk_put(pxa->clk);
-> +
-> +		sdhci_free_host(host);
-> +		platform_set_drvdata(pdev, NULL);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM
-> +static int sdhci_pxa_suspend(struct platform_device *dev, pm_message_t
-> state) +{
-> +	struct sdhci_host *host = platform_get_drvdata(dev);
-> +
-> +	return sdhci_suspend_host(host, state);
-> +}
-> +
-> +static int sdhci_pxa_resume(struct platform_device *dev)
-> +{
-> +	struct sdhci_host *host = platform_get_drvdata(dev);
-> +
-> +	return sdhci_resume_host(host);
-> +}
-> +#else
-> +#define sdhci_pxa_suspend	NULL
-> +#define sdhci_pxa_resume	NULL
-> +#endif
-> +
-> +static struct platform_driver sdhci_pxa_driver = {
-> +	.probe		= sdhci_pxa_probe,
-> +	.remove		= __devexit_p(sdhci_pxa_remove),
-> +	.suspend	= sdhci_pxa_suspend,
-> +	.resume		= sdhci_pxa_resume,
-> +	.driver		= {
-> +		.name	= DRIVER_NAME,
-> +		.owner	= THIS_MODULE,
-> +	},
-> +};
-> +
-> +/*************************************************************************
-> ****\ + *                                                                  
->         * + * Driver init/exit                                            
->              * + *                                                        
->                   *
-> +\************************************************************************
-> *****/ +
-> +static int __init sdhci_pxa_init(void)
-> +{
-> +	return platform_driver_register(&sdhci_pxa_driver);
-> +}
-> +
-> +static void __exit sdhci_pxa_exit(void)
-> +{
-> +	platform_driver_unregister(&sdhci_pxa_driver);
-> +}
-> +
-> +module_init(sdhci_pxa_init);
-> +module_exit(sdhci_pxa_exit);
-> +
-> +MODULE_DESCRIPTION("SDH controller driver for PXA168/PXA910/MMP2");
-> +MODULE_AUTHOR("Zhangfei Gao <zhangfei.gao@marvell.com>");
-> +MODULE_LICENSE("GPL v2");
+> Btw, two above functions are identical, so some refactoring won't hurt.
 
-Thanks!
+Feel free to send a patch ;)
 
-Cheers
+Regards,
+Ohad.
