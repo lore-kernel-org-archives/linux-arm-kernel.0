@@ -1,83 +1,51 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 24 Oct 2010 19:54:04 +0200
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <20101022165612.GF9149@atomide.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
-	<8739s0sobc.fsf@deeprootsystems.com>
-	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-	<20101022165612.GF9149@atomide.com>
-Message-ID: <AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 24 Oct 2010 21:17:01 +0200
+Subject: [PATCHv6 1/3] ARM: imx: Add gpio-keys to plat-mxc
+In-Reply-To: <4CC2C94A.9040700@eukrea.com>
+References: <1287801976-5324-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<4CC2977D.8060409@eukrea.com>
+	<20101023095049.GC8554@pengutronix.de>
+	<4CC2C94A.9040700@eukrea.com>
+Message-ID: <20101024191701.GA25810@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Fri, Oct 22, 2010 at 6:56 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Guys, let's try to come up with a generic interface for this instead of
-> polluting the device drivers with more omap specific interfaces.
+On Sat, Oct 23, 2010 at 01:38:50PM +0200, Eric B?nard wrote:
+> Hi Uwe,
 >
-> We really want to keep the drivers generic and platform independent.
+> Le 23/10/2010 11:50, Uwe Kleine-K?nig a ?crit :
+>> On Sat, Oct 23, 2010 at 10:06:21AM +0200, Eric B?nard wrote:
+>>> Le 23/10/2010 04:46, Dinh.Nguyen at freescale.com a ?crit :
+>>>> +struct platform_device *__init imx_add_gpio_keys(
+>>>> +		const struct gpio_keys_platform_data *pdata)
+>>>> +{
+>>>> +	return imx_add_platform_device("gpio-keys", -1, NULL,
+>>>> +		 0, pdata, sizeof(*pdata));
+>>>> +}
+>>>
+>>> What is the added value of this ?
+>> Is is (more or less) in line with the other imx functions that
+>> dynamically add platform devices.
+>>
+>>> gpio-keys is not i.MX specific so why should that land in plat-mxc ?
+>> I consider it OK for now.  I know Eric does/wants something similar for
+>> pxa.  If you want to push forward unification here that's great, but
+>> IMHO this is nothing that should stop this patch which is a good step
+>> forward.
+>>
+> Does that mean that, for example, for cpuimx51 and cpuimx51sd boards, I 
+> should create : imx_add_gpio_leds, imx_add_serial_8250 and 
+> imx_add_i2c_gpio functions instead of creating the platform_device 
+> structure in the board's files and using platform_add_devices to register 
+> it ?
+The added benefit is that if you (or someone else) do(es) they don't
+occupy memory when a different machine is booted because the functions
+and their input data can live in .init sections.  I didn't measure the
+impact on booting time, but I think it doesn't make much difference.
 
-I share this concern as well.
+Best regards
+Uwe
 
-We basically have three options here:
-
-1. Have the hwspinlock driver inside the omap folders and use pdata func ptrs
-2. Have a generic hwspinlock framework, with a small omap-specific
-implementation
-3. Have a misc driver which is currently omap specific, but can very
-easily be converted to a common framework
-
-I don't like (1) so much; it's a driver that has very little that is
-hardware specific (mainly just the two lines that actually access the
-hardware - the lock and the unlock), and it's growing. E.g., we will
-need to add it a user space interface (to allow userland IPC
-implementations), we will need to add it a "virtual" locks layer that
-would provide more locks than the hardware currently has, etc..
-
-In addition, there seem to be a general discontent about drivers
-piling up in the ARM folders, instead of having them visible in
-drivers/ so they can become useful for other platforms as well.
-
-Here's something Linus wrote about this awhile back:
-
-http://www.spinics.net/lists/linux-arm-msm/msg00324.html
-
-So initially I opted for (2). I have an implementation ready - it's a
-common drivers/hwspinlock/core.c framework with a small omap-specific
-part at drivers/hwspinlock/omap_hwspinlock.c. The core has all the
-logic while the latter, omap-specific implementation, is really small
-- it is basically just registering lock instances, that have a
-trylock/unlock/relax ops struct, with the common framework.
-
-But lack of additional users (besides the OMAP hardware), and lack of
-generic drivers that would use it (we have syslink, which currently
-tend to only need this from user space, i2c-omap and omap's upcoming
-resource manager), made it look like an overkill for now.
-
-So simplicity won, and (3) was eventually submitted. It exposes
-exactly the same interface like (2) would (s/omap_hwspin/hwspin/), and
-it's relatively easy to turn it back into a common framework in case
-additional users show up.
-
-But if you feel that (2) is justifiable/desirable, I would be more
-than happy to submit that version.
-
-> Unless somebody has better ideas, I suggest we pass a lock function
-> in the platform_data to the drivers that need it, and do the omap
-> specific nasty stuff in the platform code.
-
-Do you mean (1) and then pass the whole bunch of APIs
-(request/free/lock variants/unlock/get_id) via pdata ?
-
-Or do you mean a variation of (2) with only the specific locking bits
-coming from pdata func pointers ? I guess that in this case we just
-might as well go with the full (2).
-
-Thanks,
-Ohad.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
