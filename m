@@ -1,54 +1,101 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 24 Oct 2010 21:20:53 +0200
-Subject: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
-In-Reply-To: <19651.61503.118511.923142@ipc1.ka-ro>
-References: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1287766575-4092-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101022182812.GA8554@pengutronix.de>
-	<86A0E76937111F4C92FABEC0A2098851051D6090@az33exm21>
-	<20101022194215.GB8554@pengutronix.de>
-	<86A0E76937111F4C92FABEC0A2098851051D6116@az33exm21>
-	<19651.61503.118511.923142@ipc1.ka-ro>
-Message-ID: <20101024192053.GB25810@pengutronix.de>
+From: kristoffer.ericson@gmail.com (Kristoffer Ericson)
+Date: Sun, 24 Oct 2010 23:43:38 +0200
+Subject: cmpxchg() in recent kernels
+In-Reply-To: <AANLkTi=PeHQRibtU=jv69KVNWovtNsG3S11M0BLCnbRC@mail.gmail.com>
+References: <4CB036B7.7000100@gai.ru>
+	<AANLkTi=PeHQRibtU=jv69KVNWovtNsG3S11M0BLCnbRC@mail.gmail.com>
+Message-ID: <20101024214338.GB878@boggieman.bredbandsbolaget.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
-
-On Sun, Oct 24, 2010 at 10:37:19AM +0200, Lothar Wa?mann wrote:
-> Hi,
-> > >> How do you suggest I define this pin for Babbage board only? Do I add to iomux-mx51.h
-> > >> #define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,
-> > >0,MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP) ?
-> > >>
-> > >> Or do I define the pin in the board file with a 100K_UP? Like how eukrea_mbimxsd-baseboard.c did for
-> > >MBIMXSD_GPIO_3_31?
-> > >I'd suggest something local to your machine file.  Unfortunately I don't
-> > >see an easy way to reuse the generic MX51_PAD_EIM_A27__GPIO_2_21 to
-> > >define your local symbol.  So I think something like you wrote above
-> > >should be fine.
-> > >
-> > >Too bad that
-> > >
-> > >	#define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21 (MX51_PAD_EIM_A27__GPIO_2_21 | PAD_CTL_PUS_100K_UP)
-> > >
-> > >doesn't work.
-> > 
-> > Yes, I also wish I didn't have to redefine the pin just because of PAD setting change. I am going to send out another patch that basically sets the pad_desc.pad_ctrl=PAD_SETTING in mxc_init_board() function. I think it's a bit cleaner than having to redefine the pin.
-> > 
-> IMO the 'struct pad_desc' should be replaced with an u64 bitmap that
-> would allow for the pullup and other definitions that may be board
-> specific to be simply or'ed to the pad definition.
+On Fri, Oct 15, 2010 at 03:26:34PM +1100, Aras Vaichas wrote:
+> On 9 October 2010 20:32, Alex Sverdlin <alex@gai.ru> wrote:
+> >
+> > Hello!
+> >
+> > I've probably missed something, but how to compile recent kernels on ARM?
+> > I've been using GCC 3.4.3 from Cirrus for my EP9302 boards up to 2.6.35.4
+> > But 2.6.36-rc and upper won't compile anymore.
+> > The problem is appearing in multiplatform code of cmpxchg() function.
+> > First in kernel/pid.c (2.6.36-rc4 - 2.6.36-rc6)
+> > Then 4 times in 2.6.36-rc7-next... atomic_cmpxchg compiles fine, and when I
+> > replace cmpxhg with atomic_ version, everything compiles fine.
+> >
+> > Here is output of make from 2.6.36-rc7-next:
+> > ...
+> > ?CHK ? ? include/generated/compile.h
+> > ?UPD ? ? include/generated/compile.h
+> > ?CC ? ? ?init/version.o
+> > ?LD ? ? ?init/built-in.o
+> > ?LD ? ? ?vmlinux
+> > kernel/built-in.o: In function `alloc_pid':
+> > elfcore.c:(.text+0x1c258): undefined reference to `wrong_size_cmpxchg'
+> > net/built-in.o: In function `rt_bind_peer':
+> > sysctl_net.c:(.text+0x3bb38): undefined reference to `wrong_size_cmpxchg'
+> > net/built-in.o: In function `inet_add_protocol':
+> > sysctl_net.c:(.text+0x3f4dc): undefined reference to `wrong_size_cmpxchg'
+> > net/built-in.o: In function `inet_del_protocol':
+> > sysctl_net.c:(.text+0x3f5a8): undefined reference to `wrong_size_cmpxchg'
+> > net/built-in.o: In function `build_ehash_secret':
+> > sysctl_net.c:(.text+0x6a034): undefined reference to `wrong_size_cmpxchg'
+> > make[1]: *** [vmlinux] Error 1
+> > ...
 > 
-> I could try to provide a patch if this is agreed on.
-Hmm, I thought about that, too, when writing my mail and when I added
-the needed space for a struct pad_desc I stopped when it became >64.
-Somehow I must have got it wrong.  After rechecking now it's ==64, so
-yes, I'd like it.
+> Sorry, no answer, but I can confirm that I am having the same problem as well.
+> ARM AT91RM9200, 2.6.33.7 + at91 + rt
+> 
+> kernel/built-in.o: In function `__tasklet_hi_schedule':
+> utsname_sysctl.c:(.text+0xca1c): undefined reference to `wrong_size_cmpxchg'
+> kernel/built-in.o: In function `__tasklet_schedule':
+> utsname_sysctl.c:(.text+0xcb7c): undefined reference to `wrong_size_cmpxchg'
+> kernel/built-in.o: In function `__tasklet_action':
+> utsname_sysctl.c:(.text+0xce4c): undefined reference to `wrong_size_cmpxchg'
+> kernel/built-in.o: In function `sched_init_smp':
+> utsname_sysctl.c:(.init.text+0xec): undefined reference to `____ilog2_NaN'
+> make: *** [.tmp_vmlinux1] Error 1
+> 
+> also
+> 
+> kernel/built-in.o: In function `__tasklet_hi_schedule':
+> slow-work.c:(.text+0xc86c): undefined reference to `wrong_size_cmpxchg'
+> kernel/built-in.o: In function `__tasklet_schedule':
+> slow-work.c:(.text+0xc9cc): undefined reference to `wrong_size_cmpxchg'
+> kernel/built-in.o: In function `__tasklet_action':
+> slow-work.c:(.text+0xcc9c): undefined reference to `wrong_size_cmpxchg'
+> kernel/built-in.o: In function `sched_init_smp':
+> slow-work.c:(.init.text+0xec): undefined reference to `____ilog2_NaN'
+> make: *** [.tmp_vmlinux1] Error 1
+> 
+> Aras
 
-Best regards
-Uwe
+Im seeing something similiar, using GCC 3.4.5
+ARM HP Jornada 720, 2.6.36
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+  GZIP    kernel/config_data.gz
+  IKCFG   kernel/config_data.h
+  CC      kernel/configs.o
+  LD      kernel/built-in.o
+  LD      drivers/pcmcia/built-in.o
+  LD      drivers/built-in.o
+  LD      vmlinux.o
+  MODPOST vmlinux.o
+WARNING: modpost: Found 1 section mismatch(es).
+To see full details build your kernel with:
+'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+  GEN     .version
+  CHK     include/generated/compile.h
+  UPD     include/generated/compile.h
+  CC      init/version.o
+  LD      init/built-in.o
+  LD      .tmp_vmlinux1
+kernel/built-in.o(.text+0x1d038): In function `alloc_pid':
+include/asm-generic/cmpxchg-local.h:42: undefined reference to `wrong_size_cmpxchg'
+make: *** [.tmp_vmlinux1] Error 1
+
+Kristoffer
+
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
