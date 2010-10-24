@@ -1,49 +1,83 @@
-From: wiesel25@googlemail.com (Wieslaw Prymka)
-Date: Fri, 22 Oct 2010 09:18:54 +0200
-Subject: Smargo Cardreader problem with QNAP-TS119(2.6.32-5-kirkwood)
-In-Reply-To: <AANLkTi=R-wwH63HqV59bwzKcE50MyUtj+vGO8zmqQUBE@mail.gmail.com>
-References: <AANLkTi=R-wwH63HqV59bwzKcE50MyUtj+vGO8zmqQUBE@mail.gmail.com>
-Message-ID: <AANLkTinVUVQ7NGbXwEdsfAQG2R6Knrz2vGHe0oxTk=OC@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 24 Oct 2010 19:54:04 +0200
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <20101022165612.GF9149@atomide.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287387875-14168-4-git-send-email-ohad@wizery.com>
+	<87r5fmxghm.fsf@deeprootsystems.com>
+	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+	<8739s0sobc.fsf@deeprootsystems.com>
+	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
+	<20101022165612.GF9149@atomide.com>
+Message-ID: <AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- I have a problem with Smargo Cardreader on my debian qnap-119
+Hi Tony,
 
-
-> [203924.885817] ftdi_sio 1-1.3:1.0: FTDI USB Serial Device converter
-> detected
-> [203924.893436] usb 1-1.3: Detected FT232BM
-> [203924.897379] usb 1-1.3: Number of endpoints 2
-> [203924.901827] usb 1-1.3: Endpoint 1 MaxPacketSize 64
-> [203924.906727] usb 1-1.3: Endpoint 2 MaxPacketSize 64
-> [203924.911640] usb 1-1.3: Setting MaxPacketSize 64
-> [203924.917559] ftdi_sio ttyUSB0: Unable to read latency timer: -32
-> [203924.924186] usb 1-1.3: FTDI USB Serial Device converter now attached to
-> ttyUSB0
+On Fri, Oct 22, 2010 at 6:56 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Guys, let's try to come up with a generic interface for this instead of
+> polluting the device drivers with more omap specific interfaces.
 >
+> We really want to keep the drivers generic and platform independent.
 
-I think this is the problem:
+I share this concern as well.
 
+We basically have three options here:
 
-> 203924.917559] ftdi_sio ttyUSB0: Unable to read latency timer: -32
+1. Have the hwspinlock driver inside the omap folders and use pdata func ptrs
+2. Have a generic hwspinlock framework, with a small omap-specific
+implementation
+3. Have a misc driver which is currently omap specific, but can very
+easily be converted to a common framework
 
+I don't like (1) so much; it's a driver that has very little that is
+hardware specific (mainly just the two lines that actually access the
+hardware - the lock and the unlock), and it's growing. E.g., we will
+need to add it a user space interface (to allow userland IPC
+implementations), we will need to add it a "virtual" locks layer that
+would provide more locks than the hardware currently has, etc..
 
+In addition, there seem to be a general discontent about drivers
+piling up in the ARM folders, instead of having them visible in
+drivers/ so they can become useful for other platforms as well.
 
-the Smargo is attached on ttyUSB0, but ........
+Here's something Linus wrote about this awhile back:
 
+http://www.spinics.net/lists/linux-arm-msm/msg00324.html
 
-> 2010/10/18  8:00:45 r 41035470 ERROR opening device /dev/ttyUSB0
-> 2010/10/18  8:00:45 r 41035470 Cannot open device: /dev/ttyUSB0
+So initially I opted for (2). I have an implementation ready - it's a
+common drivers/hwspinlock/core.c framework with a small omap-specific
+part at drivers/hwspinlock/omap_hwspinlock.c. The core has all the
+logic while the latter, omap-specific implementation, is really small
+- it is basically just registering lock instances, that have a
+trylock/unlock/relax ops struct, with the common framework.
 
+But lack of additional users (besides the OMAP hardware), and lack of
+generic drivers that would use it (we have syslink, which currently
+tend to only need this from user space, i2c-omap and omap's upcoming
+resource manager), made it look like an overkill for now.
 
+So simplicity won, and (3) was eventually submitted. It exposes
+exactly the same interface like (2) would (s/omap_hwspin/hwspin/), and
+it's relatively easy to turn it back into a common framework in case
+additional users show up.
 
-any idea ?
+But if you feel that (2) is justifiable/desirable, I would be more
+than happy to submit that version.
 
+> Unless somebody has better ideas, I suggest we pass a lock function
+> in the platform_data to the drivers that need it, and do the omap
+> specific nasty stuff in the platform code.
 
+Do you mean (1) and then pass the whole bunch of APIs
+(request/free/lock variants/unlock/get_id) via pdata ?
 
+Or do you mean a variation of (2) with only the specific locking bits
+coming from pdata func pointers ? I guess that in this case we just
+might as well go with the full (2).
 
-Best regards
-Wiesiek
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101022/39482000/attachment.html>
+Thanks,
+Ohad.
