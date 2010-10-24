@@ -1,106 +1,36 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 24 Oct 2010 10:12:40 +0200
-Subject: [PATCH] ARM: orion5x/kirkwood/mv78xx0: fix MPP configuration corner
-	cases
-Message-ID: <1287907960-31563-1-git-send-email-mike@compulab.co.il>
+From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
+Date: Sun, 24 Oct 2010 10:29:56 +0200
+Subject: [PATCH] pxafb: correct the vertical back porch macro
+In-Reply-To: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
+References: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
+Message-ID: <19651.61060.253943.962658@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wrong MPP configuration would cause <cpu>_mpp_conf loop	infinitely
-because the mpp list iterator would not be incremented.
+Hi,
 
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
----
- arch/arm/mach-kirkwood/mpp.c |    5 +++--
- arch/arm/mach-mv78xx0/mpp.c  |    5 +++--
- arch/arm/mach-orion5x/mpp.c  |    5 +++--
- 3 files changed, 9 insertions(+), 6 deletions(-)
+Matt Reimer writes:
+> Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back porch
+> knob LCCR2[BFW] specifies the number of clock periods minus one, but the
+> macro wasn't doing the subtraction.
+>
+Nope! This is true only for the ELW and BLW settings in LCCR1, but not
+for the EFW and BFW settings in LCCR2! The vertical front and back
+porch can actually be programmed to a length of zero lines.
 
-diff --git a/arch/arm/mach-kirkwood/mpp.c b/arch/arm/mach-kirkwood/mpp.c
-index 065187d..273f561 100644
---- a/arch/arm/mach-kirkwood/mpp.c
-+++ b/arch/arm/mach-kirkwood/mpp.c
-@@ -67,13 +67,13 @@ void __init kirkwood_mpp_conf(unsigned int *mpp_list)
- 		if (num > MPP_MAX) {
- 			printk(KERN_ERR "kirkwood_mpp_conf: invalid MPP "
- 					"number (%u)\n", num);
--			continue;
-+			goto next_pin;
- 		}
- 		if (!(*mpp_list & variant_mask)) {
- 			printk(KERN_WARNING
- 			       "kirkwood_mpp_conf: requested MPP%u config "
- 			       "unavailable on this hardware\n", num);
--			continue;
-+			goto next_pin;
- 		}
- 
- 		shift = (num & 7) << 2;
-@@ -89,6 +89,7 @@ void __init kirkwood_mpp_conf(unsigned int *mpp_list)
- 			gpio_mode = 0;
- 		orion_gpio_set_valid(num, gpio_mode);
- 
-+next_pin:
- 		mpp_list++;
- 	}
- 
-diff --git a/arch/arm/mach-mv78xx0/mpp.c b/arch/arm/mach-mv78xx0/mpp.c
-index 354ac51..7c1fe2a 100644
---- a/arch/arm/mach-mv78xx0/mpp.c
-+++ b/arch/arm/mach-mv78xx0/mpp.c
-@@ -62,13 +62,13 @@ void __init mv78xx0_mpp_conf(unsigned int *mpp_list)
- 		if (num > MPP_MAX) {
- 			printk(KERN_ERR "mv78xx0_mpp_conf: invalid MPP "
- 					"number (%u)\n", num);
--			continue;
-+			goto next_pin;
- 		}
- 		if (!(*mpp_list & variant_mask)) {
- 			printk(KERN_WARNING
- 					"mv78xx0_mpp_conf: requested MPP%u config "
- 					"unavailable on this hardware\n", num);
--			continue;
-+			goto next_pin;
- 		}
- 
- 		shift = (num & 7) << 2;
-@@ -84,6 +84,7 @@ void __init mv78xx0_mpp_conf(unsigned int *mpp_list)
- 			gpio_mode = 0;
- 		orion_gpio_set_valid(num, gpio_mode);
- 
-+next_pin:
- 		mpp_list++;
- 	}
- 
-diff --git a/arch/arm/mach-orion5x/mpp.c b/arch/arm/mach-orion5x/mpp.c
-index bc4c3b9..dc27d1a 100644
---- a/arch/arm/mach-orion5x/mpp.c
-+++ b/arch/arm/mach-orion5x/mpp.c
-@@ -141,7 +141,7 @@ void __init orion5x_mpp_conf(struct orion5x_mpp_mode *mode)
- 		else {
- 			printk(KERN_ERR "orion5x_mpp_conf: invalid MPP "
- 					"(%d)\n", mode->mpp);
--			continue;
-+			goto next_pin;
- 		}
- 
- 		num_type = determine_type_encoding(mode->mpp, mode->type);
-@@ -149,7 +149,7 @@ void __init orion5x_mpp_conf(struct orion5x_mpp_mode *mode)
- 			printk(KERN_ERR "orion5x_mpp_conf: invalid MPP "
- 					"combination (%d, %d)\n", mode->mpp,
- 					mode->type);
--			continue;
-+			goto next_pin;
- 		}
- 
- 		shift = (mode->mpp & 7) << 2;
-@@ -161,6 +161,7 @@ void __init orion5x_mpp_conf(struct orion5x_mpp_mode *mode)
- 
- 		orion_gpio_set_valid(mode->mpp, !!(mode->type == MPP_GPIO));
- 
-+next_pin:
- 		mode++;
- 	}
- 
+Furthermore, if you introduce such a change, you should also convert
+all users of the macro to use an appropriately adjusted value so that
+the result will be the same as without the patch!
+
+
+Lothar Wa?mann
 -- 
-1.7.3.1
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
