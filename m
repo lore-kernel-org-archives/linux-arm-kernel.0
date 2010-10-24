@@ -1,52 +1,50 @@
-From: LW@KARO-electronics.de (=?iso-8859-15?Q?Lothar_Wa=DFmann?=)
-Date: Sun, 24 Oct 2010 10:37:19 +0200
-Subject: [PATCHv5 2/3] ARM: imx: Add gpio-keys to plat-mxc
-In-Reply-To: <86A0E76937111F4C92FABEC0A2098851051D6116@az33exm21>
-References: <1287766575-4092-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1287766575-4092-2-git-send-email-Dinh.Nguyen@freescale.com>
-	<20101022182812.GA8554@pengutronix.de>
-	<86A0E76937111F4C92FABEC0A2098851051D6090@az33exm21>
-	<20101022194215.GB8554@pengutronix.de>
-	<86A0E76937111F4C92FABEC0A2098851051D6116@az33exm21>
-Message-ID: <19651.61503.118511.923142@ipc1.ka-ro>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Sun, 24 Oct 2010 12:48:29 +0200
+Subject: atmel_serial: fix RTS high after initialization in RS485 mode
+Message-ID: <4CC40EFD.8070000@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> >> How do you suggest I define this pin for Babbage board only? Do I add to iomux-mx51.h
-> >> #define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21             IOMUX_PAD(0x45c, 0x0c8, 1, 0x0,
-> >0,MX51_GPIO_PAD_CTRL | PAD_CTL_PUS_100K_UP) ?
-> >>
-> >> Or do I define the pin in the board file with a 100K_UP? Like how eukrea_mbimxsd-baseboard.c did for
-> >MBIMXSD_GPIO_3_31?
-> >I'd suggest something local to your machine file.  Unfortunately I don't
-> >see an easy way to reuse the generic MX51_PAD_EIM_A27__GPIO_2_21 to
-> >define your local symbol.  So I think something like you wrote above
-> >should be fine.
-> >
-> >Too bad that
-> >
-> >	#define MX51_BABBAGE_PAD_EIM_A27__GPIO_2_21 (MX51_PAD_EIM_A27__GPIO_2_21 | PAD_CTL_PUS_100K_UP)
-> >
-> >doesn't work.
-> 
-> Yes, I also wish I didn't have to redefine the pin just because of PAD setting change. I am going to send out another patch that basically sets the pad_desc.pad_ctrl=PAD_SETTING in mxc_init_board() function. I think it's a bit cleaner than having to redefine the pin.
-> 
-IMO the 'struct pad_desc' should be replaced with an u64 bitmap that
-would allow for the pullup and other definitions that may be board
-specific to be simply or'ed to the pad definition.
+Hi Nicolas,
 
-I could try to provide a patch if this is agreed on.
+	when working in RS485 mode, the atmel_serial driver keeps RTS
+high after the initialization of the serial port. It goes low only after
+the first character has been sent. 
+
+This patch fixes this behavior. It has been already tested by Arkadiusz (CC:-ed).
+
+Best regards,
+
+	Claudio
 
 
-Lothar Wa?mann
+atmel_serial: RTS line low after initialization of the serial port
+
+Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+Signed-off-by: Arkadiusz Bubala <arkadiusz.bubala@gmail.com>
+---
+ drivers/serial/atmel_serial.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/serial/atmel_serial.c b/drivers/serial/atmel_serial.c
+index 3892666..85aa66f 100644
+--- a/drivers/serial/atmel_serial.c
++++ b/drivers/serial/atmel_serial.c
+@@ -1732,6 +1732,15 @@ static int __devinit atmel_serial_probe(struct platform_device *pdev)
+ 	device_init_wakeup(&pdev->dev, 1);
+ 	platform_set_drvdata(pdev, port);
+ 
++	if (port->rs485.flags & SER_RS485_ENABLED) {
++		unsigned int control = 0;
++		unsigned int mode = 0;
++		control |= ATMEL_US_RTSEN;
++		mode |= ATMEL_US_USMODE_NORMAL;
++		UART_PUT_MR(&port->uart, mode);
++		UART_PUT_CR(&port->uart, control);
++	}
++
+ 	return 0;
+ 
+ err_add_port:
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.6.0.4
