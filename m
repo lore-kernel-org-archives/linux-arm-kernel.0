@@ -1,38 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 24 Oct 2010 23:08:46 +0100
-Subject: cmpxchg() in recent kernels
-In-Reply-To: <20101024214338.GB878@boggieman.bredbandsbolaget.se>
-References: <4CB036B7.7000100@gai.ru>
-	<AANLkTi=PeHQRibtU=jv69KVNWovtNsG3S11M0BLCnbRC@mail.gmail.com>
-	<20101024214338.GB878@boggieman.bredbandsbolaget.se>
-Message-ID: <20101024220846.GA6041@n2100.arm.linux.org.uk>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 25 Oct 2010 00:28:20 +0100
+Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
+In-Reply-To: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
+References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1287962900.5674.21.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 24, 2010 at 11:43:38PM +0200, Kristoffer Ericson wrote:
-> Im seeing something similiar, using GCC 3.4.5
-> ARM HP Jornada 720, 2.6.36
+On Mon, 2010-09-13 at 00:35 +0200, Linus Walleij wrote:
 > 
->   GZIP    kernel/config_data.gz
->   IKCFG   kernel/config_data.h
->   CC      kernel/configs.o
->   LD      kernel/built-in.o
->   LD      drivers/pcmcia/built-in.o
->   LD      drivers/built-in.o
->   LD      vmlinux.o
->   MODPOST vmlinux.o
-> WARNING: modpost: Found 1 section mismatch(es).
-> To see full details build your kernel with:
-> 'make CONFIG_DEBUG_SECTION_MISMATCH=y'
->   GEN     .version
->   CHK     include/generated/compile.h
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   LD      init/built-in.o
->   LD      .tmp_vmlinux1
-> kernel/built-in.o(.text+0x1d038): In function `alloc_pid':
-> include/asm-generic/cmpxchg-local.h:42: undefined reference to `wrong_size_cmpxchg'
-> make: *** [.tmp_vmlinux1] Error 1
+> +#define PARTITION(n, off, sz)  {.name = n, .offset = off, .size = sz}
+> +
+> +/*
+> + * Default partition layout for small page(= 512 bytes) devices
+> + * Size for "Root file system" is updated in driver based on actual device size
+> + */
+> +static struct mtd_partition partition_info_16KB_blk[] = {
+> +       PARTITION("X-loader", 0, 4 * 0x4000),
+> +       PARTITION("U-Boot", 0x10000, 20 * 0x4000),
+> +       PARTITION("Kernel", 0x60000, 256 * 0x4000),
+> +       PARTITION("Root File System", 0x460000, 0),
+> +}; 
 
-Probably needs to be bisected, but I think in the long run we'll have
-to accept that gcc 4 will become the minimum compiler version.
+Er, you use a macro just so that you can use order-dependent non-C99
+structure initialisation? You realise that this would do the same thing:
+ #define PARTITION(a,b,c) {a,c,b}
+
+And no, I don't think *that* would be a good idea either :)
+
+Please fix.
+
+-- 
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
