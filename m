@@ -1,20 +1,51 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Oct 2010 11:35:22 +0100
-Subject: [RFC PATCH 09/18] ARM: LPAE: Add fault handling support
-In-Reply-To: <20101025101711.GA32026@shutemov.name>
-References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
-	<20101025090024.25275.59418.stgit@e102109-lin.cambridge.arm.com>
-	<20101025101711.GA32026@shutemov.name>
-Message-ID: <1288002922.14756.10.camel@e102109-lin.cambridge.arm.com>
+Date: Mon, 25 Oct 2010 11:48:00 +0100
+Subject: [PATCH] ARM: memblock: set allocation limit for
+	MEMBLOCK_ALLOC_ANYWHERE
+Message-ID: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-10-25 at 11:17 +0100, Kirill A. Shutemov wrote:
-> On Mon, Oct 25, 2010 at 10:00:24AM +0100, Catalin Marinas wrote:
-> > +     { do_bad,               SIGILL,  BUS_ADRALN,    "alignment fault"               },
-> 
-> s/SIGILL/SIGBUS/
+From: Will Deacon <will.deacon@arm.com>
 
-Good point, thanks.
+Commit e63075a3 removed the explicit MEMBLOCK_REAL_LIMIT #define
+and introduced the requirement that arch code calls
+memblock_set_current_limit to ensure that the __va macro can
+be used on physical addresses returned from memblock_alloc.
 
-Catalin
+This patch ensures that memblock allocates from lowmem on ARM
+by setting the allocation limit to lowmem_end_addr.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/memblock.h |    3 ---
+ arch/arm/mm/mmu.c               |    1 +
+ 2 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/memblock.h b/arch/arm/include/asm/memblock.h
+index fdbc43b..655b4c4 100644
+--- a/arch/arm/include/asm/memblock.h
++++ b/arch/arm/include/asm/memblock.h
+@@ -3,9 +3,6 @@
+ 
+ #ifdef CONFIG_MMU
+ extern phys_addr_t lowmem_end_addr;
+-#define MEMBLOCK_REAL_LIMIT	lowmem_end_addr
+-#else
+-#define MEMBLOCK_REAL_LIMIT	0
+ #endif
+ 
+ struct meminfo;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 72cc529..fd7bb1e 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -753,6 +753,7 @@ static void __init sanity_check_meminfo(void)
+ 	int i, j, highmem = 0;
+ 
+ 	lowmem_end_addr = __pa(vmalloc_min - 1) + 1;
++	memblock_set_current_limit(lowmem_end_addr);
+ 
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
