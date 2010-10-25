@@ -1,51 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Oct 2010 11:48:00 +0100
-Subject: [PATCH] ARM: memblock: set allocation limit for
-	MEMBLOCK_ALLOC_ANYWHERE
-Message-ID: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 25 Oct 2010 11:57:50 +0100
+Subject: [PATCH V4 1/1]MMC: add support of sdhci-pxa driver
+In-Reply-To: <AANLkTi=kS7YV4B0OEHNfm1hjCAsgeUHB7cMR10yBwMRF@mail.gmail.com>
+References: <AANLkTi=kS7YV4B0OEHNfm1hjCAsgeUHB7cMR10yBwMRF@mail.gmail.com>
+Message-ID: <20101025105750.GA30789@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Hi Zhangfei,
 
-Commit e63075a3 removed the explicit MEMBLOCK_REAL_LIMIT #define
-and introduced the requirement that arch code calls
-memblock_set_current_limit to ensure that the __va macro can
-be used on physical addresses returned from memblock_alloc.
+On Mon, Oct 25, 2010 at 06:00:37AM -0400, zhangfei gao wrote:
+> Hi, Chris
+> 
+> Add default working speed in this version, thanks.
 
-This patch ensures that memblock allocates from lowmem on ARM
-by setting the allocation limit to lowmem_end_addr.
+I've taken the previous patch version into mmc-next now:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/memblock.h |    3 ---
- arch/arm/mm/mmu.c               |    1 +
- 2 files changed, 1 insertions(+), 3 deletions(-)
+http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commit;h=536ac998f6076a0ae423b1046b85d7690e8b7107
 
-diff --git a/arch/arm/include/asm/memblock.h b/arch/arm/include/asm/memblock.h
-index fdbc43b..655b4c4 100644
---- a/arch/arm/include/asm/memblock.h
-+++ b/arch/arm/include/asm/memblock.h
-@@ -3,9 +3,6 @@
- 
- #ifdef CONFIG_MMU
- extern phys_addr_t lowmem_end_addr;
--#define MEMBLOCK_REAL_LIMIT	lowmem_end_addr
--#else
--#define MEMBLOCK_REAL_LIMIT	0
- #endif
- 
- struct meminfo;
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 72cc529..fd7bb1e 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -753,6 +753,7 @@ static void __init sanity_check_meminfo(void)
- 	int i, j, highmem = 0;
- 
- 	lowmem_end_addr = __pa(vmalloc_min - 1) + 1;
-+	memblock_set_current_limit(lowmem_end_addr);
- 
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
+So, please send further changes as individual patches against the
+version in mmc-next, and I'll apply them after the merge.
+
+Are you going to submit a patch to e.g. arch/arm/mach-mmp that hooks
+up a platform_device using this driver?
+
+By the way, we used this driver on an OLPC XO-1.75 (MMP2) today.
+I haven't finished testing it yet, though.
+
+Thanks,
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
