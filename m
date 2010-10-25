@@ -1,38 +1,34 @@
 From: rpimentel.silva@gmail.com (Rogerio Pimentel)
-Date: Mon, 25 Oct 2010 12:54:24 -0200
-Subject: [PATCH 2/4] mx31_3ds: Fix the logic for detecting the debug board
-Message-ID: <AANLkTikg5rM+cp6oJXmW=DE5=FV=drycqvhz0xWAf1by@mail.gmail.com>
+Date: Mon, 25 Oct 2010 12:55:14 -0200
+Subject: [PATCH 3/4] mx31_3ds: Fix spi registration
+Message-ID: <AANLkTi=kv7s8StZKEWitrBCdcuKE0qDMBUuAYkTNvAWi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function mxc_expio_init returns 0 on success, so fix the logic for
-printing the error case.
-Also fixed the wording on the error message.
+Commit (06606ff13) "ARM: imx: dynamically register spi_imx devices
+(imx31)" registered the wrong SPI port for mx31_3ds board.
+mx31_3ds uses SPI2 to connect to the MC13783 PMIC.
 
  Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
  Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 
 ---
- arch/arm/mach-mx3/mach-mx31_3ds.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mx3/mach-mx31_3ds.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c
 b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index bc21efc..005c0b2 100644
+index 005c0b2..9c23146 100644
 --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
 +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -251,9 +251,9 @@ static void __init mxc_board_init(void)
- 	mx31_3ds_usbotg_init();
- 	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
+@@ -242,7 +242,7 @@ static void __init mxc_board_init(void)
+ 	imx31_add_imx_uart0(&uart_pdata);
+ 	imx31_add_mxc_nand(&mx31_3ds_nand_board_info);
 
--	if (!mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
--		printk(KERN_WARNING "Init of the debugboard failed, all "
--				    "devices on the board are unusable.\n");
-+	if (mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
-+		printk(KERN_WARNING "Init of the debug board failed, all "
-+				    "devices on the debug board are unusable.\n");
- }
+-	imx31_add_spi_imx0(&spi1_pdata);
++	imx31_add_spi_imx1(&spi1_pdata);
+ 	spi_register_board_info(mx31_3ds_spi_devs,
+ 						ARRAY_SIZE(mx31_3ds_spi_devs));
 
- static void __init mx31_3ds_timer_init(void)
 -- 
 1.7.0.4
