@@ -1,59 +1,95 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Oct 2010 10:00:46 +0100
-Subject: [RFC PATCH 13/18] ARM: LPAE: ensure dma_addr_t is the same size as
-	phys_addr_t
+Date: Mon, 25 Oct 2010 10:01:04 +0100
+Subject: [RFC PATCH 16/18] ARM: LPAE: add support for ATAG_MEM64
 In-Reply-To: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
 References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20101025090046.25275.80297.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20101025090104.25275.6292.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-Now that phys_addr_t can be 64-bit on ARM, we must ensure that dma_addr_t
-is sufficiently large to hold physical addresses.
+LPAE provides support for memory banks with physical addresses of up
+to 40 bits.
 
-This patch uses the types.h implementation in asm-generic to define the
-dma_addr_t type as the same width as phys_addr_t.
+This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
+informed about memory that exists above the 4GB boundary.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/types.h |   19 ++-----------------
- 1 files changed, 2 insertions(+), 17 deletions(-)
+ arch/arm/include/asm/setup.h |   10 +++++++++-
+ arch/arm/kernel/compat.c     |    4 ++--
+ arch/arm/kernel/setup.c      |   12 +++++++++++-
+ 3 files changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-index 345df01..039dd8f 100644
---- a/arch/arm/include/asm/types.h
-+++ b/arch/arm/include/asm/types.h
-@@ -1,28 +1,13 @@
- #ifndef __ASM_ARM_TYPES_H
- #define __ASM_ARM_TYPES_H
+diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+index 5092118..fab849f 100644
+--- a/arch/arm/include/asm/setup.h
++++ b/arch/arm/include/asm/setup.h
+@@ -43,6 +43,13 @@ struct tag_mem32 {
+ 	__u32	start;	/* physical start address */
+ };
  
--#include <asm-generic/int-ll64.h>
-+#include <asm-generic/types.h>
++#define ATAG_MEM64	0x54420002
++
++struct tag_mem64 {
++	__u64	size;
++	__u64	start;	/* physical start address */
++};
++
+ /* VGA text type displays */
+ #define ATAG_VIDEOTEXT	0x54410003
  
--#ifndef __ASSEMBLY__
--
--typedef unsigned short umode_t;
--
--#endif /* __ASSEMBLY__ */
--
--/*
-- * These aren't exported outside the kernel to avoid name space clashes
-- */
- #ifdef __KERNEL__
--
- #define BITS_PER_LONG 32
+@@ -147,7 +154,8 @@ struct tag {
+ 	struct tag_header hdr;
+ 	union {
+ 		struct tag_core		core;
+-		struct tag_mem32	mem;
++		struct tag_mem32	mem32;
++		struct tag_mem64	mem64;
+ 		struct tag_videotext	videotext;
+ 		struct tag_ramdisk	ramdisk;
+ 		struct tag_initrd	initrd;
+diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
+index 9256523..f224d95 100644
+--- a/arch/arm/kernel/compat.c
++++ b/arch/arm/kernel/compat.c
+@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
+ 	tag = tag_next(tag);
+ 	tag->hdr.tag = ATAG_MEM;
+ 	tag->hdr.size = tag_size(tag_mem32);
+-	tag->u.mem.size = size;
+-	tag->u.mem.start = start;
++	tag->u.mem32.size = size;
++	tag->u.mem32.start = start;
  
- #ifndef __ASSEMBLY__
--
--/* Dma addresses are 32-bits wide.  */
--
--typedef u32 dma_addr_t;
--typedef u32 dma64_addr_t;
--
-+typedef dma_addr_t dma64_addr_t;
- #endif /* __ASSEMBLY__ */
+ 	return tag;
+ }
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index b1f3fe9..a6a37d5 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -556,11 +556,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
  
- #endif /* __KERNEL__ */
+ static int __init parse_tag_mem32(const struct tag *tag)
+ {
+-	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
++	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
+ }
+ 
+ __tagtable(ATAG_MEM, parse_tag_mem32);
+ 
++#ifdef CONFIG_PHYS_ADDR_T_64BIT
++static int __init parse_tag_mem64(const struct tag *tag)
++{
++	/* We only use 32-bits for the size. */
++	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
++}
++
++__tagtable(ATAG_MEM64, parse_tag_mem64);
++#endif /* CONFIG_PHYS_ADDR_T_64BIT */
++
+ #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+ struct screen_info screen_info = {
+  .orig_video_lines	= 30,
