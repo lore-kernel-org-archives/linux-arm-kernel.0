@@ -1,105 +1,128 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Oct 2010 09:59:33 +0100
-Subject: [RFC PATCH 00/18] ARM: Add support for the Large Physical Address
-	Extensions
-Message-ID: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
+Date: Mon, 25 Oct 2010 09:59:39 +0100
+Subject: [RFC PATCH 01/18] ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of
+	PGDIR_*
+In-Reply-To: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
+References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20101025085939.25275.19510.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+PGDIR_SHIFT and PMD_SHIFT for the classic 2-level page table format have
+the same value (21). This patch converts the PGDIR_* uses in the kernel
+to the PMD_* equivalent.
 
-This set of patches adds support for the Large Physical Extensions on
-the ARM architecture (available with the Cortex-A15 processor). LPAE
-comes with a 3-level page table format (compared to 2-level for the
-classic one), allowing up to 40-bit physical address space.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/kernel/module.c  |    2 +-
+ arch/arm/kernel/smp.c     |    2 +-
+ arch/arm/mm/dma-mapping.c |    6 +++---
+ arch/arm/mm/mmu.c         |   16 ++++++++--------
+ 4 files changed, 13 insertions(+), 13 deletions(-)
 
-These patches split the arch/arm/ page table definitions into
-corresponding 2-level and 3-level files and ensure that the common code
-works with both variants.  They also fix assumptions regarding the size
-of the physical address.  The outer cache support is currently
-restricted to 32-bit physical addresses.
-
-The LPAE page table format uses the simplified permission model (as
-described in the ARM ARM) and domains are no longer available (requiring
-an additional patch which is already in RMK's patch system).
-
-The ARM LPAE documentation is available from (free registration needed):
-
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
-
-The full set of patches (kernel fixes, LPAE and support for an emulated
-Versatile Express with Cortex-A15 tile) is available on this branch:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae
-
-Any comments are welcome. Thanks.
-
-
-Catalin Marinas (11):
-      ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
-      ARM: LPAE: Factor out 2-level page table definitions into separate files
-      ARM: LPAE: Do not assume Linux PTEs are always at PTRS_PER_PTE offset
-      ARM: LPAE: Introduce L_PTE_NOEXEC and L_PTE_NOWRITE
-      ARM: LPAE: Introduce the 3-level page table format definitions
-      ARM: LPAE: Page table maintenance for the 3-level format
-      ARM: LPAE: MMU setup for the 3-level page table format
-      ARM: LPAE: Add fault handling support
-      ARM: LPAE: Add context switching support
-      ARM: LPAE: Add SMP support for the 3-level page table format
-      ARM: LPAE: Add the Kconfig entries
-
-Will Deacon (7):
-      ARM: LPAE: use u32 instead of unsigned long for 32-bit ptes
-      ARM: LPAE: use phys_addr_t instead of unsigned long for physical addresses
-      ARM: LPAE: ensure dma_addr_t is the same size as phys_addr_t
-      ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
-      ARM: LPAE: use phys_addr_t for physical start address in early_mem
-      ARM: LPAE: add support for ATAG_MEM64
-      ARM: LPAE: define printk format for physical addresses and page table entries
-
-
- arch/arm/include/asm/cpu-multi32.h          |    8 +
- arch/arm/include/asm/cpu-single.h           |    4 
- arch/arm/include/asm/memory.h               |   17 +-
- arch/arm/include/asm/outercache.h           |   14 +
- arch/arm/include/asm/page-nommu.h           |    8 -
- arch/arm/include/asm/page.h                 |   42 ----
- arch/arm/include/asm/pgalloc.h              |   34 +++
- arch/arm/include/asm/pgtable-2level-hwdef.h |   91 +++++++++
- arch/arm/include/asm/pgtable-2level-types.h |   64 ++++++
- arch/arm/include/asm/pgtable-2level.h       |  150 +++++++++++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   78 ++++++++
- arch/arm/include/asm/pgtable-3level-types.h |   55 ++++++
- arch/arm/include/asm/pgtable-3level.h       |  113 +++++++++++
- arch/arm/include/asm/pgtable-hwdef.h        |   81 +-------
- arch/arm/include/asm/pgtable.h              |  267 +++++++++++----------------
- arch/arm/include/asm/proc-fns.h             |   13 +
- arch/arm/include/asm/setup.h                |   12 +
- arch/arm/include/asm/types.h                |   25 +--
- arch/arm/kernel/compat.c                    |    4 
- arch/arm/kernel/head.S                      |   87 +++++++--
- arch/arm/kernel/module.c                    |    2 
- arch/arm/kernel/setup.c                     |   19 ++
- arch/arm/kernel/smp.c                       |   36 +++-
- arch/arm/mm/Kconfig                         |   10 +
- arch/arm/mm/alignment.c                     |    8 +
- arch/arm/mm/context.c                       |   18 ++
- arch/arm/mm/dma-mapping.c                   |    6 -
- arch/arm/mm/fault.c                         |   88 ++++++++-
- arch/arm/mm/init.c                          |    9 +
- arch/arm/mm/ioremap.c                       |    8 +
- arch/arm/mm/mm.h                            |    8 -
- arch/arm/mm/mmu.c                           |   94 ++++++----
- arch/arm/mm/pgd.c                           |   18 +-
- arch/arm/mm/proc-macros.S                   |    5 -
- arch/arm/mm/proc-v7.S                       |  102 ++++++++++
- 35 files changed, 1193 insertions(+), 405 deletions(-)
- create mode 100644 arch/arm/include/asm/pgtable-2level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-2level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-2level.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
- create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
- create mode 100644 arch/arm/include/asm/pgtable-3level.h
-
--- 
-Catalin
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 6b46058..edeba88 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -32,7 +32,7 @@
+  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+  */
+ #undef MODULES_VADDR
+-#define MODULES_VADDR	(((unsigned long)_etext + ~PGDIR_MASK) & PGDIR_MASK)
++#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
+ #endif
+ 
+ #ifdef CONFIG_MMU
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 40dc74f..fde5497 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -102,7 +102,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
+ 	 */
+ 	pgd = pgd_alloc(&init_mm);
+ 	pmd = pmd_offset(pgd + pgd_index(PHYS_OFFSET), PHYS_OFFSET);
+-	*pmd = __pmd((PHYS_OFFSET & PGDIR_MASK) |
++	*pmd = __pmd((PHYS_OFFSET & PMD_MASK) |
+ 		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE);
+ 	flush_pmd_entry(pmd);
+ 	outer_clean_range(__pa(pmd), __pa(pmd + 1));
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e4dd064..2aab1b4 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -120,8 +120,8 @@ static void __dma_free_buffer(struct page *page, size_t size)
+ #endif
+ 
+ #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
+-#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
+-#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
++#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PMD_SHIFT)
++#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PMD_SHIFT)
+ 
+ /*
+  * These are the page tables (2MB each) covering uncached, DMA consistent allocations
+@@ -171,7 +171,7 @@ static int __init consistent_init(void)
+ 		}
+ 
+ 		consistent_pte[i++] = pte;
+-		base += (1 << PGDIR_SHIFT);
++		base += (1 << PMD_SHIFT);
+ 	} while (base < CONSISTENT_END);
+ 
+ 	return ret;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 846d293..56df812 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -861,14 +861,14 @@ static inline void prepare_page_table(void)
+ 	/*
+ 	 * Clear out all the mappings below the kernel image.
+ 	 */
+-	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
++	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ #ifdef CONFIG_XIP_KERNEL
+ 	/* The XIP kernel is mapped in the module area -- skip over it */
+-	addr = ((unsigned long)_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
++	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+ #endif
+-	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
++	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
+@@ -876,7 +876,7 @@ static inline void prepare_page_table(void)
+ 	 * memory bank, up to the end of the vmalloc region.
+ 	 */
+ 	for (addr = __phys_to_virt(bank_phys_end(&meminfo.bank[0]));
+-	     addr < VMALLOC_END; addr += PGDIR_SIZE)
++	     addr < VMALLOC_END; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ }
+ 
+@@ -917,7 +917,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	 */
+ 	vectors_page = early_alloc(PAGE_SIZE);
+ 
+-	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
++	for (addr = VMALLOC_END; addr; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
+@@ -1075,12 +1075,12 @@ void setup_mm_for_reboot(char mode)
+ 		base_pmdval |= PMD_BIT4;
+ 
+ 	for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++, pgd++) {
+-		unsigned long pmdval = (i << PGDIR_SHIFT) | base_pmdval;
++		unsigned long pmdval = (i << PMD_SHIFT) | base_pmdval;
+ 		pmd_t *pmd;
+ 
+-		pmd = pmd_off(pgd, i << PGDIR_SHIFT);
++		pmd = pmd_off(pgd, i << PMD_SHIFT);
+ 		pmd[0] = __pmd(pmdval);
+-		pmd[1] = __pmd(pmdval + (1 << (PGDIR_SHIFT - 1)));
++		pmd[1] = __pmd(pmdval + (1 << (PMD_SHIFT - 1)));
+ 		flush_pmd_entry(pmd);
+ 	}
+ 
