@@ -1,61 +1,205 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Mon, 25 Oct 2010 11:11:30 +0100
-Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
-	read/write
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DBDDEFAA@dbde02.ent.ti.com>
-References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
-	<1285063280-4057-10-git-send-email-manjugk@ti.com>
-	<7A436F7769CA33409C6B44B358BFFF0C014F74831E@dlee02.ent.ti.com>
-	<20101007185630.GA26435@n2100.arm.linux.org.uk>
-	<4CAE2475.4090607@ti.com>
-	<1287964909.5674.22.camel@macbook.infradead.org>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DBDDEFAA@dbde02.ent.ti.com>
-Message-ID: <1288001490.26820.46.camel@i7.infradead.org>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 25 Oct 2010 13:17:11 +0300
+Subject: [RFC PATCH 09/18] ARM: LPAE: Add fault handling support
+In-Reply-To: <20101025090024.25275.59418.stgit@e102109-lin.cambridge.arm.com>
+References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
+	<20101025090024.25275.59418.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20101025101711.GA32026@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-10-25 at 11:04 +0530, G, Manjunath Kondaiah wrote:
-> David,
+On Mon, Oct 25, 2010 at 10:00:24AM +0100, Catalin Marinas wrote:
+> The DFSR and IFSR register format is different when LPAE is enabled. In
+> addition, DFSR and IFSR have the similar definitions for the fault type.
+> This modifies modifies the fault code to correctly handle the new
+> format.
 > 
-> > -----Original Message-----
-> > From: David Woodhouse [mailto:dwmw2 at infradead.org] 
-> > Sent: Monday, October 25, 2010 5:32 AM
-> > To: Menon, Nishanth
-> > Cc: Russell King - ARM Linux; G, Manjunath Kondaiah; 
-> > linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; 
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH v2 09/10] OMAP2/3: Convert write/read 
-> > functions to raw read/write
-> > 
-> > On Thu, 2010-10-07 at 14:50 -0500, Nishanth Menon wrote:
-> > > my comment being that by moving {read,write}[wlb] to __raw versions 
-> > > dont solve the real issue of namespace here. fix should be in 
-> > > arch/arm/include/asm/io.h IMHO. so that there are no 
-> > overlaps as this.
-> > 
-> > Indeed. This patch is complete nonsense.
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/mm/alignment.c |    8 ++++-
+>  arch/arm/mm/fault.c     |   80 +++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 87 insertions(+), 1 deletions(-)
 > 
-> nonsense? There are two types of fixes proposed to fix these sparse warnings.
-> 1. with this patch
-> 2. fixing in io.h
-> https://patchwork.kernel.org/patch/250171/
-> 
-> 1st option is already merged with 2.6.37 merge window.
-> 
-> If 2 get accepted, all __raw_read/write will get replaced with readl/writel.
-> 
-> Apart from those two, do you have any other alternate idea to fix these sparse warnings?
+> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+> index 724ba3b..bc98a6e 100644
+> --- a/arch/arm/mm/alignment.c
+> +++ b/arch/arm/mm/alignment.c
+> @@ -906,6 +906,12 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_ARM_LPAE
+> +#define ALIGNMENT_FAULT		33
+> +#else
+> +#define ALIGNMENT_FAULT		1
+> +#endif
+> +
+>  /*
+>   * This needs to be done after sysctl_init, otherwise sys/ will be
+>   * overwritten.  Actually, this shouldn't be in sys/ at all since
+> @@ -939,7 +945,7 @@ static int __init alignment_init(void)
+>  		ai_usermode = UM_FIXUP;
+>  	}
+>  
+> -	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
+> +	hook_fault_code(ALIGNMENT_FAULT, do_alignment, SIGBUS, BUS_ADRALN,
+>  			"alignment exception");
+>  
+>  	/*
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index 2966897..b662aea 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -33,10 +33,15 @@
+>  #define FSR_WRITE		(1 << 11)
+>  #define FSR_FS4			(1 << 10)
+>  #define FSR_FS3_0		(15)
+> +#define FSR_FS5_0		(0x3f)
+>  
+>  static inline int fsr_fs(unsigned int fsr)
+>  {
+> +#ifdef CONFIG_ARM_LPAE
+> +	return fsr & FSR_FS5_0;
+> +#else
+>  	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
+> +#endif
+>  }
+>  
+>  #ifdef CONFIG_MMU
+> @@ -108,7 +113,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+>  
+>  		pte = pte_offset_map(pmd, addr);
+>  		printk(", *pte=%08lx", pte_val(*pte));
+> +#ifndef CONFIG_ARM_LPAE
+>  		printk(", *ppte=%08lx", pte_val(pte[-LINUX_PTE_OFFSET]));
+> +#endif
+>  		pte_unmap(pte);
+>  	} while(0);
+>  
+> @@ -467,6 +474,72 @@ static struct fsr_info {
+>  	int	code;
+>  	const char *name;
+>  } fsr_info[] = {
+> +#ifdef CONFIG_ARM_LPAE
+> +	{ do_bad,		SIGBUS,  0,		"unknown 0"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 1"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 2"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 3"			},
+> +	{ do_bad,		SIGBUS,  0,		"reserved translation fault"	},
+> +	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
+> +	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
+> +	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
+> +	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
+> +	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
+> +	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
+> +	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
+> +	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
+> +	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+> +	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
+> +	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
+> +	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
+> +	{ do_bad,		SIGBUS,  0,		"asynchronous external abort"	},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
+> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
+> +	{ do_bad,		SIGBUS,  0,		"asynchronous parity error"	},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
+> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
+> +	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
+> +	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
+> +	{ do_bad,		SIGILL,  BUS_ADRALN,	"alignment fault"		},
 
-The latter is obviously the better approach. The problem that sparse is
-complaining about is the fact that you have two nested C blocks, both of
-which contain a local variable called '__v'. By changing the variable
-names so that they're actually unique, we fix the real problem.
+s/SIGILL/SIGBUS/
 
-The answer is not that *all* drivers which call cpu_to_le16(readw())
-must be changed, which is what you seem to have assumed. And you
-*certainly* can't change them to use __raw_readw(), which has
-*different* semantics (and endianness in some cases), without a clear
-comment in the changelog entry saying *why* that change was OK.
+> +	{ do_bad,		SIGBUS,  0,		"debug event"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 37"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 38"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 39"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 40"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 41"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 42"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 43"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 44"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 48"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 49"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 50"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 51"			},
+> +	{ do_bad,		SIGBUS,  0,		"implementation fault (lockdown abort)" },
+> +	{ do_bad,		SIGBUS,  0,		"unknown 53"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 54"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 55"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 56"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 57"			},
+> +	{ do_bad,		SIGBUS,  0,		"implementation fault (coprocessor abort)" },
+> +	{ do_bad,		SIGBUS,  0,		"unknown 59"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 60"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 61"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 62"			},
+> +	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
+> +#else	/* !CONFIG_ARM_LPAE */
+>  	/*
+>  	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
+>  	 * defines these to be "precise" aborts.
+> @@ -508,6 +581,7 @@ static struct fsr_info {
+>  	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
+>  	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+>  	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
+> +#endif	/* CONFIG_ARM_LPAE */
+>  };
+>  
+>  void __init
+> @@ -546,6 +620,9 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>  }
+>  
+>  
+> +#ifdef CONFIG_ARM_LPAE
+> +#define ifsr_info	fsr_info
+> +#else	/* !CONFIG_ARM_LPAE */
+>  static struct fsr_info ifsr_info[] = {
+>  	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
+>  	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
+> @@ -580,6 +657,7 @@ static struct fsr_info ifsr_info[] = {
+>  	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+>  	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+>  };
+> +#endif	/* CONFIG_ARM_LPAE */
+>  
+>  asmlinkage void __exception
+>  do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+> @@ -602,6 +680,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+>  
+>  static int __init exceptions_init(void)
+>  {
+> +#ifndef CONFIG_ARM_LPAE
+>  	if (cpu_architecture() >= CPU_ARCH_ARMv6) {
+>  		hook_fault_code(4, do_translation_fault, SIGSEGV, SEGV_MAPERR,
+>  				"I-cache maintenance fault");
+> @@ -617,6 +696,7 @@ static int __init exceptions_init(void)
+>  		hook_fault_code(6, do_bad, SIGSEGV, SEGV_MAPERR,
+>  				"section access flag fault");
+>  	}
+> +#endif
+>  
+>  	return 0;
+>  }
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-dwmw2
+ Kirill A. Shutemov
