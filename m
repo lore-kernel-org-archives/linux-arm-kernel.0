@@ -1,57 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Oct 2010 16:15:13 +0100
-Subject: [PATCH] ARM: memblock: set allocation limit for
-	MEMBLOCK_ALLOC_ANYWHERE
-In-Reply-To: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
-References: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20101025151513.GB21105@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 25 Oct 2010 17:46:49 +0200
+Subject: [PATCH 01/14 v2] ARM: pxa: Introduce pxa[23]xx_map_io
+In-Reply-To: <AANLkTi=WwOnRFOnga-D=UM1Wa6QD1bR5CKVgTU0n1_4E@mail.gmail.com>
+References: <1286756432-5873-1-git-send-email-marek.vasut@gmail.com>
+	<AANLkTi=Rh7HBue1w-i7VodkRw8JJBXhYnOghMLee7hGE@mail.gmail.com>
+	<AANLkTi=WwOnRFOnga-D=UM1Wa6QD1bR5CKVgTU0n1_4E@mail.gmail.com>
+Message-ID: <201010251746.49608.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 25, 2010 at 11:48:00AM +0100, Catalin Marinas wrote:
-> From: Will Deacon <will.deacon@arm.com>
+On Monday 25 October 2010 05:07:34 Eric Miao wrote:
+> On Mon, Oct 11, 2010 at 5:14 PM, Haojian Zhuang
 > 
-> Commit e63075a3 removed the explicit MEMBLOCK_REAL_LIMIT #define
-> and introduced the requirement that arch code calls
-> memblock_set_current_limit to ensure that the __va macro can
-> be used on physical addresses returned from memblock_alloc.
+> <haojian.zhuang@gmail.com> wrote:
+> > On Mon, Oct 11, 2010 at 8:20 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> This patch introduces pxa2xx_map_io() and pxa3xx_map_io() to distinguish
+> >> between PXA2xx and PXA3xx memory mapping.
+> >> 
+> >> Also, fixup for platforms broken after introducing pxa2xx_map_io() and
+> >> pxa3xx_map_io() is included.
+> >> 
+> >> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >> ---
+> >> v2: Fix spitz.c containing code from patch 02/14. Thanks, Igor.
 > 
-> This patch ensures that memblock allocates from lowmem on ARM
-> by setting the allocation limit to lowmem_end_addr.
+> Finally got some time on this, I've come up with a refined version, the
+> reason is that pxa25x/pxa27x doesn't share the exact mapping since pxa25x
+> doesn't have Internal Memory, and that's specific to pxa27x and pxa3xx.
+> Further leads to pxa{25x,27x,3xx}_map_io() and thus been placed into the
+> specific files.
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Please check below and let know if it's OK:
+> 
+> From e5d57c3887e8ee7ad75d4f5104e306683d2feb3d Mon Sep 17 00:00:00 2001
+> From: Marek Vasut <marek.vasut@gmail.com>
+> Date: Mon, 11 Oct 2010 02:20:19 +0200
+> Subject: [PATCH] ARM: pxa: Introduce pxa{25x,27x,3xx}_map_io()
+> 
+> This patch introduces pxa2xx_map_io() and pxa3xx_map_io() to distinguish
+> between PXA25x/PXA27x and PXA3xx memory mapping.
+> 
+> Also, fixup for platforms broken after introducing pxa{25x,27x}_map_io()
+> and pxa3xx_map_io() is included.
+> 
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> Acked-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
 > ---
->  arch/arm/include/asm/memblock.h |    3 ---
->  arch/arm/mm/mmu.c               |    1 +
->  2 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/memblock.h b/arch/arm/include/asm/memblock.h
-> index fdbc43b..655b4c4 100644
-> --- a/arch/arm/include/asm/memblock.h
-> +++ b/arch/arm/include/asm/memblock.h
-> @@ -3,9 +3,6 @@
->  
->  #ifdef CONFIG_MMU
->  extern phys_addr_t lowmem_end_addr;
 
-This doesn't need to be exported anymore.
+I reviewed it ... it seems ok:
 
-> -#define MEMBLOCK_REAL_LIMIT	lowmem_end_addr
-> -#else
-> -#define MEMBLOCK_REAL_LIMIT	0
->  #endif
->  
->  struct meminfo;
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 72cc529..fd7bb1e 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -753,6 +753,7 @@ static void __init sanity_check_meminfo(void)
->  	int i, j, highmem = 0;
->  
->  	lowmem_end_addr = __pa(vmalloc_min - 1) + 1;
-> +	memblock_set_current_limit(lowmem_end_addr);
-
-So this might as well become:
-	memblock_set_current_limit(__pa(vmalloc_min - 1) + 1);
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
