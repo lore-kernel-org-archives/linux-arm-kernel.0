@@ -1,71 +1,61 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 25 Oct 2010 13:09:06 +0200
-Subject: [PATCH 2/2 v2] AT91: pm: make sure that r0 is 0 when dealing with
-	cache operations
-In-Reply-To: <20101022164247.GB29119@n2100.arm.linux.org.uk>
-References: <20101022164247.GB29119@n2100.arm.linux.org.uk>
-Message-ID: <1288004946-9324-1-git-send-email-nicolas.ferre@atmel.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Mon, 25 Oct 2010 11:11:30 +0100
+Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
+	read/write
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DBDDEFAA@dbde02.ent.ti.com>
+References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
+	<1285063280-4057-10-git-send-email-manjugk@ti.com>
+	<7A436F7769CA33409C6B44B358BFFF0C014F74831E@dlee02.ent.ti.com>
+	<20101007185630.GA26435@n2100.arm.linux.org.uk>
+	<4CAE2475.4090607@ti.com>
+	<1287964909.5674.22.camel@macbook.infradead.org>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DBDDEFAA@dbde02.ent.ti.com>
+Message-ID: <1288001490.26820.46.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using CP15 cache operations (c7), we make sure that Rd (r0)
-is actually 0 as ARM 926 TRM is saying.
+On Mon, 2010-10-25 at 11:04 +0530, G, Manjunath Kondaiah wrote:
+> David,
+> 
+> > -----Original Message-----
+> > From: David Woodhouse [mailto:dwmw2 at infradead.org] 
+> > Sent: Monday, October 25, 2010 5:32 AM
+> > To: Menon, Nishanth
+> > Cc: Russell King - ARM Linux; G, Manjunath Kondaiah; 
+> > linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; 
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH v2 09/10] OMAP2/3: Convert write/read 
+> > functions to raw read/write
+> > 
+> > On Thu, 2010-10-07 at 14:50 -0500, Nishanth Menon wrote:
+> > > my comment being that by moving {read,write}[wlb] to __raw versions 
+> > > dont solve the real issue of namespace here. fix should be in 
+> > > arch/arm/include/asm/io.h IMHO. so that there are no 
+> > overlaps as this.
+> > 
+> > Indeed. This patch is complete nonsense.
+> 
+> nonsense? There are two types of fixes proposed to fix these sparse warnings.
+> 1. with this patch
+> 2. fixing in io.h
+> https://patchwork.kernel.org/patch/250171/
+> 
+> 1st option is already merged with 2.6.37 merge window.
+> 
+> If 2 get accepted, all __raw_read/write will get replaced with readl/writel.
+> 
+> Apart from those two, do you have any other alternate idea to fix these sparse warnings?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: modify asm according to Russell's comments: be sure to insert asm lines in
-the proper order and inform gcc about register used.
+The latter is obviously the better approach. The problem that sparse is
+complaining about is the fact that you have two nested C blocks, both of
+which contain a local variable called '__v'. By changing the variable
+names so that they're actually unique, we fix the real problem.
 
- arch/arm/mach-at91/pm.c           |    9 +++++++--
- arch/arm/mach-at91/pm.h           |    3 ++-
- arch/arm/mach-at91/pm_slowclock.S |    1 +
- 3 files changed, 10 insertions(+), 3 deletions(-)
+The answer is not that *all* drivers which call cpu_to_le16(readw())
+must be changed, which is what you seem to have assumed. And you
+*certainly* can't change them to use __raw_readw(), which has
+*different* semantics (and endianness in some cases), without a clear
+comment in the changelog entry saying *why* that change was OK.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 87a31ba..dafbacc 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -261,8 +261,13 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * For ARM 926 based chips, this requirement is weaker
- 			 * as at91sam9 can access a RAM in self-refresh mode.
- 			 */
--			asm("b 1f; .align 5; 1:");
--			asm("mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
-+			asm volatile (	"mov r0, #0\n\t"
-+					"b 1f\n\t"
-+					".align 5\n\t"
-+					"1: mcr p15, 0, r0, c7, c10, 4\n\t"
-+					: /* no output */
-+					: /* no input */
-+					: "r0");
- 			saved_lpr = sdram_selfrefresh_enable();
- 			wait_for_interrupt_enable();
- 			sdram_selfrefresh_disable(saved_lpr);
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 2c4424b..ce9a206 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -21,7 +21,8 @@ static inline u32 sdram_selfrefresh_enable(void)
- }
- 
- #define sdram_selfrefresh_disable(saved_lpr)	at91_sys_write(AT91_SDRAMC_LPR, saved_lpr)
--#define wait_for_interrupt_enable()		asm("mcr p15, 0, r0, c7, c0, 4")
-+#define wait_for_interrupt_enable()		asm volatile ("mcr p15, 0, %0, c7, c0, 4" \
-+								: : "r" (0))
- 
- #elif defined(CONFIG_ARCH_AT91CAP9)
- #include <mach/at91cap9_ddrsdr.h>
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index b6b00a1..f7922a4 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -124,6 +124,7 @@ ENTRY(at91_slow_clock)
- 	ldr	r5, .at91_va_base_ramc1
- 
- 	/* Drain write buffer */
-+	mov	r0, #0
- 	mcr	p15, 0, r0, c7, c10, 4
- 
- #ifdef CONFIG_ARCH_AT91RM9200
 -- 
-1.7.3
+dwmw2
