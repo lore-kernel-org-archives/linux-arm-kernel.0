@@ -1,93 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Oct 2010 12:02:21 -0700
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
-References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
-	<1287387875-14168-4-git-send-email-ohad@wizery.com>
-	<87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
-	<8739s0sobc.fsf@deeprootsystems.com>
-	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-	<20101022165612.GF9149@atomide.com>
-	<AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
-Message-ID: <20101025190221.GC7206@atomide.com>
+From: mboards@prograde.net (Michael Cashwell)
+Date: Mon, 25 Oct 2010 15:02:42 -0400
+Subject: PXA270 Random Hangs at Low Core Freq
+In-Reply-To: <AANLkTim0yMQbMkP7eke3A18TqwuyFz2DvaYoO8bN7o-9@mail.gmail.com>
+References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
+	<201010220222.36285.marek.vasut@gmail.com>
+	<AANLkTim0yMQbMkP7eke3A18TqwuyFz2DvaYoO8bN7o-9@mail.gmail.com>
+Message-ID: <A257B8DC-1E93-4888-AA57-AB9A41AF11AA@prograde.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [101024 10:45]:
-> Hi Tony,
-> 
-> On Fri, Oct 22, 2010 at 6:56 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Guys, let's try to come up with a generic interface for this instead of
-> > polluting the device drivers with more omap specific interfaces.
-> >
-> > We really want to keep the drivers generic and platform independent.
-> 
-> I share this concern as well.
-> 
-> We basically have three options here:
-> 
-> 1. Have the hwspinlock driver inside the omap folders and use pdata func ptrs
-> 2. Have a generic hwspinlock framework, with a small omap-specific
-> implementation
-> 3. Have a misc driver which is currently omap specific, but can very
-> easily be converted to a common framework
-> 
-> I don't like (1) so much; it's a driver that has very little that is
-> hardware specific (mainly just the two lines that actually access the
-> hardware - the lock and the unlock), and it's growing. E.g., we will
-> need to add it a user space interface (to allow userland IPC
-> implementations), we will need to add it a "virtual" locks layer that
-> would provide more locks than the hardware currently has, etc..
-> 
-> In addition, there seem to be a general discontent about drivers
-> piling up in the ARM folders, instead of having them visible in
-> drivers/ so they can become useful for other platforms as well.
-> 
-> Here's something Linus wrote about this awhile back:
-> 
-> http://www.spinics.net/lists/linux-arm-msm/msg00324.html
-> 
-> So initially I opted for (2). I have an implementation ready - it's a
-> common drivers/hwspinlock/core.c framework with a small omap-specific
-> part at drivers/hwspinlock/omap_hwspinlock.c. The core has all the
-> logic while the latter, omap-specific implementation, is really small
-> - it is basically just registering lock instances, that have a
-> trylock/unlock/relax ops struct, with the common framework.
-> 
-> But lack of additional users (besides the OMAP hardware), and lack of
-> generic drivers that would use it (we have syslink, which currently
-> tend to only need this from user space, i2c-omap and omap's upcoming
-> resource manager), made it look like an overkill for now.
-> 
-> So simplicity won, and (3) was eventually submitted. It exposes
-> exactly the same interface like (2) would (s/omap_hwspin/hwspin/), and
-> it's relatively easy to turn it back into a common framework in case
-> additional users show up.
-> 
-> But if you feel that (2) is justifiable/desirable, I would be more
-> than happy to submit that version.
+On Oct 22, 2010, at 4:41 AM, Haojian Zhuang wrote:
 
-Yes (2) please. I would assume there will be more use of this. And then
-we (or probably me again!) don't have to deal with cleaning up the drivers
-again in the future.
- 
-> > Unless somebody has better ideas, I suggest we pass a lock function
-> > in the platform_data to the drivers that need it, and do the omap
-> > specific nasty stuff in the platform code.
-> 
-> Do you mean (1) and then pass the whole bunch of APIs
-> (request/free/lock variants/unlock/get_id) via pdata ?
-> 
-> Or do you mean a variation of (2) with only the specific locking bits
-> coming from pdata func pointers ? I guess that in this case we just
-> might as well go with the full (2).
+> On Fri, Oct 22, 2010 at 8:22 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> Dne Po 18. ??jna 2010 19:38:49 Michael Cashwell napsal(a):
+>> 
+>> 
+>>> I've been fighting inexplicable hangs on two different PXA270 designs running various kernels since early 2.6.28.x. The first board was custom (and of dubious integrity) but I'm currently seeing it on Gumstix Verdex PROs running 2.6.35.7.
+>> 
+>> Could it be memory-related ? Like, RAM crashes because of refresh speed or something?
 
-Yes variation of (2) where you only pass the locking function via
-platform data would be best.
+I wondered about this myself, especially on the custom board and u-boot. That's why I hadn't turned to the community until I was on unmodified commercial hardware.
 
-Regards,
+What I'd like to test would be a Gumstix-supplied uboot and current Linux with CPUfreq disabled. That would eliminate all the CPUfreq code and its plethora of errata from consideration. The problem is that such a setup runs at a fixed *high* CPU core frequency. I've never seen that hang.
 
-Tony
+The best I've been able to do is two alternate cases (stock high-freq u-boot + a current Linux with CPUfreq enabled so that it lowers the speed; and my custom u-boot that runs only at low speed + a current Linux with CPUfreq disabled so linux just uses what u-boot sets). Both of these hang as described.
+
+Meaningfully rolling back to the Gumstix's vendor-supplied Linux distro is more difficult. It's running a 3+ year old 2.6.21 kernel variant that lacks support for recent MTD FLASH parts and features like UBIFS. I used that version on an OMAP and recall its MMC support was rather sketchy and since writing to a uSD card is my test case I'm somewhat doubtful that the results from such testing would mean much.
+
+Lastly, I've run Charles Cazabon's memtester (c. 2006 v 4.0.6) over 99% of the free SDRAM for days at a time and have seen no problems at all. If it were an outright SDRAM init/timing/refresh issue I'd expect something that strenuous to report an error.
+
+> Suggest to check errata first. Maybe we need some special code sequence.
+
+I agree that it has the feel of a CPU errata. (What else would hang the core so badly that JTAG would disconnect?) So I've re-read the Rev E (April 3rd 2009) errata docs from Marvell from start to finish but nothing jumps out at me. The problem is not knowing where to focus. Having eliminated the CPU-freq code itself (which relies on CPU features with many errata) I'm left rather empty handed.
+
+My only idea is that some kernel code path (likely interacting with an integrated peripheral) is too slow at low core frequencies and is either violating the hardware spec outright or is hitting an errata.
+
+My testing to date (and that I'm on commercial hardware) makes me think that others should be seeing the same problem. It won't occur out-of-the-box because normally people want highest performance (high core CPU frequencies). With the default u-boot and without CPU-freq to lower it the hang doesn't happen.
+
+But perhaps someone has prioritized power savings as I'm trying to do and then they should see it.
+
+-Mike
