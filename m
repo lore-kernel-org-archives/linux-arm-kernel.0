@@ -1,87 +1,119 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Oct 2010 09:59:50 +0100
-Subject: [RFC PATCH 03/18] ARM: LPAE: use u32 instead of unsigned long for
-	32-bit ptes
+Date: Mon, 25 Oct 2010 09:59:56 +0100
+Subject: [RFC PATCH 04/18] ARM: LPAE: Do not assume Linux PTEs are always at
+	PTRS_PER_PTE offset
 In-Reply-To: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
 References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20101025085950.25275.77229.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20101025085956.25275.20223.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Placing the Linux PTEs at a 2KB offset inside a page is a workaround for
+the 2-level page table format where not enough spare bits are available.
+With LPAE this is no longer required. This patch changes such assumption
+by using a different macro, LINUX_PTE_OFFSET, which is defined to
+PTRS_PER_PTE for the 2-level page tables.
 
-When using 2-level paging, pte_t and pmd_t are typedefs for
-unsigned long but phys_addr_t is a typedef for u32.
-
-This patch uses u32 for the page table entry types when
-phys_addr_t is not 64-bit, allowing the same conversion
-specifier to be used for physical addresses and page table
-entries regardless of LPAE.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/page-nommu.h           |    8 ++++----
- arch/arm/include/asm/pgtable-2level-types.h |   18 +++++++++---------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/pgalloc.h        |    6 +++---
+ arch/arm/include/asm/pgtable-2level.h |    1 +
+ arch/arm/include/asm/pgtable.h        |    6 +++---
+ arch/arm/mm/fault.c                   |    2 +-
+ arch/arm/mm/mmu.c                     |    3 ++-
+ 5 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-index d1b162a..a20641a 100644
---- a/arch/arm/include/asm/page-nommu.h
-+++ b/arch/arm/include/asm/page-nommu.h
-@@ -29,10 +29,10 @@
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index b12cc98..c2a1f64 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -62,7 +62,7 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
+ 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
+ 	if (pte) {
+ 		clean_dcache_area(pte, sizeof(pte_t) * PTRS_PER_PTE);
+-		pte += PTRS_PER_PTE;
++		pte += LINUX_PTE_OFFSET;
+ 	}
+ 
+ 	return pte;
+@@ -95,7 +95,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+ static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
+ {
+ 	if (pte) {
+-		pte -= PTRS_PER_PTE;
++		pte -= LINUX_PTE_OFFSET;
+ 		free_page((unsigned long)pte);
+ 	}
+ }
+@@ -128,7 +128,7 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
+ 	 * The pmd must be loaded with the physical
+ 	 * address of the PTE table
+ 	 */
+-	pte_ptr -= PTRS_PER_PTE * sizeof(void *);
++	pte_ptr -= LINUX_PTE_OFFSET * sizeof(void *);
+ 	__pmd_populate(pmdp, __pa(pte_ptr) | _PAGE_KERNEL_TABLE);
+ }
+ 
+diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+index d60bda9..36bdef7 100644
+--- a/arch/arm/include/asm/pgtable-2level.h
++++ b/arch/arm/include/asm/pgtable-2level.h
+@@ -71,6 +71,7 @@
+ #define PTRS_PER_PTE		512
+ #define PTRS_PER_PMD		1
+ #define PTRS_PER_PGD		2048
++#define LINUX_PTE_OFFSET	PTRS_PER_PTE
+ 
  /*
-  * These are used to make use of C type-checking..
-  */
--typedef unsigned long pte_t;
--typedef unsigned long pmd_t;
--typedef unsigned long pgd_t[2];
--typedef unsigned long pgprot_t;
-+typedef u32 pte_t;
-+typedef u32 pmd_t;
-+typedef u32 pgd_t[2];
-+typedef u32 pgprot_t;
+  * PMD_SHIFT determines the size of the area a second-level page table can map
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 49dd19e..5b45463 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -137,8 +137,8 @@ extern struct page *empty_zero_page;
+ #define __pte_map(dir,km)	pmd_page_vaddr(*(dir))
+ #define __pte_unmap(pte,km)	do { } while (0)
+ #else
+-#define __pte_map(dir,km)	((pte_t *)kmap_atomic(pmd_page(*(dir)), km) + PTRS_PER_PTE)
+-#define __pte_unmap(pte,km)	kunmap_atomic((pte - PTRS_PER_PTE), km)
++#define __pte_map(dir,km)	((pte_t *)kmap_atomic(pmd_page(*(dir)), km) + LINUX_PTE_OFFSET)
++#define __pte_unmap(pte,km)	kunmap_atomic((pte - LINUX_PTE_OFFSET), km)
+ #endif
  
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
-diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
-index 30f6741..adc4928 100644
---- a/arch/arm/include/asm/pgtable-2level-types.h
-+++ b/arch/arm/include/asm/pgtable-2level-types.h
-@@ -21,16 +21,16 @@
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+@@ -234,7 +234,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 	unsigned long ptr;
  
- #undef STRICT_MM_TYPECHECKS
+ 	ptr = pmd_val(pmd) & ~(PTRS_PER_PTE * sizeof(void *) - 1);
+-	ptr += PTRS_PER_PTE * sizeof(void *);
++	ptr += LINUX_PTE_OFFSET * sizeof(void *);
  
--typedef unsigned long pteval_t;
-+typedef u32 pteval_t;
+ 	return __va(ptr);
+ }
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 23b0b03..2966897 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -108,7 +108,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
  
- #ifdef STRICT_MM_TYPECHECKS
- /*
-  * These are used to make use of C type-checking..
-  */
--typedef struct { unsigned long pte; } pte_t;
--typedef struct { unsigned long pmd; } pmd_t;
--typedef struct { unsigned long pgd[2]; } pgd_t;
--typedef struct { unsigned long pgprot; } pgprot_t;
-+typedef struct { u32 pte; } pte_t;
-+typedef struct { u32 pmd; } pmd_t;
-+typedef struct { u32 pgd[2]; } pgd_t;
-+typedef struct { u32 pgprot; } pgprot_t;
+ 		pte = pte_offset_map(pmd, addr);
+ 		printk(", *pte=%08lx", pte_val(*pte));
+-		printk(", *ppte=%08lx", pte_val(pte[-PTRS_PER_PTE]));
++		printk(", *ppte=%08lx", pte_val(pte[-LINUX_PTE_OFFSET]));
+ 		pte_unmap(pte);
+ 	} while(0);
  
- #define pte_val(x)      ((x).pte)
- #define pmd_val(x)      ((x).pmd)
-@@ -45,10 +45,10 @@ typedef struct { unsigned long pgprot; } pgprot_t;
- /*
-  * .. while these make it easier on the compiler
-  */
--typedef unsigned long pte_t;
--typedef unsigned long pmd_t;
--typedef unsigned long pgd_t[2];
--typedef unsigned long pgprot_t;
-+typedef u32 pte_t;
-+typedef u32 pmd_t;
-+typedef u32 pgd_t[2];
-+typedef u32 pgprot_t;
- 
- #define pte_val(x)      (x)
- #define pmd_val(x)      (x)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 56df812..3d6b206 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -538,7 +538,8 @@ static void __init *early_alloc(unsigned long sz)
+ static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
+ {
+ 	if (pmd_none(*pmd)) {
+-		pte_t *pte = early_alloc(2 * PTRS_PER_PTE * sizeof(pte_t));
++		pte_t *pte = early_alloc((LINUX_PTE_OFFSET +
++					  PTRS_PER_PTE) * sizeof(pte_t));
+ 		__pmd_populate(pmd, __pa(pte) | prot);
+ 	}
+ 	BUG_ON(pmd_bad(*pmd));
