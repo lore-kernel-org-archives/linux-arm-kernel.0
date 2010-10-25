@@ -1,95 +1,153 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Oct 2010 10:01:04 +0100
-Subject: [RFC PATCH 16/18] ARM: LPAE: add support for ATAG_MEM64
+Date: Mon, 25 Oct 2010 10:01:10 +0100
+Subject: [RFC PATCH 17/18] ARM: LPAE: define printk format for physical
+	addresses and page table entries
 In-Reply-To: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
 References: <20101025085812.25275.55757.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20101025090104.25275.6292.stgit@e102109-lin.cambridge.arm.com>
+Message-ID: <20101025090109.25275.23930.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-LPAE provides support for memory banks with physical addresses of up
-to 40 bits.
+Now that the Kernel supports 2 level and 3 level page tables, physical
+addresses (and also page table entries) may be 32 or 64-bits depending
+upon the configuration.
 
-This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
-informed about memory that exists above the 4GB boundary.
+This patch adds a conversion specifier (PHYS_ADDR_FMT) which represents
+a u32 or u64 depending on the width of a physical address.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/setup.h |   10 +++++++++-
- arch/arm/kernel/compat.c     |    4 ++--
- arch/arm/kernel/setup.c      |   12 +++++++++++-
- 3 files changed, 22 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/types.h |    6 ++++++
+ arch/arm/kernel/setup.c      |    2 +-
+ arch/arm/mm/fault.c          |    8 ++++----
+ arch/arm/mm/mmu.c            |   18 +++++++++---------
+ 4 files changed, 20 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 5092118..fab849f 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -43,6 +43,13 @@ struct tag_mem32 {
- 	__u32	start;	/* physical start address */
- };
- 
-+#define ATAG_MEM64	0x54420002
-+
-+struct tag_mem64 {
-+	__u64	size;
-+	__u64	start;	/* physical start address */
-+};
-+
- /* VGA text type displays */
- #define ATAG_VIDEOTEXT	0x54410003
- 
-@@ -147,7 +154,8 @@ struct tag {
- 	struct tag_header hdr;
- 	union {
- 		struct tag_core		core;
--		struct tag_mem32	mem;
-+		struct tag_mem32	mem32;
-+		struct tag_mem64	mem64;
- 		struct tag_videotext	videotext;
- 		struct tag_ramdisk	ramdisk;
- 		struct tag_initrd	initrd;
-diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
-index 9256523..f224d95 100644
---- a/arch/arm/kernel/compat.c
-+++ b/arch/arm/kernel/compat.c
-@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
- 	tag = tag_next(tag);
- 	tag->hdr.tag = ATAG_MEM;
- 	tag->hdr.size = tag_size(tag_mem32);
--	tag->u.mem.size = size;
--	tag->u.mem.start = start;
-+	tag->u.mem32.size = size;
-+	tag->u.mem32.start = start;
- 
- 	return tag;
- }
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index b1f3fe9..a6a37d5 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -556,11 +556,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
- 
- static int __init parse_tag_mem32(const struct tag *tag)
- {
--	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
-+	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
- }
- 
- __tagtable(ATAG_MEM, parse_tag_mem32);
+diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+index 039dd8f..88190c0 100644
+--- a/arch/arm/include/asm/types.h
++++ b/arch/arm/include/asm/types.h
+@@ -6,6 +6,12 @@
+ #ifdef __KERNEL__
+ #define BITS_PER_LONG 32
  
 +#ifdef CONFIG_PHYS_ADDR_T_64BIT
-+static int __init parse_tag_mem64(const struct tag *tag)
-+{
-+	/* We only use 32-bits for the size. */
-+	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
-+}
++#define PHYS_ADDR_FMT	"%016Lx"
++#else
++#define PHYS_ADDR_FMT	"%08x"
++#endif
 +
-+__tagtable(ATAG_MEM64, parse_tag_mem64);
-+#endif /* CONFIG_PHYS_ADDR_T_64BIT */
-+
- #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
- struct screen_info screen_info = {
-  .orig_video_lines	= 30,
+ #ifndef __ASSEMBLY__
+ typedef dma_addr_t dma64_addr_t;
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index a6a37d5..80ff616 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -413,7 +413,7 @@ static int __init arm_add_memory(phys_addr_t start, unsigned long size)
+ 
+ 	if (meminfo.nr_banks >= NR_BANKS) {
+ 		printk(KERN_CRIT "NR_BANKS too low, "
+-			"ignoring memory at %#lx\n", start);
++			"ignoring memory at " PHYS_ADDR_FMT "\n", start);
+ 		return -EINVAL;
+ 	}
+ 
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index b662aea..df33362 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -81,7 +81,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 	printk(KERN_ALERT "pgd = %p\n", mm->pgd);
+ 	pgd = pgd_offset(mm, addr);
+-	printk(KERN_ALERT "[%08lx] *pgd=%08lx", addr, pgd_val(*pgd));
++	printk(KERN_ALERT "[%08lx] *pgd=" PHYS_ADDR_FMT, addr, pgd_val(*pgd));
+ 
+ 	do {
+ 		pmd_t *pmd;
+@@ -97,7 +97,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 		pmd = pmd_offset(pgd, addr);
+ 		if (PTRS_PER_PMD != 1)
+-			printk(", *pmd=%08lx", pmd_val(*pmd));
++			printk(", *pmd=" PHYS_ADDR_FMT, pmd_val(*pmd));
+ 
+ 		if (pmd_none(*pmd))
+ 			break;
+@@ -112,9 +112,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 			break;
+ 
+ 		pte = pte_offset_map(pmd, addr);
+-		printk(", *pte=%08lx", pte_val(*pte));
++		printk(", *pte=" PHYS_ADDR_FMT, pte_val(*pte));
+ #ifndef CONFIG_ARM_LPAE
+-		printk(", *ppte=%08lx", pte_val(pte[-LINUX_PTE_OFFSET]));
++		printk(", *ppte=" PHYS_ADDR_FMT, pte_val(pte[-LINUX_PTE_OFFSET]));
+ #endif
+ 		pte_unmap(pte);
+ 	} while(0);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f8f8e06..87460bb 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -622,7 +622,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 
+ 	if (!(cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())) {
+ 		printk(KERN_ERR "MM: CPU does not support supersection "
+-		       "mapping for 0x%08llx at 0x%08lx\n",
++		       "mapping for 0x" PHYS_ADDR_FMT " at 0x%08lx\n",
+ 		       __pfn_to_phys((u64)md->pfn), addr);
+ 		return;
+ 	}
+@@ -635,14 +635,14 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 	 */
+ 	if (type->domain) {
+ 		printk(KERN_ERR "MM: invalid domain in supersection "
+-		       "mapping for 0x%08llx at 0x%08lx\n",
++		       "mapping for 0x" PHYS_ADDR_FMT " at 0x%08lx\n",
+ 		       __pfn_to_phys((u64)md->pfn), addr);
+ 		return;
+ 	}
+ 
+ 	if ((addr | length | __pfn_to_phys(md->pfn)) & ~SUPERSECTION_MASK) {
+-		printk(KERN_ERR "MM: cannot create mapping for "
+-		       "0x%08llx at 0x%08lx invalid alignment\n",
++		printk(KERN_ERR "MM: cannot create mapping for 0x" PHYS_ADDR_FMT
++		       " at 0x%08lx invalid alignment\n",
+ 		       __pfn_to_phys((u64)md->pfn), addr);
+ 		return;
+ 	}
+@@ -684,16 +684,16 @@ static void __init create_mapping(struct map_desc *md)
+ 	pgd_t *pgd;
+ 
+ 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
+-		printk(KERN_WARNING "BUG: not creating mapping for "
+-		       "0x%08llx at 0x%08lx in user region\n",
++		printk(KERN_WARNING "BUG: not creating mapping for 0x"
++		       PHYS_ADDR_FMT "@0x%08lx in user region\n",
+ 		       __pfn_to_phys((u64)md->pfn), md->virtual);
+ 		return;
+ 	}
+ 
+ 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+ 	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
+-		printk(KERN_WARNING "BUG: mapping for 0x%08llx at 0x%08lx "
+-		       "overlaps vmalloc space\n",
++		printk(KERN_WARNING "BUG: mapping for 0x" PHYS_ADDR_FMT
++		       "@0x%08lx overlaps vmalloc space\n",
+ 		       __pfn_to_phys((u64)md->pfn), md->virtual);
+ 	}
+ 
+@@ -714,7 +714,7 @@ static void __init create_mapping(struct map_desc *md)
+ 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+ 
+ 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
+-		printk(KERN_WARNING "BUG: map for 0x%08lx at 0x%08lx can not "
++		printk(KERN_WARNING "BUG: map for 0x" PHYS_ADDR_FMT " at 0x%08lx can not "
+ 		       "be mapped using pages, ignoring.\n",
+ 		       __pfn_to_phys(md->pfn), addr);
+ 		return;
