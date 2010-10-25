@@ -1,44 +1,38 @@
-From: mreimer@sdgsystems.com (Matt Reimer)
-Date: Mon, 25 Oct 2010 09:26:35 -0400
-Subject: [PATCH] pxafb: correct the vertical back porch macro
-In-Reply-To: <AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
-References: <386708CA-2F13-4D2B-9130-1849ED47BDA1@sdgsystems.com>
-	<AANLkTinb3hNdp5evit9Ga0Z-gLCfPrPzE1VdCvwQVB3o@mail.gmail.com>
-Message-ID: <AANLkTinPnchw4uad9M9dQXPPMR43qr7i6YHp6mqk3QfB@mail.gmail.com>
+From: rpimentel.silva@gmail.com (Rogerio Pimentel)
+Date: Mon, 25 Oct 2010 12:54:24 -0200
+Subject: [PATCH 2/4] mx31_3ds: Fix the logic for detecting the debug board
+Message-ID: <AANLkTikg5rM+cp6oJXmW=DE5=FV=drycqvhz0xWAf1by@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 22, 2010 at 9:07 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Sat, Oct 23, 2010 at 5:26 AM, Matt Reimer <mreimer@sdgsystems.com> wrote:
->> Fix an off-by-one bug in the LCCR2_BegFrmDel() macro. The vertical back porch
->> knob LCCR2[BFW] specifies the number of clock periods minus one, but the
->> macro wasn't doing the subtraction.
->> ---
->> ?arch/arm/mach-pxa/include/mach/regs-lcd.h | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/include/mach/regs-lcd.h b/arch/arm/mach-pxa/include/mach/regs-lcd.h
->> index f82dcea..5074d18 100644
->> --- a/arch/arm/mach-pxa/include/mach/regs-lcd.h
->> +++ b/arch/arm/mach-pxa/include/mach/regs-lcd.h
->> @@ -107,7 +107,7 @@
->> ?#define LCCR2_EndFrmDel(Tln) ? ((Tln) << FShft (LCCR2_EFW))
->>
->> ?#define LCCR2_BFW ? ? ?Fld (8, 24) ? ? /* Beginning-of-Frame line clock */
->> -#define LCCR2_BegFrmDel(Tln) ? ((Tln) << FShft (LCCR2_BFW))
->> +#define LCCR2_BegFrmDel(Tln) ? (((Tln) - 1) << FShft (LCCR2_BFW))
->
-> Nothing in the spec suggests that this minus 1 is necessary. Could you please
-> double check?
+The function mxc_expio_init returns 0 on success, so fix the logic for
+printing the error case.
+Also fixed the wording on the error message.
 
-The docs I have describing this bit (vol 3 rev 1.0) say, "If LCCR6[29]
-is set for LCD panels with an internal frame buffer, BFW specifies the
-pulse width of the read signal (L_FCLK_RD), which is equal to
-(BFW+1)*LCD_CLK_PERIOD."
+ Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+ Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 
-I saw the "+1" in the docs and that the macro didn't match. But I
-hadn't read closely enough to see that BFW gets different meanings
-depending on what mode the controller is in. Because of this, I agree
-it should stay as it is, so I withdraw this patch.
+---
+ arch/arm/mach-mx3/mach-mx31_3ds.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Matt
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c
+b/arch/arm/mach-mx3/mach-mx31_3ds.c
+index bc21efc..005c0b2 100644
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -251,9 +251,9 @@ static void __init mxc_board_init(void)
+ 	mx31_3ds_usbotg_init();
+ 	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
+
+-	if (!mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
+-		printk(KERN_WARNING "Init of the debugboard failed, all "
+-				    "devices on the board are unusable.\n");
++	if (mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
++		printk(KERN_WARNING "Init of the debug board failed, all "
++				    "devices on the debug board are unusable.\n");
+ }
+
+ static void __init mx31_3ds_timer_init(void)
+-- 
+1.7.0.4
