@@ -1,157 +1,93 @@
-From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Mon, 25 Oct 2010 14:10:06 -0500
-Subject: [PATCHv5 4/4] omap: iommu - create new api to set valid da range
-In-Reply-To: <1288033806-1496-4-git-send-email-x0095840@ti.com>
-References: <1288033806-1496-1-git-send-email-x0095840@ti.com>
-	<1288033806-1496-2-git-send-email-x0095840@ti.com>
-	<1288033806-1496-3-git-send-email-x0095840@ti.com>
-	<1288033806-1496-4-git-send-email-x0095840@ti.com>
-Message-ID: <1288033806-1496-5-git-send-email-x0095840@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Oct 2010 12:02:21 -0700
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
+References: <1287387875-14168-1-git-send-email-ohad@wizery.com>
+	<1287387875-14168-4-git-send-email-ohad@wizery.com>
+	<87r5fmxghm.fsf@deeprootsystems.com>
+	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+	<8739s0sobc.fsf@deeprootsystems.com>
+	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
+	<20101022165612.GF9149@atomide.com>
+	<AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
+Message-ID: <20101025190221.GC7206@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some IOMMUs cannot use the whole 0x0 - 0xFFFFFFFF rage.
-With this new API the valid range can be set.
+* Ohad Ben-Cohen <ohad@wizery.com> [101024 10:45]:
+> Hi Tony,
+> 
+> On Fri, Oct 22, 2010 at 6:56 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > Guys, let's try to come up with a generic interface for this instead of
+> > polluting the device drivers with more omap specific interfaces.
+> >
+> > We really want to keep the drivers generic and platform independent.
+> 
+> I share this concern as well.
+> 
+> We basically have three options here:
+> 
+> 1. Have the hwspinlock driver inside the omap folders and use pdata func ptrs
+> 2. Have a generic hwspinlock framework, with a small omap-specific
+> implementation
+> 3. Have a misc driver which is currently omap specific, but can very
+> easily be converted to a common framework
+> 
+> I don't like (1) so much; it's a driver that has very little that is
+> hardware specific (mainly just the two lines that actually access the
+> hardware - the lock and the unlock), and it's growing. E.g., we will
+> need to add it a user space interface (to allow userland IPC
+> implementations), we will need to add it a "virtual" locks layer that
+> would provide more locks than the hardware currently has, etc..
+> 
+> In addition, there seem to be a general discontent about drivers
+> piling up in the ARM folders, instead of having them visible in
+> drivers/ so they can become useful for other platforms as well.
+> 
+> Here's something Linus wrote about this awhile back:
+> 
+> http://www.spinics.net/lists/linux-arm-msm/msg00324.html
+> 
+> So initially I opted for (2). I have an implementation ready - it's a
+> common drivers/hwspinlock/core.c framework with a small omap-specific
+> part at drivers/hwspinlock/omap_hwspinlock.c. The core has all the
+> logic while the latter, omap-specific implementation, is really small
+> - it is basically just registering lock instances, that have a
+> trylock/unlock/relax ops struct, with the common framework.
+> 
+> But lack of additional users (besides the OMAP hardware), and lack of
+> generic drivers that would use it (we have syslink, which currently
+> tend to only need this from user space, i2c-omap and omap's upcoming
+> resource manager), made it look like an overkill for now.
+> 
+> So simplicity won, and (3) was eventually submitted. It exposes
+> exactly the same interface like (2) would (s/omap_hwspin/hwspin/), and
+> it's relatively easy to turn it back into a common framework in case
+> additional users show up.
+> 
+> But if you feel that (2) is justifiable/desirable, I would be more
+> than happy to submit that version.
 
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
----
- arch/arm/plat-omap/include/plat/iommu.h |    3 ++
- arch/arm/plat-omap/iommu.c              |   33 +++++++++++++++++++++++++++++++
- arch/arm/plat-omap/iovmm.c              |   18 ++++++++++------
- 3 files changed, 47 insertions(+), 7 deletions(-)
+Yes (2) please. I would assume there will be more use of this. And then
+we (or probably me again!) don't have to deal with cleaning up the drivers
+again in the future.
+ 
+> > Unless somebody has better ideas, I suggest we pass a lock function
+> > in the platform_data to the drivers that need it, and do the omap
+> > specific nasty stuff in the platform code.
+> 
+> Do you mean (1) and then pass the whole bunch of APIs
+> (request/free/lock variants/unlock/get_id) via pdata ?
+> 
+> Or do you mean a variation of (2) with only the specific locking bits
+> coming from pdata func pointers ? I guess that in this case we just
+> might as well go with the full (2).
 
-diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-index 33c7d41..2ea8ea3 100644
---- a/arch/arm/plat-omap/include/plat/iommu.h
-+++ b/arch/arm/plat-omap/include/plat/iommu.h
-@@ -103,6 +103,8 @@ struct iommu_platform_data {
- 	const char *name;
- 	const char *clk_name;
- 	const int nr_tlb_entries;
-+	u32 da_start;
-+	u32 da_end;
- };
- 
- #if defined(CONFIG_ARCH_OMAP1)
-@@ -152,6 +154,7 @@ extern void flush_iotlb_all(struct iommu *obj);
- extern int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e);
- extern size_t iopgtable_clear_entry(struct iommu *obj, u32 iova);
- 
-+extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
- extern struct iommu *iommu_get(const char *name);
- extern void iommu_put(struct iommu *obj);
- 
-diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-index 6cd151b..b3846bd 100644
---- a/arch/arm/plat-omap/iommu.c
-+++ b/arch/arm/plat-omap/iommu.c
-@@ -25,6 +25,12 @@
- 
- #include "iopgtable.h"
- 
-+/* Reserve the first page for NULL */
-+#define IOMMU_DEFAULT_DA_START	PAGE_SIZE
-+/* 0xFFFFFFFF not allowed because it is not page aligned */
-+#define IOMMU_DEFAULT_DA_END	0xFFFFF000
-+
-+
- #define for_each_iotlb_cr(obj, n, __i, cr)				\
- 	for (__i = 0;							\
- 	     (__i < (n)) && (cr = __iotlb_read_cr((obj), __i), true);	\
-@@ -830,6 +836,31 @@ static int device_match_by_alias(struct device *dev, void *data)
- }
- 
- /**
-+ * iommu_set_da_range - Set a valid device address range
-+ * @obj:		target iommu
-+ * @start		Start of valid range
-+ * @end			End of valid range
-+ **/
-+int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
-+{
-+	struct iommu_platform_data *pdata;
-+
-+	if (!obj)
-+		return -EFAULT;
-+
-+	if (end < start || !PAGE_ALIGN(start | end))
-+		return -EINVAL;
-+
-+	pdata = obj->dev->platform_data;
-+
-+	pdata->da_start = start;
-+	pdata->da_end = end;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iommu_set_da_range);
-+
-+/**
-  * iommu_get - Get iommu handler
-  * @name:	target iommu name
-  **/
-@@ -853,6 +884,8 @@ struct iommu *iommu_get(const char *name)
- 		if (err)
- 			goto err_enable;
- 		flush_iotlb_all(obj);
-+		iommu_set_da_range(obj, IOMMU_DEFAULT_DA_START,
-+					IOMMU_DEFAULT_DA_END);
- 	}
- 
- 	if (!try_module_get(obj->owner))
-diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-index 5489ca9..3809add 100644
---- a/arch/arm/plat-omap/iovmm.c
-+++ b/arch/arm/plat-omap/iovmm.c
-@@ -272,21 +272,25 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
- {
- 	struct iovm_struct *new, *tmp;
- 	u32 start, prev_end, alignement;
-+	struct iommu_platform_data *pdata;
- 
- 	if (!obj || !bytes)
- 		return ERR_PTR(-EINVAL);
- 
-+	pdata = obj->dev->platform_data;
-+
- 	start = da;
- 	alignement = PAGE_SIZE;
- 
- 	if (flags & IOVMF_DA_ANON) {
--		/*
--		 * Reserve the first page for NULL
--		 */
--		start = PAGE_SIZE;
-+		start = pdata->da_start;
-+
- 		if (flags & IOVMF_LINEAR)
- 			alignement = iopgsz_max(bytes);
- 		start = roundup(start, alignement);
-+	} else if (start < pdata->da_start || start > pdata->da_end ||
-+					pdata->da_end - start < bytes) {
-+		return ERR_PTR(-EINVAL);
- 	}
- 
- 	tmp = NULL;
-@@ -299,16 +303,16 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
- 		if (prev_end > start)
- 			break;
- 
--		if (start + bytes <= tmp->da_start)
-+		if (tmp->da_start > start && (tmp->da_start - start) >= bytes)
- 			goto found;
- 
--		if (flags & IOVMF_DA_ANON)
-+		if (tmp->da_end >= start && flags & IOVMF_DA_ANON)
- 			start = roundup(tmp->da_end + 1, alignement);
- 
- 		prev_end = tmp->da_end;
- 	}
- 
--	if ((start >= prev_end) && (ULONG_MAX - start + 1 >= bytes))
-+	if ((start >= prev_end) && (pdata->da_end - start >= bytes))
- 		goto found;
- 
- 	dev_dbg(obj->dev, "%s: no space to fit %08x(%x) flags: %08x\n",
--- 
-1.6.3.3
+Yes variation of (2) where you only pass the locking function via
+platform data would be best.
+
+Regards,
+
+Tony
