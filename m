@@ -1,34 +1,23 @@
 From: dwmw2@infradead.org (David Woodhouse)
-Date: Mon, 25 Oct 2010 00:28:20 +0100
-Subject: [PATCH 1/2] MTD: generic FSMC NAND MTD driver
-In-Reply-To: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
-References: <1284330922-3569-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1287962900.5674.21.camel@macbook.infradead.org>
+Date: Mon, 25 Oct 2010 01:01:49 +0100
+Subject: [PATCH v2 09/10] OMAP2/3: Convert write/read functions to raw
+	read/write
+In-Reply-To: <4CAE2475.4090607@ti.com>
+References: <1285063280-4057-1-git-send-email-manjugk@ti.com>
+	<1285063280-4057-10-git-send-email-manjugk@ti.com>
+	<7A436F7769CA33409C6B44B358BFFF0C014F74831E@dlee02.ent.ti.com>
+	<20101007185630.GA26435@n2100.arm.linux.org.uk>
+	<4CAE2475.4090607@ti.com>
+Message-ID: <1287964909.5674.22.camel@macbook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-09-13 at 00:35 +0200, Linus Walleij wrote:
-> 
-> +#define PARTITION(n, off, sz)  {.name = n, .offset = off, .size = sz}
-> +
-> +/*
-> + * Default partition layout for small page(= 512 bytes) devices
-> + * Size for "Root file system" is updated in driver based on actual device size
-> + */
-> +static struct mtd_partition partition_info_16KB_blk[] = {
-> +       PARTITION("X-loader", 0, 4 * 0x4000),
-> +       PARTITION("U-Boot", 0x10000, 20 * 0x4000),
-> +       PARTITION("Kernel", 0x60000, 256 * 0x4000),
-> +       PARTITION("Root File System", 0x460000, 0),
-> +}; 
+On Thu, 2010-10-07 at 14:50 -0500, Nishanth Menon wrote:
+> my comment being that by moving {read,write}[wlb] to __raw versions dont 
+> solve the real issue of namespace here. fix should be in 
+> arch/arm/include/asm/io.h IMHO. so that there are no overlaps as this. 
 
-Er, you use a macro just so that you can use order-dependent non-C99
-structure initialisation? You realise that this would do the same thing:
- #define PARTITION(a,b,c) {a,c,b}
-
-And no, I don't think *that* would be a good idea either :)
-
-Please fix.
+Indeed. This patch is complete nonsense.
 
 -- 
 David Woodhouse                            Open Source Technology Centre
