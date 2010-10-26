@@ -1,250 +1,334 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Oct 2010 10:49:51 +0200
-Subject: [PATCH 2/7] imx: refactor the io mapping macro
+Date: Tue, 26 Oct 2010 10:49:50 +0200
+Subject: [PATCH 1/7] mx3: fix the last users of IMX_NEEDS_DEPRECATED_SYMBOLS
 In-Reply-To: <20101022175702.GI19834@pengutronix.de>
 References: <20101022175702.GI19834@pengutronix.de>
-Message-ID: <1288082996-21981-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1288082996-21981-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes it more assembler friendly and allows it to be used in situation
-that need an unsigned long and not a pointer.  Also the naming is
-clearer.  IOMEM is introduced without IMX_ prefix as it is used this way
-in more than one ARM subarch and it might become globally available
-soon.
-
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx3/mach-kzm_arm11_01.c     |    6 +++---
- arch/arm/plat-mxc/include/mach/hardware.h |   13 +++++++++----
- arch/arm/plat-mxc/include/mach/mx1.h      |    5 +++--
- arch/arm/plat-mxc/include/mach/mx21.h     |    9 +++++----
- arch/arm/plat-mxc/include/mach/mx25.h     |    9 +++++----
- arch/arm/plat-mxc/include/mach/mx27.h     |    9 +++++----
- arch/arm/plat-mxc/include/mach/mx31.h     |   13 +++++++------
- arch/arm/plat-mxc/include/mach/mx35.h     |   13 +++++++------
- arch/arm/plat-mxc/include/mach/mx51.h     |   13 +++++++------
- arch/arm/plat-mxc/include/mach/mxc91231.h |   19 ++++++++++---------
- 10 files changed, 61 insertions(+), 48 deletions(-)
+ arch/arm/mach-mx3/Makefile        |    3 --
+ arch/arm/mach-mx3/devices.c       |   72 ++++++++++++++++++++-----------------
+ arch/arm/mach-mx3/mach-mx31_3ds.c |    2 +-
+ arch/arm/mach-mx3/mm.c            |   48 ++++++++++++------------
+ 4 files changed, 64 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-kzm_arm11_01.c b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
-index 5b23e41..423387d 100644
---- a/arch/arm/mach-mx3/mach-kzm_arm11_01.c
-+++ b/arch/arm/mach-mx3/mach-kzm_arm11_01.c
-@@ -41,9 +41,9 @@
- #include "devices-imx31.h"
- #include "devices.h"
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 8a182d0a..7feb6c4 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -5,8 +5,6 @@
+ # Object file lists.
  
--#define KZM_ARM11_IO_ADDRESS(x) (					\
--	IMX_IO_ADDRESS(x, MX31_CS4) ?:					\
--	IMX_IO_ADDRESS(x, MX31_CS5) ?:					\
-+#define KZM_ARM11_IO_ADDRESS(x) (IOMEM(					\
-+	IMX_IO_P2V_MODULE(x, MX31_CS4) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_CS5)) ?:				\
- 	MX31_IO_ADDRESS(x))
+ obj-y				:= mm.o devices.o cpu.o
+-CFLAGS_mm.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
+-CFLAGS_devices.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
+ obj-$(CONFIG_ARCH_MX31)		+= clock-imx31.o iomux-imx31.o
+ obj-$(CONFIG_ARCH_MX35)		+= clock-imx35.o
+ obj-$(CONFIG_MACH_MX31ADS)	+= mach-mx31ads.o
+@@ -15,7 +13,6 @@ obj-$(CONFIG_MACH_MX31LITE)	+= mach-mx31lite.o mx31lite-db.o
+ obj-$(CONFIG_MACH_PCM037)	+= mach-pcm037.o
+ obj-$(CONFIG_MACH_PCM037_EET)	+= mach-pcm037_eet.o
+ obj-$(CONFIG_MACH_MX31_3DS)	+= mach-mx31_3ds.o
+-CFLAGS_mach-mx31_3ds.o = -DIMX_NEEDS_DEPRECATED_SYMBOLS
+ obj-$(CONFIG_MACH_MX31MOBOARD)	+= mach-mx31moboard.o mx31moboard-devboard.o \
+ 				   mx31moboard-marxbot.o mx31moboard-smartbot.o
+ obj-$(CONFIG_MACH_QONG)		+= mach-qong.o
+diff --git a/arch/arm/mach-mx3/devices.c b/arch/arm/mach-mx3/devices.c
+index d4da949..1e737ad 100644
+--- a/arch/arm/mach-mx3/devices.c
++++ b/arch/arm/mach-mx3/devices.c
+@@ -33,18 +33,18 @@
+ static struct mxc_gpio_port imx_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+-		.base = IO_ADDRESS(GPIO1_BASE_ADDR),
+-		.irq = MXC_INT_GPIO1,
++		.base = MX31_IO_ADDRESS(MX31_GPIO1_BASE_ADDR),
++		.irq = MX3x_INT_GPIO1,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START,
+ 	}, {
+ 		.chip.label = "gpio-1",
+-		.base = IO_ADDRESS(GPIO2_BASE_ADDR),
+-		.irq = MXC_INT_GPIO2,
++		.base = MX31_IO_ADDRESS(MX31_GPIO2_BASE_ADDR),
++		.irq = MX3x_INT_GPIO2,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 32,
+ 	}, {
+ 		.chip.label = "gpio-2",
+-		.base = IO_ADDRESS(GPIO3_BASE_ADDR),
+-		.irq = MXC_INT_GPIO3,
++		.base = MX31_IO_ADDRESS(MX31_GPIO3_BASE_ADDR),
++		.irq = MX3x_INT_GPIO3,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 64,
+ 	}
+ };
+@@ -56,8 +56,8 @@ int __init imx3x_register_gpios(void)
  
- /*
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index ebadf4a..4bbe506 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -22,10 +22,15 @@
+ static struct resource mxc_w1_master_resources[] = {
+ 	{
+-		.start = OWIRE_BASE_ADDR,
+-		.end   = OWIRE_BASE_ADDR + SZ_4K - 1,
++		.start = MX3x_OWIRE_BASE_ADDR,
++		.end = MX3x_OWIRE_BASE_ADDR + SZ_4K - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ };
+@@ -110,8 +110,8 @@ struct platform_device mxcsdhc_device1 = {
  
- #include <asm/sizes.h>
+ static struct resource rnga_resources[] = {
+ 	{
+-		.start = RNGA_BASE_ADDR,
+-		.end = RNGA_BASE_ADDR + 0x28,
++		.start = MX3x_RNGA_BASE_ADDR,
++		.end = MX3x_RNGA_BASE_ADDR + 0x28,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ };
+@@ -129,20 +129,20 @@ struct platform_device mxc_rnga_device = {
+ /* The resource order is important! */
+ static struct resource mx3_ipu_rsrc[] = {
+ 	{
+-		.start = IPU_CTRL_BASE_ADDR,
+-		.end = IPU_CTRL_BASE_ADDR + 0x5F,
++		.start = MX3x_IPU_CTRL_BASE_ADDR,
++		.end = MX3x_IPU_CTRL_BASE_ADDR + 0x5F,
+ 		.flags = IORESOURCE_MEM,
+ 	}, {
+-		.start = IPU_CTRL_BASE_ADDR + 0x88,
+-		.end = IPU_CTRL_BASE_ADDR + 0xB3,
++		.start = MX3x_IPU_CTRL_BASE_ADDR + 0x88,
++		.end = MX3x_IPU_CTRL_BASE_ADDR + 0xB3,
+ 		.flags = IORESOURCE_MEM,
+ 	}, {
+-		.start = MXC_INT_IPU_SYN,
+-		.end = MXC_INT_IPU_SYN,
++		.start = MX3x_INT_IPU_SYN,
++		.end = MX3x_INT_IPU_SYN,
+ 		.flags = IORESOURCE_IRQ,
+ 	}, {
+-		.start = MXC_INT_IPU_ERR,
+-		.end = MXC_INT_IPU_ERR,
++		.start = MX3x_INT_IPU_ERR,
++		.end = MX3x_INT_IPU_ERR,
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -156,8 +156,8 @@ struct platform_device mx3_ipu = {
  
--#define IMX_IO_ADDRESS(addr, module)					\
--	((void __force __iomem *)					\
--	 (((unsigned long)((addr) - (module ## _BASE_ADDR)) < module ## _SIZE) ?\
--	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0))
-+#ifdef __ASSEMBLER__
-+#define IOMEM(addr)	(addr)
-+#else
-+#define IOMEM(addr)	((void __force __iomem *)(addr))
+ static struct resource fb_resources[] = {
+ 	{
+-		.start	= IPU_CTRL_BASE_ADDR + 0xB4,
+-		.end	= IPU_CTRL_BASE_ADDR + 0x1BF,
++		.start	= MX3x_IPU_CTRL_BASE_ADDR + 0xB4,
++		.end	= MX3x_IPU_CTRL_BASE_ADDR + 0x1BF,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ };
+@@ -174,8 +174,8 @@ struct platform_device mx3_fb = {
+ 
+ static struct resource camera_resources[] = {
+ 	{
+-		.start	= IPU_CTRL_BASE_ADDR + 0x60,
+-		.end	= IPU_CTRL_BASE_ADDR + 0x87,
++		.start	= MX3x_IPU_CTRL_BASE_ADDR + 0x60,
++		.end	= MX3x_IPU_CTRL_BASE_ADDR + 0x87,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ };
+@@ -190,14 +190,15 @@ struct platform_device mx3_camera = {
+ 	},
+ };
+ 
++#ifdef CONFIG_ARCH_MX31
+ static struct resource otg_resources[] = {
+ 	{
+ 		.start	= MX31_OTG_BASE_ADDR,
+ 		.end	= MX31_OTG_BASE_ADDR + 0x1ff,
+ 		.flags	= IORESOURCE_MEM,
+ 	}, {
+-		.start	= MXC_INT_USB3,
+-		.end	= MXC_INT_USB3,
++		.start	= MX31_INT_USB3,
++		.end	= MX31_INT_USB3,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -215,6 +216,7 @@ struct platform_device mxc_otg_udc_device = {
+ 	.resource	= otg_resources,
+ 	.num_resources	= ARRAY_SIZE(otg_resources),
+ };
 +#endif
-+
-+#define IMX_IO_P2V_MODULE(addr, module)					\
-+	(((addr) - module ## _BASE_ADDR) < module ## _SIZE ?		\
-+	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0)
  
- #ifdef CONFIG_ARCH_MX5
- #include <mach/mx51.h>
-diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
-index 641b246..6faa7d2 100644
---- a/arch/arm/plat-mxc/include/mach/mx1.h
-+++ b/arch/arm/plat-mxc/include/mach/mx1.h
-@@ -73,8 +73,9 @@
- #define MX1_CSI_BASE_ADDR		(0x24000 + MX1_IO_BASE_ADDR)
+ /* OTG host */
+ struct platform_device mxc_otg_host = {
+@@ -228,8 +230,8 @@ struct platform_device mxc_otg_host = {
+ 	.num_resources = ARRAY_SIZE(otg_resources),
+ };
  
- /* macro to get at IO space when running virtually */
--#define MX1_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX1_IO))
-+#define MX1_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX1_IO))
-+#define MX1_IO_ADDRESS(x) 		IOMEM(MX1_IO_P2V(x))
++#ifdef CONFIG_ARCH_MX31
+ /* USB host 1 */
+-
+ static u64 usbh1_dmamask = ~(u32)0;
  
- /* fixed interrput numbers */
- #define MX1_INT_SOFTINT		0
-diff --git a/arch/arm/plat-mxc/include/mach/mx21.h b/arch/arm/plat-mxc/include/mach/mx21.h
-index 8bc5972..aed0277 100644
---- a/arch/arm/plat-mxc/include/mach/mx21.h
-+++ b/arch/arm/plat-mxc/include/mach/mx21.h
-@@ -92,10 +92,11 @@
+ static struct resource mxc_usbh1_resources[] = {
+@@ -238,8 +240,8 @@ static struct resource mxc_usbh1_resources[] = {
+ 		.end = MX31_OTG_BASE_ADDR + 0x3ff,
+ 		.flags = IORESOURCE_MEM,
+ 	}, {
+-		.start = MXC_INT_USB1,
+-		.end = MXC_INT_USB1,
++		.start = MX31_INT_USB1,
++		.end = MX31_INT_USB1,
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -264,8 +266,8 @@ static struct resource mxc_usbh2_resources[] = {
+ 		.end = MX31_OTG_BASE_ADDR + 0x5ff,
+ 		.flags = IORESOURCE_MEM,
+ 	}, {
+-		.start = MXC_INT_USB2,
+-		.end = MXC_INT_USB2,
++		.start = MX31_INT_USB2,
++		.end = MX31_INT_USB2,
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -280,6 +282,7 @@ struct platform_device mxc_usbh2 = {
+ 	.resource = mxc_usbh2_resources,
+ 	.num_resources = ARRAY_SIZE(mxc_usbh2_resources),
+ };
++#endif
  
- #define MX21_IRAM_BASE_ADDR		0xffffe800	/* internal ram */
+ static struct resource imx_wdt_resources[] = {
+ 	{
+@@ -343,14 +346,17 @@ static int __init mx3_devices_init(void)
+ #endif
+ #if defined(CONFIG_ARCH_MX35)
+ 	if (cpu_is_mx35()) {
++		imx_gpio_ports[0].base = MX35_IO_ADDRESS(MX35_GPIO1_BASE_ADDR),
++		imx_gpio_ports[1].base = MX35_IO_ADDRESS(MX35_GPIO2_BASE_ADDR),
++		imx_gpio_ports[2].base = MX35_IO_ADDRESS(MX35_GPIO3_BASE_ADDR),
+ 		otg_resources[0].start = MX35_OTG_BASE_ADDR;
+ 		otg_resources[0].end = MX35_OTG_BASE_ADDR + 0x1ff;
+-		otg_resources[1].start = MXC_INT_USBOTG;
+-		otg_resources[1].end = MXC_INT_USBOTG;
++		otg_resources[1].start = MX35_INT_USBOTG;
++		otg_resources[1].end = MX35_INT_USBOTG;
+ 		mxc_usbh1_resources[0].start = MX35_OTG_BASE_ADDR + 0x400;
+ 		mxc_usbh1_resources[0].end = MX35_OTG_BASE_ADDR + 0x5ff;
+-		mxc_usbh1_resources[1].start = MXC_INT_USBHS;
+-		mxc_usbh1_resources[1].end = MXC_INT_USBHS;
++		mxc_usbh1_resources[1].start = MX35_INT_USBHS;
++		mxc_usbh1_resources[1].end = MX35_INT_ESAI;
+ 		imx_wdt_resources[0].start = MX35_WDOG_BASE_ADDR;
+ 		imx_wdt_resources[0].end = MX35_WDOG_BASE_ADDR + 0x3fff;
+ 	}
+diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
+index 6fe69e1..1d24617 100644
+--- a/arch/arm/mach-mx3/mach-mx31_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+@@ -281,7 +281,7 @@ static void __init mxc_board_init(void)
+ 	mx31_3ds_usbotg_init();
+ 	mxc_register_device(&mxc_otg_udc_device, &usbotg_pdata);
  
--#define MX21_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX21_AIPI) ?:					\
--	IMX_IO_ADDRESS(x, MX21_SAHB1) ?:				\
--	IMX_IO_ADDRESS(x, MX21_X_MEMC))
-+#define MX21_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX21_AIPI) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX21_SAHB1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX21_X_MEMC))
-+#define MX21_IO_ADDRESS(x)		IOMEM(MX21_IO_P2V(x))
- 
- /* fixed interrupt numbers */
- #define MX21_INT_CSPI3		6
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index cf46a45..6f9e1d4 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -28,10 +28,11 @@
- #define MX25_GPIO3_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0xa4000)
- #define MX25_GPIO4_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0x9c000)
- 
--#define MX25_IO_ADDRESS(x) (					\
--	IMX_IO_ADDRESS(x, MX25_AIPS1) ?:			\
--	IMX_IO_ADDRESS(x, MX25_AIPS2) ?:			\
--	IMX_IO_ADDRESS(x, MX25_AVIC))
-+#define MX25_IO_P2V(x)	(					\
-+	IMX_IO_P2V_MODULE(x, MX25_AIPS1) ?:			\
-+	IMX_IO_P2V_MODULE(x, MX25_AIPS2) ?:			\
-+	IMX_IO_P2V_MODULE(x, MX25_AVIC))
-+#define MX25_IO_ADDRESS(x)		IOMEM(MX25_IO_P2V(x))
- 
- #define MX25_AIPS1_IO_ADDRESS(x) \
- 	(((x) - MX25_AIPS1_BASE_ADDR) + MX25_AIPS1_BASE_ADDR_VIRT)
-diff --git a/arch/arm/plat-mxc/include/mach/mx27.h b/arch/arm/plat-mxc/include/mach/mx27.h
-index 2237ba2..c769cc8 100644
---- a/arch/arm/plat-mxc/include/mach/mx27.h
-+++ b/arch/arm/plat-mxc/include/mach/mx27.h
-@@ -123,10 +123,11 @@
- /* IRAM */
- #define MX27_IRAM_BASE_ADDR		0xffff4c00	/* internal ram */
- 
--#define MX27_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX27_AIPI) ?:					\
--	IMX_IO_ADDRESS(x, MX27_SAHB1) ?:				\
--	IMX_IO_ADDRESS(x, MX27_X_MEMC))
-+#define MX27_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX27_AIPI) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX27_SAHB1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX27_X_MEMC))
-+#define MX27_IO_ADDRESS(x)		IOMEM(MX27_IO_P2V(x))
- 
- #ifndef __ASSEMBLER__
- static inline void mx27_setup_weimcs(size_t cs,
-diff --git a/arch/arm/plat-mxc/include/mach/mx31.h b/arch/arm/plat-mxc/include/mach/mx31.h
-index 61cfe82..eb4a28d 100644
---- a/arch/arm/plat-mxc/include/mach/mx31.h
-+++ b/arch/arm/plat-mxc/include/mach/mx31.h
-@@ -121,12 +121,13 @@
- 
- #define MX31_PCMCIA_MEM_BASE_ADDR	0xbc000000
- 
--#define MX31_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX31_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MX31_AIPS2) ?:				\
--	IMX_IO_ADDRESS(x, MX31_AVIC) ?:					\
--	IMX_IO_ADDRESS(x, MX31_X_MEMC) ?:				\
--	IMX_IO_ADDRESS(x, MX31_SPBA0))
-+#define MX31_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX31_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_AIPS2) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_AVIC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_X_MEMC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX31_SPBA0))
-+#define MX31_IO_ADDRESS(x)		IOMEM(MX31_IO_P2V(x))
- 
- #ifndef __ASSEMBLER__
- static inline void mx31_setup_weimcs(size_t cs,
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index 6267cff..ce1a24b 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -114,12 +114,13 @@
- #define MX35_NFC_BASE_ADDR		0xbb000000
- #define MX35_PCMCIA_MEM_BASE_ADDR	0xbc000000
- 
--#define MX35_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX35_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MX35_AIPS2) ?:				\
--	IMX_IO_ADDRESS(x, MX35_AVIC) ?:					\
--	IMX_IO_ADDRESS(x, MX35_X_MEMC) ?:				\
--	IMX_IO_ADDRESS(x, MX35_SPBA0))
-+#define MX35_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX35_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_AIPS2) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_AVIC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_X_MEMC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX35_SPBA0))
-+#define MX35_IO_ADDRESS(x)		IOMEM(MX35_IO_P2V(x))
- 
- /*
-  * Interrupt numbers
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 2af7a10..e93cf5b 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -163,12 +163,13 @@
- #define MX51_GPU2D_BASE_ADDR		0xd0000000
- #define MX51_TZIC_BASE_ADDR		0xe0000000
- 
--#define MX51_IO_ADDRESS(x) (						\
--	IMX_IO_ADDRESS(x, MX51_IRAM) ?:					\
--	IMX_IO_ADDRESS(x, MX51_DEBUG) ?:				\
--	IMX_IO_ADDRESS(x, MX51_SPBA0) ?:				\
--	IMX_IO_ADDRESS(x, MX51_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MX51_AIPS2))
-+#define MX51_IO_P2V(x)	(						\
-+	IMX_IO_P2V_MODULE(x, MX51_IRAM) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_DEBUG) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_SPBA0) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MX51_AIPS2))
-+#define MX51_IO_ADDRESS(x)		IOMEM(MX51_IO_P2V(x))
- 
- /* This is currently used in <mach/debug-macro.S>, but should go away */
- #define MX51_AIPS1_IO_ADDRESS(x)  \
-diff --git a/arch/arm/plat-mxc/include/mach/mxc91231.h b/arch/arm/plat-mxc/include/mach/mxc91231.h
-index 0ca3101..49e5e25 100644
---- a/arch/arm/plat-mxc/include/mach/mxc91231.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc91231.h
-@@ -187,15 +187,16 @@
-  * it returns 0.
+-	if (!mxc_expio_init(CS5_BASE_ADDR, EXPIO_PARENT_INT))
++	if (!mxc_expio_init(MX31_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+ 		printk(KERN_WARNING "Init of the debugboard failed, all "
+ 				    "devices on the board are unusable.\n");
+ }
+diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
+index b4ffc53..809ee40 100644
+--- a/arch/arm/mach-mx3/mm.c
++++ b/arch/arm/mach-mx3/mm.c
+@@ -42,29 +42,29 @@
   */
+ static struct map_desc mxc_io_desc[] __initdata = {
+ 	{
+-		.virtual	= X_MEMC_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(X_MEMC_BASE_ADDR),
+-		.length		= X_MEMC_SIZE,
+-		.type		= MT_DEVICE
++		.virtual = MX3x_X_MEMC_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX3x_X_MEMC_BASE_ADDR),
++		.length = MX3x_X_MEMC_SIZE,
++		.type = MT_DEVICE
+ 	}, {
+-		.virtual	= AVIC_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(AVIC_BASE_ADDR),
+-		.length		= AVIC_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
++		.virtual = MX3x_AVIC_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX3x_AVIC_BASE_ADDR),
++		.length = MX3x_AVIC_SIZE,
++		.type = MT_DEVICE_NONSHARED
+ 	}, {
+-		.virtual	= AIPS1_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(AIPS1_BASE_ADDR),
+-		.length		= AIPS1_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
++		.virtual = MX3x_AIPS1_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX3x_AIPS1_BASE_ADDR),
++		.length = MX3x_AIPS1_SIZE,
++		.type = MT_DEVICE_NONSHARED
+ 	}, {
+-		.virtual	= AIPS2_BASE_ADDR_VIRT,
+-		.pfn		= __phys_to_pfn(AIPS2_BASE_ADDR),
+-		.length		= AIPS2_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
++		.virtual = MX3x_AIPS2_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX3x_AIPS2_BASE_ADDR),
++		.length = MX3x_AIPS2_SIZE,
++		.type = MT_DEVICE_NONSHARED
+ 	}, {
+-		.virtual = SPBA0_BASE_ADDR_VIRT,
+-		.pfn = __phys_to_pfn(SPBA0_BASE_ADDR),
+-		.length = SPBA0_SIZE,
++		.virtual = MX3x_SPBA0_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX3x_SPBA0_BASE_ADDR),
++		.length = MX3x_SPBA0_SIZE,
+ 		.type = MT_DEVICE_NONSHARED
+ 	},
+ };
+@@ -77,7 +77,7 @@ static struct map_desc mxc_io_desc[] __initdata = {
+ void __init mx31_map_io(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX31);
+-	mxc_arch_reset_init(IO_ADDRESS(WDOG_BASE_ADDR));
++	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
  
--#define MXC91231_IO_ADDRESS(x) (					\
--	IMX_IO_ADDRESS(x, MXC91231_L2CC) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_X_MEMC) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_ROMP) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_AVIC) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_AIPS1) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_SPBA0) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_SPBA1) ?:				\
--	IMX_IO_ADDRESS(x, MXC91231_AIPS2))
-+#define MXC91231_IO_P2V(x)	(					\
-+	IMX_IO_P2V_MODULE(x, MXC91231_L2CC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_X_MEMC) ?:			\
-+	IMX_IO_P2V_MODULE(x, MXC91231_ROMP) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_AVIC) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_AIPS1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_SPBA0) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_SPBA1) ?:				\
-+	IMX_IO_P2V_MODULE(x, MXC91231_AIPS2))
-+#define MXC91231_IO_ADDRESS(x)		IOMEM(MXC91231_IO_P2V(x))
+ 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+ }
+@@ -86,8 +86,8 @@ void __init mx31_map_io(void)
+ void __init mx35_map_io(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX35);
+-	mxc_iomux_v3_init(IO_ADDRESS(IOMUXC_BASE_ADDR));
+-	mxc_arch_reset_init(IO_ADDRESS(WDOG_BASE_ADDR));
++	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
++	mxc_arch_reset_init(MX35_IO_ADDRESS(MX3x_WDOG_BASE_ADDR));
  
- /*
-  * Interrupt numbers
+ 	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
+ }
+@@ -97,7 +97,7 @@ int imx3x_register_gpios(void);
+ 
+ void __init mx31_init_irq(void)
+ {
+-	mxc_init_irq(IO_ADDRESS(AVIC_BASE_ADDR));
++	mxc_init_irq(MX31_IO_ADDRESS(MX3x_AVIC_BASE_ADDR));
+ 	imx3x_register_gpios();
+ }
+ 
+@@ -129,7 +129,7 @@ static int mxc_init_l2x0(void)
+ 		pr_err("L2 cache: Cannot fix timing. Trying to continue without\n");
+ 	}
+ 
+-	l2x0_base = ioremap(L2CC_BASE_ADDR, 4096);
++	l2x0_base = ioremap(MX3x_L2CC_BASE_ADDR, 4096);
+ 	if (IS_ERR(l2x0_base)) {
+ 		printk(KERN_ERR "remapping L2 cache area failed with %ld\n",
+ 				PTR_ERR(l2x0_base));
 -- 
 1.7.2.3
