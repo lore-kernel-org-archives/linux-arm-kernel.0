@@ -1,58 +1,122 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Oct 2010 10:41:39 +0200
-Subject: [GITT PULL] AT91: 2.6.37 merge window
-Message-ID: <4CC69443.9090109@atmel.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue, 26 Oct 2010 10:49:53 +0200
+Subject: [PATCH 4/7] imx: remove last explicit users of virtual base address
+	defines
+In-Reply-To: <20101022175702.GI19834@pengutronix.de>
+References: <20101022175702.GI19834@pengutronix.de>
+Message-ID: <1288082996-21981-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This allows changing the mapping without the need to adapt all users.
 
-Could you please pull the following:
+While at it remove some unneeded casts to void __iomem *, this is already
+taken care for in the IO_ADDRESS macros
 
-  git://github.com/at91linux/linux-2.6-at91.git for_linus
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-imx/devices.c           |    8 ++++----
+ arch/arm/mach-mx25/devices.c          |    8 ++++----
+ arch/arm/mach-mx25/mm.c               |    2 +-
+ arch/arm/plat-mxc/include/mach/mx25.h |    9 ++++-----
+ 4 files changed, 13 insertions(+), 14 deletions(-)
 
-This contains a set of AT91 updates for 2.6.37 merge 
-window. All has been discussed on the arm-linux mailing 
-list. It is based on your tree:
-commit b18cae4224bde7e5a332c19bc99247b2098ea232
-
-Nicolas Ferre (7):
-      AT91: trivial: align comment of at91sam9g20_reset with one more tab
-      AT91: reset routine cleanup, remove not needed icache flush
-      AT91: reset: extend alternate reset procedure to several chips
-      AT91: pm: use plain cpu_do_idle() for "wait for interrupt"
-      AT91: pm: make sure that r0 is 0 when dealing with cache operations
-      at91/atmel-mci: inclusion of sd/mmc driver in at91sam9g45 chip and board
-      AT91: rtc: enable built-in RTC in Kconfig for at91sam9g45 family
-
-Peter Gsellmann (1):
-      AT91: add board support for Pcontrol_G20
-
-Peter Horton (1):
-      AT91: Fix AT91SAM9G20 reset as per the errata in the data sheet
-
- arch/arm/configs/pcontrol_g20_defconfig  |  175 ++++++++++++++++
- arch/arm/mach-at91/Kconfig               |    6 +
- arch/arm/mach-at91/Makefile              |   13 +-
- arch/arm/mach-at91/at91sam9260.c         |    7 +-
- arch/arm/mach-at91/at91sam9261.c         |    7 +-
- arch/arm/mach-at91/at91sam9263.c         |    7 +-
- arch/arm/mach-at91/at91sam9_alt_reset.S  |   48 +++++
- arch/arm/mach-at91/at91sam9g45_devices.c |  165 +++++++++++++++
- arch/arm/mach-at91/at91sam9rl.c          |    7 +-
- arch/arm/mach-at91/board-pcontrol-g20.c  |  322 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/board-sam9m10g45ek.c  |   24 +++
- arch/arm/mach-at91/generic.h             |    3 +
- arch/arm/mach-at91/pm.c                  |   15 +-
- arch/arm/mach-at91/pm.h                  |    5 +
- arch/arm/mach-at91/pm_slowclock.S        |    1 +
- drivers/mmc/host/Kconfig                 |    2 +-
- drivers/rtc/Kconfig                      |   12 +-
- 17 files changed, 778 insertions(+), 41 deletions(-)
- create mode 100644 arch/arm/configs/pcontrol_g20_defconfig
- create mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
- create mode 100644 arch/arm/mach-at91/board-pcontrol-g20.c
-
-Thanks a lot, best regards,
+diff --git a/arch/arm/mach-imx/devices.c b/arch/arm/mach-imx/devices.c
+index fba5047..e69e46e 100644
+--- a/arch/arm/mach-imx/devices.c
++++ b/arch/arm/mach-imx/devices.c
+@@ -159,22 +159,22 @@ struct platform_device imx_usb_device = {
+ static struct mxc_gpio_port imx_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+-		.base = (void __iomem *)MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR),
++		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR),
+ 		.irq = MX1_GPIO_INT_PORTA,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START,
+ 	}, {
+ 		.chip.label = "gpio-1",
+-		.base = (void __iomem *)MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x100),
++		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x100),
+ 		.irq = MX1_GPIO_INT_PORTB,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 32,
+ 	}, {
+ 		.chip.label = "gpio-2",
+-		.base = (void __iomem *)MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x200),
++		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x200),
+ 		.irq = MX1_GPIO_INT_PORTC,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 64,
+ 	}, {
+ 		.chip.label = "gpio-3",
+-		.base = (void __iomem *)MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x300),
++		.base = MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR + 0x300),
+ 		.irq = MX1_GPIO_INT_PORTD,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 96,
+ 	}
+diff --git a/arch/arm/mach-mx25/devices.c b/arch/arm/mach-mx25/devices.c
+index 1d0eb3e..92eb1a9 100644
+--- a/arch/arm/mach-mx25/devices.c
++++ b/arch/arm/mach-mx25/devices.c
+@@ -182,22 +182,22 @@ struct platform_device mxc_pwm_device3 = {
+ static struct mxc_gpio_port imx_gpio_ports[] = {
+ 	{
+ 		.chip.label = "gpio-0",
+-		.base = (void __iomem *)MX25_GPIO1_BASE_ADDR_VIRT,
++		.base = MX25_IO_ADDRESS(MX25_GPIO1_BASE_ADDR),
+ 		.irq = 52,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START,
+ 	}, {
+ 		.chip.label = "gpio-1",
+-		.base = (void __iomem *)MX25_GPIO2_BASE_ADDR_VIRT,
++		.base = MX25_IO_ADDRESS(MX25_GPIO2_BASE_ADDR),
+ 		.irq = 51,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 32,
+ 	}, {
+ 		.chip.label = "gpio-2",
+-		.base = (void __iomem *)MX25_GPIO3_BASE_ADDR_VIRT,
++		.base = MX25_IO_ADDRESS(MX25_GPIO3_BASE_ADDR),
+ 		.irq = 16,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 64,
+ 	}, {
+ 		.chip.label = "gpio-3",
+-		.base = (void __iomem *)MX25_GPIO4_BASE_ADDR_VIRT,
++		.base = MX25_IO_ADDRESS(MX25_GPIO4_BASE_ADDR),
+ 		.irq = 23,
+ 		.virtual_irq_start = MXC_GPIO_IRQ_START + 96,
+ 	}
+diff --git a/arch/arm/mach-mx25/mm.c b/arch/arm/mach-mx25/mm.c
+index 11cd335..2edec6c 100644
+--- a/arch/arm/mach-mx25/mm.c
++++ b/arch/arm/mach-mx25/mm.c
+@@ -56,7 +56,7 @@ int imx25_register_gpios(void);
+ 
+ void __init mx25_init_irq(void)
+ {
+-	mxc_init_irq((void __iomem *)MX25_AVIC_BASE_ADDR_VIRT);
++	mxc_init_irq(MX25_IO_ADDRESS(MX25_AVIC_BASE_ADDR));
+ 	imx25_register_gpios();
+ }
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+index 6f9e1d4..08b5a3a 100644
+--- a/arch/arm/plat-mxc/include/mach/mx25.h
++++ b/arch/arm/plat-mxc/include/mach/mx25.h
+@@ -21,13 +21,12 @@
+ 
+ #define MX25_CRM_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0x80000)
+ #define MX25_GPT1_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0x90000)
++#define MX25_GPIO4_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0x9c000)
++#define MX25_GPIO3_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xa4000)
++#define MX25_GPIO1_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xcc000)
++#define MX25_GPIO2_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xd0000)
+ #define MX25_WDOG_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xdc000)
+ 
+-#define MX25_GPIO1_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0xcc000)
+-#define MX25_GPIO2_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0xd0000)
+-#define MX25_GPIO3_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0xa4000)
+-#define MX25_GPIO4_BASE_ADDR_VIRT	(MX25_AIPS2_BASE_ADDR_VIRT + 0x9c000)
+-
+ #define MX25_IO_P2V(x)	(					\
+ 	IMX_IO_P2V_MODULE(x, MX25_AIPS1) ?:			\
+ 	IMX_IO_P2V_MODULE(x, MX25_AIPS2) ?:			\
 -- 
-Nicolas Ferre
+1.7.2.3
