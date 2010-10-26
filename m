@@ -1,131 +1,38 @@
-From: felipe.contreras@nokia.com (Felipe Contreras)
-Date: Tue, 26 Oct 2010 22:27:23 +0300
-Subject: [PATCH 8/8] staging: tidspbridge - make sync_wait_on_event
-	interruptible
-In-Reply-To: <496565EC904933469F292DDA3F1663E602F49E28AB@dlee06.ent.ti.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<1288054306-4361-3-git-send-email-x0095840@ti.com>
-	<1288054306-4361-4-git-send-email-x0095840@ti.com>
-	<1288054306-4361-5-git-send-email-x0095840@ti.com>
-	<1288054306-4361-6-git-send-email-x0095840@ti.com>
-	<1288054306-4361-7-git-send-email-x0095840@ti.com>
-	<1288054306-4361-8-git-send-email-x0095840@ti.com>
-	<1288054306-4361-9-git-send-email-x0095840@ti.com>
-	<AANLkTinnLb9DLMKfxEs_KqMvOmegSDYRuLWh5y=hhBCe@mail.gmail.com>
-	<496565EC904933469F292DDA3F1663E602F49E2802@dlee06.ent.ti.com>
-	<1288112260-notmuch-felipe.contreras@nokia.com>
-	<496565EC904933469F292DDA3F1663E602F49E28AB@dlee06.ent.ti.com>
-Message-ID: <1288121052-notmuch-felipe.contreras@nokia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Oct 2010 20:30:16 +0100
+Subject: [PATCH] ARM: memblock: set allocation limit for
+	MEMBLOCK_ALLOC_ANYWHERE
+In-Reply-To: <1288116524.5506.1.camel@jazztop>
+References: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
+	<20101025151513.GB21105@n2100.arm.linux.org.uk>
+	<1288047336.6035.12.camel@jazztop>
+	<20101026105638.GA2092@n2100.arm.linux.org.uk>
+	<1288116524.5506.1.camel@jazztop>
+Message-ID: <20101026193016.GA9354@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fernando.lugo at ti.com wrote:
-> > fernando.lugo at ti.com wrote:
-> > > > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
-> > > > <x0095840@ti.com> wrote:
-> > > > > So that avoid non-killable process.
-> > > > 
-> > > > It would be useful to interrupt these tasks from user-space. 
-> > > > A separate ioctl to do that would be needed.
-> > > 
-> > > I don't see use case where that could be needed. It is only 
-> > To avoid a 
-> > > nonkillable task in the case the user pass an infinite Timeout.
-> > > 
-> > > If you have some test case where that ioctl would be needed Please 
-> > > share it in order to find the best solution.
-> > 
-> > Well, imagine the application is using a library to access 
-> > the DSP, and the library has a dedicated thread listening for 
-> > DSP events in a loop.
-> > This happens to be how libomxil-ti and gst-dsp work.
-> > 
-> > Now, the thread received the last message, but has set a 
-> > timeout of 10s, or even worst, no timeout at all.
-> > 
-> > After realizing that was the last message, the main thread 
-> > decides to shut down, but it has to wait for the DSP thread 
-> > to join. Unfortunately the DSP thread is stuck waiting for 
-> > events, and there's nothing that can be done.
-> > 
-> > However, if we have a separate ioctl to interrupt that task, 
-> > then the main thread can issue that ioctl, and unlock the DSP 
-> > thread without having to wait 10s, or forever.
-> > 
-> > Does that make sense?
+On Tue, Oct 26, 2010 at 07:08:43PM +0100, Will Deacon wrote:
+> Russell,
 > 
-> Maybe sending a signal to yourselft and having a dummy signal
-> Handle should work, it that would not like good.
+> On Tue, 2010-10-26 at 11:56 +0100, Russell King - ARM Linux wrote:
+> > On Mon, Oct 25, 2010 at 11:55:36PM +0100, Will Deacon wrote:
+> > > Right. I could also move this call out of sanity_check_meminfo
+> > > and into arm_memblock_init now that we don't need lowmem_end_addr
+> > > to be initialised. If you're happy with me making that change then
+> > > I'll post a revised version to the patch system.
+> > 
+> > It looks like we're doing a few things out of order.  Yes, it makes
+> > sense to move that initialization to arm_memblock_init(), but as we're
+> > not running sanity_check_meminfo(), it could mean there's problems
+> > with out of order membanks and similar.
+> > 
+> We could move the arm_memblock_init() call into paging_init, immediately
+> after the call to sanity_check_meminfo. I think everything should be
+> safe then.
 
-Signals on libraries is a no-no.
-
-> I am thinking On having a ioctl to create and set an event the you
-> could Something like this:
-> 
-> struct dsp_notification events[3];
-> 
-> proc_register_notify(proc, event_type, &events[0]);
-> ...
-> proc_register_notify(proc, event_type, &events[1]);
-> ...
-> Sync_open_event(&events[2]);
-> 
-> 
-> second thread:
-> 
-> 	mgr_wait_for_bridge_events(proc, events, 3, index);
-> 
-> 	if (index == 2) 
-> 		/* main thread force exit */
-> 
-> 
-> Main thread:
-> 
-> 	/* if some execption happened then finish the second thread */
-> 	sync_set_event(events[2]);
-> 
-> 	pthread_join(...);
-> 
-> 
-> However it is in progess a task for change replacing dspbridge sync.c
-> Module with event_fd to signal events to userspace. Where now simple
-> File descriptor will be used as event elements. So the mgr_wait_for_bridge_events
-> Will be implemented using "select" system call inside to wait for multiple events.
-> So you will be able to do something like this:
-> 
-> int events[3];
-> 
-> proc_register_notify(proc, event_type, &events[0]);
-> ...
-> proc_register_notify(proc, event_type, &events[1]);
-> ...
-> events[2] = eventfd(0, 0);
-> 
-> 
-> second thread:
-> 
-> 	mgr_wait_for_bridge_events(proc, events, 3, index);
-> 
-> 	if (index == 2) 
-> 		/* main thread force exit */
-> 
-> Main thread:
-> 
-> 	/* if some execption happened then finish the second thread */
-> 	write(events[2], "s", 1);
-> 
-> 	pthread_join(...);
-> 
-> You won't need any aditional ioctl in order to do what you want to do.
-> 
-> So, I think it is not worth to make much changes to some module that will
-> Dissapear (my patch is just a fix it is not implementing something new),
-> It is just a matter of time to that task is finished and tested properly
-> And then send to LO.
-
-All right, that makes sense. I just wanted to make suere you are aware
-of that need.
-
--- 
-Felipe Contreras
+Well, there's actually some things which the mmu-ful stuff does (such as
+sorting) which the nommu stuff should also do for safety sake, so I
+think a little bit of a cleanup in this area would be no bad thing,
+rather than trying to move arm_memblock_init() into both the MMU and
+noMMU code.
