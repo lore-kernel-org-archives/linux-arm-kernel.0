@@ -1,48 +1,96 @@
 From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Mon, 25 Oct 2010 19:51:43 -0500
-Subject: [PATCH 5/8] staging: tidspbridge - use GTP7 for DSP stack dump
-In-Reply-To: <1288054306-4361-5-git-send-email-x0095840@ti.com>
+Date: Mon, 25 Oct 2010 19:51:42 -0500
+Subject: [PATCH 4/8] staging: tidspbridge - fix timeout in
+	dsp_gpt_wait_overflow
+In-Reply-To: <1288054306-4361-4-git-send-email-x0095840@ti.com>
 References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
 	<1288054306-4361-2-git-send-email-x0095840@ti.com>
 	<1288054306-4361-3-git-send-email-x0095840@ti.com>
 	<1288054306-4361-4-git-send-email-x0095840@ti.com>
-	<1288054306-4361-5-git-send-email-x0095840@ti.com>
-Message-ID: <1288054306-4361-6-git-send-email-x0095840@ti.com>
+Message-ID: <1288054306-4361-5-git-send-email-x0095840@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DSP stack dump is changed to GTP7 due to GPT8 is used
-by DSP side apps
+Timeout was not being initialized correctly and should
+use time_is-before_jiffies, also make it a parameter
 
 Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
 ---
- drivers/staging/tidspbridge/core/dsp-mmu.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/staging/tidspbridge/core/dsp-clock.c       |   13 +++++++------
+ drivers/staging/tidspbridge/core/dsp-mmu.c         |    5 ++++-
+ .../staging/tidspbridge/include/dspbridge/clk.h    |    4 +++-
+ 3 files changed, 14 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/staging/tidspbridge/core/dsp-clock.c b/drivers/staging/tidspbridge/core/dsp-clock.c
+index 46d17c7..8106d1e 100644
+--- a/drivers/staging/tidspbridge/core/dsp-clock.c
++++ b/drivers/staging/tidspbridge/core/dsp-clock.c
+@@ -202,13 +202,13 @@ static void mcbsp_clk_prepare(bool flag, u8 id)
+  * Sets an overflow interrupt for the desired GPT waiting for a timeout
+  * of 5 msecs for the interrupt to occur.
+  */
+-void dsp_gpt_wait_overflow(short int clk_id, unsigned int load)
++int dsp_gpt_wait_overflow(short int clk_id, unsigned int load,
++			unsigned long timeout)
+ {
+ 	struct omap_dm_timer *gpt = timer[clk_id - 1];
+-	unsigned long timeout;
+ 
+ 	if (!gpt)
+-		return;
++		return -EINVAL;
+ 
+ 	/* Enable overflow interrupt */
+ 	omap_dm_timer_set_int_enable(gpt, OMAP_TIMER_INT_OVERFLOW);
+@@ -222,14 +222,15 @@ void dsp_gpt_wait_overflow(short int clk_id, unsigned int load)
+ 	/* Wait 80us for timer to overflow */
+ 	udelay(80);
+ 
+-	timeout = msecs_to_jiffies(5);
++	timeout = jiffies + msecs_to_jiffies(timeout);
+ 	/* Check interrupt status and wait for interrupt */
+ 	while (!(omap_dm_timer_read_status(gpt) & OMAP_TIMER_INT_OVERFLOW)) {
+-		if (time_is_after_jiffies(timeout)) {
++		if (time_is_before_jiffies(timeout)) {
+ 			pr_err("%s: GPTimer interrupt failed\n", __func__);
+-			break;
++			return -ETIME;
+ 		}
+ 	}
++	return 0;
+ }
+ 
+ /*
 diff --git a/drivers/staging/tidspbridge/core/dsp-mmu.c b/drivers/staging/tidspbridge/core/dsp-mmu.c
-index 2d4e897..157b743 100644
+index 6d7501a..2d4e897 100644
 --- a/drivers/staging/tidspbridge/core/dsp-mmu.c
 +++ b/drivers/staging/tidspbridge/core/dsp-mmu.c
-@@ -63,9 +63,9 @@ static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
+@@ -65,7 +65,10 @@ static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
  
- 	load_iotlb_entry(mmu, &e);
+ 	dsp_clk_enable(DSP_CLK_GPT8);
  
--	dsp_clk_enable(DSP_CLK_GPT8);
-+	dsp_clk_enable(DSP_CLK_GPT7);
+-	dsp_gpt_wait_overflow(DSP_CLK_GPT8, 0xfffffffe);
++	if (dsp_gpt_wait_overflow(DSP_CLK_GPT8, 0xfffffffe, 10)) {
++		pr_err("%s: error sending interrupt to DSP\n", __func__);
++		return;
++	}
  
--	if (dsp_gpt_wait_overflow(DSP_CLK_GPT8, 0xfffffffe, 10)) {
-+	if (dsp_gpt_wait_overflow(DSP_CLK_GPT7, 0xfffffffe, 10)) {
- 		pr_err("%s: error sending interrupt to DSP\n", __func__);
- 		return;
- 	}
-@@ -75,7 +75,7 @@ static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
- 	iommu_write_reg(mmu, tmp, MMU_IRQSTATUS);
+ 	/* Clear MMU interrupt */
+ 	tmp = iommu_read_reg(mmu, MMU_IRQSTATUS);
+diff --git a/drivers/staging/tidspbridge/include/dspbridge/clk.h b/drivers/staging/tidspbridge/include/dspbridge/clk.h
+index b239503..6fe1ff2 100644
+--- a/drivers/staging/tidspbridge/include/dspbridge/clk.h
++++ b/drivers/staging/tidspbridge/include/dspbridge/clk.h
+@@ -62,7 +62,9 @@ extern void dsp_clk_exit(void);
+  */
+ extern void dsp_clk_init(void);
  
- 	dump_dsp_stack(dev_context);
--	dsp_clk_disable(DSP_CLK_GPT8);
-+	dsp_clk_disable(DSP_CLK_GPT7);
+-void dsp_gpt_wait_overflow(short int clk_id, unsigned int load);
++int dsp_gpt_wait_overflow(short int clk_id, unsigned int load,
++			unsigned long timeout);
++
  
- 	iopgtable_clear_entry(mmu, fa);
- 	free_page((unsigned long)dummy_addr);
+ /*
+  *  ======== dsp_clk_enable ========
 -- 
 1.6.3.3
