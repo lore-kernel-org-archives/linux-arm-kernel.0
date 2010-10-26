@@ -1,34 +1,55 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 26 Oct 2010 11:15:59 -0500
-Subject: [PATCH v2 0/4] tidspbridge: SCM layer violation fixes
-Message-ID: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+From: felipe.contreras@nokia.com (Felipe Contreras)
+Date: Tue, 26 Oct 2010 20:03:22 +0300
+Subject: [PATCH 8/8] staging: tidspbridge - make sync_wait_on_event
+	interruptible
+In-Reply-To: <496565EC904933469F292DDA3F1663E602F49E2802@dlee06.ent.ti.com>
+References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
+	<1288054306-4361-2-git-send-email-x0095840@ti.com>
+	<1288054306-4361-3-git-send-email-x0095840@ti.com>
+	<1288054306-4361-4-git-send-email-x0095840@ti.com>
+	<1288054306-4361-5-git-send-email-x0095840@ti.com>
+	<1288054306-4361-6-git-send-email-x0095840@ti.com>
+	<1288054306-4361-7-git-send-email-x0095840@ti.com>
+	<1288054306-4361-8-git-send-email-x0095840@ti.com>
+	<1288054306-4361-9-git-send-email-x0095840@ti.com>
+	<AANLkTinnLb9DLMKfxEs_KqMvOmegSDYRuLWh5y=hhBCe@mail.gmail.com>
+	<496565EC904933469F292DDA3F1663E602F49E2802@dlee06.ent.ti.com>
+Message-ID: <1288112260-notmuch-felipe.contreras@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the patch series shared by Paul, for a short term fix to
-a compile break due SCM layer layer violations from tidspbridge
-driver, where the latter is used to write directly into registers
-and use SCM layer macros, among other layer bypassing.
+fernando.lugo at ti.com wrote:
+> > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
+> > <x0095840@ti.com> wrote:
+> > > So that avoid non-killable process.
+> > 
+> > It would be useful to interrupt these tasks from user-space. 
+> > A separate ioctl to do that would be needed.
+> 
+> I don't see use case where that could be needed. It is only
+> To avoid a nonkillable task in the case the user pass an infinite
+> Timeout.
+> 
+> If you have some test case where that ioctl would be needed
+> Please share it in order to find the best solution.
 
-patch: "staging: tidspbridge: use new SCM DSP boot control fns"
-was split from its original version, it is meant to be on hold until
-the rest of the series gets upstreamed and can be found in the
-staging tree (unless best advice is given).
+Well, imagine the application is using a library to access the DSP, and
+the library has a dedicated thread listening for DSP events in a loop.
+This happens to be how libomxil-ti and gst-dsp work.
 
-Paul Walmsley (4):
-  OMAP: control: add functions for DSP boot address/mode control
-  OMAP3: PM: update DSP reset code to use new SCM DSP boot control
-    functions
-  OMAP: dsp: convert OMAP3430 adaptation layer to use new SCM DSP boot
-    control fns
-  staging: tidspbridge: use new SCM DSP boot control fns
+Now, the thread received the last message, but has set a timeout of 10s,
+or even worst, no timeout at all.
 
- arch/arm/mach-omap2/control.c                 |   51 ++++++++++++++++++++++
- arch/arm/mach-omap2/control.h                 |   16 ++++---
- arch/arm/mach-omap2/dsp.c                     |    4 ++
- arch/arm/mach-omap2/pm34xx.c                  |    6 +-
- arch/arm/plat-omap/include/plat/dsp.h         |    4 ++
- arch/arm/plat-omap/include/plat/iva2_dsp.h    |   56 +++++++++++++++++++++++++
- drivers/staging/tidspbridge/core/tiomap3430.c |   13 +++---
- 7 files changed, 133 insertions(+), 17 deletions(-)
- create mode 100644 arch/arm/plat-omap/include/plat/iva2_dsp.h
+After realizing that was the last message, the main thread decides to
+shut down, but it has to wait for the DSP thread to join. Unfortunately
+the DSP thread is stuck waiting for events, and there's nothing that can
+be done.
+
+However, if we have a separate ioctl to interrupt that task, then the
+main thread can issue that ioctl, and unlock the DSP thread without
+having to wait 10s, or forever.
+
+Does that make sense?
+
+-- 
+Felipe Contreras
