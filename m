@@ -1,123 +1,105 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 26 Oct 2010 16:18:23 -0400
-Subject: [PATCH v4 07/12] davinci: add tnetv107x evm regulators
+Date: Tue, 26 Oct 2010 16:18:21 -0400
+Subject: [PATCH v4 05/12] davinci: add spi devices on tnetv107x evm
 In-Reply-To: <1288124308-14999-1-git-send-email-cyril@ti.com>
 References: <1288124308-14999-1-git-send-email-cyril@ti.com>
-Message-ID: <1288124308-14999-8-git-send-email-cyril@ti.com>
+Message-ID: <1288124308-14999-6-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds regulator and spi board info definitions for the tps6524x
-power management IC found on tnetv107x evm boards.
+This patch adds definitions for spi devices on the tnetv107x evm platform.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/mach-davinci/board-tnetv107x-evm.c |   85 +++++++++++++++++++++++++++
- 1 files changed, 85 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |   45 +++++++++++++++++++++++++++
+ 1 files changed, 45 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-index 924cf06..42ae20f 100644
+index c74ea66..924cf06 100644
 --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
 +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-@@ -26,6 +26,9 @@
+@@ -25,6 +25,7 @@
+ #include <linux/mtd/partitions.h>
  #include <linux/input.h>
  #include <linux/input/matrix_keypad.h>
- #include <linux/spi/spi.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/regulator/driver.h>
++#include <linux/spi/spi.h>
  
  #include <asm/mach/arch.h>
  #include <asm/mach-types.h>
-@@ -257,7 +260,89 @@ static struct tnetv107x_device_info evm_device_info __initconst = {
+@@ -38,6 +39,7 @@
+ 
+ #define EVM_MMC_WP_GPIO		21
+ #define EVM_MMC_CD_GPIO		24
++#define EVM_SPI_CS_GPIO		54
+ 
+ static int initialize_gpio(int gpio, char *desc)
+ {
+@@ -203,9 +205,47 @@ static struct matrix_keypad_platform_data keypad_config = {
+ 	.no_autorepeat	= 0,
+ };
+ 
++static void spi_select_device(int cs)
++{
++	static int gpio;
++
++	if (!gpio) {
++		int ret;
++		ret = gpio_request(EVM_SPI_CS_GPIO, "spi chipsel");
++		if (ret < 0) {
++			pr_err("cannot open spi chipsel gpio\n");
++			gpio = -ENOSYS;
++			return;
++		} else {
++			gpio = EVM_SPI_CS_GPIO;
++			gpio_direction_output(gpio, 0);
++		}
++	}
++
++	if (gpio < 0)
++		return;
++
++	return gpio_set_value(gpio, cs ? 1 : 0);
++}
++
++static const struct ti_ssp_spi_data spi_master_data = {
++	.num_cs		= 2,
++	.select		= spi_select_device,
++};
++
+ static struct ti_ssp_data ssp_config = {
+ 	.out_clock	= 250 * 1000,
+ 	.dev_data	= {
++		[1] = {
++			.dev_name = "ti-ssp-spi",
++			.iosel = SSP_PIN_SEL(0, SSP_CLOCK)	|
++				 SSP_PIN_SEL(1, SSP_DATA)	|
++				 SSP_PIN_SEL(2, SSP_CHIPSEL)	|
++				 SSP_PIN_SEL(3, SSP_IN)		|
++				 SSP_INPUT_SEL(3),
++			.pdata = &spi_master_data,
++			.pdata_size = sizeof(spi_master_data),
++		},
+ 	},
+ };
+ 
+@@ -217,6 +257,9 @@ static struct tnetv107x_device_info evm_device_info __initconst = {
  	.ssp_config		= &ssp_config,
  };
  
-+static struct regulator_consumer_supply usb_consumers[] = {
-+	REGULATOR_SUPPLY("vbus", "musb_hdrc.1"),
++static struct spi_board_info spi_info[] __initconst = {
 +};
 +
-+static struct regulator_consumer_supply lcd_consumers[] = {
-+	REGULATOR_SUPPLY("vlcd", "tps6116x"),
-+};
-+
-+static struct regulator_init_data regulators[] = {
-+	{
-+		.constraints		= {
-+			.name		= "DCDC1",
-+			.min_uV		= 1000000,
-+			.max_uV		= 1000000,
-+			.always_on	= 1,
-+			.boot_on	= 1,
-+		},
-+	},
-+	{
-+		.constraints		= {
-+			.name		= "DCDC2",
-+			.min_uV		= 1800000,
-+			.max_uV		= 1800000,
-+			.always_on	= 1,
-+			.boot_on	= 1,
-+		},
-+	},
-+	{
-+		.constraints		= {
-+			.name		= "DCDC3",
-+			.min_uV		= 3300000,
-+			.max_uV		= 3300000,
-+			.always_on	= 1,
-+			.boot_on	= 1,
-+		},
-+	},
-+	{
-+		.constraints		= {
-+			.name		= "LDO1",
-+			.min_uV		= 4800000,
-+			.max_uV		= 4800000,
-+			.always_on	= 1,
-+			.boot_on	= 1,
-+		},
-+	},
-+	{
-+		.constraints		= {
-+			.name		= "LDO1",
-+			.min_uV		= 3300000,
-+			.max_uV		= 3300000,
-+			.always_on	= 1,
-+			.boot_on	= 1,
-+		},
-+	},
-+	{
-+		.num_consumer_supplies	= ARRAY_SIZE(usb_consumers),
-+		.consumer_supplies	= usb_consumers,
-+		.constraints		= {
-+			.name		= "USB",
-+			.min_uA		= 200000,
-+			.max_uA		= 1000000,
-+			.valid_ops_mask	= REGULATOR_CHANGE_CURRENT |
-+					  REGULATOR_CHANGE_STATUS,
-+		},
-+	},
-+	{
-+		.num_consumer_supplies	= ARRAY_SIZE(lcd_consumers),
-+		.consumer_supplies	= lcd_consumers,
-+		.constraints		= {
-+			.name		= "LCD",
-+			.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+		},
-+	},
-+};
-+
- static struct spi_board_info spi_info[] __initconst = {
-+	{
-+		.modalias	= "tps6524x",
-+		.bus_num	= 1,
-+		.chip_select	= 0,
-+		.mode		= SPI_MODE_0,
-+		.platform_data	= regulators,
-+	},
- };
- 
  static __init void tnetv107x_evm_board_init(void)
+ {
+ 	davinci_cfg_reg_list(sdio1_pins);
+@@ -224,6 +267,8 @@ static __init void tnetv107x_evm_board_init(void)
+ 	davinci_cfg_reg_list(ssp_pins);
+ 
+ 	tnetv107x_devices_init(&evm_device_info);
++
++	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+ }
+ 
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
 -- 
 1.7.0.4
