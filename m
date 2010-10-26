@@ -1,55 +1,159 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Oct 2010 12:06:46 -0700
-Subject: [PATCH 3/3] omap: add hwspinlock device
-In-Reply-To: <AANLkTimkUDwAn-+gmNKMkXY0Uw8evt1_W2saeRKY-Xbd@mail.gmail.com>
-References: <87r5fmxghm.fsf@deeprootsystems.com>
-	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
-	<87bp6pviwf.fsf@deeprootsystems.com>
-	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
-	<8739s0sobc.fsf@deeprootsystems.com>
-	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
-	<20101022165612.GF9149@atomide.com>
-	<AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
-	<20101025190221.GC7206@atomide.com>
-	<AANLkTimkUDwAn-+gmNKMkXY0Uw8evt1_W2saeRKY-Xbd@mail.gmail.com>
-Message-ID: <20101026190645.GH3012@atomide.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Tue, 26 Oct 2010 15:01:02 -0500
+Subject: [PATCH 8/8] staging: tidspbridge - make sync_wait_on_event
+	interruptible
+In-Reply-To: <1288121052-notmuch-felipe.contreras@nokia.com>
+References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
+	<1288054306-4361-2-git-send-email-x0095840@ti.com>
+	<1288054306-4361-3-git-send-email-x0095840@ti.com>
+	<1288054306-4361-4-git-send-email-x0095840@ti.com>
+	<1288054306-4361-5-git-send-email-x0095840@ti.com>
+	<1288054306-4361-6-git-send-email-x0095840@ti.com>
+	<1288054306-4361-7-git-send-email-x0095840@ti.com>
+	<1288054306-4361-8-git-send-email-x0095840@ti.com>
+	<1288054306-4361-9-git-send-email-x0095840@ti.com>
+	<AANLkTinnLb9DLMKfxEs_KqMvOmegSDYRuLWh5y=hhBCe@mail.gmail.com>
+	<496565EC904933469F292DDA3F1663E602F49E2802@dlee06.ent.ti.com>
+	<1288112260-notmuch-felipe.contreras@nokia.com>
+	<496565EC904933469F292DDA3F1663E602F49E28AB@dlee06.ent.ti.com>
+	<1288121052-notmuch-felipe.contreras@nokia.com>
+Message-ID: <496565EC904933469F292DDA3F1663E602F49E29A6@dlee06.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [101026 04:45]:
-> On Mon, Oct 25, 2010 at 9:02 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> if you feel that (2) is justifiable/desirable, I would be more
-> >> than happy to submit that version.
-> >
-> > Yes (2) please. I would assume there will be more use of this. And then
-> > we (or probably me again!) don't have to deal with cleaning up the drivers
-> > again in the future.
-> 
-> Sounds good.
-> 
-> >> Or do you mean a variation of (2) with only the specific locking bits
-> >> coming from pdata func pointers ? I guess that in this case we just
-> >> might as well go with the full (2).
-> >
-> > Yes variation of (2) where you only pass the locking function via
-> > platform data would be best.
-> 
-> It feels a bit funky to me because we would still have code that is
-> omap-specific inside the "common" probe()/remove() calls.
-> 
-> I suggest to move everything that is omap-specific to a small omap
-> module that, once probed, would register itself with the common
-> hwspinlock framework (after initializing its hardware).
-> 
-> That small platfom-specific module probably doesn't have to sit in the
-> arch/ folder; we can follow established conventions like
-> mmc/i2c/gpio/spi/etc..
-> 
-> With that in hand, the hwspinlock would really be hardware-agnostic,
-> and then applying s/omap_hwspin/hwspin/ would be justified.
-> 
-> Does this sound reasonable to you ?
+ 
 
-Sounds good to me.
+> -----Original Message-----
+> From: Felipe Contreras [mailto:felipe.contreras at nokia.com] 
+> Sent: Tuesday, October 26, 2010 2:27 PM
+> To: Guzman Lugo, Fernando; felipe.contreras at gmail.com
+> Cc: gregkh at suse.de; hiroshi.doyu at nokia.com; 
+> linux-kernel at vger.kernel.org; andy.shevchenko at gmail.com; 
+> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 8/8] staging: tidspbridge - make 
+> sync_wait_on_event interruptible
+> 
+> fernando.lugo at ti.com wrote:
+> > > fernando.lugo at ti.com wrote:
+> > > > > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
+> > > > > <x0095840@ti.com> wrote:
+> > > > > > So that avoid non-killable process.
+> > > > > 
+> > > > > It would be useful to interrupt these tasks from user-space. 
+> > > > > A separate ioctl to do that would be needed.
+> > > > 
+> > > > I don't see use case where that could be needed. It is only
+> > > To avoid a
+> > > > nonkillable task in the case the user pass an infinite Timeout.
+> > > > 
+> > > > If you have some test case where that ioctl would be 
+> needed Please 
+> > > > share it in order to find the best solution.
+> > > 
+> > > Well, imagine the application is using a library to 
+> access the DSP, 
+> > > and the library has a dedicated thread listening for DSP 
+> events in a 
+> > > loop.
+> > > This happens to be how libomxil-ti and gst-dsp work.
+> > > 
+> > > Now, the thread received the last message, but has set a 
+> timeout of 
+> > > 10s, or even worst, no timeout at all.
+> > > 
+> > > After realizing that was the last message, the main 
+> thread decides 
+> > > to shut down, but it has to wait for the DSP thread to join. 
+> > > Unfortunately the DSP thread is stuck waiting for events, and 
+> > > there's nothing that can be done.
+> > > 
+> > > However, if we have a separate ioctl to interrupt that task, then 
+> > > the main thread can issue that ioctl, and unlock the DSP thread 
+> > > without having to wait 10s, or forever.
+> > > 
+> > > Does that make sense?
+> > 
+> > Maybe sending a signal to yourselft and having a dummy 
+> signal Handle 
+> > should work, it that would not like good.
+> 
+> Signals on libraries is a no-no.
+> 
+> > I am thinking On having a ioctl to create and set an event the you 
+> > could Something like this:
+> > 
+> > struct dsp_notification events[3];
+> > 
+> > proc_register_notify(proc, event_type, &events[0]); ...
+> > proc_register_notify(proc, event_type, &events[1]); ...
+> > Sync_open_event(&events[2]);
+> > 
+> > 
+> > second thread:
+> > 
+> > 	mgr_wait_for_bridge_events(proc, events, 3, index);
+> > 
+> > 	if (index == 2) 
+> > 		/* main thread force exit */
+> > 
+> > 
+> > Main thread:
+> > 
+> > 	/* if some execption happened then finish the second thread */
+> > 	sync_set_event(events[2]);
+> > 
+> > 	pthread_join(...);
+> > 
+> > 
+> > However it is in progess a task for change replacing 
+> dspbridge sync.c 
+> > Module with event_fd to signal events to userspace. Where 
+> now simple 
+> > File descriptor will be used as event elements. So the 
+> > mgr_wait_for_bridge_events Will be implemented using 
+> "select" system call inside to wait for multiple events.
+> > So you will be able to do something like this:
+> > 
+> > int events[3];
+> > 
+> > proc_register_notify(proc, event_type, &events[0]); ...
+> > proc_register_notify(proc, event_type, &events[1]); ...
+> > events[2] = eventfd(0, 0);
+> > 
+> > 
+> > second thread:
+> > 
+> > 	mgr_wait_for_bridge_events(proc, events, 3, index);
+> > 
+> > 	if (index == 2) 
+> > 		/* main thread force exit */
+> > 
+> > Main thread:
+> > 
+> > 	/* if some execption happened then finish the second thread */
+> > 	write(events[2], "s", 1);
+> > 
+> > 	pthread_join(...);
+> > 
+> > You won't need any aditional ioctl in order to do what you 
+> want to do.
+> > 
+> > So, I think it is not worth to make much changes to some 
+> module that 
+> > will Dissapear (my patch is just a fix it is not implementing 
+> > something new), It is just a matter of time to that task is 
+> finished 
+> > and tested properly And then send to LO.
+> 
+> All right, that makes sense. I just wanted to make suere you 
+> are aware of that need.
 
-Tony
+Sure, that need will cover soon.
+
+Thanks and regards,
+Fernando.
+
+> 
+> --
+> Felipe Contreras
+> 
