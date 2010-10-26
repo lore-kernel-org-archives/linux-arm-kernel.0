@@ -1,82 +1,55 @@
-From: felipe.contreras@nokia.com (Felipe Contreras)
-Date: Tue, 26 Oct 2010 22:37:42 +0300
-Subject: [PATCH 1/8] staging: tidspbridge - remove req_addr from proc_map
-In-Reply-To: <496565EC904933469F292DDA3F1663E602F49E28BD@dlee06.ent.ti.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<AANLkTimCDM_nruvh_gqxxy0CVnw2sH5UYNT9VgyeBfZN@mail.gmail.com>
-	<496565EC904933469F292DDA3F1663E602F49E280A@dlee06.ent.ti.com>
-	<1288112616-notmuch-felipe.contreras@nokia.com>
-	<496565EC904933469F292DDA3F1663E602F49E28BD@dlee06.ent.ti.com>
-Message-ID: <1288121251-notmuch-felipe.contreras@nokia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Oct 2010 12:06:46 -0700
+Subject: [PATCH 3/3] omap: add hwspinlock device
+In-Reply-To: <AANLkTimkUDwAn-+gmNKMkXY0Uw8evt1_W2saeRKY-Xbd@mail.gmail.com>
+References: <87r5fmxghm.fsf@deeprootsystems.com>
+	<AANLkTinZ2+ocJCfUpT15Ow3J9XBa-8XWnVC3gDDJ7s-v@mail.gmail.com>
+	<87bp6pviwf.fsf@deeprootsystems.com>
+	<AANLkTikE1dCXW-7ScVoDgEK3sxai_TyFzstSG+zvNm2F@mail.gmail.com>
+	<8739s0sobc.fsf@deeprootsystems.com>
+	<AANLkTikdjtYtzhgM_=io3SFdUZq=8Xcc8n24bW=SFgTA@mail.gmail.com>
+	<20101022165612.GF9149@atomide.com>
+	<AANLkTimysu4L+ecFvpGAQ0bj3fhLQC1cveWddFNNp=JQ@mail.gmail.com>
+	<20101025190221.GC7206@atomide.com>
+	<AANLkTimkUDwAn-+gmNKMkXY0Uw8evt1_W2saeRKY-Xbd@mail.gmail.com>
+Message-ID: <20101026190645.GH3012@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fernando.lugo at ti.com wrote:
-> > fernando.lugo at ti.com wrote:
-> > > > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
-> > > > <x0095840@ti.com> wrote:
-> > > > > The device address is assigned by tidspbridge no need for
-> > > > that parameter anymore.
-> > > > >
-> > > > > Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> > > > 
-> > > > This would break the API with user-space, right?
-> > > 
-> > > Yes, user-space needs to be changed accordingly.
-> > 
-> > Wouldn't it make sense to avoid stuffing so many changes at 
-> > once including ABI breakage?
-> > 
-> > Does user-space really _needs_ to be changed? Can't you just 
-> > ignore that argument?
+* Ohad Ben-Cohen <ohad@wizery.com> [101026 04:45]:
+> On Mon, Oct 25, 2010 at 9:02 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> if you feel that (2) is justifiable/desirable, I would be more
+> >> than happy to submit that version.
+> >
+> > Yes (2) please. I would assume there will be more use of this. And then
+> > we (or probably me again!) don't have to deal with cleaning up the drivers
+> > again in the future.
 > 
-> Actually, I had a previous version of that patch where I only
-> Ignored that paramteter. But after thinking again and seeing
-> How the long time ago depreacted function are still there I 
-> Removed the parameter in order to force apps to make the change.
-
-Again, can we concentrate on first getting this thing to work?
-
-We can think on breaking things again later.
-
-> You can ignore that argument at API level, so all users of the
-> API not need to have change (in that momment). That should be
-> Only few line change.
-
-Yes, that's what I'm proposing.
-
-> > > > I think this change should be delayed, preferably after we have a 
-> > > > working tidspbridge.
-> > > 
-> > > The issue you were seeing must be fixed with patch 2/8, and 
-> > Having all 
-> > > the dependencies tidspbridge has to be working Properly.
-> > 
-> > Yes, which might not happen at .37. If we revert the iommu 
-> > stuff, we might have a chance at having a working bridge on .37.
+> Sounds good.
 > 
-> But havi that merged in tidspbridge make more pressure to merged
-> The dependencies, if not maybe that wont have event for .38.
+> >> Or do you mean a variation of (2) with only the specific locking bits
+> >> coming from pdata func pointers ? I guess that in this case we just
+> >> might as well go with the full (2).
+> >
+> > Yes variation of (2) where you only pass the locking function via
+> > platform data would be best.
+> 
+> It feels a bit funky to me because we would still have code that is
+> omap-specific inside the "common" probe()/remove() calls.
+> 
+> I suggest to move everything that is omap-specific to a small omap
+> module that, once probed, would register itself with the common
+> hwspinlock framework (after initializing its hardware).
+> 
+> That small platfom-specific module probably doesn't have to sit in the
+> arch/ folder; we can follow established conventions like
+> mmc/i2c/gpio/spi/etc..
+> 
+> With that in hand, the hwspinlock would really be hardware-agnostic,
+> and then applying s/omap_hwspin/hwspin/ would be justified.
+> 
+> Does this sound reasonable to you ?
 
-Those patches have been there for a while and there's no sign of when
-they'll be merged. Also, remember that the fact that the patches have
-been sent doesn't guarantee they would be on this, or even the next
-cycle.
+Sounds good to me.
 
-Besides, the rule followed here is: it's ready when it's ready. In the
-meantime the driver should work, and we can do that rather easily.
-
-> But That is just my opinion if you all are agree revert is the best
-> Option I am ok, but I looks like more work reverting and rebaseing
-> specially because it is a big change.
-
-git makes this easy.
-
-The hard part is for the people out there that are trying to use this
-driver and have to hunt mailing lists and multiple repos just to get
-this to work. Moving to staging was supposed to make this easier, not
-harder.
-
--- 
-Felipe Contreras
+Tony
