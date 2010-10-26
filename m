@@ -1,25 +1,28 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 26 Oct 2010 12:47:20 +0900
-Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-In-Reply-To: <20101026030040.GA10200@opensource.wolfsonmicro.com>
-References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
-	<AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
-	<20101026030040.GA10200@opensource.wolfsonmicro.com>
-Message-ID: <AANLkTimVbv7ro4Terupi_xc3VxA5TSOwk6HH-4BxQ4Bx@mail.gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Mon, 25 Oct 2010 21:06:19 -0700
+Subject: [PATCH 0/8] staging: tidspbridge - misc fixes
+In-Reply-To: <1288054306-4361-1-git-send-email-x0095840@ti.com>
+References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
+Message-ID: <20101026040619.GA8549@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 12:00 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Oct 26, 2010 at 11:00:34AM +0900, Kyungmin Park wrote:
->
->> Can you unify the word iis vs. i2s? some variables use the 'iis', some
->> names use the i2s. As title is i2s. just unify the i2s?
->
-> I'd prefer I2S as well, it's vastly more common than IIS (I don't recall
-> anyone except Samsung ever using that abbreviation).
+On Mon, Oct 25, 2010 at 07:51:38PM -0500, Fernando Guzman Lugo wrote:
+> This set of patches fix some issues found in lastest tree.
+> 
+> Fernando Guzman Lugo (8):
+>   staging: tidspbridge - remove req_addr from proc_map
+>   staging: tidspbridge - add kconfig parameter for DMM size
+>   staging: tidspbridge - change mmufault tasklet to a workqueue
+>   staging: tidspbridge - fix timeout in dsp_gpt_wait_overflow
+>   staging: tidspbridge - use GTP7 for DSP stack dump
+>   staging: tidspbridge - remove disabling twl when printing DSP stack
+>   staging: tidspbridge - fix some issues after iommu patches
+>   staging: tidspbridge - make sync_wait_on_event interruptible
 
-I thought so too, but that would have required even more changes in existing
-board init files as well. I tried to keep the number of patches as
-less as possible.
-But if we are to miss this cycle, maybe I should take time out to do it too.
+Are any of these really applicable for .37 after .37-rc1?  Or can they
+wait for .38?
+
+thanks,
+
+greg k-h
