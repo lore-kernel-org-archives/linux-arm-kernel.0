@@ -1,42 +1,39 @@
-From: felipe.contreras@nokia.com (Felipe Contreras)
-Date: Tue, 26 Oct 2010 20:07:57 +0300
-Subject: [PATCH 1/8] staging: tidspbridge - remove req_addr from proc_map
-In-Reply-To: <496565EC904933469F292DDA3F1663E602F49E280A@dlee06.ent.ti.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<AANLkTimCDM_nruvh_gqxxy0CVnw2sH5UYNT9VgyeBfZN@mail.gmail.com>
-	<496565EC904933469F292DDA3F1663E602F49E280A@dlee06.ent.ti.com>
-Message-ID: <1288112616-notmuch-felipe.contreras@nokia.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 26 Oct 2010 20:13:24 +0300
+Subject: [PATCH v2 0/4] tidspbridge: SCM layer violation fixes
+In-Reply-To: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <AANLkTik2K+q-585Ap2QFTaOT+vGnz1+14R5ZeenV-2J0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fernando.lugo at ti.com wrote:
-> > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
-> > <x0095840@ti.com> wrote:
-> > > The device address is assigned by tidspbridge no need for 
-> > that parameter anymore.
-> > >
-> > > Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> > 
-> > This would break the API with user-space, right?
-> 
-> Yes, user-space needs to be changed accordingly.
+On Tue, Oct 26, 2010 at 7:15 PM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+> This is the patch series shared by Paul, for a short term fix to
+> a compile break due SCM layer layer violations from tidspbridge
+> driver, where the latter is used to write directly into registers
+> and use SCM layer macros, among other layer bypassing.
+>
+> patch: "staging: tidspbridge: use new SCM DSP boot control fns"
+> was split from its original version, it is meant to be on hold until
+> the rest of the series gets upstreamed and can be found in the
+> staging tree (unless best advice is given).
+>
+> Paul Walmsley (4):
+> ?OMAP: control: add functions for DSP boot address/mode control
+> ?OMAP3: PM: update DSP reset code to use new SCM DSP boot control
+> ? ?functions
+> ?OMAP: dsp: convert OMAP3430 adaptation layer to use new SCM DSP boot
+> ? ?control fns
+> ?staging: tidspbridge: use new SCM DSP boot control fns
+>
+> ?arch/arm/mach-omap2/control.c ? ? ? ? ? ? ? ? | ? 51 ++++++++++++++++++++++
+> ?arch/arm/mach-omap2/control.h ? ? ? ? ? ? ? ? | ? 16 ++++---
+> ?arch/arm/mach-omap2/dsp.c ? ? ? ? ? ? ? ? ? ? | ? ?4 ++
+> ?arch/arm/mach-omap2/pm34xx.c ? ? ? ? ? ? ? ? ?| ? ?6 +-
+> ?arch/arm/plat-omap/include/plat/dsp.h ? ? ? ? | ? ?4 ++
+> ?arch/arm/plat-omap/include/plat/iva2_dsp.h ? ?| ? 56 +++++++++++++++++++++++++
 
-Wouldn't it make sense to avoid stuffing so many changes at once
-including ABI breakage?
-
-Does user-space really _needs_ to be changed? Can't you just ignore that
-argument?
-
-> > I think this change should be delayed, preferably after we 
-> > have a working tidspbridge.
-> 
-> The issue you were seeing must be fixed with patch 2/8, and
-> Having all the dependencies tidspbridge has to be working
-> Properly.
-
-Yes, which might not happen at .37. If we revert the iommu stuff, we
-might have a chance at having a working bridge on .37.
+Why not use the already existing dsp.h?
 
 -- 
 Felipe Contreras
