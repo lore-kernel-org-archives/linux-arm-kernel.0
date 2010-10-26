@@ -1,113 +1,94 @@
-From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Mon, 25 Oct 2010 19:51:41 -0500
-Subject: [PATCH 3/8] staging: tidspbridge - change mmufault tasklet to a
-	workqueue
-In-Reply-To: <1288054306-4361-3-git-send-email-x0095840@ti.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<1288054306-4361-3-git-send-email-x0095840@ti.com>
-Message-ID: <1288054306-4361-4-git-send-email-x0095840@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 25 Oct 2010 17:39:57 -0700
+Subject: [GIT PULL] tegra updates for 2.6.37
+Message-ID: <AANLkTimb=xgE0B-N4w45m4iJK61KQ19pD9tXj7dSJ=Mh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need to manage the mmufault inside a tasklet
-it is safer using a workqueue.
+Hi Linus,
+Please pull updates for the Tegra machine from:
 
-Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
----
- drivers/staging/tidspbridge/core/dsp-mmu.c |   34 ++++++++++++++++++----------
- 1 files changed, 22 insertions(+), 12 deletions(-)
+  git://android.git.kernel.org/kernel/tegra.git for-next
 
-diff --git a/drivers/staging/tidspbridge/core/dsp-mmu.c b/drivers/staging/tidspbridge/core/dsp-mmu.c
-index 983c95a..6d7501a 100644
---- a/drivers/staging/tidspbridge/core/dsp-mmu.c
-+++ b/drivers/staging/tidspbridge/core/dsp-mmu.c
-@@ -28,7 +28,8 @@
- 
- #define MMU_CNTL_TWL_EN		(1 << 2)
- 
--static struct tasklet_struct mmu_tasklet;
-+static struct workqueue_struct *mmu_wq;
-+static struct work_struct fault_work;
- 
- #ifdef CONFIG_TIDSPBRIDGE_BACKTRACE
- static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
-@@ -37,7 +38,10 @@ static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
- 	u32 fa, tmp;
- 	struct iotlb_entry e;
- 	struct iommu *mmu = dev_context->dsp_mmu;
--	dummy_addr = (void *)__get_free_page(GFP_ATOMIC);
-+
-+	dummy_addr = (void *)__get_free_page(GFP_KERNEL);
-+	if (!dummy_addr)
-+		return;
- 
- 	/*
- 	 * Before acking the MMU fault, let's make sure MMU can only
-@@ -76,19 +80,19 @@ static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
- #endif
- 
- 
--static void fault_tasklet(unsigned long data)
-+static void mmu_fault_work(struct work_struct *work)
- {
--	struct iommu *mmu = (struct iommu *)data;
- 	struct bridge_dev_context *dev_ctx;
- 	struct deh_mgr *dm;
- 	u32 fa;
-+
- 	dev_get_deh_mgr(dev_get_first(), &dm);
- 	dev_get_bridge_context(dev_get_first(), &dev_ctx);
- 
- 	if (!dm || !dev_ctx)
- 		return;
- 
--	fa = iommu_read_reg(mmu, MMU_FAULT_AD);
-+	fa = iommu_read_reg(dev_ctx->dsp_mmu, MMU_FAULT_AD);
- 
- #ifdef CONFIG_TIDSPBRIDGE_BACKTRACE
- 	print_dsp_trace_buffer(dev_ctx);
-@@ -109,7 +113,8 @@ static int mmu_fault_callback(struct iommu *mmu)
- 		return -EPERM;
- 
- 	iommu_write_reg(mmu, 0, MMU_IRQENABLE);
--	tasklet_schedule(&mmu_tasklet);
-+	queue_work(mmu_wq, &fault_work);
-+
- 	return 0;
- }
- 
-@@ -126,10 +131,16 @@ struct iommu *dsp_mmu_init()
- 
- 	mmu = iommu_get("iva2");
- 
--	if (!IS_ERR(mmu)) {
--		tasklet_init(&mmu_tasklet, fault_tasklet, (unsigned long)mmu);
--		mmu->isr = mmu_fault_callback;
-+	if (IS_ERR(mmu))
-+		return mmu;
-+
-+	mmu->isr = mmu_fault_callback;
-+	mmu_wq = create_workqueue("dsp-mmu_wq");
-+	if (!mmu_wq) {
-+		iommu_put(mmu);
-+		return ERR_PTR(-ENOMEM);
- 	}
-+	INIT_WORK(&fault_work, mmu_fault_work);
- 
- 	return mmu;
- }
-@@ -143,9 +154,8 @@ struct iommu *dsp_mmu_init()
-  */
- void dsp_mmu_exit(struct iommu *mmu)
- {
--	if (mmu)
--		iommu_put(mmu);
--	tasklet_kill(&mmu_tasklet);
-+	iommu_put(mmu);
-+	destroy_workqueue(mmu_wq);
- }
- 
- /**
--- 
-1.6.3.3
+Thanks,
+Colin
+
+The following changes since commit b5153163ed580e00c67bdfecb02b2e3843817b3e:
+
+  Merge branch 'devel' of master.kernel.org:/home/rmk/linux-2.6-arm
+(2010-10-21 16:42:32 -0700)
+
+
+Colin Cross (9):
+      [ARM] tegra: update iomap
+      [ARM] tegra: Add legacy irq support
+      [ARM] tegra: pinmux: add safe values, move tegra2, add suspend
+      [ARM] tegra: gpio: Add suspend and wake support
+      [ARM] tegra: Add support for reading fuses
+      [ARM] tegra: clock: Add dvfs support, bug fixes, and cleanups
+      [ARM] tegra: common: Update common clock init table
+      [ARM] tegra: Add cpufreq support
+      [ARM] tegra: Add APB DMA support
+
+Erik Gilling (2):
+      spi: add spi_tegra driver
+      spi: tegra: fix error setting on timeout
+
+Gary King (1):
+      [ARM] tegra: add suspend and mirror irqs to legacy controller
+
+Mike Rapoport (3):
+      tegra: add PCI Express clocks
+      tegra: add PCI Express support
+      tegra: harmony: enable PCI Express
+
+ arch/arm/Kconfig                              |    1 +
+ arch/arm/mach-tegra/Kconfig                   |   11 +
+ arch/arm/mach-tegra/Makefile                  |    9 +-
+ arch/arm/mach-tegra/board-harmony-pcie.c      |   57 ++
+ arch/arm/mach-tegra/board.h                   |    1 +
+ arch/arm/mach-tegra/clock.c                   |  267 +++++++-
+ arch/arm/mach-tegra/clock.h                   |   58 ++-
+ arch/arm/mach-tegra/common.c                  |   13 +-
+ arch/arm/mach-tegra/cpu-tegra.c               |  185 +++++
+ arch/arm/mach-tegra/dma.c                     |  752 ++++++++++++++++++++
+ arch/arm/mach-tegra/fuse.c                    |   84 +++
+ arch/arm/mach-tegra/fuse.h                    |   24 +
+ arch/arm/mach-tegra/gpio.c                    |  104 +++-
+ arch/arm/mach-tegra/include/mach/clk.h        |    5 +
+ arch/arm/mach-tegra/include/mach/dma.h        |  155 +++++
+ arch/arm/mach-tegra/include/mach/gpio.h       |    4 +-
+ arch/arm/mach-tegra/include/mach/hardware.h   |    4 +
+ arch/arm/mach-tegra/include/mach/io.h         |   18 +-
+ arch/arm/mach-tegra/include/mach/iomap.h      |   33 +-
+ arch/arm/mach-tegra/include/mach/irqs.h       |    2 +
+ arch/arm/mach-tegra/include/mach/legacy_irq.h |   31 +
+ arch/arm/mach-tegra/include/mach/pinmux-t2.h  |  174 +++++
+ arch/arm/mach-tegra/include/mach/pinmux.h     |  210 ++-----
+ arch/arm/mach-tegra/io.c                      |    6 +
+ arch/arm/mach-tegra/irq.c                     |  137 ++++
+ arch/arm/mach-tegra/legacy_irq.c              |  114 +++
+ arch/arm/mach-tegra/pcie.c                    |  915 +++++++++++++++++++++++++
+ arch/arm/mach-tegra/pinmux-t2-tables.c        |  260 +++++++
+ arch/arm/mach-tegra/pinmux.c                  |  354 ++++-------
+ arch/arm/mach-tegra/tegra2_clocks.c           |  826 ++++++++++++++++++-----
+ arch/arm/mach-tegra/tegra2_dvfs.c             |   86 +++
+ arch/arm/mach-tegra/tegra2_dvfs.h             |   20 +
+ drivers/spi/Kconfig                           |    7 +
+ drivers/spi/Makefile                          |    1 +
+ drivers/spi/spi_tegra.c                       |  618 +++++++++++++++++
+ 35 files changed, 4917 insertions(+), 629 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/board-harmony-pcie.c
+ create mode 100644 arch/arm/mach-tegra/cpu-tegra.c
+ create mode 100644 arch/arm/mach-tegra/dma.c
+ create mode 100644 arch/arm/mach-tegra/fuse.c
+ create mode 100644 arch/arm/mach-tegra/fuse.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/dma.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/legacy_irq.h
+ create mode 100644 arch/arm/mach-tegra/include/mach/pinmux-t2.h
+ create mode 100644 arch/arm/mach-tegra/legacy_irq.c
+ create mode 100644 arch/arm/mach-tegra/pcie.c
+ create mode 100644 arch/arm/mach-tegra/pinmux-t2-tables.c
+ create mode 100644 arch/arm/mach-tegra/tegra2_dvfs.c
+ create mode 100644 arch/arm/mach-tegra/tegra2_dvfs.h
+ create mode 100644 drivers/spi/spi_tegra.c
