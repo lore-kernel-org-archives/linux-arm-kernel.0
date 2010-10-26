@@ -1,474 +1,93 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 26 Oct 2010 13:21:51 +0900
-Subject: [PATCH 9/9] ARM: S5PV310: Add audio platform devices
-In-Reply-To: <1288057281-25635-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1288057281-25635-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <AANLkTikMG2AqmdxL7diXq9iuBK-AmgU_e4rzkekHA+td@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 26 Oct 2010 13:33:21 +0900
+Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
+In-Reply-To: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
+References: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
+Message-ID: <023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 10:41 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+Jassi Brar wrote:
+> 
 > From: Jassi Brar <jassi.brar@samsung.com>
->
-> Define platform devices for all audio devices found on S5PV310
->
+> 
+> Samsung's Soc S5PV310 has three PL330 DMACs. First is dedicated for
+> Memory->Memory data transfer while the other two meant for data
+> transfer with peripherals.
+> Define and add latter two PL330 DMACs as platform devices on the
+> S5PV310 platform.
+> 
 > Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 > ---
-> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-s5pv310/dev-audio.c ? ? ? ? | ?364 +++++++++++++++++++++++++++++
-> ?arch/arm/mach-s5pv310/include/mach/map.h ?| ? 16 ++
-> ?arch/arm/plat-samsung/include/plat/devs.h | ? ?9 +
-> ?4 files changed, 390 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-s5pv310/dev-audio.c
->
-> diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-> index d265adb..61e3cb6 100644
-> --- a/arch/arm/mach-s5pv310/Makefile
-> +++ b/arch/arm/mach-s5pv310/Makefile
-> @@ -27,6 +27,7 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210) ? ? += mach-universal_c210.o
->
-> ?# device support
->
-> +obj-y += dev-audio.o
-Why it's default build? could you make a config as others?
 
-> ?obj-$(CONFIG_S5PV310_SETUP_I2C1) ? ? ? += setup-i2c1.o
-> ?obj-$(CONFIG_S5PV310_SETUP_I2C2) ? ? ? += setup-i2c2.o
-> ?obj-$(CONFIG_S5PV310_SETUP_I2C3) ? ? ? += setup-i2c3.o
-> diff --git a/arch/arm/mach-s5pv310/dev-audio.c b/arch/arm/mach-s5pv310/dev-audio.c
-> new file mode 100644
-> index 0000000..18ede29
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/dev-audio.c
-> @@ -0,0 +1,364 @@
-> +/* linux/arch/arm/mach-s5pv310/dev-audio.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co. Ltd
-> + * ? ? Jaswinder Singh <jassi.brar@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+(snip)
 > +
-> +#include <linux/platform_device.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/gpio.h>
-> +
-> +#include <plat/gpio-cfg.h>
-> +#include <plat/audio.h>
-> +
-> +#include <mach/map.h>
-> +#include <mach/dma.h>
-> +#include <mach/irqs.h>
-> +
-> +static const char *rclksrc[] = {
-> + ? ? ? [0] = "busclk",
-> + ? ? ? [1] = "i2sclk",
+> +static struct resource s5pv310_pdma0_resource[] = {
+> +	[0] = {
+> +		.start = S5PV310_PA_PDMA0,
+                      ^
+> +		.end = S5PV310_PA_PDMA0 + SZ_4K,
+                    ^
+> +		.flags = IORESOURCE_MEM,
+                      ^
+> +	},
+> +	[1] = {
+> +		.start	= IRQ_PDMA0,
+> +		.end	= IRQ_PDMA0,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
 > +};
-> +
-> +static int s5pv310_cfg_i2s(struct platform_device *pdev)
-> +{
-> + ? ? ? /* configure GPIO for i2s port */
-> + ? ? ? switch (pdev->id) {
-> + ? ? ? case 0:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 7, S3C_GPIO_SFN(2));
-Does it default setup for i2s? In my board some pins are used for
-other purpose.
-I mean GPZ(1, 5, 6) doesn't used it for I2S.
-then how do you handle this one?
 
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case 1:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPC0(0), 5, S3C_GPIO_SFN(2));
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case 2:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPC1(0), 5, S3C_GPIO_SFN(4));
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? printk(KERN_ERR "Invalid Device %d\n", pdev->id);
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct s3c_audio_pdata i2sv5_pdata = {
-> + ? ? ? .cfg_gpio = s5pv310_cfg_i2s,
-> + ? ? ? .type = {
-> + ? ? ? ? ? ? ? .i2s = {
-> + ? ? ? ? ? ? ? ? ? ? ? .quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| QUIRK_NEED_RSTCLR,
-> + ? ? ? ? ? ? ? ? ? ? ? .src_clk = rclksrc,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> +};
-> +
-> +static struct resource s5pv310_iis0_resource[] = {
-You wrote that there are some users to use iis but c210/v310 doesn't.
-So you should use the i2s at least c210/v310 series
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_IIS0,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_IIS0 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S0_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S0_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S0_RX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S0_RX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [3] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S0S_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S0S_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +struct platform_device s5pv310_device_iis0 = {
-> + ? ? ? .name = "samsung-i2s",
-> + ? ? ? .id = 0,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_iis0_resource),
-> + ? ? ? .resource = s5pv310_iis0_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &i2sv5_pdata,
-> + ? ? ? },
-> +};
-> +
-> +static const char *rclksrc_v3[] = {
-> + ? ? ? [0] = "sclk_i2s",
-> + ? ? ? [1] = "no_such_clock",
-> +};
-> +
-> +static struct s3c_audio_pdata i2sv3_pdata = {
-> + ? ? ? .cfg_gpio = s5pv310_cfg_i2s,
-> + ? ? ? .type = {
-> + ? ? ? ? ? ? ? .i2s = {
-> + ? ? ? ? ? ? ? ? ? ? ? .quirks = QUIRK_NO_MUXPSR,
-> + ? ? ? ? ? ? ? ? ? ? ? .src_clk = rclksrc_v3,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> +};
-> +
-> +static struct resource s5pv310_iis1_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_IIS1,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_IIS1 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S1_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S1_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S1_RX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S1_RX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +struct platform_device s5pv310_device_iis1 = {
-> + ? ? ? .name = "samsung-i2s",
-> + ? ? ? .id = 1,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_iis1_resource),
-> + ? ? ? .resource = s5pv310_iis1_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &i2sv3_pdata,
-> + ? ? ? },
-> +};
-> +
-> +static struct resource s5pv310_iis2_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_IIS2,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_IIS2 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S2_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S2_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S2_RX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S2_RX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +struct platform_device s5pv310_device_iis2 = {
-> + ? ? ? .name = "samsung-i2s",
-> + ? ? ? .id = 2,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_iis2_resource),
-> + ? ? ? .resource = s5pv310_iis2_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &i2sv3_pdata,
-> + ? ? ? },
-> +};
-> +
-> +/* PCM Controller platform_devices */
-> +
-> +static int s5pv310_pcm_cfg_gpio(struct platform_device *pdev)
-> +{
-> + ? ? ? switch (pdev->id) {
-> + ? ? ? case 0:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 5, S3C_GPIO_SFN(3));
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case 1:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPC0(0), 5, S3C_GPIO_SFN(3));
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case 2:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPC1(0), 5, S3C_GPIO_SFN(3));
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? printk(KERN_DEBUG "Invalid PCM Controller number!");
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct s3c_audio_pdata s3c_pcm_pdata = {
-> + ? ? ? .cfg_gpio = s5pv310_pcm_cfg_gpio,
-> +};
-> +
-> +static struct resource s5pv310_pcm0_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_PCM0,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_PCM0 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_PCM0_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_PCM0_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_PCM0_RX,
-> + ? ? ? ? ? ? ? .end = DMACH_PCM0_RX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +struct platform_device s5pv310_device_pcm0 = {
-> + ? ? ? .name = "samsung-pcm",
-> + ? ? ? .id = 0,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_pcm0_resource),
-> + ? ? ? .resource = s5pv310_pcm0_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &s3c_pcm_pdata,
-> + ? ? ? },
-> +};
-> +
-> +static struct resource s5pv310_pcm1_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_PCM1,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_PCM1 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_PCM1_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_PCM1_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_PCM1_RX,
-> + ? ? ? ? ? ? ? .end = DMACH_PCM1_RX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +struct platform_device s5pv310_device_pcm1 = {
-> + ? ? ? .name = "samsung-pcm",
-> + ? ? ? .id = 1,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_pcm1_resource),
-> + ? ? ? .resource = s5pv310_pcm1_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &s3c_pcm_pdata,
-> + ? ? ? },
-> +};
-> +
-> +static struct resource s5pv310_pcm2_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_PCM2,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_PCM2 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_PCM2_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_PCM2_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_PCM2_RX,
-> + ? ? ? ? ? ? ? .end = DMACH_PCM2_RX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +struct platform_device s5pv310_device_pcm2 = {
-> + ? ? ? .name = "samsung-pcm",
-> + ? ? ? .id = 2,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_pcm2_resource),
-> + ? ? ? .resource = s5pv310_pcm2_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &s3c_pcm_pdata,
-> + ? ? ? },
-> +};
-> +
-> +/* AC97 Controller platform devices */
-> +
-> +static int s5pv310_ac97_cfg_gpio(struct platform_device *pdev)
-> +{
-> + ? ? ? return s3c_gpio_cfgpin_range(S5PV310_GPC0(0), 5, S3C_GPIO_SFN(4));
-> +}
-> +
-> +static struct resource s5pv310_ac97_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_AC97,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_AC97 + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_AC97_PCMOUT,
-> + ? ? ? ? ? ? ? .end = DMACH_AC97_PCMOUT,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .start = DMACH_AC97_PCMIN,
-> + ? ? ? ? ? ? ? .end = DMACH_AC97_PCMIN,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [3] = {
-> + ? ? ? ? ? ? ? .start = DMACH_AC97_MICIN,
-> + ? ? ? ? ? ? ? .end = DMACH_AC97_MICIN,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> + ? ? ? [4] = {
-> + ? ? ? ? ? ? ? .start = IRQ_AC97,
-> + ? ? ? ? ? ? ? .end = IRQ_AC97,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
-> + ? ? ? },
-> +};
-> +
-> +static struct s3c_audio_pdata s3c_ac97_pdata = {
-> + ? ? ? .cfg_gpio = s5pv310_ac97_cfg_gpio,
-> +};
-> +
-> +static u64 s5pv310_ac97_dmamask = DMA_BIT_MASK(32);
-> +
-> +struct platform_device s5pv310_device_ac97 = {
-> + ? ? ? .name = "samsung-ac97",
-> + ? ? ? .id = -1,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_ac97_resource),
-> + ? ? ? .resource = s5pv310_ac97_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &s3c_ac97_pdata,
-> + ? ? ? ? ? ? ? .dma_mask = &s5pv310_ac97_dmamask,
-> + ? ? ? ? ? ? ? .coherent_dma_mask = DMA_BIT_MASK(32),
-> + ? ? ? },
-> +};
-> +
-> +/* S/PDIF Controller platform_device */
-> +
-> +static int s5pv310_spdif_cfg_gpio(struct platform_device *pdev)
-> +{
-> + ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPC1(0), 2, S3C_GPIO_SFN(3));
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static struct resource s5pv310_spdif_resource[] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .start = S5PV310_PA_SPDIF,
-> + ? ? ? ? ? ? ? .end = S5PV310_PA_SPDIF + 0x100 - 1,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .start = DMACH_SPDIF,
-> + ? ? ? ? ? ? ? .end = DMACH_SPDIF,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> +};
-> +
-> +static struct s3c_audio_pdata samsung_spdif_pdata = {
-> + ? ? ? .cfg_gpio = s5pv310_spdif_cfg_gpio,
-> +};
-> +
-> +static u64 s5pv310_spdif_dmamask = DMA_BIT_MASK(32);
-> +
-> +struct platform_device s5pv310_device_spdif = {
-> + ? ? ? .name = "samsung-spdif",
-> + ? ? ? .id = -1,
-> + ? ? ? .num_resources = ARRAY_SIZE(s5pv310_spdif_resource),
-> + ? ? ? .resource = s5pv310_spdif_resource,
-> + ? ? ? .dev = {
-> + ? ? ? ? ? ? ? .platform_data = &samsung_spdif_pdata,
-> + ? ? ? ? ? ? ? .dma_mask = &s5pv310_spdif_dmamask,
-> + ? ? ? ? ? ? ? .coherent_dma_mask = DMA_BIT_MASK(32),
-> + ? ? ? },
-> +};
-> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
-> index f6a6587..d99eff3 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
-> @@ -61,6 +61,22 @@
->
-> ?#define S5PV310_PA_HSMMC(x) ? ? ? ? ? ?(0x12510000 + ((x) * 0x10000))
->
-> +/* S/PDIF */
-> +#define S5PV310_PA_SPDIF ? ? ? 0xE1100000
-> +
-> +/* I2S */
-> +#define S5PV310_PA_IIS0 ? ? ? ? ? ? ? ?0x03830000
-> +#define S5PV310_PA_IIS1 ? ? ? ? ? ? ? ?0xE3100000
-> +#define S5PV310_PA_IIS2 ? ? ? ? ? ? ? ?0xE2A00000
-> +
-> +/* PCM */
-> +#define S5PV310_PA_PCM0 ? ? ? ? ? ? ? ?0x03840000
-> +#define S5PV310_PA_PCM1 ? ? ? ? ? ? ? ?0x13980000
-> +#define S5PV310_PA_PCM2 ? ? ? ? ? ? ? ?0x13990000
-> +
-> +/* AC97 */
-> +#define S5PV310_PA_AC97 ? ? ? ? ? ? ? ?0x139A0000
-> +
-> ?#define S5PV310_PA_UART ? ? ? ? ? ? ? ? ? ? ? ?(0x13800000)
->
-> ?#define S5P_PA_UART(x) ? ? ? ? ? ? ? ? (S5PV310_PA_UART + ((x) * S3C_UART_OFFSET))
-> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-> index 16521cc..9764268 100644
-> --- a/arch/arm/plat-samsung/include/plat/devs.h
-> +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> @@ -94,6 +94,15 @@ extern struct platform_device s5pv210_device_iis1;
-> ?extern struct platform_device s5pv210_device_iis2;
-> ?extern struct platform_device s5pv210_device_spdif;
->
-> +extern struct platform_device s5pv310_device_ac97;
-> +extern struct platform_device s5pv310_device_pcm0;
-> +extern struct platform_device s5pv310_device_pcm1;
-> +extern struct platform_device s5pv310_device_pcm2;
-> +extern struct platform_device s5pv310_device_iis0;
-> +extern struct platform_device s5pv310_device_iis1;
-> +extern struct platform_device s5pv310_device_iis2;
-> +extern struct platform_device s5pv310_device_spdif;
-> +
+I think tab is better for easily reading and keep the same method in ^ mark.
+Actually, as you know, our Samsung arch/arm stuff followed similar method...
 
-How to make common audio platform data? If not, we should list all
-samsung soc audio node in the future.
+> +
+> +static struct s3c_pl330_platdata s5pv310_pdma0_pdata = {
+> +	.peri = {
+> +		[30] = DMACH_MAX,
+> +		[31] = DMACH_MAX,
+> +		[24] = DMACH_AC97_PCMOUT,
+> +		[23] = DMACH_AC97_PCMIN,
+> +		[22] = DMACH_AC97_MICIN,
+> +		[24] = DMACH_SLIMBUS4_TX,
+> +		[23] = DMACH_SLIMBUS4_RX,
+> +		[22] = DMACH_SLIMBUS2_TX,
+> +		[21] = DMACH_SLIMBUS2_RX,
+> +		[20] = DMACH_SLIMBUS0_TX,
+> +		[19] = DMACH_SLIMBUS0_RX,
+> +		[3] = DMACH_UART4_TX,
+> +		[2] = DMACH_UART4_RX,
+> +		[5] = DMACH_UART2_TX,
+> +		[4] = DMACH_UART2_RX,
+> +		[1] = DMACH_UART0_TX,
+> +		[0] = DMACH_UART0_RX,
+> +		[13] = DMACH_I2S2_TX,
+> +		[12] = DMACH_I2S2_RX,
+> +		[10] = DMACH_I2S0_TX,
+> +		[9] = DMACH_I2S0_RX,
+> +		[11] = DMACH_I2S0S_TX,
+> +		[19] = DMACH_SPI2_TX,
+> +		[18] = DMACH_SPI2_RX,
+> +		[17] = DMACH_SPI0_TX,
+> +		[16] = DMACH_SPI0_RX,
+> +		[5] = DMACH_MSM_REQ2,
+> +		[4] = DMACH_MSM_REQ0,
+> +		[3] = DMACH_PCM2_TX,
+> +		[2] = DMACH_PCM2_RX,
+> +		[1] = DMACH_PCM0_TX,
+> +		[0] = DMACH_PCM0_RX,
 
-> ?extern struct platform_device s5p6442_device_pcm0;
-> ?extern struct platform_device s5p6442_device_pcm1;
-> ?extern struct platform_device s5p6442_device_iis0;
-> --
-> 1.6.2.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+As you know...maybe need to fix.
+
+(snip)
+
+I think, we can merge platform_device of DMA for S5P SoCs which have same
+PL330 DMAC later. And various platform_data can be handled on each SoC part.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
