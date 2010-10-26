@@ -1,13 +1,56 @@
 From: LW@KARO-electronics.de (=?utf-8?q?Lothar=20Wa=DFmann?=)
-Date: Tue, 26 Oct 2010 11:07:22 +0200
+Date: Tue, 26 Oct 2010 11:07:21 +0200
 Subject: [PATCH RFC] MXC IOMUX-V3 replace struct pad_desc with bitmapped cookie
-In-Reply-To: <1288084042-21722-1-git-send-email-LW@KARO-electronics.de>
+In-Reply-To: <20101025072126.GG8554@pengutronix.de>
 References: <20101025072126.GG8554@pengutronix.de>
-	<1288084042-21722-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1288084042-21722-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1288084042-21722-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following patch is a first step to convert the 'struct pad_desc'
+to a bitmapped cookie to facilitate adding platform specific pullup or
+drive strength definitions to existing pad definitions without need to
+rewrite the complete pad def.
+
+The patch wraps 'struct pad_desc' in an opaque data type and
+introduces macros to access the individual members.
+This patch does not constitute any functional change!
+
+BTW: 'mx51_defconfig' produces the following compile error:
+|fs/built-in.o: In function `nfs_callback_authenticate':
+|file.c:(.text+0xd9274): undefined reference to `svc_gss_principal'
+
+and 'mx3_defconfig':
+|/usr/local/src/arm/linux-2.6-ptx/arch/arm/mach-mx3/devices.c:91: error: 'MX35_INT_MMC_SDHC2' undeclared here (not in a function)
+
+Signed-Off-By: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ mach-mx25/eukrea_mbimxsd-baseboard.c |    2 +-
+ mach-mx25/mach-cpuimx25.c            |    2 +-
+ mach-mx25/mach-mx25_3ds.c            |    2 +-
+ mach-mx3/eukrea_mbimxsd-baseboard.c  |    2 +-
+ mach-mx3/mach-cpuimx35.c             |    2 +-
+ mach-mx3/mach-mx35_3ds.c             |    2 +-
+ mach-mx3/mach-pcm043.c               |   16 ++++++++--------
+ mach-mx5/board-cpuimx51.c            |    2 +-
+ mach-mx5/board-cpuimx51sd.c          |    2 +-
+ mach-mx5/board-mx51_3ds.c            |    2 +-
+ mach-mx5/board-mx51_babbage.c        |    8 ++++----
+ mach-mx5/board-mx51_efikamx.c        |    2 +-
+ mach-mx5/eukrea_mbimx51-baseboard.c  |    2 +-
+ mach-mx5/eukrea_mbimxsd-baseboard.c  |    2 +-
+ plat-mxc/include/mach/iomux-v3.h     |   15 +++++++++++----
+ plat-mxc/iomux-v3.c                  |   22 +++++++++++-----------
+ 16 files changed, 46 insertions(+), 39 deletions(-)
+
+diff --git a/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
+index e765ac5..690a940 100644
+--- a/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
++++ b/arch/arm/mach-mx25/eukrea_mbimxsd-baseboard.c
+@@ -39,7 +39,7 @@
+ #include "devices-imx25.h"
+ #include "devices.h"
+ 
 -static struct pad_desc eukrea_mbimxsd_pads[] = {
 +static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
  	/* LCD */
