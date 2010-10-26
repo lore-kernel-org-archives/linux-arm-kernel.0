@@ -1,92 +1,140 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 26 Oct 2010 23:19:52 +0530
-Subject: [PATCH] kgdb,arm: fix register dump
-Message-ID: <1288115392-23383-1-git-send-email-rabin@rab.in>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Tue, 26 Oct 2010 12:58:56 -0500
+Subject: [PATCH 8/8] staging: tidspbridge - make sync_wait_on_event
+	interruptible
+In-Reply-To: <1288112260-notmuch-felipe.contreras@nokia.com>
+References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
+	<1288054306-4361-2-git-send-email-x0095840@ti.com>
+	<1288054306-4361-3-git-send-email-x0095840@ti.com>
+	<1288054306-4361-4-git-send-email-x0095840@ti.com>
+	<1288054306-4361-5-git-send-email-x0095840@ti.com>
+	<1288054306-4361-6-git-send-email-x0095840@ti.com>
+	<1288054306-4361-7-git-send-email-x0095840@ti.com>
+	<1288054306-4361-8-git-send-email-x0095840@ti.com>
+	<1288054306-4361-9-git-send-email-x0095840@ti.com>
+	<AANLkTinnLb9DLMKfxEs_KqMvOmegSDYRuLWh5y=hhBCe@mail.gmail.com>
+	<496565EC904933469F292DDA3F1663E602F49E2802@dlee06.ent.ti.com>
+	<1288112260-notmuch-felipe.contreras@nokia.com>
+Message-ID: <496565EC904933469F292DDA3F1663E602F49E28AB@dlee06.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DBG_MAX_REG_NUM incorrectly had the number of indices in the GDB regs
-array rather than the number of registers, leading to an oops when the
-"rd" command is used in KDB.
-
-Cc: stable at kernel.org
-Cc: kgdb-bugreport at lists.sourceforge.net
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
-
-Entering kdb (current=0xc0190d10, pid 0) due to Keyboard Entry
-kdb> rd
-r0: 00000067  r1: 00000001  r2: 20000193  r3: c01acef8  r4: c0196cd8
-r5: 00000008  r6: 00000067  r7: 20000193  r8: c019f334  r9: 00000100
-r10: 00000001  fp: 00000000  ip: c01a1580  sp: c018fee8  lr: c010229c
-pc: c0055c24  f0: ??  f1: ??  f2: ??  f3: ??  f4: ??  f5: ??  f6: ??  f7: ??
-fps: 00000000  cpsr: 20000193Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c0004000
-[00000000] *pgd=00000000
-Internal error: Oops: 17 [#1] PREEMPT
-last sysfs file: 
-KGDB: re-enter exception: ALL breakpoints killed
----[ end trace 6007df365f414cf9 ]---
-Kernel panic - not syncing: Fatal exception in interrupt
-[<c001e740>] (unwind_backtrace+0x0/0xe4) from [<c011c398>] (panic+0x58/0x180)
-[<c011c398>] (panic+0x58/0x180) from [<c001d3ac>] (die+0x17c/0x1c0)
-[<c001d3ac>] (die+0x17c/0x1c0) from [<c001f67c>] (__do_kernel_fault+0x64/0x84)
-[<c001f67c>] (__do_kernel_fault+0x64/0x84) from [<c001f874>] (do_page_fault+0x1d8/0x1f4)
-[<c001f874>] (do_page_fault+0x1d8/0x1f4) from [<c00192d8>] (do_DataAbort+0x34/0x98)
-[<c00192d8>] (do_DataAbort+0x34/0x98) from [<c0019aec>] (__dabt_svc+0x4c/0x60)
-Exception stack(0xc018fcb0 to 0xc018fcf8)
-fca0:                                     00000000 c016549e c018fcec 00000000
-fcc0: 0000001d 0000001a 00000138 00000000 00000000 00000000 c0191d78 00000000
-fce0: 0000001c c018fcf8 c005a058 c00ee9c4 80000193 ffffffff
-[<c0019aec>] (__dabt_svc+0x4c/0x60) from [<c00ee9c4>] (strlen+0xc/0x20)
-[<c00ee9c4>] (strlen+0xc/0x20) from [<c005a058>] (kdb_rd+0x40/0x1b0)
-[<c005a058>] (kdb_rd+0x40/0x1b0) from [<c005b758>] (kdb_parse+0x4a0/0x5b4)
-[<c005b758>] (kdb_parse+0x4a0/0x5b4) from [<c005c348>] (kdb_main_loop+0x454/0x6b8)
-[<c005c348>] (kdb_main_loop+0x454/0x6b8) from [<c005e4c8>] (kdb_stub+0x208/0x394)
-[<c005e4c8>] (kdb_stub+0x208/0x394) from [<c005679c>] (kgdb_handle_exception+0x3f8/0x5f0)
-[<c005679c>] (kgdb_handle_exception+0x3f8/0x5f0) from [<c001df98>] (kgdb_compiled_brk_fn+0x20/0x2c)
-[<c001df98>] (kgdb_compiled_brk_fn+0x20/0x2c) from [<c001916c>] (do_undefinstr+0xd8/0x178)
-[<c001916c>] (do_undefinstr+0xd8/0x178) from [<c0019c24>] (__und_svc+0x44/0x60)
-
- arch/arm/include/asm/kgdb.h |    5 +++--
- arch/arm/kernel/kgdb.c      |    2 +-
- 2 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 0826599..48066ce 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -70,7 +70,8 @@ extern int kgdb_fault_expected;
- #define _GP_REGS		16
- #define _FP_REGS		8
- #define _EXTRA_REGS		2
--#define DBG_MAX_REG_NUM		(_GP_REGS + (_FP_REGS * 3) + _EXTRA_REGS)
-+#define GDB_MAX_REGS		(_GP_REGS + (_FP_REGS * 3) + _EXTRA_REGS)
-+#define DBG_MAX_REG_NUM		(_GP_REGS + _FP_REGS + _EXTRA_REGS)
  
- #define KGDB_MAX_NO_CPUS	1
- #define BUFMAX			400
-@@ -93,7 +94,7 @@ extern int kgdb_fault_expected;
- #define _SPT			13
- #define _LR			14
- #define _PC			15
--#define _CPSR			(DBG_MAX_REG_NUM - 1)
-+#define _CPSR			(GDB_MAX_REGS - 1)
- 
- /*
-  * So that we can denote the end of a frame for tracing,
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index d6e8b4d..778c2f7 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -79,7 +79,7 @@ sleeping_thread_to_gdb_regs(unsigned long *gdb_regs, struct task_struct *task)
- 		return;
- 
- 	/* Initialize to zero */
--	for (regno = 0; regno < DBG_MAX_REG_NUM; regno++)
-+	for (regno = 0; regno < GDB_MAX_REGS; regno++)
- 		gdb_regs[regno] = 0;
- 
- 	/* Otherwise, we have only some registers from switch_to() */
--- 
-1.7.2.3
+
+> -----Original Message-----
+> From: Felipe Contreras [mailto:felipe.contreras at nokia.com] 
+> Sent: Tuesday, October 26, 2010 12:03 PM
+> To: Guzman Lugo, Fernando; felipe.contreras at gmail.com
+> Cc: gregkh at suse.de; hiroshi.doyu at nokia.com; 
+> linux-kernel at vger.kernel.org; andy.shevchenko at gmail.com; 
+> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH 8/8] staging: tidspbridge - make 
+> sync_wait_on_event interruptible
+> 
+> fernando.lugo at ti.com wrote:
+> > > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
+> > > <x0095840@ti.com> wrote:
+> > > > So that avoid non-killable process.
+> > > 
+> > > It would be useful to interrupt these tasks from user-space. 
+> > > A separate ioctl to do that would be needed.
+> > 
+> > I don't see use case where that could be needed. It is only 
+> To avoid a 
+> > nonkillable task in the case the user pass an infinite Timeout.
+> > 
+> > If you have some test case where that ioctl would be needed Please 
+> > share it in order to find the best solution.
+> 
+> Well, imagine the application is using a library to access 
+> the DSP, and the library has a dedicated thread listening for 
+> DSP events in a loop.
+> This happens to be how libomxil-ti and gst-dsp work.
+> 
+> Now, the thread received the last message, but has set a 
+> timeout of 10s, or even worst, no timeout at all.
+> 
+> After realizing that was the last message, the main thread 
+> decides to shut down, but it has to wait for the DSP thread 
+> to join. Unfortunately the DSP thread is stuck waiting for 
+> events, and there's nothing that can be done.
+> 
+> However, if we have a separate ioctl to interrupt that task, 
+> then the main thread can issue that ioctl, and unlock the DSP 
+> thread without having to wait 10s, or forever.
+> 
+> Does that make sense?
+
+Maybe sending a signal to yourselft and having a dummy signal
+Handle should work, it that would not like good. I am thinking
+On having a ioctl to create and set an event the you could
+Something like this:
+
+struct dsp_notification events[3];
+
+proc_register_notify(proc, event_type, &events[0]);
+...
+proc_register_notify(proc, event_type, &events[1]);
+...
+Sync_open_event(&events[2]);
+
+
+second thread:
+
+	mgr_wait_for_bridge_events(proc, events, 3, index);
+
+	if (index == 2) 
+		/* main thread force exit */
+
+
+Main thread:
+
+	/* if some execption happened then finish the second thread */
+	sync_set_event(events[2]);
+
+	pthread_join(...);
+
+
+However it is in progess a task for change replacing dspbridge sync.c
+Module with event_fd to signal events to userspace. Where now simple
+File descriptor will be used as event elements. So the mgr_wait_for_bridge_events
+Will be implemented using "select" system call inside to wait for multiple events.
+So you will be able to do something like this:
+
+int events[3];
+
+proc_register_notify(proc, event_type, &events[0]);
+...
+proc_register_notify(proc, event_type, &events[1]);
+...
+events[2] = eventfd(0, 0);
+
+
+second thread:
+
+	mgr_wait_for_bridge_events(proc, events, 3, index);
+
+	if (index == 2) 
+		/* main thread force exit */
+
+Main thread:
+
+	/* if some execption happened then finish the second thread */
+	write(events[2], "s", 1);
+
+	pthread_join(...);
+
+You won't need any aditional ioctl in order to do what you want to do.
+
+So, I think it is not worth to make much changes to some module that will
+Dissapear (my patch is just a fix it is not implementing something new),
+It is just a matter of time to that task is finished and tested properly
+And then send to LO.
+
+Regards,
+Fernando.
+
+> 
+> --
+> Felipe Contreras
+> 
