@@ -1,93 +1,79 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 26 Oct 2010 13:33:21 +0900
-Subject: [PATCH 1/9] S5PV310: DMA: Add platform devices for PL330 DMACs
-In-Reply-To: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1288057238-25377-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <023c01cb74c6$ee6404f0$cb2c0ed0$%kim@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 26 Oct 2010 13:47:58 +0900
+Subject: [PATCH 9/9] ARM: S5PV310: Add audio platform devices
+In-Reply-To: <AANLkTikMG2AqmdxL7diXq9iuBK-AmgU_e4rzkekHA+td@mail.gmail.com>
+References: <1288057281-25635-1-git-send-email-jassisinghbrar@gmail.com>
+	<AANLkTikMG2AqmdxL7diXq9iuBK-AmgU_e4rzkekHA+td@mail.gmail.com>
+Message-ID: <AANLkTimcj8i44K2xX8cW0Gm_N5WbQzs6GCBuR2Rs0Qph@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> 
-> From: Jassi Brar <jassi.brar@samsung.com>
-> 
-> Samsung's Soc S5PV310 has three PL330 DMACs. First is dedicated for
-> Memory->Memory data transfer while the other two meant for data
-> transfer with peripherals.
-> Define and add latter two PL330 DMACs as platform devices on the
-> S5PV310 platform.
-> 
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
-> ---
+On Tue, Oct 26, 2010 at 1:21 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+> On Tue, Oct 26, 2010 at 10:41 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> From: Jassi Brar <jassi.brar@samsung.com>
+>>
+>> Define platform devices for all audio devices found on S5PV310
+>>
+>> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+>> ---
+>> ?arch/arm/mach-s5pv310/Makefile ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/mach-s5pv310/dev-audio.c ? ? ? ? | ?364 +++++++++++++++++++++++++++++
+>> ?arch/arm/mach-s5pv310/include/mach/map.h ?| ? 16 ++
+>> ?arch/arm/plat-samsung/include/plat/devs.h | ? ?9 +
+>> ?4 files changed, 390 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-s5pv310/dev-audio.c
+>>
+>> diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
+>> index d265adb..61e3cb6 100644
+>> --- a/arch/arm/mach-s5pv310/Makefile
+>> +++ b/arch/arm/mach-s5pv310/Makefile
+>> @@ -27,6 +27,7 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210) ? ? += mach-universal_c210.o
+>>
+>> ?# device support
+>>
+>> +obj-y += dev-audio.o
+> Why it's default build? could you make a config as others?
 
-(snip)
-> +
-> +static struct resource s5pv310_pdma0_resource[] = {
-> +	[0] = {
-> +		.start = S5PV310_PA_PDMA0,
-                      ^
-> +		.end = S5PV310_PA_PDMA0 + SZ_4K,
-                    ^
-> +		.flags = IORESOURCE_MEM,
-                      ^
-> +	},
-> +	[1] = {
-> +		.start	= IRQ_PDMA0,
-> +		.end	= IRQ_PDMA0,
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
+It was decided by Ben (and Mark IIRC) that most, if not all, devices use
+audio and it is better to have the platform support built unconditionally.
+If you see, it is same for all platforms since 64xx.
 
-I think tab is better for easily reading and keep the same method in ^ mark.
-Actually, as you know, our Samsung arch/arm stuff followed similar method...
+>> +static int s5pv310_cfg_i2s(struct platform_device *pdev)
+>> +{
+>> + ? ? ? /* configure GPIO for i2s port */
+>> + ? ? ? switch (pdev->id) {
+>> + ? ? ? case 0:
+>> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 7, S3C_GPIO_SFN(2));
+> Does it default setup for i2s? In my board some pins are used for
+> other purpose.
+> I mean GPZ(1, 5, 6) doesn't used it for I2S.
+> then how do you handle this one?
+At least in the manual that I have, I2S0 is possible only on GPZ[0:6],
+so if a user
+does attempt to use I2S0, he/she shouldn't touch the GPIOs for any
+other purpose.
+Please let me know details of your board if you think there is some problem
+with this setup.
 
-> +
-> +static struct s3c_pl330_platdata s5pv310_pdma0_pdata = {
-> +	.peri = {
-> +		[30] = DMACH_MAX,
-> +		[31] = DMACH_MAX,
-> +		[24] = DMACH_AC97_PCMOUT,
-> +		[23] = DMACH_AC97_PCMIN,
-> +		[22] = DMACH_AC97_MICIN,
-> +		[24] = DMACH_SLIMBUS4_TX,
-> +		[23] = DMACH_SLIMBUS4_RX,
-> +		[22] = DMACH_SLIMBUS2_TX,
-> +		[21] = DMACH_SLIMBUS2_RX,
-> +		[20] = DMACH_SLIMBUS0_TX,
-> +		[19] = DMACH_SLIMBUS0_RX,
-> +		[3] = DMACH_UART4_TX,
-> +		[2] = DMACH_UART4_RX,
-> +		[5] = DMACH_UART2_TX,
-> +		[4] = DMACH_UART2_RX,
-> +		[1] = DMACH_UART0_TX,
-> +		[0] = DMACH_UART0_RX,
-> +		[13] = DMACH_I2S2_TX,
-> +		[12] = DMACH_I2S2_RX,
-> +		[10] = DMACH_I2S0_TX,
-> +		[9] = DMACH_I2S0_RX,
-> +		[11] = DMACH_I2S0S_TX,
-> +		[19] = DMACH_SPI2_TX,
-> +		[18] = DMACH_SPI2_RX,
-> +		[17] = DMACH_SPI0_TX,
-> +		[16] = DMACH_SPI0_RX,
-> +		[5] = DMACH_MSM_REQ2,
-> +		[4] = DMACH_MSM_REQ0,
-> +		[3] = DMACH_PCM2_TX,
-> +		[2] = DMACH_PCM2_RX,
-> +		[1] = DMACH_PCM0_TX,
-> +		[0] = DMACH_PCM0_RX,
+>> +
+>> +static struct resource s5pv310_iis0_resource[] = {
+> You wrote that there are some users to use iis but c210/v310 doesn't.
+> So you should use the i2s at least c210/v310 series
+yes, this was simply modified from v210 so left unchanged.
 
-As you know...maybe need to fix.
+>>
+>> +extern struct platform_device s5pv310_device_ac97;
+>> +extern struct platform_device s5pv310_device_pcm0;
+>> +extern struct platform_device s5pv310_device_pcm1;
+>> +extern struct platform_device s5pv310_device_pcm2;
+>> +extern struct platform_device s5pv310_device_iis0;
+>> +extern struct platform_device s5pv310_device_iis1;
+>> +extern struct platform_device s5pv310_device_iis2;
+>> +extern struct platform_device s5pv310_device_spdif;
+>> +
+>
+> How to make common audio platform data? If not, we should list all
+> samsung soc audio node in the future.
 
-(snip)
-
-I think, we can merge platform_device of DMA for S5P SoCs which have same
-PL330 DMAC later. And various platform_data can be handled on each SoC part.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+That will be done when we have some common mechanism for all
+devices. There is nothing Audio specific that we can do about it.
