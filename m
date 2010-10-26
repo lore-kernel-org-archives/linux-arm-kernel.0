@@ -1,158 +1,161 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 26 Oct 2010 10:41:14 +0900
-Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-Message-ID: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
+Date: Tue, 26 Oct 2010 10:40:44 +0900
+Subject: [PATCH 2/9] ARM: Samsung: Rename s3c64xx I2S platform device
+Message-ID: <1288057244-25409-1-git-send-email-jassisinghbrar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jassi Brar <jassi.brar@samsung.com>
 
-Add more information to I2S platform_devices in order
-to prepare them for new controller driver.
+Since the I2S of S3C64XX and newer SoCs are incremental
+versions of each other with changes managable in a single
+driver, rename the 's3c64xx-iis' -> 'samsung-i2s'
 
 Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
 ---
- arch/arm/mach-s5pv210/clock.c     |   10 +++---
- arch/arm/mach-s5pv210/dev-audio.c |   52 ++++++++++++++++++++++++++++--------
- 2 files changed, 45 insertions(+), 17 deletions(-)
+ arch/arm/mach-s3c64xx/dev-audio.c |    6 +++---
+ arch/arm/mach-s5p6442/dev-audio.c |    4 ++--
+ arch/arm/mach-s5p64x0/dev-audio.c |    4 ++--
+ arch/arm/mach-s5pc100/dev-audio.c |    6 +++---
+ arch/arm/mach-s5pv210/dev-audio.c |    6 +++---
+ 5 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-index 019c3a6..b774ff1 100644
---- a/arch/arm/mach-s5pv210/clock.c
-+++ b/arch/arm/mach-s5pv210/clock.c
-@@ -467,20 +467,20 @@ static struct clk init_clocks_disable[] = {
- 		.enable		= s5pv210_clk_ip3_ctrl,
- 		.ctrlbit	= (1<<21),
- 	}, {
--		.name		= "i2s_v50",
-+		.name		= "iis",
- 		.id		= 0,
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
- 		.ctrlbit	= (1<<4),
- 	}, {
--		.name		= "i2s_v32",
--		.id		= 0,
-+		.name		= "iis",
-+		.id		= 1,
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
- 		.ctrlbit	= (1 << 5),
- 	}, {
--		.name		= "i2s_v32",
--		.id		= 1,
-+		.name		= "iis",
-+		.id		= 2,
- 		.parent		= &clk_p,
- 		.enable		= s5pv210_clk_ip3_ctrl,
- 		.ctrlbit	= (1 << 6),
-diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
-index 961477a..ddd2704 100644
---- a/arch/arm/mach-s5pv210/dev-audio.c
-+++ b/arch/arm/mach-s5pv210/dev-audio.c
-@@ -19,22 +19,24 @@
- #include <mach/dma.h>
- #include <mach/irqs.h>
- 
-+static const char *rclksrc[] = {
-+	[0] = "busclk",
-+	[1] = "i2sclk",
-+};
-+
- static int s5pv210_cfg_i2s(struct platform_device *pdev)
- {
- 	/* configure GPIO for i2s port */
- 	switch (pdev->id) {
-+	case 0:
-+		s3c_gpio_cfgpin_range(S5PV210_GPI(0), 7, S3C_GPIO_SFN(2));
-+		break;
- 	case 1:
- 		s3c_gpio_cfgpin_range(S5PV210_GPC0(0), 5, S3C_GPIO_SFN(2));
- 		break;
--
- 	case 2:
- 		s3c_gpio_cfgpin_range(S5PV210_GPC1(0), 5, S3C_GPIO_SFN(4));
- 		break;
--
--	case -1:
--		s3c_gpio_cfgpin_range(S5PV210_GPI(0), 7, S3C_GPIO_SFN(2));
--		break;
--
- 	default:
- 		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
- 		return -EINVAL;
-@@ -43,8 +45,15 @@ static int s5pv210_cfg_i2s(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct s3c_audio_pdata s3c_i2s_pdata = {
-+static struct s3c_audio_pdata i2sv5_pdata = {
- 	.cfg_gpio = s5pv210_cfg_i2s,
-+	.type = {
-+		.i2s = {
-+			.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
-+					 | QUIRK_NEED_RSTCLR,
-+			.src_clk = rclksrc,
-+		},
-+	},
+diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+index 4a5c682..791bf05 100644
+--- a/arch/arm/mach-s3c64xx/dev-audio.c
++++ b/arch/arm/mach-s3c64xx/dev-audio.c
+@@ -76,7 +76,7 @@ static struct s3c_audio_pdata s3c_i2s0_pdata = {
  };
  
- static struct resource s5pv210_iis0_resource[] = {
-@@ -63,15 +72,34 @@ static struct resource s5pv210_iis0_resource[] = {
- 		.end   = DMACH_I2S0_RX,
- 		.flags = IORESOURCE_DMA,
- 	},
-+	[3] = {
-+		.start = DMACH_I2S0S_TX,
-+		.end = DMACH_I2S0S_TX,
-+		.flags = IORESOURCE_DMA,
-+	},
+ struct platform_device s3c64xx_device_iis0 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 0,
+ 	.num_resources	  = ARRAY_SIZE(s3c64xx_iis0_resource),
+ 	.resource	  = s3c64xx_iis0_resource,
+@@ -109,7 +109,7 @@ static struct s3c_audio_pdata s3c_i2s1_pdata = {
+ };
+ 
+ struct platform_device s3c64xx_device_iis1 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 1,
+ 	.num_resources	  = ARRAY_SIZE(s3c64xx_iis1_resource),
+ 	.resource	  = s3c64xx_iis1_resource,
+@@ -142,7 +142,7 @@ static struct s3c_audio_pdata s3c_i2sv4_pdata = {
+ };
+ 
+ struct platform_device s3c64xx_device_iisv4 = {
+-	.name		  = "s3c64xx-iis-v4",
++	.name		  = "samsung-i2s-v4",
+ 	.id		  = -1,
+ 	.num_resources	  = ARRAY_SIZE(s3c64xx_iisv4_resource),
+ 	.resource	  = s3c64xx_iisv4_resource,
+diff --git a/arch/arm/mach-s5p6442/dev-audio.c b/arch/arm/mach-s5p6442/dev-audio.c
+index 3462197..d0207b7 100644
+--- a/arch/arm/mach-s5p6442/dev-audio.c
++++ b/arch/arm/mach-s5p6442/dev-audio.c
+@@ -65,7 +65,7 @@ static struct resource s5p6442_iis0_resource[] = {
+ };
+ 
+ struct platform_device s5p6442_device_iis0 = {
+-	.name		  = "s3c64xx-iis-v4",
++	.name		  = "samsung-i2s-v4",
+ 	.id		  = -1,
+ 	.num_resources	  = ARRAY_SIZE(s5p6442_iis0_resource),
+ 	.resource	  = s5p6442_iis0_resource,
+@@ -93,7 +93,7 @@ static struct resource s5p6442_iis1_resource[] = {
+ };
+ 
+ struct platform_device s5p6442_device_iis1 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 1,
+ 	.num_resources	  = ARRAY_SIZE(s5p6442_iis1_resource),
+ 	.resource	  = s5p6442_iis1_resource,
+diff --git a/arch/arm/mach-s5p64x0/dev-audio.c b/arch/arm/mach-s5p64x0/dev-audio.c
+index 396bacc..fb613d0 100644
+--- a/arch/arm/mach-s5p64x0/dev-audio.c
++++ b/arch/arm/mach-s5p64x0/dev-audio.c
+@@ -82,7 +82,7 @@ static struct resource s5p64x0_iis0_resource[] = {
+ };
+ 
+ struct platform_device s5p6440_device_iis = {
+-	.name		= "s3c64xx-iis-v4",
++	.name		= "samsung-i2s-v4",
+ 	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s5p64x0_iis0_resource),
+ 	.resource	= s5p64x0_iis0_resource,
+@@ -92,7 +92,7 @@ struct platform_device s5p6440_device_iis = {
+ };
+ 
+ struct platform_device s5p6450_device_iis0 = {
+-	.name		= "s3c64xx-iis-v4",
++	.name		= "samsung-i2s-v4",
+ 	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s5p64x0_iis0_resource),
+ 	.resource	= s5p64x0_iis0_resource,
+diff --git a/arch/arm/mach-s5pc100/dev-audio.c b/arch/arm/mach-s5pc100/dev-audio.c
+index 564e195..bf0c90f 100644
+--- a/arch/arm/mach-s5pc100/dev-audio.c
++++ b/arch/arm/mach-s5pc100/dev-audio.c
+@@ -65,7 +65,7 @@ static struct resource s5pc100_iis0_resource[] = {
+ };
+ 
+ struct platform_device s5pc100_device_iis0 = {
+-	.name		  = "s3c64xx-iis-v4",
++	.name		  = "samsung-i2s-v4",
+ 	.id		  = -1,
+ 	.num_resources	  = ARRAY_SIZE(s5pc100_iis0_resource),
+ 	.resource	  = s5pc100_iis0_resource,
+@@ -93,7 +93,7 @@ static struct resource s5pc100_iis1_resource[] = {
+ };
+ 
+ struct platform_device s5pc100_device_iis1 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 1,
+ 	.num_resources	  = ARRAY_SIZE(s5pc100_iis1_resource),
+ 	.resource	  = s5pc100_iis1_resource,
+@@ -121,7 +121,7 @@ static struct resource s5pc100_iis2_resource[] = {
+ };
+ 
+ struct platform_device s5pc100_device_iis2 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 2,
+ 	.num_resources	  = ARRAY_SIZE(s5pc100_iis2_resource),
+ 	.resource	  = s5pc100_iis2_resource,
+diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
+index 1303fcb..961477a 100644
+--- a/arch/arm/mach-s5pv210/dev-audio.c
++++ b/arch/arm/mach-s5pv210/dev-audio.c
+@@ -66,7 +66,7 @@ static struct resource s5pv210_iis0_resource[] = {
  };
  
  struct platform_device s5pv210_device_iis0 = {
--	.name		  = "samsung-i2s-v4",
--	.id		  = -1,
-+	.name = "samsung-i2s",
-+	.id = 0,
+-	.name		  = "s3c64xx-iis-v4",
++	.name		  = "samsung-i2s-v4",
+ 	.id		  = -1,
  	.num_resources	  = ARRAY_SIZE(s5pv210_iis0_resource),
  	.resource	  = s5pv210_iis0_resource,
- 	.dev = {
--		.platform_data = &s3c_i2s_pdata,
-+		.platform_data = &i2sv5_pdata,
-+	},
-+};
-+
-+static const char *rclksrc_v3[] = {
-+	[0] = "iis",
-+	[1] = "audio-bus",
-+};
-+
-+static struct s3c_audio_pdata i2sv3_pdata = {
-+	.cfg_gpio = s5pv210_cfg_i2s,
-+	.type = {
-+		.i2s = {
-+			.src_clk = rclksrc_v3,
-+		},
- 	},
+@@ -94,7 +94,7 @@ static struct resource s5pv210_iis1_resource[] = {
  };
  
-@@ -99,7 +127,7 @@ struct platform_device s5pv210_device_iis1 = {
+ struct platform_device s5pv210_device_iis1 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 1,
  	.num_resources	  = ARRAY_SIZE(s5pv210_iis1_resource),
  	.resource	  = s5pv210_iis1_resource,
- 	.dev = {
--		.platform_data = &s3c_i2s_pdata,
-+		.platform_data = &i2sv3_pdata,
- 	},
+@@ -122,7 +122,7 @@ static struct resource s5pv210_iis2_resource[] = {
  };
  
-@@ -127,7 +155,7 @@ struct platform_device s5pv210_device_iis2 = {
+ struct platform_device s5pv210_device_iis2 = {
+-	.name		  = "s3c64xx-iis",
++	.name		  = "samsung-i2s",
+ 	.id		  = 2,
  	.num_resources	  = ARRAY_SIZE(s5pv210_iis2_resource),
  	.resource	  = s5pv210_iis2_resource,
- 	.dev = {
--		.platform_data = &s3c_i2s_pdata,
-+		.platform_data = &i2sv3_pdata,
- 	},
- };
- 
 -- 
 1.6.2.5
