@@ -1,395 +1,197 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue, 26 Oct 2010 10:49:52 +0200
-Subject: [PATCH 3/7] imx: use MXxy_IO_P2V macros to setup static mappings
+Date: Tue, 26 Oct 2010 10:49:55 +0200
+Subject: [PATCH 6/7] imx/debug-macro: rework using the new io mapping macro
 In-Reply-To: <20101022175702.GI19834@pengutronix.de>
 References: <20101022175702.GI19834@pengutronix.de>
-Message-ID: <1288082996-21981-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1288082996-21981-6-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes less code rely on the virtual constants.
-
-To further simplify code and reduce the needed boilerplate when
-defining the static mappings a new helper macro is defined in
-mach/hardware.h.
+This gets rid of the last user of IMX_NEEDS_DEPRECATED_SYMBOLS.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/mm-imx1.c               |    7 +---
- arch/arm/mach-imx/mm-imx21.c              |   21 ++----------
- arch/arm/mach-imx/mm-imx27.c              |   21 ++----------
- arch/arm/mach-mx25/mm.c                   |   25 +++----------
- arch/arm/mach-mx3/mm.c                    |   53 ++++++++++------------------
- arch/arm/mach-mx5/mm.c                    |   35 ++++---------------
- arch/arm/mach-mxc91231/mm.c               |   53 +++++-----------------------
- arch/arm/plat-mxc/include/mach/hardware.h |    7 ++++
- 8 files changed, 56 insertions(+), 166 deletions(-)
+ arch/arm/plat-mxc/include/mach/debug-macro.S |   23 +++++++----------------
+ arch/arm/plat-mxc/include/mach/mx25.h        |    4 ----
+ arch/arm/plat-mxc/include/mach/mx2x.h        |    5 -----
+ arch/arm/plat-mxc/include/mach/mx3x.h        |    5 -----
+ arch/arm/plat-mxc/include/mach/mx51.h        |    5 -----
+ 5 files changed, 7 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-index 9be92b9..729ae09 100644
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ b/arch/arm/mach-imx/mm-imx1.c
-@@ -25,12 +25,7 @@
- #include <mach/hardware.h>
- 
- static struct map_desc imx_io_desc[] __initdata = {
--	{
--		.virtual = MX1_IO_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX1_IO_BASE_ADDR),
--		.length = MX1_IO_SIZE,
--		.type = MT_DEVICE
--	}
-+	imx_map_entry(MX1, IO, MT_DEVICE),
- };
- 
- void __init mx1_map_io(void)
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index 12faeeaa..e728af8 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
-@@ -35,33 +35,18 @@ static struct map_desc imx21_io_desc[] __initdata = {
- 	 * - ROM Patch
- 	 * - and some reserved space
- 	 */
--	{
--		.virtual = MX21_AIPI_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX21_AIPI_BASE_ADDR),
--		.length = MX21_AIPI_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX21, AIPI, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - CSI
- 	 * - ATA
- 	 */
--	{
--		.virtual = MX21_SAHB1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX21_SAHB1_BASE_ADDR),
--		.length = MX21_SAHB1_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX21, SAHB1, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - EMI
- 	 */
--	{
--		.virtual = MX21_X_MEMC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX21_X_MEMC_BASE_ADDR),
--		.length = MX21_X_MEMC_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX21, X_MEMC, MT_DEVICE),
- };
- 
- /*
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index a246229..374e48b 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -35,33 +35,18 @@ static struct map_desc imx27_io_desc[] __initdata = {
- 	 * - ROM Patch
- 	 * - and some reserved space
- 	 */
--	{
--		.virtual = MX27_AIPI_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX27_AIPI_BASE_ADDR),
--		.length = MX27_AIPI_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX27, AIPI, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - CSI
- 	 * - ATA
- 	 */
--	{
--		.virtual = MX27_SAHB1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX27_SAHB1_BASE_ADDR),
--		.length = MX27_SAHB1_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX27, SAHB1, MT_DEVICE),
- 	/*
- 	 * this fixed mapping covers:
- 	 * - EMI
- 	 */
--	{
--		.virtual = MX27_X_MEMC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX27_X_MEMC_BASE_ADDR),
--		.length = MX27_X_MEMC_SIZE,
--		.type = MT_DEVICE
--	},
-+	imx_map_entry(MX27, X_MEMC, MT_DEVICE),
- };
- 
- /*
-diff --git a/arch/arm/mach-mx25/mm.c b/arch/arm/mach-mx25/mm.c
-index bb67711..11cd335 100644
---- a/arch/arm/mach-mx25/mm.c
-+++ b/arch/arm/mach-mx25/mm.c
-@@ -30,25 +30,12 @@
- 
- /*
-  * This table defines static virtual address mappings for I/O regions.
-- * These are the mappings common across all MX3 boards.
-+ * These are the mappings common across all MX25 boards.
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index 2560640..8170894 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -10,58 +10,49 @@
+  * published by the Free Software Foundation.
+  *
   */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual	= MX25_AVIC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MX25_AVIC_BASE_ADDR),
--		.length		= MX25_AVIC_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	}, {
--		.virtual	= MX25_AIPS1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MX25_AIPS1_BASE_ADDR),
--		.length		= MX25_AIPS1_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	}, {
--		.virtual	= MX25_AIPS2_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MX25_AIPS2_BASE_ADDR),
--		.length		= MX25_AIPS2_SIZE,
--		.type		= MT_DEVICE_NONSHARED
--	},
-+static struct map_desc mx25_io_desc[] __initdata = {
-+	imx_map_entry(MX25, AVIC, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX25, AIPS1, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX25, AIPS2, MT_DEVICE_NONSHARED),
- };
+-#define IMX_NEEDS_DEPRECATED_SYMBOLS
++#include <mach/hardware.h>
  
- /*
-@@ -62,7 +49,7 @@ void __init mx25_map_io(void)
- 	mxc_iomux_v3_init(MX25_IO_ADDRESS(MX25_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX25_IO_ADDRESS(MX25_WDOG_BASE_ADDR));
- 
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx25_io_desc, ARRAY_SIZE(mx25_io_desc));
- }
- 
- int imx25_register_gpios(void);
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index 809ee40..193c18c 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -36,40 +36,16 @@
-  * @ingroup Memory
-  */
- 
--/*!
-- * This table defines static virtual address mappings for I/O regions.
-- * These are the mappings common across all MX3 boards.
-- */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual = MX3x_X_MEMC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_X_MEMC_BASE_ADDR),
--		.length = MX3x_X_MEMC_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX3x_AVIC_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_AVIC_BASE_ADDR),
--		.length = MX3x_AVIC_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
--		.virtual = MX3x_AIPS1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_AIPS1_BASE_ADDR),
--		.length = MX3x_AIPS1_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
--		.virtual = MX3x_AIPS2_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_AIPS2_BASE_ADDR),
--		.length = MX3x_AIPS2_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	}, {
--		.virtual = MX3x_SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX3x_SPBA0_BASE_ADDR),
--		.length = MX3x_SPBA0_SIZE,
--		.type = MT_DEVICE_NONSHARED
--	},
-+#ifdef CONFIG_ARCH_MX31
-+static struct map_desc mx31_io_desc[] __initdata = {
-+	imx_map_entry(MX31, X_MEMC, MT_DEVICE),
-+	imx_map_entry(MX31, AVIC, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX31, AIPS1, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX31, AIPS2, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX31, SPBA0, MT_DEVICE_NONSHARED),
- };
- 
--/*!
-+/*
-  * This function initializes the memory map. It is called during the
-  * system startup to create static physical to virtual memory mappings
-  * for the IO modules.
-@@ -79,17 +55,26 @@ void __init mx31_map_io(void)
- 	mxc_set_cpu_type(MXC_CPU_MX31);
- 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
- 
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx31_io_desc, ARRAY_SIZE(mx31_io_desc));
- }
-+#endif
- 
- #ifdef CONFIG_ARCH_MX35
-+static struct map_desc mx35_io_desc[] __initdata = {
-+	imx_map_entry(MX35, X_MEMC, MT_DEVICE),
-+	imx_map_entry(MX35, AVIC, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX35, AIPS1, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX35, AIPS2, MT_DEVICE_NONSHARED),
-+	imx_map_entry(MX35, SPBA0, MT_DEVICE_NONSHARED),
-+};
-+
- void __init mx35_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX35);
- 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX3x_WDOG_BASE_ADDR));
- 
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx35_io_desc, ARRAY_SIZE(mx35_io_desc));
- }
+ #ifdef CONFIG_ARCH_MX1
+-#include <mach/mx1.h>
+-#define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_PADDR	MX1_UART1_BASE_ADDR
  #endif
  
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index bc3f30d..01dff26 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -23,33 +23,12 @@
- /*
-  * Define the MX51 memory map.
-  */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual = MX51_IRAM_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_IRAM_BASE_ADDR),
--		.length = MX51_IRAM_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_DEBUG_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_DEBUG_BASE_ADDR),
--		.length = MX51_DEBUG_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_AIPS1_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_AIPS1_BASE_ADDR),
--		.length = MX51_AIPS1_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_SPBA0_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_SPBA0_BASE_ADDR),
--		.length = MX51_SPBA0_SIZE,
--		.type = MT_DEVICE
--	}, {
--		.virtual = MX51_AIPS2_BASE_ADDR_VIRT,
--		.pfn = __phys_to_pfn(MX51_AIPS2_BASE_ADDR),
--		.length = MX51_AIPS2_SIZE,
--		.type = MT_DEVICE
--	},
-+static struct map_desc mx51_io_desc[] __initdata = {
-+	imx_map_entry(MX51, IRAM, MT_DEVICE),
-+	imx_map_entry(MX51, DEBUG, MT_DEVICE),
-+	imx_map_entry(MX51, AIPS1, MT_DEVICE),
-+	imx_map_entry(MX51, SPBA0, MT_DEVICE),
-+	imx_map_entry(MX51, AIPS2, MT_DEVICE),
- };
+ #ifdef CONFIG_ARCH_MX25
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx25.h>
+ #define UART_PADDR	MX25_UART1_BASE_ADDR
+-#define UART_VADDR	MX25_AIPS1_IO_ADDRESS(MX25_UART1_BASE_ADDR)
+ #endif
  
- /*
-@@ -62,7 +41,7 @@ void __init mx51_map_io(void)
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG_BASE_ADDR));
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mx51_io_desc, ARRAY_SIZE(mx51_io_desc));
- }
+ #ifdef CONFIG_ARCH_MX2
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx2x.h>
+-#define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	AIPI_IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_PADDR	MX2x_UART1_BASE_ADDR
+ #endif
  
- int imx51_register_gpios(void);
-diff --git a/arch/arm/mach-mxc91231/mm.c b/arch/arm/mach-mxc91231/mm.c
-index aeccfd7..7652c30 100644
---- a/arch/arm/mach-mxc91231/mm.c
-+++ b/arch/arm/mach-mxc91231/mm.c
-@@ -27,48 +27,15 @@
- /*
-  * This structure defines the MXC memory map.
-  */
--static struct map_desc mxc_io_desc[] __initdata = {
--	{
--		.virtual	= MXC91231_L2CC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_L2CC_BASE_ADDR),
--		.length		= MXC91231_L2CC_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_X_MEMC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_X_MEMC_BASE_ADDR),
--		.length		= MXC91231_X_MEMC_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_ROMP_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_ROMP_BASE_ADDR),
--		.length		= MXC91231_ROMP_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_AVIC_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_AVIC_BASE_ADDR),
--		.length		= MXC91231_AVIC_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_AIPS1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_AIPS1_BASE_ADDR),
--		.length		= MXC91231_AIPS1_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_SPBA0_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_SPBA0_BASE_ADDR),
--		.length		= MXC91231_SPBA0_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_SPBA1_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_SPBA1_BASE_ADDR),
--		.length		= MXC91231_SPBA1_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= MXC91231_AIPS2_BASE_ADDR_VIRT,
--		.pfn		= __phys_to_pfn(MXC91231_AIPS2_BASE_ADDR),
--		.length		= MXC91231_AIPS2_SIZE,
--		.type		= MT_DEVICE,
--	},
-+static struct map_desc mxc91231_io_desc[] __initdata = {
-+	imx_map_entry(MXC91231, L2CC, MT_DEVICE),
-+	imx_map_entry(MXC91231, X_MEMC, MT_DEVICE),
-+	imx_map_entry(MXC91231, ROMP, MT_DEVICE),
-+	imx_map_entry(MXC91231, AVIC, MT_DEVICE),
-+	imx_map_entry(MXC91231, AIPS1, MT_DEVICE),
-+	imx_map_entry(MXC91231, SPBA0, MT_DEVICE),
-+	imx_map_entry(MXC91231, SPBA1, MT_DEVICE),
-+	imx_map_entry(MXC91231, AIPS2, MT_DEVICE),
- };
+ #ifdef CONFIG_ARCH_MX3
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx3x.h>
+-#define UART_PADDR	UART1_BASE_ADDR
+-#define UART_VADDR	AIPS1_IO_ADDRESS(UART1_BASE_ADDR)
++#define UART_PADDR	MX3x_UART1_BASE_ADDR
+ #endif
  
- /*
-@@ -80,7 +47,7 @@ void __init mxc91231_map_io(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MXC91231);
+ #ifdef CONFIG_ARCH_MX5
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mx51.h>
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+-#define UART_VADDR	MX51_AIPS1_IO_ADDRESS(MX51_UART1_BASE_ADDR)
+ #endif
  
--	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
-+	iotable_init(mxc91231_io_desc, ARRAY_SIZE(mxc91231_io_desc));
- }
- 
- int mxc91231_register_gpios(void);
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index 4bbe506..409cec6 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -66,4 +66,11 @@
- 
- #include <mach/mxc.h>
- 
-+#define imx_map_entry(soc, name, _type)	{				\
-+	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
-+	.pfn = __phys_to_pfn(soc ## _ ## name ## _BASE_ADDR),		\
-+	.length = soc ## _ ## name ## _SIZE,				\
-+	.type = _type,							\
-+}
+ #ifdef CONFIG_ARCH_MXC91231
+ #ifdef UART_PADDR
+ #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+ #endif
+-#include <mach/mxc91231.h>
+ #define UART_PADDR	MXC91231_UART2_BASE_ADDR
+-#define UART_VADDR	MXC91231_IO_ADDRESS(MXC91231_UART2_BASE_ADDR)
+ #endif
 +
- #endif /* __ASM_ARCH_MXC_HARDWARE_H__ */
++#define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
++
+ 		.macro	addruart, rx, tmp
+ 		mrc	p15, 0, \rx, c1, c0
+ 		tst	\rx, #1			@ MMU enabled?
+diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
+index aac6a9c..a2404b0 100644
+--- a/arch/arm/plat-mxc/include/mach/mx25.h
++++ b/arch/arm/plat-mxc/include/mach/mx25.h
+@@ -2,7 +2,6 @@
+ #define __MACH_MX25_H__
+ 
+ #define MX25_AIPS1_BASE_ADDR		0x43f00000
+-#define MX25_AIPS1_BASE_ADDR_VIRT	0xf5300000
+ #define MX25_AIPS1_SIZE			SZ_1M
+ #define MX25_AIPS2_BASE_ADDR		0x53f00000
+ #define MX25_AIPS2_SIZE			SZ_1M
+@@ -25,9 +24,6 @@
+ #define MX25_GPIO2_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xd0000)
+ #define MX25_WDOG_BASE_ADDR		(MX25_AIPS2_BASE_ADDR + 0xdc000)
+ 
+-#define MX25_AIPS1_IO_ADDRESS(x) \
+-	(((x) - MX25_AIPS1_BASE_ADDR) + MX25_AIPS1_BASE_ADDR_VIRT)
+-
+ #define MX25_UART1_BASE_ADDR		0x43f90000
+ #define MX25_UART2_BASE_ADDR		0x43f94000
+ #define MX25_AUDMUX_BASE_ADDR		0x43fb0000
+diff --git a/arch/arm/plat-mxc/include/mach/mx2x.h b/arch/arm/plat-mxc/include/mach/mx2x.h
+index 46eeeb2..a056948 100644
+--- a/arch/arm/plat-mxc/include/mach/mx2x.h
++++ b/arch/arm/plat-mxc/include/mach/mx2x.h
+@@ -27,7 +27,6 @@
+ 
+ /* Register offsets */
+ #define MX2x_AIPI_BASE_ADDR		0x10000000
+-#define MX2x_AIPI_BASE_ADDR_VIRT	0xf4400000
+ #define MX2x_AIPI_SIZE			SZ_1M
+ #define MX2x_DMA_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x01000)
+ #define MX2x_WDOG_BASE_ADDR			(MX2x_AIPI_BASE_ADDR + 0x02000)
+@@ -68,9 +67,6 @@
+ #define MX2x_SAHB1_SIZE			SZ_1M
+ #define MX2x_CSI_BASE_ADDR			(MX2x_SAHB1_BASE_ADDR + 0x0000)
+ 
+-#define AIPI_IO_ADDRESS(x)	\
+-	(((x) - AIPI_BASE_ADDR) + AIPI_BASE_ADDR_VIRT)
+-
+ /* fixed interrupt numbers */
+ #define MX2x_INT_CSPI3		6
+ #define MX2x_INT_GPIO		8
+@@ -148,7 +144,6 @@
+ #ifdef IMX_NEEDS_DEPRECATED_SYMBOLS
+ /* these should go away */
+ #define AIPI_BASE_ADDR MX2x_AIPI_BASE_ADDR
+-#define AIPI_BASE_ADDR_VIRT MX2x_AIPI_BASE_ADDR_VIRT
+ #define AIPI_SIZE MX2x_AIPI_SIZE
+ #define DMA_BASE_ADDR MX2x_DMA_BASE_ADDR
+ #define WDOG_BASE_ADDR MX2x_WDOG_BASE_ADDR
+diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
+index da22cd4..3d6cc45 100644
+--- a/arch/arm/plat-mxc/include/mach/mx3x.h
++++ b/arch/arm/plat-mxc/include/mach/mx3x.h
+@@ -44,7 +44,6 @@
+  * AIPS 1
+  */
+ #define MX3x_AIPS1_BASE_ADDR		0x43f00000
+-#define MX3x_AIPS1_BASE_ADDR_VIRT	0xf5300000
+ #define MX3x_AIPS1_SIZE			SZ_1M
+ #define MX3x_MAX_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0x04000)
+ #define MX3x_EVTMON_BASE_ADDR			(MX3x_AIPS1_BASE_ADDR + 0x08000)
+@@ -141,9 +140,6 @@
+ 
+ #define MX3x_PCMCIA_MEM_BASE_ADDR	0xbc000000
+ 
+-#define AIPS1_IO_ADDRESS(x)  \
+-	(((x) - AIPS1_BASE_ADDR) + AIPS1_BASE_ADDR_VIRT)
+-
+ /*
+  * Interrupt numbers
+  */
+@@ -230,7 +226,6 @@ static inline int mx35_revision(void)
+ #define L2CC_BASE_ADDR MX3x_L2CC_BASE_ADDR
+ #define L2CC_SIZE MX3x_L2CC_SIZE
+ #define AIPS1_BASE_ADDR MX3x_AIPS1_BASE_ADDR
+-#define AIPS1_BASE_ADDR_VIRT MX3x_AIPS1_BASE_ADDR_VIRT
+ #define AIPS1_SIZE MX3x_AIPS1_SIZE
+ #define MAX_BASE_ADDR MX3x_MAX_BASE_ADDR
+ #define EVTMON_BASE_ADDR MX3x_EVTMON_BASE_ADDR
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index 1b8715f..636347c 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -53,7 +53,6 @@
+  * AIPS 1
+  */
+ #define MX51_AIPS1_BASE_ADDR		0x73f00000
+-#define MX51_AIPS1_BASE_ADDR_VIRT	0xf5700000
+ #define MX51_AIPS1_SIZE			SZ_1M
+ 
+ #define MX51_OTG_BASE_ADDR		(MX51_AIPS1_BASE_ADDR + 0x80000)
+@@ -137,10 +136,6 @@
+ #define MX51_IO_P2V(x)			IMX_IO_P2V(x)
+ #define MX51_IO_ADDRESS(x)		IOMEM(MX51_IO_P2V(x))
+ 
+-/* This is currently used in <mach/debug-macro.S>, but should go away */
+-#define MX51_AIPS1_IO_ADDRESS(x)  \
+-	(((x) - MX51_AIPS1_BASE_ADDR) + MX51_AIPS1_BASE_ADDR_VIRT)
+-
+ /*
+  * defines for SPBA modules
+  */
 -- 
 1.7.2.3
