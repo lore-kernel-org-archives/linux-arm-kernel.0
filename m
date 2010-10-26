@@ -1,37 +1,38 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 26 Oct 2010 14:30:49 +0900
-Subject: [PATCH 9/9] ARM: S5PV310: Add audio platform devices
-In-Reply-To: <AANLkTikJDD1qeP2KouLhwmYgcVpr4P3S2yZUfBjZgQCD@mail.gmail.com>
-References: <1288057281-25635-1-git-send-email-jassisinghbrar@gmail.com>
-	<AANLkTikMG2AqmdxL7diXq9iuBK-AmgU_e4rzkekHA+td@mail.gmail.com>
-	<AANLkTimcj8i44K2xX8cW0Gm_N5WbQzs6GCBuR2Rs0Qph@mail.gmail.com>
-	<AANLkTikJDD1qeP2KouLhwmYgcVpr4P3S2yZUfBjZgQCD@mail.gmail.com>
-Message-ID: <AANLkTi=xdW9Qct5qRr4wkdfvwTbeKwn+RnrbC97VLbBd@mail.gmail.com>
+From: arasv@magellan-technology.com (Aras Vaichas)
+Date: Tue, 26 Oct 2010 17:19:30 +1100
+Subject: at91: input overruns question
+Message-ID: <AANLkTinbThMFXd1KpuMRYNJREpjGa6RNBH9R1SM955Sd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 1:59 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+Hi,
 
->>>> +static int s5pv310_cfg_i2s(struct platform_device *pdev)
->>>> +{
->>>> + ? ? ? /* configure GPIO for i2s port */
->>>> + ? ? ? switch (pdev->id) {
->>>> + ? ? ? case 0:
->>>> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV310_GPZ(0), 7, S3C_GPIO_SFN(2));
->>> Does it default setup for i2s? In my board some pins are used for
->>> other purpose.
->>> I mean GPZ(1, 5, 6) doesn't used it for I2S.
->>> then how do you handle this one?
->> At least in the manual that I have, I2S0 is possible only on GPZ[0:6],
->> so if a user
->> does attempt to use I2S0, he/she shouldn't touch the GPIOs for any
->> other purpose.
-> No C110 use the same scheme. and works
->> Please let me know details of your board if you think there is some problem
->> with this setup.
-> As above it doesn't use the GPZ(1,5,6) and used for other purpose.
-> and these are already checked by LSI H/W team.
+I'm updating our production kernel to 2.6.33.7-rt29 for an at91rm9200.
+This is the newest version supported by RT.
 
-Ok, so you mean running I2S0 in 2channel, rather than 6 channel mode.
-We don't support that yet but that should be easy to implement by
-defining custom i/f between platform and machine init code.
+I've noticed that the age-old debug serial input overrun(s) issue has
+gotten far worse and I can no longer use the cursor keys at all. i.e.
+no history on serial console or vi.
+
+As the kernel version numbers have gone up, the problem seems to have
+gotten worse.
+
+Is there anything that I can do to make it a bit more usable?
+
+Any .config changes?
+
+Is it worse because of the RT patches?
+
+Please feel free to point me to any previous posts discussing the
+issue, or solutions.
+
+Thanks!
+
+-- 
+Aras Vaichas
+
+Senior Engineer - Software?|?Magellan Technology Pty Ltd
+
+65 Johnston St, Annandale NSW 2038, Australia
+
+P | +61 2 9562 9854 | F +61 2 9518 7620 |??arasv at magellan-technology.com
