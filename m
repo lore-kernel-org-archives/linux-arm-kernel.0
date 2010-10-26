@@ -1,139 +1,249 @@
 From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 26 Oct 2010 18:55:06 +0530
-Subject: [PATCH v3 06/13] OMAP3: DMA: hwmod: add system DMA
+Date: Tue, 26 Oct 2010 18:55:08 +0530
+Subject: [PATCH v3 08/13] OMAP1: DMA: Introduce DMA driver as platform device
 In-Reply-To: <1288099513-1854-1-git-send-email-manjugk@ti.com>
 References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-Message-ID: <1288099513-1854-7-git-send-email-manjugk@ti.com>
+Message-ID: <1288099513-1854-9-git-send-email-manjugk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OMAP3 DMA hwmod structures.
+Register OMAP1 DMA driver as platform device and add support
+for registering through platform device layer using resource
+structures.
 
 Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   93 ++++++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap1/dma.c              |  182 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap1/include/mach/dma.h |   29 +++++
+ 2 files changed, 211 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/dma.c
+ create mode 100644 arch/arm/mach-omap1/include/mach/dma.h
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index ed6bf4a..4a5231c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -45,6 +45,7 @@ static struct omap_hwmod omap3xxx_wd_timer2_hwmod;
- static struct omap_hwmod omap3xxx_i2c1_hwmod;
- static struct omap_hwmod omap3xxx_i2c2_hwmod;
- static struct omap_hwmod omap3xxx_i2c3_hwmod;
-+static struct omap_hwmod omap3xxx_dma_system_hwmod;
- 
- /* L3 -> L4_CORE interface */
- static struct omap_hwmod_ocp_if omap3xxx_l3_main__l4_core = {
-@@ -736,6 +737,97 @@ static struct omap_hwmod omap3xxx_i2c3_hwmod = {
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
- };
- 
-+/* dma_system -> L3 */
-+static struct omap_hwmod_ocp_if omap3xxx_dma_system__l3 = {
-+	.master		= &omap3xxx_dma_system_hwmod,
-+	.slave		= &omap3xxx_l3_main_hwmod,
-+	.clk		= "core_l3_ick",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
+diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+new file mode 100644
+index 0000000..e756069
+--- /dev/null
++++ b/arch/arm/mach-omap1/dma.c
+@@ -0,0 +1,182 @@
++/*
++ * dma.c - OMAP1/OMAP7xx-specific DMA code
++ *
++ * Copyright (C) 2003 - 2008 Nokia Corporation
++ * Author: Juha Yrj??l?? <juha.yrjola@nokia.com>
++ * DMA channel linking for 1610 by Samuel Ortiz <samuel.ortiz@nokia.com>
++ * Graphics DMA and LCD DMA graphics tranformations
++ * by Imre Deak <imre.deak@nokia.com>
++ * OMAP2/3 support Copyright (C) 2004-2007 Texas Instruments, Inc.
++ * Some functions based on earlier dma-omap.c Copyright (C) 2001 RidgeRun, Inc.
++ *
++ * Copyright (C) 2010 Texas Instruments, Inc.
++ * Converted DMA library into platform driver
++ *                   - G, Manjunath Kondaiah <manjugk@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+/* dma attributes */
-+static struct omap_dma_dev_attr dma_dev_attr = {
-+	.dev_caps  = DMA_LINKED_LCH | GLOBAL_PRIORITY |
-+				IS_CSSA_32 | IS_CDSA_32 | IS_RW_PRIORITY,
-+	.lch_count = OMAP_DMA4_LOGICAL_DMA_CH_COUNT,
-+};
++#include <linux/err.h>
++#include <linux/slab.h>
++#include <linux/pm_runtime.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/sched.h>
++#include <linux/spinlock.h>
++#include <linux/errno.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/device.h>
 +
-+static struct omap_hwmod_class_sysconfig omap3xxx_dma_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x002c,
-+	.syss_offs	= 0x0028,
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSC_HAS_MIDLEMODE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
++#include <plat/dma.h>
++#include <plat/tc.h>
 +
-+static struct omap_hwmod_class omap3xxx_dma_hwmod_class = {
-+	.name = "dma",
-+	.sysc = &omap3xxx_dma_sysc,
-+};
++#define OMAP1_DMA_BASE			(0xfffed800)
 +
-+/* dma_system */
-+static struct omap_hwmod_irq_info omap3xxx_dma_system_irqs[] = {
-+	{ .name = "0", .irq = INT_24XX_SDMA_IRQ0 },
-+	{ .name = "1", .irq = INT_24XX_SDMA_IRQ1 },
-+	{ .name = "2", .irq = INT_24XX_SDMA_IRQ2 },
-+	{ .name = "3", .irq = INT_24XX_SDMA_IRQ3 },
-+};
-+
-+static struct omap_hwmod_addr_space omap3xxx_dma_system_addrs[] = {
-+	{
-+		.pa_start	= 0x48056000,
-+		.pa_end		= 0x4a0560ff,
-+		.flags		= ADDR_TYPE_RT
++static struct resource res[] __initdata = {
++	[0] = {
++		.start	= OMAP1_DMA_BASE,
++		.end	= OMAP1_DMA_BASE + SZ_2K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.name   = "0",
++		.start  = INT_DMA_CH0_6,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[2] = {
++		.name   = "1",
++		.start  = INT_DMA_CH1_7,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[3] = {
++		.name   = "2",
++		.start  = INT_DMA_CH2_8,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[4] = {
++		.name   = "3",
++		.start  = INT_DMA_CH3,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[5] = {
++		.name   = "4",
++		.start  = INT_DMA_CH4,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[6] = {
++		.name   = "5",
++		.start  = INT_DMA_CH5,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[7] = {
++		.name   = "6",
++		.start  = INT_DMA_LCD,
++		.flags  = IORESOURCE_IRQ,
++	},
++	/* irq's for omap16xx and omap7xx */
++	[8] = {
++		.name   = "7",
++		.start  = 53 + IH2_BASE,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[9] = {
++		.name   = "8",
++		.start  = 54 + IH2_BASE,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[10] = {
++		.name  = "9",
++		.start = 55 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[11] = {
++		.name  = "10",
++		.start = 56 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[12] = {
++		.name  = "11",
++		.start = 57 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[13] = {
++		.name  = "12",
++		.start = 58 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[14] = {
++		.name  = "13",
++		.start = 59 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[15] = {
++		.name  = "14",
++		.start = 60 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[16] = {
++		.name  = "15",
++		.start = 61 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
++	},
++	[17] = {
++		.name  = "16",
++		.start = 62 + IH2_BASE,
++		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+/* dma_system master ports */
-+static struct omap_hwmod_ocp_if *omap3xxx_dma_system_masters[] = {
-+	&omap3xxx_dma_system__l3,
-+};
++static int __init omap1_system_dma_init(void)
++{
++	struct omap_system_dma_plat_info	*p;
++	struct platform_device			*pdev;
++	int ret;
 +
-+/* l4_cfg -> dma_system */
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__dma_system = {
-+	.master		= &omap3xxx_l4_core_hwmod,
-+	.slave		= &omap3xxx_dma_system_hwmod,
-+	.clk		= "core_l4_ick",
-+	.addr		= omap3xxx_dma_system_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap3xxx_dma_system_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
++	pdev = platform_device_alloc("omap_dma_system", 0);
++	if (!pdev) {
++		pr_err("%s: Unable to device alloc for dma\n",
++			__func__);
++		return -ENOMEM;
++	}
 +
-+/* dma_system slave ports */
-+static struct omap_hwmod_ocp_if *omap3xxx_dma_system_slaves[] = {
-+	&omap3xxx_l4_core__dma_system,
-+};
++	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
++	if (ret) {
++		pr_err("%s: Unable to add resources for %s%d\n",
++			__func__, pdev->name, pdev->id);
++		goto exit_device_del;
++	}
 +
-+static struct omap_hwmod omap3xxx_dma_system_hwmod = {
-+	.name		= "dma",
-+	.class		= &omap3xxx_dma_hwmod_class,
-+	.mpu_irqs	= omap3xxx_dma_system_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_dma_system_irqs),
-+	.main_clk	= "core_l3_ick",
-+	.prcm = {
-+		.omap2 = {
-+			.prcm_reg_id		= 1,
-+			.module_bit		= OMAP3430_ST_SDMA_SHIFT,
-+			.idlest_reg_id		= 1,
-+			.idlest_idle_bit	= OMAP3430_ST_SDMA_SHIFT,
-+		},
-+	},
-+	.slaves		= omap3xxx_dma_system_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap3xxx_dma_system_slaves),
-+	.masters	= omap3xxx_dma_system_masters,
-+	.masters_cnt	= ARRAY_SIZE(omap3xxx_dma_system_masters),
-+	.dev_attr	= &dma_dev_attr,
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.flags = HWMOD_SET_DEFAULT_CLOCKACT,
-+};
++	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
++	if (!p) {
++		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
++			__func__, pdev->name);
++		ret = -ENOMEM;
++		goto exit_device_put;
++	}
 +
- static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
- 	&omap3xxx_l3_main_hwmod,
- 	&omap3xxx_l4_core_hwmod,
-@@ -751,6 +843,7 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
- 	&omap3xxx_i2c1_hwmod,
- 	&omap3xxx_i2c2_hwmod,
- 	&omap3xxx_i2c3_hwmod,
-+	&omap3xxx_dma_system_hwmod,
- 	NULL,
- };
- 
++	ret = platform_device_add_data(pdev, p, sizeof(*p));
++	if (ret) {
++		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
++			__func__, pdev->name, pdev->id);
++		goto exit_device_put;
++	}
++	ret = platform_device_add(pdev);
++	if (ret) {
++		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
++			__func__, pdev->name, pdev->id);
++		goto exit_device_put;
++	}
++	return ret;
++
++exit_device_put:
++	platform_device_put(pdev);
++exit_device_del:
++	platform_device_del(pdev);
++
++	return ret;
++}
++arch_initcall(omap1_system_dma_init);
+diff --git a/arch/arm/mach-omap1/include/mach/dma.h b/arch/arm/mach-omap1/include/mach/dma.h
+new file mode 100644
+index 0000000..7949e3f
+--- /dev/null
++++ b/arch/arm/mach-omap1/include/mach/dma.h
+@@ -0,0 +1,29 @@
++/*
++ *  OMAP DMA controller register offsets.
++ *
++ *  Copyright (C) 2003 Nokia Corporation
++ *  Author: Juha Yrj??l?? <juha.yrjola@nokia.com>
++ *
++ *  Copyright (C) 2010 Texas Instruments
++ *  Converted DMA library into platform driver
++ *       by G, Manjunath Kondaiah <manjugk@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#ifndef __ASM_ARCH_OMAP1_DMA_H
++#define __ASM_ARCH_OMAP1_DMA_H
++
++#endif /* __ASM_ARCH_OMAP1_DMA_H */
 -- 
 1.7.1
