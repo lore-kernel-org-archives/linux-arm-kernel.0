@@ -1,42 +1,83 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 26 Oct 2010 09:55:39 -0500
-Subject: [PATCH 0/8] staging: tidspbridge - misc fixes
-In-Reply-To: <1288103059-notmuch-felipe.contreras@nokia.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<20101026040619.GA8549@suse.de>
-	<1288103059-notmuch-felipe.contreras@nokia.com>
-Message-ID: <AANLkTimgpj3iU3xQ8K7iwjMuaH3efgzsZfkzZU-H8Fxc@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 Oct 2010 17:05:49 +0200
+Subject: [GIT PULL] i.MX updates for 2.6.37
+Message-ID: <20101026150549.GB5445@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 9:43 AM, Felipe Contreras
-<felipe.contreras@nokia.com> wrote:
-> gregkh at suse.de wrote:
->> On Mon, Oct 25, 2010 at 07:51:38PM -0500, Fernando Guzman Lugo wrote:
->> > This set of patches fix some issues found in lastest tree.
->> >
->> > Fernando Guzman Lugo (8):
->> > ? staging: tidspbridge - remove req_addr from proc_map
->> > ? staging: tidspbridge - add kconfig parameter for DMM size
->> > ? staging: tidspbridge - change mmufault tasklet to a workqueue
->> > ? staging: tidspbridge - fix timeout in dsp_gpt_wait_overflow
->> > ? staging: tidspbridge - use GTP7 for DSP stack dump
->> > ? staging: tidspbridge - remove disabling twl when printing DSP stack
->> > ? staging: tidspbridge - fix some issues after iommu patches
->> > ? staging: tidspbridge - make sync_wait_on_event interruptible
->>
->> Are any of these really applicable for .37 after .37-rc1? ?Or can they
->> wait for .38?
->
-> As of right now the dspbridge doesn't work, and there's a mess of
-> dependencies to get it working.
+Russell,
 
-Just to note that there will be one more dependency for SCM changes[1]
-that will fix compilation, as these need to climb from linux-omap (if
-accepted) before applying tidspbridge chunks.
+Please pull the remaining updates for 2.6.37.
 
-Regards,
-Omar
+Sascha
 
----
-[1] http://marc.info/?l=linux-omap&m=128779652429922&w=2
+The following changes since commit f1de1613da54f754d5d2bbf79fcacbd5ed965537:
+
+  eukrea_mbimxsd-baseboard: Pass the correct GPIO to gpio_free (2010-10-19 18:45:21 +0200)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+
+Dinh Nguyen (3):
+      ARM: imx: Add gpio-keys to plat-mxc
+      ARM: mx5: Add gpio-keys to mx51 babbage board
+      ARM: imx: Add wake functionality to GPIO
+
+Rogerio Pimentel (4):
+      MX27 3ds: Add SDHC1 support to mx27 3ds
+      mx31_3ds: Remove unused debug board definitions
+      mx31_3ds: Fix the logic for detecting the debug board
+      mx31_3ds: Fix spi registration
+
+Shawn Guo (3):
+      babbage: esdhc device registration
+      mx35_3ds: add mmc support
+      mx25_3ds: add mmc support
+
+Uwe Kleine-K?nig (2):
+      ARM: mx3: fix build failure concerning MXC_INT_MMC_SDHC2
+      imx: only select HAVE_CAN_FLEXCAN if CAN is enabled
+
+Xiao Jiang (1):
+      mx35pdk: add debug board support
+
+Yong Shen (1):
+      cpufreq for freescale mx51
+
+ arch/arm/Kconfig                                |    6 +
+ arch/arm/configs/mx51_defconfig                 |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c               |   38 ++++
+ arch/arm/mach-mx25/Kconfig                      |    1 +
+ arch/arm/mach-mx25/mach-mx25_3ds.c              |   10 +
+ arch/arm/mach-mx3/Kconfig                       |    2 +
+ arch/arm/mach-mx3/devices.c                     |   16 +-
+ arch/arm/mach-mx3/mach-mx31_3ds.c               |   38 +----
+ arch/arm/mach-mx3/mach-mx35_3ds.c               |   16 ++
+ arch/arm/mach-mx5/Kconfig                       |    2 +
+ arch/arm/mach-mx5/Makefile                      |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c          |   49 ++++++-
+ arch/arm/mach-mx5/clock-mx51.c                  |   22 +++-
+ arch/arm/mach-mx5/cpu_op-mx51.c                 |   29 ++++
+ arch/arm/mach-mx5/cpu_op-mx51.h                 |   14 ++
+ arch/arm/mach-mx5/devices-imx51.h               |    2 +
+ arch/arm/plat-mxc/Makefile                      |    1 +
+ arch/arm/plat-mxc/cpufreq.c                     |  206 +++++++++++++++++++++++
+ arch/arm/plat-mxc/devices/Kconfig               |    6 +-
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-gpio_keys.c  |   27 +++
+ arch/arm/plat-mxc/gpio.c                        |   32 ++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |    4 +
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h     |    2 +
+ arch/arm/plat-mxc/include/mach/mx31.h           |    1 -
+ arch/arm/plat-mxc/include/mach/mx35.h           |    2 -
+ arch/arm/plat-mxc/include/mach/mxc.h            |   13 ++-
+ 27 files changed, 492 insertions(+), 50 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/cpu_op-mx51.c
+ create mode 100644 arch/arm/mach-mx5/cpu_op-mx51.h
+ create mode 100644 arch/arm/plat-mxc/cpufreq.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-gpio_keys.c
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
