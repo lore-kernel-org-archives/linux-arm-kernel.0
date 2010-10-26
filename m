@@ -1,76 +1,36 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Tue, 26 Oct 2010 13:08:15 -0500
-Subject: [PATCH 1/8] staging: tidspbridge - remove req_addr from proc_map
-In-Reply-To: <1288112616-notmuch-felipe.contreras@nokia.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<AANLkTimCDM_nruvh_gqxxy0CVnw2sH5UYNT9VgyeBfZN@mail.gmail.com>
-	<496565EC904933469F292DDA3F1663E602F49E280A@dlee06.ent.ti.com>
-	<1288112616-notmuch-felipe.contreras@nokia.com>
-Message-ID: <496565EC904933469F292DDA3F1663E602F49E28BD@dlee06.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Oct 2010 19:08:43 +0100
+Subject: [PATCH] ARM: memblock: set allocation limit for
+	MEMBLOCK_ALLOC_ANYWHERE
+In-Reply-To: <20101026105638.GA2092@n2100.arm.linux.org.uk>
+References: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
+	<20101025151513.GB21105@n2100.arm.linux.org.uk>
+	<1288047336.6035.12.camel@jazztop>
+	<20101026105638.GA2092@n2100.arm.linux.org.uk>
+Message-ID: <1288116524.5506.1.camel@jazztop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+Russell,
 
-> -----Original Message-----
-> From: Felipe Contreras [mailto:felipe.contreras at nokia.com] 
-> Sent: Tuesday, October 26, 2010 12:08 PM
-> To: Guzman Lugo, Fernando; felipe.contreras at gmail.com
-> Cc: gregkh at suse.de; hiroshi.doyu at nokia.com; 
-> linux-kernel at vger.kernel.org; andy.shevchenko at gmail.com; 
-> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 1/8] staging: tidspbridge - remove 
-> req_addr from proc_map
+On Tue, 2010-10-26 at 11:56 +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 25, 2010 at 11:55:36PM +0100, Will Deacon wrote:
+> > Right. I could also move this call out of sanity_check_meminfo
+> > and into arm_memblock_init now that we don't need lowmem_end_addr
+> > to be initialised. If you're happy with me making that change then
+> > I'll post a revised version to the patch system.
 > 
-> fernando.lugo at ti.com wrote:
-> > > On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
-> > > <x0095840@ti.com> wrote:
-> > > > The device address is assigned by tidspbridge no need for
-> > > that parameter anymore.
-> > > >
-> > > > Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> > > 
-> > > This would break the API with user-space, right?
-> > 
-> > Yes, user-space needs to be changed accordingly.
+> It looks like we're doing a few things out of order.  Yes, it makes
+> sense to move that initialization to arm_memblock_init(), but as we're
+> not running sanity_check_meminfo(), it could mean there's problems
+> with out of order membanks and similar.
 > 
-> Wouldn't it make sense to avoid stuffing so many changes at 
-> once including ABI breakage?
-> 
-> Does user-space really _needs_ to be changed? Can't you just 
-> ignore that argument?
+We could move the arm_memblock_init() call into paging_init, immediately
+after the call to sanity_check_meminfo. I think everything should be
+safe then.
 
-Actually, I had a previous version of that patch where I only
-Ignored that paramteter. But after thinking again and seeing
-How the long time ago depreacted function are still there I 
-Removed the parameter in order to force apps to make the change.
+> I'll look at that when I'm back.
 
-You can ignore that argument at API level, so all users of the
-API not need to have change (in that momment). That should be
-Only few line change.
+Great, thanks.
 
-> 
-> > > I think this change should be delayed, preferably after we have a 
-> > > working tidspbridge.
-> > 
-> > The issue you were seeing must be fixed with patch 2/8, and 
-> Having all 
-> > the dependencies tidspbridge has to be working Properly.
-> 
-> Yes, which might not happen at .37. If we revert the iommu 
-> stuff, we might have a chance at having a working bridge on .37.
-
-But havi that merged in tidspbridge make more pressure to merged
-The dependencies, if not maybe that wont have event for .38. But
-That is just my opinion if you all are agree revert is the best
-Option I am ok, but I looks like more work reverting and rebaseing
-specially because it is a big change.
-
-Thanks and regards,
-Fernando.
-
-> 
-> --
-> Felipe Contreras
-> 
+Will
