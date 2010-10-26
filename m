@@ -1,176 +1,70 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 26 Oct 2010 11:00:34 +0900
-Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-In-Reply-To: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
-References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
-Message-ID: <AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
+From: jason77.wang@gmail.com (Jason Wang)
+Date: Tue, 26 Oct 2010 10:11:47 +0800
+Subject: [PATCH 1/4] mx31_3ds: Remove unused debug board definitions
+In-Reply-To: <AANLkTi=GFQgwoVhv2UGZ+gpYKHYNrZi4p-A-x1Jk5=NO@mail.gmail.com>
+References: <AANLkTi=GFQgwoVhv2UGZ+gpYKHYNrZi4p-A-x1Jk5=NO@mail.gmail.com>
+Message-ID: <4CC638E3.3040804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+Looks fine to me, These stuffs should be removed earlier. :-)
 
-Can you unify the word iis vs. i2s? some variables use the 'iis', some
-names use the i2s. As title is i2s. just unify the i2s?
-
-Thank you,
-Kyungmin Park
-
-On Tue, Oct 26, 2010 at 10:41 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> From: Jassi Brar <jassi.brar@samsung.com>
+Rogerio Pimentel wrote:
+> In commit (c5d38f08): "mx31_3ds: revert 3ds debug board relate code"
+> the debug board definitions are placed in a separate file.
 >
-> Add more information to I2S platform_devices in order
-> to prepare them for new controller driver.
+> Remove the remaining debug board related define from mach-mx31_3ds.c.
 >
-> Signed-off-by: Jassi Brar <jassi.brar@samsung.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+>
 > ---
-> ?arch/arm/mach-s5pv210/clock.c ? ? | ? 10 +++---
-> ?arch/arm/mach-s5pv210/dev-audio.c | ? 52 ++++++++++++++++++++++++++++--------
-> ?2 files changed, 45 insertions(+), 17 deletions(-)
+>  arch/arm/mach-mx3/mach-mx31_3ds.c |   30 ------------------------------
+>  1 files changed, 0 insertions(+), 30 deletions(-)
 >
-> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
-> index 019c3a6..b774ff1 100644
-> --- a/arch/arm/mach-s5pv210/clock.c
-> +++ b/arch/arm/mach-s5pv210/clock.c
-> @@ -467,20 +467,20 @@ static struct clk init_clocks_disable[] = {
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<21),
-> ? ? ? ?}, {
-> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "i2s_v50",
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
-> ? ? ? ? ? ? ? ?.id ? ? ? ? ? ? = 0,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_p,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1<<4),
-> ? ? ? ?}, {
-> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "i2s_v32",
-> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 0,
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
-> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_p,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1 << 5),
-> ? ? ? ?}, {
-> - ? ? ? ? ? ? ? .name ? ? ? ? ? = "i2s_v32",
-> - ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 1,
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "iis",
-> + ? ? ? ? ? ? ? .id ? ? ? ? ? ? = 2,
-> ? ? ? ? ? ? ? ?.parent ? ? ? ? = &clk_p,
-> ? ? ? ? ? ? ? ?.enable ? ? ? ? = s5pv210_clk_ip3_ctrl,
-> ? ? ? ? ? ? ? ?.ctrlbit ? ? ? ?= (1 << 6),
-> diff --git a/arch/arm/mach-s5pv210/dev-audio.c b/arch/arm/mach-s5pv210/dev-audio.c
-> index 961477a..ddd2704 100644
-> --- a/arch/arm/mach-s5pv210/dev-audio.c
-> +++ b/arch/arm/mach-s5pv210/dev-audio.c
-> @@ -19,22 +19,24 @@
-> ?#include <mach/dma.h>
-> ?#include <mach/irqs.h>
+> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c
+> b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> index 6fe69e1..bc21efc 100644
+> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
+> @@ -38,39 +38,9 @@
+>  #include "devices-imx31.h"
+>  #include "devices.h"
 >
-> +static const char *rclksrc[] = {
-> + ? ? ? [0] = "busclk",
-> + ? ? ? [1] = "i2sclk",
-> +};
-> +
-> ?static int s5pv210_cfg_i2s(struct platform_device *pdev)
-> ?{
-> ? ? ? ?/* configure GPIO for i2s port */
-> ? ? ? ?switch (pdev->id) {
-> + ? ? ? case 0:
-> + ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV210_GPI(0), 7, S3C_GPIO_SFN(2));
-> + ? ? ? ? ? ? ? break;
-> ? ? ? ?case 1:
-> ? ? ? ? ? ? ? ?s3c_gpio_cfgpin_range(S5PV210_GPC0(0), 5, S3C_GPIO_SFN(2));
-> ? ? ? ? ? ? ? ?break;
+> -/* Definitions for components on the Debug board */
 > -
-> ? ? ? ?case 2:
-> ? ? ? ? ? ? ? ?s3c_gpio_cfgpin_range(S5PV210_GPC1(0), 5, S3C_GPIO_SFN(4));
-> ? ? ? ? ? ? ? ?break;
+> -/* Base address of CPLD controller on the Debug board */
+> -#define DEBUG_BASE_ADDRESS		CS5_IO_ADDRESS(MX3x_CS5_BASE_ADDR)
 > -
-> - ? ? ? case -1:
-> - ? ? ? ? ? ? ? s3c_gpio_cfgpin_range(S5PV210_GPI(0), 7, S3C_GPIO_SFN(2));
-> - ? ? ? ? ? ? ? break;
+> -/* LAN9217 ethernet base address */
+> -#define LAN9217_BASE_ADDR		MX3x_CS5_BASE_ADDR
 > -
-> ? ? ? ?default:
-> ? ? ? ? ? ? ? ?printk(KERN_ERR "Invalid Device %d\n", pdev->id);
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> @@ -43,8 +45,15 @@ static int s5pv210_cfg_i2s(struct platform_device *pdev)
-> ? ? ? ?return 0;
-> ?}
+> -/* CPLD config and interrupt base address */
+> -#define CPLD_ADDR			(DEBUG_BASE_ADDRESS + 0x20000)
+> -
+> -/* status, interrupt */
+> -#define CPLD_INT_STATUS_REG		(CPLD_ADDR + 0x10)
+> -#define CPLD_INT_MASK_REG		(CPLD_ADDR + 0x38)
+> -#define CPLD_INT_RESET_REG		(CPLD_ADDR + 0x20)
+> -/* magic word for debug CPLD */
+> -#define CPLD_MAGIC_NUMBER1_REG		(CPLD_ADDR + 0x40)
+> -#define CPLD_MAGIC_NUMBER2_REG		(CPLD_ADDR + 0x48)
+> -/* CPLD code version */
+> -#define CPLD_CODE_VER_REG		(CPLD_ADDR + 0x50)
+> -/* magic word for debug CPLD */
+> -#define CPLD_MAGIC_NUMBER3_REG		(CPLD_ADDR + 0x58)
+> -
+>  /* CPLD IRQ line for external uart, external ethernet etc */
+>  #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_1)
 >
-> -static struct s3c_audio_pdata s3c_i2s_pdata = {
-> +static struct s3c_audio_pdata i2sv5_pdata = {
-> ? ? ? ?.cfg_gpio = s5pv210_cfg_i2s,
-> + ? ? ? .type = {
-> + ? ? ? ? ? ? ? .i2s = {
-> + ? ? ? ? ? ? ? ? ? ? ? .quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| QUIRK_NEED_RSTCLR,
-> + ? ? ? ? ? ? ? ? ? ? ? .src_clk = rclksrc,
-> + ? ? ? ? ? ? ? },
-> + ? ? ? },
-> ?};
->
-> ?static struct resource s5pv210_iis0_resource[] = {
-> @@ -63,15 +72,34 @@ static struct resource s5pv210_iis0_resource[] = {
-> ? ? ? ? ? ? ? ?.end ? = DMACH_I2S0_RX,
-> ? ? ? ? ? ? ? ?.flags = IORESOURCE_DMA,
-> ? ? ? ?},
-> + ? ? ? [3] = {
-> + ? ? ? ? ? ? ? .start = DMACH_I2S0S_TX,
-> + ? ? ? ? ? ? ? .end = DMACH_I2S0S_TX,
-> + ? ? ? ? ? ? ? .flags = IORESOURCE_DMA,
-> + ? ? ? },
-> ?};
->
-> ?struct platform_device s5pv210_device_iis0 = {
-> - ? ? ? .name ? ? ? ? ? ? = "samsung-i2s-v4",
-> - ? ? ? .id ? ? ? ? ? ? ? = -1,
-> + ? ? ? .name = "samsung-i2s",
-> + ? ? ? .id = 0,
-> ? ? ? ?.num_resources ? ?= ARRAY_SIZE(s5pv210_iis0_resource),
-> ? ? ? ?.resource ? ? ? ? = s5pv210_iis0_resource,
-> ? ? ? ?.dev = {
-> - ? ? ? ? ? ? ? .platform_data = &s3c_i2s_pdata,
-> + ? ? ? ? ? ? ? .platform_data = &i2sv5_pdata,
-> + ? ? ? },
-> +};
-> +
-> +static const char *rclksrc_v3[] = {
-> + ? ? ? [0] = "iis",
-> + ? ? ? [1] = "audio-bus",
-> +};
-> +
-> +static struct s3c_audio_pdata i2sv3_pdata = {
-> + ? ? ? .cfg_gpio = s5pv210_cfg_i2s,
-> + ? ? ? .type = {
-> + ? ? ? ? ? ? ? .i2s = {
-> + ? ? ? ? ? ? ? ? ? ? ? .src_clk = rclksrc_v3,
-> + ? ? ? ? ? ? ? },
-> ? ? ? ?},
-> ?};
->
-> @@ -99,7 +127,7 @@ struct platform_device s5pv210_device_iis1 = {
-> ? ? ? ?.num_resources ? ?= ARRAY_SIZE(s5pv210_iis1_resource),
-> ? ? ? ?.resource ? ? ? ? = s5pv210_iis1_resource,
-> ? ? ? ?.dev = {
-> - ? ? ? ? ? ? ? .platform_data = &s3c_i2s_pdata,
-> + ? ? ? ? ? ? ? .platform_data = &i2sv3_pdata,
-> ? ? ? ?},
-> ?};
->
-> @@ -127,7 +155,7 @@ struct platform_device s5pv210_device_iis2 = {
-> ? ? ? ?.num_resources ? ?= ARRAY_SIZE(s5pv210_iis2_resource),
-> ? ? ? ?.resource ? ? ? ? = s5pv210_iis2_resource,
-> ? ? ? ?.dev = {
-> - ? ? ? ? ? ? ? .platform_data = &s3c_i2s_pdata,
-> + ? ? ? ? ? ? ? .platform_data = &i2sv3_pdata,
-> ? ? ? ?},
-> ?};
->
-> --
-> 1.6.2.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> -#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+> -#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
+> -
+> -#define EXPIO_INT_ENET		(MXC_EXP_IO_BASE + 0)
+> -
+> -#define MXC_MAX_EXP_IO_LINES	16
+> -
+>  /*
+>   * This file contains the board-specific initialization routines.
+>   */
+>   
