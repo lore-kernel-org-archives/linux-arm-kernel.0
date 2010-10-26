@@ -1,73 +1,207 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 26 Oct 2010 11:16:02 -0500
-Subject: [PATCH v3 3/4] OMAP: dsp: convert OMAP3430 adaptation layer to use
-	new SCM DSP boot control fns
+Date: Tue, 26 Oct 2010 11:16:00 -0500
+Subject: [PATCH v2 1/4] OMAP: control: add functions for DSP boot address/mode
+	control
 In-Reply-To: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
 References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1288109763-9446-4-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1288109763-9446-2-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Paul Walmsley <paul@pwsan.com>
 
-DSPBridge currently tries to __raw_writel() to the System Control
-Module to control the DSP boot process.  This is a layering violation;
-this is SoC-specific code, and belongs in a file in
-arch/arm/mach-omap2/*.  None of those CM and PRM register accesses
-through struct platform_data belong under drivers/.  (Nor would they
-belong in DSP platform init code in arch/arm/mach-omap2/* - such code
-must use the clock, clockdomain, powerdomain, omap_device, and
-omap_hwmod layers that are provided for this purpose.)
-
-The immediate problem, however, is that after commit
-346a5c890a55495c718394b74214be1de9303cf6, this code can no longer compile.
-So to fix this immediate problem, convert the DSP boot control code to
-use platform_data function pointers.
+Add two functions for OMAP2430/OMAP3 IVA2 DSP boot control.  These
+registers wound up in the System Control Module.  Other kernel code
+that wishes to control the DSP's boot process should now use these
+functions to do so; subsequent patches implement this in the two
+in-tree users of these functions.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: <fernando.lugo@ti.com>
 ---
- arch/arm/mach-omap2/dsp.c             |    4 ++++
- arch/arm/plat-omap/include/plat/dsp.h |    4 ++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/control.c              |   51 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/control.h              |   16 ++++---
+ arch/arm/plat-omap/include/plat/iva2_dsp.h |   56 ++++++++++++++++++++++++++++
+ 3 files changed, 116 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/iva2_dsp.h
 
-diff --git a/arch/arm/mach-omap2/dsp.c b/arch/arm/mach-omap2/dsp.c
-index 6feeeae..307f67a 100644
---- a/arch/arm/mach-omap2/dsp.c
-+++ b/arch/arm/mach-omap2/dsp.c
-@@ -12,6 +12,7 @@
-  */
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 1fa3294..90fae36 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -209,6 +209,57 @@ void omap4_ctrl_pad_writel(u32 val, u16 offset)
+ 	__raw_writel(val, OMAP4_CTRL_PAD_REGADDR(offset));
+ }
  
- #include <linux/platform_device.h>
-+#include "control.h"
- #include "prm.h"
- #include "cm.h"
- #ifdef CONFIG_BRIDGE_DVFS
-@@ -31,6 +32,9 @@ static struct omap_dsp_platform_data omap_dsp_pdata __initdata = {
- 	.cpu_set_freq = omap_pm_cpu_set_freq,
- 	.cpu_get_freq = omap_pm_cpu_get_freq,
- #endif
-+	.set_dsp_bootaddr = omap2430_ctrl_set_dsp_bootaddr,
-+	.set_dsp_bootmode = omap2430_ctrl_set_dsp_bootmode,
++/*
++ * OMAP3 DSP control functions
++ */
 +
- 	.dsp_prm_read = prm_read_mod_reg,
- 	.dsp_prm_write = prm_write_mod_reg,
- 	.dsp_prm_rmw_bits = prm_rmw_mod_reg_bits,
-diff --git a/arch/arm/plat-omap/include/plat/dsp.h b/arch/arm/plat-omap/include/plat/dsp.h
-index 9c604b3..34e2bd8 100644
---- a/arch/arm/plat-omap/include/plat/dsp.h
-+++ b/arch/arm/plat-omap/include/plat/dsp.h
-@@ -10,7 +10,11 @@ struct omap_dsp_platform_data {
- 	unsigned long (*cpu_get_freq) (void);
- 	unsigned long mpu_speed[6];
++/**
++ * omap2430_ctrl_set_dsp_bootaddr - set the DSP's boot address
++ * @pa: DSP boot address (in physical memory)
++ *
++ * Set the DSP's boot address.  This is an address in physical memory.
++ * No return value.  XXX The TRM claims that this is an "index to a
++ * 4kByte page".  If so, why is the bitfield 21 bits wide, rather than
++ * 20?
++ */
++void omap2430_ctrl_set_dsp_bootaddr(u32 pa)
++{
++	if (!(cpu_is_omap2430() || cpu_is_omap34xx())) {
++		WARN(1, "control: %s: not supported on this SoC\n", __func__);
++		return;
++	}
++
++	WARN(pa & ~OMAP_CTRL_DSP_BOOTADDR_MASK,
++	     "control: %s: invalid DSP boot address %08x\n", __func__, pa);
++
++	omap_ctrl_writel(pa, OMAP243X_CONTROL_IVA2_BOOTADDR);
++}
++
++/**
++ * omap2430_ctrl_set_dsp_bootmode - set the DSP's boot mode
++ * @mode: DSP boot mode (described below)
++ *
++ * Sets the DSP boot mode - see OMAP3 TRM revision ZH section 7.4.7.4
++ * "IVA2.2 Boot Registers".  Known values of @mode include 0, to boot
++ * directly to the address supplied by omap2_ctrl_set_dsp_bootaddr();
++ * 1, to boot to the DSP's ROM code and idle, waiting for interrupts;
++ * 2, to boot to the DSP's ROM code and spin in an idle loop; 3, to
++ * copy the user's bootstrap code from the DSP's internal memory and
++ * execute it (XXX how does the DSP know where to copy from?); and 4,
++ * to execute the DSP ROM code's context restore code.  No return
++ * value.
++ */
++void omap2430_ctrl_set_dsp_bootmode(u8 mode)
++{
++	if (!(cpu_is_omap2430() || cpu_is_omap34xx())) {
++		WARN(1, "control: %s: not supported on this SoC\n", __func__);
++		return;
++	}
++
++	omap_ctrl_writel(mode, OMAP243X_CONTROL_IVA2_BOOTMOD);
++}
++
++
+ #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+ /*
+  * Clears the scratchpad contents in case of cold boot-
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index b6c6b7c..ac14e0a 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -258,11 +258,6 @@
+ /* CONTROL_PROG_IO1 bits */
+ #define OMAP3630_PRG_SDMMC1_SPEEDCTRL	(1 << 20)
  
-+	void (*set_dsp_bootaddr)(u32 pa);
-+	void (*set_dsp_bootmode)(u8 mode);
+-/* CONTROL_IVA2_BOOTMOD bits */
+-#define OMAP3_IVA2_BOOTMOD_SHIFT	0
+-#define OMAP3_IVA2_BOOTMOD_MASK		(0xf << 0)
+-#define OMAP3_IVA2_BOOTMOD_IDLE		(0x1 << 0)
+-
+ /* CONTROL_PADCONF_X bits */
+ #define OMAP3_PADCONF_WAKEUPEVENT0	(1 << 15)
+ #define OMAP3_PADCONF_WAKEUPENABLE0	(1 << 14)
+@@ -280,7 +275,7 @@
+ #define AM35XX_CPGMAC_FCLK_SHIFT        9
+ #define AM35XX_VPFE_FCLK_SHIFT          10
+ 
+-/*AM35XX CONTROL_LVL_INTR_CLEAR bits*/
++/* AM35XX CONTROL_LVL_INTR_CLEAR bits */
+ #define AM35XX_CPGMAC_C0_MISC_PULSE_CLR	BIT(0)
+ #define AM35XX_CPGMAC_C0_RX_PULSE_CLR	BIT(1)
+ #define AM35XX_CPGMAC_C0_RX_THRESH_CLR	BIT(2)
+@@ -290,7 +285,7 @@
+ #define AM35XX_VPFE_CCDC_VD1_INT_CLR	BIT(6)
+ #define AM35XX_VPFE_CCDC_VD2_INT_CLR	BIT(7)
+ 
+-/*AM35XX CONTROL_IP_SW_RESET bits*/
++/* AM35XX CONTROL_IP_SW_RESET bits */
+ #define AM35XX_USBOTGSS_SW_RST		BIT(0)
+ #define AM35XX_CPGMACSS_SW_RST		BIT(1)
+ #define AM35XX_VPFE_VBUSP_SW_RST	BIT(2)
+@@ -330,6 +325,10 @@
+ #define		FEAT_NEON		0
+ #define		FEAT_NEON_NONE		1
+ 
++/*
++ * DSP booting-related constants
++ */
++#define OMAP_CTRL_DSP_BOOTADDR_MASK	0xfffffc00
+ 
+ #ifndef __ASSEMBLY__
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+@@ -351,6 +350,9 @@ extern u32 omap3_arm_context[128];
+ extern void omap3_control_save_context(void);
+ extern void omap3_control_restore_context(void);
+ 
++extern void omap2430_ctrl_set_dsp_bootaddr(u32 pa);
++extern void omap2430_ctrl_set_dsp_bootmode(u8 mode);
 +
- 	/* functions to write and read PRCM registers */
-+	/* XXX None of this should be here */
- 	void (*dsp_prm_write)(u32, s16 , u16);
- 	u32 (*dsp_prm_read)(s16 , u16);
- 	u32 (*dsp_prm_rmw_bits)(u32, u32, s16, s16);
+ #else
+ #define omap_ctrl_base_get()		0
+ #define omap_ctrl_readb(x)		0
+diff --git a/arch/arm/plat-omap/include/plat/iva2_dsp.h b/arch/arm/plat-omap/include/plat/iva2_dsp.h
+new file mode 100644
+index 0000000..495c6a9
+--- /dev/null
++++ b/arch/arm/plat-omap/include/plat/iva2_dsp.h
+@@ -0,0 +1,56 @@
++/*
++ * OMAP2430/OMAP3 IVA2 DSP control headers
++ *
++ * Copyright (C) 2010 Nokia Corporation
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
++ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
++ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write  to the Free Software Foundation, Inc.,
++ * 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#ifndef __ARCH_ARM_PLAT_OMAP_IVA2_DSP_H
++#define __ARCH_ARM_PLAT_OMAP_IVA2_DSP_H
++
++/*
++ * OMAP2430_IVA2_DSP_BOOTMODE_* values:
++ *
++ * Parameters for omap2430_ctrl_set_dsp_bootmode()
++ * (see e.g. OMAP34XX TRM revision ZH section 7.4.7.4
++ * "IVA2.2 Boot Registers"; OMAP2430 TRM revision Z table 7-181
++ * "CONTROL_IVA2_BOOTMOD")
++ *
++ * 0 is defined by the 2430 and 3xxx hardware to boot directly to the
++ * address supplied by omap2_ctrl_set_dsp_bootaddr().  The remainder
++ * of the values are firmware-dependent on the IVA2 ROM code.  Known
++ * values (from the 34XX TRM reference above) include 1, to boot to
++ * the DSP's ROM code and idle, waiting for interrupts; 2, to boot to
++ * the DSP's ROM code and spin in an idle loop; 3, to copy the user's
++ * bootstrap code from the DSP's internal memory and execute it (XXX
++ * how does the DSP know where to copy from?); and 4, to execute the
++ * DSP ROM code's context restore code.  It's unclear if all of these
++ * are present on 2430.
++ */
++#define OMAP_IVA2_DSP_BOOTMODE_USER		0
++#define OMAP_IVA2_DSP_BOOTMODE_IDLE		1
++#define OMAP_IVA2_DSP_BOOTMODE_BUSYLOOP		2
++#define OMAP_IVA2_DSP_BOOTMODE_COPY		3
++#define OMAP_IVA2_DSP_BOOTMODE_RESTORE		4
++
++#endif
 -- 
 1.7.1
