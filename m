@@ -1,65 +1,58 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 26 Oct 2010 11:16:03 -0500
-Subject: [PATCH v2 4/4] staging: tidspbridge: use new SCM DSP boot control fns
+Date: Tue, 26 Oct 2010 11:16:01 -0500
+Subject: [PATCH v2 2/4] OMAP3: PM: update DSP reset code to use new SCM DSP
+	boot control functions
 In-Reply-To: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
 References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1288109763-9446-5-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1288109763-9446-3-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Paul Walmsley <paul@pwsan.com>
 
-Use the new functions from SCM layer instead of handling registers
-directly with __raw_writel, as explained in:
+Update the DSP reset code in pm34xx.c to use one of the new SCM DSP
+boot control functions, omap2430_ctrl_set_dsp_bootmode().
 
-http://marc.info/?l=linux-omap&m=128779652429922&w=2
+This reset code should be moved out to a separate function to be
+called by the hwmod reset process at some point.  Also, 2430
+should be initializing the DSP in a similar fashion.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- drivers/staging/tidspbridge/core/tiomap3430.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/tidspbridge/core/tiomap3430.c b/drivers/staging/tidspbridge/core/tiomap3430.c
-index f22bc12..b91d911 100644
---- a/drivers/staging/tidspbridge/core/tiomap3430.c
-+++ b/drivers/staging/tidspbridge/core/tiomap3430.c
-@@ -23,7 +23,7 @@
- #include <dspbridge/host_os.h>
- #include <linux/mm.h>
- #include <linux/mmzone.h>
--#include <plat/control.h>
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 8c8f1ac..b90b1fb 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -37,6 +37,7 @@
+ #include <plat/prcm.h>
+ #include <plat/gpmc.h>
+ #include <plat/dma.h>
 +#include <plat/iva2_dsp.h>
  
- /*  ----------------------------------- DSP/BIOS Bridge */
- #include <dspbridge/dbdefs.h>
-@@ -293,6 +293,7 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
- 	u32 clk_cmd;
- 	struct io_mgr *hio_mgr;
- 	u32 ul_load_monitor_timer;
-+	u8 bootmode;
- 	struct omap_dsp_platform_data *pdata =
- 		omap_dspbridge_dev->dev.platform_data;
+ #include <asm/tlbflush.h>
  
-@@ -334,15 +335,13 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
- 					OMAP3430_RST1_IVA2_MASK, OMAP3430_IVA2_MOD,
- 					OMAP2_RM_RSTCTRL);
- 			/* Mask address with 1K for compatibility */
--			__raw_writel(dsp_addr & OMAP3_IVA2_BOOTADDR_MASK,
--					OMAP343X_CTRL_REGADDR(
--					OMAP343X_CONTROL_IVA2_BOOTADDR));
-+			dsp_addr &= OMAP3_IVA2_BOOTADDR_MASK;
-+			(*pdata->set_dsp_bootaddr)(dsp_addr);
- 			/*
- 			 * Set bootmode to self loop if dsp_debug flag is true
- 			 */
--			__raw_writel((dsp_debug) ? OMAP3_IVA2_BOOTMOD_IDLE : 0,
--					OMAP343X_CTRL_REGADDR(
--					OMAP343X_CONTROL_IVA2_BOOTMOD));
-+			bootmode = dsp_debug ? OMAP_IVA2_DSP_BOOTMODE_IDLE : 0;
-+			(*pdata->set_dsp_bootmode)(bootmode);
- 		}
- 	}
+@@ -614,6 +615,7 @@ static struct platform_suspend_ops omap_pm_ops = {
+  * function forces the IVA2 into idle state so it can go
+  * into retention/off and thus allow full-chip retention/off.
+  *
++ * XXX This should be handled by the hwmod.
+  **/
+ static void __init omap3_iva_idle(void)
+ {
+@@ -635,9 +637,7 @@ static void __init omap3_iva_idle(void)
+ 	cm_write_mod_reg(OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK,
+ 			 OMAP3430_IVA2_MOD, CM_FCLKEN);
  
+-	/* Set IVA2 boot mode to 'idle' */
+-	omap_ctrl_writel(OMAP3_IVA2_BOOTMOD_IDLE,
+-			 OMAP343X_CONTROL_IVA2_BOOTMOD);
++	omap2430_ctrl_set_dsp_bootmode(OMAP_IVA2_DSP_BOOTMODE_IDLE);
+ 
+ 	/* Un-reset IVA2 */
+ 	prm_write_mod_reg(0, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
 -- 
 1.7.1
