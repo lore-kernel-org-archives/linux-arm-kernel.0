@@ -1,96 +1,107 @@
 From: x0095840@ti.com (Fernando Guzman Lugo)
-Date: Mon, 25 Oct 2010 19:51:42 -0500
-Subject: [PATCH 4/8] staging: tidspbridge - fix timeout in
-	dsp_gpt_wait_overflow
-In-Reply-To: <1288054306-4361-4-git-send-email-x0095840@ti.com>
+Date: Mon, 25 Oct 2010 19:51:40 -0500
+Subject: [PATCH 2/8] staging: tidspbridge - add kconfig parameter for DMM size
+In-Reply-To: <1288054306-4361-2-git-send-email-x0095840@ti.com>
 References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
 	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<1288054306-4361-3-git-send-email-x0095840@ti.com>
-	<1288054306-4361-4-git-send-email-x0095840@ti.com>
-Message-ID: <1288054306-4361-5-git-send-email-x0095840@ti.com>
+Message-ID: <1288054306-4361-3-git-send-email-x0095840@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Timeout was not being initialized correctly and should
-use time_is-before_jiffies, also make it a parameter
+A new kconfig parameter for DMM size is added. Also DMM is
+allocated after the end of SHM area. So that the checks on
+DSP are still valid and we avoid using areas between SHM
+which are not mapped reducing the probability of shared
+memory corruption.
+
+NOTE: This patch has a dependency on this patch:
+
+"omap: iommu - create new api to set valid da range"
 
 Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
 ---
- drivers/staging/tidspbridge/core/dsp-clock.c       |   13 +++++++------
- drivers/staging/tidspbridge/core/dsp-mmu.c         |    5 ++++-
- .../staging/tidspbridge/include/dspbridge/clk.h    |    4 +++-
- 3 files changed, 14 insertions(+), 8 deletions(-)
+ drivers/staging/tidspbridge/Kconfig                |    8 ++++++++
+ drivers/staging/tidspbridge/core/tiomap3430.c      |   20 ++++++++++++++++++--
+ .../tidspbridge/include/dspbridge/dsp-mmu.h        |    3 +++
+ 3 files changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/tidspbridge/core/dsp-clock.c b/drivers/staging/tidspbridge/core/dsp-clock.c
-index 46d17c7..8106d1e 100644
---- a/drivers/staging/tidspbridge/core/dsp-clock.c
-+++ b/drivers/staging/tidspbridge/core/dsp-clock.c
-@@ -202,13 +202,13 @@ static void mcbsp_clk_prepare(bool flag, u8 id)
-  * Sets an overflow interrupt for the desired GPT waiting for a timeout
-  * of 5 msecs for the interrupt to occur.
-  */
--void dsp_gpt_wait_overflow(short int clk_id, unsigned int load)
-+int dsp_gpt_wait_overflow(short int clk_id, unsigned int load,
-+			unsigned long timeout)
- {
- 	struct omap_dm_timer *gpt = timer[clk_id - 1];
--	unsigned long timeout;
+diff --git a/drivers/staging/tidspbridge/Kconfig b/drivers/staging/tidspbridge/Kconfig
+index 672008f..37e47f5 100644
+--- a/drivers/staging/tidspbridge/Kconfig
++++ b/drivers/staging/tidspbridge/Kconfig
+@@ -42,6 +42,14 @@ config TIDSPBRIDGE_MEMPOOL_SIZE
+ 	  Allocate specified size of memory at booting time to avoid allocation
+ 	  failure under heavy memory fragmentation after some use time.
  
- 	if (!gpt)
--		return;
-+		return -EINVAL;
- 
- 	/* Enable overflow interrupt */
- 	omap_dm_timer_set_int_enable(gpt, OMAP_TIMER_INT_OVERFLOW);
-@@ -222,14 +222,15 @@ void dsp_gpt_wait_overflow(short int clk_id, unsigned int load)
- 	/* Wait 80us for timer to overflow */
- 	udelay(80);
- 
--	timeout = msecs_to_jiffies(5);
-+	timeout = jiffies + msecs_to_jiffies(timeout);
- 	/* Check interrupt status and wait for interrupt */
- 	while (!(omap_dm_timer_read_status(gpt) & OMAP_TIMER_INT_OVERFLOW)) {
--		if (time_is_after_jiffies(timeout)) {
-+		if (time_is_before_jiffies(timeout)) {
- 			pr_err("%s: GPTimer interrupt failed\n", __func__);
--			break;
-+			return -ETIME;
++config TIDSPBRIDGE_DMM_SIZE
++	hex "DMM capable memory size (Byte)"
++	depends on TIDSPBRIDGE
++	default "0x10000000"
++	help
++	  Memory size of DSP virtual address for Dynamic Memory Mapping.
++	  Please make sure the size is 4K aligned.
++
+ config TIDSPBRIDGE_DEBUG
+ 	bool "Debug Support"
+ 	depends on TIDSPBRIDGE
+diff --git a/drivers/staging/tidspbridge/core/tiomap3430.c b/drivers/staging/tidspbridge/core/tiomap3430.c
+index c28dcf1..88c8c71 100644
+--- a/drivers/staging/tidspbridge/core/tiomap3430.c
++++ b/drivers/staging/tidspbridge/core/tiomap3430.c
+@@ -345,7 +345,6 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
+ 					OMAP343X_CONTROL_IVA2_BOOTMOD));
  		}
  	}
-+	return 0;
- }
- 
- /*
-diff --git a/drivers/staging/tidspbridge/core/dsp-mmu.c b/drivers/staging/tidspbridge/core/dsp-mmu.c
-index 6d7501a..2d4e897 100644
---- a/drivers/staging/tidspbridge/core/dsp-mmu.c
-+++ b/drivers/staging/tidspbridge/core/dsp-mmu.c
-@@ -65,7 +65,10 @@ static void mmu_fault_print_stack(struct bridge_dev_context *dev_context)
- 
- 	dsp_clk_enable(DSP_CLK_GPT8);
- 
--	dsp_gpt_wait_overflow(DSP_CLK_GPT8, 0xfffffffe);
-+	if (dsp_gpt_wait_overflow(DSP_CLK_GPT8, 0xfffffffe, 10)) {
-+		pr_err("%s: error sending interrupt to DSP\n", __func__);
-+		return;
+-
+ 	if (!status) {
+ 		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2_MASK, 0,
+ 					OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+@@ -362,6 +361,11 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
+ 	if (!status) {
+ 		dev_context->dsp_mmu = mmu;
+ 		sm_sg = &dev_context->sh_s;
++		/* Set valid range to map shared memory */
++		status = iommu_set_da_range(mmu, sm_sg->seg0_da,
++					sm_sg->seg1_da + sm_sg->seg1_size);
 +	}
++	if (!status) {
+ 		sg0_da = iommu_kmap(mmu, sm_sg->seg0_da, sm_sg->seg0_pa,
+ 			sm_sg->seg0_size, IOVMF_ENDIAN_LITTLE | IOVMF_ELSZ_32);
+ 		if (IS_ERR_VALUE(sg0_da)) {
+@@ -411,7 +415,19 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
+ 			l4_i++;
+ 		}
+ 	}
+-
++	if (!status) {
++		/* Set valid range for DMM mappings */
++		if (MAX_DSP_MMU_DA - CONFIG_TIDSPBRIDGE_DMM_SIZE <
++					sm_sg->seg1_da + sm_sg->seg1_size) {
++			dev_err(bridge, "DMM size too big!\n");
++			status = -ENOMEM;
++		} else {
++			status = iommu_set_da_range(mmu,
++				sm_sg->seg1_da + sm_sg->seg1_size,
++				sm_sg->seg1_da + sm_sg->seg1_size +
++				CONFIG_TIDSPBRIDGE_DMM_SIZE);
++		}
++	}
+ 	/* Lock the above TLB entries and get the BIOS and load monitor timer
+ 	 * information */
+ 	if (!status) {
+diff --git a/drivers/staging/tidspbridge/include/dspbridge/dsp-mmu.h b/drivers/staging/tidspbridge/include/dspbridge/dsp-mmu.h
+index cb38d4c..bbbe9e6 100644
+--- a/drivers/staging/tidspbridge/include/dspbridge/dsp-mmu.h
++++ b/drivers/staging/tidspbridge/include/dspbridge/dsp-mmu.h
+@@ -22,6 +22,9 @@
+ #include <plat/iommu.h>
+ #include <plat/iovmm.h>
  
- 	/* Clear MMU interrupt */
- 	tmp = iommu_read_reg(mmu, MMU_IRQSTATUS);
-diff --git a/drivers/staging/tidspbridge/include/dspbridge/clk.h b/drivers/staging/tidspbridge/include/dspbridge/clk.h
-index b239503..6fe1ff2 100644
---- a/drivers/staging/tidspbridge/include/dspbridge/clk.h
-+++ b/drivers/staging/tidspbridge/include/dspbridge/clk.h
-@@ -62,7 +62,9 @@ extern void dsp_clk_exit(void);
-  */
- extern void dsp_clk_init(void);
- 
--void dsp_gpt_wait_overflow(short int clk_id, unsigned int load);
-+int dsp_gpt_wait_overflow(short int clk_id, unsigned int load,
-+			unsigned long timeout);
++/* Last patch is not mapped to detect buffer overflow in DSP side */
++#define MAX_DSP_MMU_DA 0xFFFFF000
 +
- 
- /*
-  *  ======== dsp_clk_enable ========
+ /**
+  * dsp_mmu_init() - initialize dsp_mmu module and returns a handle
+  *
 -- 
 1.6.3.3
