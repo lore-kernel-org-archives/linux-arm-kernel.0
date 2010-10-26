@@ -1,36 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Oct 2010 19:08:43 +0100
-Subject: [PATCH] ARM: memblock: set allocation limit for
-	MEMBLOCK_ALLOC_ANYWHERE
-In-Reply-To: <20101026105638.GA2092@n2100.arm.linux.org.uk>
-References: <20101025104800.6961.70715.stgit@e102109-lin.cambridge.arm.com>
-	<20101025151513.GB21105@n2100.arm.linux.org.uk>
-	<1288047336.6035.12.camel@jazztop>
-	<20101026105638.GA2092@n2100.arm.linux.org.uk>
-Message-ID: <1288116524.5506.1.camel@jazztop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 26 Oct 2010 11:31:51 -0700
+Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
+In-Reply-To: <023501cb74bf$c8e61ad0$5ab25070$%kim@samsung.com>
+References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
+	<AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
+	<20101026030040.GA10200@opensource.wolfsonmicro.com>
+	<023501cb74bf$c8e61ad0$5ab25070$%kim@samsung.com>
+Message-ID: <20101026183151.GD11207@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Tue, Oct 26, 2010 at 12:42:13PM +0900, Kukjin Kim wrote:
 
-On Tue, 2010-10-26 at 11:56 +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 25, 2010 at 11:55:36PM +0100, Will Deacon wrote:
-> > Right. I could also move this call out of sanity_check_meminfo
-> > and into arm_memblock_init now that we don't need lowmem_end_addr
-> > to be initialised. If you're happy with me making that change then
-> > I'll post a revised version to the patch system.
-> 
-> It looks like we're doing a few things out of order.  Yes, it makes
-> sense to move that initialization to arm_memblock_init(), but as we're
-> not running sanity_check_meminfo(), it could mean there's problems
-> with out of order membanks and similar.
-> 
-We could move the arm_memblock_init() call into paging_init, immediately
-after the call to sanity_check_meminfo. I think everything should be
-safe then.
+> Anyway Mark, as you know we have no much time to merge for this merge
+> window.
+> So...if you don't mind, I'd like to apply current style now...then I think
+> we can cleanup it during -rc.
 
-> I'll look at that when I'm back.
+I'm OK with the arch/arm side
 
-Great, thanks.
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Will
+but note that the sound/soc side is probably going to have to wait for
+2.6.38 as Takashi has already done the ALSA merge with Linus (unless we
+do an additional merge later on).
