@@ -1,50 +1,65 @@
-From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
-Date: Tue, 26 Oct 2010 10:52:27 -0500
-Subject: [PATCH 1/8] staging: tidspbridge - remove req_addr from proc_map
-In-Reply-To: <AANLkTimCDM_nruvh_gqxxy0CVnw2sH5UYNT9VgyeBfZN@mail.gmail.com>
-References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
-	<1288054306-4361-2-git-send-email-x0095840@ti.com>
-	<AANLkTimCDM_nruvh_gqxxy0CVnw2sH5UYNT9VgyeBfZN@mail.gmail.com>
-Message-ID: <496565EC904933469F292DDA3F1663E602F49E280A@dlee06.ent.ti.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Tue, 26 Oct 2010 11:16:03 -0500
+Subject: [PATCH v2 4/4] staging: tidspbridge: use new SCM DSP boot control fns
+In-Reply-To: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1288109763-9446-5-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Paul Walmsley <paul@pwsan.com>
+
+Use the new functions from SCM layer instead of handling registers
+directly with __raw_writel, as explained in:
+
+http://marc.info/?l=linux-omap&m=128779652429922&w=2
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ drivers/staging/tidspbridge/core/tiomap3430.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/staging/tidspbridge/core/tiomap3430.c b/drivers/staging/tidspbridge/core/tiomap3430.c
+index f22bc12..b91d911 100644
+--- a/drivers/staging/tidspbridge/core/tiomap3430.c
++++ b/drivers/staging/tidspbridge/core/tiomap3430.c
+@@ -23,7 +23,7 @@
+ #include <dspbridge/host_os.h>
+ #include <linux/mm.h>
+ #include <linux/mmzone.h>
+-#include <plat/control.h>
++#include <plat/iva2_dsp.h>
  
-
-> -----Original Message-----
-> From: Felipe Contreras [mailto:felipe.contreras at gmail.com] 
-> Sent: Tuesday, October 26, 2010 6:46 AM
-> To: Guzman Lugo, Fernando
-> Cc: gregkh at suse.de; felipe.contreras at nokia.com; 
-> Hiroshi.DOYU at nokia.com; linux-kernel at vger.kernel.org; 
-> andy.shevchenko at gmail.com; linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/8] staging: tidspbridge - remove 
-> req_addr from proc_map
-> 
-> On Tue, Oct 26, 2010 at 3:51 AM, Fernando Guzman Lugo 
-> <x0095840@ti.com> wrote:
-> > The device address is assigned by tidspbridge no need for 
-> that parameter anymore.
-> >
-> > Signed-off-by: Fernando Guzman Lugo <x0095840@ti.com>
-> 
-> This would break the API with user-space, right?
-
-Yes, user-space needs to be changed accordingly.
-
-> 
-> I think this change should be delayed, preferably after we 
-> have a working tidspbridge.
-
-The issue you were seeing must be fixed with patch 2/8, and
-Having all the dependencies tidspbridge has to be working
-Properly.
-
-Regards,
-Fernando.
-
-> 
-> --
-> Felipe Contreras
-> 
+ /*  ----------------------------------- DSP/BIOS Bridge */
+ #include <dspbridge/dbdefs.h>
+@@ -293,6 +293,7 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
+ 	u32 clk_cmd;
+ 	struct io_mgr *hio_mgr;
+ 	u32 ul_load_monitor_timer;
++	u8 bootmode;
+ 	struct omap_dsp_platform_data *pdata =
+ 		omap_dspbridge_dev->dev.platform_data;
+ 
+@@ -334,15 +335,13 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
+ 					OMAP3430_RST1_IVA2_MASK, OMAP3430_IVA2_MOD,
+ 					OMAP2_RM_RSTCTRL);
+ 			/* Mask address with 1K for compatibility */
+-			__raw_writel(dsp_addr & OMAP3_IVA2_BOOTADDR_MASK,
+-					OMAP343X_CTRL_REGADDR(
+-					OMAP343X_CONTROL_IVA2_BOOTADDR));
++			dsp_addr &= OMAP3_IVA2_BOOTADDR_MASK;
++			(*pdata->set_dsp_bootaddr)(dsp_addr);
+ 			/*
+ 			 * Set bootmode to self loop if dsp_debug flag is true
+ 			 */
+-			__raw_writel((dsp_debug) ? OMAP3_IVA2_BOOTMOD_IDLE : 0,
+-					OMAP343X_CTRL_REGADDR(
+-					OMAP343X_CONTROL_IVA2_BOOTMOD));
++			bootmode = dsp_debug ? OMAP_IVA2_DSP_BOOTMODE_IDLE : 0;
++			(*pdata->set_dsp_bootmode)(bootmode);
+ 		}
+ 	}
+ 
+-- 
+1.7.1
