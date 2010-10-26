@@ -1,32 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 26 Oct 2010 16:16:57 +0200
-Subject: [PATCH RFC] MXC IOMUX-V3 replace struct pad_desc with
-	bitmapped cookie
-In-Reply-To: <1288084042-21722-1-git-send-email-LW@KARO-electronics.de>
-References: <20101025072126.GG8554@pengutronix.de>
-	<1288084042-21722-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20101026141657.GA5445@pengutronix.de>
+From: felipe.contreras@nokia.com (Felipe Contreras)
+Date: Tue, 26 Oct 2010 17:43:34 +0300
+Subject: [PATCH 0/8] staging: tidspbridge - misc fixes
+In-Reply-To: <20101026040619.GA8549@suse.de>
+References: <1288054306-4361-1-git-send-email-x0095840@ti.com>
+	<20101026040619.GA8549@suse.de>
+Message-ID: <1288103059-notmuch-felipe.contreras@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+gregkh at suse.de wrote:
+> On Mon, Oct 25, 2010 at 07:51:38PM -0500, Fernando Guzman Lugo wrote:
+> > This set of patches fix some issues found in lastest tree.
+> > 
+> > Fernando Guzman Lugo (8):
+> >   staging: tidspbridge - remove req_addr from proc_map
+> >   staging: tidspbridge - add kconfig parameter for DMM size
+> >   staging: tidspbridge - change mmufault tasklet to a workqueue
+> >   staging: tidspbridge - fix timeout in dsp_gpt_wait_overflow
+> >   staging: tidspbridge - use GTP7 for DSP stack dump
+> >   staging: tidspbridge - remove disabling twl when printing DSP stack
+> >   staging: tidspbridge - fix some issues after iommu patches
+> >   staging: tidspbridge - make sync_wait_on_event interruptible
+> 
+> Are any of these really applicable for .37 after .37-rc1?  Or can they
+> wait for .38?
 
-On Tue, Oct 26, 2010 at 11:07:21AM +0200, Lothar Wa?mann wrote:
-> The following patch is a first step to convert the 'struct pad_desc'
-> to a bitmapped cookie to facilitate adding platform specific pullup or
-> drive strength definitions to existing pad definitions without need to
-> rewrite the complete pad def.
+As of right now the dspbridge doesn't work, and there's a mess of
+dependencies to get it working.
 
-I'm all in favour for this patch. I regret that I haven't implemented it
-this way in the first time.
-I think we should delay this to the next merge window though because
-it introduces a change for many i.MX boards. Some more testing for this
-patch is a good thing.
+ - omap iommu: linux-omap pull request has already been sent, and
+   there's no target when the omap iommu pull request will be sent...
+   right Hiroshi?
+ - linux-arm: some patches are needed, and it's not clear if they'll
+   make it to .37-rc1, or .37 at all.
 
-Sascha
+So, no, I don't think these patches should considered as of right now.
+
+In fact, these affect mostly iommu, and I think until those other
+dependencies are resolved, we should revert back to a previous point
+where the driver was actually working.
+
+What is guideline in staging when a driver is broken like this?
+
+Cheers.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Felipe Contreras
