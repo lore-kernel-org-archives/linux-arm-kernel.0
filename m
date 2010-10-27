@@ -1,24 +1,62 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Oct 2010 10:33:41 -0700
-Subject: [PATCH v2 1/2] regulator: add support for regulators on the
-	ab8500 MFD
-In-Reply-To: <AANLkTinc50bzQawaoA_XfkLhJXjVjPWzxgbCJ40UnYwi@mail.gmail.com>
-References: <1279030173-3086-1-git-send-email-sundar.iyer@stericsson.com>
-	<AANLkTinc50bzQawaoA_XfkLhJXjVjPWzxgbCJ40UnYwi@mail.gmail.com>
-Message-ID: <20101027173340.GA25134@opensource.wolfsonmicro.com>
+From: shiraz.linux.kernel@gmail.com (shiraz hashim)
+Date: Wed, 27 Oct 2010 23:05:19 +0530
+Subject: PL310 and QoS logic
+In-Reply-To: <1288186380.17877.75.camel@e102109-lin.cambridge.arm.com>
+References: <4C56D9DC.9010008@st.com>
+	<AANLkTi=tbFt9TyRL2oTDvgJu9BAxsc=mrpApCCMuQdrd@mail.gmail.com>
+	<AANLkTim2zXNP976TyWAQX+qTr4D2+0f_UzDEgYGo1MLf@mail.gmail.com>
+	<1288186380.17877.75.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTikKpNCQnaPLMD_HcEby_VV0n8YRL7jYHtxPH8ba@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 27, 2010 at 02:25:44PM -0200, Thiago Farina wrote:
+Hello Catalin,
 
-> Shouldn't be this returning 1 instead of true and 0 instead false
-> (since the return type is int not bool)?
+On Wed, Oct 27, 2010 at 7:03 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, 2010-10-27 at 14:09 +0100, shiraz hashim wrote:
+>> We were going through ARM PL310 errata list and we came across bug
+>> #738415, which says
+>> "738415: ? A cacheable read with address bits [20:5] equal to 0x0000
+>> can be stalled by non-cacheable read traffic targeting other address
+>> region 2"
+>>
+>> We believe this could be one of the potential problems which we are
+>> facing, and the
+>> errata says the implication could be that there could be a deadlock if
+>> there are dependent
+>> reads.
+>>
+>> Now, how do we ensure that this is the root cause. What is the best
+>> way in which I
+>> can prevent kernel from using cache-lines at each 2MB boundary.
+>> Have you come across this bug? Any information would be really helpful.
+>
+> I think more information or conditions for this to happen can be given
+> by support at arm.com. I don't know the hardware details around this.
 
-There is no reason to do this, logical values are treated as 0 and 1 in
-C.  Using false and true is clear and won't cause any difference in
-code.
+OK.
 
-> Maybe like this?
-> return (ret & info->mask) ? 1: 0;
+> In general you don't have any cacheable/non-cacheable dependent reads in
+> Linux to be able to trigger the deadlock. That's a situation where one
+> CPU is polling some non-cacheable memory location and a different CPU
+> cannot continue. The only situation I'm aware of is during secondary CPU
+> booting or if you boot Linux with CPU with a maxcpus less than the total
+> number of CPUs (so some of them keep polling the pen_release even at
+> run-time). But that's easily solvable with a WFE in the pen polling loop
+> (if your platform has such booting protocol).
+>
+> On the RealView platforms, the secondary CPUs are waiting in a WFI in
+> the boot monitor code and waken up one by one via an IPI, so they don't
+> usually wait in the pen polling loop.
+>
+> If you want to prevent such memory from being used, you can hack the
+> memory initialisation code in Linux to reserve a 4K physical page for
+> every 2MB.
 
-No, that's needlessly obfuscated.
+I am not very sure how to do it. Can I use reserve_bootmem_node from
+bootmem_init.
+
+-- 
+regards
+Shiraz Hashim
