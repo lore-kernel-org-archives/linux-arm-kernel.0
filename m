@@ -1,36 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 Oct 2010 21:20:18 +0100
-Subject: Is ep93xx support broken in linux-next?
-In-Reply-To: <20101026132235.GD15333@gw.healthdatacare.com>
-References: <1288094199.2098.26.camel@r60e>
-	<20101026125050.GB15333@gw.healthdatacare.com>
-	<20101026125841.GC15333@gw.healthdatacare.com>
-	<1288099206.2098.27.camel@r60e>
-	<20101026132235.GD15333@gw.healthdatacare.com>
-Message-ID: <20101027202018.GB24573@n2100.arm.linux.org.uk>
+Date: Wed, 27 Oct 2010 21:27:59 +0100
+Subject: hda interrupt timeouts on sa1110 + sa1111 board
+In-Reply-To: <20101025211239.GD879@boggieman.bredbandsbolaget.se>
+References: <20101025211239.GD879@boggieman.bredbandsbolaget.se>
+Message-ID: <20101027202759.GC24573@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 04:22:35PM +0300, Mika Westerberg wrote:
-> On Tue, Oct 26, 2010 at 05:20:06PM +0400, Alexander Sverdlin wrote:
-> > On Tue, 2010-10-26 at 15:58 +0300, Mika Westerberg wrote:
-> > > On Tue, Oct 26, 2010 at 03:50:51PM +0300, Mika Westerberg wrote:
-> > > [...]
-> > > >  
-> > > >  /*
-> > > > + *	flush_icache_all()
-> > > > + *
-> > > > + *	Unconditionally clean and invalidate the entire icache.
-> > > > + */
-> > > > +ENTRY(fa_flush_icache_all)
-> > > > +	mov	r0, #0
-> > > > +	mcr	p15, 0, ip, c7, c5, 0		@ invalidate I cache
-> > > 
-> > > Obviously the register should be r0 instead of ip.
-> > 
-> > Only one occurrence should be changed?
+On Mon, Oct 25, 2010 at 11:12:39PM +0200, Kristoffer Ericson wrote:
+> Greetings,
 > 
-> No, all of them. But with ep93xx you can just change it
-> from arm920_flush_icache_all().
+> First off I havent bisected this yet, but sounds more than likely
+> that it comes with the sa1111.c changes. It works fine in v2.6.34 also.
+> 
+> As you can see it progresses a bit but keeps loosing interrupts.
 
-Is there an updated patch ready?
+I don't see anything in the sa1111 core, soc_common, or sa11* pcmcia
+code which would cause this change of behaviour.  I think it may
+require a bisect to find what change broke this.
+
+> [   37.136325] setting trigger mode 3 for irq 51 failed (sa1111_type_highirq+0x0/0x90)
+> [   37.182938] setting trigger mode 3 for irq 53 failed (sa1111_type_highirq+0x0/0x90)
+
+These are fine - the soc_common code intentionally tries to set the type
+to rising, then both edges - the idea being that we get rising edge if
+the hardware doesn't support both edges.
+
+> [   40.662432] jornada720_pcmcia_configure_socket(): config socket 1 vcc 33 vpp 0
+> [   40.767874] jornada720_pcmcia_configure_socket(): config socket 1 vcc 33 vpp 0
+> [   41.220300] hda: SanDisk SDCFX3-8192, CFA DISK drive
+> [   42.002086] ide0 at 0xc8840000-0xc8840007,0xc884000e on irq 49
+> [   42.071940] isa bounce pool size: 16 pages
+> [   42.133597] hda: max request size: 128KiB
+> [   42.191639] hda: 16007040 sectors (8195 MB) w/1KiB Cache, CHS=15880/16/63
+> [   72.340242] hda: lost interrupt
+
+And this suggests no interrupts what so ever are coming from the drive.
