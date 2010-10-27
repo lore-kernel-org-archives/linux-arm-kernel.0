@@ -1,58 +1,35 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 27 Oct 2010 15:25:59 -0700
-Subject: [PATCH -v2] msm: fix debug-macro.S build failure
-In-Reply-To: <20101027221428.GB28391@n2100.arm.linux.org.uk>
-References: <20101027221428.GB28391@n2100.arm.linux.org.uk>
-Message-ID: <1288218359-1179-1-git-send-email-dwalker@codeaurora.org>
+From: fabioestevam@yahoo.com (Fabio Estevam)
+Date: Wed, 27 Oct 2010 16:05:30 -0700 (PDT)
+Subject: [PATCH 1/2] mx31_3ds: Add LCD support
+In-Reply-To: <20101027175601.GD8554@pengutronix.de>
+Message-ID: <77029.44543.qm@web51002.mail.re2.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originally there was an ifdef case to handle when no debug uart
-was selected. In commit 0ea1293009826da45e1019f45dfde1e557bb30df
-that case was removed which causes the following build failure,
+Hi Uwe,
 
-/local/mnt/workspace/c_dwalke/git-trees/linux-2.6/arch/arm/kernel/debug.S: Assembler messages:
-/local/mnt/workspace/c_dwalke/git-trees/linux-2.6/arch/arm/kernel/debug.S:174: Error: bad instruction `addruart r1,r2'
-/local/mnt/workspace/c_dwalke/git-trees/linux-2.6/arch/arm/kernel/debug.S:176: Error: bad instruction `waituart r2,r3'
-/local/mnt/workspace/c_dwalke/git-trees/linux-2.6/arch/arm/kernel/debug.S:177: Error: bad instruction `senduart r1,r3'
-/local/mnt/workspace/c_dwalke/git-trees/linux-2.6/arch/arm/kernel/debug.S:178: Error: bad instruction `busyuart r2,r3'
-/local/mnt/workspace/c_dwalke/git-trees/linux-2.6/arch/arm/kernel/debug.S:190: Error: bad instruction `addruart r1,r2'
+--- On Wed, 10/27/10, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+...
 
-This is a partial revert to add back the case which was removed, with
-one minor API change in addruart name the return values "rp, rv".
+> > Sascha, 
+> > 
+> > This patch should be applied after this one: 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-October/030048.html
+> You could make life still a bit more easy for others when
+> replying to
+> patches you depend on.? (Same goes for a patch 2/2,
+> which is nice to be
+> in reply to patch 1/2.)
 
-Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Jason Wang <jason77.wang@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
----
- arch/arm/mach-msm/include/mach/debug-macro.S |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+Ok, I will wait for the MX31 SDHC1 patch to hit Sascha?s tree first and after that I will resend this one.
 
-diff --git a/arch/arm/mach-msm/include/mach/debug-macro.S b/arch/arm/mach-msm/include/mach/debug-macro.S
-index fbd5d90..d726eda 100644
---- a/arch/arm/mach-msm/include/mach/debug-macro.S
-+++ b/arch/arm/mach-msm/include/mach/debug-macro.S
-@@ -36,7 +36,16 @@
- 	tst	\rd, #0x04
- 	beq	1001b
- 	.endm
-+#else
-+	.macro	addruart, rp, rv
-+	.endm
- 
--	.macro	busyuart,rd,rx
-+	.macro	senduart,rd,rx
-+	.endm
-+
-+	.macro	waituart,rd,rx
- 	.endm
- #endif
-+
-+	.macro	busyuart,rd,rx
-+	.endm
--- 
-1.7.0.4
+My email client messed up the tabs. Will fix it in the next version.
+
+Thanks for your feedback.
+
+Regards,
+
+Fabio Estevam
+
+
+      
