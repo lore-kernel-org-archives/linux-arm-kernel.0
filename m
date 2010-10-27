@@ -1,34 +1,36 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Wed, 27 Oct 2010 10:31:06 -0700 (PDT)
-Subject: [PATCH 2/2] mx31_3ds: Add touchscreen support
-Message-ID: <940696.67228.qm@web51006.mail.re2.yahoo.com>
+From: tfransosi@gmail.com (Thiago Farina)
+Date: Wed, 27 Oct 2010 15:42:53 -0200
+Subject: [PATCH v2 1/2] regulator: add support for regulators on the
+	ab8500 MFD
+In-Reply-To: <20101027173340.GA25134@opensource.wolfsonmicro.com>
+References: <1279030173-3086-1-git-send-email-sundar.iyer@stericsson.com>
+	<AANLkTinc50bzQawaoA_XfkLhJXjVjPWzxgbCJ40UnYwi@mail.gmail.com>
+	<20101027173340.GA25134@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTi=DRHVbz3ov_gL6qyYH673WDk+1Vyw2AvjhSRxv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the mx31_3ds board the touchscreen feature is provided by MC13783 PMIC.
+On Wed, Oct 27, 2010 at 3:33 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Oct 27, 2010 at 02:25:44PM -0200, Thiago Farina wrote:
+>
+>> Shouldn't be this returning 1 instead of true and 0 instead false
+>> (since the return type is int not bool)?
+>
+> There is no reason to do this, logical values are treated as 0 and 1 in
+> C. ?Using false and true is clear and won't cause any difference in
+> code.
+>
+In C99 I suppose that is true and legal?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> Maybe like this?
+>> return (ret & info->mask) ? 1: 0;
+>
+> No, that's needlessly obfuscated.
+>
+Obfuscated? What you mean? It is a driver, and people reading and
+writing a driver would know what it means, no?
 
----
- arch/arm/mach-mx3/mach-mx31_3ds.c |? ? 2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Would be much simpler if it was just (like done in ab3100.c):
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 71fe05b..cf399d5 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -255,7 +255,7 @@ static struct mc13783_regulator_init_data mx31_3ds_regulators[] = {
- static struct mc13783_platform_data mc13783_pdata __initdata = {
- ??? .regulators = mx31_3ds_regulators,
- ??? .num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
--??? .flags? = MC13783_USE_REGULATOR,
-+??? .flags? = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
- };
- 
- /* SPI */
--- 
-1.6.0.4
-
-
-
-      
+return (ret & info->mask);
