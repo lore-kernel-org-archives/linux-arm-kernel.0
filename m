@@ -1,20 +1,27 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 27 Oct 2010 10:10:02 +0100
-Subject: [PATCH] MMC: add support for the Marvell platform SDHCI controller
-In-Reply-To: <1288166860-28556-1-git-send-email-mike@compulab.co.il>
-References: <1288166860-28556-1-git-send-email-mike@compulab.co.il>
-Message-ID: <20101027091002.GA14731@void.printf.net>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 27 Oct 2010 11:15:25 +0200
+Subject: [PATCH 2/2] [ARM] Dove: add support for multi-purpose pins
+	configuration
+In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009FE1475AA36F@IL-MB01.marvell.com>
+References: <cover.1288166960.git.mike@compulab.co.il>
+	<63829134f147c923e9785f62482183efcbe62cc0.1288166961.git.mike@compulab.co.il>
+	<FCBE654890C0334289D0AD3AF4EF009FE1475AA36F@IL-MB01.marvell.com>
+Message-ID: <4CC7EDAD.8050009@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 10/27/10 11:01, Saeed Bishara wrote:
+> +static void dove_mpp_conf_grp(int num, int sel, u32 *mpp_ctrl)
+> +{
+> +	int start = dove_mpp_grp[num].start;
+> +	int end = dove_mpp_grp[num].start;
+> Shouldn't that be dove_mpp_grp[num].end ?
 
-I concur with Saeed, and please also fold this patch into the submission:
+oops.. thanks, will fix and resend
 
-   http://marc.info/?l=linux-kernel&m=128458441031769&q=raw
+> saeed
 
-Thanks!
 
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Sincerely yours,
+Mike.
