@@ -1,39 +1,24 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 27 Oct 2010 13:21:59 +0200
-Subject: [PATCH v2 2/2] [ARM] Dove: rename SDCHI devices to "sdhci-dove"
-In-Reply-To: <cover.1288178148.git.mike@compulab.co.il>
-References: <cover.1288178148.git.mike@compulab.co.il>
-Message-ID: <0991d07ee009926ba3665d3410970aaa3cbbbb22.1288178148.git.mike@compulab.co.il>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Wed, 27 Oct 2010 12:16:56 +0100
+Subject: QNAP TS-209 broken by "orion/kirkwood: reset PCIe unit on boot"
+In-Reply-To: <20101025151210.GV16863@jirafa.cyrius.com>
+References: <20101019190533.GA11893@jirafa.cyrius.com>
+	<alpine.LFD.2.00.1010191529100.2764@xanadu.home>
+	<FCBE654890C0334289D0AD3AF4EF009FD18F0B415F@IL-MB01.marvell.com>
+	<alpine.LFD.2.00.1010211608550.2764@xanadu.home>
+	<20101025151210.GV16863@jirafa.cyrius.com>
+Message-ID: <20101027111656.GA11417@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-CC: Saeed Bishara <saeed@marvell.com>
----
- arch/arm/mach-dove/common.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+* Martin Michlmayr <tbm@cyrius.com> [2010-10-25 16:12]:
+> I can confirm 1) on my QNAP TS-209.  I also booted a kernel with the
+> patch on my TS-419P but I never had a reliable way to trigger the
+> issue.  Maybe Olaf or Bernhard can help with this.
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index f7a1258..fe627ab 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -770,7 +770,7 @@ static struct resource dove_sdio0_resources[] = {
- };
- 
- static struct platform_device dove_sdio0 = {
--	.name		= "sdhci-mv",
-+	.name		= "sdhci-dove",
- 	.id		= 0,
- 	.dev		= {
- 		.dma_mask		= &sdio_dmamask,
-@@ -798,7 +798,7 @@ static struct resource dove_sdio1_resources[] = {
- };
- 
- static struct platform_device dove_sdio1 = {
--	.name		= "sdhci-mv",
-+	.name		= "sdhci-dove",
- 	.id		= 1,
- 	.dev		= {
- 		.dma_mask		= &sdio_dmamask,
+A Debian user has confirmed in the meantime that the patch helps on
+the TS-419P.
+
 -- 
-1.7.3.1
+Martin Michlmayr
+http://www.cyrius.com/
