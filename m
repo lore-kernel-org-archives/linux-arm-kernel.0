@@ -1,88 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Oct 2010 09:37:40 +0200
-Subject: [patch v3 04/10] efikamx: add mmc support
-In-Reply-To: <20101026200958.255102949@rtp-net.org>
-References: <20101026200723.839428019@rtp-net.org>
-	<20101026200958.255102949@rtp-net.org>
-Message-ID: <20101027073740.GA8554@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 27 Oct 2010 16:58:13 +0900
+Subject: [PATCH 1/6] rtc: rtc-s3c: Fix access unit from byte to word on
+	RTCCON
+In-Reply-To: <AANLkTi=+BH7nJFt5Amz_q=6HAn9STfXjKbCS6jSQeW5y@mail.gmail.com>
+References: <1286494879-2932-1-git-send-email-kgene.kim@samsung.com>
+	<1286494879-2932-2-git-send-email-kgene.kim@samsung.com>
+	<AANLkTi=+BH7nJFt5Amz_q=6HAn9STfXjKbCS6jSQeW5y@mail.gmail.com>
+Message-ID: <000401cb75ac$b6eab190$24c014b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 26, 2010 at 10:07:27PM +0200, Arnaud Patard wrote:
-> The efika mx is using a esdhc host for mmc support. Now that the sdhci
-> has support for it, enable it.
+MyungJoo Ham wrote:
 > 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-20 18:30:40.000000000 +0200
-> +++ linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-20 18:30:46.000000000 +0200
-> @@ -59,6 +59,28 @@
->  	MX51_PAD_PCBID0,
->  	MX51_PAD_PCBID1,
->  	MX51_PAD_PCBID2,
-> +
-> +	/* SD 1 */
-> +	MX51_PAD_SD1_CMD__SD1_CMD,
-> +	MX51_PAD_SD1_CLK__SD1_CLK,
-> +	MX51_PAD_SD1_DATA0__SD1_DATA0,
-> +	MX51_PAD_SD1_DATA1__SD1_DATA1,
-> +	MX51_PAD_SD1_DATA2__SD1_DATA2,
-> +	MX51_PAD_SD1_DATA3__SD1_DATA3,
-> +
-> +	/* SD 2 */
-> +	MX51_PAD_SD2_CMD__SD2_CMD,
-> +	MX51_PAD_SD2_CLK__SD2_CLK,
-> +	MX51_PAD_SD2_DATA0__SD2_DATA0,
-> +	MX51_PAD_SD2_DATA1__SD2_DATA1,
-> +	MX51_PAD_SD2_DATA2__SD2_DATA2,
-> +	MX51_PAD_SD2_DATA3__SD2_DATA3,
-> +
-> +	/* SD/MMC WP/CD */
-> +	MX51_PAD_GPIO_1_0__ESDHC1_CD,
-> +	MX51_PAD_GPIO_1_1__ESDHC1_WP,
-> +	MX51_PAD_GPIO_1_7__ESDHC2_WP,
-> +	MX51_PAD_GPIO_1_8__ESDHC2_CD,
->  };
->  
->  /* Serial ports */
-> @@ -164,6 +186,11 @@
->  	mx51_efikamx_board_id();
->  	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
->  	mxc_init_imx_uart();
-> +	imx51_add_esdhc(0, NULL);
-> +
-> +	/* on < 1.2 boards the 2 SD controller are used */
-s/the 2/both/ ?
+> On Fri, Oct 8, 2010 at 8:41 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > From: Changhwan Youn <chaos.youn@samsung.com>
+> >
+> > S3C2410_RTCCON of TYPE_S3C64XX RTC should be read/written by
+> > readw and writew, because TYPE_S3C64XX RTC uses bit 8 and 9.
+> > And TYPE_S3C2410 RTC also can access it by readw and writew.
+> >
+> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> > [atul.dahiya at samsung.com: tested on smdk2416]
+> > Tested-by: Atul Dahiya <atul.dahiya@samsung.com>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > ---
+> > ?drivers/rtc/rtc-s3c.c | ? 36 ++++++++++++++++++------------------
+> > ?1 files changed, 18 insertions(+), 18 deletions(-)
+> 
+> Hello,
+> 
+Hi,
+> 
+> Sorry for a late reply...
+> 
+Yeah, too late :-(
 
-> +	if (system_rev < 0x12)
-> +		imx51_add_esdhc(1, NULL);
->  }
->  
->  static void __init mx51_efikamx_timer_init(void)
-> Index: linux-2.6-submit/arch/arm/mach-mx5/Kconfig
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/Kconfig	2010-10-20 18:30:29.000000000 +0200
-> +++ linux-2.6-submit/arch/arm/mach-mx5/Kconfig	2010-10-20 18:30:46.000000000 +0200
-> @@ -80,6 +80,7 @@
->  config MACH_MX51_EFIKAMX
->  	bool "Support MX51 Genesi Efika MX nettop"
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_ESDHC
-Can you keep these flags sorted alphabetically please?
+> Anyway, I have a small question in this rtc-s3c.c driver.
+> 
+> Is there any reason to use read/write b/w to access registers of rtc-s3c?
+> 
+See the git comment.
 
->  	help
->  	  Include support for Genesi Efika MX nettop. This includes specific
->  	  configurations for the board and its peripherals.
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Why don't we use readl/writel when accessing registers in this drivers
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I don't know why we should use readl/writel for all case...
+even though we can use just word or byte access.
+
+> and just forget which registers require at least 8 or 16 or 32 bits?
+> 
+> In fact, it appears that readw/writew accesses 16bits, not 32bits in
+
+Yes...
+
+> ARM machines, which may incur problems with TICCNT/CURTICCNT
+> registers.
+> 
+I can't get your comment...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
