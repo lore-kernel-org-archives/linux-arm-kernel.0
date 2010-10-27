@@ -1,213 +1,66 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Wed, 27 Oct 2010 09:26:08 -0500
-Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
-	functions
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DBEBEC0B@dbde02.ent.ti.com>
-References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-2-git-send-email-manjugk@ti.com>
-	<4CC6EA5A.8070302@ti.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DBEBEC0B@dbde02.ent.ti.com>
-Message-ID: <7A436F7769CA33409C6B44B358BFFF0C014FD7F3FE@dlee02.ent.ti.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 27 Oct 2010 16:30:14 +0200
+Subject: [PATCH 2/2] [ARM] Dove: add support for multi-purpose pins
+	configuration
+In-Reply-To: <AANLkTin1SR2xm7o18uF9vOOAnNJvvjnUxjUPDvifMGp8@mail.gmail.com>
+References: <cover.1288166960.git.mike@compulab.co.il>	<63829134f147c923e9785f62482183efcbe62cc0.1288166961.git.mike@compulab.co.il>
+	<AANLkTin1SR2xm7o18uF9vOOAnNJvvjnUxjUPDvifMGp8@mail.gmail.com>
+Message-ID: <4CC83776.8040907@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: G, Manjunath Kondaiah
-> Sent: Tuesday, October 26, 2010 10:55 PM
-[..]
+On 10/27/10 14:46, saeed bishara wrote:
+>> +
+>> +               shift = (num & 7) << 2;
+>> +               if (*mpp_list & MPP_PMU_MASK) {
+>> +                       pmu_mpp_ctrl |= (0x1 << num);
+>> +                       pmu_sig_ctrl[num / 8] &= ~(0xf << shift);
+>> +                       pmu_sig_ctrl[num / 8] |= ~(0xf << shift);
+> the  ~ in line hints something wrong
 
-> > [...]
-> > >
-> > > diff --git a/arch/arm/plat-omap/dma.c
-> > b/arch/arm/plat-omap/dma.c index
-> > > f5c5b8d..77241e2 100644
-> > > --- a/arch/arm/plat-omap/dma.c
-> > > +++ b/arch/arm/plat-omap/dma.c
-> > > @@ -40,6 +40,147 @@
-> > >
-> [...]
-> > > +static u16 reg_map_omap2[] = {
-> > > +       [REVISION]              = 0x00,
-> > > +       [GCR2]                  = 0x78,
-> > > +       [IRQSTATUS_L0]          = 0x08,
-> > > +       [IRQSTATUS_L1]          = 0x0c,
-> > [..]
-> > > +       /* OMAP4 specific registers */
-> > > +       [CDP]                   = 0xd0,
-> > > +       [CNDP]                  = 0xd4,
-> > > +       [CCDN]                  = 0xd8,
-> > > +};
-> > > +
-> > dumb question: any reason why a struct wont do?
-> > struct reg_map_omap2 {
-> > u16 revision;
-> > ...
-> > ...
-> > }
+indeed :)
+
+>> diff --git a/arch/arm/mach-dove/mpp.h b/arch/arm/mach-dove/mpp.h
+>> new file mode 100644
+>> index 0000000..c7b8acf
+>> --- /dev/null
+>> +++ b/arch/arm/mach-dove/mpp.h
+>> @@ -0,0 +1,214 @@
+>> +#ifndef __ARCH_DOVE_MPP_CODED_H
+>> +#define __ARCH_DOVE_MPP_CODED_H
+>> +
+>> +#define MPP(_num, _mode, _pmu, _grp, _au1, _nfc) (     \
+>> +/* MPP/group number */         ((_num) & 0xff) |               \
+>> +/* MPP select value */         (((_mode) & 0xf) << 8) |        \
+>> +/* MPP PMU */                  ((!!(_pmu)) << 12) |            \
+>> +/* group flag */               ((!!(_grp)) << 13) |            \
+>> +/* AU1 flag */                 ((!!(_au1)) << 14) |            \
+>> +/* NFCE flag */                        ((!!(_nfc)) << 15))
+> in order to make these defines readable, I suggest to add defines for
+> the flags, for example:
+> #define GROUP   (1 << 13)
+> then MPP defines look like:
 > 
-> This approach is as per i2c driver as suggested by kevin.
-> http://www.spinics.net/lists/linux-omap/msg36446.html
-Thanks for pointing this out. I2c has what 18 registers while dma has over 40 registers :( patch 11 [1] now I understand this step -> this merges 
-together at later patchset - it starts to make sense now. It becomes reg_map. Thanks - looks like a good change in the eventual code.
+> #define MPPX_GPIO          MPP(MPP_X, 0x1, GROUP|AU1)
 
+I think we can make it even more readable with
 
-[...]
-> > > +static inline void dma_write(u32 val, int reg, int lch) {
-> > > +       if (cpu_class_is_omap1()) {
-> > > +               if (reg > OMAP1_CH_COMMON_START)
-> > > +                       __raw_writew(val, dma_base +
-> > > +                               (reg_map_omap1[reg] + 0x40 * lch));
-> > > +               else
-> > > +                       __raw_writew(val, dma_base +
-> > reg_map_omap1[reg]);
-> > > +       } else {
-> > > +               if (reg > OMAP2_CH_COMMON_START)
-> > > +                       __raw_writel(val, dma_base +
-> > > +                               (reg_map_omap2[reg] + 0x60 * lch));
-> > > +               else
-> > > +                       __raw_writel(val, dma_base +
-> > reg_map_omap2[reg]);
-> > > +       }
-> > > +}
-Eventual code looks like this:
+#define MPP_PIN(_num, _sel)	MPP(_num, _sel, 0, 0, 0, 0)
+#define MPP_GRP(_grp, _sel)	MPP(_grp, _sel, 0, 1, 0, 0)
+#define MPP_GRP_AU1(_sel)	MPP(0, _sel, 0, 0, 1, 0)
+#define MPP_GRP_NFC(_sel)	MPP(0, _sel, 0, 0, 0, 1)
 
-62 static inline void dma_write(u32 val, int reg, int lch)
-63 {
-64         if (d->dev_caps & IS_WORD_16) {
-65                 if (reg >= CH_COMMON_START)
-66                         __raw_writew(val, dma_base +
-67                                 (reg_map[reg] + 0x40 * lch));
-68                 else
-69                         __raw_writew(val, dma_base + reg_map[reg]);
-70         } else {
-71                 if (reg > CH_COMMON_START)
-72                         __raw_writel(val, dma_base +
-73                                 (reg_map[reg] + 0x60 * lch));
-74                 else
-75                         __raw_writel(val, dma_base + reg_map[reg]);
-76         }
-77 }
-I don't really see how inline will really help here!
-
-> > > +
-> > > +static inline u32 dma_read(int reg, int lch) {
-> > > +       u32 val;
-> > > +
-> > > +       if (cpu_class_is_omap1()) {
-> > > +               if (reg > OMAP1_CH_COMMON_START)
-> > > +                       val = __raw_readw(dma_base +
-> > > +                                       (reg_map_omap1[reg]
-> > + 0x40 * lch));
-> > > +               else
-> > > +                       val = __raw_readw(dma_base +
-> > reg_map_omap1[reg]);
-> > > +       } else {
-> > > +               if (reg > OMAP2_CH_COMMON_START)
-> > > +                       val = __raw_readl(dma_base +
-> > > +                                       (reg_map_omap2[reg]
-> > + 0x60 * lch));
-> > > +               else
-> > > +                       val = __raw_readl(dma_base +
-> > reg_map_omap2[reg]);
-> > > +       }
-> > > +       return val;
-> > > +}
-> > What is the benefit of using inline function here? would'nt
-> > we increase code size? cant we use a function pointer
-> > initialized to class1 or rest?
-> > Quote from CodingStyle (15):
-> > "A reasonable rule of thumb is to not put inline at functions
-> > that have more than 3 lines of code in them. An exception to
-> > this rule are the cases where a parameter is known to be a
-> > compiletime constant, and as a result of this constantness
-> > you *know* the compiler will be able to optimize most of your
-> > function away at compile time. For a good example of this
-> > later case, see the kmalloc() inline function.
-> > "
-> > is the expectation that cpu_class_is_omap1 compile time
-> > constant hence the actual compiled in code is smaller
-> > -candidate for inline?
-> 
-> Detailed discussion and alignment can be found at:
-> http://www.spinics.net/lists/linux-omap/thrd6.html
-Better link:
-http://marc.info/?t=128264802300006&r=1&w=2
+What do you think?
 
 > 
-> Search for:
-> [PATCH v2 07/11] OMAP2/3/4: DMA: HWMOD: Device registration
-
-http://marc.info/?l=linux-omap&m=128464661906497&w=2
-my question is slightly different here - debate of suggestion to use inline
-is based on the size of code involved, the discussion in the thread 
-discussed around 3 lines of code, which made sense, unfortunately, the 
-thread does not answer my question unfortunately for *this* specific patch
-- OR do you wish to point me to some specific link which answers this?
-
-> 
-> 
-> >
-> > >
-> > >  #ifdef CONFIG_ARCH_OMAP15XX
-> > >  /* Returns 1 if the DMA module is in OMAP1510-compatible mode, 0
-> > >         if (cpu_class_is_omap1()) {
-> [...]
-> > >                 u16 ccr;
-> > >
-> > > -               ccr = dma_read(CCR(lch));
-> > > +               l = dma_read(CSDP1, lch);
-> > > +               l &= ~0x03;
-> > > +               l |= data_type;
-> > > +               dma_write(l, CSDP1, lch);
-> > > +
-> > > +               ccr = dma_read(CCR1, lch);
-> > >                 ccr &= ~(1 << 5);
-> > >                 if (sync_mode == OMAP_DMA_SYNC_FRAME)
-> > >                         ccr |= 1 << 5;
-> > > -               dma_write(ccr, CCR(lch));
-> > > +               dma_write(ccr, CCR1, lch);
-> > >
-> > > -               ccr = dma_read(CCR2(lch));
-> > > +               ccr = dma_read(CCR1_2, lch);
-> > >                 ccr &= ~(1 << 2);
-> > >                 if (sync_mode == OMAP_DMA_SYNC_BLOCK)
-> > >                         ccr |= 1 << 2;
-> > > -               dma_write(ccr, CCR2(lch));
-> > > +               dma_write(ccr, CCR1_2, lch);
-> > >         }
-> > >
-> > >         if (cpu_class_is_omap2() && dma_trigger) {
-> > >                 u32 val;
-> > >
-> > > -               val = dma_read(CCR(lch));
-> > > +               l = dma_read(CSDP2, lch);
-> > > +               l &= ~0x03;
-> > > +               l |= data_type;
-> > > +               dma_write(l, CSDP2, lch);
-> > This seems to me to be a replication mess :( compared to the original
-> > CSDP(lch) - which mapped to class1 or class2 as needed - same
-> > elsewhere.
-> > Code is becoming pretty much needing a refactoring as a result :(
-> >
-> > [...]
-> 
-> This is interim patch towards hwmod and driver cleanup. As mentioned in
-> the
-> patch description, objective is to replace lowlevel read/write macros with
-> inline functions. For few registers(between omap1 and omap2+), the offset
-> is
-> different. Earlier, this offset difference was handled through macros.
-> Now, it is replaced with inline functions, the code should be seperated
-> for
-> handling between omap1 and omap2+. It will get cleaned up once the code is
-> moved respective mach-omapx directories.
-> 
-> You can have look at: PATCH 11/13
-
-Ok looks like it never made to ML :( [1] as you refered to in a later patch 
-Makes sense to me now. Thanks.
+>> +
+>> +#define MPP20_GPIO20           MPP(20, 0x0, 0, 0, 0, 0)
+>> +#define MPP20_AC97_SYSCLK_OUT  MPP(20, 0x1, 0, 0, 0, 0)
+>> +#define MPP20_SPI_2_MISO       MPP(20, 0x2, 0, 0, 0, 0)
+> I'ld rather call this LCD_SPI instead of SPI_2 to make it clear that
+> this SPI is different
 
 
-[1] http://dev.omapzoom.org/?p=manju/kernel-omap3-dev.git;a=commitdiff;h=7457a6b4248772aaa52dfb13a170f891596a512a
-Regards,
-Nishanth Menon
+-- 
+Sincerely yours,
+Mike.
