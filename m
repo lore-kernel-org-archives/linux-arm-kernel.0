@@ -1,28 +1,21 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 27 Oct 2010 08:57:15 -0400 (EDT)
-Subject: QNAP TS-209 broken by "orion/kirkwood: reset PCIe unit on boot"
-In-Reply-To: <20101027111656.GA11417@jirafa.cyrius.com>
-References: <20101019190533.GA11893@jirafa.cyrius.com>
-	<alpine.LFD.2.00.1010191529100.2764@xanadu.home>
-	<FCBE654890C0334289D0AD3AF4EF009FD18F0B415F@IL-MB01.marvell.com>
-	<alpine.LFD.2.00.1010211608550.2764@xanadu.home>
-	<20101025151210.GV16863@jirafa.cyrius.com>
-	<20101027111656.GA11417@jirafa.cyrius.com>
-Message-ID: <alpine.LFD.2.00.1010270856370.27159@xanadu.home>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Wed, 27 Oct 2010 16:01:37 +0200
+Subject: [RFC] change the dma_unmap_single for arm
+Message-ID: <AANLkTimO9m13=nLeYdS0+2Z2K_9MRfzR=VYtCDfV573s@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Oct 2010, Martin Michlmayr wrote:
+Hi,
+      latest versions invalidates the buffer in order to overcome the
+speculative prefetch. however, in some cases, specially network, the
+data that DMAed can be much less that the buffer size, so it would be
+more efficient - and correct for arm case - to use the received bytes
+count rather than the buffer size. however, the linux API restricts
+the size to be the same as the one passed to the dma_map_single -
+which is the buffer size.
+    the simplest solution that I can think of is to change the API
+restriction, and make the drivers pass the received bytes count
+instead of buffer size, the kernel also will provide a function to the
+drivers  to permit using this hack.
 
-> * Martin Michlmayr <tbm@cyrius.com> [2010-10-25 16:12]:
-> > I can confirm 1) on my QNAP TS-209.  I also booted a kernel with the
-> > patch on my TS-419P but I never had a reliable way to trigger the
-> > issue.  Maybe Olaf or Bernhard can help with this.
-> 
-> A Debian user has confirmed in the meantime that the patch helps on
-> the TS-419P.
-
-Helped what, exactly?
-
-
-Nicolas
+saeed
