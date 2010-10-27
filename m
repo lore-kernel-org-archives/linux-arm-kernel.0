@@ -1,99 +1,94 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 27 Oct 2010 18:18:12 +0900
-Subject: [PATCH 1/6] rtc: rtc-s3c: Fix access unit from byte to word on
-	RTCCON
-In-Reply-To: <AANLkTimXee842b+cmi7vy+Dj60SKzyg1Q=NorOmvJg3w@mail.gmail.com>
-References: <1286494879-2932-1-git-send-email-kgene.kim@samsung.com>
-	<1286494879-2932-2-git-send-email-kgene.kim@samsung.com>
-	<AANLkTi=+BH7nJFt5Amz_q=6HAn9STfXjKbCS6jSQeW5y@mail.gmail.com>
-	<000401cb75ac$b6eab190$24c014b0$%kim@samsung.com>
-	<AANLkTimXee842b+cmi7vy+Dj60SKzyg1Q=NorOmvJg3w@mail.gmail.com>
-Message-ID: <000801cb75b7$e35a6c10$aa0f4430$%kim@samsung.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 27 Oct 2010 11:51:06 +0200
+Subject: [patch v3 07/10] efikamx: add support for power key
+In-Reply-To: <20101027073044.GY8554@pengutronix.de> ("Uwe =?utf-8?Q?Kleine?=
+	=?utf-8?Q?-K=C3=B6nig=22's?=
+	message of "Wed, 27 Oct 2010 09:30:44 +0200")
+References: <20101026200723.839428019@rtp-net.org>
+	<20101026201002.466426845@rtp-net.org>
+	<20101027073044.GY8554@pengutronix.de>
+Message-ID: <87lj5k7ylx.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
-> 
-> On Wed, Oct 27, 2010 at 4:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > MyungJoo Ham wrote:
-> >>
-> >> On Fri, Oct 8, 2010 at 8:41 AM, Kukjin Kim <kgene.kim@samsung.com>
-wrote:
-> >> > From: Changhwan Youn <chaos.youn@samsung.com>
-> >> >
-> >> > S3C2410_RTCCON of TYPE_S3C64XX RTC should be read/written by
-> >> > readw and writew, because TYPE_S3C64XX RTC uses bit 8 and 9.
-> >> > And TYPE_S3C2410 RTC also can access it by readw and writew.
-> >> >
-> >> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> >> > [atul.dahiya at samsung.com: tested on smdk2416]
-> >> > Tested-by: Atul Dahiya <atul.dahiya@samsung.com>
-> >> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >> > Cc: Ben Dooks <ben-linux@fluff.org>
-> >> > ---
-> >> > ?drivers/rtc/rtc-s3c.c | ? 36 ++++++++++++++++++------------------
-> >> > ?1 files changed, 18 insertions(+), 18 deletions(-)
-> >>
-> >> Hello,
-> >>
-> > Hi,
-> >>
-> >> Sorry for a late reply...
-> >>
-> > Yeah, too late :-(
-> >
-> >> Anyway, I have a small question in this rtc-s3c.c driver.
-> >>
-> >> Is there any reason to use read/write b/w to access registers of
-rtc-s3c?
-> >>
-> > See the git comment.
-> >
-> >> Why don't we use readl/writel when accessing registers in this drivers
-> >
-> > I don't know why we should use readl/writel for all case...
-> > even though we can use just word or byte access.
-> >
-> >> and just forget which registers require at least 8 or 16 or 32 bits?
-> >>
-> >> In fact, it appears that readw/writew accesses 16bits, not 32bits in
-> >
-> > Yes...
-> >
-> >> ARM machines, which may incur problems with TICCNT(S3C2410_TICNT in the
-> code)/CURTICCNT
-> >> registers.
-> >>
-> > I can't get your comment...
-> 
-> It is because TICCNT and CURTICCNT RTC registers of S5PC210 require
-> 32bit access according to the manual while this patch still uses 16bit
-> accesses for them.
-> 
-> Besides, ALMYEAR/BCDYEAR(S3C2410_RTCYEAR) requires at least 16bit access.
-> 
-> 
-> This issue was found today while testing suspend-to-mem with s5pc210
-> and rtc-wakeup loop. My guess is that saving and restoring only 8 bits
-> of TICNT at suspend/resume function incurred the instable
-> suspend-to-mem (kernel hangs with about 1/100 probability) Using
-> readl/writel for TICNT solved the kernel hang issue.
-> 
-I got it.
-You mean need to fix readb(TICNT) of s3c_rtc_suspend() and
-s3c_rtc_resume()...
-Ok...but it's different some kind of bug fix with this patch.
-And...need to check side effect to all of Samsung SoCs.
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
 
-Hmm...and first of all, not supported S5PV310/S5PC210 PM in mainline now.
+> On Tue, Oct 26, 2010 at 10:07:30PM +0200, Arnaud Patard wrote:
+>> This patch adds support for power key button of the efika mx. It's connected
+>> on  GPIO 2 31.
+>> 
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> 
+>> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> ===================================================================
+>> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-26 19:57:16.000000000 +0200
+>> +++ linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-26 19:59:16.000000000 +0200
+>> @@ -19,6 +19,8 @@
+>>  #include <linux/i2c.h>
+>>  #include <linux/gpio.h>
+>>  #include <linux/leds.h>
+>> +#include <linux/input.h>
+> Do you really need linux/input.h?
+>
 
-Anyway if any bug, we can fix it during -rc.
-I always welcome to bug fix to our codes. :-)
+You need it if you want to have KEY_POWER and EV_POWER definitions
 
-Thanks.
+>> +#include <linux/gpio_keys.h>
+> this is included by devices-common.h (which is included by
+> devices-imx51.h).  So you can drop this.
+>
+>>  #include <linux/delay.h>
+>>  #include <linux/io.h>
+>>  #include <linux/fsl_devices.h>
+>> @@ -48,10 +50,13 @@
+>>  #define EFIKAMX_GREEN_LED	(2*32 + 14)
+>>  #define EFIKAMX_RED_LED		(2*32 + 15)
+>>  
+>> +#define EFIKAMX_POWER_KEY	(1*32 + 31)
+>> +
+>>  /* the pci ids pin have pull up. they're driven low according to board id */
+>>  #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
+>>  #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
+>>  #define MX51_PAD_PCBID2	IOMUX_PAD(0x504, 0x128, 3, 0x0,   0, PAD_CTL_PUS_100K_UP)
+>> +#define MX51_PAD_PWRKEY	IOMUX_PAD(0x48c, 0x0f8, 1, 0x0,   0, PAD_CTL_PUS_100K_UP | PAD_CTL_PKE)
+>>  
+>>  static struct pad_desc mx51efikamx_pads[] = {
+>>  	/* UART1 */
+>> @@ -91,6 +96,9 @@
+>>  	MX51_PAD_CSI1_D9__GPIO_3_13,
+>>  	MX51_PAD_CSI1_VSYNC__GPIO_3_14,
+>>  	MX51_PAD_CSI1_HSYNC__GPIO_3_15,
+>> +
+>> +	/* power key */
+>> +	MX51_PAD_PWRKEY,
+>>  };
+>>  
+>>  /* Serial ports */
+>> @@ -220,6 +228,22 @@
+>>  	},
+>>  };
+>>  
+>> +static struct gpio_keys_button mx51_efikamx_powerkey[] = {
+> this should be const and __initconst
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I guess you meant this for the gpio_keys_platform_data struct instead of
+this one ?
+
+>
+>> +	{
+>> +		.code   = KEY_POWER,
+>> +		.gpio   = EFIKAMX_POWER_KEY,
+>> +		.type   = EV_PWR,
+>> +		.desc   = "Power Button (CM)",
+>> +		.wakeup = 1,
+>> +		.debounce_interval = 10, /* ms */
+>> +	},
+>> +};
+> I'd prefer s/ *=/ =/ here.  The equal signs are not aligned anyhow
+> because of the last line.
+>
+
+I find this more readable but I've no strong pref. Will change.
+
+
+Arnaud
