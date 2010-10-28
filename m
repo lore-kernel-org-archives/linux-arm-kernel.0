@@ -1,118 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Oct 2010 14:19:30 -0700
-Subject: [PATCHv2 3/3] ARM: Implement a timer based __delay() loop
-In-Reply-To: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>
-References: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1288300770-18350-4-git-send-email-sboyd@codeaurora.org>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 28 Oct 2010 17:18:20 -0500
+Subject: [PATCH 5/7] omap:mailbox-resolve multiple receiver problem
+In-Reply-To: <1287108808-32119-6-git-send-email-h-kanigeri2@ti.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+	<1287108808-32119-6-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <4CC9F6AC.9030308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-udelay() can be incorrect on SMP machines that scale their CPU
-frequencies independently of one another (as pointed out here
-http://article.gmane.org/gmane.linux.kernel/977567). The delay
-loop can either be too fast or too slow depending on which CPU the
-loops_per_jiffy counter is calibrated on and which CPU the delay
-loop is running on. udelay() can also be incorrect if the
-CPU frequency switches during the __delay() loop, causing the loop
-to either terminate too early, or too late.
+On 10/14/2010 9:13 PM, Kanigeri, Hari wrote:
+> OMAP4 shares one interrupt line for all the mailbox instances.
+> The ISR is handling only the mailbox instance that was registered last.
 
-Forcing udelay() to run on one CPU is unreasonable and taking the
-penalty of a rather large loops_per_jiffy in udelay() when the
-CPU is actually running slower is bad for performance. Solve the
-problem by adding a timer based__delay() loop unaffected by CPU
-frequency scaling. Machines should set this loop as their
-__delay() implementation by calling set_timer_fn() during their
-timer initialization.
+This shouldn't be needed, request_irq is being called with IRQF_SHARED 
+flag and different device ids, so if a message arrives it fires an 
+interrupt handler for each of the callers to request_irq and since the 
+device id is actually a pointer to a mbox struct, the different users 
+can be detected and signaled without looping through the "mboxes" list.
 
-The kernel is already prepared for a timer based approach
-(evident by the read_current_timer() function). If an arch
-implements read_current_timer(), calibrate_delay() will use
-calibrate_delay_direct() to calculate loops_per_jiffy (in which
-case loops_per_jiffy should really be renamed to
-timer_ticks_per_jiffy). Since the loops_per_jiffy will be based
-on timer ticks, __delay() should be implemented as a loop around
-read_current_timer().
+Also using "mboxes" list, will try to check for all registered mailboxes 
+during probe, which might not be the same as the actual users (the ones 
+that have called omap_mbox_get) and then unnecesary check their irq 
+statuses if an interrupt arrives.
 
-Doing this makes the expensive loops_per_jiffy calculation go
-away (saving ~150ms on boot time on my machine) and fixes
-udelay() by making it safe in the face of independently scaling
-CPUs. The only prerequisite is that read_current_timer() is
-monotonically increasing across calls (and doesn't overflow
-within ~2000us).
+I think this patch can be dropped.
 
-There is a downside to this approach though. BogoMIPS is no
-longer "accurate" in that it reflects the BogoMIPS of the timer
-and not the CPU. On most SoC's the timer isn't running anywhere
-near as fast as the CPU so BogoMIPS will be ridiculously low (my
-timer runs at 4.8 MHz and thus my BogoMIPS is 9.6 compared to my
-CPU's 800). This shouldn't be too much of a concern though since
-BogoMIPS are bogus anyway (hence the name).
+Regards,
 
-This loop is pretty much a copy of AVR's version.
-
-Reported-by: Saravana Kannan <skannan@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
----
- arch/arm/include/asm/delay.h |    1 +
- arch/arm/lib/delay.c         |   18 ++++++++++++++++++
- 2 files changed, 19 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index 7c732b5..5c6b9a3 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -41,6 +41,7 @@ extern void __const_udelay(unsigned long);
- 	  __udelay(n))
- 
- extern void set_delay_fn(void (*fn)(unsigned long));
-+extern void read_current_timer_delay_loop(unsigned long loops);
- 
- #endif /* defined(_ARM_DELAY_H) */
- 
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 116a853..c92ae49 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -5,6 +5,7 @@
-  *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-  *  Copyright (C) 1993 Linus Torvalds
-  *  Copyright (C) 1997 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-+ *  Copyright (C) 2005-2006 Atmel Corporation
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -12,6 +13,7 @@
-  */
- #include <linux/module.h>
- #include <linux/delay.h>
-+#include <linux/timex.h>
- 
- /*
-  * Oh, if only we had a cycle counter...
-@@ -26,6 +28,22 @@ void delay_loop(unsigned long loops)
- 	);
- }
- 
-+#ifdef ARCH_HAS_READ_CURRENT_TIMER
-+/*
-+ * Assumes read_current_timer() is monotonically increasing
-+ * across calls and wraps at most once within MAX_UDELAY_MS.
-+ */
-+void read_current_timer_delay_loop(unsigned long loops)
-+{
-+	unsigned long bclock, now;
-+
-+	read_current_timer(&bclock);
-+	do {
-+		read_current_timer(&now);
-+	} while ((now - bclock) < loops);
-+}
-+#endif
-+
- static void (*delay_fn)(unsigned long) = delay_loop;
- 
- void set_delay_fn(void (*fn)(unsigned long))
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Omar
