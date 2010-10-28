@@ -1,30 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Oct 2010 16:29:46 +0200
-Subject: [PATCH 1/6] Realview PCIX support - add main support module code
-In-Reply-To: <20101028140949.GE3122@n2100.arm.linux.org.uk>
-References: <20101020125554.22199.78597.stgit@e102602-lin.cambridge.arm.com>
-	<201010202316.33540.arnd@arndb.de>
-	<20101028140949.GE3122@n2100.arm.linux.org.uk>
-Message-ID: <201010281629.46913.arnd@arndb.de>
+From: eballetbo@gmail.com (Enric Balletbo i Serra)
+Date: Thu, 28 Oct 2010 16:43:00 +0200
+Subject: [PATCH 0/2] OMAP: DSS2: Add new display panel
+Message-ID: <1288276982-17225-1-git-send-email-eballetbo@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 October 2010, Russell King - ARM Linux wrote:
-> On Wed, Oct 20, 2010 at 11:16:32PM +0200, Arnd Bergmann wrote:
-> > > +{
-> > > +   u32 mode;
-> > > +   u32 config_addr;
-> > > +
-> > > +   writel(0x000307F7, PCIX_UNIT_BASE + PCI_PERRSTAT); /* clear error bit */
-> > > +   writew(0xfb30, PCIX_UNIT_BASE + PCI_STATUS);       /* error bit clear */
-> > 
-> > I would guess that you need locking here, two drivers might simultaneously be
-> > accessing config space on different CPUs, or you might have kernel preemption
-> > enabled and get preempted between the register accesses.
-> 
-> pci config accesses are serialized by a global pci_lock raw spinlock,
-> which disables IRQs.
+Hi,
 
-Ok, good. Ignore my comment then.
+Next patches adds support for the two new LCD panel display used
+on IGEP boards.
 
-	Arnd
+ Powertip PH480272T LCD 4.3inch (480x242) display
+ Seiko 70WVW1TZ3 LCD 7.0inch WVGA (800x480) display
+
+Please, consider adding in next merge window.
+
+Cheers,
+
+Enric Balletbo i Serra (2):
+  OMAP: DSS2: Add Powertip PH480272T display panel
+  OMAP: DSS2: Add Seiko 70WVW1TZ3 display panel
+
+ drivers/video/omap2/displays/Kconfig               |   14 ++
+ drivers/video/omap2/displays/Makefile              |    2 +
+ .../omap2/displays/panel-powertip-ph480272t.c      |  155 +++++++++++++++++++
+ .../video/omap2/displays/panel-seiko-70wvw1tz3.c   |  157 ++++++++++++++++++++
+ 4 files changed, 328 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/video/omap2/displays/panel-powertip-ph480272t.c
+ create mode 100644 drivers/video/omap2/displays/panel-seiko-70wvw1tz3.c
