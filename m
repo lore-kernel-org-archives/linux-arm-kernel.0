@@ -1,44 +1,71 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Thu, 28 Oct 2010 12:09:35 -0400
-Subject: [PATCH v4 01/12] misc: add driver for sequencer serial port
-In-Reply-To: <AANLkTi=rDep3jkp2QAjVsgjZ7JQ0ysnse4TARv29fyHm@mail.gmail.com>
-References: <1288124308-14999-1-git-send-email-cyril@ti.com>	<1288124308-14999-2-git-send-email-cyril@ti.com>
-	<AANLkTi=rDep3jkp2QAjVsgjZ7JQ0ysnse4TARv29fyHm@mail.gmail.com>
-Message-ID: <4CC9A03F.80401@ti.com>
+From: chris@alcor.co.uk (Chris Down)
+Date: Thu, 28 Oct 2010 17:30:39 +0100
+Subject: [PATCH] Documentation about RS485 serial communications
+In-Reply-To: <4CC99761.5080602@evidence.eu.com>
+References: <20100408111310.524f7354@lxorguk.ukuu.org.uk>	<4CBD8EE4.5040808@evidence.eu.com>	<i9ka0s$4ua$1@dough.gmane.org>	<201010191727.53314.alexander.stein@systec-electronic.com>	<i9kk4o$svc$1@dough.gmane.org>
+	<4CC418A9.6090602@evidence.eu.com> <4CC99259.6080300@alcor.co.uk>
+	<4CC99761.5080602@evidence.eu.com>
+Message-ID: <4CC9A52F.3040808@alcor.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2010 11:49 AM, Linus Walleij wrote:
-> 2010/10/26 Cyril Chemparathy <cyril@ti.com>:
-> 
->> TI's sequencer serial port (TI-SSP) is a jack-of-all-trades type of serial port
->> device.  It has a built-in programmable execution engine that can be programmed
->> to operate as almost any serial bus (I2C, SPI, EasyScale, and others).
+On 28/10/2010 16:31, Claudio Scordino wrote:
+> Chris Down ha scritto:
+>> Just a minor issue.
 >>
->> This patch adds a driver for this controller device.  The driver does not
->> expose a user-land interface.  Protocol drivers built on top of this layer are
->> expected to remain in-kernel.
+>> On 24/10/2010 12:29, Claudio Scordino wrote:
+>>> +4. USAGE FROM USER-LEVEL
+>>> +
+>>> +   From user-level, RS485 configuration can be get/set using the previous
+>>> +   ioctls. For instance, to set RS485 you can use the following code:
+>>> +
+>>> +	#include <linux/serial.h>
+>>> +
+>>> +	/* Driver-specific ioctls: */
+>>> +	#define TIOCGRS485      0x542E
+>>> +	#define TIOCSRS485      0x542F
+>>> +
+>>> +	/* Open your specific device (e.g., /dev/mydevice): */
+>>> +	int fd = open ("/dev/mydevice", O_RDWR);
+>>> +	if (fd < 0) {
+>>> +		/* Error handling. See errno. */
+>>> +	}
+>>> +
+>>> +	struct serial_rs485 rs485conf;
+>>> +
+>>> +	/* Set RS485 mode: */
+>>> +	rs485conf.flags |= SER_RS485_ENABLED;
+>>> +
+>>> +	/* Set rts delay before send, if needed: */
+>> This comment is misleading as the delay must be set regardless.
+>> If it is not used it should be set to 0.
+>>
+>>> +	rs485conf.flags |= SER_RS485_RTS_BEFORE_SEND;
+>>> +	rs485conf.delay_rts_before_send = ...;
 > 
-> Why is this thing in drivers/misc?
+> Hi.
 > 
-> drivers/mfd is IMHO the apropriate place for a driver like this, and
-> the subdrivers should be migrated to use mfd cells and platform
-> drivers for the subdevices.
+> What do you mean ?
 > 
-> All functions and abstractions you create here look suspiciously
-> lot like other MFD devices.
+> The delay has not to be set regardless: if the
+> SER_RS485_RTS_BEFORE_SEND flag is not set, then the value of
+> delay_rts_before_send is ignored, whatever value is contained.
 > 
-> But please, beat me up if I'm wrong!
+> In other words, the value of delay_rts_before_send is used only when
+> SER_RS485_RTS_BEFORE_SEND is set.
+> 
+> If you don't need a delay, you have to unset the
+> SER_RS485_RTS_BEFORE_SEND flag rather than setting a delay equal to 0...
+> 
+> Best regards,
+> 
+> 	Claudio
+ 
 
-Alan had raised the same concern earlier, and my response was:
+In that case perhaps it is best to mention that in the comment.
+i.e. if the delay is not needed unset the flag as it defaults to set.
 
-> Unlike MFDs, this device doesn't have cells with differing
-> functionality.  Instead it has functionally identical ports that can
-> operate in a variety of modes.  That said, does this still fit in with
-> other MFD drivers?  If so, I don't see a problem with moving it there.
 
-I don't see a problem with moving this into MFD, but this won't be able
-to use any of the functionality provided by mfd-core.
+Best regards
 
-Thanks
-Cyril.
+Chris
