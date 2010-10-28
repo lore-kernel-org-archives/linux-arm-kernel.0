@@ -1,45 +1,26 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 28 Oct 2010 14:03:54 +0900
-Subject: [PATCH] arm: GIC: Use the irq_to_desc for SPARSE IRQ
-Message-ID: <20101028050354.GA23284@july>
+Date: Thu, 28 Oct 2010 14:10:09 +0900
+Subject: [PATCH] arm: s5pc210: Use the nr_irqs instead of NR_IRQS
+Message-ID: <20101028051009.GA23311@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kyungmin Park <kyungmin.park@samsung.com>
 
-When enable SPARSE_IRQ, there's compiler error at gic.c
-Fix it by using the irq_to_desc to get the proper irq desc.
+When enable the SPARSE_IRQ. It's not handled the proper number of irqs
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 7dfa9a8..1ca3c0d 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -158,15 +158,19 @@ static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
- {
- 	void __iomem *reg = gic_dist_base(irq) + GIC_DIST_TARGET + (gic_irq(irq) & ~3);
- 	unsigned int shift = (irq % 4) * 8;
--	unsigned int cpu = cpumask_first(mask_val);
-+	unsigned int node = cpumask_first(mask_val);
-+	struct irq_desc *desc;
- 	u32 val;
+diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
+index 0f70521..1bb38bf 100644
+--- a/arch/arm/mach-s5pv310/irq-combiner.c
++++ b/arch/arm/mach-s5pv310/irq-combiner.c
+@@ -73,7 +73,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	}
  
--	spin_lock(&irq_controller_lock);
--	irq_desc[irq].node = cpu;
--	val = readl(reg) & ~(0xff << shift);
--	val |= 1 << (cpu + shift);
--	writel(val, reg);
--	spin_unlock(&irq_controller_lock);
-+	desc = irq_to_desc(irq);
-+	if (desc) {
-+		spin_lock(&irq_controller_lock);
-+		desc->node = node;
-+		val = readl(reg) & ~(0xff << shift);
-+		val |= 1 << (node + shift);
-+		writel(val, reg);
-+		spin_unlock(&irq_controller_lock);
-+	}
- 
- 	return 0;
- }
+ 	cascade_irq = combiner_irq + (chip_data->irq_offset & ~31);
+-	if (unlikely(cascade_irq >= NR_IRQS))
++	if (unlikely(cascade_irq >= nr_irqs))
+ 		do_bad_IRQ(cascade_irq, desc);
+ 	else
+ 		generic_handle_irq(cascade_irq);
