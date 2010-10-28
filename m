@@ -1,21 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Oct 2010 19:54:39 -0700
-Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-In-Reply-To: <AANLkTiky+NsHwaJr+W4NMKs4gAeh_vHhxzKEzZdzGhNZ@mail.gmail.com>
-References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
-	<AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
-	<20101026030040.GA10200@opensource.wolfsonmicro.com>
-	<023501cb74bf$c8e61ad0$5ab25070$%kim@samsung.com>
-	<20101026183151.GD11207@opensource.wolfsonmicro.com>
-	<AANLkTiky+NsHwaJr+W4NMKs4gAeh_vHhxzKEzZdzGhNZ@mail.gmail.com>
-Message-ID: <20101028025439.GB23235@opensource.wolfsonmicro.com>
+From: arasv@magellan-technology.com (Aras Vaichas)
+Date: Thu, 28 Oct 2010 14:14:19 +1100
+Subject: at91: input overruns question
+In-Reply-To: <AANLkTinbThMFXd1KpuMRYNJREpjGa6RNBH9R1SM955Sd@mail.gmail.com>
+References: <AANLkTinbThMFXd1KpuMRYNJREpjGa6RNBH9R1SM955Sd@mail.gmail.com>
+Message-ID: <AANLkTimHnxLydJC3u58kAuukjR80EEgRDj7ZEedNMKfd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 28, 2010 at 11:06:13AM +0900, Jassi Brar wrote:
+On 26 October 2010 17:19, Aras Vaichas <arasv@magellan-technology.com> wrote:
+> Hi,
+>
+> I'm updating our production kernel to 2.6.33.7-rt29 for an at91rm9200.
+> This is the newest version supported by RT.
+>
+> I've noticed that the age-old debug serial input overrun(s) issue has
+> gotten far worse and I can no longer use the cursor keys at all. i.e.
+> no history on serial console or vi.
+>
+> As the kernel version numbers have gone up, the problem seems to have
+> gotten worse.
+>
+> Is there anything that I can do to make it a bit more usable?
+>
+> Any .config changes?
 
-> OK, I think I'll survive one release cycle :)
-> Any action item on my part before you accept the series to for-2.6.38 ?
+Configuration settings CONFIG_NO_HZ and CONFIG_HIGH_RES_TIMERS cause
+the overrun(s) problems to get worse.
 
-Not from me - Liam are you OK?  It's possible something crept through
-but we can always fix incrementally.
+If I disable these two settings I still get overrun(s) but not quite
+as frequent.
+
+Can someone explain why these settings would cause the CPU to be
+unable to process 2 serial characters in a row?
+
+Something must be causing the DBGU serial receive interrupt to stall
+for more than 86us in order to miss a complete 115200 baud serial
+character.
+
+Aras
