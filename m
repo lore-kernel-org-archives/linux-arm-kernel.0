@@ -1,5 +1,5 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 28 Oct 2010 11:27:38 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Oct 2010 19:28:51 +0100
 Subject: [PATCH] msm: fix debug-macro.S build failure
 In-Reply-To: <alpine.LFD.2.00.1010281422190.3227@xanadu.home>
 References: <1288216688-718-1-git-send-email-dwalker@codeaurora.org>
@@ -11,11 +11,11 @@ References: <1288216688-718-1-git-send-email-dwalker@codeaurora.org>
 	<20101028174653.GH3122@n2100.arm.linux.org.uk>
 	<1288288824.2683.24.camel@c-dwalke-linux.qualcomm.com>
 	<alpine.LFD.2.00.1010281422190.3227@xanadu.home>
-Message-ID: <1288290458.2683.25.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <20101028182851.GI3122@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-10-28 at 14:24 -0400, Nicolas Pitre wrote:
+On Thu, Oct 28, 2010 at 02:24:33PM -0400, Nicolas Pitre wrote:
 > On Thu, 28 Oct 2010, Daniel Walker wrote:
 > 
 > > This is what the function currently has,
@@ -32,11 +32,7 @@ On Thu, 2010-10-28 at 14:24 -0400, Nicolas Pitre wrote:
 > 
 > Just return 0 in both registers when you have nothing better to return.
 
-What about the other functions ?
-
-Daniel
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+That's not a good idea - it'll cause 512MB of 1:1 mappings to be setup
+at virtual location 0 using the IO flags, which may conflict on ARMv6+.
+A better idea would be to return 0xfff00000, which'll cause it to only
+populate the top-most 1MB.
