@@ -1,40 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Oct 2010 19:29:22 +0100
-Subject: [PATCH] msm: fix debug-macro.S build failure
-In-Reply-To: <1288290458.2683.25.camel@c-dwalke-linux.qualcomm.com>
-References: <1288216688-718-1-git-send-email-dwalker@codeaurora.org>
-	<20101027221428.GB28391@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010272227380.31220@xanadu.home>
-	<1288283413.2683.2.camel@c-dwalke-linux.qualcomm.com>
-	<20101028163518.GG3122@n2100.arm.linux.org.uk>
-	<1288284066.2683.9.camel@c-dwalke-linux.qualcomm.com>
-	<20101028174653.GH3122@n2100.arm.linux.org.uk>
-	<1288288824.2683.24.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1010281422190.3227@xanadu.home>
-	<1288290458.2683.25.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20101028182922.GJ3122@n2100.arm.linux.org.uk>
+From: nils.faerber@kernelconcepts.de (Nils Faerber)
+Date: Thu, 28 Oct 2010 20:34:45 +0200
+Subject: New Kirkwood board support
+Message-ID: <4CC9C245.3030906@kernelconcepts.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 28, 2010 at 11:27:38AM -0700, Daniel Walker wrote:
-> On Thu, 2010-10-28 at 14:24 -0400, Nicolas Pitre wrote:
-> > On Thu, 28 Oct 2010, Daniel Walker wrote:
-> > 
-> > > This is what the function currently has,
-> > > 
-> > >         .macro  addruart, rp, rv
-> > >         ldr     \rp, =MSM_DEBUG_UART_PHYS
-> > >         ldr     \rv, =MSM_DEBUG_UART_BASE
-> > >         .endm
-> > > 
-> > > So if we have a MSM_DEBUG_UART_PHYS and MSM_DEBUG_UART_BASE we're
-> > > returning it. We don't actually have those values for all the boards
-> > > tho. My understanding was that there are some generic arm changes
-> > > needed, but I need to confirm that.
-> > 
-> > Just return 0 in both registers when you have nothing better to return.
-> 
-> What about the other functions ?
+Hello!
+Attached is a patch against 2.6.36 for a new Marvell Kirkwood based
+board - the TK71. For more information about the TK71 please look at the
+WarpComm project page at
+	http://www.warpcomm.org/
 
-If you don't populate the other macros, you're only loading an address
-into a register which won't be used.
+The patch is pretty much self contained and does not touch much else -
+though it does add a defconfig which might not be necessary (Nicolas
+pointed that out already) - in case this is not wanted I can drop that
+from the patch (or you can simply not commit that part).
+
+When looking at the patch please keep in mind that the TK71 is a SOM -
+system on module. This is e.g the reason why I have commted out the
+kirkwood_spi_init() - it is only necessary on baseboards that need SPI
+for something. Maybe at some time I will add KConfig options for
+different baseboard. For the time being I would like to keep such things
+in there so that baseboard makers faster get a clue how to en- or
+disable certain support.
+
+If you have comments about the patch you are welcome!
+
+I would very much like to see this finally go upstream.
+
+Thank you!
+
+Cheers
+  nils
+
+-- 
+kernel concepts GbR      Tel: +49-271-771091-12
+Sieghuetter Hauptweg 48  Fax: +49-271-771091-19
+D-57072 Siegen           Mob: +49-176-21024535
+http://www.kernelconcepts.de
