@@ -1,55 +1,54 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Thu, 28 Oct 2010 15:02:17 -0500
-Subject: [PATCH] ARM: imx: Fix GPIO_1_xx settings that are wrongly assumed
-Message-ID: <1288296137-1995-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 28 Oct 2010 15:57:41 -0500
+Subject: [PATCH 6/7] omap:mailbox-add notification support for multiple
+	readers
+In-Reply-To: <1287108808-32119-7-git-send-email-h-kanigeri2@ti.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+	<1287108808-32119-7-git-send-email-h-kanigeri2@ti.com>
+Message-ID: <4CC9E3C5.7000208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Hi,
 
-Its not a same assumption that because because 1 gpio mux is at
-mux mode 1, that it is the same for all gpio's. Freescale HW
-engineers like to keep things interesting by varying the mux mode
-of the gpio's.
+On 10/14/2010 9:13 PM, Hari Kanigeri wrote:
+> @@ -252,41 +253,39 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+...
+> +	if (!mbox->use_count++) {
+> +		ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
+> +					mbox->name, mbox);
+...
+> @@ -296,29 +295,36 @@ fail_alloc_txq:
+...
+>   static void omap_mbox_fini(struct omap_mbox *mbox)
+>   {
+> +	if (!--mbox->use_count) {
+> +		tasklet_kill(&mbox->txq->tasklet);
+> +		flush_work(&mbox->rxq->work);
+> +		mbox_queue_free(mbox->txq);
+> +		mbox_queue_free(mbox->rxq);
+> +	}
+> +
+> +	if (likely(mbox->ops->shutdown)) {
+> +		if (!--mbox_configured) {
+> +			free_irq(mbox->irq, mbox);
 
-Reference: The iomux-mx51.h file is generated from a script that
-converts the pin mode file from the SoC HW designers.
+Above hunks will create an imbalance of free_irq, as request_irq can be 
+called per registered mailbox and free_irq is only done for the last 
+caller releasing the mailbox handle.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+e.g.: mbox-1, mbox-N will request a shared irq on the same interrupt 
+line, but only the last caller of omap_mbox_put will free its irq, 
+leaving the other one there.
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index e46b1c2..056ba0f 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -368,18 +368,18 @@ typedef enum iomux_config {
- 							MX51_SDHCI_PAD_CTRL)
- #define MX51_PAD_GPIO_1_0__GPIO_1_0		IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_1__GPIO_1_1		IOMUX_PAD(0x7B8, 0x3B0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_2__I2C2_SCL		IOMUX_PAD(0x7D4, 0x3CC, (2 | IOMUX_CONFIG_SION), \
- 							0x9b8,   3, MX51_I2C_PAD_CTRL)
--#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
- #define MX51_PAD_GPIO_1_3__I2C2_SDA		IOMUX_PAD(0x7D8, 0x3D0, (2 | IOMUX_CONFIG_SION), \
- 							0x9bc,   3, MX51_I2C_PAD_CTRL)
- #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0, 0x0,   0, NO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
--#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808, 0x3DC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810, 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
-+#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818, 0x3EC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
- 
- #endif /* __MACH_IOMUX_MX51_H__ */
--- 
-1.6.0.4
+This can be fixed if the free is moved to be executed within the 
+following block:
+
+	if (!--mbox->use_count) {
+		...
+		free_irq(mbox->irq, mbox);
+	}
+
+Regards,
+
+Omar
