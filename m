@@ -1,33 +1,26 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 28 Oct 2010 09:58:10 +0100
-Subject: [PATCH 8/9] ARM: S5PV210: I2S: Upgrade platform device
-In-Reply-To: <20101028025439.GB23235@opensource.wolfsonmicro.com>
-References: <1288057274-25603-1-git-send-email-jassisinghbrar@gmail.com>
-	<AANLkTikk_Y-VnNKLVGmVZA4iR0+ZTE0u-Scms0TWMbhq@mail.gmail.com>
-	<20101026030040.GA10200@opensource.wolfsonmicro.com>
-	<023501cb74bf$c8e61ad0$5ab25070$%kim@samsung.com>
-	<20101026183151.GD11207@opensource.wolfsonmicro.com>
-	<AANLkTiky+NsHwaJr+W4NMKs4gAeh_vHhxzKEzZdzGhNZ@mail.gmail.com>
-	<20101028025439.GB23235@opensource.wolfsonmicro.com>
-Message-ID: <1288256290.18037.394.camel@vega>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Oct 2010 10:22:47 +0100
+Subject: Is ep93xx support broken in linux-next?
+In-Reply-To: <20101028073245.GE15333@gw.healthdatacare.com>
+References: <1288094199.2098.26.camel@r60e>
+	<20101026125050.GB15333@gw.healthdatacare.com>
+	<20101026125841.GC15333@gw.healthdatacare.com>
+	<1288099206.2098.27.camel@r60e>
+	<20101026132235.GD15333@gw.healthdatacare.com>
+	<20101027202018.GB24573@n2100.arm.linux.org.uk>
+	<20101028073245.GE15333@gw.healthdatacare.com>
+Message-ID: <20101028092247.GB3122@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-10-27 at 19:54 -0700, Mark Brown wrote:
-> On Thu, Oct 28, 2010 at 11:06:13AM +0900, Jassi Brar wrote:
+On Thu, Oct 28, 2010 at 10:32:45AM +0300, Mika Westerberg wrote:
+> On Wed, Oct 27, 2010 at 09:20:18PM +0100, Russell King - ARM Linux wrote:
+> > 
+> > Is there an updated patch ready?
 > 
-> > OK, I think I'll survive one release cycle :)
-> > Any action item on my part before you accept the series to for-2.6.38 ?
+> Yes, see below.
 > 
-> Not from me - Liam are you OK?  It's possible something crept through
-> but we can always fix incrementally.
-> 
+> It is tested on ep93xx and I tried to compile test on others which
+> had suitable defconfig.
 
-Fine by me, all 
-
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
-
--- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+Ok, please send to the patch system.
