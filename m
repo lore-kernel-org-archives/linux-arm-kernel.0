@@ -1,53 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Oct 2010 15:02:48 +0100
+Date: Thu, 28 Oct 2010 15:09:49 +0100
 Subject: [PATCH 1/6] Realview PCIX support - add main support module code
-In-Reply-To: <20101020130253.22199.48589.stgit@e102602-lin.cambridge.arm.com>
+In-Reply-To: <201010202316.33540.arnd@arndb.de>
 References: <20101020125554.22199.78597.stgit@e102602-lin.cambridge.arm.com>
 	<20101020130253.22199.48589.stgit@e102602-lin.cambridge.arm.com>
-Message-ID: <20101028140248.GD3122@n2100.arm.linux.org.uk>
+	<201010202316.33540.arnd@arndb.de>
+Message-ID: <20101028140949.GE3122@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 20, 2010 at 02:02:54PM +0100, Colin Tuckley wrote:
-> +#include <mach/platform.h>
-> +#include <asm/io.h>
+On Wed, Oct 20, 2010 at 11:16:32PM +0200, Arnd Bergmann wrote:
+> > +{
+> > +	u32 mode;
+> > +	u32 config_addr;
+> > +
+> > +	writel(0x000307F7, PCIX_UNIT_BASE + PCI_PERRSTAT); /* clear error bit */
+> > +	writew(0xfb30, PCIX_UNIT_BASE + PCI_STATUS);	   /* error bit clear */
+> 
+> I would guess that you need locking here, two drivers might simultaneously be
+> accessing config space on different CPUs, or you might have kernel preemption
+> enabled and get preempted between the register accesses.
 
-linux/io.h
-
-> +static void pcie_fix_sizes(void)
-> +{
-> +	struct pci_dev *pdev = NULL;
-> +	int rrq;
-> +	int max_rrq = 4096;
-> +
-> +	/* Set the max read request size for all devices to the
-> +	 * smallest in the tree. So far, the only device we've seen
-> +	 * that fails without this is the Marvell Yukon 88E8053 but
-> +	 * this may fix other devices too.
-> +	 */
-> +	while ((pdev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
-> +		rrq = pcie_get_readrq(pdev);
-> +		if (rrq > 0 && rrq < max_rrq)
-> +			max_rrq = rrq;
-> +	}
-> +
-> +	pdev = NULL;	/* reset scan */
-> +	while ((pdev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
-> +		rrq = pcie_get_readrq(pdev);
-> +		printk(KERN_DEBUG "%s: %02x:%02x %04x/%04x : RRQSZ %d -> %d\n",
-> +				__func__, pdev->bus->number, pdev->devfn,
-> +				pdev->vendor, pdev->device, rrq, max_rrq);
-> +		pcie_set_readrq(pdev, max_rrq);
-> +	}
-> +}
-> +
-> +static int __init realview_pcie_fixups(void)
-> +{
-> +	pcie_fix_sizes();
-> +	return 0;
-> +}
-> +late_initcall(realview_pcie_fixups);
-
-Shouldn't this be done as a PCI quirk rather than walking the entire list
-of PCI devices at some point after drivers have potentially initialised
-and bound to these devices?
+pci config accesses are serialized by a global pci_lock raw spinlock,
+which disables IRQs.
