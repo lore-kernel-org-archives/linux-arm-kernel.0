@@ -1,33 +1,39 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Thu, 28 Oct 2010 14:25:07 +0200
-Subject: [PATCH v3 0/2] add support for the Marvell Dove SDHCI controller
-Message-ID: <cover.1288268453.git.mike@compulab.co.il>
+Date: Thu, 28 Oct 2010 14:25:09 +0200
+Subject: [PATCH v3 2/2] [ARM] Dove: rename SDCHI devices to "sdhci-dove"
+In-Reply-To: <cover.1288268453.git.mike@compulab.co.il>
+References: <cover.1288268453.git.mike@compulab.co.il>
+Message-ID: <0fa1fabd6da74c84e98a44ecfad099f207154aa7.1288268453.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support for the Marvell Dove SDHCI controller.
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+CC: Saeed Bishara <saeed@marvell.com>
+---
+ arch/arm/mach-dove/common.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-v3 changes:
-* finally remove unneeded includes from the driver
-
-v2 changes:
-* rename drivers/mmc/host/sdhci-mv.c to drivers/mmc/host/sdhci-dove.c and
-update Kconfig and Makefile respectively
-* add dependancy on ARCH_DOVE
-* remove unneeded includes from the driver
-
-Mike Rapoport (2):
-  MMC: add support for the Marvell Dove SDHCI controller
-  [ARM] Dove: rename SDCHI devices to "sdhci-dove"
-
- arch/arm/mach-dove/common.c    |    4 +-
- drivers/mmc/host/Kconfig       |   13 +++++++
- drivers/mmc/host/Makefile      |    1 +
- drivers/mmc/host/sdhci-dove.c  |   70 ++++++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/sdhci-pltfm.c |    3 ++
- drivers/mmc/host/sdhci-pltfm.h |    1 +
- 6 files changed, 90 insertions(+), 2 deletions(-)
- create mode 100644 drivers/mmc/host/sdhci-dove.c
-
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index f7a1258..fe627ab 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -770,7 +770,7 @@ static struct resource dove_sdio0_resources[] = {
+ };
+ 
+ static struct platform_device dove_sdio0 = {
+-	.name		= "sdhci-mv",
++	.name		= "sdhci-dove",
+ 	.id		= 0,
+ 	.dev		= {
+ 		.dma_mask		= &sdio_dmamask,
+@@ -798,7 +798,7 @@ static struct resource dove_sdio1_resources[] = {
+ };
+ 
+ static struct platform_device dove_sdio1 = {
+-	.name		= "sdhci-mv",
++	.name		= "sdhci-dove",
+ 	.id		= 1,
+ 	.dev		= {
+ 		.dma_mask		= &sdio_dmamask,
 -- 
 1.7.3.1
