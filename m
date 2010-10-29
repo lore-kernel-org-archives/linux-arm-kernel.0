@@ -1,78 +1,78 @@
-From: brian@murphy.dk (Brian Murphy)
-Date: Fri, 29 Oct 2010 12:22:47 +0200
-Subject: boot decompressor code error
-Message-ID: <AANLkTimttsvuVYFpCNFU4iJHCjHZ1Xq5E3Gni-wOrTba@mail.gmail.com>
+From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
+Date: Fri, 29 Oct 2010 12:23:06 +0200 (CEST)
+Subject: [RFC PATCH 0/2] SL351x (Gemini) ethernet driver
+Message-ID: <cover.1288321597.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-There is a problem with the boot decompression code when the inflate
-method is used on arm.
-In fact two. The second of which is also a problem on all architectures.
-The first, and more serious, is that static local variables seem not
-to be supported, this means that
-some tables initialized as static locals point to a place in ram where
-the tables are not.
-The function
+This is a driver for SL351x (Gemini) SoC ethernet peripheral.
+Based on work by Paulius Zaleckas and GPLd code from Raidsonic
+and other NAS vendors.
 
-static void zlib_fixedtables(struct inflate_state *state)
+This is work in progress. Please comment and test if you can.
+Patches are against 2.6.37-rc (current Linus' tree) but should
+apply to 2.6.36. You probably also need patches for PATA from
+	git://git.berlios.de/gemini-board ib4220
 
-includes inffixed.h which contains two static tables and
+Known bugs:
+ - repeatable bad HW calculated TCP csum
+    happens for only some packets in a TCP stream
+    looks like it doesn't like some data pattern or timing
+    (difference between correct and generated csum is the same
+    when the packet is retransmitted with changed header/TCP tstamp)
+ - TX DMA hangs sometimes (needs module reload when that happens)
+    with debugging printks disabled and HW TX csum enabled
+ - unsynced counters
 
-int zlib_inflate(z_streamp strm, int flush)
+I started to work on Paulius' code to find out why the TX DMA hangs
+happen, but then I realized that complete rewrite was a better way
+to understand how the hardware works and why it doesn't. As a "bonus"
+this got some additional features:
+ - ethtool support
+ - 64-bit counters
+ - proper cleanup on ifdown/module unload
+ - better DMA API usage
+ - cleaned up code
+ - a lot of tx/rx debugging printks
+ - based on 2.6.36 DMA and netdev interfaces
 
-contains a static local "order". The second seems not to have much
-influence on decompression
-but the first causes images (at least of a certain size) to fail
-decompression. Somtimes this failure
-is detectable in decompression and an error results, sometimes it is
-not and the kernel just fails to
-start.
-The "new" decompress_inflate.c routines do not check the checksum or
-image length fields encoded
-in the gzipped image, even though they would have detected this error.
-It may be that in some cases
-even though the kernel is not properly decompressed that it can boot
-and random unexplained errors
-can occur later because of the decompression failure.
+TODO:
+ - NAPI
+ - MTU changing
 
-Moving the local static initialization to a file local static enables
-the routines to work, i.e. moving the
-static declarations out of the functions.
+For normal use tx-csum and tso have to be disabled:
+   ethtool -K eth0 tso off tx off
 
-I am not sure how local statics work on arm but I am guessing that the
-problem is to do with relocations
-not being processed for the boot decompression code.
+Tested on Raidsonic IcyBox 4220-B (dual SATA NAS).
 
-The second problem is with the output length declaration in gunzip in
-decompress_inflate.c.
+I'm also interested in getting copies of various GPL packages for
+StorLink SL3516. I already have following packages (md5sum):
 
-out_len = 0x7fffffff; /* no limit */
+89991e543eb2e473e3d380ac9a4cd8b4  GPL_source_code(Raidsonic).zip
+6ba8b833c429794315f0a73ce2961bd8  Gemini_v2_6_0-n.tgz
+fe87e97a33554bcab8284d25ff86e383  n299_n199_1.00.24_GPL.tar.bz2
+eca8994354368304ca3b5bd1429c20bb  sl-boot_1.0.9.tgz
+eafd6497074fe0651459bf38c39d66bd  vt4kern-1.5.tar.bz2.tar
 
-When the buffer start pointer is over 0x80000000 the computation of
-the end pointer in inffast.c
-wraps around and end ends up before out(the start pointer) causing the
-main loop in
 
-void inflate_fast(z_streamp strm, unsigned start)
+Best Regards,
+Micha? Miros?aw
 
-to exit after one byte is processed at the very least causing
-unnecessary overhead. The computation
+---
 
-end = out + (strm->avail_out - 257);
+Micha? Miros?aw (2):
+  Gemini: create platform device for ethernet in Raidsonic IB-4220B
+  Gemini: SL351x Ethernet driver
 
-should check for overflow and be set to 0xffffffff when wrap would
-occur. This must also be a problem(feature?)
-for other architectures. It has probably not been fixed because the
-decompression still works but is slower.
-
-I am willing to make a patch for the second issue.
-The right fix for the first issue is probably to fixup the references
-to static locals in the boot decompress code
-the easy fix is of course to remove all local static variables but
-when this is general code, also used in the
-kernel, it is probably not a acceptable fix? Perhaps with some ifdef
-stuff? If this fix is acceptable I can also generate
-a patch for that problem.
-
-/Brian
+ arch/arm/mach-gemini/board-nas4220b.c    |   53 +
+ arch/arm/mach-gemini/common.h            |    2 +
+ arch/arm/mach-gemini/devices.c           |   52 +
+ arch/arm/mach-gemini/include/mach/gmac.h |   21 +
+ drivers/net/Kconfig                      |    7 +
+ drivers/net/Makefile                     |    1 +
+ drivers/net/sl351x.c                     | 1706 ++++++++++++++++++++++++++++++
+ drivers/net/sl351x_hw.h                  | 1423 +++++++++++++++++++++++++
+ 8 files changed, 3265 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-gemini/include/mach/gmac.h
+ create mode 100644 drivers/net/sl351x.c
+ create mode 100644 drivers/net/sl351x_hw.h
