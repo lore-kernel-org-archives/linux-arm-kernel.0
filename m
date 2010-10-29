@@ -1,42 +1,100 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Fri, 29 Oct 2010 19:59:00 +0900
-Subject: [RFC][PATCH 0/3] big chunk memory allocator v2
-In-Reply-To: <20101029103154.GA10823@gargoyle.fritz.box>
-References: <20101026190042.57f30338.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
-	<op.vlbywq137p4s8u@pikus>
-	<20101029103154.GA10823@gargoyle.fritz.box>
-Message-ID: <20101029195900.88559162.kamezawa.hiroyu@jp.fujitsu.com>
+From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
+Date: Fri, 29 Oct 2010 14:14:12 +0300
+Subject: [RFC PATCH 0/2] SL351x (Gemini) ethernet driver
+In-Reply-To: <cover.1288321597.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1288321597.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <AANLkTinTDZSC93fUsVzx2pbhZE9_39t-m=XNh3h3tkqs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Oct 2010 12:31:54 +0200
-Andi Kleen <andi.kleen@intel.com> wrote:
+2010/10/29 Micha? Miros?aw <mirq-linux@rere.qmqm.pl>:
+> This is a driver for SL351x (Gemini) SoC ethernet peripheral.
+> Based on work by Paulius Zaleckas and GPLd code from Raidsonic
+> and other NAS vendors.
+>
+> This is work in progress. Please comment and test if you can.
+> Patches are against 2.6.37-rc (current Linus' tree) but should
+> apply to 2.6.36. You probably also need patches for PATA from
+> ? ? ? ?git://git.berlios.de/gemini-board ib4220
 
-> > When I was posting CMA, it had been suggested to create a new migration type
-> > dedicated to contiguous allocations.  I think I already did that and thanks to
-> > this new migration type we have (i) an area of memory that only accepts movable
-> > and reclaimable pages and 
-> 
-> Aka highmem next generation :-(
-> 
+Nice to hear!
 
-yes. But Nick's new shrink_slab() may be a new help even without
-new zone.
+> Known bugs:
+> ?- repeatable bad HW calculated TCP csum
+> ? ?happens for only some packets in a TCP stream
+> ? ?looks like it doesn't like some data pattern or timing
+> ? ?(difference between correct and generated csum is the same
+> ? ?when the packet is retransmitted with changed header/TCP tstamp)
+> ?- TX DMA hangs sometimes (needs module reload when that happens)
+> ? ?with debugging printks disabled and HW TX csum enabled
 
+AFAIK DMA hangs are associated with HW checksum errors. So generally
+disabling HW csum is the best solution so far. If I am not wrong, OpenWRT
+does just this in their patches.
 
-> > (ii) is used only if all other (non-reserved) pages have
-> > been allocated.
-> 
-> That will be near always the case after some uptime, as memory fills up
-> with caches. Unless you do early reclaim? 
-> 
+DMA hangs happen for other reasons as well and main cause seems to be MII
+interface. If timing is wrong or some noise gets onto PCB tracks it is
+very likely
+that DMA will hang. Also using both ports at one time increases posibility of
+hang.
 
-memory migration always do work with alloc_page() for getting migration target
-pages. So, memory will be reclaimed if filled by cache.
+> ?- unsynced counters
+>
+> I started to work on Paulius' code to find out why the TX DMA hangs
+> happen, but then I realized that complete rewrite was a better way
+> to understand how the hardware works and why it doesn't. As a "bonus"
+> this got some additional features:
+> ?- ethtool support
+> ?- 64-bit counters
+> ?- proper cleanup on ifdown/module unload
+> ?- better DMA API usage
+> ?- cleaned up code
+> ?- a lot of tx/rx debugging printks
+> ?- based on 2.6.36 DMA and netdev interfaces
+>
+> TODO:
+> ?- NAPI
+> ?- MTU changing
 
-About my patch, I may have to prealloc all required pages before start.
-But I didn't do that at this time.
+Super cool! NAPI shouldn't be very hard...
 
-Thanks,
--Kame
+> For normal use tx-csum and tso have to be disabled:
+> ? ethtool -K eth0 tso off tx off
+>
+> Tested on Raidsonic IcyBox 4220-B (dual SATA NAS).
+>
+> I'm also interested in getting copies of various GPL packages for
+> StorLink SL3516. I already have following packages (md5sum):
+>
+> 89991e543eb2e473e3d380ac9a4cd8b4 ?GPL_source_code(Raidsonic).zip
+> 6ba8b833c429794315f0a73ce2961bd8 ?Gemini_v2_6_0-n.tgz
+> fe87e97a33554bcab8284d25ff86e383 ?n299_n199_1.00.24_GPL.tar.bz2
+> eca8994354368304ca3b5bd1429c20bb ?sl-boot_1.0.9.tgz
+> eafd6497074fe0651459bf38c39d66bd ?vt4kern-1.5.tar.bz2.tar
+
+I will see what I can provide you when I get home.
+
+>
+> Best Regards,
+> Micha? Miros?aw
+>
+> ---
+>
+> Micha? Miros?aw (2):
+> ?Gemini: create platform device for ethernet in Raidsonic IB-4220B
+> ?Gemini: SL351x Ethernet driver
+>
+> ?arch/arm/mach-gemini/board-nas4220b.c ? ?| ? 53 +
+> ?arch/arm/mach-gemini/common.h ? ? ? ? ? ?| ? ?2 +
+> ?arch/arm/mach-gemini/devices.c ? ? ? ? ? | ? 52 +
+> ?arch/arm/mach-gemini/include/mach/gmac.h | ? 21 +
+> ?drivers/net/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?7 +
+> ?drivers/net/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?drivers/net/sl351x.c ? ? ? ? ? ? ? ? ? ? | 1706 ++++++++++++++++++++++++++++++
+> ?drivers/net/sl351x_hw.h ? ? ? ? ? ? ? ? ?| 1423 +++++++++++++++++++++++++
+> ?8 files changed, 3265 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/mach-gemini/include/mach/gmac.h
+> ?create mode 100644 drivers/net/sl351x.c
+> ?create mode 100644 drivers/net/sl351x_hw.h
+>
+>
