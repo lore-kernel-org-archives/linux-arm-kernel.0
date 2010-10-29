@@ -1,526 +1,239 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Sat, 30 Oct 2010 00:33:10 +0100
-Subject: [PATCH 2/2] ARM: S5PV310: Add support Power Domain
-In-Reply-To: <1286970422-15993-3-git-send-email-kgene.kim@samsung.com>
+Date: Sat, 30 Oct 2010 00:26:14 +0100
+Subject: [PATCH 0/2] ARM: SAMSUNG: Add Support Power Domain Control
+In-Reply-To: <1286970422-15993-1-git-send-email-kgene.kim@samsung.com>
 References: <1286970422-15993-1-git-send-email-kgene.kim@samsung.com>
-	<1286970422-15993-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4CCB59B6.6070901@fluff.org>
+Message-ID: <4CCB5816.4040609@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 13/10/10 12:47, Kukjin Kim wrote:
-> From: Changhwan Youn <chaos.youn@samsung.com>
+> This patch adds support Power Domain Control based on Runtim PM.
 > 
-> This patch adds support Power Domain for S5PV310 and S5PC210.
-> 
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Kconfig                 |    7 +
->  arch/arm/mach-s5pv310/Makefile                |    2 +
->  arch/arm/mach-s5pv310/cpu.c                   |    5 +
->  arch/arm/mach-s5pv310/dev-pd.c                |  249 +++++++++++++++++++++++++
->  arch/arm/mach-s5pv310/include/mach/map.h      |    2 +
->  arch/arm/mach-s5pv310/include/mach/regs-pmu.h |   40 ++++
->  arch/arm/mach-s5pv310/mach-smdkc210.c         |    9 +
->  arch/arm/mach-s5pv310/mach-smdkv310.c         |    9 +
->  arch/arm/plat-s5p/include/plat/map-s5p.h      |    1 +
->  arch/arm/plat-samsung/include/plat/devs.h     |    2 +
->  10 files changed, 326 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv310/dev-pd.c
->  create mode 100644 arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-> 
-> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index 1150b36..3bf72a6 100644
-> --- a/arch/arm/mach-s5pv310/Kconfig
-> +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -14,6 +14,11 @@ config CPU_S5PV310
->  	help
->  	  Enable S5PV310 CPU support
->  
-> +config S5PV310_DEV_PD
-> +	bool
-> +	help
-> +	  Compile in platform device definitions for Power Domain
-> +
->  config S5PV310_SETUP_I2C1
->  	bool
->  	help
-> @@ -73,6 +78,7 @@ config MACH_SMDKC210
->  	select S3C_DEV_HSMMC1
->  	select S3C_DEV_HSMMC2
->  	select S3C_DEV_HSMMC3
-> +	select S5PV310_DEV_PD
->  	select S5PV310_SETUP_SDHCI
->  	help
->  	  Machine support for Samsung SMDKC210
-> @@ -101,6 +107,7 @@ config MACH_SMDKV310
->  	select S3C_DEV_HSMMC1
->  	select S3C_DEV_HSMMC2
->  	select S3C_DEV_HSMMC3
-> +	select S5PV310_DEV_PD
->  	select S5PV310_SETUP_SDHCI
->  	help
->  	  Machine support for Samsung SMDKV310
-> diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-> index 97aba6d..74beb47 100644
-> --- a/arch/arm/mach-s5pv310/Makefile
-> +++ b/arch/arm/mach-s5pv310/Makefile
-> @@ -28,6 +28,8 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
->  
->  # device support
->  
-> +obj-$(CONFIG_S5PV310_DEV_PD)		+= dev-pd.o
-> +
->  obj-$(CONFIG_S5PV310_SETUP_I2C1)	+= setup-i2c1.o
->  obj-$(CONFIG_S5PV310_SETUP_I2C2)	+= setup-i2c2.o
->  obj-$(CONFIG_S5PV310_SETUP_I2C3)	+= setup-i2c3.o
-> diff --git a/arch/arm/mach-s5pv310/cpu.c b/arch/arm/mach-s5pv310/cpu.c
-> index ffed262..44ddad6 100644
-> --- a/arch/arm/mach-s5pv310/cpu.c
-> +++ b/arch/arm/mach-s5pv310/cpu.c
-> @@ -42,6 +42,11 @@ static struct map_desc s5pv310_iodesc[] __initdata = {
->  		.length		= SZ_128K,
->  		.type		= MT_DEVICE,
->  	}, {
-> +		.virtual	= (unsigned long)S5P_VA_PMU,
-> +		.pfn		= __phys_to_pfn(S5PV310_PA_PMU),
-> +		.length		= SZ_64K,
-> +		.type		= MT_DEVICE,
-> +	}, {
->  		.virtual	= (unsigned long)S5P_VA_COMBINER_BASE,
->  		.pfn		= __phys_to_pfn(S5PV310_PA_COMBINER),
->  		.length		= SZ_4K,
-> diff --git a/arch/arm/mach-s5pv310/dev-pd.c b/arch/arm/mach-s5pv310/dev-pd.c
-> new file mode 100644
-> index 0000000..ac5a1f8
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/dev-pd.c
-> @@ -0,0 +1,249 @@
-> +/* linux/arch/arm/mach-s5pv310/dev-pd.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * S5PV310 - Power Domain support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/delay.h>
-> +
-> +#include <mach/regs-pmu.h>
-> +
-> +#include <plat/pd.h>
-> +
-> +static int s5pv310_pd_enable(enum s5pv310_pd_block pd)
-> +{
-> +	void __iomem *status;
-> +	u32 timeout;
-> +
-> +	switch (pd) {
-> +	case PD_MFC:
-> +		__raw_writel(S5P_INT_LOCAL_PWR_EN, S5P_MFC_CONFIGURATION);
-> +		status = S5P_MFC_STATUS;
-> +		break;
-> +	case PD_G3D:
-> +		__raw_writel(S5P_INT_LOCAL_PWR_EN, S5P_G3D_CONFIGURATION);
-> +		status = S5P_G3D_STATUS;
-> +		break;
-> +	case PD_LCD0:
-> +		__raw_writel(S5P_INT_LOCAL_PWR_EN, S5P_LCD0_CONFIGURATION);
-> +		status = S5P_LCD0_STATUS;
-> +		break;
-> +	case PD_LCD1:
-> +		__raw_writel(S5P_INT_LOCAL_PWR_EN, S5P_LCD1_CONFIGURATION);
-> +		status = S5P_LCD1_STATUS;
-> +		break;
-> +	case PD_CAM:
-> +		__raw_writel(S5P_INT_LOCAL_PWR_EN, S5P_CAM_CONFIGURATION);
-> +		status = S5P_CAM_STATUS;
-> +		break;
-> +	case PD_TV:
-> +		__raw_writel(S5P_INT_LOCAL_PWR_EN, S5P_TV_CONFIGURATION);
-> +		status = S5P_TV_STATUS;
-> +		break;
-> +	default:
-> +		printk(KERN_WARNING "Wrong PD enable request %d\n", pd);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Wait max 1ms */
-> +	timeout = 10;
-> +	while ((__raw_readl(status) & S5P_INT_LOCAL_PWR_EN)
-> +		!= S5P_INT_LOCAL_PWR_EN) {
-> +		if (timeout == 0) {
-> +			printk(KERN_ERR "Power domain %d enable failed.\n", pd);
-> +			return -ETIMEDOUT;
-> +		}
-> +		timeout--;
-> +		udelay(100);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int s5pv310_pd_disable(enum s5pv310_pd_block pd)
-> +{
-> +	void __iomem *status;
-> +	u32 timeout;
-> +
-> +	switch (pd) {
-> +	case PD_MFC:
-> +		__raw_writel(0, S5P_MFC_CONFIGURATION);
-> +		status = S5P_MFC_STATUS;
-> +		break;
-> +	case PD_G3D:
-> +		__raw_writel(0, S5P_G3D_CONFIGURATION);
-> +		status = S5P_G3D_STATUS;
-> +		break;
-> +	case PD_LCD0:
-> +		__raw_writel(0, S5P_LCD0_CONFIGURATION);
-> +		status = S5P_LCD0_STATUS;
-> +		break;
-> +	case PD_LCD1:
-> +		__raw_writel(0, S5P_LCD1_CONFIGURATION);
-> +		status = S5P_LCD1_STATUS;
-> +		break;
-> +	case PD_CAM:
-> +		__raw_writel(0, S5P_CAM_CONFIGURATION);
-> +		status = S5P_CAM_STATUS;
-> +		break;
-> +	case PD_TV:
-> +		__raw_writel(0, S5P_TV_CONFIGURATION);
-> +		status = S5P_TV_STATUS;
-> +		break;
-> +	default:
-> +		printk(KERN_WARNING "Wrong PD disable request %d\n", pd);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Wait max 1ms */
-> +	timeout = 10;
-> +	while (__raw_readl(status) & S5P_INT_LOCAL_PWR_EN) {
-> +		if (timeout == 0) {
-> +			printk(KERN_ERR "PD %d disable failed.\n", pd);
-> +			return -ETIMEDOUT;
-> +		}
-> +		timeout--;
-> +		udelay(100);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int s5pv310_pd_mfc_enable(void)
-> +{
-> +	return s5pv310_pd_enable(PD_MFC);
-> +}
-> +
-> +static int s5pv310_pd_mfc_disable(void)
-> +{
-> +	return s5pv310_pd_disable(PD_MFC);
-> +}
-> +
-> +static int s5pv310_pd_g3d_enable(void)
-> +{
-> +	return s5pv310_pd_enable(PD_G3D);
-> +}
-> +
-> +static int s5pv310_pd_g3d_disable(void)
-> +{
-> +	return s5pv310_pd_disable(PD_G3D);
-> +}
-> +
-> +static int s5pv310_pd_lcd0_enable(void)
-> +{
-> +	return s5pv310_pd_enable(PD_LCD0);
-> +}
-> +
-> +static int s5pv310_pd_lcd0_disable(void)
-> +{
-> +	return s5pv310_pd_disable(PD_LCD0);
-> +}
-> +
-> +static int s5pv310_pd_lcd1_enable(void)
-> +{
-> +	return s5pv310_pd_enable(PD_LCD1);
-> +}
-> +
-> +static int s5pv310_pd_lcd1_disable(void)
-> +{
-> +	return s5pv310_pd_disable(PD_LCD1);
-> +}
-> +
-> +static int s5pv310_pd_cam_enable(void)
-> +{
-> +	return s5pv310_pd_enable(PD_CAM);
-> +}
-> +
-> +static int s5pv310_pd_cam_disable(void)
-> +{
-> +	return s5pv310_pd_disable(PD_CAM);
-> +}
-> +
-> +static int s5pv310_pd_tv_enable(void)
-> +{
-> +	return s5pv310_pd_enable(PD_TV);
-> +}
-> +
-> +static int s5pv310_pd_tv_disable(void)
-> +{
-> +	return s5pv310_pd_disable(PD_TV);
-> +}
-> +
-> +static struct samsung_pd_info s5pv310_pd_mfc_pdata = {
-> +	.enable		= s5pv310_pd_mfc_enable,
-> +	.disable	= s5pv310_pd_mfc_disable,
-> +};
-> +
-> +static struct samsung_pd_info s5pv310_pd_g3d_pdata = {
-> +	.enable		= s5pv310_pd_g3d_enable,
-> +	.disable	= s5pv310_pd_g3d_disable,
-> +};
-> +
-> +static struct samsung_pd_info s5pv310_pd_lcd0_pdata = {
-> +	.enable		= s5pv310_pd_lcd0_enable,
-> +	.disable	= s5pv310_pd_lcd0_disable,
-> +};
-> +
-> +static struct samsung_pd_info s5pv310_pd_lcd1_pdata = {
-> +	.enable		= s5pv310_pd_lcd1_enable,
-> +	.disable	= s5pv310_pd_lcd1_disable,
-> +};
-> +
-> +static struct samsung_pd_info s5pv310_pd_tv_pdata = {
-> +	.enable		= s5pv310_pd_tv_enable,
-> +	.disable	= s5pv310_pd_tv_disable,
-> +};
-> +
-> +static struct samsung_pd_info s5pv310_pd_cam_pdata = {
-> +	.enable		= s5pv310_pd_cam_enable,
-> +	.disable	= s5pv310_pd_cam_disable,
-> +};
-> +
-> +struct platform_device s5pv310_device_pd[] = {
-> +	{
-> +		.name		= "samsung-pd",
-> +		.id		= 0,
-> +		.dev = {
-> +			.platform_data = &s5pv310_pd_mfc_pdata,
-> +		},
+> Each Power Domain is represented by a Power Domain device and the devices
+> belong to these Power Domains should be set as a child device of the Power
+> Domain devices. The corresponding drivers of the devices should implement
+> Runtime PM to control the Power Domains.
 
-how about wrapping each device in a new struct with the pd
-base info in it, such as
-
-struct samsung_pd_device {
-	struct platform_device	pdev;
-	void __iomem            *base;
-}
-
-this means you can squash out all the samsung_pd_info structures
-and have a single enable/disable function and avoid the switch
-statements in them.
-
-you could also simply put the base address in the pdata and
-avoid this too. also see Marek's comments about inlining the
-platform data setting.
+This sounds like a reasonable way to do this, although we still
+need a way of signaling the drivers whether they've fully powered
+down or not.
 
 
-> +	}, {
-> +		.name		= "samsung-pd",
-> +		.id		= 1,
-> +		.dev = {
-> +			.platform_data = &s5pv310_pd_g3d_pdata,
-> +		},
-> +	}, {
-> +		.name		= "samsung-pd",
-> +		.id		= 2,
-> +		.dev = {
-> +			.platform_data = &s5pv310_pd_lcd0_pdata,
-> +		},
-> +	}, {
-> +		.name		= "samsung-pd",
-> +		.id		= 3,
-> +		.dev = {
-> +			.platform_data = &s5pv310_pd_lcd1_pdata,
-> +		},
-> +	}, {
-> +		.name		= "samsung-pd",
-> +		.id		= 4,
-> +		.dev = {
-> +			.platform_data = &s5pv310_pd_tv_pdata,
-> +		},
-> +	}, {
-> +		.name		= "samsung-pd",
-> +		.id		= 5,
-> +		.dev = {
-> +			.platform_data = &s5pv310_pd_cam_pdata,
-> +		},
-> +	},
-> +};
-> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-s5pv310/include/mach/map.h
-> index 1429510..9decf02 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
-> @@ -37,6 +37,8 @@
->  #define S5PV310_PA_SYSCON		(0x10010000)
->  #define S5P_PA_SYSCON			S5PV310_PA_SYSCON
->  
-> +#define S5PV310_PA_PMU			(0x10020000)
-> +
->  #define S5PV310_PA_CMU			(0x10030000)
->  
->  #define S5PV310_PA_WATCHDOG		(0x10060000)
-> diff --git a/arch/arm/mach-s5pv310/include/mach/regs-pmu.h b/arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-> new file mode 100644
-> index 0000000..f4b2229
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-> @@ -0,0 +1,40 @@
-> +/* linux/arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * S5PV310 - Power management unit definition
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_ARCH_REGS_PMU_H
-> +#define __ASM_ARCH_REGS_PMU_H __FILE__
-> +
-> +#include <mach/map.h>
-> +
-> +#define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
-> +
-> +#define S5P_CAM_CONFIGURATION			S5P_PMUREG(0x3C00)
-> +#define S5P_CAM_STATUS				S5P_PMUREG(0x3C04)
-> +
-> +#define S5P_TV_CONFIGURATION			S5P_PMUREG(0x3C20)
-> +#define S5P_TV_STATUS				S5P_PMUREG(0x3C24)
-> +
-> +#define S5P_MFC_CONFIGURATION			S5P_PMUREG(0x3C40)
-> +#define S5P_MFC_STATUS				S5P_PMUREG(0x3C44)
-> +
-> +#define S5P_G3D_CONFIGURATION			S5P_PMUREG(0x3C60)
-> +#define S5P_G3D_STATUS				S5P_PMUREG(0x3C64)
-> +
-> +#define S5P_LCD0_CONFIGURATION			S5P_PMUREG(0x3C80)
-> +#define S5P_LCD0_STATUS				S5P_PMUREG(0x3C84)
-> +
-> +#define S5P_LCD1_CONFIGURATION			S5P_PMUREG(0x3CA0)
-> +#define S5P_LCD1_STATUS				S5P_PMUREG(0x3CA4)
+>From bogus@does.not.exist.com  Fri Oct 22 17:57:35 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 22 Oct 2010 21:57:35 -0000
+Subject: No subject
+Message-ID: <mailman.12.1289145330.1530.linux-arm-kernel@lists.infradead.org>
 
-give STATUS seems to be CONFIGURATION+0x04, why bother with them?
+a direct clock, it relies on the main ipu clock to function, but it is
+my first glance to omap4 and I might be wrong.
 
-> +
-> +#define S5P_INT_LOCAL_PWR_EN			0x7
-> +
-> +#endif /* __ASM_ARCH_REGS_PMU_H */
-> diff --git a/arch/arm/mach-s5pv310/mach-smdkc210.c b/arch/arm/mach-s5pv310/mach-smdkc210.c
-> index d2cf694..390befd 100644
-> --- a/arch/arm/mach-s5pv310/mach-smdkc210.c
-> +++ b/arch/arm/mach-s5pv310/mach-smdkc210.c
-> @@ -22,6 +22,7 @@
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
->  #include <plat/sdhci.h>
-> +#include <plat/pd.h>
->  
->  #include <mach/map.h>
->  
-> @@ -113,6 +114,12 @@ static struct platform_device *smdkc210_devices[] __initdata = {
->  	&s3c_device_hsmmc3,
->  	&s3c_device_rtc,
->  	&s3c_device_wdt,
-> +	&s5pv310_device_pd[PD_MFC],
-> +	&s5pv310_device_pd[PD_G3D],
-> +	&s5pv310_device_pd[PD_LCD0],
-> +	&s5pv310_device_pd[PD_LCD1],
-> +	&s5pv310_device_pd[PD_CAM],
-> +	&s5pv310_device_pd[PD_TV],
->  };
->  
->  static void __init smdkc210_map_io(void)
-> @@ -124,6 +131,8 @@ static void __init smdkc210_map_io(void)
->  
->  static void __init smdkc210_machine_init(void)
->  {
-> +	samsung_pd_init();
-> +
->  	s3c_sdhci0_set_platdata(&smdkc210_hsmmc0_pdata);
->  	s3c_sdhci1_set_platdata(&smdkc210_hsmmc1_pdata);
->  	s3c_sdhci2_set_platdata(&smdkc210_hsmmc2_pdata);
-> diff --git a/arch/arm/mach-s5pv310/mach-smdkv310.c b/arch/arm/mach-s5pv310/mach-smdkv310.c
-> index 10f8056..c6690cf 100644
-> --- a/arch/arm/mach-s5pv310/mach-smdkv310.c
-> +++ b/arch/arm/mach-s5pv310/mach-smdkv310.c
-> @@ -22,6 +22,7 @@
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
->  #include <plat/sdhci.h>
-> +#include <plat/pd.h>
->  
->  #include <mach/map.h>
->  
-> @@ -113,6 +114,12 @@ static struct platform_device *smdkv310_devices[] __initdata = {
->  	&s3c_device_hsmmc3,
->  	&s3c_device_rtc,
->  	&s3c_device_wdt,
-> +	&s5pv310_device_pd[PD_MFC],
-> +	&s5pv310_device_pd[PD_G3D],
-> +	&s5pv310_device_pd[PD_LCD0],
-> +	&s5pv310_device_pd[PD_LCD1],
-> +	&s5pv310_device_pd[PD_CAM],
-> +	&s5pv310_device_pd[PD_TV],
->  };
->  
->  static void __init smdkv310_map_io(void)
-> @@ -124,6 +131,8 @@ static void __init smdkv310_map_io(void)
->  
->  static void __init smdkv310_machine_init(void)
->  {
-> +	samsung_pd_init();
-> +
+> That being said, when you will change that code to switch to runtime PM, you
+> will end up managing the module state in the ISR context.
 
-given the driver will only get called when the devices are
-registered, how about making it have its own initcall and
-avoid having to splatter these through each machine?
+Mainly this patch was sent on my laziness to add device enable/disable
+calls on all the parts the code is using clk disable/enable, given
+that they are not really needed.
 
->  	s3c_sdhci0_set_platdata(&smdkv310_hsmmc0_pdata);
->  	s3c_sdhci1_set_platdata(&smdkv310_hsmmc1_pdata);
->  	s3c_sdhci2_set_platdata(&smdkv310_hsmmc2_pdata);
-> diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-> index fef353d..d973d39 100644
-> --- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-> +++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-> @@ -15,6 +15,7 @@
->  
->  #define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
->  #define S5P_VA_CMU		S3C_ADDR(0x02100000)
-> +#define S5P_VA_PMU		S3C_ADDR(0x02180000)
->  #define S5P_VA_GPIO		S3C_ADDR(0x02200000)
->  #define S5P_VA_GPIO1		S5P_VA_GPIO
->  #define S5P_VA_GPIO2		S3C_ADDR(0x02240000)
-> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-> index 71bcc0f..c483480 100644
-> --- a/arch/arm/plat-samsung/include/plat/devs.h
-> +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> @@ -118,6 +118,8 @@ extern struct platform_device s5p_device_fimc0;
->  extern struct platform_device s5p_device_fimc1;
->  extern struct platform_device s5p_device_fimc2;
->  
-> +extern struct platform_device s5pv310_device_pd[];
-> +
->  /* s3c2440 specific devices */
->  
->  #ifdef CONFIG_CPU_S3C2440
+Regards,
+
+Omar
+
+
+>From bogus@does.not.exist.com  Fri Oct 22 17:57:35 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 22 Oct 2010 21:57:35 -0000
+Subject: No subject
+Message-ID: <mailman.15.1289532866.1530.linux-arm-kernel@lists.infradead.org>
+
+around - so I just hacked up a simple patch. I also didn't bother to
+use get_maintainer.pl for CC. As you may have noticed I also managed
+to get the code wrong for msm in V1, so I guess it would have been
+better to CC properly after all.
+
+Anyway, I will break up the patch per sub-architecture in V3. That
+makes per sub-arch back porting easier.
+
+Thanks,
+
+/ magnus
+
+
+>From bogus@does.not.exist.com  Fri Oct 22 17:57:35 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 22 Oct 2010 21:57:35 -0000
+Subject: No subject
+Message-ID: <mailman.22.1290426417.1530.linux-arm-kernel@lists.infradead.org>
+
+types, which hwmod uses to define the rev field.
+
+/* timer ip constants */
+#define OMAP_TIMER_IP_LEGACY			0x1
+#define OMAP_TIMER_IP_VERSION_2			0x2
+
+
+Thank you,
+Best regards,
+Hari Kanigeri
+
+
+>From bogus@does.not.exist.com  Fri Oct 22 17:57:35 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 22 Oct 2010 21:57:35 -0000
+Subject: No subject
+Message-ID: <mailman.26.1290667452.1530.linux-arm-kernel@lists.infradead.org>
+
+does not help and if the bus is busy for too much time,
+there always was a h/w problem involved.
+
+>>> +
+>>> +       return timeout < 0 ? I2C_RETRY : 0;
+>>> +}
+>>>
+>>>  #ifdef CONFIG_I2C_PXA_SLAVE
+>>>  /*
+>>> --
+>>> 1.7.3.2
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+-- 
+Regards,
+Igor.
+
+
+
+>From bogus@does.not.exist.com  Fri Oct 22 17:57:35 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 22 Oct 2010 21:57:35 -0000
+Subject: No subject
+Message-ID: <mailman.28.1290946151.1530.linux-arm-kernel@lists.infradead.org>
+
+larger than about 16K ?
+
+A work-around would be to drop the MTU below 4K, which'll make these kinds
+of allocations order-0, and see whether you can reproduce the problem.  If
+you can, it would suggest there is a memory leak somewhere.
+
+> [180923.061930] Unable to handle kernel paging request at virtual address 804f13e6
+> [180923.070060] pgd = c0e98000
+> [180923.072893] [804f13e6] *pgd=00000000
+> [180923.076583] Internal error: Oops: 801 [#1]
+> [180923.080782] last sysfs file: /sys/devices/virtual/net/ppp0/uevent
+> [180923.086990] Modules linked in: pppol2tp pppox ppp_generic slhc xfrm_user ah6 ah4 esp6 esp4 xfrm4_mode_beet xfrm4_tunnel xfrm4_mode_tunnel xfrm4_mode_transport xfrm6_mode_transport xfrm6_mode_ro xfrm6_mode_beet xfrm6_mode_tunnel ipcomp ipcomp6 xfrm6_tunnel af_key nls_cp437 authenc ccm ecb sha512_generic tunnel4 xfrm_ipcomp tunnel6 ipv6 ctr twofish twofish_common camellia serpent blowfish cast5 des_generic cbc aes_generic xcbc rmd160 sha256_generic sha1_generic hmac crypto_null ext2 loop vfat fat nls_utf8 cifs ext3 jbd dm_crypt dm_mod evdev sata_mv mv643xx_eth libata libphy gpio_keys inet_lro ext4 mbcache jbd2 sd_mod crc_t10dif usb_storage scsi_mod ehci_hcd usbcore nls_base [last unloaded: slhc]
+> [180923.149394] CPU: 0    Not tainted  (2.6.32-5-kirkwood #1)
+> [180923.154915] PC is at __kprobes_text_end+0x818/0xae8
+> [180923.159908] LR is at tcp_sendmsg+0x32c/0xae0
+> [180923.164288] pc : [<c02b8bb8>]    lr : [<c026f2d8>]    psr: 00000013
+> [180923.164294] sp : c0fabbb8  ip : 00000550  fp : c66f5790
+> [180923.176005] r10: 00001000  r9 : c0fabc40  r8 : 00000000
+> [180923.181342] r7 : 00000000  r6 : 00000550  r5 : 804f13e6  r4 : fffffff2
+> [180923.187987] r3 : 00000000  r2 : 00000550  r1 : dba88130  r0 : c66f5790
+> [180923.194633] Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> [180923.202061] Control: 0005397f  Table: 00e98000  DAC: 00000017
+> [180923.207922] Process vsftpd (pid: 11900, stack limit = 0xc0faa270)
+> [180923.214130] Stack: (0xc0fabbb8 to 0xc0fac000)
+> [180923.218595] bba0:                                                       dba88130 00000550
+> [180923.226901] bbc0: dfb0f600 df226400 00000550 00000000 00000000 c026f2d8 c0fabc0c 00000000
+> [180923.235211] bbe0: c0fabd68 00000000 00008000 00000550 00000790 00000870 00000550 df226470
+> [180923.243521] bc00: c0faa000 00000000 c002e220 00000000 7fffffff 00000550 c050e0c0 00000000
+> [180923.251832] bc20: 00000000 df9672c0 df617000 c0fabd4c c0fabc40 00001000 00000018 c022d094
+> [180923.260141] bc40: 00000000 df974074 00000000 00000001 ffffffff 00000000 00000000 00000000
+> [180923.268452] bc60: 00000000 00000000 df9672c0 c03d4fa0 00000000 00000000 1d260c67 df9672c0
+> [180923.276763] bc80: c005d2e4 c0fabc84 c0fabc84 dfabd200 c0dddc00 dfaa9c00 c0fabcd0 c0d6a280
+> [180923.285072] bca0: dfbff578 00000000 d6c1dde0 0003ffff 00000010 c0fabe08 d4e8c300 c0fabcd4
+> [180923.293383] bcc0: 00000010 c01acf68 c0fabcd4 c0c40480 0000f140 0000f160 c0c40480 00001000
+> [180923.301693] bce0: df617000 00000010 00000000 c0fabd4c 00000000 00000010 c0509ac0 c0fabe4c
+> [180923.310002] bd00: 00000000 00000011 d4e8c2fc 00000000 00000017 bf000000 c0fabd4c df617000
+> [180923.318314] bd20: 00001000 c00ea7c0 c02bf59c c022d3ec 00000018 000066f5 c66f5000 c022f8f4
+> [180923.326623] bd40: 00001000 c0c404c0 00000000 00000000 00000000 c0fabd68 00000001 00000000
+> [180923.334934] bd60: 00000000 00008000 c66f5000 00001000 df226400 c0c3f93c c0c40800 0000000b
+> [180923.343243] bd80: c0c3f93c c026fad0 00008000 00000014 00000000 00001000 00000000 00000000
+> [180923.351553] bda0: 00001000 c050dea0 00000000 00001000 c0c40800 00008000 c0c3f93c c0c40800
+> [180923.359864] bdc0: 0000000b c0c3f93c c00ea7c0 c02bf59c 00000018 c022be64 00008000 c0fabe48
+> [180923.368174] bde0: c0fabe48 c00ea834 00008000 00000001 0f15b000 00000000 00005000 c0fabe48
+> [180923.376484] be00: c0c3f800 c00ea888 c050daa0 c0fabe48 c0c3f800 00000001 c00ea7c0 c0c40800
+> [180923.384795] be20: 00010000 0f150000 050c9000 c00eac14 c050de80 00010000 c0c3f800 0f150000
+> [180923.393104] be40: 00000000 c00eac98 00001000 00005000 00000000 c0c40800 0f15b000 00000000
+> [180923.401415] be60: 0000b000 00000000 00000000 c0c40800 c0c3f800 00010000 c0fabf20 c0fabf10
+> [180923.409725] be80: 0f150000 c00ead14 00000000 c00ea7c0 c0fabf10 c00eb43c 00000000 c0c3f800
+> [180923.418035] bea0: c0fabf10 0f150000 00000000 00010000 c0c3f800 c00eb998 00000000 00010000
+> [180923.426345] bec0: c0c3f800 c00eb280 00000000 00000001 000003e8 c00eb974 c0c40480 00000000
+> [180923.434655] bee0: 0f160000 00000000 14219000 00000000 00000000 14219000 14219000 c0c40480
+> [180923.442965] bf00: c0c404a0 c0c40800 c0c40480 c00eb3a8 14219000 00010000 00000000 c0c40800
+> [180923.451275] bf20: 0f150000 00000000 00000000 00000000 df617028 d4e8c260 14219000 ff7fc000
+> [180923.459585] bf40: c0c40800 c0c404a0 000001fe c00cd528 00000000 00000000 00000000 00000000
+> [180923.467896] bf60: c0c40480 00000000 00000000 00000000 000000bb c0028048 c0faa000 00000000
+> [180923.476205] bf80: 0000ffff c00cd75c 00000000 00000000 00000000 0002a8a4 14219000 0002a8a4
+> [180923.484516] bfa0: 00000007 c0027ea0 14219000 0002a8a4 00000007 00000003 00000000 14219000
+> [180923.492826] bfc0: 14219000 0002a8a4 00000007 000000bb 0002a034 00000003 00000000 0000ffff
+> [180923.501136] bfe0: 00000003 bef27908 0001cac4 4029375c 60000010 00000007 00000000 00000000
+> [180923.509447] Code: 00000000 00000000 e3e0400d e59b5004 (e5854000)
+> [180923.518824] ---[ end trace 0c1f4f3521f172f3 ]---
+
+This is not useful.  Unlike OABI with frame pointers, EABI seems to
+omit the very important backtrace.  Moreover, because the kprobes
+symbols appear in kallsyms, we don't know where PC was.  So all in
+all, the above oops is undebuggable.
+
+Can someone please fix the EABI backtracing to say _why_ it couldn't
+produce a backtrace.
+
+
+
+>From bogus@does.not.exist.com  Fri Oct 22 17:57:35 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 22 Oct 2010 21:57:35 -0000
+Subject: No subject
+Message-ID: <mailman.34.1291285386.1530.linux-arm-kernel@lists.infradead.org>
+
+is added so that Driver's can avoid doing ioremap.
+check Santosh's comment on this API
+http://www.spinics.net/lists/arm-kernel/msg92260.html
+
+>
+> static int __devinit =A0dev_probe (*pdev) {
+> =A0 struct resource *res;
+> =A0 void __iomem *base;
+> =A0 u16 irq;
+> =A0 ....
+> =A0 ....
+> =A0 res =3D platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> =A0 if (unlikely(!res)) {
+> =A0 =A0 =A0 =A0 =A0 =A0 =A0....
+> =A0 =A0 =A0 =A0 =A0 =A0 =A0return -ENODEV;
+> =A0 }
+>
+> =A0 base =3D ioremap(res->start, resource_size(res));
+> =A0 if (base) {
+> =A0 =A0 =A0 =A0 =A0 =A0 =A0 ....
+> =A0 =A0 =A0 =A0 =A0 =A0 =A0 return -ENOMEM;
+> =A0 }
+>
+> =A0 res =3D platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> =A0 if (unlikely(!res)) {
+> =A0 =A0 =A0 =A0 =A0 =A0 =A0 ....
+> =A0 =A0 =A0 =A0 =A0 =A0 =A0 return -ENODEV;
+> =A0 }
+> =A0 irq =3D res->start;
+> =A0 ....
+> =A0 ....
+> }
+>
+> -V Charulatha
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at =A0http://vger.kernel.org/majordomo-info.html
+>
