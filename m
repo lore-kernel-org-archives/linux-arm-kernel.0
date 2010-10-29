@@ -1,43 +1,236 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Oct 2010 23:28:44 +0100
-Subject: [PATCH] msm: fix debug-macro.S build failure
-In-Reply-To: <1288390882.6631.16.camel@m0nster>
-References: <20101028174653.GH3122@n2100.arm.linux.org.uk>
-	<1288288824.2683.24.camel@c-dwalke-linux.qualcomm.com>
-	<alpine.LFD.2.00.1010281422190.3227@xanadu.home>
-	<20101028182851.GI3122@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010281441540.3227@xanadu.home>
-	<20101028184627.GK3122@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010282226460.5029@xanadu.home>
-	<1288387033.6631.13.camel@m0nster>
-	<20101029221437.GA31224@n2100.arm.linux.org.uk>
-	<1288390882.6631.16.camel@m0nster>
-Message-ID: <20101029222844.GB31224@n2100.arm.linux.org.uk>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Sat, 30 Oct 2010 00:29:29 +0200
+Subject: [PATCH 3/6] arm: plat-tcc: Change mail address of Hans J. Koch
+In-Reply-To: <20101029221231.GA4331@local>
+References: <20101029221231.GA4331@local>
+Message-ID: <20101029222929.GD4331@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 29, 2010 at 03:21:22PM -0700, Daniel Walker wrote:
-> On Fri, 2010-10-29 at 23:14 +0100, Russell King - ARM Linux wrote:
-> 
-> > Your original patch is unsuitable as it leaves the values uninitialized.
-> > 
-> 
-> All I'm really concerned about is fixing the build issue during this
-> merge window. But I'll send another patch with your suggestions added.
+My old mail address doesn't exist anymore. This changes all occurrences
+to my new address.
 
-As we have had a complaint from Linus about pointless churn, and this
-approach causes unnecessary churn, I will refuse to apply this.  Fix
-the thing properly (it's not hard) or don't bother trying to fix it at
-all.
+Signed-off-by: Hans J. Koch <hjk@hansjkoch.de>
+---
+ arch/arm/mach-tcc8k/board-tcc8000-sdk.c      |    2 +-
+ arch/arm/mach-tcc8k/clock.c                  |    2 +-
+ arch/arm/mach-tcc8k/devices.c                |    2 +-
+ arch/arm/mach-tcc8k/io.c                     |    2 +-
+ arch/arm/mach-tcc8k/irq.c                    |    2 +-
+ arch/arm/mach-tcc8k/time.c                   |    2 +-
+ arch/arm/plat-tcc/clock.c                    |    2 +-
+ arch/arm/plat-tcc/include/mach/clock.h       |    2 +-
+ arch/arm/plat-tcc/include/mach/debug-macro.S |    2 +-
+ arch/arm/plat-tcc/include/mach/hardware.h    |    2 +-
+ arch/arm/plat-tcc/include/mach/io.h          |    2 +-
+ arch/arm/plat-tcc/include/mach/irqs.h        |    2 +-
+ arch/arm/plat-tcc/include/mach/memory.h      |    2 +-
+ arch/arm/plat-tcc/include/mach/tcc8k-regs.h  |    2 +-
+ arch/arm/plat-tcc/include/mach/uncompress.h  |    2 +-
+ arch/arm/plat-tcc/system.c                   |    2 +-
+ 16 files changed, 16 insertions(+), 16 deletions(-)
 
-All you need do is to use your initial patch, but change the addruart to
-the following:
-
-	.macro	addruart, rp, rv
-	mov	rv, #0xff000000
-	orr	rv, rv, #0x00f00000
-	.endm
-
-and you commit the result.  Problem fixed in one go, both from the
-compile point of view _and_ the runtime point of view.  It's really
-not difficult.
+diff --git a/arch/arm/mach-tcc8k/board-tcc8000-sdk.c b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
+index 7991415..7cba61f 100644
+--- a/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
++++ b/arch/arm/mach-tcc8k/board-tcc8000-sdk.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+diff --git a/arch/arm/mach-tcc8k/clock.c b/arch/arm/mach-tcc8k/clock.c
+index ba32a15..7837f0e 100644
+--- a/arch/arm/mach-tcc8k/clock.c
++++ b/arch/arm/mach-tcc8k/clock.c
+@@ -1,7 +1,7 @@
+ /*
+  * Lowlevel clock handling for Telechips TCC8xxx SoCs
+  *
+- * Copyright (C) 2010 by Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2010 by Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GPL v2
+  */
+diff --git a/arch/arm/mach-tcc8k/devices.c b/arch/arm/mach-tcc8k/devices.c
+index 6722ad7..3300159 100644
+--- a/arch/arm/mach-tcc8k/devices.c
++++ b/arch/arm/mach-tcc8k/devices.c
+@@ -2,7 +2,7 @@
+  * linux/arch/arm/mach-tcc8k/devices.c
+  *
+  * Copyright (C) Telechips, Inc.
+- * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of GPL v2.
+  *
+diff --git a/arch/arm/mach-tcc8k/io.c b/arch/arm/mach-tcc8k/io.c
+index 9b39d7f..4c7da0d 100644
+--- a/arch/arm/mach-tcc8k/io.c
++++ b/arch/arm/mach-tcc8k/io.c
+@@ -1,7 +1,7 @@
+ /*
+  * linux/arch/arm/mach-tcc8k/io.c
+  *
+- * (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * derived from TCC83xx io.c
+  * Copyright (C) Telechips, Inc.
+diff --git a/arch/arm/mach-tcc8k/irq.c b/arch/arm/mach-tcc8k/irq.c
+index 34575c4..5e8ec9d 100644
+--- a/arch/arm/mach-tcc8k/irq.c
++++ b/arch/arm/mach-tcc8k/irq.c
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) Telechips, Inc.
+- * Copyright (C) 2009-2010 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2009-2010 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GNU GPL version 2.
+  */
+diff --git a/arch/arm/mach-tcc8k/time.c b/arch/arm/mach-tcc8k/time.c
+index 78d0600..3544de0 100644
+--- a/arch/arm/mach-tcc8k/time.c
++++ b/arch/arm/mach-tcc8k/time.c
+@@ -1,7 +1,7 @@
+ /*
+  * TCC8000 system timer setup
+  *
+- * (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GPL version 2.
+  *
+diff --git a/arch/arm/plat-tcc/clock.c b/arch/arm/plat-tcc/clock.c
+index f3ced10..0d3261f 100644
+--- a/arch/arm/plat-tcc/clock.c
++++ b/arch/arm/plat-tcc/clock.c
+@@ -7,7 +7,7 @@
+  * Modified for omap shared clock framework by Tony Lindgren <tony@atomide.com>
+  * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
+  * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- * Copyright 2010 Hans J. Koch, hjk at linutronix.de
++ * Copyright 2010 Hans J. Koch, hjk at hansjkoch.de
+  *
+  * Licensed under the terms of the GPL v2.
+  */
+diff --git a/arch/arm/plat-tcc/include/mach/clock.h b/arch/arm/plat-tcc/include/mach/clock.h
+index a12f58a..0ffcc93 100644
+--- a/arch/arm/plat-tcc/include/mach/clock.h
++++ b/arch/arm/plat-tcc/include/mach/clock.h
+@@ -1,6 +1,6 @@
+ /*
+  * Low level clock header file for Telechips TCC architecture
+- * (C) 2010 Hans J. Koch <hjk@linutronix.de>
++ * (C) 2010 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the GPL v2.
+  */
+diff --git a/arch/arm/plat-tcc/include/mach/debug-macro.S b/arch/arm/plat-tcc/include/mach/debug-macro.S
+index 7662f73..6733ecd 100644
+--- a/arch/arm/plat-tcc/include/mach/debug-macro.S
++++ b/arch/arm/plat-tcc/include/mach/debug-macro.S
+@@ -1,7 +1,7 @@
+ /*
+  * Copyright (C) 1994-1999 Russell King
+  * Copyright (C) 2008-2009 Telechips
+- * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+diff --git a/arch/arm/plat-tcc/include/mach/hardware.h b/arch/arm/plat-tcc/include/mach/hardware.h
+index e70d126..5645c3c 100644
+--- a/arch/arm/plat-tcc/include/mach/hardware.h
++++ b/arch/arm/plat-tcc/include/mach/hardware.h
+@@ -8,7 +8,7 @@
+  * Copyright (C) 2001 RidgeRun, Inc.
+  * Copyright (C) 2008-2009 Telechips
+  *
+- * Modifications for mainline (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * Modifications for mainline (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GNU Pulic License version 2.
+  */
+diff --git a/arch/arm/plat-tcc/include/mach/io.h b/arch/arm/plat-tcc/include/mach/io.h
+index 3e911d3..f006f31 100644
+--- a/arch/arm/plat-tcc/include/mach/io.h
++++ b/arch/arm/plat-tcc/include/mach/io.h
+@@ -3,7 +3,7 @@
+  *
+  * Copyright (C) 1997-1999 Russell King
+  * Copyright (C) 2008-2009 Telechips
+- * Copyright (C) 2010 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2010 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GNU Public License version 2.
+  */
+diff --git a/arch/arm/plat-tcc/include/mach/irqs.h b/arch/arm/plat-tcc/include/mach/irqs.h
+index da86389..fa62e71 100644
+--- a/arch/arm/plat-tcc/include/mach/irqs.h
++++ b/arch/arm/plat-tcc/include/mach/irqs.h
+@@ -2,7 +2,7 @@
+  * IRQ definitions for TCC8xxx
+  *
+  * Copyright (C) 2008-2009 Telechips
+- * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GPL v2.
+  *
+diff --git a/arch/arm/plat-tcc/include/mach/memory.h b/arch/arm/plat-tcc/include/mach/memory.h
+index cd91ba8..c89cdc6 100644
+--- a/arch/arm/plat-tcc/include/mach/memory.h
++++ b/arch/arm/plat-tcc/include/mach/memory.h
+@@ -2,7 +2,7 @@
+  * Copyright (C) 1999 ARM Limited
+  * Copyright (C) 2000 RidgeRun, Inc.
+  * Copyright (C) 2008-2009 Telechips
+- * Copyright (C) 2010 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2010 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GPL v2.
+  */
+diff --git a/arch/arm/plat-tcc/include/mach/tcc8k-regs.h b/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
+index 1d94282..79912bb 100644
+--- a/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
++++ b/arch/arm/plat-tcc/include/mach/tcc8k-regs.h
+@@ -1,7 +1,7 @@
+ /*
+  * Telechips TCC8000 register definitions
+  *
+- * (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GPLv2.
+  */
+diff --git a/arch/arm/plat-tcc/include/mach/uncompress.h b/arch/arm/plat-tcc/include/mach/uncompress.h
+index 7a3e33a..df73880 100644
+--- a/arch/arm/plat-tcc/include/mach/uncompress.h
++++ b/arch/arm/plat-tcc/include/mach/uncompress.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2009 Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) 2009 Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * This file is licensed under the terms of the GPL version 2.
+  */
+diff --git a/arch/arm/plat-tcc/system.c b/arch/arm/plat-tcc/system.c
+index cc208fa..ac79308 100644
+--- a/arch/arm/plat-tcc/system.c
++++ b/arch/arm/plat-tcc/system.c
+@@ -1,7 +1,7 @@
+ /*
+  * System functions for Telechips TCCxxxx SoCs
+  *
+- * Copyright (C) Hans J. Koch <hjk@linutronix.de>
++ * Copyright (C) Hans J. Koch <hjk@hansjkoch.de>
+  *
+  * Licensed under the terms of the GPL v2.
+  *
+-- 
+1.7.1
