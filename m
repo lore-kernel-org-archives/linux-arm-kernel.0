@@ -1,75 +1,78 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Fri, 29 Oct 2010 11:20:40 +0200
-Subject: [RFC][PATCH 0/3] big chunk memory allocator v2
-In-Reply-To: <AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
-References: <20101026190042.57f30338.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
-Message-ID: <op.vlbywq137p4s8u@pikus>
+From: brian@murphy.dk (Brian Murphy)
+Date: Fri, 29 Oct 2010 12:22:47 +0200
+Subject: boot decompressor code error
+Message-ID: <AANLkTimttsvuVYFpCNFU4iJHCjHZ1Xq5E3Gni-wOrTba@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Oct 26, 2010 at 7:00 PM, KAMEZAWA Hiroyuki
-> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
->> I only did small test and it seems to work (but I think there will be bug...)
->> I post this now just because I'll be out of office 10/31-11/15 with ksummit and
->> a private trip.
->>
->> Any comments are welcome but please see the interface is enough for use cases or
->> not.  For example) If MAX_ORDER alignment is too bad, I need to rewrite almost
->> all code.
+Hi,
+There is a problem with the boot decompression code when the inflate
+method is used on arm.
+In fact two. The second of which is also a problem on all architectures.
+The first, and more serious, is that static local variables seem not
+to be supported, this means that
+some tables initialized as static locals point to a place in ram where
+the tables are not.
+The function
 
-On Thu, 28 Oct 2010 01:22:38 +0200, Minchan Kim <minchan.kim@gmail.com> wrote:
-> First of all, thanks for the endless your effort to embedded system.
-> It's time for statkeholders to review this.
-> Cced some guys. Maybe many people of them have to attend KS.
-> So I hope SAMSUNG guys review this.
->
-> Maybe they can't test this since ARM doesn't support movable zone now.
-> (I will look into this).
-> As Kame said, please, review this patch whether this patch have enough
-> interface and meet your requirement.
-> I think this can't meet _all_ of your requirements(ex, latency and
-> making sure getting big contiguous memory) but I believe it can meet
-> NOT CRITICAL many cases, I guess.
+static void zlib_fixedtables(struct inflate_state *state)
 
-I'm currently working on a framework (the CMA framework some may be aware of) which
-in principle is meant for the same purpose: allocating physically contiguous blocks
-of memory.  I'm hoping to help with latency, remove the need for MAX_ORDER alignment
-as well as help with fragmentation by letting different drivers allocate memory from
-different memory range.
+includes inffixed.h which contains two static tables and
 
-When I was posting CMA, it had been suggested to create a new migration type
-dedicated to contiguous allocations.  I think I already did that and thanks to
-this new migration type we have (i) an area of memory that only accepts movable
-and reclaimable pages and (ii) is used only if all other (non-reserved) pages have
-been allocated.
+int zlib_inflate(z_streamp strm, int flush)
 
-I'm currently working on migration so that those movable and reclaimable pages
-allocated in area dedicated for CMA are freed and Kame's work is quite helpful
-in this regard as I have something to base my work on. :)
+contains a static local "order". The second seems not to have much
+influence on decompression
+but the first causes images (at least of a certain size) to fail
+decompression. Somtimes this failure
+is detectable in decompression and an error results, sometimes it is
+not and the kernel just fails to
+start.
+The "new" decompress_inflate.c routines do not check the checksum or
+image length fields encoded
+in the gzipped image, even though they would have detected this error.
+It may be that in some cases
+even though the kernel is not properly decompressed that it can boot
+and random unexplained errors
+can occur later because of the decompression failure.
 
-Nonetheless, it's a conference time now (ELC, PLC; interestingly both are in
-Cambridge :P) so I guess we, here at SPRC, will look into it more after PLC.
+Moving the local static initialization to a file local static enables
+the routines to work, i.e. moving the
+static declarations out of the functions.
 
->> Now interface is:
->>
->> struct page *__alloc_contig_pages(unsigned long base, unsigned long end,
->>                        unsigned long nr_pages, int align_order,
->>                        int node, gfp_t gfpflag, nodemask_t *mask)
->>
->>  * @base: the lowest pfn which caller wants.
->>  * @end:  the highest pfn which caller wants.
->>  * @nr_pages: the length of a chunk of pages to be allocated.
->>  * @align_order: alignment of start address of returned chunk in order.
->>  *   Returned' page's order will be aligned to (1 << align_order).If smaller
->>  *   than MAX_ORDER, it's raised to MAX_ORDER.
->>  * @node: allocate near memory to the node, If -1, current node is used
+I am not sure how local statics work on arm but I am guessing that the
+problem is to do with relocations
+not being processed for the boot decompression code.
 
+The second problem is with the output length declaration in gunzip in
+decompress_inflate.c.
 
-PS. Please note that Pawel's new address is <pawel@osciak.com>.  Fixing in Cc.
+out_len = 0x7fffffff; /* no limit */
 
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+When the buffer start pointer is over 0x80000000 the computation of
+the end pointer in inffast.c
+wraps around and end ends up before out(the start pointer) causing the
+main loop in
+
+void inflate_fast(z_streamp strm, unsigned start)
+
+to exit after one byte is processed at the very least causing
+unnecessary overhead. The computation
+
+end = out + (strm->avail_out - 257);
+
+should check for overflow and be set to 0xffffffff when wrap would
+occur. This must also be a problem(feature?)
+for other architectures. It has probably not been fixed because the
+decompression still works but is slower.
+
+I am willing to make a patch for the second issue.
+The right fix for the first issue is probably to fixup the references
+to static locals in the boot decompress code
+the easy fix is of course to remove all local static variables but
+when this is general code, also used in the
+kernel, it is probably not a acceptable fix? Perhaps with some ifdef
+stuff? If this fix is acceptable I can also generate
+a patch for that problem.
+
+/Brian
