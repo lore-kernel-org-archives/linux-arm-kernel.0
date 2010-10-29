@@ -1,28 +1,139 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 29 Oct 2010 00:12:14 -0400 (EDT)
-Subject: [PATCH] ARM: orion5x/kirkwood/mv78xx0: fix MPP configuration
-	corner cases
-In-Reply-To: <1287907960-31563-1-git-send-email-mike@compulab.co.il>
-References: <1287907960-31563-1-git-send-email-mike@compulab.co.il>
-Message-ID: <alpine.LFD.2.00.1010290007070.6603@xanadu.home>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Fri, 29 Oct 2010 13:45:00 +0530
+Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
+	functions
+In-Reply-To: <7A436F7769CA33409C6B44B358BFFF0C014FD7F3FE@dlee02.ent.ti.com>
+References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
+	<1288099513-1854-2-git-send-email-manjugk@ti.com>
+	<4CC6EA5A.8070302@ti.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DBEBEC0B@dbde02.ent.ti.com>
+	<7A436F7769CA33409C6B44B358BFFF0C014FD7F3FE@dlee02.ent.ti.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DBF58654@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Oct 2010, Mike Rapoport wrote:
+ 
 
-> Wrong MPP configuration would cause <cpu>_mpp_conf loop	infinitely
-> because the mpp list iterator would not be incremented.
+> -----Original Message-----
+> From: Menon, Nishanth 
+> Sent: Wednesday, October 27, 2010 7:56 PM
+> To: G, Manjunath Kondaiah
+> Cc: linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; Cousson, Benoit; Kevin 
+> Hilman; Shilimkar, Santosh
+> Subject: RE: [PATCH v3 01/13] OMAP: DMA: Replace read/write 
+> macros with functions
 > 
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> ---
->  arch/arm/mach-kirkwood/mpp.c |    5 +++--
->  arch/arm/mach-mv78xx0/mpp.c  |    5 +++--
->  arch/arm/mach-orion5x/mpp.c  |    5 +++--
->  3 files changed, 9 insertions(+), 6 deletions(-)
 [...]
+> > This approach is as per i2c driver as suggested by kevin.
+> > http://www.spinics.net/lists/linux-omap/msg36446.html
+> Thanks for pointing this out. I2c has what 18 registers while 
+> dma has over 40 registers :( patch 11 [1] now I understand 
+> this step -> this merges 
+> together at later patchset - it starts to make sense now. It 
+> becomes reg_map. Thanks - looks like a good change in the 
+> eventual code.
+> 
+> 
+> [...]
+> > > > +static inline void dma_write(u32 val, int reg, int lch) {
+> > > > +       if (cpu_class_is_omap1()) {
+> > > > +               if (reg > OMAP1_CH_COMMON_START)
+> > > > +                       __raw_writew(val, dma_base +
+> > > > +                               (reg_map_omap1[reg] + 
+> 0x40 * lch));
+> > > > +               else
+> > > > +                       __raw_writew(val, dma_base +
+> > > reg_map_omap1[reg]);
+> > > > +       } else {
+> > > > +               if (reg > OMAP2_CH_COMMON_START)
+> > > > +                       __raw_writel(val, dma_base +
+> > > > +                               (reg_map_omap2[reg] + 
+> 0x60 * lch));
+> > > > +               else
+> > > > +                       __raw_writel(val, dma_base +
+> > > reg_map_omap2[reg]);
+> > > > +       }
+> > > > +}
+> Eventual code looks like this:
+> 
+> 62 static inline void dma_write(u32 val, int reg, int lch)
+> 63 {
+> 64         if (d->dev_caps & IS_WORD_16) {
+> 65                 if (reg >= CH_COMMON_START)
+> 66                         __raw_writew(val, dma_base +
+> 67                                 (reg_map[reg] + 0x40 * lch));
+> 68                 else
+> 69                         __raw_writew(val, dma_base + reg_map[reg]);
+> 70         } else {
+> 71                 if (reg > CH_COMMON_START)
+> 72                         __raw_writel(val, dma_base +
+> 73                                 (reg_map[reg] + 0x60 * lch));
+> 74                 else
+> 75                         __raw_writel(val, dma_base + reg_map[reg]);
+> 76         }
+> 77 }
+> I don't really see how inline will really help here!
+> 
+> > > > +
+> > > > +static inline u32 dma_read(int reg, int lch) {
+> > > > +       u32 val;
+> > > > +
+> > > > +       if (cpu_class_is_omap1()) {
+> > > > +               if (reg > OMAP1_CH_COMMON_START)
+> > > > +                       val = __raw_readw(dma_base +
+> > > > +                                       (reg_map_omap1[reg]
+> > > + 0x40 * lch));
+> > > > +               else
+> > > > +                       val = __raw_readw(dma_base +
+> > > reg_map_omap1[reg]);
+> > > > +       } else {
+> > > > +               if (reg > OMAP2_CH_COMMON_START)
+> > > > +                       val = __raw_readl(dma_base +
+> > > > +                                       (reg_map_omap2[reg]
+> > > + 0x60 * lch));
+> > > > +               else
+> > > > +                       val = __raw_readl(dma_base +
+> > > reg_map_omap2[reg]);
+> > > > +       }
+> > > > +       return val;
+> > > > +}
+> > > What is the benefit of using inline function here? would'nt
+> > > we increase code size? cant we use a function pointer
+> > > initialized to class1 or rest?
+> > > Quote from CodingStyle (15):
+> > > "A reasonable rule of thumb is to not put inline at functions
+> > > that have more than 3 lines of code in them. An exception to
+> > > this rule are the cases where a parameter is known to be a
+> > > compiletime constant, and as a result of this constantness
+> > > you *know* the compiler will be able to optimize most of your
+> > > function away at compile time. For a good example of this
+> > > later case, see the kmalloc() inline function.
+> > > "
+> > > is the expectation that cpu_class_is_omap1 compile time
+> > > constant hence the actual compiled in code is smaller
+> > > -candidate for inline?
+> > 
+> > Detailed discussion and alignment can be found at:
+> > http://www.spinics.net/lists/linux-omap/thrd6.html
+> Better link:
+> http://marc.info/?t=128264802300006&r=1&w=2
+> 
+> > 
+> > Search for:
+> > [PATCH v2 07/11] OMAP2/3/4: DMA: HWMOD: Device registration
+> 
+> http://marc.info/?l=linux-omap&m=128464661906497&w=2
+> my question is slightly different here - debate of suggestion 
+> to use inline
+> is based on the size of code involved, the discussion in the thread 
+> discussed around 3 lines of code, which made sense, 
+> unfortunately, the 
+> thread does not answer my question unfortunately for *this* 
+> specific patch
+> - OR do you wish to point me to some specific link which answers this?
 
-Instead of adding gotos, could you simply replace the 
-"while (*mpp_list)" loop with "for ( ; *mpp_list; mpp_list++)" ?
+for plat-omap dma code, these read/write api's can be replaced with function
+pointers.
 
-
-Nicolas
+-Manjunath
