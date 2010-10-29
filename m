@@ -1,8 +1,11 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Oct 2010 23:14:37 +0100
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 29 Oct 2010 18:17:14 -0400 (EDT)
 Subject: [PATCH] msm: fix debug-macro.S build failure
 In-Reply-To: <1288387033.6631.13.camel@m0nster>
-References: <20101028163518.GG3122@n2100.arm.linux.org.uk>
+References: <20101027221428.GB28391@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1010272227380.31220@xanadu.home>
+	<1288283413.2683.2.camel@c-dwalke-linux.qualcomm.com>
+	<20101028163518.GG3122@n2100.arm.linux.org.uk>
 	<1288284066.2683.9.camel@c-dwalke-linux.qualcomm.com>
 	<20101028174653.GH3122@n2100.arm.linux.org.uk>
 	<1288288824.2683.24.camel@c-dwalke-linux.qualcomm.com>
@@ -12,11 +15,12 @@ References: <20101028163518.GG3122@n2100.arm.linux.org.uk>
 	<20101028184627.GK3122@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1010282226460.5029@xanadu.home>
 	<1288387033.6631.13.camel@m0nster>
-Message-ID: <20101029221437.GA31224@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1010291814090.11553@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 29, 2010 at 02:17:13PM -0700, Daniel Walker wrote:
+On Fri, 29 Oct 2010, Daniel Walker wrote:
+
 > On Thu, 2010-10-28 at 23:03 -0400, Nicolas Pitre wrote:
 > > On Thu, 28 Oct 2010, Russell King - ARM Linux wrote:
 > > 
@@ -59,20 +63,13 @@ On Fri, Oct 29, 2010 at 02:17:13PM -0700, Daniel Walker wrote:
 > just going to go with my original revert .. It seems like anything I do
 > to get addruart to return something turns into too large a patch which I
 > don't want to force.
-> 
-> I think the revert should be fine until we come up with a good way to
-> fix this, either what you suggested or something entirely in msm.
 
-Your original patch is unsuitable as it leaves the values uninitialized.
+Could you at least comment the patch I posted for you?
 
-What will happen is that rp will be the value of the procinfo mmuflags,
-so effectively zero.  rv will be page table value for the section
-following the kernel, which is effectively the physical address of that.
+If this fixes the issue then Russell might just merge it now.  In any 
+case, that kind of fix may perfectly well be merged during the -rc 
+period since that's exactly what the -rc period is all about: fixing 
+those kind of fallouts after the big merge.
 
-This I guess will mean that it generally won't overwrite an existing
-mapping, unless the folowing 512MB of mappings does so.
 
-As I've said, the safest thing is to set rv to 0xfff00000 and have it
-only setup one mapping.  Set rp to whatever you like - leave it
-uninitialised if you're not filling in the other functions, it doesn't
-matter (but note that.)
+Nicolas
