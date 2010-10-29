@@ -1,139 +1,75 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Fri, 29 Oct 2010 13:45:00 +0530
-Subject: [PATCH v3 01/13] OMAP: DMA: Replace read/write macros with
-	functions
-In-Reply-To: <7A436F7769CA33409C6B44B358BFFF0C014FD7F3FE@dlee02.ent.ti.com>
-References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
-	<1288099513-1854-2-git-send-email-manjugk@ti.com>
-	<4CC6EA5A.8070302@ti.com>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9402DBEBEC0B@dbde02.ent.ti.com>
-	<7A436F7769CA33409C6B44B358BFFF0C014FD7F3FE@dlee02.ent.ti.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9402DBF58654@dbde02.ent.ti.com>
+From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
+Date: Fri, 29 Oct 2010 11:20:40 +0200
+Subject: [RFC][PATCH 0/3] big chunk memory allocator v2
+In-Reply-To: <AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
+References: <20101026190042.57f30338.kamezawa.hiroyu@jp.fujitsu.com>
+	<AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
+Message-ID: <op.vlbywq137p4s8u@pikus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+> On Tue, Oct 26, 2010 at 7:00 PM, KAMEZAWA Hiroyuki
+> <kamezawa.hiroyu@jp.fujitsu.com> wrote:
+>> I only did small test and it seems to work (but I think there will be bug...)
+>> I post this now just because I'll be out of office 10/31-11/15 with ksummit and
+>> a private trip.
+>>
+>> Any comments are welcome but please see the interface is enough for use cases or
+>> not.  For example) If MAX_ORDER alignment is too bad, I need to rewrite almost
+>> all code.
 
-> -----Original Message-----
-> From: Menon, Nishanth 
-> Sent: Wednesday, October 27, 2010 7:56 PM
-> To: G, Manjunath Kondaiah
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Cousson, Benoit; Kevin 
-> Hilman; Shilimkar, Santosh
-> Subject: RE: [PATCH v3 01/13] OMAP: DMA: Replace read/write 
-> macros with functions
-> 
-[...]
-> > This approach is as per i2c driver as suggested by kevin.
-> > http://www.spinics.net/lists/linux-omap/msg36446.html
-> Thanks for pointing this out. I2c has what 18 registers while 
-> dma has over 40 registers :( patch 11 [1] now I understand 
-> this step -> this merges 
-> together at later patchset - it starts to make sense now. It 
-> becomes reg_map. Thanks - looks like a good change in the 
-> eventual code.
-> 
-> 
-> [...]
-> > > > +static inline void dma_write(u32 val, int reg, int lch) {
-> > > > +       if (cpu_class_is_omap1()) {
-> > > > +               if (reg > OMAP1_CH_COMMON_START)
-> > > > +                       __raw_writew(val, dma_base +
-> > > > +                               (reg_map_omap1[reg] + 
-> 0x40 * lch));
-> > > > +               else
-> > > > +                       __raw_writew(val, dma_base +
-> > > reg_map_omap1[reg]);
-> > > > +       } else {
-> > > > +               if (reg > OMAP2_CH_COMMON_START)
-> > > > +                       __raw_writel(val, dma_base +
-> > > > +                               (reg_map_omap2[reg] + 
-> 0x60 * lch));
-> > > > +               else
-> > > > +                       __raw_writel(val, dma_base +
-> > > reg_map_omap2[reg]);
-> > > > +       }
-> > > > +}
-> Eventual code looks like this:
-> 
-> 62 static inline void dma_write(u32 val, int reg, int lch)
-> 63 {
-> 64         if (d->dev_caps & IS_WORD_16) {
-> 65                 if (reg >= CH_COMMON_START)
-> 66                         __raw_writew(val, dma_base +
-> 67                                 (reg_map[reg] + 0x40 * lch));
-> 68                 else
-> 69                         __raw_writew(val, dma_base + reg_map[reg]);
-> 70         } else {
-> 71                 if (reg > CH_COMMON_START)
-> 72                         __raw_writel(val, dma_base +
-> 73                                 (reg_map[reg] + 0x60 * lch));
-> 74                 else
-> 75                         __raw_writel(val, dma_base + reg_map[reg]);
-> 76         }
-> 77 }
-> I don't really see how inline will really help here!
-> 
-> > > > +
-> > > > +static inline u32 dma_read(int reg, int lch) {
-> > > > +       u32 val;
-> > > > +
-> > > > +       if (cpu_class_is_omap1()) {
-> > > > +               if (reg > OMAP1_CH_COMMON_START)
-> > > > +                       val = __raw_readw(dma_base +
-> > > > +                                       (reg_map_omap1[reg]
-> > > + 0x40 * lch));
-> > > > +               else
-> > > > +                       val = __raw_readw(dma_base +
-> > > reg_map_omap1[reg]);
-> > > > +       } else {
-> > > > +               if (reg > OMAP2_CH_COMMON_START)
-> > > > +                       val = __raw_readl(dma_base +
-> > > > +                                       (reg_map_omap2[reg]
-> > > + 0x60 * lch));
-> > > > +               else
-> > > > +                       val = __raw_readl(dma_base +
-> > > reg_map_omap2[reg]);
-> > > > +       }
-> > > > +       return val;
-> > > > +}
-> > > What is the benefit of using inline function here? would'nt
-> > > we increase code size? cant we use a function pointer
-> > > initialized to class1 or rest?
-> > > Quote from CodingStyle (15):
-> > > "A reasonable rule of thumb is to not put inline at functions
-> > > that have more than 3 lines of code in them. An exception to
-> > > this rule are the cases where a parameter is known to be a
-> > > compiletime constant, and as a result of this constantness
-> > > you *know* the compiler will be able to optimize most of your
-> > > function away at compile time. For a good example of this
-> > > later case, see the kmalloc() inline function.
-> > > "
-> > > is the expectation that cpu_class_is_omap1 compile time
-> > > constant hence the actual compiled in code is smaller
-> > > -candidate for inline?
-> > 
-> > Detailed discussion and alignment can be found at:
-> > http://www.spinics.net/lists/linux-omap/thrd6.html
-> Better link:
-> http://marc.info/?t=128264802300006&r=1&w=2
-> 
-> > 
-> > Search for:
-> > [PATCH v2 07/11] OMAP2/3/4: DMA: HWMOD: Device registration
-> 
-> http://marc.info/?l=linux-omap&m=128464661906497&w=2
-> my question is slightly different here - debate of suggestion 
-> to use inline
-> is based on the size of code involved, the discussion in the thread 
-> discussed around 3 lines of code, which made sense, 
-> unfortunately, the 
-> thread does not answer my question unfortunately for *this* 
-> specific patch
-> - OR do you wish to point me to some specific link which answers this?
+On Thu, 28 Oct 2010 01:22:38 +0200, Minchan Kim <minchan.kim@gmail.com> wrote:
+> First of all, thanks for the endless your effort to embedded system.
+> It's time for statkeholders to review this.
+> Cced some guys. Maybe many people of them have to attend KS.
+> So I hope SAMSUNG guys review this.
+>
+> Maybe they can't test this since ARM doesn't support movable zone now.
+> (I will look into this).
+> As Kame said, please, review this patch whether this patch have enough
+> interface and meet your requirement.
+> I think this can't meet _all_ of your requirements(ex, latency and
+> making sure getting big contiguous memory) but I believe it can meet
+> NOT CRITICAL many cases, I guess.
 
-for plat-omap dma code, these read/write api's can be replaced with function
-pointers.
+I'm currently working on a framework (the CMA framework some may be aware of) which
+in principle is meant for the same purpose: allocating physically contiguous blocks
+of memory.  I'm hoping to help with latency, remove the need for MAX_ORDER alignment
+as well as help with fragmentation by letting different drivers allocate memory from
+different memory range.
 
--Manjunath
+When I was posting CMA, it had been suggested to create a new migration type
+dedicated to contiguous allocations.  I think I already did that and thanks to
+this new migration type we have (i) an area of memory that only accepts movable
+and reclaimable pages and (ii) is used only if all other (non-reserved) pages have
+been allocated.
+
+I'm currently working on migration so that those movable and reclaimable pages
+allocated in area dedicated for CMA are freed and Kame's work is quite helpful
+in this regard as I have something to base my work on. :)
+
+Nonetheless, it's a conference time now (ELC, PLC; interestingly both are in
+Cambridge :P) so I guess we, here at SPRC, will look into it more after PLC.
+
+>> Now interface is:
+>>
+>> struct page *__alloc_contig_pages(unsigned long base, unsigned long end,
+>>                        unsigned long nr_pages, int align_order,
+>>                        int node, gfp_t gfpflag, nodemask_t *mask)
+>>
+>>  * @base: the lowest pfn which caller wants.
+>>  * @end:  the highest pfn which caller wants.
+>>  * @nr_pages: the length of a chunk of pages to be allocated.
+>>  * @align_order: alignment of start address of returned chunk in order.
+>>  *   Returned' page's order will be aligned to (1 << align_order).If smaller
+>>  *   than MAX_ORDER, it's raised to MAX_ORDER.
+>>  * @node: allocate near memory to the node, If -1, current node is used
+
+
+PS. Please note that Pawel's new address is <pawel@osciak.com>.  Fixing in Cc.
+
+-- 
+Best regards,                                        _     _
+| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
+| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
++----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
