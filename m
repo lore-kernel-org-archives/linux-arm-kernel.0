@@ -1,64 +1,50 @@
-From: paulius.zaleckas@gmail.com (Paulius Zaleckas)
-Date: Fri, 29 Oct 2010 14:17:07 +0300
-Subject: [RFC PATCH 1/2] Gemini: create platform device for ethernet in
-	Raidsonic IB-4220B
-In-Reply-To: <181be0f834f3670249d3c8d7ba1462dab1ece2c1.1288321597.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1288321597.git.mirq-linux@rere.qmqm.pl>
-	<181be0f834f3670249d3c8d7ba1462dab1ece2c1.1288321597.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <AANLkTik+r8r-pywpFYfwrZX2bTjgAVd1rwvoTi7ttq3B@mail.gmail.com>
+From: hari.kanigeri@gmail.com (Hari Kanigeri)
+Date: Fri, 29 Oct 2010 07:05:41 -0500
+Subject: [PATCH 6/7] omap:mailbox-add notification support for multiple
+	readers
+In-Reply-To: <4CC9E3C5.7000208@ti.com>
+References: <1287108808-32119-1-git-send-email-h-kanigeri2@ti.com>
+	<1287108808-32119-7-git-send-email-h-kanigeri2@ti.com>
+	<4CC9E3C5.7000208@ti.com>
+Message-ID: <AANLkTin_qX+ANZHWg6Qk54bC7MYuA5YNKkqN-kapt2C_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/29 Micha? Miros?aw <mirq-linux@rere.qmqm.pl>:
-> This is cherry-picked from:
->
-> git://git.berlios.de/gemini-board ib4220
->
-> Code by Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> and Janos Laube <janos.dev@gmail.com>.
->
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> ---
->
-> ?arch/arm/mach-gemini/board-nas4220b.c ? ?| ? 53 ++++++++++++++++++++++++++++++
-> ?arch/arm/mach-gemini/common.h ? ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-gemini/devices.c ? ? ? ? ? | ? 52 +++++++++++++++++++++++++++++
-> ?arch/arm/mach-gemini/include/mach/gmac.h | ? 21 ++++++++++++
-> ?4 files changed, 128 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-gemini/include/mach/gmac.h
->
-[...]
-> diff --git a/arch/arm/mach-gemini/include/mach/gmac.h b/arch/arm/mach-gemini/include/mach/gmac.h
-> new file mode 100644
-> index 0000000..c6eeacc
-> --- /dev/null
-> +++ b/arch/arm/mach-gemini/include/mach/gmac.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Gemini GMAC specific defines
-> + *
-> + * Copyright (C) 2008, Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+Omar,
 
-This e-mail is dead. Please change it to gmail one.
+>>
+>> ?static void omap_mbox_fini(struct omap_mbox *mbox)
+>> ?{
+>> + ? ? ? if (!--mbox->use_count) {
+>> + ? ? ? ? ? ? ? tasklet_kill(&mbox->txq->tasklet);
+>> + ? ? ? ? ? ? ? flush_work(&mbox->rxq->work);
+>> + ? ? ? ? ? ? ? mbox_queue_free(mbox->txq);
+>> + ? ? ? ? ? ? ? mbox_queue_free(mbox->rxq);
+>> + ? ? ? }
+>> +
+>> + ? ? ? if (likely(mbox->ops->shutdown)) {
+>> + ? ? ? ? ? ? ? if (!--mbox_configured) {
+>> + ? ? ? ? ? ? ? ? ? ? ? free_irq(mbox->irq, mbox);
+>
+> Above hunks will create an imbalance of free_irq, as request_irq can be
+> called per registered mailbox and free_irq is only done for the last caller
+> releasing the mailbox handle.
+>
+> e.g.: mbox-1, mbox-N will request a shared irq on the same interrupt line,
+> but only the last caller of omap_mbox_put will free its irq, leaving the
+> other one there.
+>
+> This can be fixed if the free is moved to be executed within the following
+> block:
+>
+> ? ? ? ?if (!--mbox->use_count) {
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ? ? ? ? ?free_irq(mbox->irq, mbox);
+> ? ? ? ?}
+>
 
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#ifndef __MACH_GMAC_H__
-> +#define __MACH_GMAC_H__
-> +
-> +#include <linux/phy.h>
-> +
-> +struct gemini_gmac_platform_data {
-> + ? ? ? char *bus_id[2]; /* NULL means that this port is not used */
-> + ? ? ? phy_interface_t interface[2];
-> +};
-> +
-> +#endif /* __MACH_GMAC_H__ */
-> --
-> 1.7.1
->
->
+Good catch. I will make the changes in next revision.
+
+Thank you,
+Best regards,
+Hari
