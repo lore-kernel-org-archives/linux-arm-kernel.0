@@ -1,50 +1,54 @@
-From: m.nazarewicz@samsung.com (=?utf-8?B?TWljaGHFgiBOYXphcmV3aWN6?=)
-Date: Fri, 29 Oct 2010 16:58:31 +0200
-Subject: [RFC][PATCH 0/3] big chunk memory allocator v2
-In-Reply-To: <20101029142741.GB19823@gargoyle.fritz.box>
-References: <20101026190042.57f30338.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
-	<op.vlbywq137p4s8u@pikus> <20101029103154.GA10823@gargoyle.fritz.box>
-	<20101029195900.88559162.kamezawa.hiroyu@jp.fujitsu.com>
-	<20101029122928.GA17792@gargoyle.fritz.box> <op.vlb8bda87p4s8u@pikus>
-	<20101029142741.GB19823@gargoyle.fritz.box>
-Message-ID: <op.vlcejtth7p4s8u@pikus>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 29 Oct 2010 13:58:29 -0700
+Subject: [stable] Patch Upstream: oprofile, ARM: Release resources on
+	failure
+In-Reply-To: <201010212105.o9LL57t9019586@hera.kernel.org>
+References: <201010212105.o9LL57t9019586@hera.kernel.org>
+Message-ID: <20101029205829.GC29104@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Oct 2010 16:27:41 +0200, Andi Kleen <andi.kleen@intel.com> wrote:
 
-> On Fri, Oct 29, 2010 at 01:43:51PM +0100, Micha? Nazarewicz wrote:
->> Hmm... true.  Still the point remains that only movable and reclaimable pages are
->> allowed in the marked regions.  This in effect means that from unmovable pages
->> point of view, the area is unusable but I havn't thought of any other way to
->> guarantee that because of fragmentation, long sequence of free/movable/reclaimable
->> pages is available.
+This patch doesn't apply to the .35 or .36 stable tree
+If someone wants it applied there, please email the backport
+to stable at kernel.org
 
-> Essentially a movable zone as defined today.
+thanks,
 
-Ah, right, I somehow was under the impresion that movable zone can be used as a fallback
-zone.  When I'm finished with my current approach I'll look more closely into it.
+greg k-h
 
-> That gets you near all the problems of highmem (except for the mapping
-> problem and you're a bit more flexible in the splits):
->
-> Someone has to decide at boot how much should be movable
-> and what not, some workloads will run out of space, some may
-> deadlock when it runs out of management objects, etc.etc.
-> Classic highmem had a long string of issues with all of this.
-
-Here's where the rest of CMA comes.  The solution may be not perfect but it's
-probably better then nothing.  The idea is to define regions for each device
-(with possibility for a single region to be shared) which, hopefuly, can help
-with fragmentation.
-
-In the current form, CMA is designed mostly for embeded systems where one can
-define what kind of devices will be used, but in general this could be used
-for other systems as well.
-
--- 
-Best regards,                                        _     _
-| Humble Liege of Serenely Enlightened Majesty of  o' \,=./ `o
-| Computer Science,  Micha? "mina86" Nazarewicz       (o o)
-+----[mina86*mina86.com]---[mina86*jabber.org]----ooO--(_)--Ooo--
+> commit: 81771974ae49bf79aab60c42eac7a6d730a9ef2b
+> From: Robert Richter <robert.richter@amd.com>
+> Date: Wed, 29 Sep 2010 16:52:25 +0200
+> Subject: [PATCH] oprofile, ARM: Release resources on failure
+> 
+> This patch fixes a resource leak on failure, where the
+> oprofilefs and some counters may not released properly.
+> 
+> Signed-off-by: Robert Richter <robert.richter@amd.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: <stable@kernel.org> # .35.x
+> LKML-Reference: <20100929145225.GJ13563@erda.amd.com>
+> Signed-off-by: Ingo Molnar <mingo@elte.hu>
+> ---
+>  drivers/oprofile/oprofile_perf.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/oprofile/oprofile_perf.c b/drivers/oprofile/oprofile_perf.c
+> index ebb40cb..f3d3df2 100644
+> --- a/drivers/oprofile/oprofile_perf.c
+> +++ b/drivers/oprofile/oprofile_perf.c
+> @@ -84,6 +84,7 @@ static int op_create_counter(int cpu, int event)
+>  	if (IS_ERR(pevent)) {
+>  		ret = PTR_ERR(pevent);
+>  	} else if (pevent->state != PERF_EVENT_STATE_ACTIVE) {
+> +		perf_event_release_kernel(pevent);
+>  		pr_warning("oprofile: failed to enable event %d "
+>  				"on CPU %d\n", event, cpu);
+>  		ret = -EBUSY;
+> 
+> _______________________________________________
+> stable mailing list
+> stable at linux.kernel.org
+> http://linux.kernel.org/mailman/listinfo/stable
