@@ -1,26 +1,41 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Fri, 29 Oct 2010 22:11:03 +0900
-Subject: [RFC][PATCH 0/3] big chunk memory allocator v2
-In-Reply-To: <20101029103154.GA10823@gargoyle.fritz.box>
-References: <20101026190042.57f30338.kamezawa.hiroyu@jp.fujitsu.com>
-	<AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
-	<op.vlbywq137p4s8u@pikus>
-	<20101029103154.GA10823@gargoyle.fritz.box>
-Message-ID: <AANLkTin2Q-qQSnzc9sZnP_inf+5SEgG5cXYA8f-0goYG@mail.gmail.com>
+From: eric.y.miao@gmail.com (eric.y.miao at gmail.com)
+Date: Fri, 29 Oct 2010 21:48:39 +0800
+Subject: [PATCH] ARM: mmp: fix cpuid detection on mmp2
+In-Reply-To: <1288323176-6970-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1288323176-6970-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <AANLkTimrkrha549h8cVDn0HF4YNB+MUwuPek-D-AZs_O@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/29 Andi Kleen <andi.kleen@intel.com>:
->> When I was posting CMA, it had been suggested to create a new migration type
->> dedicated to contiguous allocations. ?I think I already did that and thanks to
->> this new migration type we have (i) an area of memory that only accepts movable
->> and reclaimable pages and
+On Fri, Oct 29, 2010 at 11:32 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> Fix typo error on cpu_is_mmp2(). Correct cpu_readid_id() to read_cpuid_id().
+> Append missing parenthesis.
 >
-> Aka highmem next generation :-(
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 
-I lost the road. What is highmem next generation?
-Could you point it to me?
+Merged.
 
--- 
-Kind regards,
-Minchan Kim
+> ---
+> ?arch/arm/mach-mmp/include/mach/cputype.h | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/include/mach/cputype.h b/arch/arm/mach-mmp/include/mach/cputype.h
+> index f43a68b..8a3b56d 100644
+> --- a/arch/arm/mach-mmp/include/mach/cputype.h
+> +++ b/arch/arm/mach-mmp/include/mach/cputype.h
+> @@ -46,7 +46,8 @@ static inline int cpu_is_pxa910(void)
+> ?#ifdef CONFIG_CPU_MMP2
+> ?static inline int cpu_is_mmp2(void)
+> ?{
+> - ? ? ? return (((cpu_readid_id() >> 8) & 0xff) == 0x58);
+> + ? ? ? return (((read_cpuid_id() >> 8) & 0xff) == 0x58);
+> +}
+> ?#else
+> ?#define cpu_is_mmp2() ?(0)
+> ?#endif
+> --
+> 1.5.6.5
+>
+>
