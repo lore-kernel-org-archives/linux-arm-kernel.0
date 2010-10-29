@@ -1,41 +1,41 @@
-From: eric.y.miao@gmail.com (eric.y.miao at gmail.com)
-Date: Fri, 29 Oct 2010 21:48:39 +0800
-Subject: [PATCH] ARM: mmp: fix cpuid detection on mmp2
-In-Reply-To: <1288323176-6970-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1288323176-6970-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <AANLkTimrkrha549h8cVDn0HF4YNB+MUwuPek-D-AZs_O@mail.gmail.com>
+From: andi.kleen@intel.com (Andi Kleen)
+Date: Fri, 29 Oct 2010 16:27:41 +0200
+Subject: [RFC][PATCH 0/3] big chunk memory allocator v2
+In-Reply-To: <op.vlb8bda87p4s8u@pikus>
+References: <20101026190042.57f30338.kamezawa.hiroyu@jp.fujitsu.com>
+	<AANLkTim4fFXQKqmFCeR8pvi0SZPXpjDqyOkbV6PYJYkR@mail.gmail.com>
+	<op.vlbywq137p4s8u@pikus>
+	<20101029103154.GA10823@gargoyle.fritz.box>
+	<20101029195900.88559162.kamezawa.hiroyu@jp.fujitsu.com>
+	<20101029122928.GA17792@gargoyle.fritz.box>
+	<op.vlb8bda87p4s8u@pikus>
+Message-ID: <20101029142741.GB19823@gargoyle.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 29, 2010 at 11:32 AM, Haojian Zhuang
-<haojian.zhuang@marvell.com> wrote:
-> Fix typo error on cpu_is_mmp2(). Correct cpu_readid_id() to read_cpuid_id().
-> Append missing parenthesis.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
+On Fri, Oct 29, 2010 at 01:43:51PM +0100, Micha? Nazarewicz wrote:
+> >>>> (ii) is used only if all other (non-reserved) pages have
+> >>>> been allocated.
+> 
+> >>> That will be near always the case after some uptime, as memory fills up
+> >>> with caches. Unless you do early reclaim?
+> 
+> Hmm... true.  Still the point remains that only movable and reclaimable pages are
+> allowed in the marked regions.  This in effect means that from unmovable pages
+> point of view, the area is unusable but I havn't thought of any other way to
+> guarantee that because of fragmentation, long sequence of free/movable/reclaimable
+> pages is available.
 
-Merged.
+Essentially a movable zone as defined today.
 
-> ---
-> ?arch/arm/mach-mmp/include/mach/cputype.h | ? ?3 ++-
-> ?1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/include/mach/cputype.h b/arch/arm/mach-mmp/include/mach/cputype.h
-> index f43a68b..8a3b56d 100644
-> --- a/arch/arm/mach-mmp/include/mach/cputype.h
-> +++ b/arch/arm/mach-mmp/include/mach/cputype.h
-> @@ -46,7 +46,8 @@ static inline int cpu_is_pxa910(void)
-> ?#ifdef CONFIG_CPU_MMP2
-> ?static inline int cpu_is_mmp2(void)
-> ?{
-> - ? ? ? return (((cpu_readid_id() >> 8) & 0xff) == 0x58);
-> + ? ? ? return (((read_cpuid_id() >> 8) & 0xff) == 0x58);
-> +}
-> ?#else
-> ?#define cpu_is_mmp2() ?(0)
-> ?#endif
-> --
-> 1.5.6.5
->
->
+That gets you near all the problems of highmem (except for the mapping
+problem and you're a bit more flexible in the splits): 
+
+Someone has to decide at boot how much should be movable
+and what not, some workloads will run out of space, some may
+deadlock when it runs out of management objects, etc.etc. 
+Classic highmem had a long string of issues with all of this.
+
+If it was an easy problem it had been long solved, but it isn't really.
+
+-Andi
