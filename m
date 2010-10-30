@@ -1,42 +1,131 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 30 Oct 2010 09:51:04 +0200
-Subject: [patch v4 05/10] imx51: add gpio mode for csi1 {h,v}sync
-In-Reply-To: <20101027124345.755584279@rtp-net.org>
+Date: Sat, 30 Oct 2010 09:54:47 +0200
+Subject: [patch v4 06/10] efikamx: add leds support
+In-Reply-To: <20101027124347.146428989@rtp-net.org>
 References: <20101027124044.980739780@rtp-net.org>
-	<20101027124345.755584279@rtp-net.org>
-Message-ID: <201010300951.04885.marek.vasut@gmail.com>
+	<20101027124347.146428989@rtp-net.org>
+Message-ID: <201010300954.47839.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 October 2010 14:40:50 Arnaud Patard wrote:
-> Add definitions for configuring CSI1_{H,V}SYNC as GPIO
+On Wednesday 27 October 2010 14:40:51 Arnaud Patard wrote:
+> The efika mx a 3 leds (1 blue, 1 red, 1 green) connected on GPIOS 3
+> 13/14/15. Also, some special care is done for default trigger of blue led
+> for mmc as the mmc host used is different between hw revisions
 > 
 > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
 > ===================================================================
-> ---
-> linux-2.6-submit.orig/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-
-> 20 18:30:44.000000000 +0200 +++
-> linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-20
-> 18:30:48.000000000 +0200 @@ -200,7 +200,9 @@
->  #define MX51_PAD_CSI1_D18__CSI1_D18             IOMUX_PAD(0x5A4, 0x1BC, 0,
-> 0x0,   0, NO_PAD_CTRL) #define MX51_PAD_CSI1_D19__CSI1_D19            
-> IOMUX_PAD(0x5A8, 0x1C0, 0, 0x0,   0, NO_PAD_CTRL) #define
-> MX51_PAD_CSI1_VSYNC__CSI1_VSYNC         IOMUX_PAD(0x5AC, 0x1C4, 0, 0x0,  
-> 0, NO_PAD_CTRL) +#define MX51_PAD_CSI1_VSYNC__GPIO_3_14         
-> IOMUX_PAD(0x5AC, 0x1C4, 3, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
-> MX51_PAD_CSI1_HSYNC__CSI1_HSYNC         IOMUX_PAD(0x5B0, 0x1C8, 0, 0x0,  
-> 0, NO_PAD_CTRL) +#define MX51_PAD_CSI1_HSYNC__GPIO_3_15         
-> IOMUX_PAD(0x5B0, 0x1C8, 3, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
-> MX51_PAD_CSI1_PIXCLK__CSI1_PIXCLK       IOMUX_PAD(0x5B4, 0x000, 0, 0x0,  
-> 0, NO_PAD_CTRL) #define MX51_PAD_CSI1_MCLK__CSI1_MCLK          
-> IOMUX_PAD(0x5B8, 0x000, 0, 0x0,   0, NO_PAD_CTRL) #define
-> MX51_PAD_CSI1_PKE0__CSI1_PKE0           IOMUX_PAD(0x860, 0x000, 0, 0x0,  
-> 0, NO_PAD_CTRL)
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-27
+> 11:26:16.000000000 +0200 +++
+> linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-27
+> 11:27:38.000000000 +0200 @@ -18,6 +18,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c.h>
+>  #include <linux/gpio.h>
+> +#include <linux/leds.h>
+>  #include <linux/delay.h>
+>  #include <linux/io.h>
+>  #include <linux/fsl_devices.h>
+> @@ -43,6 +44,10 @@
+>  #define EFIKAMX_PCBID1		(2*32 + 17)
+>  #define EFIKAMX_PCBID2		(2*32 + 11)
 > 
+> +#define EFIKAMX_BLUE_LED	(2*32 + 13)
+> +#define EFIKAMX_GREEN_LED	(2*32 + 14)
+> +#define EFIKAMX_RED_LED		(2*32 + 15)
+> +
+>  /* the pci ids pin have pull up. they're driven low according to board id
+> */ #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+> PAD_CTL_PUS_100K_UP) #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3,
+> 0x0,   0, PAD_CTL_PUS_100K_UP) @@ -81,6 +86,11 @@
+>  	MX51_PAD_GPIO_1_1__ESDHC1_WP,
+>  	MX51_PAD_GPIO_1_7__ESDHC2_WP,
+>  	MX51_PAD_GPIO_1_8__ESDHC2_CD,
+> +
+> +	/* leds */
+> +	MX51_PAD_CSI1_D9__GPIO_3_13,
+> +	MX51_PAD_CSI1_VSYNC__GPIO_3_14,
+> +	MX51_PAD_CSI1_HSYNC__GPIO_3_15,
+>  };
 > 
+>  /* Serial ports */
+> @@ -179,6 +189,37 @@
+>  	}
+>  }
 
-DTTO for 03/10 ... CC the freescale people here
+Maybe this could be modularized ?
+
+#ifdef CONFIG_LEDS_GPIO
+... the platform_data stuff below ...
+
+efikamx_register_leds()
+{
+	platform_device_register();
+}
+#else
+static inline void efikamx_register_leds() {}
+#endif
+
+board_init()
+{
+...
+efikamx_register_leds();
+...
+}
+
+What do you think ? Cheers
+> 
+> +static struct gpio_led mx51_efikamx_leds[] = {
+> +	{
+> +		.name = "efikamx:green",
+> +		.default_trigger = "default-on",
+> +		.gpio = EFIKAMX_GREEN_LED,
+> +	},
+> +	{
+> +		.name = "efikamx:red",
+> +		.default_trigger = "ide-disk",
+> +		.gpio = EFIKAMX_RED_LED,
+> +	},
+> +	{
+> +		.name = "efikamx:blue",
+> +		.default_trigger = "mmc0",
+> +		.gpio = EFIKAMX_BLUE_LED,
+> +	},
+> +};
+> +
+> +static struct gpio_led_platform_data mx51_efikamx_leds_data = {
+> +	.leds = mx51_efikamx_leds,
+> +	.num_leds = ARRAY_SIZE(mx51_efikamx_leds),
+> +};
+> +
+> +static struct platform_device mx51_efikamx_leds_device = {
+> +	.name = "leds-gpio",
+> +	.id = -1,
+> +	.dev = {
+> +		.platform_data = &mx51_efikamx_leds_data,
+> +	},
+> +};
+> +
+>  static void __init mxc_board_init(void)
+>  {
+>  	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
+> @@ -189,8 +230,12 @@
+>  	imx51_add_esdhc(0, NULL);
+> 
+>  	/* on < 1.2 boards both SD controllers are used */
+> -	if (system_rev < 0x12)
+> +	if (system_rev < 0x12) {
+>  		imx51_add_esdhc(1, NULL);
+> +		mx51_efikamx_leds[2].default_trigger = "mmc1";
+> +	}
+> +
+> +	platform_device_register(&mx51_efikamx_leds_device);
+>  }
+> 
+>  static void __init mx51_efikamx_timer_init(void)
+> 
+> 
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
