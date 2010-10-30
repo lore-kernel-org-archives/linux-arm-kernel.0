@@ -1,78 +1,167 @@
-From: muddogxp@gmail.com (Xinyu Chen)
-Date: Sat, 30 Oct 2010 23:22:34 +0800
-Subject: [patch v4 02/10] imx51: fix iomux configuration
-In-Reply-To: <201010300950.01208.marek.vasut@gmail.com>
-References: <20101027124044.980739780@rtp-net.org>
-	<20101027124341.572956030@rtp-net.org>
-	<201010300950.01208.marek.vasut@gmail.com>
-Message-ID: <AANLkTi=z35ezsraNYuUyvQox3YUvDTC8dqxj-NKw+ZFU@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sat, 30 Oct 2010 14:08:17 -0700
+Subject: [PATCH 00/39] Cleanup WARN #defines
+Message-ID: <cover.1288471897.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 30, 2010 at 3:50 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On Wednesday 27 October 2010 14:40:47 Arnaud Patard wrote:
->> - ALT0 is used to set GPIO mode of GPIO_1_{2,3,4,5,6,7,8,9} but it's ALT1
->> for GPIO_1_{0,1}.
->>
->> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> Index: linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h
->> ===================================================================
->> ---
->> linux-2.6-submit.orig/arch/arm/plat-mxc/include/mach/iomux-mx51.h ? ? 2010-10-
->> 20 18:30:30.000000000 +0200 +++
->> linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h ?2010-10-20
->> 18:30:42.000000000 +0200 @@ -368,18 +368,18 @@
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MX51_SDHCI_PAD_CTRL)
->> ?#define MX51_PAD_GPIO_1_0__GPIO_1_0 ? ? ? ? ?IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,
-> 0,
->> MX51_GPIO_PAD_CTRL) #define MX51_PAD_GPIO_1_1__GPIO_1_1 ? ? ? ? ? ? ? IOMUX_PAD(0x7B8,
->> 0x3B0, 1, 0x0, ? 0, MX51_GPIO_PAD_CTRL) -#define
->> MX51_PAD_GPIO_1_2__GPIO_1_2 ? ? ? ? ? IOMUX_PAD(0x7D4, 0x3CC, 1, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_2__GPIO_1_2
-> IOMUX_PAD(0x7D4,
->> 0x3CC, 0, 0x0, ? 0, MX51_GPIO_PAD_CTRL) #define
->> MX51_PAD_GPIO_1_2__I2C2_SCL ? ? ? ? ? IOMUX_PAD(0x7D4, 0x3CC, (2 |
->> IOMUX_CONFIG_SION), \ 0x9b8, ? 3, MX51_I2C_PAD_CTRL)
->> -#define MX51_PAD_GPIO_1_3__GPIO_1_3 ? ? ? ? ?IOMUX_PAD(0x7D8, 0x3D0, 1, 0x0,
-> 0,
->> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_3__GPIO_1_3
-> IOMUX_PAD(0x7D8,
->> 0x3D0, 0, 0x0, ? 0, MX51_GPIO_PAD_CTRL) #define
->> MX51_PAD_GPIO_1_3__I2C2_SDA ? ? ? ? ? IOMUX_PAD(0x7D8, 0x3D0, (2 |
->> IOMUX_CONFIG_SION), \ 0x9bc, ? 3, MX51_I2C_PAD_CTRL)
->> ?#define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ ?IOMUX_PAD(0x7FC, 0x3D4, 0,
->> 0x0, ? 0, NO_PAD_CTRL) -#define
->> MX51_PAD_GPIO_1_4__GPIO_1_4 ? ? ? ? ? IOMUX_PAD(0x804, 0x3D8, 1, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_5__GPIO_1_5 ? ? ? ? ? ? ?IOMUX_PAD(0x808,
->> 0x3DC, 1, 0x0, ? 0, MX51_GPIO_PAD_CTRL) -#define
->> MX51_PAD_GPIO_1_6__GPIO_1_6 ? ? ? ? ? IOMUX_PAD(0x80C, 0x3E0, 1, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_7__GPIO_1_7 ? ? ? ? ? ? ?IOMUX_PAD(0x810,
->> 0x3E4, 1, 0x0, ? 0, MX51_GPIO_PAD_CTRL) -#define
->> MX51_PAD_GPIO_1_8__GPIO_1_8 ? ? ? ? ? IOMUX_PAD(0x814, 0x3E8, 1, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_9__GPIO_1_9 ? ? ? ? ? ? ?IOMUX_PAD(0x818,
->> 0x3EC, 1, 0x0, ? 0, MX51_GPIO_PAD_CTRL) +#define
->> MX51_PAD_GPIO_1_4__GPIO_1_4 ? ? ? ? ? IOMUX_PAD(0x804, 0x3D8, 0, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_5__GPIO_1_5
-> IOMUX_PAD(0x808,
->> 0x3DC, 0, 0x0, ? 0, MX51_GPIO_PAD_CTRL) +#define
->> MX51_PAD_GPIO_1_6__GPIO_1_6 ? ? ? ? ? IOMUX_PAD(0x80C, 0x3E0, 0, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_7__GPIO_1_7
-> IOMUX_PAD(0x810,
->> 0x3E4, 0, 0x0, ? 0, MX51_GPIO_PAD_CTRL) +#define
->> MX51_PAD_GPIO_1_8__GPIO_1_8 ? ? ? ? ? IOMUX_PAD(0x814, 0x3E8, 0, 0x0, ? 0,
->> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_9__GPIO_1_9
-> IOMUX_PAD(0x818,
->> 0x3EC, 0, 0x0, ? 0, MX51_GPIO_PAD_CTRL)
->>
->> ?#endif /* __MACH_IOMUX_MX51_H__ */
->>
->
-> Maybe you should CC the freescale guy on this, CCed
+WARN uses sometimes use KERN_<level> but mostly don't
+have any prefix.
 
-This change is correct.
+Change the WARN macros and the warn_slowpath function to preface
+KERN_WARNING and remove all the KERN_<level> uses from WARN sites.
+
+Neatening clean up of include/asm-generic/bug.h
+
+Update WARN macros
+Add KERN_WARNING to WARN output
+Remove any KERN_<level> from WARN uses
+Coalesce formats
+Align WARN arguments
+Add some missing newlines to WARN uses
+Add some missing first test argument (1, fmt, args) to WARN uses
+
+Joe Perches (39):
+  include/asm-generic/bug.h: Update WARN macros
+  arch/alpha: Update WARN uses
+  arch/arm: Update WARN uses
+  arch/powerpc: Update WARN uses
+  arch/x86: Update WARN uses
+  drivers/acpi: Update WARN uses
+  drivers/base: Update WARN uses
+  drivers/block: Update WARN uses
+  drivers/cpuidle: Update WARN uses
+  drivers/firewire: Update WARN uses
+  drivers/firmware: Update WARN uses
+  drivers/gpio: Update WARN uses
+  drivers/gpu/drm: Update WARN uses
+  drivers/media/video: Update WARN uses
+  drivers/mfd: Update WARN uses
+  drivers/net/can: Update WARN uses
+  drivers/net/usb: Update WARN uses
+  drivers/net/wireless/iwlwifi: Update WARN uses
+  drivers/regulator: Update WARN uses
+  drivers/scsi/fcoe: Update WARN uses
+  drivers/staging: Update WARN uses
+  drivers/usb/musb: Update WARN uses
+  drivers/video/omap2/dss: Update WARN uses
+  fs/nfsd: Update WARN uses
+  fs/notify/inotify: Update WARN uses
+  fs/sysfs: Update WARN uses
+  fs/proc: Update WARN uses
+  fs: Update WARN uses
+  include/linux/device.h: Update WARN uses
+  kernel/irq: Update WARN uses
+  kernel/panic.c: Update warn_slowpath to use %pV
+  kernel: Update WARN uses
+  lib: Update WARN uses
+  mm: Update WARN uses
+  net/core/dev.c: Update WARN uses
+  net/ipv4/tcp.c: Update WARN uses
+  net/mac80211: Update WARN uses
+  net/rfkill/input.c: Update WARN uses
+  sound/soc/codecs/wm_hubs.c: Update WARN uses
+
+ arch/alpha/kernel/pci-sysfs.c                |   14 ++--
+ arch/arm/mach-davinci/clock.c                |    4 +-
+ arch/arm/mach-davinci/da830.c                |    2 +-
+ arch/arm/mach-davinci/da850.c                |   12 ++--
+ arch/arm/mach-omap2/clkt_clksel.c            |   12 ++--
+ arch/arm/mach-omap2/clock.c                  |   16 ++--
+ arch/arm/mach-omap2/devices.c                |    4 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |   47 +++++++-----
+ arch/arm/mach-omap2/pm34xx.c                 |    7 +-
+ arch/arm/mach-omap2/serial.c                 |    2 +-
+ arch/arm/mach-omap2/timer-gp.c               |    3 +-
+ arch/arm/mach-tegra/clock.c                  |    3 +-
+ arch/arm/mach-tegra/timer.c                  |    2 +-
+ arch/arm/mach-u300/padmux.c                  |   14 +---
+ arch/arm/plat-omap/omap-pm-noop.c            |   10 ++--
+ arch/powerpc/kernel/hw_breakpoint.c          |    4 +-
+ arch/x86/kernel/acpi/boot.c                  |    2 +-
+ arch/x86/kernel/apic/apic.c                  |    2 +-
+ arch/x86/kernel/apic/es7000_32.c             |    2 +-
+ arch/x86/kernel/cpu/perf_event.c             |    4 +-
+ arch/x86/kernel/pci-calgary_64.c             |    4 +-
+ arch/x86/kernel/tsc_sync.c                   |    4 +-
+ arch/x86/kernel/xsave.c                      |    2 +-
+ arch/x86/mm/ioremap.c                        |    5 +-
+ arch/x86/mm/pageattr-test.c                  |    2 +-
+ arch/x86/mm/pageattr.c                       |    5 +-
+ arch/x86/platform/sfi/sfi.c                  |    4 +-
+ drivers/acpi/ec.c                            |    4 +-
+ drivers/base/class.c                         |    4 +-
+ drivers/base/core.c                          |    5 +-
+ drivers/base/memory.c                        |    4 +-
+ drivers/base/sys.c                           |   10 +--
+ drivers/block/floppy.c                       |    2 +-
+ drivers/cpuidle/driver.c                     |    2 +-
+ drivers/firewire/core-transaction.c          |    6 +-
+ drivers/firmware/dmi_scan.c                  |    2 +-
+ drivers/gpio/gpiolib.c                       |    4 +-
+ drivers/gpio/it8761e_gpio.c                  |    2 +-
+ drivers/gpu/drm/drm_crtc_helper.c            |    2 +-
+ drivers/gpu/drm/i915/i915_gem.c              |    3 +-
+ drivers/gpu/drm/radeon/evergreen.c           |    2 +-
+ drivers/gpu/drm/radeon/r100.c                |    4 +-
+ drivers/gpu/drm/radeon/r300.c                |    2 +-
+ drivers/gpu/drm/radeon/r600.c                |    4 +-
+ drivers/gpu/drm/radeon/radeon_fence.c        |    3 +-
+ drivers/gpu/drm/radeon/radeon_ttm.c          |    3 +-
+ drivers/gpu/drm/radeon/rs400.c               |    2 +-
+ drivers/gpu/drm/radeon/rs600.c               |    4 +-
+ drivers/media/video/s5p-fimc/fimc-core.c     |    2 +-
+ drivers/media/video/sr030pc30.c              |    2 +-
+ drivers/mfd/ezx-pcap.c                       |    5 +-
+ drivers/net/can/mscan/mscan.c                |    2 +-
+ drivers/net/usb/ipheth.c                     |    2 +-
+ drivers/net/wireless/iwlwifi/iwl-agn-lib.c   |    3 +-
+ drivers/net/wireless/iwlwifi/iwl-agn-sta.c   |    6 +-
+ drivers/net/wireless/iwlwifi/iwl-tx.c        |    6 +-
+ drivers/net/wireless/iwlwifi/iwl3945-base.c  |    2 +-
+ drivers/regulator/core.c                     |    3 +-
+ drivers/scsi/fcoe/libfcoe.c                  |    2 +-
+ drivers/staging/memrar/memrar_allocator.c    |    2 +-
+ drivers/staging/solo6x10/solo6010-v4l2-enc.c |    2 +-
+ drivers/usb/musb/musb_host.c                 |    6 +-
+ drivers/video/omap2/dss/core.c               |    3 +-
+ fs/bio.c                                     |    2 +-
+ fs/buffer.c                                  |    2 +-
+ fs/nfsd/nfs4state.c                          |    3 +-
+ fs/notify/inotify/inotify_fsnotify.c         |    4 +-
+ fs/proc/generic.c                            |    9 +--
+ fs/super.c                                   |    5 +-
+ fs/sysfs/dir.c                               |    3 +-
+ fs/sysfs/file.c                              |    4 +-
+ fs/sysfs/group.c                             |    4 +-
+ fs/sysfs/symlink.c                           |   10 +--
+ include/asm-generic/bug.h                    |  101 ++++++++++++++++----------
+ include/linux/device.h                       |    2 +-
+ kernel/irq/chip.c                            |    2 +-
+ kernel/irq/manage.c                          |    2 +-
+ kernel/notifier.c                            |    2 +-
+ kernel/panic.c                               |   40 +++++------
+ kernel/pm_qos_params.c                       |    6 +-
+ lib/debugobjects.c                           |   21 +++---
+ lib/iomap.c                                  |    2 +-
+ lib/kobject.c                                |    9 +--
+ lib/kobject_uevent.c                         |    4 +-
+ lib/list_debug.c                             |   24 +++----
+ lib/plist.c                                  |   12 ++--
+ mm/percpu.c                                  |    4 +-
+ mm/vmalloc.c                                 |    5 +-
+ net/core/dev.c                               |    3 +-
+ net/ipv4/tcp.c                               |   16 ++---
+ net/mac80211/agg-tx.c                        |    5 +-
+ net/mac80211/iface.c                         |    4 +-
+ net/mac80211/mlme.c                          |    2 +-
+ net/mac80211/rx.c                            |    4 +-
+ net/mac80211/tx.c                            |    4 +-
+ net/mac80211/util.c                          |    4 +-
+ net/mac80211/work.c                          |    4 +-
+ net/rfkill/input.c                           |    5 +-
+ sound/soc/codecs/wm_hubs.c                   |    2 +-
+ 99 files changed, 319 insertions(+), 330 deletions(-)
 
 -- 
-Best Regards
-Xinyu Chen
-Freescale Semiconductor
-Linux BSP Team
+1.7.3.1.g432b3.dirty
