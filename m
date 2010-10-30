@@ -1,45 +1,28 @@
 From: joe@perches.com (Joe Perches)
-Date: Sat, 30 Oct 2010 14:08:31 -0700
-Subject: [PATCH 14/39] drivers/media/video: Update WARN uses
-In-Reply-To: <cover.1288471897.git.joe@perches.com>
-References: <cover.1288471897.git.joe@perches.com>
-Message-ID: <def5be1d0f38494d6aea661227e7d9a24e08590b.1288471898.git.joe@perches.com>
+Date: Sat, 30 Oct 2010 14:21:24 -0700
+Subject: [PATCH] arch/arm/kernel/hw_breakpoint.c: Convert WARN_ON to WARN
+Message-ID: <1288473684.366.139.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing newlines.
+Message isn't printed by WARN_ON.
 
 Signed-off-by: Joe Perches <joe@perches.com>
 ---
- drivers/media/video/s5p-fimc/fimc-core.c |    2 +-
- drivers/media/video/sr030pc30.c          |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
-index 2e7c547..91fc213 100644
---- a/drivers/media/video/s5p-fimc/fimc-core.c
-+++ b/drivers/media/video/s5p-fimc/fimc-core.c
-@@ -543,7 +543,7 @@ static void fimc_dma_run(void *priv)
- 	unsigned long flags;
- 	u32 ret;
- 
--	if (WARN(!ctx, "null hardware context"))
-+	if (WARN(!ctx, "null hardware context\n"))
- 		return;
- 
- 	fimc = ctx->fimc_dev;
-diff --git a/drivers/media/video/sr030pc30.c b/drivers/media/video/sr030pc30.c
-index c9dc67a..864696b 100644
---- a/drivers/media/video/sr030pc30.c
-+++ b/drivers/media/video/sr030pc30.c
-@@ -735,7 +735,7 @@ static int sr030pc30_s_power(struct v4l2_subdev *sd, int on)
- 	const struct sr030pc30_platform_data *pdata = info->pdata;
- 	int ret;
- 
--	if (WARN(pdata == NULL, "No platform data!"))
-+	if (WARN(pdata == NULL, "No platform data!\n"))
- 		return -ENOMEM;
- 
- 	/*
--- 
-1.7.3.1.g432b3.dirty
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 54593b0..21e3a4a 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -748,8 +748,7 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
+ 		breakpoint_handler(addr, regs);
+ 		break;
+ 	case ARM_ENTRY_ASYNC_WATCHPOINT:
+-		WARN_ON("Asynchronous watchpoint exception taken. "
+-			"Debugging results may be unreliable");
++		WARN(1, "Asynchronous watchpoint exception taken. Debugging results may be unreliable\n");
+ 	case ARM_ENTRY_SYNC_WATCHPOINT:
+ 		watchpoint_handler(addr, regs);
+ 		break;
