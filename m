@@ -1,72 +1,42 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 30 Oct 2010 09:50:01 +0200
-Subject: [patch v4 02/10] imx51: fix iomux configuration
-In-Reply-To: <20101027124341.572956030@rtp-net.org>
+Date: Sat, 30 Oct 2010 09:51:04 +0200
+Subject: [patch v4 05/10] imx51: add gpio mode for csi1 {h,v}sync
+In-Reply-To: <20101027124345.755584279@rtp-net.org>
 References: <20101027124044.980739780@rtp-net.org>
-	<20101027124341.572956030@rtp-net.org>
-Message-ID: <201010300950.01208.marek.vasut@gmail.com>
+	<20101027124345.755584279@rtp-net.org>
+Message-ID: <201010300951.04885.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 October 2010 14:40:47 Arnaud Patard wrote:
-> - ALT0 is used to set GPIO mode of GPIO_1_{2,3,4,5,6,7,8,9} but it's ALT1
-> for GPIO_1_{0,1}.
+On Wednesday 27 October 2010 14:40:50 Arnaud Patard wrote:
+> Add definitions for configuring CSI1_{H,V}SYNC as GPIO
 > 
 > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 > Index: linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h
 > ===================================================================
 > ---
 > linux-2.6-submit.orig/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-
-> 20 18:30:30.000000000 +0200 +++
+> 20 18:30:44.000000000 +0200 +++
 > linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-20
-> 18:30:42.000000000 +0200 @@ -368,18 +368,18 @@
->  							MX51_SDHCI_PAD_CTRL)
->  #define MX51_PAD_GPIO_1_0__GPIO_1_0		IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,   
-0,
-> MX51_GPIO_PAD_CTRL) #define MX51_PAD_GPIO_1_1__GPIO_1_1		IOMUX_PAD(0x7B8,
-> 0x3B0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) -#define
-> MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 1, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_2__GPIO_1_2		
-IOMUX_PAD(0x7D4,
-> 0x3CC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
-> MX51_PAD_GPIO_1_2__I2C2_SCL		IOMUX_PAD(0x7D4, 0x3CC, (2 |
-> IOMUX_CONFIG_SION), \ 0x9b8,   3, MX51_I2C_PAD_CTRL)
-> -#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 1, 0x0,   
-0,
-> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_3__GPIO_1_3		
-IOMUX_PAD(0x7D8,
-> 0x3D0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
-> MX51_PAD_GPIO_1_3__I2C2_SDA		IOMUX_PAD(0x7D8, 0x3D0, (2 |
-> IOMUX_CONFIG_SION), \ 0x9bc,   3, MX51_I2C_PAD_CTRL)
->  #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0,
-> 0x0,   0, NO_PAD_CTRL) -#define
-> MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 1, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808,
-> 0x3DC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) -#define
-> MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 1, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810,
-> 0x3E4, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) -#define
-> MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 1, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818,
-> 0x3EC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) +#define
-> MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_5__GPIO_1_5		
-IOMUX_PAD(0x808,
-> 0x3DC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) +#define
-> MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_7__GPIO_1_7		
-IOMUX_PAD(0x810,
-> 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) +#define
-> MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   0,
-> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_9__GPIO_1_9		
-IOMUX_PAD(0x818,
-> 0x3EC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
+> 18:30:48.000000000 +0200 @@ -200,7 +200,9 @@
+>  #define MX51_PAD_CSI1_D18__CSI1_D18             IOMUX_PAD(0x5A4, 0x1BC, 0,
+> 0x0,   0, NO_PAD_CTRL) #define MX51_PAD_CSI1_D19__CSI1_D19            
+> IOMUX_PAD(0x5A8, 0x1C0, 0, 0x0,   0, NO_PAD_CTRL) #define
+> MX51_PAD_CSI1_VSYNC__CSI1_VSYNC         IOMUX_PAD(0x5AC, 0x1C4, 0, 0x0,  
+> 0, NO_PAD_CTRL) +#define MX51_PAD_CSI1_VSYNC__GPIO_3_14         
+> IOMUX_PAD(0x5AC, 0x1C4, 3, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
+> MX51_PAD_CSI1_HSYNC__CSI1_HSYNC         IOMUX_PAD(0x5B0, 0x1C8, 0, 0x0,  
+> 0, NO_PAD_CTRL) +#define MX51_PAD_CSI1_HSYNC__GPIO_3_15         
+> IOMUX_PAD(0x5B0, 0x1C8, 3, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
+> MX51_PAD_CSI1_PIXCLK__CSI1_PIXCLK       IOMUX_PAD(0x5B4, 0x000, 0, 0x0,  
+> 0, NO_PAD_CTRL) #define MX51_PAD_CSI1_MCLK__CSI1_MCLK          
+> IOMUX_PAD(0x5B8, 0x000, 0, 0x0,   0, NO_PAD_CTRL) #define
+> MX51_PAD_CSI1_PKE0__CSI1_PKE0           IOMUX_PAD(0x860, 0x000, 0, 0x0,  
+> 0, NO_PAD_CTRL)
 > 
->  #endif /* __MACH_IOMUX_MX51_H__ */
 > 
 
-Maybe you should CC the freescale guy on this, CCed
-> 
+DTTO for 03/10 ... CC the freescale people here
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
