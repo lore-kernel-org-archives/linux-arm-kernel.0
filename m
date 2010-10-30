@@ -1,122 +1,71 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 30 Oct 2010 09:48:51 +0200
-Subject: [patch v4 01/10] efikamx: read board id
-In-Reply-To: <20101027124340.156430559@rtp-net.org>
+Date: Sat, 30 Oct 2010 09:50:01 +0200
+Subject: [patch v4 02/10] imx51: fix iomux configuration
+In-Reply-To: <20101027124341.572956030@rtp-net.org>
 References: <20101027124044.980739780@rtp-net.org>
-	<20101027124340.156430559@rtp-net.org>
-Message-ID: <201010300948.51143.marek.vasut@gmail.com>
+	<20101027124341.572956030@rtp-net.org>
+Message-ID: <201010300950.01208.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 October 2010 14:40:46 Arnaud Patard wrote:
-> read board id value from the GPIO3_16/17/11
+On Wednesday 27 October 2010 14:40:47 Arnaud Patard wrote:
+> - ALT0 is used to set GPIO mode of GPIO_1_{2,3,4,5,6,7,8,9} but it's ALT1
+> for GPIO_1_{0,1}.
 > 
 > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+> Index: linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h
 > ===================================================================
-
-This is not git, is it ... what do you use to generate this stuff ?
-
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-21
-> 08:29:23.000000000 +0200 +++
-> linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-21
-> 08:29:46.000000000 +0200 @@ -39,12 +39,26 @@
+> ---
+> linux-2.6-submit.orig/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-
+> 20 18:30:30.000000000 +0200 +++
+> linux-2.6-submit/arch/arm/plat-mxc/include/mach/iomux-mx51.h	2010-10-20
+> 18:30:42.000000000 +0200 @@ -368,18 +368,18 @@
+>  							MX51_SDHCI_PAD_CTRL)
+>  #define MX51_PAD_GPIO_1_0__GPIO_1_0		IOMUX_PAD(0x7B4, 0x3AC, 1, 0x0,   
+0,
+> MX51_GPIO_PAD_CTRL) #define MX51_PAD_GPIO_1_1__GPIO_1_1		IOMUX_PAD(0x7B8,
+> 0x3B0, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) -#define
+> MX51_PAD_GPIO_1_2__GPIO_1_2		IOMUX_PAD(0x7D4, 0x3CC, 1, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_2__GPIO_1_2		
+IOMUX_PAD(0x7D4,
+> 0x3CC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
+> MX51_PAD_GPIO_1_2__I2C2_SCL		IOMUX_PAD(0x7D4, 0x3CC, (2 |
+> IOMUX_CONFIG_SION), \ 0x9b8,   3, MX51_I2C_PAD_CTRL)
+> -#define MX51_PAD_GPIO_1_3__GPIO_1_3		IOMUX_PAD(0x7D8, 0x3D0, 1, 0x0,   
+0,
+> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_3__GPIO_1_3		
+IOMUX_PAD(0x7D8,
+> 0x3D0, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) #define
+> MX51_PAD_GPIO_1_3__I2C2_SDA		IOMUX_PAD(0x7D8, 0x3D0, (2 |
+> IOMUX_CONFIG_SION), \ 0x9bc,   3, MX51_I2C_PAD_CTRL)
+>  #define MX51_PAD_PMIC_INT_REQ__PMIC_INT_REQ	IOMUX_PAD(0x7FC, 0x3D4, 0,
+> 0x0,   0, NO_PAD_CTRL) -#define
+> MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 1, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_5__GPIO_1_5		IOMUX_PAD(0x808,
+> 0x3DC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) -#define
+> MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 1, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_7__GPIO_1_7		IOMUX_PAD(0x810,
+> 0x3E4, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) -#define
+> MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 1, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) -#define MX51_PAD_GPIO_1_9__GPIO_1_9		IOMUX_PAD(0x818,
+> 0x3EC, 1, 0x0,   0, MX51_GPIO_PAD_CTRL) +#define
+> MX51_PAD_GPIO_1_4__GPIO_1_4		IOMUX_PAD(0x804, 0x3D8, 0, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_5__GPIO_1_5		
+IOMUX_PAD(0x808,
+> 0x3DC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) +#define
+> MX51_PAD_GPIO_1_6__GPIO_1_6		IOMUX_PAD(0x80C, 0x3E0, 0, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_7__GPIO_1_7		
+IOMUX_PAD(0x810,
+> 0x3E4, 0, 0x0,   0, MX51_GPIO_PAD_CTRL) +#define
+> MX51_PAD_GPIO_1_8__GPIO_1_8		IOMUX_PAD(0x814, 0x3E8, 0, 0x0,   0,
+> MX51_GPIO_PAD_CTRL) +#define MX51_PAD_GPIO_1_9__GPIO_1_9		
+IOMUX_PAD(0x818,
+> 0x3EC, 0, 0x0,   0, MX51_GPIO_PAD_CTRL)
 > 
->  #define	MX51_USB_PLL_DIV_24_MHZ	0x01
+>  #endif /* __MACH_IOMUX_MX51_H__ */
 > 
-> +#define EFIKAMX_PCBID0		(2*32 + 16)
-> +#define EFIKAMX_PCBID1		(2*32 + 17)
-> +#define EFIKAMX_PCBID2		(2*32 + 11)
-> +
-> +/* the pci ids pin have pull up. they're driven low according to board id
-> */ +#define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
-> PAD_CTL_PUS_100K_UP) +#define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3,
-> 0x0,   0, PAD_CTL_PUS_100K_UP) +#define MX51_PAD_PCBID2	IOMUX_PAD(0x504,
-> 0x128, 3, 0x0,   0, PAD_CTL_PUS_100K_UP) +
->  static struct pad_desc mx51efikamx_pads[] = {
->  	/* UART1 */
->  	MX51_PAD_UART1_RXD__UART1_RXD,
->  	MX51_PAD_UART1_TXD__UART1_TXD,
->  	MX51_PAD_UART1_RTS__UART1_RTS,
->  	MX51_PAD_UART1_CTS__UART1_CTS,
-> +
-> +	/* board id */
-> +	MX51_PAD_PCBID0,
-> +	MX51_PAD_PCBID1,
-> +	MX51_PAD_PCBID2,
->  };
-> 
->  /* Serial ports */
-> @@ -92,10 +106,62 @@
->  	.flags  = MXC_EHCI_INTERNAL_PHY,
->  };
-> 
-> +/*   PCBID2  PCBID1 PCBID0  STATE
-> +	1       1      1    ER1:rev1.1
-> +	1       1      0    ER2:rev1.2
-> +	1       0      1    ER3:rev1.3
-> +	1       0      0    ER4:rev1.4
-> +*/
-> +static void __init mx51_efikamx_board_id(void)
-> +{
-> +	int id;
-> +
-> +	/* things are taking time to settle */
-> +	msleep(150);
-> +
-> +	gpio_request(EFIKAMX_PCBID0, "pcbid0");
-> +	gpio_direction_input(EFIKAMX_PCBID0);
-> +	gpio_request(EFIKAMX_PCBID1, "pcbid1");
-> +	gpio_direction_input(EFIKAMX_PCBID1);
-> +	gpio_request(EFIKAMX_PCBID2, "pcbid2");
-> +	gpio_direction_input(EFIKAMX_PCBID2);
-> +
-> +	id = gpio_get_value(EFIKAMX_PCBID0);
-> +	id |= gpio_get_value(EFIKAMX_PCBID1) << 1;
-> +	id |= gpio_get_value(EFIKAMX_PCBID2) << 2;
-> +
-> +	switch (id) {
-> +	case 7:
-> +		system_rev = 0x11;
-> +		break;
-> +	case 6:
-> +		system_rev = 0x12;
-> +		break;
-> +	case 5:
-> +		system_rev = 0x13;
-> +		break;
-> +	case 4:
-> +		system_rev = 0x14;
-> +		break;
-> +	default:
-> +		system_rev = 0x10;
-> +		break;
-> +	}
-> +
-> +	if ((system_rev == 0x10)
-> +		|| (system_rev == 0x12)
-> +		|| (system_rev == 0x14)) {
-> +		printk(KERN_WARNING
-> +			"EfikaMX: Unsupported board revision 1.%u!\n",
-> +			system_rev & 0xf);
 
-Use rather Unknown than Unsupported ... or make it sound more like a warning 
-than like a utter crash.
-
-Also, maybe you should free the GPIOs here again ?
-
-> +	}
-> +}
-> +
->  static void __init mxc_board_init(void)
->  {
->  	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
->  					ARRAY_SIZE(mx51efikamx_pads));
-> +	mx51_efikamx_board_id();
->  	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
->  	mxc_init_imx_uart();
->  }
-> 
+Maybe you should CC the freescale guy on this, CCed
 > 
 > 
 > _______________________________________________
