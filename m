@@ -1,37 +1,34 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Sun, 31 Oct 2010 23:30:36 +0100
-Subject: ep93xx/ts72xx: Kernel 2.6.36 problems introduced with commit
-	5bc23d32d
-In-Reply-To: <20101031205210.GB30636@n2100.arm.linux.org.uk>
-References: <20101031182157.GY15069@ibawizard.net>
-	<20101031183140.GA30636@n2100.arm.linux.org.uk>
-	<20101031190034.GZ15069@ibawizard.net>
-	<20101031190833.GA15069@ibawizard.net>
-	<20101031205210.GB30636@n2100.arm.linux.org.uk>
-Message-ID: <20101031223036.GB15069@ibawizard.net>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Sat, 30 Oct 2010 23:18:52 +0100
+Subject: [PATCH] ARM: orion5x/kirkwood/mv78xx0: fix MPP configuration
+	corner cases
+In-Reply-To: <alpine.LFD.2.00.1010290007070.6603@xanadu.home>
+References: <1287907960-31563-1-git-send-email-mike@compulab.co.il>
+	<alpine.LFD.2.00.1010290007070.6603@xanadu.home>
+Message-ID: <4CCC99CC.6050808@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> [2010-10-31 20:52:10]:
+On 29/10/10 05:12, Nicolas Pitre wrote:
+> On Sun, 24 Oct 2010, Mike Rapoport wrote:
+> 
+>> Wrong MPP configuration would cause <cpu>_mpp_conf loop	infinitely
+>> because the mpp list iterator would not be incremented.
+>>
+>> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>> ---
+>>  arch/arm/mach-kirkwood/mpp.c |    5 +++--
+>>  arch/arm/mach-mv78xx0/mpp.c  |    5 +++--
+>>  arch/arm/mach-orion5x/mpp.c  |    5 +++--
+>>  3 files changed, 9 insertions(+), 6 deletions(-)
+> [...]
+> 
+> Instead of adding gotos, could you simply replace the 
+> "while (*mpp_list)" loop with "for ( ; *mpp_list; mpp_list++)" ?
 
-> It's being a little too over-cautious.  In arch/arm/mm/dma-mapping.c
-> __dma_alloc_remap, remove the + 1 from "bit = fls(size - 1) + 1;".
+you'd have to remove the mpp_list++, but this would be in my
+view a nicer solution avoiding gotos and any re-occurence of
+this in the future.
 
-Hm, that was really fast :-) It works now, thank you!
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 4bc43e5..7012105 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -198,7 +198,7 @@ __dma_alloc_remap(struct page *page, size_t size, gfp_t
-gfp, pgprot_t prot)
-         * fragmentation of the DMA space, and also prevents allocations
-         * smaller than a section from crossing a section boundary.
-         */
--       bit = fls(size - 1) + 1;
-+       bit = fls(size - 1);
-        if (bit > SECTION_SHIFT)
-                bit = SECTION_SHIFT;
-        align = 1 << bit;
-
--- ynezz
+-- 
+Ben
