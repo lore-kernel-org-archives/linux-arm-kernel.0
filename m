@@ -1,67 +1,63 @@
-From: linux@bohmer.net (Remy Bohmer)
-Date: Sun, 31 Oct 2010 12:19:38 +0100
-Subject: at91: input overruns question
-In-Reply-To: <AANLkTimHnxLydJC3u58kAuukjR80EEgRDj7ZEedNMKfd@mail.gmail.com>
-References: <AANLkTinbThMFXd1KpuMRYNJREpjGa6RNBH9R1SM955Sd@mail.gmail.com>
-	<AANLkTimHnxLydJC3u58kAuukjR80EEgRDj7ZEedNMKfd@mail.gmail.com>
-Message-ID: <AANLkTi=AhMxUjN=0PfW+XKVDJBhok=f4YwpF6bf67Eza@mail.gmail.com>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Sun, 31 Oct 2010 19:21:57 +0100
+Subject: ep93xx/ts72xx: Kernel 2.6.36 problems introduced with commit 5bc23d32d
+Message-ID: <20101031182157.GY15069@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-2010/10/28 Aras Vaichas <arasv@magellan-technology.com>:
-> On 26 October 2010 17:19, Aras Vaichas <arasv@magellan-technology.com> wrote:
->> Hi,
->>
->> I'm updating our production kernel to 2.6.33.7-rt29 for an at91rm9200.
->> This is the newest version supported by RT.
->>
->> I've noticed that the age-old debug serial input overrun(s) issue has
->> gotten far worse and I can no longer use the cursor keys at all. i.e.
->> no history on serial console or vi.
->>
->> As the kernel version numbers have gone up, the problem seems to have
->> gotten worse.
->>
->> Is there anything that I can do to make it a bit more usable?
->>
->> Any .config changes?
->
-> Configuration settings CONFIG_NO_HZ and CONFIG_HIGH_RES_TIMERS cause
-> the overrun(s) problems to get worse.
+I'm so far happy user of 2.6.34.7 on ts72xx(mach-ep93xx) and few days ago I've
+rebased the patchset[1](kernel config[2]) against 2.6.36. All seems to work
+fine, except my WiFi USB dongle, which is Belkin F6D4050v2 with Ralink rt3070
+chipset. To compile the WiFi driver on 2.6.36 I've to patch it little bit,
+because there was some rename of the usb_buffer_* functions in 2.6.35, so
+here's my patch for 2.6.36:
 
-Indeed. high-res timers and no-hz have a longer interrupt handling
-compared to the old fashioned ticking kernel.
++/* see http://kerneltrap.org/mailarchive/git-commits-head/2010/4/30/32383 */
++#ifndef usb_buffer_alloc
++#define usb_buffer_alloc usb_alloc_coherent
++#define usb_buffer_free usb_free_coherent
++#endif
++
 
-> If I disable these two settings I still get overrun(s) but not quite
-> as frequent.
+Now when I try to ifup the ra0 interface on 2.6.36 the driver fails to
+allocate four USB TX ring buffers (using usb_alloc_coherent), which are
+actually about 200kB each. It fails all the time just at allocation of the
+last, 4th buffer, it can allocate the 3 previous buffers without any problem.
+It's the same behaviour always, I can reproduce it 100%. The allocation fails
+at arch/arm/mm/vmregion.c:
 
-> Can someone explain why these settings would cause the CPU to be
-> unable to process 2 serial characters in a row?
-> Something must be causing the DBGU serial receive interrupt to stall
-> for more than 86us in order to miss a complete 115200 baud serial
-> character.
+ [...]
 
-The DBGU has a 1 byte FIFO, thus not a FIFO at all. As you already
-mention, the time between 2 interrupts on 115200 baud must be about
-86us. On rm9200 the timer interrupt handler itself can cost about 50us
-to more than 100usec in itself (measured through ETM
-trace), combined with a worst case interrupt latency of about 75us.
-This is even worse on a HRT or NOHZ enabled kernel.
-So, mathematically you can already prove that it cannot keep up to the
-115200 properly.
+ 37 struct arm_vmregion *
+ 38 arm_vmregion_alloc(struct arm_vmregion_head *head, size_t size, gfp_t gfp)
 
-Enabling DMA for DBGU is no option either since IIRC it would only
-generate an interrupt once the DMA buffer is full, not when the first
-character arrives in the buffer. Thus not very useful for a terminal.
+ [...]
 
-See for more info about the timer interrupt:
-http://linux.derkeiler.com/Mailing-Lists/Kernel/2008-03/msg01954.html
-and
-http://linux.derkeiler.com/Mailing-Lists/Kernel/2008-03/pnga98YRFl9x7.png
-(ETM trace screendump of the timer interrupt handler)
+ 56         list_for_each_entry(c, &head->vm_list, vm_list) {
+ 57                 if ((addr + size) < addr)
+ 58                         goto nospc;
+ 59                 if ((addr + size) <= c->vm_start)
+ 60                         goto found;
+ 61                 addr = c->vm_end;
+ 62                 if (addr > end)
+ 63                         goto nospc;
+ 64         }
 
-Kind regards,
+The allocation of the 4th buffer fails here and goes to nospc label. When I've
+reverted commit mentioned in the subject:
 
-Remy
+    Revert "ARM: DMA coherent allocator: align remapped addresses"
+    
+    This reverts commit 5bc23d32d86a132b5636a48dca0fa2528ef69ff9.
+
+the driver can now allocate the buffers and seems to work on 2.6.36. How to
+proceed now? I know, that the driver is pile of crap, but it works for me(tm)
+quite well on 2.6.34.7, so I don't know how to fix this. Thank you for any
+suggestions.
+
+-- ynezz
+
+1. http://github.com/ynezz/linux-2.6/tree/ts72xx-2.6.36.y
+2. http://github.com/ynezz/linux-2.6/commit/780f7c8dbe52c06c7a4610de8d09fd91f572fa56
