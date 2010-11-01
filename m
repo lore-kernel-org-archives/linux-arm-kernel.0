@@ -1,21 +1,35 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 2 Nov 2010 05:10:07 +0800
-Subject: ASoC: fix the building issue of missing codec field in 'struct
-	snd_soc_card'
-Message-ID: <AANLkTikc09UxEB+ZwGSF-guyTV_5FU2t9yXeagUAQoQ7@mail.gmail.com>
+From: weber@corscience.de (Thomas Weber)
+Date: Mon,  1 Nov 2010 23:48:11 +0100
+Subject: [PATCH] OMAP2: Devkit8000: Fix mmc regulator failure
+Message-ID: <1288651691-14914-1-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-diff --git a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
-index a3bfb2e..73d0edd 100644
---- a/sound/soc/pxa/tosa.c
-+++ b/sound/soc/pxa/tosa.c
-@@ -79,7 +79,7 @@ static void tosa_ext_control(struct snd_soc_codec *codec)
- static int tosa_startup(struct snd_pcm_substream *substream)
- {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_codec *codec = rtd->card->codec;
-+	struct snd_soc_codec *codec = rtd->codec;
+This patch fixes the following error:
 
- 	/* check the jack status at stream startup */
- 	tosa_ext_control(codec);
+>regulator: VMMC1: 1850 <--> 3150 mV at 3000 mV normal
+standby
+>twl_reg twl_reg.6: can't register VMMC1, -22
+>twl_reg: probe of twl_reg.6 failed with error -22
+
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+ arch/arm/mach-omap2/board-devkit8000.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 067f437..53ac762 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -242,9 +242,6 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+ 	mmc[0].gpio_cd = gpio + 0;
+ 	omap2_hsmmc_init(mmc);
+ 
+-	/* link regulators to MMC adapters */
+-	devkit8000_vmmc1_supply.dev = mmc[0].dev;
+-
+ 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+ 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+ 
+-- 
+1.7.3.2
