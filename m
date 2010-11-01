@@ -1,39 +1,40 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 1 Nov 2010 01:01:33 -0400
-Subject: [PATCH] spi/pl022: fix erroneous platform data in U300
-In-Reply-To: <1287687925-27189-1-git-send-email-linus.walleij@stericsson.com>
-References: <1287687925-27189-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20101101050133.GA17587@angua.secretlab.ca>
+From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
+Date: Mon, 01 Nov 2010 16:15:30 +0200
+Subject: [PATCH 0/2] OMAP: DSS2: Add new display panel
+In-Reply-To: <1288276982-17225-1-git-send-email-eballetbo@gmail.com>
+References: <1288276982-17225-1-git-send-email-eballetbo@gmail.com>
+Message-ID: <1288620930.5614.16.camel@tubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 21, 2010 at 09:05:25PM +0200, Linus Walleij wrote:
-> This fixes an erroneous use of LSB first in the U300 machine, the
-> PL022 used in U300 is a standard ARM core that doesn't support this
-> bit so it should never have been set.
-> 
-> Cc: Kevin Wells <wellsk40@gmail.com>OA
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Hi,
 
-Applied, thanks.
+On Thu, 2010-10-28 at 16:43 +0200, ext Enric Balletbo i Serra wrote:
+> Hi,
+> 
+> Next patches adds support for the two new LCD panel display used
+> on IGEP boards.
+> 
+>  Powertip PH480272T LCD 4.3inch (480x242) display
+>  Seiko 70WVW1TZ3 LCD 7.0inch WVGA (800x480) display
+> 
+> Please, consider adding in next merge window.
+> 
+> Cheers,
+> 
+> Enric Balletbo i Serra (2):
+>   OMAP: DSS2: Add Powertip PH480272T display panel
+>   OMAP: DSS2: Add Seiko 70WVW1TZ3 display panel
 
-> ---
->  arch/arm/mach-u300/spi.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-u300/spi.c b/arch/arm/mach-u300/spi.c
-> index 779abf7..5767208 100644
-> --- a/arch/arm/mach-u300/spi.c
-> +++ b/arch/arm/mach-u300/spi.c
-> @@ -67,7 +67,7 @@ static struct spi_board_info u300_spi_devices[] = {
->  		.bus_num        = 0, /* Only one bus on this chip */
->  		.chip_select    = 0,
->  		/* Means SPI_CS_HIGH, change if e.g low CS */
-> -		.mode           = SPI_MODE_1 | SPI_LSB_FIRST | SPI_LOOP,
-> +		.mode           = SPI_MODE_1 | SPI_LOOP,
->  	},
->  #endif
->  };
-> -- 
-> 1.6.3.3
-> 
+These both are "dummy" panels, and the driver is basically a copy of the
+existing drivers. I don't think I will merge any more of these, sorry.
+
+What we need is a common driver for all these dummy panels, and the
+driver would contain configurations for all the supported panels. The
+board file would pass the name of the panel used in that board to the
+driver, and the driver would use the configurations for that panel.
+
+This has been discussed a few times in l-o list, but I haven't found
+time to implement it and nobody else has done it either.
+
+ Tomi
