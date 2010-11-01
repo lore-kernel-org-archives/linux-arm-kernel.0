@@ -1,38 +1,20 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Mon, 01 Nov 2010 18:00:03 +0100
-Subject: [PATCH] mach-pcm037_eet: Fix section mismatch for eet_init_devices()
-Message-ID: <1288630803.4156.3.camel@realization>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 01 Nov 2010 13:06:19 -0400 (EDT)
+Subject: Smargo Cardreader problem with QNAP-TS119(2.6.32-5-kirkwood)
+In-Reply-To: <000001cb7480$ac8da130$05a8e390$%wieslaw@gmx.de>
+References: <000001cb7480$ac8da130$05a8e390$%wieslaw@gmx.de>
+Message-ID: <alpine.LFD.2.00.1011011304360.18581@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function should be marked as __init because it is used only
-in the init phase.
+On Mon, 25 Oct 2010, Wieslaw Prymka wrote:
 
-This fix the compiler warning:
- LD      arch/arm/mach-mx3/built-in.o
- WARNING: arch/arm/mach-mx3/built-in.o(.text+0x1328): Section mismatch in reference from the function eet_init_devices() to the (unknown reference) .init.rodata:(unknown)
- The function eet_init_devices() references
- the (unknown reference) __initconst (unknown).
- This is often because eet_init_devices lacks a __initconst
- annotation or the annotation of (unknown) is wrong.
+> Hello,
+> 
+> I have a problem with Smargo Cardreader on my debian qnap-119
 
-Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
----
- arch/arm/mach-mx3/mach-pcm037_eet.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This doesn't appear to be ARM specific.  Maybe you should post your 
+problem on the USB mailing list instead: linux-usb at vger.kernel.org.
 
-diff --git a/arch/arm/mach-mx3/mach-pcm037_eet.c b/arch/arm/mach-mx3/mach-pcm037_eet.c
-index 99e0894..3392812 100644
---- a/arch/arm/mach-mx3/mach-pcm037_eet.c
-+++ b/arch/arm/mach-mx3/mach-pcm037_eet.c
-@@ -171,7 +171,7 @@ static struct platform_device pcm037_gpio_keys_device = {
- 	},
- };
- 
--static int eet_init_devices(void)
-+static int __init eet_init_devices(void)
- {
- 	if (!machine_is_pcm037() || pcm037_variant() != PCM037_EET)
- 		return 0;
--- 
-1.6.3.3
+
+Nicolas
