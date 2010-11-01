@@ -1,158 +1,56 @@
-From: scaudle@codeaurora.org (Stephen Caudle)
-Date: Mon,  1 Nov 2010 12:39:55 -0400
-Subject: [PATCH] [ARM] gic: Unmask private interrupts on all cores during IRQ
-	enable
-Message-ID: <1288629595-15331-1-git-send-email-scaudle@codeaurora.org>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 1 Nov 2010 12:45:06 -0400
+Subject: [PATCH 0/2] OMAP: DSS2: Add new display panel
+In-Reply-To: <1288620930.5614.16.camel@tubuntu>
+References: <1288276982-17225-1-git-send-email-eballetbo@gmail.com>
+	<1288620930.5614.16.camel@tubuntu>
+Message-ID: <AANLkTi=fV58ApDqUE21YMK0_vhLdPbPr7F7YpYh0-2Vc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Requesting/freeing private peripheral interrupts on multi-core chips that
-use only one IRQ number for all cores currently unmasks/masks the interrupt
-for only the executing core.
+On Mon, Nov 1, 2010 at 10:15 AM, Tomi Valkeinen
+<tomi.valkeinen@nokia.com> wrote:
+> Hi,
+>
+> On Thu, 2010-10-28 at 16:43 +0200, ext Enric Balletbo i Serra wrote:
+>> Hi,
+>>
+>> Next patches adds support for the two new LCD panel display used
+>> on IGEP boards.
+>>
+>> ?Powertip PH480272T LCD 4.3inch (480x242) display
+>> ?Seiko 70WVW1TZ3 LCD 7.0inch WVGA (800x480) display
+>>
+>> Please, consider adding in next merge window.
+>>
+>> Cheers,
+>>
+>> Enric Balletbo i Serra (2):
+>> ? OMAP: DSS2: Add Powertip PH480272T display panel
+>> ? OMAP: DSS2: Add Seiko 70WVW1TZ3 display panel
+>
+> These both are "dummy" panels, and the driver is basically a copy of the
+> existing drivers. I don't think I will merge any more of these, sorry.
+>
+> What we need is a common driver for all these dummy panels, and the
+> driver would contain configurations for all the supported panels. The
+> board file would pass the name of the panel used in that board to the
+> driver, and the driver would use the configurations for that panel.
+>
 
-This change prevents the need for a separate call to enable_irq on other
-cores after request_irq. Also, shutdown is implemented instead of disable
-to allow for lazy IRQ disabling.
+It looks like that we just need one file name displays.c to do those
+generic things and pass the configuration from board files to this
+driver, such as timing or other things.
 
-Signed-off-by: Stephen Caudle <scaudle@codeaurora.org>
----
- arch/arm/Kconfig      |    5 +++
- arch/arm/common/gic.c |   83 +++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+), 0 deletions(-)
+> This has been discussed a few times in l-o list, but I haven't found
+> time to implement it and nobody else has done it either.
+>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..fbf5236 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1298,6 +1298,11 @@ config LOCAL_TIMERS
- 	  accounting to be spread across the timer interval, preventing a
- 	  "thundering herd" at every timer tick.
- 
-+config IRQ_PER_CPU
-+	bool
-+	depends on SMP
-+	default n
-+
- source kernel/Kconfig.preempt
- 
- config HZ
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index ada6359..372cfb3 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -39,12 +39,25 @@ struct gic_chip_data {
- 	unsigned int irq_offset;
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
-+#ifdef CONFIG_IRQ_PER_CPU
-+	struct call_single_data ppi_data;
-+#endif
- };
- 
- #ifndef MAX_GIC_NR
- #define MAX_GIC_NR	1
- #endif
- 
-+#ifdef CONFIG_IRQ_PER_CPU
-+#ifndef GIC_PPI_FIRST
-+#define GIC_PPI_FIRST	16
-+#endif
-+
-+#ifndef GIC_PPI_LAST
-+#define GIC_PPI_LAST	31
-+#endif
-+#endif
-+
- static struct gic_chip_data gic_data[MAX_GIC_NR];
- 
- static inline void __iomem *gic_dist_base(unsigned int irq)
-@@ -158,6 +171,72 @@ static int gic_set_cpu(unsigned int irq, const struct cpumask *mask_val)
- }
- #endif
- 
-+#ifdef CONFIG_IRQ_PER_CPU
-+static inline void gic_smp_call_function(struct call_single_data *data)
-+{
-+	int cpu;
-+	int this_cpu = smp_processor_id();
-+
-+	/*
-+	 * Since this function is called with interrupts disabled,
-+	 * smp_call_function can't be used here because it warns (even
-+	 * if wait = 0) when interrupts are disabled.
-+	 *
-+	 * __smp_call_function_single doesn't warn when interrupts are
-+	 * disabled and not waiting, so use it instead.
-+	 */
-+	for_each_online_cpu(cpu)
-+		if (cpu != this_cpu)
-+			__smp_call_function_single(cpu, data, 0);
-+}
-+
-+static void gic_mask_ppi(void *info)
-+{
-+	gic_mask_irq(*(unsigned int *)info);
-+}
-+
-+static void gic_unmask_ppi(void *info)
-+{
-+	gic_unmask_irq(*(unsigned int *)info);
-+}
-+
-+static void gic_enable_irq(unsigned int irq)
-+{
-+	struct irq_desc *desc = irq_to_desc(irq);
-+	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
-+
-+	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
-+		gic_data->ppi_data.func = gic_unmask_ppi;
-+		gic_data->ppi_data.info = &desc->irq;
-+		gic_data->ppi_data.flags = 0;
-+
-+		/* Unmask PPIs on all cores during enable. */
-+		gic_smp_call_function(&gic_data->ppi_data);
-+	}
-+
-+	desc->chip->unmask(irq);
-+	desc->status &= ~IRQ_MASKED;
-+}
-+
-+static void gic_shutdown_irq(unsigned int irq)
-+{
-+	struct irq_desc *desc = irq_to_desc(irq);
-+	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
-+
-+	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
-+		gic_data->ppi_data.func = gic_mask_ppi;
-+		gic_data->ppi_data.info = &desc->irq;
-+		gic_data->ppi_data.flags = 0;
-+
-+		/* Mask PPIs on all cores during disable. */
-+		gic_smp_call_function(&gic_data->ppi_data);
-+	}
-+
-+	desc->chip->mask(irq);
-+	desc->status |= IRQ_MASKED;
-+}
-+#endif
-+
- static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- {
- 	struct gic_chip_data *chip_data = get_irq_data(irq);
-@@ -196,6 +275,10 @@ static struct irq_chip gic_chip = {
- #ifdef CONFIG_SMP
- 	.set_affinity	= gic_set_cpu,
- #endif
-+#ifdef CONFIG_IRQ_PER_CPU
-+	.enable		= gic_enable_irq,
-+	.shutdown	= gic_shutdown_irq,
-+#endif
- };
- 
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+I'm quite happy to do this, thanks,
+
 -- 
-1.7.3.2
-
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
