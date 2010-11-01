@@ -1,56 +1,152 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 1 Nov 2010 15:23:15 +0100
-Subject: Using non-Global mappings for kernel address space
-Message-ID: <AANLkTi=f+s4GAKLSESK=WSjxmUDCCvog21z1XxW73nU3@mail.gmail.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Mon, 1 Nov 2010 08:24:28 -0700
+Subject: [patch v3 01/10] efikamx: read board id
+In-Reply-To: <20101026200953.996305184@rtp-net.org>
+References: <20101026200723.839428019@rtp-net.org>
+	<20101026200953.996305184@rtp-net.org>
+Message-ID: <86A0E76937111F4C92FABEC0A20988510523CAD8@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all.
+Hi,
 
-For the purpose of performance evaluation of our KVM for ARM port, I
-am interested in avoiding having to flush the TLB every time I switch
-from the guest kernel to the host kernel and vice-versa. The only way
-to accomplish this on ARMv6 would be to have non-Global mappings of
-the host kernel address space using a separate ASID from that of the
-guest kernel.
+>-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org
+[mailto:linux-arm-kernel-
+>bounces at lists.infradead.org] On Behalf Of Arnaud Patard
+>Sent: Tuesday, October 26, 2010 3:07 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: matt at genesi-usa.com; Sascha Hauer; Arnaud Patard; Amit Kucheria
+>Subject: [patch v3 01/10] efikamx: read board id
+>
+>read board id value from the GPIO3_16/17/11
+>
+>Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+>===================================================================
+>--- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c
+2010-10-21 08:29:23.000000000 +0200
+>+++ linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+2010-10-21 08:29:46.000000000 +0200
+>@@ -39,12 +39,26 @@
+>
+> #define	MX51_USB_PLL_DIV_24_MHZ	0x01
+>
+>+#define EFIKAMX_PCBID0		(2*32 + 16)
+>+#define EFIKAMX_PCBID1		(2*32 + 17)
+>+#define EFIKAMX_PCBID2		(2*32 + 11)
+>+
+>+/* the pci ids pin have pull up. they're driven low according to board
+id */
+>+#define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+PAD_CTL_PUS_100K_UP)
+>+#define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0,
+PAD_CTL_PUS_100K_UP)
+>+#define MX51_PAD_PCBID2	IOMUX_PAD(0x504, 0x128, 3, 0x0,   0,
+PAD_CTL_PUS_100K_UP)
+>+
 
-My general approach is outlined as follows:
- - Mark all pages and sections (except interrupt vector page) with
-addr > TASK_SIZE as non-global
- - Set a special kernel reserved ASID at the same time of paging_init()
- - Defer setting the CP15 context id register until return from kernel
-to userspace in ret_fast_syscall and ret_slow_syscall (ret_to_user)
- - Set the kernel reserved ASID as part of the vector_stub (and add a
-little vector_stub code for the SWI handler for this purpose)
- - Modify the tlbflush.h functions so they  invalidate the requested
-parts of the TLB matching the changes above. (Actually for testing
-purposes, make all functions invalidate the entire TLB).
+Seems a bit wasteful to redefine the IOMUX definitions. Couldn't you
+just do something like this?
 
-The problem is that with the above changes, the kernel seems to boot
-just fine, but when it starts running user space processes, the system
-eventually crashes with the messages:
+static struct pad_desc mx51efikamx_board_id[] = {
+	MX51_PAD_NANDF_CS0__GPIO_3_16,
+	MX51_PAD_NANDF_CS1__GPIO_3_17,
+	MX51_PAD_NANDF_RB3__GPIO_3_11
+}
 
-"Kernel panic - not syncing: Attempted to kill init!
-Rebooting in 5 seconds..<3>ARM9 has CRASHED"
 
-While the mentioned modification probably affects the main kernel too
-heavily to be accepted as part of any mainline KVM patch set it will
-provide us with important hints about performance bottlenecks.
+> static struct pad_desc mx51efikamx_pads[] = {
+> 	/* UART1 */
+> 	MX51_PAD_UART1_RXD__UART1_RXD,
+> 	MX51_PAD_UART1_TXD__UART1_TXD,
+> 	MX51_PAD_UART1_RTS__UART1_RTS,
+> 	MX51_PAD_UART1_CTS__UART1_CTS,
+>+
+>+	/* board id */
+>+	MX51_PAD_PCBID0,
+>+	MX51_PAD_PCBID1,
+>+	MX51_PAD_PCBID2,
+> };
+>
+> /* Serial ports */
+>@@ -92,10 +106,62 @@
+> 	.flags  = MXC_EHCI_INTERNAL_PHY,
+> };
+>
+>+/*   PCBID2  PCBID1 PCBID0  STATE
+>+	1       1      1    ER1:rev1.1
+>+	1       1      0    ER2:rev1.2
+>+	1       0      1    ER3:rev1.3
+>+	1       0      0    ER4:rev1.4
+>+*/
+>+static void __init mx51_efikamx_board_id(void)
+>+{
+>+	int id;
+>+
+>+	/* things are taking time to settle */
+>+	msleep(150);
+>+
+>+	gpio_request(EFIKAMX_PCBID0, "pcbid0");
+>+	gpio_direction_input(EFIKAMX_PCBID0);
+>+	gpio_request(EFIKAMX_PCBID1, "pcbid1");
+>+	gpio_direction_input(EFIKAMX_PCBID1);
+>+	gpio_request(EFIKAMX_PCBID2, "pcbid2");
+>+	gpio_direction_input(EFIKAMX_PCBID2);
+>+
+>+	id = gpio_get_value(EFIKAMX_PCBID0);
+>+	id |= gpio_get_value(EFIKAMX_PCBID1) << 1;
+>+	id |= gpio_get_value(EFIKAMX_PCBID2) << 2;
+>+
+>+	switch (id) {
+>+	case 7:
+>+		system_rev = 0x11;
+>+		break;
+>+	case 6:
+>+		system_rev = 0x12;
+>+		break;
+>+	case 5:
+>+		system_rev = 0x13;
+>+		break;
+>+	case 4:
+>+		system_rev = 0x14;
+>+		break;
+>+	default:
+>+		system_rev = 0x10;
+>+		break;
+>+	}
+>+
+>+	if ((system_rev == 0x10)
+>+		|| (system_rev == 0x12)
+>+		|| (system_rev == 0x14)) {
+>+		printk(KERN_WARNING
+>+			"EfikaMX: Unsupported board revision 1.%u!\n",
+>+			system_rev & 0xf);
+>+	}
+>+}
+>+
+> static void __init mxc_board_init(void)
+> {
+> 	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_pads,
+> 					ARRAY_SIZE(mx51efikamx_pads));
 
-If anyone has pointers as to why I'm seeing this specific behavior or
-have other suggestions as how to solve the address space conflict in
-the TLB I would be very thankful.
+	for(i=0;i < ARRAY_SIZE(mx51efikamx_board_id);i++)
+                mx51efikamx_board_id [i].pad_ctrl = PAD_CTL_PUS_100K_UP;
+	mxc_iomux_v3_setup_multiple_pads(mx51efikamx_board_id,
+	
+ARRAY_SIZE(mx51efikamx_board_id));
 
-The code is available at:
-http://git.ncl.cs.columbia.edu/git/?p=linux-android-msm.git;a=shortlog;h=refs/heads/kvm-arm-2.6.29-host_asid_hack
-and I attached the patch against my KVM tree for reference.
+>+	mx51_efikamx_board_id();
+> 	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
+> 	mxc_init_imx_uart();
+> }
+>
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 Thanks,
-Christoffer
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm-Use-ASID-0-instead-of-global-mappings-for-TLB-in.patch
-Type: application/octet-stream
-Size: 11824 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101101/f3d06d4a/attachment-0001.obj>
+Dinh
