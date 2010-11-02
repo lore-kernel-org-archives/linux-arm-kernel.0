@@ -1,30 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Nov 2010 22:21:11 +0000
-Subject: [PATCH 2/2] ARM: imx: Add mx53 support to common msl functions.
-In-Reply-To: <1288736227-800-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1288736227-800-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1288736227-800-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20101102222111.GA5169@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed,  3 Nov 2010 00:51:38 +0100
+Subject: [PATCH 01/17] ARM: pxa: Fix missing includes
+Message-ID: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 02, 2010 at 05:17:07PM -0500, Dinh.Nguyen at freescale.com wrote:
->  static void query_silicon_parameter(void)
->  {
-> -	void __iomem *rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
-> +	void __iomem *rom;
->  	u32 rev;
->  
-> +	if (cpu_is_mx51())
-> +		rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
-> +	else if (cpu_is_mx53())
-> +		rom = ioremap(MX53_IROM_BASE_ADDR, MX53_IROM_SIZE);
+After the "ARM: pxa: Introduce pxa{25x,27x,3xx}_map_io()" patch, forged by me
+and Eric, was applied, some variables were misnamed and some includes missing.
+This patch corrects these errors.
 
-	else
-		rom is uninitialized;
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/pxa25x.c |    2 ++
+ arch/arm/mach-pxa/pxa27x.c |    5 ++++-
+ arch/arm/mach-pxa/pxa3xx.c |    4 +++-
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
-I'd also suggest that the above set two variables - base and size, rather
-than repeating the ioremap.  If you look at the generated code, I suspect
-you'll find that the above generates two ioremap calls, whereas using
-variables for base and size, and having a common ioremap will reduce the
-code size.
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 4596b98..acde987 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -31,6 +31,8 @@
+ #include <mach/pm.h>
+ #include <mach/dma.h>
+ 
++#include <asm/mach/map.h>
++
+ #include "generic.h"
+ #include "devices.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index af47bef..764b9ac 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -27,8 +27,11 @@
+ #include <mach/ohci.h>
+ #include <mach/pm.h>
+ #include <mach/dma.h>
++
+ #include <plat/i2c.h>
+ 
++#include <asm/mach/map.h>
++
+ #include "generic.h"
+ #include "devices.h"
+ #include "clock.h"
+@@ -387,7 +390,7 @@ static struct map_desc pxa27x_io_desc[] __initdata = {
+ void __init pxa27x_map_io(void)
+ {
+ 	pxa_map_io();
+-	iotable_init(ARRAY_AND_SIZE(pxa27x_io_table));
++	iotable_init(ARRAY_AND_SIZE(pxa27x_io_desc));
+ 	pxa27x_get_clk_frequency_khz(1);
+ }
+ 
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index af7f701..bb60664 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -32,6 +32,8 @@
+ #include <mach/regs-intc.h>
+ #include <plat/i2c.h>
+ 
++#include <asm/mach/map.h>
++
+ #include "generic.h"
+ #include "devices.h"
+ #include "clock.h"
+@@ -592,7 +594,7 @@ static struct map_desc pxa3xx_io_desc[] __initdata = {
+ void __init pxa3xx_map_io(void)
+ {
+ 	pxa_map_io();
+-	iotable_init(ARRAY_AND_SIZE(common_io_desc));
++	iotable_init(ARRAY_AND_SIZE(pxa3xx_io_desc));
+ 	pxa3xx_get_clk_frequency_khz(1);
+ }
+ 
+-- 
+1.7.2.3
