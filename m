@@ -1,30 +1,40 @@
 From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 2 Nov 2010 19:11:13 +0200
-Subject: [PATCH 2/3] OMAP: DSS2: remove dummy panel driver duplicated
-	panel drivers
-In-Reply-To: <1288714390-6159-3-git-send-email-bryan.wu@canonical.com>
+Date: Tue, 2 Nov 2010 19:21:57 +0200
+Subject: [PATCH 1/3] OMAP: DSS2: Add dummy panel display driver
+In-Reply-To: <1288714390-6159-2-git-send-email-bryan.wu@canonical.com>
 References: <1288714390-6159-1-git-send-email-bryan.wu@canonical.com>
-	<1288714390-6159-3-git-send-email-bryan.wu@canonical.com>
-Message-ID: <AANLkTikXAmgxmA9eBqRceJuvMS+cNGk_NQo_R6TpcpQR@mail.gmail.com>
+	<1288714390-6159-2-git-send-email-bryan.wu@canonical.com>
+Message-ID: <AANLkTikd-hMcFkanO4SUceJuvrMoLxxcB4Fw3HvU_8-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Nov 2, 2010 at 6:13 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> Still keep sharp_ls_panel driver, because it contains blacklight control driver.
+> Dummy panel driver includes the driver and 4 similar panel configurations. It
+> will match the panel name which is passed from platform data and setup the
+> right configurations.
+>
+> With dummy panel driver, we can remove those 4 duplicated panel display
+> drivers. In the future, it is simple for us just add new panel configuration
+> date in panel-dummy.h to support new display panel.
 >
 > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> ---
-> ?drivers/video/omap2/displays/Kconfig ? ? ? ? ? ? ? | ? 18 -
-> ?drivers/video/omap2/displays/Makefile ? ? ? ? ? ? ?| ? ?3 -
-> ?drivers/video/omap2/displays/panel-generic.c ? ? ? | ?174 -------
-> ?.../video/omap2/displays/panel-sharp-lq043t1dg01.c | ?165 ------
-> ?.../video/omap2/displays/panel-tpo-td043mtea1.c ? ?| ?535 --------------------
-> ?5 files changed, 0 insertions(+), 895 deletions(-)
-> ?delete mode 100644 drivers/video/omap2/displays/panel-generic.c
-> ?delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
-> ?delete mode 100644 drivers/video/omap2/displays/panel-tpo-td043mtea1.c
 
-Hey don't remove panel-tpo-td043mtea1.c, it's not a dupe! You probably
-confused it with panel-toppoly-tdo35s.c . This shows you did not build
-test all panel drivers, just select them all in config (enable SPI so
-they all appear).
+<snip>
+
+> diff --git a/drivers/video/omap2/displays/panel-dummy.h b/drivers/video/omap2/displays/panel-dummy.h
+> new file mode 100644
+> index 0000000..ac2b7a2
+> --- /dev/null
+> +++ b/drivers/video/omap2/displays/panel-dummy.h
+
+There is no benefit of having this header, just add all data directly
+in .c file.
+
+<snip>
+
+> + ? ? ? /* Sharp LQ043T1DG01 */
+> + ? ? ? {
+> + ? ? ? ? ? ? ? { ? ? ? .x_res ? ? ? ? ?= 480,
+> + ? ? ? ? ? ? ? ? ? ? ? .y_res ? ? ? ? ?= 272,
+
+missing newline after {
