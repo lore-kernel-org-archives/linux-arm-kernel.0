@@ -1,163 +1,29 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed,  3 Nov 2010 00:51:52 +0100
-Subject: [PATCH 15/17] ARM: pxa: Update Balloon3 for new FPGA firmware
+Date: Wed,  3 Nov 2010 00:51:53 +0100
+Subject: [PATCH 16/17] SND: Tosa: Fix pointer to codec location
 In-Reply-To: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
 References: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1288741914-21328-15-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1288741914-21328-16-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new FPGA firmware in Balloon3 uses different methods to control it's bus
-control lines. In the new version, there are separate registers to set/clear
-bus control lines. This patch updates affected places.
-
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/balloon3.c              |   51 ++++++++++++++++------------
- arch/arm/mach-pxa/include/mach/balloon3.h |    2 +
- drivers/pcmcia/pxa2xx_balloon3.c          |   11 +++---
- 3 files changed, 36 insertions(+), 28 deletions(-)
+ sound/soc/pxa/tosa.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index adb8e9f..d4649c0 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -567,27 +567,29 @@ static inline void balloon3_i2c_init(void) {}
-  * NAND
-  ******************************************************************************/
- #if defined(CONFIG_MTD_NAND_PLATFORM)||defined(CONFIG_MTD_NAND_PLATFORM_MODULE)
--static uint16_t balloon3_ctl =
--	BALLOON3_NAND_CONTROL_FLCE0 | BALLOON3_NAND_CONTROL_FLCE1 |
--	BALLOON3_NAND_CONTROL_FLCE2 | BALLOON3_NAND_CONTROL_FLCE3 |
--	BALLOON3_NAND_CONTROL_FLWP;
--
- static void balloon3_nand_cmd_ctl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+diff --git a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
+index a3bfb2e..73d0edd 100644
+--- a/sound/soc/pxa/tosa.c
++++ b/sound/soc/pxa/tosa.c
+@@ -79,7 +79,7 @@ static void tosa_ext_control(struct snd_soc_codec *codec)
+ static int tosa_startup(struct snd_pcm_substream *substream)
  {
- 	struct nand_chip *this = mtd->priv;
-+	uint8_t balloon3_ctl_set = 0, balloon3_ctl_clr = 0;
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct snd_soc_codec *codec = rtd->card->codec;
++	struct snd_soc_codec *codec = rtd->codec;
  
- 	if (ctrl & NAND_CTRL_CHANGE) {
- 		if (ctrl & NAND_CLE)
--			balloon3_ctl |= BALLOON3_NAND_CONTROL_FLCLE;
-+			balloon3_ctl_set |= BALLOON3_NAND_CONTROL_FLCLE;
- 		else
--			balloon3_ctl &= ~BALLOON3_NAND_CONTROL_FLCLE;
-+			balloon3_ctl_clr |= BALLOON3_NAND_CONTROL_FLCLE;
- 
- 		if (ctrl & NAND_ALE)
--			balloon3_ctl |= BALLOON3_NAND_CONTROL_FLALE;
-+			balloon3_ctl_set |= BALLOON3_NAND_CONTROL_FLALE;
- 		else
--			balloon3_ctl &= ~BALLOON3_NAND_CONTROL_FLALE;
--
--		__raw_writel(balloon3_ctl, BALLOON3_NAND_CONTROL_REG);
-+			balloon3_ctl_clr |= BALLOON3_NAND_CONTROL_FLALE;
-+
-+		if (balloon3_ctl_clr)
-+			__raw_writel(balloon3_ctl_clr,
-+				BALLOON3_NAND_CONTROL_REG);
-+		if (balloon3_ctl_set)
-+			__raw_writel(balloon3_ctl_set,
-+				BALLOON3_NAND_CONTROL_REG |
-+				BALLOON3_FPGA_SETnCLR);
- 	}
- 
- 	if (cmd != NAND_CMD_NONE)
-@@ -599,15 +601,15 @@ static void balloon3_nand_select_chip(struct mtd_info *mtd, int chip)
- 	if (chip < 0 || chip > 3)
- 		return;
- 
--	balloon3_ctl |= BALLOON3_NAND_CONTROL_FLCE0 |
--			BALLOON3_NAND_CONTROL_FLCE1 |
--			BALLOON3_NAND_CONTROL_FLCE2 |
--			BALLOON3_NAND_CONTROL_FLCE3;
-+	/* Assert all nCE lines */
-+	__raw_writew(
-+		BALLOON3_NAND_CONTROL_FLCE0 | BALLOON3_NAND_CONTROL_FLCE1 |
-+		BALLOON3_NAND_CONTROL_FLCE2 | BALLOON3_NAND_CONTROL_FLCE3,
-+		BALLOON3_NAND_CONTROL_REG | BALLOON3_FPGA_SETnCLR);
- 
- 	/* Deassert correct nCE line */
--	balloon3_ctl &= ~(BALLOON3_NAND_CONTROL_FLCE0 << chip);
--
--	__raw_writew(balloon3_ctl, BALLOON3_NAND_CONTROL_REG);
-+	__raw_writew(BALLOON3_NAND_CONTROL_FLCE0 << chip,
-+		BALLOON3_NAND_CONTROL_REG);
- }
- 
- static int balloon3_nand_probe(struct platform_device *pdev)
-@@ -616,11 +618,12 @@ static int balloon3_nand_probe(struct platform_device *pdev)
- 	uint16_t ver;
- 	int ret;
- 
--	__raw_writew(BALLOON3_NAND_CONTROL2_16BIT, BALLOON3_NAND_CONTROL2_REG);
-+	__raw_writew(BALLOON3_NAND_CONTROL2_16BIT,
-+		BALLOON3_NAND_CONTROL2_REG | BALLOON3_FPGA_SETnCLR);
- 
- 	ver = __raw_readw(BALLOON3_FPGA_VER);
--	if (ver > 0x0201)
--		pr_warn("The FPGA code, version 0x%04x, is newer than rel-0.3. "
-+	if (ver < 0x4f08)
-+		pr_warn("The FPGA code, version 0x%04x, is too old. "
- 			"NAND support might be broken in this version!", ver);
- 
- 	/* Power up the NAND chips */
-@@ -635,7 +638,11 @@ static int balloon3_nand_probe(struct platform_device *pdev)
- 	gpio_set_value(BALLOON3_GPIO_RUN_NAND, 1);
- 
- 	/* Deassert all nCE lines and write protect line */
--	__raw_writel(balloon3_ctl, BALLOON3_NAND_CONTROL_REG);
-+	__raw_writel(
-+		BALLOON3_NAND_CONTROL_FLCE0 | BALLOON3_NAND_CONTROL_FLCE1 |
-+		BALLOON3_NAND_CONTROL_FLCE2 | BALLOON3_NAND_CONTROL_FLCE3 |
-+		BALLOON3_NAND_CONTROL_FLWP,
-+		BALLOON3_NAND_CONTROL_REG | BALLOON3_FPGA_SETnCLR);
- 	return 0;
- 
- err2:
-diff --git a/arch/arm/mach-pxa/include/mach/balloon3.h b/arch/arm/mach-pxa/include/mach/balloon3.h
-index 3506da1..f6c81ea 100644
---- a/arch/arm/mach-pxa/include/mach/balloon3.h
-+++ b/arch/arm/mach-pxa/include/mach/balloon3.h
-@@ -26,6 +26,8 @@ enum balloon3_features {
- #define BALLOON3_FPGA_VIRT	(0xf1000000)	/* as per balloon2 */
- #define BALLOON3_FPGA_LENGTH	0x01000000
- 
-+#define	BALLOON3_FPGA_SETnCLR		(0x1000)
-+
- /* FPGA / CPLD registers for CF socket */
- #define	BALLOON3_CF_STATUS_REG		(BALLOON3_FPGA_VIRT + 0x00e00008)
- #define	BALLOON3_CF_CONTROL_REG		(BALLOON3_FPGA_VIRT + 0x00e00008)
-diff --git a/drivers/pcmcia/pxa2xx_balloon3.c b/drivers/pcmcia/pxa2xx_balloon3.c
-index dbbdd00..453c54c 100644
---- a/drivers/pcmcia/pxa2xx_balloon3.c
-+++ b/drivers/pcmcia/pxa2xx_balloon3.c
-@@ -39,12 +39,10 @@ static struct pcmcia_irqs irqs[] = {
- static int balloon3_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- {
- 	uint16_t ver;
--	int ret;
--	static void __iomem *fpga_ver;
- 
- 	ver = __raw_readw(BALLOON3_FPGA_VER);
--	if (ver > 0x0201)
--		pr_warn("The FPGA code, version 0x%04x, is newer than rel-0.3. "
-+	if (ver < 0x4f08)
-+		pr_warn("The FPGA code, version 0x%04x, is too old. "
- 			"PCMCIA/CF support might be broken in this version!",
- 			ver);
- 
-@@ -97,8 +95,9 @@ static void balloon3_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
- static int balloon3_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
- 				       const socket_state_t *state)
- {
--	__raw_writew((state->flags & SS_RESET) ? BALLOON3_CF_RESET : 0,
--			BALLOON3_CF_CONTROL_REG);
-+	__raw_writew(BALLOON3_CF_RESET, BALLOON3_CF_CONTROL_REG |
-+			((state->flags & SS_RESET) ?
-+			BALLOON3_FPGA_SETnCLR : 0));
- 	return 0;
- }
- 
+ 	/* check the jack status at stream startup */
+ 	tosa_ext_control(codec);
 -- 
 1.7.2.3
