@@ -1,76 +1,30 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed,  3 Nov 2010 00:51:49 +0100
-Subject: [PATCH 12/17] ARM: pxa: Add gpio-leds and vibrator support to PalmTC
+Date: Wed,  3 Nov 2010 00:51:50 +0100
+Subject: [PATCH 13/17] ARM: pxa: Fix pxa2xx-flash section mismatch
 In-Reply-To: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
 References: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1288741914-21328-12-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1288741914-21328-13-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/mach-pxa/palmtc.c |   41 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 41 insertions(+), 0 deletions(-)
+ drivers/mtd/maps/pxa2xx-flash.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index d83eee4..fdc5ba6 100644
---- a/arch/arm/mach-pxa/palmtc.c
-+++ b/arch/arm/mach-pxa/palmtc.c
-@@ -390,6 +390,46 @@ static inline void palmtc_ts_init(void) {}
- #endif
+diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+index dd90880..d8ae634 100644
+--- a/drivers/mtd/maps/pxa2xx-flash.c
++++ b/drivers/mtd/maps/pxa2xx-flash.c
+@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
+ static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
  
- /******************************************************************************
-+ * LEDs
-+ ******************************************************************************/
-+#if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-+struct gpio_led palmtc_gpio_leds[] = {
-+{
-+	.name			= "palmtc:green:user",
-+	.default_trigger	= "none",
-+	.gpio			= GPIO_NR_PALMTC_LED_POWER,
-+	.active_low		= 1,
-+}, {
-+	.name			= "palmtc:vibra:vibra",
-+	.default_trigger	= "none",
-+	.gpio			= GPIO_NR_PALMTC_VIBRA_POWER,
-+	.active_low		= 1,
-+}
-+
-+};
-+
-+static struct gpio_led_platform_data palmtc_gpio_led_info = {
-+	.leds		= palmtc_gpio_leds,
-+	.num_leds	= ARRAY_SIZE(palmtc_gpio_leds),
-+};
-+
-+static struct platform_device palmtc_leds = {
-+	.name	= "leds-gpio",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &palmtc_gpio_led_info,
-+	}
-+};
-+
-+static void __init palmtc_leds_init(void)
-+{
-+	platform_device_register(&palmtc_leds);
-+}
-+#else
-+static inline void palmtc_leds_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * NOR Flash
-  ******************************************************************************/
- #if defined(CONFIG_MTD_PHYSMAP) || defined(CONFIG_MTD_PHYSMAP_MODULE)
-@@ -502,6 +542,7 @@ static void __init palmtc_init(void)
- 	palmtc_ts_init();
- 	palmtc_nor_init();
- 	palmtc_lcd_init();
-+	palmtc_leds_init();
- };
  
- MACHINE_START(PALMTC, "Palm Tungsten|C")
+-static int __init pxa2xx_flash_probe(struct platform_device *pdev)
++static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
+ {
+ 	struct flash_platform_data *flash = pdev->dev.platform_data;
+ 	struct pxa2xx_flash_info *info;
 -- 
 1.7.2.3
