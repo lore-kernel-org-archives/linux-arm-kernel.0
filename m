@@ -1,74 +1,90 @@
-From: miltonm@bga.com (Milton Miller)
-Date: Tue, 02 Nov 2010 01:51:00 -0600
-Subject: [PATCH] [ARM] gic: Unmask private interrupts on all cores during
-	IRQ enable
-In-Reply-To: <1288629595-15331-1-git-send-email-scaudle@codeaurora.org>
-References: <1288629595-15331-1-git-send-email-scaudle@codeaurora.org>
-Message-ID: <1288684260_11540@mail4.comsite.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 2 Nov 2010 09:38:58 +0100
+Subject: [patch v4 06/10] efikamx: add leds support
+In-Reply-To: <201010300954.47839.marek.vasut@gmail.com>
+References: <20101027124044.980739780@rtp-net.org>
+	<20101027124347.146428989@rtp-net.org>
+	<201010300954.47839.marek.vasut@gmail.com>
+Message-ID: <20101102083858.GP31158@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  1 Nov 2010 about 12:39:55 -0400, Stephen Caudle wrote:
-> +#ifdef CONFIG_IRQ_PER_CPU
-> +static inline void gic_smp_call_function(struct call_single_data *data)
-> +{
-> +	int cpu;
-> +	int this_cpu = smp_processor_id();
-> +
-> +	/*
-> +	 * Since this function is called with interrupts disabled,
-> +	 * smp_call_function can't be used here because it warns (even
-> +	 * if wait = 0) when interrupts are disabled.
-> +	 *
-> +	 * __smp_call_function_single doesn't warn when interrupts are
-> +	 * disabled and not waiting, so use it instead.
-> +	 */
-> +	for_each_online_cpu(cpu)
-> +		if (cpu != this_cpu)
-> +			__smp_call_function_single(cpu, data, 0);
-> +}
-> +
+Hello,
 
-So you think that calling __smp_call_function_single with irqs disabled
-with a data that is reused is not deadlock prone ?
+On Sat, Oct 30, 2010 at 09:54:47AM +0200, Marek Vasut wrote:
+> On Wednesday 27 October 2010 14:40:51 Arnaud Patard wrote:
+> > The efika mx a 3 leds (1 blue, 1 red, 1 green) connected on GPIOS 3
+> > 13/14/15. Also, some special care is done for default trigger of blue led
+> > for mmc as the mmc host used is different between hw revisions
+> > 
+> > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> > Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+> > ===================================================================
+> > --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-27
+> > 11:26:16.000000000 +0200 +++
+> > linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-27
+> > 11:27:38.000000000 +0200 @@ -18,6 +18,7 @@
+> >  #include <linux/platform_device.h>
+> >  #include <linux/i2c.h>
+> >  #include <linux/gpio.h>
+> > +#include <linux/leds.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/io.h>
+> >  #include <linux/fsl_devices.h>
+> > @@ -43,6 +44,10 @@
+> >  #define EFIKAMX_PCBID1		(2*32 + 17)
+> >  #define EFIKAMX_PCBID2		(2*32 + 11)
+> > 
+> > +#define EFIKAMX_BLUE_LED	(2*32 + 13)
+> > +#define EFIKAMX_GREEN_LED	(2*32 + 14)
+> > +#define EFIKAMX_RED_LED		(2*32 + 15)
+> > +
+> >  /* the pci ids pin have pull up. they're driven low according to board id
+> > */ #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+> > PAD_CTL_PUS_100K_UP) #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3,
+> > 0x0,   0, PAD_CTL_PUS_100K_UP) @@ -81,6 +86,11 @@
+> >  	MX51_PAD_GPIO_1_1__ESDHC1_WP,
+> >  	MX51_PAD_GPIO_1_7__ESDHC2_WP,
+> >  	MX51_PAD_GPIO_1_8__ESDHC2_CD,
+> > +
+> > +	/* leds */
+> > +	MX51_PAD_CSI1_D9__GPIO_3_13,
+> > +	MX51_PAD_CSI1_VSYNC__GPIO_3_14,
+> > +	MX51_PAD_CSI1_HSYNC__GPIO_3_15,
+> >  };
+> > 
+> >  /* Serial ports */
+> > @@ -179,6 +189,37 @@
+> >  	}
+> >  }
+> 
+> Maybe this could be modularized ?
+> 
+> #ifdef CONFIG_LEDS_GPIO
+> ... the platform_data stuff below ...
+> 
+> efikamx_register_leds()
+> {
+> 	platform_device_register();
+> }
+> #else
+> static inline void efikamx_register_leds() {}
+> #endif
+> 
+> board_init()
+> {
+> ...
+> efikamx_register_leds();
+> ...
+> }
+> 
+> What do you think ? Cheers
+IMHO it's better to register all devices independently of the available
+drivers.  So for me the used approach is OK.
 
-If you look, __smp_call_function_single will wait in csd_lock until
-the previous requested cpu has consumed the request (as it must, because
-the data contains both the arguments and the list pointers to link
-the element).
+Best regards
+Uwe
 
-> +static void gic_enable_irq(unsigned int irq)
-> +{
-> +	struct irq_desc *desc = irq_to_desc(irq);
-> +	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
-> +
-> +	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
-> +		gic_data->ppi_data.func = gic_unmask_ppi;
-> +		gic_data->ppi_data.info = &desc->irq;
-> +		gic_data->ppi_data.flags = 0;
-
-Oh, now the flags (and therefore the lock) are cleared, and the function
-is overwritten before it is known that the last cpu has processed this
-call function request.
-
-So you could have anything from the wrong function executed to
-the last cpu's ipi function call list is crossed with another cpus,
-probably leading to other call function data never being processed.  In
-the best case other callers to call_function_single will hang forever
-waiting for their own (per-cpu by originator) request to be consumed.
-
-If you don't want to wait you must to allocate csd data per cpu, and
-never clear flags except at the initial allocation.  You can not
-overwrite function or info unless you know its safe if the previous
-ofunction(odata) is issued and the new nfunction(ndata) is also safe
-as nfunction(odata) or ofunction(ndata) (or you put in additional
-barriers so only one has to be safe).
-
-And then someone has to decide delayed mask or unmask is safe.
-
-[note: it may be difficult to impossible to observe these races
-with nr_cpus <= 2]
-
-btw, the generic code is moving to passing desc not irq numbers around.
-
-milton
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
