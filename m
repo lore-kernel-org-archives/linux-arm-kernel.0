@@ -1,43 +1,47 @@
-From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Tue, 2 Nov 2010 10:58:57 -0500
-Subject: [PATCH v2 0/4] tidspbridge: SCM layer violation fixes
-In-Reply-To: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
-References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <4CD03541.1010609@ti.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue,  2 Nov 2010 12:13:07 -0400
+Subject: [PATCH 0/3] OMAP: DSS2: introduce dummy panel driver 
+Message-ID: <1288714390-6159-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2010 11:15 AM, Ramirez Luna, Omar wrote:
-> This is the patch series shared by Paul, for a short term fix to
-> a compile break due SCM layer layer violations from tidspbridge
-> driver, where the latter is used to write directly into registers
-> and use SCM layer macros, among other layer bypassing.
->
-> patch: "staging: tidspbridge: use new SCM DSP boot control fns"
-> was split from its original version, it is meant to be on hold until
-> the rest of the series gets upstreamed and can be found in the
-> staging tree (unless best advice is given).
->
-> Paul Walmsley (4):
->    OMAP: control: add functions for DSP boot address/mode control
->    OMAP3: PM: update DSP reset code to use new SCM DSP boot control
->      functions
->    OMAP: dsp: convert OMAP3430 adaptation layer to use new SCM DSP boot
->      control fns
->    staging: tidspbridge: use new SCM DSP boot control fns
->
->   arch/arm/mach-omap2/control.c                 |   51 ++++++++++++++++++++++
->   arch/arm/mach-omap2/control.h                 |   16 ++++---
->   arch/arm/mach-omap2/dsp.c                     |    4 ++
->   arch/arm/mach-omap2/pm34xx.c                  |    6 +-
->   arch/arm/plat-omap/include/plat/dsp.h         |    4 ++
->   arch/arm/plat-omap/include/plat/iva2_dsp.h    |   56 +++++++++++++++++++++++++
->   drivers/staging/tidspbridge/core/tiomap3430.c |   13 +++---
->   7 files changed, 133 insertions(+), 17 deletions(-)
->   create mode 100644 arch/arm/plat-omap/include/plat/iva2_dsp.h
+There are 4 duplicated panel driver sin DSS2 display driver. They are similar
+and dummy panel driver can support all them with specific panel configuration.
+And new panel driver can be easily supported by adding panel configurations
+into dummy panel driver.
 
-This series was tested on OMAP 3430 (zoom2) and 3630 (zoom3) boards.
+This patchset introduces dummy panel driver, remove 3 panel drivers and enable
+dummy panel driver in board files. And it is based on 2.6.37-rc1.
 
-Regards,
+Building with omap2plus_defconfig is successful.
 
-Omar
+Keep sharp_ls_panel, since it contains blacklight control code which will be
+moved out later.
+
+Bryan Wu (3):
+  OMAP: DSS2: Add dummy panel display driver
+  OMAP: DSS2: remove dummy panel driver duplicated panel drivers
+  OMAP: use dummy panel driver in board files
+
+ arch/arm/mach-omap2/board-3430sdp.c                |    3 +-
+ arch/arm/mach-omap2/board-am3517evm.c              |    6 +-
+ arch/arm/mach-omap2/board-cm-t35.c                 |    6 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |    6 +-
+ arch/arm/mach-omap2/board-igep0020.c               |    3 +-
+ arch/arm/mach-omap2/board-omap3beagle.c            |    3 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |    3 +-
+ arch/arm/mach-omap2/board-omap3stalker.c           |    6 +-
+ arch/arm/plat-omap/include/plat/display.h          |   28 +-
+ drivers/video/omap2/displays/Kconfig               |   22 +-
+ drivers/video/omap2/displays/Makefile              |    4 +-
+ drivers/video/omap2/displays/panel-dummy.c         |  195 +++++++
+ drivers/video/omap2/displays/panel-dummy.h         |  119 +++++
+ drivers/video/omap2/displays/panel-generic.c       |  174 -------
+ .../video/omap2/displays/panel-sharp-lq043t1dg01.c |  165 ------
+ .../video/omap2/displays/panel-tpo-td043mtea1.c    |  535 --------------------
+ 16 files changed, 364 insertions(+), 914 deletions(-)
+ create mode 100644 drivers/video/omap2/displays/panel-dummy.c
+ create mode 100644 drivers/video/omap2/displays/panel-dummy.h
+ delete mode 100644 drivers/video/omap2/displays/panel-generic.c
+ delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
+ delete mode 100644 drivers/video/omap2/displays/panel-tpo-td043mtea1.c
