@@ -1,49 +1,101 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Tue,  2 Nov 2010 19:01:00 +0530
-Subject: [PATCH] omap: tidspbridge: fix build failure on MEMBLOCK_REAL_LIMIT
-Message-ID: <1288704660-21683-1-git-send-email-gadiyar@ti.com>
+From: neko@genesi-usa.com (Matt Sealey)
+Date: Tue, 2 Nov 2010 08:31:39 -0500
+Subject: [patch v4 06/10] efikamx: add leds support
+In-Reply-To: <20101102083858.GP31158@pengutronix.de>
+References: <20101027124044.980739780@rtp-net.org>
+	<20101027124347.146428989@rtp-net.org>
+	<201010300954.47839.marek.vasut@gmail.com>
+	<20101102083858.GP31158@pengutronix.de>
+Message-ID: <3753BF4F-E4AE-4361-88E6-CACEC6D7EDFB@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MEMBLOCK_REAL_LIMIT symbol was removed by the commit e63075a3c937
-(memblock: Introduce default allocation limit and use it to replace
-explicit ones). This breaks build as below when CONFIG_TIDSPBRIDGE
-is selected. Fix this.
+I cant imagine any scenario where you'd not want a power light so the modular "no led gpio class" register function would better set the green one on anyway.
 
-  CC      arch/arm/plat-omap/devices.o
-arch/arm/plat-omap/devices.c: In function 'omap_dsp_reserve_sdram_memblock':
-arch/arm/plat-omap/devices.c:287: error: 'MEMBLOCK_REAL_LIMIT' undeclared (first use in this function)
-arch/arm/plat-omap/devices.c:287: error: (Each undeclared identifier is reported only once
-arch/arm/plat-omap/devices.c:287: error: for each function it appears in.)
-make[1]: *** [arch/arm/plat-omap/devices.o] Error 1
-make: *** [arch/arm/plat-omap] Error 2
+If you did that then I think you'd be defeating the object of modularizing. Efika mx should automatically select kconfig on led gpio and led trigger.
 
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-Cc: Felipe Contreras <felipe.contreras@gmail.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Tony Lindgren <tony@atomide.com>
----
-Based on another similar patch [1] for vram.c. I've scrubbed the rest
-of the tree for MEMBLOCK_REAL_LIMIT. Only other occurrence is in
-a comment in arch/powerpc/kernel/setup_32.c [2]. Not sure what this
-should be changed to.
+Matt Sealey
+Product Development Analyst
+Genesi USA, Inc.
 
-[1] http://marc.info/?l=linux-omap&m=128862903431257&w=2
-[2] http://lxr.free-electrons.com/source/arch/powerpc/kernel/setup_32.c#L249
+On Nov 2, 2010, at 3:38 AM, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
- arch/arm/plat-omap/devices.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-Index: linux-2.6/arch/arm/plat-omap/devices.c
-===================================================================
---- linux-2.6.orig/arch/arm/plat-omap/devices.c
-+++ linux-2.6/arch/arm/plat-omap/devices.c
-@@ -284,7 +284,7 @@ void __init omap_dsp_reserve_sdram_membl
- 	if (!size)
- 		return;
- 
--	paddr = __memblock_alloc_base(size, SZ_1M, MEMBLOCK_REAL_LIMIT);
-+	paddr = __memblock_alloc_base(size, SZ_1M, MEMBLOCK_ALLOC_ACCESSIBLE);
- 	if (!paddr) {
- 		pr_err("%s: failed to reserve %x bytes\n",
- 				__func__, size);
+> Hello,
+> 
+> On Sat, Oct 30, 2010 at 09:54:47AM +0200, Marek Vasut wrote:
+>> On Wednesday 27 October 2010 14:40:51 Arnaud Patard wrote:
+>>> The efika mx a 3 leds (1 blue, 1 red, 1 green) connected on GPIOS 3
+>>> 13/14/15. Also, some special care is done for default trigger of blue led
+>>> for mmc as the mmc host used is different between hw revisions
+>>> 
+>>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>>> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+>>> ===================================================================
+>>> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c    2010-10-27
+>>> 11:26:16.000000000 +0200 +++
+>>> linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c    2010-10-27
+>>> 11:27:38.000000000 +0200 @@ -18,6 +18,7 @@
+>>> #include <linux/platform_device.h>
+>>> #include <linux/i2c.h>
+>>> #include <linux/gpio.h>
+>>> +#include <linux/leds.h>
+>>> #include <linux/delay.h>
+>>> #include <linux/io.h>
+>>> #include <linux/fsl_devices.h>
+>>> @@ -43,6 +44,10 @@
+>>> #define EFIKAMX_PCBID1        (2*32 + 17)
+>>> #define EFIKAMX_PCBID2        (2*32 + 11)
+>>> 
+>>> +#define EFIKAMX_BLUE_LED    (2*32 + 13)
+>>> +#define EFIKAMX_GREEN_LED    (2*32 + 14)
+>>> +#define EFIKAMX_RED_LED        (2*32 + 15)
+>>> +
+>>> /* the pci ids pin have pull up. they're driven low according to board id
+>>> */ #define MX51_PAD_PCBID0    IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+>>> PAD_CTL_PUS_100K_UP) #define MX51_PAD_PCBID1    IOMUX_PAD(0x51C, 0x134, 3,
+>>> 0x0,   0, PAD_CTL_PUS_100K_UP) @@ -81,6 +86,11 @@
+>>>    MX51_PAD_GPIO_1_1__ESDHC1_WP,
+>>>    MX51_PAD_GPIO_1_7__ESDHC2_WP,
+>>>    MX51_PAD_GPIO_1_8__ESDHC2_CD,
+>>> +
+>>> +    /* leds */
+>>> +    MX51_PAD_CSI1_D9__GPIO_3_13,
+>>> +    MX51_PAD_CSI1_VSYNC__GPIO_3_14,
+>>> +    MX51_PAD_CSI1_HSYNC__GPIO_3_15,
+>>> };
+>>> 
+>>> /* Serial ports */
+>>> @@ -179,6 +189,37 @@
+>>>    }
+>>> }
+>> 
+>> Maybe this could be modularized ?
+>> 
+>> #ifdef CONFIG_LEDS_GPIO
+>> ... the platform_data stuff below ...
+>> 
+>> efikamx_register_leds()
+>> {
+>>    platform_device_register();
+>> }
+>> #else
+>> static inline void efikamx_register_leds() {}
+>> #endif
+>> 
+>> board_init()
+>> {
+>> ...
+>> efikamx_register_leds();
+>> ...
+>> }
+>> 
+>> What do you think ? Cheers
+> IMHO it's better to register all devices independently of the available
+> drivers.  So for me the used approach is OK.
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
