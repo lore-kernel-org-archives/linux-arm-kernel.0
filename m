@@ -1,82 +1,121 @@
-From: linux@bohmer.net (Remy Bohmer)
-Date: Tue, 2 Nov 2010 15:11:15 +0100
-Subject: at91: input overruns question
-In-Reply-To: <AANLkTin3gSaf-EJx6=ojakYUAyH6CDpD4SnHyN=xLNb6@mail.gmail.com>
-References: <AANLkTinbThMFXd1KpuMRYNJREpjGa6RNBH9R1SM955Sd@mail.gmail.com>
-	<AANLkTimHnxLydJC3u58kAuukjR80EEgRDj7ZEedNMKfd@mail.gmail.com>
-	<AANLkTi=AhMxUjN=0PfW+XKVDJBhok=f4YwpF6bf67Eza@mail.gmail.com>
-	<AANLkTin3gSaf-EJx6=ojakYUAyH6CDpD4SnHyN=xLNb6@mail.gmail.com>
-Message-ID: <AANLkTi=3T4cw9-i0ybst6BQN3FQnS2jhUUAbQ2BQZL5U@mail.gmail.com>
+From: neko@genesi-usa.com (Matt Sealey)
+Date: Tue, 2 Nov 2010 09:16:46 -0500
+Subject: [patch v4 06/10] efikamx: add leds support
+In-Reply-To: <1288705607.2940.24.camel@realization>
+References: <20101027124044.980739780@rtp-net.org>
+	<20101027124347.146428989@rtp-net.org>
+	<201010300954.47839.marek.vasut@gmail.com>
+	<20101102083858.GP31158@pengutronix.de>
+	<87fwvk6paq.fsf@lechat.rtp-net.org>
+	<1288705607.2940.24.camel@realization>
+Message-ID: <B222B47E-1678-4876-BC05-01B0151934FB@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-> I did manage to get ithe DBGU to work by changing the IRQ request flag
-> to NODELAY.
->
-> #ifndef CONFIG_RTC_DRV_AT91RM9200
-> ? ?if ( machine_is_at91rm9200() && port->irq == 1 )
-> ? ? ? ?retval = request_irq(port->irq, atmel_interrupt, IRQF_NODELAY,
-> ? ? ? ? ? ?tty ? tty->name : "atmel_serial", port);
-> ? ?else
-> #endif
-> ? ? ? ?retval = request_irq(port->irq, atmel_interrupt, IRQF_SHARED,
-> ? ? ? ? ? ?tty ? tty->name : "atmel_serial", port);
->
-> I understand the warnings and limitations of NODELAY for an RT kernel,
-> but this is a quick fix which allows me to continue to use the DBGU
-> for my development and I can remove it once I get to production
-> status.
->
 
-I was looking through my own patch repo and I use on 2.6.33-rt the
-patch attached (since 2.6.31) (for Atmel at91sam9261), but for a
-different reason then you run into now! (see patch header)
 
-Notice that the DBGU is shared with the system timer (ST) on rm9200.
-The interrupt of the ST is shared with the DBGU.
-This means that everything the interrupt handler for ST does bothers the DBGU.
-BUT: The ST has its interrupt handler installed with IRQF_TIMER (see
-arch/arm/mach-at91/at91rm9200_time.c). IRQF_TIMER implies
-IRQF_NODELAY.
-Without NODELAY set, the IRQ-thread of the DBGU will only run if the
-ST-interrupt is completed, causing your troubles.
-The driver of the DBGU was adapted such that it runs properly in
-NODELAY context. You can keep it set, even in production use.
+On Nov 2, 2010, at 8:46 AM, Alberto Panizzo <maramaopercheseimorto@gmail.com> wrote:
 
-> There is a comment in the atmel_serial.c file which says that
-> "Transmit is IRQF_NODELAY safe" but I don't know if the Receive is as
-> well.
+> Hi,
+> On mar, 2010-11-02 at 10:35 +0100, Arnaud Patard wrote:
+>> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+>> 
+>> Hi,
+>>> Hello,
+>>> 
+>>> On Sat, Oct 30, 2010 at 09:54:47AM +0200, Marek Vasut wrote:
+>>>> On Wednesday 27 October 2010 14:40:51 Arnaud Patard wrote:
+>>>>> The efika mx a 3 leds (1 blue, 1 red, 1 green) connected on GPIOS 3
+>>>>> 13/14/15. Also, some special care is done for default trigger of blue led
+>>>>> for mmc as the mmc host used is different between hw revisions
+>>>>> 
+>>>>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>>>>> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+>>>>> ===================================================================
+>>>>> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c    2010-10-27
+>>>>> 11:26:16.000000000 +0200 +++
+>>>>> linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c    2010-10-27
+>>>>> 11:27:38.000000000 +0200 @@ -18,6 +18,7 @@
+>>>>> #include <linux/platform_device.h>
+>>>>> #include <linux/i2c.h>
+>>>>> #include <linux/gpio.h>
+>>>>> +#include <linux/leds.h>
+>>>>> #include <linux/delay.h>
+>>>>> #include <linux/io.h>
+>>>>> #include <linux/fsl_devices.h>
+>>>>> @@ -43,6 +44,10 @@
+>>>>> #define EFIKAMX_PCBID1        (2*32 + 17)
+>>>>> #define EFIKAMX_PCBID2        (2*32 + 11)
+>>>>> 
+>>>>> +#define EFIKAMX_BLUE_LED    (2*32 + 13)
+>>>>> +#define EFIKAMX_GREEN_LED    (2*32 + 14)
+>>>>> +#define EFIKAMX_RED_LED        (2*32 + 15)
+>>>>> +
+>>>>> /* the pci ids pin have pull up. they're driven low according to board id
+>>>>> */ #define MX51_PAD_PCBID0    IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+>>>>> PAD_CTL_PUS_100K_UP) #define MX51_PAD_PCBID1    IOMUX_PAD(0x51C, 0x134, 3,
+>>>>> 0x0,   0, PAD_CTL_PUS_100K_UP) @@ -81,6 +86,11 @@
+>>>>>    MX51_PAD_GPIO_1_1__ESDHC1_WP,
+>>>>>    MX51_PAD_GPIO_1_7__ESDHC2_WP,
+>>>>>    MX51_PAD_GPIO_1_8__ESDHC2_CD,
+>>>>> +
+>>>>> +    /* leds */
+>>>>> +    MX51_PAD_CSI1_D9__GPIO_3_13,
+>>>>> +    MX51_PAD_CSI1_VSYNC__GPIO_3_14,
+>>>>> +    MX51_PAD_CSI1_HSYNC__GPIO_3_15,
+>>>>> };
+>>>>> 
+>>>>> /* Serial ports */
+>>>>> @@ -179,6 +189,37 @@
+>>>>>    }
+>>>>> }
+>>>> 
+>>>> Maybe this could be modularized ?
+>>>> 
+>>>> #ifdef CONFIG_LEDS_GPIO
+>>>> ... the platform_data stuff below ...
+>>>> 
+>>>> efikamx_register_leds()
+>>>> {
+>>>>    platform_device_register();
+>>>> }
+>>>> #else
+>>>> static inline void efikamx_register_leds() {}
+>>>> #endif
+>>>> 
+>>>> board_init()
+>>>> {
+>>>> ...
+>>>> efikamx_register_leds();
+>>>> ...
+>>>> }
+>>>> 
+>>>> What do you think ? Cheers
+>>> IMHO it's better to register all devices independently of the available
+>>> drivers.  So for me the used approach is OK.
+>> 
+>> I don't really see the point of doing that. It just looks a good way to
+>> make the code harder to read imho. Moreover, it doesn't bring a lot by
+>> doing that - if you don't want the leds-gpio stuff, just disable it at
+>> kernel configuration and you're done.
+>> 
+>> Arnaud
+> 
+> The great advantage of having all the supported devices registered
+> even if the corresponding driver is not currently built is that if you 
+> flash the kernel image to the board building this image with a subset 
+> of supported drivers and you need for some reason to change the 
+> software configuration (adding another driver) you don't have to rebuild
+> the kernel image and re-flash it on the board. Instead you can add the
+> new module on the filesystem and load it at runtime.
+> 
+> Lot of efforts were and are done to build the kernel more general as it 
+> can be to reduce the versioning issues with a really minimal difference
+> of footprint.
 
-Especially the receive was important to make safe for that context.
-That one will drop data if it is not executed fast enough!
-We do that only for receive. For transmit only there would have been
-no reason to make it nodelay safe, since that would only imply a
-bottleneck on throughput in case it runs from IRQ-thread. (you won' t
-get buffer overflows on transmit...)
+There really isn't any need to flash a kernel on the efika, it will boot from fat, ext2, mmc, pata and maybe before too long USB drives..
 
-> Maybe the Receive isn't deemed safe because it is shared with
-> the RTC? If it is not shared, then maybe it is safe? I intend
-> investigate this myself I have any further problems.
-
-Only the interrupt handler marked nodelay run in IRQ context (like ST
-and DBGU now), all others in thread context.(like PMC and RTC)
-All other shared interrupts, like RTC and PMC, slow down the interrupt
-handling of the DBGU and ST, since the IRQ-thread must first run,
-before the interrupt can be enabled again at AIC level.
-
-The best solution is to adapt all shared handlers to use the
-request_threaded_irq() API and only do in the top-half context what is
-absolutely necessary. (Only the ST-handler cannot be modified though)
-
-Kind regards,
-
-Remy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: make-atmel-serial-irq-nodelay.patch
-Type: text/x-patch
-Size: 1197 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101102/242ded5e/attachment.bin>
+Matt Sealey
+Product Development Analyst
+Genesi USA, Inc.
