@@ -1,73 +1,43 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 2 Nov 2010 16:09:45 +0100
-Subject: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-In-Reply-To: <4CD00106.8000001@panicking.kicks-ass.org>
-References: <201007150648.50521.marek.vasut@gmail.com>
-	<201007150804.06217.marek.vasut@gmail.com>
-	<4CD00106.8000001@panicking.kicks-ass.org>
-Message-ID: <201011021609.45160.marek.vasut@gmail.com>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Tue, 2 Nov 2010 10:58:57 -0500
+Subject: [PATCH v2 0/4] tidspbridge: SCM layer violation fixes
+In-Reply-To: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4CD03541.1010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 November 2010 13:16:06 Michael Trimarchi wrote:
-> Hi Marek
-> 
-> Marek Vasut wrote:
-> > Dne ?t 15. ?ervence 2010 08:00:28 Hiroshi DOYU napsal(a):
-> >> From: ext Marek Vasut <marek.vasut@gmail.com>
-> >> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-> >> Date: Thu, 15 Jul 2010 07:56:11 +0200
-> >> 
-> >>> Dne ?t 15. ?ervence 2010 07:39:31 Hiroshi DOYU napsal(a):
-> >>>> From: ext Marek Vasut <marek.vasut@gmail.com>
-> >>>> Subject: Re: [RFC][PATCH 1/1] ARM: Add initial hibernation support
-> >>>> Date: Thu, 15 Jul 2010 06:48:50 +0200
-> >>>> 
-> >>>>> Dne St 30. ?ervna 2010 16:28:01 Hiroshi DOYU napsal(a):
-> >>>>>> From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-> >>>>>> 
-> >>>>>> Hibernation (a.k.a: Suspend-To-Disk) support for ARM
-> >>>>>> 
-> >>>>>> Based on the original work from Romit and Raghu at TI. The original
-> >>>>>> patch(*1) was sent to LOML by Teerth Reddy <teerth@ti.com>
-> >>>>>> 
-> >>>>>> *1: https://patchwork.kernel.org/patch/96442/
-> >>>>>> 
-> >>>>>> Signed-off-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-> >>>>> 
-> >>>>> Hey, can this also run on pre-v7 arms ? Or is there something I
-> >>>>> missed that'd make that impossible?
-> >>>> 
-> >>>> What I verified is with OMAP3(Cortex A8) based board.
-> >>>> 
-> >>>> cp15 part has to be modified, but it might work without this part
-> >>>> itself, I guess.
-> >>> 
-> >>> I see ... do I need any special support on the bootloader or userland
-> >>> side ?
-> >> 
-> >> No, I don't think so. The resuming boot could set up most of states
-> >> basically.
-> > 
-> > I'll test it on xscale/pxa270 ... if it works, I can test on various
-> > pxa3xx too.
-> 
-> Have you done some test on pxa/xscale family?
+On 10/26/2010 11:15 AM, Ramirez Luna, Omar wrote:
+> This is the patch series shared by Paul, for a short term fix to
+> a compile break due SCM layer layer violations from tidspbridge
+> driver, where the latter is used to write directly into registers
+> and use SCM layer macros, among other layer bypassing.
+>
+> patch: "staging: tidspbridge: use new SCM DSP boot control fns"
+> was split from its original version, it is meant to be on hold until
+> the rest of the series gets upstreamed and can be found in the
+> staging tree (unless best advice is given).
+>
+> Paul Walmsley (4):
+>    OMAP: control: add functions for DSP boot address/mode control
+>    OMAP3: PM: update DSP reset code to use new SCM DSP boot control
+>      functions
+>    OMAP: dsp: convert OMAP3430 adaptation layer to use new SCM DSP boot
+>      control fns
+>    staging: tidspbridge: use new SCM DSP boot control fns
+>
+>   arch/arm/mach-omap2/control.c                 |   51 ++++++++++++++++++++++
+>   arch/arm/mach-omap2/control.h                 |   16 ++++---
+>   arch/arm/mach-omap2/dsp.c                     |    4 ++
+>   arch/arm/mach-omap2/pm34xx.c                  |    6 +-
+>   arch/arm/plat-omap/include/plat/dsp.h         |    4 ++
+>   arch/arm/plat-omap/include/plat/iva2_dsp.h    |   56 +++++++++++++++++++++++++
+>   drivers/staging/tidspbridge/core/tiomap3430.c |   13 +++---
+>   7 files changed, 133 insertions(+), 17 deletions(-)
+>   create mode 100644 arch/arm/plat-omap/include/plat/iva2_dsp.h
 
-Hi, didn't get the chance yet, but I believe there'll be need for changes in 
-this stuff ... did anything new happen on the list about this ?
+This series was tested on OMAP 3430 (zoom2) and 3630 (zoom3) boards.
 
-I'd suggest you to take this up on the list again.
+Regards,
 
-NOTE: You'll also need to adjust this stuff for armv5 core and maybe even for 
-xscale core.
-
-Cheers
-> 
-> Michael Trimarchi
-> 
-> > --
-> > 
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Omar
