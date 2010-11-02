@@ -1,41 +1,66 @@
-From: tomi.valkeinen@nokia.com (Tomi Valkeinen)
-Date: Tue, 02 Nov 2010 11:19:06 +0200
-Subject: [PATCH 0/2] OMAP: DSS2: Add new display panel
-In-Reply-To: <AANLkTi=fV58ApDqUE21YMK0_vhLdPbPr7F7YpYh0-2Vc@mail.gmail.com>
-References: <1288276982-17225-1-git-send-email-eballetbo@gmail.com>
-	<1288620930.5614.16.camel@tubuntu>
-	<AANLkTi=fV58ApDqUE21YMK0_vhLdPbPr7F7YpYh0-2Vc@mail.gmail.com>
-Message-ID: <1288689546.5614.60.camel@tubuntu>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 02 Nov 2010 10:35:15 +0100
+Subject: [patch v3 01/10] efikamx: read board id
+In-Reply-To: <86A0E76937111F4C92FABEC0A20988510523CAD8@az33exm21> (Nguyen
+	Dinh-R's message of "Mon, 1 Nov 2010 08:24:28 -0700")
+References: <20101026200723.839428019@rtp-net.org>
+	<20101026200953.996305184@rtp-net.org>
+	<86A0E76937111F4C92FABEC0A20988510523CAD8@az33exm21>
+Message-ID: <87iq0g6pbg.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2010-11-01 at 17:45 +0100, ext Bryan Wu wrote:
-> On Mon, Nov 1, 2010 at 10:15 AM, Tomi Valkeinen
-> <tomi.valkeinen@nokia.com> wrote:
+Nguyen Dinh-R00091 <R00091@freescale.com> writes:
 
-> > What we need is a common driver for all these dummy panels, and the
-> > driver would contain configurations for all the supported panels. The
-> > board file would pass the name of the panel used in that board to the
-> > driver, and the driver would use the configurations for that panel.
-> >
-> 
-> It looks like that we just need one file name displays.c to do those
-> generic things and pass the configuration from board files to this
-> driver, such as timing or other things.
+Hi,
 
-Not quite. If you pass timing information from the board files then
-every board file has to define all the timings, even if they are using
-the same panel.
+> Hi,
+>
+>>-----Original Message-----
+>>From: linux-arm-kernel-bounces at lists.infradead.org
+> [mailto:linux-arm-kernel-
+>>bounces at lists.infradead.org] On Behalf Of Arnaud Patard
+>>Sent: Tuesday, October 26, 2010 3:07 PM
+>>To: linux-arm-kernel at lists.infradead.org
+>>Cc: matt at genesi-usa.com; Sascha Hauer; Arnaud Patard; Amit Kucheria
+>>Subject: [patch v3 01/10] efikamx: read board id
+>>
+>>read board id value from the GPIO3_16/17/11
+>>
+>>Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>>Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+>>===================================================================
+>>--- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c
+> 2010-10-21 08:29:23.000000000 +0200
+>>+++ linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+> 2010-10-21 08:29:46.000000000 +0200
+>>@@ -39,12 +39,26 @@
+>>
+>> #define	MX51_USB_PLL_DIV_24_MHZ	0x01
+>>
+>>+#define EFIKAMX_PCBID0		(2*32 + 16)
+>>+#define EFIKAMX_PCBID1		(2*32 + 17)
+>>+#define EFIKAMX_PCBID2		(2*32 + 11)
+>>+
+>>+/* the pci ids pin have pull up. they're driven low according to board
+> id */
+>>+#define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+> PAD_CTL_PUS_100K_UP)
+>>+#define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0,
+> PAD_CTL_PUS_100K_UP)
+>>+#define MX51_PAD_PCBID2	IOMUX_PAD(0x504, 0x128, 3, 0x0,   0,
+> PAD_CTL_PUS_100K_UP)
+>>+
+>
+> Seems a bit wasteful to redefine the IOMUX definitions. Couldn't you
+> just do something like this?
 
-That's why the configs should be in the panel driver, and the board file
-only has to define which panel is actually connected.
+With a define, you have only 1 place to look at when debugging and
+configuring the pad requires only to put it in the list like any other
+pad. With your approach, we need to change the pad control and then call
+mxc_iomux_v3_setup_multiple_pads() separately. It's making extra-step in
+the process.
+Also, such a specific treatment for configuring theses GPIOs means for
+me more errors/bugs possible.
 
-> > This has been discussed a few times in l-o list, but I haven't found
-> > time to implement it and nobody else has done it either.
-> >
-> 
-> I'm quite happy to do this, thanks,
-
-Thanks, I appreciate that.
-
- Tomi
+Arnaud
