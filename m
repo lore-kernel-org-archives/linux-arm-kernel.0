@@ -1,96 +1,82 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 02 Nov 2010 10:35:41 +0100
-Subject: [patch v4 06/10] efikamx: add leds support
-In-Reply-To: <20101102083858.GP31158@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
-	=?utf-8?Q?e-K=C3=B6nig=22's?=
-	message of "Tue, 2 Nov 2010 09:38:58 +0100")
-References: <20101027124044.980739780@rtp-net.org>
-	<20101027124347.146428989@rtp-net.org>
-	<201010300954.47839.marek.vasut@gmail.com>
-	<20101102083858.GP31158@pengutronix.de>
-Message-ID: <87fwvk6paq.fsf@lechat.rtp-net.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 2 Nov 2010 11:47:51 +0100
+Subject: [patch v3 01/10] efikamx: read board id
+In-Reply-To: <87iq0g6pbg.fsf@lechat.rtp-net.org>
+References: <20101026200723.839428019@rtp-net.org>
+	<20101026200953.996305184@rtp-net.org>
+	<86A0E76937111F4C92FABEC0A20988510523CAD8@az33exm21>
+	<87iq0g6pbg.fsf@lechat.rtp-net.org>
+Message-ID: <20101102104751.GS31158@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+Hello,
 
-Hi,
-> Hello,
->
-> On Sat, Oct 30, 2010 at 09:54:47AM +0200, Marek Vasut wrote:
->> On Wednesday 27 October 2010 14:40:51 Arnaud Patard wrote:
->> > The efika mx a 3 leds (1 blue, 1 red, 1 green) connected on GPIOS 3
->> > 13/14/15. Also, some special care is done for default trigger of blue led
->> > for mmc as the mmc host used is different between hw revisions
->> > 
->> > Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> > Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
->> > ===================================================================
->> > --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-27
->> > 11:26:16.000000000 +0200 +++
->> > linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c	2010-10-27
->> > 11:27:38.000000000 +0200 @@ -18,6 +18,7 @@
->> >  #include <linux/platform_device.h>
->> >  #include <linux/i2c.h>
->> >  #include <linux/gpio.h>
->> > +#include <linux/leds.h>
->> >  #include <linux/delay.h>
->> >  #include <linux/io.h>
->> >  #include <linux/fsl_devices.h>
->> > @@ -43,6 +44,10 @@
->> >  #define EFIKAMX_PCBID1		(2*32 + 17)
->> >  #define EFIKAMX_PCBID2		(2*32 + 11)
->> > 
->> > +#define EFIKAMX_BLUE_LED	(2*32 + 13)
->> > +#define EFIKAMX_GREEN_LED	(2*32 + 14)
->> > +#define EFIKAMX_RED_LED		(2*32 + 15)
->> > +
->> >  /* the pci ids pin have pull up. they're driven low according to board id
->> > */ #define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
->> > PAD_CTL_PUS_100K_UP) #define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3,
->> > 0x0,   0, PAD_CTL_PUS_100K_UP) @@ -81,6 +86,11 @@
->> >  	MX51_PAD_GPIO_1_1__ESDHC1_WP,
->> >  	MX51_PAD_GPIO_1_7__ESDHC2_WP,
->> >  	MX51_PAD_GPIO_1_8__ESDHC2_CD,
->> > +
->> > +	/* leds */
->> > +	MX51_PAD_CSI1_D9__GPIO_3_13,
->> > +	MX51_PAD_CSI1_VSYNC__GPIO_3_14,
->> > +	MX51_PAD_CSI1_HSYNC__GPIO_3_15,
->> >  };
->> > 
->> >  /* Serial ports */
->> > @@ -179,6 +189,37 @@
->> >  	}
->> >  }
->> 
->> Maybe this could be modularized ?
->> 
->> #ifdef CONFIG_LEDS_GPIO
->> ... the platform_data stuff below ...
->> 
->> efikamx_register_leds()
->> {
->> 	platform_device_register();
->> }
->> #else
->> static inline void efikamx_register_leds() {}
->> #endif
->> 
->> board_init()
->> {
->> ...
->> efikamx_register_leds();
->> ...
->> }
->> 
->> What do you think ? Cheers
-> IMHO it's better to register all devices independently of the available
-> drivers.  So for me the used approach is OK.
+On Tue, Nov 02, 2010 at 10:35:15AM +0100, Arnaud Patard wrote:
+> Nguyen Dinh-R00091 <R00091@freescale.com> writes:
+> 
+> Hi,
+> 
+> > Hi,
+> >
+> >>-----Original Message-----
+> >>From: linux-arm-kernel-bounces at lists.infradead.org
+> > [mailto:linux-arm-kernel-
+> >>bounces at lists.infradead.org] On Behalf Of Arnaud Patard
+> >>Sent: Tuesday, October 26, 2010 3:07 PM
+> >>To: linux-arm-kernel at lists.infradead.org
+> >>Cc: matt at genesi-usa.com; Sascha Hauer; Arnaud Patard; Amit Kucheria
+> >>Subject: [patch v3 01/10] efikamx: read board id
+> >>
+> >>read board id value from the GPIO3_16/17/11
+> >>
+> >>Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> >>Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+> >>===================================================================
+> >>--- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c
+> > 2010-10-21 08:29:23.000000000 +0200
+> >>+++ linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+> > 2010-10-21 08:29:46.000000000 +0200
+> >>@@ -39,12 +39,26 @@
+> >>
+> >> #define	MX51_USB_PLL_DIV_24_MHZ	0x01
+> >>
+> >>+#define EFIKAMX_PCBID0		(2*32 + 16)
+> >>+#define EFIKAMX_PCBID1		(2*32 + 17)
+> >>+#define EFIKAMX_PCBID2		(2*32 + 11)
+> >>+
+> >>+/* the pci ids pin have pull up. they're driven low according to board
+> > id */
+> >>+#define MX51_PAD_PCBID0	IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+> > PAD_CTL_PUS_100K_UP)
+> >>+#define MX51_PAD_PCBID1	IOMUX_PAD(0x51C, 0x134, 3, 0x0,   0,
+> > PAD_CTL_PUS_100K_UP)
+> >>+#define MX51_PAD_PCBID2	IOMUX_PAD(0x504, 0x128, 3, 0x0,   0,
+> > PAD_CTL_PUS_100K_UP)
+> >>+
+> >
+> > Seems a bit wasteful to redefine the IOMUX definitions. Couldn't you
+> > just do something like this?
+> 
+> With a define, you have only 1 place to look at when debugging and
+> configuring the pad requires only to put it in the list like any other
+> pad. With your approach, we need to change the pad control and then call
+> mxc_iomux_v3_setup_multiple_pads() separately. It's making extra-step in
+> the process.
+> Also, such a specific treatment for configuring theses GPIOs means for
+> me more errors/bugs possible.
+I suggest to just use one of the two possibilies for now (I don't have a
+strong preference here).  Hopefully Lothar's patch that makes the pad
+definitions use a bit field[1] is merged soon and then this can become:
 
-I don't really see the point of doing that. It just looks a good way to
-make the code harder to read imho. Moreover, it doesn't bring a lot by
-doing that - if you don't want the leds-gpio stuff, just disable it at
-kernel configuration and you're done.
+	#define MX51_PAD_PCBID0	(MX51_PAD_GPIOXY | PAD_CTL_PUS_100K_UP)
 
-Arnaud
+which is pretty and easy.
+
+Best regards
+Uwe
+
+[1] http://thread.gmane.org/gmane.linux.kernel/1052626/focus=94463
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
