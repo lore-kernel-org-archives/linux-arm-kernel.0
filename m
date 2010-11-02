@@ -1,30 +1,29 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed,  3 Nov 2010 00:51:50 +0100
-Subject: [PATCH 13/17] ARM: pxa: Fix pxa2xx-flash section mismatch
+Date: Wed,  3 Nov 2010 00:51:51 +0100
+Subject: [PATCH 14/17] ARM: pxa: Fix number of IRQs on Balloon3
 In-Reply-To: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
 References: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1288741914-21328-13-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1288741914-21328-14-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- drivers/mtd/maps/pxa2xx-flash.c |    2 +-
+ arch/arm/mach-pxa/include/mach/balloon3.h |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index dd90880..d8ae634 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -51,7 +51,7 @@ struct pxa2xx_flash_info {
- static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
+diff --git a/arch/arm/mach-pxa/include/mach/balloon3.h b/arch/arm/mach-pxa/include/mach/balloon3.h
+index 561562b..3506da1 100644
+--- a/arch/arm/mach-pxa/include/mach/balloon3.h
++++ b/arch/arm/mach-pxa/include/mach/balloon3.h
+@@ -174,7 +174,7 @@ enum balloon3_features {
+ #define BALLOON3_CODEC_IRQ	IRQ_GPIO(BALLOON3_GPIO_CODEC_IRQ)
+ #define BALLOON3_S0_CD_IRQ	IRQ_GPIO(BALLOON3_GPIO_S0_CD)
  
+-#define BALLOON3_NR_IRQS	(IRQ_BOARD_START + 4)
++#define BALLOON3_NR_IRQS	(IRQ_BOARD_START + 16)
  
--static int __init pxa2xx_flash_probe(struct platform_device *pdev)
-+static int __devinit pxa2xx_flash_probe(struct platform_device *pdev)
- {
- 	struct flash_platform_data *flash = pdev->dev.platform_data;
- 	struct pxa2xx_flash_info *info;
+ extern int balloon3_has(enum balloon3_features feature);
+ 
 -- 
 1.7.2.3
