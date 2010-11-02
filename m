@@ -1,30 +1,49 @@
-From: eric.y.miao@gmail.com (eric.y.miao at gmail.com)
-Date: Tue,  2 Nov 2010 21:30:49 +0800
-Subject: [PATCH 2/2] ARM: pxa/saar: fix the building failure caused by typo
-Message-ID: <1288704649-3026-1-git-send-email-eric.y.miao@gmail.com>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Tue,  2 Nov 2010 19:01:00 +0530
+Subject: [PATCH] omap: tidspbridge: fix build failure on MEMBLOCK_REAL_LIMIT
+Message-ID: <1288704660-21683-1-git-send-email-gadiyar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Miao <eric.y.miao@gmail.com>
+MEMBLOCK_REAL_LIMIT symbol was removed by the commit e63075a3c937
+(memblock: Introduce default allocation limit and use it to replace
+explicit ones). This breaks build as below when CONFIG_TIDSPBRIDGE
+is selected. Fix this.
 
-Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+  CC      arch/arm/plat-omap/devices.o
+arch/arm/plat-omap/devices.c: In function 'omap_dsp_reserve_sdram_memblock':
+arch/arm/plat-omap/devices.c:287: error: 'MEMBLOCK_REAL_LIMIT' undeclared (first use in this function)
+arch/arm/plat-omap/devices.c:287: error: (Each undeclared identifier is reported only once
+arch/arm/plat-omap/devices.c:287: error: for each function it appears in.)
+make[1]: *** [arch/arm/plat-omap/devices.o] Error 1
+make: *** [arch/arm/plat-omap] Error 2
+
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Cc: Felipe Contreras <felipe.contreras@gmail.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-pxa/saar.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Based on another similar patch [1] for vram.c. I've scrubbed the rest
+of the tree for MEMBLOCK_REAL_LIMIT. Only other occurrence is in
+a comment in arch/powerpc/kernel/setup_32.c [2]. Not sure what this
+should be changed to.
 
-diff --git a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
-index 2e2f5a3..c1ca8cb 100644
---- a/arch/arm/mach-pxa/saar.c
-+++ b/arch/arm/mach-pxa/saar.c
-@@ -116,7 +116,7 @@ static struct platform_device smc91x_device = {
- 	},
- };
+[1] http://marc.info/?l=linux-omap&m=128862903431257&w=2
+[2] http://lxr.free-electrons.com/source/arch/powerpc/kernel/setup_32.c#L249
+
+ arch/arm/plat-omap/devices.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: linux-2.6/arch/arm/plat-omap/devices.c
+===================================================================
+--- linux-2.6.orig/arch/arm/plat-omap/devices.c
++++ linux-2.6/arch/arm/plat-omap/devices.c
+@@ -284,7 +284,7 @@ void __init omap_dsp_reserve_sdram_membl
+ 	if (!size)
+ 		return;
  
--#if defined(CONFIG_FB_PXA) || (CONFIG_FB_PXA_MODULE)
-+#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
- static uint16_t lcd_power_on[] = {
- 	/* single frame */
- 	SMART_CMD_NOOP,
--- 
-1.7.1
+-	paddr = __memblock_alloc_base(size, SZ_1M, MEMBLOCK_REAL_LIMIT);
++	paddr = __memblock_alloc_base(size, SZ_1M, MEMBLOCK_ALLOC_ACCESSIBLE);
+ 	if (!paddr) {
+ 		pr_err("%s: failed to reserve %x bytes\n",
+ 				__func__, size);
