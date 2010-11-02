@@ -1,31 +1,48 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 2 Nov 2010 18:29:25 +0100
-Subject: [patch v3 01/10] efikamx: read board id
-In-Reply-To: <20101102104751.GS31158@pengutronix.de>
-References: <20101026200723.839428019@rtp-net.org>
-	<20101026200953.996305184@rtp-net.org>
-	<86A0E76937111F4C92FABEC0A20988510523CAD8@az33exm21>
-	<87iq0g6pbg.fsf@lechat.rtp-net.org>
-	<20101102104751.GS31158@pengutronix.de>
-Message-ID: <20101102172925.GF6017@pengutronix.de>
+Date: Tue, 2 Nov 2010 18:42:47 +0100
+Subject: [patch v4 06/10] efikamx: add leds support
+In-Reply-To: <20101102083858.GP31158@pengutronix.de>
+References: <20101027124044.980739780@rtp-net.org>
+	<20101027124347.146428989@rtp-net.org>
+	<201010300954.47839.marek.vasut@gmail.com>
+	<20101102083858.GP31158@pengutronix.de>
+Message-ID: <20101102174247.GG6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 02, 2010 at 11:47:51AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> > Also, such a specific treatment for configuring theses GPIOs means for
-> > me more errors/bugs possible.
-> I suggest to just use one of the two possibilies for now (I don't have a
-> strong preference here).  Hopefully Lothar's patch that makes the pad
-> definitions use a bit field[1] is merged soon and then this can become:
-> 
-> 	#define MX51_PAD_PCBID0	(MX51_PAD_GPIOXY | PAD_CTL_PUS_100K_UP)
+On Tue, Nov 02, 2010 at 09:38:58AM +0100, Uwe Kleine-K?nig wrote:
+> > >  /* Serial ports */
+> > > @@ -179,6 +189,37 @@
+> > >  	}
+> > >  }
+> > 
+> > Maybe this could be modularized ?
+> > 
+> > #ifdef CONFIG_LEDS_GPIO
+> > ... the platform_data stuff below ...
+> > 
+> > efikamx_register_leds()
+> > {
+> > 	platform_device_register();
+> > }
+> > #else
+> > static inline void efikamx_register_leds() {}
+> > #endif
+> > 
+> > board_init()
+> > {
+> > ...
+> > efikamx_register_leds();
+> > ...
+> > }
+> > 
+> > What do you think ? Cheers
+> IMHO it's better to register all devices independently of the available
+> drivers.  So for me the used approach is OK.
 
-I just opened up a imx-for-2.6.38 branch which contains Lothars patch,
-so give it a try.
+For me this approach is also ok. I just applied this whole series.
 
 Sascha
-
 
 -- 
 Pengutronix e.K.                           |                             |
