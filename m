@@ -1,974 +1,139 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Tue,  2 Nov 2010 12:13:09 -0400
-Subject: [PATCH 2/3] OMAP: DSS2: remove dummy panel driver duplicated panel
-	drivers
-In-Reply-To: <1288714390-6159-1-git-send-email-bryan.wu@canonical.com>
-References: <1288714390-6159-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1288714390-6159-3-git-send-email-bryan.wu@canonical.com>
+From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
+Date: Tue, 02 Nov 2010 17:18:58 +0100
+Subject: [patch v4 06/10] efikamx: add leds support
+In-Reply-To: <B222B47E-1678-4876-BC05-01B0151934FB@genesi-usa.com>
+References: <20101027124044.980739780@rtp-net.org>
+	<20101027124347.146428989@rtp-net.org>
+	<201010300954.47839.marek.vasut@gmail.com>
+	<20101102083858.GP31158@pengutronix.de>
+	<87fwvk6paq.fsf@lechat.rtp-net.org>
+	<1288705607.2940.24.camel@realization>
+	<B222B47E-1678-4876-BC05-01B0151934FB@genesi-usa.com>
+Message-ID: <1288714738.2940.37.camel@realization>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Still keep sharp_ls_panel driver, because it contains blacklight control driver.
+On mar, 2010-11-02 at 09:16 -0500, Matt Sealey wrote:
+> 
+> 
+> On Nov 2, 2010, at 8:46 AM, Alberto Panizzo <maramaopercheseimorto@gmail.com> wrote:
+> 
+> > Hi,
+> > On mar, 2010-11-02 at 10:35 +0100, Arnaud Patard wrote:
+> >> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+> >> 
+> >> Hi,
+> >>> Hello,
+> >>> 
+> >>> On Sat, Oct 30, 2010 at 09:54:47AM +0200, Marek Vasut wrote:
+> >>>> On Wednesday 27 October 2010 14:40:51 Arnaud Patard wrote:
+> >>>>> The efika mx a 3 leds (1 blue, 1 red, 1 green) connected on GPIOS 3
+> >>>>> 13/14/15. Also, some special care is done for default trigger of blue led
+> >>>>> for mmc as the mmc host used is different between hw revisions
+> >>>>> 
+> >>>>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> >>>>> Index: linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c
+> >>>>> ===================================================================
+> >>>>> --- linux-2.6-submit.orig/arch/arm/mach-mx5/board-mx51_efikamx.c    2010-10-27
+> >>>>> 11:26:16.000000000 +0200 +++
+> >>>>> linux-2.6-submit/arch/arm/mach-mx5/board-mx51_efikamx.c    2010-10-27
+> >>>>> 11:27:38.000000000 +0200 @@ -18,6 +18,7 @@
+> >>>>> #include <linux/platform_device.h>
+> >>>>> #include <linux/i2c.h>
+> >>>>> #include <linux/gpio.h>
+> >>>>> +#include <linux/leds.h>
+> >>>>> #include <linux/delay.h>
+> >>>>> #include <linux/io.h>
+> >>>>> #include <linux/fsl_devices.h>
+> >>>>> @@ -43,6 +44,10 @@
+> >>>>> #define EFIKAMX_PCBID1        (2*32 + 17)
+> >>>>> #define EFIKAMX_PCBID2        (2*32 + 11)
+> >>>>> 
+> >>>>> +#define EFIKAMX_BLUE_LED    (2*32 + 13)
+> >>>>> +#define EFIKAMX_GREEN_LED    (2*32 + 14)
+> >>>>> +#define EFIKAMX_RED_LED        (2*32 + 15)
+> >>>>> +
+> >>>>> /* the pci ids pin have pull up. they're driven low according to board id
+> >>>>> */ #define MX51_PAD_PCBID0    IOMUX_PAD(0x518, 0x130, 3, 0x0,   0,
+> >>>>> PAD_CTL_PUS_100K_UP) #define MX51_PAD_PCBID1    IOMUX_PAD(0x51C, 0x134, 3,
+> >>>>> 0x0,   0, PAD_CTL_PUS_100K_UP) @@ -81,6 +86,11 @@
+> >>>>>    MX51_PAD_GPIO_1_1__ESDHC1_WP,
+> >>>>>    MX51_PAD_GPIO_1_7__ESDHC2_WP,
+> >>>>>    MX51_PAD_GPIO_1_8__ESDHC2_CD,
+> >>>>> +
+> >>>>> +    /* leds */
+> >>>>> +    MX51_PAD_CSI1_D9__GPIO_3_13,
+> >>>>> +    MX51_PAD_CSI1_VSYNC__GPIO_3_14,
+> >>>>> +    MX51_PAD_CSI1_HSYNC__GPIO_3_15,
+> >>>>> };
+> >>>>> 
+> >>>>> /* Serial ports */
+> >>>>> @@ -179,6 +189,37 @@
+> >>>>>    }
+> >>>>> }
+> >>>> 
+> >>>> Maybe this could be modularized ?
+> >>>> 
+> >>>> #ifdef CONFIG_LEDS_GPIO
+> >>>> ... the platform_data stuff below ...
+> >>>> 
+> >>>> efikamx_register_leds()
+> >>>> {
+> >>>>    platform_device_register();
+> >>>> }
+> >>>> #else
+> >>>> static inline void efikamx_register_leds() {}
+> >>>> #endif
+> >>>> 
+> >>>> board_init()
+> >>>> {
+> >>>> ...
+> >>>> efikamx_register_leds();
+> >>>> ...
+> >>>> }
+> >>>> 
+> >>>> What do you think ? Cheers
+> >>> IMHO it's better to register all devices independently of the available
+> >>> drivers.  So for me the used approach is OK.
+> >> 
+> >> I don't really see the point of doing that. It just looks a good way to
+> >> make the code harder to read imho. Moreover, it doesn't bring a lot by
+> >> doing that - if you don't want the leds-gpio stuff, just disable it at
+> >> kernel configuration and you're done.
+> >> 
+> >> Arnaud
+> > 
+> > The great advantage of having all the supported devices registered
+> > even if the corresponding driver is not currently built is that if you 
+> > flash the kernel image to the board building this image with a subset 
+> > of supported drivers and you need for some reason to change the 
+> > software configuration (adding another driver) you don't have to rebuild
+> > the kernel image and re-flash it on the board. Instead you can add the
+> > new module on the filesystem and load it at runtime.
+> > 
+> > Lot of efforts were and are done to build the kernel more general as it 
+> > can be to reduce the versioning issues with a really minimal difference
+> > of footprint.
+> 
+> There really isn't any need to flash a kernel on the efika, it will boot from fat, ext2, mmc, pata and maybe before too long USB drives..
+> 
+> Matt Sealey
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- drivers/video/omap2/displays/Kconfig               |   18 -
- drivers/video/omap2/displays/Makefile              |    3 -
- drivers/video/omap2/displays/panel-generic.c       |  174 -------
- .../video/omap2/displays/panel-sharp-lq043t1dg01.c |  165 ------
- .../video/omap2/displays/panel-tpo-td043mtea1.c    |  535 --------------------
- 5 files changed, 0 insertions(+), 895 deletions(-)
- delete mode 100644 drivers/video/omap2/displays/panel-generic.c
- delete mode 100644 drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
- delete mode 100644 drivers/video/omap2/displays/panel-tpo-td043mtea1.c
+Yes, now this is your point of view, but within the time this can 
+change and when you will code the next machine support maybe you will
+code it in another way because it logically best fit the status of the 
+moment.
+In my short experience in kernel coding, I've seen different machine 
+code leaving the "#ifdef" way to the more general "register all that can
+be supported" so this is the past experience that talk.
+But anyway, your way is not wrong, it is only a little more difficult to
+maintain for you and make a little more harder this task for persons 
+that have to apply platform wide changes if needed.
 
-diff --git a/drivers/video/omap2/displays/Kconfig b/drivers/video/omap2/displays/Kconfig
-index 4b2ed33..4a29863 100644
---- a/drivers/video/omap2/displays/Kconfig
-+++ b/drivers/video/omap2/displays/Kconfig
-@@ -9,12 +9,6 @@ config PANEL_DUMMY
- 	  Supports LCD Panel used in TI SDP3430 and EVM boards,
- 	  OMAP3517 EVM boards and CM-T35.
- 
--config PANEL_GENERIC
--        tristate "Generic Panel"
--        help
--	  Generic panel driver.
--	  Used for DVI output for Beagle and OMAP3 SDP.
--
- config PANEL_SHARP_LS037V7DW01
-         tristate "Sharp LS037V7DW01 LCD Panel"
-         depends on OMAP2_DSS
-@@ -22,24 +16,12 @@ config PANEL_SHARP_LS037V7DW01
-         help
-           LCD Panel used in TI's SDP3430 and EVM boards
- 
--config PANEL_SHARP_LQ043T1DG01
--        tristate "Sharp LQ043T1DG01 LCD Panel"
--        depends on OMAP2_DSS
--        help
--          LCD Panel used in TI's OMAP3517 EVM boards
--
- config PANEL_TAAL
-         tristate "Taal DSI Panel"
-         depends on OMAP2_DSS_DSI
-         help
-           Taal DSI command mode panel from TPO.
- 
--config PANEL_TOPPOLY_TDO35S
--        tristate "Toppoly TDO35S LCD Panel support"
--        depends on OMAP2_DSS
--        help
--          LCD Panel used in CM-T35
--
- config PANEL_TPO_TD043MTEA1
-         tristate "TPO TD043MTEA1 LCD Panel"
-         depends on OMAP2_DSS && SPI
-diff --git a/drivers/video/omap2/displays/Makefile b/drivers/video/omap2/displays/Makefile
-index 5b50036..587bef8 100644
---- a/drivers/video/omap2/displays/Makefile
-+++ b/drivers/video/omap2/displays/Makefile
-@@ -1,9 +1,6 @@
- obj-$(CONFIG_PANEL_DUMMY) += panel-dummy.o
--obj-$(CONFIG_PANEL_GENERIC) += panel-generic.o
- obj-$(CONFIG_PANEL_SHARP_LS037V7DW01) += panel-sharp-ls037v7dw01.o
--obj-$(CONFIG_PANEL_SHARP_LQ043T1DG01) += panel-sharp-lq043t1dg01.o
- 
- obj-$(CONFIG_PANEL_TAAL) += panel-taal.o
--obj-$(CONFIG_PANEL_TOPPOLY_TDO35S) += panel-toppoly-tdo35s.o
- obj-$(CONFIG_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
- obj-$(CONFIG_PANEL_ACX565AKM) += panel-acx565akm.o
-diff --git a/drivers/video/omap2/displays/panel-generic.c b/drivers/video/omap2/displays/panel-generic.c
-deleted file mode 100644
-index 395a68d..0000000
---- a/drivers/video/omap2/displays/panel-generic.c
-+++ /dev/null
-@@ -1,174 +0,0 @@
--/*
-- * Generic panel support
-- *
-- * Copyright (C) 2008 Nokia Corporation
-- * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/module.h>
--#include <linux/delay.h>
--
--#include <plat/display.h>
--
--static struct omap_video_timings generic_panel_timings = {
--	/* 640 x 480 @ 60 Hz  Reduced blanking VESA CVT 0.31M3-R */
--	.x_res		= 640,
--	.y_res		= 480,
--	.pixel_clock	= 23500,
--	.hfp		= 48,
--	.hsw		= 32,
--	.hbp		= 80,
--	.vfp		= 3,
--	.vsw		= 4,
--	.vbp		= 7,
--};
--
--static int generic_panel_power_on(struct omap_dss_device *dssdev)
--{
--	int r;
--
--	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
--		return 0;
--
--	r = omapdss_dpi_display_enable(dssdev);
--	if (r)
--		goto err0;
--
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err1;
--	}
--
--	return 0;
--err1:
--	omapdss_dpi_display_disable(dssdev);
--err0:
--	return r;
--}
--
--static void generic_panel_power_off(struct omap_dss_device *dssdev)
--{
--	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
--		return;
--
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
--	omapdss_dpi_display_disable(dssdev);
--}
--
--static int generic_panel_probe(struct omap_dss_device *dssdev)
--{
--	dssdev->panel.config = OMAP_DSS_LCD_TFT;
--	dssdev->panel.timings = generic_panel_timings;
--
--	return 0;
--}
--
--static void generic_panel_remove(struct omap_dss_device *dssdev)
--{
--}
--
--static int generic_panel_enable(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = generic_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void generic_panel_disable(struct omap_dss_device *dssdev)
--{
--	generic_panel_power_off(dssdev);
--
--	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
--}
--
--static int generic_panel_suspend(struct omap_dss_device *dssdev)
--{
--	generic_panel_power_off(dssdev);
--	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
--	return 0;
--}
--
--static int generic_panel_resume(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = generic_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void generic_panel_set_timings(struct omap_dss_device *dssdev,
--		struct omap_video_timings *timings)
--{
--	dpi_set_timings(dssdev, timings);
--}
--
--static void generic_panel_get_timings(struct omap_dss_device *dssdev,
--		struct omap_video_timings *timings)
--{
--	*timings = dssdev->panel.timings;
--}
--
--static int generic_panel_check_timings(struct omap_dss_device *dssdev,
--		struct omap_video_timings *timings)
--{
--	return dpi_check_timings(dssdev, timings);
--}
--
--static struct omap_dss_driver generic_driver = {
--	.probe		= generic_panel_probe,
--	.remove		= generic_panel_remove,
--
--	.enable		= generic_panel_enable,
--	.disable	= generic_panel_disable,
--	.suspend	= generic_panel_suspend,
--	.resume		= generic_panel_resume,
--
--	.set_timings	= generic_panel_set_timings,
--	.get_timings	= generic_panel_get_timings,
--	.check_timings	= generic_panel_check_timings,
--
--	.driver         = {
--		.name   = "generic_panel",
--		.owner  = THIS_MODULE,
--	},
--};
--
--static int __init generic_panel_drv_init(void)
--{
--	return omap_dss_register_driver(&generic_driver);
--}
--
--static void __exit generic_panel_drv_exit(void)
--{
--	omap_dss_unregister_driver(&generic_driver);
--}
--
--module_init(generic_panel_drv_init);
--module_exit(generic_panel_drv_exit);
--MODULE_LICENSE("GPL");
-diff --git a/drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c b/drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
-deleted file mode 100644
-index 0c6896c..0000000
---- a/drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c
-+++ /dev/null
-@@ -1,165 +0,0 @@
--/*
-- * LCD panel driver for Sharp LQ043T1DG01
-- *
-- * Copyright (C) 2009 Texas Instruments Inc
-- * Author: Vaibhav Hiremath <hvaibhav@ti.com>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/module.h>
--#include <linux/delay.h>
--#include <linux/device.h>
--#include <linux/err.h>
--
--#include <plat/display.h>
--
--static struct omap_video_timings sharp_lq_timings = {
--	.x_res = 480,
--	.y_res = 272,
--
--	.pixel_clock	= 9000,
--
--	.hsw		= 42,
--	.hfp		= 3,
--	.hbp		= 2,
--
--	.vsw		= 11,
--	.vfp		= 3,
--	.vbp		= 2,
--};
--
--static int sharp_lq_panel_power_on(struct omap_dss_device *dssdev)
--{
--	int r;
--
--	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
--		return 0;
--
--	r = omapdss_dpi_display_enable(dssdev);
--	if (r)
--		goto err0;
--
--	/* wait couple of vsyncs until enabling the LCD */
--	msleep(50);
--
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err1;
--	}
--
--	return 0;
--err1:
--	omapdss_dpi_display_disable(dssdev);
--err0:
--	return r;
--}
--
--static void sharp_lq_panel_power_off(struct omap_dss_device *dssdev)
--{
--	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
--		return;
--
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
--	/* wait at least 5 vsyncs after disabling the LCD */
--	msleep(100);
--
--	omapdss_dpi_display_disable(dssdev);
--}
--
--static int sharp_lq_panel_probe(struct omap_dss_device *dssdev)
--{
--
--	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
--		OMAP_DSS_LCD_IHS | OMAP_DSS_LCD_IEO;
--	dssdev->panel.acb = 0x0;
--	dssdev->panel.timings = sharp_lq_timings;
--
--	return 0;
--}
--
--static void sharp_lq_panel_remove(struct omap_dss_device *dssdev)
--{
--}
--
--static int sharp_lq_panel_enable(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = sharp_lq_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void sharp_lq_panel_disable(struct omap_dss_device *dssdev)
--{
--	sharp_lq_panel_power_off(dssdev);
--
--	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
--}
--
--static int sharp_lq_panel_suspend(struct omap_dss_device *dssdev)
--{
--	sharp_lq_panel_power_off(dssdev);
--	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
--	return 0;
--}
--
--static int sharp_lq_panel_resume(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = sharp_lq_panel_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static struct omap_dss_driver sharp_lq_driver = {
--	.probe		= sharp_lq_panel_probe,
--	.remove		= sharp_lq_panel_remove,
--
--	.enable		= sharp_lq_panel_enable,
--	.disable	= sharp_lq_panel_disable,
--	.suspend	= sharp_lq_panel_suspend,
--	.resume		= sharp_lq_panel_resume,
--
--	.driver         = {
--		.name   = "sharp_lq_panel",
--		.owner  = THIS_MODULE,
--	},
--};
--
--static int __init sharp_lq_panel_drv_init(void)
--{
--	return omap_dss_register_driver(&sharp_lq_driver);
--}
--
--static void __exit sharp_lq_panel_drv_exit(void)
--{
--	omap_dss_unregister_driver(&sharp_lq_driver);
--}
--
--module_init(sharp_lq_panel_drv_init);
--module_exit(sharp_lq_panel_drv_exit);
--MODULE_LICENSE("GPL");
-diff --git a/drivers/video/omap2/displays/panel-tpo-td043mtea1.c b/drivers/video/omap2/displays/panel-tpo-td043mtea1.c
-deleted file mode 100644
-index dbe9d43..0000000
---- a/drivers/video/omap2/displays/panel-tpo-td043mtea1.c
-+++ /dev/null
-@@ -1,535 +0,0 @@
--/*
-- * LCD panel driver for TPO TD043MTEA1
-- *
-- * Author: Gra??vydas Ignotas <notasas@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#include <linux/module.h>
--#include <linux/delay.h>
--#include <linux/spi/spi.h>
--#include <linux/regulator/consumer.h>
--#include <linux/gpio.h>
--#include <linux/err.h>
--#include <linux/slab.h>
--
--#include <plat/display.h>
--
--#define TPO_R02_MODE(x)		((x) & 7)
--#define TPO_R02_MODE_800x480	7
--#define TPO_R02_NCLK_RISING	BIT(3)
--#define TPO_R02_HSYNC_HIGH	BIT(4)
--#define TPO_R02_VSYNC_HIGH	BIT(5)
--
--#define TPO_R03_NSTANDBY	BIT(0)
--#define TPO_R03_EN_CP_CLK	BIT(1)
--#define TPO_R03_EN_VGL_PUMP	BIT(2)
--#define TPO_R03_EN_PWM		BIT(3)
--#define TPO_R03_DRIVING_CAP_100	BIT(4)
--#define TPO_R03_EN_PRE_CHARGE	BIT(6)
--#define TPO_R03_SOFTWARE_CTL	BIT(7)
--
--#define TPO_R04_NFLIP_H		BIT(0)
--#define TPO_R04_NFLIP_V		BIT(1)
--#define TPO_R04_CP_CLK_FREQ_1H	BIT(2)
--#define TPO_R04_VGL_FREQ_1H	BIT(4)
--
--#define TPO_R03_VAL_NORMAL (TPO_R03_NSTANDBY | TPO_R03_EN_CP_CLK | \
--			TPO_R03_EN_VGL_PUMP |  TPO_R03_EN_PWM | \
--			TPO_R03_DRIVING_CAP_100 | TPO_R03_EN_PRE_CHARGE | \
--			TPO_R03_SOFTWARE_CTL)
--
--#define TPO_R03_VAL_STANDBY (TPO_R03_DRIVING_CAP_100 | \
--			TPO_R03_EN_PRE_CHARGE | TPO_R03_SOFTWARE_CTL)
--
--static const u16 tpo_td043_def_gamma[12] = {
--	106, 200, 289, 375, 460, 543, 625, 705, 785, 864, 942, 1020
--};
--
--struct tpo_td043_device {
--	struct spi_device *spi;
--	struct regulator *vcc_reg;
--	u16 gamma[12];
--	u32 mode;
--	u32 hmirror:1;
--	u32 vmirror:1;
--};
--
--static int tpo_td043_write(struct spi_device *spi, u8 addr, u8 data)
--{
--	struct spi_message	m;
--	struct spi_transfer	xfer;
--	u16			w;
--	int			r;
--
--	spi_message_init(&m);
--
--	memset(&xfer, 0, sizeof(xfer));
--
--	w = ((u16)addr << 10) | (1 << 8) | data;
--	xfer.tx_buf = &w;
--	xfer.bits_per_word = 16;
--	xfer.len = 2;
--	spi_message_add_tail(&xfer, &m);
--
--	r = spi_sync(spi, &m);
--	if (r < 0)
--		dev_warn(&spi->dev, "failed to write to LCD reg (%d)\n", r);
--	return r;
--}
--
--static void tpo_td043_write_gamma(struct spi_device *spi, u16 gamma[12])
--{
--	u8 i, val;
--
--	/* gamma bits [9:8] */
--	for (val = i = 0; i < 4; i++)
--		val |= (gamma[i] & 0x300) >> ((i + 1) * 2);
--	tpo_td043_write(spi, 0x11, val);
--
--	for (val = i = 0; i < 4; i++)
--		val |= (gamma[i+4] & 0x300) >> ((i + 1) * 2);
--	tpo_td043_write(spi, 0x12, val);
--
--	for (val = i = 0; i < 4; i++)
--		val |= (gamma[i+8] & 0x300) >> ((i + 1) * 2);
--	tpo_td043_write(spi, 0x13, val);
--
--	/* gamma bits [7:0] */
--	for (val = i = 0; i < 12; i++)
--		tpo_td043_write(spi, 0x14 + i, gamma[i] & 0xff);
--}
--
--static int tpo_td043_write_mirror(struct spi_device *spi, bool h, bool v)
--{
--	u8 reg4 = TPO_R04_NFLIP_H | TPO_R04_NFLIP_V | \
--		TPO_R04_CP_CLK_FREQ_1H | TPO_R04_VGL_FREQ_1H;
--	if (h)
--		reg4 &= ~TPO_R04_NFLIP_H;
--	if (v)
--		reg4 &= ~TPO_R04_NFLIP_V;
--
--	return tpo_td043_write(spi, 4, reg4);
--}
--
--static int tpo_td043_set_hmirror(struct omap_dss_device *dssdev, bool enable)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&dssdev->dev);
--
--	tpo_td043->hmirror = enable;
--	return tpo_td043_write_mirror(tpo_td043->spi, tpo_td043->hmirror,
--			tpo_td043->vmirror);
--}
--
--static bool tpo_td043_get_hmirror(struct omap_dss_device *dssdev)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&dssdev->dev);
--
--	return tpo_td043->hmirror;
--}
--
--static ssize_t tpo_td043_vmirror_show(struct device *dev,
--	struct device_attribute *attr, char *buf)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(dev);
--
--	return snprintf(buf, PAGE_SIZE, "%d\n", tpo_td043->vmirror);
--}
--
--static ssize_t tpo_td043_vmirror_store(struct device *dev,
--	struct device_attribute *attr, const char *buf, size_t count)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(dev);
--	long val;
--	int ret;
--
--	ret = strict_strtol(buf, 0, &val);
--	if (ret < 0)
--		return ret;
--
--	ret = tpo_td043_write_mirror(tpo_td043->spi, tpo_td043->hmirror, val);
--	if (ret < 0)
--		return ret;
--
--	tpo_td043->vmirror = val;
--
--	return count;
--}
--
--static ssize_t tpo_td043_mode_show(struct device *dev,
--	struct device_attribute *attr, char *buf)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(dev);
--
--	return snprintf(buf, PAGE_SIZE, "%d\n", tpo_td043->mode);
--}
--
--static ssize_t tpo_td043_mode_store(struct device *dev,
--	struct device_attribute *attr, const char *buf, size_t count)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(dev);
--	long val;
--	int ret;
--
--	ret = strict_strtol(buf, 0, &val);
--	if (ret != 0 || val & ~7)
--		return -EINVAL;
--
--	tpo_td043->mode = val;
--
--	val |= TPO_R02_NCLK_RISING;
--	tpo_td043_write(tpo_td043->spi, 2, val);
--
--	return count;
--}
--
--static ssize_t tpo_td043_gamma_show(struct device *dev,
--	struct device_attribute *attr, char *buf)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(dev);
--	ssize_t len = 0;
--	int ret;
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(tpo_td043->gamma); i++) {
--		ret = snprintf(buf + len, PAGE_SIZE - len, "%u ",
--				tpo_td043->gamma[i]);
--		if (ret < 0)
--			return ret;
--		len += ret;
--	}
--	buf[len - 1] = '\n';
--
--	return len;
--}
--
--static ssize_t tpo_td043_gamma_store(struct device *dev,
--	struct device_attribute *attr, const char *buf, size_t count)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(dev);
--	unsigned int g[12];
--	int ret;
--	int i;
--
--	ret = sscanf(buf, "%u %u %u %u %u %u %u %u %u %u %u %u",
--			&g[0], &g[1], &g[2], &g[3], &g[4], &g[5],
--			&g[6], &g[7], &g[8], &g[9], &g[10], &g[11]);
--
--	if (ret != 12)
--		return -EINVAL;
--
--	for (i = 0; i < 12; i++)
--		tpo_td043->gamma[i] = g[i];
--
--	tpo_td043_write_gamma(tpo_td043->spi, tpo_td043->gamma);
--
--	return count;
--}
--
--static DEVICE_ATTR(vmirror, S_IRUGO | S_IWUSR,
--		tpo_td043_vmirror_show, tpo_td043_vmirror_store);
--static DEVICE_ATTR(mode, S_IRUGO | S_IWUSR,
--		tpo_td043_mode_show, tpo_td043_mode_store);
--static DEVICE_ATTR(gamma, S_IRUGO | S_IWUSR,
--		tpo_td043_gamma_show, tpo_td043_gamma_store);
--
--static struct attribute *tpo_td043_attrs[] = {
--	&dev_attr_vmirror.attr,
--	&dev_attr_mode.attr,
--	&dev_attr_gamma.attr,
--	NULL,
--};
--
--static struct attribute_group tpo_td043_attr_group = {
--	.attrs = tpo_td043_attrs,
--};
--
--static const struct omap_video_timings tpo_td043_timings = {
--	.x_res		= 800,
--	.y_res		= 480,
--
--	.pixel_clock	= 36000,
--
--	.hsw		= 1,
--	.hfp		= 68,
--	.hbp		= 214,
--
--	.vsw		= 1,
--	.vfp		= 39,
--	.vbp		= 34,
--};
--
--static int tpo_td043_power_on(struct omap_dss_device *dssdev)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&dssdev->dev);
--	int nreset_gpio = dssdev->reset_gpio;
--	int r;
--
--	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
--		return 0;
--
--	r = omapdss_dpi_display_enable(dssdev);
--	if (r)
--		goto err0;
--
--	if (dssdev->platform_enable) {
--		r = dssdev->platform_enable(dssdev);
--		if (r)
--			goto err1;
--	}
--
--	regulator_enable(tpo_td043->vcc_reg);
--
--	/* wait for power up */
--	msleep(160);
--
--	if (gpio_is_valid(nreset_gpio))
--		gpio_set_value(nreset_gpio, 1);
--
--	tpo_td043_write(tpo_td043->spi, 2,
--			TPO_R02_MODE(tpo_td043->mode) | TPO_R02_NCLK_RISING);
--	tpo_td043_write(tpo_td043->spi, 3, TPO_R03_VAL_NORMAL);
--	tpo_td043_write(tpo_td043->spi, 0x20, 0xf0);
--	tpo_td043_write(tpo_td043->spi, 0x21, 0xf0);
--	tpo_td043_write_mirror(tpo_td043->spi, tpo_td043->hmirror,
--			tpo_td043->vmirror);
--	tpo_td043_write_gamma(tpo_td043->spi, tpo_td043->gamma);
--
--	return 0;
--err1:
--	omapdss_dpi_display_disable(dssdev);
--err0:
--	return r;
--}
--
--static void tpo_td043_power_off(struct omap_dss_device *dssdev)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&dssdev->dev);
--	int nreset_gpio = dssdev->reset_gpio;
--
--	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
--		return;
--
--	tpo_td043_write(tpo_td043->spi, 3,
--			TPO_R03_VAL_STANDBY | TPO_R03_EN_PWM);
--
--	if (gpio_is_valid(nreset_gpio))
--		gpio_set_value(nreset_gpio, 0);
--
--	/* wait for at least 2 vsyncs before cutting off power */
--	msleep(50);
--
--	tpo_td043_write(tpo_td043->spi, 3, TPO_R03_VAL_STANDBY);
--
--	regulator_disable(tpo_td043->vcc_reg);
--
--	if (dssdev->platform_disable)
--		dssdev->platform_disable(dssdev);
--
--	omapdss_dpi_display_disable(dssdev);
--}
--
--static int tpo_td043_enable(struct omap_dss_device *dssdev)
--{
--	int ret;
--
--	dev_dbg(&dssdev->dev, "enable\n");
--
--	ret = tpo_td043_power_on(dssdev);
--	if (ret)
--		return ret;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static void tpo_td043_disable(struct omap_dss_device *dssdev)
--{
--	dev_dbg(&dssdev->dev, "disable\n");
--
--	tpo_td043_power_off(dssdev);
--
--	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
--}
--
--static int tpo_td043_suspend(struct omap_dss_device *dssdev)
--{
--	tpo_td043_power_off(dssdev);
--	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
--	return 0;
--}
--
--static int tpo_td043_resume(struct omap_dss_device *dssdev)
--{
--	int r = 0;
--
--	r = tpo_td043_power_on(dssdev);
--	if (r)
--		return r;
--
--	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
--
--	return 0;
--}
--
--static int tpo_td043_probe(struct omap_dss_device *dssdev)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&dssdev->dev);
--	int nreset_gpio = dssdev->reset_gpio;
--	int ret = 0;
--
--	dev_dbg(&dssdev->dev, "probe\n");
--
--	if (tpo_td043 == NULL) {
--		dev_err(&dssdev->dev, "missing tpo_td043_device\n");
--		return -ENODEV;
--	}
--
--	dssdev->panel.config = OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IHS |
--				OMAP_DSS_LCD_IVS | OMAP_DSS_LCD_IPC;
--	dssdev->panel.timings = tpo_td043_timings;
--	dssdev->ctrl.pixel_size = 24;
--
--	tpo_td043->mode = TPO_R02_MODE_800x480;
--	memcpy(tpo_td043->gamma, tpo_td043_def_gamma, sizeof(tpo_td043->gamma));
--
--	tpo_td043->vcc_reg = regulator_get(&dssdev->dev, "vcc");
--	if (IS_ERR(tpo_td043->vcc_reg)) {
--		dev_err(&dssdev->dev, "failed to get LCD VCC regulator\n");
--		ret = PTR_ERR(tpo_td043->vcc_reg);
--		goto fail_regulator;
--	}
--
--	if (gpio_is_valid(nreset_gpio)) {
--		ret = gpio_request(nreset_gpio, "lcd reset");
--		if (ret < 0) {
--			dev_err(&dssdev->dev, "couldn't request reset GPIO\n");
--			goto fail_gpio_req;
--		}
--
--		ret = gpio_direction_output(nreset_gpio, 0);
--		if (ret < 0) {
--			dev_err(&dssdev->dev, "couldn't set GPIO direction\n");
--			goto fail_gpio_direction;
--		}
--	}
--
--	ret = sysfs_create_group(&dssdev->dev.kobj, &tpo_td043_attr_group);
--	if (ret)
--		dev_warn(&dssdev->dev, "failed to create sysfs files\n");
--
--	return 0;
--
--fail_gpio_direction:
--	gpio_free(nreset_gpio);
--fail_gpio_req:
--	regulator_put(tpo_td043->vcc_reg);
--fail_regulator:
--	kfree(tpo_td043);
--	return ret;
--}
--
--static void tpo_td043_remove(struct omap_dss_device *dssdev)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&dssdev->dev);
--	int nreset_gpio = dssdev->reset_gpio;
--
--	dev_dbg(&dssdev->dev, "remove\n");
--
--	sysfs_remove_group(&dssdev->dev.kobj, &tpo_td043_attr_group);
--	regulator_put(tpo_td043->vcc_reg);
--	if (gpio_is_valid(nreset_gpio))
--		gpio_free(nreset_gpio);
--}
--
--static struct omap_dss_driver tpo_td043_driver = {
--	.probe		= tpo_td043_probe,
--	.remove		= tpo_td043_remove,
--
--	.enable		= tpo_td043_enable,
--	.disable	= tpo_td043_disable,
--	.suspend	= tpo_td043_suspend,
--	.resume		= tpo_td043_resume,
--	.set_mirror	= tpo_td043_set_hmirror,
--	.get_mirror	= tpo_td043_get_hmirror,
--
--	.driver         = {
--		.name	= "tpo_td043mtea1_panel",
--		.owner  = THIS_MODULE,
--	},
--};
--
--static int tpo_td043_spi_probe(struct spi_device *spi)
--{
--	struct omap_dss_device *dssdev = spi->dev.platform_data;
--	struct tpo_td043_device *tpo_td043;
--	int ret;
--
--	if (dssdev == NULL) {
--		dev_err(&spi->dev, "missing dssdev\n");
--		return -ENODEV;
--	}
--
--	spi->bits_per_word = 16;
--	spi->mode = SPI_MODE_0;
--
--	ret = spi_setup(spi);
--	if (ret < 0) {
--		dev_err(&spi->dev, "spi_setup failed: %d\n", ret);
--		return ret;
--	}
--
--	tpo_td043 = kzalloc(sizeof(*tpo_td043), GFP_KERNEL);
--	if (tpo_td043 == NULL)
--		return -ENOMEM;
--
--	tpo_td043->spi = spi;
--	dev_set_drvdata(&spi->dev, tpo_td043);
--	dev_set_drvdata(&dssdev->dev, tpo_td043);
--
--	omap_dss_register_driver(&tpo_td043_driver);
--
--	return 0;
--}
--
--static int __devexit tpo_td043_spi_remove(struct spi_device *spi)
--{
--	struct tpo_td043_device *tpo_td043 = dev_get_drvdata(&spi->dev);
--
--	omap_dss_unregister_driver(&tpo_td043_driver);
--	kfree(tpo_td043);
--
--	return 0;
--}
--
--static struct spi_driver tpo_td043_spi_driver = {
--	.driver = {
--		.name	= "tpo_td043mtea1_panel_spi",
--		.bus	= &spi_bus_type,
--		.owner	= THIS_MODULE,
--	},
--	.probe	= tpo_td043_spi_probe,
--	.remove	= __devexit_p(tpo_td043_spi_remove),
--};
--
--static int __init tpo_td043_init(void)
--{
--	return spi_register_driver(&tpo_td043_spi_driver);
--}
--
--static void __exit tpo_td043_exit(void)
--{
--	spi_unregister_driver(&tpo_td043_spi_driver);
--}
--
--module_init(tpo_td043_init);
--module_exit(tpo_td043_exit);
--
--MODULE_AUTHOR("Gra??vydas Ignotas <notasas@gmail.com>");
--MODULE_DESCRIPTION("TPO TD043MTEA1 LCD Driver");
--MODULE_LICENSE("GPL");
+Best Regards,
+
 -- 
-1.7.1
+Alberto!
+
+        Be Persistent!
+                - Greg Kroah-Hartman (FOSDEM 2010)
