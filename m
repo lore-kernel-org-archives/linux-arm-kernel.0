@@ -1,209 +1,189 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Tue,  2 Nov 2010 16:39:52 -0400
-Subject: [PATCH 3/3] OMAP: use generic panel driver in board files
-In-Reply-To: <1288730392-11223-1-git-send-email-bryan.wu@canonical.com>
-References: <1288730392-11223-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1288730392-11223-4-git-send-email-bryan.wu@canonical.com>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Tue, 2 Nov 2010 17:17:07 -0500
+Subject: [PATCH 2/2] ARM: imx: Add mx53 support to common msl functions.
+In-Reply-To: <1288736227-800-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1288736227-800-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <1288736227-800-2-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce some fields in struct panel, which will be used to match the right
-panel configurations in generic panel driver.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-Still keep sharp_ls_panel, since the sharp_ls_panel driver contains blacklight
-control driver code which will be moved out later. Then we can use generic driver
-for sharp_ls_panel.
+Add mx53 support to cpu.c and mm.c.
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+Signed-off by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/mach-omap2/board-3430sdp.c       |    1 +
- arch/arm/mach-omap2/board-am3517evm.c     |    4 +++-
- arch/arm/mach-omap2/board-cm-t35.c        |    4 +++-
- arch/arm/mach-omap2/board-devkit8000.c    |    2 ++
- arch/arm/mach-omap2/board-igep0020.c      |    1 +
- arch/arm/mach-omap2/board-omap3beagle.c   |    1 +
- arch/arm/mach-omap2/board-omap3evm.c      |    1 +
- arch/arm/mach-omap2/board-omap3stalker.c  |    2 ++
- arch/arm/plat-omap/include/plat/display.h |   28 +++++++++++++++++++---------
- 9 files changed, 33 insertions(+), 11 deletions(-)
+ arch/arm/mach-mx5/cpu.c |   40 +++++++++++++++++++++++++++++++----
+ arch/arm/mach-mx5/mm.c  |   52 ++++++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 84 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 4e3742c..529a016 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -273,6 +273,7 @@ static struct omap_dss_device sdp3430_lcd_device = {
- static struct omap_dss_device sdp3430_dvi_device = {
- 	.name			= "dvi",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines	= 24,
- 	.platform_enable	= sdp3430_panel_enable_dvi,
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index 0739950..e435e66 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -306,7 +306,8 @@ static void am3517_evm_panel_disable_lcd(struct omap_dss_device *dssdev)
- static struct omap_dss_device am3517_evm_lcd_device = {
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.name			= "lcd",
--	.driver_name		= "sharp_lq_panel",
-+	.driver_name		= "generic_panel",
-+	.panel.name		= "sharp_lq",
- 	.phy.dpi.data_lines 	= 16,
- 	.platform_enable	= am3517_evm_panel_enable_lcd,
- 	.platform_disable	= am3517_evm_panel_disable_lcd,
-@@ -350,6 +351,7 @@ static struct omap_dss_device am3517_evm_dvi_device = {
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.name			= "dvi",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.phy.dpi.data_lines	= 24,
- 	.platform_enable	= am3517_evm_panel_enable_dvi,
- 	.platform_disable	= am3517_evm_panel_disable_dvi,
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 63f764e..afadebb 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -353,7 +353,8 @@ static void cm_t35_panel_disable_tv(struct omap_dss_device *dssdev)
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index eaacb6e..532a96b 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -24,9 +24,14 @@ static int cpu_silicon_rev = -1;
  
- static struct omap_dss_device cm_t35_lcd_device = {
- 	.name			= "lcd",
--	.driver_name		= "toppoly_tdo35s_panel",
-+	.driver_name		= "generic_panel",
-+	.panel.name		= "toppoly_tdo35s",
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines	= 18,
- 	.platform_enable	= cm_t35_panel_enable_lcd,
-@@ -363,6 +364,7 @@ static struct omap_dss_device cm_t35_lcd_device = {
- static struct omap_dss_device cm_t35_dvi_device = {
- 	.name			= "dvi",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines	= 24,
- 	.platform_enable	= cm_t35_panel_enable_dvi,
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 067f437..3a5937e 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -152,6 +152,7 @@ static struct regulator_consumer_supply devkit8000_vio_supply =
- static struct omap_dss_device devkit8000_lcd_device = {
- 	.name                   = "lcd",
- 	.driver_name            = "generic_panel",
-+	.panel.name		= "dvi",
- 	.type                   = OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines     = 24,
- 	.reset_gpio             = -EINVAL, /* will be replaced */
-@@ -161,6 +162,7 @@ static struct omap_dss_device devkit8000_lcd_device = {
- static struct omap_dss_device devkit8000_dvi_device = {
- 	.name                   = "dvi",
- 	.driver_name            = "generic_panel",
-+	.panel.name		= "dvi",
- 	.type                   = OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines     = 24,
- 	.reset_gpio             = -EINVAL, /* will be replaced */
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 5e035a5..4c83ef0 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -437,6 +437,7 @@ static struct omap_dss_device igep2_dvi_device = {
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.name			= "dvi",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.phy.dpi.data_lines	= 24,
- 	.platform_enable	= igep2_enable_dvi,
- 	.platform_disable	= igep2_disable_dvi,
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 14f4224..18401ff 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -198,6 +198,7 @@ static struct omap_dss_device beagle_dvi_device = {
- 	.type = OMAP_DISPLAY_TYPE_DPI,
- 	.name = "dvi",
- 	.driver_name = "generic_panel",
-+	.panel.name = "dvi",
- 	.phy.dpi.data_lines = 24,
- 	.reset_gpio = 170,
- 	.platform_enable = beagle_enable_dvi,
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index b04365c..49325a4 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -304,6 +304,7 @@ static void omap3_evm_disable_dvi(struct omap_dss_device *dssdev)
- static struct omap_dss_device omap3_evm_dvi_device = {
- 	.name			= "dvi",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines	= 24,
- 	.platform_enable	= omap3_evm_enable_dvi,
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index f252721..cfbf4b1 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -163,6 +163,7 @@ static void omap3_stalker_disable_lcd(struct omap_dss_device *dssdev)
- static struct omap_dss_device omap3_stalker_lcd_device = {
- 	.name			= "lcd",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.phy.dpi.data_lines	= 24,
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.platform_enable	= omap3_stalker_enable_lcd,
-@@ -211,6 +212,7 @@ static void omap3_stalker_disable_dvi(struct omap_dss_device *dssdev)
- static struct omap_dss_device omap3_stalker_dvi_device = {
- 	.name			= "dvi",
- 	.driver_name		= "generic_panel",
-+	.panel.name		= "dvi",
- 	.type			= OMAP_DISPLAY_TYPE_DPI,
- 	.phy.dpi.data_lines	= 24,
- 	.platform_enable	= omap3_stalker_enable_dvi,
-diff --git a/arch/arm/plat-omap/include/plat/display.h b/arch/arm/plat-omap/include/plat/display.h
-index c915a66..6e1fbbd 100644
---- a/arch/arm/plat-omap/include/plat/display.h
-+++ b/arch/arm/plat-omap/include/plat/display.h
-@@ -346,6 +346,24 @@ struct omap_overlay_manager {
- 	int (*disable)(struct omap_overlay_manager *mgr);
+ static void query_silicon_parameter(void)
+ {
+-	void __iomem *rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
++	void __iomem *rom;
+ 	u32 rev;
+ 
++	if (cpu_is_mx51())
++		rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
++	else if (cpu_is_mx53())
++		rom = ioremap(MX53_IROM_BASE_ADDR, MX53_IROM_SIZE);
++
+ 	if (!rom) {
+ 		cpu_silicon_rev = -EINVAL;
+ 		return;
+@@ -89,15 +94,36 @@ static int __init mx51_neon_fixup(void)
+ late_initcall(mx51_neon_fixup);
+ #endif
+ 
++/*
++ * Returns:
++ *	the silicon revision of the cpu
++ *	-EINVAL - not a mx53
++ */
++int mx53_revision(void)
++{
++	if (!cpu_is_mx53())
++		return -EINVAL;
++
++	if (cpu_silicon_rev == -1)
++		query_silicon_parameter();
++
++	return cpu_silicon_rev;
++}
++EXPORT_SYMBOL(mx53_revision);
++
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
+ 	void __iomem *base;
+ 
+-	if (!cpu_is_mx51())
++	if (!cpu_is_mx51() || !cpu_is_mx53())
+ 		return 0;
+ 
+-	base = MX51_IO_ADDRESS(MX51_AIPS1_BASE_ADDR);
++	if (cpu_is_mx51())
++		base = ioremap(MX51_IO_ADDRESS(MX51_AIPS1_BASE_ADDR), SZ_4K);
++	else
++		base = ioremap(MX53_IO_ADDRESS(MX53_AIPS1_BASE_ADDR), SZ_4K);
++
+ 	__raw_writel(0x0, base + 0x40);
+ 	__raw_writel(0x0, base + 0x44);
+ 	__raw_writel(0x0, base + 0x48);
+@@ -105,7 +131,11 @@ static int __init post_cpu_init(void)
+ 	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
+ 	__raw_writel(reg, base + 0x50);
+ 
+-	base = MX51_IO_ADDRESS(MX51_AIPS2_BASE_ADDR);
++	if (cpu_is_mx51())
++		base = ioremap(MX51_IO_ADDRESS(MX51_AIPS2_BASE_ADDR), SZ_4K);
++	else
++		base = ioremap(MX53_IO_ADDRESS(MX53_AIPS2_BASE_ADDR), SZ_4K);
++
+ 	__raw_writel(0x0, base + 0x40);
+ 	__raw_writel(0x0, base + 0x44);
+ 	__raw_writel(0x0, base + 0x48);
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index bc3f30d..d2b9f2c 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright 2008-2009 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2008-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License.  You may obtain a copy of the GNU General Public License
+@@ -23,7 +23,7 @@
+ /*
+  * Define the MX51 memory map.
+  */
+-static struct map_desc mxc_io_desc[] __initdata = {
++static struct map_desc mx51_mxc_io_desc[] __initdata = {
+ 	{
+ 		.virtual = MX51_IRAM_BASE_ADDR_VIRT,
+ 		.pfn = __phys_to_pfn(MX51_IRAM_BASE_ADDR),
+@@ -53,6 +53,28 @@ static struct map_desc mxc_io_desc[] __initdata = {
  };
  
-+struct omap_display_panel {
-+	struct omap_video_timings timings;
-+
-+	int acbi;	/* ac-bias pin transitions per interrupt */
-+	/* Unit: line clocks */
-+	int acb;	/* ac-bias pin frequency */
-+
-+	enum omap_panel_config config;
-+
-+	int power_on_delay;
-+	int power_off_delay;
-+	/*
-+	 * Used to match device to panel configuration
-+	 * when use generic panel driver
-+	 */
-+	const char *name;
+ /*
++ * Define the MX53 memory map.
++ */
++static struct map_desc mx53_mxc_io_desc[] __initdata = {
++	{
++		.virtual = MX53_AIPS1_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX53_AIPS1_BASE_ADDR),
++		.length = MX53_AIPS1_SIZE,
++		.type = MT_DEVICE
++	}, {
++		.virtual = MX53_SPBA0_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX53_SPBA0_BASE_ADDR),
++		.length = MX53_SPBA0_SIZE,
++		.type = MT_DEVICE
++	}, {
++		.virtual = MX53_AIPS2_BASE_ADDR_VIRT,
++		.pfn = __phys_to_pfn(MX53_AIPS2_BASE_ADDR),
++		.length = MX53_AIPS2_SIZE,
++		.type = MT_DEVICE
++	},
 +};
 +
- struct omap_dss_device {
- 	struct device dev;
++/*
+  * This function initializes the memory map. It is called during the
+  * system startup to create static physical to virtual memory mappings
+  * for the IO modules.
+@@ -62,10 +84,19 @@ void __init mx51_map_io(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX51);
+ 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG_BASE_ADDR));
+-	iotable_init(mxc_io_desc, ARRAY_SIZE(mxc_io_desc));
++	iotable_init(mx51_mxc_io_desc, ARRAY_SIZE(mx51_mxc_io_desc));
++}
++
++void __init mx53_map_io(void)
++{
++	mxc_set_cpu_type(MXC_CPU_MX53);
++	mxc_iomux_v3_init(MX53_IO_ADDRESS(MX53_IOMUXC_BASE_ADDR));
++	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG_BASE_ADDR));
++	iotable_init(mx53_mxc_io_desc, ARRAY_SIZE(mx53_mxc_io_desc));
+ }
  
-@@ -395,15 +413,7 @@ struct omap_dss_device {
- 		} venc;
- 	} phy;
+ int imx51_register_gpios(void);
++int imx53_register_gpios(void);
  
--	struct {
--		struct omap_video_timings timings;
--
--		int acbi;	/* ac-bias pin transitions per interrupt */
--		/* Unit: line clocks */
--		int acb;	/* ac-bias pin frequency */
--
--		enum omap_panel_config config;
--	} panel;
-+	struct omap_display_panel panel;
- 
- 	struct {
- 		u8 pixel_size;
+ void __init mx51_init_irq(void)
+ {
+@@ -84,3 +115,18 @@ void __init mx51_init_irq(void)
+ 	tzic_init_irq(tzic_virt);
+ 	imx51_register_gpios();
+ }
++
++void __init mx53_init_irq(void)
++{
++	unsigned long tzic_addr;
++	void __iomem *tzic_virt;
++
++	tzic_addr = MX53_TZIC_BASE_ADDR;
++
++	tzic_virt = ioremap(tzic_addr, SZ_16K);
++	if (!tzic_virt)
++		panic("unable to map TZIC interrupt controller\n");
++
++	tzic_init_irq(tzic_virt);
++	imx53_register_gpios();
++}
 -- 
-1.7.1
+1.6.0.4
