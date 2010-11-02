@@ -1,15 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 2 Nov 2010 09:25:33 -0400
-Subject: ASoC: fix the building issue of missing codec field in 'struct
-	snd_soc_card'
-In-Reply-To: <AANLkTikc09UxEB+ZwGSF-guyTV_5FU2t9yXeagUAQoQ7@mail.gmail.com>
-References: <AANLkTikc09UxEB+ZwGSF-guyTV_5FU2t9yXeagUAQoQ7@mail.gmail.com>
-Message-ID: <20101102132533.GD21476@opensource.wolfsonmicro.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 02 Nov 2010 13:27:18 +0000
+Subject: [PATCH v2 2/4] OMAP3: PM: update DSP reset code to use new SCM
+	DSP boot control functions
+In-Reply-To: <1288109763-9446-3-git-send-email-omar.ramirez@ti.com> (Omar
+	Ramirez Luna's message of "Tue, 26 Oct 2010 11:16:01 -0500")
+References: <1288109763-9446-1-git-send-email-omar.ramirez@ti.com>
+	<1288109763-9446-3-git-send-email-omar.ramirez@ti.com>
+Message-ID: <874obzg8jt.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 02, 2010 at 05:10:07AM +0800, Eric Miao wrote:
+Omar Ramirez Luna <omar.ramirez@ti.com> writes:
 
-Applied but please provide a signoff and remember to CC both Liam and
-alsa-devel for ASoC patches.  I've taken it without the signoff since
-it's a small and obvious fix.
+> From: Paul Walmsley <paul@pwsan.com>
+>
+> Update the DSP reset code in pm34xx.c to use one of the new SCM DSP
+> boot control functions, omap2430_ctrl_set_dsp_bootmode().
+>
+> This reset code should be moved out to a separate function to be
+> called by the hwmod reset process at some point.  Also, 2430
+> should be initializing the DSP in a similar fashion.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+
+Acked-by: Kevin Hilman <khilman@deeprootsystems.com>
+
+In PATCH 0/x, please report on what platforms this was tested.
+
+Kevin
