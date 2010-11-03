@@ -1,23 +1,88 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 3 Nov 2010 15:02:36 +0200
-Subject: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from board
-	file
-In-Reply-To: <1285596710-25658-5-git-send-email-s-ghorai@ti.com>
-References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
-	<1285596710-25658-5-git-send-email-s-ghorai@ti.com>
-Message-ID: <AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 3 Nov 2010 21:33:14 +0800
+Subject: [PATCH 01/17] ARM: pxa: Fix missing includes
+In-Reply-To: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
+References: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <AANLkTik--cShUXGDNwZ+usZU2bz=t4UE7HrMASaUsFcL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 27, 2010 at 5:11 PM, Sukumar Ghorai <s-ghorai@ti.com> wrote:
-> This patch makes it possible to select sw or hw (different layout options)
-> ecc scheme supported by omap nand driver. ?And hw ecc layout selected for
-> sdp and zoom boards, by default.
->
-> Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-> Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+On Wed, Nov 3, 2010 at 7:51 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> After the "ARM: pxa: Introduce pxa{25x,27x,3xx}_map_io()" patch, forged by me
+> and Eric, was applied, some variables were misnamed and some includes missing.
+> This patch corrects these errors.
 
-Any news on this? Commit 2c01946c accidentally (?) enabled hardware
-ECC and now my board is broken, as the driver always used sw ecc and
-my NAND partitions are formatted accordingly. We should at least
-switch the default back to sw ecc, don't you think?
+Already fixed in my tree, but thanks again for spotting this.
+
+>
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/pxa25x.c | ? ?2 ++
+> ?arch/arm/mach-pxa/pxa27x.c | ? ?5 ++++-
+> ?arch/arm/mach-pxa/pxa3xx.c | ? ?4 +++-
+> ?3 files changed, 9 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+> index 4596b98..acde987 100644
+> --- a/arch/arm/mach-pxa/pxa25x.c
+> +++ b/arch/arm/mach-pxa/pxa25x.c
+> @@ -31,6 +31,8 @@
+> ?#include <mach/pm.h>
+> ?#include <mach/dma.h>
+>
+> +#include <asm/mach/map.h>
+> +
+> ?#include "generic.h"
+> ?#include "devices.h"
+> ?#include "clock.h"
+> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+> index af47bef..764b9ac 100644
+> --- a/arch/arm/mach-pxa/pxa27x.c
+> +++ b/arch/arm/mach-pxa/pxa27x.c
+> @@ -27,8 +27,11 @@
+> ?#include <mach/ohci.h>
+> ?#include <mach/pm.h>
+> ?#include <mach/dma.h>
+> +
+> ?#include <plat/i2c.h>
+>
+> +#include <asm/mach/map.h>
+> +
+> ?#include "generic.h"
+> ?#include "devices.h"
+> ?#include "clock.h"
+> @@ -387,7 +390,7 @@ static struct map_desc pxa27x_io_desc[] __initdata = {
+> ?void __init pxa27x_map_io(void)
+> ?{
+> ? ? ? ?pxa_map_io();
+> - ? ? ? iotable_init(ARRAY_AND_SIZE(pxa27x_io_table));
+> + ? ? ? iotable_init(ARRAY_AND_SIZE(pxa27x_io_desc));
+> ? ? ? ?pxa27x_get_clk_frequency_khz(1);
+> ?}
+>
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index af7f701..bb60664 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -32,6 +32,8 @@
+> ?#include <mach/regs-intc.h>
+> ?#include <plat/i2c.h>
+>
+> +#include <asm/mach/map.h>
+> +
+> ?#include "generic.h"
+> ?#include "devices.h"
+> ?#include "clock.h"
+> @@ -592,7 +594,7 @@ static struct map_desc pxa3xx_io_desc[] __initdata = {
+> ?void __init pxa3xx_map_io(void)
+> ?{
+> ? ? ? ?pxa_map_io();
+> - ? ? ? iotable_init(ARRAY_AND_SIZE(common_io_desc));
+> + ? ? ? iotable_init(ARRAY_AND_SIZE(pxa3xx_io_desc));
+> ? ? ? ?pxa3xx_get_clk_frequency_khz(1);
+> ?}
+>
+> --
+> 1.7.2.3
+>
+>
