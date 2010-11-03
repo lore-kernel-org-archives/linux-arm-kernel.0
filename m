@@ -1,38 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  3 Nov 2010 17:22:27 +0000
-Subject: [PATCH 3/3] ARM: atomic64: use generic implementation for OABI
-	configurations
+Date: Wed,  3 Nov 2010 17:22:26 +0000
+Subject: [PATCH 2/3] ARM: perf-events: squash compiler warning
 In-Reply-To: <1288804947-21213-1-git-send-email-will.deacon@arm.com>
 References: <1288804947-21213-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1288804947-21213-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1288804947-21213-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old apcs-gnu ABI doesn't guarantee that double words are allocated
-to registers with even alignment, causing the 64-bit exclusive memory
-operations to be rejected by the assembler.
+armv7_pmnc_counter_has_overflowed can return uninitialised data
+if an invalid counter is specified.
 
-This patch requires that CONFIG_AEABI is set in order to use the native
-atomic operations and falls back to the generic (spinlock) code otherwise.
+This patch fixes the code to return 0 in this case, which squashes
+the compiler warning from GCC 4.5.
 
-Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Jean Pihet <jpihet@mvista.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig |    2 +-
+ arch/arm/kernel/perf_event.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..8ae3d48 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -6,7 +6,7 @@ config ARM
- 	select HAVE_MEMBLOCK
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
--	select GENERIC_ATOMIC64 if (!CPU_32v6K)
-+	select GENERIC_ATOMIC64 if (!CPU_32v6K || !AEABI)
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_ARCH_KGDB
- 	select HAVE_KPROBES if (!XIP_KERNEL)
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 49643b1..07a5035 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -1749,7 +1749,7 @@ static inline int armv7_pmnc_has_overflowed(unsigned long pmnc)
+ static inline int armv7_pmnc_counter_has_overflowed(unsigned long pmnc,
+ 					enum armv7_counters counter)
+ {
+-	int ret;
++	int ret = 0;
+ 
+ 	if (counter == ARMV7_CYCLE_COUNTER)
+ 		ret = pmnc & ARMV7_FLAG_C;
 -- 
 1.7.0.4
