@@ -1,45 +1,164 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Wed, 3 Nov 2010 14:39:13 -0700 (PDT)
-Subject: [PATCH v3] mx51_3ds: Add esdhc support
-Message-ID: <579640.14227.qm@web51004.mail.re2.yahoo.com>
+From: scaudle@codeaurora.org (Stephen Caudle)
+Date: Wed,  3 Nov 2010 17:46:02 -0400
+Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores during
+	IRQ enable
+Message-ID: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for esdhc on mx51_3ds board.
+Some multi-core ARM chips designate a unique IRQ number for each core for
+private peripheral interrupts (PPIs). Others designate a common IRQ number
+for all cores. In the latter case, requesting/freeing private peripheral
+interrupts currently unmasks/masks the interrupt for only the
+executing core, respectively.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+With this change, request_irq will unmask a PPI on all cores so a separate
+call to enable_irq on the other cores is not required. Likewise, free_irq
+will mask a PPI on the other cores. Also, shutdown is implemented instead
+of disable to allow for lazy IRQ disabling.
+
+Signed-off-by: Stephen Caudle <scaudle@codeaurora.org>
 ---
- arch/arm/mach-mx5/Kconfig          |    1 +
- arch/arm/mach-mx5/board-mx51_3ds.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig      |    5 +++
+ arch/arm/common/gic.c |   86 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 91 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index b03d68e..7bff99a 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -22,6 +22,7 @@ config MACH_MX51_BABBAGE
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 30ddd06..7f11e31 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1153,6 +1153,11 @@ config SMP
  
- config MACH_MX51_3DS
- 	bool "Support MX51PDK (3DS)"
-+	select IMX_HAVE_PLATFORM_ESDHC
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_SPI_IMX
- 	select MXC_DEBUG_BOARD
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index ba5805f..d731104 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -172,6 +172,7 @@ static void __init mxc_board_init(void)
- 		printk(KERN_WARNING "Init of the debugboard failed, all "
- 				    "devices on the board are unusable.\n");
+ 	  If you don't know what to do here, say N.
  
-+	imx51_add_esdhc(0, NULL);
- 	mxc_init_keypad();
++config IRQ_PER_CPU
++	bool
++	depends on SMP
++	default n
++
+ config HAVE_ARM_SCU
+ 	bool
+ 	depends on SMP
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 886daaf..937a33a 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -44,12 +44,25 @@ struct gic_chip_data {
+ 	unsigned int wakeup_irqs[32];
+ 	unsigned int enabled_irqs[32];
+ #endif
++#ifdef CONFIG_IRQ_PER_CPU
++	struct call_single_data ppi_data[NR_CPUS];
++#endif
+ };
+ 
+ #ifndef MAX_GIC_NR
+ #define MAX_GIC_NR	1
+ #endif
+ 
++#ifdef CONFIG_IRQ_PER_CPU
++#ifndef GIC_PPI_FIRST
++#define GIC_PPI_FIRST	16
++#endif
++
++#ifndef GIC_PPI_LAST
++#define GIC_PPI_LAST	31
++#endif
++#endif
++
+ static struct gic_chip_data gic_data[MAX_GIC_NR];
+ 
+ static inline void __iomem *gic_dist_base(unsigned int irq)
+@@ -272,6 +285,75 @@ static int gic_set_type(unsigned int irq, unsigned int type)
+ 	return 0;
  }
  
++#ifdef CONFIG_IRQ_PER_CPU
++static inline void gic_smp_call_function(struct call_single_data *data)
++{
++	int cpu;
++
++	/* Make sure data is visible */
++	smp_mb();
++
++	/*
++	 * Since this function is called with interrupts disabled,
++	 * smp_call_function can't be used here because it warns (even
++	 * if wait = 0) when interrupts are disabled.
++	 *
++	 * __smp_call_function_single doesn't warn when interrupts are
++	 * disabled and not waiting, so use it instead.
++	 */
++	for_each_online_cpu(cpu)
++		if (cpu != smp_processor_id())
++			__smp_call_function_single(cpu, data, 0);
++}
++
++static void gic_mask_ppi(void *info)
++{
++	struct irq_desc *desc = info;
++	gic_mask_irq(desc->irq);
++}
++
++static void gic_unmask_ppi(void *info)
++{
++	struct irq_desc *desc = info;
++	gic_unmask_irq(desc->irq);
++}
++
++static void gic_enable_irq(unsigned int irq)
++{
++	struct irq_desc *desc = irq_to_desc(irq);
++	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
++	int cpu = smp_processor_id();
++
++	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
++		gic_data->ppi_data[cpu].func = gic_unmask_ppi;
++		gic_data->ppi_data[cpu].info = desc;
++
++		/* Unmask PPIs on all cores during enable. */
++		gic_smp_call_function(&gic_data->ppi_data[cpu]);
++	}
++
++	desc->chip->unmask(irq);
++	desc->status &= ~IRQ_MASKED;
++}
++
++static void gic_shutdown_irq(unsigned int irq)
++{
++	struct irq_desc *desc = irq_to_desc(irq);
++	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
++	int cpu = smp_processor_id();
++
++	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
++		gic_data->ppi_data[cpu].func = gic_mask_ppi;
++		gic_data->ppi_data[cpu].info = desc;
++
++		/* Mask PPIs on all cores during disable. */
++		gic_smp_call_function(&gic_data->ppi_data[cpu]);
++	}
++
++	desc->chip->mask(irq);
++	desc->status |= IRQ_MASKED;
++}
++#endif
+ 
+ static struct irq_chip gic_chip = {
+ 	.name		= "GIC",
+@@ -283,6 +365,10 @@ static struct irq_chip gic_chip = {
+ #endif
+ 	.set_type	= gic_set_type,
+ 	.set_wake	= gic_set_wake,
++#ifdef CONFIG_IRQ_PER_CPU
++	.enable		= gic_enable_irq,
++	.shutdown	= gic_shutdown_irq,
++#endif
+ };
+ 
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 -- 
-1.6.0.4
+1.7.3.2
 
-
-
-      
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
