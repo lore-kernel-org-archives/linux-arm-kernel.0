@@ -1,35 +1,81 @@
-From: fabioestevam@yahoo.com (Fabio Estevam)
-Date: Wed, 3 Nov 2010 08:25:29 -0700 (PDT)
-Subject: [patch 1/1] imx: fix iomux v3
-In-Reply-To: <20101103145508.186441704@rtp-net.org>
-Message-ID: <321894.13477.qm@web51008.mail.re2.yahoo.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed,  3 Nov 2010 16:29:36 +0100
+Subject: [PATCH 2/2] ARM: pxa: Add pxa320 PCMCIA check
+In-Reply-To: <1288798176-5019-1-git-send-email-marek.vasut@gmail.com>
+References: <1288798176-5019-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1288798176-5019-2-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+On PXA320, there's only one PCMCIA slot available. Check for cases where the
+user would want to register multiple. Also, rework failpath.
 
---- On Wed, 11/3/10, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/pcmcia/pxa2xx_base.c |   37 ++++++++++++++++++++++++-------------
+ 1 files changed, 24 insertions(+), 13 deletions(-)
 
-> From: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Subject: [patch 1/1] imx: fix iomux v3
-> To: s.hauer at pengutronix.de
-> Cc: linux-arm-kernel at lists.infradead.org, LW at KARO-electronics.de
-> Date: Wednesday, November 3, 2010, 12:54 PM
-> Commit "ARM: i.MX IOMUX-V3 replace
-> struct pad_desc with bitmapped cookie"
-> (b705cb4d42e95a4a43a8945571c8613e71526c3d) introduced a
-> typo which was
-> preventing my efikamx to boot. This patch is fixing that.
-
-Thanks. When I tried 2.6.37-rc1 today I was not able to boot Linux on Babbage. Your patch fixed the problem.
+diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+index 380d760..65a8b6f 100644
+--- a/drivers/pcmcia/pxa2xx_base.c
++++ b/drivers/pcmcia/pxa2xx_base.c
+@@ -284,14 +284,24 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 	struct soc_pcmcia_socket *skt;
  
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Regards,
-
-Fabio Estevam
-
-
-      
+ 	ops = (struct pcmcia_low_level *)dev->dev.platform_data;
+-	if (!ops)
+-		return -ENODEV;
++	if (!ops) {
++		ret = -ENODEV;
++		goto err0;
++	}
++
++	if (cpu_is_pxa320() && ops->nr > 1) {
++		dev_err(&dev->dev, "pxa320 supports only one pcmcia slot");
++		ret = -EINVAL;
++		goto err0;
++	}
+ 
+ 	pxa2xx_drv_pcmcia_ops(ops);
+ 
+ 	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+-	if (!sinfo)
+-		return -ENOMEM;
++	if (!sinfo) {
++		ret = -ENOMEM;
++		goto err0;
++	}
+ 
+ 	sinfo->nskt = ops->nr;
+ 
+@@ -307,18 +317,19 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+ 
+ 		ret = pxa2xx_drv_pcmcia_add_one(skt);
+ 		if (ret)
+-			break;
++			goto err1;
+ 	}
+ 
+-	if (ret) {
+-		while (--i >= 0)
+-			soc_pcmcia_remove_one(&sinfo->skt[i]);
+-		kfree(sinfo);
+-	} else {
+-		pxa2xx_configure_sockets(&dev->dev);
+-		dev_set_drvdata(&dev->dev, sinfo);
+-	}
++	pxa2xx_configure_sockets(&dev->dev);
++	dev_set_drvdata(&dev->dev, sinfo);
+ 
++	return 0;
++
++err1:
++	while (--i >= 0)
++		soc_pcmcia_remove_one(&sinfo->skt[i]);
++	kfree(sinfo);
++err0:
+ 	return ret;
+ }
+ 
+-- 
+1.7.2.3
