@@ -1,38 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed,  3 Nov 2010 00:51:54 +0100
-Subject: [PATCH 17/17] ARM: pxa/colibri: setup pins for USB host port 3
-In-Reply-To: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
-References: <1288741914-21328-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1288741914-21328-17-git-send-email-marek.vasut@gmail.com>
+From: david-b@pacbell.net (David Brownell)
+Date: Tue, 2 Nov 2010 19:15:16 -0700 (PDT)
+Subject: [PATCH v4 08/12] gpio: add ti-ssp gpio driver
+In-Reply-To: <1288124308-14999-9-git-send-email-cyril@ti.com>
+Message-ID: <956998.65651.qm@web180302.mail.gq1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Forsman <bjorn.forsman@gmail.com>
 
-Tested on a Colibri Evaluation Board Rev.2.1 with a Colibri PXA310 module.
 
-Signed-off-by: Bjorn Forsman <bjorn.forsman@gmail.com>
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/colibri-pxa300.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+--- On Tue, 10/26/10, Cyril Chemparathy <cyril@ti.com> wrote:
 
-diff --git a/arch/arm/mach-pxa/colibri-pxa300.c b/arch/arm/mach-pxa/colibri-pxa300.c
-index b5bb248..fddb16d 100644
---- a/arch/arm/mach-pxa/colibri-pxa300.c
-+++ b/arch/arm/mach-pxa/colibri-pxa300.c
-@@ -46,6 +46,12 @@ static mfp_cfg_t colibri_pxa300_evalboard_pin_config[] __initdata = {
- 	/* UHC */
- 	GPIO0_2_USBH_PEN,
- 	GPIO1_2_USBH_PWR,
-+	GPIO77_USB_P3_1,
-+	GPIO78_USB_P3_2,
-+	GPIO79_USB_P3_3,
-+	GPIO80_USB_P3_4,
-+	GPIO81_USB_P3_5,
-+	GPIO82_USB_P3_6,
- 
- 	/* I2C */
- 	GPIO21_I2C_SCL,
--- 
-1.7.2.3
+> From: Cyril Chemparathy <cyril@ti.com>
+> Subject: [PATCH v4 08/12] gpio: add ti-ssp gpio driver
+
+On the assumptions you've tested this *AND* will
+resubmit with the previously-requested change of
+removing all references to non-existent
+"virtual"ness in the driver ... I'll likely
+add my ack to that resubmitted version
+
+Also, chip2gpio seems an excessively generic name;
+maybe chip2_ti_ssp_gpio or somesuch?
+
+I'd still be happier seeing this "stack" packaged
+as a hardware library called by various drivers
+(like GPIO, SPI, etc) rather than a core driver
+that's called by other drivers.  That seems like
+a better structure for various vendors' "SSP"
+hardware (multifunction serial interface logic)
+since most function drivers just need to poke
+the registers a bit differently, and don't have
+much to share with a "core driver" beyond a few
+setup routines (if that).
+
+- Dave
