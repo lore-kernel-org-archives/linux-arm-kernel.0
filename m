@@ -1,164 +1,150 @@
-From: scaudle@codeaurora.org (Stephen Caudle)
-Date: Wed,  3 Nov 2010 17:46:02 -0400
-Subject: [PATCH v2] [ARM] gic: Unmask private interrupts on all cores during
-	IRQ enable
-Message-ID: <1288820762-16077-1-git-send-email-scaudle@codeaurora.org>
+From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
+Date: Wed, 3 Nov 2010 17:52:09 -0500
+Subject: [PATCH] ARM: imx: Add support for low power suspend on MX51.
+Message-ID: <1288824729-11481-1-git-send-email-Dinh.Nguyen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some multi-core ARM chips designate a unique IRQ number for each core for
-private peripheral interrupts (PPIs). Others designate a common IRQ number
-for all cores. In the latter case, requesting/freeing private peripheral
-interrupts currently unmasks/masks the interrupt for only the
-executing core, respectively.
+From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 
-With this change, request_irq will unmask a PPI on all cores so a separate
-call to enable_irq on the other cores is not required. Likewise, free_irq
-will mask a PPI on the other cores. Also, shutdown is implemented instead
-of disable to allow for lazy IRQ disabling.
+Adds initial low power suspend functionality to MX51.
+Supports "mem" and "standby" modes.
 
-Signed-off-by: Stephen Caudle <scaudle@codeaurora.org>
+Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 ---
- arch/arm/Kconfig      |    5 +++
- arch/arm/common/gic.c |   86 +++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 91 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/Makefile           |    2 +-
+ arch/arm/mach-mx5/pm.c               |   92 ++++++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/mxc.h |    6 ++
+ 3 files changed, 99 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/pm.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 30ddd06..7f11e31 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1153,6 +1153,11 @@ config SMP
+diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+index 462f177..aefc9a1 100644
+--- a/arch/arm/mach-mx5/Makefile
++++ b/arch/arm/mach-mx5/Makefile
+@@ -3,7 +3,7 @@
+ #
  
- 	  If you don't know what to do here, say N.
+ # Object file lists.
+-obj-y   := cpu.o mm.o clock-mx51.o devices.o
++obj-y   := cpu.o mm.o clock-mx51.o devices.o pm.o
  
-+config IRQ_PER_CPU
-+	bool
-+	depends on SMP
-+	default n
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
+new file mode 100644
+index 0000000..a32640e
+--- /dev/null
++++ b/arch/arm/mach-mx5/pm.c
+@@ -0,0 +1,92 @@
++/*
++ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <asm/cacheflush.h>
++#include <asm/tlb.h>
++#include <asm/mach/map.h>
++#include <mach/system.h>
++#include "crm_regs.h"
 +
- config HAVE_ARM_SCU
- 	bool
- 	depends on SMP
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 886daaf..937a33a 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -44,12 +44,25 @@ struct gic_chip_data {
- 	unsigned int wakeup_irqs[32];
- 	unsigned int enabled_irqs[32];
- #endif
-+#ifdef CONFIG_IRQ_PER_CPU
-+	struct call_single_data ppi_data[NR_CPUS];
-+#endif
- };
- 
- #ifndef MAX_GIC_NR
- #define MAX_GIC_NR	1
- #endif
- 
-+#ifdef CONFIG_IRQ_PER_CPU
-+#ifndef GIC_PPI_FIRST
-+#define GIC_PPI_FIRST	16
-+#endif
-+
-+#ifndef GIC_PPI_LAST
-+#define GIC_PPI_LAST	31
-+#endif
-+#endif
-+
- static struct gic_chip_data gic_data[MAX_GIC_NR];
- 
- static inline void __iomem *gic_dist_base(unsigned int irq)
-@@ -272,6 +285,75 @@ static int gic_set_type(unsigned int irq, unsigned int type)
- 	return 0;
- }
- 
-+#ifdef CONFIG_IRQ_PER_CPU
-+static inline void gic_smp_call_function(struct call_single_data *data)
++/* set cpu low power mode before WFI instruction */
++static void mxc_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
 +{
-+	int cpu;
++	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
 +
-+	/* Make sure data is visible */
-+	smp_mb();
++	/* always allow platform to issue a deep sleep mode request */
++	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
++		~(MXC_CORTEXA8_PLAT_LPC_DSM);
++	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
++	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
 +
-+	/*
-+	 * Since this function is called with interrupts disabled,
-+	 * smp_call_function can't be used here because it warns (even
-+	 * if wait = 0) when interrupts are disabled.
-+	 *
-+	 * __smp_call_function_single doesn't warn when interrupts are
-+	 * disabled and not waiting, so use it instead.
-+	 */
-+	for_each_online_cpu(cpu)
-+		if (cpu != smp_processor_id())
-+			__smp_call_function_single(cpu, data, 0);
-+}
-+
-+static void gic_mask_ppi(void *info)
-+{
-+	struct irq_desc *desc = info;
-+	gic_mask_irq(desc->irq);
-+}
-+
-+static void gic_unmask_ppi(void *info)
-+{
-+	struct irq_desc *desc = info;
-+	gic_unmask_irq(desc->irq);
-+}
-+
-+static void gic_enable_irq(unsigned int irq)
-+{
-+	struct irq_desc *desc = irq_to_desc(irq);
-+	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
-+	int cpu = smp_processor_id();
-+
-+	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
-+		gic_data->ppi_data[cpu].func = gic_unmask_ppi;
-+		gic_data->ppi_data[cpu].info = desc;
-+
-+		/* Unmask PPIs on all cores during enable. */
-+		gic_smp_call_function(&gic_data->ppi_data[cpu]);
++	switch (mode) {
++	case WAIT_UNCLOCKED_POWER_OFF:
++	case STOP_POWER_OFF:
++		plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
++		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
++		if (mode == WAIT_UNCLOCKED_POWER_OFF) {
++			ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
++			ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
++			ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
++		} else {
++			ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
++			ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
++			ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
++			ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
++		}
++		arm_srpgcr |= MXC_SRPGCR_PCR;
++		break;
++	default:
++		printk(KERN_WARNING "UNKNOWN cpu power mode: %d\n", mode);
++		return;
 +	}
 +
-+	desc->chip->unmask(irq);
-+	desc->status &= ~IRQ_MASKED;
++	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
++	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
++	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
 +}
 +
-+static void gic_shutdown_irq(unsigned int irq)
++static int mx5_suspend_enter(suspend_state_t state)
 +{
-+	struct irq_desc *desc = irq_to_desc(irq);
-+	struct gic_chip_data *gic_data = get_irq_chip_data(irq);
-+	int cpu = smp_processor_id();
-+
-+	if (irq >= GIC_PPI_FIRST && irq <= GIC_PPI_LAST) {
-+		gic_data->ppi_data[cpu].func = gic_mask_ppi;
-+		gic_data->ppi_data[cpu].info = desc;
-+
-+		/* Mask PPIs on all cores during disable. */
-+		gic_smp_call_function(&gic_data->ppi_data[cpu]);
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		mxc_cpu_lp_set(STOP_POWER_OFF);
++		break;
++	case PM_SUSPEND_STANDBY:
++		mxc_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
++		break;
++	default:
++		return -EINVAL;
 +	}
 +
-+	desc->chip->mask(irq);
-+	desc->status |= IRQ_MASKED;
++	if (tzic_enable_wake(0) != 0)
++		return -EAGAIN;
++	cpu_do_idle();
++	return 0;
 +}
-+#endif
++
++static int mx5_pm_valid(suspend_state_t state)
++{
++	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
++}
++
++static const struct platform_suspend_ops mx5_suspend_ops = {
++	.valid = mx5_pm_valid,
++	.enter = mx5_suspend_enter,
++};
++
++static int __init mx5_pm_init(void)
++{
++	suspend_set_ops(&mx5_suspend_ops);
++	return 0;
++}
++device_initcall(mx5_pm_init);
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index a42c720..ece13fc 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -37,6 +37,12 @@
  
- static struct irq_chip gic_chip = {
- 	.name		= "GIC",
-@@ -283,6 +365,10 @@ static struct irq_chip gic_chip = {
+ #ifndef __ASSEMBLY__
+ extern unsigned int __mxc_cpu_type;
++
++enum mxc_cpu_pwr_mode {
++	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
++	STOP_POWER_OFF,		/* STOP + SRPG */
++};
++int tzic_enable_wake(int is_idle);
  #endif
- 	.set_type	= gic_set_type,
- 	.set_wake	= gic_set_wake,
-+#ifdef CONFIG_IRQ_PER_CPU
-+	.enable		= gic_enable_irq,
-+	.shutdown	= gic_shutdown_irq,
-+#endif
- };
  
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ #ifdef CONFIG_ARCH_MX1
 -- 
-1.7.3.2
-
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+1.6.0.4
