@@ -1,22 +1,40 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Wed, 3 Nov 2010 11:18:37 +0100
-Subject: [PATCH v4 08/12] gpio: add ti-ssp gpio driver
-In-Reply-To: <956998.65651.qm@web180302.mail.gq1.yahoo.com>
-References: <1288124308-14999-9-git-send-email-cyril@ti.com>
-	<956998.65651.qm@web180302.mail.gq1.yahoo.com>
-Message-ID: <AANLkTin=3K0H+YdNM2Nhz63c3+Upp+rwApo-Ww4p5qH6@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 03 Nov 2010 14:18:42 +0300
+Subject: [PATCH] ARM: mmp: fix cpuid detection on mmp2
+In-Reply-To: <1288323176-6970-1-git-send-email-haojian.zhuang@marvell.com>
+References: <1288323176-6970-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <4CD14512.5000604@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/3 David Brownell <david-b@pacbell.net>:
+Hello.
 
-> That seems like
-> a better structure for various vendors' "SSP"
-> hardware (multifunction serial interface logic)
+On 29-10-2010 7:32, Haojian Zhuang wrote:
 
-Incidentally the ARM PrimeCell PL022 is called SSP,
-"Synchronous Serial Port" and is not multifunction at all.
-Just to add to the confusion...
+> Fix typo error on cpu_is_mmp2(). Correct cpu_readid_id() to read_cpuid_id().
+> Append missing parenthesis.
 
-Yours,
-Linus Walleij
+    That's a brace, not parenthesis.
+
+> Signed-off-by: Haojian Zhuang<haojian.zhuang@marvell.com>
+> Cc: Eric Miao<eric.y.miao@gmail.com>
+> ---
+>   arch/arm/mach-mmp/include/mach/cputype.h |    3 ++-
+>   1 files changed, 2 insertions(+), 1 deletions(-)
+
+> diff --git a/arch/arm/mach-mmp/include/mach/cputype.h b/arch/arm/mach-mmp/include/mach/cputype.h
+> index f43a68b..8a3b56d 100644
+> --- a/arch/arm/mach-mmp/include/mach/cputype.h
+> +++ b/arch/arm/mach-mmp/include/mach/cputype.h
+> @@ -46,7 +46,8 @@ static inline int cpu_is_pxa910(void)
+>   #ifdef CONFIG_CPU_MMP2
+>   static inline int cpu_is_mmp2(void)
+>   {
+> -	return (((cpu_readid_id()>>  8)&  0xff) == 0x58);
+> +	return (((read_cpuid_id()>>  8)&  0xff) == 0x58);
+> +}
+>   #else
+>   #define cpu_is_mmp2()	(0)
+>   #endif
+
+WBR, Sergei
