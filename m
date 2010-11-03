@@ -1,31 +1,26 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 4 Nov 2010 02:23:48 +0800
-Subject: [GIT PULL] pxa fixes for v2.6.37-rc1
-Message-ID: <AANLkTikW1pUx5xXkZLPw2v6Q1M3J75=R48M5b_BCLpCC@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 03 Nov 2010 18:27:21 +0000
+Subject: [PATCHv2 1/3] ARM: Translate delay.S into (mostly) C
+In-Reply-To: <1288300770-18350-2-git-send-email-sboyd@codeaurora.org>
+References: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>
+	<1288300770-18350-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1288808841.23615.5.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Stephen,
 
-The following changes since commit c8ddb2713c624f432fa5fe3c7ecffcdda46ea0d4:
+On Thu, 2010-10-28 at 21:19 +0000, Stephen Boyd wrote:
+> Nico expressed concern that fixed lpj cmdlines will break due to
+> compiler optimizations. That doesn't seem to be the case since
+> before and after this patch I get the same lpj value when running
+> my CPU at 19.2 MHz. That should be sufficiently slow enough to
+> cover any machine running Linux.
 
-  Linux 2.6.37-rc1 (2010-11-01 07:54:12 -0400)
+I appreciate this is an exceptional case, but there are some lucky
+guys at ARM who (as routinely as they can) boot Linux on sub 1MHz
+hardware. The delay loop is something they're keen to avoid so they do
+make use of the lpj= command line option and would rather it didn't
+break on them.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
-
-Eric Miao (2):
-      ARM: pxa: fix the missing definition of IRQ_BOARD_END
-      ARM: pxa/saar: fix the building failure caused by typo
-
-Haojian Zhuang (1):
-      ARM: mmp: fix cpuid detection on mmp2
-
-Mike Rapoport (1):
-      ARM: pxa/cm-x2xx: remove duplicate call to pxa27x_init_irq
-
- arch/arm/include/asm/hardware/it8152.h   |    2 +-
- arch/arm/mach-mmp/include/mach/cputype.h |    3 ++-
- arch/arm/mach-pxa/cm-x2xx.c              |    2 --
- arch/arm/mach-pxa/saar.c                 |    2 +-
- 4 files changed, 4 insertions(+), 5 deletions(-)
+Will
