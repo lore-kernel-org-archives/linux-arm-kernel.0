@@ -1,150 +1,33 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Wed, 3 Nov 2010 17:52:09 -0500
-Subject: [PATCH] ARM: imx: Add support for low power suspend on MX51.
-Message-ID: <1288824729-11481-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 03 Nov 2010 16:15:03 -0700
+Subject: [PATCHv2 1/3] ARM: Translate delay.S into (mostly) C
+In-Reply-To: <1288808841.23615.5.camel@e102144-lin.cambridge.arm.com>
+References: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>	
+	<1288300770-18350-2-git-send-email-sboyd@codeaurora.org>
+	<1288808841.23615.5.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <4CD1ECF7.5030105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+On 11/03/2010 11:27 AM, Will Deacon wrote:
+> Hi Stephen,
+>
+> On Thu, 2010-10-28 at 21:19 +0000, Stephen Boyd wrote:
+>> Nico expressed concern that fixed lpj cmdlines will break due to
+>> compiler optimizations. That doesn't seem to be the case since
+>> before and after this patch I get the same lpj value when running
+>> my CPU at 19.2 MHz. That should be sufficiently slow enough to
+>> cover any machine running Linux.
+>
+> I appreciate this is an exceptional case, but there are some lucky
+> guys at ARM who (as routinely as they can) boot Linux on sub 1MHz
+> hardware. The delay loop is something they're keen to avoid so they do
+> make use of the lpj= command line option and would rather it didn't
+> break on them.
 
-Adds initial low power suspend functionality to MX51.
-Supports "mem" and "standby" modes.
+Do you know if it breaks at that frequency? I don't have any hardware to
+test with that goes lower than the stated 19.2 MHz.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
----
- arch/arm/mach-mx5/Makefile           |    2 +-
- arch/arm/mach-mx5/pm.c               |   92 ++++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mxc.h |    6 ++
- 3 files changed, 99 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mx5/pm.c
-
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 462f177..aefc9a1 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Object file lists.
--obj-y   := cpu.o mm.o clock-mx51.o devices.o
-+obj-y   := cpu.o mm.o clock-mx51.o devices.o pm.o
- 
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
-diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
-new file mode 100644
-index 0000000..a32640e
---- /dev/null
-+++ b/arch/arm/mach-mx5/pm.c
-@@ -0,0 +1,92 @@
-+/*
-+ *  Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/io.h>
-+#include <asm/cacheflush.h>
-+#include <asm/tlb.h>
-+#include <asm/mach/map.h>
-+#include <mach/system.h>
-+#include "crm_regs.h"
-+
-+/* set cpu low power mode before WFI instruction */
-+static void mxc_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
-+{
-+	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
-+
-+	/* always allow platform to issue a deep sleep mode request */
-+	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
-+		~(MXC_CORTEXA8_PLAT_LPC_DSM);
-+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-+	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
-+
-+	switch (mode) {
-+	case WAIT_UNCLOCKED_POWER_OFF:
-+	case STOP_POWER_OFF:
-+		plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-+		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-+		if (mode == WAIT_UNCLOCKED_POWER_OFF) {
-+			ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-+			ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-+			ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-+		} else {
-+			ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-+			ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-+			ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-+			ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-+		}
-+		arm_srpgcr |= MXC_SRPGCR_PCR;
-+		break;
-+	default:
-+		printk(KERN_WARNING "UNKNOWN cpu power mode: %d\n", mode);
-+		return;
-+	}
-+
-+	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-+	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-+	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-+}
-+
-+static int mx5_suspend_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		mxc_cpu_lp_set(STOP_POWER_OFF);
-+		break;
-+	case PM_SUSPEND_STANDBY:
-+		mxc_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (tzic_enable_wake(0) != 0)
-+		return -EAGAIN;
-+	cpu_do_idle();
-+	return 0;
-+}
-+
-+static int mx5_pm_valid(suspend_state_t state)
-+{
-+	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-+}
-+
-+static const struct platform_suspend_ops mx5_suspend_ops = {
-+	.valid = mx5_pm_valid,
-+	.enter = mx5_suspend_enter,
-+};
-+
-+static int __init mx5_pm_init(void)
-+{
-+	suspend_set_ops(&mx5_suspend_ops);
-+	return 0;
-+}
-+device_initcall(mx5_pm_init);
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index a42c720..ece13fc 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -37,6 +37,12 @@
- 
- #ifndef __ASSEMBLY__
- extern unsigned int __mxc_cpu_type;
-+
-+enum mxc_cpu_pwr_mode {
-+	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
-+	STOP_POWER_OFF,		/* STOP + SRPG */
-+};
-+int tzic_enable_wake(int is_idle);
- #endif
- 
- #ifdef CONFIG_ARCH_MX1
 -- 
-1.6.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
