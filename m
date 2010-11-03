@@ -1,107 +1,67 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 3 Nov 2010 11:42:59 -0400
-Subject: [PATCH 3/3] OMAP: use generic panel driver in board files
-In-Reply-To: <1288796931.5614.199.camel@tubuntu>
+Date: Wed, 3 Nov 2010 12:21:34 -0400
+Subject: [PATCH 0/3] OMAP: DSS2: introduce generic panel display driver
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC356087034BE1EB1C@dbde02.ent.ti.com>
 References: <1288730392-11223-1-git-send-email-bryan.wu@canonical.com>
-	<1288730392-11223-4-git-send-email-bryan.wu@canonical.com>
-	<FCCFB4CDC6E5564B9182F639FC356087034BE1EB1A@dbde02.ent.ti.com>
-	<1288796931.5614.199.camel@tubuntu>
-Message-ID: <AANLkTinmgo+=qJ3WJSep52YhfihDQkD5hUsz=uyrtbox@mail.gmail.com>
+	<FCCFB4CDC6E5564B9182F639FC356087034BE1EB1C@dbde02.ent.ti.com>
+Message-ID: <AANLkTinSwSnozABAJrNzc+vNNVyV-qOo_avSQXWmihyF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 3, 2010 at 11:08 AM, Tomi Valkeinen
-<tomi.valkeinen@nokia.com> wrote:
-> On Wed, 2010-11-03 at 13:56 +0100, ext Taneja, Archit wrote:
->> Hi,
->>
->> linux-omap-owner at vger.kernel.org wrote:
->> > Introduce some fields in struct panel, which will be used to
->> > match the right panel configurations in generic panel driver.
->> >
->> > Still keep sharp_ls_panel, since the sharp_ls_panel driver
->> > contains blacklight control driver code which will be moved
->> > out later. Then we can use generic driver for sharp_ls_panel.
->> >
->> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
->>
->> [snip]
->>
->> > diff --git a/arch/arm/plat-omap/include/plat/display.h
->> > b/arch/arm/plat-omap/include/plat/display.h
->> > index c915a66..6e1fbbd 100644
->> > --- a/arch/arm/plat-omap/include/plat/display.h
->> > +++ b/arch/arm/plat-omap/include/plat/display.h
->> > @@ -346,6 +346,24 @@ struct omap_overlay_manager {
->> > ? ? int (*disable)(struct omap_overlay_manager *mgr); ?};
->> >
->> > +struct omap_display_panel {
->> > + ? struct omap_video_timings timings;
->> > +
->> > + ? int acbi; ? ? ? /* ac-bias pin transitions per interrupt */ + ? /* Unit: line
->> > clocks */ + int acb; ? ? ? ?/* ac-bias pin frequency */
->> > +
->> > + ? enum omap_panel_config config;
->> > +
->> > + ? int power_on_delay;
->> > + ? int power_off_delay;
->> > + ? /*
->> > + ? ?* Used to match device to panel configuration
->> > + ? ?* when use generic panel driver
->> > + ? ?*/
->> > + ? const char *name;
->> > +};
->> > +
->> > ?struct omap_dss_device {
->> > ? ? struct device dev;
->> >
->> > @@ -395,15 +413,7 @@ struct omap_dss_device {
->> > ? ? ? ? ? ? } venc;
->> > ? ? } phy;
->> >
->> > - ? struct {
->> > - ? ? ? ? ? struct omap_video_timings timings;
->> > -
->> > - ? ? ? ? ? int acbi; ? ? ? /* ac-bias pin transitions per
->> > interrupt */
->> > - ? ? ? ? ? /* Unit: line clocks */
->> > - ? ? ? ? ? int acb; ? ? ? ?/* ac-bias pin frequency */
->> > -
->> > - ? ? ? ? ? enum omap_panel_config config;
->> > - ? } panel;
->> > + ? struct omap_display_panel panel;
->> >
->> > ? ? struct {
->> > ? ? ? ? ? ? u8 pixel_size;
->>
->> I don't think that changing the omap_dss_device structure is the best way
->> to go about this. Members like power_on_delay and power_off_delay may not
->> be required by all types of panels. Same goes for the new "name" member since
->> its only used by the dummy dpi panels.
->>
->> I think it would be better to go with the approach taken in panel-taal.c
->> where a struct "panel_config" exists to take care of extra requirements.
->>
->> The omap_dss_device struct should contain only those members which would be
->> needed by the interface driver files like dsi.c, dpi.c etc. The rest should be
->> taken care of the panel drivers internally.
+On Wed, Nov 3, 2010 at 8:59 AM, Taneja, Archit <archit@ti.com> wrote:
+> Hi,
 >
-> Yes, the configuration for the panel is panel driver specific features,
-> and should not be in the standard structs. No need to add anything to
-> display.h.
+> Bryan Wu <bryan.wu@canonical.com> wrote:
+>> There are 4 duplicated panel drivers in DSS2 display driver.
+>> They are similar and generic panel driver can support all
+>> them with specific panel configuration.
+>> And new panel driver can be easily supported by adding panel
+>> configurations into generic panel driver.
+>>
+>> This patchset introduces generic panel driver, remove 3 panel
+>> drivers and enable generic panel driver in board files. And
+>> it is based on 2.6.37-rc1.
+>>
+>> Building with omap2plus_defconfig is successful.
+>>
+>> Keep sharp_ls_panel, since it contains blacklight control
+>> code which will be moved out later.
+>>
+>> Bryan Wu (3):
+>> ? OMAP: DSS2: Add generic panel display driver
+>> ? OMAP: DSS2: remove generic panel driver duplicated panel drivers
+>> ? OMAP: use generic panel driver in board files
+>>
+>> ?arch/arm/mach-omap2/board-3430sdp.c ? ? ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/mach-omap2/board-am3517evm.c ? ? ? ? ? ? ?| ? ?4 +-
+>> ?arch/arm/mach-omap2/board-cm-t35.c ? ? ? ? ? ? ? ? | ? ?4 +-
+>> ?arch/arm/mach-omap2/board-devkit8000.c ? ? ? ? ? ? | ? ?2 +
+>> ?arch/arm/mach-omap2/board-igep0020.c ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-omap2/board-omap3beagle.c ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/mach-omap2/board-omap3evm.c ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-omap2/board-omap3stalker.c ? ? ? ? ? | ? ?2 +
+>> ?arch/arm/plat-omap/include/plat/display.h ? ? ? ? ?| ? 28 +++-
+>> ?drivers/video/omap2/displays/Kconfig ? ? ? ? ? ? ? | ? 16 +--
+>> ?drivers/video/omap2/displays/Makefile ? ? ? ? ? ? ?| ? ?2 -
+>> ?drivers/video/omap2/displays/panel-generic.c ? ? ? | ?153 ++++++++++++++++--
+>> ?.../video/omap2/displays/panel-sharp-lq043t1dg01.c | ?165
+>> ?-------------------- .../video/omap2/displays/panel-toppoly-tdo35s.c ? ?|
+>> ?164 ------------------- 14 files changed, 175 insertions(+), 369 deletions(-)
+>> delete mode 100644
+>> drivers/video/omap2/displays/panel-sharp-lq043t1dg01.c ?delete mode 100644
+>> drivers/video/omap2/displays/panel-toppoly-tdo35s.c
 >
-> In fact, there are things in display.h that should be removed, and this
-> configurable panel driver could do that also. omap_dss_device contains
-> reset_gpio, max_backlight_level, platform_enable/disable and
-> set/get_backlight, which should actually be in panel spesific struct.
+> This series will break the build if we try to compile after applying
+> only the first or the first two patches of the series since things used
+> by the first patch are introduced in the last patch.
 >
+> Archit
 
-After a quick study of panel-taal.c driver and board-4430sdp.c, I
-believe we can pass the information from *data pointer of struct
-omap_dss_device. And keep the all panel specific configuration in
-driver.
+Got it. I will try to reorder the sequence
 
-I will keep the struct omap_dss_device untouched.
-
-Thanks,
--Bryan
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
