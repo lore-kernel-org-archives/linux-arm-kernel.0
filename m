@@ -1,131 +1,113 @@
-From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Wed, 3 Nov 2010 01:15:32 -0400
-Subject: [PATCH 2/2] ARM: mmp2: add sd card to jasper
-Message-ID: <mailman.11.1288775236.1530.linux-arm-kernel@lists.infradead.org>
+From: brian@murphy.dk (Brian Murphy)
+Date: Wed, 3 Nov 2010 10:14:46 +0100
+Subject: boot decompressor code error
+In-Reply-To: <20101103082558.GA11176@pengutronix.de>
+References: <AANLkTimttsvuVYFpCNFU4iJHCjHZ1Xq5E3Gni-wOrTba@mail.gmail.com>
+	<20101029105643.GB21103@n2100.arm.linux.org.uk>
+	<AANLkTimk14Z8f1D=YuxxLK6cYHcm=ot6mWhYB4_Emav1@mail.gmail.com>
+	<20101103082558.GA11176@pengutronix.de>
+Message-ID: <AANLkTinsKWK3fR=jZzJXeWHzmUUbbxJsRKxVdrYKtf15@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
----
- arch/arm/mach-mmp/jasper.c |   47 ++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
+2010/11/3 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Brian,
+>
+> On Wed, Nov 03, 2010 at 09:16:12AM +0100, Brian Murphy wrote:
+>> On Fri, Oct 29, 2010 at 12:56 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Oct 29, 2010 at 12:22:47PM +0200, Brian Murphy wrote:
+>> >> Hi,
+>> >> There is a problem with the boot decompression code when the inflate
+>> >> method is used on arm.
+>> >> In fact two. The second of which is also a problem on all architectures.
+>> >> The first, and more serious, is that static local variables seem not
+>> >> to be supported,
+>> >
+>> > static local variables are no different from static global variables
+>> > except their scope. ?static local variables can only be referenced
+>> > from within the block which they are defined and any child blocks,
+>> > whereas static global variables can be referenced by any code in the
+>> > same compilation unit.
+>> >
+>> > Their storage and initialization in both cases is identical.
+>> >
+>> >> this means that
+>> >> some tables initialized as static locals point to a place in ram where
+>> >> the tables are not.
+>> >> The function
+>> >>
+>> >> static void zlib_fixedtables(struct inflate_state *state)
+>> >>
+>> >> includes inffixed.h which contains two static tables and
+>> >
+>> > Both these tables are 'const' which means they end up in the read-only
+>> > section, and ultimately the text section of the image, not the data
+>> > section.
+>> >
+>> >> int zlib_inflate(z_streamp strm, int flush)
+>> >>
+>> >> contains a static local "order". The second seems not to have much
+>> >> influence on decompression
+>> >> but the first causes images (at least of a certain size) to fail
+>> >> decompression.
+>> >
+>> > Again, this is "static const unsigned short order[19] = ..." which
+>> > because of the const, ends up in the read-only section and therefore
+>> > the text section of the image.
+>> >
+>> > This is what I see from arm-linux-nm -n arch/arm/boot/compressed/vmlinux:
+>> > ...
+>> > 000835f0 t order.0
+>> > 00083618 t lenfix.1
+>> > 00083e18 t distfix.2
+>> > ...
+>> > which clearly shows these tables in the text section. ?Also
+>> > arm-linux-objdump -t arch/arm/boot/compressed/decompress.o shows:
+>> > ...
+>> > 000000fc l ? ? O .rodata ? ? ? ?00000026 order.0
+>> > 00000124 l ? ? O .rodata ? ? ? ?00000800 lenfix.1
+>> > 00000924 l ? ? O .rodata ? ? ? ?00000080 distfix.2
+>> > ...
+>> > which shows that these were placed into the .rodata section initially,
+>> > as I explained above.
+>> >
+>> > Can you show your output from the above commands please? ?Also show
+>> > the output of:
+>> >
+>> > arm-linux-nm -n arch/arm/boot/compressed/vmlinux|grep '\<__bss_start\>\|\<_end\>'
+>> >
+>> > arm-linux-objdump --section=.got -s arch/arm/boot/compressed/vmlinux
+>> >
+>> > Also, are you using ZBOOT_ROM=y or =n ?
+>> >
+>>
+>> It looks like you were right, to some degree :). The table data is in
+>> the image transferred to
+>> the board but it looks like static locals are treated by the compiler
+>> as locals and allocated on
+>> the stack! This, of course, means that at some point they get
+>> (partially) overwritten by newer
+>> locals and thus corrupted.
+> Some time ago the decompressor was compiled using
+>
+> ? ? ? ?-Dstatic=
+>
+> Is this still the case for you?
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
 
-diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
-index 2a684fa..757f251 100644
---- a/arch/arm/mach-mmp/jasper.c
-+++ b/arch/arm/mach-mmp/jasper.c
-@@ -67,6 +67,36 @@ static unsigned long jasper_pin_config[] __initdata = {
+I'll reply again to the list.
+Yes, in the decompressor in the 2.6.33 misc.c is compiled with -Dstatic=
+which puts all local static variables on the stack. As we all know
+returning a pointer
+to a local variable is not a good idea.
+This causes decompression of certain files which use these tables to fail.
 
- 	/* PMIC */
- 	PMIC_PMIC_INT | MFP_LPM_EDGE_FALL,
-+
-+	/* MMC1 */
-+	GPIO131_MMC1_DAT3,
-+	GPIO132_MMC1_DAT2,
-+	GPIO133_MMC1_DAT1,
-+	GPIO134_MMC1_DAT0,
-+	GPIO136_MMC1_CMD,
-+	GPIO139_MMC1_CLK,
-+	GPIO140_MMC1_CD,
-+	GPIO141_MMC1_WP,
-+
-+	/* MMC2 */
-+	GPIO37_MMC2_DAT3,
-+	GPIO38_MMC2_DAT2,
-+	GPIO39_MMC2_DAT1,
-+	GPIO40_MMC2_DAT0,
-+	GPIO41_MMC2_CMD,
-+	GPIO42_MMC2_CLK,
-+
-+	/* MMC3 */
-+	GPIO165_MMC3_DAT7,
-+	GPIO162_MMC3_DAT6,
-+	GPIO166_MMC3_DAT5,
-+	GPIO163_MMC3_DAT4,
-+	GPIO167_MMC3_DAT3,
-+	GPIO164_MMC3_DAT2,
-+	GPIO168_MMC3_DAT1,
-+	GPIO111_MMC3_DAT0,
-+	GPIO112_MMC3_CMD,
-+	GPIO151_MMC3_CLK,
- };
-
- static struct regulator_consumer_supply max8649_supply[] = {
-@@ -123,6 +153,19 @@ static struct i2c_board_info jasper_twsi1_info[] = {
- 	},
- };
-
-+#if defined(CONFIG_MMC_SDHCI_PXA)
-+
-+static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
-+	.max_speed	= 25000000,
-+};
-+
-+static void __init mmp2_init_mmc(void)
-+{
-+	mmp2_add_sdh(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
-+}
-+
-+#endif
-+
- static void __init jasper_init(void)
- {
- 	mfp_config(ARRAY_AND_SIZE(jasper_pin_config));
-@@ -132,6 +175,10 @@ static void __init jasper_init(void)
- 	mmp2_add_uart(3);
- 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(jasper_twsi1_info));
-
-+#if defined(CONFIG_MMC_SDHCI_PXA)
-+	mmp2_init_mmc();
-+#endif
-+
- 	regulator_has_full_constraints();
- }
-
--- 
-1.7.0.4
-
---001636c5a8e2f712de0494225d0d
-Content-Type: text/x-patch; charset=US-ASCII; 
-	name="0002-ARM-mmp2-add-sd-card-to-jasper.patch"
-Content-Disposition: attachment; 
-	filename="0002-ARM-mmp2-add-sd-card-to-jasper.patch"
-Content-Transfer-Encoding: base64
-X-Attachment-Id: f_gg1zgzhe0
-
-RnJvbSA0M2FkNGZmNDlkNmU5NGUzMjQ2ODc3NmEyNzhiYWFiYzQ2M2E2MTNmIE1vbiBTZXAgMTcg
-MDA6MDA6MDAgMjAwMQpGcm9tOiBaaGFuZ2ZlaSBHYW8gPHpoYW5nZmVpLmdhb0BtYXJ2ZWxsLmNv
-bT4KRGF0ZTogV2VkLCAzIE5vdiAyMDEwIDAxOjE1OjMyIC0wNDAwClN1YmplY3Q6IFtQQVRDSCAy
-LzJdIEFSTTogbW1wMjogYWRkIHNkIGNhcmQgdG8gamFzcGVyCgpTaWduZWQtb2ZmLWJ5OiBaaGFu
-Z2ZlaSBHYW8gPHpoYW5nZmVpLmdhb0BtYXJ2ZWxsLmNvbT4KLS0tCiBhcmNoL2FybS9tYWNoLW1t
-cC9qYXNwZXIuYyB8ICAgNDcgKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKysKIDEgZmlsZXMgY2hhbmdlZCwgNDcgaW5zZXJ0aW9ucygrKSwgMCBkZWxldGlvbnMoLSkK
-CmRpZmYgLS1naXQgYS9hcmNoL2FybS9tYWNoLW1tcC9qYXNwZXIuYyBiL2FyY2gvYXJtL21hY2gt
-bW1wL2phc3Blci5jCmluZGV4IDJhNjg0ZmEuLjc1N2YyNTEgMTAwNjQ0Ci0tLSBhL2FyY2gvYXJt
-L21hY2gtbW1wL2phc3Blci5jCisrKyBiL2FyY2gvYXJtL21hY2gtbW1wL2phc3Blci5jCkBAIC02
-Nyw2ICs2NywzNiBAQCBzdGF0aWMgdW5zaWduZWQgbG9uZyBqYXNwZXJfcGluX2NvbmZpZ1tdIF9f
-aW5pdGRhdGEgPSB7CiAKIAkvKiBQTUlDICovCiAJUE1JQ19QTUlDX0lOVCB8IE1GUF9MUE1fRURH
-RV9GQUxMLAorCisJLyogTU1DMSAqLworCUdQSU8xMzFfTU1DMV9EQVQzLAorCUdQSU8xMzJfTU1D
-MV9EQVQyLAorCUdQSU8xMzNfTU1DMV9EQVQxLAorCUdQSU8xMzRfTU1DMV9EQVQwLAorCUdQSU8x
-MzZfTU1DMV9DTUQsCisJR1BJTzEzOV9NTUMxX0NMSywKKwlHUElPMTQwX01NQzFfQ0QsCisJR1BJ
-TzE0MV9NTUMxX1dQLAorCisJLyogTU1DMiAqLworCUdQSU8zN19NTUMyX0RBVDMsCisJR1BJTzM4
-X01NQzJfREFUMiwKKwlHUElPMzlfTU1DMl9EQVQxLAorCUdQSU80MF9NTUMyX0RBVDAsCisJR1BJ
-TzQxX01NQzJfQ01ELAorCUdQSU80Ml9NTUMyX0NMSywKKworCS8qIE1NQzMgKi8KKwlHUElPMTY1
-X01NQzNfREFUNywKKwlHUElPMTYyX01NQzNfREFUNiwKKwlHUElPMTY2X01NQzNfREFUNSwKKwlH
-UElPMTYzX01NQzNfREFUNCwKKwlHUElPMTY3X01NQzNfREFUMywKKwlHUElPMTY0X01NQzNfREFU
-MiwKKwlHUElPMTY4X01NQzNfREFUMSwKKwlHUElPMTExX01NQzNfREFUMCwKKwlHUElPMTEyX01N
-QzNfQ01ELAorCUdQSU8xNTFfTU1DM19DTEssCiB9OwogCiBzdGF0aWMgc3RydWN0IHJlZ3VsYXRv
-cl9jb25zdW1lcl9zdXBwbHkgbWF4ODY0OV9zdXBwbHlbXSA9IHsKQEAgLTEyMyw2ICsxNTMsMTkg
-QEAgc3RhdGljIHN0cnVjdCBpMmNfYm9hcmRfaW5mbyBqYXNwZXJfdHdzaTFfaW5mb1tdID0gewog
-CX0sCiB9OwogCisjaWYgZGVmaW5lZChDT05GSUdfTU1DX1NESENJX1BYQSkKKworc3RhdGljIHN0
-cnVjdCBzZGhjaV9weGFfcGxhdGRhdGEgbW1wMl9zZGhfcGxhdGRhdGFfbW1jMCA9IHsKKwkubWF4
-X3NwZWVkCT0gMjUwMDAwMDAsCit9OworCitzdGF0aWMgdm9pZCBfX2luaXQgbW1wMl9pbml0X21t
-Yyh2b2lkKQoreworCW1tcDJfYWRkX3NkaCgwLCAmbW1wMl9zZGhfcGxhdGRhdGFfbW1jMCk7IC8q
-IFNEL01NQyAqLworfQorCisjZW5kaWYKKwogc3RhdGljIHZvaWQgX19pbml0IGphc3Blcl9pbml0
-KHZvaWQpCiB7CiAJbWZwX2NvbmZpZyhBUlJBWV9BTkRfU0laRShqYXNwZXJfcGluX2NvbmZpZykp
-OwpAQCAtMTMyLDYgKzE3NSwxMCBAQCBzdGF0aWMgdm9pZCBfX2luaXQgamFzcGVyX2luaXQodm9p
-ZCkKIAltbXAyX2FkZF91YXJ0KDMpOwogCW1tcDJfYWRkX3R3c2koMSwgTlVMTCwgQVJSQVlfQU5E
-X1NJWkUoamFzcGVyX3R3c2kxX2luZm8pKTsKIAorI2lmIGRlZmluZWQoQ09ORklHX01NQ19TREhD
-SV9QWEEpCisJbW1wMl9pbml0X21tYygpOworI2VuZGlmCisKIAlyZWd1bGF0b3JfaGFzX2Z1bGxf
-Y29uc3RyYWludHMoKTsKIH0KIAotLSAKMS43LjAuNAoK
---001636c5a8e2f712de0494225d0d--
+/Brian
