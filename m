@@ -1,58 +1,43 @@
-From: Jession.Dai@BENQ.com (Jession Dai)
-Date: Wed, 3 Nov 2010 22:39:02 +0800
-Subject: [PATCH v2 1/4] ARM: S5PV210: Add gpio interrupt support
-Message-ID: <6D163D12F822044EA4FE725D2268858A07A02E72@BQC-MSV11.BQC.CORP.COM>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Thu, 4 Nov 2010 21:23:11 +0900
+Subject: [PATCH] arm: Fix HAVE_S3C2410_WATCHDOG warnings
+In-Reply-To: <4CD282A7.9080204@embtoolkit.org>
+References: <20101104081633.GA27129@july>
+	<4CD282A7.9080204@embtoolkit.org>
+Message-ID: <AANLkTim_YDa9k2LiiNTswhynGQCO=V_kEv1CpOMEZgN0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dears:
+Hi,
 
-         I am looking for help about GPIO interrupt number.
+It's another patch. Can you send the patch?
 
- 
-
-Issue:
-
-The interrupt pin of an IC is connected to ARM (s5pc100) with pin
-GPJ2_1, when I want to register interrupt with the 
-
- request_irq(Int_number,
-taos_probe_hndlr,IRQF_TRIGGER_FALLING,DEVICE_NAME,NULL));
-
-but ,now I can't get the interrupt number(Int_number) in advance.
-
- 
-
-According to the spec of s5pc100, the interrupt number may be 30 ?
-here, I want to ask for your help 
-
- 
-
-IC.INT------>ARM.GPJ2_1  (connection symbol)
-
- 
-
-Many Thanks !! 
-
- 
-
-Best Regards, 
-
-Jession.Dai
-
-*********************************************
-
-HM1 Dep.  BenQ Co., Ltd.
-268# Shishan Road, New District, Suzhou, China 
-
-TEL: +86-512-68078800-6098
-FAX: +86-512-68078800-6078 
-E-mail: jession.dai at BenQ.com <mailto:jession.daii@BenQ.com> 
-
-********************************************* 
-
- 
-
+Thank you,
+Kyungmin Park
+On Nov 4, 2010 6:58 PM, "Abdoulaye Walsimou GAYE" <awg@embtoolkit.org>
+wrote:
+> On 11/04/2010 09:16 AM, Kyungmin Park wrote:
+>> Fix build warnings
+>> warning: (ARCH_S3C64XX && <choice> && WATCHDOG || ARCH_S5P64X0 &&
+<choice> && WATCHDOG || ARCH_S5P6442 && <choice> && WATCHDOG || ARCH_S5PC100
+&& <choice> || ARCH_S5PV210 && <choice> || ARCH_S5PV310 && <choice> ||
+MACH_SMDK6410 && ARCH_S3C64XX) selects HAVE_S3C2410_WATCHDOG which has unmet
+direct dependencies (WATCHDOG)
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>
+> Kyungmin Park,
+> The same warning appears when I2C is not selected.
+>
+> Best regards,
+> AWG
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101103/42cb3b87/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20101104/15653c43/attachment-0001.html>
