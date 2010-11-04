@@ -1,85 +1,79 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Thu, 4 Nov 2010 18:22:52 +0530
-Subject: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from board
-	file
-In-Reply-To: <AANLkTinfO5e9JewdTDxasTRrUAXhGaQs=n6=HnqOQP7S@mail.gmail.com>
-References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
-	<1285596710-25658-5-git-send-email-s-ghorai@ti.com>
-	<AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BABFAE@dbde02.ent.ti.com>
-	<AANLkTinOhBNUt+gvNb0MWiyHD8ZYgLDJPz8tc=p+CsVW@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC2B6@dbde02.ent.ti.com>
-	<AANLkTinNrZNuZnFfJKGLF9J3zsHsOTK0+VmUmYH88+c3@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC323@dbde02.ent.ti.com>
-	<AANLkTik3gO1Rm2U8-Rm2t2M83sdCjz_Oktpve_gDrbNM@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC331@dbde02.ent.ti.com>
-	<AANLkTinfO5e9JewdTDxasTRrUAXhGaQs=n6=HnqOQP7S@mail.gmail.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC3BB@dbde02.ent.ti.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Thu,  4 Nov 2010 22:53:21 +0800
+Subject: [PATCH] ARM: pxa: fix the building failue on saar
+Message-ID: <1288882401-14859-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since CONFIG_FB_PXA_SMARTPANEL is introduced and it's depend on CONFIG_FB_PXA.
+We can't compile CONFIG_FB_PXA as module.
 
+arch/arm/mach-pxa/built-in.o: In function `ltm020d550_update':
+saar.c:(.text+0xdc8): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xdd4): undefined reference to `pxafb_smart_flush'
+arch/arm/mach-pxa/built-in.o: In function `ltm020d550_lcd_power':
+saar.c:(.text+0xdf8): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xe08): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xe10): undefined reference to `pxafb_smart_flush'
+saar.c:(.text+0xe2c): undefined reference to `pxafb_smart_queue'
+arch/arm/mach-pxa/built-in.o: In function `ltm022a97a_update':
+saar.c:(.text+0xe68): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xe74): undefined reference to `pxafb_smart_flush'
+arch/arm/mach-pxa/built-in.o: In function `ltm022a97a_lcd_power':
+saar.c:(.text+0xeb0): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xec0): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xec8): undefined reference to `pxafb_smart_flush'
+saar.c:(.text+0xf08): undefined reference to `pxafb_smart_queue'
+saar.c:(.text+0xf18): undefined reference to `pxafb_smart_queue'
+make[1]: *** [.tmp_vmlinux1] Error 1
+make: *** [sub-make] Error 2
 
-> -----Original Message-----
-> From: Grazvydas Ignotas [mailto:notasas at gmail.com]
-> Sent: Thursday, November 04, 2010 5:03 PM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org; Artem.Bityutskiy at nokia.com; Vimal Singh; Tony
-> Lindgren
-> Subject: Re: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from
-> board file
-> 
-> On Thu, Nov 4, 2010 at 1:15 PM, Ghorai, Sukumar <s-ghorai@ti.com> wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Grazvydas Ignotas [mailto:notasas at gmail.com]
-> >> Sent: Thursday, November 04, 2010 4:42 PM
-> >> To: Ghorai, Sukumar
-> >> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-
-> arm-
-> >> kernel at lists.infradead.org; Artem.Bityutskiy at nokia.com; Vimal Singh;
-> Tony
-> >> Lindgren
-> >> Subject: Re: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from
-> >> board file
-> >>
-> >> > [Ghorai] In 2.6.36, it's a s/w ecc by default and working in all
-> >> platforms like - omap3430 SDP, zoom2, 3630SDP, ZOOM3.
-> >> > So please explain more when you found that - sw ecc is broken on both
-> >> 2.6.36
-> >>
-> >> It doesn't for me, see
-> >> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-
-> >>
-> 2.6.git;a=blob;f=drivers/mtd/nand/omap2.c;h=513e0a76a4a73866d52bba8151e435
-> >> 56a3b30a54;hb=f6f94e2ab1b33f0082ac22d71f66385a60d8157f
-> >>
-> >> This is omap NAND driver at v2.6.36 tag, and it has
-> >> CONFIG_MTD_NAND_OMAP_HWECC forced.
-> >
-> > [Ghorai] This is the same old code since log. And this portion of code
-> not touched for 2.6.36.
-> > And please let me know what kind of problem you are facing when you
-> using 2.6.36; also let me know how to reproduce, I can check in my
-> platform too.
-> 
-> It has changed in 2.5.36, take a look how it was in 2.6.35, when it
-> worked for me:
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-
-> 2.6.git;a=blob;f=drivers/mtd/nand/omap2.c;h=ee87325c7712a8eeee4bbc683f9301
-> 4c9901f337;hb=9fe6206f400646a2322096b56c59891d530e8d51
-> 
-> notice how 2.5.36 has CONFIG_MTD_NAND_OMAP_HWECC defined and 2.6.35
-> doesn't.
-> 
-> The test case is simple:
-> format and use NAND on 2.6.35 or earlier, works fine.
-> upgrade to 2.6.36 or 2.6.37-rc1 and try to mount the same NAND
-> partition - lots of ECC errors.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+---
+ arch/arm/mach-pxa/saar.c     |    2 +-
+ arch/arm/mach-pxa/tavorevb.c |    2 +-
+ drivers/video/Kconfig        |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-[Ghorai] I tested this and working fine in zoom3.
+diff --git a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
+index 115b6f2..f8c3a13 100644
+--- a/arch/arm/mach-pxa/saar.c
++++ b/arch/arm/mach-pxa/saar.c
+@@ -116,7 +116,7 @@ static struct platform_device smc91x_device = {
+ 	},
+ };
  
-And as you mentioned there may be an issue we need to identify, 
-So remove this #define form 2.6.36 and let me know the test result. 
+-#if defined(CONFIG_FB_PXA) || (CONFIG_FB_PXA_MODULE)
++#if defined(CONFIG_FB_PXA)
+ static uint16_t lcd_power_on[] = {
+ 	/* single frame */
+ 	SMART_CMD_NOOP,
+diff --git a/arch/arm/mach-pxa/tavorevb.c b/arch/arm/mach-pxa/tavorevb.c
+index 0f440c9..0b3abac 100644
+--- a/arch/arm/mach-pxa/tavorevb.c
++++ b/arch/arm/mach-pxa/tavorevb.c
+@@ -163,7 +163,7 @@ static void __init tavorevb_init_keypad(void)
+ static inline void tavorevb_init_keypad(void) {}
+ #endif /* CONFIG_KEYBOARD_PXA27x || CONFIG_KEYBOARD_PXA27x_MODULE */
+ 
+-#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
++#if defined(CONFIG_FB_PXA)
+ static struct platform_pwm_backlight_data tavorevb_backlight_data[] = {
+ 	[0] = {
+ 		/* primary backlight */
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 8b31fdf..003b84e 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1805,7 +1805,7 @@ config FB_PXA168
+ 	  MMP processor.
+ 
+ config FB_PXA
+-	tristate "PXA LCD framebuffer support"
++	bool "PXA LCD framebuffer support"
+ 	depends on FB && ARCH_PXA
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+-- 
+1.5.6.5
