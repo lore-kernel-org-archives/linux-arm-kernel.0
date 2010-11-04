@@ -1,48 +1,53 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri,  5 Nov 2010 00:26:42 +0530
-Subject: [PATCH] ARM: fix build error with GCC 4.5.0
-Message-ID: <1288897002-24073-1-git-send-email-rabin@rab.in>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Thu, 4 Nov 2010 12:21:33 -0700
+Subject: [PATCH 2/2] ARM: imx: Add mx53 support to common msl functions.
+In-Reply-To: <4CD12833.8060204@eukrea.com>
+References: <1288736227-800-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<1288736227-800-2-git-send-email-Dinh.Nguyen@freescale.com>
+	<4CD12833.8060204@eukrea.com>
+Message-ID: <86A0E76937111F4C92FABEC0A20988510523CEC2@az33exm21>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following error which occurs when building an ARM kernel with
-GCC 4.5.0:
+Hi Eric,
 
-  arm-linux-gcc -Wp,-MD,kernel/.bounds.s.d  -nostdinc
-  [command line edited to remove paths]
-  -D__KERNEL__ -mlittle-endian
-  -Wall -Wundef
-  -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common
-  -Werror-implicit-function-declaration -Wno-format-security
-  -fno-delete-null-pointer-checks -Os -marm -fno-dwarf2-cfi-asm
-  -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=5
-  -march=armv5te -mtune=arm9tdmi -msoft-float -Uarm -fomit-frame-pointer -g
-  -DCC_HAVE_ASM_GOTO    -D"KBUILD_STR(s)=#s"
-  -D"KBUILD_BASENAME=KBUILD_STR(bounds)"  -D"KBUILD_MODNAME=KBUILD_STR(bounds)"
-  -fverbose-asm -S -o kernel/bounds.s kernel/bounds.c
-  kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
+>-----Original Message-----
+>From: Eric B?nard [mailto:eric at eukrea.com]
+>Sent: Wednesday, November 03, 2010 4:16 AM
+>To: Nguyen Dinh-R00091
+>Cc: linux-kernel at vger.kernel.org; amit.kucheria at canonical.com; linux at arm.linux.org.uk;
+>s.hauer at pengutronix.de; grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+>daniel at caiaq.de; u.kleine-koenig at pengutronix.de; Zhang Lily-R58066; valentin.longchamp at epfl.ch
+>Subject: Re: [PATCH 2/2] ARM: imx: Add mx53 support to common msl functions.
+>
+>Hi Dinh,
+>
+>Le 02/11/2010 23:17, Dinh.Nguyen at freescale.com a ?crit :
+>> From: Dinh Nguyen<Dinh.Nguyen@freescale.com>
+>>
+>> Add mx53 support to cpu.c and mm.c.
+>>
+>> Signed-off by: Dinh Nguyen<Dinh.Nguyen@freescale.com>
+>>   static void query_silicon_parameter(void)
+>>   {
+>> -	void __iomem *rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
+>> +	void __iomem *rom;
+>>   	u32 rev;
+>>
+>> +	if (cpu_is_mx51())
+>> +		rom = ioremap(MX51_IROM_BASE_ADDR, MX51_IROM_SIZE);
+>> +	else if (cpu_is_mx53())
+>> +		rom = ioremap(MX53_IROM_BASE_ADDR, MX53_IROM_SIZE);
+>> +
+>isn't the correct way to get the silicon revision to read the "Product
+>Revision register" and "Silicon Revision register" of the IIM and not from the
+>internal ROM ? (page 41-11 of the i.MX51 reference manual).
+>
+>Eric
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
-Seen with this compiler:
+Reading the ROM code is probably the most reliable way to get the correct silicon revision. Because the ROM that is on the chip is "most likely" up-to-date with the silicon. "Most likely" means that 95% of the time, when you get a new silicon, the ROM code will get updated. There is still a chance that a new silicon will not require a ROM update.
 
-http://kernel.org/pub/tools/crosstool/files/bin/x86_64/4.5.0/x86_64-gcc-4.5.0-nolibc_arm-linux.tar.bz2
+Also the other reason is that sometimes the fuses that identify the silicon revision that are used by the IIM are sometimes not blown to reflect the correct revision in pre-production parts. MX51 is a post production part, so in theory, the fuses are blown correctly. But since we made MX51 boards available prior to going into production, reading from the IIM is not as reliable as reading the ROM.
 
- arch/arm/Makefile |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index b87aed0..c06d9ed 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -91,7 +91,7 @@ tune-$(CONFIG_CPU_FEROCEON)	:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
- tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
- 
- ifeq ($(CONFIG_AEABI),y)
--CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
-+CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
- else
- CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
- endif
--- 
-1.7.2.3
+Thanks,
+Dinh
