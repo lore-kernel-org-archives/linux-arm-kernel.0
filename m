@@ -1,41 +1,41 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 03 Nov 2010 16:17:15 -0700
-Subject: [PATCHv2 1/3] ARM: Translate delay.S into (mostly) C
-In-Reply-To: <4CD1ECF7.5030105@codeaurora.org>
-References: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>
-	<1288300770-18350-2-git-send-email-sboyd@codeaurora.org>
-	<1288808841.23615.5.camel@e102144-lin.cambridge.arm.com>
-	<4CD1ECF7.5030105@codeaurora.org>
-Message-ID: <1288826235.16859.38.camel@c-dwalke-linux.qualcomm.com>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Thu, 4 Nov 2010 06:32:17 +0530
+Subject: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from board
+	file
+In-Reply-To: <AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
+References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
+	<1285596710-25658-5-git-send-email-s-ghorai@ti.com>
+	<AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B0356BABFAE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2010-11-03 at 16:15 -0700, Stephen Boyd wrote:
-> On 11/03/2010 11:27 AM, Will Deacon wrote:
-> > Hi Stephen,
-> >
-> > On Thu, 2010-10-28 at 21:19 +0000, Stephen Boyd wrote:
-> >> Nico expressed concern that fixed lpj cmdlines will break due to
-> >> compiler optimizations. That doesn't seem to be the case since
-> >> before and after this patch I get the same lpj value when running
-> >> my CPU at 19.2 MHz. That should be sufficiently slow enough to
-> >> cover any machine running Linux.
-> >
-> > I appreciate this is an exceptional case, but there are some lucky
-> > guys at ARM who (as routinely as they can) boot Linux on sub 1MHz
-> > hardware. The delay loop is something they're keen to avoid so they do
-> > make use of the lpj= command line option and would rather it didn't
-> > break on them.
+
+
+> -----Original Message-----
+> From: Grazvydas Ignotas [mailto:notasas at gmail.com]
+> Sent: Wednesday, November 03, 2010 6:33 PM
+> To: Ghorai, Sukumar
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org; Vimal Singh; Artem.Bityutskiy at nokia.com
+> Subject: Re: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from
+> board file
 > 
-> Do you know if it breaks at that frequency? I don't have any hardware to
-> test with that goes lower than the stated 19.2 MHz.
-
-Isn't it possible that a new compiler could optimize the code
-differently, and then end up breaking lpj= ?
-
-Daniel
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> On Mon, Sep 27, 2010 at 5:11 PM, Sukumar Ghorai <s-ghorai@ti.com> wrote:
+> > This patch makes it possible to select sw or hw (different layout
+> options)
+> > ecc scheme supported by omap nand driver. ?And hw ecc layout selected
+> for
+> > sdp and zoom boards, by default.
+> >
+> > Signed-off-by: Vimal Singh <vimalsingh@ti.com>
+> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+> 
+> Any news on this? Commit 2c01946c accidentally (?) enabled hardware
+> ECC and now my board is broken, as the driver always used sw ecc and
+> my NAND partitions are formatted accordingly. We should at least
+> switch the default back to sw ecc, don't you think?
+[Ghorai] 
+1. which board you are working. 
+2. and the default layout is the same as previous 
++       board_nand_data.ecc_opt         = OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT;
