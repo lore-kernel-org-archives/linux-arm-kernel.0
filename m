@@ -1,62 +1,59 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 04 Nov 2010 14:16:54 -0700
-Subject: [PATCHv2 2/3] ARM: Allow machines to override __delay()
-In-Reply-To: <4CD31E67.60107@codeaurora.org>
-References: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>
-	<1288300770-18350-3-git-send-email-sboyd@codeaurora.org>
-	<1288899002.21823.3.camel@c-dwalke-linux.qualcomm.com>
-	<4CD31E67.60107@codeaurora.org>
-Message-ID: <1288905414.21823.12.camel@c-dwalke-linux.qualcomm.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Thu, 4 Nov 2010 22:21:51 +0100
+Subject: [PATCH] ARM: fix build error with GCC 4.5.0
+In-Reply-To: <yw1xy698ygbx.fsf@unicorn.mansr.com>
+References: <1288897002-24073-1-git-send-email-rabin@rab.in>
+	<yw1xy698ygbx.fsf@unicorn.mansr.com>
+Message-ID: <19667.9199.798932.405415@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2010-11-04 at 13:58 -0700, Stephen Boyd wrote:
-> On 11/04/2010 12:30 PM, Daniel Walker wrote:
-> > On Thu, 2010-10-28 at 14:19 -0700, Stephen Boyd wrote:
-> >> +
-> >> +static void (*delay_fn)(unsigned long) = delay_loop;
-> >> +
-> >> +void set_delay_fn(void (*fn)(unsigned long))
-> >> +{
-> >> +       delay_fn = fn;
-> >> +}
-> >
-> > This needs to be a static inline in the header file.
-> 
-> Wouldn't that mean delay_fn needs to be exposed in the header file too?
-> I like the fact that it's static and scoped to this file.
+M?ns Rullg?rd writes:
+ > Rabin Vincent <rabin@rab.in> writes:
+ > 
+ > > Fix the following error which occurs when building an ARM kernel with
+ > > GCC 4.5.0:
+ > >
+ > >   arm-linux-gcc -Wp,-MD,kernel/.bounds.s.d  -nostdinc
+ > >   [command line edited to remove paths]
+ > >   -D__KERNEL__ -mlittle-endian
+ > >   -Wall -Wundef
+ > >   -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common
+ > >   -Werror-implicit-function-declaration -Wno-format-security
+ > >   -fno-delete-null-pointer-checks -Os -marm -fno-dwarf2-cfi-asm
+ > >   -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=5
+ > >   -march=armv5te -mtune=arm9tdmi -msoft-float -Uarm -fomit-frame-pointer -g
+ > >   -DCC_HAVE_ASM_GOTO    -D"KBUILD_STR(s)=#s"
+ > >   -D"KBUILD_BASENAME=KBUILD_STR(bounds)"  -D"KBUILD_MODNAME=KBUILD_STR(bounds)"
+ > >   -fverbose-asm -S -o kernel/bounds.s kernel/bounds.c
+ > >   kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
+ > >
+ > > Signed-off-by: Rabin Vincent <rabin@rab.in>
+ > > ---
+ > > Seen with this compiler:
+ > >
+ > > http://kernel.org/pub/tools/crosstool/files/bin/x86_64/4.5.0/x86_64-gcc-4.5.0-nolibc_arm-linux.tar.bz2
+ > >
+ > >  arch/arm/Makefile |    2 +-
+ > >  1 files changed, 1 insertions(+), 1 deletions(-)
+ > >
+ > > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+ > > index b87aed0..c06d9ed 100644
+ > > --- a/arch/arm/Makefile
+ > > +++ b/arch/arm/Makefile
+ > > @@ -91,7 +91,7 @@ tune-$(CONFIG_CPU_FEROCEON)	:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
+ > >  tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+ > >
+ > >  ifeq ($(CONFIG_AEABI),y)
+ > > -CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
+ > > +CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
+ > 
+ > The real question is why something is trying to use floating-point.
+ > It shouldn't.
 
-Yeah you would need to make an extern for that. Why is it better to have
-it static in this file?
+Indeed. I suspect an improperly patched or configured gcc-4.5.0,
+or broken kernel sources. Especially considering that the kernel
+passes -msoft-float to gcc (see above).
 
-If you make it inline you should have smaller code size since all your
-doing is "delay_fn = fn;" and that's not expected to be used much (if at
-all).
-
-> >> +/*
-> >> + * loops = usecs * HZ * loops_per_jiffy / 1000000
-> >> + */
-> >> +void __delay(unsigned long loops)
-> >> +{
-> >> +       delay_fn(loops);
-> >> +}
-> >>  EXPORT_SYMBOL(__delay);
-> >
-> > Can we make this static inline also? I'm sure about the module issues..
-> 
-> Do you mean in the header file or in this file?
-
-header file.
-
-> I think it won't work because there actually needs to be a __delay
-> symbol and it can't just be inlined away at all the call sites.
-
-It would be inlined into delay_fn(loops); . So it's calling a function.
-I think you can export the delay_fn symbol and use it that way.
-
-Daniel
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I know gcc-4.5.0 configured for arm-linux-gnueabi built working EABI
+kernels a few months ago.
