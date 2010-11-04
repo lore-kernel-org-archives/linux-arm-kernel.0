@@ -1,70 +1,128 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Thu, 04 Nov 2010 17:16:33 +0900
-Subject: [PATCH] arm: Fix HAVE_S3C2410_WATCHDOG warnings
-Message-ID: <20101104081633.GA27129@july>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  4 Nov 2010 10:46:14 +0100
+Subject: [PATCH] pcmcia/sa1100: don't put machine specific init functions in
+	.init.text
+Message-ID: <1288863974-20434-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build warnings
-warning: (ARCH_S3C64XX && <choice> && WATCHDOG || ARCH_S5P64X0 && <choice> && WATCHDOG || ARCH_S5P6442 && <choice> && WATCHDOG || ARCH_S5PC100 && <choice> || ARCH_S5PV210 && <choice> || ARCH_S5PV310 && <choice> || MACH_SMDK6410 && ARCH_S3C64XX) selects HAVE_S3C2410_WATCHDOG which has unmet direct dependencies (WATCHDOG)
+These are called by sa11x0_drv_pcmcia_probe (which is marked now with
+__devinit) so they can go to .devinit.text now, too.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+This fixes:
+
+	WARNING: drivers/pcmcia/sa1100_cs.o(.text+0x10): Section mismatch in reference from the function sa11x0_drv_pcmcia_probe() to the function .init.text:pcmcia_simpad_init()
+	The function sa11x0_drv_pcmcia_probe() references
+	the function __init pcmcia_simpad_init().
+	This is often because sa11x0_drv_pcmcia_probe lacks a __init
+	annotation or the annotation of pcmcia_simpad_init is wrong.
+
+and a similar warning for pcmcia_collie_init, pcmcia_cerf_init,
+pcmcia_h3600_init and pcmcia_shannon_init.
+
+While at it mark pcmcia_assabet_init with __devinit, too.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a19a526..a302713 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -677,7 +677,7 @@ config ARCH_S3C64XX
- 	select USB_ARCH_HAS_OHCI
- 	select SAMSUNG_GPIOLIB_4BIT
- 	select HAVE_S3C2410_I2C
--	select HAVE_S3C2410_WATCHDOG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	help
- 	  Samsung S3C64XX series based systems
+ drivers/pcmcia/pxa2xx_sharpsl.c |    2 +-
+ drivers/pcmcia/sa1100_assabet.c |    2 +-
+ drivers/pcmcia/sa1100_cerf.c    |    2 +-
+ drivers/pcmcia/sa1100_generic.c |    2 +-
+ drivers/pcmcia/sa1100_h3600.c   |    2 +-
+ drivers/pcmcia/sa1100_shannon.c |    2 +-
+ drivers/pcmcia/sa1100_simpad.c  |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/pcmcia/pxa2xx_sharpsl.c b/drivers/pcmcia/pxa2xx_sharpsl.c
+index 0ea3b29..81af2b3 100644
+--- a/drivers/pcmcia/pxa2xx_sharpsl.c
++++ b/drivers/pcmcia/pxa2xx_sharpsl.c
+@@ -237,7 +237,7 @@ static struct pcmcia_low_level sharpsl_pcmcia_ops __initdata = {
+ #ifdef CONFIG_SA1100_COLLIE
+ #include "sa11xx_base.h"
  
-@@ -686,7 +686,7 @@ config ARCH_S5P64X0
- 	select CPU_V6
- 	select GENERIC_GPIO
- 	select HAVE_CLK
--	select HAVE_S3C2410_WATCHDOG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select ARCH_USES_GETTIMEOFFSET
- 	select HAVE_S3C2410_I2C
- 	select HAVE_S3C_RTC
-@@ -700,7 +700,7 @@ config ARCH_S5P6442
- 	select GENERIC_GPIO
- 	select HAVE_CLK
- 	select ARCH_USES_GETTIMEOFFSET
--	select HAVE_S3C2410_WATCHDOG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	help
- 	  Samsung S5P6442 CPU based systems
+-int __init pcmcia_collie_init(struct device *dev)
++int __devinit pcmcia_collie_init(struct device *dev)
+ {
+        int ret = -ENODEV;
  
-@@ -713,7 +713,7 @@ config ARCH_S5PC100
- 	select ARCH_USES_GETTIMEOFFSET
- 	select HAVE_S3C2410_I2C
- 	select HAVE_S3C_RTC
--	select HAVE_S3C2410_WATCHDOG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	help
- 	  Samsung S5PC100 series based systems
+diff --git a/drivers/pcmcia/sa1100_assabet.c b/drivers/pcmcia/sa1100_assabet.c
+index fd013a1..f1e8822 100644
+--- a/drivers/pcmcia/sa1100_assabet.c
++++ b/drivers/pcmcia/sa1100_assabet.c
+@@ -130,7 +130,7 @@ static struct pcmcia_low_level assabet_pcmcia_ops = {
+ 	.socket_suspend		= assabet_pcmcia_socket_suspend,
+ };
  
-@@ -728,7 +728,7 @@ config ARCH_S5PV210
- 	select ARCH_USES_GETTIMEOFFSET
- 	select HAVE_S3C2410_I2C
- 	select HAVE_S3C_RTC
--	select HAVE_S3C2410_WATCHDOG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	help
- 	  Samsung S5PV210/S5PC110 series based systems
+-int pcmcia_assabet_init(struct device *dev)
++int __devinit pcmcia_assabet_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
  
-@@ -741,7 +741,7 @@ config ARCH_S5PV310
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_S3C_RTC
- 	select HAVE_S3C2410_I2C
--	select HAVE_S3C2410_WATCHDOG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	help
- 	  Samsung S5PV310 series based systems
+diff --git a/drivers/pcmcia/sa1100_cerf.c b/drivers/pcmcia/sa1100_cerf.c
+index 9bf088b..30560df 100644
+--- a/drivers/pcmcia/sa1100_cerf.c
++++ b/drivers/pcmcia/sa1100_cerf.c
+@@ -97,7 +97,7 @@ static struct pcmcia_low_level cerf_pcmcia_ops = {
+ 	.socket_suspend		= cerf_pcmcia_socket_suspend,
+ };
  
+-int __init pcmcia_cerf_init(struct device *dev)
++int __devinit pcmcia_cerf_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index 945857f..6b22859 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -64,7 +64,7 @@ static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
+ #endif
+ };
+ 
+-static int sa11x0_drv_pcmcia_probe(struct platform_device *dev)
++static int __devinit sa11x0_drv_pcmcia_probe(struct platform_device *dev)
+ {
+ 	int i, ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
+index 56329ad..edf8f00 100644
+--- a/drivers/pcmcia/sa1100_h3600.c
++++ b/drivers/pcmcia/sa1100_h3600.c
+@@ -219,7 +219,7 @@ struct pcmcia_low_level h3600_pcmcia_ops = {
+ 	.socket_suspend		= h3600_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_h3600_init(struct device *dev)
++int __devinit pcmcia_h3600_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_shannon.c b/drivers/pcmcia/sa1100_shannon.c
+index c4d5186..7ff1b43 100644
+--- a/drivers/pcmcia/sa1100_shannon.c
++++ b/drivers/pcmcia/sa1100_shannon.c
+@@ -113,7 +113,7 @@ static struct pcmcia_low_level shannon_pcmcia_ops = {
+ 	.socket_suspend		= shannon_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_shannon_init(struct device *dev)
++int __devinit pcmcia_shannon_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/pcmcia/sa1100_simpad.c b/drivers/pcmcia/sa1100_simpad.c
+index 05bd504..c998f7a 100644
+--- a/drivers/pcmcia/sa1100_simpad.c
++++ b/drivers/pcmcia/sa1100_simpad.c
+@@ -123,7 +123,7 @@ static struct pcmcia_low_level simpad_pcmcia_ops = {
+ 	.socket_suspend		= simpad_pcmcia_socket_suspend,
+ };
+ 
+-int __init pcmcia_simpad_init(struct device *dev)
++int __devinit pcmcia_simpad_init(struct device *dev)
+ {
+ 	int ret = -ENODEV;
+ 
+-- 
+1.7.2.3
