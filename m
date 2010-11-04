@@ -1,42 +1,74 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 03 Nov 2010 22:40:14 -0400 (EDT)
-Subject: [PATCHv2 1/3] ARM: Translate delay.S into (mostly) C
-In-Reply-To: <1288807054.16859.2.camel@c-dwalke-linux.qualcomm.com>
-References: <1288300770-18350-1-git-send-email-sboyd@codeaurora.org>
-	<1288300770-18350-2-git-send-email-sboyd@codeaurora.org>
-	<1288807054.16859.2.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1011032236450.18581@xanadu.home>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 04 Nov 2010 00:29:01 -0400
+Subject: [PATCH v3 06/13] OMAP3: DMA: hwmod: add system DMA
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC03B4C3@dbde02.ent.ti.com>
+References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
+	<1288099513-1854-7-git-send-email-manjugk@ti.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC03B4C3@dbde02.ent.ti.com>
+Message-ID: <4CD2368D.50107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Nov 2010, Daniel Walker wrote:
+Hi Manjunath,
 
-> On Thu, 2010-10-28 at 14:19 -0700, Stephen Boyd wrote:
-> > We want to allow machines to override the __delay() implementation
-> > at runtime so they can use a timer based __delay() routine. It's
-> > easier to do this using C, so let's write udelay and friends in C.
-> > 
-> > We lose the #if 0 code, which according to Russell is used "to
-> > make the delay loop more stable and predictable on older CPUs"
-> > (see http://article.gmane.org/gmane.linux.kernel/888867 for more
-> > info). We shouldn't be too worried though, since we'll soon add
-> > functionality allowing a machine to set the __delay() loop
-> > themselves, thus allowing machines to resurrect the commented out
-> > code should they need it.
-> > 
-> > Nico expressed concern that fixed lpj cmdlines will break due to
-> > compiler optimizations. That doesn't seem to be the case since
-> > before and after this patch I get the same lpj value when running
-> > my CPU at 19.2 MHz. That should be sufficiently slow enough to
-> > cover any machine running Linux.
-> 
-> Nico, are you ready to sign off on this?
+On 11/3/2010 8:59 AM, G, Manjunath Kondaiah wrote:
+> Kevin/Benoit,
+>
+>> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of G,
+>> Manjunath Kondaiah
+>> Sent: Tuesday, October 26, 2010 6:55 PM
+>>
+>> Add OMAP3 DMA hwmod structures.
+>>
+>> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+>> Cc: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Kevin Hilman<khilman@deeprootsystems.com>
+>> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   93
+>> ++++++++++++++++++++++++++++
+>>   1 files changed, 93 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>> index ed6bf4a..4a5231c 100644
+> [...]
+>> +	.prcm = {
+>> +		.omap2 = {
+>> +			.prcm_reg_id		= 1,
+>> +			.module_bit		=
+>> OMAP3430_ST_SDMA_SHIFT,
+>> +			.idlest_reg_id		= 1,
+>> +			.idlest_idle_bit	=
+>> OMAP3430_ST_SDMA_SHIFT,
+>
+> Looks like the .module_offs field is missing here. Since
+> ST_SDMA bit belongs to CM_IDLEST1_CORE register, .module_offs should
+> be CORE_MOD.
+>
+> But, it is observed that, using .module_offs results in warning dump
+> during bootup. This is due to, ST_SDMA bit in standby mode. Since
+> there is no fclk for DMA, this bit will never change till DMA channel
+> is requested for data transfer.
+>
+> We might have to bypass calling "omap2_cm_wait_module_ready" in
+> "_wait_target_ready" in omap_hwmod.c
+>
+> With exising flags, we can use "HWMOD_NO_IDLEST" flag, but this
+> flag has different meaning. How about using new flag like
+> "HWMOD_NO_FCLK_OPCLK" and if it is set, return without calling
+> "omap2_cm_wait_module_ready"
+>
+> Any better suggestion to handle this issue?
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Well, yes, use HWMOD_NO_IDLEST and remove idlest_reg_id & 
+idlest_idle_bit entries in the omap2 structure.
 
-The compiled code looks trivial enough.  I don't think gcc will find 
-ways to optimize it further.  And if gcc regresses then the delay would 
-just be longer.
+ST_SDMA is the standby status of the SDMA, but there is no idle status 
+on that IP, so you cannot do anything.
+The standby will just reflect the activity of the master port of the 
+DMA, but it will give you no information about the slave port and thus 
+we do not have any module ready information.
 
-
-Nicolas
+Regards,
+Benoit
