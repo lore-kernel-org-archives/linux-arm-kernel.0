@@ -1,128 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  4 Nov 2010 10:46:14 +0100
-Subject: [PATCH] pcmcia/sa1100: don't put machine specific init functions in
-	.init.text
-Message-ID: <1288863974-20434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Thu, 4 Nov 2010 11:52:10 +0200
+Subject: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from board
+	file
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B0356BABFAE@dbde02.ent.ti.com>
+References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
+	<1285596710-25658-5-git-send-email-s-ghorai@ti.com>
+	<AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BABFAE@dbde02.ent.ti.com>
+Message-ID: <AANLkTinOhBNUt+gvNb0MWiyHD8ZYgLDJPz8tc=p+CsVW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are called by sa11x0_drv_pcmcia_probe (which is marked now with
-__devinit) so they can go to .devinit.text now, too.
+On Thu, Nov 4, 2010 at 3:02 AM, Ghorai, Sukumar <s-ghorai@ti.com> wrote:
+>> -----Original Message-----
+>> From: Grazvydas Ignotas [mailto:notasas at gmail.com]
+>> Sent: Wednesday, November 03, 2010 6:33 PM
+>> To: Ghorai, Sukumar
+>> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+>> kernel at lists.infradead.org; Vimal Singh; Artem.Bityutskiy at nokia.com
+>> Subject: Re: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from
+>> board file
+>>
+>> On Mon, Sep 27, 2010 at 5:11 PM, Sukumar Ghorai <s-ghorai@ti.com> wrote:
+>> > This patch makes it possible to select sw or hw (different layout
+>> options)
+>> > ecc scheme supported by omap nand driver. ?And hw ecc layout selected
+>> for
+>> > sdp and zoom boards, by default.
+>> >
+>> > Signed-off-by: Vimal Singh <vimalsingh@ti.com>
+>> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+>>
+>> Any news on this? Commit 2c01946c accidentally (?) enabled hardware
+>> ECC and now my board is broken, as the driver always used sw ecc and
+>> my NAND partitions are formatted accordingly. We should at least
+>> switch the default back to sw ecc, don't you think?
+> [Ghorai]
+> 1. which board you are working.
+> 2. and the default layout is the same as previous
+> + ? ? ? board_nand_data.ecc_opt ? ? ? ? = OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT;
 
-This fixes:
-
-	WARNING: drivers/pcmcia/sa1100_cs.o(.text+0x10): Section mismatch in reference from the function sa11x0_drv_pcmcia_probe() to the function .init.text:pcmcia_simpad_init()
-	The function sa11x0_drv_pcmcia_probe() references
-	the function __init pcmcia_simpad_init().
-	This is often because sa11x0_drv_pcmcia_probe lacks a __init
-	annotation or the annotation of pcmcia_simpad_init is wrong.
-
-and a similar warning for pcmcia_collie_init, pcmcia_cerf_init,
-pcmcia_h3600_init and pcmcia_shannon_init.
-
-While at it mark pcmcia_assabet_init with __devinit, too.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/pcmcia/pxa2xx_sharpsl.c |    2 +-
- drivers/pcmcia/sa1100_assabet.c |    2 +-
- drivers/pcmcia/sa1100_cerf.c    |    2 +-
- drivers/pcmcia/sa1100_generic.c |    2 +-
- drivers/pcmcia/sa1100_h3600.c   |    2 +-
- drivers/pcmcia/sa1100_shannon.c |    2 +-
- drivers/pcmcia/sa1100_simpad.c  |    2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/pcmcia/pxa2xx_sharpsl.c b/drivers/pcmcia/pxa2xx_sharpsl.c
-index 0ea3b29..81af2b3 100644
---- a/drivers/pcmcia/pxa2xx_sharpsl.c
-+++ b/drivers/pcmcia/pxa2xx_sharpsl.c
-@@ -237,7 +237,7 @@ static struct pcmcia_low_level sharpsl_pcmcia_ops __initdata = {
- #ifdef CONFIG_SA1100_COLLIE
- #include "sa11xx_base.h"
- 
--int __init pcmcia_collie_init(struct device *dev)
-+int __devinit pcmcia_collie_init(struct device *dev)
- {
-        int ret = -ENODEV;
- 
-diff --git a/drivers/pcmcia/sa1100_assabet.c b/drivers/pcmcia/sa1100_assabet.c
-index fd013a1..f1e8822 100644
---- a/drivers/pcmcia/sa1100_assabet.c
-+++ b/drivers/pcmcia/sa1100_assabet.c
-@@ -130,7 +130,7 @@ static struct pcmcia_low_level assabet_pcmcia_ops = {
- 	.socket_suspend		= assabet_pcmcia_socket_suspend,
- };
- 
--int pcmcia_assabet_init(struct device *dev)
-+int __devinit pcmcia_assabet_init(struct device *dev)
- {
- 	int ret = -ENODEV;
- 
-diff --git a/drivers/pcmcia/sa1100_cerf.c b/drivers/pcmcia/sa1100_cerf.c
-index 9bf088b..30560df 100644
---- a/drivers/pcmcia/sa1100_cerf.c
-+++ b/drivers/pcmcia/sa1100_cerf.c
-@@ -97,7 +97,7 @@ static struct pcmcia_low_level cerf_pcmcia_ops = {
- 	.socket_suspend		= cerf_pcmcia_socket_suspend,
- };
- 
--int __init pcmcia_cerf_init(struct device *dev)
-+int __devinit pcmcia_cerf_init(struct device *dev)
- {
- 	int ret = -ENODEV;
- 
-diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
-index 945857f..6b22859 100644
---- a/drivers/pcmcia/sa1100_generic.c
-+++ b/drivers/pcmcia/sa1100_generic.c
-@@ -64,7 +64,7 @@ static int (*sa11x0_pcmcia_hw_init[])(struct device *dev) = {
- #endif
- };
- 
--static int sa11x0_drv_pcmcia_probe(struct platform_device *dev)
-+static int __devinit sa11x0_drv_pcmcia_probe(struct platform_device *dev)
- {
- 	int i, ret = -ENODEV;
- 
-diff --git a/drivers/pcmcia/sa1100_h3600.c b/drivers/pcmcia/sa1100_h3600.c
-index 56329ad..edf8f00 100644
---- a/drivers/pcmcia/sa1100_h3600.c
-+++ b/drivers/pcmcia/sa1100_h3600.c
-@@ -219,7 +219,7 @@ struct pcmcia_low_level h3600_pcmcia_ops = {
- 	.socket_suspend		= h3600_pcmcia_socket_suspend,
- };
- 
--int __init pcmcia_h3600_init(struct device *dev)
-+int __devinit pcmcia_h3600_init(struct device *dev)
- {
- 	int ret = -ENODEV;
- 
-diff --git a/drivers/pcmcia/sa1100_shannon.c b/drivers/pcmcia/sa1100_shannon.c
-index c4d5186..7ff1b43 100644
---- a/drivers/pcmcia/sa1100_shannon.c
-+++ b/drivers/pcmcia/sa1100_shannon.c
-@@ -113,7 +113,7 @@ static struct pcmcia_low_level shannon_pcmcia_ops = {
- 	.socket_suspend		= shannon_pcmcia_socket_suspend,
- };
- 
--int __init pcmcia_shannon_init(struct device *dev)
-+int __devinit pcmcia_shannon_init(struct device *dev)
- {
- 	int ret = -ENODEV;
- 
-diff --git a/drivers/pcmcia/sa1100_simpad.c b/drivers/pcmcia/sa1100_simpad.c
-index 05bd504..c998f7a 100644
---- a/drivers/pcmcia/sa1100_simpad.c
-+++ b/drivers/pcmcia/sa1100_simpad.c
-@@ -123,7 +123,7 @@ static struct pcmcia_low_level simpad_pcmcia_ops = {
- 	.socket_suspend		= simpad_pcmcia_socket_suspend,
- };
- 
--int __init pcmcia_simpad_init(struct device *dev)
-+int __devinit pcmcia_simpad_init(struct device *dev)
- {
- 	int ret = -ENODEV;
- 
--- 
-1.7.2.3
+OMAP3 pandora.
+What I wanted to say is that current mainline code has hw ECC forced
+which is wrong for some boards, and this patch did not make into last
+merge window, so NAND is broken. It would be good to take this patch
+out of larger series you sent earlier and resend as a fix for -rc1, so
+that NAND works on 2.6.37.  It's not too large and should probably be
+ok for -rc2.
