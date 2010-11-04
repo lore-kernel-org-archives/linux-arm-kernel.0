@@ -1,37 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Nov 2010 17:30:45 +0000
-Subject: [PATCH] ARM: vexpress ct-ca9x4: only set twd_base if local timers are
-	being used
-Message-ID: <1288891845-12630-1-git-send-email-will.deacon@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 4 Nov 2010 19:30:47 +0100
+Subject: [PATCH 1/3] ARM mx3fb: check for DMA engine type
+In-Reply-To: <Pine.LNX.4.64.1011041829040.13123@axis700.grange>
+References: <1288888459-7293-1-git-send-email-s.hauer@pengutronix.de>
+	<1288888459-7293-2-git-send-email-s.hauer@pengutronix.de>
+	<Pine.LNX.4.64.1011041829040.13123@axis700.grange>
+Message-ID: <20101104183047.GP6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit bde28b84, I made the assumption that CONFIG_SMP is always set
-for the quad-core ct-ca9x4 platform. As it turns out, people who aren't
-using the SMP goodness are confronted with a build failure.
+Hi Guennadi,
 
-This patch fixes this issue by ensure that twd_base is only set if
-local timers are being used (and therefore SMP support is configured).
+On Thu, Nov 04, 2010 at 06:30:14PM +0100, Guennadi Liakhovetski wrote:
+> On Thu, 4 Nov 2010, Sascha Hauer wrote:
+> 
+> > We have two dma engines in MX3 systems: The IPU and the SDMA
+> > engine. We have to check if we got a channel from the correct
+> > engine before proceeding with a channel.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> Yeah, looks right:
+> 
+> Reviewed-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> 
+> Could you also make a similar one for drivers/media/video/mx3_camera.c?
 
-Reported-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-vexpress/ct-ca9x4.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Yes, will do. I missed that.
 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index c2e405a..fd25ccd 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -54,7 +54,9 @@ static struct map_desc ct_ca9x4_io_desc[] __initdata = {
- 
- static void __init ct_ca9x4_map_io(void)
- {
-+#ifdef CONFIG_LOCAL_TIMERS
- 	twd_base = MMIO_P2V(A9_MPCORE_TWD);
-+#endif
- 	v2m_map_io(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
- }
- 
+Sascha
+
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
