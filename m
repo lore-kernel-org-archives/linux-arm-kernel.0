@@ -1,38 +1,31 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 5 Nov 2010 00:01:44 +0800
-Subject: [PATCH] ARM: pxa: fix the building failue on saar
-In-Reply-To: <20101104155735.GE16938@pengutronix.de>
-References: <1288882401-14859-1-git-send-email-haojian.zhuang@marvell.com>
-	<20101104155735.GE16938@pengutronix.de>
-Message-ID: <AANLkTim0PNgnwOkiqCKhLFq1K29r04X=GqtaTQTngouX@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu,  4 Nov 2010 17:14:09 +0100
+Subject: [PATCH] i.MX SDMA without firmware
+Message-ID: <1288887251-31851-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/4 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> On Thu, Nov 04, 2010 at 10:53:21PM +0800, Haojian Zhuang wrote:
->> Since CONFIG_FB_PXA_SMARTPANEL is introduced and it's depend on CONFIG_FB_PXA.
->> We can't compile CONFIG_FB_PXA as module.
-> I don't know if choosing CONFIG_FB_PXA=m without
-> CONFIG_FB_PXA_SMARTPANEL makes sense. ?If yes, just letting
-> CONFIG_FB_PXA_SMARTPANEL depend on CONFIG_FB_PXA=y should work.
->
-> If this doesn't work (e.g. because arch/arm/mach-pxa/saar.c calls
-> functions that are only available in the fb_pxa kernel module) there is
-> no need to talk about CONFIG_FB_PXA_SMARTPANEL in the commit log, this
-> only confuses the readers.
->
+Hi,
 
-Haojian,
+The following series allows to run the i.MX SDMA engine without
+additional firmware.
+@Dan: I would prefer to push this via my i.MX tree to keep the correct
+order and prevent merge conflicts if this is ok with you.
 
-I don't like the Kconfig change to make FB_PXA non-tristate as well.
-Please see if there's better solution.
+Sascha
 
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+The following changes since commit c8ddb2713c624f432fa5fe3c7ecffcdda46ea0d4:
+
+  Linux 2.6.37-rc1 (2010-11-01 07:54:12 -0400)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git sdma-pu
+
+Sascha Hauer (2):
+      dmaengine i.MX SDMA: Allow to run without firmware
+      ARM i.MX SDMA: Add ROM script addresses to platform_data
+
+ arch/arm/plat-mxc/devices/platform-imx-dma.c |   99 ++++++++++++++-
+ arch/arm/plat-mxc/include/mach/sdma.h        |   46 +++++++
+ drivers/dma/imx-sdma.c                       |  174 ++++++++++++--------------
+ 3 files changed, 218 insertions(+), 101 deletions(-)
