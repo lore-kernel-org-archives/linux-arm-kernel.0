@@ -1,41 +1,47 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Thu, 4 Nov 2010 06:32:17 +0530
-Subject: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from board
-	file
-In-Reply-To: <AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
-References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
-	<1285596710-25658-5-git-send-email-s-ghorai@ti.com>
-	<AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B0356BABFAE@dbde02.ent.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 03 Nov 2010 22:42:08 -0400 (EDT)
+Subject: [PATCH 3/3] ARM: atomic64: use generic implementation for OABI
+	configurations
+In-Reply-To: <1288804947-21213-4-git-send-email-will.deacon@arm.com>
+References: <1288804947-21213-1-git-send-email-will.deacon@arm.com>
+	<1288804947-21213-4-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1011032241440.18581@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 3 Nov 2010, Will Deacon wrote:
+
+> The old apcs-gnu ABI doesn't guarantee that double words are allocated
+> to registers with even alignment, causing the 64-bit exclusive memory
+> operations to be rejected by the assembler.
+> 
+> This patch requires that CONFIG_AEABI is set in order to use the native
+> atomic operations and falls back to the generic (spinlock) code otherwise.
+> 
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 
-> -----Original Message-----
-> From: Grazvydas Ignotas [mailto:notasas at gmail.com]
-> Sent: Wednesday, November 03, 2010 6:33 PM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org; Vimal Singh; Artem.Bityutskiy at nokia.com
-> Subject: Re: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from
-> board file
+
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> On Mon, Sep 27, 2010 at 5:11 PM, Sukumar Ghorai <s-ghorai@ti.com> wrote:
-> > This patch makes it possible to select sw or hw (different layout
-> options)
-> > ecc scheme supported by omap nand driver. ?And hw ecc layout selected
-> for
-> > sdp and zoom boards, by default.
-> >
-> > Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-> > Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a19a526..8ae3d48 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -6,7 +6,7 @@ config ARM
+>  	select HAVE_MEMBLOCK
+>  	select RTC_LIB
+>  	select SYS_SUPPORTS_APM_EMULATION
+> -	select GENERIC_ATOMIC64 if (!CPU_32v6K)
+> +	select GENERIC_ATOMIC64 if (!CPU_32v6K || !AEABI)
+>  	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+>  	select HAVE_ARCH_KGDB
+>  	select HAVE_KPROBES if (!XIP_KERNEL)
+> -- 
+> 1.7.0.4
 > 
-> Any news on this? Commit 2c01946c accidentally (?) enabled hardware
-> ECC and now my board is broken, as the driver always used sw ecc and
-> my NAND partitions are formatted accordingly. We should at least
-> switch the default back to sw ecc, don't you think?
-[Ghorai] 
-1. which board you are working. 
-2. and the default layout is the same as previous 
-+       board_nand_data.ecc_opt         = OMAP_ECC_HAMMING_CODE_DIFF_LAYOUT;
