@@ -1,38 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 4 Nov 2010 19:30:47 +0100
-Subject: [PATCH 1/3] ARM mx3fb: check for DMA engine type
-In-Reply-To: <Pine.LNX.4.64.1011041829040.13123@axis700.grange>
-References: <1288888459-7293-1-git-send-email-s.hauer@pengutronix.de>
-	<1288888459-7293-2-git-send-email-s.hauer@pengutronix.de>
-	<Pine.LNX.4.64.1011041829040.13123@axis700.grange>
-Message-ID: <20101104183047.GP6017@pengutronix.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu,  4 Nov 2010 14:43:59 -0400
+Subject: PXA3xx 2D graphics accelerator
+Message-ID: <1288896241-8318-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Hi Eric,
 
-On Thu, Nov 04, 2010 at 06:30:14PM +0100, Guennadi Liakhovetski wrote:
-> On Thu, 4 Nov 2010, Sascha Hauer wrote:
-> 
-> > We have two dma engines in MX3 systems: The IPU and the SDMA
-> > engine. We have to check if we got a channel from the correct
-> > engine before proceeding with a channel.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-> Yeah, looks right:
-> 
-> Reviewed-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-> Could you also make a similar one for drivers/media/video/mx3_camera.c?
+Here's a rebased driver for the PXA3xx 2D graphics accelerator unit
+which acts as backend for the DirectFB userspace library. All the magic
+is in userspace, the driver is kept as simple as possible.
 
-Yes, will do. I missed that.
+It's been awhile since I last proposed taking this code mainline, and
+in the meantime, the DirectFB people further improved the userspace
+driver part and fixed some bugs which I suspected to be problems
+related to this kernel driver. It's all good now, and the thing is
+ready for production use.
 
-Sascha
+The only concern is that the API this driver implements is proprietary.
+But given that there is currently no better, more generic way, I think
+we can re-address this later. It would be fine to change the API at a
+later point as long as we keep the old interface around in userspace
+for backward compatibility.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+If anyone happens to have a system based on these SoCs with a display
+attached, please give it a try :)
+
+Daniel
+
+[PATCH 1/2] video: add driver for PXA3xx 2D graphics accelerator
+[PATCH 2/2] ARM: pxa/raumfeld: enable PXA3XX_GCU driver
