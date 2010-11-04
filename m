@@ -1,58 +1,101 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Thu, 4 Nov 2010 13:32:57 +0200
-Subject: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from board
-	file
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC331@dbde02.ent.ti.com>
-References: <1285596710-25658-1-git-send-email-s-ghorai@ti.com>
-	<1285596710-25658-5-git-send-email-s-ghorai@ti.com>
-	<AANLkTikKMnzHR5DZqzGdJJbnCXhCpxKA7K2C2ZtPhNke@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BABFAE@dbde02.ent.ti.com>
-	<AANLkTinOhBNUt+gvNb0MWiyHD8ZYgLDJPz8tc=p+CsVW@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC2B6@dbde02.ent.ti.com>
-	<AANLkTinNrZNuZnFfJKGLF9J3zsHsOTK0+VmUmYH88+c3@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC323@dbde02.ent.ti.com>
-	<AANLkTik3gO1Rm2U8-Rm2t2M83sdCjz_Oktpve_gDrbNM@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B0356BAC331@dbde02.ent.ti.com>
-Message-ID: <AANLkTinfO5e9JewdTDxasTRrUAXhGaQs=n6=HnqOQP7S@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 04 Nov 2010 08:30:29 -0400
+Subject: [PATCH v3 06/13] OMAP3: DMA: hwmod: add system DMA
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9402DC03B7B4@dbde02.ent.ti.com>
+References: <1288099513-1854-1-git-send-email-manjugk@ti.com>
+	<1288099513-1854-7-git-send-email-manjugk@ti.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC03B4C3@dbde02.ent.ti.com>
+	<4CD2368D.50107@ti.com>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9402DC03B7B4@dbde02.ent.ti.com>
+Message-ID: <4CD2A765.404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 4, 2010 at 1:15 PM, Ghorai, Sukumar <s-ghorai@ti.com> wrote:
+On 11/4/2010 3:01 AM, G, Manjunath Kondaiah wrote:
+> Hi Benoit,
 >
+>> From: Cousson, Benoit
+>> Sent: Thursday, November 04, 2010 9:59 AM
+>>
+>> Hi Manjunath,
+>>
+>> On 11/3/2010 8:59 AM, G, Manjunath Kondaiah wrote:
+>>> Kevin/Benoit,
+>>>
+>>>> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of G,
+>>>> Manjunath Kondaiah
+>>>> Sent: Tuesday, October 26, 2010 6:55 PM
+>>>>
+>>>> Add OMAP3 DMA hwmod structures.
+>>>>
+>>>> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+>>>> Cc: Benoit Cousson<b-cousson@ti.com>
+>>>> Cc: Kevin Hilman<khilman@deeprootsystems.com>
+>>>> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>>> ---
+>>>>    arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   93
+>>>> ++++++++++++++++++++++++++++
+>>>>    1 files changed, 93 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>>>> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>>>> index ed6bf4a..4a5231c 100644
+>>> [...]
+>>>> +	.prcm = {
+>>>> +		.omap2 = {
+>>>> +			.prcm_reg_id		= 1,
+>>>> +			.module_bit		=
+>>>> OMAP3430_ST_SDMA_SHIFT,
+>>>> +			.idlest_reg_id		= 1,
+>>>> +			.idlest_idle_bit	=
+>>>> OMAP3430_ST_SDMA_SHIFT,
+>>>
+>>> Looks like the .module_offs field is missing here. Since
+>>> ST_SDMA bit belongs to CM_IDLEST1_CORE register, .module_offs should
+>>> be CORE_MOD.
+>>>
+>>> But, it is observed that, using .module_offs results in warning dump
+>>> during bootup. This is due to, ST_SDMA bit in standby mode. Since
+>>> there is no fclk for DMA, this bit will never change till
+>> DMA channel
+>>> is requested for data transfer.
+>>>
+>>> We might have to bypass calling "omap2_cm_wait_module_ready" in
+>>> "_wait_target_ready" in omap_hwmod.c
+>>>
+>>> With exising flags, we can use "HWMOD_NO_IDLEST" flag, but this
+>>> flag has different meaning. How about using new flag like
+>>> "HWMOD_NO_FCLK_OPCLK" and if it is set, return without calling
+>>> "omap2_cm_wait_module_ready"
+>>>
+>>> Any better suggestion to handle this issue?
+>>
+>> Well, yes, use HWMOD_NO_IDLEST and remove idlest_reg_id&
+>> idlest_idle_bit entries in the omap2 structure.
+>>
+>> ST_SDMA is the standby status of the SDMA, but there is no
+>> idle status
+>> on that IP, so you cannot do anything.
+>> The standby will just reflect the activity of the master port of the
+>> DMA, but it will give you no information about the slave port
+>> and thus
+>> we do not have any module ready information.
 >
->> -----Original Message-----
->> From: Grazvydas Ignotas [mailto:notasas at gmail.com]
->> Sent: Thursday, November 04, 2010 4:42 PM
->> To: Ghorai, Sukumar
->> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
->> kernel at lists.infradead.org; Artem.Bityutskiy at nokia.com; Vimal Singh; Tony
->> Lindgren
->> Subject: Re: [PATCH RESEND v5 4/5] omap: nand: ecc layout select from
->> board file
->>
->> > [Ghorai] In 2.6.36, it's a s/w ecc by default and working in all
->> platforms like - omap3430 SDP, zoom2, 3630SDP, ZOOM3.
->> > So please explain more when you found that - sw ecc is broken on both
->> 2.6.36
->>
->> It doesn't for me, see
->> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-
->> 2.6.git;a=blob;f=drivers/mtd/nand/omap2.c;h=513e0a76a4a73866d52bba8151e435
->> 56a3b30a54;hb=f6f94e2ab1b33f0082ac22d71f66385a60d8157f
->>
->> This is omap NAND driver at v2.6.36 tag, and it has
->> CONFIG_MTD_NAND_OMAP_HWECC forced.
+> Thanks for the feedback.
 >
-> [Ghorai] This is the same old code since log. And this portion of code not touched for 2.6.36.
-> And please let me know what kind of problem you are facing when you using 2.6.36; also let me know how to reproduce, I can check in my platform too.
+> This change is introduced as per kevin's review comment at:
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34278.html
 
-It has changed in 2.5.36, take a look how it was in 2.6.35, when it
-worked for me:
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/mtd/nand/omap2.c;h=ee87325c7712a8eeee4bbc683f93014c9901f337;hb=9fe6206f400646a2322096b56c59891d530e8d51
+Well this register is confusing, because he uses the same naming 
+convention but with a difference meaning:
 
-notice how 2.5.36 has CONFIG_MTD_NAND_OMAP_HWECC defined and 2.6.35 doesn't.
+ST_SDMA: System DMA standby status.
+- 0x0: System DMA is active.
+- 0x1: System DMA is in standby mode.
 
-The test case is simple:
-format and use NAND on 2.6.35 or earlier, works fine.
-upgrade to 2.6.36 or 2.6.37-rc1 and try to mount the same NAND
-partition - lots of ECC errors.
+> I am ok to use "HWMOD_NO_IDLEST" if kevin also agrees
+
+He will... Otherwise I will throw him into the New England Aquarium like 
+Linus :-)
+
+Benoit
