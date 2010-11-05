@@ -1,34 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 5 Nov 2010 13:06:30 +0100
-Subject: [PATCH 1/3] ARM mx3_camera: check for DMA engine type
-In-Reply-To: <Pine.LNX.4.64.1011051136000.28289@axis700.grange>
-References: <1288949165-13286-1-git-send-email-s.hauer@pengutronix.de>
-	<1288949165-13286-2-git-send-email-s.hauer@pengutronix.de>
-	<Pine.LNX.4.64.1011051136000.28289@axis700.grange>
-Message-ID: <20101105120630.GU6017@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 5 Nov 2010 13:12:48 +0100
+Subject: recent ARM Erratas 742231 & 742230 broken.
+In-Reply-To: <-5088739724674874052@unknownmsgid>
+References: <AANLkTim6LRZQhW6R83P0n70GdqEwFnFvb55KC8459KwY@mail.gmail.com>
+	<-5088739724674874052@unknownmsgid>
+Message-ID: <AANLkTik3ipJHcPtsy5cTuO1PhmAbKwGfSqAE_gUKjhiG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 05, 2010 at 11:37:10AM +0100, Guennadi Liakhovetski wrote:
-> On Fri, 5 Nov 2010, Sascha Hauer wrote:
-> 
-> > We have two dma engines in MX3 systems: The IPU and the SDMA
-> > engine. We have to check if we got a channel from the correct
-> > engine before proceeding with a channel.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> 
-> Thanks, since this is a fix and the SDMA is already in the mainline, I can 
-> pull this via v4l for 37-rc2.
+2010/10/20 Will Deacon <will.deacon@arm.com>:
 
-Ok, I'll remove it from my queue then.
+> The diagnostic register is only writable from secure mode so you'll need to
+> look at what these patches do (they perform simple read-modify-writes) and
+> incorporate that code into your secure software.
+> (...)
+> I doubt that your secure monitor exposes the diagnostic register through an
+> SMC interface so you'll need to change the secure boot code to enable these
+> workarounds when the system comes out of reset.
 
-Sascha
+These SMC:s (System Management Call?) are getting hairier now.
 
+Can't you add an abstraction for the stuff we need to poke into
+diagnostics registers, enabling platform-specific overrides, like
+we do for l2x0 in mm/cache-l2x0.c?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Like if arch/arm/include/asm/proc-v7-diagnostics.h:
+(modeled on arch/arm/include/asm/outercache.h)
+
+struct v7_core_diagnostics {
+  void (*foo)(void);
+  void (*bar)(void);
+};
+
+Then we can override thes during .machine_init or even .fixup if
+it's needed real early on.
+
+This way each platform (including I think U8500 and OMAP4) can respond
+correctly to the errata patches once we have proper SMCs in place.
+
+Yours,
+Linus Walleij
