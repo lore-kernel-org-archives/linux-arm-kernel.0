@@ -1,28 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 5 Nov 2010 15:00:44 +0100
-Subject: [PATCH] mach-pcm037_eet: Fix section mismatch for
-	eet_init_devices()
-In-Reply-To: <1288630803.4156.3.camel@realization>
-References: <1288630803.4156.3.camel@realization>
-Message-ID: <20101105140044.GL16938@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Nov 2010 14:01:17 +0000
+Subject: CONFIG_FORCE_MAX_ZONEORDER settable for all ARM architectures
+In-Reply-To: <4CD40976.1080009@gmail.com>
+References: <4CD40976.1080009@gmail.com>
+Message-ID: <20101105140117.GB23828@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 01, 2010 at 06:00:03PM +0100, Alberto Panizzo wrote:
-> This function should be marked as __init because it is used only
-> in the init phase.
+On Fri, Nov 05, 2010 at 09:41:10AM -0400, Daniel Mack wrote:
+> on a PXA3xx based platform, we want to allocate 8MByte of physically
+> contiguous memory for the framebuffer device.
 > 
-> This fix the compiler warning:
->  LD      arch/arm/mach-mx3/built-in.o
->  WARNING: arch/arm/mach-mx3/built-in.o(.text+0x1328): Section mismatch in reference from the function eet_init_devices() to the (unknown reference) .init.rodata:(unknown)
->  The function eet_init_devices() references
->  the (unknown reference) __initconst (unknown).
->  This is often because eet_init_devices lacks a __initconst
->  annotation or the annotation of (unknown) is wrong.
-> 
-> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> However, alloc_pages() fails because MAX_ORDER is hard-coded to 11 for
+> this architecture.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Wrong.  If there's an SA1111, it defaults to 9 rather than 11.
+
+> Is there any reason why CONFIG_FORCE_MAX_ZONEORDER is constrained to
+> ARCH_SHMOBILE in arch/arm/Kconfig?
+
+It's not.
+
+        int "Maximum zone order" if ARCH_SHMOBILE
+
+means "present the user with this option if ARCH_SHMOBILE != n, otherwise
+don't present it to the user but set it anyway".
+
+        range 11 64 if ARCH_SHMOBILE
+
+defines the range when ARCH_SHMOBILE is set.  When it isn't set, there
+is no range limitation.
+
+        default "9" if SA1111
+        default "11"
+
+So, if SA1111 is set, then it's 9, otherwise it's 11.
