@@ -1,45 +1,41 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 5 Nov 2010 10:35:41 +0100
-Subject: [PATCH] mmci: reset voltage after power off.
-Message-ID: <1288949741-9712-1-git-send-email-linus.walleij@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri,  5 Nov 2010 10:46:04 +0100
+Subject: i.MX patches for next
+Message-ID: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@stericsson.com>
 
-At power off, reset OCR mask to be the highest possible voltage
-supported for the current mmc host.
+The following changes since commit 255ed73db5c48bcdda69aac642e265fde60564e5:
 
-This solves the re-initialization during the power up sequence.
-The voltage may have been decreased due to the card accepts a lower
-voltage than the voltage used during the initialization sequence.
-We need to reset the voltage to by the host highest possible value
-since according to specification the initialization must always be
-done at high voltage.
+  imx: remove deprecated symbols as all users are gone now (2010-11-05 09:12:31 +0100)
 
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/core/core.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-pu
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 8f86d70..508ed2b 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -940,6 +940,13 @@ static void mmc_power_off(struct mmc_host *host)
- {
- 	host->ios.clock = 0;
- 	host->ios.vdd = 0;
-+
-+	/*
-+	 * Reset ocr mask to be the highest possible voltage supported for
-+	 * this mmc host. This value will be used at next power up.
-+	 */
-+	host->ocr = 1 << (fls(host->ocr_avail) - 1);
-+
- 	if (!mmc_host_is_spi(host)) {
- 		host->ios.bus_mode = MMC_BUSMODE_OPENDRAIN;
- 		host->ios.chip_select = MMC_CS_DONTCARE;
--- 
-1.6.3.3
+Sascha Hauer (7):
+      ARM i.MX51 boards: Do not use PHYS_OFFSET
+      ARM i.MX irq: Compile avic irq code only on SoCs that need it
+      ARM i.MX51: Make CONFIG_MXC_TZIC an invisible option
+      ARM i.MX irq: Allow runtime decision between AVIC and TZIC
+      ARM i.MX DMA: return gracefully on different socs
+      ARM i.MX51: return gracefully on different socs
+      ARM i.MX27 pm: return gracefully on different socs
+
+ arch/arm/mach-imx/Kconfig                    |    3 +
+ arch/arm/mach-imx/dma-v1.c                   |    2 +-
+ arch/arm/mach-imx/pm-imx27.c                 |    3 +
+ arch/arm/mach-mx3/Kconfig                    |    2 +
+ arch/arm/mach-mx5/board-cpuimx51.c           |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
+ arch/arm/mach-mx5/board-mx51_3ds.c           |    2 +-
+ arch/arm/mach-mx5/cpu.c                      |    3 +
+ arch/arm/plat-mxc/Kconfig                    |   11 ++--
+ arch/arm/plat-mxc/Makefile                   |    3 +-
+ arch/arm/plat-mxc/{irq.c => avic.c}          |    2 +
+ arch/arm/plat-mxc/cpu.c                      |    3 +
+ arch/arm/plat-mxc/include/mach/entry-macro.S |   66 ++++++++++++++++----------
+ arch/arm/plat-mxc/include/mach/mxc.h         |    8 +++
+ arch/arm/plat-mxc/tzic.c                     |    3 +
+ 15 files changed, 79 insertions(+), 36 deletions(-)
+ rename arch/arm/plat-mxc/{irq.c => avic.c} (98%)
