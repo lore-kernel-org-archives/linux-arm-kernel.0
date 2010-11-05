@@ -1,35 +1,32 @@
 From: joe@perches.com (Joe Perches)
-Date: Fri,  5 Nov 2010 16:12:33 -0700
-Subject: [PATCH 0/7] Convert sprintf_symbol uses to %p[Ss]
-Message-ID: <1288998760-11775-1-git-send-email-joe@perches.com>
+Date: Fri,  5 Nov 2010 16:12:34 -0700
+Subject: [PATCH 1/7] arch/arm/kernel/traps.c: Convert sprintf_symbol to %pS
+In-Reply-To: <1288998760-11775-1-git-send-email-joe@perches.com>
+References: <1288998760-11775-1-git-send-email-joe@perches.com>
+Message-ID: <1288998760-11775-2-git-send-email-joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unnecessary declarations of temporary buffers.
-Use %pS or %ps as appropriate.
-Minor reformatting in a couple of places.
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/kernel/traps.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-Compiled, but otherwise untested.
-
-Joe Perches (7):
-  arch/arm/kernel/traps.c: Convert sprintf_symbol to %pS
-  arch/x86/kernel/pci-iommu_table.c: Convert sprintf_symbol to %pS
-  fs/gfs2/glock.c: Convert sprintf_symbol to %pS
-  fs/proc/base.c kernel/latencytop.c: Convert sprintf_symbol to %ps
-  kernel/lockdep_proc.c: Convert sprintf_symbol to %pS
-  mm: Convert sprintf_symbol to %pS
-  net/sunrpc/clnt.c: Convert sprintf_symbol to %ps
-
- arch/arm/kernel/traps.c           |    5 +----
- arch/x86/kernel/pci-iommu_table.c |   18 ++++--------------
- fs/gfs2/glock.c                   |   15 +++++++--------
- fs/proc/base.c                    |   22 ++++++++--------------
- kernel/latencytop.c               |   23 +++++++++--------------
- kernel/lockdep_proc.c             |   16 ++++++----------
- mm/slub.c                         |   11 ++++-------
- mm/vmalloc.c                      |    9 ++-------
- net/sunrpc/clnt.c                 |   12 ++----------
- 9 files changed, 43 insertions(+), 88 deletions(-)
-
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index cda78d5..446aee9 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -53,10 +53,7 @@ static void dump_mem(const char *, const char *, unsigned long, unsigned long);
+ void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
+ {
+ #ifdef CONFIG_KALLSYMS
+-	char sym1[KSYM_SYMBOL_LEN], sym2[KSYM_SYMBOL_LEN];
+-	sprint_symbol(sym1, where);
+-	sprint_symbol(sym2, from);
+-	printk("[<%08lx>] (%s) from [<%08lx>] (%s)\n", where, sym1, from, sym2);
++	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+ #else
+ 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
+ #endif
 -- 
 1.7.3.2.146.gca209
