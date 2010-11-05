@@ -1,173 +1,74 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  5 Nov 2010 10:46:08 +0100
-Subject: [PATCH 4/7] ARM i.MX irq: Allow runtime decision between AVIC and TZIC
-In-Reply-To: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
-References: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1288950371-1552-5-git-send-email-s.hauer@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 5 Nov 2010 11:25:16 +0100
+Subject: [PATCH 3/3] ARM i.MX pcm037 eet: compile fixes
+In-Reply-To: <1288888459-7293-4-git-send-email-s.hauer@pengutronix.de>
+References: <1288888459-7293-1-git-send-email-s.hauer@pengutronix.de>
+	<1288888459-7293-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20101105102516.GF16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are on a path to support more different i.MX SoCs in a single
-binary we have to able to support both AVIC and TZIC in a single
-binary. This patch only introduces overhead when both controllers
-are needed.
+On Thu, Nov 04, 2010 at 05:34:19PM +0100, Sascha Hauer wrote:
+> The pcm037 eet extension currently does not compile if
+> SPI_IMX is enabled. Fix it.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-mx3/mach-pcm037_eet.c |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/mach-pcm037_eet.c b/arch/arm/mach-mx3/mach-pcm037_eet.c
+> index 99e0894..b93a2d0 100644
+> --- a/arch/arm/mach-mx3/mach-pcm037_eet.c
+> +++ b/arch/arm/mach-mx3/mach-pcm037_eet.c
+> @@ -14,6 +14,7 @@
+>  
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx3.h>
+> +#include <mach/spi.h>
+>  
+>  #include <asm/mach-types.h>
+>  
+> @@ -59,14 +60,12 @@ static struct spi_board_info pcm037_spi_dev[] = {
+>  };
+>  
+>  /* Platform Data for MXC CSPI */
+> -#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
+>  static int pcm037_spi1_cs[] = {MXC_SPI_CS(1), IOMUX_TO_GPIO(MX31_PIN_KEY_COL7)};
+>  
+>  static const struct spi_imx_master pcm037_spi1_pdata __initconst = {
+>  	.chipselect = pcm037_spi1_cs,
+>  	.num_chipselect = ARRAY_SIZE(pcm037_spi1_cs),
+>  };
+> -#endif
+I suggest adding (or squashing in) the following patch:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/plat-mxc/avic.c                     |    2 +
- arch/arm/plat-mxc/cpu.c                      |    3 +
- arch/arm/plat-mxc/include/mach/entry-macro.S |   66 ++++++++++++++++----------
- arch/arm/plat-mxc/include/mach/mxc.h         |    8 +++
- arch/arm/plat-mxc/tzic.c                     |    3 +
- 5 files changed, 57 insertions(+), 25 deletions(-)
+-------------->8-----------------
+From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 7331f2a..1cb464a 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -118,6 +118,8 @@ void __init mxc_init_irq(void __iomem *irqbase)
- 	int i;
- 
- 	avic_base = irqbase;
-+	mxc_irq_base = irqbase;
-+	mxc_irq_controller_type = MXC_IRQ_TYPE_AVIC;
- 
- 	/* put the AVIC into the reset value with
- 	 * all interrupts disabled
-diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
-index 386e0d5..dc14a1c 100644
---- a/arch/arm/plat-mxc/cpu.c
-+++ b/arch/arm/plat-mxc/cpu.c
-@@ -9,3 +9,6 @@ void mxc_set_cpu_type(unsigned int type)
- 	__mxc_cpu_type = type;
- }
- 
-+void __iomem *mxc_irq_base;
-+int mxc_irq_controller_type;
-+
-diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
-index aeb0869..a7dd008 100644
---- a/arch/arm/plat-mxc/include/mach/entry-macro.S
-+++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
-@@ -18,40 +18,18 @@
- 	.endm
- 
- 	.macro  get_irqnr_preamble, base, tmp
--#ifndef CONFIG_MXC_TZIC
--	ldr	\base, =avic_base
-+	ldr	\base, =mxc_irq_base
- 	ldr	\base, [\base]
- #ifdef CONFIG_MXC_IRQ_PRIOR
- 	ldr	r4, [\base, #AVIC_NIMASK]
- #endif
--#elif defined CONFIG_MXC_TZIC
--	ldr	\base, =tzic_base
--	ldr	\base, [\base]
--#endif /* CONFIG_MXC_TZIC */
- 	.endm
- 
- 	.macro  arch_ret_to_user, tmp1, tmp2
- 	.endm
- 
--	@ this macro checks which interrupt occured
--	@ and returns its number in irqnr
--	@ and returns if an interrupt occured in irqstat
--	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--#ifndef CONFIG_MXC_TZIC
--	@ Load offset & priority of the highest priority
--	@ interrupt pending from AVIC_NIVECSR
--	ldr	\irqstat, [\base, #0x40]
--	@ Shift to get the decoded IRQ number, using ASR so
--	@ 'no interrupt pending' becomes 0xffffffff
--	mov	\irqnr, \irqstat, asr #16
--	@ set zero flag if IRQ + 1 == 0
--	adds	\tmp, \irqnr, #1
--#ifdef CONFIG_MXC_IRQ_PRIOR
--	bicne	\tmp, \irqstat, #0xFFFFFFE0
--	strne	\tmp, [\base, #AVIC_NIMASK]
--	streq	r4, [\base, #AVIC_NIMASK]
--#endif
--#elif defined CONFIG_MXC_TZIC
-+	.macro	tzic_get_irqnr_and_base, irqnr, irqstat, base, tmp
-+
- 	@ Load offset & priority of the highest priority
- 	@ interrupt pending.
- 	@ 0xD80 is HIPND0 register
-@@ -76,6 +54,44 @@
- 	mov  \irqnr, #0
- 2002:
- 	movs \irqnr, \irqnr
-+	.endm
-+
-+	.macro	avic_get_irqnr_and_base, irqnr, irqstat, base, tmp
-+
-+	@ Load offset & priority of the highest priority
-+	@ interrupt pending from AVIC_NIVECSR
-+	ldr	\irqstat, [\base, #0x40]
-+	@ Shift to get the decoded IRQ number, using ASR so
-+	@ 'no interrupt pending' becomes 0xffffffff
-+	mov	\irqnr, \irqstat, asr #16
-+	@ set zero flag if IRQ + 1 == 0
-+	adds	\tmp, \irqnr, #1
-+#ifdef CONFIG_MXC_IRQ_PRIOR
-+	bicne	\tmp, \irqstat, #0xFFFFFFE0
-+	strne	\tmp, [\base, #AVIC_NIMASK]
-+	streq	r4, [\base, #AVIC_NIMASK]
-+#endif
-+	.endm
-+
-+	.macro get_irqnr_and_base, irqnr, irqstat, base, tmp
-+#if defined CONFIG_MXC_TZIC && defined CONFIG_MXC_AVIC
-+	ldr	\tmp, =mxc_irq_controller_type
-+	ldr	\tmp, [\tmp]
-+	cmp	\tmp, #MXC_IRQ_TYPE_AVIC
-+	beq	3001f
-+
-+	tzic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
-+	b	3002f
-+3001:
-+	avic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
-+3002:
-+
-+#elif defined CONFIG_MXC_TZIC
-+	tzic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
-+#elif defined CONFIG_MXC_AVIC
-+	avic_get_irqnr_and_base \irqnr, \irqstat, \base, \tmp
-+#else
-+#error no tzic and no avic?
- #endif
- 	.endm
- 
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index a42c720..3432b78 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -154,4 +154,12 @@ extern struct cpu_op *(*get_cpu_op)(int *op);
- #define cpu_is_mx3()	(cpu_is_mx31() || cpu_is_mx35() || cpu_is_mxc91231())
- #define cpu_is_mx2()	(cpu_is_mx21() || cpu_is_mx27())
- 
-+#ifndef __ASSEMBLY__
-+extern int mxc_irq_controller_type;
-+extern void __iomem *mxc_irq_base;
-+#endif
-+
-+#define MXC_IRQ_TYPE_AVIC	1
-+#define MXC_IRQ_TYPE_TZIC	2
-+
- #endif /*  __ASM_ARCH_MXC_H__ */
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index 3703ab2..f2179b1 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -122,6 +122,9 @@ void __init tzic_init_irq(void __iomem *irqbase)
- 	int i;
- 
- 	tzic_base = irqbase;
-+	mxc_irq_base = irqbase;
-+	mxc_irq_controller_type = MXC_IRQ_TYPE_TZIC;
-+
- 	/* put the TZIC into the reset value with
- 	 * all interrupts disabled
- 	 */
+ARM: mx3: enable SPI_IMX for better compile coverage
+
+Note: SPI_IMX defaults to m for imx machines, so it doesn't occur
+explicitly in the defconfig.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
+index f0c339f..e648ea3 100644
+--- a/arch/arm/configs/mx3_defconfig
++++ b/arch/arm/configs/mx3_defconfig
+@@ -84,6 +84,7 @@ CONFIG_SERIAL_IMX_CONSOLE=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_IMX=y
++CONFIG_SPI=y
+ CONFIG_W1=y
+ CONFIG_W1_MASTER_MXC=y
+ CONFIG_W1_SLAVE_THERM=y
+
+Best regards
+Uwe
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
