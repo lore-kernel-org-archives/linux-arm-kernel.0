@@ -1,45 +1,28 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 5 Nov 2010 21:59:41 +0800
-Subject: CONFIG_FORCE_MAX_ZONEORDER settable for all ARM architectures
-In-Reply-To: <4CD40976.1080009@gmail.com>
-References: <4CD40976.1080009@gmail.com>
-Message-ID: <AANLkTikjQhKXgYzczAx70R3JkQ=DoE-xFNux=s6jUeLB@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 5 Nov 2010 15:00:44 +0100
+Subject: [PATCH] mach-pcm037_eet: Fix section mismatch for
+	eet_init_devices()
+In-Reply-To: <1288630803.4156.3.camel@realization>
+References: <1288630803.4156.3.camel@realization>
+Message-ID: <20101105140044.GL16938@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 5, 2010 at 9:41 PM, Daniel Mack <zonque@gmail.com> wrote:
-> Hi,
->
-> on a PXA3xx based platform, we want to allocate 8MByte of physically
-> contiguous memory for the framebuffer device.
->
-> However, alloc_pages() fails because MAX_ORDER is hard-coded to 11 for
-> this architecture.
->
-> Is there any reason why CONFIG_FORCE_MAX_ZONEORDER is constrained to
-> ARCH_SHMOBILE in arch/arm/Kconfig? Would a patch to remove this
-> limitation be accepted? Or is there any better way to allocate that
-> amount and type of memory?
->
+On Mon, Nov 01, 2010 at 06:00:03PM +0100, Alberto Panizzo wrote:
+> This function should be marked as __init because it is used only
+> in the init phase.
+> 
+> This fix the compiler warning:
+>  LD      arch/arm/mach-mx3/built-in.o
+>  WARNING: arch/arm/mach-mx3/built-in.o(.text+0x1328): Section mismatch in reference from the function eet_init_devices() to the (unknown reference) .init.rodata:(unknown)
+>  The function eet_init_devices() references
+>  the (unknown reference) __initconst (unknown).
+>  This is often because eet_init_devices lacks a __initconst
+>  annotation or the annotation of (unknown) is wrong.
+> 
+> Signed-off-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-There is actually an on-going discussion of memory region allocator,
-basically can
-be used to solve the allocation of large chunk of physically
-contiguous memory by
-memory migration at run-time. Some of the ideas were mentioned in a previous
-patch of CMA (contiguous memory allocator)? Though I didn't look too much into
-that thread.
-
-However, I'm not really sure about how the size of the memory region is chosen
-and if the MAX_ORDER issue can be solved as well. So I guess before that
-happens in mainline, would be acceptable to adjust MAX_ZONEORDER in a
-hackish way.
-
-> Thanks,
-> Daniel
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
