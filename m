@@ -1,51 +1,53 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Fri, 5 Nov 2010 19:51:14 +0100
-Subject: [PATCH] ARM: fix build error with GCC 4.5.0
-In-Reply-To: <AANLkTimkSxWNL+aCALGsf5prBM_RHz0BMHCeNwKrTnfA@mail.gmail.com>
-References: <1288897002-24073-1-git-send-email-rabin@rab.in>
-	<yw1xy698ygbx.fsf@unicorn.mansr.com>
-	<19667.9199.798932.405415@pilspetsen.it.uu.se>
-	<AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
-	<19667.52998.909668.596635@pilspetsen.it.uu.se>
-	<AANLkTimkSxWNL+aCALGsf5prBM_RHz0BMHCeNwKrTnfA@mail.gmail.com>
-Message-ID: <19668.21026.5416.610777@pilspetsen.it.uu.se>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 6 Nov 2010 02:59:02 +0800
+Subject: Single binary kernel for all i.MX
+In-Reply-To: <20101105123144.GW6017@pengutronix.de>
+References: <20101105121800.GV6017@pengutronix.de>
+	<20101105122946.GH13530@tarshish>
+	<20101105123144.GW6017@pengutronix.de>
+Message-ID: <AANLkTikKemXjQYZ9axTP-60bu9xjGrmPE9imf+EDB-p_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rabin Vincent writes:
- > 2010/11/5 Mikael Pettersson <mikpe@it.uu.se>:
- > > Rabin Vincent writes:
- > > ?> 2010/11/5 Mikael Pettersson <mikpe@it.uu.se>:
- > > ?> > Indeed. I suspect an improperly patched or configured gcc-4.5.0,
- > > ?> > or broken kernel sources. Especially considering that the kernel
- > > ?> > passes -msoft-float to gcc (see above).
- > > ?> >
- > > ?> > I know gcc-4.5.0 configured for arm-linux-gnueabi built working EABI
- > > ?> > kernels a few months ago.
- > > ?>
- > > ?> The kernel sources are clean Linus' tree, so I guess it must be the
- > > ?> compiler configuration then. ?Indeed, running the above mentioned cross
- > > ?> compiler with -msoft-float -mabi=aapcs-linux even on an empty source
- > > ?> file yields the same error. ?I've cc'd Tony here who I believe builds
- > > ?> these prebuilt compilers at http://kernel.org/pub/tools/crosstool/.
- > >
- > > How was that gcc configured? You can find out by running `arm-linux-gcc -v'.
- > 
- > $ arm-linux-gcc -v
- > Using built-in specs.
- > COLLECT_GCC=arm-linux-gcc
- > COLLECT_LTO_WRAPPER=[path
- > removed]/gcc-4.5.0-nolibc/arm-linux/bin/../libexec/gcc/arm-linux/4.5.0/lto-wrapper
- > Target: arm-linux
- > Configured with: /home/tony/buildall/src/gcc/configure
- > --target=arm-linux --enable-targets=all
- > --prefix=/opt/cross/gcc-4.5.0-nolibc/arm-linux/ --enable-languages=c
- > --with-newlib --without-headers --enable-sjlj-exceptions
+On Fri, Nov 5, 2010 at 8:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Fri, Nov 05, 2010 at 02:29:46PM +0200, Baruch Siach wrote:
+>> Hi Sascha,
+>>
+>> On Fri, Nov 05, 2010 at 01:18:00PM +0100, Sascha Hauer wrote:
+>> > We are talking about a single kernel for longer now, here is something
+>> > to test for the ones interested:
+>> >
+>> > git://git.pengutronix.de/git/imx/linux-2.6.git imx-single-kernel
+>> >
+>> > Compiling the imx_defconfig will result in a kernel which works
+>> > i.MX21, i.MX27, i.MX31, i.MX35 and i.MX51 (not tested on i.MX21).
+>> > i.MX1 does not work mainly because the kernel build will use some ARMv5
+>> > and later instructions.
+>>
+>> What is blocking i.MX25 from being included?
+>
+> It is. I just forgot to mention.
 
-That's an OABI compiler. You want a compiler configured for
+Hrm... the imx series is placing all header files in
+arch/arm/plat-mxc/include/plat
+instead of within each mach-*. Most other sub-arch doesn't behave like that at
+this moment and getting them built together ain't easy.
 
-	--target=arm-unknown-linux-gnueabi
+BTW, did you get it tested on different boards, I'd be interested to see what
+could be the potential issues at run-time.
 
-and without that --enable-sjlj-exceptions as well.
-
-OABI is super-legacy and essentially unsupported by current gcc.
+>
+> Sascha
+>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
