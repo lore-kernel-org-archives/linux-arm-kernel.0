@@ -1,41 +1,60 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  5 Nov 2010 10:46:04 +0100
-Subject: i.MX patches for next
-Message-ID: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri,  5 Nov 2010 10:46:05 +0100
+Subject: =?UTF-8?q?=5BPATCH=201/7=5D=20ARM=20i=2EMX51=20boards=3A=20Do=20not=20use=20PHYS=5FOFFSET?=
+In-Reply-To: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
+References: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1288950371-1552-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PHYS_OFFSET may become a variable once the runtime PHYS_OFFSET
+patch is merged, so use MX51_PHYS_OFFSET for boot_params.
 
-The following changes since commit 255ed73db5c48bcdda69aac642e265fde60564e5:
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx5/board-cpuimx51.c   |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51sd.c |    2 +-
+ arch/arm/mach-mx5/board-mx51_3ds.c   |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-  imx: remove deprecated symbols as all users are gone now (2010-11-05 09:12:31 +0100)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-pu
-
-Sascha Hauer (7):
-      ARM i.MX51 boards: Do not use PHYS_OFFSET
-      ARM i.MX irq: Compile avic irq code only on SoCs that need it
-      ARM i.MX51: Make CONFIG_MXC_TZIC an invisible option
-      ARM i.MX irq: Allow runtime decision between AVIC and TZIC
-      ARM i.MX DMA: return gracefully on different socs
-      ARM i.MX51: return gracefully on different socs
-      ARM i.MX27 pm: return gracefully on different socs
-
- arch/arm/mach-imx/Kconfig                    |    3 +
- arch/arm/mach-imx/dma-v1.c                   |    2 +-
- arch/arm/mach-imx/pm-imx27.c                 |    3 +
- arch/arm/mach-mx3/Kconfig                    |    2 +
- arch/arm/mach-mx5/board-cpuimx51.c           |    2 +-
- arch/arm/mach-mx5/board-cpuimx51sd.c         |    2 +-
- arch/arm/mach-mx5/board-mx51_3ds.c           |    2 +-
- arch/arm/mach-mx5/cpu.c                      |    3 +
- arch/arm/plat-mxc/Kconfig                    |   11 ++--
- arch/arm/plat-mxc/Makefile                   |    3 +-
- arch/arm/plat-mxc/{irq.c => avic.c}          |    2 +
- arch/arm/plat-mxc/cpu.c                      |    3 +
- arch/arm/plat-mxc/include/mach/entry-macro.S |   66 ++++++++++++++++----------
- arch/arm/plat-mxc/include/mach/mxc.h         |    8 +++
- arch/arm/plat-mxc/tzic.c                     |    3 +
- 15 files changed, 79 insertions(+), 36 deletions(-)
- rename arch/arm/plat-mxc/{irq.c => avic.c} (98%)
+diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
+index 6a9792f..1e01ec7 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51.c
++++ b/arch/arm/mach-mx5/board-cpuimx51.c
+@@ -292,7 +292,7 @@ static struct sys_timer mxc_timer = {
+ 
+ MACHINE_START(EUKREA_CPUIMX51, "Eukrea CPUIMX51 Module")
+ 	/* Maintainer: Eric B?nard <eric@eukrea.com> */
+-	.boot_params = PHYS_OFFSET + 0x100,
++	.boot_params = MX51_PHYS_OFFSET + 0x100,
+ 	.map_io = mx51_map_io,
+ 	.init_irq = mx51_init_irq,
+ 	.init_machine = eukrea_cpuimx51_init,
+diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
+index 4b3a611..24bbdb8 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51sd.c
++++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
+@@ -323,7 +323,7 @@ static struct sys_timer mxc_timer = {
+ 
+ MACHINE_START(EUKREA_CPUIMX51SD, "Eukrea CPUIMX51SD")
+ 	/* Maintainer: Eric B?nard <eric@eukrea.com> */
+-	.boot_params = PHYS_OFFSET + 0x100,
++	.boot_params = MX51_PHYS_OFFSET + 0x100,
+ 	.map_io = mx51_map_io,
+ 	.init_irq = mx51_init_irq,
+ 	.init_machine = eukrea_cpuimx51sd_init,
+diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+index 79ce8dc..873cc1f 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
++++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+@@ -186,7 +186,7 @@ static struct sys_timer mxc_timer = {
+ 
+ MACHINE_START(MX51_3DS, "Freescale MX51 3-Stack Board")
+ 	/* Maintainer: Freescale Semiconductor, Inc. */
+-	.boot_params = PHYS_OFFSET + 0x100,
++	.boot_params = MX3x_PHYS_OFFSET + 0x100,
+ 	.map_io = mx51_map_io,
+ 	.init_irq = mx51_init_irq,
+ 	.init_machine = mxc_board_init,
+-- 
+1.7.2.3
