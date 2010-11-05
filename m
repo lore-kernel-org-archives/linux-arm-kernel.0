@@ -1,36 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 5 Nov 2010 13:31:44 +0100
-Subject: Single binary kernel for all i.MX
-In-Reply-To: <20101105122946.GH13530@tarshish>
-References: <20101105121800.GV6017@pengutronix.de>
-	<20101105122946.GH13530@tarshish>
-Message-ID: <20101105123144.GW6017@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Nov 2010 13:13:40 +0000
+Subject: recent ARM Erratas 742231 & 742230 broken.
+In-Reply-To: <AANLkTik3ipJHcPtsy5cTuO1PhmAbKwGfSqAE_gUKjhiG@mail.gmail.com>
+References: <AANLkTim6LRZQhW6R83P0n70GdqEwFnFvb55KC8459KwY@mail.gmail.com>
+	<-5088739724674874052@unknownmsgid>
+	<AANLkTik3ipJHcPtsy5cTuO1PhmAbKwGfSqAE_gUKjhiG@mail.gmail.com>
+Message-ID: <20101105131340.GA23828@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 05, 2010 at 02:29:46PM +0200, Baruch Siach wrote:
-> Hi Sascha,
+On Fri, Nov 05, 2010 at 01:12:48PM +0100, Linus Walleij wrote:
+> 2010/10/20 Will Deacon <will.deacon@arm.com>:
 > 
-> On Fri, Nov 05, 2010 at 01:18:00PM +0100, Sascha Hauer wrote:
-> > We are talking about a single kernel for longer now, here is something
-> > to test for the ones interested:
-> > 
-> > git://git.pengutronix.de/git/imx/linux-2.6.git imx-single-kernel
-> > 
-> > Compiling the imx_defconfig will result in a kernel which works
-> > i.MX21, i.MX27, i.MX31, i.MX35 and i.MX51 (not tested on i.MX21).
-> > i.MX1 does not work mainly because the kernel build will use some ARMv5
-> > and later instructions.
+> > The diagnostic register is only writable from secure mode so you'll need to
+> > look at what these patches do (they perform simple read-modify-writes) and
+> > incorporate that code into your secure software.
+> > (...)
+> > I doubt that your secure monitor exposes the diagnostic register through an
+> > SMC interface so you'll need to change the secure boot code to enable these
+> > workarounds when the system comes out of reset.
 > 
-> What is blocking i.MX25 from being included?
+> These SMC:s (System Management Call?) are getting hairier now.
+> 
+> Can't you add an abstraction for the stuff we need to poke into
+> diagnostics registers, enabling platform-specific overrides, like
+> we do for l2x0 in mm/cache-l2x0.c?
 
-It is. I just forgot to mention.
+That's a subject which came up when the first errata were merged.  The
+fact of the matter is that there's no easy way to abstract the assembly
+code - it certainly can't become C code because we don't have the MMU
+up and running at this point.
 
-Sascha
+Running the kernel in non-secure mode is going to be painful because of
+(a) the need to issue SMC calls to access protected registers, and (b)
+the lack of an API for the SMC call.
 
+(a) isn't going to change, and (b) apparantly isn't something we can
+influence.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The approach generally taken by proc-v7 is to check whether the work-
+around is already enabled, and if it is, it skips trying to enable it
+a second time, thereby avoiding aborts etc.
+
+So the responsibility for enabling the protected work-arounds lies with
+code which has access to the registers.
