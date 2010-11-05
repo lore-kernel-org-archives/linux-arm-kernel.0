@@ -1,49 +1,32 @@
-From: maramaopercheseimorto@gmail.com (Alberto Panizzo)
-Date: Fri, 05 Nov 2010 12:20:23 +0100
-Subject: [PATCH 2/2] backlight: Fix blanking for L4F00242T03 LCD
-In-Reply-To: <1288955345.28481.15435.camel@rex>
-References: <1275731441-7612-1-git-send-email-marek.vasut@gmail.com>
-	<1275731441-7612-2-git-send-email-marek.vasut@gmail.com>
-	<1288954089.3072.10.camel@realization>
-	<1288955345.28481.15435.camel@rex>
-Message-ID: <1288956023.3072.12.camel@realization>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 5 Nov 2010 19:22:09 +0800
+Subject: build failure on ARMv7 while CONFIG_AEABI is disabled
+Message-ID: <AANLkTimv-bW56P+M9X+Unr4QotCTwhjaw+kOCNP3qbgD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ven, 2010-11-05 at 11:09 +0000, Richard Purdie wrote:
-> On Fri, 2010-11-05 at 11:48 +0100, Alberto Panizzo wrote:
-> > On sab, 2010-06-05 at 11:50 +0200, Marek Vasut wrote:
-> > > The LCD was turned on if the variable power was > 0, but that was incorrect. The
-> > > LCD has to be turned on in NORMAL and UNBLANK case.
-> > > 
-> > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> > 
-> > Richard,
-> > Are you still maintaining the backlight tree?
-> > These two patches never hit the mainline since gen, I hope this will 
-> > happen soon since they really fix bugs :)
-> > 
-> > Best Regards,
-> > Alberto!
-> > 
-> > Oh, add also this tag if possible:
-> > 
-> > Acked-by: Alberto Panizzo <maramaopercheseimorto@gmail.com>
-> 
-> I've talked with Andrew Morton and we've come up with a new plan to
-> handle the backlight patches. I acked these the other day and they
-> should be heading into -rc2.
-> 
-> Cheers,
-> 
-> Richard
+Hi all,
 
-Ok, thank you for the quick answer!
+If I disable CONFIG_AEABI, building kernel for ARMv7. There's no issue
+on ARMv5. Do you have any clue?
 
-Cheers,
+/tmp/ccaEQuAe.s: Assembler messages:
+/tmp/ccaEQuAe.s:88: Error: even register required -- `ldrexd r7,r8,[r4]'
+/tmp/ccaEQuAe.s:104: Error: even register required -- `strexdeq ip,r5,r6,[r4]'
+/tmp/ccaEQuAe.s:125: Error: even register required -- `ldrexd r1,r2,[r0]'
+/tmp/ccaEQuAe.s:128: Error: even register required -- `strexd ip,r1,r2,[r0]'
+/tmp/ccaEQuAe.s:2086: Error: even register required -- `ldrexd r1,r2,[r0]'
+/tmp/ccaEQuAe.s:2101: Error: even register required -- `ldrexd r3,r4,[r0]'
+/tmp/ccaEQuAe.s:2102: Error: even register required -- `strexd r3,r5,r6,[r0]'
+/tmp/ccaEQuAe.s:2135: Error: even register required -- `ldrexd r5,r6,[r2]'
+/tmp/ccaEQuAe.s:2136: Error: even register required -- `strexd r5,r3,r4,[r2]'
+/tmp/ccaEQuAe.s:2165: Error: even register required -- `ldrexd r3,r4,[r0]'
+/tmp/ccaEQuAe.s:2166: Error: even register required -- `strexd r3,r1,r2,[r0]'
+/tmp/ccaEQuAe.s:3186: Error: even register required -- `ldrexd r3,r4,[r0]'
+/tmp/ccaEQuAe.s:3187: Error: even register required -- `strexd r3,r1,r2,[r0]'
+make[2]: *** [arch/arm/kernel/perf_event.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [arch/arm/kernel] Error 2
 
--- 
-Alberto!
-
-        Be Persistent!
-                - Greg Kroah-Hartman (FOSDEM 2010)
+Thanks
+Haojian
