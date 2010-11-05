@@ -1,37 +1,35 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  5 Nov 2010 10:46:07 +0100
-Subject: [PATCH 3/7] ARM i.MX51: Make CONFIG_MXC_TZIC an invisible option
+Date: Fri,  5 Nov 2010 10:46:10 +0100
+Subject: [PATCH 6/7] ARM i.MX51: return gracefully on different socs
 In-Reply-To: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
 References: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1288950371-1552-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1288950371-1552-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no point showing this option to the user. The correct
-value will be selected anyway.
+Code called from an initcall can be maybe called for
+machines it's not intended for. So check for valid
+machines and return gracefully if an incompatible machine
+is found.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/plat-mxc/Kconfig |    7 +------
- 1 files changed, 1 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx5/cpu.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 31d07c0..8c6cd50 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -69,12 +69,7 @@ config MXC_IRQ_PRIOR
- 	  Say N here, unless you have a specialized requirement.
- 
- config MXC_TZIC
--	bool "Enable TrustZone Interrupt Controller"
--	depends on ARCH_MX51
--	help
--	  This will be automatically selected for all processors
--	  containing this interrupt controller.
--	  Say N here only if you are really sure.
-+	bool
- 
- config MXC_AVIC
- 	bool
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index eaacb6e..061ab70 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -79,6 +79,9 @@ EXPORT_SYMBOL(mx51_revision);
+  */
+ static int __init mx51_neon_fixup(void)
+ {
++	if (!cpu_is_mx51())
++		return 0;
++
+ 	if (mx51_revision() < MX51_CHIP_REV_3_0 && (elf_hwcap & HWCAP_NEON)) {
+ 		elf_hwcap &= ~HWCAP_NEON;
+ 		pr_info("Turning off NEON support, detected broken NEON implementation\n");
 -- 
 1.7.2.3
