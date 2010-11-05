@@ -1,43 +1,29 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Fri, 5 Nov 2010 20:28:34 +0000
-Subject: [PATCH] TS-78xxx NAND resource type should be IORESOURCE_MEM
-References: <1288977280-5674-1-git-send-email-mspang@csclub.uwaterloo.ca>
-Message-ID: <i06eq7-6va.ln1@chipmunk.wormnet.eu>
+From: rje@crystalfontz.com (Rob Emanuele)
+Date: Fri, 5 Nov 2010 14:09:21 -0700
+Subject: at91sam9g45 USB OTG support?
+Message-ID: <AANLkTi=8-nOGxLOw-Thvc7WaKwMg2cyC3h01SF0kZFL7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In gmane.linux.kernel Michael Spang <mspang@csclub.uwaterloo.ca> wrote:
->
-> The type was IORESOURCE_IO which is not what is expected by
-> plat_nand_probe(). This device has not worked since 2d098a72
-> ("mtd: plat_nand: request memory resource before doing ioremap").
-> 
-> Signed-off-by: Michael Spang <mspang@csclub.uwaterloo.ca>
->
-Acked-by: Alexander Clouter <alex@digriz.org.uk>
+Greetings,
 
-Cheers
+We've been developing a at91sam9g45 product and it is finally available at:
+https://www.crystalfontz.com/product/CFA910.html
 
-> ---
-> arch/arm/mach-orion5x/ts78xx-setup.c |    2 +-
-> 1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-> index 16f1bd5..c1c1cd0 100644
-> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
-> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-> @@ -239,7 +239,7 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
-> static struct resource ts78xx_ts_nand_resources = {
->        .start          = TS_NAND_DATA,
->        .end            = TS_NAND_DATA + 4,
-> -       .flags          = IORESOURCE_IO,
-> +       .flags          = IORESOURCE_MEM,
-> };
-> 
-> static struct platform_device ts78xx_ts_nand_device = {
-> -- 
-> 1.7.1
+We are looking into supporting USB OTG on this device as the 'g45 has
+the USB host/device port.  As far at I can tell Atmel or anyone else
+working on this platform has not made full use of this as an OTG
+device.  I haven't found support in the USB or the OTG code for
+reading the USB ID line to determine host or device mode.
 
--- 
-Alexander Clouter
-.sigmonster says: 98% lean.
+Am I missing something or is that an area that needs some code written for it?
+
+Thank you,
+
+Rob
+--
+Robert Emanuele
+Crystalfontz America, Inc.
+www.crystalfontz.com
+rje at crystalfontz.com
++1 509 892 1200
