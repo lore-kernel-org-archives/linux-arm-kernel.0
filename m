@@ -1,65 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 5 Nov 2010 11:30:13 +0100
-Subject: [PATCH 1/7] ARM i.MX51 boards: Do not use PHYS_OFFSET
-In-Reply-To: <1288950371-1552-2-git-send-email-s.hauer@pengutronix.de>
-References: <1288950371-1552-1-git-send-email-s.hauer@pengutronix.de>
-	<1288950371-1552-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20101105103013.GH16938@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 5 Nov 2010 11:37:10 +0100 (CET)
+Subject: [PATCH 1/3] ARM mx3_camera: check for DMA engine type
+In-Reply-To: <1288949165-13286-2-git-send-email-s.hauer@pengutronix.de>
+References: <1288949165-13286-1-git-send-email-s.hauer@pengutronix.de>
+	<1288949165-13286-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1011051136000.28289@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Sascha,
+On Fri, 5 Nov 2010, Sascha Hauer wrote:
 
-On Fri, Nov 05, 2010 at 10:46:05AM +0100, Sascha Hauer wrote:
-> PHYS_OFFSET may become a variable once the runtime PHYS_OFFSET
-> patch is merged, so use MX51_PHYS_OFFSET for boot_params.
+> We have two dma engines in MX3 systems: The IPU and the SDMA
+> engine. We have to check if we got a channel from the correct
+> engine before proceeding with a channel.
 > 
 > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-mx5/board-cpuimx51.c   |    2 +-
->  arch/arm/mach-mx5/board-cpuimx51sd.c |    2 +-
->  arch/arm/mach-mx5/board-mx51_3ds.c   |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-> index 6a9792f..1e01ec7 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51.c
-> @@ -292,7 +292,7 @@ static struct sys_timer mxc_timer = {
->  
->  MACHINE_START(EUKREA_CPUIMX51, "Eukrea CPUIMX51 Module")
->  	/* Maintainer: Eric B?nard <eric@eukrea.com> */
-> -	.boot_params = PHYS_OFFSET + 0x100,
-> +	.boot_params = MX51_PHYS_OFFSET + 0x100,
->  	.map_io = mx51_map_io,
->  	.init_irq = mx51_init_irq,
->  	.init_machine = eukrea_cpuimx51_init,
-> diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> index 4b3a611..24bbdb8 100644
-> --- a/arch/arm/mach-mx5/board-cpuimx51sd.c
-> +++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
-> @@ -323,7 +323,7 @@ static struct sys_timer mxc_timer = {
->  
->  MACHINE_START(EUKREA_CPUIMX51SD, "Eukrea CPUIMX51SD")
->  	/* Maintainer: Eric B?nard <eric@eukrea.com> */
-> -	.boot_params = PHYS_OFFSET + 0x100,
-> +	.boot_params = MX51_PHYS_OFFSET + 0x100,
->  	.map_io = mx51_map_io,
->  	.init_irq = mx51_init_irq,
->  	.init_machine = eukrea_cpuimx51sd_init,
-> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-> index 79ce8dc..873cc1f 100644
-> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
-> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-> @@ -186,7 +186,7 @@ static struct sys_timer mxc_timer = {
->  
->  MACHINE_START(MX51_3DS, "Freescale MX51 3-Stack Board")
->  	/* Maintainer: Freescale Semiconductor, Inc. */
-> -	.boot_params = PHYS_OFFSET + 0x100,
-> +	.boot_params = MX3x_PHYS_OFFSET + 0x100,
-This looks wrong.
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Uwe
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks, since this is a fix and the SDMA is already in the mainline, I can 
+pull this via v4l for 37-rc2.
+
+Thanks
+Guennadi
+
+> ---
+>  drivers/media/video/mx3_camera.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/media/video/mx3_camera.c b/drivers/media/video/mx3_camera.c
+> index 29c5fc3..aa871c2 100644
+> --- a/drivers/media/video/mx3_camera.c
+> +++ b/drivers/media/video/mx3_camera.c
+> @@ -27,6 +27,7 @@
+>  
+>  #include <mach/ipu.h>
+>  #include <mach/mx3_camera.h>
+> +#include <mach/dma.h>
+>  
+>  #define MX3_CAM_DRV_NAME "mx3-camera"
+>  
+> @@ -638,6 +639,9 @@ static bool chan_filter(struct dma_chan *chan, void *arg)
+>  	struct dma_chan_request *rq = arg;
+>  	struct mx3_camera_pdata *pdata;
+>  
+> +	if (!imx_dma_is_ipu(chan))
+> +		return false;
+> +
+>  	if (!rq)
+>  		return false;
+>  
+> -- 
+> 1.7.2.3
+> 
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
