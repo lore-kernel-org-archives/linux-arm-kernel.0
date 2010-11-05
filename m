@@ -1,53 +1,43 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 6 Nov 2010 02:59:02 +0800
-Subject: Single binary kernel for all i.MX
-In-Reply-To: <20101105123144.GW6017@pengutronix.de>
-References: <20101105121800.GV6017@pengutronix.de>
-	<20101105122946.GH13530@tarshish>
-	<20101105123144.GW6017@pengutronix.de>
-Message-ID: <AANLkTikKemXjQYZ9axTP-60bu9xjGrmPE9imf+EDB-p_@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Nov 2010 12:12:47 -0700
+Subject: [PATCH] OMAP2: Devkit8000: Fix mmc regulator failure
+In-Reply-To: <1288651691-14914-1-git-send-email-weber@corscience.de>
+References: <1288651691-14914-1-git-send-email-weber@corscience.de>
+Message-ID: <20101105191247.GR9264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 5, 2010 at 8:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Nov 05, 2010 at 02:29:46PM +0200, Baruch Siach wrote:
->> Hi Sascha,
->>
->> On Fri, Nov 05, 2010 at 01:18:00PM +0100, Sascha Hauer wrote:
->> > We are talking about a single kernel for longer now, here is something
->> > to test for the ones interested:
->> >
->> > git://git.pengutronix.de/git/imx/linux-2.6.git imx-single-kernel
->> >
->> > Compiling the imx_defconfig will result in a kernel which works
->> > i.MX21, i.MX27, i.MX31, i.MX35 and i.MX51 (not tested on i.MX21).
->> > i.MX1 does not work mainly because the kernel build will use some ARMv5
->> > and later instructions.
->>
->> What is blocking i.MX25 from being included?
->
-> It is. I just forgot to mention.
+* Thomas Weber <weber@corscience.de> [101101 14:38]:
+> This patch fixes the following error:
+> 
+> >regulator: VMMC1: 1850 <--> 3150 mV at 3000 mV normal
+> standby
+> >twl_reg twl_reg.6: can't register VMMC1, -22
+> >twl_reg: probe of twl_reg.6 failed with error -22
 
-Hrm... the imx series is placing all header files in
-arch/arm/plat-mxc/include/plat
-instead of within each mach-*. Most other sub-arch doesn't behave like that at
-this moment and getting them built together ain't easy.
+Adding this into omap-fixes.
 
-BTW, did you get it tested on different boards, I'd be interested to see what
-could be the potential issues at run-time.
-
->
-> Sascha
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Tony
+ 
+> Signed-off-by: Thomas Weber <weber@corscience.de>
+> ---
+>  arch/arm/mach-omap2/board-devkit8000.c |    3 ---
+>  1 files changed, 0 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+> index 067f437..53ac762 100644
+> --- a/arch/arm/mach-omap2/board-devkit8000.c
+> +++ b/arch/arm/mach-omap2/board-devkit8000.c
+> @@ -242,9 +242,6 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+>  	mmc[0].gpio_cd = gpio + 0;
+>  	omap2_hsmmc_init(mmc);
+>  
+> -	/* link regulators to MMC adapters */
+> -	devkit8000_vmmc1_supply.dev = mmc[0].dev;
+> -
+>  	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+>  	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+>  
+> -- 
+> 1.7.3.2
+> 
