@@ -1,24 +1,38 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Thu, 04 Nov 2010 23:53:41 +0100
-Subject: [PATCHv2 2/2] ARM: imx: Add mx53 support to common msl functions.
-In-Reply-To: <1288910773-3098-2-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1288910773-3098-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<1288910773-3098-2-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <4CD33975.4010100@eukrea.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 05 Nov 2010 00:36:11 +0000
+Subject: [PATCH] ARM: fix build error with GCC 4.5.0
+References: <1288897002-24073-1-git-send-email-rabin@rab.in>
+	<yw1xy698ygbx.fsf@unicorn.mansr.com>
+	<19667.9199.798932.405415@pilspetsen.it.uu.se>
+Message-ID: <yw1xtyjwy5c4.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Mikael Pettersson <mikpe@it.uu.se> writes:
 
-Le 04/11/2010 23:46, Dinh.Nguyen at freescale.com a ?crit :
-> From: Dinh Nguyen<Dinh.Nguyen@freescale.com>
+> M?ns Rullg?rd writes:
+>  > Rabin Vincent <rabin@rab.in> writes:
+>  > 
+>  > > Fix the following error which occurs when building an ARM kernel with
+>  > > GCC 4.5.0:
+>  > >
+>  > >   kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
+>  > >
+>  > > -CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
+>  > > +CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
+>  > 
+>  > The real question is why something is trying to use floating-point.
+>  > It shouldn't.
 >
-> Add mx53 support to cpu.c and mm.c.
+> Indeed. I suspect an improperly patched or configured gcc-4.5.0,
+> or broken kernel sources. Especially considering that the kernel
+> passes -msoft-float to gcc (see above).
 >
-> Also change the method to get the silicon version from the
-> documented IIM SREV register instead of reading the ROM code.
->
-if iMX5x IIM is like iMX27/31/35, you may need to enable the iim clock before 
-accessing the registers.
+> I know gcc-4.5.0 configured for arm-linux-gnueabi built working EABI
+> kernels a few months ago.
 
-Eric
+FWIW, GCC 4.5.1 built a working ARM kernel for me yesterday.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
