@@ -1,56 +1,46 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Nov 2010 14:29:02 -0700
-Subject: [PATCH v5 0/3] OMAP2/3: DMA: FIFO drain errata fixes
-In-Reply-To: <201010211305.17559.peter.ujfalusi@nokia.com>
-References: <1286261141-1039-1-git-send-email-peter.ujfalusi@nokia.com>
-	<20101005181525.GL3117@atomide.com>
-	<20101008221746.GS7558@atomide.com>
-	<201010211305.17559.peter.ujfalusi@nokia.com>
-Message-ID: <20101105212902.GU9264@atomide.com>
+Date: Fri, 5 Nov 2010 14:31:06 -0700
+Subject: [PATCH 1/2] arm: omap1: devices: need to return with a value
+In-Reply-To: <20101019080150.GC11713@pengutronix.de>
+References: <1287473455-25773-1-git-send-email-balbi@ti.com>
+	<1287473455-25773-2-git-send-email-balbi@ti.com>
+	<20101019080150.GC11713@pengutronix.de>
+Message-ID: <20101105213106.GV9264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-Considering below..
-
-* Peter Ujfalusi <peter.ujfalusi@nokia.com> [101021 02:56]:
-> Sorry, I did missed this mail...
-> 
-> On Saturday 09 October 2010 01:17:46 ext Tony Lindgren wrote:
-> 
-> > Guys, as we're so late into getting 2.6.36 tagged, I'm thinking about just
-> > queueing these for 2.6.37 for the following reasons:
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [101019 00:53]:
+> On Tue, Oct 19, 2010 at 10:30:54AM +0300, Felipe Balbi wrote:
+> > Get rid of the following warning:
 > > 
-> > - The 24xx patch is a fix for commit c12abc0 that's was merged over a
-> >   year ago. We've lived with it for over a year now. What difference does
-> >   extra few more months make if we have it in 2.6.37 instead of 2.6.36?
+> > arch/arm/mach-omap1/devices.c: In function 'omap_init_wdt':
+> > arch/arm/mach-omap1/devices.c:298: warning: 'return' with
+> > no value, in function returning non-void
 > > 
-> > - The second 34xx fix seems to happen only when disabling DMA on the fly.
-> >   Again, we've had support for 34xx in the mainline kernel for a few
-> >   years, and we're not seeing unrecoverable issues with MMC or USB or
-> >   any other code calling omap_dma_stop().
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/mach-omap1/devices.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
 > > 
-> > Sure these fix major issues with the DMA, but are these really critical
-> > for 2.6.36?
-> > 
-> > So if you really want me to argue for merging these into 2.6.36, please let
-> > me know some oops causing cases or data corruption that happens without
-> > these patches.
+> > diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
+> > index 63d68cf..a037aba 100644
+> > --- a/arch/arm/mach-omap1/devices.c
+> > +++ b/arch/arm/mach-omap1/devices.c
+> > @@ -295,7 +295,7 @@ static struct platform_device omap_wdt_device = {
+> >  static int __init omap_init_wdt(void)
+> >  {
+> >  	if (!cpu_is_omap16xx())
+> > -		return;
+> > +		return -ENODEV;
+> >  
+> >  	platform_device_register(&omap_wdt_device);
+> >  	return 0;
+> It's unrelated to this patch, but using
 > 
-> Well 2.6.36 is released.
-> I still would like to see this to be part of the 2.6.36.1 release. We can 
-> reproduce the DMA error in 2.6.36 with audio.
+> 	return platform_device_register(&omap_wdt_device);
 > 
-> Tony: can you make sure it is going to part of 2.6.36.1?
+> would be a bit cleaner.
 
-..are you interested in these two patches for stable kernels?
-
-The two patches in question are the following mainline commits:
-
-3e57f1626b5febe5cc99aa6870377deef3ae03cc
-0e4905c0199d683497833be60a428c784d7575b8
-
-Regards,
+Felipe, care to update this one?
 
 Tony
