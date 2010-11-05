@@ -1,42 +1,28 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Fri, 5 Nov 2010 13:12:48 +0100
-Subject: recent ARM Erratas 742231 & 742230 broken.
-In-Reply-To: <-5088739724674874052@unknownmsgid>
-References: <AANLkTim6LRZQhW6R83P0n70GdqEwFnFvb55KC8459KwY@mail.gmail.com>
-	<-5088739724674874052@unknownmsgid>
-Message-ID: <AANLkTik3ipJHcPtsy5cTuO1PhmAbKwGfSqAE_gUKjhiG@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 5 Nov 2010 13:18:00 +0100
+Subject: Single binary kernel for all i.MX
+Message-ID: <20101105121800.GV6017@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/10/20 Will Deacon <will.deacon@arm.com>:
+Hi all,
 
-> The diagnostic register is only writable from secure mode so you'll need to
-> look at what these patches do (they perform simple read-modify-writes) and
-> incorporate that code into your secure software.
-> (...)
-> I doubt that your secure monitor exposes the diagnostic register through an
-> SMC interface so you'll need to change the secure boot code to enable these
-> workarounds when the system comes out of reset.
+We are talking about a single kernel for longer now, here is something
+to test for the ones interested:
 
-These SMC:s (System Management Call?) are getting hairier now.
+git://git.pengutronix.de/git/imx/linux-2.6.git imx-single-kernel
 
-Can't you add an abstraction for the stuff we need to poke into
-diagnostics registers, enabling platform-specific overrides, like
-we do for l2x0 in mm/cache-l2x0.c?
+Compiling the imx_defconfig will result in a kernel which works
+i.MX21, i.MX27, i.MX31, i.MX35 and i.MX51 (not tested on i.MX21).
+i.MX1 does not work mainly because the kernel build will use some ARMv5
+and later instructions.
+The branch is based on the patches recently posted. It contains some
+hacks, so it still needs to be worked on.
 
-Like if arch/arm/include/asm/proc-v7-diagnostics.h:
-(modeled on arch/arm/include/asm/outercache.h)
+Sascha
 
-struct v7_core_diagnostics {
-  void (*foo)(void);
-  void (*bar)(void);
-};
-
-Then we can override thes during .machine_init or even .fixup if
-it's needed real early on.
-
-This way each platform (including I think U8500 and OMAP4) can respond
-correctly to the errata patches once we have proper SMCs in place.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
