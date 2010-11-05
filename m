@@ -1,53 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  5 Nov 2010 10:26:04 +0100
-Subject: [PATCH 2/3] ARM i.MX27 eukrea: Fix compilation
-In-Reply-To: <1288949165-13286-1-git-send-email-s.hauer@pengutronix.de>
-References: <1288949165-13286-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1288949165-13286-3-git-send-email-s.hauer@pengutronix.de>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Fri, 5 Nov 2010 10:31:50 +0100
+Subject: [PATCH] ARM: fix build error with GCC 4.5.0
+In-Reply-To: <AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
+References: <1288897002-24073-1-git-send-email-rabin@rab.in>
+	<yw1xy698ygbx.fsf@unicorn.mansr.com>
+	<19667.9199.798932.405415@pilspetsen.it.uu.se>
+	<AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
+Message-ID: <19667.52998.909668.596635@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently compilation breaks for the eukrea mbimx27 baseboard
-when CONFIG_SPI_IMX is selected and CONFIG_TOUCHSCREEN_ADS7846
-is not selected. Fix this by removing the ifdefs altogether.
+Rabin Vincent writes:
+ > 2010/11/5 Mikael Pettersson <mikpe@it.uu.se>:
+ > > M?ns Rullg?rd writes:
+ > > ?> Rabin Vincent <rabin@rab.in> writes:
+ > > ?>
+ > > ?> > Fix the following error which occurs when building an ARM kernel with
+ > > ?> > GCC 4.5.0:
+ > > ?> >
+ > > ?> > ? arm-linux-gcc -Wp,-MD,kernel/.bounds.s.d ?-nostdinc
+ > > ?> > ? [command line edited to remove paths]
+ > > ?> > ? -D__KERNEL__ -mlittle-endian
+ > > ?> > ? -Wall -Wundef
+ > > ?> > ? -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common
+ > > ?> > ? -Werror-implicit-function-declaration -Wno-format-security
+ > > ?> > ? -fno-delete-null-pointer-checks -Os -marm -fno-dwarf2-cfi-asm
+ > > ?> > ? -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=5
+ > > ?> > ? -march=armv5te -mtune=arm9tdmi -msoft-float -Uarm -fomit-frame-pointer -g
+ > > ?> > ? -DCC_HAVE_ASM_GOTO ? ?-D"KBUILD_STR(s)=#s"
+ > > ?> > ? -D"KBUILD_BASENAME=KBUILD_STR(bounds)" ?-D"KBUILD_MODNAME=KBUILD_STR(bounds)"
+ > > ?> > ? -fverbose-asm -S -o kernel/bounds.s kernel/bounds.c
+ > > ?> > ? kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
+ > > ?> >
+ > > ?> > Signed-off-by: Rabin Vincent <rabin@rab.in>
+ > > ?> > ---
+ > > ?> > Seen with this compiler:
+ > > ?> >
+ > > ?> > http://kernel.org/pub/tools/crosstool/files/bin/x86_64/4.5.0/x86_64-gcc-4.5.0-nolibc_arm-linux.tar.bz2
+ > > ?> >
+ > > ?> > ?arch/arm/Makefile | ? ?2 +-
+ > > ?> > ?1 files changed, 1 insertions(+), 1 deletions(-)
+ > > ?> >
+ > > ?> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+ > > ?> > index b87aed0..c06d9ed 100644
+ > > ?> > --- a/arch/arm/Makefile
+ > > ?> > +++ b/arch/arm/Makefile
+ > > ?> > @@ -91,7 +91,7 @@ tune-$(CONFIG_CPU_FEROCEON) ? ? ?:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
+ > > ?> > ?tune-$(CONFIG_CPU_V6) ? ? ? ? ? ? :=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+ > > ?> >
+ > > ?> > ?ifeq ($(CONFIG_AEABI),y)
+ > > ?> > -CFLAGS_ABI ? ? ? ?:=-mabi=aapcs-linux -mno-thumb-interwork
+ > > ?> > +CFLAGS_ABI ? ? ? ?:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
+ > > ?>
+ > > ?> The real question is why something is trying to use floating-point.
+ > > ?> It shouldn't.
+ > >
+ > > Indeed. I suspect an improperly patched or configured gcc-4.5.0,
+ > > or broken kernel sources. Especially considering that the kernel
+ > > passes -msoft-float to gcc (see above).
+ > >
+ > > I know gcc-4.5.0 configured for arm-linux-gnueabi built working EABI
+ > > kernels a few months ago.
+ > 
+ > The kernel sources are clean Linus' tree, so I guess it must be the
+ > compiler configuration then.  Indeed, running the above mentioned cross
+ > compiler with -msoft-float -mabi=aapcs-linux even on an empty source
+ > file yields the same error.  I've cc'd Tony here who I believe builds
+ > these prebuilt compilers at http://kernel.org/pub/tools/crosstool/.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Eric Benard <eric@eukrea.com>
----
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-index 026263c..7e1e9dc 100644
---- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-@@ -250,9 +250,6 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
- 
--#if defined(CONFIG_TOUCHSCREEN_ADS7846) \
--	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
--
- #define ADS7846_PENDOWN (GPIO_PORTD | 25)
- 
- static void ads7846_dev_init(void)
-@@ -273,9 +270,7 @@ static struct ads7846_platform_data ads7846_config __initdata = {
- 	.get_pendown_state	= ads7846_get_pendown_state,
- 	.keep_vref_on		= 1,
- };
--#endif
- 
--#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
- static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
- 	[0] = {
- 		.modalias	= "ads7846",
-@@ -294,7 +289,6 @@ static const struct spi_imx_master eukrea_mbimx27_spi0_data __initconst = {
- 	.chipselect	= eukrea_mbimx27_spi_cs,
- 	.num_chipselect = ARRAY_SIZE(eukrea_mbimx27_spi_cs),
- };
--#endif
- 
- static struct i2c_board_info eukrea_mbimx27_i2c_devices[] = {
- 	{
--- 
-1.7.2.3
+How was that gcc configured? You can find out by running `arm-linux-gcc -v'.
