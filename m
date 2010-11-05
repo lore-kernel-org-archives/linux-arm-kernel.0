@@ -1,69 +1,39 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 5 Nov 2010 08:17:33 +0530
-Subject: [PATCH] ARM: fix build error with GCC 4.5.0
-In-Reply-To: <19667.9199.798932.405415@pilspetsen.it.uu.se>
-References: <1288897002-24073-1-git-send-email-rabin@rab.in>
-	<yw1xy698ygbx.fsf@unicorn.mansr.com>
-	<19667.9199.798932.405415@pilspetsen.it.uu.se>
-Message-ID: <AANLkTinUcS3v57bMLXcHaqC+OGoAqgoK2td-ce3B6FOM@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Thu, 04 Nov 2010 21:08:35 -0700
+Subject: ARM stacktrace and SMP
+Message-ID: <4CD38343.8080406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/11/5 Mikael Pettersson <mikpe@it.uu.se>:
-> M?ns Rullg?rd writes:
-> ?> Rabin Vincent <rabin@rab.in> writes:
-> ?>
-> ?> > Fix the following error which occurs when building an ARM kernel with
-> ?> > GCC 4.5.0:
-> ?> >
-> ?> > ? arm-linux-gcc -Wp,-MD,kernel/.bounds.s.d ?-nostdinc
-> ?> > ? [command line edited to remove paths]
-> ?> > ? -D__KERNEL__ -mlittle-endian
-> ?> > ? -Wall -Wundef
-> ?> > ? -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common
-> ?> > ? -Werror-implicit-function-declaration -Wno-format-security
-> ?> > ? -fno-delete-null-pointer-checks -Os -marm -fno-dwarf2-cfi-asm
-> ?> > ? -mabi=aapcs-linux -mno-thumb-interwork -funwind-tables -D__LINUX_ARM_ARCH__=5
-> ?> > ? -march=armv5te -mtune=arm9tdmi -msoft-float -Uarm -fomit-frame-pointer -g
-> ?> > ? -DCC_HAVE_ASM_GOTO ? ?-D"KBUILD_STR(s)=#s"
-> ?> > ? -D"KBUILD_BASENAME=KBUILD_STR(bounds)" ?-D"KBUILD_MODNAME=KBUILD_STR(bounds)"
-> ?> > ? -fverbose-asm -S -o kernel/bounds.s kernel/bounds.c
-> ?> > ? kernel/bounds.c:1:0: error: FPA is unsupported in the AAPCS
-> ?> >
-> ?> > Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ?> > ---
-> ?> > Seen with this compiler:
-> ?> >
-> ?> > http://kernel.org/pub/tools/crosstool/files/bin/x86_64/4.5.0/x86_64-gcc-4.5.0-nolibc_arm-linux.tar.bz2
-> ?> >
-> ?> > ?arch/arm/Makefile | ? ?2 +-
-> ?> > ?1 files changed, 1 insertions(+), 1 deletions(-)
-> ?> >
-> ?> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> ?> > index b87aed0..c06d9ed 100644
-> ?> > --- a/arch/arm/Makefile
-> ?> > +++ b/arch/arm/Makefile
-> ?> > @@ -91,7 +91,7 @@ tune-$(CONFIG_CPU_FEROCEON) ? ? ?:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
-> ?> > ?tune-$(CONFIG_CPU_V6) ? ? ? ? ? ? :=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
-> ?> >
-> ?> > ?ifeq ($(CONFIG_AEABI),y)
-> ?> > -CFLAGS_ABI ? ? ? ?:=-mabi=aapcs-linux -mno-thumb-interwork
-> ?> > +CFLAGS_ABI ? ? ? ?:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
-> ?>
-> ?> The real question is why something is trying to use floating-point.
-> ?> It shouldn't.
->
-> Indeed. I suspect an improperly patched or configured gcc-4.5.0,
-> or broken kernel sources. Especially considering that the kernel
-> passes -msoft-float to gcc (see above).
->
-> I know gcc-4.5.0 configured for arm-linux-gnueabi built working EABI
-> kernels a few months ago.
+I am looking at the stacktrace support on arm, namely with respect to its
+support for SMP. I'm curious as to what is different between the ARM support
+and the support on other platforms.
 
-The kernel sources are clean Linus' tree, so I guess it must be the
-compiler configuration then.  Indeed, running the above mentioned cross
-compiler with -msoft-float -mabi=aapcs-linux even on an empty source
-file yields the same error.  I've cc'd Tony here who I believe builds
-these prebuilt compilers at http://kernel.org/pub/tools/crosstool/.
+I found this quote from Russell:
+ >This is unsafe on SMP - 'tsk == current' has no meaning where SMP systems
+ >are concerned - the fact that tsk is not current does not mean that it
+ >isn't running on another CPU.
+ >
+ >Basically, if a thread is running on a CPU, thread_saved_fp() is invalid.
+ >
+ >So, the question is: what guarantees do we have here that 'tsk' is not
+ >running on another CPU?
 
-Rabin
+What harm can come from using an invalid thread_saved_fp()? Is there any
+possibility that attempting to unwind a process stack with an invalid frame
+pointer could cause a system crash, or will it just return garbage stack
+frames?  Do other platforms simply ignore this issue? We are interested in
+dumping stack trace data for all processes when our target crashes, so
+even potentially inaccurate data is better than nothing.
+
+As far as actually fixing it is concerned, is there a way to stop a given
+task from being scheduled, or wait until it is descheduled if it is running?
+I didn't see anything like that at first glance, other than stop_machine
+which is rather heavy-handed.
+
+-Jeff
+
+-- 
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
