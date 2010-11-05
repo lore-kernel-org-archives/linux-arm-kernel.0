@@ -1,39 +1,34 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Thu, 04 Nov 2010 21:08:35 -0700
-Subject: ARM stacktrace and SMP
-Message-ID: <4CD38343.8080406@codeaurora.org>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Fri, 5 Nov 2010 10:44:18 +0300
+Subject: Booting CNS3420 EVB v 1.3 failed with 2.6.36 (and 2.6.35)
+In-Reply-To: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
+References: <AANLkTik-4p=rBVO9GVoa8L2pEVQtaPkyYmWebuZwAshG@mail.gmail.com>
+Message-ID: <20101105074418.GA5864@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am looking at the stacktrace support on arm, namely with respect to its
-support for SMP. I'm curious as to what is different between the ARM support
-and the support on other platforms.
+On Fri, Nov 05, 2010 at 11:08:25AM +0800, Lin Mac wrote:
+> Here's the my summary:
+> 1. Booting CNS3420 EVB v 1.3 failed with linux 2.6.36 and .35
 
-I found this quote from Russell:
- >This is unsafe on SMP - 'tsk == current' has no meaning where SMP systems
- >are concerned - the fact that tsk is not current does not mean that it
- >isn't running on another CPU.
- >
- >Basically, if a thread is running on a CPU, thread_saved_fp() is invalid.
- >
- >So, the question is: what guarantees do we have here that 'tsk' is not
- >running on another CPU?
+I see you use zImage (bootpImage) for booting. The stock U-Boot
+image from Cavium has incorrect (non-mainline) machid. You have
+to specify a correct one and thus use uImage.
 
-What harm can come from using an invalid thread_saved_fp()? Is there any
-possibility that attempting to unwind a process stack with an invalid frame
-pointer could cause a system crash, or will it just return garbage stack
-frames?  Do other platforms simply ignore this issue? We are interested in
-dumping stack trace data for all processes when our target crashes, so
-even potentially inaccurate data is better than nothing.
+So, you need to build the kernel with the following command:
 
-As far as actually fixing it is concerned, is there a way to stop a given
-task from being scheduled, or wait until it is descheduled if it is running?
-I didn't see anything like that at first glance, other than stop_machine
-which is rather heavy-handed.
+make LOADADDR=0x200000 uImage
 
--Jeff
+And boot with these commands:
+
+setenv machid ad8
+setenv bootargs console=ttyS0,38400 ip=on
+tftp 100000 uImage
+bootm 100000
+
+Thanks,
 
 -- 
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Anton Vorontsov
+email: cbouatmailru at gmail.com
+irc://irc.freenode.net/bd2
