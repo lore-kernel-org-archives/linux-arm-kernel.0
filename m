@@ -1,27 +1,32 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 5 Nov 2010 14:31:38 -0700
-Subject: [PATCH] msm: fix debug-macro.S build failure
-In-Reply-To: <1288393638.6631.65.camel@m0nster>
-References: <alpine.LFD.2.00.1010281422190.3227@xanadu.home>
-	<20101028182851.GI3122@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010281441540.3227@xanadu.home>
-	<20101028184627.GK3122@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1010282226460.5029@xanadu.home>
-	<1288387033.6631.13.camel@m0nster>
-	<alpine.LFD.2.00.1010291814090.11553@xanadu.home>
-	<1288391556.6631.23.camel@m0nster>
-	<alpine.LFD.2.00.1010291849030.11553@xanadu.home>
-	<1288393638.6631.65.camel@m0nster>
-Message-ID: <20101105213138.GA13085@huya.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Nov 2010 14:49:17 -0700
+Subject: [PATCHv2 0/3] Various code improvements for IGEP v2 board.
+In-Reply-To: <1287852540-4951-1-git-send-email-eballetbo@gmail.com>
+References: <1287852540-4951-1-git-send-email-eballetbo@gmail.com>
+Message-ID: <20101105214917.GZ9264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 29, 2010 at 04:07:18PM -0700, Daniel Walker wrote:
+* Enric Balletbo i Serra <eballetbo@gmail.com> [101023 09:40]:
+> 
+> Hello,
+> 
+> The comments of this post also apply to IGEP v2 board (thanks Laurent)
+> 
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg36402.html
+> 
+> Changes since v1:
+>  - Split patch in a serie.
+>  - [1/3] onenand_setup = NULL, is a static variable, removed from code.
+> 
+> This patch apply on top of tmlind/omap-for-linux branch.
+> 
+> $ git diff --stat tmlind/omap-for-linus 
+>  arch/arm/mach-omap2/board-igep0020.c |   35 ++++++++++-----------------------
+>  1 files changed, 11 insertions(+), 24 deletions(-)
 
-> The build issue is a little more dire I think, I never suggested my
-> revert fixed anything but the build issue (which was the point) .. It
-> was just suppose to bring back what was wrongfully removed.
+Thanks, I'll queue these for 2.6.38 merge window.
 
-A compile error for an invalid configuration is better than a crash.
+Regards,
 
-David
+Tony
